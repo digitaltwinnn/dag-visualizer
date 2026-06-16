@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Constellation Hypergraph — 3D Network Visualizer ($DAG)</title>
+  <meta name="description" content="An interactive 3D visualizer of the Constellation Network: Global L0, Layer 1, metagraphs and live $DAG snapshots." />
+  <link rel="stylesheet" href="./styles.css" />
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://unpkg.com/three@0.161.0/build/three.module.js",
+      "three/addons/": "https://unpkg.com/three@0.161.0/examples/jsm/"
+    }
+  }
+  </script>
+</head>
+<body>
+  <canvas id="scene"></canvas>
+
+  <!-- Loading -->
+  <div id="loader">
+    <div class="loader-core"></div>
+    <div class="loader-text">Connecting to the Hypergraph…</div>
+  </div>
+
+  <!-- Top bar -->
+  <header id="topbar">
+    <div class="brand">
+      <span class="brand-mark"></span>
+      <div class="brand-text">
+        <h1>Constellation Hypergraph</h1>
+        <p>Interactive 3D map of the $DAG network</p>
+      </div>
+    </div>
+    <div class="stats" id="stats">
+      <div class="stat"><span class="stat-label">Data</span><span class="stat-value" id="stat-source">…</span></div>
+      <div class="stat"><span class="stat-label">Global L0 ordinal</span><span class="stat-value" id="stat-ordinal">—</span></div>
+      <div class="stat"><span class="stat-label">Snapshot height</span><span class="stat-value" id="stat-height">—</span></div>
+      <div class="stat"><span class="stat-label">Validators L0 / L1</span><span class="stat-value" id="stat-nodes">—</span></div>
+      <div class="stat"><span class="stat-label">Active metagraphs</span><span class="stat-value" id="stat-metagraphs">—</span></div>
+      <div class="stat"><span class="stat-label">Snapshots / min</span><span class="stat-value" id="stat-rate">—</span></div>
+    </div>
+  </header>
+
+  <!-- View toggle -->
+  <div id="viewtoggle">
+    <button data-view="hyper" class="active">◆ Hypergraph</button>
+    <button data-view="geo">◍ Node geography</button>
+    <button data-view="ledger">⛓ Snapshot DAG</button>
+  </div>
+
+  <!-- Ledger / Snapshot-DAG view (placeholder) -->
+  <aside id="ledger-view" class="panel hidden">
+    <div class="ledger-head">
+      <h2>Snapshot DAG · the ledger over time</h2>
+      <span class="ledger-wip">work in progress</span>
+    </div>
+    <p>How the Global L0 ledger advances — a visual of the snapshot DAG is coming
+      here. The live ribbon along the bottom is the seed of this view.</p>
+    <p class="ledger-dim">Each <b>snapshot</b> links to its parent (that link is the
+      edge of the DAG). <b>Ordinal</b> counts snapshots and always rises;
+      <b>height</b> is the depth of the block DAG and only rises when activity
+      deepens it; <b>sub-height</b> orders snapshots that share a height.</p>
+    <p class="ledger-dim">Constellation is a graph, not a chain — blocks can form in
+      parallel, so a snapshot can carry blocks without raising the height.</p>
+  </aside>
+
+  <!-- Left column: network filter (both views) + learn (hyper) / leaderboard (geo) -->
+  <div id="leftcol">
+
+  <!-- Network filter — shared by both views -->
+  <aside id="netfilter" class="panel">
+    <div class="mf-head">
+      <h2>Filter network</h2>
+      <span class="mf-sub" id="mf-sub">Click to focus a metagraph</span>
+    </div>
+    <div class="mf-chips" id="mf-chips"></div>
+  </aside>
+
+  <!-- Learn panel -->
+  <aside id="learn">
+    <div class="learn-head">
+      <h2>Understand the network</h2>
+      <button id="learn-toggle" title="Collapse">–</button>
+    </div>
+    <div class="learn-body" id="learn-body">
+      <div class="learn-step" data-focus="overview">
+        <h3>The Hypergraph</h3>
+        <p>Constellation isn't a blockchain — it's a <b>Hypergraph</b>. Instead of one chain of blocks, data is organized as a <b>DAG</b> (Directed Acyclic Graph), letting many parts of the network process in parallel. That's how it scales horizontally and stays feeless for users.</p>
+      </div>
+      <div class="learn-step" data-focus="l0">
+        <h3>Layer 0 — the backbone</h3>
+        <p>The <b>Global L0</b> is the security and settlement layer. The ~160 <b>validators</b> forming the shell around the core run <b>PRO consensus</b> to bundle activity into <b>global snapshots</b> — the live stream along the bottom. Each snapshot references the previous one, forming the DAG.</p>
+      </div>
+      <div class="learn-step" data-focus="l1">
+        <h3>Layer 1 — transactions &amp; data</h3>
+        <p><b>L1</b> nodes accept transactions and application data, validate them, and feed them up into L0 to be finalized. Separating L1 from L0 means apps can move fast without bloating the secure base layer.</p>
+      </div>
+      <div class="learn-step" data-focus="metagraphs">
+        <h3>Metagraphs — networks of their own</h3>
+        <p>The orbiting clusters are <b>metagraphs</b>: independent, customizable networks (their own L0 + L1) that anchor their state into the Global L0 for security. Each can have its own token, rules and data — yet they all share the Hypergraph's trust. This is how Constellation hosts many economies at once.</p>
+      </div>
+    </div>
+    <div class="learn-nav">
+      <button id="tour-btn" class="primary">▶ Guided tour</button>
+      <button id="reset-view">Reset view</button>
+    </div>
+  </aside>
+
+  <!-- Country leaderboard (geography view) -->
+  <aside id="leaderboard" class="hidden">
+    <div class="lb-score" id="lb-score"></div>
+    <div class="lb-head">
+      <h2>Nodes by country</h2>
+      <span id="lb-total"></span>
+    </div>
+    <div class="lb-list" id="lb-list"></div>
+    <div class="lb-legend">
+      <span>Sparse</span>
+      <span class="lb-legend-bar"></span>
+      <span>Dense</span>
+    </div>
+    <div class="lb-foot">Glow on the globe marks validator density.</div>
+  </aside>
+
+  </div><!-- /leftcol -->
+
+  <!-- Live snapshot stream (Global L0 DAG) -->
+  <section id="stream">
+    <div class="stream-head">
+      <span class="stream-title"><span class="live-dot"></span>Global L0 snapshots — live DAG</span>
+      <span class="stream-caption">newest →</span>
+    </div>
+    <div class="stream-track" id="stream-track"></div>
+    <div class="stream-empty" id="stream-empty">Waiting for snapshots…</div>
+  </section>
+
+  <!-- Inspector -->
+  <aside id="inspector" class="hidden">
+    <button id="inspector-close" title="Close">×</button>
+    <div id="inspector-content"></div>
+  </aside>
+
+  <!-- Hover tooltip -->
+  <div id="tooltip" class="hidden"></div>
+
+  <!-- Controls hint -->
+  <div id="hint">Drag to orbit · Scroll to zoom · Click a node to inspect</div>
+
+  <script type="module" src="./js/main.js"></script>
+</body>
+</html>
