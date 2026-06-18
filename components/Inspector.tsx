@@ -13,20 +13,23 @@ export default function Inspector() {
   const setInspect = useStore((s) => s.setInspect);
   const setFilter = useStore((s) => s.setFilter);
 
+  // Context pane for the active filter: a metagraph → "meta" card; Global L0 / DAG L1
+  // → a "cluster" card (same shape, no Make-up); All → nothing.
   const mgCfg = allMetagraphs().find((m) => m.id === filter) || null;
-  const metaPick: PickDescriptor | null = mgCfg
-    ? { kind: "meta", title: mgCfg.name, cfg: mgCfg }
-    : null;
+  let panePick: PickDescriptor | null = null;
+  if (mgCfg) panePick = { kind: "meta", title: mgCfg.name, cfg: mgCfg };
+  else if (filter === "l0") panePick = { kind: "cluster", cluster: "l0", title: "Global L0" };
+  else if (filter === "l1") panePick = { kind: "cluster", cluster: "l1", title: "DAG L1" };
 
   return (
     <div id="rightcol">
-      {metaPick && (
+      {panePick && (
         <aside id="metapane" className="panel">
           <button id="metapane-close" title="Clear selection" onClick={() => setFilter("all")}>
             ×
           </button>
           <div id="metapane-content">
-            <InspectorCard p={metaPick} />
+            <InspectorCard p={panePick} />
           </div>
         </aside>
       )}

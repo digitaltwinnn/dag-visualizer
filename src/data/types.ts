@@ -67,7 +67,10 @@ export interface LeaderboardData {
 // What the inspector renders. Emitted by the engine's picking (core/l0/l1/metanode)
 // or set by the ribbon (snapshot). A "meta" descriptor drives the context pane.
 export interface PickDescriptor {
-  kind: "core" | "l0" | "l1" | "metanode" | "snapshot" | "meta";
+  // "cluster" = the Global L0 / DAG L1 context pane (the validator-cluster analogue of
+  // the metagraph "meta" pane); `cluster` says which layer.
+  kind: "core" | "l0" | "l1" | "metanode" | "snapshot" | "meta" | "cluster";
+  cluster?: "l0" | "l1";
   title?: string;
   sub?: string;
   node?: NodeInfo;

@@ -166,9 +166,11 @@ export default function InspectorCard({ p }: { p: PickDescriptor }) {
   const nodes = useStore((s) => s.nodes);
   const latest = useStore((s) => s.latestSnapshot);
   const metaList = useStore((s) => s.metaList);
+  const leaderboard = useStore((s) => s.leaderboard);
 
+  const clusterColor = p.cluster === "l1" ? COLORS.l1 : COLORS.l0;
   const tagColor =
-    { core: COLORS.core, l0: COLORS.l0, l1: COLORS.l1, snapshot: COLORS.core, meta: p.cfg?.color, metanode: p.meta?.color }[
+    { core: COLORS.core, l0: COLORS.l0, l1: COLORS.l1, snapshot: COLORS.core, meta: p.cfg?.color, metanode: p.meta?.color, cluster: clusterColor }[
       p.kind
     ] ?? COLORS.core;
   const h = hex(tagColor);
@@ -179,7 +181,9 @@ export default function InspectorCard({ p }: { p: PickDescriptor }) {
         ? "Metagraph node"
         : p.kind === "snapshot"
           ? "DAG snapshot"
-          : p.kind.toUpperCase();
+          : p.kind === "cluster"
+            ? "Validator cluster"
+            : p.kind.toUpperCase();
 
   // Token badge (meta + metanode cards).
   let token: React.ReactNode = null;
@@ -217,7 +221,7 @@ export default function InspectorCard({ p }: { p: PickDescriptor }) {
       </div>
       {p.title && <h3>{p.title}</h3>}
       {p.sub && <p className="insp-sub">{p.sub}</p>}
-      <Body p={p} nodes={nodes} latest={latest} metaList={metaList} />
+      <Body p={p} nodes={nodes} latest={latest} metaList={metaList} countries={leaderboard?.countries.length ?? 0} />
     </>
   );
 }
@@ -227,12 +231,41 @@ function Body({
   nodes,
   latest,
   metaList,
+  countries,
 }: {
   p: PickDescriptor;
   nodes: { l0: number; l1: number };
   latest: { ordinal: number; height?: number; metagraphSnapshotCount?: number } | null;
   metaList: MetaInfo[];
+  countries: number;
 }) {
+  if (p.kind === "cluster") {
+    // Validator-cluster summary — the L0/L1 analogue of the metagraph pane. Same
+    // Layers/Nodes/Countries; NO "Make-up" row (a single-layer cluster's composition
+    // is fixed, unlike a configurable metagraph).
+    const isL0 = p.cluster === "l0";
+    return (
+      <>
+        <p>
+          {isL0 ? (
+            <>
+              The <b>Global L0</b> is Constellation&apos;s security &amp; settlement layer. Its
+              validators run <b>PRO consensus</b> to bundle network activity into <b>global
+              snapshots</b> — every metagraph anchors its state here.
+            </>
+          ) : (
+            <>
+              <b>DAG L1</b> is where transactions and application data enter the network — nodes
+              validate them locally, then submit the result up to L0 for final settlement.
+            </>
+          )}
+        </p>
+        <Row label="Layer">{isL0 ? "L0 (consensus)" : "L1"}</Row>
+        <Row label="Nodes">{isL0 ? nodes.l0 : nodes.l1}</Row>
+        {countries > 0 && <Row label="Countries">{countries}</Row>}
+      </>
+    );
+  }
   if (p.kind === "core") {
     return (
       <>
