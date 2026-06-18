@@ -1,8 +1,30 @@
-/* Phase 0 globals. The full styles.css will be migrated into CSS Modules + tokens
-   in later phases; for now just a dark full-bleed shell for the WebGL canvas. */
+/* Globals + design tokens migrated from styles.css. Component-specific rules move to
+   CSS Modules as panels are ported; shared tokens/keyframes stay here. */
+:root {
+  --bg: #05060e;
+  --panel: rgba(12, 16, 32, 0.72);
+  --panel-border: rgba(90, 140, 255, 0.22);
+  --text: #e8eefc;
+  --muted: #8a96b8;
+  --core: #2af5ff;
+  --l0: #5b8cff;
+  --l1: #b06bff;
+  --meta: #ffd166;
+  --accent: #2af5ff;
+}
+
 * { box-sizing: border-box; }
-html, body { margin: 0; height: 100%; background: #060912; overflow: hidden; }
-body { font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+html, body { margin: 0; height: 100%; background: var(--bg); overflow: hidden; }
+body { font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; color: var(--text); }
+
+@keyframes pulse {
+  0%, 100% { transform: scale(0.8); opacity: 0.6; }
+  50% { transform: scale(1.15); opacity: 1; }
+}
+@keyframes chipLand {
+  0% { box-shadow: 0 0 22px rgba(42,245,255,0.7); border-color: #fff; }
+  100% { box-shadow: none; }
+}
 
 .scene-canvas {
   position: fixed;
@@ -42,3 +64,93 @@ body { font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
 .stat { display: flex; flex-direction: column; gap: 2px; }
 .stat-label { font-size: 9.5px; text-transform: uppercase; letter-spacing: 0.05em; color: #8b97b4; }
 .stat-value { font-size: 14px; font-weight: 700; font-variant-numeric: tabular-nums; }
+
+/* ── Snapshot ribbon (Phase 2, ported from styles.css) ───────────────────── */
+#stream {
+  position: fixed;
+  z-index: 10;
+  left: 16px; right: 16px; bottom: 16px;
+  height: 138px;
+  padding: 10px 14px 12px;
+  background: var(--panel);
+  border: 1px solid var(--panel-border);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border-radius: 14px;
+  display: flex;
+  flex-direction: column;
+}
+.stream-head {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 8px;
+}
+.stream-title { display: flex; align-items: center; gap: 8px; font-size: 12.5px; font-weight: 600; letter-spacing: 0.02em; }
+.stream-caption { font-size: 11px; color: var(--muted); }
+.live-dot {
+  width: 8px; height: 8px; border-radius: 50%;
+  background: var(--core); box-shadow: 0 0 8px var(--core);
+  animation: pulse 1.4s ease-in-out infinite;
+}
+.stream-track {
+  position: relative;
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;   /* newest pinned right */
+  gap: 0;
+  overflow: hidden;
+  mask-image: linear-gradient(to right, transparent 0, #000 60px);
+  -webkit-mask-image: linear-gradient(to right, transparent 0, #000 60px);
+}
+.stream-empty {
+  position: absolute; left: 0; right: 0; top: 56%;
+  text-align: center; color: var(--muted); font-size: 12px;
+}
+.stream-item { display: flex; align-items: center; flex: none; }
+.connector {
+  width: 22px; height: 2px; flex: none;
+  background: linear-gradient(to right, rgba(42,245,255,0.15), rgba(42,245,255,0.55));
+  position: relative;
+}
+.connector::after {
+  content: ""; position: absolute; right: -1px; top: -3px;
+  border-left: 6px solid rgba(42,245,255,0.7);
+  border-top: 4px solid transparent;
+  border-bottom: 4px solid transparent;
+}
+.chip {
+  flex: none;
+  width: 96px;
+  display: flex; flex-direction: column; gap: 3px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  border: 1px solid rgba(42, 245, 255, 0.35);
+  background: rgba(42, 245, 255, 0.08);
+  color: var(--text);
+  cursor: pointer;
+  text-align: left;
+  transition: transform 0.15s, background 0.15s, box-shadow 0.15s;
+}
+.chip:hover { transform: translateY(-3px); background: rgba(42, 245, 255, 0.16); box-shadow: 0 0 16px rgba(42,245,255,0.3); }
+.chip.active {
+  border: 2px solid var(--core);
+  background: rgba(42, 245, 255, 0.32);
+  box-shadow: 0 0 0 1px var(--core), 0 0 24px rgba(42,245,255,0.75), 0 4px 14px rgba(0,0,0,0.45);
+  transform: translateY(-4px);
+}
+.chip.active .chip-ord { color: #fff; }
+.chip.active .chip-bar > span { box-shadow: 0 0 8px var(--core); }
+.chip.quiet { border-color: rgba(120, 140, 180, 0.18); background: rgba(120, 140, 180, 0.05); }
+.chip.quiet .chip-ord { color: #aeb9d4; font-weight: 600; }
+.chip.quiet .chip-bar > span { background: rgba(160, 175, 205, 0.45); }
+.chip-ord { font-size: 12.5px; font-weight: 700; font-variant-numeric: tabular-nums; color: #d7fbff; }
+.chip-meta { font-size: 10px; color: var(--muted); display: flex; align-items: baseline; gap: 5px; }
+.chip-blk { color: #ffd166; font-weight: 600; font-variant-numeric: tabular-nums; }
+.chip-bar { height: 3px; border-radius: 3px; background: rgba(255,255,255,0.08); overflow: hidden; }
+.chip-bar > span { display: block; height: 100%; background: var(--core); border-radius: 3px; }
+.chip-fee { font-size: 9.5px; font-variant-numeric: tabular-nums; color: #7fe9c0; letter-spacing: -0.01em; }
+.chip-fee.settling { color: var(--muted); font-style: italic; }
+.chip.mg-anchored { border-color: var(--mg); box-shadow: inset 3px 0 0 var(--mg); }
+.chip.mg-anchored .chip-bar > span { background: var(--mg); }
+.chip.mg-dim { opacity: 0.4; }
+.stream-item:last-child .chip { animation: chipLand 0.9s ease; }

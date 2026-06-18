@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import type { GlobalSnapshot } from "@/src/data/types";
 
 // Per-hour rates + per-snapshot series from NetworkData.getActivity().
 export interface Activity {
@@ -23,12 +24,20 @@ interface AppState {
   activity: Activity | null;
   priceUsd: number | null;
 
+  // Shared network filter ("all" | "l0" | "l1" | <metagraph id>). The filter UI lands
+  // in Phase 3; the ribbon already reads it for its per-chip metagraph cue.
+  filter: string;
+  // The snapshot mirrored by the inspector / highlighted in the ribbon (or null).
+  selectedSnapshot: GlobalSnapshot | null;
+
   setLive: (live: boolean) => void;
   setNodes: (l0: number, l1: number) => void;
   setMetagraphs: (n: number) => void;
   setLatestOrdinal: (ordinal: number) => void;
   setActivity: (activity: Activity | null) => void;
   setPriceUsd: (usd: number | null) => void;
+  setFilter: (filter: string) => void;
+  setSelectedSnapshot: (snap: GlobalSnapshot | null) => void;
 }
 
 export const useStore = create<AppState>((set) => ({
@@ -38,6 +47,8 @@ export const useStore = create<AppState>((set) => ({
   latestOrdinal: null,
   activity: null,
   priceUsd: null,
+  filter: "all",
+  selectedSnapshot: null,
 
   setLive: (live) => set({ live }),
   setNodes: (l0, l1) => set({ nodes: { l0, l1 } }),
@@ -45,4 +56,6 @@ export const useStore = create<AppState>((set) => ({
   setLatestOrdinal: (latestOrdinal) => set({ latestOrdinal }),
   setActivity: (activity) => set({ activity }),
   setPriceUsd: (priceUsd) => set({ priceUsd }),
+  setFilter: (filter) => set({ filter }),
+  setSelectedSnapshot: (selectedSnapshot) => set({ selectedSnapshot }),
 }));

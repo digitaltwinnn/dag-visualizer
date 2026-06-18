@@ -32,6 +32,7 @@ export class NetworkData {
   }
 
   on(evt, fn) { this.listeners[evt].push(fn); return this; }
+  off(evt, fn) { this.listeners[evt] = (this.listeners[evt] || []).filter((f) => f !== fn); return this; }
   _emit(evt, payload) { this.listeners[evt].forEach((f) => f(payload)); }
 
   async _fetchJson(url) {

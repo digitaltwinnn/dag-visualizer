@@ -1,4 +1,5 @@
 import { useStore } from "@/src/store/store";
+import type { Anchor } from "@/src/data/types";
 // Existing data layer, reused untouched. Browser-only (fetch/setInterval); imported
 // from client code, initialized in an effect. Types come in a later phase.
 // @ts-expect-error - vanilla JS module, no type declarations yet
@@ -41,4 +42,21 @@ export function initNetwork(): NetworkData | null {
 // Exposed for later phases (engine subscribes for Lane A; panels read the store).
 export function getNetwork(): NetworkData | null {
   return net;
+}
+
+// Per-tick derived DAG fee + anchored metagraph set (null until polled).
+export function getAnchor(ts: string): Anchor | null {
+  return net?.getAnchor(ts) ?? null;
+}
+
+// Config metagraph (id → {color, ticker, name, …}) or null for all/l0/l1 filters.
+export function metagraphById(id: string): MetagraphConfig | null {
+  return (METAGRAPHS as MetagraphConfig[]).find((m) => m.id === id) ?? null;
+}
+
+export interface MetagraphConfig {
+  id: string;
+  name: string;
+  ticker: string;
+  color: number;
 }
