@@ -57,6 +57,8 @@
 }
 .mg-tag--other { color: var(--muted); background: rgba(160,175,205,0.08); border-color: rgba(160,175,205,0.3); }
 .mg-tag--sel { color: #061018; background: var(--mg); border-color: var(--mg); }
+/* Anchored pills that aren't the active metagraph filter — dimmed so the selection pops. */
+.mg-tag--dim { opacity: 0.4; }
 .desc { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; overflow: hidden; }
 .desc.expanded { -webkit-line-clamp: unset; overflow: visible; }
 .desc-more { display: inline-block; margin: 2px 0 0; padding: 0; background: none; border: none; cursor: pointer; font: inherit; font-size: 11px; font-weight: 600; color: var(--core); }

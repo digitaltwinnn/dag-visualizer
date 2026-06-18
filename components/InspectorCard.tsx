@@ -112,15 +112,19 @@ function AnchoredTags({ ts, anchored }: { ts: string; anchored: number | null })
   const filter = useStore((s) => s.filter);
   const a = getAnchor(ts);
   if (!a || !a.metaIds.size) return null;
+  // When a specific metagraph is filtered, dim the other anchored pills so the
+  // selected one stands out (no dimming for All / L0 / L1).
+  const metaFilter = metagraphById(filter) != null;
   const tags: React.ReactNode[] = [];
   for (const id of a.metaIds) {
     const cfg = metagraphById(id);
     if (!cfg) continue;
     const n = a.metaCounts.get(id) || 1;
+    const sel = id === filter;
     tags.push(
       <span
         key={id}
-        className={"mg-tag" + (id === filter ? " mg-tag--sel" : "")}
+        className={"mg-tag" + (sel ? " mg-tag--sel" : metaFilter ? " mg-tag--dim" : "")}
         style={{ ["--mg" as string]: hex(cfg.color) }}
       >
         {(cfg.ticker || cfg.name) + ` (${n})`}
@@ -129,7 +133,7 @@ function AnchoredTags({ ts, anchored }: { ts: string; anchored: number | null })
   }
   if (anchored != null && anchored > a.count)
     tags.push(
-      <span key="unlisted" className="mg-tag mg-tag--other">
+      <span key="unlisted" className={"mg-tag mg-tag--other" + (metaFilter ? " mg-tag--dim" : "")}>
         unlisted ({anchored - a.count})
       </span>,
     );
