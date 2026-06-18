@@ -7,7 +7,7 @@
 // arrive, so node radii always match the (full-size, non-scaled) globe.
 
 import * as THREE from "three";
-import { feature } from "https://cdn.jsdelivr.net/npm/topojson-client@3/+esm";
+import { feature } from "topojson-client";
 import { COLORS, METAGRAPHS, metaAnchor } from "./config.js";
 
 const R = 16;

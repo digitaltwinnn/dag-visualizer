@@ -197,3 +197,27 @@ body { font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; co
   background: rgba(255,255,255,0.06); border-radius: 8px; padding: 0 5px;
 }
 .mf-chip.active .mf-count { color: #cfe; }
+
+/* ── View toggle (Phase 4, ported from styles.css) ───────────────────────── */
+#viewtoggle {
+  position: fixed;
+  top: 56px; left: 50%; transform: translateX(-50%);
+  z-index: 11;
+  display: flex; gap: 4px;
+  padding: 4px;
+  background: var(--panel);
+  border: 1px solid var(--panel-border);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border-radius: 22px;
+}
+#viewtoggle button {
+  border: none; background: transparent;
+  padding: 7px 16px; border-radius: 18px;
+  font-size: 12.5px; color: var(--muted); font-weight: 600; cursor: pointer;
+}
+#viewtoggle button.active {
+  background: linear-gradient(135deg, var(--core), var(--l0));
+  color: #03121a;
+}
+#viewtoggle button:hover:not(.active) { color: var(--text); background: rgba(90,140,255,0.12); }

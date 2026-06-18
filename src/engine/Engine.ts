@@ -1,65 +1,265 @@
 import * as THREE from "three";
 import { useStore } from "@/src/store/store";
-import { metagraphById } from "@/src/data/network";
-// Existing vanilla modules, reused untouched. They use bare specifiers ("three",
-// "three/addons/...") which now resolve via npm. No types yet — typed wrappers come
-// in a later phase as the engine API is formalized.
+import { metagraphById, initNetwork } from "@/src/data/network";
+// Existing vanilla modules, reused. Bare specifiers resolve via npm; no types yet.
+/* eslint-disable @typescript-eslint/no-explicit-any */
 // @ts-expect-error - vanilla JS module, no type declarations yet
 import { createScene } from "../../js/scene.js";
 // @ts-expect-error - vanilla JS module, no type declarations yet
 import { Layers } from "../../js/layers.js";
+// @ts-expect-error - vanilla JS module, no type declarations yet
+import { Globe } from "../../js/globe.js";
+// @ts-expect-error - vanilla JS module, no type declarations yet
+import { loadGeoCache, resolveMissing } from "../../js/geo.js";
 
-// Imperative engine: owns the scene, the render loop, and (later) the command/event
-// surface that React drives. Phase 0 renders the Hypergraph (core + metagraph hubs +
-// starfield) so we can prove the engine-in-React pattern and npm Three before wiring
-// live data, the globe, and panels.
+type Mode = "hyper" | "geo" | "ledger";
+type Vec = THREE.Vector3;
+
+// Camera presets (ported from ui.js FOCI).
+const FOCI: Record<string, { pos: Vec; target: Vec }> = {
+  overview: { pos: new THREE.Vector3(0, 15, 60), target: new THREE.Vector3(0, 2, 0) },
+  l0: { pos: new THREE.Vector3(0, 6, 20), target: new THREE.Vector3(0, 1, 0) },
+  l1: { pos: new THREE.Vector3(14, 10, 26), target: new THREE.Vector3(0, 0, 0) },
+  metagraphs: { pos: new THREE.Vector3(0, 30, 70), target: new THREE.Vector3(0, 0, 0) },
+  geo: { pos: new THREE.Vector3(0, 11, 36), target: new THREE.Vector3(0, 2, 0) },
+};
+
+// Imperative engine: owns the scene, the Hypergraph + globe, the render loop, the
+// camera-focus tweens, and the command surface React drives via the store. Ports
+// main.js's render loop + ui.js's camera focus, decoupled from any DOM/panels.
 export class Engine {
-  private ctx: ReturnType<typeof createScene>;
-  private layers: InstanceType<typeof Layers>;
+  private ctx: any;
+  private layers: any;
+  private globe: any;
   private clock = new THREE.Clock();
   private raf = 0;
   private disposed = false;
-  private unsubFilter: () => void;
+  private _dofTmp = new THREE.Vector3();
+
+  private mode: Mode = "hyper";
+  private filter = "all";
+  private morph = 0; // 0 = hypergraph, 1 = globe (eased each frame)
+  private tween: {
+    fromPos: Vec; toPos: Vec; fromTgt: Vec; toTgt: Vec; t: number; dur: number;
+  } | null = null;
+
+  private geoMap: Record<string, any> = {};
+  private clusters: { l0: any[]; l1: any[] } | null = null;
+  private metaData: any = null;
+
+  private unsub: Array<() => void> = [];
 
   constructor(canvas: HTMLCanvasElement) {
     this.ctx = createScene(canvas);
     this.layers = new Layers(this.ctx.scene);
+    this.globe = new Globe(this.ctx.scene, this.layers, this.ctx.camera);
 
-    // Command bridge: the engine reads the store directly (Lane B) and reacts to
-    // filter changes — no prop-drilling, no React re-render of the scene. Apply the
-    // current value once on mount, then subscribe to changes.
-    this.setFilter(useStore.getState().filter);
-    this.unsubFilter = useStore.subscribe((s, prev) => {
-      if (s.filter !== prev.filter) this.setFilter(s.filter);
-    });
+    // Apply current store state, then react to changes (Lane B command bridge).
+    const s = useStore.getState();
+    this.mode = s.mode;
+    this.filter = s.filter;
+    // Booting straight into geo (deep link / persisted view): snap to the globe —
+    // there's nothing to morph from on a fresh load (matches the old #geo behaviour).
+    if (this.mode === "geo") this.morph = 1;
+    this.unsub.push(
+      useStore.subscribe((st, prev) => {
+        if (st.mode !== prev.mode) this.setMode(st.mode);
+        if (st.filter !== prev.filter) {
+          this.filter = st.filter;
+          this.applyFilter();
+        }
+      }),
+    );
 
+    this._loadData();
+    this.setMode(this.mode); // also calls applyFilter()
     this.start();
   }
 
-  // Hypergraph filter effect available today: anchor (pause the orbit of) the selected
-  // metagraph's hub so it holds position. Camera framing, DoF, and globe isolation are
-  // ported in the phases that bring the camera-focus + globe into the engine.
-  setFilter(id: string) {
-    this.layers.focusId = metagraphById(id) ? id : null;
+  // ---- data wiring (ports main.js loadGeoCache + metagraphs fetch + cluster) ----
+  private async _loadData() {
+    const net = initNetwork(); // idempotent; guarantees a NetworkData instance
+    if (net?.clusters?.l0?.length) this.clusters = net.clusters;
+    net?.on("cluster", ({ l0, l1 }: { l0: any[]; l1: any[] }) => {
+      this.clusters = { l0, l1 };
+      this._buildGlobe();
+    });
+
+    loadGeoCache().then((m: Record<string, any>) => {
+      this.geoMap = m;
+      this._buildGlobe();
+      this._applyMetagraphs();
+    });
+
+    try {
+      const r = await fetch("/data/metagraphs.json");
+      if (r.ok) {
+        this.metaData = await r.json();
+        this._applyMetagraphs();
+      }
+    } catch {
+      /* offline: globe shows validators only */
+    }
   }
 
+  private _buildGlobe() {
+    if (!this.clusters || !Object.keys(this.geoMap).length) return;
+    this.globe.setNodes(this.clusters.l0, this.clusters.l1, this.geoMap);
+    this._applyMetagraphs();
+    const ips = [...this.clusters.l0, ...this.clusters.l1].map((n: any) => n.ip);
+    resolveMissing(this.geoMap, ips, (m: Record<string, any>) => {
+      this.geoMap = m;
+      if (this.clusters) this.globe.setNodes(this.clusters.l0, this.clusters.l1, this.geoMap);
+    });
+  }
+
+  private _applyMetagraphs() {
+    if (!this.metaData || !Object.keys(this.geoMap).length) return;
+    this.globe.setMetagraphs(this.metaData, this.geoMap);
+    this.applyFilter(); // re-assert the active filter on the freshly built nodes
+  }
+
+  // ---- view + filter (ports ui.setMode / _applyFilter / camera focus) ----
+  setMode(mode: Mode) {
+    this.mode = mode;
+    if (mode === "ledger") {
+      this.layers.focusId = null;
+      this.globe.setFilter("all");
+      this.globe.focusDensest(false);
+      this.ctx.controls.autoRotate = true;
+      this.focus("overview");
+      return;
+    }
+    this.ctx.controls.autoRotate = mode !== "geo";
+    this.applyFilter();
+  }
+
+  applyFilter() {
+    if (this.mode === "geo") {
+      this.globe.setFilter(this.filter);
+      const narrowed = this.filter !== "all";
+      const R = this.globe.focusDensest(narrowed);
+      if (narrowed && R != null) this._focusGeo(R);
+      else this.focus("geo");
+    } else if (this.mode === "hyper") {
+      this.globe.setFilter("all"); // no dimming in the Hypergraph
+      this.globe.focusDensest(false);
+      this._focusFilter(this.filter);
+    }
+  }
+
+  private focus(name: string) {
+    const f = FOCI[name];
+    if (f) this._tweenTo(f.pos, f.target);
+  }
+
+  private _tweenTo(toPos: Vec, toTgt: Vec) {
+    this.tween = {
+      fromPos: this.ctx.camera.position.clone(),
+      toPos: toPos.clone(),
+      fromTgt: this.ctx.controls.target.clone(),
+      toTgt: toTgt.clone(),
+      t: 0,
+      dur: 1.4,
+    };
+  }
+
+  private _focusGeo(R: number) {
+    const t = THREE.MathUtils.smoothstep(R, 0.7, 1.0);
+    this._tweenTo(
+      new THREE.Vector3(0, THREE.MathUtils.lerp(11, 9, t), THREE.MathUtils.lerp(36, 27, t)),
+      new THREE.Vector3(0, THREE.MathUtils.lerp(2, 2.7, t), 0),
+    );
+  }
+
+  private _focusFilter(filter: string) {
+    this.layers.focusId = null;
+    if (filter === "all") {
+      this.ctx.controls.autoRotate = true;
+      this.focus("overview");
+      return;
+    }
+    this.ctx.controls.autoRotate = false;
+    if (filter === "l0" || filter === "l1") {
+      this.focus(filter);
+      return;
+    }
+    const meta = this.layers.metas?.find((x: any) => x.cfg.id === filter);
+    if (!meta) {
+      this.focus("overview");
+      return;
+    }
+    this.layers.focusId = filter; // anchor this hub so it stays framed
+    const hub = meta.group.position.clone();
+    const out = hub.clone().normalize();
+    const side = new THREE.Vector3().crossVectors(new THREE.Vector3(0, 1, 0), out).normalize();
+    const camPos = hub
+      .clone()
+      .addScaledVector(out, 12)
+      .addScaledVector(side, -6)
+      .addScaledVector(new THREE.Vector3(0, 1, 0), 5.5);
+    this._tweenTo(camPos, hub);
+  }
+
+  // ---- render loop (ports main.js animate) ----
   private start() {
     const loop = () => {
       if (this.disposed) return;
       this.raf = requestAnimationFrame(loop);
       const dt = Math.min(this.clock.getDelta(), 0.05);
-      // morph = 0 (Hypergraph). Globe/ledger/DoF land in later phases.
-      this.ctx.background.update(dt, 0);
-      this.layers.update(dt, 0);
+
+      const target = this.mode === "geo" ? 1 : 0;
+      this.morph += (target - this.morph) * Math.min(1, dt * 1.1);
+      this.layers.root.visible = this.morph < 0.985;
+      this.layers.root.scale.setScalar(Math.max(0.0001, 1 - this.morph));
+
+      this.globe.setMorph(this.morph);
+      this.ctx.background.update(dt, this.morph);
+      this.layers.update(dt, this.morph);
+      this.globe.update(dt);
+      this._updateTween(dt);
       this.ctx.controls.update();
+
+      const ledger = this.mode === "ledger";
+      if (ledger) {
+        this.layers.root.visible = false;
+        this.layers.coreGroup.visible = false;
+      }
+      this.globe.group.visible = !ledger;
+      this.ctx.background.mesh.visible = !ledger;
+
+      // Depth of field: only a single focused metagraph in the Hypergraph.
+      const metaSel =
+        this.mode === "hyper" && this.filter !== "all" && this.filter !== "l0" && this.filter !== "l1";
+      const dofMix = THREE.MathUtils.clamp(1 - (this.morph - 0.4) / 0.2, 0, 1);
+      this.ctx.dof.enabled = metaSel && dofMix > 0.001;
+      if (this.ctx.dof.enabled) {
+        const meta = this.layers.metas.find((x: any) => x.cfg.id === this.filter);
+        const focusTarget = meta
+          ? meta.group.getWorldPosition(this._dofTmp)
+          : this.ctx.controls.target;
+        this.ctx.dof.uniforms["focus"].value = this.ctx.camera.position.distanceTo(focusTarget);
+        this.ctx.dof.uniforms["maxblur"].value = 0.01 * dofMix;
+      }
+
       this.ctx.composer.render();
     };
     loop();
   }
 
+  private _updateTween(dt: number) {
+    if (!this.tween) return;
+    const tw = this.tween;
+    tw.t = Math.min(1, tw.t + dt / tw.dur);
+    const e = tw.t < 0.5 ? 2 * tw.t * tw.t : 1 - Math.pow(-2 * tw.t + 2, 2) / 2; // easeInOutQuad
+    this.ctx.camera.position.lerpVectors(tw.fromPos, tw.toPos, e);
+    this.ctx.controls.target.lerpVectors(tw.fromTgt, tw.toTgt, e);
+    if (tw.t >= 1) this.tween = null;
+  }
+
   dispose() {
     this.disposed = true;
-    this.unsubFilter();
+    this.unsub.forEach((u) => u());
     cancelAnimationFrame(this.raf);
     this.ctx.controls.dispose?.();
     this.ctx.renderer.dispose?.();
