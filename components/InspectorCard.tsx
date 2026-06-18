@@ -219,8 +219,21 @@ export default function InspectorCard({ p }: { p: PickDescriptor }) {
         {/* Real-time control sits on the right; the factual tags stay left. */}
         {p.kind === "snapshot" && p.data && <LiveHeart ordinal={p.data.ordinal} />}
       </div>
-      {p.title && <h3>{p.title}</h3>}
-      {p.sub && <p className="insp-sub">{p.sub}</p>}
+      {p.kind === "snapshot" && p.data ? (
+        // Compact header: the tag already says "snapshot", so just #ordinal + a subtle
+        // time (no large "Snapshot time" block).
+        <h3 className="insp-snap-title">
+          #{p.data.ordinal.toLocaleString()}
+          {p.data.timestamp && (
+            <span className="insp-snap-time">{new Date(p.data.timestamp).toLocaleTimeString()}</span>
+          )}
+        </h3>
+      ) : (
+        <>
+          {p.title && <h3>{p.title}</h3>}
+          {p.sub && <p className="insp-sub">{p.sub}</p>}
+        </>
+      )}
       <Body p={p} nodes={nodes} latest={latest} metaList={metaList} countries={leaderboard?.countries.length ?? 0} />
     </>
   );
@@ -313,7 +326,6 @@ function Body({
   if (p.kind === "snapshot" && p.data) {
     const d = p.data;
     const anchored = typeof d.metagraphSnapshotCount === "number" ? d.metagraphSnapshotCount : null;
-    const when = d.timestamp ? new Date(d.timestamp).toLocaleTimeString() : "—";
     const a = getAnchor(d.timestamp);
     const identified = a ? a.count : 0;
     const feeDag = a ? a.fee / 1e8 : 0;
@@ -326,12 +338,10 @@ function Body({
     const blocks = Array.isArray(d.blocks) ? d.blocks.length : 0;
     const hasFee = !!a && a.fee > 0;
     return (
-      <>
-        {/* ① the snapshot itself — time + position in the DAG (+ blocks when present) */}
-        <div className="insp-time">
-          <span className="insp-time-label">Snapshot time</span>
-          <span className="insp-time-val">{when}</span>
-        </div>
+      // Borderless rows here (only the part dividers separate sections) so a row's
+      // bottom border doesn't double up with the divider.
+      <div className="insp-snap">
+        {/* ① the snapshot's position in the DAG (+ blocks when present) */}
         <Row label={d.subHeight != null ? "Height · sub-height" : "Height"}>{heightTxt}</Row>
         {/* Most global snapshots carry zero blocks (settlement, not blocks, is the work),
             so only surface it on the rare snapshot that actually has some. */}
@@ -367,7 +377,7 @@ function Body({
             fee total is complete.
           </p>
         )}
-      </>
+      </div>
     );
   }
   if (p.kind === "metanode" && p.meta) {
