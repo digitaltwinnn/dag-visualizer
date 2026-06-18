@@ -76,8 +76,18 @@ export class Layers {
   }
 
   // Called when a new global snapshot lands so the core pulses in sync with the
-  // bottom snapshot stream.
-  flashCore() { this.coreFlash = 1; }
+  // bottom snapshot stream. `strength` scales the flash by how many metagraphs the
+  // snapshot anchored (more anchored = brighter). Math.max so overlapping flashes
+  // don't cut each other short.
+  flashCore(strength = 1) { this.coreFlash = Math.max(this.coreFlash || 0, strength); }
+
+  // Fire an "anchored into L0" packet from a metagraph's hub toward the core —
+  // called when that metagraph actually records a snapshot that anchored into a
+  // global tick (the `anchor` event), so the packets reflect real anchoring.
+  pulseMeta(metaId) {
+    const m = this.metas.find((x) => x.cfg.id === metaId);
+    if (m) m.pulse = 1;
+  }
 
   // ---------------------------------------------------------------- Metagraphs
   _buildMetagraphs() {
@@ -114,11 +124,11 @@ export class Layers {
     });
   }
 
+  // Updates a hub's latest-snapshot state (for the inspector). The hub->core packet
+  // is no longer fired here — it's driven by the real `anchor` event via pulseMeta.
   updateMeta(name, state) {
     const m = this.metas.find((x) => x.cfg.name === name);
     if (!m) return;
-    if (m.state && state.ordinal > m.state.ordinal) m.pulse = 1;
-    if (!m.state) m.pulse = 0.6;
     m.state = state;
     m.hub.userData.pick.state = state;
   }

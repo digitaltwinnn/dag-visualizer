@@ -30,16 +30,32 @@
       <span class="brand-mark"></span>
       <div class="brand-text">
         <h1>Constellation Hypergraph</h1>
-        <p>Interactive 3D map of the $DAG network</p>
+        <p>Live 3D map of the network &amp; its on-chain economy</p>
       </div>
     </div>
     <div class="stats" id="stats">
-      <div class="stat"><span class="stat-label">Data</span><span class="stat-value" id="stat-source">…</span></div>
-      <div class="stat"><span class="stat-label">Global L0 ordinal</span><span class="stat-value" id="stat-ordinal">—</span></div>
-      <div class="stat"><span class="stat-label">Snapshot height</span><span class="stat-value" id="stat-height">—</span></div>
-      <div class="stat"><span class="stat-label">Validators L0 / L1</span><span class="stat-value" id="stat-nodes">—</span></div>
-      <div class="stat"><span class="stat-label">Active metagraphs</span><span class="stat-value" id="stat-metagraphs">—</span></div>
-      <div class="stat"><span class="stat-label">Snapshots / min</span><span class="stat-value" id="stat-rate">—</span></div>
+      <span class="data-pill" id="stat-source">…</span>
+      <div class="stat-group">
+        <div class="stat stat-trend" id="stat-fees-wrap">
+          <span class="stat-label">Fees/hr</span>
+          <span class="stat-row">
+            <span class="stat-value" id="stat-fees">—</span>
+            <span class="stat-sub" id="stat-fees-dag"></span>
+            <svg class="spark" id="spark-fees"></svg>
+          </span>
+        </div>
+      </div>
+      <div class="stat-sep"></div>
+      <div class="stat-group">
+        <div class="stat"><span class="stat-label">Validators L0/L1</span><span class="stat-value" id="stat-nodes">—</span></div>
+        <div class="stat"><span class="stat-label">Public metagraphs</span><span class="stat-value" id="stat-metagraphs">—</span></div>
+      </div>
+      <div class="stat-sep"></div>
+      <div class="stat-group">
+        <div class="stat stat-trend"><span class="stat-label">Snapshots/hr</span><span class="stat-row"><span class="stat-value" id="stat-rate">—</span><svg class="spark" id="spark-rate"></svg></span></div>
+        <div class="stat stat-trend"><span class="stat-label">Anchors/hr</span><span class="stat-row"><span class="stat-value" id="stat-anchors">—</span><svg class="spark" id="spark-anchors"></svg></span></div>
+        <div class="stat stat-trend"><span class="stat-label">Blocks/hr</span><span class="stat-row"><span class="stat-value" id="stat-blocks">—</span><svg class="spark" id="spark-blocks"></svg></span></div>
+      </div>
     </div>
   </header>
 
@@ -62,8 +78,6 @@
       edge of the DAG). <b>Ordinal</b> counts snapshots and always rises;
       <b>height</b> is the depth of the block DAG and only rises when activity
       deepens it; <b>sub-height</b> orders snapshots that share a height.</p>
-    <p class="ledger-dim">Constellation is a graph, not a chain — blocks can form in
-      parallel, so a snapshot can carry blocks without raising the height.</p>
   </aside>
 
   <!-- Left column: network filter (both views) + learn (hyper) / leaderboard (geo) -->
@@ -76,6 +90,7 @@
       <span class="mf-sub" id="mf-sub">Click to focus a metagraph</span>
     </div>
     <div class="mf-chips" id="mf-chips"></div>
+    <p class="mf-foot">Shows the network's <b>publicly listed</b> metagraphs. Others anchor to Global L0 too, but aren't in the public directory.</p>
   </aside>
 
   <!-- Learn panel -->
@@ -103,7 +118,7 @@
       </div>
     </div>
     <div class="learn-nav">
-      <button id="tour-btn" class="primary">▶ Guided tour</button>
+      <button id="tour-btn">▶ Guided tour</button>
       <button id="reset-view">Reset view</button>
     </div>
   </aside>
@@ -129,18 +144,25 @@
   <!-- Live snapshot stream (Global L0 DAG) -->
   <section id="stream">
     <div class="stream-head">
-      <span class="stream-title"><span class="live-dot"></span>Global L0 snapshots — live DAG</span>
+      <span class="stream-title"><span class="live-dot"></span>Global L0 snapshots — the settlement layer<span class="stream-info" tabindex="0">i<span class="stream-info-pop">Global L0 is the network's <b>settlement layer</b>. Each snapshot bundles <b>blocks</b> (transactions from L1) and <b>anchored metagraph snapshots</b> — the "anchored" count on each chip. Each anchored snapshot pays a <b>$DAG fee</b> based on its size; the <b>≥ DAG</b> figure sums those across publicly listed metagraphs, so it's a lower bound (other metagraphs anchor too). Metagraph chains snapshot far faster than Global L0 — see the Snapshot DAG view.</span></span></span>
       <span class="stream-caption">newest →</span>
     </div>
     <div class="stream-track" id="stream-track"></div>
     <div class="stream-empty" id="stream-empty">Waiting for snapshots…</div>
   </section>
 
-  <!-- Inspector -->
-  <aside id="inspector" class="hidden">
-    <button id="inspector-close" title="Close">×</button>
-    <div id="inspector-content"></div>
-  </aside>
+  <!-- Right column: the selected-metagraph context pane (persistent, all views) +
+       the click inspector (snapshot / node / core), stacked beneath it. -->
+  <div id="rightcol">
+    <aside id="metapane" class="panel hidden">
+      <button id="metapane-close" title="Clear selection">×</button>
+      <div id="metapane-content"></div>
+    </aside>
+    <aside id="inspector" class="hidden">
+      <button id="inspector-close" title="Close">×</button>
+      <div id="inspector-content"></div>
+    </aside>
+  </div>
 
   <!-- Hover tooltip -->
   <div id="tooltip" class="hidden"></div>

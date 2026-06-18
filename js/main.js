@@ -22,7 +22,15 @@ document.body.appendChild(stats.dom);
 
 const layers = new Layers(scene);
 const globe = new Globe(scene, layers, camera);
-const ui = new UI({ camera, renderer, controls, layers, globe });
+// getAnchor is a closure over `data` (declared below) — only invoked when the
+// inspector opens, so the reference is resolved by then.
+const ui = new UI({
+  camera, renderer, controls, layers, globe,
+  getAnchor: (ts) => data.getAnchor(ts),
+  getSnapshots: () => data.globalSnapshots, // for "follow latest relevant snapshot"
+  onFilter: (id, color) => stream.setFilter(id, color), // ribbon cue for the selected metagraph
+  onSnapSelect: (d) => stream.select(d), // keep the highlighted ribbon chip in sync with the card
+});
 
 // Meaningless stand-in shown in the (work-in-progress) Snapshot DAG view: a slowly
 // tumbling wireframe cube. The real hypergraph/globe are hidden while it's on.
@@ -33,11 +41,18 @@ const ledgerCube = new THREE.LineSegments(
 ledgerCube.position.set(0, 2, 0);
 ledgerCube.visible = false;
 scene.add(ledgerCube);
-const stream = new SnapshotStream({
-  onSelect: (data) => { ui.showSnapshot(data); layers.flashCore(); },
-  onArrive: () => layers.flashCore(),
-});
 const data = new NetworkData();
+// Core flash strength scales with how many metagraphs the snapshot anchored
+// (metagraphSnapshotCount, authoritative) — a busy settlement glows brighter.
+const coreStrength = (snap) => {
+  const n = typeof snap?.metagraphSnapshotCount === "number" ? snap.metagraphSnapshotCount : 0;
+  return THREE.MathUtils.clamp(n / 12, 0.35, 1.6);
+};
+const stream = new SnapshotStream({
+  onSelect: (d) => { ui.showSnapshot(d); layers.flashCore(); },
+  onArrive: (snap) => layers.flashCore(coreStrength(snap)),
+  getAnchor: (ts) => data.getAnchor(ts), // derived DAG fee per tick (tracked metagraphs)
+});
 
 // ---- geolocation: load the baked cache, build the globe when data is ready ----
 let geoMap = {};
@@ -86,10 +101,25 @@ data.on("status", ({ live }) => ui.setStatus(live));
 data.on("global", (evt) => {
   if (evt.reset) stream.setSnapshots(evt.snapshots);
   else stream.push(evt.snapshot);
-  if (evt.latest) ui.onGlobal(evt.latest);
+  if (evt.latest) ui.onGlobal(evt.latest, data.getActivity());
 });
 
 data.on("meta", (evt) => layers.updateMeta(evt.name, evt));
+
+// A metagraph just recorded snapshot(s) that anchored into a global tick:
+//  - fire a packet from that metagraph's hub toward the L0 core (real anchoring),
+//  - refill the ribbon chip fees,
+//  - refresh the header Fees/hr (rAF-debounced so the seed's burst of anchor
+//    events — one per metagraph — collapses into a single header update).
+let _feesRaf = 0;
+data.on("anchor", (evt) => {
+  if (evt && evt.metaId) layers.pulseMeta(evt.metaId);
+  stream.refreshFees();
+  cancelAnimationFrame(_feesRaf);
+  _feesRaf = requestAnimationFrame(() => { ui.updateFees(data.getActivity()); ui.refreshFollow(); });
+});
+
+data.on("price", (p) => ui.setPrice(p));
 
 data.on("cluster", ({ l0, l1 }) => {
   ui.setNodeCounts(l0, l1);
@@ -168,8 +198,8 @@ function animate() {
   if (dof.enabled) {
     // Track the hub's LIVE position (it keeps orbiting) so it stays crisp.
     const meta = layers.metas.find((x) => x.cfg.id === ui.filter);
-    const target = meta ? meta.group.getWorldPosition(_dofTmp) : controls.target;
-    dof.uniforms["focus"].value = camera.position.distanceTo(target);
+    const focusTarget = meta ? meta.group.getWorldPosition(_dofTmp) : controls.target;
+    dof.uniforms["focus"].value = camera.position.distanceTo(focusTarget);
     dof.uniforms["maxblur"].value = 0.01 * dofMix;
   }
 

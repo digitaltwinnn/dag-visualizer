@@ -334,13 +334,16 @@ export class Globe {
     this.group.add(this.heatGroup);
     if (!clusters || !clusters.length) return;
 
-    const logMax = Math.log2(Math.max(...clusters.map((c) => c.count)) + 1);
+    // Density 0..1 on a log scale, anchored so a lone node (count 1 -> log2(1)=0)
+    // reads as sparse rather than maxing the scale out to "hot". Degenerate case
+    // (every cluster a singleton) -> logMax 0 -> all sparse.
+    const logMax = Math.log2(Math.max(...clusters.map((c) => c.count)));
     const tex = (this._glowTex ||= makeGlowTexture());
     const fillGeo = (this._heatGeo ||= new THREE.PlaneGeometry(1, 1));
     const ringGeo = (this._ringGeo ||= new THREE.RingGeometry(0.9, 1.0, 40));
 
     for (const c of clusters) {
-      const t = Math.min(1, Math.log2(c.count + 1) / logMax);
+      const t = logMax > 0 ? Math.min(1, Math.log2(c.count) / logMax) : 0;
       const color = heatColor(t);
       const pos = c.center.clone().multiplyScalar(R + 0.04);
       const quat = new THREE.Quaternion().setFromUnitVectors(Z_AXIS, c.center);
@@ -576,9 +579,9 @@ export class Globe {
             pick: {
               kind: "metanode", meta: m, node, geo: g,
               title: m.name,
-              // Hybrid nodes run several layers on one machine — say so rather than
-              // showing only the primary (inner-shell) layer.
-              sub: `${m.symbol || "metagraph"} · ${(node.roles && node.roles.length > 1) ? "Hybrid" : LAYER_NAME[layer]} node`,
+              // No subtitle — the token badge (header) + the "Runs" row cover identity
+              // and which layers this node serves (incl. Hybrid).
+              sub: "",
             },
           });
         });
