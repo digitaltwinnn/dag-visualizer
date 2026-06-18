@@ -60,7 +60,7 @@ body { font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; co
   border: 1px solid;
 }
 .data-pill.live { color: #6ee7b0; border-color: rgba(54, 226, 154, 0.45); background: rgba(54, 226, 154, 0.12); }
-.data-pill.sim { color: #ffd166; border-color: rgba(255, 209, 102, 0.4); background: rgba(255, 209, 102, 0.1); }
+.data-pill.down { color: #ff8a8a; border-color: rgba(255, 90, 90, 0.45); background: rgba(255, 90, 90, 0.12); }
 .stat { display: flex; flex-direction: column; gap: 2px; }
 .stat-label { font-size: 9.5px; text-transform: uppercase; letter-spacing: 0.05em; color: #8b97b4; }
 .stat-value { font-size: 14px; font-weight: 700; font-variant-numeric: tabular-nums; }

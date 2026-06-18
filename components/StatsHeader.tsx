@@ -26,8 +26,8 @@ export default function StatsHeader() {
 
   return (
     <header className="stats-header">
-      <span className={`data-pill ${live ? "live" : "sim"}`}>
-        {live ? "● LIVE · mainnet" : "SIMULATED"}
+      <span className={`data-pill ${live ? "live" : "down"}`}>
+        {live ? "● LIVE · mainnet" : "● NO DATA"}
       </span>
       <Stat label="Validators" value={`${nodes.l0} / ${nodes.l1}`} />
       <Stat label="Public metagraphs" value={metagraphs || "—"} />

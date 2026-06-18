@@ -1,6 +1,6 @@
-// Data layer: pulls live snapshots from the Constellation block explorer API,
-// and transparently falls back to a realistic simulation if the network is
-// unreachable (e.g. offline). Consumers don't need to know which is which.
+// Data layer: pulls live snapshots from the Constellation block explorer API.
+// No simulation — if the API is unreachable the app shows a "no data" state and
+// keeps polling, recovering on its own once it responds again (`live` reflects this).
 
 import { API_BASE, L0_CLUSTER, L1_CLUSTER, METAGRAPHS, VIS } from "./config.js";
 
@@ -27,8 +27,6 @@ export class NetworkData {
     this.listeners = { global: [], meta: [], status: [], cluster: [], anchor: [], price: [] };
     this.price = null;            // { usd, change24h, marketCap, series } — $DAG market data
     this._timer = null;
-    this._simOrdinal = 6_400_000; // plausible starting point for simulation
-    this._simHeight = 58_000;
   }
 
   on(evt, fn) { this.listeners[evt].push(fn); return this; }
@@ -58,13 +56,14 @@ export class NetworkData {
       this.latest = list[list.length - 1];
       this._setLive(true);
     } catch (e) {
+      // No simulation — a real site stays factual. Show "no data" and recover on a
+      // later poll once the API responds again.
       this._setLive(false);
-      this._seedSimulation();
     }
     this._emit("global", { reset: true, snapshots: this.globalSnapshots, latest: this.latest });
     await this._fetchClusters();
     await this._refreshMeta(VIS.metaSnapSeed); // seed each metagraph's history
-    this._fetchPrice(); // $DAG market data (fire-and-forget; independent of live/sim)
+    this._fetchPrice(); // $DAG market data (fire-and-forget; independent of the snapshot feed)
     this.start();
   }
 
@@ -80,12 +79,7 @@ export class NetworkData {
         this._emit("cluster", this.clusters);
         return;
       }
-    } catch (e) { /* fall back below */ }
-    // keep what we have; only synthesize if we have nothing yet
-    if (!this.clusters.l0.length) {
-      this.clusters = { l0: synthNodes(VIS.fallbackL0), l1: synthNodes(VIS.fallbackL1) };
-      this._emit("cluster", this.clusters);
-    }
+    } catch (e) { /* keep whatever real membership we already have (maybe none) */ }
   }
 
   _setLive(v) {
@@ -100,7 +94,7 @@ export class NetworkData {
   start() {
     if (this._timer) return;
     this._timer = setInterval(() => this._tick(), VIS.pollMs);
-    this._clusterTimer = setInterval(() => { if (this.live) this._fetchClusters(); }, VIS.clusterMs);
+    this._clusterTimer = setInterval(() => this._fetchClusters(), VIS.clusterMs);
     this._priceTimer = setInterval(() => this._fetchPrice(), VIS.priceMs);
   }
   stop() {
@@ -133,21 +127,20 @@ export class NetworkData {
   }
 
   async _tick() {
-    if (this.live) {
-      try {
-        const json = await this._get(`/global-snapshots/latest`);
-        const snap = json.data;
-        if (snap && (!this.latest || snap.ordinal > this.latest.ordinal)) {
-          this._pushGlobal(snap);
-        }
-        // occasionally pull each metagraph's newest snapshots (tail)
-        if (Math.random() < 0.5) this._refreshMeta(VIS.metaSnapTail);
-        return;
-      } catch (e) {
-        this._setLive(false); // fall through to simulation
+    // Always attempt the live fetch (even while "down"), so the app recovers on its
+    // own when the API comes back — no simulation in between.
+    try {
+      const json = await this._get(`/global-snapshots/latest`);
+      const snap = json.data;
+      if (snap && (!this.latest || snap.ordinal > this.latest.ordinal)) {
+        this._pushGlobal(snap);
       }
+      this._setLive(true);
+      // occasionally pull each metagraph's newest snapshots (tail)
+      if (Math.random() < 0.5) this._refreshMeta(VIS.metaSnapTail);
+    } catch (e) {
+      this._setLive(false);
     }
-    this._simStep();
   }
 
   _pushGlobal(snap) {
@@ -162,37 +155,27 @@ export class NetworkData {
   // first load (history), a short tail on each live poll (new arrivals).
   async _refreshMeta(limit = VIS.metaSnapTail) {
     // Refresh every metagraph in parallel — there are ~10 real ones, so serial
-    // awaits would stall the tick. Each falls back to a simulated cadence.
+    // awaits would stall the tick.
     await Promise.all(METAGRAPHS.map((m) => this._refreshOneMeta(m, limit)));
   }
 
   async _refreshOneMeta(m, limit = VIS.metaSnapTail) {
-    if (m.id && this.live) {
-      try {
-        const json = await this._get(`/currency/${m.id}/snapshots?limit=${limit}`);
-        const list = json.data || [];
-        if (list.length) {
-          const latest = list[0]; // API returns newest-first
-          this.metaState.set(m.name, { ordinal: latest.ordinal, hash: latest.hash, ts: latest.timestamp, real: true });
-          // Record full snapshot records (with fee/size) into the rolling buffer.
-          this._recordMetaSnaps(m, list.map((s) => ({
-            ordinal: s.ordinal, hash: s.hash, parent: s.lastSnapshotHash,
-            ts: s.timestamp, fee: s.fee || 0, sizeInKB: s.sizeInKB || 0,
-          })));
-          this._emit("meta", { name: m.name, ...this.metaState.get(m.name) });
-          return;
-        }
-      } catch (e) { /* fall back to sim below */ }
+    if (!m.id) return;
+    try {
+      const json = await this._get(`/currency/${m.id}/snapshots?limit=${limit}`);
+      const list = json.data || [];
+      if (!list.length) return;
+      const latest = list[0]; // API returns newest-first
+      this.metaState.set(m.name, { ordinal: latest.ordinal, hash: latest.hash, ts: latest.timestamp, real: true });
+      // Record full snapshot records (with fee/size) into the rolling buffer.
+      this._recordMetaSnaps(m, list.map((s) => ({
+        ordinal: s.ordinal, hash: s.hash, parent: s.lastSnapshotHash,
+        ts: s.timestamp, fee: s.fee || 0, sizeInKB: s.sizeInKB || 0,
+      })));
+      this._emit("meta", { name: m.name, ...this.metaState.get(m.name) });
+    } catch (e) {
+      /* no data this tick — stay factual, try again next poll */
     }
-    // simulated cadence for metagraphs without live snapshots
-    const prev = this.metaState.get(m.name);
-    const base = prev?.ordinal ?? Math.floor(50_000 + Math.random() * 1_500_000);
-    const ordinal = base + Math.floor(Math.random() * 3);
-    const sizeInKB = 3 + Math.floor(Math.random() * 6);
-    const ts = new Date().toISOString();
-    this.metaState.set(m.name, { ordinal, hash: randomHash(), ts, real: false });
-    this._recordMetaSnaps(m, [{ ordinal, hash: this.metaState.get(m.name).hash, parent: prev?.hash || randomHash(), ts, fee: sizeInKB * 100_000, sizeInKB }]);
-    this._emit("meta", { name: m.name, ...this.metaState.get(m.name) });
   }
 
   // Append new snapshot records (dedup by ordinal) to a metagraph's rolling buffer
@@ -264,77 +247,6 @@ export class NetworkData {
     };
   }
 
-  // ---- simulation fallback ----
-  _seedSimulation() {
-    const now = Date.now();
-    const list = [];
-    let ord = this._simOrdinal, h = this._simHeight, prevHash = randomHash();
-    for (let i = VIS.maxSnapshots; i > 0; i--) {
-      const hash = randomHash();
-      list.push({
-        hash, ordinal: ord++, height: h, subHeight: i,
-        lastSnapshotHash: prevHash,
-        blocks: simBlocks(),
-        metagraphSnapshotCount: simAnchored(),
-        timestamp: new Date(now - i * 9000).toISOString(),
-      });
-      prevHash = hash;
-      if (Math.random() < 0.4) h++;
-    }
-    this._simOrdinal = ord;
-    this._simHeight = h;
-    this.globalSnapshots = list;
-    this.latest = list[list.length - 1];
-  }
-
-  _simStep() {
-    const prevHash = this.latest?.hash ?? randomHash();
-    if (Math.random() < 0.45) this._simHeight++;
-    const snap = {
-      hash: randomHash(),
-      ordinal: this._simOrdinal++,
-      height: this._simHeight,
-      subHeight: Math.floor(Math.random() * 20),
-      lastSnapshotHash: prevHash,
-      blocks: simBlocks(),
-      metagraphSnapshotCount: simAnchored(),
-      timestamp: new Date().toISOString(),
-    };
-    this._pushGlobal(snap);
-    if (Math.random() < 0.5) this._refreshMeta();
-  }
-}
-
-// Synthetic validator set used only when the cluster API is unreachable, so the
-// shells are always populated with a realistic count.
-function synthNodes(n) {
-  const states = ["Ready", "Ready", "Ready", "Ready", "Observing", "WaitingForDownload"];
-  return Array.from({ length: n }, () => ({
-    id: randomHash() + randomHash(),
-    ip: `${rnd(1, 223)}.${rnd(0, 255)}.${rnd(0, 255)}.${rnd(1, 254)}`,
-    state: states[(Math.random() * states.length) | 0],
-  }));
-}
-function rnd(a, b) { return a + Math.floor(Math.random() * (b - a + 1)); }
-
-// Simulated anchor count per global snapshot — how many metagraph snapshots it
-// settles. Mirrors mainnet, where this varies snapshot to snapshot (~1–24, usually
-// around 10) rather than being a constant, so the ribbon's activity bar moves.
-function simAnchored() { return 4 + Math.floor(Math.random() * 14); } // 4..17
-
-// Real mainnet global snapshots rarely carry blocks (the layer mostly settles
-// metagraph state), so keep block-carrying snapshots uncommon in the sim too —
-// the ribbon treats them as a highlight, not the baseline.
-function simBlocks() {
-  if (Math.random() < 0.88) return [];
-  return Array.from({ length: 1 + Math.floor(Math.random() * 4) }, randomHash);
-}
-
-export function randomHash() {
-  const hex = "0123456789abcdef";
-  let s = "";
-  for (let i = 0; i < 64; i++) s += hex[(Math.random() * 16) | 0];
-  return s;
 }
 
 export function shortHash(h) {
