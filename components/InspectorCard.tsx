@@ -323,14 +323,27 @@ function Body({
       d.subHeight != null
         ? `${(d.height ?? 0).toLocaleString()} · ${d.subHeight}`
         : (d.height ?? 0).toLocaleString();
+    const blocks = Array.isArray(d.blocks) ? d.blocks.length : 0;
+    const hasFee = !!a && a.fee > 0;
     return (
       <>
+        {/* ① the snapshot itself — time + position in the DAG (+ blocks when present) */}
         <div className="insp-time">
           <span className="insp-time-label">Snapshot time</span>
           <span className="insp-time-val">{when}</span>
         </div>
+        <Row label={d.subHeight != null ? "Height · sub-height" : "Height"}>{heightTxt}</Row>
+        {/* Most global snapshots carry zero blocks (settlement, not blocks, is the work),
+            so only surface it on the rare snapshot that actually has some. */}
+        {blocks > 0 && <Row label="Blocks">{blocks}</Row>}
+
+        {/* ② what it anchored */}
+        {a && a.metaIds.size > 0 && <div className="insp-div" />}
         <AnchoredTags ts={d.timestamp} anchored={anchored} />
-        {a && a.fee > 0 && (
+
+        {/* ③ what it cost */}
+        {hasFee && <div className="insp-div" />}
+        {hasFee && (
           <Row label="Settlement fees">
             {feeDag.toFixed(4)} DAG{" "}
             <span className={"insp-mini " + (full ? "ok" : "approx")}>
@@ -338,9 +351,8 @@ function Body({
             </span>
           </Row>
         )}
-        <Row label={d.subHeight != null ? "Height · sub-height" : "Height"}>{heightTxt}</Row>
-        {a && a.fee > 0 && !full && (
-          <p style={{ marginTop: 14 }}>
+        {hasFee && !full && (
+          <p style={{ marginTop: 10 }}>
             Each anchored snapshot pays a <b>$DAG fee</b> set by its size. We can attribute{" "}
             <b>
               {identified} of {anchored}
@@ -349,8 +361,8 @@ function Body({
             <b>at least {feeDag.toFixed(4)} $DAG</b>.
           </p>
         )}
-        {full && (
-          <p style={{ marginTop: 14 }}>
+        {hasFee && full && (
+          <p style={{ marginTop: 10 }}>
             Every anchored snapshot here is publicly listed, so the <b>{feeDag.toFixed(4)} DAG</b>{" "}
             fee total is complete.
           </p>
