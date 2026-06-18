@@ -7,7 +7,7 @@
 // arrive, so node radii always match the (full-size, non-scaled) globe.
 
 import * as THREE from "three";
-import { feature } from "https://cdn.jsdelivr.net/npm/topojson-client@3/+esm";
+import { feature } from "topojson-client";
 import { COLORS, METAGRAPHS, metaAnchor } from "./config.js";
 
 const R = 16;
@@ -174,7 +174,7 @@ export class Globe {
 
   async _loadCoastlines() {
     try {
-      const res = await fetch("https://cdn.jsdelivr.net/npm/world-atlas@2/land-110m.json");
+      const res = await fetch("/land-110m.json");
       const topo = await res.json();
       const land = feature(topo, topo.objects.land);
       const pts = [];

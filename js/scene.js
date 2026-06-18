@@ -71,12 +71,13 @@ export function createScene(canvas) {
   );
   composer.addPass(bloom);
 
-  window.addEventListener("resize", () => {
+  // The caller (engine) owns the resize listener so it can be removed on dispose.
+  function resize() {
     camera.aspect = window.innerWidth / window.innerHeight;
     camera.updateProjectionMatrix();
     renderer.setSize(window.innerWidth, window.innerHeight);
     composer.setSize(window.innerWidth, window.innerHeight);
-  });
+  }
 
-  return { scene, camera, renderer, controls, composer, bloom, dof, background };
+  return { scene, camera, renderer, controls, composer, bloom, dof, background, resize };
 }

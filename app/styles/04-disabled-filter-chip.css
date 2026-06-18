@@ -1,0 +1,4 @@
+/* ── Disabled filter chip (node-less metagraphs) ─────────────────────────── */
+.mf-chip--off { cursor: default; opacity: 0.45; color: var(--muted); background: rgba(90,140,255,0.03); }
+.mf-chip--off:hover { background: rgba(90,140,255,0.03); color: var(--muted); }
+.mf-chip--off .mf-dot { filter: grayscale(0.6); }

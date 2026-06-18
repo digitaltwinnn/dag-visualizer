@@ -60,8 +60,6 @@ export const VIS = {
   maxSnapshots: 26,        // how many global snapshots to keep in the stream
   l0Radius: 8,             // Global L0 validator shell (inner)
   l1Radius: 15,            // DAG L1 validator shell (outer)
-  fallbackL0: 159,         // synthetic validator count if cluster API is offline
-  fallbackL1: 161,
   metaOrbitRadius: 36,     // base orbit radius for metagraphs — kept well clear of the
                            // validator shells so a focused hub has an emptier backdrop
   pollMs: 4000,            // how often to poll for new snapshots
