@@ -3,6 +3,7 @@
 import { useStore } from "@/src/store/store";
 import FilterPanel from "@/components/FilterPanel";
 import LearnPanel from "@/components/LearnPanel";
+import Leaderboard from "@/components/Leaderboard";
 
 // Left column: the shared network filter, plus the view-specific panel beneath it
 // (Learn in Hypergraph; the country leaderboard in Geography — ported in 5d). Hidden
@@ -14,6 +15,7 @@ export default function LeftColumn() {
     <div id="leftcol">
       <FilterPanel />
       {mode === "hyper" && <LearnPanel />}
+      {mode === "geo" && <Leaderboard />}
     </div>
   );
 }

@@ -52,6 +52,18 @@ export interface MetaInfo {
   countriesCount: number;
 }
 
+export interface CountryStat {
+  cc: string;
+  country: string;
+  count: number;
+}
+// Per-country breakdown + distribution score for the active filter (engine-computed).
+export interface LeaderboardData {
+  countries: CountryStat[];
+  score: number | null;
+  refId: string | null;
+}
+
 // What the inspector renders. Emitted by the engine's picking (core/l0/l1/metanode)
 // or set by the ribbon (snapshot). A "meta" descriptor drives the context pane.
 export interface PickDescriptor {

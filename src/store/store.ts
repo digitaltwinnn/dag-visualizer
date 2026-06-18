@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import type { GlobalSnapshot, MetaInfo, PickDescriptor } from "@/src/data/types";
+import type { GlobalSnapshot, LeaderboardData, MetaInfo, PickDescriptor } from "@/src/data/types";
 
 // Per-hour rates + per-snapshot series from NetworkData.getActivity().
 export interface Activity {
@@ -34,6 +34,10 @@ interface AppState {
   hover: { title: string; sub: string } | null;
   // Active "Understand the network" topic (camera focus + layer highlight), or null.
   learnFocus: string | null;
+  // Country drill-down within the network filter (geo view), or null.
+  country: string | null;
+  // Per-country breakdown + distribution score for the active filter (engine-pushed).
+  leaderboard: LeaderboardData | null;
 
   // Active view. The scene is one persistent canvas; the engine morphs between hyper
   // and geo and shows the ledger placeholder, all driven by this.
@@ -55,6 +59,8 @@ interface AppState {
   setFollowing: (following: boolean) => void;
   setHover: (hover: { title: string; sub: string } | null) => void;
   setLearnFocus: (focus: string | null) => void;
+  setCountry: (cc: string | null) => void;
+  setLeaderboard: (lb: LeaderboardData | null) => void;
 }
 
 export const useStore = create<AppState>((set) => ({
@@ -72,6 +78,8 @@ export const useStore = create<AppState>((set) => ({
   following: false,
   hover: null,
   learnFocus: null,
+  country: null,
+  leaderboard: null,
 
   setLive: (live) => set({ live }),
   setNodes: (l0, l1) => set({ nodes: { l0, l1 } }),
@@ -87,4 +95,6 @@ export const useStore = create<AppState>((set) => ({
   setFollowing: (following) => set({ following }),
   setHover: (hover) => set({ hover }),
   setLearnFocus: (learnFocus) => set({ learnFocus }),
+  setCountry: (country) => set({ country }),
+  setLeaderboard: (leaderboard) => set({ leaderboard }),
 }));

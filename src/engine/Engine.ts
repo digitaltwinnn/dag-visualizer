@@ -34,6 +34,7 @@ export class Engine {
 
   private mode: Mode = "hyper";
   private filter = "all";
+  private country: string | null = null;
   private morph = 0; // 0 = hypergraph, 1 = globe (eased each frame)
   private tween: {
     fromPos: Vec; toPos: Vec; fromTgt: Vec; toTgt: Vec; t: number; dur: number;
@@ -72,7 +73,15 @@ export class Engine {
         if (st.mode !== prev.mode) this.setMode(st.mode);
         if (st.filter !== prev.filter) {
           this.filter = st.filter;
+          // Switching network clears any country drill-down (matches the old geo UX).
+          this.country = null;
+          if (prev.country != null) useStore.getState().setCountry(null);
           this.applyFilter();
+        }
+        if (st.country !== prev.country && st.filter === prev.filter) {
+          this.country = st.country;
+          this.globe.setCountry(st.country);
+          this._applyGeoFocus();
         }
         if (st.learnFocus !== prev.learnFocus) this.setLearnFocus(st.learnFocus);
       }),
@@ -117,7 +126,9 @@ export class Engine {
     resolveMissing(this.geoMap, ips, (m: Record<string, any>) => {
       this.geoMap = m;
       if (this.clusters) this.globe.setNodes(this.clusters.l0, this.clusters.l1, this.geoMap);
+      this._publishLeaderboard();
     });
+    this._publishLeaderboard();
   }
 
   private _applyMetagraphs() {
@@ -162,16 +173,33 @@ export class Engine {
 
   applyFilter() {
     if (this.mode === "geo") {
-      this.globe.setFilter(this.filter);
-      const narrowed = this.filter !== "all";
-      const R = this.globe.focusDensest(narrowed);
-      if (narrowed && R != null) this._focusGeo(R);
-      else this.focus("geo");
+      this.globe.setFilter(this.filter); // also clears globe.countryFilter
+      this._applyGeoFocus();
     } else if (this.mode === "hyper") {
       this.globe.setFilter("all"); // no dimming in the Hypergraph
       this.globe.focusDensest(false);
       this._focusFilter(this.filter);
     }
+    this._publishLeaderboard();
+  }
+
+  // Aim/zoom the globe for the current network + country selection (ports
+  // ui.js _applyGeoFocus): narrowed selections swing to the densest cluster and
+  // zoom proportional to concentration; "all" sits at the wide geo overview.
+  private _applyGeoFocus() {
+    const narrowed = this.filter !== "all" || this.country != null;
+    const R = this.globe.focusDensest(narrowed);
+    if (narrowed && R != null) this._focusGeo(R);
+    else this.focus("geo");
+  }
+
+  // Compute the per-country leaderboard + distribution score for the active filter
+  // and push them to the store (the React Leaderboard reads them). Cheap.
+  private _publishLeaderboard() {
+    if (!this.globe.nodes?.length) return;
+    const countries = this.globe.countryStats(this.filter);
+    const { scores, refId } = this.globe.distributionScores();
+    useStore.getState().setLeaderboard({ countries, score: scores[this.filter] ?? null, refId });
   }
 
   // ---- picking (ports ui.js _pick / _pickablesFor / _onClick) ----
