@@ -66,4 +66,13 @@ export const VIS = {
                            // validator shells so a focused hub has an emptier backdrop
   pollMs: 4000,            // how often to poll for new snapshots
   clusterMs: 25000,        // how often to refresh validator membership
+  priceMs: 120000,         // how often to refresh $DAG market data (CoinGecko)
+
+  // Per-metagraph snapshot history (the shared data layer behind the ribbon's
+  // derived DAG fee and the Snapshot DAG / ledger view).
+  metaSnapSeed: 40,        // snapshots fetched per metagraph on first load (history);
+                           // deep enough that fast metagraphs cover the visible ribbon
+  metaSnapTail: 8,         // snapshots fetched per metagraph on each live poll (newest)
+  metaSnapBuffer: 80,      // max snapshots retained per metagraph (rolling)
+  anchorIndexMax: 400,     // max global-tick timestamps kept in the anchor index
 };

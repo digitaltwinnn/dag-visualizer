@@ -3,7 +3,7 @@
 
 import * as THREE from "three";
 import { shortHash } from "./api.js";
-import { COLORS } from "./config.js";
+import { COLORS, METAGRAPHS } from "./config.js";
 
 const FOCI = {
   overview:   { pos: new THREE.Vector3(0, 15, 60),  target: new THREE.Vector3(0, 2, 0) },
@@ -14,12 +14,23 @@ const FOCI = {
 };
 
 export class UI {
-  constructor({ camera, renderer, controls, layers, globe }) {
+  constructor({ camera, renderer, controls, layers, globe, getAnchor, getSnapshots, onFilter, onSnapSelect }) {
     this.camera = camera;
     this.renderer = renderer;
     this.controls = controls;
     this.layers = layers;
     this.globe = globe;
+    // Per-tick derived DAG fee lookup (tracked metagraphs); null until polled.
+    this.getAnchor = getAnchor || (() => null);
+    // Returns the rolling global-snapshot buffer (oldest -> newest), for "follow
+    // latest relevant snapshot".
+    this.getSnapshots = getSnapshots || (() => []);
+    // Notified (id, hexColor|null) when the network filter changes, so the snapshot
+    // ribbon can cue which chips the selected metagraph anchored into.
+    this.onFilter = onFilter || (() => {});
+    // Notified with the snapshot now shown in the inspector (or null), so the ribbon
+    // can mirror it as the selected chip — click, follow-latest, and filter alike.
+    this.onSnapSelect = onSnapSelect || (() => {});
     this.mode = "hyper";
 
     this.raycaster = new THREE.Raycaster();
@@ -31,12 +42,21 @@ export class UI {
       tooltip: document.getElementById("tooltip"),
       inspector: document.getElementById("inspector"),
       inspContent: document.getElementById("inspector-content"),
+      metapane: document.getElementById("metapane"),
+      metapaneContent: document.getElementById("metapane-content"),
       source: document.getElementById("stat-source"),
-      ordinal: document.getElementById("stat-ordinal"),
-      height: document.getElementById("stat-height"),
       metagraphs: document.getElementById("stat-metagraphs"),
       nodes: document.getElementById("stat-nodes"),
       rate: document.getElementById("stat-rate"),
+      anchors: document.getElementById("stat-anchors"),
+      blocks: document.getElementById("stat-blocks"),
+      sparkRate: document.getElementById("spark-rate"),
+      sparkAnchors: document.getElementById("spark-anchors"),
+      sparkBlocks: document.getElementById("spark-blocks"),
+      fees: document.getElementById("stat-fees"),
+      feesDag: document.getElementById("stat-fees-dag"),
+      feesWrap: document.getElementById("stat-fees-wrap"),
+      sparkFees: document.getElementById("spark-fees"),
       learn: document.getElementById("learn"),
       steps: [...document.querySelectorAll(".learn-step")],
       leaderboard: document.getElementById("leaderboard"),
@@ -52,7 +72,12 @@ export class UI {
     this.filter = "all";
     this.country = null; // optional country drill-down within the network filter (geo view)
     this.lbExpanded = false; // whether the leaderboard's "Other countries" tail is expanded
-    this._rate = { times: [], value: "—" };
+    this._priceUsd = null;   // live $DAG/USD price (conversion for Fees/hr)
+    this._activity = null;   // last NetworkData.getActivity(), for fee re-render
+    this._metaPaneId = null; // metagraph id currently shown in the context pane
+    this._followSnap = false; // snapshot card follows the latest relevant snapshot
+    this._shownSnap = null;   // the snapshot currently in the inspector card
+    this._pulse = false;      // beat the live heartbeat on the next render (new snapshot)
     this._wire();
   }
 
@@ -62,6 +87,17 @@ export class UI {
     dom.addEventListener("click", (e) => this._onClick(e));
 
     document.getElementById("inspector-close").onclick = () => this._closeInspector();
+    const mpClose = document.getElementById("metapane-close");
+    if (mpClose) mpClose.onclick = () => this.selectFilter("all"); // clearing selection hides the pane
+
+    // Expand/collapse long descriptions (clamped to a few lines by default). Delegated
+    // so it survives the card re-rendering its innerHTML.
+    [this.el.inspContent, this.el.metapaneContent].forEach((c) => c?.addEventListener("click", (e) => {
+      const btn = e.target.closest(".desc-more");
+      if (!btn) return;
+      const expanded = btn.previousElementSibling.classList.toggle("expanded");
+      btn.textContent = expanded ? "Show less" : "Show more";
+    }));
 
     this.el.steps.forEach((step) => {
       step.onclick = () => {
@@ -139,17 +175,68 @@ export class UI {
   _onClick(e) {
     this._setPointer(e);
     const p = this._pick();
-    if (p) {
-      this.controls.autoRotate = false;
-      this._showInspector(p);
-    }
+    if (!p) return;
+    // Clicking a metagraph hub selects it (filter) — that opens its context pane and
+    // frames it — rather than opening a one-off inspector card.
+    if (p.kind === "meta") { this.selectFilter(p.cfg.id); return; }
+    this.controls.autoRotate = false;
+    this._showInspector(p);
   }
 
   // ---------------------------------------------------------- inspector
   _showInspector(p) {
-    const c = this.el.inspContent;
+    this.el.inspContent.innerHTML = this._cardHTML(p);
+    this.el.inspector.classList.remove("hidden");
+    // Showing anything other than a snapshot drops the ribbon highlight and stops
+    // following, so a new global snapshot won't yank this card back to a snapshot.
+    if (p.kind !== "snapshot") { this._followSnap = false; this.onSnapSelect(null); }
+  }
+
+  // A description paragraph that's clamped to a few lines (CSS adds the "…") with a
+  // "Show more" toggle — but only when the text is long enough to need it. The toggle
+  // is handled by the delegated listener wired in _wire().
+  _descHTML(text) {
+    if (!text) return "";
+    if (text.length <= 180) return `<p>${text}</p>`;
+    return `<p class="desc">${text}</p><button type="button" class="desc-more">Show more</button>`;
+  }
+
+  // Full inspector-card HTML (tag + title + sub + body) for a pick descriptor —
+  // shared by the click inspector and the persistent metagraph context pane.
+  _cardHTML(p) {
     const tagColor = { core: COLORS.core, l0: COLORS.l0, l1: COLORS.l1, snapshot: COLORS.core, meta: p.cfg?.color, metanode: p.meta?.color }[p.kind];
     const hex = "#" + new THREE.Color(tagColor || COLORS.core).getHexString();
+    const label = p.kind === "meta" ? "Metagraph" : p.kind === "metanode" ? "Metagraph node" : p.kind === "snapshot" ? "DAG snapshot" : p.kind.toUpperCase();
+    // Live/pin cue next to the tag (snapshot card only): "● Live" while following the
+    // latest relevant snapshot, "↻ Go live" once pinned (click to resume).
+    const live = p.kind === "snapshot"
+      ? `<button id="snap-follow" class="snap-pulse${this._followSnap ? " on" : ""}${this._pulse ? " beat" : ""}" title="${this._followSnap ? "Live — following the latest snapshot. Click to pin this one." : "Pinned. Click to go live."}">
+           <svg class="hb" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>
+           <span>${this._followSnap ? "Live" : "Go live"}</span>
+         </button>`
+      : "";
+    // Metagraph cards carry their colour-coded token tag (matching the filter chip)
+    // next to the "Metagraph" pill.
+    // Token badge next to the tag — the metagraph context pane shows its ticker, and
+    // the node card matches it: the coloured ticker if the metagraph runs a currency-L1
+    // cluster, else a muted "no token" badge (it's a data metagraph).
+    let token = "";
+    if (p.kind === "meta" && p.cfg) {
+      token = `<span class="mg-tag mg-tag--sel" style="--mg:${hex};margin:0 0 10px 6px">${p.cfg.ticker || p.cfg.name}</span>`;
+    } else if (p.kind === "metanode" && p.meta) {
+      const hasCurrency = (p.meta.nodes || []).some((n) => (n.roles || [n.layer]).includes("cl1"));
+      token = hasCurrency
+        ? `<span class="mg-tag mg-tag--sel" style="--mg:${hex};margin:0 0 10px 6px">${p.meta.symbol || "—"}</span>`
+        : `<span class="mg-tag mg-tag--other" style="margin:0 0 10px 6px">no token</span>`;
+    }
+    return `
+      <span class="insp-tag" style="background:${hex}22;color:${hex};border:1px solid ${hex}55">${label}</span>${token}${live}
+      <h3>${p.title}</h3>
+      ${p.sub ? `<p class="insp-sub">${p.sub}</p>` : ""}
+      ${this._cardBody(p)}`;
+  }
+
+  _cardBody(p) {
     let body = "";
 
     if (p.kind === "core") {
@@ -158,7 +245,7 @@ export class UI {
         <p>The <b>Global L0</b> is Constellation's base layer — the shared source of truth. L0 validators continuously bundle network activity into <b>global snapshots</b>, each cryptographically referencing the last to form the DAG.</p>
         ${row("Latest ordinal", d ? d.ordinal : "—")}
         ${row("Snapshot height", d ? d.height : "—")}
-        ${row("Active metagraphs", d ? d.metagraphSnapshotCount ?? "—" : "—")}
+        ${row("Metagraphs anchored", d ? d.metagraphSnapshotCount ?? "—" : "—")}
         <p style="margin-top:14px">Because validation happens in parallel across the Hypergraph, the network scales horizontally and stays <b>feeless</b> for end users.</p>`;
     } else if (p.kind === "l0") {
       body = `
@@ -172,18 +259,33 @@ export class UI {
         <p>Separating L1 from L0 keeps the secure base layer lean while apps stay fast.</p>`;
     } else if (p.kind === "snapshot") {
       const d = p.data;
-      const blocks = Array.isArray(d.blocks) ? d.blocks.length : 0;
+      const anchored = typeof d.metagraphSnapshotCount === "number" ? d.metagraphSnapshotCount : null;
       const when = d.timestamp ? new Date(d.timestamp).toLocaleTimeString() : "—";
+      // Derived DAG fee for this tick (from tracked metagraphs). The anchored COUNT
+      // is exact (Global L0 reports it); the FEE is a floor when we can't attribute
+      // every anchored snapshot (unlisted metagraphs anchor too — no fee source).
+      const a = this.getAnchor(d.timestamp);
+      const identified = a ? a.count : 0;
+      const feeDag = a ? a.fee / 1e8 : 0;
+      const full = anchored != null && a != null && identified >= anchored;
+      const pct = anchored ? Math.round((identified / anchored) * 100) : 0;
+      // Keep this panel simple: what the snapshot settles + the fee. The DAG mechanics
+      // (ordinal vs height vs sub-height, parent-hash links forming the DAG edges) are
+      // intentionally NOT explained here — they belong in the Snapshot DAG (ledger)
+      // view, which can show the structure visually rather than in prose. See
+      // [[dag-ledger-view-plan]].
+      // Height = depth of the block DAG; sub-height orders snapshots that share a
+      // height — two coordinates of the same position, so shown as one "h · sub" row.
+      const heightTxt = d.subHeight != null
+        ? `${(d.height ?? 0).toLocaleString()} · ${d.subHeight}`
+        : (d.height ?? 0).toLocaleString();
       body = `
-        ${row("Ordinal", d.ordinal)}
-        ${row("Height", d.height)}
-        ${d.subHeight != null ? row("Sub-height", d.subHeight) : ""}
-        ${row("Blocks", blocks)}
-        ${row("Timestamp", when)}
-        ${rowHash("Snapshot hash", d.hash)}
-        ${rowHash("Parent hash", d.lastSnapshotHash)}
-        <p style="margin-top:14px"><b>Ordinal</b> counts snapshots — it rises every few seconds, even when one is empty. <b>Height</b> is the depth of the block DAG: it only climbs when real activity deepens it, so it can sit still while the ordinal keeps rising (<b>sub-height</b> orders snapshots that share a height).</p>
-        <p style="margin-top:10px">Each snapshot points at its <b>parent</b> via the previous hash — that link is the edge of the DAG. Constellation is a graph, not a chain: blocks can form in parallel, so a snapshot can carry blocks without raising the height.</p>`;
+        <div class="insp-time"><span class="insp-time-label">Snapshot time</span><span class="insp-time-val">${when}</span></div>
+        ${this._anchoredTags(a, anchored)}
+        ${a && a.fee > 0 ? row("Settlement fees", `${feeDag.toFixed(4)} DAG ${full ? `<span class="insp-mini ok">complete</span>` : `<span class="insp-mini approx">at least</span>`}`) : ""}
+        ${row(d.subHeight != null ? "Height · sub-height" : "Height", heightTxt)}
+        ${a && a.fee > 0 && !full ? `<p style="margin-top:14px">Each anchored snapshot pays a <b>$DAG fee</b> set by its size. We can attribute <b>${identified} of ${anchored}</b> (${pct}%) to publicly listed metagraphs, so the total is <b>at least ${feeDag.toFixed(4)} $DAG</b>.</p>` : ""}
+        ${full ? `<p style="margin-top:14px">Every anchored snapshot here is publicly listed, so the <b>${feeDag.toFixed(4)} DAG</b> fee total is complete.</p>` : ""}`;
     } else if (p.kind === "metanode") {
       const m = p.meta;
       // A metagraph node often serves several roles at once (consensus L0, plus
@@ -191,28 +293,21 @@ export class UI {
       const ROLE = { l0: "L0 (consensus)", cl1: "Currency L1", dl1: "Data L1" };
       const roles = (p.node.roles && p.node.roles.length ? p.node.roles : [p.node.layer])
         .map((r) => ROLE[r] || r).join(" · ");
-      // A token only exists if the metagraph actually runs a currency-L1 cluster;
-      // the `symbol` is always set (it's just an identifier), so don't trust it.
-      const hasCurrency = (m.nodes || []).some((n) => (n.roles || [n.layer]).includes("cl1"));
+      // Token is shown as a header badge (see _cardHTML), so it's not repeated here.
       body = `
-        ${m.description ? `<p>${m.description}</p>` : ""}
-        ${row("Token", hasCurrency ? (m.symbol || "—") : "none (data metagraph)")}
         ${row("Runs", roles)}
-        ${siteRow(m.siteUrl)}
-        ${nodeRows(p.node)}${geoRows(p.geo)}
+        ${nodeRows(p.node, false)}${geoRows(p.geo, false)}
         <p style="margin-top:14px">${metaNetworkText(m)}</p>`;
     } else if (p.kind === "meta") {
       const cfg = p.cfg;
-      const st = p.state;
-      const liveTag = st?.real ? `<span style="color:#36e29a">● live data</span>` : `<span style="color:#ffd166">● simulated cadence</span>`;
-      const when = st?.ts ? new Date(st.ts).toLocaleTimeString() : "—";
-
+      // The metagraph context pane is static identity only — its live anchoring (and
+      // the global snapshot ordinal) are shown in the snapshot card beneath it, so we
+      // don't repeat a separate, ever-changing metagraph ordinal here.
       // Data-driven facts from the live-baked metagraph (nodes, roles, locations).
       const mg = this.globe.metaList?.find((x) => x.id === cfg.id) || null;
       const nodes = (mg && mg.nodes) || [];
-      let facts = row("Ticker", cfg.ticker);
+      let facts = "";
       if (nodes.length) {
-        const hasCurrency = nodes.some((n) => _rolesOf(n).includes("cl1"));
         const present = _ROLE_ORDER.filter((r) => nodes.some((n) => _rolesOf(n).includes(r)));
         const hybrid = nodes.filter((n) => _rolesOf(n).length > 1).length;
         const dedBy = {};
@@ -223,7 +318,6 @@ export class UI {
           .filter((r) => r.metaId === cfg.id)
           .map((r) => r.pick.geo && r.pick.geo.country).filter(Boolean)).size;
         facts =
-          row("Token", hasCurrency ? (mg.symbol || cfg.ticker) : "none (data metagraph)") +
           row("Layers", present.map((r) => _ROLE_FR[r]).join(", ")) +
           row("Nodes", nodes.length) +
           row("Make-up", _joinList(parts)) +
@@ -234,36 +328,116 @@ export class UI {
       // inspector); fall back to the hand-written config blurb only if absent.
       const blurb = (mg && mg.description) || cfg.blurb;
       body = `
-        <p>${blurb}</p>
+        ${this._descHTML(blurb)}
         ${facts}
-        ${siteRow(mg && mg.siteUrl)}
-        ${row("Latest snapshot", st ? st.ordinal : "—")}
-        ${row("Updated", when)}
-        ${st?.hash ? rowHash("Snapshot hash", st.hash) : ""}
-        ${row("Data source", liveTag)}
-        <p style="margin-top:14px">An independent network anchored into the Global L0 — it inherits the Hypergraph's security while staying sovereign.</p>`;
+        ${siteRow(mg && mg.siteUrl)}`;
     }
-
-    c.innerHTML = `
-      <span class="insp-tag" style="background:${hex}22;color:${hex};border:1px solid ${hex}55">${p.kind === "meta" ? "Metagraph" : p.kind === "metanode" ? "Metagraph node" : p.kind === "snapshot" ? "DAG snapshot" : p.kind.toUpperCase()}</span>
-      <h3>${p.title}</h3>
-      <p class="insp-sub">${p.sub}</p>
-      ${body}`;
-    this.el.inspector.classList.remove("hidden");
+    return body;
   }
 
-  // Opens the inspector for a snapshot picked from the bottom stream.
-  showSnapshot(data) {
+  // Persistent "context" card for the selected metagraph — shown automatically
+  // whenever a metagraph is the active filter, in every view. Static identity only
+  // (its live anchoring shows in the snapshot card beneath it), so it never needs
+  // re-rendering as snapshots arrive.
+  showMetaPane(filterId) {
+    const meta = this.layers.metas?.find((m) => m.cfg.id === filterId);
+    if (!meta) return this.hideMetaPane();
+    this._metaPaneId = filterId;
+    this.el.metapaneContent.innerHTML = this._cardHTML({
+      kind: "meta", cfg: meta.cfg,
+      title: meta.cfg.name, sub: "", // identity is in the header pills (Metagraph + token)
+    });
+    this.el.metapane.classList.remove("hidden");
+  }
+
+  hideMetaPane() {
+    this._metaPaneId = null;
+    this.el.metapane?.classList.add("hidden");
+  }
+
+  // Show a snapshot in the inspector card. `following` = track the latest relevant
+  // snapshot live (updated on each new global snapshot); otherwise it's pinned to
+  // this one (e.g. the user clicked a ribbon chip).
+  showSnapshot(data, following = false) {
+    if (!data) return;
+    // Beat the live heartbeat only when the followed card advances to a NEW snapshot —
+    // not on pins or no-op re-renders of the same one. Consumed by _cardHTML's button.
+    this._pulse = following && !!this._shownSnap && data.ordinal !== this._shownSnap.ordinal;
+    this._followSnap = following;
+    this._shownSnap = data;
     const blocks = Array.isArray(data.blocks) ? data.blocks.length : 0;
+    const anchored = typeof data.metagraphSnapshotCount === "number" ? data.metagraphSnapshotCount : null;
     this._showInspector({
       kind: "snapshot",
       title: `Global snapshot #${data.ordinal}`,
-      sub: `${blocks} block${blocks === 1 ? "" : "s"} · height ${data.height}`,
+      sub: anchored != null
+        ? `${anchored} metagraph snapshot${anchored === 1 ? "" : "s"} anchored · ${blocks} block${blocks === 1 ? "" : "s"}`
+        : `${blocks} block${blocks === 1 ? "" : "s"} · height ${data.height}`,
       data,
     });
+    const btn = document.getElementById("snap-follow");
+    if (btn) btn.onclick = () => this._toggleFollow();
+    // Mirror this snapshot as the selected chip in the ribbon (highlight + scroll-in).
+    this.onSnapSelect(data);
   }
 
-  _closeInspector() { this.el.inspector.classList.add("hidden"); }
+  // Re-evaluate the followed snapshot — used when the anchor index fills in just
+  // after a snapshot arrives, so a metagraph filter lands on the chip it anchored.
+  refreshFollow() {
+    if (this._followSnap) this._followLatest();
+  }
+
+  // The latest snapshot worth showing: when a metagraph is selected, the newest one
+  // it anchored into (falling back to the newest global snapshot if it hasn't
+  // anchored in the buffered window); otherwise just the newest global snapshot.
+  _latestRelevantSnapshot() {
+    const list = this.getSnapshots() || [];
+    if (!list.length) return null;
+    const mgSelected = this.layers.metas?.some((m) => m.cfg.id === this.filter);
+    if (mgSelected) {
+      for (let i = list.length - 1; i >= 0; i--) {
+        const an = this.getAnchor(list[i].timestamp);
+        if (an && an.metaIds && an.metaIds.has(this.filter)) return list[i];
+      }
+    }
+    return list[list.length - 1];
+  }
+
+  _followLatest() {
+    const snap = this._latestRelevantSnapshot();
+    if (snap) this.showSnapshot(snap, true);
+  }
+
+  _toggleFollow() {
+    if (this._followSnap) this.showSnapshot(this._shownSnap, false); // pin current
+    else this._followLatest();                                       // resume following
+  }
+
+  // Colour-coded tags of the publicly listed metagraphs that anchored into a
+  // snapshot (from the anchor index). Adds a muted "+ unlisted" tag when the
+  // authoritative anchored count exceeds what we could attribute. Empty until the
+  // tick's metagraph snapshots have been polled.
+  _anchoredTags(a, anchored) {
+    if (!a || !a.metaIds || !a.metaIds.size) return "";
+    const cfgById = new Map((this.layers.metas || []).map((m) => [m.cfg.id, m.cfg]));
+    let tags = "";
+    for (const id of a.metaIds) {
+      const cfg = cfgById.get(id);
+      if (!cfg) continue;
+      const hex = "#" + new THREE.Color(cfg.color).getHexString();
+      const sel = id === this.filter ? " mg-tag--sel" : "";
+      const n = (a.metaCounts && a.metaCounts.get(id)) || 1;
+      tags += `<span class="mg-tag${sel}" style="--mg:${hex}">${cfg.ticker || cfg.name} (${n})</span>`;
+    }
+    if (anchored != null && anchored > a.count) tags += `<span class="mg-tag mg-tag--other">unlisted (${anchored - a.count})</span>`;
+    return `<div class="insp-mgs"><span class="insp-mgs-label">Metagraph snapshots anchored here</span><div class="insp-mgs-tags">${tags}</div></div>`;
+  }
+
+  _closeInspector() {
+    this.el.inspector.classList.add("hidden");
+    this._followSnap = false;
+    this.onSnapSelect(null); // drop the ribbon highlight
+  }
 
   // ---------------------------------------------------------- camera focus
   _tweenTo(toPos, toTgt) {
@@ -510,8 +684,21 @@ export class UI {
     for (const m of list) {
       html += chip(m.id, hex(m.color), m.symbol || m.name, m.nodes.length);
     }
+    // Config metagraphs with no locatable nodes are shown in the 3D Hypergraph (their
+    // hub is config-driven) but can't be plotted/filtered on the globe. Surface them
+    // as disabled chips so the two views stay consistent — greyed and non-clickable,
+    // with a (0) node count matching the others — rather than dropping them silently.
+    const shown = new Set(list.map((m) => m.id));
+    for (const c of METAGRAPHS) {
+      if (shown.has(c.id)) continue;
+      html += `<button class="mf-chip mf-chip--off" disabled title="No live nodes found at last data refresh — shown in the Hypergraph but not locatable on the globe">
+         <span class="mf-dot" style="background:${hex(c.color)}"></span>
+         <span class="mf-label">${c.ticker || c.name}</span>
+         <span class="mf-count">0</span>
+       </button>`;
+    }
     this.el.mfChips.innerHTML = html;
-    this.el.mfChips.querySelectorAll(".mf-chip").forEach((btn) => {
+    this.el.mfChips.querySelectorAll(".mf-chip:not(.mf-chip--off)").forEach((btn) => {
       btn.onclick = () => this.selectFilter(btn.dataset.filter);
     });
   }
@@ -521,6 +708,19 @@ export class UI {
     this.el.mfChips?.querySelectorAll(".mf-chip").forEach((b) =>
       b.classList.toggle("active", b.dataset.filter === filter));
     this._applyFilter();
+    // Tell the ribbon which metagraph (+colour) is selected; only metagraph filters
+    // carry a colour — All / L0 / L1 clear the cue.
+    const mg = this.layers.metas?.find((m) => m.cfg.id === filter);
+    this.onFilter(filter, mg ? "#" + new THREE.Color(mg.cfg.color).getHexString() : null);
+    // Auto-show the metagraph context pane + a live "following" snapshot card when a
+    // metagraph is selected; clearing the filter hides the pane and stops following.
+    if (mg) {
+      this.showMetaPane(filter);
+      this._followLatest();
+    } else {
+      this.hideMetaPane();
+      if (this._followSnap) { this._followSnap = false; this._closeInspector(); }
+    }
   }
 
   _startTour() {
@@ -544,28 +744,126 @@ export class UI {
   // ---------------------------------------------------------- live stats
   setStatus(live) {
     this.el.source.textContent = live ? "LIVE · mainnet" : "SIMULATED";
-    this.el.source.className = "stat-value " + (live ? "live" : "sim");
+    this.el.source.className = "data-pill " + (live ? "live" : "sim");
   }
 
   setNodeCounts(l0, l1) {
     this.el.nodes.textContent = `${l0.length} / ${l1.length}`;
   }
 
-  onGlobal(latest) {
+  // $DAG market data (from CoinGecko). The price isn't shown on its own — it's the
+  // conversion rate for Fees/hr (USD). Store it and re-render the fee stat.
+  setPrice(p) {
+    this._priceUsd = (p && typeof p.usd === "number") ? p.usd : null;
+    this._renderFees();
+  }
+
+  // `activity` is NetworkData.getActivity() — header rates + per-snapshot trends.
+  onGlobal(latest, activity) {
     this.layers._latest = latest;
-    this.el.ordinal.textContent = latest.ordinal.toLocaleString();
-    this.el.height.textContent = latest.height.toLocaleString();
-    if (typeof latest.metagraphSnapshotCount === "number") {
-      this.el.metagraphs.textContent = this.layers.metas.length;
+    // "Public metagraphs" = the publicly listed metagraphs we track (filter footnote).
+    this.el.metagraphs.textContent = this.layers.metas.length;
+    if (activity) {
+      const fmt = (v) => (v < 10 ? v.toFixed(1) : Math.round(v).toLocaleString());
+      this.el.rate.textContent = fmt(activity.snapsPerHour);
+      if (this.el.anchors) this.el.anchors.textContent = fmt(activity.anchorsPerHour);
+      if (this.el.blocks) this.el.blocks.textContent = fmt(activity.blocksPerHour);
+      this._spark(this.el.sparkRate, activity.cadenceSeries, "#2af5ff");
+      this._spark(this.el.sparkAnchors, activity.anchoredSeries, "#6ee7b0");
+      this._spark(this.el.sparkBlocks, activity.blocksSeries, "#ffd166");
     }
-    // snapshots/min from arrival times
-    const now = performance.now();
-    this._rate.times.push(now);
-    this._rate.times = this._rate.times.filter((x) => now - x < 60000);
-    if (this._rate.times.length >= 2) {
-      const span = (now - this._rate.times[0]) / 1000;
-      const perMin = (this._rate.times.length - 1) / span * 60;
-      this.el.rate.textContent = perMin.toFixed(1);
+    this.updateFees(activity);
+    // Keep the snapshot card on the latest relevant snapshot while following.
+    if (this._followSnap) this._followLatest();
+  }
+
+  // Store the latest activity and re-render the fee stat. Called from onGlobal and
+  // (debounced) from the `anchor` event, since the anchor index fills in just after
+  // a snapshot arrives.
+  updateFees(activity) {
+    if (activity) this._activity = activity;
+    this._renderFees();
+  }
+
+  // Fees/hr in USD (DAG fees × live $DAG price), with the DAG amount as a muted
+  // secondary. "≥" because only publicly listed metagraphs' fees are visible (a
+  // lower bound). Falls back to showing DAG as primary until the price loads.
+  _renderFees() {
+    const a = this._activity;
+    if (!a || !this.el.fees || a.feesPerHour == null) return;
+    const dag = a.feesPerHour;
+    const dagTxt = `≥${dag >= 1 ? dag.toFixed(2) : dag.toFixed(3)} DAG`;
+    if (this._priceUsd != null) {
+      const usd = dag * this._priceUsd;
+      const usdTxt = usd >= 1 ? usd.toFixed(2) : usd >= 0.01 ? usd.toFixed(3) : usd.toFixed(4);
+      this.el.fees.textContent = `≥$${usdTxt}`;
+      if (this.el.feesDag) this.el.feesDag.textContent = dagTxt;
+    } else {
+      this.el.fees.textContent = dagTxt;
+      if (this.el.feesDag) this.el.feesDag.textContent = "";
+    }
+    this._spark(this.el.sparkFees, a.feesSeries, "#f5c451");
+    if (this.el.feesWrap) this.el.feesWrap.title =
+      "DAG settlement fees per hour (converted to USD at the live $DAG price) — summed from publicly listed metagraphs, so it's a lower bound (others anchor too).";
+  }
+
+  // Update a sparkline <svg>, easing from the currently-shown series to the new one
+  // (~500ms) so the line morphs smoothly each snapshot instead of snapping. First
+  // render (or a length change) draws instantly.
+  _spark(el, target, color) {
+    if (!el) return;
+    if (!target || target.length < 2) { el.replaceChildren(); el._poly = el._area = null; el._cur = null; return; }
+    cancelAnimationFrame(el._raf);
+    const from = (el._cur && el._cur.length === target.length) ? el._cur : null;
+    if (!from) { el._cur = target.slice(); this._drawSpark(el, el._cur, color); return; }
+    const startT = performance.now(), dur = 500;
+    const step = (now) => {
+      const t = Math.min(1, (now - startT) / dur);
+      const e = t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2; // easeInOutQuad
+      const cur = target.map((v, i) => from[i] + (v - from[i]) * e);
+      this._drawSpark(el, cur, color);
+      if (t < 1) el._raf = requestAnimationFrame(step);
+      else el._cur = target.slice();
+    };
+    el._raf = requestAnimationFrame(step);
+  }
+
+  // Create the sparkline's <polygon>/<polyline> once; later frames only mutate
+  // their `points` (no innerHTML reparse).
+  _ensureSpark(el) {
+    if (el._poly) return;
+    const NS = "http://www.w3.org/2000/svg";
+    el.setAttribute("viewBox", "0 0 46 15");
+    el.setAttribute("preserveAspectRatio", "none");
+    const area = document.createElementNS(NS, "polygon");
+    area.setAttribute("opacity", "0.13");
+    const poly = document.createElementNS(NS, "polyline");
+    poly.setAttribute("fill", "none");
+    poly.setAttribute("stroke-width", "1.2");
+    poly.setAttribute("stroke-linejoin", "round");
+    poly.setAttribute("stroke-linecap", "round");
+    el.replaceChildren(area, poly);
+    el._area = area; el._poly = poly; el._color = null;
+  }
+
+  // Update the area+line sparkline from a series of values.
+  _drawSpark(el, values, color) {
+    this._ensureSpark(el);
+    const w = 46, h = 15;
+    const max = Math.max(...values), min = Math.min(...values);
+    const range = max - min || 1;
+    let line = "";
+    for (let i = 0; i < values.length; i++) {
+      const x = (i / (values.length - 1)) * w;
+      const y = h - 1 - ((values[i] - min) / range) * (h - 2);
+      line += (i ? " " : "") + x.toFixed(1) + "," + y.toFixed(1);
+    }
+    el._area.setAttribute("points", `0,${h} ${line} ${w},${h}`);
+    el._poly.setAttribute("points", line);
+    if (el._color !== color) {
+      el._area.setAttribute("fill", color);
+      el._poly.setAttribute("stroke", color);
+      el._color = color;
     }
   }
 
@@ -622,18 +920,18 @@ function metaNetworkText(m) {
 
   return `${lead}, anchored into the Global L0.${comp}`;
 }
-function nodeRows(node) {
+function nodeRows(node, showIp = true) {
   if (!node) return "";
   const ready = node.state === "Ready";
   const color = ready ? "#36e29a" : "#ffd166";
   return row("State", `<span style="color:${color}">● ${node.state}</span>`) +
-    (node.ip ? row("IP", node.ip) : "") +
+    (node.ip && showIp ? row("IP", node.ip) : "") +
     (node.id ? rowHash("Node ID", node.id) : "");
 }
-function geoRows(g) {
+function geoRows(g, showCoords = true) {
   if (!g) return "";
   return row("Location", `${g.city ? g.city + ", " : ""}${g.country}`) +
-    row("Coordinates", `${g.lat.toFixed(2)}, ${g.lon.toFixed(2)}`);
+    (showCoords ? row("Coordinates", `${g.lat.toFixed(2)}, ${g.lon.toFixed(2)}`) : "");
 }
 function ccToFlag(cc) {
   if (!cc || cc.length !== 2) return "🏳️";
