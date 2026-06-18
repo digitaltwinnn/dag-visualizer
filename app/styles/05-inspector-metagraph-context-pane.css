@@ -14,9 +14,15 @@
   background: transparent; border: none; color: var(--muted);
   font-size: 22px; cursor: pointer; line-height: 1; padding: 2px 8px;
 }
+/* Card header row: factual tag(s) on the left, the real-time control pushed right
+   (padding clears the absolute close ×). */
+.insp-head {
+  display: flex; align-items: center; flex-wrap: wrap; gap: 6px;
+  margin-bottom: 10px; padding-right: 28px;
+}
 .insp-tag {
   display: inline-block; vertical-align: middle; font-size: 10px; text-transform: uppercase;
-  letter-spacing: 0.08em; padding: 4px 9px; border-radius: 20px; margin-bottom: 10px;
+  letter-spacing: 0.08em; padding: 4px 9px; border-radius: 20px;
 }
 #inspector h3, #metapane h3 { margin: 4px 0 4px; font-size: 17px; }
 #inspector .insp-sub, #metapane .insp-sub { color: var(--muted); font-size: 12px; margin: 0 0 14px; }

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
-import { getNetwork } from "@/src/data/network";
+import { getNetwork, metagraphById } from "@/src/data/network";
 import { useStore } from "@/src/store/store";
 import { followLatest } from "@/src/data/follow";
 
@@ -29,10 +29,17 @@ export default function FollowController() {
     };
   }, []);
 
-  // When the user toggles Live on (or switches the filter while following), jump to
-  // the latest relevant snapshot immediately.
   const following = useStore((s) => s.following);
   const filter = useStore((s) => s.filter);
+  const setFollowing = useStore((s) => s.setFollowing);
+
+  // Selecting a metagraph filter (chip OR hub click) goes real-time for it; All/L0/L1
+  // pins (no auto-follow). Runs on filter change only.
+  useEffect(() => {
+    setFollowing(metagraphById(filter) != null);
+  }, [filter, setFollowing]);
+
+  // When following turns on (toggle / filter change), jump to the latest relevant snapshot.
   useEffect(() => {
     if (following) followLatest();
   }, [following, filter]);

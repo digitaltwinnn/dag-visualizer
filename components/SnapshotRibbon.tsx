@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { getNetwork, getAnchor, metagraphById } from "@/src/data/network";
+import { latestRelevant } from "@/src/data/follow";
 import { useStore } from "@/src/store/store";
 import type { GlobalEvent, GlobalSnapshot } from "@/src/data/types";
 
@@ -26,10 +27,10 @@ export default function SnapshotRibbon() {
   const selectedOrdinal =
     inspect?.kind === "snapshot" ? inspect.data?.ordinal ?? null : null;
 
-  // Clicking a chip pins that snapshot — stop following so the card stays put and
-  // shows "Go live" (instead of being dragged back to the newest each tick).
+  // Clicking a chip pins it (stop following) UNLESS it's the latest relevant snapshot
+  // for the current filter — clicking the tip resumes real-time.
   const pick = (d: GlobalSnapshot) => {
-    setFollowing(false);
+    setFollowing(latestRelevant(filter)?.ordinal === d.ordinal);
     setInspect({ kind: "snapshot", title: `Global snapshot #${d.ordinal}`, data: d });
   };
 

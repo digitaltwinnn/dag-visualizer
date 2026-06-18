@@ -1,11 +1,15 @@
 /* ── Snapshot live heartbeat (5b, ported) ────────────────────────────────── */
 .snap-pulse {
   display: inline-flex; align-items: center; gap: 5px; vertical-align: middle;
-  margin: 0 0 10px 6px; padding: 2px 7px; border-radius: 20px; cursor: pointer;
+  margin-left: auto; padding: 2px 7px; border-radius: 20px; cursor: pointer;
   font-size: 10.5px; font-weight: 700; letter-spacing: 0.04em;
   border: none; background: none; color: var(--muted);
 }
-.snap-pulse .hb { width: 13px; height: 13px; fill: currentColor; flex: none; transform-origin: center; }
+/* Heartbeat (ECG) line — drawn, not filled. */
+.snap-pulse .hb {
+  width: 18px; height: 13px; flex: none; transform-origin: center;
+  fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round;
+}
 .snap-pulse:hover { color: var(--text); }
 .snap-pulse.on { color: #6ee7b0; }
 .snap-pulse.beat { animation: snap-beat-ring 0.9s ease-out 1; }

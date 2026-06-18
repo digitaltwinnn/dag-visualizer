@@ -22,13 +22,13 @@ function LiveHeart({ ordinal }: { ordinal: number }) {
     <button
       key={following ? ordinal : "pinned"}
       className={"snap-pulse" + (following ? " on beat" : "")}
-      title={following ? "Live — following the latest snapshot. Click to pin this one." : "Pinned. Click to go live."}
+      title={following ? "Real-time — following the latest snapshot. Click to pin this one." : "Pinned. Click to go real-time."}
       onClick={() => setFollowing(!following)}
     >
       <svg className="hb" viewBox="0 0 24 24" aria-hidden="true">
-        <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" />
+        <path d="M1 12h5l2-6 3.5 13 2.5-9 1.5 4h5" />
       </svg>
-      <span>{following ? "Live" : "Go live"}</span>
+      <span>{following ? "Real-time" : "Go live"}</span>
     </button>
   );
 }
@@ -185,14 +185,17 @@ export default function InspectorCard({ p }: { p: PickDescriptor }) {
 
   return (
     <>
-      <span
-        className="insp-tag"
-        style={{ background: `${h}22`, color: h, border: `1px solid ${h}55` }}
-      >
-        {label}
-      </span>
-      {token}
-      {p.kind === "snapshot" && p.data && <LiveHeart ordinal={p.data.ordinal} />}
+      <div className="insp-head">
+        <span
+          className="insp-tag"
+          style={{ background: `${h}22`, color: h, border: `1px solid ${h}55` }}
+        >
+          {label}
+        </span>
+        {token}
+        {/* Real-time control sits on the right; the factual tags stay left. */}
+        {p.kind === "snapshot" && p.data && <LiveHeart ordinal={p.data.ordinal} />}
+      </div>
       {p.title && <h3>{p.title}</h3>}
       {p.sub && <p className="insp-sub">{p.sub}</p>}
       <Body p={p} nodes={nodes} latest={latest} metaList={metaList} />
