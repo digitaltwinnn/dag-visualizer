@@ -28,7 +28,7 @@ function LiveHeart({ ordinal }: { ordinal: number }) {
       <svg className="hb" viewBox="0 0 24 24" aria-hidden="true">
         <path d="M1 12h5l2-6 3.5 13 2.5-9 1.5 4h5" />
       </svg>
-      <span>{following ? "Real-time" : "Go live"}</span>
+      <span>{following ? "Real-time" : "Go real-time"}</span>
     </button>
   );
 }
