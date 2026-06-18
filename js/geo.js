@@ -6,9 +6,9 @@ const LS_KEY = "dag-geo-cache-v1";
 
 export async function loadGeoCache() {
   const map = {};
-  // baked cache (covers the current validator set)
+  // baked validator geo seed, served on-disk by the Next /api/geo route
   try {
-    const res = await fetch("./data/geo.json");
+    const res = await fetch("/api/geo");
     if (res.ok) Object.assign(map, await res.json());
   } catch (e) { /* ignore */ }
   // anything resolved on previous visits

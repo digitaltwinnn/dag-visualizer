@@ -101,16 +101,21 @@ export class Engine {
       this._buildGlobe();
     });
 
+    // Validator geo seed (instant plot); merged, not replaced, so it doesn't clobber
+    // the metagraph IP geo that arrives from /api/metagraphs.
     loadGeoCache().then((m: Record<string, any>) => {
-      this.geoMap = m;
+      this.geoMap = { ...this.geoMap, ...m };
       this._buildGlobe();
       this._applyMetagraphs();
     });
 
+    // Live metagraphs + their geolocated node IPs (server-side; Phase 6 route).
     try {
-      const r = await fetch("/data/metagraphs.json");
+      const r = await fetch("/api/metagraphs");
       if (r.ok) {
-        this.metaData = await r.json();
+        const { metagraphs, geo } = await r.json();
+        if (geo) this.geoMap = { ...this.geoMap, ...geo };
+        this.metaData = metagraphs;
         this._applyMetagraphs();
       }
     } catch {
