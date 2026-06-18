@@ -22,8 +22,16 @@ export default function SnapshotRibbon() {
   const filter = useStore((s) => s.filter);
   const inspect = useStore((s) => s.inspect);
   const setInspect = useStore((s) => s.setInspect);
+  const setFollowing = useStore((s) => s.setFollowing);
   const selectedOrdinal =
     inspect?.kind === "snapshot" ? inspect.data?.ordinal ?? null : null;
+
+  // Clicking a chip pins that snapshot — stop following so the card stays put and
+  // shows "Go live" (instead of being dragged back to the newest each tick).
+  const pick = (d: GlobalSnapshot) => {
+    setFollowing(false);
+    setInspect({ kind: "snapshot", title: `Global snapshot #${d.ordinal}`, data: d });
+  };
 
   useEffect(() => {
     const net = getNetwork();
@@ -112,7 +120,7 @@ export default function SnapshotRibbon() {
                 className={cls}
                 style={cueStyle}
                 title={`Snapshot #${d.ordinal.toLocaleString()} · anchored ${anchored} metagraph snapshot${anchored === 1 ? "" : "s"} · ${blocks} block${blocks === 1 ? "" : "s"}`}
-                onClick={() => setInspect({ kind: "snapshot", title: `Global snapshot #${d.ordinal}`, data: d })}
+                onClick={() => pick(d)}
               >
                 <span className="chip-ord">#{d.ordinal.toLocaleString()}</span>
                 <span className="chip-meta">
