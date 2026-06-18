@@ -52,6 +52,8 @@ export class Engine {
   private _hoverKey: string | null = null;
 
   private unsub: Array<() => void> = [];
+  private metaTimer: ReturnType<typeof setInterval> | undefined;
+  private onResize = () => this.ctx.resize?.();
 
   constructor(canvas: HTMLCanvasElement) {
     this.canvas = canvas;
@@ -60,6 +62,9 @@ export class Engine {
     this.globe = new Globe(this.ctx.scene, this.layers, this.ctx.camera);
     canvas.addEventListener("click", this.onClick);
     canvas.addEventListener("pointermove", this.onMove);
+    // The engine owns the resize handler (createScene no longer adds one) so it's
+    // cleaned up on dispose — no leak across StrictMode remounts / HMR.
+    window.addEventListener("resize", this.onResize);
 
     // Apply current store state, then react to changes (Lane B command bridge).
     const s = useStore.getState();
@@ -110,16 +115,34 @@ export class Engine {
     });
 
     // Live metagraphs + their geolocated node IPs (server-side; Phase 6 route).
+    await this.refreshMeta(true);
+    // Keep a long-open tab current. The snapshot/cluster/price feeds already poll
+    // client-side (NetworkData), but the metagraph SET is fetched once — so re-pull
+    // it on an interval too (Vercel never restarts; ISR only freshens the server
+    // cache, not an idle client). Matches the route's revalidate window.
+    this.metaTimer = setInterval(() => this.refreshMeta(false), 10 * 60 * 1000);
+  }
+
+  // Fetch the (server-cached, live) metagraph set + node geo. On the initial load we
+  // build + frame as usual; on a periodic refresh we rebuild the nodes ONLY if the
+  // set actually changed, and WITHOUT moving the camera (don't yank the user's view).
+  private async refreshMeta(initial: boolean) {
     try {
       const r = await fetch("/api/metagraphs");
-      if (r.ok) {
-        const { metagraphs, geo } = await r.json();
-        if (geo) this.geoMap = { ...this.geoMap, ...geo };
-        this.metaData = metagraphs;
+      if (!r.ok) return;
+      const { metagraphs, geo } = await r.json();
+      if (geo) this.geoMap = { ...this.geoMap, ...geo };
+      const changed = JSON.stringify(metagraphs) !== JSON.stringify(this.metaData);
+      this.metaData = metagraphs;
+      if (initial) {
         this._applyMetagraphs();
+      } else if (changed && Object.keys(this.geoMap).length) {
+        this.globe.setMetagraphs(this.metaData, this.geoMap);
+        this._publishMetaList();
+        this._publishLeaderboard();
       }
     } catch {
-      /* offline: globe shows validators only */
+      /* keep showing the last good data */
     }
   }
 
@@ -373,8 +396,10 @@ export class Engine {
 
   dispose() {
     this.disposed = true;
+    if (this.metaTimer) clearInterval(this.metaTimer);
     this.canvas.removeEventListener("click", this.onClick);
     this.canvas.removeEventListener("pointermove", this.onMove);
+    window.removeEventListener("resize", this.onResize);
     this.unsub.forEach((u) => u());
     cancelAnimationFrame(this.raf);
     this.ctx.controls.dispose?.();

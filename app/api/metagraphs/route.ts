@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
-import { readFile } from "node:fs/promises";
-import path from "node:path";
+import metagraphsBaked from "@/data/metagraphs.json";
+import geoBaked from "@/data/geo.json";
 
 // Live server-side port of scripts/bake-metagraphs.py. Next's Node server CAN reach
 // the metagraph cluster load balancers (plain HTTP, custom ports, no CORS) that a
@@ -124,15 +124,9 @@ async function fetchLive(): Promise<{ metagraphs: Metagraph[]; geo: GeoMap }> {
   return { metagraphs: metagraphs.filter((m): m is Metagraph => m !== null), geo };
 }
 
-// On-disk bake (data/*.json) — resilience fallback when the live fetch fails.
-async function fetchBaked(): Promise<{ metagraphs: Metagraph[]; geo: GeoMap }> {
-  const dir = path.join(process.cwd(), "data");
-  const [metagraphs, geo] = await Promise.all([
-    readFile(path.join(dir, "metagraphs.json"), "utf8").then(JSON.parse),
-    readFile(path.join(dir, "geo.json"), "utf8").then(JSON.parse).catch(() => ({})),
-  ]);
-  return { metagraphs, geo };
-}
+// Bundled bake (data/*.json, imported so it ships in serverless deploys) — the
+// resilience fallback when the live fetch fails or comes back empty.
+const baked = { metagraphs: metagraphsBaked as unknown as Metagraph[], geo: geoBaked as unknown as GeoMap };
 
 export async function GET() {
   try {
@@ -142,9 +136,5 @@ export async function GET() {
   } catch {
     /* fall through to baked */
   }
-  try {
-    return NextResponse.json(await fetchBaked());
-  } catch {
-    return NextResponse.json({ metagraphs: [], geo: {} });
-  }
+  return NextResponse.json(baked);
 }
