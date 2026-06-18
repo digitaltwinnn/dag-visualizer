@@ -3,13 +3,9 @@ import { useStore } from "@/src/store/store";
 import { metagraphById, initNetwork } from "@/src/data/network";
 // Existing vanilla modules, reused. Bare specifiers resolve via npm; no types yet.
 /* eslint-disable @typescript-eslint/no-explicit-any */
-// @ts-expect-error - vanilla JS module, no type declarations yet
 import { createScene } from "../../js/scene.js";
-// @ts-expect-error - vanilla JS module, no type declarations yet
 import { Layers } from "../../js/layers.js";
-// @ts-expect-error - vanilla JS module, no type declarations yet
 import { Globe } from "../../js/globe.js";
-// @ts-expect-error - vanilla JS module, no type declarations yet
 import { loadGeoCache, resolveMissing } from "../../js/geo.js";
 
 type Mode = "hyper" | "geo" | "ledger";
@@ -47,12 +43,19 @@ export class Engine {
   private clusters: { l0: any[]; l1: any[] } | null = null;
   private metaData: any = null;
 
+  private raycaster = new THREE.Raycaster();
+  private pointer = new THREE.Vector2();
+  private canvas: HTMLCanvasElement;
+  private onClick = (e: MouseEvent) => this._handleClick(e);
+
   private unsub: Array<() => void> = [];
 
   constructor(canvas: HTMLCanvasElement) {
+    this.canvas = canvas;
     this.ctx = createScene(canvas);
     this.layers = new Layers(this.ctx.scene);
     this.globe = new Globe(this.ctx.scene, this.layers, this.ctx.camera);
+    canvas.addEventListener("click", this.onClick);
 
     // Apply current store state, then react to changes (Lane B command bridge).
     const s = useStore.getState();
@@ -116,7 +119,26 @@ export class Engine {
   private _applyMetagraphs() {
     if (!this.metaData || !Object.keys(this.geoMap).length) return;
     this.globe.setMetagraphs(this.metaData, this.geoMap);
+    this._publishMetaList();
     this.applyFilter(); // re-assert the active filter on the freshly built nodes
+  }
+
+  // Push the built metagraphs (with a country count of their located nodes) to the
+  // store, so the filter chips show node counts / disabled "(0)" chips and the meta
+  // context pane can render without reaching into the engine.
+  private _publishMetaList() {
+    const list = (this.globe.metaList || []).map((m: any) => {
+      const countries = new Set(
+        (m.nodes || [])
+          .map((n: any) => this.geoMap[n.ip]?.country)
+          .filter(Boolean),
+      ).size;
+      return {
+        id: m.id, name: m.name, symbol: m.symbol, description: m.description,
+        siteUrl: m.siteUrl, color: m.color, nodes: m.nodes || [], countriesCount: countries,
+      };
+    });
+    useStore.getState().setMetaList(list);
   }
 
   // ---- view + filter (ports ui.setMode / _applyFilter / camera focus) ----
@@ -145,6 +167,37 @@ export class Engine {
       this.globe.setFilter("all"); // no dimming in the Hypergraph
       this.globe.focusDensest(false);
       this._focusFilter(this.filter);
+    }
+  }
+
+  // ---- picking (ports ui.js _pick / _pickablesFor / _onClick) ----
+  private _pickablesFor(): any[] {
+    if (this.mode === "hyper") return this.layers.pickables.concat(this.globe.pickables);
+    if (this.mode === "geo") return this.globe.pickables;
+    return []; // ledger: nothing pickable
+  }
+
+  private _handleClick(e: MouseEvent) {
+    const r = this.canvas.getBoundingClientRect();
+    this.pointer.x = ((e.clientX - r.left) / r.width) * 2 - 1;
+    this.pointer.y = -((e.clientY - r.top) / r.height) * 2 + 1;
+    const list = this._pickablesFor();
+    if (!list.length) return;
+    this.raycaster.setFromCamera(this.pointer, this.ctx.camera);
+    const hits = this.raycaster.intersectObjects(list, false);
+    if (!hits.length) return;
+    const h = hits[0];
+    const p = h.object.userData.picks
+      ? h.object.userData.picks[h.instanceId as number]
+      : h.object.userData.pick;
+    if (!p) return;
+    // A hub click selects the metagraph (opens its context pane + frames it) rather
+    // than a one-off inspector card; everything else opens the inspector.
+    if (p.kind === "meta") {
+      useStore.getState().setFilter(p.cfg.id);
+    } else {
+      this.ctx.controls.autoRotate = false;
+      useStore.getState().setInspect(p);
     }
   }
 
@@ -259,6 +312,7 @@ export class Engine {
 
   dispose() {
     this.disposed = true;
+    this.canvas.removeEventListener("click", this.onClick);
     this.unsub.forEach((u) => u());
     cancelAnimationFrame(this.raf);
     this.ctx.controls.dispose?.();

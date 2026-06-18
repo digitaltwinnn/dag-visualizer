@@ -1,11 +1,13 @@
 import { useStore } from "@/src/store/store";
-import type { Anchor } from "@/src/data/types";
+import type { Anchor, GlobalSnapshot } from "@/src/data/types";
 // Existing data layer, reused untouched. Browser-only (fetch/setInterval); imported
 // from client code, initialized in an effect. Types come in a later phase.
-// @ts-expect-error - vanilla JS module, no type declarations yet
-import { NetworkData } from "../../js/api.js";
-// @ts-expect-error - vanilla JS module, no type declarations yet
-import { METAGRAPHS } from "../../js/config.js";
+import { NetworkData, shortHash as rawShortHash } from "../../js/api.js";
+
+export const shortHash = rawShortHash as (h: string) => string;
+import { METAGRAPHS, COLORS as RAW_COLORS } from "../../js/config.js";
+
+export const COLORS = RAW_COLORS as { core: number; l0: number; l1: number; bg: number };
 
 let net: NetworkData | null = null;
 
@@ -16,7 +18,7 @@ export function initNetwork(): NetworkData | null {
   if (net) return net;
 
   net = new NetworkData();
-  const { setLive, setNodes, setMetagraphs, setLatestOrdinal, setActivity, setPriceUsd } =
+  const { setLive, setNodes, setMetagraphs, setLatestOrdinal, setLatestSnapshot, setActivity, setPriceUsd } =
     useStore.getState();
 
   setMetagraphs(METAGRAPHS.length); // publicly listed metagraphs we track
@@ -28,9 +30,10 @@ export function initNetwork(): NetworkData | null {
   net.on("price", (p: { usd?: number } | null) =>
     setPriceUsd(p && typeof p.usd === "number" ? p.usd : null),
   );
-  net.on("global", (evt: { latest?: { ordinal: number } }) => {
+  net.on("global", (evt: { latest?: GlobalSnapshot }) => {
     if (evt.latest) {
       setLatestOrdinal(evt.latest.ordinal);
+      setLatestSnapshot(evt.latest);
       setActivity(net!.getActivity());
     }
   });

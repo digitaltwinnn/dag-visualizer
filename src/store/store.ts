@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import type { GlobalSnapshot } from "@/src/data/types";
+import type { GlobalSnapshot, MetaInfo, PickDescriptor } from "@/src/data/types";
 
 // Per-hour rates + per-snapshot series from NetworkData.getActivity().
 export interface Activity {
@@ -21,27 +21,31 @@ interface AppState {
   nodes: { l0: number; l1: number };
   metagraphs: number;
   latestOrdinal: number | null;
+  latestSnapshot: GlobalSnapshot | null;
   activity: Activity | null;
   priceUsd: number | null;
+  // Baked metagraphs (with engine-computed country counts) — for filter chips + pane.
+  metaList: MetaInfo[];
+  // The inspector target: a 3D pick (core/l0/l1/metanode) or a clicked snapshot.
+  inspect: PickDescriptor | null;
 
   // Active view. The scene is one persistent canvas; the engine morphs between hyper
   // and geo and shows the ledger placeholder, all driven by this.
   mode: "hyper" | "geo" | "ledger";
-  // Shared network filter ("all" | "l0" | "l1" | <metagraph id>). The filter UI lands
-  // in Phase 3; the ribbon already reads it for its per-chip metagraph cue.
+  // Shared network filter ("all" | "l0" | "l1" | <metagraph id>).
   filter: string;
-  // The snapshot mirrored by the inspector / highlighted in the ribbon (or null).
-  selectedSnapshot: GlobalSnapshot | null;
 
   setLive: (live: boolean) => void;
   setNodes: (l0: number, l1: number) => void;
   setMetagraphs: (n: number) => void;
   setLatestOrdinal: (ordinal: number) => void;
+  setLatestSnapshot: (snap: GlobalSnapshot | null) => void;
   setActivity: (activity: Activity | null) => void;
   setPriceUsd: (usd: number | null) => void;
   setMode: (mode: "hyper" | "geo" | "ledger") => void;
   setFilter: (filter: string) => void;
-  setSelectedSnapshot: (snap: GlobalSnapshot | null) => void;
+  setMetaList: (list: MetaInfo[]) => void;
+  setInspect: (pick: PickDescriptor | null) => void;
 }
 
 export const useStore = create<AppState>((set) => ({
@@ -49,19 +53,23 @@ export const useStore = create<AppState>((set) => ({
   nodes: { l0: 0, l1: 0 },
   metagraphs: 0,
   latestOrdinal: null,
+  latestSnapshot: null,
   activity: null,
   priceUsd: null,
   mode: "hyper",
   filter: "all",
-  selectedSnapshot: null,
+  metaList: [],
+  inspect: null,
 
   setLive: (live) => set({ live }),
   setNodes: (l0, l1) => set({ nodes: { l0, l1 } }),
   setMetagraphs: (metagraphs) => set({ metagraphs }),
   setLatestOrdinal: (latestOrdinal) => set({ latestOrdinal }),
+  setLatestSnapshot: (latestSnapshot) => set({ latestSnapshot }),
   setActivity: (activity) => set({ activity }),
   setPriceUsd: (priceUsd) => set({ priceUsd }),
   setMode: (mode) => set({ mode }),
   setFilter: (filter) => set({ filter }),
-  setSelectedSnapshot: (selectedSnapshot) => set({ selectedSnapshot }),
+  setMetaList: (metaList) => set({ metaList }),
+  setInspect: (inspect) => set({ inspect }),
 }));

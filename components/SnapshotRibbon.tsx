@@ -20,8 +20,10 @@ export default function SnapshotRibbon() {
   const trackRef = useRef<HTMLDivElement>(null);
 
   const filter = useStore((s) => s.filter);
-  const selected = useStore((s) => s.selectedSnapshot);
-  const setSelectedSnapshot = useStore((s) => s.setSelectedSnapshot);
+  const inspect = useStore((s) => s.inspect);
+  const setInspect = useStore((s) => s.setInspect);
+  const selectedOrdinal =
+    inspect?.kind === "snapshot" ? inspect.data?.ordinal ?? null : null;
 
   useEffect(() => {
     const net = getNetwork();
@@ -100,7 +102,7 @@ export default function SnapshotRibbon() {
           const cls =
             "chip" +
             (anchored === 0 ? " quiet" : "") +
-            (selected && selected.ordinal === d.ordinal ? " active" : "") +
+            (selectedOrdinal === d.ordinal ? " active" : "") +
             cue;
 
           return (
@@ -110,7 +112,7 @@ export default function SnapshotRibbon() {
                 className={cls}
                 style={cueStyle}
                 title={`Snapshot #${d.ordinal.toLocaleString()} · anchored ${anchored} metagraph snapshot${anchored === 1 ? "" : "s"} · ${blocks} block${blocks === 1 ? "" : "s"}`}
-                onClick={() => setSelectedSnapshot(d)}
+                onClick={() => setInspect({ kind: "snapshot", title: `Global snapshot #${d.ordinal}`, data: d })}
               >
                 <span className="chip-ord">#{d.ordinal.toLocaleString()}</span>
                 <span className="chip-meta">

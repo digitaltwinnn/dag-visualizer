@@ -24,3 +24,43 @@ export interface GlobalEvent {
   snapshot?: GlobalSnapshot;
   latest?: GlobalSnapshot;
 }
+
+export interface NodeInfo {
+  ip?: string;
+  id?: string;
+  state?: string;
+  layer?: string;
+  roles?: string[];
+}
+export interface GeoInfo {
+  city?: string;
+  country?: string;
+  cc?: string;
+  lat?: number;
+  lon?: number;
+}
+
+// A baked metagraph + the engine-computed country count of its located nodes.
+export interface MetaInfo {
+  id: string;
+  name: string;
+  symbol?: string;
+  description?: string;
+  siteUrl?: string;
+  color: number;
+  nodes: NodeInfo[];
+  countriesCount: number;
+}
+
+// What the inspector renders. Emitted by the engine's picking (core/l0/l1/metanode)
+// or set by the ribbon (snapshot). A "meta" descriptor drives the context pane.
+export interface PickDescriptor {
+  kind: "core" | "l0" | "l1" | "metanode" | "snapshot" | "meta";
+  title?: string;
+  sub?: string;
+  node?: NodeInfo;
+  geo?: GeoInfo;
+  meta?: MetaInfo;
+  cfg?: { id: string; name: string; ticker?: string; color: number; blurb?: string };
+  data?: GlobalSnapshot;
+}
