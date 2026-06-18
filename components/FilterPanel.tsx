@@ -13,9 +13,9 @@ export default function FilterPanel() {
   const filter = useStore((s) => s.filter);
   const setFilter = useStore((s) => s.setFilter);
   const metaList = useStore((s) => s.metaList);
-  // Node count per metagraph (locatable nodes); built by the engine. Empty until the
-  // globe has data — chips then render plain (no count) and all clickable.
-  const countById = new Map(metaList.map((m) => [m.id, m.nodes.length]));
+  // Locatable-node count per metagraph (what the globe can plot); built by the engine.
+  // Empty until data loads — chips then render plain (no count) and all clickable.
+  const countById = new Map(metaList.map((m) => [m.id, m.located]));
   const haveCounts = metaList.length > 0;
 
   const fixed = [

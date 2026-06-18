@@ -134,11 +134,11 @@ export class Engine {
       if (geo) this.geoMap = { ...this.geoMap, ...geo };
       const changed = JSON.stringify(metagraphs) !== JSON.stringify(this.metaData);
       this.metaData = metagraphs;
+      this._publishMetaList(); // context-pane rows ready as soon as the route data is in
       if (initial) {
         this._applyMetagraphs();
       } else if (changed && Object.keys(this.geoMap).length) {
         this.globe.setMetagraphs(this.metaData, this.geoMap);
-        this._publishMetaList();
         this._publishLeaderboard();
       }
     } catch {
@@ -162,23 +162,28 @@ export class Engine {
   private _applyMetagraphs() {
     if (!this.metaData || !Object.keys(this.geoMap).length) return;
     this.globe.setMetagraphs(this.metaData, this.geoMap);
-    this._publishMetaList();
     this.applyFilter(); // re-assert the active filter on the freshly built nodes
+    // metaList is published in refreshMeta (metagraph geo arrives with the route), so
+    // we don't re-publish here — this runs on every cluster poll.
   }
 
-  // Push the built metagraphs (with a country count of their located nodes) to the
-  // store, so the filter chips show node counts / disabled "(0)" chips and the meta
-  // context pane can render without reaching into the engine.
+  // Push EVERY metagraph from the route data (not just the geo-filtered globe list) to
+  // the store, so the context pane's Layers/Nodes/Make-up rows render from the raw node
+  // data as soon as the route returns — independent of geolocation. `located` (count of
+  // geolocatable nodes) + `countriesCount` come from the geo we have; the filter chips
+  // use `located` for their count / disabled "(0)" state (what the globe can plot).
   private _publishMetaList() {
-    const list = (this.globe.metaList || []).map((m: any) => {
+    const data: any[] = this.metaData || [];
+    const list = data.map((m: any) => {
+      const nodes = m.nodes || [];
+      const located = nodes.filter((n: any) => this.geoMap[n.ip]).length;
       const countries = new Set(
-        (m.nodes || [])
-          .map((n: any) => this.geoMap[n.ip]?.country)
-          .filter(Boolean),
+        nodes.map((n: any) => this.geoMap[n.ip]?.country).filter(Boolean),
       ).size;
       return {
         id: m.id, name: m.name, symbol: m.symbol, description: m.description,
-        siteUrl: m.siteUrl, color: m.color, nodes: m.nodes || [], countriesCount: countries,
+        siteUrl: m.siteUrl, color: metagraphById(m.id)?.color ?? 0x8affc1,
+        nodes, located, countriesCount: countries,
       };
     });
     useStore.getState().setMetaList(list);

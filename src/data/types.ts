@@ -40,7 +40,9 @@ export interface GeoInfo {
   lon?: number;
 }
 
-// A baked metagraph + the engine-computed country count of its located nodes.
+// A metagraph + engine-computed geo facts. `nodes` is the full node list (drives the
+// context-pane Layers/Nodes/Make-up rows); `located` is how many have a geolocation
+// (what the globe can plot — drives the filter chip count / disabled state).
 export interface MetaInfo {
   id: string;
   name: string;
@@ -49,6 +51,7 @@ export interface MetaInfo {
   siteUrl?: string;
   color: number;
   nodes: NodeInfo[];
+  located: number;
   countriesCount: number;
 }
 
