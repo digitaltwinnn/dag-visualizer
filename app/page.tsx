@@ -5,6 +5,8 @@ import SnapshotRibbon from "@/components/SnapshotRibbon";
 import FilterPanel from "@/components/FilterPanel";
 import ViewToggle from "@/components/ViewToggle";
 import Inspector from "@/components/Inspector";
+import FollowController from "@/components/FollowController";
+import Tooltip from "@/components/Tooltip";
 
 // Single-page shell. The 3D scene is one persistent canvas; views (hyper/geo/ledger)
 // and panels will be driven by store state in later phases.
@@ -18,6 +20,8 @@ export default function Home() {
       <FilterPanel />
       <Inspector />
       <SnapshotRibbon />
+      <FollowController />
+      <Tooltip />
     </main>
   );
 }

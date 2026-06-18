@@ -47,6 +47,8 @@ export class Engine {
   private pointer = new THREE.Vector2();
   private canvas: HTMLCanvasElement;
   private onClick = (e: MouseEvent) => this._handleClick(e);
+  private onMove = (e: MouseEvent) => this._handleMove(e);
+  private _hoverKey: string | null = null;
 
   private unsub: Array<() => void> = [];
 
@@ -56,6 +58,7 @@ export class Engine {
     this.layers = new Layers(this.ctx.scene);
     this.globe = new Globe(this.ctx.scene, this.layers, this.ctx.camera);
     canvas.addEventListener("click", this.onClick);
+    canvas.addEventListener("pointermove", this.onMove);
 
     // Apply current store state, then react to changes (Lane B command bridge).
     const s = useStore.getState();
@@ -177,19 +180,34 @@ export class Engine {
     return []; // ledger: nothing pickable
   }
 
-  private _handleClick(e: MouseEvent) {
+  private _pickAt(e: MouseEvent): any {
     const r = this.canvas.getBoundingClientRect();
     this.pointer.x = ((e.clientX - r.left) / r.width) * 2 - 1;
     this.pointer.y = -((e.clientY - r.top) / r.height) * 2 + 1;
     const list = this._pickablesFor();
-    if (!list.length) return;
+    if (!list.length) return null;
     this.raycaster.setFromCamera(this.pointer, this.ctx.camera);
     const hits = this.raycaster.intersectObjects(list, false);
-    if (!hits.length) return;
+    if (!hits.length) return null;
     const h = hits[0];
-    const p = h.object.userData.picks
+    return h.object.userData.picks
       ? h.object.userData.picks[h.instanceId as number]
       : h.object.userData.pick;
+  }
+
+  // Hover tooltip: only writes the store when the hovered target changes (not per
+  // pixel); the Tooltip component positions itself from the pointer.
+  private _handleMove(e: MouseEvent) {
+    const p = this._pickAt(e);
+    const key = p ? `${p.title}|${p.sub}` : null;
+    this.canvas.style.cursor = p ? "pointer" : "grab";
+    if (key === this._hoverKey) return;
+    this._hoverKey = key;
+    useStore.getState().setHover(p ? { title: p.title ?? "", sub: p.sub ?? "" } : null);
+  }
+
+  private _handleClick(e: MouseEvent) {
+    const p = this._pickAt(e);
     if (!p) return;
     // A hub click selects the metagraph (opens its context pane + frames it) rather
     // than a one-off inspector card; everything else opens the inspector.
@@ -313,6 +331,7 @@ export class Engine {
   dispose() {
     this.disposed = true;
     this.canvas.removeEventListener("click", this.onClick);
+    this.canvas.removeEventListener("pointermove", this.onMove);
     this.unsub.forEach((u) => u());
     cancelAnimationFrame(this.raf);
     this.ctx.controls.dispose?.();

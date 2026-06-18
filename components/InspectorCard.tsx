@@ -13,6 +13,26 @@ const rolesOf = (n: NodeInfo) => (n.roles && n.roles.length ? n.roles : [n.layer
 const joinList = (xs: string[]) =>
   xs.length <= 1 ? xs[0] || "" : xs.slice(0, -1).join(", ") + " and " + xs[xs.length - 1];
 
+// Heartbeat "live"/"go-live" control on the snapshot card. Keyed on ordinal so the
+// one-shot beat animation replays each time a new snapshot arrives while following.
+function LiveHeart({ ordinal }: { ordinal: number }) {
+  const following = useStore((s) => s.following);
+  const setFollowing = useStore((s) => s.setFollowing);
+  return (
+    <button
+      key={following ? ordinal : "pinned"}
+      className={"snap-pulse" + (following ? " on beat" : "")}
+      title={following ? "Live — following the latest snapshot. Click to pin this one." : "Pinned. Click to go live."}
+      onClick={() => setFollowing(!following)}
+    >
+      <svg className="hb" viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" />
+      </svg>
+      <span>{following ? "Live" : "Go live"}</span>
+    </button>
+  );
+}
+
 function Row({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div className="insp-row">
@@ -172,6 +192,7 @@ export default function InspectorCard({ p }: { p: PickDescriptor }) {
         {label}
       </span>
       {token}
+      {p.kind === "snapshot" && p.data && <LiveHeart ordinal={p.data.ordinal} />}
       {p.title && <h3>{p.title}</h3>}
       {p.sub && <p className="insp-sub">{p.sub}</p>}
       <Body p={p} nodes={nodes} latest={latest} metaList={metaList} />

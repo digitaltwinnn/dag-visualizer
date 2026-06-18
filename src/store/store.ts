@@ -28,6 +28,10 @@ interface AppState {
   metaList: MetaInfo[];
   // The inspector target: a 3D pick (core/l0/l1/metanode) or a clicked snapshot.
   inspect: PickDescriptor | null;
+  // Snapshot card follows the latest relevant snapshot (heartbeat live) vs pinned.
+  following: boolean;
+  // Hover tooltip content (engine raycast); positioned by the Tooltip component.
+  hover: { title: string; sub: string } | null;
 
   // Active view. The scene is one persistent canvas; the engine morphs between hyper
   // and geo and shows the ledger placeholder, all driven by this.
@@ -46,6 +50,8 @@ interface AppState {
   setFilter: (filter: string) => void;
   setMetaList: (list: MetaInfo[]) => void;
   setInspect: (pick: PickDescriptor | null) => void;
+  setFollowing: (following: boolean) => void;
+  setHover: (hover: { title: string; sub: string } | null) => void;
 }
 
 export const useStore = create<AppState>((set) => ({
@@ -60,6 +66,8 @@ export const useStore = create<AppState>((set) => ({
   filter: "all",
   metaList: [],
   inspect: null,
+  following: false,
+  hover: null,
 
   setLive: (live) => set({ live }),
   setNodes: (l0, l1) => set({ nodes: { l0, l1 } }),
@@ -72,4 +80,6 @@ export const useStore = create<AppState>((set) => ({
   setFilter: (filter) => set({ filter }),
   setMetaList: (metaList) => set({ metaList }),
   setInspect: (inspect) => set({ inspect }),
+  setFollowing: (following) => set({ following }),
+  setHover: (hover) => set({ hover }),
 }));
