@@ -4,8 +4,11 @@ Guidance for working in this repo. See `README.md` for the human-facing overview
 
 ## What this is
 
-An interactive 3D visualizer of the Constellation Network ($DAG) built with Three.js.
-Three views, switched from the top toggle (`mode` in main.js: `hyper` | `geo` | `ledger`):
+An interactive 3D visualizer of the Constellation Network ($DAG). **Next.js (App
+Router) + React + TypeScript + Zustand** for the page/panels, driving a **vanilla
+Three.js engine** (NOT react-three-fiber) on one persistent canvas. Three views,
+switched from the top toggle (`mode` in the store, set by `ViewToggle`: `hyper` |
+`geo` | `ledger`):
 
 - **Hypergraph** — abstract architecture: a glowing Global L0 core, the DAG L0/L1
   validator shells around it, and the real metagraphs as orbiting hubs, each with
@@ -13,24 +16,30 @@ Three views, switched from the top toggle (`mode` in main.js: `hyper` | `geo` | 
 - **Node geography** — a globe with every validator and metagraph node at its real
   geolocation, a density heatmap, travelling-packet connection arcs, and a shared
   "Filter network" panel.
-- **Snapshot DAG** (`ledger`) — a **placeholder** for a future ledger-over-time view.
-  Currently shows a stand-in tumbling wireframe cube; the hypergraph, globe and the
-  skydome background are all hidden in this mode (main.js render loop), leaving just
-  the live snapshot ribbon at the bottom as the seed of the real view.
+- **Snapshot DAG** (`ledger`) — a **placeholder** (`LedgerPanel`) for a future
+  ledger-over-time view. The hypergraph, globe and skydome are hidden in this mode
+  (engine render loop), leaving just the live snapshot ribbon as the seed of it.
 
-Hyper↔geo **morph** smoothly (`morph` 0→1, eased each frame); the blue L0 core
-literally **grows out into the globe** (layers.js) as the nodes fly to their map
-positions. The `ledger` view doesn't morph (it sits at the hypergraph end, scene hidden).
+Hyper↔geo **morph** smoothly (`morph` 0→1, eased each frame in the engine loop); the
+blue L0 core literally **grows out into the globe** (layers.js) as the nodes fly to
+their map positions. The `ledger` view doesn't morph (sits at the hypergraph end).
 
 ## Run & test
 
-No build step, no Node, no deps — Three.js (and stats.js) load from a CDN via the
-import map in `index.html`. Static site, **must be served over HTTP** (ES modules
-don't work from `file://`):
+Next.js app — needs Node ≥18.18 (installed via NodeSource; `node -v` ~20). Three.js
+and friends come from npm (`three`, `three/addons/*`, `topojson-client`); no CDN deps.
 
 ```bash
-python3 -m http.server 8000   # then open http://localhost:8000
+npm install
+npm run dev        # http://localhost:3000
 ```
+
+`tsc --noEmit` for types (dev server tolerates type errors; run tsc to be sure).
+
+> **Dev-server gotcha:** a long-running `next dev` accumulates HMR/compile state across
+> many edits and can serve stale state (e.g. the wrong default view). If something
+> looks wrong after a big refactor, restart clean: `pkill -f "next dev"` (NOT `-f next`
+> — it matches your own shell), `rm -rf .next`, then `nohup npm run dev &`.
 
 ### Verifying visual changes (headless)
 
@@ -40,38 +49,56 @@ SwiftShader flags or it fails with "Error creating WebGL context":
 ```bash
 google-chrome-stable --headless=new --no-sandbox \
   --use-gl=angle --use-angle=swiftshader --enable-unsafe-swiftshader \
-  --window-size=1600,1000 --force-device-scale-factor=2 --hide-scrollbars \
-  --virtual-time-budget=11000 --screenshot=/tmp/shot.png \
-  "http://localhost:8000/index.html#geo=DOR"
+  --window-size=1400,900 --hide-scrollbars \
+  --virtual-time-budget=12000 --screenshot=/tmp/shot.png \
+  "http://localhost:3000"
 ```
 
 Gotchas that will save you time:
 
-- **Deep links**: `#geo` opens straight in the globe view; `#geo=SYMBOL` (e.g.
-  `#geo=DOR`) also pre-selects that metagraph filter (which rotates/zooms the globe
-  to its nodes). Handy for one-shot screenshots of a known state.
-- **`--virtual-time-budget` runs very few `requestAnimationFrame` frames**, so any
-  *animation* barely starts. The idle spin, the morph, and especially the **camera
-  focus tween (ui.js `_tweenTo`, 1.4s) and the globe focus spin (globe.js `spin`,
-  1.3s) never complete in a one-shot screenshot** — you'll see the camera/globe at
-  ~10% of the move. To verify a *settled* state, temporarily make them instant and
-  revert:
-  - camera: set the tween `dur` to `0.04`;
-  - globe spin: append `this.group.rotation.y = from + d;` inside `focusDensest`;
-  - or to inspect a specific globe face, set `this.group.rotation.y` directly.
+- **No clicking / no deep links in headless** — CDP is blocked (only one-shot
+  `--screenshot`), and the old `#geo=SYMBOL` hash deep-links are gone. To screenshot a
+  specific state (a filter, the geo/ledger view, an open inspector), **temporarily seed
+  the Zustand store default** in `src/store/store.ts` (e.g. `mode: "geo"` or
+  `filter: "<id>"`, `following: true`), screenshot, then revert. That's the standard
+  trick used throughout this codebase's history.
+- **`--virtual-time-budget` runs very few `requestAnimationFrame` frames**, so
+  animations barely start — the morph and camera tweens won't complete in a one-shot.
+  Booting in `geo` snaps `morph=1` (engine constructor), so the globe is settled; for
+  hyper camera tweens, temporarily shorten the tween `dur` in `Engine._tweenTo`.
 - **Benign console noise to ignore** when grepping logs: `mojo ... rejected`,
-  `gcm/... PHONE_REGISTRATION_ERROR`, `BackForwardCache`, and `Import Map: "...js"
-  matches with no entries` (just local modules not being import-mapped).
-- CDP / remote-debugging-port is blocked here — only one-shot `--screenshot` works;
-  you can't click. Reach states via deep links + the snapping tricks above.
+  `gcm/... PHONE_REGISTRATION_ERROR`, `BackForwardCache`.
 
-## Architecture (js/)
+## Architecture — three layers
 
-- `main.js` — entry point; wires data → scene/globe/UI, owns `mode` + `morph`, runs
-  the render loop, drives the **depth-of-field focus** + the **ledger placeholder**
-  (wireframe cube, hiding the scene), and hosts the stats.js FPS panel.
+The app is a thin React/Next shell around an imperative Three engine, joined by a
+Zustand store. **Two data lanes:** (A) high-freq visuals subscribe straight to
+`NetworkData` events (no React render); (B) only panel-facing state lives in the store.
+
+- **`app/`** — Next App Router. `layout.tsx`, `page.tsx` (mounts every panel + the
+  canvas), `globals.css`. **`app/api/metagraphs/route.ts`** + **`app/api/geo/route.ts`**
+  are server-side data routes (see *Data* below).
+- **`components/`** — React panels, each reads/writes the store: `SceneCanvas` (mounts
+  the engine, dynamic-imported, `ssr:false`), `StatsHeader`, `SnapshotRibbon`,
+  `ViewToggle`, `LeftColumn` (→ `FilterPanel` + `LearnPanel`/`Leaderboard`),
+  `LedgerPanel`, `Inspector` (+ `InspectorCard` — the snapshot/node/meta card),
+  `Tooltip`, `FollowController` (live snapshot follow), `DataBridge` (boots the data).
+- **`src/store/store.ts`** — the Zustand store (mode, filter, country, inspect,
+  following, metaList, leaderboard, live stats, …). **`src/data/network.ts`** wraps the
+  vanilla `NetworkData` singleton + exposes `getAnchor`/`metagraphById`/`COLORS`/etc;
+  `follow.ts` = follow logic; `types.ts`.
+- **`src/engine/Engine.ts`** — the imperative engine. Owns the scene, render loop,
+  morph, camera-focus tweens, DoF, picking, and the **command bridge**: it
+  `useStore.subscribe`s and reacts to mode/filter/country/learnFocus; it writes picks
+  back to the store. Wraps the vanilla `js/*` modules below.
+- **`js/*`** — the **reused vanilla Three modules** (no longer an app of their own;
+  driven by `Engine`). Bare specifiers resolve via npm.
+
+`js/` modules:
+
 - `scene.js` — Three.js scene, camera (FOV 55), `OrbitControls` (damping on,
   autoRotate), and the postprocessing chain: **RenderPass → BokehPass (`dof`) → bloom**.
+  Exposes `resize()`; the engine owns the window listener.
 - `layers.js` — Hypergraph-only furniture: the Global L0 **core** and the orbiting
   metagraph **hubs** (from `config.METAGRAPHS`). The core is parented to the scene
   (not `layers.root`) so the morph can **grow it out to the globe's radius and
@@ -80,21 +107,21 @@ Gotchas that will save you time:
   AND the metagraph nodes (sphere→disc instanced cross-fade), the globe
   surface/heatmap, the travelling-packet arcs, filtering/dimming, and the geo focus
   spin.
-- `ui.js` — raycast hover/click inspector, the "Understand the network" learn panel,
-  camera focus (`FOCI` presets + tweens), guided tour, the shared "Filter network"
-  chips, the clickable **country leaderboard** + distribution score, and live stats.
-  Long descriptions go through `_descHTML` (clamps to 3 lines + a "Show more" toggle,
-  only when long; CSS `.desc`/`.desc-more`) — used by the metagraph **context pane**;
-  the node inspector shows no description. The toggle is one **delegated** click handler
-  (wired in `_wire`) so it survives the cards re-rendering their `innerHTML`.
-- `stream.js` — bottom live snapshot strip (anchored count + derived `~DAG` fee per
-  tick; see *Anchoring* above). `api.js` — `NetworkData`: polls the block-explorer API,
-  keeps per-metagraph snapshot buffers + the `anchorIndex` (`getAnchor`, `anchor` event),
-  emits events, falls back to a simulation offline.
+- `api.js` — `NetworkData`: **client-side** polls the block-explorer API (CORS `*`),
+  keeps per-metagraph snapshot buffers + the `anchorIndex` (`getAnchor`, `anchor`/
+  `global`/`cluster`/`price` events, `on`/`off`), falls back to a simulation offline.
+  This drives the live ribbon/stats/anchors and keeps polling regardless of the server.
 - `config.js` — API endpoints, colors, the `METAGRAPHS` list, `VIS` tuning, and
   `metaAnchor()` (hub orbit-slot math shared by layers.js and globe.js).
-- `geo.js` — loads the baked geo cache and best-effort resolves missing IPs.
+- `geo.js` — `loadGeoCache()` (fetches `/api/geo` seed) + best-effort `resolveMissing`
+  for new validator IPs (ip-api over http, ipwho.is over https).
 - `background.js` — starfield.
+
+> The old raycast/inspector/learn/leaderboard/camera logic (`ui.js`), the render-loop
+> entry (`main.js`), and the ribbon (`stream.js`) were **ported to React + the engine
+> and deleted**. `InspectorCard` renders the snapshot/node/meta cards (the `Desc`
+> component is the React port of the old `_descHTML` clamp); `Engine` owns picking +
+> camera focus (`FOCI`/tweens) + DoF + morph.
 
 ## Nodes, layers & the filter (the parts that bite)
 
@@ -233,20 +260,26 @@ listed metagraph anchored, each showing its count `TICKER (n)`, plus an `unliste
 where `N = metagraphSnapshotCount − a.count` (the floor gap). It deliberately shows **no block
 count** — blocks aren't the activity signal here.
 
-## Data & the bake scripts
+## Data — server-side routes (was: bake scripts)
 
-The app ships baked caches so the globe works instantly and offline; live data layers
-on top. Validators poll live (`api.js`); **metagraph nodes are baked only** — their
-cluster endpoints are plain HTTP on custom ports with no CORS, so the browser can't
-fetch them.
+Metagraph cluster endpoints are plain HTTP on custom ports with **no CORS**, so the
+browser can't fetch them — but the **Next Node server can**. So instead of baking:
 
-- `data/geo.json` — IP → {lat, lon, city, country, cc}. Rebuild:
-  `python3 scripts/bake-geo.py`.
-- `data/metagraphs.json` — real mainnet metagraphs + nodes. Rebuild:
-  `python3 scripts/bake-metagraphs.py` (also merges new IPs into geo.json). Each
-  metagraph carries `name`, `symbol`, `description`, `siteUrl`, `nodes`; each node has
-  `ip`, `state`, a primary `layer` (assigned by priority **l0 > dl1 > cl1**) and a
-  `roles` list of every layer it serves.
+- **`app/api/metagraphs/route.ts`** (ISR `revalidate=600`) is a live TS port of
+  `bake-metagraphs.py`: lists the dagexplorer directory, fetches each `{l0,cl1,dl1}`
+  `/cluster/info` server-side, assigns roles + a primary `layer` (priority **l0 > dl1
+  > cl1**), geolocates IPs (ip-api batch), returns `{ metagraphs, geo }`. **Falls back
+  to the bundled `data/*.json`** (imported, so it ships in serverless deploys) if the
+  live fetch fails/empties.
+- **`app/api/geo/route.ts`** serves the validator geo seed (`data/geo.json`, imported)
+  so the globe plots instantly; `js/geo.js resolveMissing` fills new validator IPs.
+- The client (`Engine`) fetches `/api/metagraphs` on mount **and re-pulls every 10 min**
+  (Vercel never restarts; ISR only freshens the *server* cache, so an idle tab must
+  re-pull — `Engine.refreshMeta`, rebuilds only on change). The snapshot/cluster/price
+  feeds are already live via `NetworkData` client polling.
+- `scripts/bake-*.py` still exist but are now **only the offline seed/fallback** for
+  `data/*.json`, not required for normal operation. `data/metagraphs.json` shape: each
+  metagraph has `name/symbol/description/siteUrl/nodes`; each node `ip/state/layer/roles`.
 
 Metagraph reality worth knowing (it drives the inspector text):
 
@@ -261,8 +294,9 @@ Metagraph reality worth knowing (it drives the inspector text):
 - The dagexplorer API lists `l0`/`cl1`/`dl1` URLs for *every* metagraph whether or not
   that layer actually runs, so URL presence means nothing — only node presence does.
 
-Re-bake when the validator set or metagraph list changes, and keep `config.METAGRAPHS`
-in sync with `data/metagraphs.json` (matched by `id`).
+`/api/metagraphs` now picks up validator/metagraph-set changes live; the bake is just
+the fallback. Still keep `config.METAGRAPHS` (hub colors/order, the Hypergraph) in sync
+with what the route returns (matched by `id`).
 
 > Sandbox networking note: `bake-metagraphs.py` falls back to `curl` (subprocess) when
 > `urllib` fails, because here Python can't resolve some metagraph cluster hosts (e.g.

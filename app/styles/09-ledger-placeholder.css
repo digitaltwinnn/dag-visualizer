@@ -1,0 +1,11 @@
+/* ── Ledger placeholder (5c, ported) ─────────────────────────────────────── */
+#ledger-view {
+  position: fixed; z-index: 10; top: 104px; left: 16px; width: 340px;
+  padding: 16px 18px; display: flex; flex-direction: column; gap: 10px;
+}
+.ledger-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+.ledger-head h2 { margin: 0; font-size: 14px; }
+.ledger-wip { flex: none; font-size: 9.5px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--core); border: 1px solid rgba(42, 245, 255, 0.4); border-radius: 10px; padding: 2px 7px; }
+#ledger-view p { margin: 0; font-size: 12.5px; line-height: 1.55; color: #c7d0ea; }
+.ledger-dim { color: var(--muted) !important; }
+.ledger-dim b { color: #c7d0ea; }
