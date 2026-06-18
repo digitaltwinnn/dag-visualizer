@@ -54,6 +54,12 @@ export function metagraphById(id: string): MetagraphConfig | null {
   return (METAGRAPHS as MetagraphConfig[]).find((m) => m.id === id) ?? null;
 }
 
+// The publicly listed metagraphs (config). Node counts / disabled "(0)" chips return
+// when the globe's metaList is ported.
+export function allMetagraphs(): MetagraphConfig[] {
+  return METAGRAPHS as MetagraphConfig[];
+}
+
 export interface MetagraphConfig {
   id: string;
   name: string;
