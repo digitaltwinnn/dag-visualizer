@@ -1,28 +1,38 @@
 "use client";
 
 import { useStore } from "@/src/store/store";
+import Sparkline from "@/components/Sparkline";
 
 const fmt = (v?: number | null) =>
   v == null ? "—" : v < 10 ? v.toFixed(1) : Math.round(v).toLocaleString();
 
-function Stat({ label, value }: { label: string; value: string | number }) {
+function Stat({
+  label,
+  value,
+  spark,
+  color,
+}: {
+  label: string;
+  value: string | number;
+  spark?: number[];
+  color?: string;
+}) {
   return (
     <div className="stat">
       <span className="stat-label">{label}</span>
-      <span className="stat-value">{value}</span>
+      <span className="stat-row">
+        <span className="stat-value">{value}</span>
+        {spark && color && <Sparkline data={spark} color={color} />}
+      </span>
     </div>
   );
 }
 
-// First store consumer — proves the NetworkData → store → React path. Sparklines and
-// the full header styling come as the rest of the UI is ported.
 export default function StatsHeader() {
   const live = useStore((s) => s.live);
   const nodes = useStore((s) => s.nodes);
   const metagraphs = useStore((s) => s.metagraphs);
   const activity = useStore((s) => s.activity);
-  const priceUsd = useStore((s) => s.priceUsd);
-  const latestOrdinal = useStore((s) => s.latestOrdinal);
 
   return (
     <header className="stats-header">
@@ -31,14 +41,24 @@ export default function StatsHeader() {
       </span>
       <Stat label="Validators" value={`${nodes.l0} / ${nodes.l1}`} />
       <Stat label="Public metagraphs" value={metagraphs || "—"} />
-      <Stat label="Snapshots/hr" value={fmt(activity?.snapsPerHour)} />
-      <Stat label="Anchors/hr" value={fmt(activity?.anchorsPerHour)} />
-      <Stat label="Fees/hr (DAG)" value={fmt(activity?.feesPerHour)} />
       <Stat
-        label="Latest"
-        value={latestOrdinal ? `#${latestOrdinal.toLocaleString()}` : "—"}
+        label="Snapshots/hr"
+        value={fmt(activity?.snapsPerHour)}
+        spark={activity?.cadenceSeries}
+        color="#2af5ff"
       />
-      {priceUsd != null && <Stat label="$DAG" value={`$${priceUsd.toFixed(4)}`} />}
+      <Stat
+        label="Anchors/hr"
+        value={fmt(activity?.anchorsPerHour)}
+        spark={activity?.anchoredSeries}
+        color="#6ee7b0"
+      />
+      <Stat
+        label="Fees/hr (DAG)"
+        value={fmt(activity?.feesPerHour)}
+        spark={activity?.feesSeries}
+        color="#7fe9c0"
+      />
     </header>
   );
 }
