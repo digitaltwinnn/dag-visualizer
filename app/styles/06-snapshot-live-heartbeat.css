@@ -11,7 +11,7 @@
   fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round;
 }
 .snap-pulse:hover { color: var(--text); }
-.snap-pulse.on { color: #6ee7b0; }
+.snap-pulse.on { color: var(--core); } /* neutral accent; a metagraph filter overrides it inline */
 .snap-pulse.beat { animation: snap-beat-ring 0.9s ease-out 1; }
 .snap-pulse.beat .hb { animation: snap-beat 0.9s ease-out 1; }
 @keyframes snap-beat {
@@ -22,8 +22,8 @@
   62% { transform: scale(1); }
 }
 @keyframes snap-beat-ring {
-  0%   { box-shadow: 0 0 0 0 rgba(110,231,176,0.45); }
-  100% { box-shadow: 0 0 0 9px rgba(110,231,176,0); }
+  0%   { box-shadow: 0 0 0 0 rgba(42,245,255,0.45); }
+  100% { box-shadow: 0 0 0 9px rgba(42,245,255,0); }
 }
 @media (prefers-reduced-motion: reduce) {
   .snap-pulse.beat, .snap-pulse.beat .hb { animation: none; }
