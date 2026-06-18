@@ -1,15 +1,42 @@
 import * as THREE from "three";
+import Stats from "stats.js";
 import { useStore } from "@/src/store/store";
-import { metagraphById, initNetwork } from "@/src/data/network";
-// Existing vanilla modules, reused. Bare specifiers resolve via npm; no types yet.
-/* eslint-disable @typescript-eslint/no-explicit-any */
+import { metagraphById, initNetwork, DEFAULT_META_COLOR } from "@/src/data/network";
+// Existing vanilla modules, reused. Bare specifiers resolve via npm; they ship no types
+// of their own, so their surface is described in ./boundary and applied at construction.
 import { createScene } from "../../js/scene.js";
 import { Layers } from "../../js/layers.js";
 import { Globe } from "../../js/globe.js";
 import { loadGeoCache, resolveMissing } from "../../js/geo.js";
+import type { PickDescriptor } from "@/src/data/types";
+import type {
+  ClusterNode,
+  GeoMap,
+  GlobeApi,
+  LayersApi,
+  RouteMetagraph,
+  SceneCtx,
+} from "./boundary";
 
 type Mode = "hyper" | "geo" | "ledger";
 type Vec = THREE.Vector3;
+
+// The js/ modules ship no types and `allowJs` only infers partial/loose ones, so pin
+// them to the curated surface in ./boundary here — the single place these assertions
+// live. Everything downstream is then fully checked.
+const makeScene = createScene as (canvas: HTMLCanvasElement) => SceneCtx;
+const LayersCtor = Layers as unknown as new (scene: THREE.Scene) => LayersApi;
+const GlobeCtor = Globe as unknown as new (
+  scene: THREE.Scene,
+  layers: LayersApi,
+  camera: THREE.Camera,
+) => GlobeApi;
+const loadGeo = loadGeoCache as () => Promise<GeoMap>;
+const resolveGeo = resolveMissing as (
+  map: GeoMap,
+  ips: string[],
+  onResolved: (m: GeoMap) => void,
+) => void;
 
 // Camera presets (ported from ui.js FOCI).
 const FOCI: Record<string, { pos: Vec; target: Vec }> = {
@@ -24,9 +51,9 @@ const FOCI: Record<string, { pos: Vec; target: Vec }> = {
 // camera-focus tweens, and the command surface React drives via the store. Ports
 // main.js's render loop + ui.js's camera focus, decoupled from any DOM/panels.
 export class Engine {
-  private ctx: any;
-  private layers: any;
-  private globe: any;
+  private ctx: SceneCtx;
+  private layers: LayersApi;
+  private globe: GlobeApi;
   private clock = new THREE.Clock();
   private raf = 0;
   private disposed = false;
@@ -40,9 +67,9 @@ export class Engine {
     fromPos: Vec; toPos: Vec; fromTgt: Vec; toTgt: Vec; t: number; dur: number;
   } | null = null;
 
-  private geoMap: Record<string, any> = {};
-  private clusters: { l0: any[]; l1: any[] } | null = null;
-  private metaData: any = null;
+  private geoMap: GeoMap = {};
+  private clusters: { l0: ClusterNode[]; l1: ClusterNode[] } | null = null;
+  private metaData: RouteMetagraph[] | null = null;
 
   private raycaster = new THREE.Raycaster();
   private pointer = new THREE.Vector2();
@@ -54,17 +81,33 @@ export class Engine {
   private unsub: Array<() => void> = [];
   private metaTimer: ReturnType<typeof setInterval> | undefined;
   private onResize = () => this.ctx.resize?.();
+  // FPS/ms monitor — dev only, or in prod via `?stats`/`#stats` for ad-hoc checks, so
+  // it never shows for real users. Click the panel to cycle FPS → ms → MB.
+  private stats?: Stats;
 
   constructor(canvas: HTMLCanvasElement) {
     this.canvas = canvas;
-    this.ctx = createScene(canvas);
-    this.layers = new Layers(this.ctx.scene);
-    this.globe = new Globe(this.ctx.scene, this.layers, this.ctx.camera);
+    this.ctx = makeScene(canvas);
+    this.layers = new LayersCtor(this.ctx.scene);
+    this.globe = new GlobeCtor(this.ctx.scene, this.layers, this.ctx.camera);
     canvas.addEventListener("click", this.onClick);
     canvas.addEventListener("pointermove", this.onMove);
     // The engine owns the resize handler (createScene no longer adds one) so it's
     // cleaned up on dispose — no leak across StrictMode remounts / HMR.
     window.addEventListener("resize", this.onResize);
+
+    const showStats =
+      process.env.NODE_ENV === "development" ||
+      /stats/.test(window.location.search + window.location.hash);
+    if (showStats) {
+      this.stats = new Stats();
+      this.stats.showPanel(0); // 0 = fps
+      const d = this.stats.dom;
+      d.style.left = "8px";
+      d.style.top = "auto";
+      d.style.bottom = "56px"; // clear the bottom-left logo + the ribbon
+      document.body.appendChild(d);
+    }
 
     // Apply current store state, then react to changes (Lane B command bridge).
     const s = useStore.getState();
@@ -83,7 +126,9 @@ export class Engine {
           if (prev.country != null) useStore.getState().setCountry(null);
           this.applyFilter();
         }
-        if (st.country !== prev.country && st.filter === prev.filter) {
+        // Country drill-down is geo-only — gate on the view so a re-entrant clear
+        // (e.g. from setMode while switching away) can't run a geo focus in hyper.
+        if (st.country !== prev.country && st.filter === prev.filter && st.mode === "geo") {
           this.country = st.country;
           this.globe.setCountry(st.country);
           this._applyGeoFocus();
@@ -101,14 +146,14 @@ export class Engine {
   private async _loadData() {
     const net = initNetwork(); // idempotent; guarantees a NetworkData instance
     if (net?.clusters?.l0?.length) this.clusters = net.clusters;
-    net?.on("cluster", ({ l0, l1 }: { l0: any[]; l1: any[] }) => {
+    net?.on("cluster", ({ l0, l1 }: { l0: ClusterNode[]; l1: ClusterNode[] }) => {
       this.clusters = { l0, l1 };
       this._buildGlobe();
     });
 
     // Validator geo seed (instant plot); merged, not replaced, so it doesn't clobber
     // the metagraph IP geo that arrives from /api/metagraphs.
-    loadGeoCache().then((m: Record<string, any>) => {
+    loadGeo().then((m) => {
       this.geoMap = { ...this.geoMap, ...m };
       this._buildGlobe();
       this._applyMetagraphs();
@@ -137,7 +182,7 @@ export class Engine {
       this._publishMetaList(); // context-pane rows ready as soon as the route data is in
       if (initial) {
         this._applyMetagraphs();
-      } else if (changed && Object.keys(this.geoMap).length) {
+      } else if (this.metaData && changed && Object.keys(this.geoMap).length) {
         this.globe.setMetagraphs(this.metaData, this.geoMap);
         this._publishLeaderboard();
       }
@@ -150,8 +195,8 @@ export class Engine {
     if (!this.clusters || !Object.keys(this.geoMap).length) return;
     this.globe.setNodes(this.clusters.l0, this.clusters.l1, this.geoMap);
     this._applyMetagraphs();
-    const ips = [...this.clusters.l0, ...this.clusters.l1].map((n: any) => n.ip);
-    resolveMissing(this.geoMap, ips, (m: Record<string, any>) => {
+    const ips = [...this.clusters.l0, ...this.clusters.l1].map((n) => n.ip);
+    resolveGeo(this.geoMap, ips, (m) => {
       this.geoMap = m;
       if (this.clusters) this.globe.setNodes(this.clusters.l0, this.clusters.l1, this.geoMap);
       this._publishLeaderboard();
@@ -173,16 +218,16 @@ export class Engine {
   // geolocatable nodes) + `countriesCount` come from the geo we have; the filter chips
   // use `located` for their count / disabled "(0)" state (what the globe can plot).
   private _publishMetaList() {
-    const data: any[] = this.metaData || [];
-    const list = data.map((m: any) => {
+    const data: RouteMetagraph[] = this.metaData || [];
+    const list = data.map((m) => {
       const nodes = m.nodes || [];
-      const located = nodes.filter((n: any) => this.geoMap[n.ip]).length;
+      const located = nodes.filter((n) => this.geoMap[n.ip]).length;
       const countries = new Set(
-        nodes.map((n: any) => this.geoMap[n.ip]?.country).filter(Boolean),
+        nodes.map((n) => this.geoMap[n.ip]?.country).filter(Boolean),
       ).size;
       return {
         id: m.id, name: m.name, symbol: m.symbol, description: m.description,
-        siteUrl: m.siteUrl, color: metagraphById(m.id)?.color ?? 0x8affc1,
+        siteUrl: m.siteUrl, color: metagraphById(m.id)?.color ?? DEFAULT_META_COLOR,
         nodes, located, countriesCount: countries,
       };
     });
@@ -192,6 +237,13 @@ export class Engine {
   // ---- view + filter (ports ui.setMode / _applyFilter / camera focus) ----
   setMode(mode: Mode) {
     this.mode = mode;
+    // The country drill-down is geo-only; drop it on any view change so it can't
+    // linger as a stale leaderboard highlight + mismatched zoom after leaving geo.
+    if (this.country != null) {
+      this.country = null;
+      this.globe.setCountry(null);
+      useStore.getState().setCountry(null);
+    }
     if (mode === "ledger") {
       this.layers.focusId = null;
       this.globe.setFilter("all");
@@ -236,13 +288,13 @@ export class Engine {
   }
 
   // ---- picking (ports ui.js _pick / _pickablesFor / _onClick) ----
-  private _pickablesFor(): any[] {
+  private _pickablesFor(): THREE.Object3D[] {
     if (this.mode === "hyper") return this.layers.pickables.concat(this.globe.pickables);
     if (this.mode === "geo") return this.globe.pickables;
     return []; // ledger: nothing pickable
   }
 
-  private _pickAt(e: MouseEvent): any {
+  private _pickAt(e: MouseEvent): PickDescriptor | null {
     const r = this.canvas.getBoundingClientRect();
     this.pointer.x = ((e.clientX - r.left) / r.width) * 2 - 1;
     this.pointer.y = -((e.clientY - r.top) / r.height) * 2 + 1;
@@ -326,7 +378,7 @@ export class Engine {
       this.focus(filter);
       return;
     }
-    const meta = this.layers.metas?.find((x: any) => x.cfg.id === filter);
+    const meta = this.layers.metas.find((x) => x.cfg.id === filter);
     if (!meta) {
       this.focus("overview");
       return;
@@ -348,6 +400,7 @@ export class Engine {
     const loop = () => {
       if (this.disposed) return;
       this.raf = requestAnimationFrame(loop);
+      this.stats?.begin();
       const dt = Math.min(this.clock.getDelta(), 0.05);
 
       const target = this.mode === "geo" ? 1 : 0;
@@ -376,7 +429,7 @@ export class Engine {
       const dofMix = THREE.MathUtils.clamp(1 - (this.morph - 0.4) / 0.2, 0, 1);
       this.ctx.dof.enabled = metaSel && dofMix > 0.001;
       if (this.ctx.dof.enabled) {
-        const meta = this.layers.metas.find((x: any) => x.cfg.id === this.filter);
+        const meta = this.layers.metas.find((x) => x.cfg.id === this.filter);
         const focusTarget = meta
           ? meta.group.getWorldPosition(this._dofTmp)
           : this.ctx.controls.target;
@@ -385,6 +438,7 @@ export class Engine {
       }
 
       this.ctx.composer.render();
+      this.stats?.end();
     };
     loop();
   }
@@ -405,6 +459,7 @@ export class Engine {
     this.canvas.removeEventListener("click", this.onClick);
     this.canvas.removeEventListener("pointermove", this.onMove);
     window.removeEventListener("resize", this.onResize);
+    this.stats?.dom.remove();
     this.unsub.forEach((u) => u());
     cancelAnimationFrame(this.raf);
     this.ctx.controls.dispose?.();

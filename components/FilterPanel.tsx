@@ -1,9 +1,9 @@
 "use client";
 
+import { useMemo } from "react";
 import { useStore } from "@/src/store/store";
 import { allMetagraphs } from "@/src/data/network";
-
-const hex = (c: number) => "#" + (c >>> 0).toString(16).padStart(6, "0").slice(-6);
+import { hex } from "@/src/util/format";
 
 // "Filter network" panel — the React port of ui.js setMetagraphList. Writes the
 // selection to store.filter; the engine subscribes and reacts (Lane B command bridge).
@@ -15,7 +15,7 @@ export default function FilterPanel() {
   const metaList = useStore((s) => s.metaList);
   // Locatable-node count per metagraph (what the globe can plot); built by the engine.
   // Empty until data loads — chips then render plain (no count) and all clickable.
-  const countById = new Map(metaList.map((m) => [m.id, m.located]));
+  const countById = useMemo(() => new Map(metaList.map((m) => [m.id, m.located])), [metaList]);
   const haveCounts = metaList.length > 0;
 
   const fixed = [

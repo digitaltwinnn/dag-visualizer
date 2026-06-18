@@ -2,16 +2,22 @@
   "name": "dag-visualizer",
   "private": true,
   "version": "0.1.0",
+  "engines": {
+    "node": ">=18.18"
+  },
   "scripts": {
     "dev": "next dev",
     "build": "next build",
     "start": "next start"
   },
   "dependencies": {
+    "@vercel/analytics": "^2.0.1",
+    "@vercel/speed-insights": "^2.0.0",
     "next": "^15.1.6",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "recharts": "^3.8.1",
+    "stats.js": "^0.17.0",
     "three": "0.161.0",
     "topojson-client": "^3.1.0",
     "zustand": "^5.0.14"
@@ -20,6 +26,7 @@
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "@types/stats.js": "^0.17.4",
     "@types/three": "^0.161.0",
     "@types/topojson-client": "^3.1.5",
     "typescript": "^5"

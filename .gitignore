@@ -16,3 +16,11 @@ node_modules/
 out/
 *.tsbuildinfo
 next-env.d.ts
+
+# Secrets / local env — never commit (keep a committed .env.example if needed)
+.env
+.env.*
+!.env.example
+
+# Vercel CLI (created by `vercel link` / `vercel dev`)
+.vercel

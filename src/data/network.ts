@@ -6,8 +6,14 @@ import { NetworkData, shortHash as rawShortHash } from "../../js/api.js";
 
 export const shortHash = rawShortHash as (h: string) => string;
 import { METAGRAPHS, COLORS as RAW_COLORS } from "../../js/config.js";
+import { hex } from "@/src/util/format";
 
 export const COLORS = RAW_COLORS as { core: number; l0: number; l1: number; bg: number };
+
+// The neutral accent as a CSS string (for libraries like Recharts that need a literal),
+// and the fallback hub colour for a metagraph the config doesn't know yet.
+export const CORE_HEX = hex(COLORS.core);
+export const DEFAULT_META_COLOR = 0x8affc1;
 
 let net: NetworkData | null = null;
 
@@ -18,7 +24,7 @@ export function initNetwork(): NetworkData | null {
   if (net) return net;
 
   net = new NetworkData();
-  const { setLive, setNodes, setMetagraphs, setLatestOrdinal, setLatestSnapshot, setActivity, setPriceUsd } =
+  const { setLive, setNodes, setMetagraphs, setLatestOrdinal, setLatestSnapshot, setActivity } =
     useStore.getState();
 
   setMetagraphs(METAGRAPHS.length); // publicly listed metagraphs we track
@@ -26,9 +32,6 @@ export function initNetwork(): NetworkData | null {
   net.on("status", ({ live }: { live: boolean }) => setLive(live));
   net.on("cluster", ({ l0, l1 }: { l0: unknown[]; l1: unknown[] }) =>
     setNodes(l0.length, l1.length),
-  );
-  net.on("price", (p: { usd?: number } | null) =>
-    setPriceUsd(p && typeof p.usd === "number" ? p.usd : null),
   );
   net.on("global", (evt: { latest?: GlobalSnapshot }) => {
     if (evt.latest) {

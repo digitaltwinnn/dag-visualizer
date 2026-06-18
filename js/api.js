@@ -24,8 +24,7 @@ export class NetworkData {
 
     this.metagraphCount = METAGRAPHS.length;
     this.clusters = { l0: [], l1: [] };  // live validator membership
-    this.listeners = { global: [], meta: [], status: [], cluster: [], anchor: [], price: [] };
-    this.price = null;            // { usd, change24h, marketCap, series } — $DAG market data
+    this.listeners = { global: [], meta: [], status: [], cluster: [], anchor: [] };
     this._timer = null;
   }
 
@@ -63,7 +62,6 @@ export class NetworkData {
     this._emit("global", { reset: true, snapshots: this.globalSnapshots, latest: this.latest });
     await this._fetchClusters();
     await this._refreshMeta(VIS.metaSnapSeed); // seed each metagraph's history
-    this._fetchPrice(); // $DAG market data (fire-and-forget; independent of the snapshot feed)
     this.start();
   }
 
@@ -95,35 +93,10 @@ export class NetworkData {
     if (this._timer) return;
     this._timer = setInterval(() => this._tick(), VIS.pollMs);
     this._clusterTimer = setInterval(() => this._fetchClusters(), VIS.clusterMs);
-    this._priceTimer = setInterval(() => this._fetchPrice(), VIS.priceMs);
   }
   stop() {
     clearInterval(this._timer); this._timer = null;
     clearInterval(this._clusterTimer); this._clusterTimer = null;
-    clearInterval(this._priceTimer); this._priceTimer = null;
-  }
-
-  // $DAG market data from CoinGecko (independent of the live/sim block-explorer
-  // feed). One market_chart call yields the current price, 24h change, market cap
-  // and a downsampled price series for the header sparkline.
-  async _fetchPrice() {
-    try {
-      const j = await this._fetchJson("https://api.coingecko.com/api/v3/coins/constellation-labs/market_chart?vs_currency=usd&days=1");
-      const prices = (j.prices || []).map((p) => p[1]).filter((v) => typeof v === "number");
-      if (prices.length < 2) return;
-      const usd = prices[prices.length - 1];
-      const first = prices[0];
-      const change24h = first ? ((usd - first) / first) * 100 : 0;
-      const caps = j.market_caps || [];
-      const marketCap = caps.length ? caps[caps.length - 1][1] : null;
-      // downsample to ~32 points for the tiny sparkline
-      const step = Math.max(1, Math.floor(prices.length / 32));
-      const series = [];
-      for (let i = 0; i < prices.length; i += step) series.push(prices[i]);
-      if (series[series.length - 1] !== usd) series.push(usd);
-      this.price = { usd, change24h, marketCap, series };
-      this._emit("price", this.price);
-    } catch (e) { /* keep the previous price */ }
   }
 
   async _tick() {

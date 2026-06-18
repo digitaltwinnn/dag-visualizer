@@ -38,6 +38,8 @@ export default function LearnPanel() {
   const [touring, setTouring] = useState(false);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  const toggleStep = (id: string) => setLearnFocus(learnFocus === id ? null : id);
+
   // Guided tour: step through the topics, then clear.
   useEffect(() => {
     if (!touring) return;
@@ -68,10 +70,21 @@ export default function LearnPanel() {
       </div>
       <div className="learn-body">
         {STEPS.map((s) => (
+          // role="button" rather than a real <button> — the step contains an <h3>,
+          // which isn't valid inside a button. Enter/Space toggle it like a button.
           <div
             key={s.id}
             className={"learn-step" + (learnFocus === s.id ? " active" : "")}
-            onClick={() => setLearnFocus(learnFocus === s.id ? null : s.id)}
+            role="button"
+            tabIndex={0}
+            aria-expanded={learnFocus === s.id}
+            onClick={() => toggleStep(s.id)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault();
+                toggleStep(s.id);
+              }
+            }}
           >
             <h3>{s.title}</h3>
             <p>{s.body}</p>

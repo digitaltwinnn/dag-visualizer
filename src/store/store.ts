@@ -23,7 +23,6 @@ interface AppState {
   latestOrdinal: number | null;
   latestSnapshot: GlobalSnapshot | null;
   activity: Activity | null;
-  priceUsd: number | null;
   // Baked metagraphs (with engine-computed country counts) — for filter chips + pane.
   metaList: MetaInfo[];
   // The inspector target: a 3D pick (core/l0/l1/metanode) or a clicked snapshot.
@@ -51,7 +50,6 @@ interface AppState {
   setLatestOrdinal: (ordinal: number) => void;
   setLatestSnapshot: (snap: GlobalSnapshot | null) => void;
   setActivity: (activity: Activity | null) => void;
-  setPriceUsd: (usd: number | null) => void;
   setMode: (mode: "hyper" | "geo" | "ledger") => void;
   setFilter: (filter: string) => void;
   setMetaList: (list: MetaInfo[]) => void;
@@ -70,7 +68,6 @@ export const useStore = create<AppState>((set) => ({
   latestOrdinal: null,
   latestSnapshot: null,
   activity: null,
-  priceUsd: null,
   mode: "hyper",
   filter: "all",
   metaList: [],
@@ -87,7 +84,6 @@ export const useStore = create<AppState>((set) => ({
   setLatestOrdinal: (latestOrdinal) => set({ latestOrdinal }),
   setLatestSnapshot: (latestSnapshot) => set({ latestSnapshot }),
   setActivity: (activity) => set({ activity }),
-  setPriceUsd: (priceUsd) => set({ priceUsd }),
   setMode: (mode) => set({ mode }),
   setFilter: (filter) => set({ filter }),
   setMetaList: (metaList) => set({ metaList }),
