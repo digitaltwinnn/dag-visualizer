@@ -1,0 +1,13 @@
+/* Phase 0 globals. The full styles.css will be migrated into CSS Modules + tokens
+   in later phases; for now just a dark full-bleed shell for the WebGL canvas. */
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; background: #060912; overflow: hidden; }
+body { font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+
+.scene-canvas {
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100vh;
+  display: block;
+}

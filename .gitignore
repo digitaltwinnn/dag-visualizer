@@ -10,5 +10,9 @@ __pycache__/
 .venv/
 venv/
 
-# Node (if tooling is added later)
+# Node / Next.js
 node_modules/
+.next/
+out/
+*.tsbuildinfo
+next-env.d.ts
