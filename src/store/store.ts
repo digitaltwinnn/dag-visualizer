@@ -32,6 +32,8 @@ interface AppState {
   following: boolean;
   // Hover tooltip content (engine raycast); positioned by the Tooltip component.
   hover: { title: string; sub: string } | null;
+  // Active "Understand the network" topic (camera focus + layer highlight), or null.
+  learnFocus: string | null;
 
   // Active view. The scene is one persistent canvas; the engine morphs between hyper
   // and geo and shows the ledger placeholder, all driven by this.
@@ -52,6 +54,7 @@ interface AppState {
   setInspect: (pick: PickDescriptor | null) => void;
   setFollowing: (following: boolean) => void;
   setHover: (hover: { title: string; sub: string } | null) => void;
+  setLearnFocus: (focus: string | null) => void;
 }
 
 export const useStore = create<AppState>((set) => ({
@@ -68,6 +71,7 @@ export const useStore = create<AppState>((set) => ({
   inspect: null,
   following: false,
   hover: null,
+  learnFocus: null,
 
   setLive: (live) => set({ live }),
   setNodes: (l0, l1) => set({ nodes: { l0, l1 } }),
@@ -82,4 +86,5 @@ export const useStore = create<AppState>((set) => ({
   setInspect: (inspect) => set({ inspect }),
   setFollowing: (following) => set({ following }),
   setHover: (hover) => set({ hover }),
+  setLearnFocus: (learnFocus) => set({ learnFocus }),
 }));

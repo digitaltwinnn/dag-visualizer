@@ -74,6 +74,7 @@ export class Engine {
           this.filter = st.filter;
           this.applyFilter();
         }
+        if (st.learnFocus !== prev.learnFocus) this.setLearnFocus(st.learnFocus);
       }),
     );
 
@@ -222,6 +223,15 @@ export class Engine {
   private focus(name: string) {
     const f = FOCI[name];
     if (f) this._tweenTo(f.pos, f.target);
+  }
+
+  // "Understand the network" topic: frame it + dim the rest (ports ui.js focus +
+  // _highlight). null clears the dim and returns to the idle overview.
+  setLearnFocus(name: string | null) {
+    this.focus(name || "overview");
+    this.layers.setHighlight(name);
+    this.globe.setHighlight(name);
+    this.ctx.controls.autoRotate = !name;
   }
 
   private _tweenTo(toPos: Vec, toTgt: Vec) {

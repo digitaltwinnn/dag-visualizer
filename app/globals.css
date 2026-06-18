@@ -163,13 +163,15 @@ body { font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; co
   -webkit-backdrop-filter: blur(14px);
   border-radius: 14px;
 }
-#netfilter {
-  position: fixed;
-  z-index: 10;
-  left: 16px;
-  top: 64px;
-  width: 250px;
+/* Left column: filter + the view-specific panel (learn / leaderboard) stacked. */
+#leftcol {
+  position: fixed; z-index: 10; top: 64px; left: 16px;
+  width: 260px;
+  display: flex; flex-direction: column; gap: 12px;
+  max-height: calc(100vh - 260px);
 }
+#leftcol > aside { width: auto; }
+#netfilter { flex: 0 0 auto; }
 .mf-head {
   display: flex; align-items: baseline; justify-content: space-between;
   gap: 8px; padding: 14px 16px 8px;
@@ -324,3 +326,47 @@ body { font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; co
 }
 #tooltip .tt-title { font-weight: 600; }
 #tooltip .tt-sub { color: var(--muted); font-size: 11px; }
+
+/* ── Learn panel + guided tour (5c, ported from styles.css) ──────────────── */
+#learn { flex: 0 1 auto; min-height: 0; display: flex; flex-direction: column; padding: 0; overflow: hidden; }
+.learn-head {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 9px 14px; border-bottom: 1px solid var(--panel-border);
+}
+.learn-head h2 { margin: 0; font-size: 11px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+#learn-toggle { background: transparent; border: none; color: var(--muted); font-size: 18px; cursor: pointer; line-height: 1; width: 22px; padding: 0; }
+.learn-body { overflow-y: auto; padding: 4px 8px 6px; }
+.learn-step { padding: 7px 10px; border-radius: 8px; margin: 1px 0; cursor: pointer; border: 1px solid transparent; transition: background 0.18s, border 0.18s; }
+.learn-step:hover { background: rgba(90, 140, 255, 0.07); }
+.learn-step.active { background: rgba(42, 245, 255, 0.07); border-color: rgba(42, 245, 255, 0.25); }
+.learn-step h3 { margin: 0; font-size: 12.5px; font-weight: 600; color: #c7d0ea; display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.learn-step:hover h3, .learn-step.active h3 { color: #fff; }
+.learn-step h3::after { content: "›"; color: var(--muted); font-size: 15px; line-height: 1; transition: transform 0.2s, color 0.2s; }
+.learn-step.active h3::after { transform: rotate(90deg); color: var(--core); }
+.learn-step p { display: none; margin: 7px 2px 1px; font-size: 12px; line-height: 1.5; color: #aab6d4; }
+.learn-step.active p { display: block; }
+.learn-step b { color: #fff; font-weight: 600; }
+.learn-nav { display: flex; gap: 8px; padding: 9px 12px; border-top: 1px solid var(--panel-border); }
+.learn-nav button {
+  font-family: inherit; border-radius: 9px; padding: 7px 10px; font-size: 11.5px;
+  border: 1px solid var(--panel-border); background: rgba(90, 140, 255, 0.10); color: var(--text);
+  cursor: pointer; transition: background 0.18s, transform 0.1s;
+}
+.learn-nav button:hover { background: rgba(90, 140, 255, 0.22); }
+.learn-nav button:active { transform: scale(0.97); }
+.learn-nav button:disabled { opacity: 0.5; cursor: default; }
+.learn-nav button.primary { background: linear-gradient(135deg, var(--core), var(--l0)); color: #03121a; font-weight: 700; border: none; flex: 1; }
+.learn-nav button.primary:hover { filter: brightness(1.08); }
+#learn.collapsed .learn-body, #learn.collapsed .learn-nav { display: none; }
+
+/* ── Ledger placeholder (5c, ported) ─────────────────────────────────────── */
+#ledger-view {
+  position: fixed; z-index: 10; top: 104px; left: 16px; width: 340px;
+  padding: 16px 18px; display: flex; flex-direction: column; gap: 10px;
+}
+.ledger-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+.ledger-head h2 { margin: 0; font-size: 14px; }
+.ledger-wip { flex: none; font-size: 9.5px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--core); border: 1px solid rgba(42, 245, 255, 0.4); border-radius: 10px; padding: 2px 7px; }
+#ledger-view p { margin: 0; font-size: 12.5px; line-height: 1.55; color: #c7d0ea; }
+.ledger-dim { color: var(--muted) !important; }
+.ledger-dim b { color: #c7d0ea; }
