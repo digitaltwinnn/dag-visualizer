@@ -67,10 +67,20 @@ npm run dev      # http://localhost:3000
 
 ## Host it online
 
-Deploy to **Vercel** (or any Node host) — `npm run build` / `npm start`. The
-`/api/metagraphs` and `/api/geo` routes run server-side (the Node server reaches the
-no-CORS metagraph cluster endpoints a browser can't). The block-explorer API is polled
-directly from the browser. No CDN dependencies.
+[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2Fdigitaltwinnn%2Fdag-visualizer)
+
+**Vercel** is the intended host (any Node host works — `npm run build` / `npm start`).
+Import the repo in Vercel ("Add New… → Project"); it auto-detects Next.js and **needs no
+environment variables**. The `/api/metagraphs` and `/api/geo` routes run server-side (the
+Node server reaches the no-CORS metagraph cluster endpoints a browser can't); the
+block-explorer API is polled directly from the browser. No CDN dependencies.
+
+`/api/metagraphs` caches its live fetch for 10 min (`unstable_cache`) with a `maxDuration`
+budget and a concurrent cluster fan-out, falling back to the bundled `data/*.json` if the
+upstreams are down. Real-user metrics come from **Vercel Speed Insights + Analytics**, and
+a social card is generated at `app/opengraph-image.tsx`. See `CLAUDE.md` →
+*Deploying (Vercel)* for the full checklist (incl. the Pro-only extras to enable as
+traffic grows).
 
 ## How the data flows
 
