@@ -81,16 +81,19 @@ Zustand store. **Two data lanes:** (A) high-freq visuals subscribe straight to
 - **`components/`** — React panels, each reads/writes the store: `SceneCanvas` (mounts
   the engine, dynamic-imported, `ssr:false`), `StatsHeader`, `SnapshotRibbon`,
   `ViewToggle`, `LeftColumn` (→ `FilterPanel` + `LearnPanel`/`Leaderboard`),
-  `LedgerPanel`, `Inspector` (+ `InspectorCard` — the snapshot/node/meta card),
-  `Tooltip`, `FollowController` (live snapshot follow), `DataBridge` (boots the data).
+  `LedgerPanel`, `Inspector` (+ `InspectorCard` — a thin frame that dispatches to the
+  per-kind cards in `components/inspector/`), `Tooltip`, `FollowController` (live
+  snapshot follow), `DataBridge` (boots the data).
 - **`src/store/store.ts`** — the Zustand store (mode, filter, country, inspect,
   following, metaList, leaderboard, live stats, …). **`src/data/network.ts`** wraps the
   vanilla `NetworkData` singleton + exposes `getAnchor`/`metagraphById`/`COLORS`/etc;
-  `follow.ts` = follow logic; `types.ts`.
+  `follow.ts` = follow logic; `types.ts` (`PickDescriptor` is a `kind`-discriminated
+  union); `src/util/format.ts` = shared `hex`/`fmtDag` formatters.
 - **`src/engine/Engine.ts`** — the imperative engine. Owns the scene, render loop,
   morph, camera-focus tweens, DoF, picking, and the **command bridge**: it
   `useStore.subscribe`s and reacts to mode/filter/country/learnFocus; it writes picks
-  back to the store. Wraps the vanilla `js/*` modules below.
+  back to the store. Wraps the vanilla `js/*` modules below; their (untyped-JS) surface
+  is described in `src/engine/boundary.ts` and asserted once at construction.
 - **`js/*`** — the **reused vanilla Three modules** (no longer an app of their own;
   driven by `Engine`). Bare specifiers resolve via npm.
 
@@ -109,7 +112,8 @@ Zustand store. **Two data lanes:** (A) high-freq visuals subscribe straight to
   spin.
 - `api.js` — `NetworkData`: **client-side** polls the block-explorer API (CORS `*`),
   keeps per-metagraph snapshot buffers + the `anchorIndex` (`getAnchor`, `anchor`/
-  `global`/`cluster`/`price` events, `on`/`off`), falls back to a simulation offline.
+  `global`/`cluster`/`price` events, `on`/`off`). No simulation — when the API is
+  unreachable it stays factual (a "NO DATA" state) and recovers on the next good poll.
   This drives the live ribbon/stats/anchors and keeps polling regardless of the server.
 - `config.js` — API endpoints, colors, the `METAGRAPHS` list, `VIS` tuning, and
   `metaAnchor()` (hub orbit-slot math shared by layers.js and globe.js).
@@ -119,9 +123,11 @@ Zustand store. **Two data lanes:** (A) high-freq visuals subscribe straight to
 
 > The old raycast/inspector/learn/leaderboard/camera logic (`ui.js`), the render-loop
 > entry (`main.js`), and the ribbon (`stream.js`) were **ported to React + the engine
-> and deleted**. `InspectorCard` renders the snapshot/node/meta cards (the `Desc`
-> component is the React port of the old `_descHTML` clamp); `Engine` owns picking +
-> camera focus (`FOCI`/tweens) + DoF + morph.
+> and deleted**. `InspectorCard` is a thin frame (tag/token/title) that dispatches to
+> the per-kind cards in `components/inspector/` — `cards.tsx` (snapshot/meta/cluster/
+> node bodies) over shared `parts.tsx` (rows, `nodeComposition`, the `Desc` clamp that
+> ports the old `_descHTML`); `Engine` owns picking + camera focus (`FOCI`/tweens) +
+> DoF + morph.
 
 ## Nodes, layers & the filter (the parts that bite)
 
@@ -265,12 +271,28 @@ count** — blocks aren't the activity signal here.
 Metagraph cluster endpoints are plain HTTP on custom ports with **no CORS**, so the
 browser can't fetch them — but the **Next Node server can**. So instead of baking:
 
-- **`app/api/metagraphs/route.ts`** (ISR `revalidate=600`) is a live TS port of
-  `bake-metagraphs.py`: lists the dagexplorer directory, fetches each `{l0,cl1,dl1}`
-  `/cluster/info` server-side, assigns roles + a primary `layer` (priority **l0 > dl1
-  > cl1**), geolocates IPs (ip-api batch), returns `{ metagraphs, geo }`. **Falls back
-  to the bundled `data/*.json`** (imported, so it ships in serverless deploys) if the
-  live fetch fails/empties.
+- **`app/api/metagraphs/route.ts`** is a live TS port of `bake-metagraphs.py`: lists the
+  dagexplorer directory, fetches each `{l0,cl1,dl1}` `/cluster/info` server-side (the
+  three run **concurrently** per metagraph; `present` keeps `l0 > dl1 > cl1` priority),
+  geolocates IPs (ip-api batch), returns `{ metagraphs, geo }`. **Falls back to the
+  bundled `data/*.json`** (imported, so it ships in serverless deploys) if the live fetch
+  fails/empties.
+  - **Caching:** the inner fetches use `cache: "no-store"`, which by itself makes the
+    route *dynamic* (re-runs the whole fan-out on every request). So the live fetch is
+    wrapped in **`unstable_cache(…, { revalidate: 600 })`** — it runs at most ~once per
+    10 min, shared across requests/instances; throwing on an empty result keeps a blip
+    from being cached (GET serves the bake, next request retries). `export const
+    maxDuration = 60` + a **5s per-fetch timeout** keep a slow cluster LB from blowing
+    Vercel's function budget (Hobby's default is 10s). Verify it stays cached: `next
+    build` should mark `/api/metagraphs` as `○` (Static) with a `10m` revalidate, **not**
+    `ƒ (Dynamic)`.
+  - **`ip-api.com` ToS — matters before going commercial:** the geo batch uses the free
+    tier, which is **HTTP-only** (no TLS), **~45 req/min per source IP**, and
+    **non-commercial use only**. At our volume (one batched call per 10-min
+    regeneration) the rate limit is a non-issue, but for a commercial/production product
+    switch to an HTTPS geo provider with an SLA + commercial license (e.g. ipinfo,
+    MaxMind, ip-api Pro). The validator-side resolver (`js/geo.js`) likewise uses ip-api
+    (http) + ipwho.is (https).
 - **`app/api/geo/route.ts`** serves the validator geo seed (`data/geo.json`, imported)
   so the globe plots instantly; `js/geo.js resolveMissing` fills new validator IPs.
 - The client (`Engine`) fetches `/api/metagraphs` on mount **and re-pulls every 10 min**
@@ -301,3 +323,42 @@ with what the route returns (matched by `id`).
 > Sandbox networking note: `bake-metagraphs.py` falls back to `curl` (subprocess) when
 > `urllib` fails, because here Python can't resolve some metagraph cluster hosts (e.g.
 > `*.getdor.com`) while the system `curl` reaches them over IPv6.
+
+## Deploying (Vercel)
+
+Target host is **Vercel** (any Node host works). No env vars / secrets are required.
+
+**Enabled now (works on the free Hobby plan):**
+- `engines.node >= 18.18`; `next build` is clean.
+- **Route caching:** `/api/metagraphs` wraps its live fan-out in `unstable_cache`
+  (`revalidate: 600`) with `maxDuration = 60` + a 5s per-fetch timeout, and fetches the
+  per-metagraph clusters concurrently — so the expensive work runs ~once / 10 min, not
+  per request. (Verify in `next build`: it should be `○` with `10m`, not `ƒ`.)
+- **`@vercel/speed-insights`** + **`@vercel/analytics`** mounted in `app/layout.tsx`
+  (real-user Web Vitals + cookieless page views; both no-op off Vercel). Web Vitals do
+  NOT capture the WebGL frame rate — use the engine's stats.js for that.
+- **`app/opengraph-image.tsx`** — social card via `next/og`. Keep it ASCII + styled
+  `<div>`s only: a non-Latin glyph (e.g. `●`, `—`) makes Satori fetch a font at
+  render time, which fails (`Status: 400`) and breaks the image.
+- `.gitignore` covers `.env*` and `.vercel`.
+
+**FPS monitor:** stats.js is wired into the engine **dev-only**, or in prod via
+`?stats` / `#stats` in the URL — so it never shows for real users.
+
+**When adoption grows → upgrade to Pro (none of these are needed on Hobby):**
+- **Skew Protection** (dashboard toggle) — pins a client to its deployment version.
+  Worth it here because the app is a long-lived open tab; a deploy can otherwise break
+  chunk loading in tabs that stay open streaming.
+- **Cron pre-warm** — a `vercel.json` cron hitting `/api/metagraphs` every ~10 min keeps
+  the cache warm so no user ever pays the cold regeneration. Needs Pro (Hobby crons run
+  at most once/day).
+- **WAF / rate-limiting** on `/api/*` — basic abuse protection for the public route.
+- **`ip-api.com` is free-tier / non-commercial** (see the geolocation note above) — swap
+  to a licensed HTTPS geo provider before any commercial launch.
+
+**Not applicable:** Image Optimization (no `<img>`), KV/Postgres/Blob (no persistence —
+`unstable_cache` covers the geo cache), Edge Config / env vars (no secrets).
+
+**No price feed:** there is intentionally **no `$DAG` price networking**. The old
+CoinGecko poll (`_fetchPrice`) was removed because the value was never rendered — don't
+re-add a market-data fetch unless something in the UI actually consumes it.

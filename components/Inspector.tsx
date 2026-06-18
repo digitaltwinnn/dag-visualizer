@@ -1,7 +1,7 @@
 "use client";
 
 import { useStore } from "@/src/store/store";
-import { allMetagraphs } from "@/src/data/network";
+import { metagraphById } from "@/src/data/network";
 import InspectorCard from "@/components/InspectorCard";
 import type { PickDescriptor } from "@/src/data/types";
 
@@ -15,7 +15,7 @@ export default function Inspector() {
 
   // Context pane for the active filter: a metagraph → "meta" card; Global L0 / DAG L1
   // → a "cluster" card (same shape, no Make-up); All → nothing.
-  const mgCfg = allMetagraphs().find((m) => m.id === filter) || null;
+  const mgCfg = metagraphById(filter);
   let panePick: PickDescriptor | null = null;
   if (mgCfg) panePick = { kind: "meta", title: mgCfg.name, cfg: mgCfg };
   else if (filter === "l0") panePick = { kind: "cluster", cluster: "l0", title: "Global L0" };

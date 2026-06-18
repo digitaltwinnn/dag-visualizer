@@ -4,11 +4,10 @@ import { useEffect, useRef, useState } from "react";
 import { getNetwork, getAnchor, metagraphById } from "@/src/data/network";
 import { latestRelevant } from "@/src/data/follow";
 import { useStore } from "@/src/store/store";
+import { fmtDag, hex } from "@/src/util/format";
 import type { GlobalEvent, GlobalSnapshot } from "@/src/data/types";
 
 const MAX = 16;
-const fmtDag = (datum: number) => (datum / 1e8).toFixed(4);
-const hex = (c: number) => "#" + c.toString(16).padStart(6, "0");
 
 // Live Global L0 snapshot ribbon — the React port of stream.js. Subscribes to
 // NetworkData directly (snapshots arrive ~every 15s, so React state is fine here),

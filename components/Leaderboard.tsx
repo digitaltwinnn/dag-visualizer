@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useStore } from "@/src/store/store";
 import { allMetagraphs } from "@/src/data/network";
 
@@ -29,7 +29,7 @@ export default function Leaderboard() {
   const metaList = useStore((s) => s.metaList);
   const [expanded, setExpanded] = useState(false);
 
-  const metaNames = new Map(metaList.map((m) => [m.id, m.name]));
+  const metaNames = useMemo(() => new Map(metaList.map((m) => [m.id, m.name])), [metaList]);
   const list = lb?.countries ?? [];
   const max = list[0]?.count ?? 1;
   const top = list.slice(0, TOP);
@@ -84,9 +84,11 @@ export default function Leaderboard() {
 
       <div className="lb-list">
         {top.map((c) => (
-          <div
+          <button
+            type="button"
             key={c.cc}
             className={"lb-row lb-row--btn" + (c.cc === country ? " active" : "")}
+            aria-pressed={c.cc === country}
             onClick={() => drill(c.cc)}
           >
             <span className="lb-flag">{ccToFlag(c.cc)}</span>
@@ -97,11 +99,16 @@ export default function Leaderboard() {
               <span style={{ width: `${Math.round((c.count / max) * 100)}%` }} />
             </span>
             <span className="lb-count">{c.count}</span>
-          </div>
+          </button>
         ))}
 
         {others.length > 0 && (
-          <div className="lb-row lb-row--btn lb-toggle" onClick={() => setExpanded((e) => !e)}>
+          <button
+            type="button"
+            className="lb-row lb-row--btn lb-toggle"
+            aria-expanded={expanded}
+            onClick={() => setExpanded((e) => !e)}
+          >
             <span className="lb-flag">🌐</span>
             <span className="lb-name">
               {expanded ? "Show fewer" : `${others.length} more ${others.length === 1 ? "country" : "countries"}`}
@@ -110,7 +117,7 @@ export default function Leaderboard() {
               {!expanded && <span style={{ width: `${Math.round((restCount / max) * 100)}%` }} />}
             </span>
             <span className="lb-count">{expanded ? "▾" : "▸"}</span>
-          </div>
+          </button>
         )}
         {expanded && others.length > 0 && (
           <div className="lb-more">

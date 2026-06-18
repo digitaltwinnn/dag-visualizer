@@ -19,6 +19,7 @@ export default function ViewToggle() {
         <button
           key={v.id}
           className={mode === v.id ? "active" : ""}
+          aria-pressed={mode === v.id}
           onClick={() => setMode(v.id)}
         >
           {v.label}

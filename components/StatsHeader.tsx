@@ -1,12 +1,11 @@
 "use client";
 
 import { useStore } from "@/src/store/store";
+import { CORE_HEX } from "@/src/data/network";
 import Sparkline from "@/components/Sparkline";
 
 const fmt = (v?: number | null) =>
   v == null ? "—" : v < 10 ? v.toFixed(1) : Math.round(v).toLocaleString();
-
-const SPARK = "#2af5ff"; // neutral accent (--core)
 
 function Stat({
   label,
@@ -47,19 +46,19 @@ export default function StatsHeader() {
         label="Snapshots/hr"
         value={fmt(activity?.snapsPerHour)}
         spark={activity?.cadenceSeries}
-        color={SPARK}
+        color={CORE_HEX}
       />
       <Stat
         label="Anchors/hr"
         value={fmt(activity?.anchorsPerHour)}
         spark={activity?.anchoredSeries}
-        color={SPARK}
+        color={CORE_HEX}
       />
       <Stat
         label="Fees/hr (DAG)"
         value={fmt(activity?.feesPerHour)}
         spark={activity?.feesSeries}
-        color={SPARK}
+        color={CORE_HEX}
       />
     </header>
   );

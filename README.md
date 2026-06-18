@@ -29,13 +29,15 @@ can understand how it works and why it's powerful:
     L1, or any single metagraph; the **Nodes by country** list then drills further into a
     single country. Selecting one rotates + zooms the globe to wherever its nodes are densest.
   - **Snapshot DAG** — a placeholder for an upcoming ledger-over-time view (work in progress).
-- Automatic, seamless fallback to a realistic **simulation** if the network is offline.
+- Stays **factual** if the network is offline — shows a "NO DATA" state and recovers on
+  the next successful poll (no simulated/placeholder data).
 - Glowing, bloom-lit scene with depth-of-field focus and orbit controls (drag / zoom).
 - Hover any element for a tooltip; **click** for an inspector with real on-chain values —
   including a metagraph's token, layers, node make-up and website, and each node's role
   (**hybrid** vs **dedicated** L0 / data-L1 / currency-L1).
 - A "Learn" panel and a **guided tour** that flies the camera through L0 → L1 → metagraphs.
-- Live stats: latest snapshot ordinal, height, validator counts, active metagraphs, snapshots/min.
+- Live stats header: validator counts, public metagraphs, and per-hour snapshots / anchors /
+  fees with inline sparklines (snapshot ordinal & height live in the click inspector).
 
 ## Node geography & metagraph nodes
 
@@ -88,10 +90,11 @@ Browser ──poll──> Constellation block explorer API   (snapshots / cluste
 | Path | Purpose |
 |------|---------|
 | `app/` | Next App Router — `page.tsx` (mounts panels + canvas), `globals.css`, `api/{metagraphs,geo}/route.ts` (server-side data) |
-| `components/` | React panels (SceneCanvas, StatsHeader, SnapshotRibbon, ViewToggle, LeftColumn, Inspector, Tooltip, FollowController, …) |
+| `components/` | React panels (SceneCanvas, StatsHeader, SnapshotRibbon, ViewToggle, LeftColumn, Inspector, Tooltip, FollowController, …); `components/inspector/` holds the per-kind inspector cards |
 | `src/store/store.ts` | Zustand store (the React↔engine command/state bridge) |
 | `src/data/` | `network.ts` (wraps `NetworkData`), `follow.ts`, `types.ts` |
-| `src/engine/Engine.ts` | Imperative Three.js engine: render loop, morph, camera focus, DoF, picking |
+| `src/util/format.ts` | Shared formatters — `hex` (colour), `fmtDag` (fee) |
+| `src/engine/` | `Engine.ts` (imperative Three.js engine: render loop, morph, camera focus, DoF, picking) + `boundary.ts` (types for the vanilla `js/*` modules it drives) |
 | `js/*.js` | Reused vanilla Three modules driven by the engine: `scene`, `layers`, `globe`, `background`, `api` (live data), `config`, `geo` |
 | `scripts/bake-*.py` | Optional offline seed/fallback for `data/*.json` (the routes fetch live) |
 

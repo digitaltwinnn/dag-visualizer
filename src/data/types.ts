@@ -67,18 +67,30 @@ export interface LeaderboardData {
   refId: string | null;
 }
 
+export interface MetaCfg {
+  id: string;
+  name: string;
+  ticker?: string;
+  color: number;
+  blurb?: string;
+}
+
 // What the inspector renders. Emitted by the engine's picking (core/l0/l1/metanode)
 // or set by the ribbon (snapshot). A "meta" descriptor drives the context pane.
-export interface PickDescriptor {
-  // "cluster" = the Global L0 / DAG L1 context pane (the validator-cluster analogue of
-  // the metagraph "meta" pane); `cluster` says which layer.
-  kind: "core" | "l0" | "l1" | "metanode" | "snapshot" | "meta" | "cluster";
-  cluster?: "l0" | "l1";
+//
+// Discriminated on `kind` so each branch carries exactly the fields it needs — the
+// consumer (InspectorCard) narrows on `kind` and gets the right shape with no `!`.
+interface PickBase {
   title?: string;
   sub?: string;
-  node?: NodeInfo;
-  geo?: GeoInfo;
-  meta?: MetaInfo;
-  cfg?: { id: string; name: string; ticker?: string; color: number; blurb?: string };
-  data?: GlobalSnapshot;
 }
+export type PickDescriptor =
+  | (PickBase & { kind: "core" })
+  | (PickBase & { kind: "l0"; node?: NodeInfo; geo?: GeoInfo })
+  | (PickBase & { kind: "l1"; node?: NodeInfo; geo?: GeoInfo })
+  | (PickBase & { kind: "metanode"; node?: NodeInfo; geo?: GeoInfo; meta?: MetaInfo })
+  | (PickBase & { kind: "snapshot"; data: GlobalSnapshot })
+  | (PickBase & { kind: "meta"; cfg: MetaCfg })
+  // "cluster" = the Global L0 / DAG L1 context pane (the validator-cluster analogue of
+  // the metagraph "meta" pane); `cluster` says which layer.
+  | (PickBase & { kind: "cluster"; cluster: "l0" | "l1" });

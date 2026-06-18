@@ -64,7 +64,6 @@ export const VIS = {
                            // validator shells so a focused hub has an emptier backdrop
   pollMs: 4000,            // how often to poll for new snapshots
   clusterMs: 25000,        // how often to refresh validator membership
-  priceMs: 120000,         // how often to refresh $DAG market data (CoinGecko)
 
   // Per-metagraph snapshot history (the shared data layer behind the ribbon's
   // derived DAG fee and the Snapshot DAG / ledger view).
