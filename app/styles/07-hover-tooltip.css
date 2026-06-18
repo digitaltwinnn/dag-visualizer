@@ -1,0 +1,12 @@
+/* ── Hover tooltip (5b, ported) ──────────────────────────────────────────── */
+#tooltip {
+  position: fixed; z-index: 30; pointer-events: none;
+  padding: 7px 11px;
+  background: rgba(8, 12, 26, 0.92);
+  border: 1px solid var(--panel-border);
+  border-radius: 8px;
+  font-size: 12px; white-space: nowrap;
+  transform: translate(-50%, -130%);
+}
+#tooltip .tt-title { font-weight: 600; }
+#tooltip .tt-sub { color: var(--muted); font-size: 11px; }

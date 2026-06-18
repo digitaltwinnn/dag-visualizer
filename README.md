@@ -37,82 +37,63 @@ can understand how it works and why it's powerful:
 - A "Learn" panel and a **guided tour** that flies the camera through L0 → L1 → metagraphs.
 - Live stats: latest snapshot ordinal, height, validator counts, active metagraphs, snapshots/min.
 
-## Node geography & IP geolocation
+## Node geography & metagraph nodes
 
-The globe plots validators using `data/geo.json`, a baked IP→location cache so the map works
-instantly and offline. Validators not in the cache are resolved at runtime (best effort) and
-remembered in `localStorage`.
+The globe plots validators and metagraph nodes at their real geolocations.
 
-To refresh the cache (e.g. after the validator set changes), re-run the bake — it fetches the
-live clusters and geolocates every IP:
+- **Validators** — `/api/geo` serves a baked IP→location seed (`data/geo.json`) so the map
+  plots instantly; IPs not in the seed are resolved at runtime (best effort, remembered in
+  `localStorage`).
+- **Metagraph nodes** — their cluster endpoints are plain HTTP on custom ports with **no CORS**,
+  so the browser can't fetch them. **`/api/metagraphs` does it server-side** (the Node server
+  can): it lists the [dagexplorer directory](https://production.dagexplorer-api.constellationnetwork.net/mainnet/metagraphs),
+  reads each `<lb>/cluster/info` for nodes, geolocates the IPs, and returns them — cached with
+  ISR and re-pulled by the client every ~10 min. (Falls back to the baked `data/*.json` if the
+  live fetch fails.)
 
-```bash
-python3 scripts/bake-geo.py
-```
-
-## Metagraph nodes on the map
-
-Metagraph node locations aren't exposed by the block-explorer API, so they're baked too. The
-[dagexplorer API](https://production.dagexplorer-api.constellationnetwork.net/mainnet/metagraphs)
-lists every mainnet metagraph and its own L0 / L1 load balancers; each metagraph runs its own
-cluster, so `<lb>/cluster/info` returns its validator nodes (with IPs) just like the Global
-clusters. The bake reads them, geolocates the IPs, and writes `data/metagraphs.json` (and merges
-the IPs into `data/geo.json`):
-
-```bash
-python3 scripts/bake-metagraphs.py
-```
-
-Metagraphs whose cluster is temporarily unreachable are simply skipped (no nodes plotted for
-them until the next bake). These endpoints are plain HTTP on custom ports with no CORS, so they
-can't be fetched from the browser — baking is what makes the data usable and offline-ready.
+`scripts/bake-*.py` still produce the `data/*.json` seed/fallback but are no longer required for
+normal operation — the routes fetch live.
 
 ## Run it locally
 
-No build step and no Node required — it's a static site. From this folder:
+A **Next.js** app (React + TypeScript) driving a vanilla Three.js engine. Needs Node ≥ 18.18.
 
 ```bash
-python3 -m http.server 8000
+npm install
+npm run dev      # http://localhost:3000
 ```
-
-Then open **http://localhost:8000** in a browser.
-
-> It must be served over HTTP (not opened as a `file://` URL) because it uses ES modules.
 
 ## Host it online
 
-Upload this folder to any static host — GitHub Pages, Netlify, Vercel, Cloudflare
-Pages, S3, etc. Three.js loads from a CDN via an import map, so there are no
-dependencies to bundle.
+Deploy to **Vercel** (or any Node host) — `npm run build` / `npm start`. The
+`/api/metagraphs` and `/api/geo` routes run server-side (the Node server reaches the
+no-CORS metagraph cluster endpoints a browser can't). The block-explorer API is polled
+directly from the browser. No CDN dependencies.
 
 ## How the data flows
 
 ```
-Constellation block explorer API
-  /global-snapshots            -> Global L0 DAG spine
-  /global-snapshots/latest     -> live polling for new snapshots
-  /currency/{id}/snapshots     -> per-metagraph snapshots (e.g. El Paca)
-        |
-        v
-   api.js (NetworkData)  --events-->  layers.js + globe.js (3D)  +  ui.js (panels/stats)
+Browser ──poll──> Constellation block explorer API   (snapshots / clusters / prices)
+   │                                                       │ events
+   │                                                       v
+   │   NetworkData ──┬─► Engine (vanilla Three.js, 60fps, never re-rendered by React)
+   │                 └─► Zustand store ──► React panels (header, ribbon, filter, inspector…)
+   │
+   └── Next routes (server-side): /api/metagraphs (live cluster fetch + geo, ISR)
+                                  /api/geo (validator geo seed)
 ```
 
-## Files
+## Layout
 
-| File | Purpose |
+| Path | Purpose |
 |------|---------|
-| `index.html` | Page shell, import map, UI overlay |
-| `styles.css` | Glassmorphism UI styling |
-| `js/config.js` | API base, colors, metagraph registry, visual tuning |
-| `js/api.js` | Live data client + simulation fallback |
-| `js/scene.js` | Renderer, camera, controls, depth-of-field + bloom |
-| `js/background.js` | Procedural skydome (grid in Hypergraph, stars on the globe) |
-| `js/layers.js` | Hypergraph furniture: the L0 core + orbiting metagraph hubs |
-| `js/globe.js` | Shared validator + metagraph nodes, globe surface, heatmap, arcs |
-| `js/geo.js` | Baked geo cache + runtime IP geolocation |
-| `js/stream.js` | The live snapshot ribbon |
-| `js/ui.js` | Hover/click inspector, panels, filters, tour, stats |
-| `js/main.js` | Wires data → scene → UI, render loop |
+| `app/` | Next App Router — `page.tsx` (mounts panels + canvas), `globals.css`, `api/{metagraphs,geo}/route.ts` (server-side data) |
+| `components/` | React panels (SceneCanvas, StatsHeader, SnapshotRibbon, ViewToggle, LeftColumn, Inspector, Tooltip, FollowController, …) |
+| `src/store/store.ts` | Zustand store (the React↔engine command/state bridge) |
+| `src/data/` | `network.ts` (wraps `NetworkData`), `follow.ts`, `types.ts` |
+| `src/engine/Engine.ts` | Imperative Three.js engine: render loop, morph, camera focus, DoF, picking |
+| `js/*.js` | Reused vanilla Three modules driven by the engine: `scene`, `layers`, `globe`, `background`, `api` (live data), `config`, `geo` |
+| `scripts/bake-*.py` | Optional offline seed/fallback for `data/*.json` (the routes fetch live) |
 
 ---
 
