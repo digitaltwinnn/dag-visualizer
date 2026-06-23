@@ -1,8 +1,8 @@
 /* ── Inspector + metagraph context pane (Phase 5, ported from styles.css) ── */
 #rightcol {
-  position: fixed; top: 96px; right: 16px; z-index: 10;
-  width: 320px; display: flex; flex-direction: column; gap: 12px;
-  max-height: calc(100vh - 250px);
+  position: fixed; top: var(--rail-top); right: 16px; z-index: 10;
+  width: var(--detail-w); display: flex; flex-direction: column; gap: var(--rail-gap);
+  max-height: calc(100vh - var(--bottom-reserve) - var(--rail-top));
   pointer-events: none;
 }
 #rightcol > aside { position: relative; width: auto; pointer-events: auto; }

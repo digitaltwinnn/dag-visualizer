@@ -3,19 +3,21 @@
 import { useStore } from "@/src/store/store";
 import FilterPanel from "@/components/FilterPanel";
 import LearnPanel from "@/components/LearnPanel";
-import Leaderboard from "@/components/Leaderboard";
+import GeoExplore from "@/components/GeoExplore";
+import LedgerPanel from "@/components/LedgerPanel";
 
-// Left column: the shared network filter, plus the view-specific panel beneath it
-// (Learn in Hypergraph; the country leaderboard in Geography — ported in 5d). Hidden
-// entirely in the ledger view, which shows its own placeholder.
+// Left control rail: the **explore/interact** zone — the global network filter, plus the
+// view's tools beneath it. Each view gets exactly ONE tool card under the filter:
+// Hypergraph → Learn; Geography → GeoExplore (footprint + node browser in one card);
+// Snapshot DAG → the ledger "about" panel. Every view uses the same rail (uniform zone).
 export default function LeftColumn() {
   const mode = useStore((s) => s.mode);
-  if (mode === "ledger") return null;
   return (
     <div id="leftcol">
       <FilterPanel />
       {mode === "hyper" && <LearnPanel />}
-      {mode === "geo" && <Leaderboard />}
+      {mode === "geo" && <GeoExplore />}
+      {mode === "ledger" && <LedgerPanel />}
     </div>
   );
 }

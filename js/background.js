@@ -1,9 +1,9 @@
 // A procedural skydome shader that serves as the animated background for both
 // views. It reads `uMorph` (0 = Hypergraph, 1 = globe) and crossfades between
 // two distinctly different looks in the network's palette:
-//   - Hypergraph (digital): an animated cyan wireframe grid with traveling
-//     pulses and blinking data-nodes. No natural stars.
-//   - Geography (space): a deep-space field of twinkling stars + faint nebula.
+//   - Hypergraph (digital): a calm, slowly drifting aurora in the brand palette
+//     (a soft cloud + gentle gradient). Modest and atmospheric — no grid, no stars.
+//   - Geography (space): a sparse field of twinkling stars + faint nebula.
 //
 // Rendered on a large inward-facing sphere behind everything (no depth test),
 // kept mostly below the bloom threshold so it stays subtle.
@@ -28,6 +28,8 @@ const frag = /* glsl */ `
   uniform vec3 uBlue;
   uniform vec3 uPurple;
   uniform vec3 uDeep;
+  uniform vec3 uAccent;     // selected-metagraph colour (Hypergraph aurora tint)
+  uniform float uAccentMix; // 0 = brand palette, up to ~0.8 when a metagraph is selected
 
   float hash(vec3 p) {
     p = fract(p * 0.3183099 + vec3(0.71, 0.113, 0.419));
@@ -75,38 +77,33 @@ const frag = /* glsl */ `
 
   const float PI = 3.14159265;
 
-  // ---- Hypergraph background: a quiet thin-line grid (no stars) ----
-  // Bright lives on the tile EDGES (a wireframe), gently brightening and dimming
-  // in a slow diagonal wave. Faded near the poles so longitude lines don't pinch.
+  // ---- Hypergraph background: a calm drifting aurora (modest; no grid, no stars) ----
+  // A soft, low-frequency cloud in the brand palette that drifts slowly, plus a gentle
+  // vertical gradient. Kept well below the bloom threshold so it's a quiet, atmospheric
+  // backdrop that gives depth without competing with the scene.
   vec3 digitalBg(vec3 dir) {
-    vec2 sph = vec2(atan(dir.z, dir.x), asin(clamp(dir.y, -1.0, 1.0)));
-    // seamless around longitude: integer cycles over 2*PI
-    vec2 g = vec2(sph.x / (2.0 * PI) * 26.0, sph.y / PI * 13.0);
+    float n = fbm(dir * 1.4 + vec3(uTime * 0.010, uTime * 0.005, 0.0));
+    float soft = smoothstep(0.36, 0.92, n);      // broad, soft cloud regions
+    vec3 glow = mix(uBlue, uCyan, n);            // cyan↔blue across the cloud
+    glow = mix(glow, uPurple, 0.28);             // a hint of purple
+    glow = mix(glow, uAccent, uAccentMix);       // tint toward the selected metagraph
 
-    // distance to nearest tile edge: 0 at centre, 0.5 at the edge
-    vec2 b = abs(fract(g) - 0.5);
-    float w = 0.035;
-    float line = max(smoothstep(0.5 - w, 0.5, b.x), smoothstep(0.5 - w, 0.5, b.y));
-
-    // slow diagonal wave so the grid subtly breathes
-    float wave = 0.4 + 0.6 * (0.5 + 0.5 * sin(g.x * 0.22 + g.y * 0.16 - uTime * 0.5));
-    line *= wave;
-
-    // fade toward the poles to avoid converging lines
-    line *= smoothstep(0.97, 0.55, abs(dir.y));
-
+    vec3 grad = mix(uBlue, uAccent, uAccentMix); // the base gradient leans in too
     vec3 col = uDeep;
-    col += mix(uBlue, uCyan, 0.6) * line * 0.05;
+    col += grad * 0.025 * (dir.y * 0.5 + 0.5);   // gentle top-lit gradient
+    col += glow * soft * 0.07;                   // the aurora, faint but present
     return col;
   }
 
   // ---- Geography background: deep space with twinkling stars ----
+  // Sparser than before (higher thresholds = fewer cells get a star, and the fine dust
+  // layer is dropped) so the field reads as a quiet backdrop — but each remaining star
+  // keeps its per-star twinkle (the blink), so the sky still feels alive.
   vec3 spaceBg(vec3 dir) {
     float s = 0.0;
-    s += starLayer(dir, 55.0, 0.86) * 1.0;
-    s += starLayer(dir, 110.0, 0.90) * 0.7;
-    s += starLayer(dir, 200.0, 0.93) * 0.45;
-    s *= 0.9;
+    s += starLayer(dir, 46.0, 0.91) * 1.0;
+    s += starLayer(dir, 95.0, 0.945) * 0.55;
+    s *= 0.82;
     float n = fbm(dir * 2.3 + vec3(0.0, uTime * 0.01, 0.0));
     float mask = smoothstep(0.5, 0.95, pow(n, 1.6));
     vec3 neb = mix(uBlue, uPurple, fbm(dir * 1.4 + 11.0));
@@ -134,6 +131,8 @@ export function createBackground(scene) {
     uBlue: { value: new THREE.Color(COLORS.l0) },
     uPurple: { value: new THREE.Color(COLORS.l1) },
     uDeep: { value: new THREE.Color(0x04050c) },
+    uAccent: { value: new THREE.Color(COLORS.l0) },
+    uAccentMix: { value: 0 },
   };
   const mat = new THREE.ShaderMaterial({
     uniforms, vertexShader: vert, fragmentShader: frag,
@@ -144,11 +143,26 @@ export function createBackground(scene) {
   mesh.frustumCulled = false;
   scene.add(mesh);
 
+  // Eased accent tint for the Hypergraph aurora: the colour eases toward the latest
+  // metagraph colour while the mix eases up to 0.8 (or back to 0 when nothing is selected),
+  // so selecting / switching / clearing a metagraph crossfades smoothly.
+  const accentTarget = new THREE.Color(COLORS.l0);
+  let mixTarget = 0;
+
   return {
     mesh,
+    // color: a hex number (selected metagraph) to tint toward, or null for the default palette.
+    setAccent(color) {
+      if (color == null) { mixTarget = 0; return; }
+      accentTarget.set(color);
+      mixTarget = 0.5;
+    },
     update(dt, morph) {
       uniforms.uTime.value += dt;
       uniforms.uMorph.value = morph;
+      const k = Math.min(1, dt * 2.5);
+      uniforms.uAccent.value.lerp(accentTarget, k);
+      uniforms.uAccentMix.value += (mixTarget - uniforms.uAccentMix.value) * k;
     },
   };
 }

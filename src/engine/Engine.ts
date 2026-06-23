@@ -70,6 +70,8 @@ export class Engine {
   private geoMap: GeoMap = {};
   private clusters: { l0: ClusterNode[]; l1: ClusterNode[] } | null = null;
   private metaData: RouteMetagraph[] | null = null;
+  // Metagraph ids with locatable nodes (selectable hubs); null until counts load (all allowed).
+  private _activeMetaIds: Set<string> | null = null;
 
   private raycaster = new THREE.Raycaster();
   private pointer = new THREE.Vector2();
@@ -134,6 +136,9 @@ export class Engine {
           this._applyGeoFocus();
         }
         if (st.learnFocus !== prev.learnFocus) this.setLearnFocus(st.learnFocus);
+        // Geo: clicking a node (on the globe or in the left explorer both set `inspect`)
+        // flies the camera to it; clearing it returns to the selection framing.
+        if (st.inspect !== prev.inspect && st.mode === "geo") this._focusInspectNode(st.inspect);
       }),
     );
 
@@ -232,6 +237,10 @@ export class Engine {
       };
     });
     useStore.getState().setMetaList(list);
+    // Tell the Hypergraph which hubs are live (have locatable nodes) so the rest render
+    // dim + inactive; the engine also skips their picks (see _isPickActive).
+    this._activeMetaIds = new Set(list.filter((m) => m.located > 0).map((m) => m.id));
+    this.layers.setMetaActive(this._activeMetaIds);
   }
 
   // ---- view + filter (ports ui.setMode / _applyFilter / camera focus) ----
@@ -266,6 +275,11 @@ export class Engine {
       this._focusFilter(this.filter);
     }
     this._publishLeaderboard();
+    // Tint the Hypergraph background aurora + the globe's land edge with the selected
+    // metagraph's colour (null → the default for All / L0 / L1).
+    const accent = metagraphById(this.filter)?.color ?? null;
+    this.ctx.background.setAccent(accent);
+    this.globe.setEdgeColor(accent);
   }
 
   // Aim/zoom the globe for the current network + country selection (ports
@@ -278,6 +292,27 @@ export class Engine {
     else this.focus("geo");
   }
 
+  // Geo node selection (globe click or left-rail explorer): swing the node to the front
+  // (with tilt) and zoom in closer than a country focus. Clearing the pick — or a pick we
+  // can't locate — falls back to the current selection framing.
+  private _focusInspectNode(p: PickDescriptor | null) {
+    if (p && (p.kind === "l0" || p.kind === "l1" || p.kind === "metanode")) {
+      if (this.globe.focusNode(p.geo)) {
+        this.ctx.controls.autoRotate = false;
+        this._focusNode();
+      }
+    } else {
+      this._applyGeoFocus();
+    }
+  }
+
+  // Node framing: zoomed in, camera low in front of the node looking UP at a point ABOVE it
+  // — so the line of sight skims across the globe surface toward the horizon, the node sitting
+  // in the lower part of the frame (in view, but we look across rather than down at it).
+  private _focusNode() {
+    this._tweenTo(new THREE.Vector3(0, 0, 21), new THREE.Vector3(0, 15, 2));
+  }
+
   // Compute the per-country leaderboard + distribution score for the active filter
   // and push them to the store (the React Leaderboard reads them). Cheap.
   private _publishLeaderboard() {
@@ -285,6 +320,9 @@ export class Engine {
     const countries = this.globe.countryStats(this.filter);
     const { scores, refId } = this.globe.distributionScores();
     useStore.getState().setLeaderboard({ countries, score: scores[this.filter] ?? null, refId });
+    // Flat node list for the geo node browser (read-only; empty outside geo so the
+    // browser stays quiet). Built on the same triggers as the leaderboard.
+    useStore.getState().setSelNodes(this.mode === "geo" ? this.globe.listNodes(this.filter) : []);
   }
 
   // ---- picking (ports ui.js _pick / _pickablesFor / _onClick) ----
@@ -302,11 +340,35 @@ export class Engine {
     if (!list.length) return null;
     this.raycaster.setFromCamera(this.pointer, this.ctx.camera);
     const hits = this.raycaster.intersectObjects(list, false);
-    if (!hits.length) return null;
-    const h = hits[0];
-    return h.object.userData.picks
-      ? h.object.userData.picks[h.instanceId as number]
-      : h.object.userData.pick;
+    // Return the first hit that's part of the current selection — nodes filtered out of the
+    // geo view are hidden, so they shouldn't be clickable/hoverable either (Three's raycaster
+    // ignores scale/visibility, so the inactive ones must be skipped explicitly).
+    for (const h of hits) {
+      const pick: PickDescriptor | undefined = h.object.userData.picks
+        ? h.object.userData.picks[h.instanceId as number]
+        : h.object.userData.pick;
+      if (pick && this._isPickActive(pick)) return pick;
+    }
+    return null;
+  }
+
+  // A geo node is "active" (visible, hence pickable) when it passes the network filter AND
+  // the country drill-down — mirrors globe._nodeActive. Everything is pickable elsewhere.
+  private _isPickActive(p: PickDescriptor): boolean {
+    // A registered-but-node-less metagraph hub is shown (dim) but not selectable, so it
+    // matches its inactive look + its "registered · no live nodes" filter chip.
+    if (p.kind === "meta") return !this._activeMetaIds || this._activeMetaIds.has(p.cfg.id);
+    if (this.mode !== "geo") return true;
+    let id: string | undefined;
+    if (p.kind === "l0") id = "l0";
+    else if (p.kind === "l1") id = "l1";
+    else if (p.kind === "metanode") id = p.meta?.id;
+    else return true;
+    if (!(this.filter === "all" || this.filter === id)) return false;
+    if (this.country && (p.kind === "l0" || p.kind === "l1" || p.kind === "metanode") && p.geo?.cc !== this.country) {
+      return false;
+    }
+    return true;
   }
 
   // Hover tooltip: only writes the store when the hovered target changes (not per
@@ -323,14 +385,26 @@ export class Engine {
   private _handleClick(e: MouseEvent) {
     const p = this._pickAt(e);
     if (!p) return;
-    // A hub click selects the metagraph (opens its context pane + frames it) rather
-    // than a one-off inspector card; everything else opens the inspector.
+    // A hub click selects the metagraph (opens its context pane + frames it).
     if (p.kind === "meta") {
       useStore.getState().setFilter(p.cfg.id);
-    } else {
-      this.ctx.controls.autoRotate = false;
-      useStore.getState().setInspect(p);
+      return;
     }
+    // The Hypergraph is about metagraphs, not one-off node cards: clicking a metagraph
+    // node selects its metagraph (same as its hub), and other nodes aren't inspectable
+    // here — so a stray click never pops a node card in the metagraph view.
+    if (this.mode === "hyper") {
+      if (p.kind === "metanode" && p.meta?.id) useStore.getState().setFilter(p.meta.id);
+      return;
+    }
+    // Geo: open the node inspector. Clicking a metagraph node directly on the globe also
+    // drills the filter into its metagraph (isolating that network), then opens the node —
+    // set the filter first so the subsequent inspect's node-focus is the camera move that wins.
+    this.ctx.controls.autoRotate = false;
+    if (p.kind === "metanode" && p.meta?.id) {
+      useStore.getState().setFilter(p.meta.id);
+    }
+    useStore.getState().setInspect(p);
   }
 
   private focus(name: string) {
@@ -360,9 +434,11 @@ export class Engine {
 
   private _focusGeo(R: number) {
     const t = THREE.MathUtils.smoothstep(R, 0.7, 1.0);
+    // Look head-on at the FRONT of the globe (target pushed forward in +Z, toward where the
+    // focused country/selection is aimed) so it sits centred in the view rather than low.
     this._tweenTo(
-      new THREE.Vector3(0, THREE.MathUtils.lerp(11, 9, t), THREE.MathUtils.lerp(36, 27, t)),
-      new THREE.Vector3(0, THREE.MathUtils.lerp(2, 2.7, t), 0),
+      new THREE.Vector3(0, THREE.MathUtils.lerp(7, 6, t), THREE.MathUtils.lerp(34, 26, t)),
+      new THREE.Vector3(0, THREE.MathUtils.lerp(2, 2.5, t), 7),
     );
   }
 

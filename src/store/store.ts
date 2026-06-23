@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import type { GlobalSnapshot, LeaderboardData, MetaInfo, PickDescriptor } from "@/src/data/types";
+import type { GlobalSnapshot, LeaderboardData, MetaInfo, NodeRow, PickDescriptor } from "@/src/data/types";
 
 // Per-hour rates + per-snapshot series from NetworkData.getActivity().
 export interface Activity {
@@ -37,6 +37,8 @@ interface AppState {
   country: string | null;
   // Per-country breakdown + distribution score for the active filter (engine-pushed).
   leaderboard: LeaderboardData | null;
+  // The active selection's nodes, for the geo node browser (engine-pushed; [] off geo).
+  selNodes: NodeRow[];
 
   // Active view. The scene is one persistent canvas; the engine morphs between hyper
   // and geo and shows the ledger placeholder, all driven by this.
@@ -59,6 +61,7 @@ interface AppState {
   setLearnFocus: (focus: string | null) => void;
   setCountry: (cc: string | null) => void;
   setLeaderboard: (lb: LeaderboardData | null) => void;
+  setSelNodes: (nodes: NodeRow[]) => void;
 }
 
 export const useStore = create<AppState>((set) => ({
@@ -77,6 +80,7 @@ export const useStore = create<AppState>((set) => ({
   learnFocus: null,
   country: null,
   leaderboard: null,
+  selNodes: [],
 
   setLive: (live) => set({ live }),
   setNodes: (l0, l1) => set({ nodes: { l0, l1 } }),
@@ -93,4 +97,5 @@ export const useStore = create<AppState>((set) => ({
   setLearnFocus: (learnFocus) => set({ learnFocus }),
   setCountry: (country) => set({ country }),
   setLeaderboard: (leaderboard) => set({ leaderboard }),
+  setSelNodes: (selNodes) => set({ selNodes }),
 }));

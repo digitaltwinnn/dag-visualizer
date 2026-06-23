@@ -1,9 +1,8 @@
 import SceneCanvas from "@/components/SceneCanvas";
 import DataBridge from "@/components/DataBridge";
 import StatsHeader from "@/components/StatsHeader";
-import SnapshotRibbon from "@/components/SnapshotRibbon";
+import BottomStream from "@/components/BottomStream";
 import LeftColumn from "@/components/LeftColumn";
-import LedgerPanel from "@/components/LedgerPanel";
 import ViewToggle from "@/components/ViewToggle";
 import Inspector from "@/components/Inspector";
 import FollowController from "@/components/FollowController";
@@ -19,9 +18,8 @@ export default function Home() {
       <StatsHeader />
       <ViewToggle />
       <LeftColumn />
-      <LedgerPanel />
       <Inspector />
-      <SnapshotRibbon />
+      <BottomStream />
       <FollowController />
       <Tooltip />
     </main>

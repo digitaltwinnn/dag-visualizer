@@ -9,7 +9,7 @@ import type { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js
 import type { EffectComposer } from "three/examples/jsm/postprocessing/EffectComposer.js";
 import type { UnrealBloomPass } from "three/examples/jsm/postprocessing/UnrealBloomPass.js";
 import type { BokehPass } from "three/examples/jsm/postprocessing/BokehPass.js";
-import type { CountryStat, GeoInfo, NodeInfo } from "@/src/data/types";
+import type { CountryStat, GeoInfo, NodeInfo, NodeRow } from "@/src/data/types";
 
 export type GeoMap = Record<string, GeoInfo>;
 
@@ -26,6 +26,7 @@ export interface RouteNode {
   state?: string;
   layer?: string;
   roles?: string[];
+  id?: string;
 }
 export interface RouteMetagraph {
   id: string;
@@ -46,6 +47,8 @@ export type DofPass = BokehPass & {
 export interface Background {
   mesh: THREE.Object3D;
   update(dt: number, morph: number): void;
+  /** Tint the Hypergraph aurora toward a metagraph colour (hex), or null for the default palette. */
+  setAccent(color: number | null): void;
 }
 
 // js/scene.js createScene() return.
@@ -77,6 +80,8 @@ export interface LayersApi {
   pickables: THREE.Object3D[];
   update(dt: number, morph: number): void;
   setHighlight(focus: string | null): void;
+  /** Mark which metagraph hubs have locatable nodes (active); the rest are dimmed inactive. */
+  setMetaActive(ids: Set<string> | null): void;
 }
 
 // js/globe.js Globe — validator + metagraph nodes, heatmap, arcs, filtering, geo focus.
@@ -90,11 +95,17 @@ export interface GlobeApi {
   setCountry(cc: string | null): void;
   /** Rotates to the densest part of the selection; returns concentration R (0..1) or null. */
   focusDensest(on: boolean): number | null;
+  /** Aims a single node's lat/lon to the front (with tilt); false if it has no coords. */
+  focusNode(geo: { lat?: number; lon?: number } | null | undefined): boolean;
+  /** Tint the raised-land coastline edge toward a colour (hex), or null for the default. */
+  setEdgeColor(color: number | null): void;
   setHighlight(focus: string | null): void;
   setMorph(m: number): void;
   update(dt: number): void;
   countryStats(filter?: string): CountryStat[];
   distributionScores(): { scores: Record<string, number>; refId: string | null };
+  /** Flat node list for one selection (read-only), for the geo node browser. */
+  listNodes(filter?: string): NodeRow[];
 }
 
 // re-export for the Engine's callback annotations

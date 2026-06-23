@@ -120,8 +120,17 @@ export class Layers {
       this.root.add(pulseMesh);
 
       this.root.add(group);
-      this.metas.push({ group, hub, cfg, state: null, tether, pulseMesh, pulse: 0, anchor: pos.clone(), orbit: an.a, radius: an.radius, incl: an.incl, spin: 0.3 + Math.random() * 0.5 });
+      this.metas.push({ group, hub, cfg, state: null, tether, pulseMesh, pulse: 0, anchor: pos.clone(), orbit: an.a, radius: an.radius, incl: an.incl, spin: 0.3 + Math.random() * 0.5, active: true });
     });
+  }
+
+  // Mark which metagraph hubs are "active" (have locatable nodes). Inactive ones — registered
+  // on-chain but with nothing to plot/filter — are dimmed to near-no glow here AND made
+  // non-selectable by the engine (it skips their picks), so the Hypergraph still shows they
+  // exist without inviting a dead-end click. `ids` is a Set of active ids, or null = all active
+  // (e.g. before the node counts have loaded).
+  setMetaActive(ids) {
+    for (const m of this.metas) m.active = !ids || ids.has(m.cfg.id);
   }
 
   // Updates a hub's latest-snapshot state (for the inspector). The hub->core packet
@@ -190,21 +199,24 @@ export class Layers {
       m.group.rotation.y += dt * m.spin;
       m.group.visible = hubFade > 0.001;
       m.hub.rotation.x += dt * 0.5;
-      m.hub.material.opacity = metaOpacity;
+      // Registered-but-node-less hubs read as inactive: faded body, near-zero glow,
+      // fainter tether — present in the architecture, but clearly not live.
+      const glowMul = m.active ? 1 : 0.08;
+      m.hub.material.opacity = metaOpacity * (m.active ? 1 : 0.5);
 
       m.tether.geometry.setFromPoints([new THREE.Vector3(), pos]);
       m.tether.geometry.attributes.position.needsUpdate = true;
-      m.tether.material.opacity = 0.22 * metaF;
+      m.tether.material.opacity = 0.22 * metaF * (m.active ? 1 : 0.35);
 
       if (m.pulse > 0) {
         m.pulse = Math.max(0, m.pulse - dt * 0.7);
         const e = 1 - m.pulse;
         m.pulseMesh.position.copy(pos).multiplyScalar(1 - e);
         m.pulseMesh.material.opacity = Math.sin(m.pulse * Math.PI) * 0.9 * metaF;
-        m.hub.material.emissiveIntensity = (1.1 + m.pulse * 1.6) * metaF;
+        m.hub.material.emissiveIntensity = (1.1 + m.pulse * 1.6) * metaF * glowMul;
       } else {
         m.pulseMesh.material.opacity = 0;
-        m.hub.material.emissiveIntensity = 1.1 * metaF;
+        m.hub.material.emissiveIntensity = 1.1 * metaF * glowMul;
       }
     }
   }

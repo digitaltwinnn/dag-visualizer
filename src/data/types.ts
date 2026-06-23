@@ -60,6 +60,18 @@ export interface CountryStat {
   country: string;
   count: number;
 }
+
+// One row in the geo node browser. `pick` is the node's existing inspector descriptor
+// (clicking a row reuses the same card as clicking the node on the globe); the rest is
+// what the browser groups/labels on. Built by globe.listNodes, pushed via setSelNodes.
+export interface NodeRow {
+  pick: PickDescriptor;
+  label: string;
+  cc: string | null;
+  country: string | null;
+  state?: string | null;
+  layer: string;
+}
 // Per-country breakdown + distribution score for the active filter (engine-computed).
 export interface LeaderboardData {
   countries: CountryStat[];
@@ -88,9 +100,18 @@ export type PickDescriptor =
   | (PickBase & { kind: "core" })
   | (PickBase & { kind: "l0"; node?: NodeInfo; geo?: GeoInfo })
   | (PickBase & { kind: "l1"; node?: NodeInfo; geo?: GeoInfo })
-  | (PickBase & { kind: "metanode"; node?: NodeInfo; geo?: GeoInfo; meta?: MetaInfo })
+  // `layer` is the shell the node is plotted in (l0 | dl1 | cl1) — the authoritative
+  // per-node layer, used when the raw `node.roles` are absent/incomplete.
+  | (PickBase & { kind: "metanode"; node?: NodeInfo; geo?: GeoInfo; meta?: MetaInfo; layer?: string })
   | (PickBase & { kind: "snapshot"; data: GlobalSnapshot })
   | (PickBase & { kind: "meta"; cfg: MetaCfg })
+  // "metaLive" = the live-activity card for a metagraph (cadence/fee/anchor share) —
+  // the Hypergraph's signature bottom-slot card, paired with the "meta" dossier above.
+  | (PickBase & { kind: "metaLive"; cfg: MetaCfg })
   // "cluster" = the Global L0 / DAG L1 context pane (the validator-cluster analogue of
   // the metagraph "meta" pane); `cluster` says which layer.
-  | (PickBase & { kind: "cluster"; cluster: "l0" | "l1" });
+  | (PickBase & { kind: "cluster"; cluster: "l0" | "l1" })
+  // "geoLive" = Geography's always-present signature detail card: a live footprint strip
+  // for the active selection (online health / countries / densest) PLUS the selected node's
+  // details when one is picked. It reads the store itself (no payload).
+  | (PickBase & { kind: "geoLive" });

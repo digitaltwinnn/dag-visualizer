@@ -11,6 +11,22 @@
   --l1: #b06bff;
   --meta: #ffd166;
   --accent: #2af5ff;
+
+  /* ── Layout system tokens (shared by every HUD panel so they read as siblings) ──
+     One spacing scale, one panel radius, one "selected" treatment. Component CSS
+     should reference these rather than re-deriving paddings / cyan tints. */
+  --radius: 14px;
+  --panel-pad-x: 16px;     /* horizontal padding inside a panel header/section */
+  --panel-pad-y: 12px;     /* vertical   padding inside a panel header/section */
+  --rail-gap: 12px;        /* gap between stacked panels in a column */
+  --rail-top: 64px;        /* top of BOTH side rails — keeps left/right aligned (below header) */
+  --rail-w: 264px;         /* left control rail width */
+  --detail-w: 320px;       /* right details rail width */
+  /* Single selected/active language: a cyan fill + border, reused everywhere. */
+  --sel-bg: rgba(42, 245, 255, 0.12);
+  --sel-border: rgba(42, 245, 255, 0.5);
+  /* Vertical space the bottom stream reserves; overridden per view (slim vs full). */
+  --bottom-reserve: 170px;
 }
 
 * { box-sizing: border-box; }

@@ -1,0 +1,45 @@
+/* ── Panel system (uniform HUD shell) ────────────────────────────────────────
+   One header pattern + one collapse affordance shared by every rail panel
+   (Filter / Learn / Leaderboard), so the left rail reads as one control surface
+   instead of three unrelated widgets. Panel bodies keep their own classes; only
+   the head + collapse behaviour are unified here. */
+
+.panel-head {
+  display: flex; align-items: flex-start; justify-content: space-between;
+  gap: 8px; padding: var(--panel-pad-y) var(--panel-pad-x);
+  border-bottom: 1px solid var(--panel-border);
+}
+.panel-head-titles { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+/* Eyebrow marks a control's scope — e.g. the network filter is GLOBAL (persists
+   across views), which sets it apart from the view-specific tool below it. */
+.panel-eyebrow {
+  font-size: 8.5px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase;
+  color: var(--accent); line-height: 1;
+}
+.panel-head h2 { margin: 0; font-size: 14px; font-weight: 600; line-height: 1.15; }
+.panel-head-aside {
+  display: flex; align-items: center; gap: 6px; flex: none;
+  padding-top: 1px;
+}
+.panel-cap {
+  font-size: 10.5px; color: var(--muted); text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.panel-collapse {
+  background: transparent; border: none; color: var(--muted);
+  font-size: 18px; line-height: 1; cursor: pointer; width: 20px; height: 18px; padding: 0;
+}
+.panel-collapse:hover { color: var(--text); }
+
+/* A panel whose body is collapsed: only its head shows. Bodies opt in by living
+   inside .panel-body (or the panel toggles its own body — Learn keeps both). */
+.panel.collapsed .panel-body { display: none; }
+
+/* The global filter gets a faint accent stripe down its left edge to reinforce
+   "this control applies everywhere" without shouting. */
+#netfilter { position: relative; overflow: hidden; }
+#netfilter::before {
+  content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 2px;
+  background: linear-gradient(180deg, var(--core), var(--l0));
+  opacity: 0.55;
+}

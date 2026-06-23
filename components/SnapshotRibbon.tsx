@@ -1,22 +1,21 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
-import { getNetwork, getAnchor, metagraphById } from "@/src/data/network";
+import { useEffect, useRef } from "react";
+import { getAnchor, metagraphById } from "@/src/data/network";
 import { latestRelevant } from "@/src/data/follow";
 import { useStore } from "@/src/store/store";
+import { useSnapshotFeed } from "@/components/useSnapshotFeed";
 import { fmtDag, hex } from "@/src/util/format";
-import type { GlobalEvent, GlobalSnapshot } from "@/src/data/types";
+import type { GlobalSnapshot } from "@/src/data/types";
 
 const MAX = 16;
 
-// Live Global L0 snapshot ribbon — the React port of stream.js. Subscribes to
-// NetworkData directly (snapshots arrive ~every 15s, so React state is fine here),
-// reads the shared filter for the per-chip metagraph cue, and writes the clicked
-// snapshot to the store (the inspector + heartbeat reconnect in Phase 4).
+// Live Global L0 snapshot ribbon — the React port of stream.js, and the macro band
+// of the ledger view (it shows only there now; hyper/geo get the slim LiveStrip).
+// Reads the shared feed + filter for the per-chip metagraph cue, and writes the
+// clicked snapshot to the store (driving the inspector + heartbeat).
 export default function SnapshotRibbon() {
-  const [snaps, setSnaps] = useState<GlobalSnapshot[]>([]);
-  // Bumped when the anchor index fills in, so chip fees/cues re-read getAnchor().
-  const [, setAnchorTick] = useState(0);
+  const { snaps } = useSnapshotFeed(MAX);
   const trackRef = useRef<HTMLDivElement>(null);
 
   const filter = useStore((s) => s.filter);
@@ -32,35 +31,6 @@ export default function SnapshotRibbon() {
     setFollowing(latestRelevant(filter)?.ordinal === d.ordinal);
     setInspect({ kind: "snapshot", title: `Global snapshot #${d.ordinal}`, data: d });
   };
-
-  useEffect(() => {
-    const net = getNetwork();
-    if (!net) return;
-
-    // Seed from the buffer (the "reset" event may have fired before we mounted).
-    setSnaps(net.globalSnapshots.slice(-MAX));
-
-    const onGlobal = (evt: GlobalEvent) => {
-      if (evt.reset) setSnaps((evt.snapshots ?? []).slice(-MAX));
-      else if (evt.snapshot) {
-        const snap = evt.snapshot;
-        setSnaps((prev) => [...prev, snap].slice(-MAX));
-      }
-    };
-    let raf = 0;
-    const onAnchor = () => {
-      cancelAnimationFrame(raf);
-      raf = requestAnimationFrame(() => setAnchorTick((t) => t + 1));
-    };
-
-    net.on("global", onGlobal);
-    net.on("anchor", onAnchor);
-    return () => {
-      net.off("global", onGlobal);
-      net.off("anchor", onAnchor);
-      cancelAnimationFrame(raf);
-    };
-  }, []);
 
   // Keep the newest chip in view.
   useEffect(() => {

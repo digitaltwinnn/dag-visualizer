@@ -24,7 +24,7 @@ const LAYERS: Array<[string, string]> = [
   ["cl1", "cl1"],
 ];
 
-interface MetaNode { ip: string; state: string; layer: string; roles: string[] }
+interface MetaNode { ip: string; state: string; layer: string; roles: string[]; id: string }
 interface Metagraph {
   id: string; name: string; symbol: string; description: string;
   siteUrl: string; iconUrl: string; nodes: MetaNode[];
@@ -47,13 +47,17 @@ async function getJson(url: string, ms = 5000): Promise<unknown> {
   }
 }
 
-async function clusterNodes(base: string): Promise<Array<{ ip: string; state: string }>> {
+async function clusterNodes(base: string): Promise<Array<{ ip: string; state: string; id: string }>> {
   try {
     const nodes = (await getJson(base.replace(/\/$/, "") + "/cluster/info")) as unknown;
     if (!Array.isArray(nodes)) return [];
     return nodes
       .filter((n) => n && (n as { ip?: string }).ip)
-      .map((n) => ({ ip: (n as { ip: string }).ip, state: (n as { state?: string }).state ?? "Unknown" }));
+      .map((n) => ({
+        ip: (n as { ip: string }).ip,
+        state: (n as { state?: string }).state ?? "Unknown",
+        id: (n as { id?: string }).id ?? "",
+      }));
   } catch {
     return [];
   }
@@ -114,18 +118,20 @@ async function fetchLive(): Promise<{ metagraphs: Metagraph[]; geo: GeoMap }> {
       const primary: Record<string, string> = {};
       const roles: Record<string, string[]> = {};
       const stateOf: Record<string, string> = {};
+      const idOf: Record<string, string> = {};
       present.forEach(([, layer], i) => {
         for (const n of nodesByLayer[i]) {
           (roles[n.ip] ??= []).push(layer);
           if (!(n.ip in primary)) {
             primary[n.ip] = layer;
             stateOf[n.ip] = n.state;
+            idOf[n.ip] = n.id;
             ips.add(n.ip);
           }
         }
       });
       const nodes: MetaNode[] = Object.keys(primary).map((ip) => ({
-        ip, state: stateOf[ip], layer: primary[ip], roles: roles[ip],
+        ip, state: stateOf[ip], layer: primary[ip], roles: roles[ip], id: idOf[ip],
       }));
       return {
         id, name: m.name || id, symbol: m.symbol || "",

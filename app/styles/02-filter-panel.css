@@ -6,22 +6,17 @@
   -webkit-backdrop-filter: blur(14px);
   border-radius: 14px;
 }
-/* Left column: filter + the view-specific panel (learn / leaderboard) stacked. */
+/* Left control rail: the global filter + the view-specific tool (learn /
+   leaderboard) stacked, sharing one width, gap and panel-header pattern. */
 #leftcol {
-  position: fixed; z-index: 10; top: 64px; left: 16px;
-  width: 260px;
-  display: flex; flex-direction: column; gap: 12px;
-  max-height: calc(100vh - 260px);
+  position: fixed; z-index: 10; top: var(--rail-top); left: 16px;
+  width: var(--rail-w);
+  display: flex; flex-direction: column; gap: var(--rail-gap);
+  max-height: calc(100vh - var(--bottom-reserve) - var(--rail-top));
 }
 #leftcol > aside { width: auto; }
 #netfilter { flex: 0 0 auto; }
-.mf-head {
-  display: flex; align-items: baseline; justify-content: space-between;
-  gap: 8px; padding: 14px 16px 8px;
-}
-.mf-head h2 { margin: 0; font-size: 14px; }
-.mf-sub { font-size: 10.5px; color: var(--muted); }
-.mf-chips { display: flex; flex-wrap: wrap; gap: 6px; padding: 0 14px 14px; }
+.mf-chips { display: flex; flex-wrap: wrap; gap: 6px; padding: 12px var(--panel-pad-x) 14px; }
 .mf-chip {
   display: inline-flex; align-items: center; gap: 6px;
   padding: 5px 9px; border-radius: 14px;
@@ -32,8 +27,8 @@
 }
 .mf-chip:hover { background: rgba(90, 140, 255, 0.16); color: var(--text); }
 .mf-chip.active {
-  background: rgba(42, 245, 255, 0.12);
-  border-color: rgba(42, 245, 255, 0.5);
+  background: var(--sel-bg);
+  border-color: var(--sel-border);
   color: #fff;
 }
 .mf-dot { width: 9px; height: 9px; border-radius: 50%; flex: none; }

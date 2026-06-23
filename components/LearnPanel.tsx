@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useStore } from "@/src/store/store";
+import PanelHead from "@/components/PanelHead";
 
 const STEPS = [
   {
@@ -62,13 +63,13 @@ export default function LearnPanel() {
 
   return (
     <aside id="learn" className={"panel" + (collapsed ? " collapsed" : "")}>
-      <div className="learn-head">
-        <h2>Understand the network</h2>
-        <button id="learn-toggle" title="Collapse" onClick={() => setCollapsed((c) => !c)}>
-          {collapsed ? "+" : "–"}
-        </button>
-      </div>
-      <div className="learn-body">
+      <PanelHead
+        title="Understand the network"
+        eyebrow="Hypergraph · explore"
+        collapsed={collapsed}
+        onToggle={() => setCollapsed((c) => !c)}
+      />
+      <div className="learn-body panel-body">
         {STEPS.map((s) => (
           // role="button" rather than a real <button> — the step contains an <h3>,
           // which isn't valid inside a button. Enter/Space toggle it like a button.
@@ -91,7 +92,7 @@ export default function LearnPanel() {
           </div>
         ))}
       </div>
-      <div className="learn-nav">
+      <div className="learn-nav panel-body">
         <button className="primary" onClick={() => setTouring(true)} disabled={touring}>
           ▶ Guided tour
         </button>

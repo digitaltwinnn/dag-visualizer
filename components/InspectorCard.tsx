@@ -2,46 +2,18 @@
 
 import { hex } from "@/src/util/format";
 import type { PickDescriptor } from "@/src/data/types";
-import { nodeComposition, tagColorFor } from "@/components/inspector/parts";
+import { tagColorFor } from "@/components/inspector/parts";
 import LiveHeart from "@/components/inspector/LiveHeart";
 import {
   ClusterCard,
   CoreCard,
+  GeoLiveCard,
   MetaCard,
+  MetaLiveCard,
   MetaNodeCard,
   NodeCard,
   SnapshotCard,
 } from "@/components/inspector/cards";
-
-const LABEL: Partial<Record<PickDescriptor["kind"], string>> = {
-  meta: "Metagraph",
-  metanode: "Metagraph node",
-  snapshot: "DAG snapshot",
-  cluster: "Validator cluster",
-}; // core / l0 / l1 fall back to the upper-cased kind
-
-// The token badge for the meta + meta-node cards (a ticker pill, or "no token").
-function TagToken({ p, h }: { p: PickDescriptor; h: string }) {
-  if (p.kind === "meta") {
-    return (
-      <span className="mg-tag mg-tag--sel" style={{ ["--mg" as string]: h, margin: "0 0 10px 6px" }}>
-        {p.cfg.ticker || p.cfg.name}
-      </span>
-    );
-  }
-  if (p.kind === "metanode" && p.meta) {
-    return nodeComposition(p.meta.nodes || []).hasCurrency ? (
-      <span className="mg-tag mg-tag--sel" style={{ ["--mg" as string]: h, margin: "0 0 10px 6px" }}>
-        {p.meta.symbol || "—"}
-      </span>
-    ) : (
-      <span className="mg-tag mg-tag--other" style={{ margin: "0 0 10px 6px" }}>
-        no token
-      </span>
-    );
-  }
-  return null;
-}
 
 function CardBody({ p }: { p: PickDescriptor }) {
   switch (p.kind) {
@@ -52,41 +24,43 @@ function CardBody({ p }: { p: PickDescriptor }) {
     case "snapshot": return <SnapshotCard data={p.data} />;
     case "metanode": return <MetaNodeCard p={p} />;
     case "meta": return <MetaCard cfg={p.cfg} />;
+    case "metaLive": return <MetaLiveCard cfg={p.cfg} />;
+    case "geoLive": return <GeoLiveCard />;
   }
 }
 
-// The shared inspector/context card — the React port of ui.js _cardHTML. Owns the head
-// (tag, token, real-time control) + title, then dispatches the body to the per-kind
-// card. Used by both the click Inspector and the metagraph pane.
-export default function InspectorCard({ p }: { p: PickDescriptor }) {
-  const h = hex(tagColorFor(p));
-  const label = LABEL[p.kind] ?? p.kind.toUpperCase();
-
+// The shared inspector/context card — the React port of ui.js _cardHTML. Uniform header
+// across every view: a blue **eyebrow = the card's purpose** (its role in this view) over
+// a white **title = the specific subject** (the metagraph name, node, #ordinal). No kind/
+// token pills — they duplicated the eyebrow; the token now lives in the dossier body. The
+// only header control is the live ● for the snapshot. Then it dispatches to the per-kind body.
+export default function InspectorCard({ p, eyebrow }: { p: PickDescriptor; eyebrow?: string }) {
+  // A leading colour dot ties the subject back to what you picked — the same colour as
+  // the selected filter chip's dot and the metagraph's 3D hub, so "colour = this
+  // metagraph" stays one idiom across the chips, the scene and these cards.
+  const accent = hex(tagColorFor(p));
   return (
     <>
-      <div className="insp-head">
-        <span
-          className="insp-tag"
-          style={{ background: `${h}22`, color: h, border: `1px solid ${h}55` }}
-        >
-          {label}
-        </span>
-        <TagToken p={p} h={h} />
-        {/* Real-time control sits on the right; the factual tags stay left. */}
-        {p.kind === "snapshot" && <LiveHeart ordinal={p.data.ordinal} />}
-      </div>
+      {eyebrow && <span className="insp-eyebrow">{eyebrow}</span>}
       {p.kind === "snapshot" ? (
-        // Compact header: the tag already says "snapshot", so just #ordinal + a subtle
-        // time (no large "Snapshot time" block).
-        <h3 className="insp-snap-title">
-          #{p.data.ordinal.toLocaleString()}
-          {p.data.timestamp && (
-            <span className="insp-snap-time">{new Date(p.data.timestamp).toLocaleTimeString()}</span>
-          )}
-        </h3>
+        <div className="insp-titlerow">
+          <h3 className="insp-snap-title">
+            <span className="insp-dot" style={{ background: accent }} />
+            #{p.data.ordinal.toLocaleString()}
+            {p.data.timestamp && (
+              <span className="insp-snap-time">{new Date(p.data.timestamp).toLocaleTimeString()}</span>
+            )}
+          </h3>
+          <LiveHeart ordinal={p.data.ordinal} />
+        </div>
       ) : (
         <>
-          {p.title && <h3>{p.title}</h3>}
+          {p.title && (
+            <h3>
+              <span className="insp-dot" style={{ background: accent }} />
+              {p.title}
+            </h3>
+          )}
           {p.sub && <p className="insp-sub">{p.sub}</p>}
         </>
       )}
