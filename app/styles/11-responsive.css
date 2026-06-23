@@ -10,7 +10,6 @@
   .stats-header { gap: 14px; padding: 8px 12px; font-size: 11px; }
   #leftcol { width: 224px; }
   #rightcol { width: 288px; }
-  #ledger-view { width: 300px; }
 }
 
 /* Tablet / narrow: the header can no longer share the top row with the centred
@@ -23,15 +22,15 @@
     bottom: calc(138px + 28px); /* clear the ribbon (height + its 16px margin) */
   }
   #viewtoggle button { padding: 6px 12px; font-size: 12px; }
-  /* The toggle no longer occupies the top, so the columns can start higher. */
-  #leftcol { top: 52px; width: 210px; max-height: calc(100vh - 320px); }
-  #rightcol { top: 52px; width: min(300px, calc(100vw - 32px)); }
-  #ledger-view { top: 56px; width: min(320px, calc(100vw - 32px)); }
+  /* The toggle no longer occupies the top, so the columns can start higher. One token
+     keeps both rails aligned (see --rail-top). */
+  :root { --rail-top: 52px; }
+  #leftcol { width: 210px; max-height: calc(100vh - 320px); }
+  #rightcol { width: min(300px, calc(100vw - 32px)); }
 }
 
 /* Phone-class: the header wraps to two rows, so drop the columns below it so the
    second row of stats isn't tucked under the filter panel. */
 @media (max-width: 680px) {
-  #leftcol, #rightcol { top: 84px; }
-  #ledger-view { top: 88px; }
+  :root { --rail-top: 84px; }
 }

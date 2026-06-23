@@ -16,9 +16,11 @@ switched from the top toggle (`mode` in the store, set by `ViewToggle`: `hyper` 
 - **Node geography** — a globe with every validator and metagraph node at its real
   geolocation, a density heatmap, travelling-packet connection arcs, and a shared
   "Filter network" panel.
-- **Snapshot DAG** (`ledger`) — a **placeholder** (`LedgerPanel`) for a future
-  ledger-over-time view. The hypergraph, globe and skydome are hidden in this mode
-  (engine render loop), leaving just the live snapshot ribbon as the seed of it.
+- **Snapshot DAG** (`ledger`) — the ledger-over-time view (timeline still a `LedgerPanel`
+  placeholder). The hypergraph, globe and skydome are hidden in this mode (engine render
+  loop). The **full snapshot ribbon renders only here** now (the macro band of the future
+  timeline); hyper/geo get a slim **`LiveStrip`** heartbeat instead — see *The snapshot
+  stream*.
 
 Hyper↔geo **morph** smoothly (`morph` 0→1, eased each frame in the engine loop); the
 blue L0 core literally **grows out into the globe** (layers.js) as the nodes fly to
@@ -79,11 +81,15 @@ Zustand store. **Two data lanes:** (A) high-freq visuals subscribe straight to
   canvas), `globals.css`. **`app/api/metagraphs/route.ts`** + **`app/api/geo/route.ts`**
   are server-side data routes (see *Data* below).
 - **`components/`** — React panels, each reads/writes the store: `SceneCanvas` (mounts
-  the engine, dynamic-imported, `ssr:false`), `StatsHeader`, `SnapshotRibbon`,
-  `ViewToggle`, `LeftColumn` (→ `FilterPanel` + `LearnPanel`/`Leaderboard`),
-  `LedgerPanel`, `Inspector` (+ `InspectorCard` — a thin frame that dispatches to the
-  per-kind cards in `components/inspector/`), `Tooltip`, `FollowController` (live
-  snapshot follow), `DataBridge` (boots the data).
+  the engine, dynamic-imported, `ssr:false`), `StatsHeader`, `ViewToggle`, `LeftColumn`
+  (the explore rail: `FilterPanel` + one view tool card — `LearnPanel` / `GeoExplore` /
+  `LedgerPanel`), `Inspector` (the two-slot facts rail: dossier/cluster context + the signature
+  detail card, via `InspectorCard` — a thin frame dispatching to the per-kind cards in
+  `components/inspector/`), `Tooltip`, `FollowController` (ledger snapshot follow),
+  `DataBridge` (boots the data). **Bottom stream:** `BottomStream` picks the full
+  `SnapshotRibbon` (ledger) vs the slim `LiveStrip` (hyper/geo) and publishes
+  `--bottom-reserve`; both read the shared `useSnapshotFeed` hook. **`PanelHead`** is the
+  one header used by every rail panel (see *Layout system*).
 - **`src/store/store.ts`** — the Zustand store (mode, filter, country, inspect,
   following, metaList, leaderboard, live stats, …). **`src/data/network.ts`** wraps the
   vanilla `NetworkData` singleton + exposes `getAnchor`/`metagraphById`/`COLORS`/etc;
@@ -198,7 +204,58 @@ exclude the views it isn't (a deny-list grows a line every time you add a view):
 Same idea throughout: a new view is inert (no picks, no DoF, non-pickable) until you
 opt it in. The `ledger` placeholder relies on exactly this.
 
-## The snapshot stream (bottom ribbon)
+## Layout system — uniform HUD shell
+
+The HUD is **four fixed zones over the canvas, one SCOPE/role each, stable across views**.
+**Gate new chrome by *which zone/scope it belongs to* — not by what a particular view puts
+there.** Define a card by its scope (the role it plays); its *contents* are view-specific and
+keep changing, so they're examples, not the contract. The per-view widgets below are *current*.
+
+- **Top** = global vitals + view switch (`StatsHeader`, `ViewToggle`).
+- **Left rail** (`#leftcol`) = the **explore / interact** scope (verbs): the **global filter**
+  (pinned; `Global` eyebrow + accent stripe — persists across views) above **exactly one view
+  tool card** whose scope is *"explore this view's subject"* (currently `LearnPanel` in hyper,
+  `GeoExplore` in geo, `LedgerPanel` in ledger). Anything you act on to explore lives here, not
+  on the right. Tool eyebrow is one verb: `<View> · explore`.
+- **Right rail** (`#rightcol`, `Inspector`) = the **facts** scope (read-only), **two fixed-role
+  slots** mirroring the left rail: a **Context** card (the focused subject) above a **Detail**
+  card (the view's signature fact, or whatever you explicitly clicked). Each `InspectorCard`
+  opens with a role **eyebrow** (`Selected`, `Live`, `Node`…). A quiet `#rc-empty` placeholder
+  keeps the zone present.
+- **Bottom** (`BottomStream`) = the live/time lane (slim `LiveStrip` or full `SnapshotRibbon`).
+
+Uniformity is enforced with **shared tokens in `app/styles/00-base.css`** (`--radius`,
+`--panel-pad-*`, `--rail-*`, `--detail-w`, the `--sel-bg`/`--sel-border` selection language,
+and `--bottom-reserve` — set per view by `BottomStream`) and **one `PanelHead` component**
+(`app/styles/12-panel-system.css`) used by every rail panel, so the rail reads as one
+surface. Don't re-derive paddings or cyan tints in component CSS — reference the tokens.
+
+**Each view is a complementary projection of the same network** (the answer to *"what is each
+view for"*) — **hyper = who/what** (architecture + economic weight), **geo = where** (footprint),
+**ledger = when** (ledger over time + cost). How each fills the zones *today* (contents, not the
+rule):
+- **hyper** — left: `LearnPanel` (concept walkthrough). Right Context: `MetaCard` **dossier**
+  (identity only); Detail: **`MetaLiveCard`** (cadence / avg DAG fee / anchor share via
+  `metaActivity(id)` in `src/data/network.ts`, from `metaSnaps` + `anchorIndex`, refreshed on
+  `anchor`; factual — hidden until polled).
+- **geo** — left: **`GeoExplore`**, one card = a compact distribution-score meter atop a
+  **country→nodes accordion** (the leaderboard + node browser merged: a country row shows its
+  share via `store.leaderboard`/`globe.countryStats`; clicking it drills the globe **and**
+  expands its nodes inline from `store.selNodes`/`globe.listNodes` — a node row reuses the
+  node's existing `pick`). Right Context: the metagraph/cluster dossier; Detail: the
+  always-present **`GeoLiveCard`** ("Live footprint") — a live selection strip (online health /
+  countries / densest, from `selNodes`+`leaderboard`) that also **embeds the selected node**
+  when one is picked (it reads `store.inspect` itself, so a node pick augments the card rather
+  than replacing it). The accordion/globe is the master; this card's node section is the detail.
+- **ledger** — left: `LedgerPanel`. Right Context: the snapshot's metagraph dossier; Detail: the
+  **`SnapshotCard`**.
+
+**The global snapshot card is ledger-only.** `FollowController` follows the live snapshot
+*only* in `ledger` (`following = mode === "ledger"`); hyper/geo never inject one, and the
+`Inspector` only renders a `snapshot` pick in ledger. Clicking a tick in the slim `LiveStrip`
+jumps to ledger + opens it there. So a snapshot card never appears outside its home view.
+
+## The snapshot stream (full ribbon in ledger; slim strip elsewhere)
 
 Global L0 produces a snapshot every few seconds. Three different counters, which the
 UI deliberately keeps separate (cards show plain language; the click inspector shows
@@ -229,6 +286,12 @@ card, and the metagraph filter consistent. Showing a non-snapshot card or closin
 inspector clears the highlight and stops following; `ui.refreshFollow()` (fired on the
 `anchor` event) re-resolves the followed chip once the anchor index fills in. The chip
 click handler does **not** toggle `.active` itself — let `select()` own it.
+
+**Slim `LiveStrip` (hyper/geo)** is the demoted form: live dot + the last ~8 ordinals, no
+fees/anchors/bars, plus a `Snapshot DAG →` jump. It shares the same `useSnapshotFeed` hook +
+`inspect`/`following` store state as the ribbon, so the selected-snapshot highlight stays
+consistent across view switches. `BottomStream` renders one or the other by `mode` and sets
+`--bottom-reserve` (slim → the side rails grow back).
 
 ## Anchoring, fees & the metagraph data layer
 

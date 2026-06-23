@@ -1,13 +1,14 @@
 "use client";
 
 import { useEffect } from "react";
-import { getNetwork, metagraphById } from "@/src/data/network";
+import { getNetwork } from "@/src/data/network";
 import { useStore } from "@/src/store/store";
 import { followLatest } from "@/src/data/follow";
 
-// Drives the "live" snapshot card: while following, re-point the inspector at the
-// latest relevant snapshot on each new global snapshot and as the anchor index fills
-// in (ports the onGlobal/anchor → _followLatest wiring from main.js). Renders nothing.
+// Drives the "live" snapshot card, which is the **ledger view's** signature card. While
+// following, re-point the inspector at the latest relevant snapshot on each new global
+// snapshot and as the anchor index fills in. Hyper/geo never auto-follow a snapshot —
+// their signature cards are the metagraph live-activity and the node card. Renders nothing.
 export default function FollowController() {
   useEffect(() => {
     const net = getNetwork();
@@ -29,17 +30,19 @@ export default function FollowController() {
     };
   }, []);
 
+  const mode = useStore((s) => s.mode);
   const following = useStore((s) => s.following);
   const filter = useStore((s) => s.filter);
   const setFollowing = useStore((s) => s.setFollowing);
 
-  // Selecting a metagraph filter (chip OR hub click) goes real-time for it; All/L0/L1
-  // pins (no auto-follow). Runs on filter change only.
+  // Snapshot-following is on only in the ledger view (its live card). Entering ledger
+  // goes real-time; leaving it stops (a clicked chip can still pin within ledger).
   useEffect(() => {
-    setFollowing(metagraphById(filter) != null);
-  }, [filter, setFollowing]);
+    setFollowing(mode === "ledger");
+  }, [mode, setFollowing]);
 
-  // When following turns on (toggle / filter change), jump to the latest relevant snapshot.
+  // When following (enter ledger) or the filter changes while in it, jump to the
+  // latest relevant snapshot for the selection.
   useEffect(() => {
     if (following) followLatest();
   }, [following, filter]);

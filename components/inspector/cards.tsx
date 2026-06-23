@@ -1,8 +1,10 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { useStore } from "@/src/store/store";
-import { getAnchor } from "@/src/data/network";
-import { toDag } from "@/src/util/format";
+import { getAnchor, getNetwork, metaActivity, shortHash } from "@/src/data/network";
+import type { MetaActivity } from "@/src/data/network";
+import { hex, toDag } from "@/src/util/format";
 import type { GlobalSnapshot, MetaCfg, PickDescriptor } from "@/src/data/types";
 import AnchoredTags from "./AnchoredTags";
 import {
@@ -168,7 +170,26 @@ export function MetaNodeCard({ p }: { p: PickOf<"metanode"> }) {
   );
 }
 
-// The metagraph context pane: description, make-up rows, and a website link.
+// Live activity for a metagraph, recomputed as the anchor index fills in (so the
+// dossier stays current while the pane is open). Null until snapshots are polled.
+function useMetaActivity(id: string): MetaActivity | null {
+  const [act, setAct] = useState<MetaActivity | null>(() => metaActivity(id));
+  useEffect(() => {
+    setAct(metaActivity(id));
+    const net = getNetwork();
+    if (!net) return;
+    const on = () => setAct(metaActivity(id));
+    net.on("anchor", on);
+    return () => {
+      net.off("anchor", on);
+    };
+  }, [id]);
+  return act;
+}
+
+// The metagraph context pane (top-right "context" slot): identity only — description,
+// make-up rows, website. Its live/economic counterpart is MetaLiveCard (the bottom
+// "signature" slot), so the dossier stays a stable identity card.
 export function MetaCard({ cfg }: { cfg: MetaCfg }) {
   const metaList = useStore((s) => s.metaList);
   const mg = metaList.find((x) => x.id === cfg.id) || null;
@@ -178,10 +199,10 @@ export function MetaCard({ cfg }: { cfg: MetaCfg }) {
     const c = nodeComposition(nodeList);
     facts = (
       <>
+        <Row label="Token">{c.hasCurrency ? mg?.symbol || cfg.ticker || "—" : "none · data metagraph"}</Row>
         <Row label="Layers">{c.present.map((r) => ROLE_FR[r]).join(", ")}</Row>
         <Row label="Nodes">{nodeList.length}</Row>
         <Row label="Make-up">{joinList(c.parts)}</Row>
-        {mg && mg.countriesCount > 0 && <Row label="Countries">{mg.countriesCount}</Row>}
       </>
     );
   }
@@ -198,6 +219,142 @@ export function MetaCard({ cfg }: { cfg: MetaCfg }) {
           </a>
         </Row>
       )}
+    </>
+  );
+}
+
+function ccToFlag(cc?: string | null) {
+  if (!cc || cc.length !== 2) return "🏳️";
+  return String.fromCodePoint(...[...cc.toUpperCase()].map((ch) => 0x1f1e6 + ch.charCodeAt(0) - 65));
+}
+
+// Geography's always-present signature detail card. Two reads at once: a **live footprint
+// strip** for the active selection (online health, countries spanned, densest country —
+// all from `selNodes`/`leaderboard`, refreshed as the engine pushes them) ABOVE the
+// **selected node's** details when one is picked from the left explorer or the globe.
+// So the card always carries live info, and gains the node detail without replacing it.
+export function GeoLiveCard() {
+  const live = useStore((s) => s.live);
+  const selNodes = useStore((s) => s.selNodes);
+  const lb = useStore((s) => s.leaderboard);
+  const inspect = useStore((s) => s.inspect);
+  const setInspect = useStore((s) => s.setInspect);
+
+  const total = selNodes.length;
+  const ready = selNodes.reduce((n, r) => n + (r.state === "Ready" ? 1 : 0), 0);
+  const pct = total ? Math.round((ready / total) * 100) : 0;
+  const allReady = total > 0 && ready === total;
+  const countries = lb?.countries.length ?? 0;
+  const top = lb?.countries[0] ?? null;
+
+  const node =
+    inspect && (inspect.kind === "l0" || inspect.kind === "l1" || inspect.kind === "metanode")
+      ? inspect
+      : null;
+
+  return (
+    <>
+      <div className="gel-strip">
+        <div className="gel-stat">
+          <span className="gel-k">{live ? "● Online" : "Online"}</span>
+          <span className="gel-v">
+            <b style={{ color: allReady ? "#36e29a" : "#ffd166" }}>{ready}</b>
+            <span className="gel-tot">/{total || "—"}</span>
+          </span>
+          <span className="gel-bar">
+            <span style={{ width: `${pct}%` }} />
+          </span>
+        </div>
+        <div className="gel-stat">
+          <span className="gel-k">Countries</span>
+          <span className="gel-v">{countries || "—"}</span>
+        </div>
+        <div className="gel-stat">
+          <span className="gel-k">Densest</span>
+          <span className="gel-v gel-top">{top ? <>{ccToFlag(top.cc)} <b>{top.count}</b></> : "—"}</span>
+        </div>
+      </div>
+
+      {node ? (
+        <GeoLiveNode p={node} onClear={() => setInspect(null)} />
+      ) : (
+        <p className="insp-sub gel-hint">
+          Pick a node from the explorer on the left — or click one on the globe — to inspect it here.
+        </p>
+      )}
+    </>
+  );
+}
+
+// The compact selected-node block embedded in the geo live card. Identity-first: the node's
+// ID is the title; the body carries the facts you can't see on the globe — which network it
+// serves, the layer(s) it runs, its state, and exactly where it sits (place + coordinates).
+function GeoLiveNode({ p, onClear }: { p: PickOf<"l0" | "l1" | "metanode">; onClear: () => void }) {
+  // Title = Node ID (the stable identity); fall back to IP/place only if there's no ID.
+  const id = p.node?.id;
+  const title = id ? shortHash(id) : p.node?.ip || p.geo?.city || p.geo?.country || "Node";
+
+  // Which network this node serves, and the layer(s) it runs. For a metagraph node prefer the
+  // real role list; fall back to the shell layer it's plotted as (always one of the metagraph's
+  // layers) so it never collapses to a bare "L0" when the live roles are incomplete.
+  const network = p.kind === "metanode" ? p.meta?.name : p.kind === "l0" ? "Global L0" : "DAG L1";
+  const roles =
+    p.kind === "metanode"
+      ? (p.node?.roles?.length ? p.node.roles : [p.layer ?? p.node?.layer])
+          .filter(Boolean)
+          .map((r) => ROLE[r as string] || r)
+          .join(" · ") || "—"
+      : p.kind === "l0"
+        ? "L0 (consensus)"
+        : "DAG L1";
+
+  const ready = p.node?.state === "Ready";
+  const g = p.geo;
+  const place = g ? `${g.city ? g.city + ", " : ""}${g.country ?? ""}`.trim() : "";
+
+  return (
+    <div className="gel-node">
+      <div className="gel-node-head">
+        <span className="gel-node-eyebrow">Selected node</span>
+        <button className="gel-clear" title="Deselect" onClick={onClear}>
+          ×
+        </button>
+      </div>
+      <div className="gel-node-title insp-hash">{title}</div>
+      {network && <Row label="Network">{network}</Row>}
+      <Row label="Runs">{roles}</Row>
+      <Row label="State">
+        <span style={{ color: ready ? "#36e29a" : "#ffd166" }}>● {p.node?.state ?? "—"}</span>
+      </Row>
+      {place && <Row label="Location">{place}</Row>}
+    </div>
+  );
+}
+
+// The metagraph live-activity card (Hypergraph's signature bottom slot): cadence, the
+// average DAG fee it pays, and its share of the anchors we track — derived live from
+// metaSnaps via metaActivity, refreshed on the `anchor` event. Factual: shows a "no
+// data yet" line until we've polled snapshots for this metagraph.
+export function MetaLiveCard({ cfg }: { cfg: MetaCfg }) {
+  const act = useMetaActivity(cfg.id);
+  if (!act) {
+    return <p className="insp-sub">No live activity for {cfg.name} yet.</p>;
+  }
+  return (
+    <>
+      {act.snapsPerMin != null && (
+        <Row label="Snapshot cadence">{act.snapsPerMin.toFixed(1)} / min</Row>
+      )}
+      <Row label="Avg snapshot fee">{act.avgFeeDag.toFixed(5)} DAG</Row>
+      {act.sharePct != null && (
+        <>
+          <Row label="Share of anchors">{act.sharePct.toFixed(1)}%</Row>
+          <div className="insp-bar">
+            <span style={{ width: `${Math.min(100, act.sharePct)}%`, background: hex(cfg.color) }} />
+          </div>
+        </>
+      )}
+      <p className="insp-foot">Over the last {act.samples} buffered snapshots.</p>
     </>
   );
 }

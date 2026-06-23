@@ -1,0 +1,68 @@
+/* ── Right column: slot eyebrows, empty state, live bar, node browser ─────────
+   Mirrors the left rail's header language on the detail side: each card opens with
+   an eyebrow naming its slot role (Selected / Live / Node …), symmetric with the
+   left panels' eyebrows. */
+
+/* Uniform right-column header: a blue role eyebrow (purpose) over a white title
+   (subject). Both clear the absolute close × in the top-right corner. */
+.insp-eyebrow {
+  display: block;
+  font-size: 8.5px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase;
+  color: var(--accent); line-height: 1; margin-bottom: 8px; padding-right: 22px;
+}
+#inspector h3, #metapane h3 { padding-right: 22px; }
+/* Snapshot title shares its row with the live ● control; both clear the × . */
+.insp-titlerow {
+  display: flex; align-items: baseline; justify-content: space-between;
+  gap: 10px; padding-right: 22px;
+}
+.insp-titlerow h3 { padding-right: 0; }
+/* Leading colour dot on the subject — same idiom as the filter chip's dot and the 3D
+   hub, so colour = this metagraph reads consistently. Colour set inline (the accent). */
+.insp-dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 8px; vertical-align: middle; }
+
+/* Quiet placeholder so the right zone is always present (symmetric with the left rail). */
+#rc-empty { padding: 16px 18px; }
+.rc-empty-text { margin: 0; font-size: 12.5px; line-height: 1.5; color: var(--muted); }
+
+/* Share-of-anchors bar in the metagraph live card (reuses the leaderboard bar look). */
+.insp-bar { height: 7px; border-radius: 4px; background: rgba(255,255,255,0.06); overflow: hidden; margin: 8px 0 2px; }
+.insp-bar > span { display: block; height: 100%; border-radius: 4px; }
+.insp-foot { margin: 10px 0 0 !important; font-size: 11px !important; color: var(--muted) !important; }
+
+/* ── Geo "Live footprint" signature card: a live selection strip (always) + selected node ── */
+.gel-strip { display: flex; align-items: stretch; gap: 8px; }
+.gel-stat {
+  flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px;
+  padding: 8px 10px; border-radius: 9px;
+  background: rgba(90, 140, 255, 0.06); border: 1px solid var(--panel-border);
+}
+.gel-k { font-size: 8.5px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); white-space: nowrap; }
+.gel-v { font-size: 16px; font-weight: 700; font-variant-numeric: tabular-nums; line-height: 1; color: var(--text); }
+.gel-tot { font-size: 11px; font-weight: 600; color: var(--muted); }
+.gel-top { font-size: 14px; }
+.gel-top b { color: var(--text); }
+.gel-bar { margin-top: auto; height: 4px; border-radius: 3px; background: rgba(255, 255, 255, 0.08); overflow: hidden; }
+.gel-bar > span { display: block; height: 100%; border-radius: 3px; background: linear-gradient(90deg, var(--l0), #36e29a); transition: width 0.35s ease; }
+
+.gel-hint { margin: 12px 0 0 !important; }
+.gel-node { margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--panel-border); }
+.gel-node-head { display: flex; align-items: center; justify-content: space-between; }
+.gel-node-eyebrow { font-size: 8.5px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--accent); }
+.gel-clear { border: none; background: transparent; color: var(--muted); font-size: 16px; line-height: 1; cursor: pointer; padding: 0 2px; }
+.gel-clear:hover { color: var(--text); }
+.gel-node-title { font-size: 13px; font-weight: 600; color: var(--text); margin: 6px 0 8px; font-variant-numeric: tabular-nums; word-break: break-all; }
+
+/* ── Node rows — the nodes nested under an open country in the GeoExplore accordion. ── */
+.nb-row {
+  display: flex; align-items: center; gap: 9px; width: 100%;
+  padding: 5px 8px; margin: 1px 0; border-radius: 7px;
+  border: 1px solid transparent; background: transparent; cursor: pointer;
+  font: inherit; color: #c7d0ea; text-align: left; transition: background 0.14s, border 0.14s;
+}
+.nb-row:hover { background: rgba(90,140,255,0.12); color: var(--text); }
+.nb-row:focus-visible { outline: 2px solid var(--core); outline-offset: -2px; }
+.nb-row.active { background: var(--sel-bg); border-color: var(--sel-border); color: #fff; }
+.nb-dot { width: 7px; height: 7px; border-radius: 50%; flex: none; }
+.nb-label { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-variant-numeric: tabular-nums; font-size: 12px; }
+.nb-layer { flex: none; font-size: 9.5px; font-weight: 700; color: var(--muted); letter-spacing: 0.04em; }

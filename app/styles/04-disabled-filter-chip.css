@@ -1,4 +1,23 @@
-/* ── Disabled filter chip (node-less metagraphs) ─────────────────────────── */
-.mf-chip--off { cursor: default; opacity: 0.45; color: var(--muted); background: rgba(90,140,255,0.03); }
-.mf-chip--off:hover { background: rgba(90,140,255,0.03); color: var(--muted); }
-.mf-chip--off .mf-dot { filter: grayscale(0.6); }
+/* ── Registered-but-inactive metagraphs (no locatable nodes) ──────────────────
+   A metagraph registered on-chain but with no locatable nodes can't be plotted or
+   filtered on the globe. Rather than spend a full disabled chip on each (wasted space
+   for something non-interactive), they collapse into one compact labelled cluster of
+   dotted tickers below the real chips. */
+.mf-ghosts {
+  width: 100%; margin-top: 8px; padding-top: 10px;
+  border-top: 1px solid var(--panel-border);
+  display: flex; flex-direction: column; gap: 7px;
+}
+.mf-ghosts-label {
+  font-size: 9px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase;
+  color: var(--muted);
+}
+.mf-ghosts-row { display: flex; flex-wrap: wrap; gap: 6px 12px; }
+.mf-ghost {
+  display: inline-flex; align-items: center; gap: 5px;
+  font-size: 11px; color: var(--muted); cursor: help; white-space: nowrap;
+}
+.mf-ghost-dot {
+  width: 7px; height: 7px; border-radius: 50%; flex: none;
+  filter: grayscale(0.5); opacity: 0.8;
+}

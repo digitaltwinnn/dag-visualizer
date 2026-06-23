@@ -97,11 +97,17 @@ export class Globe {
     this.geoFades = [];    // { mat, base } surface materials faded by morph
     this.morph = 0;
     this.clock = 0;
-    this.spin = null; // null = idle spin; { from, to, t, dur } = ease-in-out to a focus angle
+    // null = idle spin; { from, to, fromX, toX, t, dur } = ease-in-out to a focus
+    // orientation (y = longitude swing, x = latitude tilt so high-lat nodes come into view).
+    this.spin = null;
     this.countryFilter = null; // cc to drill into (combined with the network filter), or null
     this.countryMix = 0;       // eased 0..1: how strongly the country dim is applied
     this.l0Count = 0;
     this.l1Count = 0;
+    // The coastline outline material — its colour eases toward the active metagraph's colour.
+    this.coastMat = null;
+    this._edgeColor = new THREE.Color(0x4fd0e0);
+    this._edgeTarget = new THREE.Color(0x4fd0e0);
 
     // Highlight/dim state driven by the "Understand the network" panel: each
     // validator layer eases its own dim level (0 = bright, 1 = dimmed) so the
@@ -129,9 +135,9 @@ export class Globe {
   }
 
   _buildSphere() {
-    // Writes depth so it occludes the far half of the atmosphere shell (leaving
-    // only a rim) and hides far-side nodes. Hidden while in the Hypergraph view
-    // (visibility toggled in setMorph) so it can't occlude the core there.
+    // Writes depth so it occludes the far half of the atmosphere shell (leaving only a rim)
+    // and hides far-side nodes. Hidden in the Hypergraph (visibility toggled in setMorph) so it
+    // can't occlude the core there; fades in by opacity with the rest of the surface.
     const mat = new THREE.MeshStandardMaterial({
       color: 0x0a1426, emissive: 0x050c18, emissiveIntensity: 0.5,
       roughness: 0.95, metalness: 0.1,
@@ -177,6 +183,7 @@ export class Globe {
       const res = await fetch("/land-110m.json");
       const topo = await res.json();
       const land = feature(topo, topo.objects.land);
+      // Just a light-blue coastline outline — colour eases toward the selected metagraph.
       const pts = [];
       const addRing = (ring) => {
         for (let i = 0; i < ring.length - 1; i++) {
@@ -190,10 +197,15 @@ export class Globe {
         else if (g.type === "MultiPolygon") g.coordinates.forEach((poly) => poly.forEach(addRing));
       }
       const geo = new THREE.BufferGeometry().setFromPoints(pts);
-      const mat = new THREE.LineBasicMaterial({ color: 0x4fd0e0, transparent: true, opacity: 0.55 * this.morph });
-      this.geoFades.push({ mat, base: 0.55 });
-      this.group.add(new THREE.LineSegments(geo, mat));
+      this.coastMat = new THREE.LineBasicMaterial({ color: this._edgeColor.clone(), transparent: true, opacity: 0.55 * this.morph });
+      this.geoFades.push({ mat: this.coastMat, base: 0.55 });
+      this.group.add(new THREE.LineSegments(geo, this.coastMat));
     } catch (e) { /* graticule-only fallback */ }
+  }
+
+  // Tint the coastline outline toward a colour (hex), or null for the default cyan. Eased in update.
+  setEdgeColor(color) {
+    this._edgeTarget.set(color == null ? 0x4fd0e0 : color);
   }
 
   // -------------------------------------------------- build the shared nodes
@@ -577,7 +589,7 @@ export class Globe {
             spinSpeed: 0.3 + Math.random() * 0.5, spinPhase: Math.random() * 6.2831,
             twinkle: Math.random() * 6.2831, dim: 0, dimTarget: 0,
             pick: {
-              kind: "metanode", meta: m, node, geo: g,
+              kind: "metanode", meta: m, node, geo: g, layer,
               title: m.name,
               // No subtitle — the token badge (header) + the "Runs" row cover identity
               // and which layers this node serves (incl. Hybrid).
@@ -680,12 +692,27 @@ export class Globe {
       (!this.countryFilter || (geo && geo.cc === this.countryFilter));
   }
 
-  // Aim the globe so the densest part of the current filter's located nodes faces
-  // the camera, smoothly easing the spin to that longitude. The mean of the node
-  // directions leans toward wherever the most nodes are. North stays up — we only
-  // rotate around Y. Pass false to resume the idle spin.
-  // Returns the selection's concentration R = |mean of node dirs| (0 = spread over
-  // the globe, 1 = all co-located), so the camera can zoom proportionally.
+  // Aim the globe so a unit direction `dir` (in the un-rotated globe frame) swings to the
+  // front: rotation.y picks the longitude (the short way round), rotation.x tilts the
+  // latitude up into view so nodes near the top/bottom aren't stuck at the rim. The tilt is
+  // clamped to `maxTilt` (radians) so the globe leans rather than flipping pole-on.
+  // `raise` (radians) leaves the aimed point that far ABOVE the front-centre instead of
+  // dead-centre — so a focused node sits in the upper third and the globe curves away below
+  // it (an oblique "horizon" framing), rather than being viewed straight-down top-down.
+  _aimAt(dir, maxTilt, raise = 0) {
+    const fromY = this.group.rotation.y;
+    let dy = -Math.atan2(dir.x, dir.z) - fromY;
+    dy = Math.atan2(Math.sin(dy), Math.cos(dy)); // shortest way round
+    const h = Math.hypot(dir.x, dir.z);
+    const tilt = Math.max(-maxTilt, Math.min(maxTilt, Math.atan2(dir.y, h) - raise));
+    this.spin = { from: fromY, to: fromY + dy, fromX: this.group.rotation.x, toX: tilt, t: 0, dur: 1.3 };
+  }
+
+  // Aim the globe so the densest part of the current filter's located nodes faces the
+  // camera (the mean node direction leans toward wherever the most nodes are), with a gentle
+  // ~32° tilt so a high-latitude cluster (e.g. Finland) isn't framed at the rim. Pass false
+  // to resume the idle spin. Returns the selection's concentration R = |mean of node dirs|
+  // (0 = spread over the globe, 1 = all co-located), so the camera can zoom proportionally.
   focusDensest(on) {
     if (!on) { this.spin = null; return null; }
     const mean = new THREE.Vector3();
@@ -693,12 +720,18 @@ export class Globe {
     for (const u of this.nodes) if (!u.noGeo && this._nodeActive(u.layer, u.pick.geo)) { mean.add(u.trueDir); count++; }
     for (const r of this.metaNodes) if (this._nodeActive(r.metaId, r.pick.geo)) { mean.add(r.trueDir); count++; }
     if (!count || mean.lengthSq() < 1e-6) { this.spin = null; return null; }
-    // Rotate so the mean direction swings round to the front (+Z), the short way.
-    const from = this.group.rotation.y;
-    let d = -Math.atan2(mean.x, mean.z) - from;
-    d = Math.atan2(Math.sin(d), Math.cos(d));
-    this.spin = { from, to: from + d, t: 0, dur: 1.3 };
-    return mean.length() / count;
+    const R = mean.length() / count;
+    this._aimAt(mean.clone().normalize(), 0.56); // ~32° max lean for a broad selection
+    return R;
+  }
+
+  // Aim a single node's location to the centre of the view (the caller frames the globe so its
+  // curvature still reads around it). A tiny `raise` nudges it a hair above dead-centre so there's
+  // a touch more globe below; the tilt rotates high-latitude nodes in off the rim. False if no lat/lon.
+  focusNode(geo) {
+    if (!geo || geo.lat == null || geo.lon == null) return false;
+    this._aimAt(latLonToVec3(geo.lat, geo.lon, 1).normalize(), 0.70, 0.12); // ≤40° tilt, ~7° raise
+    return true;
   }
 
   // -------------------------------------------------- per-country breakdown
@@ -727,6 +760,34 @@ export class Globe {
   countryStats(filter = this.filter) {
     const m = this._countryTallies()[filter];
     return m ? Object.values(m).sort((a, b) => b.count - a.count) : [];
+  }
+
+  // Flat node list for one filter selection — drives the React node browser. Read-only:
+  // it just surfaces each plotted node's existing `pick` descriptor (so a click reuses
+  // the exact same inspector card as clicking the node on the globe) plus the few fields
+  // the browser groups/sorts on. l0/l1/all → validators; <metaId> → that metagraph's nodes.
+  listNodes(filter = this.filter) {
+    const rows = [];
+    const push = (pick, layer) => {
+      const g = pick.geo || null;
+      rows.push({
+        pick,
+        label: (pick.node && pick.node.ip) || (g && (g.city || g.country)) || "node",
+        cc: g ? g.cc || null : null,
+        country: g ? g.country || null : null,
+        state: pick.node ? pick.node.state : null,
+        layer,
+      });
+    };
+    if (filter === "all" || filter === "l0" || filter === "l1") {
+      for (const u of this.nodes) {
+        if (u.noGeo) continue;
+        if (filter === "all" || u.layer === filter) push(u.pick, u.layer);
+      }
+    } else {
+      for (const r of this.metaNodes) if (r.metaId === filter) push(r.pick, r.layer);
+    }
+    return rows;
   }
 
   // A 0–100 "distribution score" per network: the Shannon entropy of its
@@ -831,10 +892,19 @@ export class Globe {
           _dummy.position.copy(dir).multiplyScalar(lerp(u.hyperRadius, u.geoRadius, e));
         }
 
+        // Nodes outside the current network/country selection are hidden — and on the
+        // hyper→globe morph they should vanish QUICKLY (they're irrelevant to that flight)
+        // rather than travel to the globe only to disappear. So the hide factor scales BOTH
+        // the hyper sphere and the geo disc to nothing as the dim eases in (~0.25s), much
+        // faster than the morph itself. (this.dim / countryMix are eased in the dim pass below.)
+        let hideV = u.layer === "l0" ? this.dim.l0 : this.dim.l1;
+        if (this.countryFilter && (!u.pick.geo || u.pick.geo.cc !== this.countryFilter)) hideV = Math.max(hideV, this.countryMix);
+        const show = 1 - hideV;
+
         // Sphere: tumbling on its own axis, shrinking out as it nears the globe.
         _qSpin.setFromAxisAngle(u.spinAxis, u.spinPhase + t * u.spinSpeed);
         _dummy.quaternion.copy(_qSpin);
-        _dummy.scale.setScalar(u.hyperSize * sphereVis * (u.noGeo ? 1 - e : 1));
+        _dummy.scale.setScalar(u.hyperSize * sphereVis * (u.noGeo ? 1 - e : 1) * show);
         _dummy.updateMatrix();
         this.instSphere.setMatrixAt(u.index, _dummy.matrix);
 
@@ -844,7 +914,7 @@ export class Globe {
         const fall = this._hasCam ? discFall(dir.dot(this._camN)) : 1;
         _qRadial.setFromUnitVectors(Z_AXIS, dir);
         _dummy.quaternion.copy(_qRadial);
-        _dummy.scale.setScalar(u.noGeo ? 0 : u.geoSize * discVis * fall);
+        _dummy.scale.setScalar(u.noGeo ? 0 : u.geoSize * discVis * fall * show);
         _dummy.updateMatrix();
         this.instDisc.setMatrixAt(u.index, _dummy.matrix);
       }
@@ -870,16 +940,24 @@ export class Globe {
 
   update(dt) {
     this.clock += dt;
+    // Ease the coastline outline toward the active metagraph colour.
+    if (this.coastMat) {
+      this._edgeColor.lerp(this._edgeTarget, Math.min(1, dt * 3));
+      this.coastMat.color.copy(this._edgeColor);
+    }
     if (this.spin) {
-      // Ease-in-out to the focus longitude, then hold there (no idle spin).
+      // Ease-in-out to the focus orientation (longitude + tilt), then hold there (no idle spin).
       const s = this.spin;
       if (s.t < 1) {
         s.t = Math.min(1, s.t + dt / s.dur);
         const e = s.t < 0.5 ? 2 * s.t * s.t : 1 - Math.pow(-2 * s.t + 2, 2) / 2;
         this.group.rotation.y = s.from + (s.to - s.from) * e;
+        this.group.rotation.x = (s.fromX || 0) + ((s.toX || 0) - (s.fromX || 0)) * e;
       }
     } else {
       this.group.rotation.y += dt * 0.03; // idle spin
+      // Ease any focus tilt back to level when idling, so the globe sits upright again.
+      if (this.group.rotation.x) this.group.rotation.x += (0 - this.group.rotation.x) * Math.min(1, dt * 2.2);
     }
     const m = this.morph;
     const wave = (this.clock * 0.9) % (Math.PI * 2);
@@ -1003,11 +1081,12 @@ export class Globe {
         }
         _geoVec.copy(_vec).lerp(r.geoPos, e);
 
-        // Sphere: tumbling on its own axis, shrinking out near the globe.
+        // Sphere: tumbling on its own axis, shrinking out near the globe. Filtered-out
+        // metagraph nodes shrink fully (1 - dEff) so they vanish quickly on the morph too.
         _dummy.position.copy(_geoVec);
         _qSpin.setFromAxisAngle(r.spinAxis, r.spinPhase + this.clock * r.spinSpeed);
         _dummy.quaternion.copy(_qSpin);
-        _dummy.scale.setScalar(r.hyperSize * sphereVis * (1 - dEff * 0.5));
+        _dummy.scale.setScalar(r.hyperSize * sphereVis * (1 - dEff));
         _dummy.updateMatrix();
         this.metaSphere.setMatrixAt(r.index, _dummy.matrix);
 
@@ -1016,7 +1095,8 @@ export class Globe {
         const fall = this._hasCam ? discFall(r.geoDir.dot(this._camN)) : 1;
         _qRadial.setFromUnitVectors(Z_AXIS, r.geoDir);
         _dummy.quaternion.copy(_qRadial);
-        _dummy.scale.setScalar(r.geoSize * discVis * (1 - dEff * 0.5) * fall);
+        // Hide (not dim) metagraph nodes outside the selection — shrink the disc fully out.
+        _dummy.scale.setScalar(r.geoSize * discVis * (1 - dEff) * fall);
         _dummy.updateMatrix();
         this.metaDisc.setMatrixAt(r.index, _dummy.matrix);
       }

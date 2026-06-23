@@ -28,16 +28,55 @@ can understand how it works and why it's powerful:
     travelling-packet connection arcs. A **Filter network** panel isolates the Global L0, DAG
     L1, or any single metagraph; the **Nodes by country** list then drills further into a
     single country. Selecting one rotates + zooms the globe to wherever its nodes are densest.
-  - **Snapshot DAG** — a placeholder for an upcoming ledger-over-time view (work in progress).
+  - **Snapshot DAG** — the ledger-over-time view (timeline still work in progress). The full
+    live snapshot ribbon lives **here** now, as the macro band of the timeline; the Hypergraph
+    and globe show only a slim **live heartbeat strip** so the dense instrument doesn't compete
+    with each view's own panels.
 - Stays **factual** if the network is offline — shows a "NO DATA" state and recovers on
   the next successful poll (no simulated/placeholder data).
 - Glowing, bloom-lit scene with depth-of-field focus and orbit controls (drag / zoom).
 - Hover any element for a tooltip; **click** for an inspector with real on-chain values —
-  including a metagraph's token, layers, node make-up and website, and each node's role
-  (**hybrid** vs **dedicated** L0 / data-L1 / currency-L1).
+  a metagraph's token, layers, node make-up and website (dossier) alongside a **live
+  activity** card (snapshot cadence, average fee, share of anchors), and each node's role
+  (**hybrid** vs **dedicated** L0 / data-L1 / currency-L1). In the globe view a **node
+  browser** lists the selection's nodes (grouped by country) so you can reach any node's
+  data without hunting for a dot.
 - A "Learn" panel and a **guided tour** that flies the camera through L0 → L1 → metagraphs.
 - Live stats header: validator counts, public metagraphs, and per-hour snapshots / anchors /
   fees with inline sparklines (snapshot ordinal & height live in the click inspector).
+
+## Design language
+
+The HUD is four fixed zones over the canvas, each with **one role** that holds in every
+view, so switching views never relearns the screen:
+
+- **Top** — global vitals + the view switch (orientation).
+- **Left rail** — controls & "learn/interact": the **global network filter** (pinned, marked
+  with a `Global` eyebrow + accent stripe — it persists across views) above the **view's own
+  tool** (Hypergraph → *Understand the network*; Geography → *Geographic footprint*; Snapshot
+  DAG → the ledger *about* panel). Every view uses the same rail, with one header pattern and
+  collapse affordance.
+- **Right rail** — **details on demand**, in two fixed-role slots mirroring the left rail:
+  a **Context** card (the subject you focused) above a **Detail / live** card (the view's
+  signature). Each opens with a role eyebrow (`Selected`, `Live`, `Node`…). A quiet placeholder
+  keeps the zone present when nothing is selected.
+- **Bottom** — the **live/time lane**: the slim heartbeat strip (hyper/geo) or the full ribbon (ledger).
+
+The three views are **complementary projections of the same network** — each answers an
+orthogonal question and owns one "signature" detail card, so the views never overlap:
+
+| View | Question | Context slot | Signature (detail) slot |
+|------|----------|--------------|-------------------------|
+| **Hypergraph** | *who / what* — architecture + economic weight | Metagraph **dossier** (identity, make-up, site) | **Live activity** (cadence, fee, anchor share) |
+| **Node geography** | *where* — footprint & decentralization | **Node browser** (the selection's nodes, grouped by country, clickable) | **Node card** (location, role) |
+| **Snapshot DAG** | *when* — how the ledger advances + cost | Snapshot's metagraph context | **Snapshot card** (DAG position, anchors, fees) |
+
+The global **snapshot card is scoped to the ledger view** (its home) — hyper/geo never inject
+one; clicking a tick in the slim strip jumps to the ledger and opens it there.
+
+Visual uniformity is enforced with shared design tokens (`app/styles/00-base.css`): one spacing
+scale, one panel radius, one "selected" treatment (`--sel-bg` / `--sel-border`), one `PanelHead`
+component (left rail) and matching role eyebrows on the right.
 
 ## Node geography & metagraph nodes
 
@@ -100,7 +139,7 @@ Browser ──poll──> Constellation block explorer API   (snapshots / cluste
 | Path | Purpose |
 |------|---------|
 | `app/` | Next App Router — `page.tsx` (mounts panels + canvas), `globals.css`, `api/{metagraphs,geo}/route.ts` (server-side data) |
-| `components/` | React panels (SceneCanvas, StatsHeader, SnapshotRibbon, ViewToggle, LeftColumn, Inspector, Tooltip, FollowController, …); `components/inspector/` holds the per-kind inspector cards |
+| `components/` | React panels (SceneCanvas, StatsHeader, ViewToggle, LeftColumn, Inspector, Tooltip, FollowController, …); `PanelHead` (shared rail header), `BottomStream` (picks `SnapshotRibbon` vs slim `LiveStrip` by view) + `useSnapshotFeed` (shared live feed), `NodeBrowser` (geo node list); `components/inspector/` holds the per-kind inspector cards |
 | `src/store/store.ts` | Zustand store (the React↔engine command/state bridge) |
 | `src/data/` | `network.ts` (wraps `NetworkData`), `follow.ts`, `types.ts` |
 | `src/util/format.ts` | Shared formatters — `hex` (colour), `fmtDag` (fee) |

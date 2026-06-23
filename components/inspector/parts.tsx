@@ -47,6 +47,7 @@ export function nodeComposition(nodes: NodeInfo[]): Composition {
 export function tagColorFor(p: PickDescriptor): number {
   switch (p.kind) {
     case "meta": return p.cfg.color;
+    case "metaLive": return p.cfg.color;
     case "metanode": return p.meta?.color ?? COLORS.core;
     case "l0": return COLORS.l0;
     case "l1": return COLORS.l1;
