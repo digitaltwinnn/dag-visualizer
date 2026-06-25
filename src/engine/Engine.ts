@@ -283,12 +283,18 @@ export class Engine {
   }
 
   // Aim/zoom the globe for the current network + country selection (ports
-  // ui.js _applyGeoFocus): narrowed selections swing to the densest cluster and
-  // zoom proportional to concentration; "all" sits at the wide geo overview.
+  // ui.js _applyGeoFocus): narrowed selections swing to the densest cluster, but only a
+  // COUNTRY drill-down zooms in (proportional to concentration). A metagraph selection just
+  // rotates the globe to its densest area at the DEFAULT geo distance — no zoom (node picks
+  // zoom via _focusNode); "all" sits at the wide geo overview.
   private _applyGeoFocus() {
     const narrowed = this.filter !== "all" || this.country != null;
     const R = this.globe.focusDensest(narrowed);
-    if (narrowed && R != null) this._focusGeo(R);
+    // Country drill-down zooms in proportional to concentration. A metagraph selection uses the
+    // SAME framing at its wide end (R=0) — the camera drops low and looks across the front so the
+    // tilted-up cluster is well-framed — but does NOT zoom (default geo distance). "all" = overview.
+    if (this.country != null && R != null) this._focusGeo(R);
+    else if (narrowed && R != null) this._focusGeo(0);
     else this.focus("geo");
   }
 
