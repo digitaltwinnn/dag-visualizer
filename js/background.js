@@ -82,16 +82,19 @@ const frag = /* glsl */ `
   // vertical gradient. Kept well below the bloom threshold so it's a quiet, atmospheric
   // backdrop that gives depth without competing with the scene.
   vec3 digitalBg(vec3 dir) {
-    float n = fbm(dir * 1.4 + vec3(uTime * 0.010, uTime * 0.005, 0.0));
-    float soft = smoothstep(0.36, 0.92, n);      // broad, soft cloud regions
-    vec3 glow = mix(uBlue, uCyan, n);            // cyan↔blue across the cloud
+    // Broader + fainter + lower-contrast than a detailed cloud: a smooth colour WASH that takes
+    // on the metagraph tint, so it stays a quiet ambiance and doesn't turn to mush under the
+    // depth-of-field blur. (The metagraph-accent tint — the part that's liked — is unchanged.)
+    float n = fbm(dir * 0.9 + vec3(uTime * 0.010, uTime * 0.005, 0.0));
+    float soft = smoothstep(0.30, 1.0, n);       // gentle, low-contrast variation (no cloud edges)
+    vec3 glow = mix(uBlue, uCyan, n);            // cyan↔blue across the wash
     glow = mix(glow, uPurple, 0.28);             // a hint of purple
     glow = mix(glow, uAccent, uAccentMix);       // tint toward the selected metagraph
 
     vec3 grad = mix(uBlue, uAccent, uAccentMix); // the base gradient leans in too
     vec3 col = uDeep;
     col += grad * 0.025 * (dir.y * 0.5 + 0.5);   // gentle top-lit gradient
-    col += glow * soft * 0.07;                   // the aurora, faint but present
+    col += glow * soft * 0.05;                   // the colour wash — subtle, but the tint still reads
     return col;
   }
 

@@ -24,8 +24,8 @@ can understand how it works and why it's powerful:
     each metagraph as an orbiting hub with its **own L0 / data-L1 / currency-L1 nodes** in
     concentric shells. Smoothly **morphs** into the globe (the core grows out into the Earth).
   - **Node geography** — a 3D globe with every validator and metagraph node plotted at its
-    **real geographic location** (continents from world-atlas data), a density heatmap and
-    travelling-packet connection arcs. A **Filter network** panel isolates the Global L0, DAG
+    **real geographic location** (solid raised continents from world-atlas land data, with
+    glowing coastal cliffs), a density heatmap and travelling-packet connection arcs. A **Filter network** panel isolates the Global L0, DAG
     L1, or any single metagraph; the **Nodes by country** list then drills further into a
     single country. Selecting one rotates + zooms the globe to wherever its nodes are densest.
   - **Snapshot DAG** — the ledger-over-time view (timeline still work in progress). The full

@@ -113,9 +113,16 @@ Zustand store. **Two data lanes:** (A) high-freq visuals subscribe straight to
   (not `layers.root`) so the morph can **grow it out to the globe's radius and
   dissolve it** as the Earth fades in. Hubs fade out early.
 - `globe.js` — the biggest, most complex file. Owns the shared DAG validator nodes
-  AND the metagraph nodes (sphere→disc instanced cross-fade), the globe
-  surface/heatmap, the travelling-packet arcs, filtering/dimming, and the geo focus
-  spin.
+  AND the metagraph nodes (sphere→disc instanced cross-fade), the globe surface, the
+  **solid raised continents**, the heatmap, the travelling-packet arcs, filtering/dimming,
+  and the geo focus spin. The land is the `land-110m` polygons triangulated into a
+  **plateau** at radius `R+LAND_H` (earcut via `THREE.ShapeUtils`, with a longitude
+  **unwrap** for the 4 antimeridian-crossing polygons, an Antarctica **pole-cap**, and a
+  uniform `n=4` subdivision so facets hug the sphere with no T-junction cracks), capped by
+  additive coastal **"wall" cliffs** (BackSide-culled, dim quadratic-ish rim, always the
+  default cyan — metagraph-tinting it read as too dominant). Nodes/heatmap/arcs sit on the
+  plateau (`R+LAND_H+ε`); the body sphere (`renderOrder -2`) and fill (`-1`) keep the
+  depth/transparency sort deterministic.
 - `api.js` — `NetworkData`: **client-side** polls the block-explorer API (CORS `*`),
   keeps per-metagraph snapshot buffers + the `anchorIndex` (`getAnchor`, `anchor`/
   `global`/`cluster`/`price` events, `on`/`off`). No simulation — when the API is

@@ -11,6 +11,7 @@ import { feature } from "topojson-client";
 import { COLORS, METAGRAPHS, metaAnchor } from "./config.js";
 
 const R = 16;
+const LAND_H = 0.34; // how far the coastal "wall" rim rises above the solid land fill (R)
 const Z_AXIS = new THREE.Vector3(0, 0, 1);
 const DIM = new THREE.Color(0x223046);
 const _geoVec = new THREE.Vector3(); // scratch for the morph-fly interpolation
@@ -21,6 +22,7 @@ const _qRadial = new THREE.Quaternion(); // outward-facing (globe) orientation
 const _col = new THREE.Color();          // scratch colour for dim recolouring
 const lerp = (a, b, t) => a + (b - a) * t;
 const smooth = (m) => m * m * (3 - 2 * m);
+const GOLDEN_ANGLE = Math.PI * (3 - Math.sqrt(5)); // fibonacci-shell / phyllotaxis spacing
 
 // Travelling-packet arcs: each is a short comet that hops node -> node.
 const ARC_TAIL = 8;         // points making up each comet
@@ -48,7 +50,6 @@ function spreadCoLocated(dirs, { groupDeg = 0.8, spacingDeg = 0.32, maxDeg = 2.3
     if (best) { best.members.push(d); best.sum.add(d); best.center.copy(best.sum).normalize(); }
     else clusters.push({ center: d.clone(), sum: d.clone(), members: [d] });
   }
-  const golden = Math.PI * (3 - Math.sqrt(5));
   for (const c of clusters) {
     const K = c.members.length;
     c.count = K;
@@ -64,7 +65,7 @@ function spreadCoLocated(dirs, { groupDeg = 0.8, spacingDeg = 0.32, maxDeg = 2.3
     c.spread = spread;
     c.members.forEach((d, k) => {
       const rr = spread * Math.sqrt((k + 0.5) / K);
-      const th = k * golden;
+      const th = k * GOLDEN_ANGLE;
       d.copy(ctr)
         .addScaledVector(_sx, Math.cos(th) * rr)
         .addScaledVector(_sy, Math.sin(th) * rr)
@@ -104,10 +105,9 @@ export class Globe {
     this.countryMix = 0;       // eased 0..1: how strongly the country dim is applied
     this.l0Count = 0;
     this.l1Count = 0;
-    // The coastline outline material — its colour eases toward the active metagraph's colour.
-    this.coastMat = null;
-    this._edgeColor = new THREE.Color(0x4fd0e0);
-    this._edgeTarget = new THREE.Color(0x4fd0e0);
+    // The raised coastal wall rim — a fixed soft ice-blue (eased each frame, but the target is held).
+    this._edgeColor = new THREE.Color(0x9ccad6);
+    this._edgeTarget = new THREE.Color(0x9ccad6);
 
     // Highlight/dim state driven by the "Understand the network" panel: each
     // validator layer eases its own dim level (0 = bright, 1 = dimmed) so the
@@ -131,7 +131,7 @@ export class Globe {
     this._buildSphere();
     this._buildGraticule();
     this._buildAtmosphere();
-    this._loadCoastlines();
+    this._buildLand();
   }
 
   _buildSphere() {
@@ -146,6 +146,15 @@ export class Globe {
     this.geoFades.push({ mat, base: 1 });
     this.sphereMesh = new THREE.Mesh(new THREE.SphereGeometry(R, 64, 48), mat);
     this.sphereMesh.visible = false;
+    // The body is transparent (opacity fades in), so it lands in the transparent pass
+    // alongside the additive land walls/coastline — and all three share the globe-centre
+    // bounding origin, making their back-to-front sort a tie that flips as the globe
+    // spins. When the sort puts this opaque-ish body *after* the land (which can't
+    // depthWrite to defend itself), it paints over the near-side rim, leaving only the
+    // limb — reads like you're seeing the far side. A lower renderOrder pins the body to
+    // draw first every frame: its depth is laid down, then near land passes / far land is
+    // occluded, deterministically at any orientation.
+    this.sphereMesh.renderOrder = -2;
     this.group.add(this.sphereMesh);
   }
 
@@ -172,40 +181,197 @@ export class Globe {
       uniforms: this.atmoUniforms,
       vertexShader: `varying vec3 vN; void main(){ vN = normalize(normalMatrix * normal); gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }`,
       fragmentShader: `uniform vec3 glowColor; uniform float uM; varying vec3 vN;
-        void main(){ float i = pow(clamp(0.85 - dot(vN, vec3(0.0,0.0,1.0)), 0.0, 1.0), 2.0); gl_FragColor = vec4(glowColor, 1.0) * i * uM * 0.6; }`,
+        void main(){ float i = pow(clamp(0.82 - dot(vN, vec3(0.0,0.0,1.0)), 0.0, 1.0), 2.3); gl_FragColor = vec4(glowColor, 1.0) * i * uM * 0.45; }`,
       side: THREE.BackSide, blending: THREE.AdditiveBlending, transparent: true, depthWrite: false,
     });
     this.group.add(new THREE.Mesh(new THREE.SphereGeometry(R * 1.13, 48, 32), mat));
   }
 
-  async _loadCoastlines() {
+  async _buildLand() {
     try {
       const res = await fetch("/land-110m.json");
       const topo = await res.json();
       const land = feature(topo, topo.objects.land);
-      // Just a light-blue coastline outline — colour eases toward the selected metagraph.
-      const pts = [];
+
+      // Each coastline ring becomes two things, built from the SAME vertices so they line
+      // up exactly: a raised cliff "wall" (a vertical ribbon from ocean level R up to the
+      // plateau top R+LAND_H) and the filled plateau on top (the polygon triangulated and
+      // lifted to that same top radius). Because both use latLonToVec3(lat, lon, top) on the
+      // identical ring points, the fill boundary IS the wall-top edge — no approximation.
+      // Antimeridian-safe: lon +180 and −180 map to the SAME 3D point, so a seam wall segment
+      // is a degenerate (zero-area) quad, and seam-straddling fill triangles are skipped below.
+      const top = R + LAND_H;
+      // Start the cliff base just ABOVE the sea (the opaque, faceted sphere at R dips ~0.02 below
+      // R between facets) so the additive wall never z-fights / pokes through the waterline. The
+      // base is faded to transparent anyway, so the visible rim is unchanged.
+      const wallBase = R + 0.04;
+      const wallPos = []; // wall ribbon vertices (two triangles per ring segment)
+      const fillPos = []; // plateau triangles (the solid land cap)
       const addRing = (ring) => {
         for (let i = 0; i < ring.length - 1; i++) {
-          pts.push(latLonToVec3(ring[i][1], ring[i][0], R + 0.04));
-          pts.push(latLonToVec3(ring[i + 1][1], ring[i + 1][0], R + 0.04));
+          const a = ring[i], b = ring[i + 1];
+          // Wall quad: base (just above the sea) -> raised top, as two triangles.
+          const B0 = latLonToVec3(a[1], a[0], wallBase), B1 = latLonToVec3(b[1], b[0], wallBase);
+          const T0 = latLonToVec3(a[1], a[0], top), T1 = latLonToVec3(b[1], b[0], top);
+          wallPos.push(
+            B0.x, B0.y, B0.z, B1.x, B1.y, B1.z, T1.x, T1.y, T1.z,
+            B0.x, B0.y, B0.z, T1.x, T1.y, T1.z, T0.x, T0.y, T0.z,
+          );
         }
+      };
+      // Triangulate the plateau in (lon, lat) with earcut, then lift each vertex to the
+      // wall-top radius with the very same function the walls use. The catch is the ±180
+      // seam: earcut knows nothing about it, so a polygon that crosses it (Eurasia-Africa
+      // via Chukotka, Antarctica, a couple of islands — 4 of 125) tears into garbage. We
+      // first UNWRAP each ring's longitude into a continuous run (accumulate the shortest
+      // step), which turns a crosser back into a valid simple polygon; latLonToVec3 maps
+      // the out-of-[-180,180] longitudes straight back to the right 3D points.
+      const unwrap = (ring) => {
+        let lon = ring[0][0];
+        const out = [new THREE.Vector2(lon, ring[0][1])];
+        for (let i = 1; i < ring.length; i++) {
+          let d = ring[i][0] - ring[i - 1][0];
+          if (d > 180) d -= 360; else if (d < -180) d += 360;
+          lon += d;
+          out.push(new THREE.Vector2(lon, ring[i][1]));
+        }
+        // drop the closing duplicate — unless unwrap moved it (a pole-encircling ring)
+        const a = out[0], b = out[out.length - 1];
+        if (out.length > 1 && Math.abs(a.x - b.x) < 1e-6 && a.y === b.y) out.pop();
+        return out;
+      };
+      const meanLon = (r) => r.reduce((s, p) => s + p.x, 0) / r.length;
+      // Emit one earcut triangle, subdivided into an n×n grid so each facet is small. A big
+      // flat triangle is a chord that sags toward the globe centre — past ocean level it gets
+      // depth-occluded into a black patch — so the split keeps the surface hugging the sphere.
+      // n is FIXED (not per-triangle by size): with a uniform split, neighbouring triangles
+      // divide their shared edge into the same points, so there are no T-junction cracks. The
+      // widest real triangle spans ~68°, so n=4 keeps every facet (~17°) under the ~24° sag
+      // limit (smooth per-vertex normals hide the faceting). ~76k tris in one static draw call.
+      const n = 4;
+      const emitTri = (A, B, C) => {
+        const pt = (u, w) => latLonToVec3(A.y + (B.y - A.y) * u + (C.y - A.y) * w,
+                                          A.x + (B.x - A.x) * u + (C.x - A.x) * w, top);
+        // Force outward winding so gl_FrontFacing agrees with the radial normals; otherwise
+        // DoubleSide flips the normal on back-wound facets and they render unlit (black). Every
+        // sub-facet shares this triangle's parametric orientation, so decide the flip ONCE.
+        const pA = pt(0, 0), pB = pt(1, 0), pC = pt(0, 1);
+        const nx = (pB.y - pA.y) * (pC.z - pA.z) - (pB.z - pA.z) * (pC.y - pA.y);
+        const ny = (pB.z - pA.z) * (pC.x - pA.x) - (pB.x - pA.x) * (pC.z - pA.z);
+        const nz = (pB.x - pA.x) * (pC.y - pA.y) - (pB.y - pA.y) * (pC.x - pA.x);
+        const flip = nx * pA.x + ny * pA.y + nz * pA.z < 0;
+        const tri = (p0, p1, p2) => {
+          if (flip) fillPos.push(p0.x, p0.y, p0.z, p2.x, p2.y, p2.z, p1.x, p1.y, p1.z);
+          else fillPos.push(p0.x, p0.y, p0.z, p1.x, p1.y, p1.z, p2.x, p2.y, p2.z);
+        };
+        for (let i = 0; i < n; i++) for (let j = 0; j < n - i; j++) {
+          tri(pt(i / n, j / n), pt((i + 1) / n, j / n), pt(i / n, (j + 1) / n));
+          if (j < n - i - 1) tri(pt((i + 1) / n, j / n), pt((i + 1) / n, (j + 1) / n), pt(i / n, (j + 1) / n));
+        }
+      };
+      const addPolygon = (rings) => {
+        rings.forEach(addRing); // cliff walls for the outer ring + every hole
+        const contour = unwrap(rings[0]);
+        // A ring whose longitude winds a full turn encircles a pole (Antarctica): close it
+        // along the far parallel so the cap fills down to the pole instead of leaving a gash.
+        if (Math.abs(contour[contour.length - 1].x - contour[0].x) > 270) {
+          const poleLat = contour[0].y < 0 ? -90 : 90;
+          contour.push(new THREE.Vector2(contour[contour.length - 1].x, poleLat));
+          contour.push(new THREE.Vector2(contour[0].x, poleLat));
+        }
+        const cMean = meanLon(contour);
+        const holes = rings.slice(1).map((h) => {
+          const u = unwrap(h);
+          const shift = Math.round((cMean - meanLon(u)) / 360) * 360; // into the outer's lon frame
+          if (shift) u.forEach((p) => (p.x += shift));
+          return u;
+        });
+        let faces;
+        try { faces = THREE.ShapeUtils.triangulateShape(contour, holes); } catch { return; }
+        const verts = [contour, ...holes].flat(); // earcut indexes contour then holes, in order
+        for (const [a, b, c] of faces) emitTri(verts[a], verts[b], verts[c]);
       };
       for (const f of land.features) {
         const g = f.geometry;
-        if (g.type === "Polygon") g.coordinates.forEach(addRing);
-        else if (g.type === "MultiPolygon") g.coordinates.forEach((poly) => poly.forEach(addRing));
+        if (g.type === "Polygon") addPolygon(g.coordinates);
+        else if (g.type === "MultiPolygon") g.coordinates.forEach(addPolygon);
       }
-      const geo = new THREE.BufferGeometry().setFromPoints(pts);
-      this.coastMat = new THREE.LineBasicMaterial({ color: this._edgeColor.clone(), transparent: true, opacity: 0.55 * this.morph });
-      this.geoFades.push({ mat: this.coastMat, base: 0.55 });
-      this.group.add(new THREE.LineSegments(geo, this.coastMat));
+
+      // The cliff walls. A ShaderMaterial derives each vertex's height from its
+      // distance to the globe's centre (the group's origin) — so the metagraph
+      // colour fades smoothly out at ocean level (R) and brightens toward the top
+      // (R+LAND_H). Additive + bloom makes the coastlines glow like ridges. The
+      // opaque sphere depth-occludes the far-side walls (depthWrite stays off here).
+      const wallGeo = new THREE.BufferGeometry();
+      wallGeo.setAttribute("position", new THREE.Float32BufferAttribute(wallPos, 3));
+      this.landWallUniforms = {
+        uColor: { value: this._edgeColor.clone() },
+        uBase: { value: wallBase },
+        uTop: { value: top },
+        uOpacity: { value: 0 },
+      };
+      const wallMat = new THREE.ShaderMaterial({
+        uniforms: this.landWallUniforms,
+        vertexShader: `
+          varying float vH;
+          void main() {
+            vH = length(position); // distance from the globe centre
+            gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+          }`,
+        fragmentShader: `
+          uniform vec3 uColor; uniform float uBase; uniform float uTop; uniform float uOpacity;
+          varying float vH;
+          void main() {
+            float t = clamp((vH - uBase) / (uTop - uBase), 0.0, 1.0);
+            // Gently non-linear ramp (a blend of linear + quadratic): dim along the ocean line,
+            // strengthening toward the top rim — so the rim reads as an edge, not a glowing band.
+            float e = t * (0.4 + 0.6 * t);
+            gl_FragColor = vec4(uColor * (0.09 + 0.26 * e), e * uOpacity);
+          }`,
+        // Single-sided so only cliffs whose face points toward the camera draw: a
+        // continent's near + side edges show, its far edge (behind the filled plateau)
+        // is culled instead of glowing through the translucent fill. BackSide because the
+        // topojson ring winding puts the outward cliff face on the geometry's back side.
+        transparent: true, depthWrite: false, side: THREE.BackSide,
+        blending: THREE.AdditiveBlending,
+      });
+      this.group.add(new THREE.Mesh(wallGeo, wallMat));
+
+      // The solid plateau, from the triangles built above. Radial normals (= normalized
+      // position) give it the smooth sphere shading of the sea, so it responds to light
+      // EXACTLY like the body — just lifted a couple of shades for subtle land/sea contrast.
+      // depthWrite occludes the ocean grid (and the back walls) beneath the plateau; the nodes
+      // sit ABOVE it, so they aren't hidden. Its edge IS the wall-top edge (same vertices).
+      const fillGeo = new THREE.BufferGeometry();
+      const fillArr = new Float32Array(fillPos);
+      fillGeo.setAttribute("position", new THREE.BufferAttribute(fillArr, 3));
+      const normArr = new Float32Array(fillArr.length);
+      for (let i = 0; i < fillArr.length; i += 3) {
+        const inv = 1 / Math.hypot(fillArr[i], fillArr[i + 1], fillArr[i + 2]);
+        normArr[i] = fillArr[i] * inv; normArr[i + 1] = fillArr[i + 1] * inv; normArr[i + 2] = fillArr[i + 2] * inv;
+      }
+      fillGeo.setAttribute("normal", new THREE.BufferAttribute(normArr, 3));
+      this.landFillMat = new THREE.MeshStandardMaterial({
+        // Contrast lives mostly in the emissive (lighting-independent) so the land reads as
+        // land even in dimly-lit parts of the globe — the single north key light otherwise
+        // leaves the camera-facing centre near-black, which looked like an unfilled hole.
+        color: 0x26384a, emissive: 0x121c28, emissiveIntensity: 0.9,
+        roughness: 0.95, metalness: 0.1,
+        transparent: true, opacity: 0, side: THREE.DoubleSide,
+      });
+      this.geoFades.push({ mat: this.landFillMat, base: 1 }); // fades in with the sea
+      this.landFillMesh = new THREE.Mesh(fillGeo, this.landFillMat);
+      this.landFillMesh.renderOrder = -1; // after the body (−2), before the rim/heatmap/nodes
+      this.landFillMesh.visible = false;  // revealed once the globe materialises (setMorph)
+      this.group.add(this.landFillMesh);
     } catch (e) { /* graticule-only fallback */ }
   }
 
-  // Tint the coastline outline toward a colour (hex), or null for the default cyan. Eased in update.
-  setEdgeColor(color) {
-    this._edgeTarget.set(color == null ? 0x4fd0e0 : color);
+  // The wall is always the fixed ice-blue — a metagraph's colour on it read as either too dominant
+  // (bright rim) or not nice (faded base), so the rim no longer follows the active metagraph. Kept
+  // as a setter so the Engine caller doesn't need to change.
+  setEdgeColor(_color) {
+    this._edgeTarget.set(0x9ccad6);
   }
 
   // -------------------------------------------------- build the shared nodes
@@ -256,7 +422,6 @@ export class Globe {
     this.emiArr = emiArr;
     this.pickables = [this.instSphere];
 
-    const golden = 2.399963267;
     let idx = 0;
     const place = (list, kind, color, rad, flatten, title) => {
       const n = list.length;
@@ -268,7 +433,7 @@ export class Globe {
         // hypergraph fibonacci-shell position
         const y = 1 - (i / Math.max(1, n - 1)) * 2;
         const rr = Math.sqrt(Math.max(0, 1 - y * y));
-        const phi = i * golden;
+        const phi = i * GOLDEN_ANGLE;
         const hyperPos = new THREE.Vector3(
           Math.cos(phi) * rr * rad, y * rad * flatten, Math.sin(phi) * rr * rad
         );
@@ -281,7 +446,7 @@ export class Globe {
         const u = {
           index: idx, layer: kind, ready, base: col.clone(),
           hyperPos, hyperDir: hyperPos.clone().normalize(), hyperRadius: hyperPos.length(),
-          geoDir, trueDir: geoDir ? geoDir.clone() : null, geoRadius: R + 0.05, noGeo: !g,
+          geoDir, trueDir: geoDir ? geoDir.clone() : null, geoRadius: R + LAND_H + 0.02, noGeo: !g,
           // hyperSize = sphere diameter (Hypergraph); geoSize = circle radius (globe).
           hyperSize: 0.55 * (ready ? 1 : 0.78), geoSize: 0.06 * (ready ? 1 : 0.78),
           azimuth: Math.atan2(hyperPos.z, hyperPos.x), twinkle: Math.random() * 6.2831,
@@ -357,7 +522,7 @@ export class Globe {
     for (const c of clusters) {
       const t = logMax > 0 ? Math.min(1, Math.log2(c.count) / logMax) : 0;
       const color = heatColor(t);
-      const pos = c.center.clone().multiplyScalar(R + 0.04);
+      const pos = c.center.clone().multiplyScalar(R + LAND_H + 0.01);
       const quat = new THREE.Quaternion().setFromUnitVectors(Z_AXIS, c.center);
       // ring encircles the fanned-out cluster (+ a small margin); lone nodes get
       // a modest density dot.
@@ -460,8 +625,8 @@ export class Globe {
   // A curved hop between two unit directions, sampled into ARC_SAMPLES points
   // (same outward-bulging bezier the static arcs used).
   _arcCurve(dirA, dirB) {
-    const a = dirA.clone().multiplyScalar(R + 0.05);
-    const b = dirB.clone().multiplyScalar(R + 0.05);
+    const a = dirA.clone().multiplyScalar(R + LAND_H + 0.02);
+    const b = dirB.clone().multiplyScalar(R + LAND_H + 0.02);
     const mid = a.clone().add(b).multiplyScalar(0.5).normalize().multiplyScalar(R * (1.25 + a.distanceTo(b) / (R * 6)));
     return new THREE.QuadraticBezierCurve3(a, mid, b).getPoints(ARC_SAMPLES - 1);
   }
@@ -546,7 +711,6 @@ export class Globe {
     this.metaList = withNodes;
 
     const recs = [];
-    const golden = 2.399963267;
     // Each metagraph runs its own L0 + currency-L1 (cl1) + data-L1 (dl1). Lay the
     // nodes out as concentric fibonacci shells around the hub — L0 inner, data-L1
     // middle, currency-L1 outer — mirroring the global DAG L0/L1 shells around the
@@ -571,7 +735,7 @@ export class Globe {
           // fibonacci-shell offset from the hub (deterministic, even spacing)
           const y = 1 - (i / Math.max(1, cnt - 1)) * 2;
           const rr = Math.sqrt(Math.max(0, 1 - y * y));
-          const phi = i * golden;
+          const phi = i * GOLDEN_ANGLE;
           const offset = new THREE.Vector3(Math.cos(phi) * rr * rad, y * rad, Math.sin(phi) * rr * rad);
           const dir = latLonToVec3(g.lat, g.lon, 1).normalize(); // real location; fanned out below
           recs.push({
@@ -846,7 +1010,7 @@ export class Globe {
       if (this._nodeActive(r.metaId, r.pick.geo)) mActive.push(r);
     }
     if (mActive.length) clusters.push(...spreadCoLocated(mActive.map((r) => r.geoDir), { spacingDeg: 0.4, maxDeg: 2 }));
-    for (const r of this.metaNodes) r.geoPos.copy(r.geoDir).multiplyScalar(R + 0.05);
+    for (const r of this.metaNodes) r.geoPos.copy(r.geoDir).multiplyScalar(R + LAND_H + 0.02);
 
     this._buildHeatmap(clusters);
 
@@ -933,6 +1097,8 @@ export class Globe {
     const extras = smooth(THREE.MathUtils.clamp((m - 0.6) / 0.4, 0, 1));
     this.sphereMesh.visible = m > 0.05; // keep it out of the Hypergraph view
     for (const f of this.geoFades) f.mat.opacity = f.base * surf;
+    if (this.landWallUniforms) this.landWallUniforms.uOpacity.value = surf;
+    if (this.landFillMesh) this.landFillMesh.visible = m > 0.05; // opacity via geoFades
     this.atmoUniforms.uM.value = surf;
     this._fade(this.heatGroup, extras);
     if (this.arcMat) this.arcMat.uniforms.uM.value = extras;
@@ -940,10 +1106,10 @@ export class Globe {
 
   update(dt) {
     this.clock += dt;
-    // Ease the coastline outline toward the active metagraph colour.
-    if (this.coastMat) {
+    // Ease the wall colour (held at the default cyan).
+    if (this.landWallUniforms) {
       this._edgeColor.lerp(this._edgeTarget, Math.min(1, dt * 3));
-      this.coastMat.color.copy(this._edgeColor);
+      this.landWallUniforms.uColor.value.copy(this._edgeColor);
     }
     if (this.spin) {
       // Ease-in-out to the focus orientation (longitude + tilt), then hold there (no idle spin).
