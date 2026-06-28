@@ -67,9 +67,14 @@ export const VIS = {
 
   // Per-metagraph snapshot history (the shared data layer behind the ribbon's
   // derived DAG fee and the Snapshot DAG / ledger view).
-  metaSnapSeed: 40,        // snapshots fetched per metagraph on first load (history);
+  metaSnapSeed: 60,        // snapshots fetched per metagraph on first load (history);
                            // deep enough that fast metagraphs cover the visible ribbon
-  metaSnapTail: 8,         // snapshots fetched per metagraph on each live poll (newest)
-  metaSnapBuffer: 80,      // max snapshots retained per metagraph (rolling)
+  // Snapshots fetched per metagraph on EACH live poll (newest). Must cover the fastest
+  // metagraph's output between polls — Dor is extreme: it has put 83 snapshots into ONE global
+  // tick (~26 per 4s poll). A small tail made the app miss most of them and mislabel them as
+  // "unlisted" anchors. 50 leaves comfortable margin over the worst observed burst so the anchor
+  // count stays accurate (an under-count is what inflated the unlisted gap).
+  metaSnapTail: 50,
+  metaSnapBuffer: 160,     // max snapshots retained per metagraph (rolling) — deep for fast ones
   anchorIndexMax: 400,     // max global-tick timestamps kept in the anchor index
 };

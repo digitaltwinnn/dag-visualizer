@@ -6,27 +6,24 @@
   pointer-events: none;
 }
 #rightcol > aside { position: relative; width: auto; pointer-events: auto; }
-#metapane, #inspector { overflow-y: auto; padding: 18px; min-height: 0; }
-#metapane { flex: 0 1 auto; max-height: 58%; }
-#inspector { flex: 0 1 auto; }
-#metapane-close, #inspector-close {
+/* `.rc-pane` = a card in the right-rail stack (any number, generic); `#metapane` = the left
+   dossier. They share the inspector look. */
+#metapane, .rc-pane { overflow-y: auto; padding: 18px; min-height: 0; }
+/* #metapane (the selected-subject dossier) now lives at the top of the LEFT rail, so it
+   positions itself (the absolute close × needs a positioned ancestor) and caps its height
+   so the view tool below it stays visible. */
+#metapane { position: relative; flex: 0 0 auto; max-height: 46vh; }
+.rc-pane { flex: 0 1 auto; }
+#metapane-close, .rc-close {
   position: absolute; top: 10px; right: 10px;
   background: transparent; border: none; color: var(--muted);
   font-size: 22px; cursor: pointer; line-height: 1; padding: 2px 8px;
 }
-/* Card header row: factual tag(s) on the left, the real-time control pushed right
-   (padding clears the absolute close ×). */
-.insp-head {
-  display: flex; align-items: center; flex-wrap: wrap; gap: 6px;
-  margin-bottom: 10px; padding-right: 28px;
-}
-.insp-tag {
-  display: inline-block; vertical-align: middle; font-size: 10px; text-transform: uppercase;
-  letter-spacing: 0.08em; padding: 4px 9px; border-radius: 20px;
-}
-#inspector h3, #metapane h3 { margin: 4px 0 4px; font-size: 17px; }
-#inspector .insp-sub, #metapane .insp-sub { color: var(--muted); font-size: 12px; margin: 0 0 14px; }
-#inspector p, #metapane p { font-size: 13px; line-height: 1.6; color: #c7d0ea; }
+.rc-pane h3, #metapane h3 { margin: 4px 0 4px; font-size: 15px; font-weight: 600; line-height: 1.2; }
+/* The token shown after a metagraph name — a quiet, smaller suffix (e.g. "(DOR)" / "(no token)"). */
+.insp-token { font-size: 11px; font-weight: 500; color: var(--muted); white-space: nowrap; }
+.rc-pane .insp-sub, #metapane .insp-sub { color: var(--muted); font-size: 12px; margin: 0 0 14px; }
+.rc-pane p, #metapane p { font-size: 13px; line-height: 1.6; color: #c7d0ea; }
 .insp-row {
   display: flex; justify-content: space-between; gap: 12px;
   padding: 8px 0; border-bottom: 1px solid rgba(90,140,255,0.12); font-size: 12.5px;
@@ -34,13 +31,11 @@
 .insp-row span:first-child { color: var(--muted); }
 .insp-row span:last-child { font-variant-numeric: tabular-nums; text-align: right; word-break: break-all; }
 .insp-hash { font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 11px; }
-.insp-time { margin: 2px 0 14px; }
-.insp-time-label { display: block; font-size: 9.5px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); margin-bottom: 2px; }
-.insp-time-val { font-size: 16px; font-weight: 700; color: #d7fbff; font-variant-numeric: tabular-nums; }
 .insp-mini {
   display: inline-block; margin-left: 6px; padding: 1px 6px; border-radius: 6px;
   font-size: 9.5px; font-weight: 700; letter-spacing: 0.03em; text-transform: uppercase; vertical-align: middle;
 }
+.insp-dim { color: var(--muted); }
 .insp-mini.ok { color: #6ee7b0; background: rgba(54,226,154,0.14); border: 1px solid rgba(54,226,154,0.4); }
 .insp-mini.approx { color: #ffd166; background: rgba(255,209,102,0.12); border: 1px solid rgba(255,209,102,0.4); }
 .insp-mgs { padding: 9px 0; }
@@ -51,10 +46,21 @@
 .insp-snap-time { font-size: 12px; font-weight: 400; color: var(--muted); font-variant-numeric: tabular-nums; }
 /* Borderless rows inside the snapshot card — only the part dividers separate sections. */
 .insp-snap .insp-row { border-bottom: 0; padding: 5px 0; }
-.insp-mgs-label { display: block; font-size: 12.5px; color: var(--muted); margin-bottom: 6px; }
+.insp-mgs-label { display: flex; align-items: baseline; gap: 6px; font-size: 12.5px; color: var(--muted); margin-bottom: 6px; }
+/* Authoritative total (metagraphSnapshotCount) shown in plain parens after the label text. */
+.insp-mgs-count { font-variant-numeric: tabular-nums; }
 .insp-mgs-tags { display: flex; flex-wrap: wrap; gap: 5px; }
 .insp-link { color: var(--core); text-decoration: none; }
 .insp-link:hover { text-decoration: underline; }
+/* Metagraph site link, sitting just under the description. A subtle inline link with a
+   trailing ↗, de-emphasised so it doesn't compete with the node-fabric table below. */
+.insp-site {
+  display: flex; width: fit-content; max-width: 100%; align-items: center; gap: 4px;
+  margin: 10px 0 10px; font-size: 12px; color: var(--core); text-decoration: none;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.insp-site::after { content: "↗"; font-size: 11px; opacity: 0.7; }
+.insp-site:hover { text-decoration: underline; }
 .mg-tag {
   display: inline-block; vertical-align: middle;
   padding: 2px 8px; border-radius: 6px; font-size: 10.5px; font-weight: 700;
@@ -63,10 +69,20 @@
   border: 1px solid color-mix(in srgb, var(--mg) 45%, transparent);
 }
 .mg-tag--other { color: var(--muted); background: rgba(160,175,205,0.08); border-color: rgba(160,175,205,0.3); }
+/* Placeholder for the unlisted gap while the freshest tick is still anchoring/being polled —
+   shown instead of a transiently-wrong count until it stabilises. Quiet + a soft breathe. */
+.mg-tag--settling {
+  color: var(--muted); font-weight: 600; font-style: italic;
+  background: rgba(160,175,205,0.06); border-color: rgba(160,175,205,0.22);
+  animation: mgSettle 1.4s ease-in-out infinite;
+}
+@keyframes mgSettle { 0%,100% { opacity: 0.5; } 50% { opacity: 0.85; } }
 .mg-tag--sel { color: #061018; background: var(--mg); border-color: var(--mg); }
 /* Anchored pills that aren't the active metagraph filter — dimmed so the selection pops. */
 .mg-tag--dim { opacity: 0.4; }
-.desc { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; overflow: hidden; }
+/* margin-bottom:0 so the "Show more" toggle sits right under the text it expands (the p's
+   default 1em bottom margin pushed it too far away). */
+.desc { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; overflow: hidden; margin-bottom: 0; }
 .desc.expanded { -webkit-line-clamp: unset; overflow: visible; }
 .desc-more { display: inline-block; margin: 2px 0 0; padding: 0; background: none; border: none; cursor: pointer; font: inherit; font-size: 11px; font-weight: 600; color: var(--core); }
 .desc-more:hover { text-decoration: underline; }

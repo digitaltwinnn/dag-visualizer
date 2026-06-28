@@ -2,7 +2,7 @@
 // No simulation — if the API is unreachable the app shows a "no data" state and
 // keeps polling, recovering on its own once it responds again (`live` reflects this).
 
-import { API_BASE, L0_CLUSTER, L1_CLUSTER, METAGRAPHS, VIS } from "./config.js";
+import { API_BASE, COLORS, L0_CLUSTER, L1_CLUSTER, METAGRAPHS, VIS } from "./config.js";
 
 export class NetworkData {
   constructor() {
@@ -15,15 +15,22 @@ export class NetworkData {
     // the Global L0 spine. Both the ribbon's derived DAG fee and the ledger view
     // read from these. Keyed by metagraph id.
     this.metaSnaps = new Map();   // id -> [{ ordinal, hash, parent, ts, fee, sizeInKB }] oldest->newest
-    // global snapshot timestamp -> aggregate of the metagraph snapshots anchored
-    // into that tick (from the metagraphs we track). NOTE: this is a near-complete
-    // lower bound — mainnet anchors ~1-2 more snapshots per tick than our 10 tracked
-    // metagraphs surface, so the authoritative anchored COUNT is the global
-    // snapshot's own metagraphSnapshotCount; this fee is "from tracked metagraphs".
+    // global snapshot timestamp -> aggregate of the metagraph snapshots anchored into that tick
+    // (from the metagraphs we track). The authoritative anchored COUNT is the global snapshot's
+    // own `metagraphSnapshotCount`; `count` here is how many of those WE identified (the rest =
+    // the few genuinely-unlisted metagraphs, ~a couple per tick). To keep `count` accurate even
+    // when a fast metagraph (Dor) batches 20+ snapshots into one tick, the live poll fetches a
+    // deep tail every tick (VIS.metaSnapTail) — a too-shallow tail used to drop them and inflate
+    // the "unlisted" gap. The summed fee is "from tracked metagraphs".
     this.anchorIndex = new Map(); // ts -> { fee (datum), count, metaIds:Set, metaCounts:Map(id->n) }
 
     this.metagraphCount = METAGRAPHS.length;
-    this.clusters = { l0: [], l1: [] };  // live validator membership
+    this.clusters = { l0: [], l1: [] };  // live validator membership (raw, two clusters)
+    // The DAG modelled as a metagraph-shaped CORE: the l0 + l1 clusters merged by node id
+    // into one node-list with `roles` (a machine in both is one hybrid node). Roles stay
+    // `l0`/`l1` to match the rest of the app; the DAG's L1 IS its currency-L1, displayed as
+    // "cL1" by the UI (it has no data-L1). Same shape metagraphs use → treat it as a core.
+    this.dagCore = null;
     this.listeners = { global: [], meta: [], status: [], cluster: [], anchor: [] };
     this._timer = null;
   }
@@ -74,10 +81,42 @@ export class NetworkData {
       ]);
       if (Array.isArray(l0) && Array.isArray(l1) && l0.length && l1.length) {
         this.clusters = { l0, l1 };
-        this._emit("cluster", this.clusters);
+        this.dagCore = this._buildDagCore(l0, l1);
+        this._emit("cluster", { l0, l1, dag: this.dagCore });
         return;
       }
     } catch (e) { /* keep whatever real membership we already have (maybe none) */ }
+  }
+
+  // Merge the L0 + L1 validator clusters (keyed by node `id`) into one node-list with
+  // `roles` — turning the DAG into the same hybrid/dedicated structure metagraphs use.
+  // A machine in both clusters is ONE hybrid node (`roles: ["l0","cl1"]`), not two.
+  _buildDagCore(l0, l1) {
+    const byId = new Map();
+    const merge = (list, role) => {
+      for (const n of list) {
+        if (!n || !n.id) continue;
+        let e = byId.get(n.id);
+        if (!e) { e = { id: n.id, ip: n.ip, state: n.state, roles: [] }; byId.set(n.id, e); }
+        if (!e.roles.includes(role)) e.roles.push(role);
+        if (!e.ip && n.ip) e.ip = n.ip;
+        if (role === "l0" && n.state) e.state = n.state; // prefer the consensus-layer state
+      }
+    };
+    merge(l0, "l0");    // consensus / settlement
+    merge(l1, "cl1");   // the DAG's L1 IS its $DAG currency-L1 (it has no data-L1)
+    const nodes = [...byId.values()].map((e) => {
+      e.roles.sort((a, b) => (a === "l0" ? 0 : 1) - (b === "l0" ? 0 : 1));
+      e.layer = e.roles[0]; // primary layer for plotting (l0 if present, else cl1)
+      return e;
+    });
+    return {
+      id: "dag", name: "DAG", symbol: "DAG", isRoot: true, color: COLORS.core, nodes,
+      description:
+        "The DAG is the Hypergraph's base network — its Global L0 runs PRO consensus and " +
+        "settles every metagraph's snapshots, and its currency-L1 carries $DAG. It's the root " +
+        "every metagraph anchors into, secured by $DAG-staked validators.",
+    };
   }
 
   _setLive(v) {
@@ -109,8 +148,10 @@ export class NetworkData {
         this._pushGlobal(snap);
       }
       this._setLive(true);
-      // occasionally pull each metagraph's newest snapshots (tail)
-      if (Math.random() < 0.5) this._refreshMeta(VIS.metaSnapTail);
+      // Pull each metagraph's newest snapshots EVERY tick (was every other tick) — together with
+      // the deeper tail, this keeps up with high-throughput metagraphs (Dor) so their snapshots
+      // are all attributed correctly instead of leaking into the "unlisted" count.
+      this._refreshMeta(VIS.metaSnapTail);
     } catch (e) {
       this._setLive(false);
     }
@@ -134,21 +175,40 @@ export class NetworkData {
 
   async _refreshOneMeta(m, limit = VIS.metaSnapTail) {
     if (!m.id) return;
-    try {
-      const json = await this._get(`/currency/${m.id}/snapshots?limit=${limit}`);
-      const list = json.data || [];
+    // The newest ordinal we already hold for this metagraph.
+    const have = this.metaSnaps.get(m.id);
+    const haveTo = have && have.length ? have[have.length - 1].ordinal : -1;
+
+    // SELF-HEALING CATCH-UP. A fast metagraph (Dor) can dump dozens of snapshots into one global
+    // tick — more than any fixed `tail`. So instead of trusting a magic number, we GROW the fetch
+    // until the batch reaches back to the last ordinal we already have — i.e. there is provably no
+    // gap. An uncounted gap is exactly what mislabels listed anchors as "unlisted", so this makes
+    // the anchored count correct regardless of burst size. Capped (and stops when the API returns
+    // fewer than asked = nothing more to get, or on a cold buffer where the seed limit is enough).
+    let lim = limit;
+    let list = [];
+    for (let i = 0; i < 6; i++) {
+      let json;
+      try {
+        json = await this._get(`/currency/${m.id}/snapshots?limit=${lim}`);
+      } catch {
+        return; // no data this tick — stay factual, try again next poll
+      }
+      list = json.data || [];
       if (!list.length) return;
-      const latest = list[0]; // API returns newest-first
-      this.metaState.set(m.name, { ordinal: latest.ordinal, hash: latest.hash, ts: latest.timestamp, real: true });
-      // Record full snapshot records (with fee/size) into the rolling buffer.
-      this._recordMetaSnaps(m, list.map((s) => ({
-        ordinal: s.ordinal, hash: s.hash, parent: s.lastSnapshotHash,
-        ts: s.timestamp, fee: s.fee || 0, sizeInKB: s.sizeInKB || 0,
-      })));
-      this._emit("meta", { name: m.name, ...this.metaState.get(m.name) });
-    } catch (e) {
-      /* no data this tick — stay factual, try again next poll */
+      const oldest = list[list.length - 1].ordinal; // newest-first → last is oldest
+      if (haveTo < 0 || oldest <= haveTo + 1 || list.length < lim || lim >= 600) break;
+      lim = Math.min(600, lim * 3); // gap not yet covered — fetch deeper and retry
     }
+
+    const latest = list[0]; // newest-first
+    this.metaState.set(m.name, { ordinal: latest.ordinal, hash: latest.hash, ts: latest.timestamp, real: true });
+    // Record full snapshot records (with fee/size) into the rolling buffer + anchor index.
+    this._recordMetaSnaps(m, list.map((s) => ({
+      ordinal: s.ordinal, hash: s.hash, parent: s.lastSnapshotHash,
+      ts: s.timestamp, fee: s.fee || 0, sizeInKB: s.sizeInKB || 0,
+    })));
+    this._emit("meta", { name: m.name, ...this.metaState.get(m.name) });
   }
 
   // Append new snapshot records (dedup by ordinal) to a metagraph's rolling buffer
@@ -165,9 +225,10 @@ export class NetworkData {
 
     for (const r of fresh) {
       buf.push(r);
-      const a = this.anchorIndex.get(r.ts) || { fee: 0, count: 0, metaIds: new Set(), metaCounts: new Map() };
+      const a = this.anchorIndex.get(r.ts) || { fee: 0, count: 0, metaIds: new Set(), metaCounts: new Map(), touched: 0 };
       a.fee += r.fee; a.count += 1; a.metaIds.add(m.id);
       a.metaCounts.set(m.id, (a.metaCounts.get(m.id) || 0) + 1);
+      a.touched = Date.now(); // last time this tick's identified count grew → drives "settling"
       this.anchorIndex.set(r.ts, a);
     }
     if (buf.length > VIS.metaSnapBuffer) buf.splice(0, buf.length - VIS.metaSnapBuffer);
@@ -191,7 +252,10 @@ export class NetworkData {
   //   snapshots/hr, anchors/hr (Σ metagraphSnapshotCount), blocks/hr (Σ blocks).
   // Series are per-snapshot for sparklines: cadence, anchored, blocks, fees (shape
   // only — unit-independent).
-  getActivity() {
+  getActivity(filter) {
+    // A metagraph selection reads ITS own snapshot stream (cadence + fees it pays), not the
+    // global L0 ledger. "all" and the DAG core itself ("dag") are the global L0 view.
+    if (filter && filter !== "all" && filter !== "dag") return this._metaActivity(filter);
     const s = this.globalSnapshots;
     if (s.length < 2) return null;
     const anchored = s.map((x) => (typeof x.metagraphSnapshotCount === "number" ? x.metagraphSnapshotCount : 0));
@@ -216,6 +280,35 @@ export class NetworkData {
       cadenceSeries: cadence,
       anchoredSeries: anchored,
       blocksSeries: blocks,
+      feesSeries: feesDag,
+    };
+  }
+
+  // Per-metagraph activity, the same shape as the global getActivity() but computed from one
+  // metagraph's own snapshot buffer: its snapshot cadence, how many distinct global ticks it
+  // anchored into, and the $DAG fees it paid. So the Ledger view scopes to the selection.
+  _metaActivity(id) {
+    const buf = this.metaSnaps.get(id) || [];
+    if (buf.length < 2) return null;
+    const t0 = new Date(buf[0].ts).getTime();
+    const t1 = new Date(buf[buf.length - 1].ts).getTime();
+    const spanHr = Math.max((t1 - t0) / 3600000, 1 / 3600);
+    const cadence = [];
+    for (let i = 1; i < buf.length; i++) {
+      const dt = (new Date(buf[i].ts).getTime() - new Date(buf[i - 1].ts).getTime()) / 1000;
+      cadence.push(dt > 0 ? 3600 / dt : 0);
+    }
+    const feesDag = buf.map((r) => (r.fee || 0) / 1e8);
+    const ticks = new Set(buf.map((r) => r.ts)); // distinct global snapshots it landed in
+    const sum = (arr) => arr.reduce((a, b) => a + b, 0);
+    return {
+      snapsPerHour: (buf.length - 1) / spanHr,
+      anchorsPerHour: ticks.size / spanHr,
+      blocksPerHour: 0,
+      feesPerHour: sum(feesDag) / spanHr,
+      cadenceSeries: cadence,
+      anchoredSeries: cadence, // shape only — its anchoring tracks its snapshot cadence
+      blocksSeries: buf.map(() => 0),
       feesSeries: feesDag,
     };
   }

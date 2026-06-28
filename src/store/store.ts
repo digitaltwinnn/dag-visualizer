@@ -1,5 +1,18 @@
 import { create } from "zustand";
-import type { GlobalSnapshot, LeaderboardData, MetaInfo, NodeRow, PickDescriptor } from "@/src/data/types";
+import type { GlobalSnapshot, LeaderboardData, MetaInfo, NodeRow, PickDescriptor, SnapshotExact } from "@/src/data/types";
+
+// The active view. `hyper`/`geo` drive the 3D scene (morph between them); the rest are flat
+// views (the canvas is hidden) — `ledger` has the live ribbon, the others are placeholders.
+export type Mode = "hyper" | "geo" | "ledger" | "status" | "transactions" | "staking";
+
+// One slot in the right-rail card stack (extend with future card types — e.g. "tx").
+export type SelSlot = "node" | "snap";
+
+// Move `slot` to the FRONT of the recency stack when it becomes active, or drop it when cleared.
+function bumpStack(stack: SelSlot[], slot: SelSlot, active: boolean): SelSlot[] {
+  const without = stack.filter((s) => s !== slot);
+  return active ? [slot, ...without] : without;
+}
 
 // Per-hour rates + per-snapshot series from NetworkData.getActivity().
 export interface Activity {
@@ -25,12 +38,19 @@ interface AppState {
   activity: Activity | null;
   // Baked metagraphs (with engine-computed country counts) — for filter chips + pane.
   metaList: MetaInfo[];
-  // The inspector target: a 3D pick (core/l0/l1/metanode) or a clicked snapshot.
+  // The right rail is a STACK of independent selections — each shows its own card, and you can
+  // hold several at once (a node AND a snapshot AND, later, more). `inspect` is the selected
+  // **node** (a 3D/geo pick); `snap` is the selected **snapshot** (bottom bar-chart / ribbon).
+  // `selStack` lists the currently-active slots most-recent-FIRST, so the rail renders the cards
+  // top-to-bottom in that order (the one you picked last sits on top). Add a future card type by
+  // adding a slot field + a `setSel(...)` call + a registry entry in Inspector — nothing else.
   inspect: PickDescriptor | null;
+  snap: Extract<PickDescriptor, { kind: "snapshot" }> | null;
+  selStack: SelSlot[];
   // Snapshot card follows the latest relevant snapshot (heartbeat live) vs pinned.
   following: boolean;
   // Hover tooltip content (engine raycast); positioned by the Tooltip component.
-  hover: { title: string; sub: string } | null;
+  hover: { title: string; sub: string; roles?: string[]; id?: string; color?: string } | null;
   // Active "Understand the network" topic (camera focus + layer highlight), or null.
   learnFocus: string | null;
   // Country drill-down within the network filter (geo view), or null.
@@ -39,11 +59,16 @@ interface AppState {
   leaderboard: LeaderboardData | null;
   // The active selection's nodes, for the geo node browser (engine-pushed; [] off geo).
   selNodes: NodeRow[];
+  // EXACT per-snapshot totals (fee + listed/unlisted), keyed by ordinal — populated by
+  // SnapshotExactBridge from /api/snapshot/[ordinal] for the live + selected ticks, so ANY view
+  // can read final fees without the polling floor. Missing key = not fetched / unavailable (pruned).
+  snapshotExact: Record<number, SnapshotExact>;
 
   // Active view. The scene is one persistent canvas; the engine morphs between hyper
-  // and geo and shows the ledger placeholder, all driven by this.
-  mode: "hyper" | "geo" | "ledger";
-  // Shared network filter ("all" | "l0" | "l1" | <metagraph id>).
+  // and geo and hides it for the flat views, all driven by this.
+  mode: Mode;
+  // Shared network filter ("all" | "dag" | <metagraph id>) — one unified core model, no
+  // separate L0/L1 filters (the DAG is just another metagraph-shaped core).
   filter: string;
 
   setLive: (live: boolean) => void;
@@ -52,17 +77,24 @@ interface AppState {
   setLatestOrdinal: (ordinal: number) => void;
   setLatestSnapshot: (snap: GlobalSnapshot | null) => void;
   setActivity: (activity: Activity | null) => void;
-  setMode: (mode: "hyper" | "geo" | "ledger") => void;
+  setMode: (mode: Mode) => void;
   setFilter: (filter: string) => void;
   setMetaList: (list: MetaInfo[]) => void;
   setInspect: (pick: PickDescriptor | null) => void;
+  setSnap: (snap: Extract<PickDescriptor, { kind: "snapshot" }> | null) => void;
   setFollowing: (following: boolean) => void;
-  setHover: (hover: { title: string; sub: string } | null) => void;
+  setHover: (
+    hover: { title: string; sub: string; roles?: string[]; id?: string; color?: string } | null,
+  ) => void;
   setLearnFocus: (focus: string | null) => void;
   setCountry: (cc: string | null) => void;
   setLeaderboard: (lb: LeaderboardData | null) => void;
   setSelNodes: (nodes: NodeRow[]) => void;
+  setSnapshotExact: (data: SnapshotExact) => void;
 }
+
+// Keep the exact-snapshot cache bounded (one small object per ordinal); drop the oldest.
+const EXACT_MAX = 120;
 
 export const useStore = create<AppState>((set) => ({
   live: false,
@@ -75,12 +107,15 @@ export const useStore = create<AppState>((set) => ({
   filter: "all",
   metaList: [],
   inspect: null,
+  snap: null,
+  selStack: [],
   following: false,
   hover: null,
   learnFocus: null,
   country: null,
   leaderboard: null,
   selNodes: [],
+  snapshotExact: {},
 
   setLive: (live) => set({ live }),
   setNodes: (l0, l1) => set({ nodes: { l0, l1 } }),
@@ -91,11 +126,28 @@ export const useStore = create<AppState>((set) => ({
   setMode: (mode) => set({ mode }),
   setFilter: (filter) => set({ filter }),
   setMetaList: (metaList) => set({ metaList }),
-  setInspect: (inspect) => set({ inspect }),
+  setInspect: (inspect) => set((s) => ({ inspect, selStack: bumpStack(s.selStack, "node", !!inspect) })),
+  setSnap: (snap) => set((s) => ({ snap, selStack: bumpStack(s.selStack, "snap", !!snap) })),
   setFollowing: (following) => set({ following }),
   setHover: (hover) => set({ hover }),
   setLearnFocus: (learnFocus) => set({ learnFocus }),
   setCountry: (country) => set({ country }),
   setLeaderboard: (leaderboard) => set({ leaderboard }),
   setSelNodes: (selNodes) => set({ selNodes }),
+  setSnapshotExact: (data) =>
+    set((s) => {
+      if (s.snapshotExact[data.ordinal]) return {}; // immutable per ordinal — keep the first
+      const next = { ...s.snapshotExact, [data.ordinal]: data };
+      const keys = Object.keys(next);
+      if (keys.length > EXACT_MAX) {
+        // Map/object key order is insertion order for integer-like keys is numeric — sort to be safe.
+        for (const k of keys
+          .map(Number)
+          .sort((a, b) => a - b)
+          .slice(0, keys.length - EXACT_MAX)) {
+          delete next[k];
+        }
+      }
+      return { snapshotExact: next };
+    }),
 }));
