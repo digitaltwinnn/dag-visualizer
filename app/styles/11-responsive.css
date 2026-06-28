@@ -1,36 +1,18 @@
 /* ── Responsive: keep the fixed HUD from colliding on smaller viewports ──────
    Desktop-first 3D viz. The panels are independent fixed overlays over a
-   full-bleed canvas, so these breakpoints just tighten them and relocate the
-   view toggle so it stops overlapping the stats header. Phone-class layouts
-   (a true single-column redesign) are intentionally out of scope. */
+   full-bleed canvas, so these breakpoints just tighten them. The top command bar
+   (14-top-bar.css) owns its own breakpoints. Phone-class layouts (a true
+   single-column redesign) are intentionally out of scope. */
 
-/* Small laptops / split-screen windows: tighten the header + narrow the panels
-   so the centred toggle keeps its room a while longer. */
+/* Small laptops / split-screen windows: narrow the side rails. */
 @media (max-width: 1100px) {
-  .stats-header { gap: 14px; padding: 8px 12px; font-size: 11px; }
   #leftcol { width: 224px; }
   #rightcol { width: 288px; }
 }
 
-/* Tablet / narrow: the header can no longer share the top row with the centred
-   toggle. Let the header wrap across the top, and move the toggle down to a
-   bottom-centred bar (above the ribbon) where it has the full width to itself. */
+/* Tablet / narrow: just narrow the rails; the full-width command bar keeps roughly
+   the same height, so --rail-top stays put. */
 @media (max-width: 860px) {
-  .stats-header { flex-wrap: wrap; gap: 8px 14px; }
-  #viewtoggle {
-    top: auto;
-    bottom: calc(138px + 28px); /* clear the ribbon (height + its 16px margin) */
-  }
-  #viewtoggle button { padding: 6px 12px; font-size: 12px; }
-  /* The toggle no longer occupies the top, so the columns can start higher. One token
-     keeps both rails aligned (see --rail-top). */
-  :root { --rail-top: 52px; }
   #leftcol { width: 210px; max-height: calc(100vh - 320px); }
   #rightcol { width: min(300px, calc(100vw - 32px)); }
-}
-
-/* Phone-class: the header wraps to two rows, so drop the columns below it so the
-   second row of stats isn't tucked under the filter panel. */
-@media (max-width: 680px) {
-  :root { --rail-top: 84px; }
 }

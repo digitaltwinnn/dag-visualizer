@@ -1,0 +1,249 @@
+/* ── Top command bar ─────────────────────────────────────────────────────────
+   One centered floating capsule replacing the old full-width stats header + the
+   separate view-toggle pill. Three regions on one row — status+filter (left),
+   view switch (center), view-specific vitals (right) — over a hairline outline.
+   Clicking the filter expands the capsule downward into the chip grid (same
+   surface). Tokens come from 00-base.css; chip styles from 02-filter-panel.css. */
+
+/* Full-width bar, inset 16px to mirror the bottom snapshot ribbon (same panel /
+   border / radius), so the HUD reads as a matched top+bottom frame. */
+/* Quiet "work in progress" notice pinned at the very top, above the command bar. */
+#experimental-banner {
+  position: fixed;
+  top: 5px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 13;
+  font-size: 8.5px;
+  font-weight: 700;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  line-height: 14px;
+  color: #ffd166;
+  background: rgba(255, 209, 102, 0.09);
+  border: 1px solid rgba(255, 209, 102, 0.28);
+  border-radius: 7px;
+  padding: 0 10px;
+  pointer-events: none;
+  white-space: nowrap;
+}
+
+#topbar {
+  position: fixed;
+  top: 28px;
+  left: 16px;
+  right: 16px;
+  z-index: 12;
+  /* Fallback accent for the "All" scope = the network cyan, matching the live trend charts;
+     TopBar overrides `--tb-accent` for a metagraph / L0 / L1 selection. */
+  --tb-accent-default: var(--core);
+  background: var(--panel);
+  border: 1px solid var(--panel-border);
+  border-radius: 16px;
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  box-shadow: 0 10px 36px rgba(0, 0, 0, 0.42), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+}
+
+/* The single row of regions. Left and right share the slack so the view switch
+   stays visually centered regardless of how wide the vitals get. */
+.tb-row {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 9px 14px;
+}
+.tb-left {
+  flex: 1 1 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+.tb-vitals {
+  flex: 1 1 0;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 22px;
+  min-width: 0;
+}
+
+/* A subtle divider before the vitals keeps the three regions legible; the boxed
+   view switch already groups the centre. */
+.tb-vitals::before {
+  content: "";
+  align-self: stretch;
+  width: 1px;
+  margin: 3px 0;
+  background: var(--panel-border);
+}
+
+/* Leading accent dot for the hyper structure counts — ties the plain numbers to the active
+   filter's colour (geo/ledger already signal it via flags / accent sparklines). */
+.tb-vitals-dot {
+  flex: none; width: 8px; height: 8px; border-radius: 50%;
+  background: var(--core);
+}
+
+/* Centre: the view switch grouped in a subtle segmented control (its own faint
+   surface), so the three views read as one element — like the filter's hover shape. */
+.tb-views {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 3px;
+  background: rgba(90, 140, 255, 0.06);
+  border: 1px solid var(--panel-border);
+  border-radius: 13px;
+}
+
+/* ── Left: offline warning ───────────────────────────────────────────────────
+   Live is the silent default (no indicator). This only appears when the feed is
+   down — a deliberately alerting cue (red badge, pulsing dot) since it's a problem
+   state, distinct from the neutral interactive controls. */
+.tb-offline {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 8px;
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  color: #ff9a9a;
+  background: rgba(255, 90, 90, 0.12);
+  border: 1px solid rgba(255, 90, 90, 0.45);
+}
+.tb-offline-dot {
+  width: 7px; height: 7px; border-radius: 50%;
+  background: currentColor; box-shadow: 0 0 7px currentColor;
+  animation: pulse 1.4s ease-in-out infinite;
+}
+
+/* ── Left: filter button + pill ─────────────────────────────────────────────── */
+.tb-filter {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 8px 5px 10px;
+  border-radius: 12px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  cursor: pointer;
+  flex: none;
+  transition: background 0.16s, border-color 0.16s;
+}
+.tb-filter:hover { background: rgba(90, 140, 255, 0.1); }
+.tb-filter.active { background: rgba(90, 140, 255, 0.12); border-color: var(--panel-border); }
+.tb-filter-k {
+  font-size: 9.5px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase;
+}
+.tb-filter-pill {
+  display: inline-flex; align-items: center; gap: 6px;
+  flex: none; max-width: 150px;
+  padding: 3px 9px;
+  border-radius: 11px;
+  border: 1px solid var(--panel-border);
+  background: rgba(90, 140, 255, 0.06);
+  color: #c7d0ea;
+  font-size: 12px; font-weight: 600;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+/* Active filter pill: themed to the selected metagraph's colour (same idiom as the active
+   view button), so the filter control and the view switch read as one accent. */
+.tb-filter-pill.on {
+  --acc: var(--tb-accent, var(--tb-accent-default));
+  background: color-mix(in srgb, var(--acc) 16%, transparent);
+  border-color: color-mix(in srgb, var(--acc) 55%, transparent);
+  color: color-mix(in srgb, var(--acc) 30%, #ffffff);
+}
+.tb-filter-dot { width: 9px; height: 9px; border-radius: 50%; flex: none; }
+.tb-caret { font-size: 9px; color: var(--muted); }
+
+/* ── Center: view switch ────────────────────────────────────────────────────── */
+.tb-views button {
+  display: inline-flex; align-items: center; gap: 6px;
+  border: none; background: transparent;
+  padding: 5px 9px; border-radius: 9px;
+  font-size: 12px; color: var(--muted); font-weight: 600; cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.16s, color 0.16s;
+}
+.tb-views button:hover:not(.active) { color: var(--text); background: rgba(90, 140, 255, 0.12); }
+/* Selected view: a subtle wash + outline always in the hypergraph cyan — the view switch
+   is about *views*, not the filter, so it stays a fixed accent (only the filter pill themes
+   to the selection). The icon takes the full accent. */
+.tb-views button.active {
+  --acc: var(--core);
+  background: color-mix(in srgb, var(--acc) 16%, transparent);
+  color: color-mix(in srgb, var(--acc) 35%, #ffffff);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--acc) 55%, transparent),
+    0 0 16px color-mix(in srgb, var(--acc) 22%, transparent);
+}
+/* The active view's outline/wash stays the fixed cyan, but its ICON takes the filter accent
+   (`--tb-accent`, set by TopBar) — a small hint that a network filter is applied. Cyan when
+   the filter is "All" (no accent set). */
+.tb-views button.active .tb-view-icon { color: var(--tb-accent, var(--core)); }
+.tb-view-icon { font-size: 13px; line-height: 1; }
+
+/* ── Right: vitals ──────────────────────────────────────────────────────────── */
+/* Each vital sizes to its widest child (label or value) and never shrinks, so a wide
+   value can't bleed into the neighbouring column. */
+.tb-vital { display: flex; flex-direction: column; gap: 2px; flex: none; }
+.tb-vital-k {
+  font-size: 8.5px; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase;
+  color: var(--muted); white-space: nowrap;
+}
+.tb-vital-row { display: flex; align-items: center; gap: 7px; }
+.tb-vital-v {
+  font-size: 14px; font-weight: 700; font-variant-numeric: tabular-nums; white-space: nowrap;
+}
+/* Placeholder vital (a stat slot we've intentionally left empty until it's fully factual). */
+.tb-vital-ph { color: var(--muted); font-weight: 600; font-style: italic; opacity: 0.6; }
+
+/* ── Expanded filter (drops below the row, same surface; spans the full bar width) ── */
+.tb-expand {
+  border-top: 1px solid var(--panel-border);
+  padding: 4px 6px 8px;
+}
+/* The shared chip grid sits flush inside the expand and wraps across the full width. */
+.tb-expand .mf-chips { padding: 10px 8px 6px; }
+
+/* ── Narrow screens: a graceful ladder — shed the least-essential thing at each step,
+   keep the view names (the part the user asked to keep) as long as possible. ── */
+
+/* 1 · just tighten the gaps. */
+@media (max-width: 1260px) {
+  .tb-row { gap: 12px; }
+  .tb-vitals { gap: 16px; }
+}
+/* 2 · shrink the view chips + vital values a touch. */
+@media (max-width: 1120px) {
+  .tb-views button { padding: 6px 11px; font-size: 12px; }
+  .tb-vital-v { font-size: 13px; }
+  .tb-vitals { gap: 14px; }
+}
+/* 3 · drop the sparklines first — the numbers carry the meaning. */
+@media (max-width: 1020px) {
+  .tb-vital-row .recharts-wrapper { display: none !important; }
+  .tb-vital-row { gap: 0; }
+}
+/* 4 · the "Filter" word becomes redundant (the pill + dot still read). The offline
+   warning stays — it's an alert. */
+@media (max-width: 940px) {
+  .tb-row { gap: 10px; padding: 8px 10px; }
+  .tb-filter-k { display: none; }
+  .tb-vitals { gap: 12px; }
+}
+/* 5 · only now collapse the view names to icons, and drop the region divider. */
+@media (max-width: 820px) {
+  .tb-view-name { display: none; }
+  .tb-vitals::before { display: none; }
+  .tb-vitals { gap: 10px; }
+}

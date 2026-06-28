@@ -2,6 +2,7 @@
 
 import { useEffect, useRef } from "react";
 import { useStore } from "@/src/store/store";
+import { ROLE_SHORT } from "@/components/inspector/parts";
 
 // Hover tooltip. Content comes from the store (engine raycast, set only when the
 // hovered target changes); position is updated directly on the DOM node from the
@@ -25,8 +26,23 @@ export default function Tooltip() {
   if (!hover) return null;
   return (
     <div id="tooltip" ref={ref}>
-      <div className="tt-title">{hover.title}</div>
-      <div className="tt-sub">{hover.sub}</div>
+      <div className="tt-main">
+        <div className="tt-title">
+          {hover.color && <span className="tt-dot" style={{ background: hover.color }} />}
+          <span>{hover.title}</span>
+        </div>
+        {hover.id && <div className="tt-id insp-hash">{hover.id}</div>}
+        {hover.sub && <div className="tt-sub">{hover.sub}</div>}
+      </div>
+      {hover.roles && hover.roles.length > 0 && (
+        <div className="tt-roles">
+          {hover.roles.map((r) => (
+            <span className="role-tag" key={r}>
+              {ROLE_SHORT[r] || r}
+            </span>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

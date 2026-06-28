@@ -18,12 +18,12 @@ export default function LedgerPanel() {
         collapsed={collapsed}
         onToggle={() => setCollapsed((c) => !c)}
       />
-      <div className="ledger-body panel-body">
+      <div className="prose-body panel-body">
         <p>
           How the Global L0 ledger advances over time — a visual of the snapshot DAG is coming
           here. The live ribbon along the bottom is the seed of this view.
         </p>
-        <p className="ledger-dim">
+        <p className="prose-dim">
           Each <b>snapshot</b> links to its parent (that link is the edge of the DAG). <b>Ordinal</b>{" "}
           counts snapshots and always rises; <b>height</b> is the depth of the block DAG and only
           rises when activity deepens it; <b>sub-height</b> orders snapshots that share a height.

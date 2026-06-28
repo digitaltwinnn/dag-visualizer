@@ -1,16 +1,18 @@
 import * as THREE from "three";
 import Stats from "stats.js";
-import { useStore } from "@/src/store/store";
-import { metagraphById, initNetwork, DEFAULT_META_COLOR } from "@/src/data/network";
+import { useStore, type Mode } from "@/src/store/store";
+import { metagraphById, initNetwork, shortHash, CORE_HEX, DEFAULT_META_COLOR } from "@/src/data/network";
+import { hex } from "@/src/util/format";
 // Existing vanilla modules, reused. Bare specifiers resolve via npm; they ship no types
 // of their own, so their surface is described in ./boundary and applied at construction.
 import { createScene } from "../../js/scene.js";
 import { Layers } from "../../js/layers.js";
 import { Globe } from "../../js/globe.js";
 import { loadGeoCache, resolveMissing } from "../../js/geo.js";
-import type { PickDescriptor } from "@/src/data/types";
+import type { GlobalSnapshot, PickDescriptor } from "@/src/data/types";
 import type {
   ClusterNode,
+  DagCore,
   GeoMap,
   GlobeApi,
   LayersApi,
@@ -18,7 +20,6 @@ import type {
   SceneCtx,
 } from "./boundary";
 
-type Mode = "hyper" | "geo" | "ledger";
 type Vec = THREE.Vector3;
 
 // The js/ modules ship no types and `allowJs` only infers partial/loose ones, so pin
@@ -42,6 +43,9 @@ const resolveGeo = resolveMissing as (
 const FOCI: Record<string, { pos: Vec; target: Vec }> = {
   overview: { pos: new THREE.Vector3(0, 15, 60), target: new THREE.Vector3(0, 2, 0) },
   l0: { pos: new THREE.Vector3(0, 6, 20), target: new THREE.Vector3(0, 1, 0) },
+  // The whole DAG core: pulled back enough to frame the outer cL1 (purple) shell (radius 14)
+  // — focus("l0") sat too close and clipped it off-frame.
+  dag: { pos: new THREE.Vector3(0, 9, 38), target: new THREE.Vector3(0, 1, 0) },
   l1: { pos: new THREE.Vector3(14, 10, 26), target: new THREE.Vector3(0, 0, 0) },
   metagraphs: { pos: new THREE.Vector3(0, 30, 70), target: new THREE.Vector3(0, 0, 0) },
   geo: { pos: new THREE.Vector3(0, 11, 36), target: new THREE.Vector3(0, 2, 0) },
@@ -69,9 +73,11 @@ export class Engine {
 
   private geoMap: GeoMap = {};
   private clusters: { l0: ClusterNode[]; l1: ClusterNode[] } | null = null;
+  private dagCore: DagCore | null = null;
   private metaData: RouteMetagraph[] | null = null;
   // Metagraph ids with locatable nodes (selectable hubs); null until counts load (all allowed).
   private _activeMetaIds: Set<string> | null = null;
+  private _lastFlashOrdinal = -1; // de-dupes the core flash to genuinely new global snapshots
 
   private raycaster = new THREE.Raycaster();
   private pointer = new THREE.Vector2();
@@ -126,6 +132,9 @@ export class Engine {
           // Switching network clears any country drill-down (matches the old geo UX).
           this.country = null;
           if (prev.country != null) useStore.getState().setCountry(null);
+          // In hyper, a selected node card is tied to the node you clicked; changing the
+          // network selection drops it (the node may no longer be in view).
+          if (st.mode === "hyper" && st.inspect) useStore.getState().setInspect(null);
           this.applyFilter();
         }
         // Country drill-down is geo-only — gate on the view so a re-entrant clear
@@ -136,6 +145,8 @@ export class Engine {
           this._applyGeoFocus();
         }
         if (st.learnFocus !== prev.learnFocus) this.setLearnFocus(st.learnFocus);
+        // The selected node card (geo or hyper) keeps that node's layer shells lit on the globe.
+        if (st.inspect !== prev.inspect) this.globe.setSelectedNode(this._pickNodeId(st.inspect));
         // Geo: clicking a node (on the globe or in the left explorer both set `inspect`)
         // flies the camera to it; clearing it returns to the selection framing.
         if (st.inspect !== prev.inspect && st.mode === "geo") this._focusInspectNode(st.inspect);
@@ -150,10 +161,25 @@ export class Engine {
   // ---- data wiring (ports main.js loadGeoCache + metagraphs fetch + cluster) ----
   private async _loadData() {
     const net = initNetwork(); // idempotent; guarantees a NetworkData instance
-    if (net?.clusters?.l0?.length) this.clusters = net.clusters;
-    net?.on("cluster", ({ l0, l1 }: { l0: ClusterNode[]; l1: ClusterNode[] }) => {
+    const n = net as unknown as { clusters?: { l0: ClusterNode[]; l1: ClusterNode[] }; dagCore?: DagCore | null };
+    if (n?.clusters?.l0?.length) this.clusters = n.clusters;
+    if (n?.dagCore) this.dagCore = n.dagCore;
+    net?.on("cluster", ({ l0, l1, dag }: { l0: ClusterNode[]; l1: ClusterNode[]; dag: DagCore }) => {
       this.clusters = { l0, l1 };
+      this.dagCore = dag;
       this._buildGlobe();
+      this._publishMetaList(); // the DAG core lives in the metaList — refresh it when clusters change
+    });
+    // Data-driven Hypergraph pulses: when a metagraph records a snapshot that anchored into a
+    // global tick, fire a packet from its hub along the tether into the core; flash the core
+    // itself on each new global snapshot (scaled by how many metagraphs it anchored).
+    net?.on("anchor", ({ metaId }: { metaId: string }) => this.layers.pulseMeta(metaId));
+    net?.on("global", (evt: { latest?: GlobalSnapshot }) => {
+      const ord = evt.latest?.ordinal;
+      if (ord == null || ord === this._lastFlashOrdinal) return;
+      this._lastFlashOrdinal = ord;
+      const anchored = evt.latest?.metagraphSnapshotCount ?? 0;
+      this.layers.flashCore(Math.min(1.3, 0.5 + anchored * 0.06)); // brighter when it anchored more
     });
 
     // Validator geo seed (instant plot); merged, not replaced, so it doesn't clobber
@@ -197,13 +223,13 @@ export class Engine {
   }
 
   private _buildGlobe() {
-    if (!this.clusters || !Object.keys(this.geoMap).length) return;
-    this.globe.setNodes(this.clusters.l0, this.clusters.l1, this.geoMap);
+    if (!this.dagCore || !Object.keys(this.geoMap).length) return;
+    this.globe.setNodes(this.dagCore, this.geoMap);
     this._applyMetagraphs();
-    const ips = [...this.clusters.l0, ...this.clusters.l1].map((n) => n.ip);
+    const ips = this.dagCore.nodes.map((n) => n.ip);
     resolveGeo(this.geoMap, ips, (m) => {
       this.geoMap = m;
-      if (this.clusters) this.globe.setNodes(this.clusters.l0, this.clusters.l1, this.geoMap);
+      if (this.dagCore) this.globe.setNodes(this.dagCore, this.geoMap);
       this._publishLeaderboard();
     });
     this._publishLeaderboard();
@@ -212,7 +238,8 @@ export class Engine {
   private _applyMetagraphs() {
     if (!this.metaData || !Object.keys(this.geoMap).length) return;
     this.globe.setMetagraphs(this.metaData, this.geoMap);
-    this.applyFilter(); // re-assert the active filter on the freshly built nodes
+    this.applyFilter(false); // re-assert the filter's dimming on the new nodes — but DON'T move
+    // the camera (this runs on every cluster/meta poll; moving it would reset the user's view).
     // metaList is published in refreshMeta (metagraph geo arrives with the route), so
     // we don't re-publish here — this runs on every cluster poll.
   }
@@ -223,19 +250,29 @@ export class Engine {
   // geolocatable nodes) + `countriesCount` come from the geo we have; the filter chips
   // use `located` for their count / disabled "(0)" state (what the globe can plot).
   private _publishMetaList() {
+    const located = (nodes: { ip: string }[]) => nodes.filter((n) => this.geoMap[n.ip]).length;
+    const countriesOf = (nodes: { ip: string }[]) =>
+      new Set(nodes.map((n) => this.geoMap[n.ip]?.country).filter(Boolean)).size;
     const data: RouteMetagraph[] = this.metaData || [];
-    const list = data.map((m) => {
+    const metas = data.map((m) => {
       const nodes = m.nodes || [];
-      const located = nodes.filter((n) => this.geoMap[n.ip]).length;
-      const countries = new Set(
-        nodes.map((n) => this.geoMap[n.ip]?.country).filter(Boolean),
-      ).size;
       return {
         id: m.id, name: m.name, symbol: m.symbol, description: m.description,
         siteUrl: m.siteUrl, color: metagraphById(m.id)?.color ?? DEFAULT_META_COLOR,
-        nodes, located, countriesCount: countries,
+        nodes, located: located(nodes), countriesCount: countriesOf(nodes),
       };
     });
+    // The DAG is the root CORE — prepended so it's just another entry in the metaList that the
+    // dossier / top-bar / leaderboard read uniformly (a metagraph-shaped network with roles).
+    const dag = this.dagCore
+      ? [{
+          id: "dag", name: "DAG", symbol: "DAG", description: this.dagCore.description,
+          siteUrl: undefined, color: this.dagCore.color, isRoot: true,
+          nodes: this.dagCore.nodes, located: located(this.dagCore.nodes),
+          countriesCount: countriesOf(this.dagCore.nodes),
+        }]
+      : [];
+    const list = [...dag, ...metas];
     useStore.getState().setMetaList(list);
     // Tell the Hypergraph which hubs are live (have locatable nodes) so the rest render
     // dim + inactive; the engine also skips their picks (see _isPickActive).
@@ -253,7 +290,8 @@ export class Engine {
       this.globe.setCountry(null);
       useStore.getState().setCountry(null);
     }
-    if (mode === "ledger") {
+    // Flat views (ledger + the placeholders) hide the 3D scene — reset it to a neutral idle.
+    if (mode !== "hyper" && mode !== "geo") {
       this.layers.focusId = null;
       this.globe.setFilter("all");
       this.globe.focusDensest(false);
@@ -262,23 +300,32 @@ export class Engine {
       return;
     }
     this.ctx.controls.autoRotate = mode !== "geo";
-    this.applyFilter();
+    this.applyFilter(false); // apply the filter's visuals, but leave the camera to _focusSelection
+    // A selection's camera position carries across view switches: frame the selected node in the
+    // new view (geo → its globe spot, hyper → its shell point), else the filter's default framing.
+    this._focusSelection();
   }
 
-  applyFilter() {
+  // `focusCamera` is false for BACKGROUND data refreshes (new cluster/meta/geo arriving) — they
+  // must re-assert the filter's dimming/visibility on the freshly-built nodes WITHOUT yanking the
+  // camera back to the filter preset (that was the "camera randomly resets" bug). Only a user
+  // action (changing the view or the filter) moves the camera.
+  applyFilter(focusCamera = true) {
     if (this.mode === "geo") {
       this.globe.setFilter(this.filter); // also clears globe.countryFilter
-      this._applyGeoFocus();
+      if (focusCamera) this._applyGeoFocus();
     } else if (this.mode === "hyper") {
-      this.globe.setFilter("all"); // no dimming in the Hypergraph
-      this.globe.focusDensest(false);
-      this._focusFilter(this.filter);
+      // Dim the non-selected nodes ("the others") so the selected network stands out, on top
+      // of the camera focus + DoF. "all" dims nothing (setFilter no-ops the dim).
+      this.globe.setFilter(this.filter);
+      if (focusCamera) {
+        this.globe.focusDensest(false);
+        this._focusFilter(this.filter);
+      }
     }
     this._publishLeaderboard();
-    // Tint the Hypergraph background aurora + the globe's land edge with the selected
-    // metagraph's colour (null → the default for All / L0 / L1).
+    // Tint the globe's land edge with the selected metagraph's colour (null → default cyan).
     const accent = metagraphById(this.filter)?.color ?? null;
-    this.ctx.background.setAccent(accent);
     this.globe.setEdgeColor(accent);
   }
 
@@ -298,6 +345,25 @@ export class Engine {
     else this.focus("geo");
   }
 
+  // Frame the current SELECTION in whichever view we're in — so a selection's camera position
+  // carries across view switches (geo → its globe spot, hyper → its shell point). No node
+  // selected → the filter's default framing. One place, so every view stays consistent.
+  private _focusSelection() {
+    const inspect = useStore.getState().inspect;
+    const isNode =
+      !!inspect && (inspect.kind === "l0" || inspect.kind === "l1" || inspect.kind === "metanode");
+    if (this.mode === "geo") {
+      if (isNode) this._focusInspectNode(inspect);
+      else this._applyGeoFocus();
+    } else if (this.mode === "hyper") {
+      if (isNode) this._focusHyperNode(inspect!);
+      else {
+        this.globe.focusDensest(false);
+        this._focusFilter(this.filter);
+      }
+    }
+  }
+
   // Geo node selection (globe click or left-rail explorer): swing the node to the front
   // (with tilt) and zoom in closer than a country focus. Clearing the pick — or a pick we
   // can't locate — falls back to the current selection framing.
@@ -310,6 +376,22 @@ export class Engine {
     } else {
       this._applyGeoFocus();
     }
+  }
+
+  // Hypergraph node framing: fly to the node's live shell point (pulled back along its radial,
+  // lifted a touch). Falls back to the network framing if the node can't be located.
+  private _focusHyperNode(p: PickDescriptor) {
+    const id = p.kind === "metanode" ? p.node?.ip : p.kind === "l0" || p.kind === "l1" ? p.node?.id : null;
+    const pos = id ? this.globe.hyperWorldPos(id) : null;
+    if (!pos) {
+      this.globe.focusDensest(false);
+      this._focusFilter(this.filter);
+      return;
+    }
+    this.ctx.controls.autoRotate = false;
+    this.layers.focusId = null;
+    const dir = pos.clone().normalize();
+    this._tweenTo(pos.clone().addScaledVector(dir, 9).add(new THREE.Vector3(0, 3, 0)), pos);
   }
 
   // Node framing: zoomed in, camera low in front of the node looking UP at a point ABOVE it
@@ -358,22 +440,38 @@ export class Engine {
     return null;
   }
 
-  // A geo node is "active" (visible, hence pickable) when it passes the network filter AND
-  // the country drill-down — mirrors globe._nodeActive. Everything is pickable elsewhere.
+  // The stable per-machine id of a node pick (a validator by its node id, a metagraph node by
+  // its ip) — keys the persistent selection glow, matching the hover-pairing in _handleMove.
+  private _pickNodeId(p: PickDescriptor | null): string | null {
+    if (!p) return null;
+    if (p.kind === "l0" || p.kind === "l1") return p.node?.id ?? null;
+    if (p.kind === "metanode") return p.node?.ip ?? null;
+    return null;
+  }
+
+  // The network (filter id) a node pick belongs to: its metagraph, or the DAG core for a
+  // validator. Clicking a node sets the global filter to this, consistently in every view.
+  private _pickNetId(p: PickDescriptor): string | null {
+    if (p.kind === "metanode") return p.meta?.id ?? null;
+    if (p.kind === "l0" || p.kind === "l1") return "dag";
+    return null;
+  }
+
+  // Whether a pick participates in hover/click. In GEO the off-filter / off-country nodes are
+  // genuinely hidden, so they're not pickable. In HYPER every node stays interactive — the
+  // off-focus ones are only *dimmed*, not hidden, so clicking one (e.g. a core validator while
+  // a metagraph is selected) drills into its network; gating them out there read as a bug.
   private _isPickActive(p: PickDescriptor): boolean {
     // A registered-but-node-less metagraph hub is shown (dim) but not selectable, so it
     // matches its inactive look + its "registered · no live nodes" filter chip.
     if (p.kind === "meta") return !this._activeMetaIds || this._activeMetaIds.has(p.cfg.id);
     if (this.mode !== "geo") return true;
     let id: string | undefined;
-    if (p.kind === "l0") id = "l0";
-    else if (p.kind === "l1") id = "l1";
+    if (p.kind === "l0" || p.kind === "l1") id = "dag"; // validators are the DAG core
     else if (p.kind === "metanode") id = p.meta?.id;
     else return true;
     if (!(this.filter === "all" || this.filter === id)) return false;
-    if (this.country && (p.kind === "l0" || p.kind === "l1" || p.kind === "metanode") && p.geo?.cc !== this.country) {
-      return false;
-    }
+    if (this.country && p.geo?.cc !== this.country) return false;
     return true;
   }
 
@@ -381,11 +479,38 @@ export class Engine {
   // pixel); the Tooltip component positions itself from the pointer.
   private _handleMove(e: MouseEvent) {
     const p = this._pickAt(e);
-    const key = p ? `${p.title}|${p.sub}` : null;
+    // The node's identity line for the tooltip — its node ID (shortened) when it has one,
+    // else its IP. Same identity the geo node card leads with, so hover ≈ that card.
+    const idText =
+      p && (p.kind === "l0" || p.kind === "l1" || p.kind === "metanode")
+        ? p.node?.id
+          ? shortHash(p.node.id)
+          : p.node?.ip ?? ""
+        : "";
+    // The hovered subject's network colour, for the tooltip's leading bullet: a metagraph
+    // node / hub takes its metagraph colour; a DAG validator or the L0 core, the core cyan.
+    const color =
+      p?.kind === "metanode" && p.meta
+        ? hex(p.meta.color)
+        : p?.kind === "meta"
+          ? hex(p.cfg.color)
+          : p && (p.kind === "l0" || p.kind === "l1" || p.kind === "core")
+            ? CORE_HEX
+            : undefined;
+    const key = p ? `${p.title}|${p.sub}|${p.roles?.join(",") ?? ""}|${idText}|${color ?? ""}` : null;
     this.canvas.style.cursor = p ? "pointer" : "grab";
+    // Hover-pairing: glow every layer-shell instance of the hovered node (a validator by its
+    // machine id, a metagraph node by its ip) — so a hybrid's shells read as one machine.
+    const hoverId =
+      p?.kind === "metanode" ? p.node?.ip : p?.kind === "l0" || p?.kind === "l1" ? p.node?.id : null;
+    this.globe.setHoverNode(hoverId ?? null);
     if (key === this._hoverKey) return;
     this._hoverKey = key;
-    useStore.getState().setHover(p ? { title: p.title ?? "", sub: p.sub ?? "" } : null);
+    useStore
+      .getState()
+      .setHover(
+        p ? { title: p.title ?? "", sub: p.sub ?? "", roles: p.roles, id: idText || undefined, color } : null,
+      );
   }
 
   private _handleClick(e: MouseEvent) {
@@ -396,21 +521,15 @@ export class Engine {
       useStore.getState().setFilter(p.cfg.id);
       return;
     }
-    // The Hypergraph is about metagraphs, not one-off node cards: clicking a metagraph
-    // node selects its metagraph (same as its hub), and other nodes aren't inspectable
-    // here — so a stray click never pops a node card in the metagraph view.
-    if (this.mode === "hyper") {
-      if (p.kind === "metanode" && p.meta?.id) useStore.getState().setFilter(p.meta.id);
-      return;
+    // Clicking a node, in any view: drill the global filter into the node's network (its
+    // metagraph, or the DAG core for a validator) and open its node card. Filter first, so the
+    // node-focus camera move (set by the inspect) wins over the network framing.
+    if (p.kind === "l0" || p.kind === "l1" || p.kind === "metanode") {
+      if (this.mode === "geo") this.ctx.controls.autoRotate = false;
+      const netId = this._pickNetId(p);
+      if (netId) useStore.getState().setFilter(netId);
+      useStore.getState().setInspect(p);
     }
-    // Geo: open the node inspector. Clicking a metagraph node directly on the globe also
-    // drills the filter into its metagraph (isolating that network), then opens the node —
-    // set the filter first so the subsequent inspect's node-focus is the camera move that wins.
-    this.ctx.controls.autoRotate = false;
-    if (p.kind === "metanode" && p.meta?.id) {
-      useStore.getState().setFilter(p.meta.id);
-    }
-    useStore.getState().setInspect(p);
   }
 
   private focus(name: string) {
@@ -421,7 +540,17 @@ export class Engine {
   // "Understand the network" topic: frame it + dim the rest (ports ui.js focus +
   // _highlight). null clears the dim and returns to the idle overview.
   setLearnFocus(name: string | null) {
-    this.focus(name || "overview");
+    // The "metagraphs" topic ("networks of their own") is about the orbiting metagraphs —
+    // if one is currently selected (the filter), frame THAT metagraph (the explore card is
+    // tied to the active filter) instead of the generic pulled-back metagraphs shot.
+    if (name === "metagraphs") {
+      const filter = useStore.getState().filter;
+      const isMeta = this.layers.metas.some((x) => x.cfg.id === filter);
+      if (isMeta) this._focusFilter(filter);
+      else this.focus("metagraphs");
+    } else {
+      this.focus(name || "overview");
+    }
     this.layers.setHighlight(name);
     this.globe.setHighlight(name);
     this.ctx.controls.autoRotate = !name;
@@ -456,8 +585,8 @@ export class Engine {
       return;
     }
     this.ctx.controls.autoRotate = false;
-    if (filter === "l0" || filter === "l1") {
-      this.focus(filter);
+    if (filter === "dag") {
+      this.focus("dag"); // the central core — framed to fit both the L0 and cL1 shells
       return;
     }
     const meta = this.layers.metas.find((x) => x.cfg.id === filter);
@@ -497,17 +626,17 @@ export class Engine {
       this._updateTween(dt);
       this.ctx.controls.update();
 
-      const ledger = this.mode === "ledger";
-      if (ledger) {
+      // Flat views (ledger + placeholders) hide the whole 3D scene.
+      const flat = this.mode !== "hyper" && this.mode !== "geo";
+      if (flat) {
         this.layers.root.visible = false;
         this.layers.coreGroup.visible = false;
       }
-      this.globe.group.visible = !ledger;
-      this.ctx.background.mesh.visible = !ledger;
+      this.globe.group.visible = !flat;
+      this.ctx.background.mesh.visible = !flat;
 
-      // Depth of field: only a single focused metagraph in the Hypergraph.
-      const metaSel =
-        this.mode === "hyper" && this.filter !== "all" && this.filter !== "l0" && this.filter !== "l1";
+      // Depth of field: only a single focused metagraph in the Hypergraph (not all / the DAG core).
+      const metaSel = this.mode === "hyper" && this.filter !== "all" && this.filter !== "dag";
       const dofMix = THREE.MathUtils.clamp(1 - (this.morph - 0.4) / 0.2, 0, 1);
       this.ctx.dof.enabled = metaSel && dofMix > 0.001;
       if (this.ctx.dof.enabled) {
@@ -516,7 +645,7 @@ export class Engine {
           ? meta.group.getWorldPosition(this._dofTmp)
           : this.ctx.controls.target;
         this.ctx.dof.uniforms["focus"].value = this.ctx.camera.position.distanceTo(focusTarget);
-        this.ctx.dof.uniforms["maxblur"].value = 0.01 * dofMix;
+        this.ctx.dof.uniforms["maxblur"].value = 0.07 * dofMix; // out-of-focus blur
       }
 
       this.ctx.composer.render();

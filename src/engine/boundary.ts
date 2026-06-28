@@ -37,6 +37,18 @@ export interface RouteMetagraph {
   nodes: RouteNode[];
 }
 
+// The DAG modelled as a metagraph-shaped core (api.js `_buildDagCore`): the L0+L1 validator
+// clusters merged by node id into one node-list with `roles` (a hybrid runs several layers).
+export interface DagCore {
+  id: string;
+  name: string;
+  symbol?: string;
+  description?: string;
+  isRoot?: boolean;
+  color: number;
+  nodes: RouteNode[];
+}
+
 // @types/three types BokehPass.uniforms as a bare `object`; the engine reads
 // uniforms.focus/maxblur .value, so refine just those.
 export type DofPass = BokehPass & {
@@ -47,8 +59,6 @@ export type DofPass = BokehPass & {
 export interface Background {
   mesh: THREE.Object3D;
   update(dt: number, morph: number): void;
-  /** Tint the Hypergraph aurora toward a metagraph colour (hex), or null for the default palette. */
-  setAccent(color: number | null): void;
 }
 
 // js/scene.js createScene() return.
@@ -82,6 +92,10 @@ export interface LayersApi {
   setHighlight(focus: string | null): void;
   /** Mark which metagraph hubs have locatable nodes (active); the rest are dimmed inactive. */
   setMetaActive(ids: Set<string> | null): void;
+  /** Fire an "anchored into L0" packet from a metagraph's hub toward the core (anchor event). */
+  pulseMeta(metaId: string): void;
+  /** Flash the core when a new global snapshot lands; strength scales with how much it anchored. */
+  flashCore(strength?: number): void;
 }
 
 // js/globe.js Globe — validator + metagraph nodes, heatmap, arcs, filtering, geo focus.
@@ -89,10 +103,16 @@ export interface GlobeApi {
   group: THREE.Group;
   nodes: unknown[];
   pickables: THREE.Object3D[];
-  setNodes(l0: ClusterNode[], l1: ClusterNode[], geoMap: GeoMap): void;
+  setNodes(dagCore: DagCore, geoMap: GeoMap): void;
   setMetagraphs(list: RouteMetagraph[], geoMap: GeoMap): void;
   setFilter(sel: string): void;
   setCountry(cc: string | null): void;
+  /** Hover-pairing: glow every layer-shell instance of the hovered node (id), or clear (null). */
+  setHoverNode(id: string | null): void;
+  /** Persistent selection: keep every layer-shell of the selected node lit, or clear (null). */
+  setSelectedNode(id: string | null): void;
+  /** A node's live Hypergraph-shell world position (validator/metagraph node) for the camera. */
+  hyperWorldPos(id: string | null): THREE.Vector3 | null;
   /** Rotates to the densest part of the selection; returns concentration R (0..1) or null. */
   focusDensest(on: boolean): number | null;
   /** Aims a single node's lat/lon to the front (with tilt); false if it has no coords. */

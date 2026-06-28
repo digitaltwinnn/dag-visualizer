@@ -19,17 +19,16 @@ export default function SnapshotRibbon() {
   const trackRef = useRef<HTMLDivElement>(null);
 
   const filter = useStore((s) => s.filter);
-  const inspect = useStore((s) => s.inspect);
-  const setInspect = useStore((s) => s.setInspect);
+  const snap = useStore((s) => s.snap);
+  const setSnap = useStore((s) => s.setSnap);
   const setFollowing = useStore((s) => s.setFollowing);
-  const selectedOrdinal =
-    inspect?.kind === "snapshot" ? inspect.data?.ordinal ?? null : null;
+  const selectedOrdinal = snap?.data?.ordinal ?? null;
 
   // Clicking a chip pins it (stop following) UNLESS it's the latest relevant snapshot
   // for the current filter — clicking the tip resumes real-time.
   const pick = (d: GlobalSnapshot) => {
     setFollowing(latestRelevant(filter)?.ordinal === d.ordinal);
-    setInspect({ kind: "snapshot", title: `Global snapshot #${d.ordinal}`, data: d });
+    setSnap({ kind: "snapshot", title: `Global snapshot #${d.ordinal}`, data: d });
   };
 
   // Keep the newest chip in view.

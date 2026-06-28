@@ -11,11 +11,18 @@ import LiveStrip from "@/components/LiveStrip";
 // vertical space the bottom reserves (--bottom-reserve) so the side rails grow back
 // when only the slim strip is showing.
 export default function BottomStream() {
-  const full = useStore((s) => s.mode === "ledger");
+  const mode = useStore((s) => s.mode);
+  const full = mode === "ledger";
+  // The scaffolded placeholder views have no snapshot lane — hide it and give the space back.
+  const hidden = mode !== "hyper" && mode !== "geo" && mode !== "ledger";
 
   useEffect(() => {
-    document.documentElement.style.setProperty("--bottom-reserve", full ? "170px" : "78px");
-  }, [full]);
+    document.documentElement.style.setProperty(
+      "--bottom-reserve",
+      hidden ? "0px" : full ? "170px" : "130px",
+    );
+  }, [full, hidden]);
 
+  if (hidden) return null;
   return full ? <SnapshotRibbon /> : <LiveStrip />;
 }

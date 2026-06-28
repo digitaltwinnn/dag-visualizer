@@ -1,8 +1,7 @@
-// A procedural skydome shader that serves as the animated background for both
-// views. It reads `uMorph` (0 = Hypergraph, 1 = globe) and crossfades between
-// two distinctly different looks in the network's palette:
-//   - Hypergraph (digital): a calm, slowly drifting aurora in the brand palette
-//     (a soft cloud + gentle gradient). Modest and atmospheric — no grid, no stars.
+// A procedural skydome shader behind both views. It reads `uMorph` (0 = Hypergraph,
+// 1 = globe) and crossfades between two looks in the network's palette:
+//   - Hypergraph (digital): a single flat deep colour — no animation, no gradient, no tint
+//     (it was distracting).
 //   - Geography (space): a sparse field of twinkling stars + faint nebula.
 //
 // Rendered on a large inward-facing sphere behind everything (no depth test),
@@ -28,8 +27,6 @@ const frag = /* glsl */ `
   uniform vec3 uBlue;
   uniform vec3 uPurple;
   uniform vec3 uDeep;
-  uniform vec3 uAccent;     // selected-metagraph colour (Hypergraph aurora tint)
-  uniform float uAccentMix; // 0 = brand palette, up to ~0.8 when a metagraph is selected
 
   float hash(vec3 p) {
     p = fract(p * 0.3183099 + vec3(0.71, 0.113, 0.419));
@@ -77,25 +74,9 @@ const frag = /* glsl */ `
 
   const float PI = 3.14159265;
 
-  // ---- Hypergraph background: a calm drifting aurora (modest; no grid, no stars) ----
-  // A soft, low-frequency cloud in the brand palette that drifts slowly, plus a gentle
-  // vertical gradient. Kept well below the bloom threshold so it's a quiet, atmospheric
-  // backdrop that gives depth without competing with the scene.
+  // ---- Hypergraph background: a single flat colour (no animation, no gradient, no tint) ----
   vec3 digitalBg(vec3 dir) {
-    // Broader + fainter + lower-contrast than a detailed cloud: a smooth colour WASH that takes
-    // on the metagraph tint, so it stays a quiet ambiance and doesn't turn to mush under the
-    // depth-of-field blur. (The metagraph-accent tint — the part that's liked — is unchanged.)
-    float n = fbm(dir * 0.9 + vec3(uTime * 0.010, uTime * 0.005, 0.0));
-    float soft = smoothstep(0.30, 1.0, n);       // gentle, low-contrast variation (no cloud edges)
-    vec3 glow = mix(uBlue, uCyan, n);            // cyan↔blue across the wash
-    glow = mix(glow, uPurple, 0.28);             // a hint of purple
-    glow = mix(glow, uAccent, uAccentMix);       // tint toward the selected metagraph
-
-    vec3 grad = mix(uBlue, uAccent, uAccentMix); // the base gradient leans in too
-    vec3 col = uDeep;
-    col += grad * 0.025 * (dir.y * 0.5 + 0.5);   // gentle top-lit gradient
-    col += glow * soft * 0.05;                   // the colour wash — subtle, but the tint still reads
-    return col;
+    return uDeep;
   }
 
   // ---- Geography background: deep space with twinkling stars ----
@@ -134,8 +115,6 @@ export function createBackground(scene) {
     uBlue: { value: new THREE.Color(COLORS.l0) },
     uPurple: { value: new THREE.Color(COLORS.l1) },
     uDeep: { value: new THREE.Color(0x04050c) },
-    uAccent: { value: new THREE.Color(COLORS.l0) },
-    uAccentMix: { value: 0 },
   };
   const mat = new THREE.ShaderMaterial({
     uniforms, vertexShader: vert, fragmentShader: frag,
@@ -146,26 +125,11 @@ export function createBackground(scene) {
   mesh.frustumCulled = false;
   scene.add(mesh);
 
-  // Eased accent tint for the Hypergraph aurora: the colour eases toward the latest
-  // metagraph colour while the mix eases up to 0.8 (or back to 0 when nothing is selected),
-  // so selecting / switching / clearing a metagraph crossfades smoothly.
-  const accentTarget = new THREE.Color(COLORS.l0);
-  let mixTarget = 0;
-
   return {
     mesh,
-    // color: a hex number (selected metagraph) to tint toward, or null for the default palette.
-    setAccent(color) {
-      if (color == null) { mixTarget = 0; return; }
-      accentTarget.set(color);
-      mixTarget = 0.5;
-    },
     update(dt, morph) {
-      uniforms.uTime.value += dt;
+      uniforms.uTime.value += dt; // still drives the geo starfield twinkle
       uniforms.uMorph.value = morph;
-      const k = Math.min(1, dt * 2.5);
-      uniforms.uAccent.value.lerp(accentTarget, k);
-      uniforms.uAccentMix.value += (mixTarget - uniforms.uAccentMix.value) * k;
     },
   };
 }

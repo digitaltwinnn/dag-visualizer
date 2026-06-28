@@ -26,8 +26,8 @@ export function latestRelevant(filter: string): GlobalSnapshot | null {
 // metagraph with no recent snapshots), clear a stale snapshot card rather than show a
 // misleading one — the metagraph context pane still conveys the selection.
 export function followLatest() {
-  const { filter, inspect, setInspect } = useStore.getState();
-  const snap = latestRelevant(filter);
-  if (snap) setInspect({ kind: "snapshot", title: `Global snapshot #${snap.ordinal}`, data: snap });
-  else if (inspect?.kind === "snapshot") setInspect(null);
+  const { filter, snap, setSnap } = useStore.getState();
+  const latest = latestRelevant(filter);
+  if (latest) setSnap({ kind: "snapshot", title: `Global snapshot #${latest.ordinal}`, data: latest });
+  else if (snap) setSnap(null);
 }

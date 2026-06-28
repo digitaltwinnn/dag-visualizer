@@ -1,12 +1,12 @@
 import { useStore } from "@/src/store/store";
-import type { Anchor, GlobalSnapshot } from "@/src/data/types";
+import type { Anchor, GlobalSnapshot, MetaInfo } from "@/src/data/types";
 // Existing data layer, reused untouched. Browser-only (fetch/setInterval); imported
 // from client code, initialized in an effect. Types come in a later phase.
 import { NetworkData, shortHash as rawShortHash } from "../../js/api.js";
 
 export const shortHash = rawShortHash as (h: string) => string;
 import { METAGRAPHS, COLORS as RAW_COLORS } from "../../js/config.js";
-import { hex, toDag } from "@/src/util/format";
+import { hex } from "@/src/util/format";
 
 export const COLORS = RAW_COLORS as { core: number; l0: number; l1: number; bg: number };
 
@@ -29,6 +29,11 @@ export function initNetwork(): NetworkData | null {
 
   setMetagraphs(METAGRAPHS.length); // publicly listed metagraphs we track
 
+  // Activity is scoped to the current filter — a metagraph reads its own snapshot stream,
+  // "all"/"dag" the global L0 ledger. Recompute on new snapshots, on anchor-index updates
+  // (per-metagraph fees), and whenever the selection changes.
+  const refreshActivity = () => setActivity(net!.getActivity(useStore.getState().filter));
+
   net.on("status", ({ live }: { live: boolean }) => setLive(live));
   net.on("cluster", ({ l0, l1 }: { l0: unknown[]; l1: unknown[] }) =>
     setNodes(l0.length, l1.length),
@@ -37,8 +42,12 @@ export function initNetwork(): NetworkData | null {
     if (evt.latest) {
       setLatestOrdinal(evt.latest.ordinal);
       setLatestSnapshot(evt.latest);
-      setActivity(net!.getActivity());
+      refreshActivity();
     }
+  });
+  net.on("anchor", () => refreshActivity());
+  useStore.subscribe((st, prev) => {
+    if (st.filter !== prev.filter) refreshActivity();
   });
 
   net.init();
@@ -55,50 +64,45 @@ export function getAnchor(ts: string): Anchor | null {
   return net?.getAnchor(ts) ?? null;
 }
 
-// Live economic/activity summary for one metagraph, derived from its rolling
-// snapshot buffer (`metaSnaps`) + the shared `anchorIndex`. This is the Hypergraph
-// analogue of the snapshot card's "what it settled / cost": where geo answers
-// *where* a metagraph runs and the ledger answers *when* it snapshots, this answers
-// *how active / how economically weighty* it is. Factual: null until we've polled
-// snapshots for it — never synthesized.
-export interface MetaActivity {
-  snapsPerMin: number | null; // snapshot cadence over the buffered window
-  avgFeeDag: number; // mean DAG fee per snapshot (∝ size)
-  sharePct: number | null; // its share of the anchored snapshots we track
-  samples: number; // buffered snapshots backing the numbers
+// How long after a tick's identified count last grew we treat it as "settled". Until then its
+// breakdown is still filling in (metagraphs anchor over a few seconds + our poll catches up), so
+// the UI says "still gathering" rather than committing to a floor/unlisted number. Shared by the
+// snapshot card's anchor pills and its fee note so they agree. See CLAUDE.md → "The tick lifecycle".
+export const ANCHOR_SETTLE_MS = 7000;
+
+// True while the tick `ts` is still gathering anchors (count below the authoritative total AND it
+// grew within the settle window). `total` is the global snapshot's metagraphSnapshotCount.
+export function isAnchorSettling(ts: string, total: number | null): boolean {
+  const a = net?.getAnchor(ts);
+  if (!a || total == null) return false;
+  return total > a.count && Date.now() - a.touched < ANCHOR_SETTLE_MS;
 }
 
-export function metaActivity(id: string): MetaActivity | null {
-  const n = net as unknown as {
-    metaSnaps?: Map<string, Array<{ ts: string; fee: number }>>;
-    anchorIndex?: Map<string, { count: number; metaCounts: Map<string, number> }>;
-  } | null;
-  const buf = n?.metaSnaps?.get(id);
-  if (!buf || buf.length === 0) return null;
-
-  const samples = buf.length;
-  const t0 = Date.parse(buf[0].ts);
-  const t1 = Date.parse(buf[buf.length - 1].ts);
-  const minutes = (t1 - t0) / 60000;
-  const snapsPerMin = minutes > 0 ? (samples - 1) / minutes : null;
-
-  const totalFee = buf.reduce((s, r) => s + (r.fee || 0), 0);
-  const avgFeeDag = toDag(totalFee / samples);
-
-  let mine = 0;
-  let all = 0;
-  n?.anchorIndex?.forEach((a) => {
-    all += a.count;
-    mine += a.metaCounts.get(id) || 0;
-  });
-  const sharePct = all > 0 ? (mine / all) * 100 : null;
-
-  return { snapsPerMin, avgFeeDag, sharePct, samples };
+// The DAG modelled as a metagraph-shaped CORE (its L0 + L1 clusters merged by node id into
+// one node-list with `roles`). Same shape as a metagraph (MetaInfo + `isRoot`), so the rest
+// of the app can treat it as another core. Null until the clusters are first fetched.
+export type CoreInfo = MetaInfo & { isRoot?: boolean };
+export function getDagCore(): CoreInfo | null {
+  return (net as unknown as { dagCore?: CoreInfo | null })?.dagCore ?? null;
 }
 
-// Config metagraph (id → {color, ticker, name, …}) or null for all/l0/l1 filters.
+
+// The DAG modelled as a core, resolvable like a metagraph config (its live nodes come from
+// the metaList / getDagCore; this is just its identity for the filter/dossier/top-bar).
+const DAG_CFG: MetagraphConfig = { id: "dag", name: "DAG", ticker: "DAG", color: COLORS.core };
+
+// Config core (id → {color, ticker, name, …}) — a metagraph or the DAG; null for "all".
 export function metagraphById(id: string): MetagraphConfig | null {
+  if (id === "dag") return DAG_CFG;
   return (METAGRAPHS as MetagraphConfig[]).find((m) => m.id === id) ?? null;
+}
+
+// The accent colour for the active network filter, as a CSS colour string — the selected
+// core's colour (metagraph or the DAG's cyan), or the network cyan for "all".
+export function filterAccent(filter: string): string {
+  const cfg = metagraphById(filter);
+  if (cfg) return hex(cfg.color);
+  return "var(--core)";
 }
 
 // The publicly listed metagraphs (config). Node counts / disabled "(0)" chips return

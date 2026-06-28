@@ -7,11 +7,11 @@
 // arrive, so node radii always match the (full-size, non-scaled) globe.
 
 import * as THREE from "three";
-import { feature } from "topojson-client";
 import { COLORS, METAGRAPHS, metaAnchor } from "./config.js";
+import * as geoStats from "./geoStats.js";
+import { buildGlobeSurface } from "./globeSurface.js";
+import { R, LAND_H, latLonToVec3 } from "./geoMath.js";
 
-const R = 16;
-const LAND_H = 0.34; // how far the coastal "wall" rim rises above the solid land fill (R)
 const Z_AXIS = new THREE.Vector3(0, 0, 1);
 const DIM = new THREE.Color(0x223046);
 const _geoVec = new THREE.Vector3(); // scratch for the morph-fly interpolation
@@ -20,9 +20,17 @@ const _vec = new THREE.Vector3();
 const _qSpin = new THREE.Quaternion();   // hypergraph tumble
 const _qRadial = new THREE.Quaternion(); // outward-facing (globe) orientation
 const _col = new THREE.Color();          // scratch colour for dim recolouring
+const _focusMat = new THREE.Matrix4();   // scratch for reading an instance's live transform
 const lerp = (a, b, t) => a + (b - a) * t;
 const smooth = (m) => m * m * (3 - 2 * m);
 const GOLDEN_ANGLE = Math.PI * (3 - Math.sqrt(5)); // fibonacci-shell / phyllotaxis spacing
+
+// A node's role set, shared by the DAG core + metagraph nodes. A node (one machine) can run
+// several layers; "L0" is a ROLE, not a node kind — so the tooltip names the NETWORK and
+// shows the layer(s) as tags (a hybrid lists every one it runs, which is why hovering it
+// lights more than one shell). Keyed by node, so every shell of the same machine reads alike.
+const nodeRoles = (node, fallback) =>
+  node && node.roles && node.roles.length ? node.roles : [fallback];
 
 // Travelling-packet arcs: each is a short comet that hops node -> node.
 const ARC_TAIL = 8;         // points making up each comet
@@ -75,15 +83,6 @@ function spreadCoLocated(dirs, { groupDeg = 0.8, spacingDeg = 0.32, maxDeg = 2.3
   return clusters;
 }
 
-export function latLonToVec3(lat, lon, r = R) {
-  const phi = (90 - lat) * Math.PI / 180;
-  const theta = (lon + 180) * Math.PI / 180;
-  return new THREE.Vector3(
-    -r * Math.sin(phi) * Math.cos(theta),
-    r * Math.cos(phi),
-    r * Math.sin(phi) * Math.sin(theta)
-  );
-}
 
 export class Globe {
   constructor(scene, layers = null, camera = null) {
@@ -124,247 +123,18 @@ export class Globe {
     this.metaSphere = null;   // glowing spheres (Hypergraph cluster)
     this.metaDisc = null;  // flat discs lying on the globe surface (geography)
     this.filter = "all";
+    // Hover-pairing: the node id under the cursor — every instance of that machine (its
+    // layer-shell siblings) glows, so a hybrid's points across the shells read as ONE machine.
+    this._hoverNodeId = null;
+    this._selectedNodeId = null; // a clicked node card — its shells stay lit until cleared
 
     this.nodeGroup = new THREE.Group();
     this.group.add(this.nodeGroup);
 
-    this._buildSphere();
-    this._buildGraticule();
-    this._buildAtmosphere();
-    this._buildLand();
-  }
-
-  _buildSphere() {
-    // Writes depth so it occludes the far half of the atmosphere shell (leaving only a rim)
-    // and hides far-side nodes. Hidden in the Hypergraph (visibility toggled in setMorph) so it
-    // can't occlude the core there; fades in by opacity with the rest of the surface.
-    const mat = new THREE.MeshStandardMaterial({
-      color: 0x0a1426, emissive: 0x050c18, emissiveIntensity: 0.5,
-      roughness: 0.95, metalness: 0.1,
-      transparent: true, opacity: 0,
-    });
-    this.geoFades.push({ mat, base: 1 });
-    this.sphereMesh = new THREE.Mesh(new THREE.SphereGeometry(R, 64, 48), mat);
-    this.sphereMesh.visible = false;
-    // The body is transparent (opacity fades in), so it lands in the transparent pass
-    // alongside the additive land walls/coastline — and all three share the globe-centre
-    // bounding origin, making their back-to-front sort a tie that flips as the globe
-    // spins. When the sort puts this opaque-ish body *after* the land (which can't
-    // depthWrite to defend itself), it paints over the near-side rim, leaving only the
-    // limb — reads like you're seeing the far side. A lower renderOrder pins the body to
-    // draw first every frame: its depth is laid down, then near land passes / far land is
-    // occluded, deterministically at any orientation.
-    this.sphereMesh.renderOrder = -2;
-    this.group.add(this.sphereMesh);
-  }
-
-  _buildGraticule() {
-    const pts = [];
-    const step = 15;
-    for (let lat = -75; lat <= 75; lat += step)
-      for (let lon = -180; lon < 180; lon += 4)
-        pts.push(latLonToVec3(lat, lon, R + 0.02), latLonToVec3(lat, lon + 4, R + 0.02));
-    for (let lon = -180; lon < 180; lon += step)
-      for (let lat = -88; lat < 88; lat += 4)
-        pts.push(latLonToVec3(lat, lon, R + 0.02), latLonToVec3(lat + 4, lon, R + 0.02));
-    const geo = new THREE.BufferGeometry().setFromPoints(pts);
-    const mat = new THREE.LineBasicMaterial({ color: 0x1d4a66, transparent: true, opacity: 0 });
-    this.geoFades.push({ mat, base: 0.28 });
-    this.group.add(new THREE.LineSegments(geo, mat));
-  }
-
-  _buildAtmosphere() {
-    // A thin, dim rim. Higher power concentrates it at the very edge and the low
-    // overall scale keeps it from blooming into a bright blue halo.
-    this.atmoUniforms = { glowColor: { value: new THREE.Color(0x2a6fd0) }, uM: { value: 0 } };
-    const mat = new THREE.ShaderMaterial({
-      uniforms: this.atmoUniforms,
-      vertexShader: `varying vec3 vN; void main(){ vN = normalize(normalMatrix * normal); gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }`,
-      fragmentShader: `uniform vec3 glowColor; uniform float uM; varying vec3 vN;
-        void main(){ float i = pow(clamp(0.82 - dot(vN, vec3(0.0,0.0,1.0)), 0.0, 1.0), 2.3); gl_FragColor = vec4(glowColor, 1.0) * i * uM * 0.45; }`,
-      side: THREE.BackSide, blending: THREE.AdditiveBlending, transparent: true, depthWrite: false,
-    });
-    this.group.add(new THREE.Mesh(new THREE.SphereGeometry(R * 1.13, 48, 32), mat));
-  }
-
-  async _buildLand() {
-    try {
-      const res = await fetch("/land-110m.json");
-      const topo = await res.json();
-      const land = feature(topo, topo.objects.land);
-
-      // Each coastline ring becomes two things, built from the SAME vertices so they line
-      // up exactly: a raised cliff "wall" (a vertical ribbon from ocean level R up to the
-      // plateau top R+LAND_H) and the filled plateau on top (the polygon triangulated and
-      // lifted to that same top radius). Because both use latLonToVec3(lat, lon, top) on the
-      // identical ring points, the fill boundary IS the wall-top edge — no approximation.
-      // Antimeridian-safe: lon +180 and −180 map to the SAME 3D point, so a seam wall segment
-      // is a degenerate (zero-area) quad, and seam-straddling fill triangles are skipped below.
-      const top = R + LAND_H;
-      // Start the cliff base just ABOVE the sea (the opaque, faceted sphere at R dips ~0.02 below
-      // R between facets) so the additive wall never z-fights / pokes through the waterline. The
-      // base is faded to transparent anyway, so the visible rim is unchanged.
-      const wallBase = R + 0.04;
-      const wallPos = []; // wall ribbon vertices (two triangles per ring segment)
-      const fillPos = []; // plateau triangles (the solid land cap)
-      const addRing = (ring) => {
-        for (let i = 0; i < ring.length - 1; i++) {
-          const a = ring[i], b = ring[i + 1];
-          // Wall quad: base (just above the sea) -> raised top, as two triangles.
-          const B0 = latLonToVec3(a[1], a[0], wallBase), B1 = latLonToVec3(b[1], b[0], wallBase);
-          const T0 = latLonToVec3(a[1], a[0], top), T1 = latLonToVec3(b[1], b[0], top);
-          wallPos.push(
-            B0.x, B0.y, B0.z, B1.x, B1.y, B1.z, T1.x, T1.y, T1.z,
-            B0.x, B0.y, B0.z, T1.x, T1.y, T1.z, T0.x, T0.y, T0.z,
-          );
-        }
-      };
-      // Triangulate the plateau in (lon, lat) with earcut, then lift each vertex to the
-      // wall-top radius with the very same function the walls use. The catch is the ±180
-      // seam: earcut knows nothing about it, so a polygon that crosses it (Eurasia-Africa
-      // via Chukotka, Antarctica, a couple of islands — 4 of 125) tears into garbage. We
-      // first UNWRAP each ring's longitude into a continuous run (accumulate the shortest
-      // step), which turns a crosser back into a valid simple polygon; latLonToVec3 maps
-      // the out-of-[-180,180] longitudes straight back to the right 3D points.
-      const unwrap = (ring) => {
-        let lon = ring[0][0];
-        const out = [new THREE.Vector2(lon, ring[0][1])];
-        for (let i = 1; i < ring.length; i++) {
-          let d = ring[i][0] - ring[i - 1][0];
-          if (d > 180) d -= 360; else if (d < -180) d += 360;
-          lon += d;
-          out.push(new THREE.Vector2(lon, ring[i][1]));
-        }
-        // drop the closing duplicate — unless unwrap moved it (a pole-encircling ring)
-        const a = out[0], b = out[out.length - 1];
-        if (out.length > 1 && Math.abs(a.x - b.x) < 1e-6 && a.y === b.y) out.pop();
-        return out;
-      };
-      const meanLon = (r) => r.reduce((s, p) => s + p.x, 0) / r.length;
-      // Emit one earcut triangle, subdivided into an n×n grid so each facet is small. A big
-      // flat triangle is a chord that sags toward the globe centre — past ocean level it gets
-      // depth-occluded into a black patch — so the split keeps the surface hugging the sphere.
-      // n is FIXED (not per-triangle by size): with a uniform split, neighbouring triangles
-      // divide their shared edge into the same points, so there are no T-junction cracks. The
-      // widest real triangle spans ~68°, so n=4 keeps every facet (~17°) under the ~24° sag
-      // limit (smooth per-vertex normals hide the faceting). ~76k tris in one static draw call.
-      const n = 4;
-      const emitTri = (A, B, C) => {
-        const pt = (u, w) => latLonToVec3(A.y + (B.y - A.y) * u + (C.y - A.y) * w,
-                                          A.x + (B.x - A.x) * u + (C.x - A.x) * w, top);
-        // Force outward winding so gl_FrontFacing agrees with the radial normals; otherwise
-        // DoubleSide flips the normal on back-wound facets and they render unlit (black). Every
-        // sub-facet shares this triangle's parametric orientation, so decide the flip ONCE.
-        const pA = pt(0, 0), pB = pt(1, 0), pC = pt(0, 1);
-        const nx = (pB.y - pA.y) * (pC.z - pA.z) - (pB.z - pA.z) * (pC.y - pA.y);
-        const ny = (pB.z - pA.z) * (pC.x - pA.x) - (pB.x - pA.x) * (pC.z - pA.z);
-        const nz = (pB.x - pA.x) * (pC.y - pA.y) - (pB.y - pA.y) * (pC.x - pA.x);
-        const flip = nx * pA.x + ny * pA.y + nz * pA.z < 0;
-        const tri = (p0, p1, p2) => {
-          if (flip) fillPos.push(p0.x, p0.y, p0.z, p2.x, p2.y, p2.z, p1.x, p1.y, p1.z);
-          else fillPos.push(p0.x, p0.y, p0.z, p1.x, p1.y, p1.z, p2.x, p2.y, p2.z);
-        };
-        for (let i = 0; i < n; i++) for (let j = 0; j < n - i; j++) {
-          tri(pt(i / n, j / n), pt((i + 1) / n, j / n), pt(i / n, (j + 1) / n));
-          if (j < n - i - 1) tri(pt((i + 1) / n, j / n), pt((i + 1) / n, (j + 1) / n), pt(i / n, (j + 1) / n));
-        }
-      };
-      const addPolygon = (rings) => {
-        rings.forEach(addRing); // cliff walls for the outer ring + every hole
-        const contour = unwrap(rings[0]);
-        // A ring whose longitude winds a full turn encircles a pole (Antarctica): close it
-        // along the far parallel so the cap fills down to the pole instead of leaving a gash.
-        if (Math.abs(contour[contour.length - 1].x - contour[0].x) > 270) {
-          const poleLat = contour[0].y < 0 ? -90 : 90;
-          contour.push(new THREE.Vector2(contour[contour.length - 1].x, poleLat));
-          contour.push(new THREE.Vector2(contour[0].x, poleLat));
-        }
-        const cMean = meanLon(contour);
-        const holes = rings.slice(1).map((h) => {
-          const u = unwrap(h);
-          const shift = Math.round((cMean - meanLon(u)) / 360) * 360; // into the outer's lon frame
-          if (shift) u.forEach((p) => (p.x += shift));
-          return u;
-        });
-        let faces;
-        try { faces = THREE.ShapeUtils.triangulateShape(contour, holes); } catch { return; }
-        const verts = [contour, ...holes].flat(); // earcut indexes contour then holes, in order
-        for (const [a, b, c] of faces) emitTri(verts[a], verts[b], verts[c]);
-      };
-      for (const f of land.features) {
-        const g = f.geometry;
-        if (g.type === "Polygon") addPolygon(g.coordinates);
-        else if (g.type === "MultiPolygon") g.coordinates.forEach(addPolygon);
-      }
-
-      // The cliff walls. A ShaderMaterial derives each vertex's height from its
-      // distance to the globe's centre (the group's origin) — so the metagraph
-      // colour fades smoothly out at ocean level (R) and brightens toward the top
-      // (R+LAND_H). Additive + bloom makes the coastlines glow like ridges. The
-      // opaque sphere depth-occludes the far-side walls (depthWrite stays off here).
-      const wallGeo = new THREE.BufferGeometry();
-      wallGeo.setAttribute("position", new THREE.Float32BufferAttribute(wallPos, 3));
-      this.landWallUniforms = {
-        uColor: { value: this._edgeColor.clone() },
-        uBase: { value: wallBase },
-        uTop: { value: top },
-        uOpacity: { value: 0 },
-      };
-      const wallMat = new THREE.ShaderMaterial({
-        uniforms: this.landWallUniforms,
-        vertexShader: `
-          varying float vH;
-          void main() {
-            vH = length(position); // distance from the globe centre
-            gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
-          }`,
-        fragmentShader: `
-          uniform vec3 uColor; uniform float uBase; uniform float uTop; uniform float uOpacity;
-          varying float vH;
-          void main() {
-            float t = clamp((vH - uBase) / (uTop - uBase), 0.0, 1.0);
-            // Gently non-linear ramp (a blend of linear + quadratic): dim along the ocean line,
-            // strengthening toward the top rim — so the rim reads as an edge, not a glowing band.
-            float e = t * (0.4 + 0.6 * t);
-            gl_FragColor = vec4(uColor * (0.09 + 0.26 * e), e * uOpacity);
-          }`,
-        // Single-sided so only cliffs whose face points toward the camera draw: a
-        // continent's near + side edges show, its far edge (behind the filled plateau)
-        // is culled instead of glowing through the translucent fill. BackSide because the
-        // topojson ring winding puts the outward cliff face on the geometry's back side.
-        transparent: true, depthWrite: false, side: THREE.BackSide,
-        blending: THREE.AdditiveBlending,
-      });
-      this.group.add(new THREE.Mesh(wallGeo, wallMat));
-
-      // The solid plateau, from the triangles built above. Radial normals (= normalized
-      // position) give it the smooth sphere shading of the sea, so it responds to light
-      // EXACTLY like the body — just lifted a couple of shades for subtle land/sea contrast.
-      // depthWrite occludes the ocean grid (and the back walls) beneath the plateau; the nodes
-      // sit ABOVE it, so they aren't hidden. Its edge IS the wall-top edge (same vertices).
-      const fillGeo = new THREE.BufferGeometry();
-      const fillArr = new Float32Array(fillPos);
-      fillGeo.setAttribute("position", new THREE.BufferAttribute(fillArr, 3));
-      const normArr = new Float32Array(fillArr.length);
-      for (let i = 0; i < fillArr.length; i += 3) {
-        const inv = 1 / Math.hypot(fillArr[i], fillArr[i + 1], fillArr[i + 2]);
-        normArr[i] = fillArr[i] * inv; normArr[i + 1] = fillArr[i + 1] * inv; normArr[i + 2] = fillArr[i + 2] * inv;
-      }
-      fillGeo.setAttribute("normal", new THREE.BufferAttribute(normArr, 3));
-      this.landFillMat = new THREE.MeshStandardMaterial({
-        // Contrast lives mostly in the emissive (lighting-independent) so the land reads as
-        // land even in dimly-lit parts of the globe — the single north key light otherwise
-        // leaves the camera-facing centre near-black, which looked like an unfilled hole.
-        color: 0x26384a, emissive: 0x121c28, emissiveIntensity: 0.9,
-        roughness: 0.95, metalness: 0.1,
-        transparent: true, opacity: 0, side: THREE.DoubleSide,
-      });
-      this.geoFades.push({ mat: this.landFillMat, base: 1 }); // fades in with the sea
-      this.landFillMesh = new THREE.Mesh(fillGeo, this.landFillMat);
-      this.landFillMesh.renderOrder = -1; // after the body (−2), before the rim/heatmap/nodes
-      this.landFillMesh.visible = false;  // revealed once the globe materialises (setMorph)
-      this.group.add(this.landFillMesh);
-    } catch (e) { /* graticule-only fallback */ }
+    // The geo globe surface (body, graticule, atmosphere, continents) is built in globeSurface.js
+    // — it sets the handles (sphereMesh / atmoUniforms / landWallUniforms / landFillMesh) back on
+    // `this` for the morph/fade loop, and pushes its fade materials into this.geoFades.
+    buildGlobeSurface(this);
   }
 
   // The wall is always the fixed ice-blue — a metagraph's colour on it read as either too dominant
@@ -381,12 +151,22 @@ export class Globe {
   //   - instDisc: a flat circle lying on the globe, shown in the geography view
   // They cross-fade as the nodes fly between layouts, so each view keeps its
   // ideal shape. `this.nodes` holds plain data records, not meshes.
-  setNodes(l0List, l1List, geoMap) {
+  // `dagCore` = the DAG modelled as a metagraph-shaped core (api.js `_buildDagCore`): one
+  // node per MACHINE, each with `roles` (a hybrid runs several layers). We plot one instance
+  // per machine (de-duped — no more "same IP, two rows"), in its primary shell; counts are by
+  // ROLE, so a hybrid still counts toward both L0 and L1.
+  setNodes(dagCore, geoMap) {
     this._disposeNodes();
     this.nodes = [];
+    const machines = (dagCore && dagCore.nodes) || [];
+    // Per-(machine, role) instances: a machine appears in EACH layer shell it runs, so the
+    // L0 / cL1 shells match the counts. The GLOBE still shows one dot per machine — only the
+    // primary instance is geo-visible (siblings fly in during the morph, then merge into it).
+    const l0List = machines.filter((m) => m.roles && m.roles.includes("l0"));
+    const cl1List = machines.filter((m) => m.roles && m.roles.includes("cl1"));
     this.l0Count = l0List.length;
-    this.l1Count = l1List.length;
-    const total = l0List.length + l1List.length;
+    this.l1Count = cl1List.length;
+    const total = l0List.length + cl1List.length;
 
     // Shared per-instance buffers (one colour + one glow value per node), each
     // wrapped by an attribute on both geometries so the two meshes stay in sync.
@@ -422,11 +202,17 @@ export class Globe {
     this.emiArr = emiArr;
     this.pickables = [this.instSphere];
 
+    const seen = new Set();
     let idx = 0;
-    const place = (list, kind, color, rad, flatten, title) => {
+    const net = (dagCore && dagCore.name) || "DAG";
+    const place = (list, role, kind, color, rad, flatten) => {
       const n = list.length;
       list.forEach((node, i) => {
         const ready = node.state === "Ready";
+        // The first instance of a machine is its geo "primary" (the one dot on the globe);
+        // later instances (its other layer shells) are hybrid siblings, hidden in geo.
+        const primary = node.id == null || !seen.has(node.id);
+        if (node.id != null) seen.add(node.id);
         const col = new THREE.Color(color);
         if (!ready) col.lerp(DIM, 0.55);
 
@@ -444,17 +230,18 @@ export class Globe {
         const geoDir = g ? latLonToVec3(g.lat, g.lon, 1).normalize() : null;
 
         const u = {
-          index: idx, layer: kind, ready, base: col.clone(),
+          index: idx, layer: role, roles: node.roles || [role], nodeId: node.id, geoPrimary: primary, ready, base: col.clone(),
           hyperPos, hyperDir: hyperPos.clone().normalize(), hyperRadius: hyperPos.length(),
           geoDir, trueDir: geoDir ? geoDir.clone() : null, geoRadius: R + LAND_H + 0.02, noGeo: !g,
-          // hyperSize = sphere diameter (Hypergraph); geoSize = circle radius (globe).
-          hyperSize: 0.55 * (ready ? 1 : 0.78), geoSize: 0.06 * (ready ? 1 : 0.78),
+          // hyperSize = sphere diameter (Hypergraph); geoSize = circle radius (globe). A hybrid
+          // sibling has geoSize 0 → no disc on the globe (one dot per machine).
+          hyperSize: 0.55 * (ready ? 1 : 0.78), geoSize: primary ? 0.06 * (ready ? 1 : 0.78) : 0,
           azimuth: Math.atan2(hyperPos.z, hyperPos.x), twinkle: Math.random() * 6.2831,
           spinAxis: new THREE.Vector3(Math.random() * 2 - 1, Math.random() * 2 - 1, Math.random() * 2 - 1).normalize(),
           spinSpeed: 0.3 + Math.random() * 0.5, spinPhase: Math.random() * 6.2831,
           pick: {
-            kind, title, node, geo: g || null,
-            sub: g ? `${g.city ? g.city + ", " : ""}${g.country}` : (node.ip ? `${node.state} · ${node.ip}` : title),
+            kind, title: net, roles: nodeRoles(node, role), node, geo: g || null,
+            sub: g ? `${g.city ? g.city + ", " : ""}${g.country}` : (node.ip ? `${node.state} · ${node.ip}` : ""),
           },
         };
         baseArr[idx * 3] = col.r; baseArr[idx * 3 + 1] = col.g; baseArr[idx * 3 + 2] = col.b;
@@ -463,8 +250,8 @@ export class Globe {
         idx++;
       });
     };
-    place(l0List, "l0", COLORS.l0, 8, 1.0, "Global L0 validator");
-    place(l1List, "l1", COLORS.l1, 14, 0.78, "DAG L1 node");
+    place(l0List, "l0", "l0", COLORS.l0, 8, 1.0);
+    place(cl1List, "cl1", "l1", COLORS.l1, 14, 0.78);
     this.instSphere.geometry.getAttribute("aBase").needsUpdate = true;
     this.instDisc.geometry.getAttribute("aBase").needsUpdate = true;
 
@@ -718,20 +505,23 @@ export class Globe {
     // it's outermost and usually empty — no gap left in between. The geography end
     // (geoDir) is the node's real location, so the layers morph onto the globe.
     const SHELL = { l0: 2.0, dl1: 3.4, cl1: 4.6 }; // tighter clusters hugging the hub
-    const LAYER_NAME = { l0: "L0", dl1: "Data L1", cl1: "Currency L1" };
-    const layerOf = (node) =>
-      node.layer === "l0" ? "l0" : node.layer === "cl1" ? "cl1" : "dl1"; // l1/legacy -> dl1
+    const rolesOf = (node) => nodeRoles(node, node.layer);
     for (const m of withNodes) {
       const a = m._anchor;
       // The orbiting hub mesh (Layers) this metagraph's nodes cluster around.
       const hubGroup = this.layers?.metas?.find((x) => x.cfg.id === m.id)?.group || null;
       const located = m.nodes.filter((node) => geoMap[node.ip]);
+      // Per-(node, role): a hybrid node appears in EACH layer shell it runs (so the shells
+      // match the counts); the GLOBE shows one dot per node (its first/primary instance).
+      const seen = new Set();
       for (const layer of ["l0", "dl1", "cl1"]) {
-        const list = located.filter((node) => layerOf(node) === layer);
+        const list = located.filter((node) => rolesOf(node).includes(layer));
         const cnt = list.length;
         const rad = SHELL[layer];
         list.forEach((node, i) => {
           const g = geoMap[node.ip];
+          const primary = !seen.has(node.ip);
+          seen.add(node.ip);
           // fibonacci-shell offset from the hub (deterministic, even spacing)
           const y = 1 - (i / Math.max(1, cnt - 1)) * 2;
           const rr = Math.sqrt(Math.max(0, 1 - y * y));
@@ -740,24 +530,25 @@ export class Globe {
           const dir = latLonToVec3(g.lat, g.lon, 1).normalize(); // real location; fanned out below
           recs.push({
             metaId: m.id, layer, color: new THREE.Color(m.color), index: 0,
-            hubGroup, offset,
+            hubGroup, offset, geoPrimary: primary, nodeId: node.ip,
             // Hypergraph fallback cluster (used if the hub isn't available).
             hyperPos: new THREE.Vector3(a.x, a.y, a.z).add(offset),
             // Geography end: the node's real location + outward normal for the disc
             // (geoPos is filled in after the co-located fan-out below).
             geoPos: new THREE.Vector3(),
             geoDir: dir, trueDir: dir.clone(),
-            // same sphere/disc sizing & tumble as the validator nodes
-            hyperSize: 0.52, geoSize: 0.0667,
+            // same sphere/disc sizing & tumble as the validator nodes; a hybrid sibling has
+            // geoSize 0 → no disc on the globe (one dot per node).
+            hyperSize: 0.52, geoSize: primary ? 0.0667 : 0,
             spinAxis: new THREE.Vector3(Math.random() * 2 - 1, Math.random() * 2 - 1, Math.random() * 2 - 1).normalize(),
             spinSpeed: 0.3 + Math.random() * 0.5, spinPhase: Math.random() * 6.2831,
             twinkle: Math.random() * 6.2831, dim: 0, dimTarget: 0,
             pick: {
               kind: "metanode", meta: m, node, geo: g, layer,
-              title: m.name,
-              // No subtitle — the token badge (header) + the "Runs" row cover identity
-              // and which layers this node serves (incl. Hybrid).
-              sub: "",
+              // Network name + the node's role tags (a hybrid lists every layer it runs) — so
+              // hovering any shell of a machine reads the same, matching the paired glow.
+              title: m.name, roles: rolesOf(node),
+              sub: g ? `${g.city ? g.city + ", " : ""}${g.country}` : (node.ip ? `${node.state} · ${node.ip}` : ""),
             },
           });
         });
@@ -829,8 +620,11 @@ export class Globe {
   setFilter(sel) {
     this.filter = sel;
     this.countryFilter = null; // switching network clears the country drill-down
-    this.dimTarget.l0 = (sel === "all" || sel === "l0") ? 0 : 1;
-    this.dimTarget.l1 = (sel === "all" || sel === "l1") ? 0 : 1;
+    // The validators ARE the DAG core, so they're lit under "all" or "dag" and dimmed only
+    // when a metagraph is selected (both layers together — the L0/L1 split filters are gone).
+    const dagLit = sel === "all" || sel === "dag";
+    this.dimTarget.l0 = dagLit ? 0 : 1;
+    this.dimTarget.l1 = dagLit ? 0 : 1;
     for (const r of this.metaNodes) {
       r.dimTarget = (sel === "all" || sel === r.metaId) ? 0 : 1;
     }
@@ -844,9 +638,41 @@ export class Globe {
     this._relayoutGeo();
   }
 
+  // Hover-pairing: pass the hovered node's id (validator machine id, or a metagraph node ip);
+  // the per-frame glow loops brighten every instance that shares it. null clears the highlight.
+  setHoverNode(id) {
+    this._hoverNodeId = id || null;
+  }
+
+  // The persistently selected node (a clicked node card) — glows every layer shell it runs,
+  // like the transient hover-pairing but it stays lit until the selection clears.
+  setSelectedNode(id) {
+    this._selectedNodeId = id || null;
+  }
+
+  // World position of a node's HYPERGRAPH point (validator or metagraph node) by its id — read
+  // from its live instance transform, so it's correct mid-orbit. Lets the camera frame a node
+  // when the selection carries into the Hypergraph. null if not found.
+  hyperWorldPos(id) {
+    if (!id) return null;
+    const u = this.nodes.find((n) => n.nodeId === id);
+    if (u && this.instSphere) {
+      this.instSphere.getMatrixAt(u.index, _focusMat);
+      return this.group.localToWorld(new THREE.Vector3().setFromMatrixPosition(_focusMat));
+    }
+    const r = this.metaNodes && this.metaNodes.find((n) => n.nodeId === id);
+    if (r && this.metaSphere) {
+      this.metaSphere.getMatrixAt(r.index, _focusMat);
+      return this.group.localToWorld(new THREE.Vector3().setFromMatrixPosition(_focusMat));
+    }
+    return null;
+  }
+
   // Whether a node is part of the current network filter (i.e. not network-dimmed).
-  _isActive(layerOrMetaId) {
-    return this.filter === "all" || this.filter === layerOrMetaId;
+  // `id` is the core a node belongs to ("dag" for any validator, the metagraph id for a
+  // metagraph node). Active under "all" or its own core.
+  _isActive(id) {
+    return this.filter === "all" || this.filter === id;
   }
 
   // Whether a node passes BOTH the network filter and the country drill-down —
@@ -881,8 +707,8 @@ export class Globe {
     if (!on) { this.spin = null; return null; }
     const mean = new THREE.Vector3();
     let count = 0;
-    for (const u of this.nodes) if (!u.noGeo && this._nodeActive(u.layer, u.pick.geo)) { mean.add(u.trueDir); count++; }
-    for (const r of this.metaNodes) if (this._nodeActive(r.metaId, r.pick.geo)) { mean.add(r.trueDir); count++; }
+    for (const u of this.nodes) if (!u.noGeo && u.geoPrimary && this._nodeActive("dag", u.pick.geo)) { mean.add(u.trueDir); count++; }
+    for (const r of this.metaNodes) if ((r.geoPrimary ?? true) && this._nodeActive(r.metaId, r.pick.geo)) { mean.add(r.trueDir); count++; }
     if (!count || mean.lengthSq() < 1e-6) { this.spin = null; return null; }
     const R = mean.length() / count;
     this._aimAt(mean.clone().normalize(), 0.56); // ~32° max lean for a broad selection
@@ -899,91 +725,16 @@ export class Globe {
   }
 
   // -------------------------------------------------- per-country breakdown
-  // Tally located nodes by country, keyed per network id so the leaderboard and
-  // the distribution score can both read one selection out of it:
-  //   l0 / l1 — the two validator layers; <metaId> — one metagraph's nodes;
-  //   all — the combined validator set (what the unfiltered leaderboard shows).
-  _countryTallies() {
-    const nets = {};
-    const bump = (id, g) => {
-      if (!g || !g.country) return;
-      const m = (nets[id] ||= {});
-      (m[g.country] ||= { country: g.country, cc: g.cc, count: 0 }).count++;
-    };
-    for (const u of this.nodes) {
-      if (u.noGeo) continue;
-      bump(u.layer, u.pick.geo);
-      bump("all", u.pick.geo);
-    }
-    for (const r of this.metaNodes) bump(r.metaId, r.pick.geo);
-    return nets;
-  }
-
-  // Sorted [{ country, cc, count }] for one filter selection (defaults to the
-  // active filter) — drives the "Nodes by country" leaderboard.
+  // The geo "data" functions live in geoStats.js (pure, no mesh state); these wrappers just feed
+  // them the live node arrays so the engine's call sites stay the same.
   countryStats(filter = this.filter) {
-    const m = this._countryTallies()[filter];
-    return m ? Object.values(m).sort((a, b) => b.count - a.count) : [];
+    return geoStats.countryStats(this.nodes, this.metaNodes, filter);
   }
-
-  // Flat node list for one filter selection — drives the React node browser. Read-only:
-  // it just surfaces each plotted node's existing `pick` descriptor (so a click reuses
-  // the exact same inspector card as clicking the node on the globe) plus the few fields
-  // the browser groups/sorts on. l0/l1/all → validators; <metaId> → that metagraph's nodes.
   listNodes(filter = this.filter) {
-    const rows = [];
-    const push = (pick, layer) => {
-      const g = pick.geo || null;
-      rows.push({
-        pick,
-        label: (pick.node && pick.node.ip) || (g && (g.city || g.country)) || "node",
-        cc: g ? g.cc || null : null,
-        country: g ? g.country || null : null,
-        state: pick.node ? pick.node.state : null,
-        layer,
-      });
-    };
-    if (filter === "all" || filter === "l0" || filter === "l1") {
-      for (const u of this.nodes) {
-        if (u.noGeo) continue;
-        if (filter === "all" || u.layer === filter) push(u.pick, u.layer);
-      }
-    } else {
-      for (const r of this.metaNodes) if (r.metaId === filter) push(r.pick, r.layer);
-    }
-    return rows;
+    return geoStats.listNodes(this.nodes, this.metaNodes, filter);
   }
-
-  // A 0–100 "distribution score" per network: the Shannon entropy of its
-  // country distribution (rewards many countries AND an even spread), expressed
-  // relative to the most globally distributed individual network — in practice
-  // Global L0. Returns { scores: { id -> 0..100 }, refId }.
   distributionScores() {
-    const nets = this._countryTallies();
-    const entropy = (m) => {
-      const counts = Object.values(m).map((c) => c.count);
-      const n = counts.reduce((s, c) => s + c, 0);
-      if (n <= 0) return 0;
-      let h = 0;
-      for (const c of counts) if (c > 0) { const p = c / n; h -= p * Math.log(p); }
-      return h;
-    };
-    const H = {};
-    for (const id in nets) H[id] = entropy(nets[id]);
-    // Reference = most-spread individual network; the `all` aggregate is excluded
-    // so it can't out-score every real network (it's the union of them).
-    let refId = null, refH = 0;
-    for (const id in H) {
-      if (id === "all") continue;
-      if (H[id] > refH) { refH = H[id]; refId = id; }
-    }
-    const scores = {};
-    for (const id in H) scores[id] = refH > 0 ? Math.min(100, Math.round((H[id] / refH) * 100)) : 0;
-    // The full validator footprint is the 100% baseline. Entropy of the union can
-    // sit a hair below L0's (L1 concentrates the spread), so pin it rather than
-    // surface an odd 99 for the unfiltered view.
-    if (nets.all && Object.keys(nets.all).length) scores.all = 100;
-    return { scores, refId };
+    return geoStats.distributionScores(this.nodes, this.metaNodes);
   }
 
   // Re-fan the co-located nodes and rebuild the density rings + arcs using ONLY
@@ -993,12 +744,13 @@ export class Globe {
   _relayoutGeo() {
     const clusters = [];
 
-    // Validators: active ones fan out among themselves; the rest reset to point.
+    // Validators: active ones fan out among themselves; the rest reset to point. Only the
+    // primary instance per machine takes part in the globe layout (hybrid siblings are hidden).
     const vActive = [];
     for (const u of this.nodes) {
       if (u.noGeo) continue;
       u.geoDir.copy(u.trueDir);
-      if (this._nodeActive(u.layer, u.pick.geo)) vActive.push(u);
+      if (u.geoPrimary && this._nodeActive("dag", u.pick.geo)) vActive.push(u);
     }
     if (vActive.length) clusters.push(...spreadCoLocated(vActive.map((u) => u.geoDir)));
 
@@ -1007,6 +759,7 @@ export class Globe {
     const mActive = [];
     for (const r of this.metaNodes) {
       r.geoDir.copy(r.trueDir);
+      if (!(r.geoPrimary ?? true)) continue; // hybrid siblings: hidden on the globe
       if (this._nodeActive(r.metaId, r.pick.geo)) mActive.push(r);
     }
     if (mActive.length) clusters.push(...spreadCoLocated(mActive.map((r) => r.geoDir), { spacingDeg: 0.4, maxDeg: 2 }));
@@ -1033,6 +786,16 @@ export class Globe {
     this.group.worldToLocal(this._camN).normalize();
   }
 
+  // How strong the network/country dim is, ramped by the morph: SUBTLE in the Hypergraph
+  // (a gentle "out of focus" push — nodes stay full-strength-ish and visible) and FULL on the
+  // globe (off-filter nodes fade out entirely). EVERY dim consumer — node scale AND glow, for
+  // BOTH validators and metagraph nodes — multiplies the raw eased dim by this one value, so
+  // they can never drift apart (the old bug: the validator *scale* used the raw, un-ramped dim
+  // and so scaled the nodes to nothing in hyper, while their glow only dimmed).
+  _dimScale() {
+    return 0.32 + 0.68 * this.morph;
+  }
+
   // -------------------------------------------------- morph between layouts
   setMorph(m) {
     this.morph = m;
@@ -1056,14 +819,15 @@ export class Globe {
           _dummy.position.copy(dir).multiplyScalar(lerp(u.hyperRadius, u.geoRadius, e));
         }
 
-        // Nodes outside the current network/country selection are hidden — and on the
-        // hyper→globe morph they should vanish QUICKLY (they're irrelevant to that flight)
-        // rather than travel to the globe only to disappear. So the hide factor scales BOTH
-        // the hyper sphere and the geo disc to nothing as the dim eases in (~0.25s), much
-        // faster than the morph itself. (this.dim / countryMix are eased in the dim pass below.)
+        // Nodes outside the current network/country selection are hidden ON THE GLOBE — and on
+        // the hyper→globe morph they vanish (they're irrelevant to that flight) rather than
+        // travel to the globe only to disappear. But in the HYPERGRAPH the off-filter nodes must
+        // stay visible (just dimmed) — so the hide scales with the morph `m` (0 in hyper → no
+        // hide; 1 in geo → full hide). Without this, selecting a metagraph in hyper scaled the
+        // DAG validators to nothing instead of dimming them.
         let hideV = u.layer === "l0" ? this.dim.l0 : this.dim.l1;
         if (this.countryFilter && (!u.pick.geo || u.pick.geo.cc !== this.countryFilter)) hideV = Math.max(hideV, this.countryMix);
-        const show = 1 - hideV;
+        const show = 1 - hideV * this._dimScale(); // SAME ramped dim as the glow + the metagraph nodes
 
         // Sphere: tumbling on its own axis, shrinking out as it nears the globe.
         _qSpin.setFromAxisAngle(u.spinAxis, u.spinPhase + t * u.spinSpeed);
@@ -1126,8 +890,13 @@ export class Globe {
       if (this.group.rotation.x) this.group.rotation.x += (0 - this.group.rotation.x) * Math.min(1, dt * 2.2);
     }
     const m = this.morph;
-    const wave = (this.clock * 0.9) % (Math.PI * 2);
     const flashDecay = Math.max(0, 1 - dt * 5); // ~0.2s glow tail after a hit
+    // The one morph-ramped dim strength (see _dimScale) — subtle in hyper, full in geo.
+    const dimScale = this._dimScale();
+    // The hover/select "dim the others" effect only kicks in when NOT isolating a metagraph
+    // (filter all / dag) — otherwise it would compound with the network dim and the off-focus
+    // nodes would disappear entirely. With a metagraph selected, the network dim alone carries it.
+    const dimOthersOnFocus = this.filter === "all" || this.filter === "dag";
 
     // Travelling packets: each hops node -> node, lighting up the node it reaches,
     // resting a moment, then routing on to a nearby node. Many at once read as live
@@ -1177,22 +946,30 @@ export class Globe {
       const base = this.baseArr;
 
       const emi = this.emiArr;
+      // A hovered/selected node dims the rest so it stands out — same in both views.
+      const focusId = this._hoverNodeId || this._selectedNodeId;
+      const focusDim = 0.45;
       for (const u of this.nodes) {
-        let d = u.layer === "l0" ? this.dim.l0 : this.dim.l1;
-        // outside the drilled-into country? dim it on top of the network dim.
+        let d = (u.layer === "l0" ? this.dim.l0 : this.dim.l1) * dimScale;
+        // outside the drilled-into country? dim it on top of the network dim (geo only).
         if (cf && (!u.pick.geo || u.pick.geo.cc !== cf)) d = Math.max(d, cmix);
         // dim the glow on the globe so dense regions don't bloom into a blob;
         // the lower Hypergraph base lets the point-lights shade the sphere
         // (so it reads as a solid 3D ball, not a uniform glowing dot).
         let ei = lerp(0.5, 0.22, m);
-        if (u.layer === "l0" && u.ready) {
-          const lit = Math.max(0, Math.cos(u.azimuth - wave));
-          ei += lit * lit * 1.6 * (1 - m); // consensus wave, Hypergraph view only
-        }
-        ei += Math.sin(this.clock * 2 + u.twinkle) * 0.08 * (1 - 0.6 * m);
-        const fl = u._flash || 0; // brief flash when an arc pulse reaches this node
+        // Twinkle is a decorative (non-data-driven) shimmer — geo only (scaled by m), so the
+        // Hypergraph nodes stay static and only the DATA-driven pulses animate there.
+        ei += Math.sin(this.clock * 2 + u.twinkle) * 0.06 * m;
+        const flRaw = u._flash || 0; // brief flash when an arc pulse reaches this node
+        const fl = flRaw * m; // arcs are a geo-only visual — their flash must not bleed into hyper
         emi[u.index] = Math.max(0.02, ei * (1 - d * 0.92) + fl); // suppress glow when dimmed
-        if (fl) u._flash = fl * flashDecay;
+        // Hover/selection pairing: the focused machine's every layer-shell glows together,
+        // and the rest dim back so it stands out (only when not already isolating a metagraph).
+        if (focusId) {
+          if (u.nodeId === this._hoverNodeId || u.nodeId === this._selectedNodeId) emi[u.index] += 1.4;
+          else if (dimOthersOnFocus) emi[u.index] *= focusDim;
+        }
+        if (flRaw) u._flash = flRaw * flashDecay;
 
         if (recolour) {
           const c = _col.copy(u.base).lerp(DIM, d * 0.85);
@@ -1223,16 +1000,28 @@ export class Globe {
       const emi = this.metaEmi;
       const base = this.metaBaseArr;
       const cf = this.countryFilter, cmix = this.countryMix;
+      // A hovered/selected node dims the rest so it stands out — same in both views.
+      const focusId = this._hoverNodeId || this._selectedNodeId;
+      const focusDim = 0.45;
       for (const r of this.metaNodes) {
         r.dim += (r.dimTarget - r.dim) * kk;
-        // effective dim = network dim, raised by the country dim when this node is
-        // outside the drilled-into country.
-        let dEff = r.dim;
+        // effective dim = network dim (subtle in hyper via dimScale), raised by the country
+        // dim when this node is outside the drilled-into country (geo only).
+        let dEff = r.dim * dimScale;
         if (cf && (!r.pick.geo || r.pick.geo.cc !== cf)) dEff = Math.max(dEff, cmix);
-        const glow = (0.5 + Math.sin(this.clock * 2 + r.twinkle) * 0.12) * (1 - dEff * 0.9);
-        const fl = r._flash || 0; // brief flash when an arc pulse reaches this node
+        // Twinkle (decorative shimmer) is geo-only (scaled by m) — no non-data-driven node
+        // animation in the Hypergraph.
+        const glow = (0.5 + Math.sin(this.clock * 2 + r.twinkle) * 0.12 * m) * (1 - dEff * 0.9);
+        const flRaw = r._flash || 0; // brief flash when an arc pulse reaches this node
+        const fl = flRaw * m; // arcs are a geo-only visual — their flash must not bleed into hyper
         emi[r.index] = Math.max(0.03, glow + fl);
-        if (fl) r._flash = fl * flashDecay;
+        // Hover/selection pairing: the focused node's shells glow together; the rest dim back
+        // so it stands out (only when not already isolating a metagraph).
+        if (focusId) {
+          if (r.nodeId === this._hoverNodeId || r.nodeId === this._selectedNodeId) emi[r.index] += 1.4;
+          else if (dimOthersOnFocus) emi[r.index] *= focusDim;
+        }
+        if (flRaw) r._flash = flRaw * flashDecay;
 
         const c = _col.copy(r.color).lerp(DIM, dEff * 0.85);
         base[r.index * 3] = c.r; base[r.index * 3 + 1] = c.g; base[r.index * 3 + 2] = c.b;
