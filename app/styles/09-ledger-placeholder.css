@@ -1,6 +1,7 @@
-/* ── Ledger "about" panel (left-rail tool for the Snapshot DAG view) ──────── */
+/* ── Shared "about/prose" rail card (Snapshot DAG view + the scaffolded placeholder views) ──
+   One body style so every explainer card in the left rail reads identically. */
 #ledger-view { flex: 0 1 auto; min-height: 0; }
-.ledger-body { padding: 12px 16px 14px; display: flex; flex-direction: column; gap: 10px; overflow-y: auto; }
-.ledger-body p { margin: 0; font-size: 12.5px; line-height: 1.55; color: #c7d0ea; }
-.ledger-dim { color: var(--muted) !important; }
-.ledger-dim b { color: #c7d0ea; }
+.prose-body { padding: 12px 16px 14px; display: flex; flex-direction: column; gap: 10px; overflow-y: auto; }
+.prose-body p { margin: 0; font-size: 12.5px; line-height: 1.55; color: #c7d0ea; }
+.prose-dim { color: var(--muted) !important; }
+.prose-dim b { color: #c7d0ea; }

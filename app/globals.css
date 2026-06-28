@@ -1,7 +1,6 @@
 @import "./styles/00-base.css";
 @import "./styles/01-snapshot-ribbon.css";
 @import "./styles/02-filter-panel.css";
-@import "./styles/03-view-toggle.css";
 @import "./styles/04-disabled-filter-chip.css";
 @import "./styles/05-inspector-metagraph-context-pane.css";
 @import "./styles/06-snapshot-live-heartbeat.css";
@@ -12,3 +11,4 @@
 @import "./styles/11-responsive.css";
 @import "./styles/12-panel-system.css";
 @import "./styles/13-right-column.css";
+@import "./styles/14-top-bar.css";

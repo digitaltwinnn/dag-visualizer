@@ -177,7 +177,7 @@ export class Layers {
     this.core.rotation.y += dt * 0.25;
     this.core.rotation.x += dt * 0.12;
     // Dim the glow as it expands so the swelling sphere doesn't bloom out the view.
-    this.core.material.emissiveIntensity = (1.4 + flash * 1.2) * coreF * coreReveal * (1 - 0.5 * (1 - coreReveal));
+    this.core.material.emissiveIntensity = (1.05 + flash * 1.2) * coreF * coreReveal * (1 - 0.5 * (1 - coreReveal));
     this.core.material.opacity = coreOpacity * coreReveal;
     this.coreGroup.visible = coreReveal > 0.001;
     // The wireframe halo only makes sense at Hypergraph scale — fade it out early.
@@ -201,22 +201,26 @@ export class Layers {
       m.hub.rotation.x += dt * 0.5;
       // Registered-but-node-less hubs read as inactive: faded body, near-zero glow,
       // fainter tether — present in the architecture, but clearly not live.
-      const glowMul = m.active ? 1 : 0.08;
-      m.hub.material.opacity = metaOpacity * (m.active ? 1 : 0.5);
+      // When a metagraph is selected (focusId), dim the OTHER hubs *subtly* — a gentle
+      // out-of-focus push (DoF + camera focus already carry most of the emphasis).
+      const focusOther = this.focusId && m.cfg.id !== this.focusId;
+      const fdim = focusOther ? 0.62 : 1; // glow / tether
+      const glowMul = (m.active ? 1 : 0.08) * fdim;
+      m.hub.material.opacity = metaOpacity * (m.active ? 1 : 0.5) * (focusOther ? 0.78 : 1);
 
       m.tether.geometry.setFromPoints([new THREE.Vector3(), pos]);
       m.tether.geometry.attributes.position.needsUpdate = true;
-      m.tether.material.opacity = 0.22 * metaF * (m.active ? 1 : 0.35);
+      m.tether.material.opacity = 0.22 * metaF * (m.active ? 1 : 0.35) * fdim;
 
       if (m.pulse > 0) {
         m.pulse = Math.max(0, m.pulse - dt * 0.7);
         const e = 1 - m.pulse;
         m.pulseMesh.position.copy(pos).multiplyScalar(1 - e);
         m.pulseMesh.material.opacity = Math.sin(m.pulse * Math.PI) * 0.9 * metaF;
-        m.hub.material.emissiveIntensity = (1.1 + m.pulse * 1.6) * metaF * glowMul;
+        m.hub.material.emissiveIntensity = (0.8 + m.pulse * 1.6) * metaF * glowMul;
       } else {
         m.pulseMesh.material.opacity = 0;
-        m.hub.material.emissiveIntensity = 1.1 * metaF * glowMul;
+        m.hub.material.emissiveIntensity = 0.8 * metaF * glowMul;
       }
     }
   }

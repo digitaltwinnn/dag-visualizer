@@ -56,8 +56,11 @@ export function createScene(canvas) {
   // and softly blurs everything at other depths. `focus` (distance to the focal
   // plane) is driven each frame from camera→target; only enabled in the Hypergraph
   // view (main.js) — the globe doesn't need it and it halves the cost.
+  // aperture sets how aggressively off-focus depths blur — a larger value gives a SHALLOW focus
+  // so the background nodes/hubs fall off sharply (the in-focus selection stays crisp). maxblur is
+  // re-driven per frame in the engine.
   const dof = new BokehPass(scene, camera, {
-    focus: 54, aperture: 0.00016, maxblur: 0.01,
+    focus: 54, aperture: 0.00035, maxblur: 0.01,
     width: window.innerWidth, height: window.innerHeight,
   });
   dof.enabled = false;

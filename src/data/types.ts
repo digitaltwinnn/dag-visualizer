@@ -10,12 +10,34 @@ export interface GlobalSnapshot {
   blocks?: unknown[];
 }
 
+// EXACT per-tick anchor totals read straight from the raw L0 snapshot's stateChannelSnapshots
+// (every anchored metagraph snapshot carries its own `value.fee`), via /api/snapshot/[ordinal].
+// Unlike the polled `Anchor` (a settling floor), this is final + complete the instant it's
+// available — it INCLUDES unlisted metagraphs (no directory needed). Only available while the L0
+// node still retains the snapshot (recent ticks); old/pruned ticks fall back to the polled floor.
+export interface SnapshotExact {
+  ordinal: number;
+  anchored: number; // total metagraph snapshots (== metagraphSnapshotCount)
+  channels: number; // distinct metagraphs that anchored
+  totalFee: number; // datum — EXACT, including unlisted. The fee itself, not derived from anything.
+  totalSizeKB: number; // measured serialized size (Σ content byte-array length), NOT derived from fee
+  listedFee: number; // datum from metagraphs we track
+  unlistedFee: number; // datum from metagraphs outside the public catalog
+  listedCount: number;
+  unlistedCount: number;
+  // Per-metagraph breakdown by address/id → {count, fee}. Addresses matching config.METAGRAPHS are
+  // "listed" (named/coloured pills); the rest are the genuinely-unlisted ones (aggregated as
+  // unlistedCount). This is the exact, complete answer to "which metagraphs anchored here".
+  perMeta: Record<string, { count: number; fee: number }>;
+}
+
 // Per-tick anchor aggregate from NetworkData.anchorIndex (see getAnchor).
 export interface Anchor {
   fee: number; // datum (1 DAG = 1e8 datum)
   count: number; // tracked/identified metagraph snapshots
   metaIds: Set<string>;
   metaCounts: Map<string, number>;
+  touched: number; // ms timestamp this entry's count last changed (for "settling" detection)
 }
 
 export interface GlobalEvent {
@@ -53,6 +75,7 @@ export interface MetaInfo {
   nodes: NodeInfo[];
   located: number;
   countriesCount: number;
+  isRoot?: boolean; // the DAG core (the root every metagraph anchors into)
 }
 
 export interface CountryStat {
@@ -67,10 +90,12 @@ export interface CountryStat {
 export interface NodeRow {
   pick: PickDescriptor;
   label: string;
+  id: string | null; // node ID when present (validators); null for id-less metagraph nodes
   cc: string | null;
   country: string | null;
   state?: string | null;
   layer: string;
+  roles: string[];
 }
 // Per-country breakdown + distribution score for the active filter (engine-computed).
 export interface LeaderboardData {
@@ -95,6 +120,7 @@ export interface MetaCfg {
 interface PickBase {
   title?: string;
   sub?: string;
+  roles?: string[]; // layer(s) the node runs — shown as tooltip tags (hybrids list several)
 }
 export type PickDescriptor =
   | (PickBase & { kind: "core" })
@@ -105,13 +131,7 @@ export type PickDescriptor =
   | (PickBase & { kind: "metanode"; node?: NodeInfo; geo?: GeoInfo; meta?: MetaInfo; layer?: string })
   | (PickBase & { kind: "snapshot"; data: GlobalSnapshot })
   | (PickBase & { kind: "meta"; cfg: MetaCfg })
-  // "metaLive" = the live-activity card for a metagraph (cadence/fee/anchor share) —
-  // the Hypergraph's signature bottom-slot card, paired with the "meta" dossier above.
-  | (PickBase & { kind: "metaLive"; cfg: MetaCfg })
-  // "cluster" = the Global L0 / DAG L1 context pane (the validator-cluster analogue of
-  // the metagraph "meta" pane); `cluster` says which layer.
-  | (PickBase & { kind: "cluster"; cluster: "l0" | "l1" })
-  // "geoLive" = Geography's always-present signature detail card: a live footprint strip
-  // for the active selection (online health / countries / densest) PLUS the selected node's
-  // details when one is picked. It reads the store itself (no payload).
+  // "geoLive" = Geography's signature detail card: the selected node's details (or a pick
+  // hint). The selection's footprint summary lives in the top-bar vitals. Reads the store
+  // itself (no payload).
   | (PickBase & { kind: "geoLive" });

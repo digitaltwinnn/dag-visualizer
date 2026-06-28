@@ -10,7 +10,7 @@
   font-size: 8.5px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase;
   color: var(--accent); line-height: 1; margin-bottom: 8px; padding-right: 22px;
 }
-#inspector h3, #metapane h3 { padding-right: 22px; }
+.rc-pane h3, #metapane h3 { padding-right: 22px; }
 /* Snapshot title shares its row with the live ● control; both clear the × . */
 .insp-titlerow {
   display: flex; align-items: baseline; justify-content: space-between;
@@ -19,39 +19,74 @@
 .insp-titlerow h3 { padding-right: 0; }
 /* Leading colour dot on the subject — same idiom as the filter chip's dot and the 3D
    hub, so colour = this metagraph reads consistently. Colour set inline (the accent). */
-.insp-dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 8px; vertical-align: middle; }
+/* Bullet colour follows the rail's selection accent (`--filter-accent`); cyan fallback. */
+.insp-dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 8px; vertical-align: middle; background: var(--filter-accent, var(--core)); }
 
 /* Quiet placeholder so the right zone is always present (symmetric with the left rail). */
 #rc-empty { padding: 16px 18px; }
 .rc-empty-text { margin: 0; font-size: 12.5px; line-height: 1.5; color: var(--muted); }
+
+/* Node fabric — one outlined block (the parts are all related): a single-line total
+   ("N nodes" + online tag) over the make-up breakdown. The breakdown is quiet text columns
+   that sum to the total (hybrid group + dedicated), split by hairline dividers; folds the
+   old Layers / Make-up rows in. */
+.nf {
+  margin: 8px 0 2px; padding: 9px 11px;
+  border: 1px solid var(--panel-border); border-radius: 10px;
+}
+.nf-total {
+  display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  font-size: 12.5px; color: var(--text);
+  padding-bottom: 8px; margin-bottom: 8px;
+  border-bottom: 1px solid var(--panel-border);
+}
+.nf-total b { font-weight: 700; font-variant-numeric: tabular-nums; }
+.nf-grid { display: flex; }
+/* Each layer column centres its count over the layer tag (count on top, tag beneath). */
+.nf-col { flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; align-items: center; gap: 1px; padding: 0 12px; }
+.nf-col:first-child { padding-left: 0; }
+.nf-col + .nf-col { border-left: 1px solid var(--panel-border); }
+.nf-col--empty { opacity: 0.45; } /* a 0-count layer — present for layout, de-emphasised */
+.nf-head { font-size: 12.5px; color: var(--muted); }
+.nf-head b { font-weight: 700; color: var(--text); font-variant-numeric: tabular-nums; }
+.nf-col .role-tags { margin-top: 5px; }
+
+/* Role tags — the layer(s) a node runs, as small squared chips. Shared by the node-fabric
+   (under each count) and the geo node browser (per IP row), so both read identically. A
+   hybrid shows several; the set is the node's identity. */
+.role-tags { display: inline-flex; flex-wrap: wrap; gap: 4px; }
+.role-tag {
+  display: inline-flex; align-items: center;
+  font-size: 9.5px; font-weight: 700; line-height: 1; letter-spacing: 0.03em;
+  padding: 3px 5px; border-radius: 4px;
+  color: var(--muted); border: 1px solid var(--panel-border);
+  background: rgba(255,255,255,0.035); white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
 
 /* Share-of-anchors bar in the metagraph live card (reuses the leaderboard bar look). */
 .insp-bar { height: 7px; border-radius: 4px; background: rgba(255,255,255,0.06); overflow: hidden; margin: 8px 0 2px; }
 .insp-bar > span { display: block; height: 100%; border-radius: 4px; }
 .insp-foot { margin: 10px 0 0 !important; font-size: 11px !important; color: var(--muted) !important; }
 
-/* ── Geo "Live footprint" signature card: a live selection strip (always) + selected node ── */
-.gel-strip { display: flex; align-items: stretch; gap: 8px; }
-.gel-stat {
-  flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px;
-  padding: 8px 10px; border-radius: 9px;
-  background: rgba(90, 140, 255, 0.06); border: 1px solid var(--panel-border);
+/* ── Geo selected-node detail card (the footprint summary now lives in the top bar). ── */
+.gel-hint { margin: 2px 0 0 !important; }
+.gel-node-head { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+.gel-dot { flex: none; width: 9px; height: 9px; border-radius: 50%; }
+/* Pinned to the panel's top-right corner, mirroring #inspector-close. */
+.gel-clear {
+  position: absolute; top: 10px; right: 10px;
+  border: none; background: transparent; color: var(--muted);
+  font-size: 22px; line-height: 1; cursor: pointer; padding: 2px 8px;
 }
-.gel-k { font-size: 8.5px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); white-space: nowrap; }
-.gel-v { font-size: 16px; font-weight: 700; font-variant-numeric: tabular-nums; line-height: 1; color: var(--text); }
-.gel-tot { font-size: 11px; font-weight: 600; color: var(--muted); }
-.gel-top { font-size: 14px; }
-.gel-top b { color: var(--text); }
-.gel-bar { margin-top: auto; height: 4px; border-radius: 3px; background: rgba(255, 255, 255, 0.08); overflow: hidden; }
-.gel-bar > span { display: block; height: 100%; border-radius: 3px; background: linear-gradient(90deg, var(--l0), #36e29a); transition: width 0.35s ease; }
-
-.gel-hint { margin: 12px 0 0 !important; }
-.gel-node { margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--panel-border); }
-.gel-node-head { display: flex; align-items: center; justify-content: space-between; }
-.gel-node-eyebrow { font-size: 8.5px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--accent); }
-.gel-clear { border: none; background: transparent; color: var(--muted); font-size: 16px; line-height: 1; cursor: pointer; padding: 0 2px; }
 .gel-clear:hover { color: var(--text); }
-.gel-node-title { font-size: 13px; font-weight: 600; color: var(--text); margin: 6px 0 8px; font-variant-numeric: tabular-nums; word-break: break-all; }
+.gel-node-title { font-size: 13px; font-weight: 600; color: var(--text); margin: 0; font-variant-numeric: tabular-nums; word-break: break-all; min-width: 0; }
+/* State pill floats to the right end of the ID line — colour-coded per lifecycle state
+   (colour/border/background set inline from nodeStateColor). */
+.gel-state {
+  flex: none; margin-left: auto; padding: 2px 9px; border-radius: 999px;
+  font-size: 11px; font-weight: 600; border: 1px solid transparent;
+}
 
 /* ── Node rows — the nodes nested under an open country in the GeoExplore accordion. ── */
 .nb-row {
@@ -63,6 +98,5 @@
 .nb-row:hover { background: rgba(90,140,255,0.12); color: var(--text); }
 .nb-row:focus-visible { outline: 2px solid var(--core); outline-offset: -2px; }
 .nb-row.active { background: var(--sel-bg); border-color: var(--sel-border); color: #fff; }
-.nb-dot { width: 7px; height: 7px; border-radius: 50%; flex: none; }
 .nb-label { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-variant-numeric: tabular-nums; font-size: 12px; }
-.nb-layer { flex: none; font-size: 9.5px; font-weight: 700; color: var(--muted); letter-spacing: 0.04em; }
+.nb-row .role-tags { flex: none; }

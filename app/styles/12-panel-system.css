@@ -16,7 +16,16 @@
   font-size: 8.5px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase;
   color: var(--accent); line-height: 1;
 }
-.panel-head h2 { margin: 0; font-size: 14px; font-weight: 600; line-height: 1.15; }
+/* Card title — one size across every rail card (matches the inspector/dossier h3), with a
+   leading bullet dot (cyan by default; the dossier overrides the colour to its subject). */
+.panel-head h2 {
+  margin: 0; font-size: 15px; font-weight: 600; line-height: 1.2;
+  display: inline-flex; align-items: center; gap: 8px; min-width: 0;
+}
+.panel-head h2::before {
+  content: ""; flex: none; width: 9px; height: 9px; border-radius: 50%;
+  background: var(--filter-accent, var(--accent));
+}
 .panel-head-aside {
   display: flex; align-items: center; gap: 6px; flex: none;
   padding-top: 1px;

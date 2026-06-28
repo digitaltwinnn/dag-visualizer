@@ -1,12 +1,24 @@
 /* ── Hover tooltip (5b, ported) ──────────────────────────────────────────── */
 #tooltip {
   position: fixed; z-index: 30; pointer-events: none;
-  padding: 7px 11px;
+  padding: 8px 11px;
   background: rgba(8, 12, 26, 0.92);
   border: 1px solid var(--panel-border);
   border-radius: 8px;
   font-size: 12px; white-space: nowrap;
   transform: translate(-50%, -130%);
+  /* Two columns: the identity rows (name / id / location) on the left, the layer tags
+     stacked on the right and spread across those rows (L0 top → dL1 bottom). */
+  display: flex; align-items: stretch; gap: 16px;
 }
-#tooltip .tt-title { font-weight: 600; }
-#tooltip .tt-sub { color: var(--muted); font-size: 11px; }
+#tooltip .tt-main { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+#tooltip .tt-title { font-weight: 600; display: flex; align-items: center; gap: 7px; }
+#tooltip .tt-dot { flex: none; width: 8px; height: 8px; border-radius: 50%; }
+/* Indent the id + location to line up with the name (the bullet's 8px + the title's 7px
+   gap), so the bullet sits to the left of all the text. */
+#tooltip .tt-id { font-size: 11px; color: #c7d0ea; padding-left: 15px; }
+#tooltip .tt-sub { color: var(--muted); font-size: 11px; padding-left: 15px; }
+#tooltip .tt-roles {
+  display: flex; flex-direction: column; align-items: flex-end;
+  justify-content: space-between; gap: 3px;
+}

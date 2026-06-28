@@ -6,25 +6,31 @@ Guidance for working in this repo. See `README.md` for the human-facing overview
 
 An interactive 3D visualizer of the Constellation Network ($DAG). **Next.js (App
 Router) + React + TypeScript + Zustand** for the page/panels, driving a **vanilla
-Three.js engine** (NOT react-three-fiber) on one persistent canvas. Three views,
-switched from the top toggle (`mode` in the store, set by `ViewToggle`: `hyper` |
-`geo` | `ledger`):
+Three.js engine** (NOT react-three-fiber) on one persistent canvas. The active view is
+`mode` in the store (the `Mode` union is exported from `store.ts` and shared by the Engine);
+the top-bar view switch sets it. **Two views drive the 3D scene; the rest are "flat" (the
+engine hides the canvas — `mode !== "hyper" && mode !== "geo"`):**
 
-- **Hypergraph** — abstract architecture: a glowing Global L0 core, the DAG L0/L1
-  validator shells around it, and the real metagraphs as orbiting hubs, each with
-  its own L0/L1 nodes clustered around it in concentric shells.
-- **Node geography** — a globe with every validator and metagraph node at its real
-  geolocation, a density heatmap, travelling-packet connection arcs, and a shared
-  "Filter network" panel.
-- **Snapshot DAG** (`ledger`) — the ledger-over-time view (timeline still a `LedgerPanel`
-  placeholder). The hypergraph, globe and skydome are hidden in this mode (engine render
-  loop). The **full snapshot ribbon renders only here** now (the macro band of the future
-  timeline); hyper/geo get a slim **`LiveStrip`** heartbeat instead — see *The snapshot
-  stream*.
+- **Hypergraph** (`hyper`, 3D) — abstract architecture: a glowing Global L0 core, the DAG's
+  own validator shells around it, and the real metagraphs as orbiting hubs, each with its own
+  L0 / cL1 / dL1 nodes in concentric shells. **One unified node model** — the DAG is itself a
+  metagraph-shaped "core" (see *Nodes…* + the `dag-unified-node-model` memory), not a separate
+  L0/L1 pair.
+- **Node geography** (`geo`, 3D) — a globe with every node at its real geolocation, a density
+  heatmap, travelling-packet connection arcs, and the country→nodes explorer.
+- **Snapshots** (`ledger`, flat — renamed from "Snapshot DAG") — the ledger-over-time view
+  (timeline still a `LedgerPanel` placeholder). The **full snapshot ribbon renders only here**
+  (the macro band of the future timeline); hyper/geo get a slim **`LiveStrip`** heartbeat
+  instead — see *The snapshot stream*.
+- **Network status** (`status`), **Transactions** (`transactions`), **Delegated staking**
+  (`staking`) — **scaffolded placeholders** (a `PlaceholderPanel` "SOON" card in the left rail;
+  content map in `LeftColumn.tsx`). The 3D scene, vitals, bottom stream and right rail are all
+  empty for these. See the `dag-view-scaffold` memory for each one's intent. Top-bar view glyphs
+  are all plain monochrome symbols — **never emoji** (emoji ignore CSS `color` / the accent).
 
-Hyper↔geo **morph** smoothly (`morph` 0→1, eased each frame in the engine loop); the
-blue L0 core literally **grows out into the globe** (layers.js) as the nodes fly to
-their map positions. The `ledger` view doesn't morph (sits at the hypergraph end).
+Only `hyper`↔`geo` **morph** (`morph` 0→1, eased each frame); the blue L0 core literally **grows
+out into the globe** (layers.js) as the nodes fly to their map positions. The flat views sit at
+the hyper end (morph 0) with the canvas hidden.
 
 ## Run & test
 
@@ -81,11 +87,14 @@ Zustand store. **Two data lanes:** (A) high-freq visuals subscribe straight to
   canvas), `globals.css`. **`app/api/metagraphs/route.ts`** + **`app/api/geo/route.ts`**
   are server-side data routes (see *Data* below).
 - **`components/`** — React panels, each reads/writes the store: `SceneCanvas` (mounts
-  the engine, dynamic-imported, `ssr:false`), `StatsHeader`, `ViewToggle`, `LeftColumn`
-  (the explore rail: `FilterPanel` + one view tool card — `LearnPanel` / `GeoExplore` /
-  `LedgerPanel`), `Inspector` (the two-slot facts rail: dossier/cluster context + the signature
-  detail card, via `InspectorCard` — a thin frame dispatching to the per-kind cards in
-  `components/inspector/`), `Tooltip`, `FollowController` (ledger snapshot follow),
+  the engine, dynamic-imported, `ssr:false`), `TopBar` (the full-width top command bar:
+  status + filter + view switch + view vitals — see *Layout system*; `components/topbar/`
+  holds `Vitals`, `FilterChips`, the shared `useMetaActivity` hook), `LeftColumn` (the
+  explore rail: `ContextPanel` — the selected metagraph/cluster dossier pinned at the top —
+  above one view tool card: `LearnPanel` / `GeoExplore` / `LedgerPanel`), `Inspector` (the
+  right **facts** rail: the view's signature detail card, via `InspectorCard` — a thin frame
+  dispatching to the per-kind cards in `components/inspector/`), `Tooltip`, `FollowController`
+  (ledger snapshot follow),
   `DataBridge` (boots the data). **Bottom stream:** `BottomStream` picks the full
   `SnapshotRibbon` (ledger) vs the slim `LiveStrip` (hyper/geo) and publishes
   `--bottom-reserve`; both read the shared `useSnapshotFeed` hook. **`PanelHead`** is the
@@ -132,14 +141,19 @@ Zustand store. **Two data lanes:** (A) high-freq visuals subscribe straight to
   `metaAnchor()` (hub orbit-slot math shared by layers.js and globe.js).
 - `geo.js` — `loadGeoCache()` (fetches `/api/geo` seed) + best-effort `resolveMissing`
   for new validator IPs (ip-api over http, ipwho.is over https).
-- `background.js` — starfield.
+- `background.js` — skydome. The **geo** end is the twinkling starfield + faint nebula; the
+  **hyper** end is a **single flat colour** (the drifting aurora was removed as distracting —
+  no animation, no gradient, no tint). Only `uTime`/`uMorph` drive it now.
 
 > The old raycast/inspector/learn/leaderboard/camera logic (`ui.js`), the render-loop
 > entry (`main.js`), and the ribbon (`stream.js`) were **ported to React + the engine
-> and deleted**. `InspectorCard` is a thin frame (tag/token/title) that dispatches to
-> the per-kind cards in `components/inspector/` — `cards.tsx` (snapshot/meta/cluster/
-> node bodies) over shared `parts.tsx` (rows, `nodeComposition`, the `Desc` clamp that
-> ports the old `_descHTML`); `Engine` owns picking + camera focus (`FOCI`/tweens) +
+> and deleted**. `InspectorCard` is a thin frame (eyebrow/title) that dispatches to the
+> per-kind cards in `components/inspector/`. **Only three kinds reach it now:** `meta`
+> (the dossier, from `ContextPanel`), `snapshot` (ledger), and `geoLive` (the selected-node
+> card — a proxy that reads `store.inspect` and renders `GeoLiveNode`). The old `core`/`l0`/
+> `l1`/`metanode`/`cluster` body cards were unreachable and **removed**. Bodies live in
+> `cards.tsx` over shared `parts.tsx` (rows, `RoleTags`, `nodeComposition`, the `Desc` clamp);
+> `Engine` owns picking + camera focus (`FOCI`/tweens) +
 > DoF + morph.
 
 ## Nodes, layers & the filter (the parts that bite)
@@ -186,13 +200,16 @@ Zustand store. **Two data lanes:** (A) high-freq visuals subscribe straight to
     `_nodeActive(layer, geo)` gates on BOTH). Clicking a country dims everything
     outside it and flies to it; click again to clear; switching network clears it.
     The long tail folds under an expandable "Other" row (flag chips, no scrollbar).
-  - **Hypergraph**: no dimming; `_focusFilter` flies the camera to the selected hub
-    (using its **local/unscaled** position — `layers.root` is morph-scaled, so
-    `getWorldPosition` would aim at the origin mid-morph), framed slightly off the
-    radial line so the core sits to the upper-left. The hub's **orbit is paused while
-    focused** (`layers.focusId`) so it stays framed, and a subtle **depth-of-field**
-    (BokehPass, focus tracking the hub's live position) keeps it crisp while the rest
-    softens. DoF runs **only in hyper with a metagraph selected** (main.js).
+  - **Hypergraph**: `_focusFilter` flies the camera to the selected hub (using its
+    **local/unscaled** position — `layers.root` is morph-scaled, so `getWorldPosition` would
+    aim at the origin mid-morph), framed slightly off the radial line so the core sits to the
+    upper-left. The hub's **orbit is paused while focused** (`layers.focusId`) so it stays
+    framed; a subtle **depth-of-field** (BokehPass) keeps it crisp while the rest softens; AND
+    the **non-selected nodes + hubs dim back** (`globe.setFilter(filter)` + the `focusId` hub
+    dim in `layers.js`) so the selection stands out. DoF runs **only in hyper with a metagraph
+    selected**. Picking is filter-gated in hyper too (`_isPickActive`): only the in-focus
+    selection's nodes are hoverable/clickable — the faded ones don't participate. Clicking a
+    node sets the filter to its network (consistent with geo) + opens its node card.
   - The selected network filter **persists across view switches** (held in `ui.filter`);
     the country drill-down is geo-only and cleared on view switch.
 
@@ -218,17 +235,23 @@ The HUD is **four fixed zones over the canvas, one SCOPE/role each, stable acros
 there.** Define a card by its scope (the role it plays); its *contents* are view-specific and
 keep changing, so they're examples, not the contract. The per-view widgets below are *current*.
 
-- **Top** = global vitals + view switch (`StatsHeader`, `ViewToggle`).
-- **Left rail** (`#leftcol`) = the **explore / interact** scope (verbs): the **global filter**
-  (pinned; `Global` eyebrow + accent stripe — persists across views) above **exactly one view
-  tool card** whose scope is *"explore this view's subject"* (currently `LearnPanel` in hyper,
-  `GeoExplore` in geo, `LedgerPanel` in ledger). Anything you act on to explore lives here, not
-  on the right. Tool eyebrow is one verb: `<View> · explore`.
-- **Right rail** (`#rightcol`, `Inspector`) = the **facts** scope (read-only), **two fixed-role
-  slots** mirroring the left rail: a **Context** card (the focused subject) above a **Detail**
-  card (the view's signature fact, or whatever you explicitly clicked). Each `InspectorCard`
-  opens with a role **eyebrow** (`Selected`, `Live`, `Node`…). A quiet `#rc-empty` placeholder
-  keeps the zone present.
+- **Top** (`TopBar`, `14-top-bar.css`) = the **command bar**: one full-width inset bar
+  (mirrors the bottom ribbon — same panel/border/radius). Three regions on one row:
+  **status + filter** (left; the filter is a button + pill that expands the bar *downward*
+  into the `FilterChips` grid — same connected surface, so the filter no longer needs a rail
+  slot), the **view switch** (center, a boxed segmented control), and the **view-specific
+  vitals** (right, `Vitals`). The vitals are **filter-aware** in hyper (see below).
+- **Left rail** (`#leftcol`) = the **explore / interact** scope (verbs): the **selected-subject
+  dossier** (`ContextPanel` / `#metapane` — the focused metagraph/cluster, pinned at the top
+  where the filter used to be; `Selected metagraph` eyebrow + a clear ×) above **exactly one
+  view tool card** whose scope is *"explore this view's subject"* (currently `LearnPanel` in
+  hyper, `GeoExplore` in geo, `LedgerPanel` in ledger). The global filter moved to the top
+  command bar. Tool eyebrow is one verb: `<View> · explore`.
+- **Right rail** (`#rightcol`, `Inspector`) = the **facts** scope (read-only): the view's
+  **Detail** card — the signature fact, or whatever you explicitly clicked (ledger → snapshot,
+  geo → selected node; hyper has none — its live activity is the top-bar vitals). Each
+  `InspectorCard` opens with a role **eyebrow** (`Live snapshot`, `Selected node`…). A quiet
+  `#rc-empty` placeholder keeps the zone present.
 - **Bottom** (`BottomStream`) = the live/time lane (slim `LiveStrip` or full `SnapshotRibbon`).
 
 Uniformity is enforced with **shared tokens in `app/styles/00-base.css`** (`--radius`,
@@ -241,21 +264,26 @@ surface. Don't re-derive paddings or cyan tints in component CSS — reference t
 view for"*) — **hyper = who/what** (architecture + economic weight), **geo = where** (footprint),
 **ledger = when** (ledger over time + cost). How each fills the zones *today* (contents, not the
 rule):
-- **hyper** — left: `LearnPanel` (concept walkthrough). Right Context: `MetaCard` **dossier**
-  (identity only); Detail: **`MetaLiveCard`** (cadence / avg DAG fee / anchor share via
-  `metaActivity(id)` in `src/data/network.ts`, from `metaSnaps` + `anchorIndex`, refreshed on
-  `anchor`; factual — hidden until polled).
-- **geo** — left: **`GeoExplore`**, one card = a compact distribution-score meter atop a
-  **country→nodes accordion** (the leaderboard + node browser merged: a country row shows its
-  share via `store.leaderboard`/`globe.countryStats`; clicking it drills the globe **and**
-  expands its nodes inline from `store.selNodes`/`globe.listNodes` — a node row reuses the
-  node's existing `pick`). Right Context: the metagraph/cluster dossier; Detail: the
-  always-present **`GeoLiveCard`** ("Live footprint") — a live selection strip (online health /
-  countries / densest, from `selNodes`+`leaderboard`) that also **embeds the selected node**
-  when one is picked (it reads `store.inspect` itself, so a node pick augments the card rather
-  than replacing it). The accordion/globe is the master; this card's node section is the detail.
-- **ledger** — left: `LedgerPanel`. Right Context: the snapshot's metagraph dossier; Detail: the
-  **`SnapshotCard`**.
+- **hyper** — top vitals: the **structure** (`Vitals`/`HyperVitals`), **filter-aware** — how many
+  nodes serve each layer (`L0` / `cL1` / `dL1`) for the current selection. **One node taxonomy
+  for the whole network**: a hybrid node counts in every layer it runs (so columns can sum past
+  the node count); the DAG's own L0/L1 fold into L0/cL1 (its L1 is a *currency*-L1) like any
+  metagraph. All → the whole network; L0/L1 → that shell (0 elsewhere); a metagraph → its own
+  nodes (from `store.nodes` + `metaList`, via `rolesOf`). Activity belongs to Ledger, not here.
+  Left: the selected-metagraph `MetaCard` **dossier** (identity + the node-fabric *config* block —
+  same layer vocabulary, the "how nodes are wired" cut) above `LearnPanel`. **Hyper has no
+  right-rail card** so `#rightcol` stays empty there.
+- **geo** — top vitals: the **footprint** (`GeoVitals`) — `Distribution` score (moved up from
+  GeoExplore) / `Countries` / `Densest`, from `store.leaderboard`. Left: **`GeoExplore`**, now
+  purely a **country→nodes accordion** (the leaderboard + node browser merged: a country row
+  shows its share; clicking it drills the globe **and** expands its nodes inline from
+  `store.selNodes`/`globe.listNodes`), with the selected metagraph/cluster dossier pinned above
+  it (`ContextPanel`). Right Detail: **`GeoLiveCard`** — the **selected node** (reads
+  `store.inspect`; pick hint when empty).
+- **ledger** — top vitals: the network's **live activity** (`LedgerVitals`) — `snaps/anchors/fees
+  per hour` with trend sparklines (from `store.activity`), moved here from hyper since this is the
+  view about the ledger over time. Left: the selected metagraph dossier (`ContextPanel`) above
+  `LedgerPanel`; Right Detail: the **`SnapshotCard`**.
 
 **The global snapshot card is ledger-only.** `FollowController` follows the live snapshot
 *only* in `ledger` (`following = mode === "ledger"`); hyper/geo never inject one, and the
@@ -294,11 +322,20 @@ inspector clears the highlight and stops following; `ui.refreshFollow()` (fired 
 `anchor` event) re-resolves the followed chip once the anchor index fills in. The chip
 click handler does **not** toggle `.active` itself — let `select()` own it.
 
-**Slim `LiveStrip` (hyper/geo)** is the demoted form: live dot + the last ~8 ordinals, no
-fees/anchors/bars, plus a `Snapshot DAG →` jump. It shares the same `useSnapshotFeed` hook +
-`inspect`/`following` store state as the ribbon, so the selected-snapshot highlight stays
-consistent across view switches. `BottomStream` renders one or the other by `mode` and sets
-`--bottom-reserve` (slim → the side rails grow back).
+**Slim `LiveStrip` (hyper/geo)** is the demoted form: a live dot + a full-width **anchor
+bar-chart** (one bar per tick, height = anchors), filter-coloured (`--ls-accent`), stacked
+(total + the selected metagraph's share), with a smooth bottom-transparent→top-colour gradient.
+It has **no panel chrome** — bars blend straight into the scene (only the label keeps a
+text-shadow). Clicking a bar opens that snapshot's card (carried across views). It shares the
+same `useSnapshotFeed` hook + `inspect`/`following`/`snap` store state as the ribbon, so the
+selected-snapshot highlight stays consistent across view switches. `BottomStream` renders one or
+the other by `mode` and sets `--bottom-reserve` (slim → the side rails grow back).
+
+> **Live tick — total is instant, breakdown/fee come from the exact read.** The *total*
+> (`metagraphSnapshotCount`) is final immediately; the per-metagraph breakdown + fee are pulled
+> exactly from the raw L0 snapshot (`/api/snapshot/[ordinal]`, see *The tick lifecycle*) for the
+> focused tick. Anything new on the live tick should prefer that exact read and only use the polled
+> floor for ticks too old for the L0 node.
 
 ## Anchoring, fees & the metagraph data layer
 
@@ -308,33 +345,87 @@ Verified live against mainnet (2026-06-16):
   vs L0 ~4.5/min) via `/currency/{id}/snapshots`. The explorer stamps each metagraph
   snapshot with the **timestamp of the global snapshot it anchored into**, so the anchor
   join is `metagraph.timestamp === global.timestamp` (exact — 0 orphans observed).
-- **Fees are the core economic model.** Every metagraph snapshot pays a `fee` ∝
-  `sizeInKB` (~100,000 datum/KB = 0.001 DAG/KB; 1 DAG = 1e8 datum), **paid in DAG** —
-  confirmed because data metagraphs with no token of their own (e.g. DED, `cl1: null`)
-  still pay at the same rate. Global snapshots have **no** fee field; a tick's DAG cost
-  is derived by summing the fees of the metagraph snapshots sharing its timestamp.
+- **Fees are the core economic model.** Every metagraph snapshot pays a `fee` (datum; 1 DAG =
+  1e8 datum), **paid in DAG** — confirmed because data metagraphs with no token of their own
+  (e.g. DED, `cl1: null`) still pay. ⚠️ **Treat the `fee` as an opaque reported value — do NOT
+  derive size (or anything) from it.** It correlates with size but Constellation computes it with a
+  non-trivial fee calculator; an earlier `fee/100000 = KB` assumption was wrong and removed (size
+  is measured separately from `content.length`). Global snapshots have **no** fee field; a tick's
+  DAG cost is the sum of its metagraph snapshots' fees (exact from the raw-L0 read, or the polled
+  floor).
 - **Count is exact, fee is a floor.** `metagraphSnapshotCount` is the authoritative
   anchored count. Our derived fee covers only the **publicly listed** metagraphs (the
-  dagexplorer directory of 10 = `config.METAGRAPHS`); ~7% of anchors come from metagraphs
+  dagexplorer directory of 10 = `config.METAGRAPHS`); a few anchors come from metagraphs
   that are authorized on-chain but **not publicly listed**, so the summed fee is a **lower
   bound** (shown with `~` + a `FLOOR` tag in the inspector; flips to `COMPLETE` when the
   tracked count reaches `metagraphSnapshotCount`). "Listed" ≠ protocol registration —
   anchoring still requires being a recognised L0 state channel; these are just absent from
   the public explorer catalog.
+- **The genuinely-unlisted count is TINY (~0–4 per tick).** A high "unlisted" reading is a
+  bug, not reality. `metagraphSnapshotCount` counts *snapshots*, not metagraphs, and **one
+  fast metagraph can batch dozens into a single tick** (verified: DOR put **83** into one,
+  DED **41** — both *listed*; tick 6517348 = 138 anchors, only **4** truly unlisted). So the
+  ground truth for *who* anchored is the **raw L0 snapshot's `stateChannelSnapshots`**
+  (`l0-lb-mainnet…/global-snapshots/{ord}` → `value.stateChannelSnapshots` = `{addr:[snaps]}`),
+  NOT the explorer (which only gives the count). We don't fetch that per tick (2.4 MB for a big
+  tick), but it's the cross-check tool when a count looks wrong.
+
+### The tick lifecycle — why a snapshot's breakdown *settles* (read before touching the ledger view)
+
+A metagraph snapshot is stamped with its anchoring global timestamp **only as it anchors**,
+which happens over the **few seconds after the global tick first appears**. So a tick has a
+lifecycle, and our inferred breakdown lags it:
+
+1. Global tick `T` appears (from `be-mainnet`). Its **`metagraphSnapshotCount` (total) is
+   correct and final immediately** — it's a field of the finalized snapshot.
+2. Over the next seconds, metagraphs keep getting stamped `T` as they anchor into it; our
+   per-metagraph poll then needs a cycle to fetch them and fold them into `anchorIndex[T]`.
+   During this window `a.count < total`, so a naive `unlisted = total − a.count` reads
+   **transiently high** — this is the *settling* period, not real unlisted metagraphs.
+3. Once no new snapshot has landed in `T` for `SETTLE_MS` (`AnchoredTags`, ~7 s) the count has
+   **stabilised** and the remaining gap, if any, is the *real* unlisted floor.
+
+**The snapshot card now sidesteps all this with an EXACT read** (the primary source): the raw L0
+snapshot's `stateChannelSnapshots` carry every anchored metagraph snapshot with its own
+`value.fee` + `value.content`, so the **exact** fee, data size, per-metagraph breakdown (incl.
+unlisted) and state-record count are final the instant the snapshot exists. We fetch it server-side
+(heavy, ~2.5 MB) via **`/api/snapshot/[ordinal]`** (cached per ordinal), `SnapshotExactBridge` keeps
+the **live + selected** tick's `SnapshotExact` in the store, and the card prefers it — no settling,
+no floor. The **live card never falls back to the polled floor**: while exact is in flight it shows
+a brief "reading…" (`awaiting`); only **old/pruned** ticks (the L0 node retains ~30 min) fall back
+to the polled anchor index below. See the `dag-raw-snapshot-metrics` memory for everything else
+that one read exposes (rewards, delegated staking, …).
+
+Two mechanisms back the **polled fallback** (used for old ticks, the 60-bar strip, and the activity
+rates — exact is too heavy across many ticks):
+- **Self-healing catch-up** (`api.js _refreshOneMeta`): instead of a fixed tail (which silently
+  dropped DOR's burst and mislabelled it "unlisted"), the poll **grows `?limit=` ×3 up to 600
+  until the batch reaches back to the newest ordinal we already hold** — provably no gap,
+  regardless of burst size. Polls **every** tick (`pollMs`), base `VIS.metaSnapTail`.
+- **Polled floor**: `anchorIndex[ts].count` is what we identified; `unlisted = total − count` is a
+  lower bound shown only on old ticks (`AnchoredTags` falls back to it when there's no exact read).
+  ⚠️ **The ledger/Snapshots view should prefer the exact read for any focused tick** and only use
+  the polled floor for ticks too old for the L0 node.
 
 **Shared data layer** (`api.js`): `metaSnaps` (id → rolling `[{ordinal,hash,parent,ts,fee,
-sizeInKB}]`, seeded `VIS.metaSnapSeed`, tailed `VIS.metaSnapTail`) + `anchorIndex`
-(global-tick ts → `{fee, count, metaIds:Set, metaCounts:Map(id→n)}`). `_recordMetaSnaps`
+sizeInKB}]`, seeded `VIS.metaSnapSeed`, tailed `VIS.metaSnapTail` with the catch-up above) +
+`anchorIndex` (global-tick ts → `{fee, count, metaIds:Set, metaCounts:Map(id→n), touched}`;
+`touched` = ms the count last grew, for the settling gate). `_recordMetaSnaps`
 dedupes by ordinal, caps the buffers, and emits an **`anchor`** event; `getAnchor(ts)` is the
 accessor the ribbon (and, later, the ledger view) reads. The hub-pulse `meta` event (keyed by
 name) is unchanged. `metaCounts` exists because a single metagraph can anchor **several**
 snapshots into one global tick (it snapshots faster than L0), so `metaIds` alone (presence)
 isn't enough to show a per-metagraph count.
 
-The snapshot inspector renders these as colour-coded **pills** (`_anchoredTags`): one per
-listed metagraph anchored, each showing its count `TICKER (n)`, plus an `unlisted (N)` pill
-where `N = metagraphSnapshotCount − a.count` (the floor gap). It deliberately shows **no block
-count** — blocks aren't the activity signal here.
+The snapshot card renders the breakdown as colour-coded **pills** (`AnchoredTags`): the
+authoritative **total in parens after the label** ("Metagraph snapshots anchored here (138)"),
+one pill per listed metagraph with its count `TICKER (n)`, plus an `unlisted (N)` pill — sourced
+from the **exact read when available** (final, incl. unlisted), else the polled floor for old
+ticks (or "reading…" for the live tick mid-fetch). It also shows the **settlement fee** (exact →
+the figure + `· N KB settled`; old/floor → `at least`/`complete`). It deliberately shows **no
+block count** — blocks aren't the activity signal here. (Note: a snapshot's `value.content` is the
+serialized snapshot as a *byte array*, not a list of records — don't surface its length as an
+update/record count; it's just bytes.)
 
 ## Data — server-side routes (was: bake scripts)
 
@@ -365,6 +456,14 @@ browser can't fetch them — but the **Next Node server can**. So instead of bak
     (http) + ipwho.is (https).
 - **`app/api/geo/route.ts`** serves the validator geo seed (`data/geo.json`, imported)
   so the globe plots instantly; `js/geo.js resolveMissing` fills new validator IPs.
+- **`app/api/snapshot/[ordinal]/route.ts`** reads the **raw L0 global snapshot** (heavy,
+  ~2.5 MB) and returns a tiny `SnapshotExact` (exact fee, size KB, state-record count, and the
+  per-metagraph breakdown incl. unlisted). **Cached per ordinal** (`unstable_cache`, immutable —
+  one fetch shared across clients; throws on a miss so a not-yet/pruned tick retries). Only recent
+  ticks resolve (the L0 node prunes after ~30 min) → 404 → client keeps the polled floor.
+  `SnapshotExactBridge` calls it for the live + selected tick; cost stays trivial because it's
+  per-ordinal cached and only the focused tick is fetched — **never** the whole ribbon or a poll
+  loop (that's what would make it expensive on Vercel).
 - The client (`Engine`) fetches `/api/metagraphs` on mount **and re-pulls every 10 min**
   (Vercel never restarts; ISR only freshens the *server* cache, so an idle tab must
   re-pull — `Engine.refreshMeta`, rebuilds only on change). The snapshot/cluster/price

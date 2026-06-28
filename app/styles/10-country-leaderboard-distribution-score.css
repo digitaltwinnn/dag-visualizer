@@ -4,50 +4,6 @@
    its nodes inline (master → detail), and a nested node row opens its card on the right rail. */
 #geoexplore { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; padding: 0; }
 .geo-body { display: flex; flex-direction: column; min-height: 0; flex: 1 1 auto; }
-/* A small summary strip under the header: country count (left) + a compact distribution meter
-   (right). A soft rounded panel with room to breathe — light, not dominant — so the accordion
-   stays the focus. */
-.geo-meta {
-  flex: none; display: flex; align-items: center; justify-content: space-between; gap: 12px;
-  margin: 8px 14px 10px; padding: 8px 12px; border-radius: 10px;
-  background: linear-gradient(180deg, rgba(90, 140, 255, 0.08), rgba(90, 140, 255, 0.03));
-  border: 1px solid var(--panel-border);
-  font-size: 11.5px; color: var(--muted);
-}
-.geo-meta-count { flex: none; font-variant-numeric: tabular-nums; }
-.geo-meta-count b { color: var(--text); font-weight: 700; font-size: 13px; margin-right: 3px; }
-.geo-meta-score { display: flex; align-items: center; gap: 8px; min-width: 0; }
-.geo-meta-label {
-  flex: none; display: inline-flex; align-items: center; gap: 4px;
-  font-size: 9px; font-weight: 700; letter-spacing: 0.07em; text-transform: uppercase;
-}
-.geo-meta-bar { flex: 0 1 60px; height: 5px; border-radius: 3px; background: rgba(255, 255, 255, 0.08); overflow: hidden; }
-.geo-meta-bar > span {
-  display: block; height: 100%; border-radius: 3px;
-  background: linear-gradient(90deg, var(--l0), var(--core)); transition: width 0.35s ease;
-}
-.geo-meta-val { flex: none; font-weight: 700; font-variant-numeric: tabular-nums; color: var(--core); font-size: 13px; }
-.geo-meta-max { font-size: 9px; font-weight: 600; color: var(--muted); margin-left: 1px; }
-
-/* Info affordance + styled tooltip for the distribution score. */
-.geo-info {
-  display: inline-flex; align-items: center; justify-content: center; width: 13px; height: 13px;
-  border-radius: 50%; border: 1px solid var(--muted); color: var(--muted);
-  font-size: 9px; font-style: italic; font-weight: 700; line-height: 1; cursor: help;
-  position: relative; vertical-align: middle;
-}
-.geo-info:hover, .geo-info:focus { color: var(--text); border-color: var(--text); outline: none; }
-.geo-info-pop {
-  position: absolute; top: calc(100% + 8px); right: -8px; z-index: 30; width: 232px; padding: 10px 12px;
-  background: rgba(12, 20, 38, 0.98); border: 1px solid var(--panel-border); border-radius: 10px;
-  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.5);
-  font-size: 11px; font-style: normal; font-weight: 400; letter-spacing: 0; text-transform: none;
-  line-height: 1.5; color: #c7d0ea; text-align: left;
-  opacity: 0; visibility: hidden; transform: translateY(-3px);
-  transition: opacity 0.14s, transform 0.14s, visibility 0.14s; pointer-events: none;
-}
-.geo-info-note { display: block; margin-top: 7px; color: var(--text); font-weight: 600; }
-.geo-info:hover .geo-info-pop, .geo-info:focus .geo-info-pop { opacity: 1; visibility: visible; transform: translateY(0); }
 /* The accordion is the card's scroll area; the legend + foot pin beneath it. */
 .geo-list { flex: 1 1 auto; min-height: 0; overflow-y: auto; padding: 6px 14px 8px; }
 /* An open country gets a quiet container so its nested nodes read as belonging to it. */
@@ -69,20 +25,11 @@
 .lb-row.active { background: var(--sel-bg); }
 .lb-toggle .lb-name { color: var(--muted); }
 .lb-toggle .lb-count { color: var(--muted); font-weight: 400; }
-.lb-more { display: flex; flex-wrap: wrap; gap: 5px; padding: 4px 0 2px; }
-.lb-chip {
-  display: inline-flex; align-items: center; gap: 4px; padding: 3px 7px; border-radius: 12px;
-  border: 1px solid var(--panel-border); background: rgba(90, 140, 255, 0.06);
-  color: #c7d0ea; font-size: 11.5px; cursor: pointer; transition: background 0.15s, border-color 0.15s, color 0.15s;
-}
-.lb-chip:hover { background: rgba(90, 140, 255, 0.16); color: var(--text); }
-.lb-chip.active { border-color: var(--core); color: var(--text); background: var(--sel-bg); }
-.lb-chip-flag { font-size: 13px; }
-.lb-chip-n { font-variant-numeric: tabular-nums; color: var(--muted); }
-.lb-chip.active .lb-chip-n { color: var(--text); }
-.lb-flag { font-size: 13px; width: 18px; text-align: center; flex: none; }
-.lb-name { flex: none; width: 96px; color: #c7d0ea; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.lb-flag { font-size: 11.5px; width: 17px; text-align: center; flex: none; }
+/* Explicit 12px: the `.lb-row--btn { font: inherit }` reset (a shorthand) clears the row's
+   font-size back to the larger panel base, so pin the name/count to the body size. */
+.lb-name { flex: none; width: 96px; font-size: 12px; color: #c7d0ea; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .lb-bar { flex: 1; height: 7px; border-radius: 4px; background: rgba(255,255,255,0.06); overflow: hidden; }
 .lb-bar > span { display: block; height: 100%; border-radius: 4px; background: linear-gradient(90deg, var(--l0), var(--core)); }
-.lb-count { flex: none; width: 26px; text-align: right; font-variant-numeric: tabular-nums; font-weight: 600; }
+.lb-count { flex: none; width: 26px; text-align: right; font-size: 12px; font-variant-numeric: tabular-nums; font-weight: 600; }
 .lb-foot { padding: 10px 16px 12px; font-size: 11px; color: var(--muted); }
