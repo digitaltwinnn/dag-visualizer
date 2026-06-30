@@ -5,12 +5,8 @@ import { useStore } from "@/src/store/store";
 import PanelHead from "@/components/PanelHead";
 import { shortHash } from "@/src/data/network";
 import { RoleTags } from "@/components/inspector/parts";
+import { ccToFlag } from "@/src/util/format";
 import type { NodeRow } from "@/src/data/types";
-
-function ccToFlag(cc: string | null) {
-  if (!cc || cc.length !== 2) return "🏳️";
-  return String.fromCodePoint(...[...cc.toUpperCase()].map((ch) => 0x1f1e6 + ch.charCodeAt(0) - 65));
-}
 
 const TOP = 9;
 
@@ -27,8 +23,25 @@ export default function GeoExplore() {
   const selNodes = useStore((s) => s.selNodes);
   const inspect = useStore((s) => s.inspect);
   const setInspect = useStore((s) => s.setInspect);
+  const setHoverNodeId = useStore((s) => s.setHoverNodeId);
+  const setFilter = useStore((s) => s.setFilter);
   const [showAll, setShowAll] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
+
+  // Selecting a node here mirrors clicking it on the globe (Engine._handleClick): set the
+  // network filter to the node's OWN network first, then open its card. Without the filter step
+  // the selection didn't carry into the Hypergraph (the view had nothing to isolate). A validator
+  // belongs to the DAG core ("dag"); a metagraph node to its metagraph.
+  const selectNode = (pick: NodeRow["pick"]) => {
+    const netId =
+      pick.kind === "metanode"
+        ? pick.meta?.id ?? null
+        : pick.kind === "l0" || pick.kind === "l1"
+          ? "dag"
+          : null;
+    if (netId) setFilter(netId);
+    setInspect(pick);
+  };
 
   const list = lb?.countries ?? [];
   const max = list[0]?.count ?? 1;
@@ -92,7 +105,8 @@ export default function GeoExplore() {
                 </button>
 
                 {open && (
-                  <div className="geo-c-nodes">
+                  // Leaving the node list clears the globe hover-glow.
+                  <div className="geo-c-nodes" onMouseLeave={() => setHoverNodeId(null)}>
                     {nodes.length === 0 ? (
                       <p className="geo-c-empty">No locatable nodes here yet.</p>
                     ) : (
@@ -100,12 +114,18 @@ export default function GeoExplore() {
                         const on =
                           selIp != null && r.layer === selLayer &&
                           r.pick.kind !== "snapshot" && "node" in r.pick && r.pick.node?.ip === selIp;
+                        // Match the globe's hover pairing: validators by machine id, metagraph nodes by ip.
+                        const hoverKey =
+                          r.pick.kind === "metanode" ? r.pick.node?.ip ?? null
+                            : r.pick.kind === "l0" || r.pick.kind === "l1" ? r.pick.node?.id ?? null
+                              : null;
                         return (
                           <button
                             key={r.label + i}
                             className={"nb-row" + (on ? " active" : "")}
                             title={`${r.label} · ${r.state ?? "—"}`}
-                            onClick={() => setInspect(r.pick)}
+                            onClick={() => selectNode(r.pick)}
+                            onMouseEnter={() => setHoverNodeId(hoverKey)}
                           >
                             {/* No status dot here — it read as the network bullet on the node
                                 card (different meaning); state lives in the card's pill. */}

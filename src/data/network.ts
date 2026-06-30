@@ -1,11 +1,11 @@
 import { useStore } from "@/src/store/store";
-import type { Anchor, GlobalSnapshot, MetaInfo } from "@/src/data/types";
+import type { Anchor, GlobalSnapshot } from "@/src/data/types";
 // Existing data layer, reused untouched. Browser-only (fetch/setInterval); imported
 // from client code, initialized in an effect. Types come in a later phase.
 import { NetworkData, shortHash as rawShortHash } from "../../js/api.js";
 
 export const shortHash = rawShortHash as (h: string) => string;
-import { METAGRAPHS, COLORS as RAW_COLORS } from "../../js/config.js";
+import { METAGRAPHS, COLORS as RAW_COLORS, DEFAULT_META_COLOR as RAW_DEFAULT_META } from "../../js/config.js";
 import { hex } from "@/src/util/format";
 
 export const COLORS = RAW_COLORS as { core: number; l0: number; l1: number; bg: number };
@@ -13,7 +13,7 @@ export const COLORS = RAW_COLORS as { core: number; l0: number; l1: number; bg: 
 // The neutral accent as a CSS string (for libraries like Recharts that need a literal),
 // and the fallback hub colour for a metagraph the config doesn't know yet.
 export const CORE_HEX = hex(COLORS.core);
-export const DEFAULT_META_COLOR = 0x8affc1;
+export const DEFAULT_META_COLOR = RAW_DEFAULT_META as number;
 
 let net: NetworkData | null = null;
 
@@ -78,17 +78,8 @@ export function isAnchorSettling(ts: string, total: number | null): boolean {
   return total > a.count && Date.now() - a.touched < ANCHOR_SETTLE_MS;
 }
 
-// The DAG modelled as a metagraph-shaped CORE (its L0 + L1 clusters merged by node id into
-// one node-list with `roles`). Same shape as a metagraph (MetaInfo + `isRoot`), so the rest
-// of the app can treat it as another core. Null until the clusters are first fetched.
-export type CoreInfo = MetaInfo & { isRoot?: boolean };
-export function getDagCore(): CoreInfo | null {
-  return (net as unknown as { dagCore?: CoreInfo | null })?.dagCore ?? null;
-}
-
-
 // The DAG modelled as a core, resolvable like a metagraph config (its live nodes come from
-// the metaList / getDagCore; this is just its identity for the filter/dossier/top-bar).
+// the metaList; this is just its identity for the filter/dossier/top-bar).
 const DAG_CFG: MetagraphConfig = { id: "dag", name: "DAG", ticker: "DAG", color: COLORS.core };
 
 // Config core (id → {color, ticker, name, …}) — a metagraph or the DAG; null for "all".

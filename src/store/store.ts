@@ -47,6 +47,15 @@ interface AppState {
   inspect: PickDescriptor | null;
   snap: Extract<PickDescriptor, { kind: "snapshot" }> | null;
   selStack: SelSlot[];
+  // Ordinal of the snapshot the cursor is hovering in the LiveStrip bar-chart (transient highlight —
+  // the ledger re-colours that snapshot's tiles). null = not hovering.
+  hoverSnapOrd: number | null;
+  // Filter chip the cursor is hovering (All/DAG/metagraph id) — a transient PREVIEW highlight of that
+  // selection's nodes in any view, without committing the actual `filter`. null = not hovering.
+  hoverFilter: string | null;
+  // Node id/ip the cursor is hovering in the geo explorer list — glows that node's shells on the globe
+  // (same pairing as a 3D raycast hover). null = not hovering a list row.
+  hoverNodeId: string | null;
   // Snapshot card follows the latest relevant snapshot (heartbeat live) vs pinned.
   following: boolean;
   // Hover tooltip content (engine raycast); positioned by the Tooltip component.
@@ -82,6 +91,9 @@ interface AppState {
   setMetaList: (list: MetaInfo[]) => void;
   setInspect: (pick: PickDescriptor | null) => void;
   setSnap: (snap: Extract<PickDescriptor, { kind: "snapshot" }> | null) => void;
+  setHoverSnapOrd: (ordinal: number | null) => void;
+  setHoverFilter: (filter: string | null) => void;
+  setHoverNodeId: (id: string | null) => void;
   setFollowing: (following: boolean) => void;
   setHover: (
     hover: { title: string; sub: string; roles?: string[]; id?: string; color?: string } | null,
@@ -109,6 +121,9 @@ export const useStore = create<AppState>((set) => ({
   inspect: null,
   snap: null,
   selStack: [],
+  hoverSnapOrd: null,
+  hoverFilter: null,
+  hoverNodeId: null,
   following: false,
   hover: null,
   learnFocus: null,
@@ -128,6 +143,9 @@ export const useStore = create<AppState>((set) => ({
   setMetaList: (metaList) => set({ metaList }),
   setInspect: (inspect) => set((s) => ({ inspect, selStack: bumpStack(s.selStack, "node", !!inspect) })),
   setSnap: (snap) => set((s) => ({ snap, selStack: bumpStack(s.selStack, "snap", !!snap) })),
+  setHoverSnapOrd: (hoverSnapOrd) => set({ hoverSnapOrd }),
+  setHoverFilter: (hoverFilter) => set({ hoverFilter }),
+  setHoverNodeId: (hoverNodeId) => set({ hoverNodeId }),
   setFollowing: (following) => set({ following }),
   setHover: (hover) => set({ hover }),
   setLearnFocus: (learnFocus) => set({ learnFocus }),
@@ -140,7 +158,7 @@ export const useStore = create<AppState>((set) => ({
       const next = { ...s.snapshotExact, [data.ordinal]: data };
       const keys = Object.keys(next);
       if (keys.length > EXACT_MAX) {
-        // Map/object key order is insertion order for integer-like keys is numeric — sort to be safe.
+        // Integer-like object keys iterate in numeric order, not insertion order — sort to be safe.
         for (const k of keys
           .map(Number)
           .sort((a, b) => a - b)
