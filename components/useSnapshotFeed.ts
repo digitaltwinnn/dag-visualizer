@@ -6,11 +6,12 @@ import type { GlobalEvent, GlobalSnapshot } from "@/src/data/types";
 
 // Shared Global L0 snapshot subscription — the live tail both the full ribbon
 // (ledger) and the slim heartbeat strip (hyper/geo) read from, so they never drift.
-// Snapshots arrive ~every 15s, so React state is fine here (Lane B). `anchorTick`
-// bumps when the anchor index fills in, so derived fees/cues re-read getAnchor().
+// Snapshots arrive ~every 15s, so React state is fine here (Lane B). The anchor-tick
+// state bumps when the anchor index fills in, forcing a re-render so derived fees/cues
+// re-read getAnchor() (the value itself is internal — consumers just observe the render).
 export function useSnapshotFeed(max: number) {
   const [snaps, setSnaps] = useState<GlobalSnapshot[]>([]);
-  const [anchorTick, setAnchorTick] = useState(0);
+  const [, setAnchorTick] = useState(0);
 
   useEffect(() => {
     const net = getNetwork();
@@ -41,5 +42,5 @@ export function useSnapshotFeed(max: number) {
     };
   }, [max]);
 
-  return { snaps, anchorTick };
+  return { snaps };
 }

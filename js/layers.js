@@ -11,6 +11,7 @@ import { COLORS, METAGRAPHS, metaAnchor } from "./config.js";
 
 const R_GLOBE = 16;  // must match Globe's R — the radius the core grows out to
 const CORE_R = 3.1;  // the core IcosahedronGeometry radius
+const _pos = new THREE.Vector3(); // scratch for hub orbit positions (reused each frame)
 
 export class Layers {
   constructor(scene) {
@@ -35,6 +36,25 @@ export class Layers {
     // When a metagraph is focused in the Hypergraph, its hub's orbit is paused
     // (anchored) so it stays framed & in focus; the rest keep orbiting.
     this.focusId = null;
+
+    // In the Snapshots (ledger) view the hubs (and their tethers/pulses) are hidden — ledger.js
+    // draws the metagraph snapshot blocks itself. Toggled by the engine via setLedger.
+    this.ledger = false;
+  }
+
+  // Hide/show the metagraph hubs + their tethers/pulses for the Snapshots view. Hidden state is
+  // applied once here; the normal update loop early-returns while in ledger and re-shows everything
+  // on exit.
+  setLedger(on) {
+    if (this.ledger === on) return;
+    this.ledger = on;
+    for (const m of this.metas) {
+      m.hub.visible = !on;
+      if (on) {
+        m.tether.material.opacity = 0;
+        m.pulseMesh.material.opacity = 0;
+      }
+    }
   }
 
   // Focus one topic from the learn panel and dim the rest. `focus` is one of
@@ -85,6 +105,7 @@ export class Layers {
   // called when that metagraph actually records a snapshot that anchored into a
   // global tick (the `anchor` event), so the packets reflect real anchoring.
   pulseMeta(metaId) {
+    if (this.ledger) return; // the hubs are hidden in ledger — don't accumulate an unrendered pulse
     const m = this.metas.find((x) => x.cfg.id === metaId);
     if (m) m.pulse = 1;
   }
@@ -133,15 +154,6 @@ export class Layers {
     for (const m of this.metas) m.active = !ids || ids.has(m.cfg.id);
   }
 
-  // Updates a hub's latest-snapshot state (for the inspector). The hub->core packet
-  // is no longer fired here — it's driven by the real `anchor` event via pulseMeta.
-  updateMeta(name, state) {
-    const m = this.metas.find((x) => x.cfg.name === name);
-    if (!m) return;
-    m.state = state;
-    m.hub.userData.pick.state = state;
-  }
-
   // ---------------------------------------------------------------- Update loop
   // `morph` (0 = Hypergraph, 1 = globe) fades the metagraph hubs out early so
   // they don't visibly collapse into the globe's centre — their real nodes fly
@@ -149,6 +161,10 @@ export class Layers {
   update(dt, morph = 0) {
     this.clock += dt;
     const t = this.clock;
+
+    // Snapshots view: the hubs/tethers are hidden (set once in setLedger) and ledger.js owns the
+    // metagraph blocks, so there's nothing to orbit here.
+    if (this.ledger) return;
 
     // Hubs are fully gone by ~30% into the morph, before the root-scale collapse
     // would be noticeable.
@@ -186,19 +202,25 @@ export class Layers {
     this.halo.rotation.z += dt * 0.08;
     if (this.coreFlash) this.coreFlash = Math.max(0, this.coreFlash - dt * 1.6);
 
-    // Metagraphs — orbit, spin, tether pulses
+    // Metagraphs — orbit, spin, tether pulses. While ANY metagraph is selected (focusId), the
+    // whole constellation holds still — every hub's orbit AND its own axis spin freeze, not just
+    // the focused one — so nothing drifts/spins around the framed selection. The node spheres still
+    // tumble (globe.js) and data-driven anchor pulses still fire; only the hub motion stops.
+    const frozen = this.focusId != null;
     for (const m of this.metas) {
-      if (m.cfg.id !== this.focusId) m.orbit += dt * 0.03; // anchor the focused hub
+      if (!frozen) m.orbit += dt * 0.03;
       const a = m.orbit;
-      const pos = new THREE.Vector3(
+      // Scratch vector reused every frame — this runs for all 10 hubs at 60fps, so a fresh
+      // Vector3 here would be ~600 throwaway allocations/sec.
+      _pos.set(
         Math.cos(a) * m.radius,
         Math.sin(a) * m.radius * Math.sin(m.incl) + (m.anchor.y * 0.4),
         Math.sin(a) * m.radius * Math.cos(m.incl)
       );
-      m.group.position.copy(pos);
-      m.group.rotation.y += dt * m.spin;
+      m.group.position.copy(_pos);
+      if (!frozen) m.group.rotation.y += dt * m.spin;
       m.group.visible = hubFade > 0.001;
-      m.hub.rotation.x += dt * 0.5;
+      if (!frozen) m.hub.rotation.x += dt * 0.5;
       // Registered-but-node-less hubs read as inactive: faded body, near-zero glow,
       // fainter tether — present in the architecture, but clearly not live.
       // When a metagraph is selected (focusId), dim the OTHER hubs *subtly* — a gentle
@@ -208,14 +230,18 @@ export class Layers {
       const glowMul = (m.active ? 1 : 0.08) * fdim;
       m.hub.material.opacity = metaOpacity * (m.active ? 1 : 0.5) * (focusOther ? 0.78 : 1);
 
-      m.tether.geometry.setFromPoints([new THREE.Vector3(), pos]);
-      m.tether.geometry.attributes.position.needsUpdate = true;
+      // The tether is a 2-vertex line fixed at the origin → hub. Write the moving endpoint
+      // (vertex 1) straight into the existing buffer instead of setFromPoints, which would
+      // rebuild the attribute (and drop its GPU buffer) every frame.
+      const tetherPos = m.tether.geometry.attributes.position;
+      tetherPos.setXYZ(1, _pos.x, _pos.y, _pos.z);
+      tetherPos.needsUpdate = true;
       m.tether.material.opacity = 0.22 * metaF * (m.active ? 1 : 0.35) * fdim;
 
       if (m.pulse > 0) {
         m.pulse = Math.max(0, m.pulse - dt * 0.7);
         const e = 1 - m.pulse;
-        m.pulseMesh.position.copy(pos).multiplyScalar(1 - e);
+        m.pulseMesh.position.copy(_pos).multiplyScalar(1 - e);
         m.pulseMesh.material.opacity = Math.sin(m.pulse * Math.PI) * 0.9 * metaF;
         m.hub.material.emissiveIntensity = (0.8 + m.pulse * 1.6) * metaF * glowMul;
       } else {
@@ -224,4 +250,5 @@ export class Layers {
       }
     }
   }
+
 }

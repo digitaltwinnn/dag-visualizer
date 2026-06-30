@@ -58,9 +58,12 @@ export function createScene(canvas) {
   // view (main.js) — the globe doesn't need it and it halves the cost.
   // aperture sets how aggressively off-focus depths blur — a larger value gives a SHALLOW focus
   // so the background nodes/hubs fall off sharply (the in-focus selection stays crisp). maxblur is
-  // re-driven per frame in the engine.
+  // re-driven per frame in the engine. Kept low on purpose: the selected hub's own shells span a
+  // few units of depth around the focal plane, so a shallow aperture smeared THEM too; this widens
+  // the sharp zone to cover the whole selected cluster while distant objects (the core, the other
+  // hubs) are far enough out to still saturate to maxblur — strong background blur, crisp selection.
   const dof = new BokehPass(scene, camera, {
-    focus: 54, aperture: 0.00035, maxblur: 0.01,
+    focus: 54, aperture: 0.0002, maxblur: 0.01,
     width: window.innerWidth, height: window.innerHeight,
   });
   dof.enabled = false;
@@ -82,5 +85,5 @@ export function createScene(canvas) {
     composer.setSize(window.innerWidth, window.innerHeight);
   }
 
-  return { scene, camera, renderer, controls, composer, bloom, dof, background, resize };
+  return { scene, camera, renderer, controls, composer, dof, background, resize };
 }

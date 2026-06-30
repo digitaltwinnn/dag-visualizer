@@ -117,6 +117,24 @@
   -webkit-mask-image: linear-gradient(to right, transparent 0, #000 60px);
 }
 .ls-empty { color: var(--muted); font-size: 12px; align-self: center; }
+/* Cursor-following hover tooltip for the bars — same surface as the 3D #tooltip (07-hover-tooltip)
+   so the strip reads in the app's tooltip language: the snapshot ordinal, the tick's TOTAL anchors,
+   and (when a metagraph is selected) that metagraph's share, as aligned key/value rows. */
+#ls-tip {
+  position: fixed; z-index: 30; pointer-events: none;
+  padding: 8px 11px;
+  background: rgba(8, 12, 26, 0.92);
+  border: 1px solid var(--panel-border);
+  border-radius: 8px;
+  font-size: 12px; white-space: nowrap;
+  transform: translate(-50%, -130%);
+  display: flex; flex-direction: column; gap: 4px;
+}
+#ls-tip .ls-tip-head { font-weight: 600; color: var(--text); }
+#ls-tip .ls-tip-line { display: flex; align-items: center; justify-content: space-between; gap: 18px; }
+#ls-tip .ls-tip-k { display: flex; align-items: center; gap: 6px; color: var(--muted); font-size: 11px; }
+#ls-tip .ls-tip-v { color: #c7d0ea; font-size: 11px; font-variant-numeric: tabular-nums; }
+#ls-tip .ls-tip-dot { flex: none; width: 8px; height: 8px; border-radius: 50%; }
 /* Each bar's full height = the tick's TOTAL anchors; the inner fill = the selected metagraph's
    share of it (the whole bar when no metagraph is selected). A thin accent OUTLINE with a lit top
    rim gives each bar definition; the fill fades from invisible at the bottom to a SOFT (not harsh)

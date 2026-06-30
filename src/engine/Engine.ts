@@ -1,13 +1,14 @@
 import * as THREE from "three";
 import Stats from "stats.js";
 import { useStore, type Mode } from "@/src/store/store";
-import { metagraphById, initNetwork, shortHash, CORE_HEX, DEFAULT_META_COLOR } from "@/src/data/network";
+import { metagraphById, initNetwork, getNetwork, getAnchor, shortHash, CORE_HEX, DEFAULT_META_COLOR } from "@/src/data/network";
 import { hex } from "@/src/util/format";
 // Existing vanilla modules, reused. Bare specifiers resolve via npm; they ship no types
 // of their own, so their surface is described in ./boundary and applied at construction.
 import { createScene } from "../../js/scene.js";
 import { Layers } from "../../js/layers.js";
 import { Globe } from "../../js/globe.js";
+import { Ledger } from "../../js/ledger.js";
 import { loadGeoCache, resolveMissing } from "../../js/geo.js";
 import type { GlobalSnapshot, PickDescriptor } from "@/src/data/types";
 import type {
@@ -16,6 +17,7 @@ import type {
   GeoMap,
   GlobeApi,
   LayersApi,
+  LedgerApi,
   RouteMetagraph,
   SceneCtx,
 } from "./boundary";
@@ -32,6 +34,7 @@ const GlobeCtor = Globe as unknown as new (
   layers: LayersApi,
   camera: THREE.Camera,
 ) => GlobeApi;
+const LedgerCtor = Ledger as unknown as new (scene: THREE.Scene) => LedgerApi;
 const loadGeo = loadGeoCache as () => Promise<GeoMap>;
 const resolveGeo = resolveMissing as (
   map: GeoMap,
@@ -49,6 +52,11 @@ const FOCI: Record<string, { pos: Vec; target: Vec }> = {
   l1: { pos: new THREE.Vector3(14, 10, 26), target: new THREE.Vector3(0, 0, 0) },
   metagraphs: { pos: new THREE.Vector3(0, 30, 70), target: new THREE.Vector3(0, 0, 0) },
   geo: { pos: new THREE.Vector3(0, 11, 36), target: new THREE.Vector3(0, 2, 0) },
+  // The Snapshots view is a stack of transparent wireframe FLOORS (layers) on Y. Frame it from an
+  // elevated front angle so the stacked planes read in 3D — see js/ledger.js + config.LEDGER.
+  // Default framing: the LEAD (latest block) sits toward the bottom-right, leaving the rest of the
+  // view for the trailing chains; looking roughly along -X. Orbit is free.
+  ledger: { pos: new THREE.Vector3(31, 14, 20), target: new THREE.Vector3(-17, 1, -2) },
 };
 
 // Imperative engine: owns the scene, the Hypergraph + globe, the render loop, the
@@ -58,6 +66,8 @@ export class Engine {
   private ctx: SceneCtx;
   private layers: LayersApi;
   private globe: GlobeApi;
+  private ledger: LedgerApi;
+  private _ledgerDirty = false; // rebuild the ledger geometry next frame (set on data events)
   private clock = new THREE.Clock();
   private raf = 0;
   private disposed = false;
@@ -67,12 +77,14 @@ export class Engine {
   private filter = "all";
   private country: string | null = null;
   private morph = 0; // 0 = hypergraph, 1 = globe (eased each frame)
+  private _hoverMetaId: string | null = null; // metagraph currently hovered (hub/node) → filter preview
+  private _baseFog: THREE.FogBase | null = null; // scene.js FogExp2 (hyper/geo); captured lazily
+  private _ledgerFog: THREE.Fog | null = null;    // stronger linear depth fog for the trailing chain
   private tween: {
     fromPos: Vec; toPos: Vec; fromTgt: Vec; toTgt: Vec; t: number; dur: number;
   } | null = null;
 
   private geoMap: GeoMap = {};
-  private clusters: { l0: ClusterNode[]; l1: ClusterNode[] } | null = null;
   private dagCore: DagCore | null = null;
   private metaData: RouteMetagraph[] | null = null;
   // Metagraph ids with locatable nodes (selectable hubs); null until counts load (all allowed).
@@ -98,6 +110,7 @@ export class Engine {
     this.ctx = makeScene(canvas);
     this.layers = new LayersCtor(this.ctx.scene);
     this.globe = new GlobeCtor(this.ctx.scene, this.layers, this.ctx.camera);
+    this.ledger = new LedgerCtor(this.ctx.scene);
     canvas.addEventListener("click", this.onClick);
     canvas.addEventListener("pointermove", this.onMove);
     // The engine owns the resize handler (createScene no longer adds one) so it's
@@ -150,6 +163,19 @@ export class Engine {
         // Geo: clicking a node (on the globe or in the left explorer both set `inspect`)
         // flies the camera to it; clearing it returns to the selection framing.
         if (st.inspect !== prev.inspect && st.mode === "geo") this._focusInspectNode(st.inspect);
+        // Ledger: keep the hovered/selected snapshot coloured in the trail (hover wins, then the
+        // clicked `snap`); everything else fades to the neutral background tone.
+        if (st.hoverSnapOrd !== prev.hoverSnapOrd || st.snap !== prev.snap) {
+          this.ledger.setSelected(st.hoverSnapOrd ?? st.snap?.data?.ordinal ?? null);
+        }
+        // Filter-chip hover: PREVIEW that selection's dim in any view (same per-view effect as the
+        // real filter), without committing it. null restores the committed filter.
+        if (st.hoverFilter !== prev.hoverFilter) {
+          this.globe.setHoverFilter(st.hoverFilter);
+          this.ledger.setFilter(st.hoverFilter ?? this.filter);
+        }
+        // Geo explorer list-row hover → glow that node's shells on the globe (same as a 3D hover).
+        if (st.hoverNodeId !== prev.hoverNodeId) this.globe.setHoverNode(st.hoverNodeId);
       }),
     );
 
@@ -161,11 +187,9 @@ export class Engine {
   // ---- data wiring (ports main.js loadGeoCache + metagraphs fetch + cluster) ----
   private async _loadData() {
     const net = initNetwork(); // idempotent; guarantees a NetworkData instance
-    const n = net as unknown as { clusters?: { l0: ClusterNode[]; l1: ClusterNode[] }; dagCore?: DagCore | null };
-    if (n?.clusters?.l0?.length) this.clusters = n.clusters;
+    const n = net as unknown as { dagCore?: DagCore | null };
     if (n?.dagCore) this.dagCore = n.dagCore;
-    net?.on("cluster", ({ l0, l1, dag }: { l0: ClusterNode[]; l1: ClusterNode[]; dag: DagCore }) => {
-      this.clusters = { l0, l1 };
+    net?.on("cluster", ({ dag }: { l0: ClusterNode[]; l1: ClusterNode[]; dag: DagCore }) => {
       this.dagCore = dag;
       this._buildGlobe();
       this._publishMetaList(); // the DAG core lives in the metaList — refresh it when clusters change
@@ -173,8 +197,12 @@ export class Engine {
     // Data-driven Hypergraph pulses: when a metagraph records a snapshot that anchored into a
     // global tick, fire a packet from its hub along the tether into the core; flash the core
     // itself on each new global snapshot (scaled by how many metagraphs it anchored).
-    net?.on("anchor", ({ metaId }: { metaId: string }) => this.layers.pulseMeta(metaId));
+    net?.on("anchor", ({ metaId }: { metaId: string }) => {
+      this.layers.pulseMeta(metaId);
+      if (this.mode === "ledger") this._ledgerDirty = true; // the per-tick breakdown filled in
+    });
     net?.on("global", (evt: { latest?: GlobalSnapshot }) => {
+      if (this.mode === "ledger") this._ledgerDirty = true; // a new tick landed on the chain
       const ord = evt.latest?.ordinal;
       if (ord == null || ord === this._lastFlashOrdinal) return;
       this._lastFlashOrdinal = ord;
@@ -238,6 +266,7 @@ export class Engine {
   private _applyMetagraphs() {
     if (!this.metaData || !Object.keys(this.geoMap).length) return;
     this.globe.setMetagraphs(this.metaData, this.geoMap);
+    this.ledger.setGroupSizes(this.globe.ledgerGroups); // size the Snapshots rings to the node counts
     this.applyFilter(false); // re-assert the filter's dimming on the new nodes — but DON'T move
     // the camera (this runs on every cluster/meta poll; moving it would reset the user's view).
     // metaList is published in refreshMeta (metagraph geo arrives with the route), so
@@ -280,9 +309,31 @@ export class Engine {
     this.layers.setMetaActive(this._activeMetaIds);
   }
 
+  // Re-read the ledger's live tick from the Global L0 buffer + the per-tick anchor index. Cheap
+  // enough to call on each new tick / anchor fill, but only while the ledger view is showing.
+  private _refreshLedger() {
+    const net = getNetwork() as unknown as { globalSnapshots?: GlobalSnapshot[] } | null;
+    this.ledger.setData(net?.globalSnapshots ?? [], (ts) => getAnchor(ts));
+    this._ledgerDirty = false;
+  }
+
   // ---- view + filter (ports ui.setMode / _applyFilter / camera focus) ----
   setMode(mode: Mode) {
     this.mode = mode;
+    // Stronger DEPTH fog for the ledger trail — the oldest blocks recede + fog into the background
+    // (that's the "old blocks fade" effect, depth-based, not a per-block hack). Restore the scene's
+    // base FogExp2 (tuned for hyper/geo) on every other view.
+    if (!this._ledgerFog) {
+      this._baseFog = this.ctx.scene.fog;
+      this._ledgerFog = new THREE.Fog(this._baseFog ? this._baseFog.color.getHex() : 0x05060e, 46, 70);
+    }
+    this.ctx.scene.fog = mode === "ledger" ? this._ledgerFog : this._baseFog;
+    // Snapshots view reuses the SAME hub/node meshes, laid out into planar rows. Toggle that
+    // layout on the meshes (off restores the orbit/globe layout) and lock orbit so it reads 2D.
+    const inLedger = mode === "ledger";
+    this.layers.setLedger(inLedger);
+    this.globe.setLedger(inLedger);
+    this.ctx.controls.enableRotate = true; // the 3D layer stack is meant to be looked around
     // The country drill-down is geo-only; drop it on any view change so it can't
     // linger as a stale leaderboard highlight + mismatched zoom after leaving geo.
     if (this.country != null) {
@@ -290,7 +341,19 @@ export class Engine {
       this.globe.setCountry(null);
       useStore.getState().setCountry(null);
     }
-    // Flat views (ledger + the placeholders) hide the 3D scene — reset it to a neutral idle.
+    // The Snapshots view: keep the reused meshes visible (the render loop places them into the
+    // planar rows + shows the centered live snapshot); just dim non-selected columns and frame it.
+    if (mode === "ledger") {
+      this.layers.focusId = null;
+      this.globe.focusDensest(false);
+      this.ctx.controls.autoRotate = false;
+      this.globe.setFilter(this.filter); // dim non-selected metagraph columns (no camera move)
+      this.ledger.setFilter(this.filter); // neutralise the other lanes' tiles/links
+      this._refreshLedger();
+      this._snapTo(FOCI.ledger.pos, FOCI.ledger.target); // appear already-oriented (no camera tween)
+      return;
+    }
+    // The remaining placeholder views (status/transactions/staking) hide the 3D scene — reset to idle.
     if (mode !== "hyper" && mode !== "geo") {
       this.layers.focusId = null;
       this.globe.setFilter("all");
@@ -322,6 +385,11 @@ export class Engine {
         this.globe.focusDensest(false);
         this._focusFilter(this.filter);
       }
+    } else if (this.mode === "ledger") {
+      // Dim the non-selected metagraph columns so the selection stands out; never move the camera
+      // (the planar diagram stays framed head-on). The ledger neutralises the other lanes' tiles/links.
+      this.globe.setFilter(this.filter);
+      this.ledger.setFilter(this.filter);
     }
     this._publishLeaderboard();
     // Tint the globe's land edge with the selected metagraph's colour (null → default cyan).
@@ -417,7 +485,10 @@ export class Engine {
   private _pickablesFor(): THREE.Object3D[] {
     if (this.mode === "hyper") return this.layers.pickables.concat(this.globe.pickables);
     if (this.mode === "geo") return this.globe.pickables;
-    return []; // ledger: nothing pickable
+    // Ledger: the centered snapshot (snapshot pick) + the reused producer dots (metanode/validator
+    // picks → filter into that column).
+    if (this.mode === "ledger") return this.ledger.pickables.concat(this.globe.pickables);
+    return []; // placeholder views: nothing pickable
   }
 
   private _pickAt(e: MouseEvent): PickDescriptor | null {
@@ -504,6 +575,14 @@ export class Engine {
     const hoverId =
       p?.kind === "metanode" ? p.node?.ip : p?.kind === "l0" || p?.kind === "l1" ? p.node?.id : null;
     this.globe.setHoverNode(hoverId ?? null);
+    // Hovering a metagraph HUB sphere previews that metagraph's filter highlight — the SAME effect as
+    // hovering its filter pill (dims the others). (Its nodes keep the node-shell glow above.) Cleared
+    // when not over a hub.
+    const hoverMeta = p?.kind === "meta" ? p.cfg?.id ?? null : null;
+    if (hoverMeta !== this._hoverMetaId) {
+      this._hoverMetaId = hoverMeta;
+      useStore.getState().setHoverFilter(hoverMeta);
+    }
     if (key === this._hoverKey) return;
     this._hoverKey = key;
     useStore
@@ -521,12 +600,25 @@ export class Engine {
       useStore.getState().setFilter(p.cfg.id);
       return;
     }
+    // The ledger's centred snapshot tile selects that snapshot (opens the snapshot card) and pins
+    // it (the FollowController only auto-follows the live tip when nothing is selected).
+    if (p.kind === "snapshot") {
+      useStore.getState().setFollowing(false);
+      useStore.getState().setSnap(p);
+      return;
+    }
     // Clicking a node, in any view: drill the global filter into the node's network (its
     // metagraph, or the DAG core for a validator) and open its node card. Filter first, so the
     // node-focus camera move (set by the inspect) wins over the network framing.
     if (p.kind === "l0" || p.kind === "l1" || p.kind === "metanode") {
-      if (this.mode === "geo") this.ctx.controls.autoRotate = false;
       const netId = this._pickNetId(p);
+      // Ledger: a producer dot just highlights its column (set the filter) — no node card / camera
+      // move, so the planar diagram stays put.
+      if (this.mode === "ledger") {
+        if (netId) useStore.getState().setFilter(netId);
+        return;
+      }
+      if (this.mode === "geo") this.ctx.controls.autoRotate = false;
       if (netId) useStore.getState().setFilter(netId);
       useStore.getState().setInspect(p);
     }
@@ -565,6 +657,15 @@ export class Engine {
       t: 0,
       dur: 1.4,
     };
+  }
+
+  // Jump the camera straight to a framing — no tween (used for the Snapshots view, whose planar diagram
+  // is meant to appear already-oriented; tweening it in read as the planes swinging into place).
+  private _snapTo(toPos: Vec, toTgt: Vec) {
+    this.tween = null; // cancel any in-flight tween
+    this.ctx.camera.position.copy(toPos);
+    this.ctx.controls.target.copy(toTgt);
+    this.ctx.controls.update();
   }
 
   private _focusGeo(R: number) {
@@ -614,26 +715,40 @@ export class Engine {
       this.stats?.begin();
       const dt = Math.min(this.clock.getDelta(), 0.05);
 
-      const target = this.mode === "geo" ? 1 : 0;
+      // Ledger freezes morph at the view we entered from, so the reused node meshes fly in from
+      // THAT layout (globe.ledgerT drives the lane fly-in instead). hyper/geo ease as usual.
+      const target = this.mode === "geo" ? 1 : this.mode === "ledger" ? this.morph : 0;
       this.morph += (target - this.morph) * Math.min(1, dt * 1.1);
       this.layers.root.visible = this.morph < 0.985;
       this.layers.root.scale.setScalar(Math.max(0.0001, 1 - this.morph));
 
       this.globe.setMorph(this.morph);
-      this.ctx.background.update(dt, this.morph);
+      // Stars/nebula belong to geo only; in ledger force the plain hyper-end backdrop (no starfield).
+      this.ctx.background.update(dt, this.mode === "ledger" ? 0 : this.morph);
       this.layers.update(dt, this.morph);
       this.globe.update(dt);
       this._updateTween(dt);
       this.ctx.controls.update();
 
-      // Flat views (ledger + placeholders) hide the whole 3D scene.
-      const flat = this.mode !== "hyper" && this.mode !== "geo";
+      // The Snapshots view REUSES the hub/node meshes (placed into planar rows by layers/globe) +
+      // its own centered live snapshot; only the hyper core is hidden (the snapshot stands in for
+      // it). The placeholder views (status/transactions/staking) stay fully flat (scene hidden).
+      const showLedger = this.mode === "ledger";
+      const flat = this.mode !== "hyper" && this.mode !== "geo" && !showLedger;
       if (flat) {
         this.layers.root.visible = false;
         this.layers.coreGroup.visible = false;
+      } else if (showLedger) {
+        this.layers.root.visible = true; // hubs become the metagraph-L0 row
+        this.layers.coreGroup.visible = false; // the centered snapshot represents Global L0
       }
-      this.globe.group.visible = !flat;
-      this.ctx.background.mesh.visible = !flat;
+      this.globe.group.visible = !flat; // ledger shows the reused node dots
+      this.ctx.background.mesh.visible = !flat; // ledger keeps the starfield/backdrop
+      this.ledger.group.visible = showLedger;
+      if (showLedger) {
+        if (this._ledgerDirty) this._refreshLedger();
+        this.ledger.update(dt);
+      }
 
       // Depth of field: only a single focused metagraph in the Hypergraph (not all / the DAG core).
       const metaSel = this.mode === "hyper" && this.filter !== "all" && this.filter !== "dag";

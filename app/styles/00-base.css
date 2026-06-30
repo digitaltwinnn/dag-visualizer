@@ -19,7 +19,7 @@
   --panel-pad-x: 16px;     /* horizontal padding inside a panel header/section */
   --panel-pad-y: 12px;     /* vertical   padding inside a panel header/section */
   --rail-gap: 12px;        /* gap between stacked panels in a column */
-  --rail-top: 92px;        /* top of BOTH side rails — clears the experimental banner + command bar */
+  --rail-top: 103px;       /* top of BOTH side rails — clears the experimental banner + command bar */
   --rail-w: 264px;         /* left control rail width */
   --detail-w: 320px;       /* right details rail width */
   /* Single selected/active language: a cyan fill + border, reused everywhere. */

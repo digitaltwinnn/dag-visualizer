@@ -13,6 +13,9 @@ export const COLORS = {
   bg: 0x05060e,
 };
 
+// Fallback hub colour for a metagraph the config doesn't know yet (one not in METAGRAPHS).
+export const DEFAULT_META_COLOR = 0x8affc1;
+
 // The real mainnet metagraphs (source: dagexplorer). Each pulls live snapshots
 // via its id, with a simulated cadence fallback. Colours match the metagraph
 // node clusters plotted on the globe (data/metagraphs.json). Keep this list in
@@ -55,9 +58,76 @@ export function metaAnchor(i, n) {
   };
 }
 
+// ---- Snapshots (ledger) view layout (the "settlement chamber") -------------------
+// A 3D stack of transparent glass FLOORS (one per layer) on Y, viewed from an angle. Each
+// metagraph gets its own Z-LANE; its snapshot blocks lead at x=0 and trail LEFT (-X) along the
+// lane (same direction + spacing as the global chain), so a metagraph block and the global block
+// it anchored share an X and are linked. The factual flow (Constellation docs): metagraph L1
+// (cl1+dl1) → blocks → metagraph L0 → metagraph snapshots → Global L0; DAG L1 → blocks straight
+// into the Global L0 snapshot (the global snapshot IS the $DAG ledger's L0). The floor heights are a
+// LITERAL "what sits on what" stack (top→bottom) — producers on top, settlement at the base. Floors
+// are of TWO kinds: NODE/validator layers, and SNAPSHOT/ledger layers (the OUTPUT an L0 produces —
+// the actual artifacts this view is about, NOT a node role):
+//   rowProducers  external DATA PRODUCERS — data sources POSTing signed DataUpdates to the metagraph's
+//     DATA-L1 (count is metagraph-specific & in no API, so SYMBOLIC: a labelled floor + the flow line,
+//     no nodes) ·
+//   rowML1  metagraph L1 nodes — cL1 (currency-L1: wallet TRANSACTIONS) + dL1 (data-L1: producer
+//     DataUpdates); the producer flow feeds dL1 specifically ·
+//   rowML0  metagraph L0 nodes (collect L1 blocks → the snapshot) ·
+//   rowMSnap  METAGRAPH SNAPSHOTS — the metagraph L0's ledger output ·
+//   rowHypL0  hypergraph L0 nodes — the global validators (the anchor line passes through their
+//     cluster, just like it passes through the metagraph L1/L0 clusters) ·
+//   rowGL0  GLOBAL SNAPSHOTS — the hypergraph L0's ledger output (the base) ·
+//   rowDAGL1  DAG L1 (hypergraph L1) nodes — cL1 only (native $DAG currency; the DAG has no data-L1).
+// NODES sit directly ABOVE the SNAPSHOT they produce, consistently (metagraph L0 → metagraph snapshot;
+// hypergraph L0 → global snapshot); the DAG L1 below feeds $DAG blocks UP into the global. Even spacing.
+// The X axis (time / trailing) is owned by ledger.js (SLOT_SP); this file owns the Z lane geometry
+// + the row heights, shared by layers.js, globe.js and ledger.js.
+export const LEDGER = {
+  depth: 44,        // Z span the metagraph lanes spread over
+  rowProducers: 13, // external data producers (symbolic — see note above; the flow line starts here)
+  rowML1: 9.5,      // metagraph L1 node floor (cL1 + dL1; validate producer updates into blocks)
+  rowML0: 6,        // metagraph L0 node floor (packages blocks into the snapshot)
+  rowMSnap: 2.5,    // metagraph SNAPSHOTS floor (the metagraph L0's ledger output)
+  rowHypL0: -1,     // hypergraph L0 node floor — global validators; the anchor line passes through them
+  rowGL0: -4.5,     // global snapshots floor (hypergraph L0's ledger output) — the base settlement layer
+  // TODO: also draw DAG L1 BLOCKS (global.blocks) flowing UP into the global snapshot — most ticks
+  // have 0 (settlement, not blocks); only block-carrying ticks would show them.
+  rowDAGL1: -8,     // DAG L1 (hypergraph L1) node floor (bottom — feeds blocks up into the global)
+  dagCell: 2.8,     // spread radius for the DAG node discs (global L0 + DAG L1) — tight so they're not busy
+  dot: 0.34,        // tiny-dot scale factor applied to node spheres in this view
+};
+
+// The lead SITE (x,z) of metagraph `i` of `n` — its Z-LANE (a distinct depth), leading at x=0.
+// Shared by Layers, Globe's node clusters and Ledger so a metagraph's nodes, rings and chain all
+// line up in its lane.
+const LANE_SPREAD = 0.62; // fraction of LEDGER.depth the lanes span (see clusterRadius)
+export function ledgerSite(i, n) {
+  const spread = LEDGER.depth * LANE_SPREAD;
+  return { x: 0, z: n > 1 ? (i / (n - 1) - 0.5) * spread : 0 };
+}
+
+// The ring/cluster radius for a node group of `count` nodes — grows with count (so the ring fits
+// the dots) but is capped to a fraction of the lane spacing so neighbouring rings never overlap.
+export function clusterRadius(count) {
+  const laneGap = (LEDGER.depth * LANE_SPREAD) / Math.max(1, METAGRAPHS.length - 1); // = ledgerSite's Z step
+  const cap = laneGap * 0.46;
+  return Math.min(cap, 0.55 + Math.sqrt(Math.max(1, count)) * 0.3);
+}
+
+// Small deterministic golden-angle offset for node `k` of `cnt`, spreading a cluster as a flat
+// disc ON the floor (X/Z plane) within `radius` — no random jitter.
+export function ledgerSpread(k, cnt, radius) {
+  if (cnt <= 1) return { x: 0, z: 0 };
+  const r = Math.sqrt(k / (cnt - 1)) * radius;
+  const a = k * 2.399963229728653; // golden angle
+  return { x: Math.cos(a) * r, z: Math.sin(a) * r };
+}
+
 // Visual tuning.
 export const VIS = {
-  maxSnapshots: 26,        // how many global snapshots to keep in the stream
+  maxSnapshots: 52,        // how many global snapshots to keep in the stream (also caps the
+                           // LiveStrip bar count — the strip fills with this whole retained window)
   l0Radius: 8,             // Global L0 validator shell (inner)
   l1Radius: 15,            // DAG L1 validator shell (outer)
   metaOrbitRadius: 36,     // base orbit radius for metagraphs — kept well clear of the

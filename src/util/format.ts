@@ -18,3 +18,10 @@ export const fmtKB = (kb: number) =>
     : kb >= 10
       ? `${Math.round(kb).toLocaleString()} KB`
       : `${kb.toFixed(1)} KB`;
+
+// Two-letter country code → flag emoji (a regional-indicator pair); a neutral flag when the
+// code is absent or malformed. Shared by the geo leaderboard rows + the top-bar "Densest" vital.
+export const ccToFlag = (cc?: string | null) =>
+  !cc || cc.length !== 2
+    ? "🏳️"
+    : String.fromCodePoint(...[...cc.toUpperCase()].map((ch) => 0x1f1e6 + ch.charCodeAt(0) - 65));

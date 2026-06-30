@@ -7,7 +7,7 @@
 // arrive, so node radii always match the (full-size, non-scaled) globe.
 
 import * as THREE from "three";
-import { COLORS, METAGRAPHS, metaAnchor } from "./config.js";
+import { COLORS, METAGRAPHS, metaAnchor, DEFAULT_META_COLOR, ledgerSite, ledgerSpread, clusterRadius, LEDGER } from "./config.js";
 import * as geoStats from "./geoStats.js";
 import { buildGlobeSurface } from "./globeSurface.js";
 import { R, LAND_H, latLonToVec3 } from "./geoMath.js";
@@ -96,10 +96,14 @@ export class Globe {
     this.nodes = [];
     this.geoFades = [];    // { mat, base } surface materials faded by morph
     this.morph = 0;
+    this.ledgerT = 0;      // 0→1 ease as the reused node meshes fly from their source view into the lanes
     this.clock = 0;
     // null = idle spin; { from, to, fromX, toX, t, dur } = ease-in-out to a focus
     // orientation (y = longitude swing, x = latitude tilt so high-lat nodes come into view).
     this.spin = null;
+    // Snapshots (ledger) view: place the SAME node meshes into the planar row layout instead of
+    // the shell/globe layout (see setMorph / update overrides). Toggled by the engine.
+    this.ledger = false;
     this.countryFilter = null; // cc to drill into (combined with the network filter), or null
     this.countryMix = 0;       // eased 0..1: how strongly the country dim is applied
     this.l0Count = 0;
@@ -120,6 +124,7 @@ export class Globe {
     // | <metagraphId>. Each metagraph node eases its own dim toward dimTarget.
     this.metaNodes = [];
     this.metaList = [];
+    this.ledgerGroups = {}; // metaId -> { l0, l1 } node counts per ledger floor (for ring sizing)
     this.metaSphere = null;   // glowing spheres (Hypergraph cluster)
     this.metaDisc = null;  // flat discs lying on the globe surface (geography)
     this.filter = "all";
@@ -229,8 +234,15 @@ export class Globe {
         const g = geoMap[node.ip];
         const geoDir = g ? latLonToVec3(g.lat, g.lon, 1).normalize() : null;
 
+        // Ledger (Snapshots) view: the DAG is a single core centred at x=0. Its cl1 nodes are the $DAG
+        // block producers → the DAG-L1 floor; its l0 nodes ARE the Global L0 validators that produce
+        // the global snapshots → the hypergraph-L0 floor (full node symmetry with metagraph L0).
+        const lsp = ledgerSpread(i, n, LEDGER.dagCell);
+        const ledgerPos = new THREE.Vector3(lsp.x, role === "l0" ? LEDGER.rowHypL0 : LEDGER.rowDAGL1, lsp.z);
+
         const u = {
           index: idx, layer: role, roles: node.roles || [role], nodeId: node.id, geoPrimary: primary, ready, base: col.clone(),
+          ledgerPos, ledgerHide: role !== "cl1" && role !== "l0",
           hyperPos, hyperDir: hyperPos.clone().normalize(), hyperRadius: hyperPos.length(),
           geoDir, trueDir: geoDir ? geoDir.clone() : null, geoRadius: R + LAND_H + 0.02, noGeo: !g,
           // hyperSize = sphere diameter (Hypergraph); geoSize = circle radius (globe). A hybrid
@@ -492,8 +504,9 @@ export class Globe {
     withNodes.forEach((m) => {
       const ci = METAGRAPHS.findIndex((c) => c.id === m.id);
       const cfg = ci >= 0 ? METAGRAPHS[ci] : null;
-      m.color = cfg ? cfg.color : 0x8affc1;
+      m.color = cfg ? cfg.color : DEFAULT_META_COLOR;
       m._anchor = metaAnchor(ci >= 0 ? ci : 0, n);
+      m._ledgerCol = ci >= 0 ? ci : 0; // column slot in the Snapshots view (config order)
     });
     this.metaList = withNodes;
 
@@ -528,9 +541,17 @@ export class Globe {
           const phi = i * GOLDEN_ANGLE;
           const offset = new THREE.Vector3(Math.cos(phi) * rr * rad, y * rad, Math.sin(phi) * rr * rad);
           const dir = latLonToVec3(g.lat, g.lon, 1).normalize(); // real location; fanned out below
+          // Ledger (Snapshots) view: this metagraph's scattered SITE, split by role onto its FLOOR
+          // — L1 (cl1+dl1 = blocks) floor on top, L0 (= snapshots) floor below — as a small disc of
+          // dots lying on the plane (spread in X/Z around the site, Y = the floor height).
+          const lsite = ledgerSite(m._ledgerCol, METAGRAPHS.length);
+          const lrowY = layer === "l0" ? LEDGER.rowML0 : LEDGER.rowML1;
+          // Spread the dots to fill ~75% of the (count-sized) ring for this group.
+          const lsp = ledgerSpread(i, cnt, clusterRadius(cnt) * 0.75);
+          const ledgerPos = new THREE.Vector3(lsite.x + lsp.x, lrowY, lsite.z + lsp.z);
           recs.push({
             metaId: m.id, layer, color: new THREE.Color(m.color), index: 0,
-            hubGroup, offset, geoPrimary: primary, nodeId: node.ip,
+            hubGroup, offset, ledgerPos, geoPrimary: primary, nodeId: node.ip,
             // Hypergraph fallback cluster (used if the hub isn't available).
             hyperPos: new THREE.Vector3(a.x, a.y, a.z).add(offset),
             // Geography end: the node's real location + outward normal for the disc
@@ -601,6 +622,14 @@ export class Globe {
     this.metaNodes = recs;
     this.metaEmi = emiArr;
     this.metaBaseArr = baseArr;
+    // Per-metagraph node counts per ledger floor (ML0 = l0; ML1 = cl1+dl1) — used to size the
+    // Snapshots-view rings so they fit their dots and don't overlap.
+    const groups = {};
+    for (const r of recs) {
+      const g = (groups[r.metaId] ||= { l0: 0, l1: 0 });
+      if (r.layer === "l0") g.l0 += 1; else g.l1 += 1;
+    }
+    this.ledgerGroups = groups;
     this.setFilter(this.filter);
   }
 
@@ -620,15 +649,27 @@ export class Globe {
   setFilter(sel) {
     this.filter = sel;
     this.countryFilter = null; // switching network clears the country drill-down
-    // The validators ARE the DAG core, so they're lit under "all" or "dag" and dimmed only
-    // when a metagraph is selected (both layers together — the L0/L1 split filters are gone).
+    this._applyDim(sel);
+    this._relayoutGeo();
+  }
+
+  // Transient PREVIEW dim (filter-chip hover): same per-view dim TARGETS as setFilter, but it does NOT
+  // commit `this.filter` or relayout geo. While previewing, the dim is forced STRONG (`_hoverFilterActive`)
+  // so the highlight is clearly visible even in hyper (where the committed-filter dim is otherwise weak —
+  // the click also flies the camera + adds DoF, which a hover must not do). null restores the real filter.
+  setHoverFilter(sel) {
+    this._hoverFilterActive = sel != null;
+    this._applyDim(sel || this.filter);
+  }
+
+  // Set the dim TARGETS for a selection (the dim itself eases each frame; the per-view STRENGTH is
+  // applied in the node loops). The validators ARE the DAG core → lit under "all"/"dag", dimmed only
+  // when a metagraph is selected (both layers together — the L0/L1 split filters are gone).
+  _applyDim(sel) {
     const dagLit = sel === "all" || sel === "dag";
     this.dimTarget.l0 = dagLit ? 0 : 1;
     this.dimTarget.l1 = dagLit ? 0 : 1;
-    for (const r of this.metaNodes) {
-      r.dimTarget = (sel === "all" || sel === r.metaId) ? 0 : 1;
-    }
-    this._relayoutGeo();
+    for (const r of this.metaNodes) r.dimTarget = (sel === "all" || sel === r.metaId) ? 0 : 1;
   }
 
   // Narrow the current network selection to a single country (cc), or null to
@@ -793,10 +834,25 @@ export class Globe {
   // they can never drift apart (the old bug: the validator *scale* used the raw, un-ramped dim
   // and so scaled the nodes to nothing in hyper, while their glow only dimmed).
   _dimScale() {
+    if (this._hoverFilterActive) return 0.85; // strong dim while previewing a filter-chip hover
     return 0.32 + 0.68 * this.morph;
   }
 
   // -------------------------------------------------- morph between layouts
+  // Switch the shared node meshes between the morphable shell/globe layout and the ledger lane
+  // placement. Off restores nothing special — the instance matrices are rewritten every frame.
+  setLedger(on) {
+    if (this.ledger === on) return;
+    this.ledger = on;
+    // The Snapshots view appears DIRECTLY in its intended position — no entry animation: axis-aligned
+    // (spin snapped to 0, not eased — easing read as the whole layout swinging ~90°) and the nodes are
+    // placed straight into their lanes (`ledgerT = 1`, no fly-in). Only the camera tween eases.
+    if (on) {
+      this.group.rotation.set(0, 0, 0);
+      this.ledgerT = 1;
+    }
+  }
+
   setMorph(m) {
     this.morph = m;
     const e = smooth(m);
@@ -809,6 +865,30 @@ export class Globe {
       const w = smooth(THREE.MathUtils.clamp((m - 0.82) / 0.16, 0, 1));
       const sphereVis = 1 - w, discVis = w;
       for (const u of this.nodes) {
+        // Snapshots (ledger) view: morph/e/w above are irrelevant here — we hard-place. DAG cl1
+        // nodes drop into the DAG-L1 row as tiny dots; the l0 instances (= Global L0, the centred
+        // snapshot) are hidden. No disc, no globe fly.
+        if (this.ledger) {
+          if (u.ledgerHide) {
+            _dummy.scale.setScalar(0);
+          } else {
+            // Fly in from where the node sits in the view we came from (morph is frozen in ledger,
+            // so e is that view's layout) into its lane slot — ledgerT eases 0→1 in update().
+            if (u.noGeo) _vec.copy(u.hyperPos);
+            else _vec.copy(u.hyperDir).lerp(u.geoDir, e).normalize().multiplyScalar(lerp(u.hyperRadius, u.geoRadius, e));
+            const showL = 1 - (u.layer === "l0" ? this.dim.l0 : this.dim.l1) * this._dimScale();
+            _qSpin.setFromAxisAngle(u.spinAxis, u.spinPhase + t * u.spinSpeed);
+            _dummy.position.copy(_vec).lerp(u.ledgerPos, this.ledgerT);
+            _dummy.quaternion.copy(_qSpin);
+            _dummy.scale.setScalar(u.hyperSize * LEDGER.dot * showL);
+          }
+          _dummy.updateMatrix();
+          this.instSphere.setMatrixAt(u.index, _dummy.matrix);
+          _dummy.scale.setScalar(0);
+          _dummy.updateMatrix();
+          this.instDisc.setMatrixAt(u.index, _dummy.matrix);
+          continue;
+        }
         // Shared position: fly from the fibonacci shell to the globe surface.
         let dir;
         if (u.noGeo) {
@@ -848,21 +928,23 @@ export class Globe {
       }
       this.instSphere.instanceMatrix.needsUpdate = true;
       this.instDisc.instanceMatrix.needsUpdate = true;
-      this.instSphere.visible = sphereVis > 0.001;
-      this.instDisc.visible = discVis > 0.001;
-      this.pickables = [w < 0.5 ? this.instSphere : this.instDisc];
+      this.instSphere.visible = sphereVis > 0.001 || this.ledger; // ledger hard-places the dots (morph may still be easing from geo)
+      this.instDisc.visible = discVis > 0.001 && !this.ledger;
+      this.pickables = [this.ledger || w < 0.5 ? this.instSphere : this.instDisc];
       const mp = w < 0.5 ? this.metaSphere : this.metaDisc;
       if (mp) this.pickables.push(mp);
     }
     // The globe surface fades in only once nodes are well on their way, and the
     // heatmap/arcs later still — so the Earth materialises under the arriving
     // nodes instead of veiling them mid-flight.
-    const surf = smooth(THREE.MathUtils.clamp((m - 0.35) / 0.45, 0, 1));
-    const extras = smooth(THREE.MathUtils.clamp((m - 0.6) / 0.4, 0, 1));
-    this.sphereMesh.visible = m > 0.05; // keep it out of the Hypergraph view
+    // The globe surface belongs to geo only — in ledger it's hidden OUTRIGHT (not eased by morph),
+    // so it doesn't linger when arriving from geo. The reused node dots stay (they fly into lanes).
+    const surf = this.ledger ? 0 : smooth(THREE.MathUtils.clamp((m - 0.35) / 0.45, 0, 1));
+    const extras = this.ledger ? 0 : smooth(THREE.MathUtils.clamp((m - 0.6) / 0.4, 0, 1));
+    this.sphereMesh.visible = !this.ledger && m > 0.05; // keep it out of the Hypergraph + ledger views
     for (const f of this.geoFades) f.mat.opacity = f.base * surf;
     if (this.landWallUniforms) this.landWallUniforms.uOpacity.value = surf;
-    if (this.landFillMesh) this.landFillMesh.visible = m > 0.05; // opacity via geoFades
+    if (this.landFillMesh) this.landFillMesh.visible = !this.ledger && m > 0.05; // opacity via geoFades
     this.atmoUniforms.uM.value = surf;
     this._fade(this.heatGroup, extras);
     if (this.arcMat) this.arcMat.uniforms.uM.value = extras;
@@ -875,7 +957,12 @@ export class Globe {
       this._edgeColor.lerp(this._edgeTarget, Math.min(1, dt * 3));
       this.landWallUniforms.uColor.value.copy(this._edgeColor);
     }
-    if (this.spin) {
+    if (this.ledger) {
+      // Just ease the lane fly-in (ledgerT 0→1); the spin was already snapped to 0 in setLedger, so the
+      // planar diagram stays axis-aligned from the first frame (no swinging-into-place rotation).
+      this.ledgerT += (1 - this.ledgerT) * Math.min(1, dt * 2.2);
+      this.group.rotation.set(0, 0, 0);
+    } else if (this.spin) {
       // Ease-in-out to the focus orientation (longitude + tilt), then hold there (no idle spin).
       const s = this.spin;
       if (s.t < 1) {
@@ -1006,8 +1093,9 @@ export class Globe {
       for (const r of this.metaNodes) {
         r.dim += (r.dimTarget - r.dim) * kk;
         // effective dim = network dim (subtle in hyper via dimScale), raised by the country
-        // dim when this node is outside the drilled-into country (geo only).
-        let dEff = r.dim * dimScale;
+        // dim when this node is outside the drilled-into country (geo only). In LEDGER the dim is
+        // FULL (morph is frozen, so dimScale would be weak) — the other metagraphs' nodes go quiet.
+        let dEff = r.dim * (this.ledger ? 0.82 : dimScale);
         if (cf && (!r.pick.geo || r.pick.geo.cc !== cf)) dEff = Math.max(dEff, cmix);
         // Twinkle (decorative shimmer) is geo-only (scaled by m) — no non-data-driven node
         // animation in the Hypergraph.
@@ -1026,22 +1114,30 @@ export class Globe {
         const c = _col.copy(r.color).lerp(DIM, dEff * 0.85);
         base[r.index * 3] = c.r; base[r.index * 3 + 1] = c.g; base[r.index * 3 + 2] = c.b;
 
-        // Hypergraph anchor = the hub's current orbit position, expressed in this
-        // group's local frame (so it stays glued to the hub as the globe spins).
-        if (r.hubGroup) {
-          _vec.copy(r.hubGroup.position);
-          this.group.worldToLocal(_vec).add(r.offset);
+        // Snapshots (ledger) view: fly in from the source-view layout to the node's lane slot.
+        if (this.ledger) {
+          if (r.hubGroup) { _vec.copy(r.hubGroup.position); this.group.worldToLocal(_vec).add(r.offset); }
+          else _vec.copy(r.hyperPos);
+          _geoVec.copy(_vec).lerp(r.geoPos, e).lerp(r.ledgerPos, this.ledgerT);
         } else {
-          _vec.copy(r.hyperPos);
+          // Hypergraph anchor = the hub's current orbit position, expressed in this group's local
+          // frame (so it stays glued to the hub as the globe spins).
+          if (r.hubGroup) {
+            _vec.copy(r.hubGroup.position);
+            this.group.worldToLocal(_vec).add(r.offset);
+          } else {
+            _vec.copy(r.hyperPos);
+          }
+          _geoVec.copy(_vec).lerp(r.geoPos, e);
         }
-        _geoVec.copy(_vec).lerp(r.geoPos, e);
 
         // Sphere: tumbling on its own axis, shrinking out near the globe. Filtered-out
         // metagraph nodes shrink fully (1 - dEff) so they vanish quickly on the morph too.
         _dummy.position.copy(_geoVec);
         _qSpin.setFromAxisAngle(r.spinAxis, r.spinPhase + this.clock * r.spinSpeed);
         _dummy.quaternion.copy(_qSpin);
-        _dummy.scale.setScalar(r.hyperSize * sphereVis * (1 - dEff));
+        // In ledger the dot is full (bypass sphereVis, which is 0 when arriving from geo).
+        _dummy.scale.setScalar(r.hyperSize * (this.ledger ? LEDGER.dot : sphereVis) * (1 - dEff));
         _dummy.updateMatrix();
         this.metaSphere.setMatrixAt(r.index, _dummy.matrix);
 
@@ -1057,8 +1153,8 @@ export class Globe {
       }
       this.metaSphere.instanceMatrix.needsUpdate = true;
       this.metaDisc.instanceMatrix.needsUpdate = true;
-      this.metaSphere.visible = sphereVis > 0.001;
-      this.metaDisc.visible = discVis > 0.001;
+      this.metaSphere.visible = sphereVis > 0.001 || this.ledger; // ledger hard-places the dots
+      this.metaDisc.visible = discVis > 0.001 && !this.ledger;
       this.metaAESphere.needsUpdate = true;
       this.metaAEDisc.needsUpdate = true;
       this.metaSphere.geometry.getAttribute("aBase").needsUpdate = true;
