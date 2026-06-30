@@ -12,6 +12,7 @@ import { hex } from "@/src/util/format";
 export default function FilterChips({ onPick }: { onPick?: () => void }) {
   const filter = useStore((s) => s.filter);
   const setFilter = useStore((s) => s.setFilter);
+  const setHoverFilter = useStore((s) => s.setHoverFilter);
   const metaList = useStore((s) => s.metaList);
 
   const countById = useMemo(() => new Map(metaList.map((m) => [m.id, m.located])), [metaList]);
@@ -32,12 +33,14 @@ export default function FilterChips({ onPick }: { onPick?: () => void }) {
   };
 
   return (
-    <div className="mf-chips">
+    // Hovering a chip PREVIEWS that selection (dims the others in any view); leaving the grid clears it.
+    <div className="mf-chips" onMouseLeave={() => setHoverFilter(null)}>
       {fixed.map((c) => (
         <button
           key={c.id}
           className={"mf-chip" + (filter === c.id ? " active" : "")}
           onClick={() => pick(c.id)}
+          onMouseEnter={() => setHoverFilter(c.id)}
         >
           <span className="mf-dot" style={{ background: c.dot }} />
           <span className="mf-label">{c.label}</span>
@@ -48,6 +51,7 @@ export default function FilterChips({ onPick }: { onPick?: () => void }) {
           key={m.id}
           className={"mf-chip" + (filter === m.id ? " active" : "")}
           onClick={() => pick(m.id)}
+          onMouseEnter={() => setHoverFilter(m.id)}
         >
           <span className="mf-dot" style={{ background: hex(m.color) }} />
           <span className="mf-label">{m.ticker || m.name}</span>

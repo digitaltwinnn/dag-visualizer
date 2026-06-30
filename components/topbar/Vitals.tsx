@@ -2,7 +2,7 @@
 
 import { useStore } from "@/src/store/store";
 import { CORE_HEX, filterAccent, metagraphById } from "@/src/data/network";
-import { hex } from "@/src/util/format";
+import { hex, ccToFlag } from "@/src/util/format";
 import Sparkline from "@/components/Sparkline";
 import { rolesOf } from "@/components/inspector/parts";
 import type { NodeInfo } from "@/src/data/types";
@@ -33,11 +33,6 @@ function Vital({
       </span>
     </div>
   );
-}
-
-function ccToFlag(cc?: string | null) {
-  if (!cc || cc.length !== 2) return "🏳️";
-  return String.fromCodePoint(...[...cc.toUpperCase()].map((ch) => 0x1f1e6 + ch.charCodeAt(0) - 65));
 }
 
 // Hypergraph vitals — the network's **structure** (who/what), filter-aware: how many nodes

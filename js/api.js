@@ -9,7 +9,6 @@ export class NetworkData {
     this.live = false;            // true once a real fetch succeeds
     this.latest = null;           // most recent global snapshot
     this.globalSnapshots = [];    // rolling buffer, oldest -> newest
-    this.metaState = new Map();   // name -> { ordinal, hash, ts, real } (latest, drives hub pulse)
 
     // Shared per-metagraph snapshot history + the anchor index that joins them to
     // the Global L0 spine. Both the ribbon's derived DAG fee and the ledger view
@@ -31,7 +30,7 @@ export class NetworkData {
     // `l0`/`l1` to match the rest of the app; the DAG's L1 IS its currency-L1, displayed as
     // "cL1" by the UI (it has no data-L1). Same shape metagraphs use → treat it as a core.
     this.dagCore = null;
-    this.listeners = { global: [], meta: [], status: [], cluster: [], anchor: [] };
+    this.listeners = { global: [], status: [], cluster: [], anchor: [] };
     this._timer = null;
   }
 
@@ -201,14 +200,11 @@ export class NetworkData {
       lim = Math.min(600, lim * 3); // gap not yet covered — fetch deeper and retry
     }
 
-    const latest = list[0]; // newest-first
-    this.metaState.set(m.name, { ordinal: latest.ordinal, hash: latest.hash, ts: latest.timestamp, real: true });
     // Record full snapshot records (with fee/size) into the rolling buffer + anchor index.
     this._recordMetaSnaps(m, list.map((s) => ({
       ordinal: s.ordinal, hash: s.hash, parent: s.lastSnapshotHash,
       ts: s.timestamp, fee: s.fee || 0, sizeInKB: s.sizeInKB || 0,
     })));
-    this._emit("meta", { name: m.name, ...this.metaState.get(m.name) });
   }
 
   // Append new snapshot records (dedup by ordinal) to a metagraph's rolling buffer
