@@ -13,7 +13,19 @@ const STRUCTURAL: { name: string; var: string }[] = [
   { name: "core-l1 (violet)", var: "--core-l1" },
 ];
 
-export default function DesignPage() {
+export default async function DesignPage() {
+  const origin =
+    process.env.VERCEL_PROJECT_PRODUCTION_URL
+      ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`
+      : "http://localhost:3000";
+  let metas: { id: string; symbol: string; hue?: { deg: number; oklch: string; hex: string } }[] = [];
+  try {
+    const r = await fetch(`${origin}/api/metagraphs`, { cache: "no-store" });
+    metas = (await r.json()).metagraphs ?? [];
+  } catch {
+    metas = [];
+  }
+
   return (
     <main className="min-h-screen bg-background text-foreground p-8 font-sans">
       <h1 className="text-2xl font-semibold mb-1">Instrument-Glass styleguide</h1>
@@ -69,6 +81,27 @@ export default function DesignPage() {
             </CardContent>
           </Card>
         </div>
+      </section>
+
+      <section className="mb-10">
+        <h2 className="text-sm uppercase tracking-widest text-muted-foreground mb-3">
+          Identity lane — live generated hues
+        </h2>
+        {metas.length === 0 ? (
+          <p className="text-sm text-muted-foreground">No metagraph data (API unreachable).</p>
+        ) : (
+          <div className="grid grid-cols-3 gap-3 sm:grid-cols-6">
+            {metas.map((m) => (
+              <div key={m.id} className="ig-panel p-3" style={{ ["--spine" as string]: m.hue?.oklch }}>
+                <div className="h-10 rounded-md mb-2" style={{ background: m.hue?.oklch }} />
+                <div className="text-xs font-mono">{m.symbol}</div>
+                <div className="text-[10px] font-mono text-muted-foreground">
+                  {m.hue ? `${m.hue.deg}°` : "—"}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </section>
     </main>
   );
