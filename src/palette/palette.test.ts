@@ -57,4 +57,54 @@ describe("oklchToHex", () => {
   it("maps distinct hues to distinct colours", () => {
     expect(oklchToHex(0.8, 0.15, 40)).not.toBe(oklchToHex(0.8, 0.15, 220));
   });
+
+  // Inverse sRGB(#hex) → OKLCH hue, used only to verify oklchToHex doesn't shift hue
+  // when it gamut-maps. Independent re-implementation (linear-sRGB → LMS → OKLab →
+  // hue) so it doesn't share bugs with the module under test.
+  function srgbHexToOklchHue(hex: string): number {
+    const n = parseInt(hex.slice(1), 16);
+    const r8 = (n >> 16) & 255;
+    const g8 = (n >> 8) & 255;
+    const b8 = n & 255;
+    const inv = (u: number) => {
+      u /= 255;
+      return u <= 0.04045 ? u / 12.92 : Math.pow((u + 0.055) / 1.055, 2.4);
+    };
+    const r = inv(r8);
+    const g = inv(g8);
+    const b = inv(b8);
+
+    const l = 0.4122214708 * r + 0.5363325363 * g + 0.0514459929 * b;
+    const m = 0.2119034982 * r + 0.6806995451 * g + 0.1073969566 * b;
+    const s = 0.0883024619 * r + 0.2817188376 * g + 0.6299787005 * b;
+
+    const l_ = Math.cbrt(l);
+    const m_ = Math.cbrt(m);
+    const s_ = Math.cbrt(s);
+
+    const a = 1.9779984951 * l_ - 2.428592205 * m_ + 0.4505937099 * s_;
+    const bb = 0.0259040371 * l_ + 0.7827717662 * m_ - 0.808675766 * s_;
+
+    let hue = (Math.atan2(bb, a) * 180) / Math.PI;
+    if (hue < 0) hue += 360;
+    return hue;
+  }
+
+  function hueDelta(a: number, b: number): number {
+    const d = Math.abs(a - b) % 360;
+    return d > 180 ? 360 - d : d;
+  }
+
+  // Representative hues spanning the out-of-gamut zones at the fixed identity
+  // L=0.80/C=0.15 (oranges ~41-65, blues ~211-243, reds ~348-4). Hard channel-
+  // clamping shifts these hues by tens of degrees; gamut-mapping (reduce C, keep
+  // L/hue) must not.
+  it.each([45, 65, 219, 243, 348, 4])(
+    "preserves hue %d° when gamut-mapping out-of-gamut chroma",
+    (hueDeg) => {
+      const hex = oklchToHex(IDENTITY_L, IDENTITY_C, hueDeg);
+      const back = srgbHexToOklchHue(hex);
+      expect(hueDelta(back, hueDeg)).toBeLessThan(4);
+    },
+  );
 });

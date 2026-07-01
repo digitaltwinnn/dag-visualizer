@@ -30,6 +30,9 @@
   --primary: oklch(0.88 0.13 195);           /* accent cyan #2af5ff — the sole live/accent signal */
   --primary-foreground: oklch(0.14 0.02 265);
   --ring: oklch(0.88 0.13 195);
+  /* Intentionally overrides the legacy --accent: #2af5ff (app/styles/00-base.css, consumed
+     by 3 legacy rules) — same colour, so no visible change; keeps --primary the single
+     source of truth. Don't drop this without checking those legacy rules first. */
   --accent: var(--primary);
   --accent-foreground: var(--primary-foreground);
 

@@ -8,6 +8,8 @@ export interface MgHue {
 
 // Sets --mg-<id> on :root so any chip/dot/thread/spine can read its metagraph's
 // identity hue via var(--mg-<id>). Structural tokens are never touched (two-lane rule).
+// Intentionally unused this phase (Phase 1, HUD foundation) — MetagraphVars gets mounted
+// app-wide in a later phase. Don't delete as dead code in an "unused export" sweep.
 export function applyMetagraphVars(list: MgHue[]): void {
   const root = document.documentElement;
   for (const m of list) {

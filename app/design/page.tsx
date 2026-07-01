@@ -1,3 +1,4 @@
+import { headers } from "next/headers";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
@@ -14,10 +15,14 @@ const STRUCTURAL: { name: string; var: string }[] = [
 ];
 
 export default async function DesignPage() {
-  const origin =
-    process.env.VERCEL_PROJECT_PRODUCTION_URL
-      ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`
-      : "http://localhost:3000";
+  // Same-origin base derived from the incoming request, not an env var — on a Vercel
+  // PREVIEW deployment, VERCEL_PROJECT_PRODUCTION_URL points at the PRODUCTION domain,
+  // which would make /design read production's palette instead of this deployment's.
+  // /design is already a dynamic route, so headers() is safe to await here.
+  const h = await headers();
+  const host = h.get("host");
+  const proto = host?.startsWith("localhost") ? "http" : "https";
+  const origin = `${proto}://${host}`;
   let metas: { id: string; symbol: string; hue?: { deg: number; oklch: string; hex: string } }[] = [];
   try {
     const r = await fetch(`${origin}/api/metagraphs`, { cache: "no-store" });
