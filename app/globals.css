@@ -1,3 +1,5 @@
+@import "tailwindcss";
+@import "tw-animate-css";
 @import "./styles/00-base.css";
 @import "./styles/01-snapshot-ribbon.css";
 @import "./styles/02-filter-panel.css";
