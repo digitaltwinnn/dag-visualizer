@@ -25,10 +25,17 @@ The metagraph filter (or "all") is the **pervasive context** — a snapshot is r
 
 ## Showing the parent → child relationship
 
-A vertical **anchor-line thread** runs down the left of the stack (reusing the app's anchor-line motif), tinted to the **active metagraph's identity hue** (identity lane), with a **node-dot** where each card attaches — a bigger dot for the parent, smaller for children. Each child also carries a **breadcrumb eyebrow** naming its parent (`DOR › node-7f3a`, `DOR · snapshot 6,517,348`).
+A vertical **anchor-line thread** runs down the stack (reusing the app's anchor-line motif), tinted to the **active metagraph's identity hue** (identity lane), with a **node-dot** where each card attaches. Each child carries a **breadcrumb eyebrow** naming its parent.
 
-- **Filter = all:** the thread goes **structural cyan** and the Context card is the compact "All · whole network" summary.
-- Clicking a node **sets the filter to its metagraph**, so the thread re-tints to that hue and the node becomes its child — parent/child integrity is automatic.
+**Rail placement & visual (settled):**
+- **Outer edge, not inner.** The thread hugs the **screen's outer edge** (right rail → right side of the cards); cards hang off it *toward* the scene. Principle: *rails dock to the screen edges; the thread runs the outer edge; content faces the scene* (mirrored for the left rail if it ever threads). Keeps the 3D centrepiece clean and makes the rail a signature edge feature.
+- **Instrument channel.** The spine sits in a subtle **recessed groove** (inner shadow) with **gradation tick-marks** in *neutral* structural chrome (ticks are measurement, not identity). The ticks use the **gradient-faded** treatment — distinct marks that dissolve toward the top & bottom (densest at the middle), so it never reads as a dense ruler. The **identity-hued spine** runs inside the groove.
+- **Node-dots at each card's vertical middle** (not the top corner) — so they never collide with the card's **× (kept top-right, conventional)**.
+- **Breadcrumbs read toward the edge** (`node ‹ DOR`).
+- **No data-driven pulse or gauge.** A live anchor-pulse-down-the-spine and a level-gauge variant were explored and rejected — a permanently/near-permanently animating rail competes with the scene. The rail stays static chrome; live acknowledgement happens in the panels (the odometer roll), not the rail.
+
+- **Filter = all:** the spine goes **structural cyan** and the Context card is the compact "All · whole network" summary.
+- Clicking a node **sets the filter to its metagraph**, so the spine re-tints to that hue and the node becomes its child — parent/child integrity is automatic.
 
 ## The count rule
 
