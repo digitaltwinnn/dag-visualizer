@@ -205,8 +205,11 @@ Append to `app/globals.css` (after the `@import` lines). Values are a tuned firs
 
   --border: rgba(90, 140, 255, 0.22);        /* matches the existing --panel-border */
   --input: var(--border);
-  --muted: oklch(0.18 0.03 265);
-  --secondary: var(--muted);
+  /* NOTE: do NOT redefine --muted here — the legacy app (app/styles/00-base.css)
+     defines --muted: #8a96b8 and uses it as light muted *text* in ~38 places.
+     shadcn's muted *surface* gets its own name so the two never collide. */
+  --surface-muted: oklch(0.18 0.03 265);
+  --secondary: var(--surface-muted);
   --secondary-foreground: var(--foreground);
 }
 
@@ -214,7 +217,7 @@ Append to `app/globals.css` (after the `@import` lines). Values are a tuned firs
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --color-muted: var(--muted);
+  --color-muted: var(--surface-muted);
   --color-muted-foreground: var(--muted-foreground);
   --color-card: var(--card);
   --color-card-foreground: var(--card-foreground);
