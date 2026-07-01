@@ -8,7 +8,8 @@
 With the dossier moved to the right rail (`2026-07-01-right-rail-subject-stack-design.md`), the left rail is now **purely the view's one interactive tool** — no `ContextPanel` here anymore.
 
 - **One Instrument-Glass panel** docked to the left screen edge, with a **left accent spine** in **structural cyan** (it's a tool = chrome; identity hues stay on the right-rail thread). `PanelHead` eyebrow = one verb: `<View> · explore`.
-- Contents per view (unchanged roles): `hyper` → `LearnPanel`; `geo` → `GeoExplore` (country→nodes accordion); `ledger` → `LedgerPanel`.
+- **The left rail holds the view's interactive panel** — either **data-exploration** (geo → `GeoExplore`, the country→nodes accordion) or **interactive learning** (ledger → `LedgerPanel`, the settlement-stack legend whose floor rows hover-highlight the 3D floor; hyper → the guided tour). The plain **text** view explainer stays on the *right* (the view-default); anything you *interact with* is here on the left.
+- Per view: `geo` → GeoExplore; `ledger` → LedgerPanel (settlement-stack legend — output ◇ / validator ○ floor markers, plain-language roles, "reading it" note); `hyper` → the guided tour (**currently broken → a static "about" placeholder card**).
 - **Country rows (GeoExplore): number-only.** Drop the per-row share bar — the right-aligned **count is enough**, and the list is sorted by it so rank reads top-to-bottom. (A faint full-width heat tint was considered and dropped; the bar was too busy.)
 - Rows: mono counts, hairline separation, hover state; clicking a country drills the globe + expands its nodes inline (master → nested detail), a node row opens its card on the right rail.
 
@@ -55,3 +56,4 @@ The bottom lane: one bar per global tick, clickable/hoverable to open that snaps
 - Implementation plan (writing-plans).
 - Reduced-motion: the live dot holds steady.
 - Fold the cap/body/baseline + spine tokens into the Instrument-Glass token pass.
+- **Align the explainer cards' consistency + level of detail** — the left interactive-learning panels (LedgerPanel legend, hyper guided tour) and the right text view-defaults vary in depth today; a later pass unifies how much each teaches. (Positioning is settled: interactive → left, text explainer → right.)

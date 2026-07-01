@@ -47,7 +47,7 @@ A vertical **anchor-line thread** runs down the stack (reusing the app's anchor-
 
 ## The View-default card
 
-- *What this lens is for* — a short title + one line + a pick-invite. **Every view has one** (including **hyper**, which has no right-rail detail today).
+- *What this lens is for* — a short title + one line + a pick-invite. **A text explainer.** Every view has one (including **hyper**, which has no right-rail detail today). Richer **interactive learning** (a guided tour, the ledger's clickable settlement-stack legend) is **not** this card — it's a **left-rail** interactive panel (see the left-rail spec). Right = brief text orientation + facts; left = the thing you interact with.
 - **= the Detail slot at rest.** At rest it's the expanded card; once a selection exists it **collapses to a slim view-header strip** at the top of the rail (above the Context card), one click to re-expand. Always accessible, never dominant.
 - **Neutral chrome — NOT identity yellow.** Gold `#ffd166` is SWAP's identity hue; using it here is a lane violation (it would misread as "the SWAP metagraph"). The explainer uses muted structural chrome; the only colour is the **cyan node-halo pick-invite** (live/interactive). There is no dedicated "info" colour in the structural lane — orientation chrome is neutral by design, which also keeps it non-dominant.
 
