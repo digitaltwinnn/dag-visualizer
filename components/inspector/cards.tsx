@@ -1,7 +1,7 @@
 "use client";
 
 import { useStore } from "@/src/store/store";
-import { getAnchor, shortHash, CORE_HEX } from "@/src/data/network";
+import { shortHash, CORE_HEX } from "@/src/data/network";
 import { toDag, hex, fmtKB } from "@/src/util/format";
 import type { GlobalSnapshot, MetaCfg, PickDescriptor } from "@/src/data/types";
 import AnchoredTags from "./AnchoredTags";
@@ -19,28 +19,18 @@ type PickOf<K extends PickDescriptor["kind"]> = Extract<PickDescriptor, { kind: 
 
 // A clicked Global L0 snapshot: its place in the DAG, what it anchored, and what it cost.
 export function SnapshotCard({ data: d }: { data: GlobalSnapshot }) {
-  // Re-render on anchor/global polls so the polled-floor fallback (old ticks) stays fresh.
-  useStore((s) => s.activity);
-  // EXACT totals from the raw L0 snapshot (via SnapshotExactBridge), if available for this tick.
-  // When present they're authoritative — the fee is the true total (incl. unlisted) and complete.
+  // EXACT totals from the raw L0 snapshot (via SnapshotExactBridge) are the ONLY source for the fee
+  // + anchored breakdown — authoritative (the true total, incl. unlisted). If they aren't here yet
+  // the tick is simply "reading…" (ACQUIRING); there is no polled-floor fallback. Every selectable
+  // tick is inside the L0 node's retention window, so exact always resolves.
   const exact = useStore((s) => s.snapshotExact[d.ordinal]);
-  const latestOrdinal = useStore((s) => s.latestOrdinal);
-  // The LIVE tick uses exact ONLY (it's recent, so the L0 read is quick) — never the polled floor.
-  // While exact is in-flight we show a brief "reading…" rather than a transient/settling number.
-  const isLive = latestOrdinal != null && d.ordinal === latestOrdinal;
-  const awaitingExact = isLive && exact == null;
+  const awaitingExact = exact == null;
   const anchored = typeof d.metagraphSnapshotCount === "number" ? d.metagraphSnapshotCount : null;
-  const a = getAnchor(d.timestamp);
-  const identified = a ? a.count : 0;
-  const feeDag = exact ? toDag(exact.totalFee) : a ? toDag(a.fee) : 0;
-  const full = exact != null || (anchored != null && a != null && identified >= anchored);
   const heightTxt =
     d.subHeight != null
       ? `${(d.height ?? 0).toLocaleString()} · ${d.subHeight}`
       : (d.height ?? 0).toLocaleString();
   const blocks = Array.isArray(d.blocks) ? d.blocks.length : 0;
-  // Fee shown from exact, or the polled floor for OLD ticks — but never the floor for the live tick.
-  const hasFee = exact ? exact.totalFee > 0 : !awaitingExact && !!a && a.fee > 0;
   return (
     // Borderless rows here (only the part dividers separate sections) so a row's
     // bottom border doesn't double up with the divider.
@@ -51,24 +41,21 @@ export function SnapshotCard({ data: d }: { data: GlobalSnapshot }) {
           so only surface it on the rare snapshot that actually has some. */}
       {blocks > 0 && <Row label="Blocks">{blocks}</Row>}
 
-      {/* ② what it anchored */}
-      {(exact || awaitingExact || (a && a.metaIds.size > 0)) && <div className="insp-div" />}
-      <AnchoredTags ts={d.timestamp} ordinal={d.ordinal} anchored={anchored} awaiting={awaitingExact} />
+      {/* ② what it anchored (exact breakdown, or "reading…" until it lands) */}
+      <div className="insp-div" />
+      <AnchoredTags ordinal={d.ordinal} anchored={anchored} awaiting={awaitingExact} />
 
-      {/* ③ what it cost — just the figure + how complete it is; no prose, the data is the point. */}
-      {hasFee && <div className="insp-div" />}
-      {hasFee && (
-        <Row label="Settlement fees">
-          {feeDag.toFixed(4)} DAG
-          {/* Two independent facts: the fee (as reported) and the measured serialized size (the
-              content byte length) — the size is NOT derived from the fee. */}
-          {exact ? <span className="insp-dim"> · {fmtKB(exact.totalSizeKB)} of data</span> : null}{" "}
-          {!exact && (
-            <span className={"insp-mini " + (full ? "ok" : "approx")}>
-              {full ? "complete" : "at least"}
-            </span>
-          )}
-        </Row>
+      {/* ③ what it cost — the exact figure + measured size, or nothing until exact lands. Two
+          independent facts: the fee (as reported) and the serialized size (content byte length) —
+          the size is NOT derived from the fee. */}
+      {exact != null && exact.totalFee > 0 && (
+        <>
+          <div className="insp-div" />
+          <Row label="Settlement fees">
+            {toDag(exact.totalFee).toFixed(4)} DAG
+            <span className="insp-dim"> · {fmtKB(exact.totalSizeKB)} of data</span>
+          </Row>
+        </>
       )}
     </div>
   );

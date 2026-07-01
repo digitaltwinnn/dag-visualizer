@@ -1,7 +1,7 @@
 "use client";
 
 import { useStore } from "@/src/store/store";
-import { getAnchor, metagraphById } from "@/src/data/network";
+import { metagraphById } from "@/src/data/network";
 import { hex } from "@/src/util/format";
 
 // The colour-coded pills on the snapshot card: one per listed metagraph anchored into this global
@@ -11,25 +11,21 @@ import { hex } from "@/src/util/format";
 // floor; only OLD/pruned ticks fall back to the polled anchor index. When a metagraph filter is
 // active, the other pills dim so the selection stands out.
 export default function AnchoredTags({
-  ts,
   ordinal,
   anchored,
   awaiting,
 }: {
-  ts: string;
   ordinal: number;
   anchored: number | null;
   awaiting?: boolean;
 }) {
   const filter = useStore((s) => s.filter);
   const exact = useStore((s) => s.snapshotExact[ordinal]);
-  // Re-render on each anchor poll so the polled fallback (old ticks) stays fresh.
-  useStore((s) => s.activity);
 
   const metaFilter = metagraphById(filter) != null;
 
-  // Listed metagraphs (id → count) + the unlisted count. Exact wins; for the live tick we show
-  // nothing-but-the-total until exact lands; only old ticks use the polled floor.
+  // Listed metagraphs (id → count) + the unlisted count, straight from the EXACT read — the only
+  // source (no polled floor). Until exact lands we show just the label + total + "reading…".
   const listed: Array<{ id: string; n: number }> = [];
   let unlisted = 0;
 
@@ -38,18 +34,10 @@ export default function AnchoredTags({
       if (metagraphById(addr)) listed.push({ id: addr, n: count });
     }
     unlisted = exact.unlistedCount;
-  } else if (!awaiting) {
-    const a = getAnchor(ts);
-    if (a && a.metaIds.size) {
-      for (const id of a.metaIds) {
-        if (metagraphById(id)) listed.push({ id, n: a.metaCounts.get(id) || 1 });
-      }
-      if (anchored != null && anchored > a.count) unlisted = anchored - a.count;
-    }
   }
 
-  // Old tick with no data at all → render nothing. (While awaiting we still show the label+total.)
-  if (!exact && !awaiting && !listed.length && unlisted === 0) return null;
+  // Nothing to show and not acquiring → render nothing. (While awaiting we still show label+total.)
+  if (!exact && !awaiting) return null;
   listed.sort((x, y) => y.n - x.n); // strongest anchorer first
 
   const tags: React.ReactNode[] = listed.map(({ id, n }) => {
