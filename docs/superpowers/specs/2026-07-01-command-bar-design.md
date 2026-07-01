@@ -37,8 +37,18 @@ A quiet control, not a status badge (the state is over-communicated elsewhere).
 
 - `Filter` micro-label + a **small identity dot** + the network **name in neutral text** + caret. **No filled chip**, no nested boxes.
 - **All:** the dot goes **neutral cyan**, reads `All ▾`.
-- Clicking still **expands the bar downward into the `FilterChips` grid** (one connected surface — unchanged behaviour).
+- Clicking **expands the bar downward into the picker** (one connected surface).
 - Rationale: the right-rail thread + breadcrumbs + filtered scene already carry the loud "you're on DOR" signal, so the control recedes.
+
+### The expanded picker — logo list + search
+Redesigned from the flat chip row into a proper selection menu (it's an identity-selection surface — a legitimate place for **logos**, alongside the dossier; unlike the tiny inline pill/tooltip):
+
+- **`All · whole network`** pinned on top (metagraph count + total nodes) — the default / clear option.
+- **One row per metagraph:** **logo avatar** (rounded tile, ringed in the identity hue; monogram fallback) + **name** + **ticker** (identity hue) + **node count** on the right.
+- **Sorted by node count (desc)** — most-significant first, which also sinks the **0-node / unlocatable** metagraphs to the bottom (shown **greyed with their real count**, e.g. `0 · located` — factual, never hidden).
+- **Current pick highlighted** in its identity hue; hover state on the rest.
+- **Search field** at the top — earns its keep as the metagraph set grows (the generator scales 100+); the list scrolls.
+- Instrument-Glass surface, visually continuous with the bar (rounded to meet the filter button).
 
 ## View switch
 
@@ -52,7 +62,7 @@ Per-view mono numerics on the right (`hyper` = structure, filter-aware; `geo` = 
 
 - `components/TopBar.tsx` — restructure: add the brand lockup + ECG logo; **remove the whole-bar `--tb-accent` metagraph tint** (keep the view switch structural); de-nest + tone the filter; keep the expand-to-chips behaviour.
 - `components/topbar/Vitals.tsx` — wire the odometer roll into the headline values.
-- `components/topbar/FilterChips.tsx` — unchanged (the expanded grid).
+- `components/topbar/FilterChips.tsx` — **reworked** from the chip grid into the **logo list + search** picker: `All` on top, rows (logo/monogram + name + ticker + count) sorted by node count desc, current pick highlighted, 0-node metagraphs greyed at the bottom, a search input for scaling.
 - New: the ECG logo component (live sweep / flatline), reading `store.live`.
 
 ## Open / follow-ups
