@@ -23,7 +23,7 @@ Renamed from "node fabric". **Numeric + purposeful; fully factual.**
   - `Data  dL1` · `Currency  cL1` · `Consensus  L0` — dedicated single-layer machines, named by that layer's role.
   - Rows **sum to the total**; show only the groups that exist.
 - **Chips** = a stack of uniform node-dots per row, **visual scale only** (echoing the 3D nodes): capped at ~10, **no `+N`** — the **count on the right is authoritative** (so it's factual and never sprawls, at any N). No hybrid/dedicated styling on the chips themselves (the 3D view doesn't distinguish node types visually — it's a data attribute; the *row* carries the type).
-- **Status** — one line, **text + one dot per state**, structural semantic colours: **ready = green**, **waiting = muted** (no amber — that's SWAP's identity), **offline = warn-red**. All-ready collapses to a single green `all ready`; otherwise it lists only the non-zero states (`18 ready · 2 waiting · 4 offline`).
+- **Status** — one line, **text + one dot per bucket**, using the shared node status buckets (see `2026-07-01-geo-node-card-design.md`): **in consensus = green**, **in progress = amber**, **down = red** (+ muted unknown). All-ready collapses to a single green `all ready`; otherwise it lists only the non-zero buckets (`28 ready · 3 in progress · 2 down`).
 
 ### Layer glossary (plain ↔ code)
 - **Consensus** = `L0` — the backbone; produces the metagraph's snapshots.

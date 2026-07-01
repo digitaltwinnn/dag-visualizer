@@ -7,8 +7,8 @@
 
 - **Fixed lightness + chroma: `L 0.80 · C 0.15`.** Every metagraph hue renders at the same perceptual weight, so nodes glow **equally** on `#05060e` regardless of hue (no colour is louder/dimmer than another).
 - **Guard-bands (~±16°)** around each **reserved structural hue** so identity never collides with chrome/status:
-  - warn-red ~25° · success-green ~165° · accent-cyan ~195° · core-L0-blue ~265° · core-L1-violet ~300°.
-- **Allowed hue zones** (the gaps): roughly **41–149°**, **211–249°**, **316–9°** (wrap). All generated hues live here.
+  - warn-red ~25° · **status-amber ~90°** (the "in progress" node-status colour — see the geo-node-card spec) · success-green ~165° · accent-cyan ~195° · core-L0-blue ~265° · core-L1-violet ~300°.
+- **Allowed hue zones** (the gaps): the ~41–149° band is now **split by the amber guard-band** (≈41–74° and ≈106–149°), plus **211–249°** and **316–9°** (wrap). All generated hues live here. (A warm/gold brand snaps to the nearest allowed side of the amber band.)
 - **Scaling:** the allowed zones hold ~20 perceptually-distinct hues at one L/C. Past that, add a **dimmer 2nd tier** (lower L/C) so overflow stays distinct. In practice all metagraphs are rarely on screen at once; the filter/legend + the ever-present **ticker label** disambiguate.
 
 ## Assignment — brand-first, hash-fallback

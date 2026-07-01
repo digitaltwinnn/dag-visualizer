@@ -17,11 +17,20 @@ Data honesty: only what the node data actually has — **id / ip / state / roles
 
 ## Status system (shared rule)
 
-Single-status displays (this card, and anywhere one status shows):
-- **Ready** → **plain green text** (the calm, healthy default — most nodes; no need to emphasise "all's well").
-- **Any non-ready state → a pill** ("attention"), severity by colour: **waiting** = **muted pill** (transitional — *no amber*, that's SWAP's identity), **offline** = **red pill** (error).
+The Constellation node lifecycle has ~9 real states (`Ready`, `Observing`, `WaitingForObserving`, `WaitingForReady`, `WaitingForDownload`, `DownloadInProgress`, `StartingSession`, `SessionStarted`, `Leaving`, `Offline`, …). The current code colours them with **6 hues** (cyan/amber/orange/purple + green/red) — which collides with the accent / core / identity lanes. **Consolidate to: colour = the bucket, text = the exact state.**
 
-The dossier's node-composition **breakdown** (many nodes) uses **dots + counts** (`20 ready · 2 waiting · 4 offline`) — a different form for an aggregate, but the same **green / muted / red** colour language.
+**Three semantic buckets (+ unknown):**
+- **In consensus** → **green** · `Ready`.
+- **In progress** → **amber** · the exact state as the label (`observing` / `waiting` / `syncing` / `joining`) — covers Observing / WaitingForObserving / WaitingForReady / WaitingForDownload / DownloadInProgress / StartingSession / SessionStarted.
+- **Down** → **red** · `offline` / `leaving`.
+- **Unknown** → **muted** · any unrecognised state.
+
+So the **colour** is the bucket (three lane-clean hues) and the **text** is the precise lifecycle stage — nothing lost, fully factual, no status rainbow.
+
+**Single status** (this card, GeoExplore rows): Ready = **plain green text**; any non-ready = a **pill** in its bucket colour (amber / red / muted), labelled with the exact state.
+**Breakdown** (dossier composition): the buckets rolled into counts + colour dots — `28 ready · 3 in progress · 2 down`.
+
+Amber joins the **reserved structural bands** in the identity generator (see that spec), so no metagraph resolves to amber.
 
 ## Error never breaks the identity frame
 
