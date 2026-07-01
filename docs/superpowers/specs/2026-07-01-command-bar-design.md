@@ -56,7 +56,14 @@ Segmented control, six views, **monochrome glyphs only (never emoji)**. Active =
 
 ## Vitals
 
-Per-view mono numerics on the right (`hyper` = structure, filter-aware; `geo` = footprint; `ledger` = live activity with sparklines). The **headline metrics use the odometer roll** on meaningful ticks (per `2026-07-01-panel-data-updates-design.md`). Divided from the view switch by a hairline.
+Per-view mono numerics on the right — one **cell grammar** (uppercase muted label + neutral mono value + optional sparkline), hairline-separated, divided from the view switch by a hairline. **Numbers are neutral** (the number-colour rule); values **odometer-roll** on meaningful ticks.
+
+**The three clusters:**
+- **hyper — structure** (filter-aware): `L0 · cL1 · dL1` — nodes serving each layer for the current selection. One taxonomy: a hybrid counts in every layer it runs, so columns can **sum past the node total**. A filtered metagraph shows its own counts with an **em-dash for absent layers** (`cL1 —`), keeping the three columns stable (no reflow on switch).
+- **geo — footprint**: `Nodes · Countries · Densest` — total machines on the map, the country count, and the densest country (flag + count). (The **Distribution score** moved out of the vitals into the GeoExplore header — see that spec.)
+- **ledger — live activity**: `snaps/h · anchors/h · fees/h`, each with a trend **sparkline**. The sparkline is **muted-neutral history bars + a cyan live/latest bar** — cyan = the live accent (already in the bar via the spine + ECG), lane-correct because these *are* the live-activity charts. The only splash of colour in the vitals.
+
+**Filtered state — stays neutral.** When a metagraph is filtered the vitals scope to it (its counts / footprint / own activity), but there is **no scope chip and no tinted border** — the **filter pill** (left of the same bar) is the single, subtle scope cue; re-announcing it on the right would break the toned/neutral-bar principle. The vitals just show the scoped numbers (small counts + em-dash already signal a metagraph view).
 
 ## Affected components
 

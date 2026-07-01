@@ -5,7 +5,7 @@
 
 ## Layout
 
-Instrument-Glass panel docked left, **structural cyan spine** (it's a tool), `PanelHead`: eyebrow `Geography · explore`, title `Nodes by country`.
+Instrument-Glass panel docked left, **structural cyan spine** (it's a tool), `PanelHead`: eyebrow `Geography · explore`, title `Nodes by country`, with the **`Distribution score`** (the 0–1 decentralisation metric, a computed value — labelled "score" to signal that) right-aligned in the header, beside the country list it summarises. (Moved here from the top-bar geo vitals, which now lead with `Nodes`.)
 
 - **Country rows** — `flag · name · magnitude bar · count`, **sorted by count desc**. The **magnitude bar stays** (this is a distribution leaderboard — the bar aids scanning which countries dominate, unlike the 2-row node composition where a bar was busy). **Bar style matches the breakdown bars**: a **solid cyan fill + faint glow on a thin track**. Bar = share of the top country (relative ranking); when a metagraph is filtered, the list narrows to its nodes and the bar **tints to the metagraph hue**.
 - **Expand a country** → drills the globe into it (`store.country`) **and** expands its **nodes inline** (master → nested detail): each node row = `metagraph-hue dot · id · · ticker · status`, using the **shared node status system** (colour = bucket: green `Ready` text / amber in-progress pill / red down pill / muted unknown; text = the exact state — see `2026-07-01-geo-node-card-design.md`). Clicking a node row opens the **geo node card** on the right rail.
