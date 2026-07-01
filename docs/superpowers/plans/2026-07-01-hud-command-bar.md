@@ -298,7 +298,9 @@ const FLAT = "M0 12 H34";
 export default function EcgMark() {
   const live = useStore((s) => s.live);
   const { snaps } = useSnapshotFeed(8); // small window; take the max ordinal (order-agnostic)
-  const latest = snaps.length ? Math.max(...snaps.map((s) => s.data.ordinal)) : null;
+  // NOTE: useSnapshotFeed returns GlobalSnapshot[] with `.ordinal` directly (NOT `.data.ordinal`
+  // — that wrapper is the store's pick descriptor, a different type). Verify against LiveStrip.tsx.
+  const latest = snaps.length ? Math.max(...snaps.map((s) => s.ordinal)) : null;
   const [beat, setBeat] = useState(false);
   const prevOrd = useRef<number | null>(null);
 
