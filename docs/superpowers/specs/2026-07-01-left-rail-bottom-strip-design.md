@@ -32,12 +32,23 @@ The bottom lane: one bar per global tick, clickable/hoverable to open that snaps
 ### Live indicator
 - `Global L0` label + a breathing dot at the ~1.5 s tempo (the top-bar ECG is the hero heartbeat; the strip's dot stays a simple pulse). No panel chrome — the strip blends into the scene.
 
+### Hover, tooltip & click
+- **Hover a bar** → its **cap glows** (and body lifts slightly) **and** the matching **block in the ledger view glows** — bidirectional cross-highlight, the same "one focus language" as the scene tie-in (`2026-07-01-hud-scene-tiein-design.md`).
+- **Tooltip** — the shared Instrument-Glass tooltip, border in the subject hue (metagraph hue when filtered, core cyan for All):
+  - **Bare ordinal** as the head — **no `#`** (a big mono number in a snapshot tooltip is obviously the ordinal).
+  - **Counts:** `anchored N` (All) · `‹TICKER› N of total` (filtered) · `‹TICKER› 0 · none this tick` + the tick total (a **gap** tick the metagraph skipped).
+  - **Recency:** a quiet `◷ 12s ago` line — **relative + coarse** (freshness, not a ticking clock); the **live bar** reads `● live now` (pulsing cyan dot).
+  - **Hint:** `click to open snapshot`.
+- **Gap ticks stay hoverable/clickable** (they're real global snapshots).
+- **Click** → opens that snapshot's **card in the right rail**; from `hyper`/`geo` it **jumps to `ledger`**. Consistent commit language with the rest of the HUD.
+
 ## Affected components
 
 - `components/LeftColumn.tsx` — remove `ContextPanel` (moved right); placeholders no longer render a left tool card (their explainer is the right-rail View-default).
 - `components/GeoExplore.tsx` — country rows number-only (drop the share bar).
 - Left panels + `PanelHead` — structural-cyan spine, Instrument-Glass surface.
-- `components/LiveStrip.tsx` — crisp-cap / faded-body bars (~26%), faint baseline; **switch the filtered encoding to the metagraph's own per-tick counts on its own scale** (was share-of-total); y-label swap; total on hover; keep per-bar click/hover → snapshot selection.
+- `components/LiveStrip.tsx` — crisp-cap / faded-body bars (~26%), faint baseline; **switch the filtered encoding to the metagraph's own per-tick counts on its own scale** (was share-of-total); y-label swap; per-bar hover (cap glow + ledger cross-highlight) and click → snapshot selection.
+- `components/Tooltip.tsx` (LiveStrip variant) — bare ordinal (no `#`), counts, relative recency / `live now`, click hint; subject-hued border.
 
 ## Open / follow-ups
 
