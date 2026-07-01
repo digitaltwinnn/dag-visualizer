@@ -10,8 +10,7 @@ With the dossier moved to the right rail (`2026-07-01-right-rail-subject-stack-d
 - **One Instrument-Glass panel** docked to the left screen edge, with a **left accent spine** in **structural cyan** (it's a tool = chrome; identity hues stay on the right-rail thread). `PanelHead` eyebrow = one verb: `<View> · explore`.
 - **The left rail holds the view's interactive panel** — either **data-exploration** (geo → `GeoExplore`, the country→nodes accordion) or **interactive learning** (ledger → `LedgerPanel`, the settlement-stack legend whose floor rows hover-highlight the 3D floor; hyper → the guided tour). The plain **text** view explainer stays on the *right* (the view-default); anything you *interact with* is here on the left.
 - Per view: `geo` → GeoExplore; `ledger` → LedgerPanel (settlement-stack legend — output ◇ / validator ○ floor markers, plain-language roles, "reading it" note); `hyper` → the guided tour (**currently broken → a static "about" placeholder card**).
-- **Country rows (GeoExplore): number-only.** Drop the per-row share bar — the right-aligned **count is enough**, and the list is sorted by it so rank reads top-to-bottom. (A faint full-width heat tint was considered and dropped; the bar was too busy.)
-- Rows: mono counts, hairline separation, hover state; clicking a country drills the globe + expands its nodes inline (master → nested detail), a node row opens its card on the right rail.
+- **GeoExplore is specced in full in `2026-07-01-geoexplore-design.md`** (it supersedes an earlier "number-only / Other-fold" note here): country rows = flag · name · **magnitude bar** (kept — it's a distribution leaderboard) · count, sorted desc; a **ScrollArea** (no "Other" fold); clicking a country drills the globe + expands its nodes inline (master → nested detail), a node row opens its card on the right rail.
 
 **Reconciliation:** the scaffolded placeholder views' "about" copy is *orientation* — it now belongs to the **View-default card on the right** (per the right-rail spec), not a left `PlaceholderPanel`. A not-yet-interactive view has **no left tool card**; its explainer lives on the right. (Left tool returns when the view gains real interaction.)
 
@@ -46,7 +45,7 @@ The bottom lane: one bar per global tick, clickable/hoverable to open that snaps
 ## Affected components
 
 - `components/LeftColumn.tsx` — remove `ContextPanel` (moved right); placeholders no longer render a left tool card (their explainer is the right-rail View-default).
-- `components/GeoExplore.tsx` — country rows number-only (drop the share bar).
+- `components/GeoExplore.tsx` — see `2026-07-01-geoexplore-design.md` (magnitude bar kept, ScrollArea, inline node expansion).
 - Left panels + `PanelHead` — structural-cyan spine, Instrument-Glass surface.
 - `components/LiveStrip.tsx` — crisp-cap / faded-body bars (~26%), faint baseline; **switch the filtered encoding to the metagraph's own per-tick counts on its own scale** (was share-of-total); y-label swap; per-bar hover (cap glow + ledger cross-highlight) and click → snapshot selection.
 - `components/Tooltip.tsx` (LiveStrip variant) — bare ordinal (no `#`), counts, relative recency / `live now`, click hint; subject-hued border.
