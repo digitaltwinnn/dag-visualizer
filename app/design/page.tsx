@@ -5,6 +5,7 @@ import { Separator } from "@/components/ui/separator";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import OdometerDemo from "./OdometerDemo";
+import EcgMark from "@/components/topbar/EcgMark";
 
 const STRUCTURAL: { name: string; var: string }[] = [
   { name: "background", var: "--background" },
@@ -117,6 +118,13 @@ export default async function DesignPage() {
           Command-bar primitives
         </h2>
         <div className="flex items-center gap-6">
+          <span className="flex items-center gap-2">
+            <EcgMark />
+            <span className="font-semibold tracking-tight">
+              <span className="text-foreground">DAG</span>{" "}
+              <span className="text-muted-foreground">Visualizer</span>
+            </span>
+          </span>
           <ToggleGroup type="single" defaultValue="a" variant="outline">
             <ToggleGroupItem value="a">◆</ToggleGroupItem>
             <ToggleGroupItem value="b">◍</ToggleGroupItem>
