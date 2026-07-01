@@ -13,3 +13,90 @@
 @import "./styles/12-panel-system.css";
 @import "./styles/13-right-column.css";
 @import "./styles/14-top-bar.css";
+
+/* ── Structural lane (chrome + status) — shadcn CSS variables in oklch ── */
+:root {
+  --radius: 14px;
+
+  --background: oklch(0.09 0.02 265);        /* #05060e app bg */
+  --foreground: oklch(0.94 0.02 255);        /* #e8eefc text */
+  --muted-foreground: oklch(0.66 0.04 265);  /* #8a96b8 muted */
+
+  --card: oklch(0.15 0.03 265);
+  --card-foreground: var(--foreground);
+  --popover: var(--card);
+  --popover-foreground: var(--foreground);
+
+  --primary: oklch(0.88 0.13 195);           /* accent cyan #2af5ff — the sole live/accent signal */
+  --primary-foreground: oklch(0.14 0.02 265);
+  --ring: oklch(0.88 0.13 195);
+  --accent: var(--primary);
+  --accent-foreground: var(--primary-foreground);
+
+  --destructive: oklch(0.63 0.20 25);        /* warn red */
+  --destructive-foreground: var(--foreground);
+
+  /* Added beyond shadcn defaults (structural, still not identity) */
+  --success: oklch(0.80 0.15 165);           /* ready / green */
+  --core-l0: oklch(0.66 0.16 265);           /* DAG L0 blue #5b8cff */
+  --core-l1: oklch(0.66 0.19 300);           /* DAG L1 violet #b06bff */
+
+  --border: rgba(90, 140, 255, 0.22);        /* matches the existing --panel-border */
+  --input: var(--border);
+  --surface-muted: oklch(0.18 0.03 265);
+  --secondary: var(--surface-muted);
+  --secondary-foreground: var(--foreground);
+}
+
+/* ── Tailwind v4 theme mapping — expose the vars as utilities ── */
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-muted: var(--surface-muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-success: var(--success);
+  --color-core-l0: var(--core-l0);
+  --color-core-l1: var(--core-l1);
+  --color-border: var(--border);
+  --color-ring: var(--ring);
+  --radius-lg: var(--radius);
+  --radius-md: calc(var(--radius) - 4px);
+  --radius-sm: calc(var(--radius) - 8px);
+  --animate-breathe: breathe 1.5s ease-in-out infinite;
+}
+
+@keyframes breathe {
+  0%, 100% { opacity: 0.55; }
+  50%      { opacity: 1; }
+}
+
+/* ── Instrument-Glass surface — the shared panel frame + left accent spine ── */
+@layer components {
+  .ig-panel {
+    position: relative;
+    background: linear-gradient(180deg, rgba(20, 26, 46, 0.78), rgba(10, 14, 28, 0.72));
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    backdrop-filter: blur(12px);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05), 0 8px 30px rgba(0, 0, 0, 0.35);
+  }
+  .ig-panel::before {
+    content: "";
+    position: absolute;
+    left: 0; top: 10px; bottom: 10px;
+    width: 2px;
+    border-radius: 2px;
+    /* structural cyan by default; identity panels set --spine: var(--mg) */
+    background: var(--spine, var(--primary));
+    opacity: 0.8;
+  }
+}
