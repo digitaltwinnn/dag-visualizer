@@ -1,3 +1,7 @@
+import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Separator } from "@/components/ui/separator";
+
 const STRUCTURAL: { name: string; var: string }[] = [
   { name: "background", var: "--background" },
   { name: "foreground", var: "--foreground" },
@@ -32,6 +36,38 @@ export default function DesignPage() {
               <div className="text-xs font-mono">{t.var}</div>
             </div>
           ))}
+        </div>
+      </section>
+
+      <section className="mb-10">
+        <h2 className="text-sm uppercase tracking-widest text-muted-foreground mb-3">
+          Primitives
+        </h2>
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 max-w-2xl">
+          <Card>
+            <CardHeader>
+              <CardTitle>Glass card</CardTitle>
+            </CardHeader>
+            <CardContent className="text-sm text-muted-foreground">
+              Translucent glass surface with a structural-cyan accent spine.
+              <Separator className="my-3" />
+              <div className="flex flex-wrap gap-2">
+                <Badge>default</Badge>
+                <Badge variant="secondary">secondary</Badge>
+                <Badge variant="destructive">down</Badge>
+                <Badge variant="outline">outline</Badge>
+              </div>
+            </CardContent>
+          </Card>
+          <Card style={{ ["--spine" as string]: "var(--success)" }}>
+            <CardHeader>
+              <CardTitle>Spine override</CardTitle>
+            </CardHeader>
+            <CardContent className="text-sm text-muted-foreground">
+              The accent spine reads <code className="font-mono">--spine</code>; identity
+              panels point it at <code className="font-mono">--mg</code>. Here it is success-green.
+            </CardContent>
+          </Card>
         </div>
       </section>
     </main>
