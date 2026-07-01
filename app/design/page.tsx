@@ -4,6 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import OdometerDemo from "./OdometerDemo";
 
 const STRUCTURAL: { name: string; var: string }[] = [
   { name: "background", var: "--background" },
@@ -124,6 +125,7 @@ export default async function DesignPage() {
           <Avatar className="size-8">
             <AvatarFallback>DED</AvatarFallback>
           </Avatar>
+          <OdometerDemo />
         </div>
       </section>
     </main>

@@ -82,6 +82,18 @@
   50%      { opacity: 1; }
 }
 
+@keyframes odo-in  { from { transform: translateY(60%); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+@keyframes odo-out { from { transform: translateY(0);   opacity: 1; } to { transform: translateY(-60%); opacity: 0; } }
+@layer components {
+  .odometer { position: relative; display: inline-grid; overflow: hidden; line-height: 1.1; }
+  .odometer > span { grid-area: 1 / 1; }
+  .odometer-in  { animation: odo-in  0.4s ease-out; }
+  .odometer-out { animation: odo-out 0.4s ease-out forwards; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .odometer-in, .odometer-out { animation: none; }
+}
+
 /* ── Instrument-Glass surface — the shared panel frame + left accent spine ── */
 @layer components {
   .ig-panel {
