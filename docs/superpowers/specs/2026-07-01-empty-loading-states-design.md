@@ -77,6 +77,22 @@ Kept (still load-bearing, verified in use): the `anchorIndex`/`getAnchor` infra 
 - **NO SIGNAL** — any live-data panel when `NetworkData` is in its no-data state (top-bar vitals, snapshot card, live strip lane).
 - **STANDBY** — the right-rail Detail zone when its pick is empty (geo `GeoLiveCard` / `#rc-empty`).
 
+## Per-view empty & edge-state map
+
+No new "empty" vocabulary — every per-view edge case reuses one of the states above (or the view-default / gaps):
+
+| Condition | Resolves to |
+|---|---|
+| **Nothing picked** (geo / ledger) | the right-rail **view-default** card (= STANDBY) — "what this view is + pick something" (`2026-07-01-right-rail-subject-stack-design.md`) |
+| **Geo · filtered metagraph with 0 locatable nodes** | the **GeoExplore quiet empty** (below) + the globe shows nothing for it; the dossier still describes it |
+| **Ledger · following live** | never empty — the live **`SnapshotCard`** follows the tick |
+| **Ledger · no snapshots yet** | **ACQUIRING** / first-load (constellation), then fills in |
+| **Filtered · metagraph never anchors in the window** | its LiveStrip / ledger lane shows honest **gaps** (0), not hidden |
+| **Feed unreachable** (any view) | **NO SIGNAL** (grey, flatline ECG) after the timeout |
+
+### GeoExplore quiet empty (the one new piece)
+When a filtered metagraph has **no locatable nodes** (in `config.METAGRAPHS` with a hub, but 0 geolocatable nodes — e.g. PACA/LEET/TBC at a given bake), GeoExplore replaces the country list with a quiet empty: a **dimmed node-dot** (slow dashed ring — the constellation/STANDBY family, but greyed = no live nodes) + **`No locatable nodes`** + an honest one-liner (*"PACA has no validators we can place on the map right now. It still appears in the Hypergraph."*) + a subtle **`See it in the Hypergraph →`** jump (turns the dead-end into a next action; consistent with cross-view flow). No fabricated data.
+
 ## Open / follow-ups
 
 - Implementation plan (component + CSS-token changes) is the next step (writing-plans).
