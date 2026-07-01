@@ -10,10 +10,12 @@ export default function PlaceholderPanel({
   title,
   eyebrow,
   lines,
+  caption = "SOON",
 }: {
   title: string;
   eyebrow: string;
   lines: string[];
+  caption?: string;
 }) {
   const [collapsed, setCollapsed] = useState(false);
   return (
@@ -21,7 +23,7 @@ export default function PlaceholderPanel({
       <PanelHead
         title={title}
         eyebrow={eyebrow}
-        caption="SOON"
+        caption={caption || undefined}
         collapsed={collapsed}
         onToggle={() => setCollapsed((c) => !c)}
       />

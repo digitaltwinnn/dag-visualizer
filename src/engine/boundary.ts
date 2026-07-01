@@ -86,7 +86,6 @@ export interface LayersApi {
   focusId: string | null;
   pickables: THREE.Object3D[];
   update(dt: number, morph: number): void;
-  setHighlight(focus: string | null): void;
   /** Mark which metagraph hubs have locatable nodes (active); the rest are dimmed inactive. */
   setMetaActive(ids: Set<string> | null): void;
   /** Fire an "anchored into L0" packet from a metagraph's hub toward the core (anchor event). */
@@ -122,7 +121,6 @@ export interface GlobeApi {
   focusNode(geo: { lat?: number; lon?: number } | null | undefined): boolean;
   /** Tint the raised-land coastline edge toward a colour (hex), or null for the default. */
   setEdgeColor(color: number | null): void;
-  setHighlight(focus: string | null): void;
   setMorph(m: number): void;
   /** Snapshots view: place the shared node meshes into the planar rows (off restores morph layout). */
   setLedger(on: boolean): void;

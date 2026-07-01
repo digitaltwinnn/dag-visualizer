@@ -476,17 +476,6 @@ export class Globe {
     group.traverse((o) => { if (o.userData && o.userData.baseOpacity != null) o.material.opacity = o.userData.baseOpacity * m; });
   }
 
-  // Focus one topic from the learn panel, dimming the validator layers that
-  // aren't part of it. `focus` is overview | l0 | l1 | metagraphs | null.
-  setHighlight(focus) {
-    let l0 = 0, l1 = 0;
-    if (focus === "l0") l1 = 1;
-    else if (focus === "l1") l0 = 1;
-    else if (focus === "metagraphs") { l0 = 1; l1 = 1; }
-    this.dimTarget.l0 = l0;
-    this.dimTarget.l1 = l1;
-  }
-
   // -------------------------------------------------- metagraph nodes
   // Build the metagraph validator markers from baked data. `list` is the
   // contents of data/metagraphs.json; geoMap supplies each node's location.

@@ -57,17 +57,6 @@ export class Layers {
     }
   }
 
-  // Focus one topic from the learn panel and dim the rest. `focus` is one of
-  // overview | l0 | l1 | metagraphs | null (null/overview clears the dim).
-  setHighlight(focus) {
-    let core = 0, meta = 0;
-    if (focus === "l0")            { meta = 1; }            // core stays lit
-    else if (focus === "l1")       { core = 1; meta = 1; }  // outer shell only
-    else if (focus === "metagraphs") { core = 1; }          // metas stay lit
-    this.dimTarget.core = core;
-    this.dimTarget.meta = meta;
-  }
-
   // ---------------------------------------------------------------- Core
   _buildCore() {
     this.coreGroup = new THREE.Group();

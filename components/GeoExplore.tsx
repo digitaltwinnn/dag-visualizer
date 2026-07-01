@@ -10,8 +10,8 @@ import type { NodeRow } from "@/src/data/types";
 
 const TOP = 9;
 
-// Geography's single **explore** card (mirrors the Hypergraph's one LearnPanel — one frame,
-// one "Geography · explore" eyebrow, an accordion you click into). The country list IS the
+// Geography's single **explore** card (one frame, one "Geography · explore" eyebrow, an
+// accordion you click into). The country list IS the
 // node browser: each country is a row showing its share of the footprint (bar + count), and
 // clicking it drills the globe into that country AND expands its nodes inline — master on
 // top, detail nested beneath, then a node row opens its card on the right facts rail.

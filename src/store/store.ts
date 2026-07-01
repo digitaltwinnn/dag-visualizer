@@ -60,8 +60,6 @@ interface AppState {
   following: boolean;
   // Hover tooltip content (engine raycast); positioned by the Tooltip component.
   hover: { title: string; sub: string; roles?: string[]; id?: string; color?: string } | null;
-  // Active "Understand the network" topic (camera focus + layer highlight), or null.
-  learnFocus: string | null;
   // Country drill-down within the network filter (geo view), or null.
   country: string | null;
   // Per-country breakdown + distribution score for the active filter (engine-pushed).
@@ -98,7 +96,6 @@ interface AppState {
   setHover: (
     hover: { title: string; sub: string; roles?: string[]; id?: string; color?: string } | null,
   ) => void;
-  setLearnFocus: (focus: string | null) => void;
   setCountry: (cc: string | null) => void;
   setLeaderboard: (lb: LeaderboardData | null) => void;
   setSelNodes: (nodes: NodeRow[]) => void;
@@ -126,7 +123,6 @@ export const useStore = create<AppState>((set) => ({
   hoverNodeId: null,
   following: false,
   hover: null,
-  learnFocus: null,
   country: null,
   leaderboard: null,
   selNodes: [],
@@ -148,7 +144,6 @@ export const useStore = create<AppState>((set) => ({
   setHoverNodeId: (hoverNodeId) => set({ hoverNodeId }),
   setFollowing: (following) => set({ following }),
   setHover: (hover) => set({ hover }),
-  setLearnFocus: (learnFocus) => set({ learnFocus }),
   setCountry: (country) => set({ country }),
   setLeaderboard: (leaderboard) => set({ leaderboard }),
   setSelNodes: (selNodes) => set({ selNodes }),

@@ -4,14 +4,23 @@ import type { CSSProperties } from "react";
 import { useStore } from "@/src/store/store";
 import { filterAccent } from "@/src/data/network";
 import ContextPanel from "@/components/ContextPanel";
-import LearnPanel from "@/components/LearnPanel";
 import GeoExplore from "@/components/GeoExplore";
 import LedgerPanel from "@/components/LedgerPanel";
 import PlaceholderPanel from "@/components/PlaceholderPanel";
 
-// The scaffolded (not-yet-built) views — each shows a "coming soon" tool card describing what
-// it will hold, so the nav + four-zone layout are in place ahead of the real implementations.
-const PLACEHOLDERS: Record<string, { title: string; eyebrow: string; lines: string[] }> = {
+// Per-view tool cards. The scaffolded (not-yet-built) views show a "coming soon" card (SOON);
+// Hypergraph shows a static "about" card (the guided Learn tour is being reworked). Same shell
+// either way so the four-zone HUD stays consistent.
+const PLACEHOLDERS: Record<string, { title: string; eyebrow: string; lines: string[]; caption?: string }> = {
+  hyper: {
+    title: "Hypergraph",
+    eyebrow: "Hypergraph · about",
+    caption: "",
+    lines: [
+      "Constellation is a Hypergraph, not a blockchain — activity is organized as a DAG, so many parts of the network validate in parallel: horizontally scalable and feeless for users.",
+      "The glowing core is the Global L0 (security + settlement); the validator shells around it bundle activity into the global snapshots streaming along the bottom. The orbiting clusters are metagraphs — independent networks that anchor their state into L0 for shared trust.",
+    ],
+  },
   status: {
     title: "Network status",
     eyebrow: "Status · about",
@@ -40,9 +49,9 @@ const PLACEHOLDERS: Record<string, { title: string; eyebrow: string; lines: stri
 
 // Left control rail: the **explore/interact** zone. The global network filter now lives in
 // the top command bar; when a metagraph/core is selected its **dossier** pins to the top of
-// this rail (`ContextPanel`), above the view's ONE tool card: Hypergraph → Learn; Geography →
-// GeoExplore (footprint + node browser); Snapshots → the ledger "about" panel; the scaffolded
-// views → a "coming soon" PlaceholderPanel.
+// this rail (`ContextPanel`), above the view's ONE tool card: Hypergraph → an "about" card
+// (the guided Learn tour is being reworked); Geography → GeoExplore (footprint + node browser);
+// Snapshots → the ledger "about" panel; the scaffolded views → a "coming soon" PlaceholderPanel.
 export default function LeftColumn() {
   const mode = useStore((s) => s.mode);
   const filter = useStore((s) => s.filter);
@@ -53,7 +62,6 @@ export default function LeftColumn() {
   return (
     <div id="leftcol" style={accent}>
       <ContextPanel />
-      {mode === "hyper" && <LearnPanel />}
       {mode === "geo" && <GeoExplore />}
       {mode === "ledger" && <LedgerPanel />}
       {placeholder && <PlaceholderPanel {...placeholder} />}

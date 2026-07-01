@@ -157,7 +157,6 @@ export class Engine {
           this.globe.setCountry(st.country);
           this._applyGeoFocus();
         }
-        if (st.learnFocus !== prev.learnFocus) this.setLearnFocus(st.learnFocus);
         // The selected node card (geo or hyper) keeps that node's layer shells lit on the globe.
         if (st.inspect !== prev.inspect) this.globe.setSelectedNode(this._pickNodeId(st.inspect));
         // Geo: clicking a node (on the globe or in the left explorer both set `inspect`)
@@ -629,24 +628,6 @@ export class Engine {
     if (f) this._tweenTo(f.pos, f.target);
   }
 
-  // "Understand the network" topic: frame it + dim the rest (ports ui.js focus +
-  // _highlight). null clears the dim and returns to the idle overview.
-  setLearnFocus(name: string | null) {
-    // The "metagraphs" topic ("networks of their own") is about the orbiting metagraphs —
-    // if one is currently selected (the filter), frame THAT metagraph (the explore card is
-    // tied to the active filter) instead of the generic pulled-back metagraphs shot.
-    if (name === "metagraphs") {
-      const filter = useStore.getState().filter;
-      const isMeta = this.layers.metas.some((x) => x.cfg.id === filter);
-      if (isMeta) this._focusFilter(filter);
-      else this.focus("metagraphs");
-    } else {
-      this.focus(name || "overview");
-    }
-    this.layers.setHighlight(name);
-    this.globe.setHighlight(name);
-    this.ctx.controls.autoRotate = !name;
-  }
 
   private _tweenTo(toPos: Vec, toTgt: Vec) {
     this.tween = {
