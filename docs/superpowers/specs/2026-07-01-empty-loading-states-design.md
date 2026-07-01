@@ -33,6 +33,8 @@ Down from four — SETTLING is removed.
 **Treatment:** no dashed box. A single live **node glows** with the **same expanding halo a real node gets on hover** — the pick invitation — among a few faint, static unselected peers. The inspector reads as a lens with nothing under it yet.
 **Meaning:** an invitation to pick, at rest.
 
+> **Superseded/extended** by `2026-07-01-right-rail-subject-stack-design.md`: STANDBY is the Detail slot at rest, and that slot's resting content is the **View-default card** (a short view explainer + this same node-halo pick-invite), not a bare prompt. The halo invite and reduced-motion behaviour here still hold.
+
 > Out of scope: the **SOON** placeholder for unbuilt views (status/transactions/staking) — that's "not built", not "loading".
 
 ## Motion vocabulary (shared)
