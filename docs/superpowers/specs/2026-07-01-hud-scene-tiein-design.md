@@ -21,9 +21,10 @@ A drawn tether between a card and its moving 3D object was considered and **reje
 
 On hover of a 3D object, a small tooltip gives the quick "what am I pointing at":
 
-- **Lean:** `‹identity› · ‹name›` + `click to inspect` (e.g. `DED · node-9c2 — click to inspect`). Identity ticker in the metagraph hue.
+- **Lean:** `‹identity› · ‹name›` + `click to inspect` (e.g. `DED · node-9c2 — click to inspect`).
+- **Coloured by the subject's identity hue** — the same "which network" signal as the node, its card, the right-rail thread, the filter dot and the LiveStrip. The **identity ticker + a subtle border/accent** carry the hue; the **body text stays neutral** for legibility. For a **non-metagraph subject** (a DAG-core validator, a global snapshot) the hue is the **core cyan** — that's its identity.
 - **Not a mini-card.** The full facts (state, layer, location, …) live in the **card that opens on click**, so the tooltip never duplicates them — it labels, it doesn't detail.
-- Instrument-Glass styling (glass, hairline border tinted to the subject hue).
+- Instrument-Glass styling (glass surface, hairline border in the subject hue).
 
 ## Click commits
 
