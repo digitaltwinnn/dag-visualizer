@@ -45,12 +45,8 @@ const resolveGeo = resolveMissing as (
 // Camera presets (ported from ui.js FOCI).
 const FOCI: Record<string, { pos: Vec; target: Vec }> = {
   overview: { pos: new THREE.Vector3(0, 15, 60), target: new THREE.Vector3(0, 2, 0) },
-  l0: { pos: new THREE.Vector3(0, 6, 20), target: new THREE.Vector3(0, 1, 0) },
-  // The whole DAG core: pulled back enough to frame the outer cL1 (purple) shell (radius 14)
-  // — focus("l0") sat too close and clipped it off-frame.
+  // The whole DAG core: pulled back enough to frame the outer cL1 (purple) shell (radius 14).
   dag: { pos: new THREE.Vector3(0, 9, 38), target: new THREE.Vector3(0, 1, 0) },
-  l1: { pos: new THREE.Vector3(14, 10, 26), target: new THREE.Vector3(0, 0, 0) },
-  metagraphs: { pos: new THREE.Vector3(0, 30, 70), target: new THREE.Vector3(0, 0, 0) },
   geo: { pos: new THREE.Vector3(0, 11, 36), target: new THREE.Vector3(0, 2, 0) },
   // The Snapshots view is a stack of transparent wireframe FLOORS (layers) on Y. Frame it from an
   // elevated front angle so the stacked planes read in 3D — see js/ledger.js + config.LEDGER.

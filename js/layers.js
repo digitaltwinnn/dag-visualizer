@@ -27,11 +27,6 @@ export class Layers {
 
     this.clock = 0;
 
-    // Highlight/dim state for the "Understand the network" panel: when a topic
-    // is selected, the unrelated furniture fades toward dark. 0 = full bright,
-    // 1 = fully dimmed; `dim` eases toward `dimTarget` in the update loop.
-    this.dim = { core: 0, meta: 0 };
-    this.dimTarget = { core: 0, meta: 0 };
 
     // When a metagraph is focused in the Hypergraph, its hub's orbit is paused
     // (anchored) so it stays framed & in focus; the rest keep orbiting.
@@ -159,15 +154,11 @@ export class Layers {
     // would be noticeable.
     const hubFade = THREE.MathUtils.clamp(1 - morph / 0.3, 0, 1);
 
-    // Ease the highlight dim levels toward their targets, then derive a glow
-    // multiplier (coreF/metaF) and an opacity for each dimmable group.
-    const k = Math.min(1, dt * 4);
-    this.dim.core += (this.dimTarget.core - this.dim.core) * k;
-    this.dim.meta += (this.dimTarget.meta - this.dim.meta) * k;
-    const coreF = 1 - this.dim.core * 0.9;
-    const metaF = (1 - this.dim.meta * 0.9) * hubFade;
-    const coreOpacity = 1 - this.dim.core * 0.85;
-    const metaOpacity = (1 - this.dim.meta * 0.85) * hubFade;
+    // Core stays fully lit; hubs fade out with the morph (hubFade).
+    const coreF = 1;
+    const metaF = hubFade;
+    const coreOpacity = 1;
+    const metaOpacity = hubFade;
 
     // Core pulse + flash, plus the morph "core -> globe" transform: the blue
     // Hypergraph heart swells out to the globe's radius and dissolves as the Earth
