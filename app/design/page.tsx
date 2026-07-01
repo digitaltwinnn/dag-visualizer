@@ -2,6 +2,8 @@ import { headers } from "next/headers";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 
 const STRUCTURAL: { name: string; var: string }[] = [
   { name: "background", var: "--background" },
@@ -107,6 +109,22 @@ export default async function DesignPage() {
             ))}
           </div>
         )}
+      </section>
+
+      <section className="mb-10">
+        <h2 className="text-sm uppercase tracking-widest text-muted-foreground mb-3">
+          Command-bar primitives
+        </h2>
+        <div className="flex items-center gap-6">
+          <ToggleGroup type="single" defaultValue="a" variant="outline">
+            <ToggleGroupItem value="a">◆</ToggleGroupItem>
+            <ToggleGroupItem value="b">◍</ToggleGroupItem>
+            <ToggleGroupItem value="c">▦</ToggleGroupItem>
+          </ToggleGroup>
+          <Avatar className="size-8">
+            <AvatarFallback>DED</AvatarFallback>
+          </Avatar>
+        </div>
       </section>
     </main>
   );
