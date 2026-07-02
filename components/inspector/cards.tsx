@@ -31,8 +31,12 @@ export function SnapshotCard({ data: d }: { data: GlobalSnapshot }) {
   // against an unparseable timestamp (→ no age suffix rather than "NaN").
   const rel = relativeAge(Date.now() - Date.parse(d.timestamp));
 
+  const hoverSnapOrd = useStore((s) => s.hoverSnapOrd);
+  const setHoverSnapOrd = useStore((s) => s.setHoverSnapOrd);
+  const snapPair = subjectPairing<number>(hoverSnapOrd, d.ordinal, setHoverSnapOrd, "var(--core)");
+
   return (
-    <div className="insp-snap">
+    <div className={"insp-snap " + snapPair.className} style={snapPair.style} onMouseEnter={snapPair.onMouseEnter} onMouseLeave={snapPair.onMouseLeave}>
       {/* Title: ◆ type-marker (cyan = a GLOBAL snapshot) + the ordinal (odometer-rolls live). */}
       <div className="snap-titlerow">
         <span className="snap-title">
@@ -87,6 +91,10 @@ export function MetaCard({ cfg }: { cfg: MetaCfg }) {
   const mg = metaList.find((x) => x.id === cfg.id) || null;
   const nodes = mg?.nodes || [];
   const hue = hex(cfg.color);
+  const hoverFilter = useStore((s) => s.hoverFilter);
+  const setHoverFilter = useStore((s) => s.setHoverFilter);
+  // Only real metagraph cores pair (not the "all" summary or the DAG core's dim-preview quirk):
+  const metaPair = subjectPairing<string>(hoverFilter, cfg.id, setHoverFilter, hue);
   const iconUrl = mg?.iconUrl || cfg.iconUrl; // live metagraph icon, or the core's bundled logo
   const monogram = (cfg.ticker || cfg.name).slice(0, 3).toUpperCase();
   const blurb = mg?.description || cfg.blurb;
@@ -96,7 +104,7 @@ export function MetaCard({ cfg }: { cfg: MetaCfg }) {
   // repeating it (a redundant "DAG"/"DOR") is dropped.
   const isDataMeta = cfg.id !== "dag" && !nodeComposition(nodes).hasCurrency;
   return (
-    <>
+    <div className={"dossier " + metaPair.className} style={metaPair.style} onMouseEnter={metaPair.onMouseEnter} onMouseLeave={metaPair.onMouseLeave}>
       {/* Header — logo avatar ringed in the identity hue + name + ticker. */}
       <div className="dossier-head">
         <Avatar className="dossier-logo">
@@ -127,7 +135,7 @@ export function MetaCard({ cfg }: { cfg: MetaCfg }) {
           </a>
         )}
       </div>
-    </>
+    </div>
   );
 }
 
