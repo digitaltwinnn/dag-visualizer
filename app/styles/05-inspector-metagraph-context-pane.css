@@ -98,6 +98,11 @@
 .st-bd-dot { width: 7px; height: 7px; border-radius: 50%; }
 .st-bd-sep { color: var(--muted); opacity: 0.6; }
 
+.gel-status { margin-left: auto; }
+.gel-ip { font-size: 11px; color: var(--muted); font-variant-numeric: tabular-nums; margin: 2px 0 0 16px; }
+.gel-comp { margin: 8px 0; }
+.gel-comp-label { font-size: 10.5px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); }
+
 /* Node composition rows + chip stacks (neutral chrome) */
 .comp-rows { display: flex; flex-direction: column; gap: 7px; margin-top: 8px; }
 .comp-row { display: grid; grid-template-columns: auto auto 1fr auto; align-items: center; gap: 8px; }

@@ -3,17 +3,9 @@
 import { useStore } from "@/src/store/store";
 import { shortHash, CORE_HEX } from "@/src/data/network";
 import { toDag, hex, fmtKB } from "@/src/util/format";
-import type { GlobalSnapshot, MetaCfg, PickDescriptor } from "@/src/data/types";
+import type { GlobalSnapshot, MetaCfg, NodeInfo, PickDescriptor } from "@/src/data/types";
 import AnchoredTags from "./AnchoredTags";
-import {
-  Desc,
-  ROLE_ORDER,
-  RoleTags,
-  Row,
-  nodeComposition,
-  nodeStateColor,
-  rolesOf,
-} from "./parts";
+import { Desc, ROLE_ORDER, RoleTags, Row, StatusMark, CompositionRows, nodeComposition, rolesOf } from "./parts";
 
 type PickOf<K extends PickDescriptor["kind"]> = Extract<PickDescriptor, { kind: K }>;
 
@@ -148,53 +140,36 @@ export function GeoLiveCard() {
 }
 
 // The selected-node block. Identity-first: the node's ID is the title; the body carries the
-// facts you can't see on the globe — which network it serves, the layer(s) it runs, its
-// state, and where it sits. The slot eyebrow already reads "Selected node", so this only
-// adds a deselect ×.
+// facts you can't see on the globe — status, IP, composition, and where it sits. The slot
+// eyebrow already reads "Selected node", so this only adds a deselect ×.
 function GeoLiveNode({ p, onClear }: { p: PickOf<"l0" | "l1" | "metanode">; onClear: () => void }) {
-  // Title = Node ID (the stable identity); fall back to IP/place only if there's no ID.
   const id = p.node?.id;
   const title = id ? shortHash(id) : p.node?.ip || p.geo?.city || p.geo?.country || "Node";
-
-  // The node's network colour, for the leading bullet. The network itself isn't a row — the
-  // bullet colour-codes it, clicking a node sets the filter (so the top-bar pill + the left
-  // dossier name it), so a Network row here would just triplicate it. The layer(s) it runs use
-  // the full role set the pick carries (a hybrid keeps every layer, not just the clicked shell).
   const color = p.kind === "metanode" ? (p.meta ? hex(p.meta.color) : undefined) : CORE_HEX;
-  const roleKeys = (
-    p.roles?.length
-      ? p.roles
-      : p.node?.roles?.length
-        ? p.node.roles
-        : [p.kind === "metanode" ? p.layer ?? p.node?.layer : undefined].filter(Boolean)
-  ) as string[];
-
-  const state = p.node?.state ?? "—";
-  const stateColor = nodeStateColor(p.node?.state);
+  // The single node's roles → a one-node composition row (shared vocabulary).
+  const oneNode: NodeInfo[] = p.node ? [p.node] : [];
   const g = p.geo;
   const place = g ? `${g.city ? g.city + ", " : ""}${g.country ?? ""}`.trim() : "";
-
   return (
     <>
-      {/* Close pinned to the panel's top-right corner (like the snapshot card), so the state
-          pill can float to the right end of the ID line. */}
-      <button className="gel-clear" title="Deselect" onClick={onClear}>
-        ×
-      </button>
+      <button className="gel-clear" title="Deselect" onClick={onClear}>×</button>
+      {/* Title line: node id + the status inline (right). */}
       <div className="gel-node-head">
         {color && <span className="gel-dot" style={{ background: color }} />}
         <span className="gel-node-title insp-hash">{title}</span>
-        {/* State pill floats right on the ID line — colour-coded per lifecycle state. */}
-        <span
-          className="gel-state"
-          style={{ color: stateColor, borderColor: stateColor + "55", background: stateColor + "1a" }}
-        >
-          {state}
-        </span>
+        <span className="gel-status"><StatusMark state={p.node?.state} /></span>
       </div>
-      <Row label="Runs">
-        <RoleTags roles={roleKeys} />
-      </Row>
+      {/* IP grouped with the identity (muted subtitle under the id), not a labelled row. */}
+      {p.node?.ip && <div className="gel-ip">{p.node.ip}</div>}
+      <div className="insp-div" />
+      {/* Composition as a stacked label + block (NOT inside <Row>, whose value is a <span> —
+          CompositionRows renders a <div>, so a Row would nest a block in an inline element). */}
+      {oneNode.length > 0 && (
+        <div className="gel-comp">
+          <span className="gel-comp-label">Composition</span>
+          <CompositionRows nodes={oneNode} />
+        </div>
+      )}
       {place && <Row label="Location">{place}</Row>}
     </>
   );
