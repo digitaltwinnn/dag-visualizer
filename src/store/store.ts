@@ -36,6 +36,10 @@ interface AppState {
   // Fires once, after the engine's first rendered frame — lets the boot overlay cross-fade
   // into the live scene instead of fading on a timer/guess.
   engineReady: boolean;
+  // Set if the engine couldn't start (e.g. WebGL unavailable / context creation threw). Without
+  // this the boot phase would sit on "booting" forever — engineReady never arrives — even though
+  // data is flowing. It routes the overlay to a distinct "3D unavailable" state instead of a wedge.
+  engineFailed: boolean;
   nodes: { l0: number; l1: number };
   metagraphs: number;
   latestOrdinal: number | null;
@@ -86,6 +90,7 @@ interface AppState {
 
   setLive: (live: boolean, lastGoodAt?: number) => void;
   setEngineReady: (v: boolean) => void;
+  setEngineFailed: (v: boolean) => void;
   setNodes: (l0: number, l1: number) => void;
   setMetagraphs: (n: number) => void;
   setLatestOrdinal: (ordinal: number) => void;
@@ -114,6 +119,7 @@ export const useStore = create<AppState>((set) => ({
   live: false,
   lastGoodAt: null,
   engineReady: false,
+  engineFailed: false,
   nodes: { l0: 0, l1: 0 },
   metagraphs: 0,
   latestOrdinal: null,
@@ -137,6 +143,7 @@ export const useStore = create<AppState>((set) => ({
 
   setLive: (live, lastGoodAt) => set((s) => ({ live, lastGoodAt: lastGoodAt ?? s.lastGoodAt })),
   setEngineReady: (engineReady) => set({ engineReady }),
+  setEngineFailed: (engineFailed) => set({ engineFailed }),
   setNodes: (l0, l1) => set({ nodes: { l0, l1 } }),
   setMetagraphs: (metagraphs) => set({ metagraphs }),
   setLatestOrdinal: (latestOrdinal) => set({ latestOrdinal }),

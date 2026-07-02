@@ -9,6 +9,7 @@ const BOOT_TIMEOUT_MS = 8000;
 // SIGNAL, not the boot overlay coming back.
 export function useBootPhase(): BootPhase {
   const engineReady = useStore((s) => s.engineReady);
+  const engineFailed = useStore((s) => s.engineFailed);
   const latestSnapshot = useStore((s) => s.latestSnapshot);
   const metaList = useStore((s) => s.metaList);
   const live = useStore((s) => s.live);
@@ -21,7 +22,7 @@ export function useBootPhase(): BootPhase {
   }, []);
 
   const hasData = latestSnapshot != null || metaList.length > 0;
-  const phase = bootPhase({ engineReady, hasData, live, timedOut });
+  const phase = bootPhase({ engineReady, engineFailed, hasData, live, timedOut });
   if (phase === "live") latched.current = true;
   return latched.current ? "live" : phase;
 }

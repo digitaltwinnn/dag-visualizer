@@ -22,7 +22,15 @@ export default function SceneCanvas() {
     (async () => {
       const { Engine } = await import("@/src/engine/Engine");
       if (disposed || !canvasRef.current) return;
-      engine = new Engine(canvasRef.current, () => useStore.getState().setEngineReady(true));
+      try {
+        engine = new Engine(canvasRef.current, () => useStore.getState().setEngineReady(true));
+      } catch (err) {
+        // WebGL context creation (or any engine-construction step) threw — the scene can't run.
+        // Flag it so the boot phase resolves to "no-engine" instead of hanging on "booting"
+        // forever (engineReady would never fire). Data + flat views still work.
+        console.error("[SceneCanvas] engine failed to start:", err);
+        useStore.getState().setEngineFailed(true);
+      }
     })();
 
     return () => {

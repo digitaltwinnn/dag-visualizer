@@ -9,13 +9,21 @@ export default function BootOverlay() {
   const phase = useBootPhase();
   if (phase === "live") return null; // handoff complete — gone for good
   const noSignal = phase === "no-signal";
+  const noEngine = phase === "no-engine";
+  // no-engine: the 3D scene can't run (WebGL unavailable). Say so plainly and stop the ping — this
+  // is a settled dead-end, not a "still trying" state. Reuse the grey nosignal skin.
+  const label = noEngine
+    ? "3D unavailable — WebGL not supported"
+    : noSignal
+      ? "No signal — retrying…"
+      : "reaching the network…";
   return (
-    <div className={"boot-overlay" + (noSignal ? " boot-overlay--nosignal" : "")} aria-hidden>
+    <div className={"boot-overlay" + (noSignal || noEngine ? " boot-overlay--nosignal" : "")} aria-hidden>
       <div className="boot-core">
-        <span className="boot-core-ping" />
+        {!noEngine && <span className="boot-core-ping" />}
         <span className="boot-core-glow" />
       </div>
-      <p className="boot-label">{noSignal ? "No signal — retrying…" : "reaching the network…"}</p>
+      <p className="boot-label">{label}</p>
     </div>
   );
 }
