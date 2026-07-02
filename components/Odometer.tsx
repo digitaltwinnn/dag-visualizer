@@ -42,7 +42,7 @@ export default function Odometer({
   }, [next]);
 
   return (
-    <span className={cn("odometer", className)} aria-label={next}>
+    <span className={cn("odometer", className)} aria-label={next} aria-live="polite" role="status">
       {prev !== null && <span className="odometer-out" aria-hidden>{prev}</span>}
       <span className={prev !== null ? "odometer-in" : undefined}>{shown}</span>
     </span>

@@ -19,12 +19,15 @@ export default function FilterPicker({ onPick }: { onPick?: () => void }) {
   const setHoverFilter = useStore((s) => s.setHoverFilter);
   const metaList = useStore((s) => s.metaList);
 
-  // Sort by located desc; keep the DAG root first among the "active" block if it has nodes.
+  // Sort by located desc, so 0-located metagraphs sink to the bottom.
   const rows = useMemo(
     () => [...metaList].sort((a, b) => (b.located ?? 0) - (a.located ?? 0)),
     [metaList],
   );
   const totalNodes = useMemo(() => rows.reduce((s, m) => s + (m.located ?? 0), 0), [rows]);
+  // Only count mapped cores (located > 0) — matches what's actually plotted/pickable below;
+  // the 0-located rows are greyed and excluded so the headline stays consistent with the list.
+  const mappedCount = useMemo(() => rows.filter((m) => (m.located ?? 0) > 0).length, [rows]);
 
   const pick = (id: string) => {
     setFilter(id);
@@ -48,7 +51,7 @@ export default function FilterPicker({ onPick }: { onPick?: () => void }) {
             <span className="fp-dot" style={{ background: "var(--primary)" }} />
             <span className="fp-name">All</span>
             <span className="fp-sub">whole network</span>
-            <span className="fp-count">{rows.length} · {totalNodes} nodes</span>
+            <span className="fp-count">{mappedCount} · {totalNodes} nodes</span>
           </CommandItem>
         </CommandGroup>
         <CommandGroup>
