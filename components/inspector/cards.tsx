@@ -3,6 +3,7 @@
 import { useStore } from "@/src/store/store";
 import { shortHash, CORE_HEX } from "@/src/data/network";
 import { hex, fmtDag, fmtKB } from "@/src/util/format";
+import { relativeAge } from "@/src/util/relativeAge";
 import type { GlobalSnapshot, MetaCfg, NodeInfo, PickDescriptor } from "@/src/data/types";
 import AnchoredTags from "./AnchoredTags";
 import Odometer from "@/components/Odometer";
@@ -26,12 +27,7 @@ export function SnapshotCard({ data: d }: { data: GlobalSnapshot }) {
 
   // Relative recency for an older pick — coarse (freshness, not a ticking clock). Guarded
   // against an unparseable timestamp (→ no age suffix rather than "NaN").
-  const ageMs = Date.now() - Date.parse(d.timestamp);
-  const rel = Number.isNaN(ageMs)
-    ? ""
-    : ageMs < 60_000 ? `${Math.max(1, Math.round(ageMs / 1000))}s ago`
-    : ageMs < 3_600_000 ? `${Math.round(ageMs / 60_000)}m ago`
-    : `${Math.round(ageMs / 3_600_000)}h ago`;
+  const rel = relativeAge(Date.now() - Date.parse(d.timestamp));
 
   return (
     <div className="insp-snap">
