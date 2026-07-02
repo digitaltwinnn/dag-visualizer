@@ -6,6 +6,7 @@ import { useStore } from "@/src/store/store";
 import { useSnapshotFeed } from "@/components/useSnapshotFeed";
 import { getAnchor, metagraphById, filterAccent } from "@/src/data/network";
 import type { GlobalSnapshot } from "@/src/data/types";
+import { relativeAge } from "@/src/util/relativeAge";
 
 // Matches VIS.maxSnapshots (the buffer cap) so the strip fills with the full retained window.
 const MAX = 52;
@@ -99,24 +100,43 @@ export default function LiveStrip() {
 
       {tip && (
         <div id="ls-tip" ref={tipRef} style={{ left: tip.x, top: tip.y }}>
-          <div className="ls-tip-head">#{tip.ordinal.toLocaleString()}</div>
+          {/* Bare ordinal head — no '#'; a big mono number in a snapshot tooltip is obviously the ordinal. */}
+          <div className="ls-tip-head">{tip.ordinal.toLocaleString()}</div>
           <div className="ls-tip-line">
-            <span className="ls-tip-k">Total</span>
-            <span className="ls-tip-v">
-              {tip.total} anchored
-            </span>
+            {isMeta ? (
+              tip.mine > 0 ? (
+                <>
+                  <span className="ls-tip-k">
+                    <span className="ls-tip-dot" style={{ background: accent }} />
+                    {cfg!.ticker || cfg!.name}
+                  </span>
+                  <span className="ls-tip-v">{tip.mine} of {tip.total} total</span>
+                </>
+              ) : (
+                <>
+                  <span className="ls-tip-k">
+                    <span className="ls-tip-dot" style={{ background: accent }} />
+                    {cfg!.ticker || cfg!.name}
+                  </span>
+                  <span className="ls-tip-v ls-tip-gap">0 · none this tick ({tip.total} total)</span>
+                </>
+              )
+            ) : (
+              <>
+                <span className="ls-tip-k">anchored</span>
+                <span className="ls-tip-v">{tip.total} metagraph snapshot{tip.total === 1 ? "" : "s"}</span>
+              </>
+            )}
           </div>
-          {isMeta && (
-            <div className="ls-tip-line">
-              <span className="ls-tip-k">
-                <span className="ls-tip-dot" style={{ background: accent }} />
-                {cfg!.ticker || cfg!.name}
-              </span>
-              <span className="ls-tip-v">
-                {tip.mine} of {tip.total}
-              </span>
-            </div>
-          )}
+          {/* Recency — relative + coarse; the live bar reads 'live now'. */}
+          <div className="ls-tip-rec">
+            {tip.live ? (
+              <><span className="ls-tip-live" /> live now</>
+            ) : (
+              <>◷ {relativeAge(Date.now() - Date.parse(tip.ts))}</>
+            )}
+          </div>
+          <div className="ls-tip-hint">click to open snapshot</div>
         </div>
       )}
     </section>
