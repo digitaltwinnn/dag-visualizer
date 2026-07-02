@@ -144,11 +144,17 @@ export default function Inspector() {
   const hasDetail = panes.length > 0;
 
   return (
-    <div id="rightcol" style={accent}>
+    // RailThread is a SIBLING of #rightcol, not a child: #rightcol gets the `.rail-clip` bottom-fade
+    // mask when it overflows, and a mask composites its whole subtree — since the fixed thread doesn't
+    // scroll with the rail, that mask's solid band slides off it and blanks the whole spine. Kept
+    // outside, the thread manages its own top/bottom fade (13-right-column.css) independently.
+    <>
       <RailThread />
-      <ContextCard />
-      {panes}
-      {!hasDetail && <PickHint mode={mode} />}
-    </div>
+      <div id="rightcol" style={accent}>
+        <ContextCard />
+        {panes}
+        {!hasDetail && <PickHint mode={mode} />}
+      </div>
+    </>
   );
 }
