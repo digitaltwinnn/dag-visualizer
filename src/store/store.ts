@@ -32,6 +32,7 @@ export interface Activity {
 // bounded. Filled by the network service in src/data/network.ts.
 interface AppState {
   live: boolean;
+  lastGoodAt: number | null;
   nodes: { l0: number; l1: number };
   metagraphs: number;
   latestOrdinal: number | null;
@@ -80,7 +81,7 @@ interface AppState {
   // separate L0/L1 filters (the DAG is just another metagraph-shaped core).
   filter: string;
 
-  setLive: (live: boolean) => void;
+  setLive: (live: boolean, lastGoodAt?: number) => void;
   setNodes: (l0: number, l1: number) => void;
   setMetagraphs: (n: number) => void;
   setLatestOrdinal: (ordinal: number) => void;
@@ -107,6 +108,7 @@ const EXACT_MAX = 120;
 
 export const useStore = create<AppState>((set) => ({
   live: false,
+  lastGoodAt: null,
   nodes: { l0: 0, l1: 0 },
   metagraphs: 0,
   latestOrdinal: null,
@@ -128,7 +130,7 @@ export const useStore = create<AppState>((set) => ({
   selNodes: [],
   snapshotExact: {},
 
-  setLive: (live) => set({ live }),
+  setLive: (live, lastGoodAt) => set((s) => ({ live, lastGoodAt: lastGoodAt ?? s.lastGoodAt })),
   setNodes: (l0, l1) => set({ nodes: { l0, l1 } }),
   setMetagraphs: (metagraphs) => set({ metagraphs }),
   setLatestOrdinal: (latestOrdinal) => set({ latestOrdinal }),

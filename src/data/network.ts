@@ -34,7 +34,7 @@ export function initNetwork(): NetworkData | null {
   // (per-metagraph fees), and whenever the selection changes.
   const refreshActivity = () => setActivity(net!.getActivity(useStore.getState().filter));
 
-  net.on("status", ({ live }: { live: boolean }) => setLive(live));
+  net.on("status", ({ live, lastGoodAt }: { live: boolean; lastGoodAt: number | null }) => setLive(live, lastGoodAt ?? undefined));
   net.on("cluster", ({ l0, l1 }: { l0: unknown[]; l1: unknown[] }) =>
     setNodes(l0.length, l1.length),
   );
