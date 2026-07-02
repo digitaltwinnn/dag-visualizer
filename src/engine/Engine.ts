@@ -587,10 +587,12 @@ export class Engine {
     // node-focus camera move (set by the inspect) wins over the network framing.
     if (p.kind === "l0" || p.kind === "l1" || p.kind === "metanode") {
       const netId = this._pickNetId(p);
-      // Ledger: a producer dot just highlights its column (set the filter) — no node card / camera
-      // move, so the planar diagram stays put.
+      // Ledger: open the node card + light its lane (filter), but SKIP the camera move — the planar
+      // settlement diagram must stay put. The card itself doesn't touch the 3D layout, so a node
+      // click here behaves like every other view (card + filter), just without the focus tween.
       if (this.mode === "ledger") {
         if (netId) useStore.getState().setFilter(netId);
+        useStore.getState().setInspect(p);
         return;
       }
       if (this.mode === "geo") this.ctx.controls.autoRotate = false;
