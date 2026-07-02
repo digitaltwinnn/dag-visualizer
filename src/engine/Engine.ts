@@ -99,9 +99,13 @@ export class Engine {
   // FPS/ms monitor — dev only, or in prod via `?stats`/`#stats` for ad-hoc checks, so
   // it never shows for real users. Click the panel to cycle FPS → ms → MB.
   private stats?: Stats;
+  // Fired once, after the first frame actually renders (see start()'s loop) — lets callers
+  // (SceneCanvas → store.engineReady) know the scene has painted, not just constructed.
+  private _onReady?: () => void;
 
-  constructor(canvas: HTMLCanvasElement) {
+  constructor(canvas: HTMLCanvasElement, onReady?: () => void) {
     this.canvas = canvas;
+    this._onReady = onReady;
     this.ctx = makeScene(canvas);
     this.layers = new LayersCtor(this.ctx.scene);
     this.globe = new GlobeCtor(this.ctx.scene, this.layers, this.ctx.camera);
@@ -723,6 +727,11 @@ export class Engine {
       }
 
       this.ctx.composer.render();
+      if (this._onReady) {
+        const cb = this._onReady;
+        this._onReady = undefined;
+        cb();
+      }
       this.stats?.end();
     };
     loop();

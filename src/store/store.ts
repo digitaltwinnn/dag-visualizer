@@ -33,6 +33,9 @@ export interface Activity {
 interface AppState {
   live: boolean;
   lastGoodAt: number | null;
+  // Fires once, after the engine's first rendered frame — lets the boot overlay cross-fade
+  // into the live scene instead of fading on a timer/guess.
+  engineReady: boolean;
   nodes: { l0: number; l1: number };
   metagraphs: number;
   latestOrdinal: number | null;
@@ -82,6 +85,7 @@ interface AppState {
   filter: string;
 
   setLive: (live: boolean, lastGoodAt?: number) => void;
+  setEngineReady: (v: boolean) => void;
   setNodes: (l0: number, l1: number) => void;
   setMetagraphs: (n: number) => void;
   setLatestOrdinal: (ordinal: number) => void;
@@ -109,6 +113,7 @@ const EXACT_MAX = 120;
 export const useStore = create<AppState>((set) => ({
   live: false,
   lastGoodAt: null,
+  engineReady: false,
   nodes: { l0: 0, l1: 0 },
   metagraphs: 0,
   latestOrdinal: null,
@@ -131,6 +136,7 @@ export const useStore = create<AppState>((set) => ({
   snapshotExact: {},
 
   setLive: (live, lastGoodAt) => set((s) => ({ live, lastGoodAt: lastGoodAt ?? s.lastGoodAt })),
+  setEngineReady: (engineReady) => set({ engineReady }),
   setNodes: (l0, l1) => set({ nodes: { l0, l1 } }),
   setMetagraphs: (metagraphs) => set({ metagraphs }),
   setLatestOrdinal: (latestOrdinal) => set({ latestOrdinal }),

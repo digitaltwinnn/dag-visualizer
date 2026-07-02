@@ -11,3 +11,11 @@ describe("store.live / lastGoodAt", () => {
     expect(useStore.getState().lastGoodAt).toBe(1000); // preserved
   });
 });
+
+describe("store.engineReady", () => {
+  it("defaults false and flips true once", () => {
+    expect(useStore.getState().engineReady).toBe(false);
+    useStore.getState().setEngineReady(true);
+    expect(useStore.getState().engineReady).toBe(true);
+  });
+});

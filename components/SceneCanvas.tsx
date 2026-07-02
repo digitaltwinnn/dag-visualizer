@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
+import { useStore } from "@/src/store/store";
 
 // Mounts the imperative Three.js engine onto a persistent canvas. The engine owns
 // its own render loop and never re-renders through React — React only mounts/disposes
@@ -19,7 +20,7 @@ export default function SceneCanvas() {
     (async () => {
       const { Engine } = await import("@/src/engine/Engine");
       if (disposed || !canvasRef.current) return;
-      engine = new Engine(canvasRef.current);
+      engine = new Engine(canvasRef.current, () => useStore.getState().setEngineReady(true));
     })();
 
     return () => {
