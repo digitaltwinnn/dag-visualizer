@@ -2,7 +2,10 @@
 
 import type { CSSProperties, ReactNode } from "react";
 import { useStore, type SelSlot } from "@/src/store/store";
-import { filterAccent } from "@/src/data/network";
+import { filterAccent, CORE_HEX } from "@/src/data/network";
+import { hex } from "@/src/util/format";
+import { hoverKeyOf } from "@/src/data/hoverSubject";
+import { subjectPairing } from "@/components/useSubjectPairing";
 import { breadcrumbLabel } from "@/src/data/breadcrumb";
 import InspectorCard from "@/components/InspectorCard";
 import ContextCard from "@/components/ContextCard";
@@ -29,8 +32,35 @@ function CardPane({
   ownClose: boolean; // the card already renders its own close (e.g. the node card's gel-clear ×)
 }) {
   const ref = useFlashOnChange(dep);
+  const inspect = useStore((s) => s.inspect);
+  const hoverNodeId = useStore((s) => s.hoverNodeId);
+  const hoverSnapOrd = useStore((s) => s.hoverSnapOrd);
+  const setHoverNodeId = useStore((s) => s.setHoverNodeId);
+  const setHoverSnapOrd = useStore((s) => s.setHoverSnapOrd);
+
+  // The pairing lives on the OUTER pane (the rounded card), not an inner wrapper — so the synced
+  // hover glow lights the card's rounded edge, and hovering anywhere on the card glows its 3D object.
+  let pair;
+  if (pick.kind === "snapshot") {
+    pair = subjectPairing<number>(hoverSnapOrd, pick.data.ordinal, setHoverSnapOrd, "var(--core)");
+  } else {
+    // geoLive → the selected node, read from the store like GeoLiveCard does.
+    const node =
+      inspect && (inspect.kind === "l0" || inspect.kind === "l1" || inspect.kind === "metanode")
+        ? inspect
+        : null;
+    const nodeHue = node?.kind === "metanode" && node.meta ? hex(node.meta.color) : CORE_HEX;
+    pair = subjectPairing<string>(hoverNodeId, hoverKeyOf(node), setHoverNodeId, nodeHue);
+  }
+
   return (
-    <aside className="panel rc-pane" ref={ref}>
+    <aside
+      className={"panel rc-pane " + pair.className}
+      style={pair.style}
+      ref={ref}
+      onMouseEnter={pair.onMouseEnter}
+      onMouseLeave={pair.onMouseLeave}
+    >
       {!ownClose && (
         <button className="rc-close" title="Close" onClick={onClose}>
           ×

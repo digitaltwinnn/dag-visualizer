@@ -4,8 +4,6 @@ import { useStore } from "@/src/store/store";
 import { shortHash, CORE_HEX } from "@/src/data/network";
 import { hex, fmtDag, fmtKB } from "@/src/util/format";
 import { relativeAge } from "@/src/util/relativeAge";
-import { hoverKeyOf } from "@/src/data/hoverSubject";
-import { subjectPairing } from "@/components/useSubjectPairing";
 import type { GlobalSnapshot, MetaCfg, NodeInfo, PickDescriptor } from "@/src/data/types";
 import AnchoredTags from "./AnchoredTags";
 import Odometer from "@/components/Odometer";
@@ -31,12 +29,9 @@ export function SnapshotCard({ data: d }: { data: GlobalSnapshot }) {
   // against an unparseable timestamp (→ no age suffix rather than "NaN").
   const rel = relativeAge(Date.now() - Date.parse(d.timestamp));
 
-  const hoverSnapOrd = useStore((s) => s.hoverSnapOrd);
-  const setHoverSnapOrd = useStore((s) => s.setHoverSnapOrd);
-  const snapPair = subjectPairing<number>(hoverSnapOrd, d.ordinal, setHoverSnapOrd, "var(--core)");
-
+  // Hover pairing (synced 3D glow) lives on the OUTER pane (Inspector.CardPane), not here.
   return (
-    <div className={"insp-snap " + snapPair.className} style={snapPair.style} onMouseEnter={snapPair.onMouseEnter} onMouseLeave={snapPair.onMouseLeave}>
+    <div className="insp-snap">
       {/* Title: ◆ type-marker (cyan = a GLOBAL snapshot) + the ordinal (odometer-rolls live). */}
       <div className="snap-titlerow">
         <span className="snap-title">
@@ -91,10 +86,6 @@ export function MetaCard({ cfg }: { cfg: MetaCfg }) {
   const mg = metaList.find((x) => x.id === cfg.id) || null;
   const nodes = mg?.nodes || [];
   const hue = hex(cfg.color);
-  const hoverFilter = useStore((s) => s.hoverFilter);
-  const setHoverFilter = useStore((s) => s.setHoverFilter);
-  // Only real metagraph cores pair (not the "all" summary or the DAG core's dim-preview quirk):
-  const metaPair = subjectPairing<string>(hoverFilter, cfg.id, setHoverFilter, hue);
   const iconUrl = mg?.iconUrl || cfg.iconUrl; // live metagraph icon, or the core's bundled logo
   const monogram = (cfg.ticker || cfg.name).slice(0, 3).toUpperCase();
   const blurb = mg?.description || cfg.blurb;
@@ -103,8 +94,9 @@ export function MetaCard({ cfg }: { cfg: MetaCfg }) {
   // metagraphs (and the DAG core) already show their ticker in the header, so a foot row
   // repeating it (a redundant "DAG"/"DOR") is dropped.
   const isDataMeta = cfg.id !== "dag" && !nodeComposition(nodes).hasCurrency;
+  // Hover pairing (synced 3D hub glow) lives on the OUTER pane (ContextCard's #metapane), not here.
   return (
-    <div className={"dossier " + metaPair.className} style={metaPair.style} onMouseEnter={metaPair.onMouseEnter} onMouseLeave={metaPair.onMouseLeave}>
+    <>
       {/* Header — logo avatar ringed in the identity hue + name + ticker. */}
       <div className="dossier-head">
         <Avatar className="dossier-logo">
@@ -135,7 +127,7 @@ export function MetaCard({ cfg }: { cfg: MetaCfg }) {
           </a>
         )}
       </div>
-    </div>
+    </>
   );
 }
 
@@ -169,15 +161,14 @@ function GeoLiveNode({ p, onClear }: { p: PickOf<"l0" | "l1" | "metanode">; onCl
   const id = p.node?.id;
   const title = id ? shortHash(id) : p.node?.ip || p.geo?.city || p.geo?.country || "Node";
   const color = p.kind === "metanode" ? (p.meta ? hex(p.meta.color) : undefined) : CORE_HEX;
-  const setHoverNodeId = useStore((s) => s.setHoverNodeId);
-  const hoverNodeId = useStore((s) => s.hoverNodeId);
-  const pair = subjectPairing(hoverNodeId, hoverKeyOf(p), setHoverNodeId, color ?? "var(--core)");
   // The single node's roles → a one-node composition row (shared vocabulary).
   const oneNode: NodeInfo[] = p.node ? [p.node] : [];
   const g = p.geo;
   const place = g ? `${g.city ? g.city + ", " : ""}${g.country ?? ""}`.trim() : "";
+  // NB: the hover pairing (synced 3D glow) lives on the OUTER pane (Inspector.CardPane), not here,
+  // so the glow lights the card's rounded edge.
   return (
-    <div className={"gel-card " + pair.className} style={pair.style} onMouseEnter={pair.onMouseEnter} onMouseLeave={pair.onMouseLeave}>
+    <>
       <button className="gel-clear" title="Deselect" onClick={onClear}>×</button>
       {/* Title line: node id + the status inline (right). */}
       <div className="gel-node-head">
@@ -197,7 +188,7 @@ function GeoLiveNode({ p, onClear }: { p: PickOf<"l0" | "l1" | "metanode">; onCl
         </div>
       )}
       {place && <Row label="Location">{place}</Row>}
-    </div>
+    </>
   );
 }
 

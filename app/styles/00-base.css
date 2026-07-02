@@ -92,6 +92,11 @@ body { font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; co
 #leftcol:hover::-webkit-scrollbar-thumb, #rightcol:hover::-webkit-scrollbar-thumb {
   background: rgba(160, 175, 205, 0.45);
 }
+/* The RIGHT rail's scrollbar would sit on top of the instrument thread (the right-edge visual), so
+   hide it there — the thread IS the scroll visual; scrolling stays via wheel + grab-drag (RailScroll)
+   + touch pan. (The left rail keeps its slim scrollbar — no thread to clash with.) */
+#rightcol { scrollbar-width: none; }
+#rightcol::-webkit-scrollbar { width: 0; height: 0; display: none; }
 /* While grab-dragging a rail (mouse): suppress the text cursor + selection. */
 .rail-dragging { cursor: grabbing; user-select: none; }
 

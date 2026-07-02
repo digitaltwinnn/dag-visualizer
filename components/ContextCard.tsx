@@ -2,6 +2,8 @@
 
 import { useStore } from "@/src/store/store";
 import { metagraphById } from "@/src/data/network";
+import { hex } from "@/src/util/format";
+import { subjectPairing } from "@/components/useSubjectPairing";
 import InspectorCard from "@/components/InspectorCard";
 import { useFlashOnChange } from "@/components/useFlashOnChange";
 import type { PickDescriptor } from "@/src/data/types";
@@ -15,14 +17,26 @@ export default function ContextCard() {
   const filter = useStore((s) => s.filter);
   const setFilter = useStore((s) => s.setFilter);
   const metaList = useStore((s) => s.metaList);
+  const hoverFilter = useStore((s) => s.hoverFilter);
+  const setHoverFilter = useStore((s) => s.setHoverFilter);
   const flashRef = useFlashOnChange(filter);
   const mgCfg = metagraphById(filter);
 
   if (mgCfg) {
     const context: PickDescriptor = { kind: "meta", title: mgCfg.name, cfg: mgCfg };
     const eyebrow = mgCfg.id === "dag" ? "Selected core" : "Selected metagraph";
+    // Pair the dossier (the outer rounded pane) with its 3D hub: hovering either glows both in the
+    // metagraph's hue, via the shared hoverFilter channel.
+    const pair = subjectPairing<string>(hoverFilter, mgCfg.id, setHoverFilter, hex(mgCfg.color));
     return (
-      <aside id="metapane" className="panel rc-context" ref={flashRef}>
+      <aside
+        id="metapane"
+        className={"panel rc-context " + pair.className}
+        style={pair.style}
+        ref={flashRef}
+        onMouseEnter={pair.onMouseEnter}
+        onMouseLeave={pair.onMouseLeave}
+      >
         <button id="metapane-close" title="Clear selection" onClick={() => setFilter("all")}>
           ×
         </button>

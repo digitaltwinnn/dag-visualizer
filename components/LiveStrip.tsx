@@ -32,10 +32,15 @@ export default function LiveStrip() {
   const cfg = metagraphById(filter);
   const isMeta = !!cfg && filter !== "all" && filter !== "dag"; // a single metagraph is selected
 
-  // Clear the hover highlight whenever a new snapshot lands: the bars shift under a stationary cursor
-  // (which doesn't always fire mouseleave/enter), so without this a hovered row would "stick" and trail.
+  // Clear the hover highlight whenever a new snapshot lands, but ONLY while the cursor owns a BAR:
+  // the bars shift under a stationary cursor (which doesn't fire mouseleave/enter), so a hovered bar
+  // would "stick" and trail. Gated on `barHover` so a tick doesn't stomp the SnapshotCard's own
+  // hover (it drives the same `hoverSnapOrd` channel — clearing it un-paired the card mid-hover).
+  const barHover = useRef(false);
   const latestOrd = snaps[snaps.length - 1]?.ordinal ?? null;
-  useEffect(() => setHoverSnapOrd(null), [latestOrd, setHoverSnapOrd]);
+  useEffect(() => {
+    if (barHover.current) setHoverSnapOrd(null);
+  }, [latestOrd, setHoverSnapOrd]);
   const accent = filterAccent(filter); // metagraph colour, or the core cyan for all / dag
 
   // Hover tooltip — a single cursor-following element (the bars + their container both clip with
@@ -78,7 +83,7 @@ export default function LiveStrip() {
           {isMeta ? `${cfg!.ticker || cfg!.name} anchors/tick · own scale` : "anchors/tick"}
         </span>
       </span>
-      <div className="ls-bars" onMouseLeave={() => { setTip(null); setHoverSnapOrd(null); }}>
+      <div className="ls-bars" onMouseLeave={() => { barHover.current = false; setTip(null); setHoverSnapOrd(null); }}>
         {snaps.length === 0 && <span className="ls-empty">Waiting for snapshots…</span>}
         {bars.map(({ d, total, mine }, i) => {
           const live = i === bars.length - 1;
@@ -92,7 +97,7 @@ export default function LiveStrip() {
               className={cls}
               style={{ height: gap ? "0%" : `max(6%, ${Math.round((value / scaleMax) * 100)}%)` }}
               aria-label={`snapshot ${d.ordinal}`}
-              onMouseEnter={(e) => { setTip({ ordinal: d.ordinal, total, mine, ts: d.timestamp, live, x: e.clientX, y: e.clientY }); setHoverSnapOrd(d.ordinal); }}
+              onMouseEnter={(e) => { barHover.current = true; setTip({ ordinal: d.ordinal, total, mine, ts: d.timestamp, live, x: e.clientX, y: e.clientY }); setHoverSnapOrd(d.ordinal); }}
               onMouseMove={moveTip}
               onClick={() => pick(d)}
             />
