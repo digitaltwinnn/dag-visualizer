@@ -6,6 +6,7 @@ import { filterAccent } from "@/src/data/network";
 import { breadcrumbLabel } from "@/src/data/breadcrumb";
 import InspectorCard from "@/components/InspectorCard";
 import ContextCard from "@/components/ContextCard";
+import ViewDefault from "@/components/ViewDefault";
 import { useFlashOnChange } from "@/components/useFlashOnChange";
 import type { PickDescriptor } from "@/src/data/types";
 
@@ -47,7 +48,6 @@ function CardPane({
 // type is one entry in the registry below — add a future card by adding a slot (a store field +
 // `setSel`) and an entry here; the stacking, ordering, flashing and empty-hint are all generic.
 export default function Inspector() {
-  const mode = useStore((s) => s.mode);
   const inspect = useStore((s) => s.inspect);
   const snap = useStore((s) => s.snap);
   const selStack = useStore((s) => s.selStack);
@@ -92,27 +92,11 @@ export default function Inspector() {
 
   const panes = selStack.filter((slot) => cards[slot]?.active).map((slot) => cards[slot].pane);
 
-  // Nothing selected → a view-appropriate hint keeps the zone present (geo invites a node,
-  // ledger a snapshot; hyper + the placeholder views stay empty).
-  const hint =
-    panes.length > 0
-      ? null
-      : mode === "geo"
-        ? "Pick a node from the browser, or click one on the globe, to inspect it."
-        : mode === "ledger"
-          ? "Click a snapshot in the bar-chart below to inspect it."
-          : null;
-
   return (
     <div id="rightcol" style={accent}>
       <ContextCard />
       {panes}
-      {hint && (
-        <aside id="rc-empty" className="panel">
-          <span className="insp-eyebrow">Details</span>
-          <p className="rc-empty-text">{hint}</p>
-        </aside>
-      )}
+      {panes.length === 0 && <ViewDefault collapsed={false} onToggle={() => {}} />}
     </div>
   );
 }
