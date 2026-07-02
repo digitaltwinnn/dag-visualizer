@@ -98,8 +98,6 @@
 .rc-context { position: relative; }
 .rc-context--all #metapane-content { padding: var(--panel-pad-y) var(--panel-pad-x); }
 
-/* Quiet placeholder so the right zone is always present (symmetric with the left rail). */
-#rc-empty { padding: 16px 18px; }
 .rc-empty-text { margin: 0; font-size: 12.5px; line-height: 1.5; color: var(--muted); }
 
 /* Node fabric — one outlined block (the parts are all related): a single-line total
@@ -167,6 +165,13 @@
 /* ── View-default card — neutral per-view orientation (title + line + cyan pick-invite).
    Replaces the old #rc-empty hint. Structural chrome, NOT tinted to any identity hue; the
    halo is the only colour, always cyan (--primary), regardless of the active filter. ── */
+.rc-vd { position: relative; }
+.rc-vd-collapse {
+  position: absolute; top: 8px; right: 10px;
+  background: none; border: none; cursor: pointer;
+  color: var(--muted); font-size: 12px; line-height: 1;
+}
+.rc-vd-collapse:hover { color: var(--text); }
 .rc-vd .rc-vd-invite {
   display: flex; align-items: center; gap: 8px;
   margin: 10px 0 0; font-size: 12px; color: var(--muted);

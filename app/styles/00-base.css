@@ -53,5 +53,18 @@ body { font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; co
 /* The top vitals + status + filter + view switch now live in the top command bar
    (14-top-bar.css). */
 
+/* Left control rail (`#leftcol`, `LeftColumn.tsx`) — the explore/interact zone: now just
+   the one view-tool card (the global filter moved to the top command bar). Mirrors
+   `#rightcol`'s base positioning (05-inspector-metagraph-context-pane.css) so both rails
+   are fixed siblings under the same rail-top/gap tokens. (Restored: dropped when the old
+   filter-panel stylesheet — which happened to also carry this container rule — was retired.) */
+#leftcol {
+  position: fixed; z-index: 10; top: var(--rail-top); left: 16px;
+  width: var(--rail-w);
+  display: flex; flex-direction: column; gap: var(--rail-gap);
+  max-height: calc(100vh - var(--bottom-reserve) - var(--rail-top));
+}
+#leftcol > aside { width: auto; }
+
 /* The "content updated" flash (a card whose subject just changed) is driven by the Web
    Animations API in `useFlashOnChange` — see the note there for why it's not a CSS class. */

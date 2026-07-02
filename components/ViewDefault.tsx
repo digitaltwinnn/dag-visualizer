@@ -19,9 +19,11 @@ const COPY: Record<string, { title: string; line: string; invite: string }> = {
 export default function ViewDefault({
   collapsed,
   onToggle,
+  collapsible = false,
 }: {
   collapsed: boolean;
   onToggle: () => void;
+  collapsible?: boolean;
 }) {
   const mode = useStore((s) => s.mode) as Mode;
   const c = COPY[mode] ?? COPY.hyper;
@@ -36,6 +38,9 @@ export default function ViewDefault({
   }
   return (
     <aside className="panel rc-vd">
+      {collapsible && (
+        <button className="rc-vd-collapse" title="Collapse" onClick={onToggle}>▴</button>
+      )}
       <span className="insp-eyebrow">This view</span>
       <h3 className="insp-title">{c.title}</h3>
       <p className="rc-empty-text">{c.line}</p>

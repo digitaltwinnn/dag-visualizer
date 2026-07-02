@@ -107,7 +107,7 @@ export default function Inspector() {
       )}
       <ContextCard />
       {hasDetail && vdOpen && (
-        <ViewDefault collapsed={false} onToggle={() => setVdOpen(false)} />
+        <ViewDefault collapsed={false} collapsible onToggle={() => setVdOpen(false)} />
       )}
       {panes}
       {!hasDetail && <ViewDefault collapsed={false} onToggle={() => {}} />}
