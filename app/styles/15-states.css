@@ -12,6 +12,10 @@
 .st-resolve-in { animation: st-fade-in 0.35s ease both; }
 @keyframes st-fade-in { from { opacity: 0; } to { opacity: 1; } }
 
+/* ACQUIRING — micro eyebrow paired with NodeStars (AnchoredTags / snapshot settlement). */
+.anc-acquiring { display: flex; align-items: center; gap: 8px; margin-top: 4px; }
+.anc-acq-label { font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+
 /* NO SIGNAL — panel desaturate + grey spine + red breathe dot; a sonar ring per retry. */
 .no-signal { filter: saturate(0.45); }
 .no-signal .panel-eyebrow, .no-signal .insp-eyebrow { color: var(--muted); }

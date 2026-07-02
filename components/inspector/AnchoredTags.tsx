@@ -3,6 +3,7 @@
 import { useStore } from "@/src/store/store";
 import { metagraphById } from "@/src/data/network";
 import { hex, fmtDag } from "@/src/util/format";
+import { NodeStars } from "@/components/state/StateAtoms";
 
 // The anchored block on the snapshot card: a ranked share-of-total breakdown of the metagraph
 // snapshots this global tick anchored — `dot · ticker · share-bar · count`, sorted desc, ALL of
@@ -38,7 +39,9 @@ export default function AnchoredTags({
     return (
       <div className="anc">
         {header}
-        {awaiting && <div className="anc-reading">reading…</div>}
+        {awaiting && (
+          <div className="anc-acquiring"><NodeStars count={4} /><span className="anc-acq-label">resolving</span></div>
+        )}
       </div>
     );
   }

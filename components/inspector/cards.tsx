@@ -9,7 +9,7 @@ import type { GlobalSnapshot, MetaCfg, NodeInfo, PickDescriptor } from "@/src/da
 import AnchoredTags from "./AnchoredTags";
 import Odometer from "@/components/Odometer";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
-import { SonarRing } from "@/components/state/StateAtoms";
+import { SonarRing, NodeStars } from "@/components/state/StateAtoms";
 import { Desc, Row, StatusMark, CompositionRows, StatusBreakdown, nodeComposition } from "./parts";
 
 type PickOf<K extends PickDescriptor["kind"]> = Extract<PickDescriptor, { kind: K }>;
@@ -87,8 +87,20 @@ export function SnapshotCard({ data: d }: { data: GlobalSnapshot }) {
       <div className="insp-div" />
       <AnchoredTags ordinal={d.ordinal} anchored={anchored} awaiting={awaitingExact} />
 
-      {/* Settlement — the exact fee + measured size + rewards (each an independent fact). */}
-      {exact != null && (
+      {/* Settlement — the exact fee + measured size + rewards (each an independent fact). While the
+          exact read is still in flight (ACQUIRING), the fee row shows twinkling node-stars so the
+          cell reserves width; once it lands the real value cross-fades in (st-resolve-in). */}
+      {exact == null ? (
+        <>
+          <div className="insp-div" />
+          <div className="snap-settle">
+            <div className="snap-settle-row">
+              <span className="snap-settle-label">Fees paid</span>
+              <span className="snap-settle-val"><NodeStars count={4} /></span>
+            </div>
+          </div>
+        </>
+      ) : (
         <>
           <div className="insp-div" />
           <div className="snap-settle">
@@ -96,7 +108,7 @@ export function SnapshotCard({ data: d }: { data: GlobalSnapshot }) {
               <div className="snap-settle-row">
                 <span className="snap-settle-label">Fees paid</span>
                 <span className="snap-settle-val">
-                  <span className="snap-settle-amt"><b>{fmtDag(exact.totalFee)}</b> DAG</span>
+                  <span className="snap-settle-amt st-resolve-in"><b>{fmtDag(exact.totalFee)}</b> DAG</span>
                   <span className="snap-settle-sub">{fmtKB(exact.totalSizeKB)} settled</span>
                 </span>
               </div>
@@ -104,7 +116,7 @@ export function SnapshotCard({ data: d }: { data: GlobalSnapshot }) {
             {exact.rewardsDatum > 0 && (
               <div className="snap-settle-row">
                 <span className="snap-settle-label">Rewards out</span>
-                <span className="snap-settle-val"><span className="snap-settle-amt"><b>{fmtDag(exact.rewardsDatum)}</b> DAG</span></span>
+                <span className="snap-settle-val"><span className="snap-settle-amt st-resolve-in"><b>{fmtDag(exact.rewardsDatum)}</b> DAG</span></span>
               </div>
             )}
           </div>
