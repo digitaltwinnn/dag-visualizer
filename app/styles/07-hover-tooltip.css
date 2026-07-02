@@ -1,24 +1,19 @@
-/* ── Hover tooltip (5b, ported) ──────────────────────────────────────────── */
+/* ── Hover tooltip — a lean identity LABEL (scene-tie-in) ─────────────────────
+   `‹ticker› · ‹name›  click to inspect`, one row. The ticker + a hairline border carry the
+   subject's identity hue (set inline); the name + hint stay neutral. Glass surface. */
 #tooltip {
   position: fixed; z-index: 30; pointer-events: none;
-  padding: 8px 11px;
+  display: flex; align-items: baseline; gap: 7px;
+  padding: 6px 10px;
   background: rgba(8, 12, 26, 0.92);
-  border: 1px solid var(--panel-border);
+  border: 1px solid var(--panel-border); /* overridden inline to the subject hue */
   border-radius: 8px;
   font-size: 12px; white-space: nowrap;
-  transform: translate(-50%, -130%);
-  /* Two columns: the identity rows (name / id / location) on the left, the layer tags
-     stacked on the right and spread across those rows (L0 top → dL1 bottom). */
-  display: flex; align-items: stretch; gap: 16px;
+  transform: translate(-50%, -140%);
+  backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
 }
-#tooltip .tt-main { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
-#tooltip .tt-title { font-weight: 600; display: flex; align-items: center; gap: 7px; }
-#tooltip .tt-dot { flex: none; width: 8px; height: 8px; border-radius: 50%; }
-/* Indent the id + location to line up with the name (the bullet's 8px + the title's 7px
-   gap), so the bullet sits to the left of all the text. */
-#tooltip .tt-id { font-size: 11px; color: #c7d0ea; padding-left: 15px; }
-#tooltip .tt-sub { color: var(--muted); font-size: 11px; padding-left: 15px; }
-#tooltip .tt-roles {
-  display: flex; flex-direction: column; align-items: flex-end;
-  justify-content: space-between; gap: 3px;
-}
+#tooltip .tt-ident { font-weight: 700; font-size: 11px; letter-spacing: 0.02em; }
+#tooltip .tt-sep { color: var(--muted); }
+#tooltip .tt-name { color: var(--text); }
+#tooltip .tt-name.insp-hash { font-size: 11px; }
+#tooltip .tt-hint { color: var(--muted); font-size: 10.5px; margin-left: 6px; opacity: 0.75; }

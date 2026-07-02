@@ -1,8 +1,8 @@
 import * as THREE from "three";
 import Stats from "stats.js";
 import { useStore, type Mode } from "@/src/store/store";
-import { metagraphById, initNetwork, getNetwork, getAnchor, shortHash, CORE_HEX, DEFAULT_META_COLOR } from "@/src/data/network";
-import { hex } from "@/src/util/format";
+import { metagraphById, initNetwork, getNetwork, getAnchor, DEFAULT_META_COLOR } from "@/src/data/network";
+import { hoverKeyOf, tooltipSubject } from "@/src/data/hoverSubject";
 // Existing vanilla modules, reused. Bare specifiers resolve via npm; they ship no types
 // of their own, so their surface is described in ./boundary and applied at construction.
 import { createScene } from "../../js/scene.js";
@@ -93,6 +93,8 @@ export class Engine {
   private onClick = (e: MouseEvent) => this._handleClick(e);
   private onMove = (e: MouseEvent) => this._handleMove(e);
   private _hoverKey: string | null = null;
+  private _hoverNodeKey: string | null = null; // last node-pairing key written to the store
+  private _hoverSnapOrd: number | null = null; // last snapshot ordinal written to the store
 
   private unsub: Array<() => void> = [];
   private metaTimer: ReturnType<typeof setInterval> | undefined;
@@ -546,46 +548,26 @@ export class Engine {
   // pixel); the Tooltip component positions itself from the pointer.
   private _handleMove(e: MouseEvent) {
     const p = this._pickAt(e);
-    // The node's identity line for the tooltip — its node ID (shortened) when it has one,
-    // else its IP. Same identity the geo node card leads with, so hover ≈ that card.
-    const idText =
-      p && (p.kind === "l0" || p.kind === "l1" || p.kind === "metanode")
-        ? p.node?.id
-          ? shortHash(p.node.id)
-          : p.node?.ip ?? ""
-        : "";
-    // The hovered subject's network colour, for the tooltip's leading bullet: a metagraph
-    // node / hub takes its metagraph colour; a DAG validator or the L0 core, the core cyan.
-    const color =
-      p?.kind === "metanode" && p.meta
-        ? hex(p.meta.color)
-        : p?.kind === "meta"
-          ? hex(p.cfg.color)
-          : p && (p.kind === "l0" || p.kind === "l1" || p.kind === "core")
-            ? CORE_HEX
-            : undefined;
-    const key = p ? `${p.title}|${p.sub}|${p.roles?.join(",") ?? ""}|${idText}|${color ?? ""}` : null;
     this.canvas.style.cursor = p ? "pointer" : "grab";
-    // Hover-pairing: glow every layer-shell instance of the hovered node (a validator by its
-    // machine id, a metagraph node by its ip) — so a hybrid's shells read as one machine.
-    const hoverId =
-      p?.kind === "metanode" ? p.node?.ip : p?.kind === "l0" || p?.kind === "l1" ? p.node?.id : null;
-    this.globe.setHoverNode(hoverId ?? null);
-    // Hovering a metagraph HUB sphere previews that metagraph's filter highlight — the SAME effect as
-    // hovering its filter pill (dims the others). (Its nodes keep the node-shell glow above.) Cleared
-    // when not over a hub.
-    const hoverMeta = p?.kind === "meta" ? p.cfg?.id ?? null : null;
-    if (hoverMeta !== this._hoverMetaId) {
-      this._hoverMetaId = hoverMeta;
-      useStore.getState().setHoverFilter(hoverMeta);
-    }
+    const st = useStore.getState();
+
+    // Route the hovered subject to ITS channel (each already drives a 3D effect + now the paired
+    // card/row). Only the channel for the hovered kind is set; the others clear — so exactly one
+    // subject is "hovered" at a time. Write only on change (mousemove is high-frequency).
+    const nodeKey = hoverKeyOf(p);                                   // node → globe shell glow
+    const snapOrd = p?.kind === "snapshot" ? p.data.ordinal : null;  // snapshot → ledger tile
+    const metaId = p?.kind === "meta" ? p.cfg?.id ?? null : null;    // hub → metagraph dim preview
+    if (nodeKey !== this._hoverNodeKey) { this._hoverNodeKey = nodeKey; st.setHoverNodeId(nodeKey); }
+    if (snapOrd !== this._hoverSnapOrd) { this._hoverSnapOrd = snapOrd; st.setHoverSnapOrd(snapOrd); }
+    if (metaId !== this._hoverMetaId) { this._hoverMetaId = metaId; st.setHoverFilter(metaId); }
+
+    // The lean tooltip label — re-write the store only when the subject's identity changes so
+    // following the cursor never re-renders React.
+    const subj = tooltipSubject(p);
+    const key = subj ? `${subj.ident}|${subj.name}|${subj.color}` : null;
     if (key === this._hoverKey) return;
     this._hoverKey = key;
-    useStore
-      .getState()
-      .setHover(
-        p ? { title: p.title ?? "", sub: p.sub ?? "", roles: p.roles, id: idText || undefined, color } : null,
-      );
+    st.setHover(subj);
   }
 
   private _handleClick(e: MouseEvent) {

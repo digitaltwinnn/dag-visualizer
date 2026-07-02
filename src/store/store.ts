@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import type { GlobalSnapshot, LeaderboardData, MetaInfo, NodeRow, PickDescriptor, SnapshotExact } from "@/src/data/types";
+import type { HoverSubject } from "@/src/data/hoverSubject";
 
 // The active view. `hyper`/`geo` drive the 3D scene (morph between them); the rest are flat
 // views (the canvas is hidden) — `ledger` has the live ribbon, the others are placeholders.
@@ -58,8 +59,9 @@ interface AppState {
   hoverNodeId: string | null;
   // Snapshot card follows the latest relevant snapshot (heartbeat live) vs pinned.
   following: boolean;
-  // Hover tooltip content (engine raycast); positioned by the Tooltip component.
-  hover: { title: string; sub: string; roles?: string[]; id?: string; color?: string } | null;
+  // The lean hover-tooltip subject for the currently-hovered 3D object (identity ticker + short
+  // name + hue). Set by the engine raycast only when the hovered target changes. null = nothing.
+  hover: HoverSubject | null;
   // Country drill-down within the network filter (geo view), or null.
   country: string | null;
   // Per-country breakdown + distribution score for the active filter (engine-pushed).
@@ -93,9 +95,7 @@ interface AppState {
   setHoverFilter: (filter: string | null) => void;
   setHoverNodeId: (id: string | null) => void;
   setFollowing: (following: boolean) => void;
-  setHover: (
-    hover: { title: string; sub: string; roles?: string[]; id?: string; color?: string } | null,
-  ) => void;
+  setHover: (hover: HoverSubject | null) => void;
   setCountry: (cc: string | null) => void;
   setLeaderboard: (lb: LeaderboardData | null) => void;
   setSelNodes: (nodes: NodeRow[]) => void;
