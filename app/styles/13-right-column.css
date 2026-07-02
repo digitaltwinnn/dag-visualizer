@@ -100,31 +100,6 @@
 
 .rc-empty-text { margin: 0; font-size: 12.5px; line-height: 1.5; color: var(--muted); }
 
-/* Node fabric — one outlined block (the parts are all related): a single-line total
-   ("N nodes" + online tag) over the make-up breakdown. The breakdown is quiet text columns
-   that sum to the total (hybrid group + dedicated), split by hairline dividers; folds the
-   old Layers / Make-up rows in. */
-.nf {
-  margin: 8px 0 2px; padding: 9px 11px;
-  border: 1px solid var(--panel-border); border-radius: 10px;
-}
-.nf-total {
-  display: flex; align-items: center; justify-content: space-between; gap: 8px;
-  font-size: 12.5px; color: var(--text);
-  padding-bottom: 8px; margin-bottom: 8px;
-  border-bottom: 1px solid var(--panel-border);
-}
-.nf-total b { font-weight: 700; font-variant-numeric: tabular-nums; }
-.nf-grid { display: flex; }
-/* Each layer column centres its count over the layer tag (count on top, tag beneath). */
-.nf-col { flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; align-items: center; gap: 1px; padding: 0 12px; }
-.nf-col:first-child { padding-left: 0; }
-.nf-col + .nf-col { border-left: 1px solid var(--panel-border); }
-.nf-col--empty { opacity: 0.45; } /* a 0-count layer — present for layout, de-emphasised */
-.nf-head { font-size: 12.5px; color: var(--muted); }
-.nf-head b { font-weight: 700; color: var(--text); font-variant-numeric: tabular-nums; }
-.nf-col .role-tags { margin-top: 5px; }
-
 /* Role tags — the layer(s) a node runs, as small squared chips. Shared by the node-fabric
    (under each count) and the geo node browser (per IP row), so both read identically. A
    hybrid shows several; the set is the node's identity. */
@@ -155,12 +130,6 @@
 }
 .gel-clear:hover { color: var(--text); }
 .gel-node-title { font-size: 13px; font-weight: 600; color: var(--text); margin: 0; font-variant-numeric: tabular-nums; word-break: break-all; min-width: 0; }
-/* State pill floats to the right end of the ID line — colour-coded per lifecycle state
-   (colour/border/background set inline from nodeStateColor). */
-.gel-state {
-  flex: none; margin-left: auto; padding: 2px 9px; border-radius: 999px;
-  font-size: 11px; font-weight: 600; border: 1px solid transparent;
-}
 
 /* ── View-default card — neutral per-view orientation (title + line + cyan pick-invite).
    Replaces the old #rc-empty hint. Structural chrome, NOT tinted to any identity hue; the
