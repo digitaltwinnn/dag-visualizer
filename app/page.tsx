@@ -5,6 +5,7 @@ import TopBar from "@/components/TopBar";
 import BottomStream from "@/components/BottomStream";
 import LeftColumn from "@/components/LeftColumn";
 import Inspector from "@/components/Inspector";
+import RailScroll from "@/components/RailScroll";
 import FollowController from "@/components/FollowController";
 import SnapshotExactBridge from "@/components/SnapshotExactBridge";
 import Tooltip from "@/components/Tooltip";
@@ -21,6 +22,7 @@ export default function Home() {
       <TopBar />
       <LeftColumn />
       <Inspector />
+      <RailScroll />
       <BottomStream />
       <FollowController />
       <SnapshotExactBridge />

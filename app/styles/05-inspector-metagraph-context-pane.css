@@ -1,8 +1,11 @@
 /* ── Inspector + metagraph context pane (Phase 5, ported from styles.css) ── */
 #rightcol {
-  position: fixed; top: var(--rail-top); right: 20px; z-index: 10;
+  position: fixed; top: var(--rail-top); right: 26px; z-index: 10;
   width: var(--detail-w); display: flex; flex-direction: column; gap: var(--rail-gap);
-  max-height: calc(100vh - var(--bottom-reserve) - var(--rail-top));
+  /* Full height down to a small bottom gap — the bottom strip OVERLAYS the rail instead of
+     reserving space against it (was `- var(--bottom-reserve)`). Right margin leaves room for the
+     outer instrument thread (RailThread) just outside the cards. */
+  max-height: calc(100vh - var(--rail-top) - 14px);
   overflow-y: auto;
   pointer-events: none;
 }

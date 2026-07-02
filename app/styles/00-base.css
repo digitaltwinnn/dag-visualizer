@@ -62,15 +62,27 @@ body { font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; co
   position: fixed; z-index: 10; top: var(--rail-top); left: 16px;
   width: var(--rail-w);
   display: flex; flex-direction: column; gap: var(--rail-gap);
-  max-height: calc(100vh - var(--bottom-reserve) - var(--rail-top));
+  /* Full height down to a small bottom gap — the bottom strip OVERLAYS the rail rather than
+     reserving space against it (was `- var(--bottom-reserve)`, which cut the rail short). */
+  max-height: calc(100vh - var(--rail-top) - 14px);
   overflow-y: auto;
 }
 #leftcol > aside { width: auto; }
 
-/* Custom thin scrollbar for both rails — the default chunky browser scrollbar read as heavy
-   chrome over the glass. A slim, translucent thumb on a transparent track; it brightens on hover
-   and stays out of the way at rest. (Firefox: scrollbar-width/color; WebKit: ::-webkit-scrollbar.) */
-#leftcol, #rightcol { scrollbar-width: thin; scrollbar-color: rgba(160, 175, 205, 0.28) transparent; }
+/* Both rails scroll: a slim custom scrollbar (the default chunky browser one read as heavy chrome),
+   native touch panning for tablets (pan-y + momentum), and a grab-drag fallback for mouse
+   (RailScroll). `overscroll-behavior: contain` keeps a rail scroll from chaining to the page. */
+#leftcol, #rightcol {
+  scrollbar-width: thin; scrollbar-color: rgba(160, 175, 205, 0.28) transparent;
+  touch-action: pan-y;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+  /* The bottom strip OVERLAYS the rail; rather than cards sitting hard on top of the bar-chart,
+     the rail fades out over exactly the strip's band (`--bottom-reserve`) so the last card melts
+     away just before the chart. No strip (reserve 0) → no fade. */
+  -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - var(--bottom-reserve, 0px)), transparent 100%);
+  mask-image: linear-gradient(to bottom, #000 calc(100% - var(--bottom-reserve, 0px)), transparent 100%);
+}
 #leftcol::-webkit-scrollbar, #rightcol::-webkit-scrollbar { width: 6px; }
 #leftcol::-webkit-scrollbar-track, #rightcol::-webkit-scrollbar-track { background: transparent; }
 #leftcol::-webkit-scrollbar-thumb, #rightcol::-webkit-scrollbar-thumb {
@@ -79,6 +91,8 @@ body { font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; co
 #leftcol:hover::-webkit-scrollbar-thumb, #rightcol:hover::-webkit-scrollbar-thumb {
   background: rgba(160, 175, 205, 0.45);
 }
+/* While grab-dragging a rail (mouse): suppress the text cursor + selection. */
+.rail-dragging { cursor: grabbing; user-select: none; }
 
 /* The "content updated" flash (a card whose subject just changed) is driven by the Web
    Animations API in `useFlashOnChange` — see the note there for why it's not a CSS class. */

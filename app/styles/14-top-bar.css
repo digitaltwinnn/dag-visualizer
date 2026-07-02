@@ -147,12 +147,19 @@
 }
 .tb-vital-ph { color: var(--muted); font-style: italic; opacity: 0.6; }
 
-/* ── Expanded filter (drops below the row, same surface) — a COMPACT shelf under the filter,
-   not the full bar width (the empty right half read as an oversized dropdown). ── */
-.tb-expand {
-  border-top: 1px solid var(--panel-border);
+/* ── Floating filter picker — a compact popover anchored under the filter button (its left/top are
+   measured in TopBar). A self-contained glass card, NOT a full-width expansion of the command bar. ── */
+.tb-filter-pop {
+  position: fixed;
+  z-index: 41;
+  width: 372px;
   padding: 6px;
-  max-width: 374px;   /* fp (360) + padding; left-aligned under the filter control */
+  background: linear-gradient(180deg, rgba(20, 26, 46, 0.96), rgba(10, 14, 28, 0.94));
+  border: 1px solid var(--panel-border);
+  border-radius: var(--radius);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  box-shadow: 0 14px 40px -10px rgba(0, 0, 0, 0.6);
 }
 
 /* ── Narrow screens: a graceful ladder — shed the least-essential thing at each step,
@@ -191,6 +198,17 @@
    column (not full bar width) so the rows read tightly; identity is a small dot, no logo tiles. */
 .fp { background: transparent; max-width: 360px; }
 .fp [data-slot="command-input-wrapper"] { border-bottom: 1px solid var(--panel-border); }
+/* The scrollable list — the same slim custom scrollbar as the rails (the default chunky one clashed
+   with the glass popover), a sensible max height, and contained overscroll. */
+.fp [data-slot="command-list"] {
+  max-height: 320px;
+  scrollbar-width: thin; scrollbar-color: rgba(160, 175, 205, 0.28) transparent;
+  overscroll-behavior: contain;
+}
+.fp [data-slot="command-list"]::-webkit-scrollbar { width: 6px; }
+.fp [data-slot="command-list"]::-webkit-scrollbar-track { background: transparent; }
+.fp [data-slot="command-list"]::-webkit-scrollbar-thumb { background: rgba(160, 175, 205, 0.28); border-radius: 3px; }
+.fp [data-slot="command-list"]:hover::-webkit-scrollbar-thumb { background: rgba(160, 175, 205, 0.45); }
 .fp-row { display: grid; grid-template-columns: auto 1fr auto auto; align-items: center; gap: 10px; }
 .fp-row .fp-sub { grid-column: 2; color: var(--muted); font-size: 11px; }
 .fp-name { font-size: 13px; color: var(--text); }

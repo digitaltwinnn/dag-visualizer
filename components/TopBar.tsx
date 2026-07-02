@@ -35,9 +35,20 @@ export default function TopBar() {
 
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
+  const filterBtnRef = useRef<HTMLButtonElement>(null);
+  const [pop, setPop] = useState<{ left: number; top: number } | null>(null);
 
   useEffect(() => {
     if (!open) return;
+    // Anchor the floating picker under the filter button, just below the bar. Measured so it
+    // never depends on the bar's full width (the picker is a compact popover, not a bar expansion).
+    const bar = document.getElementById("topbar");
+    const btn = filterBtnRef.current;
+    if (bar && btn) {
+      const br = bar.getBoundingClientRect();
+      const fr = btn.getBoundingClientRect();
+      setPop({ left: Math.round(fr.left), top: Math.round(br.bottom + 6) });
+    }
     const onDown = (e: MouseEvent) => {
       if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
     };
@@ -53,7 +64,8 @@ export default function TopBar() {
   const face = filterFace(filter);
 
   return (
-    <div id="topbar" ref={ref} className={open ? "open" : ""}>
+    <div ref={ref}>
+      <div id="topbar" className={open ? "open" : ""}>
       <div className="tb-row">
         {/* Brand */}
         <div className={"tb-brand" + (live ? "" : " off")}>
@@ -66,7 +78,7 @@ export default function TopBar() {
         <span className="tb-div" />
 
         {/* Filter (toned, de-nested) */}
-        <button className={"tb-filter" + (open ? " active" : "")} aria-expanded={open}
+        <button ref={filterBtnRef} className={"tb-filter" + (open ? " active" : "")} aria-expanded={open}
           onClick={() => setOpen((o) => !o)}>
           <span className="tb-filter-k">Filter</span>
           <span className="tb-filter-dot" style={{ background: face.dot }} />
@@ -98,9 +110,13 @@ export default function TopBar() {
         {/* Vitals */}
         <Vitals />
       </div>
+      </div>
 
-      {open && (
-        <div className="tb-expand">
+      {/* Floating filter picker — a compact popover anchored under the filter button (NOT a
+          full-width expansion of the bar). Lives outside #topbar so the bar's `overflow: hidden`
+          can't clip it; still inside the outer ref so an outside-click closes it. */}
+      {open && pop && (
+        <div className="tb-filter-pop" style={{ left: pop.left, top: pop.top }}>
           <FilterPicker onPick={() => setOpen(false)} />
         </div>
       )}

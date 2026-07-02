@@ -11,7 +11,7 @@ import { filterAccent } from "@/src/data/network";
 // so the dots track each card even as cards are added, grow, or the rail scrolls. Fades top+bottom
 // (CSS mask). Purely decorative (pointer-events: none) — see the no-effect-bleed rule: no
 // data-driven animation here, it just reflects the selection's hue + the current card layout.
-const W = 14; // channel width (px)
+const W = 18; // channel width (px)
 
 export default function RailThread() {
   const filter = useStore((s) => s.filter);
@@ -29,9 +29,8 @@ export default function RailThread() {
       const dots = cards
         .map((c) => { const cr = c.getBoundingClientRect(); return cr.top + cr.height / 2 - r.top; })
         .filter((y) => y >= 6 && y <= r.height - 6); // only dots inside the visible rail
-      // Straddle the cards' right edge: the base line rides the edge, the identity line + dots +
-      // ticks step just outward into the margin.
-      setG({ top: r.top, left: r.right - 6, height: Math.round(r.height), dots });
+      // Sit in the margin just OUTSIDE the cards (a small gap), so the thread doesn't touch them.
+      setG({ top: r.top, left: r.right, height: Math.round(r.height), dots });
     };
     const schedule = () => { if (!raf) raf = requestAnimationFrame(measure); };
     schedule();
@@ -52,8 +51,8 @@ export default function RailThread() {
 
   if (!g || g.height <= 0) return null;
   const H = g.height;
-  const nx = 4; // neutral base line x (rides the card edge)
-  const ax = 7; // identity line x (the parallel second line, just outward)
+  const nx = 12; // neutral base line x (out in the margin, clear of the cards)
+  const ax = 15; // identity line x (the parallel second line)
   const ticks: number[] = [];
   for (let y = 10; y <= H - 10; y += 13) ticks.push(y);
 
@@ -66,7 +65,7 @@ export default function RailThread() {
       aria-hidden
       focusable="false"
     >
-      {/* neutral base line — the fixed channel on the rail's edge */}
+      {/* neutral base line */}
       <line x1={nx} y1={0} x2={nx} y2={H} stroke="rgba(170,185,215,0.32)" strokeWidth={1} />
       {/* ruler ticker hatches, stepping outward; every 4th runs longer (an instrument scale) */}
       {ticks.map((y, i) => (
@@ -74,9 +73,10 @@ export default function RailThread() {
       ))}
       {/* identity line — the selection's hue, the second line of the pair */}
       <line x1={ax} y1={0} x2={ax} y2={H} stroke={accent} strokeWidth={2} />
-      {/* a node-dot centered on each card, with a soft identity halo, on the identity line */}
+      {/* per card: a short connector anchoring the dot back to the card, then the haloed node-dot */}
       {g.dots.map((y, i) => (
         <g key={i}>
+          <line x1={2} y1={y} x2={ax} y2={y} stroke={accent} strokeWidth={1} opacity={0.45} />
           <circle cx={ax} cy={y} r={6} fill={accent} opacity={0.16} />
           <circle cx={ax} cy={y} r={3.4} fill={accent} stroke="var(--panel)" strokeWidth={1.5} />
         </g>
