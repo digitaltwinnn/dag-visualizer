@@ -22,6 +22,11 @@
 /* Bullet colour follows the rail's selection accent (`--filter-accent`); cyan fallback. */
 .insp-dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 8px; vertical-align: middle; background: var(--filter-accent, var(--core)); }
 
+/* The Context (parent) card — the dossier / "All" summary now pinned at the top of the
+   right-rail stack (was the left rail's #metapane). */
+.rc-context { position: relative; }
+.rc-context--all #metapane-content { padding: var(--panel-pad-y) var(--panel-pad-x); }
+
 /* Quiet placeholder so the right zone is always present (symmetric with the left rail). */
 #rc-empty { padding: 16px 18px; }
 .rc-empty-text { margin: 0; font-size: 12.5px; line-height: 1.5; color: var(--muted); }

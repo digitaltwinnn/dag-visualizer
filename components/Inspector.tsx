@@ -4,6 +4,7 @@ import type { CSSProperties, ReactNode } from "react";
 import { useStore, type SelSlot } from "@/src/store/store";
 import { filterAccent } from "@/src/data/network";
 import InspectorCard from "@/components/InspectorCard";
+import ContextCard from "@/components/ContextCard";
 import { useFlashOnChange } from "@/components/useFlashOnChange";
 import type { PickDescriptor } from "@/src/data/types";
 
@@ -103,6 +104,7 @@ export default function Inspector() {
 
   return (
     <div id="rightcol" style={accent}>
+      <ContextCard />
       {panes}
       {hint && (
         <aside id="rc-empty" className="panel">

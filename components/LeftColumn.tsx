@@ -3,7 +3,6 @@
 import type { CSSProperties } from "react";
 import { useStore } from "@/src/store/store";
 import { filterAccent } from "@/src/data/network";
-import ContextPanel from "@/components/ContextPanel";
 import GeoExplore from "@/components/GeoExplore";
 import LedgerPanel from "@/components/LedgerPanel";
 import PlaceholderPanel from "@/components/PlaceholderPanel";
@@ -47,11 +46,11 @@ const PLACEHOLDERS: Record<string, { title: string; eyebrow: string; lines: stri
   },
 };
 
-// Left control rail: the **explore/interact** zone. The global network filter now lives in
-// the top command bar; when a metagraph/core is selected its **dossier** pins to the top of
-// this rail (`ContextPanel`), above the view's ONE tool card: Hypergraph → an "about" card
-// (the guided Learn tour is being reworked); Geography → GeoExplore (footprint + node browser);
-// Snapshots → the ledger "about" panel; the scaffolded views → a "coming soon" PlaceholderPanel.
+// Left control rail: the **explore/interact** zone. The global network filter lives in the
+// top command bar; the selected-subject dossier now lives in the right rail (`ContextCard`).
+// This rail renders just the view's ONE tool card: Hypergraph → an "about" card (the guided
+// Learn tour is being reworked); Geography → GeoExplore (footprint + node browser); Snapshots
+// → the ledger "about" panel; the scaffolded views → a "coming soon" PlaceholderPanel.
 export default function LeftColumn() {
   const mode = useStore((s) => s.mode);
   const filter = useStore((s) => s.filter);
@@ -61,7 +60,6 @@ export default function LeftColumn() {
   const placeholder = PLACEHOLDERS[mode];
   return (
     <div id="leftcol" style={accent}>
-      <ContextPanel />
       {mode === "geo" && <GeoExplore />}
       {mode === "ledger" && <LedgerPanel />}
       {placeholder && <PlaceholderPanel {...placeholder} />}

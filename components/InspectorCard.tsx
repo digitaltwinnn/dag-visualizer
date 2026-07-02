@@ -4,7 +4,7 @@ import type { PickDescriptor } from "@/src/data/types";
 import LiveHeart from "@/components/inspector/LiveHeart";
 import { GeoLiveCard, MetaCard, SnapshotCard } from "@/components/inspector/cards";
 
-// Only three kinds ever reach the inspector frame now: a metagraph/core dossier (ContextPanel),
+// Only three kinds ever reach the inspector frame now: a metagraph/core dossier (ContextCard),
 // a clicked snapshot (ledger), and the selected-node card (geo/hyper, via the `geoLive` proxy
 // that reads the node from the store). The raw node/core picks never land here.
 function CardBody({ p }: { p: PickDescriptor }) {
