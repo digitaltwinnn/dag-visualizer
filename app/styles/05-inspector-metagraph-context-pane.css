@@ -86,3 +86,23 @@
 .desc.expanded { -webkit-line-clamp: unset; overflow: visible; }
 .desc-more { display: inline-block; margin: 2px 0 0; padding: 0; background: none; border: none; cursor: pointer; font: inherit; font-size: 11px; font-weight: 600; color: var(--core); }
 .desc-more:hover { text-decoration: underline; }
+
+/* Status — single (pill / ready text) + breakdown */
+.st-ready { color: #36e29a; font-weight: 600; font-size: 12.5px; }
+.st-pill {
+  font-size: 11px; font-weight: 600; padding: 1px 8px; border-radius: 999px;
+  border: 1px solid; white-space: nowrap;
+}
+.st-breakdown { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; color: var(--muted); }
+.st-bd { display: inline-flex; align-items: center; gap: 5px; }
+.st-bd-dot { width: 7px; height: 7px; border-radius: 50%; }
+.st-bd-sep { color: var(--muted); opacity: 0.6; }
+
+/* Node composition rows + chip stacks (neutral chrome) */
+.comp-rows { display: flex; flex-direction: column; gap: 7px; margin-top: 8px; }
+.comp-row { display: grid; grid-template-columns: auto auto 1fr auto; align-items: center; gap: 8px; }
+.comp-role { font-size: 12.5px; color: var(--text); }
+.comp-codes { font-size: 11px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.comp-chips { display: inline-flex; gap: 3px; justify-content: flex-end; align-items: center; }
+.comp-chip { width: 6px; height: 6px; border-radius: 50%; background: rgba(160, 175, 205, 0.5); }
+.comp-count { font-size: 12.5px; color: var(--text); font-variant-numeric: tabular-nums; min-width: 1.5em; text-align: right; }
