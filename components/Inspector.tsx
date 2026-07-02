@@ -3,6 +3,7 @@
 import type { CSSProperties, ReactNode } from "react";
 import { useStore, type SelSlot } from "@/src/store/store";
 import { filterAccent } from "@/src/data/network";
+import { breadcrumbLabel } from "@/src/data/breadcrumb";
 import InspectorCard from "@/components/InspectorCard";
 import ContextCard from "@/components/ContextCard";
 import { useFlashOnChange } from "@/components/useFlashOnChange";
@@ -68,7 +69,7 @@ export default function Inspector() {
           key="node"
           dep={inspect}
           pick={{ kind: "geoLive" }}
-          eyebrow="Selected node"
+          eyebrow={breadcrumbLabel("node", filter)}
           onClose={() => setInspect(null)}
           ownClose
         />
@@ -81,7 +82,7 @@ export default function Inspector() {
           key="snap"
           dep={snap}
           pick={snap}
-          eyebrow="Selected snapshot"
+          eyebrow={breadcrumbLabel("snap", filter)}
           onClose={() => setSnap(null)}
           ownClose={false}
         />

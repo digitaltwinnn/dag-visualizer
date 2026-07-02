@@ -79,6 +79,9 @@
   color: var(--accent); line-height: 1; margin-bottom: 8px; padding-right: 22px;
 }
 .rc-pane h3, #metapane h3 { padding-right: 22px; }
+/* Detail (child) cards carry a breadcrumb eyebrow (`node ‹ DOR`) naming their parent —
+   read it toward the rail's outer edge, opposite the Context card's own eyebrow. */
+.rc-pane .insp-eyebrow { text-align: right; }
 /* Snapshot title shares its row with the live ● control; both clear the × . */
 .insp-titlerow {
   display: flex; align-items: baseline; justify-content: space-between;
