@@ -167,8 +167,10 @@
   content: ""; position: absolute; top: 0; left: 0; right: 0; height: 2px;
   background: var(--ls-accent); border-radius: 1px;
 }
-.ls-bar.gap { background: none; }
-.ls-bar.gap::before { display: none; }        /* an empty tick reads as a gap on the baseline */
+/* An empty tick reads as a gap on the baseline (no body, no cap) but stays a full-height
+   invisible hit target so it's still hoverable/clickable — these are real global snapshots. */
+.ls-bar.gap { background: none; min-height: 100%; }
+.ls-bar.gap::before { display: none; }
 .ls-bar:hover::before, .ls-bar.active::before { box-shadow: 0 0 6px var(--ls-accent); }
 .ls-bar.live::before { box-shadow: 0 0 6px var(--ls-accent); }   /* the live cap glows */
 /* New bar streams in from the right and grows up from the baseline. */
