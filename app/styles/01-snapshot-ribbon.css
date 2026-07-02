@@ -116,6 +116,7 @@
   position: relative;
   flex: 1; display: flex; align-items: flex-end; gap: 2px;
   height: 80px; overflow: hidden;
+  padding-bottom: 9px;  /* reserve a band under the bars for the axis line + its downward ruler ticks */
   mask-image: linear-gradient(to right, transparent 0, #000 60px);
   -webkit-mask-image: linear-gradient(to right, transparent 0, #000 60px);
 }
@@ -143,10 +144,18 @@
 .ls-tip-rec { display: flex; align-items: center; gap: 6px; font-size: 11px; color: var(--muted); margin-top: 4px; }
 .ls-tip-live { width: 7px; height: 7px; border-radius: 50%; background: var(--primary); box-shadow: 0 0 0 3px color-mix(in oklch, var(--primary) 30%, transparent); }
 .ls-tip-hint { font-size: 10px; color: var(--muted); opacity: 0.7; margin-top: 4px; }
-/* faint flat baseline hairline the bars sit on */
+/* The axis the bars sit on — the SAME instrument-thread language as the rails: a neutral base line
+   with ruler hairlines (short marks, every 4th taller + brighter), just rotated to a horizontal
+   axis (--axis-hairlines). `::before` = the vertical ticks (behind the bars — a ruler showing
+   through the gaps); `::after` = the crisp neutral base line on top. Both inherit the strip's
+   left-edge mask fade. */
+.ls-bars::before {
+  content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 9px;
+  background: var(--axis-hairlines); pointer-events: none;
+}
 .ls-bars::after {
-  content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 1px;
-  background: rgba(160, 175, 205, 0.18); pointer-events: none;
+  content: ""; position: absolute; left: 0; right: 0; bottom: 9px; height: 1px;
+  background: var(--thread-line); pointer-events: none;
 }
 /* Each bar plots ONE value: the tick's total anchors (All, cyan) or the filtered metagraph's own
    anchors on its own cadence/scale (identity hue). A crisp ~2px cap marks the value; the body below

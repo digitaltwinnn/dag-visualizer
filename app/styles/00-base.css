@@ -35,9 +35,11 @@
      as a reusable background — apply it to any left-anchored strip. NB the SVG thread
      can't consume these (an SVG stroke attribute doesn't resolve var()), so it mirrors
      the SAME literals in code — keep the two in sync (see RailThread `TICK_*`). */
+  --thread-line: rgba(178, 193, 223, 0.40);        /* the neutral base line the ticks hang off */
   --thread-tick: rgba(178, 193, 223, 0.30);        /* minor hairline */
   --thread-tick-major: rgba(178, 193, 223, 0.42);  /* every 4th — longer + brighter */
   --thread-tick-pitch: 13px;                        /* spacing between hairlines */
+  /* Vertical spine → horizontal hairlines (left/right rail cards). */
   --rail-hairlines:
     /* major ticks first → painted on top of the coincident minor tick (longer + brighter) */
     repeating-linear-gradient(to bottom,
@@ -46,6 +48,16 @@
     repeating-linear-gradient(to bottom,
       var(--thread-tick) 0, var(--thread-tick) 1px,
       transparent 1px, transparent var(--thread-tick-pitch)) left top / 6px 100% no-repeat;
+  /* Same rhythm rotated 90° — a horizontal baseline → vertical ticks HANGING DOWN from it (the
+     bar-chart axis, so the ruler sits under the bars, not through them). Anchored to the TOP so
+     ticks grow downward; major taller (8px) + brighter, minor 5px. */
+  --axis-hairlines:
+    repeating-linear-gradient(to right,
+      var(--thread-tick-major) 0, var(--thread-tick-major) 1px,
+      transparent 1px, transparent calc(var(--thread-tick-pitch) * 4)) left top / 100% 8px no-repeat,
+    repeating-linear-gradient(to right,
+      var(--thread-tick) 0, var(--thread-tick) 1px,
+      transparent 1px, transparent var(--thread-tick-pitch)) left top / 100% 5px no-repeat;
 }
 
 * { box-sizing: border-box; }

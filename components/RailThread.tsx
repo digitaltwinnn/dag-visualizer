@@ -16,6 +16,7 @@ const W = 22; // channel width (px)
 // so this SVG thread and the left rail's CSS spine read identically. Kept here as literals because
 // an SVG stroke ATTRIBUTE can't resolve a CSS var(); keep the two in sync.
 const TICK_PITCH = 13; // px between hairlines
+const TICK_LINE = "rgba(178,193,223,0.40)"; // neutral base line (CSS --thread-line)
 const TICK_MINOR = "rgba(178,193,223,0.3)"; // short hairline
 const TICK_MAJOR = "rgba(178,193,223,0.42)"; // every 4th — longer + brighter
 
@@ -76,7 +77,7 @@ export default function RailThread() {
       focusable="false"
     >
       {/* neutral base line (outer) — SOFT/muted; the identity line is the prominent one. */}
-      <line x1={nx} y1={0} x2={nx} y2={H} stroke="rgba(178,193,223,0.40)" strokeWidth={1} />
+      <line x1={nx} y1={0} x2={nx} y2={H} stroke={TICK_LINE} strokeWidth={1} />
       {/* ruler ticker hatches — short marks stepping OUTWARD from the neutral line; muted, every 4th
          a touch longer/brighter (an instrument scale), well clear of the identity line. */}
       {ticks.map((y, i) => (
