@@ -40,7 +40,7 @@ export default function LiveStrip() {
   // level can't be). Content is set on bar-enter (so it re-renders only when the bar changes); the
   // cursor position is written straight to the DOM node on move, so following the cursor is free.
   const tipRef = useRef<HTMLDivElement>(null);
-  const [tip, setTip] = useState<{ ordinal: number; total: number; mine: number; x: number; y: number } | null>(null);
+  const [tip, setTip] = useState<{ ordinal: number; total: number; mine: number; ts: string; live: boolean; x: number; y: number } | null>(null);
   const moveTip = (e: React.MouseEvent) => {
     const el = tipRef.current;
     if (el) {
@@ -57,55 +57,42 @@ export default function LiveStrip() {
     setSnap({ kind: "snapshot", title: `Global snapshot #${d.ordinal}`, data: d });
   };
 
-  // Per bar: the tick's TOTAL anchors (bar height), and the selected metagraph's own share of it
-  // (the filled segment). With no metagraph selected the share IS the total (a solid bar).
+  // Per bar: the tick's total anchors, and (filtered) this metagraph's own anchors. The plotted
+  // VALUE is `mine` when a metagraph is filtered (its own cadence on its own scale), else `total`.
   const bars = snaps.map((d) => {
     const total = typeof d.metagraphSnapshotCount === "number" ? d.metagraphSnapshotCount : 0;
     const mine = isMeta ? getAnchor(d.timestamp)?.metaCounts?.get(filter) ?? 0 : total;
     return { d, total, mine };
   });
-  const maxTotal = Math.max(1, ...bars.map((b) => b.total));
+  const scaleMax = Math.max(1, ...bars.map((b) => (isMeta ? b.mine : b.total)));
 
   return (
-    // --ls-accent colours the FILL (the metagraph's share); --ls-outline colours the total bar's
-    // outline. When a metagraph is selected the outline goes neutral/dim (the total is just
-    // context behind the coloured share); unselected it's the core cyan of the whole-network bar.
-    <section
-      id="livestrip"
-      style={
-        {
-          ["--ls-accent"]: accent,
-          ["--ls-outline"]: isMeta ? "rgb(150, 165, 200)" : "var(--core)",
-        } as CSSProperties
-      }
-    >
+    <section id="livestrip" style={{ ["--ls-accent"]: accent } as CSSProperties}>
       <span className="ls-live">
         <span className="live-dot" />
         Global L0
+        <span className="ls-scale">
+          {isMeta ? `${cfg!.ticker || cfg!.name} anchors/tick · own scale` : "anchors/tick"}
+        </span>
       </span>
       <div className="ls-bars" onMouseLeave={() => { setTip(null); setHoverSnapOrd(null); }}>
         {snaps.length === 0 && <span className="ls-empty">Waiting for snapshots…</span>}
         {bars.map(({ d, total, mine }, i) => {
           const live = i === bars.length - 1;
           const active = d.ordinal === activeOrd;
-          const off = isMeta && mine === 0; // total bar still shows, just no accent fill
-          const fillPct = total > 0 ? Math.round((mine / total) * 100) : 0;
-          const cls = "ls-bar" + (off ? " off" : "") + (live ? " live" : "") + (active ? " active" : "");
-          const label = isMeta
-            ? `Snapshot #${d.ordinal.toLocaleString()} · ${cfg!.ticker || cfg!.name} ${mine} of ${total} anchored`
-            : `Snapshot #${d.ordinal.toLocaleString()} · anchored ${total} metagraph snapshot${total === 1 ? "" : "s"}`;
+          const value = isMeta ? mine : total;
+          const gap = value === 0;                        // honest gap (esp. filtered)
+          const cls = "ls-bar" + (gap ? " gap" : "") + (live ? " live" : "") + (active ? " active" : "");
           return (
             <button
               key={d.ordinal}
               className={cls}
-              style={{ height: `max(8%, ${Math.round((total / maxTotal) * 100)}%)` }}
-              aria-label={label}
-              onMouseEnter={(e) => { setTip({ ordinal: d.ordinal, total, mine, x: e.clientX, y: e.clientY }); setHoverSnapOrd(d.ordinal); }}
+              style={{ height: gap ? "0%" : `max(6%, ${Math.round((value / scaleMax) * 100)}%)` }}
+              aria-label={`snapshot ${d.ordinal}`}
+              onMouseEnter={(e) => { setTip({ ordinal: d.ordinal, total, mine, ts: d.timestamp, live, x: e.clientX, y: e.clientY }); setHoverSnapOrd(d.ordinal); }}
               onMouseMove={moveTip}
               onClick={() => pick(d)}
-            >
-              <span className="ls-bar-fill" style={{ height: `${fillPct}%` }} />
-            </button>
+            />
           );
         })}
       </div>

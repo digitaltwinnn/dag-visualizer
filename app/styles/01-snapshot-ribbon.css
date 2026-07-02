@@ -106,6 +106,8 @@
   font-size: 12px; font-weight: 600; letter-spacing: 0.02em; color: var(--text);
   text-shadow: 0 1px 8px rgba(0, 0, 0, 0.7); /* legible without the panel behind it */
 }
+/* the scale label switches between the shared window max (All) and a metagraph's own cadence */
+.ls-scale { font-size: 10px; color: var(--muted); margin-left: 8px; letter-spacing: .02em; }
 /* Anchor bar-chart: one bar per snapshot (height = anchors), spanning the FULL width so the
    bars grow thinner as more stream in, newest on the right, older ones fading out to the left.
    Coloured by the active filter (`--ls-accent`): the selected metagraph's accent, or core cyan
@@ -135,67 +137,35 @@
 #ls-tip .ls-tip-k { display: flex; align-items: center; gap: 6px; color: var(--muted); font-size: 11px; }
 #ls-tip .ls-tip-v { color: #c7d0ea; font-size: 11px; font-variant-numeric: tabular-nums; }
 #ls-tip .ls-tip-dot { flex: none; width: 8px; height: 8px; border-radius: 50%; }
-/* Each bar's full height = the tick's TOTAL anchors; the inner fill = the selected metagraph's
-   share of it (the whole bar when no metagraph is selected). A thin accent OUTLINE with a lit top
-   rim gives each bar definition; the fill fades from invisible at the bottom to a SOFT (not harsh)
-   accent near the top — a clean skyline, not a glare. New bars ease in from the right. */
+.ls-bars { position: relative; }
+/* faint flat baseline hairline the bars sit on */
+.ls-bars::after {
+  content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 1px;
+  background: rgba(160, 175, 205, 0.18); pointer-events: none;
+}
+/* Each bar plots ONE value: the tick's total anchors (All, cyan) or the filtered metagraph's own
+   anchors on its own cadence/scale (identity hue). A crisp ~2px cap marks the value; the body below
+   it fades downward (quiet, not a glare) into a faint baseline hairline. New bars ease in from the
+   right; an empty tick (esp. when filtered) renders as an honest GAP — no cap, no body. */
 .ls-bar {
-  position: relative; flex: 1 1 0; min-width: 2px; padding: 0; cursor: pointer;
-  border-radius: 3px 3px 0 0; overflow: hidden;
-  /* faint grey base = the tick's TOTAL, shown behind the accent fill when a metagraph is selected */
-  background: linear-gradient(to top, transparent, rgba(150, 165, 200, 0.04) 45%, rgba(150, 165, 200, 0.11));
-  /* outline: subtle on the sides, brighter as a top rim (inset shadow) — defines the bar. The
-     outline marks the tick's TOTAL: core cyan for the whole-network bar, but neutral/dim when a
-     metagraph filter is active (so only the coloured FILL — the metagraph's share — stands out).
-     Colour comes from --ls-outline, set by LiveStrip per filter state. */
-  border: 1px solid color-mix(in srgb, var(--ls-outline, var(--core)) 20%, transparent);
-  border-bottom: none;
-  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--ls-outline, var(--core)) 30%, transparent);
+  position: relative; align-self: flex-end; border: none; cursor: pointer; padding: 0;
+  flex: 1 1 0; min-width: 2px;
+  /* body: the accent hue fading downward into the scene (quiet) */
+  background: linear-gradient(to bottom, color-mix(in oklch, var(--ls-accent) 26%, transparent), transparent);
+  border-radius: 1px 1px 0 0;
   transform-origin: bottom;
   animation: lsBarIn 0.55s cubic-bezier(0.22, 1, 0.36, 1) both;
-  transition: height 0.45s cubic-bezier(0.22, 1, 0.36, 1), border-color 0.15s, box-shadow 0.15s;
+  transition: height 0.45s cubic-bezier(0.22, 1, 0.36, 1);
 }
-.ls-bar:hover { border-color: color-mix(in srgb, var(--ls-outline, var(--core)) 45%, transparent); }
-.ls-bar-fill {
-  position: absolute; left: 0; right: 0; bottom: 0;
-  background: linear-gradient(to top,
-    transparent,
-    color-mix(in srgb, var(--ls-accent, var(--core)) 7%, transparent) 45%,
-    color-mix(in srgb, var(--ls-accent, var(--core)) 24%, transparent) 78%,
-    color-mix(in srgb, var(--ls-accent, var(--core)) 48%, transparent) 100%);
-  transition: height 0.45s cubic-bezier(0.22, 1, 0.36, 1), background 0.15s;
+/* crisp value cap at the top of the bar */
+.ls-bar::before {
+  content: ""; position: absolute; top: 0; left: 0; right: 0; height: 2px;
+  background: var(--ls-accent); border-radius: 1px;
 }
-.ls-bar:hover .ls-bar-fill {
-  background: linear-gradient(to top, transparent,
-    color-mix(in srgb, var(--ls-accent, var(--core)) 10%, transparent) 45%,
-    color-mix(in srgb, var(--ls-accent, var(--core)) 32%, transparent) 78%,
-    color-mix(in srgb, var(--ls-accent, var(--core)) 64%, transparent) 100%);
-}
-/* No accent share for the selected metagraph in this tick → grey out the outline too. */
-.ls-bar.off { border-color: rgba(150, 165, 200, 0.16); box-shadow: inset 0 1px 0 rgba(150, 165, 200, 0.18); }
-.ls-bar.active {
-  border-color: color-mix(in srgb, var(--ls-outline, var(--core)) 68%, transparent);
-  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--ls-outline, var(--core)) 55%, transparent),
-              0 0 10px color-mix(in srgb, var(--ls-outline, var(--core)) 32%, transparent);
-}
-.ls-bar.active .ls-bar-fill {
-  background: linear-gradient(to top, transparent,
-    color-mix(in srgb, var(--ls-accent, var(--core)) 12%, transparent) 45%,
-    color-mix(in srgb, var(--ls-accent, var(--core)) 36%, transparent) 78%,
-    color-mix(in srgb, var(--ls-accent, var(--core)) 70%, transparent) 100%);
-}
-/* The live (newest) bar's fill gently breathes so the stream always feels alive. */
-.ls-bar.live .ls-bar-fill {
-  background: linear-gradient(to top, transparent,
-    color-mix(in srgb, var(--ls-accent, var(--core)) 12%, transparent) 45%,
-    color-mix(in srgb, var(--ls-accent, var(--core)) 36%, transparent) 78%,
-    color-mix(in srgb, var(--ls-accent, var(--core)) 68%, transparent) 100%);
-  animation: lsPulse 1.7s ease-in-out infinite;
-}
-@keyframes lsPulse {
-  0%, 100% { opacity: 0.62; }
-  50% { opacity: 1; }
-}
+.ls-bar.gap { background: none; }
+.ls-bar.gap::before { display: none; }        /* an empty tick reads as a gap on the baseline */
+.ls-bar:hover::before, .ls-bar.active::before { box-shadow: 0 0 6px var(--ls-accent); }
+.ls-bar.live::before { box-shadow: 0 0 6px var(--ls-accent); }   /* the live cap glows */
 /* New bar streams in from the right and grows up from the baseline. */
 @keyframes lsBarIn {
   from { opacity: 0; transform: translateX(9px) scaleY(0.55); }
@@ -203,5 +173,5 @@
 }
 @media (prefers-reduced-motion: reduce) {
   .ls-bar { animation: none; }
-  .ls-bar.live .ls-bar-fill { animation: none; }
+  .live-dot { animation: none; }
 }
