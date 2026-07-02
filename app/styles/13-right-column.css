@@ -3,6 +3,74 @@
    an eyebrow naming its slot role (Selected / Live / Node …), symmetric with the
    left panels' eyebrows. */
 
+/* ── Instrument-channel identity thread — the rail's outer (right/screen) edge. ──
+   A recessed groove with neutral gradient-faded tick-marks (structural chrome, NOT
+   tinted) plus an identity-hued spine (reads --filter-accent, cyan for "all") that
+   every card's node-dot attaches to at its vertical middle. Static — no data-driven
+   pulse/animation here (see the no-effect-bleed rule). */
+#rightcol {
+  /* reserve the outer channel so cards don't overlap the thread */
+  padding-right: 18px;
+  /* NOTE: #rightcol is already `position: fixed` (05-inspector-metagraph-context-pane.css),
+     which already establishes a positioning context for the absolute ::before/::after below —
+     do NOT redeclare `position` here, it would override the fixed rail placement (this file
+     loads after that one). */
+}
+/* Recessed groove on the outer edge (neutral chrome). */
+#rightcol::before {
+  content: "";
+  position: absolute;
+  top: 0; bottom: 0; right: 6px;
+  width: 6px;
+  border-radius: 3px;
+  background: rgba(0, 0, 0, 0.25);
+  box-shadow: inset 0 0 0 1px rgba(120, 160, 255, 0.10);
+  /* neutral gradient-faded tick-marks: densest at the middle, dissolving top & bottom */
+  background-image: repeating-linear-gradient(
+    to bottom,
+    rgba(160, 175, 205, 0.28) 0 1px,
+    transparent 1px 9px
+  );
+  -webkit-mask-image: linear-gradient(to bottom, transparent, #000 22%, #000 78%, transparent);
+  mask-image: linear-gradient(to bottom, transparent, #000 22%, #000 78%, transparent);
+  pointer-events: none;
+}
+/* Identity-hued spine inside the groove (cyan for "all" via --filter-accent). */
+#rightcol::after {
+  content: "";
+  position: absolute;
+  top: 8px; bottom: 8px; right: 7px;
+  width: 2px;
+  border-radius: 2px;
+  background: var(--filter-accent, var(--primary));
+  opacity: 0.75;
+  pointer-events: none;
+}
+/* Per-card node-dot at each panel's vertical middle, attaching to the spine.
+   CONFLICT NOTE: `#metapane, .rc-pane { overflow-y: auto; }` (05-inspector-metagraph-context-pane.css)
+   clips anything positioned outside the panel's box on BOTH axes — per spec, pairing a non-`visible`
+   overflow-y with overflow-x:visible computes overflow-x to `auto` too, so the dot at `right:-16px`
+   was invisible (clipped), not merely painted-over. There's no real `::after` element collision
+   (useFlashOnChange uses the WAAPI, not a pseudo-element), so the fix is scoped to overflow: keep
+   `.panel` itself overflow-visible (so the outer-channel dot isn't clipped) and move the vertical
+   scroll onto each card's existing inner content wrapper (`#metapane-content` / `.rc-content`,
+   already present in Inspector.tsx / ContextCard.tsx) instead. */
+#rightcol > .panel { position: relative; overflow: visible; }
+#metapane-content, .rc-content { overflow-y: auto; max-height: inherit; }
+#rightcol > .panel::after {
+  content: "";
+  position: absolute;
+  right: -16px;               /* out into the channel, over the spine */
+  top: 50%;
+  transform: translateY(-50%);
+  width: 7px; height: 7px;
+  border-radius: 50%;
+  background: var(--filter-accent, var(--primary));
+  box-shadow: 0 0 0 2px var(--bg);
+  z-index: 1;
+  pointer-events: none;
+}
+
 /* Uniform right-column header: a blue role eyebrow (purpose) over a white title
    (subject). Both clear the absolute close × in the top-right corner. */
 .insp-eyebrow {
