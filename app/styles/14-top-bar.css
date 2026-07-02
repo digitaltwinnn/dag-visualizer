@@ -152,8 +152,6 @@
   border-top: 1px solid var(--panel-border);
   padding: 6px;
 }
-/* The shared chip grid sits flush inside the expand and wraps across the full width. */
-.tb-expand .mf-chips { padding: 10px 8px 6px; }
 
 /* ── Narrow screens: a graceful ladder — shed the least-essential thing at each step,
    keep the view names (the part the user asked to keep) as long as possible. ── */
