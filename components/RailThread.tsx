@@ -66,10 +66,10 @@ export default function RailThread() {
       focusable="false"
     >
       {/* neutral base line */}
-      <line x1={nx} y1={0} x2={nx} y2={H} stroke="rgba(170,185,215,0.32)" strokeWidth={1} />
+      <line x1={nx} y1={0} x2={nx} y2={H} stroke="rgba(178,193,223,0.62)" strokeWidth={1.25} />
       {/* ruler ticker hatches, stepping outward; every 4th runs longer (an instrument scale) */}
       {ticks.map((y, i) => (
-        <line key={i} x1={nx} y1={y} x2={i % 4 === 0 ? W : W - 3} y2={y} stroke="rgba(170,185,215,0.30)" strokeWidth={1} />
+        <line key={i} x1={nx} y1={y} x2={i % 4 === 0 ? W : W - 3} y2={y} stroke={`rgba(178,193,223,${i % 4 === 0 ? 0.62 : 0.5})`} strokeWidth={1} />
       ))}
       {/* identity line — the selection's hue, the second line of the pair */}
       <line x1={ax} y1={0} x2={ax} y2={H} stroke={accent} strokeWidth={2} />
