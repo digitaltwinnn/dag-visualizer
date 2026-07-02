@@ -4,6 +4,18 @@
    instead of three unrelated widgets. Panel bodies keep their own classes; only
    the head + collapse behaviour are unified here. */
 
+/* Base glass surface for every rail card (the Instrument-Glass panel). NOTE: this rule
+   originally lived in 02-filter-panel.css, which was retired in the Phase-2 top-bar refresh —
+   its deletion silently dropped the `.panel` background/border/blur, leaving every rail card
+   transparent. Restored here (the panel-system's proper home). */
+.panel {
+  background: var(--panel);
+  border: 1px solid var(--panel-border);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border-radius: var(--radius);
+}
+
 .panel-head {
   display: flex; align-items: flex-start; justify-content: space-between;
   gap: 8px; padding: var(--panel-pad-y) var(--panel-pad-x);
