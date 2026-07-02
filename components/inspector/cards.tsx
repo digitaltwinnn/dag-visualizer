@@ -2,52 +2,79 @@
 
 import { useStore } from "@/src/store/store";
 import { shortHash, CORE_HEX } from "@/src/data/network";
-import { toDag, hex, fmtKB } from "@/src/util/format";
+import { hex, fmtDag, fmtKB } from "@/src/util/format";
 import type { GlobalSnapshot, MetaCfg, NodeInfo, PickDescriptor } from "@/src/data/types";
 import AnchoredTags from "./AnchoredTags";
+import Odometer from "@/components/Odometer";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Desc, Row, StatusMark, CompositionRows, StatusBreakdown, metaToken, nodeComposition } from "./parts";
 
 type PickOf<K extends PickDescriptor["kind"]> = Extract<PickDescriptor, { kind: K }>;
 
-// A clicked Global L0 snapshot: its place in the DAG, what it anchored, and what it cost.
+// A clicked Global L0 snapshot: its place in the DAG (◆ type-marker + odometer ordinal + live/age
+// state), what it anchored, and what it settled (fees/size/rewards).
 export function SnapshotCard({ data: d }: { data: GlobalSnapshot }) {
   // EXACT totals from the raw L0 snapshot (via SnapshotExactBridge) are the ONLY source for the fee
   // + anchored breakdown — authoritative (the true total, incl. unlisted). If they aren't here yet
   // the tick is simply "reading…" (ACQUIRING); there is no polled-floor fallback. Every selectable
   // tick is inside the L0 node's retention window, so exact always resolves.
   const exact = useStore((s) => s.snapshotExact[d.ordinal]);
+  const latest = useStore((s) => s.latestSnapshot);
   const awaitingExact = exact == null;
   const anchored = typeof d.metagraphSnapshotCount === "number" ? d.metagraphSnapshotCount : null;
-  const heightTxt =
-    d.subHeight != null
-      ? `${(d.height ?? 0).toLocaleString()} · ${d.subHeight}`
-      : (d.height ?? 0).toLocaleString();
-  const blocks = Array.isArray(d.blocks) ? d.blocks.length : 0;
-  return (
-    // Borderless rows here (only the part dividers separate sections) so a row's
-    // bottom border doesn't double up with the divider.
-    <div className="insp-snap">
-      {/* ① the snapshot's position in the DAG (+ blocks when present) */}
-      <Row label={d.subHeight != null ? "Height · sub-height" : "Height"}>{heightTxt}</Row>
-      {/* Most global snapshots carry zero blocks (settlement, not blocks, is the work),
-          so only surface it on the rare snapshot that actually has some. */}
-      {blocks > 0 && <Row label="Blocks">{blocks}</Row>}
+  const isLive = latest != null && d.ordinal === latest.ordinal;
 
-      {/* ② what it anchored (exact breakdown, or "reading…" until it lands) */}
+  // Relative recency for an older pick — coarse (freshness, not a ticking clock). Guarded
+  // against an unparseable timestamp (→ no age suffix rather than "NaN").
+  const ageMs = Date.now() - Date.parse(d.timestamp);
+  const rel = Number.isNaN(ageMs)
+    ? ""
+    : ageMs < 60_000 ? `${Math.max(1, Math.round(ageMs / 1000))}s ago`
+    : ageMs < 3_600_000 ? `${Math.round(ageMs / 60_000)}m ago`
+    : `${Math.round(ageMs / 3_600_000)}h ago`;
+
+  return (
+    <div className="insp-snap">
+      {/* Title: ◆ type-marker (cyan = a GLOBAL snapshot) + the ordinal (odometer-rolls live). */}
+      <div className="snap-titlerow">
+        <span className="snap-title">
+          <span className="snap-diamond" aria-hidden>◆</span>
+          <Odometer value={d.ordinal} className="snap-ord" />
+        </span>
+        <span className="snap-state">
+          {isLive ? (
+            <><span className="snap-live-dot" /> live now</>
+          ) : (
+            <>◷ {rel}</>
+          )}
+        </span>
+      </div>
+
+      {/* Anchored block (exact share breakdown, or "reading…" until it lands). */}
       <div className="insp-div" />
       <AnchoredTags ordinal={d.ordinal} anchored={anchored} awaiting={awaitingExact} />
 
-      {/* ③ what it cost — the exact figure + measured size, or nothing until exact lands. Two
-          independent facts: the fee (as reported) and the serialized size (content byte length) —
-          the size is NOT derived from the fee. */}
-      {exact != null && exact.totalFee > 0 && (
+      {/* Settlement — the exact fee + measured size + rewards (each an independent fact). */}
+      {exact != null && (
         <>
           <div className="insp-div" />
-          <Row label="Settlement fees">
-            {toDag(exact.totalFee).toFixed(4)} DAG
-            <span className="insp-dim"> · {fmtKB(exact.totalSizeKB)} of data</span>
-          </Row>
+          <div className="snap-settle">
+            {exact.totalFee > 0 && (
+              <div className="snap-settle-row">
+                <span className="snap-settle-label">Fees paid</span>
+                <span className="snap-settle-val">
+                  <b>{fmtDag(exact.totalFee)}</b> DAG
+                  <span className="snap-settle-sub">{fmtKB(exact.totalSizeKB)} settled</span>
+                </span>
+              </div>
+            )}
+            {exact.rewardsDatum > 0 && (
+              <div className="snap-settle-row">
+                <span className="snap-settle-label">Rewards out</span>
+                <span className="snap-settle-val"><b>{fmtDag(exact.rewardsDatum)}</b> DAG</span>
+              </div>
+            )}
+          </div>
         </>
       )}
     </div>
