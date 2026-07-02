@@ -10,6 +10,7 @@ import AnchoredTags from "./AnchoredTags";
 import Odometer from "@/components/Odometer";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { SonarRing, NodeStars } from "@/components/state/StateAtoms";
+import { VIS } from "../../js/config.js";
 import { Desc, Row, StatusMark, CompositionRows, StatusBreakdown, nodeComposition } from "./parts";
 
 type PickOf<K extends PickDescriptor["kind"]> = Extract<PickDescriptor, { kind: K }>;
@@ -39,7 +40,7 @@ export function SnapshotCard({ data: d }: { data: GlobalSnapshot }) {
   const [retry, setRetry] = useState(0);
   useEffect(() => {
     if (live) return;
-    const id = setInterval(() => setRetry((r) => r + 1), 3000); // matches VIS.pollMs cadence
+    const id = setInterval(() => setRetry((r) => r + 1), VIS.pollMs); // one ring per real poll/retry
     return () => clearInterval(id);
   }, [live]);
 

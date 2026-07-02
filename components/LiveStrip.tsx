@@ -87,18 +87,18 @@ export default function LiveStrip() {
       <div className="ls-bars" onMouseLeave={() => { barHover.current = false; setTip(null); setHoverSnapOrd(null); }}>
         {snaps.length === 0 && <span className="ls-empty">Waiting for snapshots…</span>}
         {bars.map(({ d, total, mine }, i) => {
-          const live = i === bars.length - 1;
+          const isLatest = i === bars.length - 1; // the newest bar (renamed: don't shadow the store `live`)
           const active = d.ordinal === activeOrd;
           const value = isMeta ? mine : total;
           const gap = value === 0;                        // honest gap (esp. filtered)
-          const cls = "ls-bar" + (gap ? " gap" : "") + (live ? " live" : "") + (active ? " active" : "");
+          const cls = "ls-bar" + (gap ? " gap" : "") + (isLatest ? " live" : "") + (active ? " active" : "");
           return (
             <button
               key={d.ordinal}
               className={cls}
               style={{ height: gap ? "0%" : `max(6%, ${Math.round((value / scaleMax) * 100)}%)` }}
               aria-label={`snapshot ${d.ordinal}`}
-              onMouseEnter={(e) => { barHover.current = true; setTip({ ordinal: d.ordinal, total, mine, ts: d.timestamp, live, x: e.clientX, y: e.clientY }); setHoverSnapOrd(d.ordinal); }}
+              onMouseEnter={(e) => { barHover.current = true; setTip({ ordinal: d.ordinal, total, mine, ts: d.timestamp, live: isLatest, x: e.clientX, y: e.clientY }); setHoverSnapOrd(d.ordinal); }}
               onMouseMove={moveTip}
               onClick={() => pick(d)}
             />
