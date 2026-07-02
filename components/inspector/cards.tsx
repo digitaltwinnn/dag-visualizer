@@ -8,7 +8,7 @@ import type { GlobalSnapshot, MetaCfg, NodeInfo, PickDescriptor } from "@/src/da
 import AnchoredTags from "./AnchoredTags";
 import Odometer from "@/components/Odometer";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
-import { Desc, Row, StatusMark, CompositionRows, StatusBreakdown, metaToken, nodeComposition } from "./parts";
+import { Desc, Row, StatusMark, CompositionRows, StatusBreakdown, nodeComposition } from "./parts";
 
 type PickOf<K extends PickDescriptor["kind"]> = Extract<PickDescriptor, { kind: K }>;
 
@@ -59,7 +59,7 @@ export function SnapshotCard({ data: d }: { data: GlobalSnapshot }) {
               <div className="snap-settle-row">
                 <span className="snap-settle-label">Fees paid</span>
                 <span className="snap-settle-val">
-                  <b>{fmtDag(exact.totalFee)}</b> DAG
+                  <span className="snap-settle-amt"><b>{fmtDag(exact.totalFee)}</b> DAG</span>
                   <span className="snap-settle-sub">{fmtKB(exact.totalSizeKB)} settled</span>
                 </span>
               </div>
@@ -67,7 +67,7 @@ export function SnapshotCard({ data: d }: { data: GlobalSnapshot }) {
             {exact.rewardsDatum > 0 && (
               <div className="snap-settle-row">
                 <span className="snap-settle-label">Rewards out</span>
-                <span className="snap-settle-val"><b>{fmtDag(exact.rewardsDatum)}</b> DAG</span>
+                <span className="snap-settle-val"><span className="snap-settle-amt"><b>{fmtDag(exact.rewardsDatum)}</b> DAG</span></span>
               </div>
             )}
           </div>
@@ -88,12 +88,15 @@ export function MetaCard({ cfg }: { cfg: MetaCfg }) {
   const monogram = (cfg.ticker || cfg.name).slice(0, 3).toUpperCase();
   const blurb = mg?.description || cfg.blurb;
   const site = mg?.siteUrl;
-  const token = metaToken(cfg, mg); // ticker, or "no token"
+  // A metagraph with no currency-L1 has a symbol but no real token — worth noting. Token
+  // metagraphs (and the DAG core) already show their ticker in the header, so a foot row
+  // repeating it (a redundant "DAG"/"DOR") is dropped.
+  const isDataMeta = cfg.id !== "dag" && !nodeComposition(nodes).hasCurrency;
   return (
     <>
       {/* Header — logo avatar ringed in the identity hue + name + ticker. */}
       <div className="dossier-head">
-        <Avatar className="dossier-logo" style={{ ["--ring" as string]: hue }}>
+        <Avatar className="dossier-logo">
           {mg?.iconUrl && <AvatarImage src={mg.iconUrl} alt="" />}
           <AvatarFallback style={{ color: hue }}>{monogram}</AvatarFallback>
         </Avatar>
@@ -106,7 +109,7 @@ export function MetaCard({ cfg }: { cfg: MetaCfg }) {
       {nodes.length > 0 && (
         <div className="comp-block">
           <div className="comp-head">
-            <span className="comp-title">Node composition</span>
+            <span className="comp-title">Composition</span>
             <span className="comp-total"><b>{nodes.length}</b> node{nodes.length === 1 ? "" : "s"}</span>
           </div>
           <CompositionRows nodes={nodes} />
@@ -114,7 +117,7 @@ export function MetaCard({ cfg }: { cfg: MetaCfg }) {
         </div>
       )}
       <div className="dossier-foot">
-        <span className="dossier-token">{cfg.id !== "dag" && !nodeComposition(nodes).hasCurrency ? "data metagraph · no token" : token}</span>
+        {isDataMeta && <span className="dossier-token">data metagraph · no token</span>}
         {site && (
           <a className="insp-site" href={site} target="_blank" rel="noopener noreferrer" style={{ color: hue }}>
             {site.replace(/^https?:\/\//, "").replace(/\/$/, "")}

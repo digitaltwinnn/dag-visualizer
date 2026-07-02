@@ -82,7 +82,7 @@ export default function AnchoredTags({
               {focus.label}
             </span>
             <span className="anc-focus-fee">
-              <b>{fmtDag(exact.perMeta[focus.id]?.fee ?? 0)}</b> DAG
+              <span className="anc-focus-amt"><b>{fmtDag(exact.perMeta[focus.id]?.fee ?? 0)}</b> DAG</span>
               <span className="anc-sub">fees paid</span>
             </span>
           </div>

@@ -26,9 +26,9 @@
   color: var(--accent); line-height: 1; margin-bottom: 8px; padding-right: 22px;
 }
 .rc-pane h3, #metapane h3 { padding-right: 22px; }
-/* Detail (child) cards carry a breadcrumb eyebrow (`node ‹ DOR`) naming their parent —
-   read it toward the rail's outer edge, opposite the Context card's own eyebrow. */
-.rc-pane .insp-eyebrow { text-align: right; }
+/* Every card's eyebrow reads LEFT — the Context dossier, the node card and the snapshot card
+   align the same way, so the rail's headers form one consistent left column. (The detail cards'
+   breadcrumb `node ‹ DOR` still names the parent; it just no longer flips to the outer edge.) */
 /* Leading colour dot on the subject — same idiom as the filter chip's dot and the 3D
    hub, so colour = this metagraph reads consistently. Colour set inline (the accent). */
 /* Bullet colour follows the rail's selection accent (`--filter-accent`); cyan fallback. */

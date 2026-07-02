@@ -31,7 +31,7 @@ export default function EcgMark() {
     <span className={"ecg" + (live ? "" : " ecg--off") + (beat ? " ecg--beat" : "")} aria-hidden>
       <svg width="34" height="24" viewBox="0 0 34 24" fill="none">
         <path className="ecg-trace" d={live ? BEAT : FLAT} stroke="currentColor" strokeWidth="1.6"
-          strokeLinecap="round" strokeLinejoin="round" />
+          strokeLinecap="round" strokeLinejoin="round" pathLength={100} />
       </svg>
     </span>
   );

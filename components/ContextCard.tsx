@@ -3,7 +3,6 @@
 import { useStore } from "@/src/store/store";
 import { metagraphById } from "@/src/data/network";
 import InspectorCard from "@/components/InspectorCard";
-import { metaToken } from "@/components/inspector/parts";
 import { useFlashOnChange } from "@/components/useFlashOnChange";
 import type { PickDescriptor } from "@/src/data/types";
 
@@ -20,10 +19,7 @@ export default function ContextCard() {
   const mgCfg = metagraphById(filter);
 
   if (mgCfg) {
-    const mg = metaList.find((m) => m.id === mgCfg.id) ?? null;
     const context: PickDescriptor = { kind: "meta", title: mgCfg.name, cfg: mgCfg };
-    const titleSuffix =
-      mgCfg.id !== "dag" ? <span className="insp-token"> ({metaToken(mgCfg, mg)})</span> : null;
     const eyebrow = mgCfg.id === "dag" ? "Selected core" : "Selected metagraph";
     return (
       <aside id="metapane" className="panel rc-context" ref={flashRef}>
@@ -31,7 +27,7 @@ export default function ContextCard() {
           ×
         </button>
         <div id="metapane-content">
-          <InspectorCard p={context} eyebrow={eyebrow} titleSuffix={titleSuffix} />
+          <InspectorCard p={context} eyebrow={eyebrow} />
         </div>
       </aside>
     );
