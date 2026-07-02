@@ -6,6 +6,7 @@ import { filterAccent } from "@/src/data/network";
 import GeoExplore from "@/components/GeoExplore";
 import LedgerPanel from "@/components/LedgerPanel";
 import PlaceholderPanel from "@/components/PlaceholderPanel";
+import RailThread from "@/components/RailThread";
 
 // Per-view tool cards. The scaffolded (not-yet-built) views show a "coming soon" card (SOON);
 // Hypergraph shows a static "about" card (the guided Learn tour is being reworked). Same shell
@@ -59,10 +60,16 @@ export default function LeftColumn() {
   const accent = { ["--filter-accent"]: filterAccent(filter) } as CSSProperties;
   const placeholder = PLACEHOLDERS[mode];
   return (
-    <div id="leftcol" style={accent}>
-      {mode === "geo" && <GeoExplore />}
-      {mode === "ledger" && <LedgerPanel />}
-      {placeholder && <PlaceholderPanel {...placeholder} />}
-    </div>
+    // The thread is a SIBLING of #leftcol (mirrors the right rail): the rail clips horizontally + can
+    // gain an overflow-fade mask, either of which would blank a child thread. It points its ruler
+    // ticks OUTWARD into the left margin, toward the screen edge.
+    <>
+      <RailThread side="left" />
+      <div id="leftcol" style={accent}>
+        {mode === "geo" && <GeoExplore />}
+        {mode === "ledger" && <LedgerPanel />}
+        {placeholder && <PlaceholderPanel {...placeholder} />}
+      </div>
+    </>
   );
 }

@@ -56,26 +56,8 @@
    inside .panel-body (or the panel toggles its own body — Learn keeps both). */
 .panel.collapsed .panel-body { display: none; }
 
-/* Left rail identity spine — mirrors the right rail's instrument thread: a cyan (identity-hue)
-   accent bar on each card's left edge, FADED at the top + bottom (like the thread's mask), with
-   neutral ruler hairlines stepping in beside it. `var()` resolves fine here (CSS property, unlike
-   an SVG stroke attribute). (The old #netfilter stripe retired when the filter moved to the bar.) */
-#leftcol > .panel { position: relative; }
-/* the cyan identity spine, faded top+bottom */
-#leftcol > .panel::before {
-  content: ""; position: absolute; left: 0; top: 10px; bottom: 10px;
-  width: 2px; border-radius: 2px; pointer-events: none;
-  background: linear-gradient(to bottom,
-    transparent 0, var(--filter-accent, var(--primary)) 12%,
-    var(--filter-accent, var(--primary)) 88%, transparent 100%);
-}
-/* neutral ruler hairlines stepping inward from the spine — the SHARED thread rhythm
-   (short marks, every 4th longer + brighter), via the one --rail-hairlines recipe so it
-   matches the right rail's SVG thread exactly. Faded top+bottom like the spine. */
-#leftcol > .panel::after {
-  content: ""; position: absolute; left: 4px; top: 10px; bottom: 10px; width: 9px;
-  pointer-events: none;
-  background: var(--rail-hairlines);
-  -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 14%, #000 86%, transparent 100%);
-  mask-image: linear-gradient(to bottom, transparent 0, #000 14%, #000 86%, transparent 100%);
-}
+/* The left rail's identity cue is now the SAME instrument thread as the right rail (RailThread with
+   side="left"), a fixed SVG in the left margin whose ruler ticks point OUTWARD toward the screen
+   edge — symmetric with the right. It lives OUTSIDE #leftcol because the rail clips horizontally
+   (overflow), which is exactly why the old per-card CSS spine/hairlines here couldn't reach the
+   margin. Both threads mirror the shared ruler spec (`--thread-*` in 00-base.css). */
