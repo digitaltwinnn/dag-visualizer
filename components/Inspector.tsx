@@ -1,5 +1,6 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import type { CSSProperties, ReactNode } from "react";
 import { useStore, type SelSlot } from "@/src/store/store";
 import { filterAccent } from "@/src/data/network";
@@ -92,11 +93,24 @@ export default function Inspector() {
 
   const panes = selStack.filter((slot) => cards[slot]?.active).map((slot) => cards[slot].pane);
 
+  const hasDetail = panes.length > 0;
+  const [vdOpen, setVdOpen] = useState(true);
+  // Auto-collapse when a detail appears, auto-expand when the last detail is dismissed.
+  useEffect(() => {
+    setVdOpen(!hasDetail);
+  }, [hasDetail]);
+
   return (
     <div id="rightcol" style={accent}>
+      {hasDetail && !vdOpen && (
+        <ViewDefault collapsed onToggle={() => setVdOpen(true)} />
+      )}
       <ContextCard />
+      {hasDetail && vdOpen && (
+        <ViewDefault collapsed={false} onToggle={() => setVdOpen(false)} />
+      )}
       {panes}
-      {panes.length === 0 && <ViewDefault collapsed={false} onToggle={() => {}} />}
+      {!hasDetail && <ViewDefault collapsed={false} onToggle={() => {}} />}
     </div>
   );
 }
