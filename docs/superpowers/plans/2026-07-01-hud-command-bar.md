@@ -44,7 +44,7 @@
 - `components/TopBar.tsx` — **modify** — Instrument-Glass shell, brand lockup (EcgMark + wordmark), remove `--tb-accent`, de-nested filter, structural ToggleGroup view switch, expand-to-picker.
 - `src/engine/Engine.ts` — **modify** (one line) — add `iconUrl` to the published metaList.
 - `src/data/types.ts` — **modify** — add `iconUrl?: string` to `MetaInfo`.
-- `app/styles/14-top-bar.css` — **rewrite** to the Instrument-Glass bar; **delete** `app/styles/06-snapshot-live-heartbeat.css`, `app/styles/02-filter-panel.css`, `app/styles/04-disabled-filter-chip.css` (retire, with their `@import`s removed from `app/globals.css`).
+- `app/styles/14-top-bar.css` — **rewrite** to the Instrument-Glass bar; **delete** `app/styles/02-filter-panel.css`, `app/styles/04-disabled-filter-chip.css` (retire, with their `@import`s removed from `app/globals.css`). NOTE: `06-snapshot-live-heartbeat.css` is NOT retired — its `.snap-pulse` is still used by `components/LiveHeart.tsx` (the snapshot-card heartbeat), a different element from the top-bar ECG. Keep it.
 - `components/topbar/FilterChips.tsx` — **delete** (replaced by FilterPicker).
 - `app/design/page.tsx` — **modify** — showcase the new bar primitives.
 
@@ -844,7 +844,7 @@ Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>"
 
 **Files:**
 - Modify: `app/globals.css` (remove retired `@import`s), `app/design/page.tsx` (trim temporary demos if desired)
-- Delete: `app/styles/06-snapshot-live-heartbeat.css`, `app/styles/02-filter-panel.css`, `app/styles/04-disabled-filter-chip.css`
+- Delete: `app/styles/02-filter-panel.css`, `app/styles/04-disabled-filter-chip.css` (NOT `06-snapshot-live-heartbeat.css` — still used by `LiveHeart.tsx`)
 
 **Interfaces:** none new — cleanup + confirmation that nothing still references the deleted rules.
 
@@ -859,7 +859,7 @@ Expected: `no live references` (the old `FilterChips`/heartbeat markup is gone).
 
 - [ ] **Step 2: Delete the retired stylesheets + their imports**
 
-Delete `app/styles/06-snapshot-live-heartbeat.css`, `app/styles/02-filter-panel.css`, `app/styles/04-disabled-filter-chip.css`. In `app/globals.css` remove their three `@import "./styles/…";` lines.
+Delete `app/styles/02-filter-panel.css`, `app/styles/04-disabled-filter-chip.css`. In `app/globals.css` remove their two `@import "./styles/…";` lines. **Do NOT delete `06-snapshot-live-heartbeat.css`** — the dead-reference grep will show `.snap-pulse` is still used by `components/LiveHeart.tsx` (the snapshot-card heartbeat), so keep it and its `@import`.
 
 - [ ] **Step 3: Build + full typecheck**
 
@@ -888,7 +888,7 @@ Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>"
 - The **filter is de-nested + toned** (micro-label + identity dot + neutral name + caret, no filled chip); clicking expands into the **searchable logo picker** (All on top, rows sorted by located desc, 0-located greyed with real count, current highlighted, monogram/logo avatars ringed in the identity hue).
 - The **view switch is structural** (active = cyan, never metagraph-tinted; the three placeholders dimmed); **`--tb-accent` is gone** — a filtered metagraph no longer tints navigation chrome. The **only identity colour in the bar is the filter dot**.
 - **Vitals** are neutral mono values that **odometer-roll** on change, with **no scope dot**; hyper filtered shows em-dashes for absent layers; the ledger sparklines are muted-history + a cyan latest bar.
-- The old `FilterChips`, `06-snapshot-live-heartbeat.css`, `02-filter-panel.css`, `04-disabled-filter-chip.css` are deleted.
+- The old `FilterChips`, `02-filter-panel.css`, `04-disabled-filter-chip.css` are deleted. (`06-snapshot-live-heartbeat.css` stays — still used by `LiveHeart.tsx`.)
 
 ## Follow-ups (later phases)
 

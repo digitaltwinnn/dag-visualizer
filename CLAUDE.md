@@ -59,6 +59,12 @@ npm run dev        # http://localhost:3000
 > you must). HMR/Turbopack picks up edits, so a restart is only needed for config-level
 > changes (tailwind/next config) or if state looks stale — then: kill the one server by PID,
 > `rm -rf .next`, start one again.
+>
+> **`next build` and `next dev` share `.next` — don't run them together.** Running
+> `npm run build` while the shared dev server is up corrupts the dev server's chunk manifests
+> (500s / stale chunks). Do the production-build check (`next build` clean, route stays `○`
+> Static) with the dev server **stopped**, or defer it to a phase boundary, then restart dev.
+> For per-edit type checks use `tsc --noEmit` (safe alongside `next dev`).
 
 ### Verifying visual changes
 
