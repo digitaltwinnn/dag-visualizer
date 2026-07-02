@@ -598,7 +598,7 @@ Expected: `no code refs` and `no nf markup` (the old `nf` node-fabric grid + `ge
 
 - [ ] **Step 2: Prune the dead CSS**
 
-Remove the now-unused `.nf`, `.nf-total`, `.nf-grid`, `.nf-col`, `.nf-col--empty`, `.nf-head`, `.insp-mini`, and the old `.gel-state` rules from `05-inspector-metagraph-context-pane.css` (their markup is gone). Keep everything still referenced (`.gel-node-head`, `.gel-dot`, `.gel-node-title`, `.gel-clear`, `.role-tag*` if `RoleTags` is still used elsewhere — grep to confirm). Drop any now-unused imports in `cards.tsx` (tsc/lint will flag).
+Remove the now-unused `.nf`, `.nf-total`, `.nf-grid`, `.nf-col`, `.nf-col--empty`, `.nf-head`, `.insp-mini`, and the old `.gel-state` rules from wherever they live (grep both `13-right-column.css` AND `05-inspector-metagraph-context-pane.css` — the `.nf*` grid + `.gel-state` are in `13-right-column.css`) (their markup is gone). Keep everything still referenced (`.gel-node-head`, `.gel-dot`, `.gel-node-title`, `.gel-clear`, `.role-tag*` if `RoleTags` is still used elsewhere — grep to confirm). Drop any now-unused imports in `cards.tsx` (tsc/lint will flag).
 
 - [ ] **Step 3: Full typecheck + tests**
 
