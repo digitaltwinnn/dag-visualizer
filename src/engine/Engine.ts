@@ -73,7 +73,6 @@ export class Engine {
   private filter = "all";
   private country: string | null = null;
   private morph = 0; // 0 = hypergraph, 1 = globe (eased each frame)
-  private _hoverMetaId: string | null = null; // metagraph currently hovered (hub/node) → filter preview
   private _baseFog: THREE.FogBase | null = null; // scene.js FogExp2 (hyper/geo); captured lazily
   private _ledgerFog: THREE.Fog | null = null;    // stronger linear depth fog for the trailing chain
   private tween: {
@@ -93,8 +92,6 @@ export class Engine {
   private onClick = (e: MouseEvent) => this._handleClick(e);
   private onMove = (e: MouseEvent) => this._handleMove(e);
   private _hoverKey: string | null = null;
-  private _hoverNodeKey: string | null = null; // last node-pairing key written to the store
-  private _hoverSnapOrd: number | null = null; // last snapshot ordinal written to the store
 
   private unsub: Array<() => void> = [];
   private metaTimer: ReturnType<typeof setInterval> | undefined;
@@ -557,9 +554,9 @@ export class Engine {
     const nodeKey = hoverKeyOf(p);                                   // node → globe shell glow
     const snapOrd = p?.kind === "snapshot" ? p.data.ordinal : null;  // snapshot → ledger tile
     const metaId = p?.kind === "meta" ? p.cfg?.id ?? null : null;    // hub → metagraph dim preview
-    if (nodeKey !== this._hoverNodeKey) { this._hoverNodeKey = nodeKey; st.setHoverNodeId(nodeKey); }
-    if (snapOrd !== this._hoverSnapOrd) { this._hoverSnapOrd = snapOrd; st.setHoverSnapOrd(snapOrd); }
-    if (metaId !== this._hoverMetaId) { this._hoverMetaId = metaId; st.setHoverFilter(metaId); }
+    if (nodeKey !== st.hoverNodeId) st.setHoverNodeId(nodeKey);
+    if (snapOrd !== st.hoverSnapOrd) st.setHoverSnapOrd(snapOrd);
+    if (metaId !== st.hoverFilter) st.setHoverFilter(metaId);
 
     // The lean tooltip label — re-write the store only when the subject's identity changes so
     // following the cursor never re-renders React.
