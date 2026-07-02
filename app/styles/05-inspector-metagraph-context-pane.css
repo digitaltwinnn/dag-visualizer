@@ -172,3 +172,24 @@
 .comp-status { margin-top: 8px; }
 .dossier-foot { display: flex; flex-direction: column; gap: 4px; margin-top: 12px; }
 .dossier-token { font-size: 12px; color: var(--muted); }
+
+/* ── Scene-tie-in: the SHARED focus-pairing highlight ─────────────────────────
+   A subject hovered in the 3D scene (or in chrome) lights its paired card/row in ITS identity hue
+   (`--row-hue`, set inline only while paired) — the same hue the 3D object glows, so the two read
+   as one focus with no drawn line. ONE treatment for every card type (node/snapshot/dossier) +
+   rows, so they behave identically. Distinct from `.active`/committed selection. */
+.subject-paired {
+  position: relative;
+  box-shadow: 0 0 0 1px color-mix(in oklch, var(--row-hue, var(--core)) 55%, transparent),
+              0 0 18px -4px color-mix(in oklch, var(--row-hue, var(--core)) 50%, transparent);
+  transition: box-shadow 0.16s ease;
+}
+/* Explorer rows are dense list items → a wash + border reads better there than an outer glow. */
+.nb-row.subject-paired {
+  box-shadow: none;
+  background: color-mix(in oklch, var(--row-hue, var(--core)) 14%, transparent);
+  border-color: color-mix(in oklch, var(--row-hue, var(--core)) 45%, transparent);
+  color: var(--text);
+}
+.gel-card { position: relative; border-radius: inherit; }
+@media (prefers-reduced-motion: reduce) { .subject-paired { transition: none; } }

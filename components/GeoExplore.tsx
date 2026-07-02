@@ -3,9 +3,11 @@
 import { useMemo, useState } from "react";
 import { useStore } from "@/src/store/store";
 import PanelHead from "@/components/PanelHead";
-import { shortHash } from "@/src/data/network";
+import { shortHash, CORE_HEX } from "@/src/data/network";
 import { RoleTags } from "@/components/inspector/parts";
-import { ccToFlag } from "@/src/util/format";
+import { ccToFlag, hex } from "@/src/util/format";
+import { hoverKeyOf } from "@/src/data/hoverSubject";
+import { subjectPairing } from "@/components/useSubjectPairing";
 import type { NodeRow } from "@/src/data/types";
 
 const TOP = 9;
@@ -24,6 +26,7 @@ export default function GeoExplore() {
   const inspect = useStore((s) => s.inspect);
   const setInspect = useStore((s) => s.setInspect);
   const setHoverNodeId = useStore((s) => s.setHoverNodeId);
+  const hoverNodeId = useStore((s) => s.hoverNodeId);
   const setFilter = useStore((s) => s.setFilter);
   const [showAll, setShowAll] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
@@ -114,18 +117,17 @@ export default function GeoExplore() {
                         const on =
                           selIp != null && r.layer === selLayer &&
                           r.pick.kind !== "snapshot" && "node" in r.pick && r.pick.node?.ip === selIp;
-                        // Match the globe's hover pairing: validators by machine id, metagraph nodes by ip.
-                        const hoverKey =
-                          r.pick.kind === "metanode" ? r.pick.node?.ip ?? null
-                            : r.pick.kind === "l0" || r.pick.kind === "l1" ? r.pick.node?.id ?? null
-                              : null;
+                        const hoverKey = hoverKeyOf(r.pick);
+                        const rowHue = r.pick.kind === "metanode" && r.pick.meta ? hex(r.pick.meta.color) : CORE_HEX;
+                        const pair = subjectPairing(hoverNodeId, hoverKey, setHoverNodeId, rowHue);
                         return (
                           <button
                             key={r.label + i}
-                            className={"nb-row" + (on ? " active" : "")}
+                            className={"nb-row" + (on ? " active" : "") + (pair.paired ? " " + pair.className : "")}
+                            style={pair.style}
                             title={`${r.label} · ${r.state ?? "—"}`}
                             onClick={() => selectNode(r.pick)}
-                            onMouseEnter={() => setHoverNodeId(hoverKey)}
+                            onMouseEnter={pair.onMouseEnter}
                           >
                             {/* No status dot here — it read as the network bullet on the node
                                 card (different meaning); state lives in the card's pill. */}

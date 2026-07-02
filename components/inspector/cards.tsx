@@ -4,6 +4,8 @@ import { useStore } from "@/src/store/store";
 import { shortHash, CORE_HEX } from "@/src/data/network";
 import { hex, fmtDag, fmtKB } from "@/src/util/format";
 import { relativeAge } from "@/src/util/relativeAge";
+import { hoverKeyOf } from "@/src/data/hoverSubject";
+import { subjectPairing } from "@/components/useSubjectPairing";
 import type { GlobalSnapshot, MetaCfg, NodeInfo, PickDescriptor } from "@/src/data/types";
 import AnchoredTags from "./AnchoredTags";
 import Odometer from "@/components/Odometer";
@@ -159,12 +161,15 @@ function GeoLiveNode({ p, onClear }: { p: PickOf<"l0" | "l1" | "metanode">; onCl
   const id = p.node?.id;
   const title = id ? shortHash(id) : p.node?.ip || p.geo?.city || p.geo?.country || "Node";
   const color = p.kind === "metanode" ? (p.meta ? hex(p.meta.color) : undefined) : CORE_HEX;
+  const setHoverNodeId = useStore((s) => s.setHoverNodeId);
+  const hoverNodeId = useStore((s) => s.hoverNodeId);
+  const pair = subjectPairing(hoverNodeId, hoverKeyOf(p), setHoverNodeId, color ?? "var(--core)");
   // The single node's roles → a one-node composition row (shared vocabulary).
   const oneNode: NodeInfo[] = p.node ? [p.node] : [];
   const g = p.geo;
   const place = g ? `${g.city ? g.city + ", " : ""}${g.country ?? ""}`.trim() : "";
   return (
-    <>
+    <div className={"gel-card " + pair.className} style={pair.style} onMouseEnter={pair.onMouseEnter} onMouseLeave={pair.onMouseLeave}>
       <button className="gel-clear" title="Deselect" onClick={onClear}>×</button>
       {/* Title line: node id + the status inline (right). */}
       <div className="gel-node-head">
@@ -184,7 +189,7 @@ function GeoLiveNode({ p, onClear }: { p: PickOf<"l0" | "l1" | "metanode">; onCl
         </div>
       )}
       {place && <Row label="Location">{place}</Row>}
-    </>
+    </div>
   );
 }
 
