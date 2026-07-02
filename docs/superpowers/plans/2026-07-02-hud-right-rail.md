@@ -513,12 +513,51 @@ Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>"
 ## Task 6: Left-rail + CSS cleanup + final verification
 
 **Files:**
-- Modify: `app/styles/05-inspector-metagraph-context-pane.css`, `app/styles/13-right-column.css`
+- Modify: `app/styles/05-inspector-metagraph-context-pane.css`, `app/styles/13-right-column.css`, `components/ViewDefault.tsx`
 - (verify) `components/LeftColumn.tsx`
 
-**Interfaces:** none new — reconciliation + confirmation.
+**Interfaces:** none new — reconciliation + confirmation + one deferred behaviour fix.
 
-- [ ] **Step 1: Confirm the left rail is tool-only and no dead dossier refs remain**
+- [ ] **Step 0: Add a click-to-collapse control to the expanded View-default (Task-5 follow-up)**
+
+Task 5 wired `onToggle` on the Inspector side, but `ViewDefault.tsx`'s **expanded** render (`.rc-vd`) has no control that calls it, so an inline-expanded View-default can't be collapsed back to the strip. Add a small collapse affordance — shown ONLY when the card is collapsible (i.e. a detail is present, so `onToggle` is meaningful; NOT in the resting `!hasDetail` state where there's nothing to collapse to). Add a `collapsible?: boolean` prop to `ViewDefault`; in the expanded render, when `collapsible`, render a small header toggle (a `▴` button, calling `onToggle`) top-right of the `.rc-vd` card:
+```tsx
+export default function ViewDefault({
+  collapsed,
+  onToggle,
+  collapsible = false,
+}: {
+  collapsed: boolean;
+  onToggle: () => void;
+  collapsible?: boolean;
+}) {
+  // …collapsed branch unchanged…
+  return (
+    <aside className="panel rc-vd">
+      {collapsible && (
+        <button className="rc-vd-collapse" title="Collapse" onClick={onToggle}>▴</button>
+      )}
+      <span className="insp-eyebrow">This view</span>
+      {/* …rest unchanged… */}
+    </aside>
+  );
+}
+```
+In `components/Inspector.tsx`, pass `collapsible` to the **inline-expanded** instance only (the `hasDetail && vdOpen` one): `<ViewDefault collapsed={false} collapsible onToggle={() => setVdOpen(false)} />`. Leave the resting instance (`!hasDetail`) without `collapsible`. Add the button style to `13-right-column.css`:
+```css
+.rc-vd { position: relative; }
+.rc-vd-collapse {
+  position: absolute; top: 8px; right: 10px;
+  background: none; border: none; cursor: pointer;
+  color: var(--muted); font-size: 12px; line-height: 1;
+}
+.rc-vd-collapse:hover { color: var(--text); }
+```
+Verify via the MCP: with a detail selected, expand the strip → the expanded card now shows a `▴`; clicking it collapses back to the strip (the full toggle works both ways).
+
+- [ ] **Step 1: Prune dead CSS + confirm the left rail is tool-only**
+
+First remove the now-dead `#rc-empty { … }` rule from `13-right-column.css` (no component renders `id="rc-empty"` after Task 4 replaced the hint with the View-default). Then run:
 
 Run:
 ```bash
