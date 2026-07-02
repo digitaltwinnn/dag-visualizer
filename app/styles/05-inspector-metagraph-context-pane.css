@@ -32,18 +32,10 @@
 .insp-row span:last-child { font-variant-numeric: tabular-nums; text-align: right; word-break: break-all; }
 .insp-hash { font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 11px; }
 .insp-dim { color: var(--muted); }
-.insp-mgs { padding: 9px 0; }
 /* Section divider in the snapshot card (between: the snapshot · anchors · fees). */
-.insp-div { height: 1px; border: 0; background: rgba(90,140,255,0.18); margin: 12px 0; }
-/* Compact snapshot header: #ordinal with a subtle inline time (no big time block). */
-.insp-snap-title { display: flex; align-items: baseline; flex-wrap: wrap; gap: 8px; }
-.insp-snap-time { font-size: 12px; font-weight: 400; color: var(--muted); font-variant-numeric: tabular-nums; }
+.insp-div { height: 1px; border: 0; background: rgba(90,140,255,0.18); margin: 8px 0; }
 /* Borderless rows inside the snapshot card — only the part dividers separate sections. */
 .insp-snap .insp-row { border-bottom: 0; padding: 5px 0; }
-.insp-mgs-label { display: flex; align-items: baseline; gap: 6px; font-size: 12.5px; color: var(--muted); margin-bottom: 6px; }
-/* Authoritative total (metagraphSnapshotCount) shown in plain parens after the label text. */
-.insp-mgs-count { font-variant-numeric: tabular-nums; }
-.insp-mgs-tags { display: flex; flex-wrap: wrap; gap: 5px; }
 .insp-link { color: var(--core); text-decoration: none; }
 .insp-link:hover { text-decoration: underline; }
 /* Metagraph site link, sitting just under the description. A subtle inline link with a
@@ -55,25 +47,6 @@
 }
 .insp-site::after { content: "↗"; font-size: 11px; opacity: 0.7; }
 .insp-site:hover { text-decoration: underline; }
-.mg-tag {
-  display: inline-block; vertical-align: middle;
-  padding: 2px 8px; border-radius: 6px; font-size: 10.5px; font-weight: 700;
-  color: var(--mg);
-  background: color-mix(in srgb, var(--mg) 14%, transparent);
-  border: 1px solid color-mix(in srgb, var(--mg) 45%, transparent);
-}
-.mg-tag--other { color: var(--muted); background: rgba(160,175,205,0.08); border-color: rgba(160,175,205,0.3); }
-/* Placeholder for the unlisted gap while the freshest tick is still anchoring/being polled —
-   shown instead of a transiently-wrong count until it stabilises. Quiet + a soft breathe. */
-.mg-tag--settling {
-  color: var(--muted); font-weight: 600; font-style: italic;
-  background: rgba(160,175,205,0.06); border-color: rgba(160,175,205,0.22);
-  animation: mgSettle 1.4s ease-in-out infinite;
-}
-@keyframes mgSettle { 0%,100% { opacity: 0.5; } 50% { opacity: 0.85; } }
-.mg-tag--sel { color: #061018; background: var(--mg); border-color: var(--mg); }
-/* Anchored pills that aren't the active metagraph filter — dimmed so the selection pops. */
-.mg-tag--dim { opacity: 0.4; }
 /* margin-bottom:0 so the "Show more" toggle sits right under the text it expands (the p's
    default 1em bottom margin pushed it too far away). */
 .desc { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; overflow: hidden; margin-bottom: 0; }
@@ -124,7 +97,7 @@
 
 /* Anchored block — header + ranked share-of-total breakdown + filtered focus row */
 .anc { margin-top: 4px; }
-.anc-head { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; margin-bottom: 10px; }
+.anc-head { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; margin-bottom: 6px; }
 .anc-head-total { font-size: 15px; color: var(--text); }
 .anc-head-total b { font-weight: 700; }
 .anc-head-sub { font-size: 12px; color: var(--muted); }
@@ -140,10 +113,11 @@
 .anc-bar { display: block; height: 6px; border-radius: 3px; background: rgba(255,255,255,0.06); overflow: hidden; }
 .anc-bar-fill { display: block; height: 100%; border-radius: 3px; min-width: 2px; }
 
-/* Focus row (pinned, hue-filled) */
+/* Focus row — the filtered metagraph, marked by a THIN left hue accent only (no tinted box),
+   compact, consistent with the neutral node/dossier cards. */
 .anc-focus {
-  border-radius: 8px; padding: 8px 10px; margin-bottom: 10px;
-  background: color-mix(in oklch, var(--mg) 12%, transparent);
+  padding: 2px 0 6px 10px;
+  margin-bottom: 8px;
   box-shadow: inset 2px 0 0 var(--mg);
 }
 .anc-focus-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
@@ -151,7 +125,7 @@
 .anc-focus-fee { display: flex; flex-direction: column; align-items: flex-end; font-size: 13px; color: var(--text); }
 .anc-focus-fee b { font-weight: 700; }
 .anc-sub { font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
-.anc-focus-bar { display: flex; align-items: center; gap: 8px; margin-top: 7px; }
+.anc-focus-bar { display: flex; align-items: center; gap: 8px; margin-top: 5px; }
 .anc-focus-bar .anc-bar { flex: 1; }
 .anc-focus-meta { font-size: 11px; color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
 .anc-other-label { font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); margin: 4px 0 6px; }

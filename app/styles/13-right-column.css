@@ -82,12 +82,6 @@
 /* Detail (child) cards carry a breadcrumb eyebrow (`node ‹ DOR`) naming their parent —
    read it toward the rail's outer edge, opposite the Context card's own eyebrow. */
 .rc-pane .insp-eyebrow { text-align: right; }
-/* Snapshot title shares its row with the live ● control; both clear the × . */
-.insp-titlerow {
-  display: flex; align-items: baseline; justify-content: space-between;
-  gap: 10px; padding-right: 22px;
-}
-.insp-titlerow h3 { padding-right: 0; }
 /* Leading colour dot on the subject — same idiom as the filter chip's dot and the 3D
    hub, so colour = this metagraph reads consistently. Colour set inline (the accent). */
 /* Bullet colour follows the rail's selection accent (`--filter-accent`); cyan fallback. */

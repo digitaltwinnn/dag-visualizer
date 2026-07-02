@@ -1,7 +1,6 @@
 "use client";
 
 import type { PickDescriptor } from "@/src/data/types";
-import LiveHeart from "@/components/inspector/LiveHeart";
 import { GeoLiveCard, MetaCard, SnapshotCard } from "@/components/inspector/cards";
 
 // Only three kinds ever reach the inspector frame now: a metagraph/core dossier (ContextCard),
@@ -36,18 +35,7 @@ export default function InspectorCard({
   return (
     <>
       {eyebrow && <span className="insp-eyebrow">{eyebrow}</span>}
-      {p.kind === "snapshot" ? (
-        <div className="insp-titlerow">
-          <h3 className="insp-snap-title">
-            <span className="insp-dot" />
-            #{p.data.ordinal.toLocaleString()}
-            {p.data.timestamp && (
-              <span className="insp-snap-time">{new Date(p.data.timestamp).toLocaleTimeString()}</span>
-            )}
-          </h3>
-          <LiveHeart ordinal={p.data.ordinal} />
-        </div>
-      ) : (
+      {p.kind !== "snapshot" && (
         <>
           {p.title && (
             <h3>
