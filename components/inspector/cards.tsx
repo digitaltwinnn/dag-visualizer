@@ -5,7 +5,8 @@ import { shortHash, CORE_HEX } from "@/src/data/network";
 import { toDag, hex, fmtKB } from "@/src/util/format";
 import type { GlobalSnapshot, MetaCfg, NodeInfo, PickDescriptor } from "@/src/data/types";
 import AnchoredTags from "./AnchoredTags";
-import { Desc, ROLE_ORDER, RoleTags, Row, StatusMark, CompositionRows, nodeComposition, rolesOf } from "./parts";
+import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
+import { Desc, Row, StatusMark, CompositionRows, StatusBreakdown, metaToken, nodeComposition } from "./parts";
 
 type PickOf<K extends PickDescriptor["kind"]> = Extract<PickDescriptor, { kind: K }>;
 
@@ -59,59 +60,44 @@ export function SnapshotCard({ data: d }: { data: GlobalSnapshot }) {
 export function MetaCard({ cfg }: { cfg: MetaCfg }) {
   const metaList = useStore((s) => s.metaList);
   const mg = metaList.find((x) => x.id === cfg.id) || null;
-  const nodeList = mg?.nodes || [];
-  let facts: React.ReactNode = null;
-  if (nodeList.length) {
-    const c = nodeComposition(nodeList);
-    const ready = nodeList.reduce((n, x) => n + (x.state === "Ready" ? 1 : 0), 0);
-    const allReady = ready === nodeList.length;
-    // Columns that SUM to the node total: the hybrid machines (one box running several layers)
-    // + one column per layer for the *dedicated* (single-layer) machines. The dedicated columns
-    // are always rendered (0 when absent) so the table keeps a fixed skeleton instead of
-    // collapsing to a lone column. Counts sit centred over the layer tag(s).
-    const hybridRoles = ROLE_ORDER.filter((r) =>
-      nodeList.some((n) => rolesOf(n).length > 1 && rolesOf(n).includes(r)),
-    );
-    const groups = [
-      { count: c.hybrid, roles: hybridRoles.length ? hybridRoles : c.present },
-      ...ROLE_ORDER.map((r) => ({ count: c.dedBy[r] || 0, roles: [r] })),
-    ];
-    facts = (
-      <div className="nf">
-        <div className="nf-total">
-          <span>
-            <b>{nodeList.length}</b> node{nodeList.length === 1 ? "" : "s"}
-          </span>
-          <span className={"insp-mini " + (allReady ? "ok" : "approx")}>
-            {allReady ? "all online" : `${ready} online`}
-          </span>
-        </div>
-        <div className="nf-grid">
-          {groups.map((g, i) => (
-            <div className={"nf-col" + (g.count === 0 ? " nf-col--empty" : "")} key={i}>
-              <span className="nf-head">
-                <b>{g.count}</b>
-              </span>
-              <RoleTags roles={g.roles} />
-            </div>
-          ))}
-        </div>
-      </div>
-    );
-  }
+  const nodes = mg?.nodes || [];
+  const hue = hex(cfg.color);
+  const monogram = (cfg.ticker || cfg.name).slice(0, 3).toUpperCase();
   const blurb = mg?.description || cfg.blurb;
   const site = mg?.siteUrl;
+  const token = metaToken(cfg, mg); // ticker, or "no token"
   return (
     <>
+      {/* Header — logo avatar ringed in the identity hue + name + ticker. */}
+      <div className="dossier-head">
+        <Avatar className="dossier-logo" style={{ ["--ring" as string]: hue }}>
+          {mg?.iconUrl && <AvatarImage src={mg.iconUrl} alt="" />}
+          <AvatarFallback style={{ color: hue }}>{monogram}</AvatarFallback>
+        </Avatar>
+        <span className="dossier-id">
+          <span className="dossier-name">{cfg.name}</span>
+          {cfg.id !== "dag" && <span className="dossier-ticker" style={{ color: hue }}>{cfg.ticker}</span>}
+        </span>
+      </div>
       <Desc text={blurb} />
-      {/* Identity flow: name → what it is → where to find it → then the node make-up. The link
-          sits right under the description (the header's top-right is taken by the close ×). */}
-      {site && (
-        <a className="insp-site" href={site} target="_blank" rel="noopener noreferrer">
-          {site.replace(/^https?:\/\//, "").replace(/\/$/, "")}
-        </a>
+      {nodes.length > 0 && (
+        <div className="comp-block">
+          <div className="comp-head">
+            <span className="comp-title">Node composition</span>
+            <span className="comp-total"><b>{nodes.length}</b> node{nodes.length === 1 ? "" : "s"}</span>
+          </div>
+          <CompositionRows nodes={nodes} />
+          <div className="comp-status"><StatusBreakdown states={nodes.map((n) => n.state)} /></div>
+        </div>
       )}
-      {facts}
+      <div className="dossier-foot">
+        <span className="dossier-token">{cfg.id !== "dag" && !nodeComposition(nodes).hasCurrency ? "data metagraph · no token" : token}</span>
+        {site && (
+          <a className="insp-site" href={site} target="_blank" rel="noopener noreferrer" style={{ color: hue }}>
+            {site.replace(/^https?:\/\//, "").replace(/\/$/, "")}
+          </a>
+        )}
+      </div>
     </>
   );
 }

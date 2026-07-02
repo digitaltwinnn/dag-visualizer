@@ -111,3 +111,18 @@
 .comp-chips { display: inline-flex; gap: 3px; justify-content: flex-end; align-items: center; }
 .comp-chip { width: 6px; height: 6px; border-radius: 50%; background: rgba(160, 175, 205, 0.5); }
 .comp-count { font-size: 12.5px; color: var(--text); font-variant-numeric: tabular-nums; min-width: 1.5em; text-align: right; }
+
+/* Dossier header — logo avatar ringed in the identity hue + name + ticker. */
+.dossier-head { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+.dossier-logo { width: 38px; height: 38px; border-radius: 9px; box-shadow: 0 0 0 1.5px var(--ring, var(--panel-border)), 0 0 12px -2px var(--ring, transparent); }
+.dossier-id { display: flex; flex-direction: column; gap: 1px; }
+.dossier-name { font-size: 15px; font-weight: 600; color: var(--text); line-height: 1.1; }
+.dossier-ticker { font-size: 11px; font-weight: 600; letter-spacing: 0.02em; }
+.comp-block { margin-top: 12px; }
+.comp-head { display: flex; align-items: baseline; justify-content: space-between; }
+.comp-title { font-size: 10.5px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); }
+.comp-total { font-size: 15px; color: var(--text); }
+.comp-total b { font-weight: 700; }
+.comp-status { margin-top: 8px; }
+.dossier-foot { display: flex; flex-direction: column; gap: 4px; margin-top: 12px; }
+.dossier-token { font-size: 12px; color: var(--muted); }
