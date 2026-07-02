@@ -63,8 +63,22 @@ body { font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; co
   width: var(--rail-w);
   display: flex; flex-direction: column; gap: var(--rail-gap);
   max-height: calc(100vh - var(--bottom-reserve) - var(--rail-top));
+  overflow-y: auto;
 }
 #leftcol > aside { width: auto; }
+
+/* Custom thin scrollbar for both rails — the default chunky browser scrollbar read as heavy
+   chrome over the glass. A slim, translucent thumb on a transparent track; it brightens on hover
+   and stays out of the way at rest. (Firefox: scrollbar-width/color; WebKit: ::-webkit-scrollbar.) */
+#leftcol, #rightcol { scrollbar-width: thin; scrollbar-color: rgba(160, 175, 205, 0.28) transparent; }
+#leftcol::-webkit-scrollbar, #rightcol::-webkit-scrollbar { width: 6px; }
+#leftcol::-webkit-scrollbar-track, #rightcol::-webkit-scrollbar-track { background: transparent; }
+#leftcol::-webkit-scrollbar-thumb, #rightcol::-webkit-scrollbar-thumb {
+  background: rgba(160, 175, 205, 0.28); border-radius: 3px;
+}
+#leftcol:hover::-webkit-scrollbar-thumb, #rightcol:hover::-webkit-scrollbar-thumb {
+  background: rgba(160, 175, 205, 0.45);
+}
 
 /* The "content updated" flash (a card whose subject just changed) is driven by the Web
    Animations API in `useFlashOnChange` — see the note there for why it's not a CSS class. */

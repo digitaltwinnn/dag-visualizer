@@ -3,19 +3,17 @@
    an eyebrow naming its slot role (Selected / Live / Node …), symmetric with the
    left panels' eyebrows. */
 
-/* ── Left identity spine — every right-rail card. ──
-   ONE consistent identity cue for the whole rail (replaces the old outer-edge thread):
-   a left accent spine that reads --filter-accent (the active metagraph's hue, cyan for
-   "all"). Static — no data-driven pulse/animation here (see the no-effect-bleed rule). */
-#rightcol > .panel { position: relative; }
-#rightcol > .panel::before {
-  content: "";
-  position: absolute;
-  left: 0; top: 10px; bottom: 10px;
-  width: 2px; border-radius: 2px;
-  background: var(--filter-accent, var(--primary));
-  opacity: 0.9;
+/* ── Instrument-channel thread — the right rail's identity cue (RailThread.tsx). ──
+   A fixed SVG down the rail's OUTER edge: a neutral base line + an identity-hued line + fine
+   ticker hatches + a node-dot centered on each card. It fades at the top and bottom so the
+   channel reads as an instrument rail rather than a hard bar. Purely decorative. */
+.rail-thread {
+  position: fixed;
+  z-index: 11;
   pointer-events: none;
+  overflow: visible;
+  -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 7%, #000 93%, transparent 100%);
+  mask-image: linear-gradient(to bottom, transparent 0, #000 7%, #000 93%, transparent 100%);
 }
 
 /* Uniform right-column header: a blue role eyebrow (purpose) over a white title
@@ -72,26 +70,13 @@
 .gel-clear:hover { color: var(--text); }
 .gel-node-title { font-size: 13px; font-weight: 600; color: var(--text); margin: 0; font-variant-numeric: tabular-nums; word-break: break-all; min-width: 0; }
 
-/* ── View-default card — neutral per-view orientation (title + line + cyan pick-invite).
-   Replaces the old #rc-empty hint. Structural chrome, NOT tinted to any identity hue; the
-   halo is the only colour, always cyan (--primary), regardless of the active filter. ── */
-/* Inset the content like every other stack card (.panel has no base padding; siblings inset
-   via #metapane-content / .rc-pane). Without this the eyebrow/title sit flush to the edge. */
-.rc-vd { position: relative; padding: var(--panel-pad-y) var(--panel-pad-x); }
-/* Two-lane override: the view-default is orientation chrome, not a subject — its spine
-   must stay structural cyan even when a metagraph is filtered (never the identity hue).
-   Specificity must match/beat `#rightcol > .panel::before` (1 ID + 1 class), so this is
-   scoped through `#rightcol` too — a bare `.rc-vd::before` would lose the cascade. */
-#rightcol > .rc-vd::before { background: var(--primary); }
-.rc-vd-collapse {
-  position: absolute; top: 8px; right: 10px;
-  background: none; border: none; cursor: pointer;
-  color: var(--muted); font-size: 12px; line-height: 1;
-}
-.rc-vd-collapse:hover { color: var(--text); }
-.rc-vd .rc-vd-invite {
+/* ── Pick-invite for the empty Detail slot — a slim muted line + the cyan node-halo (NOT a
+   card). The right rail is the FACTS scope, so with nothing selected it stays quiet; the view's
+   own orientation lives on the LEFT rail's tool card, not here. Always cyan (structural). ── */
+.rc-pickhint {
   display: flex; align-items: center; gap: 8px;
-  margin: 10px 0 0; font-size: 12px; color: var(--muted);
+  margin: 2px 4px 0; padding: 0 var(--panel-pad-x);
+  font-size: 12px; color: var(--muted);
 }
 .rc-vd-halo {
   width: 10px; height: 10px; border-radius: 50%; flex: none;
@@ -99,15 +84,6 @@
   box-shadow: 0 0 0 3px color-mix(in oklch, var(--primary) 30%, transparent);
   animation: breathe 1.5s ease-in-out infinite;   /* the cyan node-halo pick-invite */
 }
-.rc-vd-strip {
-  display: flex; align-items: center; justify-content: space-between; gap: 8px;
-  width: 100%; padding: 8px 12px; cursor: pointer;
-  background: rgba(16, 22, 44, 0.5); border: 1px solid var(--panel-border);
-  border-radius: var(--radius); color: var(--muted);
-}
-.rc-vd-strip:hover { color: var(--text); }
-.rc-vd-strip-title { font-size: 12px; letter-spacing: 0.02em; }
-.rc-vd-strip-hint { font-size: 10px; opacity: 0.7; }
 @media (prefers-reduced-motion: reduce) { .rc-vd-halo { animation: none; } }
 
 /* ── Node rows — the nodes nested under an open country in the GeoExplore accordion. ── */

@@ -1,6 +1,6 @@
 /* ── Inspector + metagraph context pane (Phase 5, ported from styles.css) ── */
 #rightcol {
-  position: fixed; top: var(--rail-top); right: 16px; z-index: 10;
+  position: fixed; top: var(--rail-top); right: 20px; z-index: 10;
   width: var(--detail-w); display: flex; flex-direction: column; gap: var(--rail-gap);
   max-height: calc(100vh - var(--bottom-reserve) - var(--rail-top));
   overflow-y: auto;

@@ -56,11 +56,13 @@
    inside .panel-body (or the panel toggles its own body — Learn keeps both). */
 .panel.collapsed .panel-body { display: none; }
 
-/* The global filter gets a faint accent stripe down its left edge to reinforce
-   "this control applies everywhere" without shouting. */
-#netfilter { position: relative; overflow: hidden; }
-#netfilter::before {
-  content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 2px;
-  background: linear-gradient(180deg, var(--core), var(--l0));
-  opacity: 0.55;
+/* Left rail identity spine — mirrors the right rail's instrument thread: a per-card left accent
+   bar in the active selection's hue (cyan for "all"), tying the explore rail to the current
+   subject. (The old #netfilter stripe retired when the filter moved to the top command bar.) */
+#leftcol > .panel { position: relative; }
+#leftcol > .panel::before {
+  content: ""; position: absolute; left: 0; top: 12px; bottom: 12px;
+  width: 2px; border-radius: 2px;
+  background: var(--filter-accent, var(--primary));
+  opacity: 0.85; pointer-events: none;
 }

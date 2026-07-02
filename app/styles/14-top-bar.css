@@ -147,10 +147,12 @@
 }
 .tb-vital-ph { color: var(--muted); font-style: italic; opacity: 0.6; }
 
-/* ── Expanded filter (drops below the row, same surface; spans the full bar width) ── */
+/* ── Expanded filter (drops below the row, same surface) — a COMPACT shelf under the filter,
+   not the full bar width (the empty right half read as an oversized dropdown). ── */
 .tb-expand {
   border-top: 1px solid var(--panel-border);
   padding: 6px;
+  max-width: 374px;   /* fp (360) + padding; left-aligned under the filter control */
 }
 
 /* ── Narrow screens: a graceful ladder — shed the least-essential thing at each step,
