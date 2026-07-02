@@ -1,35 +1,23 @@
 "use client";
 
 import { useStore } from "@/src/store/store";
-import { CORE_HEX, filterAccent, metagraphById } from "@/src/data/network";
-import { hex, ccToFlag } from "@/src/util/format";
+import { metagraphById } from "@/src/data/network";
+import { ccToFlag } from "@/src/util/format";
 import Sparkline from "@/components/Sparkline";
+import Odometer from "@/components/Odometer";
 import { rolesOf } from "@/components/inspector/parts";
 import type { NodeInfo } from "@/src/data/types";
 
-const fmt = (v?: number | null) =>
-  v == null ? "—" : v < 10 ? v.toFixed(1) : Math.round(v).toLocaleString();
+// Structural cyan for the live-activity sparklines (lane-correct: cyan = the live accent).
+const CYAN = "#2af5ff";
 
-// One compact vital in the top bar: a small uppercase label over a tabular value,
-// optionally with a trailing sparkline. Values stay neutral (`--text`) — metagraph colours
-// are too dark/saturated to read as text; the accent lives in the pill + view switch only.
-function Vital({
-  label,
-  value,
-  spark,
-  color,
-}: {
-  label: string;
-  value: React.ReactNode;
-  spark?: number[];
-  color?: string;
-}) {
+function Vital({ label, value, spark }: { label: string; value: React.ReactNode; spark?: number[] }) {
   return (
     <div className="tb-vital">
       <span className="tb-vital-k">{label}</span>
       <span className="tb-vital-row">
         <span className="tb-vital-v">{value}</span>
-        {spark && color && <Sparkline data={spark} color={color} />}
+        {spark && <Sparkline data={spark} color={CYAN} />}
       </span>
     </div>
   );
@@ -45,74 +33,61 @@ function HyperVitals() {
   const metaList = useStore((s) => s.metaList);
   const cfg = metagraphById(filter);
 
-  // One node taxonomy: the DAG core lives in metaList alongside the metagraphs, so "all" sums
-  // every core and a selection is just one core. A hybrid counts in each layer it runs.
   const c = { l0: 0, cl1: 0, dl1: 0 };
+  const runs = { l0: false, cl1: false, dl1: false };
   const add = (nodes: NodeInfo[]) => {
     for (const n of nodes) {
       const roles = rolesOf(n);
-      if (roles.includes("l0")) c.l0++;
-      if (roles.includes("cl1")) c.cl1++;
-      if (roles.includes("dl1")) c.dl1++;
+      if (roles.includes("l0")) { c.l0++; runs.l0 = true; }
+      if (roles.includes("cl1")) { c.cl1++; runs.cl1 = true; }
+      if (roles.includes("dl1")) { c.dl1++; runs.dl1 = true; }
     }
   };
   const cores = cfg ? metaList.filter((m) => m.id === cfg.id) : metaList;
   for (const mg of cores) add(mg.nodes);
 
+  // Filtered: an em-dash for a layer this metagraph doesn't run (stable 3 columns, no reflow).
+  const cell = (n: number, runsLayer: boolean) =>
+    cfg && !runsLayer ? <span className="tb-vital-ph">—</span> : <Odometer value={n} />;
+
   return (
     <>
-      <Vital label="L0" value={c.l0} />
-      <Vital label="cL1" value={c.cl1} />
-      <Vital label="dL1" value={c.dl1} />
+      <Vital label="L0" value={cell(c.l0, runs.l0)} />
+      <Vital label="cL1" value={cell(c.cl1, runs.cl1)} />
+      <Vital label="dL1" value={cell(c.dl1, runs.dl1)} />
     </>
   );
 }
 
-// Geography vitals — the active selection's **footprint** (where): how globally distributed
-// it is (the distribution score, moved up from the GeoExplore card), how many countries it
-// spans, and its densest country.
+// Geography vitals — the active selection's **footprint** (where): total mapped nodes, how
+// many countries it spans, and its densest country. The old "Distribution" score is
+// intentionally dropped from the bar (moved to the GeoExplore header per the spec).
 function GeoVitals() {
   const lb = useStore((s) => s.leaderboard);
-  const score = lb?.score ?? null;
-  const countries = lb?.countries.length ?? 0;
-  const top = lb?.countries[0] ?? null;
-
+  const countries = lb?.countries ?? [];
+  const top = countries[0] ?? null;
+  // "Nodes" = total machines on the map = the sum of the per-country counts (the leaderboard
+  // is the authoritative per-country breakdown; each row has `.count`). Derive it rather than
+  // depend on a separate total field.
+  const nodes = countries.length ? countries.reduce((s, c) => s + c.count, 0) : null;
   return (
     <>
-      <Vital label="Distribution" value={score ? `${score}%` : "—"} />
-      <Vital label="Countries" value={countries || "—"} />
+      <Vital label="Nodes" value={<Odometer value={nodes} />} />
+      <Vital label="Countries" value={<Odometer value={countries.length || null} />} />
       <Vital label="Densest" value={top ? <>{ccToFlag(top.cc)} {top.count}</> : "—"} />
     </>
   );
 }
 
 // Snapshot DAG vitals — the network's **live activity** over time (when + cost): the snapshot
-// cadence, anchors and settlement fees per hour, with trend charts. Moved here from the
-// Hypergraph view, since this is the view that's actually about the ledger over time. The
-// charts take the filter's accent colour so they read as one with the filter.
+// cadence and anchors per hour, with trend charts in structural cyan (the live-activity accent,
+// not the filter colour).
 function LedgerVitals() {
-  const filter = useStore((s) => s.filter);
   const activity = useStore((s) => s.activity);
-  const cfg = metagraphById(filter);
-  const chartColor = cfg ? hex(cfg.color) : CORE_HEX;
   return (
     <>
-      <Vital
-        label="Snapshots/hr"
-        value={fmt(activity?.snapsPerHour)}
-        spark={activity?.cadenceSeries}
-        color={chartColor}
-      />
-      <Vital
-        label="Anchors/hr"
-        value={fmt(activity?.anchorsPerHour)}
-        spark={activity?.anchoredSeries}
-        color={chartColor}
-      />
-      {/* Fees/hr removed: the polled fee sums only the LISTED metagraphs, so it's a floor that
-          silently omits unlisted anchors — not 100% factual for a headline rate (an exact per-hour
-          fee would need the heavy raw-L0 read on every tick). Placeholder until we settle on a
-          fully-factual third stat. */}
+      <Vital label="Snaps/hr" value={<Odometer value={activity?.snapsPerHour} />} spark={activity?.cadenceSeries} />
+      <Vital label="Anchors/hr" value={<Odometer value={activity?.anchorsPerHour} />} spark={activity?.anchoredSeries} />
       <Vital label="—" value={<span className="tb-vital-ph">soon</span>} />
     </>
   );
@@ -120,30 +95,7 @@ function LedgerVitals() {
 
 export default function Vitals() {
   const mode = useStore((s) => s.mode);
-  const filter = useStore((s) => s.filter);
-  // Each view's top-bar is its own network-level read (hyper = structure, geo = footprint,
-  // ledger = activity). Hyper + geo are plain numbers, so a leading accent bullet ties them
-  // to the active filter (the same "colour = this selection" cue); ledger already carries it
-  // via its accent sparklines.
-  // The scaffolded placeholder views carry no vitals yet.
   const body =
-    mode === "geo" ? (
-      <GeoVitals />
-    ) : mode === "ledger" ? (
-      <LedgerVitals />
-    ) : mode === "hyper" ? (
-      <HyperVitals />
-    ) : null;
-  return (
-    <div className="tb-vitals">
-      {(mode === "hyper" || mode === "geo") && (
-        <span
-          className="tb-vitals-dot"
-          style={{ background: filterAccent(filter) }}
-          title="These metrics are scoped to the current filter"
-        />
-      )}
-      {body}
-    </div>
-  );
+    mode === "geo" ? <GeoVitals /> : mode === "ledger" ? <LedgerVitals /> : mode === "hyper" ? <HyperVitals /> : null;
+  return <div className="tb-vitals">{body}</div>;
 }
