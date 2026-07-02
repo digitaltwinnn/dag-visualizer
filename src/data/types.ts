@@ -112,6 +112,7 @@ export interface MetaCfg {
   ticker?: string;
   color: number;
   blurb?: string;
+  iconUrl?: string; // logo for cores not in the live metaList (e.g. the DAG core)
 }
 
 // What the inspector renders. Emitted by the engine's picking (core/l0/l1/metanode)

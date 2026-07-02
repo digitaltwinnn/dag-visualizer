@@ -85,6 +85,7 @@ export function MetaCard({ cfg }: { cfg: MetaCfg }) {
   const mg = metaList.find((x) => x.id === cfg.id) || null;
   const nodes = mg?.nodes || [];
   const hue = hex(cfg.color);
+  const iconUrl = mg?.iconUrl || cfg.iconUrl; // live metagraph icon, or the core's bundled logo
   const monogram = (cfg.ticker || cfg.name).slice(0, 3).toUpperCase();
   const blurb = mg?.description || cfg.blurb;
   const site = mg?.siteUrl;
@@ -97,7 +98,7 @@ export function MetaCard({ cfg }: { cfg: MetaCfg }) {
       {/* Header — logo avatar ringed in the identity hue + name + ticker. */}
       <div className="dossier-head">
         <Avatar className="dossier-logo">
-          {mg?.iconUrl && <AvatarImage src={mg.iconUrl} alt="" />}
+          {iconUrl && <AvatarImage src={iconUrl} alt="" />}
           <AvatarFallback style={{ color: hue }}>{monogram}</AvatarFallback>
         </Avatar>
         <span className="dossier-id">

@@ -77,11 +77,11 @@ body { font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; co
   touch-action: pan-y;
   -webkit-overflow-scrolling: touch;
   overscroll-behavior: contain;
-  /* The bottom strip OVERLAYS the rail; rather than cards sitting hard on top of the bar-chart,
-     the rail fades out over exactly the strip's band (`--bottom-reserve`) so the last card melts
-     away just before the chart. No strip (reserve 0) → no fade. */
-  -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - var(--bottom-reserve, 0px)), transparent 100%);
-  mask-image: linear-gradient(to bottom, #000 calc(100% - var(--bottom-reserve, 0px)), transparent 100%);
+  /* The bottom strip OVERLAYS the rail; the last card stays solid all the way down and fades out
+     over a short band right where the chart begins — transparent by the chart's TOP edge (~30px
+     inside the reserved band), then transparent through the chart. No strip (reserve 0) → no fade. */
+  -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - var(--bottom-reserve, 0px) + 6px), transparent calc(100% - var(--bottom-reserve, 0px) + 30px), transparent 100%);
+  mask-image: linear-gradient(to bottom, #000 calc(100% - var(--bottom-reserve, 0px) + 6px), transparent calc(100% - var(--bottom-reserve, 0px) + 30px), transparent 100%);
 }
 #leftcol::-webkit-scrollbar, #rightcol::-webkit-scrollbar { width: 6px; }
 #leftcol::-webkit-scrollbar-track, #rightcol::-webkit-scrollbar-track { background: transparent; }

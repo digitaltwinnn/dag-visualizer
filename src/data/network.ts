@@ -80,7 +80,9 @@ export function isAnchorSettling(ts: string, total: number | null): boolean {
 
 // The DAG modelled as a core, resolvable like a metagraph config (its live nodes come from
 // the metaList; this is just its identity for the filter/dossier/top-bar).
-const DAG_CFG: MetagraphConfig = { id: "dag", name: "DAG", ticker: "DAG", color: COLORS.core };
+// The DAG core carries its own logo (it isn't in the live metaList). Points at a bundled asset;
+// drop the official Constellation mark at `public/dag-logo.svg` to swap it (monogram is the fallback).
+const DAG_CFG: MetagraphConfig = { id: "dag", name: "DAG", ticker: "DAG", color: COLORS.core, iconUrl: "/dag-logo.svg" };
 
 // Config core (id → {color, ticker, name, …}) — a metagraph or the DAG; null for "all".
 export function metagraphById(id: string): MetagraphConfig | null {
@@ -107,4 +109,5 @@ export interface MetagraphConfig {
   name: string;
   ticker: string;
   color: number;
+  iconUrl?: string;
 }
