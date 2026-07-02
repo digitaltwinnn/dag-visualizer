@@ -552,7 +552,7 @@ export class Engine {
     // card/row). Only the channel for the hovered kind is set; the others clear — so exactly one
     // subject is "hovered" at a time. Write only on change (mousemove is high-frequency).
     const nodeKey = hoverKeyOf(p);                                   // node → globe shell glow
-    const snapOrd = p?.kind === "snapshot" ? p.data.ordinal : null;  // snapshot → ledger tile
+    const snapOrd = p?.kind === "snapshot" ? p.data.ordinal : null;  // snapshot → ledger row
     const metaId = p?.kind === "meta" ? p.cfg?.id ?? null : null;    // hub → metagraph dim preview
     if (nodeKey !== st.hoverNodeId) st.setHoverNodeId(nodeKey);
     if (snapOrd !== st.hoverSnapOrd) st.setHoverSnapOrd(snapOrd);

@@ -104,7 +104,7 @@ export function MetaCard({ cfg }: { cfg: MetaCfg }) {
           <AvatarFallback style={{ color: hue }}>{monogram}</AvatarFallback>
         </Avatar>
         <span className="dossier-id">
-          <span className="dossier-name">{cfg.name}</span>
+          <span key={cfg.name} className="dossier-name roll-in">{cfg.name}</span>
           {cfg.id !== "dag" && <span className="dossier-ticker" style={{ color: hue }}>{cfg.ticker}</span>}
         </span>
       </div>
@@ -173,7 +173,7 @@ function GeoLiveNode({ p, onClear }: { p: PickOf<"l0" | "l1" | "metanode">; onCl
       {/* Title line: node id + the status inline (right). */}
       <div className="gel-node-head">
         {color && <span className="gel-dot" style={{ background: color }} />}
-        <span className="gel-node-title insp-hash">{title}</span>
+        <span key={title} className="gel-node-title insp-hash roll-in">{title}</span>
         <span className="gel-status"><StatusMark state={p.node?.state} /></span>
       </div>
       {/* IP grouped with the identity (muted subtitle under the id), not a labelled row. */}

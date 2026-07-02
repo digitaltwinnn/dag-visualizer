@@ -86,9 +86,13 @@
   .odometer > span { grid-area: 1 / 1; }
   .odometer-in  { animation: odo-in  0.4s ease-out; }
   .odometer-out { animation: odo-out 0.4s ease-out forwards; }
+  /* A whole-value "roll" for TEXT card-headers (node id, metagraph name) — the same upward roll
+     the Odometer uses for numeric values, so every card's header transitions in one language on a
+     new subject. Triggered by a changing React `key` (the element re-mounts and plays it). */
+  .roll-in { display: inline-block; animation: odo-in 0.4s ease-out; }
 }
 @media (prefers-reduced-motion: reduce) {
-  .odometer-in, .odometer-out { animation: none; }
+  .odometer-in, .odometer-out, .roll-in { animation: none; }
 }
 
 @layer components {
