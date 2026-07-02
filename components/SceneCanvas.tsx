@@ -2,6 +2,7 @@
 
 import { useEffect, useRef } from "react";
 import { useStore } from "@/src/store/store";
+import { useBootPhase } from "@/components/useBootPhase";
 
 // Mounts the imperative Three.js engine onto a persistent canvas. The engine owns
 // its own render loop and never re-renders through React — React only mounts/disposes
@@ -12,6 +13,7 @@ import { useStore } from "@/src/store/store";
 // React 18/19 StrictMode's double-invoke in dev safe.
 export default function SceneCanvas() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const phase = useBootPhase();
 
   useEffect(() => {
     let disposed = false;
@@ -29,5 +31,5 @@ export default function SceneCanvas() {
     };
   }, []);
 
-  return <canvas ref={canvasRef} className="scene-canvas" />;
+  return <canvas ref={canvasRef} className={"scene-canvas" + (phase === "live" ? " scene-in" : "")} />;
 }

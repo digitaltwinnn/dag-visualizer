@@ -70,3 +70,36 @@
 .geo-qe-line { font-size: 11.5px; color: var(--muted); line-height: 1.5; }
 .geo-qe-jump { margin-top: 8px; background: none; border: none; color: var(--core); font: inherit; font-size: 12px; cursor: pointer; }
 .geo-qe-jump:hover { text-decoration: underline; }
+
+/* ── Global first-load (cold start) — the forming Global L0 core, DOM/SVG, neutral cyan ─────── */
+.boot-overlay {
+  position: fixed; inset: 0; z-index: 9; /* above the canvas (scene-canvas has no z), below the HUD */
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 18px;
+  pointer-events: none;
+  animation: st-fade-in 0.4s ease both; /* the overlay itself fades IN at 0 ms */
+}
+.boot-core { position: relative; width: 120px; height: 120px; }
+.boot-core-glow {
+  position: absolute; inset: 0; border-radius: 50%;
+  background: radial-gradient(circle, color-mix(in oklch, var(--core) 85%, transparent) 0%, transparent 62%);
+  animation: breathe 1.5s ease-in-out infinite;
+}
+.boot-core-ping {
+  position: absolute; inset: 34px; border-radius: 50%;
+  border: 1px solid color-mix(in oklch, var(--core) 55%, transparent);
+  animation: st-sonar 1.6s ease-out infinite; /* reuse the sonar expand (peak ≤ 0.6) */
+}
+.boot-label {
+  font-size: 12px; letter-spacing: 0.08em; color: color-mix(in oklch, var(--core) 80%, var(--text));
+  text-transform: lowercase; margin: 0;
+}
+/* NO SIGNAL after timeout — desaturate to grey, red-ish label. */
+.boot-overlay--nosignal { filter: saturate(0.35); }
+.boot-overlay--nosignal .boot-core-glow,
+.boot-overlay--nosignal .boot-core-ping { filter: grayscale(1); }
+.boot-overlay--nosignal .boot-label { color: var(--muted); }
+@media (prefers-reduced-motion: reduce) {
+  .boot-overlay, .boot-core-glow, .boot-core-ping { animation: none; }
+  .boot-core-glow { opacity: 0.9; }
+  .boot-core-ping { opacity: 0; }
+}

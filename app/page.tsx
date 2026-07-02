@@ -1,4 +1,5 @@
 import SceneCanvas from "@/components/SceneCanvas";
+import BootOverlay from "@/components/BootOverlay";
 import DataBridge from "@/components/DataBridge";
 import ExperimentalBanner from "@/components/ExperimentalBanner";
 import TopBar from "@/components/TopBar";
@@ -17,6 +18,7 @@ export default function Home() {
   return (
     <main>
       <SceneCanvas />
+      <BootOverlay />
       <ExperimentalBanner />
       <DataBridge />
       <TopBar />
