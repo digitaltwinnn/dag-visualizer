@@ -185,15 +185,19 @@
   .tb-vitals { gap: 8px; }
 }
 
-/* Filter picker (logo list + search) — shown in the bar's downward expansion */
-.fp { background: transparent; }
+/* Filter picker (dot list + search) — shown in the bar's downward expansion. A COMPACT left
+   column (not full bar width) so the rows read tightly; identity is a small dot, no logo tiles. */
+.fp { background: transparent; max-width: 360px; }
 .fp [data-slot="command-input-wrapper"] { border-bottom: 1px solid var(--panel-border); }
 .fp-row { display: grid; grid-template-columns: auto 1fr auto auto; align-items: center; gap: 10px; }
 .fp-row .fp-sub { grid-column: 2; color: var(--muted); font-size: 11px; }
 .fp-name { font-size: 13px; color: var(--text); }
 .fp-ticker { font-size: 11px; font-weight: 600; font-variant-numeric: tabular-nums; }
 .fp-count { font-size: 11px; color: var(--muted); font-variant-numeric: tabular-nums; text-align: right; }
-.fp-dot { width: 9px; height: 9px; border-radius: 50%; }
-.fp-logo { width: 22px; height: 22px; border-radius: 6px; box-shadow: 0 0 0 1.5px var(--ring, var(--panel-border)); }
-.fp-active { background: var(--sel-bg) !important; box-shadow: inset 2px 0 0 var(--sel-border); }
+.fp-dot { width: 8px; height: 8px; border-radius: 50%; flex: none; }
+/* Quiet hover / keyboard highlight — a faint neutral wash, NOT the bright accent fill (which
+   washed the row text out to unreadable). Text stays at full contrast. */
+.fp [data-slot="command-item"][data-selected="true"] { background: rgba(255, 255, 255, 0.05); color: var(--text); }
+/* The committed pick — a subtle left accent bar only (no bright fill). */
+.fp-active { box-shadow: inset 2px 0 0 var(--sel-border); }
 .fp-off { opacity: 0.45; }

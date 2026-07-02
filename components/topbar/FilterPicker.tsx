@@ -5,14 +5,14 @@ import { hex } from "@/src/util/format";
 import {
   Command, CommandInput, CommandList, CommandEmpty, CommandGroup, CommandItem,
 } from "@/components/ui/command";
-import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 
-// The expanded filter body: a searchable identity-selection menu. `All · whole network`
-// pinned on top (the clear/default), then one row per core — logo avatar (ringed in its
-// identity hue; monogram fallback) + name + ticker + node count — SORTED by located-node
-// count desc, so 0-located metagraphs sink to the bottom (shown greyed with their real
-// count, never hidden). Current pick highlighted; hovering a row PREVIEWS its dim in the
-// scene (setHoverFilter); leaving the list clears the preview.
+// The expanded filter body: a compact, searchable identity-selection menu. `All · whole network`
+// pinned on top (the clear/default), then one row per core — a small identity-hue DOT + name +
+// ticker + node count — SORTED by located-node count desc, so 0-located metagraphs sink to the
+// bottom (shown greyed with their real count, never hidden). No logo tiles (they ate width and
+// read as heavy chrome); the dot carries identity, matching the collapsed filter face + the rail.
+// Current pick marked with a quiet left accent; hovering a row PREVIEWS its dim in the scene
+// (setHoverFilter); leaving the list clears the preview.
 export default function FilterPicker({ onPick }: { onPick?: () => void }) {
   const filter = useStore((s) => s.filter);
   const setFilter = useStore((s) => s.setFilter);
@@ -33,8 +33,6 @@ export default function FilterPicker({ onPick }: { onPick?: () => void }) {
     setFilter(id);
     onPick?.();
   };
-  const monogram = (m: { symbol?: string; name: string }) =>
-    (m.symbol || m.name).slice(0, 3).toUpperCase();
 
   return (
     <Command className="fp" onMouseLeave={() => setHoverFilter(null)}>
@@ -68,10 +66,7 @@ export default function FilterPicker({ onPick }: { onPick?: () => void }) {
                 }
                 onMouseEnter={() => setHoverFilter(m.id)}
               >
-                <Avatar className="fp-logo" style={{ ["--ring" as string]: hue }}>
-                  {m.iconUrl && <AvatarImage src={m.iconUrl} alt="" />}
-                  <AvatarFallback style={{ color: hue }}>{monogram(m)}</AvatarFallback>
-                </Avatar>
+                <span className="fp-dot" style={{ background: hue }} />
                 <span className="fp-name">{m.name}</span>
                 <span className="fp-ticker" style={{ color: hue }}>{m.symbol}</span>
                 <span className="fp-count">{off ? "0 · located" : m.located}</span>
