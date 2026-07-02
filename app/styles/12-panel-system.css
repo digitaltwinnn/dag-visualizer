@@ -69,12 +69,13 @@
     transparent 0, var(--filter-accent, var(--primary)) 12%,
     var(--filter-accent, var(--primary)) 88%, transparent 100%);
 }
-/* neutral ruler hairlines stepping inward from the spine (1px marks every 13px), faded top+bottom */
+/* neutral ruler hairlines stepping inward from the spine — the SHARED thread rhythm
+   (short marks, every 4th longer + brighter), via the one --rail-hairlines recipe so it
+   matches the right rail's SVG thread exactly. Faded top+bottom like the spine. */
 #leftcol > .panel::after {
-  content: ""; position: absolute; left: 4px; top: 10px; bottom: 10px; width: 7px;
+  content: ""; position: absolute; left: 4px; top: 10px; bottom: 10px; width: 9px;
   pointer-events: none;
-  background: repeating-linear-gradient(to bottom,
-    rgba(178, 193, 223, 0.4) 0, rgba(178, 193, 223, 0.4) 1px, transparent 1px, transparent 13px);
+  background: var(--rail-hairlines);
   -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 14%, #000 86%, transparent 100%);
   mask-image: linear-gradient(to bottom, transparent 0, #000 14%, #000 86%, transparent 100%);
 }

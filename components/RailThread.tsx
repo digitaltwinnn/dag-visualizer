@@ -12,6 +12,12 @@ import { filterAccent, CORE_HEX } from "@/src/data/network";
 // (CSS mask). Purely decorative (pointer-events: none) — see the no-effect-bleed rule: no
 // data-driven animation here, it just reflects the selection's hue + the current card layout.
 const W = 22; // channel width (px)
+// Ruler-hairline spec — mirrors the CSS `--thread-tick*` / `--rail-hairlines` tokens (00-base.css)
+// so this SVG thread and the left rail's CSS spine read identically. Kept here as literals because
+// an SVG stroke ATTRIBUTE can't resolve a CSS var(); keep the two in sync.
+const TICK_PITCH = 13; // px between hairlines
+const TICK_MINOR = "rgba(178,193,223,0.3)"; // short hairline
+const TICK_MAJOR = "rgba(178,193,223,0.42)"; // every 4th — longer + brighter
 
 export default function RailThread() {
   const filter = useStore((s) => s.filter);
@@ -58,7 +64,7 @@ export default function RailThread() {
   const ax = 9; // identity line x (INNER — the cards' dots + connectors anchor to it; a real connector length)
   const nx = 16; // neutral base line x (OUTER — well clear of the identity line, carries the hairlines)
   const ticks: number[] = [];
-  for (let y = 10; y <= H - 10; y += 13) ticks.push(y);
+  for (let y = 10; y <= H - 10; y += TICK_PITCH) ticks.push(y);
 
   return (
     <svg
@@ -74,7 +80,7 @@ export default function RailThread() {
       {/* ruler ticker hatches — short marks stepping OUTWARD from the neutral line; muted, every 4th
          a touch longer/brighter (an instrument scale), well clear of the identity line. */}
       {ticks.map((y, i) => (
-        <line key={i} x1={nx} y1={y} x2={i % 4 === 0 ? W : W - 2} y2={y} stroke={`rgba(178,193,223,${i % 4 === 0 ? 0.42 : 0.3})`} strokeWidth={1} />
+        <line key={i} x1={nx} y1={y} x2={i % 4 === 0 ? W : W - 2} y2={y} stroke={i % 4 === 0 ? TICK_MAJOR : TICK_MINOR} strokeWidth={1} />
       ))}
       {/* identity line (inner) — the selection's hue, the PROMINENT spine the cards ride. */}
       <line x1={ax} y1={0} x2={ax} y2={H} stroke={accent} strokeWidth={2} />
@@ -83,7 +89,9 @@ export default function RailThread() {
         <g key={i}>
           <line x1={1} y1={y} x2={ax} y2={y} stroke={accent} strokeWidth={1.25} opacity={0.7} />
           <circle cx={ax} cy={y} r={5} fill={accent} opacity={0.16} />
-          <circle cx={ax} cy={y} r={3.4} fill={accent} stroke="var(--panel)" strokeWidth={1.5} />
+          {/* dark ring punches the dot off the identity line. NB a real hex, not var(--panel): an SVG
+             stroke ATTRIBUTE doesn't resolve CSS custom properties (same trap as the accent above). */}
+          <circle cx={ax} cy={y} r={3.4} fill={accent} stroke="#0c1020" strokeWidth={1.5} />
         </g>
       ))}
     </svg>
