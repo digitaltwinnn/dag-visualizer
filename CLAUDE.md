@@ -48,10 +48,17 @@ npm run dev        # http://localhost:3000
 
 `tsc --noEmit` for types (dev server tolerates type errors; run tsc to be sure).
 
-> **Dev-server gotcha:** a long-running `next dev` accumulates HMR/compile state across
-> many edits and can serve stale state (e.g. the wrong default view). If something
-> looks wrong after a big refactor, restart clean: `pkill -f "next dev"` (NOT `-f next`
-> — it matches your own shell), `rm -rf .next`, then `nohup npm run dev &`.
+> **Dev-server discipline (run ONE, shared):** keep exactly one `next dev` alive and reuse
+> it — DO NOT start a second. Concurrent servers race over port 3000 + `.next` and corrupt
+> the build (symptom: `ENOENT … .next/server/pages/_document.js`, which persists until cleaned
+> up). When coordinating parallel work (e.g. subagents), the coordinator owns the single
+> server and workers reuse `http://localhost:3000`; workers must not start/kill servers.
+> Prefer the harness background-run facility (`Bash run_in_background: true`) over
+> `nohup`/`setsid` so the process is tracked and stoppable via the task interface — avoid
+> `pkill -f "next dev"` (returns exit 144 in this sandbox and is unreliable; kill by PID if
+> you must). HMR/Turbopack picks up edits, so a restart is only needed for config-level
+> changes (tailwind/next config) or if state looks stale — then: kill the one server by PID,
+> `rm -rf .next`, start one again.
 
 ### Verifying visual changes
 
