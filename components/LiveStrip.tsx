@@ -27,6 +27,7 @@ export default function LiveStrip() {
   const setFollowing = useStore((s) => s.setFollowing);
   const snap = useStore((s) => s.snap);
   const filter = useStore((s) => s.filter);
+  const live = useStore((s) => s.live);
   const activeOrd = snap?.data.ordinal ?? null;
 
   const cfg = metagraphById(filter);
@@ -75,9 +76,9 @@ export default function LiveStrip() {
   const scaleMax = Math.max(1, ...bars.map((b) => (isMeta ? b.mine : b.total)));
 
   return (
-    <section id="livestrip" style={{ ["--ls-accent"]: accent } as CSSProperties}>
+    <section id="livestrip" className={live ? "" : "no-signal"} style={{ ["--ls-accent"]: accent } as CSSProperties}>
       <span className="ls-live">
-        <span className="live-dot" />
+        {live ? <span className="live-dot" /> : <span className="ns-dot" />}
         Global L0
         <span className="ls-scale">
           {isMeta ? `${cfg!.ticker || cfg!.name} anchors/tick · own scale` : "anchors/tick"}

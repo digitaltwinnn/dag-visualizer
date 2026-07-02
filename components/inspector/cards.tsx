@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { useStore } from "@/src/store/store";
 import { shortHash, CORE_HEX } from "@/src/data/network";
 import { hex, fmtDag, fmtKB } from "@/src/util/format";
@@ -8,6 +9,7 @@ import type { GlobalSnapshot, MetaCfg, NodeInfo, PickDescriptor } from "@/src/da
 import AnchoredTags from "./AnchoredTags";
 import Odometer from "@/components/Odometer";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
+import { SonarRing } from "@/components/state/StateAtoms";
 import { Desc, Row, StatusMark, CompositionRows, StatusBreakdown, nodeComposition } from "./parts";
 
 type PickOf<K extends PickDescriptor["kind"]> = Extract<PickDescriptor, { kind: K }>;
@@ -21,6 +23,8 @@ export function SnapshotCard({ data: d }: { data: GlobalSnapshot }) {
   // tick is inside the L0 node's retention window, so exact always resolves.
   const exact = useStore((s) => s.snapshotExact[d.ordinal]);
   const latest = useStore((s) => s.latestSnapshot);
+  const live = useStore((s) => s.live);
+  const lastGoodAt = useStore((s) => s.lastGoodAt);
   const awaitingExact = exact == null;
   const anchored = typeof d.metagraphSnapshotCount === "number" ? d.metagraphSnapshotCount : null;
   const isLive = latest != null && d.ordinal === latest.ordinal;
@@ -28,6 +32,38 @@ export function SnapshotCard({ data: d }: { data: GlobalSnapshot }) {
   // Relative recency for an older pick — coarse (freshness, not a ticking clock). Guarded
   // against an unparseable timestamp (→ no age suffix rather than "NaN").
   const rel = relativeAge(Date.now() - Date.parse(d.timestamp));
+
+  // NO SIGNAL — the feed is unreachable. One sonar ring per retry: remounting `SonarRing` via
+  // `key={retry}` (bumped on the same cadence as the poll, VIS.pollMs) makes the ring animation
+  // itself read as "still retrying", not a static icon.
+  const [retry, setRetry] = useState(0);
+  useEffect(() => {
+    if (live) return;
+    const id = setInterval(() => setRetry((r) => r + 1), 3000); // matches VIS.pollMs cadence
+    return () => clearInterval(id);
+  }, [live]);
+
+  if (!live) {
+    return (
+      <div className="insp-snap no-signal">
+        <div className="snap-titlerow">
+          <span className="snap-title">
+            <span className="snap-diamond" aria-hidden>◆</span>
+            <Odometer value={d.ordinal} className="snap-ord" />
+          </span>
+          <span className="snap-state"><span className="ns-dot" /> no signal</span>
+        </div>
+        <div className="insp-div" />
+        <div className="ns-block">
+          <SonarRing key={retry} />
+          <div className="ns-rows">
+            <span>Explorer API: unreachable</span>
+            <span>Last good read: {lastGoodAt ? relativeAge(Date.now() - lastGoodAt) : "—"}</span>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   // Hover pairing (synced 3D glow) lives on the OUTER pane (Inspector.CardPane), not here.
   return (

@@ -95,7 +95,13 @@ function LedgerVitals() {
 
 export default function Vitals() {
   const mode = useStore((s) => s.mode);
+  const live = useStore((s) => s.live);
   const body =
     mode === "geo" ? <GeoVitals /> : mode === "ledger" ? <LedgerVitals /> : mode === "hyper" ? <HyperVitals /> : null;
-  return <div className="tb-vitals">{body}</div>;
+  return (
+    <div className={"tb-vitals" + (live ? "" : " no-signal")}>
+      {!live && <span className="ns-dot" />}
+      {body}
+    </div>
+  );
 }

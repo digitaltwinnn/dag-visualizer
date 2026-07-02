@@ -21,6 +21,7 @@
   animation: breathe 1.5s ease-in-out infinite;
 }
 .ns-rows { font-size: 11.5px; color: var(--muted); display: flex; flex-direction: column; gap: 3px; }
+.ns-block { display: flex; align-items: center; gap: 12px; margin-top: 6px; }
 .st-sonar-wrap { position: relative; display: inline-block; width: 14px; height: 14px; vertical-align: middle; }
 .st-sonar-core { position: absolute; inset: 4px; border-radius: 50%; background: color-mix(in oklch, var(--muted) 60%, transparent); }
 .st-sonar {
