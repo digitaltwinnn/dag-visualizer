@@ -3,16 +3,17 @@
   position: fixed; top: var(--rail-top); right: 16px; z-index: 10;
   width: var(--detail-w); display: flex; flex-direction: column; gap: var(--rail-gap);
   max-height: calc(100vh - var(--bottom-reserve) - var(--rail-top));
+  overflow-y: auto;
   pointer-events: none;
 }
 #rightcol > aside { position: relative; width: auto; pointer-events: auto; }
 /* `.rc-pane` = a card in the right-rail stack (any number, generic); `#metapane` = the
    Context (parent) dossier, pinned at the top of the same stack. They share the inspector look. */
-#metapane, .rc-pane { overflow-y: auto; padding: 18px; min-height: 0; }
+#metapane, .rc-pane { padding: 18px; min-height: 0; }
 /* #metapane (the selected-subject dossier) sits at the top of the RIGHT rail's card stack,
    so it positions itself (the absolute close × needs a positioned ancestor) and caps its
    height so the cards below it stay visible. */
-#metapane { position: relative; flex: 0 0 auto; max-height: 46vh; }
+#metapane { position: relative; flex: 0 0 auto; }
 .rc-pane { flex: 0 1 auto; }
 #metapane-close, .rc-close {
   position: absolute; top: 10px; right: 10px;

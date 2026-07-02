@@ -18,8 +18,8 @@ function CardBody({ p }: { p: PickDescriptor }) {
 // The shared inspector/context card — the React port of ui.js _cardHTML. Uniform header
 // across every view: a blue **eyebrow = the card's purpose** (its role in this view) over
 // a white **title = the specific subject** (the metagraph name, node, #ordinal). No kind/
-// token pills — they duplicated the eyebrow; the token now lives in the dossier body. The
-// only header control is the live ● for the snapshot. Then it dispatches to the per-kind body.
+// token pills — they duplicated the eyebrow; the token now lives in the dossier body. Then
+// it dispatches to the per-kind body.
 export default function InspectorCard({
   p,
   eyebrow,
