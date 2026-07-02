@@ -71,6 +71,7 @@ export interface MetaInfo {
   symbol?: string;
   description?: string;
   siteUrl?: string;
+  iconUrl?: string;
   color: number;
   nodes: NodeInfo[];
   located: number;

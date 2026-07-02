@@ -33,6 +33,7 @@ export interface RouteMetagraph {
   symbol?: string;
   description?: string;
   siteUrl?: string;
+  iconUrl?: string;
   nodes: RouteNode[];
 }
 

@@ -5,7 +5,7 @@ import { useStore } from "@/src/store/store";
 import { metagraphById } from "@/src/data/network";
 import { hex } from "@/src/util/format";
 import Vitals from "@/components/topbar/Vitals";
-import FilterChips from "@/components/topbar/FilterChips";
+import FilterPicker from "@/components/topbar/FilterPicker";
 
 // All glyphs are plain monochrome symbols (no emoji) so they respect CSS `color` / the accent.
 const VIEWS = [
@@ -114,7 +114,7 @@ export default function TopBar() {
 
       {open && (
         <div className="tb-expand">
-          <FilterChips onPick={() => setOpen(false)} />
+          <FilterPicker onPick={() => setOpen(false)} />
         </div>
       )}
     </div>

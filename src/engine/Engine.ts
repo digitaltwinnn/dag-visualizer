@@ -282,7 +282,8 @@ export class Engine {
       const nodes = m.nodes || [];
       return {
         id: m.id, name: m.name, symbol: m.symbol, description: m.description,
-        siteUrl: m.siteUrl, color: metagraphById(m.id)?.color ?? DEFAULT_META_COLOR,
+        siteUrl: m.siteUrl, iconUrl: m.iconUrl,
+        color: metagraphById(m.id)?.color ?? DEFAULT_META_COLOR,
         nodes, located: located(nodes), countriesCount: countriesOf(nodes),
       };
     });
