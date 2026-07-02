@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import type { MetaCfg, MetaInfo, NodeInfo } from "@/src/data/types";
+import type { NodeInfo } from "@/src/data/types";
 import { nodeStatus, statusBreakdown, BUCKET_COLOR, type StatusBucket } from "@/src/data/nodeStatus";
 import { compositionRows } from "@/src/data/composition";
 
@@ -89,13 +89,6 @@ export interface Composition {
   total: number;
   hasCurrency: boolean; // runs a currency-L1 cluster → has a real token
 }
-// The token shown after a metagraph's name: its ticker, or "no token" when it runs no
-// currency-L1 (a data metagraph has a symbol but no real token). Rendered as a subtle suffix.
-export function metaToken(cfg: MetaCfg, mg: MetaInfo | null): string {
-  const hasToken = !!mg && nodeComposition(mg.nodes).hasCurrency;
-  return hasToken ? mg!.symbol || cfg.ticker || "no token" : "no token";
-}
-
 export function nodeComposition(nodes: NodeInfo[]): Composition {
   const present = ROLE_ORDER.filter((r) => nodes.some((n) => rolesOf(n).includes(r)));
   const hybrid = nodes.filter((n) => rolesOf(n).length > 1).length;
