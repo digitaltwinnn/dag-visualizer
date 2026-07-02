@@ -11,6 +11,7 @@ import InspectorCard from "@/components/InspectorCard";
 import ContextCard from "@/components/ContextCard";
 import RailThread from "@/components/RailThread";
 import { useFlashOnChange } from "@/components/useFlashOnChange";
+import { StandbyHalo } from "@/components/state/StateAtoms";
 import type { PickDescriptor } from "@/src/data/types";
 import type { Mode } from "@/src/store/store";
 
@@ -85,9 +86,7 @@ function PickHint({ mode }: { mode: Mode }) {
   const line = INVITE[mode];
   if (!line) return null;
   return (
-    <p className="rc-pickhint">
-      <span className="rc-vd-halo" aria-hidden /> {line}
-    </p>
+    <p className="rc-pickhint"><StandbyHalo /> {line}</p>
   );
 }
 

@@ -78,14 +78,6 @@
   margin: 2px 4px 0; padding: 0 var(--panel-pad-x);
   font-size: 12px; color: var(--muted);
 }
-.rc-vd-halo {
-  width: 10px; height: 10px; border-radius: 50%; flex: none;
-  background: var(--primary);
-  box-shadow: 0 0 0 3px color-mix(in oklch, var(--primary) 30%, transparent);
-  animation: breathe 1.5s ease-in-out infinite;   /* the cyan node-halo pick-invite */
-}
-@media (prefers-reduced-motion: reduce) { .rc-vd-halo { animation: none; } }
-
 /* ── Node rows — the nodes nested under an open country in the GeoExplore accordion. ── */
 .nb-row {
   display: flex; align-items: center; gap: 9px; width: 100%;

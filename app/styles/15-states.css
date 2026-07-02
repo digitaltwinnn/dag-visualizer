@@ -61,3 +61,12 @@
   .st-standby-halo { opacity: 0; } /* no halo at rest under reduced motion */
   .st-standby-node { opacity: 1; }
 }
+
+/* GeoExplore quiet-empty — a filtered metagraph with 0 locatable nodes; dimmed standby node +
+   honest copy + a jump back to the Hypergraph, where it still appears. */
+.geo-quiet-empty { padding: 16px 8px; text-align: center; }
+.st-standby-dim { filter: grayscale(1); opacity: 0.5; }
+.geo-qe-title { font-size: 12.5px; color: var(--text); margin: 8px 0 2px; }
+.geo-qe-line { font-size: 11.5px; color: var(--muted); line-height: 1.5; }
+.geo-qe-jump { margin-top: 8px; background: none; border: none; color: var(--core); font: inherit; font-size: 12px; cursor: pointer; }
+.geo-qe-jump:hover { text-decoration: underline; }

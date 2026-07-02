@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import { useStore } from "@/src/store/store";
 import PanelHead from "@/components/PanelHead";
-import { shortHash, CORE_HEX } from "@/src/data/network";
+import { shortHash, CORE_HEX, metagraphById } from "@/src/data/network";
 import { RoleTags } from "@/components/inspector/parts";
 import { ccToFlag, hex } from "@/src/util/format";
 import { hoverKeyOf } from "@/src/data/hoverSubject";
@@ -28,6 +28,8 @@ export default function GeoExplore() {
   const setHoverNodeId = useStore((s) => s.setHoverNodeId);
   const hoverNodeId = useStore((s) => s.hoverNodeId);
   const setFilter = useStore((s) => s.setFilter);
+  const filter = useStore((s) => s.filter);
+  const setMode = useStore((s) => s.setMode);
   const [showAll, setShowAll] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
 
@@ -50,6 +52,15 @@ export default function GeoExplore() {
   const max = list[0]?.count ?? 1;
   const rows = showAll ? list : list.slice(0, TOP);
   const hiddenCount = list.length - rows.length;
+
+  // Quiet-empty: a real metagraph is selected but has 0 locatable nodes, so the country list
+  // (the leaderboard's `countries`, what this accordion renders) is empty — nothing to browse,
+  // but the metagraph is real and still visible in the Hypergraph. "all"/"dag" never hit this
+  // (the whole network / DAG core always has locatable validators).
+  const isMetaFilter = filter !== "all" && filter !== "dag";
+  const quietEmpty = isMetaFilter && list.length === 0;
+  const activeCfg = metagraphById(filter);
+  const tickerOrName = activeCfg ? activeCfg.ticker || activeCfg.name : "This metagraph";
   // Click a country: drill the globe into it (store.country) — the drill state doubles as the
   // accordion's "which row is open", so the globe and the list stay one source of truth.
   const drill = (cc: string) => setCountry(country === cc ? null : cc);
@@ -84,6 +95,14 @@ export default function GeoExplore() {
       <div className="geo-body panel-body">
         {/* The footprint's headline figures (country count + distribution score) live in the
             top-bar vitals now; this card is purely the country→nodes accordion. */}
+        {quietEmpty ? (
+          <div className="geo-quiet-empty">
+            <span className="st-standby-dim" aria-hidden><span className="st-standby-node" /></span>
+            <p className="geo-qe-title">No locatable nodes</p>
+            <p className="geo-qe-line">{tickerOrName} has no validators we can place on the map right now. It still appears in the Hypergraph.</p>
+            <button className="geo-qe-jump" onClick={() => setMode("hyper")}>See it in the Hypergraph →</button>
+          </div>
+        ) : (
         <div className="geo-list">
           {rows.map((c) => {
             const open = c.cc === country;
@@ -162,8 +181,9 @@ export default function GeoExplore() {
             </button>
           )}
         </div>
+        )}
 
-        <div className="lb-foot">Click a country to drill in.</div>
+        {!quietEmpty && <div className="lb-foot">Click a country to drill in.</div>}
       </div>
     </aside>
   );
