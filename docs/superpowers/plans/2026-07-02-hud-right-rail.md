@@ -167,7 +167,11 @@ The rail's cards sit in `#rightcol`; the thread runs its **right (outer) edge**.
 #rightcol {
   /* reserve the outer channel so cards don't overlap the thread */
   padding-right: 18px;
-  position: relative;
+  /* NOTE: #rightcol is already `position: fixed` (its own positioning context) — do NOT add
+     `position: relative` here; it clobbers the fixed placement. Absolute ::before/::after still
+     anchor to the fixed element. Also: the outer-edge node-dot (`right: -16px`) sits OUTSIDE the
+     panel, so move any panel scroll (`overflow-y: auto`) to the inner content wrapper
+     (`#metapane-content`/`.rc-content`) — a panel `overflow` would clip the dot. */
 }
 /* Recessed groove on the outer edge (neutral chrome). */
 #rightcol::before {
