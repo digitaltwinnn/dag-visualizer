@@ -53,9 +53,17 @@ npm run dev        # http://localhost:3000
 > looks wrong after a big refactor, restart clean: `pkill -f "next dev"` (NOT `-f next`
 > — it matches your own shell), `rm -rf .next`, then `nohup npm run dev &`.
 
-### Verifying visual changes (headless)
+### Verifying visual changes
 
-No test suite; verify by screenshotting in headless Chrome. WebGL needs the
+No test suite; verify visual changes by looking at the running app.
+
+**Preferred: the chrome-devtools MCP** (`mcp__plugin_chrome-devtools-mcp__*`). It drives a
+real browser, so it can **navigate, click, hover, wait for a selector, and snapshot** — use
+it to reach interactive states directly (open the filter picker, click a view, hover a row)
+instead of the store-seed hack below. WebGL renders fine in it. This is the default for
+visual checks; standardized 2026-07-02.
+
+**Fallback: one-shot headless Chrome** (when the MCP is unavailable). WebGL needs the
 SwiftShader flags or it fails with "Error creating WebGL context":
 
 ```bash
@@ -68,12 +76,11 @@ google-chrome-stable --headless=new --no-sandbox \
 
 Gotchas that will save you time:
 
-- **No clicking / no deep links in headless** — CDP is blocked (only one-shot
-  `--screenshot`), and the old `#geo=SYMBOL` hash deep-links are gone. To screenshot a
-  specific state (a filter, the geo/ledger view, an open inspector), **temporarily seed
-  the Zustand store default** in `src/store/store.ts` (e.g. `mode: "geo"` or
-  `filter: "<id>"`, `following: true`), screenshot, then revert. That's the standard
-  trick used throughout this codebase's history.
+- **One-shot headless can't click / has no deep links** — CDP is blocked (only one-shot
+  `--screenshot`), and the old `#geo=SYMBOL` hash deep-links are gone. Prefer the
+  chrome-devtools MCP for any interactive state. If you must use one-shot headless, the old
+  trick is to **temporarily seed the Zustand store default** in `src/store/store.ts` (e.g.
+  `mode: "geo"` or `filter: "<id>"`, `following: true`), screenshot, then revert.
 - **`--virtual-time-budget` runs very few `requestAnimationFrame` frames**, so
   animations barely start — the morph and camera tweens won't complete in a one-shot.
   Booting in `geo` snaps `morph=1` (engine constructor), so the globe is settled; for
