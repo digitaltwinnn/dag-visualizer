@@ -62,8 +62,6 @@ body { font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; co
   position: fixed; z-index: 10; top: var(--rail-top); left: 16px;
   width: var(--rail-w);
   display: flex; flex-direction: column; gap: var(--rail-gap);
-  /* Full height down to a small bottom gap — the bottom strip OVERLAYS the rail rather than
-     reserving space against it (was `- var(--bottom-reserve)`, which cut the rail short). */
   max-height: calc(100vh - var(--rail-top) - 14px);
   overflow-y: auto;
 }
@@ -77,9 +75,12 @@ body { font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; co
   touch-action: pan-y;
   -webkit-overflow-scrolling: touch;
   overscroll-behavior: contain;
-  /* The bottom strip OVERLAYS the rail; the last card stays solid all the way down and fades out
-     over a short band right where the chart begins — transparent by the chart's TOP edge (~30px
-     inside the reserved band), then transparent through the chart. No strip (reserve 0) → no fade. */
+}
+/* Bottom fade — applied ONLY when a rail actually reaches down into the chart band (JS toggles
+   `.rail-clip`, see RailScroll). The last card stays solid down to the chart, then fades out over a
+   short band ending at the chart's TOP edge. Gating it avoids fading a SHORT rail (which, with an
+   element-relative mask, would fade the whole card / make the rail vanish). */
+#leftcol.rail-clip, #rightcol.rail-clip {
   -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - var(--bottom-reserve, 0px) + 6px), transparent calc(100% - var(--bottom-reserve, 0px) + 30px), transparent 100%);
   mask-image: linear-gradient(to bottom, #000 calc(100% - var(--bottom-reserve, 0px) + 6px), transparent calc(100% - var(--bottom-reserve, 0px) + 30px), transparent 100%);
 }

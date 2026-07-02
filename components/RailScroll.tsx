@@ -13,6 +13,25 @@ export default function RailScroll() {
       const el = document.getElementById(id);
       if (!el) continue;
 
+      // Toggle `.rail-clip` (the bottom fade mask) only while this rail actually extends down into
+      // the chart's band — otherwise a short rail would be masked to nothing. Debounced via rAF.
+      let raf = 0;
+      const syncClip = () => {
+        raf = 0;
+        const reserve = parseFloat(
+          getComputedStyle(document.documentElement).getPropertyValue("--bottom-reserve"),
+        ) || 0;
+        const r = el.getBoundingClientRect();
+        el.classList.toggle("rail-clip", reserve > 0 && r.bottom > window.innerHeight - reserve + 24);
+      };
+      const scheduleClip = () => { if (!raf) raf = requestAnimationFrame(syncClip); };
+      scheduleClip();
+      const ro = new ResizeObserver(scheduleClip);
+      ro.observe(el);
+      const mo = new MutationObserver(scheduleClip);
+      mo.observe(el, { childList: true, subtree: true });
+      window.addEventListener("resize", scheduleClip);
+
       let dragging = false;
       let startY = 0;
       let startTop = 0;
@@ -52,6 +71,10 @@ export default function RailScroll() {
       cleanups.push(() => {
         el.removeEventListener("pointerdown", onDown);
         onUp();
+        cancelAnimationFrame(raf);
+        ro.disconnect();
+        mo.disconnect();
+        window.removeEventListener("resize", scheduleClip);
       });
     }
     return () => cleanups.forEach((c) => c());

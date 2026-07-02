@@ -94,26 +94,22 @@
 @layer components {
   .ecg { display: inline-flex; color: var(--primary); }
   .ecg--off { color: var(--muted-foreground); }
-  /* pathLength is normalised to 100 on the <path>, so the dash geometry is unit-independent:
-     the whole trace is one 100-long dash, fully drawn at rest (dashoffset 0). */
-  .ecg-trace {
-    stroke-dasharray: 100;
-    stroke-dashoffset: 0;
-    filter: drop-shadow(0 0 3px color-mix(in oklch, var(--primary) 60%, transparent));
+  /* The dim base waveform (always visible while live). */
+  .ecg-base { opacity: 0.32; }
+  /* A bright ~16-unit segment (pathLength normalised to 100) travels the trace on a steady beat —
+     the sweeping heartbeat. Glows as it passes. */
+  .ecg-scan {
+    stroke-dasharray: 16 84;
+    filter: drop-shadow(0 0 4px color-mix(in oklch, var(--primary) 85%, transparent));
+    animation: ecg-scan 1.5s linear infinite;
   }
-  .ecg--off .ecg-trace { filter: none; }
-  /* A beat SWEEPS the trace: the line redraws left→right (dashoffset 100→0) with a glow crest,
-     one sweep per snapshot tick — a travelling beat, not a static flash. */
-  .ecg--beat .ecg-trace { animation: ecg-beat 0.9s ease-out 1; }
 }
-@keyframes ecg-beat {
-  0% { stroke-dashoffset: 100; opacity: 0.5; }
-  20% { opacity: 1; filter: drop-shadow(0 0 6px color-mix(in oklch, var(--primary) 90%, transparent)); }
-  70% { stroke-dashoffset: 0; }
-  100% { stroke-dashoffset: 0; opacity: 0.9; }
+@keyframes ecg-scan {
+  from { stroke-dashoffset: 100; }
+  to { stroke-dashoffset: 0; }
 }
 @media (prefers-reduced-motion: reduce) {
-  .ecg--beat .ecg-trace { animation: none; }
+  .ecg-scan { animation: none; stroke-dasharray: none; opacity: 0.85; }
 }
 
 /* ── Instrument-Glass surface — the shared panel frame + left accent spine ── */

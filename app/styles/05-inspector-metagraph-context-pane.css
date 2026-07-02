@@ -2,9 +2,9 @@
 #rightcol {
   position: fixed; top: var(--rail-top); right: 26px; z-index: 10;
   width: var(--detail-w); display: flex; flex-direction: column; gap: var(--rail-gap);
-  /* Full height down to a small bottom gap — the bottom strip OVERLAYS the rail instead of
-     reserving space against it (was `- var(--bottom-reserve)`). Right margin leaves room for the
-     outer instrument thread (RailThread) just outside the cards. */
+  /* Shrink-to-content, capped so a tall stack scrolls; the bottom strip overlays the rail. The
+     bottom fade is applied by JS only when the rail actually reaches the chart (.rail-clip) — a
+     static mask fades a SHORT rail entirely (the rail "disappears"). Right margin = RailThread room. */
   max-height: calc(100vh - var(--rail-top) - 14px);
   overflow-y: auto;
   pointer-events: none;

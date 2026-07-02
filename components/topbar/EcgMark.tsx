@@ -1,37 +1,26 @@
 "use client";
-import { useEffect, useRef, useState } from "react";
 import { useStore } from "@/src/store/store";
-import { useSnapshotFeed } from "@/components/useSnapshotFeed";
 
-// The brand mark = an ECG trace carrying liveness. It sweeps one beat on each new snapshot
-// tick (meaningful motion), and flattens to a flatline + greys when the feed is down
-// (NO SIGNAL) — the flatline is the offline state, no text tag. Reduced-motion: static trace.
+// The brand mark = a live ECG monitor. While the feed is up, a bright pulse SWEEPS along the trace
+// on a steady ~1.5s beat (the filter bullet pulses on the same beat); when the feed is down it
+// flattens to a grey flatline (NO SIGNAL). The beat is a continuous heartbeat rhythm, not a per-tick
+// flash — it always reads as "alive". Reduced-motion: a static lit trace.
 const BEAT = "M0 12 H10 L13 12 L15 4 L18 20 L21 9 L24 12 H34"; // spike
 const FLAT = "M0 12 H34";
 
 export default function EcgMark() {
   const live = useStore((s) => s.live);
-  const { snaps } = useSnapshotFeed(8); // small window; take the max ordinal (order-agnostic)
-  const latest = snaps.length ? Math.max(...snaps.map((s) => s.ordinal)) : null;
-  const [beat, setBeat] = useState(false);
-  const prevOrd = useRef<number | null>(null);
-
-  useEffect(() => {
-    if (latest == null) return;
-    if (prevOrd.current !== null && latest !== prevOrd.current) {
-      setBeat(true);
-      const t = setTimeout(() => setBeat(false), 900);
-      prevOrd.current = latest;
-      return () => clearTimeout(t);
-    }
-    prevOrd.current = latest;
-  }, [latest]);
-
   return (
-    <span className={"ecg" + (live ? "" : " ecg--off") + (beat ? " ecg--beat" : "")} aria-hidden>
+    <span className={"ecg" + (live ? "" : " ecg--off")} aria-hidden>
       <svg width="34" height="24" viewBox="0 0 34 24" fill="none">
-        <path className="ecg-trace" d={live ? BEAT : FLAT} stroke="currentColor" strokeWidth="1.6"
-          strokeLinecap="round" strokeLinejoin="round" pathLength={100} />
+        {/* dim base trace (the full waveform, always visible while live) */}
+        <path className="ecg-base" d={live ? BEAT : FLAT} stroke="currentColor" strokeWidth="1.6"
+          strokeLinecap="round" strokeLinejoin="round" />
+        {/* a bright short segment that travels along the trace — the sweeping beat */}
+        {live && (
+          <path className="ecg-scan" d={BEAT} stroke="currentColor" strokeWidth="1.9"
+            strokeLinecap="round" strokeLinejoin="round" pathLength={100} />
+        )}
       </svg>
     </span>
   );
