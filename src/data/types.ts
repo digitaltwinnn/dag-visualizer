@@ -21,6 +21,7 @@ export interface SnapshotExact {
   channels: number; // distinct metagraphs that anchored
   totalFee: number; // datum — EXACT, including unlisted. The fee itself, not derived from anything.
   totalSizeKB: number; // measured serialized size (Σ content byte-array length), NOT derived from fee
+  rewardsDatum: number; // total rewards distributed by this snapshot, in datum (0 if absent/unverified)
   listedFee: number; // datum from metagraphs we track
   unlistedFee: number; // datum from metagraphs outside the public catalog
   listedCount: number;
