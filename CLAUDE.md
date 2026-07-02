@@ -277,11 +277,15 @@ keep changing, so they're examples, not the contract. The per-view widgets below
   view tool card** whose scope is *"explore this view's subject"* (currently `LearnPanel` in
   hyper, `GeoExplore` in geo, `LedgerPanel` in ledger). The global filter moved to the top
   command bar. Tool eyebrow is one verb: `<View> · explore`.
-- **Right rail** (`#rightcol`, `Inspector`) = the **facts** scope (read-only): the view's
-  **Detail** card — the signature fact, or whatever you explicitly clicked (ledger → snapshot,
-  geo → selected node; hyper has none — its live activity is the top-bar vitals). Each
-  `InspectorCard` opens with a role **eyebrow** (`Live snapshot`, `Selected node`…). A quiet
-  `#rc-empty` placeholder keeps the zone present.
+- **Right rail** (`#rightcol`, `Inspector`) = the **facts** scope (read-only), a threaded
+  **subject stack** (HUD Phase 3): the **Context** card at the top (`ContextCard` — the selected
+  metagraph dossier, or an "All · whole network" summary; mirrors the filter, `×` clears it),
+  the **Detail** children below (ledger → snapshot, geo → selected node; each with a
+  `child ‹ parent` breadcrumb eyebrow + `×`), and a neutral **View-default** card (`ViewDefault`,
+  per view) that is expanded in the Detail slot at rest and collapses to a slim view-header strip
+  when a detail is selected. An **instrument-channel thread** runs the rail's outer edge (neutral
+  faded ticks + an identity-hued spine — cyan for "all" — + a node-dot at each card's middle).
+  The dossier moved here from the left rail; the left rail is now tool-only.
 - **Bottom** (`BottomStream`) = the live/time lane (the slim `LiveStrip` bar-chart, all views).
 
 Uniformity is enforced with **shared tokens in `app/styles/00-base.css`** (`--radius`,
