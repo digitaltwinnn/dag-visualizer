@@ -56,13 +56,25 @@
    inside .panel-body (or the panel toggles its own body — Learn keeps both). */
 .panel.collapsed .panel-body { display: none; }
 
-/* Left rail identity spine — mirrors the right rail's instrument thread: a per-card left accent
-   bar in the active selection's hue (cyan for "all"), tying the explore rail to the current
-   subject. (The old #netfilter stripe retired when the filter moved to the top command bar.) */
+/* Left rail identity spine — mirrors the right rail's instrument thread: a cyan (identity-hue)
+   accent bar on each card's left edge, FADED at the top + bottom (like the thread's mask), with
+   neutral ruler hairlines stepping in beside it. `var()` resolves fine here (CSS property, unlike
+   an SVG stroke attribute). (The old #netfilter stripe retired when the filter moved to the bar.) */
 #leftcol > .panel { position: relative; }
+/* the cyan identity spine, faded top+bottom */
 #leftcol > .panel::before {
-  content: ""; position: absolute; left: 0; top: 12px; bottom: 12px;
-  width: 2px; border-radius: 2px;
-  background: var(--filter-accent, var(--primary));
-  opacity: 0.85; pointer-events: none;
+  content: ""; position: absolute; left: 0; top: 10px; bottom: 10px;
+  width: 2px; border-radius: 2px; pointer-events: none;
+  background: linear-gradient(to bottom,
+    transparent 0, var(--filter-accent, var(--primary)) 12%,
+    var(--filter-accent, var(--primary)) 88%, transparent 100%);
+}
+/* neutral ruler hairlines stepping inward from the spine (1px marks every 13px), faded top+bottom */
+#leftcol > .panel::after {
+  content: ""; position: absolute; left: 4px; top: 10px; bottom: 10px; width: 7px;
+  pointer-events: none;
+  background: repeating-linear-gradient(to bottom,
+    rgba(178, 193, 223, 0.4) 0, rgba(178, 193, 223, 0.4) 1px, transparent 1px, transparent 13px);
+  -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 14%, #000 86%, transparent 100%);
+  mask-image: linear-gradient(to bottom, transparent 0, #000 14%, #000 86%, transparent 100%);
 }
