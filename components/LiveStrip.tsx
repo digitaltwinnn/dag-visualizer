@@ -11,13 +11,15 @@ import { relativeAge } from "@/src/util/relativeAge";
 // Matches VIS.maxSnapshots (the buffer cap) so the strip fills with the full retained window.
 const MAX = 52;
 
-// Slim live heartbeat (hyper + geo): a mini **anchor bar-chart** of the recent Global L0 stream
-// — one bar per snapshot, height = how many metagraph snapshots it anchored — with the newest
-// (live) bar gently pulsing so the network always feels alive. When a metagraph is selected the
-// bars become **stacked**: the full bar is still the tick's TOTAL anchors (so you keep the whole
-// picture), with the selected metagraph's own share filled in at the bottom in its accent colour.
-// Clicking a bar opens that snapshot in the Snapshots view. Shares the feed + selection with the
-// ribbon so the highlight is consistent. (Hand-rolled CSS, not Recharts: dense, interactive, slim.)
+// Slim live heartbeat (hyper + geo + ledger): a mini **anchor bar-chart** of the recent Global L0
+// stream — quiet crisp-cap/faded-body bars on a faint baseline, one per snapshot. Unfiltered, each
+// bar plots the tick's TOTAL anchors in cyan, scaled to the window max. When a metagraph is
+// filtered, each bar instead plots THAT metagraph's own anchors on its OWN scale, in its identity
+// hue — its own cadence, with empty ticks rendered as honest gaps (no cap, no body) rather than
+// sub-pixel slivers. Only the live (newest) cap glows. Clicking a bar opens that snapshot in the
+// Snapshots view; hovering cross-highlights the matching ledger block. Shares the feed + selection
+// with the ledger view so the highlight is consistent. (Hand-rolled CSS, not Recharts: dense,
+// interactive, slim.)
 export default function LiveStrip() {
   const { snaps } = useSnapshotFeed(MAX);
   const setSnap = useStore((s) => s.setSnap);

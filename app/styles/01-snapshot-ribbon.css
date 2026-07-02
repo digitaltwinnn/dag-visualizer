@@ -113,6 +113,7 @@
    Coloured by the active filter (`--ls-accent`): the selected metagraph's accent, or core cyan
    for all / dag. A quiet live skyline of the network's anchoring. */
 .ls-bars {
+  position: relative;
   flex: 1; display: flex; align-items: flex-end; gap: 2px;
   height: 80px; overflow: hidden;
   mask-image: linear-gradient(to right, transparent 0, #000 60px);
@@ -120,8 +121,9 @@
 }
 .ls-empty { color: var(--muted); font-size: 12px; align-self: center; }
 /* Cursor-following hover tooltip for the bars — same surface as the 3D #tooltip (07-hover-tooltip)
-   so the strip reads in the app's tooltip language: the snapshot ordinal, the tick's TOTAL anchors,
-   and (when a metagraph is selected) that metagraph's share, as aligned key/value rows. */
+   so the strip reads in the app's tooltip language: the bare ordinal, counts (anchored total, or
+   filtered metagraph's own count of the total, or an honest "none this tick" gap), relative recency,
+   and a click hint — as aligned key/value rows. */
 #ls-tip {
   position: fixed; z-index: 30; pointer-events: none;
   padding: 8px 11px;
@@ -132,17 +134,15 @@
   transform: translate(-50%, -130%);
   display: flex; flex-direction: column; gap: 4px;
 }
-#ls-tip .ls-tip-head { font-weight: 600; color: var(--text); }
+#ls-tip .ls-tip-head { color: var(--text); font-family: ui-monospace, monospace; font-weight: 700; font-variant-numeric: tabular-nums; }
 #ls-tip .ls-tip-line { display: flex; align-items: center; justify-content: space-between; gap: 18px; }
 #ls-tip .ls-tip-k { display: flex; align-items: center; gap: 6px; color: var(--muted); font-size: 11px; }
 #ls-tip .ls-tip-v { color: #c7d0ea; font-size: 11px; font-variant-numeric: tabular-nums; }
 #ls-tip .ls-tip-dot { flex: none; width: 8px; height: 8px; border-radius: 50%; }
-.ls-tip-head { font-family: ui-monospace, monospace; font-weight: 700; font-variant-numeric: tabular-nums; }
 .ls-tip-gap { color: var(--muted); }
 .ls-tip-rec { display: flex; align-items: center; gap: 6px; font-size: 11px; color: var(--muted); margin-top: 4px; }
 .ls-tip-live { width: 7px; height: 7px; border-radius: 50%; background: var(--primary); box-shadow: 0 0 0 3px color-mix(in oklch, var(--primary) 30%, transparent); }
 .ls-tip-hint { font-size: 10px; color: var(--muted); opacity: 0.7; margin-top: 4px; }
-.ls-bars { position: relative; }
 /* faint flat baseline hairline the bars sit on */
 .ls-bars::after {
   content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 1px;
