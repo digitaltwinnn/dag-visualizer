@@ -388,38 +388,86 @@ Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>"
 
 ---
 
-## Task 4: Cleanup + final verification
+## Task 4: Snapshot-card refinements (dedupe header · tone-down focus row · fix clipping) + cleanup
+
+Three user-surfaced refinements to the snapshot card + the cleanup + final verification.
 
 **Files:**
-- Modify: `app/styles/05-inspector-metagraph-context-pane.css`, `components/inspector/cards.tsx` (drop unused imports)
+- Modify: `components/InspectorCard.tsx` (remove the duplicate snapshot header), `components/inspector/AnchoredTags.tsx`/`app/styles/05-inspector-metagraph-context-pane.css` (tone-down focus row + fix clipping), `components/inspector/cards.tsx` (drop unused imports)
+- Delete (now dead): `components/inspector/LiveHeart.tsx`, `app/styles/06-snapshot-live-heartbeat.css` (its `@import` in `app/globals.css`)
 
-- [ ] **Step 1: Confirm the old snapshot-pill + dropped-row markup is gone**
+- [ ] **Step 1: Fix the DUPLICATE header (InspectorCard)**
 
-Run:
+`components/InspectorCard.tsx` still renders the OLD snapshot header (`● #ordinal` + timestamp + the `LiveHeart` "Real-time" pulse, in `.insp-titlerow`) — and `SnapshotCard` (Task 3) now renders the NEW `◆ ordinal + live now` title below it, so the card shows two headers. The SnapshotCard body now OWNS the snapshot title, so InspectorCard must NOT render its own for a snapshot. Change the return so the snapshot branch renders no frame title:
+```tsx
+  return (
+    <>
+      {eyebrow && <span className="insp-eyebrow">{eyebrow}</span>}
+      {p.kind !== "snapshot" && (
+        <>
+          {p.title && (
+            <h3>
+              <span className="insp-dot" />
+              {p.title}
+              {titleSuffix}
+            </h3>
+          )}
+          {p.sub && <p className="insp-sub">{p.sub}</p>}
+        </>
+      )}
+      <CardBody p={p} />
+    </>
+  );
+```
+Remove `import LiveHeart from "@/components/inspector/LiveHeart";` (now unused). This makes `LiveHeart.tsx` + `06-snapshot-live-heartbeat.css` (`.snap-pulse`) dead — delete both and remove the `@import "./styles/06-snapshot-live-heartbeat.css";` line from `app/globals.css` (grep first to confirm `LiveHeart`/`snap-pulse` have no other references).
+
+- [ ] **Step 2: Tone down the focus row (drop the tinted box; keep a thin accent) — USER DECISION**
+
+Per the user: drop the hue-filled background box; keep a **thin left hue accent bar** + the dot/ticker; make it more compact (the 94px height contributed to the clipping). In `05-inspector-metagraph-context-pane.css`, replace the `.anc-focus` rule:
+```css
+/* Focus row — the filtered metagraph, marked by a THIN left hue accent only (no tinted box),
+   compact, consistent with the neutral node/dossier cards. */
+.anc-focus {
+  padding: 2px 0 6px 10px;
+  margin-bottom: 8px;
+  box-shadow: inset 2px 0 0 var(--mg);
+}
+.anc-focus-bar { display: flex; align-items: center; gap: 8px; margin-top: 5px; }
+```
+(Remove the old `background: color-mix(...)`, `border-radius`, and the larger padding. Keep `.anc-focus-top`/`.anc-focus-name`/`.anc-focus-fee`/`.anc-sub`/`.anc-focus-meta` as-is.) The `--mg` var already carries the metagraph hue.
+
+- [ ] **Step 3: Fix the clipping (the focus row + breakdown must be visible)**
+
+The snapshot card content (title + `N anchored from M` header + focus row + breakdown + settlement) was overflowing the card's constrained height, pushing the focus row + list below the fold. Step 1 (removing the duplicate header) + Step 2 (compacting the focus row) reclaim vertical space. Verify via the MCP (Step 6) that, at a normal 900px-tall viewport with a metagraph filtered, the **focus row and at least the first breakdown rows are visible without scrolling inside the card**. If they still clip, tighten the anchored-header spacing (`.anc-head { margin-bottom: 6px }`) and the title/`insp-div` spacing; do NOT introduce a fixed card height — the rail card should size to its content within the stack.
+
+- [ ] **Step 4: Prune remaining dead CSS + unused imports**
+
+Grep to confirm the old markup is gone, then prune:
 ```bash
 cd /home/alexander/Workspace/dag-visualizer
-grep -rnE "mg-tag|insp-mgs" components src | grep -v "app/styles/" || echo "no mg-tag/insp-mgs markup"
-grep -rnE "Height · sub-height|Global L0" components | grep -v "js/" || echo "no dropped rows in the card"
+grep -rnE "mg-tag|insp-mgs|snap-pulse|LiveHeart" components src | grep -v "app/styles/" || echo "clean"
+grep -rnE "Height · sub-height|Global L0" components | grep -v "js/" || echo "no dropped rows"
 ```
-Expected: `no mg-tag/insp-mgs markup` (the old `AnchoredTags` pills are gone) and no `Height · sub-height` in the SnapshotCard. If any remain, resolve.
+Remove the now-unused `.mg-tag*`/`.insp-mgs*` rules **and** the now-orphaned `.insp-titlerow`/`.insp-snap-title`/`.insp-snap-time` rules (the removed snapshot frame header) from `05-inspector-metagraph-context-pane.css` — grep each to confirm no live markup uses it. In `cards.tsx`, drop any imports the restructured `SnapshotCard` no longer uses (tsc/lint will flag; `GeoLiveNode`/`MetaCard` still use `hex`/`shortHash`/`CORE_HEX`).
 
-- [ ] **Step 2: Prune the dead CSS + unused imports**
+- [ ] **Step 5: Full typecheck + tests**
 
-Remove the now-unused `.mg-tag`, `.mg-tag--sel`, `.mg-tag--dim`, `.mg-tag--other`, `.mg-tag--settling`, `.insp-mgs`, `.insp-mgs-label`, `.insp-mgs-count`, `.insp-mgs-tags` rules from `05-inspector-metagraph-context-pane.css` (their markup is gone). Keep anything still referenced (grep to confirm). In `cards.tsx`, drop any imports the restructured `SnapshotCard` no longer uses (e.g. `shortHash`/`CORE_HEX` if now unused — `tsc`/lint will flag; note `GeoLiveNode`/`MetaCard` still use `hex`, `shortHash`, `CORE_HEX`).
+Run `npx tsc --noEmit` (clean) and `npm test` (all green).
 
-- [ ] **Step 3: Full typecheck + tests**
+- [ ] **Step 6: Final regression via chrome-devtools MCP**
 
-Run `npx tsc --noEmit` (clean) and `npm test` (all green — no new tests this phase, but the suite must still pass).
+Reload `:3000`, switch to Snapshots. Read + confirm:
+- **No duplicate header** — the card shows exactly ONE title (`◆ ordinal` + `● live now`/`◷ Xm ago`), NOT the old `● #ordinal · <time>` + "Real-time" row.
+- The **live** card (◆ + ordinal + `live now` + anchored breakdown + settlement); an **older** pick (`◷ Xm ago`).
+- **Filtered:** the focus row is a compact row with a **thin hue accent bar (no tinted box)**, the dot/ticker + `fees paid` + full-width bar + `N snapshots · X%`, pinned above "Other metagraphs" (dimmed) — and **it's fully visible without scrolling inside the card** (the clipping fix).
+- The **number-colour rule** (ordinal/fees/counts neutral; cyan only ◆/live dot; identity hue only on the per-metagraph dots/bars/focus-accent) and that nothing is unstyled after the CSS prunes.
+Read the PNGs.
 
-- [ ] **Step 4: Final regression via chrome-devtools MCP**
-
-Reload `:3000`, switch to Snapshots. Read: (a) the **live** card (◆ + ordinal + `live now` + anchored breakdown + settlement), (b) an **older** pick (`◷ Xm ago`), (c) a **filtered** state (the focus row pinned + "Other metagraphs" dimmed; thread/eyebrow re-tinted). Confirm the **number-colour rule** (ordinal/fees/counts neutral; cyan only on ◆/live dot; identity hue only on the per-metagraph dots/bars) and that nothing looks unstyled after the pill CSS prune. Read the PNGs.
-
-- [ ] **Step 5: Commit**
+- [ ] **Step 7: Commit**
 
 ```bash
 git add -A && git -c user.name="digitaltwinnn" -c user.email="digitaltwinnn@users.noreply.github.com" \
-  commit -m "chore(snapshot): prune old anchored-pill CSS + unused imports
+  commit -m "fix(snapshot): remove duplicate header, tone down focus row, fix clipping; prune dead CSS
 
 Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>"
 ```
@@ -430,7 +478,7 @@ Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>"
 
 - `npx tsc --noEmit` clean; `npm test` passes.
 - The **snapshot card** shows: a `◆ <ordinal>` title (◆ cyan type-marker, ordinal neutral mono that **odometer-rolls** live) + a state line (`● live now` pulsing cyan for the live tick / `◷ Xm ago` for an older pick); a **ranked share-of-total** anchored breakdown (header `N snapshots anchored from M metagraphs`; `dot · ticker · share-bar · count` rows sorted desc, all listed + a neutral `unlisted` row; bars = share); and a **settlement** block (`Fees paid <n> DAG` + `<n> KB settled` sub-note; `Rewards out <n> DAG` only when verified > 0).
-- **Filtered → a focus row** pins at the top (hue-filled, name + `fees paid`, full-width bar + `N snapshots · X%`), the rest dimmed under "Other metagraphs"; totals unchanged.
+- **Filtered → a focus row** pins at the top (a **thin left hue accent**, no tinted box — toned down for consistency with the neutral cards; name + `fees paid`, full-width bar + `N snapshots · X%`), the rest dimmed under "Other metagraphs"; totals unchanged. It is **fully visible without scrolling** (no clipping), and the card shows **one** header (no duplicate).
 - **Number-colour rule holds:** ordinal/fees/rewards/counts neutral; cyan only on the ◆ + live dot; identity hue only on the per-metagraph dots/bars. The old `Global L0` text, `Height · sub-height`, block count, and colour-pill wall are gone; the old `.mg-tag*`/`.insp-mgs*` CSS is pruned.
 - Rewards are shown **only when the raw `value.rewards` was verified present + sane** (else the row is omitted, `rewardsDatum` 0 — never a fabricated number).
 
