@@ -44,7 +44,7 @@
 - `components/TopBar.tsx` — **modify** — Instrument-Glass shell, brand lockup (EcgMark + wordmark), remove `--tb-accent`, de-nested filter, structural ToggleGroup view switch, expand-to-picker.
 - `src/engine/Engine.ts` — **modify** (one line) — add `iconUrl` to the published metaList.
 - `src/data/types.ts` — **modify** — add `iconUrl?: string` to `MetaInfo`.
-- `app/styles/14-top-bar.css` — **rewrite** to the Instrument-Glass bar; **delete** `app/styles/02-filter-panel.css`, `app/styles/04-disabled-filter-chip.css` (retire, with their `@import`s removed from `app/globals.css`). NOTE: `06-snapshot-live-heartbeat.css` is NOT retired — its `.snap-pulse` is still used by `components/LiveHeart.tsx` (the snapshot-card heartbeat), a different element from the top-bar ECG. Keep it.
+- `app/styles/14-top-bar.css` — **rewrite** to the Instrument-Glass bar; **delete** `app/styles/02-filter-panel.css`, `app/styles/04-disabled-filter-chip.css` (retire, with their `@import`s removed from `app/globals.css`). NOTE: `06-snapshot-live-heartbeat.css` is NOT retired — its `.snap-pulse` is still used by `components/inspector/LiveHeart.tsx` (the snapshot-card heartbeat), a different element from the top-bar ECG. Keep it.
 - `components/topbar/FilterChips.tsx` — **delete** (replaced by FilterPicker).
 - `app/design/page.tsx` — **modify** — showcase the new bar primitives.
 
@@ -859,7 +859,7 @@ Expected: `no live references` (the old `FilterChips`/heartbeat markup is gone).
 
 - [ ] **Step 2: Delete the retired stylesheets + their imports**
 
-Delete `app/styles/02-filter-panel.css`, `app/styles/04-disabled-filter-chip.css`. In `app/globals.css` remove their two `@import "./styles/…";` lines. **Do NOT delete `06-snapshot-live-heartbeat.css`** — the dead-reference grep will show `.snap-pulse` is still used by `components/LiveHeart.tsx` (the snapshot-card heartbeat), so keep it and its `@import`.
+Delete `app/styles/02-filter-panel.css`, `app/styles/04-disabled-filter-chip.css`. In `app/globals.css` remove their two `@import "./styles/…";` lines. **Do NOT delete `06-snapshot-live-heartbeat.css`** — the dead-reference grep will show `.snap-pulse` is still used by `components/inspector/LiveHeart.tsx` (the snapshot-card heartbeat), so keep it and its `@import`.
 
 - [ ] **Step 3: Build + full typecheck**
 
