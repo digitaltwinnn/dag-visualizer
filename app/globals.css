@@ -10,6 +10,7 @@
 @import "./styles/12-panel-system.css";
 @import "./styles/13-right-column.css";
 @import "./styles/14-top-bar.css";
+@import "./styles/15-states.css";
 
 /* ── Structural lane (chrome + status) — shadcn CSS variables in oklch ── */
 :root {
