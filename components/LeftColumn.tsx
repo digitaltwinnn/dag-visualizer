@@ -14,7 +14,7 @@ import { useBreakpoint } from "@/components/useBreakpoint";
 // view (collapsed by default). Built views carry no caption; the scaffolded (SOON) views do.
 const ABOUT: Record<string, { title: string; eyebrow: string; lines: string[]; caption?: string }> = {
   hyper: {
-    title: "Hypergraph",
+    title: "How the network is built",
     eyebrow: "Hypergraph · about",
     lines: [
       "Constellation is a Hypergraph, not a blockchain — activity is organized as a DAG, so many parts of the network validate in parallel: horizontally scalable and feeless for users.",
@@ -22,7 +22,7 @@ const ABOUT: Record<string, { title: string; eyebrow: string; lines: string[]; c
     ],
   },
   geo: {
-    title: "Geographic footprint",
+    title: "Where the network runs",
     eyebrow: "Geography · about",
     lines: [
       "Where the network runs — every validator plotted at its real geolocation, with a density heatmap and travelling-packet connection arcs between them.",
@@ -30,7 +30,7 @@ const ABOUT: Record<string, { title: string; eyebrow: string; lines: string[]; c
     ],
   },
   ledger: {
-    title: "Snapshots",
+    title: "When the network settles",
     eyebrow: "Snapshots · about",
     lines: [
       "When the network settles — Global L0 produces a snapshot every few seconds, anchoring the metagraphs' own snapshots into shared trust. The 3D chamber stacks the validation layers top-to-bottom, and each global snapshot forms as its layer settles.",
@@ -38,7 +38,7 @@ const ABOUT: Record<string, { title: string; eyebrow: string; lines: string[]; c
     ],
   },
   status: {
-    title: "Network status",
+    title: "Is the network healthy?",
     eyebrow: "Status · about",
     caption: "SOON",
     lines: [
@@ -47,7 +47,7 @@ const ABOUT: Record<string, { title: string; eyebrow: string; lines: string[]; c
     ],
   },
   transactions: {
-    title: "Transactions",
+    title: "How value moves",
     eyebrow: "Transactions · about",
     caption: "SOON",
     lines: [
@@ -56,7 +56,7 @@ const ABOUT: Record<string, { title: string; eyebrow: string; lines: string[]; c
     ],
   },
   staking: {
-    title: "Delegated staking",
+    title: "Who backs the validators",
     eyebrow: "Staking · about",
     caption: "SOON",
     lines: [
