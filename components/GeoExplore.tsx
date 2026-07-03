@@ -11,8 +11,6 @@ import { hoverKeyOf } from "@/src/data/hoverSubject";
 import { subjectPairing } from "@/components/useSubjectPairing";
 import type { NodeRow } from "@/src/data/types";
 
-const TOP = 9;
-
 // Geography's single **explore** card (one frame, one "Geography · explore" eyebrow, an
 // accordion you click into). The country list IS the
 // node browser: each country is a row showing its share of the footprint (bar + count), and
@@ -31,7 +29,6 @@ export default function GeoExplore() {
   const setFilter = useStore((s) => s.setFilter);
   const filter = useStore((s) => s.filter);
   const setMode = useStore((s) => s.setMode);
-  const [showAll, setShowAll] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
 
   // Selecting a node here mirrors clicking it on the globe (Engine._handleClick): set the
@@ -51,8 +48,7 @@ export default function GeoExplore() {
 
   const list = lb?.countries ?? [];
   const max = list[0]?.count ?? 1;
-  const rows = showAll ? list : list.slice(0, TOP);
-  const hiddenCount = list.length - rows.length;
+  const rows = list;
 
   // Quiet-empty: a real metagraph is selected but has 0 locatable nodes, so the country list
   // (the leaderboard's `countries`, what this accordion renders) is empty — nothing to browse,
@@ -88,7 +84,7 @@ export default function GeoExplore() {
   return (
     <aside id="geoexplore" className={"panel" + (collapsed ? " collapsed" : "")}>
       <PanelHead
-        title="Geographic footprint"
+        title="Nodes by country"
         eyebrow="Geography · explore"
         collapsed={collapsed}
         onToggle={() => setCollapsed((c) => !c)}
@@ -164,23 +160,6 @@ export default function GeoExplore() {
               </div>
             );
           })}
-
-          {hiddenCount > 0 && (
-            <button type="button" className="lb-row lb-row--btn lb-toggle" onClick={() => setShowAll(true)}>
-              <span className="lb-flag">🌐</span>
-              <span className="lb-name">{`${hiddenCount} more ${hiddenCount === 1 ? "country" : "countries"}`}</span>
-              <span className="lb-bar" />
-              <span className="geo-c-caret">▸</span>
-            </button>
-          )}
-          {showAll && list.length > TOP && (
-            <button type="button" className="lb-row lb-row--btn lb-toggle" onClick={() => setShowAll(false)}>
-              <span className="lb-flag">🌐</span>
-              <span className="lb-name">Show fewer</span>
-              <span className="lb-bar" />
-              <span className="geo-c-caret">▾</span>
-            </button>
-          )}
         </div>
         )}
 
