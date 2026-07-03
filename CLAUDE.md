@@ -26,8 +26,9 @@ engine hides the canvas — `mode !== "hyper" && mode !== "geo" && mode !== "led
   See *The Snapshots (ledger) view* below and the `dag-ledger-view-plan` memory.
 - **Network status** (`status`), **Transactions** (`transactions`), **Delegated staking**
   (`staking`) — **scaffolded placeholders** (a `PlaceholderPanel` "SOON" card in the left rail;
-  content map in `LeftColumn.tsx`). The 3D scene, vitals, bottom stream and right rail are all
-  empty for these. See the `dag-view-scaffold` memory for each one's intent. Top-bar view glyphs
+  content map in `LeftColumn.tsx`). The 3D scene and vitals are empty for these; the bottom
+  stream (`LiveStrip`) is ALWAYS present regardless of view — see below. See the
+  `dag-view-scaffold` memory for each placeholder's intent. Top-bar view glyphs
   are all plain monochrome symbols — **never emoji** (emoji ignore CSS `color` / the accent).
 
 Only `hyper`↔`geo` **morph** (`morph` 0→1, eased each frame); the blue L0 core literally **grows
@@ -120,9 +121,10 @@ Zustand store. **Two data lanes:** (A) high-freq visuals subscribe straight to
   dispatching to the per-kind cards in `components/inspector/`), `Tooltip`, `FollowController`
   (ledger snapshot follow),
   `DataBridge` (boots the data). **Bottom stream:** `BottomStream` renders the slim `LiveStrip`
-  bar-chart (one bar per tick, height = anchors) in every snapshot-bearing view (hyper/geo/ledger)
-  and publishes `--bottom-reserve`; it reads the shared `useSnapshotFeed` hook. (The old full
-  `SnapshotRibbon` was removed — the `ledger` view's own 3D chain is the timeline now.) **`PanelHead`**
+  bar-chart (one bar per tick, height = anchors) in EVERY view, including the flat placeholders
+  (`status`/`transactions`/`staking`) — not just the three 3D views — and publishes
+  `--bottom-reserve`; it reads the shared `useSnapshotFeed` hook. (The old full `SnapshotRibbon`
+  was removed — the `ledger` view's own 3D chain is the timeline now.) **`PanelHead`**
   is the one header used by every rail panel (see *Layout system*).
 - **`src/store/store.ts`** — the Zustand store (mode, filter, country, inspect,
   following, metaList, leaderboard, live stats, …). **`src/data/network.ts`** wraps the
@@ -288,6 +290,16 @@ keep changing, so they're examples, not the contract. The per-view widgets below
   The dossier moved here from the left rail; the left rail is now tool-only.
 - **Bottom** (`BottomStream`) = the live/time lane (the slim `LiveStrip` bar-chart, all views).
 
+**The HUD is responsive** (`16-responsive-shell.css`, `useBreakpoint()`); only the rails
+restructure, everything above holds the same four-zone shape. **Desktop** (≥1100px): unchanged —
+both rails inline. **Tablet** (700–1099px): the rails collapse to slim edge tabs (`.rail-tab`,
+screen-edge, ≥44px tap) that each open the same rail content in a non-modal Sheet overlaying the
+scene; both can be open at once. **Phone** (<700px): a persistent split bottom bar
+(`.phone-dock-half`, Explore/Details) replaces the edge tabs — tapping a half opens ONE bottom
+sheet at a time (`store.phoneDock`), tapping the active half again (or its grabber) collapses it.
+The command bar condenses (icons only, vitals move behind a toggle/popover) and `LiveStrip` runs
+full-width under it all. See the `dag-hud-refresh-specs` memory for the full breakpoint spec.
+
 Uniformity is enforced with **shared tokens in `app/styles/00-base.css`** (`--radius`,
 `--panel-pad-*`, `--rail-*`, `--detail-w`, the `--sel-bg`/`--sel-border` selection language,
 and `--bottom-reserve` — set per view by `BottomStream`) and **one `PanelHead` component**
@@ -346,14 +358,15 @@ shows the derived **`~DAG` fee**, height/sub-height, and a `+N blk` note for the
 block-carrying ticks. Height/sub-height live only in the inspector + header stat. See **Anchoring,
 fees & the metagraph data layer**.
 
-**`LiveStrip`** (`components/LiveStrip.tsx`) is the bottom lane in every snapshot-bearing view: a
-live dot + a full-width **anchor bar-chart** (one bar per tick, height = anchors), filter-coloured
-(`--ls-accent`), stacked (total + the selected metagraph's share), with a bottom-transparent→top
-gradient. It has **no panel chrome** — bars blend straight into the scene. Clicking a bar opens that
-snapshot's card (carried across views) and, from hyper/geo, jumps to `ledger`. Selection is
-**store-driven** (`inspect`/`following`/`snap` via the shared `useSnapshotFeed` hook), so the
-highlighted snapshot stays consistent across view switches and matches the ledger's centred block /
-`SnapshotCard`. `BottomStream` renders it in all snapshot views and sets `--bottom-reserve`.
+**`LiveStrip`** (`components/LiveStrip.tsx`) is the bottom lane in EVERY view, including the flat
+placeholders: a live dot + a full-width **anchor bar-chart** (one bar per tick, height = anchors),
+filter-coloured (`--ls-accent`), stacked (total + the selected metagraph's share), with a
+bottom-transparent→top gradient. It has **no panel chrome** — bars blend straight into the scene
+(or, on a placeholder view, the empty canvas backdrop). Clicking a bar opens that snapshot's card
+(carried across views) and, from hyper/geo, jumps to `ledger`. Selection is **store-driven**
+(`inspect`/`following`/`snap` via the shared `useSnapshotFeed` hook), so the highlighted snapshot
+stays consistent across view switches and matches the ledger's centred block / `SnapshotCard`.
+`BottomStream` renders it in every view and sets `--bottom-reserve`.
 
 > **Live tick — total is instant, breakdown/fee come from the exact read.** The *total*
 > (`metagraphSnapshotCount`) is final immediately; the per-metagraph breakdown + fee are pulled

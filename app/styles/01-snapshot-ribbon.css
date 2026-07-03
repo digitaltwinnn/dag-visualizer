@@ -19,11 +19,6 @@
 }
 .stream-title { display: flex; align-items: center; gap: 8px; font-size: 12.5px; font-weight: 600; letter-spacing: 0.02em; }
 .stream-caption { font-size: 11px; color: var(--muted); }
-.live-dot {
-  width: 8px; height: 8px; border-radius: 50%;
-  background: var(--core); box-shadow: 0 0 8px var(--core);
-  animation: pulse 1.4s ease-in-out infinite;
-}
 .stream-track {
   position: relative;
   flex: 1;
@@ -175,6 +170,15 @@
   content: ""; position: absolute; top: 0; left: 0; right: 0; height: 2px;
   background: var(--ls-accent); border-radius: 1px;
 }
+/* Touch-target floor: a short/quiet bar's own box can be a few px tall, well under the ≥44px
+   minimum, since its height is deliberately data-scaled (that's the whole point of the chart).
+   This invisible `::after` extends the TAP area up to the full track height (anchored to the
+   track's bottom via the bar's own `align-self: flex-end`) without touching the visual bar
+   (`::before`'s cap / the gradient body) — so short bars stay honest-looking but are still fully
+   tappable on touch. */
+.ls-bar::after {
+  content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 44px;
+}
 /* An empty tick reads as a gap on the baseline (no body, no cap) but stays a full-height
    invisible hit target so it's still hoverable/clickable — these are real global snapshots. */
 .ls-bar.gap { background: none; min-height: 100%; }
@@ -188,5 +192,4 @@
 }
 @media (prefers-reduced-motion: reduce) {
   .ls-bar { animation: none; }
-  .live-dot { animation: none; }
 }

@@ -109,11 +109,18 @@
 .sheet-content[data-side="right"]::after { right: 4px; transform: scaleX(-1); }
 
 /* Centred grabber bar at the top of a bottom sheet (phone Detail sheet) — signals "this is a
-   sheet, sits above the scene" at a glance. Purely decorative; full drag-to-expand is a
-   follow-up, so this doesn't (yet) attach any pointer handling. */
+   sheet, sits above the scene" at a glance, AND is a real tap-to-collapse affordance (calls the
+   same close as the bar-half toggle). Kept visually slim (the 36×4px bar) but the tap TARGET is
+   widened to ≥44px via padding on the (invisible) button box, so the touch area is generous
+   without the bar itself looking clunky. Full drag-to-expand is a separate follow-up. */
 .sheet-grabber {
-  align-self: center; width: 36px; height: 4px; border-radius: 2px;
-  background: var(--panel-border); margin: -4px 0 2px;
+  align-self: center; width: 44px; height: 44px; margin: -22px 0 -18px;
+  display: flex; align-items: center; justify-content: center;
+  padding: 0; border: none; background: none; cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.sheet-grabber::before {
+  content: ""; width: 36px; height: 4px; border-radius: 2px; background: var(--panel-border);
 }
 
 /* Visually-hidden utility (accessible labels, e.g. RailDock's SheetTitle). */
@@ -149,7 +156,7 @@
    spatially confusing on a narrow phone). */
 .rail-tab {
   position: fixed; z-index: 39; top: 50%; transform: translateY(-50%);
-  width: 30px; min-height: 56px; display: none; align-items: center; justify-content: center;
+  width: 44px; min-height: 56px; display: none; align-items: center; justify-content: center;
   background: var(--panel); border: 1px solid var(--panel-border); color: var(--text);
   backdrop-filter: blur(14px); cursor: pointer; font-size: 20px; line-height: 1;
 }

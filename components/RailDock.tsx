@@ -184,7 +184,14 @@ export default function RailDock({
           onInteractOutside={(e) => e.preventDefault()}
           aria-describedby={undefined}
         >
-          {sheetSide === "bottom" && <div className="sheet-grabber" aria-hidden="true" />}
+          {sheetSide === "bottom" && (
+            <button
+              type="button"
+              className="sheet-grabber"
+              aria-label={`Collapse ${label} panel`}
+              onClick={() => handleOpenChange(false)}
+            />
+          )}
           {isBarHalf ? (
             // The persistent bar half already shows the label + hint visibly — no redundant
             // `.sheet-head` row (no ✕ either; the bar half itself is the close affordance, via

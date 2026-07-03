@@ -94,7 +94,10 @@ interface AppState {
   // (`setPhoneDock("explore" | "details")`) automatically closes the other by flipping its
   // `open` to false — the two components never need to know about each other. Never set by a
   // scene pick (`setInspect`/`setSnap`) — only by the user tapping a button or dismissing a
-  // sheet (✕ / grabber / Escape / outside-tap → `setPhoneDock(null)`). Unused on tablet/desktop.
+  // sheet: tapping the ACTIVE bar half again (toggle), tapping the grabber (`.sheet-grabber`,
+  // now a real tap-to-collapse button — see RailDock), or Escape → `setPhoneDock(null)`.
+  // (Outside-tap does NOT dismiss it — `onInteractOutside` is `preventDefault`-blocked so the
+  // scene/other dock stays interactive underneath.) Unused on tablet/desktop.
   phoneDock: "explore" | "details" | null;
 
   setLive: (live: boolean, lastGoodAt?: number) => void;
