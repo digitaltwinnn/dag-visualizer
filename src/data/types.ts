@@ -99,11 +99,9 @@ export interface NodeRow {
   layer: string;
   roles: string[];
 }
-// Per-country breakdown + distribution score for the active filter (engine-computed).
+// Per-country breakdown for the active filter (engine-computed).
 export interface LeaderboardData {
   countries: CountryStat[];
-  score: number | null;
-  refId: string | null;
 }
 
 export interface MetaCfg {

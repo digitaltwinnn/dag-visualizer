@@ -513,13 +513,12 @@ export class Engine {
     this._tweenTo(new THREE.Vector3(0, 0, 21), new THREE.Vector3(0, 15, 2));
   }
 
-  // Compute the per-country leaderboard + distribution score for the active filter
-  // and push them to the store (the React Leaderboard reads them). Cheap.
+  // Compute the per-country leaderboard for the active filter and push it to the store
+  // (the React Leaderboard reads it). Cheap.
   private _publishLeaderboard() {
     if (!this.globe.nodes?.length) return;
     const countries = this.globe.countryStats(this.filter);
-    const { scores, refId } = this.globe.distributionScores();
-    useStore.getState().setLeaderboard({ countries, score: scores[this.filter] ?? null, refId });
+    useStore.getState().setLeaderboard({ countries });
     // Flat node list for the geo node browser (read-only; empty outside geo so the
     // browser stays quiet). Built on the same triggers as the leaderboard.
     useStore.getState().setSelNodes(this.mode === "geo" ? this.globe.listNodes(this.filter) : []);

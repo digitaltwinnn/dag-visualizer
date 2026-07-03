@@ -771,9 +771,6 @@ export class Globe {
   listNodes(filter = this.filter) {
     return geoStats.listNodes(this.nodes, this.metaNodes, filter);
   }
-  distributionScores() {
-    return geoStats.distributionScores(this.nodes, this.metaNodes);
-  }
 
   // Re-fan the co-located nodes and rebuild the density rings + arcs using ONLY
   // the filter-active nodes, so the rings, fan-out and connection arcs tighten

@@ -4,7 +4,7 @@ import { forwardRef } from "react";
 import { Gauge } from "lucide-react";
 import { useStore } from "@/src/store/store";
 import { metagraphById } from "@/src/data/network";
-import { fmtScore } from "@/src/util/format";
+import { nodeStatus } from "@/src/data/nodeStatus";
 import Sparkline from "@/components/Sparkline";
 import Odometer from "@/components/Odometer";
 import { rolesOf } from "@/components/inspector/parts";
@@ -62,21 +62,21 @@ function HyperVitals() {
   );
 }
 
-// Geography vitals — the active selection's **footprint** (where): total mapped nodes, how many
-// countries it spans, and its distribution (decentralisation) score. Densest was dropped — the
-// densest country is already visible as the top row of the GeoExplore list.
+// Geography vitals — the active selection's **footprint** (where): total nodes, how many countries
+// they span, and what share of them are healthy (Ready). Nodes + Ready share one source (the geo
+// node list) so "Ready" is exactly a percentage of the "Nodes" count.
 function GeoVitals() {
   const lb = useStore((s) => s.leaderboard);
+  const selNodes = useStore((s) => s.selNodes);
   const countries = lb?.countries ?? [];
-  // "Nodes" = total machines on the map = the sum of the per-country counts (the leaderboard
-  // is the authoritative per-country breakdown; each row has `.count`). Derive it rather than
-  // depend on a separate total field.
-  const nodes = countries.length ? countries.reduce((s, c) => s + c.count, 0) : null;
+  const total = selNodes.length;
+  const ready = selNodes.reduce((n, r) => n + (nodeStatus(r.state).bucket === "ready" ? 1 : 0), 0);
+  const readyPct = total ? Math.round((ready / total) * 100) : null;
   return (
     <>
-      <Vital label="Nodes" value={<Odometer value={nodes} />} />
-      <Vital label="Countries" value={<Odometer value={countries.length || null} />} />
-      <Vital label="score" value={<span className="tb-vital-score">{fmtScore(lb?.score ?? null)}</span>} />
+      <Vital label="Nodes" value={<Odometer int value={total || null} />} />
+      <Vital label="Countries" value={<Odometer int value={countries.length || null} />} />
+      <Vital label="Ready" value={<span className="tb-vital-score">{readyPct == null ? "—" : `${readyPct}%`}</span>} />
     </>
   );
 }

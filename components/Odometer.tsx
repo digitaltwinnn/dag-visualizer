@@ -1,18 +1,21 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
-import { formatVital } from "@/src/util/odometer";
+import { formatVital, formatVitalInt } from "@/src/util/odometer";
 
 // A headline numeric that roll-animates when its value changes: the old text slides up and
 // out while the new slides in from below. Reduced-motion (or first paint) swaps instantly.
+// `int` picks the whole-count format (no "9.0") for vitals that are always integer counts.
 export default function Odometer({
   value,
   className,
+  int = false,
 }: {
   value: number | null | undefined;
   className?: string;
+  int?: boolean;
 }) {
-  const next = formatVital(value);
+  const next = int ? formatVitalInt(value) : formatVital(value);
   const [shown, setShown] = useState(next);
   const [prev, setPrev] = useState<string | null>(null);
   const first = useRef(true);

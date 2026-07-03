@@ -131,7 +131,6 @@ export interface GlobeApi {
   setLedger(on: boolean): void;
   update(dt: number): void;
   countryStats(filter?: string): CountryStat[];
-  distributionScores(): { scores: Record<string, number>; refId: string | null };
   /** Flat node list for one selection (read-only), for the geo node browser. */
   listNodes(filter?: string): NodeRow[];
 }
