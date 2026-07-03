@@ -1,8 +1,14 @@
 /* ── Responsive shell (tablet/phone): edge tabs + Sheet overlays. Desktop is unaffected. ── */
-.sheet-overlay { position: fixed; inset: 0; z-index: 40; background: rgba(3, 5, 12, 0.55); backdrop-filter: blur(2px); }
+/* The scrim is deliberately faint (a whisper of darkening + a hair of blur) so the 3D scene stays
+   clearly visible behind an open sheet — the sheet OVERLAYS the scene, it must not wall it off. */
+.sheet-overlay { position: fixed; inset: 0; z-index: 40; background: rgba(3, 5, 12, 0.16); backdrop-filter: blur(1px); }
+/* The sheet CONTAINER is (near-)transparent: the hosted cards (`.panel`/`.rc-pane`/ContextCard)
+   already carry their own glass background + border, so a panel bg here would double up and wall
+   off the scene. No bg / no border / no blur — the scene shows straight through the gaps between
+   cards. (The `.sheet-head` label + ✕ get their own legibility treatment below, since they now
+   float over the scene rather than sitting on a panel.) */
 .sheet-content {
-  position: fixed; z-index: 41; background: var(--panel); border: 1px solid var(--panel-border);
-  backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
+  position: fixed; z-index: 41; background: transparent; border: none;
   display: flex; flex-direction: column; gap: var(--rail-gap);
   padding: 12px; overflow-y: auto; overscroll-behavior: contain;
 }
@@ -16,6 +22,50 @@
 .sheet-content[data-side="right"][data-state="open"]  { animation: sheetInRight 0.28s cubic-bezier(0.22,1,0.36,1); }
 .sheet-content[data-side="bottom"][data-state="open"] { animation: sheetInBottom 0.3s cubic-bezier(0.22,1,0.36,1); }
 @media (prefers-reduced-motion: reduce) { .sheet-content { animation: none !important; } }
+
+/* Instrument-channel identity cue on the SIDE sheets — restores, on tablet/phone, the desktop
+   rails' spine + hairline ruler (RailThread + `#leftcol > .panel::before`) which are desktop-only
+   (`display:none` / unscoped below 1100px). Runs down the sheet's SCREEN-EDGE side (left sheet →
+   its left edge, right sheet → its right edge), so the cue reads as the rail's outer channel just
+   like desktop. Static decoration only (no animation), pointer-transparent, and it must NOT
+   intercept the sheet's own scroll/taps. Two layers, both reusing the shared 00-base tokens (no
+   new colours): `::before` = the cyan identity spine (faded top+bottom, `--filter-accent`);
+   `::after` = the neutral hairline ruler built from `--thread-tick*`/`--thread-tick-pitch` via a
+   repeating-linear-gradient — same rhythm the desktop threads + bar-chart axis use. */
+.sheet-content[data-side="left"], .sheet-content[data-side="right"] { position: fixed; }
+.sheet-content[data-side="left"]::before, .sheet-content[data-side="right"]::before,
+.sheet-content[data-side="left"]::after,  .sheet-content[data-side="right"]::after {
+  content: ""; position: fixed; top: 10px; bottom: 10px; pointer-events: none; z-index: 42;
+}
+/* Cyan identity spine — the exact recipe from `#leftcol > .panel::before` (12-panel-system.css). */
+.sheet-content[data-side="left"]::before, .sheet-content[data-side="right"]::before {
+  width: 2px; border-radius: 2px;
+  background: linear-gradient(to bottom,
+    transparent 0, var(--filter-accent, var(--primary)) 12%,
+    var(--filter-accent, var(--primary)) 88%, transparent 100%);
+}
+.sheet-content[data-side="left"]::before  { left: 0; }
+.sheet-content[data-side="right"]::before { right: 0; }
+/* Neutral hairline ruler — a vertical stack of short marks (every 4th longer/brighter), built from
+   the shared `--thread-tick*` tokens (00-base.css). The two gradients repeat DOWN the edge; each
+   is a thin strip whose WIDTH gives the tick length (major 8px wide, minor 5px), stepped inward
+   from the screen edge. Faded top+bottom to match the spine + the desktop thread mask. */
+.sheet-content[data-side="left"]::after, .sheet-content[data-side="right"]::after {
+  width: 8px;
+  background:
+    repeating-linear-gradient(to bottom,
+      var(--thread-tick-major) 0, var(--thread-tick-major) 1px,
+      transparent 1px, transparent calc(var(--thread-tick-pitch) * 4)) left top / 8px 100% no-repeat,
+    repeating-linear-gradient(to bottom,
+      var(--thread-tick) 0, var(--thread-tick) 1px,
+      transparent 1px, transparent var(--thread-tick-pitch)) left top / 5px 100% no-repeat;
+  -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 12%, #000 88%, transparent 100%);
+          mask-image: linear-gradient(to bottom, transparent 0, #000 12%, #000 88%, transparent 100%);
+}
+/* Screen-edge alignment: right sheet's ruler grows LEFTWARD from its right edge (flip horizontally
+   so the marks step inward, away from the edge), left sheet's grows rightward from its left edge. */
+.sheet-content[data-side="left"]::after  { left: 4px; }
+.sheet-content[data-side="right"]::after { right: 4px; transform: scaleX(-1); }
 
 /* Centred grabber bar at the top of a bottom sheet (phone Detail sheet) — signals "this is a
    sheet, sits above the scene" at a glance. Purely decorative; full drag-to-expand is a
@@ -33,13 +83,19 @@
 
 /* Sheet header row — the sheet's own chrome (label + close), ABOVE the hosted content, so the
    ✕ never overlaps a hosted card's top-right control (`.rc-close` / ContextCard close /
-   `.panel-collapse`). Flush with the sheet's 12px padding; hosted cards follow below it. */
+   `.panel-collapse`). Flush with the sheet's 12px padding; hosted cards follow below it. Now that
+   the container is transparent this row floats over the SCENE, so the label wears a small glass
+   pill (matching the cards) and a text-shadow to stay legible over any background. */
 .sheet-head {
   display: flex; align-items: center; justify-content: space-between; gap: 8px;
 }
 .sheet-head-title {
   font-size: 13px; font-weight: 600; letter-spacing: 0.02em; color: var(--text);
-  text-transform: uppercase; opacity: 0.85; margin: 0;
+  text-transform: uppercase; opacity: 0.9; margin: 0;
+  padding: 5px 10px; border-radius: var(--radius);
+  background: var(--panel); border: 1px solid var(--panel-border);
+  backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
+  text-shadow: 0 1px 3px rgba(3, 5, 12, 0.8);
 }
 /* Visible dismiss affordance for the Sheet — the primitive has no built-in close button. Lives
    in the header row (not a floating corner) to avoid colliding with card corner controls. */
