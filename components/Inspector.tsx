@@ -107,6 +107,8 @@ export default function Inspector() {
   const mode = useStore((s) => s.mode) as Mode;
   const setInspect = useStore((s) => s.setInspect);
   const setSnap = useStore((s) => s.setSnap);
+  const phoneDock = useStore((s) => s.phoneDock);
+  const setPhoneDock = useStore((s) => s.setPhoneDock);
 
   const accent = { ["--filter-accent"]: filterAccent(filter) } as CSSProperties;
   const isNode = inspect?.kind === "l0" || inspect?.kind === "l1" || inspect?.kind === "metanode";
@@ -156,8 +158,8 @@ export default function Inspector() {
     : null;
 
   // "Seen" tracking — GLOBAL CONSTRAINT: nothing here ever opens the sheet. `hint` only decides
-  // whether the tab shows the pulsing dot; the sheet's `open` state is still owned by the user
-  // tapping the tab (RailDock, on both tablet and phone — see the single RailDock call below).
+  // whether the tab/button shows the pulsing dot; the sheet's `open` state is still owned by the
+  // user tapping the trigger (RailDock's own state on tablet, `store.phoneDock` on phone).
   // `seen` starts true (arms only once a NEW detail actually lands) and: (1) flips true the
   // instant the panel opens (RailDock's onOpenChange), (2) resets false whenever the active
   // detail's identity changes, or `hasDetail` rises from false → true (a detail arriving where
@@ -175,9 +177,9 @@ export default function Inspector() {
 
   const hint = hasDetail && !seen;
 
-  // RailDock owns the Sheet's own open/close state internally; it only reports changes here so
-  // opening can mark the hint "seen", and on phone, closing can also clear whichever pick is on
-  // top (see `handlePhoneOpenChange` below) — never the reverse (a pick never sets `open`).
+  // RailDock reports open/close changes here so opening can mark the hint "seen" (tablet: its
+  // own internal state; phone: `store.phoneDock`, via `handleDismiss` below) — never the
+  // reverse (a pick never sets `open`).
   const handleOpenChange = (next: boolean) => {
     if (next) setSeen(true);
   };
@@ -200,8 +202,8 @@ export default function Inspector() {
   }, [inspect, snap, filter]);
 
   // Tablet: Context + Detail panes + PickHint together (`content` below), unchanged from Task 3.
-  // Phone: the SAME content (Context + Detail panes + PickHint) but hosted in a single BOTTOM
-  // sheet — see the Fix wave note below for why this collapsed from two sheets into one.
+  // Phone: the SAME content (Context + Detail panes + PickHint) but hosted in the "Details"
+  // bottom sheet (bottom-right button) instead of a side sheet — see below.
   const content = (
     <>
       <ContextCard />
@@ -227,18 +229,16 @@ export default function Inspector() {
     );
   }
 
-  // Fix wave (auto-open + double-pulse): the phone right rail used to be TWO sheets — a right
-  // side Sheet (Context only) plus a separate bottom Sheet whose `open` was derived as
-  // `open && hasDetail`. That derivation meant a scene pick (which flips `hasDetail` false→true)
-  // could slide the bottom sheet up on its own — an auto-open, violating the no-auto-open
-  // invariant. Consolidated to ONE RailDock per breakpoint: phone hosts the full `content`
-  // (Context + Detail panes + PickHint) in a single bottom sheet whose `open` is purely the
-  // tab's own tap-driven state (`RailDock`'s internal `open`, reported via `onOpenChange` — never
-  // derived from `hasDetail`). `hasDetail`/`hint` still only ever affect the tab's hint dot and
-  // the sheet's CONTENT, never its open state. Dismissing the sheet (its own ✕/Escape) clears
-  // whichever pick is on top, mirroring that pane's own × — via `onOpenChange` below, which is
-  // itself only invoked by RailDock's own tab-tap/close affordances, never by a pick.
-  const handlePhoneOpenChange = (next: boolean) => {
+  // Fix wave (auto-open + double-pulse): the phone right rail used to derive its sheet's `open`
+  // as `open && hasDetail`. That derivation meant a scene pick (which flips `hasDetail`
+  // false→true) could slide the sheet up on its own — an auto-open, violating the no-auto-open
+  // invariant. `open` must ALWAYS be purely user-tap-driven (RailDock's own state, or on phone
+  // `store.phoneDock` — see below) — never derived from `hasDetail`. `hasDetail`/`hint` still
+  // only ever affect the hint dot and the sheet's CONTENT, never its open state. Dismissing the
+  // sheet (its own ✕/Escape/grabber) clears whichever pick is on top, mirroring that pane's own
+  // × — via `onOpenChange`, which is itself only invoked by RailDock's own tap/close
+  // affordances, never by a pick.
+  const handleDismiss = (next: boolean) => {
     handleOpenChange(next);
     if (!next) {
       if (topSlot === "snap") setSnap(null);
@@ -246,15 +246,34 @@ export default function Inspector() {
     }
   };
 
+  if (bp === "tablet") {
+    // Tablet: unchanged — the right edge tab opening a right-side Sheet, independent of the
+    // left "Explore" dock (both can be open at once).
+    return (
+      <RailDock side="right" label="Details" style={accent} hint={hint} pulseKey={pulseCount} onOpenChange={handleOpenChange}>
+        {content}
+      </RailDock>
+    );
+  }
+
+  // Phone: a bottom-RIGHT "Details" button opening a bottom sheet, mutually exclusive with the
+  // "Explore" dock via the shared `store.phoneDock` field (see LeftColumn) — never auto-opened
+  // by a pick (only the hint dot reacts to `hint`/`pulseCount`; `open` is 100% derived from
+  // `phoneDock`, which only a tap (here) or a dismiss (handleDismiss, below) ever writes).
   return (
     <RailDock
       side="right"
-      sheetSide={bp === "phone" ? "bottom" : undefined}
       label="Details"
       style={accent}
+      trigger="bottom-button"
+      sheetSide="bottom"
       hint={hint}
       pulseKey={pulseCount}
-      onOpenChange={bp === "phone" ? handlePhoneOpenChange : handleOpenChange}
+      open={phoneDock === "details"}
+      onOpenChange={(next) => {
+        handleDismiss(next);
+        setPhoneDock(next ? "details" : null);
+      }}
     >
       {content}
     </RailDock>

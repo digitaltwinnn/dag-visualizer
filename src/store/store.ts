@@ -87,6 +87,15 @@ interface AppState {
   // Shared network filter ("all" | "dag" | <metagraph id>) — one unified core model, no
   // separate L0/L1 filters (the DAG is just another metagraph-shaped core).
   filter: string;
+  // PHONE ONLY: which bottom sheet (if any) is open — "explore" (LeftColumn) or "details"
+  // (Inspector), or null when both are closed. Phone has no room to stack two bottom sheets
+  // (unlike tablet's two independent side sheets), so this is the single source of truth both
+  // docks read `open` from: a dock is open iff `phoneDock === its own id`, and opening one
+  // (`setPhoneDock("explore" | "details")`) automatically closes the other by flipping its
+  // `open` to false — the two components never need to know about each other. Never set by a
+  // scene pick (`setInspect`/`setSnap`) — only by the user tapping a button or dismissing a
+  // sheet (✕ / grabber / Escape / outside-tap → `setPhoneDock(null)`). Unused on tablet/desktop.
+  phoneDock: "explore" | "details" | null;
 
   setLive: (live: boolean, lastGoodAt?: number) => void;
   setEngineReady: (v: boolean) => void;
@@ -110,6 +119,7 @@ interface AppState {
   setLeaderboard: (lb: LeaderboardData | null) => void;
   setSelNodes: (nodes: NodeRow[]) => void;
   setSnapshotExact: (data: SnapshotExact) => void;
+  setPhoneDock: (dock: "explore" | "details" | null) => void;
 }
 
 // Keep the exact-snapshot cache bounded (one small object per ordinal); drop the oldest.
@@ -140,6 +150,7 @@ export const useStore = create<AppState>((set) => ({
   leaderboard: null,
   selNodes: [],
   snapshotExact: {},
+  phoneDock: null,
 
   setLive: (live, lastGoodAt) => set((s) => ({ live, lastGoodAt: lastGoodAt ?? s.lastGoodAt })),
   setEngineReady: (engineReady) => set({ engineReady }),
@@ -178,4 +189,5 @@ export const useStore = create<AppState>((set) => ({
       }
       return { snapshotExact: next };
     }),
+  setPhoneDock: (phoneDock) => set({ phoneDock }),
 }));

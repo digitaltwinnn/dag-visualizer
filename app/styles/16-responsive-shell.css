@@ -17,7 +17,10 @@
 }
 .sheet-content[data-side="left"]  { top: 0; left: 0; bottom: 0; width: min(300px, 86vw); border-radius: 0 var(--radius) var(--radius) 0; }
 .sheet-content[data-side="right"] { top: 0; right: 0; bottom: 0; width: min(320px, 90vw); border-radius: var(--radius) 0 0 var(--radius); }
-.sheet-content[data-side="bottom"]{ left: 0; right: 0; bottom: 0; max-height: 72vh; border-radius: var(--radius) var(--radius) 0 0; }
+/* Phone's two bottom sheets (Explore/Details) target ~60vh so the 3D scene stays clearly visible
+   above them (`height`, not just a `max-height` cap, so short content doesn't collapse the
+   sheet); `max-height` remains a safety ceiling for tall content / short viewports. */
+.sheet-content[data-side="bottom"]{ left: 0; right: 0; bottom: 0; height: 60vh; max-height: 72vh; border-radius: var(--radius) var(--radius) 0 0; }
 @keyframes sheetInLeft   { from { transform: translateX(-100%); } to { transform: none; } }
 @keyframes sheetInRight  { from { transform: translateX(100%); }  to { transform: none; } }
 @keyframes sheetInBottom { from { transform: translateY(100%); }  to { transform: none; } }
@@ -106,7 +109,9 @@
   color: var(--text); font-size: 22px; line-height: 1; cursor: pointer;
 }
 
-/* Edge tab: collapsed rail entry point on tablet/phone, hidden on desktop. */
+/* Edge tab: collapsed rail entry point on TABLET only (700–1099px), hidden on desktop AND phone
+   (phone swaps in the bottom buttons below instead — a side tab + bottom sheet reads spatially
+   confusing on a narrow phone). */
 .rail-tab {
   position: fixed; z-index: 39; top: 50%; transform: translateY(-50%);
   width: 30px; min-height: 56px; display: none; align-items: center; justify-content: center;
@@ -117,11 +122,36 @@
 .rail-tab--right { right: 0; border-radius: var(--radius) 0 0 var(--radius); border-right: none; }
 @media (max-width: 1099px) {
   #leftcol, #rightcol, .rail-thread { display: none !important; }
+}
+@media (min-width: 700px) and (max-width: 1099px) {
   .rail-tab { display: flex; }
 }
 
-/* "New detail" hint — a small dot on the edge tab. Two variants, both purely visual (never
-   change open state — see RailDock):
+/* Phone bottom buttons: the "Explore"/"Details" trigger pair replacing the edge tabs below
+   700px. Anchored to the bottom corners, ABOVE the LiveStrip bar-chart (`#livestrip`: fixed,
+   `bottom: 16px`, `height: 98px` → occupies bottom:16px..114px) so neither obscures the bars —
+   sits at `bottom: 122px` (8px clear of the strip's top edge). Compact pill, ≥44px tall for a
+   comfortable tap target, readable label (not icon-only — a phone-only affordance can afford
+   the width, and a bare icon here would be ambiguous with the LiveStrip's own controls nearby).
+   z-index is ABOVE `.sheet-content` (41): at ~60vh a bottom sheet's box reaches up past this
+   button's own screen position, so both buttons must out-rank it to stay tappable while a sheet
+   is open — that's how tapping "Details" while "Explore" is open can switch docks at all. */
+.phone-dock-btn {
+  position: fixed; z-index: 42; bottom: 122px;
+  display: none; align-items: center; gap: 6px;
+  min-height: 44px; padding: 0 16px;
+  background: var(--panel); border: 1px solid var(--panel-border); color: var(--text);
+  border-radius: var(--radius); backdrop-filter: blur(14px);
+  font-size: 13px; font-weight: 600; letter-spacing: 0.02em; cursor: pointer;
+}
+.phone-dock-btn--left  { left: 16px; }
+.phone-dock-btn--right { right: 16px; }
+@media (max-width: 699px) {
+  .phone-dock-btn { display: inline-flex; }
+}
+
+/* "New detail" hint — a small dot on the edge tab / phone button. Two variants, both purely
+   visual (never change open state — see RailDock):
    - PERSISTENT (default `.rail-tab-hint`, `hint` true): a Detail card has landed and the user
      hasn't opened the panel since — a slow resting CSS pulse, always visible until opened.
    - TRANSIENT (`.rail-tab-hint--transient`, `pulseKey` only): an already-seen card's DATA just
@@ -138,6 +168,9 @@
 .rail-tab-hint--transient { opacity: 0; animation: none; }
 .rail-tab--left  .rail-tab-hint { right: 4px; }
 .rail-tab--right .rail-tab-hint { left: 4px; }
+/* On the phone button the dot sits at the trailing edge, vertically centred with the label
+   (the button is a horizontal pill, not the edge tab's tall vertical strip). */
+.phone-dock-btn .rail-tab-hint { position: static; margin-left: 2px; }
 @keyframes railTabHintPulse {
   0%, 100% { opacity: 0.55; transform: scale(0.85); }
   50%      { opacity: 1;    transform: scale(1.15); }

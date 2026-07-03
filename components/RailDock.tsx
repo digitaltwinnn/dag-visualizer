@@ -38,6 +38,20 @@ const PULSE_MS = 900;
 // `sheetSide`: the Sheet's slide-in edge, when it should differ from the tab's screen-edge
 // position (`side`) — e.g. the phone Detail dock keeps its tab on the right edge but slides the
 // sheet up from the bottom. Defaults to `side`.
+//
+// `trigger`: the tap affordance that opens the sheet. Defaults to `"edge-tab"` (the slim `‹`/`›`
+// tab on tablet AND phone). `"bottom-button"` swaps in a labelled pill anchored to the bottom
+// corner instead (phone-only — see LeftColumn/Inspector) — same hint/pulse dot, same Sheet/close
+// chrome, just a different trigger element, so this stays the ONE place that owns the hint/pulse
+// animation logic rather than forking it per breakpoint.
+//
+// `open`: optional CONTROLLED mode. When provided, RailDock's
+// internal `open` state is bypassed entirely — the caller (via a store field) decides when this
+// dock is open, which is how the phone buttons get their "opening one closes the other" behaviour
+// for free (both docks derive `open` from the same `store.phoneDock`). `onOpenChange` is still
+// called on every user-driven change (tap-open, ✕, Escape, outside-tap) either way; in controlled
+// mode the caller is responsible for feeding that back into the store field. Uncontrolled
+// (tablet's two independent edge docks) keeps owning its own `open` exactly as before.
 export default function RailDock({
   side,
   label,
@@ -47,6 +61,8 @@ export default function RailDock({
   pulseKey,
   onOpenChange,
   sheetSide,
+  trigger = "edge-tab",
+  open: openProp,
 }: {
   side: "left" | "right";
   label: string;
@@ -56,8 +72,11 @@ export default function RailDock({
   pulseKey?: unknown;
   onOpenChange?: (open: boolean) => void;
   sheetSide?: "left" | "right" | "bottom";
+  trigger?: "edge-tab" | "bottom-button";
+  open?: boolean;
 }) {
-  const [open, setOpen] = useState(false);
+  const [openState, setOpen] = useState(false);
+  const open = openProp ?? openState;
   const handleOpenChange = (next: boolean) => {
     setOpen(next);
     onOpenChange?.(next);
@@ -97,28 +116,42 @@ export default function RailDock({
   // might need to play (pulseKey provided) — kept mounted so the transient WAAPI pulse always has
   // an element to animate, even on an already-seen detail that just got a data update.
   const showDot = (hint || pulseKey !== undefined) && !open;
+  const dot = showDot && (
+    <span
+      ref={dotRef}
+      className={`rail-tab-hint${hint ? "" : " rail-tab-hint--transient"}`}
+      aria-hidden="true"
+    />
+  );
   return (
     <>
-      <button
-        className={`rail-tab rail-tab--${side}`}
-        aria-label={`${label} panel`}
-        onClick={() => handleOpenChange(true)}
-      >
-        {side === "left" ? "‹" : "›"}
-        {showDot && (
-          <span
-            ref={dotRef}
-            className={`rail-tab-hint${hint ? "" : " rail-tab-hint--transient"}`}
-            aria-hidden="true"
-          />
-        )}
-      </button>
-      {/* NON-MODAL (`modal={false}`): the left "Explore" and right "Details" docks can be open at
-          the SAME time, and the 3D scene between them stays interactive (picking still works — which
-          is how interacting with the scene/Explore updates Details). No focus trap, no scrim (see
-          `overlay={false}`), and outside-pointer no longer force-closes it — the user decides when
-          each closes (its own ✕ / Escape). Each RailDock owns its own `open`, so the two are fully
-          independent. */}
+      {trigger === "bottom-button" ? (
+        <button
+          className={`phone-dock-btn phone-dock-btn--${side}`}
+          aria-label={`${label} panel`}
+          onClick={() => handleOpenChange(true)}
+        >
+          {label}
+          {dot}
+        </button>
+      ) : (
+        <button
+          className={`rail-tab rail-tab--${side}`}
+          aria-label={`${label} panel`}
+          onClick={() => handleOpenChange(true)}
+        >
+          {side === "left" ? "‹" : "›"}
+          {dot}
+        </button>
+      )}
+      {/* NON-MODAL (`modal={false}`): on tablet the left "Explore" and right "Details" edge docks
+          can be open at the SAME time, and the 3D scene between them stays interactive (picking
+          still works — which is how interacting with the scene/Explore updates Details). No focus
+          trap, no scrim (see `overlay={false}`), and outside-pointer no longer force-closes it —
+          the user decides when each closes (its own ✕ / Escape). On phone the two bottom-button
+          docks are mutually exclusive via the CONTROLLED `open` prop (driven by `store.phoneDock`
+          from the caller), not by anything in here — RailDock itself still just renders whatever
+          `open` it's given. */}
       <Sheet open={open} onOpenChange={handleOpenChange} modal={false}>
         <SheetContent
           side={sheetSide ?? side}

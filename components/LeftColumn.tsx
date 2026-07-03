@@ -58,6 +58,8 @@ export default function LeftColumn() {
   const bp = useBreakpoint();
   const mode = useStore((s) => s.mode);
   const filter = useStore((s) => s.filter);
+  const phoneDock = useStore((s) => s.phoneDock);
+  const setPhoneDock = useStore((s) => s.setPhoneDock);
   // Theme every card's bullet to the current selection (the explore card is always
   // specific to the active filter).
   const accent = { ["--filter-accent"]: filterAccent(filter) } as CSSProperties;
@@ -82,10 +84,31 @@ export default function LeftColumn() {
       </>
     );
   }
-  // Tablet/phone: same content, hosted in the edge-tab Sheet overlay so the 3D scene keeps
-  // full width. The inline #leftcol/.rail-thread path is hidden below 1100px (00-base.css).
+  if (bp === "tablet") {
+    // Tablet: same content, hosted in the left edge-tab Sheet overlay so the 3D scene keeps
+    // full width. The inline #leftcol/.rail-thread path is hidden below 1100px (00-base.css).
+    return (
+      <RailDock side="left" label="Explore" style={accent}>
+        {content}
+      </RailDock>
+    );
+  }
+  // Phone: a bottom-LEFT "Explore" button opening a bottom sheet (~60vh, scene stays visible
+  // above), instead of the edge tab — a side tab + bottom sheet reads spatially confusing on a
+  // narrow phone. `phoneDock` (the store) is the single source of truth for which of the two
+  // phone docks (this one, or Inspector's "Details") is open — they can't both be open at once,
+  // there's no room to stack two bottom sheets. Opening this one just sets `phoneDock`, which
+  // simultaneously closes the Details dock (its own `open` reads the same field).
   return (
-    <RailDock side="left" label="Explore" style={accent}>
+    <RailDock
+      side="left"
+      label="Explore"
+      style={accent}
+      trigger="bottom-button"
+      sheetSide="bottom"
+      open={phoneDock === "explore"}
+      onOpenChange={(next) => setPhoneDock(next ? "explore" : null)}
+    >
       {content}
     </RailDock>
   );
