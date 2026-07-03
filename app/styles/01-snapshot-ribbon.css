@@ -101,6 +101,12 @@
   display: flex; align-items: center; gap: 14px;
   background: none; border: none;
 }
+/* Phone: the persistent Explore/Details bar docks flush to the true bottom of the viewport
+   (16-responsive-shell.css, `--phone-dock-h`) — lift the strip up to clear it (8px breathing
+   gap above the bar) so the two never overlap when the bar's sheets are collapsed. */
+@media (max-width: 699px) {
+  #livestrip { bottom: calc(var(--phone-dock-h, 56px) + 8px); }
+}
 .ls-live {
   display: flex; align-items: center; gap: 8px; flex: none;
   font-size: 12px; font-weight: 600; letter-spacing: 0.02em; color: var(--text);

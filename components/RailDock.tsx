@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
-import { Sheet, SheetContent, SheetClose, SheetTitle } from "@/components/ui/sheet";
+import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
+import { Compass, ListTree } from "lucide-react";
 
 const PULSE_MS = 900;
 
@@ -40,16 +41,26 @@ const PULSE_MS = 900;
 // sheet up from the bottom. Defaults to `side`.
 //
 // `trigger`: the tap affordance that opens the sheet. Defaults to `"edge-tab"` (the slim `‹`/`›`
-// tab on tablet AND phone). `"bottom-button"` swaps in a labelled pill anchored to the bottom
-// corner instead (phone-only — see LeftColumn/Inspector) — same hint/pulse dot, same Sheet/close
-// chrome, just a different trigger element, so this stays the ONE place that owns the hint/pulse
-// animation logic rather than forking it per breakpoint.
+// tab on tablet). `"bottom-bar-half"` (phone only — see LeftColumn/Inspector) renders HALF of a
+// single PERSISTENT full-width bar docked at the very bottom of the viewport instead: this dock's
+// icon + label, occupying the left or right 50% (`.phone-dock-half--{side}`). The two halves come
+// from the two separate RailDock instances (LeftColumn's Explore + Inspector's Details) but are
+// styled to align pixel-perfect into one seamless strip. Same hint/pulse dot, so this stays the
+// ONE place that owns that animation logic rather than forking it per breakpoint.
+//
+// The persistent bar NEVER unmounts (unlike the edge tab, which the old floating-button design
+// hid while open) — tapping the ACTIVE half again collapses its own sheet (toggle), tapping the
+// OTHER half switches to it. So the bar reads as the sheet's own docked header/handle: the sheet's
+// content area is anchored `bottom: var(--phone-dock-h)` (i.e. directly ABOVE the bar, never
+// covering it) and slides up from there, while the bar itself never moves — it just visually
+// "grows" a sheet above itself. No separate `.sheet-head` row in this mode (the bar already shows
+// the label); only a slim grabber up top of the sheet content remains.
 //
 // `open`: optional CONTROLLED mode. When provided, RailDock's
 // internal `open` state is bypassed entirely — the caller (via a store field) decides when this
-// dock is open, which is how the phone buttons get their "opening one closes the other" behaviour
-// for free (both docks derive `open` from the same `store.phoneDock`). `onOpenChange` is still
-// called on every user-driven change (tap-open, ✕, Escape, outside-tap) either way; in controlled
+// dock is open, which is how the phone bar's "opening one closes the other" behaviour comes for
+// free (both docks derive `open` from the same `store.phoneDock`). `onOpenChange` is still called
+// on every user-driven change (tap-open, tap-active-to-collapse, Escape) either way; in controlled
 // mode the caller is responsible for feeding that back into the store field. Uncontrolled
 // (tablet's two independent edge docks) keeps owning its own `open` exactly as before.
 export default function RailDock({
@@ -72,7 +83,7 @@ export default function RailDock({
   pulseKey?: unknown;
   onOpenChange?: (open: boolean) => void;
   sheetSide?: "left" | "right" | "bottom";
-  trigger?: "edge-tab" | "bottom-button";
+  trigger?: "edge-tab" | "bottom-bar-half";
   open?: boolean;
 }) {
   const [openState, setOpen] = useState(false);
@@ -123,22 +134,29 @@ export default function RailDock({
       aria-hidden="true"
     />
   );
+  const isBarHalf = trigger === "bottom-bar-half";
+  // Tapping the ACTIVE half again is a TOGGLE (collapses its own sheet); tapping it while closed
+  // opens. The edge tab never needs this — it's hidden the instant its own sheet opens, so it can
+  // only ever mean "open" — but the bar half stays visible throughout, so it must mean both.
+  const handleTriggerClick = () => handleOpenChange(isBarHalf ? !open : true);
   return (
     <>
-      {trigger === "bottom-button" ? (
+      {isBarHalf ? (
         <button
-          className={`phone-dock-btn phone-dock-btn--${side}`}
+          className={`phone-dock-half phone-dock-half--${side}${open ? " active" : ""}`}
           aria-label={`${label} panel`}
-          onClick={() => handleOpenChange(true)}
+          aria-pressed={open}
+          onClick={handleTriggerClick}
         >
-          {label}
+          {side === "left" ? <Compass size={18} strokeWidth={1.75} aria-hidden="true" /> : <ListTree size={18} strokeWidth={1.75} aria-hidden="true" />}
+          <span>{label}</span>
           {dot}
         </button>
       ) : (
         <button
           className={`rail-tab rail-tab--${side}`}
           aria-label={`${label} panel`}
-          onClick={() => handleOpenChange(true)}
+          onClick={handleTriggerClick}
         >
           {side === "left" ? "‹" : "›"}
           {dot}
@@ -148,29 +166,38 @@ export default function RailDock({
           can be open at the SAME time, and the 3D scene between them stays interactive (picking
           still works — which is how interacting with the scene/Explore updates Details). No focus
           trap, no scrim (see `overlay={false}`), and outside-pointer no longer force-closes it —
-          the user decides when each closes (its own ✕ / Escape). On phone the two bottom-button
-          docks are mutually exclusive via the CONTROLLED `open` prop (driven by `store.phoneDock`
-          from the caller), not by anything in here — RailDock itself still just renders whatever
-          `open` it's given. */}
+          the user decides when each closes (its own ✕ / Escape / bar-half toggle). On phone the
+          two bar-half docks are mutually exclusive via the CONTROLLED `open` prop (driven by
+          `store.phoneDock` from the caller), not by anything in here — RailDock itself still just
+          renders whatever `open` it's given. */}
       <Sheet open={open} onOpenChange={handleOpenChange} modal={false}>
         <SheetContent
           side={sheetSide ?? side}
           style={style}
           overlay={false}
+          className={isBarHalf ? "sheet-content--docked-bar" : undefined}
           // Don't let a pointer-down/interaction OUTSIDE the sheet (e.g. on the scene, or on the
-          // OTHER open dock) dismiss it — the user closes each dock explicitly via its own ✕ (or
-          // Escape). Without this, radix's DismissableLayer auto-closes a non-modal dialog on any
-          // outside pointer-down, which would make the two docks fight + close on every scene pick.
+          // OTHER open dock) dismiss it — the user closes each dock explicitly via its own ✕ /
+          // Escape / bar-half toggle. Without this, radix's DismissableLayer auto-closes a
+          // non-modal dialog on any outside pointer-down, which would make the two docks fight +
+          // close on every scene pick.
           onInteractOutside={(e) => e.preventDefault()}
           aria-describedby={undefined}
         >
           {sheetSide === "bottom" && <div className="sheet-grabber" aria-hidden="true" />}
-          <div className="sheet-head">
-            <SheetTitle className="sheet-head-title">{label}</SheetTitle>
-            <SheetClose className="sheet-close" aria-label={`Close ${label} panel`}>
-              ×
-            </SheetClose>
-          </div>
+          {isBarHalf ? (
+            // The persistent bar half already shows the label + hint visibly — no redundant
+            // `.sheet-head` row (no ✕ either; the bar half itself is the close affordance, via
+            // the toggle above). SheetTitle stays for the accessible dialog name only.
+            <SheetTitle className="sr-only">{label}</SheetTitle>
+          ) : (
+            <div className="sheet-head">
+              <SheetTitle className="sheet-head-title">{label}</SheetTitle>
+              <button className="sheet-close" aria-label={`Close ${label} panel`} onClick={() => handleOpenChange(false)}>
+                ×
+              </button>
+            </div>
+          )}
           {children}
         </SheetContent>
       </Sheet>

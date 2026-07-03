@@ -256,16 +256,16 @@ export default function Inspector() {
     );
   }
 
-  // Phone: a bottom-RIGHT "Details" button opening a bottom sheet, mutually exclusive with the
-  // "Explore" dock via the shared `store.phoneDock` field (see LeftColumn) — never auto-opened
-  // by a pick (only the hint dot reacts to `hint`/`pulseCount`; `open` is 100% derived from
-  // `phoneDock`, which only a tap (here) or a dismiss (handleDismiss, below) ever writes).
+  // Phone: the RIGHT half of the persistent bottom bar, mutually exclusive with the "Explore"
+  // dock via the shared `store.phoneDock` field (see LeftColumn) — never auto-opened by a pick
+  // (only the hint dot reacts to `hint`/`pulseCount`; `open` is 100% derived from `phoneDock`,
+  // which only a tap (here), a toggle-collapse, or a dismiss (handleDismiss, below) ever writes).
   return (
     <RailDock
       side="right"
       label="Details"
       style={accent}
-      trigger="bottom-button"
+      trigger="bottom-bar-half"
       sheetSide="bottom"
       hint={hint}
       pulseKey={pulseCount}

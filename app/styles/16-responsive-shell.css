@@ -21,6 +21,15 @@
    above them (`height`, not just a `max-height` cap, so short content doesn't collapse the
    sheet); `max-height` remains a safety ceiling for tall content / short viewports. */
 .sheet-content[data-side="bottom"]{ left: 0; right: 0; bottom: 0; height: 60vh; max-height: 72vh; border-radius: var(--radius) var(--radius) 0 0; }
+/* Phone's docked-bar variant (`trigger="bottom-bar-half"`): the sheet sits DIRECTLY ABOVE the
+   persistent Explore/Details bar (never covers it — the bar IS its visible header/handle, see
+   `.phone-dock-bar` below), so it's offset up by the bar's own height instead of touching the
+   true viewport bottom. Squared-off bottom corners where it meets the bar (only the top stays
+   rounded) so the two read as one continuous surface, not two stacked cards. */
+.sheet-content--docked-bar[data-side="bottom"] {
+  bottom: var(--phone-dock-h, 56px);
+  border-radius: var(--radius) var(--radius) 0 0;
+}
 @keyframes sheetInLeft   { from { transform: translateX(-100%); } to { transform: none; } }
 @keyframes sheetInRight  { from { transform: translateX(100%); }  to { transform: none; } }
 @keyframes sheetInBottom { from { transform: translateY(100%); }  to { transform: none; } }
@@ -110,8 +119,8 @@
 }
 
 /* Edge tab: collapsed rail entry point on TABLET only (700–1099px), hidden on desktop AND phone
-   (phone swaps in the bottom buttons below instead — a side tab + bottom sheet reads spatially
-   confusing on a narrow phone). */
+   (phone uses the persistent bottom bar below instead — a side tab + bottom sheet reads
+   spatially confusing on a narrow phone). */
 .rail-tab {
   position: fixed; z-index: 39; top: 50%; transform: translateY(-50%);
   width: 30px; min-height: 56px; display: none; align-items: center; justify-content: center;
@@ -127,30 +136,35 @@
   .rail-tab { display: flex; }
 }
 
-/* Phone bottom buttons: the "Explore"/"Details" trigger pair replacing the edge tabs below
-   700px. Anchored to the bottom corners, ABOVE the LiveStrip bar-chart (`#livestrip`: fixed,
-   `bottom: 16px`, `height: 98px` → occupies bottom:16px..114px) so neither obscures the bars —
-   sits at `bottom: 122px` (8px clear of the strip's top edge). Compact pill, ≥44px tall for a
-   comfortable tap target, readable label (not icon-only — a phone-only affordance can afford
-   the width, and a bare icon here would be ambiguous with the LiveStrip's own controls nearby).
-   z-index is ABOVE `.sheet-content` (41): at ~60vh a bottom sheet's box reaches up past this
-   button's own screen position, so both buttons must out-rank it to stay tappable while a sheet
-   is open — that's how tapping "Details" while "Explore" is open can switch docks at all. */
-.phone-dock-btn {
-  position: fixed; z-index: 42; bottom: 122px;
-  display: none; align-items: center; gap: 6px;
-  min-height: 44px; padding: 0 16px;
-  background: var(--panel); border: 1px solid var(--panel-border); color: var(--text);
-  border-radius: var(--radius); backdrop-filter: blur(14px);
-  font-size: 13px; font-weight: 600; letter-spacing: 0.02em; cursor: pointer;
+/* Phone persistent bottom bar: the "Explore"/"Details" trigger pair replacing the edge tabs
+   below 700px. Unlike the old floating-button design, this bar NEVER unmounts or moves — it's
+   docked flush to the REAL bottom of the viewport (`bottom: 0`) and stays visible whether its
+   sheet is open or closed, so it reads as the sheet's own header/handle (the sheet's content
+   area is offset `bottom: var(--phone-dock-h)`, i.e. directly above the bar — see
+   `.sheet-content--docked-bar`). The two `.phone-dock-half` buttons (rendered by two separate
+   RailDock instances — LeftColumn's Explore, Inspector's Details) are positioned as the left/
+   right 50% of one implied full-width strip so they read as ONE seamless bar, not two separate
+   floating pills — same light-glass background/blur as the sheets themselves.
+   `--phone-dock-h` is the single source of truth for the bar's height; `.sheet-content--docked-
+   bar` and `#livestrip`'s phone offset both reference it so nothing needs updating in two
+   places if the height ever changes. */
+:root { --phone-dock-h: 56px; }
+.phone-dock-half {
+  position: fixed; z-index: 42; bottom: 0; width: 50%; height: var(--phone-dock-h);
+  display: none; align-items: center; justify-content: center; gap: 8px;
+  background: rgba(12, 16, 32, 0.35); border: 1px solid rgba(178, 193, 223, 0.10);
+  backdrop-filter: blur(7px); -webkit-backdrop-filter: blur(7px);
+  color: var(--muted); font-size: 12.5px; font-weight: 600; letter-spacing: 0.02em;
+  cursor: pointer;
 }
-.phone-dock-btn--left  { left: 16px; }
-.phone-dock-btn--right { right: 16px; }
+.phone-dock-half.active { color: var(--text); }
+.phone-dock-half--left  { left: 0;  border-right: 1px solid rgba(178, 193, 223, 0.10); }
+.phone-dock-half--right { right: 0; }
 @media (max-width: 699px) {
-  .phone-dock-btn { display: inline-flex; }
+  .phone-dock-half { display: inline-flex; }
 }
 
-/* "New detail" hint — a small dot on the edge tab / phone button. Two variants, both purely
+/* "New detail" hint — a small dot on the edge tab / phone bar half. Two variants, both purely
    visual (never change open state — see RailDock):
    - PERSISTENT (default `.rail-tab-hint`, `hint` true): a Detail card has landed and the user
      hasn't opened the panel since — a slow resting CSS pulse, always visible until opened.
@@ -168,9 +182,9 @@
 .rail-tab-hint--transient { opacity: 0; animation: none; }
 .rail-tab--left  .rail-tab-hint { right: 4px; }
 .rail-tab--right .rail-tab-hint { left: 4px; }
-/* On the phone button the dot sits at the trailing edge, vertically centred with the label
-   (the button is a horizontal pill, not the edge tab's tall vertical strip). */
-.phone-dock-btn .rail-tab-hint { position: static; margin-left: 2px; }
+/* On the phone bar half the dot sits inline after the label, vertically centred (the bar is a
+   horizontal strip, not the edge tab's tall vertical one). */
+.phone-dock-half .rail-tab-hint { position: static; margin-left: 2px; }
 @keyframes railTabHintPulse {
   0%, 100% { opacity: 0.55; transform: scale(0.85); }
   50%      { opacity: 1;    transform: scale(1.15); }

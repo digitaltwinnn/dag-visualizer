@@ -93,18 +93,19 @@ export default function LeftColumn() {
       </RailDock>
     );
   }
-  // Phone: a bottom-LEFT "Explore" button opening a bottom sheet (~60vh, scene stays visible
-  // above), instead of the edge tab — a side tab + bottom sheet reads spatially confusing on a
-  // narrow phone. `phoneDock` (the store) is the single source of truth for which of the two
-  // phone docks (this one, or Inspector's "Details") is open — they can't both be open at once,
-  // there's no room to stack two bottom sheets. Opening this one just sets `phoneDock`, which
-  // simultaneously closes the Details dock (its own `open` reads the same field).
+  // Phone: the LEFT half of the persistent bottom bar (below the LiveStrip, at the very bottom of
+  // the viewport — see 16-responsive-shell.css), instead of the edge tab — a side tab + bottom
+  // sheet reads spatially confusing on a narrow phone. `phoneDock` (the store) is the single
+  // source of truth for which of the two phone docks (this one, or Inspector's "Details") is
+  // open — they can't both be open at once, there's no room to stack two bottom sheets. Tapping
+  // this half sets `phoneDock`, which simultaneously closes the Details dock (its own `open`
+  // reads the same field); tapping it again while open collapses it (RailDock's own toggle).
   return (
     <RailDock
       side="left"
       label="Explore"
       style={accent}
-      trigger="bottom-button"
+      trigger="bottom-bar-half"
       sheetSide="bottom"
       open={phoneDock === "explore"}
       onOpenChange={(next) => setPhoneDock(next ? "explore" : null)}
