@@ -3,19 +3,20 @@
 import { useMemo, useState } from "react";
 import { useStore } from "@/src/store/store";
 import PanelHead from "@/components/PanelHead";
-import { shortHash } from "@/src/data/network";
-import { RoleTags } from "@/components/inspector/parts";
+import { shortHash, CORE_HEX, metagraphById } from "@/src/data/network";
+import { identityHudHex } from "@/src/palette/identity";
+import { StatusMark } from "@/components/inspector/parts";
 import { ccToFlag } from "@/src/util/format";
+import { hoverKeyOf } from "@/src/data/hoverSubject";
+import { subjectPairing } from "@/components/useSubjectPairing";
 import type { NodeRow } from "@/src/data/types";
 
-const TOP = 9;
-
-// Geography's single **explore** card (mirrors the Hypergraph's one LearnPanel — one frame,
-// one "Geography · explore" eyebrow, an accordion you click into). The country list IS the
+// Geography's single **explore** card (one frame, one "Geography · explore" eyebrow, an
+// accordion you click into). The country list IS the
 // node browser: each country is a row showing its share of the footprint (bar + count), and
 // clicking it drills the globe into that country AND expands its nodes inline — master on
 // top, detail nested beneath, then a node row opens its card on the right facts rail.
-// A compact distribution-score meter sits at the top as the footprint's headline figure.
+// The footprint's headline figures live in the top-bar vitals; this card is purely the accordion.
 export default function GeoExplore() {
   const lb = useStore((s) => s.leaderboard);
   const country = useStore((s) => s.country);
@@ -24,8 +25,10 @@ export default function GeoExplore() {
   const inspect = useStore((s) => s.inspect);
   const setInspect = useStore((s) => s.setInspect);
   const setHoverNodeId = useStore((s) => s.setHoverNodeId);
+  const hoverNodeId = useStore((s) => s.hoverNodeId);
   const setFilter = useStore((s) => s.setFilter);
-  const [showAll, setShowAll] = useState(false);
+  const filter = useStore((s) => s.filter);
+  const setMode = useStore((s) => s.setMode);
   const [collapsed, setCollapsed] = useState(false);
 
   // Selecting a node here mirrors clicking it on the globe (Engine._handleClick): set the
@@ -45,8 +48,20 @@ export default function GeoExplore() {
 
   const list = lb?.countries ?? [];
   const max = list[0]?.count ?? 1;
-  const rows = showAll ? list : list.slice(0, TOP);
-  const hiddenCount = list.length - rows.length;
+  const rows = list;
+
+  // Quiet-empty: a real metagraph is selected but has 0 locatable nodes, so the country list
+  // (the leaderboard's `countries`, what this accordion renders) is empty — nothing to browse,
+  // but the metagraph is real and still visible in the Hypergraph. "all"/"dag" never hit this
+  // (the whole network / DAG core always has locatable validators).
+  const isMetaFilter = filter !== "all" && filter !== "dag";
+  const quietEmpty = isMetaFilter && list.length === 0;
+  // The magnitude bar is a distribution leaderboard cue: structural cyan for the whole network /
+  // DAG, but when a single metagraph is filtered the list is ITS nodes, so the bar tints to that
+  // metagraph's identity hue (HUD lane).
+  const barHue = isMetaFilter ? identityHudHex(filter) : undefined;
+  const activeCfg = metagraphById(filter);
+  const tickerOrName = activeCfg ? activeCfg.ticker || activeCfg.name : "This metagraph";
   // Click a country: drill the globe into it (store.country) — the drill state doubles as the
   // accordion's "which row is open", so the globe and the list stay one source of truth.
   const drill = (cc: string) => setCountry(country === cc ? null : cc);
@@ -73,14 +88,22 @@ export default function GeoExplore() {
   return (
     <aside id="geoexplore" className={"panel" + (collapsed ? " collapsed" : "")}>
       <PanelHead
-        title="Geographic footprint"
+        title="Nodes by country"
         eyebrow="Geography · explore"
         collapsed={collapsed}
         onToggle={() => setCollapsed((c) => !c)}
       />
       <div className="geo-body panel-body">
-        {/* The footprint's headline figures (country count + distribution score) live in the
-            top-bar vitals now; this card is purely the country→nodes accordion. */}
+        {/* The footprint's headline figures (Nodes / Countries / Ready) live in the top-bar
+            vitals now; this card is purely the country→nodes accordion. */}
+        {quietEmpty ? (
+          <div className="geo-quiet-empty">
+            <span className="st-standby-dim" aria-hidden><span className="st-standby-node" /></span>
+            <p className="geo-qe-title">No locatable nodes</p>
+            <p className="geo-qe-line">{tickerOrName} has no validators we can place on the map right now. It still appears in the Hypergraph.</p>
+            <button className="geo-qe-jump" onClick={() => setMode("hyper")}>See it in the Hypergraph →</button>
+          </div>
+        ) : (
         <div className="geo-list">
           {rows.map((c) => {
             const open = c.cc === country;
@@ -98,7 +121,12 @@ export default function GeoExplore() {
                     {c.country}
                   </span>
                   <span className="lb-bar">
-                    <span style={{ width: `${Math.round((c.count / max) * 100)}%` }} />
+                    <span
+                      style={{
+                        width: `${Math.round((c.count / max) * 100)}%`,
+                        ...(barHue ? { ["--lb-bar-fill" as string]: barHue } : {}),
+                      }}
+                    />
                   </span>
                   <span className="lb-count">{c.count}</span>
                   <span className="geo-c-caret">{open ? "▾" : "▸"}</span>
@@ -114,25 +142,24 @@ export default function GeoExplore() {
                         const on =
                           selIp != null && r.layer === selLayer &&
                           r.pick.kind !== "snapshot" && "node" in r.pick && r.pick.node?.ip === selIp;
-                        // Match the globe's hover pairing: validators by machine id, metagraph nodes by ip.
-                        const hoverKey =
-                          r.pick.kind === "metanode" ? r.pick.node?.ip ?? null
-                            : r.pick.kind === "l0" || r.pick.kind === "l1" ? r.pick.node?.id ?? null
-                              : null;
+                        const hoverKey = hoverKeyOf(r.pick);
+                        const pick = r.pick;
+                        const rowHue = pick.kind === "metanode" && pick.meta ? identityHudHex(pick.meta.id) : CORE_HEX;
+                        const pair = subjectPairing(hoverNodeId, hoverKey, setHoverNodeId, rowHue);
                         return (
                           <button
                             key={r.label + i}
-                            className={"nb-row" + (on ? " active" : "")}
+                            className={"nb-row" + (on ? " active" : "") + (pair.paired ? " " + pair.className : "")}
+                            style={pair.style}
                             title={`${r.label} · ${r.state ?? "—"}`}
                             onClick={() => selectNode(r.pick)}
-                            onMouseEnter={() => setHoverNodeId(hoverKey)}
+                            onMouseEnter={pair.onMouseEnter}
                           >
-                            {/* No status dot here — it read as the network bullet on the node
-                                card (different meaning); state lives in the card's pill. */}
+                            <span className="nb-dot" style={{ background: rowHue, color: rowHue }} aria-hidden />
                             <span className={"nb-label" + (r.id ? " insp-hash" : "")}>
                               {r.id ? shortHash(r.id) : r.label}
                             </span>
-                            <RoleTags roles={r.roles} />
+                            <StatusMark state={r.state} />
                           </button>
                         );
                       })
@@ -142,26 +169,10 @@ export default function GeoExplore() {
               </div>
             );
           })}
-
-          {hiddenCount > 0 && (
-            <button type="button" className="lb-row lb-row--btn lb-toggle" onClick={() => setShowAll(true)}>
-              <span className="lb-flag">🌐</span>
-              <span className="lb-name">{`${hiddenCount} more ${hiddenCount === 1 ? "country" : "countries"}`}</span>
-              <span className="lb-bar" />
-              <span className="geo-c-caret">▸</span>
-            </button>
-          )}
-          {showAll && list.length > TOP && (
-            <button type="button" className="lb-row lb-row--btn lb-toggle" onClick={() => setShowAll(false)}>
-              <span className="lb-flag">🌐</span>
-              <span className="lb-name">Show fewer</span>
-              <span className="lb-bar" />
-              <span className="geo-c-caret">▾</span>
-            </button>
-          )}
         </div>
+        )}
 
-        <div className="lb-foot">Click a country to drill in.</div>
+        {!quietEmpty && <div className="lb-foot">Click a country to drill in.</div>}
       </div>
     </aside>
   );

@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { unstable_cache } from "next/cache";
 import metagraphsBaked from "@/data/metagraphs.json";
 import geoBaked from "@/data/geo.json";
+import { assignPalette } from "@/src/palette/palette";
+import { identityPins } from "@/src/palette/identity";
 
 // Live server-side port of scripts/bake-metagraphs.py. Next's Node server CAN reach
 // the metagraph cluster load balancers (plain HTTP, custom ports, no CORS) that a
@@ -28,6 +30,7 @@ interface MetaNode { ip: string; state: string; layer: string; roles: string[]; 
 interface Metagraph {
   id: string; name: string; symbol: string; description: string;
   siteUrl: string; iconUrl: string; nodes: MetaNode[];
+  hue?: { deg: number; oklch: string; hex: string };
 }
 type GeoMap = Record<string, { lat: number; lon: number; city: string; country: string; cc: string }>;
 
@@ -164,10 +167,19 @@ const getLive = unstable_cache(
   { revalidate },
 );
 
+function withHues(list: Metagraph[]): Metagraph[] {
+  const palette = assignPalette(list.map((m) => m.id), identityPins());
+  return list.map((m) => {
+    const e = palette.get(m.id);
+    return e ? { ...m, hue: { deg: e.hueDeg, oklch: e.oklch, hex: e.hex } } : m;
+  });
+}
+
 export async function GET() {
   try {
-    return NextResponse.json(await getLive());
+    const live = await getLive();
+    return NextResponse.json({ ...live, metagraphs: withHues(live.metagraphs) });
   } catch {
-    return NextResponse.json(baked); // live fetch failed/empty — serve the bake
+    return NextResponse.json({ ...baked, metagraphs: withHues(baked.metagraphs) }); // bake + hues
   }
 }

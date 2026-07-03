@@ -4,6 +4,18 @@
    instead of three unrelated widgets. Panel bodies keep their own classes; only
    the head + collapse behaviour are unified here. */
 
+/* Base glass surface for every rail card (the Instrument-Glass panel). NOTE: this rule
+   originally lived in 02-filter-panel.css, which was retired in the Phase-2 top-bar refresh —
+   its deletion silently dropped the `.panel` background/border/blur, leaving every rail card
+   transparent. Restored here (the panel-system's proper home). */
+.panel {
+  background: var(--panel);
+  border: 1px solid var(--panel-border);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border-radius: var(--radius);
+}
+
 .panel-head {
   display: flex; align-items: flex-start; justify-content: space-between;
   gap: 8px; padding: var(--panel-pad-y) var(--panel-pad-x);
@@ -44,11 +56,18 @@
    inside .panel-body (or the panel toggles its own body — Learn keeps both). */
 .panel.collapsed .panel-body { display: none; }
 
-/* The global filter gets a faint accent stripe down its left edge to reinforce
-   "this control applies everywhere" without shouting. */
-#netfilter { position: relative; overflow: hidden; }
-#netfilter::before {
-  content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 2px;
-  background: linear-gradient(180deg, var(--core), var(--l0));
-  opacity: 0.55;
+/* Left rail identity cue — split across two layers so the CYAN identity line stays ATTACHED to the
+   card (flush at its left edge, the original spine) while the neutral RULER hairlines live out in
+   the margin near the screen edge (the fixed SVG, RailThread side="left" — the rail clips
+   horizontally, so only a sibling SVG can reach the margin). Here: the cyan spine on each card,
+   faded top+bottom (`var()` resolves fine in a CSS property, unlike an SVG stroke attribute). The
+   SVG carries the neutral base line + outward ticks + the per-card dot-anchor (which sits back on
+   this spine at the card edge). */
+#leftcol > .panel { position: relative; }
+#leftcol > .panel::before {
+  content: ""; position: absolute; left: 0; top: 10px; bottom: 10px;
+  width: 2px; border-radius: 2px; pointer-events: none;
+  background: linear-gradient(to bottom,
+    transparent 0, var(--filter-accent, var(--primary)) 12%,
+    var(--filter-accent, var(--primary)) 88%, transparent 100%);
 }

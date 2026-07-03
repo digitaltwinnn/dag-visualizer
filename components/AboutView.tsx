@@ -3,25 +3,27 @@
 import { useState } from "react";
 import PanelHead from "@/components/PanelHead";
 
-// A "coming soon" tool card for the scaffolded views (Network status / Transactions /
-// Delegated staking). Same shell as the real view panels so the four-zone HUD stays
-// consistent; the canvas is hidden behind it (the engine treats these as flat views).
-export default function PlaceholderPanel({
+// The left-rail "About this view" orientation card, shown at the top of the rail in every view.
+// Same shell as the tool panels so the four-zone HUD stays consistent. Collapsed by default (a
+// single PanelHead strip) — the view's scene/tool is the star; expand to read the orientation.
+export default function AboutView({
   title,
   eyebrow,
   lines,
+  caption = "",
 }: {
   title: string;
   eyebrow: string;
   lines: string[];
+  caption?: string;
 }) {
-  const [collapsed, setCollapsed] = useState(false);
+  const [collapsed, setCollapsed] = useState(true);
   return (
     <aside className={"panel" + (collapsed ? " collapsed" : "")}>
       <PanelHead
         title={title}
         eyebrow={eyebrow}
-        caption="SOON"
+        caption={caption || undefined}
         collapsed={collapsed}
         onToggle={() => setCollapsed((c) => !c)}
       />

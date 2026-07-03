@@ -32,8 +32,10 @@ export function useFlashOnChange(dep: unknown) {
     const ring = `color-mix(in srgb, ${accent} 70%, transparent)`;
 
     anim.current?.cancel(); // restart cleanly if it's still flashing from a previous change
+    // INSET ring pulse (drawn inside the rounded border) so the rail's overflow can't clip it
+    // left/right — it lights all four edges of the card, then fades.
     anim.current = el.animate(
-      [{ boxShadow: `0 0 0 0 ${ring}` }, { boxShadow: "0 0 0 8px transparent" }],
+      [{ boxShadow: `inset 0 0 0 2px ${ring}` }, { boxShadow: "inset 0 0 0 2px transparent" }],
       { duration: FLASH_MS, easing: "ease-out" },
     );
   }, [dep]);

@@ -1,0 +1,27 @@
+/* Center schematic blueprint for the SOON views — faint structural chrome, cyan accents. Sits
+   above the (faded-out) canvas, below the HUD chrome. */
+#blueprint {
+  position: fixed; inset: 0; z-index: 6;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 22px; pointer-events: none; padding: 0 24px;
+}
+.bp-art { opacity: 0.5; }
+.bp-svg { width: min(46vw, 420px); height: auto; overflow: visible; }
+.bp-cell { fill: none; stroke: color-mix(in oklch, var(--core) 40%, var(--panel-border)); stroke-width: 1.25; }
+.bp-cell--wait { stroke-dasharray: 3 3; stroke: color-mix(in oklch, var(--core) 55%, transparent); }
+.bp-cell--off { stroke: var(--panel-border); opacity: 0.5; }
+.bp-cap { display: flex; flex-direction: column; align-items: center; gap: 8px; text-align: center; max-width: 380px; }
+.bp-tag {
+  font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase;
+  color: color-mix(in oklch, var(--core) 80%, #fff); opacity: 0.85;
+}
+.bp-line { font-size: 13px; color: var(--muted); line-height: 1.5; }
+
+/* Transactions flow graph */
+.bp-addr { fill: none; stroke: color-mix(in oklch, var(--core) 40%, var(--panel-border)); stroke-width: 1.25; }
+.bp-flow { stroke: color-mix(in oklch, var(--core) 55%, transparent); stroke-width: 1.25; stroke-dasharray: 4 4; fill: none; }
+.bp-arrowhead { fill: none; stroke: color-mix(in oklch, var(--core) 55%, transparent); stroke-width: 1; }
+/* Staking delegation */
+.bp-validator { fill: none; stroke: color-mix(in oklch, var(--core) 45%, var(--panel-border)); stroke-width: 1.5; }
+.bp-staker { fill: color-mix(in oklch, var(--core) 45%, transparent); stroke: none; }
+.bp-delegate { stroke: var(--panel-border); stroke-width: 1; }

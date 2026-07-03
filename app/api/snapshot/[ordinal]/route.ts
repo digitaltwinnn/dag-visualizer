@@ -35,9 +35,24 @@ async function fetchExact(ordinal: number): Promise<SnapshotExact> {
   // unavailable recent tick is retried on the next request.
   if (!r.ok) throw new Error(`l0 ${r.status}`);
   const j = (await r.json()) as { value?: Record<string, unknown> } & Record<string, unknown>;
-  const v = (j.value ?? j) as { stateChannelSnapshots?: Record<string, StateChannelSnap[]> };
+  const v = (j.value ?? j) as {
+    stateChannelSnapshots?: Record<string, StateChannelSnap[]>;
+    rewards?: unknown;
+  };
   const sc = v.stateChannelSnapshots;
   if (!sc) throw new Error("no stateChannelSnapshots");
+
+  // Rewards this snapshot distributes (each reward carries an `amount` in datum). Defensive: only
+  // sum if it's an array of {amount}; anything else → 0 (never fabricate). Verified shape:
+  // `value.rewards` is an array (type confirmed live), but empty on every sampled mainnet snapshot
+  // (2026-07-02) — no reward transactions currently observed, so this consistently resolves to 0.
+  const rawRewards = v.rewards;
+  const rewardsDatum = Array.isArray(rawRewards)
+    ? rawRewards.reduce(
+        (s: number, r) => s + (typeof (r as { amount?: number })?.amount === "number" ? (r as { amount: number }).amount : 0),
+        0,
+      )
+    : 0;
 
   let totalFee = 0,
     totalBytes = 0,
@@ -75,6 +90,7 @@ async function fetchExact(ordinal: number): Promise<SnapshotExact> {
     channels: Object.keys(sc).length,
     totalFee,
     totalSizeKB: totalBytes / 1024, // measured from content byte length, not the fee
+    rewardsDatum,
     listedFee,
     unlistedFee,
     listedCount,

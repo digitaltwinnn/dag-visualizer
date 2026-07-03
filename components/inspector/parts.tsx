@@ -1,7 +1,15 @@
 "use client";
 
 import { useState } from "react";
-import type { MetaCfg, MetaInfo, NodeInfo } from "@/src/data/types";
+import type { NodeInfo } from "@/src/data/types";
+import {
+  nodeStatus,
+  statusBreakdown,
+  labelBreakdown,
+  BUCKET_COLOR,
+  type StatusBucket,
+} from "@/src/data/nodeStatus";
+import { compositionRows } from "@/src/data/composition";
 
 // Shared building blocks for the inspector cards (the React port of ui.js _cardBody),
 // split out so each per-kind card reads as its own small file.
@@ -13,31 +21,82 @@ export const ROLE_ORDER = ["l0", "cl1", "dl1"];
 // A node's roles, falling back to its primary layer when the role list is absent.
 export const rolesOf = (n: NodeInfo) => (n.roles && n.roles.length ? n.roles : [n.layer!]);
 
-// A colour per node `state` (the lifecycle status from /cluster/info), grouped by stage so the
-// status pill reads at a glance: in-consensus (green) → observing (cyan) → waiting (amber) →
-// syncing (orange) → starting a session (purple) → leaving/down (red); anything else is neutral.
-export function nodeStateColor(state?: string | null): string {
-  switch (state) {
-    case "Ready":
-      return "#36e29a"; // fully in consensus
-    case "Observing":
-      return "#5ad1ff";
-    case "WaitingForReady":
-    case "WaitingForObserving":
-      return "#ffd166"; // waiting to advance
-    case "ReadyToDownload":
-    case "WaitingForDownload":
-    case "DownloadInProgress":
-      return "#ff9f45"; // syncing state
-    case "StartingSession":
-    case "SessionStarted":
-      return "#b18cff"; // (re)joining a session
-    case "Leaving":
-    case "Offline":
-      return "#ff6b6b"; // leaving / down
-    default:
-      return "#9aa6c2"; // any other / unknown lifecycle state
-  }
+// Single node status — Ready reads as plain green text; any other state is a small pill in its
+// bucket colour, labelled with the exact stage. Colour = bucket (lane-clean), text = exact state.
+export function StatusMark({ state }: { state?: string | null }) {
+  const s = nodeStatus(state);
+  if (s.bucket === "ready") return <span className="st-ready">{s.label}</span>;
+  return (
+    <span
+      className="st-pill"
+      style={{ color: s.color, borderColor: s.color + "55", background: s.color + "1a" }}
+    >
+      {s.label}
+    </span>
+  );
+}
+
+// Rolled-up status for a node group (dossier): "all ready" (green) or the non-zero buckets as
+// counts + colour dots (`28 ready · 2 waiting · 1 syncing · 2 down`). The amber "progress"
+// bucket is spelled out by its exact lifecycle state(s) — same wording a single node's own
+// card shows (`StatusMark`) — instead of collapsing to a bare "N in progress"; colour still
+// comes from the bucket (BUCKET_COLOR), only the text goes granular.
+const BUCKET_WORD: Record<StatusBucket, string> = {
+  ready: "ready",
+  progress: "in progress",
+  down: "down",
+  unknown: "unknown",
+};
+export function StatusBreakdown({ states }: { states: (string | null | undefined)[] }) {
+  const b = statusBreakdown(states);
+  const total = states.length;
+  if (total > 0 && b.ready === total) return <span className="st-ready">all ready</span>;
+  const order: StatusBucket[] = ["ready", "progress", "down", "unknown"];
+  const parts = order.filter((k) => b[k] > 0);
+  return (
+    <span className="st-breakdown">
+      {parts.map((k, i) => {
+        const items =
+          k === "progress"
+            ? labelBreakdown(states, "progress")
+            : [{ label: BUCKET_WORD[k], count: b[k] }];
+        return (
+          <span className="st-bd" key={k}>
+            <span className="st-bd-dot" style={{ background: BUCKET_COLOR[k] }} />
+            {items.map((it, j) => (
+              <span key={it.label}>
+                {j > 0 ? <span className="st-bd-sep"> · </span> : null}
+                {it.count} {it.label}
+              </span>
+            ))}
+            {i < parts.length - 1 ? <span className="st-bd-sep"> · </span> : null}
+          </span>
+        );
+      })}
+    </span>
+  );
+}
+
+// One composition row per make-up: role (bright) + codes (muted) + a capped chip stack
+// (visual scale only, ≤10, no +N) + the authoritative count.
+export function CompositionRows({ nodes }: { nodes: NodeInfo[] }) {
+  const rows = compositionRows(nodes);
+  return (
+    <div className="comp-rows">
+      {rows.map((r, i) => (
+        <div className="comp-row" key={i}>
+          <span className="comp-role">{r.label}</span>
+          <span className="comp-codes">{r.codes.join("·")}</span>
+          <span className="comp-chips" aria-hidden>
+            {Array.from({ length: Math.min(r.count, 10) }).map((_, j) => (
+              <span className="comp-chip" key={j} />
+            ))}
+          </span>
+          <span className="comp-count">{r.count}</span>
+        </div>
+      ))}
+    </div>
+  );
 }
 
 // One pass over a metagraph's nodes → the facts every card needs to describe it.
@@ -50,13 +109,6 @@ export interface Composition {
   total: number;
   hasCurrency: boolean; // runs a currency-L1 cluster → has a real token
 }
-// The token shown after a metagraph's name: its ticker, or "no token" when it runs no
-// currency-L1 (a data metagraph has a symbol but no real token). Rendered as a subtle suffix.
-export function metaToken(cfg: MetaCfg, mg: MetaInfo | null): string {
-  const hasToken = !!mg && nodeComposition(mg.nodes).hasCurrency;
-  return hasToken ? mg!.symbol || cfg.ticker || "no token" : "no token";
-}
-
 export function nodeComposition(nodes: NodeInfo[]): Composition {
   const present = ROLE_ORDER.filter((r) => nodes.some((n) => rolesOf(n).includes(r)));
   const hybrid = nodes.filter((n) => rolesOf(n).length > 1).length;

@@ -1,33 +1,33 @@
 "use client";
 
-import { useEffect, useRef, useState, type CSSProperties } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useStore } from "@/src/store/store";
 import { metagraphById } from "@/src/data/network";
 import { hex } from "@/src/util/format";
-import Vitals from "@/components/topbar/Vitals";
-import FilterChips from "@/components/topbar/FilterChips";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import Vitals, { VitalsCluster, VitalsToggle } from "@/components/topbar/Vitals";
+import FilterPicker from "@/components/topbar/FilterPicker";
+import EcgMark from "@/components/topbar/EcgMark";
+import { useBreakpoint } from "@/components/useBreakpoint";
+import type { Mode } from "@/src/store/store";
 
-// All glyphs are plain monochrome symbols (no emoji) so they respect CSS `color` / the accent.
 const VIEWS = [
   { id: "hyper", label: "◆", name: "Hypergraph" },
   { id: "geo", label: "◍", name: "Geography" },
   { id: "ledger", label: "▦", name: "Snapshots" },
-  { id: "status", label: "◉", name: "Network" },
-  { id: "transactions", label: "⇄", name: "Transactions" },
-  { id: "staking", label: "⬢", name: "Staking" },
+  { id: "status", label: "◉", name: "Network", soon: true },
+  { id: "transactions", label: "⇄", name: "Transactions", soon: true },
+  { id: "staking", label: "⬢", name: "Staking", soon: true },
 ] as const;
 
-// Resolve the current filter to a display label + dot for the collapsed filter button.
+// Collapsed filter face: a small identity dot + the network name in neutral text (no filled
+// chip). All → a neutral cyan dot. Identity is the ONLY colour the filter carries.
 function filterFace(filter: string): { label: string; dot: string } {
   const cfg = metagraphById(filter);
   if (cfg) return { label: cfg.ticker || cfg.name, dot: hex(cfg.color) };
-  return { label: "All", dot: "var(--core)" };
+  return { label: "All", dot: "var(--primary)" };
 }
 
-// The unified top command bar: one centered floating capsule that holds the network
-// **status + filter** (left), the **view switch** (center), and the **view-specific
-// vitals** (right). Clicking the filter expands the capsule downward into the chip
-// grid (one connected surface), so the filter no longer needs a slot in the left rail.
 export default function TopBar() {
   const live = useStore((s) => s.live);
   const filter = useStore((s) => s.filter);
@@ -36,16 +36,29 @@ export default function TopBar() {
 
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
+  const filterBtnRef = useRef<HTMLButtonElement>(null);
+  const [pop, setPop] = useState<{ left: number; top: number } | null>(null);
 
-  // Close the expanded filter on outside click or Escape.
+  const bp = useBreakpoint();
+  const [vitalsOpen, setVitalsOpen] = useState(false);
+  const vitalsBtnRef = useRef<HTMLButtonElement>(null);
+  const [vitalsPop, setVitalsPop] = useState<{ right: number; top: number } | null>(null);
+
   useEffect(() => {
     if (!open) return;
+    // Anchor the floating picker under the filter button, just below the bar. Measured so it
+    // never depends on the bar's full width (the picker is a compact popover, not a bar expansion).
+    const bar = document.getElementById("topbar");
+    const btn = filterBtnRef.current;
+    if (bar && btn) {
+      const br = bar.getBoundingClientRect();
+      const fr = btn.getBoundingClientRect();
+      setPop({ left: Math.round(fr.left), top: Math.round(br.bottom + 6) });
+    }
     const onDown = (e: MouseEvent) => {
       if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
     };
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setOpen(false);
-    };
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") setOpen(false); };
     document.addEventListener("mousedown", onDown);
     document.addEventListener("keydown", onKey);
     return () => {
@@ -54,67 +67,108 @@ export default function TopBar() {
     };
   }, [open]);
 
-  const face = filterFace(filter);
-  const filtered = filter !== "all";
+  // Same popover pattern as the filter picker: measured + rendered OUTSIDE #topbar so its
+  // `overflow: hidden` (and the containing block backdrop-filter creates) can't clip it.
+  useEffect(() => {
+    if (!vitalsOpen) return;
+    const bar = document.getElementById("topbar");
+    const btn = vitalsBtnRef.current;
+    if (bar && btn) {
+      const br = bar.getBoundingClientRect();
+      const fr = btn.getBoundingClientRect();
+      setVitalsPop({ right: Math.round(window.innerWidth - fr.right), top: Math.round(br.bottom + 6) });
+    }
+    const onDown = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setVitalsOpen(false);
+    };
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") setVitalsOpen(false); };
+    document.addEventListener("mousedown", onDown);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", onDown);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [vitalsOpen]);
 
-  // The whole bar's accent (`--tb-accent`) follows the selection, so the controls that signal
-  // it — the filter pill and the active view button (outline + icon + glow) — all theme to it.
-  // A selected core (a metagraph or the DAG) uses its colour; the catch-all **All** has no single
-  // colour, so it leaves `--tb-accent` unset and the controls fall back to a neutral default.
-  const mgCfg = metagraphById(filter);
-  const accent = mgCfg ? hex(mgCfg.color) : null;
-  const barAccent: CSSProperties | undefined = accent
-    ? ({ ["--tb-accent"]: accent } as CSSProperties)
-    : undefined;
+  // Vitals aren't shown inline on phone (no room) — closing the toggle when the breakpoint
+  // changes away from phone avoids a stray open popover if the viewport is resized.
+  useEffect(() => {
+    if (bp !== "phone") setVitalsOpen(false);
+  }, [bp]);
+
+  const face = filterFace(filter);
 
   return (
-    <div id="topbar" ref={ref} className={open ? "open" : ""} style={barAccent}>
+    <div ref={ref}>
+      <div id="topbar" className={open ? "open" : ""}>
       <div className="tb-row">
-        {/* Left: an offline warning (only when down — live is the silent default) + filter */}
-        <div className="tb-left">
-          {!live && (
-            <span className="tb-offline" title="The block-explorer feed is unreachable — data is stale.">
-              <span className="tb-offline-dot" />
-              No data
-            </span>
-          )}
-          <button
-            className={"tb-filter" + (open ? " active" : "")}
-            aria-expanded={open}
-            onClick={() => setOpen((o) => !o)}
-          >
-            <span className="tb-filter-k">Filter</span>
-            <span className={"tb-filter-pill" + (filtered ? " on" : "")}>
-              <span className="tb-filter-dot" style={{ background: face.dot }} />
-              {face.label}
-            </span>
-            <span className="tb-caret">{open ? "▴" : "▾"}</span>
-          </button>
+        {/* Brand */}
+        <div className={"tb-brand" + (live ? "" : " off")}>
+          <EcgMark />
+          <span className="tb-word">
+            <span className="tb-word-dag">DAG</span>{" "}
+            <span className="tb-word-vis">Visualizer</span>
+          </span>
         </div>
+        <span className="tb-div" />
 
-        {/* Center: view switch */}
-        <div className="tb-views">
-          {VIEWS.map((v) => (
-            <button
-              key={v.id}
-              className={mode === v.id ? "active" : ""}
-              aria-pressed={mode === v.id}
-              title={v.name}
-              onClick={() => setMode(v.id)}
-            >
+        {/* Filter (toned, de-nested) */}
+        <button ref={filterBtnRef} className={"tb-filter" + (open ? " active" : "")} aria-expanded={open}
+          onClick={() => { setOpen((o) => !o); setVitalsOpen(false); }}>
+          <span className="tb-filter-k">Filter</span>
+          <span className="tb-filter-dot" style={{ background: face.dot }} />
+          <span className="tb-filter-name">{face.label}</span>
+          <span className="tb-caret">{open ? "▴" : "▾"}</span>
+        </button>
+
+        <div className="tb-spacer" />
+
+        {/* View switch — structural. On phone there's no room for the three non-functional
+            "soon" placeholders (Network/Transactions/Staking) — they're dimmed dead weight
+            that helped overflow the bar, so phone shows only the 3 working views. Tablet +
+            desktop keep all six. */}
+        <ToggleGroup
+          type="single"
+          value={mode}
+          onValueChange={(v) => { if (v) setMode(v as Mode); }}
+          className="tb-views"
+        >
+          {(bp === "phone" ? VIEWS.filter((v) => !("soon" in v && v.soon)) : VIEWS).map((v) => (
+            <ToggleGroupItem key={v.id} value={v.id} title={v.name}
+              className={"tb-view" + ("soon" in v && v.soon ? " soon" : "")}>
               <span className="tb-view-icon">{v.label}</span>
               <span className="tb-view-name">{v.name}</span>
-            </button>
+            </ToggleGroupItem>
           ))}
-        </div>
+        </ToggleGroup>
 
-        {/* Right: view-specific vitals */}
+        <div className="tb-spacer" />
+        <span className="tb-div" />
+
+        {/* Vitals — inline on tablet/desktop; a toggle button on phone (popover rendered
+            below, outside #topbar). */}
         <Vitals />
+        {bp === "phone" && (
+          <VitalsToggle ref={vitalsBtnRef} open={vitalsOpen} onClick={() => { setVitalsOpen((o) => !o); setOpen(false); }} />
+        )}
+      </div>
       </div>
 
-      {open && (
-        <div className="tb-expand">
-          <FilterChips onPick={() => setOpen(false)} />
+      {/* Floating vitals popover (phone only) — same pattern as the filter picker: measured
+          under its toggle button, rendered outside #topbar so overflow/backdrop-filter can't
+          clip it. Reduced-motion: this is a plain conditional mount, no animated reveal. */}
+      {vitalsOpen && vitalsPop && (
+        <div className="tb-vitals-pop" style={{ right: vitalsPop.right, top: vitalsPop.top }}>
+          <VitalsCluster />
+        </div>
+      )}
+
+      {/* Floating filter picker — a compact popover anchored under the filter button (NOT a
+          full-width expansion of the bar). Lives outside #topbar so the bar's `overflow: hidden`
+          can't clip it; still inside the outer ref so an outside-click closes it. */}
+      {open && pop && (
+        <div className="tb-filter-pop" style={{ left: pop.left, top: pop.top }}>
+          <FilterPicker onPick={() => setOpen(false)} />
         </div>
       )}
     </div>

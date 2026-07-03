@@ -7,6 +7,7 @@ import { NetworkData, shortHash as rawShortHash } from "../../js/api.js";
 export const shortHash = rawShortHash as (h: string) => string;
 import { METAGRAPHS, COLORS as RAW_COLORS, DEFAULT_META_COLOR as RAW_DEFAULT_META } from "../../js/config.js";
 import { hex } from "@/src/util/format";
+import { identityHudNumber } from "@/src/palette/identity";
 
 export const COLORS = RAW_COLORS as { core: number; l0: number; l1: number; bg: number };
 
@@ -34,7 +35,7 @@ export function initNetwork(): NetworkData | null {
   // (per-metagraph fees), and whenever the selection changes.
   const refreshActivity = () => setActivity(net!.getActivity(useStore.getState().filter));
 
-  net.on("status", ({ live }: { live: boolean }) => setLive(live));
+  net.on("status", ({ live, lastGoodAt }: { live: boolean; lastGoodAt: number | null }) => setLive(live, lastGoodAt ?? undefined));
   net.on("cluster", ({ l0, l1 }: { l0: unknown[]; l1: unknown[] }) =>
     setNodes(l0.length, l1.length),
   );
@@ -80,16 +81,30 @@ export function isAnchorSettling(ts: string, total: number | null): boolean {
 
 // The DAG modelled as a core, resolvable like a metagraph config (its live nodes come from
 // the metaList; this is just its identity for the filter/dossier/top-bar).
-const DAG_CFG: MetagraphConfig = { id: "dag", name: "DAG", ticker: "DAG", color: COLORS.core };
+// The DAG core carries its own logo (it isn't in the live metaList). Uses the official $DAG mark
+// from the same Stargazer asset bucket the metagraph icons come from (monogram is the fallback).
+// `color` is the fallback before the identity hue resolves (metagraphById overrides it below) —
+// the DAG is itself a metagraph-shaped "core" (it has a logo, a site, its own validator nodes)
+// and gets its own brand hue, distinct from "All"/the structural-cyan core sphere.
+const DAG_CFG: MetagraphConfig = {
+  id: "dag", name: "DAG", ticker: "DAG", color: COLORS.core,
+  iconUrl: "https://stargazer-assets.s3.us-east-2.amazonaws.com/logos/dag.png",
+};
 
 // Config core (id → {color, ticker, name, …}) — a metagraph or the DAG; null for "all".
+// The color field is resolved through the identity HUD map so every downstream HUD read
+// (filterAccent, the Engine-built metaList[].color, and any hex(cfg.color) sourced from this
+// accessor) gets the identity hue at once — the DAG flips through the same lane as any other
+// metagraph now (see palette/identity.ts's resolve()); "All" stays structural cyan via
+// filterAccent's own fallback below, and the central core sphere reads COLORS.core directly.
 export function metagraphById(id: string): MetagraphConfig | null {
-  if (id === "dag") return DAG_CFG;
-  return (METAGRAPHS as MetagraphConfig[]).find((m) => m.id === id) ?? null;
+  if (id === "dag") return { ...DAG_CFG, color: identityHudNumber(id) };
+  const cfg = (METAGRAPHS as MetagraphConfig[]).find((m) => m.id === id);
+  return cfg ? { ...cfg, color: identityHudNumber(id) } : null;
 }
 
 // The accent colour for the active network filter, as a CSS colour string — the selected
-// core's colour (metagraph or the DAG's cyan), or the network cyan for "all".
+// core's colour (metagraph or the DAG's own brand hue), or the network cyan for "all".
 export function filterAccent(filter: string): string {
   const cfg = metagraphById(filter);
   if (cfg) return hex(cfg.color);
@@ -107,4 +122,5 @@ export interface MetagraphConfig {
   name: string;
   ticker: string;
   color: number;
+  iconUrl?: string;
 }

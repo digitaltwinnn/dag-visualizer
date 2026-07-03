@@ -21,6 +21,7 @@ export interface SnapshotExact {
   channels: number; // distinct metagraphs that anchored
   totalFee: number; // datum — EXACT, including unlisted. The fee itself, not derived from anything.
   totalSizeKB: number; // measured serialized size (Σ content byte-array length), NOT derived from fee
+  rewardsDatum: number; // total rewards distributed by this snapshot, in datum (0 if absent/unverified)
   listedFee: number; // datum from metagraphs we track
   unlistedFee: number; // datum from metagraphs outside the public catalog
   listedCount: number;
@@ -71,6 +72,7 @@ export interface MetaInfo {
   symbol?: string;
   description?: string;
   siteUrl?: string;
+  iconUrl?: string;
   color: number;
   nodes: NodeInfo[];
   located: number;
@@ -97,11 +99,9 @@ export interface NodeRow {
   layer: string;
   roles: string[];
 }
-// Per-country breakdown + distribution score for the active filter (engine-computed).
+// Per-country breakdown for the active filter (engine-computed).
 export interface LeaderboardData {
   countries: CountryStat[];
-  score: number | null;
-  refId: string | null;
 }
 
 export interface MetaCfg {
@@ -110,6 +110,7 @@ export interface MetaCfg {
   ticker?: string;
   color: number;
   blurb?: string;
+  iconUrl?: string; // logo for cores not in the live metaList (e.g. the DAG core)
 }
 
 // What the inspector renders. Emitted by the engine's picking (core/l0/l1/metanode)
