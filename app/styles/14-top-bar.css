@@ -168,6 +168,17 @@
   -webkit-backdrop-filter: blur(14px);
   box-shadow: 0 14px 40px -10px rgba(0, 0, 0, 0.6);
 }
+/* Phone: the JS anchors the popover at the filter button's left edge, but a ~372px panel hangs off
+   toward the right on a ~375px screen. Center it and fit the width (overrides the inline `left`;
+   the inline `top` — just below the bar — is kept). */
+@media (max-width: 699px) {
+  .tb-filter-pop {
+    left: 50% !important;
+    right: auto;
+    transform: translateX(-50%);
+    width: min(372px, calc(100vw - 24px));
+  }
+}
 
 /* ── Narrow screens: a graceful ladder — shed the least-essential thing at each step,
    keep the view names (the part the user asked to keep) as long as possible. ── */
