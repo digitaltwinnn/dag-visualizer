@@ -142,6 +142,9 @@ export interface GlobeApi {
 // node meshes (globe), placed by globe.js. Driven from the live snapshot buffer.
 export interface LedgerApi {
   group: THREE.Group;
+  /** Identity SCENE-lane colour map (id -> 0xRRGGBB), handed in by the Engine so the ledger's
+   *  lane tiles / anchor rings / links / pulses match the metagraphs' identity hue (not config). */
+  sceneColors?: Record<string, number>;
   /** The centred snapshot mesh (carries a `snapshot` pick in userData.pick) for raycasting. */
   pickables: THREE.Object3D[];
   /** Re-read the live tick from the Global L0 buffer (oldest→newest) + the per-tick anchor accessor. */

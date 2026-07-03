@@ -129,6 +129,10 @@ export class Engine {
     this.layers = new LayersCtor(this.ctx.scene, sceneColorsFor(METAGRAPHS.map((m) => m.id)));
     this.globe = new GlobeCtor(this.ctx.scene, this.layers, this.ctx.camera);
     this.ledger = new LedgerCtor(this.ctx.scene);
+    // The ledger colours its lane tiles / anchor rings / links / pulses per metagraph — feed it the
+    // same identity SCENE map so those match the hubs/nodes (config-ids known synchronously; the
+    // live set incl. new metagraphs is refreshed in refreshMeta alongside globe).
+    this.ledger.sceneColors = sceneColorsFor(METAGRAPHS.map((m) => m.id));
     canvas.addEventListener("click", this.onClick);
     canvas.addEventListener("pointermove", this.onMove);
     // The engine owns the resize handler (createScene no longer adds one) so it's
@@ -259,7 +263,9 @@ export class Engine {
       // Globe colors nodes for ALL current metagraphs (incl. new ones the API adds later), so
       // rebuild the scene-color map over the live id set on every refresh, right before either
       // path below calls setMetagraphs.
-      this.globe.sceneColors = sceneColorsFor((this.metaData || []).map((m) => m.id));
+      const liveSceneColors = sceneColorsFor((this.metaData || []).map((m) => m.id));
+      this.globe.sceneColors = liveSceneColors;
+      this.ledger.sceneColors = liveSceneColors; // keep the ledger's per-metagraph colours in sync (incl. new metagraphs)
       if (initial) {
         this._applyMetagraphs();
       } else if (this.metaData && changed && Object.keys(this.geoMap).length) {

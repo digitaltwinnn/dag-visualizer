@@ -91,6 +91,10 @@ export class Ledger {
     this.group.visible = false;
     scene.add(this.group);
     this.pickables = [];
+    // Identity SCENE-lane colour map (id -> 0xRRGGBB), set by the Engine so lane tiles / anchor
+    // rings / links / pulses use the metagraph's identity hue (not the raw config colour). Null
+    // until set → the `?? METAGRAPHS[i].color` fallbacks below keep it working.
+    this.sceneColors = null;
     this.t = 0;
     this._latest = null;
     this._baseR = 1;
@@ -199,7 +203,7 @@ export class Ledger {
     let lane = this._metaLanes.get(id);
     if (!lane) {
       const s = ledgerSite(i, METAGRAPHS.length);
-      lane = { id, z: s.z, color: new THREE.Color(METAGRAPHS[i].color), blocks: [] };
+      lane = { id, z: s.z, color: new THREE.Color((this.sceneColors && this.sceneColors[id]) ?? METAGRAPHS[i].color), blocks: [] };
       this._metaLanes.set(id, lane);
     }
     return lane;
@@ -433,7 +437,7 @@ export class Ledger {
     const i = METAGRAPHS.findIndex((m) => m.id === id);
     if (i < 0) return null; // unlisted — no site
     const s = ledgerSite(i, METAGRAPHS.length);
-    const color = METAGRAPHS[i].color;
+    const color = (this.sceneColors && this.sceneColors[id]) ?? METAGRAPHS[i].color;
     // Rings around the L1 + L0 node groups this metagraph produces from; they light up as a pulse
     // passes through (see update).
     const dR = clusterRadius(3); // default until the live node counts arrive (setGroupSizes)
