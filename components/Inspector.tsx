@@ -234,17 +234,13 @@ export default function Inspector() {
   // false→true) could slide the sheet up on its own — an auto-open, violating the no-auto-open
   // invariant. `open` must ALWAYS be purely user-tap-driven (RailDock's own state, or on phone
   // `store.phoneDock` — see below) — never derived from `hasDetail`. `hasDetail`/`hint` still
-  // only ever affect the hint dot and the sheet's CONTENT, never its open state. Dismissing the
-  // sheet (its own ✕/Escape/grabber) clears whichever pick is on top, mirroring that pane's own
-  // × — via `onOpenChange`, which is itself only invoked by RailDock's own tap/close
-  // affordances, never by a pick.
-  const handleDismiss = (next: boolean) => {
-    handleOpenChange(next);
-    if (!next) {
-      if (topSlot === "snap") setSnap(null);
-      else if (topSlot === "node") setInspect(null);
-    }
-  };
+  // only ever affect the hint dot and the sheet's CONTENT, never its open state.
+  //
+  // Dismissing the sheet just COLLAPSES it — it does NOT clear the selection (a closed panel
+  // isn't a deselection). This matches the tablet side sheet, and keeps the picks so reopening
+  // shows the same stack; a specific pick is cleared via its own pane's × (or a new pick). (An
+  // earlier phone-only variant cleared the top pick on dismiss, which was both inconsistent with
+  // tablet and lossy when a node AND a snapshot were stacked — only the top one cleared.)
 
   if (bp === "tablet") {
     // Tablet: unchanged — the right edge tab opening a right-side Sheet, independent of the
@@ -271,7 +267,7 @@ export default function Inspector() {
       pulseKey={pulseCount}
       open={phoneDock === "details"}
       onOpenChange={(next) => {
-        handleDismiss(next);
+        handleOpenChange(next);
         setPhoneDock(next ? "details" : null);
       }}
     >

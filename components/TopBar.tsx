@@ -114,7 +114,7 @@ export default function TopBar() {
 
         {/* Filter (toned, de-nested) */}
         <button ref={filterBtnRef} className={"tb-filter" + (open ? " active" : "")} aria-expanded={open}
-          onClick={() => setOpen((o) => !o)}>
+          onClick={() => { setOpen((o) => !o); setVitalsOpen(false); }}>
           <span className="tb-filter-k">Filter</span>
           <span className="tb-filter-dot" style={{ background: face.dot }} />
           <span className="tb-filter-name">{face.label}</span>
@@ -149,7 +149,7 @@ export default function TopBar() {
             below, outside #topbar). */}
         <Vitals />
         {bp === "phone" && (
-          <VitalsToggle ref={vitalsBtnRef} open={vitalsOpen} onClick={() => setVitalsOpen((o) => !o)} />
+          <VitalsToggle ref={vitalsBtnRef} open={vitalsOpen} onClick={() => { setVitalsOpen((o) => !o); setOpen(false); }} />
         )}
       </div>
       </div>
