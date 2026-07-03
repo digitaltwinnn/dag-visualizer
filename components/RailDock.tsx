@@ -97,8 +97,24 @@ export default function RailDock({
           />
         )}
       </button>
-      <Sheet open={open} onOpenChange={handleOpenChange}>
-        <SheetContent side={side} style={style} aria-describedby={undefined}>
+      {/* NON-MODAL (`modal={false}`): the left "Explore" and right "Details" docks can be open at
+          the SAME time, and the 3D scene between them stays interactive (picking still works — which
+          is how interacting with the scene/Explore updates Details). No focus trap, no scrim (see
+          `overlay={false}`), and outside-pointer no longer force-closes it — the user decides when
+          each closes (its own ✕ / Escape). Each RailDock owns its own `open`, so the two are fully
+          independent. */}
+      <Sheet open={open} onOpenChange={handleOpenChange} modal={false}>
+        <SheetContent
+          side={side}
+          style={style}
+          overlay={false}
+          // Don't let a pointer-down/interaction OUTSIDE the sheet (e.g. on the scene, or on the
+          // OTHER open dock) dismiss it — the user closes each dock explicitly via its own ✕ (or
+          // Escape). Without this, radix's DismissableLayer auto-closes a non-modal dialog on any
+          // outside pointer-down, which would make the two docks fight + close on every scene pick.
+          onInteractOutside={(e) => e.preventDefault()}
+          aria-describedby={undefined}
+        >
           <div className="sheet-head">
             <SheetTitle className="sheet-head-title">{label}</SheetTitle>
             <SheetClose className="sheet-close" aria-label={`Close ${label} panel`}>

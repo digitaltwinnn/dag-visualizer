@@ -46,13 +46,18 @@ function SheetContent({
   className,
   children,
   side = "right",
+  overlay = true,
   ...props
 }: React.ComponentProps<typeof SheetPrimitive.Content> & {
   side?: "left" | "right" | "bottom"
+  // `overlay={false}` skips the dimming scrim — for NON-MODAL sheets (the tablet/phone rail docks)
+  // where multiple sheets can be open at once and the 3D scene between them must stay visible +
+  // interactive. A scrim would dim/trap that scene, so those sheets drop it.
+  overlay?: boolean
 }) {
   return (
     <SheetPortal>
-      <SheetOverlay />
+      {overlay && <SheetOverlay />}
       <SheetPrimitive.Content
         data-slot="sheet-content"
         data-side={side}

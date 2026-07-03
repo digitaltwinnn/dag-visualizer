@@ -247,6 +247,9 @@ export default function Inspector() {
         {content}
       </RailDock>
       {bp === "phone" && (
+        // Non-modal + no scrim, like the RailDock docks: on phone the left Explore drawer and this
+        // bottom Detail sheet don't overlap, so they can coexist and the scene between them stays
+        // interactive. Dismiss is the sheet's own ✕ / Escape (not an outside tap).
         <Sheet
           open={open && hasDetail}
           onOpenChange={(next) => {
@@ -257,8 +260,15 @@ export default function Inspector() {
               else if (topSlot === "node") setInspect(null);
             }
           }}
+          modal={false}
         >
-          <SheetContent side="bottom" style={accent} aria-describedby={undefined}>
+          <SheetContent
+            side="bottom"
+            style={accent}
+            overlay={false}
+            onInteractOutside={(e) => e.preventDefault()}
+            aria-describedby={undefined}
+          >
             <div className="sheet-grabber" aria-hidden="true" />
             <div className="sheet-head">
               <SheetTitle className="sheet-head-title">Details</SheetTitle>
