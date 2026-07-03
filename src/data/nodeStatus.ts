@@ -41,3 +41,23 @@ export function statusBreakdown(
   for (const s of states) b[nodeStatus(s).bucket]++;
   return b;
 }
+
+// Per-exact-label counts within a single bucket, most-populous first (ties keep first-seen
+// order). Lets a dossier card spell out an amber group as "3 syncing" / "2 waiting · 1 syncing"
+// instead of collapsing it to a bare bucket count — colour still comes from the bucket.
+export function labelBreakdown(
+  states: (string | null | undefined)[],
+  bucket: StatusBucket,
+): { label: string; count: number }[] {
+  const order: string[] = [];
+  const counts = new Map<string, number>();
+  for (const s of states) {
+    const st = nodeStatus(s);
+    if (st.bucket !== bucket) continue;
+    if (!counts.has(st.label)) order.push(st.label);
+    counts.set(st.label, (counts.get(st.label) || 0) + 1);
+  }
+  return order
+    .map((label) => ({ label, count: counts.get(label)! }))
+    .sort((a, b) => b.count - a.count);
+}

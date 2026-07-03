@@ -2,7 +2,13 @@
 
 import { useState } from "react";
 import type { NodeInfo } from "@/src/data/types";
-import { nodeStatus, statusBreakdown, BUCKET_COLOR, type StatusBucket } from "@/src/data/nodeStatus";
+import {
+  nodeStatus,
+  statusBreakdown,
+  labelBreakdown,
+  BUCKET_COLOR,
+  type StatusBucket,
+} from "@/src/data/nodeStatus";
 import { compositionRows } from "@/src/data/composition";
 
 // Shared building blocks for the inspector cards (the React port of ui.js _cardBody),
@@ -31,7 +37,10 @@ export function StatusMark({ state }: { state?: string | null }) {
 }
 
 // Rolled-up status for a node group (dossier): "all ready" (green) or the non-zero buckets as
-// counts + colour dots (`28 ready · 3 in progress · 2 down`).
+// counts + colour dots (`28 ready · 2 waiting · 1 syncing · 2 down`). The amber "progress"
+// bucket is spelled out by its exact lifecycle state(s) — same wording a single node's own
+// card shows (`StatusMark`) — instead of collapsing to a bare "N in progress"; colour still
+// comes from the bucket (BUCKET_COLOR), only the text goes granular.
 const BUCKET_WORD: Record<StatusBucket, string> = {
   ready: "ready",
   progress: "in progress",
@@ -46,13 +55,24 @@ export function StatusBreakdown({ states }: { states: (string | null | undefined
   const parts = order.filter((k) => b[k] > 0);
   return (
     <span className="st-breakdown">
-      {parts.map((k, i) => (
-        <span className="st-bd" key={k}>
-          <span className="st-bd-dot" style={{ background: BUCKET_COLOR[k] }} />
-          {b[k]} {BUCKET_WORD[k]}
-          {i < parts.length - 1 ? <span className="st-bd-sep"> · </span> : null}
-        </span>
-      ))}
+      {parts.map((k, i) => {
+        const items =
+          k === "progress"
+            ? labelBreakdown(states, "progress")
+            : [{ label: BUCKET_WORD[k], count: b[k] }];
+        return (
+          <span className="st-bd" key={k}>
+            <span className="st-bd-dot" style={{ background: BUCKET_COLOR[k] }} />
+            {items.map((it, j) => (
+              <span key={it.label}>
+                {j > 0 ? <span className="st-bd-sep"> · </span> : null}
+                {it.count} {it.label}
+              </span>
+            ))}
+            {i < parts.length - 1 ? <span className="st-bd-sep"> · </span> : null}
+          </span>
+        );
+      })}
     </span>
   );
 }

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { nodeStatus, statusBreakdown, BUCKET_COLOR } from "./nodeStatus";
+import { nodeStatus, statusBreakdown, labelBreakdown, BUCKET_COLOR } from "./nodeStatus";
 
 describe("nodeStatus", () => {
   it("buckets Ready as green consensus", () => {
@@ -30,5 +30,23 @@ describe("statusBreakdown", () => {
   it("counts per bucket", () => {
     const b = statusBreakdown(["Ready", "Ready", "Observing", "Offline", "Ready", null]);
     expect(b).toEqual({ ready: 3, progress: 1, down: 1, unknown: 1 });
+  });
+});
+
+describe("labelBreakdown", () => {
+  it("spells out the progress bucket's exact states, most-populous first", () => {
+    const states = ["WaitingForReady", "DownloadInProgress", "WaitingForReady", "ReadyToDownload", "Ready"];
+    expect(labelBreakdown(states, "progress")).toEqual([
+      { label: "waiting", count: 2 },
+      { label: "syncing", count: 2 },
+    ]);
+  });
+  it("returns an empty list when the bucket has no members", () => {
+    expect(labelBreakdown(["Ready", "Ready"], "progress")).toEqual([]);
+  });
+  it("collapses states that share a label (Observing/WaitingForObserving → observing)", () => {
+    expect(labelBreakdown(["Observing", "WaitingForObserving"], "progress")).toEqual([
+      { label: "observing", count: 2 },
+    ]);
   });
 });
