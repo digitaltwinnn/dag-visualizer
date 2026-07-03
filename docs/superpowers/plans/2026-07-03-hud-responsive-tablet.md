@@ -12,6 +12,7 @@
 
 - **Breakpoints (exact):** `desktop` ≥ 1100px · `tablet` 700–1099px · `phone` < 700px. Width-based (`window.innerWidth` / `matchMedia`), so a portrait tablet < 700 is treated as phone. Use these exact numbers everywhere.
 - **Protect the scene:** the canvas is always full-bleed; rails/sheets overlay it, never reflow it. No layout that narrows the canvas.
+- **No auto-opening panels (USER DECISION):** a scene interaction that adds a card must NOT auto-open the rail Sheet over the scene — it obfuscates the view. Surface a **hint** on the edge tab instead; the user opens the panel manually. Applies to every task.
 - **Overlay primitive:** shadcn **Sheet** (add `components/ui/sheet.tsx` on radix Dialog). One rail open at a time. Dismiss by tapping the scene/scrim, the tab, or Escape.
 - **Touch targets ≥ 44px** on every interactive control that appears at tablet/phone: edge tabs, view-switch icons, filter button, vitals toggle, LiveStrip bars, sheet close, accordion rows.
 - **Reduced motion:** every sheet/drawer/tab transition is gated by `@media (prefers-reduced-motion: reduce)` (instant, no slide).
@@ -263,20 +264,23 @@ export default function RailDock({ side, label, style, children }: {
 
 ---
 
-### Task 4: Phone Detail as a bottom sheet
+### Task 4: New-detail HINT (no auto-open) + phone Detail bottom sheet
+
+**Rationale (USER DECISION 2026-07-03):** Interacting with the 3D scene on tablet/phone adds a card to the right subject stack. **Do NOT auto-open the panel** — that obfuscates the scene the user is interacting with. Instead the right edge tab shows an unobtrusive **hint** that a new detail landed; the user opens it when they choose. When they do open it, on **phone** the Detail renders as an ergonomic **bottom sheet** (scene visible above); on **tablet** it stays in the right side Sheet (Task 3).
 
 **Files:**
-- Modify: `components/Inspector.tsx`
+- Modify: `components/RailDock.tsx` (add a `hint` affordance on the tab)
+- Modify: `components/Inspector.tsx` (drive the hint; phone Detail → bottom sheet on open)
 - Modify: `app/styles/16-responsive-shell.css`
 
 **Interfaces:**
-- Consumes: `useBreakpoint`, `Sheet` (bottom side), the existing pick state (`store.inspect` / `store.snap`).
+- Consumes: `useBreakpoint`, `Sheet` (bottom side), the existing pick state (`store.inspect` / `store.snap`), `hasDetail`.
 
-- [ ] **Step 1: Bottom-sheet the Detail on phone.** When `bp === "phone"` and a Detail is active (`hasDetail`), render the Detail pane(s) inside `Sheet side="bottom"`, `open` driven by `hasDetail`, `onOpenChange(false)` → clear the pick (`setInspect(null)` / `setSnap(null)` for whichever is active). The Context card + view-default stay in the right RailDock; only the Detail becomes the bottom sheet (matches the spec: "Tapping a node/snapshot opens the Detail as a bottom sheet"). Scene stays visible behind (bottom sheet ≤72vh).
-
-- [ ] **Step 2: Grabber affordance.** Add a small centered grab bar at the top of the bottom sheet (visual only; radix handles dismiss via scrim/Escape — full drag-to-expand is a follow-up, note it). ≥44px close target.
-- [ ] **Step 3: Verify.** At 480px: click a snapshot bar / a node → Detail rises as a bottom sheet over the scene; dismiss returns to scene; the pick clears. Reduced-motion: no slide.
-- [ ] **Step 4: Commit.** `feat(responsive): phone Detail opens as a bottom sheet`
+- [ ] **Step 1: Tab hint on RailDock.** Add an optional `hint?: boolean` prop. When `hint` is true and the sheet is closed, render a small pulsing dot/badge on the edge tab (a `.rail-tab-hint`, identity/cyan, ≥ does not shrink the 44px target). It **never opens the sheet on its own** — the user still taps. Clear the persistent hint when the sheet opens. Reduced-motion: a static dot (no pulse).
+- [ ] **Step 2: Drive the hint from Inspector — TWO triggers (USER DECISION), both no-auto-open.** (a) **New card / identity change** → a *persistent* unseen-dot: true when `hasDetail` AND the sheet hasn't been opened since this detail arrived. Track a "seen" flag — set true when the sheet opens; reset when the active detail's identity changes (new node id / new snapshot ordinal) or `hasDetail` rises false→true. (b) **Data update on an already-present card** → a *transient re-pulse* so the collapsed panel still feels alive: pulse whenever any hosted card's `dep` changes reference while the sheet is closed — the same signals the panes key on (`store.inspect`, `store.snap`, and the ContextCard subject / filter). This mirrors the desktop per-pane `useFlashOnChange` flash, which is invisible when the rail is collapsed. A pure data-update on an already-seen card re-pulses but does NOT resurrect the persistent unseen-dot. **No auto-open anywhere.**
+- [ ] **Step 3: Phone Detail as a bottom sheet (on open).** On `bp === "phone"`, when the user opens the right panel, render the Detail pane(s) in `Sheet side="bottom"` (≤72vh, scene visible above, a centered grabber bar at top; full drag-to-expand is a follow-up — note it) while Context + view-default stay in the right side drawer. `onOpenChange(false)` clears the pick. Tablet keeps the right side Sheet from Task 3 unchanged.
+- [ ] **Step 4: Verify (chrome-devtools MCP).** At 900 + 480px: click a node/snapshot in the scene → the panel does **NOT** auto-open; the right edge tab shows a hint pulse; the scene stays unobstructed. Tap the tab → opens (bottom sheet on phone, side Sheet on tablet), hint clears; dismiss clears the pick. Reduced-motion: static dot, no slide/pulse.
+- [ ] **Step 5: Commit.** `feat(responsive): new-detail hint on the rail tab (no auto-open) + phone Detail bottom sheet`
 
 ---
 

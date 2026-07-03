@@ -1,6 +1,6 @@
 "use client";
 
-import type { CSSProperties, ReactNode } from "react";
+import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { useStore, type SelSlot } from "@/src/store/store";
 import { filterAccent, CORE_HEX } from "@/src/data/network";
 import { hex } from "@/src/util/format";
@@ -11,6 +11,7 @@ import InspectorCard from "@/components/InspectorCard";
 import ContextCard from "@/components/ContextCard";
 import RailThread from "@/components/RailThread";
 import RailDock from "@/components/RailDock";
+import { Sheet, SheetContent, SheetClose, SheetTitle } from "@/components/ui/sheet";
 import { useBreakpoint } from "@/components/useBreakpoint";
 import { useFlashOnChange } from "@/components/useFlashOnChange";
 import { StandbyHalo } from "@/components/state/StateAtoms";
@@ -146,10 +147,64 @@ export default function Inspector() {
   const panes = selStack.filter((slot) => cards[slot]?.active).map((slot) => cards[slot].pane);
   const hasDetail = panes.length > 0;
 
+  // Stable identity of "whichever Detail is on top" — a node by its hover-pairing key (falls
+  // back to its kind so a keyless node still counts as an identity), a snapshot by ordinal. Used
+  // ONLY to decide when a new detail should re-arm the hint (below); NOT rendered.
+  const topSlot = selStack.find((slot) => cards[slot]?.active);
+  const detailIdentity =
+    topSlot === "node" ? `node:${hoverKeyOf(inspect) ?? inspect?.kind ?? ""}`
+    : topSlot === "snap" && snap ? `snap:${snap.data.ordinal}`
+    : null;
+
+  // "Seen" tracking — GLOBAL CONSTRAINT: nothing here ever opens the sheet. `hint` only decides
+  // whether the tab shows the pulsing dot; the sheet's `open` state is still owned by the user
+  // tapping the tab (RailDock / the phone bottom-Sheet below). `seen` starts true (arms only once
+  // a NEW detail actually lands) and: (1) flips true the instant the panel opens (RailDock's
+  // onOpenChange), (2) resets false whenever the active detail's identity changes, or `hasDetail`
+  // rises from false → true (a detail arriving where there was none).
+  const [seen, setSeen] = useState(true);
+  const prevIdentity = useRef<string | null>(null);
+  const prevHasDetail = useRef(false);
+  useEffect(() => {
+    const arrived = detailIdentity !== null && detailIdentity !== prevIdentity.current;
+    const rose = hasDetail && !prevHasDetail.current;
+    if (arrived || rose) setSeen(false);
+    prevIdentity.current = detailIdentity;
+    prevHasDetail.current = hasDetail;
+  }, [detailIdentity, hasDetail]);
+
+  const hint = hasDetail && !seen;
+
+  // Lifted `open` — RailDock still owns the Sheet's own open/close, but reports changes here so
+  // (a) opening can mark the hint "seen" and (b) on phone, a SECOND Sheet (the Detail bottom
+  // sheet) can open/close in lockstep with the same tab tap.
+  const [open, setOpen] = useState(false);
+  const handleOpenChange = (next: boolean) => {
+    setOpen(next);
+    if (next) setSeen(true);
+  };
+
+  // Transient re-pulse — mirrors the desktop cards' own `useFlashOnChange`, which flashes on ANY
+  // reference change of a pane's `dep` (a new subject, OR the same subject's data updating —
+  // e.g. the live snapshot ticking). That flash is invisible while the rail is collapsed, so the
+  // tab hint stands in for it: bump `pulseCount` whenever `inspect`, `snap`, or the Context
+  // subject (`filter`) changes reference, and RailDock replays a one-shot pulse on the dot. This
+  // fires even when `hint` is already false (an already-seen card whose data just changed) — it
+  // does NOT resurrect the persistent unseen dot, it's a separate transient animation.
+  const [pulseCount, setPulseCount] = useState(0);
+  const pulseMounted = useRef(false);
+  useEffect(() => {
+    if (!pulseMounted.current) {
+      pulseMounted.current = true;
+      return;
+    }
+    setPulseCount((n) => n + 1);
+  }, [inspect, snap, filter]);
+
   const content = (
     <>
       <ContextCard />
-      {panes}
+      {bp !== "phone" && panes}
       {!hasDetail && <PickHint mode={mode} />}
     </>
   );
@@ -163,17 +218,58 @@ export default function Inspector() {
       <>
         <RailThread />
         <div id="rightcol" style={accent}>
-          {content}
+          <ContextCard />
+          {panes}
+          {!hasDetail && <PickHint mode={mode} />}
         </div>
       </>
     );
   }
-  // Tablet/phone: same Context + Detail panes + PickHint, hosted in the edge-tab Sheet overlay
-  // so the 3D scene keeps full width. NOTE: on phone the Detail panes will move to a dedicated
-  // bottom sheet in a follow-up task — for now this keeps the app fully functional at every size.
+  // Tablet: Context + Detail panes + PickHint all stay together in the edge-tab Sheet overlay
+  // (Task 3's right side Sheet, unchanged) so the 3D scene keeps full width.
+  //
+  // Phone: the SAME tab opens two things in lockstep — the right Sheet keeps Context + the
+  // view-default PickHint (`content` above already excludes `panes` on phone), while the Detail
+  // pane(s) render in their OWN bottom sheet (scene stays visible above it; a centred grabber bar
+  // marks the top edge). Full drag-to-expand is a follow-up — for now it's a fixed ≤72vh sheet.
+  // Dismissing the bottom sheet (scrim/✕/Escape) clears whichever pick is on top, same as the
+  // pane's own close would.
   return (
-    <RailDock side="right" label="Details" style={accent}>
-      {content}
-    </RailDock>
+    <>
+      <RailDock
+        side="right"
+        label="Details"
+        style={accent}
+        hint={hint}
+        pulseKey={pulseCount}
+        onOpenChange={handleOpenChange}
+      >
+        {content}
+      </RailDock>
+      {bp === "phone" && (
+        <Sheet
+          open={open && hasDetail}
+          onOpenChange={(next) => {
+            handleOpenChange(next);
+            if (!next) {
+              // Dismissing the bottom sheet clears the pick on top, mirroring that pane's own ×.
+              if (topSlot === "snap") setSnap(null);
+              else if (topSlot === "node") setInspect(null);
+            }
+          }}
+        >
+          <SheetContent side="bottom" style={accent} aria-describedby={undefined}>
+            <div className="sheet-grabber" aria-hidden="true" />
+            <div className="sheet-head">
+              <SheetTitle className="sheet-head-title">Details</SheetTitle>
+              <SheetClose className="sheet-close" aria-label="Close details panel">
+                ×
+              </SheetClose>
+            </div>
+            {panes}
+          </SheetContent>
+        </Sheet>
+      )}
+    </>
   );
 }
