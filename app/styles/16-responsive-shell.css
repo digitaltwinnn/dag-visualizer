@@ -23,9 +23,20 @@
   overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0;
 }
 
-/* Visible dismiss affordance for the Sheet — the primitive has no built-in close button. */
+/* Sheet header row — the sheet's own chrome (label + close), ABOVE the hosted content, so the
+   ✕ never overlaps a hosted card's top-right control (`.rc-close` / ContextCard close /
+   `.panel-collapse`). Flush with the sheet's 12px padding; hosted cards follow below it. */
+.sheet-head {
+  display: flex; align-items: center; justify-content: space-between; gap: 8px;
+}
+.sheet-head-title {
+  font-size: 13px; font-weight: 600; letter-spacing: 0.02em; color: var(--text);
+  text-transform: uppercase; opacity: 0.85; margin: 0;
+}
+/* Visible dismiss affordance for the Sheet — the primitive has no built-in close button. Lives
+   in the header row (not a floating corner) to avoid colliding with card corner controls. */
 .sheet-close {
-  position: absolute; top: 8px; right: 8px; z-index: 1;
+  flex: 0 0 auto;
   width: 44px; height: 44px; display: flex; align-items: center; justify-content: center;
   background: var(--panel); border: 1px solid var(--panel-border); border-radius: var(--radius);
   color: var(--text); font-size: 22px; line-height: 1; cursor: pointer;
