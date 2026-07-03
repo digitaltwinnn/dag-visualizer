@@ -9,6 +9,18 @@ type Meta = { id: string; name: string; iconUrl: string; siteUrl: string };
 const metas = JSON.parse(readFileSync("data/metagraphs.json", "utf8")) as Meta[];
 const overrides = JSON.parse(readFileSync("data/brand-hue-overrides.json", "utf8")) as Record<string, number>;
 
+// The DAG itself is modelled as a metagraph-shaped "core" (see src/data/network.ts's DAG_CFG) and
+// gets its own brand hue too, distinct from the structural cyan used for the core sphere / "All"
+// filter. Not in data/metagraphs.json (it isn't a listed metagraph) — appended here so
+// spreadColliding sees it alongside the real metagraphs. Uses the official $DAG mark (same
+// Stargazer asset bucket DAG_CFG's iconUrl points at) + the Constellation Network site as the
+// theme-color fallback.
+metas.push({
+  id: "dag", name: "DAG",
+  iconUrl: "https://stargazer-assets.s3.us-east-2.amazonaws.com/logos/dag.png",
+  siteUrl: "https://constellationnetwork.io",
+});
+
 async function fetchBuf(url: string): Promise<Buffer | null> {
   try { const r = await fetch(url, { signal: AbortSignal.timeout(8000) }); if (!r.ok) return null; return Buffer.from(await r.arrayBuffer()); }
   catch { return null; }

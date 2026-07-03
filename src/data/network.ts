@@ -83,6 +83,9 @@ export function isAnchorSettling(ts: string, total: number | null): boolean {
 // the metaList; this is just its identity for the filter/dossier/top-bar).
 // The DAG core carries its own logo (it isn't in the live metaList). Uses the official $DAG mark
 // from the same Stargazer asset bucket the metagraph icons come from (monogram is the fallback).
+// `color` is the fallback before the identity hue resolves (metagraphById overrides it below) —
+// the DAG is itself a metagraph-shaped "core" (it has a logo, a site, its own validator nodes)
+// and gets its own brand hue, distinct from "All"/the structural-cyan core sphere.
 const DAG_CFG: MetagraphConfig = {
   id: "dag", name: "DAG", ticker: "DAG", color: COLORS.core,
   iconUrl: "https://stargazer-assets.s3.us-east-2.amazonaws.com/logos/dag.png",
@@ -91,15 +94,17 @@ const DAG_CFG: MetagraphConfig = {
 // Config core (id → {color, ticker, name, …}) — a metagraph or the DAG; null for "all".
 // The color field is resolved through the identity HUD map so every downstream HUD read
 // (filterAccent, the Engine-built metaList[].color, and any hex(cfg.color) sourced from this
-// accessor) gets the identity hue at once. DAG keeps its own cyan config unchanged.
+// accessor) gets the identity hue at once — the DAG flips through the same lane as any other
+// metagraph now (see palette/identity.ts's resolve()); "All" stays structural cyan via
+// filterAccent's own fallback below, and the central core sphere reads COLORS.core directly.
 export function metagraphById(id: string): MetagraphConfig | null {
-  if (id === "dag") return DAG_CFG;
+  if (id === "dag") return { ...DAG_CFG, color: identityHudNumber(id) };
   const cfg = (METAGRAPHS as MetagraphConfig[]).find((m) => m.id === id);
   return cfg ? { ...cfg, color: identityHudNumber(id) } : null;
 }
 
 // The accent colour for the active network filter, as a CSS colour string — the selected
-// core's colour (metagraph or the DAG's cyan), or the network cyan for "all".
+// core's colour (metagraph or the DAG's own brand hue), or the network cyan for "all".
 export function filterAccent(filter: string): string {
   const cfg = metagraphById(filter);
   if (cfg) return hex(cfg.color);

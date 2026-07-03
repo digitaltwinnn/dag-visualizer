@@ -262,8 +262,14 @@ export class Globe {
         idx++;
       });
     };
-    place(l0List, "l0", "l0", COLORS.l0, 8, 1.0);
-    place(cl1List, "cl1", "l1", COLORS.l1, 14, 0.78);
+    // The DAG's own validator shells (L0 inner + cL1 outer) are coloured with the DAG's identity
+    // SCENE hue (sceneColors["dag"], set by the Engine — see src/palette/identity.ts) instead of
+    // the old structural blue/purple constants, so the DAG reads as its own brand identity here
+    // too — distinct from "All". Falls back to the old structural colours if sceneColors hasn't
+    // been populated yet (shouldn't happen — the Engine seeds it at construction).
+    const dagColor = (this.sceneColors && this.sceneColors.dag) ?? COLORS.l0;
+    place(l0List, "l0", "l0", dagColor, 8, 1.0);
+    place(cl1List, "cl1", "l1", dagColor, 14, 0.78);
     this.instSphere.geometry.getAttribute("aBase").needsUpdate = true;
     this.instDisc.geometry.getAttribute("aBase").needsUpdate = true;
 

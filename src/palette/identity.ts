@@ -88,17 +88,21 @@ function known(): Map<string, IdentityHue> {
   return _known;
 }
 
-// Cache for ids resolved outside the known config set (an UNLISTED metagraph id) — without this,
-// a repeated lookup for the same unlisted id would re-run assignPalette every time. Known ids stay
-// on the `known()` memo above; `dag` is a constant below. Only this unknown-id branch is cached.
+// Cache for ids resolved outside the known config set (an UNLISTED metagraph id, or "dag" — the
+// DAG itself, which isn't in CONFIG) — without this, a repeated lookup for the same id would
+// re-run assignPalette every time. Known ids stay on the `known()` memo above.
 const _unknown = new Map<string, IdentityHue>();
 
-// Resolve a single id. `dag` is structural cyan in both lanes. A known metagraph hits the cache;
-// an unknown id is resolved on the fly (de-collided against the pins) and memoised. A falsy id (a
-// caller passed through an unset field) is not an error — it just falls back to core cyan below.
+// Resolve a single id. The DAG is itself a metagraph-shaped "core" (it has a logo, a site, its own
+// validator nodes) and gets its own brand hue like any metagraph — resolved through identityPins()
+// (brand-hues.json's "dag" entry, baked by scripts/bake-brand-hues.ts, wins; falls back to the hash
+// tier if ever unbaked). The structural cyan used for the central core sphere / "All" filter comes
+// from other paths (COLORS.core / filterAccent("all")), not from here — so this is safe. A known
+// config metagraph hits the cache; an unknown id (incl. "dag") is resolved on the fly (de-collided
+// against the pins) and memoised. A falsy id (a caller passed through an unset field) is not an
+// error — it just falls back to core cyan below.
 function resolve(id: string): IdentityHue | null {
   if (!id) return null;
-  if (id === "dag") return { id, hueDeg: hexToHueDeg(COLORS.core), hudHex: CORE_HEX, hudOklch: "", sceneHex: CORE_HEX };
   const knownHue = known().get(id);
   if (knownHue) return knownHue;
   const cached = _unknown.get(id);

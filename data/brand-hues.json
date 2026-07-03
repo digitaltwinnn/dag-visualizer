@@ -1,6 +1,6 @@
 {
   "DAG0eQr94qUQSUhmYGNXt6CoBKWu5K6htvRMGC6M": {
-    "hueDeg": 248.99900000000002,
+    "hueDeg": 240.99900000000002,
     "srcHex": "#3e4fea",
     "source": "svg"
   },
@@ -15,7 +15,7 @@
     "source": "svg"
   },
   "DAG0S16WDgdAvh8VvroR6MWLdjmHYdzAF5S181xh": {
-    "hueDeg": 240.99900000000002,
+    "hueDeg": 232.99900000000002,
     "srcHex": "#0b53bf",
     "source": "svg"
   },
@@ -30,12 +30,12 @@
     "source": "raster"
   },
   "DAG6oJ5BgUbxjeSYKxgjT1YEUZ3QBS1MN5XkstfT": {
-    "hueDeg": 232.99900000000002,
+    "hueDeg": 224.99900000000002,
     "srcHex": "#0040c0",
     "source": "raster"
   },
   "DAG7fwxZJpqBpXeHqjomVkvUfC9NgZeQ11qjmB5e": {
-    "hueDeg": 224.99900000000002,
+    "hueDeg": 216.99900000000002,
     "srcHex": "#102040",
     "source": "raster"
   },
@@ -48,5 +48,10 @@
     "hueDeg": 41,
     "srcHex": "#df1e25",
     "source": "svg"
+  },
+  "dag": {
+    "hueDeg": 248.99900000000002,
+    "srcHex": "#1050e0",
+    "source": "raster"
   }
 }

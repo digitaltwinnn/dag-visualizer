@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { hexToHueDeg, configPins, identityPins, identityMap, identityHudHex, identitySceneHex, identityHudNumber, SCENE_L, SCENE_C, HUD_L, HUD_C } from "./identity";
+import { hexToHueDeg, configPins, identityPins, identityMap, identityHudHex, identitySceneHex, SCENE_L, SCENE_C, HUD_L, HUD_C } from "./identity";
 import { METAGRAPHS, COLORS } from "../../js/config.js";
 import { oklchToHex } from "./palette";
 import brandHues from "@/data/brand-hues.json";
@@ -55,11 +55,17 @@ describe("identityPins", () => {
 });
 
 describe("lane accessors", () => {
-  it("dag is structural cyan in both lanes", () => {
+  it("dag resolves its own baked brand hue, distinct from structural cyan", () => {
+    // The DAG is itself a metagraph-shaped "core" (USER DECISION) and gets its own brand hue
+    // like any metagraph — via brand-hues.json's "dag" entry (baked by bake-brand-hues.ts) —
+    // NOT the structural cyan used by the central core sphere / "All" filter.
     const cyan = "#" + COLORS.core.toString(16).padStart(6, "0");
-    expect(identityHudHex("dag")).toBe(cyan);
-    expect(identitySceneHex("dag")).toBe(cyan);
-    expect(identityHudNumber("dag")).toBe(COLORS.core);
+    const brand = (brandHues as Record<string, { hueDeg: number }>).dag;
+    expect(brand).toBeTruthy();
+    expect(identityHudHex("dag")).toBe(oklchToHex(HUD_L, HUD_C, brand.hueDeg));
+    expect(identitySceneHex("dag")).toBe(oklchToHex(SCENE_L, SCENE_C, brand.hueDeg));
+    expect(identityHudHex("dag")).not.toBe(cyan);
+    expect(identitySceneHex("dag")).not.toBe(cyan);
   });
   it("hud and scene share the hue for a known metagraph", () => {
     const m0 = (METAGRAPHS as { id: string }[])[0];

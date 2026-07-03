@@ -131,8 +131,15 @@ export class Engine {
     this.ledger = new LedgerCtor(this.ctx.scene);
     // The ledger colours its lane tiles / anchor rings / links / pulses per metagraph — feed it the
     // same identity SCENE map so those match the hubs/nodes (config-ids known synchronously; the
-    // live set incl. new metagraphs is refreshed in refreshMeta alongside globe).
-    this.ledger.sceneColors = sceneColorsFor(METAGRAPHS.map((m) => m.id));
+    // live set incl. new metagraphs is refreshed in refreshMeta alongside globe). "dag" is included
+    // too — its own brand hue, distinct from structural cyan (see palette/identity.ts).
+    const initialSceneColors = sceneColorsFor([...METAGRAPHS.map((m) => m.id), "dag"]);
+    this.ledger.sceneColors = initialSceneColors;
+    // The globe colours the DAG's own validator nodes (the L0/cL1 shells) with sceneColors["dag"]
+    // (see globe.js setNodes) — seed it here, synchronously, so it's populated before the first
+    // setNodes call (which can fire from the "cluster" event before refreshMeta's API round-trip
+    // resolves); refreshMeta below refreshes/extends it once the live metagraph set is known.
+    this.globe.sceneColors = initialSceneColors;
     canvas.addEventListener("click", this.onClick);
     canvas.addEventListener("pointermove", this.onMove);
     // The engine owns the resize handler (createScene no longer adds one) so it's
@@ -260,10 +267,10 @@ export class Engine {
       const changed = JSON.stringify(metagraphs) !== JSON.stringify(this.metaData);
       this.metaData = metagraphs;
       this._publishMetaList(); // context-pane rows ready as soon as the route data is in
-      // Globe colors nodes for ALL current metagraphs (incl. new ones the API adds later), so
-      // rebuild the scene-color map over the live id set on every refresh, right before either
-      // path below calls setMetagraphs.
-      const liveSceneColors = sceneColorsFor((this.metaData || []).map((m) => m.id));
+      // Globe colors nodes for ALL current metagraphs (incl. new ones the API adds later) AND the
+      // DAG's own validator nodes, so rebuild the scene-color map over the live id set + "dag" on
+      // every refresh, right before either path below calls setMetagraphs.
+      const liveSceneColors = sceneColorsFor([...(this.metaData || []).map((m) => m.id), "dag"]);
       this.globe.sceneColors = liveSceneColors;
       this.ledger.sceneColors = liveSceneColors; // keep the ledger's per-metagraph colours in sync (incl. new metagraphs)
       if (initial) {
@@ -321,10 +328,13 @@ export class Engine {
     });
     // The DAG is the root CORE — prepended so it's just another entry in the metaList that the
     // dossier / top-bar / leaderboard read uniformly (a metagraph-shaped network with roles).
+    // `color` goes through the identity HUD map (like every other entry above) so the DAG shows
+    // its own brand hue in the HUD, distinct from "All" — NOT `this.dagCore.color`, which api.js
+    // hardcodes to structural COLORS.core for the (unrelated) 3D core-sphere default.
     const dag = this.dagCore
       ? [{
           id: "dag", name: "DAG", symbol: "DAG", description: this.dagCore.description,
-          siteUrl: undefined, color: this.dagCore.color, isRoot: true,
+          siteUrl: undefined, color: metagraphById("dag")?.color ?? this.dagCore.color, isRoot: true,
           nodes: this.dagCore.nodes, located: located(this.dagCore.nodes),
           countriesCount: countriesOf(this.dagCore.nodes),
         }]
@@ -421,7 +431,9 @@ export class Engine {
     }
     this._publishLeaderboard();
     // Tint the globe's land edge with the selected metagraph's SCENE colour (null → default
-    // cyan; "dag" resolves to structural cyan too via identitySceneHex).
+    // cyan). NOTE: globe.setEdgeColor currently ignores its argument and always uses the fixed
+    // ice-blue rim (see js/globe.js) — kept here so a future re-enable doesn't need call-site
+    // changes; "dag" now resolves to its own brand hue like any other id, not structural cyan.
     const accent =
       this.filter && this.filter !== "all"
         ? new THREE.Color(identitySceneHex(this.filter)).getHex()
