@@ -1,0 +1,18 @@
+/* ── Responsive shell (tablet/phone): edge tabs + Sheet overlays. Desktop is unaffected. ── */
+.sheet-overlay { position: fixed; inset: 0; z-index: 40; background: rgba(3, 5, 12, 0.55); backdrop-filter: blur(2px); }
+.sheet-content {
+  position: fixed; z-index: 41; background: var(--panel); border: 1px solid var(--panel-border);
+  backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
+  display: flex; flex-direction: column; gap: var(--rail-gap);
+  padding: 12px; overflow-y: auto; overscroll-behavior: contain;
+}
+.sheet-content[data-side="left"]  { top: 0; left: 0; bottom: 0; width: min(300px, 86vw); border-radius: 0 var(--radius) var(--radius) 0; }
+.sheet-content[data-side="right"] { top: 0; right: 0; bottom: 0; width: min(320px, 90vw); border-radius: var(--radius) 0 0 var(--radius); }
+.sheet-content[data-side="bottom"]{ left: 0; right: 0; bottom: 0; max-height: 72vh; border-radius: var(--radius) var(--radius) 0 0; }
+@keyframes sheetInLeft   { from { transform: translateX(-100%); } to { transform: none; } }
+@keyframes sheetInRight  { from { transform: translateX(100%); }  to { transform: none; } }
+@keyframes sheetInBottom { from { transform: translateY(100%); }  to { transform: none; } }
+.sheet-content[data-side="left"][data-state="open"]   { animation: sheetInLeft 0.28s cubic-bezier(0.22,1,0.36,1); }
+.sheet-content[data-side="right"][data-state="open"]  { animation: sheetInRight 0.28s cubic-bezier(0.22,1,0.36,1); }
+.sheet-content[data-side="bottom"][data-state="open"] { animation: sheetInBottom 0.3s cubic-bezier(0.22,1,0.36,1); }
+@media (prefers-reduced-motion: reduce) { .sheet-content { animation: none !important; } }
