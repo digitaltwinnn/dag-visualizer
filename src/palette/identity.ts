@@ -8,8 +8,11 @@ import { assignPalette, oklchToHex } from "./palette";
 // node keeps a distinct hue instead of blowing out to white. Visually tuned in Task 3.
 export const SCENE_L = 0.68;
 export const SCENE_C = 0.20;
-const HUD_L = 0.8;
-const HUD_C = 0.15;
+// HUD lane L/C. Lower L + higher C than the original 0.80/0.15 (which read washed-out / pale on the
+// dark glass) — closer to the scene's vividness while staying light enough to be legible as a small
+// dot/chip on the panel surface. Tuned visually.
+export const HUD_L = 0.74;
+export const HUD_C = 0.19;
 
 export interface IdentityHue {
   id: string;

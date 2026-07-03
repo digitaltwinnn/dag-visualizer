@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { hexToHueDeg, configPins, identityMap, identityHudHex, identitySceneHex, identityHudNumber, SCENE_L, SCENE_C } from "./identity";
+import { hexToHueDeg, configPins, identityMap, identityHudHex, identitySceneHex, identityHudNumber, SCENE_L, SCENE_C, HUD_L, HUD_C } from "./identity";
 import { METAGRAPHS, COLORS } from "../../js/config.js";
 import { oklchToHex } from "./palette";
 
@@ -30,7 +30,7 @@ describe("identityMap", () => {
   it("derives hud/scene hexes at the two L/C for the SAME hue", () => {
     const m0 = (METAGRAPHS as { id: string }[])[0];
     const e = identityMap([m0.id]).get(m0.id)!;
-    expect(e.hudHex).toBe(oklchToHex(0.8, 0.15, e.hueDeg));
+    expect(e.hudHex).toBe(oklchToHex(HUD_L, HUD_C, e.hueDeg));
     expect(e.sceneHex).toBe(oklchToHex(SCENE_L, SCENE_C, e.hueDeg));
   });
   it("gives a NEW id a hue in an allowed zone, de-collided against pins", () => {
