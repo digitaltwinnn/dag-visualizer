@@ -76,7 +76,7 @@ function GeoVitals() {
     <>
       <Vital label="Nodes" value={<Odometer value={nodes} />} />
       <Vital label="Countries" value={<Odometer value={countries.length || null} />} />
-      <Vital label="Distribution" value={<span className="tb-vital-score">{fmtScore(lb?.score ?? null)}</span>} />
+      <Vital label="score" value={<span className="tb-vital-score">{fmtScore(lb?.score ?? null)}</span>} />
     </>
   );
 }

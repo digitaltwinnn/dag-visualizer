@@ -26,7 +26,7 @@ export const ccToFlag = (cc?: string | null) =>
     ? "🏳️"
     : String.fromCodePoint(...[...cc.toUpperCase()].map((ch) => 0x1f1e6 + ch.charCodeAt(0) - 65));
 
-// Distribution / decentralisation score — a computed 0–1 metric. Two decimals so it reads as a
-// "score" (not a count); em dash when there's no selection yet.
+// Distribution / decentralisation score — a computed 1–100 integer percentage (js/geoStats.js);
+// 0 or null means no data → em dash. Higher % = more geographically distributed.
 export const fmtScore = (score: number | null): string =>
-  score == null ? "—" : score.toFixed(2);
+  !score ? "—" : `${Math.round(score)}%`;
