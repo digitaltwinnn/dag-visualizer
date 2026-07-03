@@ -5,27 +5,42 @@ import { useStore } from "@/src/store/store";
 import { filterAccent } from "@/src/data/network";
 import GeoExplore from "@/components/GeoExplore";
 import LedgerPanel from "@/components/LedgerPanel";
-import PlaceholderPanel from "@/components/PlaceholderPanel";
+import AboutView from "@/components/AboutView";
 import RailThread from "@/components/RailThread";
 import RailDock from "@/components/RailDock";
 import { useBreakpoint } from "@/components/useBreakpoint";
 
-// Per-view tool cards. The scaffolded (not-yet-built) views show a "coming soon" card (SOON);
-// Hypergraph shows a static "about" card (the guided Learn tour is being reworked). Same shell
-// either way so the four-zone HUD stays consistent.
-const PLACEHOLDERS: Record<string, { title: string; eyebrow: string; lines: string[]; caption?: string }> = {
+// Per-view "About this view" copy — one orientation card at the top of the left rail in every
+// view (collapsed by default). Built views carry no caption; the scaffolded (SOON) views do.
+const ABOUT: Record<string, { title: string; eyebrow: string; lines: string[]; caption?: string }> = {
   hyper: {
     title: "Hypergraph",
     eyebrow: "Hypergraph · about",
-    caption: "",
     lines: [
       "Constellation is a Hypergraph, not a blockchain — activity is organized as a DAG, so many parts of the network validate in parallel: horizontally scalable and feeless for users.",
       "The glowing core is the Global L0 (security + settlement); the validator shells around it bundle activity into the global snapshots streaming along the bottom. The orbiting clusters are metagraphs — independent networks that anchor their state into L0 for shared trust.",
     ],
   },
+  geo: {
+    title: "Geographic footprint",
+    eyebrow: "Geography · about",
+    lines: [
+      "Where the network runs — every validator plotted at its real geolocation, with a density heatmap and travelling-packet connection arcs between them.",
+      "Drill into a country to see its nodes; filtering a metagraph narrows the map to that network's footprint.",
+    ],
+  },
+  ledger: {
+    title: "Snapshots",
+    eyebrow: "Snapshots · about",
+    lines: [
+      "When the network settles — Global L0 produces a snapshot every few seconds, anchoring the metagraphs' own snapshots into shared trust. The 3D chamber stacks the validation layers top-to-bottom, and each global snapshot forms as its layer settles.",
+      "The live snapshot sits centre-stage and trails off to the left as it ages; click any snapshot (here or in the strip below) to inspect its fee, size and per-metagraph breakdown.",
+    ],
+  },
   status: {
     title: "Network status",
     eyebrow: "Status · about",
+    caption: "SOON",
     lines: [
       "Live health of the network — validator uptime, node states (Ready / waiting / offline), and software-version spread across the Global L0 and the metagraphs.",
       "A single at-a-glance read of whether the network is healthy, and where any trouble is.",
@@ -34,6 +49,7 @@ const PLACEHOLDERS: Record<string, { title: string; eyebrow: string; lines: stri
   transactions: {
     title: "Transactions",
     eyebrow: "Transactions · about",
+    caption: "SOON",
     lines: [
       "The money flow across the network — $DAG and the metagraphs' own currencies moving between addresses, visualized as it happens.",
       "Look up and trace individual transactions (à la the DAG explorer), and read the network's economic statistics — value moved, active addresses, and more (t.b.d.).",
@@ -42,6 +58,7 @@ const PLACEHOLDERS: Record<string, { title: string; eyebrow: string; lines: stri
   staking: {
     title: "Delegated staking",
     eyebrow: "Staking · about",
+    caption: "SOON",
     lines: [
       "Delegated staking across the network — who is staked to which validators, total $DAG delegated, and the rewards flowing back.",
       "How stake (and therefore consensus weight) is distributed, and how that shifts over time.",
@@ -51,9 +68,9 @@ const PLACEHOLDERS: Record<string, { title: string; eyebrow: string; lines: stri
 
 // Left control rail: the **explore/interact** zone. The global network filter lives in the
 // top command bar; the selected-subject dossier now lives in the right rail (`ContextCard`).
-// This rail renders just the view's ONE tool card: Hypergraph → an "about" card (the guided
-// Learn tour is being reworked); Geography → GeoExplore (footprint + node browser); Snapshots
-// → the ledger "about" panel; the scaffolded views → a "coming soon" PlaceholderPanel.
+// Every view now leads with a collapsed `AboutView` orientation card, above its ONE tool card
+// (if any): Geography → GeoExplore (footprint + node browser); Snapshots → LedgerPanel;
+// Hypergraph and the scaffolded views have no tool card, just the About card.
 export default function LeftColumn() {
   const bp = useBreakpoint();
   const mode = useStore((s) => s.mode);
@@ -63,12 +80,11 @@ export default function LeftColumn() {
   // Theme every card's bullet to the current selection (the explore card is always
   // specific to the active filter).
   const accent = { ["--filter-accent"]: filterAccent(filter) } as CSSProperties;
-  const placeholder = PLACEHOLDERS[mode];
   const content = (
     <>
+      <AboutView {...ABOUT[mode]} />
       {mode === "geo" && <GeoExplore />}
       {mode === "ledger" && <LedgerPanel />}
-      {placeholder && <PlaceholderPanel {...placeholder} />}
     </>
   );
   if (bp === "desktop") {
