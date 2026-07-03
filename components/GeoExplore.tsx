@@ -16,7 +16,7 @@ import type { NodeRow } from "@/src/data/types";
 // node browser: each country is a row showing its share of the footprint (bar + count), and
 // clicking it drills the globe into that country AND expands its nodes inline — master on
 // top, detail nested beneath, then a node row opens its card on the right facts rail.
-// A compact distribution-score meter sits at the top as the footprint's headline figure.
+// The footprint's headline figures live in the top-bar vitals; this card is purely the accordion.
 export default function GeoExplore() {
   const lb = useStore((s) => s.leaderboard);
   const country = useStore((s) => s.country);
@@ -94,8 +94,8 @@ export default function GeoExplore() {
         onToggle={() => setCollapsed((c) => !c)}
       />
       <div className="geo-body panel-body">
-        {/* The footprint's headline figures (country count + distribution score) live in the
-            top-bar vitals now; this card is purely the country→nodes accordion. */}
+        {/* The footprint's headline figures (Nodes / Countries / Ready) live in the top-bar
+            vitals now; this card is purely the country→nodes accordion. */}
         {quietEmpty ? (
           <div className="geo-quiet-empty">
             <span className="st-standby-dim" aria-hidden><span className="st-standby-node" /></span>
@@ -155,7 +155,7 @@ export default function GeoExplore() {
                             onClick={() => selectNode(r.pick)}
                             onMouseEnter={pair.onMouseEnter}
                           >
-                            <span className="nb-dot" style={{ background: rowHue }} aria-hidden />
+                            <span className="nb-dot" style={{ background: rowHue, color: rowHue }} aria-hidden />
                             <span className={"nb-label" + (r.id ? " insp-hash" : "")}>
                               {r.id ? shortHash(r.id) : r.label}
                             </span>

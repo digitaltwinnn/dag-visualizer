@@ -319,9 +319,11 @@ rule):
   Left: the selected-metagraph `MetaCard` **dossier** (identity + the node-fabric *config* block —
   same layer vocabulary, the "how nodes are wired" cut) above `LearnPanel`. **Hyper has no
   right-rail card** so `#rightcol` stays empty there.
-- **geo** — top vitals: the **footprint** (`GeoVitals`) — `Distribution` score (moved up from
-  GeoExplore) / `Countries` / `Densest`, from `store.leaderboard`. Left: **`GeoExplore`**, now
-  purely a **country→nodes accordion** (the leaderboard + node browser merged: a country row
+- **geo** — top vitals: the **footprint** (`GeoVitals`) — `Nodes` / `Countries` / `Ready` (the
+  share of the selection's nodes in the Ready state, computed over `store.selNodes` so it is
+  exactly a % of `Nodes`; integer counts via `Odometer int`). Left: **`GeoExplore`** (titled
+  "Nodes by country"), now purely a **country→nodes accordion** (the leaderboard + node browser
+  merged: a country row
   shows its share; clicking it drills the globe **and** expands its nodes inline from
   `store.selNodes`/`globe.listNodes`), with the selected metagraph/cluster dossier pinned above
   it (`ContextPanel`). Right Detail: **`GeoLiveCard`** — the **selected node** (reads
