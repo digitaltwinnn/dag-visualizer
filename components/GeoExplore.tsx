@@ -4,8 +4,9 @@ import { useMemo, useState } from "react";
 import { useStore } from "@/src/store/store";
 import PanelHead from "@/components/PanelHead";
 import { shortHash, CORE_HEX, metagraphById } from "@/src/data/network";
+import { identityHudHex } from "@/src/palette/identity";
 import { RoleTags } from "@/components/inspector/parts";
-import { ccToFlag, hex } from "@/src/util/format";
+import { ccToFlag } from "@/src/util/format";
 import { hoverKeyOf } from "@/src/data/hoverSubject";
 import { subjectPairing } from "@/components/useSubjectPairing";
 import type { NodeRow } from "@/src/data/types";
@@ -137,7 +138,7 @@ export default function GeoExplore() {
                           selIp != null && r.layer === selLayer &&
                           r.pick.kind !== "snapshot" && "node" in r.pick && r.pick.node?.ip === selIp;
                         const hoverKey = hoverKeyOf(r.pick);
-                        const rowHue = r.pick.kind === "metanode" && r.pick.meta ? hex(r.pick.meta.color) : CORE_HEX;
+                        const rowHue = r.pick.kind === "metanode" && r.pick.meta ? identityHudHex(r.pick.meta.id) : CORE_HEX;
                         const pair = subjectPairing(hoverNodeId, hoverKey, setHoverNodeId, rowHue);
                         return (
                           <button

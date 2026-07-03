@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useStore } from "@/src/store/store";
 import { shortHash, CORE_HEX } from "@/src/data/network";
+import { identityHudHex } from "@/src/palette/identity";
 import { hex, fmtDag, fmtKB } from "@/src/util/format";
 import { relativeAge } from "@/src/util/relativeAge";
 import type { GlobalSnapshot, MetaCfg, NodeInfo, PickDescriptor } from "@/src/data/types";
@@ -209,7 +210,7 @@ export function GeoLiveCard() {
 function GeoLiveNode({ p, onClear }: { p: PickOf<"l0" | "l1" | "metanode">; onClear: () => void }) {
   const id = p.node?.id;
   const title = id ? shortHash(id) : p.node?.ip || p.geo?.city || p.geo?.country || "Node";
-  const color = p.kind === "metanode" ? (p.meta ? hex(p.meta.color) : undefined) : CORE_HEX;
+  const color = p.kind === "metanode" ? (p.meta ? identityHudHex(p.meta.id) : undefined) : CORE_HEX;
   // The single node's roles → a one-node composition row (shared vocabulary).
   const oneNode: NodeInfo[] = p.node ? [p.node] : [];
   const g = p.geo;

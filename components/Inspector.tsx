@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { useStore, type SelSlot } from "@/src/store/store";
 import { filterAccent, CORE_HEX } from "@/src/data/network";
-import { hex } from "@/src/util/format";
+import { identityHudHex } from "@/src/palette/identity";
 import { hoverKeyOf } from "@/src/data/hoverSubject";
 import { subjectPairing } from "@/components/useSubjectPairing";
 import { breadcrumbLabel } from "@/src/data/breadcrumb";
@@ -52,7 +52,7 @@ function CardPane({
       inspect && (inspect.kind === "l0" || inspect.kind === "l1" || inspect.kind === "metanode")
         ? inspect
         : null;
-    const nodeHue = node?.kind === "metanode" && node.meta ? hex(node.meta.color) : CORE_HEX;
+    const nodeHue = node?.kind === "metanode" && node.meta ? identityHudHex(node.meta.id) : CORE_HEX;
     pair = subjectPairing<string>(hoverNodeId, hoverKeyOf(node), setHoverNodeId, nodeHue);
   }
 

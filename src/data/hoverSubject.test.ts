@@ -22,6 +22,7 @@ describe("tooltipSubject", () => {
     expect(s?.name).toBe("9c2f");
     expect(s?.mono).toBe(true);
     expect(s?.color).toMatch(/^#[0-9a-f]{6}$/);
+    expect(s?.color).not.toBe("#2af5ff");
   });
   it("labels a DAG validator as DAG in core cyan, name mono", () => {
     const s = tooltipSubject({ kind: "l1", node: { id: "abcd" } } as never);
@@ -35,6 +36,7 @@ describe("tooltipSubject", () => {
     expect(s?.name).toBe("Dor Technologies");
     expect(s?.mono).toBe(false);
     expect(s?.color).toMatch(/^#[0-9a-f]{6}$/);
+    expect(s?.color).not.toBe("#2af5ff");
   });
   it("labels a snapshot by ordinal in core cyan", () => {
     expect(tooltipSubject({ kind: "snapshot", data: { ordinal: 42 } } as never)).toEqual({ ident: "L0", name: "#42", color: "#2af5ff", mono: false });

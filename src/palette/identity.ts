@@ -41,8 +41,9 @@ const CONFIG = METAGRAPHS as { id: string; color: number }[];
 let _pins: Record<string, number> | null = null;
 export function configPins(): Record<string, number> {
   if (_pins) return _pins;
-  _pins = {};
-  for (const m of CONFIG) _pins[m.id] = hexToHueDeg(m.color);
+  const pins: Record<string, number> = {};
+  for (const m of CONFIG) pins[m.id] = hexToHueDeg(m.color);
+  _pins = Object.freeze(pins);
   return _pins;
 }
 
@@ -69,13 +70,24 @@ function known(): Map<string, IdentityHue> {
   return _known;
 }
 
+// Cache for ids resolved outside the known config set (an UNLISTED metagraph id) — without this,
+// a repeated lookup for the same unlisted id would re-run assignPalette every time. Known ids stay
+// on the `known()` memo above; `dag` is a constant below. Only this unknown-id branch is cached.
+const _unknown = new Map<string, IdentityHue>();
+
 // Resolve a single id. `dag` is structural cyan in both lanes. A known metagraph hits the cache;
-// an unknown id is resolved on the fly (de-collided against the pins). A falsy id (a caller
-// passed through an unset field) is not an error — it just falls back to core cyan below.
+// an unknown id is resolved on the fly (de-collided against the pins) and memoised. A falsy id (a
+// caller passed through an unset field) is not an error — it just falls back to core cyan below.
 function resolve(id: string): IdentityHue | null {
   if (!id) return null;
   if (id === "dag") return { id, hueDeg: hexToHueDeg(COLORS.core), hudHex: CORE_HEX, hudOklch: "", sceneHex: CORE_HEX };
-  return known().get(id) ?? identityMap([...CONFIG.map((m) => m.id), id]).get(id) ?? null;
+  const knownHue = known().get(id);
+  if (knownHue) return knownHue;
+  const cached = _unknown.get(id);
+  if (cached) return cached;
+  const resolved = identityMap([...CONFIG.map((m) => m.id), id]).get(id) ?? null;
+  if (resolved) _unknown.set(id, resolved);
+  return resolved;
 }
 
 export function identityHudHex(id: string): string { return resolve(id)?.hudHex ?? CORE_HEX; }
