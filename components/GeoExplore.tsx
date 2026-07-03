@@ -56,6 +56,10 @@ export default function GeoExplore() {
   // (the whole network / DAG core always has locatable validators).
   const isMetaFilter = filter !== "all" && filter !== "dag";
   const quietEmpty = isMetaFilter && list.length === 0;
+  // The magnitude bar is a distribution leaderboard cue: structural cyan for the whole network /
+  // DAG, but when a single metagraph is filtered the list is ITS nodes, so the bar tints to that
+  // metagraph's identity hue (HUD lane).
+  const barHue = isMetaFilter ? identityHudHex(filter) : undefined;
   const activeCfg = metagraphById(filter);
   const tickerOrName = activeCfg ? activeCfg.ticker || activeCfg.name : "This metagraph";
   // Click a country: drill the globe into it (store.country) — the drill state doubles as the
@@ -117,7 +121,12 @@ export default function GeoExplore() {
                     {c.country}
                   </span>
                   <span className="lb-bar">
-                    <span style={{ width: `${Math.round((c.count / max) * 100)}%` }} />
+                    <span
+                      style={{
+                        width: `${Math.round((c.count / max) * 100)}%`,
+                        ...(barHue ? { ["--lb-bar-fill" as string]: barHue } : {}),
+                      }}
+                    />
                   </span>
                   <span className="lb-count">{c.count}</span>
                   <span className="geo-c-caret">{open ? "▾" : "▸"}</span>
