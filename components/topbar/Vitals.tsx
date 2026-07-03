@@ -1,11 +1,14 @@
 "use client";
 
+import { forwardRef } from "react";
+import { Activity } from "lucide-react";
 import { useStore } from "@/src/store/store";
 import { metagraphById } from "@/src/data/network";
 import { ccToFlag } from "@/src/util/format";
 import Sparkline from "@/components/Sparkline";
 import Odometer from "@/components/Odometer";
 import { rolesOf } from "@/components/inspector/parts";
+import { useBreakpoint } from "@/components/useBreakpoint";
 import type { NodeInfo } from "@/src/data/types";
 
 // Structural cyan for the live-activity sparklines (lane-correct: cyan = the live accent).
@@ -93,7 +96,7 @@ function LedgerVitals() {
   );
 }
 
-export default function Vitals() {
+function VitalsCluster() {
   const mode = useStore((s) => s.mode);
   const live = useStore((s) => s.live);
   const body =
@@ -104,4 +107,35 @@ export default function Vitals() {
       {body}
     </div>
   );
+}
+
+// Phone's compact ≥44px toggle button. Exposed with a forwarded ref so TopBar can measure it
+// to position the popover — the popover itself must live OUTSIDE #topbar (same reason as the
+// filter picker: the bar's `overflow: hidden` would clip it, and `position: fixed` doesn't
+// escape it either since `backdrop-filter` on #topbar creates a containing block).
+export const VitalsToggle = forwardRef<HTMLButtonElement, { open: boolean; onClick: () => void }>(
+  function VitalsToggle({ open, onClick }, ref) {
+    return (
+      <button
+        ref={ref}
+        type="button"
+        className={"tb-vitals-toggle" + (open ? " active" : "")}
+        aria-expanded={open}
+        aria-label="Toggle vitals"
+        onClick={onClick}
+      >
+        <Activity size={14} />
+      </button>
+    );
+  }
+);
+
+export { VitalsCluster };
+
+// Tablet/desktop: vitals render inline, unchanged. Phone rendering (toggle + popover) is
+// handled by TopBar so the popover can escape the bar's clipped/containing-block surface.
+export default function Vitals() {
+  const bp = useBreakpoint();
+  if (bp === "phone") return null;
+  return <VitalsCluster />;
 }

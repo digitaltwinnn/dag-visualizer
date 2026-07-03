@@ -5,9 +5,10 @@ import { useStore } from "@/src/store/store";
 import { metagraphById } from "@/src/data/network";
 import { hex } from "@/src/util/format";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
-import Vitals from "@/components/topbar/Vitals";
+import Vitals, { VitalsCluster, VitalsToggle } from "@/components/topbar/Vitals";
 import FilterPicker from "@/components/topbar/FilterPicker";
 import EcgMark from "@/components/topbar/EcgMark";
+import { useBreakpoint } from "@/components/useBreakpoint";
 import type { Mode } from "@/src/store/store";
 
 const VIEWS = [
@@ -38,6 +39,11 @@ export default function TopBar() {
   const filterBtnRef = useRef<HTMLButtonElement>(null);
   const [pop, setPop] = useState<{ left: number; top: number } | null>(null);
 
+  const bp = useBreakpoint();
+  const [vitalsOpen, setVitalsOpen] = useState(false);
+  const vitalsBtnRef = useRef<HTMLButtonElement>(null);
+  const [vitalsPop, setVitalsPop] = useState<{ right: number; top: number } | null>(null);
+
   useEffect(() => {
     if (!open) return;
     // Anchor the floating picker under the filter button, just below the bar. Measured so it
@@ -60,6 +66,35 @@ export default function TopBar() {
       document.removeEventListener("keydown", onKey);
     };
   }, [open]);
+
+  // Same popover pattern as the filter picker: measured + rendered OUTSIDE #topbar so its
+  // `overflow: hidden` (and the containing block backdrop-filter creates) can't clip it.
+  useEffect(() => {
+    if (!vitalsOpen) return;
+    const bar = document.getElementById("topbar");
+    const btn = vitalsBtnRef.current;
+    if (bar && btn) {
+      const br = bar.getBoundingClientRect();
+      const fr = btn.getBoundingClientRect();
+      setVitalsPop({ right: Math.round(window.innerWidth - fr.right), top: Math.round(br.bottom + 6) });
+    }
+    const onDown = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setVitalsOpen(false);
+    };
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") setVitalsOpen(false); };
+    document.addEventListener("mousedown", onDown);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", onDown);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [vitalsOpen]);
+
+  // Vitals aren't shown inline on phone (no room) — closing the toggle when the breakpoint
+  // changes away from phone avoids a stray open popover if the viewport is resized.
+  useEffect(() => {
+    if (bp !== "phone") setVitalsOpen(false);
+  }, [bp]);
 
   const face = filterFace(filter);
 
@@ -107,10 +142,23 @@ export default function TopBar() {
         <div className="tb-spacer" />
         <span className="tb-div" />
 
-        {/* Vitals */}
+        {/* Vitals — inline on tablet/desktop; a toggle button on phone (popover rendered
+            below, outside #topbar). */}
         <Vitals />
+        {bp === "phone" && (
+          <VitalsToggle ref={vitalsBtnRef} open={vitalsOpen} onClick={() => setVitalsOpen((o) => !o)} />
+        )}
       </div>
       </div>
+
+      {/* Floating vitals popover (phone only) — same pattern as the filter picker: measured
+          under its toggle button, rendered outside #topbar so overflow/backdrop-filter can't
+          clip it. Reduced-motion: this is a plain conditional mount, no animated reveal. */}
+      {vitalsOpen && vitalsPop && (
+        <div className="tb-vitals-pop" style={{ right: vitalsPop.right, top: vitalsPop.top }}>
+          <VitalsCluster />
+        </div>
+      )}
 
       {/* Floating filter picker — a compact popover anchored under the filter button (NOT a
           full-width expansion of the bar). Lives outside #topbar so the bar's `overflow: hidden`
