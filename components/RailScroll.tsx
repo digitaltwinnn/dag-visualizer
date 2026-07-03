@@ -5,14 +5,26 @@ import { useEffect } from "react";
 // Grab-and-drag scrolling on the rails. Tablets already pan natively (CSS `touch-action: pan-y`
 // + momentum); this adds the same feel for a MOUSE — press on a rail's non-interactive area and
 // drag to scroll the cards up/down. A small movement threshold keeps ordinary clicks working, and
-// interactive targets (buttons, links, node rows) never start a drag. Mounted once.
+// interactive targets (buttons, links, node rows) never start a drag.
+//
+// `#leftcol`/`#rightcol` only exist in the DESKTOP breakpoint (`LeftColumn`/`Inspector` render
+// `RailDock` instead below ~1100px) — so crossing the tablet/desktop boundary during a session
+// unmounts and later REMOUNTS them as brand-new DOM nodes. This component itself is mounted once,
+// unconditionally, for the app's whole lifetime (`page.tsx`), so a one-shot `getElementById` +
+// observer setup would keep watching the ORIGINAL (now-detached) node forever after a breakpoint
+// round-trip — `.rail-clip` then never re-toggles on the live rail, so a rail that grows past the
+// bottom strip's band is never faded/masked and paints fully opaque over `LiveStrip` (bug: the
+// strip "disappears" behind an unclipped rail). Fixed by watching `document.body` for `#leftcol`/
+// `#rightcol` being added/removed and (re)attaching the per-rail setup each time the live element
+// changes identity, instead of resolving it once.
 export default function RailScroll() {
   useEffect(() => {
-    const cleanups: (() => void)[] = [];
-    for (const id of ["leftcol", "rightcol"]) {
-      const el = document.getElementById(id);
-      if (!el) continue;
+    // id -> the element it's currently attached to + its cleanup. Tracked by ELEMENT IDENTITY
+    // (not just id presence) so a same-id swap — old node removed and a new one added, which
+    // React can do without ever leaving the id "absent" in between — is detected and reattached.
+    const active = new Map<string, { el: HTMLElement; cleanup: () => void }>();
 
+    const attach = (id: string, el: HTMLElement) => {
       // Toggle `.rail-clip` (the bottom fade mask) only while this rail actually extends down into
       // the chart's band — otherwise a short rail would be masked to nothing. Debounced via rAF.
       let raf = 0;
@@ -68,16 +80,45 @@ export default function RailScroll() {
       };
 
       el.addEventListener("pointerdown", onDown);
-      cleanups.push(() => {
-        el.removeEventListener("pointerdown", onDown);
-        onUp();
-        cancelAnimationFrame(raf);
-        ro.disconnect();
-        mo.disconnect();
-        window.removeEventListener("resize", scheduleClip);
+      active.set(id, {
+        el,
+        cleanup: () => {
+          el.removeEventListener("pointerdown", onDown);
+          onUp();
+          cancelAnimationFrame(raf);
+          ro.disconnect();
+          mo.disconnect();
+          window.removeEventListener("resize", scheduleClip);
+        },
       });
-    }
-    return () => cleanups.forEach((c) => c());
+    };
+
+    // (Re)sync which rails are currently attached against which elements actually exist in the
+    // DOM right now — runs at mount and every time the DOM under <body> changes shape (breakpoint
+    // swaps the whole rail subtree in/out). Cheap: a no-op unless an id's element actually changed.
+    const sync = () => {
+      for (const id of ["leftcol", "rightcol"]) {
+        const el = document.getElementById(id);
+        const current = active.get(id);
+        if (current && current.el !== el) {
+          // Either gone, or replaced by a different node (a same-id remount) — tear down the old
+          // attachment either way; a fresh `el` (if any) gets attached below.
+          current.cleanup();
+          active.delete(id);
+        }
+        if (el && !active.has(id)) attach(id, el);
+      }
+    };
+
+    sync();
+    const bodyMo = new MutationObserver(sync);
+    bodyMo.observe(document.body, { childList: true, subtree: true });
+
+    return () => {
+      bodyMo.disconnect();
+      active.forEach(({ cleanup }) => cleanup());
+      active.clear();
+    };
   }, []);
 
   return null;
