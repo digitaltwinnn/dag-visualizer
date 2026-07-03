@@ -37,18 +37,68 @@ export function pickBrandColor(cands: { rgb: number; weight: number }[]): number
 }
 
 const norm = (h: number) => ((h % 360) + 360) % 360;
-const inZone = (h: number) => ALLOWED.some(([lo, hi]) => { const H = h < lo && hi > 360 ? h + 360 : h; return H >= lo && H < hi; });
+
+// Shared allowed-zone test (hue is inside ANY of the palette's ALLOWED bands). Normalises the
+// input hue; handles zones that wrap past 360 (e.g. [316,369)).
+export function inAllowedZone(hueDeg: number): boolean {
+  const h = norm(hueDeg);
+  return ALLOWED.some(([lo, hi]) => { const H = h < lo && hi > 360 ? h + 360 : h; return H >= lo && H < hi; });
+}
+
+const hueDist = (a: number, b: number) => { const d = Math.abs(a - b) % 360; return Math.min(d, 360 - d); };
 
 // Keep an in-zone hue exactly; nudge a guard-band hue to the nearest allowed-zone edge.
 export function snapToAllowedZone(hueDeg: number): number {
   const h = norm(hueDeg);
-  if (inZone(h)) return h;
+  if (inAllowedZone(h)) return h;
   const edges: number[] = [];
   for (const [lo, hi] of ALLOWED) { edges.push(norm(lo), norm(hi - 0.001)); }
-  const dist = (a: number, b: number) => { const d = Math.abs(a - b) % 360; return Math.min(d, 360 - d); };
   let best = edges[0], bestD = Infinity;
-  for (const e of edges) { const d = dist(h, e); if (d < bestD) { bestD = d; best = e; } }
+  for (const e of edges) { const d = hueDist(h, e); if (d < bestD) { bestD = d; best = e; } }
   return best;
+}
+
+// Minimum perceptual gap (deg) enforced between any two de-collided brand hues.
+const MIN_GAP = 8;
+// Outward search step when hunting for a free hue near a desired one.
+const SEARCH_STEP = 2;
+// Safety bound: allowed zones total well under 360°/SEARCH_STEP steps; this is generous.
+const MAX_K = 400;
+
+// Greedily de-collide a set of {id, hueDeg} entries: process in a DETERMINISTIC order (sorted by
+// id) so re-bakes are stable. Each entry starts at its own desired hue; if that hue is within
+// MIN_GAP of any hue already assigned to an earlier entry, search outward (desired ± k*SEARCH_STEP,
+// increasing k) for the nearest candidate that is BOTH >= MIN_GAP from every assigned hue AND
+// inside an allowed zone. If a zone fills up, the search naturally spills into the next allowed
+// zone (rare, acceptable). Returns id -> final hue.
+export function spreadColliding(entries: { id: string; hueDeg: number }[]): Map<string, number> {
+  const out = new Map<string, number>();
+  const assigned: number[] = [];
+
+  const farEnough = (h: number) => assigned.every((a) => hueDist(h, a) >= MIN_GAP);
+
+  for (const e of [...entries].sort((a, b) => a.id.localeCompare(b.id))) {
+    const desired = norm(e.hueDeg);
+    let chosen: number | null = null;
+
+    if (inAllowedZone(desired) && farEnough(desired)) {
+      chosen = desired;
+    } else {
+      for (let k = 1; k <= MAX_K && chosen === null; k++) {
+        for (const dir of [1, -1]) {
+          const cand = norm(desired + dir * k * SEARCH_STEP);
+          if (inAllowedZone(cand) && farEnough(cand)) { chosen = cand; break; }
+        }
+      }
+      // Fallback: should be unreachable given the allowed-zone capacity, but keep it total.
+      if (chosen === null) chosen = snapToAllowedZone(desired);
+    }
+
+    assigned.push(chosen);
+    out.set(e.id, chosen);
+  }
+
+  return out;
 }
 
 // Extract candidate colours (as 0xRRGGBB) from an SVG's fill/stroke/stop-color (attr + inline style

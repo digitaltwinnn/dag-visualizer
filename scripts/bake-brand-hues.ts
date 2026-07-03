@@ -3,7 +3,7 @@
 // data/brand-hues.json. NEVER imported by the app/runtime — jimp is a devDependency only.
 import { readFileSync, writeFileSync } from "node:fs";
 import { Jimp } from "jimp";
-import { parseSvgFills, pickBrandColor, snapToAllowedZone, hexToOklch } from "../src/palette/brand";
+import { parseSvgFills, pickBrandColor, snapToAllowedZone, hexToOklch, spreadColliding } from "../src/palette/brand";
 
 type Meta = { id: string; name: string; iconUrl: string; siteUrl: string };
 const metas = JSON.parse(readFileSync("data/metagraphs.json", "utf8")) as Meta[];
@@ -61,12 +61,19 @@ async function brandHueFor(m: Meta): Promise<{ hueDeg: number; srcHex: string; s
 // Wrapped in an async main (not top-level await) — the project has no "type": "module" in
 // package.json, so tsx transpiles this file as CJS, which doesn't support top-level await.
 async function main() {
-  const out: Record<string, unknown> = {};
+  const out: Record<string, { hueDeg: number; srcHex: string; source: string }> = {};
   for (const m of metas) {
     const r = await brandHueFor(m);
     if (r) { out[m.id] = r; console.log(`${m.name.padEnd(22)} ${r.source.padEnd(11)} hue ${r.hueDeg.toFixed(1)}  ${r.srcHex}`); }
     else console.log(`${m.name.padEnd(22)} (no usable brand colour — will fall back to config)`);
   }
+
+  // De-collide: several brands genuinely share the same snapped zone edge (e.g. multiple blues
+  // all land on 248.999°), making them indistinguishable in the HUD/hubs. Spread colliding hues
+  // apart within the allowed zones — deterministic, sorted by id — then overwrite hueDeg in place.
+  const spread = spreadColliding(Object.entries(out).map(([id, r]) => ({ id, hueDeg: r.hueDeg })));
+  for (const [id, hueDeg] of spread) out[id].hueDeg = hueDeg;
+
   writeFileSync("data/brand-hues.json", JSON.stringify(out, null, 2) + "\n");
   console.log(`\nwrote data/brand-hues.json (${Object.keys(out).length}/${metas.length} metagraphs)`);
 }

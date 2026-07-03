@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { hexToOklch, isNeutral, pickBrandColor, snapToAllowedZone, parseSvgFills } from "./brand";
+import { hexToOklch, isNeutral, pickBrandColor, snapToAllowedZone, parseSvgFills, spreadColliding, inAllowedZone } from "./brand";
 
 describe("hexToOklch", () => {
   it("gives red a mid L, high C, ~29deg hue", () => {
@@ -41,6 +41,55 @@ describe("snapToAllowedZone", () => {
     expect(inZone).toBe(true);
   });
 });
+describe("spreadColliding", () => {
+  const MIN_GAP = 8;
+  const hueDist = (a: number, b: number) => { const d = Math.abs(a - b) % 360; return Math.min(d, 360 - d); };
+
+  it("leaves non-colliding hues unchanged", () => {
+    const entries = [
+      { id: "a", hueDeg: 60 },   // [41,74]
+      { id: "b", hueDeg: 120 },  // [106,149]
+      { id: "c", hueDeg: 230 },  // [211,249]
+    ];
+    const out = spreadColliding(entries);
+    expect(out.get("a")).toBe(60);
+    expect(out.get("b")).toBe(120);
+    expect(out.get("c")).toBe(230);
+  });
+
+  it("spreads N identical hues pairwise >= MIN_GAP apart, all still in an allowed zone", () => {
+    const entries = [
+      { id: "ded", hueDeg: 249 },
+      { id: "usdc", hueDeg: 249 },
+      { id: "cmc", hueDeg: 249 },
+      { id: "tbc", hueDeg: 249 },
+    ];
+    const out = spreadColliding(entries);
+    const hues = [...out.values()];
+    expect(hues.length).toBe(4);
+    expect(new Set(out.keys())).toEqual(new Set(["ded", "usdc", "cmc", "tbc"]));
+    for (const h of hues) expect(inAllowedZone(h)).toBe(true);
+    for (let i = 0; i < hues.length; i++) {
+      for (let j = i + 1; j < hues.length; j++) {
+        expect(hueDist(hues[i], hues[j])).toBeGreaterThanOrEqual(MIN_GAP - 1e-6);
+      }
+    }
+  });
+
+  it("is deterministic regardless of input array order (sorts by id internally)", () => {
+    const a = [
+      { id: "ded", hueDeg: 249 },
+      { id: "usdc", hueDeg: 249 },
+      { id: "cmc", hueDeg: 249 },
+      { id: "tbc", hueDeg: 249 },
+    ];
+    const b = [a[3], a[1], a[0], a[2]]; // shuffled order
+    const outA = spreadColliding(a);
+    const outB = spreadColliding(b);
+    expect([...outA.entries()].sort()).toEqual([...outB.entries()].sort());
+  });
+});
+
 describe("parseSvgFills", () => {
   it("extracts hex + rgb() colours, skips none/currentColor", () => {
     const svg = `<svg><path fill="#ff5a3c"/><rect style="fill:#123456"/><stop stop-color="rgb(0,128,255)"/><path fill="none"/><path fill="currentColor"/></svg>`;
