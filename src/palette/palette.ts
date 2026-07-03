@@ -16,7 +16,7 @@ export interface PaletteEntry {
 // Allowed hue zones (deg): the gaps between the reserved structural guard-bands
 // (red 25 · amber 90 · green 165 · cyan 195 · blue 265 · violet 300, ±16°).
 // The 41–149 band is split by the amber guard into 41–74 and 106–149.
-const ALLOWED: [number, number][] = [
+export const ALLOWED: [number, number][] = [
   [41, 74],
   [106, 149],
   [211, 249],

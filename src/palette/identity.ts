@@ -3,6 +3,7 @@
 // generator. See docs/superpowers/specs/2026-07-03-engine-token-bridge-design.md.
 import { METAGRAPHS, COLORS } from "../../js/config.js";
 import { assignPalette, oklchToHex } from "./palette";
+import { hexToOklch } from "./brand";
 
 // Bloom-tuned L/C for the 3D lane — higher chroma / lower L than the HUD so an emissive+bloomed
 // node keeps a distinct hue instead of blowing out to white. Visually tuned in Task 3.
@@ -25,18 +26,10 @@ export interface IdentityHue {
 const numToHex = (n: number) => "#" + (n & 0xffffff).toString(16).padStart(6, "0");
 const CORE_HEX = numToHex(COLORS.core);
 
-// sRGB 0xRRGGBB → OKLCH hue degree [0,360). Standard sRGB→linear→OKLab (Björn Ottosson), then the
-// hue angle. Inverse direction of palette.ts's OKLab→sRGB pipeline.
+// sRGB 0xRRGGBB → OKLCH hue degree [0,360). Delegates to brand.ts's hexToOklch (DRY — same
+// sRGB→linear→OKLab pipeline, Björn Ottosson). Inverse direction of palette.ts's OKLab→sRGB pipeline.
 export function hexToHueDeg(rgb: number): number {
-  const srgb = [(rgb >> 16) & 255, (rgb >> 8) & 255, rgb & 255].map((v) => v / 255);
-  const lin = srgb.map((u) => (u <= 0.04045 ? u / 12.92 : Math.pow((u + 0.055) / 1.055, 2.4)));
-  const [r, g, b] = lin;
-  const l = Math.cbrt(0.4122214708 * r + 0.5363325363 * g + 0.0514459929 * b);
-  const m = Math.cbrt(0.2119034982 * r + 0.6806995451 * g + 0.1073969566 * b);
-  const s = Math.cbrt(0.0883024619 * r + 0.2817188376 * g + 0.6299787005 * b);
-  const a = 1.9779984951 * l - 2.428592205 * m + 0.4505937099 * s;
-  const bb = 0.0259040371 * l + 0.7827717662 * m - 0.808675766 * s;
-  return ((Math.atan2(bb, a) * 180) / Math.PI + 360) % 360;
+  return hexToOklch(rgb).h;
 }
 
 const CONFIG = METAGRAPHS as { id: string; color: number }[];
