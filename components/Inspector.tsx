@@ -10,6 +10,8 @@ import { breadcrumbLabel } from "@/src/data/breadcrumb";
 import InspectorCard from "@/components/InspectorCard";
 import ContextCard from "@/components/ContextCard";
 import RailThread from "@/components/RailThread";
+import RailDock from "@/components/RailDock";
+import { useBreakpoint } from "@/components/useBreakpoint";
 import { useFlashOnChange } from "@/components/useFlashOnChange";
 import { StandbyHalo } from "@/components/state/StateAtoms";
 import type { PickDescriptor } from "@/src/data/types";
@@ -97,6 +99,7 @@ function PickHint({ mode }: { mode: Mode }) {
 // `setSel`) and an entry here; the stacking, ordering, flashing and empty-hint are all generic.
 // An **instrument-channel thread** (`RailThread`) runs the rail's outer edge as the identity cue.
 export default function Inspector() {
+  const bp = useBreakpoint();
   const inspect = useStore((s) => s.inspect);
   const snap = useStore((s) => s.snap);
   const selStack = useStore((s) => s.selStack);
@@ -143,18 +146,34 @@ export default function Inspector() {
   const panes = selStack.filter((slot) => cards[slot]?.active).map((slot) => cards[slot].pane);
   const hasDetail = panes.length > 0;
 
-  return (
+  const content = (
+    <>
+      <ContextCard />
+      {panes}
+      {!hasDetail && <PickHint mode={mode} />}
+    </>
+  );
+
+  if (bp === "desktop") {
     // RailThread is a SIBLING of #rightcol, not a child: #rightcol gets the `.rail-clip` bottom-fade
     // mask when it overflows, and a mask composites its whole subtree — since the fixed thread doesn't
     // scroll with the rail, that mask's solid band slides off it and blanks the whole spine. Kept
     // outside, the thread manages its own top/bottom fade (13-right-column.css) independently.
-    <>
-      <RailThread />
-      <div id="rightcol" style={accent}>
-        <ContextCard />
-        {panes}
-        {!hasDetail && <PickHint mode={mode} />}
-      </div>
-    </>
+    return (
+      <>
+        <RailThread />
+        <div id="rightcol" style={accent}>
+          {content}
+        </div>
+      </>
+    );
+  }
+  // Tablet/phone: same Context + Detail panes + PickHint, hosted in the edge-tab Sheet overlay
+  // so the 3D scene keeps full width. NOTE: on phone the Detail panes will move to a dedicated
+  // bottom sheet in a follow-up task — for now this keeps the app fully functional at every size.
+  return (
+    <RailDock side="right" label="Details" style={accent}>
+      {content}
+    </RailDock>
   );
 }

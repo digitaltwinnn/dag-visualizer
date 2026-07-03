@@ -16,3 +16,31 @@
 .sheet-content[data-side="right"][data-state="open"]  { animation: sheetInRight 0.28s cubic-bezier(0.22,1,0.36,1); }
 .sheet-content[data-side="bottom"][data-state="open"] { animation: sheetInBottom 0.3s cubic-bezier(0.22,1,0.36,1); }
 @media (prefers-reduced-motion: reduce) { .sheet-content { animation: none !important; } }
+
+/* Visually-hidden utility (accessible labels, e.g. RailDock's SheetTitle). */
+.sr-only {
+  position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+  overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0;
+}
+
+/* Visible dismiss affordance for the Sheet — the primitive has no built-in close button. */
+.sheet-close {
+  position: absolute; top: 8px; right: 8px; z-index: 1;
+  width: 44px; height: 44px; display: flex; align-items: center; justify-content: center;
+  background: var(--panel); border: 1px solid var(--panel-border); border-radius: var(--radius);
+  color: var(--text); font-size: 22px; line-height: 1; cursor: pointer;
+}
+
+/* Edge tab: collapsed rail entry point on tablet/phone, hidden on desktop. */
+.rail-tab {
+  position: fixed; z-index: 39; top: 50%; transform: translateY(-50%);
+  width: 30px; min-height: 56px; display: none; align-items: center; justify-content: center;
+  background: var(--panel); border: 1px solid var(--panel-border); color: var(--text);
+  backdrop-filter: blur(14px); cursor: pointer; font-size: 20px; line-height: 1;
+}
+.rail-tab--left  { left: 0;  border-radius: 0 var(--radius) var(--radius) 0; border-left: none; }
+.rail-tab--right { right: 0; border-radius: var(--radius) 0 0 var(--radius); border-right: none; }
+@media (max-width: 1099px) {
+  #leftcol, #rightcol, .rail-thread { display: none !important; }
+  .rail-tab { display: flex; }
+}

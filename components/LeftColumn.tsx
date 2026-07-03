@@ -7,6 +7,8 @@ import GeoExplore from "@/components/GeoExplore";
 import LedgerPanel from "@/components/LedgerPanel";
 import PlaceholderPanel from "@/components/PlaceholderPanel";
 import RailThread from "@/components/RailThread";
+import RailDock from "@/components/RailDock";
+import { useBreakpoint } from "@/components/useBreakpoint";
 
 // Per-view tool cards. The scaffolded (not-yet-built) views show a "coming soon" card (SOON);
 // Hypergraph shows a static "about" card (the guided Learn tour is being reworked). Same shell
@@ -53,23 +55,38 @@ const PLACEHOLDERS: Record<string, { title: string; eyebrow: string; lines: stri
 // Learn tour is being reworked); Geography → GeoExplore (footprint + node browser); Snapshots
 // → the ledger "about" panel; the scaffolded views → a "coming soon" PlaceholderPanel.
 export default function LeftColumn() {
+  const bp = useBreakpoint();
   const mode = useStore((s) => s.mode);
   const filter = useStore((s) => s.filter);
   // Theme every card's bullet to the current selection (the explore card is always
   // specific to the active filter).
   const accent = { ["--filter-accent"]: filterAccent(filter) } as CSSProperties;
   const placeholder = PLACEHOLDERS[mode];
-  return (
+  const content = (
+    <>
+      {mode === "geo" && <GeoExplore />}
+      {mode === "ledger" && <LedgerPanel />}
+      {placeholder && <PlaceholderPanel {...placeholder} />}
+    </>
+  );
+  if (bp === "desktop") {
     // The thread is a SIBLING of #leftcol (mirrors the right rail): the rail clips horizontally + can
     // gain an overflow-fade mask, either of which would blank a child thread. It points its ruler
     // ticks OUTWARD into the left margin, toward the screen edge.
-    <>
-      <RailThread side="left" />
-      <div id="leftcol" style={accent}>
-        {mode === "geo" && <GeoExplore />}
-        {mode === "ledger" && <LedgerPanel />}
-        {placeholder && <PlaceholderPanel {...placeholder} />}
-      </div>
-    </>
+    return (
+      <>
+        <RailThread side="left" />
+        <div id="leftcol" style={accent}>
+          {content}
+        </div>
+      </>
+    );
+  }
+  // Tablet/phone: same content, hosted in the edge-tab Sheet overlay so the 3D scene keeps
+  // full width. The inline #leftcol/.rail-thread path is hidden below 1100px (00-base.css).
+  return (
+    <RailDock side="left" label="Explore" style={accent}>
+      {content}
+    </RailDock>
   );
 }
