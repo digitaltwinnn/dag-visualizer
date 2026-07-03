@@ -49,7 +49,7 @@ export default function LiveStrip() {
   useEffect(() => {
     if (barHover.current) setHoverSnapOrd(null);
   }, [latestOrd, setHoverSnapOrd]);
-  const accent = filterAccent(filter); // metagraph colour, or the core cyan for all / dag
+  const accent = filterAccent(filter); // the selected metagraph's identity hue (incl. DAG's own), or core cyan for "all"
 
   // Hover tooltip — a single cursor-following element (the bars + their container both clip with
   // `overflow: hidden` + a mask, so a per-bar tooltip would be cut off; one element at the strip
