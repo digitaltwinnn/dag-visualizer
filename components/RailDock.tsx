@@ -198,7 +198,9 @@ export default function RailDock({
               </button>
             </div>
           )}
-          {children}
+          {/* The cards scroll in an inner body so the sheet itself is `overflow: visible` — that lets
+              the bottom sheet paint its instrument ruler ABOVE its top edge (outside the element). */}
+          <div className="sheet-body">{children}</div>
         </SheetContent>
       </Sheet>
     </>

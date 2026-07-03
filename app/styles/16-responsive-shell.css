@@ -13,25 +13,31 @@
   border: 1px solid rgba(178, 193, 223, 0.10);
   backdrop-filter: blur(7px); -webkit-backdrop-filter: blur(7px);
   display: flex; flex-direction: column; gap: var(--rail-gap);
-  padding: 12px; overflow-y: auto; overscroll-behavior: contain;
-  /* Hide the default scrollbar but keep smooth/momentum scrolling — same treatment as #rightcol
-     (the chunky native bar reads as heavy chrome over the glass). */
+  padding: 12px; overflow: visible;   /* the cards scroll in .sheet-body — see below */
+}
+/* The cards scroll HERE, not on .sheet-content, so the sheet itself can be overflow:visible and
+   paint its top ruler OUTSIDE its top edge. Native scrollbar hidden, momentum kept (like #rightcol). */
+.sheet-body {
+  flex: 1 1 auto; min-height: 0;
+  display: flex; flex-direction: column; gap: var(--rail-gap);
+  overflow-y: auto; overscroll-behavior: contain;
   scrollbar-width: none;                /* Firefox */
   -webkit-overflow-scrolling: touch;    /* iOS momentum */
 }
-.sheet-content::-webkit-scrollbar { width: 0; height: 0; display: none; }
+.sheet-body::-webkit-scrollbar { width: 0; height: 0; display: none; }
 .sheet-content[data-side="left"]  { top: 0; left: 0; bottom: 0; width: min(300px, 86vw); border-radius: 0 var(--radius) var(--radius) 0; }
 .sheet-content[data-side="right"] { top: 0; right: 0; bottom: 0; width: min(320px, 90vw); border-radius: var(--radius) 0 0 var(--radius); }
 /* Phone's two bottom sheets (Explore/Details) target ~60vh so the 3D scene stays clearly visible
    above them (`height`, not just a `max-height` cap, so short content doesn't collapse the
    sheet); `max-height` remains a safety ceiling for tall content / short viewports. */
-.sheet-content[data-side="bottom"]{ left: 0; right: 0; bottom: 0; height: 60vh; max-height: 72vh; border-radius: var(--radius) var(--radius) 0 0; padding-top: 16px; }
-/* Instrument-thread ruler on the bottom sheet's TOP edge — the shared thread language, ticks
-   pointing UP (outward, toward the scene). Reuses the --thread-* tokens (same rhythm as the rails +
-   bar-chart); static decoration, faded at the left/right ends. A neutral base line sits 8px in with
-   the ruler ticks combing up to the very top edge. */
+.sheet-content[data-side="bottom"]{ left: 0; right: 0; bottom: 0; height: 60vh; max-height: 72vh; border-radius: var(--radius) var(--radius) 0 0; }
+/* Instrument-thread ruler on the bottom sheet's TOP edge — OUTSIDE the sheet, sitting just above its
+   top border with ticks pointing UP (outward, into the scene). The shared thread language, reusing
+   the --thread-* tokens (same rhythm as the rails + bar-chart); static decoration, faded at the
+   left/right ends. Renders outside because .sheet-content is overflow:visible (scroll is on
+   .sheet-body). The neutral base line sits on the sheet's top edge with the ticks combing up above it. */
 .sheet-content[data-side="bottom"]::before {
-  content: ""; position: absolute; top: 0; left: 0; right: 0; height: 8px; pointer-events: none;
+  content: ""; position: absolute; top: -8px; left: 0; right: 0; height: 8px; pointer-events: none;
   background:
     linear-gradient(var(--thread-line), var(--thread-line)) left bottom / 100% 1px no-repeat,
     repeating-linear-gradient(to right, var(--thread-tick-major) 0, var(--thread-tick-major) 1px,
