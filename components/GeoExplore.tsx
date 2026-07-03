@@ -5,7 +5,7 @@ import { useStore } from "@/src/store/store";
 import PanelHead from "@/components/PanelHead";
 import { shortHash, CORE_HEX, metagraphById } from "@/src/data/network";
 import { identityHudHex } from "@/src/palette/identity";
-import { RoleTags } from "@/components/inspector/parts";
+import { StatusMark } from "@/components/inspector/parts";
 import { ccToFlag } from "@/src/util/format";
 import { hoverKeyOf } from "@/src/data/hoverSubject";
 import { subjectPairing } from "@/components/useSubjectPairing";
@@ -143,7 +143,11 @@ export default function GeoExplore() {
                           selIp != null && r.layer === selLayer &&
                           r.pick.kind !== "snapshot" && "node" in r.pick && r.pick.node?.ip === selIp;
                         const hoverKey = hoverKeyOf(r.pick);
-                        const rowHue = r.pick.kind === "metanode" && r.pick.meta ? identityHudHex(r.pick.meta.id) : CORE_HEX;
+                        const pick = r.pick;
+                        const isMeta = pick.kind === "metanode" && !!pick.meta;
+                        const rowHue = isMeta ? identityHudHex(pick.meta!.id) : CORE_HEX;
+                        const cfg = isMeta ? metagraphById(pick.meta!.id) : null;
+                        const ticker = cfg ? cfg.ticker || cfg.name : "DAG";
                         const pair = subjectPairing(hoverNodeId, hoverKey, setHoverNodeId, rowHue);
                         return (
                           <button
@@ -154,12 +158,12 @@ export default function GeoExplore() {
                             onClick={() => selectNode(r.pick)}
                             onMouseEnter={pair.onMouseEnter}
                           >
-                            {/* No status dot here — it read as the network bullet on the node
-                                card (different meaning); state lives in the card's pill. */}
+                            <span className="nb-dot" style={{ background: rowHue }} aria-hidden />
                             <span className={"nb-label" + (r.id ? " insp-hash" : "")}>
                               {r.id ? shortHash(r.id) : r.label}
                             </span>
-                            <RoleTags roles={r.roles} />
+                            <span className="nb-ticker">{ticker}</span>
+                            <StatusMark state={r.state} />
                           </button>
                         );
                       })
