@@ -29,7 +29,15 @@ const PULSE_MS = 900;
 // `hint` is already false (already seen) — e.g. the live snapshot ticking while the sheet is
 // closed — so the tab still "feels alive" without resurrecting the persistent unseen dot. Skips
 // the initial mount, does nothing while the sheet is open, and is a no-op under
-// prefers-reduced-motion (the dot itself falls back to a static appearance — see CSS).
+// prefers-reduced-motion (the dot itself falls back to a static appearance — see CSS). It is
+// ALSO skipped the instant `hint` itself just transitioned false→true: that arrival is already
+// announced by the persistent CSS pulse (`railTabHintPulse`), so replaying the transient WAAPI
+// pulse on the very same frame would double-animate the same dot. The transient pulse is reserved
+// for a DATA update on an already-seen card (`hint` staying false across the bump).
+//
+// `sheetSide`: the Sheet's slide-in edge, when it should differ from the tab's screen-edge
+// position (`side`) — e.g. the phone Detail dock keeps its tab on the right edge but slides the
+// sheet up from the bottom. Defaults to `side`.
 export default function RailDock({
   side,
   label,
@@ -38,6 +46,7 @@ export default function RailDock({
   hint,
   pulseKey,
   onOpenChange,
+  sheetSide,
 }: {
   side: "left" | "right";
   label: string;
@@ -46,6 +55,7 @@ export default function RailDock({
   hint?: boolean;
   pulseKey?: unknown;
   onOpenChange?: (open: boolean) => void;
+  sheetSide?: "left" | "right" | "bottom";
 }) {
   const [open, setOpen] = useState(false);
   const handleOpenChange = (next: boolean) => {
@@ -56,12 +66,18 @@ export default function RailDock({
   const dotRef = useRef<HTMLSpanElement>(null);
   const mounted = useRef(false);
   const anim = useRef<Animation | null>(null);
+  const prevHint = useRef(hint);
   useEffect(() => {
+    const hintJustArrived = hint && !prevHint.current;
+    prevHint.current = hint;
     if (!mounted.current) {
       mounted.current = true;
       return;
     }
     if (open) return; // only pulses while the tab is the only visible affordance
+    // Skip the transient pulse when the persistent hint just turned on — its own resting CSS
+    // pulse already signals "new" on this same dot; firing both at once double-animates it.
+    if (hintJustArrived) return;
     const el = dotRef.current;
     if (!el || typeof el.animate !== "function") return;
     if (window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) return;
@@ -105,7 +121,7 @@ export default function RailDock({
           independent. */}
       <Sheet open={open} onOpenChange={handleOpenChange} modal={false}>
         <SheetContent
-          side={side}
+          side={sheetSide ?? side}
           style={style}
           overlay={false}
           // Don't let a pointer-down/interaction OUTSIDE the sheet (e.g. on the scene, or on the
@@ -115,6 +131,7 @@ export default function RailDock({
           onInteractOutside={(e) => e.preventDefault()}
           aria-describedby={undefined}
         >
+          {sheetSide === "bottom" && <div className="sheet-grabber" aria-hidden="true" />}
           <div className="sheet-head">
             <SheetTitle className="sheet-head-title">{label}</SheetTitle>
             <SheetClose className="sheet-close" aria-label={`Close ${label} panel`}>
