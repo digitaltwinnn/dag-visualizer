@@ -7,9 +7,9 @@
 
 The disclaimer must stay (honesty: this is an unofficial, community-built project not affiliated with Constellation), but the current treatment shouts — full-width, all-caps, saturated amber — and its `white-space: nowrap` clips on phone. Redesign it to recede into the HUD chrome like everything else while remaining legible.
 
-## Form (chosen)
+## Form (chosen — revised during build)
 
-A **refined frosted-glass ribbon**, full disclaimer always visible (not hover-hidden), fixed at top-center above the command bar. Restyle + responsive fix only — same position, same `pointer-events: none`, same stateless component.
+A **full-bleed single-line strip** across the very top (top:0, edge to edge) — a clean announcement bar, not a floating centered pill (the pill wrapped to multiple lines on narrow widths and read as cluttered). Full disclaimer visible, one line always; `pointer-events: none`, stateless. On very narrow widths the disclaimer note ellipsises its tail (keeping `△ EXPERIMENTAL` + the bulk of the text) rather than wrapping.
 
 ## Content & structure
 
@@ -35,15 +35,14 @@ Markup (`components/ExperimentalBanner.tsx`):
 
 ## Styling (Instrument-Glass, restrained amber)
 
-- **Body:** frosted glass matching the HUD panels — translucent dark background + `backdrop-filter: blur(...)` + a **hairline border** — rounded (`--radius`/8px). Reuse the panel glass tokens so it reads as the same surface family (not a separate amber block).
+- **Body:** frosted glass matching the HUD panels — translucent dark background (`var(--panel)`) + `backdrop-filter: blur(14px)`. As a full-bleed strip it has **no border-radius**; the accent is a single **amber bottom hairline** (`border-bottom`), so it reads as the same glass surface family (not a separate amber block).
 - **Accent:** amber is dialed way down — only the `△` mark and the `EXPERIMENTAL` label are amber (a muted amber, e.g. `#ffd166` at reduced weight/size), plus optionally a faint amber tint on the hairline. The body is neutral glass; the disclaimer text is muted grey. No large amber fill.
 - **Type:** ~11–11.5px; `EXPERIMENTAL` uppercase + letter-spaced; the note sentence case. Overall quieter than today's bold all-caps.
 - **Layout:** `display: flex; align-items: center; gap;` centered; a sensible `max-width` (e.g. `min(92vw, ~640px)`).
 
 ## Responsive
 
-- **Remove `white-space: nowrap`.** With the `max-width`, the ribbon **wraps to two lines** on narrow/phone widths instead of clipping (the current bug).
-- Slightly smaller type on phone; keep it centered and within the viewport. The `△`/`EXPERIMENTAL` accent stays on the first line.
+- **One line at all widths** (`white-space: nowrap`); the full-bleed full width maximizes room. On phone the type is slightly smaller, and the note (`min-width: 0; overflow: hidden; text-overflow: ellipsis`) truncates its tail with an ellipsis so `△ EXPERIMENTAL` + the disclaimer bulk stay visible — no wrapping, no vertical overlap with the command bar (the strip is one short line and clears the bar at its normal position).
 
 ## Affected components
 
