@@ -144,10 +144,7 @@ export default function GeoExplore() {
                           r.pick.kind !== "snapshot" && "node" in r.pick && r.pick.node?.ip === selIp;
                         const hoverKey = hoverKeyOf(r.pick);
                         const pick = r.pick;
-                        const isMeta = pick.kind === "metanode" && !!pick.meta;
-                        const rowHue = isMeta ? identityHudHex(pick.meta!.id) : CORE_HEX;
-                        const cfg = isMeta ? metagraphById(pick.meta!.id) : null;
-                        const ticker = cfg ? cfg.ticker || cfg.name : "DAG";
+                        const rowHue = pick.kind === "metanode" && pick.meta ? identityHudHex(pick.meta.id) : CORE_HEX;
                         const pair = subjectPairing(hoverNodeId, hoverKey, setHoverNodeId, rowHue);
                         return (
                           <button
@@ -162,7 +159,6 @@ export default function GeoExplore() {
                             <span className={"nb-label" + (r.id ? " insp-hash" : "")}>
                               {r.id ? shortHash(r.id) : r.label}
                             </span>
-                            <span className="nb-ticker">{ticker}</span>
                             <StatusMark state={r.state} />
                           </button>
                         );

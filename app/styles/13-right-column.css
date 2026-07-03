@@ -92,5 +92,4 @@
 .nb-row .role-tags { flex: none; }
 .nb-row { gap: 8px; }
 .nb-dot { flex: none; width: 7px; height: 7px; border-radius: 50%; box-shadow: 0 0 5px currentColor; }
-.nb-ticker { flex: none; margin-left: auto; font-size: 11px; color: var(--muted); font-variant-numeric: tabular-nums; }
-.nb-row .st-ready, .nb-row .st-pill { flex: none; }
+.nb-row .st-ready, .nb-row .st-pill { flex: none; margin-left: auto; }
