@@ -40,12 +40,16 @@ function CardPane({
   const hoverSnapOrd = useStore((s) => s.hoverSnapOrd);
   const setHoverNodeId = useStore((s) => s.setHoverNodeId);
   const setHoverSnapOrd = useStore((s) => s.setHoverSnapOrd);
+  const filter = useStore((s) => s.filter);
 
   // The pairing lives on the OUTER pane (the rounded card), not an inner wrapper — so the synced
   // hover glow lights the card's rounded edge, and hovering anywhere on the card glows its 3D object.
   let pair;
   if (pick.kind === "snapshot") {
-    pair = subjectPairing<number>(hoverSnapOrd, pick.data.ordinal, setHoverSnapOrd, "var(--core)");
+    // Snapshot pairing hue follows the active filter's identity: the selected metagraph's (or
+    // the DAG's own) brand hue, or the network cyan for "all" — `filterAccent` already draws
+    // that exact line (metagraphById resolves "dag" through the identity map too).
+    pair = subjectPairing<number>(hoverSnapOrd, pick.data.ordinal, setHoverSnapOrd, filterAccent(filter));
   } else {
     // geoLive → the selected node, read from the store like GeoLiveCard does.
     const node =
