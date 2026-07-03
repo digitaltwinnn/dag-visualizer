@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import type { GlobalSnapshot, LeaderboardData, MetaInfo, NodeRow, PickDescriptor, SnapshotExact } from "@/src/data/types";
+import type { HoverSubject } from "@/src/data/hoverSubject";
 
 // The active view. `hyper`/`geo` drive the 3D scene (morph between them); the rest are flat
 // views (the canvas is hidden) — `ledger` has the live ribbon, the others are placeholders.
@@ -31,6 +32,14 @@ export interface Activity {
 // bounded. Filled by the network service in src/data/network.ts.
 interface AppState {
   live: boolean;
+  lastGoodAt: number | null;
+  // Fires once, after the engine's first rendered frame — lets the boot overlay cross-fade
+  // into the live scene instead of fading on a timer/guess.
+  engineReady: boolean;
+  // Set if the engine couldn't start (e.g. WebGL unavailable / context creation threw). Without
+  // this the boot phase would sit on "booting" forever — engineReady never arrives — even though
+  // data is flowing. It routes the overlay to a distinct "3D unavailable" state instead of a wedge.
+  engineFailed: boolean;
   nodes: { l0: number; l1: number };
   metagraphs: number;
   latestOrdinal: number | null;
@@ -58,10 +67,9 @@ interface AppState {
   hoverNodeId: string | null;
   // Snapshot card follows the latest relevant snapshot (heartbeat live) vs pinned.
   following: boolean;
-  // Hover tooltip content (engine raycast); positioned by the Tooltip component.
-  hover: { title: string; sub: string; roles?: string[]; id?: string; color?: string } | null;
-  // Active "Understand the network" topic (camera focus + layer highlight), or null.
-  learnFocus: string | null;
+  // The lean hover-tooltip subject for the currently-hovered 3D object (identity ticker + short
+  // name + hue). Set by the engine raycast only when the hovered target changes. null = nothing.
+  hover: HoverSubject | null;
   // Country drill-down within the network filter (geo view), or null.
   country: string | null;
   // Per-country breakdown + distribution score for the active filter (engine-pushed).
@@ -79,8 +87,22 @@ interface AppState {
   // Shared network filter ("all" | "dag" | <metagraph id>) — one unified core model, no
   // separate L0/L1 filters (the DAG is just another metagraph-shaped core).
   filter: string;
+  // PHONE ONLY: which bottom sheet (if any) is open — "explore" (LeftColumn) or "details"
+  // (Inspector), or null when both are closed. Phone has no room to stack two bottom sheets
+  // (unlike tablet's two independent side sheets), so this is the single source of truth both
+  // docks read `open` from: a dock is open iff `phoneDock === its own id`, and opening one
+  // (`setPhoneDock("explore" | "details")`) automatically closes the other by flipping its
+  // `open` to false — the two components never need to know about each other. Never set by a
+  // scene pick (`setInspect`/`setSnap`) — only by the user tapping a button or dismissing a
+  // sheet: tapping the ACTIVE bar half again (toggle), tapping the grabber (`.sheet-grabber`,
+  // now a real tap-to-collapse button — see RailDock), or Escape → `setPhoneDock(null)`.
+  // (Outside-tap does NOT dismiss it — `onInteractOutside` is `preventDefault`-blocked so the
+  // scene/other dock stays interactive underneath.) Unused on tablet/desktop.
+  phoneDock: "explore" | "details" | null;
 
-  setLive: (live: boolean) => void;
+  setLive: (live: boolean, lastGoodAt?: number) => void;
+  setEngineReady: (v: boolean) => void;
+  setEngineFailed: (v: boolean) => void;
   setNodes: (l0: number, l1: number) => void;
   setMetagraphs: (n: number) => void;
   setLatestOrdinal: (ordinal: number) => void;
@@ -95,14 +117,12 @@ interface AppState {
   setHoverFilter: (filter: string | null) => void;
   setHoverNodeId: (id: string | null) => void;
   setFollowing: (following: boolean) => void;
-  setHover: (
-    hover: { title: string; sub: string; roles?: string[]; id?: string; color?: string } | null,
-  ) => void;
-  setLearnFocus: (focus: string | null) => void;
+  setHover: (hover: HoverSubject | null) => void;
   setCountry: (cc: string | null) => void;
   setLeaderboard: (lb: LeaderboardData | null) => void;
   setSelNodes: (nodes: NodeRow[]) => void;
   setSnapshotExact: (data: SnapshotExact) => void;
+  setPhoneDock: (dock: "explore" | "details" | null) => void;
 }
 
 // Keep the exact-snapshot cache bounded (one small object per ordinal); drop the oldest.
@@ -110,6 +130,9 @@ const EXACT_MAX = 120;
 
 export const useStore = create<AppState>((set) => ({
   live: false,
+  lastGoodAt: null,
+  engineReady: false,
+  engineFailed: false,
   nodes: { l0: 0, l1: 0 },
   metagraphs: 0,
   latestOrdinal: null,
@@ -126,13 +149,15 @@ export const useStore = create<AppState>((set) => ({
   hoverNodeId: null,
   following: false,
   hover: null,
-  learnFocus: null,
   country: null,
   leaderboard: null,
   selNodes: [],
   snapshotExact: {},
+  phoneDock: null,
 
-  setLive: (live) => set({ live }),
+  setLive: (live, lastGoodAt) => set((s) => ({ live, lastGoodAt: lastGoodAt ?? s.lastGoodAt })),
+  setEngineReady: (engineReady) => set({ engineReady }),
+  setEngineFailed: (engineFailed) => set({ engineFailed }),
   setNodes: (l0, l1) => set({ nodes: { l0, l1 } }),
   setMetagraphs: (metagraphs) => set({ metagraphs }),
   setLatestOrdinal: (latestOrdinal) => set({ latestOrdinal }),
@@ -148,7 +173,6 @@ export const useStore = create<AppState>((set) => ({
   setHoverNodeId: (hoverNodeId) => set({ hoverNodeId }),
   setFollowing: (following) => set({ following }),
   setHover: (hover) => set({ hover }),
-  setLearnFocus: (learnFocus) => set({ learnFocus }),
   setCountry: (country) => set({ country }),
   setLeaderboard: (leaderboard) => set({ leaderboard }),
   setSelNodes: (selNodes) => set({ selNodes }),
@@ -168,4 +192,5 @@ export const useStore = create<AppState>((set) => ({
       }
       return { snapshotExact: next };
     }),
+  setPhoneDock: (phoneDock) => set({ phoneDock }),
 }));

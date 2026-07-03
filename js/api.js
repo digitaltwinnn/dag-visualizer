@@ -7,6 +7,7 @@ import { API_BASE, COLORS, L0_CLUSTER, L1_CLUSTER, METAGRAPHS, VIS } from "./con
 export class NetworkData {
   constructor() {
     this.live = false;            // true once a real fetch succeeds
+    this.lastGoodAt = null;       // ms epoch of the last successful poll
     this.latest = null;           // most recent global snapshot
     this.globalSnapshots = [];    // rolling buffer, oldest -> newest
 
@@ -59,7 +60,7 @@ export class NetworkData {
       if (!list.length) throw new Error("empty");
       this.globalSnapshots = list;
       this.latest = list[list.length - 1];
-      this._setLive(true);
+      this._setLive(true, Date.now());
     } catch (e) {
       // No simulation — a real site stays factual. Show "no data" and recover on a
       // later poll once the API responds again.
@@ -118,12 +119,13 @@ export class NetworkData {
     };
   }
 
-  _setLive(v) {
+  _setLive(v, at) {
+    if (v === true && at) this.lastGoodAt = at;
     if (this.live !== v) {
       this.live = v;
-      this._emit("status", { live: v });
+      this._emit("status", { live: v, lastGoodAt: this.lastGoodAt });
     } else if (this.latest === null) {
-      this._emit("status", { live: v });
+      this._emit("status", { live: v, lastGoodAt: this.lastGoodAt });
     }
   }
 
@@ -146,7 +148,7 @@ export class NetworkData {
       if (snap && (!this.latest || snap.ordinal > this.latest.ordinal)) {
         this._pushGlobal(snap);
       }
-      this._setLive(true);
+      this._setLive(true, Date.now());
       // Pull each metagraph's newest snapshots EVERY tick (was every other tick) — together with
       // the deeper tail, this keeps up with high-throughput metagraphs (Dor) so their snapshots
       // are all attributed correctly instead of leaking into the "unlisted" count.

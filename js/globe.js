@@ -262,8 +262,14 @@ export class Globe {
         idx++;
       });
     };
-    place(l0List, "l0", "l0", COLORS.l0, 8, 1.0);
-    place(cl1List, "cl1", "l1", COLORS.l1, 14, 0.78);
+    // The DAG's own validator shells (L0 inner + cL1 outer) are coloured with the DAG's identity
+    // SCENE hue (sceneColors["dag"], set by the Engine — see src/palette/identity.ts) instead of
+    // the old structural blue/purple constants, so the DAG reads as its own brand identity here
+    // too — distinct from "All". Falls back to the old structural colours if sceneColors hasn't
+    // been populated yet (shouldn't happen — the Engine seeds it at construction).
+    const dagColor = (this.sceneColors && this.sceneColors.dag) ?? COLORS.l0;
+    place(l0List, "l0", "l0", dagColor, 8, 1.0);
+    place(cl1List, "cl1", "l1", dagColor, 14, 0.78);
     this.instSphere.geometry.getAttribute("aBase").needsUpdate = true;
     this.instDisc.geometry.getAttribute("aBase").needsUpdate = true;
 
@@ -476,17 +482,6 @@ export class Globe {
     group.traverse((o) => { if (o.userData && o.userData.baseOpacity != null) o.material.opacity = o.userData.baseOpacity * m; });
   }
 
-  // Focus one topic from the learn panel, dimming the validator layers that
-  // aren't part of it. `focus` is overview | l0 | l1 | metagraphs | null.
-  setHighlight(focus) {
-    let l0 = 0, l1 = 0;
-    if (focus === "l0") l1 = 1;
-    else if (focus === "l1") l0 = 1;
-    else if (focus === "metagraphs") { l0 = 1; l1 = 1; }
-    this.dimTarget.l0 = l0;
-    this.dimTarget.l1 = l1;
-  }
-
   // -------------------------------------------------- metagraph nodes
   // Build the metagraph validator markers from baked data. `list` is the
   // contents of data/metagraphs.json; geoMap supplies each node's location.
@@ -504,7 +499,9 @@ export class Globe {
     withNodes.forEach((m) => {
       const ci = METAGRAPHS.findIndex((c) => c.id === m.id);
       const cfg = ci >= 0 ? METAGRAPHS[ci] : null;
-      m.color = cfg ? cfg.color : DEFAULT_META_COLOR;
+      // Identity SCENE colour when available (Task 3, set by the Engine each refreshMeta);
+      // falls back to the config colour, then the neutral default for an unlisted metagraph.
+      m.color = (this.sceneColors && this.sceneColors[m.id]) ?? (cfg ? cfg.color : DEFAULT_META_COLOR);
       m._anchor = metaAnchor(ci >= 0 ? ci : 0, n);
       m._ledgerCol = ci >= 0 ? ci : 0; // column slot in the Snapshots view (config order)
     });
@@ -773,9 +770,6 @@ export class Globe {
   }
   listNodes(filter = this.filter) {
     return geoStats.listNodes(this.nodes, this.metaNodes, filter);
-  }
-  distributionScores() {
-    return geoStats.distributionScores(this.nodes, this.metaNodes);
   }
 
   // Re-fan the co-located nodes and rebuild the density rings + arcs using ONLY

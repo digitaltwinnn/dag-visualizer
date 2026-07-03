@@ -1,0 +1,57 @@
+{
+  "DAG0eQr94qUQSUhmYGNXt6CoBKWu5K6htvRMGC6M": {
+    "hueDeg": 240.99900000000002,
+    "srcHex": "#3e4fea",
+    "source": "svg"
+  },
+  "DAG0rgR8sdn8u2YBYb5Ftjy4zmuqUX3v9XsE2j94": {
+    "hueDeg": 142.4953388878099,
+    "srcHex": "#00f000",
+    "source": "raster"
+  },
+  "DAG7X5idd4aLfp4XC6WQdG1eDfR3LGPVEwtUUB2W": {
+    "hueDeg": 345.2139949577628,
+    "srcHex": "#fb3cbb",
+    "source": "svg"
+  },
+  "DAG0S16WDgdAvh8VvroR6MWLdjmHYdzAF5S181xh": {
+    "hueDeg": 232.99900000000002,
+    "srcHex": "#0b53bf",
+    "source": "svg"
+  },
+  "DAG7Ghth1WhWK83SB3MtXnnHYZbCsmiRTwJrgaW1": {
+    "hueDeg": 54,
+    "srcHex": "",
+    "source": "override"
+  },
+  "DAG06z64ifT2HzXoHfMexRfrcnpYFEwMqjFiPKze": {
+    "hueDeg": 73.99900000000002,
+    "srcHex": "#d0a030",
+    "source": "raster"
+  },
+  "DAG6oJ5BgUbxjeSYKxgjT1YEUZ3QBS1MN5XkstfT": {
+    "hueDeg": 224.99900000000002,
+    "srcHex": "#0040c0",
+    "source": "raster"
+  },
+  "DAG7fwxZJpqBpXeHqjomVkvUfC9NgZeQ11qjmB5e": {
+    "hueDeg": 216.99900000000002,
+    "srcHex": "#102040",
+    "source": "raster"
+  },
+  "DAG7ChnhUF7uKgn8tXy45aj4zn9AFuhaZr8VXY43": {
+    "hueDeg": 106,
+    "srcHex": "#f0d050",
+    "source": "raster"
+  },
+  "DAG0CyySf35ftDQDQBnd1bdQ9aPyUdacMghpnCuM": {
+    "hueDeg": 41,
+    "srcHex": "#df1e25",
+    "source": "svg"
+  },
+  "dag": {
+    "hueDeg": 248.99900000000002,
+    "srcHex": "#1050e0",
+    "source": "raster"
+  }
+}

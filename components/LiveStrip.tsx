@@ -4,43 +4,59 @@ import { useEffect, useRef, useState, type CSSProperties } from "react";
 import { latestRelevant } from "@/src/data/follow";
 import { useStore } from "@/src/store/store";
 import { useSnapshotFeed } from "@/components/useSnapshotFeed";
+import { useBreakpoint } from "@/components/useBreakpoint";
 import { getAnchor, metagraphById, filterAccent } from "@/src/data/network";
 import type { GlobalSnapshot } from "@/src/data/types";
+import { relativeAge } from "@/src/util/relativeAge";
 
 // Matches VIS.maxSnapshots (the buffer cap) so the strip fills with the full retained window.
 const MAX = 52;
+// Phone renders fewer bars (from the same buffer) so each stays a usable width/tap-target.
+const PHONE_BARS = 24;
 
-// Slim live heartbeat (hyper + geo): a mini **anchor bar-chart** of the recent Global L0 stream
-// — one bar per snapshot, height = how many metagraph snapshots it anchored — with the newest
-// (live) bar gently pulsing so the network always feels alive. When a metagraph is selected the
-// bars become **stacked**: the full bar is still the tick's TOTAL anchors (so you keep the whole
-// picture), with the selected metagraph's own share filled in at the bottom in its accent colour.
-// Clicking a bar opens that snapshot in the Snapshots view. Shares the feed + selection with the
-// ribbon so the highlight is consistent. (Hand-rolled CSS, not Recharts: dense, interactive, slim.)
+// Slim live heartbeat (hyper + geo + ledger): a mini **anchor bar-chart** of the recent Global L0
+// stream — quiet crisp-cap/faded-body bars on a faint baseline, one per snapshot. Unfiltered, each
+// bar plots the tick's TOTAL anchors in cyan, scaled to the window max. When a metagraph is
+// filtered, each bar instead plots THAT metagraph's own anchors on its OWN scale, in its identity
+// hue — its own cadence, with empty ticks rendered as honest gaps (no cap, no body) rather than
+// sub-pixel slivers. Only the live (newest) cap glows. Clicking a bar opens that snapshot in the
+// Snapshots view; hovering cross-highlights the matching ledger block. Shares the feed + selection
+// with the ledger view so the highlight is consistent. (Hand-rolled CSS, not Recharts: dense,
+// interactive, slim.)
 export default function LiveStrip() {
-  const { snaps } = useSnapshotFeed(MAX);
+  const { snaps: allSnaps } = useSnapshotFeed(MAX);
+  const bp = useBreakpoint();
+  // Phone: slice to the most recent PHONE_BARS so each bar stays a usable width — the buffer
+  // itself (MAX) is untouched, only what's rendered. Newest stays on the right (slice keeps order).
+  const snaps = bp === "phone" ? allSnaps.slice(-PHONE_BARS) : allSnaps;
   const setSnap = useStore((s) => s.setSnap);
   const setHoverSnapOrd = useStore((s) => s.setHoverSnapOrd);
   const setFollowing = useStore((s) => s.setFollowing);
   const snap = useStore((s) => s.snap);
   const filter = useStore((s) => s.filter);
+  const live = useStore((s) => s.live);
   const activeOrd = snap?.data.ordinal ?? null;
 
   const cfg = metagraphById(filter);
   const isMeta = !!cfg && filter !== "all" && filter !== "dag"; // a single metagraph is selected
 
-  // Clear the hover highlight whenever a new snapshot lands: the bars shift under a stationary cursor
-  // (which doesn't always fire mouseleave/enter), so without this a hovered row would "stick" and trail.
+  // Clear the hover highlight whenever a new snapshot lands, but ONLY while the cursor owns a BAR:
+  // the bars shift under a stationary cursor (which doesn't fire mouseleave/enter), so a hovered bar
+  // would "stick" and trail. Gated on `barHover` so a tick doesn't stomp the SnapshotCard's own
+  // hover (it drives the same `hoverSnapOrd` channel — clearing it un-paired the card mid-hover).
+  const barHover = useRef(false);
   const latestOrd = snaps[snaps.length - 1]?.ordinal ?? null;
-  useEffect(() => setHoverSnapOrd(null), [latestOrd, setHoverSnapOrd]);
-  const accent = filterAccent(filter); // metagraph colour, or the core cyan for all / dag
+  useEffect(() => {
+    if (barHover.current) setHoverSnapOrd(null);
+  }, [latestOrd, setHoverSnapOrd]);
+  const accent = filterAccent(filter); // the selected metagraph's identity hue (incl. DAG's own), or core cyan for "all"
 
   // Hover tooltip — a single cursor-following element (the bars + their container both clip with
   // `overflow: hidden` + a mask, so a per-bar tooltip would be cut off; one element at the strip
   // level can't be). Content is set on bar-enter (so it re-renders only when the bar changes); the
   // cursor position is written straight to the DOM node on move, so following the cursor is free.
   const tipRef = useRef<HTMLDivElement>(null);
-  const [tip, setTip] = useState<{ ordinal: number; total: number; mine: number; x: number; y: number } | null>(null);
+  const [tip, setTip] = useState<{ ordinal: number; total: number; mine: number; ts: string; live: boolean; x: number; y: number } | null>(null);
   const moveTip = (e: React.MouseEvent) => {
     const el = tipRef.current;
     if (el) {
@@ -57,79 +73,78 @@ export default function LiveStrip() {
     setSnap({ kind: "snapshot", title: `Global snapshot #${d.ordinal}`, data: d });
   };
 
-  // Per bar: the tick's TOTAL anchors (bar height), and the selected metagraph's own share of it
-  // (the filled segment). With no metagraph selected the share IS the total (a solid bar).
+  // Per bar: the tick's total anchors, and (filtered) this metagraph's own anchors. The plotted
+  // VALUE is `mine` when a metagraph is filtered (its own cadence on its own scale), else `total`.
   const bars = snaps.map((d) => {
     const total = typeof d.metagraphSnapshotCount === "number" ? d.metagraphSnapshotCount : 0;
     const mine = isMeta ? getAnchor(d.timestamp)?.metaCounts?.get(filter) ?? 0 : total;
     return { d, total, mine };
   });
-  const maxTotal = Math.max(1, ...bars.map((b) => b.total));
+  const scaleMax = Math.max(1, ...bars.map((b) => (isMeta ? b.mine : b.total)));
 
   return (
-    // --ls-accent colours the FILL (the metagraph's share); --ls-outline colours the total bar's
-    // outline. When a metagraph is selected the outline goes neutral/dim (the total is just
-    // context behind the coloured share); unselected it's the core cyan of the whole-network bar.
-    <section
-      id="livestrip"
-      style={
-        {
-          ["--ls-accent"]: accent,
-          ["--ls-outline"]: isMeta ? "rgb(150, 165, 200)" : "var(--core)",
-        } as CSSProperties
-      }
-    >
-      <span className="ls-live">
-        <span className="live-dot" />
-        Global L0
-      </span>
-      <div className="ls-bars" onMouseLeave={() => { setTip(null); setHoverSnapOrd(null); }}>
+    <section id="livestrip" className={live ? "" : "no-signal"} style={{ ["--ls-accent"]: accent } as CSSProperties}>
+      <div className="ls-bars" onMouseLeave={() => { barHover.current = false; setTip(null); setHoverSnapOrd(null); }}>
         {snaps.length === 0 && <span className="ls-empty">Waiting for snapshots…</span>}
         {bars.map(({ d, total, mine }, i) => {
-          const live = i === bars.length - 1;
+          const isLatest = i === bars.length - 1; // the newest bar (renamed: don't shadow the store `live`)
           const active = d.ordinal === activeOrd;
-          const off = isMeta && mine === 0; // total bar still shows, just no accent fill
-          const fillPct = total > 0 ? Math.round((mine / total) * 100) : 0;
-          const cls = "ls-bar" + (off ? " off" : "") + (live ? " live" : "") + (active ? " active" : "");
-          const label = isMeta
-            ? `Snapshot #${d.ordinal.toLocaleString()} · ${cfg!.ticker || cfg!.name} ${mine} of ${total} anchored`
-            : `Snapshot #${d.ordinal.toLocaleString()} · anchored ${total} metagraph snapshot${total === 1 ? "" : "s"}`;
+          const value = isMeta ? mine : total;
+          const gap = value === 0;                        // honest gap (esp. filtered)
+          const cls = "ls-bar" + (gap ? " gap" : "") + (isLatest ? " live" : "") + (active ? " active" : "");
           return (
             <button
               key={d.ordinal}
               className={cls}
-              style={{ height: `max(8%, ${Math.round((total / maxTotal) * 100)}%)` }}
-              aria-label={label}
-              onMouseEnter={(e) => { setTip({ ordinal: d.ordinal, total, mine, x: e.clientX, y: e.clientY }); setHoverSnapOrd(d.ordinal); }}
+              style={{ height: gap ? "0%" : `max(6%, ${Math.round((value / scaleMax) * 100)}%)` }}
+              aria-label={`snapshot ${d.ordinal}`}
+              onMouseEnter={(e) => { barHover.current = true; setTip({ ordinal: d.ordinal, total, mine, ts: d.timestamp, live: isLatest, x: e.clientX, y: e.clientY }); setHoverSnapOrd(d.ordinal); }}
               onMouseMove={moveTip}
               onClick={() => pick(d)}
-            >
-              <span className="ls-bar-fill" style={{ height: `${fillPct}%` }} />
-            </button>
+            />
           );
         })}
       </div>
 
       {tip && (
         <div id="ls-tip" ref={tipRef} style={{ left: tip.x, top: tip.y }}>
-          <div className="ls-tip-head">#{tip.ordinal.toLocaleString()}</div>
+          {/* Bare ordinal head — no '#'; a big mono number in a snapshot tooltip is obviously the ordinal. */}
+          <div className="ls-tip-head">{tip.ordinal.toLocaleString()}</div>
           <div className="ls-tip-line">
-            <span className="ls-tip-k">Total</span>
-            <span className="ls-tip-v">
-              {tip.total} anchored
-            </span>
+            {isMeta ? (
+              tip.mine > 0 ? (
+                <>
+                  <span className="ls-tip-k">
+                    <span className="ls-tip-dot" style={{ background: accent }} />
+                    {cfg!.ticker || cfg!.name}
+                  </span>
+                  <span className="ls-tip-v">{tip.mine} of {tip.total} total</span>
+                </>
+              ) : (
+                <>
+                  <span className="ls-tip-k">
+                    <span className="ls-tip-dot" style={{ background: accent }} />
+                    {cfg!.ticker || cfg!.name}
+                  </span>
+                  <span className="ls-tip-v ls-tip-gap">0 · none this tick ({tip.total} total)</span>
+                </>
+              )
+            ) : (
+              <>
+                <span className="ls-tip-k">anchored</span>
+                <span className="ls-tip-v">{tip.total} metagraph snapshot{tip.total === 1 ? "" : "s"}</span>
+              </>
+            )}
           </div>
-          {isMeta && (
-            <div className="ls-tip-line">
-              <span className="ls-tip-k">
-                <span className="ls-tip-dot" style={{ background: accent }} />
-                {cfg!.ticker || cfg!.name}
-              </span>
-              <span className="ls-tip-v">
-                {tip.mine} of {tip.total}
-              </span>
-            </div>
-          )}
+          {/* Recency — relative + coarse; the live bar reads 'live now'. */}
+          <div className="ls-tip-rec">
+            {tip.live ? (
+              <><span className="ls-tip-live" /> live now</>
+            ) : (
+              <>◷ {relativeAge(Date.now() - Date.parse(tip.ts))}</>
+            )}
+          </div>
+          <div className="ls-tip-hint">click to open snapshot</div>
         </div>
       )}
     </section>

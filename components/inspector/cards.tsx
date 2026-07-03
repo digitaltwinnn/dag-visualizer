@@ -1,74 +1,128 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { useStore } from "@/src/store/store";
-import { getAnchor, shortHash, CORE_HEX } from "@/src/data/network";
-import { toDag, hex, fmtKB } from "@/src/util/format";
-import type { GlobalSnapshot, MetaCfg, PickDescriptor } from "@/src/data/types";
+import { shortHash, CORE_HEX } from "@/src/data/network";
+import { identityHudHex } from "@/src/palette/identity";
+import { hex, fmtDag, fmtKB } from "@/src/util/format";
+import { relativeAge } from "@/src/util/relativeAge";
+import type { GlobalSnapshot, MetaCfg, NodeInfo, PickDescriptor } from "@/src/data/types";
 import AnchoredTags from "./AnchoredTags";
-import {
-  Desc,
-  ROLE_ORDER,
-  RoleTags,
-  Row,
-  nodeComposition,
-  nodeStateColor,
-  rolesOf,
-} from "./parts";
+import Odometer from "@/components/Odometer";
+import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
+import { SonarRing, NodeStars } from "@/components/state/StateAtoms";
+import { VIS } from "../../js/config.js";
+import { Desc, Row, StatusMark, CompositionRows, StatusBreakdown, nodeComposition } from "./parts";
 
 type PickOf<K extends PickDescriptor["kind"]> = Extract<PickDescriptor, { kind: K }>;
 
-// A clicked Global L0 snapshot: its place in the DAG, what it anchored, and what it cost.
+// A clicked Global L0 snapshot: its place in the DAG (◆ type-marker + odometer ordinal + live/age
+// state), what it anchored, and what it settled (fees/size/rewards).
 export function SnapshotCard({ data: d }: { data: GlobalSnapshot }) {
-  // Re-render on anchor/global polls so the polled-floor fallback (old ticks) stays fresh.
-  useStore((s) => s.activity);
-  // EXACT totals from the raw L0 snapshot (via SnapshotExactBridge), if available for this tick.
-  // When present they're authoritative — the fee is the true total (incl. unlisted) and complete.
+  // EXACT totals from the raw L0 snapshot (via SnapshotExactBridge) are the ONLY source for the fee
+  // + anchored breakdown — authoritative (the true total, incl. unlisted). If they aren't here yet
+  // the tick is simply "reading…" (ACQUIRING); there is no polled-floor fallback. Every selectable
+  // tick is inside the L0 node's retention window, so exact always resolves.
   const exact = useStore((s) => s.snapshotExact[d.ordinal]);
-  const latestOrdinal = useStore((s) => s.latestOrdinal);
-  // The LIVE tick uses exact ONLY (it's recent, so the L0 read is quick) — never the polled floor.
-  // While exact is in-flight we show a brief "reading…" rather than a transient/settling number.
-  const isLive = latestOrdinal != null && d.ordinal === latestOrdinal;
-  const awaitingExact = isLive && exact == null;
+  const latest = useStore((s) => s.latestSnapshot);
+  const live = useStore((s) => s.live);
+  const lastGoodAt = useStore((s) => s.lastGoodAt);
+  const awaitingExact = exact == null;
   const anchored = typeof d.metagraphSnapshotCount === "number" ? d.metagraphSnapshotCount : null;
-  const a = getAnchor(d.timestamp);
-  const identified = a ? a.count : 0;
-  const feeDag = exact ? toDag(exact.totalFee) : a ? toDag(a.fee) : 0;
-  const full = exact != null || (anchored != null && a != null && identified >= anchored);
-  const heightTxt =
-    d.subHeight != null
-      ? `${(d.height ?? 0).toLocaleString()} · ${d.subHeight}`
-      : (d.height ?? 0).toLocaleString();
-  const blocks = Array.isArray(d.blocks) ? d.blocks.length : 0;
-  // Fee shown from exact, or the polled floor for OLD ticks — but never the floor for the live tick.
-  const hasFee = exact ? exact.totalFee > 0 : !awaitingExact && !!a && a.fee > 0;
+  const isLive = latest != null && d.ordinal === latest.ordinal;
+
+  // Relative recency for an older pick — coarse (freshness, not a ticking clock). Guarded
+  // against an unparseable timestamp (→ no age suffix rather than "NaN").
+  const rel = relativeAge(Date.now() - Date.parse(d.timestamp));
+
+  // NO SIGNAL — the feed is unreachable. One sonar ring per retry: remounting `SonarRing` via
+  // `key={retry}` (bumped on the same cadence as the poll, VIS.pollMs) makes the ring animation
+  // itself read as "still retrying", not a static icon.
+  const [retry, setRetry] = useState(0);
+  useEffect(() => {
+    if (live) return;
+    const id = setInterval(() => setRetry((r) => r + 1), VIS.pollMs); // one ring per real poll/retry
+    return () => clearInterval(id);
+  }, [live]);
+
+  if (!live) {
+    return (
+      <div className="insp-snap no-signal">
+        <div className="snap-titlerow">
+          <span className="snap-title">
+            <span className="snap-diamond" aria-hidden>◆</span>
+            <Odometer value={d.ordinal} className="snap-ord" />
+          </span>
+          <span className="snap-state"><span className="ns-dot" /> no signal</span>
+        </div>
+        <div className="insp-div" />
+        <div className="ns-block">
+          <SonarRing key={retry} />
+          <div className="ns-rows">
+            <span>Explorer API: unreachable</span>
+            <span>Last good read: {lastGoodAt ? relativeAge(Date.now() - lastGoodAt) : "—"}</span>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Hover pairing (synced 3D glow) lives on the OUTER pane (Inspector.CardPane), not here.
   return (
-    // Borderless rows here (only the part dividers separate sections) so a row's
-    // bottom border doesn't double up with the divider.
     <div className="insp-snap">
-      {/* ① the snapshot's position in the DAG (+ blocks when present) */}
-      <Row label={d.subHeight != null ? "Height · sub-height" : "Height"}>{heightTxt}</Row>
-      {/* Most global snapshots carry zero blocks (settlement, not blocks, is the work),
-          so only surface it on the rare snapshot that actually has some. */}
-      {blocks > 0 && <Row label="Blocks">{blocks}</Row>}
-
-      {/* ② what it anchored */}
-      {(exact || awaitingExact || (a && a.metaIds.size > 0)) && <div className="insp-div" />}
-      <AnchoredTags ts={d.timestamp} ordinal={d.ordinal} anchored={anchored} awaiting={awaitingExact} />
-
-      {/* ③ what it cost — just the figure + how complete it is; no prose, the data is the point. */}
-      {hasFee && <div className="insp-div" />}
-      {hasFee && (
-        <Row label="Settlement fees">
-          {feeDag.toFixed(4)} DAG
-          {/* Two independent facts: the fee (as reported) and the measured serialized size (the
-              content byte length) — the size is NOT derived from the fee. */}
-          {exact ? <span className="insp-dim"> · {fmtKB(exact.totalSizeKB)} of data</span> : null}{" "}
-          {!exact && (
-            <span className={"insp-mini " + (full ? "ok" : "approx")}>
-              {full ? "complete" : "at least"}
-            </span>
+      {/* Title: ◆ type-marker (cyan = a GLOBAL snapshot) + the ordinal (odometer-rolls live). */}
+      <div className="snap-titlerow">
+        <span className="snap-title">
+          <span className="snap-diamond" aria-hidden>◆</span>
+          <Odometer value={d.ordinal} className="snap-ord" />
+        </span>
+        <span className="snap-state">
+          {isLive ? (
+            <><span className="snap-live-dot" /> live now</>
+          ) : (
+            <>◷ {rel}</>
           )}
-        </Row>
+        </span>
+      </div>
+
+      {/* Anchored block (exact share breakdown, or "reading…" until it lands). */}
+      <div className="insp-div" />
+      <AnchoredTags ordinal={d.ordinal} anchored={anchored} awaiting={awaitingExact} />
+
+      {/* Settlement — the exact fee + measured size + rewards (each an independent fact). While the
+          exact read is still in flight (ACQUIRING), the fee row shows twinkling node-stars so the
+          cell reserves width; once it lands the real value cross-fades in (st-resolve-in). */}
+      {exact == null ? (
+        <>
+          <div className="insp-div" />
+          <div className="snap-settle">
+            <div className="snap-settle-row">
+              <span className="snap-settle-label">Fees paid</span>
+              <span className="snap-settle-val"><NodeStars count={4} /></span>
+            </div>
+          </div>
+        </>
+      ) : (
+        <>
+          <div className="insp-div" />
+          <div className="snap-settle">
+            {exact.totalFee > 0 && (
+              <div className="snap-settle-row">
+                <span className="snap-settle-label">Fees paid</span>
+                <span className="snap-settle-val">
+                  <span className="snap-settle-amt st-resolve-in"><b>{fmtDag(exact.totalFee)}</b> DAG</span>
+                  <span className="snap-settle-sub">{fmtKB(exact.totalSizeKB)} settled</span>
+                </span>
+              </div>
+            )}
+            {exact.rewardsDatum > 0 && (
+              <div className="snap-settle-row">
+                <span className="snap-settle-label">Rewards out</span>
+                <span className="snap-settle-val"><span className="snap-settle-amt st-resolve-in"><b>{fmtDag(exact.rewardsDatum)}</b> DAG</span></span>
+              </div>
+            )}
+          </div>
+        </>
       )}
     </div>
   );
@@ -80,59 +134,49 @@ export function SnapshotCard({ data: d }: { data: GlobalSnapshot }) {
 export function MetaCard({ cfg }: { cfg: MetaCfg }) {
   const metaList = useStore((s) => s.metaList);
   const mg = metaList.find((x) => x.id === cfg.id) || null;
-  const nodeList = mg?.nodes || [];
-  let facts: React.ReactNode = null;
-  if (nodeList.length) {
-    const c = nodeComposition(nodeList);
-    const ready = nodeList.reduce((n, x) => n + (x.state === "Ready" ? 1 : 0), 0);
-    const allReady = ready === nodeList.length;
-    // Columns that SUM to the node total: the hybrid machines (one box running several layers)
-    // + one column per layer for the *dedicated* (single-layer) machines. The dedicated columns
-    // are always rendered (0 when absent) so the table keeps a fixed skeleton instead of
-    // collapsing to a lone column. Counts sit centred over the layer tag(s).
-    const hybridRoles = ROLE_ORDER.filter((r) =>
-      nodeList.some((n) => rolesOf(n).length > 1 && rolesOf(n).includes(r)),
-    );
-    const groups = [
-      { count: c.hybrid, roles: hybridRoles.length ? hybridRoles : c.present },
-      ...ROLE_ORDER.map((r) => ({ count: c.dedBy[r] || 0, roles: [r] })),
-    ];
-    facts = (
-      <div className="nf">
-        <div className="nf-total">
-          <span>
-            <b>{nodeList.length}</b> node{nodeList.length === 1 ? "" : "s"}
-          </span>
-          <span className={"insp-mini " + (allReady ? "ok" : "approx")}>
-            {allReady ? "all online" : `${ready} online`}
-          </span>
-        </div>
-        <div className="nf-grid">
-          {groups.map((g, i) => (
-            <div className={"nf-col" + (g.count === 0 ? " nf-col--empty" : "")} key={i}>
-              <span className="nf-head">
-                <b>{g.count}</b>
-              </span>
-              <RoleTags roles={g.roles} />
-            </div>
-          ))}
-        </div>
-      </div>
-    );
-  }
+  const nodes = mg?.nodes || [];
+  const hue = hex(cfg.color);
+  const iconUrl = mg?.iconUrl || cfg.iconUrl; // live metagraph icon, or the core's bundled logo
+  const monogram = (cfg.ticker || cfg.name).slice(0, 3).toUpperCase();
   const blurb = mg?.description || cfg.blurb;
   const site = mg?.siteUrl;
+  // A metagraph with no currency-L1 has a symbol but no real token — worth noting. Token
+  // metagraphs (and the DAG core) already show their ticker in the header, so a foot row
+  // repeating it (a redundant "DAG"/"DOR") is dropped.
+  const isDataMeta = cfg.id !== "dag" && !nodeComposition(nodes).hasCurrency;
+  // Hover pairing (synced 3D hub glow) lives on the OUTER pane (ContextCard's #metapane), not here.
   return (
     <>
+      {/* Header — logo avatar ringed in the identity hue + name + ticker. */}
+      <div className="dossier-head">
+        <Avatar className="dossier-logo">
+          {iconUrl && <AvatarImage src={iconUrl} alt="" />}
+          <AvatarFallback style={{ color: hue }}>{monogram}</AvatarFallback>
+        </Avatar>
+        <span className="dossier-id">
+          <span key={cfg.name} className="dossier-name roll-in">{cfg.name}</span>
+          {cfg.id !== "dag" && <span className="dossier-ticker" style={{ color: hue }}>{cfg.ticker}</span>}
+        </span>
+      </div>
       <Desc text={blurb} />
-      {/* Identity flow: name → what it is → where to find it → then the node make-up. The link
-          sits right under the description (the header's top-right is taken by the close ×). */}
-      {site && (
-        <a className="insp-site" href={site} target="_blank" rel="noopener noreferrer">
-          {site.replace(/^https?:\/\//, "").replace(/\/$/, "")}
-        </a>
+      {nodes.length > 0 && (
+        <div className="comp-block">
+          <div className="comp-head">
+            <span className="comp-title">Composition</span>
+            <span className="comp-total"><b>{nodes.length}</b> node{nodes.length === 1 ? "" : "s"}</span>
+          </div>
+          <CompositionRows nodes={nodes} />
+          <div className="comp-status"><StatusBreakdown states={nodes.map((n) => n.state)} /></div>
+        </div>
       )}
-      {facts}
+      <div className="dossier-foot">
+        {isDataMeta && <span className="dossier-token">data metagraph · no token</span>}
+        {site && (
+          <a className="insp-site" href={site} target="_blank" rel="noopener noreferrer" style={{ color: hue }}>
+            {site.replace(/^https?:\/\//, "").replace(/\/$/, "")}
+          </a>
+        )}
+      </div>
     </>
   );
 }
@@ -161,53 +205,38 @@ export function GeoLiveCard() {
 }
 
 // The selected-node block. Identity-first: the node's ID is the title; the body carries the
-// facts you can't see on the globe — which network it serves, the layer(s) it runs, its
-// state, and where it sits. The slot eyebrow already reads "Selected node", so this only
-// adds a deselect ×.
+// facts you can't see on the globe — status, IP, composition, and where it sits. The slot
+// eyebrow already reads "Selected node", so this only adds a deselect ×.
 function GeoLiveNode({ p, onClear }: { p: PickOf<"l0" | "l1" | "metanode">; onClear: () => void }) {
-  // Title = Node ID (the stable identity); fall back to IP/place only if there's no ID.
   const id = p.node?.id;
   const title = id ? shortHash(id) : p.node?.ip || p.geo?.city || p.geo?.country || "Node";
-
-  // The node's network colour, for the leading bullet. The network itself isn't a row — the
-  // bullet colour-codes it, clicking a node sets the filter (so the top-bar pill + the left
-  // dossier name it), so a Network row here would just triplicate it. The layer(s) it runs use
-  // the full role set the pick carries (a hybrid keeps every layer, not just the clicked shell).
-  const color = p.kind === "metanode" ? (p.meta ? hex(p.meta.color) : undefined) : CORE_HEX;
-  const roleKeys = (
-    p.roles?.length
-      ? p.roles
-      : p.node?.roles?.length
-        ? p.node.roles
-        : [p.kind === "metanode" ? p.layer ?? p.node?.layer : undefined].filter(Boolean)
-  ) as string[];
-
-  const state = p.node?.state ?? "—";
-  const stateColor = nodeStateColor(p.node?.state);
+  const color = p.kind === "metanode" ? (p.meta ? identityHudHex(p.meta.id) : undefined) : CORE_HEX;
+  // The single node's roles → a one-node composition row (shared vocabulary).
+  const oneNode: NodeInfo[] = p.node ? [p.node] : [];
   const g = p.geo;
   const place = g ? `${g.city ? g.city + ", " : ""}${g.country ?? ""}`.trim() : "";
-
+  // NB: the hover pairing (synced 3D glow) lives on the OUTER pane (Inspector.CardPane), not here,
+  // so the glow lights the card's rounded edge.
   return (
     <>
-      {/* Close pinned to the panel's top-right corner (like the snapshot card), so the state
-          pill can float to the right end of the ID line. */}
-      <button className="gel-clear" title="Deselect" onClick={onClear}>
-        ×
-      </button>
+      <button className="gel-clear" title="Deselect" onClick={onClear}>×</button>
+      {/* Title line: node id + the status inline (right). */}
       <div className="gel-node-head">
         {color && <span className="gel-dot" style={{ background: color }} />}
-        <span className="gel-node-title insp-hash">{title}</span>
-        {/* State pill floats right on the ID line — colour-coded per lifecycle state. */}
-        <span
-          className="gel-state"
-          style={{ color: stateColor, borderColor: stateColor + "55", background: stateColor + "1a" }}
-        >
-          {state}
-        </span>
+        <span key={title} className="gel-node-title insp-hash roll-in">{title}</span>
+        <span className="gel-status"><StatusMark state={p.node?.state} /></span>
       </div>
-      <Row label="Runs">
-        <RoleTags roles={roleKeys} />
-      </Row>
+      {/* IP grouped with the identity (muted subtitle under the id), not a labelled row. */}
+      {p.node?.ip && <div className="gel-ip">{p.node.ip}</div>}
+      <div className="insp-div" />
+      {/* Composition as a stacked label + block (NOT inside <Row>, whose value is a <span> —
+          CompositionRows renders a <div>, so a Row would nest a block in an inline element). */}
+      {oneNode.length > 0 && (
+        <div className="gel-comp">
+          <span className="gel-comp-label">Composition</span>
+          <CompositionRows nodes={oneNode} />
+        </div>
+      )}
       {place && <Row label="Location">{place}</Row>}
     </>
   );

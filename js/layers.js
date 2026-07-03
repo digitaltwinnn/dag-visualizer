@@ -14,24 +14,24 @@ const CORE_R = 3.1;  // the core IcosahedronGeometry radius
 const _pos = new THREE.Vector3(); // scratch for hub orbit positions (reused each frame)
 
 export class Layers {
-  constructor(scene) {
+  // `sceneColors` (id -> 0xRRGGBB) is the identity SCENE-lane colour map (Task 3), handed in by
+  // the Engine at construction — Layers builds all its hubs synchronously from config.METAGRAPHS
+  // right here, before any API data exists, so the map has to arrive as a ctor arg for the hubs
+  // to be born in the identity colour with no recolor pass / no first-paint flash.
+  constructor(scene, sceneColors) {
     this.scene = scene;
     this.root = new THREE.Group();
     scene.add(this.root);
 
     this.pickables = [];
     this.metas = [];
+    this.sceneColors = sceneColors || null;
 
     this._buildCore();
     this._buildMetagraphs();
 
     this.clock = 0;
 
-    // Highlight/dim state for the "Understand the network" panel: when a topic
-    // is selected, the unrelated furniture fades toward dark. 0 = full bright,
-    // 1 = fully dimmed; `dim` eases toward `dimTarget` in the update loop.
-    this.dim = { core: 0, meta: 0 };
-    this.dimTarget = { core: 0, meta: 0 };
 
     // When a metagraph is focused in the Hypergraph, its hub's orbit is paused
     // (anchored) so it stays framed & in focus; the rest keep orbiting.
@@ -55,17 +55,6 @@ export class Layers {
         m.pulseMesh.material.opacity = 0;
       }
     }
-  }
-
-  // Focus one topic from the learn panel and dim the rest. `focus` is one of
-  // overview | l0 | l1 | metagraphs | null (null/overview clears the dim).
-  setHighlight(focus) {
-    let core = 0, meta = 0;
-    if (focus === "l0")            { meta = 1; }            // core stays lit
-    else if (focus === "l1")       { core = 1; meta = 1; }  // outer shell only
-    else if (focus === "metagraphs") { core = 1; }          // metas stay lit
-    this.dimTarget.core = core;
-    this.dimTarget.meta = meta;
   }
 
   // ---------------------------------------------------------------- Core
@@ -119,8 +108,13 @@ export class Layers {
       const pos = new THREE.Vector3(an.x, an.y, an.z);
       group.position.copy(pos);
 
+      // Identity SCENE colour when available (Task 3); `?? cfg.color` is only a safety net — the
+      // Engine sets `sceneColors` (the config map) before this constructor runs, so `col` is
+      // already the identity scene colour on this first build.
+      const col = (this.sceneColors && this.sceneColors[cfg.id]) ?? cfg.color;
+
       const hubMat = new THREE.MeshStandardMaterial({
-        color: cfg.color, emissive: cfg.color, emissiveIntensity: 1.1,
+        color: col, emissive: col, emissiveIntensity: 1.1,
         roughness: 0.3, metalness: 0.4, flatShading: true, transparent: true,
       });
       const hub = new THREE.Mesh(new THREE.IcosahedronGeometry(1.5, 1), hubMat);
@@ -130,13 +124,13 @@ export class Layers {
 
       const tether = new THREE.Line(
         new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(), pos.clone()]),
-        new THREE.LineBasicMaterial({ color: cfg.color, transparent: true, opacity: 0.22 })
+        new THREE.LineBasicMaterial({ color: col, transparent: true, opacity: 0.22 })
       );
       this.root.add(tether);
 
       const pulseMesh = new THREE.Mesh(
         new THREE.SphereGeometry(0.35, 12, 12),
-        new THREE.MeshBasicMaterial({ color: cfg.color, transparent: true, opacity: 0 })
+        new THREE.MeshBasicMaterial({ color: col, transparent: true, opacity: 0 })
       );
       this.root.add(pulseMesh);
 
@@ -170,15 +164,11 @@ export class Layers {
     // would be noticeable.
     const hubFade = THREE.MathUtils.clamp(1 - morph / 0.3, 0, 1);
 
-    // Ease the highlight dim levels toward their targets, then derive a glow
-    // multiplier (coreF/metaF) and an opacity for each dimmable group.
-    const k = Math.min(1, dt * 4);
-    this.dim.core += (this.dimTarget.core - this.dim.core) * k;
-    this.dim.meta += (this.dimTarget.meta - this.dim.meta) * k;
-    const coreF = 1 - this.dim.core * 0.9;
-    const metaF = (1 - this.dim.meta * 0.9) * hubFade;
-    const coreOpacity = 1 - this.dim.core * 0.85;
-    const metaOpacity = (1 - this.dim.meta * 0.85) * hubFade;
+    // Core stays fully lit; hubs fade out with the morph (hubFade).
+    const coreF = 1;
+    const metaF = hubFade;
+    const coreOpacity = 1;
+    const metaOpacity = hubFade;
 
     // Core pulse + flash, plus the morph "core -> globe" transform: the blue
     // Hypergraph heart swells out to the globe's radius and dissolves as the Earth

@@ -1,8 +1,9 @@
 import * as THREE from "three";
 import Stats from "stats.js";
 import { useStore, type Mode } from "@/src/store/store";
-import { metagraphById, initNetwork, getNetwork, getAnchor, shortHash, CORE_HEX, DEFAULT_META_COLOR } from "@/src/data/network";
-import { hex } from "@/src/util/format";
+import { metagraphById, initNetwork, getNetwork, getAnchor, DEFAULT_META_COLOR } from "@/src/data/network";
+import { hoverKeyOf, tooltipSubject } from "@/src/data/hoverSubject";
+import { identityMap, identitySceneHex } from "@/src/palette/identity";
 // Existing vanilla modules, reused. Bare specifiers resolve via npm; they ship no types
 // of their own, so their surface is described in ./boundary and applied at construction.
 import { createScene } from "../../js/scene.js";
@@ -10,6 +11,7 @@ import { Layers } from "../../js/layers.js";
 import { Globe } from "../../js/globe.js";
 import { Ledger } from "../../js/ledger.js";
 import { loadGeoCache, resolveMissing } from "../../js/geo.js";
+import { METAGRAPHS } from "../../js/config.js";
 import type { GlobalSnapshot, PickDescriptor } from "@/src/data/types";
 import type {
   ClusterNode,
@@ -24,11 +26,23 @@ import type {
 
 type Vec = THREE.Vector3;
 
+// id[] -> { id: sceneColorNumber }, resolved through the identity map (Task 1). The vanilla
+// js/ modules never import the TS generator — the Engine owns the map and hands scene colors
+// over as plain data.
+const sceneColorsFor = (ids: string[]): Record<string, number> => {
+  const out: Record<string, number> = {};
+  for (const [id, e] of identityMap(ids)) out[id] = parseInt(e.sceneHex.slice(1), 16);
+  return out;
+};
+
 // The js/ modules ship no types and `allowJs` only infers partial/loose ones, so pin
 // them to the curated surface in ./boundary here — the single place these assertions
 // live. Everything downstream is then fully checked.
 const makeScene = createScene as (canvas: HTMLCanvasElement) => SceneCtx;
-const LayersCtor = Layers as unknown as new (scene: THREE.Scene) => LayersApi;
+const LayersCtor = Layers as unknown as new (
+  scene: THREE.Scene,
+  sceneColors?: Record<string, number>,
+) => LayersApi;
 const GlobeCtor = Globe as unknown as new (
   scene: THREE.Scene,
   layers: LayersApi,
@@ -45,12 +59,8 @@ const resolveGeo = resolveMissing as (
 // Camera presets (ported from ui.js FOCI).
 const FOCI: Record<string, { pos: Vec; target: Vec }> = {
   overview: { pos: new THREE.Vector3(0, 15, 60), target: new THREE.Vector3(0, 2, 0) },
-  l0: { pos: new THREE.Vector3(0, 6, 20), target: new THREE.Vector3(0, 1, 0) },
-  // The whole DAG core: pulled back enough to frame the outer cL1 (purple) shell (radius 14)
-  // — focus("l0") sat too close and clipped it off-frame.
+  // The whole DAG core: pulled back enough to frame the outer cL1 (purple) shell (radius 14).
   dag: { pos: new THREE.Vector3(0, 9, 38), target: new THREE.Vector3(0, 1, 0) },
-  l1: { pos: new THREE.Vector3(14, 10, 26), target: new THREE.Vector3(0, 0, 0) },
-  metagraphs: { pos: new THREE.Vector3(0, 30, 70), target: new THREE.Vector3(0, 0, 0) },
   geo: { pos: new THREE.Vector3(0, 11, 36), target: new THREE.Vector3(0, 2, 0) },
   // The Snapshots view is a stack of transparent wireframe FLOORS (layers) on Y. Frame it from an
   // elevated front angle so the stacked planes read in 3D — see js/ledger.js + config.LEDGER.
@@ -77,7 +87,6 @@ export class Engine {
   private filter = "all";
   private country: string | null = null;
   private morph = 0; // 0 = hypergraph, 1 = globe (eased each frame)
-  private _hoverMetaId: string | null = null; // metagraph currently hovered (hub/node) → filter preview
   private _baseFog: THREE.FogBase | null = null; // scene.js FogExp2 (hyper/geo); captured lazily
   private _ledgerFog: THREE.Fog | null = null;    // stronger linear depth fog for the trailing chain
   private tween: {
@@ -104,13 +113,33 @@ export class Engine {
   // FPS/ms monitor — dev only, or in prod via `?stats`/`#stats` for ad-hoc checks, so
   // it never shows for real users. Click the panel to cycle FPS → ms → MB.
   private stats?: Stats;
+  // Fired once, after the first frame actually renders (see start()'s loop) — lets callers
+  // (SceneCanvas → store.engineReady) know the scene has painted, not just constructed.
+  private _onReady?: () => void;
 
-  constructor(canvas: HTMLCanvasElement) {
+  constructor(canvas: HTMLCanvasElement, onReady?: () => void) {
     this.canvas = canvas;
+    this._onReady = onReady;
     this.ctx = makeScene(canvas);
-    this.layers = new LayersCtor(this.ctx.scene);
+    // Layers builds all its hubs synchronously from config.METAGRAPHS inside its constructor
+    // (before any API data exists), so the identity scene-color map has to be handed in at
+    // construction — passing it as a 2nd ctor arg (read by _buildMetagraphs) means the hubs are
+    // born in the identity color with no recolor pass and no first-paint flash. Layers only ever
+    // has these 10 config hubs, so this map never needs updating.
+    this.layers = new LayersCtor(this.ctx.scene, sceneColorsFor(METAGRAPHS.map((m) => m.id)));
     this.globe = new GlobeCtor(this.ctx.scene, this.layers, this.ctx.camera);
     this.ledger = new LedgerCtor(this.ctx.scene);
+    // The ledger colours its lane tiles / anchor rings / links / pulses per metagraph — feed it the
+    // same identity SCENE map so those match the hubs/nodes (config-ids known synchronously; the
+    // live set incl. new metagraphs is refreshed in refreshMeta alongside globe). "dag" is included
+    // too — its own brand hue, distinct from structural cyan (see palette/identity.ts).
+    const initialSceneColors = sceneColorsFor([...METAGRAPHS.map((m) => m.id), "dag"]);
+    this.ledger.sceneColors = initialSceneColors;
+    // The globe colours the DAG's own validator nodes (the L0/cL1 shells) with sceneColors["dag"]
+    // (see globe.js setNodes) — seed it here, synchronously, so it's populated before the first
+    // setNodes call (which can fire from the "cluster" event before refreshMeta's API round-trip
+    // resolves); refreshMeta below refreshes/extends it once the live metagraph set is known.
+    this.globe.sceneColors = initialSceneColors;
     canvas.addEventListener("click", this.onClick);
     canvas.addEventListener("pointermove", this.onMove);
     // The engine owns the resize handler (createScene no longer adds one) so it's
@@ -157,7 +186,6 @@ export class Engine {
           this.globe.setCountry(st.country);
           this._applyGeoFocus();
         }
-        if (st.learnFocus !== prev.learnFocus) this.setLearnFocus(st.learnFocus);
         // The selected node card (geo or hyper) keeps that node's layer shells lit on the globe.
         if (st.inspect !== prev.inspect) this.globe.setSelectedNode(this._pickNodeId(st.inspect));
         // Geo: clicking a node (on the globe or in the left explorer both set `inspect`)
@@ -239,6 +267,12 @@ export class Engine {
       const changed = JSON.stringify(metagraphs) !== JSON.stringify(this.metaData);
       this.metaData = metagraphs;
       this._publishMetaList(); // context-pane rows ready as soon as the route data is in
+      // Globe colors nodes for ALL current metagraphs (incl. new ones the API adds later) AND the
+      // DAG's own validator nodes, so rebuild the scene-color map over the live id set + "dag" on
+      // every refresh, right before either path below calls setMetagraphs.
+      const liveSceneColors = sceneColorsFor([...(this.metaData || []).map((m) => m.id), "dag"]);
+      this.globe.sceneColors = liveSceneColors;
+      this.ledger.sceneColors = liveSceneColors; // keep the ledger's per-metagraph colours in sync (incl. new metagraphs)
       if (initial) {
         this._applyMetagraphs();
       } else if (this.metaData && changed && Object.keys(this.geoMap).length) {
@@ -287,16 +321,20 @@ export class Engine {
       const nodes = m.nodes || [];
       return {
         id: m.id, name: m.name, symbol: m.symbol, description: m.description,
-        siteUrl: m.siteUrl, color: metagraphById(m.id)?.color ?? DEFAULT_META_COLOR,
+        siteUrl: m.siteUrl, iconUrl: m.iconUrl,
+        color: metagraphById(m.id)?.color ?? DEFAULT_META_COLOR,
         nodes, located: located(nodes), countriesCount: countriesOf(nodes),
       };
     });
     // The DAG is the root CORE — prepended so it's just another entry in the metaList that the
     // dossier / top-bar / leaderboard read uniformly (a metagraph-shaped network with roles).
+    // `color` goes through the identity HUD map (like every other entry above) so the DAG shows
+    // its own brand hue in the HUD, distinct from "All" — NOT `this.dagCore.color`, which api.js
+    // hardcodes to structural COLORS.core for the (unrelated) 3D core-sphere default.
     const dag = this.dagCore
       ? [{
           id: "dag", name: "DAG", symbol: "DAG", description: this.dagCore.description,
-          siteUrl: undefined, color: this.dagCore.color, isRoot: true,
+          siteUrl: undefined, color: metagraphById("dag")?.color ?? this.dagCore.color, isRoot: true,
           nodes: this.dagCore.nodes, located: located(this.dagCore.nodes),
           countriesCount: countriesOf(this.dagCore.nodes),
         }]
@@ -392,8 +430,14 @@ export class Engine {
       this.ledger.setFilter(this.filter);
     }
     this._publishLeaderboard();
-    // Tint the globe's land edge with the selected metagraph's colour (null → default cyan).
-    const accent = metagraphById(this.filter)?.color ?? null;
+    // Tint the globe's land edge with the selected metagraph's SCENE colour (null → default
+    // cyan). NOTE: globe.setEdgeColor currently ignores its argument and always uses the fixed
+    // ice-blue rim (see js/globe.js) — kept here so a future re-enable doesn't need call-site
+    // changes; "dag" now resolves to its own brand hue like any other id, not structural cyan.
+    const accent =
+      this.filter && this.filter !== "all"
+        ? new THREE.Color(identitySceneHex(this.filter)).getHex()
+        : null;
     this.globe.setEdgeColor(accent);
   }
 
@@ -469,13 +513,12 @@ export class Engine {
     this._tweenTo(new THREE.Vector3(0, 0, 21), new THREE.Vector3(0, 15, 2));
   }
 
-  // Compute the per-country leaderboard + distribution score for the active filter
-  // and push them to the store (the React Leaderboard reads them). Cheap.
+  // Compute the per-country leaderboard for the active filter and push it to the store
+  // (the React Leaderboard reads it). Cheap.
   private _publishLeaderboard() {
     if (!this.globe.nodes?.length) return;
     const countries = this.globe.countryStats(this.filter);
-    const { scores, refId } = this.globe.distributionScores();
-    useStore.getState().setLeaderboard({ countries, score: scores[this.filter] ?? null, refId });
+    useStore.getState().setLeaderboard({ countries });
     // Flat node list for the geo node browser (read-only; empty outside geo so the
     // browser stays quiet). Built on the same triggers as the leaderboard.
     useStore.getState().setSelNodes(this.mode === "geo" ? this.globe.listNodes(this.filter) : []);
@@ -550,46 +593,26 @@ export class Engine {
   // pixel); the Tooltip component positions itself from the pointer.
   private _handleMove(e: MouseEvent) {
     const p = this._pickAt(e);
-    // The node's identity line for the tooltip — its node ID (shortened) when it has one,
-    // else its IP. Same identity the geo node card leads with, so hover ≈ that card.
-    const idText =
-      p && (p.kind === "l0" || p.kind === "l1" || p.kind === "metanode")
-        ? p.node?.id
-          ? shortHash(p.node.id)
-          : p.node?.ip ?? ""
-        : "";
-    // The hovered subject's network colour, for the tooltip's leading bullet: a metagraph
-    // node / hub takes its metagraph colour; a DAG validator or the L0 core, the core cyan.
-    const color =
-      p?.kind === "metanode" && p.meta
-        ? hex(p.meta.color)
-        : p?.kind === "meta"
-          ? hex(p.cfg.color)
-          : p && (p.kind === "l0" || p.kind === "l1" || p.kind === "core")
-            ? CORE_HEX
-            : undefined;
-    const key = p ? `${p.title}|${p.sub}|${p.roles?.join(",") ?? ""}|${idText}|${color ?? ""}` : null;
     this.canvas.style.cursor = p ? "pointer" : "grab";
-    // Hover-pairing: glow every layer-shell instance of the hovered node (a validator by its
-    // machine id, a metagraph node by its ip) — so a hybrid's shells read as one machine.
-    const hoverId =
-      p?.kind === "metanode" ? p.node?.ip : p?.kind === "l0" || p?.kind === "l1" ? p.node?.id : null;
-    this.globe.setHoverNode(hoverId ?? null);
-    // Hovering a metagraph HUB sphere previews that metagraph's filter highlight — the SAME effect as
-    // hovering its filter pill (dims the others). (Its nodes keep the node-shell glow above.) Cleared
-    // when not over a hub.
-    const hoverMeta = p?.kind === "meta" ? p.cfg?.id ?? null : null;
-    if (hoverMeta !== this._hoverMetaId) {
-      this._hoverMetaId = hoverMeta;
-      useStore.getState().setHoverFilter(hoverMeta);
-    }
+    const st = useStore.getState();
+
+    // Route the hovered subject to ITS channel (each already drives a 3D effect + now the paired
+    // card/row). Only the channel for the hovered kind is set; the others clear — so exactly one
+    // subject is "hovered" at a time. Write only on change (mousemove is high-frequency).
+    const nodeKey = hoverKeyOf(p);                                   // node → globe shell glow
+    const snapOrd = p?.kind === "snapshot" ? p.data.ordinal : null;  // snapshot → ledger row
+    const metaId = p?.kind === "meta" ? p.cfg?.id ?? null : null;    // hub → metagraph dim preview
+    if (nodeKey !== st.hoverNodeId) st.setHoverNodeId(nodeKey);
+    if (snapOrd !== st.hoverSnapOrd) st.setHoverSnapOrd(snapOrd);
+    if (metaId !== st.hoverFilter) st.setHoverFilter(metaId);
+
+    // The lean tooltip label — re-write the store only when the subject's identity changes so
+    // following the cursor never re-renders React.
+    const subj = tooltipSubject(p);
+    const key = subj ? `${subj.ident}|${subj.name}|${subj.color}` : null;
     if (key === this._hoverKey) return;
     this._hoverKey = key;
-    useStore
-      .getState()
-      .setHover(
-        p ? { title: p.title ?? "", sub: p.sub ?? "", roles: p.roles, id: idText || undefined, color } : null,
-      );
+    st.setHover(subj);
   }
 
   private _handleClick(e: MouseEvent) {
@@ -612,10 +635,12 @@ export class Engine {
     // node-focus camera move (set by the inspect) wins over the network framing.
     if (p.kind === "l0" || p.kind === "l1" || p.kind === "metanode") {
       const netId = this._pickNetId(p);
-      // Ledger: a producer dot just highlights its column (set the filter) — no node card / camera
-      // move, so the planar diagram stays put.
+      // Ledger: open the node card + light its lane (filter), but SKIP the camera move — the planar
+      // settlement diagram must stay put. The card itself doesn't touch the 3D layout, so a node
+      // click here behaves like every other view (card + filter), just without the focus tween.
       if (this.mode === "ledger") {
         if (netId) useStore.getState().setFilter(netId);
+        useStore.getState().setInspect(p);
         return;
       }
       if (this.mode === "geo") this.ctx.controls.autoRotate = false;
@@ -629,24 +654,6 @@ export class Engine {
     if (f) this._tweenTo(f.pos, f.target);
   }
 
-  // "Understand the network" topic: frame it + dim the rest (ports ui.js focus +
-  // _highlight). null clears the dim and returns to the idle overview.
-  setLearnFocus(name: string | null) {
-    // The "metagraphs" topic ("networks of their own") is about the orbiting metagraphs —
-    // if one is currently selected (the filter), frame THAT metagraph (the explore card is
-    // tied to the active filter) instead of the generic pulled-back metagraphs shot.
-    if (name === "metagraphs") {
-      const filter = useStore.getState().filter;
-      const isMeta = this.layers.metas.some((x) => x.cfg.id === filter);
-      if (isMeta) this._focusFilter(filter);
-      else this.focus("metagraphs");
-    } else {
-      this.focus(name || "overview");
-    }
-    this.layers.setHighlight(name);
-    this.globe.setHighlight(name);
-    this.ctx.controls.autoRotate = !name;
-  }
 
   private _tweenTo(toPos: Vec, toTgt: Vec) {
     this.tween = {
@@ -764,6 +771,11 @@ export class Engine {
       }
 
       this.ctx.composer.render();
+      if (this._onReady) {
+        const cb = this._onReady;
+        this._onReady = undefined;
+        cb();
+      }
       this.stats?.end();
     };
     loop();

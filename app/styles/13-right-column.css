@@ -3,6 +3,19 @@
    an eyebrow naming its slot role (Selected / Live / Node …), symmetric with the
    left panels' eyebrows. */
 
+/* ── Instrument-channel thread — the right rail's identity cue (RailThread.tsx). ──
+   A fixed SVG down the rail's OUTER edge: a neutral base line + an identity-hued line + fine
+   ticker hatches + a node-dot centered on each card. It fades at the top and bottom so the
+   channel reads as an instrument rail rather than a hard bar. Purely decorative. */
+.rail-thread {
+  position: fixed;
+  z-index: 11;
+  pointer-events: none;
+  overflow: visible;
+  -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 7%, #000 93%, transparent 100%);
+  mask-image: linear-gradient(to bottom, transparent 0, #000 7%, #000 93%, transparent 100%);
+}
+
 /* Uniform right-column header: a blue role eyebrow (purpose) over a white title
    (subject). Both clear the absolute close × in the top-right corner. */
 .insp-eyebrow {
@@ -11,45 +24,20 @@
   color: var(--accent); line-height: 1; margin-bottom: 8px; padding-right: 22px;
 }
 .rc-pane h3, #metapane h3 { padding-right: 22px; }
-/* Snapshot title shares its row with the live ● control; both clear the × . */
-.insp-titlerow {
-  display: flex; align-items: baseline; justify-content: space-between;
-  gap: 10px; padding-right: 22px;
-}
-.insp-titlerow h3 { padding-right: 0; }
+/* Every card's eyebrow reads LEFT — the Context dossier, the node card and the snapshot card
+   align the same way, so the rail's headers form one consistent left column. (The detail cards'
+   breadcrumb `node ‹ DOR` still names the parent; it just no longer flips to the outer edge.) */
 /* Leading colour dot on the subject — same idiom as the filter chip's dot and the 3D
    hub, so colour = this metagraph reads consistently. Colour set inline (the accent). */
 /* Bullet colour follows the rail's selection accent (`--filter-accent`); cyan fallback. */
 .insp-dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 8px; vertical-align: middle; background: var(--filter-accent, var(--core)); }
 
-/* Quiet placeholder so the right zone is always present (symmetric with the left rail). */
-#rc-empty { padding: 16px 18px; }
-.rc-empty-text { margin: 0; font-size: 12.5px; line-height: 1.5; color: var(--muted); }
+/* The Context (parent) card — the dossier / "All" summary now pinned at the top of the
+   right-rail stack (was the left rail's #metapane). */
+.rc-context { position: relative; }
+.rc-context--all #metapane-content { padding: var(--panel-pad-y) var(--panel-pad-x); }
 
-/* Node fabric — one outlined block (the parts are all related): a single-line total
-   ("N nodes" + online tag) over the make-up breakdown. The breakdown is quiet text columns
-   that sum to the total (hybrid group + dedicated), split by hairline dividers; folds the
-   old Layers / Make-up rows in. */
-.nf {
-  margin: 8px 0 2px; padding: 9px 11px;
-  border: 1px solid var(--panel-border); border-radius: 10px;
-}
-.nf-total {
-  display: flex; align-items: center; justify-content: space-between; gap: 8px;
-  font-size: 12.5px; color: var(--text);
-  padding-bottom: 8px; margin-bottom: 8px;
-  border-bottom: 1px solid var(--panel-border);
-}
-.nf-total b { font-weight: 700; font-variant-numeric: tabular-nums; }
-.nf-grid { display: flex; }
-/* Each layer column centres its count over the layer tag (count on top, tag beneath). */
-.nf-col { flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; align-items: center; gap: 1px; padding: 0 12px; }
-.nf-col:first-child { padding-left: 0; }
-.nf-col + .nf-col { border-left: 1px solid var(--panel-border); }
-.nf-col--empty { opacity: 0.45; } /* a 0-count layer — present for layout, de-emphasised */
-.nf-head { font-size: 12.5px; color: var(--muted); }
-.nf-head b { font-weight: 700; color: var(--text); font-variant-numeric: tabular-nums; }
-.nf-col .role-tags { margin-top: 5px; }
+.rc-empty-text { margin: 0; font-size: 12.5px; line-height: 1.5; color: var(--muted); }
 
 /* Role tags — the layer(s) a node runs, as small squared chips. Shared by the node-fabric
    (under each count) and the geo node browser (per IP row), so both read identically. A
@@ -81,16 +69,18 @@
 }
 .gel-clear:hover { color: var(--text); }
 .gel-node-title { font-size: 13px; font-weight: 600; color: var(--text); margin: 0; font-variant-numeric: tabular-nums; word-break: break-all; min-width: 0; }
-/* State pill floats to the right end of the ID line — colour-coded per lifecycle state
-   (colour/border/background set inline from nodeStateColor). */
-.gel-state {
-  flex: none; margin-left: auto; padding: 2px 9px; border-radius: 999px;
-  font-size: 11px; font-weight: 600; border: 1px solid transparent;
-}
 
+/* ── Pick-invite for the empty Detail slot — a slim muted line + the cyan node-halo (NOT a
+   card). The right rail is the FACTS scope, so with nothing selected it stays quiet; the view's
+   own orientation lives on the LEFT rail's tool card, not here. Always cyan (structural). ── */
+.rc-pickhint {
+  display: flex; align-items: center; gap: 8px;
+  margin: 2px 4px 0; padding: 0 var(--panel-pad-x);
+  font-size: 12px; color: var(--muted);
+}
 /* ── Node rows — the nodes nested under an open country in the GeoExplore accordion. ── */
 .nb-row {
-  display: flex; align-items: center; gap: 9px; width: 100%;
+  display: flex; align-items: center; gap: 8px; width: 100%;
   padding: 5px 8px; margin: 1px 0; border-radius: 7px;
   border: 1px solid transparent; background: transparent; cursor: pointer;
   font: inherit; color: #c7d0ea; text-align: left; transition: background 0.14s, border 0.14s;
@@ -99,4 +89,5 @@
 .nb-row:focus-visible { outline: 2px solid var(--core); outline-offset: -2px; }
 .nb-row.active { background: var(--sel-bg); border-color: var(--sel-border); color: #fff; }
 .nb-label { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-variant-numeric: tabular-nums; font-size: 12px; }
-.nb-row .role-tags { flex: none; }
+.nb-dot { flex: none; width: 7px; height: 7px; border-radius: 50%; box-shadow: 0 0 5px currentColor; }
+.nb-row .st-ready, .nb-row .st-pill { flex: none; margin-left: auto; }

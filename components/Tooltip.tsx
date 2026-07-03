@@ -2,11 +2,13 @@
 
 import { useEffect, useRef } from "react";
 import { useStore } from "@/src/store/store";
-import { ROLE_SHORT } from "@/components/inspector/parts";
+import { shortHash } from "@/src/data/network";
 
-// Hover tooltip. Content comes from the store (engine raycast, set only when the
-// hovered target changes); position is updated directly on the DOM node from the
-// pointer so following the cursor never triggers a React render.
+// Lean hover tooltip — a LABEL, not a mini-card: `‹ticker› · ‹name›` + "click to inspect". The
+// identity ticker + a hairline border carry the subject's hue (core cyan for a DAG validator /
+// global snapshot); the body stays neutral. Facts live in the card that opens on click. Content
+// comes from the store (engine raycast, set only when the target changes); position is written
+// straight to the DOM from the pointer so following the cursor never triggers a React render.
 export default function Tooltip() {
   const hover = useStore((s) => s.hover);
   const ref = useRef<HTMLDivElement>(null);
@@ -24,25 +26,13 @@ export default function Tooltip() {
   }, []);
 
   if (!hover) return null;
+  const name = hover.mono ? shortHash(hover.name) : hover.name;
   return (
-    <div id="tooltip" ref={ref}>
-      <div className="tt-main">
-        <div className="tt-title">
-          {hover.color && <span className="tt-dot" style={{ background: hover.color }} />}
-          <span>{hover.title}</span>
-        </div>
-        {hover.id && <div className="tt-id insp-hash">{hover.id}</div>}
-        {hover.sub && <div className="tt-sub">{hover.sub}</div>}
-      </div>
-      {hover.roles && hover.roles.length > 0 && (
-        <div className="tt-roles">
-          {hover.roles.map((r) => (
-            <span className="role-tag" key={r}>
-              {ROLE_SHORT[r] || r}
-            </span>
-          ))}
-        </div>
-      )}
+    <div id="tooltip" ref={ref} style={{ borderColor: hover.color }}>
+      <span className="tt-ident" style={{ color: hover.color }}>{hover.ident}</span>
+      <span className="tt-sep">·</span>
+      <span className={"tt-name" + (hover.mono ? " insp-hash" : "")}>{name}</span>
+      <span className="tt-hint">click to inspect</span>
     </div>
   );
 }

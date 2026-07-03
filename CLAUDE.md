@@ -26,8 +26,9 @@ engine hides the canvas — `mode !== "hyper" && mode !== "geo" && mode !== "led
   See *The Snapshots (ledger) view* below and the `dag-ledger-view-plan` memory.
 - **Network status** (`status`), **Transactions** (`transactions`), **Delegated staking**
   (`staking`) — **scaffolded placeholders** (a `PlaceholderPanel` "SOON" card in the left rail;
-  content map in `LeftColumn.tsx`). The 3D scene, vitals, bottom stream and right rail are all
-  empty for these. See the `dag-view-scaffold` memory for each one's intent. Top-bar view glyphs
+  content map in `LeftColumn.tsx`). The 3D scene and vitals are empty for these; the bottom
+  stream (`LiveStrip`) is ALWAYS present regardless of view — see below. See the
+  `dag-view-scaffold` memory for each placeholder's intent. Top-bar view glyphs
   are all plain monochrome symbols — **never emoji** (emoji ignore CSS `color` / the accent).
 
 Only `hyper`↔`geo` **morph** (`morph` 0→1, eased each frame); the blue L0 core literally **grows
@@ -48,14 +49,35 @@ npm run dev        # http://localhost:3000
 
 `tsc --noEmit` for types (dev server tolerates type errors; run tsc to be sure).
 
-> **Dev-server gotcha:** a long-running `next dev` accumulates HMR/compile state across
-> many edits and can serve stale state (e.g. the wrong default view). If something
-> looks wrong after a big refactor, restart clean: `pkill -f "next dev"` (NOT `-f next`
-> — it matches your own shell), `rm -rf .next`, then `nohup npm run dev &`.
+> **Dev-server discipline (run ONE, shared):** keep exactly one `next dev` alive and reuse
+> it — DO NOT start a second. Concurrent servers race over port 3000 + `.next` and corrupt
+> the build (symptom: `ENOENT … .next/server/pages/_document.js`, which persists until cleaned
+> up). When coordinating parallel work (e.g. subagents), the coordinator owns the single
+> server and workers reuse `http://localhost:3000`; workers must not start/kill servers.
+> Prefer the harness background-run facility (`Bash run_in_background: true`) over
+> `nohup`/`setsid` so the process is tracked and stoppable via the task interface — avoid
+> `pkill -f "next dev"` (returns exit 144 in this sandbox and is unreliable; kill by PID if
+> you must). HMR/Turbopack picks up edits, so a restart is only needed for config-level
+> changes (tailwind/next config) or if state looks stale — then: kill the one server by PID,
+> `rm -rf .next`, start one again.
+>
+> **`next build` and `next dev` share `.next` — don't run them together.** Running
+> `npm run build` while the shared dev server is up corrupts the dev server's chunk manifests
+> (500s / stale chunks). Do the production-build check (`next build` clean, route stays `○`
+> Static) with the dev server **stopped**, or defer it to a phase boundary, then restart dev.
+> For per-edit type checks use `tsc --noEmit` (safe alongside `next dev`).
 
-### Verifying visual changes (headless)
+### Verifying visual changes
 
-No test suite; verify by screenshotting in headless Chrome. WebGL needs the
+No test suite; verify visual changes by looking at the running app.
+
+**Preferred: the chrome-devtools MCP** (`mcp__plugin_chrome-devtools-mcp__*`). It drives a
+real browser, so it can **navigate, click, hover, wait for a selector, and snapshot** — use
+it to reach interactive states directly (open the filter picker, click a view, hover a row)
+instead of the store-seed hack below. WebGL renders fine in it. This is the default for
+visual checks; standardized 2026-07-02.
+
+**Fallback: one-shot headless Chrome** (when the MCP is unavailable). WebGL needs the
 SwiftShader flags or it fails with "Error creating WebGL context":
 
 ```bash
@@ -68,12 +90,11 @@ google-chrome-stable --headless=new --no-sandbox \
 
 Gotchas that will save you time:
 
-- **No clicking / no deep links in headless** — CDP is blocked (only one-shot
-  `--screenshot`), and the old `#geo=SYMBOL` hash deep-links are gone. To screenshot a
-  specific state (a filter, the geo/ledger view, an open inspector), **temporarily seed
-  the Zustand store default** in `src/store/store.ts` (e.g. `mode: "geo"` or
-  `filter: "<id>"`, `following: true`), screenshot, then revert. That's the standard
-  trick used throughout this codebase's history.
+- **One-shot headless can't click / has no deep links** — CDP is blocked (only one-shot
+  `--screenshot`), and the old `#geo=SYMBOL` hash deep-links are gone. Prefer the
+  chrome-devtools MCP for any interactive state. If you must use one-shot headless, the old
+  trick is to **temporarily seed the Zustand store default** in `src/store/store.ts` (e.g.
+  `mode: "geo"` or `filter: "<id>"`, `following: true`), screenshot, then revert.
 - **`--virtual-time-budget` runs very few `requestAnimationFrame` frames**, so
   animations barely start — the morph and camera tweens won't complete in a one-shot.
   Booting in `geo` snaps `morph=1` (engine constructor), so the globe is settled; for
@@ -100,9 +121,10 @@ Zustand store. **Two data lanes:** (A) high-freq visuals subscribe straight to
   dispatching to the per-kind cards in `components/inspector/`), `Tooltip`, `FollowController`
   (ledger snapshot follow),
   `DataBridge` (boots the data). **Bottom stream:** `BottomStream` renders the slim `LiveStrip`
-  bar-chart (one bar per tick, height = anchors) in every snapshot-bearing view (hyper/geo/ledger)
-  and publishes `--bottom-reserve`; it reads the shared `useSnapshotFeed` hook. (The old full
-  `SnapshotRibbon` was removed — the `ledger` view's own 3D chain is the timeline now.) **`PanelHead`**
+  bar-chart (one bar per tick, height = anchors) in EVERY view, including the flat placeholders
+  (`status`/`transactions`/`staking`) — not just the three 3D views — and publishes
+  `--bottom-reserve`; it reads the shared `useSnapshotFeed` hook. (The old full `SnapshotRibbon`
+  was removed — the `ledger` view's own 3D chain is the timeline now.) **`PanelHead`**
   is the one header used by every rail panel (see *Layout system*).
 - **`src/store/store.ts`** — the Zustand store (mode, filter, country, inspect,
   following, metaList, leaderboard, live stats, …). **`src/data/network.ts`** wraps the
@@ -257,12 +279,26 @@ keep changing, so they're examples, not the contract. The per-view widgets below
   view tool card** whose scope is *"explore this view's subject"* (currently `LearnPanel` in
   hyper, `GeoExplore` in geo, `LedgerPanel` in ledger). The global filter moved to the top
   command bar. Tool eyebrow is one verb: `<View> · explore`.
-- **Right rail** (`#rightcol`, `Inspector`) = the **facts** scope (read-only): the view's
-  **Detail** card — the signature fact, or whatever you explicitly clicked (ledger → snapshot,
-  geo → selected node; hyper has none — its live activity is the top-bar vitals). Each
-  `InspectorCard` opens with a role **eyebrow** (`Live snapshot`, `Selected node`…). A quiet
-  `#rc-empty` placeholder keeps the zone present.
+- **Right rail** (`#rightcol`, `Inspector`) = the **facts** scope (read-only), a threaded
+  **subject stack** (HUD Phase 3): the **Context** card at the top (`ContextCard` — the selected
+  metagraph dossier, or an "All · whole network" summary; mirrors the filter, `×` clears it),
+  the **Detail** children below (ledger → snapshot, geo → selected node; each with a
+  `child ‹ parent` breadcrumb eyebrow + `×`), and a neutral **View-default** card (`ViewDefault`,
+  per view) that is expanded in the Detail slot at rest and collapses to a slim view-header strip
+  when a detail is selected. An **instrument-channel thread** runs the rail's outer edge (neutral
+  faded ticks + an identity-hued spine — cyan for "all" — + a node-dot at each card's middle).
+  The dossier moved here from the left rail; the left rail is now tool-only.
 - **Bottom** (`BottomStream`) = the live/time lane (the slim `LiveStrip` bar-chart, all views).
+
+**The HUD is responsive** (`16-responsive-shell.css`, `useBreakpoint()`); only the rails
+restructure, everything above holds the same four-zone shape. **Desktop** (≥1100px): unchanged —
+both rails inline. **Tablet** (700–1099px): the rails collapse to slim edge tabs (`.rail-tab`,
+screen-edge, ≥44px tap) that each open the same rail content in a non-modal Sheet overlaying the
+scene; both can be open at once. **Phone** (<700px): a persistent split bottom bar
+(`.phone-dock-half`, Explore/Details) replaces the edge tabs — tapping a half opens ONE bottom
+sheet at a time (`store.phoneDock`), tapping the active half again (or its grabber) collapses it.
+The command bar condenses (icons only, vitals move behind a toggle/popover) and `LiveStrip` runs
+full-width under it all. See the `dag-hud-refresh-specs` memory for the full breakpoint spec.
 
 Uniformity is enforced with **shared tokens in `app/styles/00-base.css`** (`--radius`,
 `--panel-pad-*`, `--rail-*`, `--detail-w`, the `--sel-bg`/`--sel-border` selection language,
@@ -283,9 +319,11 @@ rule):
   Left: the selected-metagraph `MetaCard` **dossier** (identity + the node-fabric *config* block —
   same layer vocabulary, the "how nodes are wired" cut) above `LearnPanel`. **Hyper has no
   right-rail card** so `#rightcol` stays empty there.
-- **geo** — top vitals: the **footprint** (`GeoVitals`) — `Distribution` score (moved up from
-  GeoExplore) / `Countries` / `Densest`, from `store.leaderboard`. Left: **`GeoExplore`**, now
-  purely a **country→nodes accordion** (the leaderboard + node browser merged: a country row
+- **geo** — top vitals: the **footprint** (`GeoVitals`) — `Nodes` / `Countries` / `Ready` (the
+  share of the selection's nodes in the Ready state, computed over `store.selNodes` so it is
+  exactly a % of `Nodes`; integer counts via `Odometer int`). Left: **`GeoExplore`** (titled
+  "Nodes by country"), now purely a **country→nodes accordion** (the leaderboard + node browser
+  merged: a country row
   shows its share; clicking it drills the globe **and** expands its nodes inline from
   `store.selNodes`/`globe.listNodes`), with the selected metagraph/cluster dossier pinned above
   it (`ContextPanel`). Right Detail: **`GeoLiveCard`** — the **selected node** (reads
@@ -322,14 +360,15 @@ shows the derived **`~DAG` fee**, height/sub-height, and a `+N blk` note for the
 block-carrying ticks. Height/sub-height live only in the inspector + header stat. See **Anchoring,
 fees & the metagraph data layer**.
 
-**`LiveStrip`** (`components/LiveStrip.tsx`) is the bottom lane in every snapshot-bearing view: a
-live dot + a full-width **anchor bar-chart** (one bar per tick, height = anchors), filter-coloured
-(`--ls-accent`), stacked (total + the selected metagraph's share), with a bottom-transparent→top
-gradient. It has **no panel chrome** — bars blend straight into the scene. Clicking a bar opens that
-snapshot's card (carried across views) and, from hyper/geo, jumps to `ledger`. Selection is
-**store-driven** (`inspect`/`following`/`snap` via the shared `useSnapshotFeed` hook), so the
-highlighted snapshot stays consistent across view switches and matches the ledger's centred block /
-`SnapshotCard`. `BottomStream` renders it in all snapshot views and sets `--bottom-reserve`.
+**`LiveStrip`** (`components/LiveStrip.tsx`) is the bottom lane in EVERY view, including the flat
+placeholders: a live dot + a full-width **anchor bar-chart** (one bar per tick, height = anchors),
+filter-coloured (`--ls-accent`), stacked (total + the selected metagraph's share), with a
+bottom-transparent→top gradient. It has **no panel chrome** — bars blend straight into the scene
+(or, on a placeholder view, the empty canvas backdrop). Clicking a bar opens that snapshot's card
+(carried across views) and, from hyper/geo, jumps to `ledger`. Selection is **store-driven**
+(`inspect`/`following`/`snap` via the shared `useSnapshotFeed` hook), so the highlighted snapshot
+stays consistent across view switches and matches the ledger's centred block / `SnapshotCard`.
+`BottomStream` renders it in every view and sets `--bottom-reserve`.
 
 > **Live tick — total is instant, breakdown/fee come from the exact read.** The *total*
 > (`metagraphSnapshotCount`) is final immediately; the per-metagraph breakdown + fee are pulled
@@ -561,6 +600,17 @@ browser can't fetch them — but the **Next Node server can**. So instead of bak
 - `scripts/bake-*.py` still exist but are now **only the offline seed/fallback** for
   `data/*.json`, not required for normal operation. `data/metagraphs.json` shape: each
   metagraph has `name/symbol/description/siteUrl/nodes`; each node `ip/state/layer/roles`.
+- **`data/brand-hues.json`** is baked OFFLINE by `npx tsx scripts/bake-brand-hues.ts` (run
+  manually whenever the metagraph set changes — not part of the request/build path; `jimp` is a
+  devDependency used only by this script, never imported by `app`/`src`). It extracts each
+  metagraph's identity hue from its real brand (logo SVG/raster fills, falling back to the site's
+  `theme-color`) via the pure helpers in `src/palette/brand.ts`, snapped into the palette's
+  allowed hue zones. `src/palette/identity.ts`'s `identityPins()` reads this file and overlays it
+  on top of `config.METAGRAPHS`' colours — **brand wins over config, which wins over the hash
+  fallback** — so the Hypergraph hubs/nodes and every HUD dot recolor to the real brand hue once
+  baked. `data/brand-hue-overrides.json` (id → hueDeg) is the manual escape hatch for a metagraph
+  whose extraction picked a bad dominant colour (e.g. a logo asset that isn't a real brand mark);
+  the bake applies it before extraction and re-running the bake picks it up.
 
 Metagraph reality worth knowing (it drives the inspector text):
 

@@ -33,6 +33,7 @@ export interface RouteMetagraph {
   symbol?: string;
   description?: string;
   siteUrl?: string;
+  iconUrl?: string;
   nodes: RouteNode[];
 }
 
@@ -85,8 +86,9 @@ export interface LayersApi {
   metas: MetaHub[];
   focusId: string | null;
   pickables: THREE.Object3D[];
+  /** Identity scene-hue map (id -> 0xRRGGBB), set by the Engine before hubs build. */
+  sceneColors?: Record<string, number>;
   update(dt: number, morph: number): void;
-  setHighlight(focus: string | null): void;
   /** Mark which metagraph hubs have locatable nodes (active); the rest are dimmed inactive. */
   setMetaActive(ids: Set<string> | null): void;
   /** Fire an "anchored into L0" packet from a metagraph's hub toward the core (anchor event). */
@@ -104,6 +106,8 @@ export interface GlobeApi {
   pickables: THREE.Object3D[];
   /** Per-metagraph node counts per ledger floor (ML0 = l0, ML1 = cl1+dl1) — for ring sizing. */
   ledgerGroups: Record<string, { l0: number; l1: number }>;
+  /** Identity scene-hue map (id -> 0xRRGGBB), set by the Engine each refreshMeta before setMetagraphs. */
+  sceneColors?: Record<string, number>;
   setNodes(dagCore: DagCore, geoMap: GeoMap): void;
   setMetagraphs(list: RouteMetagraph[], geoMap: GeoMap): void;
   setFilter(sel: string): void;
@@ -122,13 +126,11 @@ export interface GlobeApi {
   focusNode(geo: { lat?: number; lon?: number } | null | undefined): boolean;
   /** Tint the raised-land coastline edge toward a colour (hex), or null for the default. */
   setEdgeColor(color: number | null): void;
-  setHighlight(focus: string | null): void;
   setMorph(m: number): void;
   /** Snapshots view: place the shared node meshes into the planar rows (off restores morph layout). */
   setLedger(on: boolean): void;
   update(dt: number): void;
   countryStats(filter?: string): CountryStat[];
-  distributionScores(): { scores: Record<string, number>; refId: string | null };
   /** Flat node list for one selection (read-only), for the geo node browser. */
   listNodes(filter?: string): NodeRow[];
 }
@@ -139,6 +141,9 @@ export interface GlobeApi {
 // node meshes (globe), placed by globe.js. Driven from the live snapshot buffer.
 export interface LedgerApi {
   group: THREE.Group;
+  /** Identity SCENE-lane colour map (id -> 0xRRGGBB), handed in by the Engine so the ledger's
+   *  lane tiles / anchor rings / links / pulses match the metagraphs' identity hue (not config). */
+  sceneColors?: Record<string, number>;
   /** The centred snapshot mesh (carries a `snapshot` pick in userData.pick) for raycasting. */
   pickables: THREE.Object3D[];
   /** Re-read the live tick from the Global L0 buffer (oldest→newest) + the per-tick anchor accessor. */
