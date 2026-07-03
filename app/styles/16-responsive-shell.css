@@ -25,7 +25,22 @@
 /* Phone's two bottom sheets (Explore/Details) target ~60vh so the 3D scene stays clearly visible
    above them (`height`, not just a `max-height` cap, so short content doesn't collapse the
    sheet); `max-height` remains a safety ceiling for tall content / short viewports. */
-.sheet-content[data-side="bottom"]{ left: 0; right: 0; bottom: 0; height: 60vh; max-height: 72vh; border-radius: var(--radius) var(--radius) 0 0; }
+.sheet-content[data-side="bottom"]{ left: 0; right: 0; bottom: 0; height: 60vh; max-height: 72vh; border-radius: var(--radius) var(--radius) 0 0; padding-top: 16px; }
+/* Instrument-thread ruler on the bottom sheet's TOP edge — the shared thread language, ticks
+   pointing UP (outward, toward the scene). Reuses the --thread-* tokens (same rhythm as the rails +
+   bar-chart); static decoration, faded at the left/right ends. A neutral base line sits 8px in with
+   the ruler ticks combing up to the very top edge. */
+.sheet-content[data-side="bottom"]::before {
+  content: ""; position: absolute; top: 0; left: 0; right: 0; height: 8px; pointer-events: none;
+  background:
+    linear-gradient(var(--thread-line), var(--thread-line)) left bottom / 100% 1px no-repeat,
+    repeating-linear-gradient(to right, var(--thread-tick-major) 0, var(--thread-tick-major) 1px,
+      transparent 1px, transparent calc(var(--thread-tick-pitch) * 4)) left bottom / 100% 8px no-repeat,
+    repeating-linear-gradient(to right, var(--thread-tick) 0, var(--thread-tick) 1px,
+      transparent 1px, transparent var(--thread-tick-pitch)) left bottom / 100% 5px no-repeat;
+  -webkit-mask-image: linear-gradient(to right, transparent 0, #000 40px, #000 calc(100% - 40px), transparent 100%);
+  mask-image: linear-gradient(to right, transparent 0, #000 40px, #000 calc(100% - 40px), transparent 100%);
+}
 /* Phone's docked-bar variant (`trigger="bottom-bar-half"`): the sheet sits DIRECTLY ABOVE the
    persistent Explore/Details bar (never covers it — the bar IS its visible header/handle, see
    `.phone-dock-bar` below), so it's offset up by the bar's own height instead of touching the
@@ -162,7 +177,14 @@
   color: var(--muted); font-size: 12.5px; font-weight: 600; letter-spacing: 0.02em;
   cursor: pointer;
 }
-.phone-dock-half.active { color: var(--text); }
+/* The active half (its sheet is open) reads as SELECTED: the shared cyan selection language
+   (--sel-bg / --sel-border) + a cyan top accent line so it looks like the raised section. */
+.phone-dock-half.active {
+  color: var(--text);
+  background: var(--sel-bg);
+  box-shadow: inset 0 2px 0 var(--sel-border);
+}
+.phone-dock-half.active svg { color: var(--core); }
 .phone-dock-half--left  { left: 0;  border-right: 1px solid rgba(178, 193, 223, 0.10); }
 .phone-dock-half--right { right: 0; }
 @media (max-width: 699px) {

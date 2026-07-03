@@ -1,7 +1,7 @@
 "use client";
 
 import { forwardRef } from "react";
-import { Activity } from "lucide-react";
+import { Gauge } from "lucide-react";
 import { useStore } from "@/src/store/store";
 import { metagraphById } from "@/src/data/network";
 import { ccToFlag } from "@/src/util/format";
@@ -124,7 +124,7 @@ export const VitalsToggle = forwardRef<HTMLButtonElement, { open: boolean; onCli
         aria-label="Toggle vitals"
         onClick={onClick}
       >
-        <Activity size={14} />
+        <Gauge size={14} />
       </button>
     );
   }
