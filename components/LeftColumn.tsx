@@ -1,7 +1,7 @@
 "use client";
 
 import type { CSSProperties } from "react";
-import { useStore } from "@/src/store/store";
+import { useStore, type Mode } from "@/src/store/store";
 import { filterAccent } from "@/src/data/network";
 import GeoExplore from "@/components/GeoExplore";
 import LedgerPanel from "@/components/LedgerPanel";
@@ -12,7 +12,7 @@ import { useBreakpoint } from "@/components/useBreakpoint";
 
 // Per-view "About this view" copy — one orientation card at the top of the left rail in every
 // view (collapsed by default). Built views carry no caption; the scaffolded (SOON) views do.
-const ABOUT: Record<string, { title: string; eyebrow: string; lines: string[]; caption?: string }> = {
+const ABOUT: Record<Mode, { title: string; eyebrow: string; lines: string[]; caption?: string }> = {
   hyper: {
     title: "How the network is built",
     eyebrow: "Hypergraph · about",
