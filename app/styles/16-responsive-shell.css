@@ -2,13 +2,16 @@
 /* The scrim is deliberately faint (a whisper of darkening + a hair of blur) so the 3D scene stays
    clearly visible behind an open sheet — the sheet OVERLAYS the scene, it must not wall it off. */
 .sheet-overlay { position: fixed; inset: 0; z-index: 40; background: rgba(3, 5, 12, 0.16); backdrop-filter: blur(1px); }
-/* The sheet CONTAINER is (near-)transparent: the hosted cards (`.panel`/`.rc-pane`/ContextCard)
-   already carry their own glass background + border, so a panel bg here would double up and wall
-   off the scene. No bg / no border / no blur — the scene shows straight through the gaps between
-   cards. (The `.sheet-head` label + ✕ get their own legibility treatment below, since they now
-   float over the scene rather than sitting on a panel.) */
+/* The sheet CONTAINER is a LIGHT glass surface — noticeably more see-through than the desktop
+   `--panel`, so the 3D scene still reads through it, but with enough tint + subtle blur that it
+   reads as a real container (the header label + ✕ sit on a surface, not floating). This gives
+   three depth layers: scene (visible) < sheet (light glass, here) < cards (their own fuller glass,
+   which still stand out against this lighter surface). */
 .sheet-content {
-  position: fixed; z-index: 41; background: transparent; border: none;
+  position: fixed; z-index: 41;
+  background: rgba(12, 16, 32, 0.35);
+  border: 1px solid rgba(178, 193, 223, 0.10);
+  backdrop-filter: blur(7px); -webkit-backdrop-filter: blur(7px);
   display: flex; flex-direction: column; gap: var(--rail-gap);
   padding: 12px; overflow-y: auto; overscroll-behavior: contain;
 }
@@ -83,19 +86,16 @@
 
 /* Sheet header row — the sheet's own chrome (label + close), ABOVE the hosted content, so the
    ✕ never overlaps a hosted card's top-right control (`.rc-close` / ContextCard close /
-   `.panel-collapse`). Flush with the sheet's 12px padding; hosted cards follow below it. Now that
-   the container is transparent this row floats over the SCENE, so the label wears a small glass
-   pill (matching the cards) and a text-shadow to stay legible over any background. */
+   `.panel-collapse`). Flush with the sheet's 12px padding; hosted cards follow below it. The row
+   now sits on the sheet's own light glass surface, so the label needs no pill — just a light
+   text-shadow keeps it crisp against whatever shows through. */
 .sheet-head {
   display: flex; align-items: center; justify-content: space-between; gap: 8px;
 }
 .sheet-head-title {
   font-size: 13px; font-weight: 600; letter-spacing: 0.02em; color: var(--text);
   text-transform: uppercase; opacity: 0.9; margin: 0;
-  padding: 5px 10px; border-radius: var(--radius);
-  background: var(--panel); border: 1px solid var(--panel-border);
-  backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
-  text-shadow: 0 1px 3px rgba(3, 5, 12, 0.8);
+  text-shadow: 0 1px 2px rgba(3, 5, 12, 0.7);
 }
 /* Visible dismiss affordance for the Sheet — the primitive has no built-in close button. Lives
    in the header row (not a floating corner) to avoid colliding with card corner controls. */
