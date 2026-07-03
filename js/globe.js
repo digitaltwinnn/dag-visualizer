@@ -493,7 +493,9 @@ export class Globe {
     withNodes.forEach((m) => {
       const ci = METAGRAPHS.findIndex((c) => c.id === m.id);
       const cfg = ci >= 0 ? METAGRAPHS[ci] : null;
-      m.color = cfg ? cfg.color : DEFAULT_META_COLOR;
+      // Identity SCENE colour when available (Task 3, set by the Engine each refreshMeta);
+      // falls back to the config colour, then the neutral default for an unlisted metagraph.
+      m.color = (this.sceneColors && this.sceneColors[m.id]) ?? (cfg ? cfg.color : DEFAULT_META_COLOR);
       m._anchor = metaAnchor(ci >= 0 ? ci : 0, n);
       m._ledgerCol = ci >= 0 ? ci : 0; // column slot in the Snapshots view (config order)
     });

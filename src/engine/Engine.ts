@@ -3,6 +3,7 @@ import Stats from "stats.js";
 import { useStore, type Mode } from "@/src/store/store";
 import { metagraphById, initNetwork, getNetwork, getAnchor, DEFAULT_META_COLOR } from "@/src/data/network";
 import { hoverKeyOf, tooltipSubject } from "@/src/data/hoverSubject";
+import { identityMap, identitySceneHex } from "@/src/palette/identity";
 // Existing vanilla modules, reused. Bare specifiers resolve via npm; they ship no types
 // of their own, so their surface is described in ./boundary and applied at construction.
 import { createScene } from "../../js/scene.js";
@@ -10,6 +11,7 @@ import { Layers } from "../../js/layers.js";
 import { Globe } from "../../js/globe.js";
 import { Ledger } from "../../js/ledger.js";
 import { loadGeoCache, resolveMissing } from "../../js/geo.js";
+import { METAGRAPHS } from "../../js/config.js";
 import type { GlobalSnapshot, PickDescriptor } from "@/src/data/types";
 import type {
   ClusterNode,
@@ -24,11 +26,23 @@ import type {
 
 type Vec = THREE.Vector3;
 
+// id[] -> { id: sceneColorNumber }, resolved through the identity map (Task 1). The vanilla
+// js/ modules never import the TS generator — the Engine owns the map and hands scene colors
+// over as plain data.
+const sceneColorsFor = (ids: string[]): Record<string, number> => {
+  const out: Record<string, number> = {};
+  for (const [id, e] of identityMap(ids)) out[id] = parseInt(e.sceneHex.slice(1), 16);
+  return out;
+};
+
 // The js/ modules ship no types and `allowJs` only infers partial/loose ones, so pin
 // them to the curated surface in ./boundary here — the single place these assertions
 // live. Everything downstream is then fully checked.
 const makeScene = createScene as (canvas: HTMLCanvasElement) => SceneCtx;
-const LayersCtor = Layers as unknown as new (scene: THREE.Scene) => LayersApi;
+const LayersCtor = Layers as unknown as new (
+  scene: THREE.Scene,
+  sceneColors?: Record<string, number>,
+) => LayersApi;
 const GlobeCtor = Globe as unknown as new (
   scene: THREE.Scene,
   layers: LayersApi,
@@ -107,7 +121,12 @@ export class Engine {
     this.canvas = canvas;
     this._onReady = onReady;
     this.ctx = makeScene(canvas);
-    this.layers = new LayersCtor(this.ctx.scene);
+    // Layers builds all its hubs synchronously from config.METAGRAPHS inside its constructor
+    // (before any API data exists), so the identity scene-color map has to be handed in at
+    // construction — passing it as a 2nd ctor arg (read by _buildMetagraphs) means the hubs are
+    // born in the identity color with no recolor pass and no first-paint flash. Layers only ever
+    // has these 10 config hubs, so this map never needs updating.
+    this.layers = new LayersCtor(this.ctx.scene, sceneColorsFor(METAGRAPHS.map((m) => m.id)));
     this.globe = new GlobeCtor(this.ctx.scene, this.layers, this.ctx.camera);
     this.ledger = new LedgerCtor(this.ctx.scene);
     canvas.addEventListener("click", this.onClick);
@@ -237,6 +256,10 @@ export class Engine {
       const changed = JSON.stringify(metagraphs) !== JSON.stringify(this.metaData);
       this.metaData = metagraphs;
       this._publishMetaList(); // context-pane rows ready as soon as the route data is in
+      // Globe colors nodes for ALL current metagraphs (incl. new ones the API adds later), so
+      // rebuild the scene-color map over the live id set on every refresh, right before either
+      // path below calls setMetagraphs.
+      this.globe.sceneColors = sceneColorsFor((this.metaData || []).map((m) => m.id));
       if (initial) {
         this._applyMetagraphs();
       } else if (this.metaData && changed && Object.keys(this.geoMap).length) {
@@ -391,8 +414,12 @@ export class Engine {
       this.ledger.setFilter(this.filter);
     }
     this._publishLeaderboard();
-    // Tint the globe's land edge with the selected metagraph's colour (null → default cyan).
-    const accent = metagraphById(this.filter)?.color ?? null;
+    // Tint the globe's land edge with the selected metagraph's SCENE colour (null → default
+    // cyan; "dag" resolves to structural cyan too via identitySceneHex).
+    const accent =
+      this.filter && this.filter !== "all"
+        ? new THREE.Color(identitySceneHex(this.filter)).getHex()
+        : null;
     this.globe.setEdgeColor(accent);
   }
 

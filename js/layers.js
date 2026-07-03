@@ -14,13 +14,18 @@ const CORE_R = 3.1;  // the core IcosahedronGeometry radius
 const _pos = new THREE.Vector3(); // scratch for hub orbit positions (reused each frame)
 
 export class Layers {
-  constructor(scene) {
+  // `sceneColors` (id -> 0xRRGGBB) is the identity SCENE-lane colour map (Task 3), handed in by
+  // the Engine at construction — Layers builds all its hubs synchronously from config.METAGRAPHS
+  // right here, before any API data exists, so the map has to arrive as a ctor arg for the hubs
+  // to be born in the identity colour with no recolor pass / no first-paint flash.
+  constructor(scene, sceneColors) {
     this.scene = scene;
     this.root = new THREE.Group();
     scene.add(this.root);
 
     this.pickables = [];
     this.metas = [];
+    this.sceneColors = sceneColors || null;
 
     this._buildCore();
     this._buildMetagraphs();
@@ -103,8 +108,13 @@ export class Layers {
       const pos = new THREE.Vector3(an.x, an.y, an.z);
       group.position.copy(pos);
 
+      // Identity SCENE colour when available (Task 3); `?? cfg.color` is only a safety net — the
+      // Engine sets `sceneColors` (the config map) before this constructor runs, so `col` is
+      // already the identity scene colour on this first build.
+      const col = (this.sceneColors && this.sceneColors[cfg.id]) ?? cfg.color;
+
       const hubMat = new THREE.MeshStandardMaterial({
-        color: cfg.color, emissive: cfg.color, emissiveIntensity: 1.1,
+        color: col, emissive: col, emissiveIntensity: 1.1,
         roughness: 0.3, metalness: 0.4, flatShading: true, transparent: true,
       });
       const hub = new THREE.Mesh(new THREE.IcosahedronGeometry(1.5, 1), hubMat);
@@ -114,13 +124,13 @@ export class Layers {
 
       const tether = new THREE.Line(
         new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(), pos.clone()]),
-        new THREE.LineBasicMaterial({ color: cfg.color, transparent: true, opacity: 0.22 })
+        new THREE.LineBasicMaterial({ color: col, transparent: true, opacity: 0.22 })
       );
       this.root.add(tether);
 
       const pulseMesh = new THREE.Mesh(
         new THREE.SphereGeometry(0.35, 12, 12),
-        new THREE.MeshBasicMaterial({ color: cfg.color, transparent: true, opacity: 0 })
+        new THREE.MeshBasicMaterial({ color: col, transparent: true, opacity: 0 })
       );
       this.root.add(pulseMesh);
 

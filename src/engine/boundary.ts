@@ -86,6 +86,8 @@ export interface LayersApi {
   metas: MetaHub[];
   focusId: string | null;
   pickables: THREE.Object3D[];
+  /** Identity scene-hue map (id -> 0xRRGGBB), set by the Engine before hubs build. */
+  sceneColors?: Record<string, number>;
   update(dt: number, morph: number): void;
   /** Mark which metagraph hubs have locatable nodes (active); the rest are dimmed inactive. */
   setMetaActive(ids: Set<string> | null): void;
@@ -104,6 +106,8 @@ export interface GlobeApi {
   pickables: THREE.Object3D[];
   /** Per-metagraph node counts per ledger floor (ML0 = l0, ML1 = cl1+dl1) — for ring sizing. */
   ledgerGroups: Record<string, { l0: number; l1: number }>;
+  /** Identity scene-hue map (id -> 0xRRGGBB), set by the Engine each refreshMeta before setMetagraphs. */
+  sceneColors?: Record<string, number>;
   setNodes(dagCore: DagCore, geoMap: GeoMap): void;
   setMetagraphs(list: RouteMetagraph[], geoMap: GeoMap): void;
   setFilter(sel: string): void;
