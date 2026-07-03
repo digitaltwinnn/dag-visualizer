@@ -70,8 +70,10 @@ function known(): Map<string, IdentityHue> {
 }
 
 // Resolve a single id. `dag` is structural cyan in both lanes. A known metagraph hits the cache;
-// an unknown id is resolved on the fly (de-collided against the pins).
+// an unknown id is resolved on the fly (de-collided against the pins). A falsy id (a caller
+// passed through an unset field) is not an error — it just falls back to core cyan below.
 function resolve(id: string): IdentityHue | null {
+  if (!id) return null;
   if (id === "dag") return { id, hueDeg: hexToHueDeg(COLORS.core), hudHex: CORE_HEX, hudOklch: "", sceneHex: CORE_HEX };
   return known().get(id) ?? identityMap([...CONFIG.map((m) => m.id), id]).get(id) ?? null;
 }

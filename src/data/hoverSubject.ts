@@ -1,6 +1,7 @@
 import type { PickDescriptor } from "./types";
 import { hex } from "@/src/util/format";
 import { COLORS } from "../../js/config.js";
+import { identityHudHex } from "@/src/palette/identity";
 
 // Core cyan (the DAG spine) — the identity hue for every NON-metagraph subject (a DAG-core
 // validator, the L0 core, a global snapshot). From the plain-constant config, NOT network.ts
@@ -34,7 +35,7 @@ export function tooltipSubject(p: PickDescriptor | null | undefined): HoverSubje
       return {
         ident: p.meta?.symbol || p.meta?.name || "metagraph",
         name: p.node?.id || p.node?.ip || "node",
-        color: p.meta ? hex(p.meta.color) : CORE,
+        color: p.meta ? identityHudHex(p.meta.id) : CORE,
         mono: !!p.node?.id,
       };
     case "l0":
@@ -43,7 +44,7 @@ export function tooltipSubject(p: PickDescriptor | null | undefined): HoverSubje
     case "core":
       return { ident: "DAG", name: "Global L0", color: CORE, mono: false };
     case "meta":
-      return { ident: p.cfg.ticker || p.cfg.name, name: p.cfg.name, color: hex(p.cfg.color), mono: false };
+      return { ident: p.cfg.ticker || p.cfg.name, name: p.cfg.name, color: identityHudHex(p.cfg.id), mono: false };
     case "snapshot":
       return { ident: "L0", name: "#" + p.data.ordinal, color: CORE, mono: false };
     default:

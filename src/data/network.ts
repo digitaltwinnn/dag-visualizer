@@ -7,6 +7,7 @@ import { NetworkData, shortHash as rawShortHash } from "../../js/api.js";
 export const shortHash = rawShortHash as (h: string) => string;
 import { METAGRAPHS, COLORS as RAW_COLORS, DEFAULT_META_COLOR as RAW_DEFAULT_META } from "../../js/config.js";
 import { hex } from "@/src/util/format";
+import { identityHudNumber } from "@/src/palette/identity";
 
 export const COLORS = RAW_COLORS as { core: number; l0: number; l1: number; bg: number };
 
@@ -88,9 +89,13 @@ const DAG_CFG: MetagraphConfig = {
 };
 
 // Config core (id → {color, ticker, name, …}) — a metagraph or the DAG; null for "all".
+// The color field is resolved through the identity HUD map so every downstream HUD read
+// (filterAccent, the Engine-built metaList[].color, and any hex(cfg.color) sourced from this
+// accessor) gets the identity hue at once. DAG keeps its own cyan config unchanged.
 export function metagraphById(id: string): MetagraphConfig | null {
   if (id === "dag") return DAG_CFG;
-  return (METAGRAPHS as MetagraphConfig[]).find((m) => m.id === id) ?? null;
+  const cfg = (METAGRAPHS as MetagraphConfig[]).find((m) => m.id === id);
+  return cfg ? { ...cfg, color: identityHudNumber(id) } : null;
 }
 
 // The accent colour for the active network filter, as a CSS colour string — the selected

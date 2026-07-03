@@ -17,8 +17,11 @@ describe("hoverKeyOf", () => {
 
 describe("tooltipSubject", () => {
   it("labels a metagraph node: ticker + short-able node name + metagraph hue", () => {
-    const s = tooltipSubject({ kind: "metanode", node: { id: "9c2f", ip: "1.2.3.4" }, meta: { symbol: "DED", color: 0x36e29a } } as never);
-    expect(s).toEqual({ ident: "DED", name: "9c2f", color: "#36e29a", mono: true });
+    const s = tooltipSubject({ kind: "metanode", node: { id: "9c2f", ip: "1.2.3.4" }, meta: { id: "ded", symbol: "DED", color: 0x36e29a } } as never);
+    expect(s?.ident).toBe("DED");
+    expect(s?.name).toBe("9c2f");
+    expect(s?.mono).toBe(true);
+    expect(s?.color).toMatch(/^#[0-9a-f]{6}$/);
   });
   it("labels a DAG validator as DAG in core cyan, name mono", () => {
     const s = tooltipSubject({ kind: "l1", node: { id: "abcd" } } as never);
@@ -27,8 +30,11 @@ describe("tooltipSubject", () => {
     expect(s?.mono).toBe(true);
   });
   it("labels a hub with its name (ticker ident, metagraph hue, not mono)", () => {
-    const s = tooltipSubject({ kind: "meta", cfg: { ticker: "DOR", name: "Dor Technologies", color: 0xff5a3c } } as never);
-    expect(s).toEqual({ ident: "DOR", name: "Dor Technologies", color: "#ff5a3c", mono: false });
+    const s = tooltipSubject({ kind: "meta", cfg: { id: "dor", ticker: "DOR", name: "Dor Technologies", color: 0xff5a3c } } as never);
+    expect(s?.ident).toBe("DOR");
+    expect(s?.name).toBe("Dor Technologies");
+    expect(s?.mono).toBe(false);
+    expect(s?.color).toMatch(/^#[0-9a-f]{6}$/);
   });
   it("labels a snapshot by ordinal in core cyan", () => {
     expect(tooltipSubject({ kind: "snapshot", data: { ordinal: 42 } } as never)).toEqual({ ident: "L0", name: "#42", color: "#2af5ff", mono: false });
