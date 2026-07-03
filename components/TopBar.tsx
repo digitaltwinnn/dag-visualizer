@@ -123,14 +123,17 @@ export default function TopBar() {
 
         <div className="tb-spacer" />
 
-        {/* View switch — structural */}
+        {/* View switch — structural. On phone there's no room for the three non-functional
+            "soon" placeholders (Network/Transactions/Staking) — they're dimmed dead weight
+            that helped overflow the bar, so phone shows only the 3 working views. Tablet +
+            desktop keep all six. */}
         <ToggleGroup
           type="single"
           value={mode}
           onValueChange={(v) => { if (v) setMode(v as Mode); }}
           className="tb-views"
         >
-          {VIEWS.map((v) => (
+          {(bp === "phone" ? VIEWS.filter((v) => !("soon" in v && v.soon)) : VIEWS).map((v) => (
             <ToggleGroupItem key={v.id} value={v.id} title={v.name}
               className={"tb-view" + ("soon" in v && v.soon ? " soon" : "")}>
               <span className="tb-view-icon">{v.label}</span>

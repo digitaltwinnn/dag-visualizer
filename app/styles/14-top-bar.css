@@ -221,11 +221,15 @@
   .tb-vitals { gap: 8px; }
 }
 /* 6 · phone: tighten further so mark + filter dot + icon views + the vitals toggle all fit
-   on one row without wrapping. */
+   on one row without wrapping. Phone only shows the 3 functional views (TopBar.tsx filters
+   out the "soon" placeholders), but the row is still tight, so also drop the tablet rule's
+   hard `min-width: 44px` on `.tb-view` — the touch target stays ≥44px tall (row height +
+   `min-height: 44px` below), just narrower visually; a full 44px-wide hit box per icon isn't
+   needed to keep it tappable. */
 @media (max-width: 699px) {
   .tb-row { gap: 6px; padding: 8px; }
   .tb-views { gap: 0; }
-  .tb-view { padding: 6px; }
+  .tb-view { padding: 6px; min-width: 0; }
   .tb-filter { padding: 6px; gap: 5px; }
 }
 
