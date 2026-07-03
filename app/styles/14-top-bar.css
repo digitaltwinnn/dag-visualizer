@@ -5,25 +5,48 @@
    Clicking the filter expands the bar downward into the FilterPicker (same surface).
    No `--tb-accent` — the filter dot is the ONLY colour carrying network identity. */
 
-/* Quiet "work in progress" notice pinned at the very top, above the command bar. */
+/* Experimental disclaimer — restrained Instrument-Glass ribbon, top-centre above the command bar.
+   Full text stays visible; wraps to two lines on narrow screens instead of clipping. */
+/* Full-bleed single-line strip across the very top — a clean announcement bar (not a floating
+   pill). Frosted glass, amber bottom hairline. One line always; on very narrow widths the note
+   ellipsises its tail rather than wrapping, keeping the △ EXPERIMENTAL label intact. */
 #experimental-banner {
   position: fixed;
-  top: 5px;
-  left: 50%;
-  transform: translateX(-50%);
+  top: 0;
+  left: 0;
+  right: 0;
   z-index: 13;
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  gap: 7px;
+  padding: 5px 16px;
+  background: var(--panel);
+  border-bottom: 1px solid rgba(255, 209, 102, 0.22); /* faint amber hairline (notice cue) */
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
   font-size: 11.5px;
-  font-weight: 700;
-  letter-spacing: 0.07em;
-  text-transform: uppercase;
-  line-height: 24px;
-  color: #ffd166;
-  background: rgba(255, 209, 102, 0.11);
-  border: 1px solid rgba(255, 209, 102, 0.32);
-  border-radius: 8px;
-  padding: 0 16px;
-  pointer-events: none;
+  line-height: 1.3;
   white-space: nowrap;
+  overflow: hidden;
+  pointer-events: none;
+}
+.xb-mark { color: #ffd166; font-size: 11px; opacity: 0.85; flex: none; }
+.xb-label {
+  color: #ffd166;
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+  flex: none;
+}
+.xb-note { color: var(--muted); font-size: 11.5px; letter-spacing: 0.01em; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+
+/* Phone: a touch smaller so more of the disclaimer fits on the one line. */
+@media (max-width: 700px) {
+  #experimental-banner { padding: 5px 12px; gap: 6px; font-size: 10.5px; }
+  .xb-label { font-size: 9.5px; }
+  .xb-note { font-size: 10px; }
 }
 
 #topbar {
