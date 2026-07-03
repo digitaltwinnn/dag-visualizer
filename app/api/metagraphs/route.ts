@@ -3,7 +3,7 @@ import { unstable_cache } from "next/cache";
 import metagraphsBaked from "@/data/metagraphs.json";
 import geoBaked from "@/data/geo.json";
 import { assignPalette } from "@/src/palette/palette";
-import { configPins } from "@/src/palette/identity";
+import { identityPins } from "@/src/palette/identity";
 
 // Live server-side port of scripts/bake-metagraphs.py. Next's Node server CAN reach
 // the metagraph cluster load balancers (plain HTTP, custom ports, no CORS) that a
@@ -168,7 +168,7 @@ const getLive = unstable_cache(
 );
 
 function withHues(list: Metagraph[]): Metagraph[] {
-  const palette = assignPalette(list.map((m) => m.id), configPins());
+  const palette = assignPalette(list.map((m) => m.id), identityPins());
   return list.map((m) => {
     const e = palette.get(m.id);
     return e ? { ...m, hue: { deg: e.hueDeg, oklch: e.oklch, hex: e.hex } } : m;

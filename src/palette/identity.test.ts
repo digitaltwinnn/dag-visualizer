@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { hexToHueDeg, configPins, identityMap, identityHudHex, identitySceneHex, identityHudNumber, SCENE_L, SCENE_C, HUD_L, HUD_C } from "./identity";
+import { hexToHueDeg, configPins, identityPins, identityMap, identityHudHex, identitySceneHex, identityHudNumber, SCENE_L, SCENE_C, HUD_L, HUD_C } from "./identity";
 import { METAGRAPHS, COLORS } from "../../js/config.js";
 import { oklchToHex } from "./palette";
 
@@ -38,6 +38,13 @@ describe("identityMap", () => {
     const h = e.hueDeg;
     const inAllowed = (h>=41&&h<74)||(h>=106&&h<149)||(h>=211&&h<249)||(h>=316||h<9);
     expect(inAllowed).toBe(true);
+  });
+});
+
+describe("identityPins", () => {
+  it("overlays brand hues over config (brand wins) — currently a no-op, brand-hues.json is empty", () => {
+    // brand-hues.json is empty in-repo, so identityPins === configPins until a bake runs
+    expect(identityPins()).toEqual(configPins());
   });
 });
 

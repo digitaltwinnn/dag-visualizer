@@ -4,6 +4,7 @@
 import { METAGRAPHS, COLORS } from "../../js/config.js";
 import { assignPalette, oklchToHex } from "./palette";
 import { hexToOklch } from "./brand";
+import brandHues from "@/data/brand-hues.json";
 
 // Bloom-tuned L/C for the 3D lane — higher chroma / lower L than the HUD so an emissive+bloomed
 // node keeps a distinct hue instead of blowing out to white. Visually tuned in Task 3.
@@ -43,6 +44,27 @@ export function configPins(): Record<string, number> {
   return _pins;
 }
 
+// brand-hues.json shape: { [id: string]: { hueDeg: number; srcHex: string; source: string } } —
+// baked by Task 3's extraction script. Empty ({}) until a bake runs, which keeps this whole
+// overlay a no-op (identityPins() === configPins()).
+let _brandPins: Record<string, number> | null = null;
+export function brandPins(): Record<string, number> {
+  if (_brandPins) return _brandPins;
+  const out: Record<string, number> = {};
+  for (const [id, v] of Object.entries(brandHues as Record<string, { hueDeg: number }>)) out[id] = v.hueDeg;
+  _brandPins = Object.freeze(out);
+  return _brandPins;
+}
+
+// Config pins overlaid with baked brand pins — brand WINS when both define an id. This is the
+// pin set every consumer should use; configPins() remains the fallback layer underneath it.
+let _identityPins: Record<string, number> | null = null;
+export function identityPins(): Record<string, number> {
+  if (_identityPins) return _identityPins;
+  _identityPins = Object.freeze({ ...configPins(), ...brandPins() });
+  return _identityPins;
+}
+
 function toEntry(id: string, hueDeg: number): IdentityHue {
   return {
     id, hueDeg,
@@ -53,7 +75,7 @@ function toEntry(id: string, hueDeg: number): IdentityHue {
 }
 
 export function identityMap(ids: string[]): Map<string, IdentityHue> {
-  const palette = assignPalette(ids, configPins());
+  const palette = assignPalette(ids, identityPins());
   const out = new Map<string, IdentityHue>();
   for (const [id, e] of palette) out.set(id, toEntry(id, e.hueDeg));
   return out;
