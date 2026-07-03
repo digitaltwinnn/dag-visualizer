@@ -4,12 +4,15 @@ import { useEffect, useRef, useState, type CSSProperties } from "react";
 import { latestRelevant } from "@/src/data/follow";
 import { useStore } from "@/src/store/store";
 import { useSnapshotFeed } from "@/components/useSnapshotFeed";
+import { useBreakpoint } from "@/components/useBreakpoint";
 import { getAnchor, metagraphById, filterAccent } from "@/src/data/network";
 import type { GlobalSnapshot } from "@/src/data/types";
 import { relativeAge } from "@/src/util/relativeAge";
 
 // Matches VIS.maxSnapshots (the buffer cap) so the strip fills with the full retained window.
 const MAX = 52;
+// Phone renders fewer bars (from the same buffer) so each stays a usable width/tap-target.
+const PHONE_BARS = 24;
 
 // Slim live heartbeat (hyper + geo + ledger): a mini **anchor bar-chart** of the recent Global L0
 // stream — quiet crisp-cap/faded-body bars on a faint baseline, one per snapshot. Unfiltered, each
@@ -21,7 +24,11 @@ const MAX = 52;
 // with the ledger view so the highlight is consistent. (Hand-rolled CSS, not Recharts: dense,
 // interactive, slim.)
 export default function LiveStrip() {
-  const { snaps } = useSnapshotFeed(MAX);
+  const { snaps: allSnaps } = useSnapshotFeed(MAX);
+  const bp = useBreakpoint();
+  // Phone: slice to the most recent PHONE_BARS so each bar stays a usable width — the buffer
+  // itself (MAX) is untouched, only what's rendered. Newest stays on the right (slice keeps order).
+  const snaps = bp === "phone" ? allSnaps.slice(-PHONE_BARS) : allSnaps;
   const setSnap = useStore((s) => s.setSnap);
   const setHoverSnapOrd = useStore((s) => s.setHoverSnapOrd);
   const setFollowing = useStore((s) => s.setFollowing);
@@ -77,13 +84,6 @@ export default function LiveStrip() {
 
   return (
     <section id="livestrip" className={live ? "" : "no-signal"} style={{ ["--ls-accent"]: accent } as CSSProperties}>
-      <span className="ls-live">
-        {live ? <span className="live-dot" /> : <span className="ns-dot" />}
-        Global L0
-        <span className="ls-scale">
-          {isMeta ? `${cfg!.ticker || cfg!.name} anchors/tick · own scale` : "anchors/tick"}
-        </span>
-      </span>
       <div className="ls-bars" onMouseLeave={() => { barHover.current = false; setTip(null); setHoverSnapOrd(null); }}>
         {snaps.length === 0 && <span className="ls-empty">Waiting for snapshots…</span>}
         {bars.map(({ d, total, mine }, i) => {

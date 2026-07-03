@@ -98,7 +98,7 @@
   position: fixed; z-index: 10;
   left: 16px; right: 16px; bottom: 16px;
   height: 98px; padding: 0 14px;
-  display: flex; align-items: center; gap: 14px;
+  display: flex; align-items: center;
   background: none; border: none;
 }
 /* Phone: the persistent Explore/Details bar docks flush to the true bottom of the viewport
@@ -107,13 +107,6 @@
 @media (max-width: 699px) {
   #livestrip { bottom: calc(var(--phone-dock-h, 56px) + 8px); }
 }
-.ls-live {
-  display: flex; align-items: center; gap: 8px; flex: none;
-  font-size: 12px; font-weight: 600; letter-spacing: 0.02em; color: var(--text);
-  text-shadow: 0 1px 8px rgba(0, 0, 0, 0.7); /* legible without the panel behind it */
-}
-/* the scale label switches between the shared window max (All) and a metagraph's own cadence */
-.ls-scale { font-size: 10px; color: var(--muted); margin-left: 8px; letter-spacing: .02em; }
 /* Anchor bar-chart: one bar per snapshot (height = anchors), spanning the FULL width so the
    bars grow thinner as more stream in, newest on the right, older ones fading out to the left.
    Coloured by the active filter (`--ls-accent`): the selected metagraph's accent, or core cyan
