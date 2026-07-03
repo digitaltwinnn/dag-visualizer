@@ -25,3 +25,8 @@ export const ccToFlag = (cc?: string | null) =>
   !cc || cc.length !== 2
     ? "🏳️"
     : String.fromCodePoint(...[...cc.toUpperCase()].map((ch) => 0x1f1e6 + ch.charCodeAt(0) - 65));
+
+// Distribution / decentralisation score — a computed 0–1 metric. Two decimals so it reads as a
+// "score" (not a count); em dash when there's no selection yet.
+export const fmtScore = (score: number | null): string =>
+  score == null ? "—" : score.toFixed(2);

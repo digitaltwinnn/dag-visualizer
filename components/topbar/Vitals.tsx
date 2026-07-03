@@ -4,7 +4,7 @@ import { forwardRef } from "react";
 import { Gauge } from "lucide-react";
 import { useStore } from "@/src/store/store";
 import { metagraphById } from "@/src/data/network";
-import { ccToFlag } from "@/src/util/format";
+import { fmtScore } from "@/src/util/format";
 import Sparkline from "@/components/Sparkline";
 import Odometer from "@/components/Odometer";
 import { rolesOf } from "@/components/inspector/parts";
@@ -62,13 +62,12 @@ function HyperVitals() {
   );
 }
 
-// Geography vitals — the active selection's **footprint** (where): total mapped nodes, how
-// many countries it spans, and its densest country. The old "Distribution" score is
-// intentionally dropped from the bar (moved to the GeoExplore header per the spec).
+// Geography vitals — the active selection's **footprint** (where): total mapped nodes, how many
+// countries it spans, and its distribution (decentralisation) score. Densest was dropped — the
+// densest country is already visible as the top row of the GeoExplore list.
 function GeoVitals() {
   const lb = useStore((s) => s.leaderboard);
   const countries = lb?.countries ?? [];
-  const top = countries[0] ?? null;
   // "Nodes" = total machines on the map = the sum of the per-country counts (the leaderboard
   // is the authoritative per-country breakdown; each row has `.count`). Derive it rather than
   // depend on a separate total field.
@@ -77,7 +76,7 @@ function GeoVitals() {
     <>
       <Vital label="Nodes" value={<Odometer value={nodes} />} />
       <Vital label="Countries" value={<Odometer value={countries.length || null} />} />
-      <Vital label="Densest" value={top ? <>{ccToFlag(top.cc)} {top.count}</> : "—"} />
+      <Vital label="Distribution" value={<span className="tb-vital-score">{fmtScore(lb?.score ?? null)}</span>} />
     </>
   );
 }
