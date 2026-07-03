@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import { hexToHueDeg, configPins, identityPins, identityMap, identityHudHex, identitySceneHex, identityHudNumber, SCENE_L, SCENE_C, HUD_L, HUD_C } from "./identity";
 import { METAGRAPHS, COLORS } from "../../js/config.js";
 import { oklchToHex } from "./palette";
+import brandHues from "@/data/brand-hues.json";
 
 describe("hexToHueDeg", () => {
   it("maps primaries to their OKLCH hue neighbourhood", () => {
@@ -22,10 +23,12 @@ describe("configPins", () => {
 });
 
 describe("identityMap", () => {
-  it("keeps a known metagraph's exact brand hue", () => {
+  it("keeps a known metagraph's exact hue (baked brand hue if present, else config)", () => {
     const m0 = (METAGRAPHS as { id: string; color: number }[])[0];
     const e = identityMap([m0.id]).get(m0.id)!;
-    expect(e.hueDeg).toBeCloseTo(hexToHueDeg(m0.color), 5);
+    const brand = (brandHues as Record<string, { hueDeg: number }>)[m0.id];
+    const expected = brand ? brand.hueDeg : hexToHueDeg(m0.color);
+    expect(e.hueDeg).toBeCloseTo(expected, 5);
   });
   it("derives hud/scene hexes at the two L/C for the SAME hue", () => {
     const m0 = (METAGRAPHS as { id: string }[])[0];
@@ -42,9 +45,12 @@ describe("identityMap", () => {
 });
 
 describe("identityPins", () => {
-  it("overlays brand hues over config (brand wins) — currently a no-op, brand-hues.json is empty", () => {
-    // brand-hues.json is empty in-repo, so identityPins === configPins until a bake runs
-    expect(identityPins()).toEqual(configPins());
+  it("overlays baked brand hues over config pins (brand wins)", () => {
+    const cfg = configPins();
+    const pins = identityPins();
+    const expected: Record<string, number> = { ...cfg };
+    for (const [id, v] of Object.entries(brandHues as Record<string, { hueDeg: number }>)) expected[id] = v.hueDeg;
+    expect(pins).toEqual(expected);
   });
 });
 

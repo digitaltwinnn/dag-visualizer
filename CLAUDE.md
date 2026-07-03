@@ -598,6 +598,17 @@ browser can't fetch them — but the **Next Node server can**. So instead of bak
 - `scripts/bake-*.py` still exist but are now **only the offline seed/fallback** for
   `data/*.json`, not required for normal operation. `data/metagraphs.json` shape: each
   metagraph has `name/symbol/description/siteUrl/nodes`; each node `ip/state/layer/roles`.
+- **`data/brand-hues.json`** is baked OFFLINE by `npx tsx scripts/bake-brand-hues.ts` (run
+  manually whenever the metagraph set changes — not part of the request/build path; `jimp` is a
+  devDependency used only by this script, never imported by `app`/`src`). It extracts each
+  metagraph's identity hue from its real brand (logo SVG/raster fills, falling back to the site's
+  `theme-color`) via the pure helpers in `src/palette/brand.ts`, snapped into the palette's
+  allowed hue zones. `src/palette/identity.ts`'s `identityPins()` reads this file and overlays it
+  on top of `config.METAGRAPHS`' colours — **brand wins over config, which wins over the hash
+  fallback** — so the Hypergraph hubs/nodes and every HUD dot recolor to the real brand hue once
+  baked. `data/brand-hue-overrides.json` (id → hueDeg) is the manual escape hatch for a metagraph
+  whose extraction picked a bad dominant colour (e.g. a logo asset that isn't a real brand mark);
+  the bake applies it before extraction and re-running the bake picks it up.
 
 Metagraph reality worth knowing (it drives the inspector text):
 

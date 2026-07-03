@@ -1,0 +1,74 @@
+// OFFLINE bake — run manually when the metagraph set changes: `npx tsx scripts/bake-brand-hues.ts`.
+// Derives each metagraph's identity hue from its brand (logo, then site theme-color) and writes
+// data/brand-hues.json. NEVER imported by the app/runtime — jimp is a devDependency only.
+import { readFileSync, writeFileSync } from "node:fs";
+import { Jimp } from "jimp";
+import { parseSvgFills, pickBrandColor, snapToAllowedZone, hexToOklch } from "../src/palette/brand";
+
+type Meta = { id: string; name: string; iconUrl: string; siteUrl: string };
+const metas = JSON.parse(readFileSync("data/metagraphs.json", "utf8")) as Meta[];
+const overrides = JSON.parse(readFileSync("data/brand-hue-overrides.json", "utf8")) as Record<string, number>;
+
+async function fetchBuf(url: string): Promise<Buffer | null> {
+  try { const r = await fetch(url, { signal: AbortSignal.timeout(8000) }); if (!r.ok) return null; return Buffer.from(await r.arrayBuffer()); }
+  catch { return null; }
+}
+
+// Raster → candidate {rgb, weight} histogram (downscaled, quantised, alpha-gated).
+async function rasterCandidates(buf: Buffer): Promise<{ rgb: number; weight: number }[]> {
+  const img = await Jimp.read(buf);
+  img.resize({ w: 64 });
+  const hist = new Map<number, number>();
+  const b = img.bitmap;
+  for (let i = 0; i < b.data.length; i += 4) {
+    if (b.data[i + 3] < 128) continue; // skip transparent
+    const q = (v: number) => v & 0xf0; // quantise to 16 levels/channel
+    const rgb = (q(b.data[i]) << 16) | (q(b.data[i + 1]) << 8) | q(b.data[i + 2]);
+    hist.set(rgb, (hist.get(rgb) ?? 0) + 1);
+  }
+  return [...hist].map(([rgb, weight]) => ({ rgb, weight }));
+}
+
+function themeColor(html: string): number | null {
+  const m = html.match(/<meta[^>]+name=["']theme-color["'][^>]+content=["']\s*(#[0-9a-fA-F]{3,6})/i);
+  if (!m) return null;
+  let h = m[1].slice(1); if (h.length === 3) h = h.split("").map((c) => c + c).join("");
+  return parseInt(h.slice(0, 6), 16);
+}
+
+async function brandHueFor(m: Meta): Promise<{ hueDeg: number; srcHex: string; source: string } | null> {
+  if (m.id in overrides) return { hueDeg: snapToAllowedZone(overrides[m.id]), srcHex: "", source: "override" };
+  // 1) logo
+  const buf = m.iconUrl ? await fetchBuf(m.iconUrl) : null;
+  let chosen: number | null = null; let source = "";
+  if (buf) {
+    if (/\.svg(\?|$)/i.test(m.iconUrl) || buf.slice(0, 200).toString("utf8").includes("<svg")) {
+      chosen = pickBrandColor(parseSvgFills(buf.toString("utf8")).map((rgb) => ({ rgb, weight: 1 })));
+      source = "svg";
+    } else {
+      chosen = pickBrandColor(await rasterCandidates(buf)); source = "raster";
+    }
+  }
+  // 2) theme-color fallback
+  if (chosen === null && m.siteUrl) {
+    const html = (await fetchBuf(m.siteUrl))?.toString("utf8");
+    if (html) { chosen = themeColor(html); source = "theme-color"; }
+  }
+  if (chosen === null || Number.isNaN(hexToOklch(chosen).h)) return null;
+  return { hueDeg: snapToAllowedZone(hexToOklch(chosen).h), srcHex: "#" + (chosen & 0xffffff).toString(16).padStart(6, "0"), source };
+}
+
+// Wrapped in an async main (not top-level await) — the project has no "type": "module" in
+// package.json, so tsx transpiles this file as CJS, which doesn't support top-level await.
+async function main() {
+  const out: Record<string, unknown> = {};
+  for (const m of metas) {
+    const r = await brandHueFor(m);
+    if (r) { out[m.id] = r; console.log(`${m.name.padEnd(22)} ${r.source.padEnd(11)} hue ${r.hueDeg.toFixed(1)}  ${r.srcHex}`); }
+    else console.log(`${m.name.padEnd(22)} (no usable brand colour — will fall back to config)`);
+  }
+  writeFileSync("data/brand-hues.json", JSON.stringify(out, null, 2) + "\n");
+  console.log(`\nwrote data/brand-hues.json (${Object.keys(out).length}/${metas.length} metagraphs)`);
+}
+
+main();
