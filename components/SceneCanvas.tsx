@@ -14,6 +14,8 @@ import { useBootPhase } from "@/components/useBootPhase";
 export default function SceneCanvas() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const phase = useBootPhase();
+  const mode = useStore((s) => s.mode);
+  const is3D = mode === "hyper" || mode === "geo" || mode === "ledger";
 
   useEffect(() => {
     let disposed = false;
@@ -39,5 +41,5 @@ export default function SceneCanvas() {
     };
   }, []);
 
-  return <canvas ref={canvasRef} className={"scene-canvas" + (phase === "live" ? " scene-in" : "")} />;
+  return <canvas ref={canvasRef} className={"scene-canvas" + (phase === "live" && is3D ? " scene-in" : "")} />;
 }

@@ -12,6 +12,7 @@
 @import "./styles/14-top-bar.css";
 @import "./styles/15-states.css";
 @import "./styles/16-responsive-shell.css";
+@import "./styles/17-blueprint.css";
 
 /* ── Structural lane (chrome + status) — shadcn CSS variables in oklch ── */
 :root {

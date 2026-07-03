@@ -1,4 +1,5 @@
 import SceneCanvas from "@/components/SceneCanvas";
+import Blueprint from "@/components/Blueprint";
 import BootOverlay from "@/components/BootOverlay";
 import DataBridge from "@/components/DataBridge";
 import ExperimentalBanner from "@/components/ExperimentalBanner";
@@ -18,6 +19,7 @@ export default function Home() {
   return (
     <main>
       <SceneCanvas />
+      <Blueprint />
       <BootOverlay />
       <ExperimentalBanner />
       <DataBridge />
