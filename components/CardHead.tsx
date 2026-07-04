@@ -6,8 +6,9 @@ import { Button } from "@/components/ui/button";
 
 // The ONE HUD card header — every rail card leads with this shared grammar so the whole HUD
 // reads as one control surface:
-//   • an uppercase role EYEBROW (plain "SELECTED METAGRAPH", a breadcrumb "NODE ‹ DOR", or a
-//     view tag "HYPERGRAPH · ABOUT"),
+//   • an uppercase role EYEBROW — one simple "Selected <subject>" label ("SELECTED NETWORK" /
+//     "SELECTED NODE" / "SELECTED SNAPSHOT"; the ‹-parent breadcrumb grammar was retired, Task 13
+//     follow-up) or a view tag ("HYPERGRAPH · ABOUT"),
 //   • an optional TITLE that rolls in on a subject change (pass `titleKey` to key the remount —
 //     the same upward `roll-in` the Odometer uses; omit it and the title is static), and
 //   • an optional right ACTION — the +/− collapse toggle (rail tool cards) or the × close

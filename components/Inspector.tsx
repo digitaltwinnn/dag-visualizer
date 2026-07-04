@@ -7,7 +7,6 @@ import { filterAccent, CORE_HEX } from "@/src/data/network";
 import { identityHudHex } from "@/src/palette/identity";
 import { hoverKeyOf } from "@/src/data/hoverSubject";
 import { subjectPairing } from "@/components/useSubjectPairing";
-import { breadcrumbLabel } from "@/src/data/breadcrumb";
 import { RIGHT_CARD } from "@/components/CardHead";
 import { Card } from "@/components/ui/card";
 import InspectorCard from "@/components/InspectorCard";
@@ -133,7 +132,7 @@ export default function Inspector() {
         <CardPane
           key="node"
           pick={{ kind: "geoLive" }}
-          eyebrow={breadcrumbLabel("node", filter)}
+          eyebrow="Selected node"
           onClose={() => setInspect(null)}
         />
       ),
@@ -144,7 +143,7 @@ export default function Inspector() {
         <CardPane
           key="snap"
           pick={snap}
-          eyebrow={breadcrumbLabel("snap", filter)}
+          eyebrow="Selected snapshot"
           onClose={() => setSnap(null)}
         />
       ) : null,

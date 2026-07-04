@@ -117,15 +117,28 @@
    thread grey `--thread-line` (its 0.40 alpha carries the faintness, ≈40% of pairing's presence),
    thin (2px, the shared edge width), NO glow, NO sweep. Hierarchy MUST stay readable at a glance:
    grey whisper (pointer) < hued edge + wash (pairing) < moving light (pulse). When a card is BOTH
-   hovered and paired, PAIRING WINS — these two rules sit BEFORE the `.subject-paired` rules below,
+   hovered and paired, PAIRING WINS — these rules sit BEFORE the `.subject-paired` rules below,
    so at equal specificity (0,2,1) source order hands the win to pairing (no grey underneath
    fighting the hue). Rides the base ::before/::after `opacity 0.16s` transition (no new
    transition; reduced-motion-safe — opacity only). Suppressed inside sheets by the sheet-calm rule
    at the end of this block, exactly like pairing (touch surfaces don't hover; the sheet edge is
    the single cue). Left-rail cards get `.sig-right` on their container for this (About/GeoExplore/
-   LedgerPanel); right-rail cards already carry `.sig-left`. */
-.sig-left:hover::before  { opacity: 1; background: var(--thread-line); box-shadow: none; }
-.sig-right:hover::after  { opacity: 1; background: var(--thread-line); box-shadow: none; }
+   LedgerPanel); right-rail cards already carry `.sig-left`.
+
+   ⚠ ONLY the OPACITY may animate on these pseudos — never colour. The signal pseudo's resting
+   background is pinned to the SAME neutral grey below, so the eased fade-in/out only ever shows
+   `--thread-line` (bug fixed live: with the old `var(--spine)` resting background, leaving a left
+   card snapped the background back to the cyan spine while the opacity was still fading out — a
+   blue flash on hover-out; and the right-rail fade-out was invisible over RIGHT_CARD's transparent
+   spine). Hue appears EXCLUSIVELY via the `.subject-paired` declarations below, present only while
+   the pairing class is; a pairing leave falls back to this neutral for its 0.16s fade — calm, no
+   colour transition anywhere. */
+/* (.sig-right::after's neutral resting background is set in its own base rule below — a duplicate
+   pin here would lose to it at equal specificity/later source. The ig-panel ::before base rule
+   lives in @layer components, so this unlayered pin beats it.) */
+.sig-left::before        { background: var(--thread-line); }
+.sig-left:hover::before  { opacity: 1; box-shadow: none; }
+.sig-right:hover::after  { opacity: 1; box-shadow: none; }
 
 /* Hover PAIRING — the only non-pulse edge signal, shown strictly WHILE HOVERED (the class comes
    and goes with the hover; the 0.16s transition on the base elements eases it in/out).
@@ -139,12 +152,13 @@
 }
 
 /* LEFT-rail cards (`.sig-right`) — the mirror: pairing lights an ::after on the card's RIGHT
-   (scene-facing) edge, riding the card's own `--spine` (identity-tinted) under `--row-hue`. No
-   left card is pairable today, so this is the forward-compatible mirror + /design demo. */
+   (scene-facing) edge. No left card is pairable today, so the pairing rule is the
+   forward-compatible mirror + /design demo. Resting background is the NEUTRAL grey (see the
+   opacity-only warning above) — NOT `var(--spine)`, which made the hover-out fade flash cyan. */
 .sig-right::after {
   content: ""; position: absolute; right: 0; top: 10px; bottom: 10px; width: 2px;
   border-radius: 2px; opacity: 0; transition: opacity 0.16s ease; pointer-events: none;
-  background: var(--spine, var(--primary));
+  background: var(--thread-line);
 }
 .sig-right.subject-paired::after {
   opacity: 1;
@@ -475,10 +489,15 @@
 @layer components {
   .ig-panel {
     position: relative;
-    background: linear-gradient(180deg, rgba(20, 26, 46, 0.78), rgba(10, 14, 28, 0.72));
+    /* Glass strength (Task 13 follow-up, user: cards read too transparent over busy scene
+       detail): alphas raised 0.78/0.72 → 0.88/0.82 + blur restored to 14px (the pre-migration
+       value) so `text-muted-foreground` body text stays comfortably readable over the bright
+       hypergraph core, while the gradient + blur keep the scene glowing through at the card
+       edges — good glass, not a solid slab. */
+    background: linear-gradient(180deg, rgba(20, 26, 46, 0.88), rgba(10, 14, 28, 0.82));
     border: 1px solid var(--border);
     border-radius: var(--radius);
-    backdrop-filter: blur(12px);
+    backdrop-filter: blur(14px);
     box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05), 0 8px 30px rgba(0, 0, 0, 0.35);
   }
   .ig-panel::before {
