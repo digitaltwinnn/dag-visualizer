@@ -101,7 +101,7 @@ export default function LiveStrip() {
       <div
         className={cn(
           "relative flex-1 flex items-end gap-0.5 h-20 overflow-hidden pb-[9px]",
-          "before:content-[''] before:absolute before:inset-x-0 before:bottom-0 before:h-[9px] before:bg-[var(--axis-hairlines)] before:pointer-events-none",
+          "before:content-[''] before:absolute before:inset-x-0 before:bottom-0 before:h-[9px] before:[background:var(--axis-hairlines)] before:pointer-events-none",
           "after:content-[''] after:absolute after:inset-x-0 after:bottom-[9px] after:h-px after:bg-[var(--thread-line)] after:pointer-events-none",
         )}
         style={{

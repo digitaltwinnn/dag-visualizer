@@ -27,3 +27,10 @@ Rule: concerns are **noted here, never fixed inline**. Each entry: where seen, w
 ## From Task 10 (base retirement)
 
 9. **Legacy CSS-var names survive as aliases.** Retiring `00-base.css` folded its still-consumed colour tokens into `globals.css` as ALIASES onto the shadcn lane — `--core`→`--primary`, `--text`→`--foreground`, `--muted`→`--muted-foreground`, `--panel-border`→`--border`, `--l0`→`--core-l0`. The ~30 consumers across `components/*` (Blueprint, RailDock, GeoExplore, TopBar, inspector parts, CardHead, etc.) were left referencing the legacy names to avoid a repo-wide rename churn in the final task. A future sweep should rename consumers to the shadcn names and delete the aliases so there's exactly one name per token. (`--panel` has no shadcn equivalent and stays a literal; `--sel-bg`/`--sel-border`/`--rail-*`/`--panel-pad-*`/thread tokens are layout literals, not aliases — those are fine as-is.)
+
+## Session format (user-set, 2026-07-04)
+
+The post-migration design session runs **component by component, against the REAL rendered component** (live app / /design): brainstorm improvements to make the site stand out and look unique → agree on the outcome → implement immediately. NO separate specs/plans documents (they drifted out of sync last time). Overall page design must stay consistent and uniform across components. Testing stays light per component; ONE full verification pass at the end.
+
+9. *(logged during Task 10)* Legacy var names (`--core`, `--text`, `--muted`, `--panel`, `--panel-border`) survive as aliases of the shadcn lane; ~30 consumers (RailDock is the main straggler) await a rename sweep to the token utilities.
+10. **Card update/selection/hover feedback: replace the whole-card flash.** Today cards flash/highlight on update/selection/hover — common and boring. Keep a *subtle* highlight at most; preferred direction: a visual highlight/flash on the card's LEFT or RIGHT EDGE with a movement effect (an energy pulse travelling the spine fits the Instrument-Glass language and the existing `--spine` architecture). Applies uniformly to every card.

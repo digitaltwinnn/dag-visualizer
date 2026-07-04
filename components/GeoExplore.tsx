@@ -109,7 +109,7 @@ export default function GeoExplore() {
             <p className="text-[12.5px] text-foreground mt-2 mb-0.5">No locatable nodes</p>
             <p className="text-[11.5px] text-muted-foreground leading-[1.5]">{tickerOrName} has no validators we can place on the map right now. It still appears in the Hypergraph.</p>
             <button
-              className="mt-2 bg-transparent border-none text-primary [font:inherit] text-xs cursor-pointer hover:underline"
+              className="mt-2 bg-transparent border-none text-primary [font-family:inherit] text-xs cursor-pointer hover:underline"
               onClick={() => setMode("hyper")}
             >
               See it in the Hypergraph →
