@@ -35,7 +35,7 @@ export default function ContextCard() {
     // metagraph's hue, via the shared hoverFilter channel.
     const pair = subjectPairing<string>(hoverFilter, mgCfg.id, setHoverFilter, hex(mgCfg.color));
     return (
-      <Card asChild className={cn(RIGHT_CARD, "sig-left card-selected", pair.className)}>
+      <Card asChild className={cn(RIGHT_CARD, "sig-left", pair.className)}>
         <aside
           id="metapane"
           style={pair.style}
@@ -68,7 +68,7 @@ export default function ContextCard() {
           {cores} metagraph{cores === 1 ? "" : "s"} · {nodes.toLocaleString()} mapped nodes.
           Pick one from the filter to focus.
         </p>
-        {/* "all" is the rest state (no card-selected) — the pulse still marks the transition. */}
+        {/* the edge stays dark at rest — the pulse alone marks the transition to "all". */}
         <PulseEdge pulseKey={pulseKey} rail="right" />
       </aside>
     </Card>

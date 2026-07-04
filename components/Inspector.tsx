@@ -66,9 +66,10 @@ function CardPane({
   const pulseKey = useEdgePulse(subjectKey);
 
   return (
-    // `card-selected`: a Detail pane always REPRESENTS the active selection (it exists only while
-    // its pick is live), so its scene-facing (left) signal edge holds the steady-bright state.
-    <Card asChild className={cn(RIGHT_CARD, "sig-left card-selected", pair.className)}>
+    // No steady/selected edge state — the edge is purely transient (pulse + hover pairing);
+    // a Detail pane exists only while its pick is live, so a permanent edge would just read
+    // as a spine, which the design removed.
+    <Card asChild className={cn(RIGHT_CARD, "sig-left", pair.className)}>
       <aside
         style={pair.style}
         onMouseEnter={pair.onMouseEnter}

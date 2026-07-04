@@ -45,30 +45,48 @@
    and every signal renders on the card's SCENE-FACING (inner) edge:
      • left-rail cards  → their RIGHT edge  (`.sig-right`, an ::after element)
      • right-rail cards → their LEFT  edge  (`.sig-left`, lighting the ig-panel ::before)
-   Three signals, replacing the old whole-card flash: a travelling edge PULSE on a subject change,
-   a steady-bright edge for the active SELECTION, and an edge brighten on hover PAIRING (the inset
-   wash above is the supporting cue). UNLAYERED on purpose (same layer-trap as .subject-paired
-   above) so these beat the `@layer components` `.ig-panel::before` + Tailwind utilities at equal
-   specificity. Colour is the card's OWN identity var — no new tokens: left-rail signals ride
-   `--spine`, right-rail signals ride `--filter-accent`/`--row-hue` (RIGHT_CARD keeps `--spine`
-   transparent). Keep this block CONTIGUOUS + the sheet-suppression rules LAST (equal-specificity
-   source-order beat). */
+   The edge is PURELY TRANSIENT (user refinement): it renders ONLY during (a) the subject-change
+   PULSE and (b) hover PAIRING, while actually hovered (the inset wash above is the supporting
+   cue). There is NO resting/steady/selected edge state — an "always selected" detail card would
+   read as a permanent spine, which is exactly what was removed. Replaces the old whole-card
+   flash. UNLAYERED on purpose (same layer-trap as .subject-paired above) so these beat the
+   `@layer components` `.ig-panel::before` + Tailwind utilities at equal specificity. Colour is
+   the card's OWN identity var — no new tokens: left-rail signals ride `--spine`, right-rail
+   signals ride `--filter-accent`/`--row-hue` (RIGHT_CARD keeps `--spine` transparent). Keep this
+   block CONTIGUOUS + the sheet-suppression rules LAST (equal-specificity source-order beat). */
 
-/* Travelling pulse — a bright segment sweeps once DOWN the card's signal edge (~1.2s). The outer
-   `.edge-pulse` is the clip TRACK on the edge; the inner `> i` is the moving segment, keyed to
-   remount per pulse (EdgePulse.tsx). Geometry + weight are user-tuned live:
-   • The pulse runs on the card's SCENE-FACING (inner) edge — LEFT-rail cards pulse on their
-     RIGHT edge, RIGHT-rail cards on their LEFT — away from the screen edge, where it hid
-     against the rail margin. Rest-state spines/edges stay put; only the travelling pulse flips.
-   • It is THICKER than the spine (3px vs 2px), brighter, and a LONGER segment (~64px), with
-     gradient-faded tips (transparent→colour→transparent, like the rail masks) + a drop-shadow
-     glow (the ecg-scan idiom) so it reads clearly at a glance — no hard-capped ends. */
+/* Travelling pulse — the subject-change signal, TWO LAYERS on one ~1.2s clock (user-refined):
+   the full edge LINE fades in softly (the `::before` base — a gentle opacity ramp of the coloured
+   line, gradient-tipped like the sheet-edge spine), the BRIGHT segment sweeps down along it (the
+   `> i`), then the whole edge fades back out. Colour fade-in → bright movement across it →
+   fade-out; nothing remains after. The outer `.edge-pulse` span is keyed to remount per pulse
+   (EdgePulse.tsx), replaying both layers. Geometry + weight are user-tuned live:
+   • Runs on the card's SCENE-FACING (inner) edge — LEFT-rail cards pulse on their RIGHT edge,
+     RIGHT-rail cards on their LEFT — away from the screen edge, where it hid against the margin.
+   • The segment is THICKER than the old spine (3px), bright, LONG (~64px), gradient-faded tips
+     (transparent→colour→transparent) + a drop-shadow glow (the ecg-scan idiom) — no hard ends.
+   Reduced motion: no sweep, no fade choreography — the base line does ONE static soft blink. */
 .edge-pulse {
   position: absolute; top: 8px; bottom: 8px; right: -1px;
   width: 3px; overflow: hidden; pointer-events: none; z-index: 3;
   --pulse-hue: var(--spine, var(--primary));
 }
 .edge-pulse--rail-right { right: auto; left: -1px; --pulse-hue: var(--filter-accent, var(--primary)); }
+/* Layer 1 — the base edge line: soft fade-in, hold under the sweep, fade-out. Dimmer than the
+   travelling segment so the movement reads on top of it. */
+.edge-pulse::before {
+  content: ""; position: absolute; inset: 0; opacity: 0;
+  background: linear-gradient(to bottom,
+    transparent 0, var(--pulse-hue) 14%, var(--pulse-hue) 86%, transparent 100%);
+  animation: edge-line-fade 1.2s ease both;
+}
+@keyframes edge-line-fade {
+  0%   { opacity: 0; }
+  18%  { opacity: 0.5; }
+  78%  { opacity: 0.5; }
+  100% { opacity: 0; }
+}
+/* Layer 2 — the bright travelling segment. */
 .edge-pulse > i {
   position: absolute; left: 0; right: 0; height: 64px; opacity: 0;
   background: linear-gradient(to bottom,
@@ -82,32 +100,36 @@
   85%  { opacity: 1; }
   100% { top: 100%;  opacity: 0; }
 }
-@media (prefers-reduced-motion: reduce) { .edge-pulse > i { animation: none; opacity: 0; } }
-
-/* RIGHT-rail cards (`.sig-left`) — steady signals light the ig-panel ::before on the card's LEFT
-   (scene-facing) edge. RIGHT_CARD suppresses `--spine`, so signal colour comes from the rail's
-   `--filter-accent` (identity hue / cyan) or, while paired, the subject's own `--row-hue`. */
-.sig-left.card-selected::before {
-  opacity: 1;
-  background: var(--filter-accent, var(--primary));
-  box-shadow: 0 0 6px 0 var(--filter-accent, var(--primary));
+/* Reduced motion: a single static soft blink of the base line; the sweep never runs. (The hook
+   no longer gates on the media query — CSS owns the reduced-motion behaviour.) */
+@keyframes edge-line-blink {
+  0%   { opacity: 0; }
+  35%  { opacity: 0.5; }
+  100% { opacity: 0; }
 }
+@media (prefers-reduced-motion: reduce) {
+  .edge-pulse > i { animation: none; opacity: 0; }
+  .edge-pulse::before { animation: edge-line-blink 0.9s ease both; }
+}
+
+/* Hover PAIRING — the only non-pulse edge signal, shown strictly WHILE HOVERED (the class comes
+   and goes with the hover; the 0.16s transition on the base elements eases it in/out).
+   RIGHT-rail cards (`.sig-left`) light the ig-panel ::before on their LEFT (scene-facing) edge —
+   RIGHT_CARD suppresses `--spine`, so colour comes from the subject's `--row-hue` (falling back
+   to the rail's `--filter-accent`). */
 .sig-left.subject-paired::before {
   opacity: 1;
   background: var(--row-hue, var(--filter-accent, var(--primary)));
   box-shadow: 0 0 7px 0 var(--row-hue, var(--filter-accent, var(--primary)));
 }
 
-/* LEFT-rail cards (`.sig-right`) — steady signals on the card's RIGHT (scene-facing) edge, a
-   mirror of the ::before geometry. Rides the card's own `--spine` (identity-tinted). No left
-   card holds a selection today, so this is mostly the forward-compatible mirror + /design demo. */
+/* LEFT-rail cards (`.sig-right`) — the mirror: pairing lights an ::after on the card's RIGHT
+   (scene-facing) edge, riding the card's own `--spine` (identity-tinted) under `--row-hue`. No
+   left card is pairable today, so this is the forward-compatible mirror + /design demo. */
 .sig-right::after {
   content: ""; position: absolute; right: 0; top: 10px; bottom: 10px; width: 2px;
   border-radius: 2px; opacity: 0; transition: opacity 0.16s ease; pointer-events: none;
   background: var(--spine, var(--primary));
-}
-.sig-right.card-selected::after {
-  opacity: 1; box-shadow: 0 0 6px 0 var(--spine, var(--primary));
 }
 .sig-right.subject-paired::after {
   opacity: 1;
@@ -116,10 +138,11 @@
 }
 
 /* Sheets (tablet/phone RailDock): the sheet's own `.ig-sheet-edge` spine is the single identity
-   cue, and every hosted pane is "selected" by construction — so the STEADY signal states are
-   suppressed inside sheets to keep them calm (resting spines are already 0 everywhere; this
-   resolves design-concern #5 outright). The transient edge PULSE still plays on the card.
-   MUST stay last: equal specificity vs the selected/paired rules above, so source order wins. */
+   cue, so even the transient hover-pairing edge is suppressed on hosted cards to keep the sheet
+   calm (resting spines are already 0 everywhere — design-concern #5 is resolved by construction).
+   The subject-change PULSE still plays on the card (it's the .edge-pulse span's own ::before/i,
+   not the ig-panel's). MUST stay last: equal specificity vs the pairing rules above, so source
+   order wins. */
 .sheet-cards .ig-panel::before,
 .sheet-cards .sig-right::after { opacity: 0; box-shadow: none; }
 
@@ -453,10 +476,11 @@
     background: var(--spine, var(--primary));
     /* INVISIBLE AT REST (design evolution, Task 12): cards are spineless everywhere — the
        resting identity cue is the RAIL THREADS (RailThread, both rails, mirrored), and the
-       card edge is a transient SIGNAL channel only (hover-pairing / selected / update pulse —
-       the unlayered "Card signal system" block near the top of this file). This ::before is
-       the LEFT-edge signal element right-rail cards light (`.sig-left`); left-rail cards
-       signal on their RIGHT edge (`.sig-right::after`). */
+       card edge is a transient SIGNAL channel only (hover-pairing while hovered + the update
+       pulse — the unlayered "Card signal system" block near the top of this file; there is NO
+       steady/selected state). This ::before is the LEFT-edge signal element right-rail cards
+       light while paired (`.sig-left`); left-rail cards signal on their RIGHT edge
+       (`.sig-right::after`). */
     opacity: 0;
     transition: opacity 0.16s ease;
   }

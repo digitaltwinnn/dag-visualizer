@@ -150,13 +150,13 @@ export default async function DesignPage() {
               </div>
             </div>
           </Card>
-          <Card asChild className="block p-0 [--spine:var(--success)] sig-right card-selected">
+          <Card asChild className="block p-0 [--spine:var(--success)] sig-right subject-paired">
             <div>
               <CardHead panel eyebrow="Spine override" title="Signal colour" />
               <div className="py-[var(--panel-pad-y)] px-[var(--panel-pad-x)] text-sm text-muted-foreground">
                 Signal states read <code className="font-mono">--spine</code>; identity panels point
                 it at <code className="font-mono">--mg</code>. Here it is success-green, shown in the
-                selected state on the scene-facing edge.
+                hover-paired state on the scene-facing edge.
               </div>
             </div>
           </Card>
@@ -179,20 +179,21 @@ export default async function DesignPage() {
           Card signals — <code className="font-mono">components/EdgePulse.tsx</code>
         </h2>
         <p className="text-sm text-muted-foreground mb-3 max-w-2xl">
-          <strong>Thread = resting identity cue; card edge = transient signal channel.</strong>{" "}
+          <strong>Thread = resting identity cue; card edge = PURELY TRANSIENT signal channel.</strong>{" "}
           Cards are SPINELESS AT REST everywhere — the resting identity colour lives in the two
           rails&apos; <code className="font-mono">RailThread</code>s (identity-hued spine + node dots,
-          mirrored left/right). A card&apos;s edge lights only as a SIGNAL, always on its SCENE-FACING
-          edge (left-rail cards → right edge, <code className="font-mono">.sig-right</code>; right-rail
-          cards → left edge, <code className="font-mono">.sig-left</code>): a subject change fires{" "}
-          <code className="font-mono">useEdgePulse(subjectKey)</code> — a bright gradient-tipped segment
-          (3px, soft glow) sweeps once down the edge (~1.2s, debounced, none under reduced motion),
-          synchronized with the title&apos;s <code className="font-mono">roll-in</code>; hover pairing
-          (<code className="font-mono">.subject-paired</code>) brightens the edge (the inset wash is the
-          supporting cue); the active selection (<code className="font-mono">.card-selected</code>) holds
-          a steady-bright edge. Inside tablet/phone sheets the steady per-card edges are suppressed
-          (<code className="font-mono">.sheet-cards</code>) — the sheet&apos;s own edge is the one
-          identity cue; the pulse still plays on the card.
+          mirrored left/right). A card&apos;s edge lights ONLY during two signals, always on its
+          SCENE-FACING edge (left-rail cards → right edge, <code className="font-mono">.sig-right</code>;
+          right-rail cards → left edge, <code className="font-mono">.sig-left</code>) — no
+          steady/selected state ever. (a) A subject change fires{" "}
+          <code className="font-mono">useEdgePulse(subjectKey)</code>: the edge line fades in softly, a
+          bright gradient-tipped segment (3px, soft glow) sweeps down it, and the edge fades back out
+          (~1.2s total, debounced, synchronized with the title&apos;s{" "}
+          <code className="font-mono">roll-in</code>; reduced motion → one static soft blink, no sweep).
+          (b) Hover pairing (<code className="font-mono">.subject-paired</code>) lights the edge while
+          hovered (the inset wash is the supporting cue). Inside tablet/phone sheets even the pairing
+          edge is suppressed (<code className="font-mono">.sheet-cards</code>) — the sheet&apos;s own
+          edge is the one identity cue; the pulse still plays on the card.
         </p>
         <CardSignalsDemo />
       </section>
