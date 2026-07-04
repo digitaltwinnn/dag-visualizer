@@ -115,14 +115,14 @@ git commit -m "docs(plan): shadcn/tailwind migration plan + visual-parity baseli
 
 **Primitive mapping (from the spec):**
 - View switch (`tb-views`/`tb-view`) → **ToggleGroup** `type="single"`, themed to the existing boxed segmented look; glyphs stay plain monochrome text.
-- Filter picker (`fp-*` rows in the downward expansion) → **Command** (`Command`, `CommandInput`, `CommandList`, `CommandItem`) rendered **inline in the bar's downward expansion** — one connected surface, NOT a popover/dialog. Disabled `(0)` metagraphs = `CommandItem disabled` (grey, non-clickable), matching `mf-chip--off` semantics. Row identity dot keeps its inline `--mg` colour.
+- Filter picker (`fp-*` rows) → **Command** (`Command`, `CommandInput`, `CommandList`, `CommandItem`) rendered exactly where the shipped component renders it — **the compact popover anchored under the filter button** (the shipped code deliberately moved on from the older "bar expansion" design; parity wins over the stale spec text). 0-located metagraph rows keep the shipped behaviour (dimmed, still clickable). Row identity dot keeps its inline `--mg` colour. *(Adjudicated during Task 2 review: the spec's "inline in the bar's downward expansion" predates the shipped popover; the user's parity mandate governs.)*
 - Filter pill, vitals key/value chips → **Badge** variants + Tailwind; `Odometer` stays as-is.
 - `ExperimentalBanner` (`xb-*`, the full-width single-line strip) → pure Tailwind-on-tokens (no primitive fits; keep it custom classes inline).
 - Brand mark (`EcgMark`) already tokenised — leave untouched.
 
 - [ ] **Step 1: Read `app/styles/14-top-bar.css` end-to-end.** It is the parity spec: note every literal (paddings, font sizes, letter-spacing, rgba values, breakpoints — 14-top-bar owns its own media queries; those move to Tailwind responsive prefixes `max-[...]:`).
 - [ ] **Step 2: Migrate `TopBar.tsx`** — replace `tb-*` classes with Tailwind utilities reproducing the same computed styles; swap the view switch to `ToggleGroup`. Verify hover-preview behaviour (`hoverFilter`) still fires (it's store logic, not CSS).
-- [ ] **Step 3: Migrate `FilterPicker.tsx`** onto `Command`, keeping the downward-expansion layout (grid of rows inside the same bar surface), `--mg` dots, counts, disabled rows.
+- [x] **Step 3: Migrate `FilterPicker.tsx`** onto `Command`, keeping the SHIPPED layout (compact popover anchored under the filter button), `--mg` dots, counts, dimmed 0-located rows.
 - [ ] **Step 4: Migrate `Vitals.tsx`** (`tb-vital*` → utilities/Badge; keep `Odometer` and the states markup — `st-*` classes stay until Task 8).
 - [ ] **Step 5: Migrate `ExperimentalBanner.tsx`** (`xb-*` → utilities).
 - [ ] **Step 6: Verify zero consumers, then delete**
