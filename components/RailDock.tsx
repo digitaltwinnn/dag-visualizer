@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
+import { cn } from "@/lib/utils";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { Compass, ListTree } from "lucide-react";
 
@@ -127,14 +128,25 @@ export default function RailDock({
   // might need to play (pulseKey provided) — kept mounted so the transient WAAPI pulse always has
   // an element to animate, even on an already-seen detail that just got a data update.
   const showDot = (hint || pulseKey !== undefined) && !open;
+  const isBarHalf = trigger === "bottom-bar-half";
+  // The hint dot: a small cyan dot. On the edge tab it's absolutely placed inside the (fixed) tab;
+  // on the phone bar half it sits inline after the label. PERSISTENT (`hint`) → the resting CSS
+  // pulse; TRANSIENT (pulseKey only, `hint` false) → invisible at rest, a one-shot WAAPI pulse
+  // plays on the ref (see the effect above). Absolutely positioned on the tab so it never grows
+  // the 44px tap target.
   const dot = showDot && (
     <span
       ref={dotRef}
-      className={`rail-tab-hint${hint ? "" : " rail-tab-hint--transient"}`}
+      className={cn(
+        "w-2 h-2 rounded-full bg-[var(--core)] shadow-[0_0_6px_1px_var(--core)]",
+        isBarHalf ? "static ml-0.5" : cn("absolute top-1.5", side === "left" ? "right-1" : "left-1"),
+        hint
+          ? "animate-rail-hint motion-reduce:animate-none motion-reduce:opacity-90"
+          : "opacity-0", // transient: WAAPI drives it; no resting animation
+      )}
       aria-hidden="true"
     />
   );
-  const isBarHalf = trigger === "bottom-bar-half";
   // Tapping the ACTIVE half again is a TOGGLE (collapses its own sheet); tapping it while closed
   // opens. The edge tab never needs this — it's hidden the instant its own sheet opens, so it can
   // only ever mean "open" — but the bar half stays visible throughout, so it must mean both.
@@ -142,8 +154,19 @@ export default function RailDock({
   return (
     <>
       {isBarHalf ? (
+        // Phone persistent bottom bar HALF: hidden except on phone (<700px). The two halves (this
+        // dock's + the other rail's) tile into one seamless full-width strip docked at bottom:0;
+        // the ACTIVE half reads as selected (shared cyan --sel-* language + a cyan top accent).
         <button
-          className={`phone-dock-half phone-dock-half--${side}${open ? " active" : ""}`}
+          className={cn(
+            "fixed z-[42] bottom-0 w-1/2 h-[var(--phone-dock-h)] hidden items-center justify-center gap-2 cursor-pointer",
+            "bg-[rgba(12,16,32,0.35)] border border-[rgba(178,193,223,0.10)] backdrop-blur-[7px]",
+            "text-[12.5px] font-semibold tracking-[0.02em] max-[699px]:inline-flex",
+            side === "left" ? "left-0" : "right-0",
+            open
+              ? "text-[var(--text)] bg-[var(--sel-bg)] shadow-[inset_0_2px_0_var(--sel-border)] [&_svg]:text-[var(--core)]"
+              : "text-[var(--muted)]",
+          )}
           aria-label={`${label} panel`}
           aria-pressed={open}
           onClick={handleTriggerClick}
@@ -153,8 +176,15 @@ export default function RailDock({
           {dot}
         </button>
       ) : (
+        // Tablet edge tab (700–1099px only; hidden on desktop AND phone): a slim ‹/› entry docked
+        // to the screen edge, ≥44px tap target.
         <button
-          className={`rail-tab rail-tab--${side}`}
+          className={cn(
+            "fixed z-[39] top-1/2 -translate-y-1/2 w-11 min-h-[56px] hidden items-center justify-center cursor-pointer",
+            "bg-[var(--panel)] border border-[var(--panel-border)] text-[var(--text)] backdrop-blur-[14px] text-[20px] leading-none",
+            "min-[700px]:max-[1099px]:flex",
+            side === "left" ? "left-0 rounded-r-[var(--radius)] border-l-0" : "right-0 rounded-l-[var(--radius)] border-r-0",
+          )}
           aria-label={`${label} panel`}
           onClick={handleTriggerClick}
         >
@@ -175,7 +205,10 @@ export default function RailDock({
           side={sheetSide ?? side}
           style={style}
           overlay={false}
-          className={isBarHalf ? "sheet-content--docked-bar" : undefined}
+          // Phone bar-half variant: the sheet sits DIRECTLY ABOVE the persistent dock bar (never
+          // covers it — the bar is its visible header/handle), so offset it up by the bar height.
+          // `!` beats the base `bottom-0` from the bottom-side placement in sheet.tsx.
+          className={isBarHalf ? "!bottom-[var(--phone-dock-h)]" : undefined}
           // Don't let a pointer-down/interaction OUTSIDE the sheet (e.g. on the scene, or on the
           // OTHER open dock) dismiss it — the user closes each dock explicitly via its own ✕ /
           // Escape / bar-half toggle. Without this, radix's DismissableLayer auto-closes a
@@ -185,29 +218,45 @@ export default function RailDock({
           aria-describedby={undefined}
         >
           {sheetSide === "bottom" && (
+            // Centred grabber bar (36×4) with a ≥44px tap target; a real tap-to-collapse affordance.
             <button
               type="button"
-              className="sheet-grabber"
+              className={cn(
+                "self-center w-11 h-11 mx-0 -mt-[22px] -mb-[18px] flex items-center justify-center cursor-pointer",
+                "p-0 border-none bg-none [-webkit-tap-highlight-color:transparent]",
+                "before:content-[''] before:w-9 before:h-1 before:rounded-[2px] before:bg-[var(--panel-border)]",
+              )}
               aria-label={`Collapse ${label} panel`}
               onClick={() => handleOpenChange(false)}
             />
           )}
           {isBarHalf ? (
-            // The persistent bar half already shows the label + hint visibly — no redundant
-            // `.sheet-head` row (no ✕ either; the bar half itself is the close affordance, via
-            // the toggle above). SheetTitle stays for the accessible dialog name only.
+            // The persistent bar half already shows the label + hint visibly — no redundant header
+            // row (no ✕ either; the bar half itself is the close affordance, via the toggle above).
+            // SheetTitle stays for the accessible dialog name only.
             <SheetTitle className="sr-only">{label}</SheetTitle>
           ) : (
-            <div className="sheet-head">
-              <SheetTitle className="sheet-head-title">{label}</SheetTitle>
-              <button className="sheet-close" aria-label={`Close ${label} panel`} onClick={() => handleOpenChange(false)}>
+            // Sheet's own chrome (label + close), ABOVE the hosted content so the ✕ never overlaps a
+            // hosted card's top-right control. The close is ≥44px.
+            <div className="flex items-center justify-between gap-2">
+              <SheetTitle className="m-0 text-[13px] font-semibold tracking-[0.02em] uppercase text-[var(--text)] opacity-90 [text-shadow:0_1px_2px_rgba(3,5,12,0.7)]">
+                {label}
+              </SheetTitle>
+              <button
+                className="flex-none w-11 h-11 flex items-center justify-center bg-[var(--panel)] border border-[var(--panel-border)] rounded-[var(--radius)] text-[var(--text)] text-[22px] leading-none cursor-pointer"
+                aria-label={`Close ${label} panel`}
+                onClick={() => handleOpenChange(false)}
+              >
                 ×
               </button>
             </div>
           )}
           {/* The cards scroll in an inner body so the sheet itself is `overflow: visible` — that lets
-              the bottom sheet paint its instrument ruler ABOVE its top edge (outside the element). */}
-          <div className="sheet-body">{children}</div>
+              the bottom sheet paint its instrument ruler ABOVE its top edge (outside the element).
+              Native scrollbar hidden, momentum kept (like #rightcol). */}
+          <div className="flex-1 min-h-0 flex flex-col gap-[var(--rail-gap)] overflow-y-auto overscroll-contain [scrollbar-width:none] [-webkit-overflow-scrolling:touch] [&::-webkit-scrollbar]:hidden">
+            {children}
+          </div>
         </SheetContent>
       </Sheet>
     </>

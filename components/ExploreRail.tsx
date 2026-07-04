@@ -94,7 +94,15 @@ export default function ExploreRail() {
     return (
       <>
         <RailThread side="left" />
-        <div id="leftcol" style={accent}>
+        {/* `max-[1099px]:!hidden` + arbitrary width tweaks re-home 16/11-responsive.css (Task 9):
+            the safety-net hide below the desktop breakpoint (SSR/first-paint assume desktop, so the
+            desktop rail can flash on a narrow viewport before useBreakpoint resolves) and the small-
+            laptop / tablet rail-width narrowing. `!` beats the `#leftcol` id rule in 00-base.css. */}
+        <div
+          id="leftcol"
+          className="max-[1100px]:!w-[224px] max-[860px]:!w-[210px] max-[860px]:!max-h-[calc(100vh-320px)] max-[1099px]:!hidden"
+          style={accent}
+        >
           {content}
         </div>
       </>

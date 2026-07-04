@@ -1,12 +1,14 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 @import "./styles/00-base.css";
-@import "./styles/11-responsive.css";
-@import "./styles/16-responsive-shell.css";
 
 /* ── Structural lane (chrome + status) — shadcn CSS variables in oklch ── */
 :root {
   --radius: 14px;
+  /* Height of the phone persistent bottom dock bar — the single source of truth referenced by
+     the phone bar-half sheet offset (RailDock) AND the LiveStrip's phone bottom offset. (Was
+     16-responsive-shell.css `:root`, re-homed here when that file was retired in Task 9.) */
+  --phone-dock-h: 56px;
 
   --background: oklch(0.09 0.02 265);        /* #05060e app bg */
   --foreground: oklch(0.94 0.02 255);        /* #e8eefc text */
@@ -220,5 +222,77 @@
     /* structural cyan by default; identity panels set --spine: var(--mg) */
     background: var(--spine, var(--primary));
     opacity: 0.8;
+  }
+}
+
+/* ── Responsive shell (tablet/phone rail docks) — re-homed from 16-responsive-shell.css (Task 9).
+   The Sheet primitive's layout/positioning/colour/breakpoints are now Tailwind utilities on the
+   JSX (RailDock.tsx, components/ui/sheet.tsx); only the bespoke instrument decorations that don't
+   round-trip cleanly through utility syntax (multi-layer repeating-gradient rulers + masks) stay
+   here as recipe classes, exactly like `.ig-panel` above. ── */
+
+/* Sheet slide-in — no exit animation (matches the shipped design; Radix unmounts the non-modal
+   content on close). Reduced motion is handled at the call site (`motion-reduce:animate-none`). */
+@keyframes sheetInLeft   { from { transform: translateX(-100%); } to { transform: none; } }
+@keyframes sheetInRight  { from { transform: translateX(100%); }  to { transform: none; } }
+@keyframes sheetInBottom { from { transform: translateY(100%); }  to { transform: none; } }
+/* The "new detail landed" dot's resting pulse on a collapsed rail tab / phone bar half. */
+@keyframes railTabHintPulse {
+  0%, 100% { opacity: 0.55; transform: scale(0.85); }
+  50%      { opacity: 1;    transform: scale(1.15); }
+}
+@theme inline {
+  --animate-sheet-in-left:   sheetInLeft   0.28s cubic-bezier(0.22, 1, 0.36, 1);
+  --animate-sheet-in-right:  sheetInRight  0.28s cubic-bezier(0.22, 1, 0.36, 1);
+  --animate-sheet-in-bottom: sheetInBottom 0.30s cubic-bezier(0.22, 1, 0.36, 1);
+  --animate-rail-hint:       railTabHintPulse 1.6s ease-in-out infinite;
+}
+
+@layer components {
+  /* Side-sheet instrument channel (tablet/phone left+right docks): a cyan identity spine
+     (`::before`) + a neutral hairline ruler (`::after`) down the sheet's SCREEN-EDGE side —
+     restores, on the overlay sheets, the desktop rails' spine + RailThread ruler (both desktop-
+     only). Static decoration, pointer-transparent. `--filter-accent` is set inline by the caller
+     (falls back to --primary for "all"). Keyed on the Sheet's own `data-side`. */
+  .ig-sheet-edge::before,
+  .ig-sheet-edge::after {
+    content: ""; position: fixed; top: 10px; bottom: 10px; pointer-events: none; z-index: 42;
+  }
+  .ig-sheet-edge::before {
+    width: 2px; border-radius: 2px;
+    background: linear-gradient(to bottom,
+      transparent 0, var(--filter-accent, var(--primary)) 12%,
+      var(--filter-accent, var(--primary)) 88%, transparent 100%);
+  }
+  .ig-sheet-edge[data-side="left"]::before  { left: 0; }
+  .ig-sheet-edge[data-side="right"]::before { right: 0; }
+  .ig-sheet-edge::after {
+    width: 8px;
+    background:
+      repeating-linear-gradient(to bottom,
+        var(--thread-tick-major) 0, var(--thread-tick-major) 1px,
+        transparent 1px, transparent calc(var(--thread-tick-pitch) * 4)) left top / 8px 100% no-repeat,
+      repeating-linear-gradient(to bottom,
+        var(--thread-tick) 0, var(--thread-tick) 1px,
+        transparent 1px, transparent var(--thread-tick-pitch)) left top / 5px 100% no-repeat;
+    -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 12%, #000 88%, transparent 100%);
+            mask-image: linear-gradient(to bottom, transparent 0, #000 12%, #000 88%, transparent 100%);
+  }
+  .ig-sheet-edge[data-side="left"]::after  { left: 4px; }
+  .ig-sheet-edge[data-side="right"]::after { right: 4px; transform: scaleX(-1); }
+
+  /* Bottom-sheet (phone) instrument ruler on its TOP edge — painted OUTSIDE the sheet (the sheet
+     is overflow-visible; scroll lives on the inner body), ticks combing UP into the scene. Same
+     shared --thread-* rhythm as the rails + bar-chart axis. */
+  .ig-sheet-topruler::before {
+    content: ""; position: absolute; top: -8px; left: 0; right: 0; height: 8px; pointer-events: none;
+    background:
+      linear-gradient(var(--thread-line), var(--thread-line)) left bottom / 100% 1px no-repeat,
+      repeating-linear-gradient(to right, var(--thread-tick-major) 0, var(--thread-tick-major) 1px,
+        transparent 1px, transparent calc(var(--thread-tick-pitch) * 4)) left bottom / 100% 8px no-repeat,
+      repeating-linear-gradient(to right, var(--thread-tick) 0, var(--thread-tick) 1px,
+        transparent 1px, transparent var(--thread-tick-pitch)) left bottom / 100% 5px no-repeat;
+    -webkit-mask-image: linear-gradient(to right, transparent 0, #000 40px, #000 calc(100% - 40px), transparent 100%);
+            mask-image: linear-gradient(to right, transparent 0, #000 40px, #000 calc(100% - 40px), transparent 100%);
   }
 }

@@ -97,11 +97,12 @@ export default function RailThread({ side = "right" }: { side?: Side }) {
 
   return (
     <svg
-      // `rail-thread` is a BARE MARKER class (no styling of its own anymore — the visuals are the
-      // utilities beside it): 16-responsive-shell.css's tablet/phone safety net
-      // (`#leftcol, #rightcol, .rail-thread { display: none !important; }`) still targets it to
-      // hide the fixed SVG below the desktop breakpoint. Keep it until Task 9 retires that file.
-      className="rail-thread fixed z-[11] pointer-events-none overflow-visible"
+      // `max-[1099px]:!hidden` is the tablet/phone safety net (was 16-responsive-shell.css's
+      // `#leftcol, #rightcol, .rail-thread { display: none !important }`): the rail components only
+      // render this SVG in their desktop branch, but SSR/first-paint assume desktop (useBreakpoint),
+      // so this hides the fixed thread below the desktop breakpoint until the effect resolves. `!`
+      // beats nothing here (the SVG has no id rule), but mirrors the rails' `!hidden` for parity.
+      className="fixed z-[11] pointer-events-none overflow-visible max-[1099px]:!hidden"
       width={W}
       height={H}
       style={{
