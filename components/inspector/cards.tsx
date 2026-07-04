@@ -10,6 +10,7 @@ import type { GlobalSnapshot, MetaCfg, NodeInfo, PickDescriptor } from "@/src/da
 import AnchoredTags from "./AnchoredTags";
 import Odometer from "@/components/Odometer";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
+import { Separator } from "@/components/ui/separator";
 import { SonarRing, NodeStars } from "@/components/state/StateAtoms";
 import { VIS } from "../../js/config.js";
 import { Desc, Row, StatusMark, CompositionRows, StatusBreakdown, nodeComposition } from "./parts";
@@ -45,17 +46,38 @@ export function SnapshotCard({ data: d }: { data: GlobalSnapshot }) {
     return () => clearInterval(id);
   }, [live]);
 
+  // Shared title row: ◆ type-marker (cyan = a GLOBAL snapshot) + the ordinal (odometer-rolls
+  // live), clearing the outer pane's absolute close × on the right.
+  const titleRow = (
+    <div className="flex items-baseline justify-between gap-2.5 pr-[22px]">
+      <span className="inline-flex items-baseline gap-2">
+        <span className="text-primary text-xs" aria-hidden>◆</span>
+        <Odometer value={d.ordinal} className="text-base font-bold text-foreground tabular-nums" />
+      </span>
+      {!live ? (
+        <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground whitespace-nowrap">
+          <span className="ns-dot" /> no signal
+        </span>
+      ) : (
+        <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground whitespace-nowrap">
+          {isLive ? (
+            <>
+              <span className="w-2 h-2 rounded-full bg-primary shadow-[0_0_0_3px_color-mix(in_oklch,var(--primary)_30%,transparent)] animate-breathe motion-reduce:animate-none" />
+              {" "}live now
+            </>
+          ) : (
+            <>◷ {rel}</>
+          )}
+        </span>
+      )}
+    </div>
+  );
+
   if (!live) {
     return (
-      <div className="insp-snap no-signal">
-        <div className="snap-titlerow">
-          <span className="snap-title">
-            <span className="snap-diamond" aria-hidden>◆</span>
-            <Odometer value={d.ordinal} className="snap-ord" />
-          </span>
-          <span className="snap-state"><span className="ns-dot" /> no signal</span>
-        </div>
-        <div className="insp-div" />
+      <div className="no-signal">
+        {titleRow}
+        <Separator className="my-2" />
         <div className="ns-block">
           <SonarRing key={retry} />
           <div className="ns-rows">
@@ -69,60 +91,44 @@ export function SnapshotCard({ data: d }: { data: GlobalSnapshot }) {
 
   // Hover pairing (synced 3D glow) lives on the OUTER pane (Inspector.CardPane), not here.
   return (
-    <div className="insp-snap">
-      {/* Title: ◆ type-marker (cyan = a GLOBAL snapshot) + the ordinal (odometer-rolls live). */}
-      <div className="snap-titlerow">
-        <span className="snap-title">
-          <span className="snap-diamond" aria-hidden>◆</span>
-          <Odometer value={d.ordinal} className="snap-ord" />
-        </span>
-        <span className="snap-state">
-          {isLive ? (
-            <><span className="snap-live-dot" /> live now</>
-          ) : (
-            <>◷ {rel}</>
-          )}
-        </span>
-      </div>
+    <div>
+      {titleRow}
 
       {/* Anchored block (exact share breakdown, or "reading…" until it lands). */}
-      <div className="insp-div" />
+      <Separator className="my-2" />
       <AnchoredTags ordinal={d.ordinal} anchored={anchored} awaiting={awaitingExact} />
 
       {/* Settlement — the exact fee + measured size + rewards (each an independent fact). While the
           exact read is still in flight (ACQUIRING), the fee row shows twinkling node-stars so the
           cell reserves width; once it lands the real value cross-fades in (st-resolve-in). */}
+      <Separator className="my-2" />
       {exact == null ? (
-        <>
-          <div className="insp-div" />
-          <div className="snap-settle">
-            <div className="snap-settle-row">
-              <span className="snap-settle-label">Fees paid</span>
-              <span className="snap-settle-val"><NodeStars count={4} /></span>
-            </div>
+        <div className="flex flex-col gap-2">
+          <div className="flex items-start justify-between gap-2.5">
+            <span className="text-[12.5px] text-muted-foreground">Fees paid</span>
+            <span className="flex flex-col items-end text-[13px] text-foreground tabular-nums"><NodeStars count={4} /></span>
           </div>
-        </>
+        </div>
       ) : (
-        <>
-          <div className="insp-div" />
-          <div className="snap-settle">
-            {exact.totalFee > 0 && (
-              <div className="snap-settle-row">
-                <span className="snap-settle-label">Fees paid</span>
-                <span className="snap-settle-val">
-                  <span className="snap-settle-amt st-resolve-in"><b>{fmtDag(exact.totalFee)}</b> DAG</span>
-                  <span className="snap-settle-sub">{fmtKB(exact.totalSizeKB)} settled</span>
-                </span>
-              </div>
-            )}
-            {exact.rewardsDatum > 0 && (
-              <div className="snap-settle-row">
-                <span className="snap-settle-label">Rewards out</span>
-                <span className="snap-settle-val"><span className="snap-settle-amt st-resolve-in"><b>{fmtDag(exact.rewardsDatum)}</b> DAG</span></span>
-              </div>
-            )}
-          </div>
-        </>
+        <div className="flex flex-col gap-2">
+          {exact.totalFee > 0 && (
+            <div className="flex items-start justify-between gap-2.5">
+              <span className="text-[12.5px] text-muted-foreground">Fees paid</span>
+              <span className="flex flex-col items-end text-[13px] text-foreground tabular-nums">
+                <span className="st-resolve-in whitespace-nowrap"><b className="font-bold">{fmtDag(exact.totalFee)}</b> DAG</span>
+                <span className="text-[10.5px] text-muted-foreground">{fmtKB(exact.totalSizeKB)} settled</span>
+              </span>
+            </div>
+          )}
+          {exact.rewardsDatum > 0 && (
+            <div className="flex items-start justify-between gap-2.5">
+              <span className="text-[12.5px] text-muted-foreground">Rewards out</span>
+              <span className="flex flex-col items-end text-[13px] text-foreground tabular-nums">
+                <span className="st-resolve-in whitespace-nowrap"><b className="font-bold">{fmtDag(exact.rewardsDatum)}</b> DAG</span>
+              </span>
+            </div>
+          )}
+        </div>
       )}
     </div>
   );
@@ -147,32 +153,41 @@ export function MetaCard({ cfg }: { cfg: MetaCfg }) {
   // Hover pairing (synced 3D hub glow) lives on the OUTER pane (ContextCard's #metapane), not here.
   return (
     <>
-      {/* Header — logo avatar ringed in the identity hue + name + ticker. */}
-      <div className="dossier-head">
-        <Avatar className="dossier-logo">
+      {/* Header — logo avatar ringed in the identity hue + name + ticker. The logo shows as a clean
+          circular mark — no squared tile (brand icons are round, so a circle crop sits naturally). */}
+      <div className="flex items-center gap-2.5 mb-2.5">
+        <Avatar className="size-[38px]">
           {iconUrl && <AvatarImage src={iconUrl} alt="" />}
           <AvatarFallback style={{ color: hue }}>{monogram}</AvatarFallback>
         </Avatar>
-        <span className="dossier-id">
-          <span key={cfg.name} className="dossier-name roll-in">{cfg.name}</span>
-          {cfg.id !== "dag" && <span className="dossier-ticker" style={{ color: hue }}>{cfg.ticker}</span>}
+        <span className="flex flex-col gap-px">
+          <span key={cfg.name} className="text-[15px] font-semibold text-foreground leading-[1.1] roll-in">{cfg.name}</span>
+          {cfg.id !== "dag" && <span className="text-[11px] font-semibold tracking-[0.02em]" style={{ color: hue }}>{cfg.ticker}</span>}
         </span>
       </div>
       <Desc text={blurb} />
       {nodes.length > 0 && (
-        <div className="comp-block">
-          <div className="comp-head">
-            <span className="comp-title">Composition</span>
-            <span className="comp-total"><b>{nodes.length}</b> node{nodes.length === 1 ? "" : "s"}</span>
+        <div className="mt-3">
+          <div className="flex items-baseline justify-between">
+            <span className="text-[10.5px] tracking-[0.1em] uppercase text-muted-foreground">Composition</span>
+            <span className="text-[13px] text-foreground"><b className="font-bold">{nodes.length}</b> node{nodes.length === 1 ? "" : "s"}</span>
           </div>
           <CompositionRows nodes={nodes} />
-          <div className="comp-status"><StatusBreakdown states={nodes.map((n) => n.state)} /></div>
+          <div className="mt-2"><StatusBreakdown states={nodes.map((n) => n.state)} /></div>
         </div>
       )}
-      <div className="dossier-foot">
-        {isDataMeta && <span className="dossier-token">data metagraph · no token</span>}
+      <div className="flex flex-col gap-1 mt-3">
+        {isDataMeta && <span className="text-[12px] text-muted-foreground">data metagraph · no token</span>}
         {site && (
-          <a className="insp-site" href={site} target="_blank" rel="noopener noreferrer" style={{ color: hue }}>
+          // Metagraph site link, sitting just under the description. A subtle inline link with a
+          // trailing ↗, de-emphasised so it doesn't compete with the node-fabric table above.
+          <a
+            className="flex w-fit max-w-full items-center gap-1 my-2.5 text-[12px] text-primary no-underline overflow-hidden text-ellipsis whitespace-nowrap after:content-['↗'] after:text-[11px] after:opacity-70 hover:underline"
+            href={site}
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{ color: hue }}
+          >
             {site.replace(/^https?:\/\//, "").replace(/\/$/, "")}
           </a>
         )}
@@ -196,7 +211,7 @@ export function GeoLiveCard() {
 
   if (!node) {
     return (
-      <p className="insp-sub gel-hint">
+      <p className="text-muted-foreground text-[12px] mt-[2px] mb-0">
         Pick a node from the explorer on the left — or click one on the globe — to inspect it here.
       </p>
     );
@@ -219,21 +234,27 @@ function GeoLiveNode({ p, onClear }: { p: PickOf<"l0" | "l1" | "metanode">; onCl
   // so the glow lights the card's rounded edge.
   return (
     <>
-      <button className="gel-clear" title="Deselect" onClick={onClear}>×</button>
+      <button
+        title="Deselect"
+        onClick={onClear}
+        className="absolute top-[10px] right-[10px] bg-transparent border-none text-muted-foreground text-[22px] leading-none cursor-pointer py-0.5 px-2 hover:text-foreground"
+      >
+        ×
+      </button>
       {/* Title line: node id + the status inline (right). */}
-      <div className="gel-node-head">
-        {color && <span className="gel-dot" style={{ background: color }} />}
-        <span key={title} className="gel-node-title insp-hash roll-in">{title}</span>
-        <span className="gel-status"><StatusMark state={p.node?.state} /></span>
+      <div className="flex items-center gap-2 mb-2">
+        {color && <span className="flex-none w-[9px] h-[9px] rounded-full" style={{ background: color }} />}
+        <span key={title} className="text-[13px] font-semibold text-foreground m-0 tabular-nums break-all min-w-0 font-mono roll-in">{title}</span>
+        <span className="ml-auto flex-none"><StatusMark state={p.node?.state} /></span>
       </div>
       {/* IP grouped with the identity (muted subtitle under the id), not a labelled row. */}
-      {p.node?.ip && <div className="gel-ip">{p.node.ip}</div>}
-      <div className="insp-div" />
+      {p.node?.ip && <div className="text-[11px] text-muted-foreground tabular-nums mt-0.5 ml-4">{p.node.ip}</div>}
+      <Separator className="my-2" />
       {/* Composition as a stacked label + block (NOT inside <Row>, whose value is a <span> —
           CompositionRows renders a <div>, so a Row would nest a block in an inline element). */}
       {oneNode.length > 0 && (
-        <div className="gel-comp">
-          <span className="gel-comp-label">Composition</span>
+        <div className="my-2">
+          <span className="text-[10.5px] tracking-[0.1em] uppercase text-muted-foreground">Composition</span>
           <CompositionRows nodes={oneNode} />
         </div>
       )}
@@ -241,4 +262,3 @@ function GeoLiveNode({ p, onClear }: { p: PickOf<"l0" | "l1" | "metanode">; onCl
     </>
   );
 }
-

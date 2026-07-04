@@ -1,6 +1,8 @@
 "use client";
 
 import { useState } from "react";
+import { cn } from "@/lib/utils";
+import { Badge } from "@/components/ui/badge";
 import type { NodeInfo } from "@/src/data/types";
 import {
   nodeStatus,
@@ -21,18 +23,23 @@ export const ROLE_ORDER = ["l0", "cl1", "dl1"];
 // A node's roles, falling back to its primary layer when the role list is absent.
 export const rolesOf = (n: NodeInfo) => (n.roles && n.roles.length ? n.roles : [n.layer!]);
 
+// Shared "Ready" text treatment (plain, no chrome) — the structural green success token, not an
+// identity colour, so it's the one place we lean on a theme token instead of the exact legacy hex.
+const READY_CLS = "text-success font-semibold text-[12.5px]";
+
 // Single node status — Ready reads as plain green text; any other state is a small pill in its
 // bucket colour, labelled with the exact stage. Colour = bucket (lane-clean), text = exact state.
 export function StatusMark({ state }: { state?: string | null }) {
   const s = nodeStatus(state);
-  if (s.bucket === "ready") return <span className="st-ready">{s.label}</span>;
+  if (s.bucket === "ready") return <span className={READY_CLS}>{s.label}</span>;
   return (
-    <span
-      className="st-pill"
+    <Badge
+      variant="outline"
+      className="text-[11px] font-semibold px-2 py-px rounded-full border"
       style={{ color: s.color, borderColor: s.color + "55", background: s.color + "1a" }}
     >
       {s.label}
-    </span>
+    </Badge>
   );
 }
 
@@ -50,26 +57,26 @@ const BUCKET_WORD: Record<StatusBucket, string> = {
 export function StatusBreakdown({ states }: { states: (string | null | undefined)[] }) {
   const b = statusBreakdown(states);
   const total = states.length;
-  if (total > 0 && b.ready === total) return <span className="st-ready">all ready</span>;
+  if (total > 0 && b.ready === total) return <span className={READY_CLS}>all ready</span>;
   const order: StatusBucket[] = ["ready", "progress", "down", "unknown"];
   const parts = order.filter((k) => b[k] > 0);
   return (
-    <span className="st-breakdown">
+    <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
       {parts.map((k, i) => {
         const items =
           k === "progress"
             ? labelBreakdown(states, "progress")
             : [{ label: BUCKET_WORD[k], count: b[k] }];
         return (
-          <span className="st-bd" key={k}>
-            <span className="st-bd-dot" style={{ background: BUCKET_COLOR[k] }} />
+          <span className="inline-flex items-center gap-[5px]" key={k}>
+            <span className="w-[7px] h-[7px] rounded-full" style={{ background: BUCKET_COLOR[k] }} />
             {items.map((it, j) => (
               <span key={it.label}>
-                {j > 0 ? <span className="st-bd-sep"> · </span> : null}
+                {j > 0 ? <span className="text-muted-foreground opacity-60"> · </span> : null}
                 {it.count} {it.label}
               </span>
             ))}
-            {i < parts.length - 1 ? <span className="st-bd-sep"> · </span> : null}
+            {i < parts.length - 1 ? <span className="text-muted-foreground opacity-60"> · </span> : null}
           </span>
         );
       })}
@@ -82,17 +89,28 @@ export function StatusBreakdown({ states }: { states: (string | null | undefined
 export function CompositionRows({ nodes }: { nodes: NodeInfo[] }) {
   const rows = compositionRows(nodes);
   return (
-    <div className="comp-rows">
+    <div className="flex flex-col gap-[7px] mt-2">
       {rows.map((r, i) => (
-        <div className="comp-row" key={i}>
-          <span className="comp-role">{r.label}</span>
-          <span className="comp-codes">{r.codes.join("·")}</span>
-          <span className="comp-chips" aria-hidden>
+        <div className="grid grid-cols-[auto_auto_1fr_auto] items-center gap-2" key={i}>
+          <span className="text-[12.5px] text-foreground">{r.label}</span>
+          <span className="text-[11px] text-muted-foreground tabular-nums">{r.codes.join("·")}</span>
+          {/* Chip stack = a miniature of the 3D node cloud: identity-hued discs that OVERLAP (like
+              stacked avatars), each ringed in the panel colour so the overlap reads. Visual scale
+              only (capped ≤10). Plain overlapping dots (no image/fallback content), so a bare
+              utility span reproduces the look more directly than fighting Avatar's chrome. */}
+          <span className="inline-flex justify-end items-center pl-1" aria-hidden>
             {Array.from({ length: Math.min(r.count, 10) }).map((_, j) => (
-              <span className="comp-chip" key={j} />
+              <span
+                key={j}
+                className="w-[9px] h-[9px] rounded-full -ml-1"
+                style={{
+                  background: "color-mix(in oklch, var(--filter-accent, #a0afcd) 60%, transparent)",
+                  boxShadow: "0 0 0 1.5px var(--panel)",
+                }}
+              />
             ))}
           </span>
-          <span className="comp-count">{r.count}</span>
+          <span className="text-[12.5px] text-foreground tabular-nums min-w-[1.5em] text-right">{r.count}</span>
         </div>
       ))}
     </div>
@@ -129,11 +147,15 @@ export function nodeComposition(nodes: NodeInfo[]): Composition {
 // Shared by the metagraph node-fabric and the geo node browser so they read identically.
 export function RoleTags({ roles }: { roles: string[] }) {
   return (
-    <span className="role-tags">
+    <span className="inline-flex flex-wrap gap-1">
       {roles.map((r) => (
-        <span className={"role-tag role-tag--" + r} key={r}>
+        <Badge
+          key={r}
+          variant="outline"
+          className="rounded-[4px] px-[5px] py-[3px] text-[9.5px] font-bold leading-none tracking-[0.03em] text-muted-foreground bg-white/[0.035] tabular-nums"
+        >
           {ROLE_SHORT[r] || r}
-        </span>
+        </Badge>
       ))}
     </span>
   );
@@ -141,9 +163,9 @@ export function RoleTags({ roles }: { roles: string[] }) {
 
 export function Row({ label, children }: { label: string; children: React.ReactNode }) {
   return (
-    <div className="insp-row">
-      <span>{label}</span>
-      <span>{children}</span>
+    <div className="flex justify-between gap-3 py-2 border-b border-border/50 text-[12.5px]">
+      <span className="text-muted-foreground">{label}</span>
+      <span className="tabular-nums text-right break-all">{children}</span>
     </div>
   );
 }
@@ -153,11 +175,17 @@ export function Row({ label, children }: { label: string; children: React.ReactN
 export function Desc({ text }: { text?: string }) {
   const [open, setOpen] = useState(false);
   if (!text) return null;
-  if (text.length <= 180) return <p>{text}</p>;
+  if (text.length <= 180) return <p className="text-[13px] leading-[1.6] text-[#c7d0ea] mb-0">{text}</p>;
   return (
     <>
-      <p className={"desc" + (open ? " expanded" : "")}>{text}</p>
-      <button type="button" className="desc-more" onClick={() => setOpen((o) => !o)}>
+      <p className={cn("text-[13px] leading-[1.6] text-[#c7d0ea] mb-0", open ? "line-clamp-none" : "line-clamp-3")}>
+        {text}
+      </p>
+      <button
+        type="button"
+        className="desc-more inline-block mt-0.5 mb-0 p-0 bg-transparent border-none cursor-pointer font-inherit text-[11px] font-semibold text-primary hover:underline"
+        onClick={() => setOpen((o) => !o)}
+      >
         {open ? "Show less" : "Show more"}
       </button>
     </>

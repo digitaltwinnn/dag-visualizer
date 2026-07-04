@@ -71,3 +71,10 @@
     transparent 0, var(--filter-accent, var(--primary)) 12%,
     var(--filter-accent, var(--primary)) 88%, transparent 100%);
 }
+
+/* Right rail — each card pane needs its own positioned ancestor (for its absolute close ×) and
+   re-enables pointer events (`#rightcol` itself is pointer-events:none so gaps between cards click
+   through to the scene/bottom strip). Mirrors `#leftcol > .panel` above. Was `#rightcol > aside`
+   (05-inspector-metagraph-context-pane.css); every rail card carries `.panel` now, so this targets
+   the same elements. */
+#rightcol > .panel { position: relative; width: auto; pointer-events: auto; }

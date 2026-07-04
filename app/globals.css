@@ -2,13 +2,11 @@
 @import "tw-animate-css";
 @import "./styles/00-base.css";
 @import "./styles/01-snapshot-ribbon.css";
-@import "./styles/05-inspector-metagraph-context-pane.css";
 @import "./styles/07-hover-tooltip.css";
 @import "./styles/09-ledger-placeholder.css";
 @import "./styles/10-country-leaderboard-distribution-score.css";
 @import "./styles/11-responsive.css";
 @import "./styles/12-panel-system.css";
-@import "./styles/13-right-column.css";
 @import "./styles/15-states.css";
 @import "./styles/16-responsive-shell.css";
 @import "./styles/17-blueprint.css";
@@ -140,6 +138,32 @@
   .cmd-list-scroll::-webkit-scrollbar-track { background: transparent; }
   .cmd-list-scroll::-webkit-scrollbar-thumb { background: rgba(160, 175, 205, 0.28); border-radius: 3px; }
   .cmd-list-scroll:hover::-webkit-scrollbar-thumb { background: rgba(160, 175, 205, 0.45); }
+}
+
+/* ── Shared subject-pairing highlight (useSubjectPairing.ts) ───────────────────
+   A subject hovered in the 3D scene (or in chrome) lights its paired card/row in ITS identity hue
+   (`--row-hue`, set inline only while paired) — the same hue the 3D object glows, so the two read
+   as one focus with no drawn line. ONE treatment for every card type (node/snapshot/dossier) +
+   rows, so they behave identically. Distinct from `.active`/committed selection. Cross-cutting —
+   used by rail cards (ContextCard/Inspector's CardPane) AND GeoExplore's node rows, so it lives
+   here rather than in either owner's stylesheet (was 05-inspector-metagraph-context-pane.css). */
+@layer components {
+  /* Applied to the OUTER rounded pane (`.panel`/`#metapane`). The glow is INSET (drawn inside the
+     border) so a rail's `overflow` can't clip it left/right and it hugs all four rounded corners. */
+  .subject-paired {
+    position: relative;
+    box-shadow: inset 0 0 0 1.5px color-mix(in oklch, var(--row-hue, var(--primary)) 62%, transparent),
+                inset 0 0 16px -5px color-mix(in oklch, var(--row-hue, var(--primary)) 58%, transparent);
+    transition: box-shadow 0.16s ease;
+  }
+  /* Explorer rows are dense list items → a wash + border reads better there than an inset glow. */
+  .nb-row.subject-paired {
+    box-shadow: none;
+    background: color-mix(in oklch, var(--row-hue, var(--primary)) 14%, transparent);
+    border-color: color-mix(in oklch, var(--row-hue, var(--primary)) 45%, transparent);
+    color: var(--foreground);
+  }
+  @media (prefers-reduced-motion: reduce) { .subject-paired { transition: none; } }
 }
 
 /* ── Instrument-Glass surface — the shared panel frame + left accent spine ── */

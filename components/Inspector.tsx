@@ -63,7 +63,7 @@ function CardPane({
 
   return (
     <aside
-      className={cn("panel rc-pane", pair.className)}
+      className={cn("panel", pair.className)}
       style={pair.style}
       ref={ref}
       onMouseEnter={pair.onMouseEnter}
@@ -227,7 +227,7 @@ export default function Inspector() {
     // RailThread is a SIBLING of #rightcol, not a child: #rightcol gets the `.rail-clip` bottom-fade
     // mask when it overflows, and a mask composites its whole subtree — since the fixed thread doesn't
     // scroll with the rail, that mask's solid band slides off it and blanks the whole spine. Kept
-    // outside, the thread manages its own top/bottom fade (13-right-column.css) independently.
+    // outside, the thread manages its own top/bottom fade (inline mask, RailThread.tsx) independently.
     return (
       <>
         <RailThread />

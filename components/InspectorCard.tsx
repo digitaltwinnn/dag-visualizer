@@ -29,7 +29,11 @@ export default function InspectorCard({
 }) {
   return (
     <>
-      {eyebrow && <span className="insp-eyebrow">{eyebrow}</span>}
+      {eyebrow && (
+        <span className="block text-[8.5px] font-bold tracking-[0.1em] uppercase text-accent leading-none mb-2 pr-[22px]">
+          {eyebrow}
+        </span>
+      )}
       <CardBody p={p} />
     </>
   );

@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { cn } from "@/lib/utils";
 import { useStore } from "@/src/store/store";
 import PanelHead from "@/components/PanelHead";
 import { shortHash, CORE_HEX, metagraphById } from "@/src/data/network";
@@ -149,17 +150,27 @@ export default function GeoExplore() {
                         return (
                           <button
                             key={r.label + i}
-                            className={"nb-row" + (on ? " active" : "") + (pair.paired ? " " + pair.className : "")}
+                            className={cn(
+                              "nb-row flex items-center gap-2 w-full py-[5px] px-2 my-px rounded-[7px] border border-transparent bg-transparent cursor-pointer text-left text-[#c7d0ea] transition-colors duration-[140ms]",
+                              "hover:bg-[rgba(90,140,255,0.12)] hover:text-foreground",
+                              "focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--core)] focus-visible:outline-offset-[-2px]",
+                              on && "bg-[var(--sel-bg)] border-[var(--sel-border)] text-white",
+                              pair.paired && pair.className,
+                            )}
                             style={pair.style}
                             title={`${r.label} · ${r.state ?? "—"}`}
                             onClick={() => selectNode(r.pick)}
                             onMouseEnter={pair.onMouseEnter}
                           >
-                            <span className="nb-dot" style={{ background: rowHue, color: rowHue }} aria-hidden />
-                            <span className={"nb-label" + (r.id ? " insp-hash" : "")}>
+                            <span
+                              className="w-[7px] h-[7px] rounded-full flex-none shadow-[0_0_5px_currentColor]"
+                              style={{ background: rowHue, color: rowHue }}
+                              aria-hidden
+                            />
+                            <span className={cn("flex-1 overflow-hidden text-ellipsis whitespace-nowrap tabular-nums text-[12px]", r.id && "font-mono")}>
                               {r.id ? shortHash(r.id) : r.label}
                             </span>
-                            <StatusMark state={r.state} />
+                            <span className="ml-auto flex-none"><StatusMark state={r.state} /></span>
                           </button>
                         );
                       })

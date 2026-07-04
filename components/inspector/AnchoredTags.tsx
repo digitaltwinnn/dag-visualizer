@@ -1,5 +1,6 @@
 "use client";
 
+import { cn } from "@/lib/utils";
 import { useStore } from "@/src/store/store";
 import { metagraphById } from "@/src/data/network";
 import { hex, fmtDag } from "@/src/util/format";
@@ -29,15 +30,15 @@ export default function AnchoredTags({
 
   // Header (always, even while acquiring): "N snapshots anchored from M metagraphs".
   const header = (
-    <div className="anc-head">
-      <span className="anc-head-total"><b>{total}</b> snapshot{total === 1 ? "" : "s"} anchored</span>
-      {channels != null && <span className="anc-head-sub">from {channels} metagraph{channels === 1 ? "" : "s"}</span>}
+    <div className="flex items-baseline gap-2 flex-wrap mb-1.5">
+      <span className="text-[13px] text-foreground"><b className="font-bold">{total}</b> snapshot{total === 1 ? "" : "s"} anchored</span>
+      {channels != null && <span className="text-[12px] text-muted-foreground">from {channels} metagraph{channels === 1 ? "" : "s"}</span>}
     </div>
   );
 
   if (!exact) {
     return (
-      <div className="anc">
+      <div className="mt-1">
         {header}
         {awaiting && (
           <div className="anc-acquiring"><NodeStars count={4} /><span className="anc-acq-label">resolving</span></div>
@@ -59,10 +60,10 @@ export default function AnchoredTags({
     rows.push({ id: "unlisted", label: "unlisted", hue: null, n: exact.unlistedCount });
 
   const pct = (n: number) => (total > 0 ? (n / total) * 100 : 0);
-  const bar = (n: number, hue: string | null) => (
-    <span className="anc-bar">
+  const bar = (n: number, hue: string | null, extraClass?: string) => (
+    <span className={cn("block h-1.5 rounded-[3px] bg-white/[0.06] overflow-hidden", extraClass)}>
       <span
-        className="anc-bar-fill"
+        className="block h-full rounded-[3px] min-w-[2px]"
         style={{ width: `${Math.max(pct(n), n > 0 ? 4 : 0)}%`, background: hue ?? "var(--muted)" }}
       />
     </span>
@@ -73,38 +74,41 @@ export default function AnchoredTags({
   const rest = focus ? rows.filter((r) => r.id !== focusId) : rows;
 
   return (
-    <div className="anc">
+    <div className="mt-1">
       {header}
 
-      {/* Filtered → the focus row pinned at the top (regardless of rank). */}
+      {/* Filtered → the focus row pinned at the top (regardless of rank). Marked by a THIN left
+          hue accent only (no tinted box), compact, consistent with the neutral node/dossier cards. */}
       {focus && (
-        <div className="anc-focus" style={{ ["--mg" as string]: focus.hue ?? "var(--primary)" }}>
-          <div className="anc-focus-top">
-            <span className="anc-focus-name">
-              <span className="anc-dot" style={{ background: focus.hue ?? "var(--primary)" }} />
+        <div className="pt-0.5 pb-1.5 pl-2.5 mb-2" style={{ boxShadow: `inset 2px 0 0 ${focus.hue ?? "var(--primary)"}` }}>
+          <div className="flex items-start justify-between gap-2.5">
+            <span className="inline-flex items-center gap-[7px] text-[13px] text-foreground">
+              <span className="w-2 h-2 rounded-full flex-none" style={{ background: focus.hue ?? "var(--primary)" }} />
               {focus.label}
             </span>
-            <span className="anc-focus-fee">
-              <span className="anc-focus-amt"><b>{fmtDag(exact.perMeta[focus.id]?.fee ?? 0)}</b> DAG</span>
-              <span className="anc-sub">fees paid</span>
+            <span className="flex flex-col items-end text-[13px] text-foreground">
+              <span className="whitespace-nowrap"><b className="font-bold">{fmtDag(exact.perMeta[focus.id]?.fee ?? 0)}</b> DAG</span>
+              <span className="text-[10px] tracking-[0.08em] uppercase text-muted-foreground">fees paid</span>
             </span>
           </div>
-          <div className="anc-focus-bar">
-            {bar(focus.n, focus.hue)}
-            <span className="anc-focus-meta">{focus.n} snapshot{focus.n === 1 ? "" : "s"} · {pct(focus.n).toFixed(pct(focus.n) < 10 ? 1 : 0)}%</span>
+          <div className="flex items-center gap-2 mt-[5px]">
+            {bar(focus.n, focus.hue, "flex-1")}
+            <span className="text-[11px] text-muted-foreground tabular-nums whitespace-nowrap">{focus.n} snapshot{focus.n === 1 ? "" : "s"} · {pct(focus.n).toFixed(pct(focus.n) < 10 ? 1 : 0)}%</span>
           </div>
         </div>
       )}
 
-      {/* The ranked list (dimmed under "Other metagraphs" when a focus row is present). */}
-      {focus && rest.length > 0 && <div className="anc-other-label">Other metagraphs</div>}
-      <div className={"anc-list" + (focus ? " anc-list--dim" : "")}>
+      {/* The ranked list (dimmed under "Other metagraphs" when a focus row is present). ONE shared
+          grid for the whole list (rows are `contents`) so the columns line up ACROSS rows — every
+          bar starts at the same x, after the widest label. */}
+      {focus && rest.length > 0 && <div className="text-[10px] tracking-[0.1em] uppercase text-muted-foreground mt-1 mb-1.5">Other metagraphs</div>}
+      <div className={cn("grid grid-cols-[auto_auto_1fr_auto] items-center gap-x-2 gap-y-1.5", focus && "opacity-60")}>
         {rest.map((r) => (
-          <div className={"anc-row" + (r.hue ? "" : " anc-row--unlisted")} key={r.id}>
-            <span className="anc-dot" style={{ background: r.hue ?? "var(--muted)" }} />
-            <span className="anc-label">{r.label}</span>
+          <div className="contents" key={r.id}>
+            <span className="w-2 h-2 rounded-full flex-none" style={{ background: r.hue ?? "var(--muted)" }} />
+            <span className={cn("text-[12.5px] text-foreground", !r.hue && "italic text-muted-foreground")}>{r.label}</span>
             {bar(r.n, r.hue)}
-            <span className="anc-count">{r.n}</span>
+            <span className="text-[12.5px] text-foreground tabular-nums min-w-[2em] text-right">{r.n}</span>
           </div>
         ))}
       </div>

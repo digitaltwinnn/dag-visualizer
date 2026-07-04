@@ -92,6 +92,22 @@ body { font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; co
 }
 #leftcol > aside { width: auto; }
 
+/* Right details rail (`#rightcol`, `Inspector.tsx`) — the facts scope: a STACK of selected-subject
+   cards. Mirrors `#leftcol` above (fixed column, capped max-height so a tall stack scrolls instead
+   of pushing past the viewport). `pointer-events: none` on the container so the gaps between cards
+   click through to the scene/bottom strip below; each card re-enables it via `#rightcol > .panel`
+   (12-panel-system.css), which also gives it a positioned ancestor for its absolute close ×.
+   (Restored: was 05-inspector-metagraph-context-pane.css, retired once its card bodies moved onto
+   Tailwind utilities — this base shell rule doesn't belong to any one card, so it moved here.) */
+#rightcol {
+  position: fixed; z-index: 10; top: var(--rail-top); right: 26px;
+  width: var(--detail-w);
+  display: flex; flex-direction: column; gap: var(--rail-gap);
+  max-height: calc(100vh - var(--rail-top) - 14px);
+  overflow-y: auto;
+  pointer-events: none;
+}
+
 /* Both rails scroll: a slim custom scrollbar (the default chunky browser one read as heavy chrome),
    native touch panning for tablets (pan-y + momentum), and a grab-drag fallback for mouse
    (RailScroll). `overscroll-behavior: contain` keeps a rail scroll from chaining to the page. */

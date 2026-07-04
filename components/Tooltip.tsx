@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
+import { cn } from "@/lib/utils";
 import { useStore } from "@/src/store/store";
 import { shortHash } from "@/src/data/network";
 
@@ -31,7 +32,7 @@ export default function Tooltip() {
     <div id="tooltip" ref={ref} style={{ borderColor: hover.color }}>
       <span className="tt-ident" style={{ color: hover.color }}>{hover.ident}</span>
       <span className="tt-sep">·</span>
-      <span className={"tt-name" + (hover.mono ? " insp-hash" : "")}>{name}</span>
+      <span className={cn("tt-name", hover.mono && "font-mono text-[11px]")}>{name}</span>
       <span className="tt-hint">click to inspect</span>
     </div>
   );
