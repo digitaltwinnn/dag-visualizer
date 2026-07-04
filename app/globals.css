@@ -1,7 +1,6 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 @import "./styles/00-base.css";
-@import "./styles/07-hover-tooltip.css";
 @import "./styles/11-responsive.css";
 @import "./styles/15-states.css";
 @import "./styles/16-responsive-shell.css";
