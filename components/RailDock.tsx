@@ -26,7 +26,7 @@ const PULSE_MS = 900;
 // state (e.g. clear the hint the instant the sheet opens) without RailDock needing to know why.
 //
 // `pulseKey`: an optional value whose REFERENCE change replays a one-shot transient pulse on the
-// dot — the collapsed-panel equivalent of the desktop cards' own `useFlashOnChange` ring (which
+// dot — the collapsed-panel equivalent of the desktop cards' own `useEdgePulse` edge sweep (which
 // is invisible while the rail is hidden). Fires for a hosted card's DATA updating even when
 // `hint` is already false (already seen) — e.g. the live snapshot ticking while the sheet is
 // closed — so the tab still "feels alive" without resurrecting the persistent unseen dot. Skips
@@ -253,8 +253,11 @@ export default function RailDock({
           )}
           {/* The cards scroll in an inner body so the sheet itself is `overflow: visible` — that lets
               the bottom sheet paint its instrument ruler ABOVE its top edge (outside the element).
-              Native scrollbar hidden, momentum kept (like #rightcol). */}
-          <div className="flex-1 min-h-0 flex flex-col gap-[var(--rail-gap)] overflow-y-auto overscroll-contain [scrollbar-width:none] [-webkit-overflow-scrolling:touch] [&::-webkit-scrollbar]:hidden">
+              Native scrollbar hidden, momentum kept (like #rightcol). `sheet-cards` (globals.css)
+              suppresses the hosted cards' per-card spines/right-edges — the sheet's own
+              `.ig-sheet-edge` spine is the single identity cue (no double spine); the transient
+              edge PULSE still plays on each card's own edge. */}
+          <div className="sheet-cards flex-1 min-h-0 flex flex-col gap-[var(--rail-gap)] overflow-y-auto overscroll-contain [scrollbar-width:none] [-webkit-overflow-scrolling:touch] [&::-webkit-scrollbar]:hidden">
             {children}
           </div>
         </SheetContent>

@@ -21,6 +21,7 @@ import {
   StandbyHalo,
 } from "@/components/state/StateAtoms";
 import OdometerDemo from "./OdometerDemo";
+import CardSignalsDemo from "./CardSignalsDemo";
 import EcgMark from "@/components/topbar/EcgMark";
 
 // ── Structural lane — the shadcn oklch variables (globals.css :root). One source of truth. ──
@@ -122,21 +123,23 @@ export default async function DesignPage() {
         </h2>
         <p className="text-sm text-muted-foreground mb-3 max-w-2xl">
           The design-system <code className="font-mono">Card</code> baseline is the app&apos;s card frame:
-          the <code className="font-mono">.ig-panel</code> glass recipe (translucent glass + a left accent
-          spine) is baked into its base class, and an idiomatic <code className="font-mono">asChild</code>{" "}
+          the <code className="font-mono">.ig-panel</code> glass recipe is baked into its base class, and
+          an idiomatic <code className="font-mono">asChild</code>{" "}
           (radix <code className="font-mono">Slot</code>) lets each rail card render as{" "}
           <code className="font-mono">&lt;Card asChild&gt;&lt;aside&gt;</code> to keep its{" "}
           <code className="font-mono">complementary</code> a11y role. Every rail card leads with the one
-          shared <code className="font-mono">CardHead</code>. The spine is structural cyan by default;
-          identity panels point <code className="font-mono">--spine</code> at their hue. Rail cards
-          override the Card&apos;s default padding so today&apos;s spacing is preserved.
+          shared <code className="font-mono">CardHead</code>. Cards are SPINELESS AT REST — the frame&apos;s
+          edge element only lights as a signal (see Card signals below), coloured by{" "}
+          <code className="font-mono">--spine</code> (structural cyan by default; identity panels point it
+          at their hue). Rail cards override the Card&apos;s default padding so today&apos;s spacing is
+          preserved.
         </p>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 max-w-2xl">
           <Card asChild className="block p-0">
             <div>
               <CardHead panel eyebrow="Hypergraph · about" title="Glass card" />
               <div className="py-[var(--panel-pad-y)] px-[var(--panel-pad-x)] text-sm text-muted-foreground">
-                Default structural-cyan spine.
+                Spineless at rest — the rail thread carries identity.
                 <Separator className="my-3" />
                 <div className="flex flex-wrap gap-2">
                   <Badge>default</Badge>
@@ -147,12 +150,13 @@ export default async function DesignPage() {
               </div>
             </div>
           </Card>
-          <Card asChild className="block p-0 [--spine:var(--success)]">
+          <Card asChild className="block p-0 [--spine:var(--success)] sig-right card-selected">
             <div>
-              <CardHead panel eyebrow="Spine override" title="Identity spine" />
+              <CardHead panel eyebrow="Spine override" title="Signal colour" />
               <div className="py-[var(--panel-pad-y)] px-[var(--panel-pad-x)] text-sm text-muted-foreground">
-                The accent spine reads <code className="font-mono">--spine</code>; identity panels point
-                it at <code className="font-mono">--mg</code>. Here it is success-green.
+                Signal states read <code className="font-mono">--spine</code>; identity panels point
+                it at <code className="font-mono">--mg</code>. Here it is success-green, shown in the
+                selected state on the scene-facing edge.
               </div>
             </div>
           </Card>
@@ -168,6 +172,29 @@ export default async function DesignPage() {
           overflowing rail scrolls instead of a card overlapping the one beneath it. The right rail&apos;s
           identity cue is RailThread&apos;s spine in the margin, not a per-card one.
         </Card>
+      </section>
+
+      <section className="mb-10">
+        <h2 className="text-sm uppercase tracking-widest text-muted-foreground mb-3">
+          Card signals — <code className="font-mono">components/EdgePulse.tsx</code>
+        </h2>
+        <p className="text-sm text-muted-foreground mb-3 max-w-2xl">
+          <strong>Thread = resting identity cue; card edge = transient signal channel.</strong>{" "}
+          Cards are SPINELESS AT REST everywhere — the resting identity colour lives in the two
+          rails&apos; <code className="font-mono">RailThread</code>s (identity-hued spine + node dots,
+          mirrored left/right). A card&apos;s edge lights only as a SIGNAL, always on its SCENE-FACING
+          edge (left-rail cards → right edge, <code className="font-mono">.sig-right</code>; right-rail
+          cards → left edge, <code className="font-mono">.sig-left</code>): a subject change fires{" "}
+          <code className="font-mono">useEdgePulse(subjectKey)</code> — a bright gradient-tipped segment
+          (3px, soft glow) sweeps once down the edge (~1.2s, debounced, none under reduced motion),
+          synchronized with the title&apos;s <code className="font-mono">roll-in</code>; hover pairing
+          (<code className="font-mono">.subject-paired</code>) brightens the edge (the inset wash is the
+          supporting cue); the active selection (<code className="font-mono">.card-selected</code>) holds
+          a steady-bright edge. Inside tablet/phone sheets the steady per-card edges are suppressed
+          (<code className="font-mono">.sheet-cards</code>) — the sheet&apos;s own edge is the one
+          identity cue; the pulse still plays on the card.
+        </p>
+        <CardSignalsDemo />
       </section>
 
       <section className="mb-10">

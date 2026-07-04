@@ -60,27 +60,27 @@ export function StatusBreakdown({ states }: { states: (string | null | undefined
   const total = states.length;
   if (total > 0 && b.ready === total) return <span className={READY_CLS}>all ready</span>;
   const order: StatusBucket[] = ["ready", "progress", "down", "unknown"];
-  const parts = order.filter((k) => b[k] > 0);
+  // EVERY status item carries its own colour bullet (in its bucket's colour) — the progress
+  // bucket spells out several stage words (syncing / joining / …), and rendering one dot per
+  // BUCKET left every stage after the first (e.g. "1 joining") bullet-less.
+  const items = order
+    .filter((k) => b[k] > 0)
+    .flatMap((k) =>
+      k === "progress"
+        ? labelBreakdown(states, "progress").map((it) => ({ ...it, color: BUCKET_COLOR[k] }))
+        : [{ label: BUCKET_WORD[k], count: b[k], color: BUCKET_COLOR[k] }],
+    );
   return (
     <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
-      {parts.map((k, i) => {
-        const items =
-          k === "progress"
-            ? labelBreakdown(states, "progress")
-            : [{ label: BUCKET_WORD[k], count: b[k] }];
-        return (
-          <span className="inline-flex items-center gap-[5px]" key={k}>
-            <span className="w-[7px] h-[7px] rounded-full" style={{ background: BUCKET_COLOR[k] }} />
-            {items.map((it, j) => (
-              <span key={it.label}>
-                {j > 0 ? <span className="text-muted-foreground opacity-60"> · </span> : null}
-                {it.count} {it.label}
-              </span>
-            ))}
-            {i < parts.length - 1 ? <span className="text-muted-foreground opacity-60"> · </span> : null}
+      {items.map((it, i) => (
+        <span className="inline-flex items-center gap-[5px]" key={it.label}>
+          {i > 0 ? <span className="text-muted-foreground opacity-60"> · </span> : null}
+          <span className="w-[7px] h-[7px] rounded-full" style={{ background: it.color }} />
+          <span>
+            {it.count} {it.label}
           </span>
-        );
-      })}
+        </span>
+      ))}
     </span>
   );
 }

@@ -15,27 +15,24 @@ import ContextCard from "@/components/ContextCard";
 import RailThread from "@/components/RailThread";
 import RailDock from "@/components/RailDock";
 import { useBreakpoint } from "@/components/useBreakpoint";
-import { useFlashOnChange } from "@/components/useFlashOnChange";
+import { PulseEdge, useEdgePulse } from "@/components/EdgePulse";
 import { StandbyHalo } from "@/components/state/StateAtoms";
 import type { PickDescriptor } from "@/src/data/types";
 import type { Mode } from "@/src/store/store";
 
 // One pane in the right-rail **card stack**. Each pane is its own panel with its own
-// "content updated" flash (keyed on its subject) and its own close — rendering every card
-// through this component is what makes the stack generic: `useFlashOnChange` runs per pane, so
-// any number of cards each flash + close independently.
+// "new subject" edge pulse (keyed on its subject) and its own close — rendering every card
+// through this component is what makes the stack generic: `useEdgePulse` runs per pane, so
+// any number of cards each pulse + close independently.
 function CardPane({
-  dep,
   pick,
   eyebrow,
   onClose,
 }: {
-  dep: unknown;
   pick: PickDescriptor;
   eyebrow: string;
   onClose: () => void;
 }) {
-  const ref = useFlashOnChange(dep);
   const inspect = useStore((s) => s.inspect);
   const hoverNodeId = useStore((s) => s.hoverNodeId);
   const hoverSnapOrd = useStore((s) => s.hoverSnapOrd);
@@ -45,12 +42,17 @@ function CardPane({
 
   // The pairing lives on the OUTER pane (the rounded card), not an inner wrapper — so the synced
   // hover glow lights the card's rounded edge, and hovering anywhere on the card glows its 3D object.
+  // `subjectKey` is the SAME identity that keys the body's title roll-in (node id row / ordinal
+  // Odometer), so the title roll and the edge pulse fire together as one "new subject" moment —
+  // and it is stable across same-subject data refreshes (no pulse on a re-render, only a new pick).
   let pair;
+  let subjectKey: string | number | null;
   if (pick.kind === "snapshot") {
     // Snapshot pairing hue follows the active filter's identity: the selected metagraph's (or
     // the DAG's own) brand hue, or the network cyan for "all" — `filterAccent` already draws
     // that exact line (metagraphById resolves "dag" through the identity map too).
     pair = subjectPairing<number>(hoverSnapOrd, pick.data.ordinal, setHoverSnapOrd, filterAccent(filter));
+    subjectKey = pick.data.ordinal;
   } else {
     // geoLive → the selected node, read from the store like GeoLiveCard does.
     const node =
@@ -58,20 +60,24 @@ function CardPane({
         ? inspect
         : null;
     const nodeHue = node?.kind === "metanode" && node.meta ? identityHudHex(node.meta.id) : CORE_HEX;
-    pair = subjectPairing<string>(hoverNodeId, hoverKeyOf(node), setHoverNodeId, nodeHue);
+    subjectKey = hoverKeyOf(node);
+    pair = subjectPairing<string>(hoverNodeId, subjectKey as string | null, setHoverNodeId, nodeHue);
   }
+  const pulseKey = useEdgePulse(subjectKey);
 
   return (
-    <Card asChild className={cn(RIGHT_CARD, pair.className)}>
+    // `card-selected`: a Detail pane always REPRESENTS the active selection (it exists only while
+    // its pick is live), so its scene-facing (left) signal edge holds the steady-bright state.
+    <Card asChild className={cn(RIGHT_CARD, "sig-left card-selected", pair.className)}>
       <aside
         style={pair.style}
-        ref={ref}
         onMouseEnter={pair.onMouseEnter}
         onMouseLeave={pair.onMouseLeave}
       >
         {/* Every card's × is CardHead's shared ghost-Button close — one baseline close (the node
             card's old hand-rolled × was removed). */}
         <InspectorCard p={pick} eyebrow={eyebrow} onClose={onClose} />
+        <PulseEdge pulseKey={pulseKey} rail="right" />
       </aside>
     </Card>
   );
@@ -125,7 +131,6 @@ export default function Inspector() {
       pane: (
         <CardPane
           key="node"
-          dep={inspect}
           pick={{ kind: "geoLive" }}
           eyebrow={breadcrumbLabel("node", filter)}
           onClose={() => setInspect(null)}
@@ -137,7 +142,6 @@ export default function Inspector() {
       pane: snap ? (
         <CardPane
           key="snap"
-          dep={snap}
           pick={snap}
           eyebrow={breadcrumbLabel("snap", filter)}
           onClose={() => setSnap(null)}
@@ -185,11 +189,11 @@ export default function Inspector() {
     if (next) setSeen(true);
   };
 
-  // Transient re-pulse — mirrors the desktop cards' own `useFlashOnChange`, which flashes on ANY
-  // reference change of a pane's `dep` (a new subject, OR the same subject's data updating —
-  // e.g. the live snapshot ticking). That flash is invisible while the rail is collapsed, so the
-  // tab hint stands in for it: bump `pulseCount` whenever `inspect`, `snap`, or the Context
-  // subject (`filter`) changes reference, and RailDock replays a one-shot pulse on the dot. This
+  // Transient re-pulse — mirrors the desktop cards' own `useEdgePulse` edge sweep, which fires on
+  // a pane's subject changing (a new node/snapshot/metagraph picked). That sweep is invisible
+  // while the rail is collapsed, so the tab hint stands in for it: bump `pulseCount` whenever
+  // `inspect`, `snap`, or the Context subject (`filter`) changes reference, and RailDock replays
+  // a one-shot pulse on the dot. This
   // fires even when `hint` is already false (an already-seen card whose data just changed) — it
   // does NOT resurrect the persistent unseen dot, it's a separate transient animation.
   const [pulseCount, setPulseCount] = useState(0);

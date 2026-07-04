@@ -21,8 +21,10 @@
    CARD keeps its depth — box-shadow is one list, so overriding it would otherwise drop them. */
 .subject-paired {
   position: relative;
-  box-shadow: inset 0 0 0 1.5px color-mix(in oklch, var(--row-hue, var(--primary)) 62%, transparent),
-              inset 0 0 16px -5px color-mix(in oklch, var(--row-hue, var(--primary)) 58%, transparent),
+  /* SUPPORTING cue now (Task 12): the spine/edge is the primary pairing signal, so the inset
+     ring/glow wash is dialled DOWN to a subtler level (was 62%/58%). Row wash below is unchanged. */
+  box-shadow: inset 0 0 0 1px color-mix(in oklch, var(--row-hue, var(--primary)) 32%, transparent),
+              inset 0 0 14px -6px color-mix(in oklch, var(--row-hue, var(--primary)) 30%, transparent),
               inset 0 1px 0 rgba(255, 255, 255, 0.05), 0 8px 30px rgba(0, 0, 0, 0.35);
   transition: box-shadow 0.16s ease;
 }
@@ -34,6 +36,92 @@
   color: var(--foreground);
 }
 @media (prefers-reduced-motion: reduce) { .subject-paired { transition: none; } }
+
+/* ── Card signal system (Task 12 — EdgePulse.tsx + the card's scene-facing edge) ─────────────
+   THE MODEL (design evolution, agreed live): **thread = resting identity cue, card edge =
+   transient signal channel only.** Cards are SPINELESS AT REST everywhere (the ig-panel ::before
+   rests at opacity 0); the resting identity colour lives in the RAIL THREADS (RailThread — the
+   identity-hued spine + node dots, both rails, mirrored). A card's edge lights ONLY as a signal,
+   and every signal renders on the card's SCENE-FACING (inner) edge:
+     • left-rail cards  → their RIGHT edge  (`.sig-right`, an ::after element)
+     • right-rail cards → their LEFT  edge  (`.sig-left`, lighting the ig-panel ::before)
+   Three signals, replacing the old whole-card flash: a travelling edge PULSE on a subject change,
+   a steady-bright edge for the active SELECTION, and an edge brighten on hover PAIRING (the inset
+   wash above is the supporting cue). UNLAYERED on purpose (same layer-trap as .subject-paired
+   above) so these beat the `@layer components` `.ig-panel::before` + Tailwind utilities at equal
+   specificity. Colour is the card's OWN identity var — no new tokens: left-rail signals ride
+   `--spine`, right-rail signals ride `--filter-accent`/`--row-hue` (RIGHT_CARD keeps `--spine`
+   transparent). Keep this block CONTIGUOUS + the sheet-suppression rules LAST (equal-specificity
+   source-order beat). */
+
+/* Travelling pulse — a bright segment sweeps once DOWN the card's signal edge (~1.2s). The outer
+   `.edge-pulse` is the clip TRACK on the edge; the inner `> i` is the moving segment, keyed to
+   remount per pulse (EdgePulse.tsx). Geometry + weight are user-tuned live:
+   • The pulse runs on the card's SCENE-FACING (inner) edge — LEFT-rail cards pulse on their
+     RIGHT edge, RIGHT-rail cards on their LEFT — away from the screen edge, where it hid
+     against the rail margin. Rest-state spines/edges stay put; only the travelling pulse flips.
+   • It is THICKER than the spine (3px vs 2px), brighter, and a LONGER segment (~64px), with
+     gradient-faded tips (transparent→colour→transparent, like the rail masks) + a drop-shadow
+     glow (the ecg-scan idiom) so it reads clearly at a glance — no hard-capped ends. */
+.edge-pulse {
+  position: absolute; top: 8px; bottom: 8px; right: -1px;
+  width: 3px; overflow: hidden; pointer-events: none; z-index: 3;
+  --pulse-hue: var(--spine, var(--primary));
+}
+.edge-pulse--rail-right { right: auto; left: -1px; --pulse-hue: var(--filter-accent, var(--primary)); }
+.edge-pulse > i {
+  position: absolute; left: 0; right: 0; height: 64px; opacity: 0;
+  background: linear-gradient(to bottom,
+    transparent 0, var(--pulse-hue) 30%, var(--pulse-hue) 70%, transparent 100%);
+  filter: drop-shadow(0 0 6px var(--pulse-hue));
+  animation: edge-pulse-sweep 1.2s ease;
+}
+@keyframes edge-pulse-sweep {
+  0%   { top: -64px; opacity: 0; }
+  15%  { opacity: 1; }
+  85%  { opacity: 1; }
+  100% { top: 100%;  opacity: 0; }
+}
+@media (prefers-reduced-motion: reduce) { .edge-pulse > i { animation: none; opacity: 0; } }
+
+/* RIGHT-rail cards (`.sig-left`) — steady signals light the ig-panel ::before on the card's LEFT
+   (scene-facing) edge. RIGHT_CARD suppresses `--spine`, so signal colour comes from the rail's
+   `--filter-accent` (identity hue / cyan) or, while paired, the subject's own `--row-hue`. */
+.sig-left.card-selected::before {
+  opacity: 1;
+  background: var(--filter-accent, var(--primary));
+  box-shadow: 0 0 6px 0 var(--filter-accent, var(--primary));
+}
+.sig-left.subject-paired::before {
+  opacity: 1;
+  background: var(--row-hue, var(--filter-accent, var(--primary)));
+  box-shadow: 0 0 7px 0 var(--row-hue, var(--filter-accent, var(--primary)));
+}
+
+/* LEFT-rail cards (`.sig-right`) — steady signals on the card's RIGHT (scene-facing) edge, a
+   mirror of the ::before geometry. Rides the card's own `--spine` (identity-tinted). No left
+   card holds a selection today, so this is mostly the forward-compatible mirror + /design demo. */
+.sig-right::after {
+  content: ""; position: absolute; right: 0; top: 10px; bottom: 10px; width: 2px;
+  border-radius: 2px; opacity: 0; transition: opacity 0.16s ease; pointer-events: none;
+  background: var(--spine, var(--primary));
+}
+.sig-right.card-selected::after {
+  opacity: 1; box-shadow: 0 0 6px 0 var(--spine, var(--primary));
+}
+.sig-right.subject-paired::after {
+  opacity: 1;
+  background: var(--row-hue, var(--spine, var(--primary)));
+  box-shadow: 0 0 7px 0 var(--row-hue, var(--spine, var(--primary)));
+}
+
+/* Sheets (tablet/phone RailDock): the sheet's own `.ig-sheet-edge` spine is the single identity
+   cue, and every hosted pane is "selected" by construction — so the STEADY signal states are
+   suppressed inside sheets to keep them calm (resting spines are already 0 everywhere; this
+   resolves design-concern #5 outright). The transient edge PULSE still plays on the card.
+   MUST stay last: equal specificity vs the selected/paired rules above, so source order wins. */
+.sheet-cards .ig-panel::before,
+.sheet-cards .sig-right::after { opacity: 0; box-shadow: none; }
 
 /* ── Structural lane (chrome + status) — shadcn CSS variables in oklch ── */
 :root {
@@ -152,9 +240,11 @@
   .scene-canvas.scene-in { opacity: 1; }
 
   /* Left control rail (`#leftcol`, ExploreRail.tsx) — the explore/interact zone. Fixed
-     column under the shared rail-top/gap tokens; mirrors `#rightcol` below. */
+     column under the shared rail-top/gap tokens; mirrors `#rightcol` below. The 26px outer
+     margin matches the right rail's, making room for the mirrored identity RailThread
+     (design evolution, Task 12: both rails carry the identity thread). */
   #leftcol {
-    position: fixed; z-index: 10; top: var(--rail-top); left: 16px;
+    position: fixed; z-index: 10; top: var(--rail-top); left: 26px;
     width: var(--rail-w);
     display: flex; flex-direction: column; gap: var(--rail-gap);
     max-height: calc(100vh - var(--rail-top) - 14px);
@@ -361,7 +451,14 @@
     border-radius: 2px;
     /* structural cyan by default; identity panels set --spine: var(--mg) */
     background: var(--spine, var(--primary));
-    opacity: 0.8;
+    /* INVISIBLE AT REST (design evolution, Task 12): cards are spineless everywhere — the
+       resting identity cue is the RAIL THREADS (RailThread, both rails, mirrored), and the
+       card edge is a transient SIGNAL channel only (hover-pairing / selected / update pulse —
+       the unlayered "Card signal system" block near the top of this file). This ::before is
+       the LEFT-edge signal element right-rail cards light (`.sig-left`); left-rail cards
+       signal on their RIGHT edge (`.sig-right::after`). */
+    opacity: 0;
+    transition: opacity 0.16s ease;
   }
 }
 

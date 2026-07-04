@@ -8,7 +8,7 @@ import { subjectPairing } from "@/components/useSubjectPairing";
 import CardHead, { RIGHT_CARD } from "@/components/CardHead";
 import { Card } from "@/components/ui/card";
 import InspectorCard from "@/components/InspectorCard";
-import { useFlashOnChange } from "@/components/useFlashOnChange";
+import { PulseEdge, useEdgePulse } from "@/components/EdgePulse";
 import type { PickDescriptor } from "@/src/data/types";
 
 // The Context (parent) card at the top of the right-rail subject stack. It mirrors the
@@ -22,8 +22,11 @@ export default function ContextCard() {
   const metaList = useStore((s) => s.metaList);
   const hoverFilter = useStore((s) => s.hoverFilter);
   const setHoverFilter = useStore((s) => s.setHoverFilter);
-  const flashRef = useFlashOnChange(filter);
   const mgCfg = metagraphById(filter);
+  // Subject = the filter value itself ("all" or a metagraph id). The hook lives at the component
+  // top — NOT inside a branch — so a change ACROSS the dossier ⇄ "all" swap still pulses (the old
+  // whole-card flash keyed on `filter` the same way).
+  const pulseKey = useEdgePulse(filter);
 
   if (mgCfg) {
     const context: PickDescriptor = { kind: "meta", title: mgCfg.name, cfg: mgCfg };
@@ -32,11 +35,10 @@ export default function ContextCard() {
     // metagraph's hue, via the shared hoverFilter channel.
     const pair = subjectPairing<string>(hoverFilter, mgCfg.id, setHoverFilter, hex(mgCfg.color));
     return (
-      <Card asChild className={cn(RIGHT_CARD, pair.className)}>
+      <Card asChild className={cn(RIGHT_CARD, "sig-left card-selected", pair.className)}>
         <aside
           id="metapane"
           style={pair.style}
-          ref={flashRef}
           onMouseEnter={pair.onMouseEnter}
           onMouseLeave={pair.onMouseLeave}
         >
@@ -45,6 +47,10 @@ export default function ContextCard() {
             eyebrow={eyebrow}
             onClose={() => setFilter("all")}
           />
+          {/* Scene-facing (left) edge pulse on a new subject (metagraph picked) — synced with the
+              dossier title's own roll-in (MetaCard keys it on cfg.name; both fire on the filter
+              change). */}
+          <PulseEdge pulseKey={pulseKey} rail="right" />
         </aside>
       </Card>
     );
@@ -54,14 +60,16 @@ export default function ContextCard() {
   const cores = metaList.filter((m) => (m.located ?? 0) > 0).length;
   const nodes = metaList.reduce((s, m) => s + (m.located ?? 0), 0);
   return (
-    <Card asChild className={RIGHT_CARD}>
-      <aside ref={flashRef}>
+    <Card asChild className={cn(RIGHT_CARD, "sig-left")}>
+      <aside>
         <CardHead eyebrow="Context" />
         <h3 className="m-0">All · whole network</h3>
         <p className="m-0 text-[12.5px] leading-[1.5] text-muted-foreground">
           {cores} metagraph{cores === 1 ? "" : "s"} · {nodes.toLocaleString()} mapped nodes.
           Pick one from the filter to focus.
         </p>
+        {/* "all" is the rest state (no card-selected) — the pulse still marks the transition. */}
+        <PulseEdge pulseKey={pulseKey} rail="right" />
       </aside>
     </Card>
   );

@@ -11,12 +11,11 @@ import { filterAccent, CORE_HEX } from "@/src/data/network";
 // div (a sibling) — the rail clips horizontally + can gain an overflow-fade mask, either of which
 // would blank a child thread (see Inspector / ExploreRail).
 //
-// The two rails differ by design:
-//  • RIGHT — the full identity thread: neutral ruler + an identity-hued spine (cyan for "all") + a
-//    node-dot on each card. It carries the right rail's identity cue.
-//  • LEFT  — the neutral ruler ONLY (ticks pointing outward toward the screen edge). The left rail's
-//    identity cue is the original cyan spine attached to each card's edge (CSS, 12-panel-system.css),
-//    so the thread here adds just the hairline effect — no dot, no identity line.
+// BOTH rails carry the full identity thread, MIRRORED (design evolution, Task 12): neutral ruler +
+// an identity-hued spine (cyan for "all") + a node-dot on each card. The threads are the HUD's
+// RESTING identity cue — the cards themselves are spineless at rest (a card's edge is a transient
+// signal channel only; see the "Card signal system" block in globals.css). The left thread is the
+// exact x-mirror of the right one (x' = W − x), ticks pointing outward toward the screen edge.
 //
 // Ruler-hairline spec — mirrors the CSS `--thread-*` tokens (globals.css) so the SVG threads and the
 // bar-chart axis read identically. Kept as literals because an SVG stroke ATTRIBUTE can't resolve a
@@ -28,25 +27,23 @@ const TICK_MAJOR = "rgba(178,193,223,0.42)"; // every 4th — longer + brighter
 
 type Side = "left" | "right";
 
-// Concrete svg-x per side (x grows rightward within the svg). The right rail has a wider outer
-// margin (~26px) than the left (~16px), so the left thread is compact. `identity`/`dot`/`conn` are
-// null on the left (it's the neutral ruler only). Ticks step from `neut` OUTWARD toward the screen
-// edge — right: rightward to tickMaj/tickMin; left: leftward (smaller x, toward x≈0).
+// Concrete svg-x per side (x grows rightward within the svg). Both rails now sit in the same 26px
+// outer margin (globals.css #leftcol/#rightcol), so the left thread is the EXACT mirror of the
+// right (every x' = W − x): card edge → connector → identity spine + dots → neutral line → ticks
+// stepping outward toward the screen edge.
 const GEOM: Record<Side, {
   W: number; neut: number; tickMaj: number; tickMin: number;
-  identity: number | null; dot: number | null; conn: number | null;
+  identity: number; dot: number; conn: number;
 }> = {
   right: { W: 22, neut: 16, tickMaj: 22, tickMin: 20, identity: 9, dot: 9, conn: 1 },
-  // W=16 → card edge (the card's cyan CSS spine) is at svg x=16. Sit the neutral line snug beside it
-  // (~3px), then step the ticks outward toward the screen edge (major 6px → x=7, minor 4px → x=9).
-  left: { W: 16, neut: 13, tickMaj: 7, tickMin: 9, identity: null, dot: null, conn: null },
+  left:  { W: 22, neut: 6,  tickMaj: 0,  tickMin: 2,  identity: 13, dot: 13, conn: 21 },
 };
 
 export default function RailThread({ side = "right" }: { side?: Side }) {
   const filter = useStore((s) => s.filter);
   // Resolve to a real colour: filterAccent returns `var(--core)` for "all", but an SVG `stroke`
   // ATTRIBUTE doesn't resolve CSS custom properties — so the identity line + dots rendered invisible
-  // on "all". Fall back to the core hex for the var() case. (Only the right thread uses it.)
+  // on "all". Fall back to the core hex for the var() case.
   const rawAccent = filterAccent(filter);
   const accent = rawAccent.startsWith("var(") ? CORE_HEX : rawAccent;
   const [g, setG] = useState<{ top: number; left: number; height: number; dots: number[] } | null>(null);
@@ -127,20 +124,17 @@ export default function RailThread({ side = "right" }: { side?: Side }) {
       {ticks.map((y, i) => (
         <line key={i} x1={gm.neut} y1={y} x2={i % 4 === 0 ? gm.tickMaj : gm.tickMin} y2={y} stroke={i % 4 === 0 ? TICK_MAJOR : TICK_MINOR} strokeWidth={1} />
       ))}
-      {/* identity line + node-dots — RIGHT rail only (the left rail's identity is its card-edge CSS
-         spine). The line is the selection's hue; the dots ride it at each card's middle. */}
-      {gm.identity !== null && (
-        <line x1={gm.identity} y1={0} x2={gm.identity} y2={H} stroke={accent} strokeWidth={2} />
-      )}
-      {gm.dot !== null && g.dots.map((y, i) => (
+      {/* identity line + node-dots — BOTH rails, mirrored (the HUD's resting identity cue; cards
+         are spineless at rest). The line is the selection's hue; the dots ride it at each card's
+         middle, tethered to the card edge by the connector. */}
+      <line x1={gm.identity} y1={0} x2={gm.identity} y2={H} stroke={accent} strokeWidth={2} />
+      {g.dots.map((y, i) => (
         <g key={i}>
-          {gm.conn !== null && (
-            <line x1={gm.conn} y1={y} x2={gm.dot!} y2={y} stroke={accent} strokeWidth={1.25} opacity={0.7} />
-          )}
-          <circle cx={gm.dot!} cy={y} r={5} fill={accent} opacity={0.16} />
+          <line x1={gm.conn} y1={y} x2={gm.dot} y2={y} stroke={accent} strokeWidth={1.25} opacity={0.7} />
+          <circle cx={gm.dot} cy={y} r={5} fill={accent} opacity={0.16} />
           {/* dark ring punches the dot off the identity line. NB a real hex, not var(--panel): an SVG
              stroke ATTRIBUTE doesn't resolve CSS custom properties (same trap as the accent above). */}
-          <circle cx={gm.dot!} cy={y} r={3.4} fill={accent} stroke="#0c1020" strokeWidth={1.5} />
+          <circle cx={gm.dot} cy={y} r={3.4} fill={accent} stroke="#0c1020" strokeWidth={1.5} />
         </g>
       ))}
     </svg>
