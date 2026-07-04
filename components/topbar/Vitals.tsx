@@ -9,6 +9,7 @@ import Sparkline from "@/components/Sparkline";
 import Odometer from "@/components/Odometer";
 import { rolesOf } from "@/components/inspector/parts";
 import { useBreakpoint } from "@/components/useBreakpoint";
+import { cn } from "@/lib/utils";
 import type { NodeInfo } from "@/src/data/types";
 
 // Structural cyan for the live-activity sparklines (lane-correct: cyan = the live accent).
@@ -16,10 +17,15 @@ const CYAN = "#2af5ff";
 
 function Vital({ label, value, spark }: { label: string; value: React.ReactNode; spark?: number[] }) {
   return (
-    <div className="tb-vital">
-      <span className="tb-vital-k">{label}</span>
-      <span className="tb-vital-row">
-        <span className="tb-vital-v">{value}</span>
+    <div className="flex flex-col gap-0.5 flex-none">
+      <span className="text-[10px] tracking-[0.1em] uppercase text-muted-foreground whitespace-nowrap">{label}</span>
+      <span
+        className={cn(
+          "flex items-center gap-[7px]",
+          "max-[1020px]:gap-0 max-[1020px]:[&_.recharts-wrapper]:hidden",
+        )}
+      >
+        <span className="font-mono font-bold text-foreground tabular-nums whitespace-nowrap max-[1120px]:text-[13px]">{value}</span>
         {spark && <Sparkline data={spark} color={CYAN} />}
       </span>
     </div>
@@ -51,7 +57,7 @@ function HyperVitals() {
 
   // Filtered: an em-dash for a layer this metagraph doesn't run (stable 3 columns, no reflow).
   const cell = (n: number, runsLayer: boolean) =>
-    cfg && !runsLayer ? <span className="tb-vital-ph">—</span> : <Odometer value={n} />;
+    cfg && !runsLayer ? <span className="text-muted-foreground italic opacity-60">—</span> : <Odometer value={n} />;
 
   return (
     <>
@@ -76,7 +82,7 @@ function GeoVitals() {
     <>
       <Vital label="Nodes" value={<Odometer int value={total || null} />} />
       <Vital label="Countries" value={<Odometer int value={countries.length || null} />} />
-      <Vital label="Ready" value={<span className="tb-vital-score">{readyPct == null ? "—" : `${readyPct}%`}</span>} />
+      <Vital label="Ready" value={readyPct == null ? "—" : `${readyPct}%`} />
     </>
   );
 }
@@ -90,18 +96,30 @@ function LedgerVitals() {
     <>
       <Vital label="Snaps/hr" value={<Odometer value={activity?.snapsPerHour} />} spark={activity?.cadenceSeries} />
       <Vital label="Anchors/hr" value={<Odometer value={activity?.anchorsPerHour} />} spark={activity?.anchoredSeries} />
-      <Vital label="—" value={<span className="tb-vital-ph">soon</span>} />
+      <Vital label="—" value={<span className="text-muted-foreground italic opacity-60">soon</span>} />
     </>
   );
 }
 
-function VitalsCluster() {
+// `vertical` renders the stacked layout used inside the phone vitals popover; the default
+// (inline bar) layout is unchanged.
+function VitalsCluster({ vertical = false }: { vertical?: boolean } = {}) {
   const mode = useStore((s) => s.mode);
   const live = useStore((s) => s.live);
   const body =
     mode === "geo" ? <GeoVitals /> : mode === "ledger" ? <LedgerVitals /> : mode === "hyper" ? <HyperVitals /> : null;
   return (
-    <div className={"tb-vitals" + (live ? "" : " no-signal")}>
+    <div
+      className={cn(
+        vertical
+          ? "flex flex-col items-start gap-2"
+          : cn(
+              "flex items-center gap-3.5",
+              "max-[1260px]:gap-3 max-[1120px]:gap-2.5 max-[940px]:gap-2.5 max-[820px]:gap-2",
+            ),
+        !live && "no-signal",
+      )}
+    >
       {!live && <span className="ns-dot" />}
       {body}
     </div>
@@ -118,7 +136,12 @@ export const VitalsToggle = forwardRef<HTMLButtonElement, { open: boolean; onCli
       <button
         ref={ref}
         type="button"
-        className={"tb-vitals-toggle" + (open ? " active" : "")}
+        className={cn(
+          "flex items-center justify-center min-w-11 min-h-11 px-2.5 rounded-[8px]",
+          "bg-transparent border-0 text-muted-foreground cursor-pointer flex-none",
+          "hover:text-foreground hover:bg-[rgba(90,140,255,0.10)]",
+          open && "text-foreground bg-[rgba(90,140,255,0.10)]",
+        )}
         aria-expanded={open}
         aria-label="Toggle vitals"
         onClick={onClick}

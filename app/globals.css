@@ -9,7 +9,6 @@
 @import "./styles/11-responsive.css";
 @import "./styles/12-panel-system.css";
 @import "./styles/13-right-column.css";
-@import "./styles/14-top-bar.css";
 @import "./styles/15-states.css";
 @import "./styles/16-responsive-shell.css";
 @import "./styles/17-blueprint.css";
@@ -117,6 +116,30 @@
 }
 @media (prefers-reduced-motion: reduce) {
   .ecg-scan { animation: none; stroke-dasharray: none; opacity: 0.85; }
+}
+
+/* The command-bar filter dot pulses on the same 1.5s beat as the ECG mark — the two share the
+   network's heartbeat. Scale + opacity (colour-agnostic, so it works for any identity hue). */
+@keyframes dot-beat {
+  0%, 100% { transform: scale(1); opacity: 0.8; }
+  50%      { transform: scale(1.28); opacity: 1; }
+}
+@theme inline {
+  --animate-dot-beat: dot-beat 1.5s ease-in-out infinite;
+}
+
+/* ── Command-list scrollbar (top-bar filter picker) — the SAME slim custom scrollbar as the
+   rails (`#leftcol`/`#rightcol` in 00-base.css); the default chunky one clashed with the glass
+   popover. Scoped to a class (not the rails' ids) since `CommandList` is a reusable primitive. ── */
+@layer components {
+  .cmd-list-scroll {
+    scrollbar-width: thin; scrollbar-color: rgba(160, 175, 205, 0.28) transparent;
+    overscroll-behavior: contain;
+  }
+  .cmd-list-scroll::-webkit-scrollbar { width: 6px; }
+  .cmd-list-scroll::-webkit-scrollbar-track { background: transparent; }
+  .cmd-list-scroll::-webkit-scrollbar-thumb { background: rgba(160, 175, 205, 0.28); border-radius: 3px; }
+  .cmd-list-scroll:hover::-webkit-scrollbar-thumb { background: rgba(160, 175, 205, 0.45); }
 }
 
 /* ── Instrument-Glass surface — the shared panel frame + left accent spine ── */

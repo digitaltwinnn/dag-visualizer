@@ -2,6 +2,7 @@
 import { useMemo } from "react";
 import { useStore } from "@/src/store/store";
 import { hex } from "@/src/util/format";
+import { cn } from "@/lib/utils";
 import {
   Command, CommandInput, CommandList, CommandEmpty, CommandGroup, CommandItem,
 } from "@/components/ui/command";
@@ -34,22 +35,38 @@ export default function FilterPicker({ onPick }: { onPick?: () => void }) {
     onPick?.();
   };
 
+  // Shared row grid — one dot + name + (optional sub-label under the name) + a right-aligned
+  // count column. The committed pick gets a quiet left accent bar; a 0-located metagraph sinks
+  // visually via reduced opacity. Command's own `data-[selected=true]` hover/keyboard highlight
+  // is overridden to a faint neutral wash (the bright accent fill washed the row text out to
+  // unreadable).
+  const rowClass = (active: boolean, off: boolean) =>
+    cn(
+      "grid grid-cols-[auto_1fr_auto_auto] items-center gap-2.5",
+      "data-[selected=true]:bg-[rgba(255,255,255,0.05)] data-[selected=true]:text-foreground",
+      active && "shadow-[inset_2px_0_0_var(--sel-border)]",
+      off && "opacity-45",
+    );
+
   return (
-    <Command className="fp" onMouseLeave={() => setHoverFilter(null)}>
+    <Command
+      className="bg-transparent max-w-[360px] **:data-[slot=command-input-wrapper]:border-b-border"
+      onMouseLeave={() => setHoverFilter(null)}
+    >
       <CommandInput placeholder="Search metagraphs…" />
-      <CommandList>
+      <CommandList className="cmd-list-scroll max-h-[320px] overscroll-contain">
         <CommandEmpty>No metagraph found.</CommandEmpty>
         <CommandGroup>
           <CommandItem
             value="all whole network"
             onSelect={() => pick("all")}
-            className={filter === "all" ? "fp-row fp-active" : "fp-row"}
+            className={rowClass(filter === "all", false)}
             onMouseEnter={() => setHoverFilter("all")}
           >
-            <span className="fp-dot" style={{ background: "var(--primary)" }} />
-            <span className="fp-name">All</span>
-            <span className="fp-sub">whole network</span>
-            <span className="fp-count">{mappedCount} · {totalNodes} nodes</span>
+            <span className="w-2 h-2 rounded-full flex-none" style={{ background: "var(--primary)" }} />
+            <span className="text-[13px] text-foreground">All</span>
+            <span className="col-start-2 text-muted-foreground text-[11px]">whole network</span>
+            <span className="text-[11px] text-muted-foreground tabular-nums text-right">{mappedCount} · {totalNodes} nodes</span>
           </CommandItem>
         </CommandGroup>
         <CommandGroup>
@@ -61,15 +78,13 @@ export default function FilterPicker({ onPick }: { onPick?: () => void }) {
                 key={m.id}
                 value={`${m.name} ${m.symbol ?? ""} ${m.id}`}
                 onSelect={() => pick(m.id)}
-                className={
-                  "fp-row" + (filter === m.id ? " fp-active" : "") + (off ? " fp-off" : "")
-                }
+                className={rowClass(filter === m.id, off)}
                 onMouseEnter={() => setHoverFilter(m.id)}
               >
-                <span className="fp-dot" style={{ background: hue }} />
-                <span className="fp-name">{m.name}</span>
-                <span className="fp-ticker" style={{ color: hue }}>{m.symbol}</span>
-                <span className="fp-count">{off ? "0 · located" : m.located}</span>
+                <span className="w-2 h-2 rounded-full flex-none" style={{ background: hue }} />
+                <span className="text-[13px] text-foreground">{m.name}</span>
+                <span className="text-[11px] font-semibold tabular-nums" style={{ color: hue }}>{m.symbol}</span>
+                <span className="text-[11px] text-muted-foreground tabular-nums text-right">{off ? "0 · located" : m.located}</span>
               </CommandItem>
             );
           })}
