@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { cn } from "@/lib/utils";
 import { useStore } from "@/src/store/store";
 import { shortHash, CORE_HEX } from "@/src/data/network";
 import { identityHudHex } from "@/src/palette/identity";
@@ -13,7 +14,7 @@ import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Separator } from "@/components/ui/separator";
 import { SonarRing, NodeStars, NoSignalDot } from "@/components/state/StateAtoms";
 import { VIS } from "../../js/config.js";
-import { Desc, Row, StatusMark, CompositionRows, StatusBreakdown, nodeComposition } from "./parts";
+import { Desc, StatusMark, CompositionRows, StatusBreakdown, nodeComposition } from "./parts";
 
 type PickOf<K extends PickDescriptor["kind"]> = Extract<PickDescriptor, { kind: K }>;
 
@@ -67,21 +68,43 @@ function inspectedNode(inspect: ReturnType<typeof useStore.getState>["inspect"])
     : null;
 }
 
-// Node title: identity-hue dot + the node id (truncated hash, mono — styling rides inside the
-// title node; CardHead supplies the 15px/semibold standard). Self-keyed roll-in on a new id.
+// The node's resolved place ("City, Country") — "" when geolocation hasn't resolved.
+function nodePlace(node: NonNullable<ReturnType<typeof inspectedNode>>): string {
+  const g = node.geo;
+  return g ? `${g.city ? g.city + ", " : ""}${g.country ?? ""}`.trim() : "";
+}
+
+// Node title: identity-hue dot + the node's LOCATION ("City, Country" — user-agreed: where the
+// node sits is the headline; its hash is bookkeeping, demoted to the subtitle below). Fallback
+// when geolocation hasn't resolved: the truncated id (mono) stays the title, no subtitle. The
+// roll-in stays keyed on the node ID — the subject's identity, not the title text (a new node in
+// the same city still rolls).
 export function GeoLiveTitle() {
   const inspect = useStore((s) => s.inspect);
   const node = inspectedNode(inspect);
   if (!node) return null;
   const id = node.node?.id;
-  const title = id ? shortHash(id) : node.node?.ip || node.geo?.city || node.geo?.country || "Node";
+  const place = nodePlace(node);
+  const title = place || (id ? shortHash(id) : node.node?.ip || "Node");
   const color = node.kind === "metanode" ? (node.meta ? identityHudHex(node.meta.id) : undefined) : CORE_HEX;
   return (
     <span className="inline-flex items-center gap-2 min-w-0">
       {color && <span className="flex-none w-[9px] h-[9px] rounded-full" style={{ background: color }} />}
-      <span key={title} className="font-mono tabular-nums break-all min-w-0 roll-in">{title}</span>
+      <span key={id ?? title} className={cn("min-w-0 roll-in", !place && "font-mono tabular-nums break-all")}>{title}</span>
     </span>
   );
+}
+
+// Node subtitle: the truncated id — small/muted/mono, under the location title (CardHead's
+// `subtitle` slot supplies the standard block styling). Renders ONLY when the location made it
+// to the title; in the no-location fallback the id IS the title.
+export function GeoLiveSubtitle() {
+  const inspect = useStore((s) => s.inspect);
+  const node = inspectedNode(inspect);
+  if (!node) return null;
+  const id = node.node?.id;
+  if (!id || !nodePlace(node)) return null;
+  return <span className="font-mono tabular-nums">{shortHash(id)}</span>;
 }
 
 // Node title-row aside: the status pill.
@@ -256,22 +279,18 @@ export function GeoLiveCard() {
   return <GeoLiveNode p={node} />;
 }
 
-// The selected-node block. Identity-first: the node's ID + status pill are the card HEAD now
-// (GeoLiveTitle/GeoLiveAside above); the body carries the facts you can't see on the globe —
-// IP, composition, and where it sits. The slot eyebrow reads "Selected node"; the × is
-// CardHead's shared close (the outer pane).
+// The selected-node block. The node's LOCATION + id + status pill are all the card HEAD now
+// (GeoLiveTitle/GeoLiveSubtitle/GeoLiveAside above) — the old IP and "Location" body rows are
+// gone (the IP entirely, user-agreed; the location because it IS the title). The body is what
+// remains that the globe can't show: the node's layer composition. The slot eyebrow reads
+// "Selected node"; the × is CardHead's shared close (the outer pane).
 function GeoLiveNode({ p }: { p: PickOf<"l0" | "l1" | "metanode"> }) {
   // The single node's roles → a one-node composition row (shared vocabulary).
   const oneNode: NodeInfo[] = p.node ? [p.node] : [];
-  const g = p.geo;
-  const place = g ? `${g.city ? g.city + ", " : ""}${g.country ?? ""}`.trim() : "";
   // NB: the hover pairing (synced 3D glow) lives on the OUTER pane (Inspector.CardPane), not here,
   // so the glow lights the card's rounded edge.
   return (
     <>
-      {/* IP — the identity remainder (the id itself is the head title). */}
-      {p.node?.ip && <div className="text-[11px] text-muted-foreground tabular-nums">{p.node.ip}</div>}
-      <Separator className="my-2" />
       {/* Composition as a stacked label + block (NOT inside <Row>, whose value is a <span> —
           CompositionRows renders a <div>, so a Row would nest a block in an inline element). */}
       {oneNode.length > 0 && (
@@ -280,7 +299,6 @@ function GeoLiveNode({ p }: { p: PickOf<"l0" | "l1" | "metanode"> }) {
           <CompositionRows nodes={oneNode} />
         </div>
       )}
-      {place && <Row label="Location">{place}</Row>}
     </>
   );
 }

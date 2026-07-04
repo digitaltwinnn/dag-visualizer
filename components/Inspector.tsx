@@ -85,11 +85,14 @@ function CardPane({
 
 // A slim pick-invite for the empty Detail slot — one muted line + the cyan node-halo. NOT a card:
 // the right rail is the FACTS scope, so when nothing is selected it stays quiet (the view's own
-// "what is this for" orientation lives on the LEFT rail's tool card, not here). Placeholder views
-// have no invite → nothing shows.
+// "what is this for" orientation lives on the LEFT rail's tool card, not here). EVERY view with
+// pickable subjects gets one, view-specific wording — the map is an ALLOW-LIST mirroring the
+// engine's pick registry (`_pickablesFor`): hyper/geo/ledger raycast; the flat placeholder views
+// (status/transactions/staking) pick nothing → no entry → no hint.
 const INVITE: Partial<Record<Mode, string>> = {
+  hyper: "Click a hub or node in the hypergraph to inspect it.",
   geo: "Click a node on the globe (or a row in the explorer) to inspect it.",
-  ledger: "Click a snapshot in the bar-chart below to inspect it.",
+  ledger: "Click a snapshot block (or a bar in the strip below) to inspect it.",
 };
 function PickHint({ mode }: { mode: Mode }) {
   const line = INVITE[mode];

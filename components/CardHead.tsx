@@ -52,6 +52,7 @@ export default function CardHead({
   title,
   titleKey,
   aside,
+  subtitle,
   panel = false,
   caption,
   collapsed,
@@ -66,6 +67,10 @@ export default function CardHead({
   // Right-aligned companion on the TITLE row (the snapshot's live-dot / relative age, the node's
   // status pill) — the head's aside area, so bodies don't render their own title rows.
   aside?: ReactNode;
+  // A SUBTLE one-line subtitle under the title row, above the hairline (the slot owns the
+  // standard styling: small/muted/truncated — the node card's demoted id hash). Pass a bare node;
+  // a consumer component may render null (e.g. no-location fallback) and the empty block is inert.
+  subtitle?: ReactNode;
   panel?: boolean;
   caption?: ReactNode;
   collapsed?: boolean;
@@ -149,6 +154,11 @@ export default function CardHead({
             <h3 className={cn(TITLE, "text-foreground min-w-0")}>{rolled}</h3>
             {aside != null && <span className="ml-auto flex-none">{aside}</span>}
           </div>
+          {subtitle != null && (
+            <div className="mt-1 text-[11px] leading-none text-muted-foreground overflow-hidden text-ellipsis whitespace-nowrap">
+              {subtitle}
+            </div>
+          )}
           <div className="border-b border-border mt-2 mb-2.5" aria-hidden />
         </>
       )}

@@ -95,6 +95,7 @@ export interface NodeRow {
   id: string | null; // node ID when present (validators); null for id-less metagraph nodes
   cc: string | null;
   country: string | null;
+  city: string | null; // resolved city — the row's location-first primary (country = the group)
   state?: string | null;
   layer: string;
   roles: string[];

@@ -5,7 +5,8 @@ import type { PickDescriptor } from "@/src/data/types";
 import { useStore } from "@/src/store/store";
 import CardHead from "@/components/CardHead";
 import {
-  GeoLiveAside, GeoLiveCard, GeoLiveTitle, MetaCard, SnapshotAside, SnapshotCard, SnapshotTitle,
+  GeoLiveAside, GeoLiveCard, GeoLiveSubtitle, GeoLiveTitle,
+  MetaCard, SnapshotAside, SnapshotCard, SnapshotTitle,
 } from "@/components/inspector/cards";
 
 // Only three kinds ever reach the inspector frame now: a metagraph/core dossier (ContextCard),
@@ -20,15 +21,20 @@ function CardBody({ p }: { p: PickDescriptor }) {
   }
 }
 
-// The per-kind HEAD — the card's primary title (+ optional right-aligned aside) now renders in
-// CardHead's title slot (one head anatomy: eyebrow / title / inset hairline / body; Task 13
-// follow-up). The dossier name rolls via `titleKey`; the snapshot ordinal rolls via its own
-// Odometer; the node id self-keys its roll-in (both defined in inspector/cards.tsx).
-function headFor(p: PickDescriptor): { title?: ReactNode; titleKey?: string; aside?: ReactNode } {
+// The per-kind HEAD — the card's primary title (+ optional subtitle + right-aligned aside) now
+// renders in CardHead's title slot (one head anatomy: eyebrow / title / inset hairline / body;
+// Task 13 follow-up). The dossier name rolls via `titleKey`; the snapshot ordinal rolls via its
+// own Odometer; the node title self-keys its roll-in on the node ID (all defined in
+// inspector/cards.tsx). The node head is LOCATION-FIRST: place as the title, the demoted id hash
+// as the subtitle (GeoLiveSubtitle renders null in the no-location fallback, where the id stays
+// the title).
+function headFor(p: PickDescriptor): {
+  title?: ReactNode; titleKey?: string; subtitle?: ReactNode; aside?: ReactNode;
+} {
   switch (p.kind) {
     case "meta": return { title: p.cfg.name, titleKey: p.cfg.name };
     case "snapshot": return { title: <SnapshotTitle data={p.data} />, aside: <SnapshotAside data={p.data} /> };
-    case "geoLive": return { title: <GeoLiveTitle />, aside: <GeoLiveAside /> };
+    case "geoLive": return { title: <GeoLiveTitle />, subtitle: <GeoLiveSubtitle />, aside: <GeoLiveAside /> };
     default: return {};
   }
 }
@@ -58,6 +64,7 @@ export default function InspectorCard({
         eyebrow={eyebrow}
         title={head.title}
         titleKey={head.titleKey}
+        subtitle={head.subtitle}
         aside={head.aside}
         onClose={onClose}
         eyebrowMuted={eyebrowMuted}

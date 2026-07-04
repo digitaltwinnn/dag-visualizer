@@ -192,9 +192,25 @@ export default function GeoExplore() {
                               style={{ background: rowHue, color: rowHue }}
                               aria-hidden
                             />
-                            <span className={cn("flex-1 overflow-hidden text-ellipsis whitespace-nowrap tabular-nums text-[12px]", r.id && "font-mono")}>
-                              {r.id ? shortHash(r.id) : r.label}
-                            </span>
+                            {/* Location-first (matches the node CARD's title/subtitle pattern):
+                                the CITY is the row's primary (the country is the accordion group),
+                                with the truncated id as a subtle mono secondary — it stays visible
+                                so co-located nodes (same city) remain distinguishable. Fallback:
+                                no resolved city → the id (mono) is the primary, as before. */}
+                            {r.city ? (
+                              <span className="flex-1 min-w-0 flex items-baseline gap-1.5">
+                                <span className="flex-none text-[12px] whitespace-nowrap">{r.city}</span>
+                                {r.id && (
+                                  <span className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap font-mono tabular-nums text-[10px] text-muted-foreground">
+                                    {shortHash(r.id)}
+                                  </span>
+                                )}
+                              </span>
+                            ) : (
+                              <span className={cn("flex-1 overflow-hidden text-ellipsis whitespace-nowrap tabular-nums text-[12px]", r.id && "font-mono")}>
+                                {r.id ? shortHash(r.id) : r.label}
+                              </span>
+                            )}
                             <span className="ml-auto flex-none"><StatusMark state={r.state} /></span>
                           </button>
                         );

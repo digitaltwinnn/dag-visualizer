@@ -58,11 +58,13 @@ export default function RailThread({ side = "right" }: { side?: Side }) {
   const rawAccent = filterAccent(filter);
   const accent = rawAccent.startsWith("var(") ? CORE_HEX : rawAccent;
   const [g, setG] = useState<{ top: number; left: number; height: number; dots: number[] } | null>(null);
-  // View-switch signal: a mode change plays the SAME travelling-light language as the cards on
-  // BOTH threads — the shared `useEdgePulse` hook (once per switch, debounced, skips mount,
-  // reduced-motion → CSS static blink) driving the shared `.edge-pulse` recipe, overlaid on the
-  // identity spine (the recipe is HTML/CSS, so it rides a fixed wrapper rather than the SVG).
-  const pulseKey = useEdgePulse(mode);
+  // View-switch AND filter-change signal: either plays the SAME travelling-light language as the
+  // cards on BOTH threads — the shared `useEdgePulse` hook (once per change, debounced, skips
+  // mount, reduced-motion → CSS static blink) driving the shared `.edge-pulse` recipe, overlaid
+  // on the identity spine (the recipe is HTML/CSS, so it rides a fixed wrapper rather than the
+  // SVG). ONE combined subject key: a simultaneous mode+filter change is a single key change →
+  // one pulse (and the hook's PULSE_MS debounce keeps rapid back-to-back changes calm).
+  const pulseKey = useEdgePulse(`${mode}|${filter}`);
 
   const { W } = GEOM[side];
   const railId = side === "right" ? "rightcol" : "leftcol";
