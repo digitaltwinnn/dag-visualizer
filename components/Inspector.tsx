@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
+import { cn } from "@/lib/utils";
 import { useStore, type SelSlot } from "@/src/store/store";
 import { filterAccent, CORE_HEX } from "@/src/data/network";
 import { identityHudHex } from "@/src/palette/identity";
@@ -62,7 +63,7 @@ function CardPane({
 
   return (
     <aside
-      className={"panel rc-pane " + pair.className}
+      className={cn("panel rc-pane", pair.className)}
       style={pair.style}
       ref={ref}
       onMouseEnter={pair.onMouseEnter}

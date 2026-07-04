@@ -95,7 +95,11 @@ export default function RailThread({ side = "right" }: { side?: Side }) {
 
   return (
     <svg
-      className="fixed z-[11] pointer-events-none overflow-visible"
+      // `rail-thread` is a BARE MARKER class (no styling of its own anymore — the visuals are the
+      // utilities beside it): 16-responsive-shell.css's tablet/phone safety net
+      // (`#leftcol, #rightcol, .rail-thread { display: none !important; }`) still targets it to
+      // hide the fixed SVG below the desktop breakpoint. Keep it until Task 9 retires that file.
+      className="rail-thread fixed z-[11] pointer-events-none overflow-visible"
       width={W}
       height={H}
       style={{
