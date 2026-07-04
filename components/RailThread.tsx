@@ -61,7 +61,9 @@ export default function RailThread({ side = "right" }: { side?: Side }) {
     const measure = () => {
       raf = 0;
       const r = rail.getBoundingClientRect();
-      const cards = Array.from(rail.querySelectorAll<HTMLElement>(":scope > .panel"));
+      // Every rail card carries `.ig-panel` (the shared glass frame); the thread drops a dot at
+      // each one's middle. (Was `:scope > .panel` before the Card-frame swap retired 12-panel-system.)
+      const cards = Array.from(rail.querySelectorAll<HTMLElement>(":scope > .ig-panel"));
       const dots = cards
         .map((c) => { const cr = c.getBoundingClientRect(); return cr.top + cr.height / 2 - r.top; })
         .filter((y) => y >= 6 && y <= r.height - 6); // only dots inside the visible rail

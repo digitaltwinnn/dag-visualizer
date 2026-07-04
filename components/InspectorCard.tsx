@@ -1,6 +1,7 @@
 "use client";
 
 import type { PickDescriptor } from "@/src/data/types";
+import CardHead from "@/components/CardHead";
 import { GeoLiveCard, MetaCard, SnapshotCard } from "@/components/inspector/cards";
 
 // Only three kinds ever reach the inspector frame now: a metagraph/core dossier (ContextCard),
@@ -23,17 +24,19 @@ function CardBody({ p }: { p: PickDescriptor }) {
 export default function InspectorCard({
   p,
   eyebrow,
+  onClose,
+  closeTitle,
 }: {
   p: PickDescriptor;
   eyebrow?: string;
+  // When set, CardHead renders the card's absolute × (the node card opts out — it draws its own
+  // gel-clear ×). ContextCard passes "Clear selection"; a detail pane passes the default "Close".
+  onClose?: () => void;
+  closeTitle?: string;
 }) {
   return (
     <>
-      {eyebrow && (
-        <span className="block text-[8.5px] font-bold tracking-[0.1em] uppercase text-accent leading-none mb-2 pr-[22px]">
-          {eyebrow}
-        </span>
-      )}
+      <CardHead eyebrow={eyebrow} onClose={onClose} closeTitle={closeTitle} />
       <CardBody p={p} />
     </>
   );

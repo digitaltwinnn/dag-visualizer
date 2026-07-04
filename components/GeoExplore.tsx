@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import { cn } from "@/lib/utils";
 import { useStore } from "@/src/store/store";
-import PanelHead from "@/components/PanelHead";
+import CardHead from "@/components/CardHead";
 import { shortHash, CORE_HEX, metagraphById } from "@/src/data/network";
 import { identityHudHex } from "@/src/palette/identity";
 import { StatusMark } from "@/components/inspector/parts";
@@ -87,14 +87,18 @@ export default function GeoExplore() {
   const selLayer = sel ? (sel.kind === "metanode" ? sel.node?.layer ?? null : sel.kind) : null;
 
   return (
-    <aside id="geoexplore" className={"panel" + (collapsed ? " collapsed" : "")}>
-      <PanelHead
+    <aside
+      id="geoexplore"
+      className="ig-panel flex flex-col min-h-0 flex-[1_1_auto] [--spine:var(--filter-accent,var(--primary))]"
+    >
+      <CardHead
+        panel
         title="Nodes by country"
         eyebrow="Geography · explore"
         collapsed={collapsed}
         onToggle={() => setCollapsed((c) => !c)}
       />
-      <div className="geo-body panel-body">
+      <div className={cn("flex flex-col min-h-0 flex-[1_1_auto]", collapsed && "hidden")}>
         {/* The footprint's headline figures (Nodes / Countries / Ready) live in the top-bar
             vitals now; this card is purely the country→nodes accordion. */}
         {quietEmpty ? (
@@ -105,39 +109,48 @@ export default function GeoExplore() {
             <button className="geo-qe-jump" onClick={() => setMode("hyper")}>See it in the Hypergraph →</button>
           </div>
         ) : (
-        <div className="geo-list">
+        <div className="flex-[1_1_auto] min-h-0 overflow-y-auto pt-1.5 px-[14px] pb-2 cmd-list-scroll">
           {rows.map((c) => {
             const open = c.cc === country;
             const nodes = nodesByCountry.get(c.country) ?? [];
             return (
-              <div key={c.cc} className={"geo-c" + (open ? " open" : "")}>
+              <div key={c.cc} className={cn(open && "bg-[rgba(90,140,255,0.05)] rounded-[8px] my-0.5")}>
                 <button
                   type="button"
-                  className={"lb-row lb-row--btn geo-c-row" + (open ? " active" : "")}
+                  className={cn(
+                    "flex items-center gap-2.5 w-full text-left text-[12px] border-none bg-transparent cursor-pointer py-[5px] px-1.5 -mx-1.5 rounded-[6px] transition-[background] duration-150",
+                    "hover:bg-[rgba(90,140,255,0.12)]",
+                    "focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--core)] focus-visible:outline-offset-[-2px]",
+                    open && "bg-[var(--sel-bg)]",
+                  )}
                   aria-expanded={open}
                   onClick={() => drill(c.cc)}
                 >
-                  <span className="lb-flag">{ccToFlag(c.cc)}</span>
-                  <span className="lb-name" title={c.country}>
+                  <span className="text-[11.5px] w-[17px] text-center flex-none">{ccToFlag(c.cc)}</span>
+                  <span className="flex-none w-24 text-[12px] text-[#c7d0ea] whitespace-nowrap overflow-hidden text-ellipsis" title={c.country}>
                     {c.country}
                   </span>
-                  <span className="lb-bar">
+                  <span className="flex-1 h-[7px] rounded-[4px] bg-white/[0.06] overflow-hidden">
                     <span
+                      className="block h-full rounded-[4px]"
                       style={{
                         width: `${Math.round((c.count / max) * 100)}%`,
-                        ...(barHue ? { ["--lb-bar-fill" as string]: barHue } : {}),
+                        background: barHue ?? "linear-gradient(90deg, var(--l0), var(--core))",
+                        boxShadow: `0 0 6px color-mix(in oklch, ${barHue ?? "var(--core)"} 40%, transparent)`,
                       }}
                     />
                   </span>
-                  <span className="lb-count">{c.count}</span>
-                  <span className="geo-c-caret">{open ? "▾" : "▸"}</span>
+                  <span className="flex-none w-[26px] text-right text-[12px] tabular-nums font-semibold">{c.count}</span>
+                  <span className={cn("flex-none w-3 text-center text-[9px]", open ? "text-foreground" : "text-muted-foreground")}>
+                    {open ? "▾" : "▸"}
+                  </span>
                 </button>
 
                 {open && (
                   // Leaving the node list clears the globe hover-glow.
-                  <div className="geo-c-nodes" onMouseLeave={() => setHoverNodeId(null)}>
+                  <div className="mb-1.5 ml-[9px] py-0.5 pl-3 border-l border-border" onMouseLeave={() => setHoverNodeId(null)}>
                     {nodes.length === 0 ? (
-                      <p className="geo-c-empty">No locatable nodes here yet.</p>
+                      <p className="mt-1 mx-1 mb-1.5 text-[11px] text-muted-foreground">No locatable nodes here yet.</p>
                     ) : (
                       nodes.map((r, i) => {
                         const on =
@@ -183,7 +196,7 @@ export default function GeoExplore() {
         </div>
         )}
 
-        {!quietEmpty && <div className="lb-foot">Click a country to drill in.</div>}
+        {!quietEmpty && <div className="pt-[10px] px-4 pb-3 text-[11px] text-muted-foreground">Click a country to drill in.</div>}
       </div>
     </aside>
   );

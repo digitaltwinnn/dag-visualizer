@@ -8,6 +8,7 @@ import { identityHudHex } from "@/src/palette/identity";
 import { hoverKeyOf } from "@/src/data/hoverSubject";
 import { subjectPairing } from "@/components/useSubjectPairing";
 import { breadcrumbLabel } from "@/src/data/breadcrumb";
+import { RIGHT_CARD } from "@/components/CardHead";
 import InspectorCard from "@/components/InspectorCard";
 import ContextCard from "@/components/ContextCard";
 import RailThread from "@/components/RailThread";
@@ -63,23 +64,16 @@ function CardPane({
 
   return (
     <aside
-      className={cn("panel", pair.className)}
+      className={cn(RIGHT_CARD, pair.className)}
       style={pair.style}
       ref={ref}
       onMouseEnter={pair.onMouseEnter}
       onMouseLeave={pair.onMouseLeave}
     >
-      {!ownClose && (
-        <button
-          title="Close"
-          onClick={onClose}
-          className="absolute top-[10px] right-[10px] bg-transparent border-none text-muted-foreground text-[22px] leading-none cursor-pointer py-0.5 px-2"
-        >
-          ×
-        </button>
-      )}
       <div className="rc-content">
-        <InspectorCard p={pick} eyebrow={eyebrow} />
+        {/* The node/geoLive card renders its own gel-clear × (ownClose) — otherwise CardHead
+            draws the card's absolute Close ×. */}
+        <InspectorCard p={pick} eyebrow={eyebrow} onClose={ownClose ? undefined : onClose} />
       </div>
     </aside>
   );

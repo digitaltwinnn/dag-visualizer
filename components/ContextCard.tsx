@@ -5,6 +5,7 @@ import { useStore } from "@/src/store/store";
 import { metagraphById } from "@/src/data/network";
 import { hex } from "@/src/util/format";
 import { subjectPairing } from "@/components/useSubjectPairing";
+import CardHead, { RIGHT_CARD } from "@/components/CardHead";
 import InspectorCard from "@/components/InspectorCard";
 import { useFlashOnChange } from "@/components/useFlashOnChange";
 import type { PickDescriptor } from "@/src/data/types";
@@ -32,21 +33,19 @@ export default function ContextCard() {
     return (
       <aside
         id="metapane"
-        className={cn("panel", pair.className)}
+        className={cn(RIGHT_CARD, pair.className)}
         style={pair.style}
         ref={flashRef}
         onMouseEnter={pair.onMouseEnter}
         onMouseLeave={pair.onMouseLeave}
       >
-        <button
-          title="Clear selection"
-          onClick={() => setFilter("all")}
-          className="absolute top-[10px] right-[10px] bg-transparent border-none text-muted-foreground text-[22px] leading-none cursor-pointer py-0.5 px-2"
-        >
-          ×
-        </button>
         <div>
-          <InspectorCard p={context} eyebrow={eyebrow} />
+          <InspectorCard
+            p={context}
+            eyebrow={eyebrow}
+            onClose={() => setFilter("all")}
+            closeTitle="Clear selection"
+          />
         </div>
       </aside>
     );
@@ -56,11 +55,9 @@ export default function ContextCard() {
   const cores = metaList.filter((m) => (m.located ?? 0) > 0).length;
   const nodes = metaList.reduce((s, m) => s + (m.located ?? 0), 0);
   return (
-    <aside className="panel" ref={flashRef}>
+    <aside className={RIGHT_CARD} ref={flashRef}>
       <div className="py-[var(--panel-pad-y)] px-[var(--panel-pad-x)]">
-        <span className="block text-[8.5px] font-bold tracking-[0.1em] uppercase text-accent leading-none mb-2 pr-[22px]">
-          Context
-        </span>
+        <CardHead eyebrow="Context" />
         <h3 className="m-0">All · whole network</h3>
         <p className="m-0 text-[12.5px] leading-[1.5] text-muted-foreground">
           {cores} metagraph{cores === 1 ? "" : "s"} · {nodes.toLocaleString()} mapped nodes.
