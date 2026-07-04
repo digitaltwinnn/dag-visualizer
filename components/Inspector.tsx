@@ -69,7 +69,11 @@ function CardPane({
       onMouseLeave={pair.onMouseLeave}
     >
       {!ownClose && (
-        <button className="rc-close" title="Close" onClick={onClose}>
+        <button
+          title="Close"
+          onClick={onClose}
+          className="absolute top-[10px] right-[10px] bg-transparent border-none text-muted-foreground text-[22px] leading-none cursor-pointer py-0.5 px-2"
+        >
           ×
         </button>
       )}
@@ -92,7 +96,9 @@ function PickHint({ mode }: { mode: Mode }) {
   const line = INVITE[mode];
   if (!line) return null;
   return (
-    <p className="rc-pickhint"><StandbyHalo /> {line}</p>
+    <p className="flex items-center gap-2 mt-[2px] mx-1 mb-0 py-0 px-[var(--panel-pad-x)] text-[12px] text-muted-foreground">
+      <StandbyHalo /> {line}
+    </p>
   );
 }
 

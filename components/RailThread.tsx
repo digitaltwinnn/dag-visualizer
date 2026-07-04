@@ -95,10 +95,21 @@ export default function RailThread({ side = "right" }: { side?: Side }) {
 
   return (
     <svg
-      className="rail-thread"
+      className="fixed z-[11] pointer-events-none overflow-visible"
       width={W}
       height={H}
-      style={{ top: g.top, left: g.left }}
+      style={{
+        top: g.top,
+        left: g.left,
+        // Fades the thread top/bottom so it reads as an instrument rail, not a hard bar
+        // (was `.rail-thread`, 13-right-column.css). Kept as inline style, not a Tailwind
+        // arbitrary property, since the vendor-prefixed property name doesn't round-trip
+        // cleanly through the utility-class syntax.
+        WebkitMaskImage:
+          "linear-gradient(to bottom, transparent 0, #000 7%, #000 93%, transparent 100%)",
+        maskImage:
+          "linear-gradient(to bottom, transparent 0, #000 7%, #000 93%, transparent 100%)",
+      }}
       aria-hidden
       focusable="false"
     >

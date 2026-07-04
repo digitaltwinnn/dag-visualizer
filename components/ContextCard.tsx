@@ -1,5 +1,6 @@
 "use client";
 
+import { cn } from "@/lib/utils";
 import { useStore } from "@/src/store/store";
 import { metagraphById } from "@/src/data/network";
 import { hex } from "@/src/util/format";
@@ -31,16 +32,20 @@ export default function ContextCard() {
     return (
       <aside
         id="metapane"
-        className={"panel rc-context " + pair.className}
+        className={cn("panel", pair.className)}
         style={pair.style}
         ref={flashRef}
         onMouseEnter={pair.onMouseEnter}
         onMouseLeave={pair.onMouseLeave}
       >
-        <button id="metapane-close" title="Clear selection" onClick={() => setFilter("all")}>
+        <button
+          title="Clear selection"
+          onClick={() => setFilter("all")}
+          className="absolute top-[10px] right-[10px] bg-transparent border-none text-muted-foreground text-[22px] leading-none cursor-pointer py-0.5 px-2"
+        >
           ×
         </button>
-        <div id="metapane-content">
+        <div>
           <InspectorCard p={context} eyebrow={eyebrow} />
         </div>
       </aside>
@@ -51,11 +56,13 @@ export default function ContextCard() {
   const cores = metaList.filter((m) => (m.located ?? 0) > 0).length;
   const nodes = metaList.reduce((s, m) => s + (m.located ?? 0), 0);
   return (
-    <aside className="panel rc-context rc-context--all" ref={flashRef}>
-      <div id="metapane-content">
-        <span className="insp-eyebrow">Context</span>
-        <h3 className="insp-title">All · whole network</h3>
-        <p className="rc-empty-text">
+    <aside className="panel" ref={flashRef}>
+      <div className="py-[var(--panel-pad-y)] px-[var(--panel-pad-x)]">
+        <span className="block text-[8.5px] font-bold tracking-[0.1em] uppercase text-accent leading-none mb-2 pr-[22px]">
+          Context
+        </span>
+        <h3 className="m-0">All · whole network</h3>
+        <p className="m-0 text-[12.5px] leading-[1.5] text-muted-foreground">
           {cores} metagraph{cores === 1 ? "" : "s"} · {nodes.toLocaleString()} mapped nodes.
           Pick one from the filter to focus.
         </p>
