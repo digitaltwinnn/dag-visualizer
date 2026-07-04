@@ -28,7 +28,7 @@ function ensure(ordinal: number | null | undefined) {
     .finally(() => inflight.delete(ordinal));
 }
 
-export default function SnapshotExactBridge() {
+export default function RawSnapshotBridge() {
   const liveOrd = useStore((s) => s.latestSnapshot?.ordinal ?? null);
   const selOrd = useStore((s) => s.snap?.data.ordinal ?? null);
   useEffect(() => ensure(liveOrd), [liveOrd]);

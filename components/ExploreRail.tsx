@@ -71,7 +71,7 @@ const ABOUT: Record<Mode, { title: string; eyebrow: string; lines: string[]; cap
 // Every view now leads with a collapsed `AboutView` orientation card, above its ONE tool card
 // (if any): Geography → GeoExplore (footprint + node browser); Snapshots → LedgerPanel;
 // Hypergraph and the scaffolded views have no tool card, just the About card.
-export default function LeftColumn() {
+export default function ExploreRail() {
   const bp = useBreakpoint();
   const mode = useStore((s) => s.mode);
   const filter = useStore((s) => s.filter);

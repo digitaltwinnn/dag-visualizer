@@ -9,7 +9,7 @@ import { filterAccent, CORE_HEX } from "@/src/data/network";
 // so it tracks the cards as they're added, grow, or the rail scrolls; fades top+bottom (CSS mask);
 // purely decorative (pointer-events: none — see the no-effect-bleed rule). Must live OUTSIDE the rail
 // div (a sibling) — the rail clips horizontally + can gain an overflow-fade mask, either of which
-// would blank a child thread (see Inspector / LeftColumn).
+// would blank a child thread (see Inspector / ExploreRail).
 //
 // The two rails differ by design:
 //  • RIGHT — the full identity thread: neutral ruler + an identity-hued spine (cyan for "all") + a

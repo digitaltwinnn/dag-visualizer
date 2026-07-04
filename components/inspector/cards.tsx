@@ -20,7 +20,7 @@ type PickOf<K extends PickDescriptor["kind"]> = Extract<PickDescriptor, { kind: 
 // A clicked Global L0 snapshot: its place in the DAG (◆ type-marker + odometer ordinal + live/age
 // state), what it anchored, and what it settled (fees/size/rewards).
 export function SnapshotCard({ data: d }: { data: GlobalSnapshot }) {
-  // EXACT totals from the raw L0 snapshot (via SnapshotExactBridge) are the ONLY source for the fee
+  // EXACT totals from the raw L0 snapshot (via RawSnapshotBridge) are the ONLY source for the fee
   // + anchored breakdown — authoritative (the true total, incl. unlisted). If they aren't here yet
   // the tick is simply "reading…" (ACQUIRING); there is no polled-floor fallback. Every selectable
   // tick is inside the L0 node's retention window, so exact always resolves.

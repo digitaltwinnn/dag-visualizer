@@ -77,7 +77,7 @@ interface AppState {
   // The active selection's nodes, for the geo node browser (engine-pushed; [] off geo).
   selNodes: NodeRow[];
   // EXACT per-snapshot totals (fee + listed/unlisted), keyed by ordinal — populated by
-  // SnapshotExactBridge from /api/snapshot/[ordinal] for the live + selected ticks, so ANY view
+  // RawSnapshotBridge from /api/snapshot/[ordinal] for the live + selected ticks, so ANY view
   // can read final fees without the polling floor. Missing key = not fetched / unavailable (pruned).
   snapshotExact: Record<number, SnapshotExact>;
 
@@ -87,7 +87,7 @@ interface AppState {
   // Shared network filter ("all" | "dag" | <metagraph id>) — one unified core model, no
   // separate L0/L1 filters (the DAG is just another metagraph-shaped core).
   filter: string;
-  // PHONE ONLY: which bottom sheet (if any) is open — "explore" (LeftColumn) or "details"
+  // PHONE ONLY: which bottom sheet (if any) is open — "explore" (ExploreRail) or "details"
   // (Inspector), or null when both are closed. Phone has no room to stack two bottom sheets
   // (unlike tablet's two independent side sheets), so this is the single source of truth both
   // docks read `open` from: a dock is open iff `phoneDock === its own id`, and opening one

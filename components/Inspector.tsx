@@ -258,7 +258,7 @@ export default function Inspector() {
   }
 
   // Phone: the RIGHT half of the persistent bottom bar, mutually exclusive with the "Explore"
-  // dock via the shared `store.phoneDock` field (see LeftColumn) — never auto-opened by a pick
+  // dock via the shared `store.phoneDock` field (see ExploreRail) — never auto-opened by a pick
   // (only the hint dot reacts to `hint`/`pulseCount`; `open` is 100% derived from `phoneDock`,
   // which only a tap (here), a toggle-collapse, or a dismiss (handleDismiss, below) ever writes).
   return (

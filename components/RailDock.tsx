@@ -8,7 +8,7 @@ const PULSE_MS = 900;
 
 // Tablet/phone edge dock for a rail's content: a slim fixed edge tab (`‹`/`›`) that opens the
 // SAME content the desktop inline rail shows, inside a Sheet overlay (full-width scene stays
-// behind it). Desktop never renders this — `LeftColumn`/`Inspector` branch on `useBreakpoint()`
+// behind it). Desktop never renders this — `ExploreRail`/`Inspector` branch on `useBreakpoint()`
 // and keep the inline `#leftcol`/`#rightcol` path unchanged there.
 //
 // The Sheet primitive has no built-in close affordance, so this adds a dedicated **header row**
@@ -41,10 +41,10 @@ const PULSE_MS = 900;
 // sheet up from the bottom. Defaults to `side`.
 //
 // `trigger`: the tap affordance that opens the sheet. Defaults to `"edge-tab"` (the slim `‹`/`›`
-// tab on tablet). `"bottom-bar-half"` (phone only — see LeftColumn/Inspector) renders HALF of a
+// tab on tablet). `"bottom-bar-half"` (phone only — see ExploreRail/Inspector) renders HALF of a
 // single PERSISTENT full-width bar docked at the very bottom of the viewport instead: this dock's
 // icon + label, occupying the left or right 50% (`.phone-dock-half--{side}`). The two halves come
-// from the two separate RailDock instances (LeftColumn's Explore + Inspector's Details) but are
+// from the two separate RailDock instances (ExploreRail's Explore + Inspector's Details) but are
 // styled to align pixel-perfect into one seamless strip. Same hint/pulse dot, so this stays the
 // ONE place that owns that animation logic rather than forking it per breakpoint.
 //

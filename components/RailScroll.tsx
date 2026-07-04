@@ -7,7 +7,7 @@ import { useEffect } from "react";
 // drag to scroll the cards up/down. A small movement threshold keeps ordinary clicks working, and
 // interactive targets (buttons, links, node rows) never start a drag.
 //
-// `#leftcol`/`#rightcol` only exist in the DESKTOP breakpoint (`LeftColumn`/`Inspector` render
+// `#leftcol`/`#rightcol` only exist in the DESKTOP breakpoint (`ExploreRail`/`Inspector` render
 // `RailDock` instead below ~1100px) — so crossing the tablet/desktop boundary during a session
 // unmounts and later REMOUNTS them as brand-new DOM nodes. This component itself is mounted once,
 // unconditionally, for the app's whole lifetime (`page.tsx`), so a one-shot `getElementById` +

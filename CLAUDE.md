@@ -26,7 +26,7 @@ engine hides the canvas — `mode !== "hyper" && mode !== "geo" && mode !== "led
   See *The Snapshots (ledger) view* below and the `dag-ledger-view-plan` memory.
 - **Network status** (`status`), **Transactions** (`transactions`), **Delegated staking**
   (`staking`) — **scaffolded placeholders** (a `PlaceholderPanel` "SOON" card in the left rail;
-  content map in `LeftColumn.tsx`). The 3D scene and vitals are empty for these; the bottom
+  content map in `ExploreRail.tsx`). The 3D scene and vitals are empty for these; the bottom
   stream (`LiveStrip`) is ALWAYS present regardless of view — see below. See the
   `dag-view-scaffold` memory for each placeholder's intent. Top-bar view glyphs
   are all plain monochrome symbols — **never emoji** (emoji ignore CSS `color` / the accent).
@@ -114,7 +114,7 @@ Zustand store. **Two data lanes:** (A) high-freq visuals subscribe straight to
 - **`components/`** — React panels, each reads/writes the store: `SceneCanvas` (mounts
   the engine, dynamic-imported, `ssr:false`), `TopBar` (the full-width top command bar:
   status + filter + view switch + view vitals — see *Layout system*; `components/topbar/`
-  holds `Vitals`, `FilterChips`, the shared `useMetaActivity` hook), `LeftColumn` (the
+  holds `Vitals`, `FilterChips`, the shared `useMetaActivity` hook), `ExploreRail` (the
   explore rail: `ContextPanel` — the selected metagraph/cluster dossier pinned at the top —
   above one view tool card: `LearnPanel` / `GeoExplore` / `LedgerPanel`), `Inspector` (the
   right **facts** rail: the view's signature detail card, via `InspectorCard` — a thin frame
@@ -518,7 +518,7 @@ lifecycle, and our inferred breakdown lags it:
 snapshot's `stateChannelSnapshots` carry every anchored metagraph snapshot with its own
 `value.fee` + `value.content`, so the **exact** fee, data size, per-metagraph breakdown (incl.
 unlisted) and state-record count are final the instant the snapshot exists. We fetch it server-side
-(heavy, ~2.5 MB) via **`/api/snapshot/[ordinal]`** (cached per ordinal), `SnapshotExactBridge` keeps
+(heavy, ~2.5 MB) via **`/api/snapshot/[ordinal]`** (cached per ordinal), `RawSnapshotBridge` keeps
 the **live + selected** tick's `SnapshotExact` in the store, and the card prefers it — no settling,
 no floor. The **live card never falls back to the polled floor**: while exact is in flight it shows
 a brief "reading…" (`awaiting`); only **old/pruned** ticks (the L0 node retains ~30 min) fall back
@@ -590,7 +590,7 @@ browser can't fetch them — but the **Next Node server can**. So instead of bak
   per-metagraph breakdown incl. unlisted). **Cached per ordinal** (`unstable_cache`, immutable —
   one fetch shared across clients; throws on a miss so a not-yet/pruned tick retries). Only recent
   ticks resolve (the L0 node prunes after ~30 min) → 404 → client keeps the polled floor.
-  `SnapshotExactBridge` calls it for the live + selected tick; cost stays trivial because it's
+  `RawSnapshotBridge` calls it for the live + selected tick; cost stays trivial because it's
   per-ordinal cached and only the focused tick is fetched — **never** the whole chain or a poll
   loop (that's what would make it expensive on Vercel).
 - The client (`Engine`) fetches `/api/metagraphs` on mount **and re-pulls every 10 min**
