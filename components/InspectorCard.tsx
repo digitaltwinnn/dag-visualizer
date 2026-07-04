@@ -1,9 +1,12 @@
 "use client";
 
+import type { ReactNode } from "react";
 import type { PickDescriptor } from "@/src/data/types";
 import { useStore } from "@/src/store/store";
 import CardHead from "@/components/CardHead";
-import { GeoLiveCard, MetaCard, SnapshotCard } from "@/components/inspector/cards";
+import {
+  GeoLiveAside, GeoLiveCard, GeoLiveTitle, MetaCard, SnapshotAside, SnapshotCard, SnapshotTitle,
+} from "@/components/inspector/cards";
 
 // Only three kinds ever reach the inspector frame now: a metagraph/core dossier (ContextCard),
 // a clicked snapshot (ledger), and the selected-node card (geo/hyper, via the `geoLive` proxy
@@ -17,11 +20,22 @@ function CardBody({ p }: { p: PickDescriptor }) {
   }
 }
 
-// The shared inspector/context card — the React port of ui.js _cardHTML. It renders just the
-// blue **eyebrow = the card's purpose** (its role in this view), then dispatches to the per-kind
-// body. Every body owns its OWN subject header (the snapshot's ◆ ordinal, the dossier's logo +
-// name, the node's id row), so the frame renders no title of its own — a frame title on top of a
-// body header read as a duplicate header (2× "DAG" on the dossier).
+// The per-kind HEAD — the card's primary title (+ optional right-aligned aside) now renders in
+// CardHead's title slot (one head anatomy: eyebrow / title / inset hairline / body; Task 13
+// follow-up). The dossier name rolls via `titleKey`; the snapshot ordinal rolls via its own
+// Odometer; the node id self-keys its roll-in (both defined in inspector/cards.tsx).
+function headFor(p: PickDescriptor): { title?: ReactNode; titleKey?: string; aside?: ReactNode } {
+  switch (p.kind) {
+    case "meta": return { title: p.cfg.name, titleKey: p.cfg.name };
+    case "snapshot": return { title: <SnapshotTitle data={p.data} />, aside: <SnapshotAside data={p.data} /> };
+    case "geoLive": return { title: <GeoLiveTitle />, aside: <GeoLiveAside /> };
+    default: return {};
+  }
+}
+
+// The shared inspector/context card — the React port of ui.js _cardHTML. It renders the blue
+// **eyebrow = the card's purpose**, the subject TITLE (via CardHead's title slot — bodies render
+// no title rows of their own), the inset head hairline, then dispatches to the per-kind body.
 export default function InspectorCard({
   p,
   eyebrow,
@@ -37,9 +51,17 @@ export default function InspectorCard({
   // and the frame's eyebrow dims along with it (carried forward from `.no-signal .insp-eyebrow`).
   const live = useStore((s) => s.live);
   const eyebrowMuted = p.kind === "snapshot" && !live;
+  const head = headFor(p);
   return (
     <>
-      <CardHead eyebrow={eyebrow} onClose={onClose} eyebrowMuted={eyebrowMuted} />
+      <CardHead
+        eyebrow={eyebrow}
+        title={head.title}
+        titleKey={head.titleKey}
+        aside={head.aside}
+        onClose={onClose}
+        eyebrowMuted={eyebrowMuted}
+      />
       <CardBody p={p} />
     </>
   );

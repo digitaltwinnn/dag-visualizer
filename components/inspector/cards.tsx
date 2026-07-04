@@ -17,24 +17,93 @@ import { Desc, Row, StatusMark, CompositionRows, StatusBreakdown, nodeCompositio
 
 type PickOf<K extends PickDescriptor["kind"]> = Extract<PickDescriptor, { kind: K }>;
 
-// A clicked Global L0 snapshot: its place in the DAG (◆ type-marker + odometer ordinal + live/age
-// state), what it anchored, and what it settled (fees/size/rewards).
+// ── Card-head pieces (unified head anatomy, Task 13 follow-up) ──────────────────────────────
+// Every inspector card's primary TITLE now renders in CardHead's title slot (one standard:
+// 15px / semibold), with the bits that used to ride the body title rows in the head's ASIDE
+// area. These exports are what InspectorCard feeds CardHead per kind; the bodies below render
+// NO title rows of their own.
+
+// Snapshot title: ◆ type-marker (cyan = a GLOBAL snapshot) + the ordinal. The Odometer owns the
+// roll (digit-roll on each live tick), so no CardHead `titleKey` — a keyed remount would restart
+// it as a whole-title roll-in instead.
+export function SnapshotTitle({ data: d }: { data: GlobalSnapshot }) {
+  return (
+    <span className="inline-flex items-baseline gap-2">
+      <span className="text-primary text-xs" aria-hidden>◆</span>
+      <Odometer value={d.ordinal} className="text-[15px] font-semibold text-foreground tabular-nums" />
+    </span>
+  );
+}
+
+// Snapshot title-row aside: live-now dot / coarse relative age / the no-signal state.
+export function SnapshotAside({ data: d }: { data: GlobalSnapshot }) {
+  const latest = useStore((s) => s.latestSnapshot);
+  const live = useStore((s) => s.live);
+  const isLive = latest != null && d.ordinal === latest.ordinal;
+  // Relative recency for an older pick — coarse (freshness, not a ticking clock). Guarded
+  // against an unparseable timestamp (→ no age suffix rather than "NaN").
+  const rel = relativeAge(Date.now() - Date.parse(d.timestamp));
+  return (
+    <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground whitespace-nowrap">
+      {!live ? (
+        <><NoSignalDot /> no signal</>
+      ) : isLive ? (
+        <>
+          <span className="w-2 h-2 rounded-full bg-primary shadow-[0_0_0_3px_color-mix(in_oklch,var(--primary)_30%,transparent)] animate-breathe motion-reduce:animate-none" />
+          {" "}live now
+        </>
+      ) : (
+        <>◷ {rel}</>
+      )}
+    </span>
+  );
+}
+
+// The selected node, resolved from the store the same way GeoLiveCard does — shared by the
+// head pieces and the body so they can't disagree.
+function inspectedNode(inspect: ReturnType<typeof useStore.getState>["inspect"]) {
+  return inspect && (inspect.kind === "l0" || inspect.kind === "l1" || inspect.kind === "metanode")
+    ? inspect
+    : null;
+}
+
+// Node title: identity-hue dot + the node id (truncated hash, mono — styling rides inside the
+// title node; CardHead supplies the 15px/semibold standard). Self-keyed roll-in on a new id.
+export function GeoLiveTitle() {
+  const inspect = useStore((s) => s.inspect);
+  const node = inspectedNode(inspect);
+  if (!node) return null;
+  const id = node.node?.id;
+  const title = id ? shortHash(id) : node.node?.ip || node.geo?.city || node.geo?.country || "Node";
+  const color = node.kind === "metanode" ? (node.meta ? identityHudHex(node.meta.id) : undefined) : CORE_HEX;
+  return (
+    <span className="inline-flex items-center gap-2 min-w-0">
+      {color && <span className="flex-none w-[9px] h-[9px] rounded-full" style={{ background: color }} />}
+      <span key={title} className="font-mono tabular-nums break-all min-w-0 roll-in">{title}</span>
+    </span>
+  );
+}
+
+// Node title-row aside: the status pill.
+export function GeoLiveAside() {
+  const inspect = useStore((s) => s.inspect);
+  const node = inspectedNode(inspect);
+  if (!node) return null;
+  return <StatusMark state={node.node?.state} />;
+}
+
+// A clicked Global L0 snapshot: what it anchored and what it settled (fees/size/rewards). Its
+// place in the DAG (◆ + ordinal + live/age) is the card HEAD now (SnapshotTitle/SnapshotAside).
 export function SnapshotCard({ data: d }: { data: GlobalSnapshot }) {
   // EXACT totals from the raw L0 snapshot (via RawSnapshotBridge) are the ONLY source for the fee
   // + anchored breakdown — authoritative (the true total, incl. unlisted). If they aren't here yet
   // the tick is simply "reading…" (ACQUIRING); there is no polled-floor fallback. Every selectable
   // tick is inside the L0 node's retention window, so exact always resolves.
   const exact = useStore((s) => s.snapshotExact[d.ordinal]);
-  const latest = useStore((s) => s.latestSnapshot);
   const live = useStore((s) => s.live);
   const lastGoodAt = useStore((s) => s.lastGoodAt);
   const awaitingExact = exact == null;
   const anchored = typeof d.metagraphSnapshotCount === "number" ? d.metagraphSnapshotCount : null;
-  const isLive = latest != null && d.ordinal === latest.ordinal;
-
-  // Relative recency for an older pick — coarse (freshness, not a ticking clock). Guarded
-  // against an unparseable timestamp (→ no age suffix rather than "NaN").
-  const rel = relativeAge(Date.now() - Date.parse(d.timestamp));
 
   // NO SIGNAL — the feed is unreachable. One sonar ring per retry: remounting `SonarRing` via
   // `key={retry}` (bumped on the same cadence as the poll, VIS.pollMs) makes the ring animation
@@ -46,38 +115,11 @@ export function SnapshotCard({ data: d }: { data: GlobalSnapshot }) {
     return () => clearInterval(id);
   }, [live]);
 
-  // Shared title row: ◆ type-marker (cyan = a GLOBAL snapshot) + the ordinal (odometer-rolls
-  // live), clearing the outer pane's absolute close × on the right.
-  const titleRow = (
-    <div className="flex items-baseline justify-between gap-2.5 pr-[22px]">
-      <span className="inline-flex items-baseline gap-2">
-        <span className="text-primary text-xs" aria-hidden>◆</span>
-        <Odometer value={d.ordinal} className="text-base font-bold text-foreground tabular-nums" />
-      </span>
-      {!live ? (
-        <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground whitespace-nowrap">
-          <NoSignalDot /> no signal
-        </span>
-      ) : (
-        <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground whitespace-nowrap">
-          {isLive ? (
-            <>
-              <span className="w-2 h-2 rounded-full bg-primary shadow-[0_0_0_3px_color-mix(in_oklch,var(--primary)_30%,transparent)] animate-breathe motion-reduce:animate-none" />
-              {" "}live now
-            </>
-          ) : (
-            <>◷ {rel}</>
-          )}
-        </span>
-      )}
-    </div>
-  );
-
+  // The title row lives in the card HEAD (SnapshotTitle/SnapshotAside above); the head's inset
+  // hairline replaces the old leading Separator.
   if (!live) {
     return (
       <div className="saturate-[.45]">
-        {titleRow}
-        <Separator className="my-2" />
         <div className="flex items-center gap-3 mt-1.5">
           <SonarRing key={retry} />
           <div className="flex flex-col gap-[3px] text-[11.5px] text-muted-foreground">
@@ -92,10 +134,7 @@ export function SnapshotCard({ data: d }: { data: GlobalSnapshot }) {
   // Hover pairing (synced 3D glow) lives on the OUTER pane (Inspector.CardPane), not here.
   return (
     <div>
-      {titleRow}
-
       {/* Anchored block (exact share breakdown, or "reading…" until it lands). */}
-      <Separator className="my-2" />
       <AnchoredTags ordinal={d.ordinal} anchored={anchored} awaiting={awaitingExact} />
 
       {/* Settlement — the exact fee + measured size + rewards (each an independent fact). While the
@@ -151,19 +190,18 @@ export function MetaCard({ cfg }: { cfg: MetaCfg }) {
   // repeating it (a redundant "DAG"/"DOR") is dropped.
   const isDataMeta = cfg.id !== "dag" && !nodeComposition(nodes).hasCurrency;
   // Hover pairing (synced 3D hub glow) lives on the OUTER pane (ContextCard's #metapane), not here.
+  // The metagraph NAME is the card-head title now (CardHead, rolled via titleKey); the identity
+  // mark + ticker stay as the first body row so the brand hierarchy reads unchanged.
   return (
     <>
-      {/* Header — logo avatar ringed in the identity hue + name + ticker. The logo shows as a clean
+      {/* Identity row — logo avatar ringed in the identity hue + ticker. The logo shows as a clean
           circular mark — no squared tile (brand icons are round, so a circle crop sits naturally). */}
       <div className="flex items-center gap-2.5 mb-2.5">
         <Avatar className="size-[38px]">
           {iconUrl && <AvatarImage src={iconUrl} alt="" />}
           <AvatarFallback style={{ color: hue }}>{monogram}</AvatarFallback>
         </Avatar>
-        <span className="flex flex-col gap-px">
-          <span key={cfg.name} className="text-[15px] font-semibold text-foreground leading-[1.1] roll-in">{cfg.name}</span>
-          {cfg.id !== "dag" && <span className="text-[11px] font-semibold tracking-[0.02em]" style={{ color: hue }}>{cfg.ticker}</span>}
-        </span>
+        {cfg.id !== "dag" && <span className="text-[11px] font-semibold tracking-[0.02em]" style={{ color: hue }}>{cfg.ticker}</span>}
       </div>
       <Desc text={blurb} />
       {nodes.length > 0 && (
@@ -218,13 +256,11 @@ export function GeoLiveCard() {
   return <GeoLiveNode p={node} />;
 }
 
-// The selected-node block. Identity-first: the node's ID is the title; the body carries the
-// facts you can't see on the globe — status, IP, composition, and where it sits. The slot
-// eyebrow already reads "Selected node"; the × is CardHead's shared close (the outer pane).
+// The selected-node block. Identity-first: the node's ID + status pill are the card HEAD now
+// (GeoLiveTitle/GeoLiveAside above); the body carries the facts you can't see on the globe —
+// IP, composition, and where it sits. The slot eyebrow reads "Selected node"; the × is
+// CardHead's shared close (the outer pane).
 function GeoLiveNode({ p }: { p: PickOf<"l0" | "l1" | "metanode"> }) {
-  const id = p.node?.id;
-  const title = id ? shortHash(id) : p.node?.ip || p.geo?.city || p.geo?.country || "Node";
-  const color = p.kind === "metanode" ? (p.meta ? identityHudHex(p.meta.id) : undefined) : CORE_HEX;
   // The single node's roles → a one-node composition row (shared vocabulary).
   const oneNode: NodeInfo[] = p.node ? [p.node] : [];
   const g = p.geo;
@@ -233,14 +269,8 @@ function GeoLiveNode({ p }: { p: PickOf<"l0" | "l1" | "metanode"> }) {
   // so the glow lights the card's rounded edge.
   return (
     <>
-      {/* Title line: node id + the status inline (right). */}
-      <div className="flex items-center gap-2 mb-2">
-        {color && <span className="flex-none w-[9px] h-[9px] rounded-full" style={{ background: color }} />}
-        <span key={title} className="text-[13px] font-semibold text-foreground m-0 tabular-nums break-all min-w-0 font-mono roll-in">{title}</span>
-        <span className="ml-auto flex-none"><StatusMark state={p.node?.state} /></span>
-      </div>
-      {/* IP grouped with the identity (muted subtitle under the id), not a labelled row. */}
-      {p.node?.ip && <div className="text-[11px] text-muted-foreground tabular-nums mt-0.5 ml-4">{p.node.ip}</div>}
+      {/* IP — the identity remainder (the id itself is the head title). */}
+      {p.node?.ip && <div className="text-[11px] text-muted-foreground tabular-nums">{p.node.ip}</div>}
       <Separator className="my-2" />
       {/* Composition as a stacked label + block (NOT inside <Row>, whose value is a <span> —
           CompositionRows renders a <div>, so a Row would nest a block in an inline element). */}

@@ -41,8 +41,10 @@ const GEOM: Record<Side, {
 };
 
 // The resting thread is deliberately DIM (Task 13 follow-up, user: the rails read too bright at
-// rest): everything the SVG draws is scaled to 60% opacity so the brightness budget goes to the
-// SIGNALS — the view-switch pulse below and the card edge signals. Hues unchanged; the CSS
+// rest): the LINES — neutral ruler line + ticks + the identity spine — are scaled to 60% opacity
+// so the brightness budget goes to the SIGNALS (the view-switch pulse below and the card edge
+// signals). The NODE DOTS (connector + halo + dot) keep their ORIGINAL full brightness (user
+// adjustment) — they are the per-card markers, not ambient furniture. Hues unchanged; the CSS
 // `--thread-*` tokens (other consumers: sheet rulers, bar-chart axis, card hover whisper) are NOT
 // touched — the dim is rail-local.
 const REST_DIM = 0.6;
@@ -132,8 +134,8 @@ export default function RailThread({ side = "right" }: { side?: Side }) {
         aria-hidden
         focusable="false"
       >
-        {/* Everything at rest sits inside ONE dim group (REST_DIM) — the thread is the calm
-           resting cue; brightness belongs to the signals (view-switch pulse + card edges). */}
+        {/* The LINES sit inside the dim group (REST_DIM) — calm resting furniture; brightness
+           belongs to the signals (view-switch pulse + card edges) and the node dots below. */}
         <g opacity={REST_DIM}>
           {/* neutral base line — SOFT/muted; carries the ruler ticks. */}
           <line x1={gm.neut} y1={0} x2={gm.neut} y2={H} stroke={TICK_LINE} strokeWidth={1} />
@@ -142,20 +144,21 @@ export default function RailThread({ side = "right" }: { side?: Side }) {
           {ticks.map((y, i) => (
             <line key={i} x1={gm.neut} y1={y} x2={i % 4 === 0 ? gm.tickMaj : gm.tickMin} y2={y} stroke={i % 4 === 0 ? TICK_MAJOR : TICK_MINOR} strokeWidth={1} />
           ))}
-          {/* identity line + node-dots — BOTH rails, mirrored (the HUD's resting identity cue; cards
-             are spineless at rest). The line is the selection's hue; the dots ride it at each card's
-             middle, tethered to the card edge by the connector. */}
+          {/* identity line — BOTH rails, mirrored (the HUD's resting identity cue; cards are
+             spineless at rest). The line is the selection's hue. */}
           <line x1={gm.identity} y1={0} x2={gm.identity} y2={H} stroke={accent} strokeWidth={2} />
-          {g.dots.map((y, i) => (
-            <g key={i}>
-              <line x1={gm.conn} y1={y} x2={gm.dot} y2={y} stroke={accent} strokeWidth={1.25} opacity={0.7} />
-              <circle cx={gm.dot} cy={y} r={5} fill={accent} opacity={0.16} />
-              {/* dark ring punches the dot off the identity line. NB a real hex, not var(--panel): an SVG
-                 stroke ATTRIBUTE doesn't resolve CSS custom properties (same trap as the accent above). */}
-              <circle cx={gm.dot} cy={y} r={3.4} fill={accent} stroke="#0c1020" strokeWidth={1.5} />
-            </g>
-          ))}
         </g>
+        {/* node-dots — OUTSIDE the dim group at original full brightness (user adjustment): one
+           per card at its middle, tethered to the card edge by the connector. */}
+        {g.dots.map((y, i) => (
+          <g key={i}>
+            <line x1={gm.conn} y1={y} x2={gm.dot} y2={y} stroke={accent} strokeWidth={1.25} opacity={0.7} />
+            <circle cx={gm.dot} cy={y} r={5} fill={accent} opacity={0.16} />
+            {/* dark ring punches the dot off the identity line. NB a real hex, not var(--panel): an SVG
+               stroke ATTRIBUTE doesn't resolve CSS custom properties (same trap as the accent above). */}
+            <circle cx={gm.dot} cy={y} r={3.4} fill={accent} stroke="#0c1020" strokeWidth={1.5} />
+          </g>
+        ))}
       </svg>
       {/* View-switch pulse — the SAME `.edge-pulse` recipe the cards use (soft line fade-in, bright
          gradient-tipped segment sweeping down, fade-out; reduced motion → one static blink),

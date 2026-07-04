@@ -5,22 +5,29 @@ import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 
 // The ONE HUD card header — every rail card leads with this shared grammar so the whole HUD
-// reads as one control surface:
+// reads as one control surface. ONE head ANATOMY on all six cards (user-agreed, Task 13
+// follow-up): **eyebrow / title / INSET hairline / body** —
 //   • an uppercase role EYEBROW — one simple "Selected <subject>" label ("SELECTED NETWORK" /
 //     "SELECTED NODE" / "SELECTED SNAPSHOT"; the ‹-parent breadcrumb grammar was retired, Task 13
 //     follow-up) or a view tag ("HYPERGRAPH · ABOUT"),
-//   • an optional TITLE that rolls in on a subject change (pass `titleKey` to key the remount —
-//     the same upward `roll-in` the Odometer uses; omit it and the title is static), and
+//   • the card's primary TITLE at ONE standard (15px / font-semibold / leading-[1.2]) — the
+//     panel title, the dossier's metagraph name, the node id (mono, via a styled `title` node),
+//     the snapshot ordinal (its Odometer owns the roll). Pass `titleKey` to key the `roll-in`
+//     remount on a subject change (synced with the edge pulse); `aside` renders right-aligned on
+//     the title row (the snapshot's live-dot/age, the node's status pill),
+//   • the INSET hairline under the head — inset by the card's padding on BOTH layouts (the
+//     right-card Separator idiom; the old full-width panel border-b is gone). Full-width rules
+//     don't exist inside cards anymore: inset = the ONE rule weight (head boundary AND body
+//     grouping),
 //   • an optional right ACTION — the +/− collapse toggle (rail tool cards) or the × close
 //     (inspector/context cards), each keeping its own title/aria semantics.
 //
-// Two layouts, selected by `panel`:
-//   • panel   — the full flex-row head with a bottom rule + padding; the title carries the cyan
-//               identity bullet (Learn / GeoExplore / About / Ledger).
-//   • eyebrow — a bare block eyebrow; the card BODY renders its own rich subject header (the
-//               inspector/context cards), so no title is drawn here. The × (when given) is placed
-//               absolutely on the card — its nearest positioned ancestor is the `.ig-panel` card.
+// Still two LAYOUTS, selected by `panel` (kept only for the structural split — padded flex-row
+// head with the collapse toggle vs. block-flow head with the absolute ×; behaviour of both
+// consumer kinds is unchanged). The title recipe + hairline are shared between them.
 const EYEBROW = "text-[8.5px] font-bold tracking-[0.1em] uppercase leading-none";
+// The ONE title standard every card head uses (panel h2 and inspector h3 alike).
+const TITLE = "m-0 text-[15px] font-semibold leading-[1.2]";
 
 // The right-rail card frame — the ONE definition of the inspector-rail Card composition. It is the
 // className you hand to `<Card asChild className={RIGHT_CARD}>`: the Card baseline already supplies
@@ -44,6 +51,7 @@ export default function CardHead({
   eyebrow,
   title,
   titleKey,
+  aside,
   panel = false,
   caption,
   collapsed,
@@ -55,6 +63,9 @@ export default function CardHead({
   eyebrow?: ReactNode;
   title?: ReactNode;
   titleKey?: string | number;
+  // Right-aligned companion on the TITLE row (the snapshot's live-dot / relative age, the node's
+  // status pill) — the head's aside area, so bodies don't render their own title rows.
+  aside?: ReactNode;
   panel?: boolean;
   caption?: ReactNode;
   collapsed?: boolean;
@@ -80,35 +91,43 @@ export default function CardHead({
 
   if (panel) {
     return (
-      <div className="flex items-start justify-between gap-2 py-[var(--panel-pad-y)] px-[var(--panel-pad-x)] border-b border-border">
-        <div className="flex flex-col gap-[3px] min-w-0">
-          {eyebrow && <span className={cn("block", eyebrowClass)}>{eyebrow}</span>}
-          <h2 className="m-0 text-[15px] font-semibold leading-[1.2] inline-flex items-center gap-2 min-w-0 before:content-[''] before:flex-none before:w-[9px] before:h-[9px] before:rounded-full before:bg-[var(--filter-accent,var(--accent))]">
-            {rolled}
-          </h2>
+      <>
+        <div className="flex items-start justify-between gap-2 py-[var(--panel-pad-y)] px-[var(--panel-pad-x)]">
+          <div className="flex flex-col gap-[3px] min-w-0">
+            {eyebrow && <span className={cn("block", eyebrowClass)}>{eyebrow}</span>}
+            <h2 className={cn(TITLE, "inline-flex items-center gap-2 min-w-0 before:content-[''] before:flex-none before:w-[9px] before:h-[9px] before:rounded-full before:bg-[var(--filter-accent,var(--accent))]")}>
+              {rolled}
+            </h2>
+          </div>
+          <div className="flex items-center gap-1.5 flex-none pt-px">
+            {caption != null && (
+              <span className="text-[10.5px] text-muted-foreground text-right tabular-nums">{caption}</span>
+            )}
+            {onToggle && (
+              <Button
+                variant="ghost"
+                size="icon-xs"
+                className="w-5 h-[18px] p-0 rounded-md text-[18px] leading-none cursor-pointer text-muted-foreground hover:bg-transparent hover:text-foreground dark:hover:bg-transparent"
+                title={collapsed ? "Expand" : "Collapse"}
+                aria-expanded={!collapsed}
+                onClick={onToggle}
+              >
+                {collapsed ? "+" : "–"}
+              </Button>
+            )}
+          </div>
         </div>
-        <div className="flex items-center gap-1.5 flex-none pt-px">
-          {caption != null && (
-            <span className="text-[10.5px] text-muted-foreground text-right tabular-nums">{caption}</span>
-          )}
-          {onToggle && (
-            <Button
-              variant="ghost"
-              size="icon-xs"
-              className="w-5 h-[18px] p-0 rounded-md text-[18px] leading-none cursor-pointer text-muted-foreground hover:bg-transparent hover:text-foreground dark:hover:bg-transparent"
-              title={collapsed ? "Expand" : "Collapse"}
-              aria-expanded={!collapsed}
-              onClick={onToggle}
-            >
-              {collapsed ? "+" : "–"}
-            </Button>
-          )}
-        </div>
-      </div>
+        {/* The head hairline — INSET by the card's padding (the shared rule weight; the old
+            full-width border-b is gone). A separate element so the inset doesn't eat the head's
+            padding box. */}
+        <div className="mx-[var(--panel-pad-x)] border-b border-border" aria-hidden />
+      </>
     );
   }
 
-  // Eyebrow layout — the bare block eyebrow; the body owns the subject header below it.
+  // Inspector layout — block-flow head inside the card's own padding (RIGHT_CARD p-[18px]), so
+  // the hairline is inset by construction. The title row clears the absolute × via pr when a
+  // close is present.
   return (
     <>
       {onClose && (
@@ -124,7 +143,15 @@ export default function CardHead({
         </Button>
       )}
       {eyebrow && <span className={cn("block mb-2 pr-[22px]", eyebrowClass)}>{eyebrow}</span>}
-      {title != null && rolled}
+      {title != null && (
+        <>
+          <div className={cn("flex items-center gap-2 min-w-0", onClose && "pr-[22px]")}>
+            <h3 className={cn(TITLE, "text-foreground min-w-0")}>{rolled}</h3>
+            {aside != null && <span className="ml-auto flex-none">{aside}</span>}
+          </div>
+          <div className="border-b border-border mt-2 mb-2.5" aria-hidden />
+        </>
+      )}
     </>
   );
 }
