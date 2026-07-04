@@ -47,14 +47,17 @@ export default function TopBar() {
 
   useEffect(() => {
     if (!open) return;
-    // Anchor the floating picker under the filter button, just below the bar. Measured so it
-    // never depends on the bar's full width (the picker is a compact popover, not a bar expansion).
+    // Anchor the picker as the bar's own DRAWER: its top edge MEETS the bar's bottom edge (no
+    // floating gap), left-aligned to the filter control. Measured so it never depends on the bar's
+    // full width (the picker is a compact popover, not a bar expansion). `br.bottom - 1` overlaps
+    // the 1px borders so bar + drawer read as one continuous surface (the shared-edge ruler sits
+    // on the seam).
     const bar = document.getElementById("topbar");
     const btn = filterBtnRef.current;
     if (bar && btn) {
       const br = bar.getBoundingClientRect();
       const fr = btn.getBoundingClientRect();
-      setPop({ left: Math.round(fr.left), top: Math.round(br.bottom + 6) });
+      setPop({ left: Math.round(fr.left), top: Math.round(br.bottom - 1) });
     }
     const onDown = (e: MouseEvent) => {
       if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
@@ -219,13 +222,16 @@ export default function TopBar() {
         </div>
       )}
 
-      {/* Floating filter picker — a compact popover anchored under the filter button (NOT a
-          full-width expansion of the bar). Lives outside #topbar so the bar's `overflow: hidden`
-          can't clip it; still inside the outer ref so an outside-click closes it. */}
+      {/* Filter picker — the bar's own DRAWER, anchored under the filter control with its top edge
+          meeting the bar's bottom (no floating island). Lives outside #topbar so the bar's
+          `overflow: hidden` can't clip it; still inside the outer ref so an outside-click closes it.
+          `.ig-sheet-topruler` combs the shared instrument ruler across the seam (reused, not
+          re-declared) and the TOP corners are squared so it reads as one continuous surface with the
+          bar rather than a detached panel. */}
       {open && pop && (
         <div
           className={cn(
-            "fixed z-[41] w-[372px] p-1.5 border border-border rounded-lg backdrop-blur-[14px]",
+            "ig-sheet-topruler fixed z-[41] w-[372px] p-1.5 border border-border rounded-b-lg rounded-t-none backdrop-blur-[14px]",
             "bg-[linear-gradient(180deg,rgba(20,26,46,0.96),rgba(10,14,28,0.94))]",
             "shadow-[0_14px_40px_-10px_rgba(0,0,0,0.6)]",
             // Phone: the JS anchors the popover at the filter button's left edge, but a ~372px

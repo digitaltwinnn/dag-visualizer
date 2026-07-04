@@ -10,7 +10,7 @@ import { Card } from "@/components/ui/card";
 export default function LedgerPanel() {
   const [collapsed, setCollapsed] = useState(false);
   return (
-    <Card asChild className="block p-0 flex-[0_1_auto] min-h-0 [--spine:var(--filter-accent,var(--primary))]">
+    <Card asChild className="sig-right block p-0 flex-[0_1_auto] min-h-0 [--spine:var(--filter-accent,var(--primary))]">
       <aside id="ledger-view">
         <CardHead
           panel

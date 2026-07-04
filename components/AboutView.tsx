@@ -21,7 +21,7 @@ export default function AboutView({
 }) {
   const [collapsed, setCollapsed] = useState(true);
   return (
-    <Card asChild className="block p-0 [--spine:var(--filter-accent,var(--primary))]">
+    <Card asChild className="sig-right block p-0 [--spine:var(--filter-accent,var(--primary))]">
       <aside>
         <CardHead
           panel

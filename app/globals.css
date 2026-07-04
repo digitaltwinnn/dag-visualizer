@@ -112,6 +112,21 @@
   .edge-pulse::before { animation: edge-line-blink 0.9s ease both; }
 }
 
+/* Level 1 — POINTER HOVER (Task 13): the quietest edge signal, on EVERY card, both rails. While
+   the pointer is over the card its SCENE-FACING edge fades in a FAINT NEUTRAL line — the muted
+   thread grey `--thread-line` (its 0.40 alpha carries the faintness, ≈40% of pairing's presence),
+   thin (2px, the shared edge width), NO glow, NO sweep. Hierarchy MUST stay readable at a glance:
+   grey whisper (pointer) < hued edge + wash (pairing) < moving light (pulse). When a card is BOTH
+   hovered and paired, PAIRING WINS — these two rules sit BEFORE the `.subject-paired` rules below,
+   so at equal specificity (0,2,1) source order hands the win to pairing (no grey underneath
+   fighting the hue). Rides the base ::before/::after `opacity 0.16s` transition (no new
+   transition; reduced-motion-safe — opacity only). Suppressed inside sheets by the sheet-calm rule
+   at the end of this block, exactly like pairing (touch surfaces don't hover; the sheet edge is
+   the single cue). Left-rail cards get `.sig-right` on their container for this (About/GeoExplore/
+   LedgerPanel); right-rail cards already carry `.sig-left`. */
+.sig-left:hover::before  { opacity: 1; background: var(--thread-line); box-shadow: none; }
+.sig-right:hover::after  { opacity: 1; background: var(--thread-line); box-shadow: none; }
+
 /* Hover PAIRING — the only non-pulse edge signal, shown strictly WHILE HOVERED (the class comes
    and goes with the hover; the 0.16s transition on the base elements eases it in/out).
    RIGHT-rail cards (`.sig-left`) light the ig-panel ::before on their LEFT (scene-facing) edge —

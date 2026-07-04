@@ -91,7 +91,7 @@ export default function GeoExplore() {
   return (
     <Card
       asChild
-      className="flex flex-col min-h-0 flex-[1_1_auto] gap-0 p-0 [--spine:var(--filter-accent,var(--primary))]"
+      className="sig-right flex flex-col min-h-0 flex-[1_1_auto] gap-0 p-0 [--spine:var(--filter-accent,var(--primary))]"
     >
       <aside id="geoexplore">
       <CardHead

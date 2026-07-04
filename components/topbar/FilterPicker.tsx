@@ -84,7 +84,17 @@ export default function FilterPicker({ onPick }: { onPick?: () => void }) {
                 <span className="w-2 h-2 rounded-full flex-none" style={{ background: hue }} />
                 <span className="text-[13px] text-foreground">{m.name}</span>
                 <span className="text-[11px] font-semibold tabular-nums" style={{ color: hue }}>{m.symbol}</span>
-                <span className="text-[11px] text-muted-foreground tabular-nums text-right">{off ? "0 · located" : m.located}</span>
+                {off ? (
+                  // Honest, non-numeric tag (Task 13): these are real metagraphs with no
+                  // locatable node right now — still clickable (selectable in hyper/ledger), but
+                  // a "0" count read as a broken value. A small muted lowercase tag, matching the
+                  // squared tag idiom (RoleTags in inspector/parts.tsx).
+                  <span className="justify-self-end rounded-[4px] px-[5px] py-[3px] text-[9.5px] leading-none tracking-[0.02em] text-muted-foreground bg-white/[0.035]">
+                    not located
+                  </span>
+                ) : (
+                  <span className="text-[11px] text-muted-foreground tabular-nums text-right">{m.located}</span>
+                )}
               </CommandItem>
             );
           })}
