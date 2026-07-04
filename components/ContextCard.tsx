@@ -6,6 +6,7 @@ import { metagraphById } from "@/src/data/network";
 import { hex } from "@/src/util/format";
 import { subjectPairing } from "@/components/useSubjectPairing";
 import CardHead, { RIGHT_CARD } from "@/components/CardHead";
+import { Card } from "@/components/ui/card";
 import InspectorCard from "@/components/InspectorCard";
 import { useFlashOnChange } from "@/components/useFlashOnChange";
 import type { PickDescriptor } from "@/src/data/types";
@@ -31,23 +32,22 @@ export default function ContextCard() {
     // metagraph's hue, via the shared hoverFilter channel.
     const pair = subjectPairing<string>(hoverFilter, mgCfg.id, setHoverFilter, hex(mgCfg.color));
     return (
-      <aside
-        id="metapane"
-        className={cn(RIGHT_CARD, pair.className)}
-        style={pair.style}
-        ref={flashRef}
-        onMouseEnter={pair.onMouseEnter}
-        onMouseLeave={pair.onMouseLeave}
-      >
-        <div>
+      <Card asChild className={cn(RIGHT_CARD, pair.className)}>
+        <aside
+          id="metapane"
+          style={pair.style}
+          ref={flashRef}
+          onMouseEnter={pair.onMouseEnter}
+          onMouseLeave={pair.onMouseLeave}
+        >
           <InspectorCard
             p={context}
             eyebrow={eyebrow}
             onClose={() => setFilter("all")}
             closeTitle="Clear selection"
           />
-        </div>
-      </aside>
+        </aside>
+      </Card>
     );
   }
 
@@ -55,15 +55,15 @@ export default function ContextCard() {
   const cores = metaList.filter((m) => (m.located ?? 0) > 0).length;
   const nodes = metaList.reduce((s, m) => s + (m.located ?? 0), 0);
   return (
-    <aside className={RIGHT_CARD} ref={flashRef}>
-      <div className="py-[var(--panel-pad-y)] px-[var(--panel-pad-x)]">
+    <Card asChild className={RIGHT_CARD}>
+      <aside ref={flashRef}>
         <CardHead eyebrow="Context" />
         <h3 className="m-0">All · whole network</h3>
         <p className="m-0 text-[12.5px] leading-[1.5] text-muted-foreground">
           {cores} metagraph{cores === 1 ? "" : "s"} · {nodes.toLocaleString()} mapped nodes.
           Pick one from the filter to focus.
         </p>
-      </div>
-    </aside>
+      </aside>
+    </Card>
   );
 }

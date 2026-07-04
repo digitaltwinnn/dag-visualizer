@@ -9,6 +9,7 @@ import { hoverKeyOf } from "@/src/data/hoverSubject";
 import { subjectPairing } from "@/components/useSubjectPairing";
 import { breadcrumbLabel } from "@/src/data/breadcrumb";
 import { RIGHT_CARD } from "@/components/CardHead";
+import { Card } from "@/components/ui/card";
 import InspectorCard from "@/components/InspectorCard";
 import ContextCard from "@/components/ContextCard";
 import RailThread from "@/components/RailThread";
@@ -63,19 +64,18 @@ function CardPane({
   }
 
   return (
-    <aside
-      className={cn(RIGHT_CARD, pair.className)}
-      style={pair.style}
-      ref={ref}
-      onMouseEnter={pair.onMouseEnter}
-      onMouseLeave={pair.onMouseLeave}
-    >
-      <div className="rc-content">
+    <Card asChild className={cn(RIGHT_CARD, pair.className)}>
+      <aside
+        style={pair.style}
+        ref={ref}
+        onMouseEnter={pair.onMouseEnter}
+        onMouseLeave={pair.onMouseLeave}
+      >
         {/* The node/geoLive card renders its own gel-clear × (ownClose) — otherwise CardHead
             draws the card's absolute Close ×. */}
         <InspectorCard p={pick} eyebrow={eyebrow} onClose={ownClose ? undefined : onClose} />
-      </div>
-    </aside>
+      </aside>
+    </Card>
   );
 }
 

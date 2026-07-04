@@ -12,6 +12,8 @@ import {
   CommandItem,
 } from "@/components/ui/command";
 import CardHead, { RIGHT_CARD } from "@/components/CardHead";
+import { Card } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import {
   NodeStars,
   NoSignalDot,
@@ -116,43 +118,90 @@ export default async function DesignPage() {
 
       <section className="mb-10">
         <h2 className="text-sm uppercase tracking-widest text-muted-foreground mb-3">
-          Glass frame — <code className="font-mono">.ig-panel</code> + <code className="font-mono">CardHead</code>
+          Card — <code className="font-mono">components/ui/card.tsx</code> + <code className="font-mono">CardHead</code>
         </h2>
         <p className="text-sm text-muted-foreground mb-3 max-w-2xl">
-          Every rail card is the <code className="font-mono">.ig-panel</code> recipe (translucent
-          glass + a left accent spine) headed by the one shared{" "}
-          <code className="font-mono">CardHead</code>. The spine is structural cyan by default; identity
-          panels point <code className="font-mono">--spine</code> at their hue.
+          The design-system <code className="font-mono">Card</code> baseline is the app&apos;s card frame:
+          the <code className="font-mono">.ig-panel</code> glass recipe (translucent glass + a left accent
+          spine) is baked into its base class, and an idiomatic <code className="font-mono">asChild</code>{" "}
+          (radix <code className="font-mono">Slot</code>) lets each rail card render as{" "}
+          <code className="font-mono">&lt;Card asChild&gt;&lt;aside&gt;</code> to keep its{" "}
+          <code className="font-mono">complementary</code> a11y role. Every rail card leads with the one
+          shared <code className="font-mono">CardHead</code>. The spine is structural cyan by default;
+          identity panels point <code className="font-mono">--spine</code> at their hue. Rail cards
+          override the Card&apos;s default padding so today&apos;s spacing is preserved.
         </p>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 max-w-2xl">
-          <div className="ig-panel">
-            <CardHead panel eyebrow="Hypergraph · about" title="Glass card" />
-            <div className="py-[var(--panel-pad-y)] px-[var(--panel-pad-x)] text-sm text-muted-foreground">
-              Default structural-cyan spine.
-              <Separator className="my-3" />
-              <div className="flex flex-wrap gap-2">
-                <Badge>default</Badge>
-                <Badge variant="secondary">secondary</Badge>
-                <Badge variant="destructive">down</Badge>
-                <Badge variant="outline">outline</Badge>
+          <Card asChild className="block p-0">
+            <div>
+              <CardHead panel eyebrow="Hypergraph · about" title="Glass card" />
+              <div className="py-[var(--panel-pad-y)] px-[var(--panel-pad-x)] text-sm text-muted-foreground">
+                Default structural-cyan spine.
+                <Separator className="my-3" />
+                <div className="flex flex-wrap gap-2">
+                  <Badge>default</Badge>
+                  <Badge variant="secondary">secondary</Badge>
+                  <Badge variant="destructive">down</Badge>
+                  <Badge variant="outline">outline</Badge>
+                </div>
               </div>
             </div>
-          </div>
-          <div className="ig-panel" style={{ ["--spine" as string]: "var(--success)" }}>
-            <CardHead panel eyebrow="Spine override" title="Identity spine" />
-            <div className="py-[var(--panel-pad-y)] px-[var(--panel-pad-x)] text-sm text-muted-foreground">
-              The accent spine reads <code className="font-mono">--spine</code>; identity panels point
-              it at <code className="font-mono">--mg</code>. Here it is success-green.
+          </Card>
+          <Card asChild className="block p-0 [--spine:var(--success)]">
+            <div>
+              <CardHead panel eyebrow="Spine override" title="Identity spine" />
+              <div className="py-[var(--panel-pad-y)] px-[var(--panel-pad-x)] text-sm text-muted-foreground">
+                The accent spine reads <code className="font-mono">--spine</code>; identity panels point
+                it at <code className="font-mono">--mg</code>. Here it is success-green.
+              </div>
             </div>
-          </div>
+          </Card>
         </div>
-        <div className={`${RIGHT_CARD} mt-4 max-w-2xl p-4 text-sm text-muted-foreground`}>
-          <code className="font-mono">RIGHT_CARD</code> — the inspector-rail frame:{" "}
-          <code className="font-mono">.ig-panel</code> with the per-card spine SUPPRESSED
-          (<code className="font-mono">--spine: transparent</code>) and pointer-events re-enabled,
-          since <code className="font-mono">#rightcol</code> is <code className="font-mono">pointer-events:none</code> so
-          gaps click through to the scene. The right rail&apos;s identity cue is RailThread&apos;s spine
-          in the margin, not a per-card one.
+        <Card className={`${RIGHT_CARD} mt-4 max-w-2xl text-sm text-muted-foreground`}>
+          <code className="font-mono">RIGHT_CARD</code> — the ONE inspector-rail Card composition
+          (passed as <code className="font-mono">&lt;Card asChild className=&#123;RIGHT_CARD&#125;&gt;</code>):
+          the per-card spine SUPPRESSED (<code className="font-mono">--spine: transparent</code>),
+          pointer-events re-enabled (<code className="font-mono">#rightcol</code> is{" "}
+          <code className="font-mono">pointer-events:none</code> so gaps click through to the scene),
+          and the original right-card interior restored — a flat{" "}
+          <code className="font-mono">18px</code> pad + <code className="font-mono">flex-none</code> so an
+          overflowing rail scrolls instead of a card overlapping the one beneath it. The right rail&apos;s
+          identity cue is RailThread&apos;s spine in the margin, not a per-card one.
+        </Card>
+      </section>
+
+      <section className="mb-10">
+        <h2 className="text-sm uppercase tracking-widest text-muted-foreground mb-3">
+          Button — <code className="font-mono">components/ui/button.tsx</code>
+        </h2>
+        <p className="text-sm text-muted-foreground mb-3 max-w-2xl">
+          The design-system <code className="font-mono">Button</code> baseline. The app currently adopts
+          it only for the small text/icon controls that map cleanly onto a variant with today&apos;s exact
+          look (hover fills overridden away, a subtle focus-visible ring kept): the card{" "}
+          <code className="font-mono">×</code> close + <code className="font-mono">+/–</code> collapse
+          (CardHead, <code className="font-mono">ghost / icon-xs</code>), and the &ldquo;Show more&rdquo; /
+          &ldquo;See it in the Hypergraph →&rdquo; links (<code className="font-mono">link / xs</code>).
+          <br />
+          <span className="text-muted-foreground/80">
+            Deliberately NOT Buttons (bespoke instrument controls): LiveStrip bars, the country/node
+            accordion rows, the rail edge-tabs, the phone-dock halves, the view-switch (ToggleGroup),
+            and the filter-bar button. That boundary is the documented convention.
+          </span>
+        </p>
+        <div className="flex flex-wrap items-center gap-3">
+          <Button variant="ghost">ghost</Button>
+          <Button variant="link">link</Button>
+          <Button variant="ghost" size="xs">ghost · xs</Button>
+          <Button variant="link" size="xs">link · xs</Button>
+          <Button variant="ghost" size="icon-xs" title="collapse">–</Button>
+          <Button
+            variant="ghost"
+            size="icon-xs"
+            title="close"
+            className="size-auto py-0.5 px-2 text-[22px] leading-none text-muted-foreground hover:bg-transparent hover:text-muted-foreground dark:hover:bg-transparent"
+          >
+            ×
+          </Button>
         </div>
       </section>
 

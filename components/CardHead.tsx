@@ -2,6 +2,7 @@
 
 import type { ReactNode } from "react";
 import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
 
 // The ONE HUD card header — every rail card leads with this shared grammar so the whole HUD
 // reads as one control surface:
@@ -20,11 +21,23 @@ import { cn } from "@/lib/utils";
 //               absolutely on the card — its nearest positioned ancestor is the `.ig-panel` card.
 const EYEBROW = "text-[8.5px] font-bold tracking-[0.1em] uppercase leading-none";
 
-// The right-rail card frame: the glass surface, a positioned ancestor for CardHead's absolute ×,
-// re-enabled pointer events (`#rightcol` is pointer-events:none so gaps click through to the
-// scene), and its identity spine SUPPRESSED — the right rail's identity cue is RailThread's spine
-// in the margin, not a per-card one. Re-homes the old `#rightcol > .panel` rule (12-panel-system).
-export const RIGHT_CARD = "ig-panel relative w-auto pointer-events-auto [--spine:transparent]";
+// The right-rail card frame — the ONE definition of the inspector-rail Card composition. It is the
+// className you hand to `<Card asChild className={RIGHT_CARD}>`: the Card baseline already supplies
+// `ig-panel`, so this only carries the right-rail OVERRIDES on top of it —
+//   • a positioned ancestor for CardHead's absolute × (`relative`), shrink-to-content width, and
+//     re-enabled pointer events (`#rightcol` is pointer-events:none so gaps click through to the
+//     scene);
+//   • its identity spine SUPPRESSED (`--spine:transparent`) — the right rail's identity cue is
+//     RailThread's spine in the margin, not a per-card one;
+//   • the interior spacing restored to the ORIGINAL right-card look (was lost when 05-…css was
+//     retired): a flat `18px` pad (overriding the Card baseline's `py-4 pl-5 pr-4`), `min-h-0`, and
+//     `flex-none` so an overflowing rail scrolls instead of a card shrinking below its own content
+//     and overlapping the card beneath it.
+// Re-homes the old `#rightcol > .panel` + `#metapane, .rc-pane` rules (05-inspector / 12-panel).
+// (`block` neutralises the Card baseline's `flex flex-col gap-4` so the card's children flow with
+// their own margins — as the original block box did — rather than gaining a flex gap between the
+// eyebrow and the body.)
+export const RIGHT_CARD = "relative block w-auto pointer-events-auto [--spine:transparent] p-[18px] min-h-0 flex-none";
 
 export default function CardHead({
   eyebrow,
@@ -76,14 +89,16 @@ export default function CardHead({
             <span className="text-[10.5px] text-muted-foreground text-right tabular-nums">{caption}</span>
           )}
           {onToggle && (
-            <button
-              className="bg-transparent border-none text-muted-foreground text-[18px] leading-none cursor-pointer w-5 h-[18px] p-0 hover:text-foreground"
+            <Button
+              variant="ghost"
+              size="icon-xs"
+              className="w-5 h-[18px] p-0 rounded-md text-[18px] leading-none text-muted-foreground hover:bg-transparent hover:text-foreground dark:hover:bg-transparent"
               title={collapsed ? "Expand" : "Collapse"}
               aria-expanded={!collapsed}
               onClick={onToggle}
             >
               {collapsed ? "+" : "–"}
-            </button>
+            </Button>
           )}
         </div>
       </div>
@@ -94,13 +109,15 @@ export default function CardHead({
   return (
     <>
       {onClose && (
-        <button
+        <Button
+          variant="ghost"
+          size="icon-xs"
           title={closeTitle}
           onClick={onClose}
-          className="absolute top-[10px] right-[10px] bg-transparent border-none text-muted-foreground text-[22px] leading-none cursor-pointer py-0.5 px-2"
+          className="absolute top-[10px] right-[10px] size-auto rounded-md py-0.5 px-2 text-[22px] leading-none text-muted-foreground hover:bg-transparent hover:text-muted-foreground dark:hover:bg-transparent"
         >
           ×
-        </button>
+        </Button>
       )}
       {eyebrow && <span className={cn("block mb-2 pr-[22px]", eyebrowClass)}>{eyebrow}</span>}
       {title != null && rolled}

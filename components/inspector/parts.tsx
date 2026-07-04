@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import type { NodeInfo } from "@/src/data/types";
 import {
   nodeStatus,
@@ -181,13 +182,15 @@ export function Desc({ text }: { text?: string }) {
       <p className={cn("text-[13px] leading-[1.6] text-[#c7d0ea] mb-0", open ? "line-clamp-none" : "line-clamp-3")}>
         {text}
       </p>
-      <button
+      <Button
         type="button"
-        className="desc-more inline-block mt-0.5 mb-0 p-0 bg-transparent border-none cursor-pointer font-inherit text-[11px] font-semibold text-primary hover:underline"
+        variant="link"
+        size="xs"
+        className="inline-block h-auto mt-0.5 mb-0 p-0 text-[11px] font-semibold"
         onClick={() => setOpen((o) => !o)}
       >
         {open ? "Show less" : "Show more"}
-      </button>
+      </Button>
     </>
   );
 }

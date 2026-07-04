@@ -4,6 +4,8 @@ import { useMemo, useState } from "react";
 import { cn } from "@/lib/utils";
 import { useStore } from "@/src/store/store";
 import CardHead from "@/components/CardHead";
+import { Card } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import { shortHash, CORE_HEX, metagraphById } from "@/src/data/network";
 import { identityHudHex } from "@/src/palette/identity";
 import { StatusMark } from "@/components/inspector/parts";
@@ -87,10 +89,11 @@ export default function GeoExplore() {
   const selLayer = sel ? (sel.kind === "metanode" ? sel.node?.layer ?? null : sel.kind) : null;
 
   return (
-    <aside
-      id="geoexplore"
-      className="ig-panel flex flex-col min-h-0 flex-[1_1_auto] [--spine:var(--filter-accent,var(--primary))]"
+    <Card
+      asChild
+      className="flex flex-col min-h-0 flex-[1_1_auto] gap-0 p-0 [--spine:var(--filter-accent,var(--primary))]"
     >
+      <aside id="geoexplore">
       <CardHead
         panel
         title="Nodes by country"
@@ -108,12 +111,14 @@ export default function GeoExplore() {
             </span>
             <p className="text-[12.5px] text-foreground mt-2 mb-0.5">No locatable nodes</p>
             <p className="text-[11.5px] text-muted-foreground leading-[1.5]">{tickerOrName} has no validators we can place on the map right now. It still appears in the Hypergraph.</p>
-            <button
-              className="mt-2 bg-transparent border-none text-primary [font-family:inherit] text-xs cursor-pointer hover:underline"
+            <Button
+              variant="link"
+              size="xs"
+              className="mt-2 h-auto p-0 text-xs font-normal"
               onClick={() => setMode("hyper")}
             >
               See it in the Hypergraph →
-            </button>
+            </Button>
           </div>
         ) : (
         <div className="flex-[1_1_auto] min-h-0 overflow-y-auto pt-1.5 px-[14px] pb-2 cmd-list-scroll">
@@ -205,6 +210,7 @@ export default function GeoExplore() {
 
         {!quietEmpty && <div className="pt-[10px] px-4 pb-3 text-[11px] text-muted-foreground">Click a country to drill in.</div>}
       </div>
-    </aside>
+      </aside>
+    </Card>
   );
 }
