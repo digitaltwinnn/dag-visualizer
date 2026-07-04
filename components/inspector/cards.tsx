@@ -13,6 +13,7 @@ import Odometer from "@/components/Odometer";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Separator } from "@/components/ui/separator";
 import { SonarRing, NodeStars, NoSignalDot } from "@/components/state/StateAtoms";
+import { useMinHold } from "@/components/useMinHold";
 import { VIS } from "../../js/config.js";
 import { Desc, StatusMark, CompositionRows, StatusBreakdown, nodeComposition } from "./parts";
 
@@ -127,6 +128,9 @@ export function SnapshotCard({ data: d }: { data: GlobalSnapshot }) {
   const lastGoodAt = useStore((s) => s.lastGoodAt);
   const awaitingExact = exact == null;
   const anchored = typeof d.metagraphSnapshotCount === "number" ? d.metagraphSnapshotCount : null;
+  // Hold the ACQUIRING fee atom for one calm cycle even if the exact read lands sooner, then fade
+  // it out (concern #8) — so a fast resolve doesn't blink the twinkling node-stars away.
+  const feeHold = useMinHold(awaitingExact);
 
   // NO SIGNAL — the feed is unreachable. One sonar ring per retry: remounting `SonarRing` via
   // `key={retry}` (bumped on the same cadence as the poll, VIS.pollMs) makes the ring animation
@@ -164,11 +168,11 @@ export function SnapshotCard({ data: d }: { data: GlobalSnapshot }) {
           exact read is still in flight (ACQUIRING), the fee row shows twinkling node-stars so the
           cell reserves width; once it lands the real value cross-fades in (animate-resolve-in). */}
       <Separator className="my-2" />
-      {exact == null ? (
+      {feeHold.show ? (
         <div className="flex flex-col gap-2">
           <div className="flex items-start justify-between gap-2.5">
             <span className="text-[12.5px] text-muted-foreground">Fees paid</span>
-            <span className="flex flex-col items-end text-[13px] text-foreground tabular-nums"><NodeStars count={4} /></span>
+            <span className={cn("flex flex-col items-end text-[13px] text-foreground tabular-nums", feeHold.fading && "animate-hold-fade-out motion-reduce:animate-none")}><NodeStars count={4} /></span>
           </div>
         </div>
       ) : (

@@ -176,7 +176,13 @@ export default function TopBar() {
               value={v.id}
               title={v.name}
               className={cn(
-                "group flex items-center gap-1.5 py-1.5 px-2.5 rounded-[8px]",
+                // The design OWNS its sizing/rounding here (not inherited from the shadcn
+                // toggle primitive): explicit h-9 (== today's rendered 36px — the primitive's
+                // default is the same, but the bar now states it) and `rounded-[8px]!` — the
+                // important variant beats toggle-group.tsx's `data-[spacing=0]:rounded-none`
+                // (class+attribute specificity) so ALL buttons, incl. the middle ones' hover/on
+                // fill, get the intended 8px corners (was: middle square, first/last 10px).
+                "group flex items-center gap-1.5 h-9 py-1.5 px-2.5 rounded-[8px]!",
                 "text-muted-foreground bg-transparent border-0",
                 "hover:text-foreground hover:bg-[rgba(90,140,255,0.10)]",
                 "data-[state=on]:text-foreground data-[state=on]:bg-[var(--sel-bg)]",

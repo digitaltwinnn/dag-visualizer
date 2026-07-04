@@ -1,5 +1,6 @@
 "use client";
 import { useBootPhase } from "@/components/useBootPhase";
+import { useMinHold } from "@/components/useMinHold";
 import { cn } from "@/lib/utils";
 
 // Cold-start overlay, painted by React independent of the Three scene: a centred forming Global L0
@@ -8,7 +9,12 @@ import { cn } from "@/lib/utils";
 // SIGNAL treatment. Removed from the DOM once fully faded (LIVE) so it never intercepts anything.
 export default function BootOverlay() {
   const phase = useBootPhase();
-  if (phase === "live") return null; // handoff complete — gone for good
+  // Transient boot signal: hold "reaching the network…" for a minimum calm cycle then fade out,
+  // so a fast LIVE handoff doesn't blink away (concern #8). The dead states (no-signal/no-engine)
+  // keep `phase !== "live"`, so `active` stays true and the overlay stays put — they're steady
+  // states, not subject to the hold/fade.
+  const { show, fading } = useMinHold(phase !== "live");
+  if (!show) return null; // handoff complete + faded — gone for good
   const noSignal = phase === "no-signal";
   const noEngine = phase === "no-engine";
   // no-engine: the 3D scene can't run (WebGL unavailable). Say so plainly and stop the ping — this
@@ -23,7 +29,10 @@ export default function BootOverlay() {
     <div
       className={cn(
         "fixed inset-0 z-[9] flex flex-col items-center justify-center gap-[18px] pointer-events-none",
-        "animate-boot-fade-in motion-reduce:animate-none", // the overlay itself fades IN at 0 ms
+        // Fades IN at 0 ms; once the boot resolves LIVE (after the min hold) it fades OUT calmly
+        // instead of unmounting. Reduced motion: the hook collapses the fade, so `fading` never
+        // trips and the swap is instant (the class is guarded too).
+        fading ? "animate-hold-fade-out motion-reduce:animate-none" : "animate-boot-fade-in motion-reduce:animate-none",
         dead && "saturate-[.35]",
       )}
       aria-hidden

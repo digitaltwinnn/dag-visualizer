@@ -436,6 +436,7 @@
    `motion-reduce:animate-none` at the call site, which is Tailwind's own reduced-motion guard). */
 @keyframes st-twinkle { 0%, 100% { opacity: 0.3; } 50% { opacity: 0.9; } }
 @keyframes st-fade-in { from { opacity: 0; } to { opacity: 1; } }
+@keyframes st-fade-out { from { opacity: 1; } to { opacity: 0; } }
 @keyframes st-sonar {
   from { transform: scale(1); opacity: 0.6; }
   to   { transform: scale(3.2); opacity: 0; }
@@ -448,6 +449,10 @@
      entrance (0.4s) — kept as separate theme vars over one shared keyframe. */
   --animate-resolve-in: st-fade-in 0.35s ease both;
   --animate-boot-fade-in: st-fade-in 0.4s ease both;
+  /* Calm fade-OUT for a resolved transient/ACQUIRING signal (the boot overlay + acquiring atoms,
+     driven by `useMinHold`): after the minimum hold, it eases to 0 instead of unmounting abruptly
+     (concern #8). One shared 0.4s var; reduced motion skips it (the hook collapses the fade to 0). */
+  --animate-hold-fade-out: st-fade-out 0.4s ease both;
   /* Same expanding ring, two cadences: NO SIGNAL's one-shot-per-retry ping (`SonarRing`, replayed
      by remounting via `key`) vs the boot overlay's continuous ping while reaching the network. */
   --animate-st-sonar: st-sonar 1.4s ease-out 1 forwards;

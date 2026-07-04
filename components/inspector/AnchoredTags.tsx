@@ -5,6 +5,7 @@ import { useStore } from "@/src/store/store";
 import { metagraphById } from "@/src/data/network";
 import { hex, fmtDag } from "@/src/util/format";
 import { NodeStars } from "@/components/state/StateAtoms";
+import { useMinHold } from "@/components/useMinHold";
 
 // The anchored block on the snapshot card: a ranked share-of-total breakdown of the metagraph
 // snapshots this global tick anchored — `dot · ticker · share-bar · count`, sorted desc, ALL of
@@ -28,20 +29,27 @@ export default function AnchoredTags({
   const total = anchored ?? exact?.anchored ?? 0;
   const channels = exact?.channels ?? null;
 
+  // Hold the ACQUIRING "resolving" row for one calm cycle even if the exact read lands sooner,
+  // then fade it out (concern #8) — a fast resolve shouldn't blink the node-stars away. While
+  // held (or genuinely pre-exact) we stay on the acquiring branch and suppress the "from M
+  // metagraphs" count (it only reads once the breakdown is actually shown).
+  const resolveHold = useMinHold(!exact);
+  const acquiring = !exact || resolveHold.show;
+
   // Header (always, even while acquiring): "N snapshots anchored from M metagraphs".
   const header = (
     <div className="flex items-baseline gap-2 flex-wrap mb-1.5">
       <span className="text-[13px] text-foreground"><b className="font-bold">{total}</b> snapshot{total === 1 ? "" : "s"} anchored</span>
-      {channels != null && <span className="text-[12px] text-muted-foreground">from {channels} metagraph{channels === 1 ? "" : "s"}</span>}
+      {channels != null && !acquiring && <span className="text-[12px] text-muted-foreground">from {channels} metagraph{channels === 1 ? "" : "s"}</span>}
     </div>
   );
 
-  if (!exact) {
+  if (acquiring) {
     return (
       <div className="mt-1">
         {header}
-        {awaiting && (
-          <div className="flex items-center gap-2 mt-1">
+        {(awaiting || resolveHold.show) && (
+          <div className={cn("flex items-center gap-2 mt-1", resolveHold.fading && "animate-hold-fade-out motion-reduce:animate-none")}>
             <NodeStars count={4} />
             <span className="text-[10px] tracking-[0.08em] uppercase text-muted-foreground">resolving</span>
           </div>
