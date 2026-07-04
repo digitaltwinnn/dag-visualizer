@@ -124,7 +124,7 @@ Zustand store. **Two data lanes:** (A) high-freq visuals subscribe straight to
   bar-chart (one bar per tick, height = anchors) in EVERY view, including the flat placeholders
   (`status`/`transactions`/`staking`) — not just the three 3D views — and publishes
   `--bottom-reserve`; it reads the shared `useSnapshotFeed` hook. (The old full `SnapshotRibbon`
-  was removed — the `ledger` view's own 3D chain is the timeline now.) **`PanelHead`**
+  was removed — the `ledger` view's own 3D chain is the timeline now.) **`CardHead`**
   is the one header used by every rail panel (see *Layout system*).
 - **`src/store/store.ts`** — the Zustand store (mode, filter, country, inspect,
   following, metaList, leaderboard, live stats, …). **`src/data/network.ts`** wraps the
@@ -267,7 +267,7 @@ The HUD is **four fixed zones over the canvas, one SCOPE/role each, stable acros
 there.** Define a card by its scope (the role it plays); its *contents* are view-specific and
 keep changing, so they're examples, not the contract. The per-view widgets below are *current*.
 
-- **Top** (`TopBar`, `14-top-bar.css`) = the **command bar**: one full-width inset bar
+- **Top** (`TopBar`) = the **command bar**: one full-width inset bar
   (same panel/border/radius tokens as the rail panels). Three regions on one row:
   **status + filter** (left; the filter is a button + pill that expands the bar *downward*
   into the `FilterChips` grid — same connected surface, so the filter no longer needs a rail
@@ -290,7 +290,7 @@ keep changing, so they're examples, not the contract. The per-view widgets below
   The dossier moved here from the left rail; the left rail is now tool-only.
 - **Bottom** (`BottomStream`) = the live/time lane (the slim `LiveStrip` bar-chart, all views).
 
-**The HUD is responsive** (`16-responsive-shell.css`, `useBreakpoint()`); only the rails
+**The HUD is responsive** (`useBreakpoint()`); only the rails
 restructure, everything above holds the same four-zone shape. **Desktop** (≥1100px): unchanged —
 both rails inline. **Tablet** (700–1099px): the rails collapse to slim edge tabs (`.rail-tab`,
 screen-edge, ≥44px tap) that each open the same rail content in a non-modal Sheet overlaying the
@@ -300,11 +300,18 @@ sheet at a time (`store.phoneDock`), tapping the active half again (or its grabb
 The command bar condenses (icons only, vitals move behind a toggle/popover) and `LiveStrip` runs
 full-width under it all. See the `dag-hud-refresh-specs` memory for the full breakpoint spec.
 
-Uniformity is enforced with **shared tokens in `app/styles/00-base.css`** (`--radius`,
-`--panel-pad-*`, `--rail-*`, `--detail-w`, the `--sel-bg`/`--sel-border` selection language,
-and `--bottom-reserve` — set per view by `BottomStream`) and **one `PanelHead` component**
-(`app/styles/12-panel-system.css`) used by every rail panel, so the rail reads as one
-surface. Don't re-derive paddings or cyan tints in component CSS — reference the tokens.
+**Styling is one stylesheet — `app/globals.css`** (the `app/styles/*.css` files were all
+retired through the shadcn/Tailwind migration): the Tailwind import, two token lanes in `:root`
+(the shadcn structural lane in oklch + a legacy-alias lane — `--core`/`--text`/`--muted`/
+`--panel-border`/`--l0` alias the shadcn vars, plus the layout literals below), keyframes, and a
+handful of `@layer components` recipes (`ig-panel`, `odometer`, `ecg`, `ls-bar-anim`,
+`subject-paired`, the rail containers, the sheet rulers). Everything else is per-component
+Tailwind utilities. Uniformity is enforced with **shared tokens** (`--radius`, `--panel-pad-*`,
+`--rail-*`, `--detail-w`, the `--sel-bg`/`--sel-border` selection language, and `--bottom-reserve`
+— set per view by `BottomStream`) and **one `CardHead` component** used by every rail panel, over
+the shared `.ig-panel` glass frame (`RIGHT_CARD` for inspector cards), so the rail reads as one
+surface. Don't re-derive paddings or cyan tints in component utilities — reference the tokens.
+The `/design` route renders these live as the styleguide.
 
 **Each view is a complementary projection of the same network** (the answer to *"what is each
 view for"*) — **hyper = who/what** (architecture + economic weight), **geo = where** (footprint),

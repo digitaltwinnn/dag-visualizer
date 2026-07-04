@@ -97,7 +97,7 @@ export default function ExploreRail() {
         {/* `max-[1099px]:!hidden` + arbitrary width tweaks re-home 16/11-responsive.css (Task 9):
             the safety-net hide below the desktop breakpoint (SSR/first-paint assume desktop, so the
             desktop rail can flash on a narrow viewport before useBreakpoint resolves) and the small-
-            laptop / tablet rail-width narrowing. `!` beats the `#leftcol` id rule in 00-base.css. */}
+            laptop / tablet rail-width narrowing. `!` beats the `#leftcol` id rule in globals.css. */}
         <div
           id="leftcol"
           className="max-[1100px]:!w-[224px] max-[860px]:!w-[210px] max-[860px]:!max-h-[calc(100vh-320px)] max-[1099px]:!hidden"
@@ -110,7 +110,7 @@ export default function ExploreRail() {
   }
   if (bp === "tablet") {
     // Tablet: same content, hosted in the left edge-tab Sheet overlay so the 3D scene keeps
-    // full width. The inline #leftcol/.rail-thread path is hidden below 1100px (00-base.css).
+    // full width. The inline #leftcol/.rail-thread path is hidden below 1100px (globals.css).
     return (
       <RailDock side="left" label="Explore" style={accent}>
         {content}

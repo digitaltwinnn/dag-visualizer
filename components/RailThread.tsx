@@ -18,7 +18,7 @@ import { filterAccent, CORE_HEX } from "@/src/data/network";
 //    identity cue is the original cyan spine attached to each card's edge (CSS, 12-panel-system.css),
 //    so the thread here adds just the hairline effect — no dot, no identity line.
 //
-// Ruler-hairline spec — mirrors the CSS `--thread-*` tokens (00-base.css) so the SVG threads and the
+// Ruler-hairline spec — mirrors the CSS `--thread-*` tokens (globals.css) so the SVG threads and the
 // bar-chart axis read identically. Kept as literals because an SVG stroke ATTRIBUTE can't resolve a
 // CSS var(); keep the two in sync.
 const TICK_PITCH = 13; // px between hairlines

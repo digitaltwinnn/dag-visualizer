@@ -227,7 +227,7 @@ export default function Inspector() {
         <RailThread />
         {/* `max-[1099px]:!hidden` + arbitrary width tweaks re-home 16/11-responsive.css (Task 9):
             the safety-net hide below the desktop breakpoint (SSR/first-paint assume desktop) and the
-            small-laptop / tablet rail-width narrowing. `!` beats the `#rightcol` id rule in 00-base. */}
+            small-laptop / tablet rail-width narrowing. `!` beats the `#rightcol` id rule in globals.css. */}
         <div
           id="rightcol"
           className="max-[1100px]:!w-[288px] max-[860px]:!w-[min(300px,calc(100vw-32px))] max-[1099px]:!hidden"

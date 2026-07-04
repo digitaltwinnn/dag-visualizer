@@ -1,6 +1,5 @@
 @import "tailwindcss";
 @import "tw-animate-css";
-@import "./styles/00-base.css";
 
 /* ── Structural lane (chrome + status) — shadcn CSS variables in oklch ── */
 :root {
@@ -22,9 +21,9 @@
   --primary: oklch(0.88 0.13 195);           /* accent cyan #2af5ff — the sole live/accent signal */
   --primary-foreground: oklch(0.14 0.02 265);
   --ring: oklch(0.88 0.13 195);
-  /* Intentionally overrides the legacy --accent: #2af5ff (app/styles/00-base.css, consumed
-     by 3 legacy rules) — same colour, so no visible change; keeps --primary the single
-     source of truth. Don't drop this without checking those legacy rules first. */
+  /* The sole --accent definition (the legacy literal in app/styles/00-base.css was dropped
+     when that file was retired in Task 10) — points at --primary so it stays the single
+     source of truth. Consumed by CardHead's `var(--filter-accent, var(--accent))` bullet. */
   --accent: var(--primary);
   --accent-foreground: var(--primary-foreground);
 
@@ -41,6 +40,139 @@
   --surface-muted: oklch(0.18 0.03 265);
   --secondary: var(--surface-muted);
   --secondary-foreground: var(--foreground);
+}
+
+/* ── Legacy alias + layout lane (was app/styles/00-base.css, retired in Task 10) ──
+   Names carried over from the pre-migration stylesheet, still consumed across the
+   components. The COLOUR names simply ALIAS the shadcn lane above — --primary /
+   --foreground / --muted-foreground / --border / --core-l0 are the single source of
+   truth; the aliases keep existing consumers working WITHOUT a repo-wide rename (that
+   churn is deferred — see the migration-design-concerns doc). Only --panel (glass fill)
+   has no shadcn equivalent, so it stays a literal. Layout/spacing + instrument-thread
+   tokens have no shadcn analogue and live here as literals too. */
+:root {
+  --core: var(--primary);              /* ≡ --primary (accent cyan) */
+  --text: var(--foreground);           /* ≡ --foreground */
+  --muted: var(--muted-foreground);    /* ≡ --muted-foreground */
+  --panel-border: var(--border);       /* ≡ --border */
+  --l0: var(--core-l0);                /* ≡ --core-l0 (DAG L0 blue) */
+  --panel: rgba(12, 16, 32, 0.72);     /* translucent glass fill — no shadcn equivalent */
+
+  /* Layout system tokens (shared by every HUD panel so they read as siblings). One
+     spacing scale, one "selected" treatment; component utilities reference these. */
+  --panel-pad-x: 16px;     /* horizontal padding inside a panel header/section */
+  --panel-pad-y: 12px;     /* vertical   padding inside a panel header/section */
+  --rail-gap: 12px;        /* gap between stacked panels in a column */
+  --rail-top: 103px;       /* top of BOTH side rails — clears the banner + command bar */
+  --rail-w: 264px;         /* left control rail width */
+  --detail-w: 320px;       /* right details rail width */
+  --sel-bg: rgba(42, 245, 255, 0.12);   /* selected/active fill, reused everywhere */
+  --sel-border: rgba(42, 245, 255, 0.5);
+  --bottom-reserve: 170px; /* default; BottomStream overrides per view (slim vs full) */
+
+  /* ── Instrument-thread ruler spec (the ONE shared source) ─────────────────────
+     Both rails' SVG threads (RailThread.tsx) and the bar-chart axis read identically:
+     a neutral base line with ruler hairlines — short marks, every 4th longer + brighter.
+     The SVG threads can't consume these (an SVG stroke attribute doesn't resolve var()),
+     so they mirror the SAME literals in code — keep in sync (see RailThread `TICK_*`).
+     `--axis-hairlines` is the reusable recipe for a horizontal axis (the bar chart). */
+  --thread-line: rgba(178, 193, 223, 0.40);        /* the neutral base line the ticks hang off */
+  --thread-tick: rgba(178, 193, 223, 0.30);        /* minor hairline */
+  --thread-tick-major: rgba(178, 193, 223, 0.42);  /* every 4th — longer + brighter */
+  --thread-tick-pitch: 13px;                        /* spacing between hairlines */
+  /* Horizontal baseline → vertical ticks HANGING DOWN from it (the bar-chart axis, so the ruler
+     sits under the bars, not through them). Anchored to the TOP so ticks grow downward; major
+     taller (8px) + brighter, minor 5px. */
+  --axis-hairlines:
+    repeating-linear-gradient(to right,
+      var(--thread-tick-major) 0, var(--thread-tick-major) 1px,
+      transparent 1px, transparent calc(var(--thread-tick-pitch) * 4)) left top / 100% 8px no-repeat,
+    repeating-linear-gradient(to right,
+      var(--thread-tick) 0, var(--thread-tick) 1px,
+      transparent 1px, transparent var(--thread-tick-pitch)) left top / 100% 5px no-repeat;
+}
+
+/* ── Base resets (was app/styles/00-base.css) ── */
+@layer base {
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: var(--background); overflow: hidden; }
+  body { font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; color: var(--foreground); }
+}
+
+/* ── Scene canvas + rail containers (was app/styles/00-base.css) ──────────────────
+   Selector-driven rules that can't be plain Tailwind utilities: `.scene-in` is toggled
+   as a className by SceneCanvas.tsx on the boot handoff; `.rail-clip`/`.rail-dragging`
+   are toggled at runtime by RailScroll.tsx; and the `#leftcol`/`#rightcol` rails carry
+   :hover + ::-webkit-scrollbar pseudo-elements. The rail ids are also queried by
+   RailScroll (["leftcol","rightcol"]) and RailThread — keep them. */
+@layer components {
+  .scene-canvas {
+    position: fixed;
+    inset: 0;
+    width: 100vw;
+    height: 100vh;
+    display: block;
+    opacity: 0;                 /* fade in on the boot handoff */
+    transition: opacity 0.6s ease;
+  }
+  .scene-canvas.scene-in { opacity: 1; }
+
+  /* Left control rail (`#leftcol`, ExploreRail.tsx) — the explore/interact zone. Fixed
+     column under the shared rail-top/gap tokens; mirrors `#rightcol` below. */
+  #leftcol {
+    position: fixed; z-index: 10; top: var(--rail-top); left: 16px;
+    width: var(--rail-w);
+    display: flex; flex-direction: column; gap: var(--rail-gap);
+    max-height: calc(100vh - var(--rail-top) - 14px);
+    overflow-y: auto;
+  }
+  #leftcol > aside { width: auto; }
+
+  /* Right details rail (`#rightcol`, Inspector.tsx) — the facts scope: a STACK of
+     selected-subject cards. `pointer-events: none` so the gaps between cards click
+     through to the scene/bottom strip below; each card re-enables it via the
+     `pointer-events-auto` in RIGHT_CARD (CardHead.tsx). */
+  #rightcol {
+    position: fixed; z-index: 10; top: var(--rail-top); right: 26px;
+    width: var(--detail-w);
+    display: flex; flex-direction: column; gap: var(--rail-gap);
+    max-height: calc(100vh - var(--rail-top) - 14px);
+    overflow-y: auto;
+    pointer-events: none;
+  }
+
+  /* Both rails scroll: a slim custom scrollbar, native touch panning (pan-y + momentum),
+     and a grab-drag fallback for mouse (RailScroll). `overscroll-behavior: contain` keeps
+     a rail scroll from chaining to the page. */
+  #leftcol, #rightcol {
+    scrollbar-width: thin; scrollbar-color: rgba(160, 175, 205, 0.28) transparent;
+    touch-action: pan-y;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior: contain;
+  }
+  /* Bottom fade — applied ONLY when a rail actually reaches down into the chart band (JS
+     toggles `.rail-clip`, see RailScroll). Gating it avoids fading a SHORT rail. */
+  #leftcol.rail-clip, #rightcol.rail-clip {
+    -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - var(--bottom-reserve, 0px) + 6px), transparent calc(100% - var(--bottom-reserve, 0px) + 30px), transparent 100%);
+    mask-image: linear-gradient(to bottom, #000 calc(100% - var(--bottom-reserve, 0px) + 6px), transparent calc(100% - var(--bottom-reserve, 0px) + 30px), transparent 100%);
+  }
+  #leftcol::-webkit-scrollbar, #rightcol::-webkit-scrollbar { width: 6px; }
+  #leftcol::-webkit-scrollbar-track, #rightcol::-webkit-scrollbar-track { background: transparent; }
+  #leftcol::-webkit-scrollbar-thumb, #rightcol::-webkit-scrollbar-thumb {
+    background: rgba(160, 175, 205, 0.28); border-radius: 3px;
+  }
+  #leftcol:hover::-webkit-scrollbar-thumb, #rightcol:hover::-webkit-scrollbar-thumb {
+    background: rgba(160, 175, 205, 0.45);
+  }
+  /* The RIGHT rail's scrollbar would sit on top of the instrument thread, so hide it there —
+     the thread IS the scroll visual; scrolling stays via wheel + grab-drag + touch pan. */
+  #rightcol { scrollbar-width: none; }
+  #rightcol::-webkit-scrollbar { width: 0; height: 0; display: none; }
+  /* While grab-dragging a rail (mouse): suppress the text cursor + selection. */
+  .rail-dragging { cursor: grabbing; user-select: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .scene-canvas { transition: none; }
 }
 
 /* ── Tailwind v4 theme mapping — expose the vars as utilities ── */
@@ -164,8 +296,8 @@
 }
 
 /* ── Command-list scrollbar (top-bar filter picker) — the SAME slim custom scrollbar as the
-   rails (`#leftcol`/`#rightcol` in 00-base.css); the default chunky one clashed with the glass
-   popover. Scoped to a class (not the rails' ids) since `CommandList` is a reusable primitive. ── */
+   rails (`#leftcol`/`#rightcol`, above); the default chunky one clashed with the glass popover.
+   Scoped to a class (not the rails' ids) since `CommandList` is a reusable primitive. ── */
 @layer components {
   .cmd-list-scroll {
     scrollbar-width: thin; scrollbar-color: rgba(160, 175, 205, 0.28) transparent;
