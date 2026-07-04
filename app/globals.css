@@ -1,7 +1,6 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 @import "./styles/00-base.css";
-@import "./styles/01-snapshot-ribbon.css";
 @import "./styles/07-hover-tooltip.css";
 @import "./styles/11-responsive.css";
 @import "./styles/15-states.css";
@@ -120,6 +119,21 @@
 }
 @theme inline {
   --animate-dot-beat: dot-beat 1.5s ease-in-out infinite;
+}
+
+/* The LiveStrip bar-chart's entry animation (components/LiveStrip.tsx) — a new bar streams in
+   from the right and grows up from the baseline. Kept as a real keyframe (a Tailwind arbitrary
+   `animation` value can't declare the keyframe itself), same idiom as `.odometer-in`/`.ecg-scan`
+   above. */
+@keyframes ls-bar-in {
+  from { opacity: 0; transform: translateX(9px) scaleY(0.55); }
+  to   { opacity: 1; transform: translateX(0) scaleY(1); }
+}
+@layer components {
+  .ls-bar-anim { animation: ls-bar-in 0.55s cubic-bezier(0.22, 1, 0.36, 1) both; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ls-bar-anim { animation: none; }
 }
 
 /* ── Command-list scrollbar (top-bar filter picker) — the SAME slim custom scrollbar as the
