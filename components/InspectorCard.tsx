@@ -1,6 +1,7 @@
 "use client";
 
 import type { PickDescriptor } from "@/src/data/types";
+import { useStore } from "@/src/store/store";
 import CardHead from "@/components/CardHead";
 import { GeoLiveCard, MetaCard, SnapshotCard } from "@/components/inspector/cards";
 
@@ -34,9 +35,13 @@ export default function InspectorCard({
   onClose?: () => void;
   closeTitle?: string;
 }) {
+  // NO SIGNAL — the explorer feed is unreachable: SnapshotCard swaps to its own "no signal" body,
+  // and the frame's eyebrow dims along with it (carried forward from `.no-signal .insp-eyebrow`).
+  const live = useStore((s) => s.live);
+  const eyebrowMuted = p.kind === "snapshot" && !live;
   return (
     <>
-      <CardHead eyebrow={eyebrow} onClose={onClose} closeTitle={closeTitle} />
+      <CardHead eyebrow={eyebrow} onClose={onClose} closeTitle={closeTitle} eyebrowMuted={eyebrowMuted} />
       <CardBody p={p} />
     </>
   );

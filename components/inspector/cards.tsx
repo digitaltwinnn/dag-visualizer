@@ -11,7 +11,7 @@ import AnchoredTags from "./AnchoredTags";
 import Odometer from "@/components/Odometer";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Separator } from "@/components/ui/separator";
-import { SonarRing, NodeStars } from "@/components/state/StateAtoms";
+import { SonarRing, NodeStars, NoSignalDot } from "@/components/state/StateAtoms";
 import { VIS } from "../../js/config.js";
 import { Desc, Row, StatusMark, CompositionRows, StatusBreakdown, nodeComposition } from "./parts";
 
@@ -56,7 +56,7 @@ export function SnapshotCard({ data: d }: { data: GlobalSnapshot }) {
       </span>
       {!live ? (
         <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground whitespace-nowrap">
-          <span className="ns-dot" /> no signal
+          <NoSignalDot /> no signal
         </span>
       ) : (
         <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground whitespace-nowrap">
@@ -75,12 +75,12 @@ export function SnapshotCard({ data: d }: { data: GlobalSnapshot }) {
 
   if (!live) {
     return (
-      <div className="no-signal">
+      <div className="saturate-[.45]">
         {titleRow}
         <Separator className="my-2" />
-        <div className="ns-block">
+        <div className="flex items-center gap-3 mt-1.5">
           <SonarRing key={retry} />
-          <div className="ns-rows">
+          <div className="flex flex-col gap-[3px] text-[11.5px] text-muted-foreground">
             <span>Explorer API: unreachable</span>
             <span>Last good read: {lastGoodAt ? relativeAge(Date.now() - lastGoodAt) : "—"}</span>
           </div>
@@ -100,7 +100,7 @@ export function SnapshotCard({ data: d }: { data: GlobalSnapshot }) {
 
       {/* Settlement — the exact fee + measured size + rewards (each an independent fact). While the
           exact read is still in flight (ACQUIRING), the fee row shows twinkling node-stars so the
-          cell reserves width; once it lands the real value cross-fades in (st-resolve-in). */}
+          cell reserves width; once it lands the real value cross-fades in (animate-resolve-in). */}
       <Separator className="my-2" />
       {exact == null ? (
         <div className="flex flex-col gap-2">
@@ -115,7 +115,7 @@ export function SnapshotCard({ data: d }: { data: GlobalSnapshot }) {
             <div className="flex items-start justify-between gap-2.5">
               <span className="text-[12.5px] text-muted-foreground">Fees paid</span>
               <span className="flex flex-col items-end text-[13px] text-foreground tabular-nums">
-                <span className="st-resolve-in whitespace-nowrap"><b className="font-bold">{fmtDag(exact.totalFee)}</b> DAG</span>
+                <span className="animate-resolve-in motion-reduce:animate-none whitespace-nowrap"><b className="font-bold">{fmtDag(exact.totalFee)}</b> DAG</span>
                 <span className="text-[10.5px] text-muted-foreground">{fmtKB(exact.totalSizeKB)} settled</span>
               </span>
             </div>
@@ -124,7 +124,7 @@ export function SnapshotCard({ data: d }: { data: GlobalSnapshot }) {
             <div className="flex items-start justify-between gap-2.5">
               <span className="text-[12.5px] text-muted-foreground">Rewards out</span>
               <span className="flex flex-col items-end text-[13px] text-foreground tabular-nums">
-                <span className="st-resolve-in whitespace-nowrap"><b className="font-bold">{fmtDag(exact.rewardsDatum)}</b> DAG</span>
+                <span className="animate-resolve-in motion-reduce:animate-none whitespace-nowrap"><b className="font-bold">{fmtDag(exact.rewardsDatum)}</b> DAG</span>
               </span>
             </div>
           )}

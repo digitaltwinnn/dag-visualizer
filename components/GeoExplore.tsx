@@ -102,11 +102,18 @@ export default function GeoExplore() {
         {/* The footprint's headline figures (Nodes / Countries / Ready) live in the top-bar
             vitals now; this card is purely the country→nodes accordion. */}
         {quietEmpty ? (
-          <div className="geo-quiet-empty">
-            <span className="st-standby-dim" aria-hidden><span className="st-standby-node" /></span>
-            <p className="geo-qe-title">No locatable nodes</p>
-            <p className="geo-qe-line">{tickerOrName} has no validators we can place on the map right now. It still appears in the Hypergraph.</p>
-            <button className="geo-qe-jump" onClick={() => setMode("hyper")}>See it in the Hypergraph →</button>
+          <div className="py-4 px-2 text-center">
+            <span className="inline-block grayscale opacity-50" aria-hidden>
+              <span className="absolute left-2 top-1/2 -mt-[4.5px] w-[9px] h-[9px] rounded-full bg-primary animate-st-standby-node motion-reduce:animate-none" />
+            </span>
+            <p className="text-[12.5px] text-foreground mt-2 mb-0.5">No locatable nodes</p>
+            <p className="text-[11.5px] text-muted-foreground leading-[1.5]">{tickerOrName} has no validators we can place on the map right now. It still appears in the Hypergraph.</p>
+            <button
+              className="mt-2 bg-transparent border-none text-primary [font:inherit] text-xs cursor-pointer hover:underline"
+              onClick={() => setMode("hyper")}
+            >
+              See it in the Hypergraph →
+            </button>
           </div>
         ) : (
         <div className="flex-[1_1_auto] min-h-0 overflow-y-auto pt-1.5 px-[14px] pb-2 cmd-list-scroll">

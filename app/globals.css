@@ -2,7 +2,6 @@
 @import "tw-animate-css";
 @import "./styles/00-base.css";
 @import "./styles/11-responsive.css";
-@import "./styles/15-states.css";
 @import "./styles/16-responsive-shell.css";
 
 /* ── Structural lane (chrome + status) — shadcn CSS variables in oklch ── */
@@ -118,6 +117,33 @@
 }
 @theme inline {
   --animate-dot-beat: dot-beat 1.5s ease-in-out infinite;
+}
+
+/* ── State atoms (components/state/StateAtoms.tsx + BootOverlay.tsx) — ACQUIRING twinkle, NO
+   SIGNAL sonar, STANDBY halo, boot core ping/glow + fade. Pure motion keyframes only — size,
+   colour and position are Tailwind utilities at each call site (same split as `breathe`/
+   `dot-beat` above: simple standalone animations become `--animate-*` theme vars + an inline
+   `motion-reduce:animate-none` at the call site, which is Tailwind's own reduced-motion guard). */
+@keyframes st-twinkle { 0%, 100% { opacity: 0.3; } 50% { opacity: 0.9; } }
+@keyframes st-fade-in { from { opacity: 0; } to { opacity: 1; } }
+@keyframes st-sonar {
+  from { transform: scale(1); opacity: 0.6; }
+  to   { transform: scale(3.2); opacity: 0; }
+}
+@keyframes st-standby-node { 0%, 100% { opacity: 0.58; transform: scale(1); } 50% { opacity: 1; transform: scale(1.09); } }
+@keyframes st-standby-halo { 0% { transform: scale(1); opacity: 0.52; } 100% { transform: scale(3.6); opacity: 0; } }
+@theme inline {
+  --animate-st-twinkle: st-twinkle 1.5s ease-in-out infinite;
+  /* Same fade, two durations: the ACQUIRING value resolve-in (0.35s) vs the boot overlay's own
+     entrance (0.4s) — kept as separate theme vars over one shared keyframe. */
+  --animate-resolve-in: st-fade-in 0.35s ease both;
+  --animate-boot-fade-in: st-fade-in 0.4s ease both;
+  /* Same expanding ring, two cadences: NO SIGNAL's one-shot-per-retry ping (`SonarRing`, replayed
+     by remounting via `key`) vs the boot overlay's continuous ping while reaching the network. */
+  --animate-st-sonar: st-sonar 1.4s ease-out 1 forwards;
+  --animate-boot-ping: st-sonar 1.6s ease-out infinite;
+  --animate-st-standby-node: st-standby-node 1.5s ease-in-out infinite;
+  --animate-st-standby-halo: st-standby-halo 1.6s ease-out infinite;
 }
 
 /* The LiveStrip bar-chart's entry animation (components/LiveStrip.tsx) — a new bar streams in

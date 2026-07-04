@@ -7,6 +7,7 @@ import { metagraphById } from "@/src/data/network";
 import { nodeStatus } from "@/src/data/nodeStatus";
 import Sparkline from "@/components/Sparkline";
 import Odometer from "@/components/Odometer";
+import { NoSignalDot } from "@/components/state/StateAtoms";
 import { rolesOf } from "@/components/inspector/parts";
 import { useBreakpoint } from "@/components/useBreakpoint";
 import { cn } from "@/lib/utils";
@@ -117,10 +118,10 @@ function VitalsCluster({ vertical = false }: { vertical?: boolean } = {}) {
               "flex items-center gap-3.5",
               "max-[1260px]:gap-3 max-[1120px]:gap-2.5 max-[940px]:gap-2.5 max-[820px]:gap-2",
             ),
-        !live && "no-signal",
+        !live && "saturate-[.45]",
       )}
     >
-      {!live && <span className="ns-dot" />}
+      {!live && <NoSignalDot />}
       {body}
     </div>
   );

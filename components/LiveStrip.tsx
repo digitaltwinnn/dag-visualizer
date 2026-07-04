@@ -89,7 +89,7 @@ export default function LiveStrip() {
       className={cn(
         "fixed z-10 left-4 right-4 bottom-4 h-[98px] px-[14px] flex items-center bg-transparent border-none",
         "max-[699px]:bottom-[calc(var(--phone-dock-h,56px)+8px)]",
-        !live && "no-signal",
+        !live && "saturate-[.45]",
       )}
       style={{ ["--ls-accent"]: accent } as CSSProperties}
     >

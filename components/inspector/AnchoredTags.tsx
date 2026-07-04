@@ -41,7 +41,10 @@ export default function AnchoredTags({
       <div className="mt-1">
         {header}
         {awaiting && (
-          <div className="anc-acquiring"><NodeStars count={4} /><span className="anc-acq-label">resolving</span></div>
+          <div className="flex items-center gap-2 mt-1">
+            <NodeStars count={4} />
+            <span className="text-[10px] tracking-[0.08em] uppercase text-muted-foreground">resolving</span>
+          </div>
         )}
       </div>
     );

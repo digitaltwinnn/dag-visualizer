@@ -1,5 +1,6 @@
 "use client";
 import { useBootPhase } from "@/components/useBootPhase";
+import { cn } from "@/lib/utils";
 
 // Cold-start overlay, painted by React independent of the Three scene: a centred forming Global L0
 // core (soft radial glow + an expanding ping) + a "reaching the network…" label, in neutral cyan.
@@ -17,13 +18,43 @@ export default function BootOverlay() {
     : noSignal
       ? "No signal — retrying…"
       : "reaching the network…";
+  const dead = noSignal || noEngine;
   return (
-    <div className={"boot-overlay" + (noSignal || noEngine ? " boot-overlay--nosignal" : "")} aria-hidden>
-      <div className="boot-core">
-        {!noEngine && <span className="boot-core-ping" />}
-        <span className="boot-core-glow" />
+    <div
+      className={cn(
+        "fixed inset-0 z-[9] flex flex-col items-center justify-center gap-[18px] pointer-events-none",
+        "animate-boot-fade-in motion-reduce:animate-none", // the overlay itself fades IN at 0 ms
+        dead && "saturate-[.35]",
+      )}
+      aria-hidden
+    >
+      <div className="relative w-[120px] h-[120px]">
+        {!noEngine && (
+          <span
+            className={cn(
+              "absolute inset-[34px] rounded-full border border-[color-mix(in_oklch,var(--primary)_55%,transparent)]",
+              "animate-boot-ping motion-reduce:animate-none motion-reduce:opacity-0", // reuse the sonar expand (peak ≤ 0.6)
+              dead && "grayscale",
+            )}
+          />
+        )}
+        <span
+          className={cn(
+            "absolute inset-0 rounded-full",
+            "bg-[radial-gradient(circle,color-mix(in_oklch,var(--primary)_85%,transparent)_0%,transparent_62%)]",
+            "animate-breathe motion-reduce:animate-none motion-reduce:opacity-90",
+            dead && "grayscale",
+          )}
+        />
       </div>
-      <p className="boot-label">{label}</p>
+      <p
+        className={cn(
+          "text-xs tracking-[0.08em] lowercase m-0",
+          dead ? "text-muted-foreground" : "text-[color-mix(in_oklch,var(--primary)_80%,var(--foreground))]",
+        )}
+      >
+        {label}
+      </p>
     </div>
   );
 }

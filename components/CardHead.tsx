@@ -1,6 +1,7 @@
 "use client";
 
 import type { ReactNode } from "react";
+import { cn } from "@/lib/utils";
 
 // The ONE HUD card header — every rail card leads with this shared grammar so the whole HUD
 // reads as one control surface:
@@ -17,7 +18,7 @@ import type { ReactNode } from "react";
 //   • eyebrow — a bare block eyebrow; the card BODY renders its own rich subject header (the
 //               inspector/context cards), so no title is drawn here. The × (when given) is placed
 //               absolutely on the card — its nearest positioned ancestor is the `.ig-panel` card.
-const EYEBROW = "text-[8.5px] font-bold tracking-[0.1em] uppercase text-accent leading-none";
+const EYEBROW = "text-[8.5px] font-bold tracking-[0.1em] uppercase leading-none";
 
 // The right-rail card frame: the glass surface, a positioned ancestor for CardHead's absolute ×,
 // re-enabled pointer events (`#rightcol` is pointer-events:none so gaps click through to the
@@ -35,6 +36,7 @@ export default function CardHead({
   onToggle,
   onClose,
   closeTitle = "Close",
+  eyebrowMuted = false,
 }: {
   eyebrow?: ReactNode;
   title?: ReactNode;
@@ -45,6 +47,10 @@ export default function CardHead({
   onToggle?: () => void;
   onClose?: () => void;
   closeTitle?: string;
+  // NO SIGNAL: the feed behind this card is unreachable — dim the eyebrow to muted (was
+  // `.no-signal .panel-eyebrow`/`.insp-eyebrow`, restored here since the frame owns the eyebrow
+  // and the card body's own `.no-signal` wrapper no longer sits as its ancestor).
+  eyebrowMuted?: boolean;
 }) {
   const rolled =
     titleKey != null ? (
@@ -54,12 +60,13 @@ export default function CardHead({
     ) : (
       title
     );
+  const eyebrowClass = cn(EYEBROW, eyebrowMuted ? "text-muted-foreground" : "text-accent");
 
   if (panel) {
     return (
       <div className="flex items-start justify-between gap-2 py-[var(--panel-pad-y)] px-[var(--panel-pad-x)] border-b border-border">
         <div className="flex flex-col gap-[3px] min-w-0">
-          {eyebrow && <span className={"block " + EYEBROW}>{eyebrow}</span>}
+          {eyebrow && <span className={cn("block", eyebrowClass)}>{eyebrow}</span>}
           <h2 className="m-0 text-[15px] font-semibold leading-[1.2] inline-flex items-center gap-2 min-w-0 before:content-[''] before:flex-none before:w-[9px] before:h-[9px] before:rounded-full before:bg-[var(--filter-accent,var(--accent))]">
             {rolled}
           </h2>
@@ -95,7 +102,7 @@ export default function CardHead({
           ×
         </button>
       )}
-      {eyebrow && <span className={"block mb-2 pr-[22px] " + EYEBROW}>{eyebrow}</span>}
+      {eyebrow && <span className={cn("block mb-2 pr-[22px]", eyebrowClass)}>{eyebrow}</span>}
       {title != null && rolled}
     </>
   );
