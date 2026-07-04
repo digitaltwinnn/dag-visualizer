@@ -26,14 +26,12 @@ export default function InspectorCard({
   p,
   eyebrow,
   onClose,
-  closeTitle,
 }: {
   p: PickDescriptor;
   eyebrow?: string;
-  // When set, CardHead renders the card's absolute × (the node card opts out — it draws its own
-  // gel-clear ×). ContextCard passes "Clear selection"; a detail pane passes the default "Close".
+  // When set, CardHead renders the card's absolute × — the ONE baseline close every dismissible
+  // card shares (label: CardHead's "Clear selection" default; no per-card variants).
   onClose?: () => void;
-  closeTitle?: string;
 }) {
   // NO SIGNAL — the explorer feed is unreachable: SnapshotCard swaps to its own "no signal" body,
   // and the frame's eyebrow dims along with it (carried forward from `.no-signal .insp-eyebrow`).
@@ -41,7 +39,7 @@ export default function InspectorCard({
   const eyebrowMuted = p.kind === "snapshot" && !live;
   return (
     <>
-      <CardHead eyebrow={eyebrow} onClose={onClose} closeTitle={closeTitle} eyebrowMuted={eyebrowMuted} />
+      <CardHead eyebrow={eyebrow} onClose={onClose} eyebrowMuted={eyebrowMuted} />
       <CardBody p={p} />
     </>
   );

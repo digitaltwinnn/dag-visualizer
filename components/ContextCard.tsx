@@ -44,7 +44,6 @@ export default function ContextCard() {
             p={context}
             eyebrow={eyebrow}
             onClose={() => setFilter("all")}
-            closeTitle="Clear selection"
           />
         </aside>
       </Card>

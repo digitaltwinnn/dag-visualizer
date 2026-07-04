@@ -48,7 +48,7 @@ export default function CardHead({
   collapsed,
   onToggle,
   onClose,
-  closeTitle = "Close",
+  closeTitle = "Clear selection",
   eyebrowMuted = false,
 }: {
   eyebrow?: ReactNode;
@@ -59,6 +59,8 @@ export default function CardHead({
   collapsed?: boolean;
   onToggle?: () => void;
   onClose?: () => void;
+  // One baseline close label — every dismissible card's × reads "Clear selection" (the default);
+  // don't reintroduce per-card variants ("Close" / "Deselect").
   closeTitle?: string;
   // NO SIGNAL: the feed behind this card is unreachable — dim the eyebrow to muted (was
   // `.no-signal .panel-eyebrow`/`.insp-eyebrow`, restored here since the frame owns the eyebrow
@@ -92,7 +94,7 @@ export default function CardHead({
             <Button
               variant="ghost"
               size="icon-xs"
-              className="w-5 h-[18px] p-0 rounded-md text-[18px] leading-none text-muted-foreground hover:bg-transparent hover:text-foreground dark:hover:bg-transparent"
+              className="w-5 h-[18px] p-0 rounded-md text-[18px] leading-none cursor-pointer text-muted-foreground hover:bg-transparent hover:text-foreground dark:hover:bg-transparent"
               title={collapsed ? "Expand" : "Collapse"}
               aria-expanded={!collapsed}
               onClick={onToggle}
@@ -113,8 +115,9 @@ export default function CardHead({
           variant="ghost"
           size="icon-xs"
           title={closeTitle}
+          aria-label={closeTitle}
           onClick={onClose}
-          className="absolute top-[10px] right-[10px] size-auto rounded-md py-0.5 px-2 text-[22px] leading-none text-muted-foreground hover:bg-transparent hover:text-muted-foreground dark:hover:bg-transparent"
+          className="absolute top-[10px] right-[10px] size-auto rounded-md py-0.5 px-2 text-[22px] leading-none cursor-pointer text-muted-foreground hover:bg-transparent hover:text-muted-foreground dark:hover:bg-transparent"
         >
           ×
         </Button>

@@ -29,13 +29,11 @@ function CardPane({
   pick,
   eyebrow,
   onClose,
-  ownClose,
 }: {
   dep: unknown;
   pick: PickDescriptor;
   eyebrow: string;
   onClose: () => void;
-  ownClose: boolean; // the card already renders its own close (e.g. the node card's gel-clear ×)
 }) {
   const ref = useFlashOnChange(dep);
   const inspect = useStore((s) => s.inspect);
@@ -71,9 +69,9 @@ function CardPane({
         onMouseEnter={pair.onMouseEnter}
         onMouseLeave={pair.onMouseLeave}
       >
-        {/* The node/geoLive card renders its own gel-clear × (ownClose) — otherwise CardHead
-            draws the card's absolute Close ×. */}
-        <InspectorCard p={pick} eyebrow={eyebrow} onClose={ownClose ? undefined : onClose} />
+        {/* Every card's × is CardHead's shared ghost-Button close — one baseline close (the node
+            card's old hand-rolled × was removed). */}
+        <InspectorCard p={pick} eyebrow={eyebrow} onClose={onClose} />
       </aside>
     </Card>
   );
@@ -123,7 +121,7 @@ export default function Inspector() {
   const cards: Record<SelSlot, { active: boolean; pane: ReactNode }> = {
     node: {
       active: !!isNode,
-      // geoLive reads the node from the store and renders its own gel-clear × (ownClose).
+      // geoLive reads the node from the store; its × is CardHead's shared close like every card.
       pane: (
         <CardPane
           key="node"
@@ -131,7 +129,6 @@ export default function Inspector() {
           pick={{ kind: "geoLive" }}
           eyebrow={breadcrumbLabel("node", filter)}
           onClose={() => setInspect(null)}
-          ownClose
         />
       ),
     },
@@ -144,7 +141,6 @@ export default function Inspector() {
           pick={snap}
           eyebrow={breadcrumbLabel("snap", filter)}
           onClose={() => setSnap(null)}
-          ownClose={false}
         />
       ) : null,
     },

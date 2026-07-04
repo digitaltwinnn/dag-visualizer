@@ -69,7 +69,7 @@ export default function RailScroll() {
         if (e.pointerType !== "mouse") return; // touch = native pan
         if (el.scrollHeight <= el.clientHeight) return; // nothing to scroll
         const t = e.target as HTMLElement | null;
-        if (t?.closest("button, a, input, textarea, select, [role=button], .nb-row, .desc-more")) return;
+        if (t?.closest("button, a, input, textarea, select, [role=button], .nb-row")) return;
         dragging = true;
         moved = false;
         startY = e.clientY;

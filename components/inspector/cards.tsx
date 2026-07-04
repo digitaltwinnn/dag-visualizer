@@ -202,7 +202,6 @@ export function MetaCard({ cfg }: { cfg: MetaCfg }) {
 // to pick one. Reads the node straight from the store, so it tracks any pick.
 export function GeoLiveCard() {
   const inspect = useStore((s) => s.inspect);
-  const setInspect = useStore((s) => s.setInspect);
 
   const node =
     inspect && (inspect.kind === "l0" || inspect.kind === "l1" || inspect.kind === "metanode")
@@ -216,13 +215,13 @@ export function GeoLiveCard() {
       </p>
     );
   }
-  return <GeoLiveNode p={node} onClear={() => setInspect(null)} />;
+  return <GeoLiveNode p={node} />;
 }
 
 // The selected-node block. Identity-first: the node's ID is the title; the body carries the
 // facts you can't see on the globe — status, IP, composition, and where it sits. The slot
-// eyebrow already reads "Selected node", so this only adds a deselect ×.
-function GeoLiveNode({ p, onClear }: { p: PickOf<"l0" | "l1" | "metanode">; onClear: () => void }) {
+// eyebrow already reads "Selected node"; the × is CardHead's shared close (the outer pane).
+function GeoLiveNode({ p }: { p: PickOf<"l0" | "l1" | "metanode"> }) {
   const id = p.node?.id;
   const title = id ? shortHash(id) : p.node?.ip || p.geo?.city || p.geo?.country || "Node";
   const color = p.kind === "metanode" ? (p.meta ? identityHudHex(p.meta.id) : undefined) : CORE_HEX;
@@ -234,13 +233,6 @@ function GeoLiveNode({ p, onClear }: { p: PickOf<"l0" | "l1" | "metanode">; onCl
   // so the glow lights the card's rounded edge.
   return (
     <>
-      <button
-        title="Deselect"
-        onClick={onClear}
-        className="absolute top-[10px] right-[10px] bg-transparent border-none text-muted-foreground text-[22px] leading-none cursor-pointer py-0.5 px-2 hover:text-foreground"
-      >
-        ×
-      </button>
       {/* Title line: node id + the status inline (right). */}
       <div className="flex items-center gap-2 mb-2">
         {color && <span className="flex-none w-[9px] h-[9px] rounded-full" style={{ background: color }} />}
