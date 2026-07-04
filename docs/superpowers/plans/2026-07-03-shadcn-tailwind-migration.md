@@ -24,6 +24,7 @@
 - Per-task gates: `npx tsc --noEmit` clean · `npx vitest run` green · grep-verify before every CSS deletion · commit. (No per-task screenshots.)
 - Top-bar view glyphs stay plain monochrome symbols — never emoji.
 - shadcn class merging goes through the existing `cn()` (`lib/utils.ts`); don't add a second merge helper.
+- **Layer-trap guard (learned on this branch, 3 incidents):** bespoke recipe classes that must win over element utilities (`.subject-paired`, sheet reduced-motion overrides, axis hairlines) stay **unlayered** — never inside `@layer components`, where Tailwind's `utilities` layer silently beats them regardless of specificity. Related: `bg-[var(--x)]` compiles to background-COLOR — a token holding a gradient/shorthand needs `[background:var(--x)]`.
 - Component class conversions must reproduce the **literal values** in the CSS file being retired (the CSS file is the parity spec — read it fully before touching its components). Use arbitrary values (`text-[10.5px]`, `bg-[rgba(8,12,26,0.92)]`) where no token exists; use token utilities (`text-muted-foreground`, `border-border`, `rounded-lg`) where one does.
 - `git commit` messages end with `Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>`.
 
