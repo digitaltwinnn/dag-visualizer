@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { ChevronDown } from "lucide-react";
 import { useStore } from "@/src/store/store";
 import { metagraphById } from "@/src/data/network";
 import { hex } from "@/src/util/format";
@@ -102,7 +103,13 @@ export default function TopBar() {
               style={{ background: face.dot }}
             />
             <span className="text-body text-foreground">{face.label}</span>
-            <span className="text-micro text-muted-foreground">{open ? "▴" : "▾"}</span>
+            <ChevronDown
+              aria-hidden
+              className={cn(
+                "size-3.5 text-muted-foreground transition-transform motion-reduce:transition-none",
+                open && "rotate-180",
+              )}
+            />
           </PopoverTrigger>
           {/* The picker content — a compact DETACHED popover under the filter button (user
               decision 2026-07-04: 6px gap + its own surface, NOT a bar-expansion drawer; that

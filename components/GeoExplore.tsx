@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useStore } from "@/src/store/store";
 import CardHead from "@/components/CardHead";
@@ -158,9 +159,13 @@ export default function GeoExplore() {
                     />
                   </span>
                   <span className="flex-none w-[26px] text-right text-body tabular-nums font-semibold">{c.count}</span>
-                  <span className={cn("flex-none w-3 text-center text-micro", open ? "text-foreground" : "text-muted-foreground")}>
-                    {open ? "▾" : "▸"}
-                  </span>
+                  <ChevronRight
+                    aria-hidden
+                    className={cn(
+                      "size-3.5 flex-none transition-transform motion-reduce:transition-none",
+                      open ? "rotate-90 text-foreground" : "text-muted-foreground",
+                    )}
+                  />
                 </button>
 
                 {open && (

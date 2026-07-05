@@ -6,7 +6,7 @@ import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { PulseEdge, useEdgePulse } from "@/components/EdgePulse";
-import { Compass, ListTree } from "lucide-react";
+import { Compass, ListTree, ChevronLeft, ChevronRight } from "lucide-react";
 
 const PULSE_MS = 900;
 // How long the hint dot stays morphed into the updating card's type glyph before settling back.
@@ -363,8 +363,7 @@ export default function RailDock({
         <button
           className={cn(
             "fixed z-[39] top-1/2 -translate-y-1/2 w-11 min-h-[56px] hidden items-center justify-center cursor-pointer",
-            /* text-[20px]: control-glyph size for the ‹/› edge-tab arrow — outside the HUD text scale (a one-off). */
-            "bg-[var(--panel)] border border-border text-foreground backdrop-blur-[14px] text-[20px] leading-none",
+            "bg-[var(--panel)] border border-border text-foreground backdrop-blur-[14px]",
             "min-[700px]:max-[1099px]:flex",
             side === "left" ? "left-0 rounded-r-[var(--radius)] border-l-0" : "right-0 rounded-l-[var(--radius)] border-r-0",
           )}
@@ -373,7 +372,7 @@ export default function RailDock({
           // "open" (the bar half's open/collapse toggle is ToggleGroup's native deselect above).
           onClick={() => handleOpenChange(true)}
         >
-          {side === "left" ? "‹" : "›"}
+          {side === "left" ? <ChevronLeft size={20} aria-hidden /> : <ChevronRight size={20} aria-hidden />}
           {dot}
           {/* Tablet switch-signal, CLOSED state: the pulse runs down the tab's scene-facing
               edge (the sheet's spine-equivalent while there's no sheet on screen). */}
