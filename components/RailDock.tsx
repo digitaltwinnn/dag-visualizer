@@ -5,6 +5,7 @@ import { cn } from "@/lib/utils";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { PulseEdge, useEdgePulse } from "@/components/EdgePulse";
 import { Compass, ListTree } from "lucide-react";
 
 const PULSE_MS = 900;
@@ -93,6 +94,7 @@ export default function RailDock({
   open: openProp,
   sheetPx,
   onSheetPx,
+  signalKey,
 }: {
   side: "left" | "right";
   label: string;
@@ -112,6 +114,14 @@ export default function RailDock({
   // stays store-free — it just reads/writes through these props.
   sheetPx?: number | null;
   onSheetPx?: (px: number | null) => void;
+  // TABLET switch-signal carrier: RailThread (the desktop view/filter-switch pulse's home) is
+  // desktop-only, so below 1100px the switch had no visible carrier. The caller passes the SAME
+  // subject key RailThread uses (`${mode}|${filter}`) and RailDock plays the SAME travelling
+  // `.edge-pulse` recipe (shared `useEdgePulse` — one pulse per change, debounced, mount-skipped,
+  // reduced-motion → CSS static blink) on the tablet's spine-equivalents: the open sheet's
+  // `.ig-sheet-edge` identity spine, or — while the sheet is closed — the edge tab's scene-facing
+  // edge. Only the edge-tab (tablet) mode consumes it; phone stays carrier-free (accepted).
+  signalKey?: unknown;
 }) {
   const [openState, setOpen] = useState(false);
   const open = openProp ?? openState;
@@ -237,6 +247,34 @@ export default function RailDock({
     handleOpenChange(false);
   };
 
+  // ── Tablet switch-signal pulse (see the `signalKey` prop doc) ──────────────────────────────
+  // `pulseLive` bounds the carrier's MOUNT to the pulse window: PulseEdge replays its CSS
+  // animation on every mount (its keyed-remount contract), so without the window a sheet opened
+  // long after a pulse would replay the stale sweep on open.
+  const switchPulse = useEdgePulse(signalKey);
+  const [pulseLive, setPulseLive] = useState(false);
+  const pulseTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => {
+    if (switchPulse === 0) return;
+    setPulseLive(true);
+    if (pulseTimer.current) clearTimeout(pulseTimer.current);
+    pulseTimer.current = setTimeout(() => setPulseLive(false), 1300);
+  }, [switchPulse]);
+  useEffect(() => () => { if (pulseTimer.current) clearTimeout(pulseTimer.current); }, []);
+  // The carrier wrapper: a 3px positioning context for the shared recipe, sitting where the
+  // spine-equivalent runs, `--spine` carrying the identity hue (the caller's --filter-accent
+  // rides in on the same style object).
+  const switchPulseSpan = (cls: string) =>
+    pulseLive && (
+      <span
+        className={cn("absolute w-[3px] pointer-events-none z-[43]", cls)}
+        style={{ ...style, ["--spine" as string]: "var(--filter-accent, var(--primary))" } as CSSProperties}
+        aria-hidden
+      >
+        <PulseEdge pulseKey={switchPulse} />
+      </span>
+    );
+
   // The dot mounts whenever there's something to show (persistent hint) OR whenever a pulse
   // might need to play (pulseKey provided) — kept mounted so the transient WAAPI pulse always has
   // an element to animate, even on an already-seen detail that just got a data update.
@@ -327,6 +365,9 @@ export default function RailDock({
         >
           {side === "left" ? "‹" : "›"}
           {dot}
+          {/* Tablet switch-signal, CLOSED state: the pulse runs down the tab's scene-facing
+              edge (the sheet's spine-equivalent while there's no sheet on screen). */}
+          {!open && switchPulseSpan(cn("inset-y-1", side === "left" ? "right-0" : "left-0"))}
         </button>
       )}
       {/* NON-MODAL (`modal={false}`): on tablet the left "Explore" and right "Details" edge docks
@@ -368,6 +409,11 @@ export default function RailDock({
           onInteractOutside={(e) => e.preventDefault()}
           aria-describedby={undefined}
         >
+          {/* Tablet switch-signal, OPEN state: the pulse rides the sheet's own `.ig-sheet-edge`
+              identity spine (its screen-edge side) — same recipe/tempo as the desktop
+              RailThread pulse. Edge-tab (tablet) mode only; the phone bar-half sheet carries
+              no spine (accepted). */}
+          {!isBarHalf && switchPulseSpan(cn("inset-y-2", side === "left" ? "left-0" : "right-0"))}
           {sheetSide === "bottom" && (
             // Centred grabber bar (36×4) with a ≥44px tap target — the sheet's DRAG handle
             // (follow-the-finger + snap, see the drag block above) and still the plain

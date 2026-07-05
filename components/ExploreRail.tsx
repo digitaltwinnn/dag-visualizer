@@ -114,7 +114,9 @@ export default function ExploreRail() {
     // Tablet: same content, hosted in the left edge-tab Sheet overlay so the 3D scene keeps
     // full width. The inline #leftcol/.rail-thread path is hidden below 1100px (globals.css).
     return (
-      <RailDock side="left" label="Explore" style={accent}>
+      // `signalKey` = the same subject RailThread pulses on (desktop-only) — RailDock replays the
+      // view/filter-switch pulse on the sheet edge / tab edge so tablet keeps the signal.
+      <RailDock side="left" label="Explore" style={accent} signalKey={`${mode}|${filter}`}>
         {content}
       </RailDock>
     );

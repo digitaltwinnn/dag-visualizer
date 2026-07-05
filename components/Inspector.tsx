@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { cn } from "@/lib/utils";
 import { useStore, type SelSlot } from "@/src/store/store";
-import { filterAccent, CORE_HEX } from "@/src/data/network";
+import { filterAccent, metagraphById, CORE_HEX } from "@/src/data/network";
 import { identityHudHex } from "@/src/palette/identity";
 import { hoverKeyOf } from "@/src/data/hoverSubject";
 import { subjectPairing } from "@/components/useSubjectPairing";
@@ -94,12 +94,28 @@ const INVITE: Partial<Record<Mode, string>> = {
   geo: "Click a node on the globe (or a row in the explorer) to inspect it.",
   ledger: "Click a snapshot block (or a bar in the strip below) to inspect it.",
 };
-function PickHint({ mode }: { mode: Mode }) {
-  const line = INVITE[mode];
-  if (!line) return null;
+
+// ONE state-aware hint (user decision 2026-07-05, option c): view + pickability → message, so the
+// slot always shows SOME guidance and never a FALSE one. Normally the view's pick-invite above;
+// but when the selected network has nothing pickable in this view (geo with 0 locatable nodes —
+// e.g. TBC/LEET), inviting a click would be a dead hint, so it turns into the honest variant
+// instead. `selNodes` is exactly the set the globe plots + the explorer lists (empty ⇔ nothing
+// pickable). "All" with 0 nodes = the data simply hasn't landed yet (boot), not a real empty
+// selection → no hint rather than a false one flashing at startup.
+function pickHintText(mode: Mode, filter: string, selNodesCount: number): string | null {
+  const invite = INVITE[mode];
+  if (!invite) return null;
+  if (mode === "geo" && selNodesCount === 0) {
+    const cfg = metagraphById(filter);
+    if (!cfg) return null;
+    return `${cfg.ticker || cfg.name} has no locatable nodes — explore it in the Hypergraph view.`;
+  }
+  return invite;
+}
+function PickHint({ text }: { text: string }) {
   return (
     <p className="flex items-center gap-2 mt-[2px] mx-1 mb-0 py-0 px-[var(--panel-pad-x)] text-[12px] text-muted-foreground">
-      <StandbyHalo /> {line}
+      <StandbyHalo /> {text}
     </p>
   );
 }
@@ -158,13 +174,10 @@ export default function Inspector() {
   const panes = selStack.filter((slot) => cards[slot]?.active).map((slot) => cards[slot].pane);
   const hasDetail = panes.length > 0;
 
-  // The pick-invite only shows when there IS something to pick. In geo a filtered metagraph can
-  // have ZERO locatable nodes (the left rail's quiet-empty state, e.g. LEET) — nothing on the
-  // globe and no explorer rows, so inviting a click would be a dead hint; the quiet-empty card
-  // owns the messaging and the rail rests with just the Context dossier. `selNodes` is exactly
-  // the set the globe plots + the explorer lists, so empty ⇔ nothing pickable.
+  // The state-aware hint (pickHintText above): normal invite, honest no-pickables variant, or
+  // nothing (no detail slot noise while a Detail card is up, and no hint in the pick-less views).
   const selNodes = useStore((s) => s.selNodes);
-  const showHint = !hasDetail && !(mode === "geo" && selNodes.length === 0);
+  const hintText = hasDetail ? null : pickHintText(mode, filter, selNodes.length);
 
   // Stable identity of "whichever Detail is on top" — a node by its hover-pairing key (falls
   // back to its kind so a keyless node still counts as an identity), a snapshot by ordinal. Used
@@ -255,7 +268,7 @@ export default function Inspector() {
     <>
       <ContextCard />
       {panes}
-      {showHint && <PickHint mode={mode} />}
+      {hintText && <PickHint text={hintText} />}
     </>
   );
 
@@ -277,7 +290,7 @@ export default function Inspector() {
         >
           <ContextCard />
           {panes}
-          {showHint && <PickHint mode={mode} />}
+          {hintText && <PickHint text={hintText} />}
         </div>
       </>
     );
@@ -300,7 +313,7 @@ export default function Inspector() {
     // Tablet: unchanged — the right edge tab opening a right-side Sheet, independent of the
     // left "Explore" dock (both can be open at once).
     return (
-      <RailDock side="right" label="Details" style={accent} hint={hint} pulseKey={pulse} pulseGlyph={pulse.glyph} pulseHue={pulse.hue} onOpenChange={handleOpenChange}>
+      <RailDock side="right" label="Details" style={accent} hint={hint} pulseKey={pulse} pulseGlyph={pulse.glyph} pulseHue={pulse.hue} signalKey={`${mode}|${filter}`} onOpenChange={handleOpenChange}>
         {content}
       </RailDock>
     );
