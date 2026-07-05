@@ -288,8 +288,8 @@ and keep changing, so they're examples, not the contract.
 - **Top** (`TopBar`) = the **command bar**: one full-width glass bar whose edges align with
   the rail columns (26px) on desktop. Three regions on one row: **status + filter** (left —
   the ECG heartbeat mark + "DAG Visualizer", then the filter button whose face is a small
-  identity dot + network name — on the condensed breakpoints (≤940px) where the "FILTER" text
-  label hides, a lucide `Filter` funnel stands in for it (never both); clicking opens the
+  identity dot + network name — on the condensed breakpoints the "FILTER" text label simply
+  hides (a stand-in funnel icon was tried and rejected as too busy); clicking opens the
   **detached filter popover** — a stock Radix
   `Popover` 6px below the button hosting the shadcn `Command` picker; the detached popover is
   the *intentional* design, an anchored bar-expansion variant was tried and rejected), the
