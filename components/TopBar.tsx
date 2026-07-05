@@ -189,7 +189,10 @@ export default function TopBar() {
                 "data-[state=on]:shadow-[inset_0_0_0_1px_var(--sel-border)]",
                 "max-[1099px]:min-h-11 max-[1099px]:min-w-11 max-[1099px]:justify-center",
                 "max-[1120px]:px-2 max-[1120px]:py-1.5 max-[1120px]:text-[12px]",
-                "max-[699px]:p-1.5 max-[699px]:min-w-0",
+                // Phone keeps the ≥44px touch WIDTH (the min-w-11 above still applies — the old
+                // `max-[699px]:min-w-0` override made the icon-only radios too narrow to press);
+                // only the padding condenses. Room is fine: phone shows just the 3 working views.
+                "max-[699px]:p-1.5",
                 "soon" in v && v.soon && "opacity-45",
               )}
             >
@@ -208,6 +211,18 @@ export default function TopBar() {
         {bp === "phone" && (
           <VitalsToggle ref={vitalsBtnRef} open={vitalsOpen} onClick={() => { setVitalsOpen((o) => !o); setOpen(false); }} />
         )}
+      </div>
+
+      {/* Selected-view label — only on the icon-only breakpoints (<1100px, where the switch
+          drops its text labels): the ACTIVE view's name, centered at the bar's bottom edge as a
+          slim second row of the SAME bar surface (chosen over floating it beneath the bar — the
+          banner+bar stack stays one tidy block and nothing overlays the scene). Muted eyebrow
+          language; keyed roll-in on view change (the HUD grammar). Decorative echo of the
+          radiogroup's own accessible state, so aria-hidden. */}
+      <div className="hidden max-[1099px]:flex justify-center pb-1.5 -mt-1" aria-hidden>
+        <span key={mode} className="roll-in text-[10px] tracking-[0.12em] uppercase text-muted-foreground leading-none">
+          {VIEWS.find((v) => v.id === mode)?.name}
+        </span>
       </div>
       </div>
 
