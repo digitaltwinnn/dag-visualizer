@@ -31,8 +31,12 @@ mode !== "ledger"`):
   a faint abstract wireframe schematic of what the view will become, labelled
   `preview · in development` so it never reads as live data (no numbers, no fabricated
   values). The left rail shows only the view's About card; the bottom stream (`LiveStrip`)
-  is ALWAYS present regardless of view. Top-bar view glyphs are plain monochrome symbols —
-  **never emoji** (emoji ignore CSS `color` / the accent).
+  is ALWAYS present regardless of view. **Interface glyphs are ONE icon system: `lucide-react`,
+  monochrome via `currentColor`** (so the accent/identity tinting inherits), **never emoji** (emoji
+  ignore CSS `color` / the accent). The centralized view→icon map is `components/icons.tsx`
+  (`VIEW_ICONS` + `iconForPick`), shared by the view switch, the card-head kind marks, and the
+  tablet/phone signal chips. The bespoke marks that remain text/SVG on purpose are the identity
+  dots, the ECG mark, and the Tooltip's `‹›` punctuation.
 
 Only `hyper`↔`geo` **morph** (`morph` 0→1, eased each frame); the blue L0 core literally
 **grows out into the globe** (`layers.js`) as the nodes fly to their map positions. `ledger`
@@ -287,7 +291,9 @@ and keep changing, so they're examples, not the contract.
   identity dot + network name; clicking opens the **detached filter popover** — a stock Radix
   `Popover` 6px below the button hosting the shadcn `Command` picker; the detached popover is
   the *intentional* design, an anchored bar-expansion variant was tried and rejected), the
-  **view switch** (center — a `ToggleGroup` of six monochrome glyphs ◆ ◍ ▦ ◉ ⇄ ⬢), and the
+  **view switch** (center — a `ToggleGroup` of six monochrome lucide icons: `Orbit` hyper /
+  `Globe` geo / `Layers` ledger / `Activity` status / `ArrowLeftRight` transactions / `HandCoins`
+  staking, from `VIEW_ICONS`), and the
   **view vitals** (right, `Vitals`). **The vitals region is constant-width**: all view
   clusters render stacked in one grid cell (inactive ones `invisible` + `aria-hidden`) so the
   centered view switch never jumps on a view change; sparklines condense away ≤1240px.
@@ -434,8 +440,9 @@ code — reference the tokens. The SVG `RailThread` mirrors the `--thread-*` lit
   (`#rightcol` is `pointer-events:none` so gaps click through to the scene), spine suppressed
   (`--spine:transparent`), flat `18px` pad, `flex-none`.
 - **`Button`** — adopted only for small text/icon controls that map cleanly onto a variant:
-  the card × close and +/− collapse (`ghost`/`icon-xs`), "Show more" (`link`/`xs`), the
-  dossier's ↗ site link. **Deliberately NOT Buttons** (bespoke instrument controls):
+  the card close (`X`) and collapse (`Plus`/`Minus`) marks (`ghost`/`icon-xs`, lucide),
+  "Show more" (`link`/`xs`), the dossier's `ExternalLink` site link. **Deliberately NOT
+  Buttons** (bespoke instrument controls):
   LiveStrip bars, country/node accordion rows, rail edge-tabs, phone-dock halves, the view
   switch (ToggleGroup), the filter-bar button. That boundary is the convention.
 - **`Command`** (cmdk) — the filter picker, inside the detached `Popover`; its cursor wash is
@@ -485,9 +492,10 @@ signal channel.**
   sheet edge (open) or the rail tab (closed).
 - **Signal chips** (collapsed rails, tablet/phone): the dock tab's "new detail" hint dot is
   purely visual (never opens the sheet). On a hosted card's data update the dot replays a
-  one-shot pulse and briefly **morphs into the updating card's type glyph** — ◆ dossier /
-  ◍ node / ▦ snapshot, identity-tinted, ~2s, then settles back (`RailDock`
-  `pulseGlyph`/`pulseHue`; Inspector owns the kind→glyph mapping, most-specific wins:
+  one-shot pulse and briefly **morphs into the updating card's type icon** — `Orbit` dossier /
+  `Globe` node / `Layers` snapshot (the `VIEW_ICONS` marks), identity-tinted, ~2s, then settles
+  back (`RailDock` `pulseGlyph`/`pulseHue` now take a `LucideIcon`; Inspector owns the
+  kind→icon mapping, most-specific wins:
   node > snapshot > dossier; a pure deselect announces nothing).
 - **Calm tempo**: the heartbeat family (ECG scan, filter dot `dot-beat`, card-title dots,
   live dots `breathe`) beats at 1.5s; transient signals (edge pulse, hold-fade) run ~1.2s/
@@ -529,7 +537,7 @@ cards: **eyebrow / title / INSET hairline / body**.
   the `--sel-bg` wash + 1px inset `--sel-border` ring **as one box-shadow** (deliberate:
   the transient states it must compose with — cmdk's cursor wash, the pairing row wash — are
   background-based, and box-shadow is an independent property), plus the reserved trailing
-  **✓** (`SelectedRowMark`, absolute in a `pr-7` slot so columns never shift). Mirrors the
+  **`Check` mark** (`SelectedRowMark`, lucide, absolute in a `pr-7` slot so columns never shift). Mirrors the
   view switch's on-state.
 - **`subjectPairing(active, key, set, hue)`** (`useSubjectPairing.ts`) is the ONE scene↔HUD
   hover coupling: a subject is paired when its key equals its store channel's value

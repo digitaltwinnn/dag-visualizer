@@ -6,7 +6,7 @@ import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { PulseEdge, useEdgePulse } from "@/components/EdgePulse";
-import { Compass, ListTree, ChevronLeft, ChevronRight } from "lucide-react";
+import { Compass, ListTree, ChevronLeft, ChevronRight, X, type LucideIcon } from "lucide-react";
 
 const PULSE_MS = 900;
 // How long the hint dot stays morphed into the updating card's type glyph before settling back.
@@ -43,8 +43,8 @@ const GLYPH_MS = 2000;
 // for a DATA update on an already-seen card (`hint` staying false across the bump).
 //
 // `pulseGlyph`/`pulseHue`: the SIGNAL CHIP (user-approved 2026-07-05). When provided alongside a
-// `pulseKey` bump, the dot briefly MORPHS into the updating card's type glyph (◆ dossier / ◍ node /
-// ▦ snapshot — the same monochrome marks the card heads use), tinted the updating card's
+// `pulseKey` bump, the dot briefly MORPHS into the updating card's type icon (Orbit dossier / Globe
+// node / Layers snapshot — the same monochrome lucide marks the card heads use), tinted the updating card's
 // identity/spine hue, rides the same one-shot pulse, then settles back to the plain dot
 // (~GLYPH_MS total). So a closed tab doesn't just "feel alive" — it says WHICH kind of card just
 // updated. Presentation-only props (a glyph string + a CSS colour), so RailDock stays generic —
@@ -102,7 +102,7 @@ export default function RailDock({
   children: ReactNode;
   hint?: boolean;
   pulseKey?: unknown;
-  pulseGlyph?: string;
+  pulseGlyph?: LucideIcon;
   pulseHue?: string;
   onOpenChange?: (open: boolean) => void;
   sheetSide?: "left" | "right" | "bottom";
@@ -136,7 +136,7 @@ export default function RailDock({
   const prevHint = useRef(hint);
   // The signal chip: while set, the dot renders as the updating card's type glyph (see the
   // prop doc above). One timer; a new bump inside the window just restarts it.
-  const [glyphFlash, setGlyphFlash] = useState<{ glyph: string; hue?: string } | null>(null);
+  const [glyphFlash, setGlyphFlash] = useState<{ glyph: LucideIcon; hue?: string } | null>(null);
   const glyphTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => () => { if (glyphTimer.current) clearTimeout(glyphTimer.current); }, []);
   useEffect(() => {
@@ -294,15 +294,16 @@ export default function RailDock({
   // pulse; TRANSIENT (pulseKey only, `hint` false) → invisible at rest, a one-shot WAAPI pulse
   // plays on the ref (see the effect above). Absolutely positioned on the tab so it never grows
   // the 44px tap target.
+  const FlashIcon = glyphFlash?.glyph;
   const dot = showDot && (
     <span
       ref={dotRef}
       className={cn(
         isBarHalf ? "static ml-0.5" : cn("absolute", side === "left" ? "right-1" : "left-1"),
         glyphFlash
-          ? // Signal chip: the card-type glyph, identity-tinted, visible for the whole window
+          ? // Signal chip: the card-type icon, identity-tinted, visible for the whole window
             // (the WAAPI pulse rides on top; reduced motion → this static swap alone).
-            cn("text-label leading-none", !isBarHalf && "top-1")
+            cn("leading-none", !isBarHalf && "top-1")
           : cn(
               "w-2 h-2 rounded-full bg-[var(--primary)] shadow-[0_0_6px_1px_var(--primary)]",
               !isBarHalf && "top-1.5",
@@ -314,7 +315,7 @@ export default function RailDock({
       style={glyphFlash ? { color: glyphFlash.hue ?? "var(--primary)" } : undefined}
       aria-hidden="true"
     >
-      {glyphFlash?.glyph}
+      {FlashIcon && <FlashIcon className="size-3.5" />}
     </span>
   );
   return (
@@ -464,10 +465,9 @@ export default function RailDock({
                 aria-label={`Close ${label} panel`}
                 title={`Close ${label} panel`}
                 onClick={() => handleOpenChange(false)}
-                /* text-[22px]: control-glyph size for the × close — outside the HUD text scale (a one-off). */
-                className="flex-none w-11 h-11 rounded-[var(--radius)] text-[22px] leading-none cursor-pointer text-muted-foreground hover:bg-transparent hover:text-muted-foreground dark:hover:bg-transparent"
+                className="flex-none w-11 h-11 rounded-[var(--radius)] leading-none cursor-pointer text-muted-foreground hover:bg-transparent hover:text-muted-foreground dark:hover:bg-transparent"
               >
-                ×
+                <X aria-hidden className="size-5" />
               </Button>
             </div>
           )}

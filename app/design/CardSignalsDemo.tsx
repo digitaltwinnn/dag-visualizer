@@ -5,6 +5,7 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import CardHead, { RIGHT_CARD } from "@/components/CardHead";
 import { PulseEdge } from "@/components/EdgePulse";
+import { Play } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 // /design demo for the card signal system (EdgePulse.tsx + the unlayered recipes in globals.css):
@@ -57,8 +58,8 @@ export default function CardSignalsDemo() {
   return (
     <div className="max-w-3xl">
       <div className="mb-3">
-        <Button variant="ghost" size="xs" className="border border-border" onClick={() => setPulseKey((k) => k + 1)}>
-          ▸ trigger update pulse
+        <Button variant="ghost" size="xs" className="border border-border inline-flex items-center gap-1.5" onClick={() => setPulseKey((k) => k + 1)}>
+          <Play aria-hidden className="size-3" /> trigger update pulse
         </Button>
       </div>
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3 mb-4">

@@ -1,3 +1,4 @@
+import { TriangleAlert } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 // A quiet notice that the app is a work in progress — pinned at the very top, above the command
@@ -9,13 +10,13 @@ export default function ExperimentalBanner() {
       id="experimental-banner"
       role="note"
       className={cn(
-        "fixed inset-x-0 top-0 z-[13] flex items-baseline justify-center gap-[7px]",
+        "fixed inset-x-0 top-0 z-[13] flex items-center justify-center gap-[7px]",
         "py-[5px] px-4 bg-[var(--panel)] border-b border-b-[color-mix(in_oklch,var(--warn-soft)_22%,transparent)]",
         "backdrop-blur-[14px] text-label whitespace-nowrap overflow-hidden pointer-events-none",
         "max-[700px]:px-3 max-[700px]:py-[5px] max-[700px]:gap-1.5",
       )}
     >
-      <span aria-hidden className="text-warn-soft text-label opacity-85 flex-none">△</span>
+      <TriangleAlert aria-hidden className="text-warn-soft size-3.5 opacity-85 flex-none" />
       <span className="text-warn-soft text-micro font-bold tracking-caps uppercase flex-none">
         Experimental
       </span>

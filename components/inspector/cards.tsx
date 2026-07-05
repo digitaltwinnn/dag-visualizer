@@ -14,6 +14,8 @@ import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { SonarRing, NodeStars, NoSignalDot } from "@/components/state/StateAtoms";
+import { VIEW_ICONS } from "@/components/icons";
+import { ExternalLink } from "lucide-react";
 import { useMinHold } from "@/components/useMinHold";
 import { VIS } from "../../js/config.js";
 import { Desc, StatusMark, CompositionRows, StatusBreakdown, networkKind } from "./parts";
@@ -27,14 +29,16 @@ type PickOf<K extends PickDescriptor["kind"]> = Extract<PickDescriptor, { kind: 
 // area. These exports are what InspectorCard feeds CardHead per kind; the bodies below render
 // NO title rows of their own.
 
-// Snapshot title: ▦ type-marker (the SAME glyph the top bar uses for the Snapshots view — the
-// card head marks speak the view-glyph vocabulary; cyan = a GLOBAL snapshot) + the ordinal. The
+// Snapshot title: the Snapshots view mark (Layers — the SAME lucide icon the top bar uses for the
+// Snapshots view; the card head marks speak the view-glyph vocabulary; cyan = a GLOBAL snapshot) +
+// the ordinal. The
 // Odometer owns the roll (digit-roll on each live tick), so no CardHead `titleKey` — a keyed
 // remount would restart it as a whole-title roll-in instead.
 export function SnapshotTitle({ data: d }: { data: GlobalSnapshot }) {
+  const Mark = VIEW_ICONS.ledger;
   return (
-    <span className="inline-flex items-baseline gap-2">
-      <span className="text-primary text-title" aria-hidden>▦</span>
+    <span className="inline-flex items-center gap-2">
+      <Mark aria-hidden className="flex-none size-3.5 text-primary" />
       <Odometer value={d.ordinal} className="text-title font-semibold text-foreground tabular-nums" />
     </span>
   );
@@ -113,8 +117,8 @@ function nodePlace(node: NonNullable<ReturnType<typeof inspectedNode>>): string 
   return g ? `${g.city ? g.city + ", " : ""}${g.country ?? ""}`.trim() : "";
 }
 
-// Node title: ◍ type-marker (the Geography view's top-bar glyph — same view-glyph vocabulary as
-// the snapshot head's ▦; identity-hued) + the node's LOCATION ("City, Country" — user-agreed:
+// Node title: the Geography view mark (Globe — the Geography view's top-bar icon, same view-glyph
+// vocabulary as the snapshot head's Layers; identity-hued) + the node's LOCATION ("City, Country" — user-agreed:
 // where the node sits is the headline; its hash is bookkeeping, demoted to the subtitle below).
 // Fallback when geolocation hasn't resolved: the truncated id (mono) stays the title, no
 // subtitle. The roll-in stays keyed on the node ID — the subject's identity, not the title text
@@ -127,9 +131,10 @@ export function GeoLiveTitle() {
   const place = nodePlace(node);
   const title = place || (id ? shortHash(id) : node.node?.ip || "Node");
   const color = node.kind === "metanode" ? (node.meta ? identityHudHex(node.meta.id) : undefined) : CORE_HEX;
+  const Mark = VIEW_ICONS.geo;
   return (
     <span className="inline-flex items-center gap-2 min-w-0">
-      {color && <span className="flex-none text-title leading-none" style={{ color }} aria-hidden>◍</span>}
+      {color && <Mark className="flex-none size-3.5" style={{ color }} aria-hidden />}
       <span key={id ?? title} className={cn("min-w-0 roll-in", !place && "font-mono tabular-nums break-all")}>{title}</span>
     </span>
   );
@@ -156,7 +161,7 @@ export function GeoLiveAside() {
 }
 
 // A clicked Global L0 snapshot: what it anchored and what it settled (fees/size/rewards). Its
-// place in the DAG (◆ + ordinal + live/age) is the card HEAD now (SnapshotTitle/SnapshotAside).
+// place in the DAG (the Layers mark + ordinal + live/age) is the card HEAD now (SnapshotTitle/SnapshotAside).
 export function SnapshotCard({ data: d }: { data: GlobalSnapshot }) {
   // EXACT totals from the raw L0 snapshot (via RawSnapshotBridge) are the ONLY source for the fee
   // + anchored breakdown — authoritative (the true total, incl. unlisted). If they aren't here yet
@@ -288,7 +293,7 @@ export function MetaCard({ cfg }: { cfg: MetaCfg }) {
 }
 
 // The dossier's site/explorer link (user-agreed: the footer link row was rarely used and ate a
-// full row) — an icon-only ghost ↗ riding the TITLE row's aside slot, pinned FLUSH to the
+// full row) — an icon-only ghost ExternalLink riding the TITLE row's aside slot, pinned FLUSH to the
 // card's content edge on the avatar + name + ticker line (the name truncates, the icon doesn't
 // move). Flush mechanics (measured): the negative right margin collapses CardHead's aside
 // wrapper to zero width AT the title row's `pr-[22px]` inset edge, and the icon's own `w-[22px]`
@@ -305,10 +310,10 @@ export function MetaSiteAction({ site }: { site: string }) {
       asChild
       variant="ghost"
       size="icon-xs"
-      className="size-auto w-[22px] justify-end rounded-md py-1 px-0 -mr-[30px] text-title leading-none cursor-pointer text-primary/70 hover:bg-transparent hover:text-primary dark:hover:bg-transparent"
+      className="size-auto w-[22px] justify-end rounded-md py-1 px-0 -mr-[30px] leading-none cursor-pointer text-primary/70 hover:bg-transparent hover:text-primary dark:hover:bg-transparent"
     >
       <a href={site} target="_blank" rel="noopener noreferrer" aria-label={domain} title={domain}>
-        ↗
+        <ExternalLink aria-hidden className="size-3.5" />
       </a>
     </Button>
   );

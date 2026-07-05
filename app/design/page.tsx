@@ -23,6 +23,8 @@ import {
 import OdometerDemo from "./OdometerDemo";
 import CardSignalsDemo from "./CardSignalsDemo";
 import EcgMark from "@/components/topbar/EcgMark";
+import { VIEW_ICONS } from "@/components/icons";
+import { Minus, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 // ── Structural lane — the shadcn oklch variables (globals.css :root). One source of truth.
@@ -187,8 +189,8 @@ export default async function DesignPage() {
           The design-system <code className="font-mono">Button</code> baseline. The app currently adopts
           it only for the small text/icon controls that map cleanly onto a variant with today&apos;s exact
           look (hover fills overridden away, a subtle focus-visible ring kept): the card{" "}
-          <code className="font-mono">×</code> close + <code className="font-mono">+/–</code> collapse
-          (CardHead, <code className="font-mono">ghost / icon-xs</code>), and Desc&apos;s
+          <code className="font-mono">X</code> close + <code className="font-mono">Plus/Minus</code> collapse
+          (CardHead, <code className="font-mono">ghost / icon-xs</code>, lucide icons), and Desc&apos;s
           &ldquo;Show more&rdquo; link (<code className="font-mono">link / xs</code>).
           <br />
           <span className="text-muted-foreground/80">
@@ -202,14 +204,14 @@ export default async function DesignPage() {
           <Button variant="link">link</Button>
           <Button variant="ghost" size="xs">ghost · xs</Button>
           <Button variant="link" size="xs">link · xs</Button>
-          <Button variant="ghost" size="icon-xs" title="collapse">–</Button>
+          <Button variant="ghost" size="icon-xs" title="collapse"><Minus aria-hidden className="size-3.5" /></Button>
           <Button
             variant="ghost"
             size="icon-xs"
             title="close"
-            className="size-auto py-0.5 px-2 text-[22px] leading-none text-muted-foreground hover:bg-transparent hover:text-muted-foreground dark:hover:bg-transparent"
+            className="size-auto py-0.5 px-2 leading-none text-muted-foreground hover:bg-transparent hover:text-muted-foreground dark:hover:bg-transparent"
           >
-            ×
+            <X aria-hidden className="size-4" />
           </Button>
         </div>
       </section>
@@ -273,9 +275,9 @@ export default async function DesignPage() {
             </span>
           </span>
           <ToggleGroup type="single" defaultValue="a" variant="outline">
-            <ToggleGroupItem value="a">◆</ToggleGroupItem>
-            <ToggleGroupItem value="b">◍</ToggleGroupItem>
-            <ToggleGroupItem value="c">▦</ToggleGroupItem>
+            <ToggleGroupItem value="a"><VIEW_ICONS.hyper aria-hidden className="size-4" /></ToggleGroupItem>
+            <ToggleGroupItem value="b"><VIEW_ICONS.geo aria-hidden className="size-4" /></ToggleGroupItem>
+            <ToggleGroupItem value="c"><VIEW_ICONS.ledger aria-hidden className="size-4" /></ToggleGroupItem>
           </ToggleGroup>
           <Avatar className="size-8">
             <AvatarFallback>DED</AvatarFallback>

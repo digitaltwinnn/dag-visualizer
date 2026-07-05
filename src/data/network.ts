@@ -90,7 +90,7 @@ const DAG_CFG: MetagraphConfig = {
   id: "dag", name: "DAG", ticker: "DAG", color: COLORS.core,
   iconUrl: "https://stargazer-assets.s3.us-east-2.amazonaws.com/logos/dag.png",
   // The DAG isn't in the live metaList's siteUrl lane (Engine publishes it with
-  // `siteUrl: undefined`), so its dossier ↗ link resolves from THIS config fallback.
+  // `siteUrl: undefined`), so its dossier ExternalLink resolves from THIS config fallback.
   siteUrl: "https://constellationnetwork.io",
 };
 

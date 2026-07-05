@@ -16,6 +16,8 @@ import RailDock from "@/components/RailDock";
 import { useBreakpoint } from "@/components/useBreakpoint";
 import { PulseEdge, useEdgePulse } from "@/components/EdgePulse";
 import { StandbyHalo } from "@/components/state/StateAtoms";
+import { VIEW_ICONS } from "@/components/icons";
+import type { LucideIcon } from "lucide-react";
 import type { PickDescriptor } from "@/src/data/types";
 import type { Mode } from "@/src/store/store";
 
@@ -224,13 +226,13 @@ export default function Inspector() {
   // does NOT resurrect the persistent unseen dot, it's a separate transient animation.
   //
   // The pulse also carries WHICH card updated (the signal chip, user-approved 2026-07-05): the
-  // updating card's type glyph — ◆ dossier / ◍ node / ▦ snapshot, the same marks the card heads
+  // updating card's type icon — Orbit dossier / Globe node / Layers snapshot, the same lucide marks the card heads
   // use — plus its identity/spine hue (the exact hues the cards themselves pair with: the node's
   // metagraph hue or core cyan, the snapshot's/dossier's filter accent). RailDock morphs the hint
   // dot into it for ~2s. When several change in one commit (e.g. clicking a hyper node sets the
   // filter AND the node pick), the most specific card wins: node > snapshot > dossier. A pure
   // deselect (a pick clearing) keeps the plain dot — nothing "updated" to announce.
-  const [pulse, setPulse] = useState<{ n: number; glyph?: string; hue?: string }>({ n: 0 });
+  const [pulse, setPulse] = useState<{ n: number; glyph?: LucideIcon; hue?: string }>({ n: 0 });
   const pulseMounted = useRef(false);
   const pulsePrev = useRef({ inspect, snap, filter });
   useEffect(() => {
@@ -240,14 +242,14 @@ export default function Inspector() {
       pulseMounted.current = true;
       return;
     }
-    let glyph: string | undefined;
+    let glyph: LucideIcon | undefined;
     let hue: string | undefined;
     if (filter !== p.filter) {
-      glyph = "◆";
+      glyph = VIEW_ICONS.hyper;
       hue = filterAccent(filter);
     }
     if (snap !== p.snap && snap) {
-      glyph = "▦";
+      glyph = VIEW_ICONS.ledger;
       hue = filterAccent(filter);
     }
     if (
@@ -255,7 +257,7 @@ export default function Inspector() {
       inspect &&
       (inspect.kind === "l0" || inspect.kind === "l1" || inspect.kind === "metanode")
     ) {
-      glyph = "◍";
+      glyph = VIEW_ICONS.geo;
       hue = inspect.kind === "metanode" && inspect.meta ? identityHudHex(inspect.meta.id) : CORE_HEX;
     }
     // Only announce an actual update. A pure deselect (inspect/snap CLEARING with no filter change)

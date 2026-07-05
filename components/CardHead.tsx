@@ -1,6 +1,7 @@
 "use client";
 
 import type { ReactNode } from "react";
+import { Plus, Minus, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 
@@ -112,13 +113,12 @@ export default function CardHead({
               <Button
                 variant="ghost"
                 size="icon-xs"
-                /* text-[18px]: control-glyph size for the +/− collapse toggle — outside the HUD text scale (a one-off). */
-                className="w-5 h-[18px] p-0 rounded-md text-[18px] leading-none cursor-pointer text-muted-foreground hover:bg-transparent hover:text-foreground dark:hover:bg-transparent"
+                className="w-5 h-[18px] p-0 rounded-md leading-none cursor-pointer text-muted-foreground hover:bg-transparent hover:text-foreground dark:hover:bg-transparent"
                 title={collapsed ? "Expand" : "Collapse"}
                 aria-expanded={!collapsed}
                 onClick={onToggle}
               >
-                {collapsed ? "+" : "–"}
+                {collapsed ? <Plus aria-hidden className="size-3.5" /> : <Minus aria-hidden className="size-3.5" />}
               </Button>
             )}
           </div>
@@ -143,10 +143,9 @@ export default function CardHead({
           title={closeTitle}
           aria-label={closeTitle}
           onClick={onClose}
-          /* text-[22px]: control-glyph size for the × close — outside the HUD text scale (a one-off). */
-          className="absolute top-[10px] right-[10px] size-auto rounded-md py-0.5 px-2 text-[22px] leading-none cursor-pointer text-muted-foreground hover:bg-transparent hover:text-muted-foreground dark:hover:bg-transparent"
+          className="absolute top-[10px] right-[10px] size-auto rounded-md py-0.5 px-2 leading-none cursor-pointer text-muted-foreground hover:bg-transparent hover:text-muted-foreground dark:hover:bg-transparent"
         >
-          ×
+          <X aria-hidden className="size-4" />
         </Button>
       )}
       {eyebrow && <span className={cn("block mb-2 pr-[22px]", eyebrowClass)}>{eyebrow}</span>}

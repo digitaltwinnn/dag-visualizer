@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { ChevronDown } from "lucide-react";
+import { VIEW_ICONS } from "@/components/icons";
 import { useStore } from "@/src/store/store";
 import { metagraphById } from "@/src/data/network";
 import { hex } from "@/src/util/format";
@@ -15,12 +16,12 @@ import { useBreakpoint } from "@/components/useBreakpoint";
 import type { Mode } from "@/src/store/store";
 
 const VIEWS = [
-  { id: "hyper", label: "◆", name: "Hypergraph" },
-  { id: "geo", label: "◍", name: "Geography" },
-  { id: "ledger", label: "▦", name: "Snapshots" },
-  { id: "status", label: "◉", name: "Network", soon: true },
-  { id: "transactions", label: "⇄", name: "Transactions", soon: true },
-  { id: "staking", label: "⬢", name: "Staking", soon: true },
+  { id: "hyper", name: "Hypergraph" },
+  { id: "geo", name: "Geography" },
+  { id: "ledger", name: "Snapshots" },
+  { id: "status", name: "Network", soon: true },
+  { id: "transactions", name: "Transactions", soon: true },
+  { id: "staking", name: "Staking", soon: true },
 ] as const;
 
 // Collapsed filter face: a small identity dot + the network name in neutral text (no filled
@@ -146,7 +147,9 @@ export default function TopBar() {
           onValueChange={(v) => { if (v) setMode(v as Mode); }}
           className="flex gap-0.5 max-[699px]:gap-0"
         >
-          {(bp === "phone" ? VIEWS.filter((v) => !("soon" in v && v.soon)) : VIEWS).map((v) => (
+          {(bp === "phone" ? VIEWS.filter((v) => !("soon" in v && v.soon)) : VIEWS).map((v) => {
+            const Icon = VIEW_ICONS[v.id as Mode];
+            return (
             <ToggleGroupItem
               key={v.id}
               value={v.id}
@@ -172,10 +175,11 @@ export default function TopBar() {
                 "soon" in v && v.soon && "opacity-45",
               )}
             >
-              <span className="text-body leading-none group-data-[state=on]:text-primary">{v.label}</span>
+              <Icon aria-hidden className="size-4 group-data-[state=on]:text-primary" />
               <span className="text-label max-[1099px]:hidden">{v.name}</span>
             </ToggleGroupItem>
-          ))}
+          );
+          })}
         </ToggleGroup>
 
         <div className="flex-1" />

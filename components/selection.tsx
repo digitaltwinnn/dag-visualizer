@@ -1,3 +1,4 @@
+import { Check } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 // The ONE committed-selection language for LIST ROWS (user-agreed: the filter picker's design,
@@ -15,14 +16,10 @@ export const SELECTED_ROW =
   "text-foreground shadow-[inset_0_0_0_1px_var(--sel-border),inset_0_0_0_9999px_var(--sel-bg)]";
 
 // The deliberate glyph cue that makes the mark unmistakably "selected" (not a stray hover): a
-// monochrome ✓ in the accent — the same treatment as the view switch's on-glyph (text-primary).
-// Rows RESERVE the trailing slot (`pr-7` on every row) and the mark renders absolutely inside it
-// (`right-2`), the stock shadcn SelectItem pattern — so counts/status stay column-aligned and
-// nothing shifts when the selection moves.
+// monochrome Check (lucide) in the accent — the same treatment as the view switch's on-glyph
+// (text-primary). Rows RESERVE the trailing slot (`pr-7` on every row) and the mark renders
+// absolutely inside it (`right-2`), the stock shadcn SelectItem pattern — so counts/status stay
+// column-aligned and nothing shifts when the selection moves.
 export function SelectedRowMark({ className }: { className?: string }) {
-  return (
-    <span className={cn("text-body leading-none text-primary", className)} aria-hidden>
-      ✓
-    </span>
-  );
+  return <Check className={cn("size-3.5 text-primary", className)} aria-hidden />;
 }
