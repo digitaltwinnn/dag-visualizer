@@ -70,9 +70,9 @@ export default function FilterPicker({ onPick }: { onPick?: () => void }) {
             onMouseEnter={() => setHoverFilter("all")}
           >
             <IdentityDot hue="var(--primary)" />
-            <span className="text-[13px] text-foreground">All</span>
-            <span className="col-start-2 text-muted-foreground text-[11px]">whole network</span>
-            <span className="text-[11px] text-muted-foreground tabular-nums text-right">{mappedCount} · {totalNodes} nodes</span>
+            <span className="text-body text-foreground">All</span>
+            <span className="col-start-2 text-muted-foreground text-label">whole network</span>
+            <span className="text-label text-muted-foreground tabular-nums text-right">{mappedCount} · {totalNodes} nodes</span>
             {filter === "all" && <SelectedRowMark className="absolute right-2" />}
           </CommandItem>
         </CommandGroup>
@@ -89,18 +89,18 @@ export default function FilterPicker({ onPick }: { onPick?: () => void }) {
                 onMouseEnter={() => setHoverFilter(m.id)}
               >
                 <IdentityDot hue={hue} />
-                <span className="text-[13px] text-foreground">{m.name}</span>
-                <span className="text-[11px] font-semibold tabular-nums" style={{ color: hue }}>{m.symbol}</span>
+                <span className="text-body text-foreground">{m.name}</span>
+                <span className="text-label font-semibold tabular-nums" style={{ color: hue }}>{m.symbol}</span>
                 {off ? (
                   // Honest, non-numeric tag (Task 13): these are real metagraphs with no
                   // locatable node right now — still clickable (selectable in hyper/ledger), but
                   // a "0" count read as a broken value. A small muted lowercase tag using the
                   // squared-tag idiom (rounded-[4px] muted-foreground badge on a faint fill).
-                  <span className="justify-self-end rounded-[4px] px-[5px] py-[3px] text-[9.5px] leading-none tracking-[0.02em] text-muted-foreground bg-white/[0.035]">
+                  <span className="justify-self-end rounded-xs px-[5px] py-[3px] text-micro leading-none tracking-[0.02em] text-muted-foreground bg-white/[0.035]">
                     not located
                   </span>
                 ) : (
-                  <span className="text-[11px] text-muted-foreground tabular-nums text-right">{m.located}</span>
+                  <span className="text-label text-muted-foreground tabular-nums text-right">{m.located}</span>
                 )}
                 {filter === m.id && <SelectedRowMark className="absolute right-2" />}
               </CommandItem>

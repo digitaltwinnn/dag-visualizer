@@ -34,8 +34,8 @@ type PickOf<K extends PickDescriptor["kind"]> = Extract<PickDescriptor, { kind: 
 export function SnapshotTitle({ data: d }: { data: GlobalSnapshot }) {
   return (
     <span className="inline-flex items-baseline gap-2">
-      <span className="text-primary text-[14px]" aria-hidden>▦</span>
-      <Odometer value={d.ordinal} className="text-[15px] font-semibold text-foreground tabular-nums" />
+      <span className="text-primary text-title" aria-hidden>▦</span>
+      <Odometer value={d.ordinal} className="text-title font-semibold text-foreground tabular-nums" />
     </span>
   );
 }
@@ -91,8 +91,8 @@ export function MetaTitle({ cfg }: { cfg: MetaCfg }) {
       <span className="flex flex-col gap-px min-w-0">
         <span className="leading-[1.1]">{cfg.name}</span>
         <span className="inline-flex items-baseline gap-1.5 min-w-0">
-          <span className="text-[11px] font-semibold tracking-[0.02em] flex-none" style={{ color: hue }}>{cfg.ticker}</span>
-          <span className="text-[10px] font-normal text-muted-foreground truncate">{kind}</span>
+          <span className="text-label font-semibold tracking-[0.02em] flex-none" style={{ color: hue }}>{cfg.ticker}</span>
+          <span className="text-label font-normal text-muted-foreground truncate">{kind}</span>
         </span>
       </span>
     </span>
@@ -129,7 +129,7 @@ export function GeoLiveTitle() {
   const color = node.kind === "metanode" ? (node.meta ? identityHudHex(node.meta.id) : undefined) : CORE_HEX;
   return (
     <span className="inline-flex items-center gap-2 min-w-0">
-      {color && <span className="flex-none text-[14px] leading-none" style={{ color }} aria-hidden>◍</span>}
+      {color && <span className="flex-none text-title leading-none" style={{ color }} aria-hidden>◍</span>}
       <span key={id ?? title} className={cn("min-w-0 roll-in", !place && "font-mono tabular-nums break-all")}>{title}</span>
     </span>
   );
@@ -188,7 +188,7 @@ export function SnapshotCard({ data: d }: { data: GlobalSnapshot }) {
       <div className="saturate-[.45]">
         <div className="flex items-center gap-3 mt-1.5">
           <SonarRing key={retry} />
-          <div className="flex flex-col gap-[3px] text-[11.5px] text-muted-foreground">
+          <div className="flex flex-col gap-[3px] text-label text-muted-foreground">
             <span>Explorer API: unreachable</span>
             <span>Last good read: {lastGoodAt ? relativeAge(Date.now() - lastGoodAt) : "—"}</span>
           </div>
@@ -213,25 +213,25 @@ export function SnapshotCard({ data: d }: { data: GlobalSnapshot }) {
       {feeHold.show || exact == null ? (
         <div className="flex flex-col gap-2">
           <div className="flex items-start justify-between gap-2.5">
-            <span className="text-[12.5px] text-muted-foreground">Fees paid</span>
-            <span className={cn("flex flex-col items-end text-[13px] text-foreground tabular-nums", feeHold.fading && "animate-hold-fade-out motion-reduce:animate-none")}><NodeStars count={4} /></span>
+            <span className="text-body text-muted-foreground">Fees paid</span>
+            <span className={cn("flex flex-col items-end text-body text-foreground tabular-nums", feeHold.fading && "animate-hold-fade-out motion-reduce:animate-none")}><NodeStars count={4} /></span>
           </div>
         </div>
       ) : (
         <div className="flex flex-col gap-2">
           {exact.totalFee > 0 && (
             <div className="flex items-start justify-between gap-2.5">
-              <span className="text-[12.5px] text-muted-foreground">Fees paid</span>
-              <span className="flex flex-col items-end text-[13px] text-foreground tabular-nums">
+              <span className="text-body text-muted-foreground">Fees paid</span>
+              <span className="flex flex-col items-end text-body text-foreground tabular-nums">
                 <span className="animate-resolve-in motion-reduce:animate-none whitespace-nowrap"><b className="font-bold">{fmtDag(exact.totalFee)}</b> DAG</span>
-                <span className="text-[10.5px] text-muted-foreground">{fmtKB(exact.totalSizeKB)} settled</span>
+                <span className="text-label text-muted-foreground">{fmtKB(exact.totalSizeKB)} settled</span>
               </span>
             </div>
           )}
           {exact.rewardsDatum > 0 && (
             <div className="flex items-start justify-between gap-2.5">
-              <span className="text-[12.5px] text-muted-foreground">Rewards out</span>
-              <span className="flex flex-col items-end text-[13px] text-foreground tabular-nums">
+              <span className="text-body text-muted-foreground">Rewards out</span>
+              <span className="flex flex-col items-end text-body text-foreground tabular-nums">
                 <span className="animate-resolve-in motion-reduce:animate-none whitespace-nowrap"><b className="font-bold">{fmtDag(exact.rewardsDatum)}</b> DAG</span>
               </span>
             </div>
@@ -268,8 +268,8 @@ export function MetaCard({ cfg }: { cfg: MetaCfg }) {
               bold number, the addition — "with 3 different compositions" — as the 12px muted
               tail. Singulars handled ("1 node" / "with 1 composition" — no "different"). */}
           <div className="flex items-baseline gap-2 flex-wrap">
-            <span className="text-[13px] text-foreground"><b className="font-bold">{nodes.length}</b> node{nodes.length === 1 ? "" : "s"}</span>
-            <span className="text-[12px] text-muted-foreground">
+            <span className="text-body text-foreground"><b className="font-bold">{nodes.length}</b> node{nodes.length === 1 ? "" : "s"}</span>
+            <span className="text-label text-muted-foreground">
               with {compRows.length} {compRows.length === 1 ? "composition" : "different compositions"}
             </span>
           </div>
@@ -305,7 +305,7 @@ export function MetaSiteAction({ site }: { site: string }) {
       asChild
       variant="ghost"
       size="icon-xs"
-      className="size-auto w-[22px] justify-end rounded-md py-1 px-0 -mr-[30px] text-[14px] leading-none cursor-pointer text-primary/70 hover:bg-transparent hover:text-primary dark:hover:bg-transparent"
+      className="size-auto w-[22px] justify-end rounded-md py-1 px-0 -mr-[30px] text-title leading-none cursor-pointer text-primary/70 hover:bg-transparent hover:text-primary dark:hover:bg-transparent"
     >
       <a href={site} target="_blank" rel="noopener noreferrer" aria-label={domain} title={domain}>
         ↗
@@ -328,7 +328,7 @@ export function GeoLiveCard() {
 
   if (!node) {
     return (
-      <p className="text-muted-foreground text-[12px] mt-[2px] mb-0">
+      <p className="text-muted-foreground text-label mt-[2px] mb-0">
         Pick a node from the explorer on the left — or click one on the globe — to inspect it here.
       </p>
     );
@@ -353,7 +353,7 @@ function GeoLiveNode({ p }: { p: PickOf<"l0" | "l1" | "metanode"> }) {
           element). */}
       {oneNode.length > 0 && (
         <div className="my-2">
-          <span className="text-[10.5px] tracking-[0.1em] uppercase text-muted-foreground">Composition</span>
+          <span className="text-micro tracking-[0.1em] uppercase text-muted-foreground">Composition</span>
           <CompositionRows nodes={oneNode} />
         </div>
       )}

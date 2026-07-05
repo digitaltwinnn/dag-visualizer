@@ -151,7 +151,7 @@ export default function LiveStrip() {
         <div
           id="ls-tip"
           ref={tipRef}
-          className="fixed z-30 pointer-events-none py-2 px-[11px] bg-[rgba(8,12,26,0.92)] border border-border rounded-[8px] text-xs whitespace-nowrap -translate-x-1/2 -translate-y-[130%] flex flex-col gap-1"
+          className="fixed z-30 pointer-events-none py-2 px-[11px] bg-[var(--panel-solid)] border border-border rounded-btn text-body whitespace-nowrap -translate-x-1/2 -translate-y-[130%] flex flex-col gap-1"
           style={{ left: tip.x, top: tip.y }}
         >
           {/* Bare ordinal head — no '#'; a big mono number in a snapshot tooltip is obviously the ordinal. */}
@@ -160,37 +160,37 @@ export default function LiveStrip() {
             {isMeta ? (
               tip.mine > 0 ? (
                 <>
-                  <span className="flex items-center gap-1.5 text-muted-foreground text-[11px]">
+                  <span className="flex items-center gap-1.5 text-muted-foreground text-label">
                     <span className="flex-none w-2 h-2 rounded-full" style={{ background: accent }} />
                     {cfg!.ticker || cfg!.name}
                   </span>
-                  <span className="text-[#c7d0ea] text-[11px] tabular-nums">{tip.mine} of {tip.total} total</span>
+                  <span className="text-foreground-dim text-label tabular-nums">{tip.mine} of {tip.total} total</span>
                 </>
               ) : (
                 <>
-                  <span className="flex items-center gap-1.5 text-muted-foreground text-[11px]">
+                  <span className="flex items-center gap-1.5 text-muted-foreground text-label">
                     <span className="flex-none w-2 h-2 rounded-full" style={{ background: accent }} />
                     {cfg!.ticker || cfg!.name}
                   </span>
-                  <span className="text-muted-foreground text-[11px] tabular-nums">0 · none this tick ({tip.total} total)</span>
+                  <span className="text-muted-foreground text-label tabular-nums">0 · none this tick ({tip.total} total)</span>
                 </>
               )
             ) : (
               <>
-                <span className="text-muted-foreground text-[11px]">anchored</span>
-                <span className="text-[#c7d0ea] text-[11px] tabular-nums">{tip.total} metagraph snapshot{tip.total === 1 ? "" : "s"}</span>
+                <span className="text-muted-foreground text-label">anchored</span>
+                <span className="text-foreground-dim text-label tabular-nums">{tip.total} metagraph snapshot{tip.total === 1 ? "" : "s"}</span>
               </>
             )}
           </div>
           {/* Recency — relative + coarse; the live bar reads 'live now'. */}
-          <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground mt-1">
+          <div className="flex items-center gap-1.5 text-label text-muted-foreground mt-1">
             {tip.live ? (
               <><span className="w-[7px] h-[7px] rounded-full bg-primary shadow-[0_0_0_3px_color-mix(in_oklch,var(--primary)_30%,transparent)]" /> live now</>
             ) : (
               <>◷ {relativeAge(Date.now() - Date.parse(tip.ts))}</>
             )}
           </div>
-          <div className="text-[10px] text-muted-foreground opacity-70 mt-1">click to open snapshot</div>
+          <div className="text-label text-muted-foreground opacity-70 mt-1">click to open snapshot</div>
         </div>
       )}
     </section>

@@ -21,7 +21,7 @@ export const SELECTED_ROW =
 // nothing shifts when the selection moves.
 export function SelectedRowMark({ className }: { className?: string }) {
   return (
-    <span className={cn("text-[12px] leading-none text-primary", className)} aria-hidden>
+    <span className={cn("text-body leading-none text-primary", className)} aria-hidden>
       ✓
     </span>
   );

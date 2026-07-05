@@ -18,7 +18,7 @@ const CYAN = "#2af5ff";
 function Vital({ label, value, spark }: { label: string; value: React.ReactNode; spark?: number[] }) {
   return (
     <div className="flex flex-col gap-0.5 flex-none">
-      <span className="text-[10px] tracking-[0.1em] uppercase text-muted-foreground whitespace-nowrap">{label}</span>
+      <span className="text-micro tracking-[0.1em] uppercase text-muted-foreground whitespace-nowrap">{label}</span>
       <span
         className={cn(
           "flex items-center gap-[7px]",
@@ -30,7 +30,7 @@ function Vital({ label, value, spark }: { label: string; value: React.ReactNode;
           "max-[1240px]:gap-0 max-[1240px]:[&_.recharts-wrapper]:hidden",
         )}
       >
-        <span className="font-mono font-bold text-foreground tabular-nums whitespace-nowrap max-[1120px]:text-[13px]">{value}</span>
+        <span className="font-mono font-bold text-foreground tabular-nums whitespace-nowrap max-[1120px]:text-body">{value}</span>
         {spark && <Sparkline data={spark} color={CYAN} />}
       </span>
     </div>
@@ -155,10 +155,10 @@ export function VitalsToggle({ open, onClick }: { open: boolean; onClick: () => 
     <button
       type="button"
       className={cn(
-        "flex items-center justify-center min-w-11 min-h-11 px-2.5 rounded-[8px]",
+        "flex items-center justify-center min-w-11 min-h-11 px-2.5 rounded-btn",
         "bg-transparent border-0 text-muted-foreground cursor-pointer flex-none",
-        "hover:text-foreground hover:bg-[rgba(90,140,255,0.10)]",
-        open && "text-foreground bg-[rgba(90,140,255,0.10)]",
+        "hover:text-foreground hover:bg-wash-soft",
+        open && "text-foreground bg-wash-soft",
       )}
       aria-expanded={open}
       aria-label="Toggle vitals"

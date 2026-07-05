@@ -32,13 +32,13 @@ export default function Tooltip() {
     <div
       id="tooltip"
       ref={ref}
-      className="fixed z-30 pointer-events-none flex items-baseline gap-[7px] px-[10px] py-[6px] rounded-lg border border-border bg-[rgba(8,12,26,0.92)] text-xs whitespace-nowrap -translate-x-1/2 -translate-y-[140%] backdrop-blur-[8px]"
+      className="fixed z-30 pointer-events-none flex items-baseline gap-[7px] px-[10px] py-[6px] rounded-lg border border-border bg-[var(--panel-solid)] text-body whitespace-nowrap -translate-x-1/2 -translate-y-[140%] backdrop-blur-[8px]"
       style={{ borderColor: hover.color }}
     >
-      <span className="font-bold text-[11px] tracking-[0.02em]" style={{ color: hover.color }}>{hover.ident}</span>
+      <span className="font-bold text-label tracking-[0.02em]" style={{ color: hover.color }}>{hover.ident}</span>
       <span className="text-muted-foreground">·</span>
-      <span className={cn("text-foreground", hover.mono && "font-mono text-[11px]")}>{name}</span>
-      <span className="text-muted-foreground text-[10.5px] ml-[6px] opacity-75">click to inspect</span>
+      <span className={cn("text-foreground", hover.mono && "font-mono text-label")}>{name}</span>
+      <span className="text-muted-foreground text-label ml-[6px] opacity-75">click to inspect</span>
     </div>
   );
 }

@@ -302,7 +302,7 @@ export default function RailDock({
         glyphFlash
           ? // Signal chip: the card-type glyph, identity-tinted, visible for the whole window
             // (the WAAPI pulse rides on top; reduced motion → this static swap alone).
-            cn("text-[11px] leading-none", !isBarHalf && "top-1")
+            cn("text-label leading-none", !isBarHalf && "top-1")
           : cn(
               "w-2 h-2 rounded-full bg-[var(--primary)] shadow-[0_0_6px_1px_var(--primary)]",
               !isBarHalf && "top-1.5",
@@ -345,9 +345,9 @@ export default function RailDock({
               // The half fills its group; `!` beats the primitive's first/last rounding + the
               // toggle baseline's hover/on fills (this design owns its selection language).
               "w-full h-full rounded-none! items-center justify-center gap-2 cursor-pointer",
-              "bg-[rgba(12,16,32,0.35)] border border-[rgba(178,193,223,0.10)] backdrop-blur-[7px]",
-              "text-[12.5px] font-semibold tracking-[0.02em] text-muted-foreground",
-              "hover:bg-[rgba(12,16,32,0.35)] hover:text-muted-foreground",
+              "bg-[var(--panel-light)] border border-[var(--thread-faint)] backdrop-blur-[8px]",
+              "text-body font-semibold tracking-[0.02em] text-muted-foreground",
+              "hover:bg-[var(--panel-light)] hover:text-muted-foreground",
               "data-[state=on]:text-foreground data-[state=on]:bg-[var(--sel-bg)]",
               "data-[state=on]:shadow-[inset_0_2px_0_var(--sel-border)] data-[state=on]:[&_svg]:text-[var(--primary)]",
             )}
@@ -363,6 +363,7 @@ export default function RailDock({
         <button
           className={cn(
             "fixed z-[39] top-1/2 -translate-y-1/2 w-11 min-h-[56px] hidden items-center justify-center cursor-pointer",
+            /* text-[20px]: control-glyph size for the ‹/› edge-tab arrow — outside the HUD text scale (a one-off). */
             "bg-[var(--panel)] border border-border text-foreground backdrop-blur-[14px] text-[20px] leading-none",
             "min-[700px]:max-[1099px]:flex",
             side === "left" ? "left-0 rounded-r-[var(--radius)] border-l-0" : "right-0 rounded-l-[var(--radius)] border-r-0",
@@ -452,7 +453,7 @@ export default function RailDock({
             // Sheet's own chrome (label + close), ABOVE the hosted content so the ✕ never overlaps a
             // hosted card's top-right control. The close is ≥44px.
             <div className="flex items-center justify-between gap-2">
-              <SheetTitle className="m-0 text-[13px] font-semibold tracking-[0.02em] uppercase text-foreground opacity-90 [text-shadow:0_1px_2px_rgba(3,5,12,0.7)]">
+              <SheetTitle className="m-0 text-body font-semibold tracking-[0.02em] uppercase text-foreground opacity-90 [text-shadow:0_1px_2px_rgba(3,5,12,0.7)]">
                 {label}
               </SheetTitle>
               {/* The sheet's × on the same ghost-Button baseline as CardHead's card close (muted,
@@ -464,6 +465,7 @@ export default function RailDock({
                 aria-label={`Close ${label} panel`}
                 title={`Close ${label} panel`}
                 onClick={() => handleOpenChange(false)}
+                /* text-[22px]: control-glyph size for the × close — outside the HUD text scale (a one-off). */
                 className="flex-none w-11 h-11 rounded-[var(--radius)] text-[22px] leading-none cursor-pointer text-muted-foreground hover:bg-transparent hover:text-muted-foreground dark:hover:bg-transparent"
               >
                 ×

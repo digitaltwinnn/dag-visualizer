@@ -77,7 +77,7 @@ export default function TopBar() {
         {/* Brand */}
         <div className="flex items-center gap-2">
           <EcgMark />
-          <span className="font-semibold tracking-[-0.01em] text-[14px] max-[1099px]:hidden">
+          <span className="font-semibold tracking-[-0.01em] text-title max-[1099px]:hidden">
             <span className={live ? "text-foreground" : "text-muted-foreground opacity-70"}>DAG</span>{" "}
             <span className={cn("text-muted-foreground", !live && "opacity-70")}>Visualizer</span>
           </span>
@@ -89,20 +89,20 @@ export default function TopBar() {
         <Popover open={open} onOpenChange={setOpen}>
           <PopoverTrigger
             className={cn(
-              "flex items-center gap-[7px] bg-transparent border-0 cursor-pointer py-1.5 px-2 rounded-[8px]",
-              "hover:bg-[rgba(90,140,255,0.10)]",
-              open && "bg-[rgba(90,140,255,0.10)]",
+              "flex items-center gap-[7px] bg-transparent border-0 cursor-pointer py-1.5 px-2 rounded-btn",
+              "hover:bg-wash-soft",
+              open && "bg-wash-soft",
               "max-[1099px]:min-h-11",
               "max-[699px]:p-1.5 max-[699px]:gap-[5px]",
             )}
           >
-            <span className="text-[10px] tracking-[0.12em] uppercase text-muted-foreground max-[940px]:hidden">Filter</span>
+            <span className="text-micro tracking-caps uppercase text-muted-foreground max-[940px]:hidden">Filter</span>
             <span
               className="w-[9px] h-[9px] rounded-full flex-none animate-dot-beat motion-reduce:animate-none"
               style={{ background: face.dot }}
             />
-            <span className="text-[13px] text-foreground">{face.label}</span>
-            <span className="text-[9px] text-muted-foreground">{open ? "▴" : "▾"}</span>
+            <span className="text-body text-foreground">{face.label}</span>
+            <span className="text-micro text-muted-foreground">{open ? "▴" : "▾"}</span>
           </PopoverTrigger>
           {/* The picker content — a compact DETACHED popover under the filter button (user
               decision 2026-07-04: 6px gap + its own surface, NOT a bar-expansion drawer; that
@@ -151,13 +151,13 @@ export default function TopBar() {
                 // important variant beats toggle-group.tsx's `data-[spacing=0]:rounded-none`
                 // (class+attribute specificity) so ALL buttons, incl. the middle ones' hover/on
                 // fill, get the intended 8px corners (was: middle square, first/last 10px).
-                "group flex items-center gap-1.5 h-9 py-1.5 px-2.5 rounded-[8px]!",
+                "group flex items-center gap-1.5 h-9 py-1.5 px-2.5 rounded-btn!",
                 "text-muted-foreground bg-transparent border-0",
-                "hover:text-foreground hover:bg-[rgba(90,140,255,0.10)]",
+                "hover:text-foreground hover:bg-wash-soft",
                 "data-[state=on]:text-foreground data-[state=on]:bg-[var(--sel-bg)]",
                 "data-[state=on]:shadow-[inset_0_0_0_1px_var(--sel-border)]",
                 "max-[1099px]:min-h-11 max-[1099px]:min-w-11 max-[1099px]:justify-center",
-                "max-[1120px]:px-2 max-[1120px]:py-1.5 max-[1120px]:text-[12px]",
+                "max-[1120px]:px-2 max-[1120px]:py-1.5 max-[1120px]:text-label",
                 // Phone keeps the ≥44px touch WIDTH (the min-w-11 above still applies — the old
                 // `max-[699px]:min-w-0` override made the icon-only radios too narrow to press);
                 // only the padding condenses. Room is fine: phone shows just the 3 working views.
@@ -165,8 +165,8 @@ export default function TopBar() {
                 "soon" in v && v.soon && "opacity-45",
               )}
             >
-              <span className="text-[13px] leading-none group-data-[state=on]:text-primary">{v.label}</span>
-              <span className="text-[12px] max-[1099px]:hidden">{v.name}</span>
+              <span className="text-body leading-none group-data-[state=on]:text-primary">{v.label}</span>
+              <span className="text-label max-[1099px]:hidden">{v.name}</span>
             </ToggleGroupItem>
           ))}
         </ToggleGroup>
@@ -215,7 +215,7 @@ export default function TopBar() {
           the radiogroup's own accessible state, so aria-hidden; non-interactive (the wrapper's
           pointer-events-none passes scene clicks through the caption strip). */}
       <div className="hidden max-[1099px]:flex justify-end pr-2.5 mt-1.5" aria-hidden>
-        <span key={mode} className="roll-in text-[10px] tracking-[0.12em] uppercase text-muted-foreground leading-none">
+        <span key={mode} className="roll-in text-micro tracking-caps uppercase text-muted-foreground leading-none">
           {VIEWS.find((v) => v.id === mode)?.name}
         </span>
       </div>

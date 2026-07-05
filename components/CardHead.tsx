@@ -25,9 +25,9 @@ import { Button } from "@/components/ui/button";
 // Still two LAYOUTS, selected by `panel` (kept only for the structural split — padded flex-row
 // head with the collapse toggle vs. block-flow head with the absolute ×; behaviour of both
 // consumer kinds is unchanged). The title recipe + hairline are shared between them.
-const EYEBROW = "text-[8.5px] font-bold tracking-[0.1em] uppercase leading-none";
+const EYEBROW = "text-micro font-bold tracking-[0.1em] uppercase leading-none";
 // The ONE title standard every card head uses (panel h2 and inspector h3 alike).
-const TITLE = "m-0 text-[15px] font-semibold leading-[1.2]";
+const TITLE = "m-0 text-title font-semibold";
 
 // The right-rail card frame — the ONE definition of the inspector-rail Card composition. It is the
 // className you hand to `<Card asChild className={RIGHT_CARD}>`: the Card baseline already supplies
@@ -106,12 +106,13 @@ export default function CardHead({
           </div>
           <div className="flex items-center gap-1.5 flex-none pt-px">
             {caption != null && (
-              <span className="text-[10.5px] text-muted-foreground text-right tabular-nums">{caption}</span>
+              <span className="text-micro text-muted-foreground text-right tabular-nums">{caption}</span>
             )}
             {onToggle && (
               <Button
                 variant="ghost"
                 size="icon-xs"
+                /* text-[18px]: control-glyph size for the +/− collapse toggle — outside the HUD text scale (a one-off). */
                 className="w-5 h-[18px] p-0 rounded-md text-[18px] leading-none cursor-pointer text-muted-foreground hover:bg-transparent hover:text-foreground dark:hover:bg-transparent"
                 title={collapsed ? "Expand" : "Collapse"}
                 aria-expanded={!collapsed}
@@ -142,6 +143,7 @@ export default function CardHead({
           title={closeTitle}
           aria-label={closeTitle}
           onClick={onClose}
+          /* text-[22px]: control-glyph size for the × close — outside the HUD text scale (a one-off). */
           className="absolute top-[10px] right-[10px] size-auto rounded-md py-0.5 px-2 text-[22px] leading-none cursor-pointer text-muted-foreground hover:bg-transparent hover:text-muted-foreground dark:hover:bg-transparent"
         >
           ×
@@ -155,7 +157,7 @@ export default function CardHead({
             {aside != null && <span className="ml-auto flex-none">{aside}</span>}
           </div>
           {subtitle != null && (
-            <div className="mt-1 text-[11px] leading-none text-muted-foreground overflow-hidden text-ellipsis whitespace-nowrap">
+            <div className="mt-1 text-label leading-none text-muted-foreground overflow-hidden text-ellipsis whitespace-nowrap">
               {subtitle}
             </div>
           )}

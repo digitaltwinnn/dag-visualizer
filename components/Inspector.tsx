@@ -114,7 +114,7 @@ function pickHintText(mode: Mode, filter: string, selNodesCount: number): string
 }
 function PickHint({ text }: { text: string }) {
   return (
-    <p className="flex items-center gap-2 mt-[2px] mx-1 mb-0 py-0 px-[var(--panel-pad-x)] text-[12px] text-muted-foreground">
+    <p className="flex items-center gap-2 mt-[2px] mx-1 mb-0 py-0 px-[var(--panel-pad-x)] text-label text-muted-foreground">
       <StandbyHalo /> {text}
     </p>
   );

@@ -114,9 +114,9 @@ export default function Blueprint() {
   return (
     <figure id="blueprint" className="fixed inset-0 z-[6] flex flex-col items-center justify-center gap-[22px] pointer-events-none px-6">
       <div className="opacity-50">{art}</div>
-      <figcaption className="flex flex-col items-center gap-2 text-center max-w-[380px]">
-        <span className="text-[11px] tracking-[0.14em] uppercase [color:color-mix(in_oklch,var(--primary)_80%,#fff)] opacity-[0.85]">preview · in development</span>
-        <span className="text-[13px] text-muted-foreground leading-[1.5]">{CAPTION[mode]}</span>
+      <figcaption className="flex flex-col items-center gap-2 text-center max-w-[360px]">
+        <span className="text-label tracking-caps uppercase [color:color-mix(in_oklch,var(--primary)_80%,#fff)] opacity-[0.85]">preview · in development</span>
+        <span className="text-body text-muted-foreground">{CAPTION[mode]}</span>
       </figcaption>
     </figure>
   );

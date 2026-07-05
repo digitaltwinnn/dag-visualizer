@@ -119,8 +119,8 @@ export default function GeoExplore() {
           // One message, no jump link (user refinement: the "See it in the Hypergraph →" link
           // was removed — the explanation already says where the metagraph still appears).
           <div className="pt-2 px-[14px] pb-3">
-            <p className="text-[12.5px] text-foreground m-0 mb-1">No locatable nodes</p>
-            <p className="text-[11.5px] text-muted-foreground leading-[1.5] m-0">{tickerOrName} has no validators we can place on the map right now. It still appears in the Hypergraph.</p>
+            <p className="text-body text-foreground m-0 mb-1">No locatable nodes</p>
+            <p className="text-label text-muted-foreground m-0">{tickerOrName} has no validators we can place on the map right now. It still appears in the Hypergraph.</p>
           </div>
         ) : (
         <div className="flex-[1_1_auto] min-h-0 overflow-y-auto pt-1.5 px-[14px] pb-2 cmd-list-scroll">
@@ -128,12 +128,12 @@ export default function GeoExplore() {
             const open = c.cc === country;
             const nodes = nodesByCountry.get(c.country) ?? [];
             return (
-              <div key={c.cc} className={cn(open && "bg-[rgba(90,140,255,0.05)] rounded-[8px] my-0.5")}>
+              <div key={c.cc} className={cn(open && "bg-wash-faint rounded-btn my-0.5")}>
                 <button
                   type="button"
                   className={cn(
-                    "flex items-center gap-2.5 w-full text-left text-[12px] border-none bg-transparent cursor-pointer py-[5px] px-1.5 -mx-1.5 rounded-[6px] transition-[background] duration-150",
-                    "hover:bg-[rgba(90,140,255,0.12)]",
+                    "flex items-center gap-2.5 w-full text-left text-body border-none bg-transparent cursor-pointer py-[5px] px-1.5 -mx-1.5 rounded-sm transition-[background] duration-150",
+                    "hover:bg-wash-hover",
                     "focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--primary)] focus-visible:outline-offset-[-2px]",
                     // The drilled country row wears the same shared selection language as the
                     // picker's committed row (SELECTED_ROW) — no ✓ though: an open accordion's
@@ -143,13 +143,13 @@ export default function GeoExplore() {
                   aria-expanded={open}
                   onClick={() => drill(c.cc)}
                 >
-                  <span className="text-[11.5px] w-[17px] text-center flex-none">{ccToFlag(c.cc)}</span>
-                  <span className="flex-none w-24 text-[12px] text-[#c7d0ea] whitespace-nowrap overflow-hidden text-ellipsis" title={c.country}>
+                  <span className="text-label w-[17px] text-center flex-none">{ccToFlag(c.cc)}</span>
+                  <span className="flex-none w-24 text-body text-foreground-dim whitespace-nowrap overflow-hidden text-ellipsis" title={c.country}>
                     {c.country}
                   </span>
-                  <span className="flex-1 h-[7px] rounded-[4px] bg-white/[0.06] overflow-hidden">
+                  <span className="flex-1 h-[7px] rounded-xs bg-white/[0.06] overflow-hidden">
                     <span
-                      className="block h-full rounded-[4px]"
+                      className="block h-full rounded-xs"
                       style={{
                         width: `${Math.round((c.count / max) * 100)}%`,
                         background: barHue ?? "linear-gradient(90deg, var(--core-l0), var(--primary))",
@@ -157,8 +157,8 @@ export default function GeoExplore() {
                       }}
                     />
                   </span>
-                  <span className="flex-none w-[26px] text-right text-[12px] tabular-nums font-semibold">{c.count}</span>
-                  <span className={cn("flex-none w-3 text-center text-[9px]", open ? "text-foreground" : "text-muted-foreground")}>
+                  <span className="flex-none w-[26px] text-right text-body tabular-nums font-semibold">{c.count}</span>
+                  <span className={cn("flex-none w-3 text-center text-micro", open ? "text-foreground" : "text-muted-foreground")}>
                     {open ? "▾" : "▸"}
                   </span>
                 </button>
@@ -167,7 +167,7 @@ export default function GeoExplore() {
                   // Leaving the node list clears the globe hover-glow.
                   <div className="mb-1.5 ml-[9px] py-0.5 pl-3 border-l border-border" onMouseLeave={() => setHoverNodeId(null)}>
                     {nodes.length === 0 ? (
-                      <p className="mt-1 mx-1 mb-1.5 text-[11px] text-muted-foreground">No locatable nodes here yet.</p>
+                      <p className="mt-1 mx-1 mb-1.5 text-label text-muted-foreground">No locatable nodes here yet.</p>
                     ) : (
                       nodes.map((r, i) => {
                         const on =
@@ -183,8 +183,8 @@ export default function GeoExplore() {
                             className={cn(
                               // `relative pr-7` reserves the picker's trailing ✓ slot on every
                               // row, so the status column doesn't shift when a node is selected.
-                              "nb-row relative flex items-center gap-2 w-full py-[5px] pl-2 pr-7 my-px rounded-[7px] border border-transparent bg-transparent cursor-pointer text-left text-[#c7d0ea] transition-colors duration-[140ms]",
-                              "hover:bg-[rgba(90,140,255,0.12)] hover:text-foreground",
+                              "nb-row relative flex items-center gap-2 w-full py-[5px] pl-2 pr-7 my-px rounded-sm border border-transparent bg-transparent cursor-pointer text-left text-foreground-dim transition-colors duration-[140ms]",
+                              "hover:bg-wash-hover hover:text-foreground",
                               "focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--primary)] focus-visible:outline-offset-[-2px]",
                               // The selected node row = the SAME shared selection language as the
                               // filter picker's committed row (user-unified). Box-shadow based, so
@@ -206,15 +206,15 @@ export default function GeoExplore() {
                                 no resolved city → the id (mono) is the primary, as before. */}
                             {r.city ? (
                               <span className="flex-1 min-w-0 flex items-baseline gap-1.5">
-                                <span className="flex-none text-[12px] whitespace-nowrap">{r.city}</span>
+                                <span className="flex-none text-body whitespace-nowrap">{r.city}</span>
                                 {r.id && (
-                                  <span className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap font-mono tabular-nums text-[10px] text-muted-foreground">
+                                  <span className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap font-mono tabular-nums text-label text-muted-foreground">
                                     {shortHash(r.id)}
                                   </span>
                                 )}
                               </span>
                             ) : (
-                              <span className={cn("flex-1 overflow-hidden text-ellipsis whitespace-nowrap tabular-nums text-[12px]", r.id && "font-mono")}>
+                              <span className={cn("flex-1 overflow-hidden text-ellipsis whitespace-nowrap tabular-nums text-body", r.id && "font-mono")}>
                                 {r.id ? shortHash(r.id) : r.label}
                               </span>
                             )}
@@ -232,7 +232,7 @@ export default function GeoExplore() {
         </div>
         )}
 
-        {!quietEmpty && <div className="pt-[10px] px-4 pb-3 text-[11px] text-muted-foreground">Click a country to drill in.</div>}
+        {!quietEmpty && <div className="pt-[10px] px-4 pb-3 text-label text-muted-foreground">Click a country to drill in.</div>}
       </div>
       </aside>
     </Card>

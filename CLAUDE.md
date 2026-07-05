@@ -368,15 +368,24 @@ in order:
    PURPOSE: they must beat element utilities (see *CSS traps*). The signal block must stay
    contiguous with its sheet-suppression rules LAST (equal-specificity source-order beat).
 2. **The structural token lane** (`:root`) — the shadcn variables in oklch (`--background`,
-   `--foreground`, `--muted-foreground`, `--primary` = the accent cyan `#2af5ff`, `--accent`
-   → `--primary`, `--destructive`, `--success`, `--core-l0`, `--core-l1`, `--border`, …).
-   **`--panel`** (the translucent glass fill) is the lone structural **literal** with no
-   shadcn equivalent. Then the **layout literals**: `--panel-pad-*`, `--rail-gap`,
-   `--rail-top`, `--rail-w`, `--detail-w`, `--sel-bg`/`--sel-border` (the one selection
-   language), `--bottom-reserve`, `--phone-dock-h`, and the **instrument-thread ruler spec**
-   (`--thread-line`/`--thread-tick`/`--thread-tick-major`/`--thread-tick-pitch` +
-   `--axis-hairlines`, shared by the rails, sheet rulers, and the bar-chart axis).
-   One name per token — no aliases.
+   `--foreground`, `--muted-foreground`, **`--foreground-dim`** (`#c7d0ea`, the 2nd muted
+   text tone), `--primary` = the accent cyan `#2af5ff`, `--accent` → `--primary`,
+   `--destructive` (warn red — **also the no-signal dot**), **`--warn-soft`** (`#ffd166`, the
+   experimental-banner amber — advisory, NOT destructive), `--success`, `--core-l0`,
+   `--core-l1`, `--border`, …). **`--panel`** (the translucent glass fill) is a structural
+   **literal**, with siblings **`--panel-light`** (dock glass) + **`--panel-solid`** (tooltip
+   glass); the accent glass-wash family **`--wash-faint`/`-soft`/`-hover`** (the `--border`
+   RGB at fill alphas) is the ONE mechanism for faint accent fills. Then the **layout
+   literals**: `--panel-pad-*`, `--rail-gap`, `--rail-top`, `--rail-w`, `--detail-w`,
+   `--sel-bg`/`--sel-border` (the one selection language), `--bottom-reserve`,
+   `--phone-dock-h`, and the **instrument-thread ruler spec** (`--thread-line`/`--thread-tick`/
+   `--thread-tick-major`/**`--thread-faint`**/`--thread-tick-pitch` + `--axis-hairlines`,
+   shared by the rails, sheet rulers, and the bar-chart axis). The **`@theme inline`** block
+   then exposes the **HUD type scale** — `text-micro` (10.5px, uppercase eyebrows/tags/axis +
+   glyphs), `text-label` (11.5px, secondary/meta), `text-body` (12.5px, rows/values),
+   `text-title` (15px, card titles) — plus `--radius-xs` (4px) / `-sm` (6px) / `-btn` (8px,
+   control rounding) / `-md` / `-lg`, `tracking-caps` (0.13em), and the color→utility maps
+   (`text-foreground-dim`, `text-warn-soft`, `bg-wash-soft`, …). One name per token — no aliases.
 3. **`@layer base`** resets, and **`@layer components`** recipes for selector-driven rules
    that can't be utilities: `#leftcol`/`#rightcol` (the rail shells + slim scrollbars),
    `.scene-canvas`/`.scene-in`, `.rail-clip`/`.rail-dragging`, `.odometer`/`.roll-in`,
@@ -387,9 +396,13 @@ in order:
    `--animate-hold-fade-out`, `--animate-sheet-in-*`, `--animate-rail-hint`) consumed as
    `animate-<name>` utilities with `motion-reduce:animate-none` at each call site.
 
-Don't re-derive paddings, radii, or cyan tints in component code — reference the tokens.
-The SVG `RailThread` mirrors the `--thread-*` literals in code (`TICK_*`) because an SVG
-stroke attribute can't resolve `var()` — keep the two in sync.
+**Tokens first: use the HUD type scale and structural tokens; an arbitrary value is
+acceptable only for a true one-off (document it inline).** The parity-era literals are
+gone — do not reintroduce drift (no `text-[..px]`, no `rgba(90,140,255,…)`/`#c7d0ea`/
+`#ffd166` literals, no `rounded-[6px]`; the only surviving `text-[..px]` are the ×/±/‹›
+control glyphs, each commented). Don't re-derive paddings, radii, or cyan tints in component
+code — reference the tokens. The SVG `RailThread` mirrors the `--thread-*` literals in code
+(`TICK_*`) because an SVG stroke attribute can't resolve `var()` — keep the two in sync.
 
 ### Two colour lanes
 

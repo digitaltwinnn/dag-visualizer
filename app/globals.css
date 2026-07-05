@@ -211,19 +211,31 @@
   --accent: var(--primary);
   --accent-foreground: var(--primary-foreground);
 
-  --destructive: oklch(0.63 0.20 25);        /* warn red */
+  --destructive: oklch(0.63 0.20 25);        /* warn red — also the NO-SIGNAL dot (StateAtoms) */
   --destructive-foreground: var(--foreground);
 
   /* Added beyond shadcn defaults (structural, still not identity) */
   --success: oklch(0.80 0.15 165);           /* ready / green */
   --core-l0: oklch(0.66 0.16 265);           /* DAG L0 blue #5b8cff */
   --core-l1: oklch(0.66 0.19 300);           /* DAG L1 violet #b06bff */
+  /* A second muted text tone — brighter than --muted-foreground, dimmer than --foreground.
+     The repeated "muted blue-grey" copy tone (dossier description, geo rows, tooltip figures). */
+  --foreground-dim: #c7d0ea;
+  /* The experimental-banner advisory amber — NOT --destructive (amber ≠ red): a distinct
+     "work-in-progress / advisory" accent. Only the ExperimentalBanner uses it today. */
+  --warn-soft: #ffd166;
 
   --border: rgba(90, 140, 255, 0.22);        /* panel/hairline border (was the --panel-border alias) */
   --input: var(--border);
   --surface-muted: oklch(0.18 0.03 265);
   --secondary: var(--surface-muted);
   --secondary-foreground: var(--foreground);
+
+  /* Accent glass-wash family — the --border RGB (90,140,255) at fill alphas BELOW its .22
+     hairline. One mechanism for every faint accent fill (topbar/vitals/geo hover + open washes). */
+  --wash-faint: rgba(90, 140, 255, 0.05);
+  --wash-soft:  rgba(90, 140, 255, 0.10);
+  --wash-hover: rgba(90, 140, 255, 0.12);
 }
 
 /* ── Structural / layout lane (was app/styles/00-base.css, retired in Task 10) ──
@@ -234,8 +246,15 @@
    (--primary / --foreground / --muted-foreground / --border / --core-l0). */
 :root {
   /* --panel is the translucent glass panel fill; it has no shadcn equivalent, so it stays a
-     structural literal (NOT an alias). */
+     structural literal (NOT an alias). --panel-light is its lighter sibling (same RGB, lower
+     alpha) for the tablet/phone dock glass; --panel-solid is the near-opaque tooltip/tip glass. */
   --panel: rgba(12, 16, 32, 0.72);
+  --panel-light: rgba(12, 16, 32, 0.35);
+  --panel-solid: rgba(8, 12, 26, 0.92);
+
+  /* Dot-size scale (documented, not tokenised — the w-/h- micro-dots read cleaner as literals at
+     the call site than as size utilities): 3px xs · 5px sm · 7px md · 9px lg (odd, +2px steps) —
+     node/status/beat dots across StateAtoms, inspector/parts, CardHead, LiveStrip. Keep to it. */
 
   /* Layout system tokens (shared by every HUD panel so they read as siblings). One
      spacing scale, one "selected" treatment; component utilities reference these. */
@@ -259,6 +278,7 @@
   --thread-line: rgba(178, 193, 223, 0.40);        /* the neutral base line the ticks hang off */
   --thread-tick: rgba(178, 193, 223, 0.30);        /* minor hairline */
   --thread-tick-major: rgba(178, 193, 223, 0.42);  /* every 4th — longer + brighter */
+  --thread-faint: rgba(178, 193, 223, 0.10);       /* faintest thread-family hairline (dock borders) */
   --thread-tick-pitch: 13px;                        /* spacing between hairlines */
   /* Horizontal baseline → vertical ticks HANGING DOWN from it (the bar-chart axis, so the ruler
      sits under the bars, not through them). Anchored to the TOP so ticks grow downward; major
@@ -377,9 +397,35 @@
   --color-core-l1: var(--core-l1);
   --color-border: var(--border);
   --color-ring: var(--ring);
+  --color-foreground-dim: var(--foreground-dim);
+  --color-warn-soft: var(--warn-soft);
+  --color-wash-faint: var(--wash-faint);
+  --color-wash-soft: var(--wash-soft);
+  --color-wash-hover: var(--wash-hover);
   --radius-lg: var(--radius);
   --radius-md: calc(var(--radius) - 4px);
-  --radius-sm: calc(var(--radius) - 8px);
+  --radius-sm: calc(var(--radius) - 8px);   /* 6px */
+  --radius-xs: 4px;                          /* tiny chrome — tags, chips, share-bars, list rows */
+  --radius-btn: 8px;                         /* control rounding — view-switch, filter face, tooltips/popovers */
+
+  /* ── HUD type scale (the four steps every HUD text site snaps to) ──────────────────────────
+     micro = uppercase eyebrows / tags / axis labels + tiny UI glyphs (NOT readable body copy);
+     label = secondary/meta (counts, codes, subtitles, hints); body = rows, descriptions, values;
+     title = card titles. Sizes intentionally sit between Tailwind's default text-xs/sm steps —
+     that finer granularity is why arbitrary text-[..px] used to sprawl. Line-heights paired per
+     Tailwind v4's fontSize convention so a bare text-* also sets a sane leading. */
+  --text-micro: 10.5px;
+  --text-micro--line-height: 1;
+  --text-label: 11.5px;
+  --text-label--line-height: 1.45;
+  --text-body: 12.5px;
+  --text-body--line-height: 1.45;
+  --text-title: 15px;
+  --text-title--line-height: 1.2;
+
+  /* Uppercase-caps tracking — the merged 0.12/0.13/0.14em eyebrow/label cluster. */
+  --tracking-caps: 0.13em;
+
   --animate-breathe: breathe 1.5s ease-in-out infinite;
 }
 

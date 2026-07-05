@@ -25,7 +25,7 @@ export function NodeStars({ count = 5 }: { count?: number }) {
 // title row) — reuses the shared `breathe` beat, same treatment as the "live now" cyan dot.
 export function NoSignalDot() {
   return (
-    <span className="w-[7px] h-[7px] rounded-full flex-none bg-[#ff5a5a] shadow-[0_0_0_3px_color-mix(in_oklch,#ff5a5a_22%,transparent)] animate-breathe motion-reduce:animate-none" />
+    <span className="w-[7px] h-[7px] rounded-full flex-none bg-destructive shadow-[0_0_0_3px_color-mix(in_oklch,var(--destructive)_22%,transparent)] animate-breathe motion-reduce:animate-none" />
   );
 }
 

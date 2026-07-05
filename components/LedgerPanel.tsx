@@ -21,8 +21,8 @@ export default function LedgerPanel() {
           onToggle={() => setCollapsed((c) => !c)}
         />
         <div className={cn("flex flex-col gap-2.5 px-4 pt-3 pb-3.5 overflow-y-auto", collapsed && "hidden")}>
-          <p className="m-0 text-[12.5px] leading-[1.55] text-muted-foreground">Work in progress.</p>
-          <div className="pt-[10px] px-4 pb-3 text-[11px] text-muted-foreground">Click each layer to learn more.</div>
+          <p className="m-0 text-body text-muted-foreground">Work in progress.</p>
+          <div className="pt-[10px] px-4 pb-3 text-label text-muted-foreground">Click each layer to learn more.</div>
         </div>
       </aside>
     </Card>

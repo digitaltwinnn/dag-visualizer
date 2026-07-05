@@ -36,8 +36,8 @@ export default function AboutView({
             <p
               key={i}
               className={cn(
-                "m-0 text-[12.5px] leading-[1.55]",
-                i > 0 ? "text-muted-foreground" : "text-[#c7d0ea]",
+                "m-0 text-body",
+                i > 0 ? "text-muted-foreground" : "text-foreground-dim",
               )}
             >
               {l}

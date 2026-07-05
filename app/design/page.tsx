@@ -23,6 +23,7 @@ import {
 import OdometerDemo from "./OdometerDemo";
 import CardSignalsDemo from "./CardSignalsDemo";
 import EcgMark from "@/components/topbar/EcgMark";
+import { cn } from "@/lib/utils";
 
 // ── Structural lane — the shadcn oklch variables (globals.css :root). One source of truth.
 // `--panel` is the lone structural literal (translucent glass fill, no shadcn equivalent). ──
@@ -30,12 +31,24 @@ const STRUCTURAL: { name: string; var: string }[] = [
   { name: "background", var: "--background" },
   { name: "foreground", var: "--foreground" },
   { name: "muted-foreground", var: "--muted-foreground" },
+  { name: "foreground-dim (2nd muted tone)", var: "--foreground-dim" },
   { name: "primary / accent (live cyan)", var: "--primary" },
-  { name: "destructive (warn)", var: "--destructive" },
+  { name: "destructive (warn / no-signal)", var: "--destructive" },
+  { name: "warn-soft (banner amber)", var: "--warn-soft" },
   { name: "success (ready)", var: "--success" },
   { name: "core-l0 (blue)", var: "--core-l0" },
   { name: "core-l1 (violet)", var: "--core-l1" },
   { name: "panel (glass fill)", var: "--panel" },
+  { name: "panel-light (dock glass)", var: "--panel-light" },
+  { name: "wash-soft (accent fill)", var: "--wash-soft" },
+];
+
+// ── HUD type scale — the four steps every HUD text site snaps to (globals.css @theme). ──
+const TYPE_SCALE: { cls: string; px: string; role: string }[] = [
+  { cls: "text-micro", px: "10.5px", role: "uppercase eyebrows / tags / axis labels + tiny glyphs" },
+  { cls: "text-label", px: "11.5px", role: "secondary / meta — counts, codes, subtitles, hints" },
+  { cls: "text-body", px: "12.5px", role: "rows, descriptions, values" },
+  { cls: "text-title", px: "15px", role: "card titles" },
 ];
 
 
@@ -198,6 +211,31 @@ export default async function DesignPage() {
           >
             ×
           </Button>
+        </div>
+      </section>
+
+      <section className="mb-10">
+        <h2 className="text-sm uppercase tracking-widest text-muted-foreground mb-3">
+          HUD type scale
+        </h2>
+        <p className="text-sm text-muted-foreground mb-3 max-w-2xl">
+          Four steps every HUD text site snaps to (globals.css <code className="font-mono">@theme</code>{" "}
+          <code className="font-mono">--text-*</code>). Tokens first — an arbitrary{" "}
+          <code className="font-mono">text-[..px]</code> is only acceptable for a true one-off (e.g. a
+          control glyph), documented inline. <code className="font-mono">text-micro</code> is for
+          uppercase eyebrows/tags/axis + glyphs, never readable body copy.
+        </p>
+        <div className="flex flex-col gap-3">
+          {TYPE_SCALE.map((t) => (
+            <div key={t.cls} className="ig-panel p-3 flex items-baseline gap-4">
+              <span className={cn(t.cls, "text-foreground font-semibold w-40 flex-none")}>
+                Settlement chamber
+              </span>
+              <code className="font-mono text-xs text-primary flex-none">{t.cls}</code>
+              <span className="font-mono text-xs text-muted-foreground flex-none">{t.px}</span>
+              <span className="text-xs text-muted-foreground">{t.role}</span>
+            </div>
+          ))}
         </div>
       </section>
 

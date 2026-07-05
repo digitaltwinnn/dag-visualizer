@@ -26,7 +26,7 @@ export const rolesOf = (n: NodeInfo) => (n.roles && n.roles.length ? n.roles : [
 
 // Shared "Ready" text treatment (plain, no chrome) — the structural green success token, not an
 // identity colour, so it's the one place we lean on a theme token instead of the exact legacy hex.
-const READY_CLS = "text-success font-semibold text-[12.5px]";
+const READY_CLS = "text-success font-semibold text-body";
 
 // The ONE identity dot every row list leads with (the filter picker's rows, the geo explorer's
 // node rows): a plain small disc in the subject's identity hue — flat fill, NO glow (the geo
@@ -44,7 +44,7 @@ export function StatusMark({ state }: { state?: string | null }) {
   return (
     <Badge
       variant="outline"
-      className="text-[11px] font-semibold px-2 py-px rounded-full border"
+      className="text-label font-semibold px-2 py-px rounded-full border"
       style={{ color: s.color, borderColor: s.color + "55", background: s.color + "1a" }}
     >
       {s.label}
@@ -103,8 +103,8 @@ export function CompositionRows({ nodes }: { nodes: NodeInfo[] }) {
     <div className="flex flex-col gap-[7px] mt-2">
       {rows.map((r, i) => (
         <div className="grid grid-cols-[auto_auto_1fr_auto] items-center gap-2" key={i}>
-          <span className="text-[12.5px] text-foreground">{r.label}</span>
-          <span className="text-[11px] text-muted-foreground tabular-nums">{r.codes.join("·")}</span>
+          <span className="text-body text-foreground">{r.label}</span>
+          <span className="text-label text-muted-foreground tabular-nums">{r.codes.join("·")}</span>
           {/* Chip stack = a miniature of the 3D node cloud: identity-hued discs that OVERLAP (like
               stacked avatars), each ringed in the panel colour so the overlap reads. Visual scale
               only (capped ≤10). Plain overlapping dots (no image/fallback content), so a bare
@@ -115,13 +115,13 @@ export function CompositionRows({ nodes }: { nodes: NodeInfo[] }) {
                 key={j}
                 className="w-[9px] h-[9px] rounded-full -ml-1"
                 style={{
-                  background: "color-mix(in oklch, var(--filter-accent, #a0afcd) 60%, transparent)",
+                  background: "color-mix(in oklch, var(--filter-accent, var(--foreground-dim)) 60%, transparent)",
                   boxShadow: "0 0 0 1.5px var(--panel)",
                 }}
               />
             ))}
           </span>
-          <span className="text-[12.5px] text-foreground tabular-nums min-w-[1.5em] text-right">{r.count}</span>
+          <span className="text-body text-foreground tabular-nums min-w-[1.5em] text-right">{r.count}</span>
         </div>
       ))}
     </div>
@@ -181,17 +181,17 @@ export function networkKind(id: string, nodes: NodeInfo[]): string {
 export function Desc({ text }: { text?: string }) {
   const [open, setOpen] = useState(false);
   if (!text) return null;
-  if (text.length <= 180) return <p className="text-[13px] leading-[1.6] text-[#c7d0ea] mb-0">{text}</p>;
+  if (text.length <= 180) return <p className="text-body text-foreground-dim mb-0">{text}</p>;
   return (
     <>
-      <p className={cn("text-[13px] leading-[1.6] text-[#c7d0ea] mb-0", open ? "line-clamp-none" : "line-clamp-3")}>
+      <p className={cn("text-body text-foreground-dim mb-0", open ? "line-clamp-none" : "line-clamp-3")}>
         {text}
       </p>
       <Button
         type="button"
         variant="link"
         size="xs"
-        className="inline-block h-auto mt-0.5 mb-0 p-0 text-[11px] font-semibold"
+        className="inline-block h-auto mt-0.5 mb-0 p-0 text-label font-semibold"
         aria-expanded={open}
         onClick={() => setOpen((o) => !o)}
       >

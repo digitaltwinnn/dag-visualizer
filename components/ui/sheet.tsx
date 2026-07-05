@@ -87,7 +87,7 @@ function SheetContent({
         // its edge (cards scroll in the inner `.sheet-body`, see RailDock). `p-3` = the old 12px.
         className={cn(
           "fixed z-[41] flex flex-col gap-[var(--rail-gap)] p-3 overflow-visible",
-          "bg-[rgba(12,16,32,0.35)] border border-[rgba(178,193,223,0.10)] backdrop-blur-[7px]",
+          "bg-[var(--panel-light)] border border-[var(--thread-faint)] backdrop-blur-[8px]",
           // `!` needed: SHEET_SIDE's `data-[state=open]:animate-sheet-in-*` compiles to
           // class+attribute specificity (0,2,0), which would beat this (0,1,0) variant —
           // the retired CSS used `animation: none !important` for the same reason.
