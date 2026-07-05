@@ -15,7 +15,8 @@ import { Separator } from "@/components/ui/separator";
 import { SonarRing, NodeStars, NoSignalDot } from "@/components/state/StateAtoms";
 import { useMinHold } from "@/components/useMinHold";
 import { VIS } from "../../js/config.js";
-import { Desc, StatusMark, CompositionRows, StatusBreakdown, networkKind } from "./parts";
+import { Desc, StatusMark, CompositionRows, networkKind } from "./parts";
+import { compositionRows } from "@/src/data/composition";
 
 type PickOf<K extends PickDescriptor["kind"]> = Extract<PickDescriptor, { kind: K }>;
 
@@ -250,6 +251,9 @@ export function MetaCard({ cfg }: { cfg: MetaCfg }) {
   const hue = hex(cfg.color);
   const blurb = mg?.description || cfg.blurb;
   const site = mg?.siteUrl;
+  // The distinct make-ups this metagraph's nodes fall into (same read CompositionRows renders),
+  // needed here just for the "N different compositions" count in the section header.
+  const compRows = compositionRows(nodes);
   // Hover pairing (synced 3D hub glow) lives on the OUTER pane (ContextCard's #metapane), not here.
   // The full identity header (avatar + name + ticker) lives in the card HEAD now (MetaTitle via
   // CardHead's title slot, rolled via titleKey) — the body starts at the description.
@@ -258,12 +262,15 @@ export function MetaCard({ cfg }: { cfg: MetaCfg }) {
       <Desc text={blurb} />
       {nodes.length > 0 && (
         <div className="mt-3">
-          <div className="flex items-baseline justify-between">
-            <span className="text-[10.5px] tracking-[0.1em] uppercase text-muted-foreground">Composition</span>
-            <span className="text-[13px] text-foreground"><b className="font-bold">{nodes.length}</b> node{nodes.length === 1 ? "" : "s"}</span>
+          {/* One line: "163 nodes with 3 different compositions" — both counts bold/foreground,
+              the rest muted; each count pluralises independently ("1 node"/"1 composition" have
+              no trailing "different", matching a single-composition metagraph like DED). */}
+          <div className="text-[12.5px] text-muted-foreground">
+            <b className="font-bold text-foreground">{nodes.length}</b> node{nodes.length === 1 ? "" : "s"} with{" "}
+            <b className="font-bold text-foreground">{compRows.length}</b>{" "}
+            {compRows.length === 1 ? "composition" : "different compositions"}
           </div>
-          <CompositionRows nodes={nodes} />
-          <div className="mt-2"><StatusBreakdown states={nodes.map((n) => n.state)} /></div>
+          <CompositionRows nodes={nodes} showStatus />
         </div>
       )}
       <div className="flex flex-col gap-1 mt-3">

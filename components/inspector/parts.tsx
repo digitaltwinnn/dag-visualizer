@@ -86,32 +86,42 @@ export function StatusBreakdown({ states }: { states: (string | null | undefined
 }
 
 // One composition row per make-up: role (bright) + codes (muted) + a capped chip stack
-// (visual scale only, ≤10, no +N) + the authoritative count.
-export function CompositionRows({ nodes }: { nodes: NodeInfo[] }) {
+// (visual scale only, ≤10, no +N) + the authoritative count. `showStatus` (the dossier's
+// "Selected network" card) adds a second line under each row with that GROUP's own status —
+// the subtle green "all ready" idiom, or StatusBreakdown's compact coloured counts when mixed —
+// so a mixed metagraph reads which composition is lagging instead of one section-wide summary.
+export function CompositionRows({ nodes, showStatus = false }: { nodes: NodeInfo[]; showStatus?: boolean }) {
   const rows = compositionRows(nodes);
   return (
     <div className="flex flex-col gap-[7px] mt-2">
       {rows.map((r, i) => (
-        <div className="grid grid-cols-[auto_auto_1fr_auto] items-center gap-2" key={i}>
-          <span className="text-[12.5px] text-foreground">{r.label}</span>
-          <span className="text-[11px] text-muted-foreground tabular-nums">{r.codes.join("·")}</span>
-          {/* Chip stack = a miniature of the 3D node cloud: identity-hued discs that OVERLAP (like
-              stacked avatars), each ringed in the panel colour so the overlap reads. Visual scale
-              only (capped ≤10). Plain overlapping dots (no image/fallback content), so a bare
-              utility span reproduces the look more directly than fighting Avatar's chrome. */}
-          <span className="inline-flex justify-end items-center pl-1" aria-hidden>
-            {Array.from({ length: Math.min(r.count, 10) }).map((_, j) => (
-              <span
-                key={j}
-                className="w-[9px] h-[9px] rounded-full -ml-1"
-                style={{
-                  background: "color-mix(in oklch, var(--filter-accent, #a0afcd) 60%, transparent)",
-                  boxShadow: "0 0 0 1.5px var(--panel)",
-                }}
-              />
-            ))}
-          </span>
-          <span className="text-[12.5px] text-foreground tabular-nums min-w-[1.5em] text-right">{r.count}</span>
+        <div className="flex flex-col gap-[3px]" key={i}>
+          <div className="grid grid-cols-[auto_auto_1fr_auto] items-center gap-2">
+            <span className="text-[12.5px] text-foreground">{r.label}</span>
+            <span className="text-[11px] text-muted-foreground tabular-nums">{r.codes.join("·")}</span>
+            {/* Chip stack = a miniature of the 3D node cloud: identity-hued discs that OVERLAP (like
+                stacked avatars), each ringed in the panel colour so the overlap reads. Visual scale
+                only (capped ≤10). Plain overlapping dots (no image/fallback content), so a bare
+                utility span reproduces the look more directly than fighting Avatar's chrome. */}
+            <span className="inline-flex justify-end items-center pl-1" aria-hidden>
+              {Array.from({ length: Math.min(r.count, 10) }).map((_, j) => (
+                <span
+                  key={j}
+                  className="w-[9px] h-[9px] rounded-full -ml-1"
+                  style={{
+                    background: "color-mix(in oklch, var(--filter-accent, #a0afcd) 60%, transparent)",
+                    boxShadow: "0 0 0 1.5px var(--panel)",
+                  }}
+                />
+              ))}
+            </span>
+            <span className="text-[12.5px] text-foreground tabular-nums min-w-[1.5em] text-right">{r.count}</span>
+          </div>
+          {showStatus && (
+            <div className="flex justify-end">
+              <StatusBreakdown states={r.states} />
+            </div>
+          )}
         </div>
       ))}
     </div>

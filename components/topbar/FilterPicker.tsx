@@ -36,15 +36,20 @@ export default function FilterPicker({ onPick }: { onPick?: () => void }) {
   };
 
   // Shared row grid — one dot + name + (optional sub-label under the name) + a right-aligned
-  // count column. The committed pick gets a quiet left accent bar; a 0-located metagraph sinks
-  // visually via reduced opacity. Command's own `data-[selected=true]` hover/keyboard highlight
-  // is overridden to a faint neutral wash (the bright accent fill washed the row text out to
-  // unreadable).
+  // count column. Command's own `data-[selected=true]` hover/keyboard-cursor highlight is
+  // overridden to a faint neutral wash (the bright accent fill washed the row text out to
+  // unreadable) — that stays as the TRANSIENT cursor cue. The COMMITTED filter's row additionally
+  // gets a persistent mark in the app's selection language (`--sel-bg`/`--sel-border`, the same
+  // idiom as RailDock's `data-[state=on]`/the old `.nb-row.active`): a left accent bar + a full
+  // wash. The wash is done as an INSET box-shadow (not `background`) on purpose — `background` is
+  // the same CSS property the transient cursor wash above uses, and its `data-[selected=true]:`
+  // variant carries higher specificity, so a plain `bg-*` here would go invisible under the
+  // cursor; box-shadow is an independent property, so both compose and stay readable together.
   const rowClass = (active: boolean, off: boolean) =>
     cn(
       "grid grid-cols-[auto_1fr_auto_auto] items-center gap-2.5",
       "data-[selected=true]:bg-[rgba(255,255,255,0.05)] data-[selected=true]:text-foreground",
-      active && "shadow-[inset_2px_0_0_var(--sel-border)]",
+      active && "text-foreground shadow-[inset_2px_0_0_var(--sel-border),inset_0_0_0_9999px_var(--sel-bg)]",
       off && "opacity-45",
     );
 

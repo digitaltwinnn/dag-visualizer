@@ -6,7 +6,12 @@ import type { NodeInfo } from "@/src/data/types";
 //
 // SELF-CONTAINED (no import from components/inspector/parts, which is a "use client" React module)
 // so this stays a pure, Node-test-safe helper — same lesson as the Phase-3 breadcrumb helper.
-export interface CompRow { label: string; codes: string[]; count: number; }
+export interface CompRow {
+  label: string;
+  codes: string[];
+  count: number;
+  states: (string | null | undefined)[]; // this row's nodes' raw states, for a per-row status mark
+}
 
 const ROLE_ORDER = ["l0", "cl1", "dl1"];
 const ROLE_SHORT: Record<string, string> = { l0: "L0", cl1: "cL1", dl1: "dL1" };
@@ -19,16 +24,20 @@ const codesFor = (roles: string[]) =>
 export function compositionRows(nodes: NodeInfo[]): CompRow[] {
   const hybridByKey = new Map<string, CompRow>();
   const dedByRole: Record<string, number> = {};
+  const dedStatesByRole: Record<string, (string | null | undefined)[]> = {};
   for (const node of nodes) {
     const roles = rolesOf(node);
     if (roles.length > 1) {
       const codes = codesFor(roles);
       const key = codes.join("·");
-      const row = hybridByKey.get(key) ?? { label: "Hybrid", codes, count: 0 };
+      const row = hybridByKey.get(key) ?? { label: "Hybrid", codes, count: 0, states: [] };
       row.count++;
+      row.states.push(node.state);
       hybridByKey.set(key, row);
     } else {
-      dedByRole[roles[0]!] = (dedByRole[roles[0]!] || 0) + 1;
+      const r = roles[0]!;
+      dedByRole[r] = (dedByRole[r] || 0) + 1;
+      (dedStatesByRole[r] ??= []).push(node.state);
     }
   }
   const hybridRows = [...hybridByKey.values()].sort((a, b) => a.codes.length - b.codes.length);
@@ -36,6 +45,7 @@ export function compositionRows(nodes: NodeInfo[]): CompRow[] {
     label: DEDICATED_LABEL[r],
     codes: [ROLE_SHORT[r]],
     count: dedByRole[r],
+    states: dedStatesByRole[r]!,
   }));
   return [...hybridRows, ...dedRows];
 }
