@@ -104,6 +104,10 @@ interface AppState {
   // switches (the row's CONTENT swaps per view; only the user's toggle opens/closes it) —
   // session-only, like `phoneDock` (no localStorage). Unused on tablet/desktop (vitals inline).
   phoneVitals: boolean;
+  // PHONE ONLY: the bottom sheet's drag-chosen height override in px (null = the default 60vh).
+  // Shared by BOTH dock sheets so switching halves keeps the chosen height; reset to null the
+  // moment the dock fully closes (`setPhoneDock(null)`) so reopening starts at the default.
+  phoneSheetPx: number | null;
 
   setLive: (live: boolean, lastGoodAt?: number) => void;
   setEngineReady: (v: boolean) => void;
@@ -129,6 +133,7 @@ interface AppState {
   setSnapshotExact: (data: SnapshotExact) => void;
   setPhoneDock: (dock: "explore" | "details" | null) => void;
   setPhoneVitals: (open: boolean) => void;
+  setPhoneSheetPx: (px: number | null) => void;
 }
 
 // Keep the exact-snapshot cache bounded (one small object per ordinal); drop the oldest.
@@ -161,6 +166,7 @@ export const useStore = create<AppState>((set) => ({
   snapshotExact: {},
   phoneDock: null,
   phoneVitals: false,
+  phoneSheetPx: null,
 
   setLive: (live, lastGoodAt) => set((s) => ({ live, lastGoodAt: lastGoodAt ?? s.lastGoodAt })),
   setEngineReady: (engineReady) => set({ engineReady }),
@@ -199,6 +205,9 @@ export const useStore = create<AppState>((set) => ({
       }
       return { snapshotExact: next };
     }),
-  setPhoneDock: (phoneDock) => set({ phoneDock }),
+  // Fully closing the dock also drops the drag-chosen sheet height, so the next open starts at
+  // the default; switching halves (a non-null → non-null transition) keeps it.
+  setPhoneDock: (phoneDock) => set(phoneDock === null ? { phoneDock, phoneSheetPx: null } : { phoneDock }),
   setPhoneVitals: (phoneVitals) => set({ phoneVitals }),
+  setPhoneSheetPx: (phoneSheetPx) => set({ phoneSheetPx }),
 }));

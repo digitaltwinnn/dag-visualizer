@@ -77,6 +77,8 @@ export default function ExploreRail() {
   const filter = useStore((s) => s.filter);
   const phoneDock = useStore((s) => s.phoneDock);
   const setPhoneDock = useStore((s) => s.setPhoneDock);
+  const phoneSheetPx = useStore((s) => s.phoneSheetPx);
+  const setPhoneSheetPx = useStore((s) => s.setPhoneSheetPx);
   // Theme every card's bullet to the current selection (the explore card is always
   // specific to the active filter).
   const accent = { ["--filter-accent"]: filterAccent(filter) } as CSSProperties;
@@ -132,6 +134,8 @@ export default function ExploreRail() {
       trigger="bottom-bar-half"
       sheetSide="bottom"
       open={phoneDock === "explore"}
+      sheetPx={phoneSheetPx}
+      onSheetPx={setPhoneSheetPx}
       onOpenChange={(next) => setPhoneDock(next ? "explore" : null)}
     >
       {content}

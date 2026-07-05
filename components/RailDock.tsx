@@ -91,6 +91,8 @@ export default function RailDock({
   sheetSide,
   trigger = "edge-tab",
   open: openProp,
+  sheetPx,
+  onSheetPx,
 }: {
   side: "left" | "right";
   label: string;
@@ -104,6 +106,12 @@ export default function RailDock({
   sheetSide?: "left" | "right" | "bottom";
   trigger?: "edge-tab" | "bottom-bar-half";
   open?: boolean;
+  // Bottom-sheet drag (phone): the caller-held height override in px (null = the default 60vh)
+  // + its setter. Store-backed by BOTH phone docks (`store.phoneSheetPx`) so switching halves
+  // keeps the chosen height; the store resets it on full close (reopen = default). RailDock
+  // stays store-free — it just reads/writes through these props.
+  sheetPx?: number | null;
+  onSheetPx?: (px: number | null) => void;
 }) {
   const [openState, setOpen] = useState(false);
   const open = openProp ?? openState;
@@ -153,6 +161,81 @@ export default function RailDock({
     );
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pulseKey]);
+
+  // ── Bottom-sheet drag (phone, grabber-initiated) ────────────────────────────────────────────
+  // Standard mobile sheet gesture, v1 GRABBER-ONLY by design: the sheet body owns touch scroll,
+  // so only the grabber (a dedicated ≥44px handle with `touch-action:none`) initiates a drag —
+  // no drag/scroll arbitration needed. Pointer events, no dependency: capture on the grabber,
+  // the sheet follows the finger live (height written through `onSheetPx`, transition suspended
+  // while dragging), release snaps to the NEAREST of dismissed / default (60vh, the CSS value) /
+  // expanded (~80vh, capped so the top bar stays visible). A fast downward flick (velocity over
+  // the last ~120ms) dismisses regardless of position. A plain tap (no real movement) keeps
+  // today's tap-to-collapse. Reduced motion: the snap is instant (the transition class is
+  // motion-reduce-suppressed); the drag itself is direct manipulation and stays.
+  const [dragging, setDragging] = useState(false);
+  const drag = useRef<{ startY: number; startH: number; moved: boolean; samples: { t: number; y: number }[]; el: HTMLElement } | null>(null);
+  const expandedPx = () => Math.min(Math.round(window.innerHeight * 0.8), window.innerHeight - 140);
+  const defaultPx = () => Math.round(window.innerHeight * 0.6); // = the CSS h-[60vh]
+  const grabDown = (e: React.PointerEvent<HTMLButtonElement>) => {
+    const el = e.currentTarget.closest<HTMLElement>('[data-slot="sheet-content"]');
+    if (!el) return;
+    try {
+      e.currentTarget.setPointerCapture(e.pointerId);
+    } catch {
+      /* no active pointer (synthetic events) — the move/up handlers still work via bubbling */
+    }
+    drag.current = {
+      startY: e.clientY,
+      startH: el.getBoundingClientRect().height,
+      moved: false,
+      samples: [{ t: performance.now(), y: e.clientY }],
+      el,
+    };
+    setDragging(true);
+  };
+  const grabMove = (e: React.PointerEvent<HTMLButtonElement>) => {
+    const d = drag.current;
+    if (!d) return;
+    const dy = d.startY - e.clientY; // up = grow
+    if (Math.abs(dy) > 6) d.moved = true;
+    if (!d.moved) return;
+    onSheetPx?.(Math.max(90, Math.min(expandedPx(), Math.round(d.startH + dy))));
+    d.samples.push({ t: performance.now(), y: e.clientY });
+    if (d.samples.length > 10) d.samples.shift();
+  };
+  const grabUp = (e: React.PointerEvent<HTMLButtonElement>) => {
+    const d = drag.current;
+    drag.current = null;
+    setDragging(false);
+    if (!d) return;
+    if (!d.moved) {
+      // Plain tap on the grabber — today's tap-to-collapse, unchanged.
+      onSheetPx?.(null);
+      handleOpenChange(false);
+      return;
+    }
+    const h = d.el.getBoundingClientRect().height;
+    const def = defaultPx();
+    // Downward flick velocity (px/ms, positive = down) over the last ~120ms of the gesture.
+    const now = performance.now();
+    const past = d.samples.find((s) => now - s.t <= 120) ?? d.samples[0]!;
+    const vy = (e.clientY - past.y) / Math.max(1, now - past.t);
+    if (vy > 0.5 || h < def * 0.55) {
+      // Fast flick down, or released well below the default → dismiss (same as retap).
+      onSheetPx?.(null);
+      handleOpenChange(false);
+      return;
+    }
+    const exp = expandedPx();
+    onSheetPx?.(Math.abs(h - def) <= Math.abs(h - exp) ? def : exp);
+  };
+  // A completed drag also fires a click on the grabber — swallow it so it doesn't re-collapse.
+  const grabClick = (e: React.MouseEvent) => {
+    if (e.detail !== 0) return; // pointer-driven click: pointerup already handled tap-vs-drag
+    // Keyboard activation (Enter/Space, detail 0): the grabber's original collapse affordance.
+    onSheetPx?.(null);
+    handleOpenChange(false);
+  };
 
   // The dot mounts whenever there's something to show (persistent hint) OR whenever a pulse
   // might need to play (pulseKey provided) — kept mounted so the transient WAAPI pulse always has
@@ -257,12 +340,26 @@ export default function RailDock({
       <Sheet open={open} onOpenChange={handleOpenChange} modal={false}>
         <SheetContent
           side={sheetSide ?? side}
-          style={style}
+          // Drag-chosen height override (phone bottom sheet): inline height + unlocked max-height
+          // (the CSS caps at 72vh, below the expanded snap). Cleared back to the 60vh default when
+          // `sheetPx` is null.
+          style={isBarHalf && sheetPx != null ? { ...style, height: sheetPx, maxHeight: "none" } : style}
           overlay={false}
           // Phone bar-half variant: the sheet sits DIRECTLY ABOVE the persistent dock bar (never
           // covers it — the bar is its visible header/handle), so offset it up by the bar height.
-          // `!` beats the base `bottom-0` from the bottom-side placement in sheet.tsx.
-          className={isBarHalf ? "!bottom-[var(--phone-dock-h)]" : undefined}
+          // `!` beats the base `bottom-0` from the bottom-side placement in sheet.tsx. Snapping
+          // animates the height (calm 0.2s; suspended while the finger drags, instant under
+          // reduced motion).
+          className={
+            isBarHalf
+              ? cn(
+                  "!bottom-[var(--phone-dock-h)]",
+                  dragging
+                    ? "!transition-none"
+                    : "transition-[height] duration-200 ease-out motion-reduce:!transition-none",
+                )
+              : undefined
+          }
           // Don't let a pointer-down/interaction OUTSIDE the sheet (e.g. on the scene, or on the
           // OTHER open dock) dismiss it — the user closes each dock explicitly via its own ✕ /
           // Escape / bar-half toggle. Without this, radix's DismissableLayer auto-closes a
@@ -272,16 +369,23 @@ export default function RailDock({
           aria-describedby={undefined}
         >
           {sheetSide === "bottom" && (
-            // Centred grabber bar (36×4) with a ≥44px tap target; a real tap-to-collapse affordance.
+            // Centred grabber bar (36×4) with a ≥44px tap target — the sheet's DRAG handle
+            // (follow-the-finger + snap, see the drag block above) and still the plain
+            // tap-to-collapse affordance. `touch-action:none` so the browser never turns the
+            // drag into a page scroll; keyboard activation still collapses (grabClick).
             <button
               type="button"
               className={cn(
-                "self-center w-11 h-11 mx-0 -mt-[22px] -mb-[18px] flex items-center justify-center cursor-pointer",
-                "p-0 border-none bg-none [-webkit-tap-highlight-color:transparent]",
+                "self-center w-11 h-11 mx-0 -mt-[22px] -mb-[18px] flex items-center justify-center cursor-grab active:cursor-grabbing",
+                "p-0 border-none bg-none [-webkit-tap-highlight-color:transparent] [touch-action:none]",
                 "before:content-[''] before:w-9 before:h-1 before:rounded-[2px] before:bg-[var(--panel-border)]",
               )}
               aria-label={`Collapse ${label} panel`}
-              onClick={() => handleOpenChange(false)}
+              onPointerDown={grabDown}
+              onPointerMove={grabMove}
+              onPointerUp={grabUp}
+              onPointerCancel={grabUp}
+              onClick={grabClick}
             />
           )}
           {isBarHalf ? (

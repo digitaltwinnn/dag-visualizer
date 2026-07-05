@@ -121,6 +121,8 @@ export default function Inspector() {
   const setSnap = useStore((s) => s.setSnap);
   const phoneDock = useStore((s) => s.phoneDock);
   const setPhoneDock = useStore((s) => s.setPhoneDock);
+  const phoneSheetPx = useStore((s) => s.phoneSheetPx);
+  const setPhoneSheetPx = useStore((s) => s.setPhoneSheetPx);
 
   const accent = { ["--filter-accent"]: filterAccent(filter) } as CSSProperties;
   const isNode = inspect?.kind === "l0" || inspect?.kind === "l1" || inspect?.kind === "metanode";
@@ -320,6 +322,8 @@ export default function Inspector() {
       pulseGlyph={pulse.glyph}
       pulseHue={pulse.hue}
       open={phoneDock === "details"}
+      sheetPx={phoneSheetPx}
+      onSheetPx={setPhoneSheetPx}
       onOpenChange={(next) => {
         handleOpenChange(next);
         setPhoneDock(next ? "details" : null);
