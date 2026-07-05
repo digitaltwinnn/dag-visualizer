@@ -6,6 +6,7 @@ import {
   ArrowLeftRight,
   HandCoins,
   Info,
+  Compass,
   type LucideIcon,
 } from "lucide-react";
 import type { Mode } from "@/src/store/store";
@@ -33,6 +34,15 @@ export const VIEW_ICONS: Record<Mode, LucideIcon> = {
 // the open book reads as noise; the circled i is the universal "about" mark and stays crisp).
 // Used in the left dock tray and anywhere the About card kind needs an icon.
 export const ABOUT_ICON: LucideIcon = Info;
+
+// The left-rail TOOL cards' own mark (GeoExplore, LedgerPanel, and hyper's LearnPanel if/when it
+// grows a head): a card that lets you EXPLORE the view's subject, but isn't itself a view subject
+// (unlike the detail cards' Globe/Layers/Orbit marks), so it gets one dedicated glyph rather than
+// reusing the view icon a second time in the same rail. Compass — the same mark the phone dock's
+// Explore half already uses, so the rail tool cards and the dock agree on what "explore" looks
+// like. Used in the card head only; the dock icon TRAYS keep showing each view's own VIEW_ICONS
+// mark (that legend is unchanged — it's what's parked inside the sheet, not the card's own head).
+export const EXPLORE_ICON: LucideIcon = Compass;
 
 // The inspector card KINDS map onto the same view vocabulary: the metagraph dossier is the
 // Hypergraph subject (Orbit), a snapshot is the Snapshots subject (Layers), a node is the

@@ -4,6 +4,7 @@ import { useState } from "react";
 import { cn } from "@/lib/utils";
 import CardHead from "@/components/CardHead";
 import { Card } from "@/components/ui/card";
+import { EXPLORE_ICON } from "@/components/icons";
 
 // The Snapshots view's left-rail tool. Sits in #leftcol like Learn / GeoExplore so the view keeps
 // the four-zone layout. Copy is intentionally minimal while the view is still being built.
@@ -14,6 +15,7 @@ export default function LedgerPanel() {
       <aside id="ledger-view">
         <CardHead
           panel
+          icon={EXPLORE_ICON}
           title="Understand the layered design"
           eyebrow="Snapshots · explore"
           caption="WIP"

@@ -6,6 +6,7 @@ import { cn } from "@/lib/utils";
 import { useStore } from "@/src/store/store";
 import CardHead from "@/components/CardHead";
 import { Card } from "@/components/ui/card";
+import { EXPLORE_ICON } from "@/components/icons";
 import { shortHash, CORE_HEX, metagraphById } from "@/src/data/network";
 import { identityHudHex } from "@/src/palette/identity";
 import { IdentityDot, StatusMark } from "@/components/inspector/parts";
@@ -105,6 +106,7 @@ export default function GeoExplore() {
       <aside id="geoexplore">
       <CardHead
         panel
+        icon={EXPLORE_ICON}
         title="Nodes by country"
         eyebrow="Geography · explore"
         collapsed={collapsed}

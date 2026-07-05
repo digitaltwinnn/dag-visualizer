@@ -1,7 +1,7 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { Plus, Minus, X } from "lucide-react";
+import { Plus, Minus, X, type LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 
@@ -16,6 +16,15 @@ import { Button } from "@/components/ui/button";
 //     the snapshot ordinal (its Odometer owns the roll). Pass `titleKey` to key the `roll-in`
 //     remount on a subject change (synced with the edge pulse); `aside` renders right-aligned on
 //     the title row (the snapshot's live-dot/age, the node's status pill),
+//   • an optional leading `icon` (panel layout only) — the kind MARK the detail cards already
+//     wear (SnapshotTitle's Layers, GeoLiveTitle's Globe, MetaTitle's avatar): a small lucide glyph
+//     ahead of the title, `aria-hidden`, at the SAME 14px/identity-or-structural treatment. Panel
+//     cards aren't subject-bound (About/tool cards), so they take the filter accent — the same
+//     colour the old per-panel beating dot used — rather than a per-subject hue. Task 23
+//     (refine(hud): About + explore card heads join the lucide kind-mark language): this REPLACES
+//     the old `before:` beating-dot pseudo that used to lead every panel title — the detail cards
+//     never had a dot, just their mark, so a panel head with no `icon` now renders no dot either
+//     (consistent with the detail-card anatomy, not a parallel convention).
 //   • the INSET hairline under the head — inset by the card's padding on BOTH layouts (the
 //     right-card Separator idiom; the old full-width panel border-b is gone). Full-width rules
 //     don't exist inside cards anymore: inset = the ONE rule weight (head boundary AND body
@@ -55,6 +64,7 @@ export default function CardHead({
   aside,
   subtitle,
   panel = false,
+  icon,
   caption,
   collapsed,
   onToggle,
@@ -64,6 +74,11 @@ export default function CardHead({
 }: {
   eyebrow?: ReactNode;
   title?: ReactNode;
+  // Panel-layout-only leading kind mark — see the anatomy note above. Not used by the inspector
+  // layout: those cards fold their icon straight into the `title` node themselves (SnapshotTitle
+  // etc.), since their mark is identity/subject-hued rather than the flat filter accent every
+  // panel head shares.
+  icon?: LucideIcon;
   titleKey?: string | number;
   // Right-aligned companion on the TITLE row (the snapshot's live-dot / relative age, the node's
   // status pill) — the head's aside area, so bodies don't render their own title rows.
@@ -96,12 +111,20 @@ export default function CardHead({
   const eyebrowClass = cn(EYEBROW, eyebrowMuted ? "text-muted-foreground" : "text-accent");
 
   if (panel) {
+    const Icon = icon;
     return (
       <>
         <div className="flex items-start justify-between gap-2 py-[var(--panel-pad-y)] px-[var(--panel-pad-x)]">
           <div className="flex flex-col gap-[3px] min-w-0">
             {eyebrow && <span className={cn("block", eyebrowClass)}>{eyebrow}</span>}
-            <h2 className={cn(TITLE, "inline-flex items-center gap-2 min-w-0 before:content-[''] before:flex-none before:w-[9px] before:h-[9px] before:rounded-full before:bg-[var(--filter-accent,var(--accent))] before:animate-dot-beat motion-reduce:before:animate-none")}>
+            <h2 className={cn(TITLE, "inline-flex items-center gap-2 min-w-0")}>
+              {Icon && (
+                <Icon
+                  aria-hidden
+                  className="flex-none size-3.5"
+                  style={{ color: "var(--filter-accent, var(--accent))" }}
+                />
+              )}
               {rolled}
             </h2>
           </div>

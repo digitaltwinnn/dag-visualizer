@@ -23,7 +23,7 @@ import {
 import OdometerDemo from "./OdometerDemo";
 import CardSignalsDemo from "./CardSignalsDemo";
 import EcgMark from "@/components/topbar/EcgMark";
-import { VIEW_ICONS } from "@/components/icons";
+import { VIEW_ICONS, ABOUT_ICON, EXPLORE_ICON } from "@/components/icons";
 import { Minus, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -120,7 +120,7 @@ export default async function DesignPage() {
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 max-w-2xl">
           <Card asChild className="block p-0">
             <div>
-              <CardHead panel eyebrow="Hypergraph · about" title="Glass card" />
+              <CardHead panel icon={ABOUT_ICON} eyebrow="Hypergraph · about" title="Glass card" />
               <div className="py-[var(--panel-pad-y)] px-[var(--panel-pad-x)] text-sm text-muted-foreground">
                 Spineless at rest — the rail thread carries identity.
                 <Separator className="my-3" />
@@ -135,7 +135,7 @@ export default async function DesignPage() {
           </Card>
           <Card asChild className="block p-0 [--spine:var(--success)] sig-right subject-paired">
             <div>
-              <CardHead panel eyebrow="Spine override" title="Signal colour" />
+              <CardHead panel icon={EXPLORE_ICON} eyebrow="Spine override" title="Signal colour" />
               <div className="py-[var(--panel-pad-y)] px-[var(--panel-pad-x)] text-sm text-muted-foreground">
                 Signal states read <code className="font-mono">--spine</code>; identity panels point
                 it at <code className="font-mono">--mg</code>. Here it is success-green, shown in the
@@ -144,6 +144,13 @@ export default async function DesignPage() {
             </div>
           </Card>
         </div>
+        <p className="text-sm text-muted-foreground mt-3 max-w-2xl">
+          Task 23: every panel-layout <code className="font-mono">CardHead</code> now leads its title
+          with a lucide `icon` (About&apos;s <code className="font-mono">Info</code>, the tool cards&apos;{" "}
+          <code className="font-mono">Compass</code>) instead of the old beating dot — the SAME
+          anatomy the inspector detail cards use (Layers/Globe/avatar ahead of the title). A panel
+          head with no `icon` now renders no dot either; the dot was retired, not replaced 1:1.
+        </p>
         <Card className={`${RIGHT_CARD} mt-4 max-w-2xl text-sm text-muted-foreground`}>
           <code className="font-mono">RIGHT_CARD</code> — the ONE inspector-rail Card composition
           (passed as <code className="font-mono">&lt;Card asChild className=&#123;RIGHT_CARD&#125;&gt;</code>):

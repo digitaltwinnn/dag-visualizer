@@ -4,6 +4,7 @@ import { useState } from "react";
 import { cn } from "@/lib/utils";
 import CardHead from "@/components/CardHead";
 import { Card } from "@/components/ui/card";
+import { ABOUT_ICON } from "@/components/icons";
 
 // The left-rail "About this view" orientation card, shown at the top of the rail in every view.
 // Same shell as the tool panels so the four-zone HUD stays consistent. Collapsed by default (a
@@ -25,6 +26,7 @@ export default function AboutView({
       <aside>
         <CardHead
           panel
+          icon={ABOUT_ICON}
           title={title}
           eyebrow={eyebrow}
           caption={caption || undefined}
