@@ -3,9 +3,13 @@
 import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { cn } from "@/lib/utils";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
+import { Button } from "@/components/ui/button";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { Compass, ListTree } from "lucide-react";
 
 const PULSE_MS = 900;
+// How long the hint dot stays morphed into the updating card's type glyph before settling back.
+const GLYPH_MS = 2000;
 
 // Tablet/phone edge dock for a rail's content: a slim fixed edge tab (`‹`/`›`) that opens the
 // SAME content the desktop inline rail shows, inside a Sheet overlay (full-width scene stays
@@ -36,6 +40,16 @@ const PULSE_MS = 900;
 // announced by the persistent CSS pulse (`railTabHintPulse`), so replaying the transient WAAPI
 // pulse on the very same frame would double-animate the same dot. The transient pulse is reserved
 // for a DATA update on an already-seen card (`hint` staying false across the bump).
+//
+// `pulseGlyph`/`pulseHue`: the SIGNAL CHIP (user-approved 2026-07-05). When provided alongside a
+// `pulseKey` bump, the dot briefly MORPHS into the updating card's type glyph (◆ dossier / ◍ node /
+// ▦ snapshot — the same monochrome marks the card heads use), tinted the updating card's
+// identity/spine hue, rides the same one-shot pulse, then settles back to the plain dot
+// (~GLYPH_MS total). So a closed tab doesn't just "feel alive" — it says WHICH kind of card just
+// updated. Presentation-only props (a glyph string + a CSS colour), so RailDock stays generic —
+// the caller (Inspector) owns the kind→glyph/hue mapping. Reduced motion: the glyph swap still
+// happens (it's information), only the pulse animation is skipped. Callers whose cards don't
+// meaningfully update (ExploreRail) simply never pass one → plain dot, unchanged.
 //
 // `sheetSide`: the Sheet's slide-in edge, when it should differ from the tab's screen-edge
 // position (`side`) — e.g. the phone Detail dock keeps its tab on the right edge but slides the
@@ -71,6 +85,8 @@ export default function RailDock({
   children,
   hint,
   pulseKey,
+  pulseGlyph,
+  pulseHue,
   onOpenChange,
   sheetSide,
   trigger = "edge-tab",
@@ -82,6 +98,8 @@ export default function RailDock({
   children: ReactNode;
   hint?: boolean;
   pulseKey?: unknown;
+  pulseGlyph?: string;
+  pulseHue?: string;
   onOpenChange?: (open: boolean) => void;
   sheetSide?: "left" | "right" | "bottom";
   trigger?: "edge-tab" | "bottom-bar-half";
@@ -98,6 +116,11 @@ export default function RailDock({
   const mounted = useRef(false);
   const anim = useRef<Animation | null>(null);
   const prevHint = useRef(hint);
+  // The signal chip: while set, the dot renders as the updating card's type glyph (see the
+  // prop doc above). One timer; a new bump inside the window just restarts it.
+  const [glyphFlash, setGlyphFlash] = useState<{ glyph: string; hue?: string } | null>(null);
+  const glyphTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => () => { if (glyphTimer.current) clearTimeout(glyphTimer.current); }, []);
   useEffect(() => {
     const hintJustArrived = hint && !prevHint.current;
     prevHint.current = hint;
@@ -106,6 +129,13 @@ export default function RailDock({
       return;
     }
     if (open) return; // only pulses while the tab is the only visible affordance
+    // The glyph morph happens on EVERY qualifying bump (incl. a brand-new detail arriving — the
+    // glyph is what tells you WHAT landed); under reduced motion it's a static swap, no pulse.
+    if (pulseGlyph) {
+      setGlyphFlash({ glyph: pulseGlyph, hue: pulseHue });
+      if (glyphTimer.current) clearTimeout(glyphTimer.current);
+      glyphTimer.current = setTimeout(() => setGlyphFlash(null), GLYPH_MS);
+    }
     // Skip the transient pulse when the persistent hint just turned on — its own resting CSS
     // pulse already signals "new" on this same dot; firing both at once double-animates it.
     if (hintJustArrived) return;
@@ -138,43 +168,65 @@ export default function RailDock({
     <span
       ref={dotRef}
       className={cn(
-        "w-2 h-2 rounded-full bg-[var(--core)] shadow-[0_0_6px_1px_var(--core)]",
-        isBarHalf ? "static ml-0.5" : cn("absolute top-1.5", side === "left" ? "right-1" : "left-1"),
-        hint
-          ? "animate-rail-hint motion-reduce:animate-none motion-reduce:opacity-90"
-          : "opacity-0", // transient: WAAPI drives it; no resting animation
+        isBarHalf ? "static ml-0.5" : cn("absolute", side === "left" ? "right-1" : "left-1"),
+        glyphFlash
+          ? // Signal chip: the card-type glyph, identity-tinted, visible for the whole window
+            // (the WAAPI pulse rides on top; reduced motion → this static swap alone).
+            cn("text-[11px] leading-none", !isBarHalf && "top-1")
+          : cn(
+              "w-2 h-2 rounded-full bg-[var(--core)] shadow-[0_0_6px_1px_var(--core)]",
+              !isBarHalf && "top-1.5",
+              hint
+                ? "animate-rail-hint motion-reduce:animate-none motion-reduce:opacity-90"
+                : "opacity-0", // transient: WAAPI drives it; no resting animation
+            ),
       )}
+      style={glyphFlash ? { color: glyphFlash.hue ?? "var(--core)" } : undefined}
       aria-hidden="true"
-    />
+    >
+      {glyphFlash?.glyph}
+    </span>
   );
-  // Tapping the ACTIVE half again is a TOGGLE (collapses its own sheet); tapping it while closed
-  // opens. The edge tab never needs this — it's hidden the instant its own sheet opens, so it can
-  // only ever mean "open" — but the bar half stays visible throughout, so it must mean both.
-  const handleTriggerClick = () => handleOpenChange(isBarHalf ? !open : true);
   return (
     <>
       {isBarHalf ? (
         // Phone persistent bottom bar HALF: hidden except on phone (<700px). The two halves (this
         // dock's + the other rail's) tile into one seamless full-width strip docked at bottom:0;
         // the ACTIVE half reads as selected (shared cyan --sel-* language + a cyan top accent).
-        <button
+        // Rebased on the themed ToggleGroup primitive (user-approved 2026-07-05): a one-item
+        // `type="single"` group per half — the primitive's NATIVE deselect-on-reclick is exactly
+        // the dock's tap-to-open / retap-to-collapse semantics, so no hand-rolled toggle handler.
+        // Each half is its own group (the two halves live in two separate RailDock instances —
+        // ExploreRail's and Inspector's); their mutual exclusion stays where it was, in the shared
+        // controlled `open` (`store.phoneDock`), which RailDock never owned anyway.
+        <ToggleGroup
+          type="single"
+          value={open ? "open" : ""}
+          onValueChange={(v) => handleOpenChange(v === "open")}
           className={cn(
-            "fixed z-[42] bottom-0 w-1/2 h-[var(--phone-dock-h)] hidden items-center justify-center gap-2 cursor-pointer",
-            "bg-[rgba(12,16,32,0.35)] border border-[rgba(178,193,223,0.10)] backdrop-blur-[7px]",
-            "text-[12.5px] font-semibold tracking-[0.02em] max-[699px]:inline-flex",
+            "fixed z-[42] bottom-0 w-1/2 h-[var(--phone-dock-h)] hidden max-[699px]:flex rounded-none",
             side === "left" ? "left-0" : "right-0",
-            open
-              ? "text-[var(--text)] bg-[var(--sel-bg)] shadow-[inset_0_2px_0_var(--sel-border)] [&_svg]:text-[var(--core)]"
-              : "text-[var(--muted)]",
           )}
-          aria-label={`${label} panel`}
-          aria-pressed={open}
-          onClick={handleTriggerClick}
         >
-          {side === "left" ? <Compass size={18} strokeWidth={1.75} aria-hidden="true" /> : <ListTree size={18} strokeWidth={1.75} aria-hidden="true" />}
-          <span>{label}</span>
-          {dot}
-        </button>
+          <ToggleGroupItem
+            value="open"
+            aria-label={`${label} panel`}
+            className={cn(
+              // The half fills its group; `!` beats the primitive's first/last rounding + the
+              // toggle baseline's hover/on fills (this design owns its selection language).
+              "w-full h-full rounded-none! items-center justify-center gap-2 cursor-pointer",
+              "bg-[rgba(12,16,32,0.35)] border border-[rgba(178,193,223,0.10)] backdrop-blur-[7px]",
+              "text-[12.5px] font-semibold tracking-[0.02em] text-[var(--muted)]",
+              "hover:bg-[rgba(12,16,32,0.35)] hover:text-[var(--muted)]",
+              "data-[state=on]:text-[var(--text)] data-[state=on]:bg-[var(--sel-bg)]",
+              "data-[state=on]:shadow-[inset_0_2px_0_var(--sel-border)] data-[state=on]:[&_svg]:text-[var(--core)]",
+            )}
+          >
+            {side === "left" ? <Compass size={18} strokeWidth={1.75} aria-hidden="true" /> : <ListTree size={18} strokeWidth={1.75} aria-hidden="true" />}
+            <span>{label}</span>
+            {dot}
+          </ToggleGroupItem>
+        </ToggleGroup>
       ) : (
         // Tablet edge tab (700–1099px only; hidden on desktop AND phone): a slim ‹/› entry docked
         // to the screen edge, ≥44px tap target.
@@ -186,7 +238,9 @@ export default function RailDock({
             side === "left" ? "left-0 rounded-r-[var(--radius)] border-l-0" : "right-0 rounded-l-[var(--radius)] border-r-0",
           )}
           aria-label={`${label} panel`}
-          onClick={handleTriggerClick}
+          // The edge tab is hidden the instant its own sheet opens, so it can only ever mean
+          // "open" (the bar half's open/collapse toggle is ToggleGroup's native deselect above).
+          onClick={() => handleOpenChange(true)}
         >
           {side === "left" ? "‹" : "›"}
           {dot}
@@ -242,13 +296,19 @@ export default function RailDock({
               <SheetTitle className="m-0 text-[13px] font-semibold tracking-[0.02em] uppercase text-[var(--text)] opacity-90 [text-shadow:0_1px_2px_rgba(3,5,12,0.7)]">
                 {label}
               </SheetTitle>
-              <button
-                className="flex-none w-11 h-11 flex items-center justify-center bg-[var(--panel)] border border-[var(--panel-border)] rounded-[var(--radius)] text-[var(--text)] text-[22px] leading-none cursor-pointer"
+              {/* The sheet's × on the same ghost-Button baseline as CardHead's card close (muted,
+                  no box — the old hand-rolled panel-boxed button is gone), just kept ≥44px since
+                  it's the sheet's primary touch dismiss. */}
+              <Button
+                variant="ghost"
+                size="icon-lg"
                 aria-label={`Close ${label} panel`}
+                title={`Close ${label} panel`}
                 onClick={() => handleOpenChange(false)}
+                className="flex-none w-11 h-11 rounded-[var(--radius)] text-[22px] leading-none cursor-pointer text-muted-foreground hover:bg-transparent hover:text-muted-foreground dark:hover:bg-transparent"
               >
                 ×
-              </button>
+              </Button>
             </div>
           )}
           {/* The cards scroll in an inner body so the sheet itself is `overflow: visible` — that lets

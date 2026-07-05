@@ -205,7 +205,10 @@ export function SnapshotCard({ data: d }: { data: GlobalSnapshot }) {
           exact read is still in flight (ACQUIRING), the fee row shows twinkling node-stars so the
           cell reserves width; once it lands the real value cross-fades in (animate-resolve-in). */}
       <Separator className="my-2" />
-      {feeHold.show ? (
+      {/* `|| exact == null` guards a one-render race: when the live tick rolls to a new ordinal,
+          `exact` flips back to null on THAT render but useMinHold's `show` only rises in its
+          effect on the NEXT one — without the guard this dereferenced `exact.totalFee`. */}
+      {feeHold.show || exact == null ? (
         <div className="flex flex-col gap-2">
           <div className="flex items-start justify-between gap-2.5">
             <span className="text-[12.5px] text-muted-foreground">Fees paid</span>

@@ -202,19 +202,48 @@ export default function Inspector() {
 
   // Transient re-pulse — mirrors the desktop cards' own `useEdgePulse` edge sweep, which fires on
   // a pane's subject changing (a new node/snapshot/metagraph picked). That sweep is invisible
-  // while the rail is collapsed, so the tab hint stands in for it: bump `pulseCount` whenever
+  // while the rail is collapsed, so the tab hint stands in for it: bump the pulse whenever
   // `inspect`, `snap`, or the Context subject (`filter`) changes reference, and RailDock replays
   // a one-shot pulse on the dot. This
   // fires even when `hint` is already false (an already-seen card whose data just changed) — it
   // does NOT resurrect the persistent unseen dot, it's a separate transient animation.
-  const [pulseCount, setPulseCount] = useState(0);
+  //
+  // The pulse also carries WHICH card updated (the signal chip, user-approved 2026-07-05): the
+  // updating card's type glyph — ◆ dossier / ◍ node / ▦ snapshot, the same marks the card heads
+  // use — plus its identity/spine hue (the exact hues the cards themselves pair with: the node's
+  // metagraph hue or core cyan, the snapshot's/dossier's filter accent). RailDock morphs the hint
+  // dot into it for ~2s. When several change in one commit (e.g. clicking a hyper node sets the
+  // filter AND the node pick), the most specific card wins: node > snapshot > dossier. A pure
+  // deselect (a pick clearing) keeps the plain dot — nothing "updated" to announce.
+  const [pulse, setPulse] = useState<{ n: number; glyph?: string; hue?: string }>({ n: 0 });
   const pulseMounted = useRef(false);
+  const pulsePrev = useRef({ inspect, snap, filter });
   useEffect(() => {
+    const p = pulsePrev.current;
+    pulsePrev.current = { inspect, snap, filter };
     if (!pulseMounted.current) {
       pulseMounted.current = true;
       return;
     }
-    setPulseCount((n) => n + 1);
+    let glyph: string | undefined;
+    let hue: string | undefined;
+    if (filter !== p.filter) {
+      glyph = "◆";
+      hue = filterAccent(filter);
+    }
+    if (snap !== p.snap && snap) {
+      glyph = "▦";
+      hue = filterAccent(filter);
+    }
+    if (
+      inspect !== p.inspect &&
+      inspect &&
+      (inspect.kind === "l0" || inspect.kind === "l1" || inspect.kind === "metanode")
+    ) {
+      glyph = "◍";
+      hue = inspect.kind === "metanode" && inspect.meta ? identityHudHex(inspect.meta.id) : CORE_HEX;
+    }
+    setPulse((prev) => ({ n: prev.n + 1, glyph, hue }));
   }, [inspect, snap, filter]);
 
   // Tablet: Context + Detail panes + PickHint together (`content` below), unchanged from Task 3.
@@ -269,7 +298,7 @@ export default function Inspector() {
     // Tablet: unchanged — the right edge tab opening a right-side Sheet, independent of the
     // left "Explore" dock (both can be open at once).
     return (
-      <RailDock side="right" label="Details" style={accent} hint={hint} pulseKey={pulseCount} onOpenChange={handleOpenChange}>
+      <RailDock side="right" label="Details" style={accent} hint={hint} pulseKey={pulse} pulseGlyph={pulse.glyph} pulseHue={pulse.hue} onOpenChange={handleOpenChange}>
         {content}
       </RailDock>
     );
@@ -287,7 +316,9 @@ export default function Inspector() {
       trigger="bottom-bar-half"
       sheetSide="bottom"
       hint={hint}
-      pulseKey={pulseCount}
+      pulseKey={pulse}
+      pulseGlyph={pulse.glyph}
+      pulseHue={pulse.hue}
       open={phoneDock === "details"}
       onOpenChange={(next) => {
         handleOpenChange(next);
