@@ -5,7 +5,6 @@ import { cn } from "@/lib/utils";
 import { useStore } from "@/src/store/store";
 import CardHead from "@/components/CardHead";
 import { Card } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import { shortHash, CORE_HEX, metagraphById } from "@/src/data/network";
 import { identityHudHex } from "@/src/palette/identity";
 import { StatusMark } from "@/components/inspector/parts";
@@ -31,7 +30,6 @@ export default function GeoExplore() {
   const hoverNodeId = useStore((s) => s.hoverNodeId);
   const setFilter = useStore((s) => s.setFilter);
   const filter = useStore((s) => s.filter);
-  const setMode = useStore((s) => s.setMode);
   const [collapsed, setCollapsed] = useState(false);
 
   // Selecting a node here mirrors clicking it on the globe (Engine._handleClick): set the
@@ -108,17 +106,11 @@ export default function GeoExplore() {
           // Quiet-empty, in the standard LEFT-ALIGNED card/hint typography (the old centered
           // block — plus a stray absolutely-positioned standby dot that escaped its unsized
           // wrapper — read as a bolt-on). Same padding as the country list it stands in for.
+          // One message, no jump link (user refinement: the "See it in the Hypergraph →" link
+          // was removed — the explanation already says where the metagraph still appears).
           <div className="pt-2 px-[14px] pb-3">
             <p className="text-[12.5px] text-foreground m-0 mb-1">No locatable nodes</p>
             <p className="text-[11.5px] text-muted-foreground leading-[1.5] m-0">{tickerOrName} has no validators we can place on the map right now. It still appears in the Hypergraph.</p>
-            <Button
-              variant="link"
-              size="xs"
-              className="mt-2 h-auto p-0 text-xs font-normal"
-              onClick={() => setMode("hyper")}
-            >
-              See it in the Hypergraph →
-            </Button>
           </div>
         ) : (
         <div className="flex-[1_1_auto] min-h-0 overflow-y-auto pt-1.5 px-[14px] pb-2 cmd-list-scroll">

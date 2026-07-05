@@ -133,10 +133,21 @@
    spine). Hue appears EXCLUSIVELY via the `.subject-paired` declarations below, present only while
    the pairing class is; a pairing leave falls back to this neutral for its 0.16s fade — calm, no
    colour transition anywhere. */
-/* (.sig-right::after's neutral resting background is set in its own base rule below — a duplicate
-   pin here would lose to it at equal specificity/later source. The ig-panel ::before base rule
-   lives in @layer components, so this unlayered pin beats it.) */
-.sig-left::before        { background: var(--thread-line); }
+/* THE ONE edge-line recipe (user refinement): EVERY hover-edge signal — the neutral whisper AND
+   the hued pairing line, both rails, any variant — renders the SAME soft gradient-faded tips
+   (transparent→line→transparent, the travelling-pulse tip treatment; no hard ends anywhere on
+   the edge). The line's colour rides `--edge-hue` (neutral `--thread-line` at rest/whisper; the
+   pairing rules below swap the hue in WHILE paired — swapping a var, not the background, keeps
+   the opacity-only invariant: a pairing leave still falls back to the neutral instantly and only
+   the opacity fades, no colour transition). The ig-panel ::before base rule lives in
+   `@layer components`, so this unlayered recipe beats it. */
+.sig-left::before, .sig-right::after {
+  background: linear-gradient(to bottom,
+    transparent 0,
+    var(--edge-hue, var(--thread-line)) 14%,
+    var(--edge-hue, var(--thread-line)) 86%,
+    transparent 100%);
+}
 .sig-left:hover::before  { opacity: 1; box-shadow: none; }
 .sig-right:hover::after  { opacity: 1; box-shadow: none; }
 
@@ -144,25 +155,24 @@
    and goes with the hover; the 0.16s transition on the base elements eases it in/out).
    RIGHT-rail cards (`.sig-left`) light the ig-panel ::before on their LEFT (scene-facing) edge —
    RIGHT_CARD suppresses `--spine`, so colour comes from the subject's `--row-hue` (falling back
-   to the rail's `--filter-accent`). */
+   to the rail's `--filter-accent`). Same soft-tipped line via `--edge-hue`; only the glow is new. */
 .sig-left.subject-paired::before {
   opacity: 1;
-  background: var(--row-hue, var(--filter-accent, var(--primary)));
+  --edge-hue: var(--row-hue, var(--filter-accent, var(--primary)));
   box-shadow: 0 0 7px 0 var(--row-hue, var(--filter-accent, var(--primary)));
 }
 
 /* LEFT-rail cards (`.sig-right`) — the mirror: pairing lights an ::after on the card's RIGHT
    (scene-facing) edge. No left card is pairable today, so the pairing rule is the
-   forward-compatible mirror + /design demo. Resting background is the NEUTRAL grey (see the
-   opacity-only warning above) — NOT `var(--spine)`, which made the hover-out fade flash cyan. */
+   forward-compatible mirror + /design demo. Geometry only here — the soft-tipped background
+   comes from the shared edge-line recipe above (neutral at rest; see the opacity-only warning). */
 .sig-right::after {
   content: ""; position: absolute; right: 0; top: 10px; bottom: 10px; width: 2px;
   border-radius: 2px; opacity: 0; transition: opacity 0.16s ease; pointer-events: none;
-  background: var(--thread-line);
 }
 .sig-right.subject-paired::after {
   opacity: 1;
-  background: var(--row-hue, var(--spine, var(--primary)));
+  --edge-hue: var(--row-hue, var(--spine, var(--primary)));
   box-shadow: 0 0 7px 0 var(--row-hue, var(--spine, var(--primary)));
 }
 

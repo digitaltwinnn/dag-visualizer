@@ -6,7 +6,7 @@ import { useStore } from "@/src/store/store";
 import CardHead from "@/components/CardHead";
 import {
   GeoLiveAside, GeoLiveCard, GeoLiveSubtitle, GeoLiveTitle,
-  MetaCard, SnapshotAside, SnapshotCard, SnapshotTitle,
+  MetaCard, MetaTitle, SnapshotAside, SnapshotCard, SnapshotTitle,
 } from "@/components/inspector/cards";
 
 // Only three kinds ever reach the inspector frame now: a metagraph/core dossier (ContextCard),
@@ -32,7 +32,10 @@ function headFor(p: PickDescriptor): {
   title?: ReactNode; titleKey?: string; subtitle?: ReactNode; aside?: ReactNode;
 } {
   switch (p.kind) {
-    case "meta": return { title: p.cfg.name, titleKey: p.cfg.name };
+    // The dossier head is the full identity composition — avatar + name + ticker (MetaTitle;
+    // user refinement restoring the pre-unification header). Still rolls via titleKey on the
+    // name, synced with the edge pulse.
+    case "meta": return { title: <MetaTitle cfg={p.cfg} />, titleKey: p.cfg.name };
     case "snapshot": return { title: <SnapshotTitle data={p.data} />, aside: <SnapshotAside data={p.data} /> };
     case "geoLive": return { title: <GeoLiveTitle />, subtitle: <GeoLiveSubtitle />, aside: <GeoLiveAside /> };
     default: return {};

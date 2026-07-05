@@ -25,13 +25,14 @@ type PickOf<K extends PickDescriptor["kind"]> = Extract<PickDescriptor, { kind: 
 // area. These exports are what InspectorCard feeds CardHead per kind; the bodies below render
 // NO title rows of their own.
 
-// Snapshot title: ◆ type-marker (cyan = a GLOBAL snapshot) + the ordinal. The Odometer owns the
-// roll (digit-roll on each live tick), so no CardHead `titleKey` — a keyed remount would restart
-// it as a whole-title roll-in instead.
+// Snapshot title: ▦ type-marker (the SAME glyph the top bar uses for the Snapshots view — the
+// card head marks speak the view-glyph vocabulary; cyan = a GLOBAL snapshot) + the ordinal. The
+// Odometer owns the roll (digit-roll on each live tick), so no CardHead `titleKey` — a keyed
+// remount would restart it as a whole-title roll-in instead.
 export function SnapshotTitle({ data: d }: { data: GlobalSnapshot }) {
   return (
     <span className="inline-flex items-baseline gap-2">
-      <span className="text-primary text-xs" aria-hidden>◆</span>
+      <span className="text-primary text-[14px]" aria-hidden>▦</span>
       <Odometer value={d.ordinal} className="text-[15px] font-semibold text-foreground tabular-nums" />
     </span>
   );
@@ -61,6 +62,34 @@ export function SnapshotAside({ data: d }: { data: GlobalSnapshot }) {
   );
 }
 
+// Dossier title: the pre-unification header composition (logo avatar ringed in the identity hue
+// + the NAME over the TICKER), re-homed INTO CardHead's title slot (user refinement — the head
+// unification had split the avatar/ticker off into a body row). The name inherits CardHead's one
+// 15px/semibold title standard; the ticker rides under it at its original 11px/hue. Rolls as a
+// whole via InspectorCard's `titleKey` (keyed on the name, synced with the edge pulse).
+export function MetaTitle({ cfg }: { cfg: MetaCfg }) {
+  const metaList = useStore((s) => s.metaList);
+  const mg = metaList.find((x) => x.id === cfg.id) || null;
+  const hue = hex(cfg.color);
+  const iconUrl = mg?.iconUrl || cfg.iconUrl; // live metagraph icon, or the core's bundled logo
+  const monogram = (cfg.ticker || cfg.name).slice(0, 3).toUpperCase();
+  return (
+    <span className="inline-flex items-center gap-2.5 min-w-0">
+      {/* The logo shows as a clean circular mark — no squared tile (brand icons are round). */}
+      <Avatar className="size-[38px] flex-none">
+        {iconUrl && <AvatarImage src={iconUrl} alt="" />}
+        <AvatarFallback style={{ color: hue }}>{monogram}</AvatarFallback>
+      </Avatar>
+      <span className="flex flex-col gap-px min-w-0">
+        <span className="leading-[1.1]">{cfg.name}</span>
+        {cfg.id !== "dag" && (
+          <span className="text-[11px] font-semibold tracking-[0.02em]" style={{ color: hue }}>{cfg.ticker}</span>
+        )}
+      </span>
+    </span>
+  );
+}
+
 // The selected node, resolved from the store the same way GeoLiveCard does — shared by the
 // head pieces and the body so they can't disagree.
 function inspectedNode(inspect: ReturnType<typeof useStore.getState>["inspect"]) {
@@ -75,11 +104,12 @@ function nodePlace(node: NonNullable<ReturnType<typeof inspectedNode>>): string 
   return g ? `${g.city ? g.city + ", " : ""}${g.country ?? ""}`.trim() : "";
 }
 
-// Node title: identity-hue dot + the node's LOCATION ("City, Country" — user-agreed: where the
-// node sits is the headline; its hash is bookkeeping, demoted to the subtitle below). Fallback
-// when geolocation hasn't resolved: the truncated id (mono) stays the title, no subtitle. The
-// roll-in stays keyed on the node ID — the subject's identity, not the title text (a new node in
-// the same city still rolls).
+// Node title: ◍ type-marker (the Geography view's top-bar glyph — same view-glyph vocabulary as
+// the snapshot head's ▦; identity-hued) + the node's LOCATION ("City, Country" — user-agreed:
+// where the node sits is the headline; its hash is bookkeeping, demoted to the subtitle below).
+// Fallback when geolocation hasn't resolved: the truncated id (mono) stays the title, no
+// subtitle. The roll-in stays keyed on the node ID — the subject's identity, not the title text
+// (a new node in the same city still rolls).
 export function GeoLiveTitle() {
   const inspect = useStore((s) => s.inspect);
   const node = inspectedNode(inspect);
@@ -90,7 +120,7 @@ export function GeoLiveTitle() {
   const color = node.kind === "metanode" ? (node.meta ? identityHudHex(node.meta.id) : undefined) : CORE_HEX;
   return (
     <span className="inline-flex items-center gap-2 min-w-0">
-      {color && <span className="flex-none w-[9px] h-[9px] rounded-full" style={{ background: color }} />}
+      {color && <span className="flex-none text-[14px] leading-none" style={{ color }} aria-hidden>◍</span>}
       <span key={id ?? title} className={cn("min-w-0 roll-in", !place && "font-mono tabular-nums break-all")}>{title}</span>
     </span>
   );
@@ -208,8 +238,6 @@ export function MetaCard({ cfg }: { cfg: MetaCfg }) {
   const mg = metaList.find((x) => x.id === cfg.id) || null;
   const nodes = mg?.nodes || [];
   const hue = hex(cfg.color);
-  const iconUrl = mg?.iconUrl || cfg.iconUrl; // live metagraph icon, or the core's bundled logo
-  const monogram = (cfg.ticker || cfg.name).slice(0, 3).toUpperCase();
   const blurb = mg?.description || cfg.blurb;
   const site = mg?.siteUrl;
   // A metagraph with no currency-L1 has a symbol but no real token — worth noting. Token
@@ -217,19 +245,10 @@ export function MetaCard({ cfg }: { cfg: MetaCfg }) {
   // repeating it (a redundant "DAG"/"DOR") is dropped.
   const isDataMeta = cfg.id !== "dag" && !nodeComposition(nodes).hasCurrency;
   // Hover pairing (synced 3D hub glow) lives on the OUTER pane (ContextCard's #metapane), not here.
-  // The metagraph NAME is the card-head title now (CardHead, rolled via titleKey); the identity
-  // mark + ticker stay as the first body row so the brand hierarchy reads unchanged.
+  // The full identity header (avatar + name + ticker) lives in the card HEAD now (MetaTitle via
+  // CardHead's title slot, rolled via titleKey) — the body starts at the description.
   return (
     <>
-      {/* Identity row — logo avatar ringed in the identity hue + ticker. The logo shows as a clean
-          circular mark — no squared tile (brand icons are round, so a circle crop sits naturally). */}
-      <div className="flex items-center gap-2.5 mb-2.5">
-        <Avatar className="size-[38px]">
-          {iconUrl && <AvatarImage src={iconUrl} alt="" />}
-          <AvatarFallback style={{ color: hue }}>{monogram}</AvatarFallback>
-        </Avatar>
-        {cfg.id !== "dag" && <span className="text-[11px] font-semibold tracking-[0.02em]" style={{ color: hue }}>{cfg.ticker}</span>}
-      </div>
       <Desc text={blurb} />
       {nodes.length > 0 && (
         <div className="mt-3">
