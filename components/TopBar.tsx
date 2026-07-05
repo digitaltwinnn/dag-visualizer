@@ -103,10 +103,14 @@ export default function TopBar() {
 
   return (
     <div ref={ref}>
+      {/* Fixed wrapper = the bar + the hanging view caption below it. pointer-events-none so the
+          caption strip under the bar doesn't block clicks on the scene; the bar itself restores
+          pointer-events-auto. */}
+      <div className="fixed top-[39px] inset-x-4 z-40 pointer-events-none">
       <div
         id="topbar"
         className={cn(
-          "fixed top-[39px] inset-x-4 z-40 flex flex-col overflow-hidden",
+          "relative flex flex-col overflow-hidden pointer-events-auto",
           "border border-border rounded-lg backdrop-blur-md",
           "bg-[linear-gradient(180deg,rgba(20,26,46,0.82),rgba(10,14,28,0.76))]",
           "shadow-[inset_0_1px_0_rgba(255,255,255,0.05),0_8px_30px_rgba(0,0,0,0.35)]",
@@ -213,13 +217,17 @@ export default function TopBar() {
         )}
       </div>
 
+      </div>
+
       {/* Selected-view label — only on the icon-only breakpoints (<1100px, where the switch
-          drops its text labels): the ACTIVE view's name, centered at the bar's bottom edge as a
-          slim second row of the SAME bar surface (chosen over floating it beneath the bar — the
-          banner+bar stack stays one tidy block and nothing overlays the scene). Muted eyebrow
-          language; keyed roll-in on view change (the HUD grammar). Decorative echo of the
-          radiogroup's own accessible state, so aria-hidden. */}
-      <div className="hidden max-[1099px]:flex justify-center pb-1.5 -mt-1" aria-hidden>
+          drops its text labels): the ACTIVE view's name as a quiet caption HANGING BELOW the
+          bar, anchored under its right corner (user refinement — the centered in-bar second row
+          read misaligned with the bar's buttons). Lives OUTSIDE the bar surface (a sibling in
+          the fixed wrapper, so the bar's overflow-hidden can't clip it) and keeps the muted
+          eyebrow language + keyed roll-in on view change (the HUD grammar). Decorative echo of
+          the radiogroup's own accessible state, so aria-hidden; non-interactive (the wrapper's
+          pointer-events-none passes scene clicks through the caption strip). */}
+      <div className="hidden max-[1099px]:flex justify-end pr-2.5 mt-1.5" aria-hidden>
         <span key={mode} className="roll-in text-[10px] tracking-[0.12em] uppercase text-muted-foreground leading-none">
           {VIEWS.find((v) => v.id === mode)?.name}
         </span>
