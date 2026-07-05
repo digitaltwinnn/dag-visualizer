@@ -102,27 +102,46 @@ function LedgerVitals() {
   );
 }
 
-// `vertical` renders the stacked layout used inside the phone vitals popover; the default
-// (inline bar) layout is unchanged.
+// `vertical` renders the stacked layout used inside the phone vitals popover (active view only,
+// unchanged). The default INLINE bar renders ALL THREE view clusters stacked in ONE grid cell,
+// with only the active view's visible — the region's width is therefore the WIDEST state's
+// width at every breakpoint, CONSTANT across view switches (and the flat placeholder views,
+// where none is visible), so the centered view switch never jumps horizontally on view change.
+// Hidden clusters are `invisible` + `aria-hidden` (layout kept, no paint, no live-region noise),
+// content right-aligned inside the reserved region so it keeps hugging the bar's right edge.
 function VitalsCluster({ vertical = false }: { vertical?: boolean } = {}) {
   const mode = useStore((s) => s.mode);
   const live = useStore((s) => s.live);
-  const body =
-    mode === "geo" ? <GeoVitals /> : mode === "ledger" ? <LedgerVitals /> : mode === "hyper" ? <HyperVitals /> : null;
+  if (vertical) {
+    const body =
+      mode === "geo" ? <GeoVitals /> : mode === "ledger" ? <LedgerVitals /> : mode === "hyper" ? <HyperVitals /> : null;
+    return (
+      <div className={cn("flex flex-col items-start gap-2", !live && "saturate-[.45]")}>
+        {!live && <NoSignalDot />}
+        {body}
+      </div>
+    );
+  }
+  const gaps = "gap-3.5 max-[1260px]:gap-3 max-[1120px]:gap-2.5 max-[940px]:gap-2.5 max-[820px]:gap-2";
+  const clusters: [string, React.ReactNode][] = [
+    ["hyper", <HyperVitals key="hyper" />],
+    ["geo", <GeoVitals key="geo" />],
+    ["ledger", <LedgerVitals key="ledger" />],
+  ];
   return (
-    <div
-      className={cn(
-        vertical
-          ? "flex flex-col items-start gap-2"
-          : cn(
-              "flex items-center gap-3.5",
-              "max-[1260px]:gap-3 max-[1120px]:gap-2.5 max-[940px]:gap-2.5 max-[820px]:gap-2",
-            ),
-        !live && "saturate-[.45]",
-      )}
-    >
+    <div className={cn("flex items-center", gaps, !live && "saturate-[.45]")}>
       {!live && <NoSignalDot />}
-      {body}
+      <div className="grid">
+        {clusters.map(([m, body]) => (
+          <div
+            key={m}
+            aria-hidden={mode !== m || undefined}
+            className={cn("col-start-1 row-start-1 flex items-center justify-end", gaps, mode !== m && "invisible")}
+          >
+            {body}
+          </div>
+        ))}
+      </div>
     </div>
   );
 }

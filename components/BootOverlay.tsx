@@ -4,12 +4,12 @@ import { useMinHold } from "@/components/useMinHold";
 import { cn } from "@/lib/utils";
 
 // Cold-start overlay, painted by React independent of the Three scene: a centred forming Global L0
-// core (soft radial glow + an expanding ping) + a "reaching the network…" label, in neutral cyan.
+// core (soft radial glow + an expanding ping) + a "Connecting…" label, in neutral cyan.
 // On LIVE it cross-fades out as the real 3D core fades in; on timeout it switches to the grey NO
 // SIGNAL treatment. Removed from the DOM once fully faded (LIVE) so it never intercepts anything.
 export default function BootOverlay() {
   const phase = useBootPhase();
-  // Transient boot signal: hold "reaching the network…" for a minimum calm cycle then fade out,
+  // Transient boot signal: hold "Connecting…" for a minimum calm cycle then fade out,
   // so a fast LIVE handoff doesn't blink away (concern #8). The dead states (no-signal/no-engine)
   // keep `phase !== "live"`, so `active` stays true and the overlay stays put — they're steady
   // states, not subject to the hold/fade.
@@ -23,7 +23,7 @@ export default function BootOverlay() {
     ? "3D unavailable — WebGL not supported"
     : noSignal
       ? "No signal — retrying…"
-      : "reaching the network…";
+      : "Connecting…";
   const dead = noSignal || noEngine;
   return (
     <div

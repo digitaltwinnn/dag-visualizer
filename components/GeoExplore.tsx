@@ -105,12 +105,12 @@ export default function GeoExplore() {
         {/* The footprint's headline figures (Nodes / Countries / Ready) live in the top-bar
             vitals now; this card is purely the country→nodes accordion. */}
         {quietEmpty ? (
-          <div className="py-4 px-2 text-center">
-            <span className="inline-block grayscale opacity-50" aria-hidden>
-              <span className="absolute left-2 top-1/2 -mt-[4.5px] w-[9px] h-[9px] rounded-full bg-primary animate-st-standby-node motion-reduce:animate-none" />
-            </span>
-            <p className="text-[12.5px] text-foreground mt-2 mb-0.5">No locatable nodes</p>
-            <p className="text-[11.5px] text-muted-foreground leading-[1.5]">{tickerOrName} has no validators we can place on the map right now. It still appears in the Hypergraph.</p>
+          // Quiet-empty, in the standard LEFT-ALIGNED card/hint typography (the old centered
+          // block — plus a stray absolutely-positioned standby dot that escaped its unsized
+          // wrapper — read as a bolt-on). Same padding as the country list it stands in for.
+          <div className="pt-2 px-[14px] pb-3">
+            <p className="text-[12.5px] text-foreground m-0 mb-1">No locatable nodes</p>
+            <p className="text-[11.5px] text-muted-foreground leading-[1.5] m-0">{tickerOrName} has no validators we can place on the map right now. It still appears in the Hypergraph.</p>
             <Button
               variant="link"
               size="xs"

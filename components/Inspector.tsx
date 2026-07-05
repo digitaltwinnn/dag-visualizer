@@ -156,6 +156,14 @@ export default function Inspector() {
   const panes = selStack.filter((slot) => cards[slot]?.active).map((slot) => cards[slot].pane);
   const hasDetail = panes.length > 0;
 
+  // The pick-invite only shows when there IS something to pick. In geo a filtered metagraph can
+  // have ZERO locatable nodes (the left rail's quiet-empty state, e.g. LEET) — nothing on the
+  // globe and no explorer rows, so inviting a click would be a dead hint; the quiet-empty card
+  // owns the messaging and the rail rests with just the Context dossier. `selNodes` is exactly
+  // the set the globe plots + the explorer lists, so empty ⇔ nothing pickable.
+  const selNodes = useStore((s) => s.selNodes);
+  const showHint = !hasDetail && !(mode === "geo" && selNodes.length === 0);
+
   // Stable identity of "whichever Detail is on top" — a node by its hover-pairing key (falls
   // back to its kind so a keyless node still counts as an identity), a snapshot by ordinal. Used
   // ONLY to decide when a new detail should re-arm the hint (below); NOT rendered.
@@ -216,7 +224,7 @@ export default function Inspector() {
     <>
       <ContextCard />
       {panes}
-      {!hasDetail && <PickHint mode={mode} />}
+      {showHint && <PickHint mode={mode} />}
     </>
   );
 
@@ -238,7 +246,7 @@ export default function Inspector() {
         >
           <ContextCard />
           {panes}
-          {!hasDetail && <PickHint mode={mode} />}
+          {showHint && <PickHint mode={mode} />}
         </div>
       </>
     );

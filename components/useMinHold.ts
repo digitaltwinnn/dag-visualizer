@@ -15,7 +15,7 @@ import { useEffect, useRef, useState } from "react";
 // hold itself stays (it's timing, not motion). All timers are cleaned up on unmount (no leaks).
 export function useMinHold(
   active: boolean,
-  holdMs = 1200,
+  holdMs = 900,
   fadeMs = 400,
 ): { show: boolean; fading: boolean } {
   const [show, setShow] = useState(active);
