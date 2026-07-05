@@ -154,6 +154,7 @@ export default function ExploreRail() {
       trigger="bottom-bar-half"
       sheetSide="bottom"
       signals={tray}
+      signalKey={`${mode}|${filter}`}
       open={phoneDock === "explore"}
       sheetPx={phoneSheetPx}
       onSheetPx={setPhoneSheetPx}

@@ -263,6 +263,7 @@ export default function Inspector() {
       sheetSide="bottom"
       signals={tray}
       updateKey={updateKey}
+      signalKey={`${mode}|${filter}`}
       open={phoneDock === "details"}
       sheetPx={phoneSheetPx}
       onSheetPx={setPhoneSheetPx}

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { ChevronDown, Filter } from "lucide-react";
+import { ChevronDown } from "lucide-react";
 import { VIEW_ICONS } from "@/components/icons";
 import { useStore } from "@/src/store/store";
 import { metagraphById } from "@/src/data/network";
@@ -73,9 +73,19 @@ export default function TopBar() {
           "flex items-center gap-3 py-2 px-3.5",
           "max-[1260px]:gap-2.5",
           "max-[940px]:gap-2 max-[940px]:px-2.5 max-[940px]:py-2",
-          "max-[699px]:gap-1.5 max-[699px]:p-2",
+          // PHONE: a 3-zone grid (left cluster | view switch | right cluster) so the switch is
+          // TRULY centred in the bar. The flex layout centres it between the side clusters, and
+          // those are unequal (ECG + filter ≈ 100px vs the 44px vitals toggle), which pushed the
+          // switch ~28px right of centre — pre-existing, worsened by the removed funnel icon.
+          // `1fr auto 1fr` keeps the sides equal (centring the middle) and degrades gracefully:
+          // a long ticker just shifts the switch instead of overlapping it. Tablet/desktop keep
+          // the flex row unchanged (the zone wrappers are `display: contents` there).
+          "max-[699px]:gap-1.5 max-[699px]:p-2 max-[699px]:grid max-[699px]:grid-cols-[1fr_auto_1fr]",
         )}
       >
+        {/* LEFT zone (phone grid): brand + filter. `contents` above 700px = invisible to the
+            flex row, so tablet/desktop layout is byte-identical. */}
+        <div className="contents max-[699px]:flex max-[699px]:items-center max-[699px]:gap-1.5 max-[699px]:min-w-0">
         {/* Brand */}
         <div className="flex items-center gap-2">
           <EcgMark />
@@ -98,10 +108,11 @@ export default function TopBar() {
               "max-[699px]:p-1.5 max-[699px]:gap-[5px]",
             )}
           >
-            {/* The control's semantics on every breakpoint: the "FILTER" text label on wide
-                bars, swapped for the lucide funnel where the label hides (≤940px) — never both. */}
+            {/* The "FILTER" text label on wide bars; on the condensed breakpoints (≤940px) it
+                simply hides — the identity dot + network name ARE the control's face there (the
+                lucide funnel stand-in was tried and removed: too busy, and it crowded the phone
+                bar off-balance). */}
             <span className="text-micro tracking-caps uppercase text-muted-foreground max-[940px]:hidden">Filter</span>
-            <Filter aria-hidden className="size-3.5 flex-none text-muted-foreground hidden max-[940px]:block" />
             <span
               className="w-[9px] h-[9px] rounded-full flex-none animate-dot-beat motion-reduce:animate-none"
               style={{ background: face.dot }}
@@ -137,8 +148,10 @@ export default function TopBar() {
             <FilterPicker onPick={() => setOpen(false)} />
           </PopoverContent>
         </Popover>
+        </div>
 
-        <div className="flex-1" />
+        {/* Flex spacers (tablet/desktop only) — the phone grid's 1fr columns own the spacing. */}
+        <div className="flex-1 max-[699px]:hidden" />
 
         {/* View switch — structural. On phone there's no room for the three non-functional
             "soon" placeholders (Network/Transactions/Staking) — they're dimmed dead weight
@@ -185,7 +198,11 @@ export default function TopBar() {
           })}
         </ToggleGroup>
 
-        <div className="flex-1" />
+        <div className="flex-1 max-[699px]:hidden" />
+
+        {/* RIGHT zone (phone grid): vitals. Mirrors the left zone (`contents` above 700px);
+            `justify-self-end` pins it to the bar's right edge in the grid. */}
+        <div className="contents max-[699px]:flex max-[699px]:items-center max-[699px]:gap-1.5 max-[699px]:justify-self-end">
         <span className="w-px self-stretch bg-border my-1 max-[820px]:hidden" />
 
         {/* Vitals — inline on tablet/desktop; a toggle button on phone that expands the bar's
@@ -194,6 +211,7 @@ export default function TopBar() {
         {bp === "phone" && (
           <VitalsToggle open={phoneVitals} onClick={() => setPhoneVitals(!phoneVitals)} />
         )}
+        </div>
       </div>
 
       {/* PHONE vitals row — the bar GROWS DOWNWARD by one full-width row on its own surface,

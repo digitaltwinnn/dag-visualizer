@@ -122,13 +122,15 @@ export default function RailDock({
   // stays store-free — it just reads/writes through these props.
   sheetPx?: number | null;
   onSheetPx?: (px: number | null) => void;
-  // TABLET switch-signal carrier: RailThread (the desktop view/filter-switch pulse's home) is
-  // desktop-only, so below 1100px the switch had no visible carrier. The caller passes the SAME
-  // subject key RailThread uses (`${mode}|${filter}`) and RailDock plays the SAME travelling
-  // `.edge-pulse` recipe (shared `useEdgePulse` — one pulse per change, debounced, mount-skipped,
-  // reduced-motion → CSS static blink) on the tablet's spine-equivalents: the open sheet's
-  // `.ig-sheet-edge` identity spine, or — while the sheet is closed — the edge tab's scene-facing
-  // edge. Only the edge-tab (tablet) mode consumes it; phone stays carrier-free (accepted).
+  // TABLET + PHONE switch-signal carrier: RailThread (the desktop view/filter-switch pulse's
+  // home) is desktop-only, so below 1100px the switch had no visible carrier. The caller passes
+  // the SAME subject key RailThread uses (`${mode}|${filter}`) and RailDock plays the SAME
+  // travelling `.edge-pulse` recipe (shared `useEdgePulse` — one pulse per change, debounced,
+  // mount-skipped, reduced-motion → CSS static blink) on each breakpoint's spine-equivalent:
+  // tablet = the open sheet's `.ig-sheet-edge` identity spine, or — while the sheet is closed —
+  // the edge tab's scene-facing edge; phone (bar-half mode) = the dock half's TOP edge, the same
+  // rotated carrier the update pulse rides (phones have no rail threads/spines at all), both
+  // halves sweeping from their screen edge toward the centre seam.
   signalKey?: unknown;
 }) {
   const [openState, setOpen] = useState(false);
@@ -325,12 +327,22 @@ export default function RailDock({
             ) : (
               <ChevronUp size={16} className="flex-none opacity-70" aria-hidden />
             )}
-            {/* Hosted-card update signal: the travelling pulse along the half's TOP edge — the
-                shared vertical recipe rotated onto the horizontal edge (the mask/geometry live in
-                the carrier's local coords, so the soft tips + sweep rotate with it). Symmetric:
-                each half sweeps from ITS screen edge toward the centre seam. */}
+            {/* Hosted-card update signal + view/filter SWITCH signal: travelling pulses along
+                the half's TOP edge — the shared vertical recipe rotated onto the horizontal edge
+                (the mask/geometry live in the carrier's local coords, so the soft tips + sweep
+                rotate with it). Symmetric: each half sweeps from ITS screen edge toward the
+                centre seam. The switch channel is the phone home of the desktop RailThread /
+                tablet tab-edge pulse (see the `signalKey` doc) — same debounce/reduced-motion. */}
             {pulseSpan(
               updateP,
+              cn(
+                "h-[50vw] top-[3px]",
+                side === "left" ? "left-0 origin-top-left -rotate-90" : "right-0 origin-top-right rotate-90",
+              ),
+              true,
+            )}
+            {pulseSpan(
+              switchP,
               cn(
                 "h-[50vw] top-[3px]",
                 side === "left" ? "left-0 origin-top-left -rotate-90" : "right-0 origin-top-right rotate-90",
