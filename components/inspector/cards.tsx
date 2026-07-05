@@ -14,7 +14,7 @@ import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { SonarRing, NodeStars, NoSignalDot } from "@/components/state/StateAtoms";
-import { VIEW_ICONS } from "@/components/icons";
+import { VIEW_ICONS, KIND_MARK_CLASS } from "@/components/icons";
 import { ExternalLink } from "lucide-react";
 import { useMinHold } from "@/components/useMinHold";
 import { VIS } from "../../js/config.js";
@@ -38,7 +38,7 @@ export function SnapshotTitle({ data: d }: { data: GlobalSnapshot }) {
   const Mark = VIEW_ICONS.ledger;
   return (
     <span className="inline-flex items-center gap-2">
-      <Mark aria-hidden className="flex-none size-3.5 text-primary" />
+      <Mark aria-hidden className={cn(KIND_MARK_CLASS, "text-primary")} />
       <Odometer value={d.ordinal} className="text-title font-semibold text-foreground tabular-nums" />
     </span>
   );
@@ -134,7 +134,7 @@ export function GeoLiveTitle() {
   const Mark = VIEW_ICONS.geo;
   return (
     <span className="inline-flex items-center gap-2 min-w-0">
-      {color && <Mark className="flex-none size-3.5" style={{ color }} aria-hidden />}
+      {color && <Mark className={KIND_MARK_CLASS} style={{ color }} aria-hidden />}
       <span key={id ?? title} className={cn("min-w-0 roll-in", !place && "font-mono tabular-nums break-all")}>{title}</span>
     </span>
   );

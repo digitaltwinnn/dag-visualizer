@@ -4,6 +4,7 @@ import type { ReactNode } from "react";
 import { Plus, Minus, X, type LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
+import { KIND_MARK_CLASS } from "@/components/icons";
 
 // The ONE HUD card header — every rail card leads with this shared grammar so the whole HUD
 // reads as one control surface. ONE head ANATOMY on all six cards (user-agreed, Task 13
@@ -121,7 +122,7 @@ export default function CardHead({
               {Icon && (
                 <Icon
                   aria-hidden
-                  className="flex-none size-3.5"
+                  className={KIND_MARK_CLASS}
                   style={{ color: "var(--filter-accent, var(--accent))" }}
                 />
               )}

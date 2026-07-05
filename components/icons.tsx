@@ -44,6 +44,14 @@ export const ABOUT_ICON: LucideIcon = Info;
 // mark (that legend is unchanged — it's what's parked inside the sheet, not the card's own head).
 export const EXPLORE_ICON: LucideIcon = Compass;
 
+// The ONE size every card-head/title KIND MARK renders at — About's Info, the tool cards' Compass,
+// the node card's Globe, the snapshot card's Layers (CardHead's panel `icon` + the inspector
+// titles in inspector/cards.tsx). 16px (`size-4`): the old 14px read timid next to the 15px
+// text-title headline (user follow-up on Task 23). Single-sourced here so the heads can't drift;
+// the dock TRAYS and the top-bar view switch deliberately keep their own sizes (this constant is
+// only the head/title mark).
+export const KIND_MARK_CLASS = "flex-none size-4";
+
 // The inspector card KINDS map onto the same view vocabulary: the metagraph dossier is the
 // Hypergraph subject (Orbit), a snapshot is the Snapshots subject (Layers), a node is the
 // Geography subject (Globe). Keeps the card heads + the dock icon trays on the one glyph set.
