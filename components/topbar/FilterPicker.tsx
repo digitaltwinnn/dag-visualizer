@@ -4,6 +4,7 @@ import { useStore } from "@/src/store/store";
 import { hex } from "@/src/util/format";
 import { cn } from "@/lib/utils";
 import { SELECTED_ROW, SelectedRowMark } from "@/components/selection";
+import { IdentityDot } from "@/components/inspector/parts";
 import {
   Command, CommandInput, CommandList, CommandEmpty, CommandGroup, CommandItem,
 } from "@/components/ui/command";
@@ -68,7 +69,7 @@ export default function FilterPicker({ onPick }: { onPick?: () => void }) {
             className={rowClass(filter === "all", false)}
             onMouseEnter={() => setHoverFilter("all")}
           >
-            <span className="w-2 h-2 rounded-full flex-none" style={{ background: "var(--primary)" }} />
+            <IdentityDot hue="var(--primary)" />
             <span className="text-[13px] text-foreground">All</span>
             <span className="col-start-2 text-muted-foreground text-[11px]">whole network</span>
             <span className="text-[11px] text-muted-foreground tabular-nums text-right">{mappedCount} · {totalNodes} nodes</span>
@@ -87,7 +88,7 @@ export default function FilterPicker({ onPick }: { onPick?: () => void }) {
                 className={rowClass(filter === m.id, off)}
                 onMouseEnter={() => setHoverFilter(m.id)}
               >
-                <span className="w-2 h-2 rounded-full flex-none" style={{ background: hue }} />
+                <IdentityDot hue={hue} />
                 <span className="text-[13px] text-foreground">{m.name}</span>
                 <span className="text-[11px] font-semibold tabular-nums" style={{ color: hue }}>{m.symbol}</span>
                 {off ? (

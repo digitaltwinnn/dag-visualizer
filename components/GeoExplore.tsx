@@ -7,7 +7,7 @@ import CardHead from "@/components/CardHead";
 import { Card } from "@/components/ui/card";
 import { shortHash, CORE_HEX, metagraphById } from "@/src/data/network";
 import { identityHudHex } from "@/src/palette/identity";
-import { StatusMark } from "@/components/inspector/parts";
+import { IdentityDot, StatusMark } from "@/components/inspector/parts";
 import { SELECTED_ROW, SelectedRowMark } from "@/components/selection";
 import { ccToFlag } from "@/src/util/format";
 import { hoverKeyOf } from "@/src/data/hoverSubject";
@@ -69,13 +69,22 @@ export default function GeoExplore() {
   const drill = (cc: string) => setCountry(country === cc ? null : cc);
 
   // Selection's nodes grouped by country **name** — the join key both the leaderboard and the
-  // node list derive from `geo.country` (`cc` can be absent, the name can't).
+  // node list derive from `geo.country` (`cc` can be absent, the name can't). Each country's
+  // rows sort ALPHABETICALLY by their displayed primary (the city; the label fallback for
+  // city-less rows), locale-aware, with the node id as a stable tiebreaker so co-located
+  // nodes (same city) keep one deterministic order across refreshes.
   const nodesByCountry = useMemo(() => {
     const m = new Map<string, NodeRow[]>();
     for (const r of selNodes) {
       const key = r.country || "Unknown";
       (m.get(key) ?? m.set(key, []).get(key)!).push(r);
     }
+    for (const rows of m.values())
+      rows.sort(
+        (a, b) =>
+          (a.city || a.label).localeCompare(b.city || b.label, undefined, { sensitivity: "base" }) ||
+          (a.id || "").localeCompare(b.id || ""),
+      );
     return m;
   }, [selNodes]);
 
@@ -189,11 +198,7 @@ export default function GeoExplore() {
                             onClick={() => selectNode(r.pick)}
                             onMouseEnter={pair.onMouseEnter}
                           >
-                            <span
-                              className="w-[7px] h-[7px] rounded-full flex-none shadow-[0_0_5px_currentColor]"
-                              style={{ background: rowHue, color: rowHue }}
-                              aria-hidden
-                            />
+                            <IdentityDot hue={rowHue} />
                             {/* Location-first (matches the node CARD's title/subtitle pattern):
                                 the CITY is the row's primary (the country is the accordion group),
                                 with the truncated id as a subtle mono secondary — it stays visible

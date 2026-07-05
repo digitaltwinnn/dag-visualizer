@@ -28,6 +28,14 @@ export const rolesOf = (n: NodeInfo) => (n.roles && n.roles.length ? n.roles : [
 // identity colour, so it's the one place we lean on a theme token instead of the exact legacy hex.
 const READY_CLS = "text-success font-semibold text-[12.5px]";
 
+// The ONE identity dot every row list leads with (the filter picker's rows, the geo explorer's
+// node rows): a plain small disc in the subject's identity hue — flat fill, NO glow (the geo
+// rows' old `shadow-[0_0_5px_currentColor]` halo read much brighter than the picker's dots;
+// user-unified to the picker's exact treatment).
+export function IdentityDot({ hue }: { hue: string }) {
+  return <span className="w-2 h-2 rounded-full flex-none" style={{ background: hue }} aria-hidden />;
+}
+
 // Single node status — Ready reads as plain green text; any other state is a small pill in its
 // bucket colour, labelled with the exact stage. Colour = bucket (lane-clean), text = exact state.
 export function StatusMark({ state }: { state?: string | null }) {
