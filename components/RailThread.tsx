@@ -46,8 +46,11 @@ const GEOM: Record<Side, {
 // signals). The NODE DOTS (connector + halo + dot) keep their ORIGINAL full brightness (user
 // adjustment) — they are the per-card markers, not ambient furniture. Hues unchanged; the CSS
 // `--thread-*` tokens (other consumers: sheet rulers, bar-chart axis, card hover whisper) are NOT
-// touched — the dim is rail-local.
-const REST_DIM = 0.6;
+// touched. The value itself is the SHARED `--rail-rest-dim` token (globals.css :root) — the
+// tablet/phone sheet's `.ig-sheet-edge` channel dims by the same factor, so rest vs signal
+// contrast is consistent across breakpoints. 0.6 here is the SVG-attribute fallback (SVG `opacity`
+// attributes don't resolve CSS vars; the group uses a style prop instead — see below).
+const REST_DIM = "var(--rail-rest-dim, 0.6)";
 
 export default function RailThread({ side = "right" }: { side?: Side }) {
   const filter = useStore((s) => s.filter);
@@ -138,7 +141,7 @@ export default function RailThread({ side = "right" }: { side?: Side }) {
       >
         {/* The LINES sit inside the dim group (REST_DIM) — calm resting furniture; brightness
            belongs to the signals (view-switch pulse + card edges) and the node dots below. */}
-        <g opacity={REST_DIM}>
+        <g style={{ opacity: REST_DIM }}>
           {/* neutral base line — SOFT/muted; carries the ruler ticks. */}
           <line x1={gm.neut} y1={0} x2={gm.neut} y2={H} stroke={TICK_LINE} strokeWidth={1} />
           {/* ruler ticker hatches — short marks stepping OUTWARD from the neutral line toward the screen

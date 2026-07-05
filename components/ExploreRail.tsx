@@ -7,7 +7,8 @@ import GeoExplore from "@/components/GeoExplore";
 import LedgerPanel from "@/components/LedgerPanel";
 import AboutView from "@/components/AboutView";
 import RailThread from "@/components/RailThread";
-import RailDock from "@/components/RailDock";
+import RailDock, { type TabSignal } from "@/components/RailDock";
+import { VIEW_ICONS, ABOUT_ICON } from "@/components/icons";
 import { useBreakpoint } from "@/components/useBreakpoint";
 
 // Per-view "About this view" copy — one orientation card at the top of the left rail in every
@@ -89,6 +90,14 @@ export default function ExploreRail() {
       {mode === "ledger" && <LedgerPanel />}
     </>
   );
+  // The dock's icon TRAY (tablet edge tab + phone dock half): the legend of what this sheet
+  // hosts — the About explainer (its own ABOUT_ICON) plus, where the view has one, the tool
+  // card under the current view's own mark. The left cards are static tools (no live updates),
+  // so no `active` highlights / `updateKey` here — the tray stays a quiet legend.
+  const tray: TabSignal[] = [
+    { id: "about", icon: ABOUT_ICON },
+    ...(mode === "geo" || mode === "ledger" ? [{ id: "tool", icon: VIEW_ICONS[mode] }] : []),
+  ];
   if (bp === "desktop") {
     // The thread is a SIBLING of #leftcol (mirrors the right rail): the rail clips horizontally + can
     // gain an overflow-fade mask, either of which would blank a child thread. It points its ruler
@@ -116,7 +125,7 @@ export default function ExploreRail() {
     return (
       // `signalKey` = the same subject RailThread pulses on (desktop-only) — RailDock replays the
       // view/filter-switch pulse on the sheet edge / tab edge so tablet keeps the signal.
-      <RailDock side="left" label="Explore" style={accent} signalKey={`${mode}|${filter}`}>
+      <RailDock side="left" label="Explore" style={accent} signals={tray} signalKey={`${mode}|${filter}`}>
         {content}
       </RailDock>
     );
@@ -135,6 +144,7 @@ export default function ExploreRail() {
       style={accent}
       trigger="bottom-bar-half"
       sheetSide="bottom"
+      signals={tray}
       open={phoneDock === "explore"}
       sheetPx={phoneSheetPx}
       onSheetPx={setPhoneSheetPx}

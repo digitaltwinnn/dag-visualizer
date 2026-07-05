@@ -17,7 +17,7 @@ import { useBreakpoint } from "@/components/useBreakpoint";
 import { PulseEdge, useEdgePulse } from "@/components/EdgePulse";
 import { StandbyHalo } from "@/components/state/StateAtoms";
 import { VIEW_ICONS } from "@/components/icons";
-import type { LucideIcon } from "lucide-react";
+import type { TabSignal } from "@/components/RailDock";
 import type { PickDescriptor } from "@/src/data/types";
 import type { Mode } from "@/src/store/store";
 
@@ -181,91 +181,72 @@ export default function Inspector() {
   const selNodes = useStore((s) => s.selNodes);
   const hintText = hasDetail ? null : pickHintText(mode, filter, selNodes.length);
 
-  // Stable identity of "whichever Detail is on top" — a node by its hover-pairing key (falls
-  // back to its kind so a keyless node still counts as an identity), a snapshot by ordinal. Used
-  // ONLY to decide when a new detail should re-arm the hint (below); NOT rendered.
-  const topSlot = selStack.find((slot) => cards[slot]?.active);
-  const detailIdentity =
-    topSlot === "node" ? `node:${hoverKeyOf(inspect) ?? inspect?.kind ?? ""}`
-    : topSlot === "snap" && snap ? `snap:${snap.data.ordinal}`
-    : null;
-
-  // "Seen" tracking — GLOBAL CONSTRAINT: nothing here ever opens the sheet. `hint` only decides
-  // whether the tab/button shows the pulsing dot; the sheet's `open` state is still owned by the
-  // user tapping the trigger (RailDock's own state on tablet, `store.phoneDock` on phone).
-  // `seen` starts true (arms only once a NEW detail actually lands) and: (1) flips true the
-  // instant the panel opens (RailDock's onOpenChange), (2) resets false whenever the active
-  // detail's identity changes, or `hasDetail` rises from false → true (a detail arriving where
-  // there was none).
-  const [seen, setSeen] = useState(true);
-  const prevIdentity = useRef<string | null>(null);
-  const prevHasDetail = useRef(false);
-  useEffect(() => {
-    const arrived = detailIdentity !== null && detailIdentity !== prevIdentity.current;
-    const rose = hasDetail && !prevHasDetail.current;
-    if (arrived || rose) setSeen(false);
-    prevIdentity.current = detailIdentity;
-    prevHasDetail.current = hasDetail;
-  }, [detailIdentity, hasDetail]);
-
-  const hint = hasDetail && !seen;
-
-  // RailDock reports open/close changes here so opening can mark the hint "seen" (tablet: its
-  // own internal state; phone: `store.phoneDock`, via `handleDismiss` below) — never the
-  // reverse (a pick never sets `open`).
-  const handleOpenChange = (next: boolean) => {
-    if (next) setSeen(true);
-  };
-
-  // Transient re-pulse — mirrors the desktop cards' own `useEdgePulse` edge sweep, which fires on
-  // a pane's subject changing (a new node/snapshot/metagraph picked). That sweep is invisible
-  // while the rail is collapsed, so the tab hint stands in for it: bump the pulse whenever
-  // `inspect`, `snap`, or the Context subject (`filter`) changes reference, and RailDock replays
-  // a one-shot pulse on the dot. This
-  // fires even when `hint` is already false (an already-seen card whose data just changed) — it
-  // does NOT resurrect the persistent unseen dot, it's a separate transient animation.
+  // ── Dock icon TRAY (tablet/phone; user redesign 2026-07-05, supersedes the hint dot + morph) ──
+  // GLOBAL CONSTRAINT: nothing here ever opens the sheet — the tray is purely visual; `open` is
+  // still owned by the user tapping the trigger (RailDock's own state on tablet, `store.phoneDock`
+  // on phone).
   //
-  // The pulse also carries WHICH card updated (the signal chip, user-approved 2026-07-05): the
-  // updating card's type icon — Orbit dossier / Globe node / Layers snapshot, the same lucide marks the card heads
-  // use — plus its identity/spine hue (the exact hues the cards themselves pair with: the node's
-  // metagraph hue or core cyan, the snapshot's/dossier's filter accent). RailDock morphs the hint
-  // dot into it for ~2s. When several change in one commit (e.g. clicking a hyper node sets the
-  // filter AND the node pick), the most specific card wins: node > snapshot > dossier. A pure
-  // deselect (a pick clearing) keeps the plain dot — nothing "updated" to announce.
-  const [pulse, setPulse] = useState<{ n: number; glyph?: LucideIcon; hue?: string }>({ n: 0 });
-  const pulseMounted = useRef(false);
-  const pulsePrev = useRef({ inspect, snap, filter });
+  // `activeKinds` = which hosted cards updated while the sheet was CLOSED (unseen): that card's
+  // tray icon goes vivid/identity-hued + heartbeats until the sheet opens, which clears ALL
+  // highlights (the icons themselves stay — they're the legend of what the sheet hosts).
+  // `updateKey` bumps once per update event → RailDock replays the travelling edge pulse on the
+  // dock's outline (debounced there, so the ledger's live snapshot follow pulses at most once per
+  // sweep while the Layers icon just stays lit). Change detection mirrors the desktop cards' own
+  // `useEdgePulse` subjects: the Context dossier on `filter`, the snapshot card on `snap`, the
+  // node card on `inspect`. Several changing in one commit (e.g. clicking a hyper node sets the
+  // filter AND the node pick) highlight EACH of their icons — the tray accumulates; a pure
+  // deselect (a pick clearing) announces nothing.
+  const [activeKinds, setActiveKinds] = useState<ReadonlySet<string>>(() => new Set());
+  const [updateKey, setUpdateKey] = useState(0);
+  const dockOpen = useRef(false);
+  const handleOpenChange = (next: boolean) => {
+    dockOpen.current = next;
+    if (next) setActiveKinds(new Set());
+  };
+  const trayMounted = useRef(false);
+  const trayPrev = useRef({ inspect, snap, filter });
   useEffect(() => {
-    const p = pulsePrev.current;
-    pulsePrev.current = { inspect, snap, filter };
-    if (!pulseMounted.current) {
-      pulseMounted.current = true;
+    const p = trayPrev.current;
+    trayPrev.current = { inspect, snap, filter };
+    if (!trayMounted.current) {
+      trayMounted.current = true;
       return;
     }
-    let glyph: LucideIcon | undefined;
-    let hue: string | undefined;
-    if (filter !== p.filter) {
-      glyph = VIEW_ICONS.hyper;
-      hue = filterAccent(filter);
-    }
-    if (snap !== p.snap && snap) {
-      glyph = VIEW_ICONS.ledger;
-      hue = filterAccent(filter);
-    }
+    if (dockOpen.current) return; // visible updates aren't "unseen" — no highlight, no pulse
+    const hit: string[] = [];
+    if (filter !== p.filter) hit.push("context");
+    if (snap !== p.snap && snap) hit.push("snap");
     if (
       inspect !== p.inspect &&
       inspect &&
       (inspect.kind === "l0" || inspect.kind === "l1" || inspect.kind === "metanode")
     ) {
-      glyph = VIEW_ICONS.geo;
-      hue = inspect.kind === "metanode" && inspect.meta ? identityHudHex(inspect.meta.id) : CORE_HEX;
+      hit.push("node");
     }
-    // Only announce an actual update. A pure deselect (inspect/snap CLEARING with no filter change)
-    // sets no glyph — nothing "updated", so keep the plain dot rather than bumping an empty pulse
-    // (which RailDock would otherwise morph/animate for a nothing-happened transition to null).
-    if (!glyph) return;
-    setPulse((prev) => ({ n: prev.n + 1, glyph, hue }));
+    if (!hit.length) return;
+    setActiveKinds((prev) => {
+      const next = new Set(prev);
+      for (const k of hit) next.add(k);
+      return next;
+    });
+    setUpdateKey((k) => k + 1);
   }, [inspect, snap, filter]);
+
+  // The tray itself — one icon per card this sheet currently hosts, in the rail's own order:
+  // the Context dossier (always mounted) then the Detail cards as present. Hues match what the
+  // cards themselves pair with (the node's metagraph hue or core cyan; the dossier's/snapshot's
+  // filter accent).
+  const nodeHue =
+    inspect?.kind === "metanode" ? (inspect.meta ? identityHudHex(inspect.meta.id) : undefined) : CORE_HEX;
+  const tray: TabSignal[] = [
+    { id: "context", icon: VIEW_ICONS.hyper, hue: filterAccent(filter), active: activeKinds.has("context") },
+    ...(cards.node.active
+      ? [{ id: "node", icon: VIEW_ICONS.geo, hue: nodeHue, active: activeKinds.has("node") }]
+      : []),
+    ...(cards.snap.active
+      ? [{ id: "snap", icon: VIEW_ICONS.ledger, hue: filterAccent(filter), active: activeKinds.has("snap") }]
+      : []),
+  ];
 
   // Tablet: Context + Detail panes + PickHint together (`content` below), unchanged from Task 3.
   // Phone: the SAME content (Context + Detail panes + PickHint) but hosted in the "Details"
@@ -319,7 +300,7 @@ export default function Inspector() {
     // Tablet: unchanged — the right edge tab opening a right-side Sheet, independent of the
     // left "Explore" dock (both can be open at once).
     return (
-      <RailDock side="right" label="Details" style={accent} hint={hint} pulseKey={pulse} pulseGlyph={pulse.glyph} pulseHue={pulse.hue} signalKey={`${mode}|${filter}`} onOpenChange={handleOpenChange}>
+      <RailDock side="right" label="Details" style={accent} signals={tray} updateKey={updateKey} signalKey={`${mode}|${filter}`} onOpenChange={handleOpenChange}>
         {content}
       </RailDock>
     );
@@ -327,7 +308,7 @@ export default function Inspector() {
 
   // Phone: the RIGHT half of the persistent bottom bar, mutually exclusive with the "Explore"
   // dock via the shared `store.phoneDock` field (see ExploreRail) — never auto-opened by a pick
-  // (only the hint dot reacts to `hint`/`pulseCount`; `open` is 100% derived from `phoneDock`,
+  // (only the icon tray reacts to updates; `open` is 100% derived from `phoneDock`,
   // which only a tap (here), a toggle-collapse, or a dismiss (handleDismiss, below) ever writes).
   return (
     <RailDock
@@ -336,10 +317,8 @@ export default function Inspector() {
       style={accent}
       trigger="bottom-bar-half"
       sheetSide="bottom"
-      hint={hint}
-      pulseKey={pulse}
-      pulseGlyph={pulse.glyph}
-      pulseHue={pulse.hue}
+      signals={tray}
+      updateKey={updateKey}
       open={phoneDock === "details"}
       sheetPx={phoneSheetPx}
       onSheetPx={setPhoneSheetPx}

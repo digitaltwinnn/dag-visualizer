@@ -6,11 +6,35 @@ import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { PulseEdge, useEdgePulse } from "@/components/EdgePulse";
-import { Compass, ListTree, ChevronLeft, ChevronRight, X, type LucideIcon } from "lucide-react";
+import { Compass, ListTree, ChevronLeft, ChevronRight, ChevronUp, ChevronDown, X, type LucideIcon } from "lucide-react";
 
-const PULSE_MS = 900;
-// How long the hint dot stays morphed into the updating card's type glyph before settling back.
-const GLYPH_MS = 2000;
+// One entry in a dock's icon TRAY (user redesign 2026-07-05 — supersedes the old hint dot + the
+// dot↔glyph morph, on the edge tabs AND the phone dock halves): the tray is a quiet LEGEND of the
+// cards the sheet currently hosts — one `VIEW_ICONS`/`ABOUT_ICON` mark per hosted card, muted at
+// rest. `active` marks a card that updated while the sheet was closed (unseen): its icon goes
+// bold/vivid in the card's identity `hue` and breathes on the shared dot-beat heartbeat until the
+// sheet opens (the caller clears the actives on open; the icons themselves stay — they are the
+// legend, not the alert).
+export type TabSignal = { id: string; icon: LucideIcon; hue?: string; active?: boolean };
+
+// Shared one-shot pulse plumbing (switch signal + update signal ride the same mechanics):
+// `useEdgePulse` debounces key changes (~1.2s — so e.g. the ledger's live snapshot follow pulses
+// at most once per sweep), and the LIVE window bounds the carrier's MOUNT to the pulse window:
+// PulseEdge replays its CSS animation on every mount (its keyed-remount contract), so without the
+// window a sheet opened long after a pulse would replay the stale sweep on open.
+function usePulseWindow(key: unknown): { pulse: number; live: boolean } {
+  const pulse = useEdgePulse(key);
+  const [live, setLive] = useState(false);
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => {
+    if (pulse === 0) return;
+    setLive(true);
+    if (timer.current) clearTimeout(timer.current);
+    timer.current = setTimeout(() => setLive(false), 1300);
+  }, [pulse]);
+  useEffect(() => () => { if (timer.current) clearTimeout(timer.current); }, []);
+  return { pulse, live };
+}
 
 // Tablet/phone edge dock for a rail's content: a slim fixed edge tab (`‹`/`›`) that opens the
 // SAME content the desktop inline rail shows, inside a Sheet overlay (full-width scene stays
@@ -24,33 +48,21 @@ const GLYPH_MS = 2000;
 // controls (CardPane's `.rc-close`, ContextCard's close, the left tool cards' `.panel-collapse`),
 // so the close lives in the sheet's own chrome instead. Scrim-click + Escape still dismiss too.
 //
-// `hint`: an optional "new detail landed" affordance on the tab (a small pulsing dot,
-// `.rail-tab-hint`) — shown when `hint` is true AND the sheet is closed. It is PURELY visual:
-// it never opens the sheet itself (Global Constraint — no auto-open on a pick; the user always
-// taps the tab). `onOpenChange` is exposed so a caller (Inspector) can track its own "seen"
-// state (e.g. clear the hint the instant the sheet opens) without RailDock needing to know why.
+// `signals`: the dock's icon TRAY (see `TabSignal` above) — a quiet legend of the hosted cards
+// (muted icons at rest, on the edge tab as a vertical stack under the chevron, on the phone dock
+// half as a horizontal row after the label), with `active` entries vivid/identity-hued and
+// breathing (`dot-beat`; reduced motion → static vivid, no beat). PURELY visual: never opens the
+// sheet itself (Global Constraint — no auto-open on a pick; the user always taps the trigger).
+// Presentation-only data (icon component + a CSS colour + the active flag), so RailDock stays
+// generic — each caller owns its card→icon/hue mapping and its seen-tracking (clearing actives
+// when `onOpenChange` reports the open).
 //
-// `pulseKey`: an optional value whose REFERENCE change replays a one-shot transient pulse on the
-// dot — the collapsed-panel equivalent of the desktop cards' own `useEdgePulse` edge sweep (which
-// is invisible while the rail is hidden). Fires for a hosted card's DATA updating even when
-// `hint` is already false (already seen) — e.g. the live snapshot ticking while the sheet is
-// closed — so the tab still "feels alive" without resurrecting the persistent unseen dot. Skips
-// the initial mount, does nothing while the sheet is open, and is a no-op under
-// prefers-reduced-motion (the dot itself falls back to a static appearance — see CSS). It is
-// ALSO skipped the instant `hint` itself just transitioned false→true: that arrival is already
-// announced by the persistent CSS pulse (`railTabHintPulse`), so replaying the transient WAAPI
-// pulse on the very same frame would double-animate the same dot. The transient pulse is reserved
-// for a DATA update on an already-seen card (`hint` staying false across the bump).
-//
-// `pulseGlyph`/`pulseHue`: the SIGNAL CHIP (user-approved 2026-07-05). When provided alongside a
-// `pulseKey` bump, the dot briefly MORPHS into the updating card's type icon (Orbit dossier / Globe
-// node / Layers snapshot — the same monochrome lucide marks the card heads use), tinted the updating card's
-// identity/spine hue, rides the same one-shot pulse, then settles back to the plain dot
-// (~GLYPH_MS total). So a closed tab doesn't just "feel alive" — it says WHICH kind of card just
-// updated. Presentation-only props (a glyph string + a CSS colour), so RailDock stays generic —
-// the caller (Inspector) owns the kind→glyph/hue mapping. Reduced motion: the glyph swap still
-// happens (it's information), only the pulse animation is skipped. Callers whose cards don't
-// meaningfully update (ExploreRail) simply never pass one → plain dot, unchanged.
+// `updateKey`: bumps once per update EVENT (whatever flagged a tray entry active) — the dock's
+// outline edge replays the card-style travelling `.edge-pulse` once per bump (debounced by the
+// shared `useEdgePulse`, so live snapshot ticks pulse at most once per sweep while the Layers
+// icon just stays lit). Runs on the collapsed tab's scene-facing edge (tablet) and along the
+// phone dock half's top edge; while the sheet is open the hosted card's own edge pulse already
+// plays, so this stays a closed-state affordance.
 //
 // `sheetSide`: the Sheet's slide-in edge, when it should differ from the tab's screen-edge
 // position (`side`) — e.g. the phone Detail dock keeps its tab on the right edge but slides the
@@ -61,8 +73,8 @@ const GLYPH_MS = 2000;
 // single PERSISTENT full-width bar docked at the very bottom of the viewport instead: this dock's
 // icon + label, occupying the left or right 50% (`.phone-dock-half--{side}`). The two halves come
 // from the two separate RailDock instances (ExploreRail's Explore + Inspector's Details) but are
-// styled to align pixel-perfect into one seamless strip. Same hint/pulse dot, so this stays the
-// ONE place that owns that animation logic rather than forking it per breakpoint.
+// styled to align pixel-perfect into one seamless strip. Same signal icons + update pulse, so
+// this stays the ONE place that owns that signalling logic rather than forking it per breakpoint.
 //
 // The persistent bar NEVER unmounts (unlike the edge tab, which the old floating-button design
 // hid while open) — tapping the ACTIVE half again collapses its own sheet (toggle), tapping the
@@ -84,10 +96,8 @@ export default function RailDock({
   label,
   style,
   children,
-  hint,
-  pulseKey,
-  pulseGlyph,
-  pulseHue,
+  signals,
+  updateKey,
   onOpenChange,
   sheetSide,
   trigger = "edge-tab",
@@ -100,10 +110,8 @@ export default function RailDock({
   label: string;
   style?: CSSProperties;
   children: ReactNode;
-  hint?: boolean;
-  pulseKey?: unknown;
-  pulseGlyph?: LucideIcon;
-  pulseHue?: string;
+  signals?: TabSignal[];
+  updateKey?: unknown;
   onOpenChange?: (open: boolean) => void;
   sheetSide?: "left" | "right" | "bottom";
   trigger?: "edge-tab" | "bottom-bar-half";
@@ -129,57 +137,6 @@ export default function RailDock({
     setOpen(next);
     onOpenChange?.(next);
   };
-
-  const dotRef = useRef<HTMLSpanElement>(null);
-  const mounted = useRef(false);
-  const anim = useRef<Animation | null>(null);
-  const prevHint = useRef(hint);
-  // The signal chip: while set, the dot renders as the updating card's type glyph (see the
-  // prop doc above). One timer; a new bump inside the window just restarts it.
-  const [glyphFlash, setGlyphFlash] = useState<{ glyph: LucideIcon; hue?: string } | null>(null);
-  const glyphTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  useEffect(() => () => { if (glyphTimer.current) clearTimeout(glyphTimer.current); }, []);
-  useEffect(() => {
-    const hintJustArrived = hint && !prevHint.current;
-    if (!mounted.current) {
-      mounted.current = true;
-      return;
-    }
-    if (open) return; // only pulses while the tab is the only visible affordance
-    // The glyph morph happens on EVERY qualifying bump (incl. a brand-new detail arriving — the
-    // glyph is what tells you WHAT landed); under reduced motion it's a static swap, no pulse.
-    if (pulseGlyph) {
-      setGlyphFlash({ glyph: pulseGlyph, hue: pulseHue });
-      if (glyphTimer.current) clearTimeout(glyphTimer.current);
-      glyphTimer.current = setTimeout(() => setGlyphFlash(null), GLYPH_MS);
-    }
-    // Skip the transient pulse when the persistent hint just turned on — its own resting CSS
-    // pulse already signals "new" on this same dot; firing both at once double-animates it.
-    if (hintJustArrived) return;
-    const el = dotRef.current;
-    if (!el || typeof el.animate !== "function") return;
-    if (window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) return;
-    anim.current?.cancel();
-    anim.current = el.animate(
-      [
-        { opacity: 0.4, transform: "scale(0.8)" },
-        { opacity: 1, transform: "scale(1.35)" },
-        { opacity: 0.85, transform: "scale(1)" },
-      ],
-      { duration: PULSE_MS, easing: "ease-out" },
-    );
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pulseKey]);
-
-  // Keep prevHint in sync on EVERY hint change — NOT only when the pulse effect above fires on a
-  // pulseKey bump. Otherwise a hint that toggles without a pulseKey change leaves prevHint stale,
-  // and a later hint re-arrival (its CSS railTabHintPulse already firing) could also pass the
-  // hintJustArrived guard and double-animate with the WAAPI pulse. Declared AFTER the pulse effect
-  // so, when hint and pulseKey change in the same commit, the pulse effect still reads the previous
-  // value before this overwrites it.
-  useEffect(() => {
-    prevHint.current = hint;
-  }, [hint]);
 
   // ── Bottom-sheet drag (phone, grabber-initiated) ────────────────────────────────────────────
   // Standard mobile sheet gesture, v1 GRABBER-ONLY by design: the sheet body owns touch scroll,
@@ -256,67 +213,68 @@ export default function RailDock({
     handleOpenChange(false);
   };
 
-  // ── Tablet switch-signal pulse (see the `signalKey` prop doc) ──────────────────────────────
-  // `pulseLive` bounds the carrier's MOUNT to the pulse window: PulseEdge replays its CSS
-  // animation on every mount (its keyed-remount contract), so without the window a sheet opened
-  // long after a pulse would replay the stale sweep on open.
-  const switchPulse = useEdgePulse(signalKey);
-  const [pulseLive, setPulseLive] = useState(false);
-  const pulseTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  useEffect(() => {
-    if (switchPulse === 0) return;
-    setPulseLive(true);
-    if (pulseTimer.current) clearTimeout(pulseTimer.current);
-    pulseTimer.current = setTimeout(() => setPulseLive(false), 1300);
-  }, [switchPulse]);
-  useEffect(() => () => { if (pulseTimer.current) clearTimeout(pulseTimer.current); }, []);
-  // The carrier wrapper: a 3px positioning context for the shared recipe, sitting where the
-  // spine-equivalent runs, `--spine` carrying the identity hue (the caller's --filter-accent
-  // rides in on the same style object).
-  const switchPulseSpan = (cls: string) =>
-    pulseLive && (
+  // ── Edge pulses: the view/filter SWITCH signal + the hosted-card UPDATE signal ──────────────
+  // Two channels, one shared recipe/tempo (see `usePulseWindow`). The carrier wrapper is a 3px
+  // positioning context for the `.edge-pulse` recipe, sitting where the spine-equivalent runs,
+  // `--spine` carrying the identity hue (the caller's --filter-accent rides in on the same style
+  // object). `short` marks a SHORT host (the collapsed tab, the dock half's top edge): the
+  // travelling segment scales to ~45% of the track (`--pulse-len`) so the sweep still reads there
+  // instead of blinking the whole line at once.
+  const switchP = usePulseWindow(signalKey);
+  const updateP = usePulseWindow(updateKey);
+  const pulseSpan = (p: { pulse: number; live: boolean }, cls: string, short = false) =>
+    p.live && (
       <span
-        className={cn("absolute w-[3px] pointer-events-none z-[43]", cls)}
+        className={cn("absolute w-[3px] pointer-events-none z-[43]", short && "[--pulse-len:45%]", cls)}
         style={{ ...style, ["--spine" as string]: "var(--filter-accent, var(--primary))" } as CSSProperties}
         aria-hidden
       >
-        <PulseEdge pulseKey={switchPulse} />
+        <PulseEdge pulseKey={p.pulse} />
       </span>
     );
 
-  // The dot mounts whenever there's something to show (persistent hint) OR whenever a pulse
-  // might need to play (pulseKey provided) — kept mounted so the transient WAAPI pulse always has
-  // an element to animate, even on an already-seen detail that just got a data update.
-  const showDot = (hint || pulseKey !== undefined) && !open;
   const isBarHalf = trigger === "bottom-bar-half";
-  // The hint dot: a small cyan dot. On the edge tab it's absolutely placed inside the (fixed) tab;
-  // on the phone bar half it sits inline after the label. PERSISTENT (`hint`) → the resting CSS
-  // pulse; TRANSIENT (pulseKey only, `hint` false) → invisible at rest, a one-shot WAAPI pulse
-  // plays on the ref (see the effect above). Absolutely positioned on the tab so it never grows
-  // the 44px tap target.
-  const FlashIcon = glyphFlash?.glyph;
-  const dot = showDot && (
+  // The icon TRAY (see the `signals` prop doc): the hosted cards' legend. Muted at rest; an
+  // `active` (updated-unseen) icon goes vivid in its identity hue + breathes on the shared
+  // dot-beat heartbeat (reduced motion → static vivid). Vertical stack on the edge tab,
+  // horizontal row on the phone dock half. The frame is FIXED-SIZE for 3 icons (user refinement:
+  // the two edge trays mirror each other's geometry exactly and never grow/shrink as hosted
+  // cards change — fewer icons = empty slots), sized 3 × 14px icons + 2 gaps. Renders whenever
+  // the caller provides a tray at all (even momentarily empty), keeping the frame stable.
+  // aria-hidden — the trigger keeps its accessible label.
+  const tray = signals && (
     <span
-      ref={dotRef}
       className={cn(
-        isBarHalf ? "static ml-0.5" : cn("absolute", side === "left" ? "right-1" : "left-1"),
-        glyphFlash
-          ? // Signal chip: the card-type icon, identity-tinted, visible for the whole window
-            // (the WAAPI pulse rides on top; reduced motion → this static swap alone).
-            cn("leading-none", !isBarHalf && "top-1")
-          : cn(
-              "w-2 h-2 rounded-full bg-[var(--primary)] shadow-[0_0_6px_1px_var(--primary)]",
-              !isBarHalf && "top-1.5",
-              hint
-                ? "animate-rail-hint motion-reduce:animate-none motion-reduce:opacity-90"
-                : "opacity-0", // transient: WAAPI drives it; no resting animation
-            ),
+        "flex items-center pointer-events-none flex-none",
+        isBarHalf ? "gap-1.5 w-[54px] justify-start" : "flex-col gap-2 h-[58px] justify-start",
       )}
-      style={glyphFlash ? { color: glyphFlash.hue ?? "var(--primary)" } : undefined}
       aria-hidden="true"
     >
-      {FlashIcon && <FlashIcon className="size-3.5" />}
+      {signals.map(({ id, icon: Icon, hue, active }) => (
+        <Icon
+          key={id}
+          strokeWidth={active ? 2.25 : 1.75}
+          className={cn(
+            "size-3.5 flex-none",
+            active
+              ? "animate-dot-beat motion-reduce:animate-none drop-shadow-[0_0_4px_currentColor]"
+              : "text-muted-foreground opacity-60",
+          )}
+          style={active ? { color: hue ?? "var(--primary)" } : undefined}
+        />
+      ))}
     </span>
+  );
+  // The [icons legend] | [open control] split (user refinement): the chevron serves a different
+  // purpose than the card icons (open affordance vs contents legend), so a hairline separates
+  // the two sections — the app's inset-hairline idiom — and the chevron sits at the END of the
+  // tray (bottom on edge tabs, trailing on the phone dock half), subtly dimmer than the icons'
+  // active states. The WHOLE tray stays one ≥44px tap target.
+  const trayRule = signals && (
+    <span
+      className={cn("flex-none bg-border", isBarHalf ? "w-px h-4" : "h-px w-4")}
+      aria-hidden="true"
+    />
   );
   return (
     <>
@@ -345,25 +303,51 @@ export default function RailDock({
             className={cn(
               // The half fills its group; `!` beats the primitive's first/last rounding + the
               // toggle baseline's hover/on fills (this design owns its selection language).
-              "w-full h-full rounded-none! items-center justify-center gap-2 cursor-pointer",
+              // `relative` = the positioning context for the top-edge update-pulse carrier.
+              // The on-state cyan tint targets `>svg` (the half's OWN Compass/ListTree mark
+              // only) — the tray icons inside the span keep their muted/identity colours.
+              "relative w-full h-full rounded-none! items-center justify-center gap-2 cursor-pointer",
               "bg-[var(--panel-light)] border border-[var(--thread-faint)] backdrop-blur-[8px]",
               "text-body font-semibold tracking-[0.02em] text-muted-foreground",
               "hover:bg-[var(--panel-light)] hover:text-muted-foreground",
               "data-[state=on]:text-foreground data-[state=on]:bg-[var(--sel-bg)]",
-              "data-[state=on]:shadow-[inset_0_2px_0_var(--sel-border)] data-[state=on]:[&_svg]:text-[var(--primary)]",
+              "data-[state=on]:shadow-[inset_0_2px_0_var(--sel-border)] data-[state=on]:[&>svg]:text-[var(--primary)]",
             )}
           >
             {side === "left" ? <Compass size={18} strokeWidth={1.75} aria-hidden="true" /> : <ListTree size={18} strokeWidth={1.75} aria-hidden="true" />}
             <span>{label}</span>
-            {dot}
+            {/* [icons legend] | [open control]: the tray, then the hairline, then the trailing
+                open/collapse chevron (up = opens a sheet above; down while open = collapses). */}
+            {tray}
+            {trayRule}
+            {open ? (
+              <ChevronDown size={16} className="flex-none opacity-70" aria-hidden />
+            ) : (
+              <ChevronUp size={16} className="flex-none opacity-70" aria-hidden />
+            )}
+            {/* Hosted-card update signal: the travelling pulse along the half's TOP edge — the
+                shared vertical recipe rotated onto the horizontal edge (the mask/geometry live in
+                the carrier's local coords, so the soft tips + sweep rotate with it). Symmetric:
+                each half sweeps from ITS screen edge toward the centre seam. */}
+            {pulseSpan(
+              updateP,
+              cn(
+                "h-[50vw] top-[3px]",
+                side === "left" ? "left-0 origin-top-left -rotate-90" : "right-0 origin-top-right rotate-90",
+              ),
+              true,
+            )}
           </ToggleGroupItem>
         </ToggleGroup>
       ) : (
-        // Tablet edge tab (700–1099px only; hidden on desktop AND phone): a slim ‹/› entry docked
-        // to the screen edge, ≥44px tap target.
+        // Tablet edge tab (700–1099px only; hidden on desktop AND phone): a slim rectangular TRAY
+        // docked to the screen edge — the hosted cards' icon legend (a FIXED 3-slot frame, so the
+        // left + right trays mirror each other's height exactly) over a hairline, over the
+        // chevron (the open affordance). Width holds the ≥44px tap target (w-11); the fixed
+        // column means icons never collide with the chevron and the geometry never shifts.
         <button
           className={cn(
-            "fixed z-[39] top-1/2 -translate-y-1/2 w-11 min-h-[56px] hidden items-center justify-center cursor-pointer",
+            "fixed z-[39] top-1/2 -translate-y-1/2 w-11 min-h-[56px] hidden flex-col items-center justify-center gap-2 py-2.5 cursor-pointer",
             "bg-[var(--panel)] border border-border text-foreground backdrop-blur-[14px]",
             "min-[700px]:max-[1099px]:flex",
             side === "left" ? "left-0 rounded-r-[var(--radius)] border-l-0" : "right-0 rounded-l-[var(--radius)] border-r-0",
@@ -373,11 +357,19 @@ export default function RailDock({
           // "open" (the bar half's open/collapse toggle is ToggleGroup's native deselect above).
           onClick={() => handleOpenChange(true)}
         >
-          {side === "left" ? <ChevronLeft size={20} aria-hidden /> : <ChevronRight size={20} aria-hidden />}
-          {dot}
-          {/* Tablet switch-signal, CLOSED state: the pulse runs down the tab's scene-facing
-              edge (the sheet's spine-equivalent while there's no sheet on screen). */}
-          {!open && switchPulseSpan(cn("inset-y-1", side === "left" ? "right-0" : "left-0"))}
+          {/* [icons legend] above the hairline, [open control] below — see the trayRule doc. */}
+          {tray}
+          {trayRule}
+          {side === "left" ? (
+            <ChevronLeft size={20} className="flex-none opacity-70" aria-hidden />
+          ) : (
+            <ChevronRight size={20} className="flex-none opacity-70" aria-hidden />
+          )}
+          {/* CLOSED-state pulses down the tab's scene-facing edge (the sheet's spine-equivalent
+              while there's no sheet on screen): the view/filter SWITCH signal + the hosted-card
+              UPDATE signal — both short-host scaled. */}
+          {!open && pulseSpan(switchP, cn("inset-y-1", side === "left" ? "right-0" : "left-0"), true)}
+          {!open && pulseSpan(updateP, cn("inset-y-1", side === "left" ? "right-0" : "left-0"), true)}
         </button>
       )}
       {/* NON-MODAL (`modal={false}`): on tablet the left "Explore" and right "Details" edge docks
@@ -421,9 +413,9 @@ export default function RailDock({
         >
           {/* Tablet switch-signal, OPEN state: the pulse rides the sheet's own `.ig-sheet-edge`
               identity spine (its screen-edge side) — same recipe/tempo as the desktop
-              RailThread pulse. Edge-tab (tablet) mode only; the phone bar-half sheet carries
-              no spine (accepted). */}
-          {!isBarHalf && switchPulseSpan(cn("inset-y-2", side === "left" ? "left-0" : "right-0"))}
+              RailThread pulse, full-length segment (a tall host). Edge-tab (tablet) mode only;
+              the phone bar-half sheet carries no spine (accepted). */}
+          {!isBarHalf && pulseSpan(switchP, cn("inset-y-2", side === "left" ? "left-0" : "right-0"))}
           {sheetSide === "bottom" && (
             // Centred grabber bar (36×4) with a ≥44px tap target — the sheet's DRAG handle
             // (follow-the-finger + snap, see the drag block above) and still the plain
@@ -445,9 +437,9 @@ export default function RailDock({
             />
           )}
           {isBarHalf ? (
-            // The persistent bar half already shows the label + hint visibly — no redundant header
-            // row (no ✕ either; the bar half itself is the close affordance, via the toggle above).
-            // SheetTitle stays for the accessible dialog name only.
+            // The persistent bar half already shows the label + icon tray visibly — no redundant
+            // header row (no ✕ either; the bar half itself is the close affordance, via the toggle
+            // above). SheetTitle stays for the accessible dialog name only.
             <SheetTitle className="sr-only">{label}</SheetTitle>
           ) : (
             // Sheet's own chrome (label + close), ABOVE the hosted content so the ✕ never overlaps a

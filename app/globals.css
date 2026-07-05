@@ -70,6 +70,12 @@
   position: absolute; top: 8px; bottom: 8px; right: -1px;
   width: 3px; overflow: hidden; pointer-events: none; z-index: 3;
   --pulse-hue: var(--spine, var(--primary));
+  /* Soft extremities (consistency with the static edges' faded tips): the TRACK itself is
+     masked transparent→solid→transparent, so the travelling segment FADES in as it enters and
+     out as it leaves — no hard-edged pop/clip at either boundary. The mask lives in the span's
+     local coords, so rotated carriers (the phone dock half's top edge) keep it along the track. */
+  -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 14%, #000 86%, transparent 100%);
+          mask-image: linear-gradient(to bottom, transparent 0, #000 14%, #000 86%, transparent 100%);
 }
 .edge-pulse--rail-right { right: auto; left: -1px; --pulse-hue: var(--filter-accent, var(--primary)); }
 /* Layer 1 — the base edge line: soft fade-in, hold under the sweep, fade-out. Dimmer than the
@@ -86,16 +92,19 @@
   78%  { opacity: 0.5; }
   100% { opacity: 0; }
 }
-/* Layer 2 — the bright travelling segment. */
+/* Layer 2 — the bright travelling segment. Its length is PARAMETRIC (`--pulse-len`, default the
+   rail/card-tuned 64px): short hosts (the collapsed edge tab, the phone dock half's top edge) set
+   an element-relative length (~45% of the track) so the sweep still READS there instead of
+   blinking the whole line at once. The sweep keeps constant TIME (1.2s), not constant speed. */
 .edge-pulse > i {
-  position: absolute; left: 0; right: 0; height: 64px; opacity: 0;
+  position: absolute; left: 0; right: 0; height: var(--pulse-len, 64px); opacity: 0;
   background: linear-gradient(to bottom,
     transparent 0, var(--pulse-hue) 30%, var(--pulse-hue) 70%, transparent 100%);
   filter: drop-shadow(0 0 6px var(--pulse-hue));
   animation: edge-pulse-sweep 1.2s ease;
 }
 @keyframes edge-pulse-sweep {
-  0%   { top: -64px; opacity: 0; }
+  0%   { top: calc(-1 * var(--pulse-len, 64px)); opacity: 0; }
   15%  { opacity: 1; }
   85%  { opacity: 1; }
   100% { top: 100%;  opacity: 0; }
@@ -192,6 +201,11 @@
      the phone bar-half sheet offset (RailDock) AND the LiveStrip's phone bottom offset. (Was
      16-responsive-shell.css `:root`, re-homed here when that file was retired in Task 9.) */
   --phone-dock-h: 56px;
+  /* The ONE resting dim for rail instrument furniture (lines/ruler/spine at rest) — consumed by
+     the desktop RailThreads' dim group AND the tablet/phone sheet's `.ig-sheet-edge` channel, so
+     rest vs signal contrast is consistent everywhere. Brightness belongs to the signals (pulses)
+     and the node dots, which stay outside the dim. */
+  --rail-rest-dim: 0.6;
 
   --background: oklch(0.09 0.02 265);        /* #05060e app bg */
   --foreground: oklch(0.94 0.02 255);        /* #e8eefc text */
@@ -588,16 +602,10 @@
 @keyframes sheetInLeft   { from { transform: translateX(-100%); } to { transform: none; } }
 @keyframes sheetInRight  { from { transform: translateX(100%); }  to { transform: none; } }
 @keyframes sheetInBottom { from { transform: translateY(100%); }  to { transform: none; } }
-/* The "new detail landed" dot's resting pulse on a collapsed rail tab / phone bar half. */
-@keyframes railTabHintPulse {
-  0%, 100% { opacity: 0.55; transform: scale(0.85); }
-  50%      { opacity: 1;    transform: scale(1.15); }
-}
 @theme inline {
   --animate-sheet-in-left:   sheetInLeft   0.28s cubic-bezier(0.22, 1, 0.36, 1);
   --animate-sheet-in-right:  sheetInRight  0.28s cubic-bezier(0.22, 1, 0.36, 1);
   --animate-sheet-in-bottom: sheetInBottom 0.30s cubic-bezier(0.22, 1, 0.36, 1);
-  --animate-rail-hint:       railTabHintPulse 1.6s ease-in-out infinite;
 }
 
 @layer components {
@@ -609,6 +617,9 @@
   .ig-sheet-edge::before,
   .ig-sheet-edge::after {
     content: ""; position: fixed; top: 10px; bottom: 10px; pointer-events: none; z-index: 42;
+    /* Same resting dim as the desktop RailThreads (shared --rail-rest-dim): the channel is calm
+       furniture at rest, so the travelling switch/update pulses read clearly against it. */
+    opacity: var(--rail-rest-dim);
   }
   .ig-sheet-edge::before {
     width: 2px; border-radius: 2px;

@@ -35,7 +35,7 @@ mode !== "ledger"`):
   monochrome via `currentColor`** (so the accent/identity tinting inherits), **never emoji** (emoji
   ignore CSS `color` / the accent). The centralized view→icon map is `components/icons.tsx`
   (`VIEW_ICONS` + `iconForPick`), shared by the view switch, the card-head kind marks, and the
-  tablet/phone signal chips. The bespoke marks that remain text/SVG on purpose are the identity
+  tablet/phone dock icon trays. The bespoke marks that remain text/SVG on purpose are the identity
   dots, the ECG mark, and the Tooltip's `‹›` punctuation.
 
 Only `hyper`↔`geo` **morph** (`morph` 0→1, eased each frame); the blue L0 core literally
@@ -288,11 +288,13 @@ and keep changing, so they're examples, not the contract.
 - **Top** (`TopBar`) = the **command bar**: one full-width glass bar whose edges align with
   the rail columns (26px) on desktop. Three regions on one row: **status + filter** (left —
   the ECG heartbeat mark + "DAG Visualizer", then the filter button whose face is a small
-  identity dot + network name; clicking opens the **detached filter popover** — a stock Radix
+  identity dot + network name — on the condensed breakpoints (≤940px) where the "FILTER" text
+  label hides, a lucide `Filter` funnel stands in for it (never both); clicking opens the
+  **detached filter popover** — a stock Radix
   `Popover` 6px below the button hosting the shadcn `Command` picker; the detached popover is
   the *intentional* design, an anchored bar-expansion variant was tried and rejected), the
   **view switch** (center — a `ToggleGroup` of six monochrome lucide icons: `Orbit` hyper /
-  `Globe` geo / `Layers` ledger / `Activity` status / `ArrowLeftRight` transactions / `HandCoins`
+  `Globe` geo / `Layers` ledger / `Radar` status / `ArrowLeftRight` transactions / `HandCoins`
   staking, from `VIEW_ICONS`), and the
   **view vitals** (right, `Vitals`). **The vitals region is constant-width**: all view
   clusters render stacked in one grid cell (inactive ones `invisible` + `aria-hidden`) so the
@@ -350,8 +352,8 @@ Only the rails restructure (`useBreakpoint()`); everything else holds the four-z
   half-switches; reopen resets). The command bar condenses; the vitals row is a toggleable
   second bar row (`store.phoneVitals`, persists across views); `LiveStrip` runs full-width
   above the dock. Dismissing a sheet only collapses it — it does NOT clear the selection.
-- **No auto-open, ever** (global constraint): a pick never opens a sheet/dock — the hint dot
-  announces it; the user always taps the trigger.
+- **No auto-open, ever** (global constraint): a pick never opens a sheet/dock — the dock's icon
+  tray announces it; the user always taps the trigger.
 - SSR/first-paint assume desktop, so the desktop rails + threads carry a
   `max-[1099px]:!hidden` safety net against a flash on narrow viewports.
 
@@ -490,13 +492,19 @@ signal channel.**
   are suppressed — the sheet's own `.ig-sheet-edge` spine is the single identity cue; the
   subject-change pulse still plays on the card. On tablet the view/filter pulse plays on the
   sheet edge (open) or the rail tab (closed).
-- **Signal chips** (collapsed rails, tablet/phone): the dock tab's "new detail" hint dot is
-  purely visual (never opens the sheet). On a hosted card's data update the dot replays a
-  one-shot pulse and briefly **morphs into the updating card's type icon** — `Orbit` dossier /
-  `Globe` node / `Layers` snapshot (the `VIEW_ICONS` marks), identity-tinted, ~2s, then settles
-  back (`RailDock` `pulseGlyph`/`pulseHue` now take a `LucideIcon`; Inspector owns the
-  kind→icon mapping, most-specific wins:
-  node > snapshot > dossier; a pure deselect announces nothing).
+- **Dock icon trays** (tablet edge tabs + phone dock halves; replaced the old hint dot + the
+  dot↔glyph morph): each dock shows a quiet **legend of the cards its sheet hosts** — one lucide
+  mark per card (right: `Orbit` dossier / `Globe` node / `Layers` snapshot; left: `ABOUT_ICON`
+  (Info) explainer + the view tool card under the view's own mark), muted at rest, vertical on
+  the tab / horizontal after the dock-half label. A card updating while the sheet is CLOSED goes
+  **vivid in its identity hue + `dot-beat` heartbeat** until the sheet opens (opening clears all
+  highlights; the icons stay), and the dock's outline edge replays the travelling `.edge-pulse`
+  once per update event (debounced — live snapshot follow pulses at most once per sweep while
+  the Layers icon stays lit; segments are `--pulse-len`-scaled ~45% on these short hosts, and
+  the phone half runs it along its TOP edge via a rotated carrier). Purely visual — never opens
+  the sheet; a pure deselect announces nothing. `RailDock` `signals`/`updateKey`
+  (`TabSignal[]`); each caller owns its card→icon/hue mapping + seen-tracking. Reduced motion:
+  static vivid icons, no beat, blink-not-sweep pulse.
 - **Calm tempo**: the heartbeat family (ECG scan, filter dot `dot-beat`, card-title dots,
   live dots `breathe`) beats at 1.5s; transient signals (edge pulse, hold-fade) run ~1.2s/
   0.4s. Signals are debounced — a 4s-tick live feed must never read as a strobe.

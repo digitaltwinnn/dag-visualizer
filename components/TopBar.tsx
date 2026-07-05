@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { ChevronDown } from "lucide-react";
+import { ChevronDown, Filter } from "lucide-react";
 import { VIEW_ICONS } from "@/components/icons";
 import { useStore } from "@/src/store/store";
 import { metagraphById } from "@/src/data/network";
@@ -98,7 +98,10 @@ export default function TopBar() {
               "max-[699px]:p-1.5 max-[699px]:gap-[5px]",
             )}
           >
+            {/* The control's semantics on every breakpoint: the "FILTER" text label on wide
+                bars, swapped for the lucide funnel where the label hides (≤940px) — never both. */}
             <span className="text-micro tracking-caps uppercase text-muted-foreground max-[940px]:hidden">Filter</span>
+            <Filter aria-hidden className="size-3.5 flex-none text-muted-foreground hidden max-[940px]:block" />
             <span
               className="w-[9px] h-[9px] rounded-full flex-none animate-dot-beat motion-reduce:animate-none"
               style={{ background: face.dot }}
