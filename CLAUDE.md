@@ -587,6 +587,12 @@ invite map is an allow-list mirroring the pick registry.
    every rail card must carry `.ig-panel`, which the `Card` baseline supplies), `.nb-row`
    (the pairing row-wash selector), `#topbar`, `#metapane`, `#tooltip`. Rename only with all
    consumers.
+6. **Custom `@theme` utilities whose prefix collides with a tailwind-merge group MUST be
+   registered in `lib/utils.ts`** (`extendTailwindMerge` — `text-micro/label/body/title` as
+   font-size, `tracking-caps`, the custom radii are already there). Unregistered, twMerge
+   classifies e.g. `text-body` as a COLOR, so `cn("text-body", "text-muted-foreground")`
+   silently drops the size class and the text falls back to 16px. Register any new
+   `text-*`/`rounded-*`/`tracking-*`-prefixed token utility in the same breath.
 
 Settle any cascade/specificity question by reading the **compiled** CSS in the browser
 (CSSOM via the devtools MCP), not by reasoning about it.
