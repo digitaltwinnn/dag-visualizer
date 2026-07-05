@@ -89,6 +89,9 @@ export function isAnchorSettling(ts: string, total: number | null): boolean {
 const DAG_CFG: MetagraphConfig = {
   id: "dag", name: "DAG", ticker: "DAG", color: COLORS.core,
   iconUrl: "https://stargazer-assets.s3.us-east-2.amazonaws.com/logos/dag.png",
+  // The DAG isn't in the live metaList's siteUrl lane (Engine publishes it with
+  // `siteUrl: undefined`), so its dossier ↗ link resolves from THIS config fallback.
+  siteUrl: "https://constellationnetwork.io",
 };
 
 // Config core (id → {color, ticker, name, …}) — a metagraph or the DAG; null for "all".
@@ -123,4 +126,5 @@ export interface MetagraphConfig {
   ticker: string;
   color: number;
   iconUrl?: string;
+  siteUrl?: string; // config-level site (the DAG core; metagraphs get theirs from the live metaList)
 }

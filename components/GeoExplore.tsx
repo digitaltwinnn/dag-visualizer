@@ -8,6 +8,7 @@ import { Card } from "@/components/ui/card";
 import { shortHash, CORE_HEX, metagraphById } from "@/src/data/network";
 import { identityHudHex } from "@/src/palette/identity";
 import { StatusMark } from "@/components/inspector/parts";
+import { SELECTED_ROW, SelectedRowMark } from "@/components/selection";
 import { ccToFlag } from "@/src/util/format";
 import { hoverKeyOf } from "@/src/data/hoverSubject";
 import { subjectPairing } from "@/components/useSubjectPairing";
@@ -125,7 +126,10 @@ export default function GeoExplore() {
                     "flex items-center gap-2.5 w-full text-left text-[12px] border-none bg-transparent cursor-pointer py-[5px] px-1.5 -mx-1.5 rounded-[6px] transition-[background] duration-150",
                     "hover:bg-[rgba(90,140,255,0.12)]",
                     "focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--core)] focus-visible:outline-offset-[-2px]",
-                    open && "bg-[var(--sel-bg)]",
+                    // The drilled country row wears the same shared selection language as the
+                    // picker's committed row (SELECTED_ROW) — no ✓ though: an open accordion's
+                    // state cue is its ▾ chevron, not a selection check.
+                    open && SELECTED_ROW,
                   )}
                   aria-expanded={open}
                   onClick={() => drill(c.cc)}
@@ -168,10 +172,16 @@ export default function GeoExplore() {
                           <button
                             key={r.label + i}
                             className={cn(
-                              "nb-row flex items-center gap-2 w-full py-[5px] px-2 my-px rounded-[7px] border border-transparent bg-transparent cursor-pointer text-left text-[#c7d0ea] transition-colors duration-[140ms]",
+                              // `relative pr-7` reserves the picker's trailing ✓ slot on every
+                              // row, so the status column doesn't shift when a node is selected.
+                              "nb-row relative flex items-center gap-2 w-full py-[5px] pl-2 pr-7 my-px rounded-[7px] border border-transparent bg-transparent cursor-pointer text-left text-[#c7d0ea] transition-colors duration-[140ms]",
                               "hover:bg-[rgba(90,140,255,0.12)] hover:text-foreground",
                               "focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--core)] focus-visible:outline-offset-[-2px]",
-                              on && "bg-[var(--sel-bg)] border-[var(--sel-border)] text-white",
+                              // The selected node row = the SAME shared selection language as the
+                              // filter picker's committed row (user-unified). Box-shadow based, so
+                              // the identity-hued `.nb-row.subject-paired` hover wash (background/
+                              // border) tints UNDER it while paired and the mark returns untouched.
+                              on && SELECTED_ROW,
                               pair.paired && pair.className,
                             )}
                             style={pair.style}
@@ -204,6 +214,7 @@ export default function GeoExplore() {
                               </span>
                             )}
                             <span className="ml-auto flex-none"><StatusMark state={r.state} /></span>
+                            {on && <SelectedRowMark className="absolute right-2" />}
                           </button>
                         );
                       })

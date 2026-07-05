@@ -3,6 +3,7 @@ import { useMemo } from "react";
 import { useStore } from "@/src/store/store";
 import { hex } from "@/src/util/format";
 import { cn } from "@/lib/utils";
+import { SELECTED_ROW, SelectedRowMark } from "@/components/selection";
 import {
   Command, CommandInput, CommandList, CommandEmpty, CommandGroup, CommandItem,
 } from "@/components/ui/command";
@@ -12,8 +13,9 @@ import {
 // ticker + node count — SORTED by located-node count desc, so 0-located metagraphs sink to the
 // bottom (shown greyed with their real count, never hidden). No logo tiles (they ate width and
 // read as heavy chrome); the dot carries identity, matching the collapsed filter face + the rail.
-// Current pick marked with a quiet left accent; hovering a row PREVIEWS its dim in the scene
-// (setHoverFilter); leaving the list clears the preview.
+// The committed pick carries the shared SELECTED_ROW mark (wash + inset ring + trailing ✓ —
+// components/selection.tsx); hovering a row PREVIEWS its dim in the scene (setHoverFilter);
+// leaving the list clears the preview.
 export default function FilterPicker({ onPick }: { onPick?: () => void }) {
   const filter = useStore((s) => s.filter);
   const setFilter = useStore((s) => s.setFilter);
@@ -36,20 +38,18 @@ export default function FilterPicker({ onPick }: { onPick?: () => void }) {
   };
 
   // Shared row grid — one dot + name + (optional sub-label under the name) + a right-aligned
-  // count column. Command's own `data-[selected=true]` hover/keyboard-cursor highlight is
-  // overridden to a faint neutral wash (the bright accent fill washed the row text out to
-  // unreadable) — that stays as the TRANSIENT cursor cue. The COMMITTED filter's row additionally
-  // gets a persistent mark in the app's selection language (`--sel-bg`/`--sel-border`, the same
-  // idiom as RailDock's `data-[state=on]`/the old `.nb-row.active`): a left accent bar + a full
-  // wash. The wash is done as an INSET box-shadow (not `background`) on purpose — `background` is
-  // the same CSS property the transient cursor wash above uses, and its `data-[selected=true]:`
-  // variant carries higher specificity, so a plain `bg-*` here would go invisible under the
-  // cursor; box-shadow is an independent property, so both compose and stay readable together.
+  // count column, plus a RESERVED trailing slot (`pr-7`, every row) where the committed pick's
+  // ✓ renders absolutely — the stock SelectItem pattern, so the count column never shifts.
+  // Command's own `data-[selected=true]` hover/keyboard-cursor highlight is overridden to a
+  // faint neutral wash (the bright accent fill washed the row text out to unreadable) — that
+  // stays as the TRANSIENT cursor cue. The COMMITTED filter's row gets the shared SELECTED_ROW
+  // mark (components/selection.tsx — the view switch's on-state language, box-shadow-based so
+  // the cursor wash layers under it cleanly).
   const rowClass = (active: boolean, off: boolean) =>
     cn(
-      "grid grid-cols-[auto_1fr_auto_auto] items-center gap-2.5",
+      "relative grid grid-cols-[auto_1fr_auto_auto] items-center gap-2.5 pr-7",
       "data-[selected=true]:bg-[rgba(255,255,255,0.05)] data-[selected=true]:text-foreground",
-      active && "text-foreground shadow-[inset_2px_0_0_var(--sel-border),inset_0_0_0_9999px_var(--sel-bg)]",
+      active && SELECTED_ROW,
       off && "opacity-45",
     );
 
@@ -72,6 +72,7 @@ export default function FilterPicker({ onPick }: { onPick?: () => void }) {
             <span className="text-[13px] text-foreground">All</span>
             <span className="col-start-2 text-muted-foreground text-[11px]">whole network</span>
             <span className="text-[11px] text-muted-foreground tabular-nums text-right">{mappedCount} · {totalNodes} nodes</span>
+            {filter === "all" && <SelectedRowMark className="absolute right-2" />}
           </CommandItem>
         </CommandGroup>
         <CommandGroup>
@@ -100,6 +101,7 @@ export default function FilterPicker({ onPick }: { onPick?: () => void }) {
                 ) : (
                   <span className="text-[11px] text-muted-foreground tabular-nums text-right">{m.located}</span>
                 )}
+                {filter === m.id && <SelectedRowMark className="absolute right-2" />}
               </CommandItem>
             );
           })}

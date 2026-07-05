@@ -44,11 +44,13 @@ export function StatusMark({ state }: { state?: string | null }) {
   );
 }
 
-// Rolled-up status for a node group (dossier): "all ready" (green) or the non-zero buckets as
-// counts + colour dots (`28 ready · 2 waiting · 1 syncing · 2 down`). The amber "progress"
-// bucket is spelled out by its exact lifecycle state(s) — same wording a single node's own
-// card shows (`StatusMark`) — instead of collapsing to a bare "N in progress"; colour still
-// comes from the bucket (BUCKET_COLOR), only the text goes granular.
+// Rolled-up status for a node group (dossier): the non-zero buckets as counts + colour dots
+// (`28 ready · 2 waiting · 1 syncing · 2 down`). Deliberately NO "all ready" special case
+// (user reversal — the green bold idiom dominated the card): ready is a count in the same
+// muted text as every other status, its green BULLET alone carrying the semantic. The amber
+// "progress" bucket is spelled out by its exact lifecycle state(s) — same wording a single
+// node's own card shows (`StatusMark`) — instead of collapsing to a bare "N in progress";
+// colour still comes from the bucket (BUCKET_COLOR), only the text goes granular.
 const BUCKET_WORD: Record<StatusBucket, string> = {
   ready: "ready",
   progress: "in progress",
@@ -57,8 +59,6 @@ const BUCKET_WORD: Record<StatusBucket, string> = {
 };
 export function StatusBreakdown({ states }: { states: (string | null | undefined)[] }) {
   const b = statusBreakdown(states);
-  const total = states.length;
-  if (total > 0 && b.ready === total) return <span className={READY_CLS}>all ready</span>;
   const order: StatusBucket[] = ["ready", "progress", "down", "unknown"];
   // EVERY status item carries its own colour bullet (in its bucket's colour) — the progress
   // bucket spells out several stage words (syncing / joining / …), and rendering one dot per
@@ -86,42 +86,34 @@ export function StatusBreakdown({ states }: { states: (string | null | undefined
 }
 
 // One composition row per make-up: role (bright) + codes (muted) + a capped chip stack
-// (visual scale only, ≤10, no +N) + the authoritative count. `showStatus` (the dossier's
-// "Selected network" card) adds a second line under each row with that GROUP's own status —
-// the subtle green "all ready" idiom, or StatusBreakdown's compact coloured counts when mixed —
-// so a mixed metagraph reads which composition is lagging instead of one section-wide summary.
-export function CompositionRows({ nodes, showStatus = false }: { nodes: NodeInfo[]; showStatus?: boolean }) {
+// (visual scale only, ≤10, no +N) + the authoritative count. (A per-row status line lived
+// here briefly — reverted: it read too busy; the dossier shows ONE aggregate StatusBreakdown
+// as the composition block's attached footer instead.)
+export function CompositionRows({ nodes }: { nodes: NodeInfo[] }) {
   const rows = compositionRows(nodes);
   return (
     <div className="flex flex-col gap-[7px] mt-2">
       {rows.map((r, i) => (
-        <div className="flex flex-col gap-[3px]" key={i}>
-          <div className="grid grid-cols-[auto_auto_1fr_auto] items-center gap-2">
-            <span className="text-[12.5px] text-foreground">{r.label}</span>
-            <span className="text-[11px] text-muted-foreground tabular-nums">{r.codes.join("·")}</span>
-            {/* Chip stack = a miniature of the 3D node cloud: identity-hued discs that OVERLAP (like
-                stacked avatars), each ringed in the panel colour so the overlap reads. Visual scale
-                only (capped ≤10). Plain overlapping dots (no image/fallback content), so a bare
-                utility span reproduces the look more directly than fighting Avatar's chrome. */}
-            <span className="inline-flex justify-end items-center pl-1" aria-hidden>
-              {Array.from({ length: Math.min(r.count, 10) }).map((_, j) => (
-                <span
-                  key={j}
-                  className="w-[9px] h-[9px] rounded-full -ml-1"
-                  style={{
-                    background: "color-mix(in oklch, var(--filter-accent, #a0afcd) 60%, transparent)",
-                    boxShadow: "0 0 0 1.5px var(--panel)",
-                  }}
-                />
-              ))}
-            </span>
-            <span className="text-[12.5px] text-foreground tabular-nums min-w-[1.5em] text-right">{r.count}</span>
-          </div>
-          {showStatus && (
-            <div className="flex justify-end">
-              <StatusBreakdown states={r.states} />
-            </div>
-          )}
+        <div className="grid grid-cols-[auto_auto_1fr_auto] items-center gap-2" key={i}>
+          <span className="text-[12.5px] text-foreground">{r.label}</span>
+          <span className="text-[11px] text-muted-foreground tabular-nums">{r.codes.join("·")}</span>
+          {/* Chip stack = a miniature of the 3D node cloud: identity-hued discs that OVERLAP (like
+              stacked avatars), each ringed in the panel colour so the overlap reads. Visual scale
+              only (capped ≤10). Plain overlapping dots (no image/fallback content), so a bare
+              utility span reproduces the look more directly than fighting Avatar's chrome. */}
+          <span className="inline-flex justify-end items-center pl-1" aria-hidden>
+            {Array.from({ length: Math.min(r.count, 10) }).map((_, j) => (
+              <span
+                key={j}
+                className="w-[9px] h-[9px] rounded-full -ml-1"
+                style={{
+                  background: "color-mix(in oklch, var(--filter-accent, #a0afcd) 60%, transparent)",
+                  boxShadow: "0 0 0 1.5px var(--panel)",
+                }}
+              />
+            ))}
+          </span>
+          <span className="text-[12.5px] text-foreground tabular-nums min-w-[1.5em] text-right">{r.count}</span>
         </div>
       ))}
     </div>
@@ -196,8 +188,16 @@ export function Row({ label, children }: { label: string; children: React.ReactN
   );
 }
 
-// Long description with a 3-line clamp + "Show more" (replaces ui.js _descHTML +
-// the delegated toggle; here it's just local state).
+// Long description with a 3-line clamp + "Show more" (replaces ui.js _descHTML + the delegated
+// toggle; here it's just local state). Clamp-worthiness is decided SYNCHRONOUSLY from text
+// length (no post-paint measurement), so the control always renders in the same frame as the
+// card — the only "Show more appears late" case left is a data swap: on a cold boot the dossier
+// shows the short `cfg.blurb` (~110 chars, genuinely un-clampable) until `/api/metagraphs`
+// delivers the long `description`, and the button rightly arrives WITH that longer text.
+// Kept custom over shadcn Collapsible (evaluated): Collapsible's model is hidden-when-closed,
+// ours is always-visible-but-clamped — forceMount + data-state clamp overrides would invert the
+// primitive into a bare state container, so local state + aria-expanded is the smaller truth.
+// Keyed on `text` by the caller (MetaCard) so `open` resets when the subject changes.
 export function Desc({ text }: { text?: string }) {
   const [open, setOpen] = useState(false);
   if (!text) return null;
@@ -212,6 +212,7 @@ export function Desc({ text }: { text?: string }) {
         variant="link"
         size="xs"
         className="inline-block h-auto mt-0.5 mb-0 p-0 text-[11px] font-semibold"
+        aria-expanded={open}
         onClick={() => setOpen((o) => !o)}
       >
         {open ? "Show less" : "Show more"}

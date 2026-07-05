@@ -11,11 +11,12 @@ import type { GlobalSnapshot, MetaCfg, NodeInfo, PickDescriptor } from "@/src/da
 import AnchoredTags from "./AnchoredTags";
 import Odometer from "@/components/Odometer";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
+import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { SonarRing, NodeStars, NoSignalDot } from "@/components/state/StateAtoms";
 import { useMinHold } from "@/components/useMinHold";
 import { VIS } from "../../js/config.js";
-import { Desc, StatusMark, CompositionRows, networkKind } from "./parts";
+import { Desc, StatusMark, CompositionRows, StatusBreakdown, networkKind } from "./parts";
 import { compositionRows } from "@/src/data/composition";
 
 type PickOf<K extends PickDescriptor["kind"]> = Extract<PickDescriptor, { kind: K }>;
@@ -248,9 +249,7 @@ export function MetaCard({ cfg }: { cfg: MetaCfg }) {
   const metaList = useStore((s) => s.metaList);
   const mg = metaList.find((x) => x.id === cfg.id) || null;
   const nodes = mg?.nodes || [];
-  const hue = hex(cfg.color);
   const blurb = mg?.description || cfg.blurb;
-  const site = mg?.siteUrl;
   // The distinct make-ups this metagraph's nodes fall into (same read CompositionRows renders),
   // needed here just for the "N different compositions" count in the section header.
   const compRows = compositionRows(nodes);
@@ -259,36 +258,59 @@ export function MetaCard({ cfg }: { cfg: MetaCfg }) {
   // CardHead's title slot, rolled via titleKey) — the body starts at the description.
   return (
     <>
-      <Desc text={blurb} />
+      {/* Keyed on the text so the expand state resets when the subject (or its description
+          arriving from /api/metagraphs) changes — an expanded DOR must not leak into DED. */}
+      <Desc key={blurb} text={blurb} />
       {nodes.length > 0 && (
         <div className="mt-3">
-          {/* One line: "163 nodes with 3 different compositions" — both counts bold/foreground,
-              the rest muted; each count pluralises independently ("1 node"/"1 composition" have
-              no trailing "different", matching a single-composition metagraph like DED). */}
-          <div className="text-[12.5px] text-muted-foreground">
-            <b className="font-bold text-foreground">{nodes.length}</b> node{nodes.length === 1 ? "" : "s"} with{" "}
-            <b className="font-bold text-foreground">{compRows.length}</b>{" "}
-            {compRows.length === 1 ? "composition" : "different compositions"}
+          {/* Section header in the snapshot card's exact bold-lead + muted-tail treatment
+              (AnchoredTags): the key figure — "163 nodes" — as a 13px foreground lead with the
+              bold number, the addition — "with 3 different compositions" — as the 12px muted
+              tail. Singulars handled ("1 node" / "with 1 composition" — no "different"). */}
+          <div className="flex items-baseline gap-2 flex-wrap">
+            <span className="text-[13px] text-foreground"><b className="font-bold">{nodes.length}</b> node{nodes.length === 1 ? "" : "s"}</span>
+            <span className="text-[12px] text-muted-foreground">
+              with {compRows.length} {compRows.length === 1 ? "composition" : "different compositions"}
+            </span>
           </div>
-          <CompositionRows nodes={nodes} showStatus />
+          <CompositionRows nodes={nodes} />
+          {/* ONE aggregate status as the block's ATTACHED footer (user reversal of the per-row
+              marks — too busy): right-aligned tight under the last row, reading as part of the
+              composition block, in the standard muted count+bullet language (no "all ready"
+              special case — StatusBreakdown always shows plain counts now). */}
+          <div className="mt-1.5 flex justify-end">
+            <StatusBreakdown states={nodes.map((n) => n.state)} />
+          </div>
         </div>
       )}
-      <div className="flex flex-col gap-1 mt-3">
-        {site && (
-          // Metagraph site link, sitting just under the description. A subtle inline link with a
-          // trailing ↗, de-emphasised so it doesn't compete with the node-fabric table above.
-          <a
-            className="flex w-fit max-w-full items-center gap-1 my-2.5 text-[12px] text-primary no-underline overflow-hidden text-ellipsis whitespace-nowrap after:content-['↗'] after:text-[11px] after:opacity-70 hover:underline"
-            href={site}
-            target="_blank"
-            rel="noopener noreferrer"
-            style={{ color: hue }}
-          >
-            {site.replace(/^https?:\/\//, "").replace(/\/$/, "")}
-          </a>
-        )}
-      </div>
     </>
+  );
+}
+
+// The dossier's site/explorer link (user-agreed: the footer link row was rarely used and ate a
+// full row) — an icon-only ghost ↗ riding the TITLE row's aside slot, pinned FLUSH to the
+// card's content edge on the avatar + name + ticker line (the name truncates, the icon doesn't
+// move). Flush mechanics (measured): the negative right margin collapses CardHead's aside
+// wrapper to zero width AT the title row's `pr-[22px]` inset edge, and the icon's own `w-[22px]`
+// box then extends right from there — exactly re-occupying the 22px ×-clearance, so the
+// right-aligned glyph ends flush with the card's content edge (the composition counts' column).
+// Safe for THIS aside only because the dossier's tall title row sits below the ×; the glyph rides
+// `text-primary` (the link-variant Button language, softened at rest) so it reads as a LINK at
+// a glance, not muted chrome. Domain in the tooltip/aria-label. Rendered by InspectorCard only
+// when the metagraph actually has a siteUrl, so link-less dossiers render no aside at all.
+export function MetaSiteAction({ site }: { site: string }) {
+  const domain = site.replace(/^https?:\/\//, "").replace(/\/$/, "");
+  return (
+    <Button
+      asChild
+      variant="ghost"
+      size="icon-xs"
+      className="size-auto w-[22px] justify-end rounded-md py-1 px-0 -mr-[30px] text-[14px] leading-none cursor-pointer text-primary/70 hover:bg-transparent hover:text-primary dark:hover:bg-transparent"
+    >
+      <a href={site} target="_blank" rel="noopener noreferrer" aria-label={domain} title={domain}>
+        ↗
+      </a>
+    </Button>
   );
 }
 

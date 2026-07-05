@@ -6,7 +6,7 @@ import { useStore } from "@/src/store/store";
 import CardHead from "@/components/CardHead";
 import {
   GeoLiveAside, GeoLiveCard, GeoLiveSubtitle, GeoLiveTitle,
-  MetaCard, MetaTitle, SnapshotAside, SnapshotCard, SnapshotTitle,
+  MetaCard, MetaSiteAction, MetaTitle, SnapshotAside, SnapshotCard, SnapshotTitle,
 } from "@/components/inspector/cards";
 
 // Only three kinds ever reach the inspector frame now: a metagraph/core dossier (ContextCard),
@@ -60,6 +60,17 @@ export default function InspectorCard({
   // and the frame's eyebrow dims along with it (carried forward from `.no-signal .insp-eyebrow`).
   const live = useStore((s) => s.live);
   const eyebrowMuted = p.kind === "snapshot" && !live;
+  // The dossier's site link rides the TITLE row's aside slot (user-placed: anchored right on the
+  // avatar + name + ticker line; the name truncates, the icon stays pinned). Resolved HERE (not
+  // inside headFor, which is a plain function and can't hook); passed only when a link actually
+  // exists, so link-less dossiers render no aside at all (no empty gap). Falls back to the
+  // config-level `cfg.siteUrl` for cores the live metaList doesn't carry a site for (the DAG —
+  // Engine publishes it with `siteUrl: undefined`; DAG_CFG supplies constellationnetwork.io).
+  const metaList = useStore((s) => s.metaList);
+  const site =
+    p.kind === "meta"
+      ? (metaList.find((x) => x.id === p.cfg.id)?.siteUrl ?? p.cfg.siteUrl)
+      : undefined;
   const head = headFor(p);
   return (
     <>
@@ -68,7 +79,7 @@ export default function InspectorCard({
         title={head.title}
         titleKey={head.titleKey}
         subtitle={head.subtitle}
-        aside={head.aside}
+        aside={head.aside ?? (site ? <MetaSiteAction site={site} /> : undefined)}
         onClose={onClose}
         eyebrowMuted={eyebrowMuted}
       />
