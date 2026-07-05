@@ -149,6 +149,8 @@ export function nodeComposition(nodes: NodeInfo[]): Composition {
 // runs dL1/cL1 nodes; the DAG core is the one exception ("hypergraph", not a metagraph at all).
 export function networkKind(id: string, nodes: NodeInfo[]): string {
   if (id === "dag") return "hypergraph";
+  // With zero locatable nodes the roles are unknown — claiming a type would be a guess.
+  if (nodes.length === 0) return "metagraph";
   const { present, hasCurrency } = nodeComposition(nodes);
   const hasData = present.includes("dl1");
   if (hasCurrency && hasData) return "data and currency metagraph";
