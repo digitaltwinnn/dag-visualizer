@@ -52,7 +52,7 @@ const REST_DIM = 0.6;
 export default function RailThread({ side = "right" }: { side?: Side }) {
   const filter = useStore((s) => s.filter);
   const mode = useStore((s) => s.mode);
-  // Resolve to a real colour: filterAccent returns `var(--core)` for "all", but an SVG `stroke`
+  // Resolve to a real colour: filterAccent returns `var(--primary)` for "all", but an SVG `stroke`
   // ATTRIBUTE doesn't resolve CSS custom properties — so the identity line + dots rendered invisible
   // on "all". Fall back to the core hex for the var() case.
   const rawAccent = filterAccent(filter);

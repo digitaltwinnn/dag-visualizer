@@ -94,8 +94,8 @@ export default function FilterPicker({ onPick }: { onPick?: () => void }) {
                 {off ? (
                   // Honest, non-numeric tag (Task 13): these are real metagraphs with no
                   // locatable node right now — still clickable (selectable in hyper/ledger), but
-                  // a "0" count read as a broken value. A small muted lowercase tag, matching the
-                  // squared tag idiom (RoleTags in inspector/parts.tsx).
+                  // a "0" count read as a broken value. A small muted lowercase tag using the
+                  // squared-tag idiom (rounded-[4px] muted-foreground badge on a faint fill).
                   <span className="justify-self-end rounded-[4px] px-[5px] py-[3px] text-[9.5px] leading-none tracking-[0.02em] text-muted-foreground bg-white/[0.035]">
                     not located
                   </span>

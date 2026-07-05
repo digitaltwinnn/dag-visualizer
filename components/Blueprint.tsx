@@ -8,14 +8,14 @@ import type { Mode } from "@/src/store/store";
 // Structural blueprint chrome expressed as Tailwind-on-tokens. Stroke/fill come through
 // class-based `[stroke:…]` utilities (CSS declarations, so `var()`/`color-mix()` resolve —
 // unlike an SVG presentation attribute), keeping the cyan accents tied to the design tokens.
-const BP_CELL = "fill-none [stroke:color-mix(in_oklch,var(--core)_40%,var(--panel-border))] [stroke-width:1.25]";
-const BP_CELL_WAIT = "[stroke-dasharray:3_3] [stroke:color-mix(in_oklch,var(--core)_55%,transparent)]";
-const BP_CELL_OFF = "[stroke:var(--panel-border)] opacity-50";
-const BP_FLOW = "fill-none [stroke:color-mix(in_oklch,var(--core)_55%,transparent)] [stroke-width:1.25] [stroke-dasharray:4_4]";
-const BP_ARROWHEAD = "fill-none [stroke:color-mix(in_oklch,var(--core)_55%,transparent)] [stroke-width:1]";
-const BP_VALIDATOR = "fill-none [stroke:color-mix(in_oklch,var(--core)_45%,var(--panel-border))] [stroke-width:1.5]";
-const BP_STAKER = "[fill:color-mix(in_oklch,var(--core)_45%,transparent)] stroke-none";
-const BP_DELEGATE = "[stroke:var(--panel-border)] [stroke-width:1]";
+const BP_CELL = "fill-none [stroke:color-mix(in_oklch,var(--primary)_40%,var(--border))] [stroke-width:1.25]";
+const BP_CELL_WAIT = "[stroke-dasharray:3_3] [stroke:color-mix(in_oklch,var(--primary)_55%,transparent)]";
+const BP_CELL_OFF = "[stroke:var(--border)] opacity-50";
+const BP_FLOW = "fill-none [stroke:color-mix(in_oklch,var(--primary)_55%,transparent)] [stroke-width:1.25] [stroke-dasharray:4_4]";
+const BP_ARROWHEAD = "fill-none [stroke:color-mix(in_oklch,var(--primary)_55%,transparent)] [stroke-width:1]";
+const BP_VALIDATOR = "fill-none [stroke:color-mix(in_oklch,var(--primary)_45%,var(--border))] [stroke-width:1.5]";
+const BP_STAKER = "[fill:color-mix(in_oklch,var(--primary)_45%,transparent)] stroke-none";
+const BP_DELEGATE = "[stroke:var(--border)] [stroke-width:1]";
 const BP_SVG = "w-[min(46vw,420px)] h-auto overflow-visible";
 
 // The center schematic BLUEPRINT for the not-yet-built ("SOON") views. A faint, abstract wireframe
@@ -115,7 +115,7 @@ export default function Blueprint() {
     <figure id="blueprint" className="fixed inset-0 z-[6] flex flex-col items-center justify-center gap-[22px] pointer-events-none px-6">
       <div className="opacity-50">{art}</div>
       <figcaption className="flex flex-col items-center gap-2 text-center max-w-[380px]">
-        <span className="text-[11px] tracking-[0.14em] uppercase [color:color-mix(in_oklch,var(--core)_80%,#fff)] opacity-[0.85]">preview · in development</span>
+        <span className="text-[11px] tracking-[0.14em] uppercase [color:color-mix(in_oklch,var(--primary)_80%,#fff)] opacity-[0.85]">preview · in development</span>
         <span className="text-[13px] text-muted-foreground leading-[1.5]">{CAPTION[mode]}</span>
       </figcaption>
     </figure>

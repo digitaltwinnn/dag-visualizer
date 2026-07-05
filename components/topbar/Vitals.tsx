@@ -171,8 +171,9 @@ export function VitalsToggle({ open, onClick }: { open: boolean; onClick: () => 
 
 export { VitalsCluster };
 
-// Tablet/desktop: vitals render inline, unchanged. Phone rendering (toggle + popover) is
-// handled by TopBar so the popover can escape the bar's clipped/containing-block surface.
+// Tablet/desktop: vitals render inline, unchanged. On phone this renders nothing — TopBar owns
+// the phone treatment: a toggle button that grows the command bar downward by one full-width
+// vitals ROW on the bar's own surface (the old floating popover was removed).
 export default function Vitals() {
   const bp = useBreakpoint();
   if (bp === "phone") return null;

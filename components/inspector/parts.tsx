@@ -168,34 +168,6 @@ export function networkKind(id: string, nodes: NodeInfo[]): string {
   return "data metagraph";
 }
 
-// The layer(s) a node runs, as small squared tags (L0 / cL1 / dL1). One node can run
-// several — a hybrid gets a tag each — so it's always the role *set*, never a single label.
-// Shared by the metagraph node-fabric and the geo node browser so they read identically.
-export function RoleTags({ roles }: { roles: string[] }) {
-  return (
-    <span className="inline-flex flex-wrap gap-1">
-      {roles.map((r) => (
-        <Badge
-          key={r}
-          variant="outline"
-          className="rounded-[4px] px-[5px] py-[3px] text-[9.5px] font-bold leading-none tracking-[0.03em] text-muted-foreground bg-white/[0.035] tabular-nums"
-        >
-          {ROLE_SHORT[r] || r}
-        </Badge>
-      ))}
-    </span>
-  );
-}
-
-export function Row({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <div className="flex justify-between gap-3 py-2 border-b border-border/50 text-[12.5px]">
-      <span className="text-muted-foreground">{label}</span>
-      <span className="tabular-nums text-right break-all">{children}</span>
-    </div>
-  );
-}
-
 // Long description with a 3-line clamp + "Show more" (replaces ui.js _descHTML + the delegated
 // toggle; here it's just local state). Clamp-worthiness is decided SYNCHRONOUSLY from text
 // length (no post-paint measurement), so the control always renders in the same frame as the

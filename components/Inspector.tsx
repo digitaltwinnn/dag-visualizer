@@ -258,6 +258,10 @@ export default function Inspector() {
       glyph = "◍";
       hue = inspect.kind === "metanode" && inspect.meta ? identityHudHex(inspect.meta.id) : CORE_HEX;
     }
+    // Only announce an actual update. A pure deselect (inspect/snap CLEARING with no filter change)
+    // sets no glyph — nothing "updated", so keep the plain dot rather than bumping an empty pulse
+    // (which RailDock would otherwise morph/animate for a nothing-happened transition to null).
+    if (!glyph) return;
     setPulse((prev) => ({ n: prev.n + 1, glyph, hue }));
   }, [inspect, snap, filter]);
 

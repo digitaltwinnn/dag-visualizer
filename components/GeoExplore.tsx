@@ -134,7 +134,7 @@ export default function GeoExplore() {
                   className={cn(
                     "flex items-center gap-2.5 w-full text-left text-[12px] border-none bg-transparent cursor-pointer py-[5px] px-1.5 -mx-1.5 rounded-[6px] transition-[background] duration-150",
                     "hover:bg-[rgba(90,140,255,0.12)]",
-                    "focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--core)] focus-visible:outline-offset-[-2px]",
+                    "focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--primary)] focus-visible:outline-offset-[-2px]",
                     // The drilled country row wears the same shared selection language as the
                     // picker's committed row (SELECTED_ROW) — no ✓ though: an open accordion's
                     // state cue is its ▾ chevron, not a selection check.
@@ -152,8 +152,8 @@ export default function GeoExplore() {
                       className="block h-full rounded-[4px]"
                       style={{
                         width: `${Math.round((c.count / max) * 100)}%`,
-                        background: barHue ?? "linear-gradient(90deg, var(--l0), var(--core))",
-                        boxShadow: `0 0 6px color-mix(in oklch, ${barHue ?? "var(--core)"} 40%, transparent)`,
+                        background: barHue ?? "linear-gradient(90deg, var(--core-l0), var(--primary))",
+                        boxShadow: `0 0 6px color-mix(in oklch, ${barHue ?? "var(--primary)"} 40%, transparent)`,
                       }}
                     />
                   </span>
@@ -185,7 +185,7 @@ export default function GeoExplore() {
                               // row, so the status column doesn't shift when a node is selected.
                               "nb-row relative flex items-center gap-2 w-full py-[5px] pl-2 pr-7 my-px rounded-[7px] border border-transparent bg-transparent cursor-pointer text-left text-[#c7d0ea] transition-colors duration-[140ms]",
                               "hover:bg-[rgba(90,140,255,0.12)] hover:text-foreground",
-                              "focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--core)] focus-visible:outline-offset-[-2px]",
+                              "focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--primary)] focus-visible:outline-offset-[-2px]",
                               // The selected node row = the SAME shared selection language as the
                               // filter picker's committed row (user-unified). Box-shadow based, so
                               // the identity-hued `.nb-row.subject-paired` hover wash (background/

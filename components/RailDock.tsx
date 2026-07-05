@@ -141,7 +141,6 @@ export default function RailDock({
   useEffect(() => () => { if (glyphTimer.current) clearTimeout(glyphTimer.current); }, []);
   useEffect(() => {
     const hintJustArrived = hint && !prevHint.current;
-    prevHint.current = hint;
     if (!mounted.current) {
       mounted.current = true;
       return;
@@ -171,6 +170,16 @@ export default function RailDock({
     );
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pulseKey]);
+
+  // Keep prevHint in sync on EVERY hint change — NOT only when the pulse effect above fires on a
+  // pulseKey bump. Otherwise a hint that toggles without a pulseKey change leaves prevHint stale,
+  // and a later hint re-arrival (its CSS railTabHintPulse already firing) could also pass the
+  // hintJustArrived guard and double-animate with the WAAPI pulse. Declared AFTER the pulse effect
+  // so, when hint and pulseKey change in the same commit, the pulse effect still reads the previous
+  // value before this overwrites it.
+  useEffect(() => {
+    prevHint.current = hint;
+  }, [hint]);
 
   // ── Bottom-sheet drag (phone, grabber-initiated) ────────────────────────────────────────────
   // Standard mobile sheet gesture, v1 GRABBER-ONLY by design: the sheet body owns touch scroll,
@@ -295,14 +304,14 @@ export default function RailDock({
             // (the WAAPI pulse rides on top; reduced motion → this static swap alone).
             cn("text-[11px] leading-none", !isBarHalf && "top-1")
           : cn(
-              "w-2 h-2 rounded-full bg-[var(--core)] shadow-[0_0_6px_1px_var(--core)]",
+              "w-2 h-2 rounded-full bg-[var(--primary)] shadow-[0_0_6px_1px_var(--primary)]",
               !isBarHalf && "top-1.5",
               hint
                 ? "animate-rail-hint motion-reduce:animate-none motion-reduce:opacity-90"
                 : "opacity-0", // transient: WAAPI drives it; no resting animation
             ),
       )}
-      style={glyphFlash ? { color: glyphFlash.hue ?? "var(--core)" } : undefined}
+      style={glyphFlash ? { color: glyphFlash.hue ?? "var(--primary)" } : undefined}
       aria-hidden="true"
     >
       {glyphFlash?.glyph}
@@ -337,10 +346,10 @@ export default function RailDock({
               // toggle baseline's hover/on fills (this design owns its selection language).
               "w-full h-full rounded-none! items-center justify-center gap-2 cursor-pointer",
               "bg-[rgba(12,16,32,0.35)] border border-[rgba(178,193,223,0.10)] backdrop-blur-[7px]",
-              "text-[12.5px] font-semibold tracking-[0.02em] text-[var(--muted)]",
-              "hover:bg-[rgba(12,16,32,0.35)] hover:text-[var(--muted)]",
-              "data-[state=on]:text-[var(--text)] data-[state=on]:bg-[var(--sel-bg)]",
-              "data-[state=on]:shadow-[inset_0_2px_0_var(--sel-border)] data-[state=on]:[&_svg]:text-[var(--core)]",
+              "text-[12.5px] font-semibold tracking-[0.02em] text-muted-foreground",
+              "hover:bg-[rgba(12,16,32,0.35)] hover:text-muted-foreground",
+              "data-[state=on]:text-foreground data-[state=on]:bg-[var(--sel-bg)]",
+              "data-[state=on]:shadow-[inset_0_2px_0_var(--sel-border)] data-[state=on]:[&_svg]:text-[var(--primary)]",
             )}
           >
             {side === "left" ? <Compass size={18} strokeWidth={1.75} aria-hidden="true" /> : <ListTree size={18} strokeWidth={1.75} aria-hidden="true" />}
@@ -354,7 +363,7 @@ export default function RailDock({
         <button
           className={cn(
             "fixed z-[39] top-1/2 -translate-y-1/2 w-11 min-h-[56px] hidden items-center justify-center cursor-pointer",
-            "bg-[var(--panel)] border border-[var(--panel-border)] text-[var(--text)] backdrop-blur-[14px] text-[20px] leading-none",
+            "bg-[var(--panel)] border border-border text-foreground backdrop-blur-[14px] text-[20px] leading-none",
             "min-[700px]:max-[1099px]:flex",
             side === "left" ? "left-0 rounded-r-[var(--radius)] border-l-0" : "right-0 rounded-l-[var(--radius)] border-r-0",
           )}
@@ -424,7 +433,7 @@ export default function RailDock({
               className={cn(
                 "self-center w-11 h-11 mx-0 -mt-[22px] -mb-[18px] flex items-center justify-center cursor-grab active:cursor-grabbing",
                 "p-0 border-none bg-none [-webkit-tap-highlight-color:transparent] [touch-action:none]",
-                "before:content-[''] before:w-9 before:h-1 before:rounded-[2px] before:bg-[var(--panel-border)]",
+                "before:content-[''] before:w-9 before:h-1 before:rounded-[2px] before:bg-border",
               )}
               aria-label={`Collapse ${label} panel`}
               onPointerDown={grabDown}
@@ -443,7 +452,7 @@ export default function RailDock({
             // Sheet's own chrome (label + close), ABOVE the hosted content so the ✕ never overlaps a
             // hosted card's top-right control. The close is ≥44px.
             <div className="flex items-center justify-between gap-2">
-              <SheetTitle className="m-0 text-[13px] font-semibold tracking-[0.02em] uppercase text-[var(--text)] opacity-90 [text-shadow:0_1px_2px_rgba(3,5,12,0.7)]">
+              <SheetTitle className="m-0 text-[13px] font-semibold tracking-[0.02em] uppercase text-foreground opacity-90 [text-shadow:0_1px_2px_rgba(3,5,12,0.7)]">
                 {label}
               </SheetTitle>
               {/* The sheet's × on the same ghost-Button baseline as CardHead's card close (muted,

@@ -219,28 +219,23 @@
   --core-l0: oklch(0.66 0.16 265);           /* DAG L0 blue #5b8cff */
   --core-l1: oklch(0.66 0.19 300);           /* DAG L1 violet #b06bff */
 
-  --border: rgba(90, 140, 255, 0.22);        /* matches the existing --panel-border */
+  --border: rgba(90, 140, 255, 0.22);        /* panel/hairline border (was the --panel-border alias) */
   --input: var(--border);
   --surface-muted: oklch(0.18 0.03 265);
   --secondary: var(--surface-muted);
   --secondary-foreground: var(--foreground);
 }
 
-/* ── Legacy alias + layout lane (was app/styles/00-base.css, retired in Task 10) ──
-   Names carried over from the pre-migration stylesheet, still consumed across the
-   components. The COLOUR names simply ALIAS the shadcn lane above — --primary /
-   --foreground / --muted-foreground / --border / --core-l0 are the single source of
-   truth; the aliases keep existing consumers working WITHOUT a repo-wide rename (that
-   churn is deferred — see the migration-design-concerns doc). Only --panel (glass fill)
-   has no shadcn equivalent, so it stays a literal. Layout/spacing + instrument-thread
-   tokens have no shadcn analogue and live here as literals too. */
+/* ── Structural / layout lane (was app/styles/00-base.css, retired in Task 10) ──
+   Names carried over from the pre-migration stylesheet. Layout/spacing + instrument-thread
+   tokens have no shadcn analogue and live here as literals. The old colour ALIASES
+   (--core/--text/--muted/--panel-border/--l0) onto the shadcn lane were retired in the
+   consolidation sweep — every consumer now references the shadcn lane directly
+   (--primary / --foreground / --muted-foreground / --border / --core-l0). */
 :root {
-  --core: var(--primary);              /* ≡ --primary (accent cyan) */
-  --text: var(--foreground);           /* ≡ --foreground */
-  --muted: var(--muted-foreground);    /* ≡ --muted-foreground */
-  --panel-border: var(--border);       /* ≡ --border */
-  --l0: var(--core-l0);                /* ≡ --core-l0 (DAG L0 blue) */
-  --panel: rgba(12, 16, 32, 0.72);     /* translucent glass fill — no shadcn equivalent */
+  /* --panel is the translucent glass panel fill; it has no shadcn equivalent, so it stays a
+     structural literal (NOT an alias). */
+  --panel: rgba(12, 16, 32, 0.72);
 
   /* Layout system tokens (shared by every HUD panel so they read as siblings). One
      spacing scale, one "selected" treatment; component utilities reference these. */

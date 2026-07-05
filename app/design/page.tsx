@@ -24,7 +24,8 @@ import OdometerDemo from "./OdometerDemo";
 import CardSignalsDemo from "./CardSignalsDemo";
 import EcgMark from "@/components/topbar/EcgMark";
 
-// ── Structural lane — the shadcn oklch variables (globals.css :root). One source of truth. ──
+// ── Structural lane — the shadcn oklch variables (globals.css :root). One source of truth.
+// `--panel` is the lone structural literal (translucent glass fill, no shadcn equivalent). ──
 const STRUCTURAL: { name: string; var: string }[] = [
   { name: "background", var: "--background" },
   { name: "foreground", var: "--foreground" },
@@ -34,20 +35,9 @@ const STRUCTURAL: { name: string; var: string }[] = [
   { name: "success (ready)", var: "--success" },
   { name: "core-l0 (blue)", var: "--core-l0" },
   { name: "core-l1 (violet)", var: "--core-l1" },
+  { name: "panel (glass fill)", var: "--panel" },
 ];
 
-// ── Legacy alias lane — names carried over from the pre-migration stylesheet, kept as ALIASES
-// onto the structural lane (globals.css) so existing consumers work without a repo-wide rename.
-// The swatch reads through the alias, so it must match its target exactly. --panel is the lone
-// literal (no shadcn equivalent). ──
-const LEGACY: { alias: string; maps: string }[] = [
-  { alias: "--core", maps: "--primary" },
-  { alias: "--text", maps: "--foreground" },
-  { alias: "--muted", maps: "--muted-foreground" },
-  { alias: "--panel-border", maps: "--border" },
-  { alias: "--l0", maps: "--core-l0" },
-  { alias: "--panel", maps: "literal glass fill" },
-];
 
 export default async function DesignPage() {
   // Same-origin base derived from the incoming request, not an env var — on a Vercel
@@ -72,7 +62,7 @@ export default async function DesignPage() {
       <p className="text-muted-foreground mb-8">
         Live tokens + the primitives the app actually renders — the screenshot-verified design
         reference. Styling is one stylesheet (<code className="font-mono">app/globals.css</code>):
-        Tailwind import, the two token lanes, keyframes, and a handful of{" "}
+        Tailwind import, the structural token lane, keyframes, and a handful of{" "}
         <code className="font-mono">@layer components</code> recipes.
       </p>
 
@@ -94,28 +84,6 @@ export default async function DesignPage() {
         </div>
       </section>
 
-      <section className="mb-10">
-        <h2 className="text-sm uppercase tracking-widest text-muted-foreground mb-3">
-          Legacy alias lane
-        </h2>
-        <p className="text-sm text-muted-foreground mb-3 max-w-2xl">
-          Names carried over from the retired <code className="font-mono">app/styles/00-base.css</code>.
-          Each aliases the structural lane above (single source of truth) so existing consumers keep
-          working without a repo-wide rename — a future sweep can drop them.
-        </p>
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-          {LEGACY.map((t) => (
-            <div key={t.alias} className="ig-panel p-3">
-              <div
-                className="h-10 rounded-md mb-2"
-                style={{ background: `var(${t.alias})` }}
-              />
-              <div className="text-xs font-mono">{t.alias}</div>
-              <div className="text-[10px] font-mono text-muted-foreground">→ {t.maps}</div>
-            </div>
-          ))}
-        </div>
-      </section>
 
       <section className="mb-10">
         <h2 className="text-sm uppercase tracking-widest text-muted-foreground mb-3">
@@ -207,8 +175,8 @@ export default async function DesignPage() {
           it only for the small text/icon controls that map cleanly onto a variant with today&apos;s exact
           look (hover fills overridden away, a subtle focus-visible ring kept): the card{" "}
           <code className="font-mono">×</code> close + <code className="font-mono">+/–</code> collapse
-          (CardHead, <code className="font-mono">ghost / icon-xs</code>), and the &ldquo;Show more&rdquo; /
-          &ldquo;See it in the Hypergraph →&rdquo; links (<code className="font-mono">link / xs</code>).
+          (CardHead, <code className="font-mono">ghost / icon-xs</code>), and Desc&apos;s
+          &ldquo;Show more&rdquo; link (<code className="font-mono">link / xs</code>).
           <br />
           <span className="text-muted-foreground/80">
             Deliberately NOT Buttons (bespoke instrument controls): LiveStrip bars, the country/node
@@ -300,7 +268,7 @@ export default async function DesignPage() {
               </CommandItem>
               {metas.slice(0, 4).map((m) => (
                 <CommandItem key={m.id} value={m.symbol} className="gap-2">
-                  <span className="w-2 h-2 rounded-full flex-none" style={{ background: m.hue?.oklch ?? "var(--muted)" }} />
+                  <span className="w-2 h-2 rounded-full flex-none" style={{ background: m.hue?.oklch ?? "var(--muted-foreground)" }} />
                   <span className="text-[13px] text-foreground">{m.symbol}</span>
                 </CommandItem>
               ))}
@@ -346,10 +314,20 @@ export default async function DesignPage() {
           <code className="font-mono">.ig-sheet-edge</code> / <code className="font-mono">.ig-sheet-topruler</code>{" "}
           instrument rulers. Other bespoke recipes in <code className="font-mono">@layer components</code>:{" "}
           <code className="font-mono">.odometer</code> (numeric roll), <code className="font-mono">.ecg</code>{" "}
-          (heartbeat), <code className="font-mono">.ls-bar-anim</code> (LiveStrip bars),{" "}
-          <code className="font-mono">.subject-paired</code> (hover pairing), and the{" "}
+          (heartbeat), <code className="font-mono">.ls-bar-anim</code> (LiveStrip bars), and the{" "}
           <code className="font-mono">--axis-hairlines</code> / <code className="font-mono">--thread-*</code>{" "}
           instrument-thread ruler shared by the rails and the bar-chart axis.
+          <br />
+          <span className="text-muted-foreground/80">
+            One recipe sits deliberately OUTSIDE any layer:{" "}
+            <code className="font-mono">.subject-paired</code> (the scene↔card hover pairing) is
+            UNLAYERED on purpose — inside <code className="font-mono">@layer components</code> it would
+            lose to Tailwind&apos;s utilities layer (the rows&apos;{" "}
+            <code className="font-mono">bg-transparent</code>/<code className="font-mono">border-transparent</code>)
+            and to the later <code className="font-mono">.ig-panel</code> shadow; unlayered CSS beats
+            every layer at equal specificity (see the layer-trap note in{" "}
+            <code className="font-mono">globals.css</code>).
+          </span>
         </p>
       </section>
     </main>

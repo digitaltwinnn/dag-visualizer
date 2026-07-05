@@ -348,8 +348,9 @@ function GeoLiveNode({ p }: { p: PickOf<"l0" | "l1" | "metanode"> }) {
   // so the glow lights the card's rounded edge.
   return (
     <>
-      {/* Composition as a stacked label + block (NOT inside <Row>, whose value is a <span> —
-          CompositionRows renders a <div>, so a Row would nest a block in an inline element). */}
+      {/* Composition as a stacked label + block (NOT wrapped in a label/value row whose value
+          is an inline <span> — CompositionRows renders a <div>, which can't nest in an inline
+          element). */}
       {oneNode.length > 0 && (
         <div className="my-2">
           <span className="text-[10.5px] tracking-[0.1em] uppercase text-muted-foreground">Composition</span>

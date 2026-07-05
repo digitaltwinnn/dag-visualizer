@@ -75,7 +75,7 @@ export default function AnchoredTags({
     <span className={cn("block h-1.5 rounded-[3px] bg-white/[0.06] overflow-hidden", extraClass)}>
       <span
         className="block h-full rounded-[3px] min-w-[2px]"
-        style={{ width: `${Math.max(pct(n), n > 0 ? 4 : 0)}%`, background: hue ?? "var(--muted)" }}
+        style={{ width: `${Math.max(pct(n), n > 0 ? 4 : 0)}%`, background: hue ?? "var(--muted-foreground)" }}
       />
     </span>
   );
@@ -116,7 +116,7 @@ export default function AnchoredTags({
       <div className={cn("grid grid-cols-[auto_auto_1fr_auto] items-center gap-x-2 gap-y-1.5", focus && "opacity-60")}>
         {rest.map((r) => (
           <div className="contents" key={r.id}>
-            <span className="w-2 h-2 rounded-full flex-none" style={{ background: r.hue ?? "var(--muted)" }} />
+            <span className="w-2 h-2 rounded-full flex-none" style={{ background: r.hue ?? "var(--muted-foreground)" }} />
             <span className={cn("text-[12.5px] text-foreground", !r.hue && "italic text-muted-foreground")}>{r.label}</span>
             {bar(r.n, r.hue)}
             <span className="text-[12.5px] text-foreground tabular-nums min-w-[2em] text-right">{r.n}</span>

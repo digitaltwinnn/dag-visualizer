@@ -111,7 +111,7 @@ export function metagraphById(id: string): MetagraphConfig | null {
 export function filterAccent(filter: string): string {
   const cfg = metagraphById(filter);
   if (cfg) return hex(cfg.color);
-  return "var(--core)";
+  return "var(--primary)";
 }
 
 // The publicly listed metagraphs (config). Node counts / disabled "(0)" chips return
