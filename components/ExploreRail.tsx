@@ -1,6 +1,6 @@
 "use client";
 
-import type { CSSProperties } from "react";
+import { Fragment, type CSSProperties, type ReactNode } from "react";
 import { useStore, type Mode } from "@/src/store/store";
 import { filterAccent } from "@/src/data/network";
 import GeoExplore from "@/components/GeoExplore";
@@ -8,7 +8,7 @@ import LedgerPanel from "@/components/LedgerPanel";
 import AboutView from "@/components/AboutView";
 import RailThread from "@/components/RailThread";
 import RailDock, { type TabSignal } from "@/components/RailDock";
-import { VIEW_ICONS, ABOUT_ICON } from "@/components/icons";
+import { exploreCards } from "@/components/railCards";
 import { useBreakpoint } from "@/components/useBreakpoint";
 
 // Per-view "About this view" copy — one orientation card at the top of the left rail in every
@@ -83,21 +83,30 @@ export default function ExploreRail() {
   // Theme every card's bullet to the current selection (the explore card is always
   // specific to the active filter).
   const accent = { ["--filter-accent"]: filterAccent(filter) } as CSSProperties;
+
+  // ONE source of truth for the hosted card set (railCards.ts): both the rail content AND the dock
+  // tray are derived from the same manifest, so they can't disagree about which cards this view
+  // hosts. `id` maps to the component to render; the manifest owns presence/order.
+  const manifest = exploreCards({ mode });
+  const renderCard: Record<string, ReactNode> = {
+    about: <AboutView {...ABOUT[mode]} />,
+    tool: mode === "geo" ? <GeoExplore /> : mode === "ledger" ? <LedgerPanel /> : null,
+  };
   const content = (
     <>
-      <AboutView {...ABOUT[mode]} />
-      {mode === "geo" && <GeoExplore />}
-      {mode === "ledger" && <LedgerPanel />}
+      {manifest
+        .filter((c) => c.present)
+        .map((c) => (
+          <Fragment key={c.id}>{renderCard[c.id]}</Fragment>
+        ))}
     </>
   );
-  // The dock's icon TRAY (tablet edge tab + phone dock half): the legend of what this sheet
-  // hosts — the About explainer (its own ABOUT_ICON) plus, where the view has one, the tool
-  // card under the current view's own mark. The left cards are static tools (no live updates),
-  // so no `active` highlights / `updateKey` here — the tray stays a quiet legend.
-  const tray: TabSignal[] = [
-    { id: "about", icon: ABOUT_ICON },
-    ...(mode === "geo" || mode === "ledger" ? [{ id: "tool", icon: VIEW_ICONS[mode] }] : []),
-  ];
+  // The dock's icon TRAY (tablet edge tab + phone dock half): the legend of what this sheet hosts,
+  // straight from the manifest. The left cards are static tools (constant subjectKeys, no live
+  // updates), so no `active` highlights / `updateKey` here — the tray stays a quiet legend.
+  const tray: TabSignal[] = manifest
+    .filter((c) => c.present)
+    .map((c) => ({ id: c.id, icon: c.icon }));
   if (bp === "desktop") {
     // The thread is a SIBLING of #leftcol (mirrors the right rail): the rail clips horizontally + can
     // gain an overflow-fade mask, either of which would blank a child thread. It points its ruler

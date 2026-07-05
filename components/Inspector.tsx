@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
+import { type CSSProperties, type ReactNode } from "react";
 import { cn } from "@/lib/utils";
-import { useStore, type SelSlot } from "@/src/store/store";
+import { useStore } from "@/src/store/store";
 import { filterAccent, metagraphById, CORE_HEX } from "@/src/data/network";
 import { identityHudHex } from "@/src/palette/identity";
 import { hoverKeyOf } from "@/src/data/hoverSubject";
@@ -16,7 +16,8 @@ import RailDock from "@/components/RailDock";
 import { useBreakpoint } from "@/components/useBreakpoint";
 import { PulseEdge, useEdgePulse } from "@/components/EdgePulse";
 import { StandbyHalo } from "@/components/state/StateAtoms";
-import { VIEW_ICONS } from "@/components/icons";
+import { detailsCards } from "@/components/railCards";
+import { useTrayActives } from "@/components/useTrayActives";
 import type { TabSignal } from "@/components/RailDock";
 import type { PickDescriptor } from "@/src/data/types";
 import type { Mode } from "@/src/store/store";
@@ -143,37 +144,26 @@ export default function Inspector() {
   const setPhoneSheetPx = useStore((s) => s.setPhoneSheetPx);
 
   const accent = { ["--filter-accent"]: filterAccent(filter) } as CSSProperties;
-  const isNode = inspect?.kind === "l0" || inspect?.kind === "l1" || inspect?.kind === "metanode";
 
-  // The card registry: one entry per selection slot. A slot contributes a card only while its
-  // selection is active; `selStack` decides the order.
-  const cards: Record<SelSlot, { active: boolean; pane: ReactNode }> = {
-    node: {
-      active: !!isNode,
-      // geoLive reads the node from the store; its × is CardHead's shared close like every card.
-      pane: (
-        <CardPane
-          key="node"
-          pick={{ kind: "geoLive" }}
-          eyebrow="Selected node"
-          onClose={() => setInspect(null)}
-        />
-      ),
-    },
-    snap: {
-      active: !!snap,
-      pane: snap ? (
-        <CardPane
-          key="snap"
-          pick={snap}
-          eyebrow="Selected snapshot"
-          onClose={() => setSnap(null)}
-        />
-      ) : null,
-    },
+  // ── ONE source of truth for the hosted card set (railCards.ts) ──────────────────────────────
+  // The manifest derives, from the store, the ordered list of cards this rail hosts + each card's
+  // presence and EdgePulse subject. BOTH the rendered Detail panes AND the dock tray read it, so
+  // the tray can never drift from what actually renders (the old bug: the tray drew the Context
+  // icon even at the "all" filter, where ContextCard renders nothing). The Context card itself
+  // stays ALWAYS-mounted below (via <ContextCard/>, which self-nulls on "all") so its EdgePulse
+  // survives the dossier ⇄ nothing swap; the manifest only decides its tray-icon presence.
+  const manifest = detailsCards({ mode, filter, inspect, snap, selStack });
+  const detailPane: Record<string, ReactNode> = {
+    // geoLive reads the node from the store; its × is CardHead's shared close like every card.
+    node: (
+      <CardPane key="node" pick={{ kind: "geoLive" }} eyebrow="Selected node" onClose={() => setInspect(null)} />
+    ),
+    snap: snap ? (
+      <CardPane key="snap" pick={snap} eyebrow="Selected snapshot" onClose={() => setSnap(null)} />
+    ) : null,
   };
-
-  const panes = selStack.filter((slot) => cards[slot]?.active).map((slot) => cards[slot].pane);
+  // Present Detail cards in the manifest's (recency) order — Context is rendered separately.
+  const panes = manifest.filter((c) => c.present && c.kind !== "context").map((c) => detailPane[c.id]);
   const hasDetail = panes.length > 0;
 
   // The state-aware hint (pickHintText above): normal invite, honest no-pickables variant, or
@@ -181,72 +171,26 @@ export default function Inspector() {
   const selNodes = useStore((s) => s.selNodes);
   const hintText = hasDetail ? null : pickHintText(mode, filter, selNodes.length);
 
-  // ── Dock icon TRAY (tablet/phone; user redesign 2026-07-05, supersedes the hint dot + morph) ──
+  // ── Dock icon TRAY (tablet/phone) ───────────────────────────────────────────────────────────
   // GLOBAL CONSTRAINT: nothing here ever opens the sheet — the tray is purely visual; `open` is
   // still owned by the user tapping the trigger (RailDock's own state on tablet, `store.phoneDock`
-  // on phone).
-  //
-  // `activeKinds` = which hosted cards updated while the sheet was CLOSED (unseen): that card's
-  // tray icon goes vivid/identity-hued + heartbeats until the sheet opens, which clears ALL
-  // highlights (the icons themselves stay — they're the legend of what the sheet hosts).
-  // `updateKey` bumps once per update event → RailDock replays the travelling edge pulse on the
-  // dock's outline (debounced there, so the ledger's live snapshot follow pulses at most once per
-  // sweep while the Layers icon just stays lit). Change detection mirrors the desktop cards' own
-  // `useEdgePulse` subjects: the Context dossier on `filter`, the snapshot card on `snap`, the
-  // node card on `inspect`. Several changing in one commit (e.g. clicking a hyper node sets the
-  // filter AND the node pick) highlight EACH of their icons — the tray accumulates; a pure
-  // deselect (a pick clearing) announces nothing.
-  const [activeKinds, setActiveKinds] = useState<ReadonlySet<string>>(() => new Set());
-  const [updateKey, setUpdateKey] = useState(0);
-  const dockOpen = useRef(false);
-  const handleOpenChange = (next: boolean) => {
-    dockOpen.current = next;
-    if (next) setActiveKinds(new Set());
-  };
-  const trayMounted = useRef(false);
-  const trayPrev = useRef({ inspect, snap, filter });
-  useEffect(() => {
-    const p = trayPrev.current;
-    trayPrev.current = { inspect, snap, filter };
-    if (!trayMounted.current) {
-      trayMounted.current = true;
-      return;
-    }
-    if (dockOpen.current) return; // visible updates aren't "unseen" — no highlight, no pulse
-    const hit: string[] = [];
-    if (filter !== p.filter) hit.push("context");
-    if (snap !== p.snap && snap) hit.push("snap");
-    if (
-      inspect !== p.inspect &&
-      inspect &&
-      (inspect.kind === "l0" || inspect.kind === "l1" || inspect.kind === "metanode")
-    ) {
-      hit.push("node");
-    }
-    if (!hit.length) return;
-    setActiveKinds((prev) => {
-      const next = new Set(prev);
-      for (const k of hit) next.add(k);
-      return next;
-    });
-    setUpdateKey((k) => k + 1);
-  }, [inspect, snap, filter]);
+  // on phone). `useTrayActives` (keyed to the manifest) marks a card's icon vivid/heartbeat when
+  // its subjectKey changes while the sheet is closed, and bumps `updateKey` per event → RailDock
+  // replays the travelling edge pulse. Opening clears all highlights (`onOpenChange`).
+  const { actives, updateKey, onOpenChange: onTrayOpenChange } = useTrayActives(manifest);
 
-  // The tray itself — one icon per card this sheet currently hosts, in the rail's own order:
-  // the Context dossier (always mounted) then the Detail cards as present. Hues match what the
-  // cards themselves pair with (the node's metagraph hue or core cyan; the dossier's/snapshot's
-  // filter accent).
+  // Icon per hosted card comes from the manifest; hue is the tray's own presentation: the node's
+  // metagraph hue (or core cyan), everything else the filter accent.
   const nodeHue =
     inspect?.kind === "metanode" ? (inspect.meta ? identityHudHex(inspect.meta.id) : undefined) : CORE_HEX;
-  const tray: TabSignal[] = [
-    { id: "context", icon: VIEW_ICONS.hyper, hue: filterAccent(filter), active: activeKinds.has("context") },
-    ...(cards.node.active
-      ? [{ id: "node", icon: VIEW_ICONS.geo, hue: nodeHue, active: activeKinds.has("node") }]
-      : []),
-    ...(cards.snap.active
-      ? [{ id: "snap", icon: VIEW_ICONS.ledger, hue: filterAccent(filter), active: activeKinds.has("snap") }]
-      : []),
-  ];
+  const tray: TabSignal[] = manifest
+    .filter((c) => c.present)
+    .map((c) => ({
+      id: c.id,
+      icon: c.icon,
+      hue: c.kind === "node" ? nodeHue : filterAccent(filter),
+      active: actives.has(c.id),
+    }));
 
   // Tablet: Context + Detail panes + PickHint together (`content` below), unchanged from Task 3.
   // Phone: the SAME content (Context + Detail panes + PickHint) but hosted in the "Details"
@@ -300,7 +244,7 @@ export default function Inspector() {
     // Tablet: unchanged — the right edge tab opening a right-side Sheet, independent of the
     // left "Explore" dock (both can be open at once).
     return (
-      <RailDock side="right" label="Details" style={accent} signals={tray} updateKey={updateKey} signalKey={`${mode}|${filter}`} onOpenChange={handleOpenChange}>
+      <RailDock side="right" label="Details" style={accent} signals={tray} updateKey={updateKey} signalKey={`${mode}|${filter}`} onOpenChange={onTrayOpenChange}>
         {content}
       </RailDock>
     );
@@ -323,7 +267,7 @@ export default function Inspector() {
       sheetPx={phoneSheetPx}
       onSheetPx={setPhoneSheetPx}
       onOpenChange={(next) => {
-        handleOpenChange(next);
+        onTrayOpenChange(next);
         setPhoneDock(next ? "details" : null);
       }}
     >
