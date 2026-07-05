@@ -146,6 +146,8 @@ export default function ExploreRail() {
   // open — they can't both be open at once, there's no room to stack two bottom sheets. Tapping
   // this half sets `phoneDock`, which simultaneously closes the Details dock (its own `open`
   // reads the same field); tapping it again while open collapses it (RailDock's own toggle).
+  // No `signalKey` here — the view/filter-switch pulse for the phone dock is a single full-width
+  // overlay spanning both halves (`PhoneDockSweep`, mounted once in page.tsx), not a per-half prop.
   return (
     <RailDock
       side="left"
@@ -154,7 +156,6 @@ export default function ExploreRail() {
       trigger="bottom-bar-half"
       sheetSide="bottom"
       signals={tray}
-      signalKey={`${mode}|${filter}`}
       open={phoneDock === "explore"}
       sheetPx={phoneSheetPx}
       onSheetPx={setPhoneSheetPx}

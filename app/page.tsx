@@ -7,6 +7,7 @@ import TopBar from "@/components/TopBar";
 import BottomStream from "@/components/BottomStream";
 import ExploreRail from "@/components/ExploreRail";
 import Inspector from "@/components/Inspector";
+import PhoneDockSweep from "@/components/PhoneDockSweep";
 import RailScroll from "@/components/RailScroll";
 import FollowController from "@/components/FollowController";
 import RawSnapshotBridge from "@/components/RawSnapshotBridge";
@@ -26,6 +27,7 @@ export default function Home() {
       <TopBar />
       <ExploreRail />
       <Inspector />
+      <PhoneDockSweep />
       <RailScroll />
       <BottomStream />
       <FollowController />

@@ -254,6 +254,8 @@ export default function Inspector() {
   // dock via the shared `store.phoneDock` field (see ExploreRail) — never auto-opened by a pick
   // (only the icon tray reacts to updates; `open` is 100% derived from `phoneDock`,
   // which only a tap (here), a toggle-collapse, or a dismiss (handleDismiss, below) ever writes).
+  // No `signalKey` here — the view/filter-switch pulse for the phone dock is a single full-width
+  // overlay spanning both halves (`PhoneDockSweep`, mounted once in page.tsx), not a per-half prop.
   return (
     <RailDock
       side="right"
@@ -263,7 +265,6 @@ export default function Inspector() {
       sheetSide="bottom"
       signals={tray}
       updateKey={updateKey}
-      signalKey={`${mode}|${filter}`}
       open={phoneDock === "details"}
       sheetPx={phoneSheetPx}
       onSheetPx={setPhoneSheetPx}
