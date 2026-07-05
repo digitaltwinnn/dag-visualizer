@@ -983,7 +983,10 @@ export class Globe {
     // resting a moment, then routing on to a nearby node. Many at once read as live
     // network traffic. Advanced before the glow loops (so arrival flashes land this
     // frame) and only while the globe is showing (morph past halfway).
-    if (this.arcMat && this.arcAgents && m > 0.5) {
+    // Arcs are a GEO-view visual: never step the simulation in the Snapshots view — morph is
+    // frozen there (possibly at 1, arriving from geo), so `m > 0.5` alone would keep the agents
+    // hopping and their arrival flashes would light the reused lane dots (the "red dots" bug).
+    if (this.arcMat && this.arcAgents && !this.ledger && m > 0.5) {
       let recolour = false;
       for (const ag of this.arcAgents) {
         if (ag.state === "travel") {
