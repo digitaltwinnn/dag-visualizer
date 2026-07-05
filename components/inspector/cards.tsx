@@ -15,7 +15,7 @@ import { Separator } from "@/components/ui/separator";
 import { SonarRing, NodeStars, NoSignalDot } from "@/components/state/StateAtoms";
 import { useMinHold } from "@/components/useMinHold";
 import { VIS } from "../../js/config.js";
-import { Desc, StatusMark, CompositionRows, StatusBreakdown, nodeComposition } from "./parts";
+import { Desc, StatusMark, CompositionRows, StatusBreakdown, networkKind } from "./parts";
 
 type PickOf<K extends PickDescriptor["kind"]> = Extract<PickDescriptor, { kind: K }>;
 
@@ -65,14 +65,20 @@ export function SnapshotAside({ data: d }: { data: GlobalSnapshot }) {
 // Dossier title: the pre-unification header composition (logo avatar ringed in the identity hue
 // + the NAME over the TICKER), re-homed INTO CardHead's title slot (user refinement — the head
 // unification had split the avatar/ticker off into a body row). The name inherits CardHead's one
-// 15px/semibold title standard; the ticker rides under it at its original 11px/hue. Rolls as a
-// whole via InspectorCard's `titleKey` (keyed on the name, synced with the edge pulse).
+// 15px/semibold title standard; the ticker rides under it at its original 11px/hue — the SAME
+// treatment for every subject, DAG included (the ticker used to be metagraph-only). Right behind
+// the ticker, subtly (muted, smaller — quieter than the ticker), rides the network-type
+// descriptor ("data metagraph" / "currency metagraph" / "data and currency metagraph" /
+// "hypergraph" for DAG) — reusing the same composition read the old standalone body line derived
+// from (`networkKind`, in ./parts), just folded into the ticker row instead of its own line.
+// Rolls as a whole via InspectorCard's `titleKey` (keyed on the name, synced with the edge pulse).
 export function MetaTitle({ cfg }: { cfg: MetaCfg }) {
   const metaList = useStore((s) => s.metaList);
   const mg = metaList.find((x) => x.id === cfg.id) || null;
   const hue = hex(cfg.color);
   const iconUrl = mg?.iconUrl || cfg.iconUrl; // live metagraph icon, or the core's bundled logo
   const monogram = (cfg.ticker || cfg.name).slice(0, 3).toUpperCase();
+  const kind = networkKind(cfg.id, mg?.nodes || []);
   return (
     <span className="inline-flex items-center gap-2.5 min-w-0">
       {/* The logo shows as a clean circular mark — no squared tile (brand icons are round). */}
@@ -82,9 +88,10 @@ export function MetaTitle({ cfg }: { cfg: MetaCfg }) {
       </Avatar>
       <span className="flex flex-col gap-px min-w-0">
         <span className="leading-[1.1]">{cfg.name}</span>
-        {cfg.id !== "dag" && (
-          <span className="text-[11px] font-semibold tracking-[0.02em]" style={{ color: hue }}>{cfg.ticker}</span>
-        )}
+        <span className="inline-flex items-baseline gap-1.5 min-w-0">
+          <span className="text-[11px] font-semibold tracking-[0.02em] flex-none" style={{ color: hue }}>{cfg.ticker}</span>
+          <span className="text-[10px] text-muted-foreground truncate">{kind}</span>
+        </span>
       </span>
     </span>
   );
@@ -240,10 +247,6 @@ export function MetaCard({ cfg }: { cfg: MetaCfg }) {
   const hue = hex(cfg.color);
   const blurb = mg?.description || cfg.blurb;
   const site = mg?.siteUrl;
-  // A metagraph with no currency-L1 has a symbol but no real token — worth noting. Token
-  // metagraphs (and the DAG core) already show their ticker in the header, so a foot row
-  // repeating it (a redundant "DAG"/"DOR") is dropped.
-  const isDataMeta = cfg.id !== "dag" && !nodeComposition(nodes).hasCurrency;
   // Hover pairing (synced 3D hub glow) lives on the OUTER pane (ContextCard's #metapane), not here.
   // The full identity header (avatar + name + ticker) lives in the card HEAD now (MetaTitle via
   // CardHead's title slot, rolled via titleKey) — the body starts at the description.
@@ -261,7 +264,6 @@ export function MetaCard({ cfg }: { cfg: MetaCfg }) {
         </div>
       )}
       <div className="flex flex-col gap-1 mt-3">
-        {isDataMeta && <span className="text-[12px] text-muted-foreground">data metagraph · no token</span>}
         {site && (
           // Metagraph site link, sitting just under the description. A subtle inline link with a
           // trailing ↗, de-emphasised so it doesn't compete with the node-fabric table above.

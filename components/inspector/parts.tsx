@@ -143,6 +143,19 @@ export function nodeComposition(nodes: NodeInfo[]): Composition {
   return { present, hybrid, dedBy, parts, total, hasCurrency: present.includes("cl1") };
 }
 
+// The network-type descriptor for the dossier ticker row (subtle, behind the ticker) — derived
+// from the SAME composition read as the old "data metagraph · no token" body line (reused, not
+// re-derived): a metagraph is a "data"/"currency"/"data and currency" metagraph by whether it
+// runs dL1/cL1 nodes; the DAG core is the one exception ("hypergraph", not a metagraph at all).
+export function networkKind(id: string, nodes: NodeInfo[]): string {
+  if (id === "dag") return "hypergraph";
+  const { present, hasCurrency } = nodeComposition(nodes);
+  const hasData = present.includes("dl1");
+  if (hasCurrency && hasData) return "data and currency metagraph";
+  if (hasCurrency) return "currency metagraph";
+  return "data metagraph";
+}
+
 // The layer(s) a node runs, as small squared tags (L0 / cL1 / dL1). One node can run
 // several — a hybrid gets a tag each — so it's always the role *set*, never a single label.
 // Shared by the metagraph node-fabric and the geo node browser so they read identically.
