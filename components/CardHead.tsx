@@ -100,7 +100,7 @@ export default function CardHead({
         <div className="flex items-start justify-between gap-2 py-[var(--panel-pad-y)] px-[var(--panel-pad-x)]">
           <div className="flex flex-col gap-[3px] min-w-0">
             {eyebrow && <span className={cn("block", eyebrowClass)}>{eyebrow}</span>}
-            <h2 className={cn(TITLE, "inline-flex items-center gap-2 min-w-0 before:content-[''] before:flex-none before:w-[9px] before:h-[9px] before:rounded-full before:bg-[var(--filter-accent,var(--accent))]")}>
+            <h2 className={cn(TITLE, "inline-flex items-center gap-2 min-w-0 before:content-[''] before:flex-none before:w-[9px] before:h-[9px] before:rounded-full before:bg-[var(--filter-accent,var(--accent))] before:animate-dot-beat motion-reduce:before:animate-none")}>
               {rolled}
             </h2>
           </div>

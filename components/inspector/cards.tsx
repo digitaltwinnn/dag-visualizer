@@ -54,7 +54,7 @@ export function SnapshotAside({ data: d }: { data: GlobalSnapshot }) {
         <><NoSignalDot /> no signal</>
       ) : isLive ? (
         <>
-          <span className="w-2 h-2 rounded-full bg-primary shadow-[0_0_0_3px_color-mix(in_oklch,var(--primary)_30%,transparent)] animate-breathe motion-reduce:animate-none" />
+          <span className="w-2 h-2 rounded-full bg-primary shadow-[0_0_0_3px_color-mix(in_oklch,var(--primary)_30%,transparent)] animate-dot-beat motion-reduce:animate-none" />
           {" "}live now
         </>
       ) : (
