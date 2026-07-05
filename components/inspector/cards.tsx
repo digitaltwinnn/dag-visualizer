@@ -90,7 +90,7 @@ export function MetaTitle({ cfg }: { cfg: MetaCfg }) {
         <span className="leading-[1.1]">{cfg.name}</span>
         <span className="inline-flex items-baseline gap-1.5 min-w-0">
           <span className="text-[11px] font-semibold tracking-[0.02em] flex-none" style={{ color: hue }}>{cfg.ticker}</span>
-          <span className="text-[10px] text-muted-foreground truncate">{kind}</span>
+          <span className="text-[10px] font-normal text-muted-foreground truncate">{kind}</span>
         </span>
       </span>
     </span>
