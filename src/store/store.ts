@@ -99,6 +99,11 @@ interface AppState {
   // (Outside-tap does NOT dismiss it — `onInteractOutside` is `preventDefault`-blocked so the
   // scene/other dock stays interactive underneath.) Unused on tablet/desktop.
   phoneDock: "explore" | "details" | null;
+  // PHONE ONLY: whether the top bar's vitals row is expanded (the bar grows downward by one
+  // full-width row showing the active view's vitals). A USER CHOICE that persists across view
+  // switches (the row's CONTENT swaps per view; only the user's toggle opens/closes it) —
+  // session-only, like `phoneDock` (no localStorage). Unused on tablet/desktop (vitals inline).
+  phoneVitals: boolean;
 
   setLive: (live: boolean, lastGoodAt?: number) => void;
   setEngineReady: (v: boolean) => void;
@@ -123,6 +128,7 @@ interface AppState {
   setSelNodes: (nodes: NodeRow[]) => void;
   setSnapshotExact: (data: SnapshotExact) => void;
   setPhoneDock: (dock: "explore" | "details" | null) => void;
+  setPhoneVitals: (open: boolean) => void;
 }
 
 // Keep the exact-snapshot cache bounded (one small object per ordinal); drop the oldest.
@@ -154,6 +160,7 @@ export const useStore = create<AppState>((set) => ({
   selNodes: [],
   snapshotExact: {},
   phoneDock: null,
+  phoneVitals: false,
 
   setLive: (live, lastGoodAt) => set((s) => ({ live, lastGoodAt: lastGoodAt ?? s.lastGoodAt })),
   setEngineReady: (engineReady) => set({ engineReady }),
@@ -193,4 +200,5 @@ export const useStore = create<AppState>((set) => ({
       return { snapshotExact: next };
     }),
   setPhoneDock: (phoneDock) => set({ phoneDock }),
+  setPhoneVitals: (phoneVitals) => set({ phoneVitals }),
 }));

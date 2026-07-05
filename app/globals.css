@@ -247,7 +247,8 @@
   --panel-pad-x: 16px;     /* horizontal padding inside a panel header/section */
   --panel-pad-y: 12px;     /* vertical   padding inside a panel header/section */
   --rail-gap: 12px;        /* gap between stacked panels in a column */
-  --rail-top: 103px;       /* top of BOTH side rails — clears the banner + command bar */
+  --rail-top: 115px;       /* top of BOTH side rails — clears the banner + command bar, plus a
+                              comfortable breather under the bar (user refinement 2026-07-05) */
   --rail-w: 264px;         /* left control rail width */
   --detail-w: 320px;       /* right details rail width */
   --sel-bg: rgba(42, 245, 255, 0.12);   /* selected/active fill, reused everywhere */

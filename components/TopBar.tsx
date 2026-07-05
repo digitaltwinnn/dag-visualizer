@@ -1,11 +1,12 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 import { useStore } from "@/src/store/store";
 import { metagraphById } from "@/src/data/network";
 import { hex } from "@/src/util/format";
 import { cn } from "@/lib/utils";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 import Vitals, { VitalsCluster, VitalsToggle } from "@/components/topbar/Vitals";
 import FilterPicker from "@/components/topbar/FilterPicker";
 import EcgMark from "@/components/topbar/EcgMark";
@@ -35,91 +36,34 @@ export default function TopBar() {
   const mode = useStore((s) => s.mode);
   const setMode = useStore((s) => s.setMode);
 
+  // The filter picker's open state — Radix Popover owns anchoring (under the trigger, +6px),
+  // outside-click and Escape now; this is just the controlled flag.
   const [open, setOpen] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
-  const filterBtnRef = useRef<HTMLButtonElement>(null);
-  const [pop, setPop] = useState<{ left: number; top: number } | null>(null);
 
   const bp = useBreakpoint();
-  const [vitalsOpen, setVitalsOpen] = useState(false);
-  const vitalsBtnRef = useRef<HTMLButtonElement>(null);
-  const [vitalsPop, setVitalsPop] = useState<{ right: number; top: number } | null>(null);
-
-  useEffect(() => {
-    if (!open) return;
-    // Anchor the floating picker under the filter button, just below the bar. Measured so it
-    // never depends on the bar's full width (the picker is a compact popover, not a bar expansion).
-    // DETACHED on purpose (user decision 2026-07-04): an anchored "drawer" variant (top edge
-    // meeting the bar + seam ruler) was tried and rejected — keep the 6px gap + its own surface.
-    const bar = document.getElementById("topbar");
-    const btn = filterBtnRef.current;
-    if (bar && btn) {
-      const br = bar.getBoundingClientRect();
-      const fr = btn.getBoundingClientRect();
-      setPop({ left: Math.round(fr.left), top: Math.round(br.bottom + 6) });
-    }
-    const onDown = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
-    };
-    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") setOpen(false); };
-    document.addEventListener("mousedown", onDown);
-    document.addEventListener("keydown", onKey);
-    return () => {
-      document.removeEventListener("mousedown", onDown);
-      document.removeEventListener("keydown", onKey);
-    };
-  }, [open]);
-
-  // Same popover pattern as the filter picker: measured + rendered OUTSIDE #topbar so its
-  // `overflow: hidden` (and the containing block backdrop-filter creates) can't clip it.
-  useEffect(() => {
-    if (!vitalsOpen) return;
-    const bar = document.getElementById("topbar");
-    const btn = vitalsBtnRef.current;
-    if (bar && btn) {
-      const br = bar.getBoundingClientRect();
-      const fr = btn.getBoundingClientRect();
-      setVitalsPop({ right: Math.round(window.innerWidth - fr.right), top: Math.round(br.bottom + 6) });
-    }
-    const onDown = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) setVitalsOpen(false);
-    };
-    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") setVitalsOpen(false); };
-    document.addEventListener("mousedown", onDown);
-    document.addEventListener("keydown", onKey);
-    return () => {
-      document.removeEventListener("mousedown", onDown);
-      document.removeEventListener("keydown", onKey);
-    };
-  }, [vitalsOpen]);
-
-  // Vitals aren't shown inline on phone (no room) — closing the toggle when the breakpoint
-  // changes away from phone avoids a stray open popover if the viewport is resized.
-  useEffect(() => {
-    if (bp !== "phone") setVitalsOpen(false);
-  }, [bp]);
+  // PHONE: whether the bar's vitals ROW is expanded (the bar grows downward — see below).
+  // Store-held (session) because it's a user choice that persists across view switches.
+  const phoneVitals = useStore((s) => s.phoneVitals);
+  const setPhoneVitals = useStore((s) => s.setPhoneVitals);
 
   const face = filterFace(filter);
 
   return (
-    <div ref={ref}>
+    <div>
       {/* Fixed wrapper = the bar + the hanging view caption below it. pointer-events-none so the
           caption strip under the bar doesn't block clicks on the scene; the bar itself restores
-          pointer-events-auto. */}
-      <div className="fixed top-[39px] inset-x-4 z-40 pointer-events-none">
+          pointer-events-auto. On desktop the bar's edges align with the rail columns (26px, the
+          rails' outer margin since the mirrored threads landed); smaller breakpoints keep 16px. */}
+      <div className="fixed top-[39px] inset-x-4 min-[1100px]:inset-x-[26px] z-40 pointer-events-none">
       <div
         id="topbar"
         className={cn(
+          // No resting spine — the absolute rule (user decision 2026-07-05): the bar's identity
+          // cue is the ECG mark, so the old left-edge cyan→blue gradient pseudo is gone.
           "relative flex flex-col overflow-hidden pointer-events-auto",
           "border border-border rounded-lg backdrop-blur-md",
           "bg-[linear-gradient(180deg,rgba(20,26,46,0.82),rgba(10,14,28,0.76))]",
           "shadow-[inset_0_1px_0_rgba(255,255,255,0.05),0_8px_30px_rgba(0,0,0,0.35)]",
-          // Structural spine — cyan → blue, ALWAYS this gradient. Signals "this is navigation
-          // chrome", never the selected network's identity colour (only the filter dot below
-          // carries identity hue).
-          "before:content-[''] before:absolute before:left-0 before:top-2.5 before:bottom-2.5",
-          "before:w-0.5 before:rounded-full before:opacity-85",
-          "before:bg-gradient-to-b before:from-primary before:to-core-l0",
         )}
       >
       <div
@@ -140,27 +84,48 @@ export default function TopBar() {
         </div>
         <span className="w-px self-stretch bg-border my-1 max-[820px]:hidden" />
 
-        {/* Filter (toned, de-nested) */}
-        <button
-          ref={filterBtnRef}
-          className={cn(
-            "flex items-center gap-[7px] bg-transparent border-0 cursor-pointer py-1.5 px-2 rounded-[8px]",
-            "hover:bg-[rgba(90,140,255,0.10)]",
-            open && "bg-[rgba(90,140,255,0.10)]",
-            "max-[1099px]:min-h-11",
-            "max-[699px]:p-1.5 max-[699px]:gap-[5px]",
-          )}
-          aria-expanded={open}
-          onClick={() => { setOpen((o) => !o); setVitalsOpen(false); }}
-        >
-          <span className="text-[10px] tracking-[0.12em] uppercase text-muted-foreground max-[940px]:hidden">Filter</span>
-          <span
-            className="w-[9px] h-[9px] rounded-full flex-none animate-dot-beat motion-reduce:animate-none"
-            style={{ background: face.dot }}
-          />
-          <span className="text-[13px] text-foreground">{face.label}</span>
-          <span className="text-[9px] text-muted-foreground">{open ? "▴" : "▾"}</span>
-        </button>
+        {/* Filter (toned, de-nested) — the trigger of the stock Popover below. Radix anchors the
+            picker under this button; the visual face is unchanged. */}
+        <Popover open={open} onOpenChange={setOpen}>
+          <PopoverTrigger
+            className={cn(
+              "flex items-center gap-[7px] bg-transparent border-0 cursor-pointer py-1.5 px-2 rounded-[8px]",
+              "hover:bg-[rgba(90,140,255,0.10)]",
+              open && "bg-[rgba(90,140,255,0.10)]",
+              "max-[1099px]:min-h-11",
+              "max-[699px]:p-1.5 max-[699px]:gap-[5px]",
+            )}
+          >
+            <span className="text-[10px] tracking-[0.12em] uppercase text-muted-foreground max-[940px]:hidden">Filter</span>
+            <span
+              className="w-[9px] h-[9px] rounded-full flex-none animate-dot-beat motion-reduce:animate-none"
+              style={{ background: face.dot }}
+            />
+            <span className="text-[13px] text-foreground">{face.label}</span>
+            <span className="text-[9px] text-muted-foreground">{open ? "▴" : "▾"}</span>
+          </PopoverTrigger>
+          {/* The picker content — a compact DETACHED popover under the filter button (user
+              decision 2026-07-04: 6px gap + its own surface, NOT a bar-expansion drawer; that
+              variant was tried and rejected). Same glass recipe as before, now on the stock
+              primitive: Radix owns the anchoring (side=bottom/align=start ≈ the old measured
+              left-aligned +6px), outside-click, Escape, and focus (it moves focus into the
+              content, which lands on the cmdk input — a strict upgrade over the old container,
+              which left focus on the button; no fight observed). `avoidCollisions` +
+              `collisionPadding` replace the old phone-only centering override (the panel just
+              shifts to fit narrow viewports); width caps to the viewport on phone. */}
+          <PopoverContent
+            align="start"
+            sideOffset={6}
+            collisionPadding={12}
+            className={cn(
+              "w-[372px] max-[699px]:w-[min(372px,calc(100vw-24px))] p-1.5 border border-border rounded-lg backdrop-blur-[14px]",
+              "bg-[linear-gradient(180deg,rgba(20,26,46,0.96),rgba(10,14,28,0.94))]",
+              "shadow-[0_14px_40px_-10px_rgba(0,0,0,0.6)]",
+            )}
+          >
+            <FilterPicker onPick={() => setOpen(false)} />
+          </PopoverContent>
+        </Popover>
 
         <div className="flex-1" />
 
@@ -209,14 +174,36 @@ export default function TopBar() {
         <div className="flex-1" />
         <span className="w-px self-stretch bg-border my-1 max-[820px]:hidden" />
 
-        {/* Vitals — inline on tablet/desktop; a toggle button on phone (popover rendered
-            below, outside #topbar). */}
+        {/* Vitals — inline on tablet/desktop; a toggle button on phone that expands the bar's
+            own vitals ROW below (the old floating popover read as an afterthought). */}
         <Vitals />
         {bp === "phone" && (
-          <VitalsToggle ref={vitalsBtnRef} open={vitalsOpen} onClick={() => { setVitalsOpen((o) => !o); setOpen(false); }} />
+          <VitalsToggle open={phoneVitals} onClick={() => setPhoneVitals(!phoneVitals)} />
         )}
       </div>
 
+      {/* PHONE vitals row — the bar GROWS DOWNWARD by one full-width row on its own surface,
+          showing the active view's vitals horizontally in the same key/value language as
+          desktop (`VitalsCluster`, whose content swaps per view). Open/closed is a USER CHOICE
+          persisted in the store (`phoneVitals`) — it survives view switches until explicitly
+          collapsed for scene space. Calm grid-rows height transition (~0.25s; reduced motion →
+          instant). The below-bar view caption is a flow sibling of the bar, so it rides down
+          with the expansion automatically. */}
+      {bp === "phone" && (
+        <div
+          className={cn(
+            "grid transition-[grid-template-rows] duration-250 ease-out motion-reduce:transition-none",
+            phoneVitals ? "grid-rows-[1fr]" : "grid-rows-[0fr]",
+          )}
+          aria-hidden={!phoneVitals}
+        >
+          <div className="overflow-hidden min-h-0">
+            <div className="flex items-center justify-center gap-2 mx-2 px-2 pb-2 pt-1.5 border-t border-border/60">
+              <VitalsCluster align="center" />
+            </div>
+          </div>
+        </div>
+      )}
       </div>
 
       {/* Selected-view label — only on the icon-only breakpoints (<1100px, where the switch
@@ -233,43 +220,6 @@ export default function TopBar() {
         </span>
       </div>
       </div>
-
-      {/* Floating vitals popover (phone only) — same pattern as the filter picker: measured
-          under its toggle button, rendered outside #topbar so overflow/backdrop-filter can't
-          clip it. Reduced-motion: this is a plain conditional mount, no animated reveal. */}
-      {vitalsOpen && vitalsPop && (
-        <div
-          className={cn(
-            "fixed z-[41] py-2.5 px-3 border border-border rounded-lg backdrop-blur-[14px]",
-            "bg-[linear-gradient(180deg,rgba(20,26,46,0.96),rgba(10,14,28,0.94))]",
-            "shadow-[0_14px_40px_-10px_rgba(0,0,0,0.6)]",
-          )}
-          style={{ right: vitalsPop.right, top: vitalsPop.top }}
-        >
-          <VitalsCluster vertical />
-        </div>
-      )}
-
-      {/* Floating filter picker — a compact popover anchored under the filter button (NOT a
-          full-width expansion of the bar). Lives outside #topbar so the bar's `overflow: hidden`
-          can't clip it; still inside the outer ref so an outside-click closes it. */}
-      {open && pop && (
-        <div
-          className={cn(
-            "fixed z-[41] w-[372px] p-1.5 border border-border rounded-lg backdrop-blur-[14px]",
-            "bg-[linear-gradient(180deg,rgba(20,26,46,0.96),rgba(10,14,28,0.94))]",
-            "shadow-[0_14px_40px_-10px_rgba(0,0,0,0.6)]",
-            // Phone: the JS anchors the popover at the filter button's left edge, but a ~372px
-            // panel hangs off toward the right on a ~375px screen. Center it and fit the width
-            // (overrides the inline `left`; the inline `top` — just below the bar — is kept).
-            "max-[699px]:!left-1/2 max-[699px]:right-auto max-[699px]:-translate-x-1/2",
-            "max-[699px]:w-[min(372px,calc(100vw-24px))]",
-          )}
-          style={{ left: pop.left, top: pop.top }}
-        >
-          <FilterPicker onPick={() => setOpen(false)} />
-        </div>
-      )}
     </div>
   );
 }

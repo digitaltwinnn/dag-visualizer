@@ -46,4 +46,6 @@ The post-migration design session runs **component by component, against the REA
 ## Deferred by user (2026-07-04, revisit later)
 
 - Tablet signal-chip glyphs on the rail-tab hint dot (◆ dossier / ◍ node / ▦ snapshot, identity-hued, morph-pulse-settle) — proposed, not yet agreed.
+  - ✅ **RESOLVED (2026-07-05):** user-approved and shipped — the Details tab/dock-half hint dot briefly morphs into the updating card's type glyph, identity-tinted, one calm pulse, settles back (~2s; reduced motion = static swap). `RailDock` `pulseGlyph`/`pulseHue` + Inspector's kind→glyph mapping.
 - Top bar + filter popover resting spine: currently spineless like all cards ("spineless at rest everywhere"); decide whether the command bar deserves an exemption.
+  - ✅ **RESOLVED (2026-07-05, user decision):** command bar stays spineless — no resting spines anywhere is the absolute rule; the bar's identity cue is the ECG mark.
