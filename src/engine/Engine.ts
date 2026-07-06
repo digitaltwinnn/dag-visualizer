@@ -11,7 +11,7 @@ import { Layers } from "../../js/layers.js";
 import { Globe } from "../../js/globe.js";
 import { Ledger } from "../../js/ledger.js";
 import { loadGeoCache, resolveMissing } from "../../js/geo.js";
-import { METAGRAPHS } from "../../js/config.js";
+import { METAGRAPHS } from "@/src/engine/config";
 import type { GlobalSnapshot, PickDescriptor } from "@/src/data/types";
 import type {
   ClusterNode,

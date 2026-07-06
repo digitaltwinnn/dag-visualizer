@@ -5,7 +5,7 @@ import type { Anchor, GlobalSnapshot } from "@/src/data/types";
 import { NetworkData, shortHash as rawShortHash } from "../../js/api.js";
 
 export const shortHash = rawShortHash as (h: string) => string;
-import { METAGRAPHS, COLORS as RAW_COLORS, DEFAULT_META_COLOR as RAW_DEFAULT_META } from "../../js/config.js";
+import { METAGRAPHS, COLORS as RAW_COLORS, DEFAULT_META_COLOR as RAW_DEFAULT_META } from "@/src/engine/config";
 import { hex } from "@/src/util/format";
 import { identityHudNumber } from "@/src/palette/identity";
 
