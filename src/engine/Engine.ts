@@ -9,7 +9,8 @@ import { HyperView, type MetaHubRec } from "./scene/views/HyperView";
 import { Globe } from "./scene/Globe";
 import { LedgerView } from "./scene/views/LedgerView";
 import { loadGeoCache, resolveMissing } from "@/src/data/geoResolve";
-import { METAGRAPHS } from "@/src/engine/config";
+import { METAGRAPHS, COLORS } from "@/src/engine/config";
+import { readSceneColors, type SceneColors } from "./sceneColors";
 import { VIEW_POLICIES } from "./domain/viewPolicy";
 import { FOCI, hubFraming, geoFraming, easeInOutQuad, type CameraFraming } from "./domain/cameraRig";
 import type { GlobalSnapshot, PickDescriptor } from "@/src/data/types";
@@ -39,6 +40,7 @@ const resolveGeo = resolveMissing;
 // main.js's render loop + ui.js's camera focus, decoupled from any DOM/panels.
 export class Engine {
   private ctx: SceneCtx;
+  private colors: SceneColors; // the structural palette, read from the CSS tokens at construction
   private layers: HyperView;
   private globe: Globe;
   private ledger: LedgerView;
@@ -97,15 +99,35 @@ export class Engine {
   constructor(canvas: HTMLCanvasElement, onReady?: () => void) {
     this.canvas = canvas;
     this._onReady = onReady;
-    this.ctx = createScene(canvas);
+    // Read the structural palette from the CSS design tokens (app/globals.css) — the single source
+    // of truth. Every scene module below is fed these; none hardcodes a structural colour. In dev,
+    // warn if config.COLORS (the static mirror the non-DOM data/palette layer needs) drifts from the
+    // live tokens, so the two can't silently diverge.
+    const colors = readSceneColors();
+    this.colors = colors;
+    if (process.env.NODE_ENV === "development") {
+      // Tolerant compare (±2 per channel): oklch→sRGB resolution rounds, so only a genuine token
+      // change (a different colour) should warn — not a 1-bit rounding wobble.
+      const near = (a: number, b: number) =>
+        Math.abs(((a >> 16) & 255) - ((b >> 16) & 255)) <= 2 &&
+        Math.abs(((a >> 8) & 255) - ((b >> 8) & 255)) <= 2 &&
+        Math.abs((a & 255) - (b & 255)) <= 2;
+      const drift = ([["core", COLORS.core, colors.core], ["l0", COLORS.l0, colors.coreL0],
+        ["l1", COLORS.l1, colors.coreL1], ["bg", COLORS.bg, colors.bg]] as const)
+        .filter(([, a, b]) => !near(a, b)).map(([k]) => k);
+      if (drift.length) console.warn(
+        `[sceneColors] config.COLORS drifts from globals.css tokens: ${drift.join(", ")} — update config.ts to match.`,
+      );
+    }
+    this.ctx = createScene(canvas, colors);
     // HyperView builds all its hubs synchronously from config.METAGRAPHS inside its
     // constructor (before any API data exists), so the identity scene-color map has to be
     // handed in at construction — passing it as a 2nd ctor arg (read by _buildMetagraphs) means
     // the hubs are born in the identity color with no recolor pass and no first-paint flash.
     // HyperView only ever has these 10 config hubs, so this map never needs updating.
-    this.layers = new HyperView(this.ctx.scene, sceneColorsFor(METAGRAPHS.map((m) => m.id)));
-    this.globe = new Globe(this.ctx.scene, this.layers, this.ctx.camera);
-    this.ledger = new LedgerView(this.ctx.scene);
+    this.layers = new HyperView(this.ctx.scene, colors, sceneColorsFor(METAGRAPHS.map((m) => m.id)));
+    this.globe = new Globe(this.ctx.scene, this.layers, this.ctx.camera, colors);
+    this.ledger = new LedgerView(this.ctx.scene, colors);
     // The ledger colours its lane tiles / anchor rings / links / pulses per metagraph — feed it the
     // same identity SCENE map so those match the hubs/nodes (config-ids known synchronously; the
     // live set incl. new metagraphs is refreshed in refreshMeta alongside globe). "dag" is included
@@ -344,7 +366,7 @@ export class Engine {
     // base FogExp2 (tuned for hyper/geo) on every other view.
     if (!this._ledgerFog) {
       this._baseFog = this.ctx.scene.fog;
-      this._ledgerFog = new THREE.Fog(this._baseFog ? this._baseFog.color.getHex() : 0x05060e, 46, 70);
+      this._ledgerFog = new THREE.Fog(this._baseFog ? this._baseFog.color.getHex() : this.colors.bg, 46, 70);
     }
     this.ctx.scene.fog = policy.fog === "ledgerLinear" ? this._ledgerFog : this._baseFog;
     // Snapshots view reuses the SAME hub/node meshes, laid out into planar rows. Toggle that

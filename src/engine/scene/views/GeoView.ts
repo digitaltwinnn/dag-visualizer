@@ -1,6 +1,5 @@
 import * as THREE from "three";
 import { feature } from "topojson-client";
-import { COLORS } from "../../config";
 import { R, LAND_H, latLonToVec3 } from "../../domain/geoMath";
 
 // Builds the geo globe SURFACE — the body sphere, graticule, atmosphere rim, and the raised
@@ -24,6 +23,7 @@ interface GeoFadeEntry {
 export interface GeoViewHost {
   group: THREE.Group;
   geoFades: GeoFadeEntry[];
+  geoColor: number; // the structural accent (--primary), fed from the Engine — grid + graticule hue
   _edgeColor: THREE.Color;
   landWallUniforms?: {
     uColor: { value: THREE.Color };
@@ -56,8 +56,9 @@ function buildGraticule(globe: GeoViewHost) {
     for (let lat = -88; lat < 88; lat += 4)
       pts.push(latLonToVec3(lat, lon, R + 0.02), latLonToVec3(lat + 4, lon, R + 0.02));
   const geo = new THREE.BufferGeometry().setFromPoints(pts);
-  const mat = new THREE.LineBasicMaterial({ color: 0x1d4a66, transparent: true, opacity: 0 });
-  globe.geoFades.push({ mat, base: 0.45 }); // the sea graticule the user likes — a bit brighter/clearer
+  // The sea graticule: the accent hue kept calm by its low fade opacity (0.45), not a bespoke tone.
+  const mat = new THREE.LineBasicMaterial({ color: globe.geoColor, transparent: true, opacity: 0 });
+  globe.geoFades.push({ mat, base: 0.45 });
   globe.group.add(new THREE.LineSegments(geo, mat));
 }
 
@@ -305,21 +306,20 @@ async function buildLand(globe: GeoViewHost) {
     });
     globe.group.add(new THREE.Mesh(wallGeo, wallMat));
 
-    // HOLOGRAPHIC LAND. The surface is the geo view's "ledger pane": a faint, CALM structural
-    // cyan-glass skin (same muted-teal family as the Snapshots floors — low luminance, low
-    // saturation, one hue temperature) that holds the brighter data layers above it (nodes,
-    // heat rings, arcs) and lets the coastal walls be the star. It's a plain sphere at the
-    // wall-top radius wearing the land texture ADDITIVELY: sea texels are pure black (they add
-    // nothing and simply don't exist on screen), land carries the soft glass glow + 3° grid in
-    // luminance, and the HUE rides the material colour (COLORS.geoGrid ×1.4 — kept low so the
-    // grid stays a calm wash, not neon). No lighting model — the hologram must read identically
-    // on both hemispheres (MeshBasicMaterial); no depthWrite (additive light occludes nothing);
-    // FrontSide so the far hemisphere is culled and the hologram stays readable (walls +
-    // graticule still give the far side its faint see-through presence). Static — reduced-motion safe.
+    // HOLOGRAPHIC LAND. The surface is the geo view's "ledger pane": a faint, CALM structural skin
+    // in the SAME accent hue as the ledger tiles (globe.geoColor = --primary), so the two views match
+    // by construction — calm comes from low brightness, not a bespoke tone. It's a plain sphere at the
+    // wall-top radius wearing the land texture ADDITIVELY: sea texels are pure black (they add nothing
+    // and simply don't exist on screen), land carries the soft glass glow + 3° grid in luminance, and
+    // the HUE rides the material colour, kept dim (×1.0) so the grid stays a calm wash, not neon. No
+    // lighting model — the hologram must read identically on both hemispheres (MeshBasicMaterial); no
+    // depthWrite (additive light occludes nothing); FrontSide so the far hemisphere is culled and the
+    // hologram stays readable (walls + graticule still give the far side its faint see-through
+    // presence). Static — reduced-motion safe.
     const landTex = makeLandTexture(land.features as LandFeature[]);
     const landMat = new THREE.MeshBasicMaterial({
       map: landTex,
-      color: new THREE.Color(COLORS.geoGrid).multiplyScalar(1.1),
+      color: new THREE.Color(globe.geoColor),
       blending: THREE.AdditiveBlending, depthWrite: false,
       transparent: true, opacity: 0, side: THREE.FrontSide,
     });

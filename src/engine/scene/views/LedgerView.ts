@@ -27,7 +27,8 @@
 // this view owns the continuous interpolation toward each block's resting slot.
 
 import * as THREE from "three";
-import { COLORS, LEDGER, METAGRAPHS, ledgerSite, clusterRadius } from "../../config";
+import { LEDGER, METAGRAPHS, ledgerSite, clusterRadius } from "../../config";
+import type { SceneColors } from "../../sceneColors";
 import { LedgerModel, SLOT_SP, slotFade, curvePoint } from "../../domain/ledgerModel";
 import type { GlobalSnapshot, Anchor, PickDescriptor } from "@/src/data/types";
 
@@ -67,12 +68,13 @@ const _col = new THREE.Color();
 const _p = new THREE.Vector3();
 const _q = new THREE.Vector3(); // scratch for link curve points
 const _gx = new Map<number, number>(); // reused per-frame: slot → global block X
-// Quiet neutral the whole row (tiles + links) fades TO as it trails into the background — a deeply
-// toned-down muted CYAN (the layer/global tone, not a grey). The metagraph trail mesh is ADDITIVE, so
-// this low magnitude also reads as semi-transparent over the dark background. Metagraph colour is kept
-// only at the live lead / when the snapshot is selected, so the background isn't a wall of colour.
-const NEUTRAL_TILE = new THREE.Color(0.085, 0.24, 0.28);
-const CORE_COLOR = new THREE.Color(COLORS.core); // bright cyan for the live/selected global block
+// The trail tiles/links fade TO a quiet neutral as they recede into the background; the live lead /
+// selected block wear the bright accent. Both come from the CSS token (colors.core) set per-instance
+// in the constructor: `_coreCol` is --primary; `_neutralTile` is that SAME accent rendered dim (×0.28
+// below), ADDITIVELY blended so its low magnitude also reads semi-transparent. The ledger tiles and
+// the geo hologram therefore share --primary and stay calm by low brightness — the two views match by
+// construction (no bespoke teal).
+const NEUTRAL_DIM = 0.28; // how far the recessive tile tone dims the accent
 
 interface RingRec {
   mesh: THREE.Mesh;
@@ -99,6 +101,9 @@ interface QueueItem {
 
 export class LedgerView {
   group: THREE.Group;
+  private _core: number;             // the structural accent (colors.core), as a number
+  private _coreCol: THREE.Color;     // the accent as a Color (live/selected blocks)
+  private _neutralTile: THREE.Color; // the accent dimmed — the recessive trail tone
   // Identity SCENE-lane colour map (id -> 0xRRGGBB), set by the Engine so lane tiles / anchor rings /
   // links / pulses use the metagraph's identity hue (not the raw config colour). Null until set → the
   // `?? METAGRAPHS[i].color` fallbacks below keep it working. NOTE: the Engine sets this AFTER
@@ -150,7 +155,10 @@ export class LedgerView {
 
   private _gL0Ring: THREE.Mesh;
 
-  constructor(scene: THREE.Scene) {
+  constructor(scene: THREE.Scene, colors: SceneColors) {
+    this._core = colors.core;
+    this._coreCol = new THREE.Color(colors.core);
+    this._neutralTile = new THREE.Color(colors.core).multiplyScalar(NEUTRAL_DIM);
     this.group = new THREE.Group();
     this.group.visible = false;
     scene.add(this.group);
@@ -185,7 +193,7 @@ export class LedgerView {
 
     // The hypergraph-L0 participation ring: a single ring round the global validator cluster that
     // lights up as it produces each new global snapshot (mirrors the metagraph node-group rings).
-    this._gL0Ring = this._makeRing(0, LEDGER.rowHypL0, 0, COLORS.core);
+    this._gL0Ring = this._makeRing(0, LEDGER.rowHypL0, 0, this._core);
     this._gL0Ring.scale.setScalar(LEDGER.dagCell + 0.7);
     this.group.add(this._gL0Ring);
   }
@@ -254,7 +262,7 @@ export class LedgerView {
     let c = this._laneColors.get(id);
     if (!c) {
       const i = METAGRAPHS.findIndex((m) => m.id === id);
-      const hex = (this.sceneColors && this.sceneColors[id]) ?? (i >= 0 ? METAGRAPHS[i].color : COLORS.core);
+      const hex = (this.sceneColors && this.sceneColors[id]) ?? (i >= 0 ? METAGRAPHS[i].color : this._core);
       c = new THREE.Color(hex);
       this._laneColors.set(id, c);
     }
@@ -271,7 +279,7 @@ export class LedgerView {
     const D = 44;        // Z extent — tight to the lanes
     const cx = -16;      // centred on the content; +X (in front of the lead) stays black
     for (const y of FLOOR_Y) {
-      const pane = new THREE.Mesh(new THREE.PlaneGeometry(W, D), this._paneMat(COLORS.core, 0.007));
+      const pane = new THREE.Mesh(new THREE.PlaneGeometry(W, D), this._paneMat(this._core, 0.007));
       pane.rotation.x = -Math.PI / 2; // lie flat in the X/Z plane (W→X, D→Z)
       pane.position.set(cx, y, 0);
       pane.renderOrder = -1;
@@ -341,7 +349,7 @@ export class LedgerView {
   // next tick lands a copy solidifies into the trail. Clicking it opens the snapshot card.
   private _buildCenter() {
     this.centerMat = new THREE.MeshStandardMaterial({
-      color: COLORS.core, emissive: COLORS.core, emissiveIntensity: 0.6, // kept low so it doesn't bloom out
+      color: this._core, emissive: this._core, emissiveIntensity: 0.6, // kept low so it doesn't bloom out
       roughness: 0.4, metalness: 0.2, flatShading: true,
     });
     this.center = new THREE.Mesh(this._trailGeo, this.centerMat);
@@ -371,7 +379,7 @@ export class LedgerView {
       const mesh = new THREE.Mesh(
         this._trailGeo,
         new THREE.MeshStandardMaterial({
-          color: COLORS.core, emissive: COLORS.core, emissiveIntensity: 0.45,
+          color: this._core, emissive: this._core, emissiveIntensity: 0.45,
           roughness: 0.45, metalness: 0.2, flatShading: true, transparent: true,
           opacity: seeded ? 0.92 * slotFade(t.slot) : 0,
         }),
@@ -533,7 +541,7 @@ export class LedgerView {
     // selected row is coloured anywhere).
     this._flash = Math.max(0, this._flash - dt * 2.2);
     const leadNeutral = selectedSlot > 0;
-    const cCol = leadNeutral ? NEUTRAL_TILE : CORE_COLOR;
+    const cCol = leadNeutral ? this._neutralTile : this._coreCol;
     this.centerMat.color.copy(cCol);
     this.centerMat.emissive.copy(cCol);
     this.centerMat.emissiveIntensity = leadNeutral ? 0.22 : 0.55 + this._flash * 0.6;
@@ -552,7 +560,7 @@ export class LedgerView {
       const mat = mesh.material as THREE.MeshStandardMaterial;
       mesh.position.x += (-t.slot * SLOT_SP - mesh.position.x) * k;
       const sel = t.slot === selectedSlot;
-      const col = sel ? CORE_COLOR : NEUTRAL_TILE;
+      const col = sel ? this._coreCol : this._neutralTile;
       mat.color.copy(col);
       mat.emissive.copy(col);
       mat.emissiveIntensity = sel ? 0.7 : 0.22;
@@ -593,7 +601,7 @@ export class LedgerView {
           const hot = this.model.isRowHot(laneOff, b.slot);
           const colAmt = hot ? 1 : 0;
           const bright = (hot ? Math.max(b.fade, 0.7) : b.fade) * (b.filled ? 0.6 : 0.13);
-          this._metaTrailMesh.setColorAt(mi, _col.copy(NEUTRAL_TILE).lerp(laneColor, colAmt).multiplyScalar(bright));
+          this._metaTrailMesh.setColorAt(mi, _col.copy(this._neutralTile).lerp(laneColor, colAmt).multiplyScalar(bright));
           mi++;
 
           // One anchor link per cluster (from its centre tile) — the shared curvePoint shape: straight
@@ -601,7 +609,7 @@ export class LedgerView {
           const g = _gx.get(b.slot);
           if (b.filled && b.link && g !== undefined && li + LINK_SEG <= LINK_CURVES * LINK_SEG) {
             // Same lead/selected = coloured, trail = neutral treatment as the tiles (consistent row).
-            _col.copy(NEUTRAL_TILE).lerp(laneColor, colAmt).multiplyScalar((hot ? Math.max(b.fade, 0.7) : b.fade) * 0.42);
+            _col.copy(this._neutralTile).lerp(laneColor, colAmt).multiplyScalar((hot ? Math.max(b.fade, 0.7) : b.fade) * 0.42);
             curvePoint(0, b.x, lane.z, g, _q);
             let px = _q.x, py = _q.y, pz = _q.z;
             for (let s = 1; s <= LINK_SEG; s++) {

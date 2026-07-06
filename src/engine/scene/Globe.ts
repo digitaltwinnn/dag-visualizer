@@ -14,7 +14,8 @@
 // boundary/cast layer needed.
 
 import * as THREE from "three";
-import { COLORS, METAGRAPHS, metaAnchor, DEFAULT_META_COLOR, ledgerSite, ledgerSpread, clusterRadius, LEDGER } from "../config";
+import { METAGRAPHS, metaAnchor, DEFAULT_META_COLOR, ledgerSite, ledgerSpread, clusterRadius, LEDGER } from "../config";
+import type { SceneColors } from "../sceneColors";
 import * as geoStats from "../domain/geoStats";
 import { R, LAND_H, latLonToVec3 } from "../domain/geoMath";
 import { GOLDEN_ANGLE, fibShellPos, nodeRoles, spreadCoLocated, type Cluster } from "../domain/nodeLayout";
@@ -83,11 +84,14 @@ export class Globe implements GeoViewHost {
   private countryMix = 0;              // eased 0..1: how strongly the country dim is applied
   l0Count = 0;
   l1Count = 0;
-  // The raised coastal wall colour — the SAME structural teal as the globe grid (COLORS.geoGrid),
-  // so the whole hologram is one hue; the walls read as the accent by height + top-edge highlight,
-  // not a different colour. Never identity-tinted (config scene lane).
-  _edgeColor = new THREE.Color(COLORS.geoGrid);
-  private _edgeTarget = new THREE.Color(COLORS.geoGrid);
+  // The geo hologram is the accent (colors.core = --primary); the whole globe is one hue and stays
+  // calm via low opacity/brightness, not a bespoke teal. geoColor is the stable value GeoView reads
+  // for the land grid + sea graticule; _edgeColor is the (eased) coastal-wall colour. Set from the
+  // CSS token in the constructor. Never identity-tinted (structural scene lane).
+  geoColor = 0x000000;
+  private _coreL0 = 0x000000;
+  _edgeColor = new THREE.Color();
+  private _edgeTarget = new THREE.Color();
 
   // Highlight/dim state: each validator layer eases its own dim level (0 = bright, 1 = dimmed).
   private dim = { l0: 0, l1: 0 };
@@ -123,11 +127,15 @@ export class Globe implements GeoViewHost {
   // allocation fix — this used to allocate a fresh FrameCtx + DimContext object twice per frame).
   private _ctx!: FrameCtx;
 
-  constructor(scene: THREE.Scene, layers: HyperView | null = null, camera: THREE.Camera | null = null) {
+  constructor(scene: THREE.Scene, layers: HyperView | null, camera: THREE.Camera | null, colors: SceneColors) {
     this.group = new THREE.Group();
     scene.add(this.group);
     this.layers = layers; // for gluing metagraph nodes to their orbiting hubs
     this.camera = camera; // for the view-dependent disc falloff at the limb
+    this.geoColor = colors.core;   // the geo hologram = the accent (calm via opacity); wall + grid + graticule
+    this._coreL0 = colors.coreL0;  // DAG validator-node fallback hue
+    this._edgeColor.setHex(colors.core);
+    this._edgeTarget.setHex(colors.core);
 
     this.nodeGroup = new THREE.Group();
     this.group.add(this.nodeGroup);
@@ -157,10 +165,10 @@ export class Globe implements GeoViewHost {
     this.simSpin = sims.globeSpin;
   }
 
-  // The wall is always the fixed structural teal (COLORS.geoGrid). Kept as a setter so the Engine
+  // The wall is always the structural accent (the geo hologram hue). Kept as a setter so the Engine
   // caller doesn't change; the argument is ignored on purpose (never identity-tinted).
   setEdgeColor(_color: number | null): void {
-    this._edgeTarget.set(COLORS.geoGrid);
+    this._edgeTarget.setHex(this.geoColor);
   }
 
   // -------------------------------------------------- build the shared validator nodes
@@ -218,7 +226,7 @@ export class Globe implements GeoViewHost {
     };
     // The DAG's own validator shells are coloured with the DAG's identity SCENE hue (sceneColors.dag),
     // falling back to the old structural colours if not populated yet.
-    const dagColor = (this.sceneColors && this.sceneColors.dag) ?? COLORS.l0;
+    const dagColor = (this.sceneColors && this.sceneColors.dag) ?? this._coreL0;
     place(l0List, "l0", "l0", dagColor, 8, 1.0);
     place(cl1List, "cl1", "l1", dagColor, 14, 0.78);
 

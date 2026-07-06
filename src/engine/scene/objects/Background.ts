@@ -8,7 +8,7 @@
 // kept mostly below the bloom threshold so it stays subtle.
 
 import * as THREE from "three";
-import { COLORS } from "../../config";
+import type { SceneColors } from "../../sceneColors";
 
 const vert = /* glsl */ `
   varying vec3 vDir;
@@ -113,14 +113,14 @@ export interface Background {
   update(dt: number, morph: number): void;
 }
 
-export function createBackground(scene: THREE.Scene): Background {
+export function createBackground(scene: THREE.Scene, colors: SceneColors): Background {
   const uniforms = {
     uTime: { value: 0 },
     uMorph: { value: 0 },
-    uCyan: { value: new THREE.Color(COLORS.core) },
-    uBlue: { value: new THREE.Color(COLORS.l0) },
-    uPurple: { value: new THREE.Color(COLORS.l1) },
-    uDeep: { value: new THREE.Color(0x04050c) },
+    uCyan: { value: new THREE.Color(colors.core) },
+    uBlue: { value: new THREE.Color(colors.coreL0) },
+    uPurple: { value: new THREE.Color(colors.coreL1) },
+    uDeep: { value: new THREE.Color(colors.bg).multiplyScalar(0.7) }, // background token, deepened
   };
   const mat = new THREE.ShaderMaterial({
     uniforms, vertexShader: vert, fragmentShader: frag,

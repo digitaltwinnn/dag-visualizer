@@ -6,18 +6,27 @@ export const API_BASE = "https://be-mainnet.constellationnetwork.io";
 export const L0_CLUSTER = "https://l0-lb-mainnet.constellationnetwork.io/cluster/info";
 export const L1_CLUSTER = "https://l1-lb-mainnet.constellationnetwork.io/cluster/info";
 
+// The STATIC mirror of the structural colour tokens in app/globals.css (`:root`). These four values
+// equal --primary / --core-l0 / --core-l1 / --background respectively.
+//
+// ⚠️ globals.css is the SINGLE SOURCE OF TRUTH. The live 3D scene does NOT read these — it reads the
+// actual CSS tokens at boot via src/engine/sceneColors.ts (readSceneColors), so the rendered scene
+// always matches the stylesheet. This mirror exists ONLY for the two places that need a static hex
+// with no DOM available: the data/palette layer (src/data, src/palette — SSR + bake scripts) and as
+// sceneColors' own no-DOM fallback. Keep it in sync with globals.css; the Engine logs a dev-mode
+// warning if the live tokens ever drift from these (see Engine constructor). Scene-only derived
+// tones (the geo hologram teal, node-dim, etc.) are NOT here — they're derived from these bases in
+// sceneColors.ts, since nothing outside the DOM scene needs them.
+// These are the RESOLVED sRGB values of the oklch tokens (what the browser actually renders — the
+// HUD already uses them). NB: they differ slightly from the aspirational hex in the globals.css
+// comments (e.g. --primary's oklch resolves to 0x53f2f2, a touch greener than the "#2af5ff" note) —
+// the token is canonical, so these mirror the token, not the comment. Update both together if a token
+// changes; the Engine dev-warns on drift.
 export const COLORS = {
-  core: 0x2af5ff,   // Global L0 snapshots (the DAG spine)
-  l0: 0x5b8cff,     // L0 validators (consensus ring)
-  l1: 0xb06bff,     // L1 nodes (transactions & data)
-  bg: 0x05060e,
-  // Geo holographic-globe surface — the scene-lane STRUCTURAL family for the Geography view,
-  // kept in the core-cyan temperature (two-lane rule: structure stays cyan; identity hues never
-  // tint the surface — a settled decision). Consumed by GeoView (land grid + walls) and Globe
-  // (the eased wall colour). ONE hue: the coastal walls share the surface's grid hue so the whole
-  // globe reads as a single delicate teal hologram — the walls are the accent by height + a
-  // brighter top-edge highlight, not by a different colour.
-  geoGrid: 0x2e7486, // grid + wall hue (the grid texture's luminance + the wall shader ride this)
+  core: 0x53f2f2, // = --primary   (accent cyan — the DAG spine)
+  l0: 0x618df3,   // = --core-l0   (L0 validators, consensus ring)
+  l1: 0xa670f3,   // = --core-l1   (L1 nodes, transactions & data)
+  bg: 0x010207,   // = --background (scene clear colour)
 };
 
 // Fallback hub colour for a metagraph the config doesn't know yet (one not in METAGRAPHS).

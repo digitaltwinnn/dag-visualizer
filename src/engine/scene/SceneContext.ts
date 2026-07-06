@@ -7,8 +7,8 @@ import { EffectComposer } from "three/addons/postprocessing/EffectComposer.js";
 import { RenderPass } from "three/addons/postprocessing/RenderPass.js";
 import { UnrealBloomPass } from "three/addons/postprocessing/UnrealBloomPass.js";
 import { BokehPass, type BokehPassParamters } from "three/addons/postprocessing/BokehPass.js";
-import { COLORS } from "../config";
 import { createBackground, type Background } from "./objects/Background";
+import type { SceneColors } from "../sceneColors";
 
 // @types/three types BokehPass.uniforms as a bare `object`; the engine reads
 // uniforms.focus/maxblur .value, so refine just those.
@@ -28,10 +28,10 @@ export interface SceneCtx {
   resize(): void;
 }
 
-export function createScene(canvas: HTMLCanvasElement): SceneCtx {
+export function createScene(canvas: HTMLCanvasElement, colors: SceneColors): SceneCtx {
   const scene = new THREE.Scene();
-  scene.background = new THREE.Color(COLORS.bg);
-  scene.fog = new THREE.FogExp2(COLORS.bg, 0.012);
+  scene.background = new THREE.Color(colors.bg);
+  scene.fog = new THREE.FogExp2(colors.bg, 0.012);
 
   const camera = new THREE.PerspectiveCamera(
     55, window.innerWidth / window.innerHeight, 0.1, 2000
@@ -54,17 +54,19 @@ export function createScene(canvas: HTMLCanvasElement): SceneCtx {
   controls.autoRotate = true;
   controls.autoRotateSpeed = 0.35;
 
-  // Lighting — mostly ambient since materials are emissive; a couple of
-  // points add subtle dimensional shading.
+  // Lighting — mostly ambient since materials are emissive; a couple of points add subtle
+  // dimensional shading. Key = the accent cyan, rim = the L1 violet (both from CSS tokens); the
+  // ambient fill is a neutral cool-grey (0x4a5a8c) — a lighting technicality, not a palette hue,
+  // so it's an allowed literal (see noHardcodedColors.test.ts).
   scene.add(new THREE.AmbientLight(0x4a5a8c, 1.1));
-  const key = new THREE.PointLight(COLORS.core, 2.2, 220);
+  const key = new THREE.PointLight(colors.core, 2.2, 220);
   key.position.set(0, 8, 0);
   scene.add(key);
-  const rim = new THREE.PointLight(COLORS.l1, 1.4, 260);
+  const rim = new THREE.PointLight(colors.coreL1, 1.4, 260);
   rim.position.set(40, -20, -30);
   scene.add(rim);
 
-  const background = createBackground(scene);
+  const background = createBackground(scene, colors);
 
   // Postprocessing — depth of field then bloom.
   const composer = new EffectComposer(renderer);

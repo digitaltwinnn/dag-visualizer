@@ -7,7 +7,8 @@
 // view by scaling `root` down.
 
 import * as THREE from "three";
-import { COLORS, METAGRAPHS, metaAnchor, type MetaConfig } from "../../config";
+import { METAGRAPHS, metaAnchor, type MetaConfig } from "../../config";
+import type { SceneColors } from "../../sceneColors";
 import { R_GLOBE, CORE_R } from "../../domain/morph";
 
 const _pos = new THREE.Vector3(); // scratch for hub orbit positions (reused each frame)
@@ -48,13 +49,15 @@ export class HyperView {
   core!: THREE.Mesh;
   halo!: THREE.Mesh;
   coreFlash?: number;
+  private _core: number; // the structural accent (colors.core) — the core sphere + halo hue
 
   // `sceneColors` (id -> 0xRRGGBB) is the identity SCENE-lane colour map (Task 3), handed in by
   // the Engine at construction — HyperView builds all its hubs synchronously from
   // config.METAGRAPHS right here, before any API data exists, so the map has to arrive as a ctor
   // arg for the hubs to be born in the identity colour with no recolor pass / no first-paint flash.
-  constructor(scene: THREE.Scene, sceneColors?: Record<string, number>) {
+  constructor(scene: THREE.Scene, colors: SceneColors, sceneColors?: Record<string, number>) {
     this.scene = scene;
+    this._core = colors.core;
     this.root = new THREE.Group();
     scene.add(this.root);
 
@@ -105,7 +108,7 @@ export class HyperView {
   private _buildCore() {
     this.coreGroup = new THREE.Group();
     const mat = new THREE.MeshStandardMaterial({
-      color: COLORS.core, emissive: COLORS.core, emissiveIntensity: 1.4,
+      color: this._core, emissive: this._core, emissiveIntensity: 1.4,
       roughness: 0.25, metalness: 0.3, flatShading: true, transparent: true,
     });
     this.core = new THREE.Mesh(new THREE.IcosahedronGeometry(3.1, 2), mat);
@@ -118,7 +121,7 @@ export class HyperView {
 
     this.halo = new THREE.Mesh(
       new THREE.IcosahedronGeometry(4.4, 1),
-      new THREE.MeshBasicMaterial({ color: COLORS.core, wireframe: true, transparent: true, opacity: 0.16 })
+      new THREE.MeshBasicMaterial({ color: this._core, wireframe: true, transparent: true, opacity: 0.16 })
     );
     this.coreGroup.add(this.halo);
 
