@@ -219,6 +219,12 @@ describe("metaNodeEmissive (metagraph loop, js/globe.js:1099-1107)", () => {
     const b = metaNodeEmissive(c, 0, 0, 0, 0, false, false, base);
     expect(metaNodeEmissive(c, 0, 0, 0, 0, false, true, base)).toBeCloseTo(b * 0.45, 10);
   });
+
+  it("does nothing extra when there's no focus target at all (isFocus and dimOthersOnFocus both false)", () => {
+    const c = ctx({ morph: 0 });
+    const b = metaNodeEmissive(c, 0, 0, 0, 0, false, false, base);
+    expect(b).toBeCloseTo(0.5, 10);
+  });
 });
 
 // local mirror of nodeLayout's lerp so this test file has no import-order dependency on it

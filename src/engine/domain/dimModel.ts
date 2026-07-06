@@ -108,6 +108,10 @@ export function nodeEmissive(
 // its base/twinkle/suppression/floor coefficients differ from the validator's and aren't
 // reachable through nodeEmissive's (baseLo, baseHi) parameterisation, so it's a sibling
 // function with its own (single, unlerped) `base`.
+// `dimOthersOnFocus` = the caller has already ANDed "some focus target exists" into the
+// filter-based flag (js/globe.js:980) — with no focus target at all neither the boost nor
+// the dim-back branch should fire, and this pure function has no side channel to detect
+// "no focus", so the caller must fold that into the flag it passes.
 export function metaNodeEmissive(
   c: DimContext,
   d: number,
