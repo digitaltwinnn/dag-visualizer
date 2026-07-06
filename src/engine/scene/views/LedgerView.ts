@@ -294,7 +294,7 @@ export class LedgerView {
         floor = new THREE.LineSegments(
           edgeGeo,
           new THREE.LineBasicMaterial({
-            color: this._core, transparent: true, opacity: 0.4,
+            color: this._core, transparent: true, opacity: 0.12,
             blending: THREE.AdditiveBlending, depthWrite: false,
           }),
         );
