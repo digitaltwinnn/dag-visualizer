@@ -7,13 +7,13 @@
 // view by scaling `root` down.
 
 import * as THREE from "three";
-import { COLORS, METAGRAPHS, metaAnchor, type MetaConfig } from "../config";
+import { COLORS, METAGRAPHS, metaAnchor, type MetaConfig } from "../../config";
 
 const R_GLOBE = 16;  // must match Globe's R — the radius the core grows out to
 const CORE_R = 3.1;  // the core IcosahedronGeometry radius
 const _pos = new THREE.Vector3(); // scratch for hub orbit positions (reused each frame)
 
-// One orbiting metagraph hub record in HyperFurniture.metas (the exact shape the
+// One orbiting metagraph hub record in HyperView.metas (the exact shape the
 // constructor builds — js/globe.js, still vanilla, reads these fields off the instance
 // handed to it, so this type must track _buildMetagraphs verbatim).
 export interface MetaHubRec {
@@ -32,7 +32,7 @@ export interface MetaHubRec {
   active: boolean;
 }
 
-export class HyperFurniture {
+export class HyperView {
   scene: THREE.Scene;
   root: THREE.Group;
   pickables: THREE.Object3D[];
@@ -47,7 +47,7 @@ export class HyperFurniture {
   coreFlash?: number;
 
   // `sceneColors` (id -> 0xRRGGBB) is the identity SCENE-lane colour map (Task 3), handed in by
-  // the Engine at construction — HyperFurniture builds all its hubs synchronously from
+  // the Engine at construction — HyperView builds all its hubs synchronously from
   // config.METAGRAPHS right here, before any API data exists, so the map has to arrive as a ctor
   // arg for the hubs to be born in the identity colour with no recolor pass / no first-paint flash.
   constructor(scene: THREE.Scene, sceneColors?: Record<string, number>) {

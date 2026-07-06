@@ -1,6 +1,6 @@
 import * as THREE from "three";
 import { feature } from "topojson-client";
-import { R, LAND_H, latLonToVec3 } from "../domain/geoMath";
+import { R, LAND_H, latLonToVec3 } from "../../domain/geoMath";
 
 // Builds the geo globe SURFACE — the body sphere, graticule, atmosphere rim, and the raised
 // continents (+ glowing coastal cliffs) — into `globe.group`, and sets the handles the morph/fade
@@ -16,11 +16,11 @@ interface GeoFadeEntry {
   base: number;
 }
 
-// The exact handles buildGlobeSurface reads and writes on the host (the Globe instance —
+// The exact handles buildGeoView reads and writes on the host (the Globe instance —
 // still vanilla JS; Task 11 will make Globe implement this). `landFillMat` is set too (an
 // extra beyond the brief's 5) but is only read back locally to construct `landFillMesh`, not
 // consumed elsewhere in globe.js — kept optional here for parity with the original handle.
-export interface GlobeSurfaceHost {
+export interface GeoViewHost {
   group: THREE.Group;
   geoFades: GeoFadeEntry[];
   _edgeColor: THREE.Color;
@@ -36,14 +36,14 @@ export interface GlobeSurfaceHost {
   landFillMesh?: THREE.Mesh;
 }
 
-export function buildGlobeSurface(globe: GlobeSurfaceHost): void {
+export function buildGeoView(globe: GeoViewHost): void {
   buildSphere(globe);
   buildGraticule(globe);
   buildAtmosphere(globe);
   buildLand(globe);
 }
 
-function buildSphere(globe: GlobeSurfaceHost) {
+function buildSphere(globe: GeoViewHost) {
   // Writes depth so it occludes the far half of the atmosphere shell (leaving only a rim)
   // and hides far-side nodes. Hidden in the Hypergraph (visibility toggled in setMorph) so it
   // can't occlude the core there; fades in by opacity with the rest of the surface.
@@ -67,7 +67,7 @@ function buildSphere(globe: GlobeSurfaceHost) {
   globe.group.add(globe.sphereMesh);
 }
 
-function buildGraticule(globe: GlobeSurfaceHost) {
+function buildGraticule(globe: GeoViewHost) {
   const pts: THREE.Vector3[] = [];
   const step = 15;
   for (let lat = -75; lat <= 75; lat += step)
@@ -82,7 +82,7 @@ function buildGraticule(globe: GlobeSurfaceHost) {
   globe.group.add(new THREE.LineSegments(geo, mat));
 }
 
-function buildAtmosphere(globe: GlobeSurfaceHost) {
+function buildAtmosphere(globe: GeoViewHost) {
   // A thin, dim rim. Higher power concentrates it at the very edge and the low
   // overall scale keeps it from blooming into a bright blue halo.
   globe.atmoUniforms = { glowColor: { value: new THREE.Color(0x2a6fd0) }, uM: { value: 0 } };
@@ -96,7 +96,7 @@ function buildAtmosphere(globe: GlobeSurfaceHost) {
   globe.group.add(new THREE.Mesh(new THREE.SphereGeometry(R * 1.13, 48, 32), mat));
 }
 
-async function buildLand(globe: GlobeSurfaceHost) {
+async function buildLand(globe: GeoViewHost) {
   try {
     const res = await fetch("/land-110m.json");
     const topo = await res.json();

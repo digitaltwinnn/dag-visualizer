@@ -7,7 +7,7 @@ import { identityMap, identitySceneHex } from "@/src/palette/identity";
 // Existing vanilla modules, reused. Bare specifiers resolve via npm; they ship no types
 // of their own, so their surface is described in ./boundary and applied at construction.
 import { createScene, type SceneCtx } from "./scene/SceneContext";
-import { HyperFurniture } from "./scene/HyperFurniture";
+import { HyperView } from "./scene/views/HyperView";
 import { Globe } from "./scene/Globe";
 import { Ledger } from "../../js/ledger.js";
 import { loadGeoCache, resolveMissing } from "@/src/data/geoResolve";
@@ -61,7 +61,7 @@ const FOCI: Record<string, { pos: Vec; target: Vec }> = {
 // main.js's render loop + ui.js's camera focus, decoupled from any DOM/panels.
 export class Engine {
   private ctx: SceneCtx;
-  private layers: HyperFurniture;
+  private layers: HyperView;
   private globe: Globe;
   private ledger: LedgerApi;
   private _ledgerDirty = false; // rebuild the ledger geometry next frame (set on data events)
@@ -108,12 +108,12 @@ export class Engine {
     this.canvas = canvas;
     this._onReady = onReady;
     this.ctx = createScene(canvas);
-    // HyperFurniture builds all its hubs synchronously from config.METAGRAPHS inside its
+    // HyperView builds all its hubs synchronously from config.METAGRAPHS inside its
     // constructor (before any API data exists), so the identity scene-color map has to be
     // handed in at construction — passing it as a 2nd ctor arg (read by _buildMetagraphs) means
     // the hubs are born in the identity color with no recolor pass and no first-paint flash.
-    // HyperFurniture only ever has these 10 config hubs, so this map never needs updating.
-    this.layers = new HyperFurniture(this.ctx.scene, sceneColorsFor(METAGRAPHS.map((m) => m.id)));
+    // HyperView only ever has these 10 config hubs, so this map never needs updating.
+    this.layers = new HyperView(this.ctx.scene, sceneColorsFor(METAGRAPHS.map((m) => m.id)));
     this.globe = new Globe(this.ctx.scene, this.layers, this.ctx.camera);
     this.ledger = new LedgerCtor(this.ctx.scene);
     // The ledger colours its lane tiles / anchor rings / links / pulses per metagraph — feed it the

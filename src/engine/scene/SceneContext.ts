@@ -8,7 +8,7 @@ import { RenderPass } from "three/addons/postprocessing/RenderPass.js";
 import { UnrealBloomPass } from "three/addons/postprocessing/UnrealBloomPass.js";
 import { BokehPass, type BokehPassParamters } from "three/addons/postprocessing/BokehPass.js";
 import { COLORS } from "../config";
-import { createBackground, type Background } from "./Background";
+import { createBackground, type Background } from "./objects/Background";
 
 // @types/three types BokehPass.uniforms as a bare `object`; the engine reads
 // uniforms.focus/maxblur .value, so refine just those.

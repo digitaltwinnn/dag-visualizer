@@ -8,7 +8,7 @@
 // kept mostly below the bloom threshold so it stays subtle.
 
 import * as THREE from "three";
-import { COLORS } from "../config";
+import { COLORS } from "../../config";
 
 const vert = /* glsl */ `
   varying vec3 vDir;

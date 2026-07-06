@@ -14,7 +14,7 @@
 // `color`/`base` for the comet tint.
 
 import * as THREE from "three";
-import { ARC_TAIL, ARC_TAIL_FRAC, type ArcAgent, type ArcSim } from "../domain/arcSim";
+import { ARC_TAIL, ARC_TAIL_FRAC, type ArcAgent, type ArcSim } from "../../domain/arcSim";
 
 // A node record the flash is applied back onto (validator or metagraph node).
 interface FlashRec {

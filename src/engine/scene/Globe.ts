@@ -10,7 +10,7 @@
 // state, does the geo relayout (fan-out, heatmap + arc rebuild), the spin/aim/focus logic, and the
 // setMorph/update orchestration — delegating the instanced-mesh writes to NodeFabric, the density
 // rings to Heatmap, the travelling packets to Arcs (+ the pure ArcSim), and the globe surface to
-// buildGlobeSurface. Its public surface is exactly the old GlobeApi (boundary.ts) so the Engine's
+// buildGeoView. Its public surface is exactly the old GlobeApi (boundary.ts) so the Engine's
 // call sites are unchanged.
 
 import * as THREE from "three";
@@ -22,11 +22,11 @@ import { surfFade, extrasFade } from "../domain/morph";
 import { ArcSim, type ArcEndpoint } from "../domain/arcSim";
 import type { DimContext } from "../domain/dimModel";
 import type { MetaNodeRecord, ValidatorRecord } from "../domain/records";
-import { buildGlobeSurface, type GlobeSurfaceHost } from "./GlobeSurface";
-import { NodeFabric, type FrameCtx } from "./NodeFabric";
-import { Heatmap } from "./Heatmap";
-import { Arcs } from "./Arcs";
-import type { HyperFurniture } from "./HyperFurniture";
+import { buildGeoView, type GeoViewHost } from "./views/GeoView";
+import { NodeFabric, type FrameCtx } from "./objects/NodeFabric";
+import { Heatmap } from "./objects/Heatmap";
+import { Arcs } from "./objects/Arcs";
+import type { HyperView } from "./views/HyperView";
 import type {
   CountryStat,
   DagCore,
@@ -60,17 +60,17 @@ type MetaLayout = RouteMetagraph & {
 
 const geoOf = (pick: PickDescriptor): GeoInfo | undefined => ("geo" in pick ? pick.geo : undefined);
 
-export class Globe implements GlobeSurfaceHost {
+export class Globe implements GeoViewHost {
   group: THREE.Group;
   private nodeGroup: THREE.Group;
-  private layers: HyperFurniture | null;
+  private layers: HyperView | null;
   private camera: THREE.Camera | null;
   private _camN = new THREE.Vector3(); // camera direction in this group's local frame
   private _hasCam = false;
 
   pickables: THREE.Object3D[] = [];
   nodes: ValidatorRecord[] = [];
-  geoFades: GlobeSurfaceHost["geoFades"] = []; // { mat, base } surface materials faded by morph
+  geoFades: GeoViewHost["geoFades"] = []; // { mat, base } surface materials faded by morph
   morph = 0;
   private ledgerT = 0; // 0->1 ease as the reused node meshes fly from their source view into the lanes
   clock = 0;
@@ -99,10 +99,10 @@ export class Globe implements GlobeSurfaceHost {
   // Identity SCENE-hue map (id -> 0xRRGGBB), set by the Engine each refreshMeta before setMetagraphs.
   sceneColors?: Record<string, number>;
 
-  // Surface handles filled by buildGlobeSurface (sphere/atmosphere sync; land async).
+  // Surface handles filled by buildGeoView (sphere/atmosphere sync; land async).
   sphereMesh?: THREE.Mesh;
-  atmoUniforms?: GlobeSurfaceHost["atmoUniforms"];
-  landWallUniforms?: GlobeSurfaceHost["landWallUniforms"];
+  atmoUniforms?: GeoViewHost["atmoUniforms"];
+  landWallUniforms?: GeoViewHost["landWallUniforms"];
   landFillMat?: THREE.MeshStandardMaterial;
   landFillMesh?: THREE.Mesh;
 
@@ -111,7 +111,7 @@ export class Globe implements GlobeSurfaceHost {
   private arcs: Arcs;
   private arcSim = new ArcSim();
 
-  constructor(scene: THREE.Scene, layers: HyperFurniture | null = null, camera: THREE.Camera | null = null) {
+  constructor(scene: THREE.Scene, layers: HyperView | null = null, camera: THREE.Camera | null = null) {
     this.group = new THREE.Group();
     scene.add(this.group);
     this.layers = layers; // for gluing metagraph nodes to their orbiting hubs
@@ -126,7 +126,7 @@ export class Globe implements GlobeSurfaceHost {
 
     // The geo globe surface (body, graticule, atmosphere, continents) — it sets the surface handles
     // back on `this` for the morph/fade loop and pushes its fade materials into this.geoFades.
-    buildGlobeSurface(this);
+    buildGeoView(this);
   }
 
   // The wall is always the fixed ice-blue. Kept as a setter so the Engine caller doesn't change.

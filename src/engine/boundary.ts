@@ -21,13 +21,13 @@ import type {
 // importers of ./boundary keep working until boundary.ts is retired.
 export type { ClusterNode, DagCore, GeoMap, RouteMetagraph, RouteNode };
 
-// DofPass, Background and SceneCtx now live in ./scene/SceneContext + ./scene/Background
+// DofPass, Background and SceneCtx now live in ./scene/SceneContext + ./scene/objects/Background
 // (moved there in the scene.js/background.js port) — re-exported here so existing
 // importers of ./boundary keep working until boundary.ts is retired.
 export type { DofPass, SceneCtx } from "./scene/SceneContext";
-export type { Background } from "./scene/Background";
+export type { Background } from "./scene/objects/Background";
 
-// HyperFurniture (src/engine/scene/HyperFurniture.ts) is now the type — imported directly
+// HyperView (src/engine/scene/views/HyperView.ts) is now the type — imported directly
 // by Engine.ts, so no boundary interface is needed here. `MetaHubRec` (metas entries) is
 // exported from that module.
 
