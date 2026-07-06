@@ -10,7 +10,7 @@ import { createScene } from "../../js/scene.js";
 import { Layers } from "../../js/layers.js";
 import { Globe } from "../../js/globe.js";
 import { Ledger } from "../../js/ledger.js";
-import { loadGeoCache, resolveMissing } from "../../js/geo.js";
+import { loadGeoCache, resolveMissing } from "@/src/data/geoResolve";
 import { METAGRAPHS } from "@/src/engine/config";
 import type { GlobalSnapshot, PickDescriptor } from "@/src/data/types";
 import type {
@@ -229,7 +229,7 @@ export class Engine {
       this.layers.pulseMeta(metaId);
       if (this.mode === "ledger") this._ledgerDirty = true; // the per-tick breakdown filled in
     });
-    net?.on("global", (evt: { latest?: GlobalSnapshot }) => {
+    net?.on("global", (evt: { latest: GlobalSnapshot | null }) => {
       if (this.mode === "ledger") this._ledgerDirty = true; // a new tick landed on the chain
       const ord = evt.latest?.ordinal;
       if (ord == null || ord === this._lastFlashOrdinal) return;

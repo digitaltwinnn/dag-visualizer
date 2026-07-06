@@ -8,46 +8,23 @@ import type * as THREE from "three";
 import type { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import type { EffectComposer } from "three/examples/jsm/postprocessing/EffectComposer.js";
 import type { BokehPass } from "three/examples/jsm/postprocessing/BokehPass.js";
-import type { Anchor, CountryStat, GeoInfo, GlobalSnapshot, NodeInfo, NodeRow } from "@/src/data/types";
+import type {
+  Anchor,
+  ClusterNode,
+  CountryStat,
+  DagCore,
+  GeoMap,
+  GlobalSnapshot,
+  NodeInfo,
+  NodeRow,
+  RouteMetagraph,
+  RouteNode,
+} from "@/src/data/types";
 
-export type GeoMap = Record<string, GeoInfo>;
-
-// A validator node from the NetworkData `cluster` event (always carries an IP).
-export interface ClusterNode {
-  ip: string;
-  state?: string;
-  id?: string;
-}
-
-// A metagraph as returned by /api/metagraphs (the shape the globe + meta list read).
-export interface RouteNode {
-  ip: string;
-  state?: string;
-  layer?: string;
-  roles?: string[];
-  id?: string;
-}
-export interface RouteMetagraph {
-  id: string;
-  name: string;
-  symbol?: string;
-  description?: string;
-  siteUrl?: string;
-  iconUrl?: string;
-  nodes: RouteNode[];
-}
-
-// The DAG modelled as a metagraph-shaped core (api.js `_buildDagCore`): the L0+L1 validator
-// clusters merged by node id into one node-list with `roles` (a hybrid runs several layers).
-export interface DagCore {
-  id: string;
-  name: string;
-  symbol?: string;
-  description?: string;
-  isRoot?: boolean;
-  color: number;
-  nodes: RouteNode[];
-}
+// ClusterNode, RouteNode, RouteMetagraph, DagCore and GeoMap now live in ./types
+// (moved there in the api.ts/geoResolve.ts port) — re-exported here so existing
+// importers of ./boundary keep working until boundary.ts is retired.
+export type { ClusterNode, DagCore, GeoMap, RouteMetagraph, RouteNode };
 
 // @types/three types BokehPass.uniforms as a bare `object`; the engine reads
 // uniforms.focus/maxblur .value, so refine just those.

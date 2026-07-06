@@ -1,14 +1,11 @@
 import { useStore } from "@/src/store/store";
 import type { Anchor, GlobalSnapshot } from "@/src/data/types";
-// Existing data layer, reused untouched. Browser-only (fetch/setInterval); imported
-// from client code, initialized in an effect. Types come in a later phase.
-import { NetworkData, shortHash as rawShortHash } from "../../js/api.js";
-
-export const shortHash = rawShortHash as (h: string) => string;
+import { NetworkData, shortHash } from "@/src/data/api";
 import { METAGRAPHS, COLORS as RAW_COLORS, DEFAULT_META_COLOR as RAW_DEFAULT_META } from "@/src/engine/config";
 import { hex } from "@/src/util/format";
 import { identityHudNumber } from "@/src/palette/identity";
 
+export { shortHash };
 export const COLORS = RAW_COLORS as { core: number; l0: number; l1: number; bg: number };
 
 // The neutral accent as a CSS string (for libraries like Recharts that need a literal),
@@ -39,7 +36,7 @@ export function initNetwork(): NetworkData | null {
   net.on("cluster", ({ l0, l1 }: { l0: unknown[]; l1: unknown[] }) =>
     setNodes(l0.length, l1.length),
   );
-  net.on("global", (evt: { latest?: GlobalSnapshot }) => {
+  net.on("global", (evt: { latest: GlobalSnapshot | null }) => {
     if (evt.latest) {
       setLatestOrdinal(evt.latest.ordinal);
       setLatestSnapshot(evt.latest);
