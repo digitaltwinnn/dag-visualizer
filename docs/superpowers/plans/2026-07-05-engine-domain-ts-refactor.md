@@ -255,7 +255,9 @@ export function arcCurve(a: THREE.Vector3, b: THREE.Vector3, out: THREE.Vector3[
 - [ ] **Step 1:** Write `arcSim.test.ts` first: agents hop (travel→pause→retarget with a seeded `Math.random` stub via `vi.spyOn(Math, "random")`), arrival registers exactly one flash hit with the target index, **`step(dt, enabled: false)` produces zero flash hits and leaves agents untouched** (regression for the red-dots bug), `rebuild` with <2 points yields no agents, curve endpoints match `arcCurve`'s bezier at t=0/1. Run → FAIL.
 - [ ] **Step 2:** Implement (constants `ARC_TAIL`, `ARC_TAIL_FRAC`, `ARC_SAMPLES` move here). PASS; `npx tsc --noEmit`. Commit.
 
----### Task 11: Scene — split globe.js into Globe (coordinator) + NodeFabric + Arcs + Heatmap
+---
+
+### Task 11: Scene — split globe.js into Globe (coordinator) + NodeFabric + Arcs + Heatmap
 
 **Files:**
 - Create: `src/engine/scene/Globe.ts`, `src/engine/scene/NodeFabric.ts`, `src/engine/scene/Arcs.ts`, `src/engine/scene/Heatmap.ts`
