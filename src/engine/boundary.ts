@@ -5,9 +5,6 @@
 // are hand-written, and even their members are typed THREE objects.
 
 import type * as THREE from "three";
-import type { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
-import type { EffectComposer } from "three/examples/jsm/postprocessing/EffectComposer.js";
-import type { BokehPass } from "three/examples/jsm/postprocessing/BokehPass.js";
 import type {
   Anchor,
   ClusterNode,
@@ -26,29 +23,11 @@ import type {
 // importers of ./boundary keep working until boundary.ts is retired.
 export type { ClusterNode, DagCore, GeoMap, RouteMetagraph, RouteNode };
 
-// @types/three types BokehPass.uniforms as a bare `object`; the engine reads
-// uniforms.focus/maxblur .value, so refine just those.
-export type DofPass = BokehPass & {
-  uniforms: Record<"focus" | "maxblur", { value: number }>;
-};
-
-// Starfield skydome (js/background.js createBackground).
-export interface Background {
-  mesh: THREE.Object3D;
-  update(dt: number, morph: number): void;
-}
-
-// js/scene.js createScene() return.
-export interface SceneCtx {
-  scene: THREE.Scene;
-  camera: THREE.PerspectiveCamera;
-  renderer: THREE.WebGLRenderer;
-  controls: OrbitControls;
-  composer: EffectComposer;
-  dof: DofPass;
-  background: Background;
-  resize(): void;
-}
+// DofPass, Background and SceneCtx now live in ./scene/SceneContext + ./scene/Background
+// (moved there in the scene.js/background.js port) — re-exported here so existing
+// importers of ./boundary keep working until boundary.ts is retired.
+export type { DofPass, SceneCtx } from "./scene/SceneContext";
+export type { Background } from "./scene/Background";
 
 // One orbiting metagraph hub record in Layers.metas (only the fields the engine reads).
 export interface MetaHub {

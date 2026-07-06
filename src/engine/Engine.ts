@@ -6,7 +6,7 @@ import { hoverKeyOf, tooltipSubject } from "@/src/data/hoverSubject";
 import { identityMap, identitySceneHex } from "@/src/palette/identity";
 // Existing vanilla modules, reused. Bare specifiers resolve via npm; they ship no types
 // of their own, so their surface is described in ./boundary and applied at construction.
-import { createScene } from "../../js/scene.js";
+import { createScene, type SceneCtx } from "./scene/SceneContext";
 import { Layers } from "../../js/layers.js";
 import { Globe } from "../../js/globe.js";
 import { Ledger } from "../../js/ledger.js";
@@ -21,7 +21,6 @@ import type {
   LayersApi,
   LedgerApi,
   RouteMetagraph,
-  SceneCtx,
 } from "./boundary";
 
 type Vec = THREE.Vector3;
@@ -38,7 +37,6 @@ const sceneColorsFor = (ids: string[]): Record<string, number> => {
 // The js/ modules ship no types and `allowJs` only infers partial/loose ones, so pin
 // them to the curated surface in ./boundary here — the single place these assertions
 // live. Everything downstream is then fully checked.
-const makeScene = createScene as (canvas: HTMLCanvasElement) => SceneCtx;
 const LayersCtor = Layers as unknown as new (
   scene: THREE.Scene,
   sceneColors?: Record<string, number>,
@@ -120,7 +118,7 @@ export class Engine {
   constructor(canvas: HTMLCanvasElement, onReady?: () => void) {
     this.canvas = canvas;
     this._onReady = onReady;
-    this.ctx = makeScene(canvas);
+    this.ctx = createScene(canvas);
     // Layers builds all its hubs synchronously from config.METAGRAPHS inside its constructor
     // (before any API data exists), so the identity scene-color map has to be handed in at
     // construction — passing it as a 2nd ctor arg (read by _buildMetagraphs) means the hubs are
