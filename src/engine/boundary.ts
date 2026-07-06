@@ -8,12 +8,10 @@ import type * as THREE from "three";
 import type {
   Anchor,
   ClusterNode,
-  CountryStat,
   DagCore,
   GeoMap,
   GlobalSnapshot,
   NodeInfo,
-  NodeRow,
   RouteMetagraph,
   RouteNode,
 } from "@/src/data/types";
@@ -33,41 +31,8 @@ export type { Background } from "./scene/Background";
 // by Engine.ts, so no boundary interface is needed here. `MetaHubRec` (metas entries) is
 // exported from that module.
 
-// js/globe.js Globe — validator + metagraph nodes, heatmap, arcs, filtering, geo focus.
-export interface GlobeApi {
-  group: THREE.Group;
-  nodes: unknown[];
-  pickables: THREE.Object3D[];
-  /** Per-metagraph node counts per ledger floor (ML0 = l0, ML1 = cl1+dl1) — for ring sizing. */
-  ledgerGroups: Record<string, { l0: number; l1: number }>;
-  /** Identity scene-hue map (id -> 0xRRGGBB), set by the Engine each refreshMeta before setMetagraphs. */
-  sceneColors?: Record<string, number>;
-  setNodes(dagCore: DagCore, geoMap: GeoMap): void;
-  setMetagraphs(list: RouteMetagraph[], geoMap: GeoMap): void;
-  setFilter(sel: string): void;
-  /** Transient preview dim for a hovered filter chip (null restores the committed filter). */
-  setHoverFilter(sel: string | null): void;
-  setCountry(cc: string | null): void;
-  /** Hover-pairing: glow every layer-shell instance of the hovered node (id), or clear (null). */
-  setHoverNode(id: string | null): void;
-  /** Persistent selection: keep every layer-shell of the selected node lit, or clear (null). */
-  setSelectedNode(id: string | null): void;
-  /** A node's live Hypergraph-shell world position (validator/metagraph node) for the camera. */
-  hyperWorldPos(id: string | null): THREE.Vector3 | null;
-  /** Rotates to the densest part of the selection; returns concentration R (0..1) or null. */
-  focusDensest(on: boolean): number | null;
-  /** Aims a single node's lat/lon to the front (with tilt); false if it has no coords. */
-  focusNode(geo: { lat?: number; lon?: number } | null | undefined): boolean;
-  /** Tint the raised-land coastline edge toward a colour (hex), or null for the default. */
-  setEdgeColor(color: number | null): void;
-  setMorph(m: number): void;
-  /** Snapshots view: place the shared node meshes into the planar rows (off restores morph layout). */
-  setLedger(on: boolean): void;
-  update(dt: number): void;
-  countryStats(filter?: string): CountryStat[];
-  /** Flat node list for one selection (read-only), for the geo node browser. */
-  listNodes(filter?: string): NodeRow[];
-}
+// js/globe.js Globe is now the typed TS class src/engine/scene/Globe.ts (imported directly by
+// Engine.ts) — no boundary interface is needed for it any longer.
 
 // js/ledger.js Ledger — the Snapshots (ledger) view's own meshes: the glass floor panes, the
 // centred live global snapshot block + its left-trailing chain, the per-metagraph lane blocks,

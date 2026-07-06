@@ -8,7 +8,7 @@ import { identityMap, identitySceneHex } from "@/src/palette/identity";
 // of their own, so their surface is described in ./boundary and applied at construction.
 import { createScene, type SceneCtx } from "./scene/SceneContext";
 import { HyperFurniture } from "./scene/HyperFurniture";
-import { Globe } from "../../js/globe.js";
+import { Globe } from "./scene/Globe";
 import { Ledger } from "../../js/ledger.js";
 import { loadGeoCache, resolveMissing } from "@/src/data/geoResolve";
 import { METAGRAPHS } from "@/src/engine/config";
@@ -17,7 +17,6 @@ import type {
   ClusterNode,
   DagCore,
   GeoMap,
-  GlobeApi,
   LedgerApi,
   RouteMetagraph,
 } from "./boundary";
@@ -35,12 +34,7 @@ const sceneColorsFor = (ids: string[]): Record<string, number> => {
 
 // The remaining js/ modules ship no types and `allowJs` only infers partial/loose ones, so
 // pin them to the curated surface in ./boundary here — the single place these assertions
-// live. Everything downstream is then fully checked.
-const GlobeCtor = Globe as unknown as new (
-  scene: THREE.Scene,
-  layers: HyperFurniture,
-  camera: THREE.Camera,
-) => GlobeApi;
+// live. Everything downstream is then fully checked. (Globe is now a typed TS class — no cast.)
 const LedgerCtor = Ledger as unknown as new (scene: THREE.Scene) => LedgerApi;
 const loadGeo = loadGeoCache as () => Promise<GeoMap>;
 const resolveGeo = resolveMissing as (
@@ -68,7 +62,7 @@ const FOCI: Record<string, { pos: Vec; target: Vec }> = {
 export class Engine {
   private ctx: SceneCtx;
   private layers: HyperFurniture;
-  private globe: GlobeApi;
+  private globe: Globe;
   private ledger: LedgerApi;
   private _ledgerDirty = false; // rebuild the ledger geometry next frame (set on data events)
   private clock = new THREE.Clock();
@@ -120,7 +114,7 @@ export class Engine {
     // the hubs are born in the identity color with no recolor pass and no first-paint flash.
     // HyperFurniture only ever has these 10 config hubs, so this map never needs updating.
     this.layers = new HyperFurniture(this.ctx.scene, sceneColorsFor(METAGRAPHS.map((m) => m.id)));
-    this.globe = new GlobeCtor(this.ctx.scene, this.layers, this.ctx.camera);
+    this.globe = new Globe(this.ctx.scene, this.layers, this.ctx.camera);
     this.ledger = new LedgerCtor(this.ctx.scene);
     // The ledger colours its lane tiles / anchor rings / links / pulses per metagraph — feed it the
     // same identity SCENE map so those match the hubs/nodes (config-ids known synchronously; the
