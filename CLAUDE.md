@@ -486,6 +486,24 @@ code — reference the tokens. The SVG `RailThread` mirrors the `--thread-*` lit
   wins over the hash fallback** (`palette.ts` assigns non-colliding hues in allowed zones).
   `filterAccent(filter)` is the one helper that resolves "current selection → CSS colour"
   (cyan for "all").
+- **The 3D scene sources its structural colours FROM the CSS tokens — one source of truth, no
+  hardcoding.** `app/globals.css` is canonical; nothing in `src/engine/scene/` invents a
+  structural colour. At construction the Engine calls `readSceneColors()`
+  (`src/engine/sceneColors.ts`), which reads `--primary`/`--core-l0`/`--core-l1`/`--background`
+  via a hidden probe element + a 1×1 canvas (the canvas normalises whatever computed-colour
+  format the browser returns for an oklch token — `rgb()`, `color(srgb …)` — to sRGB bytes), and
+  threads the resulting `SceneColors` into every module (`createScene`, `Background`, `HyperView`,
+  `Globe`, `GeoView`, `LedgerView`). Calm/dim variants are the SAME token rendered at low
+  opacity/brightness — NOT a bespoke tone (so the geo hologram and the ledger tiles both = `--primary`
+  and match by construction). `config.COLORS` shrank to the 4 base values as the STATIC mirror the
+  non-DOM data/palette layer needs (SSR, bake scripts, `identity.ts`'s `CORE_HEX`); it holds the
+  tokens' *resolved* sRGB (note: `--primary` resolves to `0x53f2f2`, greener than the aspirational
+  `#2af5ff` comment — the token is canonical), and the Engine **dev-warns (±2/channel)** if the
+  mirror drifts from the live tokens. **`src/engine/noHardcodedColors.test.ts`** enforces this: it
+  fails on any raw `0xRRGGBB` in the scene layer outside a tiny documented allowlist (white tint
+  bases, the functional density-heatmap gradient, the ambient light, the node-dim tone) — runs in
+  `npm test`, the same gate as `layerBoundaries.test.ts`. (The JSX/`components/` layer has legacy
+  `rgb()`/hex literals that should migrate to the CSS-var tokens + extend the guard — a follow-up.)
 
 ### shadcn primitives in use
 
