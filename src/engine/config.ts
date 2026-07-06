@@ -11,11 +11,12 @@ export const L1_CLUSTER = "https://l1-lb-mainnet.constellationnetwork.io/cluster
 //
 // ⚠️ globals.css is the SINGLE SOURCE OF TRUTH. The live 3D scene does NOT read these — it reads the
 // actual CSS tokens at boot via src/engine/sceneColors.ts (readSceneColors), so the rendered scene
-// always matches the stylesheet. This mirror exists ONLY for the two places that need a static hex
-// with no DOM available: the data/palette layer (src/data, src/palette — SSR + bake scripts) and as
-// sceneColors' own no-DOM fallback. Keep it in sync with globals.css; the Engine logs a dev-mode
-// warning if the live tokens ever drift from these (see Engine constructor). Scene-only derived
-// tones (the geo hologram teal, node-dim, etc.) are NOT here — they're derived from these bases in
+// always matches the stylesheet. This mirror exists ONLY for the one place that needs a static hex
+// with no DOM available: the data/palette layer (src/data, src/palette — SSR + bake scripts).
+// sceneColors does NOT fall back to it — readColorToken throws if a token doesn't resolve, rather
+// than silently substituting an off-palette hex. Keep it in sync with globals.css; the Engine logs a
+// dev-mode warning if the live tokens ever drift from these (see Engine constructor). Scene-only
+// derived tones (the geo hologram, node-dim, etc.) are NOT here — they're derived from these bases in
 // sceneColors.ts, since nothing outside the DOM scene needs them.
 // These are the RESOLVED sRGB values of the oklch tokens (what the browser actually renders — the
 // HUD already uses them). NB: they differ slightly from the aspirational hex in the globals.css
