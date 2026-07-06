@@ -279,7 +279,7 @@ export class LedgerView {
     const D = 44;        // Z extent — tight to the lanes
     const cx = -16;      // centred on the content; +X (in front of the lead) stays black
     for (const y of FLOOR_Y) {
-      const pane = new THREE.Mesh(new THREE.PlaneGeometry(W, D), this._paneMat(this._core, 0.007));
+      const pane = new THREE.Mesh(new THREE.PlaneGeometry(W, D), this._paneMat(this._core, 0.025));
       pane.rotation.x = -Math.PI / 2; // lie flat in the X/Z plane (W→X, D→Z)
       pane.position.set(cx, y, 0);
       pane.renderOrder = -1;

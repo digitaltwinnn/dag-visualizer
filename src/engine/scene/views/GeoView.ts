@@ -324,7 +324,9 @@ async function buildLand(globe: GeoViewHost) {
       transparent: true, opacity: 0, side: THREE.FrontSide,
     });
     globe.landFillMat = landMat;
-    globe.geoFades.push({ mat: globe.landFillMat, base: 1 }); // fades in with the surface
+    // base = the resting ADDITIVE strength of the land grid (0..1). Kept below 1 so the globe reads
+    // as a calm hologram, not a bright neon shell — the coastal walls stay the brightest element.
+    globe.geoFades.push({ mat: globe.landFillMat, base: 0.6 });
     globe.landFillMesh = new THREE.Mesh(new THREE.SphereGeometry(top, 96, 64), globe.landFillMat);
     globe.landFillMesh.renderOrder = -1; // before the rim/heatmap/nodes
     globe.landFillMesh.visible = false;  // revealed once the globe materialises (setMorph)
