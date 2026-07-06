@@ -7,7 +7,7 @@ import { identityMap, identitySceneHex } from "@/src/palette/identity";
 // Existing vanilla modules, reused. Bare specifiers resolve via npm; they ship no types
 // of their own, so their surface is described in ./boundary and applied at construction.
 import { createScene, type SceneCtx } from "./scene/SceneContext";
-import { Layers } from "../../js/layers.js";
+import { HyperFurniture } from "./scene/HyperFurniture";
 import { Globe } from "../../js/globe.js";
 import { Ledger } from "../../js/ledger.js";
 import { loadGeoCache, resolveMissing } from "@/src/data/geoResolve";
@@ -18,7 +18,6 @@ import type {
   DagCore,
   GeoMap,
   GlobeApi,
-  LayersApi,
   LedgerApi,
   RouteMetagraph,
 } from "./boundary";
@@ -34,16 +33,12 @@ const sceneColorsFor = (ids: string[]): Record<string, number> => {
   return out;
 };
 
-// The js/ modules ship no types and `allowJs` only infers partial/loose ones, so pin
-// them to the curated surface in ./boundary here — the single place these assertions
+// The remaining js/ modules ship no types and `allowJs` only infers partial/loose ones, so
+// pin them to the curated surface in ./boundary here — the single place these assertions
 // live. Everything downstream is then fully checked.
-const LayersCtor = Layers as unknown as new (
-  scene: THREE.Scene,
-  sceneColors?: Record<string, number>,
-) => LayersApi;
 const GlobeCtor = Globe as unknown as new (
   scene: THREE.Scene,
-  layers: LayersApi,
+  layers: HyperFurniture,
   camera: THREE.Camera,
 ) => GlobeApi;
 const LedgerCtor = Ledger as unknown as new (scene: THREE.Scene) => LedgerApi;
@@ -72,7 +67,7 @@ const FOCI: Record<string, { pos: Vec; target: Vec }> = {
 // main.js's render loop + ui.js's camera focus, decoupled from any DOM/panels.
 export class Engine {
   private ctx: SceneCtx;
-  private layers: LayersApi;
+  private layers: HyperFurniture;
   private globe: GlobeApi;
   private ledger: LedgerApi;
   private _ledgerDirty = false; // rebuild the ledger geometry next frame (set on data events)
@@ -119,12 +114,12 @@ export class Engine {
     this.canvas = canvas;
     this._onReady = onReady;
     this.ctx = createScene(canvas);
-    // Layers builds all its hubs synchronously from config.METAGRAPHS inside its constructor
-    // (before any API data exists), so the identity scene-color map has to be handed in at
-    // construction — passing it as a 2nd ctor arg (read by _buildMetagraphs) means the hubs are
-    // born in the identity color with no recolor pass and no first-paint flash. Layers only ever
-    // has these 10 config hubs, so this map never needs updating.
-    this.layers = new LayersCtor(this.ctx.scene, sceneColorsFor(METAGRAPHS.map((m) => m.id)));
+    // HyperFurniture builds all its hubs synchronously from config.METAGRAPHS inside its
+    // constructor (before any API data exists), so the identity scene-color map has to be
+    // handed in at construction — passing it as a 2nd ctor arg (read by _buildMetagraphs) means
+    // the hubs are born in the identity color with no recolor pass and no first-paint flash.
+    // HyperFurniture only ever has these 10 config hubs, so this map never needs updating.
+    this.layers = new HyperFurniture(this.ctx.scene, sceneColorsFor(METAGRAPHS.map((m) => m.id)));
     this.globe = new GlobeCtor(this.ctx.scene, this.layers, this.ctx.camera);
     this.ledger = new LedgerCtor(this.ctx.scene);
     // The ledger colours its lane tiles / anchor rings / links / pulses per metagraph — feed it the

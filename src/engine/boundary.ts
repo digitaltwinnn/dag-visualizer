@@ -1,7 +1,7 @@
 // Types for the vanilla js/ modules the Engine drives. The modules stay plain JS
 // (no .ts conversion); this just describes their surface from the TypeScript side so
 // the Engine's calls are checked. Most of it composes the real @types/three classes —
-// only the app-specific wrappers (createScene's return, Layers/Globe, the starfield)
+// only the app-specific wrappers (createScene's return, Globe, the starfield)
 // are hand-written, and even their members are typed THREE objects.
 
 import type * as THREE from "three";
@@ -29,31 +29,9 @@ export type { ClusterNode, DagCore, GeoMap, RouteMetagraph, RouteNode };
 export type { DofPass, SceneCtx } from "./scene/SceneContext";
 export type { Background } from "./scene/Background";
 
-// One orbiting metagraph hub record in Layers.metas (only the fields the engine reads).
-export interface MetaHub {
-  group: THREE.Group;
-  cfg: { id: string; name: string; color: number; ticker?: string };
-}
-
-// js/layers.js Layers — Hypergraph furniture (core + orbiting hubs).
-export interface LayersApi {
-  root: THREE.Group;
-  coreGroup: THREE.Group;
-  metas: MetaHub[];
-  focusId: string | null;
-  pickables: THREE.Object3D[];
-  /** Identity scene-hue map (id -> 0xRRGGBB), set by the Engine before hubs build. */
-  sceneColors?: Record<string, number>;
-  update(dt: number, morph: number): void;
-  /** Mark which metagraph hubs have locatable nodes (active); the rest are dimmed inactive. */
-  setMetaActive(ids: Set<string> | null): void;
-  /** Fire an "anchored into L0" packet from a metagraph's hub toward the core (anchor event). */
-  pulseMeta(metaId: string): void;
-  /** Flash the core when a new global snapshot lands; strength scales with how much it anchored. */
-  flashCore(strength?: number): void;
-  /** Snapshots view: lay the hubs into the planar metagraph-L0 row (off restores the orbit). */
-  setLedger(on: boolean): void;
-}
+// HyperFurniture (src/engine/scene/HyperFurniture.ts) is now the type — imported directly
+// by Engine.ts, so no boundary interface is needed here. `MetaHubRec` (metas entries) is
+// exported from that module.
 
 // js/globe.js Globe — validator + metagraph nodes, heatmap, arcs, filtering, geo focus.
 export interface GlobeApi {
