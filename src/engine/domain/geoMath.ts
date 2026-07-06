@@ -4,7 +4,10 @@ import * as THREE from "three";
 // globe surface (globeSurface.js) — so the two can live in separate files without one importing
 // the other just for these.
 export const R = 16; // globe radius
-export const LAND_H = 0.34; // how far the coastal "wall" rim rises above the solid land fill (R)
+export const LAND_H = 1.3; // height the coastal "wall" cliffs rise from the ocean (R) to the raised
+                           // land plateau (R+LAND_H) — the walls are the geo view's signature element,
+                           // so they're tall glowing ridges (see GeoView wall shader); the surface + grid
+                           // are kept delicate so these ridges are the accent (~8% of R at R=16)
 
 export function latLonToVec3(lat: number, lon: number, r: number = R): THREE.Vector3 {
   const phi = ((90 - lat) * Math.PI) / 180;

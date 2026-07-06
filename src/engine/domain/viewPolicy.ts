@@ -70,12 +70,14 @@ export const VIEW_POLICIES: Record<Mode, ViewPolicy> = {
     dofEligible: true,
     fog: "base",
   },
-  // Footprint: the globe, travelling packets, starfield twinkle; picks the globe nodes only.
+  // Footprint: the holographic globe + travelling packets; picks the globe nodes only.
+  // starfield OFF by design (geo design session): the hologram floats in the clean flat
+  // backdrop — the same 0 the ledger passes — not a night sky.
   geo: {
     canvas: true,
     morph: "toGeo",
     sims: { arcs: true, hubOrbits: false, globeSpin: true, twinkle: true },
-    show: { hyperFurniture: true, globeSurface: true, starfield: true, ledger: false },
+    show: { hyperFurniture: true, globeSurface: true, starfield: false, ledger: false },
     pickSources: ["globe"],
     dofEligible: false,
     fog: "base",

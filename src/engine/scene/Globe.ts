@@ -83,9 +83,11 @@ export class Globe implements GeoViewHost {
   private countryMix = 0;              // eased 0..1: how strongly the country dim is applied
   l0Count = 0;
   l1Count = 0;
-  // The raised coastal wall rim — a fixed soft ice-blue.
-  _edgeColor = new THREE.Color(0x9ccad6);
-  private _edgeTarget = new THREE.Color(0x9ccad6);
+  // The raised coastal wall colour — the SAME structural teal as the globe grid (COLORS.geoGrid),
+  // so the whole hologram is one hue; the walls read as the accent by height + top-edge highlight,
+  // not a different colour. Never identity-tinted (config scene lane).
+  _edgeColor = new THREE.Color(COLORS.geoGrid);
+  private _edgeTarget = new THREE.Color(COLORS.geoGrid);
 
   // Highlight/dim state: each validator layer eases its own dim level (0 = bright, 1 = dimmed).
   private dim = { l0: 0, l1: 0 };
@@ -102,11 +104,11 @@ export class Globe implements GeoViewHost {
   // Identity SCENE-hue map (id -> 0xRRGGBB), set by the Engine each refreshMeta before setMetagraphs.
   sceneColors?: Record<string, number>;
 
-  // Surface handles filled by buildGeoView (sphere/atmosphere sync; land async).
-  sphereMesh?: THREE.Mesh;
-  atmoUniforms?: GeoViewHost["atmoUniforms"];
+  // Surface handles filled by buildGeoView (graticule sync; land async). The hologram globe
+  // has NO opaque body sphere and no atmosphere halo — the coastal rim + land glass ARE the
+  // globe; the far side shows through dimly, which is the point of the hologram look.
   landWallUniforms?: GeoViewHost["landWallUniforms"];
-  landFillMat?: THREE.MeshStandardMaterial;
+  landFillMat?: THREE.MeshBasicMaterial;
   landFillMesh?: THREE.Mesh;
 
   private fabric: NodeFabric;
@@ -155,9 +157,10 @@ export class Globe implements GeoViewHost {
     this.simSpin = sims.globeSpin;
   }
 
-  // The wall is always the fixed ice-blue. Kept as a setter so the Engine caller doesn't change.
+  // The wall is always the fixed structural teal (COLORS.geoGrid). Kept as a setter so the Engine
+  // caller doesn't change; the argument is ignored on purpose (never identity-tinted).
   setEdgeColor(_color: number | null): void {
-    this._edgeTarget.set(0x9ccad6);
+    this._edgeTarget.set(COLORS.geoGrid);
   }
 
   // -------------------------------------------------- build the shared validator nodes
@@ -519,11 +522,9 @@ export class Globe implements GeoViewHost {
     // ledger the surface is hidden OUTRIGHT (not eased by morph).
     const surf = this.ledger ? 0 : surfFade(m);
     const extras = this.ledger ? 0 : extrasFade(m);
-    if (this.sphereMesh) this.sphereMesh.visible = !this.ledger && m > 0.05; // out of hyper + ledger
     for (const f of this.geoFades) f.mat.opacity = f.base * surf;
     if (this.landWallUniforms) this.landWallUniforms.uOpacity.value = surf;
     if (this.landFillMesh) this.landFillMesh.visible = !this.ledger && m > 0.05; // opacity via geoFades
-    if (this.atmoUniforms) this.atmoUniforms.uM.value = surf;
     this.heatmap.fade(extras);
     this.arcs.setUM(extras);
   }

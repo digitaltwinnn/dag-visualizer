@@ -11,6 +11,13 @@ export const COLORS = {
   l0: 0x5b8cff,     // L0 validators (consensus ring)
   l1: 0xb06bff,     // L1 nodes (transactions & data)
   bg: 0x05060e,
+  // Geo holographic-globe surface — the scene-lane STRUCTURAL family for the Geography view,
+  // kept in the core-cyan temperature (two-lane rule: structure stays cyan; identity hues never
+  // tint the surface — a settled decision). Consumed by GeoView (land grid + walls) and Globe
+  // (the eased wall colour). ONE hue: the coastal walls share the surface's grid hue so the whole
+  // globe reads as a single delicate teal hologram — the walls are the accent by height + a
+  // brighter top-edge highlight, not by a different colour.
+  geoGrid: 0x2e7486, // grid + wall hue (the grid texture's luminance + the wall shader ride this)
 };
 
 // Fallback hub colour for a metagraph the config doesn't know yet (one not in METAGRAPHS).

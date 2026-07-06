@@ -1,5 +1,6 @@
 import * as THREE from "three";
 import { feature } from "topojson-client";
+import { COLORS } from "../../config";
 import { R, LAND_H, latLonToVec3 } from "../../domain/geoMath";
 
 // Builds the geo globe SURFACE — the body sphere, graticule, atmosphere rim, and the raised
@@ -24,47 +25,25 @@ export interface GeoViewHost {
   group: THREE.Group;
   geoFades: GeoFadeEntry[];
   _edgeColor: THREE.Color;
-  sphereMesh?: THREE.Mesh;
-  atmoUniforms?: { glowColor: { value: THREE.Color }; uM: { value: number } };
   landWallUniforms?: {
     uColor: { value: THREE.Color };
     uBase: { value: number };
     uTop: { value: number };
     uOpacity: { value: number };
   };
-  landFillMat?: THREE.MeshStandardMaterial;
+  landFillMat?: THREE.MeshBasicMaterial;
   landFillMesh?: THREE.Mesh;
 }
 
+// HOLOGRAPHIC GLOBE: there is deliberately NO opaque body sphere and NO atmosphere halo.
+// The coastal wall rim is the defining stroke, the land glass + micro-grid carry the surface,
+// and the ocean is simply the void between coastlines — the far side shows through dimly
+// (far-side node discs still vanish via discFall; the far graticule/walls reading through IS
+// the hologram). All surface colours come from config.COLORS' geo family (scene structural
+// lane — never identity-tinted).
 export function buildGeoView(globe: GeoViewHost): void {
-  buildSphere(globe);
   buildGraticule(globe);
-  buildAtmosphere(globe);
   buildLand(globe);
-}
-
-function buildSphere(globe: GeoViewHost) {
-  // Writes depth so it occludes the far half of the atmosphere shell (leaving only a rim)
-  // and hides far-side nodes. Hidden in the Hypergraph (visibility toggled in setMorph) so it
-  // can't occlude the core there; fades in by opacity with the rest of the surface.
-  const mat = new THREE.MeshStandardMaterial({
-    color: 0x0a1426, emissive: 0x050c18, emissiveIntensity: 0.5,
-    roughness: 0.95, metalness: 0.1,
-    transparent: true, opacity: 0,
-  });
-  globe.geoFades.push({ mat, base: 1 });
-  globe.sphereMesh = new THREE.Mesh(new THREE.SphereGeometry(R, 64, 48), mat);
-  globe.sphereMesh.visible = false;
-  // The body is transparent (opacity fades in), so it lands in the transparent pass
-  // alongside the additive land walls/coastline — and all three share the globe-centre
-  // bounding origin, making their back-to-front sort a tie that flips as the globe
-  // spins. When the sort puts this opaque-ish body *after* the land (which can't
-  // depthWrite to defend itself), it paints over the near-side rim, leaving only the
-  // limb — reads like you're seeing the far side. A lower renderOrder pins the body to
-  // draw first every frame: its depth is laid down, then near land passes / far land is
-  // occluded, deterministically at any orientation.
-  globe.sphereMesh.renderOrder = -2;
-  globe.group.add(globe.sphereMesh);
 }
 
 function buildGraticule(globe: GeoViewHost) {
@@ -78,22 +57,166 @@ function buildGraticule(globe: GeoViewHost) {
       pts.push(latLonToVec3(lat, lon, R + 0.02), latLonToVec3(lat + 4, lon, R + 0.02));
   const geo = new THREE.BufferGeometry().setFromPoints(pts);
   const mat = new THREE.LineBasicMaterial({ color: 0x1d4a66, transparent: true, opacity: 0 });
-  globe.geoFades.push({ mat, base: 0.28 });
+  globe.geoFades.push({ mat, base: 0.45 }); // the sea graticule the user likes — a bit brighter/clearer
   globe.group.add(new THREE.LineSegments(geo, mat));
 }
 
-function buildAtmosphere(globe: GeoViewHost) {
-  // A thin, dim rim. Higher power concentrates it at the very edge and the low
-  // overall scale keeps it from blooming into a bright blue halo.
-  globe.atmoUniforms = { glowColor: { value: new THREE.Color(0x2a6fd0) }, uM: { value: 0 } };
-  const mat = new THREE.ShaderMaterial({
-    uniforms: globe.atmoUniforms,
-    vertexShader: `varying vec3 vN; void main(){ vN = normalize(normalMatrix * normal); gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }`,
-    fragmentShader: `uniform vec3 glowColor; uniform float uM; varying vec3 vN;
-      void main(){ float i = pow(clamp(0.82 - dot(vN, vec3(0.0,0.0,1.0)), 0.0, 1.0), 2.3); gl_FragColor = vec4(glowColor, 1.0) * i * uM * 0.45; }`,
-    side: THREE.BackSide, blending: THREE.AdditiveBlending, transparent: true, depthWrite: false,
-  });
-  globe.group.add(new THREE.Mesh(new THREE.SphereGeometry(R * 1.13, 48, 32), mat));
+// The land mask + 3° micro-grid as ONE mipmapped equirectangular texture — the standard way
+// globes carry both. Canvas2D draws the topojson land polygons directly in equirect space
+// (its evenodd fill handles ring winding + holes robustly; drawing each ring at x−W/x/x+W
+// makes the antimeridian a non-issue), then composites the grid lines "source-atop" so they
+// exist ONLY on land.
+//
+// ⚠️ The mask is encoded in LUMINANCE, NOT ALPHA. The working canvas uses alpha internally,
+// but the final texture is FLATTENED onto an opaque black canvas: sea = pure black, land =
+// dim glass grey, grid lines = bright. The material renders it ADDITIVELY, so black adds
+// nothing — the sea simply doesn't exist on screen. This deliberately avoids alphaTest +
+// CanvasTexture: alpha-encoded canvas uploads proved PATH-DEPENDENT in Chrome (premultiplied
+// GPU-canvas fast paths vs readback produce different texels than getImageData reports, and
+// the result flipped between mipmapped and direct uploads). Luminance survives every path.
+// Mipmaps then do the minification anti-aliasing that analytic per-fragment lines can't get
+// under the postprocessing composer (no MSAA there) — no shimmer as the globe turns.
+type LandFeature = { geometry: { type: string; coordinates: unknown } };
+function makeLandTexture(features: LandFeature[]): THREE.DataTexture {
+  // 4096×2048: POWER-OF-TWO on purpose — NPOT dimensions combined with the wrong wrap/filter
+  // are another way a WebGL texture goes silently incomplete (= samples black, no error).
+  // POT + ClampToEdge + Linear is complete under every WebGL. High res so the fine 1px grid
+  // lines stay CRISP (supersampled) on the near face instead of blurring — see the no-mipmaps note.
+  const W = 4096, H = 2048;
+  const cv = document.createElement("canvas");
+  cv.width = W; cv.height = H;
+  const g = cv.getContext("2d")!;
+  const px = (lon: number, lat: number): [number, number] =>
+    [((lon + 180) / 360) * W, ((90 - lat) / 180) * H];
+
+  // Land mask. One path per polygon (outer ring + holes), evenodd-filled (handles winding +
+  // holes robustly); each polygon is drawn three times at x−W / x / x+W so a seam-crossing
+  // ring simply paints its overflow into the neighbouring copy; pole-encircling rings
+  // (Antarctica) are closed along the pole edge so the cap reaches the pole.
+  g.fillStyle = "rgb(26,26,26)"; // faint resting wash (~0.10) — the surface stays airy, not solid;
+                                 // the fine grid does the reading, the fill is barely a whisper
+  // Unwrap a ring's longitudes into a continuous run (accumulate the shortest step) so a
+  // seam-crosser stays one monotonic path; returns [lon, lat] pairs in absolute (possibly
+  // out-of-[-180,180]) longitude.
+  const unwrapRing = (ring: number[][]): number[][] => {
+    let lon = ring[0][0];
+    const out: number[][] = [[lon, ring[0][1]]];
+    for (let i = 1; i < ring.length; i++) {
+      let d = ring[i][0] - ring[i - 1][0];
+      if (d > 180) d -= 360; else if (d < -180) d += 360;
+      lon += d;
+      out.push([lon, ring[i][1]]);
+    }
+    return out;
+  };
+  const meanLon = (r: number[][]) => r.reduce((s, p) => s + p[0], 0) / r.length;
+  for (const f of features) {
+    const polys = (f.geometry.type === "Polygon"
+      ? [f.geometry.coordinates]
+      : f.geometry.coordinates) as number[][][][];
+    for (const rings of polys) {
+      // Unwrap the outer ring, then shift each HOLE ring into the outer's 360° frame — otherwise
+      // a hole unwrapped in its own cycle lands in a different canvas column than the outer that
+      // encloses it, so evenodd never subtracts it (that was the Caspian-Sea bug: it read as land).
+      const outer = unwrapRing(rings[0]);
+      const oMean = meanLon(outer);
+      const holes = rings.slice(1).map((h) => {
+        const u = unwrapRing(h);
+        const shift = Math.round((oMean - meanLon(u)) / 360) * 360;
+        if (shift) for (const p of u) p[0] += shift;
+        return u;
+      });
+      for (const xOff of [-W, 0, W]) {
+        g.beginPath();
+        for (const rp of [outer, ...holes]) {
+          const [x0, y0] = px(rp[0][0], rp[0][1]);
+          g.moveTo(x0 + xOff, y0);
+          let lastX = x0;
+          for (let i = 1; i < rp.length; i++) {
+            const [x, y] = px(rp[i][0], rp[i][1]);
+            g.lineTo(x + xOff, y);
+            lastX = x;
+          }
+          // Pole-encircling ring (Antarctica): the run ends ~a full width from its start —
+          // close it along the pole edge so the fill reaches the pole instead of leaving a gash.
+          if (Math.abs(lastX - x0) > W * 0.75) {
+            const poleY = rp[0][1] < 0 ? H : 0;
+            g.lineTo(lastX + xOff, poleY);
+            g.lineTo(x0 + xOff, poleY);
+          }
+          g.closePath();
+        }
+        g.fill("evenodd");
+      }
+    }
+  }
+
+  // Orientation guard: if a data source ever ships inverted coverage (world-border ring with
+  // the continents as holes), a known mid-ocean pixel comes out painted — XOR-flip the mask
+  // (painted↔unpainted in one op). No-op for correctly-oriented data like the current file.
+  const oceanProbe = g.getImageData(
+    Math.round(((-140 + 180) / 360) * W), Math.round((90 / 180) * H), 1, 1,
+  ).data;
+  if (oceanProbe[3] > 0) {
+    g.globalCompositeOperation = "xor";
+    g.fillRect(0, 0, W, H); // same fillStyle: the glass luminance
+    g.globalCompositeOperation = "source-over";
+  }
+
+  // The micro-grid, clipped to the land by compositing — drawn at exact degree positions;
+  // source-atop keeps the lines ONLY where land is painted (alpha is still live HERE, on the
+  // working canvas — it's flattened away below).
+  g.globalCompositeOperation = "source-atop";
+  g.strokeStyle = "rgb(120,120,120)"; // soft grid lines — a gentle step over the fill, not neon
+  g.lineWidth = 1.0;                   // 1px at 4096 = a very FINE hairline (crisp, not fuzzy)
+  const STEP = 1.5;                    // DENSE 1.5° graticule — a delicate mesh, not a coarse cage
+  for (let lat = -90 + STEP; lat < 90; lat += STEP) {
+    const y = ((90 - lat) / 180) * H;
+    g.beginPath(); g.moveTo(0, y); g.lineTo(W, y); g.stroke();
+  }
+  for (let lon = -180; lon < 180; lon += STEP) {
+    const x = ((lon + 180) / 360) * W;
+    // Meridians converge at the poles — stop them past |lat| 72° so Antarctica isn't a glow blob.
+    const yTop = ((90 - 72) / 180) * H, yBot = ((90 + 72) / 180) * H;
+    g.beginPath(); g.moveTo(x, yTop); g.lineTo(x, yBot); g.stroke();
+  }
+  g.globalCompositeOperation = "source-over";
+
+  // FLATTEN: opaque black out-canvas — the luminance encoding (see header note). After this,
+  // alpha is 255 everywhere and no upload path can reinterpret it. Drawn VERTICALLY FLIPPED
+  // because the texture uploads as a raw buffer, and three does NOT apply `flipY` to
+  // DataTextures — the flip must be baked into the pixels.
+  const flat = document.createElement("canvas");
+  flat.width = W; flat.height = H;
+  const fg = flat.getContext("2d")!;
+  fg.fillStyle = "#000";
+  fg.fillRect(0, 0, W, H);
+  fg.save();
+  fg.scale(1, -1);
+  fg.drawImage(cv, 0, -H);
+  fg.restore();
+
+  // Upload as RAW PIXELS (DataTexture), not as a canvas: canvas-sourced texImage2D goes
+  // through browser fast paths (GPU-GPU copies, premultiply variants) that proved unreliable;
+  // getImageData → typed array → texImage2D is the one path that is deterministic everywhere,
+  // and getImageData is exactly what our own probes verify against.
+  //
+  // ⚠️ Plain Linear filtering, NO mipmaps — deliberately. A mip-requiring minFilter whose
+  // mips fail to generate leaves the texture INCOMPLETE, which samples BLACK with no error
+  // anywhere (that was this view's hardest bug: the land silently vanished). The bake
+  // resolution is chosen near the on-screen sampling rate, so linear-without-mips shows no
+  // meaningful shimmer.
+  const pixels = fg.getImageData(0, 0, W, H);
+  const tex = new THREE.DataTexture(new Uint8Array(pixels.data.buffer), W, H, THREE.RGBAFormat);
+  tex.flipY = false; // baked into the pixels above
+  tex.magFilter = THREE.LinearFilter;
+  tex.minFilter = THREE.LinearFilter;
+  tex.generateMipmaps = false;
+  tex.wrapS = THREE.ClampToEdgeWrapping; // the sphere's native UVs stay in [0,1] — no repeat needed
+  tex.wrapT = THREE.ClampToEdgeWrapping; // poles must not wrap
+  tex.colorSpace = THREE.NoColorSpace;
+  tex.needsUpdate = true;
+  return tex;
 }
 
 async function buildLand(globe: GeoViewHost) {
@@ -102,20 +225,21 @@ async function buildLand(globe: GeoViewHost) {
     const topo = await res.json();
     const land = feature(topo, topo.objects.land);
 
-    // Each coastline ring becomes two things, built from the SAME vertices so they line
-    // up exactly: a raised cliff "wall" (a vertical ribbon from ocean level R up to the
-    // plateau top R+LAND_H) and the filled plateau on top (the polygon triangulated and
-    // lifted to that same top radius). Because both use latLonToVec3(lat, lon, top) on the
-    // identical ring points, the fill boundary IS the wall-top edge — no approximation.
-    // Antimeridian-safe: lon +180 and −180 map to the SAME 3D point, so a seam wall segment
-    // is a degenerate (zero-area) quad, and seam-straddling fill triangles are skipped below.
+    // Each coastline ring becomes a raised cliff "wall" (a vertical ribbon from ocean level R
+    // up to the plateau top R+LAND_H) — GEOMETRY, because the walls are the hologram's defining
+    // stroke and need real 3D presence for the rim shader. The land SURFACE inside the walls is
+    // NOT geometry any more: it's a full sphere at the same top radius wearing the land-mask
+    // texture (see makeLandTexture) with alphaTest cutting the ocean away — the standard
+    // texture-mask globe technique. (The previous earcut/unwrap plateau triangulation rendered
+    // its complement on part of the world — a defect masked for months by the old near-black
+    // body sphere behind it — and was fragile at the seam/poles; the masked sphere kills the
+    // whole bug class: no unwrap, no pole caps, no T-junctions, mipmapped anti-aliasing.)
     const top = R + LAND_H;
     // Start the cliff base just ABOVE the sea (the opaque, faceted sphere at R dips ~0.02 below
     // R between facets) so the additive wall never z-fights / pokes through the waterline. The
     // base is faded to transparent anyway, so the visible rim is unchanged.
     const wallBase = R + 0.04;
     const wallPos: number[] = []; // wall ribbon vertices (two triangles per ring segment)
-    const fillPos: number[] = []; // plateau triangles (the solid land cap)
     const addRing = (ring: number[][]) => {
       for (let i = 0; i < ring.length - 1; i++) {
         const a = ring[i], b = ring[i + 1];
@@ -128,82 +252,12 @@ async function buildLand(globe: GeoViewHost) {
         );
       }
     };
-    // Triangulate the plateau in (lon, lat) with earcut, then lift each vertex to the
-    // wall-top radius with the very same function the walls use. The catch is the ±180
-    // seam: earcut knows nothing about it, so a polygon that crosses it (Eurasia-Africa
-    // via Chukotka, Antarctica, a couple of islands — 4 of 125) tears into garbage. We
-    // first UNWRAP each ring's longitude into a continuous run (accumulate the shortest
-    // step), which turns a crosser back into a valid simple polygon; latLonToVec3 maps
-    // the out-of-[-180,180] longitudes straight back to the right 3D points.
-    const unwrap = (ring: number[][]): THREE.Vector2[] => {
-      let lon = ring[0][0];
-      const out = [new THREE.Vector2(lon, ring[0][1])];
-      for (let i = 1; i < ring.length; i++) {
-        let d = ring[i][0] - ring[i - 1][0];
-        if (d > 180) d -= 360; else if (d < -180) d += 360;
-        lon += d;
-        out.push(new THREE.Vector2(lon, ring[i][1]));
-      }
-      // drop the closing duplicate — unless unwrap moved it (a pole-encircling ring)
-      const a = out[0], b = out[out.length - 1];
-      if (out.length > 1 && Math.abs(a.x - b.x) < 1e-6 && a.y === b.y) out.pop();
-      return out;
-    };
-    const meanLon = (r: THREE.Vector2[]) => r.reduce((s, p) => s + p.x, 0) / r.length;
-    // Emit one earcut triangle, subdivided into an n×n grid so each facet is small. A big
-    // flat triangle is a chord that sags toward the globe centre — past ocean level it gets
-    // depth-occluded into a black patch — so the split keeps the surface hugging the sphere.
-    // n is FIXED (not per-triangle by size): with a uniform split, neighbouring triangles
-    // divide their shared edge into the same points, so there are no T-junction cracks. The
-    // widest real triangle spans ~68°, so n=4 keeps every facet (~17°) under the ~24° sag
-    // limit (smooth per-vertex normals hide the faceting). ~76k tris in one static draw call.
-    const n = 4;
-    const emitTri = (A: THREE.Vector2, B: THREE.Vector2, C: THREE.Vector2) => {
-      const pt = (u: number, w: number) => latLonToVec3(A.y + (B.y - A.y) * u + (C.y - A.y) * w,
-                                        A.x + (B.x - A.x) * u + (C.x - A.x) * w, top);
-      // Force outward winding so gl_FrontFacing agrees with the radial normals; otherwise
-      // DoubleSide flips the normal on back-wound facets and they render unlit (black). Every
-      // sub-facet shares this triangle's parametric orientation, so decide the flip ONCE.
-      const pA = pt(0, 0), pB = pt(1, 0), pC = pt(0, 1);
-      const nx = (pB.y - pA.y) * (pC.z - pA.z) - (pB.z - pA.z) * (pC.y - pA.y);
-      const ny = (pB.z - pA.z) * (pC.x - pA.x) - (pB.x - pA.x) * (pC.z - pA.z);
-      const nz = (pB.x - pA.x) * (pC.y - pA.y) - (pB.y - pA.y) * (pC.x - pA.x);
-      const flip = nx * pA.x + ny * pA.y + nz * pA.z < 0;
-      const tri = (p0: THREE.Vector3, p1: THREE.Vector3, p2: THREE.Vector3) => {
-        if (flip) fillPos.push(p0.x, p0.y, p0.z, p2.x, p2.y, p2.z, p1.x, p1.y, p1.z);
-        else fillPos.push(p0.x, p0.y, p0.z, p1.x, p1.y, p1.z, p2.x, p2.y, p2.z);
-      };
-      for (let i = 0; i < n; i++) for (let j = 0; j < n - i; j++) {
-        tri(pt(i / n, j / n), pt((i + 1) / n, j / n), pt(i / n, (j + 1) / n));
-        if (j < n - i - 1) tri(pt((i + 1) / n, j / n), pt((i + 1) / n, (j + 1) / n), pt(i / n, (j + 1) / n));
-      }
-    };
-    const addPolygon = (rings: number[][][]) => {
-      rings.forEach(addRing); // cliff walls for the outer ring + every hole
-      const contour = unwrap(rings[0]);
-      // A ring whose longitude winds a full turn encircles a pole (Antarctica): close it
-      // along the far parallel so the cap fills down to the pole instead of leaving a gash.
-      if (Math.abs(contour[contour.length - 1].x - contour[0].x) > 270) {
-        const poleLat = contour[0].y < 0 ? -90 : 90;
-        contour.push(new THREE.Vector2(contour[contour.length - 1].x, poleLat));
-        contour.push(new THREE.Vector2(contour[0].x, poleLat));
-      }
-      const cMean = meanLon(contour);
-      const holes = rings.slice(1).map((h) => {
-        const u = unwrap(h);
-        const shift = Math.round((cMean - meanLon(u)) / 360) * 360; // into the outer's lon frame
-        if (shift) u.forEach((p) => (p.x += shift));
-        return u;
-      });
-      let faces: number[][];
-      try { faces = THREE.ShapeUtils.triangulateShape(contour, holes); } catch { return; }
-      const verts = [contour, ...holes].flat(); // earcut indexes contour then holes, in order
-      for (const [a, b, c] of faces) emitTri(verts[a], verts[b], verts[c]);
-    };
-    for (const f of land.features) {
-      const g = f.geometry;
-      if (g.type === "Polygon") addPolygon(g.coordinates as number[][][]);
-      else if (g.type === "MultiPolygon") (g.coordinates as number[][][][]).forEach(addPolygon);
+    // Walls for every ring (outer coasts + hole rims). The fill is textural — see below.
+    for (const f of land.features as LandFeature[]) {
+      const polys = (f.geometry.type === "Polygon"
+        ? [f.geometry.coordinates]
+        : f.geometry.coordinates) as number[][][][];
+      for (const rings of polys) rings.forEach(addRing);
     }
 
     // The cliff walls. A ShaderMaterial derives each vertex's height from its
@@ -235,7 +289,12 @@ async function buildLand(globe: GeoViewHost) {
           // Gently non-linear ramp (a blend of linear + quadratic): dim along the ocean line,
           // strengthening toward the top rim — so the rim reads as an edge, not a glowing band.
           float e = t * (0.4 + 0.6 * t);
-          gl_FragColor = vec4(uColor * (0.09 + 0.26 * e), e * uOpacity);
+          // The coastal cliffs are the signature element, but SUBTLE: a soft body ramp up the wall
+          // plus a gentle highlight pinned to the very top edge. Now that the walls are tall
+          // (LAND_H) and share the surface's dim teal hue (uColor), height + the top-edge glow make
+          // them the accent WITHOUT the harsh ice-white brightness — calm glowing ridges.
+          float edge = smoothstep(0.6, 1.0, t);
+          gl_FragColor = vec4(uColor * (0.08 + 0.32 * e + 0.5 * edge), min(1.0, e * 1.1) * uOpacity);
         }`,
       // Single-sided so only cliffs whose face points toward the camera draw: a
       // continent's near + side edges show, its far edge (behind the filled plateau)
@@ -246,31 +305,28 @@ async function buildLand(globe: GeoViewHost) {
     });
     globe.group.add(new THREE.Mesh(wallGeo, wallMat));
 
-    // The solid plateau, from the triangles built above. Radial normals (= normalized
-    // position) give it the smooth sphere shading of the sea, so it responds to light
-    // EXACTLY like the body — just lifted a couple of shades for subtle land/sea contrast.
-    // depthWrite occludes the ocean grid (and the back walls) beneath the plateau; the nodes
-    // sit ABOVE it, so they aren't hidden. Its edge IS the wall-top edge (same vertices).
-    const fillGeo = new THREE.BufferGeometry();
-    const fillArr = new Float32Array(fillPos);
-    fillGeo.setAttribute("position", new THREE.BufferAttribute(fillArr, 3));
-    const normArr = new Float32Array(fillArr.length);
-    for (let i = 0; i < fillArr.length; i += 3) {
-      const inv = 1 / Math.hypot(fillArr[i], fillArr[i + 1], fillArr[i + 2]);
-      normArr[i] = fillArr[i] * inv; normArr[i + 1] = fillArr[i + 1] * inv; normArr[i + 2] = fillArr[i + 2] * inv;
-    }
-    fillGeo.setAttribute("normal", new THREE.BufferAttribute(normArr, 3));
-    globe.landFillMat = new THREE.MeshStandardMaterial({
-      // Contrast lives mostly in the emissive (lighting-independent) so the land reads as
-      // land even in dimly-lit parts of the globe — the single north key light otherwise
-      // leaves the camera-facing centre near-black, which looked like an unfilled hole.
-      color: 0x26384a, emissive: 0x121c28, emissiveIntensity: 0.9,
-      roughness: 0.95, metalness: 0.1,
-      transparent: true, opacity: 0, side: THREE.DoubleSide,
+    // HOLOGRAPHIC LAND. The surface is the geo view's "ledger pane": a faint, CALM structural
+    // cyan-glass skin (same muted-teal family as the Snapshots floors — low luminance, low
+    // saturation, one hue temperature) that holds the brighter data layers above it (nodes,
+    // heat rings, arcs) and lets the coastal walls be the star. It's a plain sphere at the
+    // wall-top radius wearing the land texture ADDITIVELY: sea texels are pure black (they add
+    // nothing and simply don't exist on screen), land carries the soft glass glow + 3° grid in
+    // luminance, and the HUE rides the material colour (COLORS.geoGrid ×1.4 — kept low so the
+    // grid stays a calm wash, not neon). No lighting model — the hologram must read identically
+    // on both hemispheres (MeshBasicMaterial); no depthWrite (additive light occludes nothing);
+    // FrontSide so the far hemisphere is culled and the hologram stays readable (walls +
+    // graticule still give the far side its faint see-through presence). Static — reduced-motion safe.
+    const landTex = makeLandTexture(land.features as LandFeature[]);
+    const landMat = new THREE.MeshBasicMaterial({
+      map: landTex,
+      color: new THREE.Color(COLORS.geoGrid).multiplyScalar(1.1),
+      blending: THREE.AdditiveBlending, depthWrite: false,
+      transparent: true, opacity: 0, side: THREE.FrontSide,
     });
-    globe.geoFades.push({ mat: globe.landFillMat, base: 1 }); // fades in with the sea
-    globe.landFillMesh = new THREE.Mesh(fillGeo, globe.landFillMat);
-    globe.landFillMesh.renderOrder = -1; // after the body (−2), before the rim/heatmap/nodes
+    globe.landFillMat = landMat;
+    globe.geoFades.push({ mat: globe.landFillMat, base: 1 }); // fades in with the surface
+    globe.landFillMesh = new THREE.Mesh(new THREE.SphereGeometry(top, 96, 64), globe.landFillMat);
+    globe.landFillMesh.renderOrder = -1; // before the rim/heatmap/nodes
     globe.landFillMesh.visible = false;  // revealed once the globe materialises (setMorph)
     globe.group.add(globe.landFillMesh);
   } catch {
