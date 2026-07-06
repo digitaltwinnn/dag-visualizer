@@ -165,7 +165,9 @@ store-value imports**, enforced by `layerBoundaries.test.ts`). Each ships coloca
 - `morph.ts` — the hyper↔geo morph easing + derived visibility ramps.
 - `nodeLayout.ts` — the node placement math: fibonacci shells around the core/hubs, the
   sphere→disc geo positions, `spreadCoLocated()` phyllotaxis fan-out.
-- `dimModel.ts` — the filter/hover/country dimming model (`_dimScale`, `_nodeActive` gating).
+- `dimModel.ts` — pure filter/hover/country dim + emissive resolution; a tested reference spec
+  the scene layer currently reimplements inline (`NodeFabric`'s glow writers, `Globe._dimScale`/
+  `_applyDim`) rather than calling.
 - `arcSim.ts` — the travelling-packet arc simulation: a swarm of comet "agents" that hop
   node→node. **Emits flash EVENTS via a ring buffer** — no cross-view side-channel mutation.
 - `ledgerModel.ts` — the Snapshots chamber's layout/slot/tile model over the live snapshot data.

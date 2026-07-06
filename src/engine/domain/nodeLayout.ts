@@ -1,6 +1,7 @@
-// Pure node-layout math shared by the validator + metagraph node engine (js/globe.js).
-// Extracted verbatim (with source comments) as the domain layer for Task 11's globe.js
-// split — the numbers/behaviour are unchanged, js/globe.js is not yet switched over.
+// Pure node-layout math shared by the validator + metagraph node engine. Extracted verbatim
+// (with source comments) from js/globe.js:22-84 (GOLDEN_ANGLE / nodeRoles / discFall /
+// spreadCoLocated) and :225-230 (fibShellPos) — js/globe.js is deleted (03e57d5). Consumed by
+// scene/Globe.ts, scene/objects/NodeFabric.ts, and scene/objects/Heatmap.ts.
 
 import * as THREE from "three";
 

@@ -16,8 +16,8 @@ interface GeoFadeEntry {
   base: number;
 }
 
-// The exact handles buildGeoView reads and writes on the host (the Globe instance —
-// still vanilla JS; Task 11 will make Globe implement this). `landFillMat` is set too (an
+// The exact handles buildGeoView reads and writes on the host (the Globe instance,
+// scene/Globe.ts, implements this). `landFillMat` is set too (an
 // extra beyond the brief's 5) but is only read back locally to construct `landFillMesh`, not
 // consumed elsewhere in globe.js — kept optional here for parity with the original handle.
 export interface GeoViewHost {

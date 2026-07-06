@@ -1,6 +1,8 @@
-// Pure travelling-packet arc simulation shared by the geo view's node engine (js/globe.js).
-// Extracted verbatim (with source comments) as the domain layer for Task 11's globe.js split —
-// the numbers/behaviour are unchanged, js/globe.js is not yet switched over.
+// Pure travelling-packet arc simulation shared by the geo view's node engine. Extracted
+// verbatim (with source comments) from js/globe.js — js/globe.js is deleted (03e57d5); see the
+// inline js/globe.js:NN-NN citations throughout for each piece's exact source lines. Consumed
+// by scene/Globe.ts (ArcSim, ArcEndpoint) and scene/objects/Arcs.ts (the render-loop adapter
+// this file's comments below refer to as "Task 11" — that split is now in place).
 //
 // Each "agent" is a comet that hops node -> node: travel along a curved bezier hop, flash on
 // arrival, pause a moment, then pick a new target and hop on. js/globe.js kept three concerns

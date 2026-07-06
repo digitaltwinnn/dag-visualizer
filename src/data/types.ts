@@ -1,4 +1,4 @@
-// Shapes coming off the (still-vanilla) data layer. Loose where the source is loose.
+// Shapes coming off the data layer (src/data/api.ts, typed). Loose where the source is loose.
 
 export interface GlobalSnapshot {
   ordinal: number;

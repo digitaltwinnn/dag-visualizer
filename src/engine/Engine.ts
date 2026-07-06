@@ -417,8 +417,9 @@ export class Engine {
     this._publishLeaderboard();
     // Tint the globe's land edge with the selected metagraph's SCENE colour (null → default
     // cyan). NOTE: globe.setEdgeColor currently ignores its argument and always uses the fixed
-    // ice-blue rim (see js/globe.js) — kept here so a future re-enable doesn't need call-site
-    // changes; "dag" now resolves to its own brand hue like any other id, not structural cyan.
+    // ice-blue rim (see scene/Globe.ts's setEdgeColor/`_edgeColor`) — kept here so a future
+    // re-enable doesn't need call-site changes; "dag" now resolves to its own brand hue like
+    // any other id, not structural cyan.
     const accent =
       this.filter && this.filter !== "all"
         ? new THREE.Color(identitySceneHex(this.filter)).getHex()

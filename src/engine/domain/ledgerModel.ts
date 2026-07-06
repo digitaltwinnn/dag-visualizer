@@ -1,6 +1,7 @@
-// Pure state machine behind the Snapshots (ledger) view (js/ledger.js). Extracted verbatim (with
-// source comments) as the domain layer for Task 13's LedgerChamber scene adapter — the numbers/
-// behaviour are unchanged, js/ledger.js is NOT switched over by this task.
+// Pure state machine behind the Snapshots (ledger) view. Extracted verbatim (with source
+// comments, incl. the js/ledger.js:NN line citations below) from js/ledger.js — js/ledger.js is
+// deleted (5cb3efd). Consumed by scene/views/LedgerView.ts (named "LedgerChamber" in the design
+// notes below, shipped as LedgerView).
 //
 // js/ledger.js entangles STATE (which slot a block sits in, its fade/size/position) with MESHES
 // (the block IS a THREE.Mesh; the trail entry holds `{ mesh, slot, ordinal }`). This module keeps

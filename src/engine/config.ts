@@ -25,9 +25,9 @@ export interface MetaConfig {
 }
 
 // The real mainnet metagraphs (source: dagexplorer). Each pulls live snapshots
-// via its id, with a simulated cadence fallback. Colours match the metagraph
-// node clusters plotted on the globe (data/metagraphs.json). Keep this list in
-// sync with the baked data by re-running scripts/bake-metagraphs.py.
+// via its id. Colours match the metagraph node clusters plotted on the globe
+// (data/metagraphs.json). Keep this list in sync with the baked data by
+// re-running scripts/bake-metagraphs.py.
 export const METAGRAPHS: MetaConfig[] = [
   { name: "Digital Evidence",    ticker: "DED",      color: 0x36e29a, id: "DAG0eQr94qUQSUhmYGNXt6CoBKWu5K6htvRMGC6M",
     blurb: "DoD-vetted data-fingerprinting as a service — immutable proof of data authenticity, anchored to the Global L0." },

@@ -1,6 +1,10 @@
-// Pure dim/emissive resolution shared by the validator + metagraph per-frame node loops
-// (js/globe.js). Extracted verbatim (with source comments) as the domain layer for Task 11's
-// globe.js split — the numbers/behaviour are unchanged, js/globe.js is not yet switched over.
+// Reference + regression spec for the validator + metagraph per-frame dim/emissive resolution.
+// The render path inlines these formulas verbatim rather than calling into this module:
+// NodeFabric.writeValidatorGlow/writeMetaFrame (scene/objects/NodeFabric.ts) reimplement
+// nodeEmissive/metaNodeEmissive's math inline, and Globe._dimScale/_applyDim (scene/Globe.ts)
+// reimplement dimScale/dimTargetsFor. Any change here must be made in BOTH places until a
+// follow-up wires this module in directly (parity-gated). The tests colocated with this file
+// are the executable spec of the contract.
 //
 // DEVIATION from the Task 9 brief: the brief's single `nodeEmissive(..., baseLo, baseHi)`
 // signature exactly expresses the VALIDATOR loop (js/globe.js:1043-1054) — its base term really

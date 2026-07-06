@@ -6,7 +6,7 @@ import { hex } from "@/src/util/format";
 import { identityHudNumber } from "@/src/palette/identity";
 
 export { shortHash };
-export const COLORS = RAW_COLORS as { core: number; l0: number; l1: number; bg: number };
+export const COLORS = RAW_COLORS;
 
 // The neutral accent as a CSS string (for libraries like Recharts that need a literal),
 // and the fallback hub colour for a metagraph the config doesn't know yet.

@@ -12,9 +12,10 @@ import { R_GLOBE, CORE_R } from "../../domain/morph";
 
 const _pos = new THREE.Vector3(); // scratch for hub orbit positions (reused each frame)
 
-// One orbiting metagraph hub record in HyperView.metas (the exact shape the
-// constructor builds — js/globe.js, still vanilla, reads these fields off the instance
-// handed to it, so this type must track _buildMetagraphs verbatim).
+// One orbiting metagraph hub record in HyperView.metas (the exact shape the constructor
+// builds — scene/Globe.ts (via `layers.metas.find`, keying off `.cfg.id`/`.group`) and
+// Engine.ts (`.cfg.id` lookups for DoF/filter) read these fields off the instances handed
+// to them, so this type must track _buildMetagraphs verbatim).
 export interface MetaHubRec {
   group: THREE.Group;
   hub: THREE.Mesh;

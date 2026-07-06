@@ -1,7 +1,11 @@
-// Pure morph-scalar eases driving the hyper<->geo cross-fade. Each is a one-liner lifted
-// verbatim (with its source comment) from js/globe.js and src/engine/scene/HyperFurniture.ts
-// — extracted here as the domain layer for Task 11's globe.js split; neither source file is
-// switched over to call these yet.
+// Reference + regression spec for the hyper<->geo morph-scalar eases. Each is a one-liner
+// lifted verbatim (with its source comment) from js/globe.js and the (now deleted)
+// src/engine/scene/HyperFurniture.ts. Only `surfFade`/`extrasFade` (consumed by scene/Globe.ts)
+// and `R_GLOBE`/`CORE_R` (consumed by scene/views/HyperView.ts) are wired in directly —
+// `discWeight`, `hubFade`, `coreGrow`, and `coreReveal` are reimplemented inline instead
+// (discWeight in NodeFabric.ts, the other three as local consts in HyperView.ts's update()).
+// Any change to those four must be made in BOTH places until a follow-up wires them in (parity-
+// gated). The tests colocated with this file are the executable spec of the contract.
 
 import * as THREE from "three";
 import { smooth } from "./nodeLayout";
