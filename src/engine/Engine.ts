@@ -9,7 +9,7 @@ import { identityMap, identitySceneHex } from "@/src/palette/identity";
 import { createScene, type SceneCtx } from "./scene/SceneContext";
 import { HyperView } from "./scene/views/HyperView";
 import { Globe } from "./scene/Globe";
-import { Ledger } from "../../js/ledger.js";
+import { LedgerView } from "./scene/views/LedgerView";
 import { loadGeoCache, resolveMissing } from "@/src/data/geoResolve";
 import { METAGRAPHS } from "@/src/engine/config";
 import type { GlobalSnapshot, PickDescriptor } from "@/src/data/types";
@@ -17,7 +17,6 @@ import type {
   ClusterNode,
   DagCore,
   GeoMap,
-  LedgerApi,
   RouteMetagraph,
 } from "./boundary";
 
@@ -34,8 +33,7 @@ const sceneColorsFor = (ids: string[]): Record<string, number> => {
 
 // The remaining js/ modules ship no types and `allowJs` only infers partial/loose ones, so
 // pin them to the curated surface in ./boundary here — the single place these assertions
-// live. Everything downstream is then fully checked. (Globe is now a typed TS class — no cast.)
-const LedgerCtor = Ledger as unknown as new (scene: THREE.Scene) => LedgerApi;
+// live. Everything downstream is then fully checked. (Globe + LedgerView are typed TS classes — no cast.)
 const loadGeo = loadGeoCache as () => Promise<GeoMap>;
 const resolveGeo = resolveMissing as (
   map: GeoMap,
@@ -50,7 +48,7 @@ const FOCI: Record<string, { pos: Vec; target: Vec }> = {
   dag: { pos: new THREE.Vector3(0, 9, 38), target: new THREE.Vector3(0, 1, 0) },
   geo: { pos: new THREE.Vector3(0, 11, 36), target: new THREE.Vector3(0, 2, 0) },
   // The Snapshots view is a stack of transparent wireframe FLOORS (layers) on Y. Frame it from an
-  // elevated front angle so the stacked planes read in 3D — see js/ledger.js + config.LEDGER.
+  // elevated front angle so the stacked planes read in 3D — see LedgerView + config.LEDGER.
   // Default framing: the LEAD (latest block) sits toward the bottom-right, leaving the rest of the
   // view for the trailing chains; looking roughly along -X. Orbit is free.
   ledger: { pos: new THREE.Vector3(31, 14, 20), target: new THREE.Vector3(-17, 1, -2) },
@@ -63,7 +61,7 @@ export class Engine {
   private ctx: SceneCtx;
   private layers: HyperView;
   private globe: Globe;
-  private ledger: LedgerApi;
+  private ledger: LedgerView;
   private _ledgerDirty = false; // rebuild the ledger geometry next frame (set on data events)
   private clock = new THREE.Clock();
   private raf = 0;
@@ -115,7 +113,7 @@ export class Engine {
     // HyperView only ever has these 10 config hubs, so this map never needs updating.
     this.layers = new HyperView(this.ctx.scene, sceneColorsFor(METAGRAPHS.map((m) => m.id)));
     this.globe = new Globe(this.ctx.scene, this.layers, this.ctx.camera);
-    this.ledger = new LedgerCtor(this.ctx.scene);
+    this.ledger = new LedgerView(this.ctx.scene);
     // The ledger colours its lane tiles / anchor rings / links / pulses per metagraph — feed it the
     // same identity SCENE map so those match the hubs/nodes (config-ids known synchronously; the
     // live set incl. new metagraphs is refreshed in refreshMeta alongside globe). "dag" is included
