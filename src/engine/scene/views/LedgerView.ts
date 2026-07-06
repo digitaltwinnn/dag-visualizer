@@ -38,9 +38,9 @@ import type { GlobalSnapshot, Anchor, PickDescriptor } from "@/src/data/types";
 const FLOOR_Y = [LEDGER.rowProducers, LEDGER.rowML1, LEDGER.rowML0, LEDGER.rowMSnap, LEDGER.rowGL0, LEDGER.rowHypL0, LEDGER.rowDAGL1];
 
 // The two SNAPSHOT/ledger floors (the L0 OUTPUTS — metagraph snapshots + global snapshots), as
-// opposed to the node/validator floors. They wear a distinct structural token hue (--core-l1 violet
-// vs the node floors' --primary cyan) so the two KINDS of layer read apart at a glance. Still an
-// existing palette token — no bespoke colour.
+// opposed to the node/validator floors. They render as a transparent bordered FRAME — a sharp edge
+// outline, no filled sheet — rather than the node floors' soft filled glass, so the two KINDS of
+// layer read apart at a glance (same --primary hue; only the treatment differs).
 const SNAPSHOT_FLOORS = new Set<number>([LEDGER.rowMSnap, LEDGER.rowGL0]);
 
 // Short layer labels. Two kinds of floor: node/validator layers (metagraph L1/L0, hypergraph L1) and
@@ -108,7 +108,6 @@ interface QueueItem {
 export class LedgerView {
   group: THREE.Group;
   private _core: number;             // the structural accent (colors.core), as a number
-  private _snapFloor: number;        // the snapshot-floor hue (colors.coreL1) — distinct from node floors
   private _coreCol: THREE.Color;     // the accent as a Color (live/selected blocks)
   private _neutralTile: THREE.Color; // the accent dimmed — the recessive trail tone
   // Identity SCENE-lane colour map (id -> 0xRRGGBB), set by the Engine so lane tiles / anchor rings /
@@ -164,7 +163,6 @@ export class LedgerView {
 
   constructor(scene: THREE.Scene, colors: SceneColors) {
     this._core = colors.core;
-    this._snapFloor = colors.coreL1;
     this._coreCol = new THREE.Color(colors.core);
     this._neutralTile = new THREE.Color(colors.core).multiplyScalar(NEUTRAL_DIM);
     this.group = new THREE.Group();
@@ -286,13 +284,27 @@ export class LedgerView {
     const W = 38;        // X extent (camera-depth) — tight to the lead + trail span
     const D = 44;        // Z extent — tight to the lanes
     const cx = -16;      // centred on the content; +X (in front of the lead) stays black
+    const planeGeo = new THREE.PlaneGeometry(W, D);      // shared by the node-floor sheets
+    const edgeGeo = new THREE.EdgesGeometry(planeGeo);   // the 4 sharp border edges (snapshot frames)
     for (const y of FLOOR_Y) {
-      const hue = SNAPSHOT_FLOORS.has(y) ? this._snapFloor : this._core;
-      const pane = new THREE.Mesh(new THREE.PlaneGeometry(W, D), this._paneMat(hue, 0.025));
-      pane.rotation.x = -Math.PI / 2; // lie flat in the X/Z plane (W→X, D→Z)
-      pane.position.set(cx, y, 0);
-      pane.renderOrder = -1;
-      this.group.add(pane);
+      let floor: THREE.Object3D;
+      if (SNAPSHOT_FLOORS.has(y)) {
+        // Snapshot-output floor: a transparent bordered FRAME (sharp default edge, no soft fade, no
+        // filled sheet) so it reads as a different KIND than the node floors' soft glass.
+        floor = new THREE.LineSegments(
+          edgeGeo,
+          new THREE.LineBasicMaterial({
+            color: this._core, transparent: true, opacity: 0.4,
+            blending: THREE.AdditiveBlending, depthWrite: false,
+          }),
+        );
+      } else {
+        floor = new THREE.Mesh(planeGeo, this._paneMat(this._core, 0.025));
+      }
+      floor.rotation.x = -Math.PI / 2; // lie flat in the X/Z plane (W→X, D→Z)
+      floor.position.set(cx, y, 0);
+      floor.renderOrder = -1;
+      this.group.add(floor);
     }
     // Front-left layer labels — printed flat ON each floor, tucked into its front-left corner.
     const lx = cx + W / 2 - 2, lz = D / 2 - 2.5;
