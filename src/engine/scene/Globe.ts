@@ -10,8 +10,8 @@
 // state, does the geo relayout (fan-out, heatmap + arc rebuild), the spin/aim/focus logic, and the
 // setMorph/update orchestration — delegating the instanced-mesh writes to NodeFabric, the density
 // rings to Heatmap, the travelling packets to Arcs (+ the pure ArcSim), and the globe surface to
-// buildGeoView. Its public surface is exactly the old GlobeApi (boundary.ts) so the Engine's
-// call sites are unchanged.
+// buildGeoView. Its public surface is a typed TS class imported directly by the Engine — no
+// boundary/cast layer needed.
 
 import * as THREE from "three";
 import { COLORS, METAGRAPHS, metaAnchor, DEFAULT_META_COLOR, ledgerSite, ledgerSpread, clusterRadius, LEDGER } from "../config";
@@ -20,7 +20,6 @@ import { R, LAND_H, latLonToVec3 } from "../domain/geoMath";
 import { GOLDEN_ANGLE, fibShellPos, nodeRoles, spreadCoLocated, type Cluster } from "../domain/nodeLayout";
 import { surfFade, extrasFade } from "../domain/morph";
 import { ArcSim, type ArcEndpoint } from "../domain/arcSim";
-import type { DimContext } from "../domain/dimModel";
 import type { MetaNodeRecord, ValidatorRecord } from "../domain/records";
 import { buildGeoView, type GeoViewHost } from "./views/GeoView";
 import { NodeFabric, type FrameCtx } from "./objects/NodeFabric";
@@ -115,6 +114,13 @@ export class Globe implements GeoViewHost {
   private arcs: Arcs;
   private arcSim = new ArcSim();
 
+  // The one FrameCtx struct NodeFabric's per-frame writes consume — allocated ONCE (in the
+  // constructor, after `group`/`dim`/`_camN` exist) and mutated in place each call (setMorph +
+  // update both call _frameCtx every frame); `dim`/`camN`/`group` are already-persistent fields
+  // referenced directly, so only the scalars + the nested DimContext get written per call (Task 15
+  // allocation fix — this used to allocate a fresh FrameCtx + DimContext object twice per frame).
+  private _ctx!: FrameCtx;
+
   constructor(scene: THREE.Scene, layers: HyperView | null = null, camera: THREE.Camera | null = null) {
     this.group = new THREE.Group();
     scene.add(this.group);
@@ -127,6 +133,15 @@ export class Globe implements GeoViewHost {
     this.fabric = new NodeFabric(this.nodeGroup);
     this.heatmap = new Heatmap(this.group);
     this.arcs = new Arcs(this.group);
+
+    this._ctx = {
+      c: {
+        morph: 0, hoverFilterActive: false, ledger: false, countryFilter: null,
+        countryMix: 0, hoverNodeId: null, selectedNodeId: null, filter: "all",
+      },
+      dim: this.dim, dimScaleV: 0, clock: 0, camN: this._camN, hasCam: false,
+      ledgerT: 0, dt: 0, flashDecay: 0, group: this.group,
+    };
 
     // The geo globe surface (body, graticule, atmosphere, continents) — it sets the surface handles
     // back on `this` for the morph/fade loop and pushes its fade materials into this.geoFades.
@@ -458,22 +473,28 @@ export class Globe implements GeoViewHost {
     return 0.32 + 0.68 * this.morph;
   }
 
-  // Build the one FrameCtx struct NodeFabric's per-frame writes consume.
+  // Write this frame's values into the persistent FrameCtx (`this._ctx`, built once in the
+  // constructor) and return it — `dim`/`camN`/`group` are already the same persistent objects, so
+  // only the scalars + the nested DimContext fields need updating (Task 15 allocation fix: this
+  // used to allocate a fresh FrameCtx + DimContext object on every call).
   private _frameCtx(dt: number, flashDecay: number): FrameCtx {
-    const c: DimContext = {
-      morph: this.morph,
-      hoverFilterActive: this._hoverFilterActive,
-      ledger: this.ledger,
-      countryFilter: this.countryFilter,
-      countryMix: this.countryMix,
-      hoverNodeId: this._hoverNodeId,
-      selectedNodeId: this._selectedNodeId,
-      filter: this.filter,
-    };
-    return {
-      c, dim: this.dim, dimScaleV: this._dimScale(), clock: this.clock,
-      camN: this._camN, hasCam: this._hasCam, ledgerT: this.ledgerT, dt, flashDecay, group: this.group,
-    };
+    const ctx = this._ctx;
+    const c = ctx.c;
+    c.morph = this.morph;
+    c.hoverFilterActive = this._hoverFilterActive;
+    c.ledger = this.ledger;
+    c.countryFilter = this.countryFilter;
+    c.countryMix = this.countryMix;
+    c.hoverNodeId = this._hoverNodeId;
+    c.selectedNodeId = this._selectedNodeId;
+    c.filter = this.filter;
+    ctx.dimScaleV = this._dimScale();
+    ctx.clock = this.clock;
+    ctx.hasCam = this._hasCam;
+    ctx.ledgerT = this.ledgerT;
+    ctx.dt = dt;
+    ctx.flashDecay = flashDecay;
+    return ctx;
   }
 
   // -------------------------------------------------- morph between layouts

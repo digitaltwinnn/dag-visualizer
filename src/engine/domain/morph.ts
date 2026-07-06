@@ -25,9 +25,8 @@ export const hubFade = (m: number) => THREE.MathUtils.clamp(1 - m / 0.3, 0, 1);
 
 // The core's morph "core -> globe" transform: the blue Hypergraph heart swells out to the
 // globe's radius as the Earth fades in beneath the nodes, so it reads as the core becoming
-// the globe. R_GLOBE/CORE_R are re-declared here (not imported from HyperFurniture, a scene/
-// module — domain must not import from scene/) matching its literals exactly; HyperFurniture
-// should migrate to consume these two constants from here in a later task instead of keeping
+// the globe. R_GLOBE/CORE_R are the canonical home for these two constants — HyperView
+// (src/engine/scene/views/HyperView.ts) imports them from here (Task 15) instead of keeping
 // its own copies.
 export const R_GLOBE = 16; // must match Globe's R (src/engine/domain/geoMath.ts) — the radius the core grows out to
 export const CORE_R = 3.1; // the core IcosahedronGeometry radius

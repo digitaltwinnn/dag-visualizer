@@ -8,9 +8,8 @@
 
 import * as THREE from "three";
 import { COLORS, METAGRAPHS, metaAnchor, type MetaConfig } from "../../config";
+import { R_GLOBE, CORE_R } from "../../domain/morph";
 
-const R_GLOBE = 16;  // must match Globe's R — the radius the core grows out to
-const CORE_R = 3.1;  // the core IcosahedronGeometry radius
 const _pos = new THREE.Vector3(); // scratch for hub orbit positions (reused each frame)
 
 // One orbiting metagraph hub record in HyperView.metas (the exact shape the

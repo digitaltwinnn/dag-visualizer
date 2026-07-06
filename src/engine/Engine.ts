@@ -4,27 +4,21 @@ import { useStore, type Mode } from "@/src/store/store";
 import { metagraphById, initNetwork, getNetwork, getAnchor, DEFAULT_META_COLOR } from "@/src/data/network";
 import { hoverKeyOf, tooltipSubject } from "@/src/data/hoverSubject";
 import { identityMap, identitySceneHex } from "@/src/palette/identity";
-// Existing vanilla modules, reused. Bare specifiers resolve via npm; they ship no types
-// of their own, so their surface is described in ./boundary and applied at construction.
 import { createScene, type SceneCtx } from "./scene/SceneContext";
-import { HyperView } from "./scene/views/HyperView";
+import { HyperView, type MetaHubRec } from "./scene/views/HyperView";
 import { Globe } from "./scene/Globe";
 import { LedgerView } from "./scene/views/LedgerView";
 import { loadGeoCache, resolveMissing } from "@/src/data/geoResolve";
 import { METAGRAPHS } from "@/src/engine/config";
 import { VIEW_POLICIES } from "./domain/viewPolicy";
+import { FOCI, hubFraming, geoFraming, easeInOutQuad, type CameraFraming } from "./domain/cameraRig";
 import type { GlobalSnapshot, PickDescriptor } from "@/src/data/types";
-import type {
-  ClusterNode,
-  DagCore,
-  GeoMap,
-  RouteMetagraph,
-} from "./boundary";
+import type { ClusterNode, DagCore, GeoMap, RouteMetagraph } from "@/src/data/types";
 
 type Vec = THREE.Vector3;
 
-// id[] -> { id: sceneColorNumber }, resolved through the identity map (Task 1). The vanilla
-// js/ modules never import the TS generator — the Engine owns the map and hands scene colors
+// id[] -> { id: sceneColorNumber }, resolved through the identity map (Task 1). The scene
+// layer never imports the TS generator — the Engine owns the map and hands scene colors
 // over as plain data.
 const sceneColorsFor = (ids: string[]): Record<string, number> => {
   const out: Record<string, number> = {};
@@ -32,28 +26,13 @@ const sceneColorsFor = (ids: string[]): Record<string, number> => {
   return out;
 };
 
-// The remaining js/ modules ship no types and `allowJs` only infers partial/loose ones, so
-// pin them to the curated surface in ./boundary here — the single place these assertions
-// live. Everything downstream is then fully checked. (Globe + LedgerView are typed TS classes — no cast.)
-const loadGeo = loadGeoCache as () => Promise<GeoMap>;
-const resolveGeo = resolveMissing as (
-  map: GeoMap,
-  ips: string[],
-  onResolved: (m: GeoMap) => void,
-) => void;
+// loadGeoCache/resolveMissing are real typed TS (src/data/geoResolve.ts) — aliased here only
+// for the shorter call-site names used below, no cast needed.
+const loadGeo = loadGeoCache;
+const resolveGeo = resolveMissing;
 
-// Camera presets (ported from ui.js FOCI).
-const FOCI: Record<string, { pos: Vec; target: Vec }> = {
-  overview: { pos: new THREE.Vector3(0, 15, 60), target: new THREE.Vector3(0, 2, 0) },
-  // The whole DAG core: pulled back enough to frame the outer cL1 (purple) shell (radius 14).
-  dag: { pos: new THREE.Vector3(0, 9, 38), target: new THREE.Vector3(0, 1, 0) },
-  geo: { pos: new THREE.Vector3(0, 11, 36), target: new THREE.Vector3(0, 2, 0) },
-  // The Snapshots view is a stack of transparent wireframe FLOORS (layers) on Y. Frame it from an
-  // elevated front angle so the stacked planes read in 3D — see LedgerView + config.LEDGER.
-  // Default framing: the LEAD (latest block) sits toward the bottom-right, leaving the rest of the
-  // view for the trailing chains; looking roughly along -X. Orbit is free.
-  ledger: { pos: new THREE.Vector3(31, 14, 20), target: new THREE.Vector3(-17, 1, -2) },
-};
+// Camera presets: FOCI/hubFraming/geoFraming/easeInOutQuad now live in ./domain/cameraRig
+// (Task 15) — pure, allocation-free (writes into caller-provided out structs).
 
 // Imperative engine: owns the scene, the Hypergraph + globe, the render loop, the
 // camera-focus tweens, and the command surface React drives via the store. Ports
@@ -75,9 +54,16 @@ export class Engine {
   private morph = 0; // 0 = hypergraph, 1 = globe (eased each frame)
   private _baseFog: THREE.FogBase | null = null; // scene.js FogExp2 (hyper/geo); captured lazily
   private _ledgerFog: THREE.Fog | null = null;    // stronger linear depth fog for the trailing chain
-  private tween: {
-    fromPos: Vec; toPos: Vec; fromTgt: Vec; toTgt: Vec; t: number; dur: number;
-  } | null = null;
+  // A persistent tween record (never re-allocated per focus) — `active` replaces the old
+  // null-the-object pattern; `_tweenTo` copies into these four vectors instead of `.clone()`ing.
+  private _tween = {
+    fromPos: new THREE.Vector3(), toPos: new THREE.Vector3(),
+    fromTgt: new THREE.Vector3(), toTgt: new THREE.Vector3(),
+    t: 0, dur: 1.4, active: false,
+  };
+  // Scratch framing struct handed to hubFraming/geoFraming — its values are copied into
+  // `_tween` immediately by `_tweenTo`, so reusing it across every focus call is safe.
+  private _framingOut: CameraFraming = { pos: new THREE.Vector3(), target: new THREE.Vector3() };
 
   private geoMap: GeoMap = {};
   private dagCore: DagCore | null = null;
@@ -85,6 +71,9 @@ export class Engine {
   // Metagraph ids with locatable nodes (selectable hubs); null until counts load (all allowed).
   private _activeMetaIds: Set<string> | null = null;
   private _lastFlashOrdinal = -1; // de-dupes the core flash to genuinely new global snapshots
+  // The focused metagraph's hub record, cached on filter/mode change — kills the per-frame
+  // `metas.find` the DoF read used to do every frame (Task 15 allocation fix).
+  private _dofMeta: MetaHubRec | null = null;
 
   private raycaster = new THREE.Raycaster();
   private pointer = new THREE.Vector2();
@@ -92,6 +81,8 @@ export class Engine {
   private onClick = (e: MouseEvent) => this._handleClick(e);
   private onMove = (e: MouseEvent) => this._handleMove(e);
   private _hoverKey: string | null = null;
+  // Reused pickables buffer (never re-allocated) — `_pickablesFor` runs on every pointermove.
+  private _pickBuf: THREE.Object3D[] = [];
 
   private unsub: Array<() => void> = [];
   private metaTimer: ReturnType<typeof setInterval> | undefined;
@@ -402,6 +393,10 @@ export class Engine {
   // camera back to the filter preset (that was the "camera randomly resets" bug). Only a user
   // action (changing the view or the filter) moves the camera.
   applyFilter(focusCamera = true) {
+    // Cache the focused hub record for the render loop's DoF read (killed the per-frame
+    // `metas.find` — Task 15 allocation fix). `layers.metas` never gets rebuilt after
+    // construction (config-driven, fixed 10 hubs), so this stays valid until the next filter/mode.
+    this._dofMeta = this.layers.metas.find((x) => x.cfg.id === this.filter) ?? null;
     if (this.mode === "geo") {
       this.globe.setFilter(this.filter); // also clears globe.countryFilter
       if (focusCamera) this._applyGeoFocus();
@@ -518,7 +513,8 @@ export class Engine {
   // Resolve the view policy's pick sources to the actual mesh pools. Unlisted sources / flat views
   // (empty pickSources) raycast nothing. Order is immaterial — the raycaster sorts hits by distance.
   private _pickablesFor(): THREE.Object3D[] {
-    const out: THREE.Object3D[] = [];
+    const out = this._pickBuf;
+    out.length = 0;
     for (const src of VIEW_POLICIES[this.mode].pickSources) {
       if (src === "globe") out.push(...this.globe.pickables);
       else if (src === "layers") out.push(...this.layers.pickables);
@@ -649,33 +645,30 @@ export class Engine {
 
 
   private _tweenTo(toPos: Vec, toTgt: Vec) {
-    this.tween = {
-      fromPos: this.ctx.camera.position.clone(),
-      toPos: toPos.clone(),
-      fromTgt: this.ctx.controls.target.clone(),
-      toTgt: toTgt.clone(),
-      t: 0,
-      dur: 1.4,
-    };
+    const tw = this._tween;
+    tw.fromPos.copy(this.ctx.camera.position);
+    tw.toPos.copy(toPos);
+    tw.fromTgt.copy(this.ctx.controls.target);
+    tw.toTgt.copy(toTgt);
+    tw.t = 0;
+    tw.dur = 1.4;
+    tw.active = true;
   }
 
   // Jump the camera straight to a framing — no tween (used for the Snapshots view, whose planar diagram
   // is meant to appear already-oriented; tweening it in read as the planes swinging into place).
   private _snapTo(toPos: Vec, toTgt: Vec) {
-    this.tween = null; // cancel any in-flight tween
+    this._tween.active = false; // cancel any in-flight tween
     this.ctx.camera.position.copy(toPos);
     this.ctx.controls.target.copy(toTgt);
     this.ctx.controls.update();
   }
 
   private _focusGeo(R: number) {
-    const t = THREE.MathUtils.smoothstep(R, 0.7, 1.0);
     // Look head-on at the FRONT of the globe (target pushed forward in +Z, toward where the
     // focused country/selection is aimed) so it sits centred in the view rather than low.
-    this._tweenTo(
-      new THREE.Vector3(0, THREE.MathUtils.lerp(7, 6, t), THREE.MathUtils.lerp(34, 26, t)),
-      new THREE.Vector3(0, THREE.MathUtils.lerp(2, 2.5, t), 7),
-    );
+    geoFraming(R, this._framingOut);
+    this._tweenTo(this._framingOut.pos, this._framingOut.target);
   }
 
   private _focusFilter(filter: string) {
@@ -696,15 +689,8 @@ export class Engine {
       return;
     }
     this.layers.focusId = filter; // anchor this hub so it stays framed
-    const hub = meta.group.position.clone();
-    const out = hub.clone().normalize();
-    const side = new THREE.Vector3().crossVectors(new THREE.Vector3(0, 1, 0), out).normalize();
-    const camPos = hub
-      .clone()
-      .addScaledVector(out, 12)
-      .addScaledVector(side, -6)
-      .addScaledVector(new THREE.Vector3(0, 1, 0), 5.5);
-    this._tweenTo(camPos, hub);
+    hubFraming(meta.group.position, this._framingOut);
+    this._tweenTo(this._framingOut.pos, this._framingOut.target);
   }
 
   // ---- render loop (ports main.js animate) ----
@@ -758,7 +744,7 @@ export class Engine {
       const dofMix = THREE.MathUtils.clamp(1 - (this.morph - 0.4) / 0.2, 0, 1);
       this.ctx.dof.enabled = policy.dofEligible && metaSel && dofMix > 0.001;
       if (this.ctx.dof.enabled) {
-        const meta = this.layers.metas.find((x) => x.cfg.id === this.filter);
+        const meta = this._dofMeta;
         const focusTarget = meta
           ? meta.group.getWorldPosition(this._dofTmp)
           : this.ctx.controls.target;
@@ -778,13 +764,13 @@ export class Engine {
   }
 
   private _updateTween(dt: number) {
-    if (!this.tween) return;
-    const tw = this.tween;
+    const tw = this._tween;
+    if (!tw.active) return;
     tw.t = Math.min(1, tw.t + dt / tw.dur);
-    const e = tw.t < 0.5 ? 2 * tw.t * tw.t : 1 - Math.pow(-2 * tw.t + 2, 2) / 2; // easeInOutQuad
+    const e = easeInOutQuad(tw.t);
     this.ctx.camera.position.lerpVectors(tw.fromPos, tw.toPos, e);
     this.ctx.controls.target.lerpVectors(tw.fromTgt, tw.toTgt, e);
-    if (tw.t >= 1) this.tween = null;
+    if (tw.t >= 1) tw.active = false;
   }
 
   dispose() {
