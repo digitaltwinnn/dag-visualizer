@@ -37,6 +37,12 @@ import type { GlobalSnapshot, Anchor, PickDescriptor } from "@/src/data/types";
 // them; the metagraph-snapshots floor is unlabelled (the snapshot blocks self-identify).
 const FLOOR_Y = [LEDGER.rowProducers, LEDGER.rowML1, LEDGER.rowML0, LEDGER.rowMSnap, LEDGER.rowGL0, LEDGER.rowHypL0, LEDGER.rowDAGL1];
 
+// The two SNAPSHOT/ledger floors (the L0 OUTPUTS — metagraph snapshots + global snapshots), as
+// opposed to the node/validator floors. They wear a distinct structural token hue (--core-l1 violet
+// vs the node floors' --primary cyan) so the two KINDS of layer read apart at a glance. Still an
+// existing palette token — no bespoke colour.
+const SNAPSHOT_FLOORS = new Set<number>([LEDGER.rowMSnap, LEDGER.rowGL0]);
+
 // Short layer labels. Two kinds of floor: node/validator layers (metagraph L1/L0, hypergraph L1) and
 // snapshot/ledger layers (the L0 outputs — "metagraph snapshots", "global snapshots"). "data
 // producers" is the symbolic top layer. Drawn at the front-left of each floor.
@@ -102,6 +108,7 @@ interface QueueItem {
 export class LedgerView {
   group: THREE.Group;
   private _core: number;             // the structural accent (colors.core), as a number
+  private _snapFloor: number;        // the snapshot-floor hue (colors.coreL1) — distinct from node floors
   private _coreCol: THREE.Color;     // the accent as a Color (live/selected blocks)
   private _neutralTile: THREE.Color; // the accent dimmed — the recessive trail tone
   // Identity SCENE-lane colour map (id -> 0xRRGGBB), set by the Engine so lane tiles / anchor rings /
@@ -157,6 +164,7 @@ export class LedgerView {
 
   constructor(scene: THREE.Scene, colors: SceneColors) {
     this._core = colors.core;
+    this._snapFloor = colors.coreL1;
     this._coreCol = new THREE.Color(colors.core);
     this._neutralTile = new THREE.Color(colors.core).multiplyScalar(NEUTRAL_DIM);
     this.group = new THREE.Group();
@@ -279,7 +287,8 @@ export class LedgerView {
     const D = 44;        // Z extent — tight to the lanes
     const cx = -16;      // centred on the content; +X (in front of the lead) stays black
     for (const y of FLOOR_Y) {
-      const pane = new THREE.Mesh(new THREE.PlaneGeometry(W, D), this._paneMat(this._core, 0.025));
+      const hue = SNAPSHOT_FLOORS.has(y) ? this._snapFloor : this._core;
+      const pane = new THREE.Mesh(new THREE.PlaneGeometry(W, D), this._paneMat(hue, 0.025));
       pane.rotation.x = -Math.PI / 2; // lie flat in the X/Z plane (W→X, D→Z)
       pane.position.set(cx, y, 0);
       pane.renderOrder = -1;
