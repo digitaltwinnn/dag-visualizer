@@ -290,12 +290,12 @@ async function buildLand(globe: GeoViewHost) {
           // Gently non-linear ramp (a blend of linear + quadratic): dim along the ocean line,
           // strengthening toward the top rim — so the rim reads as an edge, not a glowing band.
           float e = t * (0.4 + 0.6 * t);
-          // The coastal cliffs are the signature element, but SUBTLE: a soft body ramp up the wall
-          // plus a gentle highlight pinned to the very top edge. Now that the walls are tall
-          // (LAND_H) and share the surface's dim teal hue (uColor), height + the top-edge glow make
-          // them the accent WITHOUT the harsh ice-white brightness — calm glowing ridges.
+          // The coastal cliffs are the signature element, but CALM: they sit at roughly the same
+          // brightness as the surface grid (same --primary hue, low additive strength) so the whole
+          // globe reads as one consistent hologram. Height + a faint top-edge highlight give them
+          // presence without a hot glowing rim.
           float edge = smoothstep(0.6, 1.0, t);
-          gl_FragColor = vec4(uColor * (0.08 + 0.32 * e + 0.5 * edge), min(1.0, e * 1.1) * uOpacity);
+          gl_FragColor = vec4(uColor * (0.05 + 0.2 * e + 0.22 * edge), min(1.0, e * 0.85) * uOpacity);
         }`,
       // Single-sided so only cliffs whose face points toward the camera draw: a
       // continent's near + side edges show, its far edge (behind the filled plateau)
