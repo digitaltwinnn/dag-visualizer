@@ -8,7 +8,7 @@
 // kept mostly below the bloom threshold so it stays subtle.
 
 import * as THREE from "three";
-import { COLORS } from "./config.js";
+import { COLORS } from "../../config";
 
 const vert = /* glsl */ `
   varying vec3 vDir;
@@ -107,7 +107,13 @@ const frag = /* glsl */ `
   }
 `;
 
-export function createBackground(scene) {
+// Starfield skydome behind both views (js/background.js).
+export interface Background {
+  mesh: THREE.Object3D;
+  update(dt: number, morph: number): void;
+}
+
+export function createBackground(scene: THREE.Scene): Background {
   const uniforms = {
     uTime: { value: 0 },
     uMorph: { value: 0 },

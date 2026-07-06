@@ -1,6 +1,6 @@
 import * as THREE from "three";
 import { feature } from "topojson-client";
-import { R, LAND_H, latLonToVec3 } from "./geoMath.js";
+import { R, LAND_H, latLonToVec3 } from "../../domain/geoMath";
 
 // Builds the geo globe SURFACE — the body sphere, graticule, atmosphere rim, and the raised
 // continents (+ glowing coastal cliffs) — into `globe.group`, and sets the handles the morph/fade
@@ -8,14 +8,42 @@ import { R, LAND_H, latLonToVec3 } from "./geoMath.js";
 // pushing the fade-by-opacity materials into `globe.geoFades`. Split out of globe.js so the node
 // engine there isn't buried under ~230 lines of geometry. The continent fill is async (fetched
 // land), so `landFillMesh` / `landWallUniforms` appear once it loads (the morph loop guards them).
-export function buildGlobeSurface(globe) {
+
+// One entry in `host.geoFades`: a material faded in/out by the morph loop, scaled by `base`
+// (its own resting opacity once fully revealed).
+interface GeoFadeEntry {
+  mat: THREE.Material & { opacity: number };
+  base: number;
+}
+
+// The exact handles buildGeoView reads and writes on the host (the Globe instance,
+// scene/Globe.ts, implements this). `landFillMat` is set too (an
+// extra beyond the brief's 5) but is only read back locally to construct `landFillMesh`, not
+// consumed elsewhere in globe.js — kept optional here for parity with the original handle.
+export interface GeoViewHost {
+  group: THREE.Group;
+  geoFades: GeoFadeEntry[];
+  _edgeColor: THREE.Color;
+  sphereMesh?: THREE.Mesh;
+  atmoUniforms?: { glowColor: { value: THREE.Color }; uM: { value: number } };
+  landWallUniforms?: {
+    uColor: { value: THREE.Color };
+    uBase: { value: number };
+    uTop: { value: number };
+    uOpacity: { value: number };
+  };
+  landFillMat?: THREE.MeshStandardMaterial;
+  landFillMesh?: THREE.Mesh;
+}
+
+export function buildGeoView(globe: GeoViewHost): void {
   buildSphere(globe);
   buildGraticule(globe);
   buildAtmosphere(globe);
   buildLand(globe);
 }
 
-function buildSphere(globe) {
+function buildSphere(globe: GeoViewHost) {
   // Writes depth so it occludes the far half of the atmosphere shell (leaving only a rim)
   // and hides far-side nodes. Hidden in the Hypergraph (visibility toggled in setMorph) so it
   // can't occlude the core there; fades in by opacity with the rest of the surface.
@@ -39,8 +67,8 @@ function buildSphere(globe) {
   globe.group.add(globe.sphereMesh);
 }
 
-function buildGraticule(globe) {
-  const pts = [];
+function buildGraticule(globe: GeoViewHost) {
+  const pts: THREE.Vector3[] = [];
   const step = 15;
   for (let lat = -75; lat <= 75; lat += step)
     for (let lon = -180; lon < 180; lon += 4)
@@ -54,7 +82,7 @@ function buildGraticule(globe) {
   globe.group.add(new THREE.LineSegments(geo, mat));
 }
 
-function buildAtmosphere(globe) {
+function buildAtmosphere(globe: GeoViewHost) {
   // A thin, dim rim. Higher power concentrates it at the very edge and the low
   // overall scale keeps it from blooming into a bright blue halo.
   globe.atmoUniforms = { glowColor: { value: new THREE.Color(0x2a6fd0) }, uM: { value: 0 } };
@@ -68,7 +96,7 @@ function buildAtmosphere(globe) {
   globe.group.add(new THREE.Mesh(new THREE.SphereGeometry(R * 1.13, 48, 32), mat));
 }
 
-async function buildLand(globe) {
+async function buildLand(globe: GeoViewHost) {
   try {
     const res = await fetch("/land-110m.json");
     const topo = await res.json();
@@ -86,9 +114,9 @@ async function buildLand(globe) {
     // R between facets) so the additive wall never z-fights / pokes through the waterline. The
     // base is faded to transparent anyway, so the visible rim is unchanged.
     const wallBase = R + 0.04;
-    const wallPos = []; // wall ribbon vertices (two triangles per ring segment)
-    const fillPos = []; // plateau triangles (the solid land cap)
-    const addRing = (ring) => {
+    const wallPos: number[] = []; // wall ribbon vertices (two triangles per ring segment)
+    const fillPos: number[] = []; // plateau triangles (the solid land cap)
+    const addRing = (ring: number[][]) => {
       for (let i = 0; i < ring.length - 1; i++) {
         const a = ring[i], b = ring[i + 1];
         // Wall quad: base (just above the sea) -> raised top, as two triangles.
@@ -107,7 +135,7 @@ async function buildLand(globe) {
     // first UNWRAP each ring's longitude into a continuous run (accumulate the shortest
     // step), which turns a crosser back into a valid simple polygon; latLonToVec3 maps
     // the out-of-[-180,180] longitudes straight back to the right 3D points.
-    const unwrap = (ring) => {
+    const unwrap = (ring: number[][]): THREE.Vector2[] => {
       let lon = ring[0][0];
       const out = [new THREE.Vector2(lon, ring[0][1])];
       for (let i = 1; i < ring.length; i++) {
@@ -121,7 +149,7 @@ async function buildLand(globe) {
       if (out.length > 1 && Math.abs(a.x - b.x) < 1e-6 && a.y === b.y) out.pop();
       return out;
     };
-    const meanLon = (r) => r.reduce((s, p) => s + p.x, 0) / r.length;
+    const meanLon = (r: THREE.Vector2[]) => r.reduce((s, p) => s + p.x, 0) / r.length;
     // Emit one earcut triangle, subdivided into an n×n grid so each facet is small. A big
     // flat triangle is a chord that sags toward the globe centre — past ocean level it gets
     // depth-occluded into a black patch — so the split keeps the surface hugging the sphere.
@@ -130,8 +158,8 @@ async function buildLand(globe) {
     // widest real triangle spans ~68°, so n=4 keeps every facet (~17°) under the ~24° sag
     // limit (smooth per-vertex normals hide the faceting). ~76k tris in one static draw call.
     const n = 4;
-    const emitTri = (A, B, C) => {
-      const pt = (u, w) => latLonToVec3(A.y + (B.y - A.y) * u + (C.y - A.y) * w,
+    const emitTri = (A: THREE.Vector2, B: THREE.Vector2, C: THREE.Vector2) => {
+      const pt = (u: number, w: number) => latLonToVec3(A.y + (B.y - A.y) * u + (C.y - A.y) * w,
                                         A.x + (B.x - A.x) * u + (C.x - A.x) * w, top);
       // Force outward winding so gl_FrontFacing agrees with the radial normals; otherwise
       // DoubleSide flips the normal on back-wound facets and they render unlit (black). Every
@@ -141,7 +169,7 @@ async function buildLand(globe) {
       const ny = (pB.z - pA.z) * (pC.x - pA.x) - (pB.x - pA.x) * (pC.z - pA.z);
       const nz = (pB.x - pA.x) * (pC.y - pA.y) - (pB.y - pA.y) * (pC.x - pA.x);
       const flip = nx * pA.x + ny * pA.y + nz * pA.z < 0;
-      const tri = (p0, p1, p2) => {
+      const tri = (p0: THREE.Vector3, p1: THREE.Vector3, p2: THREE.Vector3) => {
         if (flip) fillPos.push(p0.x, p0.y, p0.z, p2.x, p2.y, p2.z, p1.x, p1.y, p1.z);
         else fillPos.push(p0.x, p0.y, p0.z, p1.x, p1.y, p1.z, p2.x, p2.y, p2.z);
       };
@@ -150,7 +178,7 @@ async function buildLand(globe) {
         if (j < n - i - 1) tri(pt((i + 1) / n, j / n), pt((i + 1) / n, (j + 1) / n), pt(i / n, (j + 1) / n));
       }
     };
-    const addPolygon = (rings) => {
+    const addPolygon = (rings: number[][][]) => {
       rings.forEach(addRing); // cliff walls for the outer ring + every hole
       const contour = unwrap(rings[0]);
       // A ring whose longitude winds a full turn encircles a pole (Antarctica): close it
@@ -167,15 +195,15 @@ async function buildLand(globe) {
         if (shift) u.forEach((p) => (p.x += shift));
         return u;
       });
-      let faces;
+      let faces: number[][];
       try { faces = THREE.ShapeUtils.triangulateShape(contour, holes); } catch { return; }
       const verts = [contour, ...holes].flat(); // earcut indexes contour then holes, in order
       for (const [a, b, c] of faces) emitTri(verts[a], verts[b], verts[c]);
     };
     for (const f of land.features) {
       const g = f.geometry;
-      if (g.type === "Polygon") addPolygon(g.coordinates);
-      else if (g.type === "MultiPolygon") g.coordinates.forEach(addPolygon);
+      if (g.type === "Polygon") addPolygon(g.coordinates as number[][][]);
+      else if (g.type === "MultiPolygon") (g.coordinates as number[][][][]).forEach(addPolygon);
     }
 
     // The cliff walls. A ShaderMaterial derives each vertex's height from its
@@ -245,5 +273,7 @@ async function buildLand(globe) {
     globe.landFillMesh.renderOrder = -1; // after the body (−2), before the rim/heatmap/nodes
     globe.landFillMesh.visible = false;  // revealed once the globe materialises (setMorph)
     globe.group.add(globe.landFillMesh);
-  } catch (e) { /* graticule-only fallback */ }
+  } catch {
+    /* graticule-only fallback */
+  }
 }

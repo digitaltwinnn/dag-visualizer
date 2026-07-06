@@ -1,7 +1,7 @@
 // The Snapshots (ledger) view, rendered on the shared Three.js canvas like the other views.
 //
 // A 3D stack of transparent glass FLOORS (one per layer; see config.LEDGER). The producer NODES
-// are the SAME node meshes reused from the hyper/geo views, placed into their lanes by globe.js.
+// are the SAME node meshes reused from the hyper/geo views, placed into their lanes by Globe.
 // This module owns what's unique to the view:
 //   • the glass floor panes,
 //   • the centred live global snapshot block + its left-trailing chain of completed snapshots,
@@ -11,9 +11,25 @@
 //
 // Factual basis: block sizes come from anchored counts; links/pulses/rings come straight from the
 // live getAnchor(ts).metaCounts — nothing fabricated. With no snapshot the centre block hides.
+//
+// ─── STATE vs. MESH split (Task 13) ────────────────────────────────────────────────────────────
+// This class is the SCENE ADAPTER over LedgerModel (src/engine/domain/ledgerModel.ts). The domain
+// state machine — which slot a block sits in, the trail/lane arrays, tickOrdinal, the selected slot,
+// the seed/tick-advance/anchor logic — lives in `this.model`. This class owns every mesh, material,
+// label, ring, pulse and the per-frame draw, and pairs model rows to meshes by ordinal (trail) /
+// array iteration (lanes → the one InstancedMesh).
+//
+// OWNERSHIP NOTE on per-frame easing: the model's LaneBlock carries `x`/`fade` as STATE fields, but
+// the frame-by-frame EASING of them (and of the trail meshes' positions/opacity) is a VISUAL concern
+// done here in update(). This adapter mutates the model's LaneBlock `x`/`fade` in place each frame —
+// they're the shared data this view renders, and js/ledger.js eased those same fields inline
+// (js/ledger.js:626-644). The model owns the discrete transitions (slot advance, block creation);
+// this view owns the continuous interpolation toward each block's resting slot.
 
 import * as THREE from "three";
-import { COLORS, LEDGER, METAGRAPHS, ledgerSite, clusterRadius } from "./config.js";
+import { COLORS, LEDGER, METAGRAPHS, ledgerSite, clusterRadius } from "../../config";
+import { LedgerModel, SLOT_SP, slotFade, curvePoint } from "../../domain/ledgerModel";
+import type { GlobalSnapshot, Anchor, PickDescriptor } from "@/src/data/types";
 
 // The glass floor heights (top→bottom): data producers · metagraph L1 · metagraph L0 · metagraph
 // snapshots · hypergraph (global) L0 · hypergraph (DAG) L1. All one colour — labels (not colour) name
@@ -38,46 +54,19 @@ const PULSE_STAGGER = 0.035; // s between successive pulse emissions (a steady s
 const META_TRAIL_MAX = 1500; // pooled metagraph trail-block instances — one per anchored snapshot,
                              // summed over all lanes × SLOT_N. A busy tick anchors ~138, so this is
                              // generous headroom (InstancedMesh cost is trivial; loop breaks if over).
-const SLOT_SP = 3.6;         // X spacing of one tick/slot — SHARED by the global + metagraph chains
-const SLOT_N = 9;            // visible blocks per chain (global + each metagraph lane)
-const BLOCK_SIZE = 0.34;     // max size of an individual metagraph-snapshot tile (per-size = TODO)
-// Z width of one lane (gap between adjacent lane sites) — the grid's depth budget.
-const LANE_GAP_Z = Math.abs(ledgerSite(1, METAGRAPHS.length).z - ledgerSite(0, METAGRAPHS.length).z);
 const LINK_CURVES = 110;     // max per-block anchor links drawn at once
 const LINK_SEG = 44;         // line segments each link is tessellated into (smooth, not pointy — the
                             // curve swings through the global-L0 cluster so it needs a fine tessellation)
-const LINK_VFRAC = 0.55;     // fraction of the anchor curve that drops straight down (MSnap→ML0)
 
-// Block/link opacity from recency: 1 at the lead/newest, fading to 0 by the far (oldest) slot. A
-// gentle linear cue — the heavy "old fades out" is now the depth FOG (scene-level, see Engine).
-const slotFade = (slot) => Math.min(1, Math.max(0, 1 - (slot - 1) / (SLOT_N - 1)));
-
-// One component of a cubic bézier (p0→p1, controls c0,c1) at t.
-const cubic = (t, p0, c0, c1, p1) => {
-  const u = 1 - t;
-  return u * u * u * p0 + 3 * u * u * t * c0 + 3 * u * t * t * c1 + t * t * t * p1;
-};
-
-// A point at parameter t on the LITERAL production→anchor curve, in the metagraph's lane (sx, sz):
-// straight DOWN the column from the data PRODUCERS (top) through L1 + L0 to the metagraph snapshot
-// tile for t<LINK_VFRAC — passing the L1/L0 ring centres — then a cubic that swings to the lane CENTRE
-// (z→0) by the hypergraph-L0 floor so it passes THROUGH the global validator cluster, then drops into
-// the global block at (gx, GL0, 0). Used by the pulse path + the link.
-function curvePoint(t, sx, sz, gx, out) {
-  const top = LEDGER.rowProducers, snap = LEDGER.rowMSnap, ey = LEDGER.rowGL0;
-  if (t <= LINK_VFRAC) return out.set(sx, top + (snap - top) * (t / LINK_VFRAC), sz);
-  const u = (t - LINK_VFRAC) / (1 - LINK_VFRAC);
-  const dy = (snap - ey) * 0.5;
-  // z control (sz,sz,0,0): flat tangent at BOTH ends (smooth top junction + smooth landing) with the
-  // swing toward centre in the MIDDLE — passes near the global-L0 cluster, no pointy top.
-  return out.set(cubic(u, sx, sx, gx, gx), cubic(u, snap, snap - dy, ey + dy, ey), cubic(u, sz, sz, 0, 0));
-}
+// Trail/lead block size from a snapshot's anchored count (clamped) so a busy tick reads bigger; never
+// fabricate a minimum. Shared by the live lead (_baseR) + the trail-tile reconciliation.
+const sizeForCount = (count: number): number => 1.0 + Math.min(1, count / 24) * 1.6;
 
 const _dummy = new THREE.Object3D();
 const _col = new THREE.Color();
 const _p = new THREE.Vector3();
 const _q = new THREE.Vector3(); // scratch for link curve points
-const _gx = new Map();          // reused per-frame: slot → global block X
+const _gx = new Map<number, number>(); // reused per-frame: slot → global block X
 // Quiet neutral the whole row (tiles + links) fades TO as it trails into the background — a deeply
 // toned-down muted CYAN (the layer/global tone, not a grey). The metagraph trail mesh is ADDITIVE, so
 // this low magnitude also reads as semi-transparent over the dark background. Metagraph colour is kept
@@ -85,48 +74,107 @@ const _gx = new Map();          // reused per-frame: slot → global block X
 const NEUTRAL_TILE = new THREE.Color(0.085, 0.24, 0.28);
 const CORE_COLOR = new THREE.Color(COLORS.core); // bright cyan for the live/selected global block
 
-export class Ledger {
-  constructor(scene) {
+interface RingRec {
+  mesh: THREE.Mesh;
+  y: number;
+  glow: number;
+  radius: number;
+  floor: "l0" | "l1";
+}
+interface CurveRec {
+  sx: number;
+  sz: number;
+  color: number;
+  rings: RingRec[];
+}
+interface Pulse {
+  rec: CurveRec;
+  t: number;
+  speed: number;
+}
+interface QueueItem {
+  id: string;
+  dueAt: number;
+}
+
+export class LedgerView {
+  group: THREE.Group;
+  // Identity SCENE-lane colour map (id -> 0xRRGGBB), set by the Engine so lane tiles / anchor rings /
+  // links / pulses use the metagraph's identity hue (not the raw config colour). Null until set → the
+  // `?? METAGRAPHS[i].color` fallbacks below keep it working. NOTE: the Engine sets this AFTER
+  // construction, so the node-group rings/pulses (_buildCurves in the ctor) resolve to the CONFIG
+  // colour, while lane tiles (resolved lazily on the first setData) use the identity map — verbatim
+  // js/ledger.js behaviour, intentionally preserved.
+  sceneColors: Record<string, number> | null;
+  pickables: THREE.Object3D[];
+
+  private model = new LedgerModel();
+  private t: number;
+  private _latest: GlobalSnapshot | null;
+  private _baseR: number;
+  private _filter: string; // metagraph filter; when a single metagraph, the OTHERS go neutral
+
+  // Anchor animation state. _anchorGroup holds the node-group rings (built once, persistent).
+  private _anchorGroup: THREE.Group;
+  private _ringGeo: THREE.RingGeometry;
+  private _curves: Map<string, CurveRec>; // metaId -> { sx, sz, color, rings } (sx/sz = pulse curve origin)
+  private _pulses: Pulse[];               // active { rec, t, speed }
+  private _queue: QueueItem[];            // pending emissions { id, dueAt }
+  private _lastDue: number;
+  private _flash: number;                 // centre-block arrival flash
+  private _gL0Glow: number;               // hypergraph-L0 ring glow — lights as anchor pulses reach that cluster
+  private _lastDrawn = 0;
+
+  // The global chain: completed snapshots become solid blocks that march LEFT into a trail (newest
+  // just-left-of-centre, older further left). Mirrors the bottom bar-chart's left→right = old→new.
+  private _trailGroup: THREE.Group;
+  private _trailMeshes: Map<number, THREE.Mesh>; // ordinal -> mesh (model.trail owns { ordinal, slot })
+  private _trailGeo: THREE.BoxGeometry;          // shared by the centre + trail blocks
+
+  // Per-metagraph chains: each metagraph's snapshot blocks trail left in its own lane (all drawn in
+  // one InstancedMesh). model.lanes owns the block state; this resolves the per-lane colour.
+  private _metaTrailMesh!: THREE.InstancedMesh;
+  private _metaLastDrawn = 0;
+  private _laneColors: Map<string, THREE.Color> = new Map();
+
+  private centerMat!: THREE.MeshStandardMaterial;
+  private center!: THREE.Mesh;
+
+  private _linkPos!: Float32Array;
+  private _linkCol!: Float32Array;
+  private _linkGeo!: THREE.BufferGeometry;
+  private _linkMesh!: THREE.LineSegments;
+
+  private _pulseMat!: THREE.MeshBasicMaterial;
+  private _pulseMesh!: THREE.InstancedMesh;
+
+  private _gL0Ring: THREE.Mesh;
+
+  constructor(scene: THREE.Scene) {
     this.group = new THREE.Group();
     this.group.visible = false;
     scene.add(this.group);
     this.pickables = [];
-    // Identity SCENE-lane colour map (id -> 0xRRGGBB), set by the Engine so lane tiles / anchor
-    // rings / links / pulses use the metagraph's identity hue (not the raw config colour). Null
-    // until set → the `?? METAGRAPHS[i].color` fallbacks below keep it working.
     this.sceneColors = null;
     this.t = 0;
     this._latest = null;
     this._baseR = 1;
 
-    // Anchor animation state. _anchorGroup holds the node-group rings (built once, persistent).
     this._anchorGroup = new THREE.Group();
     this.group.add(this._anchorGroup);
     this._ringGeo = new THREE.RingGeometry(0.84, 1.0, 36); // shared unit ring (scaled per group)
-    this._curves = new Map();   // metaId -> { sx, sz, color, rings } (sx/sz = pulse curve origin)
-    this._pulses = [];          // active { rec, t, speed }
-    this._queue = [];           // pending emissions { id, dueAt }
-    this._emitted = new Map();  // metaId -> pulses already emitted for the current tick
-    this._tickOrdinal = null;
+    this._curves = new Map();
+    this._pulses = [];
+    this._queue = [];
     this._lastDue = 0;
-    this._flash = 0;            // centre-block arrival flash
-    this._gL0Glow = 0;          // hypergraph-L0 ring glow — lights as anchor pulses reach that cluster
-    this._selectedOrd = null;   // ordinal of the selected/hovered snapshot (from the LiveStrip / pick)
-    this._selectedSlot = -1;    // its current slot (so its tiles stay COLOURED in the trail) — derived
-    this._filter = "all";       // metagraph filter; when a single metagraph, the OTHERS go neutral
+    this._flash = 0;
+    this._gL0Glow = 0;
+    this._filter = "all";
 
-    // The global chain: completed snapshots become solid blocks that march LEFT into a trail (newest
-    // just-left-of-centre, older further left). Mirrors the bottom bar-chart's left→right = old→new.
     this._trailGroup = new THREE.Group();
     this.group.add(this._trailGroup);
-    this._trail = [];           // { mesh, slot } (X lives on mesh.position.x)
+    this._trailMeshes = new Map();
     this._trailGeo = new THREE.BoxGeometry(1.4, 1.4, 0.4); // shared by the centre + trail blocks
-
-    // Per-metagraph chains: each metagraph's snapshot blocks trail left in its own lane (real where
-    // it anchored, empty placeholder where it didn't). All drawn in one InstancedMesh.
-    this._metaLanes = new Map(); // id -> { z, color, blocks:[{ x, slot, fade, size, filled }] }
-    this._tickMetas = new Map(); // id -> count anchored in the CURRENT tick (flushed on tick change)
-    this._metaLastDrawn = 0;
 
     this._buildFloors();
     this._buildCenter();
@@ -145,7 +193,7 @@ export class Ledger {
   // Per-block link segments: every completed metagraph block draws a line to the global block of
   // the same tick (they share an X). Rebuilt from the live block positions each frame so the links
   // travel left WITH the blocks. One dynamic LineSegments, coloured per metagraph.
-  _buildLinks() {
+  private _buildLinks() {
     const geo = new THREE.BufferGeometry();
     const maxVerts = LINK_CURVES * LINK_SEG * 2;
     this._linkPos = new Float32Array(maxVerts * 3);
@@ -167,13 +215,13 @@ export class Ledger {
 
   // Build the persistent node-group rings (+ cache the pulse-curve origin) for every metagraph,
   // once. The rings stay regardless of anchoring; pulses travel the curve only when it anchors.
-  _buildCurves() {
+  private _buildCurves() {
     for (const m of METAGRAPHS) this._addCurve(m.id);
   }
 
   // Live per-metagraph node counts per floor (from the globe) → size each ring to fit its dots.
   // `groups` = { metaId: { l0, l1 } }.
-  setGroupSizes(groups) {
+  setGroupSizes(groups: Record<string, { l0: number; l1: number }>) {
     if (!groups) return;
     for (const [id, rec] of this._curves) {
       const g = groups[id];
@@ -182,7 +230,7 @@ export class Ledger {
     }
   }
 
-  _buildMetaTrail() {
+  private _buildMetaTrail() {
     this._metaTrailMesh = new THREE.InstancedMesh(
       new THREE.BoxGeometry(1, 1, 0.35),
       new THREE.MeshBasicMaterial({ transparent: true, blending: THREE.AdditiveBlending, depthWrite: false }),
@@ -198,60 +246,25 @@ export class Ledger {
     this.group.add(this._metaTrailMesh);
   }
 
-  // Get (or lazily create) metagraph `i`'s lane record (keyed by id), positioned at its Z site.
-  _lane(id, i) {
-    let lane = this._metaLanes.get(id);
-    if (!lane) {
-      const s = ledgerSite(i, METAGRAPHS.length);
-      lane = { id, z: s.z, color: new THREE.Color((this.sceneColors && this.sceneColors[id]) ?? METAGRAPHS[i].color), blocks: [] };
-      this._metaLanes.set(id, lane);
+  // Resolve (and cache) metagraph `id`'s lane tile colour — the identity SCENE hue, falling back to
+  // the config colour. Mirrors js/ledger.js's `_lane` colour resolution (model.lanes carries no
+  // colour — it's a scene concern). Resolved lazily on the first update after the Engine has set
+  // sceneColors, so lane tiles get the identity hue (unlike the ctor-built curves).
+  private _laneColor(id: string): THREE.Color {
+    let c = this._laneColors.get(id);
+    if (!c) {
+      const i = METAGRAPHS.findIndex((m) => m.id === id);
+      const hex = (this.sceneColors && this.sceneColors[id]) ?? (i >= 0 ? METAGRAPHS[i].color : COLORS.core);
+      c = new THREE.Color(hex);
+      this._laneColors.set(id, c);
     }
-    return lane;
-  }
-
-  // Each anchored snapshot is a SEPARATE tile (no cap — a metagraph can anchor dozens into one tick),
-  // laid out as a RECTANGULAR GRID. Spacing is UNIFORM and tiles continuously across ticks (X step =
-  // SLOT_SP/cols) and lanes (Z step = LANE_GAP_Z/rows), with the grid INSET (centred) so an edge tile
-  // never touches the neighbouring tick/lane — the gap matches the in-grid gap. Tiles shrink to fit.
-  // The k=0 tile carries the single anchor link (drawn from the lane centre, so any tile works).
-  _anchorTiles(count) {
-    if (count <= 1) return [{ ox: 0, oz: 0, size: BLOCK_SIZE, link: true }];
-    const cols = Math.min(count, Math.max(1, Math.round(Math.sqrt(count * (SLOT_SP / LANE_GAP_Z)))));
-    const rows = Math.ceil(count / cols);
-    const stepX = SLOT_SP / cols, stepZ = LANE_GAP_Z / rows; // uniform pitch → consistent gaps everywhere
-    const size = Math.min(BLOCK_SIZE, 0.7 * Math.min(stepX, stepZ));
-    const x0 = -((cols - 1) * stepX) / 2, z0 = -((rows - 1) * stepZ) / 2;
-    const tiles = [];
-    for (let k = 0; k < count; k++) {
-      const r = Math.floor(k / cols), c = k % cols;
-      const inRow = Math.min(cols, count - r * cols);          // tiles in this row (last row may be short)
-      const ox = x0 + ((cols - inRow) / 2) * stepX + c * stepX; // centre a partial last row
-      const oz = rows > 1 ? z0 + r * stepZ : 0;
-      tiles.push({ ox, oz, size, link: k === 0 });
-    }
-    return tiles;
-  }
-
-  // A metagraph anchored into the LIVE tick → (re)build its slot-0 cluster: ONE tile per anchored
-  // snapshot (it can anchor several per tick), aligned with the live global tile so the link is drawn
-  // there + the anchoring animates right away. Re-runs as the count settles; preserves the slot-0 ease.
-  _anchorMetaBlock(id, count) {
-    const i = METAGRAPHS.findIndex((m) => m.id === id);
-    if (i < 0) return; // unlisted — no lane
-    const lane = this._lane(id, i);
-    let bx = 0, bfade = 0;
-    for (let j = lane.blocks.length - 1; j >= 0; j--) {
-      if (lane.blocks[j].slot === 0) { bx = lane.blocks[j].x; bfade = lane.blocks[j].fade; lane.blocks.splice(j, 1); }
-    }
-    for (const tl of this._anchorTiles(count)) {
-      lane.blocks.unshift({ x: bx, slot: 0, fade: bfade, ox: tl.ox, oz: tl.oz, size: tl.size, filled: true, link: tl.link });
-    }
+    return c;
   }
 
   // One transparent GLASS pane per layer — a SQUARE sheet (no grid lines) with SOFT edges that
   // dissolve into the background. Shifted back over the trails (−X) so the empty area in front of
   // the lead (toward the camera) isn't covered, keeping the black background visible there.
-  _buildFloors() {
+  private _buildFloors() {
     // Panes span the whole trail again, but are VERY transparent so even where they stack in perspective
     // they stay a subtle hint of a layer (not a wall) — the black background still reads through.
     const W = 38;        // X extent (camera-depth) — tight to the lead + trail span
@@ -271,10 +284,10 @@ export class Ledger {
 
   // A flat, quiet text label lying ON a floor (not a billboard) — the very-short layer name, printed
   // on the glass, run parallel to the lane (Z) edge and readable from the default camera.
-  _makeLabel(text, x, y, z) {
+  private _makeLabel(text: string, x: number, y: number, z: number): THREE.Mesh {
     const c = document.createElement("canvas");
     c.width = 256; c.height = 64;
-    const ctx = c.getContext("2d");
+    const ctx = c.getContext("2d")!;
     ctx.font = "300 23px system-ui, -apple-system, sans-serif";
     ctx.fillStyle = "rgba(170,196,224,0.4)"; // subtle, low-contrast
     ctx.textAlign = "center";
@@ -303,7 +316,7 @@ export class Ledger {
 
   // Simple flat transparent pane — just a faint tint, NORMAL blending (not additive/glass), with a
   // barely-there fade right at the very edge so it doesn't end on a razor line.
-  _paneMat(color, opacity) {
+  private _paneMat(color: number, opacity: number): THREE.ShaderMaterial {
     return new THREE.ShaderMaterial({
       transparent: true, depthWrite: false, side: THREE.DoubleSide, blending: THREE.NormalBlending,
       uniforms: { uColor: { value: new THREE.Color(color) }, uOpacity: { value: opacity } },
@@ -325,9 +338,8 @@ export class Ledger {
   }
 
   // The live global snapshot at centre — a SOLID block (it's always a real snapshot). When the
-  // next tick lands a copy solidifies into the trail (see _spawnTrailTile). Clicking it opens the
-  // snapshot card.
-  _buildCenter() {
+  // next tick lands a copy solidifies into the trail. Clicking it opens the snapshot card.
+  private _buildCenter() {
     this.centerMat = new THREE.MeshStandardMaterial({
       color: COLORS.core, emissive: COLORS.core, emissiveIntensity: 0.6, // kept low so it doesn't bloom out
       roughness: 0.4, metalness: 0.2, flatShading: true,
@@ -339,78 +351,41 @@ export class Ledger {
     this.pickables = [this.center];
   }
 
-  // A completed snapshot drops a SOLID block at centre that slides left into the trail; everything
-  // already in the trail shifts one slot further left. `size` = that snapshot's tile scale; `ordinal`
-  // tags which snapshot it is (so a selected/hovered tick can be found by ordinal → slot).
-  _spawnTrailTile(size, ordinal) {
-    for (const t of this._trail) t.slot += 1;
-    const mesh = new THREE.Mesh(
-      this._trailGeo,
-      new THREE.MeshStandardMaterial({
-        color: COLORS.core, emissive: COLORS.core, emissiveIntensity: 0.45,
-        roughness: 0.45, metalness: 0.2, flatShading: true, transparent: true, opacity: 0,
-      }),
-    );
-    mesh.rotation.x = -Math.PI / 2;
-    mesh.position.set(0, LEDGER.rowGL0, 0);
-    mesh.scale.setScalar(size);
-    this._trailGroup.add(mesh);
-    this._trail.unshift({ mesh, slot: 1, ordinal });
-    while (this._trail.length > SLOT_N) {
-      const old = this._trail.pop();
-      this._trailGroup.remove(old.mesh);
-      old.mesh.material.dispose(); // geometry is shared (_trailGeo)
+  // Reconcile the trail meshes to model.trail (paired by ordinal): create a mesh for each model trail
+  // entry that has none yet, and dispose meshes whose ordinal has scrolled off the model's window.
+  // `seeded` = this is the first (history-seed) call → new tiles appear directly at their resting
+  // slot/opacity (js/ledger.js `_seedTile`); otherwise a new tile is a just-completed snapshot that
+  // slides in from centre with a fade-in (js/ledger.js `_spawnTrailTile`).
+  private _reconcileTrail(snaps: GlobalSnapshot[], seeded: boolean) {
+    const present = new Set(this.model.trail.map((t) => t.ordinal));
+    for (const [ord, mesh] of this._trailMeshes) {
+      if (present.has(ord)) continue;
+      this._trailGroup.remove(mesh);
+      (mesh.material as THREE.Material).dispose(); // geometry is shared (_trailGeo)
+      this._trailMeshes.delete(ord);
     }
-  }
-
-  // Pre-populate the trail + lanes from the retained snapshot window (the same buffer the LiveStrip
-  // bar-chart reads) so the chain isn't empty on entry — it just continues live afterwards. Called
-  // once, on the first data, for the SLOT_N completed ticks behind the live one. Blocks/tiles are
-  // placed directly at their resting slot (no left-shift animation) so they appear already built up.
-  _seedHistory(snaps, getAnchor) {
-    const n = snaps.length;
-    const count = Math.min(SLOT_N, n - 1); // ticks behind the latest (the latest is the live centre)
-    for (let s = 1; s <= count; s++) {
-      const snap = snaps[n - 1 - s];
-      const total = typeof snap.metagraphSnapshotCount === "number" ? snap.metagraphSnapshotCount : 0;
-      this._seedTile(1.0 + Math.min(1, total / 24) * 1.6, s, snap.ordinal);
-      const a = getAnchor ? getAnchor(snap.timestamp) : null;
-      const counts = a && a.metaCounts ? a.metaCounts : null;
-      for (let i = 0; i < METAGRAPHS.length; i++) {
-        const id = METAGRAPHS[i].id;
-        const nc = counts ? counts.get(id) || 0 : 0;
-        const lane = this._lane(id, i);
-        if (nc > 0) {
-          if (!this._curves.get(id)) this._addCurve(id); // ensure its node-group rings exist
-          for (const tl of this._anchorTiles(nc)) {
-            lane.blocks.push({ x: -s * SLOT_SP, slot: s, fade: slotFade(s), ox: tl.ox, oz: tl.oz, size: tl.size, filled: true, link: tl.link });
-          }
-        } else {
-          lane.blocks.push({ x: -s * SLOT_SP, slot: s, fade: slotFade(s), ox: 0, oz: 0, size: 0.17, filled: false, link: false });
-        }
-      }
+    for (const t of this.model.trail) {
+      if (this._trailMeshes.has(t.ordinal)) continue;
+      const snap = snaps.find((s) => s.ordinal === t.ordinal);
+      const total = snap && typeof snap.metagraphSnapshotCount === "number" ? snap.metagraphSnapshotCount : 0;
+      const mesh = new THREE.Mesh(
+        this._trailGeo,
+        new THREE.MeshStandardMaterial({
+          color: COLORS.core, emissive: COLORS.core, emissiveIntensity: 0.45,
+          roughness: 0.45, metalness: 0.2, flatShading: true, transparent: true,
+          opacity: seeded ? 0.92 * slotFade(t.slot) : 0,
+        }),
+      );
+      mesh.rotation.x = -Math.PI / 2;
+      mesh.position.set(seeded ? -t.slot * SLOT_SP : 0, LEDGER.rowGL0, 0);
+      mesh.scale.setScalar(sizeForCount(total));
+      this._trailGroup.add(mesh);
+      this._trailMeshes.set(t.ordinal, mesh);
     }
-  }
-
-  // A trail tile placed directly at a slot (history seeding — already at its resting X/opacity).
-  _seedTile(size, slot, ordinal) {
-    const mesh = new THREE.Mesh(
-      this._trailGeo,
-      new THREE.MeshStandardMaterial({
-        color: COLORS.core, emissive: COLORS.core, emissiveIntensity: 0.45,
-        roughness: 0.45, metalness: 0.2, flatShading: true, transparent: true,
-        opacity: 0.92 * slotFade(slot),
-      }),
-    );
-    mesh.rotation.x = -Math.PI / 2;
-    mesh.position.set(-slot * SLOT_SP, LEDGER.rowGL0, 0);
-    mesh.scale.setScalar(size);
-    this._trailGroup.add(mesh);
-    this._trail.push({ mesh, slot, ordinal });
   }
 
   // Pooled glowing spheres that travel the anchor flow lines.
-  _buildPulses() {
+  private _buildPulses() {
     this._pulseMat = new THREE.MeshBasicMaterial({
       transparent: true, blending: THREE.AdditiveBlending, depthWrite: false,
     });
@@ -422,7 +397,7 @@ export class Ledger {
     this.group.add(this._pulseMesh);
   }
 
-  _hideAllPulses() {
+  private _hideAllPulses() {
     _dummy.position.set(0, 0, 0);
     _dummy.scale.setScalar(0);
     _dummy.updateMatrix();
@@ -433,7 +408,7 @@ export class Ledger {
   // Build metagraph `id`'s node-group rings + cache its pulse-curve origin (the lane site). The
   // visible anchor line is NOT built here — it's drawn dynamically per block in the link pass
   // (via curvePoint) so it travels with the block; only the pulses use the cached origin.
-  _addCurve(id) {
+  private _addCurve(id: string): CurveRec | null {
     const i = METAGRAPHS.findIndex((m) => m.id === id);
     if (i < 0) return null; // unlisted — no site
     const s = ledgerSite(i, METAGRAPHS.length);
@@ -441,7 +416,7 @@ export class Ledger {
     // Rings around the L1 + L0 node groups this metagraph produces from; they light up as a pulse
     // passes through (see update).
     const dR = clusterRadius(3); // default until the live node counts arrive (setGroupSizes)
-    const rings = [
+    const rings: RingRec[] = [
       { mesh: this._makeRing(s.x, LEDGER.rowML1, s.z, color), y: LEDGER.rowML1, glow: 0, radius: dR, floor: "l1" },
       { mesh: this._makeRing(s.x, LEDGER.rowML0, s.z, color), y: LEDGER.rowML0, glow: 0, radius: dR, floor: "l0" },
     ];
@@ -449,14 +424,14 @@ export class Ledger {
       r.mesh.scale.setScalar(r.radius);
       this._anchorGroup.add(r.mesh);
     }
-    const rec = { sx: s.x, sz: s.z, color, rings };
+    const rec: CurveRec = { sx: s.x, sz: s.z, color, rings };
     this._curves.set(id, rec);
     return rec;
   }
 
   // A thin ring lying flat on a floor, sharing the unit `_ringGeo` (scaled per group to its
   // count-based radius — see setGroupSizes / the update glow loop) so it fits the dots.
-  _makeRing(x, y, z, color) {
+  private _makeRing(x: number, y: number, z: number, color: number): THREE.Mesh {
     const ring = new THREE.Mesh(
       this._ringGeo,
       new THREE.MeshBasicMaterial({
@@ -470,17 +445,18 @@ export class Ledger {
     return ring;
   }
 
-  _clearCurves() {
+  private _clearCurves() {
     for (const o of this._anchorGroup.children.slice()) {
       this._anchorGroup.remove(o);
-      o.material?.dispose(); // geometry is the shared _ringGeo (disposed once in dispose)
+      (o as THREE.Mesh).material && ((o as THREE.Mesh).material as THREE.Material).dispose(); // geometry is the shared _ringGeo
     }
     this._curves.clear();
   }
 
   // Re-read the live tick. `snaps` = the Global L0 buffer (oldest→newest); `getAnchor(ts)` = the
-  // per-tick anchor aggregate ({ count, fee, metaCounts:Map(id→n) }).
-  setData(snaps, getAnchor) {
+  // per-tick anchor aggregate ({ count, fee, metaCounts:Map(id→n) }). The domain state transitions
+  // run in model.setData; this method owns the centre pick, the trail meshes, and pulse spawning.
+  setData(snaps: GlobalSnapshot[], getAnchor: (ts: string) => Anchor | null) {
     const latest = snaps && snaps.length ? snaps[snaps.length - 1] : null;
     this._latest = latest;
     if (!latest) {
@@ -489,14 +465,17 @@ export class Ledger {
       return;
     }
     this.center.visible = true;
-    // First data after entering the view: seed the trail + lanes from the retained history so it's
-    // already built up (instead of filling in live over the next ~SLOT_N ticks).
-    if (this._tickOrdinal === null && snaps.length > 1) this._seedHistory(snaps, getAnchor);
-    const isNewTick = latest.ordinal !== this._tickOrdinal;
-    const prevBaseR = this._baseR; // size of the snapshot that is now completing (for its trail block)
-    const total = typeof latest.metagraphSnapshotCount === "number" ? latest.metagraphSnapshotCount : 0;
+
+    // Snapshot the model's pre-call state so we can classify what changed after the transition:
+    //   • willSeed → this call seeds history (new trail tiles appear at rest, not fading in)
+    //   • isNewTick → the queue is cleared before re-filling (mirrors js/ledger.js:526)
+    const prevTick = this.model.tickOrdinal;
+    const willSeed = prevTick === null && snaps.length > 1;
+    const isNewTick = latest.ordinal !== prevTick;
+
     // Size by anchored count (clamped) so a busy tick reads bigger; never fabricate a minimum.
-    this._baseR = 1.0 + Math.min(1, total / 24) * 1.6;
+    const total = typeof latest.metagraphSnapshotCount === "number" ? latest.metagraphSnapshotCount : 0;
+    this._baseR = sizeForCount(total);
     const blk = Array.isArray(latest.blocks) ? latest.blocks.length : 0;
     const blkTxt = blk > 0 ? ` · ${blk} DAG-L1 block${blk === 1 ? "" : "s"}` : "";
     this.center.userData.pick = {
@@ -504,89 +483,56 @@ export class Ledger {
       data: latest,
       title: `Global snapshot #${latest.ordinal}`,
       sub: `${total} metagraph snapshot${total === 1 ? "" : "s"} anchored${blkTxt}`,
-    };
+    } satisfies PickDescriptor;
 
-    // ── live anchor animation: emit a pulse per metagraph snapshot anchored into this tick ──
-    const a = getAnchor ? getAnchor(latest.timestamp) : null;
-    if (isNewTick) {
-      // The previous snapshot completed → drop it into the global trail and advance every lane one
-      // slot; then seed the new live tick with an empty placeholder at slot 0 for each metagraph
-      // (upgraded to a real block when it anchors). Rings/curves are persistent, not reset here.
-      if (this._tickOrdinal !== null) {
-        this._spawnTrailTile(prevBaseR, this._tickOrdinal); // the snapshot now completing is _tickOrdinal
-        // Advance every lane one slot — the live slot-0 blocks become slot 1 (real or empty), scroll.
-        for (const lane of this._metaLanes.values()) {
-          for (const b of lane.blocks) b.slot += 1;
-          while (lane.blocks.length && lane.blocks[lane.blocks.length - 1].slot > SLOT_N) lane.blocks.pop();
-        }
-      }
-      this._tickMetas.clear();
-      this._tickOrdinal = latest.ordinal;
-      this._emitted.clear();
-      this._queue.length = 0;
-      // The new LIVE tick starts with an empty placeholder at slot 0 for EVERY metagraph (shown on
-      // the latest too); _anchorMetaBlock upgrades it to a real, sized block if the metagraph anchors.
-      for (let i = 0; i < METAGRAPHS.length; i++) {
-        this._lane(METAGRAPHS[i].id, i).blocks.unshift({ x: 0, slot: 0, fade: 0, ox: 0, oz: 0, size: 0.17, filled: false, link: false });
-      }
-      // Curves are persistent now (the linkage stays) — don't clear them per tick.
-    }
-    if (!a || !a.metaCounts) return;
+    // Advance the domain state machine (seed / tick-advance / anchor blocks / recompute selected slot).
+    const changes = this.model.setData(snaps, getAnchor);
+
+    // Pair trail meshes to the (now-updated) model.trail.
+    this._reconcileTrail(snaps, willSeed);
+
+    // ── live anchor animation: emit a pulse per NEWLY anchored metagraph snapshot into this tick ──
+    // On a new tick the pending queue is cleared first (js/ledger.js:526); the running stagger clock
+    // (_lastDue) is NOT reset (it's max'd against this.t). Only the selected metagraph emits pulses
+    // when a single-metagraph filter is active (so only ITS rings light).
+    if (isNewTick) this._queue.length = 0;
     const mf = this._filter !== "all" && this._filter !== "dag" ? this._filter : null;
-    for (const [id, n] of a.metaCounts) {
-      this._tickMetas.set(id, n); // remember for this metagraph's lane block when the tick completes
-      const prev = this._emitted.get(id) || 0;
-      if (n <= prev) continue;
-      const rec = this._curves.get(id) || this._addCurve(id);
-      if (!rec) {
-        this._emitted.set(id, n); // unlisted: no curve, but don't re-check
-        continue;
-      }
-      this._anchorMetaBlock(id, n); // draw the real block at the lead now + animate the anchoring
-      // Only the selected metagraph emits pulses (so only ITS rings light) when a filter is active.
-      if (!mf || id === mf) {
-        for (let k = prev; k < n && this._queue.length < PULSE_MAX * 2; k++) {
+    for (const ch of changes) {
+      const rec = this._curves.get(ch.id) || this._addCurve(ch.id);
+      if (!rec) continue; // unlisted: no curve (model already excludes these from changes)
+      if (!mf || ch.id === mf) {
+        for (let k = 0; k < ch.delta && this._queue.length < PULSE_MAX * 2; k++) {
           this._lastDue = Math.max(this.t, this._lastDue + PULSE_STAGGER); // global stagger = a stream
-          this._queue.push({ id, dueAt: this._lastDue });
+          this._queue.push({ id: ch.id, dueAt: this._lastDue });
         }
       }
-      this._emitted.set(id, n);
     }
-    this._recomputeSelectedSlot(); // slots just shifted on a new tick → refresh which slot is selected
   }
 
   // The selected/hovered snapshot (by ordinal, from the LiveStrip bar-chart or the centre pick) keeps
   // its metagraph COLOUR even after it trails into the neutral background. Null = nothing selected.
-  setSelected(ordinal) {
-    this._selectedOrd = ordinal == null ? null : ordinal;
-    this._recomputeSelectedSlot();
+  setSelected(ordinal: number | null) {
+    this.model.setSelected(ordinal);
   }
 
   // The network filter: when a single metagraph is selected, the OTHER metagraphs' lead tiles + links
   // go neutral too (so the lead row shows only the selected metagraph in colour). "all"/"dag" = no dim.
-  setFilter(filter) {
+  setFilter(filter: string) {
     this._filter = filter || "all";
   }
 
-  // Map the selected ordinal → its current slot (0 = the live centre; else find it in the trail).
-  _recomputeSelectedSlot() {
-    if (this._selectedOrd == null) { this._selectedSlot = -1; return; }
-    if (this._selectedOrd === this._tickOrdinal) { this._selectedSlot = 0; return; }
-    const t = this._trail.find((x) => x.ordinal === this._selectedOrd);
-    this._selectedSlot = t ? t.slot : -1;
-  }
-
-  update(dt) {
+  update(dt: number) {
     this.t += dt;
     if (!this._latest) return;
 
     const k = Math.min(1, dt * 3); // shared ease factor for the trail + lanes this frame
+    const selectedSlot = this.model.selectedSlot;
 
     // The centre block (LIVE snapshot) pulses subtly + flashes as pulses arrive — UNLESS an older
     // snapshot is selected, in which case the live lead also drops to the neutral tone (only the
     // selected row is coloured anywhere).
     this._flash = Math.max(0, this._flash - dt * 2.2);
-    const leadNeutral = this._selectedSlot > 0;
+    const leadNeutral = selectedSlot > 0;
     const cCol = leadNeutral ? NEUTRAL_TILE : CORE_COLOR;
     this.centerMat.color.copy(cCol);
     this.centerMat.emissive.copy(cCol);
@@ -594,21 +540,24 @@ export class Ledger {
 
     // Hypergraph-L0 participation ring: glows as the global L0 produces each snapshot, then fades.
     this._gL0Glow = Math.max(0, this._gL0Glow - dt * 1.4);
-    this._gL0Ring.material.opacity = this._gL0Ring.userData.baseOpacity + this._gL0Glow * 0.9;
+    (this._gL0Ring.material as THREE.MeshBasicMaterial).opacity = this._gL0Ring.userData.baseOpacity + this._gL0Glow * 0.9;
     this.center.scale.setScalar(this._baseR * (1 + Math.sin(this.t * 2.2) * 0.06 + this._flash * 0.12));
 
     // The global trail eases left into its slots; trailing blocks get the SAME treatment as the tiles
     // and links — bright cyan only when SELECTED, otherwise the toned-down NEUTRAL (the live lead is the
     // separate centre block). Fades + grows transparent by recency.
-    for (const t of this._trail) {
-      t.mesh.position.x += (-t.slot * SLOT_SP - t.mesh.position.x) * k;
-      const sel = t.slot === this._selectedSlot;
+    for (const t of this.model.trail) {
+      const mesh = this._trailMeshes.get(t.ordinal);
+      if (!mesh) continue;
+      const mat = mesh.material as THREE.MeshStandardMaterial;
+      mesh.position.x += (-t.slot * SLOT_SP - mesh.position.x) * k;
+      const sel = t.slot === selectedSlot;
       const col = sel ? CORE_COLOR : NEUTRAL_TILE;
-      t.mesh.material.color.copy(col);
-      t.mesh.material.emissive.copy(col);
-      t.mesh.material.emissiveIntensity = sel ? 0.7 : 0.22;
+      mat.color.copy(col);
+      mat.emissive.copy(col);
+      mat.emissiveIntensity = sel ? 0.7 : 0.22;
       const target = sel ? 0.95 : 0.55 * slotFade(t.slot);
-      t.mesh.material.opacity += (target - t.mesh.material.opacity) * k;
+      mat.opacity += (target - mat.opacity) * k;
     }
 
     // The per-metagraph lanes: each lane's blocks ease left + fade by recency, all drawn in the one
@@ -617,12 +566,16 @@ export class Ledger {
       // slot → global block X (slot 0 = the live centre block), so a freshly-anchored block links there.
       _gx.clear();
       _gx.set(0, this.center.position.x);
-      for (const t of this._trail) _gx.set(t.slot, t.mesh.position.x);
+      for (const t of this.model.trail) {
+        const mesh = this._trailMeshes.get(t.ordinal);
+        if (mesh) _gx.set(t.slot, mesh.position.x);
+      }
       // A single-metagraph filter neutralises every OTHER lane (even on the lead row).
       const mf = this._filter !== "all" && this._filter !== "dag" ? this._filter : null;
       let mi = 0, li = 0;
-      for (const lane of this._metaLanes.values()) {
+      for (const lane of this.model.lanes.values()) {
         const laneOff = mf != null && lane.id !== mf; // filtered out → never coloured
+        const laneColor = this._laneColor(lane.id);
         for (const b of lane.blocks) {
           if (mi >= META_TRAIL_MAX) break;
           b.x += (-b.slot * SLOT_SP - b.x) * k; // trail LEFT, same direction + spacing as the global
@@ -635,12 +588,12 @@ export class Ledger {
           // Colour belongs to the LIVE lead (slot 0) and to a SELECTED snapshot; trailing tiles fade to
           // a quiet neutral so the background isn't a wall of colour. Brightness still fades by recency.
           // Colour is binary, and EXACTLY ONE row is ever coloured: a selected OLDER snapshot
-          // (`_selectedSlot > 0`) wins outright — the live lead goes neutral with everything else;
+          // (`selectedSlot > 0`) wins outright — the live lead goes neutral with everything else;
           // otherwise the live lead (slot 0) is the coloured row. A filtered-out lane is never coloured.
-          const hot = !laneOff && (this._selectedSlot > 0 ? b.slot === this._selectedSlot : b.slot <= 0);
+          const hot = this.model.isRowHot(laneOff, b.slot);
           const colAmt = hot ? 1 : 0;
           const bright = (hot ? Math.max(b.fade, 0.7) : b.fade) * (b.filled ? 0.6 : 0.13);
-          this._metaTrailMesh.setColorAt(mi, _col.copy(NEUTRAL_TILE).lerp(lane.color, colAmt).multiplyScalar(bright));
+          this._metaTrailMesh.setColorAt(mi, _col.copy(NEUTRAL_TILE).lerp(laneColor, colAmt).multiplyScalar(bright));
           mi++;
 
           // One anchor link per cluster (from its centre tile) — the shared curvePoint shape: straight
@@ -648,7 +601,7 @@ export class Ledger {
           const g = _gx.get(b.slot);
           if (b.filled && b.link && g !== undefined && li + LINK_SEG <= LINK_CURVES * LINK_SEG) {
             // Same lead/selected = coloured, trail = neutral treatment as the tiles (consistent row).
-            _col.copy(NEUTRAL_TILE).lerp(lane.color, colAmt).multiplyScalar((hot ? Math.max(b.fade, 0.7) : b.fade) * 0.42);
+            _col.copy(NEUTRAL_TILE).lerp(laneColor, colAmt).multiplyScalar((hot ? Math.max(b.fade, 0.7) : b.fade) * 0.42);
             curvePoint(0, b.x, lane.z, g, _q);
             let px = _q.x, py = _q.y, pz = _q.z;
             for (let s = 1; s <= LINK_SEG; s++) {
@@ -682,7 +635,7 @@ export class Ledger {
 
     // Spawn any due pulses (a metagraph snapshot beginning its descent to the global tile).
     while (this._queue.length && this._queue[0].dueAt <= this.t && this._pulses.length < PULSE_MAX) {
-      const { id } = this._queue.shift();
+      const { id } = this._queue.shift()!;
       const rec = this._curves.get(id);
       if (rec) this._pulses.push({ rec, t: 0, speed: 0.85 + Math.random() * 0.25 });
     }
@@ -725,7 +678,7 @@ export class Ledger {
     for (const rec of this._curves.values()) {
       for (const r of rec.rings) {
         r.glow = Math.max(0, r.glow - dt * 2.4);
-        r.mesh.material.opacity = r.mesh.userData.baseOpacity + r.glow * 0.9; // highlight on anchor
+        (r.mesh.material as THREE.MeshBasicMaterial).opacity = r.mesh.userData.baseOpacity + r.glow * 0.9; // highlight on anchor
         r.mesh.scale.setScalar(r.radius * (1 + r.glow * 0.12)); // count-sized, a touch bigger on a pulse
       }
     }
@@ -733,15 +686,17 @@ export class Ledger {
 
   dispose() {
     this._clearCurves();
-    for (const t of this._trail) t.mesh.material.dispose(); // geometry is the shared _trailGeo
-    this._trail = [];
+    for (const mesh of this._trailMeshes.values()) (mesh.material as THREE.Material).dispose(); // geometry is the shared _trailGeo
+    this._trailMeshes.clear();
     this._ringGeo.dispose();
     for (const o of this.group.children.slice()) {
       this.group.remove(o);
-      o.geometry?.dispose();
-      o.material?.map?.dispose?.(); // label sprite canvas textures
-      o.material?.dispose();
-      o.dispose?.();
+      const obj = o as THREE.Mesh & { dispose?: () => void };
+      obj.geometry?.dispose();
+      const mat = obj.material as (THREE.Material & { map?: { dispose?: () => void } }) | undefined;
+      mat?.map?.dispose?.(); // label sprite canvas textures
+      mat?.dispose?.();
+      obj.dispose?.();
     }
     this.pickables = [];
   }

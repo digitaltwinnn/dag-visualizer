@@ -7,18 +7,53 @@
 // view by scaling `root` down.
 
 import * as THREE from "three";
-import { COLORS, METAGRAPHS, metaAnchor } from "./config.js";
+import { COLORS, METAGRAPHS, metaAnchor, type MetaConfig } from "../../config";
+import { R_GLOBE, CORE_R } from "../../domain/morph";
 
-const R_GLOBE = 16;  // must match Globe's R — the radius the core grows out to
-const CORE_R = 3.1;  // the core IcosahedronGeometry radius
 const _pos = new THREE.Vector3(); // scratch for hub orbit positions (reused each frame)
 
-export class Layers {
+// One orbiting metagraph hub record in HyperView.metas (the exact shape the constructor
+// builds — scene/Globe.ts (via `layers.metas.find`, keying off `.cfg.id`/`.group`) and
+// Engine.ts (`.cfg.id` lookups for DoF/filter) read these fields off the instances handed
+// to them, so this type must track _buildMetagraphs verbatim).
+export interface MetaHubRec {
+  group: THREE.Group;
+  hub: THREE.Mesh;
+  cfg: MetaConfig;
+  state: null;
+  tether: THREE.Line;
+  pulseMesh: THREE.Mesh;
+  pulse: number;
+  anchor: THREE.Vector3;
+  orbit: number;
+  radius: number;
+  incl: number;
+  spin: number;
+  active: boolean;
+}
+
+export class HyperView {
+  scene: THREE.Scene;
+  root: THREE.Group;
+  pickables: THREE.Object3D[];
+  metas: MetaHubRec[];
+  sceneColors: Record<string, number> | null;
+  clock: number;
+  focusId: string | null;
+  ledger: boolean;
+  // View-derived gate from VIEW_POLICIES: when false the hub constellation holds still (folds into
+  // `frozen` in update, alongside — but independent of — the focusId freeze). Only hyper leaves it on.
+  hubOrbits: boolean;
+  coreGroup!: THREE.Group;
+  core!: THREE.Mesh;
+  halo!: THREE.Mesh;
+  coreFlash?: number;
+
   // `sceneColors` (id -> 0xRRGGBB) is the identity SCENE-lane colour map (Task 3), handed in by
-  // the Engine at construction — Layers builds all its hubs synchronously from config.METAGRAPHS
-  // right here, before any API data exists, so the map has to arrive as a ctor arg for the hubs
-  // to be born in the identity colour with no recolor pass / no first-paint flash.
-  constructor(scene, sceneColors) {
+  // the Engine at construction — HyperView builds all its hubs synchronously from
+  // config.METAGRAPHS right here, before any API data exists, so the map has to arrive as a ctor
+  // arg for the hubs to be born in the identity colour with no recolor pass / no first-paint flash.
+  constructor(scene: THREE.Scene, sceneColors?: Record<string, number>) {
     this.scene = scene;
     this.root = new THREE.Group();
     scene.add(this.root);
@@ -40,25 +75,34 @@ export class Layers {
     // In the Snapshots (ledger) view the hubs (and their tethers/pulses) are hidden — ledger.js
     // draws the metagraph snapshot blocks itself. Toggled by the engine via setLedger.
     this.ledger = false;
+
+    // Hub orbit motion runs by default; the Engine gates it per view via setHubOrbits.
+    this.hubOrbits = true;
+  }
+
+  // View-derived hub-orbit gate from VIEW_POLICIES (Engine calls this on mode change). When off, the
+  // hub constellation freezes; in geo/flat the hubs are already invisible so this is a no-op there.
+  setHubOrbits(on: boolean) {
+    this.hubOrbits = on;
   }
 
   // Hide/show the metagraph hubs + their tethers/pulses for the Snapshots view. Hidden state is
   // applied once here; the normal update loop early-returns while in ledger and re-shows everything
   // on exit.
-  setLedger(on) {
+  setLedger(on: boolean) {
     if (this.ledger === on) return;
     this.ledger = on;
     for (const m of this.metas) {
       m.hub.visible = !on;
       if (on) {
-        m.tether.material.opacity = 0;
-        m.pulseMesh.material.opacity = 0;
+        (m.tether.material as THREE.LineBasicMaterial).opacity = 0;
+        (m.pulseMesh.material as THREE.MeshBasicMaterial).opacity = 0;
       }
     }
   }
 
   // ---------------------------------------------------------------- Core
-  _buildCore() {
+  private _buildCore() {
     this.coreGroup = new THREE.Group();
     const mat = new THREE.MeshStandardMaterial({
       color: COLORS.core, emissive: COLORS.core, emissiveIntensity: 1.4,
@@ -93,14 +137,14 @@ export class Layers {
   // Fire an "anchored into L0" packet from a metagraph's hub toward the core —
   // called when that metagraph actually records a snapshot that anchored into a
   // global tick (the `anchor` event), so the packets reflect real anchoring.
-  pulseMeta(metaId) {
+  pulseMeta(metaId: string) {
     if (this.ledger) return; // the hubs are hidden in ledger — don't accumulate an unrendered pulse
     const m = this.metas.find((x) => x.cfg.id === metaId);
     if (m) m.pulse = 1;
   }
 
   // ---------------------------------------------------------------- Metagraphs
-  _buildMetagraphs() {
+  private _buildMetagraphs() {
     const n = METAGRAPHS.length;
     METAGRAPHS.forEach((cfg, i) => {
       const group = new THREE.Group();
@@ -144,7 +188,7 @@ export class Layers {
   // non-selectable by the engine (it skips their picks), so the Hypergraph still shows they
   // exist without inviting a dead-end click. `ids` is a Set of active ids, or null = all active
   // (e.g. before the node counts have loaded).
-  setMetaActive(ids) {
+  setMetaActive(ids: Set<string> | null) {
     for (const m of this.metas) m.active = !ids || ids.has(m.cfg.id);
   }
 
@@ -152,7 +196,7 @@ export class Layers {
   // `morph` (0 = Hypergraph, 1 = globe) fades the metagraph hubs out early so
   // they don't visibly collapse into the globe's centre — their real nodes fly
   // out to the map (Globe) instead.
-  update(dt, morph = 0) {
+  update(dt: number, morph = 0) {
     this.clock += dt;
     const t = this.clock;
 
@@ -183,11 +227,12 @@ export class Layers {
     this.core.rotation.y += dt * 0.25;
     this.core.rotation.x += dt * 0.12;
     // Dim the glow as it expands so the swelling sphere doesn't bloom out the view.
-    this.core.material.emissiveIntensity = (1.05 + flash * 1.2) * coreF * coreReveal * (1 - 0.5 * (1 - coreReveal));
-    this.core.material.opacity = coreOpacity * coreReveal;
+    const coreMat = this.core.material as THREE.MeshStandardMaterial;
+    coreMat.emissiveIntensity = (1.05 + flash * 1.2) * coreF * coreReveal * (1 - 0.5 * (1 - coreReveal));
+    coreMat.opacity = coreOpacity * coreReveal;
     this.coreGroup.visible = coreReveal > 0.001;
     // The wireframe halo only makes sense at Hypergraph scale — fade it out early.
-    this.halo.material.opacity = 0.16 * coreF * THREE.MathUtils.clamp(1 - morph / 0.25, 0, 1);
+    (this.halo.material as THREE.MeshBasicMaterial).opacity = 0.16 * coreF * THREE.MathUtils.clamp(1 - morph / 0.25, 0, 1);
     this.halo.rotation.y -= dt * 0.15;
     this.halo.rotation.z += dt * 0.08;
     if (this.coreFlash) this.coreFlash = Math.max(0, this.coreFlash - dt * 1.6);
@@ -196,7 +241,9 @@ export class Layers {
     // whole constellation holds still — every hub's orbit AND its own axis spin freeze, not just
     // the focused one — so nothing drifts/spins around the framed selection. The node spheres still
     // tumble (globe.js) and data-driven anchor pulses still fire; only the hub motion stops.
-    const frozen = this.focusId != null;
+    // The constellation holds still when a hub is focused (focusId) OR the view policy turns hub
+    // orbits off (hubOrbits) — the two freezes are independent but drive the same hold.
+    const frozen = this.focusId != null || !this.hubOrbits;
     for (const m of this.metas) {
       if (!frozen) m.orbit += dt * 0.03;
       const a = m.orbit;
@@ -215,10 +262,11 @@ export class Layers {
       // fainter tether — present in the architecture, but clearly not live.
       // When a metagraph is selected (focusId), dim the OTHER hubs *subtly* — a gentle
       // out-of-focus push (DoF + camera focus already carry most of the emphasis).
-      const focusOther = this.focusId && m.cfg.id !== this.focusId;
+      const focusOther = this.focusId != null && m.cfg.id !== this.focusId;
       const fdim = focusOther ? 0.62 : 1; // glow / tether
       const glowMul = (m.active ? 1 : 0.08) * fdim;
-      m.hub.material.opacity = metaOpacity * (m.active ? 1 : 0.5) * (focusOther ? 0.78 : 1);
+      const hubMat = m.hub.material as THREE.MeshStandardMaterial;
+      hubMat.opacity = metaOpacity * (m.active ? 1 : 0.5) * (focusOther ? 0.78 : 1);
 
       // The tether is a 2-vertex line fixed at the origin → hub. Write the moving endpoint
       // (vertex 1) straight into the existing buffer instead of setFromPoints, which would
@@ -226,17 +274,18 @@ export class Layers {
       const tetherPos = m.tether.geometry.attributes.position;
       tetherPos.setXYZ(1, _pos.x, _pos.y, _pos.z);
       tetherPos.needsUpdate = true;
-      m.tether.material.opacity = 0.22 * metaF * (m.active ? 1 : 0.35) * fdim;
+      (m.tether.material as THREE.LineBasicMaterial).opacity = 0.22 * metaF * (m.active ? 1 : 0.35) * fdim;
 
+      const pulseMat = m.pulseMesh.material as THREE.MeshBasicMaterial;
       if (m.pulse > 0) {
         m.pulse = Math.max(0, m.pulse - dt * 0.7);
         const e = 1 - m.pulse;
         m.pulseMesh.position.copy(_pos).multiplyScalar(1 - e);
-        m.pulseMesh.material.opacity = Math.sin(m.pulse * Math.PI) * 0.9 * metaF;
-        m.hub.material.emissiveIntensity = (0.8 + m.pulse * 1.6) * metaF * glowMul;
+        pulseMat.opacity = Math.sin(m.pulse * Math.PI) * 0.9 * metaF;
+        hubMat.emissiveIntensity = (0.8 + m.pulse * 1.6) * metaF * glowMul;
       } else {
-        m.pulseMesh.material.opacity = 0;
-        m.hub.material.emissiveIntensity = 0.8 * metaF * glowMul;
+        pulseMat.opacity = 0;
+        hubMat.emissiveIntensity = 0.8 * metaF * glowMul;
       }
     }
   }

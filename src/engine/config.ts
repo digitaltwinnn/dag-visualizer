@@ -16,11 +16,19 @@ export const COLORS = {
 // Fallback hub colour for a metagraph the config doesn't know yet (one not in METAGRAPHS).
 export const DEFAULT_META_COLOR = 0x8affc1;
 
+export interface MetaConfig {
+  name: string;
+  ticker: string;
+  color: number;
+  id: string;
+  blurb: string;
+}
+
 // The real mainnet metagraphs (source: dagexplorer). Each pulls live snapshots
-// via its id, with a simulated cadence fallback. Colours match the metagraph
-// node clusters plotted on the globe (data/metagraphs.json). Keep this list in
-// sync with the baked data by re-running scripts/bake-metagraphs.py.
-export const METAGRAPHS = [
+// via its id. Colours match the metagraph node clusters plotted on the globe
+// (data/metagraphs.json). Keep this list in sync with the baked data by
+// re-running scripts/bake-metagraphs.py.
+export const METAGRAPHS: MetaConfig[] = [
   { name: "Digital Evidence",    ticker: "DED",      color: 0x36e29a, id: "DAG0eQr94qUQSUhmYGNXt6CoBKWu5K6htvRMGC6M",
     blurb: "DoD-vetted data-fingerprinting as a service — immutable proof of data authenticity, anchored to the Global L0." },
   { name: "Cyberlete",           ticker: "LEET",     color: 0xff7ad9, id: "DAG0rgR8sdn8u2YBYb5Ftjy4zmuqUX3v9XsE2j94",
@@ -46,7 +54,10 @@ export const METAGRAPHS = [
 // Anchor position of metagraph i's orbiting cluster in the Hypergraph layout.
 // Shared by Layers (the hub mesh) and Globe (where each metagraph's real nodes
 // start before they fly out to the map) so the burst originates from the hub.
-export function metaAnchor(i, n) {
+export function metaAnchor(
+  i: number,
+  n: number,
+): { x: number; y: number; z: number; a: number; radius: number; incl: number } {
   const a = (i / n) * Math.PI * 2;
   const incl = (i % 2 === 0 ? 1 : -1) * (0.15 + (i % 3) * 0.12);
   const radius = VIS.metaOrbitRadius + (i % 4) * 3.2;
@@ -102,14 +113,14 @@ export const LEDGER = {
 // Shared by Layers, Globe's node clusters and Ledger so a metagraph's nodes, rings and chain all
 // line up in its lane.
 const LANE_SPREAD = 0.62; // fraction of LEDGER.depth the lanes span (see clusterRadius)
-export function ledgerSite(i, n) {
+export function ledgerSite(i: number, n: number): { x: number; z: number } {
   const spread = LEDGER.depth * LANE_SPREAD;
   return { x: 0, z: n > 1 ? (i / (n - 1) - 0.5) * spread : 0 };
 }
 
 // The ring/cluster radius for a node group of `count` nodes — grows with count (so the ring fits
 // the dots) but is capped to a fraction of the lane spacing so neighbouring rings never overlap.
-export function clusterRadius(count) {
+export function clusterRadius(count: number): number {
   const laneGap = (LEDGER.depth * LANE_SPREAD) / Math.max(1, METAGRAPHS.length - 1); // = ledgerSite's Z step
   const cap = laneGap * 0.46;
   return Math.min(cap, 0.55 + Math.sqrt(Math.max(1, count)) * 0.3);
@@ -117,7 +128,11 @@ export function clusterRadius(count) {
 
 // Small deterministic golden-angle offset for node `k` of `cnt`, spreading a cluster as a flat
 // disc ON the floor (X/Z plane) within `radius` — no random jitter.
-export function ledgerSpread(k, cnt, radius) {
+export function ledgerSpread(
+  k: number,
+  cnt: number,
+  radius: number,
+): { x: number; z: number } {
   if (cnt <= 1) return { x: 0, z: 0 };
   const r = Math.sqrt(k / (cnt - 1)) * radius;
   const a = k * 2.399963229728653; // golden angle

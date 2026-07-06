@@ -6,11 +6,29 @@ import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import { EffectComposer } from "three/addons/postprocessing/EffectComposer.js";
 import { RenderPass } from "three/addons/postprocessing/RenderPass.js";
 import { UnrealBloomPass } from "three/addons/postprocessing/UnrealBloomPass.js";
-import { BokehPass } from "three/addons/postprocessing/BokehPass.js";
-import { COLORS } from "./config.js";
-import { createBackground } from "./background.js";
+import { BokehPass, type BokehPassParamters } from "three/addons/postprocessing/BokehPass.js";
+import { COLORS } from "../config";
+import { createBackground, type Background } from "./objects/Background";
 
-export function createScene(canvas) {
+// @types/three types BokehPass.uniforms as a bare `object`; the engine reads
+// uniforms.focus/maxblur .value, so refine just those.
+export type DofPass = BokehPass & {
+  uniforms: Record<"focus" | "maxblur", { value: number }>;
+};
+
+// js/scene.js createScene() return.
+export interface SceneCtx {
+  scene: THREE.Scene;
+  camera: THREE.PerspectiveCamera;
+  renderer: THREE.WebGLRenderer;
+  controls: OrbitControls;
+  composer: EffectComposer;
+  dof: DofPass;
+  background: Background;
+  resize(): void;
+}
+
+export function createScene(canvas: HTMLCanvasElement): SceneCtx {
   const scene = new THREE.Scene();
   scene.background = new THREE.Color(COLORS.bg);
   scene.fog = new THREE.FogExp2(COLORS.bg, 0.012);
@@ -62,10 +80,14 @@ export function createScene(canvas) {
   // few units of depth around the focal plane, so a shallow aperture smeared THEM too; this widens
   // the sharp zone to cover the whole selected cluster while distant objects (the core, the other
   // hubs) are far enough out to still saturate to maxblur — strong background blur, crisp selection.
-  const dof = new BokehPass(scene, camera, {
+  // BokehPassParamters' types only declare focus/aspect/aperture/maxblur, but the JS
+  // constructor accepts (and ignores) width/height too — kept for parity with the
+  // original call.
+  const dofParams: BokehPassParamters & { width: number; height: number } = {
     focus: 54, aperture: 0.0002, maxblur: 0.01,
     width: window.innerWidth, height: window.innerHeight,
-  });
+  };
+  const dof = new BokehPass(scene, camera, dofParams) as DofPass;
   dof.enabled = false;
   composer.addPass(dof);
 

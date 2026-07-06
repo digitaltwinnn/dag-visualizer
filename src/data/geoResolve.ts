@@ -2,10 +2,12 @@
 // resolves any validators not in the cache at runtime. Results are remembered
 // in localStorage so the globe fills in over time.
 
+import type { GeoMap } from "@/src/data/types";
+
 const LS_KEY = "dag-geo-cache-v1";
 
-export async function loadGeoCache() {
-  const map = {};
+export async function loadGeoCache(): Promise<GeoMap> {
+  const map: GeoMap = {};
   // baked validator geo seed, served on-disk by the Next /api/geo route
   try {
     const res = await fetch("/api/geo");
@@ -19,7 +21,7 @@ export async function loadGeoCache() {
   return map;
 }
 
-function persist(map, additions) {
+function persist(map: GeoMap, additions: GeoMap): void {
   try {
     const saved = JSON.parse(localStorage.getItem(LS_KEY) || "{}");
     Object.assign(saved, additions);
@@ -28,10 +30,30 @@ function persist(map, additions) {
   Object.assign(map, additions);
 }
 
+// Raw fields returned by ip-api.com's batch endpoint (only what we read).
+interface IpApiEntry {
+  status: string;
+  query: string;
+  lat?: number;
+  lon?: number;
+  city?: string;
+  country?: string;
+  countryCode?: string;
+}
+// Raw fields returned by ipwho.is (only what we read).
+interface IpWhoIsEntry {
+  success?: boolean;
+  latitude?: number;
+  longitude?: number;
+  city?: string;
+  country?: string;
+  country_code?: string;
+}
+
 // Resolve IPs missing from the cache. Uses ip-api batch when the page is served
 // over http (local dev); otherwise falls back to the HTTPS ipwho.is endpoint so
 // it still works when the site is hosted. Calls onResolved(map) as data arrives.
-export async function resolveMissing(map, ips, onResolved) {
+export async function resolveMissing(map: GeoMap, ips: string[], onResolved: (m: GeoMap) => void): Promise<void> {
   const missing = ips.filter((ip) => ip && !map[ip]);
   if (!missing.length) return;
   const isHttps = location.protocol === "https:";
@@ -39,13 +61,13 @@ export async function resolveMissing(map, ips, onResolved) {
   // Try the fast batch path first (http only).
   if (!isHttps) {
     try {
-      const found = {};
+      const found: GeoMap = {};
       for (let i = 0; i < missing.length; i += 100) {
         const chunk = missing.slice(i, i + 100);
         const res = await fetch("http://ip-api.com/batch?fields=status,country,countryCode,city,lat,lon,query", {
           method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(chunk),
         });
-        const arr = await res.json();
+        const arr: IpApiEntry[] = await res.json();
         for (const e of arr) {
           if (e.status === "success") found[e.query] = { lat: e.lat, lon: e.lon, city: e.city || "", country: e.country || "", cc: e.countryCode || "" };
         }
@@ -55,11 +77,11 @@ export async function resolveMissing(map, ips, onResolved) {
   }
 
   // HTTPS per-IP fallback, capped so we never hammer the service.
-  const found = {};
+  const found: GeoMap = {};
   for (const ip of missing.slice(0, 60)) {
     try {
       const res = await fetch(`https://ipwho.is/${ip}`);
-      const d = await res.json();
+      const d: IpWhoIsEntry = await res.json();
       if (d && d.success !== false && d.latitude != null) {
         found[ip] = { lat: d.latitude, lon: d.longitude, city: d.city || "", country: d.country || "", cc: d.country_code || "" };
       }
