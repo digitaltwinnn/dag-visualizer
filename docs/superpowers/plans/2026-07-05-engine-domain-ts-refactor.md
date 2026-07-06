@@ -6,7 +6,7 @@
 
 **Architecture:** Single scene / single canvas / one composer stays. `src/engine/domain/` = pure logic (three math types allowed, no renderer/meshes/store); `src/engine/scene/` = Three adapters that read domain state each frame and write GPU state; `Engine.ts` remains the only store bridge. Spec: `docs/superpowers/specs/2026-07-05-engine-domain-ts-refactor-design.md`.
 
-**Tech Stack:** Next.js App Router, TypeScript, three (its own bundled types — never `@types/three`), Zustand, Vitest.
+**Tech Stack:** Next.js App Router, TypeScript, three@0.161 typed by the existing `@types/three@0.161` devDependency (the official type library, version-pinned — do not add or change type packages), Zustand, Vitest.
 
 ## Global Constraints
 
