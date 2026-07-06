@@ -59,7 +59,7 @@ function buildGraticule(globe: GeoViewHost) {
   // The sea graticule (grid lines OVER the ocean): very subtle on purpose — a faint hint so the
   // continents (the raised, gridded land) clearly lead. Accent hue, kept calm by a low fade opacity.
   const mat = new THREE.LineBasicMaterial({ color: globe.geoColor, transparent: true, opacity: 0 });
-  globe.geoFades.push({ mat, base: 0.15 });
+  globe.geoFades.push({ mat, base: 0.05 });
   globe.group.add(new THREE.LineSegments(geo, mat));
 }
 
@@ -291,12 +291,11 @@ async function buildLand(globe: GeoViewHost) {
           // Gently non-linear ramp (a blend of linear + quadratic): dim along the ocean line,
           // strengthening toward the top rim — so the rim reads as an edge, not a glowing band.
           float e = t * (0.4 + 0.6 * t);
-          // The coastal cliffs are the signature element, but CALM: they sit at roughly the same
-          // brightness as the surface grid (same --primary hue, low additive strength) so the whole
-          // globe reads as one consistent hologram. Height + a faint top-edge highlight give them
-          // presence without a hot glowing rim.
+          // The coastal cliffs use the SURFACE hue (uColor = --primary) and are kept DIM so they read
+          // as a soft ridge blending into the surface, not a bright rim — height alone gives the
+          // relief. A barely-there top-edge highlight keeps the coastline legible.
           float edge = smoothstep(0.6, 1.0, t);
-          gl_FragColor = vec4(uColor * (0.05 + 0.2 * e + 0.22 * edge), min(1.0, e * 0.85) * uOpacity);
+          gl_FragColor = vec4(uColor * (0.02 + 0.08 * e + 0.08 * edge), min(1.0, e * 0.6) * uOpacity);
         }`,
       // Single-sided so only cliffs whose face points toward the camera draw: a
       // continent's near + side edges show, its far edge (behind the filled plateau)
