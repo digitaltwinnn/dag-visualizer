@@ -1,24 +1,24 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, type CSSProperties } from "react";
 import { useStore } from "@/src/store/store";
 import { filterAccent, CORE_HEX } from "@/src/data/network";
+import { PulseEdge, useEdgePulse } from "@/components/EdgePulse";
 
 // A rail's instrument-channel thread, a fixed SVG running down the rail's OUTER edge (in the margin,
 // just outside the cards). Measured from the live layout (ResizeObserver / MutationObserver / scroll)
 // so it tracks the cards as they're added, grow, or the rail scrolls; fades top+bottom (CSS mask);
 // purely decorative (pointer-events: none — see the no-effect-bleed rule). Must live OUTSIDE the rail
 // div (a sibling) — the rail clips horizontally + can gain an overflow-fade mask, either of which
-// would blank a child thread (see Inspector / LeftColumn).
+// would blank a child thread (see Inspector / ExploreRail).
 //
-// The two rails differ by design:
-//  • RIGHT — the full identity thread: neutral ruler + an identity-hued spine (cyan for "all") + a
-//    node-dot on each card. It carries the right rail's identity cue.
-//  • LEFT  — the neutral ruler ONLY (ticks pointing outward toward the screen edge). The left rail's
-//    identity cue is the original cyan spine attached to each card's edge (CSS, 12-panel-system.css),
-//    so the thread here adds just the hairline effect — no dot, no identity line.
+// BOTH rails carry the full identity thread, MIRRORED (design evolution, Task 12): neutral ruler +
+// an identity-hued spine (cyan for "all") + a node-dot on each card. The threads are the HUD's
+// RESTING identity cue — the cards themselves are spineless at rest (a card's edge is a transient
+// signal channel only; see the "Card signal system" block in globals.css). The left thread is the
+// exact x-mirror of the right one (x' = W − x), ticks pointing outward toward the screen edge.
 //
-// Ruler-hairline spec — mirrors the CSS `--thread-*` tokens (00-base.css) so the SVG threads and the
+// Ruler-hairline spec — mirrors the CSS `--thread-*` tokens (globals.css) so the SVG threads and the
 // bar-chart axis read identically. Kept as literals because an SVG stroke ATTRIBUTE can't resolve a
 // CSS var(); keep the two in sync.
 const TICK_PITCH = 13; // px between hairlines
@@ -28,28 +28,46 @@ const TICK_MAJOR = "rgba(178,193,223,0.42)"; // every 4th — longer + brighter
 
 type Side = "left" | "right";
 
-// Concrete svg-x per side (x grows rightward within the svg). The right rail has a wider outer
-// margin (~26px) than the left (~16px), so the left thread is compact. `identity`/`dot`/`conn` are
-// null on the left (it's the neutral ruler only). Ticks step from `neut` OUTWARD toward the screen
-// edge — right: rightward to tickMaj/tickMin; left: leftward (smaller x, toward x≈0).
+// Concrete svg-x per side (x grows rightward within the svg). Both rails now sit in the same 26px
+// outer margin (globals.css #leftcol/#rightcol), so the left thread is the EXACT mirror of the
+// right (every x' = W − x): card edge → connector → identity spine + dots → neutral line → ticks
+// stepping outward toward the screen edge.
 const GEOM: Record<Side, {
   W: number; neut: number; tickMaj: number; tickMin: number;
-  identity: number | null; dot: number | null; conn: number | null;
+  identity: number; dot: number; conn: number;
 }> = {
   right: { W: 22, neut: 16, tickMaj: 22, tickMin: 20, identity: 9, dot: 9, conn: 1 },
-  // W=16 → card edge (the card's cyan CSS spine) is at svg x=16. Sit the neutral line snug beside it
-  // (~3px), then step the ticks outward toward the screen edge (major 6px → x=7, minor 4px → x=9).
-  left: { W: 16, neut: 13, tickMaj: 7, tickMin: 9, identity: null, dot: null, conn: null },
+  left:  { W: 22, neut: 6,  tickMaj: 0,  tickMin: 2,  identity: 13, dot: 13, conn: 21 },
 };
+
+// The resting thread is deliberately DIM (Task 13 follow-up, user: the rails read too bright at
+// rest): the LINES — neutral ruler line + ticks + the identity spine — are scaled to 60% opacity
+// so the brightness budget goes to the SIGNALS (the view-switch pulse below and the card edge
+// signals). The NODE DOTS (connector + halo + dot) keep their ORIGINAL full brightness (user
+// adjustment) — they are the per-card markers, not ambient furniture. Hues unchanged; the CSS
+// `--thread-*` tokens (other consumers: sheet rulers, bar-chart axis, card hover whisper) are NOT
+// touched. The value itself is the SHARED `--rail-rest-dim` token (globals.css :root) — the
+// tablet/phone sheet's `.ig-sheet-edge` channel dims by the same factor, so rest vs signal
+// contrast is consistent across breakpoints. 0.6 here is the SVG-attribute fallback (SVG `opacity`
+// attributes don't resolve CSS vars; the group uses a style prop instead — see below).
+const REST_DIM = "var(--rail-rest-dim, 0.6)";
 
 export default function RailThread({ side = "right" }: { side?: Side }) {
   const filter = useStore((s) => s.filter);
-  // Resolve to a real colour: filterAccent returns `var(--core)` for "all", but an SVG `stroke`
+  const mode = useStore((s) => s.mode);
+  // Resolve to a real colour: filterAccent returns `var(--primary)` for "all", but an SVG `stroke`
   // ATTRIBUTE doesn't resolve CSS custom properties — so the identity line + dots rendered invisible
-  // on "all". Fall back to the core hex for the var() case. (Only the right thread uses it.)
+  // on "all". Fall back to the core hex for the var() case.
   const rawAccent = filterAccent(filter);
   const accent = rawAccent.startsWith("var(") ? CORE_HEX : rawAccent;
   const [g, setG] = useState<{ top: number; left: number; height: number; dots: number[] } | null>(null);
+  // View-switch AND filter-change signal: either plays the SAME travelling-light language as the
+  // cards on BOTH threads — the shared `useEdgePulse` hook (once per change, debounced, skips
+  // mount, reduced-motion → CSS static blink) driving the shared `.edge-pulse` recipe, overlaid
+  // on the identity spine (the recipe is HTML/CSS, so it rides a fixed wrapper rather than the
+  // SVG). ONE combined subject key: a simultaneous mode+filter change is a single key change →
+  // one pulse (and the hook's PULSE_MS debounce keeps rapid back-to-back changes calm).
+  const pulseKey = useEdgePulse(`${mode}|${filter}`);
 
   const { W } = GEOM[side];
   const railId = side === "right" ? "rightcol" : "leftcol";
@@ -61,7 +79,9 @@ export default function RailThread({ side = "right" }: { side?: Side }) {
     const measure = () => {
       raf = 0;
       const r = rail.getBoundingClientRect();
-      const cards = Array.from(rail.querySelectorAll<HTMLElement>(":scope > .panel"));
+      // Every rail card carries `.ig-panel` (the shared glass frame); the thread drops a dot at
+      // each one's middle. (Was `:scope > .panel` before the Card-frame swap retired 12-panel-system.)
+      const cards = Array.from(rail.querySelectorAll<HTMLElement>(":scope > .ig-panel"));
       const dots = cards
         .map((c) => { const cr = c.getBoundingClientRect(); return cr.top + cr.height / 2 - r.top; })
         .filter((y) => y >= 6 && y <= r.height - 6); // only dots inside the visible rail
@@ -94,37 +114,78 @@ export default function RailThread({ side = "right" }: { side?: Side }) {
   for (let y = 10; y <= H - 10; y += TICK_PITCH) ticks.push(y);
 
   return (
-    <svg
-      className="rail-thread"
-      width={W}
-      height={H}
-      style={{ top: g.top, left: g.left }}
-      aria-hidden
-      focusable="false"
-    >
-      {/* neutral base line — SOFT/muted; carries the ruler ticks. */}
-      <line x1={gm.neut} y1={0} x2={gm.neut} y2={H} stroke={TICK_LINE} strokeWidth={1} />
-      {/* ruler ticker hatches — short marks stepping OUTWARD from the neutral line toward the screen
-         edge; muted, every 4th a touch longer/brighter (an instrument scale). */}
-      {ticks.map((y, i) => (
-        <line key={i} x1={gm.neut} y1={y} x2={i % 4 === 0 ? gm.tickMaj : gm.tickMin} y2={y} stroke={i % 4 === 0 ? TICK_MAJOR : TICK_MINOR} strokeWidth={1} />
-      ))}
-      {/* identity line + node-dots — RIGHT rail only (the left rail's identity is its card-edge CSS
-         spine). The line is the selection's hue; the dots ride it at each card's middle. */}
-      {gm.identity !== null && (
-        <line x1={gm.identity} y1={0} x2={gm.identity} y2={H} stroke={accent} strokeWidth={2} />
-      )}
-      {gm.dot !== null && g.dots.map((y, i) => (
-        <g key={i}>
-          {gm.conn !== null && (
-            <line x1={gm.conn} y1={y} x2={gm.dot!} y2={y} stroke={accent} strokeWidth={1.25} opacity={0.7} />
-          )}
-          <circle cx={gm.dot!} cy={y} r={5} fill={accent} opacity={0.16} />
-          {/* dark ring punches the dot off the identity line. NB a real hex, not var(--panel): an SVG
-             stroke ATTRIBUTE doesn't resolve CSS custom properties (same trap as the accent above). */}
-          <circle cx={gm.dot!} cy={y} r={3.4} fill={accent} stroke="#0c1020" strokeWidth={1.5} />
+    <>
+      <svg
+        // `max-[1099px]:!hidden` is the tablet/phone safety net (was 16-responsive-shell.css's
+        // `#leftcol, #rightcol, .rail-thread { display: none !important }`): the rail components only
+        // render this SVG in their desktop branch, but SSR/first-paint assume desktop (useBreakpoint),
+        // so this hides the fixed thread below the desktop breakpoint until the effect resolves. `!`
+        // beats nothing here (the SVG has no id rule), but mirrors the rails' `!hidden` for parity.
+        className="fixed z-[11] pointer-events-none overflow-visible max-[1099px]:!hidden"
+        width={W}
+        height={H}
+        style={{
+          top: g.top,
+          left: g.left,
+          // Fades the thread top/bottom so it reads as an instrument rail, not a hard bar
+          // (was `.rail-thread`, 13-right-column.css). Kept as inline style, not a Tailwind
+          // arbitrary property, since the vendor-prefixed property name doesn't round-trip
+          // cleanly through the utility-class syntax.
+          WebkitMaskImage:
+            "linear-gradient(to bottom, transparent 0, #000 7%, #000 93%, transparent 100%)",
+          maskImage:
+            "linear-gradient(to bottom, transparent 0, #000 7%, #000 93%, transparent 100%)",
+        }}
+        aria-hidden
+        focusable="false"
+      >
+        {/* The LINES sit inside the dim group (REST_DIM) — calm resting furniture; brightness
+           belongs to the signals (view-switch pulse + card edges) and the node dots below. */}
+        <g style={{ opacity: REST_DIM }}>
+          {/* neutral base line — SOFT/muted; carries the ruler ticks. */}
+          <line x1={gm.neut} y1={0} x2={gm.neut} y2={H} stroke={TICK_LINE} strokeWidth={1} />
+          {/* ruler ticker hatches — short marks stepping OUTWARD from the neutral line toward the screen
+             edge; muted, every 4th a touch longer/brighter (an instrument scale). */}
+          {ticks.map((y, i) => (
+            <line key={i} x1={gm.neut} y1={y} x2={i % 4 === 0 ? gm.tickMaj : gm.tickMin} y2={y} stroke={i % 4 === 0 ? TICK_MAJOR : TICK_MINOR} strokeWidth={1} />
+          ))}
+          {/* identity line — BOTH rails, mirrored (the HUD's resting identity cue; cards are
+             spineless at rest). The line is the selection's hue. */}
+          <line x1={gm.identity} y1={0} x2={gm.identity} y2={H} stroke={accent} strokeWidth={2} />
         </g>
-      ))}
-    </svg>
+        {/* node-dots — OUTSIDE the dim group at original full brightness (user adjustment): one
+           per card at its middle, tethered to the card edge by the connector. */}
+        {g.dots.map((y, i) => (
+          <g key={i}>
+            <line x1={gm.conn} y1={y} x2={gm.dot} y2={y} stroke={accent} strokeWidth={1.25} opacity={0.7} />
+            <circle cx={gm.dot} cy={y} r={5} fill={accent} opacity={0.16} />
+            {/* dark ring punches the dot off the identity line. NB a real hex, not var(--panel): an SVG
+               stroke ATTRIBUTE doesn't resolve CSS custom properties (same trap as the accent above). */}
+            <circle cx={gm.dot} cy={y} r={3.4} fill={accent} stroke="#0c1020" strokeWidth={1.5} />
+          </g>
+        ))}
+      </svg>
+      {/* View-switch pulse — the SAME `.edge-pulse` recipe the cards use (soft line fade-in, bright
+         gradient-tipped segment sweeping down, fade-out; reduced motion → one static blink),
+         overlaid on the identity spine at full brightness (outside the dimmed SVG). The wrapper is
+         the fixed positioning context for the recipe's absolute span: 3px wide, centred on the
+         spine (`gm.identity`, stroke-width 2), `--spine` carries the identity hue into the
+         recipe's `--pulse-hue`. Keyed remount per pulse is PulseEdge's own contract. */}
+      {pulseKey > 0 && (
+        <div
+          className="fixed z-[12] pointer-events-none max-[1099px]:!hidden"
+          style={{
+            top: g.top,
+            left: g.left + gm.identity - 2.5,
+            width: 3,
+            height: H,
+            ["--spine" as string]: accent,
+          } as CSSProperties}
+          aria-hidden
+        >
+          <PulseEdge pulseKey={pulseKey} rail="left" />
+        </div>
+      )}
+    </>
   );
 }

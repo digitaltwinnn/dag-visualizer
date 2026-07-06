@@ -1,10 +1,14 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
+import { ChevronDown } from "lucide-react";
+import { VIEW_ICONS } from "@/components/icons";
 import { useStore } from "@/src/store/store";
 import { metagraphById } from "@/src/data/network";
 import { hex } from "@/src/util/format";
+import { cn } from "@/lib/utils";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 import Vitals, { VitalsCluster, VitalsToggle } from "@/components/topbar/Vitals";
 import FilterPicker from "@/components/topbar/FilterPicker";
 import EcgMark from "@/components/topbar/EcgMark";
@@ -12,12 +16,12 @@ import { useBreakpoint } from "@/components/useBreakpoint";
 import type { Mode } from "@/src/store/store";
 
 const VIEWS = [
-  { id: "hyper", label: "◆", name: "Hypergraph" },
-  { id: "geo", label: "◍", name: "Geography" },
-  { id: "ledger", label: "▦", name: "Snapshots" },
-  { id: "status", label: "◉", name: "Network", soon: true },
-  { id: "transactions", label: "⇄", name: "Transactions", soon: true },
-  { id: "staking", label: "⬢", name: "Staking", soon: true },
+  { id: "hyper", name: "Hypergraph" },
+  { id: "geo", name: "Geography" },
+  { id: "ledger", name: "Snapshots" },
+  { id: "status", name: "Network", soon: true },
+  { id: "transactions", name: "Transactions", soon: true },
+  { id: "staking", name: "Staking", soon: true },
 ] as const;
 
 // Collapsed filter face: a small identity dot + the network name in neutral text (no filled
@@ -34,94 +38,120 @@ export default function TopBar() {
   const mode = useStore((s) => s.mode);
   const setMode = useStore((s) => s.setMode);
 
+  // The filter picker's open state — Radix Popover owns anchoring (under the trigger, +6px),
+  // outside-click and Escape now; this is just the controlled flag.
   const [open, setOpen] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
-  const filterBtnRef = useRef<HTMLButtonElement>(null);
-  const [pop, setPop] = useState<{ left: number; top: number } | null>(null);
 
   const bp = useBreakpoint();
-  const [vitalsOpen, setVitalsOpen] = useState(false);
-  const vitalsBtnRef = useRef<HTMLButtonElement>(null);
-  const [vitalsPop, setVitalsPop] = useState<{ right: number; top: number } | null>(null);
-
-  useEffect(() => {
-    if (!open) return;
-    // Anchor the floating picker under the filter button, just below the bar. Measured so it
-    // never depends on the bar's full width (the picker is a compact popover, not a bar expansion).
-    const bar = document.getElementById("topbar");
-    const btn = filterBtnRef.current;
-    if (bar && btn) {
-      const br = bar.getBoundingClientRect();
-      const fr = btn.getBoundingClientRect();
-      setPop({ left: Math.round(fr.left), top: Math.round(br.bottom + 6) });
-    }
-    const onDown = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
-    };
-    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") setOpen(false); };
-    document.addEventListener("mousedown", onDown);
-    document.addEventListener("keydown", onKey);
-    return () => {
-      document.removeEventListener("mousedown", onDown);
-      document.removeEventListener("keydown", onKey);
-    };
-  }, [open]);
-
-  // Same popover pattern as the filter picker: measured + rendered OUTSIDE #topbar so its
-  // `overflow: hidden` (and the containing block backdrop-filter creates) can't clip it.
-  useEffect(() => {
-    if (!vitalsOpen) return;
-    const bar = document.getElementById("topbar");
-    const btn = vitalsBtnRef.current;
-    if (bar && btn) {
-      const br = bar.getBoundingClientRect();
-      const fr = btn.getBoundingClientRect();
-      setVitalsPop({ right: Math.round(window.innerWidth - fr.right), top: Math.round(br.bottom + 6) });
-    }
-    const onDown = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) setVitalsOpen(false);
-    };
-    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") setVitalsOpen(false); };
-    document.addEventListener("mousedown", onDown);
-    document.addEventListener("keydown", onKey);
-    return () => {
-      document.removeEventListener("mousedown", onDown);
-      document.removeEventListener("keydown", onKey);
-    };
-  }, [vitalsOpen]);
-
-  // Vitals aren't shown inline on phone (no room) — closing the toggle when the breakpoint
-  // changes away from phone avoids a stray open popover if the viewport is resized.
-  useEffect(() => {
-    if (bp !== "phone") setVitalsOpen(false);
-  }, [bp]);
+  // PHONE: whether the bar's vitals ROW is expanded (the bar grows downward — see below).
+  // Store-held (session) because it's a user choice that persists across view switches.
+  const phoneVitals = useStore((s) => s.phoneVitals);
+  const setPhoneVitals = useStore((s) => s.setPhoneVitals);
 
   const face = filterFace(filter);
 
   return (
-    <div ref={ref}>
-      <div id="topbar" className={open ? "open" : ""}>
-      <div className="tb-row">
+    <div>
+      {/* Fixed wrapper = the bar + the hanging view caption below it. pointer-events-none so the
+          caption strip under the bar doesn't block clicks on the scene; the bar itself restores
+          pointer-events-auto. On desktop the bar's edges align with the rail columns (26px, the
+          rails' outer margin since the mirrored threads landed); smaller breakpoints keep 16px. */}
+      <div className="fixed top-[39px] inset-x-4 min-[1100px]:inset-x-[26px] z-40 pointer-events-none">
+      <div
+        id="topbar"
+        className={cn(
+          // No resting spine — the absolute rule (user decision 2026-07-05): the bar's identity
+          // cue is the ECG mark, so the old left-edge cyan→blue gradient pseudo is gone.
+          "relative flex flex-col overflow-hidden pointer-events-auto",
+          "border border-border rounded-lg backdrop-blur-md",
+          "bg-[linear-gradient(180deg,rgba(20,26,46,0.82),rgba(10,14,28,0.76))]",
+          "shadow-[inset_0_1px_0_rgba(255,255,255,0.05),0_8px_30px_rgba(0,0,0,0.35)]",
+        )}
+      >
+      <div
+        className={cn(
+          "flex items-center gap-3 py-2 px-3.5",
+          "max-[1260px]:gap-2.5",
+          "max-[940px]:gap-2 max-[940px]:px-2.5 max-[940px]:py-2",
+          // PHONE: a 3-zone grid (left cluster | view switch | right cluster) so the switch is
+          // TRULY centred in the bar. The flex layout centres it between the side clusters, and
+          // those are unequal (ECG + filter ≈ 100px vs the 44px vitals toggle), which pushed the
+          // switch ~28px right of centre — pre-existing, worsened by the removed funnel icon.
+          // `1fr auto 1fr` keeps the sides equal (centring the middle) and degrades gracefully:
+          // a long ticker just shifts the switch instead of overlapping it. Tablet/desktop keep
+          // the flex row unchanged (the zone wrappers are `display: contents` there).
+          "max-[699px]:gap-1.5 max-[699px]:p-2 max-[699px]:grid max-[699px]:grid-cols-[1fr_auto_1fr]",
+        )}
+      >
+        {/* LEFT zone (phone grid): brand + filter. `contents` above 700px = invisible to the
+            flex row, so tablet/desktop layout is byte-identical. */}
+        <div className="contents max-[699px]:flex max-[699px]:items-center max-[699px]:gap-1.5 max-[699px]:min-w-0">
         {/* Brand */}
-        <div className={"tb-brand" + (live ? "" : " off")}>
+        <div className="flex items-center gap-2">
           <EcgMark />
-          <span className="tb-word">
-            <span className="tb-word-dag">DAG</span>{" "}
-            <span className="tb-word-vis">Visualizer</span>
+          <span className="font-semibold tracking-[-0.01em] text-title max-[1099px]:hidden">
+            <span className={live ? "text-foreground" : "text-muted-foreground opacity-70"}>DAG</span>{" "}
+            <span className={cn("text-muted-foreground", !live && "opacity-70")}>Visualizer</span>
           </span>
         </div>
-        <span className="tb-div" />
+        <span className="w-px self-stretch bg-border my-1 max-[820px]:hidden" />
 
-        {/* Filter (toned, de-nested) */}
-        <button ref={filterBtnRef} className={"tb-filter" + (open ? " active" : "")} aria-expanded={open}
-          onClick={() => { setOpen((o) => !o); setVitalsOpen(false); }}>
-          <span className="tb-filter-k">Filter</span>
-          <span className="tb-filter-dot" style={{ background: face.dot }} />
-          <span className="tb-filter-name">{face.label}</span>
-          <span className="tb-caret">{open ? "▴" : "▾"}</span>
-        </button>
+        {/* Filter (toned, de-nested) — the trigger of the stock Popover below. Radix anchors the
+            picker under this button; the visual face is unchanged. */}
+        <Popover open={open} onOpenChange={setOpen}>
+          <PopoverTrigger
+            className={cn(
+              "flex items-center gap-[7px] bg-transparent border-0 cursor-pointer py-1.5 px-2 rounded-btn",
+              "hover:bg-wash-soft",
+              open && "bg-wash-soft",
+              "max-[1099px]:min-h-11",
+              "max-[699px]:p-1.5 max-[699px]:gap-[5px]",
+            )}
+          >
+            {/* The "FILTER" text label on wide bars; on the condensed breakpoints (≤940px) it
+                simply hides — the identity dot + network name ARE the control's face there (the
+                lucide funnel stand-in was tried and removed: too busy, and it crowded the phone
+                bar off-balance). */}
+            <span className="text-micro tracking-caps uppercase text-muted-foreground max-[940px]:hidden">Filter</span>
+            <span
+              className="w-[9px] h-[9px] rounded-full flex-none animate-dot-beat motion-reduce:animate-none"
+              style={{ background: face.dot }}
+            />
+            <span className="text-body text-foreground">{face.label}</span>
+            <ChevronDown
+              aria-hidden
+              className={cn(
+                "size-3.5 text-muted-foreground transition-transform motion-reduce:transition-none",
+                open && "rotate-180",
+              )}
+            />
+          </PopoverTrigger>
+          {/* The picker content — a compact DETACHED popover under the filter button (user
+              decision 2026-07-04: 6px gap + its own surface, NOT a bar-expansion drawer; that
+              variant was tried and rejected). Same glass recipe as before, now on the stock
+              primitive: Radix owns the anchoring (side=bottom/align=start ≈ the old measured
+              left-aligned +6px), outside-click, Escape, and focus (it moves focus into the
+              content, which lands on the cmdk input — a strict upgrade over the old container,
+              which left focus on the button; no fight observed). `avoidCollisions` +
+              `collisionPadding` replace the old phone-only centering override (the panel just
+              shifts to fit narrow viewports); width caps to the viewport on phone. */}
+          <PopoverContent
+            align="start"
+            sideOffset={6}
+            collisionPadding={12}
+            className={cn(
+              "w-[372px] max-[699px]:w-[min(372px,calc(100vw-24px))] p-1.5 border border-border rounded-lg backdrop-blur-[14px]",
+              "bg-[linear-gradient(180deg,rgba(20,26,46,0.96),rgba(10,14,28,0.94))]",
+              "shadow-[0_14px_40px_-10px_rgba(0,0,0,0.6)]",
+            )}
+          >
+            <FilterPicker onPick={() => setOpen(false)} />
+          </PopoverContent>
+        </Popover>
+        </div>
 
-        <div className="tb-spacer" />
+        {/* Flex spacers (tablet/desktop only) — the phone grid's 1fr columns own the spacing. */}
+        <div className="flex-1 max-[699px]:hidden" />
 
         {/* View switch — structural. On phone there's no room for the three non-functional
             "soon" placeholders (Network/Transactions/Staking) — they're dimmed dead weight
@@ -131,46 +161,97 @@ export default function TopBar() {
           type="single"
           value={mode}
           onValueChange={(v) => { if (v) setMode(v as Mode); }}
-          className="tb-views"
+          className="flex gap-0.5 max-[699px]:gap-0"
         >
-          {(bp === "phone" ? VIEWS.filter((v) => !("soon" in v && v.soon)) : VIEWS).map((v) => (
-            <ToggleGroupItem key={v.id} value={v.id} title={v.name}
-              className={"tb-view" + ("soon" in v && v.soon ? " soon" : "")}>
-              <span className="tb-view-icon">{v.label}</span>
-              <span className="tb-view-name">{v.name}</span>
+          {(bp === "phone" ? VIEWS.filter((v) => !("soon" in v && v.soon)) : VIEWS).map((v) => {
+            const Icon = VIEW_ICONS[v.id as Mode];
+            return (
+            <ToggleGroupItem
+              key={v.id}
+              value={v.id}
+              title={v.name}
+              className={cn(
+                // The design OWNS its sizing/rounding here (not inherited from the shadcn
+                // toggle primitive): explicit h-9 (== today's rendered 36px — the primitive's
+                // default is the same, but the bar now states it) and `rounded-[8px]!` — the
+                // important variant beats toggle-group.tsx's `data-[spacing=0]:rounded-none`
+                // (class+attribute specificity) so ALL buttons, incl. the middle ones' hover/on
+                // fill, get the intended 8px corners (was: middle square, first/last 10px).
+                "group flex items-center gap-1.5 h-9 py-1.5 px-2.5 rounded-btn!",
+                "text-muted-foreground bg-transparent border-0",
+                "hover:text-foreground hover:bg-wash-soft",
+                "data-[state=on]:text-foreground data-[state=on]:bg-[var(--sel-bg)]",
+                "data-[state=on]:shadow-[inset_0_0_0_1px_var(--sel-border)]",
+                "max-[1099px]:min-h-11 max-[1099px]:min-w-11 max-[1099px]:justify-center",
+                "max-[1120px]:px-2 max-[1120px]:py-1.5 max-[1120px]:text-label",
+                // Phone keeps the ≥44px touch WIDTH (the min-w-11 above still applies — the old
+                // `max-[699px]:min-w-0` override made the icon-only radios too narrow to press);
+                // only the padding condenses. Room is fine: phone shows just the 3 working views.
+                "max-[699px]:p-1.5",
+                "soon" in v && v.soon && "opacity-45",
+              )}
+            >
+              <Icon aria-hidden className="size-4 group-data-[state=on]:text-primary" />
+              <span className="text-label max-[1099px]:hidden">{v.name}</span>
             </ToggleGroupItem>
-          ))}
+          );
+          })}
         </ToggleGroup>
 
-        <div className="tb-spacer" />
-        <span className="tb-div" />
+        <div className="flex-1 max-[699px]:hidden" />
 
-        {/* Vitals — inline on tablet/desktop; a toggle button on phone (popover rendered
-            below, outside #topbar). */}
+        {/* RIGHT zone (phone grid): vitals. Mirrors the left zone (`contents` above 700px);
+            `justify-self-end` pins it to the bar's right edge in the grid. */}
+        <div className="contents max-[699px]:flex max-[699px]:items-center max-[699px]:gap-1.5 max-[699px]:justify-self-end">
+        <span className="w-px self-stretch bg-border my-1 max-[820px]:hidden" />
+
+        {/* Vitals — inline on tablet/desktop; a toggle button on phone that expands the bar's
+            own vitals ROW below (the old floating popover read as an afterthought). */}
         <Vitals />
         {bp === "phone" && (
-          <VitalsToggle ref={vitalsBtnRef} open={vitalsOpen} onClick={() => { setVitalsOpen((o) => !o); setOpen(false); }} />
+          <VitalsToggle open={phoneVitals} onClick={() => setPhoneVitals(!phoneVitals)} />
         )}
-      </div>
+        </div>
       </div>
 
-      {/* Floating vitals popover (phone only) — same pattern as the filter picker: measured
-          under its toggle button, rendered outside #topbar so overflow/backdrop-filter can't
-          clip it. Reduced-motion: this is a plain conditional mount, no animated reveal. */}
-      {vitalsOpen && vitalsPop && (
-        <div className="tb-vitals-pop" style={{ right: vitalsPop.right, top: vitalsPop.top }}>
-          <VitalsCluster />
+      {/* PHONE vitals row — the bar GROWS DOWNWARD by one full-width row on its own surface,
+          showing the active view's vitals horizontally in the same key/value language as
+          desktop (`VitalsCluster`, whose content swaps per view). Open/closed is a USER CHOICE
+          persisted in the store (`phoneVitals`) — it survives view switches until explicitly
+          collapsed for scene space. Calm grid-rows height transition (~0.25s; reduced motion →
+          instant). The below-bar view caption is a flow sibling of the bar, so it rides down
+          with the expansion automatically. */}
+      {bp === "phone" && (
+        <div
+          className={cn(
+            "grid transition-[grid-template-rows] duration-250 ease-out motion-reduce:transition-none",
+            phoneVitals ? "grid-rows-[1fr]" : "grid-rows-[0fr]",
+          )}
+          aria-hidden={!phoneVitals}
+        >
+          <div className="overflow-hidden min-h-0">
+            <div className="flex items-center justify-center gap-2 mx-2 px-2 pb-2 pt-1.5 border-t border-border/60">
+              <VitalsCluster align="center" />
+            </div>
+          </div>
         </div>
       )}
+      </div>
 
-      {/* Floating filter picker — a compact popover anchored under the filter button (NOT a
-          full-width expansion of the bar). Lives outside #topbar so the bar's `overflow: hidden`
-          can't clip it; still inside the outer ref so an outside-click closes it. */}
-      {open && pop && (
-        <div className="tb-filter-pop" style={{ left: pop.left, top: pop.top }}>
-          <FilterPicker onPick={() => setOpen(false)} />
-        </div>
-      )}
+      {/* Selected-view label — only on the icon-only breakpoints (<1100px, where the switch
+          drops its text labels): the ACTIVE view's name as a quiet caption HANGING BELOW the
+          bar, anchored under its right corner (user refinement — the centered in-bar second row
+          read misaligned with the bar's buttons). Lives OUTSIDE the bar surface (a sibling in
+          the fixed wrapper, so the bar's overflow-hidden can't clip it) and keeps the muted
+          eyebrow language + keyed roll-in on view change (the HUD grammar). Decorative echo of
+          the radiogroup's own accessible state, so aria-hidden; non-interactive (the wrapper's
+          pointer-events-none passes scene clicks through the caption strip). */}
+      <div className="hidden max-[1099px]:flex justify-end pr-2.5 mt-1.5" aria-hidden>
+        <span key={mode} className="roll-in text-micro tracking-caps uppercase text-muted-foreground leading-none">
+          {VIEWS.find((v) => v.id === mode)?.name}
+        </span>
+      </div>
+      </div>
     </div>
   );
 }

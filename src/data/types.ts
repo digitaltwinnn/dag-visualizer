@@ -95,6 +95,7 @@ export interface NodeRow {
   id: string | null; // node ID when present (validators); null for id-less metagraph nodes
   cc: string | null;
   country: string | null;
+  city: string | null; // resolved city — the row's location-first primary (country = the group)
   state?: string | null;
   layer: string;
   roles: string[];
@@ -111,6 +112,7 @@ export interface MetaCfg {
   color: number;
   blurb?: string;
   iconUrl?: string; // logo for cores not in the live metaList (e.g. the DAG core)
+  siteUrl?: string; // site for cores not in the live metaList (e.g. the DAG core)
 }
 
 // What the inspector renders. Emitted by the engine's picking (core/l0/l1/metanode)

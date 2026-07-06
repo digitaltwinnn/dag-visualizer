@@ -1,10 +1,27 @@
 import * as React from "react"
+import { Slot } from "radix-ui"
 
 import { cn } from "@/lib/utils"
 
-function Card({ className, ...props }: React.ComponentProps<"div">) {
+// The design-system Card baseline. Themed with the app's `ig-panel` glass recipe in its base
+// class (so a Card IS a rail-card frame), and given an idiomatic `asChild` (radix-ui `Slot`,
+// exactly like `Button`) so consumers can keep their own element + a11y role — the rail cards
+// render as `<Card asChild><aside …>` to preserve `<aside>`/`complementary` semantics while the
+// Card supplies the frame. RailThread measures `:scope > .ig-panel`, so `ig-panel` must survive
+// in every merged output — it leads the base class and consumers only ADD to it.
+//
+// Default spacing (`gap-4 py-4 pl-5 pr-4`) is the baseline OPINION; consumers whose today-spacing
+// differs override it via `className` (tailwind-merge resolves the conflict, className wins) — the
+// migration rule is "the consumer's current spacing wins; do not visually change a card". The
+// right-rail frame's exact override lives once as `RIGHT_CARD` in `CardHead.tsx`.
+function Card({
+  className,
+  asChild = false,
+  ...props
+}: React.ComponentProps<"div"> & { asChild?: boolean }) {
+  const Comp = asChild ? Slot.Root : "div"
   return (
-    <div
+    <Comp
       data-slot="card"
       className={cn(
         "ig-panel text-card-foreground flex flex-col gap-4 py-4 pl-5 pr-4",

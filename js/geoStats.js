@@ -48,6 +48,7 @@ export function listNodes(nodes, metaNodes, filter) {
       id: (node && node.id) || null,
       cc: g ? g.cc || null : null,
       country: g ? g.country || null : null,
+      city: g ? g.city || null : null,
       state: node ? node.state : null,
       layer,
       // The node's full role set (a hybrid runs several) — so the browser shows every layer it

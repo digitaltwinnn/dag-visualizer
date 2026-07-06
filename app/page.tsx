@@ -5,11 +5,12 @@ import DataBridge from "@/components/DataBridge";
 import ExperimentalBanner from "@/components/ExperimentalBanner";
 import TopBar from "@/components/TopBar";
 import BottomStream from "@/components/BottomStream";
-import LeftColumn from "@/components/LeftColumn";
+import ExploreRail from "@/components/ExploreRail";
 import Inspector from "@/components/Inspector";
+import PhoneDockSweep from "@/components/PhoneDockSweep";
 import RailScroll from "@/components/RailScroll";
 import FollowController from "@/components/FollowController";
-import SnapshotExactBridge from "@/components/SnapshotExactBridge";
+import RawSnapshotBridge from "@/components/RawSnapshotBridge";
 import Tooltip from "@/components/Tooltip";
 
 // Single-page shell. The 3D scene is one persistent canvas; views (hyper/geo/ledger)
@@ -24,12 +25,13 @@ export default function Home() {
       <ExperimentalBanner />
       <DataBridge />
       <TopBar />
-      <LeftColumn />
+      <ExploreRail />
       <Inspector />
+      <PhoneDockSweep />
       <RailScroll />
       <BottomStream />
       <FollowController />
-      <SnapshotExactBridge />
+      <RawSnapshotBridge />
       <Tooltip />
     </main>
   );

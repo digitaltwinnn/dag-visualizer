@@ -1,7 +1,7 @@
-// Identity-lane colour generator. Pure, deterministic. See
-// docs/superpowers/specs/2026-07-01-identity-hue-generator-design.md.
-// Phase 1 ships the hash-fallback tier + manual pins; brand extraction slots in
-// later behind this same signature (an internal candidate source), no call-site change.
+// Identity-lane colour generator. Pure, deterministic: assigns each metagraph a
+// non-colliding hue inside the palette's allowed zones (see CLAUDE.md "Two colour lanes").
+// Ships the hash-fallback tier + manual pins; brand extraction feeds in behind this same
+// signature (an internal candidate source), no call-site change.
 
 export const IDENTITY_L = 0.8;
 export const IDENTITY_C = 0.15;

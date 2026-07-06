@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, type CSSProperties } from "react";
+import { cn } from "@/lib/utils";
 import { latestRelevant } from "@/src/data/follow";
 import { useStore } from "@/src/store/store";
 import { useSnapshotFeed } from "@/components/useSnapshotFeed";
@@ -83,19 +84,59 @@ export default function LiveStrip() {
   const scaleMax = Math.max(1, ...bars.map((b) => (isMeta ? b.mine : b.total)));
 
   return (
-    <section id="livestrip" className={live ? "" : "no-signal"} style={{ ["--ls-accent"]: accent } as CSSProperties}>
-      <div className="ls-bars" onMouseLeave={() => { barHover.current = false; setTip(null); setHoverSnapOrd(null); }}>
-        {snaps.length === 0 && <span className="ls-empty">Waiting for snapshots…</span>}
+    <section
+      id="livestrip"
+      className={cn(
+        "fixed z-10 left-4 right-4 bottom-4 h-[98px] px-[14px] flex items-center bg-transparent border-none",
+        "max-[699px]:bottom-[calc(var(--phone-dock-h,56px)+8px)]",
+        !live && "saturate-[.45]",
+      )}
+      style={{ ["--ls-accent"]: accent } as CSSProperties}
+    >
+      {/* Anchor bar-chart track. `before` = the ruler hairlines behind the bars (a ruler showing
+          through the gaps), `after` = the crisp neutral baseline on top — the same instrument-thread
+          language as the rails, rotated to a horizontal axis. Both share the strip's left-edge mask
+          fade (vendor-prefixed mask-image kept as inline style — doesn't round-trip through an
+          arbitrary Tailwind property cleanly, see RailThread.tsx). */}
+      <div
+        className={cn(
+          "relative flex-1 flex items-end gap-0.5 h-20 overflow-hidden pb-[9px]",
+          "before:content-[''] before:absolute before:inset-x-0 before:bottom-0 before:h-[9px] before:[background:var(--axis-hairlines)] before:pointer-events-none",
+          "after:content-[''] after:absolute after:inset-x-0 after:bottom-[9px] after:h-px after:bg-[var(--thread-line)] after:pointer-events-none",
+        )}
+        style={{
+          maskImage: "linear-gradient(to right, transparent 0, #000 60px)",
+          WebkitMaskImage: "linear-gradient(to right, transparent 0, #000 60px)",
+        }}
+        onMouseLeave={() => { barHover.current = false; setTip(null); setHoverSnapOrd(null); }}
+      >
+        {snaps.length === 0 && <span className="text-muted-foreground text-xs self-center">Waiting for snapshots…</span>}
         {bars.map(({ d, total, mine }, i) => {
           const isLatest = i === bars.length - 1; // the newest bar (renamed: don't shadow the store `live`)
           const active = d.ordinal === activeOrd;
           const value = isMeta ? mine : total;
           const gap = value === 0;                        // honest gap (esp. filtered)
-          const cls = "ls-bar" + (gap ? " gap" : "") + (isLatest ? " live" : "") + (active ? " active" : "");
           return (
             <button
               key={d.ordinal}
-              className={cls}
+              className={cn(
+                // body: crisp value cap fades downward into the scene (quiet, not a glare); new bars
+                // ease in from the right (`ls-bar-anim`, globals.css — the keyframe itself can't
+                // round-trip through a Tailwind arbitrary value, same reasoning as the mask above).
+                "relative self-end border-none cursor-pointer p-0 flex-1 min-w-[2px] rounded-t-[1px] origin-bottom ls-bar-anim",
+                "transition-[height] duration-[450ms] ease-[cubic-bezier(0.22,1,0.36,1)]",
+                // touch-target floor: extends the tap area up to the full track height without
+                // touching the visual bar, so short/quiet bars stay honest-looking but stay tappable.
+                "after:content-[''] after:absolute after:inset-x-0 after:bottom-0 after:h-11",
+                gap
+                  ? "bg-none min-h-full" // an empty tick: no body, no cap — an honest gap on the baseline
+                  : cn(
+                      "bg-[linear-gradient(to_bottom,color-mix(in_oklch,var(--ls-accent)_26%,transparent),transparent)]",
+                      "before:content-[''] before:absolute before:top-0 before:inset-x-0 before:h-[2px] before:rounded-[1px] before:bg-[var(--ls-accent)]",
+                      "hover:before:shadow-[0_0_6px_var(--ls-accent)]",
+                      (isLatest || active) && "before:shadow-[0_0_6px_var(--ls-accent)]", // live cap + selected glow permanently
+                    ),
+              )}
               style={{ height: gap ? "0%" : `max(6%, ${Math.round((value / scaleMax) * 100)}%)` }}
               aria-label={`snapshot ${d.ordinal}`}
               onMouseEnter={(e) => { barHover.current = true; setTip({ ordinal: d.ordinal, total, mine, ts: d.timestamp, live: isLatest, x: e.clientX, y: e.clientY }); setHoverSnapOrd(d.ordinal); }}
@@ -107,44 +148,49 @@ export default function LiveStrip() {
       </div>
 
       {tip && (
-        <div id="ls-tip" ref={tipRef} style={{ left: tip.x, top: tip.y }}>
+        <div
+          id="ls-tip"
+          ref={tipRef}
+          className="fixed z-30 pointer-events-none py-2 px-[11px] bg-[var(--panel-solid)] border border-border rounded-btn text-body whitespace-nowrap -translate-x-1/2 -translate-y-[130%] flex flex-col gap-1"
+          style={{ left: tip.x, top: tip.y }}
+        >
           {/* Bare ordinal head — no '#'; a big mono number in a snapshot tooltip is obviously the ordinal. */}
-          <div className="ls-tip-head">{tip.ordinal.toLocaleString()}</div>
-          <div className="ls-tip-line">
+          <div className="text-foreground font-mono font-bold tabular-nums">{tip.ordinal.toLocaleString()}</div>
+          <div className="flex items-center justify-between gap-[18px]">
             {isMeta ? (
               tip.mine > 0 ? (
                 <>
-                  <span className="ls-tip-k">
-                    <span className="ls-tip-dot" style={{ background: accent }} />
+                  <span className="flex items-center gap-1.5 text-muted-foreground text-label">
+                    <span className="flex-none w-2 h-2 rounded-full" style={{ background: accent }} />
                     {cfg!.ticker || cfg!.name}
                   </span>
-                  <span className="ls-tip-v">{tip.mine} of {tip.total} total</span>
+                  <span className="text-foreground-dim text-label tabular-nums">{tip.mine} of {tip.total} total</span>
                 </>
               ) : (
                 <>
-                  <span className="ls-tip-k">
-                    <span className="ls-tip-dot" style={{ background: accent }} />
+                  <span className="flex items-center gap-1.5 text-muted-foreground text-label">
+                    <span className="flex-none w-2 h-2 rounded-full" style={{ background: accent }} />
                     {cfg!.ticker || cfg!.name}
                   </span>
-                  <span className="ls-tip-v ls-tip-gap">0 · none this tick ({tip.total} total)</span>
+                  <span className="text-muted-foreground text-label tabular-nums">0 · none this tick ({tip.total} total)</span>
                 </>
               )
             ) : (
               <>
-                <span className="ls-tip-k">anchored</span>
-                <span className="ls-tip-v">{tip.total} metagraph snapshot{tip.total === 1 ? "" : "s"}</span>
+                <span className="text-muted-foreground text-label">anchored</span>
+                <span className="text-foreground-dim text-label tabular-nums">{tip.total} metagraph snapshot{tip.total === 1 ? "" : "s"}</span>
               </>
             )}
           </div>
           {/* Recency — relative + coarse; the live bar reads 'live now'. */}
-          <div className="ls-tip-rec">
+          <div className="flex items-center gap-1.5 text-label text-muted-foreground mt-1">
             {tip.live ? (
-              <><span className="ls-tip-live" /> live now</>
+              <><span className="w-[7px] h-[7px] rounded-full bg-primary shadow-[0_0_0_3px_color-mix(in_oklch,var(--primary)_30%,transparent)]" /> live now</>
             ) : (
               <>◷ {relativeAge(Date.now() - Date.parse(tip.ts))}</>
             )}
           </div>
-          <div className="ls-tip-hint">click to open snapshot</div>
+          <div className="text-label text-muted-foreground opacity-70 mt-1">click to open snapshot</div>
         </div>
       )}
     </section>

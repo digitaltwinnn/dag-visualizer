@@ -2,6 +2,9 @@
 import { useMemo } from "react";
 import { useStore } from "@/src/store/store";
 import { hex } from "@/src/util/format";
+import { cn } from "@/lib/utils";
+import { SELECTED_ROW, SelectedRowMark } from "@/components/selection";
+import { IdentityDot } from "@/components/inspector/parts";
 import {
   Command, CommandInput, CommandList, CommandEmpty, CommandGroup, CommandItem,
 } from "@/components/ui/command";
@@ -11,8 +14,9 @@ import {
 // ticker + node count — SORTED by located-node count desc, so 0-located metagraphs sink to the
 // bottom (shown greyed with their real count, never hidden). No logo tiles (they ate width and
 // read as heavy chrome); the dot carries identity, matching the collapsed filter face + the rail.
-// Current pick marked with a quiet left accent; hovering a row PREVIEWS its dim in the scene
-// (setHoverFilter); leaving the list clears the preview.
+// The committed pick carries the shared SELECTED_ROW mark (wash + inset ring + trailing ✓ —
+// components/selection.tsx); hovering a row PREVIEWS its dim in the scene (setHoverFilter);
+// leaving the list clears the preview.
 export default function FilterPicker({ onPick }: { onPick?: () => void }) {
   const filter = useStore((s) => s.filter);
   const setFilter = useStore((s) => s.setFilter);
@@ -34,22 +38,42 @@ export default function FilterPicker({ onPick }: { onPick?: () => void }) {
     onPick?.();
   };
 
+  // Shared row grid — one dot + name + (optional sub-label under the name) + a right-aligned
+  // count column, plus a RESERVED trailing slot (`pr-7`, every row) where the committed pick's
+  // ✓ renders absolutely — the stock SelectItem pattern, so the count column never shifts.
+  // Command's own `data-[selected=true]` hover/keyboard-cursor highlight is overridden to a
+  // faint neutral wash (the bright accent fill washed the row text out to unreadable) — that
+  // stays as the TRANSIENT cursor cue. The COMMITTED filter's row gets the shared SELECTED_ROW
+  // mark (components/selection.tsx — the view switch's on-state language, box-shadow-based so
+  // the cursor wash layers under it cleanly).
+  const rowClass = (active: boolean, off: boolean) =>
+    cn(
+      "relative grid grid-cols-[auto_1fr_auto_auto] items-center gap-2.5 pr-7",
+      "data-[selected=true]:bg-[rgba(255,255,255,0.05)] data-[selected=true]:text-foreground",
+      active && SELECTED_ROW,
+      off && "opacity-45",
+    );
+
   return (
-    <Command className="fp" onMouseLeave={() => setHoverFilter(null)}>
+    <Command
+      className="bg-transparent max-w-[360px] **:data-[slot=command-input-wrapper]:border-b-border"
+      onMouseLeave={() => setHoverFilter(null)}
+    >
       <CommandInput placeholder="Search metagraphs…" />
-      <CommandList>
+      <CommandList className="cmd-list-scroll max-h-[320px] overscroll-contain">
         <CommandEmpty>No metagraph found.</CommandEmpty>
         <CommandGroup>
           <CommandItem
             value="all whole network"
             onSelect={() => pick("all")}
-            className={filter === "all" ? "fp-row fp-active" : "fp-row"}
+            className={rowClass(filter === "all", false)}
             onMouseEnter={() => setHoverFilter("all")}
           >
-            <span className="fp-dot" style={{ background: "var(--primary)" }} />
-            <span className="fp-name">All</span>
-            <span className="fp-sub">whole network</span>
-            <span className="fp-count">{mappedCount} · {totalNodes} nodes</span>
+            <IdentityDot hue="var(--primary)" />
+            <span className="text-body text-foreground">All</span>
+            <span className="col-start-2 text-muted-foreground text-label">whole network</span>
+            <span className="text-label text-muted-foreground tabular-nums text-right">{mappedCount} · {totalNodes} nodes</span>
+            {filter === "all" && <SelectedRowMark className="absolute right-2" />}
           </CommandItem>
         </CommandGroup>
         <CommandGroup>
@@ -61,15 +85,24 @@ export default function FilterPicker({ onPick }: { onPick?: () => void }) {
                 key={m.id}
                 value={`${m.name} ${m.symbol ?? ""} ${m.id}`}
                 onSelect={() => pick(m.id)}
-                className={
-                  "fp-row" + (filter === m.id ? " fp-active" : "") + (off ? " fp-off" : "")
-                }
+                className={rowClass(filter === m.id, off)}
                 onMouseEnter={() => setHoverFilter(m.id)}
               >
-                <span className="fp-dot" style={{ background: hue }} />
-                <span className="fp-name">{m.name}</span>
-                <span className="fp-ticker" style={{ color: hue }}>{m.symbol}</span>
-                <span className="fp-count">{off ? "0 · located" : m.located}</span>
+                <IdentityDot hue={hue} />
+                <span className="text-body text-foreground">{m.name}</span>
+                <span className="text-label font-semibold tabular-nums" style={{ color: hue }}>{m.symbol}</span>
+                {off ? (
+                  // Honest, non-numeric tag (Task 13): these are real metagraphs with no
+                  // locatable node right now — still clickable (selectable in hyper/ledger), but
+                  // a "0" count read as a broken value. A small muted lowercase tag using the
+                  // squared-tag idiom (rounded-[4px] muted-foreground badge on a faint fill).
+                  <span className="justify-self-end rounded-xs px-[5px] py-[3px] text-micro leading-none tracking-[0.02em] text-muted-foreground bg-white/[0.035]">
+                    not located
+                  </span>
+                ) : (
+                  <span className="text-label text-muted-foreground tabular-nums text-right">{m.located}</span>
+                )}
+                {filter === m.id && <SelectedRowMark className="absolute right-2" />}
               </CommandItem>
             );
           })}

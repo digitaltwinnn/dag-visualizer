@@ -19,7 +19,7 @@ can understand how it works and why it's powerful:
 - Live data from the public Constellation block-explorer API (no backend / API key needed).
 - **Real validator sets** — fetches the actual Global L0 (~160) and DAG L1 (~160) clusters
   and renders every node, colored by live state (Ready vs. syncing).
-- **Views** (two drive the 3D scene; the rest are flat):
+- **Views** (three drive the 3D scene; the rest are flat):
   - **Hypergraph** — the abstract architecture: the core, the DAG's own validator shells, and
     each metagraph as an orbiting hub with its **own L0 / data-L1 / currency-L1 nodes** in
     concentric shells. The DAG is modelled as just another **metagraph-shaped core** (one unified
@@ -30,12 +30,15 @@ can understand how it works and why it's powerful:
     heatmap and travelling-packet connection arcs. The top-bar filter isolates the DAG core or any
     single metagraph; the country→nodes explorer then drills into a single country. Selecting one
     rotates + zooms the globe to wherever its nodes are densest.
-  - **Snapshots** — the ledger-over-time view (timeline still work in progress). The full live
-    snapshot ribbon lives **here** now, as the macro band of the timeline; the Hypergraph and globe
-    show only a slim **live heartbeat strip** so the dense instrument doesn't compete with each
-    view's own panels.
+  - **Snapshots** — the ledger-over-time view: a 3D "settlement chamber" stacking the network's
+    validation layers as glass floors, with the live global snapshot centre-stage, a left-trailing
+    chain of completed snapshots, each metagraph's lane of anchored snapshot tiles, and travelling
+    anchor pulses. A slim **live heartbeat strip** (one bar per snapshot, height = anchors) runs
+    along the bottom of every view.
   - **Network status**, **Transactions**, **Delegated staking** — scaffolded **placeholders** for
-    upcoming views (health/uptime, money-flow + transaction lookup + economics, and staking/rewards).
+    upcoming views (health/uptime, money-flow + transaction lookup + economics, and
+    staking/rewards), each shown as a faint blueprint schematic labelled
+    `preview · in development`.
 - Stays **factual** if the network is offline — shows a "NO DATA" state and recovers on
   the next successful poll (no simulated/placeholder data).
 - Glowing, bloom-lit scene with depth-of-field focus and orbit controls (drag / zoom).
@@ -45,9 +48,9 @@ can understand how it works and why it's powerful:
   (**hybrid** vs **dedicated** L0 / data-L1 / currency-L1). In the globe view a **node
   browser** lists the selection's nodes (grouped by country) so you can reach any node's
   data without hunting for a dot.
-- A "Learn" panel and a **guided tour** that flies the camera through L0 → L1 → metagraphs.
-- Live stats header: validator counts, public metagraphs, and per-hour snapshots / anchors /
-  fees with inline sparklines (snapshot ordinal & height live in the click inspector).
+- A per-view "About" card explains what each view shows; the top bar carries view-specific
+  vitals (structure / footprint / live activity with inline sparklines — snapshot ordinal &
+  height live in the click inspector).
 - **Honest anchoring.** Each global snapshot reports how many metagraph snapshots it *anchored*
   (its authoritative total) and the card breaks that down per metagraph. Because metagraphs
   anchor into a tick over a few seconds *after* it appears, the freshest tick's breakdown is
@@ -59,33 +62,31 @@ can understand how it works and why it's powerful:
 The HUD is four fixed zones over the canvas, each with **one role** that holds in every
 view, so switching views never relearns the screen:
 
-- **Top** — global vitals + the view switch (orientation).
-- **Left rail** — controls & "learn/interact": the **global network filter** (pinned, marked
-  with a `Global` eyebrow + accent stripe — it persists across views) above the **view's own
-  tool** (Hypergraph → *Understand the network*; Geography → *Geographic footprint*; Snapshots
-  → the ledger *about* panel; the scaffolded views → a "SOON" placeholder). Every view uses the
-  same rail, with one header pattern and collapse affordance.
-- **Right rail** — **details on demand**, in two fixed-role slots mirroring the left rail:
-  a **Context** card (the subject you focused) above a **Detail / live** card (the view's
-  signature). Each opens with a role eyebrow (`Selected`, `Live`, `Node`…). A quiet placeholder
-  keeps the zone present when nothing is selected.
-- **Bottom** — the **live/time lane**: the slim heartbeat strip (hyper/geo) or the full ribbon (ledger).
+- **Top** — the command bar: status + the global network filter (persists across views) +
+  the view switch + view-specific vitals.
+- **Right rail** — **facts on demand**, a stack of selected-subject cards: a **Context**
+  dossier (the filtered metagraph) above the **Detail** cards (the view's signature — node
+  card, snapshot card). Each opens with a role eyebrow (`Selected network / node / snapshot`).
+- **Left rail** — explore & interact: a collapsed "About this view" card above the view's own
+  tool (Geography → the country→nodes explorer; Snapshots → the layer explainer). One shared
+  card header and collapse affordance everywhere.
+- **Bottom** — the **live/time lane**: the slim heartbeat strip, in every view.
 
 The three live views are **complementary projections of the same network** — each answers an
 orthogonal question and owns one "signature" detail card, so the views never overlap:
 
-| View | Question | Left dossier | Signature (detail) slot |
-|------|----------|--------------|-------------------------|
-| **Hypergraph** | *who / what* — architecture + economic weight | Metagraph/core **dossier** (identity, node make-up) | *(none — structure is the dossier; live counts are the top-bar vitals)* |
+| View | Question | Explore tool (left rail) | Signature (detail) slot |
+|------|----------|--------------------------|-------------------------|
+| **Hypergraph** | *who / what* — architecture + economic weight | *(none — the dossier + node card carry the structure)* | **Node card**; structure counts live in the top-bar vitals |
 | **Node geography** | *where* — footprint & decentralization | country→nodes explorer (the selection's nodes, grouped by country) | **Node card** (state, roles, location) |
-| **Snapshots** | *when* — how the ledger advances + cost | snapshot's metagraph context | **Snapshot card** (DAG position, anchors, fees) |
+| **Snapshots** | *when* — how the ledger advances + cost | the layered-design explainer | **Snapshot card** (DAG position, anchors, fees) |
 
 The global **snapshot card is scoped to the ledger view** (its home) — hyper/geo never inject
 one; clicking a tick in the slim strip jumps to the ledger and opens it there.
 
-Visual uniformity is enforced with shared design tokens (`app/styles/00-base.css`): one spacing
-scale, one panel radius, one "selected" treatment (`--sel-bg` / `--sel-border`), one `PanelHead`
-component (left rail) and matching role eyebrows on the right.
+Visual uniformity is enforced with shared design tokens in one stylesheet (`app/globals.css`):
+one spacing scale, one panel radius, one "selected" treatment (`--sel-bg` / `--sel-border`),
+and one `CardHead` header component on every card. The live styleguide is served at `/design`.
 
 ## Node geography & metagraph nodes
 
@@ -148,7 +149,7 @@ Browser ──poll──> Constellation block explorer API   (snapshots / cluste
 | Path | Purpose |
 |------|---------|
 | `app/` | Next App Router — `page.tsx` (mounts panels + canvas), `globals.css`, `api/{metagraphs,geo}/route.ts` (server-side data) |
-| `components/` | React panels (SceneCanvas, `TopBar` (status + filter + view switch + vitals), LeftColumn, ContextPanel, Inspector, Tooltip, FollowController, …); `PanelHead` (shared rail header), `BottomStream` (picks `SnapshotRibbon` vs slim `LiveStrip` by view) + `useSnapshotFeed` (shared live feed), `GeoExplore` (geo country→nodes explorer), `PlaceholderPanel` (scaffolded views); `components/inspector/` holds the inspector cards |
+| `components/` | React panels (SceneCanvas, `TopBar` (status + filter + view switch + vitals), ExploreRail, Inspector, ContextCard, Tooltip, FollowController, …); `CardHead` (the shared card header), `BottomStream` + `LiveStrip` (the bottom heartbeat strip) + `useSnapshotFeed` (shared live feed), `GeoExplore` (geo country→nodes explorer), `Blueprint` (scaffolded-view schematics); `components/inspector/` holds the inspector cards |
 | `src/store/store.ts` | Zustand store (the React↔engine command/state bridge) |
 | `src/data/` | `network.ts` (wraps `NetworkData`), `follow.ts`, `types.ts` |
 | `src/util/format.ts` | Shared formatters — `hex` (colour), `fmtDag` (fee) |
