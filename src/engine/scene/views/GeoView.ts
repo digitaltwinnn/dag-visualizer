@@ -56,9 +56,10 @@ function buildGraticule(globe: GeoViewHost) {
     for (let lat = -88; lat < 88; lat += 4)
       pts.push(latLonToVec3(lat, lon, R + 0.02), latLonToVec3(lat + 4, lon, R + 0.02));
   const geo = new THREE.BufferGeometry().setFromPoints(pts);
-  // The sea graticule: the accent hue kept calm by its low fade opacity (0.45), not a bespoke tone.
+  // The sea graticule (grid lines OVER the ocean): very subtle on purpose — a faint hint so the
+  // continents (the raised, gridded land) clearly lead. Accent hue, kept calm by a low fade opacity.
   const mat = new THREE.LineBasicMaterial({ color: globe.geoColor, transparent: true, opacity: 0 });
-  globe.geoFades.push({ mat, base: 0.45 });
+  globe.geoFades.push({ mat, base: 0.15 });
   globe.group.add(new THREE.LineSegments(geo, mat));
 }
 
