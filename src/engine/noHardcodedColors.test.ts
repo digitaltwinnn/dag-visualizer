@@ -18,7 +18,11 @@ const ENGINE_DIR = join(import.meta.dirname, ".");
 
 // The ONLY permitted CHROMATIC literals, each a deliberate non-token colour, keyed by 0xRRGGBB:
 const ALLOWED = new Set<number>([
-  0x4a5a8c, // ambient FILL light — a lighting technicality (cool grey), not a surface colour
+  // Scene LIGHTING literals — lighting is a rendering technicality (it shades emissive materials),
+  // deliberately decoupled from the palette; a light is not a surface/identity hue (see SceneContext).
+  0x4a5a8c, // ambient FILL light (cool grey)
+  0xccd6e6, // key light (neutral cool-white)
+  0x5a6f9c, // rim light (muted cool)
   0x223046, // dimmed-node tone (Globe + NodeFabric) — TODO: derive from a token
   0xaac4e0, // ledger floor-LABEL text (rgba(170,196,224)) — TODO: source --foreground-dim
   // Density HEATMAP gradient — a functional data-viz sequential scale (cold→hot), NOT the palette:

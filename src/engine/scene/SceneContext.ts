@@ -26,6 +26,15 @@ export interface SceneCtx {
   resize(): void;
 }
 
+// Scene LIGHTING is a rendering technicality, NOT a palette concern: a light shades the (mostly
+// emissive) materials for subtle dimensional form — it is not a surface, accent or identity hue, so
+// it is deliberately NOT sourced from the CSS design tokens. These are dedicated, self-contained cool
+// lighting literals (all allowlisted in noHardcodedColors.test.ts). Changing the palette must not
+// change the lighting, and vice-versa.
+const LIGHT_AMBIENT = 0x4a5a8c; // cool-grey fill (mostly carries the scene, materials being emissive)
+const LIGHT_KEY = 0xccd6e6;     // neutral cool-white key light (top)
+const LIGHT_RIM = 0x5a6f9c;     // muted cool rim light (back — edge separation)
+
 export function createScene(canvas: HTMLCanvasElement, colors: SceneColors): SceneCtx {
   const scene = new THREE.Scene();
   scene.background = new THREE.Color(colors.bg);
@@ -53,14 +62,13 @@ export function createScene(canvas: HTMLCanvasElement, colors: SceneColors): Sce
   controls.autoRotateSpeed = 0.35;
 
   // Lighting — mostly ambient since materials are emissive; a couple of points add subtle
-  // dimensional shading. Key = the accent cyan, rim = the DAG-core blue (both from CSS tokens); the
-  // ambient fill is a neutral cool-grey (0x4a5a8c) — a lighting technicality, not a palette hue,
-  // so it's an allowed literal (see noHardcodedColors.test.ts).
-  scene.add(new THREE.AmbientLight(0x4a5a8c, 1.1));
-  const key = new THREE.PointLight(colors.core, 2.2, 220);
+  // dimensional shading. All three are dedicated lighting literals (see LIGHT_* above), decoupled
+  // from the palette — a light is a rendering technicality, not an accent/identity hue.
+  scene.add(new THREE.AmbientLight(LIGHT_AMBIENT, 1.1));
+  const key = new THREE.PointLight(LIGHT_KEY, 2.2, 220);
   key.position.set(0, 8, 0);
   scene.add(key);
-  const rim = new THREE.PointLight(colors.dagCore, 1.4, 260);
+  const rim = new THREE.PointLight(LIGHT_RIM, 1.4, 260);
   rim.position.set(40, -20, -30);
   scene.add(rim);
 
