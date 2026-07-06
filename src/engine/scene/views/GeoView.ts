@@ -169,7 +169,7 @@ function makeLandTexture(features: LandFeature[]): THREE.DataTexture {
   // source-atop keeps the lines ONLY where land is painted (alpha is still live HERE, on the
   // working canvas — it's flattened away below).
   g.globalCompositeOperation = "source-atop";
-  g.strokeStyle = "rgb(42,42,42)"; // very subtle grid — barely above the fill (26), a faint hint of mesh
+  g.strokeStyle = "rgb(34,34,34)"; // very subtle grid — barely above the fill (26), a faint hint of mesh
   g.lineWidth = 1.0;                   // 1px at 4096 = a very FINE hairline (crisp, not fuzzy)
   const STEP = 1.5;                    // DENSE 1.5° graticule — a delicate mesh, not a coarse cage
   for (let lat = -90 + STEP; lat < 90; lat += STEP) {
@@ -324,9 +324,9 @@ async function buildLand(globe: GeoViewHost) {
       transparent: true, opacity: 0, side: THREE.FrontSide,
     });
     globe.landFillMat = landMat;
-    // base = the resting ADDITIVE strength of the land grid (0..1). Kept below 1 so the globe reads
-    // as a calm hologram, not a bright neon shell — the coastal walls stay the brightest element.
-    globe.geoFades.push({ mat: globe.landFillMat, base: 0.6 });
+    // base = the resting ADDITIVE strength of the land surface (0..1) — lower = more transparent.
+    // Kept well below 1 so the globe reads as a faint calm hologram, the coastal walls the accent.
+    globe.geoFades.push({ mat: globe.landFillMat, base: 0.45 });
     globe.landFillMesh = new THREE.Mesh(new THREE.SphereGeometry(top, 96, 64), globe.landFillMat);
     globe.landFillMesh.renderOrder = -1; // before the rim/heatmap/nodes
     globe.landFillMesh.visible = false;  // revealed once the globe materialises (setMorph)
