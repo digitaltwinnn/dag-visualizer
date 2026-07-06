@@ -155,7 +155,7 @@ export default function GeoExplore() {
                       className="block h-full rounded-xs"
                       style={{
                         width: `${Math.round((c.count / max) * 100)}%`,
-                        background: barHue ?? "linear-gradient(90deg, var(--core-l0), var(--primary))",
+                        background: barHue ?? "linear-gradient(90deg, var(--core), var(--primary))",
                         boxShadow: `0 0 6px color-mix(in oklch, ${barHue ?? "var(--primary)"} 40%, transparent)`,
                       }}
                     />

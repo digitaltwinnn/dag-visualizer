@@ -89,7 +89,7 @@ export class Globe implements GeoViewHost {
   // for the land grid + sea graticule; _edgeColor is the (eased) coastal-wall colour. Set from the
   // CSS token in the constructor. Never identity-tinted (structural scene lane).
   geoColor = 0x000000;
-  private _coreL0 = 0x000000;
+  private _dagCore = 0x000000;
   _edgeColor = new THREE.Color();
   private _edgeTarget = new THREE.Color();
 
@@ -133,7 +133,7 @@ export class Globe implements GeoViewHost {
     this.layers = layers; // for gluing metagraph nodes to their orbiting hubs
     this.camera = camera; // for the view-dependent disc falloff at the limb
     this.geoColor = colors.core;   // the geo hologram = the accent (calm via opacity); wall + grid + graticule
-    this._coreL0 = colors.coreL0;  // DAG validator-node fallback hue
+    this._dagCore = colors.dagCore;  // DAG validator-node fallback hue
     this._edgeColor.setHex(colors.core);
     this._edgeTarget.setHex(colors.core);
 
@@ -226,7 +226,7 @@ export class Globe implements GeoViewHost {
     };
     // The DAG's own validator shells are coloured with the DAG's identity SCENE hue (sceneColors.dag),
     // falling back to the old structural colours if not populated yet.
-    const dagColor = (this.sceneColors && this.sceneColors.dag) ?? this._coreL0;
+    const dagColor = (this.sceneColors && this.sceneColors.dag) ?? this._dagCore;
     place(l0List, "l0", "l0", dagColor, 8, 1.0);
     place(cl1List, "cl1", "l1", dagColor, 14, 0.78);
 

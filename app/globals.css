@@ -230,8 +230,8 @@
 
   /* Added beyond shadcn defaults (structural, still not identity) */
   --success: oklch(0.80 0.15 165);           /* ready / green */
-  --core-l0: oklch(0.66 0.16 265);           /* DAG L0 blue #5b8cff */
-  --core-l1: oklch(0.66 0.19 300);           /* DAG L1 violet #b06bff */
+  --core: oklch(0.66 0.16 265);              /* DAG hypergraph-core blue #5b8cff — ONE hue for the
+                                                core; L0/L1 are NOT colour-distinguished anywhere */
   /* A second muted text tone — brighter than --muted-foreground, dimmer than --foreground.
      The repeated "muted blue-grey" copy tone (dossier description, geo rows, tooltip figures). */
   --foreground-dim: #c7d0ea;
@@ -257,7 +257,7 @@
    tokens have no shadcn analogue and live here as literals. The old colour ALIASES
    (--core/--text/--muted/--panel-border/--l0) onto the shadcn lane were retired in the
    consolidation sweep — every consumer now references the shadcn lane directly
-   (--primary / --foreground / --muted-foreground / --border / --core-l0). */
+   (--primary / --foreground / --muted-foreground / --border / --core). */
 :root {
   /* --panel is the translucent glass panel fill; it has no shadcn equivalent, so it stays a
      structural literal (NOT an alias). --panel-light is its lighter sibling (same RGB, lower
@@ -407,8 +407,7 @@
   --color-accent-foreground: var(--accent-foreground);
   --color-destructive: var(--destructive);
   --color-success: var(--success);
-  --color-core-l0: var(--core-l0);
-  --color-core-l1: var(--core-l1);
+  --color-core: var(--core);
   --color-border: var(--border);
   --color-ring: var(--ring);
   --color-foreground-dim: var(--foreground-dim);

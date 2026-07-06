@@ -436,8 +436,9 @@ in order:
    `--foreground`, `--muted-foreground`, **`--foreground-dim`** (`#c7d0ea`, the 2nd muted
    text tone), `--primary` = the accent cyan `#2af5ff`, `--accent` → `--primary`,
    `--destructive` (warn red — **also the no-signal dot**), **`--warn-soft`** (`#ffd166`, the
-   experimental-banner amber — advisory, NOT destructive), `--success`, `--core-l0`,
-   `--core-l1`, `--border`, …). **`--panel`** (the translucent glass fill) is a structural
+   experimental-banner amber — advisory, NOT destructive), `--success`, `--core` (the DAG
+   hypergraph-core blue — ONE hue; L0/L1 are NOT colour-distinguished anywhere),
+   `--border`, …). **`--panel`** (the translucent glass fill) is a structural
    **literal**, with siblings **`--panel-light`** (dock glass) + **`--panel-solid`** (tooltip
    glass); the accent glass-wash family **`--wash-faint`/`-soft`/`-hover`** (the `--border`
    RGB at fill alphas) is the ONE mechanism for faint accent fills. Then the **layout
@@ -473,7 +474,8 @@ code — reference the tokens. The SVG `RailThread` mirrors the `--thread-*` lit
 
 - **Structural cyan (`--primary`) is the SOLE accent/affordance signal**: live dots, the
   ECG, selection washes, sparklines, blueprint chrome, the "all" identity. Warn/ready use
-  `--destructive`/`--success`; the DAG core's own layers use `--core-l0`/`--core-l1`.
+  `--destructive`/`--success`; the DAG hypergraph core uses `--core` (ONE blue for the whole
+  core — its L0/L1 shells are the same hue, like any metagraph; nothing colour-distinguishes them).
 - **Identity hues appear ONLY via inline vars on subject marks** — `--mg`/`--mg-<id>`,
   `--spine`, `--filter-accent`, `--row-hue`, `--pulse-hue`, `--edge-hue` — set inline where
   a specific metagraph/node/snapshot is the subject (its dot, its thread spine, its edge
@@ -489,7 +491,7 @@ code — reference the tokens. The SVG `RailThread` mirrors the `--thread-*` lit
 - **The 3D scene sources its structural colours FROM the CSS tokens — one source of truth, no
   hardcoding.** `app/globals.css` is canonical; nothing in `src/engine/scene/` invents a
   structural colour. At construction the Engine calls `readSceneColors()`
-  (`src/engine/sceneColors.ts`), which reads `--primary`/`--core-l0`/`--core-l1`/`--background`
+  (`src/engine/sceneColors.ts`), which reads `--primary`/`--core`/`--background`
   via a hidden probe element + a 1×1 canvas (the canvas normalises whatever computed-colour
   format the browser returns for an oklch token — `rgb()`, `color(srgb …)` — to sRGB bytes), and
   threads the resulting `SceneColors` into every module (`createScene`, `Background`, `HyperView`,

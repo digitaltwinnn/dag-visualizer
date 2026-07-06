@@ -53,14 +53,14 @@ export function createScene(canvas: HTMLCanvasElement, colors: SceneColors): Sce
   controls.autoRotateSpeed = 0.35;
 
   // Lighting — mostly ambient since materials are emissive; a couple of points add subtle
-  // dimensional shading. Key = the accent cyan, rim = the L1 violet (both from CSS tokens); the
+  // dimensional shading. Key = the accent cyan, rim = the DAG-core blue (both from CSS tokens); the
   // ambient fill is a neutral cool-grey (0x4a5a8c) — a lighting technicality, not a palette hue,
   // so it's an allowed literal (see noHardcodedColors.test.ts).
   scene.add(new THREE.AmbientLight(0x4a5a8c, 1.1));
   const key = new THREE.PointLight(colors.core, 2.2, 220);
   key.position.set(0, 8, 0);
   scene.add(key);
-  const rim = new THREE.PointLight(colors.coreL1, 1.4, 260);
+  const rim = new THREE.PointLight(colors.dagCore, 1.4, 260);
   rim.position.set(40, -20, -30);
   scene.add(rim);
 

@@ -112,8 +112,8 @@ export class Engine {
         Math.abs(((a >> 16) & 255) - ((b >> 16) & 255)) <= 2 &&
         Math.abs(((a >> 8) & 255) - ((b >> 8) & 255)) <= 2 &&
         Math.abs((a & 255) - (b & 255)) <= 2;
-      const drift = ([["core", COLORS.core, colors.core], ["l0", COLORS.l0, colors.coreL0],
-        ["l1", COLORS.l1, colors.coreL1], ["bg", COLORS.bg, colors.bg]] as const)
+      const drift = ([["core", COLORS.core, colors.core], ["dagCore", COLORS.dagCore, colors.dagCore],
+        ["bg", COLORS.bg, colors.bg]] as const)
         .filter(([, a, b]) => !near(a, b)).map(([k]) => k);
       if (drift.length) console.warn(
         `[sceneColors] config.COLORS drifts from globals.css tokens: ${drift.join(", ")} — update config.ts to match.`,

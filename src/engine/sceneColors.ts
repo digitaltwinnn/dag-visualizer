@@ -16,14 +16,14 @@
 // `--primary`, so they match by construction).
 
 export interface SceneColors {
-  core: number; //   --primary   (accent cyan — the DAG spine, live/selected signals, the geo
-  //                              hologram + ledger tiles rendered dim, key light)
-  coreL0: number; // --core-l0   (DAG L0 blue)
-  coreL1: number; // --core-l1   (DAG L1 violet — rim light)
-  bg: number; //     --background (scene clear colour + fog + background depth)
+  core: number; //    --primary   (accent cyan — the DAG spine, live/selected signals, the geo
+  //                               hologram + ledger tiles rendered dim, key light)
+  dagCore: number; // --core      (DAG hypergraph-core blue — the validator-node fallback hue + rim
+  //                               light; ONE hue for the core, L0/L1 are NOT colour-distinguished)
+  bg: number; //      --background (scene clear colour + fog + background depth)
 }
 
-export type SceneColorVar = "--primary" | "--core-l0" | "--core-l1" | "--background";
+export type SceneColorVar = "--primary" | "--core" | "--background";
 
 // Resolve one CSS colour expression (e.g. "var(--primary)") to a packed 0xRRGGBB. Two steps, because
 // the computed-colour STRING format varies by browser (a token authored in oklch resolves to
@@ -67,8 +67,7 @@ export function readColorToken(name: SceneColorVar): number {
 export function readSceneColors(): SceneColors {
   return {
     core: readColorToken("--primary"),
-    coreL0: readColorToken("--core-l0"),
-    coreL1: readColorToken("--core-l1"),
+    dagCore: readColorToken("--core"),
     bg: readColorToken("--background"),
   };
 }

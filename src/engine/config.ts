@@ -6,8 +6,8 @@ export const API_BASE = "https://be-mainnet.constellationnetwork.io";
 export const L0_CLUSTER = "https://l0-lb-mainnet.constellationnetwork.io/cluster/info";
 export const L1_CLUSTER = "https://l1-lb-mainnet.constellationnetwork.io/cluster/info";
 
-// The STATIC mirror of the structural colour tokens in app/globals.css (`:root`). These four values
-// equal --primary / --core-l0 / --core-l1 / --background respectively.
+// The STATIC mirror of the structural colour tokens in app/globals.css (`:root`). These three values
+// equal --primary / --core / --background respectively.
 //
 // ⚠️ globals.css is the SINGLE SOURCE OF TRUTH. The live 3D scene does NOT read these — it reads the
 // actual CSS tokens at boot via src/engine/sceneColors.ts (readSceneColors), so the rendered scene
@@ -23,10 +23,9 @@ export const L1_CLUSTER = "https://l1-lb-mainnet.constellationnetwork.io/cluster
 // the token is canonical, so these mirror the token, not the comment. Update both together if a token
 // changes; the Engine dev-warns on drift.
 export const COLORS = {
-  core: 0x53f2f2, // = --primary   (accent cyan — the DAG spine)
-  l0: 0x618df3,   // = --core-l0   (L0 validators, consensus ring)
-  l1: 0xa670f3,   // = --core-l1   (L1 nodes, transactions & data)
-  bg: 0x010207,   // = --background (scene clear colour)
+  core: 0x53f2f2,    // = --primary   (accent cyan — the DAG spine)
+  dagCore: 0x618df3, // = --core      (DAG hypergraph-core blue — ONE hue; L0/L1 not distinguished)
+  bg: 0x010207,      // = --background (scene clear colour)
 };
 
 // Fallback hub colour for a metagraph the config doesn't know yet (one not in METAGRAPHS).
