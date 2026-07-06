@@ -1,6 +1,9 @@
 "use client";
 
 import { useState } from "react";
+import { cn } from "@/lib/utils";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import type { NodeInfo } from "@/src/data/types";
 import {
   nodeStatus,
@@ -21,26 +24,41 @@ export const ROLE_ORDER = ["l0", "cl1", "dl1"];
 // A node's roles, falling back to its primary layer when the role list is absent.
 export const rolesOf = (n: NodeInfo) => (n.roles && n.roles.length ? n.roles : [n.layer!]);
 
+// Shared "Ready" text treatment (plain, no chrome) — the structural green success token, not an
+// identity colour, so it's the one place we lean on a theme token instead of the exact legacy hex.
+const READY_CLS = "text-success font-semibold text-body";
+
+// The ONE identity dot every row list leads with (the filter picker's rows, the geo explorer's
+// node rows): a plain small disc in the subject's identity hue — flat fill, NO glow (the geo
+// rows' old `shadow-[0_0_5px_currentColor]` halo read much brighter than the picker's dots;
+// user-unified to the picker's exact treatment).
+export function IdentityDot({ hue }: { hue: string }) {
+  return <span className="w-2 h-2 rounded-full flex-none" style={{ background: hue }} aria-hidden />;
+}
+
 // Single node status — Ready reads as plain green text; any other state is a small pill in its
 // bucket colour, labelled with the exact stage. Colour = bucket (lane-clean), text = exact state.
 export function StatusMark({ state }: { state?: string | null }) {
   const s = nodeStatus(state);
-  if (s.bucket === "ready") return <span className="st-ready">{s.label}</span>;
+  if (s.bucket === "ready") return <span className={READY_CLS}>{s.label}</span>;
   return (
-    <span
-      className="st-pill"
+    <Badge
+      variant="outline"
+      className="text-label font-semibold px-2 py-px rounded-full border"
       style={{ color: s.color, borderColor: s.color + "55", background: s.color + "1a" }}
     >
       {s.label}
-    </span>
+    </Badge>
   );
 }
 
-// Rolled-up status for a node group (dossier): "all ready" (green) or the non-zero buckets as
-// counts + colour dots (`28 ready · 2 waiting · 1 syncing · 2 down`). The amber "progress"
-// bucket is spelled out by its exact lifecycle state(s) — same wording a single node's own
-// card shows (`StatusMark`) — instead of collapsing to a bare "N in progress"; colour still
-// comes from the bucket (BUCKET_COLOR), only the text goes granular.
+// Rolled-up status for a node group (dossier): the non-zero buckets as counts + colour dots
+// (`28 ready · 2 waiting · 1 syncing · 2 down`). Deliberately NO "all ready" special case
+// (user reversal — the green bold idiom dominated the card): ready is a count in the same
+// muted text as every other status, its green BULLET alone carrying the semantic. The amber
+// "progress" bucket is spelled out by its exact lifecycle state(s) — same wording a single
+// node's own card shows (`StatusMark`) — instead of collapsing to a bare "N in progress";
+// colour still comes from the bucket (BUCKET_COLOR), only the text goes granular.
 const BUCKET_WORD: Record<StatusBucket, string> = {
   ready: "ready",
   progress: "in progress",
@@ -49,50 +67,61 @@ const BUCKET_WORD: Record<StatusBucket, string> = {
 };
 export function StatusBreakdown({ states }: { states: (string | null | undefined)[] }) {
   const b = statusBreakdown(states);
-  const total = states.length;
-  if (total > 0 && b.ready === total) return <span className="st-ready">all ready</span>;
   const order: StatusBucket[] = ["ready", "progress", "down", "unknown"];
-  const parts = order.filter((k) => b[k] > 0);
+  // EVERY status item carries its own colour bullet (in its bucket's colour) — the progress
+  // bucket spells out several stage words (syncing / joining / …), and rendering one dot per
+  // BUCKET left every stage after the first (e.g. "1 joining") bullet-less.
+  const items = order
+    .filter((k) => b[k] > 0)
+    .flatMap((k) =>
+      k === "progress"
+        ? labelBreakdown(states, "progress").map((it) => ({ ...it, color: BUCKET_COLOR[k] }))
+        : [{ label: BUCKET_WORD[k], count: b[k], color: BUCKET_COLOR[k] }],
+    );
   return (
-    <span className="st-breakdown">
-      {parts.map((k, i) => {
-        const items =
-          k === "progress"
-            ? labelBreakdown(states, "progress")
-            : [{ label: BUCKET_WORD[k], count: b[k] }];
-        return (
-          <span className="st-bd" key={k}>
-            <span className="st-bd-dot" style={{ background: BUCKET_COLOR[k] }} />
-            {items.map((it, j) => (
-              <span key={it.label}>
-                {j > 0 ? <span className="st-bd-sep"> · </span> : null}
-                {it.count} {it.label}
-              </span>
-            ))}
-            {i < parts.length - 1 ? <span className="st-bd-sep"> · </span> : null}
+    <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
+      {items.map((it, i) => (
+        <span className="inline-flex items-center gap-[5px]" key={it.label}>
+          {i > 0 ? <span className="text-muted-foreground opacity-60"> · </span> : null}
+          <span className="w-[7px] h-[7px] rounded-full" style={{ background: it.color }} />
+          <span>
+            {it.count} {it.label}
           </span>
-        );
-      })}
+        </span>
+      ))}
     </span>
   );
 }
 
 // One composition row per make-up: role (bright) + codes (muted) + a capped chip stack
-// (visual scale only, ≤10, no +N) + the authoritative count.
+// (visual scale only, ≤10, no +N) + the authoritative count. (A per-row status line lived
+// here briefly — reverted: it read too busy; the dossier shows ONE aggregate StatusBreakdown
+// as the composition block's attached footer instead.)
 export function CompositionRows({ nodes }: { nodes: NodeInfo[] }) {
   const rows = compositionRows(nodes);
   return (
-    <div className="comp-rows">
+    <div className="flex flex-col gap-[7px] mt-2">
       {rows.map((r, i) => (
-        <div className="comp-row" key={i}>
-          <span className="comp-role">{r.label}</span>
-          <span className="comp-codes">{r.codes.join("·")}</span>
-          <span className="comp-chips" aria-hidden>
+        <div className="grid grid-cols-[auto_auto_1fr_auto] items-center gap-2" key={i}>
+          <span className="text-body text-foreground">{r.label}</span>
+          <span className="text-label text-muted-foreground tabular-nums">{r.codes.join("·")}</span>
+          {/* Chip stack = a miniature of the 3D node cloud: identity-hued discs that OVERLAP (like
+              stacked avatars), each ringed in the panel colour so the overlap reads. Visual scale
+              only (capped ≤10). Plain overlapping dots (no image/fallback content), so a bare
+              utility span reproduces the look more directly than fighting Avatar's chrome. */}
+          <span className="inline-flex justify-end items-center pl-1" aria-hidden>
             {Array.from({ length: Math.min(r.count, 10) }).map((_, j) => (
-              <span className="comp-chip" key={j} />
+              <span
+                key={j}
+                className="w-[9px] h-[9px] rounded-full -ml-1"
+                style={{
+                  background: "color-mix(in oklch, var(--filter-accent, var(--foreground-dim)) 60%, transparent)",
+                  boxShadow: "0 0 0 1.5px var(--panel)",
+                }}
+              />
             ))}
           </span>
-          <span className="comp-count">{r.count}</span>
+          <span className="text-body text-foreground tabular-nums min-w-[1.5em] text-right">{r.count}</span>
         </div>
       ))}
     </div>
@@ -124,42 +153,50 @@ export function nodeComposition(nodes: NodeInfo[]): Composition {
   return { present, hybrid, dedBy, parts, total, hasCurrency: present.includes("cl1") };
 }
 
-// The layer(s) a node runs, as small squared tags (L0 / cL1 / dL1). One node can run
-// several — a hybrid gets a tag each — so it's always the role *set*, never a single label.
-// Shared by the metagraph node-fabric and the geo node browser so they read identically.
-export function RoleTags({ roles }: { roles: string[] }) {
-  return (
-    <span className="role-tags">
-      {roles.map((r) => (
-        <span className={"role-tag role-tag--" + r} key={r}>
-          {ROLE_SHORT[r] || r}
-        </span>
-      ))}
-    </span>
-  );
+// The network-type descriptor for the dossier ticker row (subtle, behind the ticker) — derived
+// from the SAME composition read as the old "data metagraph · no token" body line (reused, not
+// re-derived): a metagraph is a "data"/"currency"/"data and currency" metagraph by whether it
+// runs dL1/cL1 nodes; the DAG core is the one exception ("hypergraph", not a metagraph at all).
+export function networkKind(id: string, nodes: NodeInfo[]): string {
+  if (id === "dag") return "hypergraph";
+  // With zero locatable nodes the roles are unknown — claiming a type would be a guess.
+  if (nodes.length === 0) return "metagraph";
+  const { present, hasCurrency } = nodeComposition(nodes);
+  const hasData = present.includes("dl1");
+  if (hasCurrency && hasData) return "data and currency metagraph";
+  if (hasCurrency) return "currency metagraph";
+  return "data metagraph";
 }
 
-export function Row({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <div className="insp-row">
-      <span>{label}</span>
-      <span>{children}</span>
-    </div>
-  );
-}
-
-// Long description with a 3-line clamp + "Show more" (replaces ui.js _descHTML +
-// the delegated toggle; here it's just local state).
+// Long description with a 3-line clamp + "Show more" (replaces ui.js _descHTML + the delegated
+// toggle; here it's just local state). Clamp-worthiness is decided SYNCHRONOUSLY from text
+// length (no post-paint measurement), so the control always renders in the same frame as the
+// card — the only "Show more appears late" case left is a data swap: on a cold boot the dossier
+// shows the short `cfg.blurb` (~110 chars, genuinely un-clampable) until `/api/metagraphs`
+// delivers the long `description`, and the button rightly arrives WITH that longer text.
+// Kept custom over shadcn Collapsible (evaluated): Collapsible's model is hidden-when-closed,
+// ours is always-visible-but-clamped — forceMount + data-state clamp overrides would invert the
+// primitive into a bare state container, so local state + aria-expanded is the smaller truth.
+// Keyed on `text` by the caller (MetaCard) so `open` resets when the subject changes.
 export function Desc({ text }: { text?: string }) {
   const [open, setOpen] = useState(false);
   if (!text) return null;
-  if (text.length <= 180) return <p>{text}</p>;
+  if (text.length <= 180) return <p className="text-body text-foreground-dim mb-0">{text}</p>;
   return (
     <>
-      <p className={"desc" + (open ? " expanded" : "")}>{text}</p>
-      <button type="button" className="desc-more" onClick={() => setOpen((o) => !o)}>
+      <p className={cn("text-body text-foreground-dim mb-0", open ? "line-clamp-none" : "line-clamp-3")}>
+        {text}
+      </p>
+      <Button
+        type="button"
+        variant="link"
+        size="xs"
+        className="inline-block h-auto mt-0.5 mb-0 p-0 text-label font-semibold"
+        aria-expanded={open}
+        onClick={() => setOpen((o) => !o)}
+      >
         {open ? "Show less" : "Show more"}
-      </button>
+      </Button>
     </>
   );
 }

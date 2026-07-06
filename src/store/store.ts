@@ -77,7 +77,7 @@ interface AppState {
   // The active selection's nodes, for the geo node browser (engine-pushed; [] off geo).
   selNodes: NodeRow[];
   // EXACT per-snapshot totals (fee + listed/unlisted), keyed by ordinal — populated by
-  // SnapshotExactBridge from /api/snapshot/[ordinal] for the live + selected ticks, so ANY view
+  // RawSnapshotBridge from /api/snapshot/[ordinal] for the live + selected ticks, so ANY view
   // can read final fees without the polling floor. Missing key = not fetched / unavailable (pruned).
   snapshotExact: Record<number, SnapshotExact>;
 
@@ -87,7 +87,7 @@ interface AppState {
   // Shared network filter ("all" | "dag" | <metagraph id>) — one unified core model, no
   // separate L0/L1 filters (the DAG is just another metagraph-shaped core).
   filter: string;
-  // PHONE ONLY: which bottom sheet (if any) is open — "explore" (LeftColumn) or "details"
+  // PHONE ONLY: which bottom sheet (if any) is open — "explore" (ExploreRail) or "details"
   // (Inspector), or null when both are closed. Phone has no room to stack two bottom sheets
   // (unlike tablet's two independent side sheets), so this is the single source of truth both
   // docks read `open` from: a dock is open iff `phoneDock === its own id`, and opening one
@@ -99,6 +99,15 @@ interface AppState {
   // (Outside-tap does NOT dismiss it — `onInteractOutside` is `preventDefault`-blocked so the
   // scene/other dock stays interactive underneath.) Unused on tablet/desktop.
   phoneDock: "explore" | "details" | null;
+  // PHONE ONLY: whether the top bar's vitals row is expanded (the bar grows downward by one
+  // full-width row showing the active view's vitals). A USER CHOICE that persists across view
+  // switches (the row's CONTENT swaps per view; only the user's toggle opens/closes it) —
+  // session-only, like `phoneDock` (no localStorage). Unused on tablet/desktop (vitals inline).
+  phoneVitals: boolean;
+  // PHONE ONLY: the bottom sheet's drag-chosen height override in px (null = the default 60vh).
+  // Shared by BOTH dock sheets so switching halves keeps the chosen height; reset to null the
+  // moment the dock fully closes (`setPhoneDock(null)`) so reopening starts at the default.
+  phoneSheetPx: number | null;
 
   setLive: (live: boolean, lastGoodAt?: number) => void;
   setEngineReady: (v: boolean) => void;
@@ -123,6 +132,8 @@ interface AppState {
   setSelNodes: (nodes: NodeRow[]) => void;
   setSnapshotExact: (data: SnapshotExact) => void;
   setPhoneDock: (dock: "explore" | "details" | null) => void;
+  setPhoneVitals: (open: boolean) => void;
+  setPhoneSheetPx: (px: number | null) => void;
 }
 
 // Keep the exact-snapshot cache bounded (one small object per ordinal); drop the oldest.
@@ -154,6 +165,8 @@ export const useStore = create<AppState>((set) => ({
   selNodes: [],
   snapshotExact: {},
   phoneDock: null,
+  phoneVitals: false,
+  phoneSheetPx: null,
 
   setLive: (live, lastGoodAt) => set((s) => ({ live, lastGoodAt: lastGoodAt ?? s.lastGoodAt })),
   setEngineReady: (engineReady) => set({ engineReady }),
@@ -192,5 +205,9 @@ export const useStore = create<AppState>((set) => ({
       }
       return { snapshotExact: next };
     }),
-  setPhoneDock: (phoneDock) => set({ phoneDock }),
+  // Fully closing the dock also drops the drag-chosen sheet height, so the next open starts at
+  // the default; switching halves (a non-null → non-null transition) keeps it.
+  setPhoneDock: (phoneDock) => set(phoneDock === null ? { phoneDock, phoneSheetPx: null } : { phoneDock }),
+  setPhoneVitals: (phoneVitals) => set({ phoneVitals }),
+  setPhoneSheetPx: (phoneSheetPx) => set({ phoneSheetPx }),
 }));

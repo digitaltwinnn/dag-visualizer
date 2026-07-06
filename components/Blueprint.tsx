@@ -1,8 +1,22 @@
 "use client";
 
 import type { ReactNode } from "react";
+import { cn } from "@/lib/utils";
 import { useStore } from "@/src/store/store";
 import type { Mode } from "@/src/store/store";
+
+// Structural blueprint chrome expressed as Tailwind-on-tokens. Stroke/fill come through
+// class-based `[stroke:…]` utilities (CSS declarations, so `var()`/`color-mix()` resolve —
+// unlike an SVG presentation attribute), keeping the cyan accents tied to the design tokens.
+const BP_CELL = "fill-none [stroke:color-mix(in_oklch,var(--primary)_40%,var(--border))] [stroke-width:1.25]";
+const BP_CELL_WAIT = "[stroke-dasharray:3_3] [stroke:color-mix(in_oklch,var(--primary)_55%,transparent)]";
+const BP_CELL_OFF = "[stroke:var(--border)] opacity-50";
+const BP_FLOW = "fill-none [stroke:color-mix(in_oklch,var(--primary)_55%,transparent)] [stroke-width:1.25] [stroke-dasharray:4_4]";
+const BP_ARROWHEAD = "fill-none [stroke:color-mix(in_oklch,var(--primary)_55%,transparent)] [stroke-width:1]";
+const BP_VALIDATOR = "fill-none [stroke:color-mix(in_oklch,var(--primary)_45%,var(--border))] [stroke-width:1.5]";
+const BP_STAKER = "[fill:color-mix(in_oklch,var(--primary)_45%,transparent)] stroke-none";
+const BP_DELEGATE = "[stroke:var(--border)] [stroke-width:1]";
+const BP_SVG = "w-[min(46vw,420px)] h-auto overflow-visible";
 
 // The center schematic BLUEPRINT for the not-yet-built ("SOON") views. A faint, abstract wireframe
 // of what each view will become — explicitly labelled `preview · in development` so it never reads
@@ -25,13 +39,13 @@ function NetworkSchematic() {
         <rect
           key={i}
           x={cx - r} y={cy - r} width={r * 2} height={r * 2} rx={3}
-          className={"bp-cell" + (dashed ? " bp-cell--wait" : "") + (hollow ? " bp-cell--off" : "")}
+          className={cn(BP_CELL, dashed && BP_CELL_WAIT, hollow && BP_CELL_OFF)}
         />,
       );
     }
   }
   return (
-    <svg viewBox={`-6 -6 ${cols * gap} ${rows * gap}`} className="bp-svg" role="img" aria-label="Network health grid preview">
+    <svg viewBox={`-6 -6 ${cols * gap} ${rows * gap}`} className={BP_SVG} role="img" aria-label="Network health grid preview">
       {cells}
     </svg>
   );
@@ -45,18 +59,18 @@ function TransactionsSchematic() {
   ];
   const edges: [number, number][] = [[0, 1], [1, 2], [0, 3], [3, 4], [4, 2], [3, 5], [5, 6], [6, 4]];
   return (
-    <svg viewBox="0 0 230 190" className="bp-svg" role="img" aria-label="Transaction flow preview">
+    <svg viewBox="0 0 230 190" className={BP_SVG} role="img" aria-label="Transaction flow preview">
       <defs>
         <marker id="bp-arrow" viewBox="0 0 8 8" refX="6" refY="4" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
-          <path d="M0 0 L8 4 L0 8" className="bp-arrowhead" />
+          <path d="M0 0 L8 4 L0 8" className={BP_ARROWHEAD} />
         </marker>
       </defs>
       {edges.map(([a, b], i) => (
         <line key={i} x1={nodes[a].x} y1={nodes[a].y} x2={nodes[b].x} y2={nodes[b].y}
-          className="bp-flow" markerEnd="url(#bp-arrow)" />
+          className={BP_FLOW} markerEnd="url(#bp-arrow)" />
       ))}
       {nodes.map((n, i) => (
-        <circle key={i} cx={n.x} cy={n.y} r={7} className="bp-addr" />
+        <circle key={i} cx={n.x} cy={n.y} r={7} className={BP_CELL} />
       ))}
     </svg>
   );
@@ -70,13 +84,13 @@ function StakingSchematic() {
     { x: 220, y: 60, v: 1 }, { x: 210, y: 170, v: 1 }, { x: 110, y: 176, v: 1 }, { x: 60, y: 150, v: 0 },
   ];
   return (
-    <svg viewBox="0 0 230 190" className="bp-svg" role="img" aria-label="Delegated staking preview">
+    <svg viewBox="0 0 230 190" className={BP_SVG} role="img" aria-label="Delegated staking preview">
       {stakers.map((s, i) => {
         const val = validators[s.v];
-        return <line key={"l" + i} x1={s.x} y1={s.y} x2={val.x} y2={val.y} className="bp-delegate" />;
+        return <line key={"l" + i} x1={s.x} y1={s.y} x2={val.x} y2={val.y} className={BP_DELEGATE} />;
       })}
-      {stakers.map((s, i) => <circle key={"s" + i} cx={s.x} cy={s.y} r={3.5} className="bp-staker" />)}
-      {validators.map((v, i) => <circle key={"v" + i} cx={v.x} cy={v.y} r={v.r} className="bp-validator" />)}
+      {stakers.map((s, i) => <circle key={"s" + i} cx={s.x} cy={s.y} r={3.5} className={BP_STAKER} />)}
+      {validators.map((v, i) => <circle key={"v" + i} cx={v.x} cy={v.y} r={v.r} className={BP_VALIDATOR} />)}
     </svg>
   );
 }
@@ -98,11 +112,11 @@ export default function Blueprint() {
   const art = SCHEMATIC[mode];
   if (!art) return null; // 3D views + any placeholder without art yet
   return (
-    <figure id="blueprint">
-      <div className="bp-art">{art}</div>
-      <figcaption className="bp-cap">
-        <span className="bp-tag">preview · in development</span>
-        <span className="bp-line">{CAPTION[mode]}</span>
+    <figure id="blueprint" className="fixed inset-0 z-[6] flex flex-col items-center justify-center gap-[22px] pointer-events-none px-6">
+      <div className="opacity-50">{art}</div>
+      <figcaption className="flex flex-col items-center gap-2 text-center max-w-[360px]">
+        <span className="text-label tracking-caps uppercase [color:color-mix(in_oklch,var(--primary)_80%,#fff)] opacity-[0.85]">preview · in development</span>
+        <span className="text-body text-muted-foreground">{CAPTION[mode]}</span>
       </figcaption>
     </figure>
   );

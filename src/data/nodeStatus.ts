@@ -1,6 +1,6 @@
 // The shared node status system: colour = the semantic BUCKET (lane-clean green/amber/red/
-// muted), text = the exact lifecycle stage. Replaces the old 6-colour nodeStateColor.
-// See docs/superpowers/specs/2026-07-01-geo-node-card-design.md.
+// muted), text = the exact lifecycle stage. One vocabulary for every status readout
+// (vitals Ready%, explorer rows, node card, dossier footer).
 
 export type StatusBucket = "ready" | "progress" | "down" | "unknown";
 export interface NodeStatus { bucket: StatusBucket; color: string; label: string; }

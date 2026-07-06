@@ -1,22 +1,211 @@
 @import "tailwindcss";
 @import "tw-animate-css";
-@import "./styles/00-base.css";
-@import "./styles/01-snapshot-ribbon.css";
-@import "./styles/05-inspector-metagraph-context-pane.css";
-@import "./styles/07-hover-tooltip.css";
-@import "./styles/09-ledger-placeholder.css";
-@import "./styles/10-country-leaderboard-distribution-score.css";
-@import "./styles/11-responsive.css";
-@import "./styles/12-panel-system.css";
-@import "./styles/13-right-column.css";
-@import "./styles/14-top-bar.css";
-@import "./styles/15-states.css";
-@import "./styles/16-responsive-shell.css";
-@import "./styles/17-blueprint.css";
+
+/* ── Shared subject-pairing highlight (useSubjectPairing.ts) ───────────────────
+   A subject hovered in the 3D scene (or in chrome) lights its paired card/row in ITS identity hue
+   (`--row-hue`, set inline only while paired) — the same hue the 3D object glows, so the two read
+   as one focus with no drawn line. ONE treatment for every card type (node/snapshot/dossier) +
+   rows, so they behave identically. Distinct from `.active`/committed selection. Cross-cutting —
+   used by rail cards (ContextCard/Inspector's CardPane) AND GeoExplore's node rows, so it lives
+   here rather than in either owner's stylesheet (was 05-inspector-metagraph-context-pane.css).
+
+   ⚠ UNLAYERED on purpose — bespoke recipe classes that must beat element utilities stay OUTSIDE
+   `@layer` (the third layer-trap on this branch): inside `@layer components` these rules lose to
+   Tailwind's utilities layer (the rows' `bg-transparent`/`border-transparent`) AND to the
+   later-in-layer `.ig-panel` box-shadow, which silenced the scene↔explorer hover pairing.
+   Unlayered CSS beats every layer at equal specificity. Selectors are asserted literally by
+   useSubjectPairing.test.ts — keep the class names verbatim. */
+/* Applied to the OUTER rounded pane (`.panel`/`#metapane`). The glow is INSET (drawn inside the
+   border) so a rail's `overflow` can't clip it left/right and it hugs all four rounded corners.
+   The trailing layers re-state `.ig-panel`'s ambient shadow (inner hairline + drop) so a paired
+   CARD keeps its depth — box-shadow is one list, so overriding it would otherwise drop them. */
+.subject-paired {
+  position: relative;
+  /* SUPPORTING cue now (Task 12): the spine/edge is the primary pairing signal, so the inset
+     ring/glow wash is dialled DOWN to a subtler level (was 62%/58%). Row wash below is unchanged. */
+  box-shadow: inset 0 0 0 1px color-mix(in oklch, var(--row-hue, var(--primary)) 32%, transparent),
+              inset 0 0 14px -6px color-mix(in oklch, var(--row-hue, var(--primary)) 30%, transparent),
+              inset 0 1px 0 rgba(255, 255, 255, 0.05), 0 8px 30px rgba(0, 0, 0, 0.35);
+  transition: box-shadow 0.16s ease;
+}
+/* Explorer rows are dense list items → a wash + border reads better there than an inset glow. */
+.nb-row.subject-paired {
+  box-shadow: none;
+  background: color-mix(in oklch, var(--row-hue, var(--primary)) 14%, transparent);
+  border-color: color-mix(in oklch, var(--row-hue, var(--primary)) 45%, transparent);
+  color: var(--foreground);
+}
+@media (prefers-reduced-motion: reduce) { .subject-paired { transition: none; } }
+
+/* ── Card signal system (Task 12 — EdgePulse.tsx + the card's scene-facing edge) ─────────────
+   THE MODEL (design evolution, agreed live): **thread = resting identity cue, card edge =
+   transient signal channel only.** Cards are SPINELESS AT REST everywhere (the ig-panel ::before
+   rests at opacity 0); the resting identity colour lives in the RAIL THREADS (RailThread — the
+   identity-hued spine + node dots, both rails, mirrored). A card's edge lights ONLY as a signal,
+   and every signal renders on the card's SCENE-FACING (inner) edge:
+     • left-rail cards  → their RIGHT edge  (`.sig-right`, an ::after element)
+     • right-rail cards → their LEFT  edge  (`.sig-left`, lighting the ig-panel ::before)
+   The edge is PURELY TRANSIENT (user refinement): it renders ONLY during (a) the subject-change
+   PULSE and (b) hover PAIRING, while actually hovered (the inset wash above is the supporting
+   cue). There is NO resting/steady/selected edge state — an "always selected" detail card would
+   read as a permanent spine, which is exactly what was removed. Replaces the old whole-card
+   flash. UNLAYERED on purpose (same layer-trap as .subject-paired above) so these beat the
+   `@layer components` `.ig-panel::before` + Tailwind utilities at equal specificity. Colour is
+   the card's OWN identity var — no new tokens: left-rail signals ride `--spine`, right-rail
+   signals ride `--filter-accent`/`--row-hue` (RIGHT_CARD keeps `--spine` transparent). Keep this
+   block CONTIGUOUS + the sheet-suppression rules LAST (equal-specificity source-order beat). */
+
+/* Travelling pulse — the subject-change signal, TWO LAYERS on one ~1.2s clock (user-refined):
+   the full edge LINE fades in softly (the `::before` base — a gentle opacity ramp of the coloured
+   line, gradient-tipped like the sheet-edge spine), the BRIGHT segment sweeps down along it (the
+   `> i`), then the whole edge fades back out. Colour fade-in → bright movement across it →
+   fade-out; nothing remains after. The outer `.edge-pulse` span is keyed to remount per pulse
+   (EdgePulse.tsx), replaying both layers. Geometry + weight are user-tuned live:
+   • Runs on the card's SCENE-FACING (inner) edge — LEFT-rail cards pulse on their RIGHT edge,
+     RIGHT-rail cards on their LEFT — away from the screen edge, where it hid against the margin.
+   • The segment is THICKER than the old spine (3px), bright, LONG (~64px), gradient-faded tips
+     (transparent→colour→transparent) + a drop-shadow glow (the ecg-scan idiom) — no hard ends.
+   Reduced motion: no sweep, no fade choreography — the base line does ONE static soft blink. */
+.edge-pulse {
+  position: absolute; top: 8px; bottom: 8px; right: -1px;
+  width: 3px; overflow: hidden; pointer-events: none; z-index: 3;
+  --pulse-hue: var(--spine, var(--primary));
+  /* Soft extremities (consistency with the static edges' faded tips): the TRACK itself is
+     masked transparent→solid→transparent, so the travelling segment FADES in as it enters and
+     out as it leaves — no hard-edged pop/clip at either boundary. The mask lives in the span's
+     local coords, so rotated carriers (the phone dock half's top edge) keep it along the track. */
+  -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 14%, #000 86%, transparent 100%);
+          mask-image: linear-gradient(to bottom, transparent 0, #000 14%, #000 86%, transparent 100%);
+}
+.edge-pulse--rail-right { right: auto; left: -1px; --pulse-hue: var(--filter-accent, var(--primary)); }
+/* Layer 1 — the base edge line: soft fade-in, hold under the sweep, fade-out. Dimmer than the
+   travelling segment so the movement reads on top of it. */
+.edge-pulse::before {
+  content: ""; position: absolute; inset: 0; opacity: 0;
+  background: linear-gradient(to bottom,
+    transparent 0, var(--pulse-hue) 14%, var(--pulse-hue) 86%, transparent 100%);
+  animation: edge-line-fade 1.2s ease both;
+}
+@keyframes edge-line-fade {
+  0%   { opacity: 0; }
+  18%  { opacity: 0.5; }
+  78%  { opacity: 0.5; }
+  100% { opacity: 0; }
+}
+/* Layer 2 — the bright travelling segment. Its length is PARAMETRIC (`--pulse-len`, default the
+   rail/card-tuned 64px): short hosts (the collapsed edge tab, the phone dock half's top edge) set
+   an element-relative length (~45% of the track) so the sweep still READS there instead of
+   blinking the whole line at once. The sweep keeps constant TIME (1.2s), not constant speed. */
+.edge-pulse > i {
+  position: absolute; left: 0; right: 0; height: var(--pulse-len, 64px); opacity: 0;
+  background: linear-gradient(to bottom,
+    transparent 0, var(--pulse-hue) 30%, var(--pulse-hue) 70%, transparent 100%);
+  filter: drop-shadow(0 0 6px var(--pulse-hue));
+  animation: edge-pulse-sweep 1.2s ease;
+}
+@keyframes edge-pulse-sweep {
+  0%   { top: calc(-1 * var(--pulse-len, 64px)); opacity: 0; }
+  15%  { opacity: 1; }
+  85%  { opacity: 1; }
+  100% { top: 100%;  opacity: 0; }
+}
+/* Reduced motion: a single static soft blink of the base line; the sweep never runs. (The hook
+   no longer gates on the media query — CSS owns the reduced-motion behaviour.) */
+@keyframes edge-line-blink {
+  0%   { opacity: 0; }
+  35%  { opacity: 0.5; }
+  100% { opacity: 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .edge-pulse > i { animation: none; opacity: 0; }
+  .edge-pulse::before { animation: edge-line-blink 0.9s ease both; }
+}
+
+/* Level 1 — POINTER HOVER (Task 13): the quietest edge signal, on EVERY card, both rails. While
+   the pointer is over the card its SCENE-FACING edge fades in a FAINT NEUTRAL line — the muted
+   thread grey `--thread-line` (its 0.40 alpha carries the faintness, ≈40% of pairing's presence),
+   thin (2px, the shared edge width), NO glow, NO sweep. Hierarchy MUST stay readable at a glance:
+   grey whisper (pointer) < hued edge + wash (pairing) < moving light (pulse). When a card is BOTH
+   hovered and paired, PAIRING WINS — these rules sit BEFORE the `.subject-paired` rules below,
+   so at equal specificity (0,2,1) source order hands the win to pairing (no grey underneath
+   fighting the hue). Rides the base ::before/::after `opacity 0.16s` transition (no new
+   transition; reduced-motion-safe — opacity only). Suppressed inside sheets by the sheet-calm rule
+   at the end of this block, exactly like pairing (touch surfaces don't hover; the sheet edge is
+   the single cue). Left-rail cards get `.sig-right` on their container for this (About/GeoExplore/
+   LedgerPanel); right-rail cards already carry `.sig-left`.
+
+   ⚠ ONLY the OPACITY may animate on these pseudos — never colour. The signal pseudo's resting
+   background is pinned to the SAME neutral grey below, so the eased fade-in/out only ever shows
+   `--thread-line` (bug fixed live: with the old `var(--spine)` resting background, leaving a left
+   card snapped the background back to the cyan spine while the opacity was still fading out — a
+   blue flash on hover-out; and the right-rail fade-out was invisible over RIGHT_CARD's transparent
+   spine). Hue appears EXCLUSIVELY via the `.subject-paired` declarations below, present only while
+   the pairing class is; a pairing leave falls back to this neutral for its 0.16s fade — calm, no
+   colour transition anywhere. */
+/* THE ONE edge-line recipe (user refinement): EVERY hover-edge signal — the neutral whisper AND
+   the hued pairing line, both rails, any variant — renders the SAME soft gradient-faded tips
+   (transparent→line→transparent, the travelling-pulse tip treatment; no hard ends anywhere on
+   the edge). The line's colour rides `--edge-hue` (neutral `--thread-line` at rest/whisper; the
+   pairing rules below swap the hue in WHILE paired — swapping a var, not the background, keeps
+   the opacity-only invariant: a pairing leave still falls back to the neutral instantly and only
+   the opacity fades, no colour transition). The ig-panel ::before base rule lives in
+   `@layer components`, so this unlayered recipe beats it. */
+.sig-left::before, .sig-right::after {
+  background: linear-gradient(to bottom,
+    transparent 0,
+    var(--edge-hue, var(--thread-line)) 14%,
+    var(--edge-hue, var(--thread-line)) 86%,
+    transparent 100%);
+}
+.sig-left:hover::before  { opacity: 1; box-shadow: none; }
+.sig-right:hover::after  { opacity: 1; box-shadow: none; }
+
+/* Hover PAIRING — the only non-pulse edge signal, shown strictly WHILE HOVERED (the class comes
+   and goes with the hover; the 0.16s transition on the base elements eases it in/out).
+   RIGHT-rail cards (`.sig-left`) light the ig-panel ::before on their LEFT (scene-facing) edge —
+   RIGHT_CARD suppresses `--spine`, so colour comes from the subject's `--row-hue` (falling back
+   to the rail's `--filter-accent`). Same soft-tipped line via `--edge-hue`; only the glow is new. */
+.sig-left.subject-paired::before {
+  opacity: 1;
+  --edge-hue: var(--row-hue, var(--filter-accent, var(--primary)));
+  box-shadow: 0 0 7px 0 var(--row-hue, var(--filter-accent, var(--primary)));
+}
+
+/* LEFT-rail cards (`.sig-right`) — the mirror: pairing lights an ::after on the card's RIGHT
+   (scene-facing) edge. No left card is pairable today, so the pairing rule is the
+   forward-compatible mirror + /design demo. Geometry only here — the soft-tipped background
+   comes from the shared edge-line recipe above (neutral at rest; see the opacity-only warning). */
+.sig-right::after {
+  content: ""; position: absolute; right: 0; top: 10px; bottom: 10px; width: 2px;
+  border-radius: 2px; opacity: 0; transition: opacity 0.16s ease; pointer-events: none;
+}
+.sig-right.subject-paired::after {
+  opacity: 1;
+  --edge-hue: var(--row-hue, var(--spine, var(--primary)));
+  box-shadow: 0 0 7px 0 var(--row-hue, var(--spine, var(--primary)));
+}
+
+/* Sheets (tablet/phone RailDock): the sheet's own `.ig-sheet-edge` spine is the single identity
+   cue, so even the transient hover-pairing edge is suppressed on hosted cards to keep the sheet
+   calm (resting spines are already 0 everywhere — design-concern #5 is resolved by construction).
+   The subject-change PULSE still plays on the card (it's the .edge-pulse span's own ::before/i,
+   not the ig-panel's). MUST stay last: equal specificity vs the pairing rules above, so source
+   order wins. */
+.sheet-cards .ig-panel::before,
+.sheet-cards .sig-right::after { opacity: 0; box-shadow: none; }
 
 /* ── Structural lane (chrome + status) — shadcn CSS variables in oklch ── */
 :root {
   --radius: 14px;
+  /* Height of the phone persistent bottom dock bar — the single source of truth referenced by
+     the phone bar-half sheet offset (RailDock) AND the LiveStrip's phone bottom offset. (Was
+     16-responsive-shell.css `:root`, re-homed here when that file was retired in Task 9.) */
+  --phone-dock-h: 56px;
+  /* The ONE resting dim for rail instrument furniture (lines/ruler/spine at rest) — consumed by
+     the desktop RailThreads' dim group AND the tablet/phone sheet's `.ig-sheet-edge` channel, so
+     rest vs signal contrast is consistent everywhere. Brightness belongs to the signals (pulses)
+     and the node dots, which stay outside the dim. */
+  --rail-rest-dim: 0.6;
 
   --background: oklch(0.09 0.02 265);        /* #05060e app bg */
   --foreground: oklch(0.94 0.02 255);        /* #e8eefc text */
@@ -30,25 +219,176 @@
   --primary: oklch(0.88 0.13 195);           /* accent cyan #2af5ff — the sole live/accent signal */
   --primary-foreground: oklch(0.14 0.02 265);
   --ring: oklch(0.88 0.13 195);
-  /* Intentionally overrides the legacy --accent: #2af5ff (app/styles/00-base.css, consumed
-     by 3 legacy rules) — same colour, so no visible change; keeps --primary the single
-     source of truth. Don't drop this without checking those legacy rules first. */
+  /* The sole --accent definition (the legacy literal in app/styles/00-base.css was dropped
+     when that file was retired in Task 10) — points at --primary so it stays the single
+     source of truth. Consumed by CardHead's `var(--filter-accent, var(--accent))` bullet. */
   --accent: var(--primary);
   --accent-foreground: var(--primary-foreground);
 
-  --destructive: oklch(0.63 0.20 25);        /* warn red */
+  --destructive: oklch(0.63 0.20 25);        /* warn red — also the NO-SIGNAL dot (StateAtoms) */
   --destructive-foreground: var(--foreground);
 
   /* Added beyond shadcn defaults (structural, still not identity) */
   --success: oklch(0.80 0.15 165);           /* ready / green */
   --core-l0: oklch(0.66 0.16 265);           /* DAG L0 blue #5b8cff */
   --core-l1: oklch(0.66 0.19 300);           /* DAG L1 violet #b06bff */
+  /* A second muted text tone — brighter than --muted-foreground, dimmer than --foreground.
+     The repeated "muted blue-grey" copy tone (dossier description, geo rows, tooltip figures). */
+  --foreground-dim: #c7d0ea;
+  /* The experimental-banner advisory amber — NOT --destructive (amber ≠ red): a distinct
+     "work-in-progress / advisory" accent. Only the ExperimentalBanner uses it today. */
+  --warn-soft: #ffd166;
 
-  --border: rgba(90, 140, 255, 0.22);        /* matches the existing --panel-border */
+  --border: rgba(90, 140, 255, 0.22);        /* panel/hairline border (was the --panel-border alias) */
   --input: var(--border);
   --surface-muted: oklch(0.18 0.03 265);
   --secondary: var(--surface-muted);
   --secondary-foreground: var(--foreground);
+
+  /* Accent glass-wash family — the --border RGB (90,140,255) at fill alphas BELOW its .22
+     hairline. One mechanism for every faint accent fill (topbar/vitals/geo hover + open washes). */
+  --wash-faint: rgba(90, 140, 255, 0.05);
+  --wash-soft:  rgba(90, 140, 255, 0.10);
+  --wash-hover: rgba(90, 140, 255, 0.12);
+}
+
+/* ── Structural / layout lane (was app/styles/00-base.css, retired in Task 10) ──
+   Names carried over from the pre-migration stylesheet. Layout/spacing + instrument-thread
+   tokens have no shadcn analogue and live here as literals. The old colour ALIASES
+   (--core/--text/--muted/--panel-border/--l0) onto the shadcn lane were retired in the
+   consolidation sweep — every consumer now references the shadcn lane directly
+   (--primary / --foreground / --muted-foreground / --border / --core-l0). */
+:root {
+  /* --panel is the translucent glass panel fill; it has no shadcn equivalent, so it stays a
+     structural literal (NOT an alias). --panel-light is its lighter sibling (same RGB, lower
+     alpha) for the tablet/phone dock glass; --panel-solid is the near-opaque tooltip/tip glass. */
+  --panel: rgba(12, 16, 32, 0.72);
+  --panel-light: rgba(12, 16, 32, 0.35);
+  --panel-solid: rgba(8, 12, 26, 0.92);
+
+  /* Dot-size scale (documented, not tokenised — the w-/h- micro-dots read cleaner as literals at
+     the call site than as size utilities): 3px xs · 5px sm · 7px md · 9px lg (odd, +2px steps) —
+     node/status/beat dots across StateAtoms, inspector/parts, CardHead, LiveStrip. Keep to it. */
+
+  /* Layout system tokens (shared by every HUD panel so they read as siblings). One
+     spacing scale, one "selected" treatment; component utilities reference these. */
+  --panel-pad-x: 16px;     /* horizontal padding inside a panel header/section */
+  --panel-pad-y: 12px;     /* vertical   padding inside a panel header/section */
+  --rail-gap: 12px;        /* gap between stacked panels in a column */
+  --rail-top: 115px;       /* top of BOTH side rails — clears the banner + command bar, plus a
+                              comfortable breather under the bar (user refinement 2026-07-05) */
+  --rail-w: 264px;         /* left control rail width */
+  --detail-w: 320px;       /* right details rail width */
+  --sel-bg: rgba(42, 245, 255, 0.12);   /* selected/active fill, reused everywhere */
+  --sel-border: rgba(42, 245, 255, 0.5);
+  --bottom-reserve: 170px; /* default; BottomStream overrides per view (slim vs full) */
+
+  /* ── Instrument-thread ruler spec (the ONE shared source) ─────────────────────
+     Both rails' SVG threads (RailThread.tsx) and the bar-chart axis read identically:
+     a neutral base line with ruler hairlines — short marks, every 4th longer + brighter.
+     The SVG threads can't consume these (an SVG stroke attribute doesn't resolve var()),
+     so they mirror the SAME literals in code — keep in sync (see RailThread `TICK_*`).
+     `--axis-hairlines` is the reusable recipe for a horizontal axis (the bar chart). */
+  --thread-line: rgba(178, 193, 223, 0.40);        /* the neutral base line the ticks hang off */
+  --thread-tick: rgba(178, 193, 223, 0.30);        /* minor hairline */
+  --thread-tick-major: rgba(178, 193, 223, 0.42);  /* every 4th — longer + brighter */
+  --thread-faint: rgba(178, 193, 223, 0.10);       /* faintest thread-family hairline (dock borders) */
+  --thread-tick-pitch: 13px;                        /* spacing between hairlines */
+  /* Horizontal baseline → vertical ticks HANGING DOWN from it (the bar-chart axis, so the ruler
+     sits under the bars, not through them). Anchored to the TOP so ticks grow downward; major
+     taller (8px) + brighter, minor 5px. */
+  --axis-hairlines:
+    repeating-linear-gradient(to right,
+      var(--thread-tick-major) 0, var(--thread-tick-major) 1px,
+      transparent 1px, transparent calc(var(--thread-tick-pitch) * 4)) left top / 100% 8px no-repeat,
+    repeating-linear-gradient(to right,
+      var(--thread-tick) 0, var(--thread-tick) 1px,
+      transparent 1px, transparent var(--thread-tick-pitch)) left top / 100% 5px no-repeat;
+}
+
+/* ── Base resets (was app/styles/00-base.css) ── */
+@layer base {
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: var(--background); overflow: hidden; }
+  body { font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; color: var(--foreground); }
+}
+
+/* ── Scene canvas + rail containers (was app/styles/00-base.css) ──────────────────
+   Selector-driven rules that can't be plain Tailwind utilities: `.scene-in` is toggled
+   as a className by SceneCanvas.tsx on the boot handoff; `.rail-clip`/`.rail-dragging`
+   are toggled at runtime by RailScroll.tsx; and the `#leftcol`/`#rightcol` rails carry
+   :hover + ::-webkit-scrollbar pseudo-elements. The rail ids are also queried by
+   RailScroll (["leftcol","rightcol"]) and RailThread — keep them. */
+@layer components {
+  .scene-canvas {
+    position: fixed;
+    inset: 0;
+    width: 100vw;
+    height: 100vh;
+    display: block;
+    opacity: 0;                 /* fade in on the boot handoff */
+    transition: opacity 0.6s ease;
+  }
+  .scene-canvas.scene-in { opacity: 1; }
+
+  /* Left control rail (`#leftcol`, ExploreRail.tsx) — the explore/interact zone. Fixed
+     column under the shared rail-top/gap tokens; mirrors `#rightcol` below. The 26px outer
+     margin matches the right rail's, making room for the mirrored identity RailThread
+     (design evolution, Task 12: both rails carry the identity thread). */
+  #leftcol {
+    position: fixed; z-index: 10; top: var(--rail-top); left: 26px;
+    width: var(--rail-w);
+    display: flex; flex-direction: column; gap: var(--rail-gap);
+    max-height: calc(100vh - var(--rail-top) - 14px);
+    overflow-y: auto;
+  }
+  #leftcol > aside { width: auto; }
+
+  /* Right details rail (`#rightcol`, Inspector.tsx) — the facts scope: a STACK of
+     selected-subject cards. `pointer-events: none` so the gaps between cards click
+     through to the scene/bottom strip below; each card re-enables it via the
+     `pointer-events-auto` in RIGHT_CARD (CardHead.tsx). */
+  #rightcol {
+    position: fixed; z-index: 10; top: var(--rail-top); right: 26px;
+    width: var(--detail-w);
+    display: flex; flex-direction: column; gap: var(--rail-gap);
+    max-height: calc(100vh - var(--rail-top) - 14px);
+    overflow-y: auto;
+    pointer-events: none;
+  }
+
+  /* Both rails scroll: a slim custom scrollbar, native touch panning (pan-y + momentum),
+     and a grab-drag fallback for mouse (RailScroll). `overscroll-behavior: contain` keeps
+     a rail scroll from chaining to the page. */
+  #leftcol, #rightcol {
+    scrollbar-width: thin; scrollbar-color: rgba(160, 175, 205, 0.28) transparent;
+    touch-action: pan-y;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior: contain;
+  }
+  /* Bottom fade — applied ONLY when a rail actually reaches down into the chart band (JS
+     toggles `.rail-clip`, see RailScroll). Gating it avoids fading a SHORT rail. */
+  #leftcol.rail-clip, #rightcol.rail-clip {
+    -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - var(--bottom-reserve, 0px) + 6px), transparent calc(100% - var(--bottom-reserve, 0px) + 30px), transparent 100%);
+    mask-image: linear-gradient(to bottom, #000 calc(100% - var(--bottom-reserve, 0px) + 6px), transparent calc(100% - var(--bottom-reserve, 0px) + 30px), transparent 100%);
+  }
+  #leftcol::-webkit-scrollbar, #rightcol::-webkit-scrollbar { width: 6px; }
+  #leftcol::-webkit-scrollbar-track, #rightcol::-webkit-scrollbar-track { background: transparent; }
+  #leftcol::-webkit-scrollbar-thumb, #rightcol::-webkit-scrollbar-thumb {
+    background: rgba(160, 175, 205, 0.28); border-radius: 3px;
+  }
+  #leftcol:hover::-webkit-scrollbar-thumb, #rightcol:hover::-webkit-scrollbar-thumb {
+    background: rgba(160, 175, 205, 0.45);
+  }
+  /* The RIGHT rail's scrollbar would sit on top of the instrument thread, so hide it there —
+     the thread IS the scroll visual; scrolling stays via wheel + grab-drag + touch pan. */
+  #rightcol { scrollbar-width: none; }
+  #rightcol::-webkit-scrollbar { width: 0; height: 0; display: none; }
+  /* While grab-dragging a rail (mouse): suppress the text cursor + selection. */
+  .rail-dragging { cursor: grabbing; user-select: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .scene-canvas { transition: none; }
 }
 
 /* ── Tailwind v4 theme mapping — expose the vars as utilities ── */
@@ -71,9 +411,35 @@
   --color-core-l1: var(--core-l1);
   --color-border: var(--border);
   --color-ring: var(--ring);
+  --color-foreground-dim: var(--foreground-dim);
+  --color-warn-soft: var(--warn-soft);
+  --color-wash-faint: var(--wash-faint);
+  --color-wash-soft: var(--wash-soft);
+  --color-wash-hover: var(--wash-hover);
   --radius-lg: var(--radius);
   --radius-md: calc(var(--radius) - 4px);
-  --radius-sm: calc(var(--radius) - 8px);
+  --radius-sm: calc(var(--radius) - 8px);   /* 6px */
+  --radius-xs: 4px;                          /* tiny chrome — tags, chips, share-bars, list rows */
+  --radius-btn: 8px;                         /* control rounding — view-switch, filter face, tooltips/popovers */
+
+  /* ── HUD type scale (the four steps every HUD text site snaps to) ──────────────────────────
+     micro = uppercase eyebrows / tags / axis labels + tiny UI glyphs (NOT readable body copy);
+     label = secondary/meta (counts, codes, subtitles, hints); body = rows, descriptions, values;
+     title = card titles. Sizes intentionally sit between Tailwind's default text-xs/sm steps —
+     that finer granularity is why arbitrary text-[..px] used to sprawl. Line-heights paired per
+     Tailwind v4's fontSize convention so a bare text-* also sets a sane leading. */
+  --text-micro: 10.5px;
+  --text-micro--line-height: 1;
+  --text-label: 11.5px;
+  --text-label--line-height: 1.45;
+  --text-body: 12.5px;
+  --text-body--line-height: 1.45;
+  --text-title: 15px;
+  --text-title--line-height: 1.2;
+
+  /* Uppercase-caps tracking — the merged 0.12/0.13/0.14em eyebrow/label cluster. */
+  --tracking-caps: 0.13em;
+
   --animate-breathe: breathe 1.5s ease-in-out infinite;
 }
 
@@ -119,14 +485,90 @@
   .ecg-scan { animation: none; stroke-dasharray: none; opacity: 0.85; }
 }
 
+/* The command-bar filter dot pulses on the same 1.5s beat as the ECG mark — the two share the
+   network's heartbeat. Scale + opacity (colour-agnostic, so it works for any identity hue). */
+@keyframes dot-beat {
+  0%, 100% { transform: scale(1); opacity: 0.8; }
+  50%      { transform: scale(1.28); opacity: 1; }
+}
+@theme inline {
+  --animate-dot-beat: dot-beat 1.5s ease-in-out infinite;
+}
+
+/* ── State atoms (components/state/StateAtoms.tsx + BootOverlay.tsx) — ACQUIRING twinkle, NO
+   SIGNAL sonar, STANDBY halo, boot core ping/glow + fade. Pure motion keyframes only — size,
+   colour and position are Tailwind utilities at each call site (same split as `breathe`/
+   `dot-beat` above: simple standalone animations become `--animate-*` theme vars + an inline
+   `motion-reduce:animate-none` at the call site, which is Tailwind's own reduced-motion guard). */
+@keyframes st-twinkle { 0%, 100% { opacity: 0.3; } 50% { opacity: 0.9; } }
+@keyframes st-fade-in { from { opacity: 0; } to { opacity: 1; } }
+@keyframes st-fade-out { from { opacity: 1; } to { opacity: 0; } }
+@keyframes st-sonar {
+  from { transform: scale(1); opacity: 0.6; }
+  to   { transform: scale(3.2); opacity: 0; }
+}
+@keyframes st-standby-node { 0%, 100% { opacity: 0.58; transform: scale(1); } 50% { opacity: 1; transform: scale(1.09); } }
+@keyframes st-standby-halo { 0% { transform: scale(1); opacity: 0.52; } 100% { transform: scale(3.6); opacity: 0; } }
+@theme inline {
+  --animate-st-twinkle: st-twinkle 1.5s ease-in-out infinite;
+  /* Same fade, two durations: the ACQUIRING value resolve-in (0.35s) vs the boot overlay's own
+     entrance (0.4s) — kept as separate theme vars over one shared keyframe. */
+  --animate-resolve-in: st-fade-in 0.35s ease both;
+  --animate-boot-fade-in: st-fade-in 0.4s ease both;
+  /* Calm fade-OUT for a resolved transient/ACQUIRING signal (the boot overlay + acquiring atoms,
+     driven by `useMinHold`): after the minimum hold, it eases to 0 instead of unmounting abruptly
+     (concern #8). One shared 0.4s var; reduced motion skips it (the hook collapses the fade to 0). */
+  --animate-hold-fade-out: st-fade-out 0.4s ease both;
+  /* Same expanding ring, two cadences: NO SIGNAL's one-shot-per-retry ping (`SonarRing`, replayed
+     by remounting via `key`) vs the boot overlay's continuous ping while reaching the network. */
+  --animate-st-sonar: st-sonar 1.4s ease-out 1 forwards;
+  --animate-boot-ping: st-sonar 1.6s ease-out infinite;
+  --animate-st-standby-node: st-standby-node 1.5s ease-in-out infinite;
+  --animate-st-standby-halo: st-standby-halo 1.6s ease-out infinite;
+}
+
+/* The LiveStrip bar-chart's entry animation (components/LiveStrip.tsx) — a new bar streams in
+   from the right and grows up from the baseline. Kept as a real keyframe (a Tailwind arbitrary
+   `animation` value can't declare the keyframe itself), same idiom as `.odometer-in`/`.ecg-scan`
+   above. */
+@keyframes ls-bar-in {
+  from { opacity: 0; transform: translateX(9px) scaleY(0.55); }
+  to   { opacity: 1; transform: translateX(0) scaleY(1); }
+}
+@layer components {
+  .ls-bar-anim { animation: ls-bar-in 0.55s cubic-bezier(0.22, 1, 0.36, 1) both; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ls-bar-anim { animation: none; }
+}
+
+/* ── Command-list scrollbar (top-bar filter picker) — the SAME slim custom scrollbar as the
+   rails (`#leftcol`/`#rightcol`, above); the default chunky one clashed with the glass popover.
+   Scoped to a class (not the rails' ids) since `CommandList` is a reusable primitive. ── */
+@layer components {
+  .cmd-list-scroll {
+    scrollbar-width: thin; scrollbar-color: rgba(160, 175, 205, 0.28) transparent;
+    overscroll-behavior: contain;
+  }
+  .cmd-list-scroll::-webkit-scrollbar { width: 6px; }
+  .cmd-list-scroll::-webkit-scrollbar-track { background: transparent; }
+  .cmd-list-scroll::-webkit-scrollbar-thumb { background: rgba(160, 175, 205, 0.28); border-radius: 3px; }
+  .cmd-list-scroll:hover::-webkit-scrollbar-thumb { background: rgba(160, 175, 205, 0.45); }
+}
+
 /* ── Instrument-Glass surface — the shared panel frame + left accent spine ── */
 @layer components {
   .ig-panel {
     position: relative;
-    background: linear-gradient(180deg, rgba(20, 26, 46, 0.78), rgba(10, 14, 28, 0.72));
+    /* Glass strength (Task 13 follow-up, user: cards read too transparent over busy scene
+       detail): alphas raised 0.78/0.72 → 0.88/0.82 + blur restored to 14px (the pre-migration
+       value) so `text-muted-foreground` body text stays comfortably readable over the bright
+       hypergraph core, while the gradient + blur keep the scene glowing through at the card
+       edges — good glass, not a solid slab. */
+    background: linear-gradient(180deg, rgba(20, 26, 46, 0.88), rgba(10, 14, 28, 0.82));
     border: 1px solid var(--border);
     border-radius: var(--radius);
-    backdrop-filter: blur(12px);
+    backdrop-filter: blur(14px);
     box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05), 0 8px 30px rgba(0, 0, 0, 0.35);
   }
   .ig-panel::before {
@@ -137,6 +579,83 @@
     border-radius: 2px;
     /* structural cyan by default; identity panels set --spine: var(--mg) */
     background: var(--spine, var(--primary));
-    opacity: 0.8;
+    /* INVISIBLE AT REST (design evolution, Task 12): cards are spineless everywhere — the
+       resting identity cue is the RAIL THREADS (RailThread, both rails, mirrored), and the
+       card edge is a transient SIGNAL channel only (hover-pairing while hovered + the update
+       pulse — the unlayered "Card signal system" block near the top of this file; there is NO
+       steady/selected state). This ::before is the LEFT-edge signal element right-rail cards
+       light while paired (`.sig-left`); left-rail cards signal on their RIGHT edge
+       (`.sig-right::after`). */
+    opacity: 0;
+    transition: opacity 0.16s ease;
+  }
+}
+
+/* ── Responsive shell (tablet/phone rail docks) — re-homed from 16-responsive-shell.css (Task 9).
+   The Sheet primitive's layout/positioning/colour/breakpoints are now Tailwind utilities on the
+   JSX (RailDock.tsx, components/ui/sheet.tsx); only the bespoke instrument decorations that don't
+   round-trip cleanly through utility syntax (multi-layer repeating-gradient rulers + masks) stay
+   here as recipe classes, exactly like `.ig-panel` above. ── */
+
+/* Sheet slide-in — no exit animation (matches the shipped design; Radix unmounts the non-modal
+   content on close). Reduced motion is handled at the call site (`motion-reduce:animate-none`). */
+@keyframes sheetInLeft   { from { transform: translateX(-100%); } to { transform: none; } }
+@keyframes sheetInRight  { from { transform: translateX(100%); }  to { transform: none; } }
+@keyframes sheetInBottom { from { transform: translateY(100%); }  to { transform: none; } }
+@theme inline {
+  --animate-sheet-in-left:   sheetInLeft   0.28s cubic-bezier(0.22, 1, 0.36, 1);
+  --animate-sheet-in-right:  sheetInRight  0.28s cubic-bezier(0.22, 1, 0.36, 1);
+  --animate-sheet-in-bottom: sheetInBottom 0.30s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+@layer components {
+  /* Side-sheet instrument channel (tablet/phone left+right docks): a cyan identity spine
+     (`::before`) + a neutral hairline ruler (`::after`) down the sheet's SCREEN-EDGE side —
+     restores, on the overlay sheets, the desktop rails' spine + RailThread ruler (both desktop-
+     only). Static decoration, pointer-transparent. `--filter-accent` is set inline by the caller
+     (falls back to --primary for "all"). Keyed on the Sheet's own `data-side`. */
+  .ig-sheet-edge::before,
+  .ig-sheet-edge::after {
+    content: ""; position: fixed; top: 10px; bottom: 10px; pointer-events: none; z-index: 42;
+    /* Same resting dim as the desktop RailThreads (shared --rail-rest-dim): the channel is calm
+       furniture at rest, so the travelling switch/update pulses read clearly against it. */
+    opacity: var(--rail-rest-dim);
+  }
+  .ig-sheet-edge::before {
+    width: 2px; border-radius: 2px;
+    background: linear-gradient(to bottom,
+      transparent 0, var(--filter-accent, var(--primary)) 12%,
+      var(--filter-accent, var(--primary)) 88%, transparent 100%);
+  }
+  .ig-sheet-edge[data-side="left"]::before  { left: 0; }
+  .ig-sheet-edge[data-side="right"]::before { right: 0; }
+  .ig-sheet-edge::after {
+    width: 8px;
+    background:
+      repeating-linear-gradient(to bottom,
+        var(--thread-tick-major) 0, var(--thread-tick-major) 1px,
+        transparent 1px, transparent calc(var(--thread-tick-pitch) * 4)) left top / 8px 100% no-repeat,
+      repeating-linear-gradient(to bottom,
+        var(--thread-tick) 0, var(--thread-tick) 1px,
+        transparent 1px, transparent var(--thread-tick-pitch)) left top / 5px 100% no-repeat;
+    -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 12%, #000 88%, transparent 100%);
+            mask-image: linear-gradient(to bottom, transparent 0, #000 12%, #000 88%, transparent 100%);
+  }
+  .ig-sheet-edge[data-side="left"]::after  { left: 4px; }
+  .ig-sheet-edge[data-side="right"]::after { right: 4px; transform: scaleX(-1); }
+
+  /* Bottom-sheet (phone) instrument ruler on its TOP edge — painted OUTSIDE the sheet (the sheet
+     is overflow-visible; scroll lives on the inner body), ticks combing UP into the scene. Same
+     shared --thread-* rhythm as the rails + bar-chart axis. */
+  .ig-sheet-topruler::before {
+    content: ""; position: absolute; top: -8px; left: 0; right: 0; height: 8px; pointer-events: none;
+    background:
+      linear-gradient(var(--thread-line), var(--thread-line)) left bottom / 100% 1px no-repeat,
+      repeating-linear-gradient(to right, var(--thread-tick-major) 0, var(--thread-tick-major) 1px,
+        transparent 1px, transparent calc(var(--thread-tick-pitch) * 4)) left bottom / 100% 8px no-repeat,
+      repeating-linear-gradient(to right, var(--thread-tick) 0, var(--thread-tick) 1px,
+        transparent 1px, transparent var(--thread-tick-pitch)) left bottom / 100% 5px no-repeat;
+    -webkit-mask-image: linear-gradient(to right, transparent 0, #000 40px, #000 calc(100% - 40px), transparent 100%);
+            mask-image: linear-gradient(to right, transparent 0, #000 40px, #000 calc(100% - 40px), transparent 100%);
   }
 }

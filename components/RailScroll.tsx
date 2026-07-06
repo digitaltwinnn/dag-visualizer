@@ -7,7 +7,7 @@ import { useEffect } from "react";
 // drag to scroll the cards up/down. A small movement threshold keeps ordinary clicks working, and
 // interactive targets (buttons, links, node rows) never start a drag.
 //
-// `#leftcol`/`#rightcol` only exist in the DESKTOP breakpoint (`LeftColumn`/`Inspector` render
+// `#leftcol`/`#rightcol` only exist in the DESKTOP breakpoint (`ExploreRail`/`Inspector` render
 // `RailDock` instead below ~1100px) — so crossing the tablet/desktop boundary during a session
 // unmounts and later REMOUNTS them as brand-new DOM nodes. This component itself is mounted once,
 // unconditionally, for the app's whole lifetime (`page.tsx`), so a one-shot `getElementById` +
@@ -69,7 +69,7 @@ export default function RailScroll() {
         if (e.pointerType !== "mouse") return; // touch = native pan
         if (el.scrollHeight <= el.clientHeight) return; // nothing to scroll
         const t = e.target as HTMLElement | null;
-        if (t?.closest("button, a, input, textarea, select, [role=button], .nb-row, .desc-more")) return;
+        if (t?.closest("button, a, input, textarea, select, [role=button], .nb-row")) return;
         dragging = true;
         moved = false;
         startY = e.clientY;

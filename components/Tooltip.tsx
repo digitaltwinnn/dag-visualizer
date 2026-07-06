@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
+import { cn } from "@/lib/utils";
 import { useStore } from "@/src/store/store";
 import { shortHash } from "@/src/data/network";
 
@@ -28,11 +29,16 @@ export default function Tooltip() {
   if (!hover) return null;
   const name = hover.mono ? shortHash(hover.name) : hover.name;
   return (
-    <div id="tooltip" ref={ref} style={{ borderColor: hover.color }}>
-      <span className="tt-ident" style={{ color: hover.color }}>{hover.ident}</span>
-      <span className="tt-sep">·</span>
-      <span className={"tt-name" + (hover.mono ? " insp-hash" : "")}>{name}</span>
-      <span className="tt-hint">click to inspect</span>
+    <div
+      id="tooltip"
+      ref={ref}
+      className="fixed z-30 pointer-events-none flex items-baseline gap-[7px] px-[10px] py-[6px] rounded-lg border border-border bg-[var(--panel-solid)] text-body whitespace-nowrap -translate-x-1/2 -translate-y-[140%] backdrop-blur-[8px]"
+      style={{ borderColor: hover.color }}
+    >
+      <span className="font-bold text-label tracking-[0.02em]" style={{ color: hover.color }}>{hover.ident}</span>
+      <span className="text-muted-foreground">·</span>
+      <span className={cn("text-foreground", hover.mono && "font-mono text-label")}>{name}</span>
+      <span className="text-muted-foreground text-label ml-[6px] opacity-75">click to inspect</span>
     </div>
   );
 }

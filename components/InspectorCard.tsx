@@ -1,7 +1,13 @@
 "use client";
 
+import type { ReactNode } from "react";
 import type { PickDescriptor } from "@/src/data/types";
-import { GeoLiveCard, MetaCard, SnapshotCard } from "@/components/inspector/cards";
+import { useStore } from "@/src/store/store";
+import CardHead from "@/components/CardHead";
+import {
+  GeoLiveAside, GeoLiveCard, GeoLiveSubtitle, GeoLiveTitle,
+  MetaCard, MetaSiteAction, MetaTitle, SnapshotAside, SnapshotCard, SnapshotTitle,
+} from "@/components/inspector/cards";
 
 // Only three kinds ever reach the inspector frame now: a metagraph/core dossier (ContextCard),
 // a clicked snapshot (ledger), and the selected-node card (geo/hyper, via the `geoLive` proxy
@@ -15,21 +21,68 @@ function CardBody({ p }: { p: PickDescriptor }) {
   }
 }
 
-// The shared inspector/context card — the React port of ui.js _cardHTML. It renders just the
-// blue **eyebrow = the card's purpose** (its role in this view), then dispatches to the per-kind
-// body. Every body owns its OWN subject header (the snapshot's ◆ ordinal, the dossier's logo +
-// name, the node's id row), so the frame renders no title of its own — a frame title on top of a
-// body header read as a duplicate header (2× "DAG" on the dossier).
+// The per-kind HEAD — the card's primary title (+ optional subtitle + right-aligned aside) now
+// renders in CardHead's title slot (one head anatomy: eyebrow / title / inset hairline / body;
+// Task 13 follow-up). The dossier name rolls via `titleKey`; the snapshot ordinal rolls via its
+// own Odometer; the node title self-keys its roll-in on the node ID (all defined in
+// inspector/cards.tsx). The node head is LOCATION-FIRST: place as the title, the demoted id hash
+// as the subtitle (GeoLiveSubtitle renders null in the no-location fallback, where the id stays
+// the title).
+function headFor(p: PickDescriptor): {
+  title?: ReactNode; titleKey?: string; subtitle?: ReactNode; aside?: ReactNode;
+} {
+  switch (p.kind) {
+    // The dossier head is the full identity composition — avatar + name + ticker (MetaTitle;
+    // user refinement restoring the pre-unification header). Still rolls via titleKey on the
+    // name, synced with the edge pulse.
+    case "meta": return { title: <MetaTitle cfg={p.cfg} />, titleKey: p.cfg.name };
+    case "snapshot": return { title: <SnapshotTitle data={p.data} />, aside: <SnapshotAside data={p.data} /> };
+    case "geoLive": return { title: <GeoLiveTitle />, subtitle: <GeoLiveSubtitle />, aside: <GeoLiveAside /> };
+    default: return {};
+  }
+}
+
+// The shared inspector/context card — the React port of ui.js _cardHTML. It renders the blue
+// **eyebrow = the card's purpose**, the subject TITLE (via CardHead's title slot — bodies render
+// no title rows of their own), the inset head hairline, then dispatches to the per-kind body.
 export default function InspectorCard({
   p,
   eyebrow,
+  onClose,
 }: {
   p: PickDescriptor;
   eyebrow?: string;
+  // When set, CardHead renders the card's absolute × — the ONE baseline close every dismissible
+  // card shares (label: CardHead's "Clear selection" default; no per-card variants).
+  onClose?: () => void;
 }) {
+  // NO SIGNAL — the explorer feed is unreachable: SnapshotCard swaps to its own "no signal" body,
+  // and the frame's eyebrow dims along with it (carried forward from `.no-signal .insp-eyebrow`).
+  const live = useStore((s) => s.live);
+  const eyebrowMuted = p.kind === "snapshot" && !live;
+  // The dossier's site link rides the TITLE row's aside slot (user-placed: anchored right on the
+  // avatar + name + ticker line; the name truncates, the icon stays pinned). Resolved HERE (not
+  // inside headFor, which is a plain function and can't hook); passed only when a link actually
+  // exists, so link-less dossiers render no aside at all (no empty gap). Falls back to the
+  // config-level `cfg.siteUrl` for cores the live metaList doesn't carry a site for (the DAG —
+  // Engine publishes it with `siteUrl: undefined`; DAG_CFG supplies constellationnetwork.io).
+  const metaList = useStore((s) => s.metaList);
+  const site =
+    p.kind === "meta"
+      ? (metaList.find((x) => x.id === p.cfg.id)?.siteUrl ?? p.cfg.siteUrl)
+      : undefined;
+  const head = headFor(p);
   return (
     <>
-      {eyebrow && <span className="insp-eyebrow">{eyebrow}</span>}
+      <CardHead
+        eyebrow={eyebrow}
+        title={head.title}
+        titleKey={head.titleKey}
+        subtitle={head.subtitle}
+        aside={head.aside ?? (site ? <MetaSiteAction site={site} /> : undefined)}
+        onClose={onClose}
+        eyebrowMuted={eyebrowMuted}
+      />
       <CardBody p={p} />
     </>
   );

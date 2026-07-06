@@ -1,13 +1,14 @@
 "use client";
 
-import type { CSSProperties } from "react";
+import { Fragment, type CSSProperties, type ReactNode } from "react";
 import { useStore, type Mode } from "@/src/store/store";
 import { filterAccent } from "@/src/data/network";
 import GeoExplore from "@/components/GeoExplore";
 import LedgerPanel from "@/components/LedgerPanel";
 import AboutView from "@/components/AboutView";
 import RailThread from "@/components/RailThread";
-import RailDock from "@/components/RailDock";
+import RailDock, { type TabSignal } from "@/components/RailDock";
+import { exploreCards } from "@/components/railCards";
 import { useBreakpoint } from "@/components/useBreakpoint";
 
 // Per-view "About this view" copy — one orientation card at the top of the left rail in every
@@ -71,22 +72,41 @@ const ABOUT: Record<Mode, { title: string; eyebrow: string; lines: string[]; cap
 // Every view now leads with a collapsed `AboutView` orientation card, above its ONE tool card
 // (if any): Geography → GeoExplore (footprint + node browser); Snapshots → LedgerPanel;
 // Hypergraph and the scaffolded views have no tool card, just the About card.
-export default function LeftColumn() {
+export default function ExploreRail() {
   const bp = useBreakpoint();
   const mode = useStore((s) => s.mode);
   const filter = useStore((s) => s.filter);
   const phoneDock = useStore((s) => s.phoneDock);
   const setPhoneDock = useStore((s) => s.setPhoneDock);
+  const phoneSheetPx = useStore((s) => s.phoneSheetPx);
+  const setPhoneSheetPx = useStore((s) => s.setPhoneSheetPx);
   // Theme every card's bullet to the current selection (the explore card is always
   // specific to the active filter).
   const accent = { ["--filter-accent"]: filterAccent(filter) } as CSSProperties;
+
+  // ONE source of truth for the hosted card set (railCards.ts): both the rail content AND the dock
+  // tray are derived from the same manifest, so they can't disagree about which cards this view
+  // hosts. `id` maps to the component to render; the manifest owns presence/order.
+  const manifest = exploreCards({ mode });
+  const renderCard: Record<string, ReactNode> = {
+    about: <AboutView {...ABOUT[mode]} />,
+    tool: mode === "geo" ? <GeoExplore /> : mode === "ledger" ? <LedgerPanel /> : null,
+  };
   const content = (
     <>
-      <AboutView {...ABOUT[mode]} />
-      {mode === "geo" && <GeoExplore />}
-      {mode === "ledger" && <LedgerPanel />}
+      {manifest
+        .filter((c) => c.present)
+        .map((c) => (
+          <Fragment key={c.id}>{renderCard[c.id]}</Fragment>
+        ))}
     </>
   );
+  // The dock's icon TRAY (tablet edge tab + phone dock half): the legend of what this sheet hosts,
+  // straight from the manifest. The left cards are static tools (constant subjectKeys, no live
+  // updates), so no `active` highlights / `updateKey` here — the tray stays a quiet legend.
+  const tray: TabSignal[] = manifest
+    .filter((c) => c.present)
+    .map((c) => ({ id: c.id, icon: c.icon }));
   if (bp === "desktop") {
     // The thread is a SIBLING of #leftcol (mirrors the right rail): the rail clips horizontally + can
     // gain an overflow-fade mask, either of which would blank a child thread. It points its ruler
@@ -94,7 +114,15 @@ export default function LeftColumn() {
     return (
       <>
         <RailThread side="left" />
-        <div id="leftcol" style={accent}>
+        {/* `max-[1099px]:!hidden` + arbitrary width tweaks re-home 16/11-responsive.css (Task 9):
+            the safety-net hide below the desktop breakpoint (SSR/first-paint assume desktop, so the
+            desktop rail can flash on a narrow viewport before useBreakpoint resolves) and the small-
+            laptop / tablet rail-width narrowing. `!` beats the `#leftcol` id rule in globals.css. */}
+        <div
+          id="leftcol"
+          className="max-[1100px]:!w-[224px] max-[860px]:!w-[210px] max-[860px]:!max-h-[calc(100vh-320px)] max-[1099px]:!hidden"
+          style={accent}
+        >
           {content}
         </div>
       </>
@@ -102,9 +130,11 @@ export default function LeftColumn() {
   }
   if (bp === "tablet") {
     // Tablet: same content, hosted in the left edge-tab Sheet overlay so the 3D scene keeps
-    // full width. The inline #leftcol/.rail-thread path is hidden below 1100px (00-base.css).
+    // full width. The inline #leftcol/.rail-thread path is hidden below 1100px (globals.css).
     return (
-      <RailDock side="left" label="Explore" style={accent}>
+      // `signalKey` = the same subject RailThread pulses on (desktop-only) — RailDock replays the
+      // view/filter-switch pulse on the sheet edge / tab edge so tablet keeps the signal.
+      <RailDock side="left" label="Explore" style={accent} signals={tray} signalKey={`${mode}|${filter}`}>
         {content}
       </RailDock>
     );
@@ -116,6 +146,8 @@ export default function LeftColumn() {
   // open — they can't both be open at once, there's no room to stack two bottom sheets. Tapping
   // this half sets `phoneDock`, which simultaneously closes the Details dock (its own `open`
   // reads the same field); tapping it again while open collapses it (RailDock's own toggle).
+  // No `signalKey` here — the view/filter-switch pulse for the phone dock is a single full-width
+  // overlay spanning both halves (`PhoneDockSweep`, mounted once in page.tsx), not a per-half prop.
   return (
     <RailDock
       side="left"
@@ -123,7 +155,10 @@ export default function LeftColumn() {
       style={accent}
       trigger="bottom-bar-half"
       sheetSide="bottom"
+      signals={tray}
       open={phoneDock === "explore"}
+      sheetPx={phoneSheetPx}
+      onSheetPx={setPhoneSheetPx}
       onOpenChange={(next) => setPhoneDock(next ? "explore" : null)}
     >
       {content}

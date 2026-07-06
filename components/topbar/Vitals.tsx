@@ -1,14 +1,15 @@
 "use client";
 
-import { forwardRef } from "react";
 import { Gauge } from "lucide-react";
 import { useStore } from "@/src/store/store";
 import { metagraphById } from "@/src/data/network";
 import { nodeStatus } from "@/src/data/nodeStatus";
 import Sparkline from "@/components/Sparkline";
 import Odometer from "@/components/Odometer";
+import { NoSignalDot } from "@/components/state/StateAtoms";
 import { rolesOf } from "@/components/inspector/parts";
 import { useBreakpoint } from "@/components/useBreakpoint";
+import { cn } from "@/lib/utils";
 import type { NodeInfo } from "@/src/data/types";
 
 // Structural cyan for the live-activity sparklines (lane-correct: cyan = the live accent).
@@ -16,10 +17,20 @@ const CYAN = "#2af5ff";
 
 function Vital({ label, value, spark }: { label: string; value: React.ReactNode; spark?: number[] }) {
   return (
-    <div className="tb-vital">
-      <span className="tb-vital-k">{label}</span>
-      <span className="tb-vital-row">
-        <span className="tb-vital-v">{value}</span>
+    <div className="flex flex-col gap-0.5 flex-none">
+      <span className="text-micro tracking-[0.1em] uppercase text-muted-foreground whitespace-nowrap">{label}</span>
+      <span
+        className={cn(
+          "flex items-center gap-[7px]",
+          // Sparklines condense away at ≤1240px (was 1020): the constant-width vitals
+          // reservation (VitalsCluster's overlay grid) is sized by the WIDEST cluster — the
+          // sparkline-bearing ledger one (~273px) — which stops fitting the bar below ~1240px
+          // and overflowed the row to the right. Condensing ALL clusters at the same width
+          // caps the reservation without breaking the no-jump guarantee (still view-independent).
+          "max-[1240px]:gap-0 max-[1240px]:[&_.recharts-wrapper]:hidden",
+        )}
+      >
+        <span className="font-mono font-bold text-foreground tabular-nums whitespace-nowrap max-[1120px]:text-body">{value}</span>
         {spark && <Sparkline data={spark} color={CYAN} />}
       </span>
     </div>
@@ -51,7 +62,7 @@ function HyperVitals() {
 
   // Filtered: an em-dash for a layer this metagraph doesn't run (stable 3 columns, no reflow).
   const cell = (n: number, runsLayer: boolean) =>
-    cfg && !runsLayer ? <span className="tb-vital-ph">—</span> : <Odometer value={n} />;
+    cfg && !runsLayer ? <span className="text-muted-foreground italic opacity-60">—</span> : <Odometer value={n} />;
 
   return (
     <>
@@ -76,7 +87,7 @@ function GeoVitals() {
     <>
       <Vital label="Nodes" value={<Odometer int value={total || null} />} />
       <Vital label="Countries" value={<Odometer int value={countries.length || null} />} />
-      <Vital label="Ready" value={<span className="tb-vital-score">{readyPct == null ? "—" : `${readyPct}%`}</span>} />
+      <Vital label="Ready" value={readyPct == null ? "—" : `${readyPct}%`} />
     </>
   );
 }
@@ -90,49 +101,79 @@ function LedgerVitals() {
     <>
       <Vital label="Snaps/hr" value={<Odometer value={activity?.snapsPerHour} />} spark={activity?.cadenceSeries} />
       <Vital label="Anchors/hr" value={<Odometer value={activity?.anchorsPerHour} />} spark={activity?.anchoredSeries} />
-      <Vital label="—" value={<span className="tb-vital-ph">soon</span>} />
+      <Vital label="—" value={<span className="text-muted-foreground italic opacity-60">soon</span>} />
     </>
   );
 }
 
-function VitalsCluster() {
+// The INLINE vitals bar (also the phone bar-row's content — the old stacked `vertical` popover
+// variant is gone): ALL THREE view clusters render stacked in ONE grid cell, with only the
+// active view's visible — the region's width is therefore the WIDEST state's
+// width at every breakpoint, CONSTANT across view switches (and the flat placeholder views,
+// where none is visible), so the centered view switch never jumps horizontally on view change.
+// Hidden clusters are `invisible` + `aria-hidden` (layout kept, no paint, no live-region noise),
+// content right-aligned inside the reserved region so it keeps hugging the bar's right edge —
+// EXCEPT in the phone bar row (`align="center"`), where the reserved cell centres its content:
+// with `justify-end` a narrow cluster (hyper's) visibly right-shifts inside the widest cluster's
+// reservation, reading off-centre in the full-width row while the wide clusters look centred.
+function VitalsCluster({ align = "end" }: { align?: "end" | "center" } = {}) {
   const mode = useStore((s) => s.mode);
   const live = useStore((s) => s.live);
-  const body =
-    mode === "geo" ? <GeoVitals /> : mode === "ledger" ? <LedgerVitals /> : mode === "hyper" ? <HyperVitals /> : null;
+  const gaps = "gap-3.5 max-[1260px]:gap-3 max-[1120px]:gap-2.5 max-[940px]:gap-2.5 max-[820px]:gap-2";
+  const clusters: [string, React.ReactNode][] = [
+    ["hyper", <HyperVitals key="hyper" />],
+    ["geo", <GeoVitals key="geo" />],
+    ["ledger", <LedgerVitals key="ledger" />],
+  ];
   return (
-    <div className={"tb-vitals" + (live ? "" : " no-signal")}>
-      {!live && <span className="ns-dot" />}
-      {body}
+    <div className={cn("flex items-center", gaps, !live && "saturate-[.45]")}>
+      {!live && <NoSignalDot />}
+      <div className="grid">
+        {clusters.map(([m, body]) => (
+          <div
+            key={m}
+            aria-hidden={mode !== m || undefined}
+            className={cn(
+              "col-start-1 row-start-1 flex items-center",
+              align === "center" ? "justify-center" : "justify-end",
+              gaps,
+              mode !== m && "invisible",
+            )}
+          >
+            {body}
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
 
-// Phone's compact ≥44px toggle button. Exposed with a forwarded ref so TopBar can measure it
-// to position the popover — the popover itself must live OUTSIDE #topbar (same reason as the
-// filter picker: the bar's `overflow: hidden` would clip it, and `position: fixed` doesn't
-// escape it either since `backdrop-filter` on #topbar creates a containing block).
-export const VitalsToggle = forwardRef<HTMLButtonElement, { open: boolean; onClick: () => void }>(
-  function VitalsToggle({ open, onClick }, ref) {
-    return (
-      <button
-        ref={ref}
-        type="button"
-        className={"tb-vitals-toggle" + (open ? " active" : "")}
-        aria-expanded={open}
-        aria-label="Toggle vitals"
-        onClick={onClick}
-      >
-        <Gauge size={14} />
-      </button>
-    );
-  }
-);
+// Phone's compact ≥44px toggle button — expands/collapses the bar's own vitals ROW (TopBar);
+// no more floating popover, so no measuring ref.
+export function VitalsToggle({ open, onClick }: { open: boolean; onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      className={cn(
+        "flex items-center justify-center min-w-11 min-h-11 px-2.5 rounded-btn",
+        "bg-transparent border-0 text-muted-foreground cursor-pointer flex-none",
+        "hover:text-foreground hover:bg-wash-soft",
+        open && "text-foreground bg-wash-soft",
+      )}
+      aria-expanded={open}
+      aria-label="Toggle vitals"
+      onClick={onClick}
+    >
+      <Gauge size={14} />
+    </button>
+  );
+}
 
 export { VitalsCluster };
 
-// Tablet/desktop: vitals render inline, unchanged. Phone rendering (toggle + popover) is
-// handled by TopBar so the popover can escape the bar's clipped/containing-block surface.
+// Tablet/desktop: vitals render inline, unchanged. On phone this renders nothing — TopBar owns
+// the phone treatment: a toggle button that grows the command bar downward by one full-width
+// vitals ROW on the bar's own surface (the old floating popover was removed).
 export default function Vitals() {
   const bp = useBreakpoint();
   if (bp === "phone") return null;

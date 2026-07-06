@@ -1,11 +1,16 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { ChevronRight } from "lucide-react";
+import { cn } from "@/lib/utils";
 import { useStore } from "@/src/store/store";
-import PanelHead from "@/components/PanelHead";
+import CardHead from "@/components/CardHead";
+import { Card } from "@/components/ui/card";
+import { EXPLORE_ICON } from "@/components/icons";
 import { shortHash, CORE_HEX, metagraphById } from "@/src/data/network";
 import { identityHudHex } from "@/src/palette/identity";
-import { StatusMark } from "@/components/inspector/parts";
+import { IdentityDot, StatusMark } from "@/components/inspector/parts";
+import { SELECTED_ROW, SelectedRowMark } from "@/components/selection";
 import { ccToFlag } from "@/src/util/format";
 import { hoverKeyOf } from "@/src/data/hoverSubject";
 import { subjectPairing } from "@/components/useSubjectPairing";
@@ -28,7 +33,6 @@ export default function GeoExplore() {
   const hoverNodeId = useStore((s) => s.hoverNodeId);
   const setFilter = useStore((s) => s.setFilter);
   const filter = useStore((s) => s.filter);
-  const setMode = useStore((s) => s.setMode);
   const [collapsed, setCollapsed] = useState(false);
 
   // Selecting a node here mirrors clicking it on the globe (Engine._handleClick): set the
@@ -67,13 +71,22 @@ export default function GeoExplore() {
   const drill = (cc: string) => setCountry(country === cc ? null : cc);
 
   // Selection's nodes grouped by country **name** — the join key both the leaderboard and the
-  // node list derive from `geo.country` (`cc` can be absent, the name can't).
+  // node list derive from `geo.country` (`cc` can be absent, the name can't). Each country's
+  // rows sort ALPHABETICALLY by their displayed primary (the city; the label fallback for
+  // city-less rows), locale-aware, with the node id as a stable tiebreaker so co-located
+  // nodes (same city) keep one deterministic order across refreshes.
   const nodesByCountry = useMemo(() => {
     const m = new Map<string, NodeRow[]>();
     for (const r of selNodes) {
       const key = r.country || "Unknown";
       (m.get(key) ?? m.set(key, []).get(key)!).push(r);
     }
+    for (const rows of m.values())
+      rows.sort(
+        (a, b) =>
+          (a.city || a.label).localeCompare(b.city || b.label, undefined, { sensitivity: "base" }) ||
+          (a.id || "").localeCompare(b.id || ""),
+      );
     return m;
   }, [selNodes]);
 
@@ -86,57 +99,82 @@ export default function GeoExplore() {
   const selLayer = sel ? (sel.kind === "metanode" ? sel.node?.layer ?? null : sel.kind) : null;
 
   return (
-    <aside id="geoexplore" className={"panel" + (collapsed ? " collapsed" : "")}>
-      <PanelHead
+    <Card
+      asChild
+      className="sig-right flex flex-col min-h-0 flex-[1_1_auto] gap-0 p-0 [--spine:var(--filter-accent,var(--primary))]"
+    >
+      <aside id="geoexplore">
+      <CardHead
+        panel
+        icon={EXPLORE_ICON}
         title="Nodes by country"
         eyebrow="Geography · explore"
         collapsed={collapsed}
         onToggle={() => setCollapsed((c) => !c)}
       />
-      <div className="geo-body panel-body">
+      <div className={cn("flex flex-col min-h-0 flex-[1_1_auto]", collapsed && "hidden")}>
         {/* The footprint's headline figures (Nodes / Countries / Ready) live in the top-bar
             vitals now; this card is purely the country→nodes accordion. */}
         {quietEmpty ? (
-          <div className="geo-quiet-empty">
-            <span className="st-standby-dim" aria-hidden><span className="st-standby-node" /></span>
-            <p className="geo-qe-title">No locatable nodes</p>
-            <p className="geo-qe-line">{tickerOrName} has no validators we can place on the map right now. It still appears in the Hypergraph.</p>
-            <button className="geo-qe-jump" onClick={() => setMode("hyper")}>See it in the Hypergraph →</button>
+          // Quiet-empty, in the standard LEFT-ALIGNED card/hint typography (the old centered
+          // block — plus a stray absolutely-positioned standby dot that escaped its unsized
+          // wrapper — read as a bolt-on). Same padding as the country list it stands in for.
+          // One message, no jump link (user refinement: the "See it in the Hypergraph →" link
+          // was removed — the explanation already says where the metagraph still appears).
+          <div className="pt-2 px-[14px] pb-3">
+            <p className="text-body text-foreground m-0 mb-1">No locatable nodes</p>
+            <p className="text-label text-muted-foreground m-0">{tickerOrName} has no validators we can place on the map right now. It still appears in the Hypergraph.</p>
           </div>
         ) : (
-        <div className="geo-list">
+        <div className="flex-[1_1_auto] min-h-0 overflow-y-auto pt-1.5 px-[14px] pb-2 cmd-list-scroll">
           {rows.map((c) => {
             const open = c.cc === country;
             const nodes = nodesByCountry.get(c.country) ?? [];
             return (
-              <div key={c.cc} className={"geo-c" + (open ? " open" : "")}>
+              <div key={c.cc} className={cn(open && "bg-wash-faint rounded-btn my-0.5")}>
                 <button
                   type="button"
-                  className={"lb-row lb-row--btn geo-c-row" + (open ? " active" : "")}
+                  className={cn(
+                    "flex items-center gap-2.5 w-full text-left text-body border-none bg-transparent cursor-pointer py-[5px] px-1.5 -mx-1.5 rounded-sm transition-[background] duration-150",
+                    "hover:bg-wash-hover",
+                    "focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--primary)] focus-visible:outline-offset-[-2px]",
+                    // The drilled country row wears the same shared selection language as the
+                    // picker's committed row (SELECTED_ROW) — no ✓ though: an open accordion's
+                    // state cue is its ▾ chevron, not a selection check.
+                    open && SELECTED_ROW,
+                  )}
                   aria-expanded={open}
                   onClick={() => drill(c.cc)}
                 >
-                  <span className="lb-flag">{ccToFlag(c.cc)}</span>
-                  <span className="lb-name" title={c.country}>
+                  <span className="text-label w-[17px] text-center flex-none">{ccToFlag(c.cc)}</span>
+                  <span className="flex-none w-24 text-body text-foreground-dim whitespace-nowrap overflow-hidden text-ellipsis" title={c.country}>
                     {c.country}
                   </span>
-                  <span className="lb-bar">
+                  <span className="flex-1 h-[7px] rounded-xs bg-white/[0.06] overflow-hidden">
                     <span
+                      className="block h-full rounded-xs"
                       style={{
                         width: `${Math.round((c.count / max) * 100)}%`,
-                        ...(barHue ? { ["--lb-bar-fill" as string]: barHue } : {}),
+                        background: barHue ?? "linear-gradient(90deg, var(--core-l0), var(--primary))",
+                        boxShadow: `0 0 6px color-mix(in oklch, ${barHue ?? "var(--primary)"} 40%, transparent)`,
                       }}
                     />
                   </span>
-                  <span className="lb-count">{c.count}</span>
-                  <span className="geo-c-caret">{open ? "▾" : "▸"}</span>
+                  <span className="flex-none w-[26px] text-right text-body tabular-nums font-semibold">{c.count}</span>
+                  <ChevronRight
+                    aria-hidden
+                    className={cn(
+                      "size-3.5 flex-none transition-transform motion-reduce:transition-none",
+                      open ? "rotate-90 text-foreground" : "text-muted-foreground",
+                    )}
+                  />
                 </button>
 
                 {open && (
                   // Leaving the node list clears the globe hover-glow.
-                  <div className="geo-c-nodes" onMouseLeave={() => setHoverNodeId(null)}>
+                  <div className="mb-1.5 ml-[9px] py-0.5 pl-3 border-l border-border" onMouseLeave={() => setHoverNodeId(null)}>
                     {nodes.length === 0 ? (
-                      <p className="geo-c-empty">No locatable nodes here yet.</p>
+                      <p className="mt-1 mx-1 mb-1.5 text-label text-muted-foreground">No locatable nodes here yet.</p>
                     ) : (
                       nodes.map((r, i) => {
                         const on =
@@ -149,17 +187,46 @@ export default function GeoExplore() {
                         return (
                           <button
                             key={r.label + i}
-                            className={"nb-row" + (on ? " active" : "") + (pair.paired ? " " + pair.className : "")}
+                            className={cn(
+                              // `relative pr-7` reserves the picker's trailing ✓ slot on every
+                              // row, so the status column doesn't shift when a node is selected.
+                              "nb-row relative flex items-center gap-2 w-full py-[5px] pl-2 pr-7 my-px rounded-sm border border-transparent bg-transparent cursor-pointer text-left text-foreground-dim transition-colors duration-[140ms]",
+                              "hover:bg-wash-hover hover:text-foreground",
+                              "focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--primary)] focus-visible:outline-offset-[-2px]",
+                              // The selected node row = the SAME shared selection language as the
+                              // filter picker's committed row (user-unified). Box-shadow based, so
+                              // the identity-hued `.nb-row.subject-paired` hover wash (background/
+                              // border) tints UNDER it while paired and the mark returns untouched.
+                              on && SELECTED_ROW,
+                              pair.paired && pair.className,
+                            )}
                             style={pair.style}
                             title={`${r.label} · ${r.state ?? "—"}`}
                             onClick={() => selectNode(r.pick)}
                             onMouseEnter={pair.onMouseEnter}
                           >
-                            <span className="nb-dot" style={{ background: rowHue, color: rowHue }} aria-hidden />
-                            <span className={"nb-label" + (r.id ? " insp-hash" : "")}>
-                              {r.id ? shortHash(r.id) : r.label}
-                            </span>
-                            <StatusMark state={r.state} />
+                            <IdentityDot hue={rowHue} />
+                            {/* Location-first (matches the node CARD's title/subtitle pattern):
+                                the CITY is the row's primary (the country is the accordion group),
+                                with the truncated id as a subtle mono secondary — it stays visible
+                                so co-located nodes (same city) remain distinguishable. Fallback:
+                                no resolved city → the id (mono) is the primary, as before. */}
+                            {r.city ? (
+                              <span className="flex-1 min-w-0 flex items-baseline gap-1.5">
+                                <span className="flex-none text-body whitespace-nowrap">{r.city}</span>
+                                {r.id && (
+                                  <span className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap font-mono tabular-nums text-label text-muted-foreground">
+                                    {shortHash(r.id)}
+                                  </span>
+                                )}
+                              </span>
+                            ) : (
+                              <span className={cn("flex-1 overflow-hidden text-ellipsis whitespace-nowrap tabular-nums text-body", r.id && "font-mono")}>
+                                {r.id ? shortHash(r.id) : r.label}
+                              </span>
+                            )}
+                            <span className="ml-auto flex-none"><StatusMark state={r.state} /></span>
+                            {on && <SelectedRowMark className="absolute right-2" />}
                           </button>
                         );
                       })
@@ -172,8 +239,9 @@ export default function GeoExplore() {
         </div>
         )}
 
-        {!quietEmpty && <div className="lb-foot">Click a country to drill in.</div>}
+        {!quietEmpty && <div className="pt-[10px] px-4 pb-3 text-label text-muted-foreground">Click a country to drill in.</div>}
       </div>
-    </aside>
+      </aside>
+    </Card>
   );
 }
