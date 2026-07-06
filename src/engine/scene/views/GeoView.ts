@@ -95,8 +95,8 @@ function makeLandTexture(features: LandFeature[]): THREE.DataTexture {
   // holes robustly); each polygon is drawn three times at x−W / x / x+W so a seam-crossing
   // ring simply paints its overflow into the neighbouring copy; pole-encircling rings
   // (Antarctica) are closed along the pole edge so the cap reaches the pole.
-  g.fillStyle = "rgb(26,26,26)"; // faint resting wash (~0.10) — the surface stays airy, not solid;
-                                 // the fine grid does the reading, the fill is barely a whisper
+  g.fillStyle = "rgb(8,8,8)"; // the surface FILL (wash between grid lines) — kept nearly transparent so
+                              // the land reads as a wireframe grid, not a solid glowing surface
   // Unwrap a ring's longitudes into a continuous run (accumulate the shortest step) so a
   // seam-crosser stays one monotonic path; returns [lon, lat] pairs in absolute (possibly
   // out-of-[-180,180]) longitude.
@@ -169,7 +169,8 @@ function makeLandTexture(features: LandFeature[]): THREE.DataTexture {
   // source-atop keeps the lines ONLY where land is painted (alpha is still live HERE, on the
   // working canvas — it's flattened away below).
   g.globalCompositeOperation = "source-atop";
-  g.strokeStyle = "rgb(34,34,34)"; // very subtle grid — barely above the fill (26), a faint hint of mesh
+  g.strokeStyle = "rgb(45,45,45)"; // the grid LINES — kept subtly above the near-transparent fill so
+                                   // the wireframe reads (this is the stroke, not the fill)
   g.lineWidth = 1.0;                   // 1px at 4096 = a very FINE hairline (crisp, not fuzzy)
   const STEP = 1.5;                    // DENSE 1.5° graticule — a delicate mesh, not a coarse cage
   for (let lat = -90 + STEP; lat < 90; lat += STEP) {

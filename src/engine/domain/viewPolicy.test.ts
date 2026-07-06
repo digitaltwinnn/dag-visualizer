@@ -31,8 +31,8 @@ describe("VIEW_POLICIES", () => {
     for (const m of FLAT_MODES) expect(VIEW_POLICIES[m].morph).toBe("toHyper");
   });
 
-  it("uses the linear depth fog ONLY in ledger", () => {
-    for (const m of MODES) expect(VIEW_POLICIES[m].fog).toBe(m === "ledger" ? "ledgerLinear" : "base");
+  it("uses base scene fog in every view (the ledgerLinear depth fade is currently disabled — trial)", () => {
+    for (const m of MODES) expect(VIEW_POLICIES[m].fog).toBe("base");
   });
 
   it("shows the ledger chamber ONLY in ledger", () => {

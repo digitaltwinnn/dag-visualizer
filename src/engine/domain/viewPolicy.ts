@@ -85,7 +85,7 @@ export const VIEW_POLICIES: Record<Mode, ViewPolicy> = {
     show: { hyperFurniture: false, globeSurface: true, ledger: true },
     pickSources: ["ledger", "globe"],
     dofEligible: false,
-    fog: "ledgerLinear",
+    fog: "base", // (trial) normal scene fog instead of the custom "ledgerLinear" depth fade
   },
   status: FLAT,
   transactions: FLAT,
