@@ -12,6 +12,7 @@ import { Globe } from "./scene/Globe";
 import { LedgerView } from "./scene/views/LedgerView";
 import { loadGeoCache, resolveMissing } from "@/src/data/geoResolve";
 import { METAGRAPHS } from "@/src/engine/config";
+import { VIEW_POLICIES } from "./domain/viewPolicy";
 import type { GlobalSnapshot, PickDescriptor } from "@/src/data/types";
 import type {
   ClusterNode,
@@ -343,6 +344,10 @@ export class Engine {
   // ---- view + filter (ports ui.setMode / _applyFilter / camera focus) ----
   setMode(mode: Mode) {
     this.mode = mode;
+    const policy = VIEW_POLICIES[mode];
+    // View-derived sim gates → the scene modules (the render loop reads the rest of the policy).
+    this.globe.setSimFlags(policy.sims);
+    this.layers.setHubOrbits(policy.sims.hubOrbits);
     // Stronger DEPTH fog for the ledger trail — the oldest blocks recede + fog into the background
     // (that's the "old blocks fade" effect, depth-based, not a per-block hack). Restore the scene's
     // base FogExp2 (tuned for hyper/geo) on every other view.
@@ -350,7 +355,7 @@ export class Engine {
       this._baseFog = this.ctx.scene.fog;
       this._ledgerFog = new THREE.Fog(this._baseFog ? this._baseFog.color.getHex() : 0x05060e, 46, 70);
     }
-    this.ctx.scene.fog = mode === "ledger" ? this._ledgerFog : this._baseFog;
+    this.ctx.scene.fog = policy.fog === "ledgerLinear" ? this._ledgerFog : this._baseFog;
     // Snapshots view reuses the SAME hub/node meshes, laid out into planar rows. Toggle that
     // layout on the meshes (off restores the orbit/globe layout) and lock orbit so it reads 2D.
     const inLedger = mode === "ledger";
@@ -510,13 +515,16 @@ export class Engine {
   }
 
   // ---- picking (ports ui.js _pick / _pickablesFor / _onClick) ----
+  // Resolve the view policy's pick sources to the actual mesh pools. Unlisted sources / flat views
+  // (empty pickSources) raycast nothing. Order is immaterial — the raycaster sorts hits by distance.
   private _pickablesFor(): THREE.Object3D[] {
-    if (this.mode === "hyper") return this.layers.pickables.concat(this.globe.pickables);
-    if (this.mode === "geo") return this.globe.pickables;
-    // Ledger: the centered snapshot (snapshot pick) + the reused producer dots (metanode/validator
-    // picks → filter into that column).
-    if (this.mode === "ledger") return this.ledger.pickables.concat(this.globe.pickables);
-    return []; // placeholder views: nothing pickable
+    const out: THREE.Object3D[] = [];
+    for (const src of VIEW_POLICIES[this.mode].pickSources) {
+      if (src === "globe") out.push(...this.globe.pickables);
+      else if (src === "layers") out.push(...this.layers.pickables);
+      else if (src === "ledger") out.push(...this.ledger.pickables);
+    }
+    return out;
   }
 
   private _pickAt(e: MouseEvent): PickDescriptor | null {
@@ -707,45 +715,48 @@ export class Engine {
       this.stats?.begin();
       const dt = Math.min(this.clock.getDelta(), 0.05);
 
+      const policy = VIEW_POLICIES[this.mode];
+      const show = policy.show;
+
       // Ledger freezes morph at the view we entered from, so the reused node meshes fly in from
       // THAT layout (globe.ledgerT drives the lane fly-in instead). hyper/geo ease as usual.
-      const target = this.mode === "geo" ? 1 : this.mode === "ledger" ? this.morph : 0;
+      const target = policy.morph === "toGeo" ? 1 : policy.morph === "frozen" ? this.morph : 0;
       this.morph += (target - this.morph) * Math.min(1, dt * 1.1);
       this.layers.root.visible = this.morph < 0.985;
       this.layers.root.scale.setScalar(Math.max(0.0001, 1 - this.morph));
 
       this.globe.setMorph(this.morph);
-      // Stars/nebula belong to geo only; in ledger force the plain hyper-end backdrop (no starfield).
-      this.ctx.background.update(dt, this.mode === "ledger" ? 0 : this.morph);
+      // Stars/nebula belong to the geo end; forcing a 0 morph (ledger/flat) gives the plain backdrop.
+      this.ctx.background.update(dt, show.starfield ? this.morph : 0);
       this.layers.update(dt, this.morph);
       this.globe.update(dt);
       this._updateTween(dt);
       this.ctx.controls.update();
 
-      // The Snapshots view REUSES the hub/node meshes (placed into planar rows by layers/globe) +
-      // its own centered live snapshot; only the hyper core is hidden (the snapshot stands in for
-      // it). The placeholder views (status/transactions/staking) stay fully flat (scene hidden).
-      const showLedger = this.mode === "ledger";
-      const flat = this.mode !== "hyper" && this.mode !== "geo" && !showLedger;
-      if (flat) {
-        this.layers.root.visible = false;
+      // Geometry visibility, driven by the view policy's `show.*`:
+      //  - !hyperFurniture: the hyper root + core are force-managed — ledger keeps the root as its
+      //    metagraph-L0 row (show.ledger), flat hides it; the core is hidden in both (the ledger's
+      //    centred snapshot stands in for Global L0). When hyperFurniture is on (hyper/geo) the
+      //    morph-driven root.visible above + HyperView's own core reveal stand.
+      //  - globeSurface: the shared node group (+ earth surface).
+      //  - canvas: the backdrop mesh (ledger keeps the plain backdrop; only flat hides it).
+      //  - ledger: the settlement chamber.
+      if (!show.hyperFurniture) {
+        this.layers.root.visible = show.ledger; // ledger: hubs become the metagraph-L0 row; flat: hidden
         this.layers.coreGroup.visible = false;
-      } else if (showLedger) {
-        this.layers.root.visible = true; // hubs become the metagraph-L0 row
-        this.layers.coreGroup.visible = false; // the centered snapshot represents Global L0
       }
-      this.globe.group.visible = !flat; // ledger shows the reused node dots
-      this.ctx.background.mesh.visible = !flat; // ledger keeps the starfield/backdrop
-      this.ledger.group.visible = showLedger;
-      if (showLedger) {
+      this.globe.group.visible = show.globeSurface;
+      this.ctx.background.mesh.visible = policy.canvas;
+      this.ledger.group.visible = show.ledger;
+      if (show.ledger) {
         if (this._ledgerDirty) this._refreshLedger();
         this.ledger.update(dt);
       }
 
-      // Depth of field: only a single focused metagraph in the Hypergraph (not all / the DAG core).
-      const metaSel = this.mode === "hyper" && this.filter !== "all" && this.filter !== "dag";
+      // Depth of field: only a single focused metagraph, and only where the policy allows it (hyper).
+      const metaSel = this.filter !== "all" && this.filter !== "dag";
       const dofMix = THREE.MathUtils.clamp(1 - (this.morph - 0.4) / 0.2, 0, 1);
-      this.ctx.dof.enabled = metaSel && dofMix > 0.001;
+      this.ctx.dof.enabled = policy.dofEligible && metaSel && dofMix > 0.001;
       if (this.ctx.dof.enabled) {
         const meta = this.layers.metas.find((x) => x.cfg.id === this.filter);
         const focusTarget = meta

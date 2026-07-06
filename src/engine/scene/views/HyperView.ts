@@ -41,6 +41,9 @@ export class HyperView {
   clock: number;
   focusId: string | null;
   ledger: boolean;
+  // View-derived gate from VIEW_POLICIES: when false the hub constellation holds still (folds into
+  // `frozen` in update, alongside — but independent of — the focusId freeze). Only hyper leaves it on.
+  hubOrbits: boolean;
   coreGroup!: THREE.Group;
   core!: THREE.Mesh;
   halo!: THREE.Mesh;
@@ -72,6 +75,15 @@ export class HyperView {
     // In the Snapshots (ledger) view the hubs (and their tethers/pulses) are hidden — ledger.js
     // draws the metagraph snapshot blocks itself. Toggled by the engine via setLedger.
     this.ledger = false;
+
+    // Hub orbit motion runs by default; the Engine gates it per view via setHubOrbits.
+    this.hubOrbits = true;
+  }
+
+  // View-derived hub-orbit gate from VIEW_POLICIES (Engine calls this on mode change). When off, the
+  // hub constellation freezes; in geo/flat the hubs are already invisible so this is a no-op there.
+  setHubOrbits(on: boolean) {
+    this.hubOrbits = on;
   }
 
   // Hide/show the metagraph hubs + their tethers/pulses for the Snapshots view. Hidden state is
@@ -229,7 +241,9 @@ export class HyperView {
     // whole constellation holds still — every hub's orbit AND its own axis spin freeze, not just
     // the focused one — so nothing drifts/spins around the framed selection. The node spheres still
     // tumble (globe.js) and data-driven anchor pulses still fire; only the hub motion stops.
-    const frozen = this.focusId != null;
+    // The constellation holds still when a hub is focused (focusId) OR the view policy turns hub
+    // orbits off (hubOrbits) — the two freezes are independent but drive the same hold.
+    const frozen = this.focusId != null || !this.hubOrbits;
     for (const m of this.metas) {
       if (!frozen) m.orbit += dt * 0.03;
       const a = m.orbit;

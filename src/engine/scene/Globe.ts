@@ -76,6 +76,10 @@ export class Globe implements GeoViewHost {
   clock = 0;
   private spin: SpinState | null = null;
   private ledger = false;
+  // View-derived sim gates, set by the Engine from VIEW_POLICIES (see setSimFlags). arcs replaces
+  // the old `!this.ledger` gate on the travelling packets; globeSpin gates the idle group spin.
+  private simArcs = true;
+  private simSpin = true;
   countryFilter: string | null = null; // cc to drill into (combined with the network filter), or null
   private countryMix = 0;              // eased 0..1: how strongly the country dim is applied
   l0Count = 0;
@@ -127,6 +131,13 @@ export class Globe implements GeoViewHost {
     // The geo globe surface (body, graticule, atmosphere, continents) — it sets the surface handles
     // back on `this` for the morph/fade loop and pushes its fade materials into this.geoFades.
     buildGeoView(this);
+  }
+
+  // View-derived sim gates from VIEW_POLICIES (the Engine calls this on every mode change). Only the
+  // arcs + globeSpin flags concern the Globe; the rest of the sims object is ignored here.
+  setSimFlags(sims: { arcs: boolean; globeSpin: boolean }): void {
+    this.simArcs = sims.arcs;
+    this.simSpin = sims.globeSpin;
   }
 
   // The wall is always the fixed ice-blue. Kept as a setter so the Engine caller doesn't change.
@@ -516,8 +527,8 @@ export class Globe implements GeoViewHost {
         this.group.rotation.y = s.from + (s.to - s.from) * e;
         this.group.rotation.x = (s.fromX || 0) + ((s.toX || 0) - (s.fromX || 0)) * e;
       }
-    } else {
-      this.group.rotation.y += dt * 0.03; // idle spin
+    } else if (this.simSpin) {
+      this.group.rotation.y += dt * 0.03; // idle spin (gated by the view policy's globeSpin)
       // Ease any focus tilt back to level when idling.
       if (this.group.rotation.x) this.group.rotation.x += (0 - this.group.rotation.x) * Math.min(1, dt * 2.2);
     }
@@ -526,7 +537,7 @@ export class Globe implements GeoViewHost {
 
     // Travelling packets: step the sim (a hard no-op when the gate is off — the ledger "red dots"
     // fix), then write its buffers only while the gate is on (geo view, past the morph midpoint).
-    const arcEnabled = !this.ledger && m > 0.5;
+    const arcEnabled = this.simArcs && m > 0.5;
     const { retargeted } = this.arcSim.step(dt, arcEnabled);
     if (arcEnabled && this.arcs.hasArcs) this.arcs.writeFrame(this.arcSim, retargeted);
 
