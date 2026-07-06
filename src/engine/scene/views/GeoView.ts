@@ -59,7 +59,7 @@ function buildGraticule(globe: GeoViewHost) {
   // The sea graticule (grid lines OVER the ocean): very subtle on purpose — a faint hint so the
   // continents (the raised, gridded land) clearly lead. Accent hue, kept calm by a low fade opacity.
   const mat = new THREE.LineBasicMaterial({ color: globe.geoColor, transparent: true, opacity: 0 });
-  globe.geoFades.push({ mat, base: 0.05 });
+  globe.geoFades.push({ mat, base: 0.03 });
   globe.group.add(new THREE.LineSegments(geo, mat));
 }
 
@@ -95,7 +95,7 @@ function makeLandTexture(features: LandFeature[]): THREE.DataTexture {
   // holes robustly); each polygon is drawn three times at x−W / x / x+W so a seam-crossing
   // ring simply paints its overflow into the neighbouring copy; pole-encircling rings
   // (Antarctica) are closed along the pole edge so the cap reaches the pole.
-  g.fillStyle = "rgb(8,8,8)"; // the surface FILL (wash between grid lines) — kept nearly transparent so
+  g.fillStyle = "rgb(9,9,9)"; // the surface FILL (wash between grid lines) — kept nearly transparent so
                               // the land reads as a wireframe grid, not a solid glowing surface
   // Unwrap a ring's longitudes into a continuous run (accumulate the shortest step) so a
   // seam-crosser stays one monotonic path; returns [lon, lat] pairs in absolute (possibly
