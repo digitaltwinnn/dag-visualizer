@@ -21,18 +21,16 @@ export interface ViewPolicy {
   //  - arcs:      travelling-packet arcs step + write (Globe ANDs with `morph > 0.5`).
   //  - hubOrbits: HyperView hub orbit / spin (folds into its `frozen`; the focusId freeze is separate).
   //  - globeSpin: Globe's idle group spin (replaces the old `!this.ledger` gate on it).
-  //  - twinkle:   the geo starfield twinkle (descriptive — the shader's uTime advances unconditionally;
-  //               visible stars are gated by `show.starfield` feeding the morph into the backdrop).
-  sims: { arcs: boolean; hubOrbits: boolean; globeSpin: boolean; twinkle: boolean };
+  sims: { arcs: boolean; hubOrbits: boolean; globeSpin: boolean };
   // What geometry is shown:
   //  - hyperFurniture: the Hypergraph hub furniture + core participate in the morph-driven visibility
   //                    (false → root/core are force-managed: ledger keeps root as the meta-L0 row,
   //                    flat hides both).
   //  - globeSurface:   the globe group (shared nodes + earth surface) is visible.
-  //  - starfield:      the backdrop receives the live morph (stars fade with it) rather than a forced 0.
   //  - ledger:         the ledger chamber group is visible (and it keeps the hyper root as its
   //                    metagraph-L0 row).
-  show: { hyperFurniture: boolean; globeSurface: boolean; starfield: boolean; ledger: boolean };
+  // (There is no skydome/starfield — the scene's solid clear colour + fog are the whole backdrop.)
+  show: { hyperFurniture: boolean; globeSurface: boolean; ledger: boolean };
   // Which mesh pools this view raycasts — resolved to `THREE.Object3D[]` by `Engine._pickablesFor`.
   // Unlisted = pick nothing. Order is immaterial (the raycaster sorts hits by distance).
   pickSources: Array<"globe" | "layers" | "ledger">;
@@ -49,8 +47,8 @@ export interface ViewPolicy {
 const FLAT: ViewPolicy = {
   canvas: false,
   morph: "toHyper",
-  sims: { arcs: false, hubOrbits: false, globeSpin: false, twinkle: false },
-  show: { hyperFurniture: false, globeSurface: false, starfield: false, ledger: false },
+  sims: { arcs: false, hubOrbits: false, globeSpin: false },
+  show: { hyperFurniture: false, globeSurface: false, ledger: false },
   pickSources: [],
   dofEligible: false,
   fog: "base",
@@ -62,33 +60,29 @@ export const VIEW_POLICIES: Record<Mode, ViewPolicy> = {
   hyper: {
     canvas: true,
     morph: "toHyper",
-    // starfield:true here just passes the (0) morph through to the backdrop — no stars are
-    // actually visible at morph=0; twinkle is the node shimmer and is geo-only.
-    sims: { arcs: false, hubOrbits: true, globeSpin: true, twinkle: false },
-    show: { hyperFurniture: true, globeSurface: true, starfield: true, ledger: false },
+    sims: { arcs: false, hubOrbits: true, globeSpin: true },
+    show: { hyperFurniture: true, globeSurface: true, ledger: false },
     pickSources: ["globe", "layers"],
     dofEligible: true,
     fog: "base",
   },
   // Footprint: the holographic globe + travelling packets; picks the globe nodes only.
-  // starfield OFF by design (geo design session): the hologram floats in the clean flat
-  // backdrop — the same 0 the ledger passes — not a night sky.
   geo: {
     canvas: true,
     morph: "toGeo",
-    sims: { arcs: true, hubOrbits: false, globeSpin: true, twinkle: true },
-    show: { hyperFurniture: true, globeSurface: true, starfield: false, ledger: false },
+    sims: { arcs: true, hubOrbits: false, globeSpin: true },
+    show: { hyperFurniture: true, globeSurface: true, ledger: false },
     pickSources: ["globe"],
     dofEligible: false,
     fog: "base",
   },
-  // Snapshots: the settlement chamber. Morph frozen (nodes fly into lanes), starfield off, linear
-  // depth fog fades the trail; picks the centred snapshot + the reused producer dots.
+  // Snapshots: the settlement chamber. Morph frozen (nodes fly into lanes), linear depth fog fades
+  // the trail; picks the centred snapshot + the reused producer dots.
   ledger: {
     canvas: true,
     morph: "frozen",
-    sims: { arcs: false, hubOrbits: false, globeSpin: false, twinkle: false },
-    show: { hyperFurniture: false, globeSurface: true, starfield: false, ledger: true },
+    sims: { arcs: false, hubOrbits: false, globeSpin: false },
+    show: { hyperFurniture: false, globeSurface: true, ledger: true },
     pickSources: ["ledger", "globe"],
     dofEligible: false,
     fog: "ledgerLinear",

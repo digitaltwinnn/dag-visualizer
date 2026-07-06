@@ -735,8 +735,6 @@ export class Engine {
       this.layers.root.scale.setScalar(Math.max(0.0001, 1 - this.morph));
 
       this.globe.setMorph(this.morph);
-      // Stars/nebula belong to the geo end; forcing a 0 morph (ledger/flat) gives the plain backdrop.
-      this.ctx.background.update(dt, show.starfield ? this.morph : 0);
       this.layers.update(dt, this.morph);
       this.globe.update(dt);
       this._updateTween(dt);
@@ -748,14 +746,13 @@ export class Engine {
       //    centred snapshot stands in for Global L0). When hyperFurniture is on (hyper/geo) the
       //    morph-driven root.visible above + HyperView's own core reveal stand.
       //  - globeSurface: the shared node group (+ earth surface).
-      //  - canvas: the backdrop mesh (ledger keeps the plain backdrop; only flat hides it).
       //  - ledger: the settlement chamber.
+      // (There is no skydome — the scene's solid clear colour + fog are the whole backdrop.)
       if (!show.hyperFurniture) {
         this.layers.root.visible = show.ledger; // ledger: hubs become the metagraph-L0 row; flat: hidden
         this.layers.coreGroup.visible = false;
       }
       this.globe.group.visible = show.globeSurface;
-      this.ctx.background.mesh.visible = policy.canvas;
       this.ledger.group.visible = show.ledger;
       if (show.ledger) {
         if (this._ledgerDirty) this._refreshLedger();

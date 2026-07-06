@@ -7,7 +7,6 @@ import { EffectComposer } from "three/addons/postprocessing/EffectComposer.js";
 import { RenderPass } from "three/addons/postprocessing/RenderPass.js";
 import { UnrealBloomPass } from "three/addons/postprocessing/UnrealBloomPass.js";
 import { BokehPass, type BokehPassParamters } from "three/addons/postprocessing/BokehPass.js";
-import { createBackground, type Background } from "./objects/Background";
 import type { SceneColors } from "../sceneColors";
 
 // @types/three types BokehPass.uniforms as a bare `object`; the engine reads
@@ -24,7 +23,6 @@ export interface SceneCtx {
   controls: OrbitControls;
   composer: EffectComposer;
   dof: DofPass;
-  background: Background;
   resize(): void;
 }
 
@@ -65,8 +63,6 @@ export function createScene(canvas: HTMLCanvasElement, colors: SceneColors): Sce
   const rim = new THREE.PointLight(colors.coreL1, 1.4, 260);
   rim.position.set(40, -20, -30);
   scene.add(rim);
-
-  const background = createBackground(scene, colors);
 
   // Postprocessing — depth of field then bloom.
   const composer = new EffectComposer(renderer);
@@ -109,5 +105,5 @@ export function createScene(canvas: HTMLCanvasElement, colors: SceneColors): Sce
     composer.setSize(window.innerWidth, window.innerHeight);
   }
 
-  return { scene, camera, renderer, controls, composer, dof, background, resize };
+  return { scene, camera, renderer, controls, composer, dof, resize };
 }
