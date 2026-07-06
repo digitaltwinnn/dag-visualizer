@@ -315,16 +315,18 @@ export class LedgerModel {
 
 ---
 
-### Task 13: Scene — LedgerChamber over LedgerModel
+### Task 13: Scene — LedgerView over LedgerModel
+
+*(Renamed from LedgerChamber mid-execution: user-approved `scene/views/` + `scene/objects/` restructure landed after Task 12 — HyperFurniture→views/HyperView, GlobeSurface→views/GeoView, NodeFabric/Arcs/Heatmap/Background→objects/.)*
 
 **Files:**
-- Create: `src/engine/scene/LedgerChamber.ts`
+- Create: `src/engine/scene/views/LedgerView.ts`
 - Modify: `src/engine/Engine.ts` (import swap, drop `LedgerCtor`), `src/engine/boundary.ts` (delete `LedgerApi`)
 - Delete: `js/ledger.js`
 
 **Interfaces:**
 - Consumes: `LedgerModel` (Task 12), `config.ts`.
-- Produces: `class LedgerChamber` with boundary.ts's exact `LedgerApi` surface (group, sceneColors, pickables, setData, setGroupSizes, setSelected, setFilter, update, dispose). Owns: floors/panes/labels, centre block + trail meshes, the metagraph-trail InstancedMesh (incl. the `_metaLastDrawn` zero-sweep — keep verbatim), links buffer, pulse pool, rings. Every `update()` read of slot/lane/selection state goes through the model; `_gx`, `_dummy`, `_col`, `_q` stay module-scope scratch.
+- Produces: `class LedgerView` with boundary.ts's exact `LedgerApi` surface (group, sceneColors, pickables, setData, setGroupSizes, setSelected, setFilter, update, dispose). Owns: floors/panes/labels, centre block + trail meshes, the metagraph-trail InstancedMesh (incl. the `_metaLastDrawn` zero-sweep — keep verbatim), links buffer, pulse pool, rings. Every `update()` read of slot/lane/selection state goes through the model; `_gx`, `_dummy`, `_col`, `_q` stay module-scope scratch.
 
 - [ ] **Step 1:** Translate, splitting state (→ model, already landed) from meshes (→ chamber). `setData` calls `model.setData(...)` and spawns pulses/ring glows from the returned `TickChange[]` (same behaviour as today's `_anchorMetaBlock`/queue path).
 - [ ] **Step 2:** Engine import swap; delete `js/ledger.js`; boundary cleanup. `grep -rn "js/ledger" …` → zero hits.
@@ -336,7 +338,7 @@ export class LedgerModel {
 
 **Files:**
 - Create: `src/engine/domain/viewPolicy.ts`, `src/engine/domain/viewPolicy.test.ts`, `src/engine/layerBoundaries.test.ts`
-- Modify: `src/engine/Engine.ts`, `src/engine/scene/Globe.ts` (consume sim flags), `src/engine/scene/HyperFurniture.ts` (orbit flag)
+- Modify: `src/engine/Engine.ts`, `src/engine/scene/Globe.ts` (consume sim flags), `src/engine/scene/views/HyperView.ts` (orbit flag)
 
 **Interfaces:**
 - Produces:
