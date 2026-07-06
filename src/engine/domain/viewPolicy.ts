@@ -62,6 +62,8 @@ export const VIEW_POLICIES: Record<Mode, ViewPolicy> = {
   hyper: {
     canvas: true,
     morph: "toHyper",
+    // starfield:true here just passes the (0) morph through to the backdrop — no stars are
+    // actually visible at morph=0; twinkle is the node shimmer and is geo-only.
     sims: { arcs: false, hubOrbits: true, globeSpin: true, twinkle: false },
     show: { hyperFurniture: true, globeSurface: true, starfield: true, ledger: false },
     pickSources: ["globe", "layers"],

@@ -3,8 +3,9 @@ import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 
 // Enforces the layering carved out by the Engine refactor:
-//   domain/  = pure logic + data. No THREE addons, no scene/, no react, no store VALUE import
-//              (the `Mode` string-union TYPE is allowed via `import type`).
+//   domain/  = pure logic + data. THREE's math classes (Vector3, Color, …) are fine — the boundary
+//              forbids scene/, three/addons, react, and store VALUE imports (the `Mode` string-union
+//              TYPE is allowed via `import type`).
 //   scene/   = imperative THREE view code. Must not reach into the store or react (the Engine is
 //              the only bridge to Lane B; the scene is driven by plain data).
 // Reading the files with fs keeps this a cheap grep over real import lines — no bundler needed.
@@ -33,8 +34,10 @@ function importsOf(src: string): { spec: string; typeOnly: boolean }[] {
 
 describe("engine layer boundaries", () => {
   it("domain/ imports nothing from scene/, three/addons, react, or the store (except `import type { Mode }`)", () => {
+    const files = sourceFiles(join(HERE, "domain"));
+    expect(files.length).toBeGreaterThan(0);
     const bad: string[] = [];
-    for (const file of sourceFiles(join(HERE, "domain"))) {
+    for (const file of files) {
       const rel = file.slice(HERE.length + 1);
       for (const { spec, typeOnly } of importsOf(readFileSync(file, "utf8"))) {
         const isStore = spec === "@/src/store/store" || spec.startsWith("@/src/store/");
@@ -52,8 +55,10 @@ describe("engine layer boundaries", () => {
   });
 
   it("scene/ imports nothing from the store or react", () => {
+    const files = sourceFiles(join(HERE, "scene"));
+    expect(files.length).toBeGreaterThan(0);
     const bad: string[] = [];
-    for (const file of sourceFiles(join(HERE, "scene"))) {
+    for (const file of files) {
       const rel = file.slice(HERE.length + 1);
       for (const { spec } of importsOf(readFileSync(file, "utf8"))) {
         const forbidden =
