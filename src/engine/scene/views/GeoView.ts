@@ -169,7 +169,7 @@ function makeLandTexture(features: LandFeature[]): THREE.DataTexture {
   // source-atop keeps the lines ONLY where land is painted (alpha is still live HERE, on the
   // working canvas — it's flattened away below).
   g.globalCompositeOperation = "source-atop";
-  g.strokeStyle = "rgb(78,78,78)"; // subtle grid lines — a faint raster over the fill, not neon
+  g.strokeStyle = "rgb(42,42,42)"; // very subtle grid — barely above the fill (26), a faint hint of mesh
   g.lineWidth = 1.0;                   // 1px at 4096 = a very FINE hairline (crisp, not fuzzy)
   const STEP = 1.5;                    // DENSE 1.5° graticule — a delicate mesh, not a coarse cage
   for (let lat = -90 + STEP; lat < 90; lat += STEP) {
