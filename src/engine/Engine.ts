@@ -34,6 +34,9 @@ const resolveGeo = resolveMissing;
 
 // Camera presets: FOCI/hubFraming/geoFraming/easeInOutQuad now live in ./domain/cameraRig
 // (Task 15) — pure, allocation-free (writes into caller-provided out structs).
+// Global camera dolly-back applied to EVERY framing (all views) in _tweenTo/_snapTo — one lever to
+// sit the camera a touch wider without re-tuning each preset.
+const CAM_ZOOM = 1.15;
 
 // Imperative engine: owns the scene, the Hypergraph + globe, the render loop, the
 // camera-focus tweens, and the command surface React drives via the store. Ports
@@ -690,7 +693,9 @@ export class Engine {
   private _tweenTo(toPos: Vec, toTgt: Vec) {
     const tw = this._tween;
     tw.fromPos.copy(this.ctx.camera.position);
-    tw.toPos.copy(toPos);
+    // Dolly every framing back by CAM_ZOOM (push the position out from its target) — one global lever
+    // so all views sit a touch wider. Writes straight into tw.toPos, no extra allocation.
+    tw.toPos.subVectors(toPos, toTgt).multiplyScalar(CAM_ZOOM).add(toTgt);
     tw.fromTgt.copy(this.ctx.controls.target);
     tw.toTgt.copy(toTgt);
     tw.t = 0;
@@ -702,7 +707,7 @@ export class Engine {
   // is meant to appear already-oriented; tweening it in read as the planes swinging into place).
   private _snapTo(toPos: Vec, toTgt: Vec) {
     this._tween.active = false; // cancel any in-flight tween
-    this.ctx.camera.position.copy(toPos);
+    this.ctx.camera.position.subVectors(toPos, toTgt).multiplyScalar(CAM_ZOOM).add(toTgt); // same global dolly-back
     this.ctx.controls.target.copy(toTgt);
     this.ctx.controls.update();
   }
