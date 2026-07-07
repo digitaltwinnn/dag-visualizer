@@ -95,10 +95,17 @@ export class Engine {
   // Fired once, after the first frame actually renders (see start()'s loop) — lets callers
   // (SceneCanvas → store.engineReady) know the scene has painted, not just constructed.
   private _onReady?: () => void;
+  // Fired once the hypergraph scene is structurally complete — metagraph nodes AND the DAG core's
+  // own validator nodes both placed. SceneCanvas → store.sceneReady, which holds the boot overlay
+  // until then (a fully-formed reveal, no node pop-in). Tracked via the two _*NodesPlaced flags.
+  private _onSceneReady?: () => void;
+  private _metaNodesPlaced = false;
+  private _coreNodesPlaced = false;
 
-  constructor(canvas: HTMLCanvasElement, onReady?: () => void) {
+  constructor(canvas: HTMLCanvasElement, onReady?: () => void, onSceneReady?: () => void) {
     this.canvas = canvas;
     this._onReady = onReady;
+    this._onSceneReady = onSceneReady;
     // Read the structural palette from the CSS design tokens (app/globals.css) — the single source
     // of truth. Every scene module below is fed these; none hardcodes a structural colour. In dev,
     // warn if config.COLORS (the static mirror the non-DOM data/palette layer needs) drifts from the
@@ -283,10 +290,21 @@ export class Engine {
     }
   }
 
+  // Fire onSceneReady exactly once, when the scene is structurally complete: the metagraph nodes
+  // and the DAG core's own validator nodes have both been placed. Cheap to call on every placement
+  // path — it self-guards after the first fire.
+  private _maybeSceneReady() {
+    if (!this._onSceneReady || !this._metaNodesPlaced || !this._coreNodesPlaced) return;
+    const cb = this._onSceneReady;
+    this._onSceneReady = undefined;
+    cb();
+  }
+
   private _buildGlobe() {
     if (!this.dagCore || !Object.keys(this.geoMap).length) return;
     this.globe.setNodes(this.dagCore, this.geoMap);
-    this._applyMetagraphs();
+    this._coreNodesPlaced = true; // DAG core validator nodes are now in the scene
+    this._applyMetagraphs(); // fires _maybeSceneReady once meta nodes are also placed
     const ips = this.dagCore.nodes.map((n) => n.ip);
     resolveGeo(this.geoMap, ips, (m) => {
       this.geoMap = m;
@@ -299,11 +317,13 @@ export class Engine {
   private _applyMetagraphs() {
     if (!this.metaData || !Object.keys(this.geoMap).length) return;
     this.globe.setMetagraphs(this.metaData, this.geoMap);
+    this._metaNodesPlaced = true; // metagraph node shells are now in the scene
     this.ledger.setGroupSizes(this.globe.ledgerGroups); // size the Snapshots rings to the node counts
     this.applyFilter(false); // re-assert the filter's dimming on the new nodes — but DON'T move
     // the camera (this runs on every cluster/meta poll; moving it would reset the user's view).
     // metaList is published in refreshMeta (metagraph geo arrives with the route), so
     // we don't re-publish here — this runs on every cluster poll.
+    this._maybeSceneReady(); // reveal the boot overlay once the core nodes are also in
   }
 
   // Push EVERY metagraph from the route data (not just the geo-filtered globe list) to
