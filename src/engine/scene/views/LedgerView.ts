@@ -32,22 +32,19 @@ import type { SceneColors } from "../../sceneColors";
 import { LedgerModel, SLOT_SP, slotFade, curvePoint } from "../../domain/ledgerModel";
 import type { GlobalSnapshot, Anchor, PickDescriptor } from "@/src/data/types";
 
-// The glass floor heights (top→bottom): data producers · metagraph L1 · metagraph L0 · metagraph
-// snapshots · hypergraph (global) L0 · hypergraph (DAG) L1. All one colour — labels (not colour) name
-// them; the metagraph-snapshots floor is unlabelled (the snapshot blocks self-identify).
-// Full-width floor panes (top→bottom). No producers floor; the hypergraph-L0 level is NOT here — it's
-// built separately as a plane CUT along Z into 2/3 (hypergraph L0) + 1/3 (hypergraph L1 / DAG currency).
-const FLOOR_Y = [LEDGER.rowML1, LEDGER.rowML0, LEDGER.rowMSnap, LEDGER.rowGL0];
-
-// Short layer labels for the full-width floors. Two kinds: node/validator layers (metagraph L1/L0,
-// hypergraph L0) and snapshot/ledger layers (the L0 outputs). The DAG-L1 "hypergraph L1" label is
-// placed with its own currency plane (see _buildFloors), not here. Drawn at the front-left of each floor.
-const FLOOR_LABELS = [
-  { y: LEDGER.rowML1, text: "metagraph L1" },
-  { y: LEDGER.rowML0, text: "metagraph L0" },
-  { y: LEDGER.rowMSnap, text: "metagraph snapshots" },
-  { y: LEDGER.rowGL0, text: "global snapshots" },
+// Full-width floor panes (top→bottom), each with a stable layer id. The hypergraph-L0 level is built
+// separately (a plane CUT along Z into 2/3 hypergraph L0 = "hypl0" + a −Z 1/3 = "hypl1"). Layer NAMES
+// live in the Snapshots·Explore panel (LedgerPanel) — there is NO in-scene text. The ids let that
+// panel highlight one plane on click (setHighlight); the same ids are the panel's row keys.
+const FLOOR_LAYERS: { y: number; id: string }[] = [
+  { y: LEDGER.rowML1, id: "ml1" },
+  { y: LEDGER.rowML0, id: "ml0" },
+  { y: LEDGER.rowMSnap, id: "msnap" },
+  { y: LEDGER.rowGL0, id: "gl0" },
 ];
+// Floor-frame + edge-fill opacities at rest and when a plane is highlighted from the explore panel.
+const FLOOR_FRAME_OP = 0.13, FLOOR_FILL_OP = 0.02;
+const FLOOR_FRAME_HI = 0.6, FLOOR_FILL_HI = 0.14;
 
 const PULSE_MAX = 220;       // pooled travelling-pulse instances
 const PULSE_STAGGER = 0.035; // s between successive pulse emissions (a steady stream)
@@ -153,6 +150,8 @@ export class LedgerView {
   private _pulseMesh!: THREE.InstancedMesh;
 
   private _gL0Ring: THREE.Mesh;
+  // Per-plane materials keyed by layer id, so setHighlight() can brighten one floor (explore panel).
+  private _floorMats = new Map<string, { frame: THREE.LineBasicMaterial; fill: THREE.ShaderMaterial }>();
 
   constructor(scene: THREE.Scene, colors: SceneColors) {
     this._core = colors.core;
@@ -278,53 +277,52 @@ export class LedgerView {
     const D = 44;        // Z extent — tight to the lanes
     const cx = -14;      // shifted a touch forward (+X) so the L0/L1 node ring (radius ~3.5 at x≈0)
                          // fits inside the pane's front edge; the −X edge (−33) still clears the trail (~−29)
-    // Every floor is the SAME simple treatment: a sharp-edged, transparent bordered FRAME, plus a
-    // faint EDGE-WEIGHTED fill — barely-tinted right at the border, fading to fully transparent toward
-    // the centre — so the plane reads as a surface without a distracting sheet. Same --primary hue.
+    // Every floor is the SAME simple treatment: a sharp-edged transparent FRAME plus a faint,
+    // pixelated edge-weighted fill (quickly gone toward the centre). Each plane gets its OWN cloned
+    // materials, stored by layer id in `_floorMats`, so the explore panel can highlight ONE plane
+    // (setHighlight) — brighten its frame + fill — without touching the rest. No in-scene text.
     const frameMat = new THREE.LineBasicMaterial({
-      color: this._core, transparent: true, opacity: 0.13,
+      color: this._core, transparent: true, opacity: FLOOR_FRAME_OP,
       blending: THREE.AdditiveBlending, depthWrite: false,
     });
     const fillMat = new THREE.ShaderMaterial({
       transparent: true, depthWrite: false, side: THREE.DoubleSide, blending: THREE.AdditiveBlending,
-      uniforms: { uColor: { value: new THREE.Color(this._core) }, uOpacity: { value: 0.02 } },
+      uniforms: { uColor: { value: new THREE.Color(this._core) }, uOpacity: { value: FLOOR_FILL_OP } },
       vertexShader: `
         varying vec2 vP;
         void main() { vP = uv * 2.0 - 1.0; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
       fragmentShader: `
         uniform vec3 uColor; uniform float uOpacity; varying vec2 vP;
         void main() {
-          // Pixelated, not smooth: snap to a grid of cells, then quantize the alpha into steps so the
-          // faint edge fill reads as digital blocks rather than a soft gradient.
-          float GRID = 26.0;                             // pixel-cell resolution across the half-plane
-          vec2 cell = (floor(vP * GRID) + 0.5) / GRID;   // snap to cell centres → blocky
-          float e = max(abs(cell.x), abs(cell.y));       // per-cell edge distance (0 centre → 1 edge)
-          float a = smoothstep(0.82, 1.0, e);            // same quick edge falloff, now stepped by the grid
-          a = floor(a * 3.0 + 0.5) / 3.0;                // quantize into a few alpha steps — digital, not smooth
+          // Pixelated, not smooth: snap to a grid of cells, then quantize the alpha into steps.
+          float GRID = 26.0;
+          vec2 cell = (floor(vP * GRID) + 0.5) / GRID;
+          float e = max(abs(cell.x), abs(cell.y));
+          float a = smoothstep(0.82, 1.0, e);
+          a = floor(a * 3.0 + 0.5) / 3.0;
           if (a <= 0.002) discard;
           gl_FragColor = vec4(uColor, uOpacity * a);
         }`,
     });
-    const frame = (w: number, d: number, y: number, z = 0) => {
-      const fill = new THREE.Mesh(new THREE.PlaneGeometry(w, d), fillMat);
+    // Per-plane clones (independent uniforms) so a single plane can be highlighted.
+    const frame = (w: number, d: number, y: number, z: number, id: string) => {
+      const fm = fillMat.clone();
+      const fill = new THREE.Mesh(new THREE.PlaneGeometry(w, d), fm);
       fill.rotation.x = -Math.PI / 2; fill.position.set(cx, y, z); fill.renderOrder = -2;
       this.group.add(fill);
-      const f = new THREE.LineSegments(new THREE.EdgesGeometry(new THREE.PlaneGeometry(w, d)), frameMat);
+      const lm = frameMat.clone();
+      const f = new THREE.LineSegments(new THREE.EdgesGeometry(new THREE.PlaneGeometry(w, d)), lm);
       f.rotation.x = -Math.PI / 2; // lie flat in the X/Z plane (w→X, d→Z)
       f.position.set(cx, y, z);
       f.renderOrder = -1;
       this.group.add(f);
+      this._floorMats.set(id, { frame: lm, fill: fm });
     };
-    for (const y of FLOOR_Y) frame(W, D, y);
-
-    // Front-left layer labels — printed flat ON each floor, tucked into its front-left corner.
-    const lx = cx + W / 2 - 2, lz = D / 2 - 2.5;
-    for (const { y, text } of FLOOR_LABELS) this.group.add(this._makeLabel(text, lx, y, lz));
+    for (const { y, id } of FLOOR_LAYERS) frame(W, D, y, 0, id);
 
     // The hypergraph-L0 level is ONE plane CUT along Z: the 2/3 toward +Z/centre is hypergraph L0
     // (the global validators over the global block); the −Z 1/3 is RESERVED for hypergraph L1 — the
-    // DAG's native $DAG currency — at the SAME height. Two adjacent frames tile the full floor and
-    // share the seam edge; each gets its own label; the DAG-L1 cluster sits in the 1/3.
+    // DAG's native $DAG currency — at the SAME height. Two adjacent frames with a gap between them.
     const hy = LEDGER.rowHypL0;
     const GAP = 3.5;                          // clear space between the L0 and L1 sub-panes
     const seam = -D / 2 + D / 3;              // the nominal 2/3 : 1/3 division
@@ -333,42 +331,18 @@ export class LedgerView {
     const l1D = l1Edge - -D / 2, l0D = D / 2 - l0Edge; // shrunk by the gap
     const l1Cz = (-D / 2 + l1Edge) / 2;       // −Z 1/3 centre
     const l0Cz = (l0Edge + D / 2) / 2;        // +Z 2/3 centre
-    frame(W, l0D, hy, l0Cz);
-    frame(W, l1D, hy, l1Cz);
-    this.group.add(this._makeLabel("hypergraph L0", lx, hy, D / 2 - 2.5));       // labelled in the 2/3 (+Z front edge)
-    this.group.add(this._makeLabel("hypergraph L1", lx, hy, l1Edge - 2.5));      // labelled in the 1/3 (its inner edge)
+    frame(W, l0D, hy, l0Cz, "hypl0");
+    frame(W, l1D, hy, l1Cz, "hypl1");
   }
 
-  // A flat, quiet text label lying ON a floor (not a billboard) — the very-short layer name, printed
-  // on the glass, run parallel to the lane (Z) edge and readable from the default camera.
-  private _makeLabel(text: string, x: number, y: number, z: number): THREE.Mesh {
-    const c = document.createElement("canvas");
-    c.width = 256; c.height = 64;
-    const ctx = c.getContext("2d")!;
-    ctx.font = "300 23px system-ui, -apple-system, sans-serif";
-    ctx.fillStyle = "rgba(170,196,224,0.4)"; // subtle, low-contrast
-    ctx.textAlign = "center";
-    ctx.textBaseline = "middle";
-    ctx.fillText(text, c.width / 2, c.height / 2 + 2);
-    const tex = new THREE.CanvasTexture(c);
-    tex.minFilter = THREE.LinearFilter;
-    tex.colorSpace = THREE.SRGBColorSpace;
-    const h = 1.35, w = h * (c.width / c.height);
-    const mesh = new THREE.Mesh(
-      new THREE.PlaneGeometry(w, h),
-      new THREE.MeshBasicMaterial({ map: tex, transparent: true, depthWrite: false, depthTest: false }),
-    );
-    // Lie flat, aligned to the floor's lane (Z) edge, oriented so it reads from the camera side.
-    mesh.quaternion.setFromRotationMatrix(
-      new THREE.Matrix4().makeBasis(
-        new THREE.Vector3(0, 0, -1),  // canvas right → -Z (along the edge, screen-right)
-        new THREE.Vector3(-1, 0, 0),  // canvas up    → -X (tops of letters away from the camera)
-        new THREE.Vector3(0, 1, 0),   // normal       → up off the floor
-      ),
-    );
-    mesh.position.set(x, y + 0.06, z);
-    mesh.renderOrder = 2;
-    return mesh;
+  // Highlight one floor plane by layer id (from the explore panel) — brighten its frame + edge fill;
+  // null clears. Every plane owns its materials (see _buildFloors), so this touches only the match.
+  setHighlight(id: string | null): void {
+    for (const [k, m] of this._floorMats) {
+      const on = id === k;
+      m.frame.opacity = on ? FLOOR_FRAME_HI : FLOOR_FRAME_OP;
+      m.fill.uniforms.uOpacity.value = on ? FLOOR_FILL_HI : FLOOR_FILL_OP;
+    }
   }
 
   // The live global snapshot at centre — a SOLID block (it's always a real snapshot). When the

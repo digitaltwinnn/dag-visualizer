@@ -213,6 +213,8 @@ export class Engine {
         }
         // Geo explorer list-row hover → glow that node's shells on the globe (same as a 3D hover).
         if (st.hoverNodeId !== prev.hoverNodeId) this.globe.setHoverNode(st.hoverNodeId);
+        // Snapshots·Explore panel: clicking a layer highlights its floor plane in the ledger view.
+        if (st.ledgerHilite !== prev.ledgerHilite) this.ledger.setHighlight(st.ledgerHilite);
       }),
     );
 

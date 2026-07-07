@@ -69,6 +69,9 @@ interface AppState {
   // Node id/ip the cursor is hovering in the geo explorer list — glows that node's shells on the globe
   // (same pairing as a 3D raycast hover). null = not hovering a list row.
   hoverNodeId: string | null;
+  // Ledger layer id (LedgerView FLOOR_LAYERS: "ml1"|"ml0"|"msnap"|"gl0"|"hypl0"|"hypl1") highlighted
+  // from the Snapshots·Explore panel — brightens that floor plane in the 3D view. null = none.
+  ledgerHilite: string | null;
   // Snapshot card follows the latest relevant snapshot (heartbeat live) vs pinned.
   following: boolean;
   // The lean hover-tooltip subject for the currently-hovered 3D object (identity ticker + short
@@ -130,6 +133,7 @@ interface AppState {
   setHoverSnapOrd: (ordinal: number | null) => void;
   setHoverFilter: (filter: string | null) => void;
   setHoverNodeId: (id: string | null) => void;
+  setLedgerHilite: (id: string | null) => void;
   setFollowing: (following: boolean) => void;
   setHover: (hover: HoverSubject | null) => void;
   setCountry: (cc: string | null) => void;
@@ -164,6 +168,7 @@ export const useStore = create<AppState>((set) => ({
   hoverSnapOrd: null,
   hoverFilter: null,
   hoverNodeId: null,
+  ledgerHilite: null,
   following: false,
   hover: null,
   country: null,
@@ -191,6 +196,7 @@ export const useStore = create<AppState>((set) => ({
   setHoverSnapOrd: (hoverSnapOrd) => set({ hoverSnapOrd }),
   setHoverFilter: (hoverFilter) => set({ hoverFilter }),
   setHoverNodeId: (hoverNodeId) => set({ hoverNodeId }),
+  setLedgerHilite: (ledgerHilite) => set({ ledgerHilite }),
   setFollowing: (following) => set({ following }),
   setHover: (hover) => set({ hover }),
   setCountry: (country) => set({ country }),
