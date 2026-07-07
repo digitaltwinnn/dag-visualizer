@@ -86,41 +86,42 @@ export function metaAnchor(
 }
 
 // ---- Snapshots (ledger) view layout (the "settlement chamber") -------------------
-// A 3D stack of transparent glass FLOORS (one per layer) on Y, viewed from an angle. Each
+// A 3D stack of transparent wireframe FLOORS (one per layer) on Y, viewed from an angle. Each
 // metagraph gets its own Z-LANE; its snapshot blocks lead at x=0 and trail LEFT (-X) along the
 // lane (same direction + spacing as the global chain), so a metagraph block and the global block
 // it anchored share an X and are linked. The factual flow (Constellation docs): metagraph L1
-// (cl1+dl1) → blocks → metagraph L0 → metagraph snapshots → Global L0; DAG L1 → blocks straight
-// into the Global L0 snapshot (the global snapshot IS the $DAG ledger's L0). The floor heights are a
-// LITERAL "what sits on what" stack (top→bottom) — producers on top, settlement at the base. Floors
-// are of TWO kinds: NODE/validator layers, and SNAPSHOT/ledger layers (the OUTPUT an L0 produces —
-// the actual artifacts this view is about, NOT a node role):
-//   rowProducers  external DATA PRODUCERS — data sources POSTing signed DataUpdates to the metagraph's
-//     DATA-L1 (count is metagraph-specific & in no API, so SYMBOLIC: a labelled floor + the flow line,
-//     no nodes) ·
+// (cl1+dl1) → blocks → metagraph L0 → metagraph snapshots → Global L0; DAG L1 → $DAG blocks into the
+// Global L0 snapshot (the global snapshot IS the $DAG ledger's L0). The floor heights are a LITERAL
+// "what sits on what" stack (top→bottom):
 //   rowML1  metagraph L1 nodes — cL1 (currency-L1: wallet TRANSACTIONS) + dL1 (data-L1: producer
-//     DataUpdates); the producer flow feeds dL1 specifically ·
+//     DataUpdates) — the top of the visible stack (external producers are not drawn) ·
 //   rowML0  metagraph L0 nodes (collect L1 blocks → the snapshot) ·
 //   rowMSnap  METAGRAPH SNAPSHOTS — the metagraph L0's ledger output ·
-//   rowHypL0  hypergraph L0 nodes — the global validators (the anchor line passes through their
-//     cluster, just like it passes through the metagraph L1/L0 clusters) ·
-//   rowGL0  GLOBAL SNAPSHOTS — the hypergraph L0's ledger output (the base) ·
-//   rowDAGL1  DAG L1 (hypergraph L1) nodes — cL1 only (native $DAG currency; the DAG has no data-L1).
-// NODES sit directly ABOVE the SNAPSHOT they produce, consistently (metagraph L0 → metagraph snapshot;
-// hypergraph L0 → global snapshot); the DAG L1 below feeds $DAG blocks UP into the global. Even spacing.
-// The X axis (time / trailing) is owned by ledger.js (SLOT_SP); this file owns the Z lane geometry
-// + the row heights, shared by layers.js, globe.js and ledger.js.
+//   rowHypL0  hypergraph L0 nodes — the global validators (the anchor line threads through their
+//     cluster). This floor is CUT along Z: the 2/3 (+Z/centre) is hypergraph L0; the −Z 1/3 is a
+//     reserved lane for rowDAGL1 (hypergraph L1 — native $DAG currency), at the SAME height ·
+//   rowGL0  GLOBAL SNAPSHOTS — the hypergraph L0's ledger output (the base settlement layer).
+// NODES sit directly ABOVE the SNAPSHOT they produce (metagraph L0 → metagraph snapshot; hypergraph
+// L0 → global snapshot); DAG L1 is a peer of hypergraph L0 (its own −Z third of that plane), both
+// feeding down into the global snapshot. The X axis (time / trailing) is owned by LedgerView
+// (SLOT_SP); this file owns the Z lane geometry + the row heights, shared by HyperView, Globe and
+// LedgerView. Layer NAMES live in the Snapshots·Explore panel (LedgerPanel), not on the planes.
 export const LEDGER = {
   depth: 44,        // Z span the metagraph lanes spread over
-  rowProducers: 13, // external data producers (symbolic — see note above; the flow line starts here)
-  rowML1: 9.5,      // metagraph L1 node floor (cL1 + dL1; validate producer updates into blocks)
-  rowML0: 6,        // metagraph L0 node floor (packages blocks into the snapshot)
+  // Floor heights, wider-spaced (gap ~5) and with NO producers floor. The DAG L1 is no longer a lone
+  // bottom floor: it sits at the hypergraph-L0 HEIGHT but in its OWN Z-lane (rowDAGL1 == rowHypL0 +
+  // dagLaneZ) — a distinct "$DAG currency" lane beside the central global column, both feeding down
+  // into the global snapshot. Symmetric with the metagraph lanes rather than marooned at the base.
+  rowML1: 16,       // metagraph L1 node floor (cL1 + dL1; validate producer updates into blocks)
+  rowML0: 9.25,     // metagraph L0 node floor (packages blocks into the snapshot)
   rowMSnap: 2.5,    // metagraph SNAPSHOTS floor (the metagraph L0's ledger output)
-  rowHypL0: -1,     // hypergraph L0 node floor — global validators; the anchor line passes through them
-  rowGL0: -4.5,     // global snapshots floor (hypergraph L0's ledger output) — the base settlement layer
-  // TODO: also draw DAG L1 BLOCKS (global.blocks) flowing UP into the global snapshot — most ticks
-  // have 0 (settlement, not blocks); only block-carrying ticks would show them.
-  rowDAGL1: -8,     // DAG L1 (hypergraph L1) node floor (bottom — feeds blocks up into the global)
+  rowHypL0: -4.25,  // hypergraph L0 node floor — global validators; the anchor line passes through them
+  rowGL0: -11,      // global snapshots floor (hypergraph L0's ledger output) — the base settlement layer
+  // DAG L1 (hypergraph L1) — native $DAG currency. Same HEIGHT as hypergraph L0, in its own −Z third
+  // of that plane (a plane cut 2/3 L0 + 1/3 L1). TODO: draw DAG L1 BLOCKS (global.blocks) flowing
+  // from this lane into the global snapshot.
+  rowDAGL1: -4.25,  // == rowHypL0 (shares the hypergraph-L0 level; its own −Z third of that plane)
+  dagLaneZ: -14.7,  // −Z centre of the reserved 1/3 (−depth/2 + depth/6) — where the DAG-L1 cluster sits
   dagCell: 2.8,     // spread radius for the DAG node discs (global L0 + DAG L1) — tight so they're not busy
   dot: 0.34,        // tiny-dot scale factor applied to node spheres in this view
 };

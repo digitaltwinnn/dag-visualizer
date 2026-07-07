@@ -200,10 +200,14 @@ export class Globe implements GeoViewHost {
         const g = geoMap[node.ip];
         const geoDir = g ? latLonToVec3(g.lat!, g.lon!, 1).normalize() : null;
 
-        // Ledger (Snapshots) view: DAG cl1 = $DAG block producers → DAG-L1 floor; l0 = Global L0
-        // validators → hypergraph-L0 floor.
+        // Ledger (Snapshots) view: l0 = Global L0 validators → the central hypergraph-L0 cluster;
+        // DAG cl1 = native $DAG currency (hypergraph L1) → its OWN lane, same height as hypergraph L0
+        // but offset on +Z (dagLaneZ), beside the central column.
         const lsp = ledgerSpread(i, n, LEDGER.dagCell);
-        const ledgerPos = new THREE.Vector3(lsp.x, role === "l0" ? LEDGER.rowHypL0 : LEDGER.rowDAGL1, lsp.z);
+        const ledgerPos =
+          role === "l0"
+            ? new THREE.Vector3(lsp.x, LEDGER.rowHypL0, lsp.z)
+            : new THREE.Vector3(lsp.x, LEDGER.rowDAGL1, lsp.z + LEDGER.dagLaneZ);
 
         const pick = {
           kind, title: net, roles: nodeRoles(node, role), node, geo: g || null,
