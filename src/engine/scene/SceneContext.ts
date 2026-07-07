@@ -6,14 +6,39 @@ import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import { EffectComposer } from "three/addons/postprocessing/EffectComposer.js";
 import { RenderPass } from "three/addons/postprocessing/RenderPass.js";
 import { UnrealBloomPass } from "three/addons/postprocessing/UnrealBloomPass.js";
-import { BokehPass } from "three/addons/postprocessing/BokehPass.js";
-import { COLORS } from "./config.js";
-import { createBackground } from "./background.js";
+import { BokehPass, type BokehPassParamters } from "three/addons/postprocessing/BokehPass.js";
+import type { SceneColors } from "../sceneColors";
 
-export function createScene(canvas) {
+// @types/three types BokehPass.uniforms as a bare `object`; the engine reads
+// uniforms.focus/maxblur .value, so refine just those.
+export type DofPass = BokehPass & {
+  uniforms: Record<"focus" | "maxblur", { value: number }>;
+};
+
+// js/scene.js createScene() return.
+export interface SceneCtx {
+  scene: THREE.Scene;
+  camera: THREE.PerspectiveCamera;
+  renderer: THREE.WebGLRenderer;
+  controls: OrbitControls;
+  composer: EffectComposer;
+  dof: DofPass;
+  resize(): void;
+}
+
+// Scene LIGHTING is a rendering technicality, NOT a palette concern: a light shades the (mostly
+// emissive) materials for subtle dimensional form — it is not a surface, accent or identity hue, so
+// it is deliberately NOT sourced from the CSS design tokens. These are dedicated, self-contained cool
+// lighting literals (all allowlisted in noHardcodedColors.test.ts). Changing the palette must not
+// change the lighting, and vice-versa.
+const LIGHT_AMBIENT = 0x4a5a8c; // cool-grey fill (mostly carries the scene, materials being emissive)
+const LIGHT_KEY = 0xccd6e6;     // neutral cool-white key light (top)
+const LIGHT_RIM = 0x5a6f9c;     // muted cool rim light (back — edge separation)
+
+export function createScene(canvas: HTMLCanvasElement, colors: SceneColors): SceneCtx {
   const scene = new THREE.Scene();
-  scene.background = new THREE.Color(COLORS.bg);
-  scene.fog = new THREE.FogExp2(COLORS.bg, 0.012);
+  scene.background = new THREE.Color(colors.bg);
+  scene.fog = new THREE.FogExp2(colors.bg, 0.012);
 
   const camera = new THREE.PerspectiveCamera(
     55, window.innerWidth / window.innerHeight, 0.1, 2000
@@ -36,17 +61,16 @@ export function createScene(canvas) {
   controls.autoRotate = true;
   controls.autoRotateSpeed = 0.35;
 
-  // Lighting — mostly ambient since materials are emissive; a couple of
-  // points add subtle dimensional shading.
-  scene.add(new THREE.AmbientLight(0x4a5a8c, 1.1));
-  const key = new THREE.PointLight(COLORS.core, 2.2, 220);
+  // Lighting — mostly ambient since materials are emissive; a couple of points add subtle
+  // dimensional shading. All three are dedicated lighting literals (see LIGHT_* above), decoupled
+  // from the palette — a light is a rendering technicality, not an accent/identity hue.
+  scene.add(new THREE.AmbientLight(LIGHT_AMBIENT, 1.1));
+  const key = new THREE.PointLight(LIGHT_KEY, 2.2, 220);
   key.position.set(0, 8, 0);
   scene.add(key);
-  const rim = new THREE.PointLight(COLORS.l1, 1.4, 260);
+  const rim = new THREE.PointLight(LIGHT_RIM, 1.4, 260);
   rim.position.set(40, -20, -30);
   scene.add(rim);
-
-  const background = createBackground(scene);
 
   // Postprocessing — depth of field then bloom.
   const composer = new EffectComposer(renderer);
@@ -62,10 +86,14 @@ export function createScene(canvas) {
   // few units of depth around the focal plane, so a shallow aperture smeared THEM too; this widens
   // the sharp zone to cover the whole selected cluster while distant objects (the core, the other
   // hubs) are far enough out to still saturate to maxblur — strong background blur, crisp selection.
-  const dof = new BokehPass(scene, camera, {
+  // BokehPassParamters' types only declare focus/aspect/aperture/maxblur, but the JS
+  // constructor accepts (and ignores) width/height too — kept for parity with the
+  // original call.
+  const dofParams: BokehPassParamters & { width: number; height: number } = {
     focus: 54, aperture: 0.0002, maxblur: 0.01,
     width: window.innerWidth, height: window.innerHeight,
-  });
+  };
+  const dof = new BokehPass(scene, camera, dofParams) as DofPass;
   dof.enabled = false;
   composer.addPass(dof);
 
@@ -85,5 +113,5 @@ export function createScene(canvas) {
     composer.setSize(window.innerWidth, window.innerHeight);
   }
 
-  return { scene, camera, renderer, controls, composer, dof, background, resize };
+  return { scene, camera, renderer, controls, composer, dof, resize };
 }

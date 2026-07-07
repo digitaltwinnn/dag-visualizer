@@ -17,7 +17,7 @@ import { SonarRing, NodeStars, NoSignalDot } from "@/components/state/StateAtoms
 import { VIEW_ICONS, KIND_MARK_CLASS } from "@/components/icons";
 import { ExternalLink } from "lucide-react";
 import { useMinHold } from "@/components/useMinHold";
-import { VIS } from "../../js/config.js";
+import { VIS } from "@/src/engine/config";
 import { Desc, StatusMark, CompositionRows, StatusBreakdown, networkKind } from "./parts";
 import { compositionRows } from "@/src/data/composition";
 

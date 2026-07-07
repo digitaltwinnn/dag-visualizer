@@ -1,6 +1,6 @@
 import type { PickDescriptor } from "./types";
 import { hex } from "@/src/util/format";
-import { COLORS } from "../../js/config.js";
+import { COLORS } from "@/src/engine/config";
 import { identityHudHex } from "@/src/palette/identity";
 
 // Core cyan (the DAG spine) — the identity hue for every NON-metagraph subject (a DAG-core

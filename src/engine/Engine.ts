@@ -4,30 +4,22 @@ import { useStore, type Mode } from "@/src/store/store";
 import { metagraphById, initNetwork, getNetwork, getAnchor, DEFAULT_META_COLOR } from "@/src/data/network";
 import { hoverKeyOf, tooltipSubject } from "@/src/data/hoverSubject";
 import { identityMap, identitySceneHex } from "@/src/palette/identity";
-// Existing vanilla modules, reused. Bare specifiers resolve via npm; they ship no types
-// of their own, so their surface is described in ./boundary and applied at construction.
-import { createScene } from "../../js/scene.js";
-import { Layers } from "../../js/layers.js";
-import { Globe } from "../../js/globe.js";
-import { Ledger } from "../../js/ledger.js";
-import { loadGeoCache, resolveMissing } from "../../js/geo.js";
-import { METAGRAPHS } from "../../js/config.js";
+import { createScene, type SceneCtx } from "./scene/SceneContext";
+import { HyperView, type MetaHubRec } from "./scene/views/HyperView";
+import { Globe } from "./scene/Globe";
+import { LedgerView } from "./scene/views/LedgerView";
+import { loadGeoCache, resolveMissing } from "@/src/data/geoResolve";
+import { METAGRAPHS, COLORS } from "@/src/engine/config";
+import { readSceneColors, type SceneColors } from "./sceneColors";
+import { VIEW_POLICIES } from "./domain/viewPolicy";
+import { FOCI, hubFraming, geoFraming, easeInOutQuad, type CameraFraming } from "./domain/cameraRig";
 import type { GlobalSnapshot, PickDescriptor } from "@/src/data/types";
-import type {
-  ClusterNode,
-  DagCore,
-  GeoMap,
-  GlobeApi,
-  LayersApi,
-  LedgerApi,
-  RouteMetagraph,
-  SceneCtx,
-} from "./boundary";
+import type { ClusterNode, DagCore, GeoMap, RouteMetagraph } from "@/src/data/types";
 
 type Vec = THREE.Vector3;
 
-// id[] -> { id: sceneColorNumber }, resolved through the identity map (Task 1). The vanilla
-// js/ modules never import the TS generator — the Engine owns the map and hands scene colors
+// id[] -> { id: sceneColorNumber }, resolved through the identity map (Task 1). The scene
+// layer never imports the TS generator — the Engine owns the map and hands scene colors
 // over as plain data.
 const sceneColorsFor = (ids: string[]): Record<string, number> => {
   const out: Record<string, number> = {};
@@ -35,48 +27,23 @@ const sceneColorsFor = (ids: string[]): Record<string, number> => {
   return out;
 };
 
-// The js/ modules ship no types and `allowJs` only infers partial/loose ones, so pin
-// them to the curated surface in ./boundary here — the single place these assertions
-// live. Everything downstream is then fully checked.
-const makeScene = createScene as (canvas: HTMLCanvasElement) => SceneCtx;
-const LayersCtor = Layers as unknown as new (
-  scene: THREE.Scene,
-  sceneColors?: Record<string, number>,
-) => LayersApi;
-const GlobeCtor = Globe as unknown as new (
-  scene: THREE.Scene,
-  layers: LayersApi,
-  camera: THREE.Camera,
-) => GlobeApi;
-const LedgerCtor = Ledger as unknown as new (scene: THREE.Scene) => LedgerApi;
-const loadGeo = loadGeoCache as () => Promise<GeoMap>;
-const resolveGeo = resolveMissing as (
-  map: GeoMap,
-  ips: string[],
-  onResolved: (m: GeoMap) => void,
-) => void;
+// loadGeoCache/resolveMissing are real typed TS (src/data/geoResolve.ts) — aliased here only
+// for the shorter call-site names used below, no cast needed.
+const loadGeo = loadGeoCache;
+const resolveGeo = resolveMissing;
 
-// Camera presets (ported from ui.js FOCI).
-const FOCI: Record<string, { pos: Vec; target: Vec }> = {
-  overview: { pos: new THREE.Vector3(0, 15, 60), target: new THREE.Vector3(0, 2, 0) },
-  // The whole DAG core: pulled back enough to frame the outer cL1 (purple) shell (radius 14).
-  dag: { pos: new THREE.Vector3(0, 9, 38), target: new THREE.Vector3(0, 1, 0) },
-  geo: { pos: new THREE.Vector3(0, 11, 36), target: new THREE.Vector3(0, 2, 0) },
-  // The Snapshots view is a stack of transparent wireframe FLOORS (layers) on Y. Frame it from an
-  // elevated front angle so the stacked planes read in 3D — see js/ledger.js + config.LEDGER.
-  // Default framing: the LEAD (latest block) sits toward the bottom-right, leaving the rest of the
-  // view for the trailing chains; looking roughly along -X. Orbit is free.
-  ledger: { pos: new THREE.Vector3(31, 14, 20), target: new THREE.Vector3(-17, 1, -2) },
-};
+// Camera presets: FOCI/hubFraming/geoFraming/easeInOutQuad now live in ./domain/cameraRig
+// (Task 15) — pure, allocation-free (writes into caller-provided out structs).
 
 // Imperative engine: owns the scene, the Hypergraph + globe, the render loop, the
 // camera-focus tweens, and the command surface React drives via the store. Ports
 // main.js's render loop + ui.js's camera focus, decoupled from any DOM/panels.
 export class Engine {
   private ctx: SceneCtx;
-  private layers: LayersApi;
-  private globe: GlobeApi;
-  private ledger: LedgerApi;
+  private colors: SceneColors; // the structural palette, read from the CSS tokens at construction
+  private layers: HyperView;
+  private globe: Globe;
+  private ledger: LedgerView;
   private _ledgerDirty = false; // rebuild the ledger geometry next frame (set on data events)
   private clock = new THREE.Clock();
   private raf = 0;
@@ -89,9 +56,16 @@ export class Engine {
   private morph = 0; // 0 = hypergraph, 1 = globe (eased each frame)
   private _baseFog: THREE.FogBase | null = null; // scene.js FogExp2 (hyper/geo); captured lazily
   private _ledgerFog: THREE.Fog | null = null;    // stronger linear depth fog for the trailing chain
-  private tween: {
-    fromPos: Vec; toPos: Vec; fromTgt: Vec; toTgt: Vec; t: number; dur: number;
-  } | null = null;
+  // A persistent tween record (never re-allocated per focus) — `active` replaces the old
+  // null-the-object pattern; `_tweenTo` copies into these four vectors instead of `.clone()`ing.
+  private _tween = {
+    fromPos: new THREE.Vector3(), toPos: new THREE.Vector3(),
+    fromTgt: new THREE.Vector3(), toTgt: new THREE.Vector3(),
+    t: 0, dur: 1.4, active: false,
+  };
+  // Scratch framing struct handed to hubFraming/geoFraming — its values are copied into
+  // `_tween` immediately by `_tweenTo`, so reusing it across every focus call is safe.
+  private _framingOut: CameraFraming = { pos: new THREE.Vector3(), target: new THREE.Vector3() };
 
   private geoMap: GeoMap = {};
   private dagCore: DagCore | null = null;
@@ -99,6 +73,9 @@ export class Engine {
   // Metagraph ids with locatable nodes (selectable hubs); null until counts load (all allowed).
   private _activeMetaIds: Set<string> | null = null;
   private _lastFlashOrdinal = -1; // de-dupes the core flash to genuinely new global snapshots
+  // The focused metagraph's hub record, cached on filter/mode change — kills the per-frame
+  // `metas.find` the DoF read used to do every frame (Task 15 allocation fix).
+  private _dofMeta: MetaHubRec | null = null;
 
   private raycaster = new THREE.Raycaster();
   private pointer = new THREE.Vector2();
@@ -106,6 +83,8 @@ export class Engine {
   private onClick = (e: MouseEvent) => this._handleClick(e);
   private onMove = (e: MouseEvent) => this._handleMove(e);
   private _hoverKey: string | null = null;
+  // Reused pickables buffer (never re-allocated) — `_pickablesFor` runs on every pointermove.
+  private _pickBuf: THREE.Object3D[] = [];
 
   private unsub: Array<() => void> = [];
   private metaTimer: ReturnType<typeof setInterval> | undefined;
@@ -120,15 +99,35 @@ export class Engine {
   constructor(canvas: HTMLCanvasElement, onReady?: () => void) {
     this.canvas = canvas;
     this._onReady = onReady;
-    this.ctx = makeScene(canvas);
-    // Layers builds all its hubs synchronously from config.METAGRAPHS inside its constructor
-    // (before any API data exists), so the identity scene-color map has to be handed in at
-    // construction — passing it as a 2nd ctor arg (read by _buildMetagraphs) means the hubs are
-    // born in the identity color with no recolor pass and no first-paint flash. Layers only ever
-    // has these 10 config hubs, so this map never needs updating.
-    this.layers = new LayersCtor(this.ctx.scene, sceneColorsFor(METAGRAPHS.map((m) => m.id)));
-    this.globe = new GlobeCtor(this.ctx.scene, this.layers, this.ctx.camera);
-    this.ledger = new LedgerCtor(this.ctx.scene);
+    // Read the structural palette from the CSS design tokens (app/globals.css) — the single source
+    // of truth. Every scene module below is fed these; none hardcodes a structural colour. In dev,
+    // warn if config.COLORS (the static mirror the non-DOM data/palette layer needs) drifts from the
+    // live tokens, so the two can't silently diverge.
+    const colors = readSceneColors();
+    this.colors = colors;
+    if (process.env.NODE_ENV === "development") {
+      // Tolerant compare (±2 per channel): oklch→sRGB resolution rounds, so only a genuine token
+      // change (a different colour) should warn — not a 1-bit rounding wobble.
+      const near = (a: number, b: number) =>
+        Math.abs(((a >> 16) & 255) - ((b >> 16) & 255)) <= 2 &&
+        Math.abs(((a >> 8) & 255) - ((b >> 8) & 255)) <= 2 &&
+        Math.abs((a & 255) - (b & 255)) <= 2;
+      const drift = ([["core", COLORS.core, colors.core], ["dagCore", COLORS.dagCore, colors.dagCore],
+        ["bg", COLORS.bg, colors.bg]] as const)
+        .filter(([, a, b]) => !near(a, b)).map(([k]) => k);
+      if (drift.length) console.warn(
+        `[sceneColors] config.COLORS drifts from globals.css tokens: ${drift.join(", ")} — update config.ts to match.`,
+      );
+    }
+    this.ctx = createScene(canvas, colors);
+    // HyperView builds all its hubs synchronously from config.METAGRAPHS inside its
+    // constructor (before any API data exists), so the identity scene-color map has to be
+    // handed in at construction — passing it as a 2nd ctor arg (read by _buildMetagraphs) means
+    // the hubs are born in the identity color with no recolor pass and no first-paint flash.
+    // HyperView only ever has these 10 config hubs, so this map never needs updating.
+    this.layers = new HyperView(this.ctx.scene, colors, sceneColorsFor(METAGRAPHS.map((m) => m.id)));
+    this.globe = new Globe(this.ctx.scene, this.layers, this.ctx.camera, colors);
+    this.ledger = new LedgerView(this.ctx.scene, colors);
     // The ledger colours its lane tiles / anchor rings / links / pulses per metagraph — feed it the
     // same identity SCENE map so those match the hubs/nodes (config-ids known synchronously; the
     // live set incl. new metagraphs is refreshed in refreshMeta alongside globe). "dag" is included
@@ -229,7 +228,7 @@ export class Engine {
       this.layers.pulseMeta(metaId);
       if (this.mode === "ledger") this._ledgerDirty = true; // the per-tick breakdown filled in
     });
-    net?.on("global", (evt: { latest?: GlobalSnapshot }) => {
+    net?.on("global", (evt: { latest: GlobalSnapshot | null }) => {
       if (this.mode === "ledger") this._ledgerDirty = true; // a new tick landed on the chain
       const ord = evt.latest?.ordinal;
       if (ord == null || ord === this._lastFlashOrdinal) return;
@@ -358,14 +357,18 @@ export class Engine {
   // ---- view + filter (ports ui.setMode / _applyFilter / camera focus) ----
   setMode(mode: Mode) {
     this.mode = mode;
+    const policy = VIEW_POLICIES[mode];
+    // View-derived sim gates → the scene modules (the render loop reads the rest of the policy).
+    this.globe.setSimFlags(policy.sims);
+    this.layers.setHubOrbits(policy.sims.hubOrbits);
     // Stronger DEPTH fog for the ledger trail — the oldest blocks recede + fog into the background
     // (that's the "old blocks fade" effect, depth-based, not a per-block hack). Restore the scene's
     // base FogExp2 (tuned for hyper/geo) on every other view.
     if (!this._ledgerFog) {
       this._baseFog = this.ctx.scene.fog;
-      this._ledgerFog = new THREE.Fog(this._baseFog ? this._baseFog.color.getHex() : 0x05060e, 46, 70);
+      this._ledgerFog = new THREE.Fog(this._baseFog ? this._baseFog.color.getHex() : this.colors.bg, 46, 70);
     }
-    this.ctx.scene.fog = mode === "ledger" ? this._ledgerFog : this._baseFog;
+    this.ctx.scene.fog = policy.fog === "ledgerLinear" ? this._ledgerFog : this._baseFog;
     // Snapshots view reuses the SAME hub/node meshes, laid out into planar rows. Toggle that
     // layout on the meshes (off restores the orbit/globe layout) and lock orbit so it reads 2D.
     const inLedger = mode === "ledger";
@@ -412,6 +415,10 @@ export class Engine {
   // camera back to the filter preset (that was the "camera randomly resets" bug). Only a user
   // action (changing the view or the filter) moves the camera.
   applyFilter(focusCamera = true) {
+    // Cache the focused hub record for the render loop's DoF read (killed the per-frame
+    // `metas.find` — Task 15 allocation fix). `layers.metas` never gets rebuilt after
+    // construction (config-driven, fixed 10 hubs), so this stays valid until the next filter/mode.
+    this._dofMeta = this.layers.metas.find((x) => x.cfg.id === this.filter) ?? null;
     if (this.mode === "geo") {
       this.globe.setFilter(this.filter); // also clears globe.countryFilter
       if (focusCamera) this._applyGeoFocus();
@@ -432,8 +439,9 @@ export class Engine {
     this._publishLeaderboard();
     // Tint the globe's land edge with the selected metagraph's SCENE colour (null → default
     // cyan). NOTE: globe.setEdgeColor currently ignores its argument and always uses the fixed
-    // ice-blue rim (see js/globe.js) — kept here so a future re-enable doesn't need call-site
-    // changes; "dag" now resolves to its own brand hue like any other id, not structural cyan.
+    // ice-blue rim (see scene/Globe.ts's setEdgeColor/`_edgeColor`) — kept here so a future
+    // re-enable doesn't need call-site changes; "dag" now resolves to its own brand hue like
+    // any other id, not structural cyan.
     const accent =
       this.filter && this.filter !== "all"
         ? new THREE.Color(identitySceneHex(this.filter)).getHex()
@@ -525,13 +533,17 @@ export class Engine {
   }
 
   // ---- picking (ports ui.js _pick / _pickablesFor / _onClick) ----
+  // Resolve the view policy's pick sources to the actual mesh pools. Unlisted sources / flat views
+  // (empty pickSources) raycast nothing. Order is immaterial — the raycaster sorts hits by distance.
   private _pickablesFor(): THREE.Object3D[] {
-    if (this.mode === "hyper") return this.layers.pickables.concat(this.globe.pickables);
-    if (this.mode === "geo") return this.globe.pickables;
-    // Ledger: the centered snapshot (snapshot pick) + the reused producer dots (metanode/validator
-    // picks → filter into that column).
-    if (this.mode === "ledger") return this.ledger.pickables.concat(this.globe.pickables);
-    return []; // placeholder views: nothing pickable
+    const out = this._pickBuf;
+    out.length = 0;
+    for (const src of VIEW_POLICIES[this.mode].pickSources) {
+      if (src === "globe") out.push(...this.globe.pickables);
+      else if (src === "layers") out.push(...this.layers.pickables);
+      else if (src === "ledger") out.push(...this.ledger.pickables);
+    }
+    return out;
   }
 
   private _pickAt(e: MouseEvent): PickDescriptor | null {
@@ -656,33 +668,30 @@ export class Engine {
 
 
   private _tweenTo(toPos: Vec, toTgt: Vec) {
-    this.tween = {
-      fromPos: this.ctx.camera.position.clone(),
-      toPos: toPos.clone(),
-      fromTgt: this.ctx.controls.target.clone(),
-      toTgt: toTgt.clone(),
-      t: 0,
-      dur: 1.4,
-    };
+    const tw = this._tween;
+    tw.fromPos.copy(this.ctx.camera.position);
+    tw.toPos.copy(toPos);
+    tw.fromTgt.copy(this.ctx.controls.target);
+    tw.toTgt.copy(toTgt);
+    tw.t = 0;
+    tw.dur = 1.4;
+    tw.active = true;
   }
 
   // Jump the camera straight to a framing — no tween (used for the Snapshots view, whose planar diagram
   // is meant to appear already-oriented; tweening it in read as the planes swinging into place).
   private _snapTo(toPos: Vec, toTgt: Vec) {
-    this.tween = null; // cancel any in-flight tween
+    this._tween.active = false; // cancel any in-flight tween
     this.ctx.camera.position.copy(toPos);
     this.ctx.controls.target.copy(toTgt);
     this.ctx.controls.update();
   }
 
   private _focusGeo(R: number) {
-    const t = THREE.MathUtils.smoothstep(R, 0.7, 1.0);
     // Look head-on at the FRONT of the globe (target pushed forward in +Z, toward where the
     // focused country/selection is aimed) so it sits centred in the view rather than low.
-    this._tweenTo(
-      new THREE.Vector3(0, THREE.MathUtils.lerp(7, 6, t), THREE.MathUtils.lerp(34, 26, t)),
-      new THREE.Vector3(0, THREE.MathUtils.lerp(2, 2.5, t), 7),
-    );
+    geoFraming(R, this._framingOut);
+    this._tweenTo(this._framingOut.pos, this._framingOut.target);
   }
 
   private _focusFilter(filter: string) {
@@ -703,15 +712,8 @@ export class Engine {
       return;
     }
     this.layers.focusId = filter; // anchor this hub so it stays framed
-    const hub = meta.group.position.clone();
-    const out = hub.clone().normalize();
-    const side = new THREE.Vector3().crossVectors(new THREE.Vector3(0, 1, 0), out).normalize();
-    const camPos = hub
-      .clone()
-      .addScaledVector(out, 12)
-      .addScaledVector(side, -6)
-      .addScaledVector(new THREE.Vector3(0, 1, 0), 5.5);
-    this._tweenTo(camPos, hub);
+    hubFraming(meta.group.position, this._framingOut);
+    this._tweenTo(this._framingOut.pos, this._framingOut.target);
   }
 
   // ---- render loop (ports main.js animate) ----
@@ -722,47 +724,47 @@ export class Engine {
       this.stats?.begin();
       const dt = Math.min(this.clock.getDelta(), 0.05);
 
+      const policy = VIEW_POLICIES[this.mode];
+      const show = policy.show;
+
       // Ledger freezes morph at the view we entered from, so the reused node meshes fly in from
       // THAT layout (globe.ledgerT drives the lane fly-in instead). hyper/geo ease as usual.
-      const target = this.mode === "geo" ? 1 : this.mode === "ledger" ? this.morph : 0;
+      const target = policy.morph === "toGeo" ? 1 : policy.morph === "frozen" ? this.morph : 0;
       this.morph += (target - this.morph) * Math.min(1, dt * 1.1);
       this.layers.root.visible = this.morph < 0.985;
       this.layers.root.scale.setScalar(Math.max(0.0001, 1 - this.morph));
 
       this.globe.setMorph(this.morph);
-      // Stars/nebula belong to geo only; in ledger force the plain hyper-end backdrop (no starfield).
-      this.ctx.background.update(dt, this.mode === "ledger" ? 0 : this.morph);
       this.layers.update(dt, this.morph);
       this.globe.update(dt);
       this._updateTween(dt);
       this.ctx.controls.update();
 
-      // The Snapshots view REUSES the hub/node meshes (placed into planar rows by layers/globe) +
-      // its own centered live snapshot; only the hyper core is hidden (the snapshot stands in for
-      // it). The placeholder views (status/transactions/staking) stay fully flat (scene hidden).
-      const showLedger = this.mode === "ledger";
-      const flat = this.mode !== "hyper" && this.mode !== "geo" && !showLedger;
-      if (flat) {
-        this.layers.root.visible = false;
+      // Geometry visibility, driven by the view policy's `show.*`:
+      //  - !hyperFurniture: the hyper root + core are force-managed — ledger keeps the root as its
+      //    metagraph-L0 row (show.ledger), flat hides it; the core is hidden in both (the ledger's
+      //    centred snapshot stands in for Global L0). When hyperFurniture is on (hyper/geo) the
+      //    morph-driven root.visible above + HyperView's own core reveal stand.
+      //  - globeSurface: the shared node group (+ earth surface).
+      //  - ledger: the settlement chamber.
+      // (There is no skydome — the scene's solid clear colour + fog are the whole backdrop.)
+      if (!show.hyperFurniture) {
+        this.layers.root.visible = show.ledger; // ledger: hubs become the metagraph-L0 row; flat: hidden
         this.layers.coreGroup.visible = false;
-      } else if (showLedger) {
-        this.layers.root.visible = true; // hubs become the metagraph-L0 row
-        this.layers.coreGroup.visible = false; // the centered snapshot represents Global L0
       }
-      this.globe.group.visible = !flat; // ledger shows the reused node dots
-      this.ctx.background.mesh.visible = !flat; // ledger keeps the starfield/backdrop
-      this.ledger.group.visible = showLedger;
-      if (showLedger) {
+      this.globe.group.visible = show.globeSurface;
+      this.ledger.group.visible = show.ledger;
+      if (show.ledger) {
         if (this._ledgerDirty) this._refreshLedger();
         this.ledger.update(dt);
       }
 
-      // Depth of field: only a single focused metagraph in the Hypergraph (not all / the DAG core).
-      const metaSel = this.mode === "hyper" && this.filter !== "all" && this.filter !== "dag";
+      // Depth of field: only a single focused metagraph, and only where the policy allows it (hyper).
+      const metaSel = this.filter !== "all" && this.filter !== "dag";
       const dofMix = THREE.MathUtils.clamp(1 - (this.morph - 0.4) / 0.2, 0, 1);
-      this.ctx.dof.enabled = metaSel && dofMix > 0.001;
+      this.ctx.dof.enabled = policy.dofEligible && metaSel && dofMix > 0.001;
       if (this.ctx.dof.enabled) {
-        const meta = this.layers.metas.find((x) => x.cfg.id === this.filter);
+        const meta = this._dofMeta;
         const focusTarget = meta
           ? meta.group.getWorldPosition(this._dofTmp)
           : this.ctx.controls.target;
@@ -782,13 +784,13 @@ export class Engine {
   }
 
   private _updateTween(dt: number) {
-    if (!this.tween) return;
-    const tw = this.tween;
+    const tw = this._tween;
+    if (!tw.active) return;
     tw.t = Math.min(1, tw.t + dt / tw.dur);
-    const e = tw.t < 0.5 ? 2 * tw.t * tw.t : 1 - Math.pow(-2 * tw.t + 2, 2) / 2; // easeInOutQuad
+    const e = easeInOutQuad(tw.t);
     this.ctx.camera.position.lerpVectors(tw.fromPos, tw.toPos, e);
     this.ctx.controls.target.lerpVectors(tw.fromTgt, tw.toTgt, e);
-    if (tw.t >= 1) this.tween = null;
+    if (tw.t >= 1) tw.active = false;
   }
 
   dispose() {

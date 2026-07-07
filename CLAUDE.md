@@ -20,9 +20,9 @@ mode !== "ledger"`):
   metagraph-shaped "core" (see *Nodes, layers & the filter*), not a separate L0/L1 pair.
 - **Node geography** (`geo`, 3D) — a globe with every node at its real geolocation, a density
   heatmap, travelling-packet connection arcs, and the country→nodes explorer.
-- **Snapshots** (`ledger`, 3D) — a built 3D "settlement chamber" (`js/ledger.js`): a stack of
-  transparent glass FLOORS (layers) on Y. It **REUSES the same node meshes** from hyper/geo
-  (placed into per-metagraph Z-lanes by `globe.js`), and draws its own centred live
+- **Snapshots** (`ledger`, 3D) — a built 3D "settlement chamber" (`scene/views/LedgerView.ts`):
+  a stack of transparent glass FLOORS (layers) on Y. It **REUSES the same node meshes** from
+  hyper/geo (placed into per-metagraph Z-lanes by `scene/Globe.ts`), and draws its own centred live
   global-snapshot block + a left-trailing chain of completed snapshots, each metagraph's lane
   of snapshot blocks, the node-group rings, and per-block anchor links + pulses. See *The
   Snapshots (ledger) view* below.
@@ -39,7 +39,7 @@ mode !== "ledger"`):
   dots, the ECG mark, and the Tooltip's `‹›` punctuation.
 
 Only `hyper`↔`geo` **morph** (`morph` 0→1, eased each frame); the blue L0 core literally
-**grows out into the globe** (`layers.js`) as the nodes fly to their map positions. `ledger`
+**grows out into the globe** (`scene/views/HyperView.ts`) as the nodes fly to their map positions. `ledger`
 is a separate 3D layout (not part of the morph — it pins `morph` at 0 and hard-places the
 reused node meshes into its lanes; see *Per-view behaviour*). The flat placeholder views sit
 at the hyper end with the canvas hidden.
@@ -135,65 +135,122 @@ Zustand store. **Two data lanes:** (A) high-freq visuals subscribe straight to
 - **`src/store/store.ts`** — the Zustand store (mode, filter, country, inspect, snap,
   selStack, following, metaList, leaderboard, selNodes, activity, snapshotExact, the hover
   channels `hoverFilter`/`hoverNodeId`/`hoverSnapOrd`, phone UI state, …). **`src/data/`** —
-  `network.ts` wraps the vanilla `NetworkData` singleton + exposes `getAnchor`/
+  `network.ts` wraps the typed `NetworkData` singleton (`api.ts`) + exposes `getAnchor`/
   `metagraphById`/`filterAccent`/`CORE_HEX`/etc; `follow.ts` = follow logic; `types.ts`
   (`PickDescriptor` is a `kind`-discriminated union, `SnapshotExact`, `NodeRow`);
   `composition.ts` (node-fabric grouping), `nodeStatus.ts` (the shared status vocabulary),
   `hoverSubject.ts` (`hoverKeyOf`), `bootPhase.ts`, `breakpoint.ts`. **`src/util/`** —
   `format.ts` (`hex`/`fmtDag`/`ccToFlag`), `relativeAge.ts`, `odometer.ts`.
   **`src/palette/`** — the identity-hue generator (see *Two colour lanes*).
-- **`src/engine/Engine.ts`** — the imperative engine. Owns the scene, render loop, morph,
-  camera-focus tweens (`FOCI`), DoF, picking, and the **command bridge**: it
-  `useStore.subscribe`s and reacts to mode/filter/country/hover channels; it writes picks +
-  hovers back to the store. Wraps the vanilla `js/*` modules below; their (untyped-JS)
-  surface is described in `src/engine/boundary.ts` and asserted once at construction.
-- **`js/*`** — the vanilla Three modules, driven by `Engine`. Bare specifiers resolve via npm.
+- **`src/engine/Engine.ts`** — the imperative engine and **the one bridge** (store ⇄ domain ⇄
+  scene). Owns the render loop, morph, camera-focus tweens (`FOCI`), DoF, picking, and the
+  **command bridge**: it `useStore.subscribe`s and reacts to mode/filter/country/hover channels
+  and writes picks + hovers back to the store — the ONLY layer that touches the store. Each
+  frame it consults `VIEW_POLICIES[mode]` (the per-view allow-list) and translates the flags
+  into scene state. Drives the typed `domain/` + `scene/` modules below (see *Engine layer
+  rules*).
+- **`src/engine/config.ts`** — API endpoints, colors, the `METAGRAPHS` list, `VIS` tuning,
+  `LEDGER` layout, and the shared layout math `metaAnchor()` (hub orbit-slot), `ledgerSite`,
+  `clusterRadius`, `ledgerSpread`.
 - **`lib/`** — `utils.ts` (`cn()`), `mgVars.tsx` (`MetagraphVars` sets `--mg-<id>` identity
   vars on `:root`; intentionally not yet mounted app-wide — don't delete as dead code).
 - **`components/ui/`** — the shadcn primitives in use (see *shadcn primitives*).
 
-`js/` modules:
+**`src/engine/domain/`** — pure logic (THREE's math classes are allowed; **no scene/react/
+store-value imports**, enforced by `layerBoundaries.test.ts`). Each ships colocated tests:
 
-- `scene.js` — Three.js scene, camera (FOV 55), `OrbitControls` (damping on, autoRotate),
-  and the postprocessing chain: **RenderPass → BokehPass (`dof`) → bloom**. Exposes
-  `resize()`; the engine owns the window listener.
-- `layers.js` — Hypergraph-only furniture: the Global L0 **core** and the orbiting metagraph
-  **hubs** (from `config.METAGRAPHS`). The core is parented to the scene (not `layers.root`)
-  so the morph can **grow it out to the globe's radius and dissolve it** as the Earth fades
-  in. Hubs fade out early.
-- `globe.js` — the node engine: the shared DAG validator nodes AND the metagraph nodes
-  (sphere→disc instanced cross-fade), the heatmap, the travelling-packet arcs,
-  filtering/dimming, and the geo focus spin.
-- `globeSurface.js` — the geo globe SURFACE, split out of globe.js: body sphere, graticule,
-  atmosphere rim, and the **solid raised continents**. The land is the `land-110m` polygons
-  triangulated into a **plateau** at radius `R+LAND_H` (earcut via `THREE.ShapeUtils`, with a
-  longitude **unwrap** for the 4 antimeridian-crossing polygons, an Antarctica **pole-cap**,
-  and a uniform `n=4` subdivision so facets hug the sphere with no T-junction cracks), capped
-  by additive coastal **"wall" cliffs** (BackSide-culled, dim rim, always the default cyan —
-  metagraph-tinting it read as too dominant). Nodes/heatmap/arcs sit on the plateau
-  (`R+LAND_H+ε`); the body sphere (`renderOrder -2`) and fill (`-1`) keep the
-  depth/transparency sort deterministic.
-- `geoMath.js` — shared geo constants (`R`, `LAND_H`) + `latLonToVec3`, used by both globe.js
-  and globeSurface.js so neither imports the other.
-- `geoStats.js` — the geo "data" layer: per-country tallies + the flat node-browser list,
-  **pure functions** over the Globe's node arrays (no Three/mesh state). The Globe keeps thin
-  wrappers passing its arrays in.
-- `ledger.js` — the Snapshots view's 3D chamber (see its own section below).
-- `api.js` — `NetworkData`: **client-side** polls the block-explorer API (CORS `*`), keeps
-  per-metagraph snapshot buffers + the `anchorIndex` (`getAnchor`; `global`/`status`/
-  `cluster`/`anchor` events, `on`/`off`). No simulation — when the API is unreachable it
-  stays factual (a "NO SIGNAL" state) and recovers on the next good poll. It polls regardless
-  of view.
-- `config.js` — API endpoints, colors, the `METAGRAPHS` list, `VIS` tuning, `LEDGER` layout,
-  and `metaAnchor()` (hub orbit-slot math shared by layers.js and globe.js).
-- `geo.js` — `loadGeoCache()` (fetches `/api/geo` seed) + best-effort `resolveMissing` for
-  new validator IPs (ip-api over http, ipwho.is over https).
-- `background.js` — skydome. The **geo** end is the twinkling starfield + faint nebula; the
-  **hyper** end is a **single flat colour** (no animation, no gradient, no tint — an animated
-  backdrop read as distracting). Only `uTime`/`uMorph` drive it.
+- `viewPolicy.ts` — the per-`Mode` allow-list table (`VIEW_POLICIES`): canvas / morph target /
+  sim gates / shown geometry / pick sources / DoF eligibility / fog, as DATA. The single source
+  of truth for what each view turns on (see *Per-view behaviour*).
+- `morph.ts` — the hyper↔geo morph easing + derived visibility ramps.
+- `nodeLayout.ts` — the node placement math: fibonacci shells around the core/hubs, the
+  sphere→disc geo positions, `spreadCoLocated()` phyllotaxis fan-out.
+- `dimModel.ts` — pure filter/hover/country dim + emissive resolution; a tested reference spec
+  the scene layer currently reimplements inline (`NodeFabric`'s glow writers, `Globe._dimScale`/
+  `_applyDim`) rather than calling.
+- `arcSim.ts` — the travelling-packet arc simulation: a swarm of comet "agents" that hop
+  node→node. **Emits flash EVENTS via a ring buffer** — no cross-view side-channel mutation.
+- `ledgerModel.ts` — the Snapshots chamber's layout/slot/tile model over the live snapshot data.
+- `cameraRig.ts` — `FOCI` + the camera framing math (`hubFraming`, `geoFraming`, easings).
+- `records.ts` — the plain node/metagraph record types (`ValidatorRecord`/`MetaNodeRecord`) the
+  scene consumes.
+- `geoMath.ts` — shared geo constants (`R`, `LAND_H`) + `latLonToVec3`.
+- `geoStats.ts` — the geo "data" layer: per-country tallies + the flat node-browser list,
+  **pure functions** over the node record arrays (no Three/mesh state).
+
+**`src/engine/scene/`** — the Three adapters (own their meshes/scratch; **read domain, write
+GPU; no store/react**):
+
+- `SceneContext.ts` — the Three.js scene, camera (FOV 55), `OrbitControls` (damping on,
+  autoRotate), and the postprocessing chain: **RenderPass → BokehPass (`dof`) → bloom**.
+  Exposes `resize()`; the engine owns the window listener.
+- `Globe.ts` — the node-engine coordinator: owns the shared DAG validator nodes AND the
+  metagraph nodes, the filtering/dimming, the geo focus spin, and the `ledgerT` lane placement;
+  delegates to the `objects/*` adapters.
+- `objects/NodeFabric.ts` — the node **InstancedMesh**es (sphere→disc instanced cross-fade)
+  with the patched smooth-shaded `MeshStandardMaterial` (per-instance `aBase`/`aEmissive`).
+- `objects/Arcs.ts` — the ONE `LineSegments` draw call for the arcs; rewrites head/tail
+  positions each frame from `arcSim`'s state and **applies its flash events** to the nodes.
+- `objects/Heatmap.ts` — the geo density heatmap.
+- `objects/Background.ts` — the skydome. The **geo** end is the twinkling starfield + faint
+  nebula; the **hyper** end is a **single flat colour** (no animation, no gradient, no tint — an
+  animated backdrop read as distracting). Only `uTime`/`uMorph` drive it.
+- `views/HyperView.ts` — Hypergraph-only furniture: the Global L0 **core** and the orbiting
+  metagraph **hubs** (from `config.METAGRAPHS`). The core is parented to the scene (not
+  `root`) so the morph can **grow it out to the globe's radius and dissolve it** as the Earth
+  fades in. Hubs fade out early.
+- `views/GeoView.ts` — the geo globe SURFACE: body sphere, graticule, atmosphere rim, and the
+  **solid raised continents**. The land is the `land-110m` polygons triangulated into a
+  **plateau** at radius `R+LAND_H` (earcut via `THREE.ShapeUtils`, with a longitude **unwrap**
+  for the 4 antimeridian-crossing polygons, an Antarctica **pole-cap**, and a uniform `n=4`
+  subdivision so facets hug the sphere with no T-junction cracks), capped by additive coastal
+  **"wall" cliffs** (BackSide-culled, dim rim, always the default cyan — metagraph-tinting it
+  read as too dominant). Nodes/heatmap/arcs sit on the plateau (`R+LAND_H+ε`); the body sphere
+  (`renderOrder -2`) and fill (`-1`) keep the depth/transparency sort deterministic.
+- `views/LedgerView.ts` — the Snapshots view's 3D settlement chamber over `ledgerModel` (see
+  its own section below).
+
+**`src/data/`** feeds the engine live network data (no simulation):
+
+- `api.ts` — the typed `NetworkData`: **client-side** polls the block-explorer API (CORS `*`),
+  keeps per-metagraph snapshot buffers + the `anchorIndex` (`getAnchor`; `global`/`status`/
+  `cluster`/`anchor` events, `on`/`off`). When the API is unreachable it stays factual (a "NO
+  SIGNAL" state) and recovers on the next good poll. It polls regardless of view.
+- `geoResolve.ts` — `loadGeoCache()` (fetches `/api/geo` seed) + best-effort `resolveMissing`
+  for new validator IPs (ip-api over http, ipwho.is over https).
 
 **There is intentionally no `$DAG` price networking** — don't add a market-data fetch unless
 something in the UI actually consumes it.
+
+## Engine layer rules & render-loop discipline
+
+The engine is three layers with a one-way dependency, enforced by
+`src/engine/layerBoundaries.test.ts` (a cheap grep over import lines):
+
+- **`domain/` = pure logic + data.** May import THREE's *math* classes (`Vector3`, `Color`, …),
+  `config`, and data *types* (incl. the `Mode` string-union via `import type`). MUST NOT import
+  `scene/`, `three/addons`, react, or store *values*. Side-effect-free and unit-tested in
+  isolation.
+- **`scene/` = Three adapters.** They own their meshes + scratch, **read domain, write GPU**.
+  MUST NOT reach into the store or react.
+- **`Engine.ts` is the ONLY layer that touches the store** — the single bridge to Lane B. Keep
+  it that way in every refactor.
+
+**ViewPolicy is the allow-list, made data.** Per-view behaviour lives in `domain/viewPolicy.ts`
+(`VIEW_POLICIES[mode]`), NOT in scattered `mode === "x"` guards. A new view is **inert** (no
+canvas, no sims, no picks, no DoF, no hints) until its row opts it in. Gate on the view a
+behaviour is FOR — never on a morph value, never a deny-list (a deny-list grows a line per view).
+
+**Zero-allocation render loop.** The per-frame path allocates nothing: scratch objects
+(`Vector3`/`Matrix4`/`Color`/`Quaternion`) are **construction-time fields reused via
+`.set()`/`.copy()`**, never `new`'d in `update()`. Every instanced-mesh slot is **written or
+zero-scaled every frame** (a stale slot from a previous view must never linger). Event-driven
+allocation (on a filter change, a new tick) is fine — mark it with a comment.
+
+**Simulations emit events; adapters apply them.** A sim (e.g. `arcSim`) publishes discrete
+events (arc-arrival flashes) through a ring buffer that the owning adapter drains and applies to
+its own meshes. **No cross-view side-channels** — the old `node._flash` mutation reached across
+views and caused the ledger red-dots bug; that pattern is forbidden.
 
 ## Nodes, layers & the filter (the parts that bite)
 
@@ -206,12 +263,12 @@ something in the UI actually consumes it.
 - **DAG L0/L1** are two fibonacci shells around the core. **Each metagraph** is laid out the
   same way around its hub: concentric shells **L0 inner → data-L1 (dl1) middle →
   currency-L1 (cl1) outer**. Metagraph nodes live in the rotating globe group but stay glued
-  to their orbiting hub in the Hypergraph — `globe.js` converts the hub's live position into
+  to their orbiting hub in the Hypergraph — `Globe.ts` converts the hub's live position into
   the group's local frame each frame. Keep that.
 - A metagraph's identity hue must be the SAME everywhere it appears — hub, globe nodes,
   filter dot, rail thread, card marks — matched by metagraph `id` (see *Two colour lanes*).
 - **Two sources, kept consistent on purpose.** Hypergraph **hubs** are built from
-  `config.METAGRAPHS` (all 10, unconditionally — `layers.js`), but **globe nodes** come from
+  `config.METAGRAPHS` (all 10, unconditionally — `HyperView.ts`), but **globe nodes** come from
   `globe.metaList`, filtered to metagraphs with at least one **locatable** node. A config
   metagraph with 0 locatable nodes (e.g. TBC, LEET) has a hub but can't be plotted. The
   filter picker keeps those rows **clickable but dimmed with a muted `not located` tag**
@@ -259,23 +316,23 @@ something in the UI actually consumes it.
 ## Per-view behaviour — allow-list, not deny-list
 
 When something should only apply in one view, **gate on the view it's for**, don't exclude
-the views it isn't (a deny-list grows a line every time you add a view):
+the views it isn't (a deny-list grows a line every time you add a view). **The canonical
+mechanism is the `VIEW_POLICIES` table in `domain/viewPolicy.ts`** — one row per `Mode`, and
+`Engine` reads `VIEW_POLICIES[mode]` each frame instead of hand-written `mode === "x"` guards:
 
-- **Picking** (`Engine._pickablesFor`): a per-view registry returns the exact meshes that
-  view raycasts; unlisted views pick nothing. ⚠️ **Three's raycaster ignores
-  `object.visible`** — hidden meshes are still hit — so you cannot rely on hiding a group to
-  stop picking it; it must be left out of the registry.
-- **Depth of field**: `dof.enabled = mode === "hyper" && <metagraph selected> && …` — an
-  allow-list, so new views are DoF-free by default.
+- **Picking** (`policy.pickSources` → `Engine._pickablesFor`): the row lists the exact mesh
+  pools (`"globe"`/`"layers"`/`"ledger"`) a view raycasts; unlisted = pick nothing. ⚠️ **Three's
+  raycaster ignores `object.visible`** — hidden meshes are still hit — so you cannot rely on
+  hiding a group to stop picking it; it must be left out of `pickSources`.
+- **Depth of field** (`policy.dofEligible`, still ANDed with a metagraph selected + the morph
+  window): only `hyper`, so new views are DoF-free by default.
 - **Pick hints** (`Inspector`'s `INVITE` map) mirror the pick registry: only views with
   pickable subjects get an invite; placeholder views get none.
 
-Same idea throughout: a new view is inert (no picks, no DoF, no hints) until you opt it in.
-The `ledger` view follows this exactly: it's opted into picking (`_pickablesFor` returns
-`ledger.pickables.concat(globe.pickables)`), gates its own placement via `if (this.ledger)`
-branches in the shared `globe.setMorph`/`update` (the seam that already owns the instance
-matrices) and an early-return in `layers.update`, and is **DoF-free**. Its hidden hubs
-(`layers.setLedger` sets `hub.visible = false`) are kept **out of the pick registry**, not
+Same idea throughout: a new view is inert (no picks, no DoF, no hints) until its `viewPolicy`
+row opts it in. The `ledger` row shows the pattern: `pickSources: ["ledger", "globe"]`,
+`morph: "frozen"` (nodes fly into lanes), `show.ledger: true` + `show.hyperFurniture: false`
+(hubs hidden), `dofEligible: false`. Its hidden hubs are kept **out of `pickSources`**, not
 relied on being invisible — per the raycaster rule above.
 
 ## Layout system — the four-zone HUD
@@ -379,8 +436,9 @@ in order:
    `--foreground`, `--muted-foreground`, **`--foreground-dim`** (`#c7d0ea`, the 2nd muted
    text tone), `--primary` = the accent cyan `#2af5ff`, `--accent` → `--primary`,
    `--destructive` (warn red — **also the no-signal dot**), **`--warn-soft`** (`#ffd166`, the
-   experimental-banner amber — advisory, NOT destructive), `--success`, `--core-l0`,
-   `--core-l1`, `--border`, …). **`--panel`** (the translucent glass fill) is a structural
+   experimental-banner amber — advisory, NOT destructive), `--success`, `--core` (the DAG
+   hypergraph-core blue — ONE hue; L0/L1 are NOT colour-distinguished anywhere),
+   `--border`, …). **`--panel`** (the translucent glass fill) is a structural
    **literal**, with siblings **`--panel-light`** (dock glass) + **`--panel-solid`** (tooltip
    glass); the accent glass-wash family **`--wash-faint`/`-soft`/`-hover`** (the `--border`
    RGB at fill alphas) is the ONE mechanism for faint accent fills. Then the **layout
@@ -416,7 +474,8 @@ code — reference the tokens. The SVG `RailThread` mirrors the `--thread-*` lit
 
 - **Structural cyan (`--primary`) is the SOLE accent/affordance signal**: live dots, the
   ECG, selection washes, sparklines, blueprint chrome, the "all" identity. Warn/ready use
-  `--destructive`/`--success`; the DAG core's own layers use `--core-l0`/`--core-l1`.
+  `--destructive`/`--success`; the DAG hypergraph core uses `--core` (ONE blue for the whole
+  core — its L0/L1 shells are the same hue, like any metagraph; nothing colour-distinguishes them).
 - **Identity hues appear ONLY via inline vars on subject marks** — `--mg`/`--mg-<id>`,
   `--spine`, `--filter-accent`, `--row-hue`, `--pulse-hue`, `--edge-hue` — set inline where
   a specific metagraph/node/snapshot is the subject (its dot, its thread spine, its edge
@@ -429,6 +488,24 @@ code — reference the tokens. The SVG `RailThread` mirrors the `--thread-*` lit
   wins over the hash fallback** (`palette.ts` assigns non-colliding hues in allowed zones).
   `filterAccent(filter)` is the one helper that resolves "current selection → CSS colour"
   (cyan for "all").
+- **The 3D scene sources its structural colours FROM the CSS tokens — one source of truth, no
+  hardcoding.** `app/globals.css` is canonical; nothing in `src/engine/scene/` invents a
+  structural colour. At construction the Engine calls `readSceneColors()`
+  (`src/engine/sceneColors.ts`), which reads `--primary`/`--core`/`--background`
+  via a hidden probe element + a 1×1 canvas (the canvas normalises whatever computed-colour
+  format the browser returns for an oklch token — `rgb()`, `color(srgb …)` — to sRGB bytes), and
+  threads the resulting `SceneColors` into every module (`createScene`, `Background`, `HyperView`,
+  `Globe`, `GeoView`, `LedgerView`). Calm/dim variants are the SAME token rendered at low
+  opacity/brightness — NOT a bespoke tone (so the geo hologram and the ledger tiles both = `--primary`
+  and match by construction). `config.COLORS` shrank to the 4 base values as the STATIC mirror the
+  non-DOM data/palette layer needs (SSR, bake scripts, `identity.ts`'s `CORE_HEX`); it holds the
+  tokens' *resolved* sRGB (note: `--primary` resolves to `0x53f2f2`, greener than the aspirational
+  `#2af5ff` comment — the token is canonical), and the Engine **dev-warns (±2/channel)** if the
+  mirror drifts from the live tokens. **`src/engine/noHardcodedColors.test.ts`** enforces this: it
+  fails on any raw `0xRRGGBB` in the scene layer outside a tiny documented allowlist (white tint
+  bases, the functional density-heatmap gradient, the ambient light, the node-dim tone) — runs in
+  `npm test`, the same gate as `layerBoundaries.test.ts`. (The JSX/`components/` layer has legacy
+  `rgb()`/hex literals that should migrate to the CSS-var tokens + extend the guard — a follow-up.)
 
 ### shadcn primitives in use
 
@@ -652,9 +729,9 @@ not Recharts — dense, interactive, slim (Recharts is used for the vitals `Spar
 > lifecycle*) for the focused tick. Anything new on the live tick should prefer that exact
 > read and only use the polled floor for ticks too old for the L0 node.
 
-## The Snapshots (ledger) 3D view — `js/ledger.js`
+## The Snapshots (ledger) 3D view — `scene/views/LedgerView.ts` (over `domain/ledgerModel.ts`)
 
-A 3D "settlement chamber" on the shared canvas. The `Ledger` class is driven by the Engine
+A 3D "settlement chamber" on the shared canvas. The `LedgerView` class is driven by the Engine
 (`_refreshLedger()` → `ledger.setData(globalSnapshots, getAnchor)` on each tick/anchor
 event, `ledger.update(dt)` per frame, `ledger.setGroupSizes(globe.ledgerGroups)` on
 metagraph changes).
@@ -669,12 +746,12 @@ metagraph changes).
   rings → metagraph snapshot → **the global-L0 cluster** (the line swings to lane-centre z=0
   to pass through it) → the global block. **Full node symmetry**: each L0 shows its node
   cluster AND its snapshot output; the global-L0 nodes are the DAG core's `l0` instances
-  (globe.js: `l0`→`rowHypL0`, `cl1`→`rowDAGL1`). The **DAG L1** (bottom) feeds $DAG blocks
+  (`Globe.ts`: `l0`→`rowHypL0`, `cl1`→`rowDAGL1`). The **DAG L1** (bottom) feeds $DAG blocks
   UP into the global. **Data producers** (top) is **symbolic** — external sources POSTing
   DataUpdates to the metagraph **dl1** (cL1 = wallet txns, dL1 = producer data; the DAG L1
   is cL1-only); their count is in no API, so it's a labelled floor + the flow line, **no
   nodes** (don't fabricate). Each metagraph gets its own **Z-lane** (`ledgerSite`); **X** is
-  time (chains trail LEFT, `SLOT_SP` apart, `SLOT_N` visible; X owned by ledger.js, Y/Z by
+  time (chains trail LEFT, `SLOT_SP` apart, `SLOT_N` visible; X owned by `LedgerView`, Y/Z by
   config).
 - **Reuse, not clones:** the producer NODES are the SAME `InstancedMesh` instances from
   hyper/geo (`globe.nodes` / `globe.metaNodes`); the `if (this.ledger)` branches in
@@ -684,7 +761,7 @@ metagraph changes).
   `hub.visible = false`). The **globe surface AND the starfield are gated OFF in ledger**
   (not eased by morph) — `globe.setMorph` zeroes `surf`/`extras` when `this.ledger`, and the
   Engine passes `background.update(.., 0)` — so neither lingers when arriving from geo.
-- **`ledger.js` owns:** the glass floor **panes** (`_paneMat`, one colour; floors named by
+- **`LedgerView` owns:** the glass floor **panes** (`_paneMat`, one colour; floors named by
   subtle flat edge-aligned text labels — `FLOOR_LABELS`/`_makeLabel`, not billboards); the
   centred live **global snapshot block** + its left-trailing **`_trail`** (individual
   pickable `Mesh`es, the `snapshot` pick); each metagraph's lane of snapshot **TILES** —
@@ -789,7 +866,7 @@ the polled anchor index.
 
 Two mechanisms back the **polled fallback** (used for old ticks, the strip, and the activity
 rates — exact is too heavy across many ticks):
-- **Self-healing catch-up** (`api.js _refreshOneMeta`): the poll **grows `?limit=` ×3 up to
+- **Self-healing catch-up** (`api.ts _refreshOneMeta`): the poll **grows `?limit=` ×3 up to
   600 until the batch reaches back to the newest ordinal already held** — provably no gap,
   regardless of burst size (a fixed tail silently dropped DOR-sized bursts and mislabelled
   them "unlisted"). Polls every tick (`pollMs`), base `VIS.metaSnapTail`.
@@ -798,7 +875,7 @@ rates — exact is too heavy across many ticks):
   prefer the exact read for any focused tick** and only use the polled floor for ticks too
   old for the L0 node.
 
-**Shared data layer** (`api.js`): `metaSnaps` (id → rolling `[{ordinal,hash,parent,ts,fee,
+**Shared data layer** (`api.ts`): `metaSnaps` (id → rolling `[{ordinal,hash,parent,ts,fee,
 sizeInKB}]`, seeded `VIS.metaSnapSeed`, tailed `VIS.metaSnapTail` with the catch-up above) +
 `anchorIndex` (global-tick ts → `{fee, count, metaIds:Set, metaCounts:Map(id→n), touched}`;
 `touched` = ms the count last grew, for the settling gate). `_recordMetaSnaps` dedupes by
@@ -837,9 +914,9 @@ can't fetch them — but the **Next Node server can**:
     tier: **HTTP-only**, **~45 req/min per source IP**, **non-commercial use only**. Fine at
     one batched call per 10-min regeneration; for a commercial product switch to an HTTPS
     geo provider with an SLA + license (ipinfo, MaxMind, ip-api Pro). The validator-side
-    resolver (`js/geo.js`) likewise uses ip-api (http) + ipwho.is (https).
+    resolver (`src/data/geoResolve.ts`) likewise uses ip-api (http) + ipwho.is (https).
 - **`app/api/geo/route.ts`** serves the validator geo seed (`data/geo.json`, imported) so
-  the globe plots instantly; `js/geo.js resolveMissing` fills new validator IPs.
+  the globe plots instantly; `geoResolve.ts resolveMissing` fills new validator IPs.
 - **`app/api/snapshot/[ordinal]/route.ts`** reads the **raw L0 global snapshot** (~2.5 MB)
   and returns a tiny `SnapshotExact` (exact fee, size KB, state-record count, per-metagraph
   breakdown incl. unlisted). **Cached per ordinal** (`unstable_cache`, immutable; throws on

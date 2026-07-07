@@ -1,5 +1,10 @@
 import { describe, it, expect } from "vitest";
 import { hoverKeyOf, tooltipSubject } from "./hoverSubject";
+import { COLORS } from "@/src/engine/config";
+
+// The core accent hex, derived from the SAME source tooltipSubject uses (config.COLORS.core, the
+// mirror of --primary) — not a hardcoded literal, so a token change can't silently break this.
+const CORE = "#" + COLORS.core.toString(16).padStart(6, "0");
 
 describe("hoverKeyOf", () => {
   it("keys a metagraph node by ip", () => {
@@ -22,12 +27,12 @@ describe("tooltipSubject", () => {
     expect(s?.name).toBe("9c2f");
     expect(s?.mono).toBe(true);
     expect(s?.color).toMatch(/^#[0-9a-f]{6}$/);
-    expect(s?.color).not.toBe("#2af5ff");
+    expect(s?.color).not.toBe(CORE);
   });
   it("labels a DAG validator as DAG in core cyan, name mono", () => {
     const s = tooltipSubject({ kind: "l1", node: { id: "abcd" } } as never);
     expect(s?.ident).toBe("DAG");
-    expect(s?.color).toBe("#2af5ff");
+    expect(s?.color).toBe(CORE);
     expect(s?.mono).toBe(true);
   });
   it("labels a hub with its name (ticker ident, metagraph hue, not mono)", () => {
@@ -36,13 +41,13 @@ describe("tooltipSubject", () => {
     expect(s?.name).toBe("Dor Technologies");
     expect(s?.mono).toBe(false);
     expect(s?.color).toMatch(/^#[0-9a-f]{6}$/);
-    expect(s?.color).not.toBe("#2af5ff");
+    expect(s?.color).not.toBe(CORE);
   });
   it("labels a snapshot by ordinal in core cyan", () => {
-    expect(tooltipSubject({ kind: "snapshot", data: { ordinal: 42 } } as never)).toEqual({ ident: "L0", name: "#42", color: "#2af5ff", mono: false });
+    expect(tooltipSubject({ kind: "snapshot", data: { ordinal: 42 } } as never)).toEqual({ ident: "L0", name: "#42", color: CORE, mono: false });
   });
   it("labels the core", () => {
-    expect(tooltipSubject({ kind: "core" } as never)).toEqual({ ident: "DAG", name: "Global L0", color: "#2af5ff", mono: false });
+    expect(tooltipSubject({ kind: "core" } as never)).toEqual({ ident: "DAG", name: "Global L0", color: CORE, mono: false });
   });
   it("is null for geoLive and nullish", () => {
     expect(tooltipSubject({ kind: "geoLive" } as never)).toBeNull();
