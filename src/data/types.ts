@@ -26,10 +26,12 @@ export interface SnapshotExact {
   unlistedFee: number; // datum from metagraphs outside the public catalog
   listedCount: number;
   unlistedCount: number;
-  // Per-metagraph breakdown by address/id → {count, fee}. Addresses matching config.METAGRAPHS are
-  // "listed" (named/coloured pills); the rest are the genuinely-unlisted ones (aggregated as
-  // unlistedCount). This is the exact, complete answer to "which metagraphs anchored here".
-  perMeta: Record<string, { count: number; fee: number }>;
+  // Per-metagraph breakdown by address/id → {count, fee, bytes}. Addresses matching config.METAGRAPHS
+  // are "listed" (named/coloured pills); the rest are the genuinely-unlisted ones (aggregated as
+  // unlistedCount). This is the exact, complete answer to "which metagraphs anchored here". `bytes`
+  // is that metagraph's measured serialized size (Σ content byte length), shown as KB on the
+  // expanded row — NOT derived from the fee.
+  perMeta: Record<string, { count: number; fee: number; bytes: number }>;
 }
 
 // Per-tick anchor aggregate from NetworkData.anchorIndex (see getAnchor).
