@@ -159,6 +159,13 @@ export class LedgerView {
     this._neutralTile = new THREE.Color(colors.core).multiplyScalar(NEUTRAL_DIM);
     this.group = new THREE.Group();
     this.group.visible = false;
+    // Whole-view orientation (tilt ∘ rotY) + scale so the ledger frames well under the SHARED overview
+    // camera — the camera never moves; the group does. Globe bakes the SAME matrix (Rx·Ry) into the
+    // node ledger positions so planes + nodes stay aligned — set the quaternion from that exact matrix.
+    this.group.quaternion.setFromRotationMatrix(
+      new THREE.Matrix4().makeRotationX(LEDGER.viewTiltX).multiply(new THREE.Matrix4().makeRotationY(LEDGER.viewRotY)),
+    );
+    this.group.scale.setScalar(LEDGER.viewScale);
     scene.add(this.group);
     this.pickables = [];
     this.sceneColors = null;

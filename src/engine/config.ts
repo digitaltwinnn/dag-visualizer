@@ -124,6 +124,15 @@ export const LEDGER = {
   dagLaneZ: -14.7,  // −Z centre of the reserved 1/3 (−depth/2 + depth/6) — where the DAG-L1 cluster sits
   dagCell: 2.8,     // spread radius for the DAG node discs (global L0 + DAG L1) — tight so they're not busy
   dot: 0.34,        // tiny-dot scale factor applied to node spheres in this view
+  // Whole-view ORIENTATION applied to the ledger so it frames well under the SHARED overview camera
+  // (the one hyper/geo use) — the camera never moves on a view switch; the ledger GROUP is rotated/
+  // tilted/scaled instead, and the SAME transform is baked into every node's ledger position (Globe)
+  // so planes + nodes stay aligned. viewRotY (Y) sets the diagonal — trail recedes to the top-left,
+  // lead sits bottom-right; viewTiltX (X) leans the stack a touch so it reads a bit steeper; viewScale
+  // sizes it up in frame. Order: tilt(X) ∘ rot(Y).
+  viewRotY: -Math.PI / 3, // ≈ −60° — the diagonal
+  viewTiltX: 0.22,        // ≈ 13° forward lean → a touch steeper, camera unmoved
+  viewScale: 1.5,         // bigger in frame without moving the camera
 };
 
 // The lead SITE (x,z) of metagraph `i` of `n` — its Z-LANE (a distinct depth), leading at x=0.

@@ -17,11 +17,8 @@ export const FOCI: Record<string, { pos: THREE.Vector3; target: THREE.Vector3 }>
   // The whole DAG core: pulled back enough to frame the outer cL1 (purple) shell (radius 14).
   dag: { pos: new THREE.Vector3(0, 9, 38), target: new THREE.Vector3(0, 1, 0) },
   geo: { pos: new THREE.Vector3(0, 11, 36), target: new THREE.Vector3(0, 2, 0) },
-  // The Snapshots view is a stack of transparent wireframe FLOORS (layers) on Y. Frame it from an
-  // elevated front angle so the stacked planes read in 3D — see LedgerView + config.LEDGER.
-  // Default framing: the LEAD (latest block) sits toward the bottom-right, leaving the rest of the
-  // view for the trailing chains; looking roughly along -X. Orbit is free.
-  ledger: { pos: new THREE.Vector3(31, 14, 20), target: new THREE.Vector3(-17, 1, -2) },
+  // (The Snapshots view has no camera of its own — it uses `overview`. The ledger GROUP is rotated/
+  // tilted/scaled instead, config.viewRotY/viewTiltX/viewScale, so the camera never moves on a switch.)
 };
 
 // Scratch — module-scope, reused across every hubFraming() call (never per-call allocation).

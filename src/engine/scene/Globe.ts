@@ -39,6 +39,11 @@ import type {
 } from "@/src/data/types";
 
 const _focusMat = new THREE.Matrix4(); // scratch for reading an instance's live transform
+// The ledger's whole-view orientation (tilt ∘ rotY), baked into every node's ledger position so the
+// nodes match the LedgerView group's transform. Scale is applied separately (uniform).
+const _LEDGER_M = new THREE.Matrix4()
+  .makeRotationX(LEDGER.viewTiltX)
+  .multiply(new THREE.Matrix4().makeRotationY(LEDGER.viewRotY));
 
 // null = idle spin; a focus state = ease-in-out to a focus orientation (y = longitude swing, x =
 // latitude tilt so high-lat nodes come into view).
@@ -204,10 +209,11 @@ export class Globe implements GeoViewHost {
         // DAG cl1 = native $DAG currency (hypergraph L1) → its OWN lane, same height as hypergraph L0
         // but offset on +Z (dagLaneZ), beside the central column.
         const lsp = ledgerSpread(i, n, LEDGER.dagCell);
-        const ledgerPos =
+        const ledgerPos = (
           role === "l0"
             ? new THREE.Vector3(lsp.x, LEDGER.rowHypL0, lsp.z)
-            : new THREE.Vector3(lsp.x, LEDGER.rowDAGL1, lsp.z + LEDGER.dagLaneZ);
+            : new THREE.Vector3(lsp.x, LEDGER.rowDAGL1, lsp.z + LEDGER.dagLaneZ)
+        ).applyMatrix4(_LEDGER_M).multiplyScalar(LEDGER.viewScale); // match the LedgerView group transform
 
         const pick = {
           kind, title: net, roles: nodeRoles(node, role), node, geo: g || null,
@@ -288,7 +294,8 @@ export class Globe implements GeoViewHost {
           const lsite = ledgerSite(m._ledgerCol, METAGRAPHS.length);
           const lrowY = layer === "l0" ? LEDGER.rowML0 : LEDGER.rowML1;
           const lsp = ledgerSpread(i, cnt, clusterRadius(cnt) * 0.75);
-          const ledgerPos = new THREE.Vector3(lsite.x + lsp.x, lrowY, lsite.z + lsp.z);
+          const ledgerPos = new THREE.Vector3(lsite.x + lsp.x, lrowY, lsite.z + lsp.z)
+            .applyMatrix4(_LEDGER_M).multiplyScalar(LEDGER.viewScale); // match the LedgerView group transform
           const pick = {
             kind: "metanode", meta: m, node, geo: g, layer,
             title: m.name, roles: rolesOf(node),

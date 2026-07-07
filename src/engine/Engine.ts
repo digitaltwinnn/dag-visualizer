@@ -416,7 +416,10 @@ export class Engine {
       this.globe.setFilter(this.filter); // dim non-selected metagraph columns (no camera move)
       this.ledger.setFilter(this.filter); // neutralise the other lanes' tiles/links
       this._refreshLedger();
-      this._snapTo(FOCI.ledger.pos, FOCI.ledger.target); // appear already-oriented (no camera tween)
+      // Ledger uses the SHARED overview camera — the camera never moves on a view switch. The whole
+      // ledger group is instead ROTATED + tilted + scaled (config.viewRotY/viewTiltX/viewScale) to
+      // frame the diagonal (trail top-left, lead bottom-right); the objects transform into place.
+      this.focus("overview");
       return;
     }
     // The remaining placeholder views (status/transactions/staking) hide the 3D scene — reset to idle.
@@ -705,14 +708,6 @@ export class Engine {
     tw.active = true;
   }
 
-  // Jump the camera straight to a framing — no tween (used for the Snapshots view, whose planar diagram
-  // is meant to appear already-oriented; tweening it in read as the planes swinging into place).
-  private _snapTo(toPos: Vec, toTgt: Vec) {
-    this._tween.active = false; // cancel any in-flight tween
-    this.ctx.camera.position.subVectors(toPos, toTgt).multiplyScalar(CAM_ZOOM).add(toTgt); // same global dolly-back
-    this.ctx.controls.target.copy(toTgt);
-    this.ctx.controls.update();
-  }
 
   private _focusGeo(R: number) {
     // Look head-on at the FRONT of the globe (target pushed forward in +Z, toward where the
