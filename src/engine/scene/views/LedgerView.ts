@@ -600,7 +600,10 @@ export class LedgerView {
           // otherwise the live lead (slot 0) is the coloured row. A filtered-out lane is never coloured.
           const hot = this.model.isRowHot(laneOff, b.slot);
           const colAmt = hot ? 1 : 0;
-          const bright = (hot ? Math.max(b.fade, 0.7) : b.fade) * (b.filled ? 0.6 : 0.13);
+          // The HOT (active-snapshot) filled tiles read BRIGHT — near/over full lane colour on the
+          // additive mesh so they bloom like the live global-L0 block; empty placeholders + the
+          // neutral trail stay dim.
+          const bright = hot ? Math.max(b.fade, 0.9) * (b.filled ? 1.3 : 0.2) : b.fade * (b.filled ? 0.6 : 0.13);
           this._metaTrailMesh.setColorAt(mi, _col.copy(this._neutralTile).lerp(laneColor, colAmt).multiplyScalar(bright));
           mi++;
 
