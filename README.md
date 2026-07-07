@@ -88,6 +88,13 @@ Visual uniformity is enforced with shared design tokens in one stylesheet (`app/
 one spacing scale, one panel radius, one "selected" treatment (`--sel-bg` / `--sel-border`),
 and one `CardHead` header component on every card. The live styleguide is served at `/design`.
 
+**`globals.css` is the single source of truth for colour — even in the 3D scene.** The Three.js
+engine doesn't hardcode structural colours; at start-up it reads the CSS design tokens
+(`--primary`, `--core`, `--background`) and threads them into every scene module,
+so the WebGL views and the HTML HUD always match. A `vitest` guard
+(`src/engine/noHardcodedColors.test.ts`) fails the build on any stray colour literal in the scene
+layer, keeping the palette honest.
+
 ## Node geography & metagraph nodes
 
 The globe plots validators and metagraph nodes at their real geolocations.

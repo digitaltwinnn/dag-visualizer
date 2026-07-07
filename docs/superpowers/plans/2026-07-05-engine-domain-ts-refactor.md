@@ -6,7 +6,7 @@
 
 **Architecture:** Single scene / single canvas / one composer stays. `src/engine/domain/` = pure logic (three math types allowed, no renderer/meshes/store); `src/engine/scene/` = Three adapters that read domain state each frame and write GPU state; `Engine.ts` remains the only store bridge. Spec: `docs/superpowers/specs/2026-07-05-engine-domain-ts-refactor-design.md`.
 
-**Tech Stack:** Next.js App Router, TypeScript, three (its own bundled types — never `@types/three`), Zustand, Vitest.
+**Tech Stack:** Next.js App Router, TypeScript, three@0.161 typed by the existing `@types/three@0.161` devDependency (the official type library, version-pinned — do not add or change type packages), Zustand, Vitest.
 
 ## Global Constraints
 
@@ -255,7 +255,9 @@ export function arcCurve(a: THREE.Vector3, b: THREE.Vector3, out: THREE.Vector3[
 - [ ] **Step 1:** Write `arcSim.test.ts` first: agents hop (travel→pause→retarget with a seeded `Math.random` stub via `vi.spyOn(Math, "random")`), arrival registers exactly one flash hit with the target index, **`step(dt, enabled: false)` produces zero flash hits and leaves agents untouched** (regression for the red-dots bug), `rebuild` with <2 points yields no agents, curve endpoints match `arcCurve`'s bezier at t=0/1. Run → FAIL.
 - [ ] **Step 2:** Implement (constants `ARC_TAIL`, `ARC_TAIL_FRAC`, `ARC_SAMPLES` move here). PASS; `npx tsc --noEmit`. Commit.
 
----### Task 11: Scene — split globe.js into Globe (coordinator) + NodeFabric + Arcs + Heatmap
+---
+
+### Task 11: Scene — split globe.js into Globe (coordinator) + NodeFabric + Arcs + Heatmap
 
 **Files:**
 - Create: `src/engine/scene/Globe.ts`, `src/engine/scene/NodeFabric.ts`, `src/engine/scene/Arcs.ts`, `src/engine/scene/Heatmap.ts`
@@ -313,16 +315,18 @@ export class LedgerModel {
 
 ---
 
-### Task 13: Scene — LedgerChamber over LedgerModel
+### Task 13: Scene — LedgerView over LedgerModel
+
+*(Renamed from LedgerChamber mid-execution: user-approved `scene/views/` + `scene/objects/` restructure landed after Task 12 — HyperFurniture→views/HyperView, GlobeSurface→views/GeoView, NodeFabric/Arcs/Heatmap/Background→objects/.)*
 
 **Files:**
-- Create: `src/engine/scene/LedgerChamber.ts`
+- Create: `src/engine/scene/views/LedgerView.ts`
 - Modify: `src/engine/Engine.ts` (import swap, drop `LedgerCtor`), `src/engine/boundary.ts` (delete `LedgerApi`)
 - Delete: `js/ledger.js`
 
 **Interfaces:**
 - Consumes: `LedgerModel` (Task 12), `config.ts`.
-- Produces: `class LedgerChamber` with boundary.ts's exact `LedgerApi` surface (group, sceneColors, pickables, setData, setGroupSizes, setSelected, setFilter, update, dispose). Owns: floors/panes/labels, centre block + trail meshes, the metagraph-trail InstancedMesh (incl. the `_metaLastDrawn` zero-sweep — keep verbatim), links buffer, pulse pool, rings. Every `update()` read of slot/lane/selection state goes through the model; `_gx`, `_dummy`, `_col`, `_q` stay module-scope scratch.
+- Produces: `class LedgerView` with boundary.ts's exact `LedgerApi` surface (group, sceneColors, pickables, setData, setGroupSizes, setSelected, setFilter, update, dispose). Owns: floors/panes/labels, centre block + trail meshes, the metagraph-trail InstancedMesh (incl. the `_metaLastDrawn` zero-sweep — keep verbatim), links buffer, pulse pool, rings. Every `update()` read of slot/lane/selection state goes through the model; `_gx`, `_dummy`, `_col`, `_q` stay module-scope scratch.
 
 - [ ] **Step 1:** Translate, splitting state (→ model, already landed) from meshes (→ chamber). `setData` calls `model.setData(...)` and spawns pulses/ring glows from the returned `TickChange[]` (same behaviour as today's `_anchorMetaBlock`/queue path).
 - [ ] **Step 2:** Engine import swap; delete `js/ledger.js`; boundary cleanup. `grep -rn "js/ledger" …` → zero hits.
@@ -334,7 +338,7 @@ export class LedgerModel {
 
 **Files:**
 - Create: `src/engine/domain/viewPolicy.ts`, `src/engine/domain/viewPolicy.test.ts`, `src/engine/layerBoundaries.test.ts`
-- Modify: `src/engine/Engine.ts`, `src/engine/scene/Globe.ts` (consume sim flags), `src/engine/scene/HyperFurniture.ts` (orbit flag)
+- Modify: `src/engine/Engine.ts`, `src/engine/scene/Globe.ts` (consume sim flags), `src/engine/scene/views/HyperView.ts` (orbit flag)
 
 **Interfaces:**
 - Produces:

@@ -1,4 +1,4 @@
-// Shapes coming off the (still-vanilla) data layer. Loose where the source is loose.
+// Shapes coming off the data layer (src/data/api.ts, typed). Loose where the source is loose.
 
 export interface GlobalSnapshot {
   ordinal: number;
@@ -42,10 +42,10 @@ export interface Anchor {
 }
 
 export interface GlobalEvent {
-  reset?: boolean;
+  reset: boolean;
   snapshots?: GlobalSnapshot[];
   snapshot?: GlobalSnapshot;
-  latest?: GlobalSnapshot;
+  latest: GlobalSnapshot | null;
 }
 
 export interface NodeInfo {
@@ -61,6 +61,45 @@ export interface GeoInfo {
   cc?: string;
   lat?: number;
   lon?: number;
+}
+
+export type GeoMap = Record<string, GeoInfo>;
+
+// A validator node from the NetworkData `cluster` event (always carries an IP).
+export interface ClusterNode {
+  ip: string;
+  state?: string;
+  id?: string;
+}
+
+// A metagraph as returned by /api/metagraphs (the shape the globe + meta list read).
+export interface RouteNode {
+  ip: string;
+  state?: string;
+  layer?: string;
+  roles?: string[];
+  id?: string;
+}
+export interface RouteMetagraph {
+  id: string;
+  name: string;
+  symbol?: string;
+  description?: string;
+  siteUrl?: string;
+  iconUrl?: string;
+  nodes: RouteNode[];
+}
+
+// The DAG modelled as a metagraph-shaped core (api.ts `_buildDagCore`): the L0+L1 validator
+// clusters merged by node id into one node-list with `roles` (a hybrid runs several layers).
+export interface DagCore {
+  id: string;
+  name: string;
+  symbol?: string;
+  description?: string;
+  isRoot?: boolean;
+  color: number;
+  nodes: RouteNode[];
 }
 
 // A metagraph + engine-computed geo facts. `nodes` is the full node list (drives the

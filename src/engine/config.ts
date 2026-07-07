@@ -6,21 +6,45 @@ export const API_BASE = "https://be-mainnet.constellationnetwork.io";
 export const L0_CLUSTER = "https://l0-lb-mainnet.constellationnetwork.io/cluster/info";
 export const L1_CLUSTER = "https://l1-lb-mainnet.constellationnetwork.io/cluster/info";
 
+// The STATIC mirror of the structural colour tokens in app/globals.css (`:root`). These three values
+// equal --primary / --core / --background respectively.
+//
+// ⚠️ globals.css is the SINGLE SOURCE OF TRUTH. The live 3D scene does NOT read these — it reads the
+// actual CSS tokens at boot via src/engine/sceneColors.ts (readSceneColors), so the rendered scene
+// always matches the stylesheet. This mirror exists ONLY for the one place that needs a static hex
+// with no DOM available: the data/palette layer (src/data, src/palette — SSR + bake scripts).
+// sceneColors does NOT fall back to it — readColorToken throws if a token doesn't resolve, rather
+// than silently substituting an off-palette hex. Keep it in sync with globals.css; the Engine logs a
+// dev-mode warning if the live tokens ever drift from these (see Engine constructor). Scene-only
+// derived tones (the geo hologram, node-dim, etc.) are NOT here — they're derived from these bases in
+// sceneColors.ts, since nothing outside the DOM scene needs them.
+// These are the RESOLVED sRGB values of the oklch tokens (what the browser actually renders — the
+// HUD already uses them). NB: they differ slightly from the aspirational hex in the globals.css
+// comments (e.g. --primary's oklch resolves to 0x53f2f2, a touch greener than the "#2af5ff" note) —
+// the token is canonical, so these mirror the token, not the comment. Update both together if a token
+// changes; the Engine dev-warns on drift.
 export const COLORS = {
-  core: 0x2af5ff,   // Global L0 snapshots (the DAG spine)
-  l0: 0x5b8cff,     // L0 validators (consensus ring)
-  l1: 0xb06bff,     // L1 nodes (transactions & data)
-  bg: 0x05060e,
+  core: 0x53f2f2,    // = --primary   (accent cyan — the DAG spine)
+  dagCore: 0x618df3, // = --core      (DAG hypergraph-core blue — ONE hue; L0/L1 not distinguished)
+  bg: 0x010207,      // = --background (scene clear colour)
 };
 
 // Fallback hub colour for a metagraph the config doesn't know yet (one not in METAGRAPHS).
 export const DEFAULT_META_COLOR = 0x8affc1;
 
+export interface MetaConfig {
+  name: string;
+  ticker: string;
+  color: number;
+  id: string;
+  blurb: string;
+}
+
 // The real mainnet metagraphs (source: dagexplorer). Each pulls live snapshots
-// via its id, with a simulated cadence fallback. Colours match the metagraph
-// node clusters plotted on the globe (data/metagraphs.json). Keep this list in
-// sync with the baked data by re-running scripts/bake-metagraphs.py.
-export const METAGRAPHS = [
+// via its id. Colours match the metagraph node clusters plotted on the globe
+// (data/metagraphs.json). Keep this list in sync with the baked data by
+// re-running scripts/bake-metagraphs.py.
+export const METAGRAPHS: MetaConfig[] = [
   { name: "Digital Evidence",    ticker: "DED",      color: 0x36e29a, id: "DAG0eQr94qUQSUhmYGNXt6CoBKWu5K6htvRMGC6M",
     blurb: "DoD-vetted data-fingerprinting as a service — immutable proof of data authenticity, anchored to the Global L0." },
   { name: "Cyberlete",           ticker: "LEET",     color: 0xff7ad9, id: "DAG0rgR8sdn8u2YBYb5Ftjy4zmuqUX3v9XsE2j94",
@@ -46,7 +70,10 @@ export const METAGRAPHS = [
 // Anchor position of metagraph i's orbiting cluster in the Hypergraph layout.
 // Shared by Layers (the hub mesh) and Globe (where each metagraph's real nodes
 // start before they fly out to the map) so the burst originates from the hub.
-export function metaAnchor(i, n) {
+export function metaAnchor(
+  i: number,
+  n: number,
+): { x: number; y: number; z: number; a: number; radius: number; incl: number } {
   const a = (i / n) * Math.PI * 2;
   const incl = (i % 2 === 0 ? 1 : -1) * (0.15 + (i % 3) * 0.12);
   const radius = VIS.metaOrbitRadius + (i % 4) * 3.2;
@@ -102,14 +129,14 @@ export const LEDGER = {
 // Shared by Layers, Globe's node clusters and Ledger so a metagraph's nodes, rings and chain all
 // line up in its lane.
 const LANE_SPREAD = 0.62; // fraction of LEDGER.depth the lanes span (see clusterRadius)
-export function ledgerSite(i, n) {
+export function ledgerSite(i: number, n: number): { x: number; z: number } {
   const spread = LEDGER.depth * LANE_SPREAD;
   return { x: 0, z: n > 1 ? (i / (n - 1) - 0.5) * spread : 0 };
 }
 
 // The ring/cluster radius for a node group of `count` nodes — grows with count (so the ring fits
 // the dots) but is capped to a fraction of the lane spacing so neighbouring rings never overlap.
-export function clusterRadius(count) {
+export function clusterRadius(count: number): number {
   const laneGap = (LEDGER.depth * LANE_SPREAD) / Math.max(1, METAGRAPHS.length - 1); // = ledgerSite's Z step
   const cap = laneGap * 0.46;
   return Math.min(cap, 0.55 + Math.sqrt(Math.max(1, count)) * 0.3);
@@ -117,7 +144,11 @@ export function clusterRadius(count) {
 
 // Small deterministic golden-angle offset for node `k` of `cnt`, spreading a cluster as a flat
 // disc ON the floor (X/Z plane) within `radius` — no random jitter.
-export function ledgerSpread(k, cnt, radius) {
+export function ledgerSpread(
+  k: number,
+  cnt: number,
+  radius: number,
+): { x: number; z: number } {
   if (cnt <= 1) return { x: 0, z: 0 };
   const r = Math.sqrt(k / (cnt - 1)) * radius;
   const a = k * 2.399963229728653; // golden angle

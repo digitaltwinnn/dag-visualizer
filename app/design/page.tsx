@@ -1,6 +1,4 @@
 import { headers } from "next/headers";
-import { Badge } from "@/components/ui/badge";
-import { Separator } from "@/components/ui/separator";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import {
@@ -11,7 +9,7 @@ import {
   CommandGroup,
   CommandItem,
 } from "@/components/ui/command";
-import CardHead, { RIGHT_CARD } from "@/components/CardHead";
+import { RIGHT_CARD } from "@/components/CardHead";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import {
@@ -22,8 +20,9 @@ import {
 } from "@/components/state/StateAtoms";
 import OdometerDemo from "./OdometerDemo";
 import CardSignalsDemo from "./CardSignalsDemo";
+import CardHeadDemo from "./CardHeadDemo";
 import EcgMark from "@/components/topbar/EcgMark";
-import { VIEW_ICONS, ABOUT_ICON, EXPLORE_ICON } from "@/components/icons";
+import { VIEW_ICONS } from "@/components/icons";
 import { Minus, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -38,8 +37,7 @@ const STRUCTURAL: { name: string; var: string }[] = [
   { name: "destructive (warn / no-signal)", var: "--destructive" },
   { name: "warn-soft (banner amber)", var: "--warn-soft" },
   { name: "success (ready)", var: "--success" },
-  { name: "core-l0 (blue)", var: "--core-l0" },
-  { name: "core-l1 (violet)", var: "--core-l1" },
+  { name: "core (DAG hypergraph-core blue)", var: "--core" },
   { name: "panel (glass fill)", var: "--panel" },
   { name: "panel-light (dock glass)", var: "--panel-light" },
   { name: "wash-soft (accent fill)", var: "--wash-soft" },
@@ -117,33 +115,7 @@ export default async function DesignPage() {
           at their hue). Rail cards override the Card&apos;s default padding so today&apos;s spacing is
           preserved.
         </p>
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 max-w-2xl">
-          <Card asChild className="block p-0">
-            <div>
-              <CardHead panel icon={ABOUT_ICON} eyebrow="Hypergraph · about" title="Glass card" />
-              <div className="py-[var(--panel-pad-y)] px-[var(--panel-pad-x)] text-sm text-muted-foreground">
-                Spineless at rest — the rail thread carries identity.
-                <Separator className="my-3" />
-                <div className="flex flex-wrap gap-2">
-                  <Badge>default</Badge>
-                  <Badge variant="secondary">secondary</Badge>
-                  <Badge variant="destructive">down</Badge>
-                  <Badge variant="outline">outline</Badge>
-                </div>
-              </div>
-            </div>
-          </Card>
-          <Card asChild className="block p-0 [--spine:var(--success)] sig-right subject-paired">
-            <div>
-              <CardHead panel icon={EXPLORE_ICON} eyebrow="Spine override" title="Signal colour" />
-              <div className="py-[var(--panel-pad-y)] px-[var(--panel-pad-x)] text-sm text-muted-foreground">
-                Signal states read <code className="font-mono">--spine</code>; identity panels point
-                it at <code className="font-mono">--mg</code>. Here it is success-green, shown in the
-                hover-paired state on the scene-facing edge.
-              </div>
-            </div>
-          </Card>
-        </div>
+        <CardHeadDemo />
         <p className="text-sm text-muted-foreground mt-3 max-w-2xl">
           Task 23: every panel-layout <code className="font-mono">CardHead</code> now leads its title
           with a lucide `icon` (About&apos;s <code className="font-mono">Info</code>, the tool cards&apos;{" "}

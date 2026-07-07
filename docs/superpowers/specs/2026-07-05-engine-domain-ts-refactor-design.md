@@ -18,7 +18,7 @@ allow-by-view policy; the logic is also untestable without a browser.
 
 ## Goals
 
-1. All engine code in TypeScript, using three's **bundled** types (no `@types/three`).
+1. All engine code in TypeScript, using the repo's existing `@types/three` (version-pinned to three; do not add or change type packages).
 2. Logic separated from presentation with a compiler-visible, lint-enforced boundary.
 3. Per-view behaviour declared in ONE place (`ViewPolicy`) — CLAUDE.md's
    "allow-list, not deny-list" rule as a data structure, not prose.
