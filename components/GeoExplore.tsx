@@ -135,7 +135,7 @@ export default function GeoExplore() {
                 <button
                   type="button"
                   className={cn(
-                    "flex items-center gap-2.5 w-full text-left text-body border-none bg-transparent cursor-pointer py-[5px] px-1.5 -mx-1.5 rounded-sm transition-[background] duration-150",
+                    "group flex items-center gap-2.5 w-full text-left text-body border-none bg-transparent cursor-pointer py-[5px] px-1.5 -mx-1.5 rounded-sm transition-[background] duration-150",
                     "hover:bg-wash-hover",
                     "focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--primary)] focus-visible:outline-offset-[-2px]",
                     // The drilled country row wears the same shared selection language as the
@@ -161,15 +161,18 @@ export default function GeoExplore() {
                     />
                   </span>
                   <span className="flex-none w-[26px] text-right text-body tabular-nums font-semibold">{c.count}</span>
-                  {/* Chevron shows ONLY while the country is open/drilled (down = open + collapse
-                      cue); closed rows show none — kept via opacity so the count column never
-                      shifts. Clean at rest and touch-safe (no hover-reveal). "Click a country to
-                      drill in." (card footer) keeps closed rows discoverable. */}
+                  {/* Expand affordance / open-state cue. The open/drilled country shows a down
+                      chevron. Closed rows: hidden on a mouse (revealed on row hover/focus — keeps
+                      the list clean), but ALWAYS shown on touch (`@media (hover:none)`), where
+                      there's no hover to surface it. Kept via opacity so the count column never
+                      shifts. */}
                   <ChevronRight
                     aria-hidden
                     className={cn(
                       "size-3.5 flex-none transition-[transform,opacity] duration-150 motion-reduce:transition-none",
-                      open ? "rotate-90 text-foreground opacity-100" : "opacity-0",
+                      open
+                        ? "rotate-90 text-foreground opacity-100"
+                        : "text-muted-foreground opacity-0 group-hover:opacity-100 group-focus-visible:opacity-100 [@media(hover:none)]:opacity-100",
                     )}
                   />
                 </button>

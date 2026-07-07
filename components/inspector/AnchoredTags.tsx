@@ -124,7 +124,7 @@ export default function AnchoredTags({
                 onClick={() => toggle(r.id)}
                 aria-expanded={isOpen}
                 className={cn(
-                  "flex items-center gap-2 w-full text-left border-none cursor-pointer py-[3px] px-1.5 -mx-1.5 rounded-sm transition-[background] duration-150",
+                  "group flex items-center gap-2 w-full text-left border-none cursor-pointer py-[3px] px-1.5 -mx-1.5 rounded-sm transition-[background] duration-150",
                   isSel ? "bg-transparent" : "bg-transparent hover:bg-wash-hover",
                   "focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--primary)] focus-visible:outline-offset-[-2px]",
                 )}
@@ -144,15 +144,18 @@ export default function AnchoredTags({
                 </span>
                 {bar(r.n, r.hue)}
                 <span className="w-7 flex-none text-right text-body text-foreground tabular-nums">{r.n}</span>
-                {/* Open-state indicator + collapse affordance: a down chevron ONLY while the row is
-                    open. Closed rows show none (kept via opacity so the count column never shifts) —
-                    clean at rest and touch-safe (no hover-reveal, which coarse pointers can't
-                    trigger). Every row is tappable, including the unlisted roll-up. */}
+                {/* Expand affordance / open-state cue. Open rows show a down chevron. Closed rows:
+                    hidden on a mouse (revealed on row hover/focus — keeps the resting list clean),
+                    but ALWAYS shown on touch (`@media (hover:none)`), where there's no hover to
+                    surface it. Kept via opacity so the count column never shifts. Every row is
+                    tappable, including the unlisted roll-up. */}
                 <ChevronRight
                   aria-hidden
                   className={cn(
                     "size-3.5 flex-none transition-[transform,opacity] duration-150 motion-reduce:transition-none",
-                    isOpen ? "rotate-90 text-foreground opacity-100" : "opacity-0",
+                    isOpen
+                      ? "rotate-90 text-foreground opacity-100"
+                      : "text-muted-foreground opacity-0 group-hover:opacity-100 group-focus-visible:opacity-100 [@media(hover:none)]:opacity-100",
                   )}
                 />
               </button>
