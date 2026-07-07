@@ -161,11 +161,15 @@ export default function GeoExplore() {
                     />
                   </span>
                   <span className="flex-none w-[26px] text-right text-body tabular-nums font-semibold">{c.count}</span>
+                  {/* Chevron shows ONLY while the country is open/drilled (down = open + collapse
+                      cue); closed rows show none — kept via opacity so the count column never
+                      shifts. Clean at rest and touch-safe (no hover-reveal). "Click a country to
+                      drill in." (card footer) keeps closed rows discoverable. */}
                   <ChevronRight
                     aria-hidden
                     className={cn(
-                      "size-3.5 flex-none transition-transform motion-reduce:transition-none",
-                      open ? "rotate-90 text-foreground" : "text-muted-foreground",
+                      "size-3.5 flex-none transition-[transform,opacity] duration-150 motion-reduce:transition-none",
+                      open ? "rotate-90 text-foreground opacity-100" : "opacity-0",
                     )}
                   />
                 </button>
