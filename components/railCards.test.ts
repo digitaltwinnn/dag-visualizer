@@ -18,6 +18,7 @@ const details = (over: Partial<RailManifestState>): RailManifestState => ({
   filter: "all",
   inspect: null,
   snap: null,
+  layer: null,
   selStack: [],
   ...over,
 });
@@ -56,6 +57,16 @@ describe("detailsCards — RIGHT rail (Details)", () => {
   });
   it("a snapshot followed on the all filter → snap card only (no Context)", () => {
     expect(presentKinds(detailsCards(details({ snap: snapPick, selStack: ["snap"] })))).toEqual(["snap"]);
+  });
+  it("a settlement layer selected → layer card, stacked in recency order with a snapshot", () => {
+    const layerPick = { kind: "layer", layerId: "hypl0", name: "Hypergraph L0", desc: "" } as Extract<
+      PickDescriptor,
+      { kind: "layer" }
+    >;
+    expect(presentKinds(detailsCards(details({ layer: layerPick, selStack: ["layer"] })))).toEqual(["layer"]);
+    expect(
+      presentKinds(detailsCards(details({ layer: layerPick, snap: snapPick, selStack: ["layer", "snap"] }))),
+    ).toEqual(["layer", "snap"]);
   });
   it("Context + a node when a metagraph is filtered AND a node is picked", () => {
     const s = details({ filter: "dor", inspect: nodePick, selStack: ["node"] });

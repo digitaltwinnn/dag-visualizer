@@ -47,6 +47,8 @@ function CardPane({
   // `subjectKey` is the SAME identity that keys the body's title roll-in (node id row / ordinal
   // Odometer), so the title roll and the edge pulse fire together as one "new subject" moment —
   // and it is stable across same-subject data refreshes (no pulse on a re-render, only a new pick).
+  const ledgerHilite = useStore((s) => s.ledgerHilite);
+  const setLedgerHilite = useStore((s) => s.setLedgerHilite);
   let pair;
   let subjectKey: string | number | null;
   if (pick.kind === "snapshot") {
@@ -55,6 +57,12 @@ function CardPane({
     // that exact line (metagraphById resolves "dag" through the identity map too).
     pair = subjectPairing<number>(hoverSnapOrd, pick.data.ordinal, setHoverSnapOrd, filterAccent(filter));
     subjectKey = pick.data.ordinal;
+  } else if (pick.kind === "layer") {
+    // Layer pairing rides the plane-highlight PREVIEW channel: hovering the card highlights its
+    // floor plane in the 3D view (the reverse direction doesn't exist — planes aren't raycast).
+    // Structural cyan: a layer is structural, not an identity subject.
+    pair = subjectPairing<string>(ledgerHilite, pick.layerId, setLedgerHilite, "var(--primary)");
+    subjectKey = pick.layerId;
   } else {
     // geoLive → the selected node, read from the store like GeoLiveCard does.
     const node =
@@ -133,11 +141,13 @@ export default function Inspector() {
   const bp = useBreakpoint();
   const inspect = useStore((s) => s.inspect);
   const snap = useStore((s) => s.snap);
+  const layer = useStore((s) => s.layer);
   const selStack = useStore((s) => s.selStack);
   const filter = useStore((s) => s.filter);
   const mode = useStore((s) => s.mode) as Mode;
   const setInspect = useStore((s) => s.setInspect);
   const setSnap = useStore((s) => s.setSnap);
+  const setLayer = useStore((s) => s.setLayer);
   const phoneDock = useStore((s) => s.phoneDock);
   const setPhoneDock = useStore((s) => s.setPhoneDock);
   const phoneSheetPx = useStore((s) => s.phoneSheetPx);
@@ -152,7 +162,7 @@ export default function Inspector() {
   // icon even at the "all" filter, where ContextCard renders nothing). The Context card itself
   // stays ALWAYS-mounted below (via <ContextCard/>, which self-nulls on "all") so its EdgePulse
   // survives the dossier ⇄ nothing swap; the manifest only decides its tray-icon presence.
-  const manifest = detailsCards({ mode, filter, inspect, snap, selStack });
+  const manifest = detailsCards({ mode, filter, inspect, snap, layer, selStack });
   const detailPane: Record<string, ReactNode> = {
     // geoLive reads the node from the store; its × is CardHead's shared close like every card.
     node: (
@@ -160,6 +170,9 @@ export default function Inspector() {
     ),
     snap: snap ? (
       <CardPane key="snap" pick={snap} eyebrow="Selected snapshot" onClose={() => setSnap(null)} />
+    ) : null,
+    layer: layer ? (
+      <CardPane key="layer" pick={layer} eyebrow="Selected layer" onClose={() => setLayer(null)} />
     ) : null,
   };
   // Present Detail cards in the manifest's (recency) order — Context is rendered separately.

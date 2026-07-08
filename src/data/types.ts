@@ -178,4 +178,7 @@ export type PickDescriptor =
   // "geoLive" = Geography's signature detail card: the selected node's details (or a pick
   // hint). The selection's footprint summary lives in the top-bar vitals. Reads the store
   // itself (no payload).
-  | (PickBase & { kind: "geoLive" });
+  | (PickBase & { kind: "geoLive" })
+  // A settlement-stack LAYER, selected from the Snapshots·Explore panel (LedgerPanel LAYERS —
+  // layerId matches LedgerView's floor ids). The card body derives its live facts from the store.
+  | (PickBase & { kind: "layer"; layerId: string; name: string; desc: string });

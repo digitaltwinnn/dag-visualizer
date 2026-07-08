@@ -14,7 +14,7 @@ import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { SonarRing, NodeStars, NoSignalDot } from "@/components/state/StateAtoms";
-import { VIEW_ICONS, KIND_MARK_CLASS } from "@/components/icons";
+import { VIEW_ICONS, LAYER_ICON, KIND_MARK_CLASS } from "@/components/icons";
 import { ExternalLink } from "lucide-react";
 import { useMinHold } from "@/components/useMinHold";
 import { VIS } from "@/src/engine/config";
@@ -360,6 +360,88 @@ function GeoLiveNode({ p }: { p: PickOf<"l0" | "l1" | "metanode"> }) {
         <div className="my-2">
           <span className="text-micro tracking-[0.1em] uppercase text-muted-foreground">Composition</span>
           <CompositionRows nodes={oneNode} />
+        </div>
+      )}
+    </>
+  );
+}
+
+// ── The LAYER card (Snapshots · settlement-stack layer) ─────────────────────────────────────
+// Selected from the Snapshots·Explore panel (LedgerPanel): each layer of the settlement stack is a
+// clickable subject whose card = what the layer IS (the pick carries the panel's description) plus
+// its LIVE footprint right now, derived from data already in the store — node counts from the
+// metagraph list (a hybrid counts in every layer it runs, matching the top-bar vitals taxonomy),
+// activity rates from store.activity (the vitals' source). No new fetches, nothing fabricated.
+
+// Head title: the layer's single-plane mark + its name (same view-vocabulary pattern as the
+// snapshot head's Layers mark).
+export function LayerTitle({ p }: { p: PickOf<"layer"> }) {
+  const Icon = LAYER_ICON; // the dedicated single-plane mark — same glyph as its tray icon
+  return (
+    <span className="inline-flex items-center gap-2 min-w-0">
+      <Icon className={cn(KIND_MARK_CLASS, "text-[var(--primary)]")} aria-hidden />
+      <span className="truncate">{p.name}</span>
+    </span>
+  );
+}
+
+export function LayerCard({ p }: { p: PickOf<"layer"> }) {
+  const metaList = useStore((s) => s.metaList);
+  const nodes = useStore((s) => s.nodes);
+  const activity = useStore((s) => s.activity);
+  const latestOrdinal = useStore((s) => s.latestOrdinal);
+
+  // Role tallies over the LIVE metagraph set (excluding the DAG root — its layers are the
+  // hypergraph rows below). A node counts in every layer it runs (roles), like the vitals.
+  const metas = metaList.filter((m) => !m.isRoot);
+  const roleCount = (role: string) =>
+    metas.reduce((sum, m) => sum + m.nodes.filter((n) => (n.roles ?? []).includes(role)).length, 0);
+  const metasRunning = (roles: string[]) =>
+    metas.filter((m) => m.nodes.some((n) => (n.roles ?? []).some((r) => roles.includes(r)))).length;
+
+  // The layer's live fact rows, by id (matches LedgerPanel's LAYERS / LedgerView's floors).
+  const facts: { label: string; value: string }[] = [];
+  const perHour = (n: number) => `${Math.round(n).toLocaleString()} / hr`;
+  switch (p.layerId) {
+    case "ml1":
+      facts.push(
+        { label: "Currency-L1 nodes", value: String(roleCount("cl1")) },
+        { label: "Data-L1 nodes", value: String(roleCount("dl1")) },
+        { label: "Metagraphs running it", value: String(metasRunning(["cl1", "dl1"])) },
+      );
+      break;
+    case "ml0":
+      facts.push(
+        { label: "L0 nodes", value: String(roleCount("l0")) },
+        { label: "Metagraphs running it", value: String(metasRunning(["l0"])) },
+      );
+      break;
+    case "msnap":
+      if (activity) facts.push({ label: "Snapshots anchored", value: perHour(activity.anchorsPerHour) });
+      break;
+    case "hypl0":
+      facts.push({ label: "Global validators", value: String(nodes.l0) });
+      break;
+    case "hypl1":
+      facts.push({ label: "$DAG L1 nodes", value: String(nodes.l1) });
+      break;
+    case "gl0":
+      if (activity) facts.push({ label: "Global snapshots", value: perHour(activity.snapsPerHour) });
+      if (latestOrdinal != null) facts.push({ label: "Latest ordinal", value: latestOrdinal.toLocaleString() });
+      break;
+  }
+
+  return (
+    <>
+      <Desc text={p.desc} />
+      {facts.length > 0 && (
+        <div className="flex flex-col gap-2 mt-2">
+          {facts.map((f) => (
+            <div key={f.label} className="flex items-start justify-between gap-2.5">
+              <span className="text-body text-muted-foreground">{f.label}</span>
+              <span className="text-body text-foreground tabular-nums">{f.value}</span>
+            </div>
+          ))}
         </div>
       )}
     </>

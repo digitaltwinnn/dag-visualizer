@@ -2,6 +2,7 @@ import {
   Orbit,
   Globe,
   Layers,
+  Layers2,
   Radar,
   ArrowLeftRight,
   HandCoins,
@@ -44,6 +45,13 @@ export const ABOUT_ICON: LucideIcon = Info;
 // mark (that legend is unchanged — it's what's parked inside the sheet, not the card's own head).
 export const EXPLORE_ICON: LucideIcon = Compass;
 
+// A settlement-stack LAYER's mark (the Snapshots·Explore panel's click subject). NOT a view icon —
+// it's deliberately distinct from VIEW_ICONS.ledger (the snapshot card's full-stack mark) so the
+// two cards stay distinguishable in the dock trays, where both can show at once; a single-plane
+// glyph from the same Layers family. Named like ABOUT_ICON/EXPLORE_ICON: dedicated non-view marks
+// get a constant here, view subjects borrow VIEW_ICONS.
+export const LAYER_ICON: LucideIcon = Layers2;
+
 // The ONE size every card-head/title KIND MARK renders at — About's Info, the tool cards' Compass,
 // the node card's Globe, the snapshot card's Layers (CardHead's panel `icon` + the inspector
 // titles in inspector/cards.tsx). 16px (`size-4`): the old 14px read timid next to the 15px
@@ -59,6 +67,9 @@ export function iconForPick(kind: PickDescriptor["kind"] | "l0" | "l1" | "metano
   switch (kind) {
     case "snapshot":
       return VIEW_ICONS.ledger;
+    case "layer":
+      return LAYER_ICON; // dedicated mark (see its constant above) — not a view subject
+
     case "geoLive":
     case "l0":
     case "l1":

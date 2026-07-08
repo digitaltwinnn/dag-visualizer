@@ -20,7 +20,7 @@ import type { PickDescriptor } from "@/src/data/types";
 // Hue + active-flag stay with the tray builders (per-rail presentation), not here.
 // ─────────────────────────────────────────────────────────────────────────────────────────────
 
-export type RailCardKind = "about" | "tool" | "context" | "node" | "snap";
+export type RailCardKind = "about" | "tool" | "context" | "node" | "snap" | "layer";
 
 export interface RailCard {
   /** Stable id within the rail (also the tray-icon key + the render-map key). */
@@ -40,6 +40,7 @@ export interface RailManifestState {
   filter: string;
   inspect: PickDescriptor | null;
   snap: Extract<PickDescriptor, { kind: "snapshot" }> | null;
+  layer: Extract<PickDescriptor, { kind: "layer" }> | null;
   selStack: SelSlot[];
 }
 
@@ -87,7 +88,14 @@ export function detailsCards(s: RailManifestState): RailCard[] {
     subjectKey: s.snap ? s.snap.data.ordinal : null,
     present: !!s.snap,
   };
-  const bySlot: Record<SelSlot, RailCard> = { node, snap };
+  const layer: RailCard = {
+    id: "layer",
+    kind: "layer",
+    icon: iconForPick("layer"),
+    subjectKey: s.layer ? s.layer.layerId : null,
+    present: !!s.layer,
+  };
+  const bySlot: Record<SelSlot, RailCard> = { node, snap, layer };
   // Present detail cards in the store's recency order, then any inactive slots (present: false)
   // appended so the full candidate set is always represented.
   const inStack = s.selStack.filter((slot) => bySlot[slot]);

@@ -8,11 +8,12 @@ import { EXPLORE_ICON } from "@/components/icons";
 import { useStore } from "@/src/store/store";
 
 // The Snapshots view's left-rail tool: the layered-design explainer. Lists the settlement stack
-// top→bottom; HOVERING a layer previews its plane highlight in the 3D view, CLICKING commits it
-// (click again to clear) — store.ledgerHilite → the engine → LedgerView.setHighlight. The committed
-// selection is local state; hover writes the preview and mouse-leave restores the committed one
-// (same preview-vs-commit split as hoverFilter vs filter). The 3D planes carry NO text — this panel
-// is where the names live. Ids match LedgerView's FLOOR_LAYERS / the "hypl0"/"hypl1" split panes.
+// top→bottom; HOVERING a layer previews its plane highlight in the 3D view (store.ledgerHilite, the
+// transient channel), CLICKING commits the selection (store.layer — opens the layer card on the
+// right facts rail AND keeps the plane highlighted; click again to clear). The engine resolves
+// `ledgerHilite ?? layer?.layerId` — the same preview-vs-commit split as hoverFilter vs filter.
+// The 3D planes carry NO text — this panel is where the names live. Ids match LedgerView's
+// FLOOR_LAYERS / the "hypl0"/"hypl1" split panes.
 const LAYERS: { id: string; name: string; desc: string }[] = [
   { id: "ml1", name: "Metagraph L1", desc: "Currency-L1 (wallet transactions) and data-L1 (producer updates) validate incoming work into blocks." },
   { id: "ml0", name: "Metagraph L0", desc: "Collects those L1 blocks into the metagraph's snapshot." },
@@ -24,14 +25,14 @@ const LAYERS: { id: string; name: string; desc: string }[] = [
 
 export default function LedgerPanel() {
   const [collapsed, setCollapsed] = useState(false);
-  // The COMMITTED selection (clicked). Hover previews by writing the store highlight directly;
-  // leaving a row restores the committed one. Local state — this panel is the only writer.
-  const [sel, setSel] = useState<string | null>(null);
+  // The COMMITTED selection lives in the store (store.layer — it's the layer card's pick, cleared
+  // by the card's × too); hover writes the transient preview channel, leave clears it (the engine
+  // falls back to the committed layer).
+  const sel = useStore((s) => s.layer?.layerId ?? null);
+  const setLayer = useStore((s) => s.setLayer);
   const setHilite = useStore((s) => s.setLedgerHilite);
-  const commit = (id: string) => {
-    const next = sel === id ? null : id;
-    setSel(next);
-    setHilite(next);
+  const commit = (l: (typeof LAYERS)[number]) => {
+    setLayer(sel === l.id ? null : { kind: "layer", layerId: l.id, name: l.name, desc: l.desc });
   };
   return (
     <Card asChild className="sig-right block p-0 flex-[0_1_auto] min-h-0 [--spine:var(--filter-accent,var(--primary))]">
@@ -45,18 +46,18 @@ export default function LedgerPanel() {
           onToggle={() => setCollapsed((c) => !c)}
         />
         <div className={cn("flex flex-col px-3 pt-1.5 pb-2.5 min-h-0 overflow-y-auto cmd-list-scroll", collapsed && "hidden")}>
-          <div className="flex flex-col gap-0.5" onMouseLeave={() => setHilite(sel)}>
+          <div className="flex flex-col gap-0.5" onMouseLeave={() => setHilite(null)}>
             {LAYERS.map((l) => {
               const on = sel === l.id;
               return (
                 <button
                   key={l.id}
                   type="button"
-                  onClick={() => commit(l.id)}
+                  onClick={() => commit(l)}
                   onMouseEnter={() => setHilite(l.id)}
-                  onMouseLeave={() => setHilite(sel)}
+                  onMouseLeave={() => setHilite(null)}
                   onFocus={() => setHilite(l.id)}
-                  onBlur={() => setHilite(sel)}
+                  onBlur={() => setHilite(null)}
                   aria-pressed={on}
                   className={cn(
                     "text-left border-none cursor-pointer rounded-sm px-1.5 py-1.5 transition-[background] duration-150",

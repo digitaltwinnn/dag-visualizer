@@ -7,7 +7,7 @@ import type { HoverSubject } from "@/src/data/hoverSubject";
 export type Mode = "hyper" | "geo" | "ledger" | "status" | "transactions" | "staking";
 
 // One slot in the right-rail card stack (extend with future card types — e.g. "tx").
-export type SelSlot = "node" | "snap";
+export type SelSlot = "node" | "snap" | "layer";
 
 // Move `slot` to the FRONT of the recency stack when it becomes active, or drop it when cleared.
 function bumpStack(stack: SelSlot[], slot: SelSlot, active: boolean): SelSlot[] {
@@ -69,9 +69,13 @@ interface AppState {
   // Node id/ip the cursor is hovering in the geo explorer list — glows that node's shells on the globe
   // (same pairing as a 3D raycast hover). null = not hovering a list row.
   hoverNodeId: string | null;
-  // Ledger layer id (LedgerView FLOOR_LAYERS: "ml1"|"ml0"|"msnap"|"gl0"|"hypl0"|"hypl1") highlighted
-  // from the Snapshots·Explore panel — brightens that floor plane in the 3D view. null = none.
+  // Ledger layer id (LedgerView FLOOR_LAYERS: "ml1"|"ml0"|"msnap"|"gl0"|"hypl0"|"hypl1") the cursor
+  // is HOVERING in the Snapshots·Explore panel — a transient plane-highlight PREVIEW (the committed
+  // selection is `layer` below; the engine resolves `ledgerHilite ?? layer?.layerId`). null = none.
   ledgerHilite: string | null;
+  // The COMMITTED layer selection (clicked in the explore panel) — opens the layer card in the
+  // right rail and keeps its plane highlighted. A selStack slot like `inspect`/`snap`.
+  layer: Extract<PickDescriptor, { kind: "layer" }> | null;
   // Snapshot card follows the latest relevant snapshot (heartbeat live) vs pinned.
   following: boolean;
   // The lean hover-tooltip subject for the currently-hovered 3D object (identity ticker + short
@@ -134,6 +138,7 @@ interface AppState {
   setHoverFilter: (filter: string | null) => void;
   setHoverNodeId: (id: string | null) => void;
   setLedgerHilite: (id: string | null) => void;
+  setLayer: (layer: Extract<PickDescriptor, { kind: "layer" }> | null) => void;
   setFollowing: (following: boolean) => void;
   setHover: (hover: HoverSubject | null) => void;
   setCountry: (cc: string | null) => void;
@@ -169,6 +174,7 @@ export const useStore = create<AppState>((set) => ({
   hoverFilter: null,
   hoverNodeId: null,
   ledgerHilite: null,
+  layer: null,
   following: false,
   hover: null,
   country: null,
@@ -197,6 +203,7 @@ export const useStore = create<AppState>((set) => ({
   setHoverFilter: (hoverFilter) => set({ hoverFilter }),
   setHoverNodeId: (hoverNodeId) => set({ hoverNodeId }),
   setLedgerHilite: (ledgerHilite) => set({ ledgerHilite }),
+  setLayer: (layer) => set((s) => ({ layer, selStack: bumpStack(s.selStack, "layer", !!layer) })),
   setFollowing: (following) => set({ following }),
   setHover: (hover) => set({ hover }),
   setCountry: (country) => set({ country }),
