@@ -9,7 +9,7 @@ import { HyperView, type MetaHubRec } from "./scene/views/HyperView";
 import { Globe } from "./scene/Globe";
 import { LedgerView } from "./scene/views/LedgerView";
 import { loadGeoCache, resolveMissing } from "@/src/data/geoResolve";
-import { METAGRAPHS, COLORS, LEDGER, LEDGER_LAYERS } from "@/src/engine/config";
+import { METAGRAPHS, COLORS, LEDGER, LEDGER_LAYERS, ledgerSite } from "@/src/engine/config";
 import { readSceneColors, type SceneColors } from "./sceneColors";
 import { VIEW_POLICIES } from "./domain/viewPolicy";
 import { FOCI, hubFraming, geoFraming, ledgerLayerFraming, easeInOutQuad, type CameraFraming } from "./domain/cameraRig";
@@ -483,10 +483,14 @@ export class Engine {
         this._focusFilter(this.filter);
       }
     } else if (this.mode === "ledger") {
-      // Dim the non-selected metagraph columns so the selection stands out; never move the camera
-      // (the planar diagram stays framed head-on). The ledger neutralises the other lanes' tiles/links.
+      // Dim the non-selected metagraph columns so the selection stands out. The ledger neutralises
+      // the other lanes' tiles/links. The camera stays put — EXCEPT when a layer is focused: the
+      // layer framing is lane-aware (centres the selected metagraph's lane), so a filter change
+      // re-runs it to slide over to the newly-selected lane.
       this.globe.setFilter(this.filter);
       this.ledger.setFilter(this.filter);
+      const selLayer = useStore.getState().layer;
+      if (focusCamera && selLayer) this._focusLayer(selLayer.layerId);
     }
     this._publishLeaderboard();
     // Tint the globe's land edge with the selected metagraph's SCENE colour (null → default
@@ -766,7 +770,16 @@ export class Engine {
     const l = LEDGER_LAYERS.find((x) => x.id === layerId);
     if (!l) return;
     ledgerLayerFraming(l.y * LEDGER.viewScale, this._framingOut);
-    const dx = -l.laneZ * LEDGER.viewScale;
+    // Lateral centring: the METAGRAPH layers centre the selected metagraph's lane (its node ring /
+    // snapshot cluster) when a network filter is active; the split hypergraph panes centre their
+    // own pane; the global chain sits at lane-centre 0. The group's viewRotY (−90°) maps a local
+    // lane z → world x = −z (then viewScale).
+    let laneZ = l.laneZ;
+    if (l.id === "ml1" || l.id === "ml0" || l.id === "msnap") {
+      const idx = METAGRAPHS.findIndex((m) => m.id === this.filter);
+      if (idx >= 0) laneZ = ledgerSite(idx, METAGRAPHS.length).z;
+    }
+    const dx = -laneZ * LEDGER.viewScale;
     this._framingOut.pos.x += dx;
     this._framingOut.target.x += dx;
     this._tweenTo(this._framingOut.pos, this._framingOut.target);
