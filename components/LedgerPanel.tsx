@@ -6,6 +6,8 @@ import CardHead from "@/components/CardHead";
 import { Card } from "@/components/ui/card";
 import { EXPLORE_ICON } from "@/components/icons";
 import { SELECTED_ROW, SelectedRowMark } from "@/components/selection";
+import { subjectPairing } from "@/components/useSubjectPairing";
+import { filterAccent } from "@/src/data/network";
 import { useStore } from "@/src/store/store";
 import { LEDGER_LAYERS } from "@/src/data/ledgerLayers";
 
@@ -26,7 +28,9 @@ export default function LedgerPanel() {
   // falls back to the committed layer).
   const sel = useStore((s) => s.layer?.layerId ?? null);
   const setLayer = useStore((s) => s.setLayer);
+  const hilite = useStore((s) => s.ledgerHilite);
   const setHilite = useStore((s) => s.setLedgerHilite);
+  const filter = useStore((s) => s.filter);
   const commit = (l: (typeof LAYERS)[number]) => {
     setLayer(sel === l.id ? null : { kind: "layer", layerId: l.id });
   };
@@ -45,25 +49,34 @@ export default function LedgerPanel() {
           <div className="flex flex-col gap-0.5" onMouseLeave={() => setHilite(null)}>
             {LAYERS.map((l) => {
               const on = sel === l.id;
+              // The SAME scene↔HUD hover pairing as GeoExplore's node rows: hovering the row
+              // previews the plane highlight, hovering the 3D plane pairs this row back — wearing
+              // the active filter's identity hue (`filterAccent`, cyan on "all"), via the shared
+              // `.nb-row.subject-paired` row-wash recipe.
+              const pair = subjectPairing<string>(hilite, l.id, setHilite, filterAccent(filter));
               return (
                 <button
                   key={l.id}
                   type="button"
                   onClick={() => commit(l)}
-                  onMouseEnter={() => setHilite(l.id)}
-                  onMouseLeave={() => setHilite(null)}
-                  onFocus={() => setHilite(l.id)}
-                  onBlur={() => setHilite(null)}
+                  onMouseEnter={pair.onMouseEnter}
+                  onMouseLeave={pair.onMouseLeave}
+                  onFocus={pair.onMouseEnter}
+                  onBlur={pair.onMouseLeave}
                   aria-pressed={on}
                   className={cn(
                     // `relative pr-7` reserves the shared trailing ✓ slot so the text never shifts
                     // when a layer is selected — the SAME committed-selection language as the filter
                     // picker's row (SELECTED_ROW: wash + inset ring as one box-shadow + Check mark).
-                    "relative text-left border-none cursor-pointer rounded-sm pl-1.5 pr-7 py-1.5 bg-transparent transition-[background] duration-150",
+                    // `nb-row border border-transparent` hosts the pairing wash (box-shadow-based
+                    // SELECTED_ROW composes under it, same as the geo node rows).
+                    "nb-row relative text-left border border-transparent cursor-pointer rounded-sm pl-1.5 pr-7 py-1.5 bg-transparent transition-[background] duration-150",
                     "hover:bg-wash-hover",
                     "focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--primary)] focus-visible:outline-offset-[-2px]",
                     on && SELECTED_ROW,
+                    pair.paired && pair.className,
                   )}
+                  style={pair.style}
                 >
                   <span className={cn("block text-body text-foreground", on && "font-semibold")}>{l.name}</span>
                   <span className="block text-label text-muted-foreground leading-snug mt-0.5">{l.desc}</span>

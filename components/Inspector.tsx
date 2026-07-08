@@ -59,9 +59,10 @@ function CardPane({
     subjectKey = pick.data.ordinal;
   } else if (pick.kind === "layer") {
     // Layer pairing rides the plane-highlight PREVIEW channel: hovering the card highlights its
-    // floor plane in the 3D view (the reverse direction doesn't exist — planes aren't raycast).
-    // Structural cyan: a layer is structural, not an identity subject.
-    pair = subjectPairing<string>(ledgerHilite, pick.layerId, setLedgerHilite, "var(--primary)");
+    // floor plane in the 3D view (the reverse direction: hovering the plane pairs the card too).
+    // Hue follows the active filter's identity like the snapshot card (`filterAccent`): the
+    // selected metagraph's brand hue, or structural cyan on "all".
+    pair = subjectPairing<string>(ledgerHilite, pick.layerId, setLedgerHilite, filterAccent(filter));
     subjectKey = pick.layerId;
   } else {
     // geoLive → the selected node, read from the store like GeoLiveCard does.
