@@ -308,10 +308,10 @@ export class LedgerView {
         uniform vec3 uColor; uniform float uOpacity; uniform float uInner; varying vec2 vP;
         void main() {
           // Pixelated, not smooth: snap to a grid of cells, then quantize the alpha into steps.
-          float GRID = 26.0;
+          float GRID = 48.0; // finer pixel cells (user-tuned smaller)
           vec2 cell = (floor(vP * GRID) + 0.5) / GRID;
           float e = max(abs(cell.x), abs(cell.y));
-          float band = smoothstep(0.82, 1.0, e);
+          float band = smoothstep(0.88, 1.0, e); // 12% band — user-tuned to 2/3 of the earlier 18%
           band = floor(band * 3.0 + 0.5) / 3.0;
           // Edge band + the flat INNER sheet (uInner: 0 at rest — transparent centre — raised on
           // highlight so content sits on a visible surface).
