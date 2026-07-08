@@ -43,7 +43,9 @@ const FLOOR_LAYERS: { y: number; id: string }[] = [
   { y: LEDGER.rowGL0, id: "gl0" },
 ];
 // Floor-frame + edge-fill opacities at rest and when a plane is highlighted from the explore panel.
-const FLOOR_FRAME_OP = 0.13, FLOOR_FILL_OP = 0.02;
+// The resting frame sits at ~the geo view's coastal-wall rim brightness (user-tuned) so the two
+// views' structural edges read as one weight.
+const FLOOR_FRAME_OP = 0.28, FLOOR_FILL_OP = 0.02;
 const FLOOR_FRAME_HI = 0.6, FLOOR_FILL_HI = 0.14;
 
 const PULSE_MAX = 220;       // pooled travelling-pulse instances
