@@ -581,8 +581,10 @@ export class LedgerView {
       const col = sel ? this._coreCol : this._neutralTile;
       mat.color.copy(col);
       mat.emissive.copy(col);
-      mat.emissiveIntensity = sel ? 0.7 : 0.22;
-      const target = sel ? 0.95 : 0.55 * slotFade(t.slot);
+      // Trail brightness lifted (user-tuned): the old global snapshots read too dark/transparent
+      // under the depth fog — a higher emissive + opacity floor keeps them visible as they recede.
+      mat.emissiveIntensity = sel ? 0.7 : 0.34;
+      const target = sel ? 0.95 : 0.75 * slotFade(t.slot);
       mat.opacity += (target - mat.opacity) * k;
     }
 
