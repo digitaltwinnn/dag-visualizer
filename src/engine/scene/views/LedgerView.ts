@@ -45,8 +45,10 @@ const FLOOR_LAYERS: { y: number; id: string }[] = [
 // Floor-frame + edge-fill opacities at rest and when a plane is highlighted from the explore panel.
 // The resting frame sits at ~the geo view's coastal-wall rim brightness (user-tuned) so the two
 // views' structural edges read as one weight.
-const FLOOR_FRAME_OP = 0.28, FLOOR_FILL_OP = 0.02;
-const FLOOR_FRAME_HI = 0.6, FLOOR_FILL_HI = 0.14;
+// NB: the frame material's colour is HDR-overdriven ×2 (see _buildFloors) so these opacities are
+// roughly HALF the perceived line brightness — 0.16×2 ≈ the previous 0.28 line, now with bloom.
+const FLOOR_FRAME_OP = 0.16, FLOOR_FILL_OP = 0.02;
+const FLOOR_FRAME_HI = 0.4, FLOOR_FILL_HI = 0.14;
 
 const PULSE_MAX = 220;       // pooled travelling-pulse instances
 const PULSE_STAGGER = 0.035; // s between successive pulse emissions (a steady stream)
@@ -290,8 +292,12 @@ export class LedgerView {
     // pixelated edge-weighted fill (quickly gone toward the centre). Each plane gets its OWN cloned
     // materials, stored by layer id in `_floorMats`, so the explore panel can highlight ONE plane
     // (setHighlight) — brighten its frame + fill — without touching the rest. No in-scene text.
+    // The frame colour is pushed into HDR (×2) so the thin edge lines land above the bloom pass's
+    // threshold and GLOW like the nodes / the geo coastal rim — the opacity still sets the line's
+    // core brightness, the overdriven colour is what feeds the bloom.
     const frameMat = new THREE.LineBasicMaterial({
-      color: this._core, transparent: true, opacity: FLOOR_FRAME_OP,
+      color: new THREE.Color(this._core).multiplyScalar(2),
+      transparent: true, opacity: FLOOR_FRAME_OP,
       blending: THREE.AdditiveBlending, depthWrite: false,
     });
     const fillMat = new THREE.ShaderMaterial({
