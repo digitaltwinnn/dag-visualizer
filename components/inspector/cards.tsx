@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { cn } from "@/lib/utils";
 import { useStore } from "@/src/store/store";
-import { shortHash, CORE_HEX } from "@/src/data/network";
+import { shortHash, CORE_HEX, getNetwork, metagraphById } from "@/src/data/network";
 import { identityHudHex } from "@/src/palette/identity";
 import { hex, fmtDag, fmtKB } from "@/src/util/format";
 import { relativeAge } from "@/src/util/relativeAge";
@@ -392,6 +392,13 @@ export function LayerCard({ p }: { p: PickOf<"layer"> }) {
   const nodes = useStore((s) => s.nodes);
   const activity = useStore((s) => s.activity);
   const latestOrdinal = useStore((s) => s.latestOrdinal);
+  const filter = useStore((s) => s.filter);
+  // store.activity is FILTER-SCOPED (a metagraph selection reads ITS own snapshot stream —
+  // production cadence + the distinct global ticks it anchored into; see api.getActivity).
+  // The GLOBAL layers' facts must not silently become metagraph figures under a filter, so the
+  // gl0/msnap global rates read the UNFILTERED activity straight from the network singleton.
+  const globalActivity = getNetwork()?.getActivity() ?? null;
+  const metaCfg = metagraphById(filter);
 
   // Role tallies over the LIVE metagraph set (excluding the DAG root — its layers are the
   // hypergraph rows below). A node counts in every layer it runs (roles), like the vitals.
@@ -419,7 +426,16 @@ export function LayerCard({ p }: { p: PickOf<"layer"> }) {
       );
       break;
     case "msnap":
-      if (activity) facts.push({ label: "Snapshots anchored", value: perHour(activity.anchorsPerHour) });
+      // Filtered: the selected metagraph's OWN stream — its production cadence and how many
+      // distinct global snapshots it anchored into (batching makes that ≤ production).
+      if (metaCfg && activity) {
+        facts.push(
+          { label: `${metaCfg.ticker || metaCfg.name} snapshots`, value: perHour(activity.snapsPerHour) },
+          { label: "Anchored to global snapshots", value: perHour(activity.anchorsPerHour) },
+        );
+      } else if (globalActivity) {
+        facts.push({ label: "Snapshots anchored", value: perHour(globalActivity.anchorsPerHour) });
+      }
       break;
     case "hypl0":
       facts.push({ label: "Global validators", value: String(nodes.l0) });
@@ -428,7 +444,9 @@ export function LayerCard({ p }: { p: PickOf<"layer"> }) {
       facts.push({ label: "$DAG L1 nodes", value: String(nodes.l1) });
       break;
     case "gl0":
-      if (activity) facts.push({ label: "Global snapshots", value: perHour(activity.snapsPerHour) });
+      // Always the GLOBAL cadence (unfiltered) — under a metagraph filter store.activity would be
+      // that metagraph's own rate, which is not what this layer is about.
+      if (globalActivity) facts.push({ label: "Global snapshots", value: perHour(globalActivity.snapsPerHour) });
       if (latestOrdinal != null) facts.push({ label: "Latest ordinal", value: latestOrdinal.toLocaleString() });
       break;
   }
