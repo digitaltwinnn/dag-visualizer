@@ -31,15 +31,17 @@ type PickOf<K extends PickDescriptor["kind"]> = Extract<PickDescriptor, { kind: 
 // NO title rows of their own.
 
 // Snapshot title: the Snapshots view mark (Layers — the SAME lucide icon the top bar uses for the
-// Snapshots view; the card head marks speak the view-glyph vocabulary; cyan = a GLOBAL snapshot) +
-// the ordinal. The
+// Snapshots view; the card head marks speak the view-glyph vocabulary) + the ordinal. The mark
+// TINTS with the active filter's identity (`--filter-accent`, set on the rail by Inspector; cyan
+// on "all") — the consistent subject-mark language (user rule: a selected metagraph's hue shows on
+// every mark that speaks for it). The
 // Odometer owns the roll (digit-roll on each live tick), so no CardHead `titleKey` — a keyed
 // remount would restart it as a whole-title roll-in instead.
 export function SnapshotTitle({ data: d }: { data: GlobalSnapshot }) {
   const Mark = VIEW_ICONS.ledger;
   return (
     <span className="inline-flex items-center gap-2">
-      <Mark aria-hidden className={cn(KIND_MARK_CLASS, "text-primary")} />
+      <Mark aria-hidden className={cn(KIND_MARK_CLASS, "text-[var(--filter-accent,var(--primary))]")} />
       <Odometer value={d.ordinal} className="text-title font-semibold text-foreground tabular-nums" />
     </span>
   );
@@ -380,7 +382,8 @@ export function LayerTitle({ p }: { p: PickOf<"layer"> }) {
   const Icon = LAYER_ICON; // the dedicated single-plane mark — same glyph as its tray icon
   return (
     <span className="inline-flex items-center gap-2 min-w-0">
-      <Icon className={cn(KIND_MARK_CLASS, "text-[var(--primary)]")} aria-hidden />
+      {/* Tints with the filter identity like every subject mark (--filter-accent; cyan on "all"). */}
+      <Icon className={cn(KIND_MARK_CLASS, "text-[var(--filter-accent,var(--primary))]")} aria-hidden />
       {/* The pick carries only the id; the display copy resolves through src/data/ledgerLayers. */}
       <span className="truncate">{ledgerLayerById(p.layerId)?.name ?? p.layerId}</span>
     </span>

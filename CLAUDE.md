@@ -619,7 +619,11 @@ cards: **eyebrow / title / INSET hairline / body**.
   "currency metagraph" / "data and currency metagraph" / DAG = "hypergraph"; 0-node
   metagraphs say just "metagraph"); the snapshot title's Odometer owns its own roll; the
   node card is **location-first** (place as title, the id hash demoted to the mono
-  `subtitle` slot, id-as-title fallback when unresolved).
+  `subtitle` slot, id-as-title fallback when unresolved). **Card-head kind MARKS tint with
+  the active filter's identity** via `text-[var(--filter-accent,var(--primary))]` (the rail
+  sets `--filter-accent`; cyan on "all") — never hardcode a mark to cyan (a recurring bug;
+  the snapshot Layers mark + the layer plane mark both follow this; node marks use their
+  node's own hue inline).
 - **`aside`**: right-aligned title-row companion (snapshot live-dot/age, node status pill) —
   bodies render no title rows of their own.
 - **The hairline is INSET** by the card's padding on both layouts — full-width rules don't
