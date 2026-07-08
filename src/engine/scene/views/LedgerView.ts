@@ -42,8 +42,11 @@ import type { GlobalSnapshot, Anchor, PickDescriptor } from "@/src/data/types";
 // views' structural edges read as one weight.
 // NB: the frame material's colour is HDR-overdriven ×2 (see _buildFloors) so these opacities are
 // roughly HALF the perceived line brightness — 0.16×2 ≈ the previous 0.28 line, now with bloom.
-const FLOOR_FRAME_OP = 0.16, FLOOR_FILL_OP = 0.02;
-const FLOOR_FRAME_HI = 0.4, FLOOR_FILL_HI = 0.14;
+// FILL has two parts: the pixelated EDGE band (op) and the flat INNER sheet (inner) — the inner is
+// 0 at rest (the centre stays fully transparent by design) and fills in on highlight so the tiles/
+// nodes clearly sit ON the selected plane when the layer-focus camera is close.
+const FLOOR_FRAME_OP = 0.16, FLOOR_FILL_OP = 0.04, FLOOR_INNER_OP = 0;
+const FLOOR_FRAME_HI = 0.4, FLOOR_FILL_HI = 0.14, FLOOR_INNER_HI = 0.03;
 
 const PULSE_MAX = 220;       // pooled travelling-pulse instances
 const PULSE_STAGGER = 0.035; // s between successive pulse emissions (a steady stream)
@@ -297,21 +300,24 @@ export class LedgerView {
     });
     const fillMat = new THREE.ShaderMaterial({
       transparent: true, depthWrite: false, side: THREE.DoubleSide, blending: THREE.AdditiveBlending,
-      uniforms: { uColor: { value: new THREE.Color(this._core) }, uOpacity: { value: FLOOR_FILL_OP } },
+      uniforms: { uColor: { value: new THREE.Color(this._core) }, uOpacity: { value: FLOOR_FILL_OP }, uInner: { value: FLOOR_INNER_OP } },
       vertexShader: `
         varying vec2 vP;
         void main() { vP = uv * 2.0 - 1.0; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
       fragmentShader: `
-        uniform vec3 uColor; uniform float uOpacity; varying vec2 vP;
+        uniform vec3 uColor; uniform float uOpacity; uniform float uInner; varying vec2 vP;
         void main() {
           // Pixelated, not smooth: snap to a grid of cells, then quantize the alpha into steps.
           float GRID = 26.0;
           vec2 cell = (floor(vP * GRID) + 0.5) / GRID;
           float e = max(abs(cell.x), abs(cell.y));
-          float a = smoothstep(0.82, 1.0, e);
-          a = floor(a * 3.0 + 0.5) / 3.0;
+          float band = smoothstep(0.82, 1.0, e);
+          band = floor(band * 3.0 + 0.5) / 3.0;
+          // Edge band + the flat INNER sheet (uInner: 0 at rest — transparent centre — raised on
+          // highlight so content sits on a visible surface).
+          float a = uOpacity * band + uInner;
           if (a <= 0.002) discard;
-          gl_FragColor = vec4(uColor, uOpacity * a);
+          gl_FragColor = vec4(uColor, a);
         }`,
     });
     // Per-plane clones (independent uniforms) so a single plane can be highlighted. Each fill mesh
@@ -353,6 +359,7 @@ export class LedgerView {
       const on = id === k;
       m.frame.opacity = on ? FLOOR_FRAME_HI : FLOOR_FRAME_OP;
       m.fill.uniforms.uOpacity.value = on ? FLOOR_FILL_HI : FLOOR_FILL_OP;
+      m.fill.uniforms.uInner.value = on ? FLOOR_INNER_HI : FLOOR_INNER_OP;
     }
   }
 

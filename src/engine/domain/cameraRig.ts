@@ -56,9 +56,11 @@ export function geoFraming(R: number, out: CameraFraming): void {
 // untilted; this tilt is an EXPLORATION move (the user can freely orbit from here, like the geo
 // drill zoom).
 export function ledgerLayerFraming(y: number, out: CameraFraming): void {
-  // Close-in framing (user-tuned) — the same diagonal, pulled back a touch from the closest cut.
-  out.pos.set(-18, y + 12, 16);
-  out.target.set(-6, y - 2, -14);
+  // Close-in framing (user-tuned). Target x = 0 — the caller shifts pos+target laterally by the
+  // focused LANE's world x, so the lane's node ring / snapshot cluster sits CENTRED in the view
+  // (an earlier −6 bias pushed it right of centre); the small −z keeps the trail composition.
+  out.pos.set(-18, y + 12, 15);
+  out.target.set(0, y - 2, -9);
 }
 
 // Engine.ts:784 `_updateTween`'s inline ease, lifted verbatim.
