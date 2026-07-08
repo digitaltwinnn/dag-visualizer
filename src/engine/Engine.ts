@@ -9,10 +9,10 @@ import { HyperView, type MetaHubRec } from "./scene/views/HyperView";
 import { Globe } from "./scene/Globe";
 import { LedgerView } from "./scene/views/LedgerView";
 import { loadGeoCache, resolveMissing } from "@/src/data/geoResolve";
-import { METAGRAPHS, COLORS } from "@/src/engine/config";
+import { METAGRAPHS, COLORS, LEDGER, LEDGER_LAYERS } from "@/src/engine/config";
 import { readSceneColors, type SceneColors } from "./sceneColors";
 import { VIEW_POLICIES } from "./domain/viewPolicy";
-import { FOCI, hubFraming, geoFraming, easeInOutQuad, type CameraFraming } from "./domain/cameraRig";
+import { FOCI, hubFraming, geoFraming, ledgerLayerFraming, easeInOutQuad, type CameraFraming } from "./domain/cameraRig";
 import type { GlobalSnapshot, PickDescriptor } from "@/src/data/types";
 import type { ClusterNode, DagCore, GeoMap, RouteMetagraph } from "@/src/data/types";
 
@@ -218,6 +218,13 @@ export class Engine {
         if (st.ledgerHilite !== prev.ledgerHilite || st.layer !== prev.layer) {
           this.ledger.setHighlight(st.ledgerHilite ?? st.layer?.layerId ?? null);
         }
+        // Committing a layer flies the camera to the tilted layer-focus view of its plane (an
+        // exploration move — the resting ledger pose is central/untilted); clearing returns to the
+        // shared overview. Ledger-only: the planes exist nowhere else.
+        if (st.layer !== prev.layer && st.mode === "ledger") {
+          if (st.layer) this._focusLayer(st.layer.layerId);
+          else this.focus("overview");
+        }
       }),
     );
 
@@ -419,10 +426,12 @@ export class Engine {
       this.globe.setFilter(this.filter); // dim non-selected metagraph columns (no camera move)
       this.ledger.setFilter(this.filter); // neutralise the other lanes' tiles/links
       this._refreshLedger();
-      // Ledger uses the SHARED overview camera — the camera never moves on a view switch. The whole
-      // ledger group is instead ROTATED + tilted + scaled (config.viewRotY/viewTiltX/viewScale) to
-      // frame the diagonal (trail top-left, lead bottom-right); the objects transform into place.
-      this.focus("overview");
+      // Ledger uses the SHARED overview camera — the camera never moves on a view switch; the group
+      // transform (config.viewRotY/viewScale) frames the resting pose central/untilted. If a layer
+      // is already committed, resume its tilted layer-focus framing instead.
+      const selLayer = useStore.getState().layer;
+      if (selLayer) this._focusLayer(selLayer.layerId);
+      else this.focus("overview");
       return;
     }
     // The remaining placeholder views (status/transactions/staking) hide the 3D scene — reset to idle.
@@ -588,13 +597,23 @@ export class Engine {
     // Return the first hit that's part of the current selection — nodes filtered out of the
     // geo view are hidden, so they shouldn't be clickable/hoverable either (Three's raycaster
     // ignores scale/visibility, so the inactive ones must be skipped explicitly).
+    // LAYER planes are FALLBACK picks: the big stacked floor planes sit between the camera and
+    // everything below them, so a distance-ordered "first hit" would let the top plane steal every
+    // pick. Content (blocks/nodes/hubs) wins; the nearest plane is returned only when nothing else
+    // was hit along the ray.
+    let layerFallback: PickDescriptor | null = null;
     for (const h of hits) {
       const pick: PickDescriptor | undefined = h.object.userData.picks
         ? h.object.userData.picks[h.instanceId as number]
         : h.object.userData.pick;
-      if (pick && this._isPickActive(pick)) return pick;
+      if (!pick || !this._isPickActive(pick)) continue;
+      if (pick.kind === "layer") {
+        layerFallback ??= pick;
+        continue;
+      }
+      return pick;
     }
-    return null;
+    return layerFallback;
   }
 
   // The stable per-machine id of a node pick (a validator by its node id, a metagraph node by
@@ -645,9 +664,11 @@ export class Engine {
     const nodeKey = hoverKeyOf(p);                                   // node → globe shell glow
     const snapOrd = p?.kind === "snapshot" ? p.data.ordinal : null;  // snapshot → ledger row
     const metaId = p?.kind === "meta" ? p.cfg?.id ?? null : null;    // hub → metagraph dim preview
+    const layerId = p?.kind === "layer" ? p.layerId : null;          // floor plane → highlight preview
     if (nodeKey !== st.hoverNodeId) st.setHoverNodeId(nodeKey);
     if (snapOrd !== st.hoverSnapOrd) st.setHoverSnapOrd(snapOrd);
     if (metaId !== st.hoverFilter) st.setHoverFilter(metaId);
+    if (layerId !== st.ledgerHilite) st.setLedgerHilite(layerId);    // same channel the panel rows write
 
     // The lean tooltip label — re-write the store only when the subject's identity changes so
     // following the cursor never re-renders React.
@@ -671,6 +692,13 @@ export class Engine {
     if (p.kind === "snapshot") {
       useStore.getState().setFollowing(false);
       useStore.getState().setSnap(p);
+      return;
+    }
+    // A floor PLANE click = the explore panel's row click: toggle the committed layer selection
+    // (opens/clears the layer card; the layer-focus camera rides the store change).
+    if (p.kind === "layer") {
+      const st = useStore.getState();
+      st.setLayer(st.layer?.layerId === p.layerId ? null : p);
       return;
     }
     // Clicking a node, in any view: drill the global filter into the node's network (its
@@ -711,6 +739,16 @@ export class Engine {
     tw.active = true;
   }
 
+
+  // Fly to the tilted diagonal view of a settlement layer's floor plane (Snapshots view) — the
+  // "nice tilted view" is an exploration move on layer selection, not the resting pose. The plane's
+  // height is scaled by the ledger group's viewScale (the framing works in world units).
+  private _focusLayer(layerId: string) {
+    const l = LEDGER_LAYERS.find((x) => x.id === layerId);
+    if (!l) return;
+    ledgerLayerFraming(l.y * LEDGER.viewScale, this._framingOut);
+    this._tweenTo(this._framingOut.pos, this._framingOut.target);
+  }
 
   private _focusGeo(R: number) {
     // Look head-on at the FRONT of the globe (target pushed forward in +Z, toward where the

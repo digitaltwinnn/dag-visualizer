@@ -47,6 +47,9 @@ export function tooltipSubject(p: PickDescriptor | null | undefined): HoverSubje
       return { ident: p.cfg.ticker || p.cfg.name, name: p.cfg.name, color: identityHudHex(p.cfg.id), mono: false };
     case "snapshot":
       return { ident: "L0", name: "#" + p.data.ordinal, color: CORE, mono: false };
+    case "layer":
+      // A settlement-stack floor plane (Snapshots view) — structural, so core cyan.
+      return { ident: "LAYER", name: p.name, color: CORE, mono: false };
     default:
       return null; // geoLive is a rail-only proxy, never a 3D-hover subject
   }

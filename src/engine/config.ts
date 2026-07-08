@@ -130,10 +130,26 @@ export const LEDGER = {
   // so planes + nodes stay aligned. viewRotY (Y) sets the diagonal — trail recedes to the top-left,
   // lead sits bottom-right; viewTiltX (X) leans the stack a touch so it reads a bit steeper; viewScale
   // sizes it up in frame. Order: tilt(X) ∘ rot(Y).
-  viewRotY: -Math.PI / 3, // ≈ −60° — the diagonal
-  viewTiltX: 0.22,        // ≈ 13° forward lean → a touch steeper, camera unmoved
+  // At REST the ledger sits central/untilted (trail receding straight away from the shared
+  // camera): free 3D navigation feels right when the resting pose is axis-aligned — the nice
+  // DIAGONAL view is now the layer-focus camera move instead (Engine._focusLayer, on selecting a
+  // layer), and users are encouraged to orbit freely everywhere.
+  viewRotY: -Math.PI / 2, // lanes spread on X; time recedes on −Z (keeps the depth-fog recency)
+  viewTiltX: 0,           // no resting lean
   viewScale: 1.5,         // bigger in frame without moving the camera
 };
+
+// The settlement-stack LAYERS as SUBJECTS — id (matches LedgerView's floor planes) + display
+// name/description + floor height. ONE source shared by the Snapshots·Explore panel (rows), the
+// scene (plane pick descriptors), and the layer-focus camera (y). Ordered top→bottom.
+export const LEDGER_LAYERS: { id: string; name: string; desc: string; y: number }[] = [
+  { id: "ml1", name: "Metagraph L1", desc: "Currency-L1 (wallet transactions) and data-L1 (producer updates) validate incoming work into blocks.", y: LEDGER.rowML1 },
+  { id: "ml0", name: "Metagraph L0", desc: "Collects those L1 blocks into the metagraph's snapshot.", y: LEDGER.rowML0 },
+  { id: "msnap", name: "Metagraph snapshots", desc: "Each metagraph's ledger output — they anchor into a global snapshot.", y: LEDGER.rowMSnap },
+  { id: "hypl0", name: "Hypergraph L0", desc: "The Global L0 validators that produce the global snapshot.", y: LEDGER.rowHypL0 },
+  { id: "hypl1", name: "Hypergraph L1", desc: "The native $DAG currency — its own lane beside L0.", y: LEDGER.rowDAGL1 },
+  { id: "gl0", name: "Global snapshots", desc: "The base settlement: where every metagraph snapshot anchors.", y: LEDGER.rowGL0 },
+];
 
 // The lead SITE (x,z) of metagraph `i` of `n` — its Z-LANE (a distinct depth), leading at x=0.
 // Shared by Layers, Globe's node clusters and Ledger so a metagraph's nodes, rings and chain all

@@ -27,7 +27,7 @@
 // this view owns the continuous interpolation toward each block's resting slot.
 
 import * as THREE from "three";
-import { LEDGER, METAGRAPHS, ledgerSite, clusterRadius } from "../../config";
+import { LEDGER, LEDGER_LAYERS, METAGRAPHS, ledgerSite, clusterRadius } from "../../config";
 import type { SceneColors } from "../../sceneColors";
 import { LedgerModel, SLOT_SP, slotFade, curvePoint } from "../../domain/ledgerModel";
 import type { GlobalSnapshot, Anchor, PickDescriptor } from "@/src/data/types";
@@ -311,11 +311,19 @@ export class LedgerView {
           gl_FragColor = vec4(uColor, uOpacity * a);
         }`,
     });
-    // Per-plane clones (independent uniforms) so a single plane can be highlighted.
+    // Per-plane clones (independent uniforms) so a single plane can be highlighted. Each fill mesh
+    // is also a PICK target carrying its layer descriptor (name/desc from the shared LEDGER_LAYERS):
+    // hovering/clicking the plane in 3D mirrors the explore panel's rows. The Engine treats layer
+    // picks as FALLBACK hits (blocks/nodes win), so the big stacked planes never steal their picks.
     const frame = (w: number, d: number, y: number, z: number, id: string) => {
       const fm = fillMat.clone();
       const fill = new THREE.Mesh(new THREE.PlaneGeometry(w, d), fm);
       fill.rotation.x = -Math.PI / 2; fill.position.set(cx, y, z); fill.renderOrder = -2;
+      const meta = LEDGER_LAYERS.find((l) => l.id === id);
+      if (meta) {
+        fill.userData.pick = { kind: "layer", layerId: id, name: meta.name, desc: meta.desc };
+        this.pickables.push(fill);
+      }
       this.group.add(fill);
       const lm = frameMat.clone();
       const f = new THREE.LineSegments(new THREE.EdgesGeometry(new THREE.PlaneGeometry(w, d)), lm);
@@ -363,7 +371,7 @@ export class LedgerView {
     this.center.position.set(0, LEDGER.rowGL0, 0);
     this.center.rotation.x = -Math.PI / 2; // lie the tile flat on the global-snapshot floor
     this.group.add(this.center);
-    this.pickables = [this.center];
+    this.pickables.push(this.center); // append — _buildFloors already registered the layer planes
   }
 
   // Reconcile the trail meshes to model.trail (paired by ordinal): create a mesh for each model trail

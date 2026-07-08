@@ -49,6 +49,17 @@ export function geoFraming(R: number, out: CameraFraming): void {
   out.target.set(0, THREE.MathUtils.lerp(2, 2.5, t), 7);
 }
 
+// Layer-focus framing (Snapshots view): selecting a settlement layer flies the camera to the nice
+// DIAGONAL view of that layer's floor plane — elevated, yawed off-axis from the LEFT so the live
+// lead block sits toward the BOTTOM-RIGHT and the old blocks recede to the TOP-LEFT — centred on
+// the plane's height `y` (already viewScale'd by the caller). The resting pose stays central/
+// untilted; this tilt is an EXPLORATION move (the user can freely orbit from here, like the geo
+// drill zoom).
+export function ledgerLayerFraming(y: number, out: CameraFraming): void {
+  out.pos.set(-24, y + 18, 30);
+  out.target.set(-6, y - 2, -14);
+}
+
 // Engine.ts:784 `_updateTween`'s inline ease, lifted verbatim.
 export function easeInOutQuad(t: number): number {
   return t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;

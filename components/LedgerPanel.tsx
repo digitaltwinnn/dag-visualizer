@@ -6,22 +6,17 @@ import CardHead from "@/components/CardHead";
 import { Card } from "@/components/ui/card";
 import { EXPLORE_ICON } from "@/components/icons";
 import { useStore } from "@/src/store/store";
+import { LEDGER_LAYERS } from "@/src/engine/config";
 
 // The Snapshots view's left-rail tool: the layered-design explainer. Lists the settlement stack
 // top→bottom; HOVERING a layer previews its plane highlight in the 3D view (store.ledgerHilite, the
 // transient channel), CLICKING commits the selection (store.layer — opens the layer card on the
 // right facts rail AND keeps the plane highlighted; click again to clear). The engine resolves
 // `ledgerHilite ?? layer?.layerId` — the same preview-vs-commit split as hoverFilter vs filter.
-// The 3D planes carry NO text — this panel is where the names live. Ids match LedgerView's
-// FLOOR_LAYERS / the "hypl0"/"hypl1" split panes.
-const LAYERS: { id: string; name: string; desc: string }[] = [
-  { id: "ml1", name: "Metagraph L1", desc: "Currency-L1 (wallet transactions) and data-L1 (producer updates) validate incoming work into blocks." },
-  { id: "ml0", name: "Metagraph L0", desc: "Collects those L1 blocks into the metagraph's snapshot." },
-  { id: "msnap", name: "Metagraph snapshots", desc: "Each metagraph's ledger output — they anchor into a global snapshot." },
-  { id: "hypl0", name: "Hypergraph L0", desc: "The Global L0 validators that produce the global snapshot." },
-  { id: "hypl1", name: "Hypergraph L1", desc: "The native $DAG currency — its own lane beside L0." },
-  { id: "gl0", name: "Global snapshots", desc: "The base settlement: where every metagraph snapshot anchors." },
-];
+// Hovering/clicking the 3D planes themselves does the SAME (the engine raycasts them as fallback
+// picks), so panel rows and planes are one interaction. The layer set is the shared
+// config.LEDGER_LAYERS (panel rows + plane pick descriptors + the layer-focus camera heights).
+const LAYERS = LEDGER_LAYERS;
 
 export default function LedgerPanel() {
   const [collapsed, setCollapsed] = useState(false);
