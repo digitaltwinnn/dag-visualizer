@@ -114,7 +114,7 @@ normal operation — the routes fetch live.
 
 ## Run it locally
 
-A **Next.js** app (React + TypeScript) driving a vanilla Three.js engine. Needs Node ≥ 18.18.
+A **Next.js 16** app (React + TypeScript, Turbopack) driving a vanilla Three.js engine. Needs Node ≥ 20.9.
 
 ```bash
 npm install

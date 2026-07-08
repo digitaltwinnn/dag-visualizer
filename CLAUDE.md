@@ -46,47 +46,61 @@ at the hyper end with the canvas hidden.
 
 ## Run & test
 
-Next.js app — needs Node ≥18.18 (`node -v` ~20). Three.js and friends come from npm
-(`three`, `three/addons/*`, `topojson-client`); no CDN deps.
+Next.js **16** app (Turbopack is the bundler for BOTH `dev` and `build`) — needs Node ≥20.9.
+Three.js and friends come from npm (`three`, `three/addons/*`, `topojson-client`); no CDN deps.
 
 ```bash
 npm install
-npm run dev        # http://localhost:3000
+npm run dev        # http://localhost:3000 (also exposes the Next.js MCP at /_next/mcp)
 npx tsc --noEmit   # types (dev server tolerates type errors; run tsc to be sure)
 npm test           # vitest (pure-logic unit tests: store, palette, composition, …)
 ```
 
 > **Dev-server discipline (run ONE, shared):** keep exactly one `next dev` alive and reuse
-> it — DO NOT start a second. Concurrent servers race over port 3000 + `.next` and corrupt
-> the build (symptom: `ENOENT … .next/server/pages/_document.js`, which persists until cleaned
-> up). When coordinating parallel work (e.g. subagents), the coordinator owns the single
+> it — Next 16 enforces this with a lockfile (a second `next dev` on the same project refuses
+> to start). When coordinating parallel work (e.g. subagents), the coordinator owns the single
 > server and workers reuse `http://localhost:3000`; workers must not start/kill servers.
 > Prefer the harness background-run facility (`Bash run_in_background: true`) over
 > `nohup`/`setsid` so the process is tracked and stoppable via the task interface — avoid
 > `pkill -f "next dev"` (returns exit 144 in this sandbox and is unreliable; kill by PID if
-> you must). HMR/Turbopack picks up edits, so a restart is only needed for config-level
+> you must). Turbopack HMR picks up edits, so a restart is only needed for config-level
 > changes (tailwind/next config) or if state looks stale — then: kill the one server by PID,
-> `rm -rf .next`, start one again.
+> `rm -rf .next`, start one again. **Engine/scene geometry built in constructors needs a full
+> page reload** (not just HMR) to take effect.
 >
-> **`next build` and `next dev` share `.next` — don't run them together.** Running
-> `npm run build` while the shared dev server is up corrupts the dev server's chunk manifests
-> (500s / stale chunks). Do the production-build check (`next build` clean, route stays `○`
-> Static) with the dev server **stopped**, or defer it to a phase boundary, then restart dev.
-> For per-edit checks use `tsc --noEmit` + `npm test` (safe alongside `next dev`).
+> **`next build` and `next dev` no longer conflict** (since Next 16 the dev server outputs to
+> `.next/dev`, a separate directory), so the production-build check can run alongside the dev
+> server. Still do it at phase boundaries: `next build` clean, `/api/metagraphs` stays `○`
+> (Static) with the `10m` revalidate. NB: Next 16 removed the `size`/`First Load JS` columns
+> from the build output — the route table (`○`/`ƒ` + revalidate) is what remains and is what
+> the check reads. For per-edit checks use `tsc --noEmit` + `npm test`.
 
-### Verifying visual changes
+### Verifying changes (MCP-first)
 
-No visual test suite; verify visual changes by looking at the running app.
+No visual test suite; verify visual changes by looking at the running app. Three MCP servers
+divide the work — use them in this order:
 
-**Preferred: the chrome-devtools MCP** (`mcp__plugin_chrome-devtools-mcp__*`). It drives a
-real browser, so it can **navigate, click, hover, wait for a selector, and snapshot** — use
-it to reach interactive states directly (open the filter picker, click a view, hover a row)
-instead of the store-seed hack below. WebGL renders fine in it. This is the default for
-visual checks. It can also read compiled CSS via `evaluate_script` (CSSOM) — the way to
-settle specificity/cascade questions for real instead of reasoning about them.
+**1. Runtime diagnostics: the Next.js MCP** (`mcp__next-devtools__*` — the dev server exposes
+it at `/_next/mcp` automatically on Next 16+). `nextjs_index` discovers the server (port 3000),
+then `nextjs_call` with `get_errors` (config + build + browser runtime errors, source-mapped),
+`get_routes`, `get_page_metadata` (the rendered segment tree incl. error boundaries), and
+`get_logs` (the dev log lives at `.next/dev/logs/next-development.log`). **Check `get_errors`
+FIRST** on any "is something broken" question — it beats grepping browser console output.
 
-**Fallback: one-shot headless Chrome** (when the MCP is unavailable). WebGL needs the
-SwiftShader flags or it fails with "Error creating WebGL context":
+**2. Visual + interaction: the chrome-devtools MCP** (`mcp__plugin_chrome-devtools-mcp__*`).
+It drives a real browser, so it can **navigate, click, hover, wait for a selector, and
+snapshot** — use it to reach interactive states directly (open the filter picker, click a
+view, hover a row). WebGL renders fine in it. This is the default for visual checks. It can
+also read compiled CSS via `evaluate_script` (CSSOM) — the way to settle specificity/cascade
+questions for real instead of reasoning about them.
+
+**3. Deploy-side: the Vercel MCP** (`mcp__vercel__*`) once changes ship — `list_deployments`,
+`get_deployment_build_logs`, `get_runtime_errors`/`get_runtime_logs` for the hosted app
+(the local Next.js MCP only sees the dev server).
+
+**Last-resort fallback: one-shot headless Chrome** (only when the chrome-devtools MCP is
+unavailable — it is strictly worse: no clicks, no CDP). WebGL needs the SwiftShader flags or
+it fails with "Error creating WebGL context":
 
 ```bash
 google-chrome-stable --headless=new --no-sandbox \
