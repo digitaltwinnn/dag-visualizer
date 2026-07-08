@@ -1,6 +1,6 @@
 // The Snapshots (ledger) view, rendered on the shared Three.js canvas like the other views.
 //
-// A 3D stack of transparent glass FLOORS (one per layer; see config.LEDGER). The producer NODES
+// A 3D stack of transparent glass FLOORS (one per layer; see domain/ledgerLayout.ts). The producer NODES
 // are the SAME node meshes reused from the hyper/geo views, placed into their lanes by Globe.
 // This module owns what's unique to the view:
 //   • the glass floor panes,
@@ -27,21 +27,16 @@
 // this view owns the continuous interpolation toward each block's resting slot.
 
 import * as THREE from "three";
-import { LEDGER, LEDGER_LAYERS, HYP_SPLIT, METAGRAPHS, ledgerSite, clusterRadius } from "../../config";
+import { METAGRAPHS } from "../../config";
+import { LEDGER, HYP_SPLIT, LAYER_GEOM, ledgerSite, clusterRadius } from "../../domain/ledgerLayout";
 import type { SceneColors } from "../../sceneColors";
 import { LedgerModel, SLOT_SP, slotFade, curvePoint } from "../../domain/ledgerModel";
 import type { GlobalSnapshot, Anchor, PickDescriptor } from "@/src/data/types";
 
-// Full-width floor panes (top→bottom), each with a stable layer id. The hypergraph-L0 level is built
-// separately (a plane CUT along Z into 2/3 hypergraph L0 = "hypl0" + a −Z 1/3 = "hypl1"). Layer NAMES
-// live in the Snapshots·Explore panel (LedgerPanel) — there is NO in-scene text. The ids let that
-// panel highlight one plane on click (setHighlight); the same ids are the panel's row keys.
-const FLOOR_LAYERS: { y: number; id: string }[] = [
-  { y: LEDGER.rowML1, id: "ml1" },
-  { y: LEDGER.rowML0, id: "ml0" },
-  { y: LEDGER.rowMSnap, id: "msnap" },
-  { y: LEDGER.rowGL0, id: "gl0" },
-];
+// Floor plane geometry comes from the shared domain table (ledgerLayout.LAYER_GEOM): the FULL-WIDTH
+// floors are exactly its laneZ === 0 entries; the split hypergraph panes (hypl0/hypl1, laneZ ≠ 0)
+// are built separately below. Layer NAMES live UI-side (src/data/ledgerLayers.ts) — no in-scene text;
+// a plane's pick carries only its layerId.
 // Floor-frame + edge-fill opacities at rest and when a plane is highlighted from the explore panel.
 // The resting frame sits at ~the geo view's coastal-wall rim brightness (user-tuned) so the two
 // views' structural edges read as one weight.
@@ -327,11 +322,8 @@ export class LedgerView {
       const fm = fillMat.clone();
       const fill = new THREE.Mesh(new THREE.PlaneGeometry(w, d), fm);
       fill.rotation.x = -Math.PI / 2; fill.position.set(cx, y, z); fill.renderOrder = -2;
-      const meta = LEDGER_LAYERS.find((l) => l.id === id);
-      if (meta) {
-        fill.userData.pick = { kind: "layer", layerId: id, name: meta.name, desc: meta.desc };
-        this.pickables.push(fill);
-      }
+      fill.userData.pick = { kind: "layer", layerId: id };
+      this.pickables.push(fill);
       this.group.add(fill);
       const lm = frameMat.clone();
       const f = new THREE.LineSegments(new THREE.EdgesGeometry(new THREE.PlaneGeometry(w, d)), lm);
@@ -341,7 +333,7 @@ export class LedgerView {
       this.group.add(f);
       this._floorMats.set(id, { frame: lm, fill: fm });
     };
-    for (const { y, id } of FLOOR_LAYERS) frame(W, D, y, 0, id);
+    for (const { y, id } of LAYER_GEOM.filter((l) => l.laneZ === 0)) frame(W, D, y, 0, id);
 
     // The hypergraph-L0 level is ONE plane CUT along Z: the 2/3 toward +Z/centre is hypergraph L0
     // (the global validators over the global block); the −Z 1/3 is RESERVED for hypergraph L1 — the

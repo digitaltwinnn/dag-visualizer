@@ -179,6 +179,7 @@ export type PickDescriptor =
   // hint). The selection's footprint summary lives in the top-bar vitals. Reads the store
   // itself (no payload).
   | (PickBase & { kind: "geoLive" })
-  // A settlement-stack LAYER, selected from the Snapshots·Explore panel (LedgerPanel LAYERS —
-  // layerId matches LedgerView's floor ids). The card body derives its live facts from the store.
-  | (PickBase & { kind: "layer"; layerId: string; name: string; desc: string });
+  // A settlement-stack LAYER, selected from the Snapshots·Explore panel or a 3D floor plane.
+  // Carries ONLY the id (matching domain/ledgerLayout's LAYER_GEOM) — the display name/description
+  // are UI copy, resolved through src/data/ledgerLayers.ts by every surface that shows words.
+  | (PickBase & { kind: "layer"; layerId: string });

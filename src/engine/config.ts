@@ -1,4 +1,12 @@
-// Central configuration for the Constellation Hypergraph visualizer.
+// Central configuration — PURE STATIC DATA the app is parameterized by: API endpoints, the
+// palette mirror, the metagraph catalog, and data-polling tuning. Nothing else lives here.
+//
+// The structural principles (kept deliberately, see also CLAUDE.md → "Engine layer rules"):
+//   • NO math and NO derived tables here — per-view layout geometry + layout math live in ONE
+//     domain module per view: src/engine/domain/hyperLayout.ts, ledgerLayout.ts, geoLayout.ts.
+//   • NO UI copy here — display strings live UI-side (e.g. src/data/ledgerLayers.ts); picks and
+//     scene objects carry ids only.
+//   • Groups are single-concern: POLL is data cadence/retention, COLORS is the palette mirror.
 
 export const API_BASE = "https://be-mainnet.constellationnetwork.io";
 
@@ -67,141 +75,10 @@ export const METAGRAPHS: MetaConfig[] = [
     blurb: "Foot-traffic & commerce data from the Dor Traffic Miner, validated on its own metagraph." },
 ];
 
-// Anchor position of metagraph i's orbiting cluster in the Hypergraph layout.
-// Shared by Layers (the hub mesh) and Globe (where each metagraph's real nodes
-// start before they fly out to the map) so the burst originates from the hub.
-export function metaAnchor(
-  i: number,
-  n: number,
-): { x: number; y: number; z: number; a: number; radius: number; incl: number } {
-  const a = (i / n) * Math.PI * 2;
-  const incl = (i % 2 === 0 ? 1 : -1) * (0.15 + (i % 3) * 0.12);
-  const radius = VIS.metaOrbitRadius + (i % 4) * 3.2;
-  return {
-    x: Math.cos(a) * radius,
-    y: Math.sin(a) * radius * Math.sin(incl) + (i % 2 ? 4 : -3),
-    z: Math.sin(a) * radius * Math.cos(incl),
-    a, radius, incl,
-  };
-}
-
-// ---- Snapshots (ledger) view layout (the "settlement chamber") -------------------
-// A 3D stack of transparent wireframe FLOORS (one per layer) on Y, viewed from an angle. Each
-// metagraph gets its own Z-LANE; its snapshot blocks lead at x=0 and trail LEFT (-X) along the
-// lane (same direction + spacing as the global chain), so a metagraph block and the global block
-// it anchored share an X and are linked. The factual flow (Constellation docs): metagraph L1
-// (cl1+dl1) → blocks → metagraph L0 → metagraph snapshots → Global L0; DAG L1 → $DAG blocks into the
-// Global L0 snapshot (the global snapshot IS the $DAG ledger's L0). The floor heights are a LITERAL
-// "what sits on what" stack (top→bottom):
-//   rowML1  metagraph L1 nodes — cL1 (currency-L1: wallet TRANSACTIONS) + dL1 (data-L1: producer
-//     DataUpdates) — the top of the visible stack (external producers are not drawn) ·
-//   rowML0  metagraph L0 nodes (collect L1 blocks → the snapshot) ·
-//   rowMSnap  METAGRAPH SNAPSHOTS — the metagraph L0's ledger output ·
-//   rowHypL0  hypergraph L0 nodes — the global validators (the anchor line threads through their
-//     cluster). This floor is CUT along Z: the 2/3 (+Z/centre) is hypergraph L0; the −Z 1/3 is a
-//     reserved lane for rowDAGL1 (hypergraph L1 — native $DAG currency), at the SAME height ·
-//   rowGL0  GLOBAL SNAPSHOTS — the hypergraph L0's ledger output (the base settlement layer).
-// NODES sit directly ABOVE the SNAPSHOT they produce (metagraph L0 → metagraph snapshot; hypergraph
-// L0 → global snapshot); DAG L1 is a peer of hypergraph L0 (its own −Z third of that plane), both
-// feeding down into the global snapshot. The X axis (time / trailing) is owned by LedgerView
-// (SLOT_SP); this file owns the Z lane geometry + the row heights, shared by HyperView, Globe and
-// LedgerView. Layer NAMES live in the Snapshots·Explore panel (LedgerPanel), not on the planes.
-export const LEDGER = {
-  depth: 44,        // Z span the metagraph lanes spread over
-  // Floor heights, wider-spaced (gap ~5) and with NO producers floor. The DAG L1 is no longer a lone
-  // bottom floor: it sits at the hypergraph-L0 HEIGHT but in its OWN Z-lane (rowDAGL1 == rowHypL0 +
-  // dagLaneZ) — a distinct "$DAG currency" lane beside the central global column, both feeding down
-  // into the global snapshot. Symmetric with the metagraph lanes rather than marooned at the base.
-  rowML1: 16,       // metagraph L1 node floor (cL1 + dL1; validate producer updates into blocks)
-  rowML0: 9.25,     // metagraph L0 node floor (packages blocks into the snapshot)
-  rowMSnap: 2.5,    // metagraph SNAPSHOTS floor (the metagraph L0's ledger output)
-  rowHypL0: -4.25,  // hypergraph L0 node floor — global validators; the anchor line passes through them
-  rowGL0: -11,      // global snapshots floor (hypergraph L0's ledger output) — the base settlement layer
-  // DAG L1 (hypergraph L1) — native $DAG currency. Same HEIGHT as hypergraph L0, in its own −Z third
-  // of that plane (a plane cut 2/3 L0 + 1/3 L1). TODO: draw DAG L1 BLOCKS (global.blocks) flowing
-  // from this lane into the global snapshot.
-  rowDAGL1: -4.25,  // == rowHypL0 (shares the hypergraph-L0 level; its own −Z third of that plane)
-  dagLaneZ: -14.7,  // −Z centre of the reserved 1/3 (−depth/2 + depth/6) — where the DAG-L1 cluster sits
-  dagCell: 2.8,     // spread radius for the DAG node discs (global L0 + DAG L1) — tight so they're not busy
-  dot: 0.34,        // tiny-dot scale factor applied to node spheres in this view
-  // Whole-view ORIENTATION applied to the ledger so it frames well under the SHARED overview camera
-  // (the one hyper/geo use) — the camera never moves on a view switch; the ledger GROUP is rotated/
-  // tilted/scaled instead, and the SAME transform is baked into every node's ledger position (Globe)
-  // so planes + nodes stay aligned. viewRotY (Y) sets the diagonal — trail recedes to the top-left,
-  // lead sits bottom-right; viewTiltX (X) leans the stack a touch so it reads a bit steeper; viewScale
-  // sizes it up in frame. Order: tilt(X) ∘ rot(Y).
-  // At REST the ledger sits central/untilted (trail receding straight away from the shared
-  // camera): free 3D navigation feels right when the resting pose is axis-aligned — the nice
-  // DIAGONAL view is now the layer-focus camera move instead (Engine._focusLayer, on selecting a
-  // layer), and users are encouraged to orbit freely everywhere.
-  viewRotY: -Math.PI / 2, // lanes spread on X; time recedes on −Z (keeps the depth-fog recency)
-  viewTiltX: 0,           // no resting lean
-  viewScale: 1.5,         // bigger in frame without moving the camera
-};
-
-// The hypergraph-L0 level's 2/3 + 1/3 split along Z (shared by LedgerView's panes and the
-// layer-focus camera): the seam sits at the 1/3 mark, a small gap separates the two sub-panes.
-const HYP_SEAM = -LEDGER.depth / 2 + LEDGER.depth / 3;
-export const HYP_SPLIT = {
-  gap: 3.5,
-  l1Edge: HYP_SEAM - 3.5 / 2, // hypergraph-L1 pane's inner (+Z) edge
-  l0Edge: HYP_SEAM + 3.5 / 2, // hypergraph-L0 pane's inner (−Z) edge
-  l1Cz: (-LEDGER.depth / 2 + HYP_SEAM - 3.5 / 2) / 2, // −Z third centre
-  l0Cz: (HYP_SEAM + 3.5 / 2 + LEDGER.depth / 2) / 2,  // +Z 2/3 centre
-};
-
-// The settlement-stack LAYERS as SUBJECTS — id (matches LedgerView's floor planes) + display
-// name/description + floor height + the pane's lane-centre Z (non-zero only for the split
-// hypergraph panes; the layer-focus camera shifts laterally so the pane sits centred in frame).
-// ONE source shared by the Snapshots·Explore panel (rows), the scene (plane pick descriptors),
-// and the layer-focus camera. Ordered top→bottom.
-export const LEDGER_LAYERS: { id: string; name: string; desc: string; y: number; laneZ: number }[] = [
-  { id: "ml1", name: "Metagraph L1", desc: "Currency-L1 (wallet transactions) and data-L1 (producer updates) validate incoming work into blocks.", y: LEDGER.rowML1, laneZ: 0 },
-  { id: "ml0", name: "Metagraph L0", desc: "Collects those L1 blocks into the metagraph's snapshot.", y: LEDGER.rowML0, laneZ: 0 },
-  { id: "msnap", name: "Metagraph snapshots", desc: "Each metagraph's ledger output — they anchor into a global snapshot.", y: LEDGER.rowMSnap, laneZ: 0 },
-  { id: "hypl0", name: "Hypergraph L0", desc: "The Global L0 validators that produce the global snapshot.", y: LEDGER.rowHypL0, laneZ: HYP_SPLIT.l0Cz },
-  { id: "hypl1", name: "Hypergraph L1", desc: "The native $DAG currency — its own lane beside L0.", y: LEDGER.rowDAGL1, laneZ: HYP_SPLIT.l1Cz },
-  { id: "gl0", name: "Global snapshots", desc: "The base settlement: where every metagraph snapshot anchors.", y: LEDGER.rowGL0, laneZ: 0 },
-];
-
-// The lead SITE (x,z) of metagraph `i` of `n` — its Z-LANE (a distinct depth), leading at x=0.
-// Shared by Layers, Globe's node clusters and Ledger so a metagraph's nodes, rings and chain all
-// line up in its lane.
-const LANE_SPREAD = 0.62; // fraction of LEDGER.depth the lanes span (see clusterRadius)
-export function ledgerSite(i: number, n: number): { x: number; z: number } {
-  const spread = LEDGER.depth * LANE_SPREAD;
-  return { x: 0, z: n > 1 ? (i / (n - 1) - 0.5) * spread : 0 };
-}
-
-// The ring/cluster radius for a node group of `count` nodes — grows with count (so the ring fits
-// the dots) but is capped to a fraction of the lane spacing so neighbouring rings never overlap.
-export function clusterRadius(count: number): number {
-  const laneGap = (LEDGER.depth * LANE_SPREAD) / Math.max(1, METAGRAPHS.length - 1); // = ledgerSite's Z step
-  const cap = laneGap * 0.46;
-  return Math.min(cap, 0.55 + Math.sqrt(Math.max(1, count)) * 0.3);
-}
-
-// Small deterministic golden-angle offset for node `k` of `cnt`, spreading a cluster as a flat
-// disc ON the floor (X/Z plane) within `radius` — no random jitter.
-export function ledgerSpread(
-  k: number,
-  cnt: number,
-  radius: number,
-): { x: number; z: number } {
-  if (cnt <= 1) return { x: 0, z: 0 };
-  const r = Math.sqrt(k / (cnt - 1)) * radius;
-  const a = k * 2.399963229728653; // golden angle
-  return { x: Math.cos(a) * r, z: Math.sin(a) * r };
-}
-
-// Visual tuning.
-export const VIS = {
+// Data polling cadence + retention (was `VIS`, renamed: this group is DATA tuning, not visuals).
+export const POLL = {
   maxSnapshots: 52,        // how many global snapshots to keep in the stream (also caps the
                            // LiveStrip bar count — the strip fills with this whole retained window)
-  l0Radius: 8,             // Global L0 validator shell (inner)
-  l1Radius: 15,            // DAG L1 validator shell (outer)
-  metaOrbitRadius: 36,     // base orbit radius for metagraphs — kept well clear of the
-                           // validator shells so a focused hub has an emptier backdrop
   pollMs: 4000,            // how often to poll for new snapshots
   clusterMs: 25000,        // how often to refresh validator membership
 

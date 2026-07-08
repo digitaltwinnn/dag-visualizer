@@ -9,7 +9,8 @@ import { HyperView, type MetaHubRec } from "./scene/views/HyperView";
 import { Globe } from "./scene/Globe";
 import { LedgerView } from "./scene/views/LedgerView";
 import { loadGeoCache, resolveMissing } from "@/src/data/geoResolve";
-import { METAGRAPHS, COLORS, LEDGER, LEDGER_LAYERS, ledgerSite } from "@/src/engine/config";
+import { METAGRAPHS, COLORS } from "@/src/engine/config";
+import { LEDGER, LAYER_GEOM, ledgerSite } from "./domain/ledgerLayout";
 import { readSceneColors, type SceneColors } from "./sceneColors";
 import { VIEW_POLICIES } from "./domain/viewPolicy";
 import { FOCI, hubFraming, geoFraming, ledgerLayerFraming, easeInOutQuad, type CameraFraming } from "./domain/cameraRig";
@@ -767,7 +768,7 @@ export class Engine {
   // split hypergraph panes the framing also shifts LATERALLY so the sub-pane sits centred: the
   // group's viewRotY (−90°) maps the pane's local lane-centre z → world x = −laneZ (then scaled).
   private _focusLayer(layerId: string) {
-    const l = LEDGER_LAYERS.find((x) => x.id === layerId);
+    const l = LAYER_GEOM.find((x) => x.id === layerId);
     if (!l) return;
     ledgerLayerFraming(l.y * LEDGER.viewScale, this._framingOut);
     // Lateral centring: the METAGRAPH layers centre the selected metagraph's lane (its node ring /

@@ -31,7 +31,8 @@
 // behaviour must match js/ledger.js exactly since Task 13 will diff against it).
 
 import * as THREE from "three";
-import { LEDGER, METAGRAPHS, ledgerSite } from "../config";
+import { METAGRAPHS } from "../config";
+import { LEDGER, ledgerSite } from "./ledgerLayout";
 import type { GlobalSnapshot, Anchor } from "@/src/data/types";
 
 export const SLOT_SP = 3.6; // js/ledger.js:41 — X spacing of one tick/slot

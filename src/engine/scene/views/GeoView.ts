@@ -1,6 +1,6 @@
 import * as THREE from "three";
 import { feature } from "topojson-client";
-import { R, LAND_H, latLonToVec3 } from "../../domain/geoMath";
+import { R, LAND_H, latLonToVec3 } from "../../domain/geoLayout";
 
 // Builds the geo globe SURFACE — the body sphere, graticule, atmosphere rim, and the raised
 // continents (+ glowing coastal cliffs) — into `globe.group`, and sets the handles the morph/fade

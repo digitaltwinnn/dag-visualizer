@@ -7,7 +7,7 @@ import { Card } from "@/components/ui/card";
 import { EXPLORE_ICON } from "@/components/icons";
 import { SELECTED_ROW, SelectedRowMark } from "@/components/selection";
 import { useStore } from "@/src/store/store";
-import { LEDGER_LAYERS } from "@/src/engine/config";
+import { LEDGER_LAYERS } from "@/src/data/ledgerLayers";
 
 // The Snapshots view's left-rail tool: the layered-design explainer. Lists the settlement stack
 // top→bottom; HOVERING a layer previews its plane highlight in the 3D view (store.ledgerHilite, the
@@ -15,8 +15,8 @@ import { LEDGER_LAYERS } from "@/src/engine/config";
 // right facts rail AND keeps the plane highlighted; click again to clear). The engine resolves
 // `ledgerHilite ?? layer?.layerId` — the same preview-vs-commit split as hoverFilter vs filter.
 // Hovering/clicking the 3D planes themselves does the SAME (the engine raycasts them as fallback
-// picks), so panel rows and planes are one interaction. The layer set is the shared
-// config.LEDGER_LAYERS (panel rows + plane pick descriptors + the layer-focus camera heights).
+// picks), so panel rows and planes are one interaction. Display copy comes from the shared
+// src/data/ledgerLayers.ts table; the geometry twin (heights/lanes) is domain/ledgerLayout.ts.
 const LAYERS = LEDGER_LAYERS;
 
 export default function LedgerPanel() {
@@ -28,7 +28,7 @@ export default function LedgerPanel() {
   const setLayer = useStore((s) => s.setLayer);
   const setHilite = useStore((s) => s.setLedgerHilite);
   const commit = (l: (typeof LAYERS)[number]) => {
-    setLayer(sel === l.id ? null : { kind: "layer", layerId: l.id, name: l.name, desc: l.desc });
+    setLayer(sel === l.id ? null : { kind: "layer", layerId: l.id });
   };
   return (
     <Card asChild className="sig-right block p-0 flex-[0_1_auto] min-h-0 [--spine:var(--filter-accent,var(--primary))]">

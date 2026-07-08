@@ -17,9 +17,10 @@ import { SonarRing, NodeStars, NoSignalDot } from "@/components/state/StateAtoms
 import { VIEW_ICONS, LAYER_ICON, KIND_MARK_CLASS } from "@/components/icons";
 import { ExternalLink } from "lucide-react";
 import { useMinHold } from "@/components/useMinHold";
-import { VIS } from "@/src/engine/config";
+import { POLL } from "@/src/engine/config";
 import { Desc, StatusMark, CompositionRows, StatusBreakdown, networkKind } from "./parts";
 import { compositionRows } from "@/src/data/composition";
+import { ledgerLayerById } from "@/src/data/ledgerLayers";
 
 type PickOf<K extends PickDescriptor["kind"]> = Extract<PickDescriptor, { kind: K }>;
 
@@ -177,12 +178,12 @@ export function SnapshotCard({ data: d }: { data: GlobalSnapshot }) {
   const feeHold = useMinHold(awaitingExact);
 
   // NO SIGNAL — the feed is unreachable. One sonar ring per retry: remounting `SonarRing` via
-  // `key={retry}` (bumped on the same cadence as the poll, VIS.pollMs) makes the ring animation
+  // `key={retry}` (bumped on the same cadence as the poll, POLL.pollMs) makes the ring animation
   // itself read as "still retrying", not a static icon.
   const [retry, setRetry] = useState(0);
   useEffect(() => {
     if (live) return;
-    const id = setInterval(() => setRetry((r) => r + 1), VIS.pollMs); // one ring per real poll/retry
+    const id = setInterval(() => setRetry((r) => r + 1), POLL.pollMs); // one ring per real poll/retry
     return () => clearInterval(id);
   }, [live]);
 
@@ -380,7 +381,8 @@ export function LayerTitle({ p }: { p: PickOf<"layer"> }) {
   return (
     <span className="inline-flex items-center gap-2 min-w-0">
       <Icon className={cn(KIND_MARK_CLASS, "text-[var(--primary)]")} aria-hidden />
-      <span className="truncate">{p.name}</span>
+      {/* The pick carries only the id; the display copy resolves through src/data/ledgerLayers. */}
+      <span className="truncate">{ledgerLayerById(p.layerId)?.name ?? p.layerId}</span>
     </span>
   );
 }
@@ -433,7 +435,7 @@ export function LayerCard({ p }: { p: PickOf<"layer"> }) {
 
   return (
     <>
-      <Desc text={p.desc} />
+      <Desc text={ledgerLayerById(p.layerId)?.desc ?? ""} />
       {facts.length > 0 && (
         <div className="flex flex-col gap-2 mt-2">
           {facts.map((f) => (

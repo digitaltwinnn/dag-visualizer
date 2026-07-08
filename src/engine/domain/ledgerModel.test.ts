@@ -10,7 +10,8 @@ import {
   anchorTiles,
   LedgerModel,
 } from "./ledgerModel";
-import { LEDGER, METAGRAPHS, ledgerSite } from "../config";
+import { METAGRAPHS } from "../config";
+import { LEDGER, ledgerSite } from "./ledgerLayout";
 import type { GlobalSnapshot, Anchor } from "@/src/data/types";
 
 // LINK_VFRAC (js/ledger.js:49) — kept module-private in ledgerModel.ts (not part of the brief's

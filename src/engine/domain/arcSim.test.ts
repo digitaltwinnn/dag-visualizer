@@ -1,7 +1,7 @@
 import * as THREE from "three";
 import { describe, it, expect, vi, afterEach } from "vitest";
 import { ArcSim, arcCurve, ARC_SAMPLES, ARC_TAIL, type ArcAgent, type ArcEndpoint } from "./arcSim";
-import { R, LAND_H } from "./geoMath";
+import { R, LAND_H } from "./geoLayout";
 
 function endpoint(x: number, y: number, z: number, index: number): ArcEndpoint {
   return { dir: new THREE.Vector3(x, y, z).normalize(), node: { index } };

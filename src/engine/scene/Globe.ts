@@ -14,10 +14,12 @@
 // boundary/cast layer needed.
 
 import * as THREE from "three";
-import { METAGRAPHS, metaAnchor, DEFAULT_META_COLOR, ledgerSite, ledgerSpread, clusterRadius, LEDGER } from "../config";
+import { METAGRAPHS, DEFAULT_META_COLOR } from "../config";
+import { metaAnchor } from "../domain/hyperLayout";
+import { LEDGER, ledgerSite, ledgerSpread, clusterRadius } from "../domain/ledgerLayout";
 import type { SceneColors } from "../sceneColors";
 import * as geoStats from "../domain/geoStats";
-import { R, LAND_H, latLonToVec3 } from "../domain/geoMath";
+import { R, LAND_H, latLonToVec3 } from "../domain/geoLayout";
 import { GOLDEN_ANGLE, fibShellPos, nodeRoles, spreadCoLocated, type Cluster } from "../domain/nodeLayout";
 import { surfFade, extrasFade } from "../domain/morph";
 import { ArcSim, type ArcEndpoint } from "../domain/arcSim";
