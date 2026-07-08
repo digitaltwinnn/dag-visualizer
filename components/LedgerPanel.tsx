@@ -5,6 +5,7 @@ import { cn } from "@/lib/utils";
 import CardHead from "@/components/CardHead";
 import { Card } from "@/components/ui/card";
 import { EXPLORE_ICON } from "@/components/icons";
+import { SELECTED_ROW, SelectedRowMark } from "@/components/selection";
 import { useStore } from "@/src/store/store";
 import { LEDGER_LAYERS } from "@/src/engine/config";
 
@@ -55,13 +56,18 @@ export default function LedgerPanel() {
                   onBlur={() => setHilite(null)}
                   aria-pressed={on}
                   className={cn(
-                    "text-left border-none cursor-pointer rounded-sm px-1.5 py-1.5 transition-[background] duration-150",
-                    on ? "bg-[var(--sel-bg)] shadow-[inset_2px_0_0_var(--primary)]" : "bg-transparent hover:bg-wash-hover",
+                    // `relative pr-7` reserves the shared trailing ✓ slot so the text never shifts
+                    // when a layer is selected — the SAME committed-selection language as the filter
+                    // picker's row (SELECTED_ROW: wash + inset ring as one box-shadow + Check mark).
+                    "relative text-left border-none cursor-pointer rounded-sm pl-1.5 pr-7 py-1.5 bg-transparent transition-[background] duration-150",
+                    "hover:bg-wash-hover",
                     "focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--primary)] focus-visible:outline-offset-[-2px]",
+                    on && SELECTED_ROW,
                   )}
                 >
                   <span className={cn("block text-body text-foreground", on && "font-semibold")}>{l.name}</span>
                   <span className="block text-label text-muted-foreground leading-snug mt-0.5">{l.desc}</span>
+                  {on && <SelectedRowMark className="absolute right-2 top-[13px]" />}
                 </button>
               );
             })}

@@ -27,7 +27,7 @@
 // this view owns the continuous interpolation toward each block's resting slot.
 
 import * as THREE from "three";
-import { LEDGER, LEDGER_LAYERS, METAGRAPHS, ledgerSite, clusterRadius } from "../../config";
+import { LEDGER, LEDGER_LAYERS, HYP_SPLIT, METAGRAPHS, ledgerSite, clusterRadius } from "../../config";
 import type { SceneColors } from "../../sceneColors";
 import { LedgerModel, SLOT_SP, slotFade, curvePoint } from "../../domain/ledgerModel";
 import type { GlobalSnapshot, Anchor, PickDescriptor } from "@/src/data/types";
@@ -339,15 +339,11 @@ export class LedgerView {
     // (the global validators over the global block); the −Z 1/3 is RESERVED for hypergraph L1 — the
     // DAG's native $DAG currency — at the SAME height. Two adjacent frames with a gap between them.
     const hy = LEDGER.rowHypL0;
-    const GAP = 3.5;                          // clear space between the L0 and L1 sub-panes
-    const seam = -D / 2 + D / 3;              // the nominal 2/3 : 1/3 division
-    const l1Edge = seam - GAP / 2;            // L1's inner (+Z) edge
-    const l0Edge = seam + GAP / 2;            // L0's inner (−Z) edge
-    const l1D = l1Edge - -D / 2, l0D = D / 2 - l0Edge; // shrunk by the gap
-    const l1Cz = (-D / 2 + l1Edge) / 2;       // −Z 1/3 centre
-    const l0Cz = (l0Edge + D / 2) / 2;        // +Z 2/3 centre
-    frame(W, l0D, hy, l0Cz, "hypl0");
-    frame(W, l1D, hy, l1Cz, "hypl1");
+    // The 2/3 : 1/3 split geometry is the shared config.HYP_SPLIT (the layer-focus camera reads the
+    // same pane centres to frame each sub-pane centred).
+    const l1D = HYP_SPLIT.l1Edge - -D / 2, l0D = D / 2 - HYP_SPLIT.l0Edge; // shrunk by the gap
+    frame(W, l0D, hy, HYP_SPLIT.l0Cz, "hypl0");
+    frame(W, l1D, hy, HYP_SPLIT.l1Cz, "hypl1");
   }
 
   // Highlight one floor plane by layer id (from the explore panel) — brighten its frame + edge fill;

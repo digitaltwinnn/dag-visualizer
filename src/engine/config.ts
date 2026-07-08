@@ -139,16 +139,29 @@ export const LEDGER = {
   viewScale: 1.5,         // bigger in frame without moving the camera
 };
 
+// The hypergraph-L0 level's 2/3 + 1/3 split along Z (shared by LedgerView's panes and the
+// layer-focus camera): the seam sits at the 1/3 mark, a small gap separates the two sub-panes.
+const HYP_SEAM = -LEDGER.depth / 2 + LEDGER.depth / 3;
+export const HYP_SPLIT = {
+  gap: 3.5,
+  l1Edge: HYP_SEAM - 3.5 / 2, // hypergraph-L1 pane's inner (+Z) edge
+  l0Edge: HYP_SEAM + 3.5 / 2, // hypergraph-L0 pane's inner (−Z) edge
+  l1Cz: (-LEDGER.depth / 2 + HYP_SEAM - 3.5 / 2) / 2, // −Z third centre
+  l0Cz: (HYP_SEAM + 3.5 / 2 + LEDGER.depth / 2) / 2,  // +Z 2/3 centre
+};
+
 // The settlement-stack LAYERS as SUBJECTS — id (matches LedgerView's floor planes) + display
-// name/description + floor height. ONE source shared by the Snapshots·Explore panel (rows), the
-// scene (plane pick descriptors), and the layer-focus camera (y). Ordered top→bottom.
-export const LEDGER_LAYERS: { id: string; name: string; desc: string; y: number }[] = [
-  { id: "ml1", name: "Metagraph L1", desc: "Currency-L1 (wallet transactions) and data-L1 (producer updates) validate incoming work into blocks.", y: LEDGER.rowML1 },
-  { id: "ml0", name: "Metagraph L0", desc: "Collects those L1 blocks into the metagraph's snapshot.", y: LEDGER.rowML0 },
-  { id: "msnap", name: "Metagraph snapshots", desc: "Each metagraph's ledger output — they anchor into a global snapshot.", y: LEDGER.rowMSnap },
-  { id: "hypl0", name: "Hypergraph L0", desc: "The Global L0 validators that produce the global snapshot.", y: LEDGER.rowHypL0 },
-  { id: "hypl1", name: "Hypergraph L1", desc: "The native $DAG currency — its own lane beside L0.", y: LEDGER.rowDAGL1 },
-  { id: "gl0", name: "Global snapshots", desc: "The base settlement: where every metagraph snapshot anchors.", y: LEDGER.rowGL0 },
+// name/description + floor height + the pane's lane-centre Z (non-zero only for the split
+// hypergraph panes; the layer-focus camera shifts laterally so the pane sits centred in frame).
+// ONE source shared by the Snapshots·Explore panel (rows), the scene (plane pick descriptors),
+// and the layer-focus camera. Ordered top→bottom.
+export const LEDGER_LAYERS: { id: string; name: string; desc: string; y: number; laneZ: number }[] = [
+  { id: "ml1", name: "Metagraph L1", desc: "Currency-L1 (wallet transactions) and data-L1 (producer updates) validate incoming work into blocks.", y: LEDGER.rowML1, laneZ: 0 },
+  { id: "ml0", name: "Metagraph L0", desc: "Collects those L1 blocks into the metagraph's snapshot.", y: LEDGER.rowML0, laneZ: 0 },
+  { id: "msnap", name: "Metagraph snapshots", desc: "Each metagraph's ledger output — they anchor into a global snapshot.", y: LEDGER.rowMSnap, laneZ: 0 },
+  { id: "hypl0", name: "Hypergraph L0", desc: "The Global L0 validators that produce the global snapshot.", y: LEDGER.rowHypL0, laneZ: HYP_SPLIT.l0Cz },
+  { id: "hypl1", name: "Hypergraph L1", desc: "The native $DAG currency — its own lane beside L0.", y: LEDGER.rowDAGL1, laneZ: HYP_SPLIT.l1Cz },
+  { id: "gl0", name: "Global snapshots", desc: "The base settlement: where every metagraph snapshot anchors.", y: LEDGER.rowGL0, laneZ: 0 },
 ];
 
 // The lead SITE (x,z) of metagraph `i` of `n` — its Z-LANE (a distinct depth), leading at x=0.

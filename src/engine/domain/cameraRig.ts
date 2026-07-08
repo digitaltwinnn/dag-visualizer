@@ -56,7 +56,8 @@ export function geoFraming(R: number, out: CameraFraming): void {
 // untilted; this tilt is an EXPLORATION move (the user can freely orbit from here, like the geo
 // drill zoom).
 export function ledgerLayerFraming(y: number, out: CameraFraming): void {
-  out.pos.set(-24, y + 18, 30);
+  // Close-in framing (user-tuned) — the same diagonal, pulled back a touch from the closest cut.
+  out.pos.set(-18, y + 12, 16);
   out.target.set(-6, y - 2, -14);
 }
 

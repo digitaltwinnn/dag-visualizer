@@ -85,6 +85,17 @@ export class Engine {
   private canvas: HTMLCanvasElement;
   private onClick = (e: MouseEvent) => this._handleClick(e);
   private onMove = (e: MouseEvent) => this._handleMove(e);
+  // DRAG SUPPRESSION: a "click" that ends a camera-orbit drag must pick NOTHING (with the floor
+  // planes pickable, almost every orbit would otherwise end by committing a layer + a camera
+  // flight). Record where the pointer went down; _handleClick ignores clicks that travelled
+  // further than a small threshold, and _handleMove skips hover-picking while the button is held
+  // (no highlight flicker mid-orbit). A stationary click keeps full pick behaviour.
+  private onDown = (e: MouseEvent) => {
+    this._downX = e.clientX;
+    this._downY = e.clientY;
+  };
+  private _downX = 0;
+  private _downY = 0;
   private _hoverKey: string | null = null;
   // Reused pickables buffer (never re-allocated) — `_pickablesFor` runs on every pointermove.
   private _pickBuf: THREE.Object3D[] = [];
@@ -151,6 +162,7 @@ export class Engine {
     this.globe.sceneColors = initialSceneColors;
     canvas.addEventListener("click", this.onClick);
     canvas.addEventListener("pointermove", this.onMove);
+    canvas.addEventListener("pointerdown", this.onDown);
     // The engine owns the resize handler (createScene no longer adds one) so it's
     // cleaned up on dispose — no leak across StrictMode remounts / HMR.
     window.addEventListener("resize", this.onResize);
@@ -654,6 +666,9 @@ export class Engine {
   // Hover tooltip: only writes the store when the hovered target changes (not per
   // pixel); the Tooltip component positions itself from the pointer.
   private _handleMove(e: MouseEvent) {
+    // Mid-drag (orbiting): no hover picking — raycasting the planes every move would flicker the
+    // layer highlight across the stack while the user is just navigating.
+    if (e.buttons !== 0) return;
     const p = this._pickAt(e);
     this.canvas.style.cursor = p ? "pointer" : "grab";
     const st = useStore.getState();
@@ -680,6 +695,8 @@ export class Engine {
   }
 
   private _handleClick(e: MouseEvent) {
+    // A click that ends a drag (orbit/pan) is navigation, not selection — see onDown.
+    if (Math.hypot(e.clientX - this._downX, e.clientY - this._downY) > 5) return;
     const p = this._pickAt(e);
     if (!p) return;
     // A hub click selects the metagraph (opens its context pane + frames it).
@@ -742,11 +759,16 @@ export class Engine {
 
   // Fly to the tilted diagonal view of a settlement layer's floor plane (Snapshots view) — the
   // "nice tilted view" is an exploration move on layer selection, not the resting pose. The plane's
-  // height is scaled by the ledger group's viewScale (the framing works in world units).
+  // height is scaled by the ledger group's viewScale (the framing works in world units). For the
+  // split hypergraph panes the framing also shifts LATERALLY so the sub-pane sits centred: the
+  // group's viewRotY (−90°) maps the pane's local lane-centre z → world x = −laneZ (then scaled).
   private _focusLayer(layerId: string) {
     const l = LEDGER_LAYERS.find((x) => x.id === layerId);
     if (!l) return;
     ledgerLayerFraming(l.y * LEDGER.viewScale, this._framingOut);
+    const dx = -l.laneZ * LEDGER.viewScale;
+    this._framingOut.pos.x += dx;
+    this._framingOut.target.x += dx;
     this._tweenTo(this._framingOut.pos, this._framingOut.target);
   }
 
@@ -861,6 +883,7 @@ export class Engine {
     if (this.metaTimer) clearInterval(this.metaTimer);
     this.canvas.removeEventListener("click", this.onClick);
     this.canvas.removeEventListener("pointermove", this.onMove);
+    this.canvas.removeEventListener("pointerdown", this.onDown);
     window.removeEventListener("resize", this.onResize);
     this.stats?.dom.remove();
     this.unsub.forEach((u) => u());
