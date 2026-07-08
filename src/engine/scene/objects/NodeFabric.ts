@@ -13,7 +13,7 @@
 // `pickablesFor` returns a REUSED array (the plan's allocation fix).
 
 import * as THREE from "three";
-import { LEDGER } from "../../config";
+import { LEDGER } from "../../domain/ledgerLayout";
 import { discFall, lerp, smooth } from "../../domain/nodeLayout";
 import type { DimContext, DimState } from "../../domain/dimModel";
 import type { MetaNodeRecord, ValidatorRecord } from "../../domain/records";

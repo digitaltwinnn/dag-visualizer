@@ -5,7 +5,7 @@ import type { PickDescriptor } from "@/src/data/types";
 import { useStore } from "@/src/store/store";
 import CardHead from "@/components/CardHead";
 import {
-  GeoLiveAside, GeoLiveCard, GeoLiveSubtitle, GeoLiveTitle,
+  GeoLiveAside, GeoLiveCard, GeoLiveSubtitle, GeoLiveTitle, LayerCard, LayerTitle,
   MetaCard, MetaSiteAction, MetaTitle, SnapshotAside, SnapshotCard, SnapshotTitle,
 } from "@/components/inspector/cards";
 
@@ -17,6 +17,7 @@ function CardBody({ p }: { p: PickDescriptor }) {
     case "snapshot": return <SnapshotCard data={p.data} />;
     case "meta": return <MetaCard cfg={p.cfg} />;
     case "geoLive": return <GeoLiveCard />;
+    case "layer": return <LayerCard p={p} />;
     default: return null;
   }
 }
@@ -38,6 +39,8 @@ function headFor(p: PickDescriptor): {
     case "meta": return { title: <MetaTitle cfg={p.cfg} />, titleKey: p.cfg.name };
     case "snapshot": return { title: <SnapshotTitle data={p.data} />, aside: <SnapshotAside data={p.data} /> };
     case "geoLive": return { title: <GeoLiveTitle />, subtitle: <GeoLiveSubtitle />, aside: <GeoLiveAside /> };
+    // The layer head: the dedicated single-plane mark + name; rolls (titleKey) on the layer id.
+    case "layer": return { title: <LayerTitle p={p} />, titleKey: p.layerId };
     default: return {};
   }
 }

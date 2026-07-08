@@ -97,11 +97,13 @@ function GeoVitals() {
 // not the filter colour).
 function LedgerVitals() {
   const activity = useStore((s) => s.activity);
+  const latestOrdinal = useStore((s) => s.latestOrdinal);
   return (
     <>
       <Vital label="Snaps/hr" value={<Odometer value={activity?.snapsPerHour} />} spark={activity?.cadenceSeries} />
       <Vital label="Anchors/hr" value={<Odometer value={activity?.anchorsPerHour} />} spark={activity?.anchoredSeries} />
-      <Vital label="—" value={<span className="text-muted-foreground italic opacity-60">soon</span>} />
+      {/* The live chain head — rolls on every tick (was the reserved "soon" slot). */}
+      <Vital label="Ordinal" value={<Odometer int value={latestOrdinal} />} />
     </>
   );
 }

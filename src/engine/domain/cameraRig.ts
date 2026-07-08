@@ -17,11 +17,8 @@ export const FOCI: Record<string, { pos: THREE.Vector3; target: THREE.Vector3 }>
   // The whole DAG core: pulled back enough to frame the outer cL1 (purple) shell (radius 14).
   dag: { pos: new THREE.Vector3(0, 9, 38), target: new THREE.Vector3(0, 1, 0) },
   geo: { pos: new THREE.Vector3(0, 11, 36), target: new THREE.Vector3(0, 2, 0) },
-  // The Snapshots view is a stack of transparent wireframe FLOORS (layers) on Y. Frame it from an
-  // elevated front angle so the stacked planes read in 3D — see LedgerView + config.LEDGER.
-  // Default framing: the LEAD (latest block) sits toward the bottom-right, leaving the rest of the
-  // view for the trailing chains; looking roughly along -X. Orbit is free.
-  ledger: { pos: new THREE.Vector3(31, 14, 20), target: new THREE.Vector3(-17, 1, -2) },
+  // (The Snapshots view has no camera of its own — it uses `overview`. The ledger GROUP is rotated/
+  // tilted/scaled instead, config.viewRotY/viewTiltX/viewScale, so the camera never moves on a switch.)
 };
 
 // Scratch — module-scope, reused across every hubFraming() call (never per-call allocation).
@@ -50,6 +47,22 @@ export function geoFraming(R: number, out: CameraFraming): void {
   const t = THREE.MathUtils.smoothstep(R, 0.7, 1.0);
   out.pos.set(0, THREE.MathUtils.lerp(7, 6, t), THREE.MathUtils.lerp(34, 26, t));
   out.target.set(0, THREE.MathUtils.lerp(2, 2.5, t), 7);
+}
+
+// Layer-focus framing (Snapshots view): selecting a settlement layer flies the camera to the nice
+// DIAGONAL view of that layer's floor plane — elevated, yawed off-axis from the LEFT so the live
+// lead block sits toward the BOTTOM-RIGHT and the old blocks recede to the TOP-LEFT — centred on
+// the plane's height `y` (already viewScale'd by the caller). The resting pose stays central/
+// untilted; this tilt is an EXPLORATION move (the user can freely orbit from here, like the geo
+// drill zoom).
+export function ledgerLayerFraming(y: number, out: CameraFraming): void {
+  // Close-in framing (user-tuned). The TARGET sits exactly at the lane's LEAD point (x=0, z=0 —
+  // the caller shifts pos+target laterally by the focused lane's world x), so the node ring /
+  // snapshot cluster projects at the exact screen centre. Earlier x/z target offsets (−6, −9,
+  // meant for composition) each pushed the ring right of centre through the diagonal camera —
+  // composition now comes from the camera OFFSET alone (left + above → trail recedes top-left).
+  out.pos.set(-9, y + 8, 30);
+  out.target.set(0, y - 1, 0);
 }
 
 // Engine.ts:784 `_updateTween`'s inline ease, lifted verbatim.

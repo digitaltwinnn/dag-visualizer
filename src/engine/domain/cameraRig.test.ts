@@ -3,15 +3,15 @@ import * as THREE from "three";
 import { FOCI, hubFraming, geoFraming, easeInOutQuad } from "./cameraRig";
 
 describe("FOCI", () => {
-  it("carries the ported camera presets verbatim (Engine.ts:46-56)", () => {
+  it("carries the camera presets (ledger has none — it uses `overview` + a rotated group)", () => {
     expect(FOCI.overview.pos).toEqual(new THREE.Vector3(0, 15, 60));
     expect(FOCI.overview.target).toEqual(new THREE.Vector3(0, 2, 0));
     expect(FOCI.dag.pos).toEqual(new THREE.Vector3(0, 9, 38));
     expect(FOCI.dag.target).toEqual(new THREE.Vector3(0, 1, 0));
     expect(FOCI.geo.pos).toEqual(new THREE.Vector3(0, 11, 36));
     expect(FOCI.geo.target).toEqual(new THREE.Vector3(0, 2, 0));
-    expect(FOCI.ledger.pos).toEqual(new THREE.Vector3(31, 14, 20));
-    expect(FOCI.ledger.target).toEqual(new THREE.Vector3(-17, 1, -2));
+    // The Snapshots view shares `overview` (no own preset — the ledger GROUP is rotated instead).
+    expect(FOCI.ledger).toBeUndefined();
   });
 });
 

@@ -10,7 +10,8 @@ import {
   anchorTiles,
   LedgerModel,
 } from "./ledgerModel";
-import { LEDGER, METAGRAPHS, ledgerSite } from "../config";
+import { METAGRAPHS } from "../config";
+import { LEDGER, ledgerSite } from "./ledgerLayout";
 import type { GlobalSnapshot, Anchor } from "@/src/data/types";
 
 // LINK_VFRAC (js/ledger.js:49) — kept module-private in ledgerModel.ts (not part of the brief's
@@ -97,11 +98,11 @@ describe("curvePoint (js/ledger.js:66-74 verbatim)", () => {
     expect(out.z).toBeCloseTo(0, 10);
   });
 
-  it("starts straight down the column at t=0: (sx, LEDGER.rowProducers, sz)", () => {
+  it("starts straight down the column at t=0: (sx, LEDGER.rowML1, sz)", () => {
     const out = new THREE.Vector3();
     curvePoint(0, 2.5, -3.1, 7.3, out);
     expect(out.x).toBeCloseTo(2.5, 10);
-    expect(out.y).toBeCloseTo(LEDGER.rowProducers, 10);
+    expect(out.y).toBeCloseTo(LEDGER.rowML1, 10);
     expect(out.z).toBeCloseTo(-3.1, 10);
   });
 

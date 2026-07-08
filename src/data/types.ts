@@ -26,10 +26,12 @@ export interface SnapshotExact {
   unlistedFee: number; // datum from metagraphs outside the public catalog
   listedCount: number;
   unlistedCount: number;
-  // Per-metagraph breakdown by address/id → {count, fee}. Addresses matching config.METAGRAPHS are
-  // "listed" (named/coloured pills); the rest are the genuinely-unlisted ones (aggregated as
-  // unlistedCount). This is the exact, complete answer to "which metagraphs anchored here".
-  perMeta: Record<string, { count: number; fee: number }>;
+  // Per-metagraph breakdown by address/id → {count, fee, bytes}. Addresses matching config.METAGRAPHS
+  // are "listed" (named/coloured pills); the rest are the genuinely-unlisted ones (aggregated as
+  // unlistedCount). This is the exact, complete answer to "which metagraphs anchored here". `bytes`
+  // is that metagraph's measured serialized size (Σ content byte length), shown as KB on the
+  // expanded row — NOT derived from the fee.
+  perMeta: Record<string, { count: number; fee: number; bytes: number }>;
 }
 
 // Per-tick anchor aggregate from NetworkData.anchorIndex (see getAnchor).
@@ -176,4 +178,8 @@ export type PickDescriptor =
   // "geoLive" = Geography's signature detail card: the selected node's details (or a pick
   // hint). The selection's footprint summary lives in the top-bar vitals. Reads the store
   // itself (no payload).
-  | (PickBase & { kind: "geoLive" });
+  | (PickBase & { kind: "geoLive" })
+  // A settlement-stack LAYER, selected from the Snapshots·Explore panel or a 3D floor plane.
+  // Carries ONLY the id (matching domain/ledgerLayout's LAYER_GEOM) — the display name/description
+  // are UI copy, resolved through src/data/ledgerLayers.ts by every surface that shows words.
+  | (PickBase & { kind: "layer"; layerId: string });

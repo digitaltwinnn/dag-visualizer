@@ -1,6 +1,6 @@
 import * as THREE from "three";
 import { feature } from "topojson-client";
-import { R, LAND_H, latLonToVec3 } from "../../domain/geoMath";
+import { R, LAND_H, latLonToVec3 } from "../../domain/geoLayout";
 
 // Builds the geo globe SURFACE — the body sphere, graticule, atmosphere rim, and the raised
 // continents (+ glowing coastal cliffs) — into `globe.group`, and sets the handles the morph/fade
@@ -292,11 +292,11 @@ async function buildLand(globe: GeoViewHost) {
           // Gently non-linear ramp (a blend of linear + quadratic): dim along the ocean line,
           // strengthening toward the top rim — so the rim reads as an edge, not a glowing band.
           float e = t * (0.4 + 0.6 * t);
-          // The coastal cliffs use the SURFACE hue (uColor = --primary) and are kept DIM so they read
-          // as a soft ridge blending into the surface, not a bright rim — height alone gives the
-          // relief. A barely-there top-edge highlight keeps the coastline legible.
-          float edge = smoothstep(0.6, 1.0, t);
-          gl_FragColor = vec4(uColor * (0.03 + 0.13 * e + 0.15 * edge), min(1.0, e * 0.72) * uOpacity);
+          // The coastal cliffs use the SURFACE hue (uColor = --primary), dim at the base so they read
+          // as a soft ridge blending into the surface. The TOP EDGE carries a clearly brighter
+          // highlight (user-tuned: shorter walls, brighter rim) so the coastline stays legible.
+          float edge = smoothstep(0.65, 1.0, t);
+          gl_FragColor = vec4(uColor * (0.03 + 0.13 * e + 0.24 * edge), min(1.0, e * 0.72) * uOpacity);
         }`,
       // Single-sided so only cliffs whose face points toward the camera draw: a
       // continent's near + side edges show, its far edge (behind the filled plateau)

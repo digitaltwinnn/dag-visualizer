@@ -20,7 +20,15 @@ import { usePulseWindow } from "@/components/RailDock";
 // vertical track rotated onto the horizontal edge — just widened from a HALF track (`50vw`, one
 // per half) to the FULL track (`100vw`) and mounted once instead of twice, so the bright segment
 // travels uninterrupted across the whole dock instead of two segments converging on the seam.
-// `pointer-events-none` throughout — never intercepts taps on the halves beneath it.
+//
+// POSITIONING (bug-fixed): the carrier must sit at the dock's TOP edge, and its rotation origin's
+// Y must NOT depend on the `100vw` track length. Anchoring the carrier itself with `bottom` +
+// `origin-top-left` is the trap — the top-left origin then lands at `100vh − bottom − 100vw`, i.e.
+// ~100vw ABOVE the dock (mid-screen). So we mirror RailDock's per-half carriers exactly: a
+// container fixed to the dock's own box (`bottom-0 h-[var(--phone-dock-h)]`, bottom-anchored like
+// the dock so there's no vh/dvh drift), with the carrier `absolute top-[3px]` inside it — a
+// height-independent origin pinned to the dock's top edge. `pointer-events-none` throughout —
+// never intercepts taps on the halves beneath it.
 export default function PhoneDockSweep() {
   const mode = useStore((s) => s.mode);
   const filter = useStore((s) => s.filter);
@@ -29,14 +37,13 @@ export default function PhoneDockSweep() {
   if (!switchP.live) return null;
   return (
     <span
-      className={
-        "hidden max-[699px]:block fixed z-[43] left-0 w-[3px] h-[100vw] origin-top-left -rotate-90 " +
-        "pointer-events-none [--pulse-len:45%]"
-      }
-      style={{ bottom: "calc(var(--phone-dock-h) - 3px)", ["--spine" as string]: accent } as CSSProperties}
+      className="hidden max-[699px]:block fixed z-[43] bottom-0 left-0 w-full h-[var(--phone-dock-h)] pointer-events-none"
+      style={{ ["--spine" as string]: accent } as CSSProperties}
       aria-hidden
     >
-      <PulseEdge pulseKey={switchP.pulse} />
+      <span className="absolute top-[3px] left-0 w-[3px] h-[100vw] origin-top-left -rotate-90 [--pulse-len:45%]">
+        <PulseEdge pulseKey={switchP.pulse} />
+      </span>
     </span>
   );
 }

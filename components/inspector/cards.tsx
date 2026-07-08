@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { cn } from "@/lib/utils";
 import { useStore } from "@/src/store/store";
-import { shortHash, CORE_HEX } from "@/src/data/network";
+import { shortHash, CORE_HEX, getNetwork, metagraphById } from "@/src/data/network";
 import { identityHudHex } from "@/src/palette/identity";
 import { hex, fmtDag, fmtKB } from "@/src/util/format";
 import { relativeAge } from "@/src/util/relativeAge";
@@ -14,12 +14,13 @@ import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { SonarRing, NodeStars, NoSignalDot } from "@/components/state/StateAtoms";
-import { VIEW_ICONS, KIND_MARK_CLASS } from "@/components/icons";
+import { VIEW_ICONS, LAYER_ICON, KIND_MARK_CLASS } from "@/components/icons";
 import { ExternalLink } from "lucide-react";
 import { useMinHold } from "@/components/useMinHold";
-import { VIS } from "@/src/engine/config";
+import { POLL } from "@/src/engine/config";
 import { Desc, StatusMark, CompositionRows, StatusBreakdown, networkKind } from "./parts";
 import { compositionRows } from "@/src/data/composition";
+import { ledgerLayerById } from "@/src/data/ledgerLayers";
 
 type PickOf<K extends PickDescriptor["kind"]> = Extract<PickDescriptor, { kind: K }>;
 
@@ -30,15 +31,17 @@ type PickOf<K extends PickDescriptor["kind"]> = Extract<PickDescriptor, { kind: 
 // NO title rows of their own.
 
 // Snapshot title: the Snapshots view mark (Layers — the SAME lucide icon the top bar uses for the
-// Snapshots view; the card head marks speak the view-glyph vocabulary; cyan = a GLOBAL snapshot) +
-// the ordinal. The
+// Snapshots view; the card head marks speak the view-glyph vocabulary) + the ordinal. The mark
+// TINTS with the active filter's identity (`--filter-accent`, set on the rail by Inspector; cyan
+// on "all") — the consistent subject-mark language (user rule: a selected metagraph's hue shows on
+// every mark that speaks for it). The
 // Odometer owns the roll (digit-roll on each live tick), so no CardHead `titleKey` — a keyed
 // remount would restart it as a whole-title roll-in instead.
 export function SnapshotTitle({ data: d }: { data: GlobalSnapshot }) {
   const Mark = VIEW_ICONS.ledger;
   return (
     <span className="inline-flex items-center gap-2">
-      <Mark aria-hidden className={cn(KIND_MARK_CLASS, "text-primary")} />
+      <Mark aria-hidden className={cn(KIND_MARK_CLASS, "text-[var(--filter-accent,var(--primary))]")} />
       <Odometer value={d.ordinal} className="text-title font-semibold text-foreground tabular-nums" />
     </span>
   );
@@ -177,12 +180,12 @@ export function SnapshotCard({ data: d }: { data: GlobalSnapshot }) {
   const feeHold = useMinHold(awaitingExact);
 
   // NO SIGNAL — the feed is unreachable. One sonar ring per retry: remounting `SonarRing` via
-  // `key={retry}` (bumped on the same cadence as the poll, VIS.pollMs) makes the ring animation
+  // `key={retry}` (bumped on the same cadence as the poll, POLL.pollMs) makes the ring animation
   // itself read as "still retrying", not a static icon.
   const [retry, setRetry] = useState(0);
   useEffect(() => {
     if (live) return;
-    const id = setInterval(() => setRetry((r) => r + 1), VIS.pollMs); // one ring per real poll/retry
+    const id = setInterval(() => setRetry((r) => r + 1), POLL.pollMs); // one ring per real poll/retry
     return () => clearInterval(id);
   }, [live]);
 
@@ -360,6 +363,108 @@ function GeoLiveNode({ p }: { p: PickOf<"l0" | "l1" | "metanode"> }) {
         <div className="my-2">
           <span className="text-micro tracking-[0.1em] uppercase text-muted-foreground">Composition</span>
           <CompositionRows nodes={oneNode} />
+        </div>
+      )}
+    </>
+  );
+}
+
+// ── The LAYER card (Snapshots · settlement-stack layer) ─────────────────────────────────────
+// Selected from the Snapshots·Explore panel (LedgerPanel): each layer of the settlement stack is a
+// clickable subject whose card = what the layer IS (the pick carries the panel's description) plus
+// its LIVE footprint right now, derived from data already in the store — node counts from the
+// metagraph list (a hybrid counts in every layer it runs, matching the top-bar vitals taxonomy),
+// activity rates from store.activity (the vitals' source). No new fetches, nothing fabricated.
+
+// Head title: the layer's single-plane mark + its name (same view-vocabulary pattern as the
+// snapshot head's Layers mark).
+export function LayerTitle({ p }: { p: PickOf<"layer"> }) {
+  const Icon = LAYER_ICON; // the dedicated single-plane mark — same glyph as its tray icon
+  return (
+    <span className="inline-flex items-center gap-2 min-w-0">
+      {/* Tints with the filter identity like every subject mark (--filter-accent; cyan on "all"). */}
+      <Icon className={cn(KIND_MARK_CLASS, "text-[var(--filter-accent,var(--primary))]")} aria-hidden />
+      {/* The pick carries only the id; the display copy resolves through src/data/ledgerLayers. */}
+      <span className="truncate">{ledgerLayerById(p.layerId)?.name ?? p.layerId}</span>
+    </span>
+  );
+}
+
+export function LayerCard({ p }: { p: PickOf<"layer"> }) {
+  const metaList = useStore((s) => s.metaList);
+  const nodes = useStore((s) => s.nodes);
+  const activity = useStore((s) => s.activity);
+  const latestOrdinal = useStore((s) => s.latestOrdinal);
+  const filter = useStore((s) => s.filter);
+  // store.activity is FILTER-SCOPED (a metagraph selection reads ITS own snapshot stream —
+  // production cadence + the distinct global ticks it anchored into; see api.getActivity).
+  // The GLOBAL layers' facts must not silently become metagraph figures under a filter, so the
+  // gl0/msnap global rates read the UNFILTERED activity straight from the network singleton.
+  const globalActivity = getNetwork()?.getActivity() ?? null;
+  const metaCfg = metagraphById(filter);
+
+  // Role tallies over the LIVE metagraph set (excluding the DAG root — its layers are the
+  // hypergraph rows below). A node counts in every layer it runs (roles), like the vitals.
+  const metas = metaList.filter((m) => !m.isRoot);
+  const roleCount = (role: string) =>
+    metas.reduce((sum, m) => sum + m.nodes.filter((n) => (n.roles ?? []).includes(role)).length, 0);
+  const metasRunning = (roles: string[]) =>
+    metas.filter((m) => m.nodes.some((n) => (n.roles ?? []).some((r) => roles.includes(r)))).length;
+
+  // The layer's live fact rows, by id (matches LedgerPanel's LAYERS / LedgerView's floors).
+  const facts: { label: string; value: string }[] = [];
+  const perHour = (n: number) => `${Math.round(n).toLocaleString()} / hr`;
+  switch (p.layerId) {
+    case "ml1":
+      facts.push(
+        { label: "Currency-L1 nodes", value: String(roleCount("cl1")) },
+        { label: "Data-L1 nodes", value: String(roleCount("dl1")) },
+        { label: "Metagraphs running it", value: String(metasRunning(["cl1", "dl1"])) },
+      );
+      break;
+    case "ml0":
+      facts.push(
+        { label: "L0 nodes", value: String(roleCount("l0")) },
+        { label: "Metagraphs running it", value: String(metasRunning(["l0"])) },
+      );
+      break;
+    case "msnap":
+      // Filtered: the selected metagraph's OWN stream — its production cadence and how many
+      // distinct global snapshots it anchored into (batching makes that ≤ production).
+      if (metaCfg && activity) {
+        facts.push(
+          { label: `${metaCfg.ticker || metaCfg.name} snapshots`, value: perHour(activity.snapsPerHour) },
+          { label: "Anchored to global snapshots", value: perHour(activity.anchorsPerHour) },
+        );
+      } else if (globalActivity) {
+        facts.push({ label: "Snapshots anchored", value: perHour(globalActivity.anchorsPerHour) });
+      }
+      break;
+    case "hypl0":
+      facts.push({ label: "Global validators", value: String(nodes.l0) });
+      break;
+    case "hypl1":
+      facts.push({ label: "$DAG L1 nodes", value: String(nodes.l1) });
+      break;
+    case "gl0":
+      // Always the GLOBAL cadence (unfiltered) — under a metagraph filter store.activity would be
+      // that metagraph's own rate, which is not what this layer is about.
+      if (globalActivity) facts.push({ label: "Global snapshots", value: perHour(globalActivity.snapsPerHour) });
+      if (latestOrdinal != null) facts.push({ label: "Latest ordinal", value: latestOrdinal.toLocaleString() });
+      break;
+  }
+
+  return (
+    <>
+      <Desc text={ledgerLayerById(p.layerId)?.desc ?? ""} />
+      {facts.length > 0 && (
+        <div className="flex flex-col gap-2 mt-2">
+          {facts.map((f) => (
+            <div key={f.label} className="flex items-start justify-between gap-2.5">
+              <span className="text-body text-muted-foreground">{f.label}</span>
+              <span className="text-body text-foreground tabular-nums">{f.value}</span>
+            </div>
+          ))}
         </div>
       )}
     </>

@@ -30,7 +30,7 @@
 // the scaled endpoints exactly, matching js/globe.js:432-437's `_arcCurve`).
 
 import * as THREE from "three";
-import { R, LAND_H } from "./geoMath";
+import { R, LAND_H } from "./geoLayout";
 
 // Travelling-packet arcs: each is a short comet that hops node -> node (js/globe.js:35-38).
 export const ARC_TAIL = 8; // points making up each comet

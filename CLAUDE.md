@@ -139,7 +139,9 @@ Zustand store. **Two data lanes:** (A) high-freq visuals subscribe straight to
   `metagraphById`/`filterAccent`/`CORE_HEX`/etc; `follow.ts` = follow logic; `types.ts`
   (`PickDescriptor` is a `kind`-discriminated union, `SnapshotExact`, `NodeRow`);
   `composition.ts` (node-fabric grouping), `nodeStatus.ts` (the shared status vocabulary),
-  `hoverSubject.ts` (`hoverKeyOf`), `bootPhase.ts`, `breakpoint.ts`. **`src/util/`** —
+  `hoverSubject.ts` (`hoverKeyOf`), `ledgerLayers.ts` (the settlement layers' display COPY —
+  name/desc by layer id; the geometry twin is `domain/ledgerLayout.ts`'s `LAYER_GEOM`),
+  `bootPhase.ts`, `breakpoint.ts`. **`src/util/`** —
   `format.ts` (`hex`/`fmtDag`/`ccToFlag`), `relativeAge.ts`, `odometer.ts`.
   **`src/palette/`** — the identity-hue generator (see *Two colour lanes*).
 - **`src/engine/Engine.ts`** — the imperative engine and **the one bridge** (store ⇄ domain ⇄
@@ -149,9 +151,13 @@ Zustand store. **Two data lanes:** (A) high-freq visuals subscribe straight to
   frame it consults `VIEW_POLICIES[mode]` (the per-view allow-list) and translates the flags
   into scene state. Drives the typed `domain/` + `scene/` modules below (see *Engine layer
   rules*).
-- **`src/engine/config.ts`** — API endpoints, colors, the `METAGRAPHS` list, `VIS` tuning,
-  `LEDGER` layout, and the shared layout math `metaAnchor()` (hub orbit-slot), `ledgerSite`,
-  `clusterRadius`, `ledgerSpread`.
+- **`src/engine/config.ts`** — PURE STATIC DATA the app is parameterized by, nothing else: API
+  endpoints, the `COLORS` palette mirror, the `METAGRAPHS` catalog, `POLL` (data cadence/
+  retention tuning). **Config principles (hold in every change):** no math and no derived tables
+  here — per-view layout geometry + layout math live in ONE `domain/` module per view
+  (`hyperLayout.ts` / `ledgerLayout.ts` / `geoLayout.ts`); no UI copy here — display strings live
+  UI-side (e.g. `src/data/ledgerLayers.ts`) and picks/scene objects carry ids only; groups are
+  single-concern.
 - **`lib/`** — `utils.ts` (`cn()`), `mgVars.tsx` (`MetagraphVars` sets `--mg-<id>` identity
   vars on `:root`; intentionally not yet mounted app-wide — don't delete as dead code).
 - **`components/ui/`** — the shadcn primitives in use (see *shadcn primitives*).
@@ -171,10 +177,17 @@ store-value imports**, enforced by `layerBoundaries.test.ts`). Each ships coloca
 - `arcSim.ts` — the travelling-packet arc simulation: a swarm of comet "agents" that hop
   node→node. **Emits flash EVENTS via a ring buffer** — no cross-view side-channel mutation.
 - `ledgerModel.ts` — the Snapshots chamber's layout/slot/tile model over the live snapshot data.
-- `cameraRig.ts` — `FOCI` + the camera framing math (`hubFraming`, `geoFraming`, easings).
+- `hyperLayout.ts` — the Hypergraph view's layout home: `metaAnchor()` (hub orbit-slot),
+  `META_ORBIT`. Per-view layout peers: `ledgerLayout.ts`, `geoLayout.ts`.
+- `ledgerLayout.ts` — the Snapshots view's layout home: `LEDGER` (floor heights + the whole-view
+  group transform), `HYP_SPLIT` (the hypergraph level's 2/3+1/3 cut), `LAYER_GEOM` (layer id →
+  height/lane-centre; ids shared with the UI copy table `src/data/ledgerLayers.ts` and the scene's
+  `layer` picks), `ledgerSite`, `clusterRadius`, `ledgerSpread`.
+- `cameraRig.ts` — `FOCI` + the camera framing math (`hubFraming`, `geoFraming`,
+  `ledgerLayerFraming`, easings).
 - `records.ts` — the plain node/metagraph record types (`ValidatorRecord`/`MetaNodeRecord`) the
   scene consumes.
-- `geoMath.ts` — shared geo constants (`R`, `LAND_H`) + `latLonToVec3`.
+- `geoLayout.ts` — shared geo constants (`R`, `LAND_H`) + `latLonToVec3`.
 - `geoStats.ts` — the geo "data" layer: per-country tallies + the flat node-browser list,
   **pure functions** over the node record arrays (no Three/mesh state).
 
@@ -606,7 +619,11 @@ cards: **eyebrow / title / INSET hairline / body**.
   "currency metagraph" / "data and currency metagraph" / DAG = "hypergraph"; 0-node
   metagraphs say just "metagraph"); the snapshot title's Odometer owns its own roll; the
   node card is **location-first** (place as title, the id hash demoted to the mono
-  `subtitle` slot, id-as-title fallback when unresolved).
+  `subtitle` slot, id-as-title fallback when unresolved). **Card-head kind MARKS tint with
+  the active filter's identity** via `text-[var(--filter-accent,var(--primary))]` (the rail
+  sets `--filter-accent`; cyan on "all") — never hardcode a mark to cyan (a recurring bug;
+  the snapshot Layers mark + the layer plane mark both follow this; node marks use their
+  node's own hue inline).
 - **`aside`**: right-aligned title-row companion (snapshot live-dot/age, node status pill) —
   bodies render no title rows of their own.
 - **The hairline is INSET** by the card's padding on both layouts — full-width rules don't
