@@ -7,7 +7,8 @@
 // view by scaling `root` down.
 
 import * as THREE from "three";
-import { METAGRAPHS, metaAnchor, type MetaConfig } from "../../config";
+import { METAGRAPHS, type MetaConfig } from "../../config";
+import { metaAnchor } from "../../domain/hyperLayout";
 import type { SceneColors } from "../../sceneColors";
 import { R_GLOBE, CORE_R } from "../../domain/morph";
 

@@ -6,7 +6,7 @@
 // frame — the plan's allocation fix).
 
 import * as THREE from "three";
-import { R, LAND_H } from "../../domain/geoMath";
+import { R, LAND_H } from "../../domain/geoLayout";
 import type { Cluster } from "../../domain/nodeLayout";
 
 const Z_AXIS = new THREE.Vector3(0, 0, 1);

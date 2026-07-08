@@ -1,6 +1,6 @@
 // The Snapshots (ledger) view, rendered on the shared Three.js canvas like the other views.
 //
-// A 3D stack of transparent glass FLOORS (one per layer; see config.LEDGER). The producer NODES
+// A 3D stack of transparent glass FLOORS (one per layer; see domain/ledgerLayout.ts). The producer NODES
 // are the SAME node meshes reused from the hyper/geo views, placed into their lanes by Globe.
 // This module owns what's unique to the view:
 //   • the glass floor panes,
@@ -27,34 +27,26 @@
 // this view owns the continuous interpolation toward each block's resting slot.
 
 import * as THREE from "three";
-import { LEDGER, METAGRAPHS, ledgerSite, clusterRadius } from "../../config";
+import { METAGRAPHS } from "../../config";
+import { LEDGER, HYP_SPLIT, LAYER_GEOM, ledgerSite, clusterRadius } from "../../domain/ledgerLayout";
 import type { SceneColors } from "../../sceneColors";
 import { LedgerModel, SLOT_SP, slotFade, curvePoint } from "../../domain/ledgerModel";
 import type { GlobalSnapshot, Anchor, PickDescriptor } from "@/src/data/types";
 
-// The glass floor heights (top→bottom): data producers · metagraph L1 · metagraph L0 · metagraph
-// snapshots · hypergraph (global) L0 · hypergraph (DAG) L1. All one colour — labels (not colour) name
-// them; the metagraph-snapshots floor is unlabelled (the snapshot blocks self-identify).
-const FLOOR_Y = [LEDGER.rowProducers, LEDGER.rowML1, LEDGER.rowML0, LEDGER.rowMSnap, LEDGER.rowGL0, LEDGER.rowHypL0, LEDGER.rowDAGL1];
-
-// The two SNAPSHOT/ledger floors (the L0 OUTPUTS — metagraph snapshots + global snapshots), as
-// opposed to the node/validator floors. They render as a transparent bordered FRAME — a sharp edge
-// outline, no filled sheet — rather than the node floors' soft filled glass, so the two KINDS of
-// layer read apart at a glance (same --primary hue; only the treatment differs).
-const SNAPSHOT_FLOORS = new Set<number>([LEDGER.rowMSnap, LEDGER.rowGL0]);
-
-// Short layer labels. Two kinds of floor: node/validator layers (metagraph L1/L0, hypergraph L1) and
-// snapshot/ledger layers (the L0 outputs — "metagraph snapshots", "global snapshots"). "data
-// producers" is the symbolic top layer. Drawn at the front-left of each floor.
-const FLOOR_LABELS = [
-  { y: LEDGER.rowProducers, text: "data producers" },
-  { y: LEDGER.rowML1, text: "metagraph L1" },
-  { y: LEDGER.rowML0, text: "metagraph L0" },
-  { y: LEDGER.rowMSnap, text: "metagraph snapshots" },
-  { y: LEDGER.rowGL0, text: "global snapshots" },
-  { y: LEDGER.rowHypL0, text: "hypergraph L0" },
-  { y: LEDGER.rowDAGL1, text: "hypergraph L1" },
-];
+// Floor plane geometry comes from the shared domain table (ledgerLayout.LAYER_GEOM): the FULL-WIDTH
+// floors are exactly its laneZ === 0 entries; the split hypergraph panes (hypl0/hypl1, laneZ ≠ 0)
+// are built separately below. Layer NAMES live UI-side (src/data/ledgerLayers.ts) — no in-scene text;
+// a plane's pick carries only its layerId.
+// Floor-frame + edge-fill opacities at rest and when a plane is highlighted from the explore panel.
+// The resting frame sits at ~the geo view's coastal-wall rim brightness (user-tuned) so the two
+// views' structural edges read as one weight.
+// NB: the frame material's colour is HDR-overdriven ×2 (see _buildFloors) so these opacities are
+// roughly HALF the perceived line brightness — 0.16×2 ≈ the previous 0.28 line, now with bloom.
+// FILL has two parts: the pixelated EDGE band (op) and the flat INNER sheet (inner) — the inner is
+// 0 at rest (the centre stays fully transparent by design) and fills in on highlight so the tiles/
+// nodes clearly sit ON the selected plane when the layer-focus camera is close.
+const FLOOR_FRAME_OP = 0.16, FLOOR_FILL_OP = 0.04, FLOOR_INNER_OP = 0;
+const FLOOR_FRAME_HI = 0.4, FLOOR_FILL_HI = 0.14, FLOOR_INNER_HI = 0.03;
 
 const PULSE_MAX = 220;       // pooled travelling-pulse instances
 const PULSE_STAGGER = 0.035; // s between successive pulse emissions (a steady stream)
@@ -160,6 +152,8 @@ export class LedgerView {
   private _pulseMesh!: THREE.InstancedMesh;
 
   private _gL0Ring: THREE.Mesh;
+  // Per-plane materials keyed by layer id, so setHighlight() can brighten one floor (explore panel).
+  private _floorMats = new Map<string, { frame: THREE.LineBasicMaterial; fill: THREE.ShaderMaterial }>();
 
   constructor(scene: THREE.Scene, colors: SceneColors) {
     this._core = colors.core;
@@ -167,6 +161,13 @@ export class LedgerView {
     this._neutralTile = new THREE.Color(colors.core).multiplyScalar(NEUTRAL_DIM);
     this.group = new THREE.Group();
     this.group.visible = false;
+    // Whole-view orientation (tilt ∘ rotY) + scale so the ledger frames well under the SHARED overview
+    // camera — the camera never moves; the group does. Globe bakes the SAME matrix (Rx·Ry) into the
+    // node ledger positions so planes + nodes stay aligned — set the quaternion from that exact matrix.
+    this.group.quaternion.setFromRotationMatrix(
+      new THREE.Matrix4().makeRotationX(LEDGER.viewTiltX).multiply(new THREE.Matrix4().makeRotationY(LEDGER.viewRotY)),
+    );
+    this.group.scale.setScalar(LEDGER.viewScale);
     scene.add(this.group);
     this.pickables = [];
     this.sceneColors = null;
@@ -219,7 +220,7 @@ export class LedgerView {
     this._linkMesh = new THREE.LineSegments(
       geo,
       new THREE.LineBasicMaterial({
-        vertexColors: true, transparent: true, opacity: 0.38, // soft
+        vertexColors: true, transparent: true, opacity: 0.85, // hot links pop; neutral kept dim by their low vertex-colour
         blending: THREE.AdditiveBlending, depthWrite: false,
       }),
     );
@@ -283,87 +284,83 @@ export class LedgerView {
     // they stay a subtle hint of a layer (not a wall) — the black background still reads through.
     const W = 38;        // X extent (camera-depth) — tight to the lead + trail span
     const D = 44;        // Z extent — tight to the lanes
-    const cx = -16;      // centred on the content; +X (in front of the lead) stays black
-    const planeGeo = new THREE.PlaneGeometry(W, D);      // shared by the node-floor sheets
-    const edgeGeo = new THREE.EdgesGeometry(planeGeo);   // the 4 sharp border edges (snapshot frames)
-    for (const y of FLOOR_Y) {
-      let floor: THREE.Object3D;
-      if (SNAPSHOT_FLOORS.has(y)) {
-        // Snapshot-output floor: a transparent bordered FRAME (sharp default edge, no soft fade, no
-        // filled sheet) so it reads as a different KIND than the node floors' soft glass.
-        floor = new THREE.LineSegments(
-          edgeGeo,
-          new THREE.LineBasicMaterial({
-            color: this._core, transparent: true, opacity: 0.12,
-            blending: THREE.AdditiveBlending, depthWrite: false,
-          }),
-        );
-      } else {
-        floor = new THREE.Mesh(planeGeo, this._paneMat(this._core, 0.025));
-      }
-      floor.rotation.x = -Math.PI / 2; // lie flat in the X/Z plane (W→X, D→Z)
-      floor.position.set(cx, y, 0);
-      floor.renderOrder = -1;
-      this.group.add(floor);
-    }
-    // Front-left layer labels — printed flat ON each floor, tucked into its front-left corner.
-    const lx = cx + W / 2 - 2, lz = D / 2 - 2.5;
-    for (const { y, text } of FLOOR_LABELS) this.group.add(this._makeLabel(text, lx, y, lz));
-  }
-
-  // A flat, quiet text label lying ON a floor (not a billboard) — the very-short layer name, printed
-  // on the glass, run parallel to the lane (Z) edge and readable from the default camera.
-  private _makeLabel(text: string, x: number, y: number, z: number): THREE.Mesh {
-    const c = document.createElement("canvas");
-    c.width = 256; c.height = 64;
-    const ctx = c.getContext("2d")!;
-    ctx.font = "300 23px system-ui, -apple-system, sans-serif";
-    ctx.fillStyle = "rgba(170,196,224,0.4)"; // subtle, low-contrast
-    ctx.textAlign = "center";
-    ctx.textBaseline = "middle";
-    ctx.fillText(text, c.width / 2, c.height / 2 + 2);
-    const tex = new THREE.CanvasTexture(c);
-    tex.minFilter = THREE.LinearFilter;
-    tex.colorSpace = THREE.SRGBColorSpace;
-    const h = 1.35, w = h * (c.width / c.height);
-    const mesh = new THREE.Mesh(
-      new THREE.PlaneGeometry(w, h),
-      new THREE.MeshBasicMaterial({ map: tex, transparent: true, depthWrite: false, depthTest: false }),
-    );
-    // Lie flat, aligned to the floor's lane (Z) edge, oriented so it reads from the camera side.
-    mesh.quaternion.setFromRotationMatrix(
-      new THREE.Matrix4().makeBasis(
-        new THREE.Vector3(0, 0, -1),  // canvas right → -Z (along the edge, screen-right)
-        new THREE.Vector3(-1, 0, 0),  // canvas up    → -X (tops of letters away from the camera)
-        new THREE.Vector3(0, 1, 0),   // normal       → up off the floor
-      ),
-    );
-    mesh.position.set(x, y + 0.06, z);
-    mesh.renderOrder = 2;
-    return mesh;
-  }
-
-  // Simple flat transparent pane — just a faint tint, NORMAL blending (not additive/glass), with a
-  // barely-there fade right at the very edge so it doesn't end on a razor line.
-  private _paneMat(color: number, opacity: number): THREE.ShaderMaterial {
-    return new THREE.ShaderMaterial({
-      transparent: true, depthWrite: false, side: THREE.DoubleSide, blending: THREE.NormalBlending,
-      uniforms: { uColor: { value: new THREE.Color(color) }, uOpacity: { value: opacity } },
+    const cx = -14;      // shifted a touch forward (+X) so the L0/L1 node ring (radius ~3.5 at x≈0)
+                         // fits inside the pane's front edge; the −X edge (−33) still clears the trail (~−29)
+    // Every floor is the SAME simple treatment: a sharp-edged transparent FRAME plus a faint,
+    // pixelated edge-weighted fill (quickly gone toward the centre). Each plane gets its OWN cloned
+    // materials, stored by layer id in `_floorMats`, so the explore panel can highlight ONE plane
+    // (setHighlight) — brighten its frame + fill — without touching the rest. No in-scene text.
+    // The frame colour is pushed into HDR (×2) so the thin edge lines land above the bloom pass's
+    // threshold and GLOW like the nodes / the geo coastal rim — the opacity still sets the line's
+    // core brightness, the overdriven colour is what feeds the bloom.
+    const frameMat = new THREE.LineBasicMaterial({
+      color: new THREE.Color(this._core).multiplyScalar(2),
+      transparent: true, opacity: FLOOR_FRAME_OP,
+      blending: THREE.AdditiveBlending, depthWrite: false,
+    });
+    const fillMat = new THREE.ShaderMaterial({
+      transparent: true, depthWrite: false, side: THREE.DoubleSide, blending: THREE.AdditiveBlending,
+      uniforms: { uColor: { value: new THREE.Color(this._core) }, uOpacity: { value: FLOOR_FILL_OP }, uInner: { value: FLOOR_INNER_OP } },
       vertexShader: `
         varying vec2 vP;
-        void main() {
-          vP = uv * 2.0 - 1.0; // -1..1 across the rectangle
-          gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
-        }`,
+        void main() { vP = uv * 2.0 - 1.0; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
       fragmentShader: `
-        uniform vec3 uColor; uniform float uOpacity; varying vec2 vP;
+        uniform vec3 uColor; uniform float uOpacity; uniform float uInner; varying vec2 vP;
         void main() {
-          float e = max(abs(vP.x), abs(vP.y));          // distance to the edge
-          float fade = 1.0 - smoothstep(0.96, 1.0, e);  // flat, just a hair of edge softening
-          if (fade <= 0.002) discard;
-          gl_FragColor = vec4(uColor, uOpacity * fade);
+          // Pixelated, not smooth: snap to a grid of cells, then quantize the alpha into steps.
+          float GRID = 48.0; // finer pixel cells (user-tuned smaller)
+          vec2 cell = (floor(vP * GRID) + 0.5) / GRID;
+          float e = max(abs(cell.x), abs(cell.y));
+          float band = smoothstep(0.88, 1.0, e); // 12% band — user-tuned to 2/3 of the earlier 18%
+          band = floor(band * 3.0 + 0.5) / 3.0;
+          // Edge band + the flat INNER sheet (uInner: 0 at rest — transparent centre — raised on
+          // highlight so content sits on a visible surface).
+          float a = uOpacity * band + uInner;
+          if (a <= 0.002) discard;
+          gl_FragColor = vec4(uColor, a);
         }`,
     });
+    // Per-plane clones (independent uniforms) so a single plane can be highlighted. Each fill mesh
+    // is also a PICK target carrying its layer descriptor (name/desc from the shared LEDGER_LAYERS):
+    // hovering/clicking the plane in 3D mirrors the explore panel's rows. The Engine treats layer
+    // picks as FALLBACK hits (blocks/nodes win), so the big stacked planes never steal their picks.
+    const frame = (w: number, d: number, y: number, z: number, id: string) => {
+      const fm = fillMat.clone();
+      const fill = new THREE.Mesh(new THREE.PlaneGeometry(w, d), fm);
+      fill.rotation.x = -Math.PI / 2; fill.position.set(cx, y, z); fill.renderOrder = -2;
+      fill.userData.pick = { kind: "layer", layerId: id };
+      this.pickables.push(fill);
+      this.group.add(fill);
+      const lm = frameMat.clone();
+      const f = new THREE.LineSegments(new THREE.EdgesGeometry(new THREE.PlaneGeometry(w, d)), lm);
+      f.rotation.x = -Math.PI / 2; // lie flat in the X/Z plane (w→X, d→Z)
+      f.position.set(cx, y, z);
+      f.renderOrder = -1;
+      this.group.add(f);
+      this._floorMats.set(id, { frame: lm, fill: fm });
+    };
+    for (const { y, id } of LAYER_GEOM.filter((l) => l.laneZ === 0)) frame(W, D, y, 0, id);
+
+    // The hypergraph-L0 level is ONE plane CUT along Z: the 2/3 toward +Z/centre is hypergraph L0
+    // (the global validators over the global block); the −Z 1/3 is RESERVED for hypergraph L1 — the
+    // DAG's native $DAG currency — at the SAME height. Two adjacent frames with a gap between them.
+    const hy = LEDGER.rowHypL0;
+    // The 2/3 : 1/3 split geometry is the shared config.HYP_SPLIT (the layer-focus camera reads the
+    // same pane centres to frame each sub-pane centred).
+    const l1D = HYP_SPLIT.l1Edge - -D / 2, l0D = D / 2 - HYP_SPLIT.l0Edge; // shrunk by the gap
+    frame(W, l0D, hy, HYP_SPLIT.l0Cz, "hypl0");
+    frame(W, l1D, hy, HYP_SPLIT.l1Cz, "hypl1");
+  }
+
+  // Highlight one floor plane by layer id (from the explore panel) — brighten its frame + edge fill;
+  // null clears. Every plane owns its materials (see _buildFloors), so this touches only the match.
+  setHighlight(id: string | null): void {
+    for (const [k, m] of this._floorMats) {
+      const on = id === k;
+      m.frame.opacity = on ? FLOOR_FRAME_HI : FLOOR_FRAME_OP;
+      m.fill.uniforms.uOpacity.value = on ? FLOOR_FILL_HI : FLOOR_FILL_OP;
+      m.fill.uniforms.uInner.value = on ? FLOOR_INNER_HI : FLOOR_INNER_OP;
+    }
   }
 
   // The live global snapshot at centre — a SOLID block (it's always a real snapshot). When the
@@ -377,7 +374,7 @@ export class LedgerView {
     this.center.position.set(0, LEDGER.rowGL0, 0);
     this.center.rotation.x = -Math.PI / 2; // lie the tile flat on the global-snapshot floor
     this.group.add(this.center);
-    this.pickables = [this.center];
+    this.pickables.push(this.center); // append — _buildFloors already registered the layer planes
   }
 
   // Reconcile the trail meshes to model.trail (paired by ordinal): create a mesh for each model trail
@@ -584,8 +581,10 @@ export class LedgerView {
       const col = sel ? this._coreCol : this._neutralTile;
       mat.color.copy(col);
       mat.emissive.copy(col);
-      mat.emissiveIntensity = sel ? 0.7 : 0.22;
-      const target = sel ? 0.95 : 0.55 * slotFade(t.slot);
+      // Trail brightness lifted (user-tuned): the old global snapshots read too dark/transparent
+      // under the depth fog — a higher emissive + opacity floor keeps them visible as they recede.
+      mat.emissiveIntensity = sel ? 0.7 : 0.34;
+      const target = sel ? 0.95 : 0.75 * slotFade(t.slot);
       mat.opacity += (target - mat.opacity) * k;
     }
 
@@ -621,7 +620,10 @@ export class LedgerView {
           // otherwise the live lead (slot 0) is the coloured row. A filtered-out lane is never coloured.
           const hot = this.model.isRowHot(laneOff, b.slot);
           const colAmt = hot ? 1 : 0;
-          const bright = (hot ? Math.max(b.fade, 0.7) : b.fade) * (b.filled ? 0.6 : 0.13);
+          // The HOT (active-snapshot) filled tiles read BRIGHT — near/over full lane colour on the
+          // additive mesh so they bloom like the live global-L0 block; empty placeholders + the
+          // neutral trail stay dim.
+          const bright = hot ? Math.max(b.fade, 0.9) * (b.filled ? 1.3 : 0.2) : b.fade * (b.filled ? 0.6 : 0.13);
           this._metaTrailMesh.setColorAt(mi, _col.copy(this._neutralTile).lerp(laneColor, colAmt).multiplyScalar(bright));
           mi++;
 
@@ -630,7 +632,9 @@ export class LedgerView {
           const g = _gx.get(b.slot);
           if (b.filled && b.link && g !== undefined && li + LINK_SEG <= LINK_CURVES * LINK_SEG) {
             // Same lead/selected = coloured, trail = neutral treatment as the tiles (consistent row).
-            _col.copy(this._neutralTile).lerp(laneColor, colAmt).multiplyScalar((hot ? Math.max(b.fade, 0.7) : b.fade) * 0.42);
+            // The COLOURED (hot) link reads bright — near-full lane colour on the additive material;
+            // neutral trail links stay dim so only the active anchor pops.
+            _col.copy(this._neutralTile).lerp(laneColor, colAmt).multiplyScalar(hot ? Math.max(b.fade, 0.9) * 1.25 : b.fade * 0.34);
             curvePoint(0, b.x, lane.z, g, _q);
             let px = _q.x, py = _q.y, pz = _q.z;
             for (let s = 1; s <= LINK_SEG; s++) {

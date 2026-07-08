@@ -61,11 +61,12 @@ async function fetchExact(ordinal: number): Promise<SnapshotExact> {
     anchored = 0,
     listedCount = 0,
     unlistedCount = 0;
-  const perMeta: Record<string, { count: number; fee: number }> = {};
+  const perMeta: Record<string, { count: number; fee: number; bytes: number }> = {};
   for (const [addr, snaps] of Object.entries(sc)) {
     const listed = LISTED.has(addr);
     let count = 0,
-      fee = 0;
+      fee = 0,
+      metaBytes = 0;
     for (const s of snaps) {
       const f = s?.value?.fee ?? 0;
       // Actual serialized size — `content` is the snapshot's content as a byte array, so its
@@ -74,13 +75,16 @@ async function fetchExact(ordinal: number): Promise<SnapshotExact> {
       const bytes = Array.isArray(s?.value?.content) ? s.value!.content!.length : 0;
       count++;
       fee += f;
+      metaBytes += bytes;
       totalBytes += bytes;
       anchored++;
       totalFee += f;
       if (listed) listedFee += f;
       else unlistedFee += f;
     }
-    perMeta[addr] = { count, fee };
+    // Per-metagraph size (bytes) alongside count + fee — the snapshot card reveals it as KB on the
+    // selected/expanded row. Measured from content byte length, same as the total (not fee-derived).
+    perMeta[addr] = { count, fee, bytes: metaBytes };
     if (listed) listedCount += count;
     else unlistedCount += count;
   }

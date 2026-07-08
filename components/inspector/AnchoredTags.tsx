@@ -1,9 +1,11 @@
 "use client";
 
+import { useState } from "react";
+import { ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useStore } from "@/src/store/store";
 import { metagraphById } from "@/src/data/network";
-import { hex, fmtDag } from "@/src/util/format";
+import { hex, fmtDag, fmtKB } from "@/src/util/format";
 import { NodeStars } from "@/components/state/StateAtoms";
 import { useMinHold } from "@/components/useMinHold";
 
@@ -11,8 +13,13 @@ import { useMinHold } from "@/components/useMinHold";
 // snapshots this global tick anchored — `dot · ticker · share-bar · count`, sorted desc, ALL of
 // them (no cap; facts), unlisted as a neutral row. Bars = share of the total, so length is
 // comparable across the whole list. Source = the EXACT raw-L0 read only (no polled floor); while
-// it loads we show the header + "reading…". When a metagraph is filtered, it gets a focus row
-// pinned at the top (regardless of rank) and the rest list under "Other metagraphs", dimmed.
+// it loads we show the header + "reading…".
+//
+// Every listed row is an EXPANDABLE accordion: click to reveal its stat line
+// (`N snapshots · P% · KB · DAG`) — you can inspect any metagraph's detail, filter or not. The
+// network-filtered metagraph is highlighted in place (identity-hue ticker + a thin left accent)
+// and AUTO-OPENED, so its detail shows without a click. The `unlisted` aggregate row is NOT
+// expandable — it's a roll-up of several metagraphs with no single fee/size to break out.
 export default function AnchoredTags({
   ordinal,
   anchored,
@@ -25,6 +32,18 @@ export default function AnchoredTags({
   const filter = useStore((s) => s.filter);
   const exact = useStore((s) => s.snapshotExact[ordinal]);
   const cfg = metagraphById(filter);
+  const focusId = cfg?.id ?? null;
+
+  // Which rows are expanded. Persists across live ticks (the component re-renders with a new
+  // `ordinal` rather than remounting), so an opened row stays open as the tick advances. The
+  // network-selected metagraph is highlighted (below) but NOT auto-expanded — the user opens it.
+  const [open, setOpen] = useState<Set<string>>(() => new Set());
+  const toggle = (id: string) =>
+    setOpen((s) => {
+      const n = new Set(s);
+      n.has(id) ? n.delete(id) : n.add(id);
+      return n;
+    });
 
   const total = anchored ?? exact?.anchored ?? 0;
   const channels = exact?.channels ?? null;
@@ -58,21 +77,31 @@ export default function AnchoredTags({
     );
   }
 
-  // Rows from the exact per-metagraph breakdown: listed (named/hued) + one aggregate unlisted row.
-  type Row = { id: string; label: string; hue: string | null; n: number };
+  // Rows from the exact per-metagraph breakdown: listed (named/hued, expandable) + one aggregate
+  // unlisted row (neutral, not expandable).
+  type Row = { id: string; label: string; hue: string | null; n: number; fee: number; bytes: number };
   const listed: Row[] = [];
-  for (const [addr, { count }] of Object.entries(exact.perMeta)) {
+  for (const [addr, { count, fee, bytes }] of Object.entries(exact.perMeta)) {
     const c = metagraphById(addr);
-    if (c) listed.push({ id: addr, label: c.ticker || c.name, hue: hex(c.color), n: count });
+    if (c) listed.push({ id: addr, label: c.ticker || c.name, hue: hex(c.color), n: count, fee, bytes });
   }
   listed.sort((a, b) => b.n - a.n);
+
+  // The genuinely-unlisted metagraphs are in `perMeta` too (addresses not in config) — roll them
+  // into ONE neutral row at the bottom, aggregating count/fee/bytes so it expands to its own stat
+  // line just like the listed rows. It's never the network selection, so it never gets the hue wash.
   const rows: Row[] = [...listed];
-  if (exact.unlistedCount > 0)
-    rows.push({ id: "unlisted", label: "unlisted", hue: null, n: exact.unlistedCount });
+  if (exact.unlistedCount > 0) {
+    const unlistedBytes = Object.entries(exact.perMeta)
+      .filter(([addr]) => !metagraphById(addr))
+      .reduce((sum, [, v]) => sum + v.bytes, 0);
+    rows.push({ id: "unlisted", label: "unlisted", hue: null, n: exact.unlistedCount, fee: exact.unlistedFee, bytes: unlistedBytes });
+  }
 
   const pct = (n: number) => (total > 0 ? (n / total) * 100 : 0);
-  const bar = (n: number, hue: string | null, extraClass?: string) => (
-    <span className={cn("block h-1.5 rounded-xs bg-white/[0.06] overflow-hidden", extraClass)}>
+  const pctStr = (n: number) => `${pct(n).toFixed(pct(n) < 10 ? 1 : 0)}%`;
+  const bar = (n: number, hue: string | null) => (
+    <span className="block flex-1 h-1.5 rounded-xs bg-white/[0.06] overflow-hidden">
       <span
         className="block h-full rounded-xs min-w-[2px]"
         style={{ width: `${Math.max(pct(n), n > 0 ? 4 : 0)}%`, background: hue ?? "var(--muted-foreground)" }}
@@ -80,48 +109,72 @@ export default function AnchoredTags({
     </span>
   );
 
-  const focusId = cfg?.id ?? null;
-  const focus = focusId ? rows.find((r) => r.id === focusId) : undefined;
-  const rest = focus ? rows.filter((r) => r.id !== focusId) : rows;
-
   return (
     <div className="mt-1">
       {header}
 
-      {/* Filtered → the focus row pinned at the top (regardless of rank). Marked by a THIN left
-          hue accent only (no tinted box), compact, consistent with the neutral node/dossier cards. */}
-      {focus && (
-        <div className="pt-0.5 pb-1.5 pl-2.5 mb-2" style={{ boxShadow: `inset 2px 0 0 ${focus.hue ?? "var(--primary)"}` }}>
-          <div className="flex items-start justify-between gap-2.5">
-            <span className="inline-flex items-center gap-[7px] text-body text-foreground">
-              <span className="w-2 h-2 rounded-full flex-none" style={{ background: focus.hue ?? "var(--primary)" }} />
-              {focus.label}
-            </span>
-            <span className="flex flex-col items-end text-body text-foreground">
-              <span className="whitespace-nowrap"><b className="font-bold">{fmtDag(exact.perMeta[focus.id]?.fee ?? 0)}</b> DAG</span>
-              <span className="text-micro tracking-[0.08em] uppercase text-muted-foreground">fees paid</span>
-            </span>
-          </div>
-          <div className="flex items-center gap-2 mt-[5px]">
-            {bar(focus.n, focus.hue, "flex-1")}
-            <span className="text-label text-muted-foreground tabular-nums whitespace-nowrap">{focus.n} snapshot{focus.n === 1 ? "" : "s"} · {pct(focus.n).toFixed(pct(focus.n) < 10 ? 1 : 0)}%</span>
-          </div>
-        </div>
-      )}
+      <div className="flex flex-col gap-y-1">
+        {rows.map((r) => {
+          const isOpen = open.has(r.id);
+          const isSel = r.id === focusId;
+          return (
+            <div key={r.id}>
+              <button
+                type="button"
+                onClick={() => toggle(r.id)}
+                aria-expanded={isOpen}
+                className={cn(
+                  "group flex items-center gap-2 w-full text-left border-none cursor-pointer py-[3px] px-1.5 -mx-1.5 rounded-sm transition-[background] duration-150",
+                  isSel ? "bg-transparent" : "bg-transparent hover:bg-wash-hover",
+                  "focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--primary)] focus-visible:outline-offset-[-2px]",
+                )}
+                // Selected (network-filtered) row: highlighted in place by a faint identity-hue row
+                // wash (+ the hue ticker below) — reads as "the selection" even while collapsed.
+                style={isSel ? ({ background: `color-mix(in oklch, ${r.hue ?? "var(--primary)"} 16%, transparent)` } as const) : undefined}
+              >
+                <span className="w-2 h-2 rounded-full flex-none" style={{ background: r.hue ?? "var(--muted-foreground)" }} />
+                <span
+                  className={cn(
+                    "w-[68px] flex-none text-body truncate",
+                    !r.hue ? "italic text-muted-foreground" : isSel ? "font-semibold" : "text-foreground",
+                  )}
+                  style={isSel && r.hue ? { color: r.hue } : undefined}
+                >
+                  {r.label}
+                </span>
+                {bar(r.n, r.hue)}
+                <span className="w-7 flex-none text-right text-body text-foreground tabular-nums">{r.n}</span>
+                {/* Expand affordance / open-state cue. Open rows show a down chevron. Closed rows:
+                    hidden on a mouse (revealed on row hover/focus — keeps the resting list clean),
+                    but ALWAYS shown on touch (`@media (hover:none)`), where there's no hover to
+                    surface it. Kept via opacity so the count column never shifts. Every row is
+                    tappable, including the unlisted roll-up. */}
+                <ChevronRight
+                  aria-hidden
+                  className={cn(
+                    "size-3.5 flex-none transition-[transform,opacity] duration-150 motion-reduce:transition-none",
+                    isOpen
+                      ? "rotate-90 text-foreground opacity-100"
+                      : "text-muted-foreground opacity-0 group-hover:opacity-100 group-focus-visible:opacity-100 [@media(hover:none)]:opacity-100",
+                  )}
+                />
+              </button>
 
-      {/* The ranked list (dimmed under "Other metagraphs" when a focus row is present). ONE shared
-          grid for the whole list (rows are `contents`) so the columns line up ACROSS rows — every
-          bar starts at the same x, after the widest label. */}
-      {focus && rest.length > 0 && <div className="text-micro tracking-[0.1em] uppercase text-muted-foreground mt-1 mb-1.5">Other metagraphs</div>}
-      <div className={cn("grid grid-cols-[auto_auto_1fr_auto] items-center gap-x-2 gap-y-1.5", focus && "opacity-60")}>
-        {rest.map((r) => (
-          <div className="contents" key={r.id}>
-            <span className="w-2 h-2 rounded-full flex-none" style={{ background: r.hue ?? "var(--muted-foreground)" }} />
-            <span className={cn("text-body text-foreground", !r.hue && "italic text-muted-foreground")}>{r.label}</span>
-            {bar(r.n, r.hue)}
-            <span className="text-body text-foreground tabular-nums min-w-[2em] text-right">{r.n}</span>
-          </div>
-        ))}
+              {isOpen && (
+                // Revealed stat line: this metagraph's exact detail for the tick.
+                <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5 pl-[16px] pr-1.5 pb-1 pt-0.5 text-label text-muted-foreground tabular-nums">
+                  <span>{r.n} snapshot{r.n === 1 ? "" : "s"}</span>
+                  <span aria-hidden>·</span>
+                  <span>{pctStr(r.n)}</span>
+                  <span aria-hidden>·</span>
+                  <span>{fmtKB(r.bytes / 1024)}</span>
+                  <span aria-hidden>·</span>
+                  <span>{fmtDag(r.fee)} DAG</span>
+                </div>
+              )}
+            </div>
+          );
+        })}
       </div>
     </div>
   );

@@ -10,9 +10,10 @@ import { Globe } from "./scene/Globe";
 import { LedgerView } from "./scene/views/LedgerView";
 import { loadGeoCache, resolveMissing } from "@/src/data/geoResolve";
 import { METAGRAPHS, COLORS } from "@/src/engine/config";
+import { LEDGER, LAYER_GEOM, ledgerSite } from "./domain/ledgerLayout";
 import { readSceneColors, type SceneColors } from "./sceneColors";
 import { VIEW_POLICIES } from "./domain/viewPolicy";
-import { FOCI, hubFraming, geoFraming, easeInOutQuad, type CameraFraming } from "./domain/cameraRig";
+import { FOCI, hubFraming, geoFraming, ledgerLayerFraming, easeInOutQuad, type CameraFraming } from "./domain/cameraRig";
 import type { GlobalSnapshot, PickDescriptor } from "@/src/data/types";
 import type { ClusterNode, DagCore, GeoMap, RouteMetagraph } from "@/src/data/types";
 
@@ -34,6 +35,9 @@ const resolveGeo = resolveMissing;
 
 // Camera presets: FOCI/hubFraming/geoFraming/easeInOutQuad now live in ./domain/cameraRig
 // (Task 15) — pure, allocation-free (writes into caller-provided out structs).
+// Global camera dolly-back applied to EVERY framing (all views) in _tweenTo/_snapTo — one lever to
+// sit the camera a touch wider without re-tuning each preset.
+const CAM_ZOOM = 1.15;
 
 // Imperative engine: owns the scene, the Hypergraph + globe, the render loop, the
 // camera-focus tweens, and the command surface React drives via the store. Ports
@@ -82,6 +86,17 @@ export class Engine {
   private canvas: HTMLCanvasElement;
   private onClick = (e: MouseEvent) => this._handleClick(e);
   private onMove = (e: MouseEvent) => this._handleMove(e);
+  // DRAG SUPPRESSION: a "click" that ends a camera-orbit drag must pick NOTHING (with the floor
+  // planes pickable, almost every orbit would otherwise end by committing a layer + a camera
+  // flight). Record where the pointer went down; _handleClick ignores clicks that travelled
+  // further than a small threshold, and _handleMove skips hover-picking while the button is held
+  // (no highlight flicker mid-orbit). A stationary click keeps full pick behaviour.
+  private onDown = (e: MouseEvent) => {
+    this._downX = e.clientX;
+    this._downY = e.clientY;
+  };
+  private _downX = 0;
+  private _downY = 0;
   private _hoverKey: string | null = null;
   // Reused pickables buffer (never re-allocated) — `_pickablesFor` runs on every pointermove.
   private _pickBuf: THREE.Object3D[] = [];
@@ -95,10 +110,17 @@ export class Engine {
   // Fired once, after the first frame actually renders (see start()'s loop) — lets callers
   // (SceneCanvas → store.engineReady) know the scene has painted, not just constructed.
   private _onReady?: () => void;
+  // Fired once the hypergraph scene is structurally complete — metagraph nodes AND the DAG core's
+  // own validator nodes both placed. SceneCanvas → store.sceneReady, which holds the boot overlay
+  // until then (a fully-formed reveal, no node pop-in). Tracked via the two _*NodesPlaced flags.
+  private _onSceneReady?: () => void;
+  private _metaNodesPlaced = false;
+  private _coreNodesPlaced = false;
 
-  constructor(canvas: HTMLCanvasElement, onReady?: () => void) {
+  constructor(canvas: HTMLCanvasElement, onReady?: () => void, onSceneReady?: () => void) {
     this.canvas = canvas;
     this._onReady = onReady;
+    this._onSceneReady = onSceneReady;
     // Read the structural palette from the CSS design tokens (app/globals.css) — the single source
     // of truth. Every scene module below is fed these; none hardcodes a structural colour. In dev,
     // warn if config.COLORS (the static mirror the non-DOM data/palette layer needs) drifts from the
@@ -141,6 +163,7 @@ export class Engine {
     this.globe.sceneColors = initialSceneColors;
     canvas.addEventListener("click", this.onClick);
     canvas.addEventListener("pointermove", this.onMove);
+    canvas.addEventListener("pointerdown", this.onDown);
     // The engine owns the resize handler (createScene no longer adds one) so it's
     // cleaned up on dispose — no leak across StrictMode remounts / HMR.
     window.addEventListener("resize", this.onResize);
@@ -203,6 +226,18 @@ export class Engine {
         }
         // Geo explorer list-row hover → glow that node's shells on the globe (same as a 3D hover).
         if (st.hoverNodeId !== prev.hoverNodeId) this.globe.setHoverNode(st.hoverNodeId);
+        // Snapshots·Explore panel: the plane highlight = the transient hover PREVIEW, else the
+        // COMMITTED layer selection (the layer card) — same resolve idiom as hoverFilter ?? filter.
+        if (st.ledgerHilite !== prev.ledgerHilite || st.layer !== prev.layer) {
+          this.ledger.setHighlight(st.ledgerHilite ?? st.layer?.layerId ?? null);
+        }
+        // Committing a layer flies the camera to the tilted layer-focus view of its plane (an
+        // exploration move — the resting ledger pose is central/untilted); clearing returns to the
+        // shared overview. Ledger-only: the planes exist nowhere else.
+        if (st.layer !== prev.layer && st.mode === "ledger") {
+          if (st.layer) this._focusLayer(st.layer.layerId);
+          else this.focus("overview");
+        }
       }),
     );
 
@@ -283,10 +318,21 @@ export class Engine {
     }
   }
 
+  // Fire onSceneReady exactly once, when the scene is structurally complete: the metagraph nodes
+  // and the DAG core's own validator nodes have both been placed. Cheap to call on every placement
+  // path — it self-guards after the first fire.
+  private _maybeSceneReady() {
+    if (!this._onSceneReady || !this._metaNodesPlaced || !this._coreNodesPlaced) return;
+    const cb = this._onSceneReady;
+    this._onSceneReady = undefined;
+    cb();
+  }
+
   private _buildGlobe() {
     if (!this.dagCore || !Object.keys(this.geoMap).length) return;
     this.globe.setNodes(this.dagCore, this.geoMap);
-    this._applyMetagraphs();
+    this._coreNodesPlaced = true; // DAG core validator nodes are now in the scene
+    this._applyMetagraphs(); // fires _maybeSceneReady once meta nodes are also placed
     const ips = this.dagCore.nodes.map((n) => n.ip);
     resolveGeo(this.geoMap, ips, (m) => {
       this.geoMap = m;
@@ -299,11 +345,13 @@ export class Engine {
   private _applyMetagraphs() {
     if (!this.metaData || !Object.keys(this.geoMap).length) return;
     this.globe.setMetagraphs(this.metaData, this.geoMap);
+    this._metaNodesPlaced = true; // metagraph node shells are now in the scene
     this.ledger.setGroupSizes(this.globe.ledgerGroups); // size the Snapshots rings to the node counts
     this.applyFilter(false); // re-assert the filter's dimming on the new nodes — but DON'T move
     // the camera (this runs on every cluster/meta poll; moving it would reset the user's view).
     // metaList is published in refreshMeta (metagraph geo arrives with the route), so
     // we don't re-publish here — this runs on every cluster poll.
+    this._maybeSceneReady(); // reveal the boot overlay once the core nodes are also in
   }
 
   // Push EVERY metagraph from the route data (not just the geo-filtered globe list) to
@@ -391,7 +439,12 @@ export class Engine {
       this.globe.setFilter(this.filter); // dim non-selected metagraph columns (no camera move)
       this.ledger.setFilter(this.filter); // neutralise the other lanes' tiles/links
       this._refreshLedger();
-      this._snapTo(FOCI.ledger.pos, FOCI.ledger.target); // appear already-oriented (no camera tween)
+      // Ledger uses the SHARED overview camera — the camera never moves on a view switch; the group
+      // transform (config.viewRotY/viewScale) frames the resting pose central/untilted. If a layer
+      // is already committed, resume its tilted layer-focus framing instead.
+      const selLayer = useStore.getState().layer;
+      if (selLayer) this._focusLayer(selLayer.layerId);
+      else this.focus("overview");
       return;
     }
     // The remaining placeholder views (status/transactions/staking) hide the 3D scene — reset to idle.
@@ -431,10 +484,14 @@ export class Engine {
         this._focusFilter(this.filter);
       }
     } else if (this.mode === "ledger") {
-      // Dim the non-selected metagraph columns so the selection stands out; never move the camera
-      // (the planar diagram stays framed head-on). The ledger neutralises the other lanes' tiles/links.
+      // Dim the non-selected metagraph columns so the selection stands out. The ledger neutralises
+      // the other lanes' tiles/links. The camera stays put — EXCEPT when a layer is focused: the
+      // layer framing is lane-aware (centres the selected metagraph's lane), so a filter change
+      // re-runs it to slide over to the newly-selected lane.
       this.globe.setFilter(this.filter);
       this.ledger.setFilter(this.filter);
+      const selLayer = useStore.getState().layer;
+      if (focusCamera && selLayer) this._focusLayer(selLayer.layerId);
     }
     this._publishLeaderboard();
     // Tint the globe's land edge with the selected metagraph's SCENE colour (null → default
@@ -557,13 +614,23 @@ export class Engine {
     // Return the first hit that's part of the current selection — nodes filtered out of the
     // geo view are hidden, so they shouldn't be clickable/hoverable either (Three's raycaster
     // ignores scale/visibility, so the inactive ones must be skipped explicitly).
+    // LAYER planes are FALLBACK picks: the big stacked floor planes sit between the camera and
+    // everything below them, so a distance-ordered "first hit" would let the top plane steal every
+    // pick. Content (blocks/nodes/hubs) wins; the nearest plane is returned only when nothing else
+    // was hit along the ray.
+    let layerFallback: PickDescriptor | null = null;
     for (const h of hits) {
       const pick: PickDescriptor | undefined = h.object.userData.picks
         ? h.object.userData.picks[h.instanceId as number]
         : h.object.userData.pick;
-      if (pick && this._isPickActive(pick)) return pick;
+      if (!pick || !this._isPickActive(pick)) continue;
+      if (pick.kind === "layer") {
+        layerFallback ??= pick;
+        continue;
+      }
+      return pick;
     }
-    return null;
+    return layerFallback;
   }
 
   // The stable per-machine id of a node pick (a validator by its node id, a metagraph node by
@@ -604,6 +671,9 @@ export class Engine {
   // Hover tooltip: only writes the store when the hovered target changes (not per
   // pixel); the Tooltip component positions itself from the pointer.
   private _handleMove(e: MouseEvent) {
+    // Mid-drag (orbiting): no hover picking — raycasting the planes every move would flicker the
+    // layer highlight across the stack while the user is just navigating.
+    if (e.buttons !== 0) return;
     const p = this._pickAt(e);
     this.canvas.style.cursor = p ? "pointer" : "grab";
     const st = useStore.getState();
@@ -614,9 +684,11 @@ export class Engine {
     const nodeKey = hoverKeyOf(p);                                   // node → globe shell glow
     const snapOrd = p?.kind === "snapshot" ? p.data.ordinal : null;  // snapshot → ledger row
     const metaId = p?.kind === "meta" ? p.cfg?.id ?? null : null;    // hub → metagraph dim preview
+    const layerId = p?.kind === "layer" ? p.layerId : null;          // floor plane → highlight preview
     if (nodeKey !== st.hoverNodeId) st.setHoverNodeId(nodeKey);
     if (snapOrd !== st.hoverSnapOrd) st.setHoverSnapOrd(snapOrd);
     if (metaId !== st.hoverFilter) st.setHoverFilter(metaId);
+    if (layerId !== st.ledgerHilite) st.setLedgerHilite(layerId);    // same channel the panel rows write
 
     // The lean tooltip label — re-write the store only when the subject's identity changes so
     // following the cursor never re-renders React.
@@ -628,6 +700,8 @@ export class Engine {
   }
 
   private _handleClick(e: MouseEvent) {
+    // A click that ends a drag (orbit/pan) is navigation, not selection — see onDown.
+    if (Math.hypot(e.clientX - this._downX, e.clientY - this._downY) > 5) return;
     const p = this._pickAt(e);
     if (!p) return;
     // A hub click selects the metagraph (opens its context pane + frames it).
@@ -640,6 +714,13 @@ export class Engine {
     if (p.kind === "snapshot") {
       useStore.getState().setFollowing(false);
       useStore.getState().setSnap(p);
+      return;
+    }
+    // A floor PLANE click = the explore panel's row click: toggle the committed layer selection
+    // (opens/clears the layer card; the layer-focus camera rides the store change).
+    if (p.kind === "layer") {
+      const st = useStore.getState();
+      st.setLayer(st.layer?.layerId === p.layerId ? null : p);
       return;
     }
     // Clicking a node, in any view: drill the global filter into the node's network (its
@@ -670,7 +751,9 @@ export class Engine {
   private _tweenTo(toPos: Vec, toTgt: Vec) {
     const tw = this._tween;
     tw.fromPos.copy(this.ctx.camera.position);
-    tw.toPos.copy(toPos);
+    // Dolly every framing back by CAM_ZOOM (push the position out from its target) — one global lever
+    // so all views sit a touch wider. Writes straight into tw.toPos, no extra allocation.
+    tw.toPos.subVectors(toPos, toTgt).multiplyScalar(CAM_ZOOM).add(toTgt);
     tw.fromTgt.copy(this.ctx.controls.target);
     tw.toTgt.copy(toTgt);
     tw.t = 0;
@@ -678,13 +761,29 @@ export class Engine {
     tw.active = true;
   }
 
-  // Jump the camera straight to a framing — no tween (used for the Snapshots view, whose planar diagram
-  // is meant to appear already-oriented; tweening it in read as the planes swinging into place).
-  private _snapTo(toPos: Vec, toTgt: Vec) {
-    this._tween.active = false; // cancel any in-flight tween
-    this.ctx.camera.position.copy(toPos);
-    this.ctx.controls.target.copy(toTgt);
-    this.ctx.controls.update();
+
+  // Fly to the tilted diagonal view of a settlement layer's floor plane (Snapshots view) — the
+  // "nice tilted view" is an exploration move on layer selection, not the resting pose. The plane's
+  // height is scaled by the ledger group's viewScale (the framing works in world units). For the
+  // split hypergraph panes the framing also shifts LATERALLY so the sub-pane sits centred: the
+  // group's viewRotY (−90°) maps the pane's local lane-centre z → world x = −laneZ (then scaled).
+  private _focusLayer(layerId: string) {
+    const l = LAYER_GEOM.find((x) => x.id === layerId);
+    if (!l) return;
+    ledgerLayerFraming(l.y * LEDGER.viewScale, this._framingOut);
+    // Lateral centring: the METAGRAPH layers centre the selected metagraph's lane (its node ring /
+    // snapshot cluster) when a network filter is active; the split hypergraph panes centre their
+    // own pane; the global chain sits at lane-centre 0. The group's viewRotY (−90°) maps a local
+    // lane z → world x = −z (then viewScale).
+    let laneZ = l.laneZ;
+    if (l.id === "ml1" || l.id === "ml0" || l.id === "msnap") {
+      const idx = METAGRAPHS.findIndex((m) => m.id === this.filter);
+      if (idx >= 0) laneZ = ledgerSite(idx, METAGRAPHS.length).z;
+    }
+    const dx = -laneZ * LEDGER.viewScale;
+    this._framingOut.pos.x += dx;
+    this._framingOut.target.x += dx;
+    this._tweenTo(this._framingOut.pos, this._framingOut.target);
   }
 
   private _focusGeo(R: number) {
@@ -798,6 +897,7 @@ export class Engine {
     if (this.metaTimer) clearInterval(this.metaTimer);
     this.canvas.removeEventListener("click", this.onClick);
     this.canvas.removeEventListener("pointermove", this.onMove);
+    this.canvas.removeEventListener("pointerdown", this.onDown);
     window.removeEventListener("resize", this.onResize);
     this.stats?.dom.remove();
     this.unsub.forEach((u) => u());

@@ -32,7 +32,7 @@ export const hubFade = (m: number) => THREE.MathUtils.clamp(1 - m / 0.3, 0, 1);
 // the globe. R_GLOBE/CORE_R are the canonical home for these two constants — HyperView
 // (src/engine/scene/views/HyperView.ts) imports them from here (Task 15) instead of keeping
 // its own copies.
-export const R_GLOBE = 16; // must match Globe's R (src/engine/domain/geoMath.ts) — the radius the core grows out to
+export const R_GLOBE = 16; // must match Globe's R (src/engine/domain/geoLayout.ts) — the radius the core grows out to
 export const CORE_R = 3.1; // the core IcosahedronGeometry radius
 
 // HyperFurniture.ts update() — reach the globe's full radius early (by ~0.5) so the core is

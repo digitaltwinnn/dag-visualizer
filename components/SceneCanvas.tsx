@@ -25,7 +25,11 @@ export default function SceneCanvas() {
       const { Engine } = await import("@/src/engine/Engine");
       if (disposed || !canvasRef.current) return;
       try {
-        engine = new Engine(canvasRef.current, () => useStore.getState().setEngineReady(true));
+        engine = new Engine(
+          canvasRef.current,
+          () => useStore.getState().setEngineReady(true),
+          () => useStore.getState().setSceneReady(true),
+        );
       } catch (err) {
         // WebGL context creation (or any engine-construction step) threw — the scene can't run.
         // Flag it so the boot phase resolves to "no-engine" instead of hanging on "booting"

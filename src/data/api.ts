@@ -2,7 +2,7 @@
 // No simulation — if the API is unreachable the app shows a "no data" state and
 // keeps polling, recovering on its own once it responds again (`live` reflects this).
 
-import { API_BASE, COLORS, L0_CLUSTER, L1_CLUSTER, METAGRAPHS, VIS, type MetaConfig } from "@/src/engine/config";
+import { API_BASE, COLORS, L0_CLUSTER, L1_CLUSTER, METAGRAPHS, POLL, type MetaConfig } from "@/src/engine/config";
 import type { Anchor, ClusterNode, DagCore, GlobalSnapshot } from "@/src/data/types";
 
 export interface NetworkEvents {
@@ -64,7 +64,7 @@ export class NetworkData {
   // own `metagraphSnapshotCount`; `count` here is how many of those WE identified (the rest =
   // the few genuinely-unlisted metagraphs, ~a couple per tick). To keep `count` accurate even
   // when a fast metagraph (Dor) batches 20+ snapshots into one tick, the live poll fetches a
-  // deep tail every tick (VIS.metaSnapTail) — a too-shallow tail used to drop them and inflate
+  // deep tail every tick (POLL.metaSnapTail) — a too-shallow tail used to drop them and inflate
   // the "unlisted" gap. The summed fee is "from tracked metagraphs".
   anchorIndex: Map<string, Anchor>; // ts -> { fee (datum), count, metaIds:Set, metaCounts:Map(id->n) }
 
@@ -125,7 +125,7 @@ export class NetworkData {
   // ---- bootstrap: seed the spine with recent history ----
   async init(): Promise<void> {
     try {
-      const json = await this._get(`/global-snapshots?limit=${VIS.maxSnapshots}`);
+      const json = await this._get(`/global-snapshots?limit=${POLL.maxSnapshots}`);
       const list: GlobalSnapshot[] = (json.data || []).slice().reverse(); // oldest -> newest
       if (!list.length) throw new Error("empty");
       this.globalSnapshots = list;
@@ -138,7 +138,7 @@ export class NetworkData {
     }
     this._emit("global", { reset: true, snapshots: this.globalSnapshots, latest: this.latest });
     await this._fetchClusters();
-    await this._refreshMeta(VIS.metaSnapSeed); // seed each metagraph's history
+    await this._refreshMeta(POLL.metaSnapSeed); // seed each metagraph's history
     this.start();
   }
 
@@ -201,8 +201,8 @@ export class NetworkData {
 
   start(): void {
     if (this._timer) return;
-    this._timer = setInterval(() => this._tick(), VIS.pollMs);
-    this._clusterTimer = setInterval(() => this._fetchClusters(), VIS.clusterMs);
+    this._timer = setInterval(() => this._tick(), POLL.pollMs);
+    this._clusterTimer = setInterval(() => this._fetchClusters(), POLL.clusterMs);
   }
   stop(): void {
     if (this._timer) clearInterval(this._timer);
@@ -224,7 +224,7 @@ export class NetworkData {
       // Pull each metagraph's newest snapshots EVERY tick (was every other tick) — together with
       // the deeper tail, this keeps up with high-throughput metagraphs (Dor) so their snapshots
       // are all attributed correctly instead of leaking into the "unlisted" count.
-      this._refreshMeta(VIS.metaSnapTail);
+      this._refreshMeta(POLL.metaSnapTail);
     } catch (e) {
       this._setLive(false);
     }
@@ -233,20 +233,20 @@ export class NetworkData {
   private _pushGlobal(snap: GlobalSnapshot): void {
     this.latest = snap;
     this.globalSnapshots.push(snap);
-    if (this.globalSnapshots.length > VIS.maxSnapshots) this.globalSnapshots.shift();
+    if (this.globalSnapshots.length > POLL.maxSnapshots) this.globalSnapshots.shift();
     this._emit("global", { reset: false, snapshot: snap, latest: snap });
   }
 
   // ---- metagraphs ----
   // `limit` is how many recent snapshots to pull per metagraph: a deep seed on the
   // first load (history), a short tail on each live poll (new arrivals).
-  private async _refreshMeta(limit: number = VIS.metaSnapTail): Promise<void> {
+  private async _refreshMeta(limit: number = POLL.metaSnapTail): Promise<void> {
     // Refresh every metagraph in parallel — there are ~10 real ones, so serial
     // awaits would stall the tick.
     await Promise.all(METAGRAPHS.map((m) => this._refreshOneMeta(m, limit)));
   }
 
-  private async _refreshOneMeta(m: MetaConfig, limit: number = VIS.metaSnapTail): Promise<void> {
+  private async _refreshOneMeta(m: MetaConfig, limit: number = POLL.metaSnapTail): Promise<void> {
     if (!m.id) return;
     // The newest ordinal we already hold for this metagraph.
     const have = this.metaSnaps.get(m.id);
@@ -301,11 +301,11 @@ export class NetworkData {
       a.touched = Date.now(); // last time this tick's identified count grew → drives "settling"
       this.anchorIndex.set(r.ts, a);
     }
-    if (buf.length > VIS.metaSnapBuffer) buf.splice(0, buf.length - VIS.metaSnapBuffer);
+    if (buf.length > POLL.metaSnapBuffer) buf.splice(0, buf.length - POLL.metaSnapBuffer);
     this.metaSnaps.set(m.id, buf);
 
     // Cap the anchor index (Map keeps insertion order — drop the oldest ticks).
-    while (this.anchorIndex.size > VIS.anchorIndexMax) {
+    while (this.anchorIndex.size > POLL.anchorIndexMax) {
       const oldestKey = this.anchorIndex.keys().next().value;
       if (oldestKey === undefined) break;
       this.anchorIndex.delete(oldestKey);
