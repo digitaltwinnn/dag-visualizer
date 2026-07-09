@@ -7,9 +7,8 @@ import {
   ArrowLeftRight,
   HandCoins,
   Info,
-  Compass,
+  Telescope,
   Box,
-  BookOpen,
   type LucideIcon,
 } from "lucide-react";
 import type { Mode } from "@/src/store/store";
@@ -38,18 +37,13 @@ export const VIEW_ICONS: Record<Mode, LucideIcon> = {
 // Used in the left dock tray and anywhere the About card kind needs an icon.
 export const ABOUT_ICON: LucideIcon = Info;
 
-// The left-rail TOOL cards' own mark family — a tool card isn't itself a view subject (unlike the
-// detail cards' Globe/Box/Orbit marks), so each gets a dedicated glyph rather than reusing the
-// view icon a second time in the same rail. Used in the card head AND the dock icon trays
-// (railCards.ts) — head and tray must show the same mark (a Layers tray icon on the ledger's left
-// tab read as the snapshot card; user bug report).
-//   • EXPLORE_ICON (Compass) — genuinely explorative tools (GeoExplore's country→nodes browser);
-//     the same mark the phone dock's Explore half uses.
-//   • LEARN_ICON (BookOpen) — EXPLAINER tools (LedgerPanel's "Understand the layered design"):
-//     the compass read as "navigation" there, not "learn" (user feedback) — the open book says
-//     understand/learn at a glance.
-export const EXPLORE_ICON: LucideIcon = Compass;
-export const LEARN_ICON: LucideIcon = BookOpen;
+// The left-rail TOOL cards' ONE mark (GeoExplore, LedgerPanel — user decision: the SAME standard
+// icon in every view; the earlier per-view Compass/BookOpen split read as neither exploring nor
+// learning). Telescope: an INSTRUMENT that says explore/investigate — same reasoning as the
+// status view's Radar. A tool card isn't itself a view subject (unlike the detail cards'
+// Globe/Box/Orbit marks), so it doesn't reuse a view icon. Used in the card head, the dock icon
+// trays (railCards.ts), and the phone dock's Explore half — head, tray, and dock must agree.
+export const EXPLORE_ICON: LucideIcon = Telescope;
 
 // A SNAPSHOT's mark (the snapshot detail card + dock tray): a snapshot renders as a solid BLOCK
 // in the settlement chamber, so it wears the cube — deliberately distinct from VIEW_ICONS.ledger

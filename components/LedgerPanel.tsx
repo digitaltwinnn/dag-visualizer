@@ -4,7 +4,7 @@ import { useState } from "react";
 import { cn } from "@/lib/utils";
 import CardHead from "@/components/CardHead";
 import { Card } from "@/components/ui/card";
-import { LEARN_ICON } from "@/components/icons";
+import { EXPLORE_ICON } from "@/components/icons";
 import { SELECTED_ROW, SelectedRowMark } from "@/components/selection";
 import { subjectPairing } from "@/components/useSubjectPairing";
 import { filterAccent } from "@/src/data/network";
@@ -40,7 +40,7 @@ export default function LedgerPanel() {
       <aside id="ledger-view">
         <CardHead
           panel
-          icon={LEARN_ICON}
+          icon={EXPLORE_ICON}
           title="Understand the layered design"
           eyebrow="Snapshots · explore"
           collapsed={collapsed}
@@ -48,7 +48,7 @@ export default function LedgerPanel() {
         />
         <div className={cn("flex flex-col px-3 pt-1.5 pb-2.5 min-h-0 overflow-y-auto cmd-list-scroll", collapsed && "hidden")}>
           <div className="flex flex-col gap-0.5" onMouseLeave={() => setHilite(null)}>
-            {LAYERS.map((l, li) => {
+            {LAYERS.map((l) => {
               const on = sel === l.id;
               // The SAME scene↔HUD hover pairing as GeoExplore's node rows: hovering the row
               // previews the plane highlight, hovering the 3D plane pairs this row back — wearing
@@ -79,20 +79,20 @@ export default function LedgerPanel() {
                   )}
                   style={pair.style}
                 >
-                  {/* The layer's STACK-LEVEL badge — levels count UP from the base settlement
-                      (Global snapshots = 1 … Metagraph L1 = 6, user decision), mirrored by the 3D
-                      floor labels so panel row and plane pair at a glance. Decorative. */}
+                  {/* The layer's STACK-LEVEL badge (LEDGER_LAYERS.level — up from the base:
+                      Global snapshots = 1, the split hypergraph plane = sub-levels 2.1/2.2),
+                      mirrored by the 3D floor labels so panel row and plane pair at a glance. */}
                   <span className="flex items-center gap-2 min-w-0">
                     <span
                       aria-hidden
                       className={cn(
-                        "flex-none w-[18px] h-[18px] rounded-xs border flex items-center justify-center text-micro tabular-nums leading-none",
+                        "flex-none min-w-[18px] h-[18px] px-1 rounded-xs border flex items-center justify-center text-micro tabular-nums leading-none",
                         on
                           ? "border-[var(--filter-accent,var(--primary))] text-[var(--filter-accent,var(--primary))]"
                           : "border-border text-muted-foreground",
                       )}
                     >
-                      {LAYERS.length - li}
+                      {l.level}
                     </span>
                     <span className={cn("block text-body text-foreground", on && "font-semibold")}>{l.name}</span>
                   </span>

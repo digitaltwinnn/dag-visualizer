@@ -391,17 +391,15 @@ export class LedgerView {
 
     // Floor labels — flat text at each plane's FRONT-LEFT corner (user-placed), reading from the
     // camera: the layer's STACK LEVEL in a small outlined box + its name, both from the SAME
-    // display-copy table as the explore panel rows (src/data/ledgerLayers.ts), so a numbered
-    // panel row and its plane pair at a glance. Levels count UP from the base settlement
-    // (Global snapshots = 1 … Metagraph L1 = 6, user decision). The split hypergraph panes each
-    // label their own front-left corner.
-    const layerNo = (id: string) => LEDGER_LAYERS.length - LEDGER_LAYERS.findIndex((l) => l.id === id);
-    const nameOf = (id: string) => LEDGER_LAYERS.find((l) => l.id === id)?.name ?? id;
+    // display-copy table as the explore panel rows (src/data/ledgerLayers.ts LEDGER_LAYERS.level:
+    // up from the base — Global snapshots = 1; the split hypergraph plane is ONE level with
+    // sub-levels 2.1/2.2, each labelling its own front-left corner).
+    const copyOf = (id: string) => LEDGER_LAYERS.find((l) => l.id === id);
     const lx = cx + W / 2 - 0.4; // front edge, small inset
     for (const { y, id } of LAYER_GEOM.filter((l) => l.laneZ === 0))
-      this.group.add(this._makeLabel(layerNo(id), nameOf(id), lx, y, D / 2 - 1.2));
-    this.group.add(this._makeLabel(layerNo("hypl0"), nameOf("hypl0"), lx, hy, D / 2 - 1.2));
-    this.group.add(this._makeLabel(layerNo("hypl1"), nameOf("hypl1"), lx, hy, HYP_SPLIT.l1Edge - 1.2));
+      this.group.add(this._makeLabel(copyOf(id)?.level ?? "", copyOf(id)?.name ?? id, lx, y, D / 2 - 1.2));
+    this.group.add(this._makeLabel(copyOf("hypl0")?.level ?? "", copyOf("hypl0")?.name ?? "", lx, hy, D / 2 - 1.2));
+    this.group.add(this._makeLabel(copyOf("hypl1")?.level ?? "", copyOf("hypl1")?.name ?? "", lx, hy, HYP_SPLIT.l1Edge - 1.2));
   }
 
   // A flat floor label lying on the plane, its text STARTING at the given front-left corner
@@ -409,23 +407,24 @@ export class LedgerView {
   // edge toward screen-right: the layer's ORDER digit in a small outlined box (mirroring the
   // explore panel's number badge) + the name. Canvas-texture text (revival of the pre-47cbc72
   // _makeLabel); the one colour is the allowlisted label tone (noHardcodedColors).
-  private _makeLabel(num: number, text: string, frontX: number, y: number, leftZ: number): THREE.Mesh {
+  private _makeLabel(level: string, text: string, frontX: number, y: number, leftZ: number): THREE.Mesh {
     const c = document.createElement("canvas");
     c.width = 512;
     c.height = 64;
     const ctx = c.getContext("2d")!;
     const tone = "rgba(170,196,224,0.42)"; // subtle, low-contrast (allowlisted 0xaac4e0)
+    ctx.font = "400 22px system-ui, -apple-system, sans-serif";
+    const boxW = Math.max(34, Math.ceil(ctx.measureText(level).width) + 16); // fits "2.1" sub-levels
     ctx.strokeStyle = tone;
     ctx.lineWidth = 2;
-    ctx.strokeRect(6, 15, 34, 34); // the order badge box
+    ctx.strokeRect(6, 15, boxW, 34); // the level badge box
     ctx.fillStyle = tone;
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
-    ctx.font = "400 22px system-ui, -apple-system, sans-serif";
-    ctx.fillText(String(num), 6 + 17, 15 + 17 + 1); // digit centred in the box
+    ctx.fillText(level, 6 + boxW / 2, 15 + 17 + 1); // level centred in the box
     ctx.font = "300 26px system-ui, -apple-system, sans-serif";
     ctx.textAlign = "left";
-    ctx.fillText(text, 52, c.height / 2 + 2);
+    ctx.fillText(text, 6 + boxW + 12, c.height / 2 + 2);
     const tex = new THREE.CanvasTexture(c);
     tex.minFilter = THREE.LinearFilter;
     tex.colorSpace = THREE.SRGBColorSpace;
@@ -650,6 +649,14 @@ export class LedgerView {
   // dim strongly too (so the lead row emphasises only the selected metagraph). "all"/"dag" = no dim.
   setFilter(filter: string) {
     this._filter = filter || "all";
+    // The floor-plane FRAME LINES wear the active filter's identity hue — a small visual hint,
+    // the scene twin of the HUD's `--filter-accent`. ONLY the crisp edge line tints (user
+    // refinement); the pixelated edge FILL stays the structural accent so the wash under the
+    // line remains neutral. "all" rests the lines back on the structural accent. Event-driven
+    // (a filter change), re-tinting the existing material Colors in place — no allocation. The
+    // frame keeps its ×2 HDR overdrive so the tinted lines still feed the bloom.
+    const hue = this._filter === "all" ? this._core : (this.sceneColors[this._filter] ?? this._core);
+    for (const m of this._floorMats.values()) m.frame.color.set(hue).multiplyScalar(2);
   }
 
   update(dt: number) {

@@ -6,7 +6,8 @@ import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { PulseEdge, useEdgePulse } from "@/components/EdgePulse";
-import { Compass, ListTree, ChevronLeft, ChevronRight, ChevronUp, ChevronDown, X, type LucideIcon } from "lucide-react";
+import { ListTree, ChevronLeft, ChevronRight, ChevronUp, ChevronDown, X, type LucideIcon } from "lucide-react";
+import { EXPLORE_ICON } from "@/components/icons";
 
 // One entry in a dock's icon TRAY (user redesign 2026-07-05 — supersedes the old hint dot + the
 // dot↔glyph morph, on the edge tabs AND the phone dock halves): the tray is a quiet LEGEND of the
@@ -311,7 +312,7 @@ export default function RailDock({
               // The half fills its group; `!` beats the primitive's first/last rounding + the
               // toggle baseline's hover/on fills (this design owns its selection language).
               // `relative` = the positioning context for the top-edge update-pulse carrier.
-              // The on-state cyan tint targets `>svg` (the half's OWN Compass/ListTree mark
+              // The on-state cyan tint targets `>svg` (the half's OWN EXPLORE_ICON/ListTree mark
               // only) — the tray icons inside the span keep their muted/identity colours.
               "relative w-full h-full rounded-none! items-center justify-center gap-2 cursor-pointer",
               "bg-[var(--panel-light)] border border-[var(--thread-faint)] backdrop-blur-[8px]",
@@ -321,7 +322,7 @@ export default function RailDock({
               "data-[state=on]:shadow-[inset_0_2px_0_var(--sel-border)] data-[state=on]:[&>svg]:text-[var(--primary)]",
             )}
           >
-            {side === "left" ? <Compass size={18} strokeWidth={1.75} aria-hidden="true" /> : <ListTree size={18} strokeWidth={1.75} aria-hidden="true" />}
+            {side === "left" ? <EXPLORE_ICON size={18} strokeWidth={1.75} aria-hidden="true" /> : <ListTree size={18} strokeWidth={1.75} aria-hidden="true" />}
             <span>{label}</span>
             {/* [icons legend] | [open control]: the tray, then the hairline, then the trailing
                 open/collapse chevron (up = opens a sheet above; down while open = collapses). */}
