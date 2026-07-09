@@ -14,16 +14,20 @@
 
 import * as THREE from "three";
 import { LEDGER } from "../../domain/ledgerLayout";
+import { HEX_H } from "../../domain/geoLayout";
 import { discFall, lerp, smooth } from "../../domain/nodeLayout";
-import type { DimContext, DimState } from "../../domain/dimModel";
+import type { DimContext } from "../../domain/dimModel";
 import type { MetaNodeRecord, ValidatorRecord } from "../../domain/records";
 import type { PickDescriptor } from "@/src/data/types";
 
-const Z_AXIS = new THREE.Vector3(0, 0, 1);
+const Y_AXIS = new THREE.Vector3(0, 1, 0); // hex-prism axis (radial after _qRadial)
 // Ledger (Snapshots) nodes are flat COINS lying on their floor plane: the sphere instance squashed
 // on Y. A zero-thickness circle was tried and foreshortens to an invisible sliver at the view's
 // shallow overview camera; the coin reads as a circle from above yet stays visible edge-on.
 const COIN_H = 0.22;
+// The geo hex prisms' resting opacity — slightly glassy (user: replaces the wireframe overlay,
+// which never read as clean edges). Depth-write stays ON so stacks occlude normally.
+const HEX_ALPHA = 0.8;
 const DIM = new THREE.Color(0x223046);
 const _dummy = new THREE.Object3D(); // reused to compose per-instance matrices
 const _vec = new THREE.Vector3();
@@ -40,7 +44,7 @@ const geoCcOf = (pick: PickDescriptor): string | null =>
 // frame after easing its dim state.
 export interface FrameCtx {
   c: DimContext;        // the pure dim context (morph/filter/country/hover/ledger…)
-  dim: DimState;        // Globe's eased per-layer validator dims { l0, l1 }
+  dim: number;          // Globe's eased whole-core validator dim (ONE value for the DAG core)
   dimScaleV: number;    // Globe._dimScale() — the one morph-ramped dim strength
   clock: number;        // Globe.clock (accumulated seconds)
   camN: THREE.Vector3;  // camera direction in the group's local frame (disc falloff)
@@ -56,22 +60,22 @@ export class NodeFabric {
 
   // Validators (the DAG core) — two InstancedMeshes sharing one colour + glow buffer.
   instSphere: THREE.InstancedMesh | null = null;
-  instDisc: THREE.InstancedMesh | null = null;
+  instHex: THREE.InstancedMesh | null = null;
   private baseArr: Float32Array = new Float32Array(0);
   private emiArr: Float32Array = new Float32Array(0);
   private aEmiSphere: THREE.InstancedBufferAttribute | null = null;
-  private aEmiDisc: THREE.InstancedBufferAttribute | null = null;
+  private aEmiHex: THREE.InstancedBufferAttribute | null = null;
   private _sphereGeo: THREE.SphereGeometry | null = null;
-  private _discGeo: THREE.CircleGeometry | null = null;
-  private readonly _appliedDim = { l0: -1, l1: -1 }; // last dim baked into the colour buffer
+  private _hexGeo: THREE.CylinderGeometry | null = null; // hex prism (6-seg cylinder)
+  private _appliedDim = -1; // last validator dim baked into the colour buffer
 
   // Metagraph nodes — the same two-mesh cross-fade, coloured per metagraph.
   metaSphere: THREE.InstancedMesh | null = null;
-  metaDisc: THREE.InstancedMesh | null = null;
+  metaHex: THREE.InstancedMesh | null = null;
   private metaBaseArr: Float32Array = new Float32Array(0);
   private metaEmi: Float32Array = new Float32Array(0);
   private metaAESphere: THREE.InstancedBufferAttribute | null = null;
-  private metaAEDisc: THREE.InstancedBufferAttribute | null = null;
+  private metaAEHex: THREE.InstancedBufferAttribute | null = null;
 
   // Reused pickables array (never re-allocated — the plan's allocation fix).
   readonly pickables: THREE.Object3D[] = [];
@@ -86,10 +90,14 @@ export class NodeFabric {
 
   // MeshStandardMaterial patched so each instance gets its own colour and an animated emissive
   // intensity — neither is per-instance on the stock material. aBase tints the lit diffuse;
-  // emissive becomes aBase * aEmissive (js/globe.js:284-298).
-  private _makeNodeMaterial(): THREE.MeshStandardMaterial {
+  // emissive becomes aBase * aEmissive (js/globe.js:284-298). The hex prisms render SLIGHTLY
+  // TRANSPARENT (user: replaces the tried-and-rejected wireframe overlay) — depthWrite stays on
+  // so the chip stacks still occlude each other cleanly.
+  private _makeNodeMaterial(flat = false, alpha = 1): THREE.MeshStandardMaterial {
     const mat = new THREE.MeshStandardMaterial({
       color: 0xffffff, roughness: 0.5, metalness: 0.2,
+      flatShading: flat, // crisp facet definition on the hex prisms; spheres stay smooth
+      transparent: alpha < 1, opacity: alpha,
     });
     mat.onBeforeCompile = (shader) => {
       shader.vertexShader = shader.vertexShader
@@ -113,7 +121,9 @@ export class NodeFabric {
     const picks = new Array(total);
 
     const sphereGeo = (this._sphereGeo ||= new THREE.SphereGeometry(0.5, 16, 12)).clone();
-    const discGeo = (this._discGeo ||= new THREE.CircleGeometry(1, 24)).clone();
+    // GEO node: a HEX PRISM (user spec) — unit circumradius, unit height (scaled to
+    // (geoSize, HEX_H, geoSize)); thetaStart π/6 puts an EDGE toward each honeycomb neighbour.
+    const hexGeo = (this._hexGeo ||= new THREE.CylinderGeometry(1, 1, 1, 6, 1, false, Math.PI / 6)).clone();
     const wrap = (geo: THREE.BufferGeometry): THREE.InstancedBufferAttribute => {
       geo.setAttribute("aBase", new THREE.InstancedBufferAttribute(baseArr, 3));
       const aE = new THREE.InstancedBufferAttribute(emiArr, 1);
@@ -122,10 +132,10 @@ export class NodeFabric {
       return aE;
     };
     this.aEmiSphere = wrap(sphereGeo);
-    this.aEmiDisc = wrap(discGeo);
+    this.aEmiHex = wrap(hexGeo);
 
-    const mkMesh = (geo: THREE.BufferGeometry, side: THREE.Side): THREE.InstancedMesh => {
-      const mat = this._makeNodeMaterial();
+    const mkMesh = (geo: THREE.BufferGeometry, side: THREE.Side, hexEdges = false): THREE.InstancedMesh => {
+      const mat = this._makeNodeMaterial(hexEdges, hexEdges ? HEX_ALPHA : 1);
       mat.side = side;
       const mesh = new THREE.InstancedMesh(geo, mat, total);
       mesh.frustumCulled = false; // instances span the whole scene; base bounds would mis-cull
@@ -135,7 +145,7 @@ export class NodeFabric {
       return mesh;
     };
     this.instSphere = mkMesh(sphereGeo, THREE.FrontSide);
-    this.instDisc = mkMesh(discGeo, THREE.DoubleSide); // visible even at the globe's limb
+    this.instHex = mkMesh(hexGeo, THREE.FrontSide, true); // flat-shaded, slightly transparent prism
     this.baseArr = baseArr;
     this.emiArr = emiArr;
 
@@ -145,22 +155,22 @@ export class NodeFabric {
       picks[u.index] = u.pick;
     }
     (this.instSphere.geometry.getAttribute("aBase") as THREE.InstancedBufferAttribute).needsUpdate = true;
-    (this.instDisc.geometry.getAttribute("aBase") as THREE.InstancedBufferAttribute).needsUpdate = true;
+    (this.instHex.geometry.getAttribute("aBase") as THREE.InstancedBufferAttribute).needsUpdate = true;
 
-    this._appliedDim.l0 = -1; this._appliedDim.l1 = -1;
+    this._appliedDim = -1;
     this.pickables.length = 0;
     this.pickables.push(this.instSphere);
   }
 
   disposeValidators(): void {
-    for (const mesh of [this.instSphere, this.instDisc]) {
+    for (const mesh of [this.instSphere, this.instHex]) {
       if (!mesh) continue;
       this.nodeGroup.remove(mesh);
       mesh.geometry.dispose();
       (mesh.material as THREE.Material).dispose();
       mesh.dispose();
     }
-    this.instSphere = this.instDisc = null;
+    this.instSphere = this.instHex = null;
   }
 
   // -------------------------------------------------- build the metagraph meshes
@@ -174,7 +184,7 @@ export class NodeFabric {
     const emiArr = new Float32Array(total).fill(0.5);
     const picks = new Array(total);
     const sphereGeo = new THREE.SphereGeometry(0.5, 16, 12);
-    const discGeo = new THREE.CircleGeometry(1, 24);
+    const hexGeo = new THREE.CylinderGeometry(1, 1, 1, 6, 1, false, Math.PI / 6);
     const wrap = (geo: THREE.BufferGeometry): THREE.InstancedBufferAttribute => {
       geo.setAttribute("aBase", new THREE.InstancedBufferAttribute(baseArr, 3));
       const aE = new THREE.InstancedBufferAttribute(emiArr, 1);
@@ -183,10 +193,10 @@ export class NodeFabric {
       return aE;
     };
     this.metaAESphere = wrap(sphereGeo);
-    this.metaAEDisc = wrap(discGeo);
+    this.metaAEHex = wrap(hexGeo);
 
-    const mkMesh = (geo: THREE.BufferGeometry, side: THREE.Side): THREE.InstancedMesh => {
-      const mat = this._makeNodeMaterial();
+    const mkMesh = (geo: THREE.BufferGeometry, side: THREE.Side, hexEdges = false): THREE.InstancedMesh => {
+      const mat = this._makeNodeMaterial(hexEdges, hexEdges ? HEX_ALPHA : 1);
       mat.side = side;
       const mesh = new THREE.InstancedMesh(geo, mat, total);
       mesh.frustumCulled = false;
@@ -196,7 +206,7 @@ export class NodeFabric {
       return mesh;
     };
     this.metaSphere = mkMesh(sphereGeo, THREE.FrontSide);
-    this.metaDisc = mkMesh(discGeo, THREE.DoubleSide); // visible even at the limb
+    this.metaHex = mkMesh(hexGeo, THREE.FrontSide, true); // flat-shaded, slightly transparent prism
 
     records.forEach((r, i) => {
       r.index = i;
@@ -204,21 +214,21 @@ export class NodeFabric {
       picks[i] = r.pick;
     });
     (this.metaSphere.geometry.getAttribute("aBase") as THREE.InstancedBufferAttribute).needsUpdate = true;
-    (this.metaDisc.geometry.getAttribute("aBase") as THREE.InstancedBufferAttribute).needsUpdate = true;
+    (this.metaHex.geometry.getAttribute("aBase") as THREE.InstancedBufferAttribute).needsUpdate = true;
 
     this.metaEmi = emiArr;
     this.metaBaseArr = baseArr;
   }
 
   disposeMeta(): void {
-    for (const mesh of [this.metaSphere, this.metaDisc]) {
+    for (const mesh of [this.metaSphere, this.metaHex]) {
       if (!mesh) continue;
       this.nodeGroup.remove(mesh);
       mesh.geometry.dispose();
       (mesh.material as THREE.Material).dispose();
       mesh.dispose();
     }
-    this.metaSphere = this.metaDisc = null;
+    this.metaSphere = this.metaHex = null;
   }
 
   // -------------------------------------------------- per-view pickables (reused array)
@@ -226,27 +236,26 @@ export class NodeFabric {
   pickablesFor(w: number, ledger: boolean): THREE.Object3D[] {
     const arr = this.pickables;
     arr.length = 0;
-    // Ledger renders (and therefore picks) the coin-squashed SPHERES; hyper/geo pick whichever
-    // side of the sphere→disc cross-fade is showing.
-    if (this.instSphere) arr.push(ledger || w < 0.5 ? this.instSphere : this.instDisc!);
-    const mp = !ledger && w >= 0.5 ? this.metaDisc : this.metaSphere;
+    // Hyper + ledger pick the sphere instances (ledger's coins ARE spheres); geo picks the hex
+    // prisms once the landing cross-fade has mostly completed.
+    if (this.instSphere) arr.push(ledger || w < 0.5 ? this.instSphere : this.instHex!);
+    const mp = !ledger && w >= 0.5 ? this.metaHex : this.metaSphere;
     if (mp) arr.push(mp);
     return arr;
   }
 
   // -------------------------------------------------- setMorph loop: validator matrices
-  // js/globe.js:850-930's node block. Writes the instSphere/instDisc matrices for the current
+  // js/globe.js:850-930's node block. Writes the instSphere/instHex matrices for the current
   // morph (or the ledger lane placement), sets their visibility, and returns the reused pickables.
   placeValidators(records: ValidatorRecord[], ctx: FrameCtx): THREE.Object3D[] {
-    if (!this.instSphere || !this.instDisc) return this.pickables;
+    if (!this.instSphere || !this.instHex) return this.pickables;
     const { c, dim, dimScaleV, ledgerT, clock: t, camN, hasCam } = ctx;
     const m = c.morph;
     const e = smooth(m);
     // Keep the spheres full-size for the whole flight so their movement reads clearly, then
     // cross-fade them into the circles only at the last moment, once the nodes have essentially
     // arrived at the globe surface.
-    const w = smooth(THREE.MathUtils.clamp((m - 0.82) / 0.16, 0, 1));
-    const sphereVis = 1 - w, discVis = w;
+    const w = smooth(THREE.MathUtils.clamp((m - 0.82) / 0.16, 0, 1)); // sphere → chip squash phase
     for (const u of records) {
       // Snapshots (ledger) view: hard-place as flat COINS lying on the floor planes (see COIN_H).
       // DAG cl1 nodes drop into the DAG-L1 row.
@@ -256,7 +265,7 @@ export class NodeFabric {
         } else {
           if (u.noGeo) _vec.copy(u.hyperPos);
           else _vec.copy(u.hyperDir).lerp(u.geoDir!, e).normalize().multiplyScalar(lerp(u.hyperRadius, u.geoRadius, e));
-          const showL = 1 - (u.layer === "l0" ? dim.l0 : dim.l1) * dimScaleV;
+          const showL = 1 - dim * dimScaleV;
           _dummy.position.copy(_vec).lerp(u.ledgerPos, ledgerT);
           _dummy.quaternion.identity(); // flat on the floor — no tumble
           const sL = u.hyperSize * LEDGER.dot * showL;
@@ -266,7 +275,7 @@ export class NodeFabric {
         this.instSphere.setMatrixAt(u.index, _dummy.matrix);
         _dummy.scale.setScalar(0);
         _dummy.updateMatrix();
-        this.instDisc.setMatrixAt(u.index, _dummy.matrix);
+        this.instHex.setMatrixAt(u.index, _dummy.matrix);
         continue;
       }
       // Shared position: fly from the fibonacci shell to the globe surface.
@@ -281,31 +290,33 @@ export class NodeFabric {
 
       // Off-filter nodes vanish on the hyper->globe morph but stay visible (just dimmed) in hyper —
       // the hide scales with the morph `m` (via dimScaleV). See js/globe.js:896-904.
-      let hideV = u.layer === "l0" ? dim.l0 : dim.l1;
+      let hideV = dim;
       const geoCc = geoCcOf(u.pick);
       if (c.countryFilter && (!geoCc || geoCc !== c.countryFilter)) hideV = Math.max(hideV, c.countryMix);
       const show = 1 - hideV * dimScaleV; // SAME ramped dim as the glow + the metagraph nodes
 
-      // Sphere: tumbling on its own axis, shrinking out as it nears the globe.
+      // Sphere: tumbling on its own axis, cross-fading out as the node lands.
       _qSpin.setFromAxisAngle(u.spinAxis, u.spinPhase + t * u.spinSpeed);
       _dummy.quaternion.copy(_qSpin);
-      _dummy.scale.setScalar(u.hyperSize * sphereVis * (u.noGeo ? 1 - e : 1) * show);
+      _dummy.scale.setScalar(u.hyperSize * (1 - w) * (u.noGeo ? 1 - e : 1) * show);
       _dummy.updateMatrix();
       this.instSphere.setMatrixAt(u.index, _dummy.matrix);
 
-      // Circle: a flat disc lying tangent on the surface (local +Z outward), growing in as the node
-      // lands, and fading out toward the limb. No-geo nodes never get a disc.
+      // HEX PRISM: standing tangent on the plateau (prism axis = radial, local +Y after _qRadial),
+      // growing in as the node lands; stack level is baked into geoRadius (honeycomb cells +
+      // poker-stack levels); still eases out toward the limb (discFall) so the horizon stays clean.
       const fall = hasCam ? discFall(dir.dot(camN)) : 1;
-      _qRadial.setFromUnitVectors(Z_AXIS, dir);
+      _qRadial.setFromUnitVectors(Y_AXIS, dir);
       _dummy.quaternion.copy(_qRadial);
-      _dummy.scale.setScalar(u.noGeo ? 0 : u.geoSize * discVis * fall * show);
+      const gV = u.noGeo ? 0 : w * fall * show;
+      _dummy.scale.set(u.geoSize * gV, HEX_H * gV, u.geoSize * gV);
       _dummy.updateMatrix();
-      this.instDisc.setMatrixAt(u.index, _dummy.matrix);
+      this.instHex.setMatrixAt(u.index, _dummy.matrix);
     }
     this.instSphere.instanceMatrix.needsUpdate = true;
-    this.instDisc.instanceMatrix.needsUpdate = true;
-    this.instSphere.visible = sphereVis > 0.001 || c.ledger; // ledger hard-places the coins
-    this.instDisc.visible = discVis > 0.001 && !c.ledger;
+    this.instHex.instanceMatrix.needsUpdate = true;
+    this.instSphere.visible = w < 0.999 || c.ledger; // ledger's coins are sphere instances
+    this.instHex.visible = w > 0.001 && !c.ledger;
     return this.pickablesFor(w, c.ledger);
   }
 
@@ -313,15 +324,14 @@ export class NodeFabric {
   // js/globe.js:1017-1072. Reads the (already-eased) dim; writes emissive + (when a transition or a
   // country drill is in flight) the base colour; decays each node's arc flash.
   writeValidatorGlow(records: ValidatorRecord[], ctx: FrameCtx): void {
-    if (!this.instSphere || !this.instDisc || !this.aEmiSphere || !this.aEmiDisc) return;
-    const { c, dim, dimScaleV, clock, flashDecay } = ctx;
+    if (!this.instSphere || !this.instHex || !this.aEmiSphere || !this.aEmiHex) return;
+    const { c, dim, dimScaleV, flashDecay } = ctx;
     const m = c.morph;
     const cf = c.countryFilter, cmix = c.countryMix;
     // While a country drill-down is active, per-node dim varies, so recolour every frame; otherwise
     // only during a layer-dim transition.
     const recolour = cf != null || cmix > 0.001 ||
-      Math.abs(dim.l0 - this._appliedDim.l0) > 0.001 ||
-      Math.abs(dim.l1 - this._appliedDim.l1) > 0.001;
+      Math.abs(dim - this._appliedDim) > 0.001;
     const base = this.baseArr;
     const emi = this.emiArr;
     // A hovered/selected node dims the rest so it stands out — same in both views.
@@ -329,15 +339,14 @@ export class NodeFabric {
     const dimOthersOnFocus = c.filter === "all" || c.filter === "dag";
     const focusDim = 0.45;
     for (const u of records) {
-      let d = (u.layer === "l0" ? dim.l0 : dim.l1) * dimScaleV;
+      let d = dim * dimScaleV;
       const geoCc = geoCcOf(u.pick);
       // outside the drilled-into country? dim it on top of the network dim (geo only).
       if (cf && (!geoCc || geoCc !== cf)) d = Math.max(d, cmix);
-      // dim the glow on the globe so dense regions don't bloom into a blob; the lower Hypergraph
-      // base lets the point-lights shade the sphere.
-      let ei = lerp(0.5, 0.22, m);
-      // Twinkle is a decorative (non-data-driven) shimmer — geo only (scaled by m).
-      ei += Math.sin(clock * 2 + u.twinkle) * 0.06 * m;
+      // SAME glow model as the metagraph nodes (user: the DAG's globe hexes must read like any
+      // metagraph's — one node language): 0.5 base lifted +0.08 on the globe (eased back from
+      // +0.14 — user: a little less bright). Steady — the old twinkle shimmer was removed (user).
+      const ei = 0.5 + 0.08 * m;
       const flRaw = u._flash || 0; // brief flash when an arc pulse reaches this node
       const fl = flRaw * m; // arcs are a geo-only visual — their flash must not bleed into hyper
       emi[u.index] = Math.max(0.02, ei * (1 - d * 0.92) + fl); // suppress glow when dimmed
@@ -356,12 +365,11 @@ export class NodeFabric {
     }
     // Both meshes share emiArr; flag both attributes for re-upload.
     this.aEmiSphere.needsUpdate = true;
-    this.aEmiDisc.needsUpdate = true;
+    this.aEmiHex.needsUpdate = true;
     if (recolour) {
       (this.instSphere.geometry.getAttribute("aBase") as THREE.InstancedBufferAttribute).needsUpdate = true;
-      (this.instDisc.geometry.getAttribute("aBase") as THREE.InstancedBufferAttribute).needsUpdate = true;
-      this._appliedDim.l0 = dim.l0;
-      this._appliedDim.l1 = dim.l1;
+      (this.instHex.geometry.getAttribute("aBase") as THREE.InstancedBufferAttribute).needsUpdate = true;
+      this._appliedDim = dim;
     }
   }
 
@@ -370,12 +378,11 @@ export class NodeFabric {
   // colour, and sets their visibility. Coloured per metagraph; the hub orbit is converted into the
   // globe group's local frame each frame.
   writeMetaFrame(records: MetaNodeRecord[], ctx: FrameCtx): void {
-    if (!this.metaSphere || !this.metaDisc || !this.metaAESphere || !this.metaAEDisc) return;
+    if (!this.metaSphere || !this.metaHex || !this.metaAESphere || !this.metaAEHex) return;
     const { c, clock, dt, dimScaleV, ledgerT, camN, hasCam, group, flashDecay } = ctx;
     const m = c.morph;
     const e = smooth(m);                                              // flight progress
-    const w = smooth(THREE.MathUtils.clamp((m - 0.82) / 0.16, 0, 1)); // sphere -> disc
-    const sphereVis = 1 - w, discVis = w;
+    const w = smooth(THREE.MathUtils.clamp((m - 0.82) / 0.16, 0, 1)); // sphere → chip squash phase
     const kk = Math.min(1, dt * 4);
     const emi = this.metaEmi;
     const base = this.metaBaseArr;
@@ -391,7 +398,7 @@ export class NodeFabric {
       const geoCc = geoCcOf(r.pick);
       if (cf && (!geoCc || geoCc !== cf)) dEff = Math.max(dEff, cmix);
       // Twinkle (decorative shimmer) is geo-only (scaled by m).
-      const glow = (0.5 + Math.sin(clock * 2 + r.twinkle) * 0.12 * m) * (1 - dEff * 0.9);
+      const glow = (0.5 + 0.08 * m) * (1 - dEff * 0.9); // steady, = validators' (twinkle removed, geo lift eased back — user)
       const flRaw = r._flash || 0; // brief flash when an arc pulse reaches this node
       const fl = flRaw * m; // arcs are a geo-only visual — their flash must not bleed into hyper
       emi[r.index] = Math.max(0.03, glow + fl);
@@ -433,34 +440,36 @@ export class NodeFabric {
         this.metaSphere.setMatrixAt(r.index, _dummy.matrix);
         _dummy.scale.setScalar(0);
         _dummy.updateMatrix();
-        this.metaDisc.setMatrixAt(r.index, _dummy.matrix);
+        this.metaHex.setMatrixAt(r.index, _dummy.matrix);
         continue;
       }
 
       // Sphere: tumbling on its own axis, shrinking out near the globe. Filtered-out metagraph
       // nodes shrink fully (1 - dEff).
+      // Sphere: tumbling, cross-fading out as the node lands (see the validator loop).
       _qSpin.setFromAxisAngle(r.spinAxis, r.spinPhase + clock * r.spinSpeed);
       _dummy.quaternion.copy(_qSpin);
-      _dummy.scale.setScalar(r.hyperSize * sphereVis * (1 - dEff));
+      _dummy.scale.setScalar(r.hyperSize * (1 - w) * (1 - dEff));
       _dummy.updateMatrix();
       this.metaSphere.setMatrixAt(r.index, _dummy.matrix);
 
-      // Disc: flat on the surface (local +Z points outward), growing in and fading out toward the limb.
+      // HEX PRISM standing tangent at geoPos (honeycomb cell + stack level baked in). Hide (not
+      // dim) metagraph nodes outside the selection — the (1 - dEff) factor shrinks them fully out.
       const fall = hasCam ? discFall(r.geoDir.dot(camN)) : 1;
-      _qRadial.setFromUnitVectors(Z_AXIS, r.geoDir);
+      _qRadial.setFromUnitVectors(Y_AXIS, r.geoDir);
       _dummy.quaternion.copy(_qRadial);
-      // Hide (not dim) metagraph nodes outside the selection — shrink the disc fully out.
-      _dummy.scale.setScalar(r.geoSize * discVis * (1 - dEff) * fall);
+      const gM = w * fall * (1 - dEff);
+      _dummy.scale.set(r.geoSize * gM, HEX_H * gM, r.geoSize * gM);
       _dummy.updateMatrix();
-      this.metaDisc.setMatrixAt(r.index, _dummy.matrix);
+      this.metaHex.setMatrixAt(r.index, _dummy.matrix);
     }
     this.metaSphere.instanceMatrix.needsUpdate = true;
-    this.metaDisc.instanceMatrix.needsUpdate = true;
-    this.metaSphere.visible = sphereVis > 0.001 || c.ledger; // ledger hard-places the coins
-    this.metaDisc.visible = discVis > 0.001 && !c.ledger;
+    this.metaHex.instanceMatrix.needsUpdate = true;
+    this.metaSphere.visible = w < 0.999 || c.ledger; // ledger's coins are sphere instances
+    this.metaHex.visible = w > 0.001 && !c.ledger;
     this.metaAESphere.needsUpdate = true;
-    this.metaAEDisc.needsUpdate = true;
+    this.metaAEHex.needsUpdate = true;
     (this.metaSphere.geometry.getAttribute("aBase") as THREE.InstancedBufferAttribute).needsUpdate = true;
-    (this.metaDisc.geometry.getAttribute("aBase") as THREE.InstancedBufferAttribute).needsUpdate = true;
+    (this.metaHex.geometry.getAttribute("aBase") as THREE.InstancedBufferAttribute).needsUpdate = true;
   }
 }

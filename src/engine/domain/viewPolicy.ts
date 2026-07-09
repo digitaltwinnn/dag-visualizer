@@ -37,6 +37,10 @@ export interface ViewPolicy {
   // May depth-of-field run here at all? (Still ANDs with a single metagraph being selected +
   // the morph window.) Only hyper.
   dofEligible: boolean;
+  // OrbitControls zoom floor (camera→target distance). Geo raises it above the globe radius
+  // (R=16 + land + margin) so the user can't wheel the camera through the surface into the
+  // globe's interior; the abstract views keep the close-in default.
+  minCamDist: number;
 }
 
 // A flat placeholder view (status / transactions / staking): the canvas is hidden and the view
@@ -48,6 +52,7 @@ const FLAT: ViewPolicy = {
   show: { hyperFurniture: false, globeSurface: false, ledger: false },
   pickSources: [],
   dofEligible: false,
+  minCamDist: 12,
 };
 
 export const VIEW_POLICIES: Record<Mode, ViewPolicy> = {
@@ -60,6 +65,7 @@ export const VIEW_POLICIES: Record<Mode, ViewPolicy> = {
     show: { hyperFurniture: true, globeSurface: true, ledger: false },
     pickSources: ["globe", "layers"],
     dofEligible: true,
+    minCamDist: 12,
   },
   // Footprint: the holographic globe + travelling packets; picks the globe nodes only.
   geo: {
@@ -69,6 +75,7 @@ export const VIEW_POLICIES: Record<Mode, ViewPolicy> = {
     show: { hyperFurniture: true, globeSurface: true, ledger: false },
     pickSources: ["globe"],
     dofEligible: false,
+    minCamDist: 17, // outside the globe surface (R 16 + land 0.11 + margin) — no zooming inside
   },
   // Snapshots: the settlement chamber. Morph frozen (nodes fly into lanes); picks the centred
   // snapshot + the reused producer dots. (The ledger-specific depth-fog recency treatment was
@@ -80,6 +87,7 @@ export const VIEW_POLICIES: Record<Mode, ViewPolicy> = {
     show: { hyperFurniture: false, globeSurface: true, ledger: true },
     pickSources: ["ledger", "globe"],
     dofEligible: false,
+    minCamDist: 12,
   },
   status: FLAT,
   transactions: FLAT,

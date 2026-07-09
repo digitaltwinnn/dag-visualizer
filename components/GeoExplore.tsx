@@ -130,12 +130,20 @@ export default function GeoExplore() {
           {rows.map((c) => {
             const open = c.cc === country;
             const nodes = nodesByCountry.get(c.country) ?? [];
+            // The open group's wash box gets the SAME ±6px outset as the country button
+            // (px-1.5 -mx-1.5), so the drilled row's hover/selection box and the dropdown group
+            // behind it share edges — the button used to overhang the wash by 6px on both sides
+            // (user: "nodes dropdown not aligned with the parent").
             return (
-              <div key={c.cc} className={cn(open && "bg-wash-faint rounded-btn my-0.5")}>
+              <div key={c.cc} className={cn(open && "bg-wash-faint rounded-btn my-0.5 -mx-1.5 px-1.5")}>
                 <button
                   type="button"
                   className={cn(
-                    "group flex items-center gap-2.5 w-full text-left text-body border-none bg-transparent cursor-pointer py-[5px] px-1.5 -mx-1.5 rounded-sm transition-[background] duration-150",
+                    // w-[calc(100%+12px)] (not w-full): with w-full the right -mx-1.5 was ignored
+                    // (overconstrained box) and the row ended 6px SHORT of the column; the calc width
+                    // bakes both 6px outsets in, so the row box spans the open group's wash box
+                    // edge-to-edge (buttons shrink-to-fit, so an auto width is not an option).
+                    "group flex items-center gap-2.5 w-[calc(100%+12px)] text-left text-body border-none bg-transparent cursor-pointer py-[5px] px-1.5 -mx-1.5 rounded-sm transition-[background] duration-150",
                     "hover:bg-wash-hover",
                     "focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--primary)] focus-visible:outline-offset-[-2px]",
                     // The drilled country row wears the same shared selection language as the
@@ -197,7 +205,9 @@ export default function GeoExplore() {
                             className={cn(
                               // `relative pr-7` reserves the picker's trailing ✓ slot on every
                               // row, so the status column doesn't shift when a node is selected.
-                              "nb-row relative flex items-center gap-2 w-full py-[5px] pl-2 pr-7 my-px rounded-sm border border-transparent bg-transparent cursor-pointer text-left text-foreground-dim transition-colors duration-[140ms]",
+                              // w-[calc(100%+6px)]: the node boxes end on the SAME right edge as the country
+                          // row's box above (which spans the wash box), so the group reads as one block.
+                          "nb-row relative flex items-center gap-2 w-[calc(100%+6px)] py-[5px] pl-2 pr-7 my-px rounded-sm border border-transparent bg-transparent cursor-pointer text-left text-foreground-dim transition-colors duration-[140ms]",
                               "hover:bg-wash-hover hover:text-foreground",
                               "focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--primary)] focus-visible:outline-offset-[-2px]",
                               // The selected node row = the SAME shared selection language as the

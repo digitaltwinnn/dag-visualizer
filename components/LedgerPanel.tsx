@@ -97,7 +97,9 @@ export default function LedgerPanel() {
                     <span className={cn("block text-body text-foreground", on && "font-semibold")}>{l.name}</span>
                   </span>
                   <span className="block pl-[26px] text-label text-muted-foreground leading-snug mt-0.5">{l.desc}</span>
-                  {on && <SelectedRowMark className="absolute right-2 top-[13px]" />}
+                  {/* top-[8px] centres the 14px check on the SAME line as the 18px level badge
+                      (row pad 6 + 18/2 = 15px centre; 8 + 14/2 = 15). */}
+                  {on && <SelectedRowMark className="absolute right-2 top-[8px]" />}
                 </button>
               );
             })}

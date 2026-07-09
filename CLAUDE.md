@@ -19,7 +19,8 @@ mode !== "ledger"`):
   L0 / cL1 / dL1 nodes in concentric shells. **One unified node model** — the DAG is itself a
   metagraph-shaped "core" (see *Nodes, layers & the filter*), not a separate L0/L1 pair.
 - **Node geography** (`geo`, 3D) — a globe with every node at its real geolocation, a density
-  heatmap, travelling-packet connection arcs, and the country→nodes explorer.
+  travelling-packet connection arcs, and the country→nodes explorer (the old density heatmap +
+  rings were removed entirely, 2026-07-09 — the honeycomb node stacks themselves show density).
 - **Snapshots** (`ledger`, 3D) — a built 3D "settlement chamber" (`scene/views/LedgerView.ts`):
   a stack of transparent glass FLOORS (layers) on Y. It **REUSES the same node meshes** from
   hyper/geo (placed into per-metagraph Z-lanes by `scene/Globe.ts`), and draws its own centred live
@@ -180,14 +181,18 @@ Zustand store. **Two data lanes:** (A) high-freq visuals subscribe straight to
 store-value imports**, enforced by `layerBoundaries.test.ts`). Each ships colocated tests:
 
 - `viewPolicy.ts` — the per-`Mode` allow-list table (`VIEW_POLICIES`): canvas / morph target /
-  sim gates / shown geometry / pick sources / DoF eligibility / fog, as DATA. The single source
-  of truth for what each view turns on (see *Per-view behaviour*).
+  sim gates / shown geometry / pick sources / DoF eligibility / camera zoom floor
+  (`minCamDist` — geo raises it to 17 > globe R so the user can't wheel inside the globe), as
+  DATA. The single source of truth for what each view turns on (see *Per-view behaviour*).
 - `morph.ts` — the hyper↔geo morph easing + derived visibility ramps.
 - `nodeLayout.ts` — the node placement math: fibonacci shells around the core/hubs, the
   sphere→disc geo positions, `spreadCoLocated()` phyllotaxis fan-out.
 - `dimModel.ts` — pure filter/hover/country dim + emissive resolution; a tested reference spec
   the scene layer currently reimplements inline (`NodeFabric`'s glow writers, `Globe._dimScale`/
-  `_applyDim`) rather than calling.
+  `_applyDim`) rather than calling. The DAG core dims as ONE value (the old per-layer `{l0,l1}`
+  pair always moved in lockstep and was collapsed, 2026-07-09); node glow is STEADY — validator
+  and metagraph pools share one formula (`0.5 + 0.08·morph`), the decorative twinkle shimmer
+  was removed (user).
 - `arcSim.ts` — the travelling-packet arc simulation: a swarm of comet "agents" that hop
   node→node. **Emits flash EVENTS via a ring buffer** — no cross-view side-channel mutation.
 - `ledgerModel.ts` — the Snapshots chamber's layout/slot/tile model over the live snapshot data.
@@ -218,7 +223,6 @@ GPU; no store/react**):
   with the patched smooth-shaded `MeshStandardMaterial` (per-instance `aBase`/`aEmissive`).
 - `objects/Arcs.ts` — the ONE `LineSegments` draw call for the arcs; rewrites head/tail
   positions each frame from `arcSim`'s state and **applies its flash events** to the nodes.
-- `objects/Heatmap.ts` — the geo density heatmap.
 - `objects/Background.ts` — the skydome. The **geo** end is the twinkling starfield + faint
   nebula; the **hyper** end is a **single flat colour** (no animation, no gradient, no tint — an
   animated backdrop read as distracting). Only `uTime`/`uMorph` drive it.
@@ -232,8 +236,11 @@ GPU; no store/react**):
   for the 4 antimeridian-crossing polygons, an Antarctica **pole-cap**, and a uniform `n=4`
   subdivision so facets hug the sphere with no T-junction cracks), capped by additive coastal
   **"wall" cliffs** (BackSide-culled, dim rim, always the default cyan — metagraph-tinting it
-  read as too dominant). Nodes/heatmap/arcs sit on the plateau (`R+LAND_H+ε`); the body sphere
-  (`renderOrder -2`) and fill (`-1`) keep the depth/transparency sort deterministic.
+  read as too dominant). The land surface is a SIMPLE FILL (luminance `rgb(18,18,18)` in the
+  baked texture, user-tuned) — the tile/micro-grid was removed entirely (user, after an A/B);
+  the sea graticule (base 0.06) spanning the whole sphere carries the digital line work.
+  Nodes/arcs sit on the plateau (`R+LAND_H+ε`); the body sphere (`renderOrder -2`) and fill
+  (`-1`) keep the depth/transparency sort deterministic.
 - `views/LedgerView.ts` — the Snapshots view's 3D settlement chamber over `ledgerModel` (see
   its own section below).
 
@@ -284,9 +291,11 @@ views and caused the ledger red-dots bug; that pattern is forbidden.
 - **Node meshes**: validators and metagraph nodes are **InstancedMesh**es with a patched
   smooth-shaded `MeshStandardMaterial` (`_makeNodeMaterial`) — each instance gets its own
   color (`aBase`) and animated glow (`aEmissive`). In the Hypergraph they're small
-  **spheres**; on the globe they cross-fade to flat **discs** (`discFall()` fades them out
-  toward the limb — needs the camera). Per-instance transforms via the shared `_dummy`.
-  (Don't introduce "box"/"cube" naming — they are spheres/discs.)
+  **spheres**; on the globe they cross-fade to standing **HEX PRISMS** (6-seg cylinder,
+  circumradius = `geoSize`, height `geoLayout.HEX_H`, slightly glassy `HEX_ALPHA 0.8` — a wireframe
+  overlay was tried and rejected; `discFall()` eases them out toward the
+  limb — needs the camera); in the ledger they're flat **coins** (the sphere squashed on Y,
+  `COIN_H`). Per-instance transforms via the shared `_dummy`.
 - **DAG L0/L1** are two fibonacci shells around the core. **Each metagraph** is laid out the
   same way around its hub: concentric shells **L0 inner → data-L1 (dl1) middle →
   currency-L1 (cl1) outer**. Metagraph nodes live in the rotating globe group but stay glued
@@ -302,13 +311,20 @@ views and caused the ledger red-dots bug; that pattern is forbidden.
   (user decision) — they're real metagraphs, selectable in Hypergraph/Snapshots, just not
   plottable; picking one lands geo in its quiet-empty state and the right rail shows the
   honest state-aware hint (see *State-aware pick hints*).
-- Co-located nodes are fanned out deterministically by `spreadCoLocated()` (phyllotaxis);
-  the density ring encircles the cluster. Don't add random jitter.
+- Co-located nodes are laid out deterministically by `spreadCoLocated()` as **poker-chip
+  STACKS in a HONEYCOMB** (2026-07-09, user design): the group is chunked into stack heights
+  of 5–10 (`stackSizes` — one hex per REAL node, sizes always sum to the true count; honest,
+  never randomized), stacks sit on adjacent hex cells (`hexCell` spiral, edges touching — no
+  circular fan), and each node's stack LEVEL lifts it radially by `geoLayout.CHIP_PITCH`.
+  The old density heatmap (rings AND glow) was REMOVED entirely (the rings read as extra
+  colour/score; the gradient's hot orange collided with metagraph identity hues and read as a
+  dim/hide bug) — the honeycomb itself shows density. Don't add random jitter.
 - **Arcs are travelling packets**, not fixed lines: `_buildArcs` builds a swarm of comet
   "agents" that each hop node→node (pick a random node in the filter, fly a curved arc,
   flash it on arrival, pause, repeat). All share ONE `LineSegments` (one draw call); only
   their head/tail positions are rewritten on the CPU each frame, coloured per metagraph.
-  Rebuilt on every filter change.
+  Rebuilt on every filter change. Tuned CALM (user, 2026-07-09): slow hops (`speed 0.15–0.35`),
+  long comet tails (`ARC_TAIL 14`, `ARC_TAIL_FRAC 0.42`), longer rests between hops.
 - **The filter** lives in the top command bar (`TopBar` → `FilterPicker`); everything routes
   through `Engine.applyFilter()`, which behaves per-view:
   - **Geography**: `globe.setFilter()` isolates/dims the selection, the leaderboard
@@ -530,7 +546,7 @@ code — reference the tokens. The SVG `RailThread` mirrors the `--thread-*` lit
   `#2af5ff` comment — the token is canonical), and the Engine **dev-warns (±2/channel)** if the
   mirror drifts from the live tokens. **`src/engine/noHardcodedColors.test.ts`** enforces this: it
   fails on any raw `0xRRGGBB` in the scene layer outside a tiny documented allowlist (white tint
-  bases, the functional density-heatmap gradient, the ambient light, the node-dim tone) — runs in
+  bases, the ambient light, the node-dim tone) — runs in
   `npm test`, the same gate as `layerBoundaries.test.ts`. (The JSX/`components/` layer has legacy
   `rgb()`/hex literals that should migrate to the CSS-var tokens + extend the guard — a follow-up.)
 

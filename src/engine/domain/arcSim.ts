@@ -33,8 +33,8 @@ import * as THREE from "three";
 import { R, LAND_H } from "./geoLayout";
 
 // Travelling-packet arcs: each is a short comet that hops node -> node (js/globe.js:35-38).
-export const ARC_TAIL = 8; // points making up each comet
-export const ARC_TAIL_FRAC = 0.3; // comet length as a fraction of its current arc
+export const ARC_TAIL = 14; // points making up each comet (longer, smoother tail — user)
+export const ARC_TAIL_FRAC = 0.42; // comet length as a fraction of its current arc (user-tuned)
 export const ARC_SAMPLES = 24; // bezier samples baked per hop
 
 const DEFAULT_MAX_AGENTS = 40; // js/globe.js:368 hard cap
@@ -120,7 +120,7 @@ export class ArcSim {
       this.agents.push({
         from, to, curve, vstart: i * vertsPer,
         t: Math.random(), // spread the swarm along their hops
-        speed: 0.25 + Math.random() * 0.4, // hop progress per second
+        speed: 0.15 + Math.random() * 0.20, // hop progress per second — calm drift (user-tuned)
         state: "travel",
         pause: 0,
       });
@@ -149,7 +149,7 @@ export class ArcSim {
           ag.t = 1;
           if (this.flashCount < this.flashHits.length) this.flashHits[this.flashCount++] = ag.to.node.index;
           ag.state = "pause";
-          ag.pause = 0.3 + Math.random() * 1.2; // dynamic rest before hopping on
+          ag.pause = 0.8 + Math.random() * 1.8; // dynamic rest before hopping on (calmer cadence)
         }
       } else {
         ag.pause -= dt;

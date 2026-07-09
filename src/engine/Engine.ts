@@ -225,8 +225,9 @@ export class Engine {
         if (st.hoverNodeId !== prev.hoverNodeId) this.globe.setHoverNode(st.hoverNodeId);
         // Snapshots·Explore panel: the plane highlight = the transient hover PREVIEW, else the
         // COMMITTED layer selection (the layer card) — same resolve idiom as hoverFilter ?? filter.
+        // Only a COMMITTED layer dims the other planes; a hover just brightens its own plane.
         if (st.ledgerHilite !== prev.ledgerHilite || st.layer !== prev.layer) {
-          this.ledger.setHighlight(st.ledgerHilite ?? st.layer?.layerId ?? null);
+          this.ledger.setHighlight(st.ledgerHilite ?? st.layer?.layerId ?? null, st.layer != null);
         }
         // While a layer is COMMITTED, the 3D planes stop being hover/click targets (see _pickAt) —
         // in the zoomed layer-focus pose the planes fill the screen and every idle mouse move stole
@@ -409,6 +410,8 @@ export class Engine {
     // View-derived sim gates → the scene modules (the render loop reads the rest of the policy).
     this.globe.setSimFlags(policy.sims);
     this.layers.setHubOrbits(policy.sims.hubOrbits);
+    // Zoom floor: geo keeps the camera outside the globe surface (see viewPolicy.minCamDist).
+    this.ctx.controls.minDistance = policy.minCamDist;
     // Snapshots view reuses the SAME hub/node meshes, laid out into planar rows. Toggle that
     // layout on the meshes (off restores the orbit/globe layout) and lock orbit so it reads 2D.
     const inLedger = mode === "ledger";
@@ -567,7 +570,9 @@ export class Engine {
   // — so the line of sight skims across the globe surface toward the horizon, the node sitting
   // in the lower part of the frame (in view, but we look across rather than down at it).
   private _focusNode() {
-    this._tweenTo(new THREE.Vector3(0, 0, 21), new THREE.Vector3(0, 15, 2));
+    // z 21 → 19.4 (user: zoom in more) — close enough to read the hex prism's facets/edges,
+    // still skimming the surface rather than staring down at it.
+    this._tweenTo(new THREE.Vector3(0, 0, 19.4), new THREE.Vector3(0, 14, 2));
   }
 
   // Compute the per-country leaderboard for the active filter and push it to the store

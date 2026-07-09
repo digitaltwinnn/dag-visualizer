@@ -56,10 +56,10 @@ function buildGraticule(globe: GeoViewHost) {
     for (let lat = -88; lat < 88; lat += 4)
       pts.push(latLonToVec3(lat, lon, R + 0.02), latLonToVec3(lat + 4, lon, R + 0.02));
   const geo = new THREE.BufferGeometry().setFromPoints(pts);
-  // The sea graticule (grid lines OVER the ocean): very subtle on purpose — a faint hint so the
-  // continents (the raised, gridded land) clearly lead. Accent hue, kept calm by a low fade opacity.
+  // The sea graticule (grid lines OVER the ocean): subtle so the continents (the raised, gridded
+  // land) clearly lead — lifted from 0.03 (user: a bit more present on the water). Accent hue.
   const mat = new THREE.LineBasicMaterial({ color: globe.geoColor, transparent: true, opacity: 0 });
-  globe.geoFades.push({ mat, base: 0.03 });
+  globe.geoFades.push({ mat, base: 0.06 });
   globe.group.add(new THREE.LineSegments(geo, mat));
 }
 
@@ -95,8 +95,9 @@ function makeLandTexture(features: LandFeature[]): THREE.DataTexture {
   // holes robustly); each polygon is drawn three times at x−W / x / x+W so a seam-crossing
   // ring simply paints its overflow into the neighbouring copy; pole-encircling rings
   // (Antarctica) are closed along the pole edge so the cap reaches the pole.
-  g.fillStyle = "rgb(9,9,9)"; // the surface FILL (wash between grid lines) — kept nearly transparent so
-                              // the land reads as a wireframe grid, not a solid glowing surface
+  g.fillStyle = "rgb(14,14,14)"; // the surface FILL — a faint solid wash (user-tuned up when the tile
+                                 // grid was removed) so the land reads present, not void; on screen it
+                                 // lands at texel × base 0.45 additive of the geo cyan (~5-6%)
   // Unwrap a ring's longitudes into a continuous run (accumulate the shortest step) so a
   // seam-crosser stays one monotonic path; returns [lon, lat] pairs in absolute (possibly
   // out-of-[-180,180]) longitude.
@@ -165,25 +166,9 @@ function makeLandTexture(features: LandFeature[]): THREE.DataTexture {
     g.globalCompositeOperation = "source-over";
   }
 
-  // The micro-grid, clipped to the land by compositing — drawn at exact degree positions;
-  // source-atop keeps the lines ONLY where land is painted (alpha is still live HERE, on the
-  // working canvas — it's flattened away below).
-  g.globalCompositeOperation = "source-atop";
-  g.strokeStyle = "rgb(40,40,40)"; // the grid LINES — kept subtly above the near-transparent fill so
-                                   // the wireframe reads (this is the stroke, not the fill)
-  g.lineWidth = 1.0;                   // 1px at 4096 = a very FINE hairline (crisp, not fuzzy)
-  const STEP = 1.5;                    // DENSE 1.5° graticule — a delicate mesh, not a coarse cage
-  for (let lat = -90 + STEP; lat < 90; lat += STEP) {
-    const y = ((90 - lat) / 180) * H;
-    g.beginPath(); g.moveTo(0, y); g.lineTo(W, y); g.stroke();
-  }
-  for (let lon = -180; lon < 180; lon += STEP) {
-    const x = ((lon + 180) / 360) * W;
-    // Meridians converge at the poles — stop them past |lat| 72° so Antarctica isn't a glow blob.
-    const yTop = ((90 - 72) / 180) * H, yBot = ((90 + 72) / 180) * H;
-    g.beginPath(); g.moveTo(x, yTop); g.lineTo(x, yBot); g.stroke();
-  }
-  g.globalCompositeOperation = "source-over";
+  // NO land tiles (user decision, after A/B): the land is a SIMPLE FILL — the near-transparent
+  // wash + the glowing coastal walls carry the landmass, and the sea graticule (which spans the
+  // whole sphere, water and behind the land) supplies the digital-globe line work.
 
   // FLATTEN: opaque black out-canvas — the luminance encoding (see header note). After this,
   // alpha is 255 everywhere and no upload path can reinterpret it. Drawn VERTICALLY FLIPPED

@@ -320,10 +320,13 @@ export class LedgerView {
   private _buildFloors() {
     // Panes span the whole trail again, but are VERY transparent so even where they stack in perspective
     // they stay a subtle hint of a layer (not a wall) — the black background still reads through.
-    const W = 38;        // X extent (camera-depth) — tight to the lead + trail span
+    const W = 39.5;      // X extent (camera-depth) — tight to the trail; the FRONT gets a 1.5-unit
+                         // strip beyond the original edge: enough that the corner labels clear the
+                         // global clusters' dials (DIAL_R_GLOBAL reaches x≈4.2; label band ~5.0–6.1)
+                         // without the panes reading empty at the front (user-tuned down from +3)
     const D = 44;        // Z extent — tight to the lanes
-    const cx = -14;      // shifted a touch forward (+X) so the L0/L1 node ring (radius ~3.5 at x≈0)
-                         // fits inside the pane's front edge; the −X edge (−33) still clears the trail (~−29)
+    const cx = -13.25;   // keeps the −X edge at −33 (still clears the trail ~−29) while the +X
+                         // front edge sits at 6.5 for the label strip
     // Every floor is the SAME simple treatment: a sharp-edged transparent FRAME plus a faint,
     // pixelated edge-weighted fill (quickly gone toward the centre). Each plane gets its OWN cloned
     // materials, stored by layer id in `_floorMats`, so the explore panel can highlight ONE plane
@@ -409,26 +412,32 @@ export class LedgerView {
   // _makeLabel); the one colour is the allowlisted label tone (noHardcodedColors).
   private _makeLabel(level: string, text: string, frontX: number, y: number, leftZ: number): THREE.Mesh {
     const c = document.createElement("canvas");
-    c.width = 512;
-    c.height = 64;
+    // 2× supersampled canvas (SS): the old 512×64 texture went blurry under the shallow overview
+    // camera's foreshortening; all metrics below are in CSS-ish units and multiplied by SS.
+    const SS = 2;
+    c.width = 512 * SS;
+    c.height = 64 * SS;
     const ctx = c.getContext("2d")!;
-    const tone = "rgba(170,196,224,0.42)"; // subtle, low-contrast (allowlisted 0xaac4e0)
-    ctx.font = "400 22px system-ui, -apple-system, sans-serif";
-    const boxW = Math.max(34, Math.ceil(ctx.measureText(level).width) + 16); // fits "2.1" sub-levels
+    // Structural accent (colors.core — the SAME token the floor frames use), solid-bright for
+    // legibility (user: labels read unclear, make them cyan); derived from the token, no literal.
+    const cc = new THREE.Color(this._core);
+    const tone = `rgba(${Math.round(cc.r * 255)},${Math.round(cc.g * 255)},${Math.round(cc.b * 255)},0.85)`;
+    ctx.font = `400 ${22 * SS}px system-ui, -apple-system, sans-serif`;
+    const boxW = Math.max(34 * SS, Math.ceil(ctx.measureText(level).width) + 16 * SS); // fits "2.1" sub-levels
     ctx.strokeStyle = tone;
-    ctx.lineWidth = 2;
-    ctx.strokeRect(6, 15, boxW, 34); // the level badge box
+    ctx.lineWidth = 2 * SS;
+    ctx.strokeRect(6 * SS, 15 * SS, boxW, 34 * SS); // the level badge box
     ctx.fillStyle = tone;
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
-    ctx.fillText(level, 6 + boxW / 2, 15 + 17 + 1); // level centred in the box
-    ctx.font = "300 26px system-ui, -apple-system, sans-serif";
+    ctx.fillText(level, 6 * SS + boxW / 2, (15 + 17 + 1) * SS); // level centred in the box
+    ctx.font = `400 ${26 * SS}px system-ui, -apple-system, sans-serif`;
     ctx.textAlign = "left";
-    ctx.fillText(text, 6 + boxW + 12, c.height / 2 + 2);
+    ctx.fillText(text, 6 * SS + boxW + 12 * SS, c.height / 2 + 2 * SS);
     const tex = new THREE.CanvasTexture(c);
     tex.minFilter = THREE.LinearFilter;
     tex.colorSpace = THREE.SRGBColorSpace;
-    const h = 1.15, w = h * (c.width / c.height);
+    const h = 1.05, w = h * (c.width / c.height); // aspect is SS-invariant; sized down a touch (user)
     const mesh = new THREE.Mesh(
       new THREE.PlaneGeometry(w, h),
       new THREE.MeshBasicMaterial({ map: tex, transparent: true, depthWrite: false, depthTest: false }),
@@ -449,15 +458,18 @@ export class LedgerView {
     return mesh;
   }
 
-  // Highlight one floor plane by layer id (from the explore panel) — brighten its frame + edge fill
-  // (the fill stays airy — the selected plane must not read as a solid sheet) while the OTHER planes
-  // recede to the dimmed OFF state; null restores every plane to rest. Every plane owns its
-  // materials (see _buildFloors), so this touches exactly the right ones.
-  setHighlight(id: string | null): void {
+  // Highlight one floor plane by layer id — brighten its frame + edge fill (the fill stays airy —
+  // the selected plane must not read as a solid sheet). `dimOthers` (a COMMITTED layer selection)
+  // additionally recedes the OTHER planes to the dimmed OFF state; a mere hover preview must NOT
+  // (the overview planes cover most of the screen, so the cursor is nearly always over one — a
+  // hover that dimmed the rest read as "filtering dims the layers", user bug). null id restores
+  // every plane to rest. Every plane owns its materials (see _buildFloors).
+  setHighlight(id: string | null, dimOthers = false): void {
     for (const [k, m] of this._floorMats) {
       const on = id === k;
-      m.frame.opacity = on ? FLOOR_FRAME_HI : id ? FLOOR_FRAME_OFF : FLOOR_FRAME_OP;
-      m.fill.uniforms.uOpacity.value = on ? FLOOR_FILL_HI : id ? FLOOR_FILL_OFF : FLOOR_FILL_OP;
+      const off = id != null && dimOthers;
+      m.frame.opacity = on ? FLOOR_FRAME_HI : off ? FLOOR_FRAME_OFF : FLOOR_FRAME_OP;
+      m.fill.uniforms.uOpacity.value = on ? FLOOR_FILL_HI : off ? FLOOR_FILL_OFF : FLOOR_FILL_OP;
       m.fill.uniforms.uInner.value = on ? FLOOR_INNER_HI : FLOOR_INNER_OP;
     }
   }
