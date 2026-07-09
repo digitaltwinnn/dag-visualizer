@@ -20,6 +20,10 @@ import type { MetaNodeRecord, ValidatorRecord } from "../../domain/records";
 import type { PickDescriptor } from "@/src/data/types";
 
 const Z_AXIS = new THREE.Vector3(0, 0, 1);
+// Ledger (Snapshots) nodes are flat COINS lying on their floor plane: the sphere instance squashed
+// on Y. A zero-thickness circle was tried and foreshortens to an invisible sliver at the view's
+// shallow overview camera; the coin reads as a circle from above yet stays visible edge-on.
+const COIN_H = 0.22;
 const DIM = new THREE.Color(0x223046);
 const _dummy = new THREE.Object3D(); // reused to compose per-instance matrices
 const _vec = new THREE.Vector3();
@@ -222,8 +226,10 @@ export class NodeFabric {
   pickablesFor(w: number, ledger: boolean): THREE.Object3D[] {
     const arr = this.pickables;
     arr.length = 0;
+    // Ledger renders (and therefore picks) the coin-squashed SPHERES; hyper/geo pick whichever
+    // side of the sphere→disc cross-fade is showing.
     if (this.instSphere) arr.push(ledger || w < 0.5 ? this.instSphere : this.instDisc!);
-    const mp = w < 0.5 ? this.metaSphere : this.metaDisc;
+    const mp = !ledger && w >= 0.5 ? this.metaDisc : this.metaSphere;
     if (mp) arr.push(mp);
     return arr;
   }
@@ -242,8 +248,8 @@ export class NodeFabric {
     const w = smooth(THREE.MathUtils.clamp((m - 0.82) / 0.16, 0, 1));
     const sphereVis = 1 - w, discVis = w;
     for (const u of records) {
-      // Snapshots (ledger) view: hard-place. DAG cl1 nodes drop into the DAG-L1 row as tiny dots;
-      // the l0 instances (= Global L0, the centred snapshot) are hidden.
+      // Snapshots (ledger) view: hard-place as flat COINS lying on the floor planes (see COIN_H).
+      // DAG cl1 nodes drop into the DAG-L1 row.
       if (c.ledger) {
         if (u.ledgerHide) {
           _dummy.scale.setScalar(0);
@@ -251,10 +257,10 @@ export class NodeFabric {
           if (u.noGeo) _vec.copy(u.hyperPos);
           else _vec.copy(u.hyperDir).lerp(u.geoDir!, e).normalize().multiplyScalar(lerp(u.hyperRadius, u.geoRadius, e));
           const showL = 1 - (u.layer === "l0" ? dim.l0 : dim.l1) * dimScaleV;
-          _qSpin.setFromAxisAngle(u.spinAxis, u.spinPhase + t * u.spinSpeed);
           _dummy.position.copy(_vec).lerp(u.ledgerPos, ledgerT);
-          _dummy.quaternion.copy(_qSpin);
-          _dummy.scale.setScalar(u.hyperSize * LEDGER.dot * showL);
+          _dummy.quaternion.identity(); // flat on the floor — no tumble
+          const sL = u.hyperSize * LEDGER.dot * showL;
+          _dummy.scale.set(sL, sL * COIN_H, sL);
         }
         _dummy.updateMatrix();
         this.instSphere.setMatrixAt(u.index, _dummy.matrix);
@@ -298,7 +304,7 @@ export class NodeFabric {
     }
     this.instSphere.instanceMatrix.needsUpdate = true;
     this.instDisc.instanceMatrix.needsUpdate = true;
-    this.instSphere.visible = sphereVis > 0.001 || c.ledger; // ledger hard-places the dots
+    this.instSphere.visible = sphereVis > 0.001 || c.ledger; // ledger hard-places the coins
     this.instDisc.visible = discVis > 0.001 && !c.ledger;
     return this.pickablesFor(w, c.ledger);
   }
@@ -416,13 +422,26 @@ export class NodeFabric {
         _geoVec.copy(_vec).lerp(r.geoPos, e);
       }
 
+      _dummy.position.copy(_geoVec);
+      if (c.ledger) {
+        // Ledger: a flat COIN lying on the floor plane (see COIN_H) — same size rule as the
+        // validators (uniform dot for every cluster). Filtered-out nodes shrink out (1 - dEff).
+        _dummy.quaternion.identity(); // flat on the floor — no tumble
+        const sL = r.hyperSize * LEDGER.dot * (1 - dEff);
+        _dummy.scale.set(sL, sL * COIN_H, sL);
+        _dummy.updateMatrix();
+        this.metaSphere.setMatrixAt(r.index, _dummy.matrix);
+        _dummy.scale.setScalar(0);
+        _dummy.updateMatrix();
+        this.metaDisc.setMatrixAt(r.index, _dummy.matrix);
+        continue;
+      }
+
       // Sphere: tumbling on its own axis, shrinking out near the globe. Filtered-out metagraph
       // nodes shrink fully (1 - dEff).
-      _dummy.position.copy(_geoVec);
       _qSpin.setFromAxisAngle(r.spinAxis, r.spinPhase + clock * r.spinSpeed);
       _dummy.quaternion.copy(_qSpin);
-      // In ledger the dot is full (bypass sphereVis, which is 0 when arriving from geo).
-      _dummy.scale.setScalar(r.hyperSize * (c.ledger ? LEDGER.dot : sphereVis) * (1 - dEff));
+      _dummy.scale.setScalar(r.hyperSize * sphereVis * (1 - dEff));
       _dummy.updateMatrix();
       this.metaSphere.setMatrixAt(r.index, _dummy.matrix);
 
@@ -437,7 +456,7 @@ export class NodeFabric {
     }
     this.metaSphere.instanceMatrix.needsUpdate = true;
     this.metaDisc.instanceMatrix.needsUpdate = true;
-    this.metaSphere.visible = sphereVis > 0.001 || c.ledger; // ledger hard-places the dots
+    this.metaSphere.visible = sphereVis > 0.001 || c.ledger; // ledger hard-places the coins
     this.metaDisc.visible = discVis > 0.001 && !c.ledger;
     this.metaAESphere.needsUpdate = true;
     this.metaAEDisc.needsUpdate = true;

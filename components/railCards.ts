@@ -1,5 +1,5 @@
 import type { LucideIcon } from "lucide-react";
-import { VIEW_ICONS, ABOUT_ICON, iconForPick } from "@/components/icons";
+import { ABOUT_ICON, EXPLORE_ICON, LEARN_ICON, iconForPick } from "@/components/icons";
 import { hoverKeyOf } from "@/src/data/hoverSubject";
 import type { Mode, SelSlot } from "@/src/store/store";
 import type { PickDescriptor } from "@/src/data/types";
@@ -53,9 +53,13 @@ const isNodePick = (p: PickDescriptor | null): boolean =>
 // legend; view switches ride the separate switch-signal, not a per-card update highlight).
 export function exploreCards(s: Pick<RailManifestState, "mode">): RailCard[] {
   const hasTool = s.mode === "geo" || s.mode === "ledger";
+  // The tray shows the tool card's OWN head mark (GeoExplore → Compass, LedgerPanel → BookOpen) —
+  // it used to show VIEW_ICONS[mode], which in ledger put a Layers glyph on the left tab that read
+  // as the snapshot card's mark (user bug report); card head and tray icon must agree.
+  const toolIcon = s.mode === "ledger" ? LEARN_ICON : EXPLORE_ICON;
   return [
     { id: "about", kind: "about", icon: ABOUT_ICON, subjectKey: "about", present: true },
-    { id: "tool", kind: "tool", icon: VIEW_ICONS[s.mode], subjectKey: "tool", present: hasTool },
+    { id: "tool", kind: "tool", icon: toolIcon, subjectKey: "tool", present: hasTool },
   ];
 }
 

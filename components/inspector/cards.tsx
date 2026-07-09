@@ -14,7 +14,7 @@ import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { SonarRing, NodeStars, NoSignalDot } from "@/components/state/StateAtoms";
-import { VIEW_ICONS, LAYER_ICON, KIND_MARK_CLASS } from "@/components/icons";
+import { VIEW_ICONS, LAYER_ICON, SNAPSHOT_ICON, KIND_MARK_CLASS } from "@/components/icons";
 import { ExternalLink } from "lucide-react";
 import { useMinHold } from "@/components/useMinHold";
 import { POLL } from "@/src/engine/config";
@@ -30,15 +30,15 @@ type PickOf<K extends PickDescriptor["kind"]> = Extract<PickDescriptor, { kind: 
 // area. These exports are what InspectorCard feeds CardHead per kind; the bodies below render
 // NO title rows of their own.
 
-// Snapshot title: the Snapshots view mark (Layers — the SAME lucide icon the top bar uses for the
-// Snapshots view; the card head marks speak the view-glyph vocabulary) + the ordinal. The mark
+// Snapshot title: the snapshot BLOCK mark (SNAPSHOT_ICON/Box — the snapshot renders as a block in
+// the chamber; distinct from the view's Layers and the layer card's stratum mark) + the ordinal. The mark
 // TINTS with the active filter's identity (`--filter-accent`, set on the rail by Inspector; cyan
 // on "all") — the consistent subject-mark language (user rule: a selected metagraph's hue shows on
 // every mark that speaks for it). The
 // Odometer owns the roll (digit-roll on each live tick), so no CardHead `titleKey` — a keyed
 // remount would restart it as a whole-title roll-in instead.
 export function SnapshotTitle({ data: d }: { data: GlobalSnapshot }) {
-  const Mark = VIEW_ICONS.ledger;
+  const Mark = SNAPSHOT_ICON;
   return (
     <span className="inline-flex items-center gap-2">
       <Mark aria-hidden className={cn(KIND_MARK_CLASS, "text-[var(--filter-accent,var(--primary))]")} />

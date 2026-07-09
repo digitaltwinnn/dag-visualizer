@@ -37,9 +37,6 @@ export interface ViewPolicy {
   // May depth-of-field run here at all? (Still ANDs with a single metagraph being selected +
   // the morph window.) Only hyper.
   dofEligible: boolean;
-  // Scene fog: "base" = the shared FogExp2; "ledgerLinear" = the stronger linear depth fog that
-  // fades the trailing chain into the background.
-  fog: "base" | "ledgerLinear";
 }
 
 // A flat placeholder view (status / transactions / staking): the canvas is hidden and the view
@@ -51,7 +48,6 @@ const FLAT: ViewPolicy = {
   show: { hyperFurniture: false, globeSurface: false, ledger: false },
   pickSources: [],
   dofEligible: false,
-  fog: "base",
 };
 
 export const VIEW_POLICIES: Record<Mode, ViewPolicy> = {
@@ -64,7 +60,6 @@ export const VIEW_POLICIES: Record<Mode, ViewPolicy> = {
     show: { hyperFurniture: true, globeSurface: true, ledger: false },
     pickSources: ["globe", "layers"],
     dofEligible: true,
-    fog: "base",
   },
   // Footprint: the holographic globe + travelling packets; picks the globe nodes only.
   geo: {
@@ -74,10 +69,10 @@ export const VIEW_POLICIES: Record<Mode, ViewPolicy> = {
     show: { hyperFurniture: true, globeSurface: true, ledger: false },
     pickSources: ["globe"],
     dofEligible: false,
-    fog: "base",
   },
-  // Snapshots: the settlement chamber. Morph frozen (nodes fly into lanes), linear depth fog fades
-  // the trail; picks the centred snapshot + the reused producer dots.
+  // Snapshots: the settlement chamber. Morph frozen (nodes fly into lanes); picks the centred
+  // snapshot + the reused producer dots. (The ledger-specific depth-fog recency treatment was
+  // removed — the shared scene fog applies everywhere.)
   ledger: {
     canvas: true,
     morph: "frozen",
@@ -85,7 +80,6 @@ export const VIEW_POLICIES: Record<Mode, ViewPolicy> = {
     show: { hyperFurniture: false, globeSurface: true, ledger: true },
     pickSources: ["ledger", "globe"],
     dofEligible: false,
-    fog: "base", // (trial) normal scene fog instead of the custom "ledgerLinear" depth fade
   },
   status: FLAT,
   transactions: FLAT,

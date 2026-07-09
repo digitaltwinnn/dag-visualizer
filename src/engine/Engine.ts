@@ -11,7 +11,7 @@ import { LedgerView } from "./scene/views/LedgerView";
 import { loadGeoCache, resolveMissing } from "@/src/data/geoResolve";
 import { METAGRAPHS, COLORS } from "@/src/engine/config";
 import { LEDGER, LAYER_GEOM, ledgerSite } from "./domain/ledgerLayout";
-import { readSceneColors, type SceneColors } from "./sceneColors";
+import { readSceneColors } from "./sceneColors";
 import { VIEW_POLICIES } from "./domain/viewPolicy";
 import { FOCI, hubFraming, geoFraming, ledgerLayerFraming, easeInOutQuad, type CameraFraming } from "./domain/cameraRig";
 import type { GlobalSnapshot, PickDescriptor } from "@/src/data/types";
@@ -44,7 +44,6 @@ const CAM_ZOOM = 1.15;
 // main.js's render loop + ui.js's camera focus, decoupled from any DOM/panels.
 export class Engine {
   private ctx: SceneCtx;
-  private colors: SceneColors; // the structural palette, read from the CSS tokens at construction
   private layers: HyperView;
   private globe: Globe;
   private ledger: LedgerView;
@@ -58,8 +57,6 @@ export class Engine {
   private filter = "all";
   private country: string | null = null;
   private morph = 0; // 0 = hypergraph, 1 = globe (eased each frame)
-  private _baseFog: THREE.FogBase | null = null; // scene.js FogExp2 (hyper/geo); captured lazily
-  private _ledgerFog: THREE.Fog | null = null;    // stronger linear depth fog for the trailing chain
   // A persistent tween record (never re-allocated per focus) — `active` replaces the old
   // null-the-object pattern; `_tweenTo` copies into these four vectors instead of `.clone()`ing.
   private _tween = {
@@ -77,6 +74,8 @@ export class Engine {
   // Metagraph ids with locatable nodes (selectable hubs); null until counts load (all allowed).
   private _activeMetaIds: Set<string> | null = null;
   private _lastFlashOrdinal = -1; // de-dupes the core flash to genuinely new global snapshots
+  // While a layer is committed the 3D floor planes stop being pick targets (panel-only switching).
+  private _layerCommitted = false;
   // The focused metagraph's hub record, cached on filter/mode change — kills the per-frame
   // `metas.find` the DoF read used to do every frame (Task 15 allocation fix).
   private _dofMeta: MetaHubRec | null = null;
@@ -126,7 +125,6 @@ export class Engine {
     // warn if config.COLORS (the static mirror the non-DOM data/palette layer needs) drifts from the
     // live tokens, so the two can't silently diverge.
     const colors = readSceneColors();
-    this.colors = colors;
     if (process.env.NODE_ENV === "development") {
       // Tolerant compare (±2 per channel): oklch→sRGB resolution rounds, so only a genuine token
       // change (a different colour) should warn — not a 1-bit rounding wobble.
@@ -149,17 +147,16 @@ export class Engine {
     // HyperView only ever has these 10 config hubs, so this map never needs updating.
     this.layers = new HyperView(this.ctx.scene, colors, sceneColorsFor(METAGRAPHS.map((m) => m.id)));
     this.globe = new Globe(this.ctx.scene, this.layers, this.ctx.camera, colors);
-    this.ledger = new LedgerView(this.ctx.scene, colors);
-    // The ledger colours its lane tiles / anchor rings / links / pulses per metagraph — feed it the
-    // same identity SCENE map so those match the hubs/nodes (config-ids known synchronously; the
-    // live set incl. new metagraphs is refreshed in refreshMeta alongside globe). "dag" is included
-    // too — its own brand hue, distinct from structural cyan (see palette/identity.ts).
+    // ONE identity colour system everywhere: the ledger + globe are handed the same identity
+    // SCENE map the hubs were born with, at construction, so nothing anywhere is built from a raw
+    // config colour ("dag" included — its own brand hue, distinct from structural cyan; see
+    // palette/identity.ts). refreshMeta below refreshes/extends both once the live set is known.
     const initialSceneColors = sceneColorsFor([...METAGRAPHS.map((m) => m.id), "dag"]);
-    this.ledger.sceneColors = initialSceneColors;
+    this.ledger = new LedgerView(this.ctx.scene, colors, initialSceneColors);
     // The globe colours the DAG's own validator nodes (the L0/cL1 shells) with sceneColors["dag"]
     // (see globe.js setNodes) — seed it here, synchronously, so it's populated before the first
     // setNodes call (which can fire from the "cluster" event before refreshMeta's API round-trip
-    // resolves); refreshMeta below refreshes/extends it once the live metagraph set is known.
+    // resolves).
     this.globe.sceneColors = initialSceneColors;
     canvas.addEventListener("click", this.onClick);
     canvas.addEventListener("pointermove", this.onMove);
@@ -231,6 +228,10 @@ export class Engine {
         if (st.ledgerHilite !== prev.ledgerHilite || st.layer !== prev.layer) {
           this.ledger.setHighlight(st.ledgerHilite ?? st.layer?.layerId ?? null);
         }
+        // While a layer is COMMITTED, the 3D planes stop being hover/click targets (see _pickAt) —
+        // in the zoomed layer-focus pose the planes fill the screen and every idle mouse move stole
+        // the committed highlight. Deliberate navigation stays: the panel rows + the card's ×.
+        this._layerCommitted = st.layer != null;
         // Committing a layer flies the camera to the tilted layer-focus view of its plane (an
         // exploration move — the resting ledger pose is central/untilted); clearing returns to the
         // shared overview. Ledger-only: the planes exist nowhere else.
@@ -306,7 +307,7 @@ export class Engine {
       // every refresh, right before either path below calls setMetagraphs.
       const liveSceneColors = sceneColorsFor([...(this.metaData || []).map((m) => m.id), "dag"]);
       this.globe.sceneColors = liveSceneColors;
-      this.ledger.sceneColors = liveSceneColors; // keep the ledger's per-metagraph colours in sync (incl. new metagraphs)
+      this.ledger.setSceneColors(liveSceneColors); // re-tints the dials/pulses too (incl. new metagraphs)
       if (initial) {
         this._applyMetagraphs();
       } else if (this.metaData && changed && Object.keys(this.geoMap).length) {
@@ -346,7 +347,6 @@ export class Engine {
     if (!this.metaData || !Object.keys(this.geoMap).length) return;
     this.globe.setMetagraphs(this.metaData, this.geoMap);
     this._metaNodesPlaced = true; // metagraph node shells are now in the scene
-    this.ledger.setGroupSizes(this.globe.ledgerGroups); // size the Snapshots rings to the node counts
     this.applyFilter(false); // re-assert the filter's dimming on the new nodes — but DON'T move
     // the camera (this runs on every cluster/meta poll; moving it would reset the user's view).
     // metaList is published in refreshMeta (metagraph geo arrives with the route), so
@@ -409,14 +409,6 @@ export class Engine {
     // View-derived sim gates → the scene modules (the render loop reads the rest of the policy).
     this.globe.setSimFlags(policy.sims);
     this.layers.setHubOrbits(policy.sims.hubOrbits);
-    // Stronger DEPTH fog for the ledger trail — the oldest blocks recede + fog into the background
-    // (that's the "old blocks fade" effect, depth-based, not a per-block hack). Restore the scene's
-    // base FogExp2 (tuned for hyper/geo) on every other view.
-    if (!this._ledgerFog) {
-      this._baseFog = this.ctx.scene.fog;
-      this._ledgerFog = new THREE.Fog(this._baseFog ? this._baseFog.color.getHex() : this.colors.bg, 46, 70);
-    }
-    this.ctx.scene.fog = policy.fog === "ledgerLinear" ? this._ledgerFog : this._baseFog;
     // Snapshots view reuses the SAME hub/node meshes, laid out into planar rows. Toggle that
     // layout on the meshes (off restores the orbit/globe layout) and lock orbit so it reads 2D.
     const inLedger = mode === "ledger";
@@ -625,7 +617,10 @@ export class Engine {
         : h.object.userData.pick;
       if (!pick || !this._isPickActive(pick)) continue;
       if (pick.kind === "layer") {
-        layerFallback ??= pick;
+        // Planes are only 3D targets while NO layer is committed — once one is selected (the
+        // zoomed layer-focus pose), hovering/clicking the stack must not steal the highlight;
+        // switching layers is the panel's job then (user decision).
+        if (!this._layerCommitted) layerFallback ??= pick;
         continue;
       }
       return pick;

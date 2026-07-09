@@ -39,8 +39,9 @@ export const LEDGER = {
   // from this lane into the global snapshot.
   rowDAGL1: -4.25,  // == rowHypL0 (shares the hypergraph-L0 level; its own −Z third of that plane)
   dagLaneZ: -14.7,  // −Z centre of the reserved 1/3 (−depth/2 + depth/6) — where the DAG-L1 cluster sits
-  dagCell: 2.8,     // spread radius for the DAG node discs (global L0 + DAG L1) — tight so they're not busy
-  dot: 0.34,        // tiny-dot scale factor applied to node spheres in this view
+  dagCell: 3.4,     // spread radius for the DAG node discs (global L0 + DAG L1) — sized to the bigger dots
+  dot: 0.55,        // node-sphere scale in this view — uniform for EVERY cluster (a 3-node metagraph's
+                    // dot = a global-L0 dot; small groups get presence from the station DIAL, not dot size)
   // Whole-view ORIENTATION applied to the ledger so it frames well under the SHARED overview camera
   // (the one hyper/geo use) — the camera never moves on a view switch; the ledger GROUP is
   // rotated/scaled instead, and the SAME transform is baked into every node's ledger position
@@ -91,12 +92,22 @@ export function ledgerSite(i: number, n: number): { x: number; z: number } {
 }
 
 // The ring/cluster radius for a node group of `count` nodes — grows with count (so the ring fits
-// the dots) but is capped to a fraction of the lane spacing so neighbouring rings never overlap.
+// the dots) but is capped WELL INSIDE the station dial (DIAL_R below) so a big group's dots never
+// poke outside their dial.
 export function clusterRadius(count: number): number {
   const laneGap = (LEDGER.depth * LANE_SPREAD) / Math.max(1, METAGRAPHS.length - 1); // = ledgerSite's Z step
-  const cap = laneGap * 0.46;
+  const cap = laneGap * 0.3;
   return Math.min(cap, 0.55 + Math.sqrt(Math.max(1, count)) * 0.3);
 }
+
+// The station DIAL radius — ONE fixed size for every metagraph regardless of node count (the
+// resting identity mark; the ledger's analog of the hypergraph hubs). Sized so neighbouring
+// lanes' dials keep clear spacing even with the tick tips (the dial geometry's ticks reach
+// 1.2× its radius): 2 × 0.38 × 1.2 = 0.912 of the lane gap, leaving ~9% air between dials.
+// The global L0 / DAG L1 clusters use their own larger constant (they are the "core", not a
+// lane): DIAL_R_GLOBAL fits the dagCell cloud.
+export const DIAL_R = ((LEDGER.depth * LANE_SPREAD) / Math.max(1, METAGRAPHS.length - 1)) * 0.38;
+export const DIAL_R_GLOBAL = LEDGER.dagCell + 0.8;
 
 // Small deterministic golden-angle offset for node `k` of `cnt`, spreading a cluster as a flat
 // disc ON the floor (X/Z plane) within `radius` — no random jitter.

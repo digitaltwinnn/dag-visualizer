@@ -4,7 +4,7 @@ import { useState } from "react";
 import { cn } from "@/lib/utils";
 import CardHead from "@/components/CardHead";
 import { Card } from "@/components/ui/card";
-import { EXPLORE_ICON } from "@/components/icons";
+import { LEARN_ICON } from "@/components/icons";
 import { SELECTED_ROW, SelectedRowMark } from "@/components/selection";
 import { subjectPairing } from "@/components/useSubjectPairing";
 import { filterAccent } from "@/src/data/network";
@@ -31,6 +31,7 @@ export default function LedgerPanel() {
   const hilite = useStore((s) => s.ledgerHilite);
   const setHilite = useStore((s) => s.setLedgerHilite);
   const filter = useStore((s) => s.filter);
+
   const commit = (l: (typeof LAYERS)[number]) => {
     setLayer(sel === l.id ? null : { kind: "layer", layerId: l.id });
   };
@@ -39,7 +40,7 @@ export default function LedgerPanel() {
       <aside id="ledger-view">
         <CardHead
           panel
-          icon={EXPLORE_ICON}
+          icon={LEARN_ICON}
           title="Understand the layered design"
           eyebrow="Snapshots · explore"
           collapsed={collapsed}
@@ -47,7 +48,7 @@ export default function LedgerPanel() {
         />
         <div className={cn("flex flex-col px-3 pt-1.5 pb-2.5 min-h-0 overflow-y-auto cmd-list-scroll", collapsed && "hidden")}>
           <div className="flex flex-col gap-0.5" onMouseLeave={() => setHilite(null)}>
-            {LAYERS.map((l) => {
+            {LAYERS.map((l, li) => {
               const on = sel === l.id;
               // The SAME scene↔HUD hover pairing as GeoExplore's node rows: hovering the row
               // previews the plane highlight, hovering the 3D plane pairs this row back — wearing
@@ -78,8 +79,24 @@ export default function LedgerPanel() {
                   )}
                   style={pair.style}
                 >
-                  <span className={cn("block text-body text-foreground", on && "font-semibold")}>{l.name}</span>
-                  <span className="block text-label text-muted-foreground leading-snug mt-0.5">{l.desc}</span>
+                  {/* The layer's STACK-LEVEL badge — levels count UP from the base settlement
+                      (Global snapshots = 1 … Metagraph L1 = 6, user decision), mirrored by the 3D
+                      floor labels so panel row and plane pair at a glance. Decorative. */}
+                  <span className="flex items-center gap-2 min-w-0">
+                    <span
+                      aria-hidden
+                      className={cn(
+                        "flex-none w-[18px] h-[18px] rounded-xs border flex items-center justify-center text-micro tabular-nums leading-none",
+                        on
+                          ? "border-[var(--filter-accent,var(--primary))] text-[var(--filter-accent,var(--primary))]"
+                          : "border-border text-muted-foreground",
+                      )}
+                    >
+                      {LAYERS.length - li}
+                    </span>
+                    <span className={cn("block text-body text-foreground", on && "font-semibold")}>{l.name}</span>
+                  </span>
+                  <span className="block pl-[26px] text-label text-muted-foreground leading-snug mt-0.5">{l.desc}</span>
                   {on && <SelectedRowMark className="absolute right-2 top-[13px]" />}
                 </button>
               );

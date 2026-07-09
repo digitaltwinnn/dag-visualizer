@@ -61,7 +61,7 @@ export function ledgerLayerFraming(y: number, out: CameraFraming): void {
   // snapshot cluster projects at the exact screen centre. Earlier x/z target offsets (−6, −9,
   // meant for composition) each pushed the ring right of centre through the diagonal camera —
   // composition now comes from the camera OFFSET alone (left + above → trail recedes top-left).
-  out.pos.set(-9, y + 8, 30);
+  out.pos.set(-7, y + 6.2, 23.5); // ~22% closer than the first tuning (user: zoom in a bit more)
   out.target.set(0, y - 1, 0);
 }
 

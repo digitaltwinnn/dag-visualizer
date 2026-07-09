@@ -106,7 +106,6 @@ export class Globe implements GeoViewHost {
 
   metaNodes: MetaNodeRecord[] = [];
   metaList: MetaLayout[] = [];
-  ledgerGroups: Record<string, { l0: number; l1: number }> = {};
   filter = "all";
   private _hoverNodeId: string | null = null;
   private _selectedNodeId: string | null = null;
@@ -295,7 +294,7 @@ export class Globe implements GeoViewHost {
           const dir = latLonToVec3(g.lat!, g.lon!, 1).normalize(); // real location; fanned out below
           const lsite = ledgerSite(m._ledgerCol, METAGRAPHS.length);
           const lrowY = layer === "l0" ? LEDGER.rowML0 : LEDGER.rowML1;
-          const lsp = ledgerSpread(i, cnt, clusterRadius(cnt) * 0.75);
+          const lsp = ledgerSpread(i, cnt, clusterRadius(cnt) * 0.85); // slightly wider for the bigger dots
           const ledgerPos = new THREE.Vector3(lsite.x + lsp.x, lrowY, lsite.z + lsp.z)
             .applyMatrix4(_LEDGER_M).multiplyScalar(LEDGER.viewScale); // match the LedgerView group transform
           const pick = {
@@ -322,13 +321,6 @@ export class Globe implements GeoViewHost {
 
     this.fabric.buildMetaNodes(recs);
     this.metaNodes = recs;
-    // Per-metagraph node counts per ledger floor (ML0 = l0; ML1 = cl1+dl1) — sizes the rings.
-    const groups: Record<string, { l0: number; l1: number }> = {};
-    for (const r of recs) {
-      const g = (groups[r.metaId] ||= { l0: 0, l1: 0 });
-      if (r.layer === "l0") g.l0 += 1; else g.l1 += 1;
-    }
-    this.ledgerGroups = groups;
     this.setFilter(this.filter);
   }
 

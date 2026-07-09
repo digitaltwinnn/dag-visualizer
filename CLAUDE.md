@@ -764,8 +764,7 @@ not Recharts — dense, interactive, slim (Recharts is used for the vitals `Spar
 
 A 3D "settlement chamber" on the shared canvas. The `LedgerView` class is driven by the Engine
 (`_refreshLedger()` → `ledger.setData(globalSnapshots, getAnchor)` on each tick/anchor
-event, `ledger.update(dt)` per frame, `ledger.setGroupSizes(globe.ledgerGroups)` on
-metagraph changes).
+event, `ledger.update(dt)` per frame).
 
 - **Layer model (`config.LEDGER`) — a LITERAL top-down validation stack.** Floors stack on
   **Y**, evenly spaced, top→bottom: `rowProducers` · `rowML1` · `rowML0` · `rowMSnap` ·
@@ -800,31 +799,43 @@ metagraph changes).
   `_anchorTiles` lays them in a rectangular GRID filling that tick's cell with a **uniform
   pitch** (`SLOT_SP/cols` × `LANE_GAP_Z/rows`, grid inset) so gaps are equal within a tick,
   between ticks, and between lanes), empty placeholder where a metagraph didn't anchor; the
-  node-group **rings** (`setGroupSizes`/`clusterRadius`, **fully invisible at rest**
-  `baseOpacity = 0`, showing ONLY while a pulse passes — metagraph rings on anchoring + a
-  global-L0 participation ring `_gL0Ring` lit via `_gL0Glow` only when an anchor pulse
-  actually reaches that floor); and the anchor **links** + travelling **pulses** along the
+  node-group **station DIALS** (`_makeDial`/`buildDialGeometry` — a hairline circle + radial
+  ruler ticks, the instrument-thread language bent into a circle; **ONE fixed radius for every
+  metagraph**, `ledgerLayout.DIAL_R`, regardless of node count — the resting identity mark that
+  gives a 3-node metagraph the same footprint as a big one; **visible at rest** at
+  `DIAL_REST_OP`, brightened + slightly scaled while an anchor pulse passes; the global L0 +
+  DAG L1 clusters wear the same dial in the DAG's identity hue (`sceneColors["dag"]` — matching
+  the node instances inside them) at `DIAL_R_GLOBAL`; `_gL0Ring` additionally glows via
+  `_gL0Glow` when a pulse reaches that floor. **Every ledger colour resolves through the ONE
+  identity system** — the identity SCENE map is a required LedgerView ctor arg (like HyperView)
+  and `setSceneColors()` re-tints on live refresh; nothing falls back to a raw
+  `config.METAGRAPHS` colour. Node size is uniform too: `LEDGER.dot` applies to every cluster
+  equally — small groups get presence from the dial, not from bigger dots — and ledger nodes
+  render as flat **COINS** (the sphere instance squashed on Y, `NodeFabric.COIN_H`; a
+  zero-thickness circle foreshortened to an invisible sliver at the overview camera, the coin
+  reads as a circle from above yet stays visible edge-on)); and the anchor **links** +
+  travelling **pulses** along the
   shared **`curvePoint`** — the literal production→anchor column down from the producers
   floor through the L1/L0 ring centres → the snapshot tile → swinging to centre through the
   global-L0 cluster → cubic into the global block (`LINK_SEG` segments; one link per
   cluster, from its centre tile).
-- **Recency fade is DEPTH FOG, not per-block.** The trail recedes from the camera (oldest =
-  farthest), so the Engine swaps in a stronger linear `THREE.Fog` in ledger (near/far ≈46/70,
-  colour = bg) and restores the scene's base `FogExp2` elsewhere; `slotFade` is just a
-  gentle linear brightness cue.
-- **Colour only at the lead / selected; the trail is neutral.** The colour switch is
-  **binary** and **exactly one row** is ever coloured: a selected/hovered **older** snapshot
-  (`_selectedSlot > 0`) wins outright — the live lead + everything newer go neutral
-  (`leadNeutral`); otherwise the live lead (slot 0) is the coloured row. A row out of the
-  coloured slot goes to a deeply toned-down `NEUTRAL_TILE` (faint cyan; the global block the
-  same cyan dimmed + low-emissive). Selection comes from the LiveStrip: the Engine forwards
-  `hoverSnapOrd ?? snap.data.ordinal` to `ledger.setSelected(ordinal)`; the ledger tags each
-  trail block with its ordinal, maps it → slot each tick (`_recomputeSelectedSlot`), and
-  re-colours that whole row. The DAG node-cluster spread is `LEDGER.dagCell`.
-- **Metagraph filter neutralises the OTHER lanes** (`ledger.setFilter`, wired alongside
-  `globe.setFilter`): only the selected lane stays coloured (`laneOff`), other metagraphs'
-  nodes are strongly dimmed (the morph-ramped `_dimScale` is too weak in ledger, so it's
-  forced), and only the selected metagraph emits pulses (so only ITS rings light).
+- **Recency is `slotFade` brightness only (2026-07-09).** The old neutral-tone + ledger-specific
+  linear depth fog recency treatment was REMOVED at the user's direction (a replacement may be
+  designed later): tiles/links/trail blocks keep their identity/accent colour all the way down
+  the trail, fading gently by `slotFade`; the shared scene `FogExp2` applies in every view (the
+  `ViewPolicy.fog` field + Engine fog swap are gone).
+- **Emphasis is brightness, not a colour switch.** `model.isRowHot` still enforces exactly ONE
+  hot row (a selected/hovered older snapshot beats the live lead): the hot row's tiles/links
+  render near-full-brightness (bloom), everything else stays dim-but-coloured; the centre block
+  dims (`leadDimmed`) while an older snapshot is selected. Selection comes from the LiveStrip:
+  the Engine forwards `hoverSnapOrd ?? snap.data.ordinal` to `ledger.setSelected(ordinal)`; the
+  ledger maps ordinal → slot each tick (`_recomputeSelectedSlot`). The DAG node-cluster spread
+  is `LEDGER.dagCell`.
+- **Metagraph filter dims the OTHER lanes** (`ledger.setFilter`, wired alongside
+  `globe.setFilter`): the selected lane keeps full colour; other metagraphs' tiles/links/dials
+  are strongly dimmed (×0.22) and their nodes too (the morph-ramped `_dimScale` is too weak in
+  ledger, so it's forced), and only the selected metagraph emits pulses (so only ITS dials
+  light).
 - **Slot model + history seed:** every new tick all chains advance one slot left; tiles
   appear at the lead as a metagraph anchors (`_anchorMetaBlock` rebuilds the slot-0 cluster
   as the count settles). On first data, `_seedHistory` pre-populates the trail + lanes from
