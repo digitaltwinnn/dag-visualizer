@@ -659,16 +659,10 @@ export class LedgerView {
 
   // The network filter: when a single metagraph is selected, the OTHER metagraphs' lead tiles + links
   // dim strongly too (so the lead row emphasises only the selected metagraph). "all"/"dag" = no dim.
+  // The floor-plane FRAME LINES deliberately stay the structural default in every filter state —
+  // an identity-hued outline was tried (with luminance equalization) and read too dominant (user).
   setFilter(filter: string) {
     this._filter = filter || "all";
-    // The floor-plane FRAME LINES wear the active filter's identity hue — a small visual hint,
-    // the scene twin of the HUD's `--filter-accent`. ONLY the crisp edge line tints (user
-    // refinement); the pixelated edge FILL stays the structural accent so the wash under the
-    // line remains neutral. "all" rests the lines back on the structural accent. Event-driven
-    // (a filter change), re-tinting the existing material Colors in place — no allocation. The
-    // frame keeps its ×2 HDR overdrive so the tinted lines still feed the bloom.
-    const hue = this._filter === "all" ? this._core : (this.sceneColors[this._filter] ?? this._core);
-    for (const m of this._floorMats.values()) m.frame.color.set(hue).multiplyScalar(2);
   }
 
   update(dt: number) {

@@ -343,6 +343,10 @@
     max-height: calc(100vh - var(--rail-top) - 14px);
     overflow-y: auto;
   }
+  /* Rail cards are flex-none SO THE RAIL SCROLLS — an expanded card (the country accordion)
+     must overflow the rail, not shrink-to-fit or cap itself in an inner scrollbox. Declared
+     as a utility ON each card (GeoExplore): a flex rule here would lose to any flex-*
+     utility on the element (utilities layer > components layer, CSS trap #1). */
   #leftcol > aside { width: auto; }
 
   /* Right details rail (`#rightcol`, Inspector.tsx) — the facts scope: a STACK of
@@ -368,8 +372,12 @@
     overscroll-behavior: contain;
   }
   /* Bottom fade — applied ONLY when a rail actually reaches down into the chart band (JS
-     toggles `.rail-clip`, see RailScroll). Gating it avoids fading a SHORT rail. */
+     toggles `.rail-clip`, see RailScroll). Gating it avoids fading a SHORT rail. The padding
+     is the SCROLL RUNWAY: without it, even at max scroll the last card's bottom sat inside
+     the faded band forever (user bug) — the runway lets the content scroll fully clear of
+     the fade, sheet-like, while mid-scroll content still fades into the band. */
   #leftcol.rail-clip, #rightcol.rail-clip {
+    padding-bottom: calc(var(--bottom-reserve, 0px) + 12px);
     -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - var(--bottom-reserve, 0px) + 6px), transparent calc(100% - var(--bottom-reserve, 0px) + 30px), transparent 100%);
     mask-image: linear-gradient(to bottom, #000 calc(100% - var(--bottom-reserve, 0px) + 6px), transparent calc(100% - var(--bottom-reserve, 0px) + 30px), transparent 100%);
   }

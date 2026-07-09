@@ -99,9 +99,12 @@ export default function GeoExplore() {
   const selLayer = sel ? (sel.kind === "metanode" ? sel.node?.layer ?? null : sel.kind) : null;
 
   return (
+    // flex-none + no inner list overflow: the card grows with its content and the RAIL
+    // scrolls (runway + fade) — the old inner-scroll flex card capped the node list in a cramped
+    // scrollbox whose tail was easy to miss (user); rail scrolling matches the tablet sheet.
     <Card
       asChild
-      className="sig-right flex flex-col min-h-0 flex-[1_1_auto] gap-0 p-0 [--spine:var(--filter-accent,var(--primary))]"
+      className="sig-right flex flex-col flex-none gap-0 p-0 [--spine:var(--filter-accent,var(--primary))]"
     >
       <aside id="geoexplore">
       <CardHead
@@ -112,7 +115,7 @@ export default function GeoExplore() {
         collapsed={collapsed}
         onToggle={() => setCollapsed((c) => !c)}
       />
-      <div className={cn("flex flex-col min-h-0 flex-[1_1_auto]", collapsed && "hidden")}>
+      <div className={cn("flex flex-col", collapsed && "hidden")}>
         {/* The footprint's headline figures (Nodes / Countries / Ready) live in the top-bar
             vitals now; this card is purely the country→nodes accordion. */}
         {quietEmpty ? (
@@ -126,7 +129,7 @@ export default function GeoExplore() {
             <p className="text-label text-muted-foreground m-0">{tickerOrName} has no validators we can place on the map right now. It still appears in the Hypergraph.</p>
           </div>
         ) : (
-        <div className="flex-[1_1_auto] min-h-0 overflow-y-auto pt-1.5 px-[14px] pb-2 cmd-list-scroll">
+        <div className="pt-1.5 px-[14px] pb-2">
           {rows.map((c) => {
             const open = c.cc === country;
             const nodes = nodesByCountry.get(c.country) ?? [];

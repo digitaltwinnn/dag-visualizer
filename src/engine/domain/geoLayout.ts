@@ -4,10 +4,10 @@ import * as THREE from "three";
 // globe surface (globeSurface.js) — so the two can live in separate files without one importing
 // the other just for these.
 export const R = 16; // globe radius
-export const HEX_H = 0.11;       // geo hex-prism height (world) — "not flat", user spec
-export const CHIP_PITCH = 0.12;  // radial lift per LEVEL in a co-located stack (HEX_H + a hair of
-                                 // air) — see nodeLayout's stackSizes/spreadCoLocated levels +
-                                 // NodeFabric's hex-prism rendering
+export const HEX_H = 0.08;      // geo hex-prism height (world) — thin chip (user-tuned down from 0.11)
+export const CHIP_PITCH = 0.13;  // radial lift per LEVEL in a co-located stack: HEX_H + clear air
+                                 // (user: chips must read as separate, not one fused column) — see
+                                 // nodeLayout's stackSizes/spreadCoLocated levels + NodeFabric
 export const LAND_H = 1.0; // height the coastal "wall" cliffs rise from the ocean (R) to the raised
                            // land plateau (R+LAND_H) — a modest relief (~6% of R at R=16); the walls
                            // are a calm ridge in the surface hue with a brighter top rim.
