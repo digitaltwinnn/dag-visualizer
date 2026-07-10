@@ -232,7 +232,9 @@ GPU; no store/react**):
   metagraph **hubs** (from `config.METAGRAPHS`). The core is parented to the scene (not
   `root`) so the morph can **grow it out to the globe's radius and dissolve it** as the Earth
   fades in. Hubs fade out early.
-- `views/GeoView.ts` — the geo globe SURFACE: body sphere, graticule, atmosphere rim, and the
+- `views/GeoView.ts` — the geo globe SURFACE: body sphere, graticule, atmosphere rim, the polar
+  **compass roses** (hairline dial + micro N/S letter over each pole, in `globe.group` so they
+  rotate truthfully — E/W are deliberately not floated), and the
   **solid raised continents**. The land is the `land-110m` polygons triangulated into a
   **plateau** at radius `R+LAND_H` (earcut via `THREE.ShapeUtils`, with a longitude **unwrap**
   for the 4 antimeridian-crossing polygons, an Antarctica **pole-cap**, and a uniform `n=4`
