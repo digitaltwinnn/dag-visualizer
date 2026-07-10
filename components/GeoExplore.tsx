@@ -30,6 +30,7 @@ export default function GeoExplore() {
   const inspect = useStore((s) => s.inspect);
   const setInspect = useStore((s) => s.setInspect);
   const setHoverNodeId = useStore((s) => s.setHoverNodeId);
+  const setHoverCountry = useStore((s) => s.setHoverCountry);
   const hoverNodeId = useStore((s) => s.hoverNodeId);
   const setFilter = useStore((s) => s.setFilter);
   const filter = useStore((s) => s.filter);
@@ -177,6 +178,10 @@ export default function GeoExplore() {
                   )}
                   aria-expanded={open}
                   onClick={() => drill(c.cc)}
+                  // Hovering a country row previews its border outline on the globe (whisper
+                  // level — the committed drill's full hairline wins engine-side).
+                  onMouseEnter={() => setHoverCountry(c.cc)}
+                  onMouseLeave={() => setHoverCountry(null)}
                 >
                   <span className="text-label w-[17px] text-center flex-none">{ccToFlag(c.cc)}</span>
                   <span className="flex-none w-24 text-body text-foreground-dim whitespace-nowrap overflow-hidden text-ellipsis" title={c.country}>

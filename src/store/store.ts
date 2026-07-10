@@ -69,6 +69,9 @@ interface AppState {
   // Node id/ip the cursor is hovering in the geo explorer list — glows that node's shells on the globe
   // (same pairing as a 3D raycast hover). null = not hovering a list row.
   hoverNodeId: string | null;
+  // Country code (cc) the cursor is hovering in the geo explorer list — previews that country's
+  // border outline on the globe at a whisper level (the committed drill is `country` below).
+  hoverCountry: string | null;
   // Ledger layer id (LedgerView FLOOR_LAYERS: "ml1"|"ml0"|"msnap"|"gl0"|"hypl0"|"hypl1") the cursor
   // is HOVERING in the Snapshots·Explore panel — a transient plane-highlight PREVIEW (the committed
   // selection is `layer` below; the engine resolves `ledgerHilite ?? layer?.layerId`). null = none.
@@ -137,6 +140,7 @@ interface AppState {
   setHoverSnapOrd: (ordinal: number | null) => void;
   setHoverFilter: (filter: string | null) => void;
   setHoverNodeId: (id: string | null) => void;
+  setHoverCountry: (cc: string | null) => void;
   setLedgerHilite: (id: string | null) => void;
   setLayer: (layer: Extract<PickDescriptor, { kind: "layer" }> | null) => void;
   setFollowing: (following: boolean) => void;
@@ -173,6 +177,7 @@ export const useStore = create<AppState>((set) => ({
   hoverSnapOrd: null,
   hoverFilter: null,
   hoverNodeId: null,
+  hoverCountry: null,
   ledgerHilite: null,
   layer: null,
   following: false,
@@ -202,6 +207,7 @@ export const useStore = create<AppState>((set) => ({
   setHoverSnapOrd: (hoverSnapOrd) => set({ hoverSnapOrd }),
   setHoverFilter: (hoverFilter) => set({ hoverFilter }),
   setHoverNodeId: (hoverNodeId) => set({ hoverNodeId }),
+  setHoverCountry: (hoverCountry) => set({ hoverCountry }),
   setLedgerHilite: (ledgerHilite) => set({ ledgerHilite }),
   setLayer: (layer) => set((s) => ({ layer, selStack: bumpStack(s.selStack, "layer", !!layer) })),
   setFollowing: (following) => set({ following }),

@@ -209,6 +209,12 @@ store-value imports**, enforced by `layerBoundaries.test.ts`). Each ships coloca
 - `records.ts` — the plain node/metagraph record types (`ValidatorRecord`/`MetaNodeRecord`) the
   scene consumes.
 - `geoLayout.ts` — shared geo constants (`R`, `LAND_H`) + `latLonToVec3`.
+- `countryShape.ts` — the country drill's shape math over the countries topology: `ccToNumeric`
+  (alpha-2 → world-atlas numeric id via the baked `data/country-codes.json`), `geometryRings` /
+  `mainPolygonRings` (framing composes on the main landmass; the border draws all polygons),
+  `ringsCentroid` (3D-unit-dir mean, segment-length-weighted — antimeridian-safe, no unwrap),
+  `ringsAngularRadius`, `countryFraming` (extent-fit zoom + the `AIM_BELOW_CENTROID` angle-based
+  aim), `ringsToSegments` (the border hairline's positions), `COUNTRY_LEAN_MAX`/`GLOBE_LEAN_MAX`.
 - `geoStats.ts` — the geo "data" layer: per-country tallies + the flat node-browser list,
   **pure functions** over the node record arrays (no Three/mesh state).
 
@@ -235,16 +241,20 @@ GPU; no store/react**):
 - `views/GeoView.ts` — the geo globe SURFACE: body sphere, graticule, atmosphere rim, the polar
   **compass roses** (hairline dial + micro N/S letter over each pole, in `globe.group` so they
   rotate truthfully — E/W are deliberately not floated), and the
-  **solid raised continents**. The land is the `land-110m` polygons triangulated into a
-  **plateau** at radius `R+LAND_H` (earcut via `THREE.ShapeUtils`, with a longitude **unwrap**
-  for the 4 antimeridian-crossing polygons, an Antarctica **pole-cap**, and a uniform `n=4`
-  subdivision so facets hug the sphere with no T-junction cracks), capped by additive coastal
-  **"wall" cliffs** (BackSide-culled, dim rim, always the default cyan — metagraph-tinting it
-  read as too dominant). The land surface is a SIMPLE FILL (luminance `rgb(14,14,14)` in the
-  baked texture, user-tuned) — the tile/micro-grid was removed entirely (user, after an A/B);
-  the sea graticule (base 0.06) spanning the whole sphere carries the digital line work.
-  Nodes/arcs sit on the plateau (`R+LAND_H+ε`); the body sphere (`renderOrder -2`) and fill
-  (`-1`) keep the depth/transparency sort deterministic.
+  **solid raised continents**. The topology is **`public/countries-110m.json`** (world-atlas;
+  replaced `land-110m.json` 2026-07-10 — it carries BOTH `objects.land` for the surface AND
+  `objects.countries` for the drill border/framing, one fetch). Each coastline ring becomes an
+  additive **"wall" cliff** ribbon from ocean level to `R+LAND_H` (BackSide-culled, dim rim,
+  always the default cyan — metagraph-tinting it read as too dominant); the land SURFACE is a
+  full sphere at the wall-top radius wearing a **baked equirect land-mask texture** (Canvas2D,
+  additive — sea texels are black; the old earcut plateau triangulation was replaced by this
+  masked sphere, killing the seam/pole bug class). The fill is a SIMPLE luminance wash
+  (user-tuned) — the tile/micro-grid was removed entirely (user, after an A/B); the sea
+  graticule (base 0.06) spanning the whole sphere carries the digital line work. GeoView also
+  owns the **country drill border** (`setCountryBorder` — one `LineSegments` rebuilt per
+  drill/hover change) + the per-country geometry index (`countryGeoms`, world-atlas numeric id →
+  geometry; `onCountriesReady` re-asserts a drill made before the async load). Nodes/arcs sit
+  on the plateau (`R+LAND_H+ε`).
 - `views/LedgerView.ts` — the Snapshots view's 3D settlement chamber over `ledgerModel` (see
   its own section below).
 
@@ -338,9 +348,8 @@ views and caused the ledger red-dots bug; that pattern is forbidden.
     `globe.focusDensest()` rotates the globe so the **densest part of the selection faces the
     camera** (north stays up — Y rotation only). A **metagraph** selection frames WIDE
     (`FOCI.geoNetwork`, deliberately farther out than the country pose so drilling still reads
-    as a zoom); a **country** drill flies to the tilted mid framing, zoomed **proportional to
-    concentration** R = |mean of node dirs| (`geoFraming` — the node-zoom's low-camera tilt
-    held farther out); a **node** pick zooms close with the node at the LOWER-third line
+    as a zoom); a **country** drill frames the country's real SHAPE (see the drill-down bullet);
+    a **node** pick zooms close with the node at the LOWER-third line
     (`_focusNode` — the look-at point swings far up the globe's rising face; the camera is only
     ~4.6 units from the node, so screen shifts need big target moves).
   - **Country drill-down** (geo only): the country rows in `GeoExplore` are clickable and
@@ -348,7 +357,25 @@ views and caused the ledger red-dots bug; that pattern is forbidden.
     `_nodeActive(layer, geo)` gates on BOTH). Clicking a country dims everything outside it,
     flies to it, and marks the row with the shared selection ✓ (`SELECTED_ROW` +
     `SelectedRowMark`, same language as the node rows); click again to clear; switching
-    network clears it.
+    network clears it. **The drill is shape-driven** (2026-07-10, `domain/countryShape.ts` over
+    `public/countries-110m.json`): the globe spins to the country's polygon **centroid**
+    (`focusCountryShape`, lean cap `COUNTRY_LEAN_MAX` 0.55 — between focusDensest's 0.32 and the
+    node zoom's 0.70) and `countryFraming()` zooms to fit its angular **extent**, aiming the view
+    axis `AIM_BELOW_CENTROID` below the centroid so the country rides just above frame-centre at
+    any zoom (a fixed-fraction target aim broke at close range — high-latitude countries shot past
+    the FOV top). Framing composes on the **main landmass** (`mainPolygonRings` — France's
+    geometry includes French Guiana, the US's Alaska/Hawaii; the mainland leads, the node-mean
+    framing is the fallback while the topology loads). A **cyan hairline border** (structural, not
+    identity) outlines the drilled country at plateau height — invisible at rest (the surface
+    stays clean), whisper-level (0.3) while a country ROW is hovered (`store.hoverCountry` →
+    `globe.setHoverCountry`, the committed drill's 0.75 wins), gone on deselect; it's a
+    `geoFades` entry whose `base` IS the level, so the morph gates it for free. ⚠️ **Data
+    rebuilds must not wipe the drill**: `Globe.setMetagraphs` restores its own `countryFilter`
+    around the internal `setFilter`, and `Engine.applyFilter`'s geo branch re-asserts
+    `this.country` — the background cluster poll (`_applyMetagraphs → applyFilter(false)`) used
+    to silently clear the drill's dim + border seconds after every drill (long-standing bug,
+    found+fixed 2026-07-10; a real filter SWITCH still clears the drill by design — the store
+    subscription nulls `country` first).
   - **Hypergraph**: `_focusFilter` flies the camera to the selected hub (using its
     **local/unscaled** position — `layers.root` is morph-scaled, so `getWorldPosition` would
     aim at the origin mid-morph), framed slightly off the radial line so the core sits to the
@@ -367,7 +394,9 @@ views and caused the ledger red-dots bug; that pattern is forbidden.
   is forced **strong** (`_hoverFilterActive` → `_dimScale` 0.85) so it's visible even in
   hyper where the committed-filter dim is weak (the *click* also flies the camera + adds DoF,
   which a hover must not). Hovering an explorer node row glows that node's shells on the
-  globe (`hoverNodeId` → `globe.setHoverNode`), matching a 3D raycast hover.
+  globe (`hoverNodeId` → `globe.setHoverNode`), matching a 3D raycast hover; hovering a
+  country row previews that country's border outline at a whisper level (`hoverCountry` →
+  `globe.setHoverCountry` — the committed drill's full hairline wins).
 
 ## Per-view behaviour — allow-list, not deny-list
 
@@ -1019,6 +1048,9 @@ can't fetch them — but the **Next Node server can**:
   falling back to the site's `theme-color`) via the pure helpers in `src/palette/brand.ts`,
   snapped into the palette's allowed hue zones. `data/brand-hue-overrides.json` (id → hueDeg)
   is the manual escape hatch for a bad extraction; the bake applies it before extraction.
+- **`data/country-codes.json`** (alpha-2 → ISO numeric, the geo-cc ↔ countries-topology join)
+  is baked OFFLINE by `npx tsx scripts/bake-country-codes.ts` from the `world-countries`
+  devDependency — effectively never needs re-running (the ISO standard is stable).
 
 Metagraph reality worth knowing (it drives the dossier/inspector text):
 

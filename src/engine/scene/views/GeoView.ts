@@ -1,6 +1,7 @@
 import * as THREE from "three";
 import { feature } from "topojson-client";
 import { R, LAND_H, latLonToVec3 } from "../../domain/geoLayout";
+import { ringsToSegments, type Ring } from "../../domain/countryShape";
 
 // Builds the geo globe SURFACE — the body sphere, graticule, atmosphere rim, and the raised
 // continents (+ glowing coastal cliffs) — into `globe.group`, and sets the handles the morph/fade
@@ -40,6 +41,12 @@ export interface GeoViewHost {
   // The polar compass roses' materials, faded per frame by BOTH the morph fade and the pole's
   // own facing (a rose on the far side dims hard — the depth cue that killed the ambiguity).
   poleRoses?: Array<{ mats: Array<THREE.Material & { opacity: number }>; bases: number[]; sign: number }>;
+  // Per-country geometries from the countries topology (world-atlas numeric id → GeoJSON
+  // geometry) — the country drill's border + shape-based framing read these. Async (set once
+  // the topology loads); `onCountriesReady` lets the owner re-assert a drill made before then.
+  countryGeoms?: Map<string, { type: string; coordinates: unknown }>;
+  countryBorder?: { mesh: THREE.LineSegments; fade: GeoFadeEntry };
+  onCountriesReady?: () => void;
 }
 
 // HOLOGRAPHIC GLOBE: there is deliberately NO opaque body sphere and NO atmosphere halo.
@@ -309,7 +316,10 @@ function makeLandTexture(features: LandFeature[]): THREE.DataTexture {
 
 async function buildLand(globe: GeoViewHost) {
   try {
-    const res = await fetch("/land-110m.json");
+    // countries-110m carries BOTH the land union (`objects.land` — the plateau/walls build,
+    // identical arcs to the old land-110m file) AND per-country geometries (`objects.countries`
+    // — the drill border + shape-based framing), so one fetch serves both.
+    const res = await fetch("/countries-110m.json");
     const topo = await res.json();
     const land = feature(topo, topo.objects.land);
 
@@ -427,7 +437,53 @@ async function buildLand(globe: GeoViewHost) {
     globe.landFillMesh.renderOrder = -1; // before the rim/nodes
     globe.landFillMesh.visible = false;  // revealed once the globe materialises (setMorph)
     globe.group.add(globe.landFillMesh);
+
+    // COUNTRY DRILL BORDER — one LineSegments, rebuilt per drill/hover change (event-driven;
+    // see setCountryBorder). Invisible at rest (the user's call: the surface stays clean — the
+    // border exists only while a country is hovered/drilled). Structural accent, additive like
+    // the coastal walls so the hairline glows over the land glass; the geoFades entry gives it
+    // the surface's morph gating for free (its `base` IS the hover/commit level).
+    const borderMat = new THREE.LineBasicMaterial({
+      color: globe.geoColor,
+      transparent: true,
+      opacity: 0,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+    });
+    const borderMesh = new THREE.LineSegments(new THREE.BufferGeometry(), borderMat);
+    borderMesh.visible = false;
+    const borderFade = { mat: borderMat, base: 0 };
+    globe.geoFades.push(borderFade);
+    globe.countryBorder = { mesh: borderMesh, fade: borderFade };
+    globe.group.add(borderMesh);
+
+    // Per-country geometry index for the border + framing (world-atlas numeric id → geometry).
+    const countries = feature(topo, topo.objects.countries) as unknown as {
+      features: Array<{ id?: string | number; geometry: { type: string; coordinates: unknown } }>;
+    };
+    globe.countryGeoms = new Map();
+    for (const f of countries.features)
+      if (f.id != null) globe.countryGeoms.set(String(f.id), f.geometry);
+    globe.onCountriesReady?.();
   } catch {
     /* graticule-only fallback */
   }
+}
+
+// Show the drill border for `rings` at `level` opacity (0 hides it). The geometry rebuild is
+// event-driven — once per country hover/drill change, never per frame.
+export function setCountryBorder(globe: GeoViewHost, rings: Ring[] | null, level: number): void {
+  const b = globe.countryBorder;
+  if (!b) return; // topology not loaded yet — onCountriesReady re-asserts
+  if (!rings?.length || level <= 0) {
+    b.fade.base = 0;
+    b.mesh.visible = false;
+    return;
+  }
+  b.mesh.geometry.dispose();
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute("position", new THREE.Float32BufferAttribute(ringsToSegments(rings), 3));
+  b.mesh.geometry = geo;
+  b.mesh.visible = true;
+  b.fade.base = level;
 }

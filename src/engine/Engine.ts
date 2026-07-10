@@ -14,6 +14,7 @@ import { LEDGER, LAYER_GEOM, ledgerSite } from "./domain/ledgerLayout";
 import { readSceneColors } from "./sceneColors";
 import { VIEW_POLICIES } from "./domain/viewPolicy";
 import { FOCI, hubFraming, geoFraming, ledgerLayerFraming, easeInOutQuad, type CameraFraming } from "./domain/cameraRig";
+import { countryFraming } from "./domain/countryShape";
 import type { GlobalSnapshot, PickDescriptor } from "@/src/data/types";
 import type { ClusterNode, DagCore, GeoMap, RouteMetagraph } from "@/src/data/types";
 
@@ -224,6 +225,9 @@ export class Engine {
         }
         // Geo explorer list-row hover → glow that node's shells on the globe (same as a 3D hover).
         if (st.hoverNodeId !== prev.hoverNodeId) this.globe.setHoverNode(st.hoverNodeId);
+        // Geo explorer country-row hover → preview that country's border outline (whisper level;
+        // the committed drill's full hairline wins inside the Globe).
+        if (st.hoverCountry !== prev.hoverCountry) this.globe.setHoverCountry(st.hoverCountry);
         // Snapshots·Explore panel: the plane highlight = the transient hover PREVIEW, else the
         // COMMITTED layer selection (the layer card) — same resolve idiom as hoverFilter ?? filter.
         // Only a COMMITTED layer dims the other planes; a hover just brightens its own plane.
@@ -407,6 +411,10 @@ export class Engine {
   // ---- view + filter (ports ui.setMode / _applyFilter / camera focus) ----
   setMode(mode: Mode) {
     this.mode = mode;
+    // A view switch re-lays the scene under a stationary pointer, so any in-flight hover
+    // (tooltip + the hover channels) would linger re-projected at a wrong screen position
+    // until the next pointermove — clear it as part of the switch.
+    this._clearHover();
     const policy = VIEW_POLICIES[mode];
     // View-derived sim gates → the scene modules (the render loop reads the rest of the policy).
     this.globe.setSimFlags(policy.sims);
@@ -470,6 +478,12 @@ export class Engine {
     this._dofMeta = this.layers.metas.find((x) => x.cfg.id === this.filter) ?? null;
     if (this.mode === "geo") {
       this.globe.setFilter(this.filter); // also clears globe.countryFilter
+      // Re-assert a live country drill: setFilter clears the Globe's drill BY DESIGN for a
+      // user filter switch (the subscription nulls this.country before calling us), but this
+      // also runs on every background cluster/meta poll (_applyMetagraphs → applyFilter(false))
+      // — without the re-assert, the poll silently wiped the drill's dim + border seconds
+      // after every drill while the store/engine still said drilled (long-standing bug).
+      if (this.country != null) this.globe.setCountry(this.country);
       if (focusCamera) this._applyGeoFocus();
     } else if (this.mode === "hyper") {
       // Dim the non-selected nodes ("the others") so the selected network stands out, on top
@@ -509,6 +523,18 @@ export class Engine {
   // zoom via _focusNode); "all" sits at the wide geo overview.
   private _applyGeoFocus() {
     const narrowed = this.filter !== "all" || this.country != null;
+    // Country drill: the country's SHAPE leads — spin to its polygon centroid and frame its
+    // angular extent (domain countryShape), so the country itself sits centred regardless of
+    // where its nodes cluster. Falls back to the node-mean concentration framing while the
+    // countries topology is still loading / for a cc it doesn't cover.
+    if (this.country != null) {
+      const shape = this.globe.focusCountryShape(this.country);
+      if (shape) {
+        countryFraming(shape.latAngle, shape.angularRadius, this._framingOut);
+        this._tweenTo(this._framingOut.pos, this._framingOut.target);
+        return;
+      }
+    }
     const R = this.globe.focusDensest(narrowed);
     // Three zoom LEVELS (user design): metagraph = a WIDE network pose (rotated to the densest
     // cluster, held clearly farther out than the country pose so the country drill still reads
@@ -672,6 +698,23 @@ export class Engine {
     if (!(this.filter === "all" || this.filter === id)) return false;
     if (this.country && p.geo?.cc !== this.country) return false;
     return true;
+  }
+
+  // Drop every transient hover: the tooltip subject + all four hover channels (each store
+  // write also resets its 3D effect via the command-bridge subscription). Event-driven only
+  // (view switch) — never on the per-frame path.
+  private _clearHover() {
+    const st = useStore.getState();
+    if (st.hoverNodeId != null) st.setHoverNodeId(null);
+    if (st.hoverSnapOrd != null) st.setHoverSnapOrd(null);
+    if (st.hoverFilter != null) st.setHoverFilter(null);
+    if (st.hoverCountry != null) st.setHoverCountry(null);
+    if (st.ledgerHilite != null) st.setLedgerHilite(null);
+    if (this._hoverKey != null || st.hover != null) {
+      this._hoverKey = null;
+      st.setHover(null);
+    }
+    this.canvas.style.cursor = "grab";
   }
 
   // Hover tooltip: only writes the store when the hovered target changes (not per

@@ -24,7 +24,8 @@ import { GOLDEN_ANGLE, fibShellPos, nodeRoles, spreadCoLocated } from "../domain
 import { surfFade, extrasFade } from "../domain/morph";
 import { ArcSim, type ArcEndpoint } from "../domain/arcSim";
 import type { MetaNodeRecord, ValidatorRecord } from "../domain/records";
-import { buildGeoView, type GeoViewHost } from "./views/GeoView";
+import { buildGeoView, setCountryBorder, type GeoViewHost } from "./views/GeoView";
+import { ccToNumeric, COUNTRY_LEAN_MAX, geometryRings, mainPolygonRings, ringsAngularRadius, ringsCentroid, type Ring } from "../domain/countryShape";
 import { NodeFabric, type FrameCtx } from "./objects/NodeFabric";
 import { Arcs } from "./objects/Arcs";
 import type { HyperView } from "./views/HyperView";
@@ -117,6 +118,7 @@ export class Globe implements GeoViewHost {
   private _hoverNodeId: string | null = null;
   private _selectedNodeId: string | null = null;
   private _hoverFilterActive = false;
+  private _hoverCountryCc: string | null = null; // explorer row hover — border preview only
 
   // Identity SCENE-hue map (id -> 0xRRGGBB), set by the Engine each refreshMeta before setMetagraphs.
   sceneColors?: Record<string, number>;
@@ -129,6 +131,9 @@ export class Globe implements GeoViewHost {
   landFillMesh?: THREE.Mesh;
   facingUniform?: GeoViewHost["facingUniform"]; // shared camera-facing uniform (graticule + walls)
   poleRoses?: GeoViewHost["poleRoses"];         // the polar compass roses (faded per frame here)
+  countryGeoms?: GeoViewHost["countryGeoms"];   // per-country geometries (drill border + framing)
+  countryBorder?: GeoViewHost["countryBorder"]; // the drill border LineSegments + its fade entry
+  onCountriesReady?: GeoViewHost["onCountriesReady"];
 
   private fabric: NodeFabric;
   private arcs: Arcs;
@@ -168,6 +173,8 @@ export class Globe implements GeoViewHost {
 
     // The geo globe surface (body, graticule, atmosphere, continents) — it sets the surface handles
     // back on `this` for the morph/fade loop and pushes its fade materials into this.geoFades.
+    // The countries topology arrives async: re-assert any drill/hover border made before then.
+    this.onCountriesReady = () => this._updateCountryBorder();
     buildGeoView(this);
   }
 
@@ -330,13 +337,19 @@ export class Globe implements GeoViewHost {
 
     this.fabric.buildMetaNodes(recs);
     this.metaNodes = recs;
+    // Re-assert the filter's dim on the fresh records — but a data REBUILD is not a filter
+    // switch, so a live country drill survives it (setFilter clears the drill by design for
+    // real switches; without the restore, every cluster poll wiped the drill's dim + border).
+    const drill = this.countryFilter;
     this.setFilter(this.filter);
+    if (drill) this.setCountry(drill);
   }
 
   // Isolate one network on the globe and dim the rest.
   setFilter(sel: string): void {
     this.filter = sel;
     this.countryFilter = null; // switching network clears the country drill-down
+    this._updateCountryBorder();
     this._applyDim(sel);
     this._relayoutGeo();
   }
@@ -359,6 +372,47 @@ export class Globe implements GeoViewHost {
   setCountry(cc: string | null): void {
     this.countryFilter = cc || null;
     this._relayoutGeo();
+    this._updateCountryBorder();
+  }
+
+  // Transient border PREVIEW (explorer country-row hover): shows the country's outline at a
+  // whisper level without committing the drill. The committed drill always wins.
+  setHoverCountry(cc: string | null): void {
+    this._hoverCountryCc = cc || null;
+    this._updateCountryBorder();
+  }
+
+  // The drilled country's polygon rings ([lon,lat] degrees) from the loaded topology, or null
+  // (unknown cc / topology still loading). The Engine reads this for shape-based framing too.
+  countryRings(cc: string | null): Ring[] | null {
+    const ccn = ccToNumeric(cc);
+    const geom = ccn ? this.countryGeoms?.get(ccn) : null;
+    return geom ? geometryRings(geom) : null;
+  }
+
+  // Aim the globe so the country's shape centroid faces the camera (same capped lean as
+  // focusDensest). Returns the centroid's elevation angle + the country's angular radius for
+  // the shape-based framing, or null when the shape is unknown (unknown cc / topology still
+  // loading — the caller falls back to the node-mean spin). Framing composes on the MAIN
+  // landmass (mainPolygonRings) — the border still draws the whole country.
+  focusCountryShape(cc: string | null): { latAngle: number; angularRadius: number } | null {
+    const ccn = ccToNumeric(cc);
+    const geom = ccn ? this.countryGeoms?.get(ccn) : null;
+    const rings = geom ? mainPolygonRings(geom) : null;
+    const centroid = rings?.length ? ringsCentroid(rings) : null;
+    if (!rings || !centroid) return null;
+    this._aimAt(centroid, COUNTRY_LEAN_MAX);
+    return {
+      latAngle: Math.atan2(centroid.y, Math.hypot(centroid.x, centroid.z)),
+      angularRadius: ringsAngularRadius(rings, centroid),
+    };
+  }
+
+  // Border = committed drill (full hairline) beats hover preview (whisper); nothing at rest.
+  private _updateCountryBorder(): void {
+    const cc = this.countryFilter ?? this._hoverCountryCc;
+    const level = this.countryFilter ? 0.75 : 0.3;
+    setCountryBorder(this, cc ? this.countryRings(cc) : null, cc ? level : 0);
   }
 
   // Hover-pairing: pass the hovered node's id; the per-frame glow loops brighten every instance
