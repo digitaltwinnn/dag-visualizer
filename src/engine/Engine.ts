@@ -510,11 +510,12 @@ export class Engine {
   private _applyGeoFocus() {
     const narrowed = this.filter !== "all" || this.country != null;
     const R = this.globe.focusDensest(narrowed);
-    // Country drill-down zooms in proportional to concentration. A metagraph selection uses the
-    // SAME framing at its wide end (R=0) — the camera drops low and looks across the front so the
-    // tilted-up cluster is well-framed — but does NOT zoom (default geo distance). "all" = overview.
+    // Three zoom LEVELS (user design): metagraph = a WIDE network pose (rotated to the densest
+    // cluster, held clearly farther out than the country pose so the country drill still reads
+    // as a zoom), country = the tilted mid framing (concentration-scaled), node = _focusNode.
+    // Each deselect steps back up one level ("all" = the resting overview).
     if (this.country != null && R != null) this._focusGeo(R);
-    else if (narrowed && R != null) this._focusGeo(0);
+    else if (narrowed && R != null) this.focus("geoNetwork");
     else this.focus("geo");
   }
 
@@ -567,13 +568,17 @@ export class Engine {
     this._tweenTo(pos.clone().addScaledVector(dir, 9).add(new THREE.Vector3(0, 3, 0)), pos);
   }
 
-  // Node framing: zoomed in, camera low in front of the node looking UP at a point ABOVE it
-  // — so the line of sight skims across the globe surface toward the horizon, the node sitting
-  // in the lower part of the frame (in view, but we look across rather than down at it).
+  // Node framing: zoomed in, camera low in front of the node, line of sight skimming across the
+  // globe surface toward the horizon. The look-at point sits ABOVE the node's apparent position,
+  // which settles the node at the LOWER-third line (user; rule-of-thirds — centred read wrong)
+  // with the horizon + sky filling the upper frame.
   private _focusNode() {
     // z 21 → 19.4 (user: zoom in more) — close enough to read the hex prism's facets/edges,
-    // still skimming the surface rather than staring down at it.
-    this._tweenTo(new THREE.Vector3(0, 0, 19.4), new THREE.Vector3(0, 14, 2));
+    // still skimming the surface rather than staring down at it. target y 14 → 32 (user: node at
+    // the LOWER third, not centred): the camera sits ~4.6 world units from the node, so the
+    // look-at point must swing far up the globe's rising face to shift the node a third of the
+    // frame — solved from the framing geometry (node ≈ (0,3.7,16.7) after focusNode's aim).
+    this._tweenTo(new THREE.Vector3(0, 0, 19.4), new THREE.Vector3(0, 32, 2));
   }
 
   // Compute the per-country leaderboard for the active filter and push it to the store
@@ -750,6 +755,7 @@ export class Engine {
 
 
   private _tweenTo(toPos: Vec, toTgt: Vec) {
+
     const tw = this._tween;
     tw.fromPos.copy(this.ctx.camera.position);
     // Dolly every framing back by CAM_ZOOM (push the position out from its target) — one global lever
@@ -839,6 +845,14 @@ export class Engine {
       this.globe.update(dt);
       this._updateTween(dt);
       this.ctx.controls.update();
+      // Altitude clamp (policy.minCamAlt): OrbitControls' minDistance is target-relative, and
+      // the geo target is off-centre — so after the controls settle, push the camera back out
+      // to the minimum radius from the ORIGIN if a dolly/orbit carried it inside. In-place (no
+      // alloc); grazing feel: past the floor the camera slides along the sphere to the target.
+      const minAlt = policy.minCamAlt;
+      if (minAlt != null && this.ctx.camera.position.lengthSq() < minAlt * minAlt) {
+        this.ctx.camera.position.setLength(minAlt);
+      }
 
       // Geometry visibility, driven by the view policy's `show.*`:
       //  - !hyperFurniture: the hyper root + core are force-managed — ledger keeps the root as its

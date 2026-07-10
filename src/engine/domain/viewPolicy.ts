@@ -37,10 +37,15 @@ export interface ViewPolicy {
   // May depth-of-field run here at all? (Still ANDs with a single metagraph being selected +
   // the morph window.) Only hyper.
   dofEligible: boolean;
-  // OrbitControls zoom floor (camera→target distance). Geo raises it above the land plateau
-  // (R=16 + LAND_H 1.0 = 17) with margin for the raised hex stacks, so the user can't wheel
-  // the camera through the surface; the abstract views keep the close-in default.
+  // OrbitControls zoom floor (camera→TARGET distance) — the stock dolly clamp.
   minCamDist: number;
+  // Minimum camera ALTITUDE from the world origin (null = no clamp), enforced by the Engine
+  // after each controls update. Geo needs this because its orbit target is NOT the globe
+  // centre (the resting target is offset, and country/node focus moves it near the surface),
+  // so a target-distance floor alone is inconsistent — too tight on one side of the globe,
+  // inside the surface on the other (user bug). 18 clears the land plateau (R 16 + LAND_H 1)
+  // and the raised hex stacks.
+  minCamAlt: number | null;
 }
 
 // A flat placeholder view (status / transactions / staking): the canvas is hidden and the view
@@ -53,6 +58,7 @@ const FLAT: ViewPolicy = {
   pickSources: [],
   dofEligible: false,
   minCamDist: 12,
+  minCamAlt: null,
 };
 
 export const VIEW_POLICIES: Record<Mode, ViewPolicy> = {
@@ -66,6 +72,7 @@ export const VIEW_POLICIES: Record<Mode, ViewPolicy> = {
     pickSources: ["globe", "layers"],
     dofEligible: true,
     minCamDist: 12,
+    minCamAlt: null,
   },
   // Footprint: the holographic globe + travelling packets; picks the globe nodes only.
   geo: {
@@ -75,7 +82,8 @@ export const VIEW_POLICIES: Record<Mode, ViewPolicy> = {
     show: { hyperFurniture: true, globeSurface: true, ledger: false },
     pickSources: ["globe"],
     dofEligible: false,
-    minCamDist: 18, // above the land plateau (R 16 + LAND_H 1.0) + chip stacks — no zooming inside
+    minCamDist: 12,
+    minCamAlt: 18, // above the land plateau (R 16 + LAND_H 1.0) + chip stacks — no zooming inside
   },
   // Snapshots: the settlement chamber. Morph frozen (nodes fly into lanes); picks the centred
   // snapshot + the reused producer dots. (The ledger-specific depth-fog recency treatment was
@@ -88,6 +96,7 @@ export const VIEW_POLICIES: Record<Mode, ViewPolicy> = {
     pickSources: ["ledger", "globe"],
     dofEligible: false,
     minCamDist: 12,
+    minCamAlt: null,
   },
   status: FLAT,
   transactions: FLAT,

@@ -33,8 +33,10 @@ export default function FilterPicker({ onPick }: { onPick?: () => void }) {
   // the 0-located rows are greyed and excluded so the headline stays consistent with the list.
   const mappedCount = useMemo(() => rows.filter((m) => (m.located ?? 0) > 0).length, [rows]);
 
+  // Re-picking the COMMITTED metagraph deselects back to "all" (user: the same toggle
+  // language as the explorer's node/country rows — every selection un-selects in place).
   const pick = (id: string) => {
-    setFilter(id);
+    setFilter(id !== "all" && id === filter ? "all" : id);
     onPick?.();
   };
 

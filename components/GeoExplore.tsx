@@ -39,7 +39,14 @@ export default function GeoExplore() {
   // network filter to the node's OWN network first, then open its card. Without the filter step
   // the selection didn't carry into the Hypergraph (the view had nothing to isolate). A validator
   // belongs to the DAG core ("dag"); a metagraph node to its metagraph.
-  const selectNode = (pick: NodeRow["pick"]) => {
+  // `selected` = this row is the currently-inspected node — re-clicking it DESELECTS (the same
+  // step-back as the node card's ×, user: one toggle language everywhere), which drops the
+  // camera back to the country/network framing.
+  const selectNode = (pick: NodeRow["pick"], selected: boolean) => {
+    if (selected) {
+      setInspect(null);
+      return;
+    }
     const netId =
       pick.kind === "metanode"
         ? pick.meta?.id ?? null
@@ -172,20 +179,20 @@ export default function GeoExplore() {
                     />
                   </span>
                   <span className="flex-none w-[26px] text-right text-body tabular-nums font-semibold">{c.count}</span>
-                  {/* Expand affordance / open-state cue. The open/drilled country shows a down
-                      chevron. Closed rows: hidden on a mouse (revealed on row hover/focus — keeps
-                      the list clean), but ALWAYS shown on touch (`@media (hover:none)`), where
-                      there's no hover to surface it. Kept via opacity so the count column never
-                      shifts. */}
+                  {/* Trailing slot: the drilled country shows the shared selection ✓ (same mark
+                    as the node rows / filter picker — one selection language, user); closed rows
+                    keep the expand-affordance chevron — hidden on a mouse (revealed on row hover/
+                    focus, keeps the list clean) but ALWAYS shown on touch (`@media (hover:none)`)
+                    where there's no hover. Both occupy the same flex-none slot, so the count
+                    column never shifts. */}
+                {open ? (
+                  <SelectedRowMark className="flex-none" />
+                ) : (
                   <ChevronRight
                     aria-hidden
-                    className={cn(
-                      "size-3.5 flex-none transition-[transform,opacity] duration-150 motion-reduce:transition-none",
-                      open
-                        ? "rotate-90 text-foreground opacity-100"
-                        : "text-muted-foreground opacity-0 group-hover:opacity-100 group-focus-visible:opacity-100 [@media(hover:none)]:opacity-100",
-                    )}
+                    className="size-3.5 flex-none transition-opacity duration-150 motion-reduce:transition-none text-muted-foreground opacity-0 group-hover:opacity-100 group-focus-visible:opacity-100 [@media(hover:none)]:opacity-100"
                   />
+                )}
                 </button>
 
                 {open && (
@@ -222,7 +229,7 @@ export default function GeoExplore() {
                             )}
                             style={pair.style}
                             title={`${r.label} · ${r.state ?? "—"}`}
-                            onClick={() => selectNode(r.pick)}
+                            onClick={() => selectNode(r.pick, on)}
                             onMouseEnter={pair.onMouseEnter}
                           >
                             <IdentityDot hue={rowHue} />

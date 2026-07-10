@@ -43,6 +43,7 @@ export interface GeoViewHost {
 // lane — never identity-tinted).
 export function buildGeoView(globe: GeoViewHost): void {
   buildGraticule(globe);
+  buildCompassRose(globe);
   buildLand(globe);
 }
 
@@ -61,6 +62,79 @@ function buildGraticule(globe: GeoViewHost) {
   const mat = new THREE.LineBasicMaterial({ color: globe.geoColor, transparent: true, opacity: 0 });
   globe.geoFades.push({ mat, base: 0.06 });
   globe.group.add(new THREE.LineSegments(geo, mat));
+}
+
+// POLAR COMPASS ROSE — the subtle orientation cue (user: the tilted country/node poses read
+// disorienting without knowing where north is). E/W only exist relative to a point on a sphere,
+// so the honest anchors are the POLES: a hairline dial (the instrument-thread language — ring +
+// radial ticks, the 4 cardinal ticks longer) floats over each pole with a micro letter, "N"
+// bright-ish, "S" dimmer. Lives in `globe.group` (rotates + tilts WITH the globe — a truthful
+// scene marker, not HUD chrome), structural accent, faded in with the rest of the geo furniture
+// (geoFades). Construction-time only.
+function buildCompassRose(globe: GeoViewHost) {
+  const RING_R = 1.5, TICKS = 24, TICK_IN = 0.16, TICK_CARD = 0.34;
+  const pts: THREE.Vector3[] = [];
+  // Hairline ring as segments (72 spans) + radial ticks pointing inward; cardinal ticks longer.
+  const SEG = 72;
+  for (let i = 0; i < SEG; i++) {
+    const a0 = (i / SEG) * Math.PI * 2, a1 = ((i + 1) / SEG) * Math.PI * 2;
+    pts.push(
+      new THREE.Vector3(Math.cos(a0) * RING_R, 0, Math.sin(a0) * RING_R),
+      new THREE.Vector3(Math.cos(a1) * RING_R, 0, Math.sin(a1) * RING_R),
+    );
+  }
+  for (let i = 0; i < TICKS; i++) {
+    const a = (i / TICKS) * Math.PI * 2;
+    const len = i % (TICKS / 4) === 0 ? TICK_CARD : TICK_IN;
+    pts.push(
+      new THREE.Vector3(Math.cos(a) * RING_R, 0, Math.sin(a) * RING_R),
+      new THREE.Vector3(Math.cos(a) * (RING_R - len), 0, Math.sin(a) * (RING_R - len)),
+    );
+  }
+  const dialGeo = new THREE.BufferGeometry().setFromPoints(pts);
+
+  // A micro cardinal letter on a small flat plane at the dial's centre — canvas-texture text
+  // (the ledger _makeLabel idiom), colour derived from the structural accent, additive so the
+  // dark canvas adds nothing.
+  const makeLetter = (text: string): THREE.Mesh => {
+    const cv = document.createElement("canvas");
+    cv.width = cv.height = 128;
+    const g = cv.getContext("2d")!;
+    g.fillStyle = new THREE.Color(globe.geoColor).getStyle();
+    g.font = "600 84px 'Geist Mono', ui-monospace, monospace";
+    g.textAlign = "center"; g.textBaseline = "middle";
+    g.fillText(text, 64, 68);
+    const tex = new THREE.CanvasTexture(cv);
+    tex.anisotropy = 4;
+    const mat = new THREE.MeshBasicMaterial({
+      map: tex, transparent: true, opacity: 0,
+      blending: THREE.AdditiveBlending, depthWrite: false,
+    });
+    return new THREE.Mesh(new THREE.PlaneGeometry(1.05, 1.05), mat);
+  };
+
+  // One rose per pole. The north pole is ocean (surface at R); the south pole sits on the
+  // Antarctica plateau (R+LAND_H) — each floats a little above its own surface.
+  const poles: Array<{ y: number; letter: string; base: number; flipX: number }> = [
+    { y: R + 0.5, letter: "N", base: 0.4, flipX: -Math.PI / 2 },
+    { y: -(R + LAND_H + 0.5), letter: "S", base: 0.22, flipX: Math.PI / 2 },
+  ];
+  for (const pole of poles) {
+    const mat = new THREE.LineBasicMaterial({
+      color: globe.geoColor, transparent: true, opacity: 0,
+      blending: THREE.AdditiveBlending, depthWrite: false,
+    });
+    globe.geoFades.push({ mat, base: pole.base });
+    const dial = new THREE.LineSegments(dialGeo, mat);
+    dial.position.y = pole.y;
+    globe.group.add(dial);
+
+    const letter = makeLetter(pole.letter);
+    letter.rotation.x = pole.flipX; // lie flat, readable from outside the pole
+    letter.position.y = pole.y;
+    globe.geoFades.push({ mat: letter.material as THREE.MeshBasicMaterial, base: pole.base + 0.15 });
+    globe.group.add(letter);
+  }
 }
 
 // The land mask + 3° micro-grid as ONE mipmapped equirectangular texture — the standard way

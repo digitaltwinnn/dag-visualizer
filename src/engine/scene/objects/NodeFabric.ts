@@ -93,20 +93,39 @@ export class NodeFabric {
   // emissive becomes aBase * aEmissive (js/globe.js:284-298). The hex prisms render SLIGHTLY
   // TRANSPARENT (user: replaces the tried-and-rejected wireframe overlay) — depthWrite stays on
   // so the chip stacks still occlude each other cleanly.
+  // Hex prisms (flat=true) additionally get the EDGE-LIT CHIP treatment (user: the uniform
+  // emissive read dull, especially dense DAG stacks): the emissive is redistributed — dimmer
+  // SIDES, a bright TOP CAP (backlit-acrylic look; the prism's caps are exactly ±Y in local
+  // space, so `objectNormal.y` is the cap mask), plus a view-dependent FRESNEL rim so each
+  // chip's silhouette catches light and the stack gaps read as dark seams between lit chips.
+  // Coefficients keep the AVERAGE energy near the old flat value so filter/hover dims and the
+  // bloom threshold behave unchanged. Glintier surface (roughness .3, metalness .35) so the
+  // flat-shaded facets vary under the key light. Spheres (hyper) + coins (ledger) keep the
+  // original flat emissive.
   private _makeNodeMaterial(flat = false, alpha = 1): THREE.MeshStandardMaterial {
     const mat = new THREE.MeshStandardMaterial({
-      color: 0xffffff, roughness: 0.5, metalness: 0.2,
+      color: 0xffffff,
+      roughness: flat ? 0.3 : 0.5, metalness: flat ? 0.35 : 0.2,
       flatShading: flat, // crisp facet definition on the hex prisms; spheres stay smooth
       transparent: alpha < 1, opacity: alpha,
     });
     mat.onBeforeCompile = (shader) => {
       shader.vertexShader = shader.vertexShader
-        .replace("#include <common>", "#include <common>\nattribute vec3 aBase;\nattribute float aEmissive;\nvarying vec3 vBase;\nvarying float vEmi;")
-        .replace("#include <begin_vertex>", "#include <begin_vertex>\nvBase = aBase;\nvEmi = aEmissive;");
+        .replace("#include <common>", "#include <common>\nattribute vec3 aBase;\nattribute float aEmissive;\nvarying vec3 vBase;\nvarying float vEmi;\nvarying float vCap;")
+        .replace("#include <begin_vertex>", "#include <begin_vertex>\nvBase = aBase;\nvEmi = aEmissive;\nvCap = max(0.0, objectNormal.y);");
       shader.fragmentShader = shader.fragmentShader
-        .replace("#include <common>", "#include <common>\nvarying vec3 vBase;\nvarying float vEmi;")
+        .replace("#include <common>", "#include <common>\nvarying vec3 vBase;\nvarying float vEmi;\nvarying float vCap;")
         .replace("#include <color_fragment>", "#include <color_fragment>\ndiffuseColor.rgb *= vBase;")
-        .replace("#include <emissivemap_fragment>", "#include <emissivemap_fragment>\ntotalEmissiveRadiance = vBase * vEmi;");
+        .replace(
+          "#include <emissivemap_fragment>",
+          flat
+            ? // edge-lit chip: dim sides + bright cap + fresnel rim (`normal` is the flat-shaded
+              // view-space normal here; vViewPosition normalized points fragment→camera).
+              "#include <emissivemap_fragment>\n" +
+              "float fres = pow(1.0 - clamp(dot(normalize(vViewPosition), normal), 0.0, 1.0), 3.0);\n" +
+              "totalEmissiveRadiance = vBase * vEmi * (0.5 + 0.95 * vCap + 1.1 * fres);"
+            : "#include <emissivemap_fragment>\ntotalEmissiveRadiance = vBase * vEmi;",
+        );
     };
     return mat;
   }

@@ -182,8 +182,9 @@ store-value imports**, enforced by `layerBoundaries.test.ts`). Each ships coloca
 
 - `viewPolicy.ts` — the per-`Mode` allow-list table (`VIEW_POLICIES`): canvas / morph target /
   sim gates / shown geometry / pick sources / DoF eligibility / camera zoom floor
-  (`minCamDist` — geo raises it to 18 > the land plateau at R+LAND_H=17 so the user can't wheel
-  inside the globe), as
+  (geo also sets `minCamAlt: 18` — a camera-ALTITUDE floor the Engine enforces after each controls
+  update, because the orbit target is off-centre in geo so the stock target-distance clamp alone
+  is inconsistent around the globe), as
   DATA. The single source of truth for what each view turns on (see *Per-view behaviour*).
 - `morph.ts` — the hyper↔geo morph easing + derived visibility ramps.
 - `nodeLayout.ts` — the node placement math: fibonacci shells around the core/hubs, the
@@ -294,7 +295,8 @@ views and caused the ledger red-dots bug; that pattern is forbidden.
   color (`aBase`) and animated glow (`aEmissive`). In the Hypergraph they're small
   **spheres**; on the globe they cross-fade to standing **HEX PRISMS** (6-seg cylinder,
   circumradius = `geoSize`, height `geoLayout.HEX_H`, slightly glassy `HEX_ALPHA 0.8` — a wireframe
-  overlay was tried and rejected; `discFall()` eases them out toward the
+  overlay was tried and rejected; EDGE-LIT: dim sides, bright top cap + fresnel rim redistribute
+  the emissive so stacks read as lit chips, not a flat mass; `discFall()` eases them out toward the
   limb — needs the camera); in the ledger they're flat **coins** (the sphere squashed on Y,
   `COIN_H`). Per-instance transforms via the shared `_dummy`.
 - **DAG L0/L1** are two fibonacci shells around the core. **Each metagraph** is laid out the
@@ -328,15 +330,22 @@ views and caused the ledger red-dots bug; that pattern is forbidden.
   long comet tails (`ARC_TAIL 14`, `ARC_TAIL_FRAC 0.42`), longer rests between hops.
 - **The filter** lives in the top command bar (`TopBar` → `FilterPicker`); everything routes
   through `Engine.applyFilter()`, which behaves per-view:
-  - **Geography**: `globe.setFilter()` isolates/dims the selection, the leaderboard
-    refreshes, and `globe.focusDensest()` rotates the globe so the **densest part of the
-    selection faces the camera** (north stays up — Y rotation only) while the camera zooms
-    **proportional to concentration** R = |mean of node dirs| (`_focusGeo`, via `FOCI.geo`):
-    near-co-located selections zoom in subtly, spread ones stay wide.
+  - **Geography — three zoom LEVELS** (user design), each deselect stepping back up one:
+    `globe.setFilter()` isolates/dims the selection, the leaderboard refreshes, and
+    `globe.focusDensest()` rotates the globe so the **densest part of the selection faces the
+    camera** (north stays up — Y rotation only). A **metagraph** selection frames WIDE
+    (`FOCI.geoNetwork`, deliberately farther out than the country pose so drilling still reads
+    as a zoom); a **country** drill flies to the tilted mid framing, zoomed **proportional to
+    concentration** R = |mean of node dirs| (`geoFraming` — the node-zoom's low-camera tilt
+    held farther out); a **node** pick zooms close with the node at the LOWER-third line
+    (`_focusNode` — the look-at point swings far up the globe's rising face; the camera is only
+    ~4.6 units from the node, so screen shifts need big target moves).
   - **Country drill-down** (geo only): the country rows in `GeoExplore` are clickable and
     combine with the network filter (`globe.countryFilter` + eased `countryMix`;
-    `_nodeActive(layer, geo)` gates on BOTH). Clicking a country dims everything outside it
-    and flies to it; click again to clear; switching network clears it.
+    `_nodeActive(layer, geo)` gates on BOTH). Clicking a country dims everything outside it,
+    flies to it, and marks the row with the shared selection ✓ (`SELECTED_ROW` +
+    `SelectedRowMark`, same language as the node rows); click again to clear; switching
+    network clears it.
   - **Hypergraph**: `_focusFilter` flies the camera to the selected hub (using its
     **local/unscaled** position — `layers.root` is morph-scaled, so `getWorldPosition` would
     aim at the origin mid-morph), framed slightly off the radial line so the core sits to the

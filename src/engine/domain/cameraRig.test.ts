@@ -9,7 +9,10 @@ describe("FOCI", () => {
     expect(FOCI.dag.pos).toEqual(new THREE.Vector3(0, 9, 38));
     expect(FOCI.dag.target).toEqual(new THREE.Vector3(0, 1, 0));
     expect(FOCI.geo.pos).toEqual(new THREE.Vector3(0, 11, 36));
-    expect(FOCI.geo.target).toEqual(new THREE.Vector3(0, 2, 0));
+    // Geo targets the globe CENTRE (manual orbits stay concentric — no wobble).
+    expect(FOCI.geo.target).toEqual(new THREE.Vector3(0, 0, 0));
+    // Metagraph pose sits between the overview (z 36) and the country framing (z 29..25).
+    expect(FOCI.geoNetwork.pos).toEqual(new THREE.Vector3(0, 5, 33));
     // The Snapshots view shares `overview` (no own preset — the ledger GROUP is rotated instead).
     expect(FOCI.ledger).toBeUndefined();
   });
@@ -53,54 +56,33 @@ describe("hubFraming", () => {
 });
 
 describe("geoFraming", () => {
-  // Engine.ts:671-679 — t = smoothstep(R, 0.7, 1.0); pos/target lerp between the wide/near ends.
-  it("at R=0.7 (t=0, wide end) matches pos (0,7,34) / target (0,2,7)", () => {
+  // The node-zoom TILT held farther out (user: the old framing read too top-down) —
+  // t = smoothstep(R, 0.7, 1.0); only the dolly + target height vary with concentration.
+  it("at R=0.7 (t=0, wide end) matches pos (0,1.5,29) / target (0,10.5,2.5)", () => {
     const out = { pos: new THREE.Vector3(), target: new THREE.Vector3() };
     geoFraming(0.7, out);
     expect(out.pos.x).toBeCloseTo(0, 10);
-    expect(out.pos.y).toBeCloseTo(7, 10);
-    expect(out.pos.z).toBeCloseTo(34, 10);
+    expect(out.pos.y).toBeCloseTo(1.5, 10);
+    expect(out.pos.z).toBeCloseTo(29, 10);
     expect(out.target.x).toBeCloseTo(0, 10);
-    expect(out.target.y).toBeCloseTo(2, 10);
-    expect(out.target.z).toBeCloseTo(7, 10);
+    expect(out.target.y).toBeCloseTo(10.5, 10);
+    expect(out.target.z).toBeCloseTo(2.5, 10);
   });
 
-  it("at R=1.0 (t=1, near end) matches pos (0,6,26) / target (0,2.5,7)", () => {
+  it("at R=1 (t=1, near end) dollies in and lifts the target", () => {
     const out = { pos: new THREE.Vector3(), target: new THREE.Vector3() };
-    geoFraming(1.0, out);
-    expect(out.pos.x).toBeCloseTo(0, 10);
-    expect(out.pos.y).toBeCloseTo(6, 10);
-    expect(out.pos.z).toBeCloseTo(26, 10);
-    expect(out.target.x).toBeCloseTo(0, 10);
-    expect(out.target.y).toBeCloseTo(2.5, 10);
-    expect(out.target.z).toBeCloseTo(7, 10);
+    geoFraming(1, out);
+    expect(out.pos.z).toBeCloseTo(25, 10);
+    expect(out.target.y).toBeCloseTo(11.5, 10);
   });
 
-  it("at R=0.85 (t=0.5, midpoint) matches pos (0,6.5,30) / target (0,2.25,7)", () => {
-    const out = { pos: new THREE.Vector3(), target: new THREE.Vector3() };
-    geoFraming(0.85, out);
-    expect(out.pos.x).toBeCloseTo(0, 10);
-    expect(out.pos.y).toBeCloseTo(6.5, 10);
-    expect(out.pos.z).toBeCloseTo(30, 10);
-    expect(out.target.x).toBeCloseTo(0, 10);
-    expect(out.target.y).toBeCloseTo(2.25, 10);
-    expect(out.target.z).toBeCloseTo(7, 10);
-  });
-
-  it("clamps below R=0.7 to the wide end (smoothstep clamps t to 0)", () => {
-    const out = { pos: new THREE.Vector3(), target: new THREE.Vector3() };
-    geoFraming(0, out);
-    expect(out.pos.y).toBeCloseTo(7, 10);
-    expect(out.pos.z).toBeCloseTo(34, 10);
-  });
-
-  it("writes into the SAME out.pos/out.target instances (no new Vector3 allocated)", () => {
-    const out = { pos: new THREE.Vector3(), target: new THREE.Vector3() };
-    const posRef = out.pos;
-    const targetRef = out.target;
-    geoFraming(0.9, out);
-    expect(out.pos).toBe(posRef);
-    expect(out.target).toBe(targetRef);
+  it("clamps below the wide end (R<0.7 behaves like R=0.7)", () => {
+    const a = { pos: new THREE.Vector3(), target: new THREE.Vector3() };
+    const b = { pos: new THREE.Vector3(), target: new THREE.Vector3() };
+    geoFraming(0.2, a);
+    geoFraming(0.7, b);
+    expect(a.pos).toEqual(b.pos);
+    expect(a.target).toEqual(b.target);
   });
 });
 

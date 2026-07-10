@@ -81,7 +81,7 @@ const _gx = new Map<number, number>(); // reused per-frame: slot → global bloc
 // snapshot arrives, cleared in setData on the tick change) → plus a transient pulse sparkle
 // while an anchor pulse is actually passing through.
 const DIAL_REST_OP = 0.13; // resting identity mark — dim
-const DIAL_LIT_OP = 0.5;   // added while latched as did-work-this-tick
+const DIAL_LIT_OP = 0.78;  // added while latched as did-work-this-tick (user: brighter highlight)
 
 // The shared unit station DIAL geometry — the instrument-ruler language bent into a circle: a
 // hairline circle plus radial ticks (fine ticks all round, longer cardinals), mirroring the rail
@@ -686,7 +686,7 @@ export class LedgerView {
     // Hypergraph-L0 participation ring: glows as the global L0 produces each snapshot, then fades.
     this._gL0Glow = Math.max(0, this._gL0Glow - dt * 1.4);
     (this._gL0Ring.material as THREE.LineBasicMaterial).opacity =
-      this._gL0Ring.userData.baseOpacity + (this._gL0Lit ? DIAL_LIT_OP : 0) + this._gL0Glow * 0.5;
+      this._gL0Ring.userData.baseOpacity + (this._gL0Lit ? DIAL_LIT_OP : 0) + this._gL0Glow * 0.7;
     this.center.scale.setScalar(this._baseR * (1 + Math.sin(this.t * 2.2) * 0.06 + this._flash * 0.12));
 
     // The global trail eases left into its slots; every block keeps the accent colour — the SELECTED
@@ -827,7 +827,7 @@ export class LedgerView {
       for (const r of rec.rings) {
         r.glow = Math.max(0, r.glow - dt * 2.4);
         (r.mesh.material as THREE.LineBasicMaterial).opacity =
-          (r.mesh.userData.baseOpacity + (r.lit ? DIAL_LIT_OP : 0) + r.glow * 0.5) * (dialOff ? 0.22 : 1);
+          (r.mesh.userData.baseOpacity + (r.lit ? DIAL_LIT_OP : 0) + r.glow * 0.7) * (dialOff ? 0.22 : 1);
         r.mesh.scale.setScalar(r.radius * (1 + r.glow * 0.12)); // fixed radius, a touch bigger on a pulse
       }
     }

@@ -41,7 +41,11 @@ export default function RailScroll() {
         const r = el.getBoundingClientRect();
         const runway = el.classList.contains("rail-clip") ? reserve + 12 : 0; // globals.css .rail-clip
         const contentH = el.scrollHeight - runway;
-        const avail = window.innerHeight - reserve + 24 - r.top; // space above the band (+tolerance)
+        // Space above the band, NO tolerance: any entry into the chart band fades (a +24px
+        // slack let the rail overlap the chart unfaded — user bug; the content-height measure
+        // is DOM-change-driven, so borderline flicker isn't a concern the way it was for the
+        // old rect-based measure).
+        const avail = window.innerHeight - reserve - r.top;
         el.classList.toggle("rail-clip", reserve > 0 && contentH > avail);
       };
       const scheduleClip = () => { if (!raf) raf = requestAnimationFrame(syncClip); };

@@ -139,9 +139,10 @@ export default function RailThread({ side = "right" }: { side?: Side }) {
         aria-hidden
         focusable="false"
       >
-        {/* The LINES sit inside the dim group (REST_DIM) — calm resting furniture; brightness
-           belongs to the signals (view-switch pulse + card edges) and the node dots below. */}
-        <g style={{ opacity: REST_DIM }}>
+        {/* The RULER (neutral line + ticks) is barely dimmed — its greys are already muted, so
+           the resting REST_DIM read as over-faded there (user); only the COLOURED identity
+           spine takes the full resting dim, keeping brightness for the signals + node dots. */}
+        <g style={{ opacity: 0.9 }}>
           {/* neutral base line — SOFT/muted; carries the ruler ticks. */}
           <line x1={gm.neut} y1={0} x2={gm.neut} y2={H} stroke={TICK_LINE} strokeWidth={1} />
           {/* ruler ticker hatches — short marks stepping OUTWARD from the neutral line toward the screen
@@ -149,6 +150,8 @@ export default function RailThread({ side = "right" }: { side?: Side }) {
           {ticks.map((y, i) => (
             <line key={i} x1={gm.neut} y1={y} x2={i % 4 === 0 ? gm.tickMaj : gm.tickMin} y2={y} stroke={i % 4 === 0 ? TICK_MAJOR : TICK_MINOR} strokeWidth={1} />
           ))}
+        </g>
+        <g style={{ opacity: REST_DIM }}>
           {/* identity line — BOTH rails, mirrored (the HUD's resting identity cue; cards are
              spineless at rest). The line is the selection's hue. */}
           <line x1={gm.identity} y1={0} x2={gm.identity} y2={H} stroke={accent} strokeWidth={2} />
