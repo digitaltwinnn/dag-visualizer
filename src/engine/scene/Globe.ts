@@ -39,11 +39,12 @@ import type {
   RouteNode,
 } from "@/src/data/types";
 
-// Geo hex-prism helpers: a node's prism CENTRE sits half its height above the plateau (level 0),
+// Geo chip helpers: a node's chip CENTRE sits half its height above the plateau (level 0),
 // each stack level adds CHIP_PITCH; hexPitchDeg(r) is the angular distance between ADJACENT
-// honeycomb cells for hexes of circumradius r (√3·r edge-to-edge + 4% air).
+// honeycomb cells. The chips are ROUND now (radius r), so neighbours touch at 2·r
+// (diameter), not the hex prisms' √3·r edge-to-edge — same 4% air on top.
 const HEX_BASE_R = R + LAND_H + 0.02 + HEX_H / 2;
-const hexPitchDeg = (r: number) => ((Math.sqrt(3) * r * 1.04) / (R + LAND_H)) * (180 / Math.PI);
+const hexPitchDeg = (r: number) => ((2 * r * 1.04) / (R + LAND_H)) * (180 / Math.PI);
 
 const _focusMat = new THREE.Matrix4(); // scratch for reading an instance's live transform
 // The ledger's whole-view orientation (tilt ∘ rotY), baked into every node's ledger position so the

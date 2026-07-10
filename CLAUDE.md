@@ -254,7 +254,7 @@ GPU; no store/react**):
   keeps per-metagraph snapshot buffers + the `anchorIndex` (`getAnchor`; `global`/`status`/
   `cluster`/`anchor` events, `on`/`off`). When the API is unreachable it stays factual (a "NO
   SIGNAL" state) and recovers on the next good poll. It polls regardless of view.
-- `geoResolve.ts` — `loadGeoCache()` (fetches `/api/geo` seed) + best-effort `resolveMissing`
+- `geoResolve.ts` — `loadGeoCache()` (fetches the live `/api/geo` map) + best-effort `resolveMissing`
   for new validator IPs (ip-api over http, ipwho.is over https).
 
 **There is intentionally no `$DAG` price networking** — don't add a market-data fetch unless
@@ -295,8 +295,9 @@ views and caused the ledger red-dots bug; that pattern is forbidden.
 - **Node meshes**: validators and metagraph nodes are **InstancedMesh**es with a patched
   smooth-shaded `MeshStandardMaterial` (`_makeNodeMaterial`) — each instance gets its own
   color (`aBase`) and animated glow (`aEmissive`). In the Hypergraph they're small
-  **spheres**; on the globe they cross-fade to standing **HEX PRISMS** (6-seg cylinder,
-  circumradius = `geoSize`, height `geoLayout.HEX_H`, slightly glassy `HEX_ALPHA 0.8` — a wireframe
+  **spheres**; on the globe they cross-fade to standing **round CHIPS** (32-seg
+  cylinder — was a hex prism, user re-shaped 2026-07-10; identifiers keep their hex-era names;
+  radius = `geoSize`, height `geoLayout.HEX_H`, slightly glassy `HEX_ALPHA 0.8` — a wireframe
   overlay was tried and rejected; EDGE-LIT: dim sides, bright top cap + fresnel rim redistribute
   the emissive so stacks read as lit chips, not a flat mass; `discFall()` eases them out toward the
   limb — needs the camera); in the ledger they're flat **coins** (the sphere squashed on Y,
@@ -993,8 +994,9 @@ can't fetch them — but the **Next Node server can**:
     one batched call per 10-min regeneration; for a commercial product switch to an HTTPS
     geo provider with an SLA + license (ipinfo, MaxMind, ip-api Pro). The validator-side
     resolver (`src/data/geoResolve.ts`) likewise uses ip-api (http) + ipwho.is (https).
-- **`app/api/geo/route.ts`** serves the validator geo seed (`data/geo.json`, imported) so
-  the globe plots instantly; `geoResolve.ts resolveMissing` fills new validator IPs.
+- **`app/api/geo/route.ts`** serves the validator IP→geo map LIVE (fetches both validator
+  clusters server-side + the shared ip-api batch, `unstable_cache` 1h, 503 on failure) so the
+  globe plots instantly from one request; `geoResolve.ts resolveMissing` fills any misses.
 - **`app/api/snapshot/[ordinal]/route.ts`** reads the **raw L0 global snapshot** (~2.5 MB)
   and returns a tiny `SnapshotExact` (exact fee, size KB, state-record count, per-metagraph
   breakdown incl. unlisted). **Cached per ordinal** (`unstable_cache`, immutable; throws on

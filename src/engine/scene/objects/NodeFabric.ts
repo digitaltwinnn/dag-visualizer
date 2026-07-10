@@ -106,7 +106,8 @@ export class NodeFabric {
     const mat = new THREE.MeshStandardMaterial({
       color: 0xffffff,
       roughness: flat ? 0.3 : 0.5, metalness: flat ? 0.35 : 0.2,
-      flatShading: flat, // crisp facet definition on the hex prisms; spheres stay smooth
+      // smooth-shaded everywhere: the chips are ROUND now (flat shading was the hex prisms'
+      // facet-definition trick); the edge-lit cap/fresnel treatment is shading-independent.
       transparent: alpha < 1, opacity: alpha,
     });
     mat.onBeforeCompile = (shader) => {
@@ -140,9 +141,10 @@ export class NodeFabric {
     const picks = new Array(total);
 
     const sphereGeo = (this._sphereGeo ||= new THREE.SphereGeometry(0.5, 16, 12)).clone();
-    // GEO node: a HEX PRISM (user spec) — unit circumradius, unit height (scaled to
-    // (geoSize, HEX_H, geoSize)); thetaStart π/6 puts an EDGE toward each honeycomb neighbour.
-    const hexGeo = (this._hexGeo ||= new THREE.CylinderGeometry(1, 1, 1, 6, 1, false, Math.PI / 6)).clone();
+    // GEO node: a round CHIP (user, 2026-07-10 — was a hex prism; only the geometry changed,
+    // the edge-lit cap/side treatment stays): unit radius, unit height, scaled to
+    // (geoSize, HEX_H, geoSize). Identifiers keep their hex-era names.
+    const hexGeo = (this._hexGeo ||= new THREE.CylinderGeometry(1, 1, 1, 32)).clone();
     const wrap = (geo: THREE.BufferGeometry): THREE.InstancedBufferAttribute => {
       geo.setAttribute("aBase", new THREE.InstancedBufferAttribute(baseArr, 3));
       const aE = new THREE.InstancedBufferAttribute(emiArr, 1);
@@ -203,7 +205,7 @@ export class NodeFabric {
     const emiArr = new Float32Array(total).fill(0.5);
     const picks = new Array(total);
     const sphereGeo = new THREE.SphereGeometry(0.5, 16, 12);
-    const hexGeo = new THREE.CylinderGeometry(1, 1, 1, 6, 1, false, Math.PI / 6);
+    const hexGeo = new THREE.CylinderGeometry(1, 1, 1, 32); // round chip (see the validator note)
     const wrap = (geo: THREE.BufferGeometry): THREE.InstancedBufferAttribute => {
       geo.setAttribute("aBase", new THREE.InstancedBufferAttribute(baseArr, 3));
       const aE = new THREE.InstancedBufferAttribute(emiArr, 1);
