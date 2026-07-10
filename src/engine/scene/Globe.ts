@@ -25,7 +25,7 @@ import { surfFade, extrasFade } from "../domain/morph";
 import { ArcSim, type ArcEndpoint } from "../domain/arcSim";
 import type { MetaNodeRecord, ValidatorRecord } from "../domain/records";
 import { buildGeoView, setCountryBorder, type GeoViewHost } from "./views/GeoView";
-import { ccToNumeric, COUNTRY_LEAN_MAX, geometryRings, mainPolygonRings, ringsAngularRadius, ringsCentroid, type Ring } from "../domain/countryShape";
+import { ccToNumeric, geometryRings, GLOBE_LEAN_MAX, mainPolygonRings, ringsAngularRadius, ringsCentroid, type Ring } from "../domain/countryShape";
 import { NodeFabric, type FrameCtx } from "./objects/NodeFabric";
 import { Arcs } from "./objects/Arcs";
 import type { HyperView } from "./views/HyperView";
@@ -130,6 +130,7 @@ export class Globe implements GeoViewHost {
   landFillMat?: THREE.MeshBasicMaterial;
   landFillMesh?: THREE.Mesh;
   facingUniform?: GeoViewHost["facingUniform"]; // shared camera-facing uniform (graticule + walls)
+  closeUniform?: GeoViewHost["closeUniform"];   // shared closeness uniform (wall sharpening + far-side damp)
   poleRoses?: GeoViewHost["poleRoses"];         // the polar compass roses (faded per frame here)
   countryGeoms?: GeoViewHost["countryGeoms"];   // per-country geometries (drill border + framing)
   countryBorder?: GeoViewHost["countryBorder"]; // the drill border LineSegments + its fade entry
@@ -390,18 +391,19 @@ export class Globe implements GeoViewHost {
     return geom ? geometryRings(geom) : null;
   }
 
-  // Aim the globe so the country's shape centroid faces the camera (same capped lean as
-  // focusDensest). Returns the centroid's elevation angle + the country's angular radius for
-  // the shape-based framing, or null when the shape is unknown (unknown cc / topology still
-  // loading — the caller falls back to the node-mean spin). Framing composes on the MAIN
-  // landmass (mainPolygonRings) — the border still draws the whole country.
+  // Aim the globe so the country's shape centroid faces the camera (same gentle lean cap as
+  // focusDensest — the constant viewing angle comes from countryFraming's camera construction,
+  // not the lean). Returns the centroid's elevation angle + the country's angular radius, or
+  // null when the shape is unknown (unknown cc / topology still loading — the caller falls
+  // back to the node-mean spin). Framing composes on the MAIN landmass (mainPolygonRings) —
+  // the border still draws the whole country.
   focusCountryShape(cc: string | null): { latAngle: number; angularRadius: number } | null {
     const ccn = ccToNumeric(cc);
     const geom = ccn ? this.countryGeoms?.get(ccn) : null;
     const rings = geom ? mainPolygonRings(geom) : null;
     const centroid = rings?.length ? ringsCentroid(rings) : null;
     if (!rings || !centroid) return null;
-    this._aimAt(centroid, COUNTRY_LEAN_MAX);
+    this._aimAt(centroid, GLOBE_LEAN_MAX);
     return {
       latAngle: Math.atan2(centroid.y, Math.hypot(centroid.x, centroid.z)),
       angularRadius: ringsAngularRadius(rings, centroid),
@@ -622,6 +624,12 @@ export class Globe implements GeoViewHost {
     // and each polar compass rose fades by its own pole's facing on top of the morph fade —
     // a far-side rose dims hard, so front vs back reads instantly (user).
     if (this.facingUniform && this._hasCam) this.facingUniform.value.copy(this._camN);
+    // Closeness (0 = overview, 1 = country/node zoom) from the camera altitude: the walls
+    // tighten to a crisp rim and the far-side see-through damps out as the camera closes in.
+    if (this.closeUniform && this.camera) {
+      const alt = (this.camera as THREE.Camera).position.length();
+      this.closeUniform.value = THREE.MathUtils.clamp((30 - alt) / 7, 0, 1); // 1 at ≤23, 0 at ≥30
+    }
     if (this.poleRoses) {
       for (const rose of this.poleRoses) {
         const t = THREE.MathUtils.clamp((rose.sign * this._camN.y + 0.15) / 0.5, 0, 1);

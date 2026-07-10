@@ -2,10 +2,9 @@
 // countries topology (public/countries-110m.json, parsed to GeoJSON rings by the scene layer).
 //
 // Two jobs:
-//  1. the drill FRAMING: aim the camera at the country's centroid LATITUDE and zoom to fit its
-//     angular EXTENT (replaces the node-mean concentration zoom, which pinned mid/high-latitude
-//     countries to the top limb of the frame — the globe's lean is capped, so latitude must be
-//     compensated by the camera target, not the spin);
+//  1. the drill FRAMING: a constant-angle pose — the camera approaches the country's centroid
+//     from IN FRONT (the equator side) at one fixed angle above its local tangent plane, at a
+//     distance fit to the country's angular extent (see countryFraming);
 //  2. the selection BORDER: the country's rings as line-segment positions on the plateau.
 //
 // The alpha-2 → numeric join (node geo `cc` → topology country id) is baked offline to
@@ -18,13 +17,11 @@ import type { CameraFraming } from "./cameraRig";
 // One polygon ring: [lon, lat] pairs in degrees (GeoJSON order), first == last.
 export type Ring = [number, number][];
 
-// The globe's max X-lean when aiming a selection to the front. focusDensest's WIDE pose caps
-// at 0.32 (a stronger lean read as "viewing the globe from the north", user); the node zoom
-// leans up to 0.70. The country drill sits between the two: 0.32 left a high-latitude
-// country's residual elevation so high that the CLOSE camera craned ~43° up and pulled the
-// pole into mid-frame (France) — 0.55 brings the country down the front face instead.
+// The globe's max X-lean when aiming a selection to the front (mirrors focusDensest's cap —
+// a stronger lean read as "viewing the globe from the north", user; a FULL lean read as the
+// camera going over the country, upside-down-ish). The constant viewing angle comes from the
+// camera construction below, not from the lean.
 export const GLOBE_LEAN_MAX = 0.32;
-export const COUNTRY_LEAN_MAX = 0.55;
 
 // alpha-2 (node geo `cc`) → the topology's ISO numeric id, or null when unknown.
 export function ccToNumeric(cc: string | null | undefined): string | null {
@@ -98,39 +95,46 @@ export function ringsAngularRadius(rings: Ring[], centroid: THREE.Vector3): numb
   return max;
 }
 
-// Country-drill camera framing from the country's shape (not its nodes): the globe has already
-// been aimed at the centroid (Y-spin + X-lean capped at GLOBE_LEAN_MAX), so the centroid rests
-// on the front meridian at a RESIDUAL elevation (its latitude minus the capped lean). The camera
-// stays in the user-approved low-tilt pose (pos.y fixed, near the equator plane); the DISTANCE
-// fits the country's angular extent, and the AIM is angle-based: the view axis points
-// AIM_BELOW_CENTROID radians below the centroid, so the country rides just above frame-centre
-// at ANY zoom (a fixed-fraction target pull broke at close range — the elevation angle to a
-// high-latitude centroid grows as the camera closes in, pushing it past the FOV-55 top edge).
+// Country-drill camera framing, CONSTANT-ANGLE (user: the old pose read flatter the further
+// north the country; the angle toward the country must always be the same — and approached
+// FROM THE FRONT, not over the top). The globe leans gently (GLOBE_LEAN_MAX), leaving the
+// country's centroid C on the front meridian at a residual elevation `e`; the camera then
+// sits IN FRONT OF AND BELOW C — on the equator side of its meridian, COUNTRY_VIEW_ELEV
+// above C's local tangent plane — angling down at the country. Same surface angle for every
+// country (US vs Finland differ only in DISTANCE, fit to their extent), north stays up, and
+// the camera never crosses over the country's zenith.
 //
 // `latAngle` = the centroid's elevation angle (atan2(dir.y, hypot(dir.x, dir.z))), radians.
-// `angularRadius` = ringsAngularRadius(), radians.
+// `angularRadius` = ringsAngularRadius() over the main landmass, radians.
 export function countryFraming(latAngle: number, angularRadius: number, out: CameraFraming): void {
   const top = R + LAND_H;
-  const lean = THREE.MathUtils.clamp(latAngle, -COUNTRY_LEAN_MAX, COUNTRY_LEAN_MAX);
-  const e = latAngle - lean; // residual elevation after the globe's capped lean
-  const cy = Math.sin(e) * top; // the centroid on the front face, post-spin
+  const lean = THREE.MathUtils.clamp(latAngle, -GLOBE_LEAN_MAX, GLOBE_LEAN_MAX);
+  const e = latAngle - lean; // C's residual elevation on the front face, post-lean
+  const cy = Math.sin(e) * top;
   const cz = Math.cos(e) * top;
-  // Distance: fit the extent within ~a third of the 55° camera's half-frame (margin for the
-  // low-tilt foreshortening), floored so city-states don't slam the surface and clamped so
-  // continent-spanning countries stay inside the geoNetwork-ish wide end.
+  // Distance: fit the extent within ~a third of the 55° camera's half-frame, floored so
+  // city-states don't slam the surface, capped so continent-spanning countries stay inside
+  // a readable wide pose.
   const halfSpan = Math.max(0.06, angularRadius);
   const FIT_TAN = 0.27; // ≈ tan(15°) — the comfortable half-angle inside the FOV-55 frame
-  const need = (Math.sin(halfSpan) * top) / FIT_TAN;
-  const py = 1.5;
-  const pz = THREE.MathUtils.clamp(cz + need, 22, 34);
-  out.pos.set(0, py, pz);
-  const elev = Math.atan2(cy - py, pz - cz); // camera → centroid elevation
-  const aim = elev - AIM_BELOW_CENTROID;
-  const tz = cz * 0.35; // target depth pulled toward the globe centre (composed pivot)
-  out.target.set(0, py + Math.tan(aim) * (pz - tz), tz);
+  const D = THREE.MathUtils.clamp((Math.sin(halfSpan) * top) / FIT_TAN, 5, 20);
+  // Approach direction (in the meridian plane): COUNTRY_VIEW_ELEV above C's tangent plane on
+  // the EQUATOR side — v̂ = (0, -cos(e+φ), sin(e+φ)). Clamped just short of π/2 so even a
+  // polar territory keeps the camera on the front side of its zenith (bites only above ~66°;
+  // every node country today keeps the exact angle).
+  const a = Math.min(e + COUNTRY_VIEW_ELEV, 1.55);
+  out.pos.set(0, cy - Math.cos(a) * D, cz + Math.sin(a) * D);
+  // Aim slightly below C along the surface's south direction — the country rides just above
+  // frame-centre.
+  const drop = Math.tan(AIM_BELOW_CENTROID) * D;
+  out.target.set(0, cy - Math.cos(e) * drop, cz + Math.sin(e) * drop);
 }
 
-// How far below the centroid the view axis aims (radians): the country appears this angle
+// The fixed elevation of the camera above the country's local tangent plane (radians,
+// ~41° — top-down enough that the outline reads as a shape, not a silhouette).
+export const COUNTRY_VIEW_ELEV = 0.72;
+
+// How far below the front point the view axis aims (radians): the country appears this angle
 // ABOVE frame-centre — ~30% up the FOV-55 half-frame.
 export const AIM_BELOW_CENTROID = 0.15;
 

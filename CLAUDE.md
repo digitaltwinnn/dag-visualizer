@@ -213,8 +213,9 @@ store-value imports**, enforced by `layerBoundaries.test.ts`). Each ships coloca
   (alpha-2 → world-atlas numeric id via the baked `data/country-codes.json`), `geometryRings` /
   `mainPolygonRings` (framing composes on the main landmass; the border draws all polygons),
   `ringsCentroid` (3D-unit-dir mean, segment-length-weighted — antimeridian-safe, no unwrap),
-  `ringsAngularRadius`, `countryFraming` (extent-fit zoom + the `AIM_BELOW_CENTROID` angle-based
-  aim), `ringsToSegments` (the border hairline's positions), `COUNTRY_LEAN_MAX`/`GLOBE_LEAN_MAX`.
+  `ringsAngularRadius`, `countryFraming` (the constant-angle front-approach pose —
+  `COUNTRY_VIEW_ELEV` above the tangent, `AIM_BELOW_CENTROID` composition drop, extent-fit
+  distance), `ringsToSegments` (the border hairline's positions), `GLOBE_LEAN_MAX`.
 - `geoStats.ts` — the geo "data" layer: per-country tallies + the flat node-browser list,
   **pure functions** over the node record arrays (no Three/mesh state).
 
@@ -253,8 +254,13 @@ GPU; no store/react**):
   graticule (base 0.06) spanning the whole sphere carries the digital line work. GeoView also
   owns the **country drill border** (`setCountryBorder` — one `LineSegments` rebuilt per
   drill/hover change) + the per-country geometry index (`countryGeoms`, world-atlas numeric id →
-  geometry; `onCountriesReady` re-asserts a drill made before the async load). Nodes/arcs sit
-  on the plateau (`R+LAND_H+ε`).
+  geometry; `onCountriesReady` re-asserts a drill made before the async load). A shared
+  **closeness uniform** (`closeUniform`, written from the camera altitude each frame: 0 at the
+  overview, 1 at country/node range) sharpens the surface up close — the walls damp their soft
+  body glow and tighten/brighten the top rim (the ridge read as FUZZ at node range, user), and
+  BOTH the walls' and the graticule's far-hemisphere facing floor drops to near-zero (looking
+  THROUGH the globe distracted at close range, user). Nodes/arcs sit on the plateau
+  (`R+LAND_H+ε`).
 - `views/LedgerView.ts` — the Snapshots view's 3D settlement chamber over `ledgerModel` (see
   its own section below).
 
@@ -358,24 +364,25 @@ views and caused the ledger red-dots bug; that pattern is forbidden.
     flies to it, and marks the row with the shared selection ✓ (`SELECTED_ROW` +
     `SelectedRowMark`, same language as the node rows); click again to clear; switching
     network clears it. **The drill is shape-driven** (2026-07-10, `domain/countryShape.ts` over
-    `public/countries-110m.json`): the globe spins to the country's polygon **centroid**
-    (`focusCountryShape`, lean cap `COUNTRY_LEAN_MAX` 0.55 — between focusDensest's 0.32 and the
-    node zoom's 0.70) and `countryFraming()` zooms to fit its angular **extent**, aiming the view
-    axis `AIM_BELOW_CENTROID` below the centroid so the country rides just above frame-centre at
-    any zoom (a fixed-fraction target aim broke at close range — high-latitude countries shot past
-    the FOV top). Framing composes on the **main landmass** (`mainPolygonRings` — France's
-    geometry includes French Guiana, the US's Alaska/Hawaii; the mainland leads, the node-mean
-    framing is the fallback while the topology loads). A **cyan hairline border** (structural, not
-    identity) outlines the drilled country at plateau height — invisible at rest (the surface
-    stays clean), whisper-level (0.3) while a country ROW is hovered (`store.hoverCountry` →
-    `globe.setHoverCountry`, the committed drill's 0.75 wins), gone on deselect; it's a
-    `geoFades` entry whose `base` IS the level, so the morph gates it for free. ⚠️ **Data
-    rebuilds must not wipe the drill**: `Globe.setMetagraphs` restores its own `countryFilter`
-    around the internal `setFilter`, and `Engine.applyFilter`'s geo branch re-asserts
-    `this.country` — the background cluster poll (`_applyMetagraphs → applyFilter(false)`) used
-    to silently clear the drill's dim + border seconds after every drill (long-standing bug,
-    found+fixed 2026-07-10; a real filter SWITCH still clears the drill by design — the store
-    subscription nulls `country` first).
+    `public/countries-110m.json`): the globe spins to the country's polygon **centroid** (gentle
+    `GLOBE_LEAN_MAX` lean — a FULL lean read as the camera going over the country) and
+    `countryFraming()` builds a **constant-angle pose**: the camera approaches from IN FRONT
+    (the equator side of the country's meridian) at `COUNTRY_VIEW_ELEV` (~41°) above its local
+    tangent plane, aimed `AIM_BELOW_CENTROID` below it — every country is viewed at the SAME
+    surface angle, north up, never over the zenith; only the DISTANCE varies, fit to the
+    country's angular extent (floor 5 / cap 20). Framing composes on the **main landmass**
+    (`mainPolygonRings` — France's geometry includes French Guiana, the US's Alaska/Hawaii; the
+    mainland leads, the node-mean framing is the fallback while the topology loads). A **cyan
+    hairline border** (structural, not identity) outlines the drilled country at plateau height
+    — invisible at rest (the surface stays clean), whisper-level (0.3) while a country ROW is
+    hovered (`store.hoverCountry` → `globe.setHoverCountry`, the committed drill's 0.75 wins),
+    gone on deselect; it's a `geoFades` entry whose `base` IS the level, so the morph gates it
+    for free. ⚠️ **Data rebuilds must not wipe the drill**: `Globe.setMetagraphs` restores its
+    own `countryFilter` around the internal `setFilter`, and `Engine.applyFilter`'s geo branch
+    re-asserts `this.country` — the background cluster poll (`_applyMetagraphs →
+    applyFilter(false)`) used to silently clear the drill's dim + border seconds after every
+    drill (long-standing bug, found+fixed 2026-07-10; a real filter SWITCH still clears the
+    drill by design — the store subscription nulls `country` first).
   - **Hypergraph**: `_focusFilter` flies the camera to the selected hub (using its
     **local/unscaled** position — `layers.root` is morph-scaled, so `getWorldPosition` would
     aim at the origin mid-morph), framed slightly off the radial line so the core sits to the

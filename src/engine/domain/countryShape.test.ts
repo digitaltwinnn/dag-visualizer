@@ -8,8 +8,8 @@ import {
   ringsAngularRadius,
   countryFraming,
   ringsToSegments,
-  COUNTRY_LEAN_MAX,
-  AIM_BELOW_CENTROID,
+  COUNTRY_VIEW_ELEV,
+  GLOBE_LEAN_MAX,
   type Ring,
 } from "./countryShape";
 import { R, LAND_H, latLonToVec3 } from "./geoLayout";
@@ -100,38 +100,51 @@ describe("countryFraming", () => {
   const out = { pos: new THREE.Vector3(), target: new THREE.Vector3() };
   const top = R + LAND_H;
 
-  // The framing invariant: the centroid appears AIM_BELOW_CENTROID radians above the view
-  // axis — at any latitude and any zoom (the top-limb fix).
-  const centroidAboveAxis = (latAngle: number) => {
-    const e = latAngle - THREE.MathUtils.clamp(latAngle, -COUNTRY_LEAN_MAX, COUNTRY_LEAN_MAX);
-    const cy = Math.sin(e) * top;
-    const cz = Math.cos(e) * top;
-    const elevCentroid = Math.atan2(cy - out.pos.y, out.pos.z - cz);
-    const elevAxis = Math.atan2(out.target.y - out.pos.y, out.pos.z - out.target.z);
-    return elevCentroid - elevAxis;
+  // C = the country's front point after the gentle lean.
+  const C = (latAngle: number) => {
+    const e = latAngle - THREE.MathUtils.clamp(latAngle, -GLOBE_LEAN_MAX, GLOBE_LEAN_MAX);
+    return new THREE.Vector3(0, Math.sin(e) * top, Math.cos(e) * top);
+  };
+  // The invariant: the camera sits COUNTRY_VIEW_ELEV above C's local tangent plane — the
+  // same surface angle for every country, at any latitude and any extent.
+  const camElevAboveTangent = (latAngle: number) => {
+    const c = C(latAngle);
+    const n = c.clone().normalize();
+    const v = out.pos.clone().sub(c).normalize();
+    return Math.asin(v.dot(n));
   };
 
-  it("keeps a high-latitude centroid just above frame-centre at CLOSE zoom (the top-limb fix)", () => {
-    countryFraming(0.9, 0.05, out); // ~51°N (Germany-ish), compact extent → near-end zoom
-    expect(out.pos.z).toBe(22);
-    expect(centroidAboveAxis(0.9)).toBeCloseTo(AIM_BELOW_CENTROID, 5);
+  it("views every country at the same surface angle (equator, Germany, Finland)", () => {
+    for (const lat of [0.05, 0.9, 1.12]) {
+      countryFraming(lat, 0.08, out);
+      expect(camElevAboveTangent(lat)).toBeCloseTo(COUNTRY_VIEW_ELEV, 5);
+    }
   });
 
-  it("holds the same aim invariant WIDE (continent-spanning extent)", () => {
-    countryFraming(0.8, 0.7, out); // US-with-Alaska-ish
-    expect(out.pos.z).toBe(34); // clamped at the wide end
-    expect(centroidAboveAxis(0.8)).toBeCloseTo(AIM_BELOW_CENTROID, 5);
+  it("approaches from IN FRONT (equator side) — never over the country's zenith", () => {
+    for (const lat of [0.05, 0.9, 1.12]) {
+      countryFraming(lat, 0.08, out);
+      const c = C(lat);
+      expect(out.pos.y).toBeLessThan(c.y + 1e-9); // below the country point, not above it
+      expect(out.pos.z).toBeGreaterThan(c.z); // outward, in front of the surface
+    }
   });
 
-  it("and for an equatorial centroid", () => {
-    countryFraming(0.1, 0.1, out); // within COUNTRY_LEAN_MAX — the lean covers the latitude
-    expect(centroidAboveAxis(0.1)).toBeCloseTo(AIM_BELOW_CENTROID, 5);
+  it("distance is fit to extent — floored, monotonic, capped", () => {
+    const dist = (ang: number) => {
+      countryFraming(0.9, ang, out);
+      return out.pos.distanceTo(C(0.9));
+    };
+    expect(dist(0.02)).toBeCloseTo(5, 9); // floor
+    expect(dist(0.25)).toBeGreaterThan(dist(0.12));
+    expect(dist(0.7)).toBeCloseTo(20, 9); // cap
   });
 
-  it("keeps the low-tilt camera pose (pos.y fixed, camera outside the globe)", () => {
-    countryFraming(0.2, 0.2, out);
-    expect(out.pos.y).toBe(1.5);
-    expect(out.pos.length()).toBeGreaterThan(top); // never inside the surface
+  it("aims slightly below the country point (rides above frame-centre) and stays outside the globe", () => {
+    countryFraming(0.9, 0.12, out);
+    const c = C(0.9);
+    expect(out.target.y).toBeLessThan(c.y); // aim dropped south along the surface
+    expect(out.pos.length()).toBeGreaterThan(top);
   });
 
   it("allocates nothing (writes into the caller's out struct)", () => {

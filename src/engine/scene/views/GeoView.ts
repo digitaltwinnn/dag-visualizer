@@ -38,6 +38,11 @@ export interface GeoViewHost {
   // each frame): the graticule + coastal walls dim their far-hemisphere fragments through it,
   // so the see-through backside stays present but visibly "behind" (user: front/back ambiguity).
   facingUniform?: { value: THREE.Vector3 };
+  // Shared CLOSENESS uniform (0 = overview, 1 = country/node zoom; Globe writes it from the
+  // camera altitude each frame): up close the coastal walls tighten to a crisp rim (the soft
+  // ridge read as fuzz at node range, user) and the far-side see-through drops to near-nothing
+  // (looking THROUGH the globe distracted at close range, user).
+  closeUniform?: { value: number };
   // The polar compass roses' materials, faded per frame by BOTH the morph fade and the pole's
   // own facing (a rose on the far side dims hard — the depth cue that killed the ambiguity).
   poleRoses?: Array<{ mats: Array<THREE.Material & { opacity: number }>; bases: number[]; sign: number }>;
@@ -76,17 +81,21 @@ function buildGraticule(globe: GeoViewHost) {
   const mat = new THREE.LineBasicMaterial({ color: globe.geoColor, transparent: true, opacity: 0 });
   // FACING dim: far-hemisphere fragments fade to ~30% so the backside reads as behind the globe
   // instead of blending with the front (the hologram keeps its see-through presence, quieter).
+  // The floor drops to near-zero as the camera closes in (uClose) — at country/node range the
+  // far side showing through read as visual noise (user).
   globe.facingUniform = { value: new THREE.Vector3(0, 0, 1) };
+  globe.closeUniform = { value: 0 };
   mat.onBeforeCompile = (sh) => {
     sh.uniforms.uCamN = globe.facingUniform!;
+    sh.uniforms.uClose = globe.closeUniform!;
     sh.vertexShader = sh.vertexShader
       .replace("#include <common>", "#include <common>\nvarying vec3 vDir;")
       .replace("#include <begin_vertex>", "#include <begin_vertex>\nvDir = normalize(position);");
     sh.fragmentShader = sh.fragmentShader
-      .replace("#include <common>", "#include <common>\nuniform vec3 uCamN;\nvarying vec3 vDir;")
+      .replace("#include <common>", "#include <common>\nuniform vec3 uCamN;\nuniform float uClose;\nvarying vec3 vDir;")
       .replace(
         "#include <color_fragment>",
-        "#include <color_fragment>\ndiffuseColor.a *= mix(0.3, 1.0, smoothstep(-0.35, 0.2, dot(vDir, uCamN)));",
+        "#include <color_fragment>\ndiffuseColor.a *= mix(mix(0.3, 0.04, uClose), 1.0, smoothstep(-0.35, 0.2, dot(vDir, uCamN)));",
       );
   };
   globe.geoFades.push({ mat, base: 0.06 });
@@ -371,10 +380,12 @@ async function buildLand(globe: GeoViewHost) {
       uTop: { value: top },
       uOpacity: { value: 0 },
     };
-    // The wall material shares the graticule's facing uniform (built first in buildGeoView).
+    // The wall material shares the graticule's facing + closeness uniforms (built first in
+    // buildGeoView).
     const wallUniforms = {
       ...globe.landWallUniforms,
       uCamN: globe.facingUniform ?? { value: new THREE.Vector3(0, 0, 1) },
+      uClose: globe.closeUniform ?? { value: 0 },
     };
     const wallMat = new THREE.ShaderMaterial({
       uniforms: wallUniforms,
@@ -387,7 +398,7 @@ async function buildLand(globe: GeoViewHost) {
         }`,
       fragmentShader: `
         uniform vec3 uColor; uniform float uBase; uniform float uTop; uniform float uOpacity;
-        uniform vec3 uCamN;
+        uniform vec3 uCamN; uniform float uClose;
         varying float vH; varying vec3 vDir;
         void main() {
           float t = clamp((vH - uBase) / (uTop - uBase), 0.0, 1.0);
@@ -397,11 +408,15 @@ async function buildLand(globe: GeoViewHost) {
           // The coastal cliffs use the SURFACE hue (uColor = --primary), dim at the base so they read
           // as a soft ridge blending into the surface. The TOP EDGE carries a clearly brighter
           // highlight (user-tuned: shorter walls, brighter rim) so the coastline stays legible.
-          float edge = smoothstep(0.65, 1.0, t);
+          // Up close (uClose) the soft ridge read as FUZZ (user): the body glow damps down and the
+          // rim band tightens + brightens, so the coastline resolves into a crisp line.
+          float body = (0.03 + 0.13 * e) * mix(1.0, 0.4, uClose);
+          float edge = smoothstep(mix(0.65, 0.86, uClose), 1.0, t) * mix(0.24, 0.36, uClose);
           // FACING dim: far-hemisphere cliffs stay visible (the hologram's see-through
-          // presence) but clearly BEHIND — see GeoViewHost.facingUniform.
-          float facing = mix(0.35, 1.0, smoothstep(-0.35, 0.15, dot(vDir, uCamN)));
-          gl_FragColor = vec4(uColor * (0.03 + 0.13 * e + 0.24 * edge), min(1.0, e * 0.72) * uOpacity * facing);
+          // presence) but clearly BEHIND — and near-invisible at close range (uClose), where
+          // seeing through the globe distracted (user). See GeoViewHost.facingUniform/closeUniform.
+          float facing = mix(mix(0.35, 0.04, uClose), 1.0, smoothstep(-0.35, 0.15, dot(vDir, uCamN)));
+          gl_FragColor = vec4(uColor * (body + edge), min(1.0, e * mix(0.72, 0.6, uClose)) * uOpacity * facing);
         }`,
       // Single-sided so only cliffs whose face points toward the camera draw: a
       // continent's near + side edges show, its far edge (behind the filled plateau)
