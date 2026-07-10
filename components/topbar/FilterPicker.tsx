@@ -9,8 +9,9 @@ import {
   Command, CommandInput, CommandList, CommandEmpty, CommandGroup, CommandItem,
 } from "@/components/ui/command";
 
-// The expanded filter body: a compact, searchable identity-selection menu. `All · whole network`
-// pinned on top (the clear/default), then one row per core — a small identity-hue DOT + name +
+// The expanded filter body: a compact, searchable identity-selection menu. The `All` row
+// pinned on top (the clear/default — one line like every other row: dot + "All" +
+// "<n> metagraphs" in the ticker slot + the node count right-aligned), then one row per core — a small identity-hue DOT + name +
 // ticker + node count — SORTED by located-node count desc, so 0-located metagraphs sink to the
 // bottom (shown greyed with their real count, never hidden). No logo tiles (they ate width and
 // read as heavy chrome); the dot carries identity, matching the collapsed filter face + the rail.
@@ -66,15 +67,17 @@ export default function FilterPicker({ onPick }: { onPick?: () => void }) {
         <CommandEmpty>No metagraph found.</CommandEmpty>
         <CommandGroup>
           <CommandItem
-            value="all whole network"
+            value="all metagraphs"
             onSelect={() => pick("all")}
             className={rowClass(filter === "all", false)}
             onMouseEnter={() => setHoverFilter("all")}
           >
             <IdentityDot hue="var(--primary)" />
             <span className="text-body text-foreground">All</span>
-            <span className="col-start-2 text-muted-foreground text-label">whole network</span>
-            <span className="text-label text-muted-foreground tabular-nums text-right">{mappedCount} · {totalNodes} nodes</span>
+            {/* one line like the metagraph rows (user): the mapped-core count sits in the
+                ticker slot, the node total right-aligns as a bare number like every row */}
+            <span className="text-label text-muted-foreground whitespace-nowrap">{mappedCount} metagraphs</span>
+            <span className="text-label text-muted-foreground tabular-nums text-right">{totalNodes}</span>
             {filter === "all" && <SelectedRowMark className="absolute right-2" />}
           </CommandItem>
         </CommandGroup>
