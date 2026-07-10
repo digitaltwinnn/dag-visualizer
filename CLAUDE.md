@@ -19,7 +19,8 @@ mode !== "ledger"`):
   L0 / cL1 / dL1 nodes in concentric shells. **One unified node model** — the DAG is itself a
   metagraph-shaped "core" (see *Nodes, layers & the filter*), not a separate L0/L1 pair.
 - **Node geography** (`geo`, 3D) — a globe with every node at its real geolocation, a density
-  heatmap, travelling-packet connection arcs, and the country→nodes explorer.
+  travelling-packet connection arcs, and the country→nodes explorer (the old density heatmap +
+  rings were removed entirely, 2026-07-09 — the honeycomb node stacks themselves show density).
 - **Snapshots** (`ledger`, 3D) — a built 3D "settlement chamber" (`scene/views/LedgerView.ts`):
   a stack of transparent glass FLOORS (layers) on Y. It **REUSES the same node meshes** from
   hyper/geo (placed into per-metagraph Z-lanes by `scene/Globe.ts`), and draws its own centred live
@@ -180,14 +181,20 @@ Zustand store. **Two data lanes:** (A) high-freq visuals subscribe straight to
 store-value imports**, enforced by `layerBoundaries.test.ts`). Each ships colocated tests:
 
 - `viewPolicy.ts` — the per-`Mode` allow-list table (`VIEW_POLICIES`): canvas / morph target /
-  sim gates / shown geometry / pick sources / DoF eligibility / fog, as DATA. The single source
-  of truth for what each view turns on (see *Per-view behaviour*).
+  sim gates / shown geometry / pick sources / DoF eligibility / camera zoom floor
+  (geo also sets `minCamAlt: 18` — a camera-ALTITUDE floor the Engine enforces after each controls
+  update, because the orbit target is off-centre in geo so the stock target-distance clamp alone
+  is inconsistent around the globe), as
+  DATA. The single source of truth for what each view turns on (see *Per-view behaviour*).
 - `morph.ts` — the hyper↔geo morph easing + derived visibility ramps.
 - `nodeLayout.ts` — the node placement math: fibonacci shells around the core/hubs, the
   sphere→disc geo positions, `spreadCoLocated()` phyllotaxis fan-out.
 - `dimModel.ts` — pure filter/hover/country dim + emissive resolution; a tested reference spec
   the scene layer currently reimplements inline (`NodeFabric`'s glow writers, `Globe._dimScale`/
-  `_applyDim`) rather than calling.
+  `_applyDim`) rather than calling. The DAG core dims as ONE value (the old per-layer `{l0,l1}`
+  pair always moved in lockstep and was collapsed, 2026-07-09); node glow is STEADY — validator
+  and metagraph pools share one formula (`0.5 + 0.08·morph`), the decorative twinkle shimmer
+  was removed (user).
 - `arcSim.ts` — the travelling-packet arc simulation: a swarm of comet "agents" that hop
   node→node. **Emits flash EVENTS via a ring buffer** — no cross-view side-channel mutation.
 - `ledgerModel.ts` — the Snapshots chamber's layout/slot/tile model over the live snapshot data.
@@ -218,7 +225,6 @@ GPU; no store/react**):
   with the patched smooth-shaded `MeshStandardMaterial` (per-instance `aBase`/`aEmissive`).
 - `objects/Arcs.ts` — the ONE `LineSegments` draw call for the arcs; rewrites head/tail
   positions each frame from `arcSim`'s state and **applies its flash events** to the nodes.
-- `objects/Heatmap.ts` — the geo density heatmap.
 - `objects/Background.ts` — the skydome. The **geo** end is the twinkling starfield + faint
   nebula; the **hyper** end is a **single flat colour** (no animation, no gradient, no tint — an
   animated backdrop read as distracting). Only `uTime`/`uMorph` drive it.
@@ -226,14 +232,19 @@ GPU; no store/react**):
   metagraph **hubs** (from `config.METAGRAPHS`). The core is parented to the scene (not
   `root`) so the morph can **grow it out to the globe's radius and dissolve it** as the Earth
   fades in. Hubs fade out early.
-- `views/GeoView.ts` — the geo globe SURFACE: body sphere, graticule, atmosphere rim, and the
+- `views/GeoView.ts` — the geo globe SURFACE: body sphere, graticule, atmosphere rim, the polar
+  **compass roses** (hairline dial + micro N/S letter over each pole, in `globe.group` so they
+  rotate truthfully — E/W are deliberately not floated), and the
   **solid raised continents**. The land is the `land-110m` polygons triangulated into a
   **plateau** at radius `R+LAND_H` (earcut via `THREE.ShapeUtils`, with a longitude **unwrap**
   for the 4 antimeridian-crossing polygons, an Antarctica **pole-cap**, and a uniform `n=4`
   subdivision so facets hug the sphere with no T-junction cracks), capped by additive coastal
   **"wall" cliffs** (BackSide-culled, dim rim, always the default cyan — metagraph-tinting it
-  read as too dominant). Nodes/heatmap/arcs sit on the plateau (`R+LAND_H+ε`); the body sphere
-  (`renderOrder -2`) and fill (`-1`) keep the depth/transparency sort deterministic.
+  read as too dominant). The land surface is a SIMPLE FILL (luminance `rgb(14,14,14)` in the
+  baked texture, user-tuned) — the tile/micro-grid was removed entirely (user, after an A/B);
+  the sea graticule (base 0.06) spanning the whole sphere carries the digital line work.
+  Nodes/arcs sit on the plateau (`R+LAND_H+ε`); the body sphere (`renderOrder -2`) and fill
+  (`-1`) keep the depth/transparency sort deterministic.
 - `views/LedgerView.ts` — the Snapshots view's 3D settlement chamber over `ledgerModel` (see
   its own section below).
 
@@ -243,7 +254,7 @@ GPU; no store/react**):
   keeps per-metagraph snapshot buffers + the `anchorIndex` (`getAnchor`; `global`/`status`/
   `cluster`/`anchor` events, `on`/`off`). When the API is unreachable it stays factual (a "NO
   SIGNAL" state) and recovers on the next good poll. It polls regardless of view.
-- `geoResolve.ts` — `loadGeoCache()` (fetches `/api/geo` seed) + best-effort `resolveMissing`
+- `geoResolve.ts` — `loadGeoCache()` (fetches the live `/api/geo` map) + best-effort `resolveMissing`
   for new validator IPs (ip-api over http, ipwho.is over https).
 
 **There is intentionally no `$DAG` price networking** — don't add a market-data fetch unless
@@ -284,9 +295,13 @@ views and caused the ledger red-dots bug; that pattern is forbidden.
 - **Node meshes**: validators and metagraph nodes are **InstancedMesh**es with a patched
   smooth-shaded `MeshStandardMaterial` (`_makeNodeMaterial`) — each instance gets its own
   color (`aBase`) and animated glow (`aEmissive`). In the Hypergraph they're small
-  **spheres**; on the globe they cross-fade to flat **discs** (`discFall()` fades them out
-  toward the limb — needs the camera). Per-instance transforms via the shared `_dummy`.
-  (Don't introduce "box"/"cube" naming — they are spheres/discs.)
+  **spheres**; on the globe they cross-fade to standing **round CHIPS** (32-seg
+  cylinder — was a hex prism, user re-shaped 2026-07-10; identifiers keep their hex-era names;
+  radius = `geoSize`, height `geoLayout.HEX_H`, slightly glassy `HEX_ALPHA 0.8` — a wireframe
+  overlay was tried and rejected; EDGE-LIT: dim sides, bright top cap + fresnel rim redistribute
+  the emissive so stacks read as lit chips, not a flat mass; `discFall()` eases them out toward the
+  limb — needs the camera); in the ledger they're flat **coins** (the sphere squashed on Y,
+  `COIN_H`). Per-instance transforms via the shared `_dummy`.
 - **DAG L0/L1** are two fibonacci shells around the core. **Each metagraph** is laid out the
   same way around its hub: concentric shells **L0 inner → data-L1 (dl1) middle →
   currency-L1 (cl1) outer**. Metagraph nodes live in the rotating globe group but stay glued
@@ -302,24 +317,38 @@ views and caused the ledger red-dots bug; that pattern is forbidden.
   (user decision) — they're real metagraphs, selectable in Hypergraph/Snapshots, just not
   plottable; picking one lands geo in its quiet-empty state and the right rail shows the
   honest state-aware hint (see *State-aware pick hints*).
-- Co-located nodes are fanned out deterministically by `spreadCoLocated()` (phyllotaxis);
-  the density ring encircles the cluster. Don't add random jitter.
+- Co-located nodes are laid out deterministically by `spreadCoLocated()` as **poker-chip
+  STACKS in a HONEYCOMB** (2026-07-09, user design): the group is chunked into stack heights
+  of 5–10 (`stackSizes` — one hex per REAL node, sizes always sum to the true count; honest,
+  never randomized), stacks sit on adjacent hex cells (`hexCell` spiral, edges touching — no
+  circular fan), and each node's stack LEVEL lifts it radially by `geoLayout.CHIP_PITCH`.
+  The old density heatmap (rings AND glow) was REMOVED entirely (the rings read as extra
+  colour/score; the gradient's hot orange collided with metagraph identity hues and read as a
+  dim/hide bug) — the honeycomb itself shows density. Don't add random jitter.
 - **Arcs are travelling packets**, not fixed lines: `_buildArcs` builds a swarm of comet
   "agents" that each hop node→node (pick a random node in the filter, fly a curved arc,
   flash it on arrival, pause, repeat). All share ONE `LineSegments` (one draw call); only
   their head/tail positions are rewritten on the CPU each frame, coloured per metagraph.
-  Rebuilt on every filter change.
+  Rebuilt on every filter change. Tuned CALM (user, 2026-07-09): slow hops (`speed 0.15–0.35`),
+  long comet tails (`ARC_TAIL 14`, `ARC_TAIL_FRAC 0.42`), longer rests between hops.
 - **The filter** lives in the top command bar (`TopBar` → `FilterPicker`); everything routes
   through `Engine.applyFilter()`, which behaves per-view:
-  - **Geography**: `globe.setFilter()` isolates/dims the selection, the leaderboard
-    refreshes, and `globe.focusDensest()` rotates the globe so the **densest part of the
-    selection faces the camera** (north stays up — Y rotation only) while the camera zooms
-    **proportional to concentration** R = |mean of node dirs| (`_focusGeo`, via `FOCI.geo`):
-    near-co-located selections zoom in subtly, spread ones stay wide.
+  - **Geography — three zoom LEVELS** (user design), each deselect stepping back up one:
+    `globe.setFilter()` isolates/dims the selection, the leaderboard refreshes, and
+    `globe.focusDensest()` rotates the globe so the **densest part of the selection faces the
+    camera** (north stays up — Y rotation only). A **metagraph** selection frames WIDE
+    (`FOCI.geoNetwork`, deliberately farther out than the country pose so drilling still reads
+    as a zoom); a **country** drill flies to the tilted mid framing, zoomed **proportional to
+    concentration** R = |mean of node dirs| (`geoFraming` — the node-zoom's low-camera tilt
+    held farther out); a **node** pick zooms close with the node at the LOWER-third line
+    (`_focusNode` — the look-at point swings far up the globe's rising face; the camera is only
+    ~4.6 units from the node, so screen shifts need big target moves).
   - **Country drill-down** (geo only): the country rows in `GeoExplore` are clickable and
     combine with the network filter (`globe.countryFilter` + eased `countryMix`;
-    `_nodeActive(layer, geo)` gates on BOTH). Clicking a country dims everything outside it
-    and flies to it; click again to clear; switching network clears it.
+    `_nodeActive(layer, geo)` gates on BOTH). Clicking a country dims everything outside it,
+    flies to it, and marks the row with the shared selection ✓ (`SELECTED_ROW` +
+    `SelectedRowMark`, same language as the node rows); click again to clear; switching
+    network clears it.
   - **Hypergraph**: `_focusFilter` flies the camera to the selected hub (using its
     **local/unscaled** position — `layers.root` is morph-scaled, so `getWorldPosition` would
     aim at the origin mid-morph), framed slightly off the radial line so the core sits to the
@@ -392,13 +421,16 @@ and keep changing, so they're examples, not the contract.
   it drills the globe AND expands its nodes inline; node rows are city-first, alphabetical
   per country, with the shared identity dot + status), ledger → `LedgerPanel` (WIP copy).
   Hyper and the placeholders have just the About card.
-- **Right rail** (`#rightcol`, `Inspector`) = the **facts** scope (read-only), a **subject
-  stack**: `ContextCard` at the top (the selected metagraph/core dossier — it mirrors the
-  filter; on "all" it simply doesn't render, the rail rests quiet; its × clears the filter),
-  then the Detail cards from the registry (`store.selStack`, most-recent on top): the
-  **node card** (`geoLive` — location-first title, id demoted to a mono subtitle, status
-  pill in the head aside) and the **snapshot card**. When no detail is up, a slim
-  **state-aware pick hint** shows instead (see the design system). An **instrument-channel
+- **Right rail** (`#rightcol`, `Inspector`) = the **facts** scope (read-only), a set of
+  **FIXED card SLOTS** in one stable order — network dossier, node, snapshot, layer (user
+  design, 2026-07-10; replaced the recency stack + the floating pick-hint): every card the
+  current view CAN produce is always visible — POPULATED when its subject is selected
+  (`ContextCard` mirrors the filter; the **node card** `geoLive` — location-first title, id
+  demoted to a mono subtitle, status pill in the head aside; the **snapshot** and **layer**
+  cards), else as a quiet **GHOST hint card** (a dashed one-liner:
+  kind mark · slot label · instruction — no halo/animation) saying what to interact with — so the rail shows the view's whole possibility space and a deselect
+  returns its slot to the ghost in place. Slot availability + hint copy live in the rail
+  manifest (`railCards.ts`), the same source the dock trays read. An **instrument-channel
   thread** (`RailThread`) runs each rail's outer edge.
 - **Bottom** (`BottomStream`) = the live/time lane: the slim `LiveStrip` bar-chart in EVERY
   view; it publishes `--bottom-reserve`.
@@ -530,7 +562,7 @@ code — reference the tokens. The SVG `RailThread` mirrors the `--thread-*` lit
   `#2af5ff` comment — the token is canonical), and the Engine **dev-warns (±2/channel)** if the
   mirror drifts from the live tokens. **`src/engine/noHardcodedColors.test.ts`** enforces this: it
   fails on any raw `0xRRGGBB` in the scene layer outside a tiny documented allowlist (white tint
-  bases, the functional density-heatmap gradient, the ambient light, the node-dim tone) — runs in
+  bases, the ambient light, the node-dim tone) — runs in
   `npm test`, the same gate as `layerBoundaries.test.ts`. (The JSX/`components/` layer has legacy
   `rgb()`/hex literals that should migrate to the CSS-var tokens + extend the guard — a follow-up.)
 
@@ -571,8 +603,9 @@ signal channel.**
   fixed SVG in the 26px margin — neutral ruler line + ticks, an identity-hued spine (cyan
   for "all"), and a node-dot at each card's middle (measured live via
   ResizeObserver/MutationObserver/scroll; the thread must stay a SIBLING of the rail — the
-  rail's clip/mask would blank a child). Resting lines are dimmed to 60% (`REST_DIM`); the
-  node dots keep full brightness.
+  rail's clip/mask would blank a child). Only the coloured identity spine rests
+  dimmed (`REST_DIM` 60%); the neutral ruler + ticks rest near-full (0.9 — their greys are
+  already muted) and the node dots keep full brightness.
 - **Every card edge signal renders on the SCENE-FACING (inner) edge**: left-rail cards →
   their right edge (`.sig-right::after`), right-rail cards → their left edge (`.sig-left`
   lighting the `.ig-panel::before`). Three levels, and the hierarchy must stay readable at a
@@ -670,7 +703,7 @@ cards: **eyebrow / title / INSET hairline / body**.
 - **`components/state/StateAtoms.tsx`** — empty/loading states built from the app's own
   marks so an absent feed reads as part of the instrument: `NodeStars` (ACQUIRING twinkle),
   `NoSignalDot` + `SonarRing` (NO SIGNAL — the ring is remounted per retry, so the animation
-  IS the retry), `StandbyHalo` (standby / the pick hint's halo).
+  IS the retry), `StandbyHalo` (standby).
 - **`useMinHold(active, holdMs=900, fadeMs=400)`** — every *transient* signal
   (the `BootOverlay`'s "Connecting…", the snapshot card's fee node-stars, AnchoredTags'
   "resolving") holds for a minimum calm cycle even if data resolves instantly, then eases
@@ -680,14 +713,18 @@ cards: **eyebrow / title / INSET hairline / body**.
   not the boot overlay returning. `SceneCanvas` fades the canvas in on the handoff
   (`.scene-in`) and out for the flat views.
 
-### State-aware pick hints
+### Ghost hint cards (the pick hints)
 
-The empty Detail slot shows ONE computed hint (`Inspector.pickHintText`) — view +
-pickability → message, so the slot always shows some guidance and never a false one: the
-view's pick invite normally; when the selected network has nothing pickable in this view
-(geo with 0 locatable nodes) it becomes the honest variant — "<TICKER> has no locatable
-nodes — explore it in the Hypergraph view"; "all" with 0 nodes = boot, no hint at all. The
-invite map is an allow-list mirroring the pick registry.
+Each right-rail slot's empty state is a **GHOST card** (`Inspector.GhostCard`; shown on
+`/design`) — availability + copy derive from the rail manifest (`railCards.ts` `hint`
+fields), an allow-list mirroring the pick registry: hyper/geo invite node picks, ledger
+invites snapshot + layer picks, the network slot invites the top-bar filter, the flat
+placeholder views get no ghosts. Honesty rules carried over from the old single pick-hint:
+when the filtered network has nothing pickable in geo the node ghost turns into the honest
+variant ("<TICKER> has no locatable nodes — explore it in the Hypergraph view"); "all" with
+0 nodes = boot → that ghost stays silent rather than flashing a false invite. A populated
+card renders in ANY view (e.g. a pinned snapshot carried out of ledger); the ghost only
+appears where the view can actually produce the card.
 
 ### CSS traps (learned the hard way)
 
@@ -764,8 +801,7 @@ not Recharts — dense, interactive, slim (Recharts is used for the vitals `Spar
 
 A 3D "settlement chamber" on the shared canvas. The `LedgerView` class is driven by the Engine
 (`_refreshLedger()` → `ledger.setData(globalSnapshots, getAnchor)` on each tick/anchor
-event, `ledger.update(dt)` per frame, `ledger.setGroupSizes(globe.ledgerGroups)` on
-metagraph changes).
+event, `ledger.update(dt)` per frame).
 
 - **Layer model (`config.LEDGER`) — a LITERAL top-down validation stack.** Floors stack on
   **Y**, evenly spaced, top→bottom: `rowProducers` · `rowML1` · `rowML0` · `rowMSnap` ·
@@ -800,31 +836,43 @@ metagraph changes).
   `_anchorTiles` lays them in a rectangular GRID filling that tick's cell with a **uniform
   pitch** (`SLOT_SP/cols` × `LANE_GAP_Z/rows`, grid inset) so gaps are equal within a tick,
   between ticks, and between lanes), empty placeholder where a metagraph didn't anchor; the
-  node-group **rings** (`setGroupSizes`/`clusterRadius`, **fully invisible at rest**
-  `baseOpacity = 0`, showing ONLY while a pulse passes — metagraph rings on anchoring + a
-  global-L0 participation ring `_gL0Ring` lit via `_gL0Glow` only when an anchor pulse
-  actually reaches that floor); and the anchor **links** + travelling **pulses** along the
+  node-group **station DIALS** (`_makeDial`/`buildDialGeometry` — a hairline circle + radial
+  ruler ticks, the instrument-thread language bent into a circle; **ONE fixed radius for every
+  metagraph**, `ledgerLayout.DIAL_R`, regardless of node count — the resting identity mark that
+  gives a 3-node metagraph the same footprint as a big one; **visible at rest** at
+  `DIAL_REST_OP`, brightened + slightly scaled while an anchor pulse passes; the global L0 +
+  DAG L1 clusters wear the same dial in the DAG's identity hue (`sceneColors["dag"]` — matching
+  the node instances inside them) at `DIAL_R_GLOBAL`; `_gL0Ring` additionally glows via
+  `_gL0Glow` when a pulse reaches that floor. **Every ledger colour resolves through the ONE
+  identity system** — the identity SCENE map is a required LedgerView ctor arg (like HyperView)
+  and `setSceneColors()` re-tints on live refresh; nothing falls back to a raw
+  `config.METAGRAPHS` colour. Node size is uniform too: `LEDGER.dot` applies to every cluster
+  equally — small groups get presence from the dial, not from bigger dots — and ledger nodes
+  render as flat **COINS** (the sphere instance squashed on Y, `NodeFabric.COIN_H`; a
+  zero-thickness circle foreshortened to an invisible sliver at the overview camera, the coin
+  reads as a circle from above yet stays visible edge-on)); and the anchor **links** +
+  travelling **pulses** along the
   shared **`curvePoint`** — the literal production→anchor column down from the producers
   floor through the L1/L0 ring centres → the snapshot tile → swinging to centre through the
   global-L0 cluster → cubic into the global block (`LINK_SEG` segments; one link per
   cluster, from its centre tile).
-- **Recency fade is DEPTH FOG, not per-block.** The trail recedes from the camera (oldest =
-  farthest), so the Engine swaps in a stronger linear `THREE.Fog` in ledger (near/far ≈46/70,
-  colour = bg) and restores the scene's base `FogExp2` elsewhere; `slotFade` is just a
-  gentle linear brightness cue.
-- **Colour only at the lead / selected; the trail is neutral.** The colour switch is
-  **binary** and **exactly one row** is ever coloured: a selected/hovered **older** snapshot
-  (`_selectedSlot > 0`) wins outright — the live lead + everything newer go neutral
-  (`leadNeutral`); otherwise the live lead (slot 0) is the coloured row. A row out of the
-  coloured slot goes to a deeply toned-down `NEUTRAL_TILE` (faint cyan; the global block the
-  same cyan dimmed + low-emissive). Selection comes from the LiveStrip: the Engine forwards
-  `hoverSnapOrd ?? snap.data.ordinal` to `ledger.setSelected(ordinal)`; the ledger tags each
-  trail block with its ordinal, maps it → slot each tick (`_recomputeSelectedSlot`), and
-  re-colours that whole row. The DAG node-cluster spread is `LEDGER.dagCell`.
-- **Metagraph filter neutralises the OTHER lanes** (`ledger.setFilter`, wired alongside
-  `globe.setFilter`): only the selected lane stays coloured (`laneOff`), other metagraphs'
-  nodes are strongly dimmed (the morph-ramped `_dimScale` is too weak in ledger, so it's
-  forced), and only the selected metagraph emits pulses (so only ITS rings light).
+- **Recency is `slotFade` brightness only (2026-07-09).** The old neutral-tone + ledger-specific
+  linear depth fog recency treatment was REMOVED at the user's direction (a replacement may be
+  designed later): tiles/links/trail blocks keep their identity/accent colour all the way down
+  the trail, fading gently by `slotFade`; the shared scene `FogExp2` applies in every view (the
+  `ViewPolicy.fog` field + Engine fog swap are gone).
+- **Emphasis is brightness, not a colour switch.** `model.isRowHot` still enforces exactly ONE
+  hot row (a selected/hovered older snapshot beats the live lead): the hot row's tiles/links
+  render near-full-brightness (bloom), everything else stays dim-but-coloured; the centre block
+  dims (`leadDimmed`) while an older snapshot is selected. Selection comes from the LiveStrip:
+  the Engine forwards `hoverSnapOrd ?? snap.data.ordinal` to `ledger.setSelected(ordinal)`; the
+  ledger maps ordinal → slot each tick (`_recomputeSelectedSlot`). The DAG node-cluster spread
+  is `LEDGER.dagCell`.
+- **Metagraph filter dims the OTHER lanes** (`ledger.setFilter`, wired alongside
+  `globe.setFilter`): the selected lane keeps full colour; other metagraphs' tiles/links/dials
+  are strongly dimmed (×0.22) and their nodes too (the morph-ramped `_dimScale` is too weak in
+  ledger, so it's forced), and only the selected metagraph emits pulses (so only ITS dials
+  light).
 - **Slot model + history seed:** every new tick all chains advance one slot left; tiles
   appear at the lead as a metagraph anchors (`_anchorMetaBlock` rebuilds the slot-0 cluster
   as the count settles). On first data, `_seedHistory` pre-populates the trail + lanes from
@@ -946,8 +994,9 @@ can't fetch them — but the **Next Node server can**:
     one batched call per 10-min regeneration; for a commercial product switch to an HTTPS
     geo provider with an SLA + license (ipinfo, MaxMind, ip-api Pro). The validator-side
     resolver (`src/data/geoResolve.ts`) likewise uses ip-api (http) + ipwho.is (https).
-- **`app/api/geo/route.ts`** serves the validator geo seed (`data/geo.json`, imported) so
-  the globe plots instantly; `geoResolve.ts resolveMissing` fills new validator IPs.
+- **`app/api/geo/route.ts`** serves the validator IP→geo map LIVE (fetches both validator
+  clusters server-side + the shared ip-api batch, `unstable_cache` 1h, 503 on failure) so the
+  globe plots instantly from one request; `geoResolve.ts resolveMissing` fills any misses.
 - **`app/api/snapshot/[ordinal]/route.ts`** reads the **raw L0 global snapshot** (~2.5 MB)
   and returns a tiny `SnapshotExact` (exact fee, size KB, state-record count, per-metagraph
   breakdown incl. unlisted). **Cached per ordinal** (`unstable_cache`, immutable; throws on
@@ -959,8 +1008,10 @@ can't fetch them — but the **Next Node server can**:
   (Vercel never restarts; ISR only freshens the *server* cache, so an idle tab must re-pull —
   `Engine.refreshMeta`, rebuilds only on change). Snapshot/cluster feeds are live via
   `NetworkData` client polling.
-- `scripts/bake-*.py` are **only the offline seed/fallback** for `data/*.json`, not required
-  for normal operation. `data/metagraphs.json` shape: each metagraph has
+- **`data/*.json` are a static baked snapshot** (as of ~2026-06) — the imported seed/fallback
+  the routes use when the live fetch fails. The Python bake scripts that once regenerated them were removed
+  (2026-07-10, unmaintained); if the seeds ever need refreshing, regenerate by hand from the
+  live routes' output. `data/metagraphs.json` shape: each metagraph has
   `name/symbol/description/siteUrl/nodes`; each node `ip/state/layer/roles`.
 - **`data/brand-hues.json`** is baked OFFLINE by `npx tsx scripts/bake-brand-hues.ts` (run
   manually whenever the metagraph set changes; `jimp` is a devDependency used only by this
@@ -987,16 +1038,18 @@ Metagraph reality worth knowing (it drives the dossier/inspector text):
 - Keep `config.METAGRAPHS` (hub order/colour fallback, the Hypergraph) in sync with what the
   route returns (matched by `id`).
 
-> Sandbox networking note: `bake-metagraphs.py` falls back to `curl` (subprocess) when
-> `urllib` fails, because here Python can't resolve some metagraph cluster hosts (e.g.
-> `*.getdor.com`) while the system `curl` reaches them over IPv6.
-
 ## Deploying (Vercel)
 
 Target host is **Vercel** (any Node host works). No env vars / secrets are required.
 
 **Enabled now (works on the free Hobby plan):**
 - `engines.node >= 18.18`; `next build` is clean.
+- **Security headers** (`next.config.mjs`): a moderate CSP (inline script/style for the Next
+  runtime, `img https:` for metagraph logos, `connect https:` — the Constellation host set is
+  open — `va.vercel-scripts.com` for telemetry; dev adds `unsafe-eval`/`ws:`/`http:`), nosniff,
+  frame-ancestors none, Referrer-/Permissions-Policy. Added for reputation-scanner posture
+  after Zscaler NRD-isolated the fresh domain (registered 2026-06-26; re-categorization via
+  sitereview.zscaler.com; the NRD window ages out ~30-90 days).
 - Route caching as above (`/api/metagraphs` `○` with `10m` in `next build` output).
 - **`@vercel/speed-insights`** + **`@vercel/analytics`** mounted in `app/layout.tsx`
   (real-user Web Vitals + cookieless page views; both no-op off Vercel). Web Vitals do NOT

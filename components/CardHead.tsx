@@ -9,7 +9,7 @@ import { KIND_MARK_CLASS } from "@/components/icons";
 // The ONE HUD card header — every rail card leads with this shared grammar so the whole HUD
 // reads as one control surface. ONE head ANATOMY on all six cards (user-agreed, Task 13
 // follow-up): **eyebrow / title / INSET hairline / body** —
-//   • an uppercase role EYEBROW — one simple "Selected <subject>" label ("SELECTED NETWORK" /
+//   • an uppercase role EYEBROW — one simple "Selected <subject>" label ("SELECTED METAGRAPH" /
 //     "SELECTED NODE" / "SELECTED SNAPSHOT"; the ‹-parent breadcrumb grammar was retired, Task 13
 //     follow-up) or a view tag ("HYPERGRAPH · ABOUT"),
 //   • the card's primary TITLE at ONE standard (15px / font-semibold / leading-[1.2]) — the
@@ -113,37 +113,61 @@ export default function CardHead({
 
   if (panel) {
     const Icon = icon;
+    // Collapsible heads follow the WAI-ARIA disclosure pattern: the HEADING wraps a real toggle
+    // <button> (aria-expanded), and the button's hit area is stretched over the ENTIRE head row
+    // (after:inset-0 against the head's `relative`) — the whole bar is the tap target (≥44px on
+    // touch, where hunting for a 20px "−" was the pain point). The +/− stays as the state
+    // INDICATOR only: decorative, aria-hidden, brightening on head hover via `group`.
+    const toggleable = !!onToggle;
+    const titleRow = (
+      <>
+        {Icon && (
+          <Icon
+            aria-hidden
+            className={KIND_MARK_CLASS}
+            style={{ color: "var(--filter-accent, var(--accent))" }}
+          />
+        )}
+        {rolled}
+      </>
+    );
     return (
       <>
-        <div className="flex items-start justify-between gap-2 py-[var(--panel-pad-y)] px-[var(--panel-pad-x)]">
+        <div
+          className={cn(
+            "flex items-start justify-between gap-2 py-[var(--panel-pad-y)] px-[var(--panel-pad-x)]",
+            toggleable && "relative group",
+          )}
+        >
           <div className="flex flex-col gap-[3px] min-w-0">
             {eyebrow && <span className={cn("block", eyebrowClass)}>{eyebrow}</span>}
             <h2 className={cn(TITLE, "inline-flex items-center gap-2 min-w-0")}>
-              {Icon && (
-                <Icon
-                  aria-hidden
-                  className={KIND_MARK_CLASS}
-                  style={{ color: "var(--filter-accent, var(--accent))" }}
-                />
+              {toggleable ? (
+                <button
+                  type="button"
+                  aria-expanded={!collapsed}
+                  title={collapsed ? "Expand" : "Collapse"}
+                  onClick={onToggle}
+                  className="appearance-none bg-transparent border-0 p-0 m-0 [font:inherit] text-inherit text-left inline-flex items-center gap-2 min-w-0 rounded-sm focus-visible:outline-1 focus-visible:outline-ring/60 after:absolute after:inset-0 after:cursor-pointer after:content-['']"
+                >
+                  {titleRow}
+                </button>
+              ) : (
+                titleRow
               )}
-              {rolled}
             </h2>
           </div>
           <div className="flex items-center gap-1.5 flex-none pt-px">
             {caption != null && (
               <span className="text-micro text-muted-foreground text-right tabular-nums">{caption}</span>
             )}
-            {onToggle && (
-              <Button
-                variant="ghost"
-                size="icon-xs"
-                className="w-5 h-[18px] p-0 rounded-md leading-none cursor-pointer text-muted-foreground hover:bg-transparent hover:text-foreground dark:hover:bg-transparent"
-                title={collapsed ? "Expand" : "Collapse"}
-                aria-expanded={!collapsed}
-                onClick={onToggle}
+            {toggleable && (
+              <span
+                aria-hidden
+                className="inline-flex items-center justify-center w-5 h-[18px] leading-none text-muted-foreground group-hover:text-foreground"
               >
-                {collapsed ? <Plus aria-hidden className="size-3.5" /> : <Minus aria-hidden className="size-3.5" />}
-              </Button>
+                {collapsed ? <Plus className="size-3.5" /> : <Minus className="size-3.5" />}
+              </span>
             )}
           </div>
         </div>

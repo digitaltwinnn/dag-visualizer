@@ -3,13 +3,13 @@
 //   - Hypergraph: fibonacci shells around the core (L0 inner, L1 outer).
 //   - Geography:  each node at its real lat/lon on the globe surface.
 // The SAME node objects move between the two — they never disappear/reappear. The globe surface,
-// coastlines, heatmap and arcs fade in via opacity as nodes arrive, so node radii always match the
+// coastlines and arcs fade in via opacity as nodes arrive, so node radii always match the
 // (full-size, non-scaled) globe.
 //
 // This is the COORDINATOR half of the old js/globe.js: it holds the records + filter/country/hover
-// state, does the geo relayout (fan-out, heatmap + arc rebuild), the spin/aim/focus logic, and the
+// state, does the geo relayout (honeycomb fan-out + arc rebuild), the spin/aim/focus logic, and the
 // setMorph/update orchestration — delegating the instanced-mesh writes to NodeFabric, the density
-// rings to Heatmap, the travelling packets to Arcs (+ the pure ArcSim), and the globe surface to
+// the travelling packets to Arcs (+ the pure ArcSim), and the globe surface to
 // buildGeoView. Its public surface is a typed TS class imported directly by the Engine — no
 // boundary/cast layer needed.
 
@@ -19,14 +19,13 @@ import { metaAnchor } from "../domain/hyperLayout";
 import { LEDGER, ledgerSite, ledgerSpread, clusterRadius } from "../domain/ledgerLayout";
 import type { SceneColors } from "../sceneColors";
 import * as geoStats from "../domain/geoStats";
-import { R, LAND_H, latLonToVec3 } from "../domain/geoLayout";
-import { GOLDEN_ANGLE, fibShellPos, nodeRoles, spreadCoLocated, type Cluster } from "../domain/nodeLayout";
+import { R, LAND_H, CHIP_PITCH, HEX_H, VALIDATOR_HEX_R, META_HEX_R, latLonToVec3 } from "../domain/geoLayout";
+import { GOLDEN_ANGLE, fibShellPos, nodeRoles, spreadCoLocated } from "../domain/nodeLayout";
 import { surfFade, extrasFade } from "../domain/morph";
 import { ArcSim, type ArcEndpoint } from "../domain/arcSim";
 import type { MetaNodeRecord, ValidatorRecord } from "../domain/records";
 import { buildGeoView, type GeoViewHost } from "./views/GeoView";
 import { NodeFabric, type FrameCtx } from "./objects/NodeFabric";
-import { Heatmap } from "./objects/Heatmap";
 import { Arcs } from "./objects/Arcs";
 import type { HyperView } from "./views/HyperView";
 import type {
@@ -39,6 +38,13 @@ import type {
   RouteMetagraph,
   RouteNode,
 } from "@/src/data/types";
+
+// Geo chip helpers: a node's chip CENTRE sits half its height above the plateau (level 0),
+// each stack level adds CHIP_PITCH; hexPitchDeg(r) is the angular distance between ADJACENT
+// honeycomb cells. The chips are ROUND now (radius r), so neighbours touch at 2·r
+// (diameter), not the hex prisms' √3·r edge-to-edge — same 4% air on top.
+const HEX_BASE_R = R + LAND_H + 0.02 + HEX_H / 2;
+const hexPitchDeg = (r: number) => ((2 * r * 1.04) / (R + LAND_H)) * (180 / Math.PI);
 
 const _focusMat = new THREE.Matrix4(); // scratch for reading an instance's live transform
 // The ledger's whole-view orientation (tilt ∘ rotY), baked into every node's ledger position so the
@@ -101,12 +107,12 @@ export class Globe implements GeoViewHost {
   private _edgeTarget = new THREE.Color();
 
   // Highlight/dim state: each validator layer eases its own dim level (0 = bright, 1 = dimmed).
-  private dim = { l0: 0, l1: 0 };
-  private dimTarget = { l0: 0, l1: 0 };
+  // ONE whole-core dim (the old per-layer {l0,l1} pair always moved in lockstep — collapsed).
+  private dim = 0;
+  private dimTarget = 0;
 
   metaNodes: MetaNodeRecord[] = [];
   metaList: MetaLayout[] = [];
-  ledgerGroups: Record<string, { l0: number; l1: number }> = {};
   filter = "all";
   private _hoverNodeId: string | null = null;
   private _selectedNodeId: string | null = null;
@@ -121,9 +127,10 @@ export class Globe implements GeoViewHost {
   landWallUniforms?: GeoViewHost["landWallUniforms"];
   landFillMat?: THREE.MeshBasicMaterial;
   landFillMesh?: THREE.Mesh;
+  facingUniform?: GeoViewHost["facingUniform"]; // shared camera-facing uniform (graticule + walls)
+  poleRoses?: GeoViewHost["poleRoses"];         // the polar compass roses (faded per frame here)
 
   private fabric: NodeFabric;
-  private heatmap: Heatmap;
   private arcs: Arcs;
   private arcSim = new ArcSim();
 
@@ -148,7 +155,6 @@ export class Globe implements GeoViewHost {
     this.group.add(this.nodeGroup);
 
     this.fabric = new NodeFabric(this.nodeGroup);
-    this.heatmap = new Heatmap(this.group);
     this.arcs = new Arcs(this.group);
 
     this._ctx = {
@@ -156,7 +162,7 @@ export class Globe implements GeoViewHost {
         morph: 0, hoverFilterActive: false, ledger: false, countryFilter: null,
         countryMix: 0, hoverNodeId: null, selectedNodeId: null, filter: "all",
       },
-      dim: this.dim, dimScaleV: 0, clock: 0, camN: this._camN, hasCam: false,
+      dim: 0, dimScaleV: 0, clock: 0, camN: this._camN, hasCam: false,
       ledgerT: 0, dt: 0, flashDecay: 0, group: this.group,
     };
 
@@ -225,9 +231,11 @@ export class Globe implements GeoViewHost {
           index: idx, layer: role, roles: node.roles || [role], nodeId: node.id, geoPrimary: primary, ready, base: col.clone(),
           ledgerPos, ledgerHide: role !== "cl1" && role !== "l0",
           hyperPos, hyperDir: hyperPos.clone().normalize(), hyperRadius: hyperPos.length(),
-          geoDir, trueDir: geoDir ? geoDir.clone() : null, geoRadius: R + LAND_H + 0.02, noGeo: !g,
-          hyperSize: 0.55 * (ready ? 1 : 0.78), geoSize: primary ? 0.06 * (ready ? 1 : 0.78) : 0,
-          azimuth: Math.atan2(hyperPos.z, hyperPos.x), twinkle: Math.random() * 6.2831,
+          geoDir, trueDir: geoDir ? geoDir.clone() : null, geoRadius: HEX_BASE_R, noGeo: !g,
+          // UNIFORM node size regardless of ready state (user: never size by status; status lives
+          // in the explorer pill + node card). geoSize = hex prism CIRCUMRADIUS (world).
+          hyperSize: 0.55, geoSize: primary ? VALIDATOR_HEX_R : 0,
+          azimuth: Math.atan2(hyperPos.z, hyperPos.x),
           spinAxis: new THREE.Vector3(Math.random() * 2 - 1, Math.random() * 2 - 1, Math.random() * 2 - 1).normalize(),
           spinSpeed: 0.3 + Math.random() * 0.5, spinPhase: Math.random() * 6.2831,
           pick,
@@ -295,7 +303,7 @@ export class Globe implements GeoViewHost {
           const dir = latLonToVec3(g.lat!, g.lon!, 1).normalize(); // real location; fanned out below
           const lsite = ledgerSite(m._ledgerCol, METAGRAPHS.length);
           const lrowY = layer === "l0" ? LEDGER.rowML0 : LEDGER.rowML1;
-          const lsp = ledgerSpread(i, cnt, clusterRadius(cnt) * 0.75);
+          const lsp = ledgerSpread(i, cnt, clusterRadius(cnt) * 0.85); // slightly wider for the bigger dots
           const ledgerPos = new THREE.Vector3(lsite.x + lsp.x, lrowY, lsite.z + lsp.z)
             .applyMatrix4(_LEDGER_M).multiplyScalar(LEDGER.viewScale); // match the LedgerView group transform
           const pick = {
@@ -309,10 +317,10 @@ export class Globe implements GeoViewHost {
             hyperPos: new THREE.Vector3(a.x, a.y, a.z).add(offset),
             geoPos: new THREE.Vector3(),
             geoDir: dir, trueDir: dir.clone(),
-            hyperSize: 0.52, geoSize: primary ? 0.0667 : 0,
+            hyperSize: 0.52, geoSize: primary ? META_HEX_R : 0, // hex prism CIRCUMRADIUS (world)
             spinAxis: new THREE.Vector3(Math.random() * 2 - 1, Math.random() * 2 - 1, Math.random() * 2 - 1).normalize(),
             spinSpeed: 0.3 + Math.random() * 0.5, spinPhase: Math.random() * 6.2831,
-            twinkle: Math.random() * 6.2831, dim: 0, dimTarget: 0,
+            dim: 0, dimTarget: 0,
             pick,
           });
         });
@@ -322,13 +330,6 @@ export class Globe implements GeoViewHost {
 
     this.fabric.buildMetaNodes(recs);
     this.metaNodes = recs;
-    // Per-metagraph node counts per ledger floor (ML0 = l0; ML1 = cl1+dl1) — sizes the rings.
-    const groups: Record<string, { l0: number; l1: number }> = {};
-    for (const r of recs) {
-      const g = (groups[r.metaId] ||= { l0: 0, l1: 0 });
-      if (r.layer === "l0") g.l0 += 1; else g.l1 += 1;
-    }
-    this.ledgerGroups = groups;
     this.setFilter(this.filter);
   }
 
@@ -350,8 +351,7 @@ export class Globe implements GeoViewHost {
   // Set the dim TARGETS for a selection (the dim itself eases each frame).
   private _applyDim(sel: string): void {
     const dagLit = sel === "all" || sel === "dag";
-    this.dimTarget.l0 = dagLit ? 0 : 1;
-    this.dimTarget.l1 = dagLit ? 0 : 1;
+    this.dimTarget = dagLit ? 0 : 1;
     for (const r of this.metaNodes) r.dimTarget = (sel === "all" || sel === r.metaId) ? 0 : 1;
   }
 
@@ -419,7 +419,8 @@ export class Globe implements GeoViewHost {
     for (const r of this.metaNodes) if ((r.geoPrimary ?? true) && this._nodeActive(r.metaId, geoOf(r.pick))) { mean.add(r.trueDir); count++; }
     if (!count || mean.lengthSq() < 1e-6) { this.spin = null; return null; }
     const conc = mean.length() / count;
-    this._aimAt(mean.clone().normalize(), 0.56); // ~32° max lean for a broad selection
+    this._aimAt(mean.clone().normalize(), 0.32); // ≤18° lean (was 32° — a northern cluster tipped
+    // the globe so far the view read as 'from the north', user; the pose looks ACROSS instead)
     return conc;
   }
 
@@ -438,31 +439,46 @@ export class Globe implements GeoViewHost {
     return geoStats.listNodes(this.nodes, this.metaNodes, filter);
   }
 
-  // Re-fan the co-located nodes and rebuild the density rings + arcs using ONLY the filter-active
-  // nodes. Inactive (dimmed) nodes collapse back to their true location and drop out of the arc pool.
+  // Re-fan the co-located nodes and rebuild the arcs using ONLY the filter-active nodes.
+  // Inactive (dimmed) nodes collapse back to their true location and drop out of the arc pool.
+  // Co-located groups come back as HEX STACKS in a honeycomb (spreadCoLocated's levels): each
+  // node's stack level lifts it radially by CHIP_PITCH. (The density heatmap that used to be
+  // rebuilt here was removed entirely — user decision; the honeycomb itself shows density.)
   private _relayoutGeo(): void {
-    const clusters: Cluster[] = [];
 
-    // Validators: active ones fan out among themselves; the rest reset to point.
+    // Gather BOTH pools' active nodes, then run ONE combined fan: validators and metagraph
+    // nodes at the same site must share one honeycomb + one stack chunking — fanning the pools
+    // separately put each pool's first stack on the SAME centre cell (the Ashburn overlap bug).
+    // Because only filter-ACTIVE nodes enter the fan, every filter change re-tiles the
+    // survivors into a fresh honeycomb (inactive nodes collapse back to their true location).
     const vActive: ValidatorRecord[] = [];
     for (const u of this.nodes) {
       if (u.noGeo) continue;
       u.geoDir!.copy(u.trueDir!);
+      u.geoRadius = HEX_BASE_R; // rest on the plateau until the fan assigns a level
       if (u.geoPrimary && this._nodeActive("dag", geoOf(u.pick))) vActive.push(u);
     }
-    if (vActive.length) clusters.push(...spreadCoLocated(vActive.map((u) => u.geoDir!)));
-
-    // Metagraph nodes: same treatment, then re-drop each onto the globe surface.
     const mActive: MetaNodeRecord[] = [];
+    const mLevel = new Map<MetaNodeRecord, number>();
     for (const r of this.metaNodes) {
       r.geoDir.copy(r.trueDir);
       if (!(r.geoPrimary ?? true)) continue; // hybrid siblings: hidden on the globe
       if (this._nodeActive(r.metaId, geoOf(r.pick))) mActive.push(r);
     }
-    if (mActive.length) clusters.push(...spreadCoLocated(mActive.map((r) => r.geoDir), { spacingDeg: 0.4, maxDeg: 2 }));
-    for (const r of this.metaNodes) r.geoPos.copy(r.geoDir).multiplyScalar(R + LAND_H + 0.02);
+    if (vActive.length + mActive.length) {
+      const lv: number[] = [];
+      // one pitch for the combined set, sized to the LARGER hex footprint
+      spreadCoLocated(
+        [...vActive.map((u) => u.geoDir!), ...mActive.map((r) => r.geoDir)],
+        { spacingDeg: hexPitchDeg(Math.max(VALIDATOR_HEX_R, META_HEX_R)) },
+        lv,
+      );
+      vActive.forEach((u, i) => { u.geoRadius = HEX_BASE_R + (lv[i] ?? 0) * CHIP_PITCH; });
+      mActive.forEach((r, i) => mLevel.set(r, lv[vActive.length + i] ?? 0));
+    }
+    for (const r of this.metaNodes)
+      r.geoPos.copy(r.geoDir).multiplyScalar(HEX_BASE_R + (mLevel.get(r) ?? 0) * CHIP_PITCH);
 
-    this.heatmap.rebuild(clusters);
 
     // Arcs only connect the filter-active nodes, drawn from their fanned-out positions. Each endpoint
     // carries a POOL-LOCAL index (not the per-mesh record index, which collides across the two
@@ -498,9 +514,11 @@ export class Globe implements GeoViewHost {
   }
 
   // Write this frame's values into the persistent FrameCtx (`this._ctx`, built once in the
-  // constructor) and return it — `dim`/`camN`/`group` are already the same persistent objects, so
-  // only the scalars + the nested DimContext fields need updating (Task 15 allocation fix: this
-  // used to allocate a fresh FrameCtx + DimContext object on every call).
+  // constructor) and return it — `camN`/`group` are the same persistent objects, so only the
+  // scalars + the nested DimContext fields need updating (Task 15 allocation fix: this used to
+  // allocate a fresh FrameCtx + DimContext object on every call). NB `dim` became a SCALAR when
+  // the per-layer {l0,l1} pair was collapsed — it MUST be copied here each frame (a stale
+  // captured 0 left off-filter DAG nodes visible in geo).
   private _frameCtx(dt: number, flashDecay: number): FrameCtx {
     const ctx = this._ctx;
     const c = ctx.c;
@@ -512,6 +530,7 @@ export class Globe implements GeoViewHost {
     c.hoverNodeId = this._hoverNodeId;
     c.selectedNodeId = this._selectedNodeId;
     c.filter = this.filter;
+    ctx.dim = this.dim;
     ctx.dimScaleV = this._dimScale();
     ctx.clock = this.clock;
     ctx.hasCam = this._hasCam;
@@ -539,14 +558,25 @@ export class Globe implements GeoViewHost {
     const ctx = this._frameCtx(0, 0); // dt/flashDecay unused by the matrix loop
     this.pickables = this.fabric.placeValidators(this.nodes, ctx);
 
-    // The globe surface fades in only once nodes are well on their way; heatmap/arcs later still. In
+    // The globe surface fades in only once nodes are well on their way; arcs later still. In
     // ledger the surface is hidden OUTRIGHT (not eased by morph).
     const surf = this.ledger ? 0 : surfFade(m);
     const extras = this.ledger ? 0 : extrasFade(m);
     for (const f of this.geoFades) f.mat.opacity = f.base * surf;
+    // Depth cueing for the see-through hologram: the graticule + coastal walls dim their far
+    // hemisphere through the shared facing uniform (camera dir in this group's local frame),
+    // and each polar compass rose fades by its own pole's facing on top of the morph fade —
+    // a far-side rose dims hard, so front vs back reads instantly (user).
+    if (this.facingUniform && this._hasCam) this.facingUniform.value.copy(this._camN);
+    if (this.poleRoses) {
+      for (const rose of this.poleRoses) {
+        const t = THREE.MathUtils.clamp((rose.sign * this._camN.y + 0.15) / 0.5, 0, 1);
+        const facing = 0.18 + 0.82 * t;
+        for (let i = 0; i < rose.mats.length; i++) rose.mats[i].opacity = rose.bases[i] * surf * facing;
+      }
+    }
     if (this.landWallUniforms) this.landWallUniforms.uOpacity.value = surf;
     if (this.landFillMesh) this.landFillMesh.visible = !this.ledger && m > 0.05; // opacity via geoFades
-    this.heatmap.fade(extras);
     this.arcs.setUM(extras);
   }
 
@@ -587,8 +617,7 @@ export class Globe implements GeoViewHost {
     // Ease the per-layer dim levels + the country mix, then hand a fresh FrameCtx to the fabric.
     if (this.fabric.hasValidators) {
       const k = Math.min(1, dt * 4);
-      this.dim.l0 += (this.dimTarget.l0 - this.dim.l0) * k;
-      this.dim.l1 += (this.dimTarget.l1 - this.dim.l1) * k;
+      this.dim += (this.dimTarget - this.dim) * k;
       this.countryMix += ((this.countryFilter ? 1 : 0) - this.countryMix) * k;
     }
     const ctx = this._frameCtx(dt, flashDecay);

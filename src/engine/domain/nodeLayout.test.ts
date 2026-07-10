@@ -1,6 +1,9 @@
 import { describe, it, expect } from "vitest";
 import * as THREE from "three";
-import { GOLDEN_ANGLE, lerp, smooth, discFall, fibShellPos, spreadCoLocated } from "./nodeLayout";
+import {
+  GOLDEN_ANGLE, lerp, smooth, discFall, fibShellPos, spreadCoLocated,
+  stackSizes, STACK_MIN, STACK_MAX,
+} from "./nodeLayout";
 
 describe("lerp / smooth / GOLDEN_ANGLE", () => {
   it("lerp interpolates linearly", () => {
@@ -89,20 +92,37 @@ describe("spreadCoLocated", () => {
     expect(clusters[0].spread).toBe(0);
   });
 
-  it("spreads a 7-node co-located group within maxDeg of the cluster centre", () => {
-    // All 7 start at (nearly) the same point, well within the default groupDeg (0.8deg).
+  it("keeps a 7-node co-located group as ONE stack at the cluster centre (honeycomb cell 0)", () => {
+    // All 7 start at (nearly) the same point, well within the default groupDeg (0.8deg) —
+    // ≤ STACK_MAX nodes = a single stack, so every member sits exactly on the centre cell.
     const dirs = Array.from({ length: 7 }, (_, i) =>
       dir(1, i * 0.0005, i * -0.0003),
     );
-    const maxDeg = 2.3; // default
-    const clusters = spreadCoLocated(dirs, { maxDeg });
+    const clusters = spreadCoLocated(dirs);
     expect(clusters).toHaveLength(1);
     expect(clusters[0].count).toBe(7);
     const centre = clusters[0].center;
-    const maxRad = (maxDeg * Math.PI) / 180;
     for (const d of dirs) {
       const angle = Math.acos(THREE.MathUtils.clamp(d.dot(centre), -1, 1));
-      expect(angle).toBeLessThanOrEqual(maxRad + 1e-6);
+      expect(angle).toBeLessThanOrEqual(1e-6); // one stack: all members share the centre direction
+    }
+  });
+
+  it("tiles a multi-stack group as adjacent honeycomb cells (spacingDeg apart)", () => {
+    const N = 23; // stackSizes(23) -> multiple stacks
+    const dirs = Array.from({ length: N }, () => new THREE.Vector3(0, 0, 1));
+    const spacingDeg = 0.8;
+    const clusters = spreadCoLocated(dirs, { spacingDeg });
+    expect(clusters).toHaveLength(1);
+    // distinct stack directions = the number of chunks; each non-centre stack sits a whole
+    // multiple of ~spacing from the centre cell ring structure (adjacent cells touch).
+    const uniq = new Set(dirs.map((d) => `${d.x.toFixed(6)},${d.y.toFixed(6)},${d.z.toFixed(6)}`));
+    expect(uniq.size).toBe(stackSizes(N).length);
+    const pitch = (spacingDeg * Math.PI) / 180;
+    const centre = clusters[0].center;
+    for (const d of dirs) {
+      const angle = Math.acos(THREE.MathUtils.clamp(d.dot(centre), -1, 1));
+      expect(angle).toBeLessThanOrEqual(pitch * 2.01); // all cells within the first two rings here
     }
   });
 
@@ -111,5 +131,54 @@ describe("spreadCoLocated", () => {
     const groupB = [dir(0, 1, 0), dir(0.001, 1, 0), dir(-0.001, 1, 0.001)];
     const clusters = spreadCoLocated([...groupA, ...groupB]);
     expect(clusters).toHaveLength(2);
+  });
+});
+
+describe("stackSizes (chip-stack chunking)", () => {
+  it("sizes always sum to K and never exceed STACK_MAX", () => {
+    for (let K = 1; K <= 80; K++) {
+      const sizes = stackSizes(K);
+      expect(sizes.reduce((a, b) => a + b, 0)).toBe(K);
+      for (const sz of sizes) {
+        expect(sz).toBeGreaterThanOrEqual(1);
+        expect(sz).toBeLessThanOrEqual(STACK_MAX);
+      }
+    }
+  });
+
+  it("a group up to STACK_MAX is one honest stack; larger groups prefer STACK_MIN.. chunks", () => {
+    expect(stackSizes(3)).toEqual([3]);
+    expect(stackSizes(STACK_MAX)).toEqual([STACK_MAX]);
+    const sizes = stackSizes(30);
+    expect(sizes.length).toBeGreaterThan(1);
+    // all but at most one stack reach the preferred minimum
+    expect(sizes.filter((sz) => sz < STACK_MIN).length).toBeLessThanOrEqual(1);
+  });
+
+  it("is deterministic", () => {
+    expect(stackSizes(67)).toEqual(stackSizes(67));
+  });
+});
+
+describe("spreadCoLocated levels (chip stacks)", () => {
+  it("fills a level for every input and stacks co-located nodes 0..h-1", () => {
+    const N = 23;
+    const dirs = Array.from({ length: N }, () => new THREE.Vector3(0, 0, 1)); // one co-located site
+    const levels: number[] = [];
+    const clusters = spreadCoLocated(dirs, undefined, levels);
+    expect(clusters.length).toBe(1);
+    expect(levels.length).toBe(N);
+    for (const l of levels) expect(l).toBeGreaterThanOrEqual(0);
+    // levels per stack are contiguous from 0: the number of level-0 chips == the number of stacks,
+    // and the whole set sums to the stackSizes chunking of N.
+    const zeroCount = levels.filter((l) => l === 0).length;
+    expect(zeroCount).toBe(stackSizes(N).length);
+  });
+
+  it("a lone node gets level 0", () => {
+    const dirs = [new THREE.Vector3(1, 0, 0)];
+    const levels: number[] = [];
+    spreadCoLocated(dirs, undefined, levels);
+    expect(levels).toEqual([0]);
   });
 });

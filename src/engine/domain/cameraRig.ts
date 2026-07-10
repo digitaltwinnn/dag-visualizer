@@ -16,7 +16,17 @@ export const FOCI: Record<string, { pos: THREE.Vector3; target: THREE.Vector3 }>
   overview: { pos: new THREE.Vector3(0, 15, 60), target: new THREE.Vector3(0, 2, 0) },
   // The whole DAG core: pulled back enough to frame the outer cL1 (purple) shell (radius 14).
   dag: { pos: new THREE.Vector3(0, 9, 38), target: new THREE.Vector3(0, 1, 0) },
-  geo: { pos: new THREE.Vector3(0, 11, 36), target: new THREE.Vector3(0, 2, 0) },
+  // Geo targets the globe CENTRE — the downward-tilt composition comes from camera HEIGHT
+  // only. An off-centre target made every manual orbit wobble (the globe centre swept a small
+  // screen-space circle around the pivot, user bug). The drill/node framings still compose
+  // their targets off-centre on purpose (a grab-to-re-centre ease was tried and reverted —
+  // user preferred the composed pivots left alone).
+  geo: { pos: new THREE.Vector3(0, 11, 36), target: new THREE.Vector3(0, 0, 0) },
+  // Metagraph-selection pose: rotated-to-densest at a WIDE distance — deliberately farther out
+  // than the country framing (geoFraming z 29..25) so the country drill reads as a real zoom-in.
+  // Camera held LOW (near the equator plane, like the country/node poses) — a higher camera
+  // stacked on the densest-cluster lean read as "viewing the globe from the north" (user).
+  geoNetwork: { pos: new THREE.Vector3(0, 5, 33), target: new THREE.Vector3(0, 2, 0) },
   // (The Snapshots view has no camera of its own — it uses `overview`. The ledger GROUP is rotated/
   // tilted/scaled instead, config.viewRotY/viewTiltX/viewScale, so the camera never moves on a switch.)
 };
@@ -40,13 +50,16 @@ export function hubFraming(hubLocalPos: THREE.Vector3, out: CameraFraming): void
   out.target.copy(hubLocalPos);
 }
 
-// Geo selection framing (Engine.ts:671-679 `_focusGeo` verbatim): R is the selection's
-// concentration (|mean of node dirs|, 0..1) — near-co-located selections zoom in subtly by
-// smoothstepping from the wide end (R<=0.7) to the near end (R>=1.0).
+// Geo selection framing (country drill / metagraph focus): R is the selection's concentration
+// (|mean of node dirs|, 0..1) — near-co-located selections zoom in subtly by smoothstepping from
+// the wide end (R<=0.7) to the near end (R>=1.0). The POSE is the node-zoom's low-camera TILT
+// (user: the old high framing read too top-down) — camera near the equator plane looking up at
+// the focused region high on the near face, horizon tilted — but held farther out than the node
+// zoom so the COUNTRY carries the frame, not individual stacks.
 export function geoFraming(R: number, out: CameraFraming): void {
   const t = THREE.MathUtils.smoothstep(R, 0.7, 1.0);
-  out.pos.set(0, THREE.MathUtils.lerp(7, 6, t), THREE.MathUtils.lerp(34, 26, t));
-  out.target.set(0, THREE.MathUtils.lerp(2, 2.5, t), 7);
+  out.pos.set(0, 1.5, THREE.MathUtils.lerp(29, 25, t));
+  out.target.set(0, THREE.MathUtils.lerp(10.5, 11.5, t), 2.5);
 }
 
 // Layer-focus framing (Snapshots view): selecting a settlement layer flies the camera to the nice
@@ -61,7 +74,7 @@ export function ledgerLayerFraming(y: number, out: CameraFraming): void {
   // snapshot cluster projects at the exact screen centre. Earlier x/z target offsets (−6, −9,
   // meant for composition) each pushed the ring right of centre through the diagonal camera —
   // composition now comes from the camera OFFSET alone (left + above → trail recedes top-left).
-  out.pos.set(-9, y + 8, 30);
+  out.pos.set(-7, y + 6.2, 23.5); // ~22% closer than the first tuning (user: zoom in a bit more)
   out.target.set(0, y - 1, 0);
 }
 

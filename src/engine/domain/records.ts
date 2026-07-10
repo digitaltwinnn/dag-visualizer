@@ -30,7 +30,6 @@ export interface ValidatorRecord {
   hyperSize: number;
   geoSize: number;
   azimuth: number;
-  twinkle: number;
   spinAxis: THREE.Vector3;
   spinSpeed: number;
   spinPhase: number;
@@ -69,7 +68,6 @@ export interface MetaNodeRecord {
   spinAxis: THREE.Vector3;
   spinSpeed: number;
   spinPhase: number;
-  twinkle: number;
   dim: number;
   dimTarget: number;
   pick: PickDescriptor;

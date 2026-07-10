@@ -37,7 +37,8 @@ import type { GlobalSnapshot, Anchor } from "@/src/data/types";
 
 export const SLOT_SP = 3.6; // js/ledger.js:41 — X spacing of one tick/slot
 export const SLOT_N = 9; // js/ledger.js:42 — visible blocks per chain
-export const BLOCK_SIZE = 0.34; // js/ledger.js:43 — max size of an individual metagraph-snapshot tile
+export const BLOCK_SIZE = 0.48; // max size of an individual metagraph-snapshot tile (bumped from the
+  // js/ledger.js 0.34 — the subjects read too small at the overview camera)
 
 // js/ledger.js:45 — Z width of one lane (the grid's depth budget for anchorTiles), derived from
 // ledgerSite exactly as the source does (shared by the whole METAGRAPHS roster, not per-lane).
@@ -191,7 +192,7 @@ export class LedgerModel {
             lane.blocks.push({ x: -s * SLOT_SP, slot: s, fade: slotFade(s), ox: tl.ox, oz: tl.oz, size: tl.size, filled: true, link: tl.link });
           }
         } else {
-          lane.blocks.push({ x: -s * SLOT_SP, slot: s, fade: slotFade(s), ox: 0, oz: 0, size: 0.17, filled: false, link: false });
+          lane.blocks.push({ x: -s * SLOT_SP, slot: s, fade: slotFade(s), ox: 0, oz: 0, size: 0.24, filled: false, link: false });
         }
       }
     }
@@ -240,7 +241,7 @@ export class LedgerModel {
       // The new LIVE tick starts with an empty placeholder at slot 0 for EVERY metagraph (shown on
       // the latest too); anchorMetaBlock upgrades it to a real, sized block if the metagraph anchors.
       for (let i = 0; i < METAGRAPHS.length; i++) {
-        this.lane(METAGRAPHS[i].id, i).blocks.unshift({ x: 0, slot: 0, fade: 0, ox: 0, oz: 0, size: 0.17, filled: false, link: false });
+        this.lane(METAGRAPHS[i].id, i).blocks.unshift({ x: 0, slot: 0, fade: 0, ox: 0, oz: 0, size: 0.24, filled: false, link: false });
       }
     }
 

@@ -9,9 +9,9 @@
 // DEVIATION from the Task 9 brief: the brief's single `nodeEmissive(..., baseLo, baseHi)`
 // signature exactly expresses the VALIDATOR loop (js/globe.js:1043-1054) — its base term really
 // does lerp(0.5, 0.22, morph) — but it can NOT also express the metagraph loop
-// (js/globe.js:1099-1107): that loop's base term is a flat 0.5 (no lerp), its twinkle
-// coefficient is 0.12 (not 0.06), its glow-suppression coefficient is 0.9 (not 0.92), and its
-// floor is 0.03 (not 0.02). None of those four differences are reachable through
+// (js/globe.js:1099-1107): its glow-suppression coefficient is 0.9 (not 0.92) and its
+// floor is 0.03 (not 0.02) — historic per-loop tuning kept verbatim. (The loops' base terms
+// and twinkle have since been unified/removed.) Those differences are not reachable through
 // (baseLo, baseHi) alone. Per the brief's own escape hatch ("splitting into validatorEmissive +
 // metaNodeEmissive is acceptable if documented"), this file keeps `nodeEmissive` exactly as
 // specified (== the validator formula) and adds a sibling `metaNodeEmissive` carrying the
@@ -20,10 +20,6 @@
 
 import { lerp } from "./nodeLayout";
 
-export interface DimState {
-  l0: number;
-  l1: number;
-}
 
 export interface DimContext {
   morph: number;
@@ -54,14 +50,12 @@ export const dimTargetsFor = (sel: string, metaIds: string[]) => ({
   meta: new Map(metaIds.map((id) => [id, sel === "all" || sel === id ? 0 : 1])),
 });
 
-// Validator per-node dim (js/globe.js:1037-1039): layer dim x dimScale, raised by countryMix
-// when the node is outside the drilled-into country (geo only). `layer` is the node's role —
-// "l0" or "cl1" (DimState's `l1` field is the "not l0" bucket: historically named after the L1
-// shell, but it's the dim level for the cl1 role — see js/globe.js:244/1037, where `u.layer`
-// is the node's `role` and anything that isn't "l0" reads `dim.l1`). `geoCc` is the node's geo
-// country code, or null if it has none (hybrid siblings / unlocated nodes).
-export function validatorDim(c: DimContext, s: DimState, layer: "l0" | "cl1", geoCc: string | null): number {
-  let d = (layer === "l0" ? s.l0 : s.l1) * dimScale(c);
+// Validator (DAG-core) dim: the eased whole-core dim (ONE value — the old per-layer {l0,l1}
+// split always carried identical values and was collapsed; the DAG core is one subject) scaled
+// by the morph-ramped strength, then raised by countryMix outside the drilled country. `geoCc`
+// is the node's geo country code (null when unlocated).
+export function validatorDim(c: DimContext, dim: number, geoCc: string | null): number {
+  let d = dim * dimScale(c);
   // outside the drilled-into country? dim it on top of the network dim (geo only).
   if (c.countryFilter && (!geoCc || geoCc !== c.countryFilter)) d = Math.max(d, c.countryMix);
   return d;
@@ -77,28 +71,23 @@ export function metaNodeDim(c: DimContext, recDim: number, geoCc: string | null)
   return d;
 }
 
-// Validator emissive glow (js/globe.js:1043-1054). `twinkle` is the node's own decorative phase
-// offset; `flash` is the node's raw (undecayed) arc-arrival flash. `isFocus` = this node IS the
-// hovered/selected focus target. `dimOthersOnFocus` = the caller has already ANDed "some focus
-// target exists" into the filter-based flag (js/globe.js:980) — with no focus target at all
+// Validator emissive glow. `flash` is the node's raw (undecayed) arc-arrival flash. `isFocus` =
+// this node IS the hovered/selected focus target. `dimOthersOnFocus` = the caller has already
+// ANDed "some focus target exists" into the filter-based flag — with no focus target at all
 // neither the boost nor the dim-back branch should fire, and this pure function has no side
 // channel to detect "no focus", so the caller must fold that into the flag it passes.
 // `baseLo`/`baseHi` are the emissive base's Hypergraph/globe endpoints, lerped by morph.
+// STEADY: the old decorative twinkle shimmer was removed (user) — only data-driven pulses animate.
 export function nodeEmissive(
   c: DimContext,
   d: number,
-  clock: number,
-  twinkle: number,
   flash: number,
   isFocus: boolean,
   dimOthersOnFocus: boolean,
   baseLo: number,
   baseHi: number,
 ): number {
-  let ei = lerp(baseLo, baseHi, c.morph);
-  // Twinkle is a decorative (non-data-driven) shimmer — geo only (scaled by m), so the
-  // Hypergraph nodes stay static and only the DATA-driven pulses animate there.
-  ei += Math.sin(clock * 2 + twinkle) * 0.06 * c.morph;
+  const ei = lerp(baseLo, baseHi, c.morph);
   const fl = flash * c.morph; // arcs are a geo-only visual — their flash must not bleed into hyper
   let v = Math.max(0.02, ei * (1 - d * 0.92) + fl); // suppress glow when dimmed
   // Hover/selection pairing: the focused machine's every layer-shell glows together,
@@ -108,25 +97,23 @@ export function nodeEmissive(
   return v;
 }
 
-// Metagraph-node emissive glow (js/globe.js:1099-1107) — see the file-header deviation note:
-// its base/twinkle/suppression/floor coefficients differ from the validator's and aren't
-// reachable through nodeEmissive's (baseLo, baseHi) parameterisation, so it's a sibling
-// function with its own (single, unlerped) `base`.
+// Metagraph-node emissive glow — see the file-header deviation note: its suppression/floor
+// coefficients differ from the validator's and aren't reachable through nodeEmissive's
+// (baseLo, baseHi) parameterisation, so it's a sibling function with its own (single,
+// unlerped) `base`. STEADY: the decorative twinkle shimmer was removed (user).
 // `dimOthersOnFocus` = the caller has already ANDed "some focus target exists" into the
-// filter-based flag (js/globe.js:980) — with no focus target at all neither the boost nor
-// the dim-back branch should fire, and this pure function has no side channel to detect
-// "no focus", so the caller must fold that into the flag it passes.
+// filter-based flag — with no focus target at all neither the boost nor the dim-back branch
+// should fire, and this pure function has no side channel to detect "no focus", so the
+// caller must fold that into the flag it passes.
 export function metaNodeEmissive(
   c: DimContext,
   d: number,
-  clock: number,
-  twinkle: number,
   flash: number,
   isFocus: boolean,
   dimOthersOnFocus: boolean,
   base: number,
 ): number {
-  const glow = (base + Math.sin(clock * 2 + twinkle) * 0.12 * c.morph) * (1 - d * 0.9);
+  const glow = base * (1 - d * 0.9);
   const fl = flash * c.morph; // arcs are a geo-only visual — their flash must not bleed into hyper
   let v = Math.max(0.03, glow + fl);
   if (isFocus) v += 1.4;

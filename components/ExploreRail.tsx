@@ -26,7 +26,7 @@ const ABOUT: Record<Mode, { title: string; eyebrow: string; lines: string[]; cap
     title: "Where the network runs",
     eyebrow: "Geography · about",
     lines: [
-      "Where the network runs — every validator plotted at its real geolocation, with a density heatmap and travelling-packet connection arcs between them.",
+      "Where the network runs — every validator plotted at its real geolocation, co-located machines stacked into honeycomb chip towers, with travelling-packet connection arcs between them.",
       "Drill into a country to see its nodes; filtering a metagraph narrows the map to that network's footprint.",
     ],
   },

@@ -25,8 +25,13 @@ export default function RailScroll() {
     const active = new Map<string, { el: HTMLElement; cleanup: () => void }>();
 
     const attach = (id: string, el: HTMLElement) => {
-      // Toggle `.rail-clip` (the bottom fade mask) only while this rail actually extends down into
-      // the chart's band — otherwise a short rail would be masked to nothing. Debounced via rAF.
+      // Toggle `.rail-clip` (the bottom fade mask + its scroll RUNWAY padding) only while this
+      // rail's CONTENT actually extends down into the chart's band — otherwise a short rail
+      // would be masked to nothing. The class itself adds `--bottom-reserve` of padding (the
+      // runway that lets the last card scroll clear of the fade), so the measure must EXCLUDE
+      // that padding or applying the class would re-trigger itself and never release. Content
+      // height (scrollHeight minus the applied runway) vs the space above the band is
+      // scroll-position-independent, so the toggle can't flip while the user scrolls. rAF-debounced.
       let raf = 0;
       const syncClip = () => {
         raf = 0;
@@ -34,7 +39,14 @@ export default function RailScroll() {
           getComputedStyle(document.documentElement).getPropertyValue("--bottom-reserve"),
         ) || 0;
         const r = el.getBoundingClientRect();
-        el.classList.toggle("rail-clip", reserve > 0 && r.bottom > window.innerHeight - reserve + 24);
+        const runway = el.classList.contains("rail-clip") ? reserve + 12 : 0; // globals.css .rail-clip
+        const contentH = el.scrollHeight - runway;
+        // Space above the band, NO tolerance: any entry into the chart band fades (a +24px
+        // slack let the rail overlap the chart unfaded — user bug; the content-height measure
+        // is DOM-change-driven, so borderline flicker isn't a concern the way it was for the
+        // old rect-based measure).
+        const avail = window.innerHeight - reserve - r.top;
+        el.classList.toggle("rail-clip", reserve > 0 && contentH > avail);
       };
       const scheduleClip = () => { if (!raf) raf = requestAnimationFrame(syncClip); };
       scheduleClip();

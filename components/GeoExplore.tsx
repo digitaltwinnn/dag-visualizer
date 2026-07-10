@@ -39,14 +39,29 @@ export default function GeoExplore() {
   // network filter to the node's OWN network first, then open its card. Without the filter step
   // the selection didn't carry into the Hypergraph (the view had nothing to isolate). A validator
   // belongs to the DAG core ("dag"); a metagraph node to its metagraph.
-  const selectNode = (pick: NodeRow["pick"]) => {
+  // `selected` = this row is the currently-inspected node — re-clicking it DESELECTS (the same
+  // step-back as the node card's ×, user: one toggle language everywhere), which drops the
+  // camera back to the country/network framing.
+  const selectNode = (pick: NodeRow["pick"], selected: boolean) => {
+    if (selected) {
+      setInspect(null);
+      return;
+    }
     const netId =
       pick.kind === "metanode"
         ? pick.meta?.id ?? null
         : pick.kind === "l0" || pick.kind === "l1"
           ? "dag"
           : null;
-    if (netId) setFilter(netId);
+    if (netId && netId !== filter) {
+      setFilter(netId);
+      // The engine's "switching network clears the country drill" rule fires on that setFilter —
+      // right for the PICKER, wrong here: this filter change is a side-effect of selecting a
+      // node INSIDE the drilled country (user bug: the accordion collapsed and the row's
+      // selection vanished). Re-assert the drill — the node provably lives in it.
+      const cc = "geo" in pick ? pick.geo?.cc ?? null : null;
+      if (country && cc === country) setCountry(country);
+    }
     setInspect(pick);
   };
 
@@ -68,7 +83,13 @@ export default function GeoExplore() {
   const tickerOrName = activeCfg ? activeCfg.ticker || activeCfg.name : "This metagraph";
   // Click a country: drill the globe into it (store.country) — the drill state doubles as the
   // accordion's "which row is open", so the globe and the list stay one source of truth.
-  const drill = (cc: string) => setCountry(country === cc ? null : cc);
+  // Moving between zoom LEVELS deselects the finer one (user): drilling (or un-drilling) a
+  // country clears any selected NODE — its card closes and the camera lands on the country
+  // (or network) framing instead of staying pinned to the old node.
+  const drill = (cc: string) => {
+    if (sel) setInspect(null);
+    setCountry(country === cc ? null : cc);
+  };
 
   // Selection's nodes grouped by country **name** — the join key both the leaderboard and the
   // node list derive from `geo.country` (`cc` can be absent, the name can't). Each country's
@@ -99,9 +120,12 @@ export default function GeoExplore() {
   const selLayer = sel ? (sel.kind === "metanode" ? sel.node?.layer ?? null : sel.kind) : null;
 
   return (
+    // flex-none + no inner list overflow: the card grows with its content and the RAIL
+    // scrolls (runway + fade) — the old inner-scroll flex card capped the node list in a cramped
+    // scrollbox whose tail was easy to miss (user); rail scrolling matches the tablet sheet.
     <Card
       asChild
-      className="sig-right flex flex-col min-h-0 flex-[1_1_auto] gap-0 p-0 [--spine:var(--filter-accent,var(--primary))]"
+      className="sig-right flex flex-col flex-none gap-0 p-0 [--spine:var(--filter-accent,var(--primary))]"
     >
       <aside id="geoexplore">
       <CardHead
@@ -112,7 +136,7 @@ export default function GeoExplore() {
         collapsed={collapsed}
         onToggle={() => setCollapsed((c) => !c)}
       />
-      <div className={cn("flex flex-col min-h-0 flex-[1_1_auto]", collapsed && "hidden")}>
+      <div className={cn("flex flex-col", collapsed && "hidden")}>
         {/* The footprint's headline figures (Nodes / Countries / Ready) live in the top-bar
             vitals now; this card is purely the country→nodes accordion. */}
         {quietEmpty ? (
@@ -126,16 +150,24 @@ export default function GeoExplore() {
             <p className="text-label text-muted-foreground m-0">{tickerOrName} has no validators we can place on the map right now. It still appears in the Hypergraph.</p>
           </div>
         ) : (
-        <div className="flex-[1_1_auto] min-h-0 overflow-y-auto pt-1.5 px-[14px] pb-2 cmd-list-scroll">
+        <div className="pt-1.5 px-[14px] pb-2">
           {rows.map((c) => {
             const open = c.cc === country;
             const nodes = nodesByCountry.get(c.country) ?? [];
+            // The open group's wash box gets the SAME ±6px outset as the country button
+            // (px-1.5 -mx-1.5), so the drilled row's hover/selection box and the dropdown group
+            // behind it share edges — the button used to overhang the wash by 6px on both sides
+            // (user: "nodes dropdown not aligned with the parent").
             return (
-              <div key={c.cc} className={cn(open && "bg-wash-faint rounded-btn my-0.5")}>
+              <div key={c.cc} className={cn(open && "bg-wash-faint rounded-btn my-0.5 -mx-1.5 px-1.5")}>
                 <button
                   type="button"
                   className={cn(
-                    "group flex items-center gap-2.5 w-full text-left text-body border-none bg-transparent cursor-pointer py-[5px] px-1.5 -mx-1.5 rounded-sm transition-[background] duration-150",
+                    // w-[calc(100%+12px)] (not w-full): with w-full the right -mx-1.5 was ignored
+                    // (overconstrained box) and the row ended 6px SHORT of the column; the calc width
+                    // bakes both 6px outsets in, so the row box spans the open group's wash box
+                    // edge-to-edge (buttons shrink-to-fit, so an auto width is not an option).
+                    "group flex items-center gap-2.5 w-[calc(100%+12px)] text-left text-body border-none bg-transparent cursor-pointer py-[5px] px-1.5 -mx-1.5 rounded-sm transition-[background] duration-150",
                     "hover:bg-wash-hover",
                     "focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--primary)] focus-visible:outline-offset-[-2px]",
                     // The drilled country row wears the same shared selection language as the
@@ -161,20 +193,20 @@ export default function GeoExplore() {
                     />
                   </span>
                   <span className="flex-none w-[26px] text-right text-body tabular-nums font-semibold">{c.count}</span>
-                  {/* Expand affordance / open-state cue. The open/drilled country shows a down
-                      chevron. Closed rows: hidden on a mouse (revealed on row hover/focus — keeps
-                      the list clean), but ALWAYS shown on touch (`@media (hover:none)`), where
-                      there's no hover to surface it. Kept via opacity so the count column never
-                      shifts. */}
+                  {/* Trailing slot: the drilled country shows the shared selection ✓ (same mark
+                    as the node rows / filter picker — one selection language, user); closed rows
+                    keep the expand-affordance chevron — hidden on a mouse (revealed on row hover/
+                    focus, keeps the list clean) but ALWAYS shown on touch (`@media (hover:none)`)
+                    where there's no hover. Both occupy the same flex-none slot, so the count
+                    column never shifts. */}
+                {open ? (
+                  <SelectedRowMark className="flex-none" />
+                ) : (
                   <ChevronRight
                     aria-hidden
-                    className={cn(
-                      "size-3.5 flex-none transition-[transform,opacity] duration-150 motion-reduce:transition-none",
-                      open
-                        ? "rotate-90 text-foreground opacity-100"
-                        : "text-muted-foreground opacity-0 group-hover:opacity-100 group-focus-visible:opacity-100 [@media(hover:none)]:opacity-100",
-                    )}
+                    className="size-3.5 flex-none transition-opacity duration-150 motion-reduce:transition-none text-muted-foreground opacity-0 group-hover:opacity-100 group-focus-visible:opacity-100 [@media(hover:none)]:opacity-100"
                   />
+                )}
                 </button>
 
                 {open && (
@@ -197,7 +229,9 @@ export default function GeoExplore() {
                             className={cn(
                               // `relative pr-7` reserves the picker's trailing ✓ slot on every
                               // row, so the status column doesn't shift when a node is selected.
-                              "nb-row relative flex items-center gap-2 w-full py-[5px] pl-2 pr-7 my-px rounded-sm border border-transparent bg-transparent cursor-pointer text-left text-foreground-dim transition-colors duration-[140ms]",
+                              // w-[calc(100%+6px)]: the node boxes end on the SAME right edge as the country
+                          // row's box above (which spans the wash box), so the group reads as one block.
+                          "nb-row relative flex items-center gap-2 w-[calc(100%+6px)] py-[5px] pl-2 pr-7 my-px rounded-sm border border-transparent bg-transparent cursor-pointer text-left text-foreground-dim transition-colors duration-[140ms]",
                               "hover:bg-wash-hover hover:text-foreground",
                               "focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--primary)] focus-visible:outline-offset-[-2px]",
                               // The selected node row = the SAME shared selection language as the
@@ -209,7 +243,7 @@ export default function GeoExplore() {
                             )}
                             style={pair.style}
                             title={`${r.label} · ${r.state ?? "—"}`}
-                            onClick={() => selectNode(r.pick)}
+                            onClick={() => selectNode(r.pick, on)}
                             onMouseEnter={pair.onMouseEnter}
                           >
                             <IdentityDot hue={rowHue} />

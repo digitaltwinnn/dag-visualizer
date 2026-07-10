@@ -7,7 +7,8 @@
 //   • the centred live global snapshot block + its left-trailing chain of completed snapshots,
 //   • each metagraph's lane of snapshot blocks (real where it anchored, an empty placeholder where
 //     it didn't), all drawn in one InstancedMesh,
-//   • the node-group rings, and the per-block anchor LINKS + travelling pulses.
+//   • the node-group station DIALS (the resting identity marks), and the per-block anchor LINKS +
+//     travelling pulses.
 //
 // Factual basis: block sizes come from anchored counts; links/pulses/rings come straight from the
 // live getAnchor(ts).metaCounts — nothing fabricated. With no snapshot the centre block hides.
@@ -28,15 +29,17 @@
 
 import * as THREE from "three";
 import { METAGRAPHS } from "../../config";
-import { LEDGER, HYP_SPLIT, LAYER_GEOM, ledgerSite, clusterRadius } from "../../domain/ledgerLayout";
+import { LEDGER, HYP_SPLIT, LAYER_GEOM, ledgerSite, DIAL_R, DIAL_R_GLOBAL } from "../../domain/ledgerLayout";
 import type { SceneColors } from "../../sceneColors";
 import { LedgerModel, SLOT_SP, slotFade, curvePoint } from "../../domain/ledgerModel";
 import type { GlobalSnapshot, Anchor, PickDescriptor } from "@/src/data/types";
+import { LEDGER_LAYERS } from "@/src/data/ledgerLayers"; // shared display copy + ORDER — floor labels = panel rows
 
 // Floor plane geometry comes from the shared domain table (ledgerLayout.LAYER_GEOM): the FULL-WIDTH
 // floors are exactly its laneZ === 0 entries; the split hypergraph panes (hypl0/hypl1, laneZ ≠ 0)
-// are built separately below. Layer NAMES live UI-side (src/data/ledgerLayers.ts) — no in-scene text;
-// a plane's pick carries only its layerId.
+// are built separately below. Layer NAMES come from the shared UI copy table
+// (src/data/ledgerLayers.ts) — rendered in-scene as flat front-left corner labels (_makeLabel) AND
+// by the explore panel rows, one source; a plane's pick still carries only its layerId.
 // Floor-frame + edge-fill opacities at rest and when a plane is highlighted from the explore panel.
 // The resting frame sits at ~the geo view's coastal-wall rim brightness (user-tuned) so the two
 // views' structural edges read as one weight.
@@ -45,8 +48,13 @@ import type { GlobalSnapshot, Anchor, PickDescriptor } from "@/src/data/types";
 // FILL has two parts: the pixelated EDGE band (op) and the flat INNER sheet (inner) — the inner is
 // 0 at rest (the centre stays fully transparent by design) and fills in on highlight so the tiles/
 // nodes clearly sit ON the selected plane when the layer-focus camera is close.
-const FLOOR_FRAME_OP = 0.16, FLOOR_FILL_OP = 0.04, FLOOR_INNER_OP = 0;
-const FLOOR_FRAME_HI = 0.4, FLOOR_FILL_HI = 0.14, FLOOR_INNER_HI = 0.03;
+const FLOOR_FRAME_OP = 0.11, FLOOR_FILL_OP = 0.03, FLOOR_INNER_OP = 0; // resting frame kept quiet (user-tuned
+  // down from 0.16/0.04: the default view's plane lines read too strong once the subjects grew)
+const FLOOR_FRAME_HI = 0.4, FLOOR_FILL_HI = 0.055, FLOOR_INNER_HI = 0.008; // fill kept airy (user-tuned
+  // down twice: the sheet over the see-through stack read too busy — the bright FRAME is the cue)
+// While ONE plane is selected, the OTHERS recede — dimmed structural cyan (the planes' colour is
+// already the neutral/structural accent; dimming is the recede, no colour swap).
+const FLOOR_FRAME_OFF = 0.055, FLOOR_FILL_OFF = 0.015;
 
 const PULSE_MAX = 220;       // pooled travelling-pulse instances
 const PULSE_STAGGER = 0.035; // s between successive pulse emissions (a steady stream)
@@ -59,29 +67,55 @@ const LINK_SEG = 44;         // line segments each link is tessellated into (smo
 
 // Trail/lead block size from a snapshot's anchored count (clamped) so a busy tick reads bigger; never
 // fabricate a minimum. Shared by the live lead (_baseR) + the trail-tile reconciliation.
-const sizeForCount = (count: number): number => 1.0 + Math.min(1, count / 24) * 1.6;
+const sizeForCount = (count: number): number => 1.4 + Math.min(1, count / 24) * 2.0;
 
 const _dummy = new THREE.Object3D();
 const _col = new THREE.Color();
 const _p = new THREE.Vector3();
 const _q = new THREE.Vector3(); // scratch for link curve points
 const _gx = new Map<number, number>(); // reused per-frame: slot → global block X
-// The trail tiles/links fade TO a quiet neutral as they recede into the background; the live lead /
-// selected block wear the bright accent. Both come from the CSS token (colors.core) set per-instance
-// in the constructor: `_coreCol` is --primary; `_neutralTile` is that SAME accent rendered dim (×0.28
-// below), ADDITIVELY blended so its low magnitude also reads semi-transparent. The ledger tiles and
-// the geo hologram therefore share --primary and stay calm by low brightness — the two views match by
-// construction (no bespoke teal).
-const NEUTRAL_DIM = 0.28; // how far the recessive tile tone dims the accent
+// The trail tiles/links keep their identity/accent colour; recency is carried by slotFade brightness
+// alone (the neutral-tone + depth-fog recency treatment was removed — a future session may revisit).
+// Station-dial brightness model: REST (inactive — deliberately dim so the lit state carries the
+// signal) → LIT (this metagraph anchored into the CURRENT tick; held until the next global
+// snapshot arrives, cleared in setData on the tick change) → plus a transient pulse sparkle
+// while an anchor pulse is actually passing through.
+const DIAL_REST_OP = 0.13; // resting identity mark — dim
+const DIAL_LIT_OP = 0.78;  // added while latched as did-work-this-tick (user: brighter highlight)
+
+// The shared unit station DIAL geometry — the instrument-ruler language bent into a circle: a
+// hairline circle plus radial ticks (fine ticks all round, longer cardinals), mirroring the rail
+// threads' ruler spec in-scene. Unit radius; each dial scales it to its fixed radius.
+// Construction-time allocation (once, shared by every dial).
+function buildDialGeometry(): THREE.BufferGeometry {
+  const pts: number[] = [];
+  const SEG = 72;
+  for (let i = 0; i < SEG; i++) {
+  const a0 = (i / SEG) * Math.PI * 2, a1 = ((i + 1) / SEG) * Math.PI * 2;
+  pts.push(Math.cos(a0), 0, Math.sin(a0), Math.cos(a1), 0, Math.sin(a1));
+  }
+  const TICKS = 48;
+  for (let i = 0; i < TICKS; i++) {
+  const a = (i / TICKS) * Math.PI * 2;
+  const cardinal = i % (TICKS / 4) === 0; // 4 longer cardinal ticks
+  const r0 = 1.04, r1 = cardinal ? 1.2 : 1.11;
+  pts.push(Math.cos(a) * r0, 0, Math.sin(a) * r0, Math.cos(a) * r1, 0, Math.sin(a) * r1);
+  }
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute("position", new THREE.BufferAttribute(new Float32Array(pts), 3));
+  return geo;
+}
 
 interface RingRec {
-  mesh: THREE.Mesh;
+  mesh: THREE.LineSegments;
   y: number;
-  glow: number;
+  glow: number;   // transient sparkle while a pulse passes (decays)
+  lit: boolean;   // latched: anchored into the CURRENT tick (cleared on the next tick)
   radius: number;
   floor: "l0" | "l1";
 }
 interface CurveRec {
+  id: string; // metagraph id — carried on the rec so the per-frame loop can iterate .values()
   sx: number;
   sz: number;
   color: number;
@@ -101,31 +135,29 @@ export class LedgerView {
   group: THREE.Group;
   private _core: number;             // the structural accent (colors.core), as a number
   private _coreCol: THREE.Color;     // the accent as a Color (live/selected blocks)
-  private _neutralTile: THREE.Color; // the accent dimmed — the recessive trail tone
-  // Identity SCENE-lane colour map (id -> 0xRRGGBB), set by the Engine so lane tiles / anchor rings /
-  // links / pulses use the metagraph's identity hue (not the raw config colour). Null until set → the
-  // `?? METAGRAPHS[i].color` fallbacks below keep it working. NOTE: the Engine sets this AFTER
-  // construction, so the node-group rings/pulses (_buildCurves in the ctor) resolve to the CONFIG
-  // colour, while lane tiles (resolved lazily on the first setData) use the identity map — verbatim
-  // js/ledger.js behaviour, intentionally preserved.
-  sceneColors: Record<string, number> | null;
+  // Identity SCENE-lane colour map (id -> 0xRRGGBB) — the ONE colour system, shared with the
+  // hubs/nodes/HUD (src/palette/identity.ts via the Engine). Required at construction so nothing
+  // in this view is ever built from a raw config colour; refreshed via setSceneColors() when the
+  // live metagraph set arrives. Defensive fallback is the structural accent, never config.
+  sceneColors: Record<string, number>;
   pickables: THREE.Object3D[];
 
   private model = new LedgerModel();
   private t: number;
   private _latest: GlobalSnapshot | null;
   private _baseR: number;
-  private _filter: string; // metagraph filter; when a single metagraph, the OTHERS go neutral
+  private _filter: string; // metagraph filter; when a single metagraph, the OTHERS dim strongly
 
-  // Anchor animation state. _anchorGroup holds the node-group rings (built once, persistent).
+  // Anchor animation state. _anchorGroup holds the node-group station dials (built once, persistent).
   private _anchorGroup: THREE.Group;
-  private _ringGeo: THREE.RingGeometry;
+  private _dialGeo: THREE.BufferGeometry;
   private _curves: Map<string, CurveRec>; // metaId -> { sx, sz, color, rings } (sx/sz = pulse curve origin)
   private _pulses: Pulse[];               // active { rec, t, speed }
   private _queue: QueueItem[];            // pending emissions { id, dueAt }
   private _lastDue: number;
   private _flash: number;                 // centre-block arrival flash
-  private _gL0Glow: number;               // hypergraph-L0 ring glow — lights as anchor pulses reach that cluster
+  private _gL0Glow: number;               // hypergraph-L0 dial sparkle — as anchor pulses reach that cluster
+  private _gL0Lit = false;                // latched: produced the CURRENT tick (cleared on the next)
   private _lastDrawn = 0;
 
   // The global chain: completed snapshots become solid blocks that march LEFT into a trail (newest
@@ -151,14 +183,15 @@ export class LedgerView {
   private _pulseMat!: THREE.MeshBasicMaterial;
   private _pulseMesh!: THREE.InstancedMesh;
 
-  private _gL0Ring: THREE.Mesh;
+  private _gL0Ring: THREE.LineSegments;
+  private _dagL1Ring: THREE.LineSegments;
   // Per-plane materials keyed by layer id, so setHighlight() can brighten one floor (explore panel).
   private _floorMats = new Map<string, { frame: THREE.LineBasicMaterial; fill: THREE.ShaderMaterial }>();
 
-  constructor(scene: THREE.Scene, colors: SceneColors) {
+  constructor(scene: THREE.Scene, colors: SceneColors, sceneColors: Record<string, number>) {
     this._core = colors.core;
     this._coreCol = new THREE.Color(colors.core);
-    this._neutralTile = new THREE.Color(colors.core).multiplyScalar(NEUTRAL_DIM);
+    this.sceneColors = sceneColors;
     this.group = new THREE.Group();
     this.group.visible = false;
     // Whole-view orientation (tilt ∘ rotY) + scale so the ledger frames well under the SHARED overview
@@ -170,14 +203,13 @@ export class LedgerView {
     this.group.scale.setScalar(LEDGER.viewScale);
     scene.add(this.group);
     this.pickables = [];
-    this.sceneColors = null;
     this.t = 0;
     this._latest = null;
     this._baseR = 1;
 
     this._anchorGroup = new THREE.Group();
     this.group.add(this._anchorGroup);
-    this._ringGeo = new THREE.RingGeometry(0.84, 1.0, 36); // shared unit ring (scaled per group)
+    this._dialGeo = buildDialGeometry(); // shared unit dial (hairline circle + ruler ticks), scaled per group
     this._curves = new Map();
     this._pulses = [];
     this._queue = [];
@@ -198,11 +230,15 @@ export class LedgerView {
     this._buildLinks();
     this._buildCurves(); // persistent flow line + rings per metagraph (kept as the visual linkage)
 
-    // The hypergraph-L0 participation ring: a single ring round the global validator cluster that
-    // lights up as it produces each new global snapshot (mirrors the metagraph node-group rings).
-    this._gL0Ring = this._makeRing(0, LEDGER.rowHypL0, 0, this._core);
-    this._gL0Ring.scale.setScalar(LEDGER.dagCell + 0.7);
+    // The global clusters' station dials — the DAG treated as a metagraph-shaped core (unified node
+    // model): hypergraph L0 (lights as anchor pulses reach that floor) + the DAG L1 lane's cluster.
+    const dagHue = this.sceneColors["dag"] ?? this._core; // the DAG's identity hue — matches its node instances
+    this._gL0Ring = this._makeDial(0, LEDGER.rowHypL0, 0, dagHue);
+    this._gL0Ring.scale.setScalar(DIAL_R_GLOBAL);
     this.group.add(this._gL0Ring);
+    this._dagL1Ring = this._makeDial(0, LEDGER.rowDAGL1, LEDGER.dagLaneZ, dagHue);
+    this._dagL1Ring.scale.setScalar(DIAL_R_GLOBAL);
+    this.group.add(this._dagL1Ring);
   }
 
   // Per-block link segments: every completed metagraph block draws a line to the global block of
@@ -220,7 +256,7 @@ export class LedgerView {
     this._linkMesh = new THREE.LineSegments(
       geo,
       new THREE.LineBasicMaterial({
-        vertexColors: true, transparent: true, opacity: 0.85, // hot links pop; neutral kept dim by their low vertex-colour
+        vertexColors: true, transparent: true, opacity: 0.85, // hot links pop; trailing links kept dim by their low vertex-colour
         blending: THREE.AdditiveBlending, depthWrite: false,
       }),
     );
@@ -234,15 +270,20 @@ export class LedgerView {
     for (const m of METAGRAPHS) this._addCurve(m.id);
   }
 
-  // Live per-metagraph node counts per floor (from the globe) → size each ring to fit its dots.
-  // `groups` = { metaId: { l0, l1 } }.
-  setGroupSizes(groups: Record<string, { l0: number; l1: number }>) {
-    if (!groups) return;
+  // Install/refresh the identity colour map and RE-TINT everything built before it arrived:
+  // each metagraph's station dials + pulse colour (rec.color), and the global dials (the DAG's
+  // own identity hue — the same hue its L0/L1 node instances wear, so dial and dots agree).
+  setSceneColors(map: Record<string, number>) {
+    this.sceneColors = map;
+    this._laneColors.clear(); // lane tiles re-resolve lazily via _laneColor
     for (const [id, rec] of this._curves) {
-      const g = groups[id];
-      if (!g) continue;
-      for (const r of rec.rings) r.radius = clusterRadius(r.floor === "l0" ? g.l0 : g.l1);
+      const color = map[id] ?? rec.color;
+      rec.color = color;
+      for (const r of rec.rings) (r.mesh.material as THREE.LineBasicMaterial).color.set(color);
     }
+    const dag = map["dag"] ?? this._core;
+    (this._gL0Ring.material as THREE.LineBasicMaterial).color.set(dag);
+    (this._dagL1Ring.material as THREE.LineBasicMaterial).color.set(dag);
   }
 
   private _buildMetaTrail() {
@@ -268,9 +309,7 @@ export class LedgerView {
   private _laneColor(id: string): THREE.Color {
     let c = this._laneColors.get(id);
     if (!c) {
-      const i = METAGRAPHS.findIndex((m) => m.id === id);
-      const hex = (this.sceneColors && this.sceneColors[id]) ?? (i >= 0 ? METAGRAPHS[i].color : this._core);
-      c = new THREE.Color(hex);
+      c = new THREE.Color(this.sceneColors[id] ?? this._core); // identity map only
       this._laneColors.set(id, c);
     }
     return c;
@@ -282,14 +321,17 @@ export class LedgerView {
   private _buildFloors() {
     // Panes span the whole trail again, but are VERY transparent so even where they stack in perspective
     // they stay a subtle hint of a layer (not a wall) — the black background still reads through.
-    const W = 38;        // X extent (camera-depth) — tight to the lead + trail span
+    const W = 39.5;      // X extent (camera-depth) — tight to the trail; the FRONT gets a 1.5-unit
+                         // strip beyond the original edge: enough that the corner labels clear the
+                         // global clusters' dials (DIAL_R_GLOBAL reaches x≈4.2; label band ~5.0–6.1)
+                         // without the panes reading empty at the front (user-tuned down from +3)
     const D = 44;        // Z extent — tight to the lanes
-    const cx = -14;      // shifted a touch forward (+X) so the L0/L1 node ring (radius ~3.5 at x≈0)
-                         // fits inside the pane's front edge; the −X edge (−33) still clears the trail (~−29)
+    const cx = -13.25;   // keeps the −X edge at −33 (still clears the trail ~−29) while the +X
+                         // front edge sits at 6.5 for the label strip
     // Every floor is the SAME simple treatment: a sharp-edged transparent FRAME plus a faint,
     // pixelated edge-weighted fill (quickly gone toward the centre). Each plane gets its OWN cloned
     // materials, stored by layer id in `_floorMats`, so the explore panel can highlight ONE plane
-    // (setHighlight) — brighten its frame + fill — without touching the rest. No in-scene text.
+    // (setHighlight) — brighten its frame + fill — without touching the rest.
     // The frame colour is pushed into HDR (×2) so the thin edge lines land above the bloom pass's
     // threshold and GLOW like the nodes / the geo coastal rim — the opacity still sets the line's
     // core brightness, the overdriven colour is what feeds the bloom.
@@ -350,15 +392,85 @@ export class LedgerView {
     const l1D = HYP_SPLIT.l1Edge - -D / 2, l0D = D / 2 - HYP_SPLIT.l0Edge; // shrunk by the gap
     frame(W, l0D, hy, HYP_SPLIT.l0Cz, "hypl0");
     frame(W, l1D, hy, HYP_SPLIT.l1Cz, "hypl1");
+
+    // Floor labels — flat text at each plane's FRONT-LEFT corner (user-placed), reading from the
+    // camera: the layer's STACK LEVEL in a small outlined box + its name, both from the SAME
+    // display-copy table as the explore panel rows (src/data/ledgerLayers.ts LEDGER_LAYERS.level:
+    // up from the base — Global snapshots = 1; the split hypergraph plane is ONE level with
+    // sub-levels 2.1/2.2, each labelling its own front-left corner).
+    const copyOf = (id: string) => LEDGER_LAYERS.find((l) => l.id === id);
+    const lx = cx + W / 2 - 0.4; // front edge, small inset
+    for (const { y, id } of LAYER_GEOM.filter((l) => l.laneZ === 0))
+      this.group.add(this._makeLabel(copyOf(id)?.level ?? "", copyOf(id)?.name ?? id, lx, y, D / 2 - 1.2));
+    this.group.add(this._makeLabel(copyOf("hypl0")?.level ?? "", copyOf("hypl0")?.name ?? "", lx, hy, D / 2 - 1.2));
+    this.group.add(this._makeLabel(copyOf("hypl1")?.level ?? "", copyOf("hypl1")?.name ?? "", lx, hy, HYP_SPLIT.l1Edge - 1.2));
   }
 
-  // Highlight one floor plane by layer id (from the explore panel) — brighten its frame + edge fill;
-  // null clears. Every plane owns its materials (see _buildFloors), so this touches only the match.
-  setHighlight(id: string | null): void {
+  // A flat floor label lying on the plane, its text STARTING at the given front-left corner
+  // (frontX = the plane's +X/camera edge, leftZ = its +Z/screen-left edge) and running along the
+  // edge toward screen-right: the layer's ORDER digit in a small outlined box (mirroring the
+  // explore panel's number badge) + the name. Canvas-texture text (revival of the pre-47cbc72
+  // _makeLabel); the one colour derives from the structural token (colors.core).
+  private _makeLabel(level: string, text: string, frontX: number, y: number, leftZ: number): THREE.Mesh {
+    const c = document.createElement("canvas");
+    // 2× supersampled canvas (SS): the old 512×64 texture went blurry under the shallow overview
+    // camera's foreshortening; all metrics below are in CSS-ish units and multiplied by SS.
+    const SS = 2;
+    c.width = 512 * SS;
+    c.height = 64 * SS;
+    const ctx = c.getContext("2d")!;
+    // Structural accent (colors.core — the SAME token the floor frames use), solid-bright for
+    // legibility (user: labels read unclear, make them cyan); derived from the token, no literal.
+    const cc = new THREE.Color(this._core);
+    const tone = `rgba(${Math.round(cc.r * 255)},${Math.round(cc.g * 255)},${Math.round(cc.b * 255)},0.85)`;
+    ctx.font = `400 ${22 * SS}px system-ui, -apple-system, sans-serif`;
+    const boxW = Math.max(34 * SS, Math.ceil(ctx.measureText(level).width) + 16 * SS); // fits "2.1" sub-levels
+    ctx.strokeStyle = tone;
+    ctx.lineWidth = 2 * SS;
+    ctx.strokeRect(6 * SS, 15 * SS, boxW, 34 * SS); // the level badge box
+    ctx.fillStyle = tone;
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText(level, 6 * SS + boxW / 2, (15 + 17 + 1) * SS); // level centred in the box
+    ctx.font = `400 ${26 * SS}px system-ui, -apple-system, sans-serif`;
+    ctx.textAlign = "left";
+    ctx.fillText(text, 6 * SS + boxW + 12 * SS, c.height / 2 + 2 * SS);
+    const tex = new THREE.CanvasTexture(c);
+    tex.minFilter = THREE.LinearFilter;
+    tex.colorSpace = THREE.SRGBColorSpace;
+    const h = 1.05, w = h * (c.width / c.height); // aspect is SS-invariant; sized down a touch (user)
+    const mesh = new THREE.Mesh(
+      new THREE.PlaneGeometry(w, h),
+      new THREE.MeshBasicMaterial({ map: tex, transparent: true, depthWrite: false, depthTest: false }),
+    );
+    // Lie flat on the floor, readable from the resting camera: canvas right → −Z local (screen
+    // right), canvas up → −X local (glyph tops away from the camera), normal → +Y (up).
+    mesh.quaternion.setFromRotationMatrix(
+      new THREE.Matrix4().makeBasis(
+        new THREE.Vector3(0, 0, -1),
+        new THREE.Vector3(-1, 0, 0),
+        new THREE.Vector3(0, 1, 0),
+      ),
+    );
+    // Corner-anchor: the canvas LEFT edge sits at leftZ (text starts at the corner), the glyph
+    // BASELINE side hugs the front edge.
+    mesh.position.set(frontX - h / 2, y + 0.06, leftZ - w / 2);
+    mesh.renderOrder = 2;
+    return mesh;
+  }
+
+  // Highlight one floor plane by layer id — brighten its frame + edge fill (the fill stays airy —
+  // the selected plane must not read as a solid sheet). `dimOthers` (a COMMITTED layer selection)
+  // additionally recedes the OTHER planes to the dimmed OFF state; a mere hover preview must NOT
+  // (the overview planes cover most of the screen, so the cursor is nearly always over one — a
+  // hover that dimmed the rest read as "filtering dims the layers", user bug). null id restores
+  // every plane to rest. Every plane owns its materials (see _buildFloors).
+  setHighlight(id: string | null, dimOthers = false): void {
     for (const [k, m] of this._floorMats) {
       const on = id === k;
-      m.frame.opacity = on ? FLOOR_FRAME_HI : FLOOR_FRAME_OP;
-      m.fill.uniforms.uOpacity.value = on ? FLOOR_FILL_HI : FLOOR_FILL_OP;
+      const off = id != null && dimOthers;
+      m.frame.opacity = on ? FLOOR_FRAME_HI : off ? FLOOR_FRAME_OFF : FLOOR_FRAME_OP;
+      m.fill.uniforms.uOpacity.value = on ? FLOOR_FILL_HI : off ? FLOOR_FILL_OFF : FLOOR_FILL_OP;
       m.fill.uniforms.uInner.value = on ? FLOOR_INNER_HI : FLOOR_INNER_OP;
     }
   }
@@ -431,50 +543,49 @@ export class LedgerView {
     this._pulseMesh.instanceMatrix.needsUpdate = true;
   }
 
-  // Build metagraph `id`'s node-group rings + cache its pulse-curve origin (the lane site). The
+  // Build metagraph `id`'s station dials + cache its pulse-curve origin (the lane site). The
   // visible anchor line is NOT built here — it's drawn dynamically per block in the link pass
   // (via curvePoint) so it travels with the block; only the pulses use the cached origin.
   private _addCurve(id: string): CurveRec | null {
     const i = METAGRAPHS.findIndex((m) => m.id === id);
     if (i < 0) return null; // unlisted — no site
     const s = ledgerSite(i, METAGRAPHS.length);
-    const color = (this.sceneColors && this.sceneColors[id]) ?? METAGRAPHS[i].color;
-    // Rings around the L1 + L0 node groups this metagraph produces from; they light up as a pulse
-    // passes through (see update).
-    const dR = clusterRadius(3); // default until the live node counts arrive (setGroupSizes)
+    const color = this.sceneColors[id] ?? this._core; // identity map only — never a config colour
+    // Station dials on the L1 + L0 node floors this metagraph produces from — the resting identity
+    // mark (ONE fixed radius for every metagraph); an anchor pulse brightens them as it passes.
     const rings: RingRec[] = [
-      { mesh: this._makeRing(s.x, LEDGER.rowML1, s.z, color), y: LEDGER.rowML1, glow: 0, radius: dR, floor: "l1" },
-      { mesh: this._makeRing(s.x, LEDGER.rowML0, s.z, color), y: LEDGER.rowML0, glow: 0, radius: dR, floor: "l0" },
+      { mesh: this._makeDial(s.x, LEDGER.rowML1, s.z, color), y: LEDGER.rowML1, glow: 0, lit: false, radius: DIAL_R, floor: "l1" },
+      { mesh: this._makeDial(s.x, LEDGER.rowML0, s.z, color), y: LEDGER.rowML0, glow: 0, lit: false, radius: DIAL_R, floor: "l0" },
     ];
     for (const r of rings) {
       r.mesh.scale.setScalar(r.radius);
       this._anchorGroup.add(r.mesh);
     }
-    const rec: CurveRec = { sx: s.x, sz: s.z, color, rings };
+    const rec: CurveRec = { id, sx: s.x, sz: s.z, color, rings };
     this._curves.set(id, rec);
     return rec;
   }
 
-  // A thin ring lying flat on a floor, sharing the unit `_ringGeo` (scaled per group to its
-  // count-based radius — see setGroupSizes / the update glow loop) so it fits the dots.
-  private _makeRing(x: number, y: number, z: number, color: number): THREE.Mesh {
-    const ring = new THREE.Mesh(
-      this._ringGeo,
-      new THREE.MeshBasicMaterial({
-        color, transparent: true, opacity: 0, side: THREE.DoubleSide,
+  // A station DIAL lying flat on a floor, sharing the unit `_dialGeo` (scaled to its FIXED radius —
+  // one size for every metagraph, DIAL_R; the global clusters use DIAL_R_GLOBAL). Identity-hued,
+  // faint at rest (DIAL_REST_OP); the anchor-pulse glow brightens it on top (see update).
+  private _makeDial(x: number, y: number, z: number, color: number): THREE.LineSegments {
+    const dial = new THREE.LineSegments(
+      this._dialGeo,
+      new THREE.LineBasicMaterial({
+        color, transparent: true, opacity: DIAL_REST_OP,
         blending: THREE.AdditiveBlending, depthWrite: false,
       }),
     );
-    ring.rotation.x = -Math.PI / 2; // lie flat on the floor
-    ring.position.set(x, y + 0.02, z);
-    ring.userData.baseOpacity = 0; // INVISIBLE at rest; only shows while a pulse is passing through it
-    return ring;
+    dial.position.set(x, y + 0.02, z); // geometry is already in the floor plane (X/Z)
+    dial.userData.baseOpacity = DIAL_REST_OP; // resting identity mark; pulses brighten from here
+    return dial;
   }
 
   private _clearCurves() {
     for (const o of this._anchorGroup.children.slice()) {
       this._anchorGroup.remove(o);
-      (o as THREE.Mesh).material && ((o as THREE.Mesh).material as THREE.Material).dispose(); // geometry is the shared _ringGeo
+      (o as THREE.Mesh).material && ((o as THREE.Mesh).material as THREE.Material).dispose(); // geometry is the shared _dialGeo
     }
     this._curves.clear();
   }
@@ -521,7 +632,13 @@ export class LedgerView {
     // On a new tick the pending queue is cleared first (js/ledger.js:526); the running stagger clock
     // (_lastDue) is NOT reset (it's max'd against this.t). Only the selected metagraph emits pulses
     // when a single-metagraph filter is active (so only ITS rings light).
-    if (isNewTick) this._queue.length = 0;
+    if (isNewTick) {
+      this._queue.length = 0;
+      // A new global snapshot: the previous tick's did-work latches expire — dials drop back
+      // to rest until this tick's own anchor pulses re-light them.
+      for (const rec of this._curves.values()) for (const r of rec.rings) r.lit = false;
+      this._gL0Lit = false;
+    }
     const mf = this._filter !== "all" && this._filter !== "dag" ? this._filter : null;
     for (const ch of changes) {
       const rec = this._curves.get(ch.id) || this._addCurve(ch.id);
@@ -536,13 +653,15 @@ export class LedgerView {
   }
 
   // The selected/hovered snapshot (by ordinal, from the LiveStrip bar-chart or the centre pick) keeps
-  // its metagraph COLOUR even after it trails into the neutral background. Null = nothing selected.
+  // its emphasis (brightness) even after it trails left. Null = nothing selected.
   setSelected(ordinal: number | null) {
     this.model.setSelected(ordinal);
   }
 
   // The network filter: when a single metagraph is selected, the OTHER metagraphs' lead tiles + links
-  // go neutral too (so the lead row shows only the selected metagraph in colour). "all"/"dag" = no dim.
+  // dim strongly too (so the lead row emphasises only the selected metagraph). "all"/"dag" = no dim.
+  // The floor-plane FRAME LINES deliberately stay the structural default in every filter state —
+  // an identity-hued outline was tried (with luminance equalization) and read too dominant (user).
   setFilter(filter: string) {
     this._filter = filter || "all";
   }
@@ -553,37 +672,35 @@ export class LedgerView {
 
     const k = Math.min(1, dt * 3); // shared ease factor for the trail + lanes this frame
     const selectedSlot = this.model.selectedSlot;
+    // A single-metagraph filter strongly dims every OTHER lane's tiles/links/dials.
+    const mf = this._filter !== "all" && this._filter !== "dag" ? this._filter : null;
 
-    // The centre block (LIVE snapshot) pulses subtly + flashes as pulses arrive — UNLESS an older
-    // snapshot is selected, in which case the live lead also drops to the neutral tone (only the
-    // selected row is coloured anywhere).
+    // The centre block (LIVE snapshot) pulses subtly + flashes as pulses arrive — dimmed (brightness
+    // only, colour stays) while an OLDER snapshot is selected so the selected row reads brightest.
     this._flash = Math.max(0, this._flash - dt * 2.2);
-    const leadNeutral = selectedSlot > 0;
-    const cCol = leadNeutral ? this._neutralTile : this._coreCol;
-    this.centerMat.color.copy(cCol);
-    this.centerMat.emissive.copy(cCol);
-    this.centerMat.emissiveIntensity = leadNeutral ? 0.22 : 0.55 + this._flash * 0.6;
+    const leadDimmed = selectedSlot > 0;
+    this.centerMat.color.copy(this._coreCol);
+    this.centerMat.emissive.copy(this._coreCol);
+    this.centerMat.emissiveIntensity = leadDimmed ? 0.3 : 0.55 + this._flash * 0.6;
 
     // Hypergraph-L0 participation ring: glows as the global L0 produces each snapshot, then fades.
     this._gL0Glow = Math.max(0, this._gL0Glow - dt * 1.4);
-    (this._gL0Ring.material as THREE.MeshBasicMaterial).opacity = this._gL0Ring.userData.baseOpacity + this._gL0Glow * 0.9;
+    (this._gL0Ring.material as THREE.LineBasicMaterial).opacity =
+      this._gL0Ring.userData.baseOpacity + (this._gL0Lit ? DIAL_LIT_OP : 0) + this._gL0Glow * 0.7;
     this.center.scale.setScalar(this._baseR * (1 + Math.sin(this.t * 2.2) * 0.06 + this._flash * 0.12));
 
-    // The global trail eases left into its slots; trailing blocks get the SAME treatment as the tiles
-    // and links — bright cyan only when SELECTED, otherwise the toned-down NEUTRAL (the live lead is the
-    // separate centre block). Fades + grows transparent by recency.
+    // The global trail eases left into its slots; every block keeps the accent colour — the SELECTED
+    // block reads brighter, everything else fades gently by recency (slotFade). (The neutral-tone +
+    // depth-fog recency treatment was removed; brightness alone carries recency for now.)
     for (const t of this.model.trail) {
       const mesh = this._trailMeshes.get(t.ordinal);
       if (!mesh) continue;
       const mat = mesh.material as THREE.MeshStandardMaterial;
       mesh.position.x += (-t.slot * SLOT_SP - mesh.position.x) * k;
       const sel = t.slot === selectedSlot;
-      const col = sel ? this._coreCol : this._neutralTile;
-      mat.color.copy(col);
-      mat.emissive.copy(col);
-      // Trail brightness lifted (user-tuned): the old global snapshots read too dark/transparent
-      // under the depth fog — a higher emissive + opacity floor keeps them visible as they recede.
-      mat.emissiveIntensity = sel ? 0.7 : 0.34;
+      mat.color.copy(this._coreCol);
+      mat.emissive.copy(this._coreCol);
+      mat.emissiveIntensity = sel ? 0.9 : 0.34;
       const target = sel ? 0.95 : 0.75 * slotFade(t.slot);
       mat.opacity += (target - mat.opacity) * k;
     }
@@ -598,11 +715,9 @@ export class LedgerView {
         const mesh = this._trailMeshes.get(t.ordinal);
         if (mesh) _gx.set(t.slot, mesh.position.x);
       }
-      // A single-metagraph filter neutralises every OTHER lane (even on the lead row).
-      const mf = this._filter !== "all" && this._filter !== "dag" ? this._filter : null;
       let mi = 0, li = 0;
       for (const lane of this.model.lanes.values()) {
-        const laneOff = mf != null && lane.id !== mf; // filtered out → never coloured
+        const laneOff = mf != null && lane.id !== mf; // filtered out → strongly dimmed
         const laneColor = this._laneColor(lane.id);
         for (const b of lane.blocks) {
           if (mi >= META_TRAIL_MAX) break;
@@ -613,28 +728,25 @@ export class LedgerView {
           _dummy.scale.set(b.size, b.size, b.size * (b.filled ? 1 : 0.18)); // empty = thin ghost tile
           _dummy.updateMatrix();
           this._metaTrailMesh.setMatrixAt(mi, _dummy.matrix);
-          // Colour belongs to the LIVE lead (slot 0) and to a SELECTED snapshot; trailing tiles fade to
-          // a quiet neutral so the background isn't a wall of colour. Brightness still fades by recency.
-          // Colour is binary, and EXACTLY ONE row is ever coloured: a selected OLDER snapshot
-          // (`selectedSlot > 0`) wins outright — the live lead goes neutral with everything else;
-          // otherwise the live lead (slot 0) is the coloured row. A filtered-out lane is never coloured.
+          // Every tile wears its LANE COLOUR; emphasis is pure brightness. The HOT row (live lead, or
+          // a selected older snapshot — isRowHot keeps the exactly-one-hot-row rule) reads bright and
+          // blooms; the rest fade by recency (slotFade). A filtered-out lane is strongly dimmed.
           const hot = this.model.isRowHot(laneOff, b.slot);
-          const colAmt = hot ? 1 : 0;
-          // The HOT (active-snapshot) filled tiles read BRIGHT — near/over full lane colour on the
-          // additive mesh so they bloom like the live global-L0 block; empty placeholders + the
-          // neutral trail stay dim.
-          const bright = hot ? Math.max(b.fade, 0.9) * (b.filled ? 1.3 : 0.2) : b.fade * (b.filled ? 0.6 : 0.13);
-          this._metaTrailMesh.setColorAt(mi, _col.copy(this._neutralTile).lerp(laneColor, colAmt).multiplyScalar(bright));
+          const bright =
+            (hot ? Math.max(b.fade, 0.9) * (b.filled ? 1.3 : 0.2) : b.fade * (b.filled ? 0.55 : 0.12)) *
+            (laneOff ? 0.22 : 1);
+          this._metaTrailMesh.setColorAt(mi, _col.copy(laneColor).multiplyScalar(bright));
           mi++;
 
           // One anchor link per cluster (from its centre tile) — the shared curvePoint shape: straight
           // down through the L1/L0 ring centres, then into the global block, travelling with the blocks.
           const g = _gx.get(b.slot);
           if (b.filled && b.link && g !== undefined && li + LINK_SEG <= LINK_CURVES * LINK_SEG) {
-            // Same lead/selected = coloured, trail = neutral treatment as the tiles (consistent row).
-            // The COLOURED (hot) link reads bright — near-full lane colour on the additive material;
-            // neutral trail links stay dim so only the active anchor pops.
-            _col.copy(this._neutralTile).lerp(laneColor, colAmt).multiplyScalar(hot ? Math.max(b.fade, 0.9) * 1.25 : b.fade * 0.34);
+            // Links match their tiles: lane colour, brightness-graded — the hot row's link pops
+            // near-full on the additive material, trailing links stay dim, filtered-out lanes dimmer.
+            _col.copy(laneColor).multiplyScalar(
+              (hot ? Math.max(b.fade, 0.9) * 1.25 : b.fade * 0.3) * (laneOff ? 0.22 : 1),
+            );
             curvePoint(0, b.x, lane.z, g, _q);
             let px = _q.x, py = _q.y, pz = _q.z;
             for (let s = 1; s <= LINK_SEG; s++) {
@@ -683,9 +795,9 @@ export class LedgerView {
         continue; // dropped below (compacted)
       }
       curvePoint(p.t, p.rec.sx, p.rec.sz, 0, _p);
-      for (const r of p.rec.rings) if (Math.abs(_p.y - r.y) < 1.3) r.glow = 1;
+      for (const r of p.rec.rings) if (Math.abs(_p.y - r.y) < 1.3) { r.glow = 1; r.lit = true; }
       // The global-L0 ring lights only when an anchor pulse actually reaches that cluster's floor.
-      if (Math.abs(_p.y - LEDGER.rowHypL0) < 1.3) this._gL0Glow = 1;
+      if (Math.abs(_p.y - LEDGER.rowHypL0) < 1.3) { this._gL0Glow = 1; this._gL0Lit = true; }
       _dummy.position.copy(_p);
       _dummy.scale.setScalar(1);
       _dummy.quaternion.identity();
@@ -707,12 +819,16 @@ export class LedgerView {
     this._pulseMesh.instanceMatrix.needsUpdate = true;
     if (this._pulseMesh.instanceColor) this._pulseMesh.instanceColor.needsUpdate = true;
 
-    // Decay + apply the node-group ring highlights (brighter + slightly larger while a pulse is in).
+    // Decay + apply the station-dial highlights (brighter + slightly larger while a pulse is in).
+    // A single-metagraph filter dims every OTHER metagraph's dials, consistent with its tiles/links.
+    // .values(), not entries — Map entry destructuring allocates a tuple per rec per frame.
     for (const rec of this._curves.values()) {
+      const dialOff = mf != null && rec.id !== mf;
       for (const r of rec.rings) {
         r.glow = Math.max(0, r.glow - dt * 2.4);
-        (r.mesh.material as THREE.MeshBasicMaterial).opacity = r.mesh.userData.baseOpacity + r.glow * 0.9; // highlight on anchor
-        r.mesh.scale.setScalar(r.radius * (1 + r.glow * 0.12)); // count-sized, a touch bigger on a pulse
+        (r.mesh.material as THREE.LineBasicMaterial).opacity =
+          (r.mesh.userData.baseOpacity + (r.lit ? DIAL_LIT_OP : 0) + r.glow * 0.7) * (dialOff ? 0.22 : 1);
+        r.mesh.scale.setScalar(r.radius * (1 + r.glow * 0.12)); // fixed radius, a touch bigger on a pulse
       }
     }
   }
@@ -721,7 +837,7 @@ export class LedgerView {
     this._clearCurves();
     for (const mesh of this._trailMeshes.values()) (mesh.material as THREE.Material).dispose(); // geometry is the shared _trailGeo
     this._trailMeshes.clear();
-    this._ringGeo.dispose();
+    this._dialGeo.dispose();
     for (const o of this.group.children.slice()) {
       this.group.remove(o);
       const obj = o as THREE.Mesh & { dispose?: () => void };
