@@ -15,8 +15,7 @@ import RailThread from "@/components/RailThread";
 import RailDock from "@/components/RailDock";
 import { useBreakpoint } from "@/components/useBreakpoint";
 import { PulseEdge, useEdgePulse } from "@/components/EdgePulse";
-import { StandbyHalo } from "@/components/state/StateAtoms";
-import { detailsCards } from "@/components/railCards";
+import { detailsCards, type RailCard } from "@/components/railCards";
 import { useTrayActives } from "@/components/useTrayActives";
 import type { TabSignal } from "@/components/RailDock";
 import type { PickDescriptor } from "@/src/data/types";
@@ -95,40 +94,44 @@ function CardPane({
   );
 }
 
-// A slim pick-invite for the empty Detail slot — one muted line + the cyan node-halo. NOT a card:
-// the right rail is the FACTS scope, so when nothing is selected it stays quiet (the view's own
-// "what is this for" orientation lives on the LEFT rail's tool card, not here). EVERY view with
-// pickable subjects gets one, view-specific wording — the map is an ALLOW-LIST mirroring the
-// engine's pick registry (`_pickablesFor`): hyper/geo/ledger raycast; the flat placeholder views
-// (status/transactions/staking) pick nothing → no entry → no hint.
-const INVITE: Partial<Record<Mode, string>> = {
-  hyper: "Click a hub or node in the hypergraph to inspect it.",
-  geo: "Click a node on the globe (or a row in the explorer) to inspect it.",
-  ledger: "Click a snapshot block (or a bar in the strip below) to inspect it.",
+// A GHOST card — the hint state of a Detail slot (user design, 2026-07-10; replaces the single
+// floating pick-invite). Every card the current view CAN produce is always visible: populated
+// with its subject, or as this quiet placeholder saying what to interact with. AS SUBTLE AS
+// POSSIBLE (user refinement): ONE line — kind mark · slot name · instruction — dashed hairline,
+// slim vertical pad, no halo/animation, so the possibility space reads at a glance without the
+// rail losing its calm. Availability + copy come from the rail manifest (railCards.ts), the
+// same single source of truth the dock trays read.
+const GHOST_EYEBROW: Record<string, string> = {
+  context: "Network", node: "Node", snap: "Snapshot", layer: "Layer",
 };
-
-// ONE state-aware hint (user decision 2026-07-05, option c): view + pickability → message, so the
-// slot always shows SOME guidance and never a FALSE one. Normally the view's pick-invite above;
-// but when the selected network has nothing pickable in this view (geo with 0 locatable nodes —
-// e.g. TBC/LEET), inviting a click would be a dead hint, so it turns into the honest variant
-// instead. `selNodes` is exactly the set the globe plots + the explorer lists (empty ⇔ nothing
-// pickable). "All" with 0 nodes = the data simply hasn't landed yet (boot), not a real empty
-// selection → no hint rather than a false one flashing at startup.
-function pickHintText(mode: Mode, filter: string, selNodesCount: number): string | null {
-  const invite = INVITE[mode];
-  if (!invite) return null;
-  if (mode === "geo" && selNodesCount === 0) {
-    const cfg = metagraphById(filter);
-    if (!cfg) return null;
-    return `${cfg.ticker || cfg.name} has no locatable nodes — explore it in the Hypergraph view.`;
-  }
-  return invite;
-}
-function PickHint({ text }: { text: string }) {
+export function GhostCard({ card }: { card: RailCard }) {
+  const Icon = card.icon;
+  const label = GHOST_EYEBROW[card.id] ?? card.id;
   return (
-    <p className="flex items-center gap-2 mt-[2px] mx-1 mb-0 py-0 px-[var(--panel-pad-x)] text-label text-muted-foreground">
-      <StandbyHalo /> {text}
-    </p>
+    // NEAR-transparent (user-tuned): the ghost drops .ig-panel's glass — the fill is a
+    // background GRADIENT + backdrop blur, so `bg-transparent` (background-color only) can't
+    // clear it; the arbitrary background property replaces the whole shorthand with a bare
+    // HINT of the panel tone (--panel at 75%, user-tuned), no blur/depth shadow, faded dashed hairline.
+    <Card
+      asChild
+      className={cn(
+        RIGHT_CARD,
+        "border-dashed py-3 shadow-none border-border/50 [background:color-mix(in_srgb,var(--panel)_75%,transparent)] [backdrop-filter:none]",
+      )}
+    >
+      <aside aria-label={`${label} — nothing selected yet`}>
+        <p className="m-0 flex items-start gap-2.5 text-label text-muted-foreground">
+          <Icon
+            aria-hidden
+            className="size-3.5 flex-none mt-[1px] text-[var(--filter-accent,var(--primary))] opacity-55"
+          />
+          {/* fixed label column (fits the longest slot name, "SNAPSHOT") so the instruction
+              text starts at the SAME x on every ghost card (user) */}
+          <span className="flex-none w-[76px] mt-[2px] text-micro tracking-caps uppercase">{label}</span>
+          <span className="min-w-0">{card.hint}</span>
+        </p>
+      </aside>
+    </Card>
   );
 }
 
@@ -143,7 +146,6 @@ export default function Inspector() {
   const inspect = useStore((s) => s.inspect);
   const snap = useStore((s) => s.snap);
   const layer = useStore((s) => s.layer);
-  const selStack = useStore((s) => s.selStack);
   const filter = useStore((s) => s.filter);
   const mode = useStore((s) => s.mode) as Mode;
   const setInspect = useStore((s) => s.setInspect);
@@ -163,7 +165,13 @@ export default function Inspector() {
   // icon even at the "all" filter, where ContextCard renders nothing). The Context card itself
   // stays ALWAYS-mounted below (via <ContextCard/>, which self-nulls on "all") so its EdgePulse
   // survives the dossier ⇄ nothing swap; the manifest only decides its tray-icon presence.
-  const manifest = detailsCards({ mode, filter, inspect, snap, layer, selStack });
+  const selNodes = useStore((s) => s.selNodes);
+  const filterCfg = metagraphById(filter);
+  const manifest = detailsCards({
+    mode, filter, inspect, snap, layer,
+    selNodesCount: selNodes.length,
+    filterLabel: filterCfg ? filterCfg.ticker || filterCfg.name : null,
+  });
   const detailPane: Record<string, ReactNode> = {
     // geoLive reads the node from the store; its × is CardHead's shared close like every card.
     node: (
@@ -176,14 +184,14 @@ export default function Inspector() {
       <CardPane key="layer" pick={layer} eyebrow="Selected layer" onClose={() => setLayer(null)} />
     ) : null,
   };
-  // Present Detail cards in the manifest's (recency) order — Context is rendered separately.
-  const panes = manifest.filter((c) => c.present && c.kind !== "context").map((c) => detailPane[c.id]);
-  const hasDetail = panes.length > 0;
-
-  // The state-aware hint (pickHintText above): normal invite, honest no-pickables variant, or
-  // nothing (no detail slot noise while a Detail card is up, and no hint in the pick-less views).
-  const selNodes = useStore((s) => s.selNodes);
-  const hintText = hasDetail ? null : pickHintText(mode, filter, selNodes.length);
+  // Slots in TWO groups (user refinement): POPULATED cards first, then every GHOST pushed to
+  // the bottom — each group in the manifest's stable slot order. A deselect drops the card's
+  // ghost into the bottom group; activating a ghost lifts it into the populated group. Context
+  // is rendered separately (always-mounted, self-nulling) — only its ghost comes from here.
+  const panes = manifest.filter((c) => c.kind !== "context" && c.present).map((c) => detailPane[c.id]);
+  const ghosts = manifest
+    .filter((c) => !c.present && c.hint != null)
+    .map((c) => <GhostCard key={`${c.id}-ghost`} card={c} />);
 
   // ── Dock icon TRAY (tablet/phone) ───────────────────────────────────────────────────────────
   // GLOBAL CONSTRAINT: nothing here ever opens the sheet — the tray is purely visual; `open` is
@@ -213,7 +221,7 @@ export default function Inspector() {
     <>
       <ContextCard />
       {panes}
-      {hintText && <PickHint text={hintText} />}
+      {ghosts}
     </>
   );
 
@@ -235,7 +243,7 @@ export default function Inspector() {
         >
           <ContextCard />
           {panes}
-          {hintText && <PickHint text={hintText} />}
+          {ghosts}
         </div>
       </>
     );

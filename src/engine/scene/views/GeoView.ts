@@ -33,6 +33,13 @@ export interface GeoViewHost {
   };
   landFillMat?: THREE.MeshBasicMaterial;
   landFillMesh?: THREE.Mesh;
+  // Shared FACING uniform (camera direction in the globe's local frame — Globe copies _camN in
+  // each frame): the graticule + coastal walls dim their far-hemisphere fragments through it,
+  // so the see-through backside stays present but visibly "behind" (user: front/back ambiguity).
+  facingUniform?: { value: THREE.Vector3 };
+  // The polar compass roses' materials, faded per frame by BOTH the morph fade and the pole's
+  // own facing (a rose on the far side dims hard — the depth cue that killed the ambiguity).
+  poleRoses?: Array<{ mats: Array<THREE.Material & { opacity: number }>; bases: number[]; sign: number }>;
 }
 
 // HOLOGRAPHIC GLOBE: there is deliberately NO opaque body sphere and NO atmosphere halo.
@@ -60,40 +67,52 @@ function buildGraticule(globe: GeoViewHost) {
   // The sea graticule (grid lines OVER the ocean): subtle so the continents (the raised, gridded
   // land) clearly lead — lifted from 0.03 (user: a bit more present on the water). Accent hue.
   const mat = new THREE.LineBasicMaterial({ color: globe.geoColor, transparent: true, opacity: 0 });
+  // FACING dim: far-hemisphere fragments fade to ~30% so the backside reads as behind the globe
+  // instead of blending with the front (the hologram keeps its see-through presence, quieter).
+  globe.facingUniform = { value: new THREE.Vector3(0, 0, 1) };
+  mat.onBeforeCompile = (sh) => {
+    sh.uniforms.uCamN = globe.facingUniform!;
+    sh.vertexShader = sh.vertexShader
+      .replace("#include <common>", "#include <common>\nvarying vec3 vDir;")
+      .replace("#include <begin_vertex>", "#include <begin_vertex>\nvDir = normalize(position);");
+    sh.fragmentShader = sh.fragmentShader
+      .replace("#include <common>", "#include <common>\nuniform vec3 uCamN;\nvarying vec3 vDir;")
+      .replace(
+        "#include <color_fragment>",
+        "#include <color_fragment>\ndiffuseColor.a *= mix(0.3, 1.0, smoothstep(-0.35, 0.2, dot(vDir, uCamN)));",
+      );
+  };
   globe.geoFades.push({ mat, base: 0.06 });
   globe.group.add(new THREE.LineSegments(geo, mat));
 }
 
 // POLAR COMPASS ROSE — the subtle orientation cue (user: the tilted country/node poses read
 // disorienting without knowing where north is). E/W only exist relative to a point on a sphere,
-// so the honest anchors are the POLES: a hairline dial (the instrument-thread language — ring +
-// radial ticks, the 4 cardinal ticks longer) floats over each pole with a micro letter, "N"
-// bright-ish, "S" dimmer. Lives in `globe.group` (rotates + tilts WITH the globe — a truthful
-// scene marker, not HUD chrome), structural accent, faded in with the rest of the geo furniture
-// (geoFades). Construction-time only.
+// so the honest anchors are the POLES. The mark is a slender FOUR-POINT STAR rose (long cardinal
+// points, short diagonal spokes, one hairline ring crossing the waists) — deliberately NOT the
+// ring-and-ruler-ticks dial the Snapshots station dials use (user: the first draft read as the
+// same instrument). Lives in `globe.group` (rotates + tilts WITH the globe — a truthful scene
+// marker, not HUD chrome), structural accent, and fades by BOTH the morph fade and the pole's
+// FACING (a far-side rose dims hard — the front/back depth cue). Construction-time only.
 function buildCompassRose(globe: GeoViewHost) {
-  const RING_R = 1.5, TICKS = 24, TICK_IN = 0.16, TICK_CARD = 0.34;
+  const R_TIP = 1.6, R_WAIST = 0.3, R_DIAG = 0.8, R_RING = 1.0, SEG = 72;
   const pts: THREE.Vector3[] = [];
-  // Hairline ring as segments (72 spans) + radial ticks pointing inward; cardinal ticks longer.
-  const SEG = 72;
-  for (let i = 0; i < SEG; i++) {
-    const a0 = (i / SEG) * Math.PI * 2, a1 = ((i + 1) / SEG) * Math.PI * 2;
-    pts.push(
-      new THREE.Vector3(Math.cos(a0) * RING_R, 0, Math.sin(a0) * RING_R),
-      new THREE.Vector3(Math.cos(a1) * RING_R, 0, Math.sin(a1) * RING_R),
-    );
+  const at = (a: number, r: number) => new THREE.Vector3(Math.cos(a) * r, 0, Math.sin(a) * r);
+  for (let k = 0; k < 4; k++) {
+    const a = (k * Math.PI) / 2;
+    // the star point: tip → the two 45° waist corners (a slim diamond blade)
+    pts.push(at(a, R_TIP), at(a + Math.PI / 4, R_WAIST));
+    pts.push(at(a, R_TIP), at(a - Math.PI / 4, R_WAIST));
+    // short plain diagonal spoke between the blades
+    pts.push(at(a + Math.PI / 4, R_WAIST), at(a + Math.PI / 4, R_DIAG));
   }
-  for (let i = 0; i < TICKS; i++) {
-    const a = (i / TICKS) * Math.PI * 2;
-    const len = i % (TICKS / 4) === 0 ? TICK_CARD : TICK_IN;
-    pts.push(
-      new THREE.Vector3(Math.cos(a) * RING_R, 0, Math.sin(a) * RING_R),
-      new THREE.Vector3(Math.cos(a) * (RING_R - len), 0, Math.sin(a) * (RING_R - len)),
-    );
+  for (let i2 = 0; i2 < SEG; i2++) {
+    const a0 = (i2 / SEG) * Math.PI * 2, a1 = ((i2 + 1) / SEG) * Math.PI * 2;
+    pts.push(at(a0, R_RING), at(a1, R_RING));
   }
   const dialGeo = new THREE.BufferGeometry().setFromPoints(pts);
 
-  // A micro cardinal letter on a small flat plane at the dial's centre — canvas-texture text
+  // A micro cardinal letter on a small flat plane at the rose's centre — canvas-texture text
   // (the ledger _makeLabel idiom), colour derived from the structural accent, additive so the
   // dark canvas adds nothing.
   const makeLetter = (text: string): THREE.Mesh => {
@@ -110,21 +129,22 @@ function buildCompassRose(globe: GeoViewHost) {
       map: tex, transparent: true, opacity: 0,
       blending: THREE.AdditiveBlending, depthWrite: false,
     });
-    return new THREE.Mesh(new THREE.PlaneGeometry(1.05, 1.05), mat);
+    return new THREE.Mesh(new THREE.PlaneGeometry(0.95, 0.95), mat);
   };
 
   // One rose per pole. The north pole is ocean (surface at R); the south pole sits on the
-  // Antarctica plateau (R+LAND_H) — each floats a little above its own surface.
-  const poles: Array<{ y: number; letter: string; base: number; flipX: number }> = [
-    { y: R + 0.5, letter: "N", base: 0.4, flipX: -Math.PI / 2 },
-    { y: -(R + LAND_H + 0.5), letter: "S", base: 0.22, flipX: Math.PI / 2 },
+  // Antarctica plateau (R+LAND_H) — each floats a little above its own surface. Bases kept
+  // QUIET (user: the first draft read brighter than the rest of the hologram).
+  const poles: Array<{ y: number; letter: string; dial: number; text: number; flipX: number; sign: number }> = [
+    { y: R + 0.5, letter: "N", dial: 0.16, text: 0.24, flipX: -Math.PI / 2, sign: 1 },
+    { y: -(R + LAND_H + 0.5), letter: "S", dial: 0.09, text: 0.14, flipX: Math.PI / 2, sign: -1 },
   ];
+  globe.poleRoses = [];
   for (const pole of poles) {
     const mat = new THREE.LineBasicMaterial({
       color: globe.geoColor, transparent: true, opacity: 0,
       blending: THREE.AdditiveBlending, depthWrite: false,
     });
-    globe.geoFades.push({ mat, base: pole.base });
     const dial = new THREE.LineSegments(dialGeo, mat);
     dial.position.y = pole.y;
     globe.group.add(dial);
@@ -132,8 +152,14 @@ function buildCompassRose(globe: GeoViewHost) {
     const letter = makeLetter(pole.letter);
     letter.rotation.x = pole.flipX; // lie flat, readable from outside the pole
     letter.position.y = pole.y;
-    globe.geoFades.push({ mat: letter.material as THREE.MeshBasicMaterial, base: pole.base + 0.15 });
     globe.group.add(letter);
+
+    // NOT in geoFades: Globe fades these itself (morph fade × pole facing) each frame.
+    globe.poleRoses.push({
+      mats: [mat, letter.material as THREE.MeshBasicMaterial],
+      bases: [pole.dial, pole.text],
+      sign: pole.sign,
+    });
   }
 }
 
@@ -335,17 +361,24 @@ async function buildLand(globe: GeoViewHost) {
       uTop: { value: top },
       uOpacity: { value: 0 },
     };
+    // The wall material shares the graticule's facing uniform (built first in buildGeoView).
+    const wallUniforms = {
+      ...globe.landWallUniforms,
+      uCamN: globe.facingUniform ?? { value: new THREE.Vector3(0, 0, 1) },
+    };
     const wallMat = new THREE.ShaderMaterial({
-      uniforms: globe.landWallUniforms,
+      uniforms: wallUniforms,
       vertexShader: `
-        varying float vH;
+        varying float vH; varying vec3 vDir;
         void main() {
           vH = length(position); // distance from the globe centre
+          vDir = normalize(position);
           gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
         }`,
       fragmentShader: `
         uniform vec3 uColor; uniform float uBase; uniform float uTop; uniform float uOpacity;
-        varying float vH;
+        uniform vec3 uCamN;
+        varying float vH; varying vec3 vDir;
         void main() {
           float t = clamp((vH - uBase) / (uTop - uBase), 0.0, 1.0);
           // Gently non-linear ramp (a blend of linear + quadratic): dim along the ocean line,
@@ -355,7 +388,10 @@ async function buildLand(globe: GeoViewHost) {
           // as a soft ridge blending into the surface. The TOP EDGE carries a clearly brighter
           // highlight (user-tuned: shorter walls, brighter rim) so the coastline stays legible.
           float edge = smoothstep(0.65, 1.0, t);
-          gl_FragColor = vec4(uColor * (0.03 + 0.13 * e + 0.24 * edge), min(1.0, e * 0.72) * uOpacity);
+          // FACING dim: far-hemisphere cliffs stay visible (the hologram's see-through
+          // presence) but clearly BEHIND — see GeoViewHost.facingUniform.
+          float facing = mix(0.35, 1.0, smoothstep(-0.35, 0.15, dot(vDir, uCamN)));
+          gl_FragColor = vec4(uColor * (0.03 + 0.13 * e + 0.24 * edge), min(1.0, e * 0.72) * uOpacity * facing);
         }`,
       // Single-sided so only cliffs whose face points toward the camera draw: a
       // continent's near + side edges show, its far edge (behind the filled plateau)

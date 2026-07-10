@@ -420,13 +420,16 @@ and keep changing, so they're examples, not the contract.
   it drills the globe AND expands its nodes inline; node rows are city-first, alphabetical
   per country, with the shared identity dot + status), ledger → `LedgerPanel` (WIP copy).
   Hyper and the placeholders have just the About card.
-- **Right rail** (`#rightcol`, `Inspector`) = the **facts** scope (read-only), a **subject
-  stack**: `ContextCard` at the top (the selected metagraph/core dossier — it mirrors the
-  filter; on "all" it simply doesn't render, the rail rests quiet; its × clears the filter),
-  then the Detail cards from the registry (`store.selStack`, most-recent on top): the
-  **node card** (`geoLive` — location-first title, id demoted to a mono subtitle, status
-  pill in the head aside) and the **snapshot card**. When no detail is up, a slim
-  **state-aware pick hint** shows instead (see the design system). An **instrument-channel
+- **Right rail** (`#rightcol`, `Inspector`) = the **facts** scope (read-only), a set of
+  **FIXED card SLOTS** in one stable order — network dossier, node, snapshot, layer (user
+  design, 2026-07-10; replaced the recency stack + the floating pick-hint): every card the
+  current view CAN produce is always visible — POPULATED when its subject is selected
+  (`ContextCard` mirrors the filter; the **node card** `geoLive` — location-first title, id
+  demoted to a mono subtitle, status pill in the head aside; the **snapshot** and **layer**
+  cards), else as a quiet **GHOST hint card** (dashed, head-only, standby halo) saying what
+  to interact with — so the rail shows the view's whole possibility space and a deselect
+  returns its slot to the ghost in place. Slot availability + hint copy live in the rail
+  manifest (`railCards.ts`), the same source the dock trays read. An **instrument-channel
   thread** (`RailThread`) runs each rail's outer edge.
 - **Bottom** (`BottomStream`) = the live/time lane: the slim `LiveStrip` bar-chart in EVERY
   view; it publishes `--bottom-reserve`.
@@ -708,14 +711,18 @@ cards: **eyebrow / title / INSET hairline / body**.
   not the boot overlay returning. `SceneCanvas` fades the canvas in on the handoff
   (`.scene-in`) and out for the flat views.
 
-### State-aware pick hints
+### Ghost hint cards (the pick hints)
 
-The empty Detail slot shows ONE computed hint (`Inspector.pickHintText`) — view +
-pickability → message, so the slot always shows some guidance and never a false one: the
-view's pick invite normally; when the selected network has nothing pickable in this view
-(geo with 0 locatable nodes) it becomes the honest variant — "<TICKER> has no locatable
-nodes — explore it in the Hypergraph view"; "all" with 0 nodes = boot, no hint at all. The
-invite map is an allow-list mirroring the pick registry.
+Each right-rail slot's empty state is a **GHOST card** (`Inspector.GhostCard`; shown on
+`/design`) — availability + copy derive from the rail manifest (`railCards.ts` `hint`
+fields), an allow-list mirroring the pick registry: hyper/geo invite node picks, ledger
+invites snapshot + layer picks, the network slot invites the top-bar filter, the flat
+placeholder views get no ghosts. Honesty rules carried over from the old single pick-hint:
+when the filtered network has nothing pickable in geo the node ghost turns into the honest
+variant ("<TICKER> has no locatable nodes — explore it in the Hypergraph view"); "all" with
+0 nodes = boot → that ghost stays silent rather than flashing a false invite. A populated
+card renders in ANY view (e.g. a pinned snapshot carried out of ledger); the ghost only
+appears where the view can actually produce the card.
 
 ### CSS traps (learned the hard way)
 

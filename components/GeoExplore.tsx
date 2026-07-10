@@ -53,7 +53,15 @@ export default function GeoExplore() {
         : pick.kind === "l0" || pick.kind === "l1"
           ? "dag"
           : null;
-    if (netId) setFilter(netId);
+    if (netId && netId !== filter) {
+      setFilter(netId);
+      // The engine's "switching network clears the country drill" rule fires on that setFilter —
+      // right for the PICKER, wrong here: this filter change is a side-effect of selecting a
+      // node INSIDE the drilled country (user bug: the accordion collapsed and the row's
+      // selection vanished). Re-assert the drill — the node provably lives in it.
+      const cc = "geo" in pick ? pick.geo?.cc ?? null : null;
+      if (country && cc === country) setCountry(country);
+    }
     setInspect(pick);
   };
 
@@ -75,7 +83,13 @@ export default function GeoExplore() {
   const tickerOrName = activeCfg ? activeCfg.ticker || activeCfg.name : "This metagraph";
   // Click a country: drill the globe into it (store.country) — the drill state doubles as the
   // accordion's "which row is open", so the globe and the list stay one source of truth.
-  const drill = (cc: string) => setCountry(country === cc ? null : cc);
+  // Moving between zoom LEVELS deselects the finer one (user): drilling (or un-drilling) a
+  // country clears any selected NODE — its card closes and the camera lands on the country
+  // (or network) framing instead of staying pinned to the old node.
+  const drill = (cc: string) => {
+    if (sel) setInspect(null);
+    setCountry(country === cc ? null : cc);
+  };
 
   // Selection's nodes grouped by country **name** — the join key both the leaderboard and the
   // node list derive from `geo.country` (`cc` can be absent, the name can't). Each country's

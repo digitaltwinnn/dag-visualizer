@@ -126,6 +126,8 @@ export class Globe implements GeoViewHost {
   landWallUniforms?: GeoViewHost["landWallUniforms"];
   landFillMat?: THREE.MeshBasicMaterial;
   landFillMesh?: THREE.Mesh;
+  facingUniform?: GeoViewHost["facingUniform"]; // shared camera-facing uniform (graticule + walls)
+  poleRoses?: GeoViewHost["poleRoses"];         // the polar compass roses (faded per frame here)
 
   private fabric: NodeFabric;
   private arcs: Arcs;
@@ -560,6 +562,18 @@ export class Globe implements GeoViewHost {
     const surf = this.ledger ? 0 : surfFade(m);
     const extras = this.ledger ? 0 : extrasFade(m);
     for (const f of this.geoFades) f.mat.opacity = f.base * surf;
+    // Depth cueing for the see-through hologram: the graticule + coastal walls dim their far
+    // hemisphere through the shared facing uniform (camera dir in this group's local frame),
+    // and each polar compass rose fades by its own pole's facing on top of the morph fade —
+    // a far-side rose dims hard, so front vs back reads instantly (user).
+    if (this.facingUniform && this._hasCam) this.facingUniform.value.copy(this._camN);
+    if (this.poleRoses) {
+      for (const rose of this.poleRoses) {
+        const t = THREE.MathUtils.clamp((rose.sign * this._camN.y + 0.15) / 0.5, 0, 1);
+        const facing = 0.18 + 0.82 * t;
+        for (let i = 0; i < rose.mats.length; i++) rose.mats[i].opacity = rose.bases[i] * surf * facing;
+      }
+    }
     if (this.landWallUniforms) this.landWallUniforms.uOpacity.value = surf;
     if (this.landFillMesh) this.landFillMesh.visible = !this.ledger && m > 0.05; // opacity via geoFades
     this.arcs.setUM(extras);

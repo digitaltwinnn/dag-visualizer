@@ -36,7 +36,11 @@ export default function LedgerPanel() {
     setLayer(sel === l.id ? null : { kind: "layer", layerId: l.id });
   };
   return (
-    <Card asChild className="sig-right block p-0 flex-[0_1_auto] min-h-0 [--spine:var(--filter-accent,var(--primary))]">
+    // flex-none + no inner overflow (same treatment as GeoExplore, user: consistent rail
+    // behaviour): the card grows with its content and the RAIL scrolls/fades into the chart
+    // band — the old shrink-to-fit + inner scrollbox kept the rail from ever overflowing, so
+    // the bottom fade never engaged in this view.
+    <Card asChild className="sig-right block p-0 flex-none [--spine:var(--filter-accent,var(--primary))]">
       <aside id="ledger-view">
         <CardHead
           panel
@@ -46,7 +50,7 @@ export default function LedgerPanel() {
           collapsed={collapsed}
           onToggle={() => setCollapsed((c) => !c)}
         />
-        <div className={cn("flex flex-col px-3 pt-1.5 pb-2.5 min-h-0 overflow-y-auto cmd-list-scroll", collapsed && "hidden")}>
+        <div className={cn("flex flex-col px-3 pt-1.5 pb-2.5", collapsed && "hidden")}>
           <div className="flex flex-col gap-0.5" onMouseLeave={() => setHilite(null)}>
             {LAYERS.map((l) => {
               const on = sel === l.id;
