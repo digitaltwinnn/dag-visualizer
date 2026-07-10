@@ -9,7 +9,7 @@ import { KIND_MARK_CLASS } from "@/components/icons";
 // The ONE HUD card header — every rail card leads with this shared grammar so the whole HUD
 // reads as one control surface. ONE head ANATOMY on all six cards (user-agreed, Task 13
 // follow-up): **eyebrow / title / INSET hairline / body** —
-//   • an uppercase role EYEBROW — one simple "Selected <subject>" label ("SELECTED NETWORK" /
+//   • an uppercase role EYEBROW — one simple "Selected <subject>" label ("SELECTED METAGRAPH" /
 //     "SELECTED NODE" / "SELECTED SNAPSHOT"; the ‹-parent breadcrumb grammar was retired, Task 13
 //     follow-up) or a view tag ("HYPERGRAPH · ABOUT"),
 //   • the card's primary TITLE at ONE standard (15px / font-semibold / leading-[1.2]) — the

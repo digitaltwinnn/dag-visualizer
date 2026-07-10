@@ -102,7 +102,7 @@ function CardPane({
 // rail losing its calm. Availability + copy come from the rail manifest (railCards.ts), the
 // same single source of truth the dock trays read.
 const GHOST_EYEBROW: Record<string, string> = {
-  context: "Network", node: "Node", snap: "Snapshot", layer: "Layer",
+  context: "Metagraph", node: "Node", snap: "Snapshot", layer: "Layer",
 };
 export function GhostCard({ card }: { card: RailCard }) {
   const Icon = card.icon;
@@ -125,9 +125,9 @@ export function GhostCard({ card }: { card: RailCard }) {
             aria-hidden
             className="size-3.5 flex-none mt-[1px] text-[var(--filter-accent,var(--primary))] opacity-55"
           />
-          {/* fixed label column (fits the longest slot name, "SNAPSHOT") so the instruction
+          {/* fixed label column (fits the longest slot name, "METAGRAPH") so the instruction
               text starts at the SAME x on every ghost card (user) */}
-          <span className="flex-none w-[76px] mt-[2px] text-micro tracking-caps uppercase">{label}</span>
+          <span className="flex-none w-[86px] mt-[2px] text-micro tracking-caps uppercase">{label}</span>
           <span className="min-w-0">{card.hint}</span>
         </p>
       </aside>

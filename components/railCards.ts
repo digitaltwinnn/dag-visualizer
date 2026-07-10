@@ -82,7 +82,7 @@ export function exploreCards(s: Pick<RailManifestState, "mode">): RailCard[] {
 const IN_3D = (m: Mode) => m === "hyper" || m === "geo" || m === "ledger";
 function contextHint(s: RailManifestState): string | null {
   if (!IN_3D(s.mode)) return null;
-  return "Pick a network with the top-bar filter to open its dossier.";
+  return "Pick a metagraph with the top-bar filter to inspect it.";
 }
 function nodeHint(s: RailManifestState): string | null {
   if (s.mode === "hyper") return "Click a hub or node in the hypergraph to inspect it.";
