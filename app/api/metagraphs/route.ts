@@ -1,15 +1,16 @@
 import { NextResponse } from "next/server";
 import { unstable_cache } from "next/cache";
-import metagraphsBaked from "@/data/metagraphs.json";
-import geoBaked from "@/data/geo.json";
 import { assignPalette } from "@/src/palette/palette";
 import { identityPins } from "@/src/palette/identity";
+import { geolocate } from "@/src/server/ipGeolocate";
+import type { GeoMap } from "@/src/data/types";
 
 // Live server-side metagraph directory + cluster fetch. Next's Node server CAN reach
 // the metagraph cluster load balancers (plain HTTP, custom ports, no CORS) that a
-// browser can't — which is exactly why this data used to be baked. We fetch the
-// directory + each cluster's nodes on demand and geolocate the IPs, cached via ISR.
-// On any failure we fall back to the on-disk bake so the globe always has data.
+// browser can't. We fetch the directory + each cluster's nodes on demand and geolocate
+// the IPs, cached via ISR. On failure the route answers 503 — NO pre-baked fallback
+// (user decision, 2026-07-10: stale baked data was worse than an honest error; the
+// client keeps its last good pull and simply retries on its next 10-min cycle).
 
 export const runtime = "nodejs";
 export const revalidate = 600; // re-fetch at most every 10 minutes
@@ -18,7 +19,6 @@ export const revalidate = 600; // re-fetch at most every 10 minutes
 export const maxDuration = 60;
 
 const API = "https://production.dagexplorer-api.constellationnetwork.net/mainnet";
-const GEO_FIELDS = "status,country,countryCode,city,lat,lon,query";
 // l0 (consensus/inner) > dl1 > cl1 (outer, usually empty) — primary layer priority.
 const LAYERS: Array<[string, string]> = [
   ["l0", "l0"],
@@ -32,7 +32,7 @@ interface Metagraph {
   siteUrl: string; iconUrl: string; nodes: MetaNode[];
   hue?: { deg: number; oklch: string; hex: string };
 }
-type GeoMap = Record<string, { lat: number; lon: number; city: string; country: string; cc: string }>;
+
 
 async function getJson(url: string, ms = 5000): Promise<unknown> {
   const ctrl = new AbortController();
@@ -64,39 +64,6 @@ async function clusterNodes(base: string): Promise<Array<{ ip: string; state: st
   } catch {
     return [];
   }
-}
-
-// ip-api.com free tier: HTTP only, ~45 req/min per source IP, non-commercial use
-// (see API note in CLAUDE.md). We batch 100 IPs/request, so this is ~1 call per
-// regeneration — well under the limit. Batches run concurrently.
-async function geoBatch(ips: string[]): Promise<GeoMap> {
-  const out: GeoMap = {};
-  try {
-    const r = await fetch(`http://ip-api.com/batch?fields=${GEO_FIELDS}`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(ips),
-    });
-    const arr = (await r.json()) as Array<Record<string, string | number>>;
-    for (const e of arr) {
-      if (e.status === "success")
-        out[e.query as string] = {
-          lat: e.lat as number, lon: e.lon as number,
-          city: (e.city as string) || "", country: (e.country as string) || "",
-          cc: (e.countryCode as string) || "",
-        };
-    }
-  } catch {
-    /* leave these IPs unlocated; the globe just won't plot them */
-  }
-  return out;
-}
-
-async function geolocate(ips: string[]): Promise<GeoMap> {
-  const chunks: string[][] = [];
-  for (let i = 0; i < ips.length; i += 100) chunks.push(ips.slice(i, i + 100));
-  const maps = await Promise.all(chunks.map(geoBatch));
-  return Object.assign({}, ...maps);
 }
 
 async function fetchLive(): Promise<{ metagraphs: Metagraph[]; geo: GeoMap }> {
@@ -148,15 +115,11 @@ async function fetchLive(): Promise<{ metagraphs: Metagraph[]; geo: GeoMap }> {
   return { metagraphs: metagraphs.filter((m): m is Metagraph => m !== null), geo };
 }
 
-// Bundled bake (data/*.json, imported so it ships in serverless deploys) — the
-// resilience fallback when the live fetch fails or comes back empty.
-const baked = { metagraphs: metagraphsBaked as unknown as Metagraph[], geo: geoBaked as unknown as GeoMap };
-
 // Cache the live fan-out across requests/instances for `revalidate` seconds, so the
 // expensive dagexplorer + cluster + ip-api calls run at most ~once per 10 min — not on
 // every visitor's mount (inner fetches use `no-store`, which otherwise makes the route
 // dynamic and re-runs the whole fan-out per request). Throwing on empty keeps a network
-// blip from being cached: GET then serves the bake and the next request retries.
+// blip from being cached: GET answers 503 and the next request retries.
 const getLive = unstable_cache(
   async () => {
     const live = await fetchLive();
@@ -180,6 +143,8 @@ export async function GET() {
     const live = await getLive();
     return NextResponse.json({ ...live, metagraphs: withHues(live.metagraphs) });
   } catch {
-    return NextResponse.json({ ...baked, metagraphs: withHues(baked.metagraphs) }); // bake + hues
+    // No baked fallback (user decision): an honest 503 — the client keeps its last good
+    // pull (Engine.refreshMeta only rebuilds on a changed OK response) and retries later.
+    return NextResponse.json({ error: "live metagraph fetch failed" }, { status: 503 });
   }
 }

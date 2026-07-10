@@ -102,9 +102,9 @@ layer, keeping the palette honest.
 
 The globe plots validators and metagraph nodes at their real geolocations.
 
-- **Validators** — `/api/geo` serves a baked IP→location seed (`data/geo.json`) so the map
-  plots instantly; IPs not in the seed are resolved at runtime (best effort, remembered in
-  `localStorage`).
+- **Validators** — `/api/geo` geolocates the live validator clusters server-side (cached ~1h)
+  so the map plots instantly from one request; any IPs it misses are resolved at runtime
+  (best effort, remembered in `localStorage`).
 - **Metagraph nodes** — their cluster endpoints are plain HTTP on custom ports with **no CORS**,
   so the browser can't fetch them. **`/api/metagraphs` does it server-side** (the Node server
   can): it lists the [dagexplorer directory](https://production.dagexplorer-api.constellationnetwork.net/mainnet/metagraphs),
@@ -112,8 +112,6 @@ The globe plots validators and metagraph nodes at their real geolocations.
   ISR and re-pulled by the client every ~10 min. (Falls back to the baked `data/*.json` if the
   live fetch fails.)
 
-The bundled `data/*.json` files are a static baked snapshot used as the seed/fallback; the
-routes fetch live data in normal operation.
 
 ## Run it locally
 

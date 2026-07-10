@@ -76,6 +76,15 @@ describe("geoFraming", () => {
     expect(out.target.y).toBeCloseTo(11.5, 10);
   });
 
+  it("writes into the SAME out.pos/out.target instances (no new Vector3 allocated)", () => {
+    const out = { pos: new THREE.Vector3(), target: new THREE.Vector3() };
+    const posRef = out.pos;
+    const targetRef = out.target;
+    geoFraming(0.8, out);
+    expect(out.pos).toBe(posRef);
+    expect(out.target).toBe(targetRef);
+  });
+
   it("clamps below the wide end (R<0.7 behaves like R=0.7)", () => {
     const a = { pos: new THREE.Vector3(), target: new THREE.Vector3() };
     const b = { pos: new THREE.Vector3(), target: new THREE.Vector3() };

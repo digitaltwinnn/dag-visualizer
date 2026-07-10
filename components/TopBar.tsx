@@ -89,7 +89,9 @@ export default function TopBar() {
         {/* Brand */}
         <div className="flex items-center gap-2">
           <EcgMark />
-          <span className="font-semibold tracking-[-0.01em] text-title max-[1209px]:hidden">
+          {/* wordmark hides below 1300 (not 1210 with the labels): between 1210 and ~1300 it
+                  wrapped to two lines and grew the bar (review finding) */}
+              <span className="font-semibold tracking-[-0.01em] text-title whitespace-nowrap max-[1299px]:hidden">
             <span className={live ? "text-foreground" : "text-muted-foreground opacity-70"}>DAG</span>{" "}
             <span className={cn("text-muted-foreground", !live && "opacity-70")}>Visualizer</span>
           </span>

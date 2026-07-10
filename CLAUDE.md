@@ -426,8 +426,8 @@ and keep changing, so they're examples, not the contract.
   current view CAN produce is always visible — POPULATED when its subject is selected
   (`ContextCard` mirrors the filter; the **node card** `geoLive` — location-first title, id
   demoted to a mono subtitle, status pill in the head aside; the **snapshot** and **layer**
-  cards), else as a quiet **GHOST hint card** (dashed, head-only, standby halo) saying what
-  to interact with — so the rail shows the view's whole possibility space and a deselect
+  cards), else as a quiet **GHOST hint card** (a dashed one-liner:
+  kind mark · slot label · instruction — no halo/animation) saying what to interact with — so the rail shows the view's whole possibility space and a deselect
   returns its slot to the ghost in place. Slot availability + hint copy live in the rail
   manifest (`railCards.ts`), the same source the dock trays read. An **instrument-channel
   thread** (`RailThread`) runs each rail's outer edge.
@@ -602,8 +602,9 @@ signal channel.**
   fixed SVG in the 26px margin — neutral ruler line + ticks, an identity-hued spine (cyan
   for "all"), and a node-dot at each card's middle (measured live via
   ResizeObserver/MutationObserver/scroll; the thread must stay a SIBLING of the rail — the
-  rail's clip/mask would blank a child). Resting lines are dimmed to 60% (`REST_DIM`); the
-  node dots keep full brightness.
+  rail's clip/mask would blank a child). Only the coloured identity spine rests
+  dimmed (`REST_DIM` 60%); the neutral ruler + ticks rest near-full (0.9 — their greys are
+  already muted) and the node dots keep full brightness.
 - **Every card edge signal renders on the SCENE-FACING (inner) edge**: left-rail cards →
   their right edge (`.sig-right::after`), right-rail cards → their left edge (`.sig-left`
   lighting the `.ig-panel::before`). Three levels, and the hierarchy must stay readable at a
@@ -701,7 +702,7 @@ cards: **eyebrow / title / INSET hairline / body**.
 - **`components/state/StateAtoms.tsx`** — empty/loading states built from the app's own
   marks so an absent feed reads as part of the instrument: `NodeStars` (ACQUIRING twinkle),
   `NoSignalDot` + `SonarRing` (NO SIGNAL — the ring is remounted per retry, so the animation
-  IS the retry), `StandbyHalo` (standby / the pick hint's halo).
+  IS the retry), `StandbyHalo` (standby).
 - **`useMinHold(active, holdMs=900, fadeMs=400)`** — every *transient* signal
   (the `BootOverlay`'s "Connecting…", the snapshot card's fee node-stars, AnchoredTags'
   "resolving") holds for a minimum calm cycle even if data resolves instantly, then eases
@@ -1005,8 +1006,8 @@ can't fetch them — but the **Next Node server can**:
   (Vercel never restarts; ISR only freshens the *server* cache, so an idle tab must re-pull —
   `Engine.refreshMeta`, rebuilds only on change). Snapshot/cluster feeds are live via
   `NetworkData` client polling.
-- **`data/*.json` are a static baked snapshot** — the imported seed/fallback the routes use
-  when the live fetch fails. The Python bake scripts that once regenerated them were removed
+- **`data/*.json` are a static baked snapshot** (as of ~2026-06) — the imported seed/fallback
+  the routes use when the live fetch fails. The Python bake scripts that once regenerated them were removed
   (2026-07-10, unmaintained); if the seeds ever need refreshing, regenerate by hand from the
   live routes' output. `data/metagraphs.json` shape: each metagraph has
   `name/symbol/description/siteUrl/nodes`; each node `ip/state/layer/roles`.

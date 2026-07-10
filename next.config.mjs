@@ -14,21 +14,27 @@
 //  - frame-ancestors 'none' (+ legacy X-Frame-Options DENY): nothing embeds this app.
 // Dev additions: 'unsafe-eval' (react-refresh), ws: (HMR), http: (the ip-api dev-only geo path).
 const dev = process.env.NODE_ENV !== "production";
+// Preview deployments inject the Vercel feedback toolbar from vercel.live — allow it there
+// only (production + dev stay closed); the toolbar-thread workflow depends on it.
+const preview = process.env.VERCEL_ENV === "preview";
+const vercelLive = preview ? " https://vercel.live" : "";
 
 const csp = [
   "default-src 'self'",
   // va.vercel-scripts.com: the @vercel/analytics + speed-insights loaders (dev pulls debug
   // builds from that CDN; production serves them same-origin under /_vercel/ — allowlisted
   // in both so a loader-path change never silently breaks telemetry).
-  `script-src 'self' 'unsafe-inline' https://va.vercel-scripts.com${dev ? " 'unsafe-eval'" : ""}`,
+  `script-src 'self' 'unsafe-inline' https://va.vercel-scripts.com${vercelLive}${dev ? " 'unsafe-eval'" : ""}`,
   "style-src 'self' 'unsafe-inline'",
   "img-src 'self' data: blob: https:",
   "font-src 'self' data:",
-  `connect-src 'self' https:${dev ? " ws: http:" : ""}`,
+  `connect-src 'self' https:${preview ? " wss://vercel.live" : ""}${dev ? " ws: http:" : ""}`,
   "worker-src 'self' blob:",
   "object-src 'none'",
   "base-uri 'self'",
   "form-action 'self'",
+  // vercel.live frames the preview toolbar UI; production keeps frames fully closed.
+  `frame-src 'self'${vercelLive}`,
   "frame-ancestors 'none'",
 ].join("; ");
 

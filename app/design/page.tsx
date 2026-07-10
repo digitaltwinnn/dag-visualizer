@@ -1,4 +1,5 @@
 import { headers } from "next/headers";
+import type { Metadata } from "next";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import {
@@ -26,6 +27,13 @@ import EcgMark from "@/components/topbar/EcgMark";
 import { VIEW_ICONS } from "@/components/icons";
 import { Minus, X } from "lucide-react";
 import { cn } from "@/lib/utils";
+
+// Internal styleguide: robots-disallowed; carries its OWN title and no canonical (it would
+// otherwise inherit the root layout's canonical "/", mislabelling it as a duplicate).
+export const metadata: Metadata = {
+  title: "Design system — DAG Visualizer",
+  robots: { index: false },
+};
 
 // ── Structural lane — the shadcn oklch variables (globals.css :root). One source of truth.
 // `--panel` is the lone structural literal (translucent glass fill, no shadcn equivalent). ──

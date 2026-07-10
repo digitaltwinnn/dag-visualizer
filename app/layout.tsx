@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { SpeedInsights } from "@vercel/speed-insights/next";
 import { Analytics } from "@vercel/analytics/next";
+import { SITE_ORIGIN } from "@/src/data/site";
 import "./globals.css";
 
 // Absolute base for OG/canonical URLs: the production domain on Vercel, the per-deploy
@@ -36,7 +37,7 @@ const jsonLd = {
   "@context": "https://schema.org",
   "@type": "WebApplication",
   name: "DAG Visualizer",
-  url: "https://dagvisualizer.io",
+  url: SITE_ORIGIN,
   description,
   applicationCategory: "Data visualization",
   operatingSystem: "Web browser",

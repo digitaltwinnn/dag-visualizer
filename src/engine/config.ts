@@ -50,7 +50,7 @@ export interface MetaConfig {
 
 // The real mainnet metagraphs (source: dagexplorer). Each pulls live snapshots
 // via its id. Colours match the metagraph node clusters plotted on the globe
-// (data/metagraphs.json). Keep this list in sync with the baked data by
+// (/api/metagraphs). Keep this list in sync with the live route's directory by
 // refreshing the baked data/*.json snapshot.
 export const METAGRAPHS: MetaConfig[] = [
   { name: "Digital Evidence",    ticker: "DED",      color: 0x36e29a, id: "DAG0eQr94qUQSUhmYGNXt6CoBKWu5K6htvRMGC6M",

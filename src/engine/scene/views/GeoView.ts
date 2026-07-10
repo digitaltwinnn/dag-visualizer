@@ -120,7 +120,7 @@ function buildCompassRose(globe: GeoViewHost) {
     cv.width = cv.height = 128;
     const g = cv.getContext("2d")!;
     g.fillStyle = new THREE.Color(globe.geoColor).getStyle();
-    g.font = "600 84px 'Geist Mono', ui-monospace, monospace";
+    g.font = "600 84px ui-monospace, monospace"; // no webfont is loaded — name the real stack
     g.textAlign = "center"; g.textBaseline = "middle";
     g.fillText(text, 64, 68);
     const tex = new THREE.CanvasTexture(cv);
