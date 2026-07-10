@@ -64,7 +64,7 @@ function HyperVitals() {
 
   // Filtered: an em-dash for a layer this metagraph doesn't run (stable 3 columns, no reflow).
   const cell = (n: number, runsLayer: boolean) =>
-    cfg && !runsLayer ? <span className="text-muted-foreground italic opacity-60">—</span> : <Odometer value={n} />;
+    cfg && !runsLayer ? <span className="text-muted-foreground italic opacity-60">—</span> : <Odometer int value={n} />;
 
   return (
     <>
