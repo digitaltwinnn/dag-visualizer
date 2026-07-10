@@ -1,6 +1,6 @@
 import type { MetadataRoute } from "next";
 
-// One-page app: the root is the only indexable URL (the views are store state, not routes;
+// The root + the crawlable /about prose page (the views are store state, not routes;
 // /design is styleguide-internal and disallowed in robots). Served at /sitemap.xml by Next.
 export default function sitemap(): MetadataRoute.Sitemap {
   return [
@@ -9,6 +9,12 @@ export default function sitemap(): MetadataRoute.Sitemap {
       lastModified: new Date(),
       changeFrequency: "weekly",
       priority: 1,
+    },
+    {
+      url: "https://dagvisualizer.io/about",
+      lastModified: new Date(),
+      changeFrequency: "monthly",
+      priority: 0.6,
     },
   ];
 }
