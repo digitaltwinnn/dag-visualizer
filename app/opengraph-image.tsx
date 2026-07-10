@@ -2,7 +2,7 @@ import { ImageResponse } from "next/og";
 
 // Social-preview card (1200×630). Next attaches it to the OG + Twitter tags from
 // metadata. Themed to match the app — dark bg + the glowing cyan core motif.
-export const alt = "Constellation Hypergraph — interactive 3D network visualizer";
+export const alt = "DAG Visualizer — live 3D map of the Constellation Network";
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
 
@@ -38,7 +38,7 @@ export default function OgImage() {
           }}
         />
         <div style={{ fontSize: 72, fontWeight: 800, letterSpacing: -1 }}>
-          Constellation Hypergraph
+          DAG Visualizer
         </div>
         <div style={{ fontSize: 30, color: "#8a96b8", marginTop: 18, maxWidth: 880, textAlign: "center" }}>
           Interactive 3D map of the $DAG network: Global L0, Layer 1, metagraphs and live snapshots

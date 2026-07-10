@@ -31,11 +31,16 @@ export default function LedgerPanel() {
   const hilite = useStore((s) => s.ledgerHilite);
   const setHilite = useStore((s) => s.setLedgerHilite);
   const filter = useStore((s) => s.filter);
+
   const commit = (l: (typeof LAYERS)[number]) => {
     setLayer(sel === l.id ? null : { kind: "layer", layerId: l.id });
   };
   return (
-    <Card asChild className="sig-right block p-0 flex-[0_1_auto] min-h-0 [--spine:var(--filter-accent,var(--primary))]">
+    // flex-none + no inner overflow (same treatment as GeoExplore, user: consistent rail
+    // behaviour): the card grows with its content and the RAIL scrolls/fades into the chart
+    // band — the old shrink-to-fit + inner scrollbox kept the rail from ever overflowing, so
+    // the bottom fade never engaged in this view.
+    <Card asChild className="sig-right block p-0 flex-none [--spine:var(--filter-accent,var(--primary))]">
       <aside id="ledger-view">
         <CardHead
           panel
@@ -45,7 +50,7 @@ export default function LedgerPanel() {
           collapsed={collapsed}
           onToggle={() => setCollapsed((c) => !c)}
         />
-        <div className={cn("flex flex-col px-3 pt-1.5 pb-2.5 min-h-0 overflow-y-auto cmd-list-scroll", collapsed && "hidden")}>
+        <div className={cn("flex flex-col px-3 pt-1.5 pb-2.5", collapsed && "hidden")}>
           <div className="flex flex-col gap-0.5" onMouseLeave={() => setHilite(null)}>
             {LAYERS.map((l) => {
               const on = sel === l.id;
@@ -78,9 +83,27 @@ export default function LedgerPanel() {
                   )}
                   style={pair.style}
                 >
-                  <span className={cn("block text-body text-foreground", on && "font-semibold")}>{l.name}</span>
-                  <span className="block text-label text-muted-foreground leading-snug mt-0.5">{l.desc}</span>
-                  {on && <SelectedRowMark className="absolute right-2 top-[13px]" />}
+                  {/* The layer's STACK-LEVEL badge (LEDGER_LAYERS.level — up from the base:
+                      Global snapshots = 1, the split hypergraph plane = sub-levels 2.1/2.2),
+                      mirrored by the 3D floor labels so panel row and plane pair at a glance. */}
+                  <span className="flex items-center gap-2 min-w-0">
+                    <span
+                      aria-hidden
+                      className={cn(
+                        "flex-none min-w-[18px] h-[18px] px-1 rounded-xs border flex items-center justify-center text-micro tabular-nums leading-none",
+                        on
+                          ? "border-[var(--filter-accent,var(--primary))] text-[var(--filter-accent,var(--primary))]"
+                          : "border-border text-muted-foreground",
+                      )}
+                    >
+                      {l.level}
+                    </span>
+                    <span className={cn("block text-body text-foreground", on && "font-semibold")}>{l.name}</span>
+                  </span>
+                  <span className="block pl-[26px] text-label text-muted-foreground leading-snug mt-0.5">{l.desc}</span>
+                  {/* top-[8px] centres the 14px check on the SAME line as the 18px level badge
+                      (row pad 6 + 18/2 = 15px centre; 8 + 14/2 = 15). */}
+                  {on && <SelectedRowMark className="absolute right-2 top-[8px]" />}
                 </button>
               );
             })}

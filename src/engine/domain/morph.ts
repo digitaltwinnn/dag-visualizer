@@ -20,7 +20,7 @@ export const discWeight = (m: number) => smooth(THREE.MathUtils.clamp((m - 0.82)
 // Earth materialises under the arriving nodes instead of veiling them mid-flight.
 export const surfFade = (m: number) => smooth(THREE.MathUtils.clamp((m - 0.35) / 0.45, 0, 1));
 
-// js/globe.js:937 — the heatmap/arcs fade in later still than the surface.
+// js/globe.js:937 — the arcs fade in later still than the surface.
 export const extrasFade = (m: number) => smooth(THREE.MathUtils.clamp((m - 0.6) / 0.4, 0, 1));
 
 // src/engine/scene/HyperFurniture.ts update() — hubs are fully gone by ~30% into the morph,

@@ -22,12 +22,14 @@ function Vital({ label, value, spark }: { label: string; value: React.ReactNode;
       <span
         className={cn(
           "flex items-center gap-[7px]",
-          // Sparklines condense away at ≤1240px (was 1020): the constant-width vitals
-          // reservation (VitalsCluster's overlay grid) is sized by the WIDEST cluster — the
-          // sparkline-bearing ledger one (~273px) — which stops fitting the bar below ~1240px
-          // and overflowed the row to the right. Condensing ALL clusters at the same width
-          // caps the reservation without breaking the no-jump guarantee (still view-independent).
-          "max-[1240px]:gap-0 max-[1240px]:[&_.recharts-wrapper]:hidden",
+          // Sparklines condense away at ≤1360px (was 1240, before that 1020): the
+          // constant-width vitals reservation (VitalsCluster's overlay grid) is sized by the
+          // WIDEST cluster — the sparkline-bearing ledger one — whose width GROWS WITH THE
+          // NETWORK's live figures (anchors/hr crossing 1,000 added a digit and pushed the
+          // overflow point from ~1240 to ~1300, clipping the bar off-screen at 1280 — user
+          // bug). 1360 keeps headroom for another digit; condensing ALL clusters at the same
+          // width caps the reservation without breaking the no-jump guarantee.
+          "max-[1360px]:gap-0 max-[1360px]:[&_.recharts-wrapper]:hidden",
         )}
       >
         <span className="font-mono font-bold text-foreground tabular-nums whitespace-nowrap max-[1120px]:text-body">{value}</span>

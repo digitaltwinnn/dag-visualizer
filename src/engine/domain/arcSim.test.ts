@@ -163,8 +163,8 @@ describe("ArcSim.rebuild (js/globe.js:359-397, agent seeding verbatim)", () => {
     for (const ag of sim.agents) {
       expect(ag.state).toBe("travel");
       expect(ag.pause).toBe(0);
-      expect(ag.speed).toBeGreaterThanOrEqual(0.25);
-      expect(ag.speed).toBeLessThanOrEqual(0.65);
+      expect(ag.speed).toBeGreaterThanOrEqual(0.15);
+      expect(ag.speed).toBeLessThanOrEqual(0.35);
       expect(ag.t).toBeGreaterThanOrEqual(0);
       expect(ag.t).toBeLessThan(1);
     }
@@ -227,13 +227,13 @@ describe("ArcSim.step — travel -> arrival -> pause (js/globe.js:987-999 verbat
     sim.agents = [ag];
     sim.pool = [from, to];
 
-    vi.spyOn(Math, "random").mockReturnValue(0.5); // pause = 0.3 + 0.5*1.2 = 0.9
+    vi.spyOn(Math, "random").mockReturnValue(0.5); // pause = 0.8 + 0.5*1.8 = 1.7
 
     const result = sim.step(0.1, true);
 
     expect(ag.state).toBe("pause");
     expect(ag.t).toBe(1);
-    expect(ag.pause).toBeCloseTo(0.9, 10);
+    expect(ag.pause).toBeCloseTo(1.7, 10);
     expect(sim.flashCount).toBe(1);
     expect(sim.flashHits[0]).toBe(7); // to.node.index
     expect(result.retargeted).toBe(false); // arrival itself isn't a retarget

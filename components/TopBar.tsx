@@ -89,7 +89,9 @@ export default function TopBar() {
         {/* Brand */}
         <div className="flex items-center gap-2">
           <EcgMark />
-          <span className="font-semibold tracking-[-0.01em] text-title max-[1099px]:hidden">
+          {/* wordmark hides below 1300 (not 1210 with the labels): between 1210 and ~1300 it
+                  wrapped to two lines and grew the bar (review finding) */}
+              <span className="font-semibold tracking-[-0.01em] text-title whitespace-nowrap max-[1299px]:hidden">
             <span className={live ? "text-foreground" : "text-muted-foreground opacity-70"}>DAG</span>{" "}
             <span className={cn("text-muted-foreground", !live && "opacity-70")}>Visualizer</span>
           </span>
@@ -182,7 +184,7 @@ export default function TopBar() {
                 "hover:text-foreground hover:bg-wash-soft",
                 "data-[state=on]:text-foreground data-[state=on]:bg-[var(--sel-bg)]",
                 "data-[state=on]:shadow-[inset_0_0_0_1px_var(--sel-border)]",
-                "max-[1099px]:min-h-11 max-[1099px]:min-w-11 max-[1099px]:justify-center",
+                "max-[1099px]:min-h-11 max-[1099px]:min-w-11 max-[1209px]:justify-center",
                 "max-[1120px]:px-2 max-[1120px]:py-1.5 max-[1120px]:text-label",
                 // Phone keeps the ≥44px touch WIDTH (the min-w-11 above still applies — the old
                 // `max-[699px]:min-w-0` override made the icon-only radios too narrow to press);
@@ -192,7 +194,7 @@ export default function TopBar() {
               )}
             >
               <Icon aria-hidden className="size-4 group-data-[state=on]:text-primary" />
-              <span className="text-label max-[1099px]:hidden">{v.name}</span>
+              <span className="text-label max-[1209px]:hidden">{v.name}</span>
             </ToggleGroupItem>
           );
           })}
@@ -238,15 +240,17 @@ export default function TopBar() {
       )}
       </div>
 
-      {/* Selected-view label — only on the icon-only breakpoints (<1100px, where the switch
-          drops its text labels): the ACTIVE view's name as a quiet caption HANGING BELOW the
+      {/* Selected-view label — only on the icon-only breakpoints (<1210px, where the switch
+          drops its text labels — raised from 1100 when the live vitals figures grew a digit
+          and the LABELED switch stopped fitting beside them, clipping the bar; user bug):
+          the ACTIVE view's name as a quiet caption HANGING BELOW the
           bar, anchored under its right corner (user refinement — the centered in-bar second row
           read misaligned with the bar's buttons). Lives OUTSIDE the bar surface (a sibling in
           the fixed wrapper, so the bar's overflow-hidden can't clip it) and keeps the muted
           eyebrow language + keyed roll-in on view change (the HUD grammar). Decorative echo of
           the radiogroup's own accessible state, so aria-hidden; non-interactive (the wrapper's
           pointer-events-none passes scene clicks through the caption strip). */}
-      <div className="hidden max-[1099px]:flex justify-end pr-2.5 mt-1.5" aria-hidden>
+      <div className="hidden max-[1209px]:flex justify-end pr-2.5 mt-1.5" aria-hidden>
         <span key={mode} className="roll-in text-micro tracking-caps uppercase text-muted-foreground leading-none">
           {VIEWS.find((v) => v.id === mode)?.name}
         </span>

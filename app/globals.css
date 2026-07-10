@@ -21,10 +21,11 @@
    CARD keeps its depth — box-shadow is one list, so overriding it would otherwise drop them. */
 .subject-paired {
   position: relative;
-  /* SUPPORTING cue now (Task 12): the spine/edge is the primary pairing signal, so the inset
-     ring/glow wash is dialled DOWN to a subtler level (was 62%/58%). Row wash below is unchanged. */
-  box-shadow: inset 0 0 0 1px color-mix(in oklch, var(--row-hue, var(--primary)) 32%, transparent),
-              inset 0 0 14px -6px color-mix(in oklch, var(--row-hue, var(--primary)) 30%, transparent),
+  /* SUPPORTING cue (Task 12): the spine/edge is the primary pairing signal. First dial-down
+     (62%/58% → 32%/30%) overshot — the wash read too soft over the dark glass (user feedback);
+     resettled midway. Row wash below is unchanged. */
+  box-shadow: inset 0 0 0 1px color-mix(in oklch, var(--row-hue, var(--primary)) 46%, transparent),
+              inset 0 0 18px -5px color-mix(in oklch, var(--row-hue, var(--primary)) 44%, transparent),
               inset 0 1px 0 rgba(255, 255, 255, 0.05), 0 8px 30px rgba(0, 0, 0, 0.35);
   transition: box-shadow 0.16s ease;
 }
@@ -168,7 +169,7 @@
 .sig-left.subject-paired::before {
   opacity: 1;
   --edge-hue: var(--row-hue, var(--filter-accent, var(--primary)));
-  box-shadow: 0 0 7px 0 var(--row-hue, var(--filter-accent, var(--primary)));
+  box-shadow: 0 0 10px 0 var(--row-hue, var(--filter-accent, var(--primary)));
 }
 
 /* LEFT-rail cards (`.sig-right`) — the mirror: pairing lights an ::after on the card's RIGHT
@@ -182,7 +183,7 @@
 .sig-right.subject-paired::after {
   opacity: 1;
   --edge-hue: var(--row-hue, var(--spine, var(--primary)));
-  box-shadow: 0 0 7px 0 var(--row-hue, var(--spine, var(--primary)));
+  box-shadow: 0 0 10px 0 var(--row-hue, var(--spine, var(--primary)));
 }
 
 /* Sheets (tablet/phone RailDock): the sheet's own `.ig-sheet-edge` spine is the single identity
@@ -342,6 +343,10 @@
     max-height: calc(100vh - var(--rail-top) - 14px);
     overflow-y: auto;
   }
+  /* Rail cards are flex-none SO THE RAIL SCROLLS — an expanded card (the country accordion)
+     must overflow the rail, not shrink-to-fit or cap itself in an inner scrollbox. Declared
+     as a utility ON each card (GeoExplore): a flex rule here would lose to any flex-*
+     utility on the element (utilities layer > components layer, CSS trap #1). */
   #leftcol > aside { width: auto; }
 
   /* Right details rail (`#rightcol`, Inspector.tsx) — the facts scope: a STACK of
@@ -357,33 +362,31 @@
     pointer-events: none;
   }
 
-  /* Both rails scroll: a slim custom scrollbar, native touch panning (pan-y + momentum),
-     and a grab-drag fallback for mouse (RailScroll). `overscroll-behavior: contain` keeps
-     a rail scroll from chaining to the page. */
+  /* Both rails scroll: native touch panning (pan-y + momentum) and a grab-drag fallback for
+     mouse (RailScroll); the native scrollbar is hidden on both (see below). `overscroll-behavior:
+     contain` keeps a rail scroll from chaining to the page. */
   #leftcol, #rightcol {
-    scrollbar-width: thin; scrollbar-color: rgba(160, 175, 205, 0.28) transparent;
     touch-action: pan-y;
     -webkit-overflow-scrolling: touch;
     overscroll-behavior: contain;
   }
   /* Bottom fade — applied ONLY when a rail actually reaches down into the chart band (JS
-     toggles `.rail-clip`, see RailScroll). Gating it avoids fading a SHORT rail. */
+     toggles `.rail-clip`, see RailScroll). Gating it avoids fading a SHORT rail. The padding
+     is the SCROLL RUNWAY: without it, even at max scroll the last card's bottom sat inside
+     the faded band forever (user bug) — the runway lets the content scroll fully clear of
+     the fade, sheet-like, while mid-scroll content still fades into the band. */
   #leftcol.rail-clip, #rightcol.rail-clip {
+    padding-bottom: calc(var(--bottom-reserve, 0px) + 12px);
     -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - var(--bottom-reserve, 0px) + 6px), transparent calc(100% - var(--bottom-reserve, 0px) + 30px), transparent 100%);
     mask-image: linear-gradient(to bottom, #000 calc(100% - var(--bottom-reserve, 0px) + 6px), transparent calc(100% - var(--bottom-reserve, 0px) + 30px), transparent 100%);
   }
-  #leftcol::-webkit-scrollbar, #rightcol::-webkit-scrollbar { width: 6px; }
-  #leftcol::-webkit-scrollbar-track, #rightcol::-webkit-scrollbar-track { background: transparent; }
-  #leftcol::-webkit-scrollbar-thumb, #rightcol::-webkit-scrollbar-thumb {
-    background: rgba(160, 175, 205, 0.28); border-radius: 3px;
-  }
-  #leftcol:hover::-webkit-scrollbar-thumb, #rightcol:hover::-webkit-scrollbar-thumb {
-    background: rgba(160, 175, 205, 0.45);
-  }
-  /* The RIGHT rail's scrollbar would sit on top of the instrument thread, so hide it there —
-     the thread IS the scroll visual; scrolling stays via wheel + grab-drag + touch pan. */
-  #rightcol { scrollbar-width: none; }
-  #rightcol::-webkit-scrollbar { width: 0; height: 0; display: none; }
+  /* BOTH rails hide the native scrollbar — each carries its instrument thread in the outer
+     margin (the thread IS the scroll visual) and the bottom fade signals clipped content;
+     scrolling stays via wheel + grab-drag + touch pan. (The left rail used to show a slim
+     scrollbar; it popped in whenever a country drill nudged the rail past the chart band and
+     read as chrome appearing from nowhere — user.) */
+  #leftcol, #rightcol { scrollbar-width: none; }
+  #leftcol::-webkit-scrollbar, #rightcol::-webkit-scrollbar { width: 0; height: 0; display: none; }
   /* While grab-dragging a rail (mouse): suppress the text cursor + selection. */
   .rail-dragging { cursor: grabbing; user-select: none; }
 }
@@ -546,7 +549,6 @@
    Scoped to a class (not the rails' ids) since `CommandList` is a reusable primitive. ── */
 @layer components {
   .cmd-list-scroll {
-    scrollbar-width: thin; scrollbar-color: rgba(160, 175, 205, 0.28) transparent;
     overscroll-behavior: contain;
   }
   .cmd-list-scroll::-webkit-scrollbar { width: 6px; }

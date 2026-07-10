@@ -44,7 +44,7 @@ export default function ContextCard() {
       >
         <InspectorCard
           p={context}
-          eyebrow="Selected network"
+          eyebrow="Selected metagraph"
           onClose={() => setFilter("all")}
         />
         {/* Scene-facing (left) edge pulse on a new subject (metagraph picked) — synced with the

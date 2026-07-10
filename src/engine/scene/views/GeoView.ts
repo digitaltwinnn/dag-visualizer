@@ -33,6 +33,13 @@ export interface GeoViewHost {
   };
   landFillMat?: THREE.MeshBasicMaterial;
   landFillMesh?: THREE.Mesh;
+  // Shared FACING uniform (camera direction in the globe's local frame — Globe copies _camN in
+  // each frame): the graticule + coastal walls dim their far-hemisphere fragments through it,
+  // so the see-through backside stays present but visibly "behind" (user: front/back ambiguity).
+  facingUniform?: { value: THREE.Vector3 };
+  // The polar compass roses' materials, faded per frame by BOTH the morph fade and the pole's
+  // own facing (a rose on the far side dims hard — the depth cue that killed the ambiguity).
+  poleRoses?: Array<{ mats: Array<THREE.Material & { opacity: number }>; bases: number[]; sign: number }>;
 }
 
 // HOLOGRAPHIC GLOBE: there is deliberately NO opaque body sphere and NO atmosphere halo.
@@ -43,6 +50,7 @@ export interface GeoViewHost {
 // lane — never identity-tinted).
 export function buildGeoView(globe: GeoViewHost): void {
   buildGraticule(globe);
+  buildCompassRose(globe);
   buildLand(globe);
 }
 
@@ -56,11 +64,103 @@ function buildGraticule(globe: GeoViewHost) {
     for (let lat = -88; lat < 88; lat += 4)
       pts.push(latLonToVec3(lat, lon, R + 0.02), latLonToVec3(lat + 4, lon, R + 0.02));
   const geo = new THREE.BufferGeometry().setFromPoints(pts);
-  // The sea graticule (grid lines OVER the ocean): very subtle on purpose — a faint hint so the
-  // continents (the raised, gridded land) clearly lead. Accent hue, kept calm by a low fade opacity.
+  // The sea graticule (grid lines OVER the ocean): subtle so the continents (the raised, gridded
+  // land) clearly lead — lifted from 0.03 (user: a bit more present on the water). Accent hue.
   const mat = new THREE.LineBasicMaterial({ color: globe.geoColor, transparent: true, opacity: 0 });
-  globe.geoFades.push({ mat, base: 0.03 });
+  // FACING dim: far-hemisphere fragments fade to ~30% so the backside reads as behind the globe
+  // instead of blending with the front (the hologram keeps its see-through presence, quieter).
+  globe.facingUniform = { value: new THREE.Vector3(0, 0, 1) };
+  mat.onBeforeCompile = (sh) => {
+    sh.uniforms.uCamN = globe.facingUniform!;
+    sh.vertexShader = sh.vertexShader
+      .replace("#include <common>", "#include <common>\nvarying vec3 vDir;")
+      .replace("#include <begin_vertex>", "#include <begin_vertex>\nvDir = normalize(position);");
+    sh.fragmentShader = sh.fragmentShader
+      .replace("#include <common>", "#include <common>\nuniform vec3 uCamN;\nvarying vec3 vDir;")
+      .replace(
+        "#include <color_fragment>",
+        "#include <color_fragment>\ndiffuseColor.a *= mix(0.3, 1.0, smoothstep(-0.35, 0.2, dot(vDir, uCamN)));",
+      );
+  };
+  globe.geoFades.push({ mat, base: 0.06 });
   globe.group.add(new THREE.LineSegments(geo, mat));
+}
+
+// POLAR COMPASS ROSE — the subtle orientation cue (user: the tilted country/node poses read
+// disorienting without knowing where north is). E/W only exist relative to a point on a sphere,
+// so the honest anchors are the POLES. The mark is a slender FOUR-POINT STAR rose (long cardinal
+// points, short diagonal spokes, one hairline ring crossing the waists) — deliberately NOT the
+// ring-and-ruler-ticks dial the Snapshots station dials use (user: the first draft read as the
+// same instrument). Lives in `globe.group` (rotates + tilts WITH the globe — a truthful scene
+// marker, not HUD chrome), structural accent, and fades by BOTH the morph fade and the pole's
+// FACING (a far-side rose dims hard — the front/back depth cue). Construction-time only.
+function buildCompassRose(globe: GeoViewHost) {
+  const R_TIP = 1.6, R_WAIST = 0.3, R_DIAG = 0.8, R_RING = 1.0, SEG = 72;
+  const pts: THREE.Vector3[] = [];
+  const at = (a: number, r: number) => new THREE.Vector3(Math.cos(a) * r, 0, Math.sin(a) * r);
+  for (let k = 0; k < 4; k++) {
+    const a = (k * Math.PI) / 2;
+    // the star point: tip → the two 45° waist corners (a slim diamond blade)
+    pts.push(at(a, R_TIP), at(a + Math.PI / 4, R_WAIST));
+    pts.push(at(a, R_TIP), at(a - Math.PI / 4, R_WAIST));
+    // short plain diagonal spoke between the blades
+    pts.push(at(a + Math.PI / 4, R_WAIST), at(a + Math.PI / 4, R_DIAG));
+  }
+  for (let i2 = 0; i2 < SEG; i2++) {
+    const a0 = (i2 / SEG) * Math.PI * 2, a1 = ((i2 + 1) / SEG) * Math.PI * 2;
+    pts.push(at(a0, R_RING), at(a1, R_RING));
+  }
+  const dialGeo = new THREE.BufferGeometry().setFromPoints(pts);
+
+  // A micro cardinal letter on a small flat plane at the rose's centre — canvas-texture text
+  // (the ledger _makeLabel idiom), colour derived from the structural accent, additive so the
+  // dark canvas adds nothing.
+  const makeLetter = (text: string): THREE.Mesh => {
+    const cv = document.createElement("canvas");
+    cv.width = cv.height = 128;
+    const g = cv.getContext("2d")!;
+    g.fillStyle = new THREE.Color(globe.geoColor).getStyle();
+    g.font = "600 84px ui-monospace, monospace"; // no webfont is loaded — name the real stack
+    g.textAlign = "center"; g.textBaseline = "middle";
+    g.fillText(text, 64, 68);
+    const tex = new THREE.CanvasTexture(cv);
+    tex.anisotropy = 4;
+    const mat = new THREE.MeshBasicMaterial({
+      map: tex, transparent: true, opacity: 0,
+      blending: THREE.AdditiveBlending, depthWrite: false,
+    });
+    return new THREE.Mesh(new THREE.PlaneGeometry(0.95, 0.95), mat);
+  };
+
+  // One rose per pole. The north pole is ocean (surface at R); the south pole sits on the
+  // Antarctica plateau (R+LAND_H) — each floats a little above its own surface. Bases kept
+  // QUIET (user: the first draft read brighter than the rest of the hologram).
+  const poles: Array<{ y: number; letter: string; dial: number; text: number; flipX: number; sign: number }> = [
+    { y: R + 0.5, letter: "N", dial: 0.16, text: 0.24, flipX: -Math.PI / 2, sign: 1 },
+    { y: -(R + LAND_H + 0.5), letter: "S", dial: 0.09, text: 0.14, flipX: Math.PI / 2, sign: -1 },
+  ];
+  globe.poleRoses = [];
+  for (const pole of poles) {
+    const mat = new THREE.LineBasicMaterial({
+      color: globe.geoColor, transparent: true, opacity: 0,
+      blending: THREE.AdditiveBlending, depthWrite: false,
+    });
+    const dial = new THREE.LineSegments(dialGeo, mat);
+    dial.position.y = pole.y;
+    globe.group.add(dial);
+
+    const letter = makeLetter(pole.letter);
+    letter.rotation.x = pole.flipX; // lie flat, readable from outside the pole
+    letter.position.y = pole.y;
+    globe.group.add(letter);
+
+    // NOT in geoFades: Globe fades these itself (morph fade × pole facing) each frame.
+    globe.poleRoses.push({
+      mats: [mat, letter.material as THREE.MeshBasicMaterial],
+      bases: [pole.dial, pole.text],
+      sign: pole.sign,
+    });
+  }
 }
 
 // The land mask + 3° micro-grid as ONE mipmapped equirectangular texture — the standard way
@@ -95,8 +195,9 @@ function makeLandTexture(features: LandFeature[]): THREE.DataTexture {
   // holes robustly); each polygon is drawn three times at x−W / x / x+W so a seam-crossing
   // ring simply paints its overflow into the neighbouring copy; pole-encircling rings
   // (Antarctica) are closed along the pole edge so the cap reaches the pole.
-  g.fillStyle = "rgb(9,9,9)"; // the surface FILL (wash between grid lines) — kept nearly transparent so
-                              // the land reads as a wireframe grid, not a solid glowing surface
+  g.fillStyle = "rgb(14,14,14)"; // the surface FILL — a faint solid wash (user-tuned up when the tile
+                                 // grid was removed) so the land reads present, not void; on screen it
+                                 // lands at texel × base 0.45 additive of the geo cyan (~5-6%)
   // Unwrap a ring's longitudes into a continuous run (accumulate the shortest step) so a
   // seam-crosser stays one monotonic path; returns [lon, lat] pairs in absolute (possibly
   // out-of-[-180,180]) longitude.
@@ -165,25 +266,9 @@ function makeLandTexture(features: LandFeature[]): THREE.DataTexture {
     g.globalCompositeOperation = "source-over";
   }
 
-  // The micro-grid, clipped to the land by compositing — drawn at exact degree positions;
-  // source-atop keeps the lines ONLY where land is painted (alpha is still live HERE, on the
-  // working canvas — it's flattened away below).
-  g.globalCompositeOperation = "source-atop";
-  g.strokeStyle = "rgb(40,40,40)"; // the grid LINES — kept subtly above the near-transparent fill so
-                                   // the wireframe reads (this is the stroke, not the fill)
-  g.lineWidth = 1.0;                   // 1px at 4096 = a very FINE hairline (crisp, not fuzzy)
-  const STEP = 1.5;                    // DENSE 1.5° graticule — a delicate mesh, not a coarse cage
-  for (let lat = -90 + STEP; lat < 90; lat += STEP) {
-    const y = ((90 - lat) / 180) * H;
-    g.beginPath(); g.moveTo(0, y); g.lineTo(W, y); g.stroke();
-  }
-  for (let lon = -180; lon < 180; lon += STEP) {
-    const x = ((lon + 180) / 360) * W;
-    // Meridians converge at the poles — stop them past |lat| 72° so Antarctica isn't a glow blob.
-    const yTop = ((90 - 72) / 180) * H, yBot = ((90 + 72) / 180) * H;
-    g.beginPath(); g.moveTo(x, yTop); g.lineTo(x, yBot); g.stroke();
-  }
-  g.globalCompositeOperation = "source-over";
+  // NO land tiles (user decision, after A/B): the land is a SIMPLE FILL — the near-transparent
+  // wash + the glowing coastal walls carry the landmass, and the sea graticule (which spans the
+  // whole sphere, water and behind the land) supplies the digital-globe line work.
 
   // FLATTEN: opaque black out-canvas — the luminance encoding (see header note). After this,
   // alpha is 255 everywhere and no upload path can reinterpret it. Drawn VERTICALLY FLIPPED
@@ -276,17 +361,24 @@ async function buildLand(globe: GeoViewHost) {
       uTop: { value: top },
       uOpacity: { value: 0 },
     };
+    // The wall material shares the graticule's facing uniform (built first in buildGeoView).
+    const wallUniforms = {
+      ...globe.landWallUniforms,
+      uCamN: globe.facingUniform ?? { value: new THREE.Vector3(0, 0, 1) },
+    };
     const wallMat = new THREE.ShaderMaterial({
-      uniforms: globe.landWallUniforms,
+      uniforms: wallUniforms,
       vertexShader: `
-        varying float vH;
+        varying float vH; varying vec3 vDir;
         void main() {
           vH = length(position); // distance from the globe centre
+          vDir = normalize(position);
           gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
         }`,
       fragmentShader: `
         uniform vec3 uColor; uniform float uBase; uniform float uTop; uniform float uOpacity;
-        varying float vH;
+        uniform vec3 uCamN;
+        varying float vH; varying vec3 vDir;
         void main() {
           float t = clamp((vH - uBase) / (uTop - uBase), 0.0, 1.0);
           // Gently non-linear ramp (a blend of linear + quadratic): dim along the ocean line,
@@ -296,7 +388,10 @@ async function buildLand(globe: GeoViewHost) {
           // as a soft ridge blending into the surface. The TOP EDGE carries a clearly brighter
           // highlight (user-tuned: shorter walls, brighter rim) so the coastline stays legible.
           float edge = smoothstep(0.65, 1.0, t);
-          gl_FragColor = vec4(uColor * (0.03 + 0.13 * e + 0.24 * edge), min(1.0, e * 0.72) * uOpacity);
+          // FACING dim: far-hemisphere cliffs stay visible (the hologram's see-through
+          // presence) but clearly BEHIND — see GeoViewHost.facingUniform.
+          float facing = mix(0.35, 1.0, smoothstep(-0.35, 0.15, dot(vDir, uCamN)));
+          gl_FragColor = vec4(uColor * (0.03 + 0.13 * e + 0.24 * edge), min(1.0, e * 0.72) * uOpacity * facing);
         }`,
       // Single-sided so only cliffs whose face points toward the camera draw: a
       // continent's near + side edges show, its far edge (behind the filled plateau)
@@ -329,7 +424,7 @@ async function buildLand(globe: GeoViewHost) {
     // Kept well below 1 so the globe reads as a faint calm hologram, the coastal walls the accent.
     globe.geoFades.push({ mat: globe.landFillMat, base: 0.45 });
     globe.landFillMesh = new THREE.Mesh(new THREE.SphereGeometry(top, 96, 64), globe.landFillMat);
-    globe.landFillMesh.renderOrder = -1; // before the rim/heatmap/nodes
+    globe.landFillMesh.renderOrder = -1; // before the rim/nodes
     globe.landFillMesh.visible = false;  // revealed once the globe materialises (setMorph)
     globe.group.add(globe.landFillMesh);
   } catch {

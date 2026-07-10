@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { unstable_cache } from "next/cache";
-import metagraphsBaked from "@/data/metagraphs.json";
+import { METAGRAPHS } from "@/src/engine/config";
 import type { SnapshotExact } from "@/src/data/types";
 
 // EXACT per-tick anchor totals, read straight from the raw L0 global snapshot. The block explorer
@@ -16,12 +16,9 @@ export const maxDuration = 30;
 
 const L0 = "https://l0-lb-mainnet.constellationnetwork.io";
 
-// Addresses we track (the public catalog) — used to split listed vs unlisted.
-const rawList = metagraphsBaked as unknown;
-const LISTED = new Set(
-  ((Array.isArray(rawList) ? rawList : (rawList as { metagraphs?: unknown[] }).metagraphs) ?? []
-  ).map((m) => (m as { id: string }).id),
-);
+// Addresses we track (the public catalog, config.METAGRAPHS — the canonical list the
+// Hypergraph hubs are built from) — used to split listed vs unlisted.
+const LISTED = new Set(METAGRAPHS.map((m) => m.id));
 
 type StateChannelSnap = { value?: { fee?: number; content?: unknown[] } };
 

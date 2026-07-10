@@ -1,7 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { exploreCards, detailsCards, type RailManifestState } from "@/components/railCards";
 import type { PickDescriptor } from "@/src/data/types";
-import type { SelSlot } from "@/src/store/store";
 
 // Present card kinds in render order — the exact set/order both the rail and the tray consume.
 const presentKinds = (cards: { kind: string; present: boolean }[]) =>
@@ -19,9 +18,14 @@ const details = (over: Partial<RailManifestState>): RailManifestState => ({
   inspect: null,
   snap: null,
   layer: null,
-  selStack: [],
+  selNodesCount: 10,
+  filterLabel: null,
   ...over,
 });
+
+// The ghosted slots (view can produce the card, nothing selected) — the hint-state cards.
+const ghostIds = (cards: { id: string; present: boolean; hint: string | null }[]) =>
+  cards.filter((c) => !c.present && c.hint != null).map((c) => c.id);
 
 describe("exploreCards — LEFT rail (Explore)", () => {
   it("hyper hosts About only (no tool card)", () => {
@@ -42,45 +46,49 @@ describe("exploreCards — LEFT rail (Explore)", () => {
   });
 });
 
-describe("detailsCards — RIGHT rail (Details)", () => {
-  it("all filter, nothing picked → NO cards (the old bug: Context icon showed here)", () => {
+describe("detailsCards — RIGHT rail (Details): fixed slots + ghost hints", () => {
+  it("all filter, nothing picked → no POPULATED cards", () => {
     expect(presentKinds(detailsCards(details({ filter: "all" })))).toEqual([]);
   });
-  it("a metagraph filter → Context dossier", () => {
+  it("a metagraph filter → Context dossier populated", () => {
     expect(presentKinds(detailsCards(details({ filter: "dor" })))).toEqual(["context"]);
   });
-  it("the DAG filter → Context dossier", () => {
+  it("the DAG filter → Context dossier populated", () => {
     expect(presentKinds(detailsCards(details({ filter: "dag" })))).toEqual(["context"]);
   });
-  it("a node inspected on the all filter → node card only (no Context)", () => {
-    expect(presentKinds(detailsCards(details({ inspect: nodePick, selStack: ["node"] })))).toEqual(["node"]);
+  it("slots come in ONE fixed order (context, node, snap, layer) regardless of selection", () => {
+    const ids = detailsCards(details({ filter: "dor", inspect: nodePick, snap: snapPick })).map((c) => c.id);
+    expect(ids).toEqual(["context", "node", "snap", "layer"]);
   });
-  it("a snapshot followed on the all filter → snap card only (no Context)", () => {
-    expect(presentKinds(detailsCards(details({ snap: snapPick, selStack: ["snap"] })))).toEqual(["snap"]);
+  it("ledger ghosts: context + snapshot + layer invites (node has no ledger invite)", () => {
+    expect(ghostIds(detailsCards(details({})))).toEqual(["context", "snap", "layer"]);
   });
-  it("a settlement layer selected → layer card, stacked in recency order with a snapshot", () => {
-    const layerPick = { kind: "layer", layerId: "hypl0", name: "Hypergraph L0", desc: "" } as Extract<
-      PickDescriptor,
-      { kind: "layer" }
-    >;
-    expect(presentKinds(detailsCards(details({ layer: layerPick, selStack: ["layer"] })))).toEqual(["layer"]);
-    expect(
-      presentKinds(detailsCards(details({ layer: layerPick, snap: snapPick, selStack: ["layer", "snap"] }))),
-    ).toEqual(["layer", "snap"]);
+  it("hyper ghosts: context + node + snapshot invites (the strip runs in every view)", () => {
+    expect(ghostIds(detailsCards(details({ mode: "hyper" })))).toEqual(["context", "node", "snap"]);
   });
-  it("Context + a node when a metagraph is filtered AND a node is picked", () => {
-    const s = details({ filter: "dor", inspect: nodePick, selStack: ["node"] });
-    expect(presentKinds(detailsCards(s))).toEqual(["context", "node"]);
+  it("geo ghosts: context + node + snapshot invites (the strip runs in every view)", () => {
+    expect(ghostIds(detailsCards(details({ mode: "geo" })))).toEqual(["context", "node", "snap"]);
   });
-  it("orders the Detail cards by selStack recency (most-recent first, after Context)", () => {
-    const base = { filter: "dor", inspect: nodePick, snap: snapPick } as const;
-    const nodeFirst = details({ ...base, selStack: ["node", "snap"] as SelSlot[] });
-    const snapFirst = details({ ...base, selStack: ["snap", "node"] as SelSlot[] });
-    expect(presentKinds(detailsCards(nodeFirst))).toEqual(["context", "node", "snap"]);
-    expect(presentKinds(detailsCards(snapFirst))).toEqual(["context", "snap", "node"]);
+  it("geo node ghost turns HONEST when the filtered network plots nothing", () => {
+    const cards = detailsCards(details({ mode: "geo", filter: "tbc", selNodesCount: 0, filterLabel: "TBC" }));
+    const node = cards.find((c) => c.id === "node")!;
+    expect(node.hint).toContain("TBC has no locatable nodes");
+  });
+  it("geo node ghost is SILENT during boot (all filter, 0 nodes — no false invite)", () => {
+    const cards = detailsCards(details({ mode: "geo", filter: "all", selNodesCount: 0, filterLabel: null }));
+    expect(cards.find((c) => c.id === "node")!.hint).toBeNull();
+  });
+  it.each(["status", "transactions", "staking"] as const)("placeholder %s has NO ghosts", (mode) => {
+    expect(ghostIds(detailsCards(details({ mode })))).toEqual([]);
+  });
+  it("a populated slot loses its ghost but keeps rendering anywhere (pinned snap in hyper)", () => {
+    const cards = detailsCards(details({ mode: "hyper", snap: snapPick }));
+    const snap = cards.find((c) => c.id === "snap")!;
+    expect(snap.present).toBe(true);
+    expect(ghostIds(cards)).toEqual(["context", "node"]); // snap populated → no snap ghost
   });
   it("subjectKeys track each card's EdgePulse subject (filter / node ip / snapshot ordinal)", () => {
-    const s = details({ filter: "dor", inspect: nodePick, snap: snapPick, selStack: ["snap", "node"] });
+    const s = details({ filter: "dor", inspect: nodePick, snap: snapPick });
     const byId = Object.fromEntries(detailsCards(s).map((c) => [c.id, c.subjectKey]));
     expect(byId.context).toBe("dor");
     expect(byId.node).toBe("9.9.9.9");
