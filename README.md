@@ -1,4 +1,6 @@
-# Constellation Hypergraph — 3D Network Visualizer
+# DAG Visualizer — live 3D map of the Constellation Network
+
+**Live at [dagvisualizer.io](https://dagvisualizer.io)**
 
 An interactive, real-time 3D map of the **Constellation Network ($DAG)** built with
 [Three.js](https://threejs.org). It visualizes the network's fundamentals so anyone
@@ -26,8 +28,9 @@ can understand how it works and why it's powerful:
     node model — a node is *hybrid* or *dedicated*, never a separate "L0 cluster" vs "L1 cluster").
     Smoothly **morphs** into the globe (the core grows out into the Earth).
   - **Node geography** — a 3D globe with every node plotted at its **real geographic location**
-    (solid raised continents from world-atlas land data, with glowing coastal cliffs), a density
-    heatmap and travelling-packet connection arcs. The top-bar filter isolates the DAG core or any
+    (solid raised continents from world-atlas land data, with glowing coastal cliffs), co-located
+    machines stacked into honeycomb chip towers, and travelling-packet connection arcs. The
+    top-bar filter isolates the DAG core or any
     single metagraph; the country→nodes explorer then drills into a single country. Selecting one
     rotates + zooms the globe to wherever its nodes are densest.
   - **Snapshots** — the ledger-over-time view: a 3D "settlement chamber" stacking the network's
@@ -141,7 +144,7 @@ traffic grows).
 ## How the data flows
 
 ```
-Browser ──poll──> Constellation block explorer API   (snapshots / clusters / prices)
+Browser ──poll──> Constellation block explorer API   (snapshots / clusters)
    │                                                       │ events
    │                                                       v
    │   NetworkData ──┬─► Engine (vanilla Three.js, 60fps, never re-rendered by React)
@@ -160,8 +163,7 @@ Browser ──poll──> Constellation block explorer API   (snapshots / cluste
 | `src/store/store.ts` | Zustand store (the React↔engine command/state bridge) |
 | `src/data/` | `network.ts` (wraps `NetworkData`), `follow.ts`, `types.ts` |
 | `src/util/format.ts` | Shared formatters — `hex` (colour), `fmtDag` (fee) |
-| `src/engine/` | `Engine.ts` (imperative Three.js engine: render loop, morph, camera focus, DoF, picking) + `boundary.ts` (types for the vanilla `js/*` modules it drives) |
-| `js/*.js` | Reused vanilla Three modules driven by the engine: `scene`, `layers`, `globe`, `background`, `api` (live data), `config`, `geo` |
+| `src/engine/` | `Engine.ts` (imperative Three.js engine: render loop, morph, camera focus, DoF, picking — the one store bridge) over `domain/` (pure, unit-tested layout/sim/policy logic) and `scene/` (the Three.js adapters: globe, hyper furniture, ledger chamber, node meshes) |
 | `scripts/bake-*.py` | Optional offline seed/fallback for `data/*.json` (the routes fetch live) |
 
 ---
