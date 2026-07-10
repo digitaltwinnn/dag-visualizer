@@ -112,8 +112,8 @@ The globe plots validators and metagraph nodes at their real geolocations.
   ISR and re-pulled by the client every ~10 min. (Falls back to the baked `data/*.json` if the
   live fetch fails.)
 
-`scripts/bake-*.py` still produce the `data/*.json` seed/fallback but are no longer required for
-normal operation — the routes fetch live.
+The bundled `data/*.json` files are a static baked snapshot used as the seed/fallback; the
+routes fetch live data in normal operation.
 
 ## Run it locally
 
@@ -164,7 +164,6 @@ Browser ──poll──> Constellation block explorer API   (snapshots / cluste
 | `src/data/` | `network.ts` (wraps `NetworkData`), `follow.ts`, `types.ts` |
 | `src/util/format.ts` | Shared formatters — `hex` (colour), `fmtDag` (fee) |
 | `src/engine/` | `Engine.ts` (imperative Three.js engine: render loop, morph, camera focus, DoF, picking — the one store bridge) over `domain/` (pure, unit-tested layout/sim/policy logic) and `scene/` (the Three.js adapters: globe, hyper furniture, ledger chamber, node meshes) |
-| `scripts/bake-*.py` | Optional offline seed/fallback for `data/*.json` (the routes fetch live) |
 
 ---
 

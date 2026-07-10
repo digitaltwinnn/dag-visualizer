@@ -1005,8 +1005,10 @@ can't fetch them — but the **Next Node server can**:
   (Vercel never restarts; ISR only freshens the *server* cache, so an idle tab must re-pull —
   `Engine.refreshMeta`, rebuilds only on change). Snapshot/cluster feeds are live via
   `NetworkData` client polling.
-- `scripts/bake-*.py` are **only the offline seed/fallback** for `data/*.json`, not required
-  for normal operation. `data/metagraphs.json` shape: each metagraph has
+- **`data/*.json` are a static baked snapshot** — the imported seed/fallback the routes use
+  when the live fetch fails. The Python bake scripts that once regenerated them were removed
+  (2026-07-10, unmaintained); if the seeds ever need refreshing, regenerate by hand from the
+  live routes' output. `data/metagraphs.json` shape: each metagraph has
   `name/symbol/description/siteUrl/nodes`; each node `ip/state/layer/roles`.
 - **`data/brand-hues.json`** is baked OFFLINE by `npx tsx scripts/bake-brand-hues.ts` (run
   manually whenever the metagraph set changes; `jimp` is a devDependency used only by this
@@ -1032,10 +1034,6 @@ Metagraph reality worth knowing (it drives the dossier/inspector text):
   layer actually runs, so URL presence means nothing — only node presence does.
 - Keep `config.METAGRAPHS` (hub order/colour fallback, the Hypergraph) in sync with what the
   route returns (matched by `id`).
-
-> Sandbox networking note: `bake-metagraphs.py` falls back to `curl` (subprocess) when
-> `urllib` fails, because here Python can't resolve some metagraph cluster hosts (e.g.
-> `*.getdor.com`) while the system `curl` reaches them over IPv6.
 
 ## Deploying (Vercel)
 

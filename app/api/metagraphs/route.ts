@@ -5,7 +5,7 @@ import geoBaked from "@/data/geo.json";
 import { assignPalette } from "@/src/palette/palette";
 import { identityPins } from "@/src/palette/identity";
 
-// Live server-side port of scripts/bake-metagraphs.py. Next's Node server CAN reach
+// Live server-side metagraph directory + cluster fetch. Next's Node server CAN reach
 // the metagraph cluster load balancers (plain HTTP, custom ports, no CORS) that a
 // browser can't — which is exactly why this data used to be baked. We fetch the
 // directory + each cluster's nodes on demand and geolocate the IPs, cached via ISR.
