@@ -5,6 +5,8 @@ import * as THREE from "three";
 // the other just for these.
 export const R = 16; // globe radius
 export const HEX_H = 0.08;      // geo hex-prism height (world) — thin chip (user-tuned down from 0.11)
+export const VALIDATOR_HEX_R = 0.13; // geo hex-prism CIRCUMRADIUS (world) — DAG validators
+export const META_HEX_R = 0.14;      // …metagraph nodes; the honeycomb pitch derives from the LARGER
 export const CHIP_PITCH = 0.13;  // radial lift per LEVEL in a co-located stack: HEX_H + clear air
                                  // (user: chips must read as separate, not one fused column) — see
                                  // nodeLayout's stackSizes/spreadCoLocated levels + NodeFabric

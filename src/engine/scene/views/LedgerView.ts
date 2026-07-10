@@ -115,6 +115,7 @@ interface RingRec {
   floor: "l0" | "l1";
 }
 interface CurveRec {
+  id: string; // metagraph id — carried on the rec so the per-frame loop can iterate .values()
   sx: number;
   sz: number;
   color: number;
@@ -409,7 +410,7 @@ export class LedgerView {
   // (frontX = the plane's +X/camera edge, leftZ = its +Z/screen-left edge) and running along the
   // edge toward screen-right: the layer's ORDER digit in a small outlined box (mirroring the
   // explore panel's number badge) + the name. Canvas-texture text (revival of the pre-47cbc72
-  // _makeLabel); the one colour is the allowlisted label tone (noHardcodedColors).
+  // _makeLabel); the one colour derives from the structural token (colors.core).
   private _makeLabel(level: string, text: string, frontX: number, y: number, leftZ: number): THREE.Mesh {
     const c = document.createElement("canvas");
     // 2× supersampled canvas (SS): the old 512×64 texture went blurry under the shallow overview
@@ -560,7 +561,7 @@ export class LedgerView {
       r.mesh.scale.setScalar(r.radius);
       this._anchorGroup.add(r.mesh);
     }
-    const rec: CurveRec = { sx: s.x, sz: s.z, color, rings };
+    const rec: CurveRec = { id, sx: s.x, sz: s.z, color, rings };
     this._curves.set(id, rec);
     return rec;
   }
@@ -820,8 +821,9 @@ export class LedgerView {
 
     // Decay + apply the station-dial highlights (brighter + slightly larger while a pulse is in).
     // A single-metagraph filter dims every OTHER metagraph's dials, consistent with its tiles/links.
-    for (const [id, rec] of this._curves) {
-      const dialOff = mf != null && id !== mf;
+    // .values(), not entries — Map entry destructuring allocates a tuple per rec per frame.
+    for (const rec of this._curves.values()) {
+      const dialOff = mf != null && rec.id !== mf;
       for (const r of rec.rings) {
         r.glow = Math.max(0, r.glow - dt * 2.4);
         (r.mesh.material as THREE.LineBasicMaterial).opacity =

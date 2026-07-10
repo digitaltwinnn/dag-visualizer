@@ -9,9 +9,9 @@
 // DEVIATION from the Task 9 brief: the brief's single `nodeEmissive(..., baseLo, baseHi)`
 // signature exactly expresses the VALIDATOR loop (js/globe.js:1043-1054) — its base term really
 // does lerp(0.5, 0.22, morph) — but it can NOT also express the metagraph loop
-// (js/globe.js:1099-1107): that loop's base term is a flat 0.5 (no lerp), its twinkle
-// coefficient is 0.12 (not 0.06), its glow-suppression coefficient is 0.9 (not 0.92), and its
-// floor is 0.03 (not 0.02). None of those four differences are reachable through
+// (js/globe.js:1099-1107): its glow-suppression coefficient is 0.9 (not 0.92) and its
+// floor is 0.03 (not 0.02) — historic per-loop tuning kept verbatim. (The loops' base terms
+// and twinkle have since been unified/removed.) Those differences are not reachable through
 // (baseLo, baseHi) alone. Per the brief's own escape hatch ("splitting into validatorEmissive +
 // metaNodeEmissive is acceptable if documented"), this file keeps `nodeEmissive` exactly as
 // specified (== the validator formula) and adds a sibling `metaNodeEmissive` carrying the

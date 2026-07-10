@@ -182,6 +182,7 @@ export class Engine {
     const s = useStore.getState();
     this.mode = s.mode;
     this.filter = s.filter;
+    this._layerCommitted = s.layer != null; // seed — subscription only sees CHANGES (HMR remount)
     // Booting straight into geo (deep link / persisted view): snap to the globe —
     // there's nothing to morph from on a fresh load (matches the old #geo behaviour).
     if (this.mode === "geo") this.morph = 1;

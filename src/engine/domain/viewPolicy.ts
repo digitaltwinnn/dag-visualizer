@@ -37,9 +37,9 @@ export interface ViewPolicy {
   // May depth-of-field run here at all? (Still ANDs with a single metagraph being selected +
   // the morph window.) Only hyper.
   dofEligible: boolean;
-  // OrbitControls zoom floor (camera→target distance). Geo raises it above the globe radius
-  // (R=16 + land + margin) so the user can't wheel the camera through the surface into the
-  // globe's interior; the abstract views keep the close-in default.
+  // OrbitControls zoom floor (camera→target distance). Geo raises it above the land plateau
+  // (R=16 + LAND_H 1.0 = 17) with margin for the raised hex stacks, so the user can't wheel
+  // the camera through the surface; the abstract views keep the close-in default.
   minCamDist: number;
 }
 
@@ -75,7 +75,7 @@ export const VIEW_POLICIES: Record<Mode, ViewPolicy> = {
     show: { hyperFurniture: true, globeSurface: true, ledger: false },
     pickSources: ["globe"],
     dofEligible: false,
-    minCamDist: 17, // outside the globe surface (R 16 + land 0.11 + margin) — no zooming inside
+    minCamDist: 18, // above the land plateau (R 16 + LAND_H 1.0) + chip stacks — no zooming inside
   },
   // Snapshots: the settlement chamber. Morph frozen (nodes fly into lanes); picks the centred
   // snapshot + the reused producer dots. (The ledger-specific depth-fog recency treatment was

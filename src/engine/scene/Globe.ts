@@ -19,13 +19,7 @@ import { metaAnchor } from "../domain/hyperLayout";
 import { LEDGER, ledgerSite, ledgerSpread, clusterRadius } from "../domain/ledgerLayout";
 import type { SceneColors } from "../sceneColors";
 import * as geoStats from "../domain/geoStats";
-import { R, LAND_H, CHIP_PITCH, HEX_H, latLonToVec3 } from "../domain/geoLayout";
-
-// Geo hex-prism helpers: a node's prism CENTRE sits half its height above the plateau (level 0),
-// each stack level adds CHIP_PITCH; hexPitchDeg(r) is the angular distance between ADJACENT
-// honeycomb cells for hexes of circumradius r (√3·r edge-to-edge + 4% air).
-const HEX_BASE_R = R + LAND_H + 0.02 + HEX_H / 2;
-const hexPitchDeg = (r: number) => ((Math.sqrt(3) * r * 1.04) / (R + LAND_H)) * (180 / Math.PI);
+import { R, LAND_H, CHIP_PITCH, HEX_H, VALIDATOR_HEX_R, META_HEX_R, latLonToVec3 } from "../domain/geoLayout";
 import { GOLDEN_ANGLE, fibShellPos, nodeRoles, spreadCoLocated } from "../domain/nodeLayout";
 import { surfFade, extrasFade } from "../domain/morph";
 import { ArcSim, type ArcEndpoint } from "../domain/arcSim";
@@ -44,6 +38,12 @@ import type {
   RouteMetagraph,
   RouteNode,
 } from "@/src/data/types";
+
+// Geo hex-prism helpers: a node's prism CENTRE sits half its height above the plateau (level 0),
+// each stack level adds CHIP_PITCH; hexPitchDeg(r) is the angular distance between ADJACENT
+// honeycomb cells for hexes of circumradius r (√3·r edge-to-edge + 4% air).
+const HEX_BASE_R = R + LAND_H + 0.02 + HEX_H / 2;
+const hexPitchDeg = (r: number) => ((Math.sqrt(3) * r * 1.04) / (R + LAND_H)) * (180 / Math.PI);
 
 const _focusMat = new THREE.Matrix4(); // scratch for reading an instance's live transform
 // The ledger's whole-view orientation (tilt ∘ rotY), baked into every node's ledger position so the
@@ -231,7 +231,7 @@ export class Globe implements GeoViewHost {
           geoDir, trueDir: geoDir ? geoDir.clone() : null, geoRadius: HEX_BASE_R, noGeo: !g,
           // UNIFORM node size regardless of ready state (user: never size by status; status lives
           // in the explorer pill + node card). geoSize = hex prism CIRCUMRADIUS (world).
-          hyperSize: 0.55, geoSize: primary ? 0.13 : 0,
+          hyperSize: 0.55, geoSize: primary ? VALIDATOR_HEX_R : 0,
           azimuth: Math.atan2(hyperPos.z, hyperPos.x),
           spinAxis: new THREE.Vector3(Math.random() * 2 - 1, Math.random() * 2 - 1, Math.random() * 2 - 1).normalize(),
           spinSpeed: 0.3 + Math.random() * 0.5, spinPhase: Math.random() * 6.2831,
@@ -314,7 +314,7 @@ export class Globe implements GeoViewHost {
             hyperPos: new THREE.Vector3(a.x, a.y, a.z).add(offset),
             geoPos: new THREE.Vector3(),
             geoDir: dir, trueDir: dir.clone(),
-            hyperSize: 0.52, geoSize: primary ? 0.14 : 0, // hex prism CIRCUMRADIUS (world)
+            hyperSize: 0.52, geoSize: primary ? META_HEX_R : 0, // hex prism CIRCUMRADIUS (world)
             spinAxis: new THREE.Vector3(Math.random() * 2 - 1, Math.random() * 2 - 1, Math.random() * 2 - 1).normalize(),
             spinSpeed: 0.3 + Math.random() * 0.5, spinPhase: Math.random() * 6.2831,
             dim: 0, dimTarget: 0,
@@ -463,10 +463,10 @@ export class Globe implements GeoViewHost {
     }
     if (vActive.length + mActive.length) {
       const lv: number[] = [];
-      // one pitch for the combined set, sized to the LARGER hex footprint (metagraph 0.14)
+      // one pitch for the combined set, sized to the LARGER hex footprint
       spreadCoLocated(
         [...vActive.map((u) => u.geoDir!), ...mActive.map((r) => r.geoDir)],
-        { spacingDeg: hexPitchDeg(0.14) },
+        { spacingDeg: hexPitchDeg(Math.max(VALIDATOR_HEX_R, META_HEX_R)) },
         lv,
       );
       vActive.forEach((u, i) => { u.geoRadius = HEX_BASE_R + (lv[i] ?? 0) * CHIP_PITCH; });
@@ -554,7 +554,7 @@ export class Globe implements GeoViewHost {
     const ctx = this._frameCtx(0, 0); // dt/flashDecay unused by the matrix loop
     this.pickables = this.fabric.placeValidators(this.nodes, ctx);
 
-    // The globe surface fades in only once nodes are well on their way; heatmap/arcs later still. In
+    // The globe surface fades in only once nodes are well on their way; arcs later still. In
     // ledger the surface is hidden OUTRIGHT (not eased by morph).
     const surf = this.ledger ? 0 : surfFade(m);
     const extras = this.ledger ? 0 : extrasFade(m);

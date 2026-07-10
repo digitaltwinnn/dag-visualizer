@@ -1,7 +1,7 @@
 // Pure node-layout math shared by the validator + metagraph node engine. Extracted verbatim
 // (with source comments) from js/globe.js:22-84 (GOLDEN_ANGLE / nodeRoles / discFall /
 // spreadCoLocated) and :225-230 (fibShellPos) — js/globe.js is deleted (03e57d5). Consumed by
-// scene/Globe.ts, scene/objects/NodeFabric.ts, and scene/objects/Heatmap.ts.
+// scene/Globe.ts and scene/objects/NodeFabric.ts.
 
 import * as THREE from "three";
 
@@ -98,7 +98,8 @@ export function hexCell(i: number): { x: number; y: number } {
 // above it, …) written into `levels` parallel to `dirs` — the caller bakes the level into the
 // node's radial position so co-located nodes read as poker-chip stacks instead of a carpet of
 // dots. Mutates the vectors in place; returns the proximity clusters (centre + count + angular
-// spread) for the density heatmap glow.
+// spread). The heatmap that consumed the clusters is gone — Globe discards the return value; the
+// cluster fields remain as the function's tested contract (nodeLayout.test.ts) and debug surface.
 const _sx = new THREE.Vector3(), _sy = new THREE.Vector3(), _sh = new THREE.Vector3();
 export function spreadCoLocated(
   dirs: THREE.Vector3[],
@@ -148,7 +149,7 @@ export function spreadCoLocated(
         d.copy(ctr).addScaledVector(_sx, dx).addScaledVector(_sy, dy).normalize();
       }
     });
-    c.spread = maxRR + pitch * 0.5; // for the heatmap glow footprint
+    c.spread = maxRR + pitch * 0.5; // the tiled group's angular footprint (test/debug surface)
   }
   return clusters;
 }

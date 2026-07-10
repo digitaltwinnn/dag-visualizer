@@ -38,7 +38,7 @@ export const VIEW_ICONS: Record<Mode, LucideIcon> = {
 export const ABOUT_ICON: LucideIcon = Info;
 
 // The left-rail TOOL cards' ONE mark (GeoExplore, LedgerPanel — user decision: the SAME standard
-// icon in every view; the earlier per-view Compass/BookOpen split read as neither exploring nor
+// icon in every view; an earlier per-view icon split read as neither exploring nor
 // learning). Telescope: an INSTRUMENT that says explore/investigate — same reasoning as the
 // status view's Radar. A tool card isn't itself a view subject (unlike the detail cards'
 // Globe/Box/Orbit marks), so it doesn't reuse a view icon. Used in the card head, the dock icon
@@ -58,7 +58,7 @@ export const SNAPSHOT_ICON: LucideIcon = Box;
 export const LAYER_ICON: LucideIcon = Layers2;
 
 // The ONE size every card-head/title KIND MARK renders at — About's Info, the tool cards'
-// Compass/BookOpen, the node card's Globe, the snapshot card's Box (CardHead's panel `icon` + the inspector
+// Telescope, the node card's Globe, the snapshot card's Box (CardHead's panel `icon` + the inspector
 // titles in inspector/cards.tsx). 16px (`size-4`): the old 14px read timid next to the 15px
 // text-title headline (user follow-up on Task 23). Single-sourced here so the heads can't drift;
 // the dock TRAYS and the top-bar view switch deliberately keep their own sizes (this constant is

@@ -397,7 +397,6 @@ export class NodeFabric {
       let dEff = r.dim * (c.ledger ? 0.82 : dimScaleV);
       const geoCc = geoCcOf(r.pick);
       if (cf && (!geoCc || geoCc !== cf)) dEff = Math.max(dEff, cmix);
-      // Twinkle (decorative shimmer) is geo-only (scaled by m).
       const glow = (0.5 + 0.08 * m) * (1 - dEff * 0.9); // steady, = validators' (twinkle removed, geo lift eased back — user)
       const flRaw = r._flash || 0; // brief flash when an arc pulse reaches this node
       const fl = flRaw * m; // arcs are a geo-only visual — their flash must not bleed into hyper
@@ -444,9 +443,8 @@ export class NodeFabric {
         continue;
       }
 
-      // Sphere: tumbling on its own axis, shrinking out near the globe. Filtered-out metagraph
-      // nodes shrink fully (1 - dEff).
-      // Sphere: tumbling, cross-fading out as the node lands (see the validator loop).
+      // Sphere: tumbling on its own axis, cross-fading out as the node lands (see the validator
+      // loop). Filtered-out metagraph nodes shrink fully (1 - dEff).
       _qSpin.setFromAxisAngle(r.spinAxis, r.spinPhase + clock * r.spinSpeed);
       _dummy.quaternion.copy(_qSpin);
       _dummy.scale.setScalar(r.hyperSize * (1 - w) * (1 - dEff));

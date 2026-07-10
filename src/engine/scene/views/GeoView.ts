@@ -314,7 +314,7 @@ async function buildLand(globe: GeoViewHost) {
     // Kept well below 1 so the globe reads as a faint calm hologram, the coastal walls the accent.
     globe.geoFades.push({ mat: globe.landFillMat, base: 0.45 });
     globe.landFillMesh = new THREE.Mesh(new THREE.SphereGeometry(top, 96, 64), globe.landFillMat);
-    globe.landFillMesh.renderOrder = -1; // before the rim/heatmap/nodes
+    globe.landFillMesh.renderOrder = -1; // before the rim/nodes
     globe.landFillMesh.visible = false;  // revealed once the globe materialises (setMorph)
     globe.group.add(globe.landFillMesh);
   } catch {

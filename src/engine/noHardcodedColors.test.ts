@@ -24,7 +24,6 @@ const ALLOWED = new Set<number>([
   0xccd6e6, // key light (neutral cool-white)
   0x5a6f9c, // rim light (muted cool)
   0x223046, // dimmed-node tone (Globe + NodeFabric) — TODO: derive from a token
-  // Density HEATMAP gradient — a functional data-viz sequential scale (cold→hot), NOT the palette:
 ]);
 
 // Parse any colour-literal token to {r,g,b}, or null if it isn't one.

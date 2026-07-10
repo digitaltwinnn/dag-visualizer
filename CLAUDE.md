@@ -182,7 +182,8 @@ store-value imports**, enforced by `layerBoundaries.test.ts`). Each ships coloca
 
 - `viewPolicy.ts` — the per-`Mode` allow-list table (`VIEW_POLICIES`): canvas / morph target /
   sim gates / shown geometry / pick sources / DoF eligibility / camera zoom floor
-  (`minCamDist` — geo raises it to 17 > globe R so the user can't wheel inside the globe), as
+  (`minCamDist` — geo raises it to 18 > the land plateau at R+LAND_H=17 so the user can't wheel
+  inside the globe), as
   DATA. The single source of truth for what each view turns on (see *Per-view behaviour*).
 - `morph.ts` — the hyper↔geo morph easing + derived visibility ramps.
 - `nodeLayout.ts` — the node placement math: fibonacci shells around the core/hubs, the
@@ -236,7 +237,7 @@ GPU; no store/react**):
   for the 4 antimeridian-crossing polygons, an Antarctica **pole-cap**, and a uniform `n=4`
   subdivision so facets hug the sphere with no T-junction cracks), capped by additive coastal
   **"wall" cliffs** (BackSide-culled, dim rim, always the default cyan — metagraph-tinting it
-  read as too dominant). The land surface is a SIMPLE FILL (luminance `rgb(18,18,18)` in the
+  read as too dominant). The land surface is a SIMPLE FILL (luminance `rgb(14,14,14)` in the
   baked texture, user-tuned) — the tile/micro-grid was removed entirely (user, after an A/B);
   the sea graticule (base 0.06) spanning the whole sphere carries the digital line work.
   Nodes/arcs sit on the plateau (`R+LAND_H+ε`); the body sphere (`renderOrder -2`) and fill
