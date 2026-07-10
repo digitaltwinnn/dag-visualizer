@@ -1043,6 +1043,12 @@ Target host is **Vercel** (any Node host works). No env vars / secrets are requi
 
 **Enabled now (works on the free Hobby plan):**
 - `engines.node >= 18.18`; `next build` is clean.
+- **Security headers** (`next.config.mjs`): a moderate CSP (inline script/style for the Next
+  runtime, `img https:` for metagraph logos, `connect https:` — the Constellation host set is
+  open — `va.vercel-scripts.com` for telemetry; dev adds `unsafe-eval`/`ws:`/`http:`), nosniff,
+  frame-ancestors none, Referrer-/Permissions-Policy. Added for reputation-scanner posture
+  after Zscaler NRD-isolated the fresh domain (registered 2026-06-26; re-categorization via
+  sitereview.zscaler.com; the NRD window ages out ~30-90 days).
 - Route caching as above (`/api/metagraphs` `○` with `10m` in `next build` output).
 - **`@vercel/speed-insights`** + **`@vercel/analytics`** mounted in `app/layout.tsx`
   (real-user Web Vitals + cookieless page views; both no-op off Vercel). Web Vitals do NOT
