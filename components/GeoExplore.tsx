@@ -9,7 +9,7 @@ import { Card } from "@/components/ui/card";
 import { EXPLORE_ICON } from "@/components/icons";
 import { shortHash, CORE_HEX, metagraphById } from "@/src/data/network";
 import { identityHudHex } from "@/src/palette/identity";
-import { IdentityDot, StatusMark } from "@/components/inspector/parts";
+import { IdentityDot } from "@/components/inspector/parts";
 import { SELECTED_ROW, SelectedRowMark } from "@/components/selection";
 import { ccToFlag } from "@/src/util/format";
 import { hoverKeyOf } from "@/src/data/hoverSubject";
@@ -31,6 +31,7 @@ export default function GeoExplore() {
   const inspect = useStore((s) => s.inspect);
   const setHoverNodeId = useStore((s) => s.setHoverNodeId);
   const setHoverCountry = useStore((s) => s.setHoverCountry);
+  const setHoverCohort = useStore((s) => s.setHoverCohort);
   const hoverCountry = useStore((s) => s.hoverCountry);
   const hoverNodeId = useStore((s) => s.hoverNodeId);
   const filter = useStore((s) => s.filter);
@@ -88,13 +89,14 @@ export default function GeoExplore() {
   }, [selNodes]);
 
   // COHORT ROWS (user redesign, option C): a country's nodes collapse into one row per
-  // city × provider × status × network — mirroring the 3D honeycomb stacks — so the list
+  // city × provider × network — mirroring the 3D honeycomb stacks — so the list
   // repeats nothing (the old rows re-stated the same city and "ready" dozens of times).
   // A cohort row is a DISCLOSURE: clicking expands its id rows inline (the pure pickers);
-  // everything aggregate already reads on the cohort row itself. Status shows BY EXCEPTION
-  // (ready = silent — the instrument convention); the NETWORK key keeps each cohort's
-  // identity dot one hue (a mixed cohort under "all" would break the identity rule).
-  type Cohort = { key: string; city: string | null; isp: string | null; state: string | null; hue: string; rows: NodeRow[] };
+  // everything aggregate already reads on the cohort row itself. NO status anywhere in the
+  // list (user: health belongs to the node CARD + the future network-health view); the
+  // NETWORK key keeps each cohort's identity dot one hue (a mixed cohort under "all" would
+  // break the identity rule).
+  type Cohort = { key: string; city: string | null; isp: string | null; hue: string; rows: NodeRow[] };
   const cohortsOf = (rows: NodeRow[]): Cohort[] => {
     const by = new Map<string, Cohort>();
     for (const r of rows) {
@@ -102,16 +104,14 @@ export default function GeoExplore() {
       const netId = r.pick.kind === "metanode" ? r.pick.meta?.id ?? null : "dag";
       const city = r.city || null;
       const isp = geo?.isp || null;
-      const state = r.state || null;
-      const key = `${city ?? ""}|${isp ?? ""}|${state ?? ""}|${netId ?? ""}`;
+      const key = `${city ?? ""}|${isp ?? ""}|${netId ?? ""}`;
       const hue = r.pick.kind === "metanode" && r.pick.meta ? identityHudHex(r.pick.meta.id) : CORE_HEX;
-      (by.get(key) ?? by.set(key, { key, city, isp, state, hue, rows: [] }).get(key)!).rows.push(r);
+      (by.get(key) ?? by.set(key, { key, city, isp, hue, rows: [] }).get(key)!).rows.push(r);
     }
     return [...by.values()].sort(
       (a, b) =>
         b.rows.length - a.rows.length ||
-        (a.city ?? "\uffff").localeCompare(b.city ?? "\uffff") ||
-        (a.state ?? "").localeCompare(b.state ?? ""),
+        (a.city ?? "\uffff").localeCompare(b.city ?? "\uffff"),
     );
   };
   // Which cohort is disclosed (single-open keeps the list calm); keys are country-scoped so a
@@ -239,7 +239,6 @@ export default function GeoExplore() {
                     ) : (
                       cohortsOf(nodes).map((c) => {
                         const isOpen = openCohort === c.key;
-                        const ready = (c.state ?? "").toLowerCase() === "ready";
                         const holdsSel =
                           selIp != null &&
                           c.rows.some(
@@ -259,9 +258,25 @@ export default function GeoExplore() {
                               )}
                               aria-expanded={isOpen}
                               title={`${c.city ?? "Unlocated"}${c.isp ? ` · ${c.isp}` : ""} · ${c.rows.length} node${c.rows.length > 1 ? "s" : ""}`}
-                              onClick={() => setOpenCohort(isOpen ? null : c.key)}
-                              // A cohort hover lights its country's border, like any node hover.
-                              onMouseEnter={() => setHoverCountry(c.rows[0] && "geo" in c.rows[0].pick ? c.rows[0].pick.geo?.cc ?? null : null)}
+                              // A single-node cohort has no further choice to make: clicking it
+                              // expands AND selects its one node in the same click (user).
+                              onClick={() => {
+                                setOpenCohort(isOpen ? null : c.key);
+                                if (c.rows.length === 1) {
+                                  const r = c.rows[0];
+                                  const on =
+                                    selIp != null && r.layer === selLayer &&
+                                    "node" in r.pick && r.pick.node?.ip === selIp;
+                                  selectNode(r.pick, on && isOpen);
+                                }
+                              }}
+                              // Hovering a cohort glows its WHOLE 3D stack (every member id) and
+                              // lights the country border, like any node hover.
+                              onMouseEnter={() => {
+                                setHoverCohort(c.rows.map((r) => hoverKeyOf(r.pick)).filter((k): k is string => !!k));
+                                setHoverCountry(c.rows[0] && "geo" in c.rows[0].pick ? c.rows[0].pick.geo?.cc ?? null : null);
+                              }}
+                              onMouseLeave={() => setHoverCohort(null)}
                             >
                               <IdentityDot hue={c.hue} />
                               <span className="flex-none text-body whitespace-nowrap">{c.city ?? "Unlocated"}</span>
@@ -270,8 +285,7 @@ export default function GeoExplore() {
                                   {c.isp}
                                 </span>
                               )}
-                              <span className="ml-auto flex-none tabular-nums text-body font-semibold">×{c.rows.length}</span>
-                              {!ready && <span className="flex-none"><StatusMark state={c.state ?? undefined} /></span>}
+                              <span className="ml-auto flex-none tabular-nums text-body font-semibold">{c.rows.length}</span>
                               {/* Collapsed + holding the selected node: surface the ✓ up here. */}
                               {holdsSel && !isOpen ? (
                                 <SelectedRowMark className="flex-none" />

@@ -553,11 +553,13 @@ and keep changing, so they're examples, not the contract.
   it drills the globe AND expands its **COHORT rows** — one row per city × provider × status ×
   network, mirroring the 3D honeycomb stacks (`Falkenstein · Hetzner ×28`), sorted by count;
   the old per-node rows repeated the same city/"ready" dozens of times (user: "a patch, not a
-  design"). Status shows BY EXCEPTION (ready = silent; joining/syncing chip); the NETWORK in
-  the cohort key keeps each identity dot one hue. A cohort is a DISCLOSURE (single-open
-  chevron): it expands inline to bare mono-id picker rows (the id is the only per-node fact
-  left — everything aggregate lives on the cohort row); a collapsed cohort holding the
-  selected node surfaces the ✓. User design 2026-07-11, option C of three mockups), ledger → `LedgerPanel` (WIP copy).
+  design"). NO status anywhere in the list (user: health belongs to the node card + the future
+  network-health view); the NETWORK in the cohort key keeps each identity dot one hue. A
+  cohort is a DISCLOSURE (single-open chevron) expanding to bare mono-id picker rows; a
+  SINGLE-node cohort click selects its node in the same click (no pointless second click); a
+  collapsed cohort holding the selected node surfaces the ✓. Hovering a cohort glows its WHOLE
+  3D stack (`store.hoverCohort` ids[] → `globe.setHoverCohort` → the fabric's hot check) and
+  lights the country border. Counts are bare numbers (no ×). User design 2026-07-11), ledger → `LedgerPanel` (WIP copy).
   Hyper and the placeholders have just the About card.
 - **Right rail** (`#rightcol`, `Inspector`) = the **facts** scope (read-only), a set of
   **FIXED card SLOTS** in one stable order — network dossier, node, snapshot, layer (user
@@ -577,7 +579,8 @@ and keep changing, so they're examples, not the contract.
 L0 / cL1 / dL1 node counts; one node taxonomy — a hybrid node counts in every layer it
 runs, the DAG's own L0/L1 fold into L0/cL1 like any metagraph; a filtered metagraph shows an
 em-dash for a layer it doesn't run). **geo** = the footprint (`Nodes` / `Countries` /
-`Ready`, integer odometers; Ready is exactly a % of Nodes, both over `store.selNodes`).
+`Providers` — distinct known ISPs over `store.selNodes`; replaced Ready %, user 2026-07-11:
+health belongs to the cards + the future network-health view).
 **ledger** = live activity (`Snaps/hr` / `Anchors/hr` with cyan trend sparklines from
 `store.activity`; a third slot is reserved "soon").
 

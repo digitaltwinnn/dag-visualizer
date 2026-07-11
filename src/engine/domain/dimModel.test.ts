@@ -16,6 +16,7 @@ const ctx = (overrides: Partial<DimContext> = {}): DimContext => ({
   countryFilter: null,
   countryMix: 0,
   hoverNodeId: null,
+  hoverCohort: null,
   selectedNodeId: null,
   filter: "all",
   ...overrides,

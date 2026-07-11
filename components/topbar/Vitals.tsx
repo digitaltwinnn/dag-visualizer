@@ -3,7 +3,6 @@
 import { Gauge } from "lucide-react";
 import { useStore } from "@/src/store/store";
 import { metagraphById } from "@/src/data/network";
-import { nodeStatus } from "@/src/data/nodeStatus";
 import Sparkline from "@/components/Sparkline";
 import Odometer from "@/components/Odometer";
 import { NoSignalDot } from "@/components/state/StateAtoms";
@@ -75,21 +74,25 @@ function HyperVitals() {
   );
 }
 
-// Geography vitals — the active selection's **footprint** (where): total nodes, how many countries
-// they span, and what share of them are healthy (Ready). Nodes + Ready share one source (the geo
-// node list) so "Ready" is exactly a percentage of the "Nodes" count.
+// Geography vitals — the active selection's **footprint** (where): total nodes, how many
+// countries they span, and how many distinct hosting PROVIDERS they sit on (replaced the Ready %
+// — user: health belongs to the cards + the future network-health view, not the footprint).
 function GeoVitals() {
   const lb = useStore((s) => s.leaderboard);
   const selNodes = useStore((s) => s.selNodes);
   const countries = lb?.countries ?? [];
   const total = selNodes.length;
-  const ready = selNodes.reduce((n, r) => n + (nodeStatus(r.state).bucket === "ready" ? 1 : 0), 0);
-  const readyPct = total ? Math.round((ready / total) * 100) : null;
+  // Distinct hosting providers across the selection (KNOWN isps only — an unknown host is
+  // absent data, not a provider). Replaced the Ready % (user, 2026-07-11): the footprint
+  // story is where the network RUNS — nodes, countries, hosts; health lives in the cards.
+  const providers = new Set(
+    selNodes.map((r) => ("geo" in r.pick ? r.pick.geo?.isp : undefined)).filter(Boolean),
+  ).size;
   return (
     <>
       <Vital label="Nodes" value={<Odometer int value={total || null} />} />
       <Vital label="Countries" value={<Odometer int value={countries.length || null} />} />
-      <Vital label="Ready" value={readyPct == null ? "—" : `${readyPct}%`} />
+      <Vital label="Providers" value={<Odometer int value={providers || null} />} />
     </>
   );
 }

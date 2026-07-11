@@ -116,6 +116,7 @@ export class Globe implements GeoViewHost {
   metaList: MetaLayout[] = [];
   filter = "all";
   private _hoverNodeId: string | null = null;
+  private _hoverCohort: Set<string> | null = null; // cohort-row hover — the whole stack glows
   private _selectedNodeId: string | null = null;
   private _hoverCountryCc: string | null = null; // explorer row hover — border preview only
 
@@ -166,7 +167,7 @@ export class Globe implements GeoViewHost {
     this._ctx = {
       c: {
         morph: 0, hoverFilterActive: false, ledger: false, countryFilter: null,
-        countryMix: 0, hoverNodeId: null, selectedNodeId: null, filter: "all",
+        countryMix: 0, hoverNodeId: null, hoverCohort: null, selectedNodeId: null, filter: "all",
       },
       dim: 0, dimScaleV: 0, clock: 0, camN: this._camN, hasCam: false,
       ledgerT: 0, dt: 0, flashDecay: 0, group: this.group,
@@ -465,6 +466,12 @@ export class Globe implements GeoViewHost {
     this._hoverNodeId = id || null;
   }
 
+  // Cohort-row hover (explorer): glow EVERY member of the cohort's 3D stack together.
+  // Event-driven allocation (one Set per hover change), never per frame.
+  setHoverCohort(ids: string[] | null): void {
+    this._hoverCohort = ids?.length ? new Set(ids) : null;
+  }
+
   // The persistently selected node (a clicked node card) — glows every layer shell it runs.
   setSelectedNode(id: string | null): void {
     this._selectedNodeId = id || null;
@@ -635,6 +642,7 @@ export class Globe implements GeoViewHost {
     c.countryFilter = null;
     c.countryMix = 0;
     c.hoverNodeId = this._hoverNodeId;
+    c.hoverCohort = this._hoverCohort;
     c.selectedNodeId = this._selectedNodeId;
     c.filter = this.filter;
     ctx.dim = this.dim;

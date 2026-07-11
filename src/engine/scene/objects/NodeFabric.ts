@@ -356,7 +356,7 @@ export class NodeFabric {
     const base = this.baseArr;
     const emi = this.emiArr;
     // A hovered/selected node dims the rest so it stands out — same in both views.
-    const focusId = c.hoverNodeId || c.selectedNodeId;
+    const focusId = c.hoverNodeId || c.selectedNodeId || c.hoverCohort;
     const dimOthersOnFocus = c.filter === "all" || c.filter === "dag";
     const focusDim = 0.45;
     for (const u of records) {
@@ -374,7 +374,7 @@ export class NodeFabric {
       // Hover/selection pairing: the focused machine's every layer-shell glows together, and the
       // rest dim back so it stands out (only when not already isolating a metagraph).
       if (focusId) {
-        if (u.nodeId === c.hoverNodeId || u.nodeId === c.selectedNodeId) emi[u.index] += 1.4;
+        if (u.nodeId === c.hoverNodeId || u.nodeId === c.selectedNodeId || (!!u.nodeId && c.hoverCohort?.has(u.nodeId))) emi[u.index] += 1.4;
         else if (dimOthersOnFocus) emi[u.index] *= focusDim;
       }
       if (flRaw) u._flash = flRaw * flashDecay;
@@ -408,7 +408,7 @@ export class NodeFabric {
     const emi = this.metaEmi;
     const base = this.metaBaseArr;
     const cf = c.countryFilter, cmix = c.countryMix;
-    const focusId = c.hoverNodeId || c.selectedNodeId;
+    const focusId = c.hoverNodeId || c.selectedNodeId || c.hoverCohort;
     const dimOthersOnFocus = c.filter === "all" || c.filter === "dag";
     const focusDim = 0.45;
     for (const r of records) {
@@ -424,7 +424,7 @@ export class NodeFabric {
       emi[r.index] = Math.max(0.03, glow + fl);
       // Hover/selection pairing: the focused node's shells glow together; the rest dim back.
       if (focusId) {
-        if (r.nodeId === c.hoverNodeId || r.nodeId === c.selectedNodeId) emi[r.index] += 1.4;
+        if (r.nodeId === c.hoverNodeId || r.nodeId === c.selectedNodeId || c.hoverCohort?.has(r.nodeId)) emi[r.index] += 1.4;
         else if (dimOthersOnFocus) emi[r.index] *= focusDim;
       }
       if (flRaw) r._flash = flRaw * flashDecay;

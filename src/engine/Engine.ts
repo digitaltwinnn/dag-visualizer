@@ -236,6 +236,8 @@ export class Engine {
         // Geo explorer country-row hover → preview that country's border outline (whisper level;
         // the committed drill's full hairline wins inside the Globe).
         if (st.hoverCountry !== prev.hoverCountry) this.globe.setHoverCountry(st.hoverCountry);
+        // Explorer cohort-row hover → glow the whole 3D stack (every member id together).
+        if (st.hoverCohort !== prev.hoverCohort) this.globe.setHoverCohort(st.hoverCohort);
         // Snapshots·Explore panel: the plane highlight = the transient hover PREVIEW, else the
         // COMMITTED layer selection (the layer card) — same resolve idiom as hoverFilter ?? filter.
         // Only a COMMITTED layer dims the other planes; a hover just brightens its own plane.
@@ -691,6 +693,7 @@ export class Engine {
     if (st.hoverSnapOrd != null) st.setHoverSnapOrd(null);
     if (st.hoverFilter != null) st.setHoverFilter(null);
     if (st.hoverCountry != null) st.setHoverCountry(null);
+    if (st.hoverCohort != null) st.setHoverCohort(null);
     if (st.ledgerHilite != null) st.setLedgerHilite(null);
     if (this._hoverKey != null || st.hover != null) {
       this._hoverKey = null;

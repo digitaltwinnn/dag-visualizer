@@ -28,6 +28,9 @@ export interface DimContext {
   countryFilter: string | null;
   countryMix: number;
   hoverNodeId: string | null;
+  // A hovered COHORT (explorer cohort row): every member id glows together — the whole 3D
+  // honeycomb stack lights from one list row. null = no cohort hover.
+  hoverCohort: ReadonlySet<string> | null;
   selectedNodeId: string | null;
   filter: string;
 }
