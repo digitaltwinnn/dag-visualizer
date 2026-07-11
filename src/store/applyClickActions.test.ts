@@ -48,6 +48,16 @@ describe("applyClickActions", () => {
     expect(st.following).toBe(true); // the live tip (re-)follows
   });
 
+  it("a snapshot CLEAR (pick null, follow omitted) leaves the follow state untouched", () => {
+    const st = useStore.getState();
+    st.setSnap(snapPick);
+    st.setFollowing(false);
+    applyClickActions([{ kind: "snapshot", pick: null }]);
+    const after = useStore.getState();
+    expect(after.snap).toBeNull();
+    expect(after.following).toBe(false); // untouched — FollowController owns the re-follow
+  });
+
   it("clears via null payloads (deselect / un-drill / layer off)", () => {
     const st = useStore.getState();
     st.setCountry("DE");

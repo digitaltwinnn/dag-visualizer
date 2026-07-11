@@ -1,6 +1,8 @@
 "use client";
 import { useMemo } from "react";
 import { useStore } from "@/src/store/store";
+import { filterToggleActions } from "@/src/engine/domain/pickActions";
+import { applyClickActions } from "@/src/store/applyClickActions";
 import { hex } from "@/src/util/format";
 import { cn } from "@/lib/utils";
 import { SELECTED_ROW, SelectedRowMark } from "@/components/selection";
@@ -20,7 +22,6 @@ import {
 // leaving the list clears the preview.
 export default function FilterPicker({ onPick }: { onPick?: () => void }) {
   const filter = useStore((s) => s.filter);
-  const setFilter = useStore((s) => s.setFilter);
   const setHoverFilter = useStore((s) => s.setHoverFilter);
   const metaList = useStore((s) => s.metaList);
 
@@ -37,7 +38,8 @@ export default function FilterPicker({ onPick }: { onPick?: () => void }) {
   // Re-picking the COMMITTED metagraph deselects back to "all" (user: the same toggle
   // language as the explorer's node/country rows — every selection un-selects in place).
   const pick = (id: string) => {
-    setFilter(id !== "all" && id === filter ? "all" : id);
+    // The committed-row step-back rule lives in the tested table (filterToggleActions).
+    applyClickActions(filterToggleActions(id, filter));
     onPick?.();
   };
 

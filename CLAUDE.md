@@ -214,10 +214,16 @@ store-value imports**, enforced by `layerBoundaries.test.ts`). Each ships coloca
   node-less hubs never, geo off-filter nodes never, hyper everything). Ordering contracts are
   tested invariants: filter-first (only when it CHANGES — no drill churn) → node's country →
   inspect-LAST (the node camera wins); deselect-before-drill on the country toggle; the LIVE
-  strip tip (re-)follows while older bars pin. The table self-gates by mode. Every caller
-  applies actions through the ONE executor **`src/store/applyClickActions.ts`** (tested —
-  action kind → exactly one store effect). New click/select semantics go HERE with a test,
-  and their effects in the executor — never inline in a component or the Engine. The ORDERING contracts are tested invariants: a node
+  strip tip (re-)follows while older bars pin; layer/filter toggles (`layerToggleActions`,
+  `filterToggleActions` — the picker's committed-row step-back-to-all). The table self-gates
+  by mode. Every caller applies actions through the ONE executor
+  **`src/store/applyClickActions.ts`** (tested — action kind → exactly one store effect; a
+  snapshot CLEAR leaves `following` to the FollowController). **ENFORCED by
+  `components/selectionBoundary.test.ts`** (house grep-test): no component may write a
+  selection setter directly — the rule is WRITE-based, so read-only facts cards cost nothing
+  and every future explorer card inherits the table; sole allowlisted exception:
+  `FollowController` (the follow SYSTEM, not a user pick). New click/select semantics go in
+  the table with a test, their effects in the executor — never inline anywhere. The ORDERING contracts are tested invariants: a node
   click sets filter FIRST (its subscription clears any old drill) → the node's country → inspect
   LAST (the node camera wins); the empty-click country toggle drops a selected node before
   moving the drill level. New click semantics go HERE with a test, not inline in the Engine.

@@ -9,6 +9,8 @@ import { SELECTED_ROW, SelectedRowMark } from "@/components/selection";
 import { subjectPairing } from "@/components/useSubjectPairing";
 import { filterAccent } from "@/src/data/network";
 import { useStore } from "@/src/store/store";
+import { layerToggleActions } from "@/src/engine/domain/pickActions";
+import { applyClickActions } from "@/src/store/applyClickActions";
 import { LEDGER_LAYERS } from "@/src/data/ledgerLayers";
 
 // The Snapshots view's left-rail tool: the layered-design explainer. Lists the settlement stack
@@ -27,14 +29,14 @@ export default function LedgerPanel() {
   // by the card's × too); hover writes the transient preview channel, leave clears it (the engine
   // falls back to the committed layer).
   const sel = useStore((s) => s.layer?.layerId ?? null);
-  const setLayer = useStore((s) => s.setLayer);
   const hilite = useStore((s) => s.ledgerHilite);
   const setHilite = useStore((s) => s.setLedgerHilite);
   const filter = useStore((s) => s.filter);
 
-  const commit = (l: (typeof LAYERS)[number]) => {
-    setLayer(sel === l.id ? null : { kind: "layer", layerId: l.id });
-  };
+  // Rows run the SAME tested toggle as the scene's floor-plane click, through the shared
+  // executor — the panel and the 3D planes can't drift (see domain/pickActions).
+  const commit = (l: (typeof LAYERS)[number]) =>
+    applyClickActions(layerToggleActions({ kind: "layer", layerId: l.id }, sel));
   return (
     // flex-none + no inner overflow (same treatment as GeoExplore, user: consistent rail
     // behaviour): the card grows with its content and the RAIL scrolls/fades into the chart

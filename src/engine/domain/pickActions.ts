@@ -16,8 +16,10 @@ export type ClickAction =
   | { kind: "filter"; id: string }                                             // commit the network filter
   | { kind: "country"; cc: string | null }                                     // commit/clear the country drill
   | { kind: "inspect"; pick: PickDescriptor | null }                           // open/clear the node card
-  | { kind: "snapshot"; pick: Extract<PickDescriptor, { kind: "snapshot" }>; follow: boolean } // select a snapshot
-  | { kind: "layer"; pick: Extract<PickDescriptor, { kind: "layer" }> | null }; // toggle the layer card
+  // Select a snapshot (follow decides pin vs heartbeat) — or CLEAR it (pick null, follow
+  // omitted: the follow state is untouched; FollowController owns the re-follow).
+  | { kind: "snapshot"; pick: Extract<PickDescriptor, { kind: "snapshot" }> | null; follow?: boolean }
+  | { kind: "layer"; pick: Extract<PickDescriptor, { kind: "layer" }> | null }; // commit/clear the layer card
 
 // The network a node pick belongs to: its metagraph, or the DAG core for a validator.
 export const pickNetId = (p: PickDescriptor): string | null =>
@@ -77,6 +79,22 @@ export function nodeSelectActions(
   return acts;
 }
 
+// The layer TOGGLE — shared by the scene's floor-plane click and LedgerPanel's rows: commit
+// the clicked layer, or clear when it's already the committed one.
+export function layerToggleActions(
+  p: Extract<PickDescriptor, { kind: "layer" }>,
+  currentLayerId: string | null,
+): ClickAction[] {
+  return [{ kind: "layer", pick: currentLayerId === p.layerId ? null : p }];
+}
+
+// The network-filter TOGGLE — the FilterPicker's committed-row rule: picking the committed
+// metagraph again steps back to "all" (one toggle language everywhere); "all" itself never
+// toggles off.
+export function filterToggleActions(id: string, currentFilter: string): ClickAction[] {
+  return [{ kind: "filter", id: id !== "all" && id === currentFilter ? "all" : id }];
+}
+
 // Selecting a SNAPSHOT — shared by the ledger's tile click and LiveStrip's bar click:
 // clicking the LIVE tip (re-)follows the heartbeat; anything older pins that snapshot
 // (the FollowController only auto-advances while following).
@@ -110,8 +128,7 @@ export function clickActions(input: {
   if (p.kind === "snapshot") return snapshotSelectActions(p, false);
 
   // A floor PLANE click = the explore panel's row click: toggle the committed layer.
-  if (p.kind === "layer")
-    return [{ kind: "layer", pick: current.layerId === p.layerId ? null : p }];
+  if (p.kind === "layer") return layerToggleActions(p, current.layerId);
 
   // A node, in any view. (No autoRotate action: geo disables the controls' rotation at mode
   // entry and the inspect subscription re-asserts it on the node flight.)

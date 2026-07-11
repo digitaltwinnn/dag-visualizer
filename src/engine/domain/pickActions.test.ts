@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { clickActions, countryToggleActions, nodeSelectActions, snapshotSelectActions, pickActive, pickNetId, type ClickAction } from "./pickActions";
+import { clickActions, countryToggleActions, filterToggleActions, layerToggleActions, nodeSelectActions, snapshotSelectActions, pickActive, pickNetId, type ClickAction } from "./pickActions";
 import type { PickDescriptor } from "@/src/data/types";
 
 // Minimal pick fixtures — only the fields the table reads.
@@ -10,7 +10,8 @@ const validatorPick = (): PickDescriptor =>
 const hubPick = (): PickDescriptor => ({ kind: "meta", cfg: { id: "dor" } }) as unknown as PickDescriptor;
 type SnapPick = Extract<PickDescriptor, { kind: "snapshot" }>;
 const snapPick = (): SnapPick => ({ kind: "snapshot", data: { ordinal: 42 } }) as unknown as SnapPick;
-const layerPick = (id = "ml0"): PickDescriptor => ({ kind: "layer", layerId: id }) as unknown as PickDescriptor;
+type LayerPick = Extract<PickDescriptor, { kind: "layer" }>;
+const layerPick = (id = "ml0"): LayerPick => ({ kind: "layer", layerId: id }) as unknown as LayerPick;
 
 const state = (
   over: Partial<{ filter: string; country: string | null; hasInspect: boolean; layerId: string | null }> = {},
@@ -195,5 +196,22 @@ describe("the shared component builders (GeoExplore rows + LiveStrip bars run th
     const p = snapPick();
     expect(snapshotSelectActions(p, true)).toEqual([{ kind: "snapshot", pick: p, follow: true }]);
     expect(snapshotSelectActions(p, false)).toEqual([{ kind: "snapshot", pick: p, follow: false }]);
+  });
+});
+
+describe("layerToggleActions / filterToggleActions (the remaining rail interactions)", () => {
+  it("layer rows == the scene's floor-plane toggle (commit, switch, clear)", () => {
+    const p = layerPick("ml0");
+    expect(layerToggleActions(p, null)).toEqual([{ kind: "layer", pick: p }]);
+    expect(layerToggleActions(p, "msnap")).toEqual([{ kind: "layer", pick: p }]);
+    expect(layerToggleActions(p, "ml0")).toEqual([{ kind: "layer", pick: null }]);
+    // identical to the scene click through clickActions
+    expect(clickActions({ mode: "ledger", pick: p, countryCc: null, current: state({ layerId: "ml0" }) }))
+      .toEqual(layerToggleActions(p, "ml0"));
+  });
+  it("the filter picker's committed-row rule: re-picking steps back to 'all'; 'all' never toggles", () => {
+    expect(filterToggleActions("dor", "all")).toEqual([{ kind: "filter", id: "dor" }]);
+    expect(filterToggleActions("dor", "dor")).toEqual([{ kind: "filter", id: "all" }]);
+    expect(filterToggleActions("all", "all")).toEqual([{ kind: "filter", id: "all" }]);
   });
 });

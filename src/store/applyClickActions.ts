@@ -20,9 +20,10 @@ export function applyClickActions(actions: ClickAction[]): void {
         st.setInspect(a.pick);
         break;
       case "snapshot":
-        // Selecting a snapshot both sets the card subject and the follow state (the live tip
-        // re-follows the heartbeat; anything older pins — see snapshotSelectActions).
-        st.setFollowing(a.follow);
+        // Selecting a snapshot sets the card subject AND the follow state (live tip
+        // re-follows, older pins — snapshotSelectActions); a CLEAR (pick null, follow
+        // omitted) leaves following to the FollowController.
+        if (a.follow !== undefined) st.setFollowing(a.follow);
         st.setSnap(a.pick);
         break;
       case "layer":
