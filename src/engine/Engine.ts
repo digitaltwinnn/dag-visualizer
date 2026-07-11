@@ -612,10 +612,11 @@ export class Engine {
     // same residual elevation (the 0.42 raise → node ≈ (0, 6.9, 15.5)) — the oblique angle is
     // latitude-independent. The camera sits well ABOVE the node ("elevate quite a bit more",
     // user round 2), looking down at it with the surface falling away toward the horizon; the
-    // target keeps the node just above frame-centre (y 4.6 — "middle of this and what I had
-    // before", user round 3). Dolly-exempt: the composed target made
+    // target puts the node at the LOWER THIRD (axis aimed ~9° above it — rule-of-thirds,
+    // user; camera y 4.6 = "middle of this and what I had before"). Dolly-exempt: the
+    // composed target made
     // CAM_ZOOM drag the camera diagonally away from the node (zoom-OUT, user).
-    this._tweenTo(new THREE.Vector3(0, 4.6, 19.2), new THREE.Vector3(0, 13, 2), false);
+    this._tweenTo(new THREE.Vector3(0, 4.6, 19.2), new THREE.Vector3(0, 19.5, 2), false);
   }
 
   // Compute the per-country leaderboard for the active filter and push it to the store
