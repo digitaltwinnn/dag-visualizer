@@ -545,7 +545,11 @@ and keep changing, so they're examples, not the contract.
   clusters render stacked in one grid cell (inactive ones `invisible` + `aria-hidden`) so the
   centered view switch never jumps on a view change; sparklines condense away ≤1240px.
   Below 1100px a slim **selected-view caption** hangs under the bar, right-anchored. The
-  command bar is **spineless** (absolute rule — the ECG mark is its identity cue).
+  command bar is **spineless** (absolute rule — the ECG mark is its identity cue). With a
+  network COMMITTED, the active vitals cluster wears a 1px soft-tipped **filter-scope
+  hairline** in the filter's identity hue at rest-dim (user, 2026-07-11: the numbers silently
+  switched to filtered values with nothing marking the scope) — the thread language, not a
+  spine; "all" renders nothing (defaults carry no mark), numbers/sparklines stay untinted.
 - **Left rail** (`#leftcol`, `ExploreRail`) = the **explore / interact** scope: every view
   leads with a collapsed **`AboutView`** orientation card (per-view title + eyebrow + copy;
   scaffolded views carry a `SOON` caption), above the view's ONE tool card if it has one —

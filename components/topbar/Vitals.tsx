@@ -2,7 +2,7 @@
 
 import { Gauge } from "lucide-react";
 import { useStore } from "@/src/store/store";
-import { metagraphById } from "@/src/data/network";
+import { metagraphById, filterAccent } from "@/src/data/network";
 import Sparkline from "@/components/Sparkline";
 import Odometer from "@/components/Odometer";
 import { NoSignalDot } from "@/components/state/StateAtoms";
@@ -126,6 +126,13 @@ function LedgerVitals() {
 function VitalsCluster({ align = "end" }: { align?: "end" | "center" } = {}) {
   const mode = useStore((s) => s.mode);
   const live = useStore((s) => s.live);
+  // FILTER-SCOPE hairline (user, 2026-07-11): with a network committed, the vitals silently
+  // showed FILTERED numbers with nothing marking the scope. The active cluster wears a 1px
+  // soft-tipped identity hairline under it — the "thread = resting identity cue" language
+  // (numbers/sparklines stay untinted; identity only on the mark). "all" renders nothing:
+  // global is the default state, defaults carry no mark.
+  const filter = useStore((s) => s.filter);
+  const scopeHue = filter !== "all" ? filterAccent(filter) : null;
   const gaps = "gap-3.5 max-[1260px]:gap-3 max-[1120px]:gap-2.5 max-[940px]:gap-2.5 max-[820px]:gap-2";
   const clusters: [string, React.ReactNode][] = [
     ["hyper", <HyperVitals key="hyper" />],
@@ -141,13 +148,21 @@ function VitalsCluster({ align = "end" }: { align?: "end" | "center" } = {}) {
             key={m}
             aria-hidden={mode !== m || undefined}
             className={cn(
-              "col-start-1 row-start-1 flex items-center",
+              "relative col-start-1 row-start-1 flex items-center",
               align === "center" ? "justify-center" : "justify-end",
               gaps,
               mode !== m && "invisible",
             )}
           >
             {body}
+            {scopeHue && mode === m && (
+              <span
+                aria-hidden
+                className="absolute -bottom-[5px] left-0 right-0 h-px opacity-60 transition-opacity duration-300 motion-reduce:transition-none"
+                // The shared soft-tipped hairline recipe (transparent → hue → transparent).
+                style={{ background: `linear-gradient(90deg, transparent, ${scopeHue}, transparent)` }}
+              />
+            )}
           </div>
         ))}
       </div>
