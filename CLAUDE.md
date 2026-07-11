@@ -204,6 +204,12 @@ store-value imports**, enforced by `layerBoundaries.test.ts`). Each ships coloca
   group transform), `HYP_SPLIT` (the hypergraph level's 2/3+1/3 cut), `LAYER_GEOM` (layer id →
   height/lane-centre; ids shared with the UI copy table `src/data/ledgerLayers.ts` and the scene's
   `layer` picks), `ledgerSite`, `clusterRadius`, `ledgerSpread`.
+- `pickActions.ts` — the scene CLICK DECISION TABLE: what a click means per view × pick kind
+  (`clickActions` → ordered `ClickAction[]`; `pickNetId`), as pure data-in/actions-out logic the
+  Engine's `_handleClick` merely executes. The ORDERING contracts are tested invariants: a node
+  click sets filter FIRST (its subscription clears any old drill) → the node's country → inspect
+  LAST (the node camera wins); the empty-click country toggle drops a selected node before
+  moving the drill level. New click semantics go HERE with a test, not inline in the Engine.
 - `cameraRig.ts` — the ONE camera home: `FOCI` presets, every framing function (`hubFraming`,
   `nodeFraming` (geo node — ABSOLUTE/dolly-exempt, solved against `NODE_RAISE`, the residual
   Globe.focusNode leans every node to — a documented cross-layer CONTRACT), `hyperNodeFraming`,

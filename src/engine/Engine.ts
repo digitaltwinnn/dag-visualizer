@@ -16,6 +16,7 @@ import { VIEW_POLICIES } from "./domain/viewPolicy";
 import { FOCI, hubFraming, geoFraming, ledgerLayerFraming, nodeFraming, hyperNodeFraming, dollyBack, easeInOutQuad, type CameraFraming } from "./domain/cameraRig";
 import { countryFraming } from "./domain/countryShape";
 import { R as GEO_R, LAND_H } from "./domain/geoLayout";
+import { clickActions } from "./domain/pickActions";
 import type { GlobalSnapshot, PickDescriptor } from "@/src/data/types";
 import type { ClusterNode, DagCore, GeoMap, RouteMetagraph } from "@/src/data/types";
 
@@ -680,12 +681,6 @@ export class Engine {
 
   // The network (filter id) a node pick belongs to: its metagraph, or the DAG core for a
   // validator. Clicking a node sets the global filter to this, consistently in every view.
-  private _pickNetId(p: PickDescriptor): string | null {
-    if (p.kind === "metanode") return p.meta?.id ?? null;
-    if (p.kind === "l0" || p.kind === "l1") return "dag";
-    return null;
-  }
-
   // Whether a pick participates in hover/click. In GEO the off-filter / off-country nodes are
   // genuinely hidden, so they're not pickable. In HYPER every node stays interactive — the
   // off-focus ones are only *dimmed*, not hidden, so clicking one (e.g. a core validator while
@@ -773,62 +768,32 @@ export class Engine {
     // A click that ends a drag (orbit/pan) is navigation, not selection — see onDown.
     if (Math.hypot(e.clientX - this._downX, e.clientY - this._downY) > 5) return;
     const p = this._pickAt(e);
-    if (!p) {
-      // No object under the cursor: in geo, a click on a drillable COUNTRY toggles its drill —
-      // the scene twin of the explorer row (the hover border already invited it). Same
-      // semantics as GeoExplore.drill: entering/leaving a country level drops a selected node.
-      if (VIEW_POLICIES[this.mode].countryHover && this.morph > 0.9) {
-        const hit = this.raycaster.ray.intersectSphere(this._landSphere, this._landHit);
-        const cc = hit ? this.globe.countryCcAtPoint(hit) : null;
-        if (cc) {
-          const st = useStore.getState();
-          if (st.inspect) st.setInspect(null);
-          st.setCountry(st.country === cc ? null : cc);
-        }
+    // With nothing picked, resolve the drillable country under the cursor (geo only — the
+    // land-sphere hit is analytic; the Globe resolves WHICH country in its rotated frame).
+    let countryCc: string | null = null;
+    if (!p && VIEW_POLICIES[this.mode].countryHover && this.morph > 0.9) {
+      const hit = this.raycaster.ray.intersectSphere(this._landSphere, this._landHit);
+      countryCc = hit ? this.globe.countryCcAtPoint(hit) : null;
+    }
+    // The SEMANTICS live in the pure, tested decision table (domain/pickActions) — what a
+    // click means per view × pick kind, including the ordering contracts. This handler only
+    // resolves inputs above and executes the actions below.
+    const st = useStore.getState();
+    const actions = clickActions({
+      mode: this.mode,
+      pick: p,
+      countryCc,
+      current: { country: st.country, hasInspect: !!st.inspect, layerId: st.layer?.layerId ?? null },
+    });
+    for (const a of actions) {
+      switch (a.kind) {
+        case "filter": st.setFilter(a.id); break;
+        case "country": st.setCountry(a.cc); break;
+        case "inspect": st.setInspect(a.pick); break;
+        case "snapshot": st.setFollowing(false); st.setSnap(a.pick); break;
+        case "layer": st.setLayer(a.pick); break;
+        case "stopAutoRotate": this.ctx.controls.autoRotate = false; break;
       }
-      return;
-    }
-    // A hub click selects the metagraph (opens its context pane + frames it).
-    if (p.kind === "meta") {
-      useStore.getState().setFilter(p.cfg.id);
-      return;
-    }
-    // The ledger's centred snapshot tile selects that snapshot (opens the snapshot card) and pins
-    // it (the FollowController only auto-follows the live tip when nothing is selected).
-    if (p.kind === "snapshot") {
-      useStore.getState().setFollowing(false);
-      useStore.getState().setSnap(p);
-      return;
-    }
-    // A floor PLANE click = the explore panel's row click: toggle the committed layer selection
-    // (opens/clears the layer card; the layer-focus camera rides the store change).
-    if (p.kind === "layer") {
-      const st = useStore.getState();
-      st.setLayer(st.layer?.layerId === p.layerId ? null : p);
-      return;
-    }
-    // Clicking a node, in any view: drill the global filter into the node's network (its
-    // metagraph, or the DAG core for a validator) and open its node card. Filter first, so the
-    // node-focus camera move (set by the inspect) wins over the network framing.
-    if (p.kind === "l0" || p.kind === "l1" || p.kind === "metanode") {
-      const netId = this._pickNetId(p);
-      // Ledger: open the node card + light its lane (filter), but SKIP the camera move — the planar
-      // settlement diagram must stay put. The card itself doesn't touch the 3D layout, so a node
-      // click here behaves like every other view (card + filter), just without the focus tween.
-      if (this.mode === "ledger") {
-        if (netId) useStore.getState().setFilter(netId);
-        useStore.getState().setInspect(p);
-        return;
-      }
-      if (this.mode === "geo") this.ctx.controls.autoRotate = false;
-      if (netId) useStore.getState().setFilter(netId);
-      // Selecting a node in the SCENE also selects its country (user): the drill commits
-      // (border, firmer land, expanded explorer row) beneath the node selection — the node
-      // zoom still wins the camera because inspect is set LAST. Geo-only: the drill is a geo
-      // concept. (Explorer rows already behave this way — their country accordion IS the
-      // drill.) Order matters: setFilter's subscription clears any old drill first.
-      if (this.mode === "geo" && "geo" in p && p.geo?.cc) useStore.getState().setCountry(p.geo.cc);
-      useStore.getState().setInspect(p);
     }
   }
 
