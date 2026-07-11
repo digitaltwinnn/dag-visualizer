@@ -50,7 +50,8 @@ export interface GeoViewHost {
   // geometry) — the country drill's border + shape-based framing read these. Async (set once
   // the topology loads); `onCountriesReady` lets the owner re-assert a drill made before then.
   countryGeoms?: Map<string, { type: string; coordinates: unknown }>;
-  countryBorder?: { mesh: THREE.LineSegments; fade: GeoFadeEntry };
+  countryBorder?: { mesh: THREE.LineSegments; fade: GeoFadeEntry };      // the committed drill
+  hoverCountryBorder?: { mesh: THREE.LineSegments; fade: GeoFadeEntry }; // the hover preview (may coexist)
   onCountriesReady?: () => void;
 }
 
@@ -453,24 +454,29 @@ async function buildLand(globe: GeoViewHost) {
     globe.landFillMesh.visible = false;  // revealed once the globe materialises (setMorph)
     globe.group.add(globe.landFillMesh);
 
-    // COUNTRY DRILL BORDER — one LineSegments, rebuilt per drill/hover change (event-driven;
-    // see setCountryBorder). Invisible at rest (the user's call: the surface stays clean — the
-    // border exists only while a country is hovered/drilled). Structural accent, additive like
-    // the coastal walls so the hairline glows over the land glass; the geoFades entry gives it
-    // the surface's morph gating for free (its `base` IS the hover/commit level).
-    const borderMat = new THREE.LineBasicMaterial({
-      color: globe.geoColor,
-      transparent: true,
-      opacity: 0,
-      blending: THREE.AdditiveBlending,
-      depthWrite: false,
-    });
-    const borderMesh = new THREE.LineSegments(new THREE.BufferGeometry(), borderMat);
-    borderMesh.visible = false;
-    const borderFade = { mat: borderMat, base: 0 };
-    globe.geoFades.push(borderFade);
-    globe.countryBorder = { mesh: borderMesh, fade: borderFade };
-    globe.group.add(borderMesh);
+    // COUNTRY BORDERS — TWO LineSegments, rebuilt per drill/hover change (event-driven; see
+    // setCountryBorder): one for the COMMITTED drill, one for the HOVER preview, so hovering
+    // another country still previews while a drill is lit (user — the single shared border made
+    // committed-wins eat the preview). Invisible at rest (the surface stays clean). Structural
+    // accent, additive like the coastal walls so the hairline glows over the land glass; the
+    // geoFades entries give them the surface's morph gating for free (`base` IS the level).
+    const makeBorder = () => {
+      const mat = new THREE.LineBasicMaterial({
+        color: globe.geoColor,
+        transparent: true,
+        opacity: 0,
+        blending: THREE.AdditiveBlending,
+        depthWrite: false,
+      });
+      const mesh = new THREE.LineSegments(new THREE.BufferGeometry(), mat);
+      mesh.visible = false;
+      const fade = { mat, base: 0 };
+      globe.geoFades.push(fade);
+      globe.group.add(mesh);
+      return { mesh, fade };
+    };
+    globe.countryBorder = makeBorder();
+    globe.hoverCountryBorder = makeBorder();
 
     // Per-country geometry index for the border + framing (world-atlas numeric id → geometry).
     const countries = feature(topo, topo.objects.countries) as unknown as {
@@ -485,10 +491,16 @@ async function buildLand(globe: GeoViewHost) {
   }
 }
 
-// Show the drill border for `rings` at `level` opacity (0 hides it). The geometry rebuild is
-// event-driven — once per country hover/drill change, never per frame.
-export function setCountryBorder(globe: GeoViewHost, rings: Ring[] | null, level: number): void {
-  const b = globe.countryBorder;
+// Show a country border (`which`: the committed drill or the hover preview) for `rings` at
+// `level` opacity (0 hides it). The geometry rebuild is event-driven — once per country
+// hover/drill change, never per frame.
+export function setCountryBorder(
+  globe: GeoViewHost,
+  which: "drill" | "hover",
+  rings: Ring[] | null,
+  level: number,
+): void {
+  const b = which === "drill" ? globe.countryBorder : globe.hoverCountryBorder;
   if (!b) return; // topology not loaded yet — onCountriesReady re-asserts
   if (!rings?.length || level <= 0) {
     b.fade.base = 0;

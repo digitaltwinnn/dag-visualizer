@@ -609,13 +609,13 @@ export class Engine {
   // with the horizon + sky filling the upper frame.
   private _focusNode() {
     // Pose iterated live with the user. focusNode's uncapped lean parks EVERY node at the
-    // same residual elevation (the 0.42 raise → node ≈ (0, 6.9, 15.5)) — the oblique
-    // surface-skimming angle the user approved on Helsinki, now latitude-independent. The
-    // camera sits slightly above the equator plane (y 1.2 — "a bit higher, not too much") and
-    // closer than the first tuning; the steep composed look-at (y 32) keeps the surface
-    // rising toward the horizon with the node just below centre. Dolly-exempt: the composed
-    // target made CAM_ZOOM drag the camera diagonally away from the node (zoom-OUT, user).
-    this._tweenTo(new THREE.Vector3(0, 1.2, 18.8), new THREE.Vector3(0, 32, 2), false);
+    // same residual elevation (the 0.42 raise → node ≈ (0, 6.9, 15.5)) — the oblique angle is
+    // latitude-independent. The camera sits well ABOVE the node ("elevate quite a bit more",
+    // user round 2), looking down at it with the surface falling away toward the horizon; the
+    // target keeps the node just above frame-centre (y 4.6 — "middle of this and what I had
+    // before", user round 3). Dolly-exempt: the composed target made
+    // CAM_ZOOM drag the camera diagonally away from the node (zoom-OUT, user).
+    this._tweenTo(new THREE.Vector3(0, 4.6, 19.2), new THREE.Vector3(0, 13, 2), false);
   }
 
   // Compute the per-country leaderboard for the active filter and push it to the store
@@ -707,7 +707,8 @@ export class Engine {
     else if (p.kind === "metanode") id = p.meta?.id;
     else return true;
     if (!(this.filter === "all" || this.filter === id)) return false;
-    if (this.country && p.geo?.cc !== this.country) return false;
+    // No country clause: the drill is a lens, not a filter (user 2026-07-11) — out-of-country
+    // nodes stay visible and therefore stay pickable.
     return true;
   }
 

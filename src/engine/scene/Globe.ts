@@ -94,8 +94,7 @@ export class Globe implements GeoViewHost {
   // the old `!this.ledger` gate on the travelling packets; globeSpin gates the idle group spin.
   private simArcs = true;
   private simSpin = true;
-  countryFilter: string | null = null; // cc to drill into (combined with the network filter), or null
-  private countryMix = 0;              // eased 0..1: how strongly the country dim is applied
+  countryFilter: string | null = null; // the drilled country (a LENS: border/framing only, no node filter)
   l0Count = 0;
   l1Count = 0;
   // The geo hologram is the accent (colors.core = --primary); the whole globe is one hue and stays
@@ -133,7 +132,8 @@ export class Globe implements GeoViewHost {
   closeUniform?: GeoViewHost["closeUniform"];   // shared closeness uniform (wall sharpening + far-side damp)
   poleRoses?: GeoViewHost["poleRoses"];         // the polar compass roses (faded per frame here)
   countryGeoms?: GeoViewHost["countryGeoms"];   // per-country geometries (drill border + framing)
-  countryBorder?: GeoViewHost["countryBorder"]; // the drill border LineSegments + its fade entry
+  countryBorder?: GeoViewHost["countryBorder"];           // the committed drill's border
+  hoverCountryBorder?: GeoViewHost["hoverCountryBorder"]; // the hover preview's border
   onCountriesReady?: GeoViewHost["onCountriesReady"];
 
   private fabric: NodeFabric;
@@ -371,10 +371,11 @@ export class Globe implements GeoViewHost {
     for (const r of this.metaNodes) r.dimTarget = (sel === "all" || sel === r.metaId) ? 0 : 1;
   }
 
-  // Narrow the current network selection to a single country (cc), or null to clear.
+  // Drill into a single country (cc), or null to clear. The drill is a LENS, not a filter
+  // (user, 2026-07-11): it frames the country, draws its border and firms the land — the
+  // OTHER nodes stay visible, pickable and fanned exactly as before, so no relayout here.
   setCountry(cc: string | null): void {
     this.countryFilter = cc || null;
-    this._relayoutGeo();
     this._updateCountryBorder();
   }
 
@@ -415,16 +416,17 @@ export class Globe implements GeoViewHost {
     };
   }
 
-  // Border = committed drill (full-strength hairline — brighter than the first tuning, user)
-  // beats hover preview (whisper); nothing at rest. A committed drill also firms up the land
-  // glass (user: "reduce the transparency a bit" while a country is selected) — the land fill's
-  // resting additive base lifts while drilled; the geoFades loop applies it next frame.
+  // Two borders: the committed drill at full strength AND the hover preview at a whisper —
+  // both may show at once (user: hovering another country must still preview while a drill
+  // is lit). A committed drill also firms up the land glass (user: less transparent while a
+  // country is selected).
   private _updateCountryBorder(): void {
-    const cc = this.countryFilter ?? this._hoverCountryCc;
-    const level = this.countryFilter ? 1.0 : 0.3;
-    setCountryBorder(this, cc ? this.countryRings(cc) : null, cc ? level : 0);
+    const drillCc = this.countryFilter;
+    setCountryBorder(this, "drill", drillCc ? this.countryRings(drillCc) : null, drillCc ? 1.0 : 0);
+    const hoverCc = this._hoverCountryCc && this._hoverCountryCc !== drillCc ? this._hoverCountryCc : null;
+    setCountryBorder(this, "hover", hoverCc ? this.countryRings(hoverCc) : null, hoverCc ? 0.3 : 0);
     const landFade = this.landFillMat && this.geoFades.find((f) => f.mat === this.landFillMat);
-    if (landFade) landFade.base = this.countryFilter ? 0.62 : 0.45;
+    if (landFade) landFade.base = drillCc ? 0.62 : 0.45;
   }
 
   // Resolve a globe-surface WORLD point to the country under it — only countries that
@@ -490,10 +492,11 @@ export class Globe implements GeoViewHost {
     return this.filter === "all" || this.filter === id;
   }
 
-  // Whether a node passes BOTH the network filter and the country drill-down.
-  private _nodeActive(layerOrMetaId: string, geo: GeoInfo | undefined | null): boolean {
-    return this._isActive(layerOrMetaId) &&
-      (!this.countryFilter || (!!geo && geo.cc === this.countryFilter));
+  // Whether a node passes the network filter. The country drill deliberately does NOT
+  // narrow this (user, 2026-07-11: the drill is a lens — border + framing — not a filter;
+  // the old dim/hide of out-of-country nodes is gone). `_geo` stays for the call sites' shape.
+  private _nodeActive(layerOrMetaId: string, _geo: GeoInfo | undefined | null): boolean {
+    return this._isActive(layerOrMetaId);
   }
 
   // Aim the globe so a unit direction `dir` swings to the front (see js/globe.js:730-737).
@@ -627,8 +630,10 @@ export class Globe implements GeoViewHost {
     c.morph = this.morph;
     c.hoverFilterActive = this._hoverFilterActive;
     c.ledger = this.ledger;
-    c.countryFilter = this.countryFilter;
-    c.countryMix = this.countryMix;
+    // The drill never dims/hides nodes (lens-not-filter, user 2026-07-11) — the fabric's
+    // country-dim clauses stay dormant; countryFilter lives on `this` for border/framing.
+    c.countryFilter = null;
+    c.countryMix = 0;
     c.hoverNodeId = this._hoverNodeId;
     c.selectedNodeId = this._selectedNodeId;
     c.filter = this.filter;
@@ -722,11 +727,10 @@ export class Globe implements GeoViewHost {
     const { retargeted } = this.arcSim.step(dt, arcEnabled);
     if (arcEnabled && this.arcs.hasArcs) this.arcs.writeFrame(this.arcSim, retargeted);
 
-    // Ease the per-layer dim levels + the country mix, then hand a fresh FrameCtx to the fabric.
+    // Ease the per-layer dim levels, then hand a fresh FrameCtx to the fabric.
     if (this.fabric.hasValidators) {
       const k = Math.min(1, dt * 4);
       this.dim += (this.dimTarget - this.dim) * k;
-      this.countryMix += ((this.countryFilter ? 1 : 0) - this.countryMix) * k;
     }
     const ctx = this._frameCtx(dt, flashDecay);
     if (this.fabric.hasValidators) this.fabric.writeValidatorGlow(this.nodes, ctx);

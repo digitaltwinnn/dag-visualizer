@@ -361,12 +361,13 @@ views and caused the ledger red-dots bug; that pattern is forbidden.
     the old 0.70 tilt cap, user; `_focusNode`'s camera/target are solved for that one pose and
     are CAM_ZOOM dolly-EXEMPT — the composed far-up look-at made the global dolly drag the
     camera away from the node).
-  - **Country drill-down** (geo only): the country rows in `GeoExplore` are clickable and
-    combine with the network filter (`globe.countryFilter` + eased `countryMix`;
-    `_nodeActive(layer, geo)` gates on BOTH). Clicking a country dims everything outside it,
-    flies to it, and marks the row with the shared selection ✓ (`SELECTED_ROW` +
-    `SelectedRowMark`, same language as the node rows); click again to clear; switching
-    network clears it. **The drill is shape-driven** (2026-07-10, `domain/countryShape.ts` over
+  - **Country drill-down** (geo only): the country rows in `GeoExplore` are clickable.
+    **The drill is a LENS, not a filter** (user, 2026-07-11 — reversed the original
+    dim-everything-outside design): it flies to the country, draws its border, firms the land
+    glass and marks the row with the shared selection ✓ (`SELECTED_ROW` + `SelectedRowMark`),
+    but the OTHER nodes stay fully visible, pickable and fanned (`_nodeActive` ignores
+    `countryFilter`; the `countryMix` dim machinery is dormant — the FrameCtx always gets
+    `countryFilter: null`). Click again to clear; switching network clears it. **The drill is shape-driven** (2026-07-10, `domain/countryShape.ts` over
     `public/countries-110m.json`): the globe spins to the country's polygon **centroid** (gentle
     `GLOBE_LEAN_MAX` lean — a FULL lean read as the camera going over the country) and
     `countryFraming()` builds a **constant-angle pose**: the camera approaches from IN FRONT
@@ -380,8 +381,9 @@ views and caused the ledger red-dots bug; that pattern is forbidden.
     mainland leads, the node-mean framing is the fallback while the topology loads). A **cyan
     hairline border** (structural, not identity) outlines the drilled country at plateau height
     — invisible at rest (the surface stays clean), whisper-level (0.3) while a country ROW is
-    hovered (`store.hoverCountry` → `globe.setHoverCountry`, the committed drill's full 1.0
-    wins), gone on deselect; it's a `geoFades` entry whose `base` IS the level, so the morph
+    hovered (`store.hoverCountry` → `globe.setHoverCountry`) — TWO border objects, so the
+    hover preview coexists with a committed drill (user: hovering another country must still
+    preview while one is selected), gone on deselect; it's a `geoFades` entry whose `base` IS the level, so the morph
     gates it for free. A committed drill also firms the land glass (landFill base 0.45 → 0.62 —
     user: less transparent while selected). **The country hover/click pairing is BIDIRECTIONAL**
     (`ViewPolicy.countryHover`, geo only): pointer-moving over a DRILLABLE country on the globe
