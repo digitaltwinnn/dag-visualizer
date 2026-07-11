@@ -13,7 +13,7 @@ import { METAGRAPHS, COLORS } from "@/src/engine/config";
 import { LEDGER, LAYER_GEOM, ledgerSite } from "./domain/ledgerLayout";
 import { readSceneColors } from "./sceneColors";
 import { VIEW_POLICIES } from "./domain/viewPolicy";
-import { FOCI, hubFraming, geoFraming, ledgerLayerFraming, easeInOutQuad, type CameraFraming } from "./domain/cameraRig";
+import { FOCI, hubFraming, geoFraming, ledgerLayerFraming, nodeFraming, hyperNodeFraming, dollyBack, easeInOutQuad, type CameraFraming } from "./domain/cameraRig";
 import { countryFraming } from "./domain/countryShape";
 import { R as GEO_R, LAND_H } from "./domain/geoLayout";
 import type { GlobalSnapshot, PickDescriptor } from "@/src/data/types";
@@ -35,11 +35,8 @@ const sceneColorsFor = (ids: string[]): Record<string, number> => {
 const loadGeo = loadGeoCache;
 const resolveGeo = resolveMissing;
 
-// Camera presets: FOCI/hubFraming/geoFraming/easeInOutQuad now live in ./domain/cameraRig
-// (Task 15) — pure, allocation-free (writes into caller-provided out structs).
-// Global camera dolly-back applied to EVERY framing (all views) in _tweenTo/_snapTo — one lever to
-// sit the camera a touch wider without re-tuning each preset.
-const CAM_ZOOM = 1.15;
+// Camera presets + framing math + the global CAM_ZOOM dolly all live in ./domain/cameraRig —
+// pure, allocation-free (writes into caller-provided out structs); the Engine only orchestrates.
 
 // Imperative engine: owns the scene, the Hypergraph + globe, the render loop, the
 // camera-focus tweens, and the command surface React drives via the store. Ports
@@ -599,8 +596,8 @@ export class Engine {
     }
     this.ctx.controls.autoRotate = false;
     this.layers.focusId = null;
-    const dir = pos.clone().normalize();
-    this._tweenTo(pos.clone().addScaledVector(dir, 9).add(new THREE.Vector3(0, 3, 0)), pos);
+    hyperNodeFraming(pos, this._framingOut);
+    this._tweenTo(this._framingOut.pos, this._framingOut.target);
   }
 
   // Node framing: zoomed in, camera low in front of the node, line of sight skimming across the
@@ -608,15 +605,10 @@ export class Engine {
   // which settles the node at the LOWER-third line (user; rule-of-thirds — centred read wrong)
   // with the horizon + sky filling the upper frame.
   private _focusNode() {
-    // Pose iterated live with the user. focusNode's uncapped lean parks EVERY node at the
-    // same residual elevation (the 0.42 raise → node ≈ (0, 6.9, 15.5)) — the oblique angle is
-    // latitude-independent. The camera sits well ABOVE the node ("elevate quite a bit more",
-    // user round 2), looking down at it with the surface falling away toward the horizon; the
-    // target puts the node at the LOWER THIRD (axis aimed ~9° above it — rule-of-thirds,
-    // user; camera y 4.6 = "middle of this and what I had before"). Dolly-exempt: the
-    // composed target made
-    // CAM_ZOOM drag the camera diagonally away from the node (zoom-OUT, user).
-    this._tweenTo(new THREE.Vector3(0, 4.6, 19.2), new THREE.Vector3(0, 19.5, 2), false);
+    // The one geo node pose (cameraRig.nodeFraming — latitude-independent via Globe.focusNode's
+    // NODE_RAISE contract). Dolly-exempt: its numbers are absolute (see CAM_ZOOM's note).
+    nodeFraming(this._framingOut);
+    this._tweenTo(this._framingOut.pos, this._framingOut.target, false);
   }
 
   // Compute the per-country leaderboard for the active filter and push it to the store
@@ -843,12 +835,10 @@ export class Engine {
   private _tweenTo(toPos: Vec, toTgt: Vec, dolly = true) {
     const tw = this._tween;
     tw.fromPos.copy(this.ctx.camera.position);
-    // Dolly every framing back by CAM_ZOOM (push the position out from its target) — one global lever
-    // so all views sit a touch wider. Writes straight into tw.toPos, no extra allocation.
-    // `dolly: false` exempts poses whose TARGET is a composed look-at rather than the subject
-    // (the node zoom aims far up the globe's face — dollying along that axis dragged the camera
-    // diagonally away from the node instead of just widening the shot).
-    if (dolly) tw.toPos.subVectors(toPos, toTgt).multiplyScalar(CAM_ZOOM).add(toTgt);
+    // The global CAM_ZOOM dolly (see cameraRig) — writes straight into tw.toPos, no extra
+    // allocation. `dolly: false` is for poses whose TARGET is a composed look-at rather than
+    // the subject (nodeFraming — see the exemption note next to CAM_ZOOM).
+    if (dolly) dollyBack(toPos, toTgt, tw.toPos);
     else tw.toPos.copy(toPos);
     tw.fromTgt.copy(this.ctx.controls.target);
     tw.toTgt.copy(toTgt);

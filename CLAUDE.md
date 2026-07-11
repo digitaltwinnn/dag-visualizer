@@ -204,8 +204,14 @@ store-value imports**, enforced by `layerBoundaries.test.ts`). Each ships coloca
   group transform), `HYP_SPLIT` (the hypergraph level's 2/3+1/3 cut), `LAYER_GEOM` (layer id →
   height/lane-centre; ids shared with the UI copy table `src/data/ledgerLayers.ts` and the scene's
   `layer` picks), `ledgerSite`, `clusterRadius`, `ledgerSpread`.
-- `cameraRig.ts` — `FOCI` + the camera framing math (`hubFraming`, `geoFraming`,
-  `ledgerLayerFraming`, easings).
+- `cameraRig.ts` — the ONE camera home: `FOCI` presets, every framing function (`hubFraming`,
+  `nodeFraming` (geo node — ABSOLUTE/dolly-exempt, solved against `NODE_RAISE`, the residual
+  Globe.focusNode leans every node to — a documented cross-layer CONTRACT), `hyperNodeFraming`,
+  `geoFraming` (the no-topology FALLBACK — the real drill pose is countryShape.countryFraming),
+  `ledgerLayerFraming`), the global **`CAM_ZOOM` dolly** (`dollyBack()` — one lever widening
+  every pose; a pose with a composed non-subject target must opt out explicitly or the dolly
+  drags the camera off the subject, the bug that hit the node pose), and **`closeness()`**
+  (camera altitude → the surface-sharpening factor GeoView's shaders consume). Easings too.
 - `records.ts` — the plain node/metagraph record types (`ValidatorRecord`/`MetaNodeRecord`) the
   scene consumes.
 - `geoLayout.ts` — shared geo constants (`R`, `LAND_H`) + `latLonToVec3`.

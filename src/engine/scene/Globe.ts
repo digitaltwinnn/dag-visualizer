@@ -26,6 +26,7 @@ import { ArcSim, type ArcEndpoint } from "../domain/arcSim";
 import type { MetaNodeRecord, ValidatorRecord } from "../domain/records";
 import { buildGeoView, setCountryBorder, type GeoViewHost } from "./views/GeoView";
 import { ccToNumeric, countryCcAt, countryLean, geometryRings, mainPolygonRings, ringsAngularRadius, ringsCentroid, type Ring } from "../domain/countryShape";
+import { closeness, NODE_RAISE } from "../domain/cameraRig";
 import { NodeFabric, type FrameCtx } from "./objects/NodeFabric";
 import { Arcs } from "./objects/Arcs";
 import type { HyperView } from "./views/HyperView";
@@ -528,11 +529,11 @@ export class Globe implements GeoViewHost {
   // UNCAPPED tilt (was 0.70): the cap left high-latitude nodes at a DIFFERENT residual
   // elevation than everyone else, so the fixed node camera's angle varied with latitude
   // (user: Helsinki read more horizontal). Uncapped, every node arrives at the SAME residual
-  // — the 0.42 raise, matching the oblique surface-skimming angle the user approved — so the
-  // pose is relative to the node's local surface at any latitude; the lean eases on deselect.
+  // — NODE_RAISE, the contract cameraRig.nodeFraming's pose is solved against — so the pose
+  // is relative to the node's local surface at any latitude; the lean eases on deselect.
   focusNode(geo: { lat?: number; lon?: number } | null | undefined): boolean {
     if (!geo || geo.lat == null || geo.lon == null) return false;
-    this._aimAt(latLonToVec3(geo.lat, geo.lon, 1).normalize(), Math.PI / 2, 0.42);
+    this._aimAt(latLonToVec3(geo.lat, geo.lon, 1).normalize(), Math.PI / 2, NODE_RAISE);
     return true;
   }
 
@@ -678,8 +679,7 @@ export class Globe implements GeoViewHost {
     // Closeness (0 = overview, 1 = country/node zoom) from the camera altitude: the walls
     // tighten to a crisp rim and the far-side see-through damps out as the camera closes in.
     if (this.closeUniform && this.camera) {
-      const alt = (this.camera as THREE.Camera).position.length();
-      this.closeUniform.value = THREE.MathUtils.clamp((30 - alt) / 7, 0, 1); // 1 at ≤23, 0 at ≥30
+      this.closeUniform.value = closeness((this.camera as THREE.Camera).position.length());
     }
     if (this.poleRoses) {
       for (const rose of this.poleRoses) {
