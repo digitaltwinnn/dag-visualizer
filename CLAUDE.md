@@ -550,11 +550,14 @@ and keep changing, so they're examples, not the contract.
   leads with a collapsed **`AboutView`** orientation card (per-view title + eyebrow + copy;
   scaffolded views carry a `SOON` caption), above the view's ONE tool card if it has one —
   geo → `GeoExplore` (the country→nodes accordion: a country row shows its share, clicking
-  it drills the globe AND expands its nodes inline; node rows are city-first, alphabetical
-  per country, with the shared identity dot + status; inside an expanded country the rows
-  group under quiet micro-caps **HOSTING-PROVIDER section labels** (`ISP · n` — the cards'
-  COMPOSITION idiom; providers by count desc, "Unknown host" last, all-unknown renders flat) —
-  aggregation without a third accordion level, user design 2026-07-11), ledger → `LedgerPanel` (WIP copy).
+  it drills the globe AND expands its **COHORT rows** — one row per city × provider × status ×
+  network, mirroring the 3D honeycomb stacks (`Falkenstein · Hetzner ×28`), sorted by count;
+  the old per-node rows repeated the same city/"ready" dozens of times (user: "a patch, not a
+  design"). Status shows BY EXCEPTION (ready = silent; joining/syncing chip); the NETWORK in
+  the cohort key keeps each identity dot one hue. A cohort is a DISCLOSURE (single-open
+  chevron): it expands inline to bare mono-id picker rows (the id is the only per-node fact
+  left — everything aggregate lives on the cohort row); a collapsed cohort holding the
+  selected node surfaces the ✓. User design 2026-07-11, option C of three mockups), ledger → `LedgerPanel` (WIP copy).
   Hyper and the placeholders have just the About card.
 - **Right rail** (`#rightcol`, `Inspector`) = the **facts** scope (read-only), a set of
   **FIXED card SLOTS** in one stable order — network dossier, node, snapshot, layer (user
