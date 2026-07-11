@@ -45,6 +45,55 @@ is a separate 3D layout (not part of the morph — it pins `morph` at 0 and hard
 reused node meshes into its lanes; see *Per-view behaviour*). The flat placeholder views sit
 at the hyper end with the canvas hidden.
 
+## The rules — invariants that hold in every change
+
+The application is governed by a small set of architectural rules. THREE ARE EXECUTABLE —
+`npm test` fails when they're violated — the rest are standing conventions detailed in their
+own sections below. Check any change against this list before committing; when a change wants
+to break one, that's a design conversation, not a workaround.
+
+**Enforced by tests:**
+
+1. **Engine layering** (`src/engine/layerBoundaries.test.ts`) — `domain/` = pure logic/data
+   (THREE math + config + data TYPES only; no scene/react/store values), `scene/` = Three
+   adapters (read domain, write GPU; no store/react), `Engine.ts` = the ONLY store bridge.
+   New behaviour lands in `domain/` WITH a colocated test; the scene stays a dumb adapter.
+   → *Engine layer rules & render-loop discipline*.
+2. **One selection write path** (`components/selectionBoundary.test.ts`) — every interactive
+   surface (scene clicks, explorer rows, strip bars, picker rows, card closes) expresses
+   intent through the tested decision table `domain/pickActions.ts` and applies it through
+   the ONE executor `src/store/applyClickActions.ts`; components never call selection setters
+   directly (sole exemption: `FollowController`, the follow SYSTEM). The rule is WRITE-based,
+   so read-only facts cards cost nothing. New click/select semantics = a table builder + a
+   test + (if a new action kind) its executor effect. → *the `pickActions.ts` bullet*.
+3. **One colour source** (`src/engine/noHardcodedColors.test.ts`) — `app/globals.css` tokens
+   are canonical; the scene reads them at boot via `readSceneColors()`; no raw hex in
+   `scene/` outside the documented allowlist. Two lanes never mix: structural cyan = the sole
+   accent/affordance; identity hues (deterministic, `src/palette/`) appear only on subject
+   marks, matched by metagraph id everywhere. → *The design system → Two colour lanes*.
+
+**Standing conventions (each detailed in its section):**
+
+4. **Per-view behaviour is an allow-list** — `domain/viewPolicy.ts` has one row per `Mode`;
+   a new view is inert until its row opts in; never `mode === "x"` guards, never deny-lists.
+5. **One home per concern** — the camera lives in `domain/cameraRig.ts` (presets, framings,
+   the global `CAM_ZOOM` dolly + its documented exemption rule), country-shape math in
+   `domain/countryShape.ts`, click semantics in `domain/pickActions.ts`. Don't grow a second
+   copy of any of these in the Engine or a component.
+6. **Zero-allocation render loop** — per-frame code reuses construction-time scratch; every
+   instanced slot is written or zero-scaled each frame; sims emit ring-buffer events their
+   owning adapter drains (no cross-view mutation). Event-driven allocation is fine — comment it.
+7. **The scene↔HUD hover pairing is sacrosanct** — the shared store channels (`hoverFilter`,
+   `hoverNodeId`, `hoverSnapOrd`, `hoverCountry`, `ledgerHilite`) + `.subject-paired` +
+   the marker classes survive every refactor; hovers PREVIEW, never commit.
+8. **Honesty over decoration** — every visual quantity comes from live data; absent data is
+   an instrument state (NO SIGNAL / acquiring / standby), never a fabricated number; floors
+   are labelled floors (`~`, `FLOOR`); don't "fix" honest gaps.
+9. **Design tokens first** — the HUD type scale + structural tokens for all styling; an
+   arbitrary value only for a documented one-off; new `text-*`/`rounded-*`/`tracking-*`
+   tokens must be registered in `lib/utils.ts` (twMerge). `/design` must always agree with
+   the shipped app.
+
 ## Run & test
 
 Next.js **16** app (Turbopack is the bundler for BOTH `dev` and `build`) — needs Node ≥20.9.

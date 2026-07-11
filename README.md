@@ -152,6 +152,53 @@ Browser ──poll──> Constellation block explorer API   (snapshots / cluste
                                   /api/geo (validator geo seed)
 ```
 
+## Architecture rules
+
+The codebase is held together by a small set of rules — three of them are *executable*
+(vitest fails if they're broken), the rest are conventions the code and docs follow
+everywhere. If you contribute (human or AI), these are the contract:
+
+**1. The engine is three layers with one-way dependencies** *(enforced:
+`src/engine/layerBoundaries.test.ts`)*. `domain/` is pure logic and data — layout math,
+simulations, decision tables, camera framings; it may use THREE's math classes but never the
+scene, React, or store values, so every behaviour is unit-testable in isolation. `scene/`
+owns meshes and GPU writes; it reads domain, never the store. `Engine.ts` is the single
+bridge: it subscribes to the store and translates state into scene commands. New logic goes
+into `domain/` with a test; the scene stays a dumb adapter.
+
+**2. Selections have one write path** *(enforced: `components/selectionBoundary.test.ts`)*.
+Every interactive surface — a 3D raycast click, an explorer row, a strip bar, a picker row, a
+card's Clear-selection × — expresses intent through the same pure decision table
+(`src/engine/domain/pickActions.ts`, where the per-view semantics and ordering rules live,
+tested) and applies it through one executor (`src/store/applyClickActions.ts`). Components
+never call selection setters directly, so the scene and the panels can't drift apart. The
+rule is write-based: read-only cards cost nothing.
+
+**3. Colours have one source of truth** *(enforced: `src/engine/noHardcodedColors.test.ts`)*.
+The CSS design tokens in `app/globals.css` are canonical; the 3D engine reads them at boot
+(`sceneColors.ts`) and no scene file may contain a raw hex colour outside a tiny documented
+allowlist. Two colour lanes never mix: structural cyan is the sole affordance/accent signal,
+and per-metagraph identity hues (generated deterministically in `src/palette/`) appear only
+on subject marks — a metagraph is the same colour in the 3D scene, the filter picker, the
+rail threads, and the cards, by construction.
+
+**4. Per-view behaviour is an allow-list, not scattered ifs.** `domain/viewPolicy.ts` has one
+row per view declaring what it turns on (canvas, sims, pickable pools, camera floors); a new
+view is inert until its row opts in. The same idea repeats at smaller scales: the camera has
+one home (`domain/cameraRig.ts`, including the global zoom lever), and the click semantics
+one table.
+
+**5. The render loop allocates nothing.** Per-frame code reuses construction-time scratch
+objects; simulations communicate through ring-buffer events their owning adapter drains —
+never by mutating another view's objects.
+
+**6. The scene↔HUD hover pairing is sacrosanct.** Hovering a row glows the 3D object and
+hovering the 3D object washes the row, through shared store channels (`hoverFilter`,
+`hoverNodeId`, `hoverSnapOrd`, `hoverCountry`) — previews never commit anything.
+
+**7. Honesty over decoration.** Every bar, tile, count and border comes from live data;
+absent data reads as an instrument state (NO SIGNAL, acquiring), never as fabricated numbers.
+
 ## Layout
 
 | Path | Purpose |
