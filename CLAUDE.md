@@ -808,8 +808,11 @@ cards: **eyebrow / title / INSET hairline / body**.
   `MetaTitle` (avatar + name + ticker + a muted type descriptor — "data metagraph" /
   "currency metagraph" / "data and currency metagraph" / DAG = "hypergraph"; 0-node
   metagraphs say just "metagraph"); the snapshot title's Odometer owns its own roll; the
-  node card is **location-first** (place as title, the id hash demoted to the mono
-  `subtitle` slot, id-as-title fallback when unresolved). **Card-head kind MARKS tint with
+  node card is **location-first** (place as title; the `subtitle` slot leads with the node's
+  COMPOSITION phrase and trails the mono id hash — `hybrid (L0 · cL1) · fd2e…`, via the pure
+  `nodeCompositionLabel`; the id is a technicality but stays as the unique reference (user,
+  2026-07-11 — this replaced the one-node CompositionRows block whose count was always "1");
+  id-as-title fallback when unresolved; the body is the HOSTING line). **Card-head kind MARKS tint with
   the active filter's identity** via `text-[var(--filter-accent,var(--primary))]` (the rail
   sets `--filter-accent`; cyan on "all") — never hardcode a mark to cyan (a recurring bug;
   the snapshot Layers mark + the layer plane mark both follow this; node marks use their

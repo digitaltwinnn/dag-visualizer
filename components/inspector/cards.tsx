@@ -152,13 +152,14 @@ export function GeoLiveSubtitle() {
   if (!node) return null;
   const id = node.node?.id;
   if (!id || !nodePlace(node)) return null;
-  // The node's composition rides inline behind the id — "hybrid (L0 · cL1)" — instead of a
-  // one-node CompositionRows block whose count was always 1 (user, 2026-07-11).
+  // COMPOSITION LEADS, id trails — "hybrid (L0 · cL1) · fd2e…" (user, 2026-07-11: the id is a
+  // technicality — kept because it IS the unique reference, but the human-meaningful fact
+  // fronts the row). Replaces the one-node CompositionRows block whose count was always 1.
   const comp = node.node ? nodeCompositionLabel(node.node) : null;
   return (
-    <span className="font-mono tabular-nums">
-      {shortHash(id)}
-      {comp && <span className="font-sans text-muted-foreground"> · {comp}</span>}
+    <span>
+      {comp && <>{comp} · </>}
+      <span className="font-mono tabular-nums text-muted-foreground">{shortHash(id)}</span>
     </span>
   );
 }
