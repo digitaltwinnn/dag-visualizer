@@ -13,7 +13,8 @@ import { IdentityDot, StatusMark } from "@/components/inspector/parts";
 import { SELECTED_ROW, SelectedRowMark } from "@/components/selection";
 import { ccToFlag } from "@/src/util/format";
 import { hoverKeyOf } from "@/src/data/hoverSubject";
-import { countryToggleActions, nodeSelectActions, type ClickAction } from "@/src/engine/domain/pickActions";
+import { countryToggleActions, nodeSelectActions } from "@/src/engine/domain/pickActions";
+import { applyClickActions } from "@/src/store/applyClickActions";
 import { subjectPairing } from "@/components/useSubjectPairing";
 import type { NodeRow } from "@/src/data/types";
 
@@ -26,33 +27,23 @@ import type { NodeRow } from "@/src/data/types";
 export default function GeoExplore() {
   const lb = useStore((s) => s.leaderboard);
   const country = useStore((s) => s.country);
-  const setCountry = useStore((s) => s.setCountry);
   const selNodes = useStore((s) => s.selNodes);
   const inspect = useStore((s) => s.inspect);
-  const setInspect = useStore((s) => s.setInspect);
   const setHoverNodeId = useStore((s) => s.setHoverNodeId);
   const setHoverCountry = useStore((s) => s.setHoverCountry);
   const hoverCountry = useStore((s) => s.hoverCountry);
   const hoverNodeId = useStore((s) => s.hoverNodeId);
-  const setFilter = useStore((s) => s.setFilter);
   const filter = useStore((s) => s.filter);
   const [collapsed, setCollapsed] = useState(false);
 
   // Row selections run the SAME tested decision table as the scene clicks (domain/pickActions)
-  // — this component only executes the returned store actions, so the explorer and the globe
-  // can never drift in semantics (filter-first / node's-country / inspect-last ordering, the
+  // through the SAME executor (store/applyClickActions), so the explorer and the globe can
+  // never drift in semantics (filter-first / node's-country / inspect-last ordering, the
   // row's re-click deselect, the zoom-level rule).
-  const runActions = (acts: ClickAction[]) => {
-    for (const a of acts) {
-      if (a.kind === "filter") setFilter(a.id);
-      else if (a.kind === "country") setCountry(a.cc);
-      else if (a.kind === "inspect") setInspect(a.pick as NodeRow["pick"] | null);
-    }
-  };
   // `selected` = this row is the currently-inspected node — re-clicking it DESELECTS (the same
   // step-back as the node card's ×, user: one toggle language everywhere).
   const selectNode = (pick: NodeRow["pick"], selected: boolean) =>
-    runActions(nodeSelectActions(pick, { mode: "geo", currentFilter: filter, deselect: selected }));
+    applyClickActions(nodeSelectActions(pick, { mode: "geo", currentFilter: filter, deselect: selected }));
 
   const list = lb?.countries ?? [];
   const max = list[0]?.count ?? 1;
@@ -74,7 +65,7 @@ export default function GeoExplore() {
   // accordion's "which row is open", so the globe and the list stay one source of truth. Same
   // tested table as the scene's empty-click country toggle (zoom-level rule included).
   const drill = (cc: string) =>
-    runActions(countryToggleActions(cc, { country, hasInspect: !!sel }));
+    applyClickActions(countryToggleActions(cc, { country, hasInspect: !!sel }));
 
   // Selection's nodes grouped by country **name** — the join key both the leaderboard and the
   // node list derive from `geo.country` (`cc` can be absent, the name can't). Each country's

@@ -9,6 +9,7 @@ import { useBreakpoint } from "@/components/useBreakpoint";
 import { getAnchor, metagraphById, filterAccent } from "@/src/data/network";
 import type { GlobalSnapshot } from "@/src/data/types";
 import { snapshotSelectActions } from "@/src/engine/domain/pickActions";
+import { applyClickActions } from "@/src/store/applyClickActions";
 import { relativeAge } from "@/src/util/relativeAge";
 
 // Matches VIS.maxSnapshots (the buffer cap) so the strip fills with the full retained window.
@@ -31,9 +32,7 @@ export default function LiveStrip() {
   // Phone: slice to the most recent PHONE_BARS so each bar stays a usable width — the buffer
   // itself (MAX) is untouched, only what's rendered. Newest stays on the right (slice keeps order).
   const snaps = bp === "phone" ? allSnaps.slice(-PHONE_BARS) : allSnaps;
-  const setSnap = useStore((s) => s.setSnap);
   const setHoverSnapOrd = useStore((s) => s.setHoverSnapOrd);
-  const setFollowing = useStore((s) => s.setFollowing);
   const snap = useStore((s) => s.snap);
   const filter = useStore((s) => s.filter);
   const live = useStore((s) => s.live);
@@ -71,15 +70,13 @@ export default function LiveStrip() {
   // you're in and carries across views, like the selected node. Runs the SAME tested decision
   // table as the ledger's 3D tile click (domain/pickActions): the live tip (re-)follows the
   // heartbeat, anything older pins.
-  const pick = (d: GlobalSnapshot) => {
-    const p = { kind: "snapshot", title: `Global snapshot #${d.ordinal}`, data: d } as const;
-    for (const a of snapshotSelectActions(p, latestRelevant("all")?.ordinal === d.ordinal)) {
-      if (a.kind === "snapshot") {
-        setFollowing(a.follow);
-        setSnap(a.pick);
-      }
-    }
-  };
+  const pick = (d: GlobalSnapshot) =>
+    applyClickActions(
+      snapshotSelectActions(
+        { kind: "snapshot", title: `Global snapshot #${d.ordinal}`, data: d },
+        latestRelevant("all")?.ordinal === d.ordinal,
+      ),
+    );
 
   // Per bar: the tick's total anchors, and (filtered) this metagraph's own anchors. The plotted
   // VALUE is `mine` when a metagraph is filtered (its own cadence on its own scale), else `total`.

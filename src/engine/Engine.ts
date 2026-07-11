@@ -1,6 +1,7 @@
 import * as THREE from "three";
 import Stats from "stats.js";
 import { useStore, type Mode } from "@/src/store/store";
+import { applyClickActions } from "@/src/store/applyClickActions";
 import { metagraphById, initNetwork, getNetwork, getAnchor, DEFAULT_META_COLOR } from "@/src/data/network";
 import { hoverKeyOf, tooltipSubject } from "@/src/data/hoverSubject";
 import { identityMap, identitySceneHex } from "@/src/palette/identity";
@@ -760,26 +761,19 @@ export class Engine {
     // click means per view × pick kind, including the ordering contracts. This handler only
     // resolves inputs above and executes the actions below.
     const st = useStore.getState();
-    const actions = clickActions({
-      mode: this.mode,
-      pick: p,
-      countryCc,
-      current: {
-        filter: st.filter,
-        country: st.country,
-        hasInspect: !!st.inspect,
-        layerId: st.layer?.layerId ?? null,
-      },
-    });
-    for (const a of actions) {
-      switch (a.kind) {
-        case "filter": st.setFilter(a.id); break;
-        case "country": st.setCountry(a.cc); break;
-        case "inspect": st.setInspect(a.pick); break;
-        case "snapshot": st.setFollowing(a.follow); st.setSnap(a.pick); break;
-        case "layer": st.setLayer(a.pick); break;
-      }
-    }
+    applyClickActions(
+      clickActions({
+        mode: this.mode,
+        pick: p,
+        countryCc,
+        current: {
+          filter: st.filter,
+          country: st.country,
+          hasInspect: !!st.inspect,
+          layerId: st.layer?.layerId ?? null,
+        },
+      }),
+    );
   }
 
   private focus(name: string) {

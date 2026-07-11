@@ -214,8 +214,10 @@ store-value imports**, enforced by `layerBoundaries.test.ts`). Each ships coloca
   node-less hubs never, geo off-filter nodes never, hyper everything). Ordering contracts are
   tested invariants: filter-first (only when it CHANGES — no drill churn) → node's country →
   inspect-LAST (the node camera wins); deselect-before-drill on the country toggle; the LIVE
-  strip tip (re-)follows while older bars pin. The table self-gates by mode. New click/select
-  semantics go HERE with a test, not inline in a component or the Engine. The ORDERING contracts are tested invariants: a node
+  strip tip (re-)follows while older bars pin. The table self-gates by mode. Every caller
+  applies actions through the ONE executor **`src/store/applyClickActions.ts`** (tested —
+  action kind → exactly one store effect). New click/select semantics go HERE with a test,
+  and their effects in the executor — never inline in a component or the Engine. The ORDERING contracts are tested invariants: a node
   click sets filter FIRST (its subscription clears any old drill) → the node's country → inspect
   LAST (the node camera wins); the empty-click country toggle drops a selected node before
   moving the drill level. New click semantics go HERE with a test, not inline in the Engine.
@@ -520,8 +522,10 @@ cost). Activity metrics belong to ledger, structure to hyper — don't cross-pol
 
 **The snapshot card is ledger-scoped.** `FollowController` follows the live snapshot and the
 ledger view follows live by default; once a snapshot is *selected* it's pinned and carries
-across views until deselected. Clicking a `LiveStrip` bar from hyper/geo jumps to `ledger`
-and opens the card there.
+across views until deselected. Clicking a `LiveStrip` bar selects that snapshot IN PLACE —
+no view switch (the old jump-to-ledger was dropped); the card shows in whatever view you're
+in. Clicking the LIVE tip (re-)follows the heartbeat; an older bar pins
+(`snapshotSelectActions` — the same tested table the ledger's 3D tile click runs).
 
 ### Responsive shell
 
@@ -854,7 +858,9 @@ Unfiltered, bars plot each tick's TOTAL anchors in cyan. **Filtered, each bar pl
 metagraph's own anchors on its OWN scale in its identity hue — its own cadence, with empty
 ticks as honest gaps** (deliberate: a ~1-anchor-per-tick metagraph reads sparse/degenerate,
 and 0-in-window reads blank; that honesty is the design, don't "fix" it). Clicking a bar
-opens that snapshot's card and, from hyper/geo, jumps to `ledger`. Hovering a bar
+selects that snapshot IN PLACE (no view switch — the old hyper/geo jump-to-ledger was
+dropped): the LIVE tip (re-)follows, an older bar pins, via `snapshotSelectActions` +
+`applyClickActions` (the same table/executor as the ledger's 3D tile). Hovering a bar
 cross-highlights the matching ledger block (`hoverSnapOrd`); the hover is cleared on each
 new tick (bars shift under a stationary cursor, which never fires mouseleave, so a hover
 would otherwise stick and trail). Selection is store-driven (`inspect`/`following`/`snap`
