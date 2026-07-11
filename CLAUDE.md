@@ -559,7 +559,9 @@ and keep changing, so they're examples, not the contract.
   the old per-node rows repeated the same city/"ready" dozens of times (user: "a patch, not a
   design"). NO status anywhere in the list (user: health belongs to the node card + the future
   network-health view); the NETWORK in the cohort key keeps each identity dot one hue. A
-  cohort is a DISCLOSURE (single-open chevron) expanding to bare mono-id picker rows; a
+  cohort is a DISCLOSURE (single-open chevron) expanding to picker rows that LEAD with the
+  composition word + trail the muted mono id (`data 53de…` — real per-row info, cohorts can
+  mix compositions); a
   SINGLE-node cohort click selects its node in the same click (no pointless second click); a
   collapsed cohort holding the selected node surfaces the ✓. Hovering a cohort glows its WHOLE
   3D stack (`store.hoverCohort` ids[] → `globe.setHoverCohort` → the fabric's hot check) and
@@ -812,11 +814,12 @@ cards: **eyebrow / title / INSET hairline / body**.
   `MetaTitle` (avatar + name + ticker + a muted type descriptor — "data metagraph" /
   "currency metagraph" / "data and currency metagraph" / DAG = "hypergraph"; 0-node
   metagraphs say just "metagraph"); the snapshot title's Odometer owns its own roll; the
-  node card is **location-first** (place as title; the `subtitle` slot leads with the node's
-  COMPOSITION phrase and trails the mono id hash — `hybrid (L0 · cL1) · fd2e…`, via the pure
-  `nodeCompositionLabel`; the id is a technicality but stays as the unique reference (user,
-  2026-07-11 — this replaced the one-node CompositionRows block whose count was always "1");
-  id-as-title fallback when unresolved; the body is the HOSTING line). **Card-head kind MARKS tint with
+  node card is **location-first** (place as title; the `subtitle` is ONE word — the node's
+  composition, `hybrid`/`consensus`/… via the pure `nodeCompositionLabel`; the BODY is
+  labelled rows in importance order: HOSTING, then **NODE ID last** — the unique reference
+  sits where references sit, truncated with the full hash on hover (user, 2026-07-11; this
+  replaced the one-node CompositionRows block whose count was always "1"); id-as-title
+  fallback when unresolved). **Card-head kind MARKS tint with
   the active filter's identity** via `text-[var(--filter-accent,var(--primary))]` (the rail
   sets `--filter-accent`; cyan on "all") — never hardcode a mark to cyan (a recurring bug;
   the snapshot Layers mark + the layer plane mark both follow this; node marks use their
