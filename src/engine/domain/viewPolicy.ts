@@ -37,6 +37,10 @@ export interface ViewPolicy {
   // May depth-of-field run here at all? (Still ANDs with a single metagraph being selected +
   // the morph window.) Only hyper.
   dofEligible: boolean;
+  // Does pointer-moving over the globe SURFACE resolve the country under the cursor (the scene
+  // side of the bidirectional country hover pairing)? Only geo — the drill it previews is a
+  // geo-only concept.
+  countryHover: boolean;
   // OrbitControls zoom floor (camera→TARGET distance) — the stock dolly clamp.
   minCamDist: number;
   // Minimum camera ALTITUDE from the world origin (null = no clamp), enforced by the Engine
@@ -57,6 +61,7 @@ const FLAT: ViewPolicy = {
   show: { hyperFurniture: false, globeSurface: false, ledger: false },
   pickSources: [],
   dofEligible: false,
+  countryHover: false,
   minCamDist: 12,
   minCamAlt: null,
 };
@@ -71,6 +76,7 @@ export const VIEW_POLICIES: Record<Mode, ViewPolicy> = {
     show: { hyperFurniture: true, globeSurface: true, ledger: false },
     pickSources: ["globe", "layers"],
     dofEligible: true,
+    countryHover: false,
     minCamDist: 12,
     minCamAlt: null,
   },
@@ -82,6 +88,7 @@ export const VIEW_POLICIES: Record<Mode, ViewPolicy> = {
     show: { hyperFurniture: true, globeSurface: true, ledger: false },
     pickSources: ["globe"],
     dofEligible: false,
+    countryHover: true, // pointer over a drillable country previews its border (pairs both ways)
     minCamDist: 12,
     minCamAlt: 18, // above the land plateau (R 16 + LAND_H 1.0) + chip stacks — no zooming inside
   },
@@ -95,6 +102,7 @@ export const VIEW_POLICIES: Record<Mode, ViewPolicy> = {
     show: { hyperFurniture: false, globeSurface: true, ledger: true },
     pickSources: ["ledger", "globe"],
     dofEligible: false,
+    countryHover: false,
     minCamDist: 12,
     minCamAlt: null,
   },

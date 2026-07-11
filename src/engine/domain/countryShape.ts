@@ -23,10 +23,69 @@ export type Ring = [number, number][];
 // camera construction below, not from the lean.
 export const GLOBE_LEAN_MAX = 0.32;
 
+// The drill's globe lean for a country at `latAngle`: gentle (GLOBE_LEAN_MAX), stretched just
+// enough at very high latitudes that the constant-angle camera stays on the front side of the
+// zenith (ZENITH_CAP) — so Finland keeps the exact same surface angle as Germany instead of
+// silently flattening against the cap.
+export const ZENITH_CAP = 1.55; // just short of π/2
+export function countryLean(latAngle: number): number {
+  const need = Math.abs(latAngle) - (ZENITH_CAP - COUNTRY_VIEW_ELEV);
+  return Math.sign(latAngle) * Math.min(Math.abs(latAngle), Math.max(GLOBE_LEAN_MAX, need));
+}
+
 // alpha-2 (node geo `cc`) → the topology's ISO numeric id, or null when unknown.
 export function ccToNumeric(cc: string | null | undefined): string | null {
   if (!cc) return null;
   return (codes as Record<string, string>)[cc.toUpperCase()] ?? null;
+}
+
+// …and the reverse join (numeric → alpha-2), for resolving a scene hit back to the cc channel.
+const numericToAlpha: Record<string, string> = {};
+for (const [cc, ccn] of Object.entries(codes as Record<string, string>)) numericToAlpha[ccn] = cc;
+export function numericToCc(ccn: string): string | null {
+  return numericToAlpha[ccn] ?? null;
+}
+
+// Even-odd point-in-rings test in lon/lat degrees (holes fall out of the even-odd rule
+// naturally). Each edge is unwrapped into the test longitude's ±180° frame, so seam-crossing
+// rings (the Aleutians, Fiji) test correctly without a global unwrap. (Pole-enclosing rings —
+// Antarctica — are the known blind spot; no node country encloses a pole.)
+const wrapNear = (x: number, ref: number): number => {
+  while (x - ref > 180) x -= 360;
+  while (x - ref < -180) x += 360;
+  return x;
+};
+export function pointInRings(lat: number, lon: number, rings: Ring[]): boolean {
+  let inside = false;
+  for (const ring of rings) {
+    for (let i = 0; i < ring.length - 1; i++) {
+      const y1 = ring[i][1];
+      const y2 = ring[i + 1][1];
+      if (y1 > lat === y2 > lat) continue; // edge doesn't straddle the test latitude
+      const x1 = wrapNear(ring[i][0], lon);
+      const x2 = wrapNear(ring[i + 1][0], x1);
+      const xCross = x1 + ((lat - y1) / (y2 - y1)) * (x2 - x1);
+      if (lon < xCross) inside = !inside;
+    }
+  }
+  return inside;
+}
+
+// The country under a lat/lon, restricted to `eligible` alpha-2 codes (the drillable set —
+// hovering open ocean or a node-less country stays quiet). Iterates the topology index;
+// event-driven per pointer move, cheap at 110m over the gated set.
+export function countryCcAt(
+  lat: number,
+  lon: number,
+  geoms: Iterable<[string, { type: string; coordinates: unknown }]>,
+  eligible?: (cc: string) => boolean,
+): string | null {
+  for (const [ccn, geom] of geoms) {
+    const cc = numericToCc(ccn);
+    if (!cc || (eligible && !eligible(cc))) continue;
+    if (pointInRings(lat, lon, geometryRings(geom))) return cc;
+  }
+  return null;
 }
 
 // Flatten a GeoJSON Polygon/MultiPolygon coordinates array to a flat list of rings.
@@ -108,8 +167,7 @@ export function ringsAngularRadius(rings: Ring[], centroid: THREE.Vector3): numb
 // `angularRadius` = ringsAngularRadius() over the main landmass, radians.
 export function countryFraming(latAngle: number, angularRadius: number, out: CameraFraming): void {
   const top = R + LAND_H;
-  const lean = THREE.MathUtils.clamp(latAngle, -GLOBE_LEAN_MAX, GLOBE_LEAN_MAX);
-  const e = latAngle - lean; // C's residual elevation on the front face, post-lean
+  const e = latAngle - countryLean(latAngle); // C's residual elevation on the front face, post-lean
   const cy = Math.sin(e) * top;
   const cz = Math.cos(e) * top;
   // Distance: fit the extent within ~a third of the 55° camera's half-frame, floored so
@@ -117,22 +175,28 @@ export function countryFraming(latAngle: number, angularRadius: number, out: Cam
   // a readable wide pose.
   const halfSpan = Math.max(0.06, angularRadius);
   const FIT_TAN = 0.27; // ≈ tan(15°) — the comfortable half-angle inside the FOV-55 frame
-  const D = THREE.MathUtils.clamp((Math.sin(halfSpan) * top) / FIT_TAN, 5, 20);
+  // Floor 4.3 (compact countries — Finland-sized — come in close; the Engine's global
+  // CAM_ZOOM dolly widens the net pose ~15%), cap 20 (continent-spanners stay readable).
+  const D = THREE.MathUtils.clamp((Math.sin(halfSpan) * top) / FIT_TAN, 4.3, 20);
   // Approach direction (in the meridian plane): COUNTRY_VIEW_ELEV above C's tangent plane on
-  // the EQUATOR side — v̂ = (0, -cos(e+φ), sin(e+φ)). Clamped just short of π/2 so even a
-  // polar territory keeps the camera on the front side of its zenith (bites only above ~66°;
-  // every node country today keeps the exact angle).
-  const a = Math.min(e + COUNTRY_VIEW_ELEV, 1.55);
+  // the EQUATOR side — v̂ = (0, -cos(e+φ), sin(e+φ)). countryLean() guarantees e+φ ≤ ZENITH_CAP,
+  // so the camera stays on the front side of the country's zenith at any latitude.
+  const a = Math.min(e + COUNTRY_VIEW_ELEV, ZENITH_CAP);
   out.pos.set(0, cy - Math.cos(a) * D, cz + Math.sin(a) * D);
-  // Aim slightly below C along the surface's south direction — the country rides just above
-  // frame-centre.
-  const drop = Math.tan(AIM_BELOW_CENTROID) * D;
+  // Composition: compact countries ride slightly above frame-centre (the drop aims the axis
+  // below C); wide countries ease down to the mid-line — their landmass extends upward from
+  // the centroid, so the same above-centre bias read "too high" for the US/Canada/India
+  // (user). The drop fades out (slightly negative) as D approaches the wide cap.
+  const t = (D - 4.3) / 15.7; // 0 at the near floor, 1 at the wide cap
+  const bias = THREE.MathUtils.lerp(AIM_BELOW_CENTROID, -0.04, t);
+  const drop = Math.tan(bias) * D;
   out.target.set(0, cy - Math.cos(e) * drop, cz + Math.sin(e) * drop);
 }
 
 // The fixed elevation of the camera above the country's local tangent plane (radians,
-// ~41° — top-down enough that the outline reads as a shape, not a silhouette).
-export const COUNTRY_VIEW_ELEV = 0.72;
+// ~49° — top-down enough that the outline reads as a shape, not a silhouette; lifted from
+// 0.72, user: "tilt the camera a bit more up").
+export const COUNTRY_VIEW_ELEV = 0.85;
 
 // How far below the front point the view axis aims (radians): the country appears this angle
 // ABOVE frame-centre — ~30% up the FOV-55 half-frame.

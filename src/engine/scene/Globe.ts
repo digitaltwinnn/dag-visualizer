@@ -19,13 +19,13 @@ import { metaAnchor } from "../domain/hyperLayout";
 import { LEDGER, ledgerSite, ledgerSpread, clusterRadius } from "../domain/ledgerLayout";
 import type { SceneColors } from "../sceneColors";
 import * as geoStats from "../domain/geoStats";
-import { R, LAND_H, CHIP_PITCH, HEX_H, VALIDATOR_HEX_R, META_HEX_R, latLonToVec3 } from "../domain/geoLayout";
+import { R, LAND_H, CHIP_PITCH, HEX_H, VALIDATOR_HEX_R, META_HEX_R, latLonToVec3, vec3ToLatLon } from "../domain/geoLayout";
 import { GOLDEN_ANGLE, fibShellPos, nodeRoles, spreadCoLocated } from "../domain/nodeLayout";
 import { surfFade, extrasFade } from "../domain/morph";
 import { ArcSim, type ArcEndpoint } from "../domain/arcSim";
 import type { MetaNodeRecord, ValidatorRecord } from "../domain/records";
 import { buildGeoView, setCountryBorder, type GeoViewHost } from "./views/GeoView";
-import { ccToNumeric, geometryRings, GLOBE_LEAN_MAX, mainPolygonRings, ringsAngularRadius, ringsCentroid, type Ring } from "../domain/countryShape";
+import { ccToNumeric, countryCcAt, countryLean, geometryRings, mainPolygonRings, ringsAngularRadius, ringsCentroid, type Ring } from "../domain/countryShape";
 import { NodeFabric, type FrameCtx } from "./objects/NodeFabric";
 import { Arcs } from "./objects/Arcs";
 import type { HyperView } from "./views/HyperView";
@@ -198,6 +198,7 @@ export class Globe implements GeoViewHost {
   setNodes(dagCore: DagCore | null, geoMap: GeoMap): void {
     this.fabric.disposeValidators();
     this.nodes = [];
+    this._activeCcsCache = null; // the drillable-country set follows the validator rebuild
     const machines: RouteNode[] = (dagCore && dagCore.nodes) || [];
     const l0List = machines.filter((m) => m.roles && m.roles.includes("l0"));
     const cl1List = machines.filter((m) => m.roles && m.roles.includes("cl1"));
@@ -350,6 +351,7 @@ export class Globe implements GeoViewHost {
   setFilter(sel: string): void {
     this.filter = sel;
     this.countryFilter = null; // switching network clears the country drill-down
+    this._activeCcsCache = null; // the drillable-country set follows the filter
     this._updateCountryBorder();
     this._applyDim(sel);
     this._relayoutGeo();
@@ -403,18 +405,57 @@ export class Globe implements GeoViewHost {
     const rings = geom ? mainPolygonRings(geom) : null;
     const centroid = rings?.length ? ringsCentroid(rings) : null;
     if (!rings || !centroid) return null;
-    this._aimAt(centroid, GLOBE_LEAN_MAX);
+    const latAngle = Math.atan2(centroid.y, Math.hypot(centroid.x, centroid.z));
+    // countryLean stretches the gentle lean just enough at very high latitudes that the
+    // constant-angle camera never crosses the zenith (domain + framing agree by construction).
+    this._aimAt(centroid, Math.abs(countryLean(latAngle)));
     return {
-      latAngle: Math.atan2(centroid.y, Math.hypot(centroid.x, centroid.z)),
+      latAngle,
       angularRadius: ringsAngularRadius(rings, centroid),
     };
   }
 
-  // Border = committed drill (full hairline) beats hover preview (whisper); nothing at rest.
+  // Border = committed drill (full-strength hairline — brighter than the first tuning, user)
+  // beats hover preview (whisper); nothing at rest. A committed drill also firms up the land
+  // glass (user: "reduce the transparency a bit" while a country is selected) — the land fill's
+  // resting additive base lifts while drilled; the geoFades loop applies it next frame.
   private _updateCountryBorder(): void {
     const cc = this.countryFilter ?? this._hoverCountryCc;
-    const level = this.countryFilter ? 0.75 : 0.3;
+    const level = this.countryFilter ? 1.0 : 0.3;
     setCountryBorder(this, cc ? this.countryRings(cc) : null, cc ? level : 0);
+    const landFade = this.landFillMat && this.geoFades.find((f) => f.mat === this.landFillMat);
+    if (landFade) landFade.base = this.countryFilter ? 0.62 : 0.45;
+  }
+
+  // Resolve a globe-surface WORLD point to the country under it — only countries that
+  // currently have filter-active nodes respond (the drillable set; open ocean and node-less
+  // countries stay quiet). Drives the scene side of the bidirectional country hover pairing.
+  private _hitLocal = new THREE.Vector3(); // scratch (pointer-move path)
+  countryCcAtPoint(world: THREE.Vector3): string | null {
+    if (!this.countryGeoms) return null;
+    const local = this.group.worldToLocal(this._hitLocal.copy(world));
+    const { lat, lon } = vec3ToLatLon(local);
+    const active = this._activeCcs();
+    return countryCcAt(lat, lon, this.countryGeoms, (cc) => active.has(cc));
+  }
+
+  // The alpha-2 codes with at least one filter-active locatable node — cached; invalidated by
+  // every path that changes the active set (filter / node or metagraph rebuild).
+  private _activeCcsCache: Set<string> | null = null;
+  private _activeCcs(): Set<string> {
+    if (this._activeCcsCache) return this._activeCcsCache;
+    const s = new Set<string>();
+    if (this._isActive("dag"))
+      for (const u of this.nodes) {
+        const g = geoOf(u.pick);
+        if (!u.noGeo && g?.cc) s.add(g.cc);
+      }
+    for (const r of this.metaNodes) {
+      const g = geoOf(r.pick);
+      if (g?.cc && this._isActive(r.metaId)) s.add(g.cc);
+    }
+    this._activeCcsCache = s;
+    return s;
   }
 
   // Hover-pairing: pass the hovered node's id; the per-frame glow loops brighten every instance
@@ -481,9 +522,14 @@ export class Globe implements GeoViewHost {
   }
 
   // Aim a single node's location to the centre of the view. False if no lat/lon.
+  // UNCAPPED tilt (was 0.70): the cap left high-latitude nodes at a DIFFERENT residual
+  // elevation than everyone else, so the fixed node camera's angle varied with latitude
+  // (user: Helsinki read more horizontal). Uncapped, every node arrives at the SAME residual
+  // — the 0.42 raise, matching the oblique surface-skimming angle the user approved — so the
+  // pose is relative to the node's local surface at any latitude; the lean eases on deselect.
   focusNode(geo: { lat?: number; lon?: number } | null | undefined): boolean {
     if (!geo || geo.lat == null || geo.lon == null) return false;
-    this._aimAt(latLonToVec3(geo.lat, geo.lon, 1).normalize(), 0.70, 0.12); // ≤40° tilt, ~7° raise
+    this._aimAt(latLonToVec3(geo.lat, geo.lon, 1).normalize(), Math.PI / 2, 0.42);
     return true;
   }
 

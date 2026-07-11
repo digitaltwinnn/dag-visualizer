@@ -355,9 +355,12 @@ views and caused the ledger red-dots bug; that pattern is forbidden.
     camera** (north stays up — Y rotation only). A **metagraph** selection frames WIDE
     (`FOCI.geoNetwork`, deliberately farther out than the country pose so drilling still reads
     as a zoom); a **country** drill frames the country's real SHAPE (see the drill-down bullet);
-    a **node** pick zooms close with the node at the LOWER-third line
-    (`_focusNode` — the look-at point swings far up the globe's rising face; the camera is only
-    ~4.6 units from the node, so screen shifts need big target moves).
+    a **node** pick zooms close in a
+    LATITUDE-INDEPENDENT pose (`Globe.focusNode` leans the globe UNCAPPED with a 0.42 raise, so
+    every node rests at the same residual elevation — Helsinki read flatter than the rest with
+    the old 0.70 tilt cap, user; `_focusNode`'s camera/target are solved for that one pose and
+    are CAM_ZOOM dolly-EXEMPT — the composed far-up look-at made the global dolly drag the
+    camera away from the node).
   - **Country drill-down** (geo only): the country rows in `GeoExplore` are clickable and
     combine with the network filter (`globe.countryFilter` + eased `countryMix`;
     `_nodeActive(layer, geo)` gates on BOTH). Clicking a country dims everything outside it,
@@ -367,17 +370,26 @@ views and caused the ledger red-dots bug; that pattern is forbidden.
     `public/countries-110m.json`): the globe spins to the country's polygon **centroid** (gentle
     `GLOBE_LEAN_MAX` lean — a FULL lean read as the camera going over the country) and
     `countryFraming()` builds a **constant-angle pose**: the camera approaches from IN FRONT
-    (the equator side of the country's meridian) at `COUNTRY_VIEW_ELEV` (~41°) above its local
+    (the equator side of the country's meridian) at `COUNTRY_VIEW_ELEV` (~49°) above its local
     tangent plane, aimed `AIM_BELOW_CENTROID` below it — every country is viewed at the SAME
-    surface angle, north up, never over the zenith; only the DISTANCE varies, fit to the
-    country's angular extent (floor 5 / cap 20). Framing composes on the **main landmass**
+    surface angle, north up, never over the zenith (`countryLean` stretches the lean at very
+    high latitudes so the invariant survives the zenith cap); only the DISTANCE varies, fit to
+    the country's angular extent (floor 4.3 / cap 20), with the composition drop fading to the
+    mid-line for wide countries (the US/Canada/India read too high with the compact bias). Framing composes on the **main landmass**
     (`mainPolygonRings` — France's geometry includes French Guiana, the US's Alaska/Hawaii; the
     mainland leads, the node-mean framing is the fallback while the topology loads). A **cyan
     hairline border** (structural, not identity) outlines the drilled country at plateau height
     — invisible at rest (the surface stays clean), whisper-level (0.3) while a country ROW is
-    hovered (`store.hoverCountry` → `globe.setHoverCountry`, the committed drill's 0.75 wins),
-    gone on deselect; it's a `geoFades` entry whose `base` IS the level, so the morph gates it
-    for free. ⚠️ **Data rebuilds must not wipe the drill**: `Globe.setMetagraphs` restores its
+    hovered (`store.hoverCountry` → `globe.setHoverCountry`, the committed drill's full 1.0
+    wins), gone on deselect; it's a `geoFades` entry whose `base` IS the level, so the morph
+    gates it for free. A committed drill also firms the land glass (landFill base 0.45 → 0.62 —
+    user: less transparent while selected). **The country hover/click pairing is BIDIRECTIONAL**
+    (`ViewPolicy.countryHover`, geo only): pointer-moving over a DRILLABLE country on the globe
+    (no object hit → analytic ray→sphere + `countryCcAt` point-in-polygon over the drillable
+    set) writes the same `hoverCountry` channel — the explorer row washes (`subjectPairing`,
+    structural cyan) and the border previews; clicking the country toggles the drill exactly
+    like the row. A canvas `pointerleave` clears every hover channel (cards overlay the canvas,
+    so moves stop at their edge). ⚠️ **Data rebuilds must not wipe the drill**: `Globe.setMetagraphs` restores its
     own `countryFilter` around the internal `setFilter`, and `Engine.applyFilter`'s geo branch
     re-asserts `this.country` — the background cluster poll (`_applyMetagraphs →
     applyFilter(false)`) used to silently clear the drill's dim + border seconds after every
@@ -895,8 +907,10 @@ event, `ledger.update(dt)` per frame).
 - **Recency is `slotFade` brightness only (2026-07-09).** The old neutral-tone + ledger-specific
   linear depth fog recency treatment was REMOVED at the user's direction (a replacement may be
   designed later): tiles/links/trail blocks keep their identity/accent colour all the way down
-  the trail, fading gently by `slotFade`; the shared scene `FogExp2` applies in every view (the
-  `ViewPolicy.fog` field + Engine fog swap are gone).
+  the trail, fading gently by `slotFade`. There is NO scene fog at all any more (the shared
+  `FogExp2` was removed 2026-07-11, user: zooming out darkened the scene — it must stay clear
+  and coloured at every zoom; depth reads through DoF/facing/closeness instead. The
+  `ViewPolicy.fog` field + Engine fog swap were already gone).
 - **Emphasis is brightness, not a colour switch.** `model.isRowHot` still enforces exactly ONE
   hot row (a selected/hovered older snapshot beats the live lead): the hot row's tiles/links
   render near-full-brightness (bloom), everything else stays dim-but-coloured; the centre block

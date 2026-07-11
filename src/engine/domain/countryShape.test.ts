@@ -9,7 +9,7 @@ import {
   countryFraming,
   ringsToSegments,
   COUNTRY_VIEW_ELEV,
-  GLOBE_LEAN_MAX,
+  countryLean,
   type Ring,
 } from "./countryShape";
 import { R, LAND_H, latLonToVec3 } from "./geoLayout";
@@ -100,9 +100,10 @@ describe("countryFraming", () => {
   const out = { pos: new THREE.Vector3(), target: new THREE.Vector3() };
   const top = R + LAND_H;
 
-  // C = the country's front point after the gentle lean.
+  // C = the country's front point after the drill lean (countryLean stretches at high
+  // latitudes so the constant angle survives the zenith cap).
   const C = (latAngle: number) => {
-    const e = latAngle - THREE.MathUtils.clamp(latAngle, -GLOBE_LEAN_MAX, GLOBE_LEAN_MAX);
+    const e = latAngle - countryLean(latAngle);
     return new THREE.Vector3(0, Math.sin(e) * top, Math.cos(e) * top);
   };
   // The invariant: the camera sits COUNTRY_VIEW_ELEV above C's local tangent plane — the
@@ -135,7 +136,7 @@ describe("countryFraming", () => {
       countryFraming(0.9, ang, out);
       return out.pos.distanceTo(C(0.9));
     };
-    expect(dist(0.02)).toBeCloseTo(5, 9); // floor
+    expect(dist(0.02)).toBeCloseTo(4.3, 9); // floor
     expect(dist(0.25)).toBeGreaterThan(dist(0.12));
     expect(dist(0.7)).toBeCloseTo(20, 9); // cap
   });

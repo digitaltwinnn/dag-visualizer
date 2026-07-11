@@ -15,6 +15,7 @@ import { readSceneColors } from "./sceneColors";
 import { VIEW_POLICIES } from "./domain/viewPolicy";
 import { FOCI, hubFraming, geoFraming, ledgerLayerFraming, easeInOutQuad, type CameraFraming } from "./domain/cameraRig";
 import { countryFraming } from "./domain/countryShape";
+import { R as GEO_R, LAND_H } from "./domain/geoLayout";
 import type { GlobalSnapshot, PickDescriptor } from "@/src/data/types";
 import type { ClusterNode, DagCore, GeoMap, RouteMetagraph } from "@/src/data/types";
 
@@ -82,10 +83,17 @@ export class Engine {
   private _dofMeta: MetaHubRec | null = null;
 
   private raycaster = new THREE.Raycaster();
+  // Land-sphere hit scratch for the scene country hover/click (ray→sphere analytically —
+  // the sphere is rotation-invariant, so no mesh raycast is needed).
+  private _landSphere = new THREE.Sphere(new THREE.Vector3(0, 0, 0), GEO_R + LAND_H);
+  private _landHit = new THREE.Vector3();
   private pointer = new THREE.Vector2();
   private canvas: HTMLCanvasElement;
   private onClick = (e: MouseEvent) => this._handleClick(e);
   private onMove = (e: MouseEvent) => this._handleMove(e);
+  // Leaving the canvas (onto a card/rail) stops pointermoves, so transient hovers would
+  // otherwise linger — clear them all at the boundary.
+  private onLeave = () => this._clearHover();
   // DRAG SUPPRESSION: a "click" that ends a camera-orbit drag must pick NOTHING (with the floor
   // planes pickable, almost every orbit would otherwise end by committing a layer + a camera
   // flight). Record where the pointer went down; _handleClick ignores clicks that travelled
@@ -162,6 +170,7 @@ export class Engine {
     canvas.addEventListener("click", this.onClick);
     canvas.addEventListener("pointermove", this.onMove);
     canvas.addEventListener("pointerdown", this.onDown);
+    canvas.addEventListener("pointerleave", this.onLeave);
     // The engine owns the resize handler (createScene no longer adds one) so it's
     // cleaned up on dispose — no leak across StrictMode remounts / HMR.
     window.addEventListener("resize", this.onResize);
@@ -599,12 +608,14 @@ export class Engine {
   // which settles the node at the LOWER-third line (user; rule-of-thirds — centred read wrong)
   // with the horizon + sky filling the upper frame.
   private _focusNode() {
-    // z 21 → 19.4 (user: zoom in more) — close enough to read the hex prism's facets/edges,
-    // still skimming the surface rather than staring down at it. target y 14 → 32 (user: node at
-    // the LOWER third, not centred): the camera sits ~4.6 world units from the node, so the
-    // look-at point must swing far up the globe's rising face to shift the node a third of the
-    // frame — solved from the framing geometry (node ≈ (0,3.7,16.7) after focusNode's aim).
-    this._tweenTo(new THREE.Vector3(0, 0, 19.4), new THREE.Vector3(0, 32, 2));
+    // Pose iterated live with the user. focusNode's uncapped lean parks EVERY node at the
+    // same residual elevation (the 0.42 raise → node ≈ (0, 6.9, 15.5)) — the oblique
+    // surface-skimming angle the user approved on Helsinki, now latitude-independent. The
+    // camera sits slightly above the equator plane (y 1.2 — "a bit higher, not too much") and
+    // closer than the first tuning; the steep composed look-at (y 32) keeps the surface
+    // rising toward the horizon with the node just below centre. Dolly-exempt: the composed
+    // target made CAM_ZOOM drag the camera diagonally away from the node (zoom-OUT, user).
+    this._tweenTo(new THREE.Vector3(0, 1.2, 18.8), new THREE.Vector3(0, 32, 2), false);
   }
 
   // Compute the per-country leaderboard for the active filter and push it to the store
@@ -734,9 +745,20 @@ export class Engine {
     const snapOrd = p?.kind === "snapshot" ? p.data.ordinal : null;  // snapshot → ledger row
     const metaId = p?.kind === "meta" ? p.cfg?.id ?? null : null;    // hub → metagraph dim preview
     const layerId = p?.kind === "layer" ? p.layerId : null;          // floor plane → highlight preview
+    // Country under the cursor (policy-gated, no object hit): the SCENE side of the
+    // bidirectional country pairing — writes the same hoverCountry channel the explorer rows
+    // use, so the border preview + the row wash light from either end. Ray→sphere analytically
+    // (the land sphere is rotation-invariant; the Globe resolves WHICH country in its frame).
+    let countryCc: string | null = null;
+    if (!p && VIEW_POLICIES[this.mode].countryHover && this.morph > 0.9) {
+      const hit = this.raycaster.ray.intersectSphere(this._landSphere, this._landHit);
+      if (hit) countryCc = this.globe.countryCcAtPoint(hit);
+    }
+    if (countryCc) this.canvas.style.cursor = "pointer"; // the border preview invites the drill
     if (nodeKey !== st.hoverNodeId) st.setHoverNodeId(nodeKey);
     if (snapOrd !== st.hoverSnapOrd) st.setHoverSnapOrd(snapOrd);
     if (metaId !== st.hoverFilter) st.setHoverFilter(metaId);
+    if (countryCc !== st.hoverCountry) st.setHoverCountry(countryCc);
     if (layerId !== st.ledgerHilite) st.setLedgerHilite(layerId);    // same channel the panel rows write
 
     // The lean tooltip label — re-write the store only when the subject's identity changes so
@@ -752,7 +774,21 @@ export class Engine {
     // A click that ends a drag (orbit/pan) is navigation, not selection — see onDown.
     if (Math.hypot(e.clientX - this._downX, e.clientY - this._downY) > 5) return;
     const p = this._pickAt(e);
-    if (!p) return;
+    if (!p) {
+      // No object under the cursor: in geo, a click on a drillable COUNTRY toggles its drill —
+      // the scene twin of the explorer row (the hover border already invited it). Same
+      // semantics as GeoExplore.drill: entering/leaving a country level drops a selected node.
+      if (VIEW_POLICIES[this.mode].countryHover && this.morph > 0.9) {
+        const hit = this.raycaster.ray.intersectSphere(this._landSphere, this._landHit);
+        const cc = hit ? this.globe.countryCcAtPoint(hit) : null;
+        if (cc) {
+          const st = useStore.getState();
+          if (st.inspect) st.setInspect(null);
+          st.setCountry(st.country === cc ? null : cc);
+        }
+      }
+      return;
+    }
     // A hub click selects the metagraph (opens its context pane + frames it).
     if (p.kind === "meta") {
       useStore.getState().setFilter(p.cfg.id);
@@ -797,13 +833,16 @@ export class Engine {
   }
 
 
-  private _tweenTo(toPos: Vec, toTgt: Vec) {
-
+  private _tweenTo(toPos: Vec, toTgt: Vec, dolly = true) {
     const tw = this._tween;
     tw.fromPos.copy(this.ctx.camera.position);
     // Dolly every framing back by CAM_ZOOM (push the position out from its target) — one global lever
     // so all views sit a touch wider. Writes straight into tw.toPos, no extra allocation.
-    tw.toPos.subVectors(toPos, toTgt).multiplyScalar(CAM_ZOOM).add(toTgt);
+    // `dolly: false` exempts poses whose TARGET is a composed look-at rather than the subject
+    // (the node zoom aims far up the globe's face — dollying along that axis dragged the camera
+    // diagonally away from the node instead of just widening the shot).
+    if (dolly) tw.toPos.subVectors(toPos, toTgt).multiplyScalar(CAM_ZOOM).add(toTgt);
+    else tw.toPos.copy(toPos);
     tw.fromTgt.copy(this.ctx.controls.target);
     tw.toTgt.copy(toTgt);
     tw.t = 0;
@@ -956,6 +995,7 @@ export class Engine {
     this.canvas.removeEventListener("click", this.onClick);
     this.canvas.removeEventListener("pointermove", this.onMove);
     this.canvas.removeEventListener("pointerdown", this.onDown);
+    this.canvas.removeEventListener("pointerleave", this.onLeave);
     window.removeEventListener("resize", this.onResize);
     this.stats?.dom.remove();
     this.unsub.forEach((u) => u());

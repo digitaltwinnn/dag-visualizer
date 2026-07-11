@@ -31,6 +31,7 @@ export default function GeoExplore() {
   const setInspect = useStore((s) => s.setInspect);
   const setHoverNodeId = useStore((s) => s.setHoverNodeId);
   const setHoverCountry = useStore((s) => s.setHoverCountry);
+  const hoverCountry = useStore((s) => s.hoverCountry);
   const hoverNodeId = useStore((s) => s.hoverNodeId);
   const setFilter = useStore((s) => s.setFilter);
   const filter = useStore((s) => s.filter);
@@ -159,6 +160,11 @@ export default function GeoExplore() {
             // (px-1.5 -mx-1.5), so the drilled row's hover/selection box and the dropdown group
             // behind it share edges — the button used to overhang the wash by 6px on both sides
             // (user: "nodes dropdown not aligned with the parent").
+            // Bidirectional pairing: hovering the row previews the country's border on the
+            // globe, and hovering the COUNTRY IN THE SCENE washes this row (same channel,
+            // same .subject-paired language as the node rows; structural cyan — a place, not
+            // an identity).
+            const pair = subjectPairing(hoverCountry, c.cc, setHoverCountry, "var(--primary)");
             return (
               <div key={c.cc} className={cn(open && "bg-wash-faint rounded-btn my-0.5 -mx-1.5 px-1.5")}>
                 <button
@@ -168,20 +174,20 @@ export default function GeoExplore() {
                     // (overconstrained box) and the row ended 6px SHORT of the column; the calc width
                     // bakes both 6px outsets in, so the row box spans the open group's wash box
                     // edge-to-edge (buttons shrink-to-fit, so an auto width is not an option).
-                    "group flex items-center gap-2.5 w-[calc(100%+12px)] text-left text-body border-none bg-transparent cursor-pointer py-[5px] px-1.5 -mx-1.5 rounded-sm transition-[background] duration-150",
+                    "nb-row group flex items-center gap-2.5 w-[calc(100%+12px)] text-left text-body border border-transparent bg-transparent cursor-pointer py-[5px] px-1.5 -mx-1.5 rounded-sm transition-[background] duration-150",
                     "hover:bg-wash-hover",
                     "focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--primary)] focus-visible:outline-offset-[-2px]",
                     // The drilled country row wears the same shared selection language as the
                     // picker's committed row (SELECTED_ROW) — no ✓ though: an open accordion's
                     // state cue is its ▾ chevron, not a selection check.
                     open && SELECTED_ROW,
+                    pair.paired && pair.className,
                   )}
+                  style={pair.style}
                   aria-expanded={open}
                   onClick={() => drill(c.cc)}
-                  // Hovering a country row previews its border outline on the globe (whisper
-                  // level — the committed drill's full hairline wins engine-side).
-                  onMouseEnter={() => setHoverCountry(c.cc)}
-                  onMouseLeave={() => setHoverCountry(null)}
+                  onMouseEnter={pair.onMouseEnter}
+                  onMouseLeave={pair.onMouseLeave}
                 >
                   <span className="text-label w-[17px] text-center flex-none">{ccToFlag(c.cc)}</span>
                   <span className="flex-none w-24 text-body text-foreground-dim whitespace-nowrap overflow-hidden text-ellipsis" title={c.country}>
