@@ -7,7 +7,7 @@ import { shortHash, CORE_HEX, getNetwork, metagraphById } from "@/src/data/netwo
 import { identityHudHex } from "@/src/palette/identity";
 import { hex, fmtDag, fmtKB } from "@/src/util/format";
 import { relativeAge } from "@/src/util/relativeAge";
-import type { GlobalSnapshot, MetaCfg, NodeInfo, PickDescriptor } from "@/src/data/types";
+import type { GlobalSnapshot, MetaCfg, PickDescriptor } from "@/src/data/types";
 import AnchoredTags from "./AnchoredTags";
 import Odometer from "@/components/Odometer";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
@@ -19,7 +19,7 @@ import { ExternalLink } from "lucide-react";
 import { useMinHold } from "@/components/useMinHold";
 import { POLL } from "@/src/engine/config";
 import { Desc, StatusMark, CompositionRows, StatusBreakdown, networkKind } from "./parts";
-import { compositionRows } from "@/src/data/composition";
+import { compositionRows, nodeCompositionLabel } from "@/src/data/composition";
 import { ledgerLayerById } from "@/src/data/ledgerLayers";
 
 type PickOf<K extends PickDescriptor["kind"]> = Extract<PickDescriptor, { kind: K }>;
@@ -152,7 +152,15 @@ export function GeoLiveSubtitle() {
   if (!node) return null;
   const id = node.node?.id;
   if (!id || !nodePlace(node)) return null;
-  return <span className="font-mono tabular-nums">{shortHash(id)}</span>;
+  // The node's composition rides inline behind the id — "hybrid (L0 · cL1)" — instead of a
+  // one-node CompositionRows block whose count was always 1 (user, 2026-07-11).
+  const comp = node.node ? nodeCompositionLabel(node.node) : null;
+  return (
+    <span className="font-mono tabular-nums">
+      {shortHash(id)}
+      {comp && <span className="font-sans text-muted-foreground"> · {comp}</span>}
+    </span>
+  );
 }
 
 // Node title-row aside: the status pill.
@@ -350,8 +358,6 @@ export function GeoLiveCard() {
 // remains that the globe can't show: the node's layer composition. The slot eyebrow reads
 // "Selected node"; the × is CardHead's shared close (the outer pane).
 function GeoLiveNode({ p }: { p: PickOf<"l0" | "l1" | "metanode"> }) {
-  // The single node's roles → a one-node composition row (shared vocabulary).
-  const oneNode: NodeInfo[] = p.node ? [p.node] : [];
   // Hosting provider from the node's IP lookup (GeoInfo.isp/asn) — the one machine fact the
   // globe can't show. Absent = the lookup didn't know; the line simply doesn't render
   // (honesty: no "Unknown" filler in a facts card).
@@ -369,15 +375,8 @@ function GeoLiveNode({ p }: { p: PickOf<"l0" | "l1" | "metanode"> }) {
           </div>
         </div>
       )}
-      {/* Composition as a stacked label + block (NOT wrapped in a label/value row whose value
-          is an inline <span> — CompositionRows renders a <div>, which can't nest in an inline
-          element). */}
-      {oneNode.length > 0 && (
-        <div className="my-2">
-          <span className="text-micro tracking-[0.1em] uppercase text-muted-foreground">Composition</span>
-          <CompositionRows nodes={oneNode} />
-        </div>
-      )}
+      {/* No COMPOSITION block: the single node's composition is an inline phrase on the id
+          subtitle now — the aggregate CompositionRows always counted "1" here (user). */}
     </>
   );
 }
