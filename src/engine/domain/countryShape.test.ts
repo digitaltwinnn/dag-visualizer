@@ -136,9 +136,9 @@ describe("countryFraming", () => {
       countryFraming(0.9, ang, out);
       return out.pos.distanceTo(C(0.9));
     };
-    expect(dist(0.02)).toBeCloseTo(4.3, 9); // floor
+    expect(dist(0.02)).toBeCloseTo(3.9, 9); // floor
     expect(dist(0.25)).toBeGreaterThan(dist(0.12));
-    expect(dist(0.7)).toBeCloseTo(20, 9); // cap
+    expect(dist(0.7)).toBeCloseTo(18.5, 9); // cap
   });
 
   it("aims slightly below the country point (rides above frame-centre) and stays outside the globe", () => {

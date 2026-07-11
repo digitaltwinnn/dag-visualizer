@@ -174,10 +174,10 @@ export function countryFraming(latAngle: number, angularRadius: number, out: Cam
   // city-states don't slam the surface, capped so continent-spanning countries stay inside
   // a readable wide pose.
   const halfSpan = Math.max(0.06, angularRadius);
-  const FIT_TAN = 0.27; // ≈ tan(15°) — the comfortable half-angle inside the FOV-55 frame
-  // Floor 4.3 (compact countries — Finland-sized — come in close; the Engine's global
-  // CAM_ZOOM dolly widens the net pose ~15%), cap 20 (continent-spanners stay readable).
-  const D = THREE.MathUtils.clamp((Math.sin(halfSpan) * top) / FIT_TAN, 4.3, 20);
+  const FIT_TAN = 0.31; // fit half-angle inside the FOV-55 frame (0.27 → 0.31, user: zoom in a bit more)
+  // Floor 3.9 (compact countries — Finland-sized — come in close; the Engine's global
+  // CAM_ZOOM dolly widens the net pose ~15%), cap 18.5 (continent-spanners stay readable).
+  const D = THREE.MathUtils.clamp((Math.sin(halfSpan) * top) / FIT_TAN, 3.9, 18.5);
   // Approach direction (in the meridian plane): COUNTRY_VIEW_ELEV above C's tangent plane on
   // the EQUATOR side — v̂ = (0, -cos(e+φ), sin(e+φ)). countryLean() guarantees e+φ ≤ ZENITH_CAP,
   // so the camera stays on the front side of the country's zenith at any latitude.
@@ -187,7 +187,7 @@ export function countryFraming(latAngle: number, angularRadius: number, out: Cam
   // below C); wide countries ease down to the mid-line — their landmass extends upward from
   // the centroid, so the same above-centre bias read "too high" for the US/Canada/India
   // (user). The drop fades out (slightly negative) as D approaches the wide cap.
-  const t = (D - 4.3) / 15.7; // 0 at the near floor, 1 at the wide cap
+  const t = (D - 3.9) / 14.6; // 0 at the near floor, 1 at the wide cap
   const bias = THREE.MathUtils.lerp(AIM_BELOW_CENTROID, -0.04, t);
   const drop = Math.tan(bias) * D;
   out.target.set(0, cy - Math.cos(e) * drop, cz + Math.sin(e) * drop);

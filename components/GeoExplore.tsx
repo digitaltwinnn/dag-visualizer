@@ -222,7 +222,13 @@ export default function GeoExplore() {
 
                 {open && (
                   // Leaving the node list clears the globe hover-glow.
-                  <div className="mb-1.5 ml-[9px] py-0.5 pl-3 border-l border-border" onMouseLeave={() => setHoverNodeId(null)}>
+                  <div
+                    className="mb-1.5 ml-[9px] py-0.5 pl-3 border-l border-border"
+                    onMouseLeave={() => {
+                      setHoverNodeId(null);
+                      setHoverCountry(null);
+                    }}
+                  >
                     {nodes.length === 0 ? (
                       <p className="mt-1 mx-1 mb-1.5 text-label text-muted-foreground">No locatable nodes here yet.</p>
                     ) : (
@@ -255,7 +261,12 @@ export default function GeoExplore() {
                             style={pair.style}
                             title={`${r.label} · ${r.state ?? "—"}`}
                             onClick={() => selectNode(r.pick, on)}
-                            onMouseEnter={pair.onMouseEnter}
+                            // Hovering a node also hovers its COUNTRY (user) — the globe shows
+                            // the whisper border and the country row washes, same as the scene.
+                            onMouseEnter={() => {
+                              pair.onMouseEnter();
+                              setHoverCountry("geo" in r.pick ? r.pick.geo?.cc ?? null : null);
+                            }}
                           >
                             <IdentityDot hue={rowHue} />
                             {/* Location-first (matches the node CARD's title/subtitle pattern):

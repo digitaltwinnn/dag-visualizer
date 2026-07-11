@@ -747,14 +747,19 @@ export class Engine {
     const snapOrd = p?.kind === "snapshot" ? p.data.ordinal : null;  // snapshot → ledger row
     const metaId = p?.kind === "meta" ? p.cfg?.id ?? null : null;    // hub → metagraph dim preview
     const layerId = p?.kind === "layer" ? p.layerId : null;          // floor plane → highlight preview
-    // Country under the cursor (policy-gated, no object hit): the SCENE side of the
-    // bidirectional country pairing — writes the same hoverCountry channel the explorer rows
-    // use, so the border preview + the row wash light from either end. Ray→sphere analytically
-    // (the land sphere is rotation-invariant; the Globe resolves WHICH country in its frame).
+    // Country under the cursor (policy-gated): the SCENE side of the bidirectional country
+    // pairing — writes the same hoverCountry channel the explorer rows use, so the border
+    // preview + the row wash light from either end. Hovering a NODE hovers its country too
+    // (user); with no object hit, the land point under the cursor resolves analytically
+    // (ray→sphere — the sphere is rotation-invariant; the Globe resolves WHICH country).
     let countryCc: string | null = null;
-    if (!p && VIEW_POLICIES[this.mode].countryHover && this.morph > 0.9) {
-      const hit = this.raycaster.ray.intersectSphere(this._landSphere, this._landHit);
-      if (hit) countryCc = this.globe.countryCcAtPoint(hit);
+    if (VIEW_POLICIES[this.mode].countryHover && this.morph > 0.9) {
+      if (p && (p.kind === "l0" || p.kind === "l1" || p.kind === "metanode")) {
+        countryCc = p.geo?.cc ?? null;
+      } else if (!p) {
+        const hit = this.raycaster.ray.intersectSphere(this._landSphere, this._landHit);
+        if (hit) countryCc = this.globe.countryCcAtPoint(hit);
+      }
     }
     if (countryCc) this.canvas.style.cursor = "pointer"; // the border preview invites the drill
     if (nodeKey !== st.hoverNodeId) st.setHoverNodeId(nodeKey);

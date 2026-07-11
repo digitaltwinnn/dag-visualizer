@@ -13,7 +13,10 @@ export interface CameraFraming {
 
 // Camera presets (ported from ui.js FOCI; Engine.ts:46-56 verbatim).
 export const FOCI: Record<string, { pos: THREE.Vector3; target: THREE.Vector3 }> = {
-  overview: { pos: new THREE.Vector3(0, 15, 60), target: new THREE.Vector3(0, 2, 0) },
+  // Pulled back (60 → 68, user): every view's START pose gets the same zoom-out the globe
+  // needs — the whole scene rests inside the rail-free centre of the frame. Shared by the
+  // hyper resting pose, the ledger overview and the placeholder idle.
+  overview: { pos: new THREE.Vector3(0, 17, 68), target: new THREE.Vector3(0, 2, 0) },
   // The whole DAG core: pulled back enough to frame the outer cL1 (purple) shell (radius 14).
   dag: { pos: new THREE.Vector3(0, 9, 38), target: new THREE.Vector3(0, 1, 0) },
   // Geo targets the globe CENTRE — the downward-tilt composition comes from camera HEIGHT
@@ -21,7 +24,10 @@ export const FOCI: Record<string, { pos: THREE.Vector3; target: THREE.Vector3 }>
   // screen-space circle around the pivot, user bug). The drill/node framings still compose
   // their targets off-centre on purpose (a grab-to-re-centre ease was tried and reverted —
   // user preferred the composed pivots left alone).
-  geo: { pos: new THREE.Vector3(0, 11, 36), target: new THREE.Vector3(0, 0, 0) },
+  // Pulled back (36 → 41.5, user): the whole globe must rest inside the VISIBLE centre of
+  // the frame — the rails carve the sides and the LiveStrip the bottom, so the fit is set by
+  // the bottom-strip vertical band, not the raw FOV.
+  geo: { pos: new THREE.Vector3(0, 12.5, 41.5), target: new THREE.Vector3(0, 0, 0) },
   // Metagraph-selection pose: rotated-to-densest at a WIDE distance — deliberately farther out
   // than the country framing (geoFraming z 29..25) so the country drill reads as a real zoom-in.
   // Camera held LOW (near the equator plane, like the country/node poses) — a higher camera

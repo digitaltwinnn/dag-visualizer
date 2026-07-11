@@ -4,11 +4,11 @@ import { FOCI, hubFraming, geoFraming, easeInOutQuad } from "./cameraRig";
 
 describe("FOCI", () => {
   it("carries the camera presets (ledger has none — it uses `overview` + a rotated group)", () => {
-    expect(FOCI.overview.pos).toEqual(new THREE.Vector3(0, 15, 60));
+    expect(FOCI.overview.pos).toEqual(new THREE.Vector3(0, 17, 68)); // pulled back (user: whole scene visible at view start)
     expect(FOCI.overview.target).toEqual(new THREE.Vector3(0, 2, 0));
     expect(FOCI.dag.pos).toEqual(new THREE.Vector3(0, 9, 38));
     expect(FOCI.dag.target).toEqual(new THREE.Vector3(0, 1, 0));
-    expect(FOCI.geo.pos).toEqual(new THREE.Vector3(0, 11, 36));
+    expect(FOCI.geo.pos).toEqual(new THREE.Vector3(0, 12.5, 41.5)); // pulled back (whole globe inside the rail-free centre)
     // Geo targets the globe CENTRE (manual orbits stay concentric — no wobble).
     expect(FOCI.geo.target).toEqual(new THREE.Vector3(0, 0, 0));
     // Metagraph pose sits between the overview (z 36) and the country framing (z 29..25).
