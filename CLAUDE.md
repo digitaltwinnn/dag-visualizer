@@ -205,8 +205,12 @@ store-value imports**, enforced by `layerBoundaries.test.ts`). Each ships coloca
   height/lane-centre; ids shared with the UI copy table `src/data/ledgerLayers.ts` and the scene's
   `layer` picks), `ledgerSite`, `clusterRadius`, `ledgerSpread`.
 - `pickActions.ts` — the scene CLICK DECISION TABLE: what a click means per view × pick kind
-  (`clickActions` → ordered `ClickAction[]`; `pickNetId`), as pure data-in/actions-out logic the
-  Engine's `_handleClick` merely executes. The ORDERING contracts are tested invariants: a node
+  (`clickActions` → ordered `ClickAction[]`; `pickNetId`; **`pickActive`** — which picks respond
+  AT ALL per view: node-less hubs never, geo off-filter nodes never, hyper everything), as pure
+  data-in/actions-out logic the Engine's `_handleClick`/`_pickAt` merely execute. The table
+  self-gates by mode (safe even if a caller violates the countryCc contract). NOT covered here:
+  the React-side click handlers (LiveStrip's bar → jump-to-ledger, GeoExplore's drill/selectNode)
+  — component-scoped, no component-test rig in the repo. The ORDERING contracts are tested invariants: a node
   click sets filter FIRST (its subscription clears any old drill) → the node's country → inspect
   LAST (the node camera wins); the empty-click country toggle drops a selected node before
   moving the drill level. New click semantics go HERE with a test, not inline in the Engine.

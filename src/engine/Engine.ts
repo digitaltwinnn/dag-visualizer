@@ -16,7 +16,7 @@ import { VIEW_POLICIES } from "./domain/viewPolicy";
 import { FOCI, hubFraming, geoFraming, ledgerLayerFraming, nodeFraming, hyperNodeFraming, dollyBack, easeInOutQuad, type CameraFraming } from "./domain/cameraRig";
 import { countryFraming } from "./domain/countryShape";
 import { R as GEO_R, LAND_H } from "./domain/geoLayout";
-import { clickActions } from "./domain/pickActions";
+import { clickActions, pickActive } from "./domain/pickActions";
 import type { GlobalSnapshot, PickDescriptor } from "@/src/data/types";
 import type { ClusterNode, DagCore, GeoMap, RouteMetagraph } from "@/src/data/types";
 
@@ -657,7 +657,7 @@ export class Engine {
       const pick: PickDescriptor | undefined = h.object.userData.picks
         ? h.object.userData.picks[h.instanceId as number]
         : h.object.userData.pick;
-      if (!pick || !this._isPickActive(pick)) continue;
+      if (!pick || !pickActive(pick, this.mode, this.filter, this._activeMetaIds)) continue;
       if (pick.kind === "layer") {
         // Planes are only 3D targets while NO layer is committed — once one is selected (the
         // zoomed layer-focus pose), hovering/clicking the stack must not steal the highlight;
@@ -681,25 +681,6 @@ export class Engine {
 
   // The network (filter id) a node pick belongs to: its metagraph, or the DAG core for a
   // validator. Clicking a node sets the global filter to this, consistently in every view.
-  // Whether a pick participates in hover/click. In GEO the off-filter / off-country nodes are
-  // genuinely hidden, so they're not pickable. In HYPER every node stays interactive — the
-  // off-focus ones are only *dimmed*, not hidden, so clicking one (e.g. a core validator while
-  // a metagraph is selected) drills into its network; gating them out there read as a bug.
-  private _isPickActive(p: PickDescriptor): boolean {
-    // A registered-but-node-less metagraph hub is shown (dim) but not selectable, so it
-    // matches its inactive look + its "registered · no live nodes" filter chip.
-    if (p.kind === "meta") return !this._activeMetaIds || this._activeMetaIds.has(p.cfg.id);
-    if (this.mode !== "geo") return true;
-    let id: string | undefined;
-    if (p.kind === "l0" || p.kind === "l1") id = "dag"; // validators are the DAG core
-    else if (p.kind === "metanode") id = p.meta?.id;
-    else return true;
-    if (!(this.filter === "all" || this.filter === id)) return false;
-    // No country clause: the drill is a lens, not a filter (user 2026-07-11) — out-of-country
-    // nodes stay visible and therefore stay pickable.
-    return true;
-  }
-
   // Drop every transient hover: the tooltip subject + all four hover channels (each store
   // write also resets its 3D effect via the command-bridge subscription). Event-driven only
   // (view switch) — never on the per-frame path.

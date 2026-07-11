@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { clickActions, pickNetId, type ClickAction } from "./pickActions";
+import { clickActions, pickActive, pickNetId, type ClickAction } from "./pickActions";
 import type { PickDescriptor } from "@/src/data/types";
 
 // Minimal pick fixtures — only the fields the table reads.
@@ -110,5 +110,49 @@ describe("clickActions — node clicks (the ordering contracts)", () => {
       "filter",
       "inspect",
     ]);
+  });
+});
+
+describe("clickActions — flat/placeholder + non-geo safety (the table gates itself)", () => {
+  it("an empty click does nothing in ANY non-geo view, even with a (contract-violating) countryCc", () => {
+    for (const mode of ["hyper", "ledger", "status", "transactions", "staking"] as const) {
+      expect(clickActions({ mode, pick: null, countryCc: "DE", current: state() })).toEqual([]);
+    }
+  });
+});
+
+describe("clickActions — layer SWITCH (a different plane while one is committed)", () => {
+  it("commits the newly clicked plane instead of toggling off", () => {
+    const p = layerPick("msnap");
+    expect(
+      clickActions({ mode: "ledger", pick: p, countryCc: null, current: state({ layerId: "ml0" }) }),
+    ).toEqual([{ kind: "layer", pick: p }]);
+  });
+});
+
+describe("pickActive — which picks respond at all, per view", () => {
+  it("a node-less metagraph hub is never selectable; a located one is", () => {
+    const active = new Set(["dor"]);
+    expect(pickActive(hubPick(), "hyper", "all", active)).toBe(true);
+    const emptyHub = { kind: "meta", cfg: { id: "leet" } } as unknown as PickDescriptor;
+    expect(pickActive(emptyHub, "hyper", "all", active)).toBe(false);
+  });
+  it("before the located counts load (null set), every hub is allowed", () => {
+    expect(pickActive(hubPick(), "hyper", "all", null)).toBe(true);
+  });
+  it("GEO: off-filter nodes are not pickable (they're genuinely hidden)", () => {
+    expect(pickActive(nodePick(), "geo", "all", null)).toBe(true);
+    expect(pickActive(nodePick(), "geo", "dor", null)).toBe(true);
+    expect(pickActive(nodePick(), "geo", "swap", null)).toBe(false);
+    expect(pickActive(validatorPick(), "geo", "dag", null)).toBe(true);
+    expect(pickActive(validatorPick(), "geo", "dor", null)).toBe(false);
+  });
+  it("HYPER/LEDGER: every node stays interactive — off-focus ones are only dimmed", () => {
+    expect(pickActive(nodePick(), "hyper", "swap", null)).toBe(true);
+    expect(pickActive(nodePick(), "ledger", "swap", null)).toBe(true);
+  });
+  it("non-node picks (snapshot/layer) pass — their view gating is pickSources", () => {
+    expect(pickActive(snapPick(), "ledger", "dor", null)).toBe(true);
+    expect(pickActive(layerPick(), "ledger", "dor", null)).toBe(true);
   });
 });

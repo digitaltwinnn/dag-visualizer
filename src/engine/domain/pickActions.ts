@@ -23,6 +23,28 @@ export type ClickAction =
 export const pickNetId = (p: PickDescriptor): string | null =>
   p.kind === "metanode" ? p.meta?.id ?? null : p.kind === "l0" || p.kind === "l1" ? "dag" : null;
 
+// Whether a pick participates in hover/click AT ALL — the per-view activity gate the Engine
+// applies to every raycast hit before it reaches clickActions/tooltips.
+//  - A registered-but-node-less metagraph hub is shown (dim) but never selectable, matching
+//    its inactive look + its "registered · no live nodes" filter chip (`activeMetaIds` null =
+//    counts not loaded yet → all allowed).
+//  - GEO: off-filter nodes are genuinely hidden, so they must not respond either (Three's
+//    raycaster ignores `visible`); the country drill is a LENS, so it does NOT gate picking.
+//  - HYPER (and elsewhere): every node stays interactive — off-focus ones are only dimmed,
+//    and clicking one drills into its network (gating them out read as a bug).
+export function pickActive(
+  p: PickDescriptor,
+  mode: Mode,
+  filter: string,
+  activeMetaIds: ReadonlySet<string> | null,
+): boolean {
+  if (p.kind === "meta") return !activeMetaIds || activeMetaIds.has(p.cfg.id);
+  if (mode !== "geo") return true;
+  const id = p.kind === "l0" || p.kind === "l1" ? "dag" : p.kind === "metanode" ? p.meta?.id : undefined;
+  if (id === undefined) return true; // non-node picks (snapshot/layer) are view-gated by pickSources
+  return filter === "all" || filter === id;
+}
+
 export function clickActions(input: {
   mode: Mode;
   // The raycast pick (already drag-suppressed + active-gated by the Engine), or null.
@@ -34,10 +56,11 @@ export function clickActions(input: {
 }): ClickAction[] {
   const { mode, pick: p, countryCc, current } = input;
 
-  // Empty click on a drillable country (geo): toggle its drill — the scene twin of the
-  // explorer row. Entering/leaving a country level drops a selected node first.
+  // Empty click on a drillable country: toggle its drill — the scene twin of the explorer
+  // row. Entering/leaving a country level drops a selected node first. Mode-gated here TOO
+  // (the Engine only resolves countryCc in geo, but the table stays safe on its own).
   if (!p) {
-    if (!countryCc) return [];
+    if (mode !== "geo" || !countryCc) return [];
     const acts: ClickAction[] = [];
     if (current.hasInspect) acts.push({ kind: "inspect", pick: null });
     acts.push({ kind: "country", cc: current.country === countryCc ? null : countryCc });
