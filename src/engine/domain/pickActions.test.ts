@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { clickActions, pickActive, pickNetId, type ClickAction } from "./pickActions";
+import { clickActions, countryToggleActions, nodeSelectActions, snapshotSelectActions, pickActive, pickNetId, type ClickAction } from "./pickActions";
 import type { PickDescriptor } from "@/src/data/types";
 
 // Minimal pick fixtures — only the fields the table reads.
@@ -8,10 +8,14 @@ const nodePick = (cc: string | null = "DE"): PickDescriptor =>
 const validatorPick = (): PickDescriptor =>
   ({ kind: "l0", node: { id: "abc" }, geo: { cc: "US" } }) as unknown as PickDescriptor;
 const hubPick = (): PickDescriptor => ({ kind: "meta", cfg: { id: "dor" } }) as unknown as PickDescriptor;
-const snapPick = (): PickDescriptor => ({ kind: "snapshot", data: { ordinal: 42 } }) as unknown as PickDescriptor;
+type SnapPick = Extract<PickDescriptor, { kind: "snapshot" }>;
+const snapPick = (): SnapPick => ({ kind: "snapshot", data: { ordinal: 42 } }) as unknown as SnapPick;
 const layerPick = (id = "ml0"): PickDescriptor => ({ kind: "layer", layerId: id }) as unknown as PickDescriptor;
 
-const state = (over: Partial<{ country: string | null; hasInspect: boolean; layerId: string | null }> = {}) => ({
+const state = (
+  over: Partial<{ filter: string; country: string | null; hasInspect: boolean; layerId: string | null }> = {},
+) => ({
+  filter: "all",
   country: null,
   hasInspect: false,
   layerId: null,
@@ -62,10 +66,10 @@ describe("clickActions — hub / snapshot / layer", () => {
       { kind: "filter", id: "dor" },
     ]);
   });
-  it("a snapshot tile pins that snapshot", () => {
+  it("a snapshot tile PINS that snapshot (a scene tile is never the strip's live tip)", () => {
     const p = snapPick();
     expect(clickActions({ mode: "ledger", pick: p, countryCc: null, current: state() })).toEqual([
-      { kind: "snapshot", pick: p },
+      { kind: "snapshot", pick: p, follow: false },
     ]);
   });
   it("a layer plane toggles the committed layer (on, then off on the same plane)", () => {
@@ -80,22 +84,28 @@ describe("clickActions — hub / snapshot / layer", () => {
 });
 
 describe("clickActions — node clicks (the ordering contracts)", () => {
-  it("GEO: stopAutoRotate, filter FIRST, then the node's country, inspect LAST", () => {
+  it("GEO: filter FIRST, then the node's country, inspect LAST", () => {
     const p = nodePick("DE");
     const acts = clickActions({ mode: "geo", pick: p, countryCc: null, current: state() });
-    expect(kinds(acts)).toEqual(["stopAutoRotate", "filter", "country", "inspect"]);
-    expect(acts[1]).toEqual({ kind: "filter", id: "dor" });
-    expect(acts[2]).toEqual({ kind: "country", cc: "DE" });
-    expect(acts[3]).toEqual({ kind: "inspect", pick: p });
+    expect(acts).toEqual([
+      { kind: "filter", id: "dor" },
+      { kind: "country", cc: "DE" },
+      { kind: "inspect", pick: p },
+    ]);
+  });
+  it("GEO: the filter step is SKIPPED when the node's network is already selected (no drill churn)", () => {
+    const p = nodePick("DE");
+    const acts = clickActions({ mode: "geo", pick: p, countryCc: null, current: state({ filter: "dor" }) });
+    expect(kinds(acts)).toEqual(["country", "inspect"]);
   });
   it("GEO: a node without a resolvable country skips the drill (no country action)", () => {
     const acts = clickActions({ mode: "geo", pick: nodePick(null), countryCc: null, current: state() });
-    expect(kinds(acts)).toEqual(["stopAutoRotate", "filter", "inspect"]);
+    expect(kinds(acts)).toEqual(["filter", "inspect"]);
   });
   it("GEO: a validator drills the DAG core + its country", () => {
     const acts = clickActions({ mode: "geo", pick: validatorPick(), countryCc: null, current: state() });
-    expect(acts[1]).toEqual({ kind: "filter", id: "dag" });
-    expect(acts[2]).toEqual({ kind: "country", cc: "US" });
+    expect(acts[0]).toEqual({ kind: "filter", id: "dag" });
+    expect(acts[1]).toEqual({ kind: "country", cc: "US" });
   });
   it("HYPER: filter + inspect only — no country (a geo concept), no autoRotate stop", () => {
     const p = nodePick("DE");
@@ -154,5 +164,36 @@ describe("pickActive — which picks respond at all, per view", () => {
   it("non-node picks (snapshot/layer) pass — their view gating is pickSources", () => {
     expect(pickActive(snapPick(), "ledger", "dor", null)).toBe(true);
     expect(pickActive(layerPick(), "ledger", "dor", null)).toBe(true);
+  });
+});
+
+describe("the shared component builders (GeoExplore rows + LiveStrip bars run the SAME table)", () => {
+  it("countryToggleActions === the scene's empty-click semantics (drill, toggle, deselect-first)", () => {
+    expect(countryToggleActions("DE", { country: null, hasInspect: false })).toEqual([
+      { kind: "country", cc: "DE" },
+    ]);
+    expect(countryToggleActions("DE", { country: "DE", hasInspect: false })).toEqual([
+      { kind: "country", cc: null },
+    ]);
+    expect(countryToggleActions("FI", { country: "DE", hasInspect: true })).toEqual([
+      { kind: "inspect", pick: null },
+      { kind: "country", cc: "FI" },
+    ]);
+  });
+  it("nodeSelectActions: the row's re-click deselects (one toggle language everywhere)", () => {
+    expect(nodeSelectActions(nodePick(), { mode: "geo", currentFilter: "dor", deselect: true })).toEqual([
+      { kind: "inspect", pick: null },
+    ]);
+  });
+  it("nodeSelectActions: a row select == a scene node click (same ordered actions)", () => {
+    const p = nodePick("DE");
+    const row = nodeSelectActions(p, { mode: "geo", currentFilter: "all" });
+    const scene = clickActions({ mode: "geo", pick: p, countryCc: null, current: state() });
+    expect(row).toEqual(scene);
+  });
+  it("snapshotSelectActions: the live tip (re-)follows, an older bar pins", () => {
+    const p = snapPick();
+    expect(snapshotSelectActions(p, true)).toEqual([{ kind: "snapshot", pick: p, follow: true }]);
+    expect(snapshotSelectActions(p, false)).toEqual([{ kind: "snapshot", pick: p, follow: false }]);
   });
 });

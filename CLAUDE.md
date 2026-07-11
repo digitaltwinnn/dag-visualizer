@@ -204,13 +204,18 @@ store-value imports**, enforced by `layerBoundaries.test.ts`). Each ships coloca
   group transform), `HYP_SPLIT` (the hypergraph level's 2/3+1/3 cut), `LAYER_GEOM` (layer id →
   height/lane-centre; ids shared with the UI copy table `src/data/ledgerLayers.ts` and the scene's
   `layer` picks), `ledgerSite`, `clusterRadius`, `ledgerSpread`.
-- `pickActions.ts` — the scene CLICK DECISION TABLE: what a click means per view × pick kind
-  (`clickActions` → ordered `ClickAction[]`; `pickNetId`; **`pickActive`** — which picks respond
-  AT ALL per view: node-less hubs never, geo off-filter nodes never, hyper everything), as pure
-  data-in/actions-out logic the Engine's `_handleClick`/`_pickAt` merely execute. The table
-  self-gates by mode (safe even if a caller violates the countryCc contract). NOT covered here:
-  the React-side click handlers (LiveStrip's bar → jump-to-ledger, GeoExplore's drill/selectNode)
-  — component-scoped, no component-test rig in the repo. The ORDERING contracts are tested invariants: a node
+- `pickActions.ts` — the CLICK/SELECT DECISION TABLE: what picking a subject means per view ×
+  pick kind, as pure data-in/actions-out logic with TWO kinds of executor: the Engine's
+  `_handleClick` (scene raycast clicks, via `clickActions` → ordered `ClickAction[]`) AND the
+  React components (GeoExplore's `drill`/`selectNode`, LiveStrip's bar `pick`) via the named
+  builders `countryToggleActions` / `nodeSelectActions` / `snapshotSelectActions` — so the
+  scene and the panels can never drift in semantics (a test literally asserts row-select ===
+  scene-click). Also `pickNetId` + **`pickActive`** (which picks respond AT ALL per view:
+  node-less hubs never, geo off-filter nodes never, hyper everything). Ordering contracts are
+  tested invariants: filter-first (only when it CHANGES — no drill churn) → node's country →
+  inspect-LAST (the node camera wins); deselect-before-drill on the country toggle; the LIVE
+  strip tip (re-)follows while older bars pin. The table self-gates by mode. New click/select
+  semantics go HERE with a test, not inline in a component or the Engine. The ORDERING contracts are tested invariants: a node
   click sets filter FIRST (its subscription clears any old drill) → the node's country → inspect
   LAST (the node camera wins); the empty-click country toggle drops a selected node before
   moving the drill level. New click semantics go HERE with a test, not inline in the Engine.

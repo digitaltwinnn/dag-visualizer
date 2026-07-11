@@ -8,6 +8,7 @@ import { useSnapshotFeed } from "@/components/useSnapshotFeed";
 import { useBreakpoint } from "@/components/useBreakpoint";
 import { getAnchor, metagraphById, filterAccent } from "@/src/data/network";
 import type { GlobalSnapshot } from "@/src/data/types";
+import { snapshotSelectActions } from "@/src/engine/domain/pickActions";
 import { relativeAge } from "@/src/util/relativeAge";
 
 // Matches VIS.maxSnapshots (the buffer cap) so the strip fills with the full retained window.
@@ -67,11 +68,17 @@ export default function LiveStrip() {
   };
 
   // Clicking a bar SELECTS that snapshot (no view switch) — its card shows in whatever view
-  // you're in and carries across views, like the selected node. Following the live tip if you
-  // clicked it, otherwise pinning a specific one.
+  // you're in and carries across views, like the selected node. Runs the SAME tested decision
+  // table as the ledger's 3D tile click (domain/pickActions): the live tip (re-)follows the
+  // heartbeat, anything older pins.
   const pick = (d: GlobalSnapshot) => {
-    setFollowing(latestRelevant("all")?.ordinal === d.ordinal);
-    setSnap({ kind: "snapshot", title: `Global snapshot #${d.ordinal}`, data: d });
+    const p = { kind: "snapshot", title: `Global snapshot #${d.ordinal}`, data: d } as const;
+    for (const a of snapshotSelectActions(p, latestRelevant("all")?.ordinal === d.ordinal)) {
+      if (a.kind === "snapshot") {
+        setFollowing(a.follow);
+        setSnap(a.pick);
+      }
+    }
   };
 
   // Per bar: the tick's total anchors, and (filtered) this metagraph's own anchors. The plotted

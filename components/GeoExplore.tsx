@@ -13,6 +13,7 @@ import { IdentityDot, StatusMark } from "@/components/inspector/parts";
 import { SELECTED_ROW, SelectedRowMark } from "@/components/selection";
 import { ccToFlag } from "@/src/util/format";
 import { hoverKeyOf } from "@/src/data/hoverSubject";
+import { countryToggleActions, nodeSelectActions, type ClickAction } from "@/src/engine/domain/pickActions";
 import { subjectPairing } from "@/components/useSubjectPairing";
 import type { NodeRow } from "@/src/data/types";
 
@@ -37,35 +38,21 @@ export default function GeoExplore() {
   const filter = useStore((s) => s.filter);
   const [collapsed, setCollapsed] = useState(false);
 
-  // Selecting a node here mirrors clicking it on the globe (Engine._handleClick): set the
-  // network filter to the node's OWN network first, then open its card. Without the filter step
-  // the selection didn't carry into the Hypergraph (the view had nothing to isolate). A validator
-  // belongs to the DAG core ("dag"); a metagraph node to its metagraph.
-  // `selected` = this row is the currently-inspected node — re-clicking it DESELECTS (the same
-  // step-back as the node card's ×, user: one toggle language everywhere), which drops the
-  // camera back to the country/network framing.
-  const selectNode = (pick: NodeRow["pick"], selected: boolean) => {
-    if (selected) {
-      setInspect(null);
-      return;
+  // Row selections run the SAME tested decision table as the scene clicks (domain/pickActions)
+  // — this component only executes the returned store actions, so the explorer and the globe
+  // can never drift in semantics (filter-first / node's-country / inspect-last ordering, the
+  // row's re-click deselect, the zoom-level rule).
+  const runActions = (acts: ClickAction[]) => {
+    for (const a of acts) {
+      if (a.kind === "filter") setFilter(a.id);
+      else if (a.kind === "country") setCountry(a.cc);
+      else if (a.kind === "inspect") setInspect(a.pick as NodeRow["pick"] | null);
     }
-    const netId =
-      pick.kind === "metanode"
-        ? pick.meta?.id ?? null
-        : pick.kind === "l0" || pick.kind === "l1"
-          ? "dag"
-          : null;
-    if (netId && netId !== filter) {
-      setFilter(netId);
-      // The engine's "switching network clears the country drill" rule fires on that setFilter —
-      // right for the PICKER, wrong here: this filter change is a side-effect of selecting a
-      // node INSIDE the drilled country (user bug: the accordion collapsed and the row's
-      // selection vanished). Re-assert the drill — the node provably lives in it.
-      const cc = "geo" in pick ? pick.geo?.cc ?? null : null;
-      if (country && cc === country) setCountry(country);
-    }
-    setInspect(pick);
   };
+  // `selected` = this row is the currently-inspected node — re-clicking it DESELECTS (the same
+  // step-back as the node card's ×, user: one toggle language everywhere).
+  const selectNode = (pick: NodeRow["pick"], selected: boolean) =>
+    runActions(nodeSelectActions(pick, { mode: "geo", currentFilter: filter, deselect: selected }));
 
   const list = lb?.countries ?? [];
   const max = list[0]?.count ?? 1;
@@ -84,14 +71,10 @@ export default function GeoExplore() {
   const activeCfg = metagraphById(filter);
   const tickerOrName = activeCfg ? activeCfg.ticker || activeCfg.name : "This metagraph";
   // Click a country: drill the globe into it (store.country) — the drill state doubles as the
-  // accordion's "which row is open", so the globe and the list stay one source of truth.
-  // Moving between zoom LEVELS deselects the finer one (user): drilling (or un-drilling) a
-  // country clears any selected NODE — its card closes and the camera lands on the country
-  // (or network) framing instead of staying pinned to the old node.
-  const drill = (cc: string) => {
-    if (sel) setInspect(null);
-    setCountry(country === cc ? null : cc);
-  };
+  // accordion's "which row is open", so the globe and the list stay one source of truth. Same
+  // tested table as the scene's empty-click country toggle (zoom-level rule included).
+  const drill = (cc: string) =>
+    runActions(countryToggleActions(cc, { country, hasInspect: !!sel }));
 
   // Selection's nodes grouped by country **name** — the join key both the leaderboard and the
   // node list derive from `geo.country` (`cc` can be absent, the name can't). Each country's

@@ -764,16 +764,20 @@ export class Engine {
       mode: this.mode,
       pick: p,
       countryCc,
-      current: { country: st.country, hasInspect: !!st.inspect, layerId: st.layer?.layerId ?? null },
+      current: {
+        filter: st.filter,
+        country: st.country,
+        hasInspect: !!st.inspect,
+        layerId: st.layer?.layerId ?? null,
+      },
     });
     for (const a of actions) {
       switch (a.kind) {
         case "filter": st.setFilter(a.id); break;
         case "country": st.setCountry(a.cc); break;
         case "inspect": st.setInspect(a.pick); break;
-        case "snapshot": st.setFollowing(false); st.setSnap(a.pick); break;
+        case "snapshot": st.setFollowing(a.follow); st.setSnap(a.pick); break;
         case "layer": st.setLayer(a.pick); break;
-        case "stopAutoRotate": this.ctx.controls.autoRotate = false; break;
       }
     }
   }
