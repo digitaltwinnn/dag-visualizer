@@ -126,7 +126,7 @@ const getLive = unstable_cache(
     if (!live.metagraphs.length) throw new Error("empty live result");
     return live;
   },
-  ["metagraphs-live"],
+  ["metagraphs-live-v2"], // v2: +isp/asn geo fields (key bump busts the pre-provider cache)
   { revalidate },
 );
 

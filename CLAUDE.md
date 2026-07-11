@@ -349,7 +349,11 @@ GPU; no store/react**):
   `cluster`/`anchor` events, `on`/`off`). When the API is unreachable it stays factual (a "NO
   SIGNAL" state) and recovers on the next good poll. It polls regardless of view.
 - `geoResolve.ts` — `loadGeoCache()` (fetches the live `/api/geo` map) + best-effort `resolveMissing`
-  for new validator IPs (ip-api over http, ipwho.is over https).
+  for new validator IPs (ip-api over http, ipwho.is over https). The lookups also carry the
+  **hosting provider** (`GeoInfo.isp`/`asn` — ip-api's `isp` + the ASN prefix of `as`; free on the
+  same batch call): the node card's HOSTING line + the explorer's provider sections. ⚠️ Adding
+  geo FIELDS does not invalidate `unstable_cache`/localStorage — bump the cache keys
+  (`validator-geo-live-v2`, `metagraphs-live-v2`, `dag-geo-cache-v2`) when the field set changes.
 
 **There is intentionally no `$DAG` price networking** — don't add a market-data fetch unless
 something in the UI actually consumes it.
@@ -547,7 +551,10 @@ and keep changing, so they're examples, not the contract.
   scaffolded views carry a `SOON` caption), above the view's ONE tool card if it has one —
   geo → `GeoExplore` (the country→nodes accordion: a country row shows its share, clicking
   it drills the globe AND expands its nodes inline; node rows are city-first, alphabetical
-  per country, with the shared identity dot + status), ledger → `LedgerPanel` (WIP copy).
+  per country, with the shared identity dot + status; inside an expanded country the rows
+  group under quiet micro-caps **HOSTING-PROVIDER section labels** (`ISP · n` — the cards'
+  COMPOSITION idiom; providers by count desc, "Unknown host" last, all-unknown renders flat) —
+  aggregation without a third accordion level, user design 2026-07-11), ledger → `LedgerPanel` (WIP copy).
   Hyper and the placeholders have just the About card.
 - **Right rail** (`#rightcol`, `Inspector`) = the **facts** scope (read-only), a set of
   **FIXED card SLOTS** in one stable order — network dossier, node, snapshot, layer (user

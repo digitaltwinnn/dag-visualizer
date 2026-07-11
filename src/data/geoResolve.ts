@@ -4,7 +4,7 @@
 
 import type { GeoMap } from "@/src/data/types";
 
-const LS_KEY = "dag-geo-cache-v1";
+const LS_KEY = "dag-geo-cache-v2"; // v2: +isp/asn (old entries lack the provider fields)
 
 export async function loadGeoCache(): Promise<GeoMap> {
   const map: GeoMap = {};
@@ -39,6 +39,8 @@ interface IpApiEntry {
   city?: string;
   country?: string;
   countryCode?: string;
+  isp?: string;
+  as?: string; // "AS24940 Hetzner Online GmbH" — the ASN is the first token
 }
 // Raw fields returned by ipwho.is (only what we read).
 interface IpWhoIsEntry {
@@ -48,6 +50,7 @@ interface IpWhoIsEntry {
   city?: string;
   country?: string;
   country_code?: string;
+  connection?: { asn?: number; isp?: string };
 }
 
 // Resolve IPs missing from the cache. Uses ip-api batch when the page is served
@@ -64,12 +67,17 @@ export async function resolveMissing(map: GeoMap, ips: string[], onResolved: (m:
       const found: GeoMap = {};
       for (let i = 0; i < missing.length; i += 100) {
         const chunk = missing.slice(i, i + 100);
-        const res = await fetch("http://ip-api.com/batch?fields=status,country,countryCode,city,lat,lon,query", {
+        const res = await fetch("http://ip-api.com/batch?fields=status,country,countryCode,city,lat,lon,query,isp,as", {
           method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(chunk),
         });
         const arr: IpApiEntry[] = await res.json();
         for (const e of arr) {
-          if (e.status === "success") found[e.query] = { lat: e.lat, lon: e.lon, city: e.city || "", country: e.country || "", cc: e.countryCode || "" };
+          if (e.status === "success")
+            found[e.query] = {
+              lat: e.lat, lon: e.lon, city: e.city || "", country: e.country || "",
+              cc: e.countryCode || "",
+              isp: e.isp || undefined, asn: (e.as || "").split(" ")[0] || undefined,
+            };
         }
       }
       if (Object.keys(found).length) { persist(map, found); onResolved(map); return; }
@@ -83,7 +91,12 @@ export async function resolveMissing(map: GeoMap, ips: string[], onResolved: (m:
       const res = await fetch(`https://ipwho.is/${ip}`);
       const d: IpWhoIsEntry = await res.json();
       if (d && d.success !== false && d.latitude != null) {
-        found[ip] = { lat: d.latitude, lon: d.longitude, city: d.city || "", country: d.country || "", cc: d.country_code || "" };
+        found[ip] = {
+          lat: d.latitude, lon: d.longitude, city: d.city || "", country: d.country || "",
+          cc: d.country_code || "",
+          isp: d.connection?.isp || undefined,
+          asn: d.connection?.asn ? `AS${d.connection.asn}` : undefined,
+        };
       }
     } catch (e) { /* skip */ }
   }

@@ -87,6 +87,26 @@ export default function GeoExplore() {
     return m;
   }, [selNodes]);
 
+  // PROVIDER SECTIONS (user design, option A): inside an expanded country the node rows stay
+  // immediately visible but group under quiet micro-caps provider labels — aggregation at a
+  // glance without a third accordion level. Known providers by count (desc, then name),
+  // "UNKNOWN HOST" last; a country with NO known provider renders flat (an all-unknown header
+  // would be noise, not information). Row order within a group inherits the alphabetical sort.
+  const providerSections = (rows: NodeRow[]): { name: string | null; rows: NodeRow[] }[] => {
+    const by = new Map<string | null, NodeRow[]>();
+    for (const r of rows) {
+      const isp = ("geo" in r.pick ? r.pick.geo?.isp : undefined) || null;
+      (by.get(isp) ?? by.set(isp, []).get(isp)!).push(r);
+    }
+    if (by.size === 1 && by.has(null)) return [{ name: null, rows }]; // nothing known → flat
+    return [...by.entries()]
+      .map(([name, rows]) => ({ name, rows }))
+      .sort((a, b) =>
+        a.name === null ? 1 : b.name === null ? -1 :
+        b.rows.length - a.rows.length || a.name.localeCompare(b.name),
+      );
+  };
+
   // The selected node, matched by IP **and** layer: one machine can sit in both the l0 and
   // l1 clusters (same IP, two rows), so IP alone highlighted both. `selLayer` is the picked
   // node's layer (its kind for a validator; its node.layer for a metagraph node).
@@ -206,7 +226,20 @@ export default function GeoExplore() {
                     {nodes.length === 0 ? (
                       <p className="mt-1 mx-1 mb-1.5 text-label text-muted-foreground">No locatable nodes here yet.</p>
                     ) : (
-                      nodes.map((r, i) => {
+                      (() => {
+                        const sections = providerSections(nodes);
+                        // A single null section = the flat nothing-known case: no headers at all.
+                        const flat = sections.length === 1 && sections[0].name === null;
+                        return sections.map((sec) => (
+                          <div key={sec.name ?? "unknown"}>
+                            {/* Quiet section label (the cards' COMPOSITION idiom): provider · count;
+                                the null group trails as "Unknown host". */}
+                            {!flat && (
+                              <div className="mt-1.5 mb-0.5 pl-2 text-micro tracking-[0.1em] uppercase text-muted-foreground truncate">
+                                {sec.name ?? "Unknown host"} · {sec.rows.length}
+                              </div>
+                            )}
+                            {sec.rows.map((r, i) => {
                         const on =
                           selIp != null && r.layer === selLayer &&
                           r.pick.kind !== "snapshot" && "node" in r.pick && r.pick.node?.ip === selIp;
@@ -266,7 +299,10 @@ export default function GeoExplore() {
                             {on && <SelectedRowMark className="absolute right-2" />}
                           </button>
                         );
-                      })
+                            })}
+                          </div>
+                        ));
+                      })()
                     )}
                   </div>
                 )}

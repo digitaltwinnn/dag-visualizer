@@ -352,10 +352,23 @@ export function GeoLiveCard() {
 function GeoLiveNode({ p }: { p: PickOf<"l0" | "l1" | "metanode"> }) {
   // The single node's roles → a one-node composition row (shared vocabulary).
   const oneNode: NodeInfo[] = p.node ? [p.node] : [];
+  // Hosting provider from the node's IP lookup (GeoInfo.isp/asn) — the one machine fact the
+  // globe can't show. Absent = the lookup didn't know; the line simply doesn't render
+  // (honesty: no "Unknown" filler in a facts card).
+  const geo = "geo" in p ? p.geo : undefined;
   // NB: the hover pairing (synced 3D glow) lives on the OUTER pane (Inspector.CardPane), not here,
   // so the glow lights the card's rounded edge.
   return (
     <>
+      {geo?.isp && (
+        <div className="my-2">
+          <span className="text-micro tracking-[0.1em] uppercase text-muted-foreground">Hosting</span>
+          <div className="text-body text-foreground-dim mt-0.5">
+            {geo.isp}
+            {geo.asn && <span className="font-mono text-label text-muted-foreground"> · {geo.asn}</span>}
+          </div>
+        </div>
+      )}
       {/* Composition as a stacked label + block (NOT wrapped in a label/value row whose value
           is an inline <span> — CompositionRows renders a <div>, which can't nest in an inline
           element). */}
