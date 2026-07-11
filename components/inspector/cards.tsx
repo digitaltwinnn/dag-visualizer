@@ -150,10 +150,20 @@ export function GeoLiveSubtitle() {
   const inspect = useStore((s) => s.inspect);
   const node = inspectedNode(inspect);
   if (!node) return null;
-  // The subtitle is ONE human word — "hybrid" / "consensus" / … (user, 2026-07-11). The id
-  // moved to the body's NODE ID row, last: the reference number sits where references sit.
+  // The subtitle = the composition word + its layer codes in the METAGRAPH card's exact
+  // style — "hybrid L0·cL1" (user, 2026-07-11: the word alone wasn't enough). The id lives
+  // in the body's NODE ID row, last: the reference number sits where references sit.
   const comp = node.node ? nodeCompositionLabel(node.node) : null;
-  return comp ? <span>{comp}</span> : null;
+  const codes = node.node ? compositionRows([node.node])[0]?.codes : undefined;
+  if (!comp) return null;
+  return (
+    <span>
+      {comp}
+      {codes && codes.length > 0 && (
+        <span className="text-label text-muted-foreground tabular-nums"> {codes.join("·")}</span>
+      )}
+    </span>
+  );
 }
 
 // Node title-row aside: the status pill.
