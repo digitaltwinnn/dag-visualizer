@@ -35,9 +35,9 @@ describe("dimScale", () => {
     expect(dimScale(ctx({ morph: 0.5 }))).toBeCloseTo(0.32 + 0.68 * 0.5, 10);
   });
 
-  it("hover-preview forces a strong 0.85 regardless of morph", () => {
-    expect(dimScale(ctx({ hoverFilterActive: true, morph: 0 }))).toBe(0.85);
-    expect(dimScale(ctx({ hoverFilterActive: true, morph: 1 }))).toBe(0.85);
+  it("hover-preview dims at the same strength as a committed filter (the forced 0.85 is gone)", () => {
+    expect(dimScale(ctx({ hoverFilterActive: true, morph: 0 }))).toBeCloseTo(0.32, 9);
+    expect(dimScale(ctx({ hoverFilterActive: true, morph: 1 }))).toBeCloseTo(1, 9);
   });
 });
 

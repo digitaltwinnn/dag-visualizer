@@ -117,7 +117,6 @@ export class Globe implements GeoViewHost {
   filter = "all";
   private _hoverNodeId: string | null = null;
   private _selectedNodeId: string | null = null;
-  private _hoverFilterActive = false;
   private _hoverCountryCc: string | null = null; // explorer row hover — border preview only
 
   // Identity SCENE-hue map (id -> 0xRRGGBB), set by the Engine each refreshMeta before setMetagraphs.
@@ -358,10 +357,9 @@ export class Globe implements GeoViewHost {
     this._relayoutGeo();
   }
 
-  // Transient PREVIEW dim (filter-chip hover): same dim TARGETS as setFilter, but does NOT commit
-  // `this.filter` or relayout geo. While previewing, the dim is forced STRONG (_hoverFilterActive).
+  // Transient PREVIEW dim (filter-chip / hub hover): same dim TARGETS as setFilter, but does
+  // NOT commit `this.filter` or relayout geo — and the same per-view dim STRENGTH too.
   setHoverFilter(sel: string | null): void {
-    this._hoverFilterActive = sel != null;
     this._applyDim(sel || this.filter);
   }
 
@@ -613,9 +611,10 @@ export class Globe implements GeoViewHost {
     this.group.worldToLocal(this._camN).normalize();
   }
 
-  // How strong the network/country dim is, ramped by the morph (js/globe.js:830-833).
+  // How strong the network dim is, ramped by the morph. (The hover-preview forced-strong
+  // 0.85 branch is gone — user: the hub hover/click dim in hyper was far harder than the
+  // regular dim; previews now dim at the committed strength.)
   private _dimScale(): number {
-    if (this._hoverFilterActive) return 0.85; // strong dim while previewing a filter-chip hover
     return 0.32 + 0.68 * this.morph;
   }
 
@@ -629,7 +628,7 @@ export class Globe implements GeoViewHost {
     const ctx = this._ctx;
     const c = ctx.c;
     c.morph = this.morph;
-    c.hoverFilterActive = this._hoverFilterActive;
+    c.hoverFilterActive = false; // the forced-strong preview dim is gone (field kept for the DimContext shape)
     c.ledger = this.ledger;
     // The drill never dims/hides nodes (lens-not-filter, user 2026-07-11) — the fabric's
     // country-dim clauses stay dormant; countryFilter lives on `this` for border/framing.

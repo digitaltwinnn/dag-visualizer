@@ -822,6 +822,12 @@ export class Engine {
       }
       if (this.mode === "geo") this.ctx.controls.autoRotate = false;
       if (netId) useStore.getState().setFilter(netId);
+      // Selecting a node in the SCENE also selects its country (user): the drill commits
+      // (border, firmer land, expanded explorer row) beneath the node selection — the node
+      // zoom still wins the camera because inspect is set LAST. Geo-only: the drill is a geo
+      // concept. (Explorer rows already behave this way — their country accordion IS the
+      // drill.) Order matters: setFilter's subscription clears any old drill first.
+      if (this.mode === "geo" && "geo" in p && p.geo?.cc) useStore.getState().setCountry(p.geo.cc);
       useStore.getState().setInspect(p);
     }
   }

@@ -38,8 +38,10 @@ export interface DimContext {
 // BOTH validators and metagraph nodes — multiplies the raw eased dim by this one value, so
 // they can never drift apart (the old bug: the validator *scale* used the raw, un-ramped dim
 // and so scaled the nodes to nothing in hyper, while their glow only dimmed).
-export const dimScale = (c: DimContext): number =>
-  c.hoverFilterActive ? 0.85 : 0.32 + 0.68 * c.morph; // js/globe.js:830-833 verbatim
+// (The old hover-preview FORCED-STRONG 0.85 branch is gone — user 2026-07-11: hovering/
+// clicking a hub in hyper dimmed the rest far harder than the regular dim; the preview now
+// dims at the same per-view strength as a committed filter.)
+export const dimScale = (c: DimContext): number => 0.32 + 0.68 * c.morph;
 
 // Set the dim TARGETS for a selection (the dim itself eases each frame; the per-view STRENGTH is
 // applied in the node loops). The validators ARE the DAG core → lit under "all"/"dag", dimmed only
