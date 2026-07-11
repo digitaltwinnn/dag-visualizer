@@ -8,6 +8,7 @@ import CardHead from "@/components/CardHead";
 import { Card } from "@/components/ui/card";
 import { EXPLORE_ICON } from "@/components/icons";
 import { shortHash, CORE_HEX, metagraphById } from "@/src/data/network";
+import { nodeCompositionLabel } from "@/src/data/composition";
 import { identityHudHex } from "@/src/palette/identity";
 import { IdentityDot } from "@/components/inspector/parts";
 import { SELECTED_ROW, SelectedRowMark } from "@/components/selection";
@@ -329,9 +330,20 @@ export default function GeoExplore() {
                                         setHoverCountry("geo" in r.pick ? r.pick.geo?.cc ?? null : null);
                                       }}
                                     >
-                                      <span className="flex-1 overflow-hidden text-ellipsis whitespace-nowrap font-mono tabular-nums text-label">
-                                        {r.id ? shortHash(r.id) : r.label}
-                                      </span>
+                                      {/* Type word leads, mono id trails (user — mirrors the
+                                          node card's role → reference order; the type is real
+                                          per-row info: a cohort can mix compositions). */}
+                                      {(() => {
+                                        const comp = "node" in r.pick && r.pick.node ? nodeCompositionLabel(r.pick.node) : null;
+                                        return (
+                                          <span className="flex-1 min-w-0 flex items-baseline gap-1.5">
+                                            {comp && <span className="flex-none text-label">{comp}</span>}
+                                            <span className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap font-mono tabular-nums text-label text-muted-foreground">
+                                              {r.id ? shortHash(r.id) : r.label}
+                                            </span>
+                                          </span>
+                                        );
+                                      })()}
                                       {on && <SelectedRowMark className="absolute right-2" />}
                                     </button>
                                   );

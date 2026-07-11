@@ -40,12 +40,12 @@ export function compositionRows(nodes: NodeInfo[]): CompRow[] {
   return [...hybridRows, ...dedRows];
 }
 
-// A SINGLE node's composition as an inline phrase — "hybrid (L0 · cL1)" / "consensus (L0)" —
-// for the node card's id row (user, 2026-07-11: CompositionRows is an AGGREGATE vocabulary;
-// a one-node row always counted "1"). null when the node carries no role/layer info.
+// A SINGLE node's composition as one lowercase WORD — "hybrid" / "consensus" / "data" /
+// "currency" — the node card's subtitle (user, 2026-07-11: CompositionRows is an AGGREGATE
+// vocabulary — a one-node row always counted "1"; the layer codes read as noise next to a
+// word). null when the node carries no role/layer info.
 export function nodeCompositionLabel(node: NodeInfo): string | null {
   if (!(node.roles && node.roles.length) && !node.layer) return null;
   const row = compositionRows([node])[0];
-  if (!row) return null;
-  return `${row.label.toLowerCase()} (${row.codes.join(" · ")})`;
+  return row ? row.label.toLowerCase() : null;
 }

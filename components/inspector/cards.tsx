@@ -150,18 +150,10 @@ export function GeoLiveSubtitle() {
   const inspect = useStore((s) => s.inspect);
   const node = inspectedNode(inspect);
   if (!node) return null;
-  const id = node.node?.id;
-  if (!id || !nodePlace(node)) return null;
-  // COMPOSITION LEADS, id trails — "hybrid (L0 · cL1) · fd2e…" (user, 2026-07-11: the id is a
-  // technicality — kept because it IS the unique reference, but the human-meaningful fact
-  // fronts the row). Replaces the one-node CompositionRows block whose count was always 1.
+  // The subtitle is ONE human word — "hybrid" / "consensus" / … (user, 2026-07-11). The id
+  // moved to the body's NODE ID row, last: the reference number sits where references sit.
   const comp = node.node ? nodeCompositionLabel(node.node) : null;
-  return (
-    <span>
-      {comp && <>{comp} · </>}
-      <span className="font-mono tabular-nums text-muted-foreground">{shortHash(id)}</span>
-    </span>
-  );
+  return comp ? <span>{comp}</span> : null;
 }
 
 // Node title-row aside: the status pill.
@@ -376,8 +368,16 @@ function GeoLiveNode({ p }: { p: PickOf<"l0" | "l1" | "metanode"> }) {
           </div>
         </div>
       )}
-      {/* No COMPOSITION block: the single node's composition is an inline phrase on the id
-          subtitle now — the aggregate CompositionRows always counted "1" here (user). */}
+      {/* The unique reference sits LAST — a labelled row like HOSTING (the reading order is
+          place → health → role → host → reference). Truncated display, full hash on hover. */}
+      {p.node?.id && (
+        <div className="my-2">
+          <span className="text-micro tracking-[0.1em] uppercase text-muted-foreground">Node id</span>
+          <div className="font-mono tabular-nums text-label text-foreground-dim mt-0.5" title={p.node.id}>
+            {shortHash(p.node.id)}
+          </div>
+        </div>
+      )}
     </>
   );
 }

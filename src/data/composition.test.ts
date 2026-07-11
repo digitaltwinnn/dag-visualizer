@@ -28,12 +28,12 @@ describe("compositionRows", () => {
   });
 });
 
-describe("nodeCompositionLabel (the node card's inline phrase)", () => {
-  it("renders a hybrid as 'hybrid (L0 · cL1)' and a dedicated node by its role name", () => {
-    expect(nodeCompositionLabel({ roles: ["l0", "cl1"] })).toBe("hybrid (L0 · cL1)");
-    expect(nodeCompositionLabel({ roles: ["l0"] })).toBe("consensus (L0)");
-    expect(nodeCompositionLabel({ roles: ["dl1"] })).toBe("data (dL1)");
-    expect(nodeCompositionLabel({ layer: "cl1" })).toBe("currency (cL1)"); // layer fallback
+describe("nodeCompositionLabel (the node card's subtitle word)", () => {
+  it("renders one lowercase word per composition", () => {
+    expect(nodeCompositionLabel({ roles: ["l0", "cl1"] })).toBe("hybrid");
+    expect(nodeCompositionLabel({ roles: ["l0"] })).toBe("consensus");
+    expect(nodeCompositionLabel({ roles: ["dl1"] })).toBe("data");
+    expect(nodeCompositionLabel({ layer: "cl1" })).toBe("currency"); // layer fallback
   });
   it("is null when the node carries no role/layer info", () => {
     expect(nodeCompositionLabel({})).toBeNull();
