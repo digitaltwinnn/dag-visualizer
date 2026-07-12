@@ -96,6 +96,14 @@ export function createScene(canvas: HTMLCanvasElement, colors: SceneColors): Sce
 
   // Postprocessing — depth of field then bloom.
   const composer = new EffectComposer(renderer);
+  // Restore antialiasing. An EffectComposer renders the scene into an OFFSCREEN target, which
+  // bypasses the renderer's `antialias: true` (that only applies to the default framebuffer) — so
+  // every geometry edge (ledger floor planes, node chips, coastlines, graticule) came out aliased,
+  // read as "raw edges" on high-contrast OLED/HDR panels. Multisample the composer's ping-pong
+  // targets so those edges are MSAA-resolved again. WebGL2 (three's default) supports RT samples;
+  // 4 is the quality/perf sweet spot. The default targets are already HalfFloat (HDR-safe bloom).
+  composer.renderTarget1.samples = 4;
+  composer.renderTarget2.samples = 4;
   composer.addPass(new RenderPass(scene, camera));
 
   // Depth of field: keeps whatever the camera is looking at (the selection) crisp
