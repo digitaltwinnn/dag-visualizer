@@ -10,7 +10,6 @@ import * as THREE from "three";
 import { METAGRAPHS, type MetaConfig } from "../../config";
 import { metaAnchor } from "../../domain/hyperLayout";
 import type { SceneColors } from "../../sceneColors";
-import { R_GLOBE, CORE_R } from "../../domain/morph";
 
 const _pos = new THREE.Vector3(); // scratch for hub orbit positions (reused each frame)
 
@@ -218,19 +217,17 @@ export class HyperView {
     const coreOpacity = 1;
     const metaOpacity = hubFade;
 
-    // Core pulse + flash, plus the morph "core -> globe" transform: the blue
-    // Hypergraph heart swells out to the globe's radius and dissolves as the Earth
-    // fades in beneath the nodes, so it reads as the core becoming the globe.
+    // Core pulse + flash. The core no longer SWELLS out into the globe on the morph (user removed
+    // the grow-into-globe transition): it just dissolves in place (coreReveal) while the Earth fades
+    // in on its own, so geo/ledger simply appear rather than being born from the core. The node
+    // transforms (the fly-out to map positions) are untouched.
     const flash = this.coreFlash || 0;
-    // Reach the globe's full radius early (by ~0.5) so the core is the SAME size
-    // as the Earth during the cross-fade, then dissolve sooner to hand off.
-    const grow = THREE.MathUtils.lerp(1, R_GLOBE / CORE_R, THREE.MathUtils.clamp(morph / 0.5, 0, 1));
     const coreReveal = 1 - THREE.MathUtils.clamp((morph - 0.3) / 0.35, 0, 1); // 1 -> 0 over 0.3..0.65
     const pulse = 1 + Math.sin(t * 1.6) * 0.04 + flash * 0.25;
-    this.core.scale.setScalar(pulse * grow);
+    this.core.scale.setScalar(pulse);
     this.core.rotation.y += dt * 0.25;
     this.core.rotation.x += dt * 0.12;
-    // Dim the glow as it expands so the swelling sphere doesn't bloom out the view.
+    // Dim the glow as it dissolves so the fading sphere doesn't bloom out the view.
     const coreMat = this.core.material as THREE.MeshStandardMaterial;
     coreMat.emissiveIntensity = (0.6 + flash * 0.9) * coreF * coreReveal * (1 - 0.5 * (1 - coreReveal));
     coreMat.opacity = coreOpacity * coreReveal;

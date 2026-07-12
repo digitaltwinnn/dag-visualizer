@@ -2,9 +2,11 @@
 // ledger peer is ledgerLayout.ts). Pure data + math: no scene, no react, no store (enforced by
 // layerBoundaries.test.ts). config.ts stays pure app parameters; view geometry lives here.
 
-// Base orbit radius for the metagraph hubs — kept well clear of the DAG validator shells so a
-// focused hub has an emptier backdrop.
-export const META_ORBIT = 36;
+// Base orbit radius for the metagraph hubs — kept well clear of the DAG validator shells (cL1 at
+// ~14) so a focused hub has an emptier backdrop. Pulled in 36 → 25 so the whole hub ring fits the
+// frame in the top-down resting pose (shorter tethers to the core) instead of dollying the camera
+// back (user).
+export const META_ORBIT = 25;
 
 // Anchor position of metagraph i's orbiting cluster in the Hypergraph layout.
 // Shared by HyperView (the hub mesh) and Globe (where each metagraph's real nodes

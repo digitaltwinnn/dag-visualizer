@@ -839,7 +839,7 @@ export class Engine {
     this.layers.focusId = null;
     if (filter === "all") {
       this.ctx.controls.autoRotate = true;
-      this.focus("overview");
+      this.focus("hyperRing"); // look down onto the hub ring — reads as a 2D circle around the core
       return;
     }
     this.ctx.controls.autoRotate = false;
