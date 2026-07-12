@@ -7,6 +7,7 @@ import { EffectComposer } from "three/addons/postprocessing/EffectComposer.js";
 import { RenderPass } from "three/addons/postprocessing/RenderPass.js";
 import { UnrealBloomPass } from "three/addons/postprocessing/UnrealBloomPass.js";
 import { BokehPass, type BokehPassParameters } from "three/addons/postprocessing/BokehPass.js";
+import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
 import type { SceneColors } from "../sceneColors";
 
 // @types/three types BokehPass.uniforms as a bare `object`; the engine reads
@@ -53,7 +54,13 @@ export function createScene(canvas: HTMLCanvasElement, colors: SceneColors): Sce
   });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
   renderer.setSize(window.innerWidth, window.innerHeight);
-  renderer.toneMapping = THREE.ACESFilmicToneMapping;
+  // Tone mapping — NeutralToneMapping (Khronos PBR Neutral). With the OutputPass added below it
+  // now ACTUALLY applies (an EffectComposer bypasses the renderer's direct-to-screen output, so
+  // this was a no-op before). Neutral was chosen over ACES + AgX in a live A/B on the
+  // bloom-heavy scene: ACES + AgX both added a milky highlight haze and desaturated the neon
+  // identity hues; Neutral tames the blown-out cores (the Global L0 core reads as a glowing cyan
+  // orb, not a flat white disc) while keeping the vivid cyans/magentas the identity system needs.
+  renderer.toneMapping = THREE.NeutralToneMapping;
   renderer.toneMappingExposure = 1.05;
 
   const controls = new OrbitControls(camera, renderer.domElement);
@@ -113,6 +120,12 @@ export function createScene(canvas: HTMLCanvasElement, colors: SceneColors): Sce
     0.18   // threshold
   );
   composer.addPass(bloom);
+
+  // Terminal pass: applies the renderer's toneMapping + exposure and the sRGB output
+  // conversion to the composited result. Without it an EffectComposer bypasses the renderer's
+  // output step, so `toneMapping` above was effectively a no-op (three r150+ standardised on
+  // OutputPass as the correct chain end).
+  composer.addPass(new OutputPass());
 
   // The caller (engine) owns the resize listener so it can be removed on dispose.
   function resize() {
