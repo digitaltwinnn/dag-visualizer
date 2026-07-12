@@ -48,6 +48,7 @@ export class HyperView {
   coreGroup!: THREE.Group;
   core!: THREE.Mesh;
   coreFlash?: number;
+  private _coreDim = 0; // eased 0→1: the DAG core fades back when a specific metagraph is the subject
   private _core: number; // the structural accent (colors.core) — the core sphere hue
 
   // `sceneColors` (id -> 0xRRGGBB) is the identity SCENE-lane colour map (Task 3), handed in by
@@ -192,7 +193,7 @@ export class HyperView {
   // `morph` (0 = Hypergraph, 1 = globe) fades the metagraph hubs out early so
   // they don't visibly collapse into the globe's centre — their real nodes fly
   // out to the map (Globe) instead.
-  update(dt: number, morph = 0) {
+  update(dt: number, morph = 0, coreDimTarget = 0) {
     this.clock += dt;
     const t = this.clock;
 
@@ -216,13 +217,18 @@ export class HyperView {
     // transforms (the fly-out to map positions) are untouched.
     const flash = this.coreFlash || 0;
     const coreReveal = 1 - THREE.MathUtils.clamp((morph - 0.3) / 0.35, 0, 1); // 1 -> 0 over 0.3..0.65
+    // The DAG core IS the DAG's heart, so it tracks the DAG's highlight state like the validator
+    // nodes do: lit when the subject is "all"/"dag", faded back when a specific metagraph is the
+    // hovered/committed subject (user: hovering a metagraph highlighted its nodes but left the core
+    // full-bright). Eased so it fades rather than snaps.
+    this._coreDim += (coreDimTarget - this._coreDim) * Math.min(1, dt * 4);
     const pulse = 1 + Math.sin(t * 1.6) * 0.04 + flash * 0.25;
     this.core.scale.setScalar(pulse);
     this.core.rotation.y += dt * 0.25;
     this.core.rotation.x += dt * 0.12;
     // Dim the glow as it dissolves so the fading sphere doesn't bloom out the view.
     const coreMat = this.core.material as THREE.MeshStandardMaterial;
-    coreMat.emissiveIntensity = (0.6 + flash * 0.9) * coreF * coreReveal * (1 - 0.5 * (1 - coreReveal));
+    coreMat.emissiveIntensity = (0.6 + flash * 0.9) * coreF * coreReveal * (1 - 0.5 * (1 - coreReveal)) * (1 - this._coreDim * 0.6);
     coreMat.opacity = coreOpacity * coreReveal;
     this.coreGroup.visible = coreReveal > 0.001;
     if (this.coreFlash) this.coreFlash = Math.max(0, this.coreFlash - dt * 1.6);

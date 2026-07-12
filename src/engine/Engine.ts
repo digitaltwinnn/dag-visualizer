@@ -58,6 +58,7 @@ export class Engine {
 
   private mode: Mode = "hyper";
   private filter = "all";
+  private _hoverFilter: string | null = null; // previewed filter (chip/hub hover); drives the core dim
   private country: string | null = null;
   private morph = 0; // 0 = hypergraph, 1 = globe (eased each frame)
   // A persistent tween record (never re-allocated per focus) — `active` replaces the old
@@ -230,6 +231,7 @@ export class Engine {
         // Filter-chip hover: PREVIEW that selection's dim in any view (same per-view effect as the
         // real filter), without committing it. null restores the committed filter.
         if (st.hoverFilter !== prev.hoverFilter) {
+          this._hoverFilter = st.hoverFilter;
           this.globe.setHoverFilter(st.hoverFilter);
           this.ledger.setFilter(st.hoverFilter ?? this.filter);
         }
@@ -887,7 +889,11 @@ export class Engine {
       this.layers.root.scale.setScalar(Math.max(0.0001, 1 - this.morph));
 
       this.globe.setMorph(this.morph);
-      this.layers.update(dt, this.morph);
+      // Core-dim target: the DAG core fades back when a specific metagraph is the effective subject
+      // (hover-preview wins over the committed filter), and stays lit for "all"/"dag".
+      const coreSubj = this._hoverFilter ?? this.filter;
+      const coreDim = coreSubj === "all" || coreSubj === "dag" ? 0 : 1;
+      this.layers.update(dt, this.morph, coreDim);
       this.globe.update(dt);
       this._updateTween(dt);
       this.ctx.controls.update();
