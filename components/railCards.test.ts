@@ -60,8 +60,8 @@ describe("detailsCards — RIGHT rail (Details): fixed slots + ghost hints", () 
     const ids = detailsCards(details({ filter: "dor", inspect: nodePick, snap: snapPick })).map((c) => c.id);
     expect(ids).toEqual(["context", "node", "snap", "layer"]);
   });
-  it("ledger ghosts: context + snapshot + layer invites (node has no ledger invite)", () => {
-    expect(ghostIds(detailsCards(details({})))).toEqual(["context", "snap", "layer"]);
+  it("ledger ghosts: context + node + snapshot + layer invites (nodes pick in the chamber too)", () => {
+    expect(ghostIds(detailsCards(details({})))).toEqual(["context", "node", "snap", "layer"]);
   });
   it("hyper ghosts: context + node + snapshot invites (the strip runs in every view)", () => {
     expect(ghostIds(detailsCards(details({ mode: "hyper" })))).toEqual(["context", "node", "snap"]);

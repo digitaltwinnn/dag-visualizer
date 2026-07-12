@@ -48,7 +48,7 @@ export default function LedgerPanel() {
           panel
           icon={EXPLORE_ICON}
           title="Settlement layers"
-          eyebrow="Snapshots · explore"
+          eyebrow="Explore"
           collapsed={collapsed}
           onToggle={() => setCollapsed((c) => !c)}
         />

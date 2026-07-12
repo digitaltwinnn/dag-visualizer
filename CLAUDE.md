@@ -234,7 +234,10 @@ store-value imports**, enforced by `layerBoundaries.test.ts`). Each ships coloca
   (geo also sets `minCamAlt: 18` — a camera-ALTITUDE floor the Engine enforces after each controls
   update, because the orbit target is off-centre in geo so the stock target-distance clamp alone
   is inconsistent around the globe) / `nodeList` (which views publish `store.selNodes` for
-  their explorer node browsers — hyper + geo), as
+  their explorer node browsers — hyper + geo) / `nodePickAssist` (world-units radius, ledger
+  only: the chamber's coins are edge-on slivers, so when the ray hits no content the nearest
+  live node instance within the radius still picks — `NodeFabric.pickNodeNearRay`, beating
+  the layer-plane fallback; nodes are hover/clickable in the chamber, user 2026-07-12), as
   DATA. The single source of truth for what each view turns on (see *Per-view behaviour*).
 - `morph.ts` — the hyper↔geo morph easing + derived visibility ramps.
 - `nodeLayout.ts` — the node placement math: fibonacci shells around the core/hubs, the
@@ -575,15 +578,21 @@ and keep changing, so they're examples, not the contract.
   collapsed cohort holding the selected node surfaces the ✓. Hovering a cohort glows its WHOLE
   3D stack (`store.hoverCohort` ids[] → `globe.setHoverCohort` → the fabric's hot check) and
   lights the country border. Counts are bare numbers (no ×). User design 2026-07-11), hyper →
-  `HyperExplore` ("Nodes by network", 2026-07-12 — the architectural sibling: network →
-  layer-shell → node id rows; network rows commit the filter via `filterToggleActions` (a row
-  IS a hub click, re-click steps back to all) and pair on the `hoverFilter` channel; shell
-  rows are DISCLOSURES ONLY (never layer-card selectors — the layer card stays ledger-scoped)
-  whose hover glows the whole 3D shell via `hoverCohort`; id rows run `nodeSelectActions`.
-  Feeds off `store.selNodes`, published per `ViewPolicy.nodeList`. The tool-card NAMING rule:
-  About = the view's point of view ("How the network is built"); the tool says what you
-  BROWSE — "Nodes by network" / "Nodes by country" / ledger's "Settlement layers" (not
-  "Nodes by…": its subjects are strata, not nodes)), ledger → `LedgerPanel`.
+  `HyperExplore` ("Nodes by network", 2026-07-12 — the architectural sibling: network (sorted
+  by fleet size) → COMPOSITION group → node id rows; network rows commit the filter via
+  `filterToggleActions` (a row IS a hub click, re-click steps back to all) and pair on the
+  `hoverFilter` channel; the composition groups use the metagraph card's exact table
+  vocabulary (Hybrid / Data / … + the RoleChips code pills), dedupe cluster entries to
+  MACHINES so counts match the dossier, are DISCLOSURES ONLY (never layer-card selectors —
+  the layer card stays ledger-scoped), and hover-glow all member instances via `hoverCohort`;
+  the id rows are bare mono ids (the group label carries the word) running
+  `nodeSelectActions`. Feeds off `store.selNodes`, published per `ViewPolicy.nodeList`. The
+  tool-card NAMING rule: About = the view's point of view ("How the network is built"); the
+  tool says what you BROWSE — "Nodes by network" / "Nodes by country" / ledger's "Settlement
+  layers" (not "Nodes by…": its subjects are strata, not nodes). Card EYEBROWS are the bare
+  role words ("About" / "Explore") — the view name was dropped (user, 2026-07-12: the view
+  switch already says where you are), and each explorer's usage hint LEADS the card (top,
+  descriptive) instead of trailing it), ledger → `LedgerPanel`.
   The placeholder views have just the About card.
 - **Right rail** (`#rightcol`, `Inspector`) = the **facts** scope (read-only), a set of
   **FIXED card SLOTS** in one stable order — network dossier, node, snapshot, layer (user

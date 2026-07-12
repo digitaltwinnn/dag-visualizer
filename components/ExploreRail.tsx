@@ -17,7 +17,7 @@ import { useBreakpoint } from "@/components/useBreakpoint";
 const ABOUT: Record<Mode, { title: string; eyebrow: string; lines: string[]; caption?: string }> = {
   hyper: {
     title: "How the network is built",
-    eyebrow: "Hypergraph · about",
+    eyebrow: "About",
     lines: [
       "Constellation is a Hypergraph, not a blockchain — activity is organized as a DAG, so many parts of the network validate in parallel: horizontally scalable and feeless for users.",
       "The glowing core is the Global L0 (security + settlement); the validator shells around it bundle activity into the global snapshots streaming along the bottom. The orbiting clusters are metagraphs — independent networks that anchor their state into L0 for shared trust.",
@@ -25,7 +25,7 @@ const ABOUT: Record<Mode, { title: string; eyebrow: string; lines: string[]; cap
   },
   geo: {
     title: "Where the network runs",
-    eyebrow: "Geography · about",
+    eyebrow: "About",
     lines: [
       "Where the network runs — every validator plotted at its real geolocation, co-located machines stacked into honeycomb chip towers, with travelling-packet connection arcs between them.",
       "Drill into a country to see its nodes; filtering a metagraph narrows the map to that network's footprint.",
@@ -33,7 +33,7 @@ const ABOUT: Record<Mode, { title: string; eyebrow: string; lines: string[]; cap
   },
   ledger: {
     title: "When the network settles",
-    eyebrow: "Snapshots · about",
+    eyebrow: "About",
     lines: [
       "When the network settles — Global L0 produces a snapshot every few seconds, anchoring the metagraphs' own snapshots into shared trust. The 3D chamber stacks the validation layers top-to-bottom, and each global snapshot forms as its layer settles.",
       "The live snapshot sits centre-stage and trails off to the left as it ages; click any snapshot (here or in the strip below) to inspect its fee, size and per-metagraph breakdown.",
@@ -41,7 +41,7 @@ const ABOUT: Record<Mode, { title: string; eyebrow: string; lines: string[]; cap
   },
   status: {
     title: "Is the network healthy?",
-    eyebrow: "Status · about",
+    eyebrow: "About",
     caption: "SOON",
     lines: [
       "Live health of the network — validator uptime, node states (Ready / waiting / offline), and software-version spread across the Global L0 and the metagraphs.",
@@ -50,7 +50,7 @@ const ABOUT: Record<Mode, { title: string; eyebrow: string; lines: string[]; cap
   },
   transactions: {
     title: "How value moves",
-    eyebrow: "Transactions · about",
+    eyebrow: "About",
     caption: "SOON",
     lines: [
       "The money flow across the network — $DAG and the metagraphs' own currencies moving between addresses, visualized as it happens.",
@@ -59,7 +59,7 @@ const ABOUT: Record<Mode, { title: string; eyebrow: string; lines: string[]; cap
   },
   staking: {
     title: "Who backs the validators",
-    eyebrow: "Staking · about",
+    eyebrow: "About",
     caption: "SOON",
     lines: [
       "Delegated staking across the network — who is staked to which validators, total $DAG delegated, and the rewards flowing back.",

@@ -94,6 +94,9 @@ function nodeHint(s: RailManifestState): string | null {
     }
     return "Click a node on the globe (or a row in the explorer) to inspect it.";
   }
+  // Nodes are pickable in the chamber too (user, 2026-07-12 — the proximity assist makes the
+  // coins practically hoverable), so the slot announces it.
+  if (s.mode === "ledger") return "Click a node in the chamber to inspect it.";
   return null;
 }
 function snapHint(s: RailManifestState): string | null {

@@ -18,8 +18,9 @@ import { applyClickActions } from "@/src/store/applyClickActions";
 import { subjectPairing } from "@/components/useSubjectPairing";
 import type { NodeRow } from "@/src/data/types";
 
-// Geography's single **explore** card (one frame, one "Geography · explore" eyebrow, an
-// accordion you click into). The country list IS the
+// Geography's single **explore** card (one frame, the bare "Explore" eyebrow — the view name
+// was dropped from card eyebrows, user 2026-07-12: the view switch already says where you
+// are — an accordion you click into). The country list IS the
 // node browser: each country is a row showing its share of the footprint (bar + count), and
 // clicking it drills the globe into that country AND expands its nodes inline — master on
 // top, detail nested beneath, then a node row opens its card on the right facts rail.
@@ -137,13 +138,20 @@ export default function GeoExplore() {
         panel
         icon={EXPLORE_ICON}
         title="Nodes by country"
-        eyebrow="Geography · explore"
+        eyebrow="Explore"
         collapsed={collapsed}
         onToggle={() => setCollapsed((c) => !c)}
       />
       <div className={cn("flex flex-col", collapsed && "hidden")}>
         {/* The footprint's headline figures (Nodes / Countries / Ready) live in the top-bar
-            vitals now; this card is purely the country→nodes accordion. */}
+            vitals now; this card is purely the country→nodes accordion. The usage hint LEADS
+            the card (user, 2026-07-12 — a bottom hint read as an afterthought) and says what
+            the card holds, not just the click. */}
+        {!quietEmpty && (
+          <div className="pt-2 px-4 pb-1 text-label text-muted-foreground">
+            Every country hosting nodes of the selection — click one to drill in.
+          </div>
+        )}
         {quietEmpty ? (
           // Quiet-empty, in the standard LEFT-ALIGNED card/hint typography (the old centered
           // block — plus a stray absolutely-positioned standby dot that escaped its unsized
@@ -361,7 +369,6 @@ export default function GeoExplore() {
         </div>
         )}
 
-        {!quietEmpty && <div className="pt-[10px] px-4 pb-3 text-label text-muted-foreground">Click a country to drill in.</div>}
       </div>
       </aside>
     </Card>

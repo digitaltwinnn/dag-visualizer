@@ -8,9 +8,9 @@ import CardHead from "@/components/CardHead";
 import { Card } from "@/components/ui/card";
 import { EXPLORE_ICON } from "@/components/icons";
 import { shortHash, CORE_HEX, metagraphById } from "@/src/data/network";
-import { nodeCompositionLabel } from "@/src/data/composition";
+import { compositionRows } from "@/src/data/composition";
 import { identityHudHex } from "@/src/palette/identity";
-import { IdentityDot, RoleChips, ROLE_FR } from "@/components/inspector/parts";
+import { IdentityDot, RoleChips } from "@/components/inspector/parts";
 import { SELECTED_ROW, SelectedRowMark } from "@/components/selection";
 import { hoverKeyOf } from "@/src/data/hoverSubject";
 import { filterToggleActions, nodeSelectActions } from "@/src/engine/domain/pickActions";
@@ -48,31 +48,39 @@ export default function HyperExplore() {
   const selectNode = (pick: NodeRow["pick"], selected: boolean) =>
     applyClickActions(nodeSelectActions(pick, { mode: "hyper", currentFilter: filter, deselect: selected }));
 
-  // The drilled network's nodes grouped by the LAYER SHELL each instance sits in — one row per
-  // cluster entry, exactly what the 3D lays out (a hybrid machine appears in every cluster it
-  // runs, as separate entries). The DAG's own L0/L1 fold into L0/cL1 like any metagraph (the
-  // vitals' one-taxonomy rule). Sorted by id for a stable order across refreshes.
-  const SHELL_ORDER = ["l0", "cl1", "dl1"] as const;
-  type ShellId = (typeof SHELL_ORDER)[number];
-  const shellOf = (r: NodeRow): ShellId => (r.layer === "l1" ? "cl1" : (r.layer as ShellId) ?? "l0");
-  const shellsOf = (rows: NodeRow[]): { shell: ShellId; rows: NodeRow[] }[] => {
-    const by = new Map<ShellId, NodeRow[]>();
+  // The drilled network's nodes grouped by COMPOSITION (user, 2026-07-12 — was by layer
+  // shell): the same make-up vocabulary as the metagraph card's composition table (Hybrid /
+  // Data / …), each group showing WHICH layers it runs as the squared pills. Entries are
+  // deduped to MACHINES first (a hybrid machine appears once per cluster it runs — one row
+  // per machine here, so the group counts match the dossier's), groups sorted by size.
+  type CompGroup = { key: string; label: string; codes: string[]; rows: NodeRow[] };
+  const compsOf = (rows: NodeRow[]): CompGroup[] => {
+    const machines = new Map<string, NodeRow>();
     for (const r of rows) {
-      const s = shellOf(r);
-      (by.get(s) ?? by.set(s, []).get(s)!).push(r);
+      const mk = ("node" in r.pick && r.pick.node?.ip) || r.id || r.label;
+      if (!machines.has(mk)) machines.set(mk, r);
     }
-    for (const rows of by.values()) rows.sort((a, b) => (a.id || a.label).localeCompare(b.id || b.label));
-    return SHELL_ORDER.filter((s) => by.has(s)).map((s) => ({ shell: s, rows: by.get(s)! }));
+    const by = new Map<string, CompGroup>();
+    for (const r of machines.values()) {
+      const node = "node" in r.pick ? r.pick.node : null;
+      const comp = node ? compositionRows([node])[0] : undefined;
+      const label = comp?.label ?? "Node";
+      const codes = comp?.codes ?? [];
+      const key = `${label}|${codes.join("·")}`;
+      (by.get(key) ?? by.set(key, { key, label, codes, rows: [] }).get(key)!).rows.push(r);
+    }
+    for (const g of by.values()) g.rows.sort((a, b) => (a.id || a.label).localeCompare(b.id || b.label));
+    return [...by.values()].sort((a, b) => b.rows.length - a.rows.length);
   };
-  // Which shell is disclosed (single-open, like geo's cohorts); keys are network-scoped so a
-  // stale key after a filter switch simply matches nothing.
-  const [openShell, setOpenShell] = useState<string | null>(null);
+  // Which composition group is disclosed (single-open, like geo's cohorts); keys are
+  // network-scoped so a stale key after a filter switch simply matches nothing.
+  const [openComp, setOpenComp] = useState<string | null>(null);
 
-  // The selected node, matched by IP **and** layer (one machine can sit in two clusters).
+  // The selected node, matched by IP alone — the id rows here are MACHINE rows (one per
+  // machine after the dedupe), so the geo browser's ip+layer double-row problem can't occur.
   const sel =
     inspect && (inspect.kind === "l0" || inspect.kind === "l1" || inspect.kind === "metanode") ? inspect : null;
   const selIp = sel?.node?.ip ?? null;
-  const selLayer = sel ? (sel.kind === "metanode" ? sel.node?.layer ?? null : sel.kind) : null;
 
   return (
     <Card
@@ -84,13 +92,18 @@ export default function HyperExplore() {
           panel
           icon={EXPLORE_ICON}
           title="Nodes by network"
-          eyebrow="Hypergraph · explore"
+          eyebrow="Explore"
           collapsed={collapsed}
           onToggle={() => setCollapsed((c) => !c)}
         />
         <div className={cn("flex flex-col", collapsed && "hidden")}>
+          {/* The usage hint LEADS the card (matches GeoExplore) — what it holds + the click. */}
+          <div className="pt-2 px-4 pb-1 text-label text-muted-foreground">
+            Every network on the hypergraph — click one to drill into its layers.
+          </div>
           <div className="pt-1.5 px-[14px] pb-2">
-            {metaList.map((m) => {
+            {/* Sorted by fleet size (user, 2026-07-12) — the biggest networks lead. */}
+            {[...metaList].sort((a, b) => b.nodes.length - a.nodes.length).map((m) => {
               const cfg = metagraphById(m.id);
               const name = cfg?.name ?? m.id;
               const hue = m.id === "dag" ? CORE_HEX : identityHudHex(m.id);
@@ -148,19 +161,18 @@ export default function HyperExplore() {
                         // reported nodes renders a hub and nothing else.
                         <p className="mt-1 mx-1 mb-1.5 text-label text-muted-foreground">No nodes reported — hub only.</p>
                       ) : (
-                        shellsOf(selNodes).map((g) => {
-                          const key = `${m.id}|${g.shell}`;
-                          const isOpen = openShell === key;
+                        compsOf(selNodes).map((g) => {
+                          const key = `${m.id}|${g.key}`;
+                          const isOpen = openComp === key;
                           const holdsSel =
                             selIp != null &&
-                            g.rows.some(
-                              (r) => r.layer === selLayer && "node" in r.pick && r.pick.node?.ip === selIp,
-                            );
+                            g.rows.some((r) => "node" in r.pick && r.pick.node?.ip === selIp);
                           return (
                             <div key={key}>
-                              {/* The shell row: one line per concentric layer shell — the
-                                  hub's architecture as a list. A DISCLOSURE (chevron) on the
-                                  way to a node, never a layer-card selector. */}
+                              {/* The composition-group row — the metagraph card's table
+                                  vocabulary (Hybrid / Data / …) with the layer-code pills.
+                                  A DISCLOSURE (chevron) on the way to a node, never a
+                                  layer-card selector. */}
                               <button
                                 type="button"
                                 className={cn(
@@ -169,22 +181,16 @@ export default function HyperExplore() {
                                   "focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--primary)] focus-visible:outline-offset-[-2px]",
                                 )}
                                 aria-expanded={isOpen}
-                                title={`${ROLE_FR[g.shell]} · ${g.rows.length} node${g.rows.length > 1 ? "s" : ""}`}
-                                onClick={() => setOpenShell(isOpen ? null : key)}
-                                // Hovering a shell glows its WHOLE 3D shell (every member id).
+                                title={`${g.label} · ${g.rows.length} node${g.rows.length > 1 ? "s" : ""}`}
+                                onClick={() => setOpenComp(isOpen ? null : key)}
+                                // Hovering a group glows ALL its 3D instances (every member id).
                                 onMouseEnter={() =>
                                   setHoverCohort(g.rows.map((r) => hoverKeyOf(r.pick)).filter((k): k is string => !!k))
                                 }
                                 onMouseLeave={() => setHoverCohort(null)}
                               >
-                                <RoleChips codes={[g.shell === "l0" ? "L0" : g.shell === "cl1" ? "cL1" : "dL1"]} />
-                                {/* The friendly word — omitted for L0, where it would just
-                                    repeat the chip ("[L0] L0"). */}
-                                {g.shell !== "l0" && (
-                                  <span className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-label text-muted-foreground">
-                                    {ROLE_FR[g.shell]}
-                                  </span>
-                                )}
+                                <span className="flex-none text-body text-foreground">{g.label}</span>
+                                <RoleChips codes={g.codes} />
                                 <span className="ml-auto flex-none tabular-nums text-body font-semibold">{g.rows.length}</span>
                                 {holdsSel && !isOpen ? (
                                   <SelectedRowMark className="flex-none" />
@@ -203,7 +209,7 @@ export default function HyperExplore() {
                                 <div className="mb-1 ml-[7px] pl-2 border-l border-border">
                                   {g.rows.map((r, i) => {
                                     const on =
-                                      selIp != null && r.layer === selLayer &&
+                                      selIp != null &&
                                       "node" in r.pick && r.pick.node?.ip === selIp;
                                     const hoverKey = hoverKeyOf(r.pick);
                                     const rowHue = r.pick.kind === "metanode" && r.pick.meta ? identityHudHex(r.pick.meta.id) : CORE_HEX;
@@ -223,19 +229,12 @@ export default function HyperExplore() {
                                         onClick={() => selectNode(r.pick, on)}
                                         onMouseEnter={rowPair.onMouseEnter}
                                       >
-                                        {/* Type word leads, mono id trails — the geo id rows'
-                                            exact grammar (one picker idiom everywhere). */}
-                                        {(() => {
-                                          const comp = "node" in r.pick && r.pick.node ? nodeCompositionLabel(r.pick.node) : null;
-                                          return (
-                                            <span className="flex-1 min-w-0 flex items-baseline gap-1.5">
-                                              {comp && <span className="flex-none text-label">{comp}</span>}
-                                              <span className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap font-mono tabular-nums text-label text-muted-foreground">
-                                                {r.id ? shortHash(r.id) : r.label}
-                                              </span>
-                                            </span>
-                                          );
-                                        })()}
+                                        {/* Bare mono id — the composition group's label
+                                            already carries the word (geo's cohorts mix
+                                            compositions, these groups ARE one). */}
+                                        <span className="flex-1 min-w-0 overflow-hidden text-ellipsis whitespace-nowrap font-mono tabular-nums text-label text-muted-foreground">
+                                          {r.id ? shortHash(r.id) : r.label}
+                                        </span>
                                         {on && <SelectedRowMark className="absolute right-2" />}
                                       </button>
                                     );
@@ -252,7 +251,6 @@ export default function HyperExplore() {
               );
             })}
           </div>
-          <div className="pt-[10px] px-4 pb-3 text-label text-muted-foreground">Click a network to drill into its shells.</div>
         </div>
       </aside>
     </Card>

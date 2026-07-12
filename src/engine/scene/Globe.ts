@@ -443,6 +443,12 @@ export class Globe implements GeoViewHost {
     return countryCcAt(lat, lon, this.countryGeoms, (cc) => active.has(cc));
   }
 
+  // Nearest live node instance within `maxDist` world units of the ray — the ledger's
+  // proximity pick assist (the coins are edge-on slivers there; see NodeFabric).
+  pickNodeNearRay(ray: THREE.Ray, maxDist: number): PickDescriptor | null {
+    return this.fabric.pickNodeNearRay(ray, maxDist);
+  }
+
   // The alpha-2 codes with at least one filter-active locatable node — cached; invalidated by
   // every path that changes the active set (filter / node or metagraph rebuild).
   private _activeCcsCache: Set<string> | null = null;

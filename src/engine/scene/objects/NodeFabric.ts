@@ -35,6 +35,7 @@ const _geoVec = new THREE.Vector3(); // scratch for the morph-fly interpolation
 const _qSpin = new THREE.Quaternion();   // hypergraph tumble
 const _qRadial = new THREE.Quaternion(); // outward-facing (globe) orientation
 const _col = new THREE.Color();          // scratch colour for dim recolouring
+const _m4 = new THREE.Matrix4();         // scratch instance matrix (proximity pick)
 
 // A pick's optional geo country code (only l0/l1/metanode descriptors carry geo).
 const geoCcOf = (pick: PickDescriptor): string | null =>
@@ -263,6 +264,35 @@ export class NodeFabric {
     const mp = !ledger && w >= 0.5 ? this.metaHex : this.metaSphere;
     if (mp) arr.push(mp);
     return arr;
+  }
+
+  // PROXIMITY node pick (user, 2026-07-12 — ledger): the chamber's coins are the sphere
+  // instances squashed to slivers, nearly edge-on from the ledger camera — a raw raycast
+  // needs pixel-perfect aim, so nodes were effectively un-hoverable there. When the ray hits
+  // no geometry, the Engine asks for the nearest LIVE node instance within `maxDist` world
+  // units of the ray (the same assist idea as the analytic country resolve). Event-frequency
+  // only (pointer move/click), scratch-only math — never on the render loop.
+  pickNodeNearRay(ray: THREE.Ray, maxDist: number): PickDescriptor | null {
+    let best: PickDescriptor | null = null;
+    let bestD = maxDist;
+    for (const mesh of [this.instSphere, this.metaSphere]) {
+      if (!mesh || !mesh.visible) continue;
+      const picks = mesh.userData.picks as PickDescriptor[] | undefined;
+      if (!picks) continue;
+      for (let i = 0; i < mesh.count; i++) {
+        mesh.getMatrixAt(i, _m4);
+        const e = _m4.elements;
+        // Zero-scaled slot = a hidden node this frame (column-0 length ~0) — not a target.
+        if (e[0] * e[0] + e[1] * e[1] + e[2] * e[2] < 1e-8) continue;
+        _vec.set(e[12], e[13], e[14]).applyMatrix4(mesh.matrixWorld);
+        const d = ray.distanceToPoint(_vec);
+        if (d < bestD && picks[i]) {
+          bestD = d;
+          best = picks[i];
+        }
+      }
+    }
+    return best;
   }
 
   // -------------------------------------------------- setMorph loop: validator matrices
