@@ -60,11 +60,12 @@ const isNodePick = (p: PickDescriptor | null): boolean =>
   !!p && (p.kind === "l0" || p.kind === "l1" || p.kind === "metanode");
 
 // LEFT rail (Explore): the "About this view" orientation card in EVERY view, plus — only where the
-// view has one — its single tool card (geo → GeoExplore, ledger → LedgerPanel). Both are STATIC
+// view has one — its single tool card (hyper → HyperExplore, geo → GeoExplore, ledger →
+// LedgerPanel). All are STATIC
 // tools: their subjectKeys are constants so they never read as "updated" (the tray stays a quiet
 // legend; view switches ride the separate switch-signal, not a per-card update highlight).
 export function exploreCards(s: Pick<RailManifestState, "mode">): RailCard[] {
-  const hasTool = s.mode === "geo" || s.mode === "ledger";
+  const hasTool = s.mode === "hyper" || s.mode === "geo" || s.mode === "ledger";
   // The tray shows the tool card's OWN head mark (the ONE standard EXPLORE_ICON) — it used to
   // show VIEW_ICONS[mode], which in ledger put a Layers glyph on the left tab that read as the
   // snapshot card's mark (user bug report); card head and tray icon must agree.
@@ -93,6 +94,9 @@ function nodeHint(s: RailManifestState): string | null {
     }
     return "Click a node on the globe (or a row in the explorer) to inspect it.";
   }
+  // Nodes are pickable in the chamber too (user, 2026-07-12 — the proximity assist makes the
+  // coins practically hoverable), so the slot announces it.
+  if (s.mode === "ledger") return "Click a node in the chamber to inspect it.";
   return null;
 }
 function snapHint(s: RailManifestState): string | null {

@@ -1,6 +1,7 @@
 import * as THREE from "three";
 import Stats from "stats.js";
 import { useStore, type Mode } from "@/src/store/store";
+import { applyClickActions } from "@/src/store/applyClickActions";
 import { metagraphById, initNetwork, getNetwork, getAnchor, DEFAULT_META_COLOR } from "@/src/data/network";
 import { hoverKeyOf, tooltipSubject } from "@/src/data/hoverSubject";
 import { identityMap, identitySceneHex } from "@/src/palette/identity";
@@ -13,7 +14,10 @@ import { METAGRAPHS, COLORS } from "@/src/engine/config";
 import { LEDGER, LAYER_GEOM, ledgerSite } from "./domain/ledgerLayout";
 import { readSceneColors } from "./sceneColors";
 import { VIEW_POLICIES } from "./domain/viewPolicy";
-import { FOCI, hubFraming, geoFraming, ledgerLayerFraming, easeInOutQuad, type CameraFraming } from "./domain/cameraRig";
+import { FOCI, hubFraming, geoFraming, ledgerLayerFraming, nodeFraming, hyperNodeFraming, dollyBack, easeInOutQuad, type CameraFraming } from "./domain/cameraRig";
+import { countryFraming } from "./domain/countryShape";
+import { R as GEO_R, LAND_H } from "./domain/geoLayout";
+import { clickActions, pickActive } from "./domain/pickActions";
 import type { GlobalSnapshot, PickDescriptor } from "@/src/data/types";
 import type { ClusterNode, DagCore, GeoMap, RouteMetagraph } from "@/src/data/types";
 
@@ -33,11 +37,8 @@ const sceneColorsFor = (ids: string[]): Record<string, number> => {
 const loadGeo = loadGeoCache;
 const resolveGeo = resolveMissing;
 
-// Camera presets: FOCI/hubFraming/geoFraming/easeInOutQuad now live in ./domain/cameraRig
-// (Task 15) — pure, allocation-free (writes into caller-provided out structs).
-// Global camera dolly-back applied to EVERY framing (all views) in _tweenTo/_snapTo — one lever to
-// sit the camera a touch wider without re-tuning each preset.
-const CAM_ZOOM = 1.15;
+// Camera presets + framing math + the global CAM_ZOOM dolly all live in ./domain/cameraRig —
+// pure, allocation-free (writes into caller-provided out structs); the Engine only orchestrates.
 
 // Imperative engine: owns the scene, the Hypergraph + globe, the render loop, the
 // camera-focus tweens, and the command surface React drives via the store. Ports
@@ -81,10 +82,17 @@ export class Engine {
   private _dofMeta: MetaHubRec | null = null;
 
   private raycaster = new THREE.Raycaster();
+  // Land-sphere hit scratch for the scene country hover/click (ray→sphere analytically —
+  // the sphere is rotation-invariant, so no mesh raycast is needed).
+  private _landSphere = new THREE.Sphere(new THREE.Vector3(0, 0, 0), GEO_R + LAND_H);
+  private _landHit = new THREE.Vector3();
   private pointer = new THREE.Vector2();
   private canvas: HTMLCanvasElement;
   private onClick = (e: MouseEvent) => this._handleClick(e);
   private onMove = (e: MouseEvent) => this._handleMove(e);
+  // Leaving the canvas (onto a card/rail) stops pointermoves, so transient hovers would
+  // otherwise linger — clear them all at the boundary.
+  private onLeave = () => this._clearHover();
   // DRAG SUPPRESSION: a "click" that ends a camera-orbit drag must pick NOTHING (with the floor
   // planes pickable, almost every orbit would otherwise end by committing a layer + a camera
   // flight). Record where the pointer went down; _handleClick ignores clicks that travelled
@@ -161,6 +169,7 @@ export class Engine {
     canvas.addEventListener("click", this.onClick);
     canvas.addEventListener("pointermove", this.onMove);
     canvas.addEventListener("pointerdown", this.onDown);
+    canvas.addEventListener("pointerleave", this.onLeave);
     // The engine owns the resize handler (createScene no longer adds one) so it's
     // cleaned up on dispose — no leak across StrictMode remounts / HMR.
     window.addEventListener("resize", this.onResize);
@@ -224,6 +233,11 @@ export class Engine {
         }
         // Geo explorer list-row hover → glow that node's shells on the globe (same as a 3D hover).
         if (st.hoverNodeId !== prev.hoverNodeId) this.globe.setHoverNode(st.hoverNodeId);
+        // Geo explorer country-row hover → preview that country's border outline (whisper level;
+        // the committed drill's full hairline wins inside the Globe).
+        if (st.hoverCountry !== prev.hoverCountry) this.globe.setHoverCountry(st.hoverCountry);
+        // Explorer cohort-row hover → glow the whole 3D stack (every member id together).
+        if (st.hoverCohort !== prev.hoverCohort) this.globe.setHoverCohort(st.hoverCohort);
         // Snapshots·Explore panel: the plane highlight = the transient hover PREVIEW, else the
         // COMMITTED layer selection (the layer card) — same resolve idiom as hoverFilter ?? filter.
         // Only a COMMITTED layer dims the other planes; a hover just brightens its own plane.
@@ -407,6 +421,10 @@ export class Engine {
   // ---- view + filter (ports ui.setMode / _applyFilter / camera focus) ----
   setMode(mode: Mode) {
     this.mode = mode;
+    // A view switch re-lays the scene under a stationary pointer, so any in-flight hover
+    // (tooltip + the hover channels) would linger re-projected at a wrong screen position
+    // until the next pointermove — clear it as part of the switch.
+    this._clearHover();
     const policy = VIEW_POLICIES[mode];
     // View-derived sim gates → the scene modules (the render loop reads the rest of the policy).
     this.globe.setSimFlags(policy.sims);
@@ -470,6 +488,12 @@ export class Engine {
     this._dofMeta = this.layers.metas.find((x) => x.cfg.id === this.filter) ?? null;
     if (this.mode === "geo") {
       this.globe.setFilter(this.filter); // also clears globe.countryFilter
+      // Re-assert a live country drill: setFilter clears the Globe's drill BY DESIGN for a
+      // user filter switch (the subscription nulls this.country before calling us), but this
+      // also runs on every background cluster/meta poll (_applyMetagraphs → applyFilter(false))
+      // — without the re-assert, the poll silently wiped the drill's dim + border seconds
+      // after every drill while the store/engine still said drilled (long-standing bug).
+      if (this.country != null) this.globe.setCountry(this.country);
       if (focusCamera) this._applyGeoFocus();
     } else if (this.mode === "hyper") {
       // Dim the non-selected nodes ("the others") so the selected network stands out, on top
@@ -509,6 +533,18 @@ export class Engine {
   // zoom via _focusNode); "all" sits at the wide geo overview.
   private _applyGeoFocus() {
     const narrowed = this.filter !== "all" || this.country != null;
+    // Country drill: the country's SHAPE leads — spin to its polygon centroid and frame its
+    // angular extent (domain countryShape), so the country itself sits centred regardless of
+    // where its nodes cluster. Falls back to the node-mean concentration framing while the
+    // countries topology is still loading / for a cc it doesn't cover.
+    if (this.country != null) {
+      const shape = this.globe.focusCountryShape(this.country);
+      if (shape) {
+        countryFraming(shape.latAngle, shape.angularRadius, this._framingOut);
+        this._tweenTo(this._framingOut.pos, this._framingOut.target);
+        return;
+      }
+    }
     const R = this.globe.focusDensest(narrowed);
     // Three zoom LEVELS (user design): metagraph = a WIDE network pose (rotated to the densest
     // cluster, held clearly farther out than the country pose so the country drill still reads
@@ -564,8 +600,8 @@ export class Engine {
     }
     this.ctx.controls.autoRotate = false;
     this.layers.focusId = null;
-    const dir = pos.clone().normalize();
-    this._tweenTo(pos.clone().addScaledVector(dir, 9).add(new THREE.Vector3(0, 3, 0)), pos);
+    hyperNodeFraming(pos, this._framingOut);
+    this._tweenTo(this._framingOut.pos, this._framingOut.target);
   }
 
   // Node framing: zoomed in, camera low in front of the node, line of sight skimming across the
@@ -573,12 +609,10 @@ export class Engine {
   // which settles the node at the LOWER-third line (user; rule-of-thirds — centred read wrong)
   // with the horizon + sky filling the upper frame.
   private _focusNode() {
-    // z 21 → 19.4 (user: zoom in more) — close enough to read the hex prism's facets/edges,
-    // still skimming the surface rather than staring down at it. target y 14 → 32 (user: node at
-    // the LOWER third, not centred): the camera sits ~4.6 world units from the node, so the
-    // look-at point must swing far up the globe's rising face to shift the node a third of the
-    // frame — solved from the framing geometry (node ≈ (0,3.7,16.7) after focusNode's aim).
-    this._tweenTo(new THREE.Vector3(0, 0, 19.4), new THREE.Vector3(0, 32, 2));
+    // The one geo node pose (cameraRig.nodeFraming — latitude-independent via Globe.focusNode's
+    // NODE_RAISE contract). Dolly-exempt: its numbers are absolute (see CAM_ZOOM's note).
+    nodeFraming(this._framingOut);
+    this._tweenTo(this._framingOut.pos, this._framingOut.target, false);
   }
 
   // Compute the per-country leaderboard for the active filter and push it to the store
@@ -587,9 +621,10 @@ export class Engine {
     if (!this.globe.nodes?.length) return;
     const countries = this.globe.countryStats(this.filter);
     useStore.getState().setLeaderboard({ countries });
-    // Flat node list for the geo node browser (read-only; empty outside geo so the
-    // browser stays quiet). Built on the same triggers as the leaderboard.
-    useStore.getState().setSelNodes(this.mode === "geo" ? this.globe.listNodes(this.filter) : []);
+    // Flat node list for the explorer node browsers (read-only; the policy says which views
+    // have one — geo's Nodes-by-country, hyper's Nodes-by-layer — so it empties elsewhere
+    // and the browsers stay quiet). Built on the same triggers as the leaderboard.
+    useStore.getState().setSelNodes(VIEW_POLICIES[this.mode].nodeList ? this.globe.listNodes(this.filter) : []);
   }
 
   // ---- picking (ports ui.js _pick / _pickablesFor / _onClick) ----
@@ -626,7 +661,7 @@ export class Engine {
       const pick: PickDescriptor | undefined = h.object.userData.picks
         ? h.object.userData.picks[h.instanceId as number]
         : h.object.userData.pick;
-      if (!pick || !this._isPickActive(pick)) continue;
+      if (!pick || !pickActive(pick, this.mode, this.filter, this._activeMetaIds)) continue;
       if (pick.kind === "layer") {
         // Planes are only 3D targets while NO layer is committed — once one is selected (the
         // zoomed layer-focus pose), hovering/clicking the stack must not steal the highlight;
@@ -650,28 +685,22 @@ export class Engine {
 
   // The network (filter id) a node pick belongs to: its metagraph, or the DAG core for a
   // validator. Clicking a node sets the global filter to this, consistently in every view.
-  private _pickNetId(p: PickDescriptor): string | null {
-    if (p.kind === "metanode") return p.meta?.id ?? null;
-    if (p.kind === "l0" || p.kind === "l1") return "dag";
-    return null;
-  }
-
-  // Whether a pick participates in hover/click. In GEO the off-filter / off-country nodes are
-  // genuinely hidden, so they're not pickable. In HYPER every node stays interactive — the
-  // off-focus ones are only *dimmed*, not hidden, so clicking one (e.g. a core validator while
-  // a metagraph is selected) drills into its network; gating them out there read as a bug.
-  private _isPickActive(p: PickDescriptor): boolean {
-    // A registered-but-node-less metagraph hub is shown (dim) but not selectable, so it
-    // matches its inactive look + its "registered · no live nodes" filter chip.
-    if (p.kind === "meta") return !this._activeMetaIds || this._activeMetaIds.has(p.cfg.id);
-    if (this.mode !== "geo") return true;
-    let id: string | undefined;
-    if (p.kind === "l0" || p.kind === "l1") id = "dag"; // validators are the DAG core
-    else if (p.kind === "metanode") id = p.meta?.id;
-    else return true;
-    if (!(this.filter === "all" || this.filter === id)) return false;
-    if (this.country && p.geo?.cc !== this.country) return false;
-    return true;
+  // Drop every transient hover: the tooltip subject + all four hover channels (each store
+  // write also resets its 3D effect via the command-bridge subscription). Event-driven only
+  // (view switch) — never on the per-frame path.
+  private _clearHover() {
+    const st = useStore.getState();
+    if (st.hoverNodeId != null) st.setHoverNodeId(null);
+    if (st.hoverSnapOrd != null) st.setHoverSnapOrd(null);
+    if (st.hoverFilter != null) st.setHoverFilter(null);
+    if (st.hoverCountry != null) st.setHoverCountry(null);
+    if (st.hoverCohort != null) st.setHoverCohort(null);
+    if (st.ledgerHilite != null) st.setLedgerHilite(null);
+    if (this._hoverKey != null || st.hover != null) {
+      this._hoverKey = null;
+      st.setHover(null);
+    }
+    this.canvas.style.cursor = "grab";
   }
 
   // Hover tooltip: only writes the store when the hovered target changes (not per
@@ -691,9 +720,25 @@ export class Engine {
     const snapOrd = p?.kind === "snapshot" ? p.data.ordinal : null;  // snapshot → ledger row
     const metaId = p?.kind === "meta" ? p.cfg?.id ?? null : null;    // hub → metagraph dim preview
     const layerId = p?.kind === "layer" ? p.layerId : null;          // floor plane → highlight preview
+    // Country under the cursor (policy-gated): the SCENE side of the bidirectional country
+    // pairing — writes the same hoverCountry channel the explorer rows use, so the border
+    // preview + the row wash light from either end. Hovering a NODE hovers its country too
+    // (user); with no object hit, the land point under the cursor resolves analytically
+    // (ray→sphere — the sphere is rotation-invariant; the Globe resolves WHICH country).
+    let countryCc: string | null = null;
+    if (VIEW_POLICIES[this.mode].countryHover && this.morph > 0.9) {
+      if (p && (p.kind === "l0" || p.kind === "l1" || p.kind === "metanode")) {
+        countryCc = p.geo?.cc ?? null;
+      } else if (!p) {
+        const hit = this.raycaster.ray.intersectSphere(this._landSphere, this._landHit);
+        if (hit) countryCc = this.globe.countryCcAtPoint(hit);
+      }
+    }
+    if (countryCc) this.canvas.style.cursor = "pointer"; // the border preview invites the drill
     if (nodeKey !== st.hoverNodeId) st.setHoverNodeId(nodeKey);
     if (snapOrd !== st.hoverSnapOrd) st.setHoverSnapOrd(snapOrd);
     if (metaId !== st.hoverFilter) st.setHoverFilter(metaId);
+    if (countryCc !== st.hoverCountry) st.setHoverCountry(countryCc);
     if (layerId !== st.ledgerHilite) st.setLedgerHilite(layerId);    // same channel the panel rows write
 
     // The lean tooltip label — re-write the store only when the subject's identity changes so
@@ -709,43 +754,30 @@ export class Engine {
     // A click that ends a drag (orbit/pan) is navigation, not selection — see onDown.
     if (Math.hypot(e.clientX - this._downX, e.clientY - this._downY) > 5) return;
     const p = this._pickAt(e);
-    if (!p) return;
-    // A hub click selects the metagraph (opens its context pane + frames it).
-    if (p.kind === "meta") {
-      useStore.getState().setFilter(p.cfg.id);
-      return;
+    // With nothing picked, resolve the drillable country under the cursor (geo only — the
+    // land-sphere hit is analytic; the Globe resolves WHICH country in its rotated frame).
+    let countryCc: string | null = null;
+    if (!p && VIEW_POLICIES[this.mode].countryHover && this.morph > 0.9) {
+      const hit = this.raycaster.ray.intersectSphere(this._landSphere, this._landHit);
+      countryCc = hit ? this.globe.countryCcAtPoint(hit) : null;
     }
-    // The ledger's centred snapshot tile selects that snapshot (opens the snapshot card) and pins
-    // it (the FollowController only auto-follows the live tip when nothing is selected).
-    if (p.kind === "snapshot") {
-      useStore.getState().setFollowing(false);
-      useStore.getState().setSnap(p);
-      return;
-    }
-    // A floor PLANE click = the explore panel's row click: toggle the committed layer selection
-    // (opens/clears the layer card; the layer-focus camera rides the store change).
-    if (p.kind === "layer") {
-      const st = useStore.getState();
-      st.setLayer(st.layer?.layerId === p.layerId ? null : p);
-      return;
-    }
-    // Clicking a node, in any view: drill the global filter into the node's network (its
-    // metagraph, or the DAG core for a validator) and open its node card. Filter first, so the
-    // node-focus camera move (set by the inspect) wins over the network framing.
-    if (p.kind === "l0" || p.kind === "l1" || p.kind === "metanode") {
-      const netId = this._pickNetId(p);
-      // Ledger: open the node card + light its lane (filter), but SKIP the camera move — the planar
-      // settlement diagram must stay put. The card itself doesn't touch the 3D layout, so a node
-      // click here behaves like every other view (card + filter), just without the focus tween.
-      if (this.mode === "ledger") {
-        if (netId) useStore.getState().setFilter(netId);
-        useStore.getState().setInspect(p);
-        return;
-      }
-      if (this.mode === "geo") this.ctx.controls.autoRotate = false;
-      if (netId) useStore.getState().setFilter(netId);
-      useStore.getState().setInspect(p);
-    }
+    // The SEMANTICS live in the pure, tested decision table (domain/pickActions) — what a
+    // click means per view × pick kind, including the ordering contracts. This handler only
+    // resolves inputs above and executes the actions below.
+    const st = useStore.getState();
+    applyClickActions(
+      clickActions({
+        mode: this.mode,
+        pick: p,
+        countryCc,
+        current: {
+          filter: st.filter,
+          country: st.country,
+          hasInspect: !!st.inspect,
+          layerId: st.layer?.layerId ?? null,
+        },
+      }),
+    );
   }
 
   private focus(name: string) {
@@ -754,13 +786,14 @@ export class Engine {
   }
 
 
-  private _tweenTo(toPos: Vec, toTgt: Vec) {
-
+  private _tweenTo(toPos: Vec, toTgt: Vec, dolly = true) {
     const tw = this._tween;
     tw.fromPos.copy(this.ctx.camera.position);
-    // Dolly every framing back by CAM_ZOOM (push the position out from its target) — one global lever
-    // so all views sit a touch wider. Writes straight into tw.toPos, no extra allocation.
-    tw.toPos.subVectors(toPos, toTgt).multiplyScalar(CAM_ZOOM).add(toTgt);
+    // The global CAM_ZOOM dolly (see cameraRig) — writes straight into tw.toPos, no extra
+    // allocation. `dolly: false` is for poses whose TARGET is a composed look-at rather than
+    // the subject (nodeFraming — see the exemption note next to CAM_ZOOM).
+    if (dolly) dollyBack(toPos, toTgt, tw.toPos);
+    else tw.toPos.copy(toPos);
     tw.fromTgt.copy(this.ctx.controls.target);
     tw.toTgt.copy(toTgt);
     tw.t = 0;
@@ -913,6 +946,7 @@ export class Engine {
     this.canvas.removeEventListener("click", this.onClick);
     this.canvas.removeEventListener("pointermove", this.onMove);
     this.canvas.removeEventListener("pointerdown", this.onDown);
+    this.canvas.removeEventListener("pointerleave", this.onLeave);
     window.removeEventListener("resize", this.onResize);
     this.stats?.dom.remove();
     this.unsub.forEach((u) => u());

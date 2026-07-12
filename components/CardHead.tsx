@@ -180,8 +180,16 @@ export default function CardHead({
   }
 
   // Inspector layout — block-flow head inside the card's own padding (RIGHT_CARD p-[18px]), so
-  // the hairline is inset by construction. The title row clears the absolute × via pr when a
-  // close is present.
+  // the hairline is inset by construction. Only the EYEBROW clears the absolute corner controls
+  // (they share the card's top edge); the title row sits BELOW them and runs to the content
+  // edge, so its aside (status pill, live dot, site link) ends flush with the ×'s glyph and the
+  // body's right-aligned columns (user, 2026-07-12 — the 22px title-row clearance double-inset
+  // the aside ~40px from the card edge while everything else aligned at ~18px). Right cards are
+  // COLLAPSIBLE too (user, 2026-07-12): the WHOLE head is the toggle (same WAI-ARIA disclosure
+  // pattern + stretched hit area as the panel layout — required for touch), with the +/− as the
+  // decorative indicator on the eyebrow line; the × and the title-row aside float ABOVE the
+  // stretched hit area (z) so closing and the site link keep working. Collapsed = eyebrow +
+  // title only (the caller hides subtitle/body; the hairline goes too).
   return (
     <>
       {onClose && (
@@ -191,26 +199,49 @@ export default function CardHead({
           title={closeTitle}
           aria-label={closeTitle}
           onClick={onClose}
-          className="absolute top-[10px] right-[10px] size-auto rounded-md py-0.5 px-2 leading-none cursor-pointer text-muted-foreground hover:bg-transparent hover:text-muted-foreground dark:hover:bg-transparent"
+          className="absolute top-[10px] right-[10px] z-10 size-auto rounded-md py-0.5 px-2 leading-none cursor-pointer text-muted-foreground hover:bg-transparent hover:text-muted-foreground dark:hover:bg-transparent"
         >
           <X aria-hidden className="size-4" />
         </Button>
       )}
-      {eyebrow && <span className={cn("block mb-2 pr-[22px]", eyebrowClass)}>{eyebrow}</span>}
-      {title != null && (
-        <>
-          <div className={cn("flex items-center gap-2 min-w-0", onClose && "pr-[22px]")}>
-            <h3 className={cn(TITLE, "text-foreground min-w-0")}>{rolled}</h3>
-            {aside != null && <span className="ml-auto flex-none">{aside}</span>}
+      <div className={cn(onToggle && "relative group")}>
+        {(eyebrow || onToggle) && (
+          <div className={cn("flex items-start justify-between gap-2 mb-2", onClose && "pr-[30px]")}>
+            {eyebrow ? <span className={cn("block", eyebrowClass)}>{eyebrow}</span> : <span />}
+            {onToggle && (
+              // -mt aligns the glyph's centre with the ×'s (the × floats at the card corner,
+              // outside this row's flow — measured, not eyeballed).
+              <button
+                type="button"
+                aria-expanded={!collapsed}
+                title={collapsed ? "Expand" : "Collapse"}
+                onClick={onToggle}
+                className="appearance-none bg-transparent border-0 p-0 -mt-[7px] -mb-1 inline-flex items-center justify-center w-5 h-[18px] leading-none text-muted-foreground group-hover:text-foreground rounded-sm focus-visible:outline-1 focus-visible:outline-ring/60 after:absolute after:inset-0 after:cursor-pointer after:content-['']"
+              >
+                {collapsed ? <Plus className="size-3.5" aria-hidden /> : <Minus className="size-3.5" aria-hidden />}
+              </button>
+            )}
           </div>
-          {subtitle != null && (
-            <div className="mt-1 text-label leading-none text-muted-foreground overflow-hidden text-ellipsis whitespace-nowrap">
-              {subtitle}
+        )}
+        {title != null && (
+          <>
+            <div className="flex items-center gap-2 min-w-0">
+              <h3 className={cn(TITLE, "text-foreground min-w-0")}>{rolled}</h3>
+              {/* z-10 lifts the aside (site link) above the head's stretched toggle overlay. */}
+              {aside != null && <span className="ml-auto flex-none relative z-10">{aside}</span>}
             </div>
-          )}
-          <div className="border-b border-border mt-2 mb-2.5" aria-hidden />
-        </>
-      )}
+            {subtitle != null && (
+              // No leading-none here: the node card's subtitle carries bordered code pills
+              // (RoleChips) that need the natural line box — a collapsed line + overflow-hidden
+              // clipped their borders.
+              <div className="mt-1 text-label text-muted-foreground overflow-hidden text-ellipsis whitespace-nowrap">
+                {subtitle}
+              </div>
+            )}
+          </>
+        )}
+      </div>
+      {title != null && !collapsed && <div className="border-b border-border mt-2 mb-2.5" aria-hidden />}
     </>
   );
 }

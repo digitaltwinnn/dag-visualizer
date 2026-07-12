@@ -2,14 +2,6 @@ import { headers } from "next/headers";
 import type { Metadata } from "next";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import {
-  Command,
-  CommandInput,
-  CommandList,
-  CommandEmpty,
-  CommandGroup,
-  CommandItem,
-} from "@/components/ui/command";
 import { RIGHT_CARD } from "@/components/CardHead";
 import GhostCardDemo from "./GhostCardDemo";
 import { Card } from "@/components/ui/card";
@@ -27,6 +19,7 @@ import EcgMark from "@/components/topbar/EcgMark";
 import { VIEW_ICONS } from "@/components/icons";
 import { Minus, X } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { SELECTED_ROW } from "@/components/selection";
 
 // Internal styleguide: robots-disallowed; carries its OWN title and no canonical (it would
 // otherwise inherit the root layout's canonical "/", mislabelling it as a duplicate).
@@ -276,33 +269,37 @@ export default async function DesignPage() {
 
       <section className="mb-10">
         <h2 className="text-sm uppercase tracking-widest text-muted-foreground mb-3">
-          Filter picker — <code className="font-mono">Command</code>
+          Filter strip — chip toggles
         </h2>
         <p className="text-sm text-muted-foreground mb-3 max-w-2xl">
-          The top-bar filter picker is the shadcn <code className="font-mono">Command</code>{" "}
-          primitive (cmdk) in an <code className="font-mono">.ig-panel</code>, with the shared slim{" "}
-          <code className="font-mono">.cmd-list-scroll</code> scrollbar. Each row carries an identity
-          dot in the metagraph&apos;s hue.
+          The top-bar filter is an ATTACHED strip that grows the command bar downward (the
+          detached <code className="font-mono">Command</code> popover was replaced 2026-07-12 —
+          hovering a chip previews the selection while the scene reacts behind it). Each chip
+          carries an identity dot in the network&apos;s hue + its located-node count; the
+          committed pick wears the shared selection wash.
         </p>
-        <Command className="ig-panel max-w-[360px] bg-transparent">
-          <CommandInput placeholder="Search metagraphs…" />
-          <CommandList className="cmd-list-scroll max-h-[200px]">
-            <CommandEmpty>No metagraph found.</CommandEmpty>
-            <CommandGroup>
-              <CommandItem value="all whole network" className="gap-2">
-                <span className="w-2 h-2 rounded-full flex-none" style={{ background: "var(--primary)" }} />
-                <span className="text-[13px] text-foreground">All</span>
-                <span className="text-[11px] text-muted-foreground ml-auto">whole network</span>
-              </CommandItem>
-              {metas.slice(0, 4).map((m) => (
-                <CommandItem key={m.id} value={m.symbol} className="gap-2">
-                  <span className="w-2 h-2 rounded-full flex-none" style={{ background: m.hue?.oklch ?? "var(--muted-foreground)" }} />
-                  <span className="text-[13px] text-foreground">{m.symbol}</span>
-                </CommandItem>
-              ))}
-            </CommandGroup>
-          </CommandList>
-        </Command>
+        <div className="ig-panel max-w-[560px] flex flex-wrap items-center gap-1 p-2">
+          <button type="button" className="flex items-center gap-[7px] py-1.5 px-2.5 rounded-btn border-0 bg-transparent cursor-pointer hover:bg-wash-hover">
+            <span className="w-2 h-2 rounded-full flex-none" style={{ background: "var(--primary)" }} />
+            <span className="text-body text-foreground">All</span>
+            <span className="text-label text-muted-foreground tabular-nums">8 metagraphs · 217</span>
+          </button>
+          <span className="w-px self-stretch bg-border/60 my-1.5 mx-1" aria-hidden />
+          {metas.slice(0, 4).map((m, i) => (
+            <button
+              key={m.id}
+              type="button"
+              className={cn(
+                "flex items-center gap-[7px] py-1.5 px-2.5 rounded-btn border-0 bg-transparent cursor-pointer hover:bg-wash-hover",
+                i === 0 && SELECTED_ROW,
+              )}
+            >
+              <span className="w-2 h-2 rounded-full flex-none" style={{ background: m.hue?.oklch ?? "var(--muted-foreground)" }} />
+              <span className="text-body text-foreground">{m.symbol}</span>
+              <span className="text-label text-muted-foreground tabular-nums">{3 * (i + 1)}</span>
+            </button>
+          ))}
+        </div>
       </section>
 
       <section className="mb-10">

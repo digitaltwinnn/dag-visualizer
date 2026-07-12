@@ -1,118 +1,94 @@
 "use client";
 import { useMemo } from "react";
 import { useStore } from "@/src/store/store";
+import { filterToggleActions } from "@/src/engine/domain/pickActions";
+import { applyClickActions } from "@/src/store/applyClickActions";
 import { hex } from "@/src/util/format";
 import { cn } from "@/lib/utils";
-import { SELECTED_ROW, SelectedRowMark } from "@/components/selection";
+import { SELECTED_ROW } from "@/components/selection";
 import { IdentityDot } from "@/components/inspector/parts";
-import {
-  Command, CommandInput, CommandList, CommandEmpty, CommandGroup, CommandItem,
-} from "@/components/ui/command";
 
-// The expanded filter body: a compact, searchable identity-selection menu. The `All` row
-// pinned on top (the clear/default — one line like every other row: dot + "All" +
-// "<n> metagraphs" in the ticker slot + the node count right-aligned), then one row per core — a small identity-hue DOT + name +
-// ticker + node count — SORTED by located-node count desc, so 0-located metagraphs sink to the
-// bottom (shown greyed with their real count, never hidden). No logo tiles (they ate width and
-// read as heavy chrome); the dot carries identity, matching the collapsed filter face + the rail.
-// The committed pick carries the shared SELECTED_ROW mark (wash + inset ring + trailing ✓ —
-// components/selection.tsx); hovering a row PREVIEWS its dim in the scene (setHoverFilter);
-// leaving the list clears the preview.
-export default function FilterPicker({ onPick }: { onPick?: () => void }) {
+// The expanded filter body — a horizontal CHIP STRIP on the command bar's own surface (user,
+// 2026-07-12: reversed the 2026-07-04 detached-popover decision — the bar-expansion variant is
+// back, because hovering/clicking networks should read against the SCENE reacting live, and the
+// popover glass sat on top of it). The bar grows downward by one row (TopBar owns the grid-rows
+// collapse); this is just the strip: the `All` chip (dot + label + the mapped-network/node
+// tallies), then one chip per network — identity dot + name + located count — SORTED by located
+// desc so 0-located metagraphs sink to the end (dimmed with their honest 0, never hidden). The
+// committed pick wears the view switch's on-state (SELECTED_ROW wash + ring — chips are
+// controls, not list rows, so no trailing ✓); hovering a chip PREVIEWS its dim in the scene
+// (setHoverFilter), leaving the strip clears the preview. Picking does NOT close the strip —
+// exploring several networks in a row is the point; the FILTER button (or Escape) closes it.
+export default function FilterPicker() {
   const filter = useStore((s) => s.filter);
-  const setFilter = useStore((s) => s.setFilter);
   const setHoverFilter = useStore((s) => s.setHoverFilter);
   const metaList = useStore((s) => s.metaList);
 
-  // Sort by located desc, so 0-located metagraphs sink to the bottom.
   const rows = useMemo(
     () => [...metaList].sort((a, b) => (b.located ?? 0) - (a.located ?? 0)),
     [metaList],
   );
   const totalNodes = useMemo(() => rows.reduce((s, m) => s + (m.located ?? 0), 0), [rows]);
-  // Only count mapped cores (located > 0) — matches what's actually plotted/pickable below;
-  // the 0-located rows are greyed and excluded so the headline stays consistent with the list.
   const mappedCount = useMemo(() => rows.filter((m) => (m.located ?? 0) > 0).length, [rows]);
 
-  // Re-picking the COMMITTED metagraph deselects back to "all" (user: the same toggle
-  // language as the explorer's node/country rows — every selection un-selects in place).
-  const pick = (id: string) => {
-    setFilter(id !== "all" && id === filter ? "all" : id);
-    onPick?.();
-  };
+  // Re-picking the COMMITTED metagraph deselects back to "all" — the tested table rule.
+  const pick = (id: string) => applyClickActions(filterToggleActions(id, filter));
 
-  // Shared row grid — one dot + name + (optional sub-label under the name) + a right-aligned
-  // count column, plus a RESERVED trailing slot (`pr-7`, every row) where the committed pick's
-  // ✓ renders absolutely — the stock SelectItem pattern, so the count column never shifts.
-  // Command's own `data-[selected=true]` hover/keyboard-cursor highlight is overridden to a
-  // faint neutral wash (the bright accent fill washed the row text out to unreadable) — that
-  // stays as the TRANSIENT cursor cue. The COMMITTED filter's row gets the shared SELECTED_ROW
-  // mark (components/selection.tsx — the view switch's on-state language, box-shadow-based so
-  // the cursor wash layers under it cleanly).
-  const rowClass = (active: boolean, off: boolean) =>
+  const chipClass = (active: boolean, off: boolean) =>
     cn(
-      "relative grid grid-cols-[auto_1fr_auto_auto] items-center gap-2.5 pr-7",
-      "data-[selected=true]:bg-[rgba(255,255,255,0.05)] data-[selected=true]:text-foreground",
+      "flex items-center gap-[7px] py-1.5 px-2.5 rounded-btn border-0 bg-transparent cursor-pointer",
+      "text-left whitespace-nowrap transition-[background] duration-150",
+      "hover:bg-wash-hover",
+      "focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--primary)] focus-visible:outline-offset-[-2px]",
+      "max-[1099px]:min-h-11",
       active && SELECTED_ROW,
       off && "opacity-45",
     );
 
   return (
-    <Command
-      className="bg-transparent max-w-[360px] **:data-[slot=command-input-wrapper]:border-b-border"
+    <div
+      className={cn(
+        "flex flex-wrap items-center gap-1 mx-2 px-1.5 pb-2 pt-1.5 border-t border-border/60",
+        // PHONE: the wrapped chips would otherwise fill ~a third of the screen (12 chips at
+        // ≥44px tap height wrap to ~7 rows). Cap to ~4 rows and scroll the rest (user,
+        // 2026-07-12) — the strip stays a bar expansion, not a takeover. `.cmd-list-scroll` =
+        // the shared slim scrollbar; overscroll-contain keeps the flick off the page.
+        "max-[699px]:max-h-[192px] max-[699px]:overflow-y-auto max-[699px]:overscroll-contain cmd-list-scroll",
+      )}
       onMouseLeave={() => setHoverFilter(null)}
     >
-      <CommandInput placeholder="Search metagraphs…" />
-      <CommandList className="cmd-list-scroll max-h-[320px] overscroll-contain">
-        <CommandEmpty>No metagraph found.</CommandEmpty>
-        <CommandGroup>
-          <CommandItem
-            value="all metagraphs"
-            onSelect={() => pick("all")}
-            className={rowClass(filter === "all", false)}
-            onMouseEnter={() => setHoverFilter("all")}
+      <button
+        type="button"
+        aria-pressed={filter === "all"}
+        className={chipClass(filter === "all", false)}
+        onClick={() => pick("all")}
+        onMouseEnter={() => setHoverFilter("all")}
+      >
+        <IdentityDot hue="var(--primary)" />
+        <span className="text-body text-foreground">All</span>
+        <span className="text-label text-muted-foreground tabular-nums">
+          {mappedCount} metagraphs · {totalNodes}
+        </span>
+      </button>
+      <span className="w-px self-stretch bg-border/60 my-1.5 mx-1" aria-hidden />
+      {rows.map((m) => {
+        const off = (m.located ?? 0) === 0;
+        return (
+          <button
+            key={m.id}
+            type="button"
+            aria-pressed={filter === m.id}
+            title={`${m.name}${m.symbol ? ` · ${m.symbol}` : ""}`}
+            className={chipClass(filter === m.id, off)}
+            onClick={() => pick(m.id)}
+            onMouseEnter={() => setHoverFilter(m.id)}
           >
-            <IdentityDot hue="var(--primary)" />
-            <span className="text-body text-foreground">All</span>
-            {/* one line like the metagraph rows (user): the mapped-core count sits in the
-                ticker slot, the node total right-aligns as a bare number like every row */}
-            <span className="text-label text-muted-foreground whitespace-nowrap">{mappedCount} metagraphs</span>
-            <span className="text-label text-muted-foreground tabular-nums text-right">{totalNodes}</span>
-            {filter === "all" && <SelectedRowMark className="absolute right-2" />}
-          </CommandItem>
-        </CommandGroup>
-        <CommandGroup>
-          {rows.map((m) => {
-            const off = (m.located ?? 0) === 0;
-            const hue = hex(m.color);
-            return (
-              <CommandItem
-                key={m.id}
-                value={`${m.name} ${m.symbol ?? ""} ${m.id}`}
-                onSelect={() => pick(m.id)}
-                className={rowClass(filter === m.id, off)}
-                onMouseEnter={() => setHoverFilter(m.id)}
-              >
-                <IdentityDot hue={hue} />
-                <span className="text-body text-foreground">{m.name}</span>
-                <span className="text-label font-semibold tabular-nums" style={{ color: hue }}>{m.symbol}</span>
-                {off ? (
-                  // Honest, non-numeric tag (Task 13): these are real metagraphs with no
-                  // locatable node right now — still clickable (selectable in hyper/ledger), but
-                  // a "0" count read as a broken value. A small muted lowercase tag using the
-                  // squared-tag idiom (rounded-[4px] muted-foreground badge on a faint fill).
-                  <span className="justify-self-end rounded-xs px-[5px] py-[3px] text-micro leading-none tracking-[0.02em] text-muted-foreground bg-white/[0.035]">
-                    not located
-                  </span>
-                ) : (
-                  <span className="text-label text-muted-foreground tabular-nums text-right">{m.located}</span>
-                )}
-                {filter === m.id && <SelectedRowMark className="absolute right-2" />}
-              </CommandItem>
-            );
-          })}
-        </CommandGroup>
-      </CommandList>
-    </Command>
+            <IdentityDot hue={hex(m.color)} />
+            <span className="text-body text-foreground">{m.name}</span>
+            <span className="text-label text-muted-foreground tabular-nums">{m.located ?? 0}</span>
+          </button>
+        );
+      })}
+    </div>
   );
 }

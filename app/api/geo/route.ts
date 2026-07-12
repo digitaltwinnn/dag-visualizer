@@ -36,7 +36,7 @@ const getLiveGeo = unstable_cache(
     if (!Object.keys(map).length) throw new Error("geolocation empty");
     return map;
   },
-  ["validator-geo-live"],
+  ["validator-geo-live-v2"], // v2: +isp/asn fields (a key bump busts the pre-provider cache)
   { revalidate },
 );
 

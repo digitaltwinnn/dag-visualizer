@@ -9,6 +9,8 @@ import { SELECTED_ROW, SelectedRowMark } from "@/components/selection";
 import { subjectPairing } from "@/components/useSubjectPairing";
 import { filterAccent } from "@/src/data/network";
 import { useStore } from "@/src/store/store";
+import { layerToggleActions } from "@/src/engine/domain/pickActions";
+import { applyClickActions } from "@/src/store/applyClickActions";
 import { LEDGER_LAYERS } from "@/src/data/ledgerLayers";
 
 // The Snapshots view's left-rail tool: the layered-design explainer. Lists the settlement stack
@@ -27,14 +29,14 @@ export default function LedgerPanel() {
   // by the card's × too); hover writes the transient preview channel, leave clears it (the engine
   // falls back to the committed layer).
   const sel = useStore((s) => s.layer?.layerId ?? null);
-  const setLayer = useStore((s) => s.setLayer);
   const hilite = useStore((s) => s.ledgerHilite);
   const setHilite = useStore((s) => s.setLedgerHilite);
   const filter = useStore((s) => s.filter);
 
-  const commit = (l: (typeof LAYERS)[number]) => {
-    setLayer(sel === l.id ? null : { kind: "layer", layerId: l.id });
-  };
+  // Rows run the SAME tested toggle as the scene's floor-plane click, through the shared
+  // executor — the panel and the 3D planes can't drift (see domain/pickActions).
+  const commit = (l: (typeof LAYERS)[number]) =>
+    applyClickActions(layerToggleActions({ kind: "layer", layerId: l.id }, sel));
   return (
     // flex-none + no inner overflow (same treatment as GeoExplore, user: consistent rail
     // behaviour): the card grows with its content and the RAIL scrolls/fades into the chart
@@ -45,12 +47,17 @@ export default function LedgerPanel() {
         <CardHead
           panel
           icon={EXPLORE_ICON}
-          title="Understand the layered design"
-          eyebrow="Snapshots · explore"
+          title="Settlement layers"
+          eyebrow="Explore"
           collapsed={collapsed}
           onToggle={() => setCollapsed((c) => !c)}
         />
         <div className={cn("flex flex-col px-3 pt-1.5 pb-2.5", collapsed && "hidden")}>
+          {/* The usage hint LEADS the card (matches the other explorers) — what it holds + what
+              you learn. px-1 nets the same ~16px inset as the sibling cards' px-4 hints. */}
+          <div className="px-1 pt-0.5 pb-1.5 text-label text-muted-foreground">
+            Every layer that participates in creating a snapshot — hover or click one to see what it does in the settlement stack.
+          </div>
           <div className="flex flex-col gap-0.5" onMouseLeave={() => setHilite(null)}>
             {LAYERS.map((l) => {
               const on = sel === l.id;

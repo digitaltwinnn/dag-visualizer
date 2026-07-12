@@ -29,7 +29,7 @@
 
 import * as THREE from "three";
 import { METAGRAPHS } from "../../config";
-import { LEDGER, HYP_SPLIT, LAYER_GEOM, ledgerSite, DIAL_R, DIAL_R_GLOBAL } from "../../domain/ledgerLayout";
+import { LEDGER, HYP_SPLIT, LAYER_GEOM, ledgerSite, DIAL_R } from "../../domain/ledgerLayout";
 import type { SceneColors } from "../../sceneColors";
 import { LedgerModel, SLOT_SP, slotFade, curvePoint } from "../../domain/ledgerModel";
 import type { GlobalSnapshot, Anchor, PickDescriptor } from "@/src/data/types";
@@ -83,23 +83,32 @@ const _gx = new Map<number, number>(); // reused per-frame: slot → global bloc
 const DIAL_REST_OP = 0.13; // resting identity mark — dim
 const DIAL_LIT_OP = 0.78;  // added while latched as did-work-this-tick (user: brighter highlight)
 
-// The shared unit station DIAL geometry — the instrument-ruler language bent into a circle: a
-// hairline circle plus radial ticks (fine ticks all round, longer cardinals), mirroring the rail
-// threads' ruler spec in-scene. Unit radius; each dial scales it to its fixed radius.
-// Construction-time allocation (once, shared by every dial).
+// The shared unit station DIAL geometry — the instrument-ruler language bent around the node
+// field: a hairline HEXAGON (user, 2026-07-12 — the honeycomb-stacked chips fill a hexagonal
+// footprint now, so the circle read as a mismatched frame; vertices at k·60° match the hex
+// grid's neighbour axes) plus radial ruler ticks that follow the hex boundary (fine ticks all
+// round, longer ones at the six corners), mirroring the rail threads' ruler spec in-scene.
+// Unit circumradius; each dial scales it to its fixed radius. Construction-time allocation
+// (once, shared by every dial).
 function buildDialGeometry(): THREE.BufferGeometry {
   const pts: number[] = [];
-  const SEG = 72;
-  for (let i = 0; i < SEG; i++) {
-  const a0 = (i / SEG) * Math.PI * 2, a1 = ((i + 1) / SEG) * Math.PI * 2;
-  pts.push(Math.cos(a0), 0, Math.sin(a0), Math.cos(a1), 0, Math.sin(a1));
+  // A regular hexagon's boundary distance at angle a (circumradius 1, vertices at k·60°).
+  const SIXTH = Math.PI / 3;
+  const rHex = (a: number) => {
+    const m = ((a % SIXTH) + SIXTH) % SIXTH - SIXTH / 2;
+    return Math.sqrt(3) / 2 / Math.cos(m);
+  };
+  for (let i = 0; i < 6; i++) {
+    const a0 = i * SIXTH, a1 = (i + 1) * SIXTH;
+    pts.push(Math.cos(a0), 0, Math.sin(a0), Math.cos(a1), 0, Math.sin(a1));
   }
   const TICKS = 48;
   for (let i = 0; i < TICKS; i++) {
-  const a = (i / TICKS) * Math.PI * 2;
-  const cardinal = i % (TICKS / 4) === 0; // 4 longer cardinal ticks
-  const r0 = 1.04, r1 = cardinal ? 1.2 : 1.11;
-  pts.push(Math.cos(a) * r0, 0, Math.sin(a) * r0, Math.cos(a) * r1, 0, Math.sin(a) * r1);
+    const a = (i / TICKS) * Math.PI * 2;
+    const corner = i % (TICKS / 6) === 0; // 6 longer corner ticks
+    const rb = rHex(a);
+    const r0 = rb * 1.04, r1 = rb * (corner ? 1.2 : 1.11);
+    pts.push(Math.cos(a) * r0, 0, Math.sin(a) * r0, Math.cos(a) * r1, 0, Math.sin(a) * r1);
   }
   const geo = new THREE.BufferGeometry();
   geo.setAttribute("position", new THREE.BufferAttribute(new Float32Array(pts), 3));
@@ -234,10 +243,10 @@ export class LedgerView {
     // model): hypergraph L0 (lights as anchor pulses reach that floor) + the DAG L1 lane's cluster.
     const dagHue = this.sceneColors["dag"] ?? this._core; // the DAG's identity hue — matches its node instances
     this._gL0Ring = this._makeDial(0, LEDGER.rowHypL0, 0, dagHue);
-    this._gL0Ring.scale.setScalar(DIAL_R_GLOBAL);
+    this._gL0Ring.scale.setScalar(DIAL_R);
     this.group.add(this._gL0Ring);
     this._dagL1Ring = this._makeDial(0, LEDGER.rowDAGL1, LEDGER.dagLaneZ, dagHue);
-    this._dagL1Ring.scale.setScalar(DIAL_R_GLOBAL);
+    this._dagL1Ring.scale.setScalar(DIAL_R);
     this.group.add(this._dagL1Ring);
   }
 
@@ -323,7 +332,7 @@ export class LedgerView {
     // they stay a subtle hint of a layer (not a wall) — the black background still reads through.
     const W = 39.5;      // X extent (camera-depth) — tight to the trail; the FRONT gets a 1.5-unit
                          // strip beyond the original edge: enough that the corner labels clear the
-                         // global clusters' dials (DIAL_R_GLOBAL reaches x≈4.2; label band ~5.0–6.1)
+                         // global clusters' dials (ONE DIAL_R everywhere since 2026-07-12; label band clears it)
                          // without the panes reading empty at the front (user-tuned down from +3)
     const D = 44;        // Z extent — tight to the lanes
     const cx = -13.25;   // keeps the −X edge at −33 (still clears the trail ~−29) while the +X
@@ -567,7 +576,7 @@ export class LedgerView {
   }
 
   // A station DIAL lying flat on a floor, sharing the unit `_dialGeo` (scaled to its FIXED radius —
-  // one size for every metagraph, DIAL_R; the global clusters use DIAL_R_GLOBAL). Identity-hued,
+  // one size for EVERY cluster incl. the global L0 / DAG L1, DIAL_R). Identity-hued,
   // faint at rest (DIAL_REST_OP); the anchor-pulse glow brightens it on top (see update).
   private _makeDial(x: number, y: number, z: number, color: number): THREE.LineSegments {
     const dial = new THREE.LineSegments(

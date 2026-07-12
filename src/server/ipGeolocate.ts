@@ -6,7 +6,9 @@ import type { GeoMap } from "@/src/data/types";
 // routes run behind unstable_cache, so this is a handful of calls per revalidation —
 // well under the limit. Batches run concurrently. Failures leave IPs unlocated (the
 // globe simply won't plot them; the client-side resolver may still fill them later).
-const GEO_FIELDS = "status,country,countryCode,city,lat,lon,query";
+// `isp` + `as` ride along free on the same batch call: the hosting provider for the node
+// card + the explorer's provider sections ("AS24940 Hetzner Online GmbH" → asn "AS24940").
+const GEO_FIELDS = "status,country,countryCode,city,lat,lon,query,isp,as";
 
 async function geoBatch(ips: string[]): Promise<GeoMap> {
   const out: GeoMap = {};
@@ -23,6 +25,8 @@ async function geoBatch(ips: string[]): Promise<GeoMap> {
           lat: e.lat as number, lon: e.lon as number,
           city: (e.city as string) || "", country: (e.country as string) || "",
           cc: (e.countryCode as string) || "",
+          isp: (e.isp as string) || undefined,
+          asn: ((e.as as string) || "").split(" ")[0] || undefined,
         };
     }
   } catch {

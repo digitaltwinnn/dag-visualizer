@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { compositionRows } from "./composition";
+import { compositionRows, nodeCompositionLabel } from "./composition";
 import type { NodeInfo } from "@/src/data/types";
 
 const n = (roles: string[]): NodeInfo => ({ ip: "x", state: "Ready", layer: roles[0], roles }) as NodeInfo;
@@ -25,5 +25,17 @@ describe("compositionRows", () => {
   });
   it("names dedicated currency as Currency cL1", () => {
     expect(compositionRows([n(["cl1"])])).toContainEqual({ label: "Currency", codes: ["cL1"], count: 1 });
+  });
+});
+
+describe("nodeCompositionLabel (the node card's subtitle word)", () => {
+  it("renders one lowercase word per composition", () => {
+    expect(nodeCompositionLabel({ roles: ["l0", "cl1"] })).toBe("hybrid");
+    expect(nodeCompositionLabel({ roles: ["l0"] })).toBe("consensus");
+    expect(nodeCompositionLabel({ roles: ["dl1"] })).toBe("data");
+    expect(nodeCompositionLabel({ layer: "cl1" })).toBe("currency"); // layer fallback
+  });
+  it("is null when the node carries no role/layer info", () => {
+    expect(nodeCompositionLabel({})).toBeNull();
   });
 });

@@ -9,15 +9,17 @@ import { Card } from "@/components/ui/card";
 import { EXPLORE_ICON } from "@/components/icons";
 import { shortHash, CORE_HEX, metagraphById } from "@/src/data/network";
 import { identityHudHex } from "@/src/palette/identity";
-import { IdentityDot, StatusMark } from "@/components/inspector/parts";
 import { SELECTED_ROW, SelectedRowMark } from "@/components/selection";
 import { ccToFlag } from "@/src/util/format";
 import { hoverKeyOf } from "@/src/data/hoverSubject";
+import { countryToggleActions, nodeSelectActions } from "@/src/engine/domain/pickActions";
+import { applyClickActions } from "@/src/store/applyClickActions";
 import { subjectPairing } from "@/components/useSubjectPairing";
 import type { NodeRow } from "@/src/data/types";
 
-// Geography's single **explore** card (one frame, one "Geography · explore" eyebrow, an
-// accordion you click into). The country list IS the
+// Geography's single **explore** card (one frame, the bare "Explore" eyebrow — the view name
+// was dropped from card eyebrows, user 2026-07-12: the view switch already says where you
+// are — an accordion you click into). The country list IS the
 // node browser: each country is a row showing its share of the footprint (bar + count), and
 // clicking it drills the globe into that country AND expands its nodes inline — master on
 // top, detail nested beneath, then a node row opens its card on the right facts rail.
@@ -25,45 +27,24 @@ import type { NodeRow } from "@/src/data/types";
 export default function GeoExplore() {
   const lb = useStore((s) => s.leaderboard);
   const country = useStore((s) => s.country);
-  const setCountry = useStore((s) => s.setCountry);
   const selNodes = useStore((s) => s.selNodes);
   const inspect = useStore((s) => s.inspect);
-  const setInspect = useStore((s) => s.setInspect);
   const setHoverNodeId = useStore((s) => s.setHoverNodeId);
+  const setHoverCountry = useStore((s) => s.setHoverCountry);
+  const setHoverCohort = useStore((s) => s.setHoverCohort);
+  const hoverCountry = useStore((s) => s.hoverCountry);
   const hoverNodeId = useStore((s) => s.hoverNodeId);
-  const setFilter = useStore((s) => s.setFilter);
   const filter = useStore((s) => s.filter);
   const [collapsed, setCollapsed] = useState(false);
 
-  // Selecting a node here mirrors clicking it on the globe (Engine._handleClick): set the
-  // network filter to the node's OWN network first, then open its card. Without the filter step
-  // the selection didn't carry into the Hypergraph (the view had nothing to isolate). A validator
-  // belongs to the DAG core ("dag"); a metagraph node to its metagraph.
+  // Row selections run the SAME tested decision table as the scene clicks (domain/pickActions)
+  // through the SAME executor (store/applyClickActions), so the explorer and the globe can
+  // never drift in semantics (filter-first / node's-country / inspect-last ordering, the
+  // row's re-click deselect, the zoom-level rule).
   // `selected` = this row is the currently-inspected node — re-clicking it DESELECTS (the same
-  // step-back as the node card's ×, user: one toggle language everywhere), which drops the
-  // camera back to the country/network framing.
-  const selectNode = (pick: NodeRow["pick"], selected: boolean) => {
-    if (selected) {
-      setInspect(null);
-      return;
-    }
-    const netId =
-      pick.kind === "metanode"
-        ? pick.meta?.id ?? null
-        : pick.kind === "l0" || pick.kind === "l1"
-          ? "dag"
-          : null;
-    if (netId && netId !== filter) {
-      setFilter(netId);
-      // The engine's "switching network clears the country drill" rule fires on that setFilter —
-      // right for the PICKER, wrong here: this filter change is a side-effect of selecting a
-      // node INSIDE the drilled country (user bug: the accordion collapsed and the row's
-      // selection vanished). Re-assert the drill — the node provably lives in it.
-      const cc = "geo" in pick ? pick.geo?.cc ?? null : null;
-      if (country && cc === country) setCountry(country);
-    }
-    setInspect(pick);
-  };
+  // step-back as the node card's ×, user: one toggle language everywhere).
+  const selectNode = (pick: NodeRow["pick"], selected: boolean) =>
+    applyClickActions(nodeSelectActions(pick, { mode: "geo", currentFilter: filter, deselect: selected }));
 
   const list = lb?.countries ?? [];
   const max = list[0]?.count ?? 1;
@@ -82,14 +63,10 @@ export default function GeoExplore() {
   const activeCfg = metagraphById(filter);
   const tickerOrName = activeCfg ? activeCfg.ticker || activeCfg.name : "This metagraph";
   // Click a country: drill the globe into it (store.country) — the drill state doubles as the
-  // accordion's "which row is open", so the globe and the list stay one source of truth.
-  // Moving between zoom LEVELS deselects the finer one (user): drilling (or un-drilling) a
-  // country clears any selected NODE — its card closes and the camera lands on the country
-  // (or network) framing instead of staying pinned to the old node.
-  const drill = (cc: string) => {
-    if (sel) setInspect(null);
-    setCountry(country === cc ? null : cc);
-  };
+  // accordion's "which row is open", so the globe and the list stay one source of truth. Same
+  // tested table as the scene's empty-click country toggle (zoom-level rule included).
+  const drill = (cc: string) =>
+    applyClickActions(countryToggleActions(cc, { country, hasInspect: !!sel }));
 
   // Selection's nodes grouped by country **name** — the join key both the leaderboard and the
   // node list derive from `geo.country` (`cc` can be absent, the name can't). Each country's
@@ -110,6 +87,34 @@ export default function GeoExplore() {
       );
     return m;
   }, [selNodes]);
+
+  // COHORT ROWS (user redesign, option C): a country's nodes collapse into one row per
+  // city × provider — so the list repeats nothing (the old rows re-stated the same city
+  // and "ready" dozens of times). A cohort row is a DISCLOSURE: clicking expands its id
+  // rows inline (the pure pickers); everything aggregate already reads on the cohort row
+  // itself. NO status anywhere in the list (user: health belongs to the node CARD + the
+  // future network-health view). NO identity dot either (user, 2026-07-12): network is NOT
+  // in the key — a provider cohort can host many metagraphs, so no single hue can speak for
+  // the row, and splitting per network multiplied groups (the dot went with the split).
+  type Cohort = { key: string; city: string | null; isp: string | null; rows: NodeRow[] };
+  const cohortsOf = (rows: NodeRow[]): Cohort[] => {
+    const by = new Map<string, Cohort>();
+    for (const r of rows) {
+      const geo = "geo" in r.pick ? r.pick.geo : undefined;
+      const city = r.city || null;
+      const isp = geo?.isp || null;
+      const key = `${city ?? ""}|${isp ?? ""}`;
+      (by.get(key) ?? by.set(key, { key, city, isp, rows: [] }).get(key)!).rows.push(r);
+    }
+    return [...by.values()].sort(
+      (a, b) =>
+        b.rows.length - a.rows.length ||
+        (a.city ?? "\uffff").localeCompare(b.city ?? "\uffff"),
+    );
+  };
+  // Which cohort is disclosed (single-open keeps the list calm); keys are country-scoped so a
+  // stale key after switching countries simply matches nothing.
+  const [openCohort, setOpenCohort] = useState<string | null>(null);
 
   // The selected node, matched by IP **and** layer: one machine can sit in both the l0 and
   // l1 clusters (same IP, two rows), so IP alone highlighted both. `selLayer` is the picked
@@ -132,13 +137,20 @@ export default function GeoExplore() {
         panel
         icon={EXPLORE_ICON}
         title="Nodes by country"
-        eyebrow="Geography · explore"
+        eyebrow="Explore"
         collapsed={collapsed}
         onToggle={() => setCollapsed((c) => !c)}
       />
       <div className={cn("flex flex-col", collapsed && "hidden")}>
         {/* The footprint's headline figures (Nodes / Countries / Ready) live in the top-bar
-            vitals now; this card is purely the country→nodes accordion. */}
+            vitals now; this card is purely the country→nodes accordion. The usage hint LEADS
+            the card (user, 2026-07-12 — a bottom hint read as an afterthought) and says what
+            the card holds, not just the click. */}
+        {!quietEmpty && (
+          <div className="pt-2 px-4 pb-1 text-label text-muted-foreground">
+            Every country hosting nodes — hover or click one to see how the network is geographically distributed.
+          </div>
+        )}
         {quietEmpty ? (
           // Quiet-empty, in the standard LEFT-ALIGNED card/hint typography (the old centered
           // block — plus a stray absolutely-positioned standby dot that escaped its unsized
@@ -158,6 +170,11 @@ export default function GeoExplore() {
             // (px-1.5 -mx-1.5), so the drilled row's hover/selection box and the dropdown group
             // behind it share edges — the button used to overhang the wash by 6px on both sides
             // (user: "nodes dropdown not aligned with the parent").
+            // Bidirectional pairing: hovering the row previews the country's border on the
+            // globe, and hovering the COUNTRY IN THE SCENE washes this row (same channel,
+            // same .subject-paired language as the node rows; structural cyan — a place, not
+            // an identity).
+            const pair = subjectPairing(hoverCountry, c.cc, setHoverCountry, "var(--primary)");
             return (
               <div key={c.cc} className={cn(open && "bg-wash-faint rounded-btn my-0.5 -mx-1.5 px-1.5")}>
                 <button
@@ -167,16 +184,20 @@ export default function GeoExplore() {
                     // (overconstrained box) and the row ended 6px SHORT of the column; the calc width
                     // bakes both 6px outsets in, so the row box spans the open group's wash box
                     // edge-to-edge (buttons shrink-to-fit, so an auto width is not an option).
-                    "group flex items-center gap-2.5 w-[calc(100%+12px)] text-left text-body border-none bg-transparent cursor-pointer py-[5px] px-1.5 -mx-1.5 rounded-sm transition-[background] duration-150",
+                    "nb-row group flex items-center gap-2.5 w-[calc(100%+12px)] text-left text-body border border-transparent bg-transparent cursor-pointer py-[5px] px-1.5 -mx-1.5 rounded-sm transition-[background] duration-150",
                     "hover:bg-wash-hover",
                     "focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--primary)] focus-visible:outline-offset-[-2px]",
                     // The drilled country row wears the same shared selection language as the
                     // picker's committed row (SELECTED_ROW) — no ✓ though: an open accordion's
                     // state cue is its ▾ chevron, not a selection check.
                     open && SELECTED_ROW,
+                    pair.paired && pair.className,
                   )}
+                  style={pair.style}
                   aria-expanded={open}
                   onClick={() => drill(c.cc)}
+                  onMouseEnter={pair.onMouseEnter}
+                  onMouseLeave={pair.onMouseLeave}
                 >
                   <span className="text-label w-[17px] text-center flex-none">{ccToFlag(c.cc)}</span>
                   <span className="flex-none w-24 text-body text-foreground-dim whitespace-nowrap overflow-hidden text-ellipsis" title={c.country}>
@@ -211,64 +232,126 @@ export default function GeoExplore() {
 
                 {open && (
                   // Leaving the node list clears the globe hover-glow.
-                  <div className="mb-1.5 ml-[9px] py-0.5 pl-3 border-l border-border" onMouseLeave={() => setHoverNodeId(null)}>
+                  <div
+                    className="mb-1.5 ml-[9px] py-0.5 pl-3 border-l border-border"
+                    onMouseLeave={() => {
+                      setHoverNodeId(null);
+                      setHoverCountry(null);
+                    }}
+                  >
                     {nodes.length === 0 ? (
                       <p className="mt-1 mx-1 mb-1.5 text-label text-muted-foreground">No locatable nodes here yet.</p>
                     ) : (
-                      nodes.map((r, i) => {
-                        const on =
-                          selIp != null && r.layer === selLayer &&
-                          r.pick.kind !== "snapshot" && "node" in r.pick && r.pick.node?.ip === selIp;
-                        const hoverKey = hoverKeyOf(r.pick);
-                        const pick = r.pick;
-                        const rowHue = pick.kind === "metanode" && pick.meta ? identityHudHex(pick.meta.id) : CORE_HEX;
-                        const pair = subjectPairing(hoverNodeId, hoverKey, setHoverNodeId, rowHue);
+                      cohortsOf(nodes).map((c) => {
+                        const isOpen = openCohort === c.key;
+                        const holdsSel =
+                          selIp != null &&
+                          c.rows.some(
+                            (r) => r.layer === selLayer && "node" in r.pick && r.pick.node?.ip === selIp,
+                          );
                         return (
-                          <button
-                            key={r.label + i}
-                            className={cn(
-                              // `relative pr-7` reserves the picker's trailing ✓ slot on every
-                              // row, so the status column doesn't shift when a node is selected.
-                              // w-[calc(100%+6px)]: the node boxes end on the SAME right edge as the country
-                          // row's box above (which spans the wash box), so the group reads as one block.
-                          "nb-row relative flex items-center gap-2 w-[calc(100%+6px)] py-[5px] pl-2 pr-7 my-px rounded-sm border border-transparent bg-transparent cursor-pointer text-left text-foreground-dim transition-colors duration-[140ms]",
-                              "hover:bg-wash-hover hover:text-foreground",
-                              "focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--primary)] focus-visible:outline-offset-[-2px]",
-                              // The selected node row = the SAME shared selection language as the
-                              // filter picker's committed row (user-unified). Box-shadow based, so
-                              // the identity-hued `.nb-row.subject-paired` hover wash (background/
-                              // border) tints UNDER it while paired and the mark returns untouched.
-                              on && SELECTED_ROW,
-                              pair.paired && pair.className,
+                          <div key={c.key}>
+                            {/* The cohort row: one line per city × provider — the honeycomb
+                                as a list row. A DISCLOSURE (chevron), not a selection; no
+                                leading dot (a cohort can host many networks). */}
+                            <button
+                              type="button"
+                              className={cn(
+                                "group/cohort relative flex items-center gap-2 w-[calc(100%+6px)] py-[5px] pl-2 pr-2 my-px rounded-sm border border-transparent bg-transparent cursor-pointer text-left text-foreground-dim transition-colors duration-[140ms]",
+                                "hover:bg-wash-hover hover:text-foreground",
+                                "focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--primary)] focus-visible:outline-offset-[-2px]",
+                              )}
+                              aria-expanded={isOpen}
+                              title={`${c.city ?? "Unlocated"}${c.isp ? ` · ${c.isp}` : ""} · ${c.rows.length} node${c.rows.length > 1 ? "s" : ""}`}
+                              // A single-node cohort has no further choice to make: clicking it
+                              // expands AND selects its one node in the same click (user).
+                              onClick={() => {
+                                setOpenCohort(isOpen ? null : c.key);
+                                if (c.rows.length === 1) {
+                                  const r = c.rows[0];
+                                  const on =
+                                    selIp != null && r.layer === selLayer &&
+                                    "node" in r.pick && r.pick.node?.ip === selIp;
+                                  selectNode(r.pick, on && isOpen);
+                                }
+                              }}
+                              // Hovering a cohort glows its WHOLE 3D stack (every member id) and
+                              // lights the country border, like any node hover.
+                              onMouseEnter={() => {
+                                setHoverCohort(c.rows.map((r) => hoverKeyOf(r.pick)).filter((k): k is string => !!k));
+                                setHoverCountry(c.rows[0] && "geo" in c.rows[0].pick ? c.rows[0].pick.geo?.cc ?? null : null);
+                              }}
+                              onMouseLeave={() => setHoverCohort(null)}
+                            >
+                              <span className="flex-none text-body whitespace-nowrap">{c.city ?? "Unlocated"}</span>
+                              {c.isp && (
+                                <span className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-label text-muted-foreground">
+                                  {c.isp}
+                                </span>
+                              )}
+                              <span className="ml-auto flex-none tabular-nums text-body font-semibold">{c.rows.length}</span>
+                              {/* Collapsed + holding the selected node: surface the ✓ up here. */}
+                              {holdsSel && !isOpen ? (
+                                <SelectedRowMark className="flex-none" />
+                              ) : (
+                                <ChevronRight
+                                  aria-hidden
+                                  className={cn(
+                                    "size-3.5 flex-none transition-transform duration-150 motion-reduce:transition-none text-muted-foreground opacity-0 group-hover/cohort:opacity-100 group-focus-visible/cohort:opacity-100 [@media(hover:none)]:opacity-100",
+                                    isOpen && "rotate-90 opacity-100",
+                                  )}
+                                />
+                              )}
+                            </button>
+
+                            {isOpen && (
+                              <div className="mb-1 ml-[7px] pl-2 border-l border-border">
+                                {c.rows.map((r, i) => {
+                                  const on =
+                                    selIp != null && r.layer === selLayer &&
+                                    "node" in r.pick && r.pick.node?.ip === selIp;
+                                  const hoverKey = hoverKeyOf(r.pick);
+                                  // Pairing hue per ROW (the cohort has no single hue —
+                                  // it can host many networks; the row knows its own).
+                                  const rowHue = r.pick.kind === "metanode" && r.pick.meta ? identityHudHex(r.pick.meta.id) : CORE_HEX;
+                                  const pair = subjectPairing(hoverNodeId, hoverKey, setHoverNodeId, rowHue);
+                                  return (
+                                    <button
+                                      key={(r.id ?? r.label) + i}
+                                      className={cn(
+                                        // The id rows are the pure PICKERS: the mono id is the
+                                        // only per-node fact left (city/provider/status live on
+                                        // the cohort row). `relative pr-7` reserves the ✓ slot.
+                                        "nb-row relative flex items-center gap-2 w-full py-1 pl-2 pr-7 my-px rounded-sm border border-transparent bg-transparent cursor-pointer text-left text-foreground-dim transition-colors duration-[140ms]",
+                                        "hover:bg-wash-hover hover:text-foreground",
+                                        "focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--primary)] focus-visible:outline-offset-[-2px]",
+                                        on && SELECTED_ROW,
+                                        pair.paired && pair.className,
+                                      )}
+                                      style={pair.style}
+                                      title={`${r.label} · ${r.state ?? "—"}`}
+                                      onClick={() => selectNode(r.pick, on)}
+                                      onMouseEnter={() => {
+                                        pair.onMouseEnter();
+                                        setHoverCountry("geo" in r.pick ? r.pick.geo?.cc ?? null : null);
+                                      }}
+                                    >
+                                      {/* Just "node" + the mono id (user, 2026-07-12 — the
+                                          composition word was dropped: the node card carries
+                                          the role detail; the row is a pure picker). */}
+                                      <span className="flex-1 min-w-0 flex items-baseline gap-1.5">
+                                        <span className="flex-none text-label">Node</span>
+                                        <span className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap font-mono tabular-nums text-label text-muted-foreground">
+                                          {r.id ? shortHash(r.id) : r.label}
+                                        </span>
+                                      </span>
+                                      {on && <SelectedRowMark className="absolute right-2" />}
+                                    </button>
+                                  );
+                                })}
+                              </div>
                             )}
-                            style={pair.style}
-                            title={`${r.label} · ${r.state ?? "—"}`}
-                            onClick={() => selectNode(r.pick, on)}
-                            onMouseEnter={pair.onMouseEnter}
-                          >
-                            <IdentityDot hue={rowHue} />
-                            {/* Location-first (matches the node CARD's title/subtitle pattern):
-                                the CITY is the row's primary (the country is the accordion group),
-                                with the truncated id as a subtle mono secondary — it stays visible
-                                so co-located nodes (same city) remain distinguishable. Fallback:
-                                no resolved city → the id (mono) is the primary, as before. */}
-                            {r.city ? (
-                              <span className="flex-1 min-w-0 flex items-baseline gap-1.5">
-                                <span className="flex-none text-body whitespace-nowrap">{r.city}</span>
-                                {r.id && (
-                                  <span className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap font-mono tabular-nums text-label text-muted-foreground">
-                                    {shortHash(r.id)}
-                                  </span>
-                                )}
-                              </span>
-                            ) : (
-                              <span className={cn("flex-1 overflow-hidden text-ellipsis whitespace-nowrap tabular-nums text-body", r.id && "font-mono")}>
-                                {r.id ? shortHash(r.id) : r.label}
-                              </span>
-                            )}
-                            <span className="ml-auto flex-none"><StatusMark state={r.state} /></span>
-                            {on && <SelectedRowMark className="absolute right-2" />}
-                          </button>
+                          </div>
                         );
                       })
                     )}
@@ -280,7 +363,6 @@ export default function GeoExplore() {
         </div>
         )}
 
-        {!quietEmpty && <div className="pt-[10px] px-4 pb-3 text-label text-muted-foreground">Click a country to drill in.</div>}
       </div>
       </aside>
     </Card>

@@ -23,3 +23,15 @@ export function latLonToVec3(lat: number, lon: number, r: number = R): THREE.Vec
     r * Math.sin(phi) * Math.sin(theta),
   );
 }
+
+// The exact inverse (any radius): a globe-local position back to lat/lon degrees — the scene
+// country-hover resolves a surface hit through this.
+export function vec3ToLatLon(v: THREE.Vector3): { lat: number; lon: number } {
+  const r = v.length();
+  const phi = Math.acos(THREE.MathUtils.clamp(v.y / r, -1, 1));
+  const theta = Math.atan2(v.z, -v.x);
+  const lat = 90 - (phi * 180) / Math.PI;
+  let lon = (theta * 180) / Math.PI - 180;
+  if (lon <= -180) lon += 360;
+  return { lat, lon };
+}

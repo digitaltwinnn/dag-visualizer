@@ -2,6 +2,7 @@
 
 import { cn } from "@/lib/utils";
 import { useStore } from "@/src/store/store";
+import { applyClickActions } from "@/src/store/applyClickActions";
 import { metagraphById } from "@/src/data/network";
 import { hex } from "@/src/util/format";
 import { subjectPairing } from "@/components/useSubjectPairing";
@@ -19,7 +20,6 @@ import type { PickDescriptor } from "@/src/data/types";
 // Read-only identity; its live readout is the top-bar vitals.
 export default function ContextCard() {
   const filter = useStore((s) => s.filter);
-  const setFilter = useStore((s) => s.setFilter);
   const hoverFilter = useStore((s) => s.hoverFilter);
   const setHoverFilter = useStore((s) => s.setHoverFilter);
   const mgCfg = metagraphById(filter);
@@ -45,7 +45,7 @@ export default function ContextCard() {
         <InspectorCard
           p={context}
           eyebrow="Selected metagraph"
-          onClose={() => setFilter("all")}
+          onClose={() => applyClickActions([{ kind: "filter", id: "all" }])}
         />
         {/* Scene-facing (left) edge pulse on a new subject (metagraph picked) — synced with the
             dossier title's own roll-in (MetaCard keys it on cfg.name; both fire on the filter

@@ -1,6 +1,7 @@
 import * as THREE from "three";
 import { feature } from "topojson-client";
 import { R, LAND_H, latLonToVec3 } from "../../domain/geoLayout";
+import { ringsToSegments, type Ring } from "../../domain/countryShape";
 
 // Builds the geo globe SURFACE — the body sphere, graticule, atmosphere rim, and the raised
 // continents (+ glowing coastal cliffs) — into `globe.group`, and sets the handles the morph/fade
@@ -37,9 +38,24 @@ export interface GeoViewHost {
   // each frame): the graticule + coastal walls dim their far-hemisphere fragments through it,
   // so the see-through backside stays present but visibly "behind" (user: front/back ambiguity).
   facingUniform?: { value: THREE.Vector3 };
+  // Shared CLOSENESS uniform (0 = overview, 1 = country/node zoom; Globe writes it from the
+  // camera altitude each frame): up close the coastal walls tighten to a crisp rim (the soft
+  // ridge read as fuzz at node range, user) and the far-side see-through drops to near-nothing
+  // (looking THROUGH the globe distracted at close range, user).
+  closeUniform?: { value: number };
   // The polar compass roses' materials, faded per frame by BOTH the morph fade and the pole's
   // own facing (a rose on the far side dims hard — the depth cue that killed the ambiguity).
   poleRoses?: Array<{ mats: Array<THREE.Material & { opacity: number }>; bases: number[]; sign: number }>;
+  // Per-country geometries from the countries topology (world-atlas numeric id → GeoJSON
+  // geometry) — the country drill's border + shape-based framing read these. Async (set once
+  // the topology loads); `onCountriesReady` lets the owner re-assert a drill made before then.
+  countryGeoms?: Map<string, { type: string; coordinates: unknown }>;
+  countryBorder?: { mesh: THREE.LineSegments; fade: GeoFadeEntry };      // the committed drill
+  hoverCountryBorder?: { mesh: THREE.LineSegments; fade: GeoFadeEntry }; // the hover preview (may coexist)
+  // The drilled country's FILL boost: a low-res equirect mask texture sampled by the land-fill
+  // shader — inside the mask the additive land glass brightens (see setCountryFillMask).
+  countryMaskUniforms?: { uCountryMask: { value: THREE.Texture }; uMaskBoost: { value: number } };
+  onCountriesReady?: () => void;
 }
 
 // HOLOGRAPHIC GLOBE: there is deliberately NO opaque body sphere and NO atmosphere halo.
@@ -69,17 +85,21 @@ function buildGraticule(globe: GeoViewHost) {
   const mat = new THREE.LineBasicMaterial({ color: globe.geoColor, transparent: true, opacity: 0 });
   // FACING dim: far-hemisphere fragments fade to ~30% so the backside reads as behind the globe
   // instead of blending with the front (the hologram keeps its see-through presence, quieter).
+  // The floor drops to near-zero as the camera closes in (uClose) — at country/node range the
+  // far side showing through read as visual noise (user).
   globe.facingUniform = { value: new THREE.Vector3(0, 0, 1) };
+  globe.closeUniform = { value: 0 };
   mat.onBeforeCompile = (sh) => {
     sh.uniforms.uCamN = globe.facingUniform!;
+    sh.uniforms.uClose = globe.closeUniform!;
     sh.vertexShader = sh.vertexShader
       .replace("#include <common>", "#include <common>\nvarying vec3 vDir;")
       .replace("#include <begin_vertex>", "#include <begin_vertex>\nvDir = normalize(position);");
     sh.fragmentShader = sh.fragmentShader
-      .replace("#include <common>", "#include <common>\nuniform vec3 uCamN;\nvarying vec3 vDir;")
+      .replace("#include <common>", "#include <common>\nuniform vec3 uCamN;\nuniform float uClose;\nvarying vec3 vDir;")
       .replace(
         "#include <color_fragment>",
-        "#include <color_fragment>\ndiffuseColor.a *= mix(0.3, 1.0, smoothstep(-0.35, 0.2, dot(vDir, uCamN)));",
+        "#include <color_fragment>\ndiffuseColor.a *= mix(mix(0.3, 0.04, uClose), 1.0, smoothstep(-0.35, 0.2, dot(vDir, uCamN)));",
       );
   };
   globe.geoFades.push({ mat, base: 0.06 });
@@ -309,7 +329,10 @@ function makeLandTexture(features: LandFeature[]): THREE.DataTexture {
 
 async function buildLand(globe: GeoViewHost) {
   try {
-    const res = await fetch("/land-110m.json");
+    // countries-110m carries BOTH the land union (`objects.land` — the plateau/walls build,
+    // identical arcs to the old land-110m file) AND per-country geometries (`objects.countries`
+    // — the drill border + shape-based framing), so one fetch serves both.
+    const res = await fetch("/countries-110m.json");
     const topo = await res.json();
     const land = feature(topo, topo.objects.land);
 
@@ -361,10 +384,12 @@ async function buildLand(globe: GeoViewHost) {
       uTop: { value: top },
       uOpacity: { value: 0 },
     };
-    // The wall material shares the graticule's facing uniform (built first in buildGeoView).
+    // The wall material shares the graticule's facing + closeness uniforms (built first in
+    // buildGeoView).
     const wallUniforms = {
       ...globe.landWallUniforms,
       uCamN: globe.facingUniform ?? { value: new THREE.Vector3(0, 0, 1) },
+      uClose: globe.closeUniform ?? { value: 0 },
     };
     const wallMat = new THREE.ShaderMaterial({
       uniforms: wallUniforms,
@@ -377,7 +402,7 @@ async function buildLand(globe: GeoViewHost) {
         }`,
       fragmentShader: `
         uniform vec3 uColor; uniform float uBase; uniform float uTop; uniform float uOpacity;
-        uniform vec3 uCamN;
+        uniform vec3 uCamN; uniform float uClose;
         varying float vH; varying vec3 vDir;
         void main() {
           float t = clamp((vH - uBase) / (uTop - uBase), 0.0, 1.0);
@@ -387,11 +412,15 @@ async function buildLand(globe: GeoViewHost) {
           // The coastal cliffs use the SURFACE hue (uColor = --primary), dim at the base so they read
           // as a soft ridge blending into the surface. The TOP EDGE carries a clearly brighter
           // highlight (user-tuned: shorter walls, brighter rim) so the coastline stays legible.
-          float edge = smoothstep(0.65, 1.0, t);
+          // Up close (uClose) the soft ridge read as FUZZ (user): the body glow damps down and the
+          // rim band tightens + brightens, so the coastline resolves into a crisp line.
+          float body = (0.03 + 0.13 * e) * mix(1.0, 0.4, uClose);
+          float edge = smoothstep(mix(0.65, 0.86, uClose), 1.0, t) * mix(0.24, 0.36, uClose);
           // FACING dim: far-hemisphere cliffs stay visible (the hologram's see-through
-          // presence) but clearly BEHIND — see GeoViewHost.facingUniform.
-          float facing = mix(0.35, 1.0, smoothstep(-0.35, 0.15, dot(vDir, uCamN)));
-          gl_FragColor = vec4(uColor * (0.03 + 0.13 * e + 0.24 * edge), min(1.0, e * 0.72) * uOpacity * facing);
+          // presence) but clearly BEHIND — and near-invisible at close range (uClose), where
+          // seeing through the globe distracted (user). See GeoViewHost.facingUniform/closeUniform.
+          float facing = mix(mix(0.35, 0.04, uClose), 1.0, smoothstep(-0.35, 0.15, dot(vDir, uCamN)));
+          gl_FragColor = vec4(uColor * (body + edge), min(1.0, e * mix(0.72, 0.6, uClose)) * uOpacity * facing);
         }`,
       // Single-sided so only cliffs whose face points toward the camera draw: a
       // continent's near + side edges show, its far edge (behind the filled plateau)
@@ -419,6 +448,30 @@ async function buildLand(globe: GeoViewHost) {
       blending: THREE.AdditiveBlending, depthWrite: false,
       transparent: true, opacity: 0, side: THREE.FrontSide,
     });
+    // SELECTED-COUNTRY FILL BOOST (user, 2026-07-11): the drilled country's interior firms up
+    // while the rest of the world keeps the calm resting glass. A second equirect MASK texture
+    // (rasterized per drill — setCountryFillMask) rides the same UVs as the land map; inside
+    // the mask the additive luminance multiplies up. Cleared = uMaskBoost 1 (a hard no-op, so
+    // a stale mask can never show through).
+    const blank = document.createElement("canvas");
+    blank.width = blank.height = 1;
+    const blankTex = new THREE.CanvasTexture(blank);
+    blankTex.colorSpace = THREE.NoColorSpace;
+    globe.countryMaskUniforms = { uCountryMask: { value: blankTex }, uMaskBoost: { value: 1 } };
+    landMat.onBeforeCompile = (sh) => {
+      sh.uniforms.uCountryMask = globe.countryMaskUniforms!.uCountryMask;
+      sh.uniforms.uMaskBoost = globe.countryMaskUniforms!.uMaskBoost;
+      sh.fragmentShader = sh.fragmentShader
+        .replace("#include <common>", "#include <common>\nuniform sampler2D uCountryMask;\nuniform float uMaskBoost;")
+        .replace(
+          "#include <map_fragment>",
+          // THRESHOLDED sample: linear filtering smears the rasterized mask across many
+          // screen pixels at node-level zoom (the fill faded toward the border, user
+          // 2026-07-12) — the tight smoothstep snaps the boost to a crisp in/out boundary
+          // with sub-texel antialiasing, so the fill reads as a proper fill to the edge.
+          "#include <map_fragment>\n\tdiffuseColor.rgb *= mix(1.0, uMaskBoost, smoothstep(0.4, 0.6, texture2D(uCountryMask, vMapUv).r));",
+        );
+    };
     globe.landFillMat = landMat;
     // base = the resting ADDITIVE strength of the land surface (0..1) — lower = more transparent.
     // Kept well below 1 so the globe reads as a faint calm hologram, the coastal walls the accent.
@@ -427,7 +480,128 @@ async function buildLand(globe: GeoViewHost) {
     globe.landFillMesh.renderOrder = -1; // before the rim/nodes
     globe.landFillMesh.visible = false;  // revealed once the globe materialises (setMorph)
     globe.group.add(globe.landFillMesh);
+
+    // COUNTRY BORDERS — TWO LineSegments, rebuilt per drill/hover change (event-driven; see
+    // setCountryBorder): one for the COMMITTED drill, one for the HOVER preview, so hovering
+    // another country still previews while a drill is lit (user — the single shared border made
+    // committed-wins eat the preview). Invisible at rest (the surface stays clean). Structural
+    // accent, additive like the coastal walls so the hairline glows over the land glass; the
+    // geoFades entries give them the surface's morph gating for free (`base` IS the level).
+    const makeBorder = () => {
+      const mat = new THREE.LineBasicMaterial({
+        color: globe.geoColor,
+        transparent: true,
+        opacity: 0,
+        blending: THREE.AdditiveBlending,
+        depthWrite: false,
+      });
+      const mesh = new THREE.LineSegments(new THREE.BufferGeometry(), mat);
+      mesh.visible = false;
+      const fade = { mat, base: 0 };
+      globe.geoFades.push(fade);
+      globe.group.add(mesh);
+      return { mesh, fade };
+    };
+    globe.countryBorder = makeBorder();
+    globe.hoverCountryBorder = makeBorder();
+
+    // Per-country geometry index for the border + framing (world-atlas numeric id → geometry).
+    const countries = feature(topo, topo.objects.countries) as unknown as {
+      features: Array<{ id?: string | number; geometry: { type: string; coordinates: unknown } }>;
+    };
+    globe.countryGeoms = new Map();
+    for (const f of countries.features)
+      if (f.id != null) globe.countryGeoms.set(String(f.id), f.geometry);
+    globe.onCountriesReady?.();
   } catch {
     /* graticule-only fallback */
   }
+}
+
+// How much the drilled country's land glass brightens inside the mask. The land fill's
+// resting additive contribution is TINY (texel luminance ~0.055 × the 0.45 base), so small
+// multipliers are imperceptible — the readable range starts ~×6 (tuned live: ×8 firms the
+// selection without going neon; ×12 read as a hot plate competing with the node stacks).
+const MASK_BOOST = 8.0;
+
+// Rasterize the drilled country's rings into a low-res equirect mask and hand it to the
+// land-fill shader; null clears (uMaskBoost 1 = hard no-op). Event-driven — one Canvas2D
+// draw per drill change, never per frame. Same projection + seam strategy as the land
+// texture: per-ring longitude unwrap and a triple draw at x−W / x / x+W, evenodd for holes.
+export function setCountryFillMask(globe: GeoViewHost, rings: Ring[] | null): void {
+  const u = globe.countryMaskUniforms;
+  if (!u) return; // land not built yet — the drill re-asserts via onCountriesReady
+  if (!rings?.length) {
+    u.uMaskBoost.value = 1;
+    return;
+  }
+  const W = 2048, H = 1024; // enough texels that the shader's threshold lands ON the border
+  const cv = document.createElement("canvas");
+  cv.width = W; cv.height = H;
+  const g = cv.getContext("2d")!;
+  g.fillStyle = "#000";
+  g.fillRect(0, 0, W, H);
+  g.fillStyle = "#fff";
+  const px = (lon: number, lat: number): [number, number] =>
+    [((lon + 180) / 360) * W, ((90 - lat) / 180) * H];
+  const unwrap = (ring: Ring): Ring => {
+    let lon = ring[0][0];
+    const out: Ring = [[lon, ring[0][1]]];
+    for (let i = 1; i < ring.length; i++) {
+      let d = ring[i][0] - ring[i - 1][0];
+      if (d > 180) d -= 360; else if (d < -180) d += 360;
+      lon += d;
+      out.push([lon, ring[i][1]]);
+    }
+    return out;
+  };
+  for (const xOff of [-W, 0, W]) {
+    g.beginPath();
+    for (const raw of rings) {
+      const ring = unwrap(raw);
+      const [x0, y0] = px(ring[0][0], ring[0][1]);
+      g.moveTo(x0 + xOff, y0);
+      for (let i = 1; i < ring.length; i++) {
+        const [x, y] = px(ring[i][0], ring[i][1]);
+        g.lineTo(x + xOff, y);
+      }
+      g.closePath();
+    }
+    g.fill("evenodd");
+  }
+  const tex = new THREE.CanvasTexture(cv);
+  tex.colorSpace = THREE.NoColorSpace;
+  tex.magFilter = THREE.LinearFilter;
+  tex.minFilter = THREE.LinearFilter;
+  tex.generateMipmaps = false;
+  tex.wrapS = THREE.ClampToEdgeWrapping;
+  tex.wrapT = THREE.ClampToEdgeWrapping;
+  const old = u.uCountryMask.value;
+  u.uCountryMask.value = tex;
+  u.uMaskBoost.value = MASK_BOOST;
+  old.dispose(); // event-driven swap — never per frame
+}
+
+// Show a country border (`which`: the committed drill or the hover preview) for `rings` at
+// `level` opacity (0 hides it). The geometry rebuild is event-driven — once per country
+// hover/drill change, never per frame.
+export function setCountryBorder(
+  globe: GeoViewHost,
+  which: "drill" | "hover",
+  rings: Ring[] | null,
+  level: number,
+): void {
+  const b = which === "drill" ? globe.countryBorder : globe.hoverCountryBorder;
+  if (!b) return; // topology not loaded yet — onCountriesReady re-asserts
+  if (!rings?.length || level <= 0) {
+    b.fade.base = 0;
+    b.mesh.visible = false;
+    return;
+  }
+  b.mesh.geometry.dispose();
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute("position", new THREE.Float32BufferAttribute(ringsToSegments(rings), 3));
+  b.mesh.geometry = geo;
+  b.mesh.visible = true;
+  b.fade.base = level;
 }

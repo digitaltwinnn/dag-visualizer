@@ -63,6 +63,10 @@ export interface GeoInfo {
   cc?: string;
   lat?: number;
   lon?: number;
+  // Hosting provider, from the same IP lookup (ip-api `isp` + the ASN prefix of `as`;
+  // ipwho.is `connection.isp/asn` on the https fallback). Absent = unknown host.
+  isp?: string;
+  asn?: string;
 }
 
 export type GeoMap = Record<string, GeoInfo>;

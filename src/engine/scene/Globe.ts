@@ -19,12 +19,14 @@ import { metaAnchor } from "../domain/hyperLayout";
 import { LEDGER, ledgerSite, ledgerSpread, clusterRadius } from "../domain/ledgerLayout";
 import type { SceneColors } from "../sceneColors";
 import * as geoStats from "../domain/geoStats";
-import { R, LAND_H, CHIP_PITCH, HEX_H, VALIDATOR_HEX_R, META_HEX_R, latLonToVec3 } from "../domain/geoLayout";
+import { R, LAND_H, CHIP_PITCH, HEX_H, VALIDATOR_HEX_R, META_HEX_R, latLonToVec3, vec3ToLatLon } from "../domain/geoLayout";
 import { GOLDEN_ANGLE, fibShellPos, nodeRoles, spreadCoLocated } from "../domain/nodeLayout";
 import { surfFade, extrasFade } from "../domain/morph";
 import { ArcSim, type ArcEndpoint } from "../domain/arcSim";
 import type { MetaNodeRecord, ValidatorRecord } from "../domain/records";
-import { buildGeoView, type GeoViewHost } from "./views/GeoView";
+import { buildGeoView, setCountryBorder, setCountryFillMask, type GeoViewHost } from "./views/GeoView";
+import { ccToNumeric, countryCcAt, countryLean, geometryRings, mainPolygonRings, ringsAngularRadius, ringsCentroid, type Ring } from "../domain/countryShape";
+import { closeness, NODE_RAISE } from "../domain/cameraRig";
 import { NodeFabric, type FrameCtx } from "./objects/NodeFabric";
 import { Arcs } from "./objects/Arcs";
 import type { HyperView } from "./views/HyperView";
@@ -52,6 +54,15 @@ const _focusMat = new THREE.Matrix4(); // scratch for reading an instance's live
 const _LEDGER_M = new THREE.Matrix4()
   .makeRotationX(LEDGER.viewTiltX)
   .multiply(new THREE.Matrix4().makeRotationY(LEDGER.viewRotY));
+
+// Ledger honeycomb pitches, in the spread's PRE-viewScale units (the spread offsets get
+// multiplied by viewScale; the chip's world footprint/height do not). Cell pitch = the chip
+// diameter (hyperSize 0.55/0.52 × LEDGER.dot) + 12% air; level pitch = GEO'S EXACT stack
+// pitch (CHIP_PITCH = HEX_H + clear air — user, 2026-07-12: the tighter 1.35×HEX_H read as
+// fused towers; the chambers' stacks now breathe like the globe's).
+const LEDGER_CELL_V = (2 * 0.55 * LEDGER.dot * 1.12) / LEDGER.viewScale;
+const LEDGER_CELL_M = (2 * 0.52 * LEDGER.dot * 1.12) / LEDGER.viewScale;
+const LEDGER_LVL = CHIP_PITCH / LEDGER.viewScale;
 
 // null = idle spin; a focus state = ease-in-out to a focus orientation (y = longitude swing, x =
 // latitude tilt so high-lat nodes come into view).
@@ -93,8 +104,7 @@ export class Globe implements GeoViewHost {
   // the old `!this.ledger` gate on the travelling packets; globeSpin gates the idle group spin.
   private simArcs = true;
   private simSpin = true;
-  countryFilter: string | null = null; // cc to drill into (combined with the network filter), or null
-  private countryMix = 0;              // eased 0..1: how strongly the country dim is applied
+  countryFilter: string | null = null; // the drilled country (a LENS: border/framing only, no node filter)
   l0Count = 0;
   l1Count = 0;
   // The geo hologram is the accent (colors.core = --primary); the whole globe is one hue and stays
@@ -115,8 +125,9 @@ export class Globe implements GeoViewHost {
   metaList: MetaLayout[] = [];
   filter = "all";
   private _hoverNodeId: string | null = null;
+  private _hoverCohort: Set<string> | null = null; // cohort-row hover — the whole stack glows
   private _selectedNodeId: string | null = null;
-  private _hoverFilterActive = false;
+  private _hoverCountryCc: string | null = null; // explorer row hover — border preview only
 
   // Identity SCENE-hue map (id -> 0xRRGGBB), set by the Engine each refreshMeta before setMetagraphs.
   sceneColors?: Record<string, number>;
@@ -128,7 +139,12 @@ export class Globe implements GeoViewHost {
   landFillMat?: THREE.MeshBasicMaterial;
   landFillMesh?: THREE.Mesh;
   facingUniform?: GeoViewHost["facingUniform"]; // shared camera-facing uniform (graticule + walls)
+  closeUniform?: GeoViewHost["closeUniform"];   // shared closeness uniform (wall sharpening + far-side damp)
   poleRoses?: GeoViewHost["poleRoses"];         // the polar compass roses (faded per frame here)
+  countryGeoms?: GeoViewHost["countryGeoms"];   // per-country geometries (drill border + framing)
+  countryBorder?: GeoViewHost["countryBorder"];           // the committed drill's border
+  hoverCountryBorder?: GeoViewHost["hoverCountryBorder"]; // the hover preview's border
+  onCountriesReady?: GeoViewHost["onCountriesReady"];
 
   private fabric: NodeFabric;
   private arcs: Arcs;
@@ -160,7 +176,7 @@ export class Globe implements GeoViewHost {
     this._ctx = {
       c: {
         morph: 0, hoverFilterActive: false, ledger: false, countryFilter: null,
-        countryMix: 0, hoverNodeId: null, selectedNodeId: null, filter: "all",
+        countryMix: 0, hoverNodeId: null, hoverCohort: null, selectedNodeId: null, filter: "all",
       },
       dim: 0, dimScaleV: 0, clock: 0, camN: this._camN, hasCam: false,
       ledgerT: 0, dt: 0, flashDecay: 0, group: this.group,
@@ -168,6 +184,8 @@ export class Globe implements GeoViewHost {
 
     // The geo globe surface (body, graticule, atmosphere, continents) — it sets the surface handles
     // back on `this` for the morph/fade loop and pushes its fade materials into this.geoFades.
+    // The countries topology arrives async: re-assert any drill/hover border made before then.
+    this.onCountriesReady = () => this._updateCountryBorder();
     buildGeoView(this);
   }
 
@@ -190,6 +208,7 @@ export class Globe implements GeoViewHost {
   setNodes(dagCore: DagCore | null, geoMap: GeoMap): void {
     this.fabric.disposeValidators();
     this.nodes = [];
+    this._activeCcsCache = null; // the drillable-country set follows the validator rebuild
     const machines: RouteNode[] = (dagCore && dagCore.nodes) || [];
     const l0List = machines.filter((m) => m.roles && m.roles.includes("l0"));
     const cl1List = machines.filter((m) => m.roles && m.roles.includes("cl1"));
@@ -216,11 +235,15 @@ export class Globe implements GeoViewHost {
         // Ledger (Snapshots) view: l0 = Global L0 validators → the central hypergraph-L0 cluster;
         // DAG cl1 = native $DAG currency (hypergraph L1) → its OWN lane, same height as hypergraph L0
         // but offset on +Z (dagLaneZ), beside the central column.
-        const lsp = ledgerSpread(i, n, LEDGER.dagCell);
+        // Honeycomb + stacks (units are pre-viewScale — the world chip sizes divide by it;
+        // lsp.y lifts a chip per stack LEVEL once the dial's cells fill up).
+        // SAME footprint rule as the metagraph clusters (one dial size in design and code,
+      // user 2026-07-12) — the bigger DAG fleets simply stack higher inside it.
+      const lsp = ledgerSpread(i, n, clusterRadius(n) * 0.85, LEDGER_CELL_V, LEDGER_LVL);
         const ledgerPos = (
           role === "l0"
-            ? new THREE.Vector3(lsp.x, LEDGER.rowHypL0, lsp.z)
-            : new THREE.Vector3(lsp.x, LEDGER.rowDAGL1, lsp.z + LEDGER.dagLaneZ)
+            ? new THREE.Vector3(lsp.x, LEDGER.rowHypL0 + lsp.y, lsp.z)
+            : new THREE.Vector3(lsp.x, LEDGER.rowDAGL1 + lsp.y, lsp.z + LEDGER.dagLaneZ)
         ).applyMatrix4(_LEDGER_M).multiplyScalar(LEDGER.viewScale); // match the LedgerView group transform
 
         const pick = {
@@ -303,8 +326,8 @@ export class Globe implements GeoViewHost {
           const dir = latLonToVec3(g.lat!, g.lon!, 1).normalize(); // real location; fanned out below
           const lsite = ledgerSite(m._ledgerCol, METAGRAPHS.length);
           const lrowY = layer === "l0" ? LEDGER.rowML0 : LEDGER.rowML1;
-          const lsp = ledgerSpread(i, cnt, clusterRadius(cnt) * 0.85); // slightly wider for the bigger dots
-          const ledgerPos = new THREE.Vector3(lsite.x + lsp.x, lrowY, lsite.z + lsp.z)
+          const lsp = ledgerSpread(i, cnt, clusterRadius(cnt) * 0.85, LEDGER_CELL_M, LEDGER_LVL);
+          const ledgerPos = new THREE.Vector3(lsite.x + lsp.x, lrowY + lsp.y, lsite.z + lsp.z)
             .applyMatrix4(_LEDGER_M).multiplyScalar(LEDGER.viewScale); // match the LedgerView group transform
           const pick = {
             kind: "metanode", meta: m, node, geo: g, layer,
@@ -330,21 +353,27 @@ export class Globe implements GeoViewHost {
 
     this.fabric.buildMetaNodes(recs);
     this.metaNodes = recs;
+    // Re-assert the filter's dim on the fresh records — but a data REBUILD is not a filter
+    // switch, so a live country drill survives it (setFilter clears the drill by design for
+    // real switches; without the restore, every cluster poll wiped the drill's dim + border).
+    const drill = this.countryFilter;
     this.setFilter(this.filter);
+    if (drill) this.setCountry(drill);
   }
 
   // Isolate one network on the globe and dim the rest.
   setFilter(sel: string): void {
     this.filter = sel;
     this.countryFilter = null; // switching network clears the country drill-down
+    this._activeCcsCache = null; // the drillable-country set follows the filter
+    this._updateCountryBorder();
     this._applyDim(sel);
     this._relayoutGeo();
   }
 
-  // Transient PREVIEW dim (filter-chip hover): same dim TARGETS as setFilter, but does NOT commit
-  // `this.filter` or relayout geo. While previewing, the dim is forced STRONG (_hoverFilterActive).
+  // Transient PREVIEW dim (filter-chip / hub hover): same dim TARGETS as setFilter, but does
+  // NOT commit `this.filter` or relayout geo — and the same per-view dim STRENGTH too.
   setHoverFilter(sel: string | null): void {
-    this._hoverFilterActive = sel != null;
     this._applyDim(sel || this.filter);
   }
 
@@ -355,16 +384,107 @@ export class Globe implements GeoViewHost {
     for (const r of this.metaNodes) r.dimTarget = (sel === "all" || sel === r.metaId) ? 0 : 1;
   }
 
-  // Narrow the current network selection to a single country (cc), or null to clear.
+  // Drill into a single country (cc), or null to clear. The drill is a LENS, not a filter
+  // (user, 2026-07-11): it frames the country, draws its border and firms the land — the
+  // OTHER nodes stay visible, pickable and fanned exactly as before, so no relayout here.
   setCountry(cc: string | null): void {
     this.countryFilter = cc || null;
-    this._relayoutGeo();
+    this._updateCountryBorder();
+  }
+
+  // Transient border PREVIEW (explorer country-row hover): shows the country's outline at a
+  // whisper level without committing the drill. The committed drill always wins.
+  setHoverCountry(cc: string | null): void {
+    this._hoverCountryCc = cc || null;
+    this._updateCountryBorder();
+  }
+
+  // The drilled country's polygon rings ([lon,lat] degrees) from the loaded topology, or null
+  // (unknown cc / topology still loading). The Engine reads this for shape-based framing too.
+  countryRings(cc: string | null): Ring[] | null {
+    const ccn = ccToNumeric(cc);
+    const geom = ccn ? this.countryGeoms?.get(ccn) : null;
+    return geom ? geometryRings(geom) : null;
+  }
+
+  // Aim the globe so the country's shape centroid faces the camera (same gentle lean cap as
+  // focusDensest — the constant viewing angle comes from countryFraming's camera construction,
+  // not the lean). Returns the centroid's elevation angle + the country's angular radius, or
+  // null when the shape is unknown (unknown cc / topology still loading — the caller falls
+  // back to the node-mean spin). Framing composes on the MAIN landmass (mainPolygonRings) —
+  // the border still draws the whole country.
+  focusCountryShape(cc: string | null): { latAngle: number; angularRadius: number } | null {
+    const ccn = ccToNumeric(cc);
+    const geom = ccn ? this.countryGeoms?.get(ccn) : null;
+    const rings = geom ? mainPolygonRings(geom) : null;
+    const centroid = rings?.length ? ringsCentroid(rings) : null;
+    if (!rings || !centroid) return null;
+    const latAngle = Math.atan2(centroid.y, Math.hypot(centroid.x, centroid.z));
+    // countryLean stretches the gentle lean just enough at very high latitudes that the
+    // constant-angle camera never crosses the zenith (domain + framing agree by construction).
+    this._aimAt(centroid, Math.abs(countryLean(latAngle)));
+    return {
+      latAngle,
+      angularRadius: ringsAngularRadius(rings, centroid),
+    };
+  }
+
+  // Two borders: the committed drill at full strength AND the hover preview at a whisper —
+  // both may show at once (user: hovering another country must still preview while a drill
+  // is lit). A committed drill also firms up the land glass (user: less transparent while a
+  // country is selected).
+  private _updateCountryBorder(): void {
+    const drillCc = this.countryFilter;
+    const drillRings = drillCc ? this.countryRings(drillCc) : null;
+    setCountryBorder(this, "drill", drillRings, drillCc ? 1.0 : 0);
+    const hoverCc = this._hoverCountryCc && this._hoverCountryCc !== drillCc ? this._hoverCountryCc : null;
+    setCountryBorder(this, "hover", hoverCc ? this.countryRings(hoverCc) : null, hoverCc ? 0.3 : 0);
+    // The drilled country's INTERIOR firms up via the fill-mask shader (scoped — the old
+    // whole-globe 0.45→0.62 base bump is gone; the rest of the world keeps the calm glass).
+    setCountryFillMask(this, drillRings);
+  }
+
+  // Resolve a globe-surface WORLD point to the country under it — only countries that
+  // currently have filter-active nodes respond (the drillable set; open ocean and node-less
+  // countries stay quiet). Drives the scene side of the bidirectional country hover pairing.
+  private _hitLocal = new THREE.Vector3(); // scratch (pointer-move path)
+  countryCcAtPoint(world: THREE.Vector3): string | null {
+    if (!this.countryGeoms) return null;
+    const local = this.group.worldToLocal(this._hitLocal.copy(world));
+    const { lat, lon } = vec3ToLatLon(local);
+    const active = this._activeCcs();
+    return countryCcAt(lat, lon, this.countryGeoms, (cc) => active.has(cc));
+  }
+
+  // The alpha-2 codes with at least one filter-active locatable node — cached; invalidated by
+  // every path that changes the active set (filter / node or metagraph rebuild).
+  private _activeCcsCache: Set<string> | null = null;
+  private _activeCcs(): Set<string> {
+    if (this._activeCcsCache) return this._activeCcsCache;
+    const s = new Set<string>();
+    if (this._isActive("dag"))
+      for (const u of this.nodes) {
+        const g = geoOf(u.pick);
+        if (!u.noGeo && g?.cc) s.add(g.cc);
+      }
+    for (const r of this.metaNodes) {
+      const g = geoOf(r.pick);
+      if (g?.cc && this._isActive(r.metaId)) s.add(g.cc);
+    }
+    this._activeCcsCache = s;
+    return s;
   }
 
   // Hover-pairing: pass the hovered node's id; the per-frame glow loops brighten every instance
   // that shares it. null clears the highlight.
   setHoverNode(id: string | null): void {
     this._hoverNodeId = id || null;
+  }
+
+  // Cohort-row hover (explorer): glow EVERY member of the cohort's 3D stack together.
+  // Event-driven allocation (one Set per hover change), never per frame.
+  setHoverCohort(ids: string[] | null): void {
+    this._hoverCohort = ids?.length ? new Set(ids) : null;
   }
 
   // The persistently selected node (a clicked node card) — glows every layer shell it runs.
@@ -393,10 +513,11 @@ export class Globe implements GeoViewHost {
     return this.filter === "all" || this.filter === id;
   }
 
-  // Whether a node passes BOTH the network filter and the country drill-down.
-  private _nodeActive(layerOrMetaId: string, geo: GeoInfo | undefined | null): boolean {
-    return this._isActive(layerOrMetaId) &&
-      (!this.countryFilter || (!!geo && geo.cc === this.countryFilter));
+  // Whether a node passes the network filter. The country drill deliberately does NOT
+  // narrow this (user, 2026-07-11: the drill is a lens — border + framing — not a filter;
+  // the old dim/hide of out-of-country nodes is gone). `_geo` stays for the call sites' shape.
+  private _nodeActive(layerOrMetaId: string, _geo: GeoInfo | undefined | null): boolean {
+    return this._isActive(layerOrMetaId);
   }
 
   // Aim the globe so a unit direction `dir` swings to the front (see js/globe.js:730-737).
@@ -425,9 +546,14 @@ export class Globe implements GeoViewHost {
   }
 
   // Aim a single node's location to the centre of the view. False if no lat/lon.
+  // UNCAPPED tilt (was 0.70): the cap left high-latitude nodes at a DIFFERENT residual
+  // elevation than everyone else, so the fixed node camera's angle varied with latitude
+  // (user: Helsinki read more horizontal). Uncapped, every node arrives at the SAME residual
+  // — NODE_RAISE, the contract cameraRig.nodeFraming's pose is solved against — so the pose
+  // is relative to the node's local surface at any latitude; the lean eases on deselect.
   focusNode(geo: { lat?: number; lon?: number } | null | undefined): boolean {
     if (!geo || geo.lat == null || geo.lon == null) return false;
-    this._aimAt(latLonToVec3(geo.lat, geo.lon, 1).normalize(), 0.70, 0.12); // ≤40° tilt, ~7° raise
+    this._aimAt(latLonToVec3(geo.lat, geo.lon, 1).normalize(), Math.PI / 2, NODE_RAISE);
     return true;
   }
 
@@ -507,9 +633,10 @@ export class Globe implements GeoViewHost {
     this.group.worldToLocal(this._camN).normalize();
   }
 
-  // How strong the network/country dim is, ramped by the morph (js/globe.js:830-833).
+  // How strong the network dim is, ramped by the morph. (The hover-preview forced-strong
+  // 0.85 branch is gone — user: the hub hover/click dim in hyper was far harder than the
+  // regular dim; previews now dim at the committed strength.)
   private _dimScale(): number {
-    if (this._hoverFilterActive) return 0.85; // strong dim while previewing a filter-chip hover
     return 0.32 + 0.68 * this.morph;
   }
 
@@ -523,11 +650,14 @@ export class Globe implements GeoViewHost {
     const ctx = this._ctx;
     const c = ctx.c;
     c.morph = this.morph;
-    c.hoverFilterActive = this._hoverFilterActive;
+    c.hoverFilterActive = false; // the forced-strong preview dim is gone (field kept for the DimContext shape)
     c.ledger = this.ledger;
-    c.countryFilter = this.countryFilter;
-    c.countryMix = this.countryMix;
+    // The drill never dims/hides nodes (lens-not-filter, user 2026-07-11) — the fabric's
+    // country-dim clauses stay dormant; countryFilter lives on `this` for border/framing.
+    c.countryFilter = null;
+    c.countryMix = 0;
     c.hoverNodeId = this._hoverNodeId;
+    c.hoverCohort = this._hoverCohort;
     c.selectedNodeId = this._selectedNodeId;
     c.filter = this.filter;
     ctx.dim = this.dim;
@@ -568,6 +698,11 @@ export class Globe implements GeoViewHost {
     // and each polar compass rose fades by its own pole's facing on top of the morph fade —
     // a far-side rose dims hard, so front vs back reads instantly (user).
     if (this.facingUniform && this._hasCam) this.facingUniform.value.copy(this._camN);
+    // Closeness (0 = overview, 1 = country/node zoom) from the camera altitude: the walls
+    // tighten to a crisp rim and the far-side see-through damps out as the camera closes in.
+    if (this.closeUniform && this.camera) {
+      this.closeUniform.value = closeness((this.camera as THREE.Camera).position.length());
+    }
     if (this.poleRoses) {
       for (const rose of this.poleRoses) {
         const t = THREE.MathUtils.clamp((rose.sign * this._camN.y + 0.15) / 0.5, 0, 1);
@@ -614,11 +749,10 @@ export class Globe implements GeoViewHost {
     const { retargeted } = this.arcSim.step(dt, arcEnabled);
     if (arcEnabled && this.arcs.hasArcs) this.arcs.writeFrame(this.arcSim, retargeted);
 
-    // Ease the per-layer dim levels + the country mix, then hand a fresh FrameCtx to the fabric.
+    // Ease the per-layer dim levels, then hand a fresh FrameCtx to the fabric.
     if (this.fabric.hasValidators) {
       const k = Math.min(1, dt * 4);
       this.dim += (this.dimTarget - this.dim) * k;
-      this.countryMix += ((this.countryFilter ? 1 : 0) - this.countryMix) * k;
     }
     const ctx = this._frameCtx(dt, flashDecay);
     if (this.fabric.hasValidators) this.fabric.writeValidatorGlow(this.nodes, ctx);

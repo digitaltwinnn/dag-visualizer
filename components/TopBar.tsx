@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ChevronDown } from "lucide-react";
 import { VIEW_ICONS } from "@/components/icons";
 import { useStore } from "@/src/store/store";
@@ -8,7 +8,6 @@ import { metagraphById } from "@/src/data/network";
 import { hex } from "@/src/util/format";
 import { cn } from "@/lib/utils";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
-import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 import Vitals, { VitalsCluster, VitalsToggle } from "@/components/topbar/Vitals";
 import FilterPicker from "@/components/topbar/FilterPicker";
 import EcgMark from "@/components/topbar/EcgMark";
@@ -38,8 +37,8 @@ export default function TopBar() {
   const mode = useStore((s) => s.mode);
   const setMode = useStore((s) => s.setMode);
 
-  // The filter picker's open state — Radix Popover owns anchoring (under the trigger, +6px),
-  // outside-click and Escape now; this is just the controlled flag.
+  // The filter strip's open state — a plain controlled flag: the FILTER button toggles it,
+  // Escape closes it (picking a chip deliberately does NOT — see the strip note below).
   const [open, setOpen] = useState(false);
 
   const bp = useBreakpoint();
@@ -49,6 +48,23 @@ export default function TopBar() {
   const setPhoneVitals = useStore((s) => s.setPhoneVitals);
 
   const face = filterFace(filter);
+
+  // Publish the strip's rendered height as `--topbar-extra` (globals.css) so the RAILS slide
+  // down under the grown bar instead of being overlapped — the strip is a bigger bar, not a
+  // popup (user, 2026-07-12). ResizeObserver keeps it honest when the chips re-wrap.
+  const stripInner = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const el = stripInner.current;
+    const apply = () =>
+      document.documentElement.style.setProperty("--topbar-extra", open && el ? `${el.offsetHeight}px` : "0px");
+    apply();
+    const ro = el ? new ResizeObserver(apply) : null;
+    if (el && ro) ro.observe(el);
+    return () => {
+      ro?.disconnect();
+      document.documentElement.style.setProperty("--topbar-extra", "0px");
+    };
+  }, [open]);
 
   return (
     <div>
@@ -98,58 +114,41 @@ export default function TopBar() {
         </div>
         <span className="w-px self-stretch bg-border my-1 max-[820px]:hidden" />
 
-        {/* Filter (toned, de-nested) — the trigger of the stock Popover below. Radix anchors the
-            picker under this button; the visual face is unchanged. */}
-        <Popover open={open} onOpenChange={setOpen}>
-          <PopoverTrigger
+        {/* Filter (toned, de-nested) — toggles the ATTACHED filter strip below (user,
+            2026-07-12: reversed the 2026-07-04 detached-popover decision; the strip lives on
+            the bar's own surface so the scene reacts in the open while you hover networks). */}
+        <button
+          type="button"
+          aria-expanded={open}
+          aria-controls="filter-strip"
+          onClick={() => setOpen((o) => !o)}
+          onKeyDown={(e) => { if (e.key === "Escape") setOpen(false); }}
+          className={cn(
+            "flex items-center gap-[7px] bg-transparent border-0 cursor-pointer py-1.5 px-2 rounded-btn",
+            "hover:bg-wash-soft",
+            open && "bg-wash-soft",
+            "max-[1099px]:min-h-11",
+            "max-[699px]:p-1.5 max-[699px]:gap-[5px]",
+          )}
+        >
+          {/* The "FILTER" text label on wide bars; on the condensed breakpoints (≤940px) it
+              simply hides — the identity dot + network name ARE the control's face there (the
+              lucide funnel stand-in was tried and removed: too busy, and it crowded the phone
+              bar off-balance). */}
+          <span className="text-micro tracking-caps uppercase text-muted-foreground max-[940px]:hidden">Filter</span>
+          <span
+            className="w-[9px] h-[9px] rounded-full flex-none animate-dot-beat motion-reduce:animate-none"
+            style={{ background: face.dot }}
+          />
+          <span className="text-body text-foreground">{face.label}</span>
+          <ChevronDown
+            aria-hidden
             className={cn(
-              "flex items-center gap-[7px] bg-transparent border-0 cursor-pointer py-1.5 px-2 rounded-btn",
-              "hover:bg-wash-soft",
-              open && "bg-wash-soft",
-              "max-[1099px]:min-h-11",
-              "max-[699px]:p-1.5 max-[699px]:gap-[5px]",
+              "size-3.5 text-muted-foreground transition-transform motion-reduce:transition-none",
+              open && "rotate-180",
             )}
-          >
-            {/* The "FILTER" text label on wide bars; on the condensed breakpoints (≤940px) it
-                simply hides — the identity dot + network name ARE the control's face there (the
-                lucide funnel stand-in was tried and removed: too busy, and it crowded the phone
-                bar off-balance). */}
-            <span className="text-micro tracking-caps uppercase text-muted-foreground max-[940px]:hidden">Filter</span>
-            <span
-              className="w-[9px] h-[9px] rounded-full flex-none animate-dot-beat motion-reduce:animate-none"
-              style={{ background: face.dot }}
-            />
-            <span className="text-body text-foreground">{face.label}</span>
-            <ChevronDown
-              aria-hidden
-              className={cn(
-                "size-3.5 text-muted-foreground transition-transform motion-reduce:transition-none",
-                open && "rotate-180",
-              )}
-            />
-          </PopoverTrigger>
-          {/* The picker content — a compact DETACHED popover under the filter button (user
-              decision 2026-07-04: 6px gap + its own surface, NOT a bar-expansion drawer; that
-              variant was tried and rejected). Same glass recipe as before, now on the stock
-              primitive: Radix owns the anchoring (side=bottom/align=start ≈ the old measured
-              left-aligned +6px), outside-click, Escape, and focus (it moves focus into the
-              content, which lands on the cmdk input — a strict upgrade over the old container,
-              which left focus on the button; no fight observed). `avoidCollisions` +
-              `collisionPadding` replace the old phone-only centering override (the panel just
-              shifts to fit narrow viewports); width caps to the viewport on phone. */}
-          <PopoverContent
-            align="start"
-            sideOffset={6}
-            collisionPadding={12}
-            className={cn(
-              "w-[372px] max-[699px]:w-[min(372px,calc(100vw-24px))] p-1.5 border border-border rounded-lg backdrop-blur-[14px]",
-              "bg-[linear-gradient(180deg,rgba(20,26,46,0.96),rgba(10,14,28,0.94))]",
-              "shadow-[0_14px_40px_-10px_rgba(0,0,0,0.6)]",
-            )}
-          >
-            <FilterPicker onPick={() => setOpen(false)} />
-          </PopoverContent>
-        </Popover>
+          />
+        </button>
         </div>
 
         {/* Flex spacers (tablet/desktop only) — the phone grid's 1fr columns own the spacing. */}
@@ -213,6 +212,28 @@ export default function TopBar() {
         {bp === "phone" && (
           <VitalsToggle open={phoneVitals} onClick={() => setPhoneVitals(!phoneVitals)} />
         )}
+        </div>
+      </div>
+
+      {/* FILTER STRIP — the bar GROWS DOWNWARD by one row on its own surface (the same
+          grid-rows collapse as the phone vitals row below): every network as a hoverable/
+          clickable chip, so the SCENE previews the selection live while browsing (user,
+          2026-07-12 — this replaces the detached popover, whose glass covered the scene).
+          Picking keeps the strip open (exploring several networks in a row is the point);
+          the FILTER button or Escape closes it. */}
+      <div
+        id="filter-strip"
+        className={cn(
+          "grid transition-[grid-template-rows] duration-250 ease-out motion-reduce:transition-none",
+          open ? "grid-rows-[1fr]" : "grid-rows-[0fr]",
+        )}
+        aria-hidden={!open}
+        onKeyDown={(e) => { if (e.key === "Escape") setOpen(false); }}
+      >
+        <div className={cn("overflow-hidden min-h-0", !open && "invisible")}>
+          <div ref={stripInner}>
+            <FilterPicker />
+          </div>
         </div>
       </div>
 
