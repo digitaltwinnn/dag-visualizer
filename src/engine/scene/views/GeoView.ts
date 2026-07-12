@@ -81,7 +81,8 @@ function buildGraticule(globe: GeoViewHost) {
       pts.push(latLonToVec3(lat, lon, R + 0.02), latLonToVec3(lat + 4, lon, R + 0.02));
   const geo = new THREE.BufferGeometry().setFromPoints(pts);
   // The sea graticule (grid lines OVER the ocean): subtle so the continents (the raised, gridded
-  // land) clearly lead — lifted from 0.03 (user: a bit more present on the water). Accent hue.
+  // land) clearly lead. 0.03 → 0.06 → 0.045 (user: eased back down a bit — a touch more subtle on
+  // the water). Accent hue.
   const mat = new THREE.LineBasicMaterial({ color: globe.geoColor, transparent: true, opacity: 0 });
   // FACING dim: far-hemisphere fragments fade to ~30% so the backside reads as behind the globe
   // instead of blending with the front (the hologram keeps its see-through presence, quieter).
@@ -102,7 +103,7 @@ function buildGraticule(globe: GeoViewHost) {
         "#include <color_fragment>\ndiffuseColor.a *= mix(mix(0.3, 0.04, uClose), 1.0, smoothstep(-0.35, 0.2, dot(vDir, uCamN)));",
       );
   };
-  globe.geoFades.push({ mat, base: 0.06 });
+  globe.geoFades.push({ mat, base: 0.045 });
   globe.group.add(new THREE.LineSegments(geo, mat));
 }
 
