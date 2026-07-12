@@ -668,12 +668,17 @@ Only the rails restructure (`useBreakpoint()`); everything else holds the four-z
 The HUD's character is **Instrument-Glass**: translucent glass panels over a live 3D scene,
 instrument-channel rulers and threads, one cyan heartbeat, restrained identity hues, calm
 transient signals. Bespoke design elements are the product — never genericize them into
-stock-component defaults. **`/design` (`app/design/page.tsx`) is the TOKEN REFERENCE**: the
-structural colour lane, the identity-hue lane, and the HUD type scale — all read live from the
-tokens (CSS vars) + the palette generator, so they're accurate BY CONSTRUCTION and need no
-hand-sync. It is fully static (no request-time fetch). It deliberately does NOT mirror the
-components (that gallery drifted and was always partial, 2026-07-12) — the verification surface
-for components is the RUNNING APP (see *Verifying changes*), and `app/globals.css` is the
+stock-component defaults. **`/design` (`app/design/page.tsx`) is the TOKEN REFERENCE + the
+signature-element gallery**: the structural colour lane, the identity-hue lane, and the HUD type
+scale all read live from the tokens (CSS vars) + the palette generator, so they're accurate BY
+CONSTRUCTION and need no hand-sync; below them, the app's SIGNATURE design elements — the card
+states (ghost / active / collapsed), the signal language (`EdgePulse` hover-pairing + pulse), and
+the ghost hint card — are shown via the REAL components (`CardHead`, `PulseEdge`,
+`Inspector.GhostCard`; the `RailThread` is prose since it measures live rail positions), so they
+can't drift either. It is fully static (no request-time fetch). It is deliberately NOT a full
+component gallery (that mirror drifted and was always partial, 2026-07-12 — the hand-rebuilt
+filter/button/command-bar demos were dropped) — the verification surface for component
+BEHAVIOUR is the RUNNING APP (see *Verifying changes*), and `app/globals.css` is the
 authoritative token source this page indexes.
 
 ### One stylesheet

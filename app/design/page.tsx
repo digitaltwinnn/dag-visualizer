@@ -2,6 +2,11 @@ import type { Metadata } from "next";
 import { cn } from "@/lib/utils";
 import { METAGRAPHS } from "@/src/engine/config";
 import { identityMap } from "@/src/palette/identity";
+import CardHeadDemo from "./CardHeadDemo";
+import CardSignalsDemo from "./CardSignalsDemo";
+import GhostCardDemo from "./GhostCardDemo";
+import IconLegend from "./IconLegend";
+import StatusDemo from "./StatusDemo";
 
 // Internal styleguide: robots-disallowed; carries its OWN title and no canonical (it would
 // point at the marketing root otherwise).
@@ -62,7 +67,7 @@ export default function DesignPage() {
   const identity = METAGRAPHS.map((m) => ({ ticker: m.ticker, hue: hues.get(m.id) }));
 
   return (
-    <main className="min-h-screen bg-background text-foreground p-8 font-sans">
+    <main className="h-screen overflow-y-auto bg-background text-foreground p-8 font-sans">
       <h1 className="text-2xl font-semibold mb-1">Instrument-Glass tokens</h1>
       <p className="text-muted-foreground mb-2 max-w-2xl">
         The design system&apos;s TOKENS — the colour lanes and the type scale, read live from{" "}
@@ -70,10 +75,12 @@ export default function DesignPage() {
         value here is correct by construction.
       </p>
       <p className="text-sm text-muted-foreground/80 mb-8 max-w-2xl">
-        This is a token reference, not a component gallery — components are verified against the
-        running app (see <code className="font-mono">CLAUDE.md</code>), and{" "}
-        <code className="font-mono">app/globals.css</code> is the authoritative source these
-        swatches index.
+        The tokens are the durable, drift-proof part; below them are the app&apos;s SIGNATURE
+        design elements — the card states + the signal language — shown via the REAL components
+        (not rebuilds), so they can&apos;t drift either. It is not a full component gallery;
+        component behaviour is verified against the running app (see{" "}
+        <code className="font-mono">CLAUDE.md</code>), and <code className="font-mono">app/globals.css</code>{" "}
+        is the authoritative token source.
       </p>
 
       <section className="mb-10">
@@ -112,7 +119,7 @@ export default function DesignPage() {
           {TYPE_SCALE.map((t) => (
             <div key={t.cls} className="ig-panel p-3 flex items-baseline gap-4">
               <span className={cn(t.cls, "text-foreground font-semibold w-40 flex-none")}>
-                Settlement chamber
+                The quick brown fox
               </span>
               <code className="font-mono text-xs text-primary flex-none">{t.cls}</code>
               <span className="font-mono text-xs text-muted-foreground flex-none">{t.px}</span>
@@ -142,6 +149,113 @@ export default function DesignPage() {
               </div>
             </div>
           ))}
+        </div>
+      </section>
+
+      <h2 className="text-xs uppercase tracking-[0.2em] text-primary/70 mt-14 mb-4 border-t border-border pt-6">
+        Signature elements — the bespoke design language
+      </h2>
+
+      <section className="mb-10">
+        <h2 className="text-sm uppercase tracking-widest text-muted-foreground mb-3">
+          Object marks — <code className="font-mono">components/icons.tsx</code>
+        </h2>
+        <p className="text-sm text-muted-foreground mb-3 max-w-2xl">
+          ONE icon system: monochrome <code className="font-mono">lucide-react</code> glyphs via{" "}
+          <code className="font-mono">currentColor</code> (so the accent/identity tint inherits),
+          never emoji. Each SUBJECT kind has a mark (<code className="font-mono">iconForPick</code>),
+          each VIEW its switch icon (<code className="font-mono">VIEW_ICONS</code>), shared by the
+          card heads, the view switch, and the dock trays — read here from the real map, so it
+          can&apos;t drift.
+        </p>
+        <IconLegend />
+      </section>
+
+      <section className="mb-10">
+        <h2 className="text-sm uppercase tracking-widest text-muted-foreground mb-3">
+          Card states — <code className="font-mono">Card</code> + <code className="font-mono">CardHead</code>
+        </h2>
+        <p className="text-sm text-muted-foreground mb-3 max-w-2xl">
+          Every rail card is the design-system <code className="font-mono">Card</code> (the{" "}
+          <code className="font-mono">.ig-panel</code> glass recipe) led by the one shared{" "}
+          <code className="font-mono">CardHead</code> (eyebrow / title / inset hairline / body).
+          Cards are SPINELESS AT REST — the resting identity cue lives in the rail thread, not a
+          per-card edge. A card has three states: the GHOST hint (below), the ACTIVE populated
+          card, and COLLAPSED (the whole head is the disclosure toggle → eyebrow + title only).
+          Rendered here with the real component, so it can&apos;t drift.
+        </p>
+        <CardHeadDemo />
+      </section>
+
+      <section className="mb-10">
+        <h2 className="text-sm uppercase tracking-widest text-muted-foreground mb-3">
+          Ghost (hint) card — <code className="font-mono">Inspector.GhostCard</code>
+        </h2>
+        <p className="text-sm text-muted-foreground mb-3 max-w-2xl">
+          A right-rail slot&apos;s empty state: every card the view CAN produce stays visible —
+          populated when its subject is selected, else this quiet dashed one-liner (kind mark ·
+          slot label · instruction). Availability + copy derive from the rail manifest
+          (<code className="font-mono">railCards.ts</code>); shown here via the real{" "}
+          <code className="font-mono">GhostCard</code>.
+        </p>
+        <GhostCardDemo />
+      </section>
+
+      <section className="mb-10">
+        <h2 className="text-sm uppercase tracking-widest text-muted-foreground mb-3">
+          Node status — <code className="font-mono">nodeStatus.ts</code> + the status pills
+        </h2>
+        <p className="text-sm text-muted-foreground mb-3 max-w-2xl">
+          Node health resolves to four buckets, each with its own colour (a LITERAL palette in{" "}
+          <code className="font-mono">nodeStatus.ts</code>, separate from the structural tokens):
+          ready green, in-progress amber, down red, unknown grey. Everything renders as ONE quiet
+          pill language — the node card&apos;s status mark and the dossier&apos;s rolled-up
+          breakdown (shown via the real <code className="font-mono">StatusMark</code> /{" "}
+          <code className="font-mono">StatusBreakdown</code>).
+        </p>
+        <StatusDemo />
+      </section>
+
+      <section className="mb-10">
+        <h2 className="text-sm uppercase tracking-widest text-muted-foreground mb-3">
+          Signal language — <code className="font-mono">EdgePulse.tsx</code> + the edge recipes
+        </h2>
+        <p className="text-sm text-muted-foreground mb-3 max-w-2xl">
+          <strong>Thread = resting identity cue; card edge = purely transient signal channel.</strong>{" "}
+          The edge lights ONLY as a signal, always on the SCENE-FACING edge, in a strict hierarchy:
+          grey pointer-hover whisper &lt; identity-hued hover pairing (<code className="font-mono">.subject-paired</code>)
+          &lt; the subject-change PULSE (<code className="font-mono">useEdgePulse</code> — a bright
+          gradient-tipped segment sweeps the edge, ~1.2s, synced with the title roll-in). Driven
+          here by the real <code className="font-mono">PulseEdge</code>; reduced motion → one static
+          blink.
+        </p>
+        <CardSignalsDemo />
+      </section>
+
+      <section className="mb-10">
+        <h2 className="text-sm uppercase tracking-widest text-muted-foreground mb-3">
+          Instrument ruler — <code className="font-mono">--thread-*</code> / <code className="font-mono">--axis-hairlines</code>
+        </h2>
+        <p className="text-sm text-muted-foreground mb-3 max-w-2xl">
+          One ruler spec threads the whole HUD: a neutral baseline with combed hairline ticks
+          (minor every <code className="font-mono">--thread-tick-pitch</code>, a taller/brighter
+          major every 4th). It appears as the two rails&apos; <code className="font-mono">RailThread</code>{" "}
+          (a mirrored fixed SVG in the 26px margin, with an identity-hued spine + a node-dot at each
+          card&apos;s middle — the RESTING identity cue the spineless cards defer to), the
+          tablet/phone sheet edges (<code className="font-mono">.ig-sheet-edge</code> /{" "}
+          <code className="font-mono">.ig-sheet-topruler</code>), and the bar-chart axis. The strip
+          below renders the live <code className="font-mono">--axis-hairlines</code> recipe (reads
+          the same tokens, so it can&apos;t drift). The 3D ledger station dials bend this same ruler
+          into a hexagon — not shown (same spec, different medium).
+        </p>
+        <div className="ig-panel p-4 max-w-2xl">
+          <div className="h-3 w-full" style={{ background: "var(--axis-hairlines)" }} aria-hidden />
+          <div className="mt-3 flex flex-wrap gap-x-6 gap-y-1 text-[10px] font-mono text-muted-foreground">
+            <span>--thread-tick (minor)</span>
+            <span>--thread-tick-major (every 4th)</span>
+            <span>--thread-tick-pitch (spacing)</span>
+            <span>--thread-line (spine base)</span>
+          </div>
         </div>
       </section>
     </main>
