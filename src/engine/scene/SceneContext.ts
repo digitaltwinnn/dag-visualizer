@@ -6,7 +6,7 @@ import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import { EffectComposer } from "three/addons/postprocessing/EffectComposer.js";
 import { RenderPass } from "three/addons/postprocessing/RenderPass.js";
 import { UnrealBloomPass } from "three/addons/postprocessing/UnrealBloomPass.js";
-import { BokehPass, type BokehPassParamters } from "three/addons/postprocessing/BokehPass.js";
+import { BokehPass, type BokehPassParameters } from "three/addons/postprocessing/BokehPass.js";
 import type { SceneColors } from "../sceneColors";
 
 // @types/three types BokehPass.uniforms as a bare `object`; the engine reads
@@ -95,10 +95,10 @@ export function createScene(canvas: HTMLCanvasElement, colors: SceneColors): Sce
   // few units of depth around the focal plane, so a shallow aperture smeared THEM too; this widens
   // the sharp zone to cover the whole selected cluster while distant objects (the core, the other
   // hubs) are far enough out to still saturate to maxblur — strong background blur, crisp selection.
-  // BokehPassParamters' types only declare focus/aspect/aperture/maxblur, but the JS
+  // BokehPassParameters' types only declare focus/aspect/aperture/maxblur, but the JS
   // constructor accepts (and ignores) width/height too — kept for parity with the
   // original call.
-  const dofParams: BokehPassParamters & { width: number; height: number } = {
+  const dofParams: BokehPassParameters & { width: number; height: number } = {
     focus: 54, aperture: 0.0002, maxblur: 0.01,
     width: window.innerWidth, height: window.innerHeight,
   };

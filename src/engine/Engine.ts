@@ -49,7 +49,9 @@ export class Engine {
   private globe: Globe;
   private ledger: LedgerView;
   private _ledgerDirty = false; // rebuild the ledger geometry next frame (set on data events)
-  private clock = new THREE.Clock();
+  // The frame timer — THREE.Timer (THREE.Clock was deprecated in r180). Unlike Clock it must be
+  // updated once per frame before reading the delta; the render loop does that.
+  private clock = new THREE.Timer();
   private raf = 0;
   private disposed = false;
   private _dofTmp = new THREE.Vector3();
@@ -861,6 +863,7 @@ export class Engine {
       if (this.disposed) return;
       this.raf = requestAnimationFrame(loop);
       this.stats?.begin();
+      this.clock.update(); // Timer: advance once per frame before reading the delta
       const dt = Math.min(this.clock.getDelta(), 0.05);
 
       const policy = VIEW_POLICIES[this.mode];
