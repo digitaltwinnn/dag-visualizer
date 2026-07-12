@@ -115,9 +115,9 @@ export function createScene(canvas: HTMLCanvasElement, colors: SceneColors): Sce
 
   const bloom = new UnrealBloomPass(
     new THREE.Vector2(window.innerWidth, window.innerHeight),
-    0.9,   // strength
-    0.7,   // radius
-    0.18   // threshold
+    0.6,   // strength (was 0.9 — the bloom read overpowered under the now-applied tone mapping)
+    0.55,  // radius (was 0.7 — tighter halo)
+    0.28   // threshold (was 0.18 — only genuinely bright cores/hubs bloom, not every midtone)
   );
   composer.addPass(bloom);
 
