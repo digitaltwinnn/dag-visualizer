@@ -52,6 +52,9 @@ export interface GeoViewHost {
   countryGeoms?: Map<string, { type: string; coordinates: unknown }>;
   countryBorder?: { mesh: THREE.LineSegments; fade: GeoFadeEntry };      // the committed drill
   hoverCountryBorder?: { mesh: THREE.LineSegments; fade: GeoFadeEntry }; // the hover preview (may coexist)
+  // The drilled country's FILL boost: a low-res equirect mask texture sampled by the land-fill
+  // shader — inside the mask the additive land glass brightens (see setCountryFillMask).
+  countryMaskUniforms?: { uCountryMask: { value: THREE.Texture }; uMaskBoost: { value: number } };
   onCountriesReady?: () => void;
 }
 
@@ -445,6 +448,26 @@ async function buildLand(globe: GeoViewHost) {
       blending: THREE.AdditiveBlending, depthWrite: false,
       transparent: true, opacity: 0, side: THREE.FrontSide,
     });
+    // SELECTED-COUNTRY FILL BOOST (user, 2026-07-11): the drilled country's interior firms up
+    // while the rest of the world keeps the calm resting glass. A second equirect MASK texture
+    // (rasterized per drill — setCountryFillMask) rides the same UVs as the land map; inside
+    // the mask the additive luminance multiplies up. Cleared = uMaskBoost 1 (a hard no-op, so
+    // a stale mask can never show through).
+    const blank = document.createElement("canvas");
+    blank.width = blank.height = 1;
+    const blankTex = new THREE.CanvasTexture(blank);
+    blankTex.colorSpace = THREE.NoColorSpace;
+    globe.countryMaskUniforms = { uCountryMask: { value: blankTex }, uMaskBoost: { value: 1 } };
+    landMat.onBeforeCompile = (sh) => {
+      sh.uniforms.uCountryMask = globe.countryMaskUniforms!.uCountryMask;
+      sh.uniforms.uMaskBoost = globe.countryMaskUniforms!.uMaskBoost;
+      sh.fragmentShader = sh.fragmentShader
+        .replace("#include <common>", "#include <common>\nuniform sampler2D uCountryMask;\nuniform float uMaskBoost;")
+        .replace(
+          "#include <map_fragment>",
+          "#include <map_fragment>\n\tdiffuseColor.rgb *= mix(1.0, uMaskBoost, texture2D(uCountryMask, vMapUv).r);",
+        );
+    };
     globe.landFillMat = landMat;
     // base = the resting ADDITIVE strength of the land surface (0..1) — lower = more transparent.
     // Kept well below 1 so the globe reads as a faint calm hologram, the coastal walls the accent.
@@ -489,6 +512,70 @@ async function buildLand(globe: GeoViewHost) {
   } catch {
     /* graticule-only fallback */
   }
+}
+
+// How much the drilled country's land glass brightens inside the mask. The land fill's
+// resting additive contribution is TINY (texel luminance ~0.055 × the 0.45 base), so small
+// multipliers are imperceptible — the readable range starts ~×6 (tuned live: ×8 firms the
+// selection without going neon; ×12 read as a hot plate competing with the node stacks).
+const MASK_BOOST = 8.0;
+
+// Rasterize the drilled country's rings into a low-res equirect mask and hand it to the
+// land-fill shader; null clears (uMaskBoost 1 = hard no-op). Event-driven — one Canvas2D
+// draw per drill change, never per frame. Same projection + seam strategy as the land
+// texture: per-ring longitude unwrap and a triple draw at x−W / x / x+W, evenodd for holes.
+export function setCountryFillMask(globe: GeoViewHost, rings: Ring[] | null): void {
+  const u = globe.countryMaskUniforms;
+  if (!u) return; // land not built yet — the drill re-asserts via onCountriesReady
+  if (!rings?.length) {
+    u.uMaskBoost.value = 1;
+    return;
+  }
+  const W = 1024, H = 512; // soft wash — low res is plenty (the land map carries the detail)
+  const cv = document.createElement("canvas");
+  cv.width = W; cv.height = H;
+  const g = cv.getContext("2d")!;
+  g.fillStyle = "#000";
+  g.fillRect(0, 0, W, H);
+  g.fillStyle = "#fff";
+  const px = (lon: number, lat: number): [number, number] =>
+    [((lon + 180) / 360) * W, ((90 - lat) / 180) * H];
+  const unwrap = (ring: Ring): Ring => {
+    let lon = ring[0][0];
+    const out: Ring = [[lon, ring[0][1]]];
+    for (let i = 1; i < ring.length; i++) {
+      let d = ring[i][0] - ring[i - 1][0];
+      if (d > 180) d -= 360; else if (d < -180) d += 360;
+      lon += d;
+      out.push([lon, ring[i][1]]);
+    }
+    return out;
+  };
+  for (const xOff of [-W, 0, W]) {
+    g.beginPath();
+    for (const raw of rings) {
+      const ring = unwrap(raw);
+      const [x0, y0] = px(ring[0][0], ring[0][1]);
+      g.moveTo(x0 + xOff, y0);
+      for (let i = 1; i < ring.length; i++) {
+        const [x, y] = px(ring[i][0], ring[i][1]);
+        g.lineTo(x + xOff, y);
+      }
+      g.closePath();
+    }
+    g.fill("evenodd");
+  }
+  const tex = new THREE.CanvasTexture(cv);
+  tex.colorSpace = THREE.NoColorSpace;
+  tex.magFilter = THREE.LinearFilter;
+  tex.minFilter = THREE.LinearFilter;
+  tex.generateMipmaps = false;
+  tex.wrapS = THREE.ClampToEdgeWrapping;
+  tex.wrapT = THREE.ClampToEdgeWrapping;
+  const old = u.uCountryMask.value;
+  u.uCountryMask.value = tex;
+  u.uMaskBoost.value = MASK_BOOST;
+  old.dispose(); // event-driven swap — never per frame
 }
 
 // Show a country border (`which`: the committed drill or the hover preview) for `rings` at

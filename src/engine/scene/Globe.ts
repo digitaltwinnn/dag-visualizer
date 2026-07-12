@@ -24,7 +24,7 @@ import { GOLDEN_ANGLE, fibShellPos, nodeRoles, spreadCoLocated } from "../domain
 import { surfFade, extrasFade } from "../domain/morph";
 import { ArcSim, type ArcEndpoint } from "../domain/arcSim";
 import type { MetaNodeRecord, ValidatorRecord } from "../domain/records";
-import { buildGeoView, setCountryBorder, type GeoViewHost } from "./views/GeoView";
+import { buildGeoView, setCountryBorder, setCountryFillMask, type GeoViewHost } from "./views/GeoView";
 import { ccToNumeric, countryCcAt, countryLean, geometryRings, mainPolygonRings, ringsAngularRadius, ringsCentroid, type Ring } from "../domain/countryShape";
 import { closeness, NODE_RAISE } from "../domain/cameraRig";
 import { NodeFabric, type FrameCtx } from "./objects/NodeFabric";
@@ -422,11 +422,13 @@ export class Globe implements GeoViewHost {
   // country is selected).
   private _updateCountryBorder(): void {
     const drillCc = this.countryFilter;
-    setCountryBorder(this, "drill", drillCc ? this.countryRings(drillCc) : null, drillCc ? 1.0 : 0);
+    const drillRings = drillCc ? this.countryRings(drillCc) : null;
+    setCountryBorder(this, "drill", drillRings, drillCc ? 1.0 : 0);
     const hoverCc = this._hoverCountryCc && this._hoverCountryCc !== drillCc ? this._hoverCountryCc : null;
     setCountryBorder(this, "hover", hoverCc ? this.countryRings(hoverCc) : null, hoverCc ? 0.3 : 0);
-    const landFade = this.landFillMat && this.geoFades.find((f) => f.mat === this.landFillMat);
-    if (landFade) landFade.base = drillCc ? 0.62 : 0.45;
+    // The drilled country's INTERIOR firms up via the fill-mask shader (scoped — the old
+    // whole-globe 0.45→0.62 base bump is gone; the rest of the world keeps the calm glass).
+    setCountryFillMask(this, drillRings);
   }
 
   // Resolve a globe-surface WORLD point to the country under it — only countries that

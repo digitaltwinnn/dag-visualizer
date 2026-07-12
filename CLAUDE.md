@@ -466,8 +466,12 @@ views and caused the ledger red-dots bug; that pattern is forbidden.
     hovered (`store.hoverCountry` → `globe.setHoverCountry`) — TWO border objects, so the
     hover preview coexists with a committed drill (user: hovering another country must still
     preview while one is selected), gone on deselect; it's a `geoFades` entry whose `base` IS the level, so the morph
-    gates it for free. A committed drill also firms the land glass (landFill base 0.45 → 0.62 —
-    user: less transparent while selected). **The country hover/click pairing is BIDIRECTIONAL**
+    gates it for free. A committed drill also firms the drilled country's OWN land glass — a
+    SCOPED equirect mask, not a global bump (`setCountryFillMask`: the country's rings
+    rasterized to a 1024×512 canvas per drill change, sampled by the land-fill shader via
+    `onBeforeCompile`, `uMaskBoost` inside / 1 elsewhere; cleared = hard no-op). NB the fill's
+    resting additive is tiny (~0.055 luminance × 0.45), so perceptible boosts start ~×6 —
+    `MASK_BOOST` 8, tuned live (×12 read hot). **The country hover/click pairing is BIDIRECTIONAL**
     (`ViewPolicy.countryHover`, geo only): pointer-moving over a DRILLABLE country on the globe
     (no object hit → analytic ray→sphere + `countryCcAt` point-in-polygon over the drillable
     set) writes the same `hoverCountry` channel — the explorer row washes (`subjectPairing`,
