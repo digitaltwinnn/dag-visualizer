@@ -5,11 +5,17 @@
 export type StatusBucket = "ready" | "progress" | "down" | "unknown";
 export interface NodeStatus { bucket: StatusBucket; color: string; label: string; }
 
+// The bucket colour lane. These REFERENCE the structural CSS tokens (globals.css) rather than
+// re-stating hexes (user, 2026-07-12 — they used to be independent literals, e.g. progress was
+// #ffd166, byte-identical to --warn-soft, so they could silently drift from the tokens). Values
+// are `var(--…)` strings — DOM-only (the 3D scene never colours by status), and the status pill
+// composes their alpha with `color-mix`, so a `var()` works where the old hex-append couldn't.
+//   ready → --success · progress → --warn-soft · down → --destructive · unknown → --muted-foreground
 export const BUCKET_COLOR: Record<StatusBucket, string> = {
-  ready: "#36e29a",
-  progress: "#ffd166",
-  down: "#ff6b6b",
-  unknown: "#9aa6c2",
+  ready: "var(--success)",
+  progress: "var(--warn-soft)",
+  down: "var(--destructive)",
+  unknown: "var(--muted-foreground)",
 };
 
 // Map each raw lifecycle state to its bucket + a short label. In-progress states collapse to
