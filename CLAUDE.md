@@ -91,7 +91,9 @@ to break one, that's a design conversation, not a workaround.
    are labelled floors (`~`, `FLOOR`); don't "fix" honest gaps.
 9. **Design tokens first** — the HUD type scale + structural tokens for all styling; an
    arbitrary value only for a documented one-off; new `text-*`/`rounded-*`/`tracking-*`
-   tokens must be registered in `lib/utils.ts` (twMerge). `/design` must always agree with
+   tokens must be registered in `lib/utils.ts` (twMerge). `/design` is the TOKEN REFERENCE
+   (colour lanes + type scale, read live from the tokens/palette — accurate by construction);
+   it is NOT a component mirror, so components are verified against the running app, not it.
    the shipped app.
 
 ## Run & test
@@ -182,7 +184,7 @@ Zustand store. **Two data lanes:** (A) high-freq visuals subscribe straight to
 
 - **`app/`** — Next App Router. `layout.tsx`, `page.tsx` (mounts every panel + the canvas),
   **`globals.css` (the ONE stylesheet — see *The design system*)**, `design/page.tsx` (the
-  living styleguide at `/design`). **`app/api/metagraphs/route.ts`**, **`app/api/geo/route.ts`**
+  static token reference at `/design`). **`app/api/metagraphs/route.ts`**, **`app/api/geo/route.ts`**
   and **`app/api/snapshot/[ordinal]/route.ts`** are server-side data routes (see *Data*).
 - **`components/`** — React panels, each reads/writes the store: `SceneCanvas` (mounts the
   engine, dynamic-imported so Three never enters the server bundle), `Blueprint` (placeholder
@@ -551,10 +553,14 @@ and keep changing, so they're examples, not the contract.
   bare 0; the committed chip wears the view switch's SELECTED_ROW on-state, no ✓). User
   reversal 2026-07-12 of the 2026-07-04 detached-popover decision: hovering chips previews
   the dim while the SCENE reacts in the open (the popover glass covered it); picking keeps
-  the strip OPEN (browsing several networks is the point) — the button/Escape close it. The
-  strip is a LAYOUT participant, not a popup: TopBar publishes its rendered height as
-  `--topbar-extra` (ResizeObserver) and both rails add it to their `top` (globals.css), so
-  the grown bar pushes the layout down instead of overlapping the cards), the
+  the strip OPEN (browsing several networks is the point) — the button/Escape close it. It is
+  EXPANDED BY DEFAULT (non-phone; phone closes it once the breakpoint resolves — no room for a
+  persistent strip). The strip is a LAYOUT participant, not a popup: TopBar publishes its
+  rendered height as `--topbar-extra` (ResizeObserver), and BOTH the rails AND the scene canvas
+  add it to their `top` (globals.css) — the rails slide down and the 3D canvas slides down with
+  them (a pure position shift: the buffer stays viewport-sized, so no distortion / no engine
+  resize; capped + scrolled on phone), so the grown bar pushes the whole layout down instead of
+  overlapping the cards or covering the scene's top), the
   **view switch** (center — a `ToggleGroup` of six monochrome lucide icons: `Orbit` hyper /
   `Globe` geo / `Layers` ledger / `Radar` status / `ArrowLeftRight` transactions / `HandCoins`
   staking, from `VIEW_ICONS`), and the
@@ -662,9 +668,18 @@ Only the rails restructure (`useBreakpoint()`); everything else holds the four-z
 The HUD's character is **Instrument-Glass**: translucent glass panels over a live 3D scene,
 instrument-channel rulers and threads, one cyan heartbeat, restrained identity hues, calm
 transient signals. Bespoke design elements are the product — never genericize them into
-stock-component defaults. **`/design` (`app/design/page.tsx`) is the living reference**:
-live tokens + the primitives the app actually renders. Update it with any design change —
-it must always agree with the shipped app.
+stock-component defaults. **`/design` (`app/design/page.tsx`) is the TOKEN REFERENCE + the
+signature-element gallery**: the structural colour lane, the identity-hue lane, and the HUD type
+scale all read live from the tokens (CSS vars) + the palette generator, so they're accurate BY
+CONSTRUCTION and need no hand-sync; below them, the app's SIGNATURE design elements — the card
+states (ghost / active / collapsed), the signal language (`EdgePulse` hover-pairing + pulse), and
+the ghost hint card — are shown via the REAL components (`CardHead`, `PulseEdge`,
+`Inspector.GhostCard`; the `RailThread` is prose since it measures live rail positions), so they
+can't drift either. It is fully static (no request-time fetch). It is deliberately NOT a full
+component gallery (that mirror drifted and was always partial, 2026-07-12 — the hand-rebuilt
+filter/button/command-bar demos were dropped) — the verification surface for component
+BEHAVIOUR is the RUNNING APP (see *Verifying changes*), and `app/globals.css` is the
+authoritative token source this page indexes.
 
 ### One stylesheet
 
@@ -1284,8 +1299,9 @@ Target host is **Vercel** (any Node host works). No env vars / secrets are requi
   `superpowers:subagent-driven-development`, `superpowers:requesting-code-review`,
   `superpowers:finishing-a-development-branch`).
 - **Design work runs component-by-component against the LIVE app** (the user's preferred
-  mode): brainstorm improvements on the real rendered component (app + `/design`) → agree
-  the outcome → implement immediately. NO separate spec/plan documents for design sessions
+  mode): brainstorm improvements on the real rendered component in the running app → agree
+  the outcome → implement immediately (`/design` is a token reference, not the component
+  surface — verify components in the app). NO separate spec/plan documents for design sessions
   (they drift out of sync); light per-change gates (`tsc` + `vitest` + a targeted visual
   check) and ONE full verification pass at the end (prod build with dev stopped + a
   screenshot suite + reduced-motion/tablet/phone re-verifies).

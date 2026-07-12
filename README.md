@@ -89,7 +89,8 @@ one; clicking a tick in the slim strip jumps to the ledger and opens it there.
 
 Visual uniformity is enforced with shared design tokens in one stylesheet (`app/globals.css`):
 one spacing scale, one panel radius, one "selected" treatment (`--sel-bg` / `--sel-border`),
-and one `CardHead` header component on every card. The live styleguide is served at `/design`.
+and one `CardHead` header component on every card. The design tokens (colour lanes + type
+scale) are indexed at `/design`.
 
 **`globals.css` is the single source of truth for colour — even in the 3D scene.** The Three.js
 engine doesn't hardcode structural colours; at start-up it reads the CSS design tokens

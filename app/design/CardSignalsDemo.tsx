@@ -55,6 +55,7 @@ function DemoCard({
 
 export default function CardSignalsDemo() {
   const [pulseKey, setPulseKey] = useState(0);
+  const states: ("rest" | "hover" | "paired")[] = ["rest", "hover", "paired"];
   return (
     <div className="max-w-3xl">
       <div className="mb-3">
@@ -62,15 +63,16 @@ export default function CardSignalsDemo() {
           <Play aria-hidden className="size-3" /> trigger update pulse
         </Button>
       </div>
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3 mb-4">
-        <DemoCard rail="left" state="rest" pulseKey={pulseKey} />
-        <DemoCard rail="left" state="hover" pulseKey={pulseKey} />
-        <DemoCard rail="left" state="paired" pulseKey={pulseKey} />
-      </div>
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-        <DemoCard rail="right" state="rest" pulseKey={pulseKey} />
-        <DemoCard rail="right" state="hover" pulseKey={pulseKey} />
-        <DemoCard rail="right" state="paired" pulseKey={pulseKey} />
+      {/* Columns match the app's geography: LEFT-rail cards on the page's left, RIGHT-rail on
+          the right — each signals on its own SCENE-FACING (inner) edge, so the two columns'
+          lit edges face each other across the gap. */}
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <div className="flex flex-col gap-3">
+          {states.map((s) => <DemoCard key={s} rail="left" state={s} pulseKey={pulseKey} />)}
+        </div>
+        <div className="flex flex-col gap-3">
+          {states.map((s) => <DemoCard key={s} rail="right" state={s} pulseKey={pulseKey} />)}
+        </div>
       </div>
     </div>
   );

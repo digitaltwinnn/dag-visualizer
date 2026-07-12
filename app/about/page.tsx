@@ -14,8 +14,11 @@ export const metadata: Metadata = {
 };
 
 export default function AboutPage() {
+  // h-screen + overflow-y-auto: `html, body` are `overflow: hidden` for the fixed-canvas app
+  // (globals.css), which would CLIP this tall document page — so it scrolls in its own viewport
+  // instead of relying on page scroll. Same fix on /design.
   return (
-    <main className="min-h-screen bg-background text-foreground">
+    <main className="h-screen overflow-y-auto bg-background text-foreground">
       <article className="mx-auto max-w-2xl px-6 py-16 leading-relaxed">
         <p className="text-micro tracking-caps uppercase text-muted-foreground mb-3">About</p>
         <h1 className="text-2xl font-semibold mb-6">
