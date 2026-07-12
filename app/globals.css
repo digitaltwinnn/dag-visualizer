@@ -276,6 +276,10 @@
   --panel-pad-x: 16px;     /* horizontal padding inside a panel header/section */
   --panel-pad-y: 12px;     /* vertical   padding inside a panel header/section */
   --rail-gap: 12px;        /* gap between stacked panels in a column */
+  --topbar-extra: 0px;     /* how far the command bar has GROWN downward (the attached filter
+                              strip, 2026-07-12) — published live by TopBar via ResizeObserver;
+                              the rails add it to their top so the strip PUSHES the layout
+                              instead of overlapping it (it's a bigger bar, not a popup). */
   --rail-top: 115px;       /* top of BOTH side rails — clears the banner + command bar, plus a
                               comfortable breather under the bar (user refinement 2026-07-05) */
   --rail-w: 264px;         /* left control rail width */
@@ -337,10 +341,11 @@
      margin matches the right rail's, making room for the mirrored identity RailThread
      (design evolution, Task 12: both rails carry the identity thread). */
   #leftcol {
-    position: fixed; z-index: 10; top: var(--rail-top); left: 26px;
+    position: fixed; z-index: 10; top: calc(var(--rail-top) + var(--topbar-extra, 0px)); left: 26px;
+    transition: top 0.25s ease-out;
     width: var(--rail-w);
     display: flex; flex-direction: column; gap: var(--rail-gap);
-    max-height: calc(100vh - var(--rail-top) - 14px);
+    max-height: calc(100vh - var(--rail-top) - var(--topbar-extra, 0px) - 14px);
     overflow-y: auto;
   }
   /* Rail cards are flex-none SO THE RAIL SCROLLS — an expanded card (the country accordion)
@@ -354,12 +359,18 @@
      through to the scene/bottom strip below; each card re-enables it via the
      `pointer-events-auto` in RIGHT_CARD (CardHead.tsx). */
   #rightcol {
-    position: fixed; z-index: 10; top: var(--rail-top); right: 26px;
+    position: fixed; z-index: 10; top: calc(var(--rail-top) + var(--topbar-extra, 0px)); right: 26px;
+    transition: top 0.25s ease-out;
     width: var(--detail-w);
     display: flex; flex-direction: column; gap: var(--rail-gap);
-    max-height: calc(100vh - var(--rail-top) - 14px);
+    max-height: calc(100vh - var(--rail-top) - var(--topbar-extra, 0px) - 14px);
     overflow-y: auto;
     pointer-events: none;
+  }
+
+  /* The rails' strip-follow slide (top rides --topbar-extra) — motion off under reduce. */
+  @media (prefers-reduced-motion: reduce) {
+    #leftcol, #rightcol { transition: none; }
   }
 
   /* Both rails scroll: native touch panning (pan-y + momentum) and a grab-drag fallback for

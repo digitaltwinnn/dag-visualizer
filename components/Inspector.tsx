@@ -3,6 +3,7 @@
 import { type CSSProperties, type ReactNode } from "react";
 import { cn } from "@/lib/utils";
 import { useStore } from "@/src/store/store";
+import { applyClickActions } from "@/src/store/applyClickActions";
 import { filterAccent, metagraphById, CORE_HEX } from "@/src/data/network";
 import { identityHudHex } from "@/src/palette/identity";
 import { hoverKeyOf } from "@/src/data/hoverSubject";
@@ -148,9 +149,7 @@ export default function Inspector() {
   const layer = useStore((s) => s.layer);
   const filter = useStore((s) => s.filter);
   const mode = useStore((s) => s.mode) as Mode;
-  const setInspect = useStore((s) => s.setInspect);
-  const setSnap = useStore((s) => s.setSnap);
-  const setLayer = useStore((s) => s.setLayer);
+
   const phoneDock = useStore((s) => s.phoneDock);
   const setPhoneDock = useStore((s) => s.setPhoneDock);
   const phoneSheetPx = useStore((s) => s.phoneSheetPx);
@@ -175,13 +174,13 @@ export default function Inspector() {
   const detailPane: Record<string, ReactNode> = {
     // geoLive reads the node from the store; its × is CardHead's shared close like every card.
     node: (
-      <CardPane key="node" pick={{ kind: "geoLive" }} eyebrow="Selected node" onClose={() => setInspect(null)} />
+      <CardPane key="node" pick={{ kind: "geoLive" }} eyebrow="Selected node" onClose={() => applyClickActions([{ kind: "inspect", pick: null }])} />
     ),
     snap: snap ? (
-      <CardPane key="snap" pick={snap} eyebrow="Selected snapshot" onClose={() => setSnap(null)} />
+      <CardPane key="snap" pick={snap} eyebrow="Selected snapshot" onClose={() => applyClickActions([{ kind: "snapshot", pick: null }])} />
     ) : null,
     layer: layer ? (
-      <CardPane key="layer" pick={layer} eyebrow="Selected layer" onClose={() => setLayer(null)} />
+      <CardPane key="layer" pick={layer} eyebrow="Selected layer" onClose={() => applyClickActions([{ kind: "layer", pick: null }])} />
     ) : null,
   };
   // Slots in TWO groups (user refinement): POPULATED cards first, then every GHOST pushed to

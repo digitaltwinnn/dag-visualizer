@@ -65,16 +65,34 @@ describe("clusterRadius", () => {
   });
 });
 
-describe("ledgerSpread", () => {
+describe("ledgerSpread (honeycomb + stacks)", () => {
+  const r = 3, cell = 0.6, lvl = 0.11;
   it("is deterministic and stays within the given radius", () => {
-    const r = 3;
-    for (let k = 0; k < 24; k++) {
-      const a = ledgerSpread(k, 24, r);
-      expect(a).toEqual(ledgerSpread(k, 24, r));
+    for (let k = 0; k < 64; k++) {
+      const a = ledgerSpread(k, 64, r, cell, lvl);
+      expect(a).toEqual(ledgerSpread(k, 64, r, cell, lvl));
       expect(Math.hypot(a.x, a.z)).toBeLessThanOrEqual(r + 1e-9);
     }
   });
+  it("no two chips share a cell on the same level (no overlap)", () => {
+    const seen = new Set<string>();
+    for (let k = 0; k < 200; k++) {
+      const a = ledgerSpread(k, 200, r, cell, lvl);
+      const key = `${a.x.toFixed(4)}|${a.y.toFixed(4)}|${a.z.toFixed(4)}`;
+      expect(seen.has(key)).toBe(false);
+      seen.add(key);
+    }
+  });
+  it("stacks UP in level-pitch multiples once the dial's cells fill", () => {
+    // With a tiny dial only the centre cell fits — every node stacks on it.
+    for (let k = 0; k < 5; k++) {
+      const a = ledgerSpread(k, 5, 0.1, cell, lvl);
+      expect(a.x).toBe(0);
+      expect(a.z).toBe(0);
+      expect(a.y).toBeCloseTo(k * lvl, 9);
+    }
+  });
   it("a lone node sits at the centre", () => {
-    expect(ledgerSpread(0, 1, 5)).toEqual({ x: 0, z: 0 });
+    expect(ledgerSpread(0, 1, 5, cell, lvl)).toEqual({ x: 0, y: 0, z: 0 });
   });
 });

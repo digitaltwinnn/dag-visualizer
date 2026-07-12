@@ -26,6 +26,7 @@
 // HyperView, Globe and LedgerView.
 
 import { METAGRAPHS } from "../config";
+import { hexCell } from "./nodeLayout";
 
 export const LEDGER = {
   depth: 44,        // Z span the metagraph lanes spread over
@@ -39,7 +40,6 @@ export const LEDGER = {
   // from this lane into the global snapshot.
   rowDAGL1: -4.25,  // == rowHypL0 (shares the hypergraph-L0 level; its own −Z third of that plane)
   dagLaneZ: -14.7,  // −Z centre of the reserved 1/3 (−depth/2 + depth/6) — where the DAG-L1 cluster sits
-  dagCell: 3.4,     // spread radius for the DAG node discs (global L0 + DAG L1) — sized to the bigger dots
   dot: 0.55,        // node-sphere scale in this view — uniform for EVERY cluster (a 3-node metagraph's
                     // dot = a global-L0 dot; small groups get presence from the station DIAL, not dot size)
   // Whole-view ORIENTATION applied to the ledger so it frames well under the SHARED overview camera
@@ -104,20 +104,38 @@ export function clusterRadius(count: number): number {
 // resting identity mark; the ledger's analog of the hypergraph hubs). Sized so neighbouring
 // lanes' dials keep clear spacing even with the tick tips (the dial geometry's ticks reach
 // 1.2× its radius): 2 × 0.38 × 1.2 = 0.912 of the lane gap, leaving ~9% air between dials.
-// The global L0 / DAG L1 clusters use their own larger constant (they are the "core", not a
-// lane): DIAL_R_GLOBAL fits the dagCell cloud.
+// The global L0 / DAG L1 clusters use the SAME dial (user, 2026-07-12 — one size in
+// design and code; with the honeycomb-stack spread their bigger fleets simply stack HIGHER
+// inside the same footprint; the old larger DIAL_R_GLOBAL + its dagCell disc are gone).
 export const DIAL_R = ((LEDGER.depth * LANE_SPREAD) / Math.max(1, METAGRAPHS.length - 1)) * 0.38;
-export const DIAL_R_GLOBAL = LEDGER.dagCell + 0.8;
 
-// Small deterministic golden-angle offset for node `k` of `cnt`, spreading a cluster as a flat
-// disc ON the floor (X/Z plane) within `radius` — no random jitter.
+// Deterministic HONEYCOMB + STACK spread for a node cluster (user, 2026-07-12 — the old
+// golden-angle disc overlapped chips once a cluster outgrew its dial; this is geo's chip-stack
+// language laid flat on the floor): hex cells of `cellPitch` fill the dial spiralling out from
+// the centre (nodeLayout.hexCell), and when the cells inside `radius` run out the layout goes
+// UP — `levelPitch` per level on Y, reusing the same cells — so every chip stays inside the
+// dial and nothing overlaps. All units are the caller's (pre-viewScale). No random jitter.
 export function ledgerSpread(
   k: number,
   cnt: number,
   radius: number,
-): { x: number; z: number } {
-  if (cnt <= 1) return { x: 0, z: 0 };
-  const r = Math.sqrt(k / (cnt - 1)) * radius;
-  const a = k * 2.399963229728653; // golden angle
-  return { x: Math.cos(a) * r, z: Math.sin(a) * r };
+  cellPitch: number,
+  levelPitch: number,
+): { x: number; y: number; z: number } {
+  if (cnt <= 1) return { x: 0, y: 0, z: 0 };
+  // How many spiral cells fit inside the dial (the centre cell always does). The spiral's
+  // per-ring distances aren't strictly monotonic, so stop at the FIRST cell that pokes out —
+  // every used cell is provably inside.
+  let capacity = 1;
+  while (capacity < cnt) {
+    const c = hexCell(capacity);
+    if (Math.hypot(c.x, c.y) * cellPitch > radius) break;
+    capacity++;
+  }
+  const cell = hexCell(k % capacity);
+  return {
+    x: cell.x * cellPitch,
+    y: Math.floor(k / capacity) * levelPitch,
+    z: cell.y * cellPitch,
+  };
 }

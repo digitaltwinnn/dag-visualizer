@@ -37,6 +37,10 @@ export interface ViewPolicy {
   // May depth-of-field run here at all? (Still ANDs with a single metagraph being selected +
   // the morph window.) Only hyper.
   dofEligible: boolean;
+  // Does pointer-moving over the globe SURFACE resolve the country under the cursor (the scene
+  // side of the bidirectional country hover pairing)? Only geo — the drill it previews is a
+  // geo-only concept.
+  countryHover: boolean;
   // OrbitControls zoom floor (camera→TARGET distance) — the stock dolly clamp.
   minCamDist: number;
   // Minimum camera ALTITUDE from the world origin (null = no clamp), enforced by the Engine
@@ -46,6 +50,10 @@ export interface ViewPolicy {
   // inside the surface on the other (user bug). 18 clears the land plateau (R 16 + LAND_H 1)
   // and the raised hex stacks.
   minCamAlt: number | null;
+  // Does this view publish the selection's flat node list (`store.selNodes`) for its explorer
+  // card? geo (Nodes by country) + hyper (Nodes by layer); elsewhere the list empties so the
+  // browsers stay quiet.
+  nodeList: boolean;
 }
 
 // A flat placeholder view (status / transactions / staking): the canvas is hidden and the view
@@ -57,8 +65,10 @@ const FLAT: ViewPolicy = {
   show: { hyperFurniture: false, globeSurface: false, ledger: false },
   pickSources: [],
   dofEligible: false,
+  countryHover: false,
   minCamDist: 12,
   minCamAlt: null,
+  nodeList: false,
 };
 
 export const VIEW_POLICIES: Record<Mode, ViewPolicy> = {
@@ -71,9 +81,11 @@ export const VIEW_POLICIES: Record<Mode, ViewPolicy> = {
     show: { hyperFurniture: true, globeSurface: true, ledger: false },
     pickSources: ["globe", "layers"],
     dofEligible: true,
+    countryHover: false,
     minCamDist: 12,
     minCamAlt: null,
-  },
+    nodeList: true,
+    },
   // Footprint: the holographic globe + travelling packets; picks the globe nodes only.
   geo: {
     canvas: true,
@@ -82,9 +94,11 @@ export const VIEW_POLICIES: Record<Mode, ViewPolicy> = {
     show: { hyperFurniture: true, globeSurface: true, ledger: false },
     pickSources: ["globe"],
     dofEligible: false,
+    countryHover: true, // pointer over a drillable country previews its border (pairs both ways)
     minCamDist: 12,
     minCamAlt: 18, // above the land plateau (R 16 + LAND_H 1.0) + chip stacks — no zooming inside
-  },
+    nodeList: true,
+    },
   // Snapshots: the settlement chamber. Morph frozen (nodes fly into lanes); picks the centred
   // snapshot + the reused producer dots. (The ledger-specific depth-fog recency treatment was
   // removed — the shared scene fog applies everywhere.)
@@ -95,8 +109,10 @@ export const VIEW_POLICIES: Record<Mode, ViewPolicy> = {
     show: { hyperFurniture: false, globeSurface: true, ledger: true },
     pickSources: ["ledger", "globe"],
     dofEligible: false,
+    countryHover: false,
     minCamDist: 12,
     minCamAlt: null,
+    nodeList: false,
   },
   status: FLAT,
   transactions: FLAT,

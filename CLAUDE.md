@@ -45,6 +45,55 @@ is a separate 3D layout (not part of the morph — it pins `morph` at 0 and hard
 reused node meshes into its lanes; see *Per-view behaviour*). The flat placeholder views sit
 at the hyper end with the canvas hidden.
 
+## The rules — invariants that hold in every change
+
+The application is governed by a small set of architectural rules. THREE ARE EXECUTABLE —
+`npm test` fails when they're violated — the rest are standing conventions detailed in their
+own sections below. Check any change against this list before committing; when a change wants
+to break one, that's a design conversation, not a workaround.
+
+**Enforced by tests:**
+
+1. **Engine layering** (`src/engine/layerBoundaries.test.ts`) — `domain/` = pure logic/data
+   (THREE math + config + data TYPES only; no scene/react/store values), `scene/` = Three
+   adapters (read domain, write GPU; no store/react), `Engine.ts` = the ONLY store bridge.
+   New behaviour lands in `domain/` WITH a colocated test; the scene stays a dumb adapter.
+   → *Engine layer rules & render-loop discipline*.
+2. **One selection write path** (`components/selectionBoundary.test.ts`) — every interactive
+   surface (scene clicks, explorer rows, strip bars, picker rows, card closes) expresses
+   intent through the tested decision table `domain/pickActions.ts` and applies it through
+   the ONE executor `src/store/applyClickActions.ts`; components never call selection setters
+   directly (sole exemption: `FollowController`, the follow SYSTEM). The rule is WRITE-based,
+   so read-only facts cards cost nothing. New click/select semantics = a table builder + a
+   test + (if a new action kind) its executor effect. → *the `pickActions.ts` bullet*.
+3. **One colour source** (`src/engine/noHardcodedColors.test.ts`) — `app/globals.css` tokens
+   are canonical; the scene reads them at boot via `readSceneColors()`; no raw hex in
+   `scene/` outside the documented allowlist. Two lanes never mix: structural cyan = the sole
+   accent/affordance; identity hues (deterministic, `src/palette/`) appear only on subject
+   marks, matched by metagraph id everywhere. → *The design system → Two colour lanes*.
+
+**Standing conventions (each detailed in its section):**
+
+4. **Per-view behaviour is an allow-list** — `domain/viewPolicy.ts` has one row per `Mode`;
+   a new view is inert until its row opts in; never `mode === "x"` guards, never deny-lists.
+5. **One home per concern** — the camera lives in `domain/cameraRig.ts` (presets, framings,
+   the global `CAM_ZOOM` dolly + its documented exemption rule), country-shape math in
+   `domain/countryShape.ts`, click semantics in `domain/pickActions.ts`. Don't grow a second
+   copy of any of these in the Engine or a component.
+6. **Zero-allocation render loop** — per-frame code reuses construction-time scratch; every
+   instanced slot is written or zero-scaled each frame; sims emit ring-buffer events their
+   owning adapter drains (no cross-view mutation). Event-driven allocation is fine — comment it.
+7. **The scene↔HUD hover pairing is sacrosanct** — the shared store channels (`hoverFilter`,
+   `hoverNodeId`, `hoverSnapOrd`, `hoverCountry`, `ledgerHilite`) + `.subject-paired` +
+   the marker classes survive every refactor; hovers PREVIEW, never commit.
+8. **Honesty over decoration** — every visual quantity comes from live data; absent data is
+   an instrument state (NO SIGNAL / acquiring / standby), never a fabricated number; floors
+   are labelled floors (`~`, `FLOOR`); don't "fix" honest gaps.
+9. **Design tokens first** — the HUD type scale + structural tokens for all styling; an
+   arbitrary value only for a documented one-off; new `text-*`/`rounded-*`/`tracking-*`
+   tokens must be registered in `lib/utils.ts` (twMerge). `/design` must always agree with
+   the shipped app.
+
 ## Run & test
 
 Next.js **16** app (Turbopack is the bundler for BOTH `dev` and `build`) — needs Node ≥20.9.
@@ -184,7 +233,8 @@ store-value imports**, enforced by `layerBoundaries.test.ts`). Each ships coloca
   sim gates / shown geometry / pick sources / DoF eligibility / camera zoom floor
   (geo also sets `minCamAlt: 18` — a camera-ALTITUDE floor the Engine enforces after each controls
   update, because the orbit target is off-centre in geo so the stock target-distance clamp alone
-  is inconsistent around the globe), as
+  is inconsistent around the globe) / `nodeList` (which views publish `store.selNodes` for
+  their explorer node browsers — hyper + geo), as
   DATA. The single source of truth for what each view turns on (see *Per-view behaviour*).
 - `morph.ts` — the hyper↔geo morph easing + derived visibility ramps.
 - `nodeLayout.ts` — the node placement math: fibonacci shells around the core/hubs, the
@@ -204,11 +254,47 @@ store-value imports**, enforced by `layerBoundaries.test.ts`). Each ships coloca
   group transform), `HYP_SPLIT` (the hypergraph level's 2/3+1/3 cut), `LAYER_GEOM` (layer id →
   height/lane-centre; ids shared with the UI copy table `src/data/ledgerLayers.ts` and the scene's
   `layer` picks), `ledgerSite`, `clusterRadius`, `ledgerSpread`.
-- `cameraRig.ts` — `FOCI` + the camera framing math (`hubFraming`, `geoFraming`,
-  `ledgerLayerFraming`, easings).
+- `pickActions.ts` — the CLICK/SELECT DECISION TABLE: what picking a subject means per view ×
+  pick kind, as pure data-in/actions-out logic with TWO kinds of executor: the Engine's
+  `_handleClick` (scene raycast clicks, via `clickActions` → ordered `ClickAction[]`) AND the
+  React components (GeoExplore's `drill`/`selectNode`, LiveStrip's bar `pick`) via the named
+  builders `countryToggleActions` / `nodeSelectActions` / `snapshotSelectActions` — so the
+  scene and the panels can never drift in semantics (a test literally asserts row-select ===
+  scene-click). Also `pickNetId` + **`pickActive`** (which picks respond AT ALL per view:
+  node-less hubs never, geo off-filter nodes never, hyper everything). Ordering contracts are
+  tested invariants: filter-first (only when it CHANGES — no drill churn) → node's country →
+  inspect-LAST (the node camera wins); deselect-before-drill on the country toggle; the LIVE
+  strip tip (re-)follows while older bars pin; layer/filter toggles (`layerToggleActions`,
+  `filterToggleActions` — the picker's committed-row step-back-to-all). The table self-gates
+  by mode. Every caller applies actions through the ONE executor
+  **`src/store/applyClickActions.ts`** (tested — action kind → exactly one store effect; a
+  snapshot CLEAR leaves `following` to the FollowController). **ENFORCED by
+  `components/selectionBoundary.test.ts`** (house grep-test): no component may write a
+  selection setter directly — the rule is WRITE-based, so read-only facts cards cost nothing
+  and every future explorer card inherits the table; sole allowlisted exception:
+  `FollowController` (the follow SYSTEM, not a user pick). New click/select semantics go in
+  the table with a test, their effects in the executor — never inline anywhere. The ORDERING contracts are tested invariants: a node
+  click sets filter FIRST (its subscription clears any old drill) → the node's country → inspect
+  LAST (the node camera wins); the empty-click country toggle drops a selected node before
+  moving the drill level. New click semantics go HERE with a test, not inline in the Engine.
+- `cameraRig.ts` — the ONE camera home: `FOCI` presets, every framing function (`hubFraming`,
+  `nodeFraming` (geo node — ABSOLUTE/dolly-exempt, solved against `NODE_RAISE`, the residual
+  Globe.focusNode leans every node to — a documented cross-layer CONTRACT), `hyperNodeFraming`,
+  `geoFraming` (the no-topology FALLBACK — the real drill pose is countryShape.countryFraming),
+  `ledgerLayerFraming`), the global **`CAM_ZOOM` dolly** (`dollyBack()` — one lever widening
+  every pose; a pose with a composed non-subject target must opt out explicitly or the dolly
+  drags the camera off the subject, the bug that hit the node pose), and **`closeness()`**
+  (camera altitude → the surface-sharpening factor GeoView's shaders consume). Easings too.
 - `records.ts` — the plain node/metagraph record types (`ValidatorRecord`/`MetaNodeRecord`) the
   scene consumes.
 - `geoLayout.ts` — shared geo constants (`R`, `LAND_H`) + `latLonToVec3`.
+- `countryShape.ts` — the country drill's shape math over the countries topology: `ccToNumeric`
+  (alpha-2 → world-atlas numeric id via the baked `data/country-codes.json`), `geometryRings` /
+  `mainPolygonRings` (framing composes on the main landmass; the border draws all polygons),
+  `ringsCentroid` (3D-unit-dir mean, segment-length-weighted — antimeridian-safe, no unwrap),
+  `ringsAngularRadius`, `countryFraming` (the constant-angle front-approach pose —
+  `COUNTRY_VIEW_ELEV` above the tangent, `AIM_BELOW_CENTROID` composition drop, extent-fit
+  distance), `ringsToSegments` (the border hairline's positions), `GLOBE_LEAN_MAX`.
 - `geoStats.ts` — the geo "data" layer: per-country tallies + the flat node-browser list,
   **pure functions** over the node record arrays (no Three/mesh state).
 
@@ -235,16 +321,25 @@ GPU; no store/react**):
 - `views/GeoView.ts` — the geo globe SURFACE: body sphere, graticule, atmosphere rim, the polar
   **compass roses** (hairline dial + micro N/S letter over each pole, in `globe.group` so they
   rotate truthfully — E/W are deliberately not floated), and the
-  **solid raised continents**. The land is the `land-110m` polygons triangulated into a
-  **plateau** at radius `R+LAND_H` (earcut via `THREE.ShapeUtils`, with a longitude **unwrap**
-  for the 4 antimeridian-crossing polygons, an Antarctica **pole-cap**, and a uniform `n=4`
-  subdivision so facets hug the sphere with no T-junction cracks), capped by additive coastal
-  **"wall" cliffs** (BackSide-culled, dim rim, always the default cyan — metagraph-tinting it
-  read as too dominant). The land surface is a SIMPLE FILL (luminance `rgb(14,14,14)` in the
-  baked texture, user-tuned) — the tile/micro-grid was removed entirely (user, after an A/B);
-  the sea graticule (base 0.06) spanning the whole sphere carries the digital line work.
-  Nodes/arcs sit on the plateau (`R+LAND_H+ε`); the body sphere (`renderOrder -2`) and fill
-  (`-1`) keep the depth/transparency sort deterministic.
+  **solid raised continents**. The topology is **`public/countries-110m.json`** (world-atlas;
+  replaced `land-110m.json` 2026-07-10 — it carries BOTH `objects.land` for the surface AND
+  `objects.countries` for the drill border/framing, one fetch). Each coastline ring becomes an
+  additive **"wall" cliff** ribbon from ocean level to `R+LAND_H` (BackSide-culled, dim rim,
+  always the default cyan — metagraph-tinting it read as too dominant); the land SURFACE is a
+  full sphere at the wall-top radius wearing a **baked equirect land-mask texture** (Canvas2D,
+  additive — sea texels are black; the old earcut plateau triangulation was replaced by this
+  masked sphere, killing the seam/pole bug class). The fill is a SIMPLE luminance wash
+  (user-tuned) — the tile/micro-grid was removed entirely (user, after an A/B); the sea
+  graticule (base 0.06) spanning the whole sphere carries the digital line work. GeoView also
+  owns the **country drill border** (`setCountryBorder` — one `LineSegments` rebuilt per
+  drill/hover change) + the per-country geometry index (`countryGeoms`, world-atlas numeric id →
+  geometry; `onCountriesReady` re-asserts a drill made before the async load). A shared
+  **closeness uniform** (`closeUniform`, written from the camera altitude each frame: 0 at the
+  overview, 1 at country/node range) sharpens the surface up close — the walls damp their soft
+  body glow and tighten/brighten the top rim (the ridge read as FUZZ at node range, user), and
+  BOTH the walls' and the graticule's far-hemisphere facing floor drops to near-zero (looking
+  THROUGH the globe distracted at close range, user). Nodes/arcs sit on the plateau
+  (`R+LAND_H+ε`).
 - `views/LedgerView.ts` — the Snapshots view's 3D settlement chamber over `ledgerModel` (see
   its own section below).
 
@@ -255,7 +350,11 @@ GPU; no store/react**):
   `cluster`/`anchor` events, `on`/`off`). When the API is unreachable it stays factual (a "NO
   SIGNAL" state) and recovers on the next good poll. It polls regardless of view.
 - `geoResolve.ts` — `loadGeoCache()` (fetches the live `/api/geo` map) + best-effort `resolveMissing`
-  for new validator IPs (ip-api over http, ipwho.is over https).
+  for new validator IPs (ip-api over http, ipwho.is over https). The lookups also carry the
+  **hosting provider** (`GeoInfo.isp`/`asn` — ip-api's `isp` + the ASN prefix of `as`; free on the
+  same batch call): the node card's HOSTING line + the explorer's provider sections. ⚠️ Adding
+  geo FIELDS does not invalidate `unstable_cache`/localStorage — bump the cache keys
+  (`validator-geo-live-v2`, `metagraphs-live-v2`, `dag-geo-cache-v2`) when the field set changes.
 
 **There is intentionally no `$DAG` price networking** — don't add a market-data fetch unless
 something in the UI actually consumes it.
@@ -300,8 +399,10 @@ views and caused the ledger red-dots bug; that pattern is forbidden.
   radius = `geoSize`, height `geoLayout.HEX_H`, slightly glassy `HEX_ALPHA 0.8` — a wireframe
   overlay was tried and rejected; EDGE-LIT: dim sides, bright top cap + fresnel rim redistribute
   the emissive so stacks read as lit chips, not a flat mass; `discFall()` eases them out toward the
-  limb — needs the camera); in the ledger they're flat **coins** (the sphere squashed on Y,
-  `COIN_H`). Per-instance transforms via the shared `_dummy`.
+  limb — needs the camera); in the ledger they're the SAME standing chips on the floor planes
+  (`LEDGER.dot` footprint × `HEX_H` — replaced the squashed-sphere COINS 2026-07-12, user: the
+  edge-on coin slivers were nearly un-raycastable; the chip's top cap + sides are a real pick
+  target, so the ledger needs no pick assist). Per-instance transforms via the shared `_dummy`.
 - **DAG L0/L1** are two fibonacci shells around the core. **Each metagraph** is laid out the
   same way around its hub: concentric shells **L0 inner → data-L1 (dl1) middle →
   currency-L1 (cl1) outer**. Metagraph nodes live in the rotating globe group but stay glued
@@ -313,8 +414,10 @@ views and caused the ledger red-dots bug; that pattern is forbidden.
   `config.METAGRAPHS` (all 10, unconditionally — `HyperView.ts`), but **globe nodes** come from
   `globe.metaList`, filtered to metagraphs with at least one **locatable** node. A config
   metagraph with 0 locatable nodes (e.g. TBC, LEET) has a hub but can't be plotted. The
-  filter picker keeps those rows **clickable but dimmed with a muted `not located` tag**
-  (user decision) — they're real metagraphs, selectable in Hypergraph/Snapshots, just not
+  filter picker keeps those rows **clickable but dimmed, with a bare `0` count** (user; the
+  earlier muted `not located` tag was replaced 2026-07-12 — the dim already says it's quiet;
+  the hyper explorer dims its 0-node network rows the same way) — they're real metagraphs,
+  selectable in Hypergraph/Snapshots, just not
   plottable; picking one lands geo in its quiet-empty state and the right rail shows the
   honest state-aware hint (see *State-aware pick hints*).
 - Co-located nodes are laid out deterministically by `spreadCoLocated()` as **poker-chip
@@ -338,17 +441,55 @@ views and caused the ledger red-dots bug; that pattern is forbidden.
     `globe.focusDensest()` rotates the globe so the **densest part of the selection faces the
     camera** (north stays up — Y rotation only). A **metagraph** selection frames WIDE
     (`FOCI.geoNetwork`, deliberately farther out than the country pose so drilling still reads
-    as a zoom); a **country** drill flies to the tilted mid framing, zoomed **proportional to
-    concentration** R = |mean of node dirs| (`geoFraming` — the node-zoom's low-camera tilt
-    held farther out); a **node** pick zooms close with the node at the LOWER-third line
-    (`_focusNode` — the look-at point swings far up the globe's rising face; the camera is only
-    ~4.6 units from the node, so screen shifts need big target moves).
-  - **Country drill-down** (geo only): the country rows in `GeoExplore` are clickable and
-    combine with the network filter (`globe.countryFilter` + eased `countryMix`;
-    `_nodeActive(layer, geo)` gates on BOTH). Clicking a country dims everything outside it,
-    flies to it, and marks the row with the shared selection ✓ (`SELECTED_ROW` +
-    `SelectedRowMark`, same language as the node rows); click again to clear; switching
-    network clears it.
+    as a zoom); a **country** drill frames the country's real SHAPE (see the drill-down bullet);
+    a **node** pick zooms close in a
+    LATITUDE-INDEPENDENT pose (`Globe.focusNode` leans the globe UNCAPPED with a 0.42 raise, so
+    every node rests at the same residual elevation — Helsinki read flatter than the rest with
+    the old 0.70 tilt cap, user; `_focusNode`'s camera/target are solved for that one pose and
+    are CAM_ZOOM dolly-EXEMPT — the composed far-up look-at made the global dolly drag the
+    camera away from the node).
+  - **Country drill-down** (geo only): the country rows in `GeoExplore` are clickable.
+    **The drill is a LENS, not a filter** (user, 2026-07-11 — reversed the original
+    dim-everything-outside design): it flies to the country, draws its border, firms the land
+    glass and marks the row with the shared selection ✓ (`SELECTED_ROW` + `SelectedRowMark`),
+    but the OTHER nodes stay fully visible, pickable and fanned (`_nodeActive` ignores
+    `countryFilter`; the `countryMix` dim machinery is dormant — the FrameCtx always gets
+    `countryFilter: null`). Click again to clear; switching network clears it. **The drill is shape-driven** (2026-07-10, `domain/countryShape.ts` over
+    `public/countries-110m.json`): the globe spins to the country's polygon **centroid** (gentle
+    `GLOBE_LEAN_MAX` lean — a FULL lean read as the camera going over the country) and
+    `countryFraming()` builds a **constant-angle pose**: the camera approaches from IN FRONT
+    (the equator side of the country's meridian) at `COUNTRY_VIEW_ELEV` (~49°) above its local
+    tangent plane, aimed `AIM_BELOW_CENTROID` below it — every country is viewed at the SAME
+    surface angle, north up, never over the zenith (`countryLean` stretches the lean at very
+    high latitudes so the invariant survives the zenith cap); only the DISTANCE varies, fit to
+    the country's angular extent (floor 4.3 / cap 20), with the composition drop fading to the
+    mid-line for wide countries (the US/Canada/India read too high with the compact bias). Framing composes on the **main landmass**
+    (`mainPolygonRings` — France's geometry includes French Guiana, the US's Alaska/Hawaii; the
+    mainland leads, the node-mean framing is the fallback while the topology loads). A **cyan
+    hairline border** (structural, not identity) outlines the drilled country at plateau height
+    — invisible at rest (the surface stays clean), whisper-level (0.3) while a country ROW is
+    hovered (`store.hoverCountry` → `globe.setHoverCountry`) — TWO border objects, so the
+    hover preview coexists with a committed drill (user: hovering another country must still
+    preview while one is selected), gone on deselect; it's a `geoFades` entry whose `base` IS the level, so the morph
+    gates it for free. A committed drill also firms the drilled country's OWN land glass — a
+    SCOPED equirect mask, not a global bump (`setCountryFillMask`: the country's rings
+    rasterized to a 2048×1024 canvas per drill change, sampled THRESHOLDED (a tight
+    smoothstep — linear filtering smeared the boundary at node-level zoom) by the land-fill
+    shader via
+    `onBeforeCompile`, `uMaskBoost` inside / 1 elsewhere; cleared = hard no-op). NB the fill's
+    resting additive is tiny (~0.055 luminance × 0.45), so perceptible boosts start ~×6 —
+    `MASK_BOOST` 8, tuned live (×12 read hot). **The country hover/click pairing is BIDIRECTIONAL**
+    (`ViewPolicy.countryHover`, geo only): pointer-moving over a DRILLABLE country on the globe
+    (no object hit → analytic ray→sphere + `countryCcAt` point-in-polygon over the drillable
+    set) writes the same `hoverCountry` channel — the explorer row washes (`subjectPairing`,
+    structural cyan) and the border previews; clicking the country toggles the drill exactly
+    like the row. A canvas `pointerleave` clears every hover channel (cards overlay the canvas,
+    so moves stop at their edge). ⚠️ **Data rebuilds must not wipe the drill**: `Globe.setMetagraphs` restores its
+    own `countryFilter` around the internal `setFilter`, and `Engine.applyFilter`'s geo branch
+    re-asserts `this.country` — the background cluster poll (`_applyMetagraphs →
+    applyFilter(false)`) used to silently clear the drill's dim + border seconds after every
+    drill (long-standing bug, found+fixed 2026-07-10; a real filter SWITCH still clears the
+    drill by design — the store subscription nulls `country` first).
   - **Hypergraph**: `_focusFilter` flies the camera to the selected hub (using its
     **local/unscaled** position — `layers.root` is morph-scaled, so `getWorldPosition` would
     aim at the origin mid-morph), framed slightly off the radial line so the core sits to the
@@ -367,7 +508,9 @@ views and caused the ledger red-dots bug; that pattern is forbidden.
   is forced **strong** (`_hoverFilterActive` → `_dimScale` 0.85) so it's visible even in
   hyper where the committed-filter dim is weak (the *click* also flies the camera + adds DoF,
   which a hover must not). Hovering an explorer node row glows that node's shells on the
-  globe (`hoverNodeId` → `globe.setHoverNode`), matching a 3D raycast hover.
+  globe (`hoverNodeId` → `globe.setHoverNode`), matching a 3D raycast hover; hovering a
+  country row previews that country's border outline at a whisper level (`hoverCountry` →
+  `globe.setHoverCountry` — the committed drill's full hairline wins).
 
 ## Per-view behaviour — allow-list, not deny-list
 
@@ -402,10 +545,16 @@ and keep changing, so they're examples, not the contract.
   the rail columns (26px) on desktop. Three regions on one row: **status + filter** (left —
   the ECG heartbeat mark + "DAG Visualizer", then the filter button whose face is a small
   identity dot + network name — on the condensed breakpoints the "FILTER" text label simply
-  hides (a stand-in funnel icon was tried and rejected as too busy); clicking opens the
-  **detached filter popover** — a stock Radix
-  `Popover` 6px below the button hosting the shadcn `Command` picker; the detached popover is
-  the *intentional* design, an anchored bar-expansion variant was tried and rejected), the
+  hides (a stand-in funnel icon was tried and rejected as too busy); clicking toggles the
+  **attached FILTER STRIP** — the bar GROWS DOWNWARD by one row of network chips on its own
+  surface (identity dot + name + located count, sorted located-desc, 0-located dimmed with a
+  bare 0; the committed chip wears the view switch's SELECTED_ROW on-state, no ✓). User
+  reversal 2026-07-12 of the 2026-07-04 detached-popover decision: hovering chips previews
+  the dim while the SCENE reacts in the open (the popover glass covered it); picking keeps
+  the strip OPEN (browsing several networks is the point) — the button/Escape close it. The
+  strip is a LAYOUT participant, not a popup: TopBar publishes its rendered height as
+  `--topbar-extra` (ResizeObserver) and both rails add it to their `top` (globals.css), so
+  the grown bar pushes the layout down instead of overlapping the cards), the
   **view switch** (center — a `ToggleGroup` of six monochrome lucide icons: `Orbit` hyper /
   `Globe` geo / `Layers` ledger / `Radar` status / `ArrowLeftRight` transactions / `HandCoins`
   staking, from `VIEW_ICONS`), and the
@@ -413,14 +562,45 @@ and keep changing, so they're examples, not the contract.
   clusters render stacked in one grid cell (inactive ones `invisible` + `aria-hidden`) so the
   centered view switch never jumps on a view change; sparklines condense away ≤1240px.
   Below 1100px a slim **selected-view caption** hangs under the bar, right-anchored. The
-  command bar is **spineless** (absolute rule — the ECG mark is its identity cue).
+  command bar is **spineless** (absolute rule — the ECG mark is its identity cue). With a
+  network COMMITTED, the active vitals cluster wears a 1px soft-tipped **filter-scope
+  hairline** in the filter's identity hue at rest-dim (user, 2026-07-11: the numbers silently
+  switched to filtered values with nothing marking the scope) — the thread language, not a
+  spine; "all" renders nothing (defaults carry no mark), numbers/sparklines stay untinted.
 - **Left rail** (`#leftcol`, `ExploreRail`) = the **explore / interact** scope: every view
   leads with a collapsed **`AboutView`** orientation card (per-view title + eyebrow + copy;
   scaffolded views carry a `SOON` caption), above the view's ONE tool card if it has one —
   geo → `GeoExplore` (the country→nodes accordion: a country row shows its share, clicking
-  it drills the globe AND expands its nodes inline; node rows are city-first, alphabetical
-  per country, with the shared identity dot + status), ledger → `LedgerPanel` (WIP copy).
-  Hyper and the placeholders have just the About card.
+  it drills the globe AND expands its **COHORT rows** — one row per city × provider
+  (`Falkenstein · Hetzner 31`), sorted by count; the old per-node rows repeated the same
+  city/"ready" dozens of times (user: "a patch, not a design"). NO status anywhere in the
+  list (user: health belongs to the node card + the future network-health view); NO identity
+  dot on cohort rows either (user, 2026-07-12 — network is NOT in the key: a provider cohort
+  can host many metagraphs, no single hue can speak for the row, and splitting per network
+  multiplied groups). A
+  cohort is a DISCLOSURE (single-open chevron) expanding to picker rows that LEAD with the
+  composition word + trail the muted mono id (`data 53de…` — real per-row info, cohorts can
+  mix compositions and NETWORKS; the id rows' hover-pairing hue derives per row); a
+  SINGLE-node cohort click selects its node in the same click (no pointless second click); a
+  collapsed cohort holding the selected node surfaces the ✓. Hovering a cohort glows its WHOLE
+  3D stack (`store.hoverCohort` ids[] → `globe.setHoverCohort` → the fabric's hot check) and
+  lights the country border. Counts are bare numbers (no ×). User design 2026-07-11), hyper →
+  `HyperExplore` ("Nodes by network", 2026-07-12 — the architectural sibling: network (sorted
+  by fleet size) → COMPOSITION group → node id rows; network rows commit the filter via
+  `filterToggleActions` (a row IS a hub click, re-click steps back to all) and pair on the
+  `hoverFilter` channel; the composition groups use the metagraph card's exact table
+  vocabulary (Hybrid / Data / … + the RoleChips code pills), dedupe cluster entries to
+  MACHINES so counts match the dossier, are DISCLOSURES ONLY (never layer-card selectors —
+  the layer card stays ledger-scoped), and hover-glow all member instances via `hoverCohort`;
+  the id rows are bare mono ids (the group label carries the word) running
+  `nodeSelectActions`. Feeds off `store.selNodes`, published per `ViewPolicy.nodeList`. The
+  tool-card NAMING rule: About = the view's point of view ("How the network is built"); the
+  tool says what you BROWSE — "Nodes by network" / "Nodes by country" / ledger's "Settlement
+  layers" (not "Nodes by…": its subjects are strata, not nodes). Card EYEBROWS are the bare
+  role words ("About" / "Explore") — the view name was dropped (user, 2026-07-12: the view
+  switch already says where you are), and each explorer's usage hint LEADS the card (top,
+  descriptive) instead of trailing it), ledger → `LedgerPanel`.
+  The placeholder views have just the About card.
 - **Right rail** (`#rightcol`, `Inspector`) = the **facts** scope (read-only), a set of
   **FIXED card SLOTS** in one stable order — network dossier, node, snapshot, layer (user
   design, 2026-07-10; replaced the recency stack + the floating pick-hint): every card the
@@ -436,10 +616,12 @@ and keep changing, so they're examples, not the contract.
   view; it publishes `--bottom-reserve`.
 
 **Per-view vitals** (contents, not the rule): **hyper** = the structure (filter-aware
-L0 / cL1 / dL1 node counts; one node taxonomy — a hybrid node counts in every layer it
-runs, the DAG's own L0/L1 fold into L0/cL1 like any metagraph; a filtered metagraph shows an
-em-dash for a layer it doesn't run). **geo** = the footprint (`Nodes` / `Countries` /
-`Ready`, integer odometers; Ready is exactly a % of Nodes, both over `store.selNodes`).
+MACHINE counts per composition — Data / Hybrid / Currency, the same vocabulary as the
+dossier table + hyper explorer (2026-07-12, replaced the per-layer L0/cL1/dL1 role counts);
+cluster entries dedupe to machines; an em-dash for a composition the selection doesn't have;
+NB dedicated-L0 "Consensus" machines have no column — visible in the dossier breakdown). **geo** = the footprint (`Nodes` / `Countries` /
+`Providers` — distinct known ISPs over `store.selNodes`; replaced Ready %, user 2026-07-11:
+health belongs to the cards + the future network-health view).
 **ledger** = live activity (`Snaps/hr` / `Anchors/hr` with cyan trend sparklines from
 `store.activity`; a third slot is reserved "soon").
 
@@ -449,8 +631,10 @@ cost). Activity metrics belong to ledger, structure to hyper — don't cross-pol
 
 **The snapshot card is ledger-scoped.** `FollowController` follows the live snapshot and the
 ledger view follows live by default; once a snapshot is *selected* it's pinned and carries
-across views until deselected. Clicking a `LiveStrip` bar from hyper/geo jumps to `ledger`
-and opens the card there.
+across views until deselected. Clicking a `LiveStrip` bar selects that snapshot IN PLACE —
+no view switch (the old jump-to-ledger was dropped); the card shows in whatever view you're
+in. Clicking the LIVE tip (re-)follows the heartbeat; an older bar pins
+(`snapshotSelectActions` — the same tested table the ledger's 3D tile click runs).
 
 ### Responsive shell
 
@@ -665,8 +849,14 @@ cards: **eyebrow / title / INSET hairline / body**.
   `MetaTitle` (avatar + name + ticker + a muted type descriptor — "data metagraph" /
   "currency metagraph" / "data and currency metagraph" / DAG = "hypergraph"; 0-node
   metagraphs say just "metagraph"); the snapshot title's Odometer owns its own roll; the
-  node card is **location-first** (place as title, the id hash demoted to the mono
-  `subtitle` slot, id-as-title fallback when unresolved). **Card-head kind MARKS tint with
+  node card is **location-first** (place as title; the `subtitle` is the node's sentence-cased
+  composition word + its layer codes as squared PILLS — `Hybrid [L0][cL1][dL1]`
+  (`nodeCompositionLabel` + `compositionRows` codes via the shared `RoleChips`; the joined
+  `L0·cL1` text read as one token, user 2026-07-12); the BODY is
+  labelled rows in importance order: HOSTING, then **NODE ID last** — the unique reference
+  sits where references sit, truncated with the full hash on hover (user, 2026-07-11; this
+  replaced the one-node CompositionRows block whose count was always "1"); id-as-title
+  fallback when unresolved). **Card-head kind MARKS tint with
   the active filter's identity** via `text-[var(--filter-accent,var(--primary))]` (the rail
   sets `--filter-accent`; cyan on "all") — never hardcode a mark to cyan (a recurring bug;
   the snapshot Layers mark + the layer plane mark both follow this; node marks use their
@@ -678,6 +868,10 @@ cards: **eyebrow / title / INSET hairline / body**.
   `Separator` in bodies).
 - **One close**: every dismissible card's × is CardHead's ghost-Button close labelled
   **"Clear selection"** — no per-card variants. Tool cards use the +/− collapse instead.
+  RIGHT cards are collapsible TOO (user, 2026-07-12): the WHOLE head is the disclosure toggle
+  (the panel layout's stretched-hit-area pattern — required for touch), the +/− rides the
+  eyebrow line as the indicator, and the × + the title-row aside float ABOVE the stretched
+  overlay (z) so closing and the site link keep working; collapsed = eyebrow + title only.
 
 ### Selection + pairing
 
@@ -783,7 +977,9 @@ Unfiltered, bars plot each tick's TOTAL anchors in cyan. **Filtered, each bar pl
 metagraph's own anchors on its OWN scale in its identity hue — its own cadence, with empty
 ticks as honest gaps** (deliberate: a ~1-anchor-per-tick metagraph reads sparse/degenerate,
 and 0-in-window reads blank; that honesty is the design, don't "fix" it). Clicking a bar
-opens that snapshot's card and, from hyper/geo, jumps to `ledger`. Hovering a bar
+selects that snapshot IN PLACE (no view switch — the old hyper/geo jump-to-ledger was
+dropped): the LIVE tip (re-)follows, an older bar pins, via `snapshotSelectActions` +
+`applyClickActions` (the same table/executor as the ledger's 3D tile). Hovering a bar
 cross-highlights the matching ledger block (`hoverSnapOrd`); the hover is cleared on each
 new tick (bars shift under a stationary cursor, which never fires mouseleave, so a hover
 would otherwise stick and trail). Selection is store-driven (`inspect`/`following`/`snap`
@@ -842,15 +1038,15 @@ event, `ledger.update(dt)` per frame).
   gives a 3-node metagraph the same footprint as a big one; **visible at rest** at
   `DIAL_REST_OP`, brightened + slightly scaled while an anchor pulse passes; the global L0 +
   DAG L1 clusters wear the same dial in the DAG's identity hue (`sceneColors["dag"]` — matching
-  the node instances inside them) at `DIAL_R_GLOBAL`; `_gL0Ring` additionally glows via
+  the node instances inside them) at the SAME `DIAL_R` (one dial size in design and code,
+  user 2026-07-12 — their bigger fleets just stack higher); `_gL0Ring` additionally glows via
   `_gL0Glow` when a pulse reaches that floor. **Every ledger colour resolves through the ONE
   identity system** — the identity SCENE map is a required LedgerView ctor arg (like HyperView)
   and `setSceneColors()` re-tints on live refresh; nothing falls back to a raw
   `config.METAGRAPHS` colour. Node size is uniform too: `LEDGER.dot` applies to every cluster
   equally — small groups get presence from the dial, not from bigger dots — and ledger nodes
-  render as flat **COINS** (the sphere instance squashed on Y, `NodeFabric.COIN_H`; a
-  zero-thickness circle foreshortened to an invisible sliver at the overview camera, the coin
-  reads as a circle from above yet stays visible edge-on)); and the anchor **links** +
+  render as the SAME standing **CHIPS** as geo (hex/cylinder instances, `LEDGER.dot` × `HEX_H` —
+  replaced the squashed-sphere coins 2026-07-12: edge-lit, visible, and raycastable)); and the anchor **links** +
   travelling **pulses** along the
   shared **`curvePoint`** — the literal production→anchor column down from the producers
   floor through the L1/L0 ring centres → the snapshot tile → swinging to centre through the
@@ -859,15 +1055,18 @@ event, `ledger.update(dt)` per frame).
 - **Recency is `slotFade` brightness only (2026-07-09).** The old neutral-tone + ledger-specific
   linear depth fog recency treatment was REMOVED at the user's direction (a replacement may be
   designed later): tiles/links/trail blocks keep their identity/accent colour all the way down
-  the trail, fading gently by `slotFade`; the shared scene `FogExp2` applies in every view (the
-  `ViewPolicy.fog` field + Engine fog swap are gone).
+  the trail, fading gently by `slotFade`. There is NO scene fog at all any more (the shared
+  `FogExp2` was removed 2026-07-11, user: zooming out darkened the scene — it must stay clear
+  and coloured at every zoom; depth reads through DoF/facing/closeness instead. The
+  `ViewPolicy.fog` field + Engine fog swap were already gone).
 - **Emphasis is brightness, not a colour switch.** `model.isRowHot` still enforces exactly ONE
   hot row (a selected/hovered older snapshot beats the live lead): the hot row's tiles/links
   render near-full-brightness (bloom), everything else stays dim-but-coloured; the centre block
   dims (`leadDimmed`) while an older snapshot is selected. Selection comes from the LiveStrip:
   the Engine forwards `hoverSnapOrd ?? snap.data.ordinal` to `ledger.setSelected(ordinal)`; the
   ledger maps ordinal → slot each tick (`_recomputeSelectedSlot`). The DAG node-cluster spread
-  is `LEDGER.dagCell`.
+  follows the same `clusterRadius`-capped honeycomb footprint as every lane (the old
+  `LEDGER.dagCell` disc is gone).
 - **Metagraph filter dims the OTHER lanes** (`ledger.setFilter`, wired alongside
   `globe.setFilter`): the selected lane keeps full colour; other metagraphs' tiles/links/dials
   are strongly dimmed (×0.22) and their nodes too (the morph-ramped `_dimScale` is too weak in
@@ -1019,6 +1218,9 @@ can't fetch them — but the **Next Node server can**:
   falling back to the site's `theme-color`) via the pure helpers in `src/palette/brand.ts`,
   snapped into the palette's allowed hue zones. `data/brand-hue-overrides.json` (id → hueDeg)
   is the manual escape hatch for a bad extraction; the bake applies it before extraction.
+- **`data/country-codes.json`** (alpha-2 → ISO numeric, the geo-cc ↔ countries-topology join)
+  is baked OFFLINE by `npx tsx scripts/bake-country-codes.ts` from the `world-countries`
+  devDependency — effectively never needs re-running (the ISO standard is stable).
 
 Metagraph reality worth knowing (it drives the dossier/inspector text):
 

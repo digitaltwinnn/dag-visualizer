@@ -2,12 +2,11 @@
 
 import { Gauge } from "lucide-react";
 import { useStore } from "@/src/store/store";
-import { metagraphById } from "@/src/data/network";
-import { nodeStatus } from "@/src/data/nodeStatus";
+import { metagraphById, filterAccent } from "@/src/data/network";
 import Sparkline from "@/components/Sparkline";
 import Odometer from "@/components/Odometer";
 import { NoSignalDot } from "@/components/state/StateAtoms";
-import { rolesOf } from "@/components/inspector/parts";
+import { compositionRows } from "@/src/data/composition";
 import { useBreakpoint } from "@/components/useBreakpoint";
 import { cn } from "@/lib/utils";
 import type { NodeInfo } from "@/src/data/types";
@@ -39,57 +38,62 @@ function Vital({ label, value, spark }: { label: string; value: React.ReactNode;
   );
 }
 
-// Hypergraph vitals — the network's **structure** (who/what), filter-aware: how many nodes
-// serve each layer (L0 / currency-L1 / data-L1) for the current selection. One node taxonomy
-// for the whole network — a hybrid node counts in every layer it runs, the DAG's own L0/L1
-// fold into L0/cL1 like any other network. All → the whole network; L0/L1 → that shell (0
-// elsewhere); a metagraph → its own nodes. Structure, not activity (that's the Ledger view).
+// Hypergraph vitals — the network's **structure** (who/what), filter-aware: how many MACHINES
+// of each composition make up the current selection (user, 2026-07-12 — replaced the per-layer
+// L0/cL1/dL1 role counts: the composition vocabulary is what the hyper explorer + the dossier
+// table speak, so the vitals now agree with them). Cluster entries are deduped to machines
+// first (a hybrid appears once per cluster it runs), then counted by their composition label
+// (src/data/composition). NB "Consensus" (dedicated-L0) machines — the DAG core has some —
+// have no column (user picked the three); they're visible in the dossier/explorer breakdowns.
+// Filtered: an em-dash for a composition the selection doesn't have (stable columns, no reflow).
 function HyperVitals() {
   const filter = useStore((s) => s.filter);
   const metaList = useStore((s) => s.metaList);
   const cfg = metagraphById(filter);
 
-  const c = { l0: 0, cl1: 0, dl1: 0 };
-  const runs = { l0: false, cl1: false, dl1: false };
-  const add = (nodes: NodeInfo[]) => {
-    for (const n of nodes) {
-      const roles = rolesOf(n);
-      if (roles.includes("l0")) { c.l0++; runs.l0 = true; }
-      if (roles.includes("cl1")) { c.cl1++; runs.cl1 = true; }
-      if (roles.includes("dl1")) { c.dl1++; runs.dl1 = true; }
-    }
-  };
+  const counts: Record<string, number> = { Data: 0, Hybrid: 0, Currency: 0 };
   const cores = cfg ? metaList.filter((m) => m.id === cfg.id) : metaList;
-  for (const mg of cores) add(mg.nodes);
+  for (const mg of cores) {
+    const machines = new Map<string, NodeInfo>();
+    for (const n of mg.nodes) {
+      const k = n.ip || JSON.stringify(n);
+      if (!machines.has(k)) machines.set(k, n);
+    }
+    for (const row of compositionRows([...machines.values()]))
+      if (row.label in counts) counts[row.label]! += row.count;
+  }
 
-  // Filtered: an em-dash for a layer this metagraph doesn't run (stable 3 columns, no reflow).
-  const cell = (n: number, runsLayer: boolean) =>
-    cfg && !runsLayer ? <span className="text-muted-foreground italic opacity-60">—</span> : <Odometer value={n} />;
+  const cell = (n: number) =>
+    cfg && n === 0 ? <span className="text-muted-foreground italic opacity-60">—</span> : <Odometer int value={n} />;
 
   return (
     <>
-      <Vital label="L0" value={cell(c.l0, runs.l0)} />
-      <Vital label="cL1" value={cell(c.cl1, runs.cl1)} />
-      <Vital label="dL1" value={cell(c.dl1, runs.dl1)} />
+      <Vital label="Data" value={cell(counts.Data!)} />
+      <Vital label="Hybrid" value={cell(counts.Hybrid!)} />
+      <Vital label="Currency" value={cell(counts.Currency!)} />
     </>
   );
 }
 
-// Geography vitals — the active selection's **footprint** (where): total nodes, how many countries
-// they span, and what share of them are healthy (Ready). Nodes + Ready share one source (the geo
-// node list) so "Ready" is exactly a percentage of the "Nodes" count.
+// Geography vitals — the active selection's **footprint** (where): total nodes, how many
+// countries they span, and how many distinct hosting PROVIDERS they sit on (replaced the Ready %
+// — user: health belongs to the cards + the future network-health view, not the footprint).
 function GeoVitals() {
   const lb = useStore((s) => s.leaderboard);
   const selNodes = useStore((s) => s.selNodes);
   const countries = lb?.countries ?? [];
   const total = selNodes.length;
-  const ready = selNodes.reduce((n, r) => n + (nodeStatus(r.state).bucket === "ready" ? 1 : 0), 0);
-  const readyPct = total ? Math.round((ready / total) * 100) : null;
+  // Distinct hosting providers across the selection (KNOWN isps only — an unknown host is
+  // absent data, not a provider). Replaced the Ready % (user, 2026-07-11): the footprint
+  // story is where the network RUNS — nodes, countries, hosts; health lives in the cards.
+  const providers = new Set(
+    selNodes.map((r) => ("geo" in r.pick ? r.pick.geo?.isp : undefined)).filter(Boolean),
+  ).size;
   return (
     <>
       <Vital label="Nodes" value={<Odometer int value={total || null} />} />
       <Vital label="Countries" value={<Odometer int value={countries.length || null} />} />
-      <Vital label="Ready" value={readyPct == null ? "—" : `${readyPct}%`} />
+      <Vital label="Providers" value={<Odometer int value={providers || null} />} />
     </>
   );
 }
@@ -123,6 +127,13 @@ function LedgerVitals() {
 function VitalsCluster({ align = "end" }: { align?: "end" | "center" } = {}) {
   const mode = useStore((s) => s.mode);
   const live = useStore((s) => s.live);
+  // FILTER-SCOPE hairline (user, 2026-07-11): with a network committed, the vitals silently
+  // showed FILTERED numbers with nothing marking the scope. The active cluster wears a 1px
+  // soft-tipped identity hairline under it — the "thread = resting identity cue" language
+  // (numbers/sparklines stay untinted; identity only on the mark). "all" renders nothing:
+  // global is the default state, defaults carry no mark.
+  const filter = useStore((s) => s.filter);
+  const scopeHue = filter !== "all" ? filterAccent(filter) : null;
   const gaps = "gap-3.5 max-[1260px]:gap-3 max-[1120px]:gap-2.5 max-[940px]:gap-2.5 max-[820px]:gap-2";
   const clusters: [string, React.ReactNode][] = [
     ["hyper", <HyperVitals key="hyper" />],
@@ -138,13 +149,23 @@ function VitalsCluster({ align = "end" }: { align?: "end" | "center" } = {}) {
             key={m}
             aria-hidden={mode !== m || undefined}
             className={cn(
-              "col-start-1 row-start-1 flex items-center",
+              "relative col-start-1 row-start-1 flex items-center",
               align === "center" ? "justify-center" : "justify-end",
               gaps,
               mode !== m && "invisible",
             )}
           >
             {body}
+            {scopeHue && mode === m && (
+              <span
+                aria-hidden
+                className="absolute -bottom-[5px] left-0 right-0 h-px opacity-60 transition-opacity duration-300 motion-reduce:transition-none"
+                // The shared soft-tipped hairline recipe — full colour across the middle,
+                // easing out only in the last ~15% each side (user, 2026-07-12: the bare
+                // transparent→hue→transparent ramp faded most of the line away).
+                style={{ background: `linear-gradient(90deg, transparent, ${scopeHue} 15%, ${scopeHue} 85%, transparent)` }}
+              />
+            )}
           </div>
         ))}
       </div>

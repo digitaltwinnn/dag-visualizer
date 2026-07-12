@@ -38,7 +38,10 @@ const LIGHT_RIM = 0x5a6f9c;     // muted cool rim light (back — edge separatio
 export function createScene(canvas: HTMLCanvasElement, colors: SceneColors): SceneCtx {
   const scene = new THREE.Scene();
   scene.background = new THREE.Color(colors.bg);
-  scene.fog = new THREE.FogExp2(colors.bg, 0.012);
+  // Deliberately NO scene fog (removed 2026-07-11, user): the FogExp2 depth cue darkened the
+  // whole scene as the camera pulled back — the scene must stay clear and coloured at every
+  // zoom. Depth reads through DoF (hyper focus), the facing dims, and the closeness uniform;
+  // darkening is never a zoom side-effect.
 
   const camera = new THREE.PerspectiveCamera(
     55, window.innerWidth / window.innerHeight, 0.1, 2000

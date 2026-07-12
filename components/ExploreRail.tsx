@@ -4,6 +4,7 @@ import { Fragment, type CSSProperties, type ReactNode } from "react";
 import { useStore, type Mode } from "@/src/store/store";
 import { filterAccent } from "@/src/data/network";
 import GeoExplore from "@/components/GeoExplore";
+import HyperExplore from "@/components/HyperExplore";
 import LedgerPanel from "@/components/LedgerPanel";
 import AboutView from "@/components/AboutView";
 import RailThread from "@/components/RailThread";
@@ -16,7 +17,7 @@ import { useBreakpoint } from "@/components/useBreakpoint";
 const ABOUT: Record<Mode, { title: string; eyebrow: string; lines: string[]; caption?: string }> = {
   hyper: {
     title: "How the network is built",
-    eyebrow: "Hypergraph · about",
+    eyebrow: "About",
     lines: [
       "Constellation is a Hypergraph, not a blockchain — activity is organized as a DAG, so many parts of the network validate in parallel: horizontally scalable and feeless for users.",
       "The glowing core is the Global L0 (security + settlement); the validator shells around it bundle activity into the global snapshots streaming along the bottom. The orbiting clusters are metagraphs — independent networks that anchor their state into L0 for shared trust.",
@@ -24,7 +25,7 @@ const ABOUT: Record<Mode, { title: string; eyebrow: string; lines: string[]; cap
   },
   geo: {
     title: "Where the network runs",
-    eyebrow: "Geography · about",
+    eyebrow: "About",
     lines: [
       "Where the network runs — every validator plotted at its real geolocation, co-located machines stacked into honeycomb chip towers, with travelling-packet connection arcs between them.",
       "Drill into a country to see its nodes; filtering a metagraph narrows the map to that network's footprint.",
@@ -32,7 +33,7 @@ const ABOUT: Record<Mode, { title: string; eyebrow: string; lines: string[]; cap
   },
   ledger: {
     title: "When the network settles",
-    eyebrow: "Snapshots · about",
+    eyebrow: "About",
     lines: [
       "When the network settles — Global L0 produces a snapshot every few seconds, anchoring the metagraphs' own snapshots into shared trust. The 3D chamber stacks the validation layers top-to-bottom, and each global snapshot forms as its layer settles.",
       "The live snapshot sits centre-stage and trails off to the left as it ages; click any snapshot (here or in the strip below) to inspect its fee, size and per-metagraph breakdown.",
@@ -40,7 +41,7 @@ const ABOUT: Record<Mode, { title: string; eyebrow: string; lines: string[]; cap
   },
   status: {
     title: "Is the network healthy?",
-    eyebrow: "Status · about",
+    eyebrow: "About",
     caption: "SOON",
     lines: [
       "Live health of the network — validator uptime, node states (Ready / waiting / offline), and software-version spread across the Global L0 and the metagraphs.",
@@ -49,7 +50,7 @@ const ABOUT: Record<Mode, { title: string; eyebrow: string; lines: string[]; cap
   },
   transactions: {
     title: "How value moves",
-    eyebrow: "Transactions · about",
+    eyebrow: "About",
     caption: "SOON",
     lines: [
       "The money flow across the network — $DAG and the metagraphs' own currencies moving between addresses, visualized as it happens.",
@@ -58,7 +59,7 @@ const ABOUT: Record<Mode, { title: string; eyebrow: string; lines: string[]; cap
   },
   staking: {
     title: "Who backs the validators",
-    eyebrow: "Staking · about",
+    eyebrow: "About",
     caption: "SOON",
     lines: [
       "Delegated staking across the network — who is staked to which validators, total $DAG delegated, and the rewards flowing back.",
@@ -70,8 +71,9 @@ const ABOUT: Record<Mode, { title: string; eyebrow: string; lines: string[]; cap
 // Left control rail: the **explore/interact** zone. The global network filter lives in the
 // top command bar; the selected-subject dossier now lives in the right rail (`ContextCard`).
 // Every view now leads with a collapsed `AboutView` orientation card, above its ONE tool card
-// (if any): Geography → GeoExplore (footprint + node browser); Snapshots → LedgerPanel;
-// Hypergraph and the scaffolded views have no tool card, just the About card.
+// (if any): Hypergraph → HyperExplore (network → layer shell → node); Geography → GeoExplore
+// (footprint + node browser); Snapshots → LedgerPanel; the scaffolded views have no tool
+// card, just the About card.
 export default function ExploreRail() {
   const bp = useBreakpoint();
   const mode = useStore((s) => s.mode);
@@ -90,7 +92,7 @@ export default function ExploreRail() {
   const manifest = exploreCards({ mode });
   const renderCard: Record<string, ReactNode> = {
     about: <AboutView {...ABOUT[mode]} />,
-    tool: mode === "geo" ? <GeoExplore /> : mode === "ledger" ? <LedgerPanel /> : null,
+    tool: mode === "hyper" ? <HyperExplore /> : mode === "geo" ? <GeoExplore /> : mode === "ledger" ? <LedgerPanel /> : null,
   };
   const content = (
     <>

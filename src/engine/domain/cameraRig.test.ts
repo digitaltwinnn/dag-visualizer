@@ -1,14 +1,14 @@
 import { describe, it, expect } from "vitest";
 import * as THREE from "three";
-import { FOCI, hubFraming, geoFraming, easeInOutQuad } from "./cameraRig";
+import { FOCI, hubFraming, geoFraming, easeInOutQuad, CAM_ZOOM, dollyBack, nodeFraming, hyperNodeFraming, closeness, CLOSE_FAR_ALT, CLOSE_NEAR_ALT } from "./cameraRig";
 
 describe("FOCI", () => {
   it("carries the camera presets (ledger has none — it uses `overview` + a rotated group)", () => {
-    expect(FOCI.overview.pos).toEqual(new THREE.Vector3(0, 15, 60));
+    expect(FOCI.overview.pos).toEqual(new THREE.Vector3(0, 17, 68)); // pulled back (user: whole scene visible at view start)
     expect(FOCI.overview.target).toEqual(new THREE.Vector3(0, 2, 0));
     expect(FOCI.dag.pos).toEqual(new THREE.Vector3(0, 9, 38));
     expect(FOCI.dag.target).toEqual(new THREE.Vector3(0, 1, 0));
-    expect(FOCI.geo.pos).toEqual(new THREE.Vector3(0, 11, 36));
+    expect(FOCI.geo.pos).toEqual(new THREE.Vector3(0, 12.5, 41.5)); // pulled back (whole globe inside the rail-free centre)
     // Geo targets the globe CENTRE (manual orbits stay concentric — no wobble).
     expect(FOCI.geo.target).toEqual(new THREE.Vector3(0, 0, 0));
     // Metagraph pose sits between the overview (z 36) and the country framing (z 29..25).
@@ -113,5 +113,48 @@ describe("easeInOutQuad", () => {
   it("matches the inline formula at t=0.75 (decelerating half)", () => {
     const t = 0.75;
     expect(easeInOutQuad(t)).toBeCloseTo(1 - Math.pow(-2 * t + 2, 2) / 2, 12);
+  });
+});
+
+describe("dollyBack (the one global zoom lever)", () => {
+  it("pushes the position out from its target by CAM_ZOOM, leaving the target fixed", () => {
+    const pos = new THREE.Vector3(0, 0, 10);
+    const target = new THREE.Vector3(0, 0, 2);
+    const out = new THREE.Vector3();
+    dollyBack(pos, target, out);
+    expect(out.z).toBeCloseTo(2 + (10 - 2) * CAM_ZOOM, 9);
+    // inputs untouched (the Engine hands it preset vectors)
+    expect(pos.z).toBe(10);
+    expect(target.z).toBe(2);
+  });
+});
+
+describe("nodeFraming (the geo node pose — ABSOLUTE, dolly-exempt)", () => {
+  it("is the one live-tuned pose: camera above the equator plane, axis aimed above the node", () => {
+    const out = { pos: new THREE.Vector3(), target: new THREE.Vector3() };
+    nodeFraming(out);
+    expect(out.pos).toEqual(new THREE.Vector3(0, 4.6, 19.2));
+    expect(out.target).toEqual(new THREE.Vector3(0, 19.5, 2));
+  });
+});
+
+describe("hyperNodeFraming", () => {
+  it("pulls back along the node's outward radial, lifted, looking at the node", () => {
+    const node = new THREE.Vector3(0, 0, 20);
+    const out = { pos: new THREE.Vector3(), target: new THREE.Vector3() };
+    hyperNodeFraming(node, out);
+    expect(out.target).toEqual(node);
+    expect(out.pos.z).toBeCloseTo(29, 9); // 20 + 9 along the radial
+    expect(out.pos.y).toBeCloseTo(3, 9);  // the lift
+  });
+});
+
+describe("closeness (camera altitude → surface-sharpening factor)", () => {
+  it("is 0 at/beyond the far band, 1 at/inside the near band, linear between", () => {
+    expect(closeness(CLOSE_FAR_ALT)).toBe(0);
+    expect(closeness(CLOSE_FAR_ALT + 10)).toBe(0);
+    expect(closeness(CLOSE_NEAR_ALT)).toBe(1);
+    expect(closeness(CLOSE_NEAR_ALT - 5)).toBe(1);
+    expect(closeness((CLOSE_FAR_ALT + CLOSE_NEAR_ALT) / 2)).toBeCloseTo(0.5, 9);
   });
 });

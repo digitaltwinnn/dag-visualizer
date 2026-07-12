@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { Fragment, useState } from "react";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -24,10 +24,6 @@ export const ROLE_ORDER = ["l0", "cl1", "dl1"];
 // A node's roles, falling back to its primary layer when the role list is absent.
 export const rolesOf = (n: NodeInfo) => (n.roles && n.roles.length ? n.roles : [n.layer!]);
 
-// Shared "Ready" text treatment (plain, no chrome) — the structural green success token, not an
-// identity colour, so it's the one place we lean on a theme token instead of the exact legacy hex.
-const READY_CLS = "text-success font-semibold text-body";
-
 // The ONE identity dot every row list leads with (the filter picker's rows, the geo explorer's
 // node rows): a plain small disc in the subject's identity hue — flat fill, NO glow (the geo
 // rows' old `shadow-[0_0_5px_currentColor]` halo read much brighter than the picker's dots;
@@ -36,29 +32,36 @@ export function IdentityDot({ hue }: { hue: string }) {
   return <span className="w-2 h-2 rounded-full flex-none" style={{ background: hue }} aria-hidden />;
 }
 
-// Single node status — Ready reads as plain green text; any other state is a small pill in its
-// bucket colour, labelled with the exact stage. Colour = bucket (lane-clean), text = exact state.
-export function StatusMark({ state }: { state?: string | null }) {
-  const s = nodeStatus(state);
-  if (s.bucket === "ready") return <span className={READY_CLS}>{s.label}</span>;
+// The ONE status pill chrome (user, 2026-07-12 — unified: ready used to render as plain bold
+// green text while every other state got a pill, which read as an inconsistency next to the
+// dossier's breakdown). Quiet by construction: the state's bucket colour at soft tint alphas
+// (border 0x55, fill 0x1a), never a solid block — so even the green stays un-dominant.
+function StatusPill({ color, children }: { color: string; children: React.ReactNode }) {
   return (
     <Badge
       variant="outline"
       className="text-label font-semibold px-2 py-px rounded-full border"
-      style={{ color: s.color, borderColor: s.color + "55", background: s.color + "1a" }}
+      style={{ color, borderColor: color + "55", background: color + "1a" }}
     >
-      {s.label}
+      {children}
     </Badge>
   );
 }
 
-// Rolled-up status for a node group (dossier): the non-zero buckets as counts + colour dots
-// (`28 ready · 2 waiting · 1 syncing · 2 down`). Deliberately NO "all ready" special case
-// (user reversal — the green bold idiom dominated the card): ready is a count in the same
-// muted text as every other status, its green BULLET alone carrying the semantic. The amber
-// "progress" bucket is spelled out by its exact lifecycle state(s) — same wording a single
-// node's own card shows (`StatusMark`) — instead of collapsing to a bare "N in progress";
-// colour still comes from the bucket (BUCKET_COLOR), only the text goes granular.
+// Single node status — one pill in its bucket colour, labelled with the exact stage (no
+// ready special case). Colour = bucket (lane-clean), text = exact state.
+export function StatusMark({ state }: { state?: string | null }) {
+  const s = nodeStatus(state);
+  return <StatusPill color={s.color}>{s.label}</StatusPill>;
+}
+
+// Rolled-up status for a node group (dossier): the non-zero buckets as count PILLS in the
+// node card's exact StatusPill chrome (`21 ready` / `2 syncing` — user, 2026-07-12: pills
+// read cleaner than the old bullet+text items and align the two cards' status language).
+// The amber "progress" AND red "down" buckets are spelled out by their exact lifecycle
+// state(s) — the same wording the single node's own card shows (`StatusMark`; the dossier
+// said "down" while the node card said "leaving", user 2026-07-12) — instead of collapsing
+// to the bucket word; colour still comes from the bucket (BUCKET_COLOR).
 const BUCKET_WORD: Record<StatusBucket, string> = {
   ready: "ready",
   progress: "in progress",
@@ -68,43 +71,58 @@ const BUCKET_WORD: Record<StatusBucket, string> = {
 export function StatusBreakdown({ states }: { states: (string | null | undefined)[] }) {
   const b = statusBreakdown(states);
   const order: StatusBucket[] = ["ready", "progress", "down", "unknown"];
-  // EVERY status item carries its own colour bullet (in its bucket's colour) — the progress
-  // bucket spells out several stage words (syncing / joining / …), and rendering one dot per
-  // BUCKET left every stage after the first (e.g. "1 joining") bullet-less.
   const items = order
     .filter((k) => b[k] > 0)
     .flatMap((k) =>
-      k === "progress"
-        ? labelBreakdown(states, "progress").map((it) => ({ ...it, color: BUCKET_COLOR[k] }))
+      k === "progress" || k === "down"
+        ? labelBreakdown(states, k).map((it) => ({ ...it, color: BUCKET_COLOR[k] }))
         : [{ label: BUCKET_WORD[k], count: b[k], color: BUCKET_COLOR[k] }],
     );
   return (
-    <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
-      {items.map((it, i) => (
-        <span className="inline-flex items-center gap-[5px]" key={it.label}>
-          {i > 0 ? <span className="text-muted-foreground opacity-60"> · </span> : null}
-          <span className="w-[7px] h-[7px] rounded-full" style={{ background: it.color }} />
-          <span>
-            {it.count} {it.label}
-          </span>
+    <span className="inline-flex items-center flex-wrap justify-end gap-1">
+      {items.map((it) => (
+        <StatusPill key={it.label} color={it.color}>
+          {it.count} {it.label}
+        </StatusPill>
+      ))}
+    </span>
+  );
+}
+
+// Squared layer-code pills — the ONE rendering for layer codes wherever they appear (the
+// node card's subtitle, the dossier's composition rows). User, 2026-07-12: the joined
+// "L0·cL1" text read as one mushy token; separate squared pills scan as discrete units.
+// Taxonomy chrome, not identity — muted text on the faint wash, never hued.
+export function RoleChips({ codes }: { codes: string[] }) {
+  return (
+    <span className="inline-flex items-center gap-1">
+      {codes.map((c) => (
+        <span
+          key={c}
+          className="inline-flex items-center rounded-xs border border-border bg-wash-faint px-[5px] py-[2px] text-micro leading-none text-muted-foreground"
+        >
+          {c}
         </span>
       ))}
     </span>
   );
 }
 
-// One composition row per make-up: role (bright) + codes (muted) + a capped chip stack
+// One composition row per make-up: role (bright) + code pills + a capped chip stack
 // (visual scale only, ≤10, no +N) + the authoritative count. (A per-row status line lived
 // here briefly — reverted: it read too busy; the dossier shows ONE aggregate StatusBreakdown
-// as the composition block's attached footer instead.)
+// in its STATUS segment instead.)
 export function CompositionRows({ nodes }: { nodes: NodeInfo[] }) {
   const rows = compositionRows(nodes);
+  // ONE grid for the whole table (not per-row grids): the label column sizes to the WIDEST
+  // label, so the code-pill column starts at one consistent x on every row (user, 2026-07-12
+  // — per-row grids let each label push its own pills around).
   return (
-    <div className="flex flex-col gap-[7px] mt-2">
+    <div className="grid grid-cols-[auto_auto_1fr_auto] items-center gap-x-2 gap-y-[7px] mt-2">
       {rows.map((r, i) => (
-        <div className="grid grid-cols-[auto_auto_1fr_auto] items-center gap-2" key={i}>
+        <Fragment key={i}>
           <span className="text-body text-foreground">{r.label}</span>
-          <span className="text-label text-muted-foreground tabular-nums">{r.codes.join("·")}</span>
+          <RoleChips codes={r.codes} />
           {/* Chip stack = a miniature of the 3D node cloud: identity-hued discs that OVERLAP (like
               stacked avatars), each ringed in the panel colour so the overlap reads. Visual scale
               only (capped ≤10). Plain overlapping dots (no image/fallback content), so a bare
@@ -122,7 +140,7 @@ export function CompositionRows({ nodes }: { nodes: NodeInfo[] }) {
             ))}
           </span>
           <span className="text-body text-foreground tabular-nums min-w-[1.5em] text-right">{r.count}</span>
-        </div>
+        </Fragment>
       ))}
     </div>
   );
