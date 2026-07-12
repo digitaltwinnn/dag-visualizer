@@ -7,7 +7,7 @@ import { useStore } from "@/src/store/store";
 import CardHead from "@/components/CardHead";
 import { Card } from "@/components/ui/card";
 import { EXPLORE_ICON } from "@/components/icons";
-import { shortHash, CORE_HEX, metagraphById } from "@/src/data/network";
+import { CORE_HEX, metagraphById } from "@/src/data/network";
 import { compositionRows } from "@/src/data/composition";
 import { identityHudHex } from "@/src/palette/identity";
 import { IdentityDot, RoleChips } from "@/components/inspector/parts";
@@ -16,6 +16,7 @@ import { hoverKeyOf } from "@/src/data/hoverSubject";
 import { filterToggleActions, nodeSelectActions } from "@/src/engine/domain/pickActions";
 import { applyClickActions } from "@/src/store/applyClickActions";
 import { subjectPairing } from "@/components/useSubjectPairing";
+import { DisclosureRow, NodePickerRow } from "@/components/ExploreRows";
 import type { NodeRow } from "@/src/data/types";
 
 // Hypergraph's single **explore** card — the architectural sibling of GeoExplore: each view's
@@ -183,21 +184,13 @@ export default function HyperExplore() {
                                   vocabulary (Hybrid / Data / …) with the layer-code pills.
                                   A DISCLOSURE (chevron) on the way to a node, never a
                                   layer-card selector. */}
-                              <button
-                                type="button"
-                                className={cn(
-                                  "group/shell relative flex items-center gap-2 w-[calc(100%+6px)] py-[5px] pl-2 pr-2 my-px rounded-sm border border-transparent bg-transparent cursor-pointer text-left text-foreground-dim transition-colors duration-[140ms]",
-                                  "hover:bg-wash-hover hover:text-foreground",
-                                  "focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--primary)] focus-visible:outline-offset-[-2px]",
-                                )}
-                                aria-expanded={isOpen}
+                              <DisclosureRow
+                                open={isOpen}
+                                holdsSel={holdsSel}
                                 title={`${g.label} · ${g.rows.length} node${g.rows.length > 1 ? "s" : ""}`}
-                                onClick={() => setOpenComp(isOpen ? null : key)}
-                                // Hovering a group glows ALL its 3D instances (every member id).
-                                onMouseEnter={() =>
-                                  setHoverCohort(g.rows.map((r) => hoverKeyOf(r.pick)).filter((k): k is string => !!k))
-                                }
-                                onMouseLeave={() => setHoverCohort(null)}
+                                onToggle={() => setOpenComp(isOpen ? null : key)}
+                                onHoverEnter={() => setHoverCohort(g.rows.map((r) => hoverKeyOf(r.pick)).filter((k): k is string => !!k))}
+                                onHoverLeave={() => setHoverCohort(null)}
                               >
                                 <span className="inline-grid flex-none text-body text-foreground">
                                   <span className="col-start-1 row-start-1">{g.label}</span>
@@ -205,18 +198,7 @@ export default function HyperExplore() {
                                 </span>
                                 <RoleChips codes={g.codes} />
                                 <span className="ml-auto flex-none tabular-nums text-body font-semibold">{g.rows.length}</span>
-                                {holdsSel && !isOpen ? (
-                                  <SelectedRowMark className="flex-none" />
-                                ) : (
-                                  <ChevronRight
-                                    aria-hidden
-                                    className={cn(
-                                      "size-3.5 flex-none transition-transform duration-150 motion-reduce:transition-none text-muted-foreground opacity-0 group-hover/shell:opacity-100 group-focus-visible/shell:opacity-100 [@media(hover:none)]:opacity-100",
-                                      isOpen && "rotate-90 opacity-100",
-                                    )}
-                                  />
-                                )}
-                              </button>
+                              </DisclosureRow>
 
                               {isOpen && (
                                 <div className="mb-1 ml-[7px] pl-2 border-l border-border">
@@ -224,34 +206,15 @@ export default function HyperExplore() {
                                     const on =
                                       selIp != null &&
                                       "node" in r.pick && r.pick.node?.ip === selIp;
-                                    const hoverKey = hoverKeyOf(r.pick);
-                                    const rowHue = r.pick.kind === "metanode" && r.pick.meta ? identityHudHex(r.pick.meta.id) : CORE_HEX;
-                                    const rowPair = subjectPairing(hoverNodeId, hoverKey, setHoverNodeId, rowHue);
                                     return (
-                                      <button
+                                      <NodePickerRow
                                         key={(r.id ?? r.label) + i}
-                                        className={cn(
-                                          "nb-row relative flex items-center gap-2 w-full py-1 pl-2 pr-7 my-px rounded-sm border border-transparent bg-transparent cursor-pointer text-left text-foreground-dim transition-colors duration-[140ms]",
-                                          "hover:bg-wash-hover hover:text-foreground",
-                                          "focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--primary)] focus-visible:outline-offset-[-2px]",
-                                          on && SELECTED_ROW,
-                                          rowPair.paired && rowPair.className,
-                                        )}
-                                        style={rowPair.style}
-                                        title={`${r.label} · ${r.state ?? "—"}`}
-                                        onClick={() => selectNode(r.pick, on)}
-                                        onMouseEnter={rowPair.onMouseEnter}
-                                      >
-                                        {/* Just "node" + the mono id (user, 2026-07-12 — matches geo's
-                                            picker rows; the group label above carries the composition). */}
-                                        <span className="flex-1 min-w-0 flex items-baseline gap-1.5">
-                                          <span className="flex-none text-label">Node</span>
-                                          <span className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap font-mono tabular-nums text-label text-muted-foreground">
-                                            {r.id ? shortHash(r.id) : r.label}
-                                          </span>
-                                        </span>
-                                        {on && <SelectedRowMark className="absolute right-2" />}
-                                      </button>
+                                        row={r}
+                                        selected={on}
+                                        hoverNodeId={hoverNodeId}
+                                        setHoverNodeId={setHoverNodeId}
+                                        onSelect={() => selectNode(r.pick, on)}
+                                      />
                                     );
                                   })}
                                 </div>
