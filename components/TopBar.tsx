@@ -37,11 +37,18 @@ export default function TopBar() {
   const mode = useStore((s) => s.mode);
   const setMode = useStore((s) => s.setMode);
 
-  // The filter strip's open state — a plain controlled flag: the FILTER button toggles it,
-  // Escape closes it (picking a chip deliberately does NOT — see the strip note below).
-  const [open, setOpen] = useState(false);
+  // The filter strip's open state — EXPANDED BY DEFAULT (user, 2026-07-12): it's a persistent
+  // part of the bar, not a popup. The FILTER button toggles it, Escape closes it (picking a
+  // chip deliberately does NOT — see the strip note below). SSR/first paint assume desktop, so
+  // `true` is right there; on phone there's no room for a persistent strip, so it closes once
+  // the breakpoint resolves (the user can still open it manually — the effect only fires on a
+  // bp CHANGE, so a manual phone-open sticks).
+  const [open, setOpen] = useState(true);
 
   const bp = useBreakpoint();
+  useEffect(() => {
+    if (bp === "phone") setOpen(false);
+  }, [bp]);
   // PHONE: whether the bar's vitals ROW is expanded (the bar grows downward — see below).
   // Store-held (session) because it's a user choice that persists across view switches.
   const phoneVitals = useStore((s) => s.phoneVitals);
