@@ -57,10 +57,12 @@ const _LEDGER_M = new THREE.Matrix4()
 
 // Ledger honeycomb pitches, in the spread's PRE-viewScale units (the spread offsets get
 // multiplied by viewScale; the chip's world footprint/height do not). Cell pitch = the chip
-// diameter (hyperSize 0.55/0.52 × LEDGER.dot) + 12% air; level pitch = the chip height + air.
+// diameter (hyperSize 0.55/0.52 × LEDGER.dot) + 12% air; level pitch = GEO'S EXACT stack
+// pitch (CHIP_PITCH = HEX_H + clear air — user, 2026-07-12: the tighter 1.35×HEX_H read as
+// fused towers; the chambers' stacks now breathe like the globe's).
 const LEDGER_CELL_V = (2 * 0.55 * LEDGER.dot * 1.12) / LEDGER.viewScale;
 const LEDGER_CELL_M = (2 * 0.52 * LEDGER.dot * 1.12) / LEDGER.viewScale;
-const LEDGER_LVL = (HEX_H * 1.35) / LEDGER.viewScale;
+const LEDGER_LVL = CHIP_PITCH / LEDGER.viewScale;
 
 // null = idle spin; a focus state = ease-in-out to a focus orientation (y = longitude swing, x =
 // latitude tilt so high-lat nodes come into view).
@@ -235,7 +237,9 @@ export class Globe implements GeoViewHost {
         // but offset on +Z (dagLaneZ), beside the central column.
         // Honeycomb + stacks (units are pre-viewScale — the world chip sizes divide by it;
         // lsp.y lifts a chip per stack LEVEL once the dial's cells fill up).
-        const lsp = ledgerSpread(i, n, LEDGER.dagCell, LEDGER_CELL_V, LEDGER_LVL);
+        // SAME footprint rule as the metagraph clusters (one dial size in design and code,
+      // user 2026-07-12) — the bigger DAG fleets simply stack higher inside it.
+      const lsp = ledgerSpread(i, n, clusterRadius(n) * 0.85, LEDGER_CELL_V, LEDGER_LVL);
         const ledgerPos = (
           role === "l0"
             ? new THREE.Vector3(lsp.x, LEDGER.rowHypL0 + lsp.y, lsp.z)

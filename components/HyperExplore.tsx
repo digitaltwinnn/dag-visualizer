@@ -245,7 +245,7 @@ export default function HyperExplore() {
                                         {/* Just "node" + the mono id (user, 2026-07-12 — matches geo's
                                             picker rows; the group label above carries the composition). */}
                                         <span className="flex-1 min-w-0 flex items-baseline gap-1.5">
-                                          <span className="flex-none text-label">node</span>
+                                          <span className="flex-none text-label">Node</span>
                                           <span className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap font-mono tabular-nums text-label text-muted-foreground">
                                             {r.id ? shortHash(r.id) : r.label}
                                           </span>

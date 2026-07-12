@@ -29,7 +29,7 @@
 
 import * as THREE from "three";
 import { METAGRAPHS } from "../../config";
-import { LEDGER, HYP_SPLIT, LAYER_GEOM, ledgerSite, DIAL_R, DIAL_R_GLOBAL } from "../../domain/ledgerLayout";
+import { LEDGER, HYP_SPLIT, LAYER_GEOM, ledgerSite, DIAL_R } from "../../domain/ledgerLayout";
 import type { SceneColors } from "../../sceneColors";
 import { LedgerModel, SLOT_SP, slotFade, curvePoint } from "../../domain/ledgerModel";
 import type { GlobalSnapshot, Anchor, PickDescriptor } from "@/src/data/types";
@@ -243,10 +243,10 @@ export class LedgerView {
     // model): hypergraph L0 (lights as anchor pulses reach that floor) + the DAG L1 lane's cluster.
     const dagHue = this.sceneColors["dag"] ?? this._core; // the DAG's identity hue — matches its node instances
     this._gL0Ring = this._makeDial(0, LEDGER.rowHypL0, 0, dagHue);
-    this._gL0Ring.scale.setScalar(DIAL_R_GLOBAL);
+    this._gL0Ring.scale.setScalar(DIAL_R);
     this.group.add(this._gL0Ring);
     this._dagL1Ring = this._makeDial(0, LEDGER.rowDAGL1, LEDGER.dagLaneZ, dagHue);
-    this._dagL1Ring.scale.setScalar(DIAL_R_GLOBAL);
+    this._dagL1Ring.scale.setScalar(DIAL_R);
     this.group.add(this._dagL1Ring);
   }
 
@@ -332,7 +332,7 @@ export class LedgerView {
     // they stay a subtle hint of a layer (not a wall) — the black background still reads through.
     const W = 39.5;      // X extent (camera-depth) — tight to the trail; the FRONT gets a 1.5-unit
                          // strip beyond the original edge: enough that the corner labels clear the
-                         // global clusters' dials (DIAL_R_GLOBAL reaches x≈4.2; label band ~5.0–6.1)
+                         // global clusters' dials (ONE DIAL_R everywhere since 2026-07-12; label band clears it)
                          // without the panes reading empty at the front (user-tuned down from +3)
     const D = 44;        // Z extent — tight to the lanes
     const cx = -13.25;   // keeps the −X edge at −33 (still clears the trail ~−29) while the +X
@@ -576,7 +576,7 @@ export class LedgerView {
   }
 
   // A station DIAL lying flat on a floor, sharing the unit `_dialGeo` (scaled to its FIXED radius —
-  // one size for every metagraph, DIAL_R; the global clusters use DIAL_R_GLOBAL). Identity-hued,
+  // one size for EVERY cluster incl. the global L0 / DAG L1, DIAL_R). Identity-hued,
   // faint at rest (DIAL_REST_OP); the anchor-pulse glow brightens it on top (see update).
   private _makeDial(x: number, y: number, z: number, color: number): THREE.LineSegments {
     const dial = new THREE.LineSegments(

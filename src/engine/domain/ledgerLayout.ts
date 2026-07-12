@@ -40,7 +40,6 @@ export const LEDGER = {
   // from this lane into the global snapshot.
   rowDAGL1: -4.25,  // == rowHypL0 (shares the hypergraph-L0 level; its own −Z third of that plane)
   dagLaneZ: -14.7,  // −Z centre of the reserved 1/3 (−depth/2 + depth/6) — where the DAG-L1 cluster sits
-  dagCell: 3.4,     // spread radius for the DAG node discs (global L0 + DAG L1) — sized to the bigger dots
   dot: 0.55,        // node-sphere scale in this view — uniform for EVERY cluster (a 3-node metagraph's
                     // dot = a global-L0 dot; small groups get presence from the station DIAL, not dot size)
   // Whole-view ORIENTATION applied to the ledger so it frames well under the SHARED overview camera
@@ -105,10 +104,10 @@ export function clusterRadius(count: number): number {
 // resting identity mark; the ledger's analog of the hypergraph hubs). Sized so neighbouring
 // lanes' dials keep clear spacing even with the tick tips (the dial geometry's ticks reach
 // 1.2× its radius): 2 × 0.38 × 1.2 = 0.912 of the lane gap, leaving ~9% air between dials.
-// The global L0 / DAG L1 clusters use their own larger constant (they are the "core", not a
-// lane): DIAL_R_GLOBAL fits the dagCell cloud.
+// The global L0 / DAG L1 clusters use the SAME dial (user, 2026-07-12 — one size in
+// design and code; with the honeycomb-stack spread their bigger fleets simply stack HIGHER
+// inside the same footprint; the old larger DIAL_R_GLOBAL + its dagCell disc are gone).
 export const DIAL_R = ((LEDGER.depth * LANE_SPREAD) / Math.max(1, METAGRAPHS.length - 1)) * 0.38;
-export const DIAL_R_GLOBAL = LEDGER.dagCell + 0.8;
 
 // Deterministic HONEYCOMB + STACK spread for a node cluster (user, 2026-07-12 — the old
 // golden-angle disc overlapped chips once a cluster outgrew its dial; this is geo's chip-stack

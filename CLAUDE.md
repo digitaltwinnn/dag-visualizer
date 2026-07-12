@@ -545,10 +545,16 @@ and keep changing, so they're examples, not the contract.
   the rail columns (26px) on desktop. Three regions on one row: **status + filter** (left —
   the ECG heartbeat mark + "DAG Visualizer", then the filter button whose face is a small
   identity dot + network name — on the condensed breakpoints the "FILTER" text label simply
-  hides (a stand-in funnel icon was tried and rejected as too busy); clicking opens the
-  **detached filter popover** — a stock Radix
-  `Popover` 6px below the button hosting the shadcn `Command` picker; the detached popover is
-  the *intentional* design, an anchored bar-expansion variant was tried and rejected), the
+  hides (a stand-in funnel icon was tried and rejected as too busy); clicking toggles the
+  **attached FILTER STRIP** — the bar GROWS DOWNWARD by one row of network chips on its own
+  surface (identity dot + name + located count, sorted located-desc, 0-located dimmed with a
+  bare 0; the committed chip wears the view switch's SELECTED_ROW on-state, no ✓). User
+  reversal 2026-07-12 of the 2026-07-04 detached-popover decision: hovering chips previews
+  the dim while the SCENE reacts in the open (the popover glass covered it); picking keeps
+  the strip OPEN (browsing several networks is the point) — the button/Escape close it. The
+  strip is a LAYOUT participant, not a popup: TopBar publishes its rendered height as
+  `--topbar-extra` (ResizeObserver) and both rails add it to their `top` (globals.css), so
+  the grown bar pushes the layout down instead of overlapping the cards), the
   **view switch** (center — a `ToggleGroup` of six monochrome lucide icons: `Orbit` hyper /
   `Globe` geo / `Layers` ledger / `Radar` status / `ArrowLeftRight` transactions / `HandCoins`
   staking, from `VIEW_ICONS`), and the
@@ -1032,7 +1038,8 @@ event, `ledger.update(dt)` per frame).
   gives a 3-node metagraph the same footprint as a big one; **visible at rest** at
   `DIAL_REST_OP`, brightened + slightly scaled while an anchor pulse passes; the global L0 +
   DAG L1 clusters wear the same dial in the DAG's identity hue (`sceneColors["dag"]` — matching
-  the node instances inside them) at `DIAL_R_GLOBAL`; `_gL0Ring` additionally glows via
+  the node instances inside them) at the SAME `DIAL_R` (one dial size in design and code,
+  user 2026-07-12 — their bigger fleets just stack higher); `_gL0Ring` additionally glows via
   `_gL0Glow` when a pulse reaches that floor. **Every ledger colour resolves through the ONE
   identity system** — the identity SCENE map is a required LedgerView ctor arg (like HyperView)
   and `setSceneColors()` re-tints on live refresh; nothing falls back to a raw
@@ -1058,7 +1065,8 @@ event, `ledger.update(dt)` per frame).
   dims (`leadDimmed`) while an older snapshot is selected. Selection comes from the LiveStrip:
   the Engine forwards `hoverSnapOrd ?? snap.data.ordinal` to `ledger.setSelected(ordinal)`; the
   ledger maps ordinal → slot each tick (`_recomputeSelectedSlot`). The DAG node-cluster spread
-  is `LEDGER.dagCell`.
+  follows the same `clusterRadius`-capped honeycomb footprint as every lane (the old
+  `LEDGER.dagCell` disc is gone).
 - **Metagraph filter dims the OTHER lanes** (`ledger.setFilter`, wired alongside
   `globe.setFilter`): the selected lane keeps full colour; other metagraphs' tiles/links/dials
   are strongly dimmed (×0.22) and their nodes too (the morph-ramped `_dimScale` is too weak in

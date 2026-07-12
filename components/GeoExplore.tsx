@@ -340,7 +340,7 @@ export default function GeoExplore() {
                                           composition word was dropped: the node card carries
                                           the role detail; the row is a pure picker). */}
                                       <span className="flex-1 min-w-0 flex items-baseline gap-1.5">
-                                        <span className="flex-none text-label">node</span>
+                                        <span className="flex-none text-label">Node</span>
                                         <span className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap font-mono tabular-nums text-label text-muted-foreground">
                                           {r.id ? shortHash(r.id) : r.label}
                                         </span>
