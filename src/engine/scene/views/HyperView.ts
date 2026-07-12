@@ -119,8 +119,9 @@ export class HyperView {
     };
     this.coreGroup.add(this.core);
 
-    // The core lives directly in the scene (not under `root`), so the morph's
-    // root-collapse doesn't shrink it — instead it grows into the globe in update().
+    // The core lives directly in the scene (not under `root`), so the morph's root-collapse
+    // doesn't shrink it — instead it dissolves in place (coreReveal) in update() while the globe
+    // fades in on its own (the old grow-into-globe swell was removed).
     this.scene.add(this.coreGroup);
     this.pickables.push(this.core);
   }
