@@ -357,7 +357,9 @@ export class NodeFabric {
     // A hovered/selected node dims the rest so it stands out — same in both views.
     const focusId = c.hoverNodeId || c.selectedNodeId || c.hoverCohort;
     const dimOthersOnFocus = c.filter === "all" || c.filter === "dag";
-    const focusDim = 0.45;
+    // Per-view hover/selection dim (user): how far the OTHER nodes drop when one node is the
+    // focus. Softer in geo (the rest stay brighter), a notch stronger in ledger, hyper unchanged.
+    const focusDim = c.ledger ? 0.55 : 0.45 + 0.20 * m; // hyper 0.45 · geo 0.65 · ledger 0.55
     for (const u of records) {
       let d = dim * dimScaleV;
       const geoCc = geoCcOf(u.pick);
@@ -410,7 +412,9 @@ export class NodeFabric {
     const cf = c.countryFilter, cmix = c.countryMix;
     const focusId = c.hoverNodeId || c.selectedNodeId || c.hoverCohort;
     const dimOthersOnFocus = c.filter === "all" || c.filter === "dag";
-    const focusDim = 0.45;
+    // Per-view hover/selection dim (user): how far the OTHER nodes drop when one node is the
+    // focus. Softer in geo (the rest stay brighter), a notch stronger in ledger, hyper unchanged.
+    const focusDim = c.ledger ? 0.55 : 0.45 + 0.20 * m; // hyper 0.45 · geo 0.65 · ledger 0.55
     for (const r of records) {
       r.dim += (r.dimTarget - r.dim) * kk;
       // effective dim = network dim (subtle in hyper via dimScaleV), raised by the country dim when
