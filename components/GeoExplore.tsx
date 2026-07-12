@@ -149,7 +149,7 @@ export default function GeoExplore() {
             the card holds, not just the click. */}
         {!quietEmpty && (
           <div className="pt-2 px-4 pb-1 text-label text-muted-foreground">
-            Every country hosting nodes of the selection — click one to drill in.
+            Every country hosting nodes — hover or click one to see how the network is geographically distributed.
           </div>
         )}
         {quietEmpty ? (

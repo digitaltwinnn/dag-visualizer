@@ -1,6 +1,6 @@
 "use client";
 
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import type { PickDescriptor } from "@/src/data/types";
 import { useStore } from "@/src/store/store";
 import CardHead from "@/components/CardHead";
@@ -59,6 +59,11 @@ export default function InspectorCard({
   // card shares (label: CardHead's "Clear selection" default; no per-card variants).
   onClose?: () => void;
 }) {
+  // Right cards are COLLAPSIBLE too (user, 2026-07-12 — the left rail's tool cards already
+  // were): the +/− ghost rides beside the ×, collapsing to eyebrow + title (no hairline, no
+  // body). Local state per slot — it survives subject changes within the slot on purpose (a
+  // reader who parked the dossier collapsed wants it to STAY parked across filter switches).
+  const [collapsed, setCollapsed] = useState(false);
   // NO SIGNAL — the explorer feed is unreachable: SnapshotCard swaps to its own "no signal" body,
   // and the frame's eyebrow dims along with it (carried forward from `.no-signal .insp-eyebrow`).
   const live = useStore((s) => s.live);
@@ -81,12 +86,14 @@ export default function InspectorCard({
         eyebrow={eyebrow}
         title={head.title}
         titleKey={head.titleKey}
-        subtitle={head.subtitle}
+        subtitle={collapsed ? undefined : head.subtitle}
         aside={head.aside ?? (site ? <MetaSiteAction site={site} /> : undefined)}
         onClose={onClose}
+        collapsed={collapsed}
+        onToggle={() => setCollapsed((c) => !c)}
         eyebrowMuted={eyebrowMuted}
       />
-      <CardBody p={p} />
+      {!collapsed && <CardBody p={p} />}
     </>
   );
 }

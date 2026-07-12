@@ -99,7 +99,7 @@ export default function HyperExplore() {
         <div className={cn("flex flex-col", collapsed && "hidden")}>
           {/* The usage hint LEADS the card (matches GeoExplore) — what it holds + the click. */}
           <div className="pt-2 px-4 pb-1 text-label text-muted-foreground">
-            Every network on the hypergraph — click one to drill into its layers.
+            Every network on the hypergraph — hover or click one to see how it is composed of different nodes.
           </div>
           <div className="pt-1.5 px-[14px] pb-2">
             {/* Sorted by fleet size (user, 2026-07-12) — the biggest networks lead. */}

@@ -671,15 +671,6 @@ export class Engine {
       }
       return pick;
     }
-    // PROXIMITY assist (policy-gated — ledger): the chamber's coins are edge-on slivers, so a
-    // raw raycast needs pixel-perfect aim. With no content hit, the nearest live node within
-    // the assist radius of the ray still picks — it beats the plane fallback (a small subject
-    // near the cursor is clearly the intent; empty pane areas still pick the layer).
-    const assist = VIEW_POLICIES[this.mode].nodePickAssist;
-    if (assist != null) {
-      const near = this.globe.pickNodeNearRay(this.raycaster.ray, assist);
-      if (near && pickActive(near, this.mode, this.filter, this._activeMetaIds)) return near;
-    }
     return layerFallback;
   }
 

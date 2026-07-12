@@ -54,11 +54,6 @@ export interface ViewPolicy {
   // card? geo (Nodes by country) + hyper (Nodes by layer); elsewhere the list empties so the
   // browsers stay quiet.
   nodeList: boolean;
-  // Proximity pick assist radius (world units, null = off): when the ray hits no geometry,
-  // the nearest live node instance within this distance of the ray still picks. Ledger only —
-  // its coins are edge-on slivers from the chamber camera, so a raw raycast needs
-  // pixel-perfect aim (user, 2026-07-12: nodes must be hover/clickable in the chamber too).
-  nodePickAssist: number | null;
 }
 
 // A flat placeholder view (status / transactions / staking): the canvas is hidden and the view
@@ -74,7 +69,6 @@ const FLAT: ViewPolicy = {
   minCamDist: 12,
   minCamAlt: null,
   nodeList: false,
-  nodePickAssist: null,
 };
 
 export const VIEW_POLICIES: Record<Mode, ViewPolicy> = {
@@ -91,8 +85,7 @@ export const VIEW_POLICIES: Record<Mode, ViewPolicy> = {
     minCamDist: 12,
     minCamAlt: null,
     nodeList: true,
-    nodePickAssist: null,
-  },
+    },
   // Footprint: the holographic globe + travelling packets; picks the globe nodes only.
   geo: {
     canvas: true,
@@ -105,8 +98,7 @@ export const VIEW_POLICIES: Record<Mode, ViewPolicy> = {
     minCamDist: 12,
     minCamAlt: 18, // above the land plateau (R 16 + LAND_H 1.0) + chip stacks — no zooming inside
     nodeList: true,
-    nodePickAssist: null,
-  },
+    },
   // Snapshots: the settlement chamber. Morph frozen (nodes fly into lanes); picks the centred
   // snapshot + the reused producer dots. (The ledger-specific depth-fog recency treatment was
   // removed — the shared scene fog applies everywhere.)
@@ -121,7 +113,6 @@ export const VIEW_POLICIES: Record<Mode, ViewPolicy> = {
     minCamDist: 12,
     minCamAlt: null,
     nodeList: false,
-    nodePickAssist: 2.5, // forgiving but local (chamber units are small on screen) — the dial area picks coins, open pane still picks the layer
   },
   status: FLAT,
   transactions: FLAT,

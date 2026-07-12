@@ -6,7 +6,7 @@ import { metagraphById, filterAccent } from "@/src/data/network";
 import Sparkline from "@/components/Sparkline";
 import Odometer from "@/components/Odometer";
 import { NoSignalDot } from "@/components/state/StateAtoms";
-import { rolesOf } from "@/components/inspector/parts";
+import { compositionRows } from "@/src/data/composition";
 import { useBreakpoint } from "@/components/useBreakpoint";
 import { cn } from "@/lib/utils";
 import type { NodeInfo } from "@/src/data/types";
@@ -38,38 +38,39 @@ function Vital({ label, value, spark }: { label: string; value: React.ReactNode;
   );
 }
 
-// Hypergraph vitals — the network's **structure** (who/what), filter-aware: how many nodes
-// serve each layer (L0 / currency-L1 / data-L1) for the current selection. One node taxonomy
-// for the whole network — a hybrid node counts in every layer it runs, the DAG's own L0/L1
-// fold into L0/cL1 like any other network. All → the whole network; L0/L1 → that shell (0
-// elsewhere); a metagraph → its own nodes. Structure, not activity (that's the Ledger view).
+// Hypergraph vitals — the network's **structure** (who/what), filter-aware: how many MACHINES
+// of each composition make up the current selection (user, 2026-07-12 — replaced the per-layer
+// L0/cL1/dL1 role counts: the composition vocabulary is what the hyper explorer + the dossier
+// table speak, so the vitals now agree with them). Cluster entries are deduped to machines
+// first (a hybrid appears once per cluster it runs), then counted by their composition label
+// (src/data/composition). NB "Consensus" (dedicated-L0) machines — the DAG core has some —
+// have no column (user picked the three); they're visible in the dossier/explorer breakdowns.
+// Filtered: an em-dash for a composition the selection doesn't have (stable columns, no reflow).
 function HyperVitals() {
   const filter = useStore((s) => s.filter);
   const metaList = useStore((s) => s.metaList);
   const cfg = metagraphById(filter);
 
-  const c = { l0: 0, cl1: 0, dl1: 0 };
-  const runs = { l0: false, cl1: false, dl1: false };
-  const add = (nodes: NodeInfo[]) => {
-    for (const n of nodes) {
-      const roles = rolesOf(n);
-      if (roles.includes("l0")) { c.l0++; runs.l0 = true; }
-      if (roles.includes("cl1")) { c.cl1++; runs.cl1 = true; }
-      if (roles.includes("dl1")) { c.dl1++; runs.dl1 = true; }
-    }
-  };
+  const counts: Record<string, number> = { Data: 0, Hybrid: 0, Currency: 0 };
   const cores = cfg ? metaList.filter((m) => m.id === cfg.id) : metaList;
-  for (const mg of cores) add(mg.nodes);
+  for (const mg of cores) {
+    const machines = new Map<string, NodeInfo>();
+    for (const n of mg.nodes) {
+      const k = n.ip || JSON.stringify(n);
+      if (!machines.has(k)) machines.set(k, n);
+    }
+    for (const row of compositionRows([...machines.values()]))
+      if (row.label in counts) counts[row.label]! += row.count;
+  }
 
-  // Filtered: an em-dash for a layer this metagraph doesn't run (stable 3 columns, no reflow).
-  const cell = (n: number, runsLayer: boolean) =>
-    cfg && !runsLayer ? <span className="text-muted-foreground italic opacity-60">—</span> : <Odometer int value={n} />;
+  const cell = (n: number) =>
+    cfg && n === 0 ? <span className="text-muted-foreground italic opacity-60">—</span> : <Odometer int value={n} />;
 
   return (
     <>
-      <Vital label="L0" value={cell(c.l0, runs.l0)} />
-      <Vital label="cL1" value={cell(c.cl1, runs.cl1)} />
-      <Vital label="dL1" value={cell(c.dl1, runs.dl1)} />
+      <Vital label="Data" value={cell(counts.Data!)} />
+      <Vital label="Hybrid" value={cell(counts.Hybrid!)} />
+      <Vital label="Currency" value={cell(counts.Currency!)} />
     </>
   );
 }

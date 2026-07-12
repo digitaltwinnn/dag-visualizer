@@ -21,10 +21,6 @@ import type { MetaNodeRecord, ValidatorRecord } from "../../domain/records";
 import type { PickDescriptor } from "@/src/data/types";
 
 const Y_AXIS = new THREE.Vector3(0, 1, 0); // hex-prism axis (radial after _qRadial)
-// Ledger (Snapshots) nodes are flat COINS lying on their floor plane: the sphere instance squashed
-// on Y. A zero-thickness circle was tried and foreshortens to an invisible sliver at the view's
-// shallow overview camera; the coin reads as a circle from above yet stays visible edge-on.
-const COIN_H = 0.22;
 // The geo hex prisms' resting opacity — slightly glassy (user: replaces the wireframe overlay,
 // which never read as clean edges). Depth-write stays ON so stacks occlude normally.
 const HEX_ALPHA = 0.8;
@@ -35,7 +31,6 @@ const _geoVec = new THREE.Vector3(); // scratch for the morph-fly interpolation
 const _qSpin = new THREE.Quaternion();   // hypergraph tumble
 const _qRadial = new THREE.Quaternion(); // outward-facing (globe) orientation
 const _col = new THREE.Color();          // scratch colour for dim recolouring
-const _m4 = new THREE.Matrix4();         // scratch instance matrix (proximity pick)
 
 // A pick's optional geo country code (only l0/l1/metanode descriptors carry geo).
 const geoCcOf = (pick: PickDescriptor): string | null =>
@@ -101,8 +96,8 @@ export class NodeFabric {
   // chip's silhouette catches light and the stack gaps read as dark seams between lit chips.
   // Coefficients keep the AVERAGE energy near the old flat value so filter/hover dims and the
   // bloom threshold behave unchanged. Glintier surface (roughness .3, metalness .35) so the
-  // flat-shaded facets vary under the key light. Spheres (hyper) + coins (ledger) keep the
-  // original flat emissive.
+  // flat-shaded facets vary under the key light. Spheres (hyper) keep the original flat
+  // emissive; the ledger's standing chips are hex instances, so they share the edge-lit look.
   private _makeNodeMaterial(flat = false, alpha = 1): THREE.MeshStandardMaterial {
     const mat = new THREE.MeshStandardMaterial({
       color: 0xffffff,
@@ -258,41 +253,12 @@ export class NodeFabric {
   pickablesFor(w: number, ledger: boolean): THREE.Object3D[] {
     const arr = this.pickables;
     arr.length = 0;
-    // Hyper + ledger pick the sphere instances (ledger's coins ARE spheres); geo picks the hex
-    // prisms once the landing cross-fade has mostly completed.
-    if (this.instSphere) arr.push(ledger || w < 0.5 ? this.instSphere : this.instHex!);
-    const mp = !ledger && w >= 0.5 ? this.metaHex : this.metaSphere;
+    // Hyper picks the sphere instances; geo (once the landing cross-fade has mostly
+    // completed) AND ledger pick the chips (ledger's nodes ARE standing chips now).
+    if (this.instSphere) arr.push(!ledger && w < 0.5 ? this.instSphere : this.instHex!);
+    const mp = ledger || w >= 0.5 ? this.metaHex : this.metaSphere;
     if (mp) arr.push(mp);
     return arr;
-  }
-
-  // PROXIMITY node pick (user, 2026-07-12 — ledger): the chamber's coins are the sphere
-  // instances squashed to slivers, nearly edge-on from the ledger camera — a raw raycast
-  // needs pixel-perfect aim, so nodes were effectively un-hoverable there. When the ray hits
-  // no geometry, the Engine asks for the nearest LIVE node instance within `maxDist` world
-  // units of the ray (the same assist idea as the analytic country resolve). Event-frequency
-  // only (pointer move/click), scratch-only math — never on the render loop.
-  pickNodeNearRay(ray: THREE.Ray, maxDist: number): PickDescriptor | null {
-    let best: PickDescriptor | null = null;
-    let bestD = maxDist;
-    for (const mesh of [this.instSphere, this.metaSphere]) {
-      if (!mesh || !mesh.visible) continue;
-      const picks = mesh.userData.picks as PickDescriptor[] | undefined;
-      if (!picks) continue;
-      for (let i = 0; i < mesh.count; i++) {
-        mesh.getMatrixAt(i, _m4);
-        const e = _m4.elements;
-        // Zero-scaled slot = a hidden node this frame (column-0 length ~0) — not a target.
-        if (e[0] * e[0] + e[1] * e[1] + e[2] * e[2] < 1e-8) continue;
-        _vec.set(e[12], e[13], e[14]).applyMatrix4(mesh.matrixWorld);
-        const d = ray.distanceToPoint(_vec);
-        if (d < bestD && picks[i]) {
-          bestD = d;
-          best = picks[i];
-        }
-      }
-    }
-    return best;
   }
 
   // -------------------------------------------------- setMorph loop: validator matrices
@@ -308,8 +274,11 @@ export class NodeFabric {
     // arrived at the globe surface.
     const w = smooth(THREE.MathUtils.clamp((m - 0.82) / 0.16, 0, 1)); // sphere → chip squash phase
     for (const u of records) {
-      // Snapshots (ledger) view: hard-place as flat COINS lying on the floor planes (see COIN_H).
-      // DAG cl1 nodes drop into the DAG-L1 row.
+      // Snapshots (ledger) view: hard-place as standing CHIPS on the floor planes (the same
+      // cylinder geometry as geo, HEX_H tall — user 2026-07-12: the old squashed-sphere COIN
+      // was an edge-on sliver the raycaster could barely hit; the chip's top cap + sides are
+      // a real target, so the ledger needs no pick assist). DAG cl1 nodes drop into the
+      // DAG-L1 row.
       if (c.ledger) {
         if (u.ledgerHide) {
           _dummy.scale.setScalar(0);
@@ -318,15 +287,15 @@ export class NodeFabric {
           else _vec.copy(u.hyperDir).lerp(u.geoDir!, e).normalize().multiplyScalar(lerp(u.hyperRadius, u.geoRadius, e));
           const showL = 1 - dim * dimScaleV;
           _dummy.position.copy(_vec).lerp(u.ledgerPos, ledgerT);
-          _dummy.quaternion.identity(); // flat on the floor — no tumble
+          _dummy.quaternion.identity(); // standing on the floor — cylinder axis is +Y
           const sL = u.hyperSize * LEDGER.dot * showL;
-          _dummy.scale.set(sL, sL * COIN_H, sL);
+          _dummy.scale.set(sL, HEX_H * showL, sL);
         }
         _dummy.updateMatrix();
-        this.instSphere.setMatrixAt(u.index, _dummy.matrix);
+        this.instHex.setMatrixAt(u.index, _dummy.matrix);
         _dummy.scale.setScalar(0);
         _dummy.updateMatrix();
-        this.instHex.setMatrixAt(u.index, _dummy.matrix);
+        this.instSphere.setMatrixAt(u.index, _dummy.matrix);
         continue;
       }
       // Shared position: fly from the fibonacci shell to the globe surface.
@@ -366,8 +335,8 @@ export class NodeFabric {
     }
     this.instSphere.instanceMatrix.needsUpdate = true;
     this.instHex.instanceMatrix.needsUpdate = true;
-    this.instSphere.visible = w < 0.999 || c.ledger; // ledger's coins are sphere instances
-    this.instHex.visible = w > 0.001 && !c.ledger;
+    this.instSphere.visible = w < 0.999 && !c.ledger;
+    this.instHex.visible = w > 0.001 || c.ledger; // ledger's chips are hex/cylinder instances
     return this.pickablesFor(w, c.ledger);
   }
 
@@ -481,16 +450,17 @@ export class NodeFabric {
 
       _dummy.position.copy(_geoVec);
       if (c.ledger) {
-        // Ledger: a flat COIN lying on the floor plane (see COIN_H) — same size rule as the
-        // validators (uniform dot for every cluster). Filtered-out nodes shrink out (1 - dEff).
-        _dummy.quaternion.identity(); // flat on the floor — no tumble
+        // Ledger: a standing CHIP on the floor plane (the geo cylinder, HEX_H tall — see the
+        // validator loop) — same size rule as the validators (uniform dot for every cluster).
+        // Filtered-out nodes shrink out (1 - dEff).
+        _dummy.quaternion.identity(); // standing on the floor — cylinder axis is +Y
         const sL = r.hyperSize * LEDGER.dot * (1 - dEff);
-        _dummy.scale.set(sL, sL * COIN_H, sL);
-        _dummy.updateMatrix();
-        this.metaSphere.setMatrixAt(r.index, _dummy.matrix);
-        _dummy.scale.setScalar(0);
+        _dummy.scale.set(sL, HEX_H * (1 - dEff), sL);
         _dummy.updateMatrix();
         this.metaHex.setMatrixAt(r.index, _dummy.matrix);
+        _dummy.scale.setScalar(0);
+        _dummy.updateMatrix();
+        this.metaSphere.setMatrixAt(r.index, _dummy.matrix);
         continue;
       }
 
@@ -514,8 +484,8 @@ export class NodeFabric {
     }
     this.metaSphere.instanceMatrix.needsUpdate = true;
     this.metaHex.instanceMatrix.needsUpdate = true;
-    this.metaSphere.visible = w < 0.999 || c.ledger; // ledger's coins are sphere instances
-    this.metaHex.visible = w > 0.001 && !c.ledger;
+    this.metaSphere.visible = w < 0.999 && !c.ledger;
+    this.metaHex.visible = w > 0.001 || c.ledger; // ledger's chips are hex/cylinder instances
     this.metaAESphere.needsUpdate = true;
     this.metaAEHex.needsUpdate = true;
     (this.metaSphere.geometry.getAttribute("aBase") as THREE.InstancedBufferAttribute).needsUpdate = true;

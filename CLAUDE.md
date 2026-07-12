@@ -234,10 +234,7 @@ store-value imports**, enforced by `layerBoundaries.test.ts`). Each ships coloca
   (geo also sets `minCamAlt: 18` — a camera-ALTITUDE floor the Engine enforces after each controls
   update, because the orbit target is off-centre in geo so the stock target-distance clamp alone
   is inconsistent around the globe) / `nodeList` (which views publish `store.selNodes` for
-  their explorer node browsers — hyper + geo) / `nodePickAssist` (world-units radius, ledger
-  only: the chamber's coins are edge-on slivers, so when the ray hits no content the nearest
-  live node instance within the radius still picks — `NodeFabric.pickNodeNearRay`, beating
-  the layer-plane fallback; nodes are hover/clickable in the chamber, user 2026-07-12), as
+  their explorer node browsers — hyper + geo), as
   DATA. The single source of truth for what each view turns on (see *Per-view behaviour*).
 - `morph.ts` — the hyper↔geo morph easing + derived visibility ramps.
 - `nodeLayout.ts` — the node placement math: fibonacci shells around the core/hubs, the
@@ -402,8 +399,10 @@ views and caused the ledger red-dots bug; that pattern is forbidden.
   radius = `geoSize`, height `geoLayout.HEX_H`, slightly glassy `HEX_ALPHA 0.8` — a wireframe
   overlay was tried and rejected; EDGE-LIT: dim sides, bright top cap + fresnel rim redistribute
   the emissive so stacks read as lit chips, not a flat mass; `discFall()` eases them out toward the
-  limb — needs the camera); in the ledger they're flat **coins** (the sphere squashed on Y,
-  `COIN_H`). Per-instance transforms via the shared `_dummy`.
+  limb — needs the camera); in the ledger they're the SAME standing chips on the floor planes
+  (`LEDGER.dot` footprint × `HEX_H` — replaced the squashed-sphere COINS 2026-07-12, user: the
+  edge-on coin slivers were nearly un-raycastable; the chip's top cap + sides are a real pick
+  target, so the ledger needs no pick assist). Per-instance transforms via the shared `_dummy`.
 - **DAG L0/L1** are two fibonacci shells around the core. **Each metagraph** is laid out the
   same way around its hub: concentric shells **L0 inner → data-L1 (dl1) middle →
   currency-L1 (cl1) outer**. Metagraph nodes live in the rotating globe group but stay glued
@@ -609,9 +608,10 @@ and keep changing, so they're examples, not the contract.
   view; it publishes `--bottom-reserve`.
 
 **Per-view vitals** (contents, not the rule): **hyper** = the structure (filter-aware
-L0 / cL1 / dL1 node counts; one node taxonomy — a hybrid node counts in every layer it
-runs, the DAG's own L0/L1 fold into L0/cL1 like any metagraph; a filtered metagraph shows an
-em-dash for a layer it doesn't run). **geo** = the footprint (`Nodes` / `Countries` /
+MACHINE counts per composition — Data / Hybrid / Currency, the same vocabulary as the
+dossier table + hyper explorer (2026-07-12, replaced the per-layer L0/cL1/dL1 role counts);
+cluster entries dedupe to machines; an em-dash for a composition the selection doesn't have;
+NB dedicated-L0 "Consensus" machines have no column — visible in the dossier breakdown). **geo** = the footprint (`Nodes` / `Countries` /
 `Providers` — distinct known ISPs over `store.selNodes`; replaced Ready %, user 2026-07-11:
 health belongs to the cards + the future network-health view).
 **ledger** = live activity (`Snaps/hr` / `Anchors/hr` with cyan trend sparklines from
@@ -860,6 +860,10 @@ cards: **eyebrow / title / INSET hairline / body**.
   `Separator` in bodies).
 - **One close**: every dismissible card's × is CardHead's ghost-Button close labelled
   **"Clear selection"** — no per-card variants. Tool cards use the +/− collapse instead.
+  RIGHT cards are collapsible TOO (user, 2026-07-12): the WHOLE head is the disclosure toggle
+  (the panel layout's stretched-hit-area pattern — required for touch), the +/− rides the
+  eyebrow line as the indicator, and the × + the title-row aside float ABOVE the stretched
+  overlay (z) so closing and the site link keep working; collapsed = eyebrow + title only.
 
 ### Selection + pairing
 
@@ -1032,9 +1036,8 @@ event, `ledger.update(dt)` per frame).
   and `setSceneColors()` re-tints on live refresh; nothing falls back to a raw
   `config.METAGRAPHS` colour. Node size is uniform too: `LEDGER.dot` applies to every cluster
   equally — small groups get presence from the dial, not from bigger dots — and ledger nodes
-  render as flat **COINS** (the sphere instance squashed on Y, `NodeFabric.COIN_H`; a
-  zero-thickness circle foreshortened to an invisible sliver at the overview camera, the coin
-  reads as a circle from above yet stays visible edge-on)); and the anchor **links** +
+  render as the SAME standing **CHIPS** as geo (hex/cylinder instances, `LEDGER.dot` × `HEX_H` —
+  replaced the squashed-sphere coins 2026-07-12: edge-lit, visible, and raycastable)); and the anchor **links** +
   travelling **pulses** along the
   shared **`curvePoint`** — the literal production→anchor column down from the producers
   floor through the L1/L0 ring centres → the snapshot tile → swinging to centre through the
