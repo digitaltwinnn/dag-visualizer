@@ -82,7 +82,7 @@ export function SnapshotAside({ data: d }: { data: GlobalSnapshot }) {
 // "hypergraph" for DAG) — reusing the same composition read the old standalone body line derived
 // from (`networkKind`, in ./parts), just folded into the ticker row instead of its own line.
 // Rolls as a whole via InspectorCard's `titleKey` (keyed on the name, synced with the edge pulse).
-export function MetaTitle({ cfg }: { cfg: MetaCfg }) {
+export function MetaTitle({ cfg, compact = false }: { cfg: MetaCfg; compact?: boolean }) {
   const metaList = useStore((s) => s.metaList);
   const mg = metaList.find((x) => x.id === cfg.id) || null;
   const hue = hex(cfg.color);
@@ -91,18 +91,30 @@ export function MetaTitle({ cfg }: { cfg: MetaCfg }) {
   const kind = networkKind(cfg.id, mg?.nodes || []);
   return (
     <span className="inline-flex items-center gap-2.5 min-w-0">
-      {/* The logo shows as a clean circular mark — no squared tile (brand icons are round). */}
-      <Avatar className="size-[38px] flex-none">
+      {/* The logo shows as a clean circular mark — no squared tile (brand icons are round).
+          30px matches the two-line name+ticker block; COMPACT (the collapsed card) keeps ALL
+          the info but flows it on ONE line (name · ticker · kind, truncating) with a
+          line-height logo — so a collapsed dossier matches the other collapsed cards' height
+          without dropping anything (user, 2026-07-12). */}
+      <Avatar className={cn("flex-none", compact ? "size-[20px]" : "size-[30px]")}>
         {iconUrl && <AvatarImage src={iconUrl} alt="" />}
         <AvatarFallback style={{ color: hue }}>{monogram}</AvatarFallback>
       </Avatar>
-      <span className="flex flex-col gap-px min-w-0">
-        <span className="leading-[1.1]">{cfg.name}</span>
-        <span className="inline-flex items-baseline gap-1.5 min-w-0">
+      {compact ? (
+        <span className="flex items-baseline gap-1.5 min-w-0">
+          <span className="leading-[1.1] flex-none">{cfg.name}</span>
           <span className="text-label font-semibold tracking-[0.02em] flex-none" style={{ color: hue }}>{cfg.ticker}</span>
           <span className="text-label font-normal text-muted-foreground truncate">{kind}</span>
         </span>
-      </span>
+      ) : (
+        <span className="flex flex-col gap-px min-w-0">
+          <span className="leading-[1.1]">{cfg.name}</span>
+          <span className="inline-flex items-baseline gap-1.5 min-w-0">
+            <span className="text-label font-semibold tracking-[0.02em] flex-none" style={{ color: hue }}>{cfg.ticker}</span>
+            <span className="text-label font-normal text-muted-foreground truncate">{kind}</span>
+          </span>
+        </span>
+      )}
     </span>
   );
 }

@@ -53,6 +53,11 @@ export default function LedgerPanel() {
           onToggle={() => setCollapsed((c) => !c)}
         />
         <div className={cn("flex flex-col px-3 pt-1.5 pb-2.5", collapsed && "hidden")}>
+          {/* The usage hint LEADS the card (matches the other explorers) — what it holds + what
+              you learn. px-1 nets the same ~16px inset as the sibling cards' px-4 hints. */}
+          <div className="px-1 pt-0.5 pb-1.5 text-label text-muted-foreground">
+            Every layer that participates in creating a snapshot — hover or click one to see what it does in the settlement stack.
+          </div>
           <div className="flex flex-col gap-0.5" onMouseLeave={() => setHilite(null)}>
             {LAYERS.map((l) => {
               const on = sel === l.id;

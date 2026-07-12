@@ -414,8 +414,10 @@ views and caused the ledger red-dots bug; that pattern is forbidden.
   `config.METAGRAPHS` (all 10, unconditionally — `HyperView.ts`), but **globe nodes** come from
   `globe.metaList`, filtered to metagraphs with at least one **locatable** node. A config
   metagraph with 0 locatable nodes (e.g. TBC, LEET) has a hub but can't be plotted. The
-  filter picker keeps those rows **clickable but dimmed with a muted `not located` tag**
-  (user decision) — they're real metagraphs, selectable in Hypergraph/Snapshots, just not
+  filter picker keeps those rows **clickable but dimmed, with a bare `0` count** (user; the
+  earlier muted `not located` tag was replaced 2026-07-12 — the dim already says it's quiet;
+  the hyper explorer dims its 0-node network rows the same way) — they're real metagraphs,
+  selectable in Hypergraph/Snapshots, just not
   plottable; picking one lands geo in its quiet-empty state and the right rail shows the
   honest state-aware hint (see *State-aware pick hints*).
 - Co-located nodes are laid out deterministically by `spreadCoLocated()` as **poker-chip

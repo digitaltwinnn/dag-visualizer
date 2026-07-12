@@ -55,6 +55,13 @@ const _LEDGER_M = new THREE.Matrix4()
   .makeRotationX(LEDGER.viewTiltX)
   .multiply(new THREE.Matrix4().makeRotationY(LEDGER.viewRotY));
 
+// Ledger honeycomb pitches, in the spread's PRE-viewScale units (the spread offsets get
+// multiplied by viewScale; the chip's world footprint/height do not). Cell pitch = the chip
+// diameter (hyperSize 0.55/0.52 × LEDGER.dot) + 12% air; level pitch = the chip height + air.
+const LEDGER_CELL_V = (2 * 0.55 * LEDGER.dot * 1.12) / LEDGER.viewScale;
+const LEDGER_CELL_M = (2 * 0.52 * LEDGER.dot * 1.12) / LEDGER.viewScale;
+const LEDGER_LVL = (HEX_H * 1.35) / LEDGER.viewScale;
+
 // null = idle spin; a focus state = ease-in-out to a focus orientation (y = longitude swing, x =
 // latitude tilt so high-lat nodes come into view).
 interface SpinState {
@@ -226,11 +233,13 @@ export class Globe implements GeoViewHost {
         // Ledger (Snapshots) view: l0 = Global L0 validators → the central hypergraph-L0 cluster;
         // DAG cl1 = native $DAG currency (hypergraph L1) → its OWN lane, same height as hypergraph L0
         // but offset on +Z (dagLaneZ), beside the central column.
-        const lsp = ledgerSpread(i, n, LEDGER.dagCell);
+        // Honeycomb + stacks (units are pre-viewScale — the world chip sizes divide by it;
+        // lsp.y lifts a chip per stack LEVEL once the dial's cells fill up).
+        const lsp = ledgerSpread(i, n, LEDGER.dagCell, LEDGER_CELL_V, LEDGER_LVL);
         const ledgerPos = (
           role === "l0"
-            ? new THREE.Vector3(lsp.x, LEDGER.rowHypL0, lsp.z)
-            : new THREE.Vector3(lsp.x, LEDGER.rowDAGL1, lsp.z + LEDGER.dagLaneZ)
+            ? new THREE.Vector3(lsp.x, LEDGER.rowHypL0 + lsp.y, lsp.z)
+            : new THREE.Vector3(lsp.x, LEDGER.rowDAGL1 + lsp.y, lsp.z + LEDGER.dagLaneZ)
         ).applyMatrix4(_LEDGER_M).multiplyScalar(LEDGER.viewScale); // match the LedgerView group transform
 
         const pick = {
@@ -313,8 +322,8 @@ export class Globe implements GeoViewHost {
           const dir = latLonToVec3(g.lat!, g.lon!, 1).normalize(); // real location; fanned out below
           const lsite = ledgerSite(m._ledgerCol, METAGRAPHS.length);
           const lrowY = layer === "l0" ? LEDGER.rowML0 : LEDGER.rowML1;
-          const lsp = ledgerSpread(i, cnt, clusterRadius(cnt) * 0.85); // slightly wider for the bigger dots
-          const ledgerPos = new THREE.Vector3(lsite.x + lsp.x, lrowY, lsite.z + lsp.z)
+          const lsp = ledgerSpread(i, cnt, clusterRadius(cnt) * 0.85, LEDGER_CELL_M, LEDGER_LVL);
+          const ledgerPos = new THREE.Vector3(lsite.x + lsp.x, lrowY + lsp.y, lsite.z + lsp.z)
             .applyMatrix4(_LEDGER_M).multiplyScalar(LEDGER.viewScale); // match the LedgerView group transform
           const pick = {
             kind: "metanode", meta: m, node, geo: g, layer,

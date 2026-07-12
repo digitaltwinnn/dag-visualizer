@@ -98,17 +98,9 @@ export default function FilterPicker({ onPick }: { onPick?: () => void }) {
                 <IdentityDot hue={hue} />
                 <span className="text-body text-foreground">{m.name}</span>
                 <span className="text-label font-semibold tabular-nums" style={{ color: hue }}>{m.symbol}</span>
-                {off ? (
-                  // Honest, non-numeric tag (Task 13): these are real metagraphs with no
-                  // locatable node right now — still clickable (selectable in hyper/ledger), but
-                  // a "0" count read as a broken value. A small muted lowercase tag using the
-                  // squared-tag idiom (rounded-[4px] muted-foreground badge on a faint fill).
-                  <span className="justify-self-end rounded-xs px-[5px] py-[3px] text-micro leading-none tracking-[0.02em] text-muted-foreground bg-white/[0.035]">
-                    not located
-                  </span>
-                ) : (
-                  <span className="text-label text-muted-foreground tabular-nums text-right">{m.located}</span>
-                )}
+                {/* 0-node rows show the bare 0 like every other count (user, 2026-07-12 —
+                    replaced the "not located" tag; the row's dim already says it's quiet). */}
+                <span className="text-label text-muted-foreground tabular-nums text-right">{m.located ?? 0}</span>
                 {filter === m.id && <SelectedRowMark className="absolute right-2" />}
               </CommandItem>
             );

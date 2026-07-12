@@ -123,6 +123,9 @@ export default function HyperExplore() {
                       // The committed network wears the shared selection language; its state
                       // cue is the open accordion, not a ✓ (geo's drilled-country rule).
                       open && SELECTED_ROW,
+                      // 0-node networks dim like the filter picker's 0-count rows
+                      // (opacity-45 there too) — real and clickable, just quiet.
+                      m.nodes.length === 0 && "opacity-45",
                       pair.paired && pair.className,
                     )}
                     style={pair.style}
@@ -159,9 +162,16 @@ export default function HyperExplore() {
                       {selNodes.length === 0 ? (
                         // Honest instrument state — mirrors the 3D: a metagraph with no
                         // reported nodes renders a hub and nothing else.
-                        <p className="mt-1 mx-1 mb-1.5 text-label text-muted-foreground">No nodes reported — hub only.</p>
+                        <p className="mt-1 mx-1 mb-1.5 text-label text-muted-foreground">No nodes reported.</p>
                       ) : (
-                        compsOf(selNodes).map((g) => {
+                        (() => {
+                          const groups = compsOf(selNodes);
+                          // The label column sizes to the LONGEST label PRESENT (user — a fixed
+                          // width left dead air when only short words showed): every label span
+                          // stacks an invisible copy of the longest word behind its own text
+                          // (the inline-grid overlap sizer), so the pill column aligns AND hugs.
+                          const longest = groups.reduce((a, g) => (g.label.length > a.length ? g.label : a), "");
+                          return groups.map((g) => {
                           const key = `${m.id}|${g.key}`;
                           const isOpen = openComp === key;
                           const holdsSel =
@@ -189,7 +199,10 @@ export default function HyperExplore() {
                                 }
                                 onMouseLeave={() => setHoverCohort(null)}
                               >
-                                <span className="flex-none text-body text-foreground">{g.label}</span>
+                                <span className="inline-grid flex-none text-body text-foreground">
+                                  <span className="col-start-1 row-start-1">{g.label}</span>
+                                  <span className="col-start-1 row-start-1 invisible" aria-hidden>{longest}</span>
+                                </span>
                                 <RoleChips codes={g.codes} />
                                 <span className="ml-auto flex-none tabular-nums text-body font-semibold">{g.rows.length}</span>
                                 {holdsSel && !isOpen ? (
@@ -243,7 +256,8 @@ export default function HyperExplore() {
                               )}
                             </div>
                           );
-                        })
+                          });
+                        })()
                       )}
                     </div>
                   )}
