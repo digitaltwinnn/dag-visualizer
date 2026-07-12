@@ -919,7 +919,9 @@ export class Engine {
           ? meta.group.getWorldPosition(this._dofTmp)
           : this.ctx.controls.target;
         this.ctx.dof.uniforms["focus"].value = this.ctx.camera.position.distanceTo(focusTarget);
-        this.ctx.dof.uniforms["maxblur"].value = 0.07 * dofMix; // out-of-focus blur
+        // out-of-focus blur — kept modest so the SELECTED hub (a sphere whose near/far surfaces
+        // straddle the focal plane) stays crisp; it's enough to separate the background core/hubs.
+        this.ctx.dof.uniforms["maxblur"].value = 0.045 * dofMix;
       }
 
       this.ctx.composer.render();

@@ -520,9 +520,10 @@ async function buildLand(globe: GeoViewHost) {
 
 // How much the drilled country's land glass brightens inside the mask. The land fill's
 // resting additive contribution is TINY (texel luminance ~0.055 × the 0.45 base), so small
-// multipliers are imperceptible — the readable range starts ~×6 (tuned live: ×8 firms the
-// selection without going neon; ×12 read as a hot plate competing with the node stacks).
-const MASK_BOOST = 8.0;
+// multipliers are imperceptible — the readable range starts ~×6. Kept at ×5 (was ×8): with the
+// calmer exposure/bloom the fill no longer needs to shout, and on a LARGE country (US) ×8 read
+// as a glaring cyan plate — ×5 firms the selection without dominating.
+const MASK_BOOST = 5.0;
 
 // Rasterize the drilled country's rings into a low-res equirect mask and hand it to the
 // land-fill shader; null clears (uMaskBoost 1 = hard no-op). Event-driven — one Canvas2D

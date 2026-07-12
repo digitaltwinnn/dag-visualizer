@@ -232,7 +232,7 @@ export class HyperView {
     this.core.rotation.x += dt * 0.12;
     // Dim the glow as it expands so the swelling sphere doesn't bloom out the view.
     const coreMat = this.core.material as THREE.MeshStandardMaterial;
-    coreMat.emissiveIntensity = (1.05 + flash * 1.2) * coreF * coreReveal * (1 - 0.5 * (1 - coreReveal));
+    coreMat.emissiveIntensity = (0.6 + flash * 0.9) * coreF * coreReveal * (1 - 0.5 * (1 - coreReveal));
     coreMat.opacity = coreOpacity * coreReveal;
     this.coreGroup.visible = coreReveal > 0.001;
     // The wireframe halo only makes sense at Hypergraph scale — fade it out early.
@@ -286,10 +286,10 @@ export class HyperView {
         const e = 1 - m.pulse;
         m.pulseMesh.position.copy(_pos).multiplyScalar(1 - e);
         pulseMat.opacity = Math.sin(m.pulse * Math.PI) * 0.9 * metaF;
-        hubMat.emissiveIntensity = (0.8 + m.pulse * 1.6) * metaF * glowMul;
+        hubMat.emissiveIntensity = (0.62 + m.pulse * 0.6) * metaF * glowMul;
       } else {
         pulseMat.opacity = 0;
-        hubMat.emissiveIntensity = 0.8 * metaF * glowMul;
+        hubMat.emissiveIntensity = 0.72 * metaF * glowMul;
       }
     }
   }

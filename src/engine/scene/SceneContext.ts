@@ -61,7 +61,13 @@ export function createScene(canvas: HTMLCanvasElement, colors: SceneColors): Sce
   // identity hues; Neutral tames the blown-out cores (the Global L0 core reads as a glowing cyan
   // orb, not a flat white disc) while keeping the vivid cyans/magentas the identity system needs.
   renderer.toneMapping = THREE.NeutralToneMapping;
-  renderer.toneMappingExposure = 1.05;
+  // Exposure is the master brightness dial (a single multiplier applied to the whole frame at
+  // the OutputPass). Kept well BELOW 1 on purpose: the scene otherwise read too hot overall —
+  // most visible in hyper/geo, where hundreds of emissive nodes each contribute a bit of
+  // ADDITIVE bloom that accumulates into a general glow (ledger has far fewer emitters, so it
+  // reads calmer at the same setting). 0.7 pulls the whole scene down uniformly without touching
+  // the per-object balance below.
+  renderer.toneMappingExposure = 0.7;
 
   const controls = new OrbitControls(camera, renderer.domElement);
   controls.enableDamping = true;
@@ -115,9 +121,15 @@ export function createScene(canvas: HTMLCanvasElement, colors: SceneColors): Sce
 
   const bloom = new UnrealBloomPass(
     new THREE.Vector2(window.innerWidth, window.innerHeight),
-    0.6,   // strength (was 0.9 — the bloom read overpowered under the now-applied tone mapping)
-    0.55,  // radius (was 0.7 — tighter halo)
-    0.28   // threshold (was 0.18 — only genuinely bright cores/hubs bloom, not every midtone)
+    0.30,  // strength — the dominant "overpowering" lever; well down from the r0.161 default. The
+           // whole-scene glow, the geo node "dark halo" (a bloom mip/tonemap ring, not a radius
+           // artifact — it survives radius cuts but vanishes with strength), and the fuzzy selected
+           // hub all trace back to over-strong bloom.
+    0.35,  // radius — tight halos: keeps hubs/core crisp discs (not overpowering washes) and
+           // shrinks the bloom-mip "dark ring" that saturated hues cast on the dimmed globe
+    0.13   // threshold — low so every identity HUE clears it (bloom thresholds on luminance, and
+           // low-luma hues like the blue/green metagraphs would be cut out at a higher value; the
+           // node/structure separation comes from the emissive gap, not the threshold)
   );
   composer.addPass(bloom);
 

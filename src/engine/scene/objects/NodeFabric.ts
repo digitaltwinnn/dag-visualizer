@@ -364,9 +364,10 @@ export class NodeFabric {
       // outside the drilled-into country? dim it on top of the network dim (geo only).
       if (cf && (!geoCc || geoCc !== cf)) d = Math.max(d, cmix);
       // SAME glow model as the metagraph nodes (user: the DAG's globe hexes must read like any
-      // metagraph's — one node language): 0.5 base lifted +0.08 on the globe (eased back from
-      // +0.14 — user: a little less bright). Steady — the old twinkle shimmer was removed (user).
-      const ei = 0.5 + 0.08 * m;
+      // metagraph's — one node language): 0.42 base lifted +0.08 on the globe (base eased back
+      // from 0.5 — user: nodes read too hot up close when a metagraph is selected). Steady — the
+      // old twinkle shimmer was removed (user).
+      const ei = 0.42 + 0.08 * m;
       const flRaw = u._flash || 0; // brief flash when an arc pulse reaches this node
       const fl = flRaw * m; // arcs are a geo-only visual — their flash must not bleed into hyper
       emi[u.index] = Math.max(0.02, ei * (1 - d * 0.92) + fl); // suppress glow when dimmed
@@ -417,7 +418,7 @@ export class NodeFabric {
       let dEff = r.dim * (c.ledger ? 0.82 : dimScaleV);
       const geoCc = geoCcOf(r.pick);
       if (cf && (!geoCc || geoCc !== cf)) dEff = Math.max(dEff, cmix);
-      const glow = (0.5 + 0.08 * m) * (1 - dEff * 0.9); // steady, = validators' (twinkle removed, geo lift eased back — user)
+      const glow = (0.42 + 0.08 * m) * (1 - dEff * 0.9); // steady, = validators' (twinkle removed, geo lift eased back — user)
       const flRaw = r._flash || 0; // brief flash when an arc pulse reaches this node
       const fl = flRaw * m; // arcs are a geo-only visual — their flash must not bleed into hyper
       emi[r.index] = Math.max(0.03, glow + fl);
