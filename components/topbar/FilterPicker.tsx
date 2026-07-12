@@ -47,7 +47,14 @@ export default function FilterPicker() {
 
   return (
     <div
-      className="flex flex-wrap items-center gap-1 mx-2 px-1.5 pb-2 pt-1.5 border-t border-border/60"
+      className={cn(
+        "flex flex-wrap items-center gap-1 mx-2 px-1.5 pb-2 pt-1.5 border-t border-border/60",
+        // PHONE: the wrapped chips would otherwise fill ~a third of the screen (12 chips at
+        // ≥44px tap height wrap to ~7 rows). Cap to ~4 rows and scroll the rest (user,
+        // 2026-07-12) — the strip stays a bar expansion, not a takeover. `.cmd-list-scroll` =
+        // the shared slim scrollbar; overscroll-contain keeps the flick off the page.
+        "max-[699px]:max-h-[192px] max-[699px]:overflow-y-auto max-[699px]:overscroll-contain cmd-list-scroll",
+      )}
       onMouseLeave={() => setHoverFilter(null)}
     >
       <button
