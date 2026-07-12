@@ -24,6 +24,7 @@ export interface SceneCtx {
   controls: OrbitControls;
   composer: EffectComposer;
   dof: DofPass;
+  bloom: UnrealBloomPass; // per-view strength/radius/threshold, driven by the Engine from ViewPolicy
   resize(): void;
 }
 
@@ -155,5 +156,5 @@ export function createScene(canvas: HTMLCanvasElement, colors: SceneColors): Sce
     composer.setSize(window.innerWidth, window.innerHeight);
   }
 
-  return { scene, camera, renderer, controls, composer, dof, resize };
+  return { scene, camera, renderer, controls, composer, dof, bloom, resize };
 }

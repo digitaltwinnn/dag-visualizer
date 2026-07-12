@@ -54,7 +54,18 @@ export interface ViewPolicy {
   // card? geo (Nodes by country) + hyper (Nodes by layer); elsewhere the list empties so the
   // browsers stay quiet.
   nodeList: boolean;
+  // Per-view bloom (UnrealBloomPass strength/radius/threshold), applied by the Engine each frame.
+  // Hyper/geo run CALMER than ledger on purpose: their dense, bright emitters (the core, hundreds
+  // of nodes, the additive coastal walls) piled up an additive veil + a strength-driven "black
+  // halo" ring + fuzzy walls, worst on OLED/HDR; ledger (thin lines, sparse emitters) keeps the
+  // fuller bloom the design wants. strength is the dominant lever (the halo "vanishes with
+  // strength"). All three are read live by UnrealBloomPass.render, so a per-frame set is enough.
+  bloom: { strength: number; radius: number; threshold: number };
 }
+
+// The calm bloom the ledger view uses — the reference the design likes (thin lines, sparse
+// emitters). Shared so ledger + the canvas-hidden FLAT views read identically.
+const BLOOM_CALM = { strength: 0.30, radius: 0.35, threshold: 0.13 };
 
 // A flat placeholder view (status / transactions / staking): the canvas is hidden and the view
 // is fully inert. Shared so the three rows stay identical by construction.
@@ -69,6 +80,7 @@ const FLAT: ViewPolicy = {
   minCamDist: 12,
   minCamAlt: null,
   nodeList: false,
+  bloom: BLOOM_CALM,
 };
 
 export const VIEW_POLICIES: Record<Mode, ViewPolicy> = {
@@ -85,6 +97,8 @@ export const VIEW_POLICIES: Record<Mode, ViewPolicy> = {
     minCamDist: 12,
     minCamAlt: null,
     nodeList: true,
+    // Calmer than ledger: the core + dense node field piled up an additive bleed on OLED/HDR.
+    bloom: { strength: 0.20, radius: 0.32, threshold: 0.14 },
     },
   // Footprint: the holographic globe + travelling packets; picks the globe nodes only.
   geo: {
@@ -98,6 +112,9 @@ export const VIEW_POLICIES: Record<Mode, ViewPolicy> = {
     minCamDist: 12,
     minCamAlt: 18, // above the land plateau (R 16 + LAND_H 1.0) + chip stacks — no zooming inside
     nodeList: true,
+    // The lowest bloom of the three views: strength drives the "black halo" ring the saturated
+    // node/wall hues cast on the globe, and the additive coastal walls read fuzzy under bloom.
+    bloom: { strength: 0.15, radius: 0.30, threshold: 0.16 },
     },
   // Snapshots: the settlement chamber. Morph frozen (nodes fly into lanes); picks the centred
   // snapshot + the reused producer dots. (The ledger-specific depth-fog recency treatment was
@@ -113,6 +130,7 @@ export const VIEW_POLICIES: Record<Mode, ViewPolicy> = {
     minCamDist: 12,
     minCamAlt: null,
     nodeList: false,
+    bloom: BLOOM_CALM, // the reference look the design likes — unchanged
   },
   status: FLAT,
   transactions: FLAT,

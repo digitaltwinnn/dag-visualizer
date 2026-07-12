@@ -869,6 +869,16 @@ export class Engine {
       const policy = VIEW_POLICIES[this.mode];
       const show = policy.show;
 
+      // Per-view bloom (ViewPolicy.bloom): hyper/geo run calmer than ledger — their dense, bright
+      // emitters (core, node field, additive coastal walls) piled up an additive bleed + a
+      // strength-driven "black halo" ring + fuzzy walls, worst on OLED/HDR. UnrealBloomPass reads
+      // strength/radius/threshold live each render, so a per-frame set is enough (and it tracks a
+      // mode switch immediately).
+      const pb = policy.bloom;
+      this.ctx.bloom.strength = pb.strength;
+      this.ctx.bloom.radius = pb.radius;
+      this.ctx.bloom.threshold = pb.threshold;
+
       // Ledger freezes morph at the view we entered from, so the reused node meshes fly in from
       // THAT layout (globe.ledgerT drives the lane fly-in instead). hyper/geo ease as usual.
       const target = policy.morph === "toGeo" ? 1 : policy.morph === "frozen" ? this.morph : 0;
