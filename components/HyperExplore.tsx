@@ -242,11 +242,13 @@ export default function HyperExplore() {
                                         onClick={() => selectNode(r.pick, on)}
                                         onMouseEnter={rowPair.onMouseEnter}
                                       >
-                                        {/* Bare mono id — the composition group's label
-                                            already carries the word (geo's cohorts mix
-                                            compositions, these groups ARE one). */}
-                                        <span className="flex-1 min-w-0 overflow-hidden text-ellipsis whitespace-nowrap font-mono tabular-nums text-label text-muted-foreground">
-                                          {r.id ? shortHash(r.id) : r.label}
+                                        {/* Just "node" + the mono id (user, 2026-07-12 — matches geo's
+                                            picker rows; the group label above carries the composition). */}
+                                        <span className="flex-1 min-w-0 flex items-baseline gap-1.5">
+                                          <span className="flex-none text-label">node</span>
+                                          <span className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap font-mono tabular-nums text-label text-muted-foreground">
+                                            {r.id ? shortHash(r.id) : r.label}
+                                          </span>
                                         </span>
                                         {on && <SelectedRowMark className="absolute right-2" />}
                                       </button>
