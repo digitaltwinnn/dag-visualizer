@@ -621,9 +621,10 @@ export class Engine {
     if (!this.globe.nodes?.length) return;
     const countries = this.globe.countryStats(this.filter);
     useStore.getState().setLeaderboard({ countries });
-    // Flat node list for the geo node browser (read-only; empty outside geo so the
-    // browser stays quiet). Built on the same triggers as the leaderboard.
-    useStore.getState().setSelNodes(this.mode === "geo" ? this.globe.listNodes(this.filter) : []);
+    // Flat node list for the explorer node browsers (read-only; the policy says which views
+    // have one — geo's Nodes-by-country, hyper's Nodes-by-layer — so it empties elsewhere
+    // and the browsers stay quiet). Built on the same triggers as the leaderboard.
+    useStore.getState().setSelNodes(VIEW_POLICIES[this.mode].nodeList ? this.globe.listNodes(this.filter) : []);
   }
 
   // ---- picking (ports ui.js _pick / _pickablesFor / _onClick) ----

@@ -4,6 +4,7 @@ import { Fragment, type CSSProperties, type ReactNode } from "react";
 import { useStore, type Mode } from "@/src/store/store";
 import { filterAccent } from "@/src/data/network";
 import GeoExplore from "@/components/GeoExplore";
+import HyperExplore from "@/components/HyperExplore";
 import LedgerPanel from "@/components/LedgerPanel";
 import AboutView from "@/components/AboutView";
 import RailThread from "@/components/RailThread";
@@ -70,8 +71,9 @@ const ABOUT: Record<Mode, { title: string; eyebrow: string; lines: string[]; cap
 // Left control rail: the **explore/interact** zone. The global network filter lives in the
 // top command bar; the selected-subject dossier now lives in the right rail (`ContextCard`).
 // Every view now leads with a collapsed `AboutView` orientation card, above its ONE tool card
-// (if any): Geography → GeoExplore (footprint + node browser); Snapshots → LedgerPanel;
-// Hypergraph and the scaffolded views have no tool card, just the About card.
+// (if any): Hypergraph → HyperExplore (network → layer shell → node); Geography → GeoExplore
+// (footprint + node browser); Snapshots → LedgerPanel; the scaffolded views have no tool
+// card, just the About card.
 export default function ExploreRail() {
   const bp = useBreakpoint();
   const mode = useStore((s) => s.mode);
@@ -90,7 +92,7 @@ export default function ExploreRail() {
   const manifest = exploreCards({ mode });
   const renderCard: Record<string, ReactNode> = {
     about: <AboutView {...ABOUT[mode]} />,
-    tool: mode === "geo" ? <GeoExplore /> : mode === "ledger" ? <LedgerPanel /> : null,
+    tool: mode === "hyper" ? <HyperExplore /> : mode === "geo" ? <GeoExplore /> : mode === "ledger" ? <LedgerPanel /> : null,
   };
   const content = (
     <>

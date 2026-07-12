@@ -47,7 +47,7 @@ export default function LedgerPanel() {
         <CardHead
           panel
           icon={EXPLORE_ICON}
-          title="Understand the layered design"
+          title="Settlement layers"
           eyebrow="Snapshots · explore"
           collapsed={collapsed}
           onToggle={() => setCollapsed((c) => !c)}

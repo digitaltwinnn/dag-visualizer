@@ -28,8 +28,8 @@ const ghostIds = (cards: { id: string; present: boolean; hint: string | null }[]
   cards.filter((c) => !c.present && c.hint != null).map((c) => c.id);
 
 describe("exploreCards — LEFT rail (Explore)", () => {
-  it("hyper hosts About only (no tool card)", () => {
-    expect(presentKinds(exploreCards({ mode: "hyper" }))).toEqual(["about"]);
+  it("hyper hosts About + the Nodes-by-layer tool", () => {
+    expect(presentKinds(exploreCards({ mode: "hyper" }))).toEqual(["about", "tool"]);
   });
   it("geo hosts About + the Nodes-by-country tool", () => {
     expect(presentKinds(exploreCards({ mode: "geo" }))).toEqual(["about", "tool"]);

@@ -50,6 +50,10 @@ export interface ViewPolicy {
   // inside the surface on the other (user bug). 18 clears the land plateau (R 16 + LAND_H 1)
   // and the raised hex stacks.
   minCamAlt: number | null;
+  // Does this view publish the selection's flat node list (`store.selNodes`) for its explorer
+  // card? geo (Nodes by country) + hyper (Nodes by layer); elsewhere the list empties so the
+  // browsers stay quiet.
+  nodeList: boolean;
 }
 
 // A flat placeholder view (status / transactions / staking): the canvas is hidden and the view
@@ -64,6 +68,7 @@ const FLAT: ViewPolicy = {
   countryHover: false,
   minCamDist: 12,
   minCamAlt: null,
+  nodeList: false,
 };
 
 export const VIEW_POLICIES: Record<Mode, ViewPolicy> = {
@@ -79,6 +84,7 @@ export const VIEW_POLICIES: Record<Mode, ViewPolicy> = {
     countryHover: false,
     minCamDist: 12,
     minCamAlt: null,
+    nodeList: true,
   },
   // Footprint: the holographic globe + travelling packets; picks the globe nodes only.
   geo: {
@@ -91,6 +97,7 @@ export const VIEW_POLICIES: Record<Mode, ViewPolicy> = {
     countryHover: true, // pointer over a drillable country previews its border (pairs both ways)
     minCamDist: 12,
     minCamAlt: 18, // above the land plateau (R 16 + LAND_H 1.0) + chip stacks — no zooming inside
+    nodeList: true,
   },
   // Snapshots: the settlement chamber. Morph frozen (nodes fly into lanes); picks the centred
   // snapshot + the reused producer dots. (The ledger-specific depth-fog recency treatment was
@@ -105,6 +112,7 @@ export const VIEW_POLICIES: Record<Mode, ViewPolicy> = {
     countryHover: false,
     minCamDist: 12,
     minCamAlt: null,
+    nodeList: false,
   },
   status: FLAT,
   transactions: FLAT,
