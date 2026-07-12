@@ -553,10 +553,14 @@ and keep changing, so they're examples, not the contract.
   bare 0; the committed chip wears the view switch's SELECTED_ROW on-state, no ✓). User
   reversal 2026-07-12 of the 2026-07-04 detached-popover decision: hovering chips previews
   the dim while the SCENE reacts in the open (the popover glass covered it); picking keeps
-  the strip OPEN (browsing several networks is the point) — the button/Escape close it. The
-  strip is a LAYOUT participant, not a popup: TopBar publishes its rendered height as
-  `--topbar-extra` (ResizeObserver) and both rails add it to their `top` (globals.css), so
-  the grown bar pushes the layout down instead of overlapping the cards), the
+  the strip OPEN (browsing several networks is the point) — the button/Escape close it. It is
+  EXPANDED BY DEFAULT (non-phone; phone closes it once the breakpoint resolves — no room for a
+  persistent strip). The strip is a LAYOUT participant, not a popup: TopBar publishes its
+  rendered height as `--topbar-extra` (ResizeObserver), and BOTH the rails AND the scene canvas
+  add it to their `top` (globals.css) — the rails slide down and the 3D canvas slides down with
+  them (a pure position shift: the buffer stays viewport-sized, so no distortion / no engine
+  resize; capped + scrolled on phone), so the grown bar pushes the whole layout down instead of
+  overlapping the cards or covering the scene's top), the
   **view switch** (center — a `ToggleGroup` of six monochrome lucide icons: `Orbit` hyper /
   `Globe` geo / `Layers` ledger / `Radar` status / `ArrowLeftRight` transactions / `HandCoins`
   staking, from `VIEW_ICONS`), and the

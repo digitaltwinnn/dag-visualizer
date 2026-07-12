@@ -327,12 +327,19 @@
 @layer components {
   .scene-canvas {
     position: fixed;
-    inset: 0;
+    /* Slide the scene DOWN by the grown-bar height (the attached filter strip), the same
+       `--topbar-extra` the rails ride, so the 3D scene sits below the bar like everything else
+       instead of the strip covering its top (user, 2026-07-12). Pure POSITION shift — the
+       buffer stays 100vw×100vh, so no distortion and no engine resize; it renders a touch
+       below the viewport (the empty bottom margin leaves frame). Slides in lockstep with the
+       rails; reduced-motion kills it (below). */
+    top: var(--topbar-extra, 0px);
+    left: 0;
     width: 100vw;
     height: 100vh;
     display: block;
     opacity: 0;                 /* fade in on the boot handoff */
-    transition: opacity 0.6s ease;
+    transition: opacity 0.6s ease, top 0.25s ease-out;
   }
   .scene-canvas.scene-in { opacity: 1; }
 
