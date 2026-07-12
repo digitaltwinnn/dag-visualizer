@@ -180,8 +180,11 @@ export default function CardHead({
   }
 
   // Inspector layout — block-flow head inside the card's own padding (RIGHT_CARD p-[18px]), so
-  // the hairline is inset by construction. The title row clears the absolute × via pr when a
-  // close is present.
+  // the hairline is inset by construction. Only the EYEBROW clears the absolute × (they share
+  // the card's top edge); the title row sits BELOW the × and runs to the content edge, so its
+  // aside (status pill, live dot, site link) ends flush with the ×'s glyph and the body's
+  // right-aligned columns (user, 2026-07-12 — the 22px title-row clearance double-inset the
+  // aside ~40px from the card edge while everything else aligned at ~18px).
   return (
     <>
       {onClose && (
@@ -199,12 +202,15 @@ export default function CardHead({
       {eyebrow && <span className={cn("block mb-2 pr-[22px]", eyebrowClass)}>{eyebrow}</span>}
       {title != null && (
         <>
-          <div className={cn("flex items-center gap-2 min-w-0", onClose && "pr-[22px]")}>
+          <div className="flex items-center gap-2 min-w-0">
             <h3 className={cn(TITLE, "text-foreground min-w-0")}>{rolled}</h3>
             {aside != null && <span className="ml-auto flex-none">{aside}</span>}
           </div>
           {subtitle != null && (
-            <div className="mt-1 text-label leading-none text-muted-foreground overflow-hidden text-ellipsis whitespace-nowrap">
+            // No leading-none here: the node card's subtitle carries bordered code pills
+            // (RoleChips) that need the natural line box — a collapsed line + overflow-hidden
+            // clipped their borders.
+            <div className="mt-1 text-label text-muted-foreground overflow-hidden text-ellipsis whitespace-nowrap">
               {subtitle}
             </div>
           )}

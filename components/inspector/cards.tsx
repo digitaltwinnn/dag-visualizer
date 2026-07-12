@@ -18,7 +18,7 @@ import { VIEW_ICONS, LAYER_ICON, SNAPSHOT_ICON, KIND_MARK_CLASS } from "@/compon
 import { ExternalLink } from "lucide-react";
 import { useMinHold } from "@/components/useMinHold";
 import { POLL } from "@/src/engine/config";
-import { Desc, StatusMark, CompositionRows, StatusBreakdown, networkKind } from "./parts";
+import { Desc, StatusMark, CompositionRows, StatusBreakdown, RoleChips, networkKind } from "./parts";
 import { compositionRows, nodeCompositionLabel } from "@/src/data/composition";
 import { ledgerLayerById } from "@/src/data/ledgerLayers";
 
@@ -150,18 +150,20 @@ export function GeoLiveSubtitle() {
   const inspect = useStore((s) => s.inspect);
   const node = inspectedNode(inspect);
   if (!node) return null;
-  // The subtitle = the composition word + its layer codes in the METAGRAPH card's exact
-  // style — "hybrid L0·cL1" (user, 2026-07-11: the word alone wasn't enough). The id lives
-  // in the body's NODE ID row, last: the reference number sits where references sit.
-  const comp = node.node ? nodeCompositionLabel(node.node) : null;
+  // The subtitle = the composition word + its layer codes as squared pills (RoleChips — the
+  // same rendering the metagraph card's composition rows use; user 2026-07-12: the joined
+  // "L0·cL1" text read as one token). Sentence-cased ("Hybrid") to match the composition
+  // rows' label style — the caps RULE: text-micro is the UPPERCASE lane (eyebrows/section
+  // tags); word labels at text-label/body are sentence case. The id lives in the body's
+  // NODE ID row, last: the reference number sits where references sit.
+  const compWord = node.node ? nodeCompositionLabel(node.node) : null;
+  const comp = compWord ? compWord.charAt(0).toUpperCase() + compWord.slice(1) : null;
   const codes = node.node ? compositionRows([node.node])[0]?.codes : undefined;
   if (!comp) return null;
   return (
-    <span>
-      {comp}
-      {codes && codes.length > 0 && (
-        <span className="text-label text-muted-foreground tabular-nums"> {codes.join("·")}</span>
-      )}
+    <span className="inline-flex items-center gap-1.5 min-w-0">
+      <span>{comp}</span>
+      {codes && codes.length > 0 && <RoleChips codes={codes} />}
     </span>
   );
 }
@@ -269,9 +271,6 @@ export function MetaCard({ cfg }: { cfg: MetaCfg }) {
   const mg = metaList.find((x) => x.id === cfg.id) || null;
   const nodes = mg?.nodes || [];
   const blurb = mg?.description || cfg.blurb;
-  // The distinct make-ups this metagraph's nodes fall into (same read CompositionRows renders),
-  // needed here just for the "N different compositions" count in the section header.
-  const compRows = compositionRows(nodes);
   // Hover pairing (synced 3D hub glow) lives on the OUTER pane (ContextCard's #metapane), not here.
   // The full identity header (avatar + name + ticker) lives in the card HEAD now (MetaTitle via
   // CardHead's title slot, rolled via titleKey) — the body starts at the description.
@@ -281,42 +280,39 @@ export function MetaCard({ cfg }: { cfg: MetaCfg }) {
           arriving from /api/metagraphs) changes — an expanded DOR must not leak into DED. */}
       <Desc key={blurb} text={blurb} />
       {nodes.length > 0 && (
-        <div className="mt-3">
-          {/* Section header in the snapshot card's exact bold-lead + muted-tail treatment
-              (AnchoredTags): the key figure — "163 nodes" — as a 13px foreground lead with the
-              bold number, the addition — "with 3 different compositions" — as the 12px muted
-              tail. Singulars handled ("1 node" / "with 1 composition" — no "different"). */}
-          <div className="flex items-baseline gap-2 flex-wrap">
-            <span className="text-body text-foreground"><b className="font-bold">{nodes.length}</b> node{nodes.length === 1 ? "" : "s"}</span>
-            <span className="text-label text-muted-foreground">
-              with {compRows.length} {compRows.length === 1 ? "composition" : "different compositions"}
+        <>
+          {/* The snapshot card's rhythm, applied here (user, 2026-07-12): the BREAKDOWN first
+              (composition table — rows carry their own counts), then the shared Separator,
+              then ONE summary row in the snapshot card's "Fees paid" grammar — muted label
+              left, the bold total + per-state breakdown right. Totals sit BELOW their parts;
+              the old "166 nodes with 3 different compositions" header restated the table. */}
+          <div className="mt-3">
+            <span className="text-micro tracking-[0.1em] uppercase text-muted-foreground">Composition</span>
+            <CompositionRows nodes={nodes} />
+          </div>
+          <Separator className="my-2" />
+          <div className="flex items-start justify-between gap-2.5">
+            <span className="text-body text-muted-foreground">Network status</span>
+            <span className="flex items-baseline justify-end gap-2 flex-wrap">
+              <span className="text-body text-foreground whitespace-nowrap"><b className="font-bold">{nodes.length}</b> node{nodes.length === 1 ? "" : "s"}</span>
+              <StatusBreakdown states={nodes.map((n) => n.state)} />
             </span>
           </div>
-          <CompositionRows nodes={nodes} />
-          {/* ONE aggregate status as the block's ATTACHED footer (user reversal of the per-row
-              marks — too busy): right-aligned tight under the last row, reading as part of the
-              composition block, in the standard muted count+bullet language (no "all ready"
-              special case — StatusBreakdown always shows plain counts now). */}
-          <div className="mt-1.5 flex justify-end">
-            <StatusBreakdown states={nodes.map((n) => n.state)} />
-          </div>
-        </div>
+        </>
       )}
     </>
   );
 }
 
 // The dossier's site/explorer link (user-agreed: the footer link row was rarely used and ate a
-// full row) — an icon-only ghost ExternalLink riding the TITLE row's aside slot, pinned FLUSH to the
-// card's content edge on the avatar + name + ticker line (the name truncates, the icon doesn't
-// move). Flush mechanics (measured): the negative right margin collapses CardHead's aside
-// wrapper to zero width AT the title row's `pr-[22px]` inset edge, and the icon's own `w-[22px]`
-// box then extends right from there — exactly re-occupying the 22px ×-clearance, so the
-// right-aligned glyph ends flush with the card's content edge (the composition counts' column).
-// Safe for THIS aside only because the dossier's tall title row sits below the ×; the glyph rides
-// `text-primary` (the link-variant Button language, softened at rest) so it reads as a LINK at
-// a glance, not muted chrome. Domain in the tooltip/aria-label. Rendered by InspectorCard only
-// when the metagraph actually has a siteUrl, so link-less dossiers render no aside at all.
+// full row) — an icon-only ghost ExternalLink riding the TITLE row's aside slot. Flush comes
+// free now: the title row no longer reserves ×-clearance (CardHead dropped its pr — the row
+// sits below the ×), so the aside slot ends AT the card's content edge and the old measured
+// `-mr-[30px]` re-occupation hack is gone with it. 16px glyph — matches the × (user,
+// 2026-07-12: the 14px mark read too small). The glyph rides `text-primary` (the link-variant
+// Button language, softened at rest) so it reads as a LINK at a glance, not muted chrome.
+// Domain in the tooltip/aria-label. Rendered by InspectorCard only when the metagraph actually
+// has a siteUrl, so link-less dossiers render no aside at all.
 export function MetaSiteAction({ site }: { site: string }) {
   const domain = site.replace(/^https?:\/\//, "").replace(/\/$/, "");
   return (
@@ -324,10 +320,10 @@ export function MetaSiteAction({ site }: { site: string }) {
       asChild
       variant="ghost"
       size="icon-xs"
-      className="size-auto w-[22px] justify-end rounded-md py-1 px-0 -mr-[30px] leading-none cursor-pointer text-primary/70 hover:bg-transparent hover:text-primary dark:hover:bg-transparent"
+      className="size-auto rounded-md py-1 px-0 leading-none cursor-pointer text-primary/70 hover:bg-transparent hover:text-primary dark:hover:bg-transparent"
     >
       <a href={site} target="_blank" rel="noopener noreferrer" aria-label={domain} title={domain}>
-        <ExternalLink aria-hidden className="size-3.5" />
+        <ExternalLink aria-hidden className="size-4" />
       </a>
     </Button>
   );

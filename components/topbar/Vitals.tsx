@@ -159,8 +159,10 @@ function VitalsCluster({ align = "end" }: { align?: "end" | "center" } = {}) {
               <span
                 aria-hidden
                 className="absolute -bottom-[5px] left-0 right-0 h-px opacity-60 transition-opacity duration-300 motion-reduce:transition-none"
-                // The shared soft-tipped hairline recipe (transparent → hue → transparent).
-                style={{ background: `linear-gradient(90deg, transparent, ${scopeHue}, transparent)` }}
+                // The shared soft-tipped hairline recipe — full colour across the middle,
+                // easing out only in the last ~15% each side (user, 2026-07-12: the bare
+                // transparent→hue→transparent ramp faded most of the line away).
+                style={{ background: `linear-gradient(90deg, transparent, ${scopeHue} 15%, ${scopeHue} 85%, transparent)` }}
               />
             )}
           </div>

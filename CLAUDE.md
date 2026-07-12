@@ -818,9 +818,10 @@ cards: **eyebrow / title / INSET hairline / body**.
   `MetaTitle` (avatar + name + ticker + a muted type descriptor — "data metagraph" /
   "currency metagraph" / "data and currency metagraph" / DAG = "hypergraph"; 0-node
   metagraphs say just "metagraph"); the snapshot title's Odometer owns its own roll; the
-  node card is **location-first** (place as title; the `subtitle` is the node's
-  composition word + its layer codes in the metagraph card's exact style — `hybrid L0·cL1·dL1`
-  (`nodeCompositionLabel` + `compositionRows` codes; the word alone wasn't enough, user); the BODY is
+  node card is **location-first** (place as title; the `subtitle` is the node's sentence-cased
+  composition word + its layer codes as squared PILLS — `Hybrid [L0][cL1][dL1]`
+  (`nodeCompositionLabel` + `compositionRows` codes via the shared `RoleChips`; the joined
+  `L0·cL1` text read as one token, user 2026-07-12); the BODY is
   labelled rows in importance order: HOSTING, then **NODE ID last** — the unique reference
   sits where references sit, truncated with the full hash on hover (user, 2026-07-11; this
   replaced the one-node CompositionRows block whose count was always "1"); id-as-title

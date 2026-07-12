@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { Fragment, useState } from "react";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -93,18 +93,40 @@ export function StatusBreakdown({ states }: { states: (string | null | undefined
   );
 }
 
-// One composition row per make-up: role (bright) + codes (muted) + a capped chip stack
+// Squared layer-code pills — the ONE rendering for layer codes wherever they appear (the
+// node card's subtitle, the dossier's composition rows). User, 2026-07-12: the joined
+// "L0·cL1" text read as one mushy token; separate squared pills scan as discrete units.
+// Taxonomy chrome, not identity — muted text on the faint wash, never hued.
+export function RoleChips({ codes }: { codes: string[] }) {
+  return (
+    <span className="inline-flex items-center gap-1">
+      {codes.map((c) => (
+        <span
+          key={c}
+          className="inline-flex items-center rounded-xs border border-border bg-wash-faint px-[5px] py-[2px] text-micro leading-none text-muted-foreground"
+        >
+          {c}
+        </span>
+      ))}
+    </span>
+  );
+}
+
+// One composition row per make-up: role (bright) + code pills + a capped chip stack
 // (visual scale only, ≤10, no +N) + the authoritative count. (A per-row status line lived
 // here briefly — reverted: it read too busy; the dossier shows ONE aggregate StatusBreakdown
-// as the composition block's attached footer instead.)
+// in its STATUS segment instead.)
 export function CompositionRows({ nodes }: { nodes: NodeInfo[] }) {
   const rows = compositionRows(nodes);
+  // ONE grid for the whole table (not per-row grids): the label column sizes to the WIDEST
+  // label, so the code-pill column starts at one consistent x on every row (user, 2026-07-12
+  // — per-row grids let each label push its own pills around).
   return (
-    <div className="flex flex-col gap-[7px] mt-2">
+    <div className="grid grid-cols-[auto_auto_1fr_auto] items-center gap-x-2 gap-y-[7px] mt-2">
       {rows.map((r, i) => (
-        <div className="grid grid-cols-[auto_auto_1fr_auto] items-center gap-2" key={i}>
+        <Fragment key={i}>
           <span className="text-body text-foreground">{r.label}</span>
-          <span className="text-label text-muted-foreground tabular-nums">{r.codes.join("·")}</span>
+          <RoleChips codes={r.codes} />
           {/* Chip stack = a miniature of the 3D node cloud: identity-hued discs that OVERLAP (like
               stacked avatars), each ringed in the panel colour so the overlap reads. Visual scale
               only (capped ≤10). Plain overlapping dots (no image/fallback content), so a bare
@@ -122,7 +144,7 @@ export function CompositionRows({ nodes }: { nodes: NodeInfo[] }) {
             ))}
           </span>
           <span className="text-body text-foreground tabular-nums min-w-[1.5em] text-right">{r.count}</span>
-        </div>
+        </Fragment>
       ))}
     </div>
   );
