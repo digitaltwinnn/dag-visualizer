@@ -286,7 +286,7 @@ export class HyperView {
         const e = 1 - m.pulse;
         m.pulseMesh.position.copy(_pos).multiplyScalar(1 - e);
         pulseMat.opacity = Math.sin(m.pulse * Math.PI) * 0.9 * metaF;
-        hubMat.emissiveIntensity = (0.62 + m.pulse * 0.6) * metaF * glowMul;
+        hubMat.emissiveIntensity = (0.72 + m.pulse * 0.5) * metaF * glowMul;
       } else {
         pulseMat.opacity = 0;
         hubMat.emissiveIntensity = 0.72 * metaF * glowMul;
