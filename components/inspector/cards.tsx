@@ -7,6 +7,7 @@ import { shortHash, CORE_HEX, getNetwork, metagraphById } from "@/src/data/netwo
 import { identityHudHex } from "@/src/palette/identity";
 import { hex, fmtDag, fmtKB } from "@/src/util/format";
 import { relativeAge } from "@/src/util/relativeAge";
+import { statusBreakdown } from "@/src/data/nodeStatus";
 import type { GlobalSnapshot, MetaCfg, PickDescriptor } from "@/src/data/types";
 import AnchoredTags from "./AnchoredTags";
 import Odometer from "@/components/Odometer";
@@ -271,6 +272,12 @@ export function MetaCard({ cfg }: { cfg: MetaCfg }) {
   const mg = metaList.find((x) => x.id === cfg.id) || null;
   const nodes = mg?.nodes || [];
   const blurb = mg?.description || cfg.blurb;
+  // The summary row: "Online nodes" + the TOTAL (user, 2026-07-12 — it summarizes the
+  // composition table above, whose counts sum to the total; a joining node is online too,
+  // just not ready yet). The pill row below appears only when something is NOT ready.
+  const states = nodes.map((n) => n.state);
+  const buckets = statusBreakdown(states);
+  const nonReady = buckets.progress + buckets.down + buckets.unknown > 0;
   // Hover pairing (synced 3D hub glow) lives on the OUTER pane (ContextCard's #metapane), not here.
   // The full identity header (avatar + name + ticker) lives in the card HEAD now (MetaTitle via
   // CardHead's title slot, rolled via titleKey) — the body starts at the description.
@@ -291,13 +298,20 @@ export function MetaCard({ cfg }: { cfg: MetaCfg }) {
             <CompositionRows nodes={nodes} />
           </div>
           <Separator className="my-2" />
+          {/* Summary in the snapshot card's "Fees paid" grammar — muted label left, the bold
+              TOTAL right (column-aligned with the composition counts it summarizes). */}
           <div className="flex items-start justify-between gap-2.5">
-            <span className="text-body text-muted-foreground">Network status</span>
-            <span className="flex items-baseline justify-end gap-2 flex-wrap">
-              <span className="text-body text-foreground whitespace-nowrap"><b className="font-bold">{nodes.length}</b> node{nodes.length === 1 ? "" : "s"}</span>
-              <StatusBreakdown states={nodes.map((n) => n.state)} />
-            </span>
+            <span className="text-body text-muted-foreground">Online nodes</span>
+            <span className="text-body text-foreground tabular-nums"><b className="font-bold">{nodes.length}</b></span>
           </div>
+          {/* The pill row appears only when something is NOT ready — and then it shows the
+              FULL breakdown including the ready pill (user, 2026-07-12: all-ready is the
+              silent default; a mixed fleet reads as one complete picture). */}
+          {nonReady && (
+            <div className="mt-1.5 flex justify-end">
+              <StatusBreakdown states={states} />
+            </div>
+          )}
         </>
       )}
     </>

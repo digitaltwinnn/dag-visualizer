@@ -10,7 +10,6 @@ import { EXPLORE_ICON } from "@/components/icons";
 import { shortHash, CORE_HEX, metagraphById } from "@/src/data/network";
 import { nodeCompositionLabel } from "@/src/data/composition";
 import { identityHudHex } from "@/src/palette/identity";
-import { IdentityDot } from "@/components/inspector/parts";
 import { SELECTED_ROW, SelectedRowMark } from "@/components/selection";
 import { ccToFlag } from "@/src/util/format";
 import { hoverKeyOf } from "@/src/data/hoverSubject";
@@ -90,24 +89,22 @@ export default function GeoExplore() {
   }, [selNodes]);
 
   // COHORT ROWS (user redesign, option C): a country's nodes collapse into one row per
-  // city × provider × network — mirroring the 3D honeycomb stacks — so the list
-  // repeats nothing (the old rows re-stated the same city and "ready" dozens of times).
-  // A cohort row is a DISCLOSURE: clicking expands its id rows inline (the pure pickers);
-  // everything aggregate already reads on the cohort row itself. NO status anywhere in the
-  // list (user: health belongs to the node CARD + the future network-health view); the
-  // NETWORK key keeps each cohort's identity dot one hue (a mixed cohort under "all" would
-  // break the identity rule).
-  type Cohort = { key: string; city: string | null; isp: string | null; hue: string; rows: NodeRow[] };
+  // city × provider — so the list repeats nothing (the old rows re-stated the same city
+  // and "ready" dozens of times). A cohort row is a DISCLOSURE: clicking expands its id
+  // rows inline (the pure pickers); everything aggregate already reads on the cohort row
+  // itself. NO status anywhere in the list (user: health belongs to the node CARD + the
+  // future network-health view). NO identity dot either (user, 2026-07-12): network is NOT
+  // in the key — a provider cohort can host many metagraphs, so no single hue can speak for
+  // the row, and splitting per network multiplied groups (the dot went with the split).
+  type Cohort = { key: string; city: string | null; isp: string | null; rows: NodeRow[] };
   const cohortsOf = (rows: NodeRow[]): Cohort[] => {
     const by = new Map<string, Cohort>();
     for (const r of rows) {
       const geo = "geo" in r.pick ? r.pick.geo : undefined;
-      const netId = r.pick.kind === "metanode" ? r.pick.meta?.id ?? null : "dag";
       const city = r.city || null;
       const isp = geo?.isp || null;
-      const key = `${city ?? ""}|${isp ?? ""}|${netId ?? ""}`;
-      const hue = r.pick.kind === "metanode" && r.pick.meta ? identityHudHex(r.pick.meta.id) : CORE_HEX;
-      (by.get(key) ?? by.set(key, { key, city, isp, hue, rows: [] }).get(key)!).rows.push(r);
+      const key = `${city ?? ""}|${isp ?? ""}`;
+      (by.get(key) ?? by.set(key, { key, city, isp, rows: [] }).get(key)!).rows.push(r);
     }
     return [...by.values()].sort(
       (a, b) =>
@@ -247,9 +244,9 @@ export default function GeoExplore() {
                           );
                         return (
                           <div key={c.key}>
-                            {/* The cohort row: one line per city × provider × status × network —
-                                the 3D stack as a list row. A DISCLOSURE (chevron), not a
-                                selection; ready is silent, exceptions chip. */}
+                            {/* The cohort row: one line per city × provider — the honeycomb
+                                as a list row. A DISCLOSURE (chevron), not a selection; no
+                                leading dot (a cohort can host many networks). */}
                             <button
                               type="button"
                               className={cn(
@@ -279,7 +276,6 @@ export default function GeoExplore() {
                               }}
                               onMouseLeave={() => setHoverCohort(null)}
                             >
-                              <IdentityDot hue={c.hue} />
                               <span className="flex-none text-body whitespace-nowrap">{c.city ?? "Unlocated"}</span>
                               {c.isp && (
                                 <span className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-label text-muted-foreground">
@@ -308,7 +304,10 @@ export default function GeoExplore() {
                                     selIp != null && r.layer === selLayer &&
                                     "node" in r.pick && r.pick.node?.ip === selIp;
                                   const hoverKey = hoverKeyOf(r.pick);
-                                  const pair = subjectPairing(hoverNodeId, hoverKey, setHoverNodeId, c.hue);
+                                  // Pairing hue per ROW (the cohort has no single hue —
+                                  // it can host many networks; the row knows its own).
+                                  const rowHue = r.pick.kind === "metanode" && r.pick.meta ? identityHudHex(r.pick.meta.id) : CORE_HEX;
+                                  const pair = subjectPairing(hoverNodeId, hoverKey, setHoverNodeId, rowHue);
                                   return (
                                     <button
                                       key={(r.id ?? r.label) + i}

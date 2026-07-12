@@ -465,7 +465,11 @@ async function buildLand(globe: GeoViewHost) {
         .replace("#include <common>", "#include <common>\nuniform sampler2D uCountryMask;\nuniform float uMaskBoost;")
         .replace(
           "#include <map_fragment>",
-          "#include <map_fragment>\n\tdiffuseColor.rgb *= mix(1.0, uMaskBoost, texture2D(uCountryMask, vMapUv).r);",
+          // THRESHOLDED sample: linear filtering smears the rasterized mask across many
+          // screen pixels at node-level zoom (the fill faded toward the border, user
+          // 2026-07-12) — the tight smoothstep snaps the boost to a crisp in/out boundary
+          // with sub-texel antialiasing, so the fill reads as a proper fill to the edge.
+          "#include <map_fragment>\n\tdiffuseColor.rgb *= mix(1.0, uMaskBoost, smoothstep(0.4, 0.6, texture2D(uCountryMask, vMapUv).r));",
         );
     };
     globe.landFillMat = landMat;
@@ -531,7 +535,7 @@ export function setCountryFillMask(globe: GeoViewHost, rings: Ring[] | null): vo
     u.uMaskBoost.value = 1;
     return;
   }
-  const W = 1024, H = 512; // soft wash — low res is plenty (the land map carries the detail)
+  const W = 2048, H = 1024; // enough texels that the shader's threshold lands ON the border
   const cv = document.createElement("canvas");
   cv.width = W; cv.height = H;
   const g = cv.getContext("2d")!;

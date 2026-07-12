@@ -468,7 +468,9 @@ views and caused the ledger red-dots bug; that pattern is forbidden.
     preview while one is selected), gone on deselect; it's a `geoFades` entry whose `base` IS the level, so the morph
     gates it for free. A committed drill also firms the drilled country's OWN land glass — a
     SCOPED equirect mask, not a global bump (`setCountryFillMask`: the country's rings
-    rasterized to a 1024×512 canvas per drill change, sampled by the land-fill shader via
+    rasterized to a 2048×1024 canvas per drill change, sampled THRESHOLDED (a tight
+    smoothstep — linear filtering smeared the boundary at node-level zoom) by the land-fill
+    shader via
     `onBeforeCompile`, `uMaskBoost` inside / 1 elsewhere; cleared = hard no-op). NB the fill's
     resting additive is tiny (~0.055 luminance × 0.45), so perceptible boosts start ~×6 —
     `MASK_BOOST` 8, tuned live (×12 read hot). **The country hover/click pairing is BIDIRECTIONAL**
@@ -558,14 +560,16 @@ and keep changing, so they're examples, not the contract.
   leads with a collapsed **`AboutView`** orientation card (per-view title + eyebrow + copy;
   scaffolded views carry a `SOON` caption), above the view's ONE tool card if it has one —
   geo → `GeoExplore` (the country→nodes accordion: a country row shows its share, clicking
-  it drills the globe AND expands its **COHORT rows** — one row per city × provider × status ×
-  network, mirroring the 3D honeycomb stacks (`Falkenstein · Hetzner ×28`), sorted by count;
-  the old per-node rows repeated the same city/"ready" dozens of times (user: "a patch, not a
-  design"). NO status anywhere in the list (user: health belongs to the node card + the future
-  network-health view); the NETWORK in the cohort key keeps each identity dot one hue. A
+  it drills the globe AND expands its **COHORT rows** — one row per city × provider
+  (`Falkenstein · Hetzner 31`), sorted by count; the old per-node rows repeated the same
+  city/"ready" dozens of times (user: "a patch, not a design"). NO status anywhere in the
+  list (user: health belongs to the node card + the future network-health view); NO identity
+  dot on cohort rows either (user, 2026-07-12 — network is NOT in the key: a provider cohort
+  can host many metagraphs, no single hue can speak for the row, and splitting per network
+  multiplied groups). A
   cohort is a DISCLOSURE (single-open chevron) expanding to picker rows that LEAD with the
   composition word + trail the muted mono id (`data 53de…` — real per-row info, cohorts can
-  mix compositions); a
+  mix compositions and NETWORKS; the id rows' hover-pairing hue derives per row); a
   SINGLE-node cohort click selects its node in the same click (no pointless second click); a
   collapsed cohort holding the selected node surfaces the ✓. Hovering a cohort glows its WHOLE
   3D stack (`store.hoverCohort` ids[] → `globe.setHoverCohort` → the fabric's hot check) and
