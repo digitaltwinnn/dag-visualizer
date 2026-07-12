@@ -83,23 +83,32 @@ const _gx = new Map<number, number>(); // reused per-frame: slot → global bloc
 const DIAL_REST_OP = 0.13; // resting identity mark — dim
 const DIAL_LIT_OP = 0.78;  // added while latched as did-work-this-tick (user: brighter highlight)
 
-// The shared unit station DIAL geometry — the instrument-ruler language bent into a circle: a
-// hairline circle plus radial ticks (fine ticks all round, longer cardinals), mirroring the rail
-// threads' ruler spec in-scene. Unit radius; each dial scales it to its fixed radius.
-// Construction-time allocation (once, shared by every dial).
+// The shared unit station DIAL geometry — the instrument-ruler language bent around the node
+// field: a hairline HEXAGON (user, 2026-07-12 — the honeycomb-stacked chips fill a hexagonal
+// footprint now, so the circle read as a mismatched frame; vertices at k·60° match the hex
+// grid's neighbour axes) plus radial ruler ticks that follow the hex boundary (fine ticks all
+// round, longer ones at the six corners), mirroring the rail threads' ruler spec in-scene.
+// Unit circumradius; each dial scales it to its fixed radius. Construction-time allocation
+// (once, shared by every dial).
 function buildDialGeometry(): THREE.BufferGeometry {
   const pts: number[] = [];
-  const SEG = 72;
-  for (let i = 0; i < SEG; i++) {
-  const a0 = (i / SEG) * Math.PI * 2, a1 = ((i + 1) / SEG) * Math.PI * 2;
-  pts.push(Math.cos(a0), 0, Math.sin(a0), Math.cos(a1), 0, Math.sin(a1));
+  // A regular hexagon's boundary distance at angle a (circumradius 1, vertices at k·60°).
+  const SIXTH = Math.PI / 3;
+  const rHex = (a: number) => {
+    const m = ((a % SIXTH) + SIXTH) % SIXTH - SIXTH / 2;
+    return Math.sqrt(3) / 2 / Math.cos(m);
+  };
+  for (let i = 0; i < 6; i++) {
+    const a0 = i * SIXTH, a1 = (i + 1) * SIXTH;
+    pts.push(Math.cos(a0), 0, Math.sin(a0), Math.cos(a1), 0, Math.sin(a1));
   }
   const TICKS = 48;
   for (let i = 0; i < TICKS; i++) {
-  const a = (i / TICKS) * Math.PI * 2;
-  const cardinal = i % (TICKS / 4) === 0; // 4 longer cardinal ticks
-  const r0 = 1.04, r1 = cardinal ? 1.2 : 1.11;
-  pts.push(Math.cos(a) * r0, 0, Math.sin(a) * r0, Math.cos(a) * r1, 0, Math.sin(a) * r1);
+    const a = (i / TICKS) * Math.PI * 2;
+    const corner = i % (TICKS / 6) === 0; // 6 longer corner ticks
+    const rb = rHex(a);
+    const r0 = rb * 1.04, r1 = rb * (corner ? 1.2 : 1.11);
+    pts.push(Math.cos(a) * r0, 0, Math.sin(a) * r0, Math.cos(a) * r1, 0, Math.sin(a) * r1);
   }
   const geo = new THREE.BufferGeometry();
   geo.setAttribute("position", new THREE.BufferAttribute(new Float32Array(pts), 3));

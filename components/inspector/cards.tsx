@@ -82,7 +82,7 @@ export function SnapshotAside({ data: d }: { data: GlobalSnapshot }) {
 // "hypergraph" for DAG) — reusing the same composition read the old standalone body line derived
 // from (`networkKind`, in ./parts), just folded into the ticker row instead of its own line.
 // Rolls as a whole via InspectorCard's `titleKey` (keyed on the name, synced with the edge pulse).
-export function MetaTitle({ cfg, compact = false }: { cfg: MetaCfg; compact?: boolean }) {
+export function MetaTitle({ cfg }: { cfg: MetaCfg }) {
   const metaList = useStore((s) => s.metaList);
   const mg = metaList.find((x) => x.id === cfg.id) || null;
   const hue = hex(cfg.color);
@@ -91,30 +91,23 @@ export function MetaTitle({ cfg, compact = false }: { cfg: MetaCfg; compact?: bo
   const kind = networkKind(cfg.id, mg?.nodes || []);
   return (
     <span className="inline-flex items-center gap-2.5 min-w-0">
-      {/* The logo shows as a clean circular mark — no squared tile (brand icons are round).
-          30px matches the two-line name+ticker block; COMPACT (the collapsed card) keeps ALL
-          the info but flows it on ONE line (name · ticker · kind, truncating) with a
-          line-height logo — so a collapsed dossier matches the other collapsed cards' height
-          without dropping anything (user, 2026-07-12). */}
-      <Avatar className={cn("flex-none", compact ? "size-[20px]" : "size-[30px]")}>
+      {/* The logo shows as a clean circular mark — no squared tile (brand icons are round);
+          30px matches the two-line name+ticker block (was 38 — bottom-padded the collapsed
+          card, user). The head keeps its TWO lines even collapsed: a one-line compact variant
+          was tried and rejected (2026-07-12 — the kind text truncated into the site link);
+          the dossier's collapsed height runs a few px taller than the other cards' by
+          deliberate trade (all the identity info stays). */}
+      <Avatar className="size-[30px] flex-none">
         {iconUrl && <AvatarImage src={iconUrl} alt="" />}
         <AvatarFallback style={{ color: hue }}>{monogram}</AvatarFallback>
       </Avatar>
-      {compact ? (
-        <span className="flex items-baseline gap-1.5 min-w-0">
-          <span className="leading-[1.1] flex-none">{cfg.name}</span>
+      <span className="flex flex-col gap-px min-w-0">
+        <span className="leading-[1.1]">{cfg.name}</span>
+        <span className="inline-flex items-baseline gap-1.5 min-w-0">
           <span className="text-label font-semibold tracking-[0.02em] flex-none" style={{ color: hue }}>{cfg.ticker}</span>
           <span className="text-label font-normal text-muted-foreground truncate">{kind}</span>
         </span>
-      ) : (
-        <span className="flex flex-col gap-px min-w-0">
-          <span className="leading-[1.1]">{cfg.name}</span>
-          <span className="inline-flex items-baseline gap-1.5 min-w-0">
-            <span className="text-label font-semibold tracking-[0.02em] flex-none" style={{ color: hue }}>{cfg.ticker}</span>
-            <span className="text-label font-normal text-muted-foreground truncate">{kind}</span>
-          </span>
-        </span>
-      )}
+      </span>
     </span>
   );
 }

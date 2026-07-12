@@ -29,16 +29,15 @@ function CardBody({ p }: { p: PickDescriptor }) {
 // inspector/cards.tsx). The node head is LOCATION-FIRST: place as the title, the demoted id hash
 // as the subtitle (GeoLiveSubtitle renders null in the no-location fallback, where the id stays
 // the title).
-function headFor(p: PickDescriptor, collapsed: boolean): {
+function headFor(p: PickDescriptor): {
   title?: ReactNode; titleKey?: string; subtitle?: ReactNode; aside?: ReactNode;
 } {
   switch (p.kind) {
     // The dossier head is the full identity composition — avatar + name + ticker (MetaTitle;
     // user refinement restoring the pre-unification header). Still rolls via titleKey on the
-    // name, synced with the edge pulse. Collapsed = COMPACT: the ticker/kind line (subtitle
-    // content) hides and the logo shrinks, so the collapsed dossier matches the other cards'
-    // height (user, 2026-07-12).
-    case "meta": return { title: <MetaTitle cfg={p.cfg} compact={collapsed} />, titleKey: p.cfg.name };
+    // name, synced with the edge pulse. It keeps its two-line block even collapsed (a compact
+    // one-line variant was tried and rejected, 2026-07-12 — see MetaTitle's note).
+    case "meta": return { title: <MetaTitle cfg={p.cfg} />, titleKey: p.cfg.name };
     case "snapshot": return { title: <SnapshotTitle data={p.data} />, aside: <SnapshotAside data={p.data} /> };
     case "geoLive": return { title: <GeoLiveTitle />, subtitle: <GeoLiveSubtitle />, aside: <GeoLiveAside /> };
     // The layer head: the dedicated single-plane mark + name; rolls (titleKey) on the layer id.
@@ -81,7 +80,7 @@ export default function InspectorCard({
     p.kind === "meta"
       ? (metaList.find((x) => x.id === p.cfg.id)?.siteUrl ?? p.cfg.siteUrl)
       : undefined;
-  const head = headFor(p, collapsed);
+  const head = headFor(p);
   return (
     <>
       <CardHead
