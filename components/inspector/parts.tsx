@@ -41,7 +41,13 @@ function StatusPill({ color, children }: { color: string; children: React.ReactN
     <Badge
       variant="outline"
       className="text-label font-semibold px-2 py-px rounded-full border"
-      style={{ color, borderColor: color + "55", background: color + "1a" }}
+      // color-mix (not hex-append) so the alpha composes on ANY colour format — the bucket
+      // colours are `var(--token)` now (see BUCKET_COLOR): border ~0x55, fill ~0x1a.
+      style={{
+        color,
+        borderColor: `color-mix(in oklch, ${color} 33%, transparent)`,
+        background: `color-mix(in oklch, ${color} 10%, transparent)`,
+      }}
     >
       {children}
     </Badge>
