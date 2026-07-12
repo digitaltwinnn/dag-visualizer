@@ -47,9 +47,8 @@ export class HyperView {
   hubOrbits: boolean;
   coreGroup!: THREE.Group;
   core!: THREE.Mesh;
-  halo!: THREE.Mesh;
   coreFlash?: number;
-  private _core: number; // the structural accent (colors.core) — the core sphere + halo hue
+  private _core: number; // the structural accent (colors.core) — the core sphere hue
 
   // `sceneColors` (id -> 0xRRGGBB) is the identity SCENE-lane colour map (Task 3), handed in by
   // the Engine at construction — HyperView builds all its hubs synchronously from
@@ -111,19 +110,13 @@ export class HyperView {
       color: this._core, emissive: this._core, emissiveIntensity: 1.4,
       roughness: 0.25, metalness: 0.3, flatShading: true, transparent: true,
     });
-    this.core = new THREE.Mesh(new THREE.IcosahedronGeometry(3.1, 2), mat);
+    this.core = new THREE.Mesh(new THREE.IcosahedronGeometry(1.5, 2), mat);
     this.core.userData.pick = {
       kind: "core",
       title: "Global L0 — the Hypergraph core",
       sub: "Security & settlement layer",
     };
     this.coreGroup.add(this.core);
-
-    this.halo = new THREE.Mesh(
-      new THREE.IcosahedronGeometry(4.4, 1),
-      new THREE.MeshBasicMaterial({ color: this._core, wireframe: true, transparent: true, opacity: 0.16 })
-    );
-    this.coreGroup.add(this.halo);
 
     // The core lives directly in the scene (not under `root`), so the morph's
     // root-collapse doesn't shrink it — instead it grows into the globe in update().
@@ -232,10 +225,6 @@ export class HyperView {
     coreMat.emissiveIntensity = (0.6 + flash * 0.9) * coreF * coreReveal * (1 - 0.5 * (1 - coreReveal));
     coreMat.opacity = coreOpacity * coreReveal;
     this.coreGroup.visible = coreReveal > 0.001;
-    // The wireframe halo only makes sense at Hypergraph scale — fade it out early.
-    (this.halo.material as THREE.MeshBasicMaterial).opacity = 0.16 * coreF * THREE.MathUtils.clamp(1 - morph / 0.25, 0, 1);
-    this.halo.rotation.y -= dt * 0.15;
-    this.halo.rotation.z += dt * 0.08;
     if (this.coreFlash) this.coreFlash = Math.max(0, this.coreFlash - dt * 1.6);
 
     // Metagraphs — orbit, spin, tether pulses. While ANY metagraph is selected (focusId), the
