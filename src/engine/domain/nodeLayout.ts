@@ -34,6 +34,55 @@ export function fibShellPos(i: number, n: number, rad: number, flatten: number):
   return new THREE.Vector3(Math.cos(phi) * rr * rad, y * rad * flatten, Math.sin(phi) * rr * rad);
 }
 
+// ---- Hypergraph ORBITAL layout (redesign) ---------------------------------------------------
+// The Hypergraph places nodes on flat CONCENTRIC RINGS in the hub's XZ plane (read top-down as
+// clean orbital diagrams), replacing the old fibonacci scatter shells. Two cases:
+//   - a metagraph LAYER (few nodes) is ONE even ring at the layer's radius → `ringEven`;
+//   - the DAG core's dense pools fill MULTIPLE concentric rings outward → `ringStackPos`, with
+//     `ringStackRadii` giving the matching hoop radii the scene draws as cyan rings.
+
+// One even ring: node i of n at radius `r`, evenly spaced, in the XZ plane (y = 0). `phase` rotates
+// the ring so adjacent layers don't align their seams.
+export function ringEven(i: number, n: number, r: number, phase = 0): THREE.Vector3 {
+  const theta = (i / Math.max(1, n)) * Math.PI * 2 + phase;
+  return new THREE.Vector3(Math.cos(theta) * r, 0, Math.sin(theta) * r);
+}
+
+// Capacity of a ring at radius `r` given a target arc `gap` between chips (min 1).
+const ringCap = (r: number, gap: number) => Math.max(1, Math.floor((2 * Math.PI * r) / gap));
+
+// The hoop radii needed to hold `n` nodes, filling concentric rings outward from `r0` by `pitch`
+// until every node has a slot. Shared by the placement (`ringStackPos`) and the scene (which draws
+// a cyan hoop at each radius).
+export function ringStackRadii(n: number, r0: number, pitch: number, gap: number): number[] {
+  const radii: number[] = [];
+  let placed = 0, k = 0;
+  while (placed < Math.max(1, n)) {
+    const r = r0 + k * pitch;
+    radii.push(r);
+    placed += ringCap(r, gap);
+    k++;
+  }
+  return radii;
+}
+
+// Place node i of n across the concentric ring stack (each ring evenly spread over its ACTUAL
+// members so a partly-filled outer ring still looks even). XZ plane, y = 0.
+export function ringStackPos(i: number, n: number, r0: number, pitch: number, gap: number, phase = 0): THREE.Vector3 {
+  const radii = ringStackRadii(n, r0, pitch, gap);
+  let start = 0;
+  for (let k = 0; k < radii.length; k++) {
+    const r = radii[k];
+    const onThis = Math.min(ringCap(r, gap), n - start);
+    if (i < start + onThis) {
+      const theta = ((i - start) / Math.max(1, onThis)) * Math.PI * 2 + phase + k * 0.5; // stagger per ring
+      return new THREE.Vector3(Math.cos(theta) * r, 0, Math.sin(theta) * r);
+    }
+    start += onThis;
+  }
+  return new THREE.Vector3(r0, 0, 0); // unreachable
+}
+
 export interface Cluster {
   center: THREE.Vector3;
   count: number;
