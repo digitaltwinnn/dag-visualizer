@@ -214,6 +214,21 @@ export class HyperView {
     for (const m of this.metas) m.active = !ids || ids.has(m.cfg.id);
   }
 
+  // A metagraph's 3 layer hoops render SOLID where the layer has nodes and DOTTED where the layer
+  // exists in the architecture but is empty (a data-only metagraph like DED has no cL1 — its outer
+  // ring shows dotted, not absent). `present` maps metaId → [l0, dl1, cl1]; called on node (re)load.
+  setHoopPresence(present: Map<string, boolean[]>) {
+    for (const m of this.metas) {
+      const p = present.get(m.cfg.id);
+      m.hoops.forEach((h, li) => {
+        const mat = h.material as THREE.LineDashedMaterial;
+        const has = !!(p ? p[li] : true);
+        mat.dashSize = has ? 1e3 : 0.5; // huge dash + 0 gap = solid; small dash + gap = dotted
+        mat.gapSize = has ? 0 : 0.7;
+      });
+    }
+  }
+
   // A cyan structural hoop: a LineLoop circle of `radius` on the plane of ring `frame` (its two
   // in-plane basis vectors) — the redesign's "surface" primitive, tilted to match its node ring.
   private _makeHoop(frame: RingFrame, radius: number): THREE.LineLoop {
@@ -225,8 +240,12 @@ export class HyperView {
         frame.t.clone().multiplyScalar(Math.cos(a) * radius).addScaledVector(frame.b, Math.sin(a) * radius),
       );
     }
-    const mat = new THREE.LineBasicMaterial({ color: this._core, transparent: true, opacity: HOOP_OP });
-    return new THREE.LineLoop(new THREE.BufferGeometry().setFromPoints(pts), mat);
+    // Dash-capable material: a populated layer renders SOLID (gapSize 0), an empty layer renders
+    // DOTTED (set by setHoopPresence) to show the layer exists in the architecture but has no nodes.
+    const mat = new THREE.LineDashedMaterial({ color: this._core, transparent: true, opacity: HOOP_OP, dashSize: 1e3, gapSize: 0 });
+    const loop = new THREE.LineLoop(new THREE.BufferGeometry().setFromPoints(pts), mat);
+    loop.computeLineDistances(); // required for the dashed (empty-layer) style
+    return loop;
   }
 
   // (Re)build the DAG core's tilted cyan hoops — one per ring of each armillary shell (L0 ball +

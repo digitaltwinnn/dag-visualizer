@@ -330,14 +330,19 @@ export class Globe implements GeoViewHost {
     // DIFFERENT tilt angles (layer index = ring index; same primitive as the DAG core), so L0 / dL1 /
     // cL1 read as distinct tilted rings around a cyan hub. HyperView draws a matching tilted hoop.
     const rolesOf = (node: RouteNode) => nodeRoles(node, node.layer as string);
+    // Which layers each metagraph actually PLOTS a node in — HyperView hides the hoop for an absent
+    // layer (a data-only metagraph like DED has no cL1, so its outer ring must not draw empty).
+    const hoopPresent = new Map<string, boolean[]>();
     for (const m of withNodes) {
       const a = m._anchor;
       const hubGroup = this.layers?.metas?.find((x) => x.cfg.id === m.id)?.group || null;
       const located = m.nodes.filter((node) => geoMap[node.ip]);
       const seen = new Set<string>();
+      const present: boolean[] = [];
       META_LAYERS.forEach((layer, li) => {
         const nodeList = located.filter((node) => rolesOf(node).includes(layer));
         const cnt = nodeList.length;
+        present[li] = cnt > 0;
         const frame = armillaryFrame(li, META_LAYERS.length, META_RING.tilt);
         nodeList.forEach((node, i) => {
           const g = geoMap[node.ip]!;
@@ -369,7 +374,9 @@ export class Globe implements GeoViewHost {
           });
         });
       });
+      hoopPresent.set(m.id, present);
     }
+    this.layers?.setHoopPresence(hoopPresent);
     if (!recs.length) return;
 
     this.fabric.buildMetaNodes(recs);
