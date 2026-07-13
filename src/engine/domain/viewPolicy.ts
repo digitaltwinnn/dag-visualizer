@@ -50,6 +50,10 @@ export interface ViewPolicy {
   // inside the surface on the other (user bug). 18 clears the land plateau (R 16 + LAND_H 1)
   // and the raised hex stacks.
   minCamAlt: number | null;
+  // OrbitControls minPolarAngle (radians from +Y). The globe views keep the ~0.25 "no pole
+  // crossing" clamp; the Hypergraph relaxes it so the ring layout can be viewed straight from the
+  // TOP (user). Applied by the Engine on a view change.
+  minPolarAngle: number;
   // Does this view publish the selection's flat node list (`store.selNodes`) for its explorer
   // card? geo (Nodes by country) + hyper (Nodes by layer); elsewhere the list empties so the
   // browsers stay quiet.
@@ -79,6 +83,7 @@ const FLAT: ViewPolicy = {
   countryHover: false,
   minCamDist: 12,
   minCamAlt: null,
+  minPolarAngle: 0.25,
   nodeList: false,
   bloom: BLOOM_CALM,
 };
@@ -96,6 +101,7 @@ export const VIEW_POLICIES: Record<Mode, ViewPolicy> = {
     countryHover: false,
     minCamDist: 12,
     minCamAlt: null,
+    minPolarAngle: 0.06, // relaxed: view the ring layout straight from the top (user)
     nodeList: true,
     // Calmer than ledger: the core + dense node field piled up an additive bleed on OLED/HDR.
     bloom: { strength: 0.20, radius: 0.32, threshold: 0.14 },
@@ -111,6 +117,7 @@ export const VIEW_POLICIES: Record<Mode, ViewPolicy> = {
     countryHover: true, // pointer over a drillable country previews its border (pairs both ways)
     minCamDist: 12,
     minCamAlt: 18, // above the land plateau (R 16 + LAND_H 1.0) + chip stacks — no zooming inside
+    minPolarAngle: 0.25,
     nodeList: true,
     // The lowest bloom of the three views: strength drives the "black halo" ring the saturated
     // node/wall hues cast on the globe, and the additive coastal walls read fuzzy under bloom.
@@ -129,6 +136,7 @@ export const VIEW_POLICIES: Record<Mode, ViewPolicy> = {
     countryHover: false,
     minCamDist: 12,
     minCamAlt: null,
+    minPolarAngle: 0.25,
     nodeList: false,
     bloom: BLOOM_CALM, // the reference look the design likes — unchanged
   },

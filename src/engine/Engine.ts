@@ -435,6 +435,9 @@ export class Engine {
     this.layers.setHubOrbits(policy.sims.hubOrbits);
     // Zoom floor: geo keeps the camera outside the globe surface (see viewPolicy.minCamDist).
     this.ctx.controls.minDistance = policy.minCamDist;
+    // Polar clamp: globe views keep the "no pole crossing" limit; hyper relaxes it so the ring
+    // layout can be viewed straight from the top (viewPolicy.minPolarAngle).
+    this.ctx.controls.minPolarAngle = policy.minPolarAngle;
     // Snapshots view reuses the SAME hub/node meshes, laid out into planar rows. Toggle that
     // layout on the meshes (off restores the orbit/globe layout) and lock orbit so it reads 2D.
     const inLedger = mode === "ledger";

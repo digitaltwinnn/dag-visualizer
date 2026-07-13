@@ -17,12 +17,12 @@ export const FOCI: Record<string, { pos: THREE.Vector3; target: THREE.Vector3 }>
   // needs — the whole scene rests inside the rail-free centre of the frame. Shared by the
   // hyper resting pose, the ledger overview and the placeholder idle.
   overview: { pos: new THREE.Vector3(0, 17, 68), target: new THREE.Vector3(0, 2, 0) },
-  // Hypergraph RESTING pose ("all" selected): looks DOWN onto the hub ring from well above so the
-  // metagraphs read as a flat 2D circle around the centred core on open (the shared front-on
-  // `overview` presented the ring nearly edge-on). Held off perfectly top-down so there's still a
-  // touch of 3D; autoRotate (on for hyper "all") spins the ring in its own plane, so it stays a
-  // circle. Tuned live with the user.
-  hyperRing: { pos: new THREE.Vector3(0, 62, 34), target: new THREE.Vector3(0, 0, 0) },
+  // Hypergraph RESTING pose ("all" selected): looks straight DOWN onto the ring layout from high
+  // above so the metagraph atoms + DAG core read as flat concentric rings from the TOP (user). Held
+  // a few degrees off exact-vertical to avoid the look-straight-down gimbal; the relaxed hyper
+  // minPolarAngle (viewPolicy) keeps this pose from being clamped. autoRotate spins it about the
+  // vertical axis (the rings stay circles). Tuned live.
+  hyperRing: { pos: new THREE.Vector3(0, 74, 10), target: new THREE.Vector3(0, 0, 0) },
   // The whole DAG core: pulled back enough to frame the outer cL1 (purple) shell (radius 14).
   dag: { pos: new THREE.Vector3(0, 9, 38), target: new THREE.Vector3(0, 1, 0) },
   // Geo targets the globe CENTRE — the downward-tilt composition comes from camera HEIGHT
