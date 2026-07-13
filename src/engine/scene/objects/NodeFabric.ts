@@ -357,7 +357,9 @@ export class NodeFabric {
     // A hovered/selected node dims the rest so it stands out — same in both views.
     const focusId = c.hoverNodeId || c.selectedNodeId || c.hoverCohort;
     const dimOthersOnFocus = c.filter === "all" || c.filter === "dag";
-    const focusDim = 0.45;
+    // Per-view hover/selection dim (user): how far the OTHER nodes drop when one node is the
+    // focus. Softer in geo (the rest stay brighter), a notch stronger in ledger, hyper unchanged.
+    const focusDim = c.ledger ? 0.55 : 0.45 + 0.20 * m; // hyper 0.45 · geo 0.65 · ledger 0.55
     for (const u of records) {
       let d = dim * dimScaleV;
       const geoCc = geoCcOf(u.pick);
@@ -410,7 +412,9 @@ export class NodeFabric {
     const cf = c.countryFilter, cmix = c.countryMix;
     const focusId = c.hoverNodeId || c.selectedNodeId || c.hoverCohort;
     const dimOthersOnFocus = c.filter === "all" || c.filter === "dag";
-    const focusDim = 0.45;
+    // Per-view hover/selection dim (user): how far the OTHER nodes drop when one node is the
+    // focus. Softer in geo (the rest stay brighter), a notch stronger in ledger, hyper unchanged.
+    const focusDim = c.ledger ? 0.55 : 0.45 + 0.20 * m; // hyper 0.45 · geo 0.65 · ledger 0.55
     for (const r of records) {
       r.dim += (r.dimTarget - r.dim) * kk;
       // effective dim = network dim (subtle in hyper via dimScaleV), raised by the country dim when
@@ -419,9 +423,15 @@ export class NodeFabric {
       const geoCc = geoCcOf(r.pick);
       if (cf && (!geoCc || geoCc !== cf)) dEff = Math.max(dEff, cmix);
       const glow = (0.42 + 0.08 * m) * (1 - dEff * 0.9); // steady, = validators' (twinkle removed, geo lift eased back — user)
+      // The COMMITTED metagraph's own nodes glow at the hub's resting level (HyperView hub base
+      // 0.72) in the Hypergraph, so the picked network's nodes bloom like its hub instead of sitting
+      // at the dimmer node base (user). Fades out with the hubs by morph 0.3 — there's no hub on the
+      // globe. The per-node hover/select +1.4 boost below still layers on top for the focused node.
+      const hubMatch =
+        c.filter === r.metaId ? Math.max(0, 0.72 - glow) * THREE.MathUtils.clamp(1 - m / 0.3, 0, 1) : 0;
       const flRaw = r._flash || 0; // brief flash when an arc pulse reaches this node
       const fl = flRaw * m; // arcs are a geo-only visual — their flash must not bleed into hyper
-      emi[r.index] = Math.max(0.03, glow + fl);
+      emi[r.index] = Math.max(0.03, glow + fl + hubMatch);
       // Hover/selection pairing: the focused node's shells glow together; the rest dim back.
       if (focusId) {
         if (r.nodeId === c.hoverNodeId || r.nodeId === c.selectedNodeId || c.hoverCohort?.has(r.nodeId)) emi[r.index] += 1.4;

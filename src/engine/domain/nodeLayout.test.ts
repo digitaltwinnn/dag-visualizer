@@ -132,6 +132,34 @@ describe("spreadCoLocated", () => {
     const clusters = spreadCoLocated([...groupA, ...groupB]);
     expect(clusters).toHaveLength(2);
   });
+
+  it("gives each KEY its own stack at a shared site (per-metagraph partition)", () => {
+    const key = (d: THREE.Vector3) => `${d.x.toFixed(6)},${d.y.toFixed(6)},${d.z.toFixed(6)}`;
+
+    // 6 nodes at the SAME point. Without keys, stackSizes(6) = [6] → ONE stack on one cell.
+    const noKeyDirs = Array.from({ length: 6 }, () => new THREE.Vector3(0, 0, 1));
+    spreadCoLocated(noKeyDirs);
+    expect(new Set(noKeyDirs.map(key)).size).toBe(1); // one stack = one direction
+
+    // Same 6 nodes, keyed 'a','a','a','b','b','b' → each metagraph forms its OWN 3-chip stack on
+    // its OWN honeycomb cell (two distinct directions), and each stack's levels run 0..2.
+    const dirs = Array.from({ length: 6 }, () => new THREE.Vector3(0, 0, 1));
+    const keys = ["a", "a", "a", "b", "b", "b"];
+    const levels: number[] = [];
+    const clusters = spreadCoLocated(dirs, undefined, levels, keys);
+    expect(clusters).toHaveLength(1);
+
+    const aDirs = new Set(dirs.filter((_, i) => keys[i] === "a").map(key));
+    const bDirs = new Set(dirs.filter((_, i) => keys[i] === "b").map(key));
+    expect(aDirs.size).toBe(1); // all 'a' chips share one cell
+    expect(bDirs.size).toBe(1); // all 'b' chips share another
+    expect([...aDirs][0]).not.toBe([...bDirs][0]); // the two stacks sit on different cells
+    expect(new Set(dirs.map(key)).size).toBe(2); // two stacks total, not one
+
+    const levelsFor = (k: string) => levels.filter((_, i) => keys[i] === k).slice().sort();
+    expect(levelsFor("a")).toEqual([0, 1, 2]);
+    expect(levelsFor("b")).toEqual([0, 1, 2]);
+  });
 });
 
 describe("stackSizes (chip-stack chunking)", () => {
