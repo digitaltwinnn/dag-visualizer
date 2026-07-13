@@ -51,17 +51,25 @@ export function createScene(canvas: HTMLCanvasElement, colors: SceneColors): Sce
   camera.position.set(0, 14, 54);
 
   const renderer = new THREE.WebGLRenderer({
-    canvas, antialias: true, powerPreference: "high-performance",
+    // antialias:false ON PURPOSE — an EffectComposer renders the scene into offscreen targets and
+    // only the final full-screen OutputPass quad reaches the default framebuffer (no geometry edges
+    // there to multisample), so renderer MSAA was pure wasted allocation. Composer-target MSAA was
+    // tried and reverted (a real perf hit for little gain on this bloom-heavy scene — user). stencil
+    // is never used, so drop it too.
+    canvas, antialias: false, stencil: false, powerPreference: "high-performance",
   });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
   renderer.setSize(window.innerWidth, window.innerHeight);
-  // Tone mapping — NeutralToneMapping (Khronos PBR Neutral). With the OutputPass added below it
-  // now ACTUALLY applies (an EffectComposer bypasses the renderer's direct-to-screen output, so
-  // this was a no-op before). Neutral was chosen over ACES + AgX in a live A/B on the
-  // bloom-heavy scene: ACES + AgX both added a milky highlight haze and desaturated the neon
-  // identity hues; Neutral tames the blown-out cores (the Global L0 core reads as a glowing cyan
-  // orb, not a flat white disc) while keeping the vivid cyans/magentas the identity system needs.
-  renderer.toneMapping = THREE.NeutralToneMapping;
+  // Tone mapping — ACESFilmicToneMapping. (Applies via the OutputPass; an EffectComposer bypasses
+  // the renderer's direct-to-screen output, so without OutputPass this would be a no-op.) Switched
+  // from NeutralToneMapping (user, on-device): Khronos Neutral does a min-channel `color -= offset`
+  // desaturation that DARKENS the desaturated boundary between a saturated COLOURED node (e.g.
+  // orange) and the cyan globe — the visible "black halo" around colored geo nodes, worst on
+  // OLED/HDR. ACES has no such subtraction (a smooth per-channel filmic curve), so the boundary
+  // ring is gone. The earlier A/B that preferred Neutral was run on the OLD hot bloom (strength
+  // 0.9) where ACES hazed blown cores; with the now-calm per-view bloom that haze is a non-issue.
+  // Trade accepted (user): ACES desaturates very bright hub/core CENTRES slightly toward white.
+  renderer.toneMapping = THREE.ACESFilmicToneMapping;
   // Exposure is the master brightness dial (a single multiplier applied to the whole frame at
   // the OutputPass). Kept well BELOW 1 on purpose: the scene otherwise read too hot overall —
   // most visible in hyper/geo, where hundreds of emissive nodes each contribute a bit of
@@ -97,14 +105,6 @@ export function createScene(canvas: HTMLCanvasElement, colors: SceneColors): Sce
 
   // Postprocessing — depth of field then bloom.
   const composer = new EffectComposer(renderer);
-  // Restore antialiasing. An EffectComposer renders the scene into an OFFSCREEN target, which
-  // bypasses the renderer's `antialias: true` (that only applies to the default framebuffer) — so
-  // every geometry edge (ledger floor planes, node chips, coastlines, graticule) came out aliased,
-  // read as "raw edges" on high-contrast OLED/HDR panels. Multisample the composer's ping-pong
-  // targets so those edges are MSAA-resolved again. WebGL2 (three's default) supports RT samples;
-  // 4 is the quality/perf sweet spot. The default targets are already HalfFloat (HDR-safe bloom).
-  composer.renderTarget1.samples = 4;
-  composer.renderTarget2.samples = 4;
   composer.addPass(new RenderPass(scene, camera));
 
   // Depth of field: keeps whatever the camera is looking at (the selection) crisp
