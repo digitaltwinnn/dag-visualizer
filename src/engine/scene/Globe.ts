@@ -194,6 +194,13 @@ export class Globe implements GeoViewHost {
   setSimFlags(sims: { arcs: boolean; globeSpin: boolean }): void {
     this.simArcs = sims.arcs;
     this.simSpin = sims.globeSpin;
+    // Spin OFF (hyper): snap the group frame to identity so the redesigned TILTED node rings
+    // register with the Hypergraph's cyan hoops (drawn in the unrotated frame). A leftover rotation
+    // from a prior geo visit would otherwise offset them (nodes drift off the rings when tilted).
+    if (!this.simSpin && !this.ledger) {
+      this.spin = null;
+      this.group.rotation.set(0, 0, 0);
+    }
   }
 
   // The wall is always the structural accent (the geo hologram hue). Kept as a setter so the Engine
@@ -336,7 +343,7 @@ export class Globe implements GeoViewHost {
           const g = geoMap[node.ip]!;
           const primary = !seen.has(node.ip);
           seen.add(node.ip);
-          const offset = ringFramePos(i, cnt, META_RING.radius, frame);
+          const offset = ringFramePos(i, cnt, META_RING.radii[layer], frame);
           const dir = latLonToVec3(g.lat!, g.lon!, 1).normalize(); // real location; fanned out below
           const lsite = ledgerSite(m._ledgerCol, METAGRAPHS.length);
           const lrowY = layer === "l0" ? LEDGER.rowML0 : LEDGER.rowML1;

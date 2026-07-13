@@ -94,7 +94,10 @@ export const VIEW_POLICIES: Record<Mode, ViewPolicy> = {
   hyper: {
     canvas: true,
     morph: "toHyper",
-    sims: { arcs: false, hubOrbits: true, globeSpin: true },
+    // globeSpin OFF: the redesigned tilted rings must stay registered with the cyan hoops (drawn in
+    // the unrotated frame) — an idle group spin would rotate the nodes off them. The camera
+    // autoRotate provides the motion instead.
+    sims: { arcs: false, hubOrbits: true, globeSpin: false },
     show: { hyperFurniture: true, globeSurface: true, ledger: false },
     pickSources: ["globe", "layers"],
     dofEligible: true,

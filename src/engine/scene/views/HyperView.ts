@@ -185,8 +185,8 @@ export class HyperView {
       // angles (layer index = ring index — same armillaryFrame the nodes use), so L0/dL1/cL1 read
       // as distinct tilted rings. The group only ORBITS (no spin — see update), so hoops + nodes
       // stay registered.
-      const hoops = META_LAYERS.map((_, li) => {
-        const h = this._makeHoop(armillaryFrame(li, META_LAYERS.length, META_RING.tilt), META_RING.radius);
+      const hoops = META_LAYERS.map((layer, li) => {
+        const h = this._makeHoop(armillaryFrame(li, META_LAYERS.length, META_RING.tilt), META_RING.radii[layer]);
         group.add(h);
         return h;
       });

@@ -31,10 +31,11 @@ export function metaAnchor(
 // nodeLayout), not concentric rings of increasing diameter. Shared by Globe (node placement) and
 // HyperView (the tilted cyan hoops it draws from the same frames), so they can't drift.
 
-// A metagraph is 3 same-diameter rings (one per layer) at 3 tilts — layer index = ring index.
-// The tilt is SHALLOW (near-flat, user) so the rings read almost flat but stay distinguishable.
+// A metagraph is 3 rings — one per layer — at DIFFERENT radii (L0 inner → dL1 → cL1 outer) so the
+// layers read distinct (like the DAG's L0/L1), each with a shallow tilt (near-flat, user) at a
+// different orientation for the atom feel. layer key → radius.
 export const META_LAYERS: ("l0" | "dl1" | "cl1")[] = ["l0", "dl1", "cl1"];
-export const META_RING = { radius: 3.6, tilt: 0.28 };
+export const META_RING = { radii: { l0: 2.6, dl1: 4.0, cl1: 5.4 }, tilt: 0.28 };
 
 // The DAG core: L0 is a near-flat armillary of just a FEW same-diameter rings; the native $DAG
 // currency (L1 / cl1) is its OWN, clearly separated OUTER shell (bigger diameter) so Global L0 and
