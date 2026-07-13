@@ -81,7 +81,8 @@ function buildGraticule(globe: GeoViewHost) {
       pts.push(latLonToVec3(lat, lon, R + 0.02), latLonToVec3(lat + 4, lon, R + 0.02));
   const geo = new THREE.BufferGeometry().setFromPoints(pts);
   // The sea graticule (grid lines OVER the ocean): subtle so the continents (the raised, gridded
-  // land) clearly lead — lifted from 0.03 (user: a bit more present on the water). Accent hue.
+  // land) clearly lead. 0.03 → 0.06 → 0.045 (user: eased back down a bit — a touch more subtle on
+  // the water). Accent hue.
   const mat = new THREE.LineBasicMaterial({ color: globe.geoColor, transparent: true, opacity: 0 });
   // FACING dim: far-hemisphere fragments fade to ~30% so the backside reads as behind the globe
   // instead of blending with the front (the hologram keeps its see-through presence, quieter).
@@ -102,7 +103,7 @@ function buildGraticule(globe: GeoViewHost) {
         "#include <color_fragment>\ndiffuseColor.a *= mix(mix(0.3, 0.04, uClose), 1.0, smoothstep(-0.35, 0.2, dot(vDir, uCamN)));",
       );
   };
-  globe.geoFades.push({ mat, base: 0.06 });
+  globe.geoFades.push({ mat, base: 0.045 });
   globe.group.add(new THREE.LineSegments(geo, mat));
 }
 
@@ -414,8 +415,8 @@ async function buildLand(globe: GeoViewHost) {
           // highlight (user-tuned: shorter walls, brighter rim) so the coastline stays legible.
           // Up close (uClose) the soft ridge read as FUZZ (user): the body glow damps down and the
           // rim band tightens + brightens, so the coastline resolves into a crisp line.
-          float body = (0.03 + 0.13 * e) * mix(1.0, 0.4, uClose);
-          float edge = smoothstep(mix(0.65, 0.86, uClose), 1.0, t) * mix(0.24, 0.36, uClose);
+          float body = (0.025 + 0.11 * e) * mix(1.0, 0.4, uClose);
+          float edge = smoothstep(mix(0.65, 0.86, uClose), 1.0, t) * mix(0.30, 0.44, uClose);
           // FACING dim: far-hemisphere cliffs stay visible (the hologram's see-through
           // presence) but clearly BEHIND — and near-invisible at close range (uClose), where
           // seeing through the globe distracted (user). See GeoViewHost.facingUniform/closeUniform.
@@ -475,7 +476,7 @@ async function buildLand(globe: GeoViewHost) {
     globe.landFillMat = landMat;
     // base = the resting ADDITIVE strength of the land surface (0..1) — lower = more transparent.
     // Kept well below 1 so the globe reads as a faint calm hologram, the coastal walls the accent.
-    globe.geoFades.push({ mat: globe.landFillMat, base: 0.45 });
+    globe.geoFades.push({ mat: globe.landFillMat, base: 0.38 });
     globe.landFillMesh = new THREE.Mesh(new THREE.SphereGeometry(top, 96, 64), globe.landFillMat);
     globe.landFillMesh.renderOrder = -1; // before the rim/nodes
     globe.landFillMesh.visible = false;  // revealed once the globe materialises (setMorph)
@@ -519,10 +520,11 @@ async function buildLand(globe: GeoViewHost) {
 }
 
 // How much the drilled country's land glass brightens inside the mask. The land fill's
-// resting additive contribution is TINY (texel luminance ~0.055 × the 0.45 base), so small
-// multipliers are imperceptible — the readable range starts ~×6 (tuned live: ×8 firms the
-// selection without going neon; ×12 read as a hot plate competing with the node stacks).
-const MASK_BOOST = 8.0;
+// resting additive contribution is TINY (texel luminance ~0.055 × the 0.38 base), so small
+// multipliers are imperceptible — the readable range starts ~×6. Compensated 5.0 → 5.9 when the
+// resting base was lowered 0.45 → 0.38 (user wanted the globe more transparent WITHOUT changing
+// the country-selected look): 0.38 × 5.9 ≈ 0.45 × 5.0, so the drilled plate is unchanged.
+const MASK_BOOST = 5.9;
 
 // Rasterize the drilled country's rings into a low-res equirect mask and hand it to the
 // land-fill shader; null clears (uMaskBoost 1 = hard no-op). Event-driven — one Canvas2D

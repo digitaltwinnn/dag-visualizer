@@ -690,7 +690,7 @@ export class LedgerView {
     const leadDimmed = selectedSlot > 0;
     this.centerMat.color.copy(this._coreCol);
     this.centerMat.emissive.copy(this._coreCol);
-    this.centerMat.emissiveIntensity = leadDimmed ? 0.3 : 0.55 + this._flash * 0.6;
+    this.centerMat.emissiveIntensity = leadDimmed ? 0.26 : 0.44 + this._flash * 0.5;
 
     // Hypergraph-L0 participation ring: glows as the global L0 produces each snapshot, then fades.
     this._gL0Glow = Math.max(0, this._gL0Glow - dt * 1.4);

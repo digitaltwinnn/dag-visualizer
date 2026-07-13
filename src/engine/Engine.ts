@@ -49,13 +49,16 @@ export class Engine {
   private globe: Globe;
   private ledger: LedgerView;
   private _ledgerDirty = false; // rebuild the ledger geometry next frame (set on data events)
-  private clock = new THREE.Clock();
+  // The frame timer — THREE.Timer (THREE.Clock was deprecated in r180). Unlike Clock it must be
+  // updated once per frame before reading the delta; the render loop does that.
+  private clock = new THREE.Timer();
   private raf = 0;
   private disposed = false;
   private _dofTmp = new THREE.Vector3();
 
   private mode: Mode = "hyper";
   private filter = "all";
+  private _hoverFilter: string | null = null; // previewed filter (chip/hub hover); drives the core dim
   private country: string | null = null;
   private morph = 0; // 0 = hypergraph, 1 = globe (eased each frame)
   // A persistent tween record (never re-allocated per focus) — `active` replaces the old
@@ -228,6 +231,7 @@ export class Engine {
         // Filter-chip hover: PREVIEW that selection's dim in any view (same per-view effect as the
         // real filter), without committing it. null restores the committed filter.
         if (st.hoverFilter !== prev.hoverFilter) {
+          this._hoverFilter = st.hoverFilter;
           this.globe.setHoverFilter(st.hoverFilter);
           this.ledger.setFilter(st.hoverFilter ?? this.filter);
         }
@@ -837,7 +841,7 @@ export class Engine {
     this.layers.focusId = null;
     if (filter === "all") {
       this.ctx.controls.autoRotate = true;
-      this.focus("overview");
+      this.focus("hyperRing"); // look down onto the hub ring — reads as a 2D circle around the core
       return;
     }
     this.ctx.controls.autoRotate = false;
@@ -861,10 +865,21 @@ export class Engine {
       if (this.disposed) return;
       this.raf = requestAnimationFrame(loop);
       this.stats?.begin();
+      this.clock.update(); // Timer: advance once per frame before reading the delta
       const dt = Math.min(this.clock.getDelta(), 0.05);
 
       const policy = VIEW_POLICIES[this.mode];
       const show = policy.show;
+
+      // Per-view bloom (ViewPolicy.bloom): hyper/geo run calmer than ledger — their dense, bright
+      // emitters (core, node field, additive coastal walls) piled up an additive bleed + a
+      // strength-driven "black halo" ring + fuzzy walls, worst on OLED/HDR. UnrealBloomPass reads
+      // strength/radius/threshold live each render, so a per-frame set is enough (and it tracks a
+      // mode switch immediately).
+      const pb = policy.bloom;
+      this.ctx.bloom.strength = pb.strength;
+      this.ctx.bloom.radius = pb.radius;
+      this.ctx.bloom.threshold = pb.threshold;
 
       // Ledger freezes morph at the view we entered from, so the reused node meshes fly in from
       // THAT layout (globe.ledgerT drives the lane fly-in instead). hyper/geo ease as usual.
@@ -874,7 +889,11 @@ export class Engine {
       this.layers.root.scale.setScalar(Math.max(0.0001, 1 - this.morph));
 
       this.globe.setMorph(this.morph);
-      this.layers.update(dt, this.morph);
+      // Core-dim target: the DAG core fades back when a specific metagraph is the effective subject
+      // (hover-preview wins over the committed filter), and stays lit for "all"/"dag".
+      const coreSubj = this._hoverFilter ?? this.filter;
+      const coreDim = coreSubj === "all" || coreSubj === "dag" ? 0 : 1;
+      this.layers.update(dt, this.morph, coreDim);
       this.globe.update(dt);
       this._updateTween(dt);
       this.ctx.controls.update();
@@ -916,7 +935,9 @@ export class Engine {
           ? meta.group.getWorldPosition(this._dofTmp)
           : this.ctx.controls.target;
         this.ctx.dof.uniforms["focus"].value = this.ctx.camera.position.distanceTo(focusTarget);
-        this.ctx.dof.uniforms["maxblur"].value = 0.07 * dofMix; // out-of-focus blur
+        // out-of-focus blur — kept modest so the SELECTED hub (a sphere whose near/far surfaces
+        // straddle the focal plane) stays crisp; it's enough to separate the background core/hubs.
+        this.ctx.dof.uniforms["maxblur"].value = 0.045 * dofMix;
       }
 
       this.ctx.composer.render();

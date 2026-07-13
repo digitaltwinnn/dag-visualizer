@@ -105,6 +105,7 @@ export function spreadCoLocated(
   dirs: THREE.Vector3[],
   { groupDeg = 0.8, spacingDeg = 0.8 }: SpreadOpts = {},
   levels?: number[],
+  keys?: string[],
 ): Cluster[] {
   const cosT = Math.cos(groupDeg * Math.PI / 180);
   const clusters: { center: THREE.Vector3; sum: THREE.Vector3; members: THREE.Vector3[]; count: number; spread: number }[] = [];
@@ -135,20 +136,33 @@ export function spreadCoLocated(
     // Chunk the group into chip stacks and place the STACKS as a HONEYCOMB (hexCell spiral,
     // edge-attached — user: no circular fan): `spacingDeg` is the angular distance between
     // ADJACENT hex cells (the caller derives it from the hex footprint so tiles touch).
-    const sizes = stackSizes(K);
     const pitch = spacingDeg * Math.PI / 180;
+    // Partition the co-located members by KEY (metagraph id; validators share "dag") so each
+    // metagraph forms its OWN chip stacks on its OWN honeycomb cells instead of intermixing at a
+    // shared site (user). No keys → one group, i.e. the previous whole-cluster chunking. First-seen
+    // key order keeps it deterministic; the key is read by object reference BEFORE members move.
+    const groups = new Map<string, THREE.Vector3[]>();
+    for (const d of c.members) {
+      const k = keys ? keys[idxOf.get(d)!] : "";
+      let g = groups.get(k);
+      if (!g) groups.set(k, (g = []));
+      g.push(d);
+    }
     let maxRR = 0;
-    let mi = 0;
-    sizes.forEach((size, j) => {
-      const cell = hexCell(j);
-      const dx = cell.x * pitch, dy = cell.y * pitch;
-      maxRR = Math.max(maxRR, Math.hypot(dx, dy));
-      for (let l = 0; l < size; l++, mi++) {
-        const d = c.members[mi];
-        setLevel(d, l);
-        d.copy(ctr).addScaledVector(_sx, dx).addScaledVector(_sy, dy).normalize();
+    let j = 0; // hex-cell index, advancing across every stack of every key-group in this cluster
+    for (const members of groups.values()) {
+      let mi = 0;
+      for (const size of stackSizes(members.length)) {
+        const cell = hexCell(j++);
+        const dx = cell.x * pitch, dy = cell.y * pitch;
+        maxRR = Math.max(maxRR, Math.hypot(dx, dy));
+        for (let l = 0; l < size; l++, mi++) {
+          const d = members[mi];
+          setLevel(d, l);
+          d.copy(ctr).addScaledVector(_sx, dx).addScaledVector(_sy, dy).normalize();
+        }
       }
-    });
+    }
     c.spread = maxRR + pitch * 0.5; // the tiled group's angular footprint (test/debug surface)
   }
   return clusters;

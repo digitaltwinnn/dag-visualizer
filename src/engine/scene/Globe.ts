@@ -593,11 +593,14 @@ export class Globe implements GeoViewHost {
     }
     if (vActive.length + mActive.length) {
       const lv: number[] = [];
-      // one pitch for the combined set, sized to the LARGER hex footprint
+      // one pitch for the combined set, sized to the LARGER hex footprint. KEYS group the fan by
+      // network (validators = "dag", metagraph nodes by metaId) so each metagraph's co-located
+      // chips get their OWN stack/cell instead of intermixing at a shared site (user).
       spreadCoLocated(
         [...vActive.map((u) => u.geoDir!), ...mActive.map((r) => r.geoDir)],
         { spacingDeg: hexPitchDeg(Math.max(VALIDATOR_HEX_R, META_HEX_R)) },
         lv,
+        [...vActive.map(() => "dag"), ...mActive.map((r) => r.metaId)],
       );
       vActive.forEach((u, i) => { u.geoRadius = HEX_BASE_R + (lv[i] ?? 0) * CHIP_PITCH; });
       mActive.forEach((r, i) => mLevel.set(r, lv[vActive.length + i] ?? 0));

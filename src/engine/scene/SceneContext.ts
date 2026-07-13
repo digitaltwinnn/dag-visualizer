@@ -6,7 +6,8 @@ import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import { EffectComposer } from "three/addons/postprocessing/EffectComposer.js";
 import { RenderPass } from "three/addons/postprocessing/RenderPass.js";
 import { UnrealBloomPass } from "three/addons/postprocessing/UnrealBloomPass.js";
-import { BokehPass, type BokehPassParamters } from "three/addons/postprocessing/BokehPass.js";
+import { BokehPass, type BokehPassParameters } from "three/addons/postprocessing/BokehPass.js";
+import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
 import type { SceneColors } from "../sceneColors";
 
 // @types/three types BokehPass.uniforms as a bare `object`; the engine reads
@@ -23,6 +24,7 @@ export interface SceneCtx {
   controls: OrbitControls;
   composer: EffectComposer;
   dof: DofPass;
+  bloom: UnrealBloomPass; // per-view strength/radius/threshold, driven by the Engine from ViewPolicy
   resize(): void;
 }
 
@@ -49,12 +51,31 @@ export function createScene(canvas: HTMLCanvasElement, colors: SceneColors): Sce
   camera.position.set(0, 14, 54);
 
   const renderer = new THREE.WebGLRenderer({
-    canvas, antialias: true, powerPreference: "high-performance",
+    // antialias:false ON PURPOSE — an EffectComposer renders the scene into offscreen targets and
+    // only the final full-screen OutputPass quad reaches the default framebuffer (no geometry edges
+    // there to multisample), so renderer MSAA was pure wasted allocation. Composer-target MSAA was
+    // tried and reverted (a real perf hit for little gain on this bloom-heavy scene — user). stencil
+    // is never used, so drop it too.
+    canvas, antialias: false, stencil: false, powerPreference: "high-performance",
   });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
   renderer.setSize(window.innerWidth, window.innerHeight);
+  // Tone mapping — ACESFilmicToneMapping. (Applies via the OutputPass; an EffectComposer bypasses
+  // the renderer's direct-to-screen output, so without OutputPass this would be a no-op.) Switched
+  // from NeutralToneMapping (user, on-device): Khronos Neutral does a min-channel `color -= offset`
+  // desaturation that DARKENS the desaturated boundary between a saturated COLOURED node (e.g.
+  // orange) and the cyan globe — the visible "black halo" around colored geo nodes, worst on
+  // OLED/HDR. ACES has no such subtraction (a smooth per-channel filmic curve), so the boundary
+  // ring is gone. The earlier A/B that preferred Neutral was run on the OLD hot bloom (strength
+  // 0.9) where ACES hazed blown cores; with the now-calm per-view bloom that haze is a non-issue.
+  // Trade accepted (user): ACES desaturates very bright hub/core CENTRES slightly toward white.
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
-  renderer.toneMappingExposure = 1.05;
+  // Exposure is the master brightness dial (a single multiplier applied to the whole frame at
+  // the OutputPass). Kept below 1 on purpose: the scene otherwise read too hot overall — most
+  // visible in hyper/geo, where many emissive nodes each contribute a bit of ADDITIVE bloom that
+  // accumulates into a general glow. Nudged 0.7 → 0.82 (user) after the large bright objects were
+  // downsized and ACES gave more highlight headroom — the scene has room to sit a touch brighter.
+  renderer.toneMappingExposure = 0.82;
 
   const controls = new OrbitControls(camera, renderer.domElement);
   controls.enableDamping = true;
@@ -95,10 +116,10 @@ export function createScene(canvas: HTMLCanvasElement, colors: SceneColors): Sce
   // few units of depth around the focal plane, so a shallow aperture smeared THEM too; this widens
   // the sharp zone to cover the whole selected cluster while distant objects (the core, the other
   // hubs) are far enough out to still saturate to maxblur — strong background blur, crisp selection.
-  // BokehPassParamters' types only declare focus/aspect/aperture/maxblur, but the JS
+  // BokehPassParameters' types only declare focus/aspect/aperture/maxblur, but the JS
   // constructor accepts (and ignores) width/height too — kept for parity with the
   // original call.
-  const dofParams: BokehPassParamters & { width: number; height: number } = {
+  const dofParams: BokehPassParameters & { width: number; height: number } = {
     focus: 54, aperture: 0.0002, maxblur: 0.01,
     width: window.innerWidth, height: window.innerHeight,
   };
@@ -108,11 +129,23 @@ export function createScene(canvas: HTMLCanvasElement, colors: SceneColors): Sce
 
   const bloom = new UnrealBloomPass(
     new THREE.Vector2(window.innerWidth, window.innerHeight),
-    0.9,   // strength
-    0.7,   // radius
-    0.18   // threshold
+    0.30,  // strength — the dominant "overpowering" lever; well down from the r0.161 default. The
+           // whole-scene glow, the geo node "dark halo" (a bloom mip/tonemap ring, not a radius
+           // artifact — it survives radius cuts but vanishes with strength), and the fuzzy selected
+           // hub all trace back to over-strong bloom.
+    0.35,  // radius — tight halos: keeps hubs/core crisp discs (not overpowering washes) and
+           // shrinks the bloom-mip "dark ring" that saturated hues cast on the dimmed globe
+    0.13   // threshold — low so every identity HUE clears it (bloom thresholds on luminance, and
+           // low-luma hues like the blue/green metagraphs would be cut out at a higher value; the
+           // node/structure separation comes from the emissive gap, not the threshold)
   );
   composer.addPass(bloom);
+
+  // Terminal pass: applies the renderer's toneMapping + exposure and the sRGB output
+  // conversion to the composited result. Without it an EffectComposer bypasses the renderer's
+  // output step, so `toneMapping` above was effectively a no-op (three r150+ standardised on
+  // OutputPass as the correct chain end).
+  composer.addPass(new OutputPass());
 
   // The caller (engine) owns the resize listener so it can be removed on dispose.
   function resize() {
@@ -122,5 +155,5 @@ export function createScene(canvas: HTMLCanvasElement, colors: SceneColors): Sce
     composer.setSize(window.innerWidth, window.innerHeight);
   }
 
-  return { scene, camera, renderer, controls, composer, dof, resize };
+  return { scene, camera, renderer, controls, composer, dof, bloom, resize };
 }

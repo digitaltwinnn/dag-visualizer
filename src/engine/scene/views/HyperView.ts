@@ -10,7 +10,6 @@ import * as THREE from "three";
 import { METAGRAPHS, type MetaConfig } from "../../config";
 import { metaAnchor } from "../../domain/hyperLayout";
 import type { SceneColors } from "../../sceneColors";
-import { R_GLOBE, CORE_R } from "../../domain/morph";
 
 const _pos = new THREE.Vector3(); // scratch for hub orbit positions (reused each frame)
 
@@ -48,9 +47,9 @@ export class HyperView {
   hubOrbits: boolean;
   coreGroup!: THREE.Group;
   core!: THREE.Mesh;
-  halo!: THREE.Mesh;
   coreFlash?: number;
-  private _core: number; // the structural accent (colors.core) — the core sphere + halo hue
+  private _coreDim = 0; // eased 0→1: the DAG core fades back when a specific metagraph is the subject
+  private _core: number; // the structural accent (colors.core) — the core sphere hue
 
   // `sceneColors` (id -> 0xRRGGBB) is the identity SCENE-lane colour map (Task 3), handed in by
   // the Engine at construction — HyperView builds all its hubs synchronously from
@@ -112,7 +111,7 @@ export class HyperView {
       color: this._core, emissive: this._core, emissiveIntensity: 1.4,
       roughness: 0.25, metalness: 0.3, flatShading: true, transparent: true,
     });
-    this.core = new THREE.Mesh(new THREE.IcosahedronGeometry(3.1, 2), mat);
+    this.core = new THREE.Mesh(new THREE.IcosahedronGeometry(1.5, 2), mat);
     this.core.userData.pick = {
       kind: "core",
       title: "Global L0 — the Hypergraph core",
@@ -120,14 +119,9 @@ export class HyperView {
     };
     this.coreGroup.add(this.core);
 
-    this.halo = new THREE.Mesh(
-      new THREE.IcosahedronGeometry(4.4, 1),
-      new THREE.MeshBasicMaterial({ color: this._core, wireframe: true, transparent: true, opacity: 0.16 })
-    );
-    this.coreGroup.add(this.halo);
-
-    // The core lives directly in the scene (not under `root`), so the morph's
-    // root-collapse doesn't shrink it — instead it grows into the globe in update().
+    // The core lives directly in the scene (not under `root`), so the morph's root-collapse
+    // doesn't shrink it — instead it dissolves in place (coreReveal) in update() while the globe
+    // fades in on its own (the old grow-into-globe swell was removed).
     this.scene.add(this.coreGroup);
     this.pickables.push(this.core);
   }
@@ -200,7 +194,7 @@ export class HyperView {
   // `morph` (0 = Hypergraph, 1 = globe) fades the metagraph hubs out early so
   // they don't visibly collapse into the globe's centre — their real nodes fly
   // out to the map (Globe) instead.
-  update(dt: number, morph = 0) {
+  update(dt: number, morph = 0, coreDimTarget = 0) {
     this.clock += dt;
     const t = this.clock;
 
@@ -218,27 +212,26 @@ export class HyperView {
     const coreOpacity = 1;
     const metaOpacity = hubFade;
 
-    // Core pulse + flash, plus the morph "core -> globe" transform: the blue
-    // Hypergraph heart swells out to the globe's radius and dissolves as the Earth
-    // fades in beneath the nodes, so it reads as the core becoming the globe.
+    // Core pulse + flash. The core no longer SWELLS out into the globe on the morph (user removed
+    // the grow-into-globe transition): it just dissolves in place (coreReveal) while the Earth fades
+    // in on its own, so geo/ledger simply appear rather than being born from the core. The node
+    // transforms (the fly-out to map positions) are untouched.
     const flash = this.coreFlash || 0;
-    // Reach the globe's full radius early (by ~0.5) so the core is the SAME size
-    // as the Earth during the cross-fade, then dissolve sooner to hand off.
-    const grow = THREE.MathUtils.lerp(1, R_GLOBE / CORE_R, THREE.MathUtils.clamp(morph / 0.5, 0, 1));
     const coreReveal = 1 - THREE.MathUtils.clamp((morph - 0.3) / 0.35, 0, 1); // 1 -> 0 over 0.3..0.65
+    // The DAG core IS the DAG's heart, so it tracks the DAG's highlight state like the validator
+    // nodes do: lit when the subject is "all"/"dag", faded back when a specific metagraph is the
+    // hovered/committed subject (user: hovering a metagraph highlighted its nodes but left the core
+    // full-bright). Eased so it fades rather than snaps.
+    this._coreDim += (coreDimTarget - this._coreDim) * Math.min(1, dt * 4);
     const pulse = 1 + Math.sin(t * 1.6) * 0.04 + flash * 0.25;
-    this.core.scale.setScalar(pulse * grow);
+    this.core.scale.setScalar(pulse);
     this.core.rotation.y += dt * 0.25;
     this.core.rotation.x += dt * 0.12;
-    // Dim the glow as it expands so the swelling sphere doesn't bloom out the view.
+    // Dim the glow as it dissolves so the fading sphere doesn't bloom out the view.
     const coreMat = this.core.material as THREE.MeshStandardMaterial;
-    coreMat.emissiveIntensity = (1.05 + flash * 1.2) * coreF * coreReveal * (1 - 0.5 * (1 - coreReveal));
+    coreMat.emissiveIntensity = (0.6 + flash * 0.9) * coreF * coreReveal * (1 - 0.5 * (1 - coreReveal)) * (1 - this._coreDim * 0.6);
     coreMat.opacity = coreOpacity * coreReveal;
     this.coreGroup.visible = coreReveal > 0.001;
-    // The wireframe halo only makes sense at Hypergraph scale — fade it out early.
-    (this.halo.material as THREE.MeshBasicMaterial).opacity = 0.16 * coreF * THREE.MathUtils.clamp(1 - morph / 0.25, 0, 1);
-    this.halo.rotation.y -= dt * 0.15;
-    this.halo.rotation.z += dt * 0.08;
     if (this.coreFlash) this.coreFlash = Math.max(0, this.coreFlash - dt * 1.6);
 
     // Metagraphs — orbit, spin, tether pulses. While ANY metagraph is selected (focusId), the
@@ -286,10 +279,10 @@ export class HyperView {
         const e = 1 - m.pulse;
         m.pulseMesh.position.copy(_pos).multiplyScalar(1 - e);
         pulseMat.opacity = Math.sin(m.pulse * Math.PI) * 0.9 * metaF;
-        hubMat.emissiveIntensity = (0.8 + m.pulse * 1.6) * metaF * glowMul;
+        hubMat.emissiveIntensity = (0.72 + m.pulse * 0.5) * metaF * glowMul;
       } else {
         pulseMat.opacity = 0;
-        hubMat.emissiveIntensity = 0.8 * metaF * glowMul;
+        hubMat.emissiveIntensity = 0.72 * metaF * glowMul;
       }
     }
   }
