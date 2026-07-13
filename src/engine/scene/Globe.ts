@@ -273,8 +273,9 @@ export class Globe implements GeoViewHost {
     // DAG core: L0 is an armillary ball (same-diameter rings at different tilts); the native $DAG
     // currency (L1 / cl1) is its OWN clearly-separated OUTER shell (bigger radius). The ring COUNT
     // per shell scales with the node count and is shared with HyperView's tilted cyan hoops.
-    const l0Rings = armillaryRings(l0List.length);
-    const l1Rings = armillaryRings(cl1List.length, 10, 1, 3);
+    // Few rings (user: 2–3, not many): ~60 nodes per L0 ring capped at 3; L1 keeps 1–2.
+    const l0Rings = armillaryRings(l0List.length, 60, 2, 3);
+    const l1Rings = armillaryRings(cl1List.length, 12, 1, 2);
     place(l0List, "l0", "l0", dagColor, { radius: DAG_L0.radius, numRings: l0Rings, tilt: DAG_L0.tilt });
     place(cl1List, "cl1", "l1", dagColor, { radius: DAG_L1.radius, numRings: l1Rings, tilt: DAG_L1.tilt });
     // Hand the DAG core's ring shells to HyperView so it draws a tilted cyan hoop per ring.

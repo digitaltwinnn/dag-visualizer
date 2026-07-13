@@ -32,10 +32,12 @@ export function metaAnchor(
 // HyperView (the tilted cyan hoops it draws from the same frames), so they can't drift.
 
 // A metagraph is 3 same-diameter rings (one per layer) at 3 tilts — layer index = ring index.
+// The tilt is SHALLOW (near-flat, user) so the rings read almost flat but stay distinguishable.
 export const META_LAYERS: ("l0" | "dl1" | "cl1")[] = ["l0", "dl1", "cl1"];
-export const META_RING = { radius: 3.6, tilt: 1.15 };
+export const META_RING = { radius: 3.6, tilt: 0.28 };
 
-// The DAG core: L0 is an armillary ball; the native $DAG currency (L1 / cl1) is its OWN, clearly
-// separated OUTER shell (bigger diameter) so Global L0 and L1 read apart (user).
-export const DAG_L0 = { radius: 9, tilt: 1.15 };
-export const DAG_L1 = { radius: 12.5, tilt: 1.15 };
+// The DAG core: L0 is a near-flat armillary of just a FEW same-diameter rings; the native $DAG
+// currency (L1 / cl1) is its OWN, clearly separated OUTER shell (bigger diameter) so Global L0 and
+// L1 read apart (user).
+export const DAG_L0 = { radius: 9, tilt: 0.28 };
+export const DAG_L1 = { radius: 12.5, tilt: 0.28 };
