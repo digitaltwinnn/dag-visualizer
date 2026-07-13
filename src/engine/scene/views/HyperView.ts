@@ -172,11 +172,13 @@ export class HyperView {
       // already the identity scene colour on this first build.
       const col = (this.sceneColors && this.sceneColors[cfg.id]) ?? cfg.color;
 
+      // Hub sphere = the metagraph's OWN identity colour (user; the cyan structure is carried by the
+      // rings + hoops). A little smaller than before so the ring atom leads.
       const hubMat = new THREE.MeshStandardMaterial({
-        color: this._core, emissive: this._core, emissiveIntensity: 1.1,
+        color: col, emissive: col, emissiveIntensity: 1.1,
         roughness: 0.3, metalness: 0.4, flatShading: true, transparent: true,
       });
-      const hub = new THREE.Mesh(new THREE.IcosahedronGeometry(1.2, 1), hubMat);
+      const hub = new THREE.Mesh(new THREE.IcosahedronGeometry(0.9, 1), hubMat);
       hub.userData.pick = { kind: "meta", cfg, title: cfg.name, sub: `Metagraph · ${cfg.ticker}` };
       group.add(hub);
       this.pickables.push(hub);
