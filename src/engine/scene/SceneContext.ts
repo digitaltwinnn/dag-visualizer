@@ -71,12 +71,11 @@ export function createScene(canvas: HTMLCanvasElement, colors: SceneColors): Sce
   // Trade accepted (user): ACES desaturates very bright hub/core CENTRES slightly toward white.
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
   // Exposure is the master brightness dial (a single multiplier applied to the whole frame at
-  // the OutputPass). Kept well BELOW 1 on purpose: the scene otherwise read too hot overall —
-  // most visible in hyper/geo, where hundreds of emissive nodes each contribute a bit of
-  // ADDITIVE bloom that accumulates into a general glow (ledger has far fewer emitters, so it
-  // reads calmer at the same setting). 0.7 pulls the whole scene down uniformly without touching
-  // the per-object balance below.
-  renderer.toneMappingExposure = 0.7;
+  // the OutputPass). Kept below 1 on purpose: the scene otherwise read too hot overall — most
+  // visible in hyper/geo, where many emissive nodes each contribute a bit of ADDITIVE bloom that
+  // accumulates into a general glow. Nudged 0.7 → 0.82 (user) after the large bright objects were
+  // downsized and ACES gave more highlight headroom — the scene has room to sit a touch brighter.
+  renderer.toneMappingExposure = 0.82;
 
   const controls = new OrbitControls(camera, renderer.domElement);
   controls.enableDamping = true;
