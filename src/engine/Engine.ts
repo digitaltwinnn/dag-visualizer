@@ -896,7 +896,11 @@ export class Engine {
       // (hover-preview wins over the committed filter), and stays lit for "all"/"dag".
       const coreSubj = this._hoverFilter ?? this.filter;
       const coreDim = coreSubj === "all" || coreSubj === "dag" ? 0 : 1;
-      this.layers.update(dt, this.morph, coreDim);
+      // Freeze the overall sphere spin once the camera is zoomed in to inspect (hyper) — a close-up
+      // reads still; the per-node axis spin keeps going. Threshold is well inside the resting pose.
+      const zoomedIn = this.mode === "hyper" &&
+        this.ctx.camera.position.distanceTo(this.ctx.controls.target) < 45;
+      this.layers.update(dt, this.morph, coreDim, zoomedIn);
       this.globe.update(dt);
       this._updateTween(dt);
       this.ctx.controls.update();

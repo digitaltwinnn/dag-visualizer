@@ -16,9 +16,7 @@ const _pos = new THREE.Vector3(); // scratch for hub orbit positions (reused eac
 
 // Resting opacity of the cyan structural hoops (subtle — structure, not a subject). Faded per
 // frame with the hub/core reveal so the rings are Hypergraph-only furniture.
-const HOOP_OP = 0.16;
-// The faint cyan ground grid beneath the whole ring — the planar cyan context (geo/ledger peer).
-const GROUND_OP = 0.05;
+const HOOP_OP = 0.08;
 
 // One orbiting metagraph hub record in HyperView.metas (the exact shape the constructor
 // builds — scene/Globe.ts (via `layers.metas.find`, keying off `.cfg.id`/`.group`) and
@@ -57,7 +55,6 @@ export class HyperView {
   core!: THREE.Mesh;
   coreFlash?: number;
   private _coreRings: THREE.LineLoop[] = []; // the DAG core's cyan "sun" hoops (rebuilt on node load)
-  private _ground!: THREE.GridHelper; // the faint cyan ground grid beneath the whole ring
   private _coreDim = 0; // eased 0→1: the DAG core fades back when a specific metagraph is the subject
   private _core: number; // the structural accent (colors.core) — the core sphere hue
 
@@ -77,7 +74,6 @@ export class HyperView {
 
     this._buildCore();
     this._buildMetagraphs();
-    this._buildGround();
 
     this.clock = 0;
 
@@ -107,9 +103,8 @@ export class HyperView {
     if (this.ledger === on) return;
     this.ledger = on;
     // The Hypergraph furniture is hidden in the Snapshots chamber (update() early-returns there, so
-    // it can't fade these itself): the DAG core + its cyan hoops, the ground grid, and each hub +
-    // its layer hoops. Restored on exit; update() then governs their per-frame fade again.
-    this._ground.visible = !on;
+    // it can't fade these itself): the DAG core + its cyan hoops, and each hub + its layer hoops.
+    // Restored on exit; update() then governs their per-frame fade again.
     this.coreGroup.visible = !on;
     for (const m of this.metas) {
       m.hub.visible = !on;
@@ -253,24 +248,13 @@ export class HyperView {
     }
   }
 
-  // The faint cyan ground grid beneath the whole ring — the planar cyan context that gives the
-  // Hypergraph the geo-globe / ledger-plane design language. Static; faded with the hubs on the
-  // morph (see update). Lives in the scene (not `root`) so it fades rather than scale-collapses.
-  private _buildGround() {
-    const g = new THREE.GridHelper(130, 26, this._core, this._core);
-    const mat = g.material as THREE.LineBasicMaterial;
-    mat.transparent = true;
-    mat.opacity = GROUND_OP;
-    g.position.y = -7;
-    this.scene.add(g);
-    this._ground = g;
-  }
-
   // ---------------------------------------------------------------- Update loop
   // `morph` (0 = Hypergraph, 1 = globe) fades the metagraph hubs out early so
   // they don't visibly collapse into the globe's centre — their real nodes fly
   // out to the map (Globe) instead.
-  update(dt: number, morph = 0, coreDimTarget = 0) {
+  // `spinFrozen` (set when the camera is zoomed in to inspect) stops the overall SPHERE spin — the
+  // core + hub meshes — so a close-up reads still; the per-node axis spin (Globe) keeps going.
+  update(dt: number, morph = 0, coreDimTarget = 0, spinFrozen = false) {
     this.clock += dt;
     const t = this.clock;
 
@@ -281,9 +265,6 @@ export class HyperView {
     // Hubs are fully gone by ~30% into the morph, before the root-scale collapse
     // would be noticeable.
     const hubFade = THREE.MathUtils.clamp(1 - morph / 0.3, 0, 1);
-    // The cyan ground grid fades out with the hubs on the morph (Hypergraph-only furniture).
-    this._ground.visible = hubFade > 0.001;
-    (this._ground.material as THREE.LineBasicMaterial).opacity = GROUND_OP * hubFade;
 
     // Core stays fully lit; hubs fade out with the morph (hubFade).
     const coreF = 1;
@@ -304,8 +285,10 @@ export class HyperView {
     this._coreDim += (coreDimTarget - this._coreDim) * Math.min(1, dt * 4);
     const pulse = 1 + Math.sin(t * 1.6) * 0.04 + flash * 0.25;
     this.core.scale.setScalar(pulse);
-    this.core.rotation.y += dt * 0.25;
-    this.core.rotation.x += dt * 0.12;
+    if (!spinFrozen) {
+      this.core.rotation.y += dt * 0.25;
+      this.core.rotation.x += dt * 0.12;
+    }
     // Dim the glow as it dissolves so the fading sphere doesn't bloom out the view.
     const coreMat = this.core.material as THREE.MeshStandardMaterial;
     coreMat.emissiveIntensity = (0.6 + flash * 0.9) * coreF * coreReveal * (1 - 0.5 * (1 - coreReveal)) * (1 - this._coreDim * 0.6);
@@ -336,10 +319,11 @@ export class HyperView {
       );
       m.group.position.copy(_pos);
       // Spin the hub MESH, not the group — the group also holds the cyan hoops, which must stay
-      // registered with the (non-spinning) node rings Globe places at the same radii.
-      if (!frozen) m.hub.rotation.y += dt * m.spin;
+      // registered with the (non-spinning) node rings Globe places at the same radii. Frozen when a
+      // hub is focused OR the camera is zoomed in (spinFrozen).
+      if (!frozen && !spinFrozen) m.hub.rotation.y += dt * m.spin;
       m.group.visible = hubFade > 0.001;
-      if (!frozen) m.hub.rotation.x += dt * 0.5;
+      if (!frozen && !spinFrozen) m.hub.rotation.x += dt * 0.5;
       // Registered-but-node-less hubs read as inactive: faded body, near-zero glow,
       // fainter tether — present in the architecture, but clearly not live.
       // When a metagraph is selected (focusId), dim the OTHER hubs *subtly* — a gentle
