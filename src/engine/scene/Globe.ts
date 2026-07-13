@@ -15,12 +15,12 @@
 
 import * as THREE from "three";
 import { METAGRAPHS, DEFAULT_META_COLOR } from "../config";
-import { metaAnchor, META_SHELL, META_SHELL_PHASE, META_LAYERS, DAG_RING } from "../domain/hyperLayout";
+import { metaAnchor, META_LAYERS, META_RING, DAG_L0, DAG_L1 } from "../domain/hyperLayout";
 import { LEDGER, ledgerSite, ledgerSpread, clusterRadius } from "../domain/ledgerLayout";
 import type { SceneColors } from "../sceneColors";
 import * as geoStats from "../domain/geoStats";
 import { R, LAND_H, CHIP_PITCH, HEX_H, VALIDATOR_HEX_R, META_HEX_R, latLonToVec3, vec3ToLatLon } from "../domain/geoLayout";
-import { ringEven, ringStackPos, ringStackRadii, nodeRoles, spreadCoLocated } from "../domain/nodeLayout";
+import { armillaryFrame, ringFramePos, armillaryRings, armillaryPos, nodeRoles, spreadCoLocated } from "../domain/nodeLayout";
 import { surfFade, extrasFade } from "../domain/morph";
 import { ArcSim, type ArcEndpoint } from "../domain/arcSim";
 import type { MetaNodeRecord, ValidatorRecord } from "../domain/records";
@@ -218,7 +218,7 @@ export class Globe implements GeoViewHost {
     const seen = new Set<string>();
     let idx = 0;
     const net = (dagCore && dagCore.name) || "DAG";
-    const place = (list: RouteNode[], role: "l0" | "cl1", kind: "l0" | "l1", color: number, ring: { r0: number; pitch: number; gap: number }) => {
+    const place = (list: RouteNode[], role: "l0" | "cl1", kind: "l0" | "l1", color: number, ring: { radius: number; numRings: number; tilt: number }) => {
       const n = list.length;
       list.forEach((node, i) => {
         const ready = node.state === "Ready";
@@ -228,7 +228,7 @@ export class Globe implements GeoViewHost {
         const col = new THREE.Color(color);
         if (!ready) col.lerp(NODE_DIM, 0.55);
 
-        const hyperPos = ringStackPos(i, n, ring.r0, ring.pitch, ring.gap);
+        const hyperPos = armillaryPos(i, n, ring.radius, ring.numRings, ring.tilt);
         const g = geoMap[node.ip];
         const geoDir = g ? latLonToVec3(g.lat!, g.lon!, 1).normalize() : null;
 
@@ -270,14 +270,19 @@ export class Globe implements GeoViewHost {
     // The DAG's own validator shells are coloured with the DAG's identity SCENE hue (sceneColors.dag),
     // falling back to the old structural colours if not populated yet.
     const dagColor = (this.sceneColors && this.sceneColors.dag) ?? this._dagCore;
-    // DAG core: L0 fills a multi-ring "sun" outward from DAG_RING.r0; the native $DAG currency (cl1)
-    // gets its own ring just beyond the L0 rings. Radii shared with HyperView's cyan hoops.
-    const l0Radii = ringStackRadii(l0List.length, DAG_RING.r0, DAG_RING.pitch, DAG_RING.gap);
-    const dagCl1R0 = (l0Radii[l0Radii.length - 1] ?? DAG_RING.r0) + DAG_RING.cl1Offset;
-    place(l0List, "l0", "l0", dagColor, { r0: DAG_RING.r0, pitch: DAG_RING.pitch, gap: DAG_RING.gap });
-    place(cl1List, "cl1", "l1", dagColor, { r0: dagCl1R0, pitch: DAG_RING.cl1Pitch, gap: DAG_RING.cl1Gap });
-    // Hand the DAG core's hoop radii to HyperView so it can draw a cyan ring at each (Step 2).
-    this.layers?.buildCoreRings(cl1List.length ? [...l0Radii, dagCl1R0] : l0Radii);
+    // DAG core: L0 is an armillary ball (same-diameter rings at different tilts); the native $DAG
+    // currency (L1 / cl1) is its OWN clearly-separated OUTER shell (bigger radius). The ring COUNT
+    // per shell scales with the node count and is shared with HyperView's tilted cyan hoops.
+    const l0Rings = armillaryRings(l0List.length);
+    const l1Rings = armillaryRings(cl1List.length, 10, 1, 3);
+    place(l0List, "l0", "l0", dagColor, { radius: DAG_L0.radius, numRings: l0Rings, tilt: DAG_L0.tilt });
+    place(cl1List, "cl1", "l1", dagColor, { radius: DAG_L1.radius, numRings: l1Rings, tilt: DAG_L1.tilt });
+    // Hand the DAG core's ring shells to HyperView so it draws a tilted cyan hoop per ring.
+    this.layers?.buildCoreRings(
+      cl1List.length
+        ? [{ radius: DAG_L0.radius, numRings: l0Rings, tilt: DAG_L0.tilt }, { radius: DAG_L1.radius, numRings: l1Rings, tilt: DAG_L1.tilt }]
+        : [{ radius: DAG_L0.radius, numRings: l0Rings, tilt: DAG_L0.tilt }],
+    );
 
     this.fabric.buildValidators(this.nodes);
     this.pickables = this.fabric.pickables;
@@ -313,21 +318,24 @@ export class Globe implements GeoViewHost {
     // RINGS in the hub's plane — L0 inner, data-L1 middle, currency-L1 outer — read top-down as clean
     // orbital diagrams (was scattered fibonacci shells). One even ring per layer; a small per-layer
     // phase so the layers' node seams don't align radially.
+    // Each metagraph is a little "atom": its 3 layers become 3 rings of the SAME diameter at 3
+    // DIFFERENT tilt angles (layer index = ring index; same primitive as the DAG core), so L0 / dL1 /
+    // cL1 read as distinct tilted rings around a cyan hub. HyperView draws a matching tilted hoop.
     const rolesOf = (node: RouteNode) => nodeRoles(node, node.layer as string);
     for (const m of withNodes) {
       const a = m._anchor;
       const hubGroup = this.layers?.metas?.find((x) => x.cfg.id === m.id)?.group || null;
       const located = m.nodes.filter((node) => geoMap[node.ip]);
       const seen = new Set<string>();
-      for (const layer of META_LAYERS) {
+      META_LAYERS.forEach((layer, li) => {
         const nodeList = located.filter((node) => rolesOf(node).includes(layer));
         const cnt = nodeList.length;
-        const rad = META_SHELL[layer];
+        const frame = armillaryFrame(li, META_LAYERS.length, META_RING.tilt);
         nodeList.forEach((node, i) => {
           const g = geoMap[node.ip]!;
           const primary = !seen.has(node.ip);
           seen.add(node.ip);
-          const offset = ringEven(i, cnt, rad, META_SHELL_PHASE[layer]);
+          const offset = ringFramePos(i, cnt, META_RING.radius, frame);
           const dir = latLonToVec3(g.lat!, g.lon!, 1).normalize(); // real location; fanned out below
           const lsite = ledgerSite(m._ledgerCol, METAGRAPHS.length);
           const lrowY = layer === "l0" ? LEDGER.rowML0 : LEDGER.rowML1;
@@ -352,7 +360,7 @@ export class Globe implements GeoViewHost {
             pick,
           });
         });
-      }
+      });
     }
     if (!recs.length) return;
 

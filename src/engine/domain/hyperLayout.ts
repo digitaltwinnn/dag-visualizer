@@ -26,18 +26,16 @@ export function metaAnchor(
   };
 }
 
-// ---- Hypergraph ORBITAL layout (redesign) ---------------------------------------------------
-// Each network is concentric flat RINGS in the hub's plane. These radii are shared by Globe (which
-// places the nodes on them, via nodeLayout's ringEven/ringStackPos) and HyperView (which draws a
-// cyan hoop at each radius — the view's structural "surfaces", the geo-globe / ledger-plane peer).
+// ---- Hypergraph ARMILLARY layout (redesign v2) ----------------------------------------------
+// Each network is an "atom": rings of the SAME diameter at DIFFERENT tilt angles (armillaryFrame in
+// nodeLayout), not concentric rings of increasing diameter. Shared by Globe (node placement) and
+// HyperView (the tilted cyan hoops it draws from the same frames), so they can't drift.
 
-// Per-metagraph LAYER ring radii (L0 inner → data-L1 → currency-L1 outer) + a per-layer seam phase
-// so the layers' node seams don't align radially. One even ring per layer.
-export const META_SHELL: Record<"l0" | "dl1" | "cl1", number> = { l0: 2.0, dl1: 3.4, cl1: 4.6 };
-export const META_SHELL_PHASE: Record<"l0" | "dl1" | "cl1", number> = { l0: 0, dl1: 0.5, cl1: 1.0 };
+// A metagraph is 3 same-diameter rings (one per layer) at 3 tilts — layer index = ring index.
 export const META_LAYERS: ("l0" | "dl1" | "cl1")[] = ["l0", "dl1", "cl1"];
+export const META_RING = { radius: 3.6, tilt: 1.15 };
 
-// The DAG core's dense L0 fills a multi-ring "sun" from r0 outward; the native $DAG currency (L1 /
-// cl1) gets its OWN clearly-separated ring `cl1Offset` beyond the outermost L0 ring (user: Global
-// L0 and L1 must read as separate rings, so the gap is wider than the L0 inter-ring pitch).
-export const DAG_RING = { r0: 4, pitch: 1.6, gap: 0.9, cl1Offset: 4.0, cl1Pitch: 1.4, cl1Gap: 0.9 };
+// The DAG core: L0 is an armillary ball; the native $DAG currency (L1 / cl1) is its OWN, clearly
+// separated OUTER shell (bigger diameter) so Global L0 and L1 read apart (user).
+export const DAG_L0 = { radius: 9, tilt: 1.15 };
+export const DAG_L1 = { radius: 12.5, tilt: 1.15 };

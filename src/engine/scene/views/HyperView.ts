@@ -8,7 +8,8 @@
 
 import * as THREE from "three";
 import { METAGRAPHS, type MetaConfig } from "../../config";
-import { metaAnchor, META_SHELL, META_LAYERS } from "../../domain/hyperLayout";
+import { metaAnchor, META_RING, META_LAYERS } from "../../domain/hyperLayout";
+import { armillaryFrame, type RingFrame } from "../../domain/nodeLayout";
 import type { SceneColors } from "../../sceneColors";
 
 const _pos = new THREE.Vector3(); // scratch for hub orbit positions (reused each frame)
@@ -180,12 +181,12 @@ export class HyperView {
       group.add(hub);
       this.pickables.push(hub);
 
-      // Cyan structural hoops: one per layer at its ring radius, in the hub's plane (XZ). They are
-      // the view's cyan "surfaces" — the geo-globe / ledger-plane peer — and register with the nodes
-      // Globe places on the same radii. The group only ORBITS (no spin — see update), so the hoops
-      // and their nodes stay aligned.
-      const hoops = META_LAYERS.map((layer) => {
-        const h = this._makeHoop(META_SHELL[layer]);
+      // Cyan structural "atom" hoops: one per LAYER, all the same diameter but at different tilt
+      // angles (layer index = ring index — same armillaryFrame the nodes use), so L0/dL1/cL1 read
+      // as distinct tilted rings. The group only ORBITS (no spin — see update), so hoops + nodes
+      // stay registered.
+      const hoops = META_LAYERS.map((_, li) => {
+        const h = this._makeHoop(armillaryFrame(li, META_LAYERS.length, META_RING.tilt), META_RING.radius);
         group.add(h);
         return h;
       });
@@ -216,32 +217,38 @@ export class HyperView {
     for (const m of this.metas) m.active = !ids || ids.has(m.cfg.id);
   }
 
-  // A cyan structural hoop: a LineLoop circle of radius `r` in the XZ plane — the redesign's
-  // "surface" primitive (the geo-globe / ledger-plane peer for the Hypergraph). Dim by default.
-  private _makeHoop(r: number): THREE.LineLoop {
+  // A cyan structural hoop: a LineLoop circle of `radius` on the plane of ring `frame` (its two
+  // in-plane basis vectors) — the redesign's "surface" primitive, tilted to match its node ring.
+  private _makeHoop(frame: RingFrame, radius: number): THREE.LineLoop {
     const seg = 96;
     const pts: THREE.Vector3[] = [];
     for (let i = 0; i < seg; i++) {
-      const t = (i / seg) * Math.PI * 2;
-      pts.push(new THREE.Vector3(Math.cos(t) * r, 0, Math.sin(t) * r));
+      const a = (i / seg) * Math.PI * 2;
+      pts.push(
+        frame.t.clone().multiplyScalar(Math.cos(a) * radius).addScaledVector(frame.b, Math.sin(a) * radius),
+      );
     }
     const mat = new THREE.LineBasicMaterial({ color: this._core, transparent: true, opacity: HOOP_OP });
     return new THREE.LineLoop(new THREE.BufferGeometry().setFromPoints(pts), mat);
   }
 
-  // (Re)build the DAG core's cyan "sun" hoops at the radii Globe computed for its node rings —
-  // called from Globe.setNodes whenever the validator set changes.
-  buildCoreRings(radii: number[]) {
+  // (Re)build the DAG core's tilted cyan hoops — one per ring of each armillary shell (L0 ball +
+  // the separated $DAG L1 outer shell) — matching the node rings Globe placed. Called from
+  // Globe.setNodes whenever the validator set changes.
+  buildCoreRings(shells: { radius: number; numRings: number; tilt: number }[]) {
     for (const h of this._coreRings) {
       this.coreGroup.remove(h);
       h.geometry.dispose();
       (h.material as THREE.Material).dispose();
     }
-    this._coreRings = radii.map((r) => {
-      const h = this._makeHoop(r);
-      this.coreGroup.add(h);
-      return h;
-    });
+    this._coreRings = [];
+    for (const s of shells) {
+      for (let k = 0; k < s.numRings; k++) {
+        const h = this._makeHoop(armillaryFrame(k, s.numRings, s.tilt), s.radius);
+        this.coreGroup.add(h);
+        this._coreRings.push(h);
+      }
+    }
   }
 
   // The faint cyan ground grid beneath the whole ring — the planar cyan context that gives the
