@@ -877,7 +877,7 @@ export class Globe implements GeoViewHost {
     // the per-node motion; the whole structure keeps its slow drift (Engine setHyperSpin).
     if (!this.ledger && this.morph < 0.5) {
       // Uniform ANGULAR speed for every ring (user) — all nodes advance the same angle per frame.
-      const ang = dt * 0.08;
+      const ang = dt * 0.12;
       for (const r of this.nodes) { r.hyperPos.applyAxisAngle(r.ringAxis, ang); r.hyperDir.applyAxisAngle(r.ringAxis, ang); }
       for (const r of this.metaNodes) r.offset.applyAxisAngle(r.ringAxis, ang);
     }
