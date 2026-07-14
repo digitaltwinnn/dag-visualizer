@@ -20,6 +20,9 @@ const HOOP_OP = 0.08;
 // Resting opacity of the soft rim-fill disk under each ring (populated layers only) — more cyan
 // presence + anchors the layer label, which otherwise floated between the thin rings (user).
 const FILL_OP = 0.055;
+// How far INSIDE the ring the layer label sits (user: inner side, not outer). Shared by metagraph
+// rings and the DAG core shells so both read the same.
+const LABEL_INSET = 0.45;
 
 // Ring layer-code labels — the text a focused metagraph shows on each of its three layer rings so
 // the L0 / dL1 / cL1 shells read WITH text (user: hard to tell which ring is which). Only the
@@ -92,6 +95,7 @@ export class HyperView {
   coreFlash?: number;
   private _coreRings: THREE.LineLoop[] = []; // the DAG core's cyan "sun" hoops (rebuilt on node load)
   private _coreLabels: THREE.Mesh[] = []; // the DAG core's shell labels (L0 / L1), shown when DAG focused
+  private _coreFills: THREE.Mesh[] = []; // the DAG core's shell rim-fill disks (same as a metagraph's)
   private _fillTex?: THREE.Texture; // shared rim-weighted radial gradient for the ring fill disks
   // Scratch for _faceLabelInPlane (per-frame label orientation) — never allocate in the loop.
   private _lN = new THREE.Vector3();
@@ -231,33 +235,20 @@ export class HyperView {
       group.add(hub);
       this.pickables.push(hub);
 
-      // Cyan structural "atom" hoops: one per LAYER, all the same diameter but at different tilt
-      // angles (layer index = ring index — same armillaryFrame the nodes use), so L0/dL1/cL1 read
-      // as distinct tilted rings. The group only ORBITS (no spin — see update), so hoops + nodes
-      // stay registered.
-      const hoops = META_LAYERS.map((layer, li) => {
-        const h = this._makeHoop(armillaryFrame(li, META_LAYERS.length, META_RING.tilt), META_RING.radii[layer]);
-        group.add(h);
-        return h;
-      });
-
-      // Soft rim-fill disk behind each ring (populated layers only — toggled by setHoopPresence).
-      const fills = META_LAYERS.map((layer, li) => {
-        const f = this._makeRingFill(armillaryFrame(li, META_LAYERS.length, META_RING.tilt), META_RING.radii[layer]);
-        group.add(f);
-        return f;
-      });
-
-      // One layer-code label per ring, lying IN the ring's tilted plane (3D effect, tilts with the
-      // ring — not billboarded) at its outer rim, hidden until this metagraph is focused.
-      const labels = META_LAYERS.map((layer, li) => {
+      // Each layer is ONE structural ring: a cyan hoop + the shared decoration (rim-fill + inner
+      // label). Same treatment the DAG core shells get (see buildCoreRings) — one ring model.
+      const hoops: THREE.LineLoop[] = [];
+      const fills: THREE.Mesh[] = [];
+      const labels: THREE.Mesh[] = [];
+      META_LAYERS.forEach((layer, li) => {
         const frame = armillaryFrame(li, META_LAYERS.length, META_RING.tilt);
-        const lb = this._makeRingLabel(LAYER_CODE[layer]);
-        lb.position.copy(frame.t).multiplyScalar(META_RING.radii[layer] + 0.2);
-        storeRingNormal(lb, frame);
-        lb.visible = false;
-        group.add(lb);
-        return lb;
+        const radius = META_RING.radii[layer];
+        const h = this._makeHoop(frame, radius);
+        group.add(h);
+        hoops.push(h);
+        const d = this._makeRingDecor(group, frame, radius, LAYER_CODE[layer]);
+        fills.push(d.fill); // fill toggled per populated layer by setHoopPresence
+        labels.push(d.label);
       });
 
       const tether = new THREE.Line(
@@ -370,6 +361,20 @@ export class HyperView {
     return mesh;
   }
 
+  // The shared "ring decoration" — the rim-fill disk + the inner-side layer label — added to `group`
+  // for one ring plane at `radius`. Used identically by the metagraph layer rings AND the DAG core
+  // shells (they are structurally the same ring), so there's no duplicate build logic.
+  private _makeRingDecor(group: THREE.Object3D, frame: RingFrame, radius: number, code: string): { fill: THREE.Mesh; label: THREE.Mesh } {
+    const fill = this._makeRingFill(frame, radius);
+    group.add(fill);
+    const label = this._makeRingLabel(code);
+    label.position.copy(frame.t).multiplyScalar(radius - LABEL_INSET); // INNER side of the ring
+    storeRingNormal(label, frame);
+    label.visible = false;
+    group.add(label);
+    return { fill, label };
+  }
+
   // A small cyan layer-code label ("L0" / "dL1" / "cL1") as a billboard plane. Text-only (structural
   // annotation → the accent token, not identity); billboarded to the camera each frame in update().
   private _makeRingLabel(text: string): THREE.Mesh {
@@ -406,27 +411,24 @@ export class HyperView {
       (h.material as THREE.Material).dispose();
     }
     this._coreRings = [];
-    for (const lb of this._coreLabels) {
-      this.coreGroup.remove(lb);
-      (lb.material as THREE.MeshBasicMaterial).map?.dispose();
-      (lb.material as THREE.Material).dispose();
+    for (const m of [...this._coreLabels, ...this._coreFills]) {
+      this.coreGroup.remove(m);
+      (m.material as THREE.MeshBasicMaterial).map?.dispose();
+      (m.material as THREE.Material).dispose();
     }
     this._coreLabels = [];
+    this._coreFills = [];
     for (const s of shells) {
       for (let k = 0; k < s.numRings; k++) {
         const h = this._makeHoop(armillaryFrame(k, s.numRings, s.tilt), s.radius);
         this.coreGroup.add(h);
         this._coreRings.push(h);
       }
-      // One shell label (L0 / L1) at the shell's outer edge, lying in its ring plane — shown only
-      // while the DAG is focused.
-      const frame = armillaryFrame(0, s.numRings, s.tilt);
-      const lb = this._makeRingLabel(s.code);
-      lb.position.copy(frame.t).multiplyScalar(s.radius + 0.8);
-      storeRingNormal(lb, frame);
-      lb.visible = false;
-      this.coreGroup.add(lb);
-      this._coreLabels.push(lb);
+      // The DAG core shell is the same structural ring as a metagraph layer — same rim-fill + inner
+      // label, shown while the DAG is focused. Uses the shell's representative (k=0) ring plane.
+      const d = this._makeRingDecor(this.coreGroup, armillaryFrame(0, s.numRings, s.tilt), s.radius, s.code);
+      this._coreFills.push(d.fill);
+      this._coreLabels.push(d.label);
     }
   }
 
@@ -480,6 +482,9 @@ export class HyperView {
     // specific metagraph is the subject (_coreDim).
     const coreHoopOp = HOOP_OP * coreReveal * (1 - this._coreDim * 0.5);
     for (const h of this._coreRings) (h.material as THREE.LineBasicMaterial).opacity = coreHoopOp;
+    // The core shells' rim-fill disks fade the same way (same treatment as a metagraph's fills).
+    const coreFillOp = FILL_OP * coreReveal * (1 - this._coreDim * 0.5);
+    for (const f of this._coreFills) (f.material as THREE.MeshBasicMaterial).opacity = coreFillOp;
     // Core shell labels (L0 / L1) — shown only when the DAG is focused; laid in the ring plane +
     // re-oriented each frame (front to camera, upright).
     const showCoreLabels = dagFocused && coreReveal > 0.5 && !this.ledger;
