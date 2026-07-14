@@ -910,7 +910,7 @@ export class Engine {
       // structure). ONE shared angle → globe group + root + coreGroup can't desync from the hoops.
       // Frozen when a hub is focused (filter ≠ all) or the camera is zoomed in to inspect.
       if (this.mode === "hyper") {
-        if (this.filter === "all" && !zoomedIn) this._hyperSpinY += dt * 0.04;
+        if (this.filter === "all" && !zoomedIn) this._hyperSpinY += dt * 0.06;
         this.globe.setHyperSpin(this._hyperSpinY);
         this.layers.setHyperSpin(this._hyperSpinY);
       }
