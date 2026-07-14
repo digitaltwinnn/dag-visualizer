@@ -19,7 +19,7 @@ const _pos = new THREE.Vector3(); // scratch for hub orbit positions (reused eac
 const HOOP_OP = 0.08;
 // Resting opacity of the soft rim-fill disk under each ring (populated layers only) — more cyan
 // presence + anchors the layer label, which otherwise floated between the thin rings (user).
-const FILL_OP = 0.055;
+const FILL_OP = 0.09;
 // How far INSIDE the ring the layer label sits (user: inner side, not outer). Shared by metagraph
 // rings and the DAG core shells so both read the same.
 const LABEL_INSET = 0.45;
@@ -270,11 +270,11 @@ export class HyperView {
 
       const tether = new THREE.Line(
         new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(), pos.clone()]),
-        // depthTest/Write OFF so the faint hub→core line is never occluded (and broken) by the
-        // opaque orbiting nodes it passes through — esp. the dark off-ready ones (user bug).
-        new THREE.LineBasicMaterial({ color: this._core, transparent: true, opacity: 0.22, depthTest: false, depthWrite: false })
+        // Transparent line → don't WRITE depth (the standard for transparents; avoids z-fighting
+        // where the tethers converge at the core). Still depth-TESTED, so it's properly occluded in
+        // 3D by opaque objects in front — real depth, not a render-on-top hack.
+        new THREE.LineBasicMaterial({ color: this._core, transparent: true, opacity: 0.22, depthWrite: false })
       );
-      tether.renderOrder = 2;
       this.root.add(tether);
 
       // A pool of anchor "packets" (reused) — one launches per anchored snapshot (see pulseMeta).

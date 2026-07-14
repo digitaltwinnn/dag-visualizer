@@ -111,7 +111,7 @@ export function hubFraming(hubLocalPos: THREE.Vector3, out: CameraFraming): void
 // hubFraming gave (user). `hubWorld` is the hub's WORLD position (carries the tilt + spin).
 const _OVERVIEW_DIR = new THREE.Vector3(0, 15, 66).normalize(); // FOCI.overview (pos − target)
 export function hyperFocusFraming(hubWorld: THREE.Vector3, out: CameraFraming): void {
-  out.pos.copy(hubWorld).addScaledVector(_OVERVIEW_DIR, 13); // dolly widens it a touch on top
+  out.pos.copy(hubWorld).addScaledVector(_OVERVIEW_DIR, 16); // dolly widens it a touch on top
   out.target.copy(hubWorld);
 }
 
