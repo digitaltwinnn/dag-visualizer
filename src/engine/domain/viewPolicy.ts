@@ -104,7 +104,8 @@ export const VIEW_POLICIES: Record<Mode, ViewPolicy> = {
     countryHover: false,
     minCamDist: 12,
     minCamAlt: null,
-    minPolarAngle: 0.06, // relaxed: view the ring layout straight from the top (user)
+    minPolarAngle: 0.25, // standard clamp: the structure is TILTED (HYPER_TILT), not the camera —
+    // so hyper shares the overview pose with the other views and never needs the pole-crossing relax
     nodeList: true,
     // Calmer than ledger: the core + dense node field piled up an additive bleed on OLED/HDR.
     bloom: { strength: 0.20, radius: 0.32, threshold: 0.14 },

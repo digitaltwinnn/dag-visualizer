@@ -444,14 +444,15 @@ export class NodeFabric {
 
       // Snapshots (ledger) view: fly in from the source-view layout to the node's lane slot.
       if (c.ledger) {
-        if (r.hubGroup) { _vec.copy(r.hubGroup.position); group.worldToLocal(_vec).add(r.offset); }
+        if (r.hubGroup) { r.hubGroup.getWorldPosition(_vec); group.worldToLocal(_vec).add(r.offset); }
         else _vec.copy(r.hyperPos);
         _geoVec.copy(_vec).lerp(r.geoPos, e).lerp(r.ledgerPos, ledgerT);
       } else {
         // Hypergraph anchor = the hub's current orbit position, expressed in this group's local
-        // frame (so it stays glued to the hub as the globe spins).
+        // frame (so it stays glued to the hub as the globe spins). WORLD position, not the root-local
+        // `.position`, because the hyper structure (root + this group) is tilted by HYPER_TILT.
         if (r.hubGroup) {
-          _vec.copy(r.hubGroup.position);
+          r.hubGroup.getWorldPosition(_vec);
           group.worldToLocal(_vec).add(r.offset);
         } else {
           _vec.copy(r.hyperPos);

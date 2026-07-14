@@ -8,7 +8,7 @@
 
 import * as THREE from "three";
 import { METAGRAPHS, type MetaConfig } from "../../config";
-import { metaAnchor, META_RING, META_LAYERS } from "../../domain/hyperLayout";
+import { metaAnchor, META_RING, META_LAYERS, HYPER_TILT } from "../../domain/hyperLayout";
 import { armillaryFrame, type RingFrame } from "../../domain/nodeLayout";
 import type { SceneColors } from "../../sceneColors";
 
@@ -66,6 +66,9 @@ export class HyperView {
     this.scene = scene;
     this._core = colors.core;
     this.root = new THREE.Group();
+    // Tilt the hub/tether/hoop structure to read top-down from the shared overview camera (Globe
+    // tilts the node group + HyperView the core by the same HYPER_TILT, so all three stay registered).
+    this.root.rotation.x = HYPER_TILT;
     scene.add(this.root);
 
     this.pickables = [];
@@ -119,6 +122,7 @@ export class HyperView {
   // ---------------------------------------------------------------- Core
   private _buildCore() {
     this.coreGroup = new THREE.Group();
+    this.coreGroup.rotation.x = HYPER_TILT; // match the tilted node group + hubs (see root)
     const mat = new THREE.MeshStandardMaterial({
       color: this._core, emissive: this._core, emissiveIntensity: 1.4,
       roughness: 0.25, metalness: 0.3, flatShading: true, transparent: true,
@@ -212,6 +216,14 @@ export class HyperView {
   // (e.g. before the node counts have loaded).
   setMetaActive(ids: Set<string> | null) {
     for (const m of this.metas) m.active = !ids || ids.has(m.cfg.id);
+  }
+
+  // Spin the hub + core structure about its own vertical axis by `y`, keeping the HYPER_TILT (Euler
+  // XYZ → tilt applied after the Y-spin). The Engine drives this with the SAME angle it gives the
+  // node group, so hubs/core/hoops and the nodes stay registered while the whole atom rotates.
+  setHyperSpin(y: number) {
+    this.root.rotation.set(HYPER_TILT, y, 0);
+    this.coreGroup.rotation.set(HYPER_TILT, y, 0);
   }
 
   // A metagraph's 3 layer hoops render SOLID where the layer has nodes and DOTTED where the layer

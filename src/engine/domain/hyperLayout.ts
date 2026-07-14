@@ -42,3 +42,11 @@ export const META_RING = { radii: { l0: 2.6, dl1: 4.0, cl1: 5.4 }, tilt: 0.28 };
 // L1 read apart (user).
 export const DAG_L0 = { radius: 9, tilt: 0.28 };
 export const DAG_L1 = { radius: 12.5, tilt: 0.28 };
+
+// The Hypergraph structure (nodes + hubs + core, spread across the globe group, HyperView.root and
+// HyperView.coreGroup) is TILTED by this angle about X so it reads top-DOWN from the SHARED overview
+// camera — instead of moving the camera to a top-down pose (which every other view then has to tween
+// away from, user). ~77° stands the near-flat ring layout up to face the overview camera (pos ~(0,17,
+// 68), pitched ~12° below horizontal), so the rings present as circles. All three groups share this
+// exact tilt so the tilted node rings stay registered with the cyan hoops.
+export const HYPER_TILT = 1.35;

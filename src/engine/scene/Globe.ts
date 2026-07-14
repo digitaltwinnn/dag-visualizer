@@ -15,7 +15,7 @@
 
 import * as THREE from "three";
 import { METAGRAPHS, DEFAULT_META_COLOR } from "../config";
-import { metaAnchor, META_LAYERS, META_RING, DAG_L0, DAG_L1 } from "../domain/hyperLayout";
+import { metaAnchor, META_LAYERS, META_RING, DAG_L0, DAG_L1, HYPER_TILT } from "../domain/hyperLayout";
 import { LEDGER, ledgerSite, ledgerSpread, clusterRadius } from "../domain/ledgerLayout";
 import type { SceneColors } from "../sceneColors";
 import * as geoStats from "../domain/geoStats";
@@ -194,13 +194,21 @@ export class Globe implements GeoViewHost {
   setSimFlags(sims: { arcs: boolean; globeSpin: boolean }): void {
     this.simArcs = sims.arcs;
     this.simSpin = sims.globeSpin;
-    // Spin OFF (hyper): snap the group frame to identity so the redesigned TILTED node rings
-    // register with the Hypergraph's cyan hoops (drawn in the unrotated frame). A leftover rotation
-    // from a prior geo visit would otherwise offset them (nodes drift off the rings when tilted).
+    // Spin OFF (hyper): the redesigned TILTED node rings register with the Hypergraph's cyan hoops.
+    // Tilt the whole node group by HYPER_TILT so the near-flat ring layout reads top-down from the
+    // SHARED overview camera (HyperView tilts root + coreGroup by the same angle, so nodes + hoops
+    // stay registered). A leftover geo rotation would otherwise offset them.
     if (!this.simSpin && !this.ledger) {
       this.spin = null;
-      this.group.rotation.set(0, 0, 0);
+      this.group.rotation.set(HYPER_TILT, 0, 0);
     }
+  }
+
+  // Set the hyper-structure spin: the node group is tilted by HYPER_TILT and spun about its own
+  // vertical axis by `y` (Euler XYZ → tilt applied AFTER the Y-spin). Driven by the Engine with the
+  // SAME angle it gives HyperView, so nodes and hoops rotate in lockstep. Only meaningful in hyper.
+  setHyperSpin(y: number): void {
+    if (!this.simSpin && !this.ledger) this.group.rotation.set(HYPER_TILT, y, 0);
   }
 
   // The wall is always the structural accent (the geo hologram hue). Kept as a setter so the Engine

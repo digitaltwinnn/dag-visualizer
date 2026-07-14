@@ -71,6 +71,8 @@ export class Engine {
   // Scratch framing struct handed to hubFraming/geoFraming — its values are copied into
   // `_tween` immediately by `_tweenTo`, so reusing it across every focus call is safe.
   private _framingOut: CameraFraming = { pos: new THREE.Vector3(), target: new THREE.Vector3() };
+  private _hubWorld = new THREE.Vector3(); // scratch: hub local pos tilted into world for framing
+  private _hyperSpinY = 0; // shared hyper-structure spin angle (globe group + root + core, in lockstep)
 
   private geoMap: GeoMap = {};
   private dagCore: DagCore | null = null;
@@ -843,9 +845,9 @@ export class Engine {
   private _focusFilter(filter: string) {
     this.layers.focusId = null;
     if (filter === "all") {
-      this.ctx.controls.autoRotate = true;
-      this.focus("hyperRing"); // look down onto the hub ring — reads as a 2D circle around the core
-      return;
+      this.ctx.controls.autoRotate = false; // the STRUCTURE spins (setHyperSpin), not the camera
+      this.focus("overview"); // SHARED pose — the hyper structure is tilted (HYPER_TILT) to read
+      return; // top-down instead of moving the camera, so other views tween cleanly from here.
     }
     this.ctx.controls.autoRotate = false;
     if (filter === "dag") {
@@ -857,8 +859,11 @@ export class Engine {
       this.focus("overview");
       return;
     }
-    this.layers.focusId = filter; // anchor this hub so it stays framed
-    hubFraming(meta.group.position, this._framingOut);
+    this.layers.focusId = filter; // anchor this hub so it stays framed (its orbit + the spin freeze)
+    // Frame against the hub's actual WORLD position — it carries the structure's tilt AND spin. Safe
+    // here (root scale ≈ 1 in hyper at morph 0; the mid-morph origin-collapse never applies to a pick).
+    meta.group.getWorldPosition(this._hubWorld);
+    hubFraming(this._hubWorld, this._framingOut);
     this._tweenTo(this._framingOut.pos, this._framingOut.target);
   }
 
@@ -900,6 +905,15 @@ export class Engine {
       // reads still; the per-node axis spin keeps going. Threshold is well inside the resting pose.
       const zoomedIn = this.mode === "hyper" &&
         this.ctx.camera.position.distanceTo(this.ctx.controls.target) < 45;
+      // Hyper resting: spin the whole TILTED structure about its own vertical axis so it reads as
+      // slowly-rotating top-down rings (replaces camera autoRotate, which wobbles a tilted
+      // structure). ONE shared angle → globe group + root + coreGroup can't desync from the hoops.
+      // Frozen when a hub is focused (filter ≠ all) or the camera is zoomed in to inspect.
+      if (this.mode === "hyper") {
+        if (this.filter === "all" && !zoomedIn) this._hyperSpinY += dt * 0.08;
+        this.globe.setHyperSpin(this._hyperSpinY);
+        this.layers.setHyperSpin(this._hyperSpinY);
+      }
       this.layers.update(dt, this.morph, coreDim, zoomedIn);
       this.globe.update(dt);
       this._updateTween(dt);
