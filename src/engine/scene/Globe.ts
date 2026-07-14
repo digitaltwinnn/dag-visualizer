@@ -296,8 +296,8 @@ export class Globe implements GeoViewHost {
     // Hand the DAG core's ring shells to HyperView so it draws a tilted cyan hoop per ring.
     this.layers?.buildCoreRings(
       cl1List.length
-        ? [{ radius: DAG_L0.radius, numRings: l0Rings, tilt: DAG_L0.tilt }, { radius: DAG_L1.radius, numRings: l1Rings, tilt: DAG_L1.tilt }]
-        : [{ radius: DAG_L0.radius, numRings: l0Rings, tilt: DAG_L0.tilt }],
+        ? [{ radius: DAG_L0.radius, numRings: l0Rings, tilt: DAG_L0.tilt, code: "L0" }, { radius: DAG_L1.radius, numRings: l1Rings, tilt: DAG_L1.tilt, code: "L1" }]
+        : [{ radius: DAG_L0.radius, numRings: l0Rings, tilt: DAG_L0.tilt, code: "L0" }],
     );
 
     this.fabric.buildValidators(this.nodes);

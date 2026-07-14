@@ -61,6 +61,7 @@ export class HyperView {
   core!: THREE.Mesh;
   coreFlash?: number;
   private _coreRings: THREE.LineLoop[] = []; // the DAG core's cyan "sun" hoops (rebuilt on node load)
+  private _coreLabels: THREE.Mesh[] = []; // the DAG core's shell labels (L0 / L1), shown when DAG focused
   private _camQ = new THREE.Quaternion(); // scratch: camera world quat (ring-label billboarding)
   private _parentQ = new THREE.Quaternion(); // scratch: label parent world quat
   private _coreDim = 0; // eased 0→1: the DAG core fades back when a specific metagraph is the subject
@@ -309,19 +310,32 @@ export class HyperView {
   // (Re)build the DAG core's tilted cyan hoops — one per ring of each armillary shell (L0 ball +
   // the separated $DAG L1 outer shell) — matching the node rings Globe placed. Called from
   // Globe.setNodes whenever the validator set changes.
-  buildCoreRings(shells: { radius: number; numRings: number; tilt: number }[]) {
+  buildCoreRings(shells: { radius: number; numRings: number; tilt: number; code: string }[]) {
     for (const h of this._coreRings) {
       this.coreGroup.remove(h);
       h.geometry.dispose();
       (h.material as THREE.Material).dispose();
     }
     this._coreRings = [];
+    for (const lb of this._coreLabels) {
+      this.coreGroup.remove(lb);
+      (lb.material as THREE.MeshBasicMaterial).map?.dispose();
+      (lb.material as THREE.Material).dispose();
+    }
+    this._coreLabels = [];
     for (const s of shells) {
       for (let k = 0; k < s.numRings; k++) {
         const h = this._makeHoop(armillaryFrame(k, s.numRings, s.tilt), s.radius);
         this.coreGroup.add(h);
         this._coreRings.push(h);
       }
+      // One shell label (L0 / L1) at the shell's outer edge — shown only while the DAG is focused.
+      const frame = armillaryFrame(0, s.numRings, s.tilt);
+      const lb = this._makeRingLabel(s.code);
+      lb.position.copy(frame.t).multiplyScalar(s.radius + 0.8);
+      lb.visible = false;
+      this.coreGroup.add(lb);
+      this._coreLabels.push(lb);
     }
   }
 
@@ -331,7 +345,7 @@ export class HyperView {
   // out to the map (Globe) instead.
   // `spinFrozen` (set when the camera is zoomed in to inspect) stops the overall SPHERE spin — the
   // core + hub meshes — so a close-up reads still; the per-node axis spin (Globe) keeps going.
-  update(dt: number, morph = 0, coreDimTarget = 0, spinFrozen = false, cam?: THREE.Camera) {
+  update(dt: number, morph = 0, coreDimTarget = 0, spinFrozen = false, cam?: THREE.Camera, dagFocused = false) {
     this.clock += dt;
     const t = this.clock;
 
@@ -375,6 +389,16 @@ export class HyperView {
     // specific metagraph is the subject (_coreDim).
     const coreHoopOp = HOOP_OP * coreReveal * (1 - this._coreDim * 0.5);
     for (const h of this._coreRings) (h.material as THREE.LineBasicMaterial).opacity = coreHoopOp;
+    // Core shell labels (L0 / L1) — shown only when the DAG is the focused subject, billboarded.
+    const showCoreLabels = dagFocused && cam != null && coreReveal > 0.5 && !this.ledger;
+    if (showCoreLabels) {
+      cam!.getWorldQuaternion(this._camQ);
+      this.coreGroup.getWorldQuaternion(this._parentQ).invert().multiply(this._camQ);
+    }
+    for (const lb of this._coreLabels) {
+      lb.visible = showCoreLabels;
+      if (showCoreLabels) lb.quaternion.copy(this._parentQ);
+    }
     if (this.coreFlash) this.coreFlash = Math.max(0, this.coreFlash - dt * 1.6);
 
     // Metagraphs — orbit, spin, tether pulses. While ANY metagraph is selected (focusId), the

@@ -14,7 +14,7 @@ import { METAGRAPHS, COLORS } from "@/src/engine/config";
 import { LEDGER, LAYER_GEOM, ledgerSite } from "./domain/ledgerLayout";
 import { readSceneColors } from "./sceneColors";
 import { VIEW_POLICIES } from "./domain/viewPolicy";
-import { FOCI, hubFraming, geoFraming, ledgerLayerFraming, nodeFraming, hyperNodeFraming, dollyBack, easeInOutQuad, type CameraFraming } from "./domain/cameraRig";
+import { FOCI, hyperFocusFraming, geoFraming, ledgerLayerFraming, nodeFraming, hyperNodeFraming, dollyBack, easeInOutQuad, type CameraFraming } from "./domain/cameraRig";
 import { countryFraming } from "./domain/countryShape";
 import { R as GEO_R, LAND_H } from "./domain/geoLayout";
 import { clickActions, pickActive } from "./domain/pickActions";
@@ -863,7 +863,7 @@ export class Engine {
     // Frame against the hub's actual WORLD position — it carries the structure's tilt AND spin. Safe
     // here (root scale ≈ 1 in hyper at morph 0; the mid-morph origin-collapse never applies to a pick).
     meta.group.getWorldPosition(this._hubWorld);
-    hubFraming(this._hubWorld, this._framingOut);
+    hyperFocusFraming(this._hubWorld, this._framingOut); // look down the ring normal → rings stay flat
     this._tweenTo(this._framingOut.pos, this._framingOut.target);
   }
 
@@ -910,11 +910,11 @@ export class Engine {
       // structure). ONE shared angle → globe group + root + coreGroup can't desync from the hoops.
       // Frozen when a hub is focused (filter ≠ all) or the camera is zoomed in to inspect.
       if (this.mode === "hyper") {
-        if (this.filter === "all" && !zoomedIn) this._hyperSpinY += dt * 0.08;
+        if (this.filter === "all" && !zoomedIn) this._hyperSpinY += dt * 0.14;
         this.globe.setHyperSpin(this._hyperSpinY);
         this.layers.setHyperSpin(this._hyperSpinY);
       }
-      this.layers.update(dt, this.morph, coreDim, zoomedIn, this.ctx.camera);
+      this.layers.update(dt, this.morph, coreDim, zoomedIn, this.ctx.camera, this.filter === "dag");
       this.globe.update(dt);
       this._updateTween(dt);
       this.ctx.controls.update();

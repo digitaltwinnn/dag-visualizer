@@ -105,6 +105,16 @@ export function hubFraming(hubLocalPos: THREE.Vector3, out: CameraFraming): void
   out.target.copy(hubLocalPos);
 }
 
+// Focused-metagraph pose (the CURRENT hyper hub focus): approach the hub along the SAME axis the
+// resting overview camera uses — the structure's ring-plane normal, which HYPER_TILT aligns to that
+// camera — so the atom's rings stay HORIZONTAL/flat while zoomed in, instead of the 3/4 side view
+// hubFraming gave (user). `hubWorld` is the hub's WORLD position (carries the tilt + spin).
+const _OVERVIEW_DIR = new THREE.Vector3(0, 15, 66).normalize(); // FOCI.overview (pos − target)
+export function hyperFocusFraming(hubWorld: THREE.Vector3, out: CameraFraming): void {
+  out.pos.copy(hubWorld).addScaledVector(_OVERVIEW_DIR, 13); // dolly widens it a touch on top
+  out.target.copy(hubWorld);
+}
+
 // FALLBACK country framing (concentration-based) — used ONLY while the countries topology
 // hasn't loaded / a cc it doesn't cover; the real drill pose is countryShape.countryFraming
 // (shape-driven, constant-angle). R is the selection's concentration (|mean of node dirs|,
