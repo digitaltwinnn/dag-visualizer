@@ -98,6 +98,7 @@ export class Globe implements GeoViewHost {
   private _densityGlow: THREE.Mesh[] = []; // additive light pools under dense node clusters (geo)
   private _glowTex?: THREE.Texture; // shared radial-gradient sprite for the light pools
   private _glowDim = 1; // eased 1→~0.2 while a country is drilled, so its highlight isn't overruled
+  private _glowAllDim = 1; // eased ~0.62 in "all" (overlapping per-network planes stack additively)
   morph = 0;
   private ledgerT = 0; // 0->1 ease as the reused node meshes fly from their source view into the lanes
   clock = 0;
@@ -802,7 +803,7 @@ export class Globe implements GeoViewHost {
     // Density light pools: morph fade × the country-drill recede (so a drilled country's own
     // highlight isn't washed out by the pools).
     for (const g of this._densityGlow) {
-      (g.material as THREE.MeshBasicMaterial).opacity = (g.userData.glowBase as number) * surf * this._glowDim;
+      (g.material as THREE.MeshBasicMaterial).opacity = (g.userData.glowBase as number) * surf * this._glowDim * this._glowAllDim;
     }
     // Depth cueing for the see-through hologram: the graticule + coastal walls dim their far
     // hemisphere through the shared facing uniform (camera dir in this group's local frame),
@@ -830,6 +831,9 @@ export class Globe implements GeoViewHost {
     this.clock += dt;
     // Recede the density light pools while a country is drilled (so its highlight leads), eased.
     this._glowDim += ((this.countryFilter ? 0.2 : 1) - this._glowDim) * Math.min(1, dt * 3);
+    // In "all" the per-network pools OVERLAP and stack additively — damp them so multi-network sites
+    // don't blow out (a single-network filter has no overlap, so it stays full), eased on switch.
+    this._glowAllDim += ((this.filter === "all" ? 0.62 : 1) - this._glowAllDim) * Math.min(1, dt * 3);
     // Ease the wall colour (held at the default cyan).
     if (this.landWallUniforms) {
       this._edgeColor.lerp(this._edgeTarget, Math.min(1, dt * 3));
