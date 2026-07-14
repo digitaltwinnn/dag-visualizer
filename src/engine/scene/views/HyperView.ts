@@ -19,7 +19,7 @@ const _pos = new THREE.Vector3(); // scratch for hub orbit positions (reused eac
 const HOOP_OP = 0.08;
 // Resting opacity of the soft rim-fill disk under each ring (populated layers only) — more cyan
 // presence + anchors the layer label, which otherwise floated between the thin rings (user).
-const FILL_OP = 0.2;
+const FILL_OP = 0.055;
 
 // Ring layer-code labels — the text a focused metagraph shows on each of its three layer rings so
 // the L0 / dL1 / cL1 shells read WITH text (user: hard to tell which ring is which). Only the
@@ -36,9 +36,9 @@ function makeRingFillTexture(): THREE.Texture {
   const ctx = c.getContext("2d")!;
   const g = ctx.createRadialGradient(s / 2, s / 2, 0, s / 2, s / 2, s / 2);
   g.addColorStop(0, "rgba(255,255,255,0)");
-  g.addColorStop(0.68, "rgba(255,255,255,0)");
-  g.addColorStop(0.9, "rgba(255,255,255,0.4)");
-  g.addColorStop(1, "rgba(255,255,255,0.9)");
+  g.addColorStop(0.84, "rgba(255,255,255,0)");
+  g.addColorStop(0.96, "rgba(255,255,255,0.35)");
+  g.addColorStop(1, "rgba(255,255,255,0.8)");
   ctx.fillStyle = g;
   ctx.fillRect(0, 0, s, s);
   const tex = new THREE.CanvasTexture(c);
@@ -323,7 +323,7 @@ export class HyperView {
     const geo = new THREE.CircleGeometry(radius, 96);
     const mat = new THREE.MeshBasicMaterial({
       map: this._fillTex, color: new THREE.Color(this._core), transparent: true,
-      blending: THREE.AdditiveBlending, depthWrite: false, opacity: FILL_OP,
+      blending: THREE.AdditiveBlending, depthWrite: false, opacity: FILL_OP, side: THREE.DoubleSide,
     });
     const mesh = new THREE.Mesh(geo, mat);
     // Orient the disk into the ring's tilted plane: CircleGeometry lies in XY (+Z normal) → map its
