@@ -46,6 +46,12 @@ function makeRingFillTexture(): THREE.Texture {
   return tex;
 }
 
+// Store a label's ring-plane normal (local, unrotated frame) so _faceLabelInPlane can lay it flat
+// IN the plane each frame — front toward the camera, text upright — for a real 3D-on-the-plane look.
+function storeRingNormal(mesh: THREE.Object3D, frame: RingFrame): void {
+  mesh.userData.ringN = frame.t.clone().cross(frame.b).normalize();
+}
+
 // One orbiting metagraph hub record in HyperView.metas (the exact shape the constructor
 // builds — scene/Globe.ts (via `layers.metas.find`, keying off `.cfg.id`/`.group`) and
 // Engine.ts (`.cfg.id` lookups for DoF/filter) read these fields off the instances handed
@@ -87,8 +93,15 @@ export class HyperView {
   private _coreRings: THREE.LineLoop[] = []; // the DAG core's cyan "sun" hoops (rebuilt on node load)
   private _coreLabels: THREE.Mesh[] = []; // the DAG core's shell labels (L0 / L1), shown when DAG focused
   private _fillTex?: THREE.Texture; // shared rim-weighted radial gradient for the ring fill disks
-  private _camQ = new THREE.Quaternion(); // scratch: camera world quat (ring-label billboarding)
-  private _parentQ = new THREE.Quaternion(); // scratch: label parent world quat
+  // Scratch for _faceLabelInPlane (per-frame label orientation) — never allocate in the loop.
+  private _lN = new THREE.Vector3();
+  private _lUp = new THREE.Vector3();
+  private _lRight = new THREE.Vector3();
+  private _lPos = new THREE.Vector3();
+  private _lCam = new THREE.Vector3();
+  private _lPQ = new THREE.Quaternion();
+  private _lQ = new THREE.Quaternion();
+  private _lM = new THREE.Matrix4();
   private _coreDim = 0; // eased 0→1: the DAG core fades back when a specific metagraph is the subject
   private _core: number; // the structural accent (colors.core) — the core sphere hue
 
@@ -235,12 +248,13 @@ export class HyperView {
         return f;
       });
 
-      // One layer-code label per ring, parked on the ring's outer rim (its frame's +t direction, on
-      // the fill band so it reads as attached), hidden until this metagraph is focused (see update()).
+      // One layer-code label per ring, lying IN the ring's tilted plane (3D effect, tilts with the
+      // ring — not billboarded) at its outer rim, hidden until this metagraph is focused.
       const labels = META_LAYERS.map((layer, li) => {
         const frame = armillaryFrame(li, META_LAYERS.length, META_RING.tilt);
         const lb = this._makeRingLabel(LAYER_CODE[layer]);
         lb.position.copy(frame.t).multiplyScalar(META_RING.radii[layer] + 0.2);
+        storeRingNormal(lb, frame);
         lb.visible = false;
         group.add(lb);
         return lb;
@@ -261,6 +275,28 @@ export class HyperView {
       this.root.add(group);
       this.metas.push({ group, hub, cfg, state: null, tether, pulseMesh, pulse: 0, anchor: pos.clone(), orbit: an.a, radius: an.radius, incl: an.incl, spin: 0.3 + Math.random() * 0.5, active: true, hoops, fills, labels });
     });
+  }
+
+  // Lay a ring label flat IN its ring plane, but oriented so it reads: front toward the camera
+  // (whichever side of the plane faces it) and text "up" = world-up projected onto the plane. Runs
+  // per frame only for the few CURRENTLY-SHOWN labels, so the 3D tilt is real but text stays legible.
+  private _faceLabelInPlane(lb: THREE.Object3D, cam: THREE.Camera): void {
+    const localN = lb.userData.ringN as THREE.Vector3 | undefined;
+    if (!localN || !lb.parent) return;
+    lb.parent.getWorldQuaternion(this._lPQ);
+    this._lN.copy(localN).applyQuaternion(this._lPQ).normalize(); // ring normal in world
+    lb.getWorldPosition(this._lPos);
+    cam.getWorldPosition(this._lCam).sub(this._lPos); // label → camera
+    if (this._lN.dot(this._lCam) < 0) this._lN.negate(); // front faces the camera
+    // text up = world-up projected onto the plane (fallback if the plane is near-horizontal)
+    this._lUp.set(0, 1, 0).addScaledVector(this._lN, -this._lN.y);
+    if (this._lUp.lengthSq() < 1e-5) this._lUp.set(0, 0, 1).addScaledVector(this._lN, -this._lN.z);
+    this._lUp.normalize();
+    this._lRight.crossVectors(this._lUp, this._lN).normalize();
+    this._lUp.crossVectors(this._lN, this._lRight); // re-orthogonalize
+    this._lM.makeBasis(this._lRight, this._lUp, this._lN);
+    this._lQ.setFromRotationMatrix(this._lM); // desired WORLD orientation
+    lb.quaternion.copy(this._lPQ).invert().multiply(this._lQ); // → local (relative to the hub group)
   }
 
   // Mark which metagraph hubs are "active" (have locatable nodes). Inactive ones — registered
@@ -354,7 +390,7 @@ export class HyperView {
     const h = 0.62, w = h * (c.width / c.height);
     const mesh = new THREE.Mesh(
       new THREE.PlaneGeometry(w, h),
-      new THREE.MeshBasicMaterial({ map: tex, transparent: true, depthWrite: false, depthTest: false }),
+      new THREE.MeshBasicMaterial({ map: tex, transparent: true, depthWrite: false, depthTest: false, side: THREE.DoubleSide }),
     );
     mesh.renderOrder = 3; // over the hoops/nodes
     return mesh;
@@ -382,10 +418,12 @@ export class HyperView {
         this.coreGroup.add(h);
         this._coreRings.push(h);
       }
-      // One shell label (L0 / L1) at the shell's outer edge — shown only while the DAG is focused.
+      // One shell label (L0 / L1) at the shell's outer edge, lying in its ring plane — shown only
+      // while the DAG is focused.
       const frame = armillaryFrame(0, s.numRings, s.tilt);
       const lb = this._makeRingLabel(s.code);
       lb.position.copy(frame.t).multiplyScalar(s.radius + 0.8);
+      storeRingNormal(lb, frame);
       lb.visible = false;
       this.coreGroup.add(lb);
       this._coreLabels.push(lb);
@@ -442,15 +480,12 @@ export class HyperView {
     // specific metagraph is the subject (_coreDim).
     const coreHoopOp = HOOP_OP * coreReveal * (1 - this._coreDim * 0.5);
     for (const h of this._coreRings) (h.material as THREE.LineBasicMaterial).opacity = coreHoopOp;
-    // Core shell labels (L0 / L1) — shown only when the DAG is the focused subject, billboarded.
-    const showCoreLabels = dagFocused && cam != null && coreReveal > 0.5 && !this.ledger;
-    if (showCoreLabels) {
-      cam!.getWorldQuaternion(this._camQ);
-      this.coreGroup.getWorldQuaternion(this._parentQ).invert().multiply(this._camQ);
-    }
+    // Core shell labels (L0 / L1) — shown only when the DAG is focused; laid in the ring plane +
+    // re-oriented each frame (front to camera, upright).
+    const showCoreLabels = dagFocused && coreReveal > 0.5 && !this.ledger;
     for (const lb of this._coreLabels) {
       lb.visible = showCoreLabels;
-      if (showCoreLabels) lb.quaternion.copy(this._parentQ);
+      if (showCoreLabels && cam) this._faceLabelInPlane(lb, cam);
     }
     if (this.coreFlash) this.coreFlash = Math.max(0, this.coreFlash - dt * 1.6);
 
@@ -504,16 +539,12 @@ export class HyperView {
       const fillOp = FILL_OP * metaF * (m.active ? 1 : 0.7) * fdim;
       for (const f of m.fills) (f.material as THREE.MeshBasicMaterial).opacity = fillOp;
 
-      // Layer-code labels: ONLY the focused metagraph shows them (one atom at a time — the resting
-      // overview stays clean), billboarded to the camera so they read from the drilled side pose.
-      const showLabels = this.focusId === m.cfg.id && cam != null && metaF > 0.5;
-      if (showLabels) {
-        cam!.getWorldQuaternion(this._camQ);
-        m.group.getWorldQuaternion(this._parentQ).invert().multiply(this._camQ); // parentWorld⁻¹ · camWorld
-      }
+      // Layer-code labels: ONLY the focused metagraph shows them; they lie in the ring plane but are
+      // re-oriented each frame (front to camera, upright) so the 3D tilt reads while staying legible.
+      const showLabels = this.focusId === m.cfg.id && metaF > 0.5;
       for (const lb of m.labels) {
         lb.visible = showLabels;
-        if (showLabels) lb.quaternion.copy(this._parentQ);
+        if (showLabels && cam) this._faceLabelInPlane(lb, cam);
       }
 
       const pulseMat = m.pulseMesh.material as THREE.MeshBasicMaterial;
