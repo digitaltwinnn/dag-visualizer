@@ -119,6 +119,8 @@ export class HyperView {
   private _lM = new THREE.Matrix4();
   private _coreDim = 0; // eased 0→1: the DAG core fades back when a specific metagraph is the subject
   private _core: number; // the structural accent (colors.core) — the core sphere hue
+  private _border: number; // colors.border — the label-chip hairline/wash RGB (the .role-chip pill)
+  private _panel: number; // colors.panel — the label-chip glass backing (== --panel)
 
   // `sceneColors` (id -> 0xRRGGBB) is the identity SCENE-lane colour map (Task 3), handed in by
   // the Engine at construction — HyperView builds all its hubs synchronously from
@@ -127,6 +129,8 @@ export class HyperView {
   constructor(scene: THREE.Scene, colors: SceneColors, sceneColors?: Record<string, number>) {
     this.scene = scene;
     this._core = colors.core;
+    this._border = colors.border;
+    this._panel = colors.panel;
     this.root = new THREE.Group();
     // Tilt the hub/tether/hoop structure to read top-down from the shared overview camera (Globe
     // tilts the node group + HyperView the core by the same HYPER_TILT, so all three stay registered).
@@ -414,10 +418,17 @@ export class HyperView {
     const ctx = c.getContext("2d")!;
     const cc = new THREE.Color(this._core);
     const rgb = `${Math.round(cc.r * 255)},${Math.round(cc.g * 255)},${Math.round(cc.b * 255)}`;
+    const bc = new THREE.Color(this._border);
+    const brgb = `${Math.round(bc.r * 255)},${Math.round(bc.g * 255)},${Math.round(bc.b * 255)}`;
+    const pc = new THREE.Color(this._panel);
+    const prgb = `${Math.round(pc.r * 255)},${Math.round(pc.g * 255)},${Math.round(pc.b * 255)}`;
     ctx.font = `600 ${34 * SS}px system-ui, -apple-system, sans-serif`;
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
-    // Rounded-square chip around the code (user): sized to the text + padding, centred on the canvas.
+    // Rounded-square chip around the code (user): the SAME glass backing + border HUE as the React
+    // .role-chip pill — `--panel` fill (opaque enough that the bright ring disc behind it doesn't
+    // bleed through, user) + `--border` blue hairline — brought across via the unified SceneColors
+    // bridge so the pill and the 3D label share one colour source.
     const tw = ctx.measureText(text).width;
     const boxW = tw + 22 * SS;
     const boxH = 44 * SS;
@@ -425,12 +436,12 @@ export class HyperView {
     const by = c.height / 2 - boxH / 2;
     ctx.beginPath();
     ctx.roundRect(bx, by, boxW, boxH, 9 * SS);
-    ctx.fillStyle = `rgba(${rgb},0.08)`; // faint accent wash inside the chip
+    ctx.fillStyle = `rgba(${prgb},0.9)`; // --panel glass, opaque so the disc doesn't show through
     ctx.fill();
-    ctx.lineWidth = 2.5 * SS;
-    ctx.strokeStyle = `rgba(${rgb},0.7)`;
+    ctx.lineWidth = 2 * SS;
+    ctx.strokeStyle = `rgba(${brgb},0.6)`; // --border hue
     ctx.stroke();
-    ctx.fillStyle = `rgba(${rgb},0.95)`;
+    ctx.fillStyle = `rgba(${rgb},0.95)`; // the code text stays the structural accent
     ctx.fillText(text, c.width / 2, c.height / 2 + 2 * SS);
     const tex = new THREE.CanvasTexture(c);
     tex.minFilter = THREE.LinearFilter;

@@ -121,7 +121,12 @@ export class NodeFabric {
               "#include <emissivemap_fragment>\n" +
               "float fres = pow(1.0 - clamp(dot(normalize(vViewPosition), normal), 0.0, 1.0), 3.0);\n" +
               "totalEmissiveRadiance = vBase * vEmi * (0.5 + 0.95 * vCap + 1.1 * fres);"
-            : "#include <emissivemap_fragment>\ntotalEmissiveRadiance = vBase * vEmi;",
+            : // spheres (hyper nodes): a view-dependent FRESNEL rim so they read as glowing 3D orbs
+              // instead of flat blobs (user). Coeffs keep the average near the old flat vEmi so the
+              // dim/hover and bloom-threshold behaviour is unchanged.
+              "#include <emissivemap_fragment>\n" +
+              "float fres = pow(1.0 - clamp(dot(normalize(vViewPosition), normal), 0.0, 1.0), 2.5);\n" +
+              "totalEmissiveRadiance = vBase * vEmi * (0.72 + 0.9 * fres);",
         );
     };
     return mat;

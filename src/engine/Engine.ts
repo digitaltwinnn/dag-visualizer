@@ -863,9 +863,13 @@ export class Engine {
       return;
     }
     this.layers.focusId = filter; // anchor this hub so it stays framed (its orbit + the spin freeze)
-    // Frame against the hub's actual WORLD position — it carries the structure's tilt AND spin. Safe
-    // here (root scale ≈ 1 in hyper at morph 0; the mid-morph origin-collapse never applies to a pick).
-    meta.group.getWorldPosition(this._hubWorld);
+    // Frame against the hub's morph-0 world position: root carries the structure's tilt+spin in its
+    // ROTATION and the morph collapse in its SCALE. On a geo→hyper switch morph is still 1 at this
+    // instant (it eases to 0 over the next frames), so root.scale ≈ 0 and getWorldPosition would
+    // return the origin (the "doesn't focus the metagraph" bug). Apply ONLY the rotation to the
+    // hub's local orbit position — that's where the hub lands once the morph settles; the spin/orbit
+    // are frozen (focusId + non-"all" filter) so it stays valid for the whole tween.
+    this._hubWorld.copy(meta.group.position).applyEuler(this.layers.root.rotation);
     hyperFocusFraming(this._hubWorld, this._framingOut); // look down the ring normal → rings stay flat
     this._tweenTo(this._framingOut.pos, this._framingOut.target);
   }

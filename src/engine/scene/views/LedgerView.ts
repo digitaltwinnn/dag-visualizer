@@ -143,6 +143,8 @@ interface QueueItem {
 export class LedgerView {
   group: THREE.Group;
   private _core: number;             // the structural accent (colors.core), as a number
+  private _border: number;           // colors.border — the label-chip hairline/wash (the .role-chip pill)
+  private _panel: number;            // colors.panel — the label-chip glass backing (== --panel)
   private _coreCol: THREE.Color;     // the accent as a Color (live/selected blocks)
   // Identity SCENE-lane colour map (id -> 0xRRGGBB) — the ONE colour system, shared with the
   // hubs/nodes/HUD (src/palette/identity.ts via the Engine). Required at construction so nothing
@@ -199,6 +201,8 @@ export class LedgerView {
 
   constructor(scene: THREE.Scene, colors: SceneColors, sceneColors: Record<string, number>) {
     this._core = colors.core;
+    this._border = colors.border;
+    this._panel = colors.panel;
     this._coreCol = new THREE.Color(colors.core);
     this.sceneColors = sceneColors;
     this.group = new THREE.Group();
@@ -432,11 +436,24 @@ export class LedgerView {
     // legibility (user: labels read unclear, make them cyan); derived from the token, no literal.
     const cc = new THREE.Color(this._core);
     const tone = `rgba(${Math.round(cc.r * 255)},${Math.round(cc.g * 255)},${Math.round(cc.b * 255)},0.85)`;
+    // The level badge box wears the SAME glass backing + border HUE as the React .role-chip pill —
+    // `--panel` fill (opaque enough that the floor plane behind it doesn't bleed through) + `--border`
+    // blue hairline — via the unified SceneColors bridge so the scene chip and the pill share one
+    // colour source.
+    const bc = new THREE.Color(this._border);
+    const brgb = `${Math.round(bc.r * 255)},${Math.round(bc.g * 255)},${Math.round(bc.b * 255)}`;
+    const pc = new THREE.Color(this._panel);
+    const prgb = `${Math.round(pc.r * 255)},${Math.round(pc.g * 255)},${Math.round(pc.b * 255)}`;
     ctx.font = `400 ${22 * SS}px system-ui, -apple-system, sans-serif`;
     const boxW = Math.max(34 * SS, Math.ceil(ctx.measureText(level).width) + 16 * SS); // fits "2.1" sub-levels
-    ctx.strokeStyle = tone;
+    const bx = 6 * SS, by = 15 * SS, bh = 34 * SS, br = 6 * SS;
+    ctx.beginPath();
+    ctx.roundRect(bx, by, boxW, bh, br);
+    ctx.fillStyle = `rgba(${prgb},0.9)`; // --panel glass, opaque so the floor doesn't show through
+    ctx.fill();
+    ctx.strokeStyle = `rgba(${brgb},0.6)`; // --border hue
     ctx.lineWidth = 2 * SS;
-    ctx.strokeRect(6 * SS, 15 * SS, boxW, 34 * SS); // the level badge box
+    ctx.stroke();
     ctx.fillStyle = tone;
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
