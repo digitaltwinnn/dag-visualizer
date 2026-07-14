@@ -24,6 +24,12 @@ const FILL_OP = 0.055;
 // rings and the DAG core shells so both read the same.
 const LABEL_INSET = 0.45;
 
+// Anchor-packet stream tuning: each anchored snapshot launches one packet hub→core; a burst of N
+// streams out staggered, reusing a small pool (which naturally throttles very large bursts).
+const PKT_TRAVEL = 0.85; // seconds hub → core
+const PKT_STAGGER = 0.07; // seconds between launches within a burst
+const PKT_POOL = 14; // reusable packet meshes per metagraph (caps simultaneous in-flight)
+
 // Ring layer-code labels — the text a focused metagraph shows on each of its three layer rings so
 // the L0 / dL1 / cL1 shells read WITH text (user: hard to tell which ring is which). Only the
 // focused atom labels (one at a time), so the resting overview never gets busy.
@@ -65,8 +71,13 @@ export interface MetaHubRec {
   cfg: MetaConfig;
   state: null;
   tether: THREE.Line;
-  pulseMesh: THREE.Mesh;
-  pulse: number;
+  // Anchor "packets": one travels hub→core per snapshot the metagraph anchored into a tick (same
+  // count the Snapshots view shows). `pending` snapshots launch staggered, reusing the `pool`.
+  packets: { t: number; mesh: THREE.Mesh }[];
+  pool: THREE.Mesh[];
+  pending: number;
+  lastLaunch: number;
+  glow: number; // decaying hub-glow boost on each launch
   anchor: THREE.Vector3;
   orbit: number;
   radius: number;
@@ -167,7 +178,10 @@ export class HyperView {
       if (on) for (const lb of m.labels) lb.visible = false;
       if (on) {
         (m.tether.material as THREE.LineBasicMaterial).opacity = 0;
-        (m.pulseMesh.material as THREE.MeshBasicMaterial).opacity = 0;
+        // Retire any in-flight anchor packets + clear the pending queue.
+        for (const pk of m.packets) { pk.mesh.visible = false; (pk.mesh.material as THREE.MeshBasicMaterial).opacity = 0; m.pool.push(pk.mesh); }
+        m.packets.length = 0;
+        m.pending = 0;
       }
     }
   }
@@ -180,7 +194,7 @@ export class HyperView {
       color: this._core, emissive: this._core, emissiveIntensity: 1.4,
       roughness: 0.25, metalness: 0.3, flatShading: true, transparent: true,
     });
-    this.core = new THREE.Mesh(new THREE.IcosahedronGeometry(1.5, 2), mat);
+    this.core = new THREE.Mesh(new THREE.IcosahedronGeometry(1.5, 5), mat);
     this.core.userData.pick = {
       kind: "core",
       title: "Global L0 — the Hypergraph core",
@@ -204,10 +218,13 @@ export class HyperView {
   // Fire an "anchored into L0" packet from a metagraph's hub toward the core —
   // called when that metagraph actually records a snapshot that anchored into a
   // global tick (the `anchor` event), so the packets reflect real anchoring.
-  pulseMeta(metaId: string) {
-    if (this.ledger) return; // the hubs are hidden in ledger — don't accumulate an unrendered pulse
+  // Queue `count` anchor packets (one per snapshot the metagraph anchored into a tick) to stream
+  // from its hub toward the core — the same count the Snapshots view renders as tiles. They launch
+  // staggered in update(); the pool caps how many fly at once (very large bursts just take longer).
+  pulseMeta(metaId: string, count = 1) {
+    if (this.ledger) return; // the hubs are hidden in ledger — don't accumulate unrendered packets
     const m = this.metas.find((x) => x.cfg.id === metaId);
-    if (m) m.pulse = 1;
+    if (m) m.pending += Math.max(1, count);
   }
 
   // ---------------------------------------------------------------- Metagraphs
@@ -230,7 +247,7 @@ export class HyperView {
         color: col, emissive: col, emissiveIntensity: 1.1,
         roughness: 0.3, metalness: 0.4, flatShading: true, transparent: true,
       });
-      const hub = new THREE.Mesh(new THREE.IcosahedronGeometry(0.9, 1), hubMat);
+      const hub = new THREE.Mesh(new THREE.IcosahedronGeometry(0.9, 4), hubMat);
       hub.userData.pick = { kind: "meta", cfg, title: cfg.name, sub: `Metagraph · ${cfg.ticker}` };
       group.add(hub);
       this.pickables.push(hub);
@@ -257,14 +274,20 @@ export class HyperView {
       );
       this.root.add(tether);
 
-      const pulseMesh = new THREE.Mesh(
-        new THREE.SphereGeometry(0.35, 12, 12),
-        new THREE.MeshBasicMaterial({ color: col, transparent: true, opacity: 0 })
-      );
-      this.root.add(pulseMesh);
+      // A pool of anchor "packets" (reused) — one launches per anchored snapshot (see pulseMeta).
+      const pool: THREE.Mesh[] = [];
+      for (let p = 0; p < PKT_POOL; p++) {
+        const pk = new THREE.Mesh(
+          new THREE.SphereGeometry(0.28, 12, 12),
+          new THREE.MeshBasicMaterial({ color: col, transparent: true, opacity: 0, depthWrite: false }),
+        );
+        pk.visible = false;
+        this.root.add(pk);
+        pool.push(pk);
+      }
 
       this.root.add(group);
-      this.metas.push({ group, hub, cfg, state: null, tether, pulseMesh, pulse: 0, anchor: pos.clone(), orbit: an.a, radius: an.radius, incl: an.incl, spin: 0.3 + Math.random() * 0.5, active: true, hoops, fills, labels });
+      this.metas.push({ group, hub, cfg, state: null, tether, packets: [], pool, pending: 0, lastLaunch: 0, glow: 0, anchor: pos.clone(), orbit: an.a, radius: an.radius, incl: an.incl, spin: 0.3 + Math.random() * 0.5, active: true, hoops, fills, labels });
     });
   }
 
@@ -552,17 +575,32 @@ export class HyperView {
         if (showLabels && cam) this._faceLabelInPlane(lb, cam);
       }
 
-      const pulseMat = m.pulseMesh.material as THREE.MeshBasicMaterial;
-      if (m.pulse > 0) {
-        m.pulse = Math.max(0, m.pulse - dt * 0.7);
-        const e = 1 - m.pulse;
-        m.pulseMesh.position.copy(_pos).multiplyScalar(1 - e);
-        pulseMat.opacity = Math.sin(m.pulse * Math.PI) * 0.9 * metaF;
-        hubMat.emissiveIntensity = (0.72 + m.pulse * 0.5) * metaF * glowMul;
-      } else {
-        pulseMat.opacity = 0;
-        hubMat.emissiveIntensity = 0.72 * metaF * glowMul;
+      // Anchor packets: launch one per pending snapshot (staggered), advance the in-flight ones
+      // hub→core, and boost the hub glow while any are flowing. `_pos` is the hub's live position.
+      if (m.pending > 0 && m.pool.length && t - m.lastLaunch >= PKT_STAGGER) {
+        const pk = m.pool.pop()!;
+        m.packets.push({ t: 0, mesh: pk });
+        m.pending--;
+        m.lastLaunch = t;
+        m.glow = 1;
       }
+      m.glow = Math.max(0, m.glow - dt * 1.4);
+      for (let pi = m.packets.length - 1; pi >= 0; pi--) {
+        const pk = m.packets[pi];
+        pk.t += dt / PKT_TRAVEL;
+        const mat = pk.mesh.material as THREE.MeshBasicMaterial;
+        if (pk.t >= 1) {
+          pk.mesh.visible = false;
+          mat.opacity = 0;
+          m.pool.push(pk.mesh);
+          m.packets.splice(pi, 1);
+          continue;
+        }
+        pk.mesh.visible = true;
+        pk.mesh.position.copy(_pos).multiplyScalar(1 - pk.t); // hub (t=0) → core (t=1)
+        mat.opacity = Math.sin(pk.t * Math.PI) * 0.9 * metaF;
+      }
+      hubMat.emissiveIntensity = (0.72 + m.glow * 0.5) * metaF * glowMul;
     }
   }
 

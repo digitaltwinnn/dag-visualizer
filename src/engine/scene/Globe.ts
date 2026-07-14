@@ -876,12 +876,10 @@ export class Globe implements GeoViewHost {
     // ring normal (the hoop is a full circle, so nodes stay registered on it). Hyper only. This is
     // the per-node motion; the whole structure keeps its slow drift (Engine setHyperSpin).
     if (!this.ledger && this.morph < 0.5) {
-      // Constant APPARENT (linear) speed across every ring, so the big DAG core shells orbit at the
-      // same visual pace as the small metagraph rings — angular rate = v / ringRadius (user: the core
-      // read faster because same angular rate × larger radius). One formula for validators + metanodes.
-      const v = dt * 1.0;
-      for (const r of this.nodes) { const a = v / Math.max(0.8, r.hyperPos.length()); r.hyperPos.applyAxisAngle(r.ringAxis, a); r.hyperDir.applyAxisAngle(r.ringAxis, a); }
-      for (const r of this.metaNodes) r.offset.applyAxisAngle(r.ringAxis, v / Math.max(0.8, r.offset.length()));
+      // Uniform ANGULAR speed for every ring (user) — all nodes advance the same angle per frame.
+      const ang = dt * 0.275;
+      for (const r of this.nodes) { r.hyperPos.applyAxisAngle(r.ringAxis, ang); r.hyperDir.applyAxisAngle(r.ringAxis, ang); }
+      for (const r of this.metaNodes) r.offset.applyAxisAngle(r.ringAxis, ang);
     }
     if (this.fabric.hasValidators) this.fabric.writeValidatorGlow(this.nodes, ctx);
     this.fabric.writeMetaFrame(this.metaNodes, ctx);
