@@ -417,7 +417,15 @@ export class Globe implements GeoViewHost {
     this._densityGlow = [];
     if (!this._glowTex) this._glowTex = makeGlowTexture();
 
-    // Cluster all located primary nodes by rounded direction (~one site per cell), summing counts.
+    // Which nodes contribute + the pool colour follow the committed filter: "all" pools EVERY site in
+    // structural cyan; a metagraph (or "dag") pools only ITS sites, tinted its identity hue — the
+    // selected network lights up where it runs.
+    const filter = this.filter;
+    const glowColor = (filter !== "all" && this.sceneColors?.[filter]) || this.geoColor;
+    const valIn = filter === "all" || filter === "dag";
+    const metaIn = (id: string) => filter === "all" || id === filter;
+
+    // Cluster the included located primary nodes by rounded direction (~one site per cell).
     const clusters = new Map<string, { dir: THREE.Vector3; n: number }>();
     const add = (dir: THREE.Vector3 | null) => {
       if (!dir) return;
@@ -425,14 +433,14 @@ export class Globe implements GeoViewHost {
       const c = clusters.get(key);
       if (c) { c.dir.add(dir); c.n++; } else clusters.set(key, { dir: dir.clone(), n: 1 });
     };
-    for (const u of this.nodes) if (!u.noGeo && u.geoPrimary && u.trueDir) add(u.trueDir);
-    for (const r of this.metaNodes) if ((r.geoPrimary ?? true) && r.trueDir) add(r.trueDir);
+    if (valIn) for (const u of this.nodes) if (!u.noGeo && u.geoPrimary && u.trueDir) add(u.trueDir);
+    for (const r of this.metaNodes) if (metaIn(r.metaId) && (r.geoPrimary ?? true) && r.trueDir) add(r.trueDir);
 
     for (const c of clusters.values()) {
       const dir = c.dir.normalize();
       const size = Math.min(7, 1.8 + Math.sqrt(c.n) * 0.7); // pool grows with node count, capped
       const mat = new THREE.MeshBasicMaterial({
-        map: this._glowTex, color: new THREE.Color(this.geoColor),
+        map: this._glowTex, color: new THREE.Color(glowColor),
         transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, opacity: 0,
       });
       const mesh = new THREE.Mesh(new THREE.PlaneGeometry(size, size), mat);
@@ -457,6 +465,7 @@ export class Globe implements GeoViewHost {
     this._updateCountryBorder();
     this._applyDim(sel);
     this._relayoutGeo();
+    this._buildDensityGlow(); // pools follow the filter (its sites, its identity hue)
   }
 
   // Transient PREVIEW dim (filter-chip / hub hover): same dim TARGETS as setFilter, but does
