@@ -97,6 +97,7 @@ export class Globe implements GeoViewHost {
   geoFades: GeoViewHost["geoFades"] = []; // { mat, base } surface materials faded by morph
   private _densityGlow: THREE.Mesh[] = []; // additive light pools under dense node clusters (geo)
   private _glowTex?: THREE.Texture; // shared radial-gradient sprite for the light pools
+  private _glowDim = 1; // eased 1→~0.2 while a country is drilled, so its highlight isn't overruled
   morph = 0;
   private ledgerT = 0; // 0->1 ease as the reused node meshes fly from their source view into the lanes
   clock = 0;
@@ -411,10 +412,7 @@ export class Globe implements GeoViewHost {
   private _buildDensityGlow(): void {
     for (const m of this._densityGlow) {
       this.group.remove(m);
-      const mat = m.material as THREE.Material;
-      const gi = this.geoFades.findIndex((f) => f.mat === mat);
-      if (gi >= 0) this.geoFades.splice(gi, 1); // drop its morph-fade entry too
-      mat.dispose();
+      (m.material as THREE.Material).dispose();
     }
     this._densityGlow = [];
     if (!this._glowTex) this._glowTex = makeGlowTexture();
@@ -432,10 +430,10 @@ export class Globe implements GeoViewHost {
 
     for (const c of clusters.values()) {
       const dir = c.dir.normalize();
-      const size = Math.min(9, 2.2 + Math.sqrt(c.n) * 0.95); // pool grows with node count, capped
+      const size = Math.min(7, 1.8 + Math.sqrt(c.n) * 0.7); // pool grows with node count, capped
       const mat = new THREE.MeshBasicMaterial({
         map: this._glowTex, color: new THREE.Color(this.geoColor),
-        transparent: true, blending: THREE.AdditiveBlending, depthWrite: false,
+        transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, opacity: 0,
       });
       const mesh = new THREE.Mesh(new THREE.PlaneGeometry(size, size), mat);
       mesh.position.copy(dir).multiplyScalar(R + LAND_H + 0.06); // just above the plateau
@@ -443,9 +441,11 @@ export class Globe implements GeoViewHost {
       // seated as the globe spins — lookAt (world space) would bake in the current spin.
       mesh.quaternion.setFromUnitVectors(_PLANE_N, dir);
       mesh.renderOrder = 0; // over the land fill (-1), under the standing chips
+      // Resting strength — SUBTLE (a whisper of light, not a spotlight), brighter where denser.
+      // Opacity is driven per-frame in setMorph (morph fade × the country-drill recede), NOT geoFades.
+      mesh.userData.glowBase = Math.min(0.22, 0.05 + c.n * 0.014);
       this.group.add(mesh);
       this._densityGlow.push(mesh);
-      this.geoFades.push({ mat, base: Math.min(0.5, 0.13 + c.n * 0.03) }); // brighter where denser
     }
   }
 
@@ -784,6 +784,11 @@ export class Globe implements GeoViewHost {
     const surf = this.ledger ? 0 : surfFade(m);
     const extras = this.ledger ? 0 : extrasFade(m);
     for (const f of this.geoFades) f.mat.opacity = f.base * surf;
+    // Density light pools: morph fade × the country-drill recede (so a drilled country's own
+    // highlight isn't washed out by the pools).
+    for (const g of this._densityGlow) {
+      (g.material as THREE.MeshBasicMaterial).opacity = (g.userData.glowBase as number) * surf * this._glowDim;
+    }
     // Depth cueing for the see-through hologram: the graticule + coastal walls dim their far
     // hemisphere through the shared facing uniform (camera dir in this group's local frame),
     // and each polar compass rose fades by its own pole's facing on top of the morph fade —
@@ -808,6 +813,8 @@ export class Globe implements GeoViewHost {
 
   update(dt: number): void {
     this.clock += dt;
+    // Recede the density light pools while a country is drilled (so its highlight leads), eased.
+    this._glowDim += ((this.countryFilter ? 0.2 : 1) - this._glowDim) * Math.min(1, dt * 3);
     // Ease the wall colour (held at the default cyan).
     if (this.landWallUniforms) {
       this._edgeColor.lerp(this._edgeTarget, Math.min(1, dt * 3));
