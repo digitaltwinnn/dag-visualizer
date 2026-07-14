@@ -95,6 +95,8 @@ export class Globe implements GeoViewHost {
   pickables: THREE.Object3D[] = [];
   nodes: ValidatorRecord[] = [];
   geoFades: GeoViewHost["geoFades"] = []; // { mat, base } surface materials faded by morph
+  private _densityGlow: THREE.Mesh[] = []; // additive light pools under dense node clusters (geo)
+  private _glowTex?: THREE.Texture; // shared radial-gradient sprite for the light pools
   morph = 0;
   private ledgerT = 0; // 0->1 ease as the reused node meshes fly from their source view into the lanes
   clock = 0;
@@ -308,6 +310,7 @@ export class Globe implements GeoViewHost {
 
     // Fan out the filter-active nodes and (re)build the density rings + arcs.
     this._relayoutGeo();
+    this._buildDensityGlow(); // light pools follow the validator sites too
     this.setMorph(this.morph); // place at current morph
   }
 
@@ -399,6 +402,51 @@ export class Globe implements GeoViewHost {
     const drill = this.countryFilter;
     this.setFilter(this.filter);
     if (drill) this.setCountry(drill);
+    this._buildDensityGlow();
+  }
+
+  // A soft additive "light pool" under each dense node cluster on the globe — LIGHTING driven by the
+  // real data (more nodes at a site → a bigger, brighter pool), so Germany / the US / Finland glow.
+  // Fades with the morph (geoFades) so it's a geo-only effect. Rebuilt whenever node data changes.
+  private _buildDensityGlow(): void {
+    for (const m of this._densityGlow) {
+      this.group.remove(m);
+      const mat = m.material as THREE.Material;
+      const gi = this.geoFades.findIndex((f) => f.mat === mat);
+      if (gi >= 0) this.geoFades.splice(gi, 1); // drop its morph-fade entry too
+      mat.dispose();
+    }
+    this._densityGlow = [];
+    if (!this._glowTex) this._glowTex = makeGlowTexture();
+
+    // Cluster all located primary nodes by rounded direction (~one site per cell), summing counts.
+    const clusters = new Map<string, { dir: THREE.Vector3; n: number }>();
+    const add = (dir: THREE.Vector3 | null) => {
+      if (!dir) return;
+      const key = `${Math.round(dir.x * 30)},${Math.round(dir.y * 30)},${Math.round(dir.z * 30)}`;
+      const c = clusters.get(key);
+      if (c) { c.dir.add(dir); c.n++; } else clusters.set(key, { dir: dir.clone(), n: 1 });
+    };
+    for (const u of this.nodes) if (!u.noGeo && u.geoPrimary && u.trueDir) add(u.trueDir);
+    for (const r of this.metaNodes) if ((r.geoPrimary ?? true) && r.trueDir) add(r.trueDir);
+
+    for (const c of clusters.values()) {
+      const dir = c.dir.normalize();
+      const size = Math.min(9, 2.2 + Math.sqrt(c.n) * 0.95); // pool grows with node count, capped
+      const mat = new THREE.MeshBasicMaterial({
+        map: this._glowTex, color: new THREE.Color(this.geoColor),
+        transparent: true, blending: THREE.AdditiveBlending, depthWrite: false,
+      });
+      const mesh = new THREE.Mesh(new THREE.PlaneGeometry(size, size), mat);
+      mesh.position.copy(dir).multiplyScalar(R + LAND_H + 0.06); // just above the plateau
+      // Tangent to the sphere in GROUP-LOCAL space (plane +Z → surface normal `dir`), so it stays
+      // seated as the globe spins — lookAt (world space) would bake in the current spin.
+      mesh.quaternion.setFromUnitVectors(_PLANE_N, dir);
+      mesh.renderOrder = 0; // over the land fill (-1), under the standing chips
+      this.group.add(mesh);
+      this._densityGlow.push(mesh);
+      this.geoFades.push({ mat, base: Math.min(0.5, 0.13 + c.n * 0.03) }); // brighter where denser
+    }
   }
 
   // Isolate one network on the globe and dim the rest.
@@ -813,3 +861,22 @@ export class Globe implements GeoViewHost {
 
 // Off-ready validator tint — mirrors js/globe.js's module-level DIM.
 const NODE_DIM = new THREE.Color(0x223046);
+const _PLANE_N = new THREE.Vector3(0, 0, 1); // PlaneGeometry's default facing (for orienting glow pools)
+
+// A soft radial-gradient sprite (white centre → transparent edge) for the geo density light pools.
+// White so the per-mesh `color` tints it; additive blending turns overlaps into brighter light.
+function makeGlowTexture(): THREE.Texture {
+  const s = 128;
+  const c = document.createElement("canvas");
+  c.width = c.height = s;
+  const ctx = c.getContext("2d")!;
+  const g = ctx.createRadialGradient(s / 2, s / 2, 0, s / 2, s / 2, s / 2);
+  g.addColorStop(0, "rgba(255,255,255,0.9)");
+  g.addColorStop(0.4, "rgba(255,255,255,0.32)");
+  g.addColorStop(1, "rgba(255,255,255,0)");
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, s, s);
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  return tex;
+}
