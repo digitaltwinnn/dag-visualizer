@@ -25,9 +25,11 @@ export interface SceneColors {
   //                               reuse it at the SAME alphas as the .role-chip pill: .22 / .05)
   panel: number; //   --panel      (translucent glass panel RGB, 12,16,32 — the label chips fill
   //                               with it so the badge reads as glass, not the disc behind it)
+  muted: number; //   --muted-foreground (the muted text tone, #8a96b8 — the label-chip CODE text,
+  //                               matching the React .role-chip pill's text-muted-foreground)
 }
 
-export type SceneColorVar = "--primary" | "--core" | "--background" | "--border" | "--panel";
+export type SceneColorVar = "--primary" | "--core" | "--background" | "--border" | "--panel" | "--muted-foreground";
 
 // Resolve one CSS colour expression (e.g. "var(--primary)") to a packed 0xRRGGBB. Two steps, because
 // the computed-colour STRING format varies by browser (a token authored in oklch resolves to
@@ -75,5 +77,6 @@ export function readSceneColors(): SceneColors {
     bg: readColorToken("--background"),
     border: readColorToken("--border"),
     panel: readColorToken("--panel"),
+    muted: readColorToken("--muted-foreground"),
   };
 }

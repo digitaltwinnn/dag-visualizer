@@ -121,6 +121,7 @@ export class HyperView {
   private _core: number; // the structural accent (colors.core) — the core sphere hue
   private _border: number; // colors.border — the label-chip hairline/wash RGB (the .role-chip pill)
   private _panel: number; // colors.panel — the label-chip glass backing (== --panel)
+  private _muted: number; // colors.muted — the label-chip CODE text tone (== --muted-foreground)
 
   // `sceneColors` (id -> 0xRRGGBB) is the identity SCENE-lane colour map (Task 3), handed in by
   // the Engine at construction — HyperView builds all its hubs synchronously from
@@ -131,6 +132,7 @@ export class HyperView {
     this._core = colors.core;
     this._border = colors.border;
     this._panel = colors.panel;
+    this._muted = colors.muted;
     this.root = new THREE.Group();
     // Tilt the hub/tether/hoop structure to read top-down from the shared overview camera (Globe
     // tilts the node group + HyperView the core by the same HYPER_TILT, so all three stay registered).
@@ -416,12 +418,12 @@ export class HyperView {
     c.width = 128 * SS;
     c.height = 64 * SS;
     const ctx = c.getContext("2d")!;
-    const cc = new THREE.Color(this._core);
-    const rgb = `${Math.round(cc.r * 255)},${Math.round(cc.g * 255)},${Math.round(cc.b * 255)}`;
     const bc = new THREE.Color(this._border);
     const brgb = `${Math.round(bc.r * 255)},${Math.round(bc.g * 255)},${Math.round(bc.b * 255)}`;
     const pc = new THREE.Color(this._panel);
     const prgb = `${Math.round(pc.r * 255)},${Math.round(pc.g * 255)},${Math.round(pc.b * 255)}`;
+    const mc = new THREE.Color(this._muted);
+    const mrgb = `${Math.round(mc.r * 255)},${Math.round(mc.g * 255)},${Math.round(mc.b * 255)}`;
     ctx.font = `600 ${34 * SS}px system-ui, -apple-system, sans-serif`;
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
@@ -441,7 +443,7 @@ export class HyperView {
     ctx.lineWidth = 2 * SS;
     ctx.strokeStyle = `rgba(${brgb},0.6)`; // --border hue
     ctx.stroke();
-    ctx.fillStyle = `rgba(${rgb},0.95)`; // the code text stays the structural accent
+    ctx.fillStyle = `rgba(${mrgb},0.95)`; // --muted-foreground, matching the pill's code text (not cyan)
     ctx.fillText(text, c.width / 2, c.height / 2 + 2 * SS);
     const tex = new THREE.CanvasTexture(c);
     tex.minFilter = THREE.LinearFilter;
@@ -474,15 +476,24 @@ export class HyperView {
     this._coreFills = [];
     for (const s of shells) {
       for (let k = 0; k < s.numRings; k++) {
-        const h = this._makeHoop(armillaryFrame(k, s.numRings, s.tilt), s.radius);
+        const frame = armillaryFrame(k, s.numRings, s.tilt);
+        const h = this._makeHoop(frame, s.radius);
         this.coreGroup.add(h);
         this._coreRings.push(h);
+        // Rim-fill disc on EVERY ring of the shell (user: a multi-ring shell like the Global L0
+        // must show the fill on all its rings, not just the k=0 representative).
+        const fill = this._makeRingFill(frame, s.radius);
+        this.coreGroup.add(fill);
+        this._coreFills.push(fill);
       }
-      // The DAG core shell is the same structural ring as a metagraph layer — same rim-fill + inner
-      // label, shown while the DAG is focused. Uses the shell's representative (k=0) ring plane.
-      const d = this._makeRingDecor(this.coreGroup, armillaryFrame(0, s.numRings, s.tilt), s.radius, s.code);
-      this._coreFills.push(d.fill);
-      this._coreLabels.push(d.label);
+      // ONE label per shell (the k=0 ring plane) — repeating the code on every ring reads busy.
+      const frame0 = armillaryFrame(0, s.numRings, s.tilt);
+      const label = this._makeRingLabel(s.code);
+      label.position.copy(frame0.t).multiplyScalar(s.radius - LABEL_INSET); // INNER side of the ring
+      storeRingNormal(label, frame0);
+      label.visible = false;
+      this.coreGroup.add(label);
+      this._coreLabels.push(label);
     }
   }
 

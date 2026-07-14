@@ -145,6 +145,7 @@ export class LedgerView {
   private _core: number;             // the structural accent (colors.core), as a number
   private _border: number;           // colors.border — the label-chip hairline/wash (the .role-chip pill)
   private _panel: number;            // colors.panel — the label-chip glass backing (== --panel)
+  private _muted: number;            // colors.muted — the level-badge text tone (== --muted-foreground)
   private _coreCol: THREE.Color;     // the accent as a Color (live/selected blocks)
   // Identity SCENE-lane colour map (id -> 0xRRGGBB) — the ONE colour system, shared with the
   // hubs/nodes/HUD (src/palette/identity.ts via the Engine). Required at construction so nothing
@@ -203,6 +204,7 @@ export class LedgerView {
     this._core = colors.core;
     this._border = colors.border;
     this._panel = colors.panel;
+    this._muted = colors.muted;
     this._coreCol = new THREE.Color(colors.core);
     this.sceneColors = sceneColors;
     this.group = new THREE.Group();
@@ -436,6 +438,8 @@ export class LedgerView {
     // legibility (user: labels read unclear, make them cyan); derived from the token, no literal.
     const cc = new THREE.Color(this._core);
     const tone = `rgba(${Math.round(cc.r * 255)},${Math.round(cc.g * 255)},${Math.round(cc.b * 255)},0.85)`;
+    const mc = new THREE.Color(this._muted);
+    const mtone = `rgba(${Math.round(mc.r * 255)},${Math.round(mc.g * 255)},${Math.round(mc.b * 255)},0.95)`;
     // The level badge box wears the SAME glass backing + border HUE as the React .role-chip pill —
     // `--panel` fill (opaque enough that the floor plane behind it doesn't bleed through) + `--border`
     // blue hairline — via the unified SceneColors bridge so the scene chip and the pill share one
@@ -454,12 +458,13 @@ export class LedgerView {
     ctx.strokeStyle = `rgba(${brgb},0.6)`; // --border hue
     ctx.lineWidth = 2 * SS;
     ctx.stroke();
-    ctx.fillStyle = tone;
+    ctx.fillStyle = mtone; // --muted-foreground, matching the pill's code text (not cyan)
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
     ctx.fillText(level, 6 * SS + boxW / 2, (15 + 17 + 1) * SS); // level centred in the box
     ctx.font = `400 ${26 * SS}px system-ui, -apple-system, sans-serif`;
     ctx.textAlign = "left";
+    ctx.fillStyle = tone; // the floor NAME stays the accent (not a pill — the floor's own label)
     ctx.fillText(text, 6 * SS + boxW + 12 * SS, c.height / 2 + 2 * SS);
     const tex = new THREE.CanvasTexture(c);
     tex.minFilter = THREE.LinearFilter;
