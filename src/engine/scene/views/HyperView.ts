@@ -279,8 +279,11 @@ export class HyperView {
       for (let p = 0; p < PKT_POOL; p++) {
         const pk = new THREE.Mesh(
           new THREE.SphereGeometry(0.28, 12, 12),
-          new THREE.MeshBasicMaterial({ color: col, transparent: true, opacity: 0, depthWrite: false, blending: THREE.AdditiveBlending }),
+          // Additive (only ever BRIGHTENS — normal blending darkened the bloomed tether/core as a
+          // packet passed over, the "black objects"); depthTest off so it never occludes the line.
+          new THREE.MeshBasicMaterial({ color: col, transparent: true, opacity: 0, depthWrite: false, depthTest: false, blending: THREE.AdditiveBlending }),
         );
+        pk.renderOrder = 4;
         pk.visible = false;
         this.root.add(pk);
         pool.push(pk);
