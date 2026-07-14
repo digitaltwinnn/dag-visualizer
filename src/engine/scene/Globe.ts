@@ -879,7 +879,7 @@ export class Globe implements GeoViewHost {
       // Uniform ANGULAR speed for every ring (user) — all nodes advance the same angle per frame.
       // The DAG core rings are much larger, so the same angular rate sweeps a long arc and reads
       // too fast — give the core (validators) a slower angular rate than the metagraph rings (user).
-      const coreAng = dt * 0.05;
+      const coreAng = dt * 0.09;
       const metaAng = dt * 0.12;
       for (const r of this.nodes) { r.hyperPos.applyAxisAngle(r.ringAxis, coreAng); r.hyperDir.applyAxisAngle(r.ringAxis, coreAng); }
       for (const r of this.metaNodes) r.offset.applyAxisAngle(r.ringAxis, metaAng);

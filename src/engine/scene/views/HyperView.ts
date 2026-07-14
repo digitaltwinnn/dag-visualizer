@@ -279,7 +279,7 @@ export class HyperView {
       for (let p = 0; p < PKT_POOL; p++) {
         const pk = new THREE.Mesh(
           new THREE.SphereGeometry(0.28, 12, 12),
-          new THREE.MeshBasicMaterial({ color: col, transparent: true, opacity: 0, depthWrite: false }),
+          new THREE.MeshBasicMaterial({ color: col, transparent: true, opacity: 0, depthWrite: false, blending: THREE.AdditiveBlending }),
         );
         pk.visible = false;
         this.root.add(pk);

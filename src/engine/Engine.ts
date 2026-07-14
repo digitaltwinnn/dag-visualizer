@@ -282,8 +282,8 @@ export class Engine {
     // Data-driven Hypergraph pulses: when a metagraph records a snapshot that anchored into a
     // global tick, fire a packet from its hub along the tether into the core; flash the core
     // itself on each new global snapshot (scaled by how many metagraphs it anchored).
-    net?.on("anchor", ({ metaId, timestamps }: { metaId: string; timestamps: string[] }) => {
-      this.layers.pulseMeta(metaId, timestamps?.length ?? 1); // one packet per anchored snapshot
+    net?.on("anchor", ({ metaId, timestamps, seed }: { metaId: string; timestamps: string[]; seed: boolean }) => {
+      if (!seed) this.layers.pulseMeta(metaId, timestamps?.length ?? 1); // one packet per LIVE snapshot (skip the history seed)
       if (this.mode === "ledger") this._ledgerDirty = true; // the per-tick breakdown filled in
     });
     net?.on("global", (evt: { latest: GlobalSnapshot | null }) => {

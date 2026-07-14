@@ -9,7 +9,7 @@ export interface NetworkEvents {
   global: { reset: boolean; snapshots?: GlobalSnapshot[]; snapshot?: GlobalSnapshot; latest: GlobalSnapshot | null };
   status: { live: boolean; lastGoodAt: number | null };
   cluster: { l0: ClusterNode[]; l1: ClusterNode[]; dag: DagCore };
-  anchor: { metaId: string; timestamps: string[] };
+  anchor: { metaId: string; timestamps: string[]; seed: boolean };
 }
 
 // One record in a metagraph's rolling snapshot buffer (metaSnaps).
@@ -310,7 +310,7 @@ export class NetworkData {
       if (oldestKey === undefined) break;
       this.anchorIndex.delete(oldestKey);
     }
-    this._emit("anchor", { metaId: m.id, timestamps: fresh.map((r) => r.ts) });
+    this._emit("anchor", { metaId: m.id, timestamps: fresh.map((r) => r.ts), seed: lastOrd === -1 });
   }
 
   // Aggregate fee + count of the metagraph snapshots anchored into a given global
