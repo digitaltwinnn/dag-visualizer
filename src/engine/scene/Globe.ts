@@ -438,7 +438,7 @@ export class Globe implements GeoViewHost {
 
     for (const c of clusters.values()) {
       const dir = c.dir.normalize();
-      const size = Math.min(7, 1.8 + Math.sqrt(c.n) * 0.7); // pool grows with node count, capped
+      const size = Math.min(9, 2.2 + Math.sqrt(c.n) * 0.9); // pool grows with node count, capped
       const mat = new THREE.MeshBasicMaterial({
         map: this._glowTex, color: new THREE.Color(glowColor),
         transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, opacity: 0,
@@ -451,7 +451,7 @@ export class Globe implements GeoViewHost {
       mesh.renderOrder = 0; // over the land fill (-1), under the standing chips
       // Resting strength — SUBTLE (a whisper of light, not a spotlight), brighter where denser.
       // Opacity is driven per-frame in setMorph (morph fade × the country-drill recede), NOT geoFades.
-      mesh.userData.glowBase = Math.min(0.22, 0.05 + c.n * 0.014);
+      mesh.userData.glowBase = Math.min(0.42, 0.1 + c.n * 0.024);
       this.group.add(mesh);
       this._densityGlow.push(mesh);
     }
@@ -887,8 +887,8 @@ function makeGlowTexture(): THREE.Texture {
   c.width = c.height = s;
   const ctx = c.getContext("2d")!;
   const g = ctx.createRadialGradient(s / 2, s / 2, 0, s / 2, s / 2, s / 2);
-  g.addColorStop(0, "rgba(255,255,255,0.9)");
-  g.addColorStop(0.4, "rgba(255,255,255,0.32)");
+  g.addColorStop(0, "rgba(255,255,255,1.0)");
+  g.addColorStop(0.32, "rgba(255,255,255,0.5)");
   g.addColorStop(1, "rgba(255,255,255,0)");
   ctx.fillStyle = g;
   ctx.fillRect(0, 0, s, s);
