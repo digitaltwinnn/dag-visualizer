@@ -21,6 +21,8 @@ export interface ValidatorRecord {
   ledgerPos: THREE.Vector3;
   ledgerHide: boolean;
   hyperPos: THREE.Vector3;
+  /** Ring-plane normal in the base (untilted) frame — the node orbits ALONG its shell around this. */
+  ringAxis: THREE.Vector3;
   hyperDir: THREE.Vector3;
   hyperRadius: number;
   geoDir: THREE.Vector3 | null;
@@ -55,6 +57,9 @@ export interface MetaNodeRecord {
    *  record stays renderer-free (no THREE.Group in the domain layer). */
   hubGroup: Pick<THREE.Object3D, "position" | "getWorldPosition"> | null;
   offset: THREE.Vector3;
+  /** The node's ring-plane normal in the base (untilted) frame — its Hypergraph shell orbits ALONG
+   *  this axis (the offset is spun around it each frame; the hoop is a full circle so it stays on it). */
+  ringAxis: THREE.Vector3;
   ledgerPos: THREE.Vector3;
   geoPrimary: boolean;
   nodeId: string;

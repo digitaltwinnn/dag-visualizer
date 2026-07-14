@@ -244,6 +244,9 @@ export class Globe implements GeoViewHost {
         if (!ready) col.lerp(NODE_DIM, 0.55);
 
         const hyperPos = armillaryPos(i, n, ring.radius, ring.numRings, ring.tilt);
+        // The node's ring normal — nodes orbit ALONG their shell around this axis (see update()).
+        const _rf = armillaryFrame(i % ring.numRings, ring.numRings, ring.tilt);
+        const ringAxis = _rf.t.clone().cross(_rf.b).normalize();
         const g = geoMap[node.ip];
         const geoDir = g ? latLonToVec3(g.lat!, g.lon!, 1).normalize() : null;
 
@@ -268,7 +271,7 @@ export class Globe implements GeoViewHost {
         const u: ValidatorRecord = {
           index: idx, layer: role, roles: node.roles || [role], nodeId: node.id, geoPrimary: primary, ready, base: col.clone(),
           ledgerPos, ledgerHide: role !== "cl1" && role !== "l0",
-          hyperPos, hyperDir: hyperPos.clone().normalize(), hyperRadius: hyperPos.length(),
+          hyperPos, hyperDir: hyperPos.clone().normalize(), hyperRadius: hyperPos.length(), ringAxis,
           geoDir, trueDir: geoDir ? geoDir.clone() : null, geoRadius: HEX_BASE_R, noGeo: !g,
           // UNIFORM node size regardless of ready state (user: never size by status; status lives
           // in the explorer pill + node card). geoSize = hex prism CIRCUMRADIUS (world).
@@ -352,6 +355,7 @@ export class Globe implements GeoViewHost {
         const cnt = nodeList.length;
         present[li] = cnt > 0;
         const frame = armillaryFrame(li, META_LAYERS.length, META_RING.tilt);
+        const ringAxis = frame.t.clone().cross(frame.b).normalize(); // nodes orbit along this shell
         nodeList.forEach((node, i) => {
           const g = geoMap[node.ip]!;
           const primary = !seen.has(node.ip);
@@ -370,7 +374,7 @@ export class Globe implements GeoViewHost {
           } as unknown as PickDescriptor;
           recs.push({
             metaId: m.id, layer, color: new THREE.Color(m.color), index: 0,
-            hubGroup, offset, ledgerPos, geoPrimary: primary, nodeId: node.ip,
+            hubGroup, offset, ledgerPos, geoPrimary: primary, nodeId: node.ip, ringAxis,
             hyperPos: new THREE.Vector3(a.x, a.y, a.z).add(offset),
             geoPos: new THREE.Vector3(),
             geoDir: dir, trueDir: dir.clone(),
@@ -794,6 +798,14 @@ export class Globe implements GeoViewHost {
       this.dim += (this.dimTarget - this.dim) * k;
     }
     const ctx = this._frameCtx(dt, flashDecay);
+    // Hypergraph "atom" life: each node ORBITS along its own shell — spin its position around the
+    // ring normal (the hoop is a full circle, so nodes stay registered on it). Hyper only. This is
+    // the per-node motion; the whole structure keeps its slow drift (Engine setHyperSpin).
+    if (!this.ledger && this.morph < 0.5) {
+      const ang = dt * 0.55; // node orbital speed (livelier than the slow whole-structure spin)
+      for (const r of this.nodes) { r.hyperPos.applyAxisAngle(r.ringAxis, ang); r.hyperDir.applyAxisAngle(r.ringAxis, ang); }
+      for (const r of this.metaNodes) r.offset.applyAxisAngle(r.ringAxis, ang);
+    }
     if (this.fabric.hasValidators) this.fabric.writeValidatorGlow(this.nodes, ctx);
     this.fabric.writeMetaFrame(this.metaNodes, ctx);
   }
