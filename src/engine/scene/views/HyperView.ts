@@ -18,6 +18,11 @@ const _pos = new THREE.Vector3(); // scratch for hub orbit positions (reused eac
 // frame with the hub/core reveal so the rings are Hypergraph-only furniture.
 const HOOP_OP = 0.08;
 
+// Ring layer-code labels — the text a focused metagraph shows on each of its three layer rings so
+// the L0 / dL1 / cL1 shells read WITH text (user: hard to tell which ring is which). Only the
+// focused atom labels (one at a time), so the resting overview never gets busy.
+const LAYER_CODE: Record<"l0" | "dl1" | "cl1", string> = { l0: "L0", dl1: "dL1", cl1: "cL1" };
+
 // One orbiting metagraph hub record in HyperView.metas (the exact shape the constructor
 // builds — scene/Globe.ts (via `layers.metas.find`, keying off `.cfg.id`/`.group`) and
 // Engine.ts (`.cfg.id` lookups for DoF/filter) read these fields off the instances handed
@@ -37,6 +42,7 @@ export interface MetaHubRec {
   spin: number;
   active: boolean;
   hoops: THREE.LineLoop[]; // the cyan layer rings (structural) drawn around this hub
+  labels: THREE.Mesh[]; // per-ring layer-code labels (L0 / dL1 / cL1) — shown only while focused
 }
 
 export class HyperView {
@@ -55,6 +61,8 @@ export class HyperView {
   core!: THREE.Mesh;
   coreFlash?: number;
   private _coreRings: THREE.LineLoop[] = []; // the DAG core's cyan "sun" hoops (rebuilt on node load)
+  private _camQ = new THREE.Quaternion(); // scratch: camera world quat (ring-label billboarding)
+  private _parentQ = new THREE.Quaternion(); // scratch: label parent world quat
   private _coreDim = 0; // eased 0→1: the DAG core fades back when a specific metagraph is the subject
   private _core: number; // the structural accent (colors.core) — the core sphere hue
 
@@ -112,6 +120,7 @@ export class HyperView {
     for (const m of this.metas) {
       m.hub.visible = !on;
       for (const h of m.hoops) h.visible = !on;
+      if (on) for (const lb of m.labels) lb.visible = false;
       if (on) {
         (m.tether.material as THREE.LineBasicMaterial).opacity = 0;
         (m.pulseMesh.material as THREE.MeshBasicMaterial).opacity = 0;
@@ -192,6 +201,17 @@ export class HyperView {
         return h;
       });
 
+      // One layer-code label per ring, parked at the ring's outer edge (its frame's +t direction),
+      // hidden until this metagraph is focused (see update()).
+      const labels = META_LAYERS.map((layer, li) => {
+        const frame = armillaryFrame(li, META_LAYERS.length, META_RING.tilt);
+        const lb = this._makeRingLabel(LAYER_CODE[layer]);
+        lb.position.copy(frame.t).multiplyScalar(META_RING.radii[layer] + 0.6);
+        lb.visible = false;
+        group.add(lb);
+        return lb;
+      });
+
       const tether = new THREE.Line(
         new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(), pos.clone()]),
         new THREE.LineBasicMaterial({ color: this._core, transparent: true, opacity: 0.22 })
@@ -205,7 +225,7 @@ export class HyperView {
       this.root.add(pulseMesh);
 
       this.root.add(group);
-      this.metas.push({ group, hub, cfg, state: null, tether, pulseMesh, pulse: 0, anchor: pos.clone(), orbit: an.a, radius: an.radius, incl: an.incl, spin: 0.3 + Math.random() * 0.5, active: true, hoops });
+      this.metas.push({ group, hub, cfg, state: null, tether, pulseMesh, pulse: 0, anchor: pos.clone(), orbit: an.a, radius: an.radius, incl: an.incl, spin: 0.3 + Math.random() * 0.5, active: true, hoops, labels });
     });
   }
 
@@ -260,6 +280,32 @@ export class HyperView {
     return loop;
   }
 
+  // A small cyan layer-code label ("L0" / "dL1" / "cL1") as a billboard plane. Text-only (structural
+  // annotation → the accent token, not identity); billboarded to the camera each frame in update().
+  private _makeRingLabel(text: string): THREE.Mesh {
+    const SS = 2;
+    const c = document.createElement("canvas");
+    c.width = 128 * SS;
+    c.height = 64 * SS;
+    const ctx = c.getContext("2d")!;
+    const cc = new THREE.Color(this._core);
+    ctx.fillStyle = `rgba(${Math.round(cc.r * 255)},${Math.round(cc.g * 255)},${Math.round(cc.b * 255)},0.92)`;
+    ctx.font = `600 ${34 * SS}px system-ui, -apple-system, sans-serif`;
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText(text, c.width / 2, c.height / 2 + 2 * SS);
+    const tex = new THREE.CanvasTexture(c);
+    tex.minFilter = THREE.LinearFilter;
+    tex.colorSpace = THREE.SRGBColorSpace;
+    const h = 0.62, w = h * (c.width / c.height);
+    const mesh = new THREE.Mesh(
+      new THREE.PlaneGeometry(w, h),
+      new THREE.MeshBasicMaterial({ map: tex, transparent: true, depthWrite: false, depthTest: false }),
+    );
+    mesh.renderOrder = 3; // over the hoops/nodes
+    return mesh;
+  }
+
   // (Re)build the DAG core's tilted cyan hoops — one per ring of each armillary shell (L0 ball +
   // the separated $DAG L1 outer shell) — matching the node rings Globe placed. Called from
   // Globe.setNodes whenever the validator set changes.
@@ -285,7 +331,7 @@ export class HyperView {
   // out to the map (Globe) instead.
   // `spinFrozen` (set when the camera is zoomed in to inspect) stops the overall SPHERE spin — the
   // core + hub meshes — so a close-up reads still; the per-node axis spin (Globe) keeps going.
-  update(dt: number, morph = 0, coreDimTarget = 0, spinFrozen = false) {
+  update(dt: number, morph = 0, coreDimTarget = 0, spinFrozen = false, cam?: THREE.Camera) {
     this.clock += dt;
     const t = this.clock;
 
@@ -375,6 +421,18 @@ export class HyperView {
       // The cyan layer hoops fade with the hubs on the morph, dim on inactive / out-of-focus hubs.
       const hoopOp = HOOP_OP * metaF * (m.active ? 1 : 0.4) * fdim;
       for (const h of m.hoops) (h.material as THREE.LineBasicMaterial).opacity = hoopOp;
+
+      // Layer-code labels: ONLY the focused metagraph shows them (one atom at a time — the resting
+      // overview stays clean), billboarded to the camera so they read from the drilled side pose.
+      const showLabels = this.focusId === m.cfg.id && cam != null && metaF > 0.5;
+      if (showLabels) {
+        cam!.getWorldQuaternion(this._camQ);
+        m.group.getWorldQuaternion(this._parentQ).invert().multiply(this._camQ); // parentWorld⁻¹ · camWorld
+      }
+      for (const lb of m.labels) {
+        lb.visible = showLabels;
+        if (showLabels) lb.quaternion.copy(this._parentQ);
+      }
 
       const pulseMat = m.pulseMesh.material as THREE.MeshBasicMaterial;
       if (m.pulse > 0) {

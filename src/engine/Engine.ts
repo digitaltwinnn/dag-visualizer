@@ -914,7 +914,7 @@ export class Engine {
         this.globe.setHyperSpin(this._hyperSpinY);
         this.layers.setHyperSpin(this._hyperSpinY);
       }
-      this.layers.update(dt, this.morph, coreDim, zoomedIn);
+      this.layers.update(dt, this.morph, coreDim, zoomedIn, this.ctx.camera);
       this.globe.update(dt);
       this._updateTween(dt);
       this.ctx.controls.update();
