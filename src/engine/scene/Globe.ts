@@ -449,9 +449,10 @@ export class Globe implements GeoViewHost {
       // seated as the globe spins — lookAt (world space) would bake in the current spin.
       mesh.quaternion.setFromUnitVectors(_PLANE_N, dir);
       mesh.renderOrder = 0; // over the land fill (-1), under the standing chips
-      // Resting strength — SUBTLE (a whisper of light, not a spotlight), brighter where denser.
+      // Resting strength — brighter where denser, but capped LOW so the "all" view (huge per-site
+      // counts) doesn't overpower; a metagraph selection's lower counts sit naturally below the cap.
       // Opacity is driven per-frame in setMorph (morph fade × the country-drill recede), NOT geoFades.
-      mesh.userData.glowBase = Math.min(0.42, 0.1 + c.n * 0.024);
+      mesh.userData.glowBase = Math.min(0.28, 0.1 + c.n * 0.024);
       this.group.add(mesh);
       this._densityGlow.push(mesh);
     }

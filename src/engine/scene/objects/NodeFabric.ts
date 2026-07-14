@@ -366,10 +366,10 @@ export class NodeFabric {
       // outside the drilled-into country? dim it on top of the network dim (geo only).
       if (cf && (!geoCc || geoCc !== cf)) d = Math.max(d, cmix);
       // SAME glow model as the metagraph nodes (user: the DAG's globe hexes must read like any
-      // metagraph's — one node language): 0.42 base lifted +0.08 on the globe (base eased back
-      // from 0.5 — user: nodes read too hot up close when a metagraph is selected). Steady — the
-      // old twinkle shimmer was removed (user).
-      const ei = 0.42 + 0.08 * m;
+      // metagraph's — one node language). Base LIFTED in hyper (nodes read too dim on the flat
+      // backdrop) and eased DOWN on the globe (they read too hot against the density light pools,
+      // esp. the dense DAG stacks) — user. Steady; the old twinkle shimmer was removed.
+      const ei = 0.47 - 0.10 * m;
       const flRaw = u._flash || 0; // brief flash when an arc pulse reaches this node
       const fl = flRaw * m; // arcs are a geo-only visual — their flash must not bleed into hyper
       emi[u.index] = Math.max(0.02, ei * (1 - d * 0.92) + fl); // suppress glow when dimmed
@@ -422,7 +422,7 @@ export class NodeFabric {
       let dEff = r.dim * (c.ledger ? 0.82 : dimScaleV);
       const geoCc = geoCcOf(r.pick);
       if (cf && (!geoCc || geoCc !== cf)) dEff = Math.max(dEff, cmix);
-      const glow = (0.42 + 0.08 * m) * (1 - dEff * 0.9); // steady, = validators' (twinkle removed, geo lift eased back — user)
+      const glow = (0.47 - 0.10 * m) * (1 - dEff * 0.9); // steady, = validators'; lifted in hyper, eased down on the globe (user)
       // The COMMITTED metagraph's own nodes glow at the hub's resting level (HyperView hub base
       // 0.72) in the Hypergraph, so the picked network's nodes bloom like its hub instead of sitting
       // at the dimmer node base (user). Fades out with the hubs by morph 0.3 — there's no hub on the
