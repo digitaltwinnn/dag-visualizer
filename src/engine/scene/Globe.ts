@@ -417,30 +417,27 @@ export class Globe implements GeoViewHost {
     this._densityGlow = [];
     if (!this._glowTex) this._glowTex = makeGlowTexture();
 
-    // Which nodes contribute + the pool colour follow the committed filter: "all" pools EVERY site in
-    // structural cyan; a metagraph (or "dag") pools only ITS sites, tinted its identity hue — the
-    // selected network lights up where it runs.
-    const filter = this.filter;
-    const glowColor = (filter !== "all" && this.sceneColors?.[filter]) || this.geoColor;
-    const valIn = filter === "all" || filter === "dag";
-    const metaIn = (id: string) => filter === "all" || id === filter;
+    // Build a pool per site×network ALWAYS (all nodes, each tagged with its network + identity hue);
+    // the committed filter just SHOWS/HIDES pools (setFilter → _applyGlowFilter), no recluster needed.
+    const dagHex = this.sceneColors?.dag ?? this.geoColor;
+    const metaHex = (id: string) => this.sceneColors?.[id] ?? this.geoColor;
 
-    // Cluster the included located primary nodes by rounded direction (~one site per cell).
-    const clusters = new Map<string, { dir: THREE.Vector3; n: number }>();
-    const add = (dir: THREE.Vector3 | null) => {
+    // Cluster the primary nodes by rounded direction AND network (~one pool per site×network).
+    const clusters = new Map<string, { dir: THREE.Vector3; n: number; color: number; net: string }>();
+    const add = (dir: THREE.Vector3 | null, color: number, net: string) => {
       if (!dir) return;
-      const key = `${Math.round(dir.x * 30)},${Math.round(dir.y * 30)},${Math.round(dir.z * 30)}`;
+      const key = `${Math.round(dir.x * 30)},${Math.round(dir.y * 30)},${Math.round(dir.z * 30)}|${net}`;
       const c = clusters.get(key);
-      if (c) { c.dir.add(dir); c.n++; } else clusters.set(key, { dir: dir.clone(), n: 1 });
+      if (c) { c.dir.add(dir); c.n++; } else clusters.set(key, { dir: dir.clone(), n: 1, color, net });
     };
-    if (valIn) for (const u of this.nodes) if (!u.noGeo && u.geoPrimary && u.trueDir) add(u.trueDir);
-    for (const r of this.metaNodes) if (metaIn(r.metaId) && (r.geoPrimary ?? true) && r.trueDir) add(r.trueDir);
+    for (const u of this.nodes) if (!u.noGeo && u.geoPrimary && u.trueDir) add(u.trueDir, dagHex, "dag");
+    for (const r of this.metaNodes) if ((r.geoPrimary ?? true) && r.trueDir) add(r.trueDir, metaHex(r.metaId), r.metaId);
 
     for (const c of clusters.values()) {
       const dir = c.dir.normalize();
       const size = Math.min(9, 2.2 + Math.sqrt(c.n) * 0.9); // pool grows with node count, capped
       const mat = new THREE.MeshBasicMaterial({
-        map: this._glowTex, color: new THREE.Color(glowColor),
+        map: this._glowTex, color: new THREE.Color(c.color),
         transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, opacity: 0,
       });
       const mesh = new THREE.Mesh(new THREE.PlaneGeometry(size, size), mat);
@@ -453,9 +450,17 @@ export class Globe implements GeoViewHost {
       // counts) doesn't overpower; a metagraph selection's lower counts sit naturally below the cap.
       // Opacity is driven per-frame in setMorph (morph fade × the country-drill recede), NOT geoFades.
       mesh.userData.glowBase = Math.min(0.28, 0.1 + c.n * 0.024);
+      mesh.userData.net = c.net; // which network this pool belongs to (for the filter toggle)
       this.group.add(mesh);
       this._densityGlow.push(mesh);
     }
+    this._applyGlowFilter();
+  }
+
+  // Show only the pools of the committed network ("all" shows every pool) — a cheap visibility
+  // toggle, so a filter change never re-clusters the light pools (just drops the other planes).
+  private _applyGlowFilter(): void {
+    for (const m of this._densityGlow) m.visible = this.filter === "all" || m.userData.net === this.filter;
   }
 
   // Isolate one network on the globe and dim the rest.
@@ -466,7 +471,7 @@ export class Globe implements GeoViewHost {
     this._updateCountryBorder();
     this._applyDim(sel);
     this._relayoutGeo();
-    this._buildDensityGlow(); // pools follow the filter (its sites, its identity hue)
+    this._applyGlowFilter(); // just show/hide the matching pools — no recluster
   }
 
   // Transient PREVIEW dim (filter-chip / hub hover): same dim TARGETS as setFilter, but does
