@@ -240,12 +240,13 @@ export class Globe implements GeoViewHost {
     const place = (list: RouteNode[], role: "l0" | "cl1", kind: "l0" | "l1", color: number, ring: { radius: number; numRings: number; tilt: number }) => {
       const n = list.length;
       list.forEach((node, i) => {
-        const ready = node.state === "Ready";
+        const ready = node.state === "Ready"; // kept for the record (arc endpoints + card status pill)
         // The first instance of a machine is its geo "primary" (the one dot on the globe).
         const primary = node.id == null || !seen.has(node.id);
         if (node.id != null) seen.add(node.id);
         const col = new THREE.Color(color);
-        if (!ready) col.lerp(NODE_DIM, 0.55);
+        // NB: node colour is NOT dimmed by ready state — status lives in the card/explorer, never in
+        // the 3D scene (matches the uniform-size rule); off-ready nodes render at full identity colour.
 
         const hyperPos = armillaryPos(i, n, ring.radius, ring.numRings, ring.tilt);
         // The node's ring normal — nodes orbit ALONG their shell around this axis (see update()).
@@ -889,8 +890,7 @@ export class Globe implements GeoViewHost {
   }
 }
 
-// Off-ready validator tint — mirrors js/globe.js's module-level DIM.
-const NODE_DIM = new THREE.Color(0x223046);
+
 const _PLANE_N = new THREE.Vector3(0, 0, 1); // PlaneGeometry's default facing (for orienting glow pools)
 
 // A soft radial-gradient sprite (white centre → transparent edge) for the geo density light pools.
