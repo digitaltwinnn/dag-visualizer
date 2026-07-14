@@ -270,8 +270,11 @@ export class HyperView {
 
       const tether = new THREE.Line(
         new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(), pos.clone()]),
-        new THREE.LineBasicMaterial({ color: this._core, transparent: true, opacity: 0.22 })
+        // depthTest/Write OFF so the faint hub→core line is never occluded (and broken) by the
+        // opaque orbiting nodes it passes through — esp. the dark off-ready ones (user bug).
+        new THREE.LineBasicMaterial({ color: this._core, transparent: true, opacity: 0.22, depthTest: false, depthWrite: false })
       );
+      tether.renderOrder = 2;
       this.root.add(tether);
 
       // A pool of anchor "packets" (reused) — one launches per anchored snapshot (see pulseMeta).
