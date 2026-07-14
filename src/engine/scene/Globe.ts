@@ -876,7 +876,7 @@ export class Globe implements GeoViewHost {
     // ring normal (the hoop is a full circle, so nodes stay registered on it). Hyper only. This is
     // the per-node motion; the whole structure keeps its slow drift (Engine setHyperSpin).
     if (!this.ledger && this.morph < 0.5) {
-      const ang = dt * 0.55; // node orbital speed (livelier than the slow whole-structure spin)
+      const ang = dt * 0.275; // node orbital speed (half of the first tuning — user)
       for (const r of this.nodes) { r.hyperPos.applyAxisAngle(r.ringAxis, ang); r.hyperDir.applyAxisAngle(r.ringAxis, ang); }
       for (const r of this.metaNodes) r.offset.applyAxisAngle(r.ringAxis, ang);
     }

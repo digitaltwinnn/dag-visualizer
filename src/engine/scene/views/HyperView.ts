@@ -17,11 +17,34 @@ const _pos = new THREE.Vector3(); // scratch for hub orbit positions (reused eac
 // Resting opacity of the cyan structural hoops (subtle — structure, not a subject). Faded per
 // frame with the hub/core reveal so the rings are Hypergraph-only furniture.
 const HOOP_OP = 0.08;
+// Resting opacity of the soft rim-fill disk under each ring (populated layers only) — more cyan
+// presence + anchors the layer label, which otherwise floated between the thin rings (user).
+const FILL_OP = 0.2;
 
 // Ring layer-code labels — the text a focused metagraph shows on each of its three layer rings so
 // the L0 / dL1 / cL1 shells read WITH text (user: hard to tell which ring is which). Only the
 // focused atom labels (one at a time), so the resting overview never gets busy.
 const LAYER_CODE: Record<"l0" | "dl1" | "cl1", string> = { l0: "L0", dl1: "dL1", cl1: "cL1" };
+
+// A rim-weighted radial gradient (white; the material tints it cyan) for the ring fill disks:
+// transparent at the centre, ramping to a soft band at the OUTER edge (the ring), so a CircleGeometry
+// reads as a filled ring that fades quickly inward. CircleGeometry's rim samples at gradient r≈1.
+function makeRingFillTexture(): THREE.Texture {
+  const s = 128;
+  const c = document.createElement("canvas");
+  c.width = c.height = s;
+  const ctx = c.getContext("2d")!;
+  const g = ctx.createRadialGradient(s / 2, s / 2, 0, s / 2, s / 2, s / 2);
+  g.addColorStop(0, "rgba(255,255,255,0)");
+  g.addColorStop(0.68, "rgba(255,255,255,0)");
+  g.addColorStop(0.9, "rgba(255,255,255,0.4)");
+  g.addColorStop(1, "rgba(255,255,255,0.9)");
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, s, s);
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  return tex;
+}
 
 // One orbiting metagraph hub record in HyperView.metas (the exact shape the constructor
 // builds — scene/Globe.ts (via `layers.metas.find`, keying off `.cfg.id`/`.group`) and
@@ -42,6 +65,7 @@ export interface MetaHubRec {
   spin: number;
   active: boolean;
   hoops: THREE.LineLoop[]; // the cyan layer rings (structural) drawn around this hub
+  fills: THREE.Mesh[]; // soft radial fill disks under each ring (rim-weighted, fade to transparent)
   labels: THREE.Mesh[]; // per-ring layer-code labels (L0 / dL1 / cL1) — shown only while focused
 }
 
@@ -62,6 +86,7 @@ export class HyperView {
   coreFlash?: number;
   private _coreRings: THREE.LineLoop[] = []; // the DAG core's cyan "sun" hoops (rebuilt on node load)
   private _coreLabels: THREE.Mesh[] = []; // the DAG core's shell labels (L0 / L1), shown when DAG focused
+  private _fillTex?: THREE.Texture; // shared rim-weighted radial gradient for the ring fill disks
   private _camQ = new THREE.Quaternion(); // scratch: camera world quat (ring-label billboarding)
   private _parentQ = new THREE.Quaternion(); // scratch: label parent world quat
   private _coreDim = 0; // eased 0→1: the DAG core fades back when a specific metagraph is the subject
@@ -121,6 +146,7 @@ export class HyperView {
     for (const m of this.metas) {
       m.hub.visible = !on;
       for (const h of m.hoops) h.visible = !on;
+      for (const f of m.fills) f.visible = !on && f.userData.populated !== false; // restore populated fills on exit
       if (on) for (const lb of m.labels) lb.visible = false;
       if (on) {
         (m.tether.material as THREE.LineBasicMaterial).opacity = 0;
@@ -202,12 +228,19 @@ export class HyperView {
         return h;
       });
 
-      // One layer-code label per ring, parked at the ring's outer edge (its frame's +t direction),
-      // hidden until this metagraph is focused (see update()).
+      // Soft rim-fill disk behind each ring (populated layers only — toggled by setHoopPresence).
+      const fills = META_LAYERS.map((layer, li) => {
+        const f = this._makeRingFill(armillaryFrame(li, META_LAYERS.length, META_RING.tilt), META_RING.radii[layer]);
+        group.add(f);
+        return f;
+      });
+
+      // One layer-code label per ring, parked on the ring's outer rim (its frame's +t direction, on
+      // the fill band so it reads as attached), hidden until this metagraph is focused (see update()).
       const labels = META_LAYERS.map((layer, li) => {
         const frame = armillaryFrame(li, META_LAYERS.length, META_RING.tilt);
         const lb = this._makeRingLabel(LAYER_CODE[layer]);
-        lb.position.copy(frame.t).multiplyScalar(META_RING.radii[layer] + 0.6);
+        lb.position.copy(frame.t).multiplyScalar(META_RING.radii[layer] + 0.2);
         lb.visible = false;
         group.add(lb);
         return lb;
@@ -226,7 +259,7 @@ export class HyperView {
       this.root.add(pulseMesh);
 
       this.root.add(group);
-      this.metas.push({ group, hub, cfg, state: null, tether, pulseMesh, pulse: 0, anchor: pos.clone(), orbit: an.a, radius: an.radius, incl: an.incl, spin: 0.3 + Math.random() * 0.5, active: true, hoops, labels });
+      this.metas.push({ group, hub, cfg, state: null, tether, pulseMesh, pulse: 0, anchor: pos.clone(), orbit: an.a, radius: an.radius, incl: an.incl, spin: 0.3 + Math.random() * 0.5, active: true, hoops, fills, labels });
     });
   }
 
@@ -248,16 +281,17 @@ export class HyperView {
   }
 
   // A metagraph's 3 layer hoops render SOLID where the layer has nodes and DOTTED where the layer
-  // exists in the architecture but is empty (a data-only metagraph like DED has no cL1 — its outer
-  // ring shows dotted, not absent). `present` maps metaId → [l0, dl1, cl1]; called on node (re)load.
+  // exists in the architecture but is empty — a data-only metagraph (DED) has no cL1 → dotted outer
+  // ring; a node-LESS metagraph (not in `present`) shows ALL THREE dotted (user). metaId → [l0,dl1,cl1].
   setHoopPresence(present: Map<string, boolean[]>) {
     for (const m of this.metas) {
       const p = present.get(m.cfg.id);
       m.hoops.forEach((h, li) => {
         const mat = h.material as THREE.LineDashedMaterial;
-        const has = !!(p ? p[li] : true);
+        const has = !!(p && p[li]); // no presence entry = node-less metagraph → every ring dotted
         mat.dashSize = has ? 1e3 : 0.5; // huge dash + 0 gap = solid; small dash + gap = dotted
         mat.gapSize = has ? 0 : 0.7;
+        if (m.fills[li]) { m.fills[li].userData.populated = has; m.fills[li].visible = has && !this.ledger; } // fill only under populated rings
       });
     }
   }
@@ -279,6 +313,25 @@ export class HyperView {
     const loop = new THREE.LineLoop(new THREE.BufferGeometry().setFromPoints(pts), mat);
     loop.computeLineDistances(); // required for the dashed (empty-layer) style
     return loop;
+  }
+
+  // A soft cyan fill DISK for a ring: a circle of `radius` on ring `frame`'s plane whose radial fill
+  // is weighted to the OUTER edge and fades quickly to transparent inward (like the geo pools, but
+  // rim-first). Adds cyan body to the ring + a surface for its label to sit on. Populated rings only.
+  private _makeRingFill(frame: RingFrame, radius: number): THREE.Mesh {
+    if (!this._fillTex) this._fillTex = makeRingFillTexture();
+    const geo = new THREE.CircleGeometry(radius, 96);
+    const mat = new THREE.MeshBasicMaterial({
+      map: this._fillTex, color: new THREE.Color(this._core), transparent: true,
+      blending: THREE.AdditiveBlending, depthWrite: false, opacity: FILL_OP,
+    });
+    const mesh = new THREE.Mesh(geo, mat);
+    // Orient the disk into the ring's tilted plane: CircleGeometry lies in XY (+Z normal) → map its
+    // X/Y/Z axes onto the ring's t / b / (t×b) basis.
+    const n = frame.t.clone().cross(frame.b).normalize();
+    mesh.quaternion.setFromRotationMatrix(new THREE.Matrix4().makeBasis(frame.t, frame.b, n));
+    mesh.renderOrder = -1; // behind the hoops + nodes
+    return mesh;
   }
 
   // A small cyan layer-code label ("L0" / "dL1" / "cL1") as a billboard plane. Text-only (structural
@@ -431,9 +484,11 @@ export class HyperView {
       // out-of-focus push (DoF + camera focus already carry most of the emphasis).
       const focusOther = this.focusId != null && m.cfg.id !== this.focusId;
       const fdim = focusOther ? 0.62 : 1; // glow / tether
-      const glowMul = (m.active ? 1 : 0.08) * fdim;
+      // Inactive (node-less) metagraphs read as present-but-quiet — dimmer than active, but NOT
+      // buried (user: decrease the inactive dim); their rings are all-dotted (setHoopPresence).
+      const glowMul = (m.active ? 1 : 0.35) * fdim;
       const hubMat = m.hub.material as THREE.MeshStandardMaterial;
-      hubMat.opacity = metaOpacity * (m.active ? 1 : 0.5) * (focusOther ? 0.78 : 1);
+      hubMat.opacity = metaOpacity * (m.active ? 1 : 0.8) * (focusOther ? 0.78 : 1);
 
       // The tether is a 2-vertex line fixed at the origin → hub. Write the moving endpoint
       // (vertex 1) straight into the existing buffer instead of setFromPoints, which would
@@ -441,10 +496,13 @@ export class HyperView {
       const tetherPos = m.tether.geometry.attributes.position;
       tetherPos.setXYZ(1, _pos.x, _pos.y, _pos.z);
       tetherPos.needsUpdate = true;
-      (m.tether.material as THREE.LineBasicMaterial).opacity = 0.22 * metaF * (m.active ? 1 : 0.35) * fdim;
+      (m.tether.material as THREE.LineBasicMaterial).opacity = 0.22 * metaF * (m.active ? 1 : 0.6) * fdim;
       // The cyan layer hoops fade with the hubs on the morph, dim on inactive / out-of-focus hubs.
-      const hoopOp = HOOP_OP * metaF * (m.active ? 1 : 0.4) * fdim;
+      const hoopOp = HOOP_OP * metaF * (m.active ? 1 : 0.7) * fdim;
       for (const h of m.hoops) (h.material as THREE.LineBasicMaterial).opacity = hoopOp;
+      // The rim-fill disks fade with the hoops (populated rings only — empty ones were hidden).
+      const fillOp = FILL_OP * metaF * (m.active ? 1 : 0.7) * fdim;
+      for (const f of m.fills) (f.material as THREE.MeshBasicMaterial).opacity = fillOp;
 
       // Layer-code labels: ONLY the focused metagraph shows them (one atom at a time — the resting
       // overview stays clean), billboarded to the camera so they read from the drilled side pose.
