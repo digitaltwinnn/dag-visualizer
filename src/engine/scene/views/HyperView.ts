@@ -413,10 +413,24 @@ export class HyperView {
     c.height = 64 * SS;
     const ctx = c.getContext("2d")!;
     const cc = new THREE.Color(this._core);
-    ctx.fillStyle = `rgba(${Math.round(cc.r * 255)},${Math.round(cc.g * 255)},${Math.round(cc.b * 255)},0.92)`;
+    const rgb = `${Math.round(cc.r * 255)},${Math.round(cc.g * 255)},${Math.round(cc.b * 255)}`;
     ctx.font = `600 ${34 * SS}px system-ui, -apple-system, sans-serif`;
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
+    // Rounded-square chip around the code (user): sized to the text + padding, centred on the canvas.
+    const tw = ctx.measureText(text).width;
+    const boxW = tw + 22 * SS;
+    const boxH = 44 * SS;
+    const bx = c.width / 2 - boxW / 2;
+    const by = c.height / 2 - boxH / 2;
+    ctx.beginPath();
+    ctx.roundRect(bx, by, boxW, boxH, 9 * SS);
+    ctx.fillStyle = `rgba(${rgb},0.08)`; // faint accent wash inside the chip
+    ctx.fill();
+    ctx.lineWidth = 2.5 * SS;
+    ctx.strokeStyle = `rgba(${rgb},0.7)`;
+    ctx.stroke();
+    ctx.fillStyle = `rgba(${rgb},0.95)`;
     ctx.fillText(text, c.width / 2, c.height / 2 + 2 * SS);
     const tex = new THREE.CanvasTexture(c);
     tex.minFilter = THREE.LinearFilter;

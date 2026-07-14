@@ -627,13 +627,16 @@ export class Engine {
   // Compute the per-country leaderboard for the active filter and push it to the store
   // (the React Leaderboard reads it). Cheap.
   private _publishLeaderboard() {
+    // Flat node list for the explorer node browsers (read-only; the policy says which views have
+    // one — geo's Nodes-by-country, hyper's Nodes-by-network — so it empties elsewhere). Published
+    // FIRST + unconditionally: a metagraph's rows come from metaNodes, which load independently of
+    // the DAG core, so this must NOT be gated on the validator set (bug: "no nodes reported" while
+    // the core was still loading).
+    useStore.getState().setSelNodes(VIEW_POLICIES[this.mode].nodeList ? this.globe.listNodes(this.filter) : []);
+    // The per-country leaderboard needs the validator set — skip it until the core has loaded.
     if (!this.globe.nodes?.length) return;
     const countries = this.globe.countryStats(this.filter);
     useStore.getState().setLeaderboard({ countries });
-    // Flat node list for the explorer node browsers (read-only; the policy says which views
-    // have one — geo's Nodes-by-country, hyper's Nodes-by-layer — so it empties elsewhere
-    // and the browsers stay quiet). Built on the same triggers as the leaderboard.
-    useStore.getState().setSelNodes(VIEW_POLICIES[this.mode].nodeList ? this.globe.listNodes(this.filter) : []);
   }
 
   // ---- picking (ports ui.js _pick / _pickablesFor / _onClick) ----
