@@ -105,13 +105,27 @@ export function hubFraming(hubLocalPos: THREE.Vector3, out: CameraFraming): void
   out.target.copy(hubLocalPos);
 }
 
-// Focused-metagraph pose (the CURRENT hyper hub focus): approach the hub along the SAME axis the
-// resting overview camera uses — the structure's ring-plane normal, which HYPER_TILT aligns to that
-// camera — so the atom's rings stay HORIZONTAL/flat while zoomed in, instead of the 3/4 side view
-// hubFraming gave (user). `hubWorld` is the hub's WORLD position (carries the tilt + spin).
-const _OVERVIEW_DIR = new THREE.Vector3(0, 15, 66).normalize(); // FOCI.overview (pos − target)
-export function hyperFocusFraming(hubWorld: THREE.Vector3, out: CameraFraming): void {
-  out.pos.copy(hubWorld).addScaledVector(_OVERVIEW_DIR, 16); // dolly widens it a touch on top
+// Focused-metagraph pose (the CURRENT hyper hub focus): look along the atom's own plane NORMAL so its
+// rings read as flat, HORIZONTAL discs regardless of the structure's spin — the normal's azimuth
+// follows the spin, so a fixed world-space approach catches the rings edge-on at some spins (the bug
+// this replaced). Then bias sideways so the DAG core (world origin, behind the hub) lands toward the
+// UPPER-LEFT of the frame for context (user). `hubWorld` is the hub's WORLD position; `planeNormal` is
+// the atom ring-plane normal in world (root.rotation applied to +Y). Target is the subject → CAM_ZOOM
+// dolly applies normally.
+export function hyperFocusFraming(hubWorld: THREE.Vector3, planeNormal: THREE.Vector3, out: CameraFraming): void {
+  _out.copy(planeNormal).normalize(); // atom "up" — looking down this gives flat discs at any spin
+  // In-plane direction from the hub toward the DAG core (world origin), with the normal component
+  // removed so the bias stays in the ring plane (keeps the discs flat). Shifting the camera AWAY
+  // from the core along this makes the core sit BEHIND the hub in the frame, at any spin/hub slot.
+  _side.copy(hubWorld).negate(); // hub → core
+  _side.addScaledVector(_out, -_side.dot(_out)); // project into the ring plane
+  if (_side.lengthSq() < 1e-4) _side.set(1, 0, 0);
+  _side.normalize();
+  out.pos
+    .copy(hubWorld)
+    .addScaledVector(_out, 14) // up ALONG the normal → the rings present as flat/horizontal discs
+    .addScaledVector(_side, -10) // away from the core → the core sits behind the hub, background
+    .addScaledVector(_up, 9); // lift the camera → looking down tips the background core UP the frame
   out.target.copy(hubWorld);
 }
 

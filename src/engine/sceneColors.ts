@@ -25,8 +25,8 @@ export interface SceneColors {
   //                               reuse it at the SAME alphas as the .role-chip pill: .22 / .05)
   panel: number; //   --panel      (translucent glass panel RGB, 12,16,32 — the label chips fill
   //                               with it so the badge reads as glass, not the disc behind it)
-  muted: number; //   --muted-foreground (the muted text tone, #8a96b8 — the label-chip CODE text,
-  //                               matching the React .role-chip pill's text-muted-foreground)
+  muted: number; //   --muted-foreground (the muted text tone — the label-chip CODE text, matching
+  //                               the React .role-chip pill's text-muted-foreground)
 }
 
 export type SceneColorVar = "--primary" | "--core" | "--background" | "--border" | "--panel" | "--muted-foreground";

@@ -61,6 +61,22 @@ function storeRingNormal(mesh: THREE.Object3D, frame: RingFrame): void {
   mesh.userData.ringN = frame.t.clone().cross(frame.b).normalize();
 }
 
+// Give a single (non-instanced) emissive sphere the SAME fresnel-rim ORB look as the node instances
+// (NodeFabric._makeNodeMaterial): a view-dependent rim multiplied onto its emissive so the core /
+// hub read as lit 3D orbs, not flat faceted suns (user). The nodes are instanced (per-instance
+// aBase/aEmissive) so their material can't be reused directly; this replays the same shader tail
+// against the material's own emissive. Smooth-shade the mesh (drop flatShading) so the rim is even.
+function applyOrbFresnel(mat: THREE.MeshStandardMaterial): void {
+  mat.onBeforeCompile = (shader) => {
+    shader.fragmentShader = shader.fragmentShader.replace(
+      "#include <emissivemap_fragment>",
+      "#include <emissivemap_fragment>\n" +
+        "float fres = pow(1.0 - clamp(dot(normalize(vViewPosition), normal), 0.0, 1.0), 2.5);\n" +
+        "totalEmissiveRadiance *= (0.72 + 0.9 * fres);",
+    );
+  };
+}
+
 // One orbiting metagraph hub record in HyperView.metas (the exact shape the constructor
 // builds — scene/Globe.ts (via `layers.metas.find`, keying off `.cfg.id`/`.group`) and
 // Engine.ts (`.cfg.id` lookups for DoF/filter) read these fields off the instances handed
@@ -198,8 +214,9 @@ export class HyperView {
     this.coreGroup.rotation.x = HYPER_TILT; // match the tilted node group + hubs (see root)
     const mat = new THREE.MeshStandardMaterial({
       color: this._core, emissive: this._core, emissiveIntensity: 1.4,
-      roughness: 0.25, metalness: 0.3, flatShading: true, transparent: true,
+      roughness: 0.5, metalness: 0.2, transparent: true, // match the node orbs (smooth + fresnel)
     });
+    applyOrbFresnel(mat);
     this.core = new THREE.Mesh(new THREE.IcosahedronGeometry(1.5, 5), mat);
     this.core.userData.pick = {
       kind: "core",
@@ -251,8 +268,9 @@ export class HyperView {
       // rings + hoops). A little smaller than before so the ring atom leads.
       const hubMat = new THREE.MeshStandardMaterial({
         color: col, emissive: col, emissiveIntensity: 1.1,
-        roughness: 0.3, metalness: 0.4, flatShading: true, transparent: true,
+        roughness: 0.5, metalness: 0.2, transparent: true, // match the node orbs (smooth + fresnel)
       });
+      applyOrbFresnel(hubMat);
       const hub = new THREE.Mesh(new THREE.IcosahedronGeometry(0.9, 4), hubMat);
       hub.userData.pick = { kind: "meta", cfg, title: cfg.name, sub: `Metagraph · ${cfg.ticker}` };
       group.add(hub);

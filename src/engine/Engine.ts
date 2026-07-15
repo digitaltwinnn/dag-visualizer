@@ -72,6 +72,7 @@ export class Engine {
   // `_tween` immediately by `_tweenTo`, so reusing it across every focus call is safe.
   private _framingOut: CameraFraming = { pos: new THREE.Vector3(), target: new THREE.Vector3() };
   private _hubWorld = new THREE.Vector3(); // scratch: hub local pos tilted into world for framing
+  private _hubNormal = new THREE.Vector3(); // scratch: atom ring-plane normal in world (for framing)
   private _hyperSpinY = 0; // shared hyper-structure spin angle (globe group + root + core, in lockstep)
 
   private geoMap: GeoMap = {};
@@ -870,7 +871,10 @@ export class Engine {
     // hub's local orbit position — that's where the hub lands once the morph settles; the spin/orbit
     // are frozen (focusId + non-"all" filter) so it stays valid for the whole tween.
     this._hubWorld.copy(meta.group.position).applyEuler(this.layers.root.rotation);
-    hyperFocusFraming(this._hubWorld, this._framingOut); // look down the ring normal → rings stay flat
+    // The atom's ring-plane normal in world = root's tilt+spin applied to +Y. Passed to the framing
+    // so it looks DOWN this normal → the rings present as flat/horizontal discs at any spin.
+    this._hubNormal.set(0, 1, 0).applyEuler(this.layers.root.rotation);
+    hyperFocusFraming(this._hubWorld, this._hubNormal, this._framingOut);
     this._tweenTo(this._framingOut.pos, this._framingOut.target);
   }
 
@@ -965,7 +969,7 @@ export class Engine {
         this.ctx.dof.uniforms["focus"].value = this.ctx.camera.position.distanceTo(focusTarget);
         // out-of-focus blur — kept modest so the SELECTED hub (a sphere whose near/far surfaces
         // straddle the focal plane) stays crisp; it's enough to separate the background core/hubs.
-        this.ctx.dof.uniforms["maxblur"].value = 0.045 * dofMix;
+        this.ctx.dof.uniforms["maxblur"].value = 0.08 * dofMix;
       }
 
       this.ctx.composer.render();
