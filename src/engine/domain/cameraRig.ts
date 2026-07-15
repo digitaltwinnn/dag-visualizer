@@ -105,28 +105,29 @@ export function hubFraming(hubLocalPos: THREE.Vector3, out: CameraFraming): void
   out.target.copy(hubLocalPos);
 }
 
-// Focused-metagraph pose (the CURRENT hyper hub focus): look along the atom's own plane NORMAL so its
-// rings read as flat, HORIZONTAL discs regardless of the structure's spin — the normal's azimuth
-// follows the spin, so a fixed world-space approach catches the rings edge-on at some spins (the bug
-// this replaced). Then bias sideways so the DAG core (world origin, behind the hub) lands toward the
-// UPPER-LEFT of the frame for context (user). `hubWorld` is the hub's WORLD position; `planeNormal` is
-// the atom ring-plane normal in world (root.rotation applied to +Y). Target is the subject → CAM_ZOOM
-// dolly applies normally.
+// Focused-metagraph pose (the CURRENT hyper hub focus): make the atom's rings read as WIDE,
+// HORIZONTAL discs (plates lying down), not tall vertical ellipses (user). Two parts: (1) keep the
+// camera in the plane spanned by the atom's ring normal and world-up, so the disc's foreshortening is
+// VERTICAL → its major axis stays horizontal at ANY spin; (2) view it from a SHALLOW oblique angle
+// (offset OPPOSITE the normal's horizontal lean, only a little above) so the circle foreshortens into
+// a flat wide ellipse — a top-down view would just give a near-circle. `planeNormal` = root.rotation·
+// +Y. Target is the subject → CAM_ZOOM dolly applies normally.
 export function hyperFocusFraming(hubWorld: THREE.Vector3, planeNormal: THREE.Vector3, out: CameraFraming): void {
-  _out.copy(planeNormal).normalize(); // atom "up" — looking down this gives flat discs at any spin
-  // In-plane direction from the hub toward the DAG core (world origin), with the normal component
-  // removed so the bias stays in the ring plane (keeps the discs flat). Shifting the camera AWAY
-  // from the core along this makes the core sit BEHIND the hub in the frame, at any spin/hub slot.
-  _side.copy(hubWorld).negate(); // hub → core
-  _side.addScaledVector(_out, -_side.dot(_out)); // project into the ring plane
-  if (_side.lengthSq() < 1e-4) _side.set(1, 0, 0);
+  _out.copy(planeNormal).normalize(); // n — the atom's ring-plane normal
+  _side.copy(_out).addScaledVector(_up, -_out.dot(_up)); // n_h = horizontal lean of the normal
+  if (_side.lengthSq() < 1e-4) _side.set(0, 0, 1);
   _side.normalize();
+  // Pick the lean side that points AWAY from the core (world origin): dot with hubWorld (origin→hub)
+  // positive. This puts the camera on the far side from the core, so the core falls BEHIND the hub →
+  // in frame. Both signs give the same flat horizontal ellipse (viewing the plate from either face).
+  const s = _side.dot(hubWorld) >= 0 ? 1 : -1;
   out.pos
     .copy(hubWorld)
-    .addScaledVector(_out, 14) // up ALONG the normal → the rings present as flat/horizontal discs
-    .addScaledVector(_side, -10) // away from the core → the core sits behind the hub, background
-    .addScaledVector(_up, 9); // lift the camera → looking down tips the background core UP the frame
-  out.target.copy(hubWorld);
+    .addScaledVector(_side, s * 18) // shallow side-on view on the away-from-core side → flat wide disc
+    .addScaledVector(_up, 4); // only a little above → keeps the ellipse flat (a high camera rounds it)
+  // Aim a touch toward the core so it's pulled into frame behind the hub (user: the core just has to
+  // be VISIBLE, not pinned to a corner). Small shift → the discs stay essentially horizontal.
+  out.target.copy(hubWorld).multiplyScalar(0.86);
 }
 
 // FALLBACK country framing (concentration-based) — used ONLY while the countries topology

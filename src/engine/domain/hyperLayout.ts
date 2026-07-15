@@ -47,8 +47,8 @@ export const DAG_L1 = { radius: 12.5, tilt: 0.28 };
 // HyperView.coreGroup) is TILTED by this angle about X so it reads from the SHARED overview camera
 // — instead of moving the camera to a top-down pose (which every other view then has to tween away
 // from, user). At the full ~77° the ring normal aligns exactly with the overview camera axis and the
-// rings present as flat circles (too top-down, user); pulling it back to ~52° leaves the rings tilted
-// ~26° off that axis, so they present as ellipses with real 3D perspective — in the overview AND the
-// focused atom (hyperFocusFraming approaches along the same overview axis). All three groups share
-// this exact tilt so the tilted node rings stay registered with the cyan hoops.
-export const HYPER_TILT = 0.9;
+// rings present as flat circles (too top-down, user); pulling it back to ~41° leaves the rings tilted
+// well off that axis, so they present as strong ellipses with real 3D perspective — in the overview
+// AND the focused atom (hyperFocusFraming views along the same normal). All three groups share this
+// exact tilt so the tilted node rings stay registered with the cyan hoops.
+export const HYPER_TILT = 0.72;
