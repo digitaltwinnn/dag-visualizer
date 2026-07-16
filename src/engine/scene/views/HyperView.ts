@@ -10,6 +10,7 @@ import * as THREE from "three";
 import { METAGRAPHS, type MetaConfig } from "../../config";
 import { metaAnchor, META_RING, META_LAYERS, HYPER_TILT } from "../../domain/hyperLayout";
 import { armillaryFrame, type RingFrame } from "../../domain/nodeLayout";
+import { FocusSpot } from "../objects/FocusSpot";
 import type { SceneColors } from "../../sceneColors";
 
 const _pos = new THREE.Vector3(); // scratch for hub orbit positions (reused each frame)
@@ -30,14 +31,14 @@ const PKT_TRAVEL = 0.85; // seconds hub → core
 const PKT_STAGGER = 0.07; // seconds between launches within a burst
 const PKT_POOL = 14; // reusable packet meshes per metagraph (caps simultaneous in-flight)
 
-// The focus SPOTLIGHT — a real THREE.SpotLight staged above the focused metagraph's ring plane so
-// the selected atom's nodes/hub catch a stage-light wash (user: extra visual selection effect).
-// Neutral WHITE on purpose: lighting is a rendering technicality decoupled from the palette (see
-// SceneContext's LIGHT_* note; greyscale is exempt from the no-hardcoded-colours guard), and a
-// white key over the identity-hued emissive nodes brightens them without shifting their hue.
+// The focus SPOTLIGHT (see scene/objects/FocusSpot) — staged above the focused metagraph's ring
+// plane (or the DAG core's, a bigger stage) so the selected atom catches a stage-light wash.
 const SPOT_H = 9; //     height above the ring plane, along the atom's normal
 const SPOT_ANGLE = 0.68; // cone just covers the outer cL1 ring (5.4) + margin at SPOT_H
-const SPOT_I = 2.4; //   full intensity when focused (decay 0 — predictable, non-physical falloff)
+const SPOT_I = 2.4; //   full intensity when focused
+// The DAG core is the same subject at a bigger scale (L1 shell radius 12.5 vs 5.4): higher stage,
+// wider-reaching cone (same angle at that height covers it), so selecting DAG gets the same wash.
+const SPOT_H_DAG = 17;
 
 // Ring layer-code labels — the text a focused metagraph shows on each of its three layer rings so
 // the L0 / dL1 / cL1 shells read WITH text (user: hard to tell which ring is which). Only the
@@ -130,9 +131,8 @@ export class HyperView {
   // Scratch for _faceLabelInPlane (per-frame label orientation) — never allocate in the loop.
   private _lPQ = new THREE.Quaternion();
   private _lQ = new THREE.Quaternion();
-  // The focus spotlight (see SPOT_* above) + its eased intensity and per-frame scratch.
-  private _spot!: THREE.SpotLight;
-  private _spotI = 0;
+  // The focus spotlight (see SPOT_* above) + per-frame scratch.
+  private _spot!: FocusSpot;
   private _spotPos = new THREE.Vector3();
   private _spotN = new THREE.Vector3();
   private _coreDim = 0; // eased 0→1: the DAG core fades back when a specific metagraph is the subject
@@ -158,11 +158,9 @@ export class HyperView {
     scene.add(this.root);
 
     // The focus spotlight (world-space — the hub position is resolved through root's tilt+spin each
-    // frame). Intensity rests at 0 and eases up only while a metagraph is focused (see update()).
-    this._spot = new THREE.SpotLight(0xffffff, 0, 26, SPOT_ANGLE, 0.5, 0);
-    this._spot.visible = false;
-    scene.add(this._spot);
-    scene.add(this._spot.target);
+    // frame). Rests dark; eases up only while a metagraph / the DAG is focused (see update()).
+    // distance 40 clears the DAG stage's farthest shell node (~21).
+    this._spot = new FocusSpot(scene, { angle: SPOT_ANGLE, distance: 40, intensity: SPOT_I });
 
     this.pickables = [];
     this.metas = [];
@@ -662,20 +660,21 @@ export class HyperView {
       if (m.cfg.id === this.focusId) this._spotPos.copy(m.group.position);
     }
 
-    // Focus SPOTLIGHT: stage a white key above the focused atom's ring plane, aimed at its hub, so
-    // the selection catches a real light wash on top of the DoF/dim emphasis (user). Intensity
-    // eases (no pop) and fades with the hubs on the morph; rests dark + invisible otherwise.
-    const spotFocused = this.focusId != null && this.metas.some((m) => m.cfg.id === this.focusId);
-    this._spotI += ((spotFocused ? SPOT_I * hubFade : 0) - this._spotI) * Math.min(1, dt * 3);
-    this._spot.visible = this._spotI > 0.02;
-    this._spot.intensity = this._spotI;
-    if (spotFocused) {
-      // Only while focused: the loop stashed the hub's ROOT-LOCAL position this frame — resolve it
-      // to world once (root tilt+spin+scale). During the fade-out the light just dims in place.
-      this._spotN.set(0, 1, 0).applyEuler(this.root.rotation); // the atom's ring-plane normal (world)
-      this._spotPos.applyEuler(this.root.rotation).multiplyScalar(this.root.scale.x); // hub → world
-      this._spot.target.position.copy(this._spotPos);
-      this._spot.position.copy(this._spotPos).addScaledVector(this._spotN, SPOT_H);
+    // Focus SPOTLIGHT: stage a white key above the focused subject's ring plane — a metagraph atom's
+    // hub, or the DAG CORE itself (same subject at a bigger scale; higher stage, same cone) — so the
+    // selection catches a real light wash on top of the DoF/dim emphasis (user). Eases via FocusSpot
+    // and fades with its subject on the morph; rests dark otherwise.
+    const spotMeta = this.focusId != null && this.metas.some((m) => m.cfg.id === this.focusId);
+    const spotOn = spotMeta || dagFocused;
+    this._spot.update(dt, spotOn, spotMeta ? hubFade : coreReveal);
+    if (spotOn) {
+      // Only while focused: resolve the subject to world once per frame (root tilt+spin+scale) —
+      // the metagraph loop stashed its hub's ROOT-LOCAL position; the DAG core sits at the origin.
+      // During the fade-out the light just dims in place.
+      this._spotN.set(0, 1, 0).applyEuler(this.root.rotation); // the ring-plane normal (world)
+      if (spotMeta) this._spotPos.applyEuler(this.root.rotation).multiplyScalar(this.root.scale.x);
+      else this._spotPos.set(0, 0, 0);
+      this._spot.aim(this._spotPos, this._spotN, spotMeta ? SPOT_H : SPOT_H_DAG);
     }
   }
 

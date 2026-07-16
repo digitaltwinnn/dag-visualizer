@@ -974,7 +974,7 @@ export class Engine {
       if (show.ledger) {
         if (this._ledgerDirty) this._refreshLedger();
         this.ledger.update(dt);
-      }
+      } else this.ledger.spotOff(); // its update() stops ticking off-view — don't leave the light lit
 
       // Depth of field: only a single focused metagraph, and only where the policy allows it (hyper).
       const metaSel = this.filter !== "all" && this.filter !== "dag";

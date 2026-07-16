@@ -25,6 +25,7 @@ import { surfFade, extrasFade } from "../domain/morph";
 import { ArcSim, type ArcEndpoint } from "../domain/arcSim";
 import type { MetaNodeRecord, ValidatorRecord } from "../domain/records";
 import { buildGeoView, setCountryBorder, setCountryFillMask, HOVER_MASK_BOOST, type GeoViewHost } from "./views/GeoView";
+import { FocusSpot } from "./objects/FocusSpot";
 import { ccToNumeric, countryCcAt, countryLean, geometryRings, mainPolygonRings, ringsAngularRadius, ringsCentroid, type Ring } from "../domain/countryShape";
 import { closeness, NODE_RAISE } from "../domain/cameraRig";
 import { NodeFabric, type FrameCtx } from "./objects/NodeFabric";
@@ -132,6 +133,14 @@ export class Globe implements GeoViewHost {
   private _hoverCohort: Set<string> | null = null; // cohort-row hover — the whole stack glows
   private _selectedNodeId: string | null = null;
   private _hoverCountryCc: string | null = null; // explorer row hover — border preview only
+  // The geo focus SPOTLIGHT (scene/objects/FocusSpot): staged above the SELECTED node's chip stack
+  // so the zoomed-in node pick catches a stage-light wash (user; hyper/ledger have their own).
+  // `_selNodeRec` caches the selected node's geoPrimary record — re-resolved by setSelectedNode,
+  // which the rebuilds (setNodes/setMetagraphs) re-run so the cache never dangles.
+  private _spot: FocusSpot;
+  private _selNodeRec: ValidatorRecord | MetaNodeRecord | null = null;
+  private _spotPos = new THREE.Vector3();
+  private _spotN = new THREE.Vector3();
 
   // Identity SCENE-hue map (id -> 0xRRGGBB), set by the Engine each refreshMeta before setMetagraphs.
   sceneColors?: Record<string, number>;
@@ -164,6 +173,8 @@ export class Globe implements GeoViewHost {
   constructor(scene: THREE.Scene, layers: HyperView | null, camera: THREE.Camera | null, colors: SceneColors) {
     this.group = new THREE.Group();
     scene.add(this.group);
+    // Node-pick stage light: tight cone over one chip stack (radius ≈ 6·tan(0.36) ≈ 2.3).
+    this._spot = new FocusSpot(scene, { angle: 0.36, distance: 22, intensity: 3.0 });
     this.layers = layers; // for gluing metagraph nodes to their orbiting hubs
     this.camera = camera; // for the view-dependent disc falloff at the limb
     this.geoColor = colors.core;   // the geo hologram = the accent (calm via opacity); wall + grid + graticule
@@ -310,6 +321,7 @@ export class Globe implements GeoViewHost {
 
     this.fabric.buildValidators(this.nodes);
     this.pickables = this.fabric.pickables;
+    this.setSelectedNode(this._selectedNodeId); // re-resolve the spotlight's record on fresh data
 
     // Fan out the filter-active nodes and (re)build the density rings + arcs.
     this._relayoutGeo();
@@ -405,6 +417,7 @@ export class Globe implements GeoViewHost {
     const drill = this.countryFilter;
     this.setFilter(this.filter);
     if (drill) this.setCountry(drill);
+    this.setSelectedNode(this._selectedNodeId); // re-resolve the spotlight's record on fresh data
     this._buildDensityGlow();
   }
 
@@ -599,6 +612,13 @@ export class Globe implements GeoViewHost {
   // The persistently selected node (a clicked node card) — glows every layer shell it runs.
   setSelectedNode(id: string | null): void {
     this._selectedNodeId = id || null;
+    // Resolve the geoPrimary record once per selection change (not per frame) for the spotlight.
+    // setNodes/setMetagraphs re-run this so a rebuild can't leave the cache dangling.
+    this._selNodeRec = !id
+      ? null
+      : this.nodes.find((n) => n.nodeId === id && n.geoPrimary) ??
+        this.metaNodes.find((n) => n.nodeId === id && n.geoPrimary) ??
+        null;
   }
 
   // World position of a node's HYPERGRAPH point by its id — read from its live instance transform.
@@ -834,6 +854,22 @@ export class Globe implements GeoViewHost {
 
   update(dt: number): void {
     this.clock += dt;
+    // Node-pick SPOTLIGHT (geo only): stage a white key above the selected node's chip stack so the
+    // zoomed-in pick catches a light wash (user; the same FocusSpot pattern as hyper/ledger). The
+    // record's geo position is group-LOCAL — resolve through the globe's spin/lean each frame.
+    const selRec = this._selNodeRec;
+    const spotOn =
+      selRec != null && !this.ledger && this.morph > 0.85 && ("geoPos" in selRec || !selRec.noGeo);
+    this._spot.update(dt, spotOn);
+    if (spotOn) {
+      const rec = selRec!;
+      if ("geoPos" in rec) this._spotPos.copy(rec.geoPos); // metagraph node (fanned stack position)
+      else this._spotPos.copy(rec.geoDir!).multiplyScalar(rec.geoRadius); // validator
+      this._spotN.copy(this._spotPos).normalize(); // surface normal ≈ radial
+      this.group.localToWorld(this._spotPos);
+      this._spotN.transformDirection(this.group.matrixWorld);
+      this._spot.aim(this._spotPos, this._spotN, 6);
+    }
     // Recede the density light pools while a country is drilled (so its highlight leads), eased.
     this._glowDim += ((this.countryFilter ? 0.2 : 1) - this._glowDim) * Math.min(1, dt * 3);
     // In "all" the per-network pools OVERLAP and stack additively — damp them so multi-network sites

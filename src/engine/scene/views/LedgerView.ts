@@ -34,6 +34,7 @@ import type { SceneColors } from "../../sceneColors";
 import { LedgerModel, SLOT_SP, slotFade, curvePoint } from "../../domain/ledgerModel";
 import type { GlobalSnapshot, Anchor, PickDescriptor } from "@/src/data/types";
 import { LEDGER_LAYERS } from "@/src/data/ledgerLayers"; // shared display copy + ORDER — floor labels = panel rows
+import { FocusSpot } from "../objects/FocusSpot";
 
 // Floor plane geometry comes from the shared domain table (ledgerLayout.LAYER_GEOM): the FULL-WIDTH
 // floors are exactly its laneZ === 0 entries; the split hypergraph panes (hypl0/hypl1, laneZ ≠ 0)
@@ -199,6 +200,13 @@ export class LedgerView {
   private _dagL1Ring: THREE.LineSegments;
   // Per-plane materials keyed by layer id, so setHighlight() can brighten one floor (explore panel).
   private _floorMats = new Map<string, { frame: THREE.LineBasicMaterial; fill: THREE.ShaderMaterial }>();
+  // The layer focus SPOTLIGHT (scene/objects/FocusSpot): staged above the COMMITTED layer's lead
+  // area so the tilted layer zoom catches a stage-light wash on its chips/tiles (user; hyper/geo
+  // have their own). `_spotLayerId` is set by setHighlight (committed selections only).
+  private _spot: FocusSpot;
+  private _spotLayerId: string | null = null;
+  private _spotPos = new THREE.Vector3();
+  private _spotN = new THREE.Vector3();
 
   constructor(scene: THREE.Scene, colors: SceneColors, sceneColors: Record<string, number>) {
     this._core = colors.core;
@@ -217,6 +225,9 @@ export class LedgerView {
     );
     this.group.scale.setScalar(LEDGER.viewScale);
     scene.add(this.group);
+    // Layer stage light: a wide, higher pool over the committed floor's lead area — the floors span
+    // the whole lane depth, so the cone is wide (radius ≈ 14·tan(0.75) ≈ 13 covers the mid lanes).
+    this._spot = new FocusSpot(scene, { angle: 0.75, distance: 44, intensity: 2.6 });
     this.pickables = [];
     this.t = 0;
     this._latest = null;
@@ -496,7 +507,15 @@ export class LedgerView {
   // (the overview planes cover most of the screen, so the cursor is nearly always over one — a
   // hover that dimmed the rest read as "filtering dims the layers", user bug). null id restores
   // every plane to rest. Every plane owns its materials (see _buildFloors).
+  // Instant spotlight off — the Engine calls this on non-ledger frames: update() stops ticking when
+  // the view hides, so without it a lit layer spot would linger into the next view.
+  spotOff(): void {
+    this._spot.blackout();
+  }
+
   setHighlight(id: string | null, dimOthers = false): void {
+    // A COMMITTED layer (dimOthers) also stages the focus spotlight over that floor (see update()).
+    this._spotLayerId = dimOthers && id ? id : null;
     for (const [k, m] of this._floorMats) {
       const on = id === k;
       const off = id != null && dimOthers;
@@ -699,6 +718,17 @@ export class LedgerView {
 
   update(dt: number) {
     this.t += dt;
+    // Layer focus SPOTLIGHT: stage a white key above the committed floor's LEAD area (x≈0, its
+    // lane centre) so the tilted layer zoom catches a light wash on the chips/tiles there (user).
+    // Positions are group-LOCAL (the whole chamber is rotated/scaled) — resolve to world each frame.
+    const spotGeom = this._spotLayerId ? LAYER_GEOM.find((l) => l.id === this._spotLayerId) : undefined;
+    this._spot.update(dt, spotGeom != null && this.group.visible);
+    if (spotGeom) {
+      this._spotPos.set(0, spotGeom.y, spotGeom.laneZ);
+      this.group.localToWorld(this._spotPos);
+      this._spotN.set(0, 1, 0).applyQuaternion(this.group.quaternion); // the floors' world up
+      this._spot.aim(this._spotPos, this._spotN, 14);
+    }
     if (!this._latest) return;
 
     const k = Math.min(1, dt * 3); // shared ease factor for the trail + lanes this frame
