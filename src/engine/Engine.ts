@@ -68,6 +68,9 @@ export class Engine {
     fromTgt: new THREE.Vector3(), toTgt: new THREE.Vector3(),
     t: 0, dur: 1.4, active: false,
   };
+  private _worldUp = new THREE.Vector3(0, 1, 0); // the default (level) camera up
+  private _hyperRoll = false; // true while a hyper metagraph atom is focused → camera.up eases to its normal
+  private _hyperRollUp = new THREE.Vector3(0, 1, 0); // the focused atom's ring normal (the rolled up target)
   // Scratch framing struct handed to hubFraming/geoFraming — its values are copied into
   // `_tween` immediately by `_tweenTo`, so reusing it across every focus call is safe.
   private _framingOut: CameraFraming = { pos: new THREE.Vector3(), target: new THREE.Vector3() };
@@ -428,6 +431,7 @@ export class Engine {
   // ---- view + filter (ports ui.setMode / _applyFilter / camera focus) ----
   setMode(mode: Mode) {
     this.mode = mode;
+    this._hyperRoll = false; // the rolled camera-up is a hyper-focus-only pose; every view switch levels it
     // A view switch re-lays the scene under a stationary pointer, so any in-flight hover
     // (tooltip + the hover channels) would linger re-projected at a wrong screen position
     // until the next pointermove — clear it as part of the switch.
@@ -610,6 +614,7 @@ export class Engine {
     }
     this.ctx.controls.autoRotate = false;
     this.layers.focusId = null;
+    this._hyperRoll = false; // the node pose is a world-up framing — level the atom-focus roll
     hyperNodeFraming(pos, this._framingOut);
     this._tweenTo(this._framingOut.pos, this._framingOut.target);
   }
@@ -848,6 +853,7 @@ export class Engine {
 
   private _focusFilter(filter: string) {
     this.layers.focusId = null;
+    this._hyperRoll = false; // only a focused metagraph atom (below) rolls the camera; all/dag/none = level
     if (filter === "all") {
       this.ctx.controls.autoRotate = false; // the STRUCTURE spins (setHyperSpin), not the camera
       this.focus("overview"); // SHARED pose — the hyper structure is tilted (HYPER_TILT) to read
@@ -871,10 +877,15 @@ export class Engine {
     // hub's local orbit position — that's where the hub lands once the morph settles; the spin/orbit
     // are frozen (focusId + non-"all" filter) so it stays valid for the whole tween.
     this._hubWorld.copy(meta.group.position).applyEuler(this.layers.root.rotation);
-    // The atom's ring-plane normal in world = root's tilt+spin applied to +Y. Passed to the framing
-    // so it looks DOWN this normal → the rings present as flat/horizontal discs at any spin.
+    // The atom's ring-plane normal in world = root's tilt+spin applied to +Y. The framing uses it BOTH
+    // for the position (consistent core placement) AND as the camera-UP (roll) so the discs read
+    // horizontal at any spin — passed through to the tween as the pose's up.
     this._hubNormal.set(0, 1, 0).applyEuler(this.layers.root.rotation);
     hyperFocusFraming(this._hubWorld, this._hubNormal, this._framingOut);
+    // Roll the camera to the atom's ring normal so its discs read horizontal (the render loop eases
+    // camera.up toward this while the atom stays focused; cleared for every other state).
+    this._hyperRoll = true;
+    this._hyperRollUp.copy(this._hubNormal);
     this._tweenTo(this._framingOut.pos, this._framingOut.target);
   }
 
@@ -928,6 +939,14 @@ export class Engine {
       this.layers.update(dt, this.morph, coreDim, zoomedIn, this.ctx.camera, this.filter === "dag");
       this.globe.update(dt);
       this._updateTween(dt);
+      // Camera ROLL: while a hyper metagraph atom is focused, ease camera.up toward its ring-plane
+      // normal so the atom's discs read horizontal (hyperFocusFraming's contract); every other state
+      // eases back to world-up. Per-frame (not tween-owned) so it also levels when a view switch
+      // keeps the camera put (ledger). OrbitControls' per-frame lookAt reads the live camera.up, so
+      // manual orbiting keeps the rolled horizon while focused — the accepted trade-off.
+      this.ctx.camera.up
+        .lerp(this._hyperRoll ? this._hyperRollUp : this._worldUp, Math.min(1, dt * 2.5))
+        .normalize();
       this.ctx.controls.update();
       // Altitude clamp (policy.minCamAlt): OrbitControls' minDistance is target-relative, and
       // the geo target is off-centre — so after the controls settle, push the camera back out
