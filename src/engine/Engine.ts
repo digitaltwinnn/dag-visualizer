@@ -13,7 +13,7 @@ import { loadGeoCache, resolveMissing } from "@/src/data/geoResolve";
 import { METAGRAPHS, COLORS } from "@/src/engine/config";
 import { LEDGER, LAYER_GEOM, ledgerSite } from "./domain/ledgerLayout";
 import { readSceneColors } from "./sceneColors";
-import { VIEW_POLICIES, BLOOM_GAIN } from "./domain/viewPolicy";
+import { VIEW_POLICIES } from "./domain/viewPolicy";
 import { FOCI, hyperFocusFraming, geoFraming, ledgerLayerFraming, nodeFraming, hyperNodeFraming, dollyBack, easeInOutQuad, type CameraFraming } from "./domain/cameraRig";
 import { countryFraming } from "./domain/countryShape";
 import { R as GEO_R, LAND_H } from "./domain/geoLayout";
@@ -896,7 +896,7 @@ export class Engine {
       // strength/radius/threshold live each render, so a per-frame set is enough (and it tracks a
       // mode switch immediately).
       const pb = policy.bloom;
-      this.ctx.bloom.strength = pb.strength * BLOOM_GAIN;
+      this.ctx.bloom.strength = pb.strength;
       this.ctx.bloom.radius = pb.radius;
       this.ctx.bloom.threshold = pb.threshold;
 

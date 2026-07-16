@@ -68,13 +68,10 @@ export interface ViewPolicy {
 }
 
 // The calm bloom the ledger view uses — the reference the design likes (thin lines, sparse
-// emitters). Shared so ledger + the canvas-hidden FLAT views read identically.
-const BLOOM_CALM = { strength: 0.30, radius: 0.35, threshold: 0.13 };
-
-// ONE global bloom gain (user): a single knob that scales every view's bloom strength so the whole
-// scene glows a bit more without re-tuning each view's ratio. Applied by the Engine on top of the
-// per-view `bloom.strength`.
-export const BLOOM_GAIN = 1.35;
+// emitters). Shared so ledger + the canvas-hidden FLAT views read identically. strength values
+// across the views are the EFFECTIVE strengths (an earlier global gain was folded in so the numbers
+// read at a glance — bump them here directly for more/less overall glow).
+const BLOOM_CALM = { strength: 0.40, radius: 0.35, threshold: 0.13 };
 
 // A flat placeholder view (status / transactions / staking): the canvas is hidden and the view
 // is fully inert. Shared so the three rows stay identical by construction.
@@ -113,7 +110,7 @@ export const VIEW_POLICIES: Record<Mode, ViewPolicy> = {
     // so hyper shares the overview pose with the other views and never needs the pole-crossing relax
     nodeList: true,
     // Calmer than ledger: the core + dense node field piled up an additive bleed on OLED/HDR.
-    bloom: { strength: 0.20, radius: 0.32, threshold: 0.14 },
+    bloom: { strength: 0.27, radius: 0.32, threshold: 0.14 },
     },
   // Footprint: the holographic globe + travelling packets; picks the globe nodes only.
   geo: {
@@ -130,7 +127,7 @@ export const VIEW_POLICIES: Record<Mode, ViewPolicy> = {
     nodeList: true,
     // The lowest bloom of the three views: strength drives the "black halo" ring the saturated
     // node/wall hues cast on the globe, and the additive coastal walls read fuzzy under bloom.
-    bloom: { strength: 0.15, radius: 0.30, threshold: 0.16 },
+    bloom: { strength: 0.20, radius: 0.30, threshold: 0.16 },
     },
   // Snapshots: the settlement chamber. Morph frozen (nodes fly into lanes); picks the centred
   // snapshot + the reused producer dots. (The ledger-specific depth-fog recency treatment was
