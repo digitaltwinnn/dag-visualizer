@@ -704,7 +704,12 @@ export class LedgerView {
     const k = Math.min(1, dt * 3); // shared ease factor for the trail + lanes this frame
     const selectedSlot = this.model.selectedSlot;
     // A single-metagraph filter strongly dims every OTHER lane's tiles/links/dials.
-    const mf = this._filter !== "all" && this._filter !== "dag" ? this._filter : null;
+    // Lane/dial dimming: a metagraph filter dims the OTHER lanes; a DAG filter dims ALL metagraph
+    // lanes (no lane id equals "dag"), leaving the DAG's own clusters + global block bright — so
+    // filtering DAG focuses the hypergraph-L0 stack (user). The metagraph NODES already dim via
+    // globe.setFilter's _applyDim. (The pulse-emission gate at setData keeps mf excluding "dag" so
+    // metagraph→global anchor pulses still stream INTO the focused DAG L0.)
+    const mf = this._filter !== "all" ? this._filter : null;
 
     // The centre block (LIVE snapshot) pulses subtly + flashes as pulses arrive — dimmed (brightness
     // only, colour stays) while an OLDER snapshot is selected so the selected row reads brightest.
