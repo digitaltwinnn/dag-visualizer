@@ -71,6 +71,11 @@ export interface ViewPolicy {
 // emitters). Shared so ledger + the canvas-hidden FLAT views read identically.
 const BLOOM_CALM = { strength: 0.30, radius: 0.35, threshold: 0.13 };
 
+// ONE global bloom gain (user): a single knob that scales every view's bloom strength so the whole
+// scene glows a bit more without re-tuning each view's ratio. Applied by the Engine on top of the
+// per-view `bloom.strength`.
+export const BLOOM_GAIN = 1.35;
+
 // A flat placeholder view (status / transactions / staking): the canvas is hidden and the view
 // is fully inert. Shared so the three rows stay identical by construction.
 const FLAT: ViewPolicy = {

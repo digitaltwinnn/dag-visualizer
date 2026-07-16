@@ -526,11 +526,17 @@ async function buildLand(globe: GeoViewHost) {
 // the country-selected look): 0.38 × 5.9 ≈ 0.45 × 5.0, so the drilled plate is unchanged.
 const MASK_BOOST = 5.9;
 
+// The land-fill boost for a country HOVER PREVIEW (explorer row / scene pointer): a slight fill,
+// clearly less than the committed drill's MASK_BOOST so hover reads as "preview" and selecting still
+// firms it further (user). Leans toward the visible end since hovering happens at overview distance
+// where the land wash is faint. Same single mask uniform, so the drill wins when both are present.
+export const HOVER_MASK_BOOST = 4.2;
+
 // Rasterize the drilled country's rings into a low-res equirect mask and hand it to the
 // land-fill shader; null clears (uMaskBoost 1 = hard no-op). Event-driven — one Canvas2D
 // draw per drill change, never per frame. Same projection + seam strategy as the land
 // texture: per-ring longitude unwrap and a triple draw at x−W / x / x+W, evenodd for holes.
-export function setCountryFillMask(globe: GeoViewHost, rings: Ring[] | null): void {
+export function setCountryFillMask(globe: GeoViewHost, rings: Ring[] | null, boost: number = MASK_BOOST): void {
   const u = globe.countryMaskUniforms;
   if (!u) return; // land not built yet — the drill re-asserts via onCountriesReady
   if (!rings?.length) {
@@ -580,7 +586,7 @@ export function setCountryFillMask(globe: GeoViewHost, rings: Ring[] | null): vo
   tex.wrapT = THREE.ClampToEdgeWrapping;
   const old = u.uCountryMask.value;
   u.uCountryMask.value = tex;
-  u.uMaskBoost.value = MASK_BOOST;
+  u.uMaskBoost.value = boost;
   old.dispose(); // event-driven swap — never per frame
 }
 

@@ -24,7 +24,7 @@ import { armillaryFrame, ringFramePos, armillaryRings, armillaryPos, nodeRoles, 
 import { surfFade, extrasFade } from "../domain/morph";
 import { ArcSim, type ArcEndpoint } from "../domain/arcSim";
 import type { MetaNodeRecord, ValidatorRecord } from "../domain/records";
-import { buildGeoView, setCountryBorder, setCountryFillMask, type GeoViewHost } from "./views/GeoView";
+import { buildGeoView, setCountryBorder, setCountryFillMask, HOVER_MASK_BOOST, type GeoViewHost } from "./views/GeoView";
 import { ccToNumeric, countryCcAt, countryLean, geometryRings, mainPolygonRings, ringsAngularRadius, ringsCentroid, type Ring } from "../domain/countryShape";
 import { closeness, NODE_RAISE } from "../domain/cameraRig";
 import { NodeFabric, type FrameCtx } from "./objects/NodeFabric";
@@ -543,10 +543,14 @@ export class Globe implements GeoViewHost {
     const drillRings = drillCc ? this.countryRings(drillCc) : null;
     setCountryBorder(this, "drill", drillRings, drillCc ? 1.0 : 0);
     const hoverCc = this._hoverCountryCc && this._hoverCountryCc !== drillCc ? this._hoverCountryCc : null;
-    setCountryBorder(this, "hover", hoverCc ? this.countryRings(hoverCc) : null, hoverCc ? 0.3 : 0);
-    // The drilled country's INTERIOR firms up via the fill-mask shader (scoped — the old
-    // whole-globe 0.45→0.62 base bump is gone; the rest of the world keeps the calm glass).
-    setCountryFillMask(this, drillRings);
+    const hoverRings = hoverCc ? this.countryRings(hoverCc) : null;
+    setCountryBorder(this, "hover", hoverRings, hoverCc ? 0.3 : 0);
+    // The country's INTERIOR firms up via the fill-mask shader (scoped — the old whole-globe base
+    // bump is gone). The committed drill fills at full strength; a HOVER preview fills at a lower
+    // boost so it reads as a preview and selecting still firms it further (user). One mask uniform,
+    // so the drill wins when both are present.
+    if (drillRings) setCountryFillMask(this, drillRings);
+    else setCountryFillMask(this, hoverRings, HOVER_MASK_BOOST);
   }
 
   // Resolve a globe-surface WORLD point to the country under it — only countries that
