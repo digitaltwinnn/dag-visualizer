@@ -30,6 +30,15 @@ const PKT_TRAVEL = 0.85; // seconds hub → core
 const PKT_STAGGER = 0.07; // seconds between launches within a burst
 const PKT_POOL = 14; // reusable packet meshes per metagraph (caps simultaneous in-flight)
 
+// The focus SPOTLIGHT — a real THREE.SpotLight staged above the focused metagraph's ring plane so
+// the selected atom's nodes/hub catch a stage-light wash (user: extra visual selection effect).
+// Neutral WHITE on purpose: lighting is a rendering technicality decoupled from the palette (see
+// SceneContext's LIGHT_* note; greyscale is exempt from the no-hardcoded-colours guard), and a
+// white key over the identity-hued emissive nodes brightens them without shifting their hue.
+const SPOT_H = 9; //     height above the ring plane, along the atom's normal
+const SPOT_ANGLE = 0.68; // cone just covers the outer cL1 ring (5.4) + margin at SPOT_H
+const SPOT_I = 2.4; //   full intensity when focused (decay 0 — predictable, non-physical falloff)
+
 // Ring layer-code labels — the text a focused metagraph shows on each of its three layer rings so
 // the L0 / dL1 / cL1 shells read WITH text (user: hard to tell which ring is which). Only the
 // focused atom labels (one at a time), so the resting overview never gets busy.
@@ -121,6 +130,11 @@ export class HyperView {
   // Scratch for _faceLabelInPlane (per-frame label orientation) — never allocate in the loop.
   private _lPQ = new THREE.Quaternion();
   private _lQ = new THREE.Quaternion();
+  // The focus spotlight (see SPOT_* above) + its eased intensity and per-frame scratch.
+  private _spot!: THREE.SpotLight;
+  private _spotI = 0;
+  private _spotPos = new THREE.Vector3();
+  private _spotN = new THREE.Vector3();
   private _coreDim = 0; // eased 0→1: the DAG core fades back when a specific metagraph is the subject
   private _core: number; // the structural accent (colors.core) — the core sphere hue
   private _border: number; // colors.border — the label-chip hairline/wash RGB (the .role-chip pill)
@@ -142,6 +156,13 @@ export class HyperView {
     // tilts the node group + HyperView the core by the same HYPER_TILT, so all three stay registered).
     this.root.rotation.x = HYPER_TILT;
     scene.add(this.root);
+
+    // The focus spotlight (world-space — the hub position is resolved through root's tilt+spin each
+    // frame). Intensity rests at 0 and eases up only while a metagraph is focused (see update()).
+    this._spot = new THREE.SpotLight(0xffffff, 0, 26, SPOT_ANGLE, 0.5, 0);
+    this._spot.visible = false;
+    scene.add(this._spot);
+    scene.add(this._spot.target);
 
     this.pickables = [];
     this.metas = [];
@@ -636,6 +657,25 @@ export class HyperView {
         mat.opacity = Math.sin(pk.t * Math.PI) * 0.9 * metaF;
       }
       hubMat.emissiveIntensity = (0.72 + m.glow * 0.5) * metaF * glowMul;
+      // Stash the FOCUSED hub's root-local position for the spotlight block below (the loop's
+      // `_pos` scratch is overwritten per hub).
+      if (m.cfg.id === this.focusId) this._spotPos.copy(m.group.position);
+    }
+
+    // Focus SPOTLIGHT: stage a white key above the focused atom's ring plane, aimed at its hub, so
+    // the selection catches a real light wash on top of the DoF/dim emphasis (user). Intensity
+    // eases (no pop) and fades with the hubs on the morph; rests dark + invisible otherwise.
+    const spotFocused = this.focusId != null && this.metas.some((m) => m.cfg.id === this.focusId);
+    this._spotI += ((spotFocused ? SPOT_I * hubFade : 0) - this._spotI) * Math.min(1, dt * 3);
+    this._spot.visible = this._spotI > 0.02;
+    this._spot.intensity = this._spotI;
+    if (spotFocused) {
+      // Only while focused: the loop stashed the hub's ROOT-LOCAL position this frame — resolve it
+      // to world once (root tilt+spin+scale). During the fade-out the light just dims in place.
+      this._spotN.set(0, 1, 0).applyEuler(this.root.rotation); // the atom's ring-plane normal (world)
+      this._spotPos.applyEuler(this.root.rotation).multiplyScalar(this.root.scale.x); // hub → world
+      this._spot.target.position.copy(this._spotPos);
+      this._spot.position.copy(this._spotPos).addScaledVector(this._spotN, SPOT_H);
     }
   }
 
