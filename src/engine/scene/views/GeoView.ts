@@ -528,9 +528,9 @@ const MASK_BOOST = 5.9;
 
 // The land-fill boost for a country HOVER PREVIEW (explorer row / scene pointer): a slight fill,
 // clearly less than the committed drill's MASK_BOOST so hover reads as "preview" and selecting still
-// firms it further (user). Leans toward the visible end since hovering happens at overview distance
-// where the land wash is faint. Same single mask uniform, so the drill wins when both are present.
-export const HOVER_MASK_BOOST = 4.2;
+// firms it further (user). Kept subtle (well under the drill) — the outline carries the hover; the
+// fill is just a hint. Same single mask uniform, so the drill wins when both are present.
+export const HOVER_MASK_BOOST = 3.4;
 
 // Rasterize the drilled country's rings into a low-res equirect mask and hand it to the
 // land-fill shader; null clears (uMaskBoost 1 = hard no-op). Event-driven — one Canvas2D
