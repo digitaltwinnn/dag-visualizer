@@ -121,10 +121,10 @@ export function hubFraming(hubLocalPos: THREE.Vector3, out: CameraFraming): void
 //     axes (r0,u0), the core lands at a FIXED screen offset (−right, +up) for every hub slot → the
 //     same corner every time.
 // `planeNormal` = root.rotation·+Y. Target is the subject → CAM_ZOOM dolly applies normally.
-const HF_BACK = 15; // pull behind the hub along the radial (away from the core)
-const HF_UP = 8; //    lift above the ring plane (sets disc flatness)
-const HF_OR = 11; //   in-screen shift that drops the core to one side (LEFT)
-const HF_OU = 4; //    in-screen shift that lifts the core (TOP), on top of the natural above-plane lift
+const HF_BACK = 12; // pull behind the hub along the radial (away from the core) — closer = more zoom (user)
+const HF_UP = 6.5; //  lift above the ring plane (sets disc flatness; ratio to HF_BACK kept)
+const HF_OR = 14; //   in-screen shift that drops the core to one side (LEFT) — larger = nearer the corner
+const HF_OU = 6; //    in-screen shift that lifts the core (TOP), on top of the natural above-plane lift
 export function hyperFocusFraming(hubWorld: THREE.Vector3, planeNormal: THREE.Vector3, out: CameraFraming): void {
   _out.copy(planeNormal).normalize(); // n
   _d.copy(hubWorld);

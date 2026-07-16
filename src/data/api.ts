@@ -180,6 +180,11 @@ export class NetworkData {
       e.layer = e.roles[0]; // primary layer for plotting (l0 if present, else cl1)
       return e;
     });
+    // CANONICAL ORDER — cluster/info returns peers in an unstable order, and the scene places
+    // nodes by list INDEX (armillary ring slots, honeycomb stacks). Without this, the 25s
+    // membership poll could reshuffle indices and visibly SNAP every node to a new ring
+    // position mid-rotation (user bug).
+    nodes.sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
     return {
       id: "dag", name: "DAG", symbol: "DAG", isRoot: true, color: COLORS.core, nodes,
       description:

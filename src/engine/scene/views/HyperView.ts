@@ -55,12 +55,6 @@ function makeRingFillTexture(): THREE.Texture {
   return tex;
 }
 
-// Store a label's ring-plane normal (local, unrotated frame) so _faceLabelInPlane can lay it flat
-// IN the plane each frame — front toward the camera, text upright — for a real 3D-on-the-plane look.
-function storeRingNormal(mesh: THREE.Object3D, frame: RingFrame): void {
-  mesh.userData.ringN = frame.t.clone().cross(frame.b).normalize();
-}
-
 // Give a single (non-instanced) emissive sphere the SAME fresnel-rim ORB look as the node instances
 // (NodeFabric._makeNodeMaterial): a view-dependent rim multiplied onto its emissive so the core /
 // hub read as lit 3D orbs, not flat faceted suns (user). The nodes are instanced (per-instance
@@ -125,14 +119,8 @@ export class HyperView {
   private _coreFills: THREE.Mesh[] = []; // the DAG core's shell rim-fill disks (same as a metagraph's)
   private _fillTex?: THREE.Texture; // shared rim-weighted radial gradient for the ring fill disks
   // Scratch for _faceLabelInPlane (per-frame label orientation) — never allocate in the loop.
-  private _lN = new THREE.Vector3();
-  private _lUp = new THREE.Vector3();
-  private _lRight = new THREE.Vector3();
-  private _lPos = new THREE.Vector3();
-  private _lCam = new THREE.Vector3();
   private _lPQ = new THREE.Quaternion();
   private _lQ = new THREE.Quaternion();
-  private _lM = new THREE.Matrix4();
   private _coreDim = 0; // eased 0→1: the DAG core fades back when a specific metagraph is the subject
   private _core: number; // the structural accent (colors.core) — the core sphere hue
   private _border: number; // colors.border — the label-chip hairline/wash RGB (the .role-chip pill)
@@ -321,25 +309,14 @@ export class HyperView {
     });
   }
 
-  // Lay a ring label flat IN its ring plane, but oriented so it reads: front toward the camera
-  // (whichever side of the plane faces it) and text "up" = world-up projected onto the plane. Runs
-  // per frame only for the few CURRENTLY-SHOWN labels, so the 3D tilt is real but text stays legible.
+  // BILLBOARD a ring label to the camera (screen-aligned: same orientation as the camera, so the
+  // text is always face-on and upright on screen). It was laid flat IN the ring plane before, but at
+  // the oblique focused pose the in-plane text foreshortened to a sliver (user: "label often not
+  // oriented to the camera"). Runs per frame only for the few CURRENTLY-SHOWN labels.
   private _faceLabelInPlane(lb: THREE.Object3D, cam: THREE.Camera): void {
-    const localN = lb.userData.ringN as THREE.Vector3 | undefined;
-    if (!localN || !lb.parent) return;
+    if (!lb.parent) return;
     lb.parent.getWorldQuaternion(this._lPQ);
-    this._lN.copy(localN).applyQuaternion(this._lPQ).normalize(); // ring normal in world
-    lb.getWorldPosition(this._lPos);
-    cam.getWorldPosition(this._lCam).sub(this._lPos); // label → camera
-    if (this._lN.dot(this._lCam) < 0) this._lN.negate(); // front faces the camera
-    // text up = world-up projected onto the plane (fallback if the plane is near-horizontal)
-    this._lUp.set(0, 1, 0).addScaledVector(this._lN, -this._lN.y);
-    if (this._lUp.lengthSq() < 1e-5) this._lUp.set(0, 0, 1).addScaledVector(this._lN, -this._lN.z);
-    this._lUp.normalize();
-    this._lRight.crossVectors(this._lUp, this._lN).normalize();
-    this._lUp.crossVectors(this._lN, this._lRight); // re-orthogonalize
-    this._lM.makeBasis(this._lRight, this._lUp, this._lN);
-    this._lQ.setFromRotationMatrix(this._lM); // desired WORLD orientation
+    cam.getWorldQuaternion(this._lQ); // screen-aligned world orientation
     lb.quaternion.copy(this._lPQ).invert().multiply(this._lQ); // → local (relative to the hub group)
   }
 
@@ -422,7 +399,6 @@ export class HyperView {
     group.add(fill);
     const label = this._makeRingLabel(code);
     label.position.copy(frame.t).multiplyScalar(radius - LABEL_INSET); // INNER side of the ring
-    storeRingNormal(label, frame);
     label.visible = false;
     group.add(label);
     return { fill, label };
@@ -466,7 +442,7 @@ export class HyperView {
     const tex = new THREE.CanvasTexture(c);
     tex.minFilter = THREE.LinearFilter;
     tex.colorSpace = THREE.SRGBColorSpace;
-    const h = 0.62, w = h * (c.width / c.height);
+    const h = 1.0, w = h * (c.width / c.height); // was 0.62 — read too small at the focused distance (user)
     const mesh = new THREE.Mesh(
       new THREE.PlaneGeometry(w, h),
       new THREE.MeshBasicMaterial({ map: tex, transparent: true, depthWrite: false, depthTest: false, side: THREE.DoubleSide }),
@@ -508,7 +484,6 @@ export class HyperView {
       const frame0 = armillaryFrame(0, s.numRings, s.tilt);
       const label = this._makeRingLabel(s.code);
       label.position.copy(frame0.t).multiplyScalar(s.radius - LABEL_INSET); // INNER side of the ring
-      storeRingNormal(label, frame0);
       label.visible = false;
       this.coreGroup.add(label);
       this._coreLabels.push(label);

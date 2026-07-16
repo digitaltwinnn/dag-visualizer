@@ -120,7 +120,7 @@ export function createScene(canvas: HTMLCanvasElement, colors: SceneColors): Sce
   // constructor accepts (and ignores) width/height too — kept for parity with the
   // original call.
   const dofParams: BokehPassParameters & { width: number; height: number } = {
-    focus: 54, aperture: 0.00032, maxblur: 0.01,
+    focus: 54, aperture: 0.00028, maxblur: 0.01,
     width: window.innerWidth, height: window.innerHeight,
   };
   const dof = new BokehPass(scene, camera, dofParams) as DofPass;
