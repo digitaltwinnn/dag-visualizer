@@ -1003,6 +1003,28 @@ export class Engine {
         this._pendingBoundary = null;
         this._applyBoundary(dest);
       }
+      // Camera integration runs BEFORE the staging plane is derived: the plane is anchored to
+      // the camera, and computing it from a pre-tween pose made every staged node trail the
+      // camera by one frame — a visible drift-and-return on the hyper→geo flight (user,
+      // 2026-07-17). Tween → roll ease → controls → altitude clamp, THEN the plane.
+      this._updateTween(dt);
+      // Camera ROLL: while a hyper metagraph atom is focused, ease camera.up toward its ring-plane
+      // normal so the atom's discs read horizontal (hyperFocusFraming's contract); every other state
+      // eases back to world-up. Per-frame (not tween-owned) so it also levels when a view switch
+      // keeps the camera put (ledger). OrbitControls' per-frame lookAt reads the live camera.up, so
+      // manual orbiting keeps the rolled horizon while focused — the accepted trade-off.
+      this.ctx.camera.up
+        .lerp(this._hyperRoll ? this._hyperRollUp : this._worldUp, Math.min(1, dt * 2.5))
+        .normalize();
+      this.ctx.controls.update();
+      // Altitude clamp (policy.minCamAlt): OrbitControls' minDistance is target-relative, and
+      // the geo target is off-centre — so after the controls settle, push the camera back out
+      // to the minimum radius from the ORIGIN if a dolly/orbit carried it inside. In-place (no
+      // alloc); grazing feel: past the floor the camera slides along the sphere to the target.
+      const minAlt = policy.minCamAlt;
+      if (minAlt != null && this.ctx.camera.position.lengthSq() < minAlt * minAlt) {
+        this.ctx.camera.position.setLength(minAlt);
+      }
       // The staging plane: a camera-anchored band across the TOP of the viewport (world space;
       // the Globe converts to group-local). Height from the frustum so the grids read the same at
       // any camera pose.
@@ -1059,24 +1081,6 @@ export class Engine {
       }
       this.layers.update(dt, this.morph, coreDim, zoomedIn, this.ctx.camera, this.filter === "dag");
       this.globe.update(dt);
-      this._updateTween(dt);
-      // Camera ROLL: while a hyper metagraph atom is focused, ease camera.up toward its ring-plane
-      // normal so the atom's discs read horizontal (hyperFocusFraming's contract); every other state
-      // eases back to world-up. Per-frame (not tween-owned) so it also levels when a view switch
-      // keeps the camera put (ledger). OrbitControls' per-frame lookAt reads the live camera.up, so
-      // manual orbiting keeps the rolled horizon while focused — the accepted trade-off.
-      this.ctx.camera.up
-        .lerp(this._hyperRoll ? this._hyperRollUp : this._worldUp, Math.min(1, dt * 2.5))
-        .normalize();
-      this.ctx.controls.update();
-      // Altitude clamp (policy.minCamAlt): OrbitControls' minDistance is target-relative, and
-      // the geo target is off-centre — so after the controls settle, push the camera back out
-      // to the minimum radius from the ORIGIN if a dolly/orbit carried it inside. In-place (no
-      // alloc); grazing feel: past the floor the camera slides along the sphere to the target.
-      const minAlt = policy.minCamAlt;
-      if (minAlt != null && this.ctx.camera.position.lengthSq() < minAlt * minAlt) {
-        this.ctx.camera.position.setLength(minAlt);
-      }
 
       // Geometry visibility, driven by the view policy's `show.*`:
       //  - !hyperFurniture: the hyper root + core are force-managed — ledger keeps the root as its

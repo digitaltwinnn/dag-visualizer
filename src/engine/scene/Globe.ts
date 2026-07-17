@@ -904,6 +904,12 @@ export class Globe implements GeoViewHost {
   // once per frame (the instanced matrices NodeFabric writes are in group space). World-space in;
   // stored on the persistent ctx.gather object NodeFabric's _applyGather reads.
   setGatherFrame(origin: THREE.Vector3, right: THREE.Vector3, up: THREE.Vector3): void {
+    // Force a FRESH world matrix before converting: group.matrixWorld is otherwise only
+    // recomputed at render time, so a rotation applied earlier THIS frame (the boundary's
+    // destination spin/lean snap, the per-frame spin ease) would leave the conversion one
+    // frame stale — every staged node visibly jumped a few pixels and snapped back on the
+    // hyper→geo boundary (user, 2026-07-17). One matrix chain per transition frame.
+    this.group.updateWorldMatrix(true, false);
     const g = this._ctx.gather;
     g.origin.copy(origin);
     this.group.worldToLocal(g.origin);
