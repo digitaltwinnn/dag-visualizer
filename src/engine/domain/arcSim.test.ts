@@ -18,8 +18,13 @@ describe("ARC_TAIL_FRAC (comet length as a fraction of its current hop; consumed
   });
 
   it("keeps the sampling step (ARC_TAIL_FRAC / (ARC_TAIL - 1)) small enough that ARC_TAIL points resolve the tail smoothly", () => {
+    // Pin the tuned constants themselves (arcSim.ts:36-37) — an independent check that catches
+    // an accidental value change, unlike multiplying `step` back out (that's forced algebraically
+    // by its own derivation below and can never fail).
+    expect(ARC_TAIL_FRAC).toBe(0.42);
+    expect(ARC_TAIL).toBe(14);
+
     const step = ARC_TAIL_FRAC / (ARC_TAIL - 1);
-    expect(step * (ARC_TAIL - 1)).toBeCloseTo(ARC_TAIL_FRAC, 12);
     expect(step).toBeLessThan(ARC_TAIL_FRAC); // more than one sample point across the tail
   });
 });
