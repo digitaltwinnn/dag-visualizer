@@ -67,7 +67,7 @@ export interface FrameCtx {
   group: THREE.Group;   // the (rotating) globe group — for hub world->local conversion
   // View-transition inputs (persistent objects; Globe writes them each frame):
   transition: ViewTransition | null;
-  gather: { origin: THREE.Vector3; right: THREE.Vector3; up: THREE.Vector3; cell: number };
+  gather: { origin: THREE.Vector3; right: THREE.Vector3; up: THREE.Vector3; quat: THREE.Quaternion; cell: number };
 }
 
 export class NodeFabric {
@@ -305,6 +305,10 @@ export class NodeFabric {
       .addScaledVector(ctx.gather.right, gU * ctx.gather.cell)
       .addScaledVector(ctx.gather.up, gV * ctx.gather.cell);
     _dummy.position.lerp(_gatherV, w);
+    // Face the camera with the biggest surface (user): slerp toward the staging basis —
+    // local +Y (the chip's bright top cap; the cylinder axis) aimed at the viewer, X/Z
+    // pinned to the grid's right/up so the parked squares sit still (no residual tumble).
+    _dummy.quaternion.slerp(ctx.gather.quat, w);
     const s = 1 + (GATHER_SCALE / Math.max(1e-6, _dummy.scale.x) - 1) * w;
     _dummy.scale.multiplyScalar(s);
   }

@@ -113,6 +113,9 @@ export class Globe implements GeoViewHost {
   // yet at that call site. Read each frame by _frameCtx into ctx.transition for NodeFabric's gather.
   transition: ViewTransition | null = null;
   private _invM = new THREE.Matrix4(); // scratch: this.group's inverse world matrix (setGatherFrame)
+  private _gatherN = new THREE.Vector3(); //  scratch: the staging plane's camera-facing normal
+  private _gatherZ = new THREE.Vector3(); //  scratch: the staging basis' Z (= -up)
+  private _gatherM = new THREE.Matrix4(); //  scratch: the staging orientation basis
   private ledgerT = 0; // 0->1 ease as the reused node meshes fly from their source view into the lanes
   clock = 0;
   private spin: SpinState | null = null;
@@ -208,7 +211,7 @@ export class Globe implements GeoViewHost {
       dim: 0, dimScaleV: 0, dimScaleMetaV: 0, clock: 0, camN: this._camN, hasCam: false,
       ledgerT: 0, dt: 0, flashDecay: 0, group: this.group,
       transition: null,
-      gather: { origin: new THREE.Vector3(), right: new THREE.Vector3(), up: new THREE.Vector3(), cell: GATHER_CELL },
+      gather: { origin: new THREE.Vector3(), right: new THREE.Vector3(), up: new THREE.Vector3(), quat: new THREE.Quaternion(), cell: GATHER_CELL },
     };
 
     // The geo globe surface (body, graticule, atmosphere, continents) — it sets the surface handles
@@ -907,6 +910,14 @@ export class Globe implements GeoViewHost {
     this._invM.copy(this.group.matrixWorld).invert();
     g.right.copy(right).transformDirection(this._invM);
     g.up.copy(up).transformDirection(this._invM);
+    // The staging ORIENTATION (group-local): chips face the camera with their top cap —
+    // local +Y (the cylinder axis / biggest surface) aims at the viewer (right × up = the
+    // plane's camera-facing normal), local X pinned to grid-right and Z = X × Y = -up, so
+    // the parked squares hold still with no residual tumble. Scratch fields, zero-alloc.
+    this._gatherN.crossVectors(g.right, g.up).normalize();
+    this._gatherZ.copy(g.up).negate();
+    this._gatherM.makeBasis(g.right, this._gatherN, this._gatherZ);
+    g.quat.setFromRotationMatrix(this._gatherM);
   }
 
   // Narrow (e.g. phone-portrait) viewports: the Engine scales the cell down from GATHER_CELL so

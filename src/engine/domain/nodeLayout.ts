@@ -7,6 +7,12 @@ import * as THREE from "three";
 
 export const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
 export const smooth = (m: number) => m * m * (3 - 2 * m);
+// Quintic smootherstep: zero first AND second derivative at both ends — a pronounced
+// slow-start → fast-middle → slow-landing profile (the transition flight's speed curve;
+// plain `smooth` reads too mild over the long IN placement window). Shares smoothstep's
+// odd symmetry about 0.5 (smoother(1-x) = 1-smoother(x)), which the retarget continuity
+// math relies on.
+export const smoother = (m: number) => m * m * m * (m * (6 * m - 15) + 10);
 export const GOLDEN_ANGLE = Math.PI * (3 - Math.sqrt(5)); // fibonacci-shell / phyllotaxis spacing
 
 // A node's role set, shared by the DAG core + metagraph nodes. A node (one machine) can run

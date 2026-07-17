@@ -8,7 +8,7 @@
 //   IN   (t: 0→DUR_IN)   — the to-view's furniture builds while nodes fly, staggered, to
 //                          their destination poses (gatherWeight 1→0); the camera flies.
 // Pure and allocation-free; the scene calls gatherWeight per node per frame.
-import { smooth } from "./nodeLayout";
+import { smooth, smoother } from "./nodeLayout";
 
 export type View3D = "hyper" | "geo" | "ledger";
 
@@ -101,10 +101,12 @@ export class ViewTransition {
   gatherWeight(rank: number, count: number): number {
     if (this.phase === "idle") return 0;
     const delay = (rank / Math.max(1, count - 1)) * STAGGER_SPREAD;
+    // `smoother` (quintic), not `smooth`: a pronounced glide — slow launch, fast cruise for
+    // the big distance, slow landing (user). Same 0.5-symmetry, so retarget continuity holds.
     if (this.phase === "out") {
-      return smooth(Math.min(1, Math.max(0, (this.t - delay) / FLIGHT_OUT)));
+      return smoother(Math.min(1, Math.max(0, (this.t - delay) / FLIGHT_OUT)));
     }
-    return 1 - smooth(Math.min(1, Math.max(0, (this.t - delay) / FLIGHT_IN)));
+    return 1 - smoother(Math.min(1, Math.max(0, (this.t - delay) / FLIGHT_IN)));
   }
 
   // Furniture multiplier for `view` this frame. At most one view is ever lit (spec:
