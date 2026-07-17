@@ -2,8 +2,8 @@
 // are the objects pushed into `this.nodes` (js/globe.js:243-258) and `this.metaNodes`
 // (js/globe.js:549-571) — typed verbatim from those two record literals as the domain layer
 // for Task 11's globe.js split. Renderer-free: no THREE.Object3D/Mesh/Group field except
-// `hubGroup`, which is narrowed to the one thing globe.js actually reads off it (its live
-// position) so this stays a plain-data type.
+// `hubGroup`, narrowed to the two things globe.js reads off it — its live local position and its
+// WORLD position (the hyper structure is tilted, so the anchor must resolve through the tilt).
 
 import * as THREE from "three";
 import type { PickDescriptor } from "@/src/data/types";
@@ -21,6 +21,8 @@ export interface ValidatorRecord {
   ledgerPos: THREE.Vector3;
   ledgerHide: boolean;
   hyperPos: THREE.Vector3;
+  /** Ring-plane normal in the base (untilted) frame — the node orbits ALONG its shell around this. */
+  ringAxis: THREE.Vector3;
   hyperDir: THREE.Vector3;
   hyperRadius: number;
   geoDir: THREE.Vector3 | null;
@@ -53,8 +55,11 @@ export interface MetaNodeRecord {
   /** The orbiting hub (HyperFurniture.metas[].group) this metagraph's nodes cluster around in
    *  the Hypergraph, or null if the hub isn't available. Narrowed to its position so this
    *  record stays renderer-free (no THREE.Group in the domain layer). */
-  hubGroup: { position: THREE.Vector3 } | null;
+  hubGroup: Pick<THREE.Object3D, "position" | "getWorldPosition"> | null;
   offset: THREE.Vector3;
+  /** The node's ring-plane normal in the base (untilted) frame — its Hypergraph shell orbits ALONG
+   *  this axis (the offset is spun around it each frame; the hoop is a full circle so it stays on it). */
+  ringAxis: THREE.Vector3;
   ledgerPos: THREE.Vector3;
   geoPrimary: boolean;
   nodeId: string;

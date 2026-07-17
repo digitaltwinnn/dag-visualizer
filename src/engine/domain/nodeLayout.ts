@@ -34,6 +34,52 @@ export function fibShellPos(i: number, n: number, rad: number, flatten: number):
   return new THREE.Vector3(Math.cos(phi) * rr * rad, y * rad * flatten, Math.sin(phi) * rr * rad);
 }
 
+// ---- Hypergraph ARMILLARY "atom" rings (redesign v2) ---------------------------------------
+// (The v1 flat-concentric-rings layout — ringEven/ringStackRadii/ringStackPos — was superseded
+// by the armillary functions below within the same redesign and has been removed.)
+// Nodes sit on multiple rings of the SAME diameter at DIFFERENT tilt angles (an armillary sphere /
+// atom), instead of concentric rings of increasing diameter (which read as one ring spiralling).
+// Both Globe (node placement) and HyperView (the tilted cyan hoops) build from `armillaryFrame`,
+// so hoops and nodes register. Build-time only (a data event), so allocation here is fine.
+
+export interface RingFrame { t: THREE.Vector3; b: THREE.Vector3 } // the ring's in-plane unit basis
+
+const _yAxis = new THREE.Vector3(0, 1, 0);
+const _xAxis = new THREE.Vector3(1, 0, 0);
+
+// The in-plane basis of the k-th of `numRings` rings: a horizontal circle tilted by `tilt` about X,
+// then spun about Y to its own azimuth — so every ring shares one diameter but sits at a distinct
+// angle, and no two share a pole (each contains ±X spun to a different point).
+export function armillaryFrame(k: number, numRings: number, tilt: number): RingFrame {
+  const q = new THREE.Quaternion()
+    .setFromAxisAngle(_yAxis, (k / Math.max(1, numRings)) * Math.PI)
+    .multiply(new THREE.Quaternion().setFromAxisAngle(_xAxis, tilt));
+  return {
+    t: new THREE.Vector3(1, 0, 0).applyQuaternion(q),
+    b: new THREE.Vector3(0, 0, 1).applyQuaternion(q),
+  };
+}
+
+// Position of node j of `count` evenly spaced on the ring described by `frame` at `radius`.
+export function ringFramePos(j: number, count: number, radius: number, frame: RingFrame, phase = 0): THREE.Vector3 {
+  const a = (j / Math.max(1, count)) * Math.PI * 2 + phase;
+  return frame.t.clone().multiplyScalar(Math.cos(a) * radius).addScaledVector(frame.b, Math.sin(a) * radius);
+}
+
+// How many rings an armillary of `n` nodes uses — ~`per` nodes per ring, clamped to [min, max].
+export function armillaryRings(n: number, per = 22, min = 2, max = 7): number {
+  return Math.max(min, Math.min(max, Math.round(Math.max(1, n) / per)));
+}
+
+// Place node i of n round-robin across `numRings` armillary rings of `radius` — its XYZ. Each ring
+// is filled evenly over its own member count; a per-ring phase staggers the seams.
+export function armillaryPos(i: number, n: number, radius: number, numRings: number, tilt: number): THREE.Vector3 {
+  const k = i % numRings;
+  const onRing = Math.floor((n - 1 - k) / numRings) + 1; // members on ring k
+  const j = Math.floor(i / numRings);
+  return ringFramePos(j, onRing, radius, armillaryFrame(k, numRings, tilt), k * 0.6);
+}
+
 export interface Cluster {
   center: THREE.Vector3;
   count: number;

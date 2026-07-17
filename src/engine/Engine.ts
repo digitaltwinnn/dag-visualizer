@@ -14,7 +14,7 @@ import { METAGRAPHS, COLORS } from "@/src/engine/config";
 import { LEDGER, LAYER_GEOM, ledgerSite } from "./domain/ledgerLayout";
 import { readSceneColors } from "./sceneColors";
 import { VIEW_POLICIES } from "./domain/viewPolicy";
-import { FOCI, hubFraming, geoFraming, ledgerLayerFraming, nodeFraming, hyperNodeFraming, dollyBack, easeInOutQuad, type CameraFraming } from "./domain/cameraRig";
+import { FOCI, hyperFocusFraming, geoFraming, ledgerLayerFraming, nodeFraming, hyperNodeFraming, dollyBack, easeInOutQuad, type CameraFraming } from "./domain/cameraRig";
 import { countryFraming } from "./domain/countryShape";
 import { R as GEO_R, LAND_H } from "./domain/geoLayout";
 import { clickActions, pickActive } from "./domain/pickActions";
@@ -68,9 +68,15 @@ export class Engine {
     fromTgt: new THREE.Vector3(), toTgt: new THREE.Vector3(),
     t: 0, dur: 1.4, active: false,
   };
+  private _worldUp = new THREE.Vector3(0, 1, 0); // the default (level) camera up
+  private _hyperRoll = false; // true while a hyper metagraph atom is focused → camera.up eases to its normal
+  private _hyperRollUp = new THREE.Vector3(0, 1, 0); // the focused atom's ring normal (the rolled up target)
   // Scratch framing struct handed to hubFraming/geoFraming — its values are copied into
   // `_tween` immediately by `_tweenTo`, so reusing it across every focus call is safe.
   private _framingOut: CameraFraming = { pos: new THREE.Vector3(), target: new THREE.Vector3() };
+  private _hubWorld = new THREE.Vector3(); // scratch: hub local pos tilted into world for framing
+  private _hubNormal = new THREE.Vector3(); // scratch: atom ring-plane normal in world (for framing)
+  private _hyperSpinY = 0; // shared hyper-structure spin angle (globe group + root + core, in lockstep)
 
   private geoMap: GeoMap = {};
   private dagCore: DagCore | null = null;
@@ -280,8 +286,8 @@ export class Engine {
     // Data-driven Hypergraph pulses: when a metagraph records a snapshot that anchored into a
     // global tick, fire a packet from its hub along the tether into the core; flash the core
     // itself on each new global snapshot (scaled by how many metagraphs it anchored).
-    net?.on("anchor", ({ metaId }: { metaId: string }) => {
-      this.layers.pulseMeta(metaId);
+    net?.on("anchor", ({ metaId, timestamps, seed }: { metaId: string; timestamps: string[]; seed: boolean }) => {
+      if (!seed) this.layers.pulseMeta(metaId, timestamps?.length ?? 1); // one packet per LIVE snapshot (skip the history seed)
       if (this.mode === "ledger") this._ledgerDirty = true; // the per-tick breakdown filled in
     });
     net?.on("global", (evt: { latest: GlobalSnapshot | null }) => {
@@ -425,6 +431,7 @@ export class Engine {
   // ---- view + filter (ports ui.setMode / _applyFilter / camera focus) ----
   setMode(mode: Mode) {
     this.mode = mode;
+    this._hyperRoll = false; // the rolled camera-up is a hyper-focus-only pose; every view switch levels it
     // A view switch re-lays the scene under a stationary pointer, so any in-flight hover
     // (tooltip + the hover channels) would linger re-projected at a wrong screen position
     // until the next pointermove — clear it as part of the switch.
@@ -435,6 +442,9 @@ export class Engine {
     this.layers.setHubOrbits(policy.sims.hubOrbits);
     // Zoom floor: geo keeps the camera outside the globe surface (see viewPolicy.minCamDist).
     this.ctx.controls.minDistance = policy.minCamDist;
+    // Polar clamp: globe views keep the "no pole crossing" limit; hyper relaxes it so the ring
+    // layout can be viewed straight from the top (viewPolicy.minPolarAngle).
+    this.ctx.controls.minPolarAngle = policy.minPolarAngle;
     // Snapshots view reuses the SAME hub/node meshes, laid out into planar rows. Toggle that
     // layout on the meshes (off restores the orbit/globe layout) and lock orbit so it reads 2D.
     const inLedger = mode === "ledger";
@@ -604,6 +614,7 @@ export class Engine {
     }
     this.ctx.controls.autoRotate = false;
     this.layers.focusId = null;
+    this._hyperRoll = false; // the node pose is a world-up framing — level the atom-focus roll
     hyperNodeFraming(pos, this._framingOut);
     this._tweenTo(this._framingOut.pos, this._framingOut.target);
   }
@@ -622,13 +633,16 @@ export class Engine {
   // Compute the per-country leaderboard for the active filter and push it to the store
   // (the React Leaderboard reads it). Cheap.
   private _publishLeaderboard() {
+    // Flat node list for the explorer node browsers (read-only; the policy says which views have
+    // one — geo's Nodes-by-country, hyper's Nodes-by-network — so it empties elsewhere). Published
+    // FIRST + unconditionally: a metagraph's rows come from metaNodes, which load independently of
+    // the DAG core, so this must NOT be gated on the validator set (bug: "no nodes reported" while
+    // the core was still loading).
+    useStore.getState().setSelNodes(VIEW_POLICIES[this.mode].nodeList ? this.globe.listNodes(this.filter) : []);
+    // The per-country leaderboard needs the validator set — skip it until the core has loaded.
     if (!this.globe.nodes?.length) return;
     const countries = this.globe.countryStats(this.filter);
     useStore.getState().setLeaderboard({ countries });
-    // Flat node list for the explorer node browsers (read-only; the policy says which views
-    // have one — geo's Nodes-by-country, hyper's Nodes-by-layer — so it empties elsewhere
-    // and the browsers stay quiet). Built on the same triggers as the leaderboard.
-    useStore.getState().setSelNodes(VIEW_POLICIES[this.mode].nodeList ? this.globe.listNodes(this.filter) : []);
   }
 
   // ---- picking (ports ui.js _pick / _pickablesFor / _onClick) ----
@@ -839,10 +853,11 @@ export class Engine {
 
   private _focusFilter(filter: string) {
     this.layers.focusId = null;
+    this._hyperRoll = false; // only a focused metagraph atom (below) rolls the camera; all/dag/none = level
     if (filter === "all") {
-      this.ctx.controls.autoRotate = true;
-      this.focus("hyperRing"); // look down onto the hub ring — reads as a 2D circle around the core
-      return;
+      this.ctx.controls.autoRotate = false; // the STRUCTURE spins (setHyperSpin), not the camera
+      this.focus("overview"); // SHARED pose — the hyper structure is tilted (HYPER_TILT) to read
+      return; // top-down instead of moving the camera, so other views tween cleanly from here.
     }
     this.ctx.controls.autoRotate = false;
     if (filter === "dag") {
@@ -854,8 +869,23 @@ export class Engine {
       this.focus("overview");
       return;
     }
-    this.layers.focusId = filter; // anchor this hub so it stays framed
-    hubFraming(meta.group.position, this._framingOut);
+    this.layers.focusId = filter; // anchor this hub so it stays framed (its orbit + the spin freeze)
+    // Frame against the hub's morph-0 world position: root carries the structure's tilt+spin in its
+    // ROTATION and the morph collapse in its SCALE. On a geo→hyper switch morph is still 1 at this
+    // instant (it eases to 0 over the next frames), so root.scale ≈ 0 and getWorldPosition would
+    // return the origin (the "doesn't focus the metagraph" bug). Apply ONLY the rotation to the
+    // hub's local orbit position — that's where the hub lands once the morph settles; the spin/orbit
+    // are frozen (focusId + non-"all" filter) so it stays valid for the whole tween.
+    this._hubWorld.copy(meta.group.position).applyEuler(this.layers.root.rotation);
+    // The atom's ring-plane normal in world = root's tilt+spin applied to +Y. The framing uses it BOTH
+    // for the position (consistent core placement) AND as the camera-UP (roll) so the discs read
+    // horizontal at any spin — passed through to the tween as the pose's up.
+    this._hubNormal.set(0, 1, 0).applyEuler(this.layers.root.rotation);
+    hyperFocusFraming(this._hubWorld, this._hubNormal, this._framingOut);
+    // Roll the camera to the atom's ring normal so its discs read horizontal (the render loop eases
+    // camera.up toward this while the atom stays focused; cleared for every other state).
+    this._hyperRoll = true;
+    this._hyperRollUp.copy(this._hubNormal);
     this._tweenTo(this._framingOut.pos, this._framingOut.target);
   }
 
@@ -893,9 +923,30 @@ export class Engine {
       // (hover-preview wins over the committed filter), and stays lit for "all"/"dag".
       const coreSubj = this._hoverFilter ?? this.filter;
       const coreDim = coreSubj === "all" || coreSubj === "dag" ? 0 : 1;
-      this.layers.update(dt, this.morph, coreDim);
+      // Freeze the overall sphere spin once the camera is zoomed in to inspect (hyper) — a close-up
+      // reads still; the per-node axis spin keeps going. Threshold is well inside the resting pose.
+      const zoomedIn = this.mode === "hyper" &&
+        this.ctx.camera.position.distanceTo(this.ctx.controls.target) < 45;
+      // Hyper resting: spin the whole TILTED structure about its own vertical axis so it reads as
+      // slowly-rotating top-down rings (replaces camera autoRotate, which wobbles a tilted
+      // structure). ONE shared angle → globe group + root + coreGroup can't desync from the hoops.
+      // Frozen when a hub is focused (filter ≠ all) or the camera is zoomed in to inspect.
+      if (this.mode === "hyper") {
+        if (this.filter === "all" && !zoomedIn) this._hyperSpinY += dt * 0.06;
+        this.globe.setHyperSpin(this._hyperSpinY);
+        this.layers.setHyperSpin(this._hyperSpinY);
+      }
+      this.layers.update(dt, this.morph, coreDim, zoomedIn, this.ctx.camera, this.filter === "dag");
       this.globe.update(dt);
       this._updateTween(dt);
+      // Camera ROLL: while a hyper metagraph atom is focused, ease camera.up toward its ring-plane
+      // normal so the atom's discs read horizontal (hyperFocusFraming's contract); every other state
+      // eases back to world-up. Per-frame (not tween-owned) so it also levels when a view switch
+      // keeps the camera put (ledger). OrbitControls' per-frame lookAt reads the live camera.up, so
+      // manual orbiting keeps the rolled horizon while focused — the accepted trade-off.
+      this.ctx.camera.up
+        .lerp(this._hyperRoll ? this._hyperRollUp : this._worldUp, Math.min(1, dt * 2.5))
+        .normalize();
       this.ctx.controls.update();
       // Altitude clamp (policy.minCamAlt): OrbitControls' minDistance is target-relative, and
       // the geo target is off-centre — so after the controls settle, push the camera back out
@@ -923,7 +974,7 @@ export class Engine {
       if (show.ledger) {
         if (this._ledgerDirty) this._refreshLedger();
         this.ledger.update(dt);
-      }
+      } else this.ledger.spotOff(); // its update() stops ticking off-view — don't leave the light lit
 
       // Depth of field: only a single focused metagraph, and only where the policy allows it (hyper).
       const metaSel = this.filter !== "all" && this.filter !== "dag";
@@ -935,9 +986,11 @@ export class Engine {
           ? meta.group.getWorldPosition(this._dofTmp)
           : this.ctx.controls.target;
         this.ctx.dof.uniforms["focus"].value = this.ctx.camera.position.distanceTo(focusTarget);
-        // out-of-focus blur — kept modest so the SELECTED hub (a sphere whose near/far surfaces
-        // straddle the focal plane) stays crisp; it's enough to separate the background core/hubs.
-        this.ctx.dof.uniforms["maxblur"].value = 0.045 * dofMix;
+        // out-of-focus blur — the ceiling the background core/hubs saturate to. The selected
+        // cluster stays crisp regardless (the wide sharp zone comes from the LOW aperture, not
+        // this cap — see SceneContext's dofParams note); raised 0.08 → 0.16 (user 2026-07-17:
+        // more background separation while focused).
+        this.ctx.dof.uniforms["maxblur"].value = 0.16 * dofMix;
       }
 
       this.ctx.composer.render();

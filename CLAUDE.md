@@ -239,14 +239,20 @@ store-value imports**, enforced by `layerBoundaries.test.ts`). Each ships coloca
   their explorer node browsers — hyper + geo), as
   DATA. The single source of truth for what each view turns on (see *Per-view behaviour*).
 - `morph.ts` — the hyper↔geo morph easing + derived visibility ramps.
-- `nodeLayout.ts` — the node placement math: fibonacci shells around the core/hubs, the
-  sphere→disc geo positions, `spreadCoLocated()` phyllotaxis fan-out.
+- `nodeLayout.ts` — the node placement math: the Hypergraph's ARMILLARY "atom" rings
+  (`armillaryFrame`/`ringFramePos`/`armillaryRings`/`armillaryPos` — nodes on same-diameter
+  rings at different tilts; replaced the old fibonacci scatter shells, hypergraph-redesign
+  branch; `HyperView._makeHoop` draws its cyan hoops from the SAME `ringFramePos` curve so
+  nodes and hoops can never drift), the sphere→disc geo positions, `spreadCoLocated()`
+  honeycomb chip-stack fan-out.
 - `dimModel.ts` — pure filter/hover/country dim + emissive resolution; a tested reference spec
   the scene layer currently reimplements inline (`NodeFabric`'s glow writers, `Globe._dimScale`/
   `_applyDim`) rather than calling. The DAG core dims as ONE value (the old per-layer `{l0,l1}`
-  pair always moved in lockstep and was collapsed, 2026-07-09); node glow is STEADY — validator
-  and metagraph pools share one formula (`0.5 + 0.08·morph`), the decorative twinkle shimmer
-  was removed (user).
+  pair always moved in lockstep and was collapsed, 2026-07-09); node glow is STEADY (the
+  decorative twinkle shimmer was removed, user) with PER-POOL resting bases — validators
+  `lerp(0.47, 0.37, morph)`, metagraph nodes `lerp(0.33, 0.37, morph)` (they rest at the dim
+  look in hyper, 2026-07-17: `metaDimScale` = morph zeroes their network dim there; the
+  committed network pops via `hubMatchBoost` to the hub level 0.72).
 - `arcSim.ts` — the travelling-packet arc simulation: a swarm of comet "agents" that hop
   node→node. **Emits flash EVENTS via a ring buffer** — no cross-view side-channel mutation.
 - `ledgerModel.ts` — the Snapshots chamber's layout/slot/tile model over the live snapshot data.
@@ -405,9 +411,12 @@ views and caused the ledger red-dots bug; that pattern is forbidden.
   (`LEDGER.dot` footprint × `HEX_H` — replaced the squashed-sphere COINS 2026-07-12, user: the
   edge-on coin slivers were nearly un-raycastable; the chip's top cap + sides are a real pick
   target, so the ledger needs no pick assist). Per-instance transforms via the shared `_dummy`.
-- **DAG L0/L1** are two fibonacci shells around the core. **Each metagraph** is laid out the
-  same way around its hub: concentric shells **L0 inner → data-L1 (dl1) middle →
-  currency-L1 (cl1) outer**. Metagraph nodes live in the rotating globe group but stay glued
+- **DAG L0/L1** are two ARMILLARY shells around the core (each shell = several same-diameter
+  rings at different tilts — an "atom", `nodeLayout.armillaryPos`; replaced the fibonacci
+  shells on the hypergraph-redesign branch). **Each metagraph** is laid out the same way
+  around its hub: one armillary ring set per layer at the `hyperLayout.META_RING` radii
+  (**L0 inner → data-L1 (dl1) middle → currency-L1 (cl1) outer**), each ring drawn as a
+  matching cyan hoop. Metagraph nodes live in the rotating globe group but stay glued
   to their orbiting hub in the Hypergraph — `Globe.ts` converts the hub's live position into
   the group's local frame each frame. Keep that.
 - A metagraph's identity hue must be the SAME everywhere it appears — hub, globe nodes,
@@ -855,9 +864,10 @@ signal channel.**
 Every rail card leads with `CardHead` (`components/CardHead.tsx`), ONE head anatomy on all
 cards: **eyebrow / title / INSET hairline / body**.
 
-- **Eyebrow**: uppercase 8.5px — either a view tag ("HYPERGRAPH · ABOUT") or one simple
-  "Selected <subject>" label ("SELECTED NETWORK" / "SELECTED NODE" / "SELECTED SNAPSHOT" —
-  no breadcrumb grammar). `eyebrowMuted` dims it when the feed behind the card is down.
+- **Eyebrow**: uppercase 8.5px — either a view tag ("HYPERGRAPH · ABOUT") or the bare slot
+  noun ("METAGRAPH" / "NODE" / "SNAPSHOT" / "LAYER" — the "Selected " prefix was dropped,
+  user 2026-07-17: the populated card wears the same slot label as its ghost state; no
+  breadcrumb grammar). `eyebrowMuted` dims it when the feed behind the card is down.
 - **Title**: one standard — 15px / semibold / leading-[1.2]. Pass `titleKey` to key the
   `roll-in` remount on a subject change (synced with the edge pulse). Panel titles carry a
   leading identity dot on the shared `dot-beat`. Rich titles are nodes: the dossier renders

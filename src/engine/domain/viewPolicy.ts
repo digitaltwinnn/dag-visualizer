@@ -50,6 +50,10 @@ export interface ViewPolicy {
   // inside the surface on the other (user bug). 18 clears the land plateau (R 16 + LAND_H 1)
   // and the raised hex stacks.
   minCamAlt: number | null;
+  // OrbitControls minPolarAngle (radians from +Y). The globe views keep the ~0.25 "no pole
+  // crossing" clamp; the Hypergraph relaxes it so the ring layout can be viewed straight from the
+  // TOP (user). Applied by the Engine on a view change.
+  minPolarAngle: number;
   // Does this view publish the selection's flat node list (`store.selNodes`) for its explorer
   // card? geo (Nodes by country) + hyper (Nodes by layer); elsewhere the list empties so the
   // browsers stay quiet.
@@ -64,8 +68,10 @@ export interface ViewPolicy {
 }
 
 // The calm bloom the ledger view uses — the reference the design likes (thin lines, sparse
-// emitters). Shared so ledger + the canvas-hidden FLAT views read identically.
-const BLOOM_CALM = { strength: 0.30, radius: 0.35, threshold: 0.13 };
+// emitters). Shared so ledger + the canvas-hidden FLAT views read identically. strength values
+// across the views are the EFFECTIVE strengths (an earlier global gain was folded in so the numbers
+// read at a glance — bump them here directly for more/less overall glow).
+const BLOOM_CALM = { strength: 0.40, radius: 0.35, threshold: 0.13 };
 
 // A flat placeholder view (status / transactions / staking): the canvas is hidden and the view
 // is fully inert. Shared so the three rows stay identical by construction.
@@ -79,6 +85,7 @@ const FLAT: ViewPolicy = {
   countryHover: false,
   minCamDist: 12,
   minCamAlt: null,
+  minPolarAngle: 0.25,
   nodeList: false,
   bloom: BLOOM_CALM,
 };
@@ -89,16 +96,21 @@ export const VIEW_POLICIES: Record<Mode, ViewPolicy> = {
   hyper: {
     canvas: true,
     morph: "toHyper",
-    sims: { arcs: false, hubOrbits: true, globeSpin: true },
+    // globeSpin OFF: the redesigned tilted rings must stay registered with the cyan hoops (drawn in
+    // the unrotated frame) — an idle group spin would rotate the nodes off them. The camera
+    // autoRotate provides the motion instead.
+    sims: { arcs: false, hubOrbits: true, globeSpin: false },
     show: { hyperFurniture: true, globeSurface: true, ledger: false },
     pickSources: ["globe", "layers"],
     dofEligible: true,
     countryHover: false,
     minCamDist: 12,
     minCamAlt: null,
+    minPolarAngle: 0.25, // standard clamp: the structure is TILTED (HYPER_TILT), not the camera —
+    // so hyper shares the overview pose with the other views and never needs the pole-crossing relax
     nodeList: true,
     // Calmer than ledger: the core + dense node field piled up an additive bleed on OLED/HDR.
-    bloom: { strength: 0.20, radius: 0.32, threshold: 0.14 },
+    bloom: { strength: 0.27, radius: 0.32, threshold: 0.14 },
     },
   // Footprint: the holographic globe + travelling packets; picks the globe nodes only.
   geo: {
@@ -111,10 +123,11 @@ export const VIEW_POLICIES: Record<Mode, ViewPolicy> = {
     countryHover: true, // pointer over a drillable country previews its border (pairs both ways)
     minCamDist: 12,
     minCamAlt: 18, // above the land plateau (R 16 + LAND_H 1.0) + chip stacks — no zooming inside
+    minPolarAngle: 0.25,
     nodeList: true,
     // The lowest bloom of the three views: strength drives the "black halo" ring the saturated
     // node/wall hues cast on the globe, and the additive coastal walls read fuzzy under bloom.
-    bloom: { strength: 0.15, radius: 0.30, threshold: 0.16 },
+    bloom: { strength: 0.20, radius: 0.30, threshold: 0.16 },
     },
   // Snapshots: the settlement chamber. Morph frozen (nodes fly into lanes); picks the centred
   // snapshot + the reused producer dots. (The ledger-specific depth-fog recency treatment was
@@ -129,6 +142,7 @@ export const VIEW_POLICIES: Record<Mode, ViewPolicy> = {
     countryHover: false,
     minCamDist: 12,
     minCamAlt: null,
+    minPolarAngle: 0.25,
     nodeList: false,
     bloom: BLOOM_CALM, // the reference look the design likes — unchanged
   },

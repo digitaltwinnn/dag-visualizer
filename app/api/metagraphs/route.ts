@@ -100,9 +100,15 @@ async function fetchLive(): Promise<{ metagraphs: Metagraph[]; geo: GeoMap }> {
           }
         }
       });
-      const nodes: MetaNode[] = Object.keys(primary).map((ip) => ({
-        ip, state: stateOf[ip], layer: primary[ip], roles: roles[ip], id: idOf[ip],
-      }));
+      // CANONICAL ORDER — cluster/info returns peers in an unstable order, and the client scene
+      // places nodes by list index (ring slots, honeycomb stacks): a reshuffled payload after a
+      // revalidate would visibly snap nodes to new positions. Object.keys' insertion order is the
+      // fetch order, so sort explicitly.
+      const nodes: MetaNode[] = Object.keys(primary)
+        .sort()
+        .map((ip) => ({
+          ip, state: stateOf[ip], layer: primary[ip], roles: roles[ip], id: idOf[ip],
+        }));
       return {
         id, name: m.name || id, symbol: m.symbol || "",
         description: m.description || "", siteUrl: m.siteUrl || "",

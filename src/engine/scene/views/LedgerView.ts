@@ -34,6 +34,7 @@ import type { SceneColors } from "../../sceneColors";
 import { LedgerModel, SLOT_SP, slotFade, curvePoint } from "../../domain/ledgerModel";
 import type { GlobalSnapshot, Anchor, PickDescriptor } from "@/src/data/types";
 import { LEDGER_LAYERS } from "@/src/data/ledgerLayers"; // shared display copy + ORDER — floor labels = panel rows
+import { FocusSpot } from "../objects/FocusSpot";
 
 // Floor plane geometry comes from the shared domain table (ledgerLayout.LAYER_GEOM): the FULL-WIDTH
 // floors are exactly its laneZ === 0 entries; the split hypergraph panes (hypl0/hypl1, laneZ ≠ 0)
@@ -143,6 +144,9 @@ interface QueueItem {
 export class LedgerView {
   group: THREE.Group;
   private _core: number;             // the structural accent (colors.core), as a number
+  private _border: number;           // colors.border — the label-chip hairline/wash (the .role-chip pill)
+  private _panel: number;            // colors.panel — the label-chip glass backing (== --panel)
+  private _muted: number;            // colors.muted — the level-badge text tone (== --muted-foreground)
   private _coreCol: THREE.Color;     // the accent as a Color (live/selected blocks)
   // Identity SCENE-lane colour map (id -> 0xRRGGBB) — the ONE colour system, shared with the
   // hubs/nodes/HUD (src/palette/identity.ts via the Engine). Required at construction so nothing
@@ -196,9 +200,19 @@ export class LedgerView {
   private _dagL1Ring: THREE.LineSegments;
   // Per-plane materials keyed by layer id, so setHighlight() can brighten one floor (explore panel).
   private _floorMats = new Map<string, { frame: THREE.LineBasicMaterial; fill: THREE.ShaderMaterial }>();
+  // The layer focus SPOTLIGHT (scene/objects/FocusSpot): staged above the COMMITTED layer's lead
+  // area so the tilted layer zoom catches a stage-light wash on its chips/tiles (user; hyper/geo
+  // have their own). `_spotLayerId` is set by setHighlight (committed selections only).
+  private _spot: FocusSpot;
+  private _spotLayerId: string | null = null;
+  private _spotPos = new THREE.Vector3();
+  private _spotN = new THREE.Vector3();
 
   constructor(scene: THREE.Scene, colors: SceneColors, sceneColors: Record<string, number>) {
     this._core = colors.core;
+    this._border = colors.border;
+    this._panel = colors.panel;
+    this._muted = colors.muted;
     this._coreCol = new THREE.Color(colors.core);
     this.sceneColors = sceneColors;
     this.group = new THREE.Group();
@@ -211,6 +225,9 @@ export class LedgerView {
     );
     this.group.scale.setScalar(LEDGER.viewScale);
     scene.add(this.group);
+    // Layer stage light: a wide, higher pool over the committed floor's lead area — the floors span
+    // the whole lane depth, so the cone is wide (radius ≈ 14·tan(0.75) ≈ 13 covers the mid lanes).
+    this._spot = new FocusSpot(scene, { angle: 0.75, distance: 44, intensity: 2.6 });
     this.pickables = [];
     this.t = 0;
     this._latest = null;
@@ -432,17 +449,33 @@ export class LedgerView {
     // legibility (user: labels read unclear, make them cyan); derived from the token, no literal.
     const cc = new THREE.Color(this._core);
     const tone = `rgba(${Math.round(cc.r * 255)},${Math.round(cc.g * 255)},${Math.round(cc.b * 255)},0.85)`;
+    const mc = new THREE.Color(this._muted);
+    const mtone = `rgba(${Math.round(mc.r * 255)},${Math.round(mc.g * 255)},${Math.round(mc.b * 255)},0.95)`;
+    // The level badge box wears the SAME glass backing + border HUE as the React .role-chip pill —
+    // `--panel` fill (opaque enough that the floor plane behind it doesn't bleed through) + `--border`
+    // blue hairline — via the unified SceneColors bridge so the scene chip and the pill share one
+    // colour source.
+    const bc = new THREE.Color(this._border);
+    const brgb = `${Math.round(bc.r * 255)},${Math.round(bc.g * 255)},${Math.round(bc.b * 255)}`;
+    const pc = new THREE.Color(this._panel);
+    const prgb = `${Math.round(pc.r * 255)},${Math.round(pc.g * 255)},${Math.round(pc.b * 255)}`;
     ctx.font = `400 ${22 * SS}px system-ui, -apple-system, sans-serif`;
     const boxW = Math.max(34 * SS, Math.ceil(ctx.measureText(level).width) + 16 * SS); // fits "2.1" sub-levels
-    ctx.strokeStyle = tone;
+    const bx = 6 * SS, by = 15 * SS, bh = 34 * SS, br = 6 * SS;
+    ctx.beginPath();
+    ctx.roundRect(bx, by, boxW, bh, br);
+    ctx.fillStyle = `rgba(${prgb},0.9)`; // --panel glass, opaque so the floor doesn't show through
+    ctx.fill();
+    ctx.strokeStyle = `rgba(${brgb},0.6)`; // --border hue
     ctx.lineWidth = 2 * SS;
-    ctx.strokeRect(6 * SS, 15 * SS, boxW, 34 * SS); // the level badge box
-    ctx.fillStyle = tone;
+    ctx.stroke();
+    ctx.fillStyle = mtone; // --muted-foreground, matching the pill's code text (not cyan)
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
     ctx.fillText(level, 6 * SS + boxW / 2, (15 + 17 + 1) * SS); // level centred in the box
     ctx.font = `400 ${26 * SS}px system-ui, -apple-system, sans-serif`;
     ctx.textAlign = "left";
+    ctx.fillStyle = tone; // the floor NAME stays the accent (not a pill — the floor's own label)
     ctx.fillText(text, 6 * SS + boxW + 12 * SS, c.height / 2 + 2 * SS);
     const tex = new THREE.CanvasTexture(c);
     tex.minFilter = THREE.LinearFilter;
@@ -474,7 +507,15 @@ export class LedgerView {
   // (the overview planes cover most of the screen, so the cursor is nearly always over one — a
   // hover that dimmed the rest read as "filtering dims the layers", user bug). null id restores
   // every plane to rest. Every plane owns its materials (see _buildFloors).
+  // Instant spotlight off — the Engine calls this on non-ledger frames: update() stops ticking when
+  // the view hides, so without it a lit layer spot would linger into the next view.
+  spotOff(): void {
+    this._spot.blackout();
+  }
+
   setHighlight(id: string | null, dimOthers = false): void {
+    // A COMMITTED layer (dimOthers) also stages the focus spotlight over that floor (see update()).
+    this._spotLayerId = dimOthers && id ? id : null;
     for (const [k, m] of this._floorMats) {
       const on = id === k;
       const off = id != null && dimOthers;
@@ -677,12 +718,28 @@ export class LedgerView {
 
   update(dt: number) {
     this.t += dt;
+    // Layer focus SPOTLIGHT: stage a white key above the committed floor's LEAD area (x≈0, its
+    // lane centre) so the tilted layer zoom catches a light wash on the chips/tiles there (user).
+    // Positions are group-LOCAL (the whole chamber is rotated/scaled) — resolve to world each frame.
+    const spotGeom = this._spotLayerId ? LAYER_GEOM.find((l) => l.id === this._spotLayerId) : undefined;
+    this._spot.update(dt, spotGeom != null && this.group.visible);
+    if (spotGeom) {
+      this._spotPos.set(0, spotGeom.y, spotGeom.laneZ);
+      this.group.localToWorld(this._spotPos);
+      this._spotN.set(0, 1, 0).applyQuaternion(this.group.quaternion); // the floors' world up
+      this._spot.aim(this._spotPos, this._spotN, 14);
+    }
     if (!this._latest) return;
 
     const k = Math.min(1, dt * 3); // shared ease factor for the trail + lanes this frame
     const selectedSlot = this.model.selectedSlot;
     // A single-metagraph filter strongly dims every OTHER lane's tiles/links/dials.
-    const mf = this._filter !== "all" && this._filter !== "dag" ? this._filter : null;
+    // Lane/dial dimming: a metagraph filter dims the OTHER lanes; a DAG filter dims ALL metagraph
+    // lanes (no lane id equals "dag"), leaving the DAG's own clusters + global block bright — so
+    // filtering DAG focuses the hypergraph-L0 stack (user). The metagraph NODES already dim via
+    // globe.setFilter's _applyDim. (The pulse-emission gate at setData keeps mf excluding "dag" so
+    // metagraph→global anchor pulses still stream INTO the focused DAG L0.)
+    const mf = this._filter !== "all" ? this._filter : null;
 
     // The centre block (LIVE snapshot) pulses subtly + flashes as pulses arrive — dimmed (brightness
     // only, colour stays) while an OLDER snapshot is selected so the selected row reads brightest.
@@ -710,7 +767,7 @@ export class LedgerView {
       mat.color.copy(this._coreCol);
       mat.emissive.copy(this._coreCol);
       mat.emissiveIntensity = sel ? 0.9 : 0.34;
-      const target = sel ? 0.95 : 0.75 * slotFade(t.slot);
+      const target = sel ? 0.95 : 0.88 * slotFade(t.slot); // trail blocks kept near-solid (user)
       mat.opacity += (target - mat.opacity) * k;
     }
 
@@ -742,7 +799,7 @@ export class LedgerView {
           // blooms; the rest fade by recency (slotFade). A filtered-out lane is strongly dimmed.
           const hot = this.model.isRowHot(laneOff, b.slot);
           const bright =
-            (hot ? Math.max(b.fade, 0.9) * (b.filled ? 1.3 : 0.2) : b.fade * (b.filled ? 0.55 : 0.12)) *
+            (hot ? Math.max(b.fade, 0.9) * (b.filled ? 1.3 : 0.2) : b.fade * (b.filled ? 0.7 : 0.12)) *
             (laneOff ? 0.22 : 1);
           this._metaTrailMesh.setColorAt(mi, _col.copy(laneColor).multiplyScalar(bright));
           mi++;

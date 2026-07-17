@@ -3,6 +3,7 @@ import * as THREE from "three";
 import {
   GOLDEN_ANGLE, lerp, smooth, discFall, fibShellPos, spreadCoLocated,
   stackSizes, STACK_MIN, STACK_MAX,
+  armillaryFrame, ringFramePos, armillaryRings, armillaryPos,
 } from "./nodeLayout";
 
 describe("lerp / smooth / GOLDEN_ANGLE", () => {
@@ -208,5 +209,50 @@ describe("spreadCoLocated levels (chip stacks)", () => {
     const levels: number[] = [];
     spreadCoLocated(dirs, undefined, levels);
     expect(levels).toEqual([0]);
+  });
+});
+
+describe("hypergraph armillary rings (redesign v2)", () => {
+  it("armillaryFrame gives an orthonormal in-plane basis; k=0/tilt=0 is the horizontal ring", () => {
+    const f = armillaryFrame(0, 3, 0);
+    expect(f.t.length()).toBeCloseTo(1, 10);
+    expect(f.b.length()).toBeCloseTo(1, 10);
+    expect(f.t.dot(f.b)).toBeCloseTo(0, 10);
+    expect(f.t.x).toBeCloseTo(1, 10); // t = (1,0,0)
+    expect(f.b.z).toBeCloseTo(1, 10); // b = (0,0,1)
+    expect(f.b.y).toBeCloseTo(0, 10);
+  });
+
+  it("ringFramePos puts every node exactly on the ring of radius r, in the frame's plane", () => {
+    const f = armillaryFrame(1, 3, 1.15); // a tilted ring
+    const n = 5, r = 3.6;
+    const normal = f.t.clone().cross(f.b).normalize();
+    for (let i = 0; i < n; i++) {
+      const p = ringFramePos(i, n, r, f);
+      expect(p.length()).toBeCloseTo(r, 10);    // same diameter
+      expect(p.dot(normal)).toBeCloseTo(0, 10); // lies in the ring plane
+    }
+  });
+
+  it("armillaryRings scales with count and clamps to [min, max]", () => {
+    expect(armillaryRings(1)).toBe(2);                    // min
+    expect(armillaryRings(150)).toBe(7);                  // max
+    expect(armillaryRings(6, 10, 1, 3)).toBe(1);          // 6/10 -> 1, min 1
+    expect(armillaryRings(88)).toBeGreaterThan(2);        // scales up
+  });
+
+  it("armillaryPos keeps every node on a SAME-diameter ring across distinct tilted planes", () => {
+    const n = 150, r = 9, rings = 6, tilt = 1.15;
+    for (let i = 0; i < n; i++) {
+      expect(armillaryPos(i, n, r, rings, tilt).length()).toBeCloseTo(r, 6); // one diameter
+    }
+    // the `rings` frames are genuinely distinct planes (distinct normals)
+    const normals = new Set<string>();
+    for (let k = 0; k < rings; k++) {
+      const f = armillaryFrame(k, rings, tilt);
+      const nrm = f.t.clone().cross(f.b).normalize();
+      normals.add(`${nrm.x.toFixed(3)},${nrm.y.toFixed(3)},${nrm.z.toFixed(3)}`);
+    }
+    expect(normals.size).toBe(rings);
   });
 });

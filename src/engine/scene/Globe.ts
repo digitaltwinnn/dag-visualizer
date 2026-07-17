@@ -15,16 +15,17 @@
 
 import * as THREE from "three";
 import { METAGRAPHS, DEFAULT_META_COLOR } from "../config";
-import { metaAnchor } from "../domain/hyperLayout";
+import { metaAnchor, META_LAYERS, META_RING, DAG_L0, DAG_L1, HYPER_TILT } from "../domain/hyperLayout";
 import { LEDGER, ledgerSite, ledgerSpread, clusterRadius } from "../domain/ledgerLayout";
 import type { SceneColors } from "../sceneColors";
 import * as geoStats from "../domain/geoStats";
 import { R, LAND_H, CHIP_PITCH, HEX_H, VALIDATOR_HEX_R, META_HEX_R, latLonToVec3, vec3ToLatLon } from "../domain/geoLayout";
-import { GOLDEN_ANGLE, fibShellPos, nodeRoles, spreadCoLocated } from "../domain/nodeLayout";
+import { armillaryFrame, ringFramePos, armillaryRings, armillaryPos, nodeRoles, spreadCoLocated } from "../domain/nodeLayout";
 import { surfFade, extrasFade } from "../domain/morph";
 import { ArcSim, type ArcEndpoint } from "../domain/arcSim";
 import type { MetaNodeRecord, ValidatorRecord } from "../domain/records";
-import { buildGeoView, setCountryBorder, setCountryFillMask, type GeoViewHost } from "./views/GeoView";
+import { buildGeoView, setCountryBorder, setCountryFillMask, HOVER_MASK_BOOST, type GeoViewHost } from "./views/GeoView";
+import { FocusSpot } from "./objects/FocusSpot";
 import { ccToNumeric, countryCcAt, countryLean, geometryRings, mainPolygonRings, ringsAngularRadius, ringsCentroid, type Ring } from "../domain/countryShape";
 import { closeness, NODE_RAISE } from "../domain/cameraRig";
 import { NodeFabric, type FrameCtx } from "./objects/NodeFabric";
@@ -95,6 +96,10 @@ export class Globe implements GeoViewHost {
   pickables: THREE.Object3D[] = [];
   nodes: ValidatorRecord[] = [];
   geoFades: GeoViewHost["geoFades"] = []; // { mat, base } surface materials faded by morph
+  private _densityGlow: THREE.Mesh[] = []; // additive light pools under dense node clusters (geo)
+  private _glowTex?: THREE.Texture; // shared radial-gradient sprite for the light pools
+  private _glowDim = 1; // eased 1→~0.2 while a country is drilled, so its highlight isn't overruled
+  private _glowAllDim = 1; // eased ~0.62 in "all" (overlapping per-network planes stack additively)
   morph = 0;
   private ledgerT = 0; // 0->1 ease as the reused node meshes fly from their source view into the lanes
   clock = 0;
@@ -128,6 +133,14 @@ export class Globe implements GeoViewHost {
   private _hoverCohort: Set<string> | null = null; // cohort-row hover — the whole stack glows
   private _selectedNodeId: string | null = null;
   private _hoverCountryCc: string | null = null; // explorer row hover — border preview only
+  // The geo focus SPOTLIGHT (scene/objects/FocusSpot): staged above the SELECTED node's chip stack
+  // so the zoomed-in node pick catches a stage-light wash (user; hyper/ledger have their own).
+  // `_selNodeRec` caches the selected node's geoPrimary record — re-resolved by setSelectedNode,
+  // which the rebuilds (setNodes/setMetagraphs) re-run so the cache never dangles.
+  private _spot: FocusSpot;
+  private _selNodeRec: ValidatorRecord | MetaNodeRecord | null = null;
+  private _spotPos = new THREE.Vector3();
+  private _spotN = new THREE.Vector3();
 
   // Identity SCENE-hue map (id -> 0xRRGGBB), set by the Engine each refreshMeta before setMetagraphs.
   sceneColors?: Record<string, number>;
@@ -160,6 +173,8 @@ export class Globe implements GeoViewHost {
   constructor(scene: THREE.Scene, layers: HyperView | null, camera: THREE.Camera | null, colors: SceneColors) {
     this.group = new THREE.Group();
     scene.add(this.group);
+    // Node-pick stage light: tight cone over one chip stack (radius ≈ 6·tan(0.36) ≈ 2.3).
+    this._spot = new FocusSpot(scene, { angle: 0.36, distance: 22, intensity: 1.5 });
     this.layers = layers; // for gluing metagraph nodes to their orbiting hubs
     this.camera = camera; // for the view-dependent disc falloff at the limb
     this.geoColor = colors.core;   // the geo hologram = the accent (calm via opacity); wall + grid + graticule
@@ -178,7 +193,7 @@ export class Globe implements GeoViewHost {
         morph: 0, hoverFilterActive: false, ledger: false, countryFilter: null,
         countryMix: 0, hoverNodeId: null, hoverCohort: null, selectedNodeId: null, filter: "all",
       },
-      dim: 0, dimScaleV: 0, clock: 0, camN: this._camN, hasCam: false,
+      dim: 0, dimScaleV: 0, dimScaleMetaV: 0, clock: 0, camN: this._camN, hasCam: false,
       ledgerT: 0, dt: 0, flashDecay: 0, group: this.group,
     };
 
@@ -194,6 +209,21 @@ export class Globe implements GeoViewHost {
   setSimFlags(sims: { arcs: boolean; globeSpin: boolean }): void {
     this.simArcs = sims.arcs;
     this.simSpin = sims.globeSpin;
+    // Spin OFF (hyper): the redesigned TILTED node rings register with the Hypergraph's cyan hoops.
+    // Tilt the whole node group by HYPER_TILT so the near-flat ring layout reads top-down from the
+    // SHARED overview camera (HyperView tilts root + coreGroup by the same angle, so nodes + hoops
+    // stay registered). A leftover geo rotation would otherwise offset them.
+    if (!this.simSpin && !this.ledger) {
+      this.spin = null;
+      this.group.rotation.set(HYPER_TILT, 0, 0);
+    }
+  }
+
+  // Set the hyper-structure spin: the node group is tilted by HYPER_TILT and spun about its own
+  // vertical axis by `y` (Euler XYZ → tilt applied AFTER the Y-spin). Driven by the Engine with the
+  // SAME angle it gives HyperView, so nodes and hoops rotate in lockstep. Only meaningful in hyper.
+  setHyperSpin(y: number): void {
+    if (!this.simSpin && !this.ledger) this.group.rotation.set(HYPER_TILT, y, 0);
   }
 
   // The wall is always the structural accent (the geo hologram hue). Kept as a setter so the Engine
@@ -218,17 +248,21 @@ export class Globe implements GeoViewHost {
     const seen = new Set<string>();
     let idx = 0;
     const net = (dagCore && dagCore.name) || "DAG";
-    const place = (list: RouteNode[], role: "l0" | "cl1", kind: "l0" | "l1", color: number, rad: number, flatten: number) => {
+    const place = (list: RouteNode[], role: "l0" | "cl1", kind: "l0" | "l1", color: number, ring: { radius: number; numRings: number; tilt: number }) => {
       const n = list.length;
       list.forEach((node, i) => {
-        const ready = node.state === "Ready";
+        const ready = node.state === "Ready"; // kept for the record (arc endpoints + card status pill)
         // The first instance of a machine is its geo "primary" (the one dot on the globe).
         const primary = node.id == null || !seen.has(node.id);
         if (node.id != null) seen.add(node.id);
         const col = new THREE.Color(color);
-        if (!ready) col.lerp(NODE_DIM, 0.55);
+        // NB: node colour is NOT dimmed by ready state — status lives in the card/explorer, never in
+        // the 3D scene (matches the uniform-size rule); off-ready nodes render at full identity colour.
 
-        const hyperPos = fibShellPos(i, n, rad, flatten);
+        const hyperPos = armillaryPos(i, n, ring.radius, ring.numRings, ring.tilt);
+        // The node's ring normal — nodes orbit ALONG their shell around this axis (see update()).
+        const _rf = armillaryFrame(i % ring.numRings, ring.numRings, ring.tilt);
+        const ringAxis = _rf.t.clone().cross(_rf.b).normalize();
         const g = geoMap[node.ip];
         const geoDir = g ? latLonToVec3(g.lat!, g.lon!, 1).normalize() : null;
 
@@ -253,7 +287,7 @@ export class Globe implements GeoViewHost {
         const u: ValidatorRecord = {
           index: idx, layer: role, roles: node.roles || [role], nodeId: node.id, geoPrimary: primary, ready, base: col.clone(),
           ledgerPos, ledgerHide: role !== "cl1" && role !== "l0",
-          hyperPos, hyperDir: hyperPos.clone().normalize(), hyperRadius: hyperPos.length(),
+          hyperPos, hyperDir: hyperPos.clone().normalize(), hyperRadius: hyperPos.length(), ringAxis,
           geoDir, trueDir: geoDir ? geoDir.clone() : null, geoRadius: HEX_BASE_R, noGeo: !g,
           // UNIFORM node size regardless of ready state (user: never size by status; status lives
           // in the explorer pill + node card). geoSize = hex prism CIRCUMRADIUS (world).
@@ -270,14 +304,28 @@ export class Globe implements GeoViewHost {
     // The DAG's own validator shells are coloured with the DAG's identity SCENE hue (sceneColors.dag),
     // falling back to the old structural colours if not populated yet.
     const dagColor = (this.sceneColors && this.sceneColors.dag) ?? this._dagCore;
-    place(l0List, "l0", "l0", dagColor, 8, 1.0);
-    place(cl1List, "cl1", "l1", dagColor, 14, 0.78);
+    // DAG core: L0 is an armillary ball (same-diameter rings at different tilts); the native $DAG
+    // currency (L1 / cl1) is its OWN clearly-separated OUTER shell (bigger radius). The ring COUNT
+    // per shell scales with the node count and is shared with HyperView's tilted cyan hoops.
+    // Few rings (user: 2–3, not many): ~60 nodes per L0 ring capped at 3; L1 keeps 1–2.
+    const l0Rings = armillaryRings(l0List.length, 60, 2, 3);
+    const l1Rings = armillaryRings(cl1List.length, 12, 1, 2);
+    place(l0List, "l0", "l0", dagColor, { radius: DAG_L0.radius, numRings: l0Rings, tilt: DAG_L0.tilt });
+    place(cl1List, "cl1", "l1", dagColor, { radius: DAG_L1.radius, numRings: l1Rings, tilt: DAG_L1.tilt });
+    // Hand the DAG core's ring shells to HyperView so it draws a tilted cyan hoop per ring.
+    this.layers?.buildCoreRings(
+      cl1List.length
+        ? [{ radius: DAG_L0.radius, numRings: l0Rings, tilt: DAG_L0.tilt, code: "L0" }, { radius: DAG_L1.radius, numRings: l1Rings, tilt: DAG_L1.tilt, code: "L1" }]
+        : [{ radius: DAG_L0.radius, numRings: l0Rings, tilt: DAG_L0.tilt, code: "L0" }],
+    );
 
     this.fabric.buildValidators(this.nodes);
     this.pickables = this.fabric.pickables;
+    this.setSelectedNode(this._selectedNodeId); // re-resolve the spotlight's record on fresh data
 
     // Fan out the filter-active nodes and (re)build the density rings + arcs.
     this._relayoutGeo();
+    this._buildDensityGlow(); // light pools follow the validator sites too
     this.setMorph(this.morph); // place at current morph
   }
 
@@ -303,26 +351,34 @@ export class Globe implements GeoViewHost {
     const recs: MetaNodeRecord[] = [];
     // Each metagraph runs its own L0 + currency-L1 (cl1) + data-L1 (dl1). Concentric fibonacci
     // shells around the hub — L0 inner, data-L1 middle, currency-L1 outer.
-    const SHELL: Record<"l0" | "dl1" | "cl1", number> = { l0: 2.0, dl1: 3.4, cl1: 4.6 };
+    // Each metagraph runs its own L0 + currency-L1 (cl1) + data-L1 (dl1). Redesign: concentric flat
+    // RINGS in the hub's plane — L0 inner, data-L1 middle, currency-L1 outer — read top-down as clean
+    // orbital diagrams (was scattered fibonacci shells). One even ring per layer; a small per-layer
+    // phase so the layers' node seams don't align radially.
+    // Each metagraph is a little "atom": its 3 layers become 3 rings of the SAME diameter at 3
+    // DIFFERENT tilt angles (layer index = ring index; same primitive as the DAG core), so L0 / dL1 /
+    // cL1 read as distinct tilted rings around a cyan hub. HyperView draws a matching tilted hoop.
     const rolesOf = (node: RouteNode) => nodeRoles(node, node.layer as string);
-    const shellLayers: ("l0" | "dl1" | "cl1")[] = ["l0", "dl1", "cl1"];
+    // Which layers each metagraph actually PLOTS a node in — HyperView hides the hoop for an absent
+    // layer (a data-only metagraph like DED has no cL1, so its outer ring must not draw empty).
+    const hoopPresent = new Map<string, boolean[]>();
     for (const m of withNodes) {
       const a = m._anchor;
       const hubGroup = this.layers?.metas?.find((x) => x.cfg.id === m.id)?.group || null;
       const located = m.nodes.filter((node) => geoMap[node.ip]);
       const seen = new Set<string>();
-      for (const layer of shellLayers) {
+      const present: boolean[] = [];
+      META_LAYERS.forEach((layer, li) => {
         const nodeList = located.filter((node) => rolesOf(node).includes(layer));
         const cnt = nodeList.length;
-        const rad = SHELL[layer];
+        present[li] = cnt > 0;
+        const frame = armillaryFrame(li, META_LAYERS.length, META_RING.tilt);
+        const ringAxis = frame.t.clone().cross(frame.b).normalize(); // nodes orbit along this shell
         nodeList.forEach((node, i) => {
           const g = geoMap[node.ip]!;
           const primary = !seen.has(node.ip);
           seen.add(node.ip);
-          const y = 1 - (i / Math.max(1, cnt - 1)) * 2;
-          const rr = Math.sqrt(Math.max(0, 1 - y * y));
-          const phi = i * GOLDEN_ANGLE;
-          const offset = new THREE.Vector3(Math.cos(phi) * rr * rad, y * rad, Math.sin(phi) * rr * rad);
+          const offset = ringFramePos(i, cnt, META_RING.radii[layer], frame);
           const dir = latLonToVec3(g.lat!, g.lon!, 1).normalize(); // real location; fanned out below
           const lsite = ledgerSite(m._ledgerCol, METAGRAPHS.length);
           const lrowY = layer === "l0" ? LEDGER.rowML0 : LEDGER.rowML1;
@@ -336,7 +392,7 @@ export class Globe implements GeoViewHost {
           } as unknown as PickDescriptor;
           recs.push({
             metaId: m.id, layer, color: new THREE.Color(m.color), index: 0,
-            hubGroup, offset, ledgerPos, geoPrimary: primary, nodeId: node.ip,
+            hubGroup, offset, ledgerPos, geoPrimary: primary, nodeId: node.ip, ringAxis,
             hyperPos: new THREE.Vector3(a.x, a.y, a.z).add(offset),
             geoPos: new THREE.Vector3(),
             geoDir: dir, trueDir: dir.clone(),
@@ -347,8 +403,10 @@ export class Globe implements GeoViewHost {
             pick,
           });
         });
-      }
+      });
+      hoopPresent.set(m.id, present);
     }
+    this.layers?.setHoopPresence(hoopPresent);
     if (!recs.length) return;
 
     this.fabric.buildMetaNodes(recs);
@@ -359,6 +417,66 @@ export class Globe implements GeoViewHost {
     const drill = this.countryFilter;
     this.setFilter(this.filter);
     if (drill) this.setCountry(drill);
+    this.setSelectedNode(this._selectedNodeId); // re-resolve the spotlight's record on fresh data
+    this._buildDensityGlow();
+  }
+
+  // A soft additive "light pool" under each dense node cluster on the globe — LIGHTING driven by the
+  // real data (more nodes at a site → a bigger, brighter pool), so Germany / the US / Finland glow.
+  // Fades with the morph (geoFades) so it's a geo-only effect. Rebuilt whenever node data changes.
+  private _buildDensityGlow(): void {
+    for (const m of this._densityGlow) {
+      this.group.remove(m);
+      m.geometry.dispose(); // each pool owns its PlaneGeometry (leaked before, ~2×/25s poll)
+      (m.material as THREE.Material).dispose(); // the map is the shared _glowTex — kept alive
+    }
+    this._densityGlow = [];
+    if (!this._glowTex) this._glowTex = makeGlowTexture();
+
+    // Build a pool per site×network ALWAYS (all nodes, each tagged with its network + identity hue);
+    // the committed filter just SHOWS/HIDES pools (setFilter → _applyGlowFilter), no recluster needed.
+    const dagHex = this.sceneColors?.dag ?? this.geoColor;
+    const metaHex = (id: string) => this.sceneColors?.[id] ?? this.geoColor;
+
+    // Cluster the primary nodes by rounded direction AND network (~one pool per site×network).
+    const clusters = new Map<string, { dir: THREE.Vector3; n: number; color: number; net: string }>();
+    const add = (dir: THREE.Vector3 | null, color: number, net: string) => {
+      if (!dir) return;
+      const key = `${Math.round(dir.x * 30)},${Math.round(dir.y * 30)},${Math.round(dir.z * 30)}|${net}`;
+      const c = clusters.get(key);
+      if (c) { c.dir.add(dir); c.n++; } else clusters.set(key, { dir: dir.clone(), n: 1, color, net });
+    };
+    for (const u of this.nodes) if (!u.noGeo && u.geoPrimary && u.trueDir) add(u.trueDir, dagHex, "dag");
+    for (const r of this.metaNodes) if ((r.geoPrimary ?? true) && r.trueDir) add(r.trueDir, metaHex(r.metaId), r.metaId);
+
+    for (const c of clusters.values()) {
+      const dir = c.dir.normalize();
+      const size = Math.min(9, 2.2 + Math.sqrt(c.n) * 0.9); // pool grows with node count, capped
+      const mat = new THREE.MeshBasicMaterial({
+        map: this._glowTex, color: new THREE.Color(c.color),
+        transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, opacity: 0,
+      });
+      const mesh = new THREE.Mesh(new THREE.PlaneGeometry(size, size), mat);
+      mesh.position.copy(dir).multiplyScalar(R + LAND_H + 0.06); // just above the plateau
+      // Tangent to the sphere in GROUP-LOCAL space (plane +Z → surface normal `dir`), so it stays
+      // seated as the globe spins — lookAt (world space) would bake in the current spin.
+      mesh.quaternion.setFromUnitVectors(_PLANE_N, dir);
+      mesh.renderOrder = 0; // over the land fill (-1), under the standing chips
+      // Resting strength — brighter where denser, but capped LOW so the "all" view (huge per-site
+      // counts) doesn't overpower; a metagraph selection's lower counts sit naturally below the cap.
+      // Opacity is driven per-frame in setMorph (morph fade × the country-drill recede), NOT geoFades.
+      mesh.userData.glowBase = Math.min(0.28, 0.1 + c.n * 0.024);
+      mesh.userData.net = c.net; // which network this pool belongs to (for the filter toggle)
+      this.group.add(mesh);
+      this._densityGlow.push(mesh);
+    }
+    this._applyGlowFilter();
+  }
+
+  // Show only the pools of the committed network ("all" shows every pool) — a cheap visibility
+  // toggle, so a filter change never re-clusters the light pools (just drops the other planes).
+  private _applyGlowFilter(): void {
+    for (const m of this._densityGlow) m.visible = this.filter === "all" || m.userData.net === this.filter;
   }
 
   // Isolate one network on the globe and dim the rest.
@@ -369,6 +487,7 @@ export class Globe implements GeoViewHost {
     this._updateCountryBorder();
     this._applyDim(sel);
     this._relayoutGeo();
+    this._applyGlowFilter(); // just show/hide the matching pools — no recluster
   }
 
   // Transient PREVIEW dim (filter-chip / hub hover): same dim TARGETS as setFilter, but does
@@ -438,10 +557,14 @@ export class Globe implements GeoViewHost {
     const drillRings = drillCc ? this.countryRings(drillCc) : null;
     setCountryBorder(this, "drill", drillRings, drillCc ? 1.0 : 0);
     const hoverCc = this._hoverCountryCc && this._hoverCountryCc !== drillCc ? this._hoverCountryCc : null;
-    setCountryBorder(this, "hover", hoverCc ? this.countryRings(hoverCc) : null, hoverCc ? 0.3 : 0);
-    // The drilled country's INTERIOR firms up via the fill-mask shader (scoped — the old
-    // whole-globe 0.45→0.62 base bump is gone; the rest of the world keeps the calm glass).
-    setCountryFillMask(this, drillRings);
+    const hoverRings = hoverCc ? this.countryRings(hoverCc) : null;
+    setCountryBorder(this, "hover", hoverRings, hoverCc ? 0.3 : 0);
+    // The country's INTERIOR firms up via the fill-mask shader (scoped — the old whole-globe base
+    // bump is gone). The committed drill fills at full strength; a HOVER preview fills at a lower
+    // boost so it reads as a preview and selecting still firms it further (user). One mask uniform,
+    // so the drill wins when both are present.
+    if (drillRings) setCountryFillMask(this, drillRings);
+    else setCountryFillMask(this, hoverRings, HOVER_MASK_BOOST);
   }
 
   // Resolve a globe-surface WORLD point to the country under it — only countries that
@@ -490,6 +613,13 @@ export class Globe implements GeoViewHost {
   // The persistently selected node (a clicked node card) — glows every layer shell it runs.
   setSelectedNode(id: string | null): void {
     this._selectedNodeId = id || null;
+    // Resolve the geoPrimary record once per selection change (not per frame) for the spotlight.
+    // setNodes/setMetagraphs re-run this so a rebuild can't leave the cache dangling.
+    this._selNodeRec = !id
+      ? null
+      : this.nodes.find((n) => n.nodeId === id && n.geoPrimary) ??
+        this.metaNodes.find((n) => n.nodeId === id && n.geoPrimary) ??
+        null;
   }
 
   // World position of a node's HYPERGRAPH point by its id — read from its live instance transform.
@@ -636,11 +766,19 @@ export class Globe implements GeoViewHost {
     this.group.worldToLocal(this._camN).normalize();
   }
 
-  // How strong the network dim is, ramped by the morph. (The hover-preview forced-strong
-  // 0.85 branch is gone — user: the hub hover/click dim in hyper was far harder than the
-  // regular dim; previews now dim at the committed strength.)
+  // How strong the VALIDATOR network dim is, ramped by the morph. (The hover-preview
+  // forced-strong 0.85 branch is gone — user: the hub hover/click dim in hyper was far harder
+  // than the regular dim; previews now dim at the committed strength.)
   private _dimScale(): number {
     return 0.32 + 0.68 * this.morph;
+  }
+
+  // The METAGRAPH pool's own dim strength — ZERO in hyper (metagraph nodes REST at the dimmed
+  // look there, baked into writeMetaFrame's base size/glow; hover previews and committed
+  // filters leave them at rest), full on the globe. Mirrors domain/dimModel.metaDimScale —
+  // change BOTH (the tested reference spec, see dimModel's file header).
+  private _metaDimScale(): number {
+    return this.morph;
   }
 
   // Write this frame's values into the persistent FrameCtx (`this._ctx`, built once in the
@@ -665,6 +803,7 @@ export class Globe implements GeoViewHost {
     c.filter = this.filter;
     ctx.dim = this.dim;
     ctx.dimScaleV = this._dimScale();
+    ctx.dimScaleMetaV = this._metaDimScale();
     ctx.clock = this.clock;
     ctx.hasCam = this._hasCam;
     ctx.ledgerT = this.ledgerT;
@@ -696,6 +835,11 @@ export class Globe implements GeoViewHost {
     const surf = this.ledger ? 0 : surfFade(m);
     const extras = this.ledger ? 0 : extrasFade(m);
     for (const f of this.geoFades) f.mat.opacity = f.base * surf;
+    // Density light pools: morph fade × the country-drill recede (so a drilled country's own
+    // highlight isn't washed out by the pools).
+    for (const g of this._densityGlow) {
+      (g.material as THREE.MeshBasicMaterial).opacity = (g.userData.glowBase as number) * surf * this._glowDim * this._glowAllDim;
+    }
     // Depth cueing for the see-through hologram: the graticule + coastal walls dim their far
     // hemisphere through the shared facing uniform (camera dir in this group's local frame),
     // and each polar compass rose fades by its own pole's facing on top of the morph fade —
@@ -720,6 +864,27 @@ export class Globe implements GeoViewHost {
 
   update(dt: number): void {
     this.clock += dt;
+    // Node-pick SPOTLIGHT (geo only): stage a white key above the selected node's chip stack so the
+    // zoomed-in pick catches a light wash (user; the same FocusSpot pattern as hyper/ledger). The
+    // record's geo position is group-LOCAL — resolve through the globe's spin/lean each frame.
+    const selRec = this._selNodeRec;
+    const spotOn =
+      selRec != null && !this.ledger && this.morph > 0.85 && ("geoPos" in selRec || !selRec.noGeo);
+    this._spot.update(dt, spotOn);
+    if (spotOn) {
+      const rec = selRec!;
+      if ("geoPos" in rec) this._spotPos.copy(rec.geoPos); // metagraph node (fanned stack position)
+      else this._spotPos.copy(rec.geoDir!).multiplyScalar(rec.geoRadius); // validator
+      this._spotN.copy(this._spotPos).normalize(); // surface normal ≈ radial
+      this.group.localToWorld(this._spotPos);
+      this._spotN.transformDirection(this.group.matrixWorld);
+      this._spot.aim(this._spotPos, this._spotN, 6);
+    }
+    // Recede the density light pools while a country is drilled (so its highlight leads), eased.
+    this._glowDim += ((this.countryFilter ? 0.2 : 1) - this._glowDim) * Math.min(1, dt * 3);
+    // In "all" the per-network pools OVERLAP and stack additively — damp them so multi-network sites
+    // don't blow out (a single-network filter has no overlap, so it stays full), eased on switch.
+    this._glowAllDim += ((this.filter === "all" ? 0.62 : 1) - this._glowAllDim) * Math.min(1, dt * 3);
     // Ease the wall colour (held at the default cyan).
     if (this.landWallUniforms) {
       this._edgeColor.lerp(this._edgeTarget, Math.min(1, dt * 3));
@@ -758,10 +923,40 @@ export class Globe implements GeoViewHost {
       this.dim += (this.dimTarget - this.dim) * k;
     }
     const ctx = this._frameCtx(dt, flashDecay);
+    // Hypergraph "atom" life: each node ORBITS along its own shell — spin its position around the
+    // ring normal (the hoop is a full circle, so nodes stay registered on it). Hyper only. This is
+    // the per-node motion; the whole structure keeps its slow drift (Engine setHyperSpin).
+    if (!this.ledger && this.morph < 0.5) {
+      // Uniform ANGULAR speed for every ring (user) — all nodes advance the same angle per frame.
+      // The DAG core rings are much larger, so the same angular rate sweeps a long arc and reads
+      // too fast — give the core (validators) a slower angular rate than the metagraph rings (user).
+      const coreAng = dt * 0.09;
+      const metaAng = dt * 0.12;
+      for (const r of this.nodes) { r.hyperPos.applyAxisAngle(r.ringAxis, coreAng); r.hyperDir.applyAxisAngle(r.ringAxis, coreAng); }
+      for (const r of this.metaNodes) r.offset.applyAxisAngle(r.ringAxis, metaAng);
+    }
     if (this.fabric.hasValidators) this.fabric.writeValidatorGlow(this.nodes, ctx);
     this.fabric.writeMetaFrame(this.metaNodes, ctx);
   }
 }
 
-// Off-ready validator tint — mirrors js/globe.js's module-level DIM.
-const NODE_DIM = new THREE.Color(0x223046);
+
+const _PLANE_N = new THREE.Vector3(0, 0, 1); // PlaneGeometry's default facing (for orienting glow pools)
+
+// A soft radial-gradient sprite (white centre → transparent edge) for the geo density light pools.
+// White so the per-mesh `color` tints it; additive blending turns overlaps into brighter light.
+function makeGlowTexture(): THREE.Texture {
+  const s = 128;
+  const c = document.createElement("canvas");
+  c.width = c.height = s;
+  const ctx = c.getContext("2d")!;
+  const g = ctx.createRadialGradient(s / 2, s / 2, 0, s / 2, s / 2, s / 2);
+  g.addColorStop(0, "rgba(255,255,255,1.0)");
+  g.addColorStop(0.32, "rgba(255,255,255,0.5)");
+  g.addColorStop(1, "rgba(255,255,255,0)");
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, s, s);
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  return tex;
+}
