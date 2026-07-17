@@ -195,6 +195,8 @@ export class Globe implements GeoViewHost {
       },
       dim: 0, dimScaleV: 0, dimScaleMetaV: 0, clock: 0, camN: this._camN, hasCam: false,
       ledgerT: 0, dt: 0, flashDecay: 0, group: this.group,
+      transition: null,
+      gather: { origin: new THREE.Vector3(), right: new THREE.Vector3(), up: new THREE.Vector3(), cell: 0.55 },
     };
 
     // The geo globe surface (body, graticule, atmosphere, continents) — it sets the surface handles
@@ -296,6 +298,7 @@ export class Globe implements GeoViewHost {
           spinAxis: new THREE.Vector3(Math.random() * 2 - 1, Math.random() * 2 - 1, Math.random() * 2 - 1).normalize(),
           spinSpeed: 0.3 + Math.random() * 0.5, spinPhase: Math.random() * 6.2831,
           pick,
+          gU: 0, gV: 0, gRank: 0, gCount: 0,
         };
         this.nodes.push(u);
         idx++;
@@ -401,6 +404,7 @@ export class Globe implements GeoViewHost {
             spinSpeed: 0.3 + Math.random() * 0.5, spinPhase: Math.random() * 6.2831,
             dim: 0, dimTarget: 0,
             pick,
+            gU: 0, gV: 0, gRank: 0, gCount: 0,
           });
         });
       });

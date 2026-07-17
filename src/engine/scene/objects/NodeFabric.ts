@@ -18,6 +18,7 @@ import { HEX_H } from "../../domain/geoLayout";
 import { discFall, lerp, smooth } from "../../domain/nodeLayout";
 import type { DimContext } from "../../domain/dimModel";
 import type { MetaNodeRecord, ValidatorRecord } from "../../domain/records";
+import type { ViewTransition } from "../../domain/viewTransition";
 import type { PickDescriptor } from "@/src/data/types";
 
 const Y_AXIS = new THREE.Vector3(0, 1, 0); // hex-prism axis (radial after _qRadial)
@@ -36,10 +37,12 @@ const HEX_ALPHA = 0.92;
 // inert in hyper now, see dimScaleMetaV). Eases back to full size over the morph, so the
 // sphere→chip handoff and the hex chips' geo sizing are unchanged.
 const META_REST_SCALE = 0.68;
+const GATHER_SCALE = 0.22; // uniform node size at the staging grid (tidy, equal pixels)
 const DIM = new THREE.Color(0x223046);
 const _dummy = new THREE.Object3D(); // reused to compose per-instance matrices
 const _vec = new THREE.Vector3();
 const _geoVec = new THREE.Vector3(); // scratch for the morph-fly interpolation
+const _gatherV = new THREE.Vector3(); // scratch: a node's world-space staging-grid position
 const _qSpin = new THREE.Quaternion();   // hypergraph tumble
 const _qRadial = new THREE.Quaternion(); // outward-facing (globe) orientation
 const _col = new THREE.Color();          // scratch colour for dim recolouring
@@ -62,6 +65,9 @@ export interface FrameCtx {
   dt: number;           // frame delta (metagraph per-record dim easing)
   flashDecay: number;   // ~0.2s glow tail after an arc hit
   group: THREE.Group;   // the (rotating) globe group — for hub world->local conversion
+  // View-transition inputs (persistent objects; Globe writes them each frame):
+  transition: ViewTransition | null;
+  gather: { origin: THREE.Vector3; right: THREE.Vector3; up: THREE.Vector3; cell: number };
 }
 
 export class NodeFabric {
@@ -280,6 +286,24 @@ export class NodeFabric {
     return arr;
   }
 
+  // Blend the composed pose toward the node's staging-grid slot by its staggered gather
+  // weight (view-transition choreography). Runs on the already-final _dummy pose so it is
+  // the LAST word on position/scale; ctx.gather's vectors are group-LOCAL (Globe converts
+  // the camera-anchored plane once per frame). Uniform GATHER_SCALE reads as tidy grid dots.
+  private _applyGather(ctx: FrameCtx, gU: number, gV: number, rank: number, count: number): void {
+    const tr = ctx.transition;
+    if (!tr || !tr.active()) return;
+    const w = tr.gatherWeight(rank, count);
+    if (w <= 0) return;
+    _gatherV
+      .copy(ctx.gather.origin)
+      .addScaledVector(ctx.gather.right, gU * ctx.gather.cell)
+      .addScaledVector(ctx.gather.up, gV * ctx.gather.cell);
+    _dummy.position.lerp(_gatherV, w);
+    const s = 1 + (GATHER_SCALE / Math.max(1e-6, _dummy.scale.x) - 1) * w;
+    _dummy.scale.multiplyScalar(s);
+  }
+
   // -------------------------------------------------- setMorph loop: validator matrices
   // js/globe.js:850-930's node block. Writes the instSphere/instHex matrices for the current
   // morph (or the ledger lane placement), sets their visibility, and returns the reused pickables.
@@ -309,6 +333,7 @@ export class NodeFabric {
           _dummy.quaternion.identity(); // standing on the floor — cylinder axis is +Y
           const sL = u.hyperSize * LEDGER.dot * showL;
           _dummy.scale.set(sL, HEX_H * showL, sL);
+          this._applyGather(ctx, u.gU, u.gV, u.gRank, u.gCount);
         }
         _dummy.updateMatrix();
         this.instHex.setMatrixAt(u.index, _dummy.matrix);
@@ -338,6 +363,7 @@ export class NodeFabric {
       _qSpin.setFromAxisAngle(u.spinAxis, u.spinPhase + t * u.spinSpeed);
       _dummy.quaternion.copy(_qSpin);
       _dummy.scale.setScalar(u.hyperSize * (1 - w) * (u.noGeo ? 1 - e : 1) * show);
+      this._applyGather(ctx, u.gU, u.gV, u.gRank, u.gCount);
       _dummy.updateMatrix();
       this.instSphere.setMatrixAt(u.index, _dummy.matrix);
 
@@ -349,6 +375,7 @@ export class NodeFabric {
       _dummy.quaternion.copy(_qRadial);
       const gV = u.noGeo ? 0 : w * fall * show;
       _dummy.scale.set(u.geoSize * gV, HEX_H * gV, u.geoSize * gV);
+      this._applyGather(ctx, u.gU, u.gV, u.gRank, u.gCount);
       _dummy.updateMatrix();
       this.instHex.setMatrixAt(u.index, _dummy.matrix);
     }
@@ -498,6 +525,7 @@ export class NodeFabric {
         _dummy.quaternion.identity(); // standing on the floor — cylinder axis is +Y
         const sL = r.hyperSize * LEDGER.dot * (1 - dEff);
         _dummy.scale.set(sL, HEX_H * (1 - dEff), sL);
+        this._applyGather(ctx, r.gU, r.gV, r.gRank, r.gCount);
         _dummy.updateMatrix();
         this.metaHex.setMatrixAt(r.index, _dummy.matrix);
         _dummy.scale.setScalar(0);
@@ -514,6 +542,7 @@ export class NodeFabric {
       _dummy.quaternion.copy(_qSpin);
       const rest = META_REST_SCALE + (1 - META_REST_SCALE) * m;
       _dummy.scale.setScalar(r.hyperSize * rest * (1 - w) * (1 - dEff));
+      this._applyGather(ctx, r.gU, r.gV, r.gRank, r.gCount);
       _dummy.updateMatrix();
       this.metaSphere.setMatrixAt(r.index, _dummy.matrix);
 
@@ -524,6 +553,7 @@ export class NodeFabric {
       _dummy.quaternion.copy(_qRadial);
       const gM = w * fall * (1 - dEff);
       _dummy.scale.set(r.geoSize * gM, HEX_H * gM, r.geoSize * gM);
+      this._applyGather(ctx, r.gU, r.gV, r.gRank, r.gCount);
       _dummy.updateMatrix();
       this.metaHex.setMatrixAt(r.index, _dummy.matrix);
     }
