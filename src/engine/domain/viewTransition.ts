@@ -12,6 +12,11 @@ import { smooth } from "./nodeLayout";
 
 export type View3D = "hyper" | "geo" | "ledger";
 
+// Live-reviewed at 4x/20x/40x-stretched slow motion (Task 8, chrome-devtools MCP screenshots)
+// across all six 3D transition directions: the per-network squares read as tidy distinct
+// blocks (DAG's clearly biggest), the stagger reads as an assembling wave rather than a swarm,
+// nothing overlaps the furniture mid-flight, and the 1.9s total holds up as balanced rather
+// than waited-for. No change from the Task 1-7 values — kept as-is.
 export const DUR_OUT = 0.9; //         teardown + gather, incl. the stagger spread
 export const DUR_IN = 1.0; //          build + placement + camera flight
 export const STAGGER_SPREAD = 0.25; // window over which node flights START (rank-ordered)

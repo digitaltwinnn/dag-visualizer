@@ -51,6 +51,12 @@ import type {
 const HEX_BASE_R = R + LAND_H + 0.02 + HEX_H / 2;
 const hexPitchDeg = (r: number) => ((2 * r * 1.04) / (R + LAND_H)) * (180 / Math.PI);
 
+// View-transition staging grid: the cell pitch (world units) at the DESKTOP reference aspect.
+// The Engine scales this down for narrower (e.g. phone-portrait) viewports — see setGatherCell —
+// so the packed row of per-network squares (domain/gatherLayout) still fits the frustum width;
+// unscaled it overflowed badly at phone aspect (verified live, Task 8).
+export const GATHER_CELL = 0.55;
+
 const _focusMat = new THREE.Matrix4(); // scratch for reading an instance's live transform
 // The ledger's whole-view orientation (tilt ∘ rotY), baked into every node's ledger position so the
 // nodes match the LedgerView group's transform. Scale is applied separately (uniform).
@@ -202,7 +208,7 @@ export class Globe implements GeoViewHost {
       dim: 0, dimScaleV: 0, dimScaleMetaV: 0, clock: 0, camN: this._camN, hasCam: false,
       ledgerT: 0, dt: 0, flashDecay: 0, group: this.group,
       transition: null,
-      gather: { origin: new THREE.Vector3(), right: new THREE.Vector3(), up: new THREE.Vector3(), cell: 0.55 },
+      gather: { origin: new THREE.Vector3(), right: new THREE.Vector3(), up: new THREE.Vector3(), cell: GATHER_CELL },
     };
 
     // The geo globe surface (body, graticule, atmosphere, continents) — it sets the surface handles
@@ -860,6 +866,13 @@ export class Globe implements GeoViewHost {
     this._invM.copy(this.group.matrixWorld).invert();
     g.right.copy(right).transformDirection(this._invM);
     g.up.copy(up).transformDirection(this._invM);
+  }
+
+  // Narrow (e.g. phone-portrait) viewports: the Engine scales the cell down from GATHER_CELL so
+  // the packed staging row still fits the frustum width (verified live, Task 8 — unscaled, the
+  // DAG's big square ran off the right edge at phone aspect).
+  setGatherCell(cell: number): void {
+    this._ctx.gather.cell = cell;
   }
 
   // -------------------------------------------------- morph between layouts

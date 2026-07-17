@@ -7,7 +7,7 @@ import { hoverKeyOf, tooltipSubject } from "@/src/data/hoverSubject";
 import { identityMap, identitySceneHex } from "@/src/palette/identity";
 import { createScene, type SceneCtx } from "./scene/SceneContext";
 import { HyperView, type MetaHubRec } from "./scene/views/HyperView";
-import { Globe } from "./scene/Globe";
+import { Globe, GATHER_CELL } from "./scene/Globe";
 import { LedgerView } from "./scene/views/LedgerView";
 import { loadGeoCache, resolveMissing } from "@/src/data/geoResolve";
 import { METAGRAPHS, COLORS } from "@/src/engine/config";
@@ -30,6 +30,11 @@ type Vec = THREE.Vector3;
 // the grids read the same at any pose.
 const GATHER_DIST = 34;
 const GATHER_TOP_FRAC = 0.62;
+// The aspect the staging grid's cell size (Globe's GATHER_CELL) was tuned at (desktop-ish
+// 16:10). Narrower viewports (phone portrait, aspect ~0.46) scale the cell down proportionally
+// so the packed row of per-network squares (domain/gatherLayout) still fits the frustum width —
+// verified live (Task 8): unscaled, the DAG's big square ran off the right edge at phone width.
+const GATHER_CELL_ASPECT_REF = 1.6;
 
 // id[] -> { id: sceneColorNumber }, resolved through the identity map (Task 1). The scene
 // layer never imports the TS generator — the Engine owns the map and hands scene colors
@@ -990,6 +995,10 @@ export class Engine {
         // screen-RIGHT (verified on screen: the network squares fill left→right across the band).
         this._gatherR.cross(this._gatherU2).normalize().negate();
         this.globe.setGatherFrame(this._gatherO, this._gatherR, this._gatherU2);
+        // Phone/narrow viewports: shrink the cell so the row's total width still fits — never
+        // grow it past the reference aspect's size (Math.min(1, …)).
+        const cellScale = Math.min(1, this.ctx.camera.aspect / GATHER_CELL_ASPECT_REF);
+        this.globe.setGatherCell(GATHER_CELL * cellScale);
       }
 
       // Ledger freezes morph at the view we entered from, so the reused node meshes fly in from
