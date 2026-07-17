@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import * as THREE from "three";
-import { FOCI, hubFraming, hyperFocusFraming, geoFraming, ledgerLayerFraming, ledgerNodeFraming, easeInOutQuad, CAM_ZOOM, dollyBack, nodeFraming, hyperNodeFraming, closeness, CLOSE_FAR_ALT, CLOSE_NEAR_ALT } from "./cameraRig";
+import { FOCI, hubFraming, hyperFocusFraming, geoFraming, ledgerLayerFraming, ledgerNodeFraming, easeInOutQuad, CAM_ZOOM, dollyBack, nodeFraming, hyperNodeFraming, closeness, CLOSE_FAR_ALT, CLOSE_NEAR_ALT, NODE_RAISE } from "./cameraRig";
 
 describe("FOCI", () => {
   it("carries the camera presets (ledger has none — it uses `overview` + a rotated group)", () => {
@@ -215,6 +215,16 @@ describe("nodeFraming (the geo node pose — ABSOLUTE, dolly-exempt)", () => {
     nodeFraming(out);
     expect(out.pos).toEqual(new THREE.Vector3(0, 4.6, 19.2));
     expect(out.target).toEqual(new THREE.Vector3(0, 19.5, 2));
+  });
+});
+
+describe("NODE_RAISE (the Globe.focusNode lean-raise contract paired with nodeFraming)", () => {
+  it("is a fraction in (0,1) — a partial, uncapped lean raise, not a full flip", () => {
+    expect(NODE_RAISE).toBeGreaterThan(0);
+    expect(NODE_RAISE).toBeLessThan(1);
+  });
+  it("is the exact documented value the nodeFraming pose above is solved against", () => {
+    expect(NODE_RAISE).toBeCloseTo(0.42, 10);
   });
 });
 
