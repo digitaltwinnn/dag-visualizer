@@ -24,6 +24,11 @@ const Y_AXIS = new THREE.Vector3(0, 1, 0); // hex-prism axis (radial after _qRad
 // The geo hex prisms' resting opacity — slightly glassy (user: replaces the wireframe overlay,
 // which never read as clean edges). Depth-write stays ON so stacks occlude normally.
 const HEX_ALPHA = 0.92;
+// Metagraph spheres' RESTING scale in the Hypergraph — the old 0.32-dim shrink (×0.68) baked in
+// as the normal state (user, 2026-07-17: the hover-dim size IS the right size; the dim itself is
+// inert in hyper now, see dimScaleMetaV). Eases back to full size over the morph, so the
+// sphere→chip handoff and the hex chips' geo sizing are unchanged.
+const META_REST_SCALE = 0.68;
 const DIM = new THREE.Color(0x223046);
 const _dummy = new THREE.Object3D(); // reused to compose per-instance matrices
 const _vec = new THREE.Vector3();
@@ -41,7 +46,8 @@ const geoCcOf = (pick: PickDescriptor): string | null =>
 export interface FrameCtx {
   c: DimContext;        // the pure dim context (morph/filter/country/hover/ledger…)
   dim: number;          // Globe's eased whole-core validator dim (ONE value for the DAG core)
-  dimScaleV: number;    // Globe._dimScale() — the one morph-ramped dim strength
+  dimScaleV: number;    // Globe._dimScale() — the VALIDATOR morph-ramped dim strength
+  dimScaleMetaV: number; // Globe._metaDimScale() — the METAGRAPH pool's own strength (0 in hyper)
   clock: number;        // Globe.clock (accumulated seconds)
   camN: THREE.Vector3;  // camera direction in the group's local frame (disc falloff)
   hasCam: boolean;
@@ -318,7 +324,7 @@ export class NodeFabric {
       let hideV = dim;
       const geoCc = geoCcOf(u.pick);
       if (c.countryFilter && (!geoCc || geoCc !== c.countryFilter)) hideV = Math.max(hideV, c.countryMix);
-      const show = 1 - hideV * dimScaleV; // SAME ramped dim as the glow + the metagraph nodes
+      const show = 1 - hideV * dimScaleV; // SAME ramped dim as the validator glow
 
       // Sphere: tumbling on its own axis, cross-fading out as the node lands.
       _qSpin.setFromAxisAngle(u.spinAxis, u.spinPhase + t * u.spinSpeed);
@@ -365,6 +371,9 @@ export class NodeFabric {
     // Per-view hover/selection dim (user): how far the OTHER nodes drop when one node is the
     // focus. Softer in geo (the rest stay brighter), a notch stronger in ledger, hyper unchanged.
     const focusDim = c.ledger ? 0.55 : 0.45 + 0.20 * m; // hyper 0.45 · geo 0.65 · ledger 0.55
+    // Per-view focus BOOST — halved in geo/ledger where the chips' brighter base blew out at the
+    // flat 1.4 (user, 2026-07-17). Mirrors domain/dimModel.focusBoost — change BOTH.
+    const focusBoost = c.ledger ? 0.7 : 1.4 - 0.7 * m; // hyper 1.4 · geo 0.7 · ledger 0.7
     for (const u of records) {
       let d = dim * dimScaleV;
       const geoCc = geoCcOf(u.pick);
@@ -381,7 +390,7 @@ export class NodeFabric {
       // Hover/selection pairing: the focused machine's every layer-shell glows together, and the
       // rest dim back so it stands out (only when not already isolating a metagraph).
       if (focusId) {
-        if (u.nodeId === c.hoverNodeId || u.nodeId === c.selectedNodeId || (!!u.nodeId && c.hoverCohort?.has(u.nodeId))) emi[u.index] += 1.4;
+        if (u.nodeId === c.hoverNodeId || u.nodeId === c.selectedNodeId || (!!u.nodeId && c.hoverCohort?.has(u.nodeId))) emi[u.index] += focusBoost;
         else if (dimOthersOnFocus) emi[u.index] *= focusDim;
       }
       if (flRaw) u._flash = flRaw * flashDecay;
@@ -407,7 +416,7 @@ export class NodeFabric {
   // globe group's local frame each frame.
   writeMetaFrame(records: MetaNodeRecord[], ctx: FrameCtx): void {
     if (!this.metaSphere || !this.metaHex || !this.metaAESphere || !this.metaAEHex) return;
-    const { c, clock, dt, dimScaleV, ledgerT, camN, hasCam, group, flashDecay } = ctx;
+    const { c, clock, dt, dimScaleMetaV, ledgerT, camN, hasCam, group, flashDecay } = ctx;
     const m = c.morph;
     const e = smooth(m);                                              // flight progress
     const w = smooth(THREE.MathUtils.clamp((m - 0.82) / 0.16, 0, 1)); // sphere → chip squash phase
@@ -420,18 +429,25 @@ export class NodeFabric {
     // Per-view hover/selection dim (user): how far the OTHER nodes drop when one node is the
     // focus. Softer in geo (the rest stay brighter), a notch stronger in ledger, hyper unchanged.
     const focusDim = c.ledger ? 0.55 : 0.45 + 0.20 * m; // hyper 0.45 · geo 0.65 · ledger 0.55
+    // Per-view focus BOOST (see the validator loop's note; mirrors domain/dimModel.focusBoost).
+    const focusBoost = c.ledger ? 0.7 : 1.4 - 0.7 * m; // hyper 1.4 · geo 0.7 · ledger 0.7
     for (const r of records) {
       r.dim += (r.dimTarget - r.dim) * kk;
-      // effective dim = network dim (subtle in hyper via dimScaleV), raised by the country dim when
-      // outside the drilled-into country (geo only). In LEDGER the dim is FULL (morph frozen).
-      let dEff = r.dim * (c.ledger ? 0.82 : dimScaleV);
+      // effective dim = network dim × the METAGRAPH strength (dimScaleMetaV — ZERO in hyper:
+      // these nodes rest at the dimmed look there, so hover/commit can't move them; mirrors
+      // domain/dimModel.metaNodeDim), raised by the country dim when outside the drilled-into
+      // country (geo only). In LEDGER the dim is FULL (morph frozen).
+      let dEff = r.dim * (c.ledger ? 0.82 : dimScaleMetaV);
       const geoCc = geoCcOf(r.pick);
       if (cf && (!geoCc || geoCc !== cf)) dEff = Math.max(dEff, cmix);
-      const glow = (0.47 - 0.10 * m) * (1 - dEff * 0.9); // steady, = validators'; lifted in hyper, eased down on the globe (user)
+      // Base glow rests LOW in hyper (0.33 — the old 0.47 × the retired 0.32-dim suppression:
+      // the dimmed look IS the resting look now, user 2026-07-17), easing UP to the unchanged
+      // globe value (0.37) as the nodes land.
+      const glow = (0.33 + 0.04 * m) * (1 - dEff * 0.9);
       // The COMMITTED metagraph's own nodes glow at the hub's resting level (HyperView hub base
       // 0.72) in the Hypergraph, so the picked network's nodes bloom like its hub instead of sitting
       // at the dimmer node base (user). Fades out with the hubs by morph 0.3 — there's no hub on the
-      // globe. The per-node hover/select +1.4 boost below still layers on top for the focused node.
+      // globe. The per-node hover/select focusBoost below still layers on top for the focused node.
       const hubMatch =
         c.filter === r.metaId ? Math.max(0, 0.72 - glow) * THREE.MathUtils.clamp(1 - m / 0.3, 0, 1) : 0;
       const flRaw = r._flash || 0; // brief flash when an arc pulse reaches this node
@@ -439,7 +455,7 @@ export class NodeFabric {
       emi[r.index] = Math.max(0.03, glow + fl + hubMatch);
       // Hover/selection pairing: the focused node's shells glow together; the rest dim back.
       if (focusId) {
-        if (r.nodeId === c.hoverNodeId || r.nodeId === c.selectedNodeId || c.hoverCohort?.has(r.nodeId)) emi[r.index] += 1.4;
+        if (r.nodeId === c.hoverNodeId || r.nodeId === c.selectedNodeId || c.hoverCohort?.has(r.nodeId)) emi[r.index] += focusBoost;
         else if (dimOthersOnFocus) emi[r.index] *= focusDim;
       }
       if (flRaw) r._flash = flRaw * flashDecay;
@@ -482,10 +498,13 @@ export class NodeFabric {
       }
 
       // Sphere: tumbling on its own axis, cross-fading out as the node lands (see the validator
-      // loop). Filtered-out metagraph nodes shrink fully (1 - dEff).
+      // loop), resting at META_REST_SCALE in hyper and easing back to full size over the flight
+      // (so the sphere→chip handoff stays exactly as before). Filtered-out metagraph nodes
+      // shrink fully (1 - dEff; geo only — dEff is pinned 0 in hyper).
       _qSpin.setFromAxisAngle(r.spinAxis, r.spinPhase + clock * r.spinSpeed);
       _dummy.quaternion.copy(_qSpin);
-      _dummy.scale.setScalar(r.hyperSize * (1 - w) * (1 - dEff));
+      const rest = META_REST_SCALE + (1 - META_REST_SCALE) * m;
+      _dummy.scale.setScalar(r.hyperSize * rest * (1 - w) * (1 - dEff));
       _dummy.updateMatrix();
       this.metaSphere.setMatrixAt(r.index, _dummy.matrix);
 

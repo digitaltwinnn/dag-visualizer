@@ -46,6 +46,17 @@ export interface DimContext {
 // dims at the same per-view strength as a committed filter.)
 export const dimScale = (c: DimContext): number => 0.32 + 0.68 * c.morph;
 
+// The METAGRAPH pool's own dim strength: ZERO in the Hypergraph, full on the globe. Metagraph
+// nodes REST at the dimmed look in hyper (user, 2026-07-17 — the base size/glow in
+// NodeFabric.writeMetaFrame carry the old dim appearance instead), so the network dim must not
+// move them there: a hover preview is inert and a committed filter leaves the others at rest
+// (the selection pops via the hubMatch glow boost + camera/DoF, not by dimming the rest).
+// Geo is unchanged — 1.0 at morph=1, the same ceiling as dimScale, so the off-filter
+// isolate/hide on the globe is bit-identical. The ledger's flat 0.82 override (metaNodeDim)
+// bypasses this ramp entirely, as before. Validators keep dimScale — the DAG core still dims
+// back in hyper when a metagraph is the subject (the core-preview cue).
+export const metaDimScale = (c: DimContext): number => c.morph;
+
 // Set the dim TARGETS for a selection (the dim itself eases each frame; the per-view STRENGTH is
 // applied in the node loops). The validators ARE the DAG core → lit under "all"/"dag", dimmed only
 // when a metagraph is selected (both layers together — the L0/L1 split filters are gone).
@@ -54,6 +65,17 @@ export const dimTargetsFor = (sel: string, metaIds: string[]) => ({
   dag: sel === "all" || sel === "dag" ? 0 : 1,
   meta: new Map(metaIds.map((id) => [id, sel === "all" || sel === id ? 0 : 1])),
 });
+
+// Per-view hover/selection DIM-BACK: how far the OTHER nodes drop when one node is the focus
+// (user): softer in geo (the rest stay brighter), a notch stronger in ledger, hyper unchanged.
+export const focusDim = (c: DimContext): number =>
+  c.ledger ? 0.55 : 0.45 + 0.20 * c.morph; // hyper 0.45 · geo 0.65 · ledger 0.55
+
+// Per-view hover/selection BOOST: the emissive added to the focused node's shells. Full pop in
+// hyper (the nodes rest dim there, see metaDimScale); HALVED in geo and ledger (user,
+// 2026-07-17: the chips' base glow is brighter there and the flat 1.4 blew out).
+export const focusBoost = (c: DimContext): number =>
+  c.ledger ? 0.7 : 1.4 - 0.7 * c.morph; // hyper 1.4 · geo 0.7 · ledger 0.7
 
 // Validator (DAG-core) dim: the eased whole-core dim (ONE value — the old per-layer {l0,l1}
 // split always carried identical values and was collapsed; the DAG core is one subject) scaled
@@ -66,12 +88,13 @@ export function validatorDim(c: DimContext, dim: number, geoCc: string | null): 
   return d;
 }
 
-// Metagraph-node per-node dim (js/globe.js:1095-1096): its own eased `recDim`, times dimScale —
-// except in the Snapshots (ledger) view, where morph is frozen so dimScale alone would be too
-// weak, so the effective dim is forced to a flat 0.82. Raised by countryMix outside the drilled
-// country, same as validatorDim.
+// Metagraph-node per-node dim (js/globe.js:1095-1096): its own eased `recDim`, times the
+// metagraph pool's OWN strength (metaDimScale — zero in hyper, see its note) — except in the
+// Snapshots (ledger) view, where morph is frozen so the ramp alone would be too weak, so the
+// effective dim is forced to a flat 0.82. Raised by countryMix outside the drilled country,
+// same as validatorDim.
 export function metaNodeDim(c: DimContext, recDim: number, geoCc: string | null): number {
-  let d = recDim * (c.ledger ? 0.82 : dimScale(c));
+  let d = recDim * (c.ledger ? 0.82 : metaDimScale(c));
   if (c.countryFilter && (!geoCc || geoCc !== c.countryFilter)) d = Math.max(d, c.countryMix);
   return d;
 }
@@ -97,8 +120,8 @@ export function nodeEmissive(
   let v = Math.max(0.02, ei * (1 - d * 0.92) + fl); // suppress glow when dimmed
   // Hover/selection pairing: the focused machine's every layer-shell glows together,
   // and the rest dim back so it stands out (only when not already isolating a metagraph).
-  if (isFocus) v += 1.4;
-  else if (dimOthersOnFocus) v *= 0.45;
+  if (isFocus) v += focusBoost(c);
+  else if (dimOthersOnFocus) v *= focusDim(c);
   return v;
 }
 
@@ -121,7 +144,7 @@ export function metaNodeEmissive(
   const glow = base * (1 - d * 0.9);
   const fl = flash * c.morph; // arcs are a geo-only visual — their flash must not bleed into hyper
   let v = Math.max(0.03, glow + fl);
-  if (isFocus) v += 1.4;
-  else if (dimOthersOnFocus) v *= 0.45;
+  if (isFocus) v += focusBoost(c);
+  else if (dimOthersOnFocus) v *= focusDim(c);
   return v;
 }

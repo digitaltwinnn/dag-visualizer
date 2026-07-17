@@ -193,7 +193,7 @@ export class Globe implements GeoViewHost {
         morph: 0, hoverFilterActive: false, ledger: false, countryFilter: null,
         countryMix: 0, hoverNodeId: null, hoverCohort: null, selectedNodeId: null, filter: "all",
       },
-      dim: 0, dimScaleV: 0, clock: 0, camN: this._camN, hasCam: false,
+      dim: 0, dimScaleV: 0, dimScaleMetaV: 0, clock: 0, camN: this._camN, hasCam: false,
       ledgerT: 0, dt: 0, flashDecay: 0, group: this.group,
     };
 
@@ -765,11 +765,19 @@ export class Globe implements GeoViewHost {
     this.group.worldToLocal(this._camN).normalize();
   }
 
-  // How strong the network dim is, ramped by the morph. (The hover-preview forced-strong
-  // 0.85 branch is gone — user: the hub hover/click dim in hyper was far harder than the
-  // regular dim; previews now dim at the committed strength.)
+  // How strong the VALIDATOR network dim is, ramped by the morph. (The hover-preview
+  // forced-strong 0.85 branch is gone — user: the hub hover/click dim in hyper was far harder
+  // than the regular dim; previews now dim at the committed strength.)
   private _dimScale(): number {
     return 0.32 + 0.68 * this.morph;
+  }
+
+  // The METAGRAPH pool's own dim strength — ZERO in hyper (metagraph nodes REST at the dimmed
+  // look there, baked into writeMetaFrame's base size/glow; hover previews and committed
+  // filters leave them at rest), full on the globe. Mirrors domain/dimModel.metaDimScale —
+  // change BOTH (the tested reference spec, see dimModel's file header).
+  private _metaDimScale(): number {
+    return this.morph;
   }
 
   // Write this frame's values into the persistent FrameCtx (`this._ctx`, built once in the
@@ -794,6 +802,7 @@ export class Globe implements GeoViewHost {
     c.filter = this.filter;
     ctx.dim = this.dim;
     ctx.dimScaleV = this._dimScale();
+    ctx.dimScaleMetaV = this._metaDimScale();
     ctx.clock = this.clock;
     ctx.hasCam = this._hasCam;
     ctx.ledgerT = this.ledgerT;

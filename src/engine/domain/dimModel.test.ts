@@ -1,6 +1,9 @@
 import { describe, it, expect } from "vitest";
 import {
   dimScale,
+  metaDimScale,
+  focusDim,
+  focusBoost,
   dimTargetsFor,
   validatorDim,
   metaNodeDim,
@@ -39,6 +42,49 @@ describe("dimScale", () => {
   it("hover-preview dims at the same strength as a committed filter (the forced 0.85 is gone)", () => {
     expect(dimScale(ctx({ hoverFilterActive: true, morph: 0 }))).toBeCloseTo(0.32, 9);
     expect(dimScale(ctx({ hoverFilterActive: true, morph: 1 }))).toBeCloseTo(1, 9);
+  });
+});
+
+describe("metaDimScale", () => {
+  // Metagraph nodes REST at the dim look in hyper (user, 2026-07-17): the network dim no
+  // longer moves them there — hover previews and committed filters both leave them at rest.
+  it("is ZERO at morph=0 — no network dim can move a metagraph node in hyper", () => {
+    expect(metaDimScale(ctx({ morph: 0 }))).toBeCloseTo(0, 10);
+  });
+
+  it("ramps to the same geo ceiling 1.0 as dimScale at morph=1 (geo isolate/hide unchanged)", () => {
+    expect(metaDimScale(ctx({ morph: 1 }))).toBeCloseTo(1.0, 10);
+    expect(metaDimScale(ctx({ morph: 1 }))).toBeCloseTo(dimScale(ctx({ morph: 1 })), 10);
+  });
+
+  it("is the bare morph at a midpoint", () => {
+    expect(metaDimScale(ctx({ morph: 0.5 }))).toBeCloseTo(0.5, 10);
+  });
+});
+
+describe("focusDim / focusBoost (per-view hover/selection strength)", () => {
+  it("focusDim: hyper 0.45 · geo 0.65 · ledger 0.55", () => {
+    expect(focusDim(ctx({ morph: 0 }))).toBeCloseTo(0.45, 10);
+    expect(focusDim(ctx({ morph: 1 }))).toBeCloseTo(0.65, 10);
+    expect(focusDim(ctx({ morph: 0, ledger: true }))).toBeCloseTo(0.55, 10);
+  });
+
+  // The focused node's glow pop is HALVED in geo/ledger (user, 2026-07-17: the chips' brighter
+  // base blew out at the flat 1.4); hyper keeps the full pop over its dim resting nodes.
+  it("focusBoost: hyper 1.4 · geo 0.7 · ledger 0.7", () => {
+    expect(focusBoost(ctx({ morph: 0 }))).toBeCloseTo(1.4, 10);
+    expect(focusBoost(ctx({ morph: 1 }))).toBeCloseTo(0.7, 10);
+    expect(focusBoost(ctx({ morph: 0, ledger: true }))).toBeCloseTo(0.7, 10);
+  });
+
+  it("the emissive functions consume them: a geo-focused node gains 0.7, a geo dim-back is ×0.65", () => {
+    const c = ctx({ morph: 1 });
+    const base = nodeEmissive(c, 0, 0, false, false, 0.5, 0.22);
+    expect(nodeEmissive(c, 0, 0, true, true, 0.5, 0.22)).toBeCloseTo(base + 0.7, 10);
+    expect(nodeEmissive(c, 0, 0, false, true, 0.5, 0.22)).toBeCloseTo(base * 0.65, 10);
+    const mBase = metaNodeEmissive(c, 0, 0, false, false, 0.5);
+    expect(metaNodeEmissive(c, 0, 0, true, true, 0.5)).toBeCloseTo(mBase + 0.7, 10);
+    expect(metaNodeEmissive(c, 0, 0, false, true, 0.5)).toBeCloseTo(mBase * 0.65, 10);
   });
 });
 
@@ -95,9 +141,14 @@ describe("validatorDim", () => {
 });
 
 describe("metaNodeDim", () => {
-  it("multiplies recDim by dimScale outside the ledger view", () => {
+  it("multiplies recDim by metaDimScale outside the ledger view", () => {
     const c = ctx({ morph: 1, ledger: false });
-    expect(metaNodeDim(c, 0.5, null)).toBeCloseTo(0.5 * dimScale(c), 10);
+    expect(metaNodeDim(c, 0.5, null)).toBeCloseTo(0.5 * metaDimScale(c), 10);
+  });
+
+  it("is inert in hyper (morph=0): the dim target may ease all it wants, dEff stays 0", () => {
+    const c = ctx({ morph: 0, ledger: false });
+    expect(metaNodeDim(c, 1, null)).toBeCloseTo(0, 10);
   });
 
   it("forces a flat 0.82 multiplier in the ledger view, ignoring dimScale/morph", () => {
