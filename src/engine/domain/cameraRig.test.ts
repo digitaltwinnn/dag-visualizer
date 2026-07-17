@@ -4,7 +4,7 @@ import { FOCI, hubFraming, hyperFocusFraming, geoFraming, easeInOutQuad, CAM_ZOO
 
 describe("FOCI", () => {
   it("carries the camera presets (ledger has none — it uses `overview` + a rotated group)", () => {
-    expect(FOCI.overview.pos).toEqual(new THREE.Vector3(0, 17, 68)); // pulled back (user: whole scene visible at view start)
+    expect(FOCI.overview.pos).toEqual(new THREE.Vector3(0, 21, 80)); // pulled back again with META_ORBIT 29 (user: whole ring visible unselected, clear of the LiveStrip band)
     expect(FOCI.overview.target).toEqual(new THREE.Vector3(0, 2, 0));
     expect(FOCI.dag.pos).toEqual(new THREE.Vector3(0, 9, 38));
     expect(FOCI.dag.target).toEqual(new THREE.Vector3(0, 1, 0));

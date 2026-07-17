@@ -17,7 +17,7 @@ import { VIEW_POLICIES } from "./domain/viewPolicy";
 import { FOCI, hubFraming, geoFraming, ledgerLayerFraming, nodeFraming, hyperNodeFraming, dollyBack, easeInOutQuad, type CameraFraming } from "./domain/cameraRig";
 import { countryFraming } from "./domain/countryShape";
 import { R as GEO_R, LAND_H } from "./domain/geoLayout";
-import { clickActions, pickActive } from "./domain/pickActions";
+import { autoLayerForNode, clickActions, pickActive } from "./domain/pickActions";
 import { ViewTransition, type View3D } from "./domain/viewTransition";
 import type { GlobalSnapshot, PickDescriptor } from "@/src/data/types";
 import type { ClusterNode, DagCore, GeoMap, RouteMetagraph } from "@/src/data/types";
@@ -561,7 +561,18 @@ export class Engine {
       // tilted layer-focus framing instead.
       const selLayer = useStore.getState().layer;
       if (selLayer) this._focusLayer(selLayer.layerId);
-      else this.focus("overview");
+      else {
+        // A selected NODE carries into Snapshots as its related L0 layer (user, 2026-07-17):
+        // auto-commit the layer so the camera arrives well-positioned on the settlement row
+        // the node belongs to (metagraph node → metagraph L0; DAG validator → hypergraph L0).
+        // Committed through the ONE executor, exactly like the panel row's toggle.
+        const inspect = useStore.getState().inspect;
+        const autoLayer = autoLayerForNode(inspect?.kind);
+        if (autoLayer) {
+          applyClickActions([{ kind: "layer", pick: { kind: "layer", layerId: autoLayer } }]);
+          this._focusLayer(autoLayer);
+        } else this.focus("overview");
+      }
       return;
     }
     // The remaining placeholder views (status/transactions/staking) hide the 3D scene — reset to idle.

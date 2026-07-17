@@ -88,6 +88,16 @@ export function layerToggleActions(
   return [{ kind: "layer", pick: currentLayerId === p.layerId ? null : p }];
 }
 
+// A selected NODE entering the Snapshots view auto-commits its RELATED L0 layer (user,
+// 2026-07-17) so the camera arrives on the settlement row the node belongs to: a metagraph
+// node → the metagraph-L0 row, a DAG validator (either shell) → the hypergraph-L0 row.
+// null = no node selected / not a node pick → no auto-selection (the resting overview).
+export function autoLayerForNode(kind: PickDescriptor["kind"] | null | undefined): "ml0" | "hypl0" | null {
+  if (kind === "metanode") return "ml0";
+  if (kind === "l0" || kind === "l1") return "hypl0";
+  return null;
+}
+
 // The network-filter TOGGLE — the FilterPicker's committed-row rule: picking the committed
 // metagraph again steps back to "all" (one toggle language everywhere); "all" itself never
 // toggles off.

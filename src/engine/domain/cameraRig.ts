@@ -16,7 +16,9 @@ export const FOCI: Record<string, { pos: THREE.Vector3; target: THREE.Vector3 }>
   // Pulled back (60 → 68, user): every view's START pose gets the same zoom-out the globe
   // needs — the whole scene rests inside the rail-free centre of the frame. Shared by the
   // hyper resting pose, the ledger overview and the placeholder idle.
-  overview: { pos: new THREE.Vector3(0, 17, 68), target: new THREE.Vector3(0, 2, 0) },
+  // Pulled back 68 → 76 with META_ORBIT 25 → 29 (user, 2026-07-17) so the widened hub ring
+  // still fits the frame with no selection.
+  overview: { pos: new THREE.Vector3(0, 21, 80), target: new THREE.Vector3(0, 2, 0) },
   // The whole DAG core: pulled back enough to frame the outer cL1 (purple) shell (radius 14).
   dag: { pos: new THREE.Vector3(0, 9, 38), target: new THREE.Vector3(0, 1, 0) },
   // Geo targets the globe CENTRE — the downward-tilt composition comes from camera HEIGHT
