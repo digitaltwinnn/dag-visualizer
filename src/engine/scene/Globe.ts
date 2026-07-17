@@ -174,7 +174,7 @@ export class Globe implements GeoViewHost {
     this.group = new THREE.Group();
     scene.add(this.group);
     // Node-pick stage light: tight cone over one chip stack (radius ≈ 6·tan(0.36) ≈ 2.3).
-    this._spot = new FocusSpot(scene, { angle: 0.36, distance: 22, intensity: 3.0 });
+    this._spot = new FocusSpot(scene, { angle: 0.36, distance: 22, intensity: 1.5 });
     this.layers = layers; // for gluing metagraph nodes to their orbiting hubs
     this.camera = camera; // for the view-dependent disc falloff at the limb
     this.geoColor = colors.core;   // the geo hologram = the accent (calm via opacity); wall + grid + graticule

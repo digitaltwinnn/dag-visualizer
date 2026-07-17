@@ -21,9 +21,6 @@ const HOOP_OP = 0.08;
 // Resting opacity of the soft rim-fill disk under each ring (populated layers only) — more cyan
 // presence + anchors the layer label, which otherwise floated between the thin rings (user).
 const FILL_OP = 0.09;
-// How far INSIDE the ring the layer label sits (user: inner side, not outer). Shared by metagraph
-// rings and the DAG core shells so both read the same.
-const LABEL_INSET = 0.45;
 
 // Anchor-packet stream tuning: each anchored snapshot launches one packet hub→core; a burst of N
 // streams out staggered, reusing a small pool (which naturally throttles very large bursts).
@@ -34,16 +31,12 @@ const PKT_POOL = 14; // reusable packet meshes per metagraph (caps simultaneous 
 // The focus SPOTLIGHT (see scene/objects/FocusSpot) — staged above the focused metagraph's ring
 // plane (or the DAG core's, a bigger stage) so the selected atom catches a stage-light wash.
 const SPOT_H = 9; //     height above the ring plane, along the atom's normal
-const SPOT_ANGLE = 0.68; // cone just covers the outer cL1 ring (5.4) + margin at SPOT_H
+const SPOT_ANGLE = 0.9; // cone covers the outer cL1 ring (5.4) with margin at SPOT_H — see penumbra note below
 const SPOT_I = 2.4; //   full intensity when focused
 // The DAG core is the same subject at a bigger scale (L1 shell radius 12.5 vs 5.4): higher stage,
 // wider-reaching cone (same angle at that height covers it), so selecting DAG gets the same wash.
 const SPOT_H_DAG = 17;
 
-// Ring layer-code labels — the text a focused metagraph shows on each of its three layer rings so
-// the L0 / dL1 / cL1 shells read WITH text (user: hard to tell which ring is which). Only the
-// focused atom labels (one at a time), so the resting overview never gets busy.
-const LAYER_CODE: Record<"l0" | "dl1" | "cl1", string> = { l0: "L0", dl1: "dL1", cl1: "cL1" };
 
 // A rim-weighted radial gradient (white; the material tints it cyan) for the ring fill disks:
 // transparent at the centre, ramping to a soft band at the OUTER edge (the ring), so a CircleGeometry
@@ -106,7 +99,6 @@ export interface MetaHubRec {
   active: boolean;
   hoops: THREE.LineLoop[]; // the cyan layer rings (structural) drawn around this hub
   fills: THREE.Mesh[]; // soft radial fill disks under each ring (rim-weighted, fade to transparent)
-  labels: THREE.Mesh[]; // per-ring layer-code labels (L0 / dL1 / cL1) — shown only while focused
 }
 
 export class HyperView {
@@ -125,21 +117,14 @@ export class HyperView {
   core!: THREE.Mesh;
   coreFlash?: number;
   private _coreRings: THREE.LineLoop[] = []; // the DAG core's cyan "sun" hoops (rebuilt on node load)
-  private _coreLabels: THREE.Mesh[] = []; // the DAG core's shell labels (L0 / L1), shown when DAG focused
   private _coreFills: THREE.Mesh[] = []; // the DAG core's shell rim-fill disks (same as a metagraph's)
   private _fillTex?: THREE.Texture; // shared rim-weighted radial gradient for the ring fill disks
-  // Scratch for _faceLabelInPlane (per-frame label orientation) — never allocate in the loop.
-  private _lPQ = new THREE.Quaternion();
-  private _lQ = new THREE.Quaternion();
   // The focus spotlight (see SPOT_* above) + per-frame scratch.
   private _spot!: FocusSpot;
   private _spotPos = new THREE.Vector3();
   private _spotN = new THREE.Vector3();
   private _coreDim = 0; // eased 0→1: the DAG core fades back when a specific metagraph is the subject
   private _core: number; // the structural accent (colors.core) — the core sphere hue
-  private _border: number; // colors.border — the label-chip hairline/wash RGB (the .role-chip pill)
-  private _panel: number; // colors.panel — the label-chip glass backing (== --panel)
-  private _muted: number; // colors.muted — the label-chip CODE text tone (== --muted-foreground)
 
   // `sceneColors` (id -> 0xRRGGBB) is the identity SCENE-lane colour map (Task 3), handed in by
   // the Engine at construction — HyperView builds all its hubs synchronously from
@@ -148,9 +133,6 @@ export class HyperView {
   constructor(scene: THREE.Scene, colors: SceneColors, sceneColors?: Record<string, number>) {
     this.scene = scene;
     this._core = colors.core;
-    this._border = colors.border;
-    this._panel = colors.panel;
-    this._muted = colors.muted;
     this.root = new THREE.Group();
     // Tilt the hub/tether/hoop structure to read top-down from the shared overview camera (Globe
     // tilts the node group + HyperView the core by the same HYPER_TILT, so all three stay registered).
@@ -159,8 +141,10 @@ export class HyperView {
 
     // The focus spotlight (world-space — the hub position is resolved through root's tilt+spin each
     // frame). Rests dark; eases up only while a metagraph / the DAG is focused (see update()).
-    // distance 40 clears the DAG stage's farthest shell node (~21).
-    this._spot = new FocusSpot(scene, { angle: SPOT_ANGLE, distance: 40, intensity: SPOT_I });
+    // distance 40 clears the DAG stage's farthest shell node (~21). Penumbra kept SMALL on purpose:
+    // the full-intensity cone is angle·(1−penumbra), and a soft-edged cone lit only the inner rings —
+    // the outer dL1/cL1 rings sat in the falloff and read like a DIFFERENT material (user bug).
+    this._spot = new FocusSpot(scene, { angle: SPOT_ANGLE, distance: 40, intensity: SPOT_I, penumbra: 0.25 });
 
     this.pickables = [];
     this.metas = [];
@@ -204,7 +188,6 @@ export class HyperView {
       m.hub.visible = !on;
       for (const h of m.hoops) h.visible = !on;
       for (const f of m.fills) f.visible = !on && f.userData.populated !== false; // restore populated fills on exit
-      if (on) for (const lb of m.labels) lb.visible = false;
       if (on) {
         (m.tether.material as THREE.LineBasicMaterial).opacity = 0;
         // Retire any in-flight anchor packets + clear the pending queue.
@@ -283,20 +266,17 @@ export class HyperView {
       group.add(hub);
       this.pickables.push(hub);
 
-      // Each layer is ONE structural ring: a cyan hoop + the shared decoration (rim-fill + inner
-      // label). Same treatment the DAG core shells get (see buildCoreRings) — one ring model.
+      // Each layer is ONE structural ring: a cyan hoop + the shared rim-fill decoration. Same
+      // treatment the DAG core shells get (see buildCoreRings) — one ring model.
       const hoops: THREE.LineLoop[] = [];
       const fills: THREE.Mesh[] = [];
-      const labels: THREE.Mesh[] = [];
       META_LAYERS.forEach((layer, li) => {
         const frame = armillaryFrame(li, META_LAYERS.length, META_RING.tilt);
         const radius = META_RING.radii[layer];
         const h = this._makeHoop(frame, radius);
         group.add(h);
         hoops.push(h);
-        const d = this._makeRingDecor(group, frame, radius, LAYER_CODE[layer]);
-        fills.push(d.fill); // fill toggled per populated layer by setHoopPresence
-        labels.push(d.label);
+        fills.push(this._makeRingDecor(group, frame, radius)); // fill toggled per populated layer by setHoopPresence
       });
 
       const tether = new THREE.Line(
@@ -324,19 +304,8 @@ export class HyperView {
       }
 
       this.root.add(group);
-      this.metas.push({ group, hub, cfg, state: null, tether, packets: [], pool, pending: 0, lastLaunch: 0, glow: 0, anchor: pos.clone(), orbit: an.a, radius: an.radius, incl: an.incl, spin: 0.3 + Math.random() * 0.5, active: true, hoops, fills, labels });
+      this.metas.push({ group, hub, cfg, state: null, tether, packets: [], pool, pending: 0, lastLaunch: 0, glow: 0, anchor: pos.clone(), orbit: an.a, radius: an.radius, incl: an.incl, spin: 0.3 + Math.random() * 0.5, active: true, hoops, fills });
     });
-  }
-
-  // BILLBOARD a ring label to the camera (screen-aligned: same orientation as the camera, so the
-  // text is always face-on and upright on screen). It was laid flat IN the ring plane before, but at
-  // the oblique focused pose the in-plane text foreshortened to a sliver (user: "label often not
-  // oriented to the camera"). Runs per frame only for the few CURRENTLY-SHOWN labels.
-  private _faceLabelInPlane(lb: THREE.Object3D, cam: THREE.Camera): void {
-    if (!lb.parent) return;
-    lb.parent.getWorldQuaternion(this._lPQ);
-    cam.getWorldQuaternion(this._lQ); // screen-aligned world orientation
-    lb.quaternion.copy(this._lPQ).invert().multiply(this._lQ); // → local (relative to the hub group)
   }
 
   // Mark which metagraph hubs are "active" (have locatable nodes). Inactive ones — registered
@@ -410,64 +379,13 @@ export class HyperView {
     return mesh;
   }
 
-  // The shared "ring decoration" — the rim-fill disk + the inner-side layer label — added to `group`
-  // for one ring plane at `radius`. Used identically by the metagraph layer rings AND the DAG core
-  // shells (they are structurally the same ring), so there's no duplicate build logic.
-  private _makeRingDecor(group: THREE.Object3D, frame: RingFrame, radius: number, code: string): { fill: THREE.Mesh; label: THREE.Mesh } {
+  // The shared ring rim-fill disk, added to `group` for one ring plane at `radius`. Used
+  // identically by the metagraph layer rings AND the DAG core shells (one ring model). The
+  // per-ring layer-code labels that sat here were removed (user: too distracting).
+  private _makeRingDecor(group: THREE.Object3D, frame: RingFrame, radius: number): THREE.Mesh {
     const fill = this._makeRingFill(frame, radius);
     group.add(fill);
-    const label = this._makeRingLabel(code);
-    label.position.copy(frame.t).multiplyScalar(radius - LABEL_INSET); // INNER side of the ring
-    label.visible = false;
-    group.add(label);
-    return { fill, label };
-  }
-
-  // A small cyan layer-code label ("L0" / "dL1" / "cL1") as a billboard plane. Text-only (structural
-  // annotation → the accent token, not identity); billboarded to the camera each frame in update().
-  private _makeRingLabel(text: string): THREE.Mesh {
-    const SS = 2;
-    const c = document.createElement("canvas");
-    c.width = 128 * SS;
-    c.height = 64 * SS;
-    const ctx = c.getContext("2d")!;
-    const bc = new THREE.Color(this._border);
-    const brgb = `${Math.round(bc.r * 255)},${Math.round(bc.g * 255)},${Math.round(bc.b * 255)}`;
-    const pc = new THREE.Color(this._panel);
-    const prgb = `${Math.round(pc.r * 255)},${Math.round(pc.g * 255)},${Math.round(pc.b * 255)}`;
-    const mc = new THREE.Color(this._muted);
-    const mrgb = `${Math.round(mc.r * 255)},${Math.round(mc.g * 255)},${Math.round(mc.b * 255)}`;
-    ctx.font = `600 ${34 * SS}px system-ui, -apple-system, sans-serif`;
-    ctx.textAlign = "center";
-    ctx.textBaseline = "middle";
-    // Rounded-square chip around the code (user): the SAME glass backing + border HUE as the React
-    // .role-chip pill — `--panel` fill (opaque enough that the bright ring disc behind it doesn't
-    // bleed through, user) + `--border` blue hairline — brought across via the unified SceneColors
-    // bridge so the pill and the 3D label share one colour source.
-    const tw = ctx.measureText(text).width;
-    const boxW = tw + 22 * SS;
-    const boxH = 44 * SS;
-    const bx = c.width / 2 - boxW / 2;
-    const by = c.height / 2 - boxH / 2;
-    ctx.beginPath();
-    ctx.roundRect(bx, by, boxW, boxH, 9 * SS);
-    ctx.fillStyle = `rgba(${prgb},0.9)`; // --panel glass, opaque so the disc doesn't show through
-    ctx.fill();
-    ctx.lineWidth = 2 * SS;
-    ctx.strokeStyle = `rgba(${brgb},0.6)`; // --border hue
-    ctx.stroke();
-    ctx.fillStyle = `rgba(${mrgb},0.95)`; // --muted-foreground, matching the pill's code text (not cyan)
-    ctx.fillText(text, c.width / 2, c.height / 2 + 2 * SS);
-    const tex = new THREE.CanvasTexture(c);
-    tex.minFilter = THREE.LinearFilter;
-    tex.colorSpace = THREE.SRGBColorSpace;
-    const h = 1.0, w = h * (c.width / c.height); // was 0.62 — read too small at the focused distance (user)
-    const mesh = new THREE.Mesh(
-      new THREE.PlaneGeometry(w, h),
-      new THREE.MeshBasicMaterial({ map: tex, transparent: true, depthWrite: false, depthTest: false, side: THREE.DoubleSide }),
-    );
-    mesh.renderOrder = 3; // over the hoops/nodes
-    return mesh;
+    return fill;
   }
 
   // (Re)build the DAG core's tilted cyan hoops — one per ring of each armillary shell (L0 ball +
@@ -480,12 +398,11 @@ export class HyperView {
       (h.material as THREE.Material).dispose();
     }
     this._coreRings = [];
-    for (const m of [...this._coreLabels, ...this._coreFills]) {
+    for (const m of this._coreFills) {
       this.coreGroup.remove(m);
       (m.material as THREE.MeshBasicMaterial).map?.dispose();
       (m.material as THREE.Material).dispose();
     }
-    this._coreLabels = [];
     this._coreFills = [];
     for (const s of shells) {
       for (let k = 0; k < s.numRings; k++) {
@@ -499,13 +416,6 @@ export class HyperView {
         this.coreGroup.add(fill);
         this._coreFills.push(fill);
       }
-      // ONE label per shell (the k=0 ring plane) — repeating the code on every ring reads busy.
-      const frame0 = armillaryFrame(0, s.numRings, s.tilt);
-      const label = this._makeRingLabel(s.code);
-      label.position.copy(frame0.t).multiplyScalar(s.radius - LABEL_INSET); // INNER side of the ring
-      label.visible = false;
-      this.coreGroup.add(label);
-      this._coreLabels.push(label);
     }
   }
 
@@ -515,7 +425,7 @@ export class HyperView {
   // out to the map (Globe) instead.
   // `spinFrozen` (set when the camera is zoomed in to inspect) stops the overall SPHERE spin — the
   // core + hub meshes — so a close-up reads still; the per-node axis spin (Globe) keeps going.
-  update(dt: number, morph = 0, coreDimTarget = 0, spinFrozen = false, cam?: THREE.Camera, dagFocused = false) {
+  update(dt: number, morph = 0, coreDimTarget = 0, spinFrozen = false, _cam?: THREE.Camera, dagFocused = false) {
     this.clock += dt;
     const t = this.clock;
 
@@ -562,13 +472,6 @@ export class HyperView {
     // The core shells' rim-fill disks fade the same way (same treatment as a metagraph's fills).
     const coreFillOp = FILL_OP * coreReveal * (1 - this._coreDim * 0.5);
     for (const f of this._coreFills) (f.material as THREE.MeshBasicMaterial).opacity = coreFillOp;
-    // Core shell labels (L0 / L1) — shown only when the DAG is focused; laid in the ring plane +
-    // re-oriented each frame (front to camera, upright).
-    const showCoreLabels = dagFocused && coreReveal > 0.5 && !this.ledger;
-    for (const lb of this._coreLabels) {
-      lb.visible = showCoreLabels;
-      if (showCoreLabels && cam) this._faceLabelInPlane(lb, cam);
-    }
     if (this.coreFlash) this.coreFlash = Math.max(0, this.coreFlash - dt * 1.6);
 
     // Metagraphs — orbit, spin, tether pulses. While ANY metagraph is selected (focusId), the
@@ -621,13 +524,6 @@ export class HyperView {
       const fillOp = FILL_OP * metaF * (m.active ? 1 : 0.7) * fdim;
       for (const f of m.fills) (f.material as THREE.MeshBasicMaterial).opacity = fillOp;
 
-      // Layer-code labels: ONLY the focused metagraph shows them; they lie in the ring plane but are
-      // re-oriented each frame (front to camera, upright) so the 3D tilt reads while staying legible.
-      const showLabels = this.focusId === m.cfg.id && metaF > 0.5;
-      for (const lb of m.labels) {
-        lb.visible = showLabels;
-        if (showLabels && cam) this._faceLabelInPlane(lb, cam);
-      }
 
       // Anchor packets: launch one per pending snapshot (staggered), advance the in-flight ones
       // hub→core, and boost the hub glow while any are flowing. `_pos` is the hub's live position.

@@ -23,7 +23,7 @@ import type { PickDescriptor } from "@/src/data/types";
 const Y_AXIS = new THREE.Vector3(0, 1, 0); // hex-prism axis (radial after _qRadial)
 // The geo hex prisms' resting opacity — slightly glassy (user: replaces the wireframe overlay,
 // which never read as clean edges). Depth-write stays ON so stacks occlude normally.
-const HEX_ALPHA = 0.8;
+const HEX_ALPHA = 0.92;
 const DIM = new THREE.Color(0x223046);
 const _dummy = new THREE.Object3D(); // reused to compose per-instance matrices
 const _vec = new THREE.Vector3();

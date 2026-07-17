@@ -767,7 +767,7 @@ export class LedgerView {
       mat.color.copy(this._coreCol);
       mat.emissive.copy(this._coreCol);
       mat.emissiveIntensity = sel ? 0.9 : 0.34;
-      const target = sel ? 0.95 : 0.75 * slotFade(t.slot);
+      const target = sel ? 0.95 : 0.88 * slotFade(t.slot); // trail blocks kept near-solid (user)
       mat.opacity += (target - mat.opacity) * k;
     }
 
@@ -799,7 +799,7 @@ export class LedgerView {
           // blooms; the rest fade by recency (slotFade). A filtered-out lane is strongly dimmed.
           const hot = this.model.isRowHot(laneOff, b.slot);
           const bright =
-            (hot ? Math.max(b.fade, 0.9) * (b.filled ? 1.3 : 0.2) : b.fade * (b.filled ? 0.55 : 0.12)) *
+            (hot ? Math.max(b.fade, 0.9) * (b.filled ? 1.3 : 0.2) : b.fade * (b.filled ? 0.7 : 0.12)) *
             (laneOff ? 0.22 : 1);
           this._metaTrailMesh.setColorAt(mi, _col.copy(laneColor).multiplyScalar(bright));
           mi++;
