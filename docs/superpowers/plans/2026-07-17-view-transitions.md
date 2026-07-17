@@ -105,7 +105,7 @@ describe("gatherWeight (staggered)", () => {
   it("runs 1 -> 0 during IN (staggered dissolve)", () => {
     const tr = settled();
     tr.start("hyper", "geo");
-    tr.tick(DUR_OUT + 1e-6); // boundary crossed
+    tr.tick(DUR_OUT); // boundary crossed exactly (residual 0)
     expect(tr.gatherWeight(0, 10)).toBe(1);
     tr.tick(DUR_IN / 2);
     const mid = tr.gatherWeight(0, 10);
@@ -171,7 +171,8 @@ describe("retargeting", () => {
   it("mid-IN to a third view re-enters OUT seeded from the current weight", () => {
     const tr = settled("hyper");
     tr.start("hyper", "geo");
-    tr.tick(DUR_OUT + DUR_IN * 0.4); // 40% into IN (weight descending)
+    tr.tick(DUR_OUT);
+    tr.tick(DUR_IN * 0.4); // 40% into IN via the real frame path (weight descending)
     const w = tr.gatherWeight(0, 1);
     tr.start("geo", "ledger");
     expect(tr.phase).toBe("out");
@@ -246,7 +247,9 @@ export class ViewTransition {
         // UN-staggered base weight is continuous (per-node stagger reorders slightly).
         this.to = this.from;
         this.from = from;
-        this.t = (1 - this.t / DUR_OUT) * DUR_IN;
+        // Continuity inverts against FLIGHT_* (the gatherWeight denominators), NOT the raw
+        // DUR_* phase lengths — inverting against DUR_* breaks the no-teleport contract.
+        this.t = (1 - this.t / FLIGHT_OUT) * FLIGHT_IN;
         this.phase = "in";
       } else {
         this.to = to; // gather continues; only the destination changes
@@ -257,7 +260,7 @@ export class ViewTransition {
     if (to === this.to) return; // already heading there
     this.from = this.to;
     this.to = to;
-    this.t = (1 - this.t / DUR_IN) * DUR_OUT; // base-weight continuity (see test)
+    this.t = (1 - this.t / FLIGHT_IN) * FLIGHT_OUT; // base-weight continuity vs the FLIGHT_* denominators (see test)
     this.phase = "out";
   }
 
