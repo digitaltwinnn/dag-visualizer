@@ -539,8 +539,10 @@ views and caused the ledger red-dots bug; that pattern is forbidden.
     applyFilter(false)`) used to silently clear the drill's dim + border seconds after every
     drill (long-standing bug, found+fixed 2026-07-10; a real filter SWITCH still clears the
     drill by design — the store subscription nulls `country` first).
-  - **Hypergraph**: `_focusFilter` flies the camera to the selected hub with the plain radial
-    `hubFraming` (using the hub's **local/unscaled** position — `layers.root` is morph-scaled,
+  - **Hypergraph**: committing a metagraph eases the WHOLE structure's shared tilt from
+    `HYPER_TILT` down to `HYPER_TILT_FOCUS` (~flat — the discs read horizontal from the side
+    pose; the structure moves, never the camera rolling), and `_focusFilter` flies the camera
+    to the selected hub with the plain radial `hubFraming` (using the hub's **local/unscaled** position — `layers.root` is morph-scaled,
     so `getWorldPosition` would aim at the origin mid-morph), world-up, NO camera roll. The
     rolled `hyperFocusFraming` pose (core pinned upper-left) AND depth-of-field were DROPPED
     2026-07-17 (user: the bokeh read as fuzz on the selected atom and the composed pose fought

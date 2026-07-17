@@ -238,8 +238,10 @@ export class Globe implements GeoViewHost {
   // Set the hyper-structure spin: the node group is tilted by HYPER_TILT and spun about its own
   // vertical axis by `y` (Euler XYZ → tilt applied AFTER the Y-spin). Driven by the Engine with the
   // SAME angle it gives HyperView, so nodes and hoops rotate in lockstep. Only meaningful in hyper.
-  setHyperSpin(y: number): void {
-    if (!this.simSpin && !this.ledger) this.group.rotation.set(HYPER_TILT, y, 0);
+  setHyperSpin(y: number, tiltX: number = HYPER_TILT): void {
+    // `tiltX` is the Engine-eased shared structure tilt: HYPER_TILT at rest, easing to
+    // HYPER_TILT_FOCUS while a metagraph is committed (discs read horizontal from the side).
+    if (!this.simSpin && !this.ledger) this.group.rotation.set(tiltX, y, 0);
   }
 
   // The wall is always the structural accent (the geo hologram hue). Kept as a setter so the Engine

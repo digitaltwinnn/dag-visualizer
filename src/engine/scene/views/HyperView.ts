@@ -333,9 +333,9 @@ export class HyperView {
   // Spin the hub + core structure about its own vertical axis by `y`, keeping the HYPER_TILT (Euler
   // XYZ → tilt applied after the Y-spin). The Engine drives this with the SAME angle it gives the
   // node group, so hubs/core/hoops and the nodes stay registered while the whole atom rotates.
-  setHyperSpin(y: number) {
-    this.root.rotation.set(HYPER_TILT, y, 0);
-    this.coreGroup.rotation.set(HYPER_TILT, y, 0);
+  setHyperSpin(y: number, tiltX: number = HYPER_TILT) {
+    this.root.rotation.set(tiltX, y, 0);
+    this.coreGroup.rotation.set(tiltX, y, 0);
   }
 
   // A metagraph's 3 layer hoops render SOLID where the layer has nodes and DOTTED where the layer

@@ -12,6 +12,7 @@ import { LedgerView } from "./scene/views/LedgerView";
 import { loadGeoCache, resolveMissing } from "@/src/data/geoResolve";
 import { METAGRAPHS, COLORS } from "@/src/engine/config";
 import { LEDGER, LAYER_GEOM, ledgerSite } from "./domain/ledgerLayout";
+import { HYPER_TILT, HYPER_TILT_FOCUS } from "./domain/hyperLayout";
 import { readSceneColors } from "./sceneColors";
 import { VIEW_POLICIES } from "./domain/viewPolicy";
 import { FOCI, hubFraming, geoFraming, ledgerLayerFraming, nodeFraming, hyperNodeFraming, dollyBack, easeInOutQuad, type CameraFraming } from "./domain/cameraRig";
@@ -88,7 +89,11 @@ export class Engine {
   // `_tween` immediately by `_tweenTo`, so reusing it across every focus call is safe.
   private _framingOut: CameraFraming = { pos: new THREE.Vector3(), target: new THREE.Vector3() };
   private _hubWorld = new THREE.Vector3(); // scratch: hub local pos tilted into world for framing
+  private _focusEuler = new THREE.Euler(); // scratch: the focus TARGET rotation (flat tilt + spin)
   private _hyperSpinY = 0; // shared hyper-structure spin angle (globe group + root + core, in lockstep)
+  // The shared structure TILT, eased per frame: HYPER_TILT at rest → HYPER_TILT_FOCUS while a
+  // metagraph is committed (the structure flattens so the side-on hub pose sees horizontal discs).
+  private _hyperTiltX = HYPER_TILT;
 
   // The ONE view-transition state machine (domain/viewTransition). Every 3D↔3D view switch runs the
   // staged gather choreography through it; the render loop advances it + feeds the furniture alphas,
@@ -529,8 +534,8 @@ export class Engine {
     // source view's rotation (the hyper tilt+spin only reasserts later in the loop).
     this.layers.root.scale.setScalar(Math.max(0.0001, 1 - this.morph));
     if (dest === "hyper") {
-      this.globe.setHyperSpin(this._hyperSpinY);
-      this.layers.setHyperSpin(this._hyperSpinY);
+      this.globe.setHyperSpin(this._hyperSpinY, this._hyperTiltX);
+      this.layers.setHyperSpin(this._hyperSpinY, this._hyperTiltX);
     }
     this._applyDestLayout(dest);
   }
@@ -978,7 +983,10 @@ export class Engine {
     // return the origin (the "doesn't focus the metagraph" bug). Apply ONLY the rotation to the
     // hub's local orbit position — that's where the hub lands once the morph settles; the spin/orbit
     // are frozen (focusId + non-"all" filter) so it stays valid for the whole tween.
-    this._hubWorld.copy(meta.group.position).applyEuler(this.layers.root.rotation);
+    // Frame against the TARGET rotation — the flattened focus tilt + the (frozen) spin — not the
+    // still-easing current root.rotation, so the tween ends exactly where the structure settles.
+    this._focusEuler.set(HYPER_TILT_FOCUS, this.layers.root.rotation.y, 0);
+    this._hubWorld.copy(meta.group.position).applyEuler(this._focusEuler);
     // Plain radial hub framing, world-up, NO camera roll and NO core-corner composition
     // (user, 2026-07-17: the rolled hyperFocusFraming + DoF read fuzzy/off — keep the focused
     // pose simple and correct; hyperFocusFraming stays in cameraRig, currently unused).
@@ -1049,8 +1057,13 @@ export class Engine {
       // Frozen when a hub is focused (filter ≠ all) or the camera is zoomed in to inspect.
       if (this.mode === "hyper") {
         if (this.filter === "all" && !zoomedIn) this._hyperSpinY += dt * 0.06;
-        this.globe.setHyperSpin(this._hyperSpinY);
-        this.layers.setHyperSpin(this._hyperSpinY);
+        // Ease the shared structure tilt: near-flat while a metagraph is committed so its discs
+        // read horizontal from the plain side-on hub framing (user, 2026-07-17 — the structure
+        // moves, not the camera); back to the resting overview tilt otherwise.
+        const tiltTarget = this.filter !== "all" && this.filter !== "dag" ? HYPER_TILT_FOCUS : HYPER_TILT;
+        this._hyperTiltX += (tiltTarget - this._hyperTiltX) * Math.min(1, dt * 2.5);
+        this.globe.setHyperSpin(this._hyperSpinY, this._hyperTiltX);
+        this.layers.setHyperSpin(this._hyperSpinY, this._hyperTiltX);
       }
       // The globe group's rotation integrates HERE — before the staging-plane conversion — so
       // the world→group-local mapping always reflects THIS frame's final orientation (the geo

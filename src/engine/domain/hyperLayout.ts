@@ -53,3 +53,9 @@ export const DAG_L1 = { radius: 12.5, tilt: 0.28 };
 // AND the focused atom (hyperFocusFraming views along the same normal). All three groups share this
 // exact tilt so the tilted node rings stay registered with the cyan hoops.
 export const HYPER_TILT = 0.72;
+
+// The FOCUSED structure tilt (user, 2026-07-17): committing a metagraph eases the WHOLE
+// structure's shared tilt down to near-flat, so the plain side-on hub framing sees the atom's
+// discs horizontally — the structure moves instead of the camera rolling (the retired
+// hyperFocusFraming approach). Slightly above 0 so the rings never collapse to edge-on lines.
+export const HYPER_TILT_FOCUS = 0.12;
