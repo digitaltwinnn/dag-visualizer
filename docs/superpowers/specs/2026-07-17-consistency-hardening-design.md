@@ -77,6 +77,40 @@ took 1 line in Globe (its `geoFades` registry) vs 11 and 16 hand-edits in HyperV
    in JSX to the CSS-var tokens, then widen the guard's scope (CLAUDE.md already names this
    follow-up).
 
+## Part C — Learnings from the 2026-07-17 live-review batch (five staging bugs + the DoF/tilt rework)
+
+The post-final-review session surfaced failure classes the earlier parts don't yet cover; they
+are first-class hardening items:
+
+1. **The render loop's phase order becomes an explicit contract.** Three of the five staging
+   bugs were same-frame ordering bugs (consumer read state a later mutation changed: group
+   matrix, camera pose, rotation tween). The loop is now implicitly ordered (inputs → camera →
+   rotation → staging frame → writes → render) but nothing NAMES that contract. Restructure the
+   Engine loop into named phase methods called in order (`_integrateCamera`, `_integrateMotion`,
+   `_deriveFrames`, `_writeScene`) with a header comment stating the rule: *nothing may mutate a
+   pose after the phase that derives from it*. Future additions then have an obvious slot.
+2. **Framings read LAYOUT, never render state — as a written rule.** Two focus bugs came from
+   camera math reading instance matrices / `getWorldPosition` of animated or collapsed groups
+   (`hyperWorldPos`, the boundary's root scale). The rule "camera framing math consumes layout
+   data (records, anchors, orbit slots), never rendered transforms" goes into CLAUDE.md's
+   camera section; the pass audits remaining `getWorldPosition`/`getMatrixAt` uses in framing
+   paths.
+3. **Structure-space beats camera-space.** The rolled `hyperFocusFraming` + DoF caused three
+   user-visible defects and fell to deletion + a structure-tilt ease that inherited every system
+   (staging, transitions, picking) for free. Principle for the doc: express view emphasis by
+   moving the STRUCTURE (shared, lockstep, policy-driven) rather than composing camera
+   cleverness; camera poses stay dumb. Sweep `_hyperRoll`/`_hyperRollUp`/`hyperFocusFraming`
+   dead weight while codifying it.
+4. **A supported `?slowmo` dev flag.** Verifying sub-2s choreography required agents to
+   hand-stretch `DUR_*` constants (and revert) three separate times — error-prone (one leftover
+   would ship). Add a dev-only URL flag (`?slowmo=4`, like the existing `?stats`) that scales
+   the transition clock, so mid-flight states are screenshotable without touching source.
+5. **The focus/zoom ladder becomes data.** Three views now hand-roll laddered focus logic
+   (geo: selection→country→node; ledger: layer→node; hyper: filter→node) as scattered
+   branches with per-view fallback chains. Evaluate one per-view ladder table (viewPolicy-
+   adjacent: level → framing fn + deselect step-up) so cross-view carry and deselect stepping
+   are data — this is the same allow-list idiom the views already use for everything else.
+
 ## Non-goals
 
 No visual redesign: every unification must be pixel-neutral (verified per-change in the
