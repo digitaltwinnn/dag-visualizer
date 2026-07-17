@@ -736,6 +736,19 @@ export class Globe implements GeoViewHost {
     return null;
   }
 
+  // The node's LEDGER LANE position in world space — layout data (ledgerPos carries the
+  // chamber orientation bake), NOT the rendered instance matrix, for the same reason as
+  // hyperWorldPos: mid-transition the instance is at the staging grid, and the camera must
+  // frame where the chip will LAND. Event-time (a focus), allocation fine.
+  ledgerWorldPos(id: string | null): THREE.Vector3 | null {
+    if (!id) return null;
+    const u = this.nodes.find((n) => n.nodeId === id);
+    if (u) return this.group.localToWorld(new THREE.Vector3().copy(u.ledgerPos));
+    const r = this.metaNodes && this.metaNodes.find((n) => n.nodeId === id);
+    if (r) return this.group.localToWorld(new THREE.Vector3().copy(r.ledgerPos));
+    return null;
+  }
+
   // Whether a node is part of the current network filter. `id` is the core a node belongs to.
   private _isActive(id: string): boolean {
     return this.filter === "all" || this.filter === id;

@@ -15,7 +15,7 @@ import { LEDGER, LAYER_GEOM, ledgerSite } from "./domain/ledgerLayout";
 import { HYPER_TILT, HYPER_TILT_FOCUS } from "./domain/hyperLayout";
 import { readSceneColors } from "./sceneColors";
 import { VIEW_POLICIES } from "./domain/viewPolicy";
-import { FOCI, hubFraming, geoFraming, ledgerLayerFraming, nodeFraming, hyperNodeFraming, dollyBack, easeInOutQuad, type CameraFraming } from "./domain/cameraRig";
+import { FOCI, hubFraming, geoFraming, ledgerLayerFraming, ledgerNodeFraming, nodeFraming, hyperNodeFraming, dollyBack, easeInOutQuad, type CameraFraming } from "./domain/cameraRig";
 import { countryFraming } from "./domain/countryShape";
 import { R as GEO_R, LAND_H } from "./domain/geoLayout";
 import { autoLayerForNode, clickActions, pickActive } from "./domain/pickActions";
@@ -263,6 +263,8 @@ export class Engine {
         // Geo: clicking a node (on the globe or in the left explorer both set `inspect`)
         // flies the camera to it; clearing it returns to the selection framing.
         if (st.inspect !== prev.inspect && st.mode === "geo") this._focusInspectNode(st.inspect);
+        // Ledger: the same ladder — a node pick zooms to its chip, a clear steps back to the layer.
+        if (st.inspect !== prev.inspect && st.mode === "ledger") this._focusLedgerInspect(st.inspect);
         // Ledger: keep the hovered/selected snapshot coloured in the trail (hover wins, then the
         // clicked `snap`); everything else fades to the neutral background tone.
         if (st.hoverSnapOrd !== prev.hoverSnapOrd || st.snap !== prev.snap) {
@@ -565,19 +567,18 @@ export class Engine {
       // frames the resting pose central/untilted. If a layer is already committed, resume its
       // tilted layer-focus framing instead.
       const selLayer = useStore.getState().layer;
-      if (selLayer) this._focusLayer(selLayer.layerId);
-      else {
-        // A selected NODE carries into Snapshots as its related L0 layer (user, 2026-07-17):
-        // auto-commit the layer so the camera arrives well-positioned on the settlement row
-        // the node belongs to (metagraph node → metagraph L0; DAG validator → hypergraph L0).
-        // Committed through the ONE executor, exactly like the panel row's toggle.
-        const inspect = useStore.getState().inspect;
-        const autoLayer = autoLayerForNode(inspect?.kind);
-        if (autoLayer) {
-          applyClickActions([{ kind: "layer", pick: { kind: "layer", layerId: autoLayer } }]);
-          this._focusLayer(autoLayer);
-        } else this.focus("overview");
-      }
+      const inspect = useStore.getState().inspect;
+      // A selected NODE carries into Snapshots as its related L0 layer (user, 2026-07-17):
+      // auto-commit the layer (through the ONE executor, like the panel row's toggle) so the
+      // rail/dims reflect the row — then the NODE zoom wins the camera (the level after the
+      // layer level, geo's country→node ladder mirrored).
+      const autoLayer = selLayer ? null : autoLayerForNode(inspect?.kind);
+      if (autoLayer) applyClickActions([{ kind: "layer", pick: { kind: "layer", layerId: autoLayer } }]);
+      const layerId = selLayer?.layerId ?? autoLayer;
+      const isNode = !!inspect && (inspect.kind === "l0" || inspect.kind === "l1" || inspect.kind === "metanode");
+      if (isNode && this._focusLedgerNode(inspect!)) { /* node camera wins */ }
+      else if (layerId) this._focusLayer(layerId);
+      else this.focus("overview");
       return;
     }
     // The remaining placeholder views (status/transactions/staking) hide the 3D scene — reset to idle.
@@ -722,6 +723,30 @@ export class Engine {
     this._hyperRoll = false; // the node pose is a world-up framing — level the atom-focus roll
     hyperNodeFraming(pos, this._framingOut);
     this._tweenTo(this._framingOut.pos, this._framingOut.target);
+  }
+
+  // Snapshots NODE zoom (user, 2026-07-17): the level after the layer zoom, mirroring geo's
+  // country→node ladder. Frames the selected node's chip in the chamber; false when the node
+  // can't be located (caller falls back to the layer framing).
+  private _focusLedgerNode(p: PickDescriptor): boolean {
+    const id = p.kind === "metanode" ? p.node?.ip : p.kind === "l0" || p.kind === "l1" ? p.node?.id : null;
+    const pos = id ? this.globe.ledgerWorldPos(id) : null;
+    if (!pos) return false;
+    this.ctx.controls.autoRotate = false;
+    ledgerNodeFraming(pos, this._framingOut);
+    this._tweenTo(this._framingOut.pos, this._framingOut.target);
+    return true;
+  }
+
+  // Ledger inspect-change camera: a node pick zooms to its chip (the node level); clearing it
+  // steps back UP one level to the committed layer's framing, else the resting overview —
+  // the same deselect ladder as geo's node → country → selection.
+  private _focusLedgerInspect(p: PickDescriptor | null) {
+    const isNode = !!p && (p.kind === "l0" || p.kind === "l1" || p.kind === "metanode");
+    if (isNode && this._focusLedgerNode(p!)) return;
+    const selLayer = useStore.getState().layer;
+    if (selLayer) this._focusLayer(selLayer.layerId);
+    else this.focus("overview");
   }
 
   // Node framing: zoomed in, camera low in front of the node, line of sight skimming across the

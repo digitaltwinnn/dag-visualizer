@@ -179,6 +179,16 @@ export function ledgerLayerFraming(y: number, out: CameraFraming): void {
   out.target.set(0, y - 1, 0);
 }
 
+// Snapshots NODE zoom — the level AFTER the layer zoom (user, 2026-07-17), mirroring geo's
+// country→node ladder: the layer pose is the "country" level, this frames the selected node's
+// chip itself. Same diagonal viewing direction as ledgerLayerFraming (left + above, trail
+// receding top-left), much closer; the target sits slightly above the chip so it settles just
+// below centre (the house rule-of-thirds node composition). `node` is the chip's WORLD position.
+export function ledgerNodeFraming(node: THREE.Vector3, out: CameraFraming): void {
+  out.pos.set(node.x - 2.6, node.y + 2.8, node.z + 8.5);
+  out.target.set(node.x, node.y + 0.4, node.z);
+}
+
 // Engine.ts:784 `_updateTween`'s inline ease, lifted verbatim.
 export function easeInOutQuad(t: number): number {
   return t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
