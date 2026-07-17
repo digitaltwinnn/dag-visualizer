@@ -295,6 +295,11 @@ export class NodeFabric {
     if (!tr || !tr.active()) return;
     const w = tr.gatherWeight(rank, count);
     if (w <= 0) return;
+    // A dynamically-invisible non-primary (e.g. a hybrid's shell record hidden in geo) already
+    // wrote a zero scale — it doesn't fly, it stays zero-scaled wherever it is. Without this,
+    // GATHER_SCALE/max(1e-6, scale.x) blows up into a huge multiplier that only stays inert
+    // because 0×huge=0; bail explicitly instead of relying on that accident.
+    if (_dummy.scale.x < 1e-4) return;
     _gatherV
       .copy(ctx.gather.origin)
       .addScaledVector(ctx.gather.right, gU * ctx.gather.cell)

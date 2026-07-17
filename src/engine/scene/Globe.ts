@@ -350,20 +350,61 @@ export class Globe implements GeoViewHost {
   // setMetagraphs — whichever rebuilt, the other array's slots are recomputed too (harmless: the
   // layout is a pure function of the current counts).
   private _assignGatherSlots(): void {
-    const groups = [{ id: "dag", count: this.nodes.length }];
-    const byMeta = new Map<string, typeof this.metaNodes>();
+    // Group by MACHINE, not shell instance: a hybrid validator/metagraph machine holds a record
+    // PER LAYER it runs (e.g. an l0 record + a cl1 twin), but only one — the geoPrimary — renders
+    // on the globe; in hyper all of them render. Sizing/slotting the grid by raw record count
+    // double-counted hybrids (the DAG block came out ~2× too many slots) and made the fill
+    // inconsistent by source view (full arriving from hyper, half-empty/moth-eaten from geo). A
+    // machine gets exactly ONE staging slot, keyed by `nodeId` (the validator's `node.id` / the
+    // metagraph node's `node.ip` — both already used as the machine identity elsewhere, e.g.
+    // `setSelectedNode`'s lookups). Every shell record for that machine copies the slot verbatim,
+    // so all its instances CONVERGE to one grid pixel during OUT (sharing the stagger rank) and
+    // fan back out to their separate hyper shells during IN — the square is identical regardless
+    // of which view the transition started from. Grouping by nodeId (not filtering by the
+    // `geoPrimary` flag) naturally collapses every shell record of one machine into one group even
+    // in an edge case where the flag were missing/duplicated.
+    const dagByMachine = new Map<string, ValidatorRecord[]>();
+    let dagAnonSeq = 0;
+    for (const u of this.nodes) {
+      const key = u.nodeId != null ? `id:${u.nodeId}` : `anon:${dagAnonSeq++}`; // no id: never shared, its own machine
+      let a = dagByMachine.get(key);
+      if (!a) dagByMachine.set(key, (a = []));
+      a.push(u);
+    }
+    const groups: { id: string; count: number }[] = [{ id: "dag", count: dagByMachine.size }];
+
+    const byMeta = new Map<string, MetaNodeRecord[]>();
     for (const r of this.metaNodes) {
       let a = byMeta.get(r.metaId);
       if (!a) byMeta.set(r.metaId, (a = []));
       a.push(r);
     }
-    for (const [id, arr] of byMeta) groups.push({ id, count: arr.length });
-    const slots = gatherSlots(groups);
-    const dagSlots = slots.get("dag");
-    if (dagSlots) this.nodes.forEach((u, i) => { const s = dagSlots[i]; u.gU = s.u; u.gV = s.v; u.gRank = s.rank; u.gCount = s.count; });
+    const metaByMachine = new Map<string, Map<string, MetaNodeRecord[]>>();
     for (const [id, arr] of byMeta) {
+      const byMachine = new Map<string, MetaNodeRecord[]>();
+      for (const r of arr) {
+        let a = byMachine.get(r.nodeId);
+        if (!a) byMachine.set(r.nodeId, (a = []));
+        a.push(r);
+      }
+      metaByMachine.set(id, byMachine);
+      groups.push({ id, count: byMachine.size });
+    }
+
+    const slots = gatherSlots(groups);
+    const apply = (recs: { gU: number; gV: number; gRank: number; gCount: number }[], s: { u: number; v: number; rank: number; count: number }) =>
+      recs.forEach((r) => { r.gU = s.u; r.gV = s.v; r.gRank = s.rank; r.gCount = s.count; });
+
+    const dagSlots = slots.get("dag");
+    if (dagSlots) {
+      let i = 0;
+      for (const arr of dagByMachine.values()) { const s = dagSlots[i++]; if (s) apply(arr, s); }
+    }
+    for (const [id, byMachine] of metaByMachine) {
       const ss = slots.get(id);
-      if (ss) arr.forEach((r, i) => { const s = ss[i]; r.gU = s.u; r.gV = s.v; r.gRank = s.rank; r.gCount = s.count; });
+      if (!ss) continue;
+      let i = 0;
+      for (const arr of byMachine.values()) { const s = ss[i++]; if (s) apply(arr, s); }
     }
   }
 
