@@ -17,6 +17,8 @@ import * as THREE from "three";
 import { METAGRAPHS, DEFAULT_META_COLOR } from "../config";
 import { metaAnchor, META_LAYERS, META_RING, DAG_L0, DAG_L1, HYPER_TILT } from "../domain/hyperLayout";
 import { LEDGER, ledgerSite, ledgerSpread, clusterRadius } from "../domain/ledgerLayout";
+import { gatherSlots } from "../domain/gatherLayout";
+import type { ViewTransition } from "../domain/viewTransition";
 import type { SceneColors } from "../sceneColors";
 import * as geoStats from "../domain/geoStats";
 import { R, LAND_H, CHIP_PITCH, HEX_H, VALIDATOR_HEX_R, META_HEX_R, latLonToVec3, vec3ToLatLon } from "../domain/geoLayout";
@@ -101,6 +103,10 @@ export class Globe implements GeoViewHost {
   private _glowDim = 1; // eased 1→~0.2 while a country is drilled, so its highlight isn't overruled
   private _glowAllDim = 1; // eased ~0.62 in "all" (overlapping per-network planes stack additively)
   morph = 0;
+  // The view-transition state machine (Engine-owned, set once); null = no transition support wired
+  // yet at that call site. Read each frame by _frameCtx into ctx.transition for NodeFabric's gather.
+  transition: ViewTransition | null = null;
+  private _invM = new THREE.Matrix4(); // scratch: this.group's inverse world matrix (setGatherFrame)
   private ledgerT = 0; // 0->1 ease as the reused node meshes fly from their source view into the lanes
   clock = 0;
   private spin: SpinState | null = null;
@@ -329,7 +335,30 @@ export class Globe implements GeoViewHost {
     // Fan out the filter-active nodes and (re)build the density rings + arcs.
     this._relayoutGeo();
     this._buildDensityGlow(); // light pools follow the validator sites too
+    this._assignGatherSlots(); // a validator-only rebuild must not leave stale ranks either
     this.setMorph(this.morph); // place at current morph
+  }
+
+  // Staging-grid slots for the view-transition choreography (event-time: data rebuilds). Reads
+  // BOTH record arrays as they currently stand, so it's safe to call from either setNodes or
+  // setMetagraphs — whichever rebuilt, the other array's slots are recomputed too (harmless: the
+  // layout is a pure function of the current counts).
+  private _assignGatherSlots(): void {
+    const groups = [{ id: "dag", count: this.nodes.length }];
+    const byMeta = new Map<string, typeof this.metaNodes>();
+    for (const r of this.metaNodes) {
+      let a = byMeta.get(r.metaId);
+      if (!a) byMeta.set(r.metaId, (a = []));
+      a.push(r);
+    }
+    for (const [id, arr] of byMeta) groups.push({ id, count: arr.length });
+    const slots = gatherSlots(groups);
+    const dagSlots = slots.get("dag");
+    if (dagSlots) this.nodes.forEach((u, i) => { const s = dagSlots[i]; u.gU = s.u; u.gV = s.v; u.gRank = s.rank; u.gCount = s.count; });
+    for (const [id, arr] of byMeta) {
+      const ss = slots.get(id);
+      if (ss) arr.forEach((r, i) => { const s = ss[i]; r.gU = s.u; r.gV = s.v; r.gRank = s.rank; r.gCount = s.count; });
+    }
   }
 
   // -------------------------------------------------- metagraph nodes
@@ -411,18 +440,22 @@ export class Globe implements GeoViewHost {
       hoopPresent.set(m.id, present);
     }
     this.layers?.setHoopPresence(hoopPresent);
-    if (!recs.length) return;
-
-    this.fabric.buildMetaNodes(recs);
-    this.metaNodes = recs;
-    // Re-assert the filter's dim on the fresh records — but a data REBUILD is not a filter
-    // switch, so a live country drill survives it (setFilter clears the drill by design for
-    // real switches; without the restore, every cluster poll wiped the drill's dim + border).
-    const drill = this.countryFilter;
-    this.setFilter(this.filter);
-    if (drill) this.setCountry(drill);
-    this.setSelectedNode(this._selectedNodeId); // re-resolve the spotlight's record on fresh data
-    this._buildDensityGlow();
+    if (recs.length) {
+      this.fabric.buildMetaNodes(recs);
+      this.metaNodes = recs;
+      // Re-assert the filter's dim on the fresh records — but a data REBUILD is not a filter
+      // switch, so a live country drill survives it (setFilter clears the drill by design for
+      // real switches; without the restore, every cluster poll wiped the drill's dim + border).
+      const drill = this.countryFilter;
+      this.setFilter(this.filter);
+      if (drill) this.setCountry(drill);
+      this.setSelectedNode(this._selectedNodeId); // re-resolve the spotlight's record on fresh data
+      this._buildDensityGlow();
+    }
+    // Staging-grid slots for the view-transition choreography (event-time: data rebuilds); this.metaNodes
+    // was just reset (to `recs`, or to `[]` above if `!recs.length`), so the "dag" group's slots need
+    // recomputing here too (the packed row shifts when a metagraph appears/vanishes).
+    this._assignGatherSlots();
   }
 
   // A soft additive "light pool" under each dense node cluster on the globe — LIGHTING driven by the
@@ -813,18 +846,36 @@ export class Globe implements GeoViewHost {
     ctx.ledgerT = this.ledgerT;
     ctx.dt = dt;
     ctx.flashDecay = flashDecay;
+    ctx.transition = this.transition;
     return ctx;
   }
 
+  // The camera-anchored staging plane (view-transition choreography), converted to group-LOCAL
+  // once per frame (the instanced matrices NodeFabric writes are in group space). World-space in;
+  // stored on the persistent ctx.gather object NodeFabric's _applyGather reads.
+  setGatherFrame(origin: THREE.Vector3, right: THREE.Vector3, up: THREE.Vector3): void {
+    const g = this._ctx.gather;
+    g.origin.copy(origin);
+    this.group.worldToLocal(g.origin);
+    this._invM.copy(this.group.matrixWorld).invert();
+    g.right.copy(right).transformDirection(this._invM);
+    g.up.copy(up).transformDirection(this._invM);
+  }
+
   // -------------------------------------------------- morph between layouts
-  setLedger(on: boolean): void {
-    if (this.ledger === on) return;
+  setLedger(on: boolean): void { this.applyLedgerLayout(on); } // TEMP alias — removed in the Engine wiring task
+
+  // BOUNDARY-applied ledger layout (view-transition choreography): called by the Engine at the
+  // invisible mid-transition boundary — nodes are gathered, so the snap can't be seen. ledgerT
+  // stopped being an eased flight; it is now a pure layout parameter (the IN-phase flight is the
+  // gather dissolve).
+  applyLedgerLayout(on: boolean): void {
     this.ledger = on;
-    // The Snapshots view appears DIRECTLY in position — no entry animation: axis-aligned (spin
-    // snapped to 0) and the nodes placed straight into their lanes (ledgerT = 1). Only the camera eases.
     if (on) {
       this.group.rotation.set(0, 0, 0);
       this.ledgerT = 1;
+    } else {
+      this.ledgerT = 0;
     }
   }
 
@@ -835,9 +886,12 @@ export class Globe implements GeoViewHost {
     this.pickables = this.fabric.placeValidators(this.nodes, ctx);
 
     // The globe surface fades in only once nodes are well on their way; arcs later still. In
-    // ledger the surface is hidden OUTRIGHT (not eased by morph).
-    const surf = this.ledger ? 0 : surfFade(m);
-    const extras = this.ledger ? 0 : extrasFade(m);
+    // ledger the surface is hidden OUTRIGHT (not eased by morph). Also rides the transition's
+    // furniture alpha (view-transition choreography): the geo furniture only lights while geo is
+    // the lit view (never mid-flight, per furnitureAlpha's contract).
+    const vAlpha = this.transition ? this.transition.furnitureAlpha("geo") : 1;
+    const surf = this.ledger ? 0 : surfFade(m) * vAlpha;
+    const extras = this.ledger ? 0 : extrasFade(m) * vAlpha;
     for (const f of this.geoFades) f.mat.opacity = f.base * surf;
     // Density light pools: morph fade × the country-drill recede (so a drilled country's own
     // highlight isn't washed out by the pools).
@@ -895,8 +949,8 @@ export class Globe implements GeoViewHost {
       this.landWallUniforms.uColor.value.copy(this._edgeColor);
     }
     if (this.ledger) {
-      // Ease the lane fly-in (ledgerT 0->1); the spin was already snapped to 0 in setLedger.
-      this.ledgerT += (1 - this.ledgerT) * Math.min(1, dt * 2.2);
+      // ledgerT is a pure layout parameter now (snapped to 1 at the transition boundary in
+      // applyLedgerLayout) — the IN-phase gather-dissolve flight is what used to be this ease.
       this.group.rotation.set(0, 0, 0);
     } else if (this.spin) {
       // Ease-in-out to the focus orientation (longitude + tilt), then hold there.
