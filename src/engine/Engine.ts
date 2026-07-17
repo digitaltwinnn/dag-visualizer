@@ -986,9 +986,11 @@ export class Engine {
           ? meta.group.getWorldPosition(this._dofTmp)
           : this.ctx.controls.target;
         this.ctx.dof.uniforms["focus"].value = this.ctx.camera.position.distanceTo(focusTarget);
-        // out-of-focus blur — kept modest so the SELECTED hub (a sphere whose near/far surfaces
-        // straddle the focal plane) stays crisp; it's enough to separate the background core/hubs.
-        this.ctx.dof.uniforms["maxblur"].value = 0.08 * dofMix;
+        // out-of-focus blur — the ceiling the background core/hubs saturate to. The selected
+        // cluster stays crisp regardless (the wide sharp zone comes from the LOW aperture, not
+        // this cap — see SceneContext's dofParams note); raised 0.08 → 0.16 (user 2026-07-17:
+        // more background separation while focused).
+        this.ctx.dof.uniforms["maxblur"].value = 0.16 * dofMix;
       }
 
       this.ctx.composer.render();
