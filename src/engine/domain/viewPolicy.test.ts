@@ -20,8 +20,8 @@ describe("VIEW_POLICIES", () => {
     for (const m of MODES) expect(VIEW_POLICIES[m].sims.arcs).toBe(m === "geo");
   });
 
-  it("makes hyper the only dofEligible view", () => {
-    for (const m of MODES) expect(VIEW_POLICIES[m].dofEligible).toBe(m === "hyper");
+  it("makes NO view dofEligible (DoF dropped — user 2026-07-17: bokeh read as fuzz on the selection)", () => {
+    for (const m of MODES) expect(VIEW_POLICIES[m].dofEligible).toBe(false);
   });
 
   it("morphs hyper→toHyper, geo→toGeo, ledger→frozen, flat→toHyper", () => {

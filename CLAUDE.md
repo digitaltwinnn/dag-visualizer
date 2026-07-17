@@ -539,13 +539,15 @@ views and caused the ledger red-dots bug; that pattern is forbidden.
     applyFilter(false)`) used to silently clear the drill's dim + border seconds after every
     drill (long-standing bug, found+fixed 2026-07-10; a real filter SWITCH still clears the
     drill by design — the store subscription nulls `country` first).
-  - **Hypergraph**: `_focusFilter` flies the camera to the selected hub (using its
-    **local/unscaled** position — `layers.root` is morph-scaled, so `getWorldPosition` would
-    aim at the origin mid-morph), framed slightly off the radial line so the core sits to the
-    upper-left. The hub's **orbit is paused while focused** (`layers.focusId`) so it stays
-    framed; a subtle **depth-of-field** (BokehPass) keeps it crisp while the rest softens;
-    AND the non-selected nodes + hubs dim back so the selection stands out. DoF runs **only
-    in hyper with a metagraph selected**. Picking is filter-gated in hyper too
+  - **Hypergraph**: `_focusFilter` flies the camera to the selected hub with the plain radial
+    `hubFraming` (using the hub's **local/unscaled** position — `layers.root` is morph-scaled,
+    so `getWorldPosition` would aim at the origin mid-morph), world-up, NO camera roll. The
+    rolled `hyperFocusFraming` pose (core pinned upper-left) AND depth-of-field were DROPPED
+    2026-07-17 (user: the bokeh read as fuzz on the selected atom and the composed pose fought
+    the transition choreography — simple and correct wins; `hyperFocusFraming` stays in
+    cameraRig unused, the BokehPass stays wired but no view is `dofEligible`). The hub's
+    **orbit is paused while focused** (`layers.focusId`) so it stays framed, AND the
+    non-selected nodes + hubs dim back so the selection stands out. Picking is filter-gated in hyper too
     (`_isPickActive`): only the in-focus selection's nodes are hoverable/clickable. Clicking
     a node sets the filter to its network (consistent with geo) + opens its node card —
     `GeoExplore.selectNode` mirrors the same two-step for explorer rows.

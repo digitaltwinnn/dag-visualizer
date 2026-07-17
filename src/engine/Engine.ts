@@ -14,7 +14,7 @@ import { METAGRAPHS, COLORS } from "@/src/engine/config";
 import { LEDGER, LAYER_GEOM, ledgerSite } from "./domain/ledgerLayout";
 import { readSceneColors } from "./sceneColors";
 import { VIEW_POLICIES } from "./domain/viewPolicy";
-import { FOCI, hyperFocusFraming, geoFraming, ledgerLayerFraming, nodeFraming, hyperNodeFraming, dollyBack, easeInOutQuad, type CameraFraming } from "./domain/cameraRig";
+import { FOCI, hubFraming, geoFraming, ledgerLayerFraming, nodeFraming, hyperNodeFraming, dollyBack, easeInOutQuad, type CameraFraming } from "./domain/cameraRig";
 import { countryFraming } from "./domain/countryShape";
 import { R as GEO_R, LAND_H } from "./domain/geoLayout";
 import { clickActions, pickActive } from "./domain/pickActions";
@@ -88,7 +88,6 @@ export class Engine {
   // `_tween` immediately by `_tweenTo`, so reusing it across every focus call is safe.
   private _framingOut: CameraFraming = { pos: new THREE.Vector3(), target: new THREE.Vector3() };
   private _hubWorld = new THREE.Vector3(); // scratch: hub local pos tilted into world for framing
-  private _hubNormal = new THREE.Vector3(); // scratch: atom ring-plane normal in world (for framing)
   private _hyperSpinY = 0; // shared hyper-structure spin angle (globe group + root + core, in lockstep)
 
   // The ONE view-transition state machine (domain/viewTransition). Every 3D↔3D view switch runs the
@@ -969,15 +968,10 @@ export class Engine {
     // hub's local orbit position — that's where the hub lands once the morph settles; the spin/orbit
     // are frozen (focusId + non-"all" filter) so it stays valid for the whole tween.
     this._hubWorld.copy(meta.group.position).applyEuler(this.layers.root.rotation);
-    // The atom's ring-plane normal in world = root's tilt+spin applied to +Y. The framing uses it BOTH
-    // for the position (consistent core placement) AND as the camera-UP (roll) so the discs read
-    // horizontal at any spin — passed through to the tween as the pose's up.
-    this._hubNormal.set(0, 1, 0).applyEuler(this.layers.root.rotation);
-    hyperFocusFraming(this._hubWorld, this._hubNormal, this._framingOut);
-    // Roll the camera to the atom's ring normal so its discs read horizontal (the render loop eases
-    // camera.up toward this while the atom stays focused; cleared for every other state).
-    this._hyperRoll = true;
-    this._hyperRollUp.copy(this._hubNormal);
+    // Plain radial hub framing, world-up, NO camera roll and NO core-corner composition
+    // (user, 2026-07-17: the rolled hyperFocusFraming + DoF read fuzzy/off — keep the focused
+    // pose simple and correct; hyperFocusFraming stays in cameraRig, currently unused).
+    hubFraming(this._hubWorld, this._framingOut);
     this._tweenTo(this._framingOut.pos, this._framingOut.target);
   }
 
