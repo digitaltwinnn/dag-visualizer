@@ -31,9 +31,12 @@ const FLIGHT_OUT = DUR_OUT - STAGGER_SPREAD;
 const FLIGHT_IN = DUR_IN - STAGGER_SPREAD;
 
 export class ViewTransition {
-  phase: "idle" | "out" | "in" = "idle";
+  // "staged" = parked at the gathering grids with NO destination (a "soon"/placeholder view
+  // is active): step 1 ran, step 2 waits for the next 3D view (user, 2026-07-17). The grids
+  // are the universal parked state, so every navigation reads as the same choreography.
+  phase: "idle" | "out" | "in" | "staged" = "idle";
   from: View3D | null = null;
-  to: View3D | null = null; // while idle: the SETTLED view
+  to: View3D | null = null; // while idle: the SETTLED view; null while staging/staged
   private t = 0;
 
   // Adopt `view` as the settled state with no animation (boot, or a non-3D interlude).
@@ -42,6 +45,53 @@ export class ViewTransition {
     this.from = null;
     this.to = view;
     this.t = 0;
+  }
+
+  // Park at the grids instantly, no animation — booting straight into a "soon" view (the
+  // nodes were never seen, so the first 3D view entered later runs step 2 from the grids).
+  stageInstant(): void {
+    this.phase = "staged";
+    this.from = null;
+    this.to = null;
+    this.t = 0;
+  }
+
+  // Step 1 only: gather out of `from` toward the grids with NO destination (entering a
+  // "soon" view). From IN, re-gathers with weight continuity like any retarget.
+  stage(from: View3D): void {
+    if (this.phase === "staged") return;
+    if (this.phase === "out") {
+      this.to = null; // keep gathering; just drop the destination
+      return;
+    }
+    if (this.phase === "in") {
+      this.from = this.to;
+      this.to = null;
+      this.t = (1 - this.t / FLIGHT_IN) * FLIGHT_OUT; // base-weight continuity
+      this.phase = "out";
+      return;
+    }
+    this.from = from;
+    this.to = null;
+    this.phase = "out";
+    this.t = 0;
+  }
+
+  // Step 2 from the parked state (leaving a "soon" view for a 3D one). Returns how the
+  // caller must apply the destination layout: "immediate" (nodes are parked and no boundary
+  // will fire — apply now, it's invisible) or "atBoundary" (still gathering; the normal
+  // boundary fires when the OUT completes).
+  place(to: View3D): "immediate" | "atBoundary" {
+    if (this.phase === "out") {
+      this.to = to; // still flying to the grids — adopt the destination, boundary as usual
+      return "atBoundary";
+    }
+    // parked (staged): begin the IN dissolve right away
+    this.from = null;
+    this.to = to;
+    this.phase = "in";
+    this.t = 0;
+    return "immediate";
   }
 
   active(): boolean {
@@ -83,9 +133,15 @@ export class ViewTransition {
   // Advance the clock. Returns TRUE exactly once — on the frame the OUT phase completes
   // (the boundary): the caller applies the destination layout then.
   tick(dt: number): boolean {
-    if (this.phase === "idle") return false;
+    if (this.phase === "idle" || this.phase === "staged") return false;
     this.t += dt;
     if (this.phase === "out" && this.t >= DUR_OUT) {
+      if (this.to === null) {
+        // Stage-bound gather (a "soon" view): park at the grids — NO boundary (there is no
+        // destination layout to apply until place() names one).
+        this.stageInstant();
+        return false;
+      }
       this.t -= DUR_OUT;
       this.phase = "in";
       return true;
@@ -100,6 +156,7 @@ export class ViewTransition {
   // (row-major within its network square): 0 = at its view pose, 1 = at its grid slot.
   gatherWeight(rank: number, count: number): number {
     if (this.phase === "idle") return 0;
+    if (this.phase === "staged") return 1; // parked at the grids
     const delay = (rank / Math.max(1, count - 1)) * STAGGER_SPREAD;
     // `smoother` (quintic), not `smooth`: a pronounced glide — slow launch, fast cruise for
     // the big distance, slow landing (user). Same 0.5-symmetry, so retarget continuity holds.
@@ -115,6 +172,7 @@ export class ViewTransition {
   // still placing (the decoupled ramps, see the constants note).
   furnitureAlpha(view: View3D): number {
     if (this.phase === "idle") return view === this.to ? 1 : 0;
+    if (this.phase === "staged") return 0; // every furniture dark behind the hidden canvas
     if (this.phase === "out") return view === this.from ? 1 - smooth(Math.min(1, this.t / DUR_OUT)) : 0;
     return view === this.to ? smooth(Math.min(1, this.t / FURN_IN)) : 0;
   }

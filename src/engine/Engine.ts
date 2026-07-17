@@ -230,7 +230,10 @@ export class Engine {
     if (this.mode === "geo") this.morph = 1;
     // Seed the transition machine on the settled boot view (setMode below re-settles on the same
     // value — harmless — but this guarantees a valid state before the first render frame).
-    this.transition.settle(this.mode === "geo" ? "geo" : this.mode === "ledger" ? "ledger" : "hyper");
+    // Boot: settle on the 3D view, or PARK at the staging grids for a flat/"soon" boot (the
+    // first 3D view entered later runs step 2 from the grids — one choreography everywhere).
+    if (this.mode === "hyper" || this.mode === "geo" || this.mode === "ledger") this.transition.settle(this.mode);
+    else this.transition.stageInstant();
     this.unsub.push(
       useStore.subscribe((st, prev) => {
         if (st.mode !== prev.mode) this.setMode(st.mode);
@@ -491,16 +494,37 @@ export class Engine {
       // at the OUT→IN boundary, while the nodes are gathered and both furnitures are dark.
       this.transition.start(prevMode, mode);
       this._pendingBoundary = mode;
-    } else {
-      // Boot, a flat interlude, or flat→3D: no choreography (SceneCanvas cross-fades the canvas).
-      // Cancel any in-flight boundary; settle the machine on the destination (a flat view that
-      // interrupted a 3D transition settles it on the in-progress target so the alpha doesn't
-      // strand a half-lit furniture). _applyDestLayout runs immediately, as before.
+    } else if (!is3D(mode)) {
+      // Entering a "soon"/placeholder view: STEP 1 ONLY (user, 2026-07-17) — the old view's
+      // furniture fades and the nodes fly to the staging grids, where they PARK (the machine
+      // ends in "staged", no boundary, no destination layout). SceneCanvas still cross-fades
+      // the canvas out; the parked grids are the state the next 3D view resumes from. From a
+      // flat/boot origin there is nothing to gather — the machine parks instantly.
       this._pendingBoundary = null;
-      if (is3D(mode)) this.transition.settle(mode);
-      else if (this.transition.active()) this.transition.settle(this.transition.to!);
-      this._applyDestLayout(mode);
+      if (is3D(prevMode)) this.transition.stage(prevMode);
+      else this.transition.stageInstant();
+    } else {
+      // Flat/boot → 3D: STEP 2 from the parked grids — the nodes dissolve out of staging into
+      // the destination. place() says whether the layout applies NOW (parked: it's invisible —
+      // the boundary-equivalent) or at the normal boundary (still mid-gather toward the grids).
+      if (this.transition.place(mode) === "immediate") {
+        this._pendingBoundary = null;
+        this._applyBoundary(mode);
+      } else {
+        this._pendingBoundary = mode;
+      }
     }
+  }
+
+  // The boundary-equivalent layout application: morph snapped to the destination's value +
+  // the per-view layout/camera. Called at the mid-flight OUT→IN boundary (render loop) and
+  // immediately when step 2 starts from the parked grids (both moments are invisible: nodes
+  // gathered, furnitures dark).
+  private _applyBoundary(dest: Mode): void {
+    if (dest === "geo") this.morph = 1;
+    if (dest === "hyper") this.morph = 0;
+    // ledger snaps nothing — it freezes morph at the source view's value.
+    this._applyDestLayout(dest);
   }
 
   // The per-view destination LAYOUT + camera framing, applied either immediately (flat/boot path)
@@ -977,10 +1001,7 @@ export class Engine {
       if (this.transition.tick(dt) && this._pendingBoundary) {
         const dest = this._pendingBoundary;
         this._pendingBoundary = null;
-        if (dest === "geo") this.morph = 1;
-        if (dest === "hyper") this.morph = 0;
-        // ledger snaps nothing — it freezes morph at the source view's value (below).
-        this._applyDestLayout(dest);
+        this._applyBoundary(dest);
       }
       // The staging plane: a camera-anchored band across the TOP of the viewport (world space;
       // the Globe converts to group-local). Height from the frustum so the grids read the same at

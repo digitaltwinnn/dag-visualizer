@@ -118,6 +118,66 @@ describe("furnitureAlpha exclusivity", () => {
   });
 });
 
+describe("staging (the 'soon'-view parked state)", () => {
+  it("stage() runs step 1 only: gathers, parks, fires NO boundary", () => {
+    const tr = settled("hyper");
+    tr.stage("hyper");
+    expect(tr.phase).toBe("out");
+    expect(tr.tick(DUR_OUT / 2)).toBe(false);
+    expect(tr.furnitureAlpha("hyper")).toBeLessThan(1); // old view fading
+    expect(tr.tick(DUR_OUT)).toBe(false); // OUT completes — parked, no boundary
+    expect(tr.phase).toBe("staged");
+    expect(tr.gatherWeight(0, 10)).toBe(1); // held at the grids
+    expect(tr.gatherWeight(9, 10)).toBe(1);
+    for (const v of ["hyper", "geo", "ledger"] as const) expect(tr.furnitureAlpha(v)).toBe(0);
+    expect(tr.tick(10)).toBe(false); // parked indefinitely
+    expect(tr.phase).toBe("staged");
+  });
+
+  it("place() from parked runs step 2 immediately (caller applies layout now)", () => {
+    const tr = settled("geo");
+    tr.stage("geo");
+    tr.tick(DUR_OUT);
+    expect(tr.place("ledger")).toBe("immediate");
+    expect(tr.phase).toBe("in");
+    expect(tr.gatherWeight(0, 10)).toBe(1); // dissolve starts from the grids
+    tr.tick(DUR_IN);
+    expect(tr.phase).toBe("idle");
+    expect(tr.to).toBe("ledger");
+    expect(tr.furnitureAlpha("ledger")).toBe(1);
+  });
+
+  it("place() mid-gather adopts the destination and defers to the normal boundary", () => {
+    const tr = settled("hyper");
+    tr.stage("hyper");
+    tr.tick(DUR_OUT / 2);
+    expect(tr.place("geo")).toBe("atBoundary");
+    expect(tr.phase).toBe("out");
+    expect(tr.to).toBe("geo");
+    expect(tr.tick(DUR_OUT)).toBe(true); // the boundary fires as usual now
+  });
+
+  it("stage() from IN re-gathers with base-weight continuity", () => {
+    const tr = settled("hyper");
+    tr.start("hyper", "geo");
+    tr.tick(DUR_OUT);
+    tr.tick(DUR_IN * 0.4);
+    const w = tr.gatherWeight(0, 1);
+    tr.stage("geo");
+    expect(tr.phase).toBe("out");
+    expect(tr.to).toBe(null);
+    expect(tr.gatherWeight(0, 1)).toBeCloseTo(w, 5);
+  });
+
+  it("stageInstant() parks with no animation (flat-view boot)", () => {
+    const tr = new ViewTransition();
+    tr.stageInstant();
+    expect(tr.phase).toBe("staged");
+    expect(tr.gatherWeight(3, 8)).toBe(1);
+    expect(tr.place("hyper")).toBe("immediate");
+  });
+});
+
 describe("retargeting", () => {
   it("mid-OUT to a new destination just swaps `to` (gather continues uninterrupted)", () => {
     const tr = settled("hyper");
