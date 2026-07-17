@@ -1025,6 +1025,23 @@ export class Engine {
       if (minAlt != null && this.ctx.camera.position.lengthSq() < minAlt * minAlt) {
         this.ctx.camera.position.setLength(minAlt);
       }
+      // Freeze the overall sphere spin once the camera is zoomed in to inspect (hyper) — a close-up
+      // reads still; the per-node axis spin keeps going. Threshold is well inside the resting pose.
+      const zoomedIn = this.mode === "hyper" &&
+        this.ctx.camera.position.distanceTo(this.ctx.controls.target) < 45;
+      // Hyper resting: spin the whole TILTED structure about its own vertical axis so it reads as
+      // slowly-rotating top-down rings (replaces camera autoRotate, which wobbles a tilted
+      // structure). ONE shared angle → globe group + root + coreGroup can't desync from the hoops.
+      // Frozen when a hub is focused (filter ≠ all) or the camera is zoomed in to inspect.
+      if (this.mode === "hyper") {
+        if (this.filter === "all" && !zoomedIn) this._hyperSpinY += dt * 0.06;
+        this.globe.setHyperSpin(this._hyperSpinY);
+        this.layers.setHyperSpin(this._hyperSpinY);
+      }
+      // The globe group's rotation integrates HERE — before the staging-plane conversion — so
+      // the world→group-local mapping always reflects THIS frame's final orientation (the geo
+      // focusDensest tween otherwise lagged the staged nodes by one frame: the hyper→geo snap).
+      this.globe.updateRotation(dt);
       // The staging plane: a camera-anchored band across the TOP of the viewport (world space;
       // the Globe converts to group-local). Height from the frustum so the grids read the same at
       // any camera pose.
@@ -1066,19 +1083,6 @@ export class Engine {
       // (hover-preview wins over the committed filter), and stays lit for "all"/"dag".
       const coreSubj = this._hoverFilter ?? this.filter;
       const coreDim = coreSubj === "all" || coreSubj === "dag" ? 0 : 1;
-      // Freeze the overall sphere spin once the camera is zoomed in to inspect (hyper) — a close-up
-      // reads still; the per-node axis spin keeps going. Threshold is well inside the resting pose.
-      const zoomedIn = this.mode === "hyper" &&
-        this.ctx.camera.position.distanceTo(this.ctx.controls.target) < 45;
-      // Hyper resting: spin the whole TILTED structure about its own vertical axis so it reads as
-      // slowly-rotating top-down rings (replaces camera autoRotate, which wobbles a tilted
-      // structure). ONE shared angle → globe group + root + coreGroup can't desync from the hoops.
-      // Frozen when a hub is focused (filter ≠ all) or the camera is zoomed in to inspect.
-      if (this.mode === "hyper") {
-        if (this.filter === "all" && !zoomedIn) this._hyperSpinY += dt * 0.06;
-        this.globe.setHyperSpin(this._hyperSpinY);
-        this.layers.setHyperSpin(this._hyperSpinY);
-      }
       this.layers.update(dt, this.morph, coreDim, zoomedIn, this.ctx.camera, this.filter === "dag");
       this.globe.update(dt);
 

@@ -989,6 +989,33 @@ export class Globe implements GeoViewHost {
     this.arcs.setUM(extras);
   }
 
+  // The globe group's ROTATION integration (spin tween / idle spin / ledger hold), split out
+  // of update() so the Engine can run it BEFORE deriving the camera-anchored staging plane.
+  // With the easing inside update() (after the plane conversion), the geo destination's fast
+  // focusDensest tween made every staged node lag the globe by one frame of angular velocity —
+  // the hyper→geo "few pixels up and back" snap (user, 2026-07-17); the other direction never
+  // showed it because hyper's 0.06 rad/s drift is sub-pixel per frame.
+  updateRotation(dt: number): void {
+    if (this.ledger) {
+      // ledgerT is a pure layout parameter now (snapped to 1 at the transition boundary in
+      // applyLedgerLayout) — the IN-phase gather-dissolve flight is what used to be this ease.
+      this.group.rotation.set(0, 0, 0);
+    } else if (this.spin) {
+      // Ease-in-out to the focus orientation (longitude + tilt), then hold there.
+      const s = this.spin;
+      if (s.t < 1) {
+        s.t = Math.min(1, s.t + dt / s.dur);
+        const e = s.t < 0.5 ? 2 * s.t * s.t : 1 - Math.pow(-2 * s.t + 2, 2) / 2;
+        this.group.rotation.y = s.from + (s.to - s.from) * e;
+        this.group.rotation.x = (s.fromX || 0) + ((s.toX || 0) - (s.fromX || 0)) * e;
+      }
+    } else if (this.simSpin) {
+      this.group.rotation.y += dt * 0.03; // idle spin (gated by the view policy's globeSpin)
+      // Ease any focus tilt back to level when idling.
+      if (this.group.rotation.x) this.group.rotation.x += (0 - this.group.rotation.x) * Math.min(1, dt * 2.2);
+    }
+  }
+
   update(dt: number): void {
     this.clock += dt;
     // Node-pick SPOTLIGHT (geo only): stage a white key above the selected node's chip stack so the
@@ -1016,24 +1043,6 @@ export class Globe implements GeoViewHost {
     if (this.landWallUniforms) {
       this._edgeColor.lerp(this._edgeTarget, Math.min(1, dt * 3));
       this.landWallUniforms.uColor.value.copy(this._edgeColor);
-    }
-    if (this.ledger) {
-      // ledgerT is a pure layout parameter now (snapped to 1 at the transition boundary in
-      // applyLedgerLayout) — the IN-phase gather-dissolve flight is what used to be this ease.
-      this.group.rotation.set(0, 0, 0);
-    } else if (this.spin) {
-      // Ease-in-out to the focus orientation (longitude + tilt), then hold there.
-      const s = this.spin;
-      if (s.t < 1) {
-        s.t = Math.min(1, s.t + dt / s.dur);
-        const e = s.t < 0.5 ? 2 * s.t * s.t : 1 - Math.pow(-2 * s.t + 2, 2) / 2;
-        this.group.rotation.y = s.from + (s.to - s.from) * e;
-        this.group.rotation.x = (s.fromX || 0) + ((s.toX || 0) - (s.fromX || 0)) * e;
-      }
-    } else if (this.simSpin) {
-      this.group.rotation.y += dt * 0.03; // idle spin (gated by the view policy's globeSpin)
-      // Ease any focus tilt back to level when idling.
-      if (this.group.rotation.x) this.group.rotation.x += (0 - this.group.rotation.x) * Math.min(1, dt * 2.2);
     }
     const m = this.morph;
     const flashDecay = Math.max(0, 1 - dt * 5); // ~0.2s glow tail after a hit
