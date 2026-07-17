@@ -57,7 +57,6 @@ const hexPitchDeg = (r: number) => ((2 * r * 1.04) / (R + LAND_H)) * (180 / Math
 // unscaled it overflowed badly at phone aspect (verified live, Task 8).
 export const GATHER_CELL = 0.55;
 
-const _focusMat = new THREE.Matrix4(); // scratch for reading an instance's live transform
 // The ledger's whole-view orientation (tilt ∘ rotY), baked into every node's ledger position so the
 // nodes match the LedgerView group's transform. Scale is applied separately (uniform).
 const _LEDGER_M = new THREE.Matrix4()
@@ -710,17 +709,27 @@ export class Globe implements GeoViewHost {
   }
 
   // World position of a node's HYPERGRAPH point by its id — read from its live instance transform.
+  // The node's HYPER LAYOUT position in world space — from the layout DATA, deliberately NOT
+  // the rendered instance matrix: mid-transition the instance sits at the staging grid, and a
+  // camera framing must aim where the node will LAND, not where it happens to be in flight
+  // (user bug: geo node selected → hyper flew the camera to the staging area, "focus lost").
+  // Event-time (a focus click), so the allocation is fine.
   hyperWorldPos(id: string | null): THREE.Vector3 | null {
     if (!id) return null;
     const u = this.nodes.find((n) => n.nodeId === id);
-    if (u && this.fabric.instSphere) {
-      this.fabric.instSphere.getMatrixAt(u.index, _focusMat);
-      return this.group.localToWorld(new THREE.Vector3().setFromMatrixPosition(_focusMat));
-    }
+    if (u) return this.group.localToWorld(new THREE.Vector3().copy(u.hyperPos));
     const r = this.metaNodes && this.metaNodes.find((n) => n.nodeId === id);
-    if (r && this.fabric.metaSphere) {
-      this.fabric.metaSphere.getMatrixAt(r.index, _focusMat);
-      return this.group.localToWorld(new THREE.Vector3().setFromMatrixPosition(_focusMat));
+    if (r) {
+      // Same composition writeMetaFrame renders: the hub's world position expressed in the
+      // group's local frame, plus the node's hub-local offset, back out to world.
+      const v = new THREE.Vector3();
+      if (r.hubGroup) {
+        r.hubGroup.getWorldPosition(v);
+        this.group.worldToLocal(v).add(r.offset);
+      } else {
+        v.copy(r.hyperPos);
+      }
+      return this.group.localToWorld(v);
     }
     return null;
   }

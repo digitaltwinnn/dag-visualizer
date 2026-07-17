@@ -524,6 +524,15 @@ export class Engine {
     if (dest === "geo") this.morph = 1;
     if (dest === "hyper") this.morph = 0;
     // ledger snaps nothing — it freezes morph at the source view's value.
+    // Bring the DESTINATION's frame state up BEFORE any framing math reads it: the hyper
+    // root's scale is still collapsed from geo's morph 1 at this instant (a hub
+    // getWorldPosition would return ~the origin), and the globe group still carries the
+    // source view's rotation (the hyper tilt+spin only reasserts later in the loop).
+    this.layers.root.scale.setScalar(Math.max(0.0001, 1 - this.morph));
+    if (dest === "hyper") {
+      this.globe.setHyperSpin(this._hyperSpinY);
+      this.layers.setHyperSpin(this._hyperSpinY);
+    }
     this._applyDestLayout(dest);
   }
 
