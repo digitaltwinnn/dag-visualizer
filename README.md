@@ -28,7 +28,7 @@ can understand how it works and why it's powerful:
     node model — a node is *hybrid* or *dedicated*, never a separate "L0 cluster" vs "L1 cluster").
     Switching into any other 3D view runs a brief staged **transition**: nodes gather into
     small per-network squares, the layout swaps behind that cover, then everything flies out
-    to its new pose (~2 seconds) — instead of an instant cut.
+    to its new pose (~4 seconds, the view drawing in well before the last node lands) — instead of an instant cut.
   - **Node geography** — a 3D globe with every node plotted at its **real geographic location**
     (solid raised continents from world-atlas land data, with glowing coastal cliffs), co-located
     machines stacked into honeycomb chip towers, and travelling-packet connection arcs. The

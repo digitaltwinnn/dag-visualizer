@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { ViewTransition, DUR_OUT, DUR_IN, STAGGER_SPREAD } from "./viewTransition";
+import { ViewTransition, DUR_OUT, DUR_IN, FURN_IN, STAGGER_SPREAD } from "./viewTransition";
 
 const settled = (v: "hyper" | "geo" | "ledger" = "hyper") => {
   const tr = new ViewTransition();
@@ -99,6 +99,22 @@ describe("furnitureAlpha exclusivity", () => {
     tr.start("geo", "hyper");
     tr.tick(DUR_OUT);
     expect(tr.furnitureAlpha("geo")).toBe(0);
+  });
+
+  it("IN decouples its ramps: the room is fully built while nodes are still placing", () => {
+    // (user, 2026-07-17): furniture rides FURN_IN, node placement rides DUR_IN (3×) — at
+    // FURN_IN into the IN phase the destination view is complete but the flight continues.
+    const tr = settled("hyper");
+    tr.start("hyper", "geo");
+    tr.tick(DUR_OUT); // boundary, exactly
+    tr.tick(FURN_IN); // the furniture build completes here…
+    expect(tr.furnitureAlpha("geo")).toBe(1);
+    expect(tr.phase).toBe("in"); // …but the phase (node placement) is still running
+    const w = tr.gatherWeight(0, 10);
+    expect(w).toBeGreaterThan(0); // the lead node is still in flight
+    expect(w).toBeLessThan(1);
+    tr.tick(DUR_IN - FURN_IN); // the full placement window settles it
+    expect(tr.phase).toBe("idle");
   });
 });
 

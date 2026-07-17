@@ -15,10 +15,15 @@ export type View3D = "hyper" | "geo" | "ledger";
 // Live-reviewed at 4x/20x/40x-stretched slow motion (Task 8, chrome-devtools MCP screenshots)
 // across all six 3D transition directions: the per-network squares read as tidy distinct
 // blocks (DAG's clearly biggest), the stagger reads as an assembling wave rather than a swarm,
-// nothing overlaps the furniture mid-flight, and the 1.9s total holds up as balanced rather
-// than waited-for. No change from the Task 1-7 values — kept as-is.
+// and nothing overlaps the furniture mid-flight.
 export const DUR_OUT = 0.9; //         teardown + gather, incl. the stagger spread
-export const DUR_IN = 1.0; //          build + placement + camera flight
+// The IN phase DECOUPLES its two ramps (user, 2026-07-17): the furniture builds fast
+// (FURN_IN — the room is fully lit early) while the node placement takes its time
+// (DUR_IN, 3× the original 1.0s — nodes keep arriving into the already-drawn view).
+// Total switch ≈ DUR_OUT + DUR_IN ≈ 3.9s; the wait reads as staging, not loading,
+// because the destination view is complete long before the last node lands.
+export const DUR_IN = 3.0; //          node placement (phase length), incl. the stagger spread
+export const FURN_IN = 1.0; //         the to-view's furniture build, inside the IN phase
 export const STAGGER_SPREAD = 0.25; // window over which node flights START (rank-ordered)
 
 // A node's flight lasts the phase minus the spread, so the LAST starter still lands in-phase.
@@ -103,10 +108,12 @@ export class ViewTransition {
   }
 
   // Furniture multiplier for `view` this frame. At most one view is ever lit (spec:
-  // furniture never overlaps the flight); idle lights only the settled view.
+  // furniture never overlaps the flight); idle lights only the settled view. The IN branch
+  // runs on FURN_IN, not the phase length — the room finishes building while the nodes are
+  // still placing (the decoupled ramps, see the constants note).
   furnitureAlpha(view: View3D): number {
     if (this.phase === "idle") return view === this.to ? 1 : 0;
     if (this.phase === "out") return view === this.from ? 1 - smooth(Math.min(1, this.t / DUR_OUT)) : 0;
-    return view === this.to ? smooth(Math.min(1, this.t / DUR_IN)) : 0;
+    return view === this.to ? smooth(Math.min(1, this.t / FURN_IN)) : 0;
   }
 }

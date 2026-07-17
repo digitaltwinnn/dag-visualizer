@@ -48,8 +48,10 @@ per-network near-square **staging grids** on a camera-anchored plane at the top 
 viewport (`domain/gatherLayout.ts`) — then **BOUNDARY**, one invisible frame where the nodes
 are fully gathered and both furnitures are dark: the destination layout snaps in (`morph`
 set, `applyLedgerLayout`, `layers.setLedger`, filters re-asserted) and the camera focus/tween
-starts — then **IN** (1.0s) — the to-view's furniture builds back in while its nodes disperse,
-staggered, to their real destination poses and the camera flies. **1.9s total.** `morph` and
+starts — then **IN** (3.0s node placement) — the to-view's furniture builds back in FAST (`FURN_IN`
+1.0s — the room is fully lit early) while its nodes disperse, staggered, over the longer
+placement window into the already-drawn view, and the camera flies. **~3.9s total** (user:
+the slow placement reads as staging, not loading, because the destination is complete first). `morph` and
 `ledgerT` are now **BOUNDARY-APPLIED LAYOUT PARAMETERS** the machine snaps, not eased flight
 blends — the old hyper↔geo core-grow-into-the-globe flight and the Snapshots view's
 "appears already-formed, no entry animation" rule are both **RETIRED** (deliberate reversals,
@@ -257,7 +259,8 @@ store-value imports**, enforced by `layerBoundaries.test.ts`). Each ships coloca
   furniture fades via `furnitureAlpha`, nodes fly staggered [`STAGGER_SPREAD` 0.25s spread,
   rank-ordered within each network's grid] to the gathering slots) → **BOUNDARY** (`tick()`
   returns `true` exactly once, mid-flight, invisible — the Engine applies the destination
-  layout there) → **IN** (`DUR_IN` 1.0s — the to-view's furniture builds, nodes disperse to
+  layout there) → **IN** (`DUR_IN` 3.0s node placement with the furniture building on its own faster
+  `FURN_IN` 1.0s ramp — decoupled, user 2026-07-17; nodes disperse to
   their destination poses, the camera flies). `morph`/`ledgerT` are now BOUNDARY-APPLIED
   layout parameters the machine snaps, not eased flight blends. Retargeting (flipping the
   switch mid-flight) keeps flight weights continuous via the `FLIGHT_OUT`/`FLIGHT_IN`
