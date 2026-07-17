@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { clickActions, countryToggleActions, filterToggleActions, layerToggleActions, nodeSelectActions, snapshotSelectActions, pickActive, pickNetId, type ClickAction } from "./pickActions";
+import { autoLayerForNode, clickActions, countryToggleActions, filterToggleActions, layerToggleActions, nodeSelectActions, snapshotSelectActions, pickActive, pickNetId, type ClickAction } from "./pickActions";
 import type { PickDescriptor } from "@/src/data/types";
 
 // Minimal pick fixtures — only the fields the table reads.
@@ -196,6 +196,24 @@ describe("the shared component builders (GeoExplore rows + LiveStrip bars run th
     const p = snapPick();
     expect(snapshotSelectActions(p, true)).toEqual([{ kind: "snapshot", pick: p, follow: true }]);
     expect(snapshotSelectActions(p, false)).toEqual([{ kind: "snapshot", pick: p, follow: false }]);
+  });
+});
+
+describe("autoLayerForNode (node selection carrying into Snapshots)", () => {
+  it("maps a metagraph node to the metagraph-L0 row", () => {
+    expect(autoLayerForNode("metanode")).toBe("ml0");
+  });
+
+  it("maps a DAG validator (either shell) to the hypergraph-L0 row", () => {
+    expect(autoLayerForNode("l0")).toBe("hypl0");
+    expect(autoLayerForNode("l1")).toBe("hypl0");
+  });
+
+  it("returns null for non-node picks and no selection (resting overview)", () => {
+    expect(autoLayerForNode("meta")).toBe(null);
+    expect(autoLayerForNode("snapshot")).toBe(null);
+    expect(autoLayerForNode(null)).toBe(null);
+    expect(autoLayerForNode(undefined)).toBe(null);
   });
 });
 

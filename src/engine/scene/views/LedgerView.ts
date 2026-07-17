@@ -207,6 +207,17 @@ export class LedgerView {
   private _spotLayerId: string | null = null;
   private _spotPos = new THREE.Vector3();
   private _spotN = new THREE.Vector3();
+  // The flat floor-corner labels (level badge + name) — collected so their opacity can ride the
+  // view-transition alpha each frame (they otherwise never have their opacity written after ctor).
+  private _labels: THREE.Mesh[] = [];
+  // Cached highlight state so the floor materials can be reapplied every frame (see _applyFloorAlpha)
+  // instead of only on the (rare) setHighlight event — needed so a mid-transition alpha change stays
+  // in sync with whatever highlight is currently committed/hovered.
+  private _hiliteId: string | null = null;
+  private _hiliteDim = false;
+  // The view-transition furniture multiplier (Engine, per frame; Task 7 wires it up). At 0 the
+  // spot is also blacked out — a lit stage light over dark furniture is the lingering-light bug class.
+  private _viewAlpha = 1;
 
   constructor(scene: THREE.Scene, colors: SceneColors, sceneColors: Record<string, number>) {
     this._core = colors.core;
@@ -426,10 +437,17 @@ export class LedgerView {
     // sub-levels 2.1/2.2, each labelling its own front-left corner).
     const copyOf = (id: string) => LEDGER_LAYERS.find((l) => l.id === id);
     const lx = cx + W / 2 - 0.4; // front edge, small inset
+    // Collect every label mesh (`_labels`) so update() can drive its opacity from the view-transition
+    // alpha each frame — labels otherwise never have their opacity written again after construction.
+    const addLabel = (level: string, text: string, x: number, y: number, z: number) => {
+      const m = this._makeLabel(level, text, x, y, z);
+      this._labels.push(m);
+      this.group.add(m);
+    };
     for (const { y, id } of LAYER_GEOM.filter((l) => l.laneZ === 0))
-      this.group.add(this._makeLabel(copyOf(id)?.level ?? "", copyOf(id)?.name ?? id, lx, y, D / 2 - 1.2));
-    this.group.add(this._makeLabel(copyOf("hypl0")?.level ?? "", copyOf("hypl0")?.name ?? "", lx, hy, D / 2 - 1.2));
-    this.group.add(this._makeLabel(copyOf("hypl1")?.level ?? "", copyOf("hypl1")?.name ?? "", lx, hy, HYP_SPLIT.l1Edge - 1.2));
+      addLabel(copyOf(id)?.level ?? "", copyOf(id)?.name ?? id, lx, y, D / 2 - 1.2);
+    addLabel(copyOf("hypl0")?.level ?? "", copyOf("hypl0")?.name ?? "", lx, hy, D / 2 - 1.2);
+    addLabel(copyOf("hypl1")?.level ?? "", copyOf("hypl1")?.name ?? "", lx, hy, HYP_SPLIT.l1Edge - 1.2);
   }
 
   // A flat floor label lying on the plane, its text STARTING at the given front-left corner
@@ -501,6 +519,16 @@ export class LedgerView {
     return mesh;
   }
 
+  // The view-transition furniture multiplier (Engine, per frame). At 0 the spot is also blacked
+  // out — a lit stage light over dark furniture is the lingering-light bug class. The reused NODE
+  // instances (Globe/NodeFabric) are NOT gated here — only this view's own furniture.
+  setViewAlpha(a: number): void {
+    this._viewAlpha = a;
+    // group.visible is owned SOLELY by the Engine (it composes this alpha with the ledger-active
+    // gate so the chamber can't linger in an unrelated view/flight); writing it here would fight that.
+    if (a <= 0.001) this._spot.blackout();
+  }
+
   // Highlight one floor plane by layer id — brighten its frame + edge fill (the fill stays airy —
   // the selected plane must not read as a solid sheet). `dimOthers` (a COMMITTED layer selection)
   // additionally recedes the OTHER planes to the dimmed OFF state; a mere hover preview must NOT
@@ -516,12 +544,23 @@ export class LedgerView {
   setHighlight(id: string | null, dimOthers = false): void {
     // A COMMITTED layer (dimOthers) also stages the focus spotlight over that floor (see update()).
     this._spotLayerId = dimOthers && id ? id : null;
+    this._hiliteId = id;
+    this._hiliteDim = dimOthers;
+    this._applyFloorAlpha();
+  }
+
+  // (Re)apply the floor pane materials from the cached highlight state × the view-transition alpha.
+  // Called on every setHighlight event AND every update() frame — the event alone isn't enough
+  // because the alpha can keep changing (mid build-in/teardown) independently of the highlight.
+  private _applyFloorAlpha(): void {
+    const id = this._hiliteId;
+    const dimOthers = this._hiliteDim;
     for (const [k, m] of this._floorMats) {
       const on = id === k;
       const off = id != null && dimOthers;
-      m.frame.opacity = on ? FLOOR_FRAME_HI : off ? FLOOR_FRAME_OFF : FLOOR_FRAME_OP;
-      m.fill.uniforms.uOpacity.value = on ? FLOOR_FILL_HI : off ? FLOOR_FILL_OFF : FLOOR_FILL_OP;
-      m.fill.uniforms.uInner.value = on ? FLOOR_INNER_HI : FLOOR_INNER_OP;
+      m.frame.opacity = (on ? FLOOR_FRAME_HI : off ? FLOOR_FRAME_OFF : FLOOR_FRAME_OP) * this._viewAlpha;
+      m.fill.uniforms.uOpacity.value = (on ? FLOOR_FILL_HI : off ? FLOOR_FILL_OFF : FLOOR_FILL_OP) * this._viewAlpha;
+      m.fill.uniforms.uInner.value = (on ? FLOOR_INNER_HI : FLOOR_INNER_OP) * this._viewAlpha;
     }
   }
 
@@ -561,7 +600,10 @@ export class LedgerView {
         new THREE.MeshStandardMaterial({
           color: this._core, emissive: this._core, emissiveIntensity: 0.45,
           roughness: 0.45, metalness: 0.2, flatShading: true, transparent: true,
-          opacity: seeded ? 0.92 * slotFade(t.slot) : 0,
+          // seeded (history-seed on first load) tiles appear directly at their resting opacity — a
+          // PER-TICK write, so it rides the view-transition alpha too; a freshly spawned (non-seeded)
+          // tile starts at 0 regardless (0 * anything is still 0) and eases up via update()'s target.
+          opacity: seeded ? 0.92 * slotFade(t.slot) * this._viewAlpha : 0,
         }),
       );
       mesh.rotation.x = -Math.PI / 2;
@@ -722,13 +764,21 @@ export class LedgerView {
     // lane centre) so the tilted layer zoom catches a light wash on the chips/tiles there (user).
     // Positions are group-LOCAL (the whole chamber is rotated/scaled) — resolve to world each frame.
     const spotGeom = this._spotLayerId ? LAYER_GEOM.find((l) => l.id === this._spotLayerId) : undefined;
-    this._spot.update(dt, spotGeom != null && this.group.visible);
+    this._spot.update(dt, spotGeom != null && this.group.visible, this._viewAlpha);
     if (spotGeom) {
       this._spotPos.set(0, spotGeom.y, spotGeom.laneZ);
       this.group.localToWorld(this._spotPos);
       this._spotN.set(0, 1, 0).applyQuaternion(this.group.quaternion); // the floors' world up
       this._spot.aim(this._spotPos, this._spotN, 14);
     }
+
+    // View-transition furniture fade: the floor panes, their corner labels, and the (currently
+    // static) DAG-L1 dial ride the multiplier unconditionally — they don't depend on live snapshot
+    // data, so they must fade even before the first tick ever arrives.
+    this._applyFloorAlpha();
+    for (const lbl of this._labels) (lbl.material as THREE.MeshBasicMaterial).opacity = this._viewAlpha;
+    (this._dagL1Ring.material as THREE.LineBasicMaterial).opacity = DIAL_REST_OP * this._viewAlpha;
+
     if (!this._latest) return;
 
     const k = Math.min(1, dt * 3); // shared ease factor for the trail + lanes this frame
@@ -747,12 +797,17 @@ export class LedgerView {
     const leadDimmed = selectedSlot > 0;
     this.centerMat.color.copy(this._coreCol);
     this.centerMat.emissive.copy(this._coreCol);
-    this.centerMat.emissiveIntensity = leadDimmed ? 0.26 : 0.44 + this._flash * 0.5;
+    this.centerMat.emissiveIntensity = (leadDimmed ? 0.26 : 0.44 + this._flash * 0.5) * this._viewAlpha;
+    // centerMat is OPAQUE (no `transparent`), so emissiveIntensity alone can't fade it to nothing —
+    // ambient/directional light would still light its base colour at alpha 0. An explicit visibility
+    // gate closes that gap (setData already drives `true` when a live snapshot exists; this ANDs the
+    // view-transition alpha on top, every frame, since setData runs per-tick not per-frame).
+    this.center.visible = this._viewAlpha > 0.001;
 
     // Hypergraph-L0 participation ring: glows as the global L0 produces each snapshot, then fades.
     this._gL0Glow = Math.max(0, this._gL0Glow - dt * 1.4);
     (this._gL0Ring.material as THREE.LineBasicMaterial).opacity =
-      this._gL0Ring.userData.baseOpacity + (this._gL0Lit ? DIAL_LIT_OP : 0) + this._gL0Glow * 0.7;
+      (this._gL0Ring.userData.baseOpacity + (this._gL0Lit ? DIAL_LIT_OP : 0) + this._gL0Glow * 0.7) * this._viewAlpha;
     this.center.scale.setScalar(this._baseR * (1 + Math.sin(this.t * 2.2) * 0.06 + this._flash * 0.12));
 
     // The global trail eases left into its slots; every block keeps the accent colour — the SELECTED
@@ -766,8 +821,8 @@ export class LedgerView {
       const sel = t.slot === selectedSlot;
       mat.color.copy(this._coreCol);
       mat.emissive.copy(this._coreCol);
-      mat.emissiveIntensity = sel ? 0.9 : 0.34;
-      const target = sel ? 0.95 : 0.88 * slotFade(t.slot); // trail blocks kept near-solid (user)
+      mat.emissiveIntensity = (sel ? 0.9 : 0.34) * this._viewAlpha;
+      const target = (sel ? 0.95 : 0.88 * slotFade(t.slot)) * this._viewAlpha; // trail blocks kept near-solid (user)
       mat.opacity += (target - mat.opacity) * k;
     }
 
@@ -800,7 +855,7 @@ export class LedgerView {
           const hot = this.model.isRowHot(laneOff, b.slot);
           const bright =
             (hot ? Math.max(b.fade, 0.9) * (b.filled ? 1.3 : 0.2) : b.fade * (b.filled ? 0.7 : 0.12)) *
-            (laneOff ? 0.22 : 1);
+            (laneOff ? 0.22 : 1) * this._viewAlpha;
           this._metaTrailMesh.setColorAt(mi, _col.copy(laneColor).multiplyScalar(bright));
           mi++;
 
@@ -811,7 +866,7 @@ export class LedgerView {
             // Links match their tiles: lane colour, brightness-graded — the hot row's link pops
             // near-full on the additive material, trailing links stay dim, filtered-out lanes dimmer.
             _col.copy(laneColor).multiplyScalar(
-              (hot ? Math.max(b.fade, 0.9) * 1.25 : b.fade * 0.3) * (laneOff ? 0.22 : 1),
+              (hot ? Math.max(b.fade, 0.9) * 1.25 : b.fade * 0.3) * (laneOff ? 0.22 : 1) * this._viewAlpha,
             );
             curvePoint(0, b.x, lane.z, g, _q);
             let px = _q.x, py = _q.y, pz = _q.z;
@@ -869,7 +924,7 @@ export class LedgerView {
       _dummy.quaternion.identity();
       _dummy.updateMatrix();
       this._pulseMesh.setMatrixAt(i, _dummy.matrix);
-      this._pulseMesh.setColorAt(i, _col.set(p.rec.color));
+      this._pulseMesh.setColorAt(i, _col.set(p.rec.color).multiplyScalar(this._viewAlpha));
       i++;
     }
     // Keep only the still-travelling pulses.
@@ -893,7 +948,7 @@ export class LedgerView {
       for (const r of rec.rings) {
         r.glow = Math.max(0, r.glow - dt * 2.4);
         (r.mesh.material as THREE.LineBasicMaterial).opacity =
-          (r.mesh.userData.baseOpacity + (r.lit ? DIAL_LIT_OP : 0) + r.glow * 0.7) * (dialOff ? 0.22 : 1);
+          (r.mesh.userData.baseOpacity + (r.lit ? DIAL_LIT_OP : 0) + r.glow * 0.7) * (dialOff ? 0.22 : 1) * this._viewAlpha;
         r.mesh.scale.setScalar(r.radius * (1 + r.glow * 0.12)); // fixed radius, a touch bigger on a pulse
       }
     }

@@ -1,10 +1,10 @@
 import { describe, it, expect } from "vitest";
 import * as THREE from "three";
-import { FOCI, hubFraming, hyperFocusFraming, geoFraming, easeInOutQuad, CAM_ZOOM, dollyBack, nodeFraming, hyperNodeFraming, closeness, CLOSE_FAR_ALT, CLOSE_NEAR_ALT } from "./cameraRig";
+import { FOCI, hubFraming, hyperFocusFraming, geoFraming, ledgerLayerFraming, ledgerNodeFraming, easeInOutQuad, CAM_ZOOM, dollyBack, nodeFraming, hyperNodeFraming, closeness, CLOSE_FAR_ALT, CLOSE_NEAR_ALT } from "./cameraRig";
 
 describe("FOCI", () => {
   it("carries the camera presets (ledger has none — it uses `overview` + a rotated group)", () => {
-    expect(FOCI.overview.pos).toEqual(new THREE.Vector3(0, 17, 68)); // pulled back (user: whole scene visible at view start)
+    expect(FOCI.overview.pos).toEqual(new THREE.Vector3(0, 21, 80)); // pulled back again with META_ORBIT 29 (user: whole ring visible unselected, clear of the LiveStrip band)
     expect(FOCI.overview.target).toEqual(new THREE.Vector3(0, 2, 0));
     expect(FOCI.dag.pos).toEqual(new THREE.Vector3(0, 9, 38));
     expect(FOCI.dag.target).toEqual(new THREE.Vector3(0, 1, 0));
@@ -104,6 +104,34 @@ describe("hyperFocusFraming", () => {
     const r0 = f.clone().cross(n).normalize();
     const u0 = r0.clone().cross(f).normalize();
     expect(u0.dot(n)).toBeGreaterThan(0);
+  });
+});
+
+describe("ledgerNodeFraming (the Snapshots node zoom level)", () => {
+  const out = () => ({ pos: new THREE.Vector3(), target: new THREE.Vector3() });
+
+  it("targets just above the chip and keeps a constant diagonal offset", () => {
+    const node = new THREE.Vector3(4, -2, 7);
+    const o = out();
+    ledgerNodeFraming(node, o);
+    expect(o.target.x).toBeCloseTo(4, 10);
+    expect(o.target.y).toBeCloseTo(-2 + 0.4, 10);
+    expect(o.target.z).toBeCloseTo(7, 10);
+    expect(o.pos.x).toBeCloseTo(4 - 2.6, 10);
+    expect(o.pos.y).toBeCloseTo(-2 + 2.8, 10);
+    expect(o.pos.z).toBeCloseTo(7 + 8.5, 10);
+    expect(node).toEqual(new THREE.Vector3(4, -2, 7)); // input untouched
+  });
+
+  it("zooms CLOSER than the layer pose — the ladder's next level (geo's country→node mirrored)", () => {
+    const node = new THREE.Vector3(0, 3, 0);
+    const n = out();
+    ledgerNodeFraming(node, n);
+    const nodeDist = n.pos.distanceTo(n.target);
+    const l = out();
+    ledgerLayerFraming(3, l); // the same height's layer pose
+    const layerDist = l.pos.distanceTo(l.target);
+    expect(nodeDist).toBeLessThan(layerDist * 0.55); // clearly a level deeper, not a nudge
   });
 });
 

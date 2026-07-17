@@ -38,6 +38,12 @@ export interface ValidatorRecord {
   pick: PickDescriptor;
   /** Brief flash when an arc pulse reaches this node — set dynamically (js/globe.js:996), absent until then. */
   _flash?: number;
+  // Staging-grid slot for the view-transition choreography (domain/gatherLayout, assigned
+  // event-time by Globe when the node set is (re)built): cell-unit position + stagger rank.
+  gU: number;
+  gV: number;
+  gRank: number;
+  gCount: number;
 }
 
 // js/globe.js:549-571 — one instance per metagraph node PER layer shell it runs (l0 / dl1 /
@@ -78,4 +84,10 @@ export interface MetaNodeRecord {
   pick: PickDescriptor;
   /** Brief flash when an arc pulse reaches this node — set dynamically (js/globe.js:1109), absent until then. */
   _flash?: number;
+  // Staging-grid slot for the view-transition choreography (domain/gatherLayout, assigned
+  // event-time by Globe when the node set is (re)built): cell-unit position + stagger rank.
+  gU: number;
+  gV: number;
+  gRank: number;
+  gCount: number;
 }

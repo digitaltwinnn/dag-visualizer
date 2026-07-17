@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import * as THREE from "three";
 import {
-  GOLDEN_ANGLE, lerp, smooth, discFall, fibShellPos, spreadCoLocated,
+  GOLDEN_ANGLE, lerp, smooth, smoother, discFall, fibShellPos, spreadCoLocated,
   stackSizes, STACK_MIN, STACK_MAX,
   armillaryFrame, ringFramePos, armillaryRings, armillaryPos,
 } from "./nodeLayout";
@@ -31,6 +31,25 @@ describe("discFall", () => {
   });
   it("is 1 at facing=1 (dead on)", () => {
     expect(discFall(1)).toBe(1);
+  });
+});
+
+describe("smoother (quintic)", () => {
+  it("pins the endpoints and midpoint", () => {
+    expect(smoother(0)).toBe(0);
+    expect(smoother(1)).toBe(1);
+    expect(smoother(0.5)).toBeCloseTo(0.5, 12);
+  });
+
+  it("is odd-symmetric about 0.5 — the retarget continuity contract", () => {
+    for (const x of [0.1, 0.25, 0.4]) expect(smoother(1 - x)).toBeCloseTo(1 - smoother(x), 12);
+  });
+
+  it("has a more pronounced slow-fast-slow profile than smooth (flatter ends, steeper middle)", () => {
+    expect(smoother(0.1)).toBeLessThan(smooth(0.1));
+    expect(smoother(0.9)).toBeGreaterThan(smooth(0.9));
+    const midSlope = (f: (m: number) => number) => (f(0.51) - f(0.49)) / 0.02;
+    expect(midSlope(smoother)).toBeGreaterThan(midSlope(smooth));
   });
 });
 

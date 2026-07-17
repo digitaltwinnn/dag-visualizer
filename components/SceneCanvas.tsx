@@ -14,8 +14,11 @@ import { useBootPhase } from "@/components/useBootPhase";
 export default function SceneCanvas() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const phase = useBootPhase();
-  const mode = useStore((s) => s.mode);
-  const is3D = mode === "hyper" || mode === "geo" || mode === "ledger";
+  // The canvas stays visible in the FLAT ("soon") views too: the transition choreography
+  // parks the node fleet at the staging grids there (user, 2026-07-17 — the parked squares
+  // are the "the network is still here" element above the Blueprint schematic; every view's
+  // furniture is alpha'd to 0, so only the nodes and backdrop render). Mode no longer gates
+  // the canvas fade — only the boot handoff does.
 
   useEffect(() => {
     let disposed = false;
@@ -45,5 +48,5 @@ export default function SceneCanvas() {
     };
   }, []);
 
-  return <canvas ref={canvasRef} className={"scene-canvas" + (phase === "live" && is3D ? " scene-in" : "")} />;
+  return <canvas ref={canvasRef} className={"scene-canvas" + (phase === "live" ? " scene-in" : "")} />;
 }
