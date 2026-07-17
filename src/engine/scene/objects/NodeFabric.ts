@@ -290,11 +290,16 @@ export class NodeFabric {
   // weight (view-transition choreography). Runs on the already-final _dummy pose so it is
   // the LAST word on position/scale; ctx.gather's vectors are group-LOCAL (Globe converts
   // the camera-anchored plane once per frame). Uniform GATHER_SCALE reads as tidy grid dots.
-  private _applyGather(ctx: FrameCtx, gU: number, gV: number, rank: number, count: number): void {
+  // Per-record gather weight for this frame (0 when no transition is live) — computed ONCE
+  // per record at the top of each write loop and shared by the shape crossfade, the
+  // visibility lifts, and _applyGather, so the choreography can't self-disagree.
+  private _gatherW(ctx: FrameCtx, rank: number, count: number): number {
     const tr = ctx.transition;
-    if (!tr || !tr.active()) return;
-    const w = tr.gatherWeight(rank, count);
-    if (w <= 0) return;
+    return tr && tr.active() ? tr.gatherWeight(rank, count) : 0;
+  }
+
+  private _applyGather(ctx: FrameCtx, gU: number, gV: number, gw: number, primary: boolean): void {
+    if (gw <= 0) return;
     // A dynamically-invisible non-primary (e.g. a hybrid's shell record hidden in geo) already
     // wrote a zero scale — it doesn't fly, it stays zero-scaled wherever it is. Without this,
     // GATHER_SCALE/max(1e-6, scale.x) blows up into a huge multiplier that only stays inert
@@ -304,13 +309,18 @@ export class NodeFabric {
       .copy(ctx.gather.origin)
       .addScaledVector(ctx.gather.right, gU * ctx.gather.cell)
       .addScaledVector(ctx.gather.up, gV * ctx.gather.cell);
-    _dummy.position.lerp(_gatherV, w);
+    _dummy.position.lerp(_gatherV, gw);
     // Face the camera with the biggest surface (user): slerp toward the staging basis —
     // local +Y (the chip's bright top cap; the cylinder axis) aimed at the viewer, X/Z
     // pinned to the grid's right/up so the parked squares sit still (no residual tumble).
-    _dummy.quaternion.slerp(ctx.gather.quat, w);
-    const s = 1 + (GATHER_SCALE / Math.max(1e-6, _dummy.scale.x) - 1) * w;
+    _dummy.quaternion.slerp(ctx.gather.quat, gw);
+    const s = 1 + (GATHER_SCALE / Math.max(1e-6, _dummy.scale.x) - 1) * gw;
     _dummy.scale.multiplyScalar(s);
+    // Non-primary shell instances share their MACHINE's grid pixel (the squares count
+    // machines) — overlapping there exactly would z-fight and read as nodes vanishing
+    // (user, the SWAP case). Instead they ABSORB: shrink into the pixel as they converge,
+    // re-emerging on dispersal — three chips visibly merge into one machine pixel.
+    if (!primary) _dummy.scale.multiplyScalar(1 - gw);
   }
 
   // -------------------------------------------------- setMorph loop: validator matrices
@@ -331,18 +341,25 @@ export class NodeFabric {
       // was an edge-on sliver the raycaster could barely hit; the chip's top cap + sides are
       // a real target, so the ledger needs no pick assist). DAG cl1 nodes drop into the
       // DAG-L1 row.
+      const gw = this._gatherW(ctx, u.gRank, u.gCount);
+      const prim = u.geoPrimary !== false;
+      // Effective squash: the STAGING SHAPE is the chip (the grid's "square pixel", top cap
+      // to the camera) — each node crossfades sphere→chip ALONG its gather flight instead of
+      // popping at the boundary's morph snap (user: no shape jump at the staging area).
+      const wEff = w + (1 - w) * gw;
       if (c.ledger) {
         if (u.ledgerHide) {
           _dummy.scale.setScalar(0);
         } else {
           if (u.noGeo) _vec.copy(u.hyperPos);
           else _vec.copy(u.hyperDir).lerp(u.geoDir!, e).normalize().multiplyScalar(lerp(u.hyperRadius, u.geoRadius, e));
-          const showL = 1 - dim * dimScaleV;
+          let showL = 1 - dim * dimScaleV;
+          showL += (1 - showL) * gw; // the square shows the WHOLE fleet — dim-hidden nodes lift in
           _dummy.position.copy(_vec).lerp(u.ledgerPos, ledgerT);
           _dummy.quaternion.identity(); // standing on the floor — cylinder axis is +Y
           const sL = u.hyperSize * LEDGER.dot * showL;
           _dummy.scale.set(sL, HEX_H * showL, sL);
-          this._applyGather(ctx, u.gU, u.gV, u.gRank, u.gCount);
+          this._applyGather(ctx, u.gU, u.gV, gw, prim);
         }
         _dummy.updateMatrix();
         this.instHex.setMatrixAt(u.index, _dummy.matrix);
@@ -366,13 +383,15 @@ export class NodeFabric {
       let hideV = dim;
       const geoCc = geoCcOf(u.pick);
       if (c.countryFilter && (!geoCc || geoCc !== c.countryFilter)) hideV = Math.max(hideV, c.countryMix);
-      const show = 1 - hideV * dimScaleV; // SAME ramped dim as the validator glow
+      let show = 1 - hideV * dimScaleV; // SAME ramped dim as the validator glow
+      show += (1 - show) * gw; // parked squares show the whole fleet (dim re-applies on landing)
 
-      // Sphere: tumbling on its own axis, cross-fading out as the node lands.
+      // Sphere: tumbling on its own axis, cross-fading into the chip ALONG the gather flight
+      // (wEff; noGeo nodes keep the plain morph squash — they have no geo chip to become).
       _qSpin.setFromAxisAngle(u.spinAxis, u.spinPhase + t * u.spinSpeed);
       _dummy.quaternion.copy(_qSpin);
-      _dummy.scale.setScalar(u.hyperSize * (1 - w) * (u.noGeo ? 1 - e : 1) * show);
-      this._applyGather(ctx, u.gU, u.gV, u.gRank, u.gCount);
+      _dummy.scale.setScalar(u.hyperSize * (1 - (u.noGeo ? w : wEff)) * (u.noGeo ? 1 - e : 1) * show);
+      this._applyGather(ctx, u.gU, u.gV, gw, prim);
       _dummy.updateMatrix();
       this.instSphere.setMatrixAt(u.index, _dummy.matrix);
 
@@ -382,16 +401,18 @@ export class NodeFabric {
       const fall = hasCam ? discFall(dir.dot(camN)) : 1;
       _qRadial.setFromUnitVectors(Y_AXIS, dir);
       _dummy.quaternion.copy(_qRadial);
-      const gV = u.noGeo ? 0 : w * fall * show;
+      // fall lifts with gw: a far-side chip must still fill its staging pixel mid-flight.
+      const gV = u.noGeo ? 0 : wEff * (fall + (1 - fall) * gw) * show;
       _dummy.scale.set(u.geoSize * gV, HEX_H * gV, u.geoSize * gV);
-      this._applyGather(ctx, u.gU, u.gV, u.gRank, u.gCount);
+      this._applyGather(ctx, u.gU, u.gV, gw, prim);
       _dummy.updateMatrix();
       this.instHex.setMatrixAt(u.index, _dummy.matrix);
     }
+    const trOn = !!(ctx.transition && ctx.transition.active());
     this.instSphere.instanceMatrix.needsUpdate = true;
     this.instHex.instanceMatrix.needsUpdate = true;
-    this.instSphere.visible = w < 0.999 && !c.ledger;
-    this.instHex.visible = w > 0.001 || c.ledger; // ledger's chips are hex/cylinder instances
+    this.instSphere.visible = (w < 0.999 && !c.ledger) || trOn; // transitions crossfade per node
+    this.instHex.visible = w > 0.001 || c.ledger || trOn; //       (both meshes live mid-flight)
     return this.pickablesFor(w, c.ledger);
   }
 
@@ -477,6 +498,9 @@ export class NodeFabric {
     const focusBoost = c.ledger ? 0.7 : 1.4 - 0.7 * m; // hyper 1.4 · geo 0.7 · ledger 0.7
     for (const r of records) {
       r.dim += (r.dimTarget - r.dim) * kk;
+      const gw = this._gatherW(ctx, r.gRank, r.gCount);
+      const prim = r.geoPrimary !== false;
+      const wEff = w + (1 - w) * gw; // staging shape = the chip (see the validator loop)
       // effective dim = network dim × the METAGRAPH strength (dimScaleMetaV — ZERO in hyper:
       // these nodes rest at the dimmed look there, so hover/commit can't move them; mirrors
       // domain/dimModel.metaNodeDim), raised by the country dim when outside the drilled-into
@@ -532,9 +556,10 @@ export class NodeFabric {
         // validator loop) — same size rule as the validators (uniform dot for every cluster).
         // Filtered-out nodes shrink out (1 - dEff).
         _dummy.quaternion.identity(); // standing on the floor — cylinder axis is +Y
-        const sL = r.hyperSize * LEDGER.dot * (1 - dEff);
-        _dummy.scale.set(sL, HEX_H * (1 - dEff), sL);
-        this._applyGather(ctx, r.gU, r.gV, r.gRank, r.gCount);
+        const visL = (1 - dEff) + dEff * gw; // parked squares show the whole fleet
+        const sL = r.hyperSize * LEDGER.dot * visL;
+        _dummy.scale.set(sL, HEX_H * visL, sL);
+        this._applyGather(ctx, r.gU, r.gV, gw, prim);
         _dummy.updateMatrix();
         this.metaHex.setMatrixAt(r.index, _dummy.matrix);
         _dummy.scale.setScalar(0);
@@ -550,8 +575,9 @@ export class NodeFabric {
       _qSpin.setFromAxisAngle(r.spinAxis, r.spinPhase + clock * r.spinSpeed);
       _dummy.quaternion.copy(_qSpin);
       const rest = META_REST_SCALE + (1 - META_REST_SCALE) * m;
-      _dummy.scale.setScalar(r.hyperSize * rest * (1 - w) * (1 - dEff));
-      this._applyGather(ctx, r.gU, r.gV, r.gRank, r.gCount);
+      const visM = (1 - dEff) + dEff * gw; // parked squares show the whole fleet
+      _dummy.scale.setScalar(r.hyperSize * rest * (1 - wEff) * visM);
+      this._applyGather(ctx, r.gU, r.gV, gw, prim);
       _dummy.updateMatrix();
       this.metaSphere.setMatrixAt(r.index, _dummy.matrix);
 
@@ -560,16 +586,18 @@ export class NodeFabric {
       const fall = hasCam ? discFall(r.geoDir.dot(camN)) : 1;
       _qRadial.setFromUnitVectors(Y_AXIS, r.geoDir);
       _dummy.quaternion.copy(_qRadial);
-      const gM = w * fall * (1 - dEff);
+      const visH = (1 - dEff) + dEff * gw;
+      const gM = wEff * (fall + (1 - fall) * gw) * visH; // fall lifts with gw (see validators)
       _dummy.scale.set(r.geoSize * gM, HEX_H * gM, r.geoSize * gM);
-      this._applyGather(ctx, r.gU, r.gV, r.gRank, r.gCount);
+      this._applyGather(ctx, r.gU, r.gV, gw, prim);
       _dummy.updateMatrix();
       this.metaHex.setMatrixAt(r.index, _dummy.matrix);
     }
+    const trOnM = !!(ctx.transition && ctx.transition.active());
     this.metaSphere.instanceMatrix.needsUpdate = true;
     this.metaHex.instanceMatrix.needsUpdate = true;
-    this.metaSphere.visible = w < 0.999 && !c.ledger;
-    this.metaHex.visible = w > 0.001 || c.ledger; // ledger's chips are hex/cylinder instances
+    this.metaSphere.visible = (w < 0.999 && !c.ledger) || trOnM;
+    this.metaHex.visible = w > 0.001 || c.ledger || trOnM;
     this.metaAESphere.needsUpdate = true;
     this.metaAEHex.needsUpdate = true;
     (this.metaSphere.geometry.getAttribute("aBase") as THREE.InstancedBufferAttribute).needsUpdate = true;

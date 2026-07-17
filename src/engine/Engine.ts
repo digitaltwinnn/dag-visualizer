@@ -1094,7 +1094,10 @@ export class Engine {
         this.layers.root.visible = show.ledger; // ledger: hubs become the metagraph-L0 row; flat: hidden
         this.layers.coreGroup.visible = false;
       }
-      this.globe.group.visible = show.globeSurface; // true for all three 3D views — the shared nodes never blink out mid-flight
+      // True for all three 3D views (the shared nodes never blink out mid-flight); the flat
+      // "soon" views set it false, but the PARKED staging grids live in this group too — the
+      // active/staged machine keeps it visible so the fleet shows above the Blueprint.
+      this.globe.group.visible = show.globeSurface || this.transition.active();
       // Ledger chamber is live while settled in ledger OR a transition involving it is running (the
       // build/teardown must animate). The Engine is the SINGLE owner of ledger.group.visible —
       // LedgerView.setViewAlpha no longer writes it (the two would fight). The alpha gates whether it
