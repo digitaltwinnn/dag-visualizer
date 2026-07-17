@@ -82,9 +82,6 @@ export class Engine {
     fromTgt: new THREE.Vector3(), toTgt: new THREE.Vector3(),
     t: 0, dur: 1.4, active: false,
   };
-  private _worldUp = new THREE.Vector3(0, 1, 0); // the default (level) camera up
-  private _hyperRoll = false; // true while a hyper metagraph atom is focused → camera.up eases to its normal
-  private _hyperRollUp = new THREE.Vector3(0, 1, 0); // the focused atom's ring normal (the rolled up target)
   // Scratch framing struct handed to hubFraming/geoFraming — its values are copied into
   // `_tween` immediately by `_tweenTo`, so reusing it across every focus call is safe.
   private _framingOut: CameraFraming = { pos: new THREE.Vector3(), target: new THREE.Vector3() };
@@ -229,13 +226,15 @@ export class Engine {
     this.mode = s.mode;
     this.filter = s.filter;
     this._layerCommitted = s.layer != null; // seed — subscription only sees CHANGES (HMR remount)
-    // Booting straight into geo (deep link / persisted view): snap to the globe —
-    // there's nothing to morph from on a fresh load (matches the old #geo behaviour).
+    // Booting straight into geo (deep link / persisted view): seed morph=1 so the boot layout
+    // is the globe from the first frame.
     if (this.mode === "geo") this.morph = 1;
-    // Seed the transition machine on the settled boot view (setMode below re-settles on the same
-    // value — harmless — but this guarantees a valid state before the first render frame).
-    // Boot: settle on the 3D view, or PARK at the staging grids for a flat/"soon" boot (the
-    // first 3D view entered later runs step 2 from the grids — one choreography everywhere).
+    // Seed a valid transition state before the first render frame. NB the `setMode(this.mode)`
+    // call in the constructor tail runs `place(mode)` from this idle seed, so a fresh load into
+    // a 3D view plays the staging-dissolve INTRO (nodes disperse from the top grids into the
+    // view — user 2026-07-17: accepted as the boot animation, final layout is correct). A
+    // flat/"soon" boot parks the fleet at the grids instead; the first 3D view entered later
+    // runs step 2 from there — one choreography everywhere.
     if (this.mode === "hyper" || this.mode === "geo" || this.mode === "ledger") this.transition.settle(this.mode);
     else this.transition.stageInstant();
     this.unsub.push(
@@ -468,7 +467,6 @@ export class Engine {
   setMode(mode: Mode) {
     const prevMode = this.mode; // capture BEFORE the reassignment — the choreography branches on it
     this.mode = mode;
-    this._hyperRoll = false; // the rolled camera-up is a hyper-focus-only pose; every view switch levels it
     // A view switch re-lays the scene under a stationary pointer, so any in-flight hover
     // (tooltip + the hover channels) would linger re-projected at a wrong screen position
     // until the next pointermove — clear it as part of the switch.
@@ -547,6 +545,9 @@ export class Engine {
   // blocks; the ledger LAYOUT snaps (globe.applyLedgerLayout + layers.setLedger's hard hide) belong
   // at the boundary so the hyper furniture FADES out under the alpha instead of vanishing at switch
   // time, and the camera flies during the IN phase rather than at transition start.
+  // Reached ONLY via _applyBoundary, whose `dest` is always a 3D view (hyper/geo/ledger) —
+  // flat/"soon" views never route here (they PARK the fleet and never apply a destination
+  // layout, see setMode's !is3D branch). So there is no flat-view reset case below.
   private _applyDestLayout(mode: Mode) {
     // Snapshots view reuses the SAME hub/node meshes, laid into planar rows / lanes. These are the
     // boundary-only layout snaps (invisible: the nodes are gathered): the hyper furniture hard
@@ -581,15 +582,7 @@ export class Engine {
       else this.focus("overview");
       return;
     }
-    // The remaining placeholder views (status/transactions/staking) hide the 3D scene — reset to idle.
-    if (mode !== "hyper" && mode !== "geo") {
-      this.layers.focusId = null;
-      this.globe.setFilter("all");
-      this.globe.focusDensest(false);
-      this.ctx.controls.autoRotate = true;
-      this.focus("overview");
-      return;
-    }
+    // hyper / geo (ledger returned above; flat views never reach here — see the method note):
     this.ctx.controls.autoRotate = mode !== "geo";
     this.applyFilter(false); // apply the filter's visuals, but leave the camera to _focusSelection
     // A selection's camera position carries across view switches: frame the selected node in the
@@ -720,7 +713,6 @@ export class Engine {
     }
     this.ctx.controls.autoRotate = false;
     this.layers.focusId = null;
-    this._hyperRoll = false; // the node pose is a world-up framing — level the atom-focus roll
     hyperNodeFraming(pos, this._framingOut);
     this._tweenTo(this._framingOut.pos, this._framingOut.target);
   }
@@ -985,7 +977,6 @@ export class Engine {
 
   private _focusFilter(filter: string) {
     this.layers.focusId = null;
-    this._hyperRoll = false; // only a focused metagraph atom (below) rolls the camera; all/dag/none = level
     if (filter === "all") {
       this.ctx.controls.autoRotate = false; // the STRUCTURE spins (setHyperSpin), not the camera
       this.focus("overview"); // SHARED pose — the hyper structure is tilted (HYPER_TILT) to read
@@ -1055,14 +1046,6 @@ export class Engine {
       // camera by one frame — a visible drift-and-return on the hyper→geo flight (user,
       // 2026-07-17). Tween → roll ease → controls → altitude clamp, THEN the plane.
       this._updateTween(dt);
-      // Camera ROLL: while a hyper metagraph atom is focused, ease camera.up toward its ring-plane
-      // normal so the atom's discs read horizontal (hyperFocusFraming's contract); every other state
-      // eases back to world-up. Per-frame (not tween-owned) so it also levels when a view switch
-      // keeps the camera put (ledger). OrbitControls' per-frame lookAt reads the live camera.up, so
-      // manual orbiting keeps the rolled horizon while focused — the accepted trade-off.
-      this.ctx.camera.up
-        .lerp(this._hyperRoll ? this._hyperRollUp : this._worldUp, Math.min(1, dt * 2.5))
-        .normalize();
       this.ctx.controls.update();
       // Altitude clamp (policy.minCamAlt): OrbitControls' minDistance is target-relative, and
       // the geo target is off-centre — so after the controls settle, push the camera back out
@@ -1099,10 +1082,10 @@ export class Engine {
       // any camera pose.
       if (this.transition.active()) {
         // The plane's basis comes from the camera's ACTUAL orientation (its quaternion), NOT
-        // the raw camera.up — .up is only the lookAt CONSTRAINT, and while the hyper focus
-        // roll is active (or easing back) it diverges from the true screen-up, which anchored
-        // the grid below the top of the view and slightly tilted (user: focused NDT → geo).
-        // Local +X/+Y through the quaternion ARE screen-right/screen-up, exactly, roll or not.
+        // the raw camera.up — .up is only the lookAt CONSTRAINT and can diverge from the true
+        // screen-up (any camera roll), which anchored the grid below the top of the view and
+        // tilted it (user: focused NDT → geo). Local +X/+Y through the quaternion ARE
+        // screen-right/screen-up, exactly, whatever the camera's orientation.
         this._gatherR.set(1, 0, 0).applyQuaternion(this.ctx.camera.quaternion); // screen-right
         this._gatherU2.set(0, 1, 0).applyQuaternion(this.ctx.camera.quaternion); // screen-up
         this.ctx.camera.getWorldDirection(this._gatherO); // forward (scratch reuse)
@@ -1179,9 +1162,9 @@ export class Engine {
       this.ctx.dof.enabled = policy.dofEligible && metaSel && dofMix > 0.001;
       if (this.ctx.dof.enabled) {
         const meta = this._dofMeta;
-        const focusTarget = meta
-          ? meta.group.getWorldPosition(this._dofTmp)
-          : this.ctx.controls.target;
+        // The bokeh focal-plane distance is a RENDER property — it needs the hub's actual
+        // rendered world position, not a layout anchor (this is not framing math). render-state OK
+        const focusTarget = meta ? meta.group.getWorldPosition(this._dofTmp) : this.ctx.controls.target;
         this.ctx.dof.uniforms["focus"].value = this.ctx.camera.position.distanceTo(focusTarget);
         // out-of-focus blur — the ceiling the background core/hubs saturate to. The selected
         // cluster stays crisp regardless (the wide sharp zone comes from the LOW aperture, not

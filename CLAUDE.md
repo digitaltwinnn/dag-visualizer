@@ -186,8 +186,10 @@ Gotchas that will save you time:
   `mode: "geo"` or `filter: "<id>"`, `following: true`), screenshot, then revert.
 - **`--virtual-time-budget` runs very few `requestAnimationFrame` frames**, so
   animations barely start — the morph and camera tweens won't complete in a one-shot.
-  Booting in `geo` snaps `morph=1` (engine constructor), so the globe is settled; for
-  hyper camera tweens, temporarily shorten the tween `dur` in `Engine._tweenTo`.
+  Booting in `geo` snaps `morph=1` (engine constructor), so the globe SURFACE is settled from
+  frame 1 — but a fresh 3D boot also plays the ~4s staging-dissolve intro (nodes disperse from
+  the top grids), so a one-shot may catch the nodes mid-flight; the surface/layout is correct
+  regardless. For hyper camera tweens, temporarily shorten the tween `dur` in `Engine._tweenTo`.
 - **Benign console noise to ignore** when grepping logs: `mojo ... rejected`,
   `gcm/... PHONE_REGISTRATION_ERROR`, `BackForwardCache`.
 
