@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import * as THREE from "three";
 import {
   GOLDEN_ANGLE, lerp, smooth, discFall, fibShellPos, spreadCoLocated,
-  stackSizes, STACK_MIN, STACK_MAX, ringEven, ringStackRadii, ringStackPos,
+  stackSizes, STACK_MIN, STACK_MAX,
   armillaryFrame, ringFramePos, armillaryRings, armillaryPos,
 } from "./nodeLayout";
 
@@ -209,45 +209,6 @@ describe("spreadCoLocated levels (chip stacks)", () => {
     const levels: number[] = [];
     spreadCoLocated(dirs, undefined, levels);
     expect(levels).toEqual([0]);
-  });
-});
-
-describe("hypergraph orbital rings (redesign)", () => {
-  const at = (v: THREE.Vector3) => Math.hypot(v.x, v.z);
-
-  it("ringEven places n nodes evenly on one flat ring of radius r (y = 0)", () => {
-    const n = 6, r = 3.4;
-    const pos = Array.from({ length: n }, (_, i) => ringEven(i, n, r));
-    for (const p of pos) {
-      expect(p.y).toBe(0);
-      expect(at(p)).toBeCloseTo(r, 10); // every node exactly on the ring
-    }
-    // even spacing: consecutive nodes are 2π/n apart
-    const ang = (p: THREE.Vector3) => Math.atan2(p.z, p.x);
-    const d = ((ang(pos[1]) - ang(pos[0])) % (2 * Math.PI) + 2 * Math.PI) % (2 * Math.PI);
-    expect(d).toBeCloseTo((2 * Math.PI) / n, 10);
-  });
-
-  it("ringStackRadii fills concentric rings from r0 by pitch until every node has a slot", () => {
-    // a small count fits ONE ring
-    expect(ringStackRadii(3, 4, 1.6, 0.9)).toEqual([4]);
-    // a big count needs multiple rings, increasing by pitch, covering all n
-    const radii = ringStackRadii(150, 4, 1.6, 0.9);
-    expect(radii.length).toBeGreaterThan(1);
-    radii.forEach((r, k) => expect(r).toBeCloseTo(4 + k * 1.6, 10));
-    const capacity = radii.reduce((s, r) => s + Math.max(1, Math.floor((2 * Math.PI * r) / 0.9)), 0);
-    expect(capacity).toBeGreaterThanOrEqual(150);
-  });
-
-  it("ringStackPos lays every node flat (y = 0) on one of the stack's ring radii", () => {
-    const n = 150, r0 = 4, pitch = 1.6, gap = 0.9;
-    const radii = ringStackRadii(n, r0, pitch, gap);
-    for (let i = 0; i < n; i++) {
-      const p = ringStackPos(i, n, r0, pitch, gap);
-      expect(p.y).toBe(0);
-      const onARing = radii.some((r) => Math.abs(at(p) - r) < 1e-9);
-      expect(onARing).toBe(true);
-    }
   });
 });
 

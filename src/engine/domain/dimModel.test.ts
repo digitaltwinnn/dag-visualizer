@@ -4,6 +4,7 @@ import {
   metaDimScale,
   focusDim,
   focusBoost,
+  hubMatchBoost,
   dimTargetsFor,
   validatorDim,
   metaNodeDim,
@@ -160,6 +161,32 @@ describe("metaNodeDim", () => {
     const c = ctx({ morph: 1, ledger: false, countryFilter: "US", countryMix: 0.95 });
     // recDim * dimScale(1) = 0.1, below countryMix 0.95 -> raised
     expect(metaNodeDim(c, 0.1, "DE")).toBeCloseTo(0.95, 10);
+  });
+});
+
+describe("hubMatchBoost (the committed metagraph's hub-level bloom)", () => {
+  it("lifts the committed network's node up to the hub level 0.72 in hyper", () => {
+    expect(hubMatchBoost(ctx({ morph: 0 }), 0.33, true)).toBeCloseTo(0.72 - 0.33, 10);
+  });
+
+  it("is never negative (a node already above 0.72 keeps its own glow)", () => {
+    expect(hubMatchBoost(ctx({ morph: 0 }), 0.9, true)).toBe(0);
+  });
+
+  it("is zero for non-committed networks", () => {
+    expect(hubMatchBoost(ctx({ morph: 0 }), 0.33, false)).toBe(0);
+  });
+
+  it("fades out with the hubs by morph 0.3 — there's no hub on the globe", () => {
+    expect(hubMatchBoost(ctx({ morph: 0.15 }), 0.33, true)).toBeCloseTo((0.72 - 0.33) * 0.5, 10);
+    expect(hubMatchBoost(ctx({ morph: 0.3 }), 0.33, true)).toBe(0);
+    expect(hubMatchBoost(ctx({ morph: 1 }), 0.33, true)).toBe(0);
+  });
+
+  it("composes INSIDE metaNodeEmissive's floor, exactly as the render path does", () => {
+    const c = ctx({ morph: 0 });
+    const boost = hubMatchBoost(c, 0.33, true);
+    expect(metaNodeEmissive(c, 0, 0, false, false, 0.33, boost)).toBeCloseTo(0.72, 10);
   });
 });
 

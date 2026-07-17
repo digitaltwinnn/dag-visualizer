@@ -427,7 +427,8 @@ export class Globe implements GeoViewHost {
   private _buildDensityGlow(): void {
     for (const m of this._densityGlow) {
       this.group.remove(m);
-      (m.material as THREE.Material).dispose();
+      m.geometry.dispose(); // each pool owns its PlaneGeometry (leaked before, ~2×/25s poll)
+      (m.material as THREE.Material).dispose(); // the map is the shared _glowTex — kept alive
     }
     this._densityGlow = [];
     if (!this._glowTex) this._glowTex = makeGlowTexture();

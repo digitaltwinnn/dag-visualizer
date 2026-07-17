@@ -9,8 +9,9 @@
 import * as THREE from "three";
 import { METAGRAPHS, type MetaConfig } from "../../config";
 import { metaAnchor, META_RING, META_LAYERS, HYPER_TILT } from "../../domain/hyperLayout";
-import { armillaryFrame, type RingFrame } from "../../domain/nodeLayout";
+import { armillaryFrame, ringFramePos, type RingFrame } from "../../domain/nodeLayout";
 import { FocusSpot } from "../objects/FocusSpot";
+import { ORB_FRESNEL_GLSL, ORB_FRESNEL_MIX } from "../objects/NodeFabric";
 import type { SceneColors } from "../../sceneColors";
 
 const _pos = new THREE.Vector3(); // scratch for hub orbit positions (reused each frame)
@@ -67,9 +68,9 @@ function applyOrbFresnel(mat: THREE.MeshStandardMaterial): void {
   mat.onBeforeCompile = (shader) => {
     shader.fragmentShader = shader.fragmentShader.replace(
       "#include <emissivemap_fragment>",
-      "#include <emissivemap_fragment>\n" +
-        "float fres = pow(1.0 - clamp(dot(normalize(vViewPosition), normal), 0.0, 1.0), 2.5);\n" +
-        "totalEmissiveRadiance *= (0.72 + 0.9 * fres);",
+      // The SHARED orb rim chunk (NodeFabric.ORB_FRESNEL_*) — one curve for instanced nodes
+      // and these single orbs, so tuning it can never diverge the two materials.
+      `#include <emissivemap_fragment>\n${ORB_FRESNEL_GLSL}totalEmissiveRadiance *= ${ORB_FRESNEL_MIX};`,
     );
   };
 }
@@ -180,6 +181,10 @@ export class HyperView {
   setLedger(on: boolean) {
     if (this.ledger === on) return;
     this.ledger = on;
+    // The spot lives in the SHARED scene (not root) and its easing runs in update(), which
+    // early-returns in ledger — without this instant off, a spot lit by a focused atom would
+    // linger and wash the ledger chamber (the same bug class LedgerView.spotOff() guards).
+    if (on) this._spot.blackout();
     // The Hypergraph furniture is hidden in the Snapshots chamber (update() early-returns there, so
     // it can't fade these itself): the DAG core + its cyan hoops, and each hub + its layer hoops.
     // Restored on exit; update() then governs their per-frame fade again.
@@ -346,12 +351,9 @@ export class HyperView {
   private _makeHoop(frame: RingFrame, radius: number): THREE.LineLoop {
     const seg = 96;
     const pts: THREE.Vector3[] = [];
-    for (let i = 0; i < seg; i++) {
-      const a = (i / seg) * Math.PI * 2;
-      pts.push(
-        frame.t.clone().multiplyScalar(Math.cos(a) * radius).addScaledVector(frame.b, Math.sin(a) * radius),
-      );
-    }
+    // The hoop's circle comes from the SAME parametrization that places the nodes on this ring
+    // (Globe → ringFramePos) — one curve source, so nodes can never drift off their hoop.
+    for (let i = 0; i < seg; i++) pts.push(ringFramePos(i, seg, radius, frame));
     // Dash-capable material: a populated layer renders SOLID (gapSize 0), an empty layer renders
     // DOTTED (set by setHoopPresence) to show the layer exists in the architecture but has no nodes.
     const mat = new THREE.LineDashedMaterial({ color: this._core, transparent: true, opacity: HOOP_OP, dashSize: 1e3, gapSize: 0 });
@@ -400,7 +402,9 @@ export class HyperView {
     this._coreRings = [];
     for (const m of this._coreFills) {
       this.coreGroup.remove(m);
-      (m.material as THREE.MeshBasicMaterial).map?.dispose();
+      m.geometry.dispose(); // each fill owns its CircleGeometry (leaked before, ~every 25s poll)
+      // NB: the material's map is the SHARED lazily-created _fillTex (also referenced by every
+      // metagraph ring fill) — deliberately NOT disposed here; it lives for the app's lifetime.
       (m.material as THREE.Material).dispose();
     }
     this._coreFills = [];

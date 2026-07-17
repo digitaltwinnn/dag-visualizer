@@ -21,6 +21,13 @@ import type { MetaNodeRecord, ValidatorRecord } from "../../domain/records";
 import type { PickDescriptor } from "@/src/data/types";
 
 const Y_AXIS = new THREE.Vector3(0, 1, 0); // hex-prism axis (radial after _qRadial)
+// The ONE orb fresnel-rim shader tail (view-dependent rim so emissive spheres read as lit 3D
+// orbs): shared by the instanced node spheres below AND HyperView's single core/hub orbs
+// (applyOrbFresnel), so the "one node language" look can't drift between the two materials.
+// GLSL declares `fres`; MIX is the emissive multiplier both sites apply to their own emissive.
+export const ORB_FRESNEL_GLSL =
+  "float fres = pow(1.0 - clamp(dot(normalize(vViewPosition), normal), 0.0, 1.0), 2.5);\n";
+export const ORB_FRESNEL_MIX = "(0.72 + 0.9 * fres)";
 // The geo hex prisms' resting opacity — slightly glassy (user: replaces the wireframe overlay,
 // which never read as clean edges). Depth-write stays ON so stacks occlude normally.
 const HEX_ALPHA = 0.92;
@@ -129,10 +136,11 @@ export class NodeFabric {
               "totalEmissiveRadiance = vBase * vEmi * (0.5 + 0.95 * vCap + 1.1 * fres);"
             : // spheres (hyper nodes): a view-dependent FRESNEL rim so they read as glowing 3D orbs
               // instead of flat blobs (user). Coeffs keep the average near the old flat vEmi so the
-              // dim/hover and bloom-threshold behaviour is unchanged.
+              // dim/hover and bloom-threshold behaviour is unchanged. The rim is the shared
+              // ORB_FRESNEL chunk (HyperView's core/hub orbs replay the same tail).
               "#include <emissivemap_fragment>\n" +
-              "float fres = pow(1.0 - clamp(dot(normalize(vViewPosition), normal), 0.0, 1.0), 2.5);\n" +
-              "totalEmissiveRadiance = vBase * vEmi * (0.72 + 0.9 * fres);",
+              ORB_FRESNEL_GLSL +
+              `totalEmissiveRadiance = vBase * vEmi * ${ORB_FRESNEL_MIX};`,
         );
     };
     return mat;
@@ -447,7 +455,8 @@ export class NodeFabric {
       // The COMMITTED metagraph's own nodes glow at the hub's resting level (HyperView hub base
       // 0.72) in the Hypergraph, so the picked network's nodes bloom like its hub instead of sitting
       // at the dimmer node base (user). Fades out with the hubs by morph 0.3 — there's no hub on the
-      // globe. The per-node hover/select focusBoost below still layers on top for the focused node.
+      // globe. Mirrors domain/dimModel.hubMatchBoost (composed inside metaNodeEmissive's floor) —
+      // change BOTH. The per-node hover/select focusBoost below still layers on top.
       const hubMatch =
         c.filter === r.metaId ? Math.max(0, 0.72 - glow) * THREE.MathUtils.clamp(1 - m / 0.3, 0, 1) : 0;
       const flRaw = r._flash || 0; // brief flash when an arc pulse reaches this node

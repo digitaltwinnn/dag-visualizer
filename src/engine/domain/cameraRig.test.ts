@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import * as THREE from "three";
-import { FOCI, hubFraming, geoFraming, easeInOutQuad, CAM_ZOOM, dollyBack, nodeFraming, hyperNodeFraming, closeness, CLOSE_FAR_ALT, CLOSE_NEAR_ALT } from "./cameraRig";
+import { FOCI, hubFraming, hyperFocusFraming, geoFraming, easeInOutQuad, CAM_ZOOM, dollyBack, nodeFraming, hyperNodeFraming, closeness, CLOSE_FAR_ALT, CLOSE_NEAR_ALT } from "./cameraRig";
 
 describe("FOCI", () => {
   it("carries the camera presets (ledger has none — it uses `overview` + a rotated group)", () => {
@@ -52,6 +52,58 @@ describe("hubFraming", () => {
     hubFraming(hub, out);
     expect(out.pos).toBe(posRef);
     expect(out.target).toBe(targetRef);
+  });
+});
+
+describe("hyperFocusFraming", () => {
+  const framing = (hub: THREE.Vector3, n = new THREE.Vector3(0, 1, 0)) => {
+    const out = { pos: new THREE.Vector3(), target: new THREE.Vector3() };
+    hyperFocusFraming(hub, n, out);
+    return out;
+  };
+
+  it("targets the hub itself (so the CAM_ZOOM dolly applies normally)", () => {
+    const hub = new THREE.Vector3(20, 0, 5);
+    expect(framing(hub).target).toEqual(hub);
+  });
+
+  it("stands behind the hub along the radial and above the ring plane (core lands BEHIND)", () => {
+    const hub = new THREE.Vector3(20, 0, 0);
+    const n = new THREE.Vector3(0, 1, 0);
+    const { pos } = framing(hub, n);
+    const rel = pos.clone().sub(hub);
+    expect(rel.clone().projectOnVector(hub.clone().normalize()).dot(hub) > 0).toBe(true); // behind = away from the core
+    expect(rel.dot(n)).toBeGreaterThan(0); // above the ring plane
+  });
+
+  it("is equivariant under a spin about the plane normal — every hub slot gets the SAME pose", () => {
+    // Rotate the hub 90° about Y: the whole framing must be the same rotation of the first —
+    // this is what makes the core land in the SAME screen corner for every focused metagraph.
+    const n = new THREE.Vector3(0, 1, 0);
+    const a = framing(new THREE.Vector3(20, 0, 0), n);
+    const b = framing(new THREE.Vector3(0, 0, -20), n); // the same hub slot, spun +90° about Y
+    const rot = new THREE.Quaternion().setFromAxisAngle(n, Math.PI / 2);
+    const aPosRot = a.pos.clone().applyQuaternion(rot);
+    expect(b.pos.x).toBeCloseTo(aPosRot.x, 10);
+    expect(b.pos.y).toBeCloseTo(aPosRot.y, 10);
+    expect(b.pos.z).toBeCloseTo(aPosRot.z, 10);
+  });
+
+  it("survives the degenerate hub-at-origin case without NaN (the d fallback)", () => {
+    const { pos, target } = framing(new THREE.Vector3(0, 0, 0));
+    expect(Number.isFinite(pos.x) && Number.isFinite(pos.y) && Number.isFinite(pos.z)).toBe(true);
+    expect(target).toEqual(new THREE.Vector3(0, 0, 0));
+  });
+
+  it("keeps screen-up on the ring-normal side (the u0 sign flip)", () => {
+    // The view direction f = target - pos; screen-up u0 = r0 × f (unit); the framing promises
+    // +u0 has a positive component along the plane normal so the disc reads right-side up.
+    const n = new THREE.Vector3(0, 1, 0);
+    const { pos, target } = framing(new THREE.Vector3(20, 0, 0), n);
+    const f = target.clone().sub(pos).normalize();
+    const r0 = f.clone().cross(n).normalize();
+    const u0 = r0.clone().cross(f).normalize();
+    expect(u0.dot(n)).toBeGreaterThan(0);
   });
 });
 

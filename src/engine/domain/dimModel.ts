@@ -125,6 +125,17 @@ export function nodeEmissive(
   return v;
 }
 
+// The COMMITTED metagraph's hub-match boost: in the Hypergraph, the picked network's nodes rise
+// to the hub's resting glow level (0.72) instead of sitting at the dimmer node base, so they
+// bloom like their hub (user). Derived from the node's own pre-floor `glow` (the boost is the
+// GAP up to 0.72, never negative) and fading out with the hubs by morph 0.3 — there's no hub on
+// the globe. `committed` = this node's metagraph IS the committed filter.
+export function hubMatchBoost(c: DimContext, glow: number, committed: boolean): number {
+  if (!committed) return 0;
+  const hubFade = Math.min(1, Math.max(0, 1 - c.morph / 0.3));
+  return Math.max(0, 0.72 - glow) * hubFade;
+}
+
 // Metagraph-node emissive glow — see the file-header deviation note: its suppression/floor
 // coefficients differ from the validator's and aren't reachable through nodeEmissive's
 // (baseLo, baseHi) parameterisation, so it's a sibling function with its own (single,
@@ -132,7 +143,8 @@ export function nodeEmissive(
 // `dimOthersOnFocus` = the caller has already ANDed "some focus target exists" into the
 // filter-based flag — with no focus target at all neither the boost nor the dim-back branch
 // should fire, and this pure function has no side channel to detect "no focus", so the
-// caller must fold that into the flag it passes.
+// caller must fold that into the flag it passes. `hubBoost` is hubMatchBoost(...) above —
+// added INSIDE the floor, exactly as the render path composes it.
 export function metaNodeEmissive(
   c: DimContext,
   d: number,
@@ -140,10 +152,11 @@ export function metaNodeEmissive(
   isFocus: boolean,
   dimOthersOnFocus: boolean,
   base: number,
+  hubBoost = 0,
 ): number {
   const glow = base * (1 - d * 0.9);
   const fl = flash * c.morph; // arcs are a geo-only visual — their flash must not bleed into hyper
-  let v = Math.max(0.03, glow + fl);
+  let v = Math.max(0.03, glow + fl + hubBoost);
   if (isFocus) v += focusBoost(c);
   else if (dimOthersOnFocus) v *= focusDim(c);
   return v;
