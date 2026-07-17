@@ -43,7 +43,15 @@ took 1 line in Globe (its `geoFades` registry) vs 11 and 16 hand-edits in HyperV
 5. **Visibility ownership rule (CLAUDE.md + enforced):** the Engine/policy owns `visible`
    on view root groups; views own opacity/alpha. LedgerView's remaining `group.visible`
    history and any future view follow it.
-6. **Fade-curve consistency sweep:** the ledger centre-block's boolean visibility pop gets
+6. **Transition-window input consistency:** picking is already suppressed mid-flight, but
+   HUD commits (top-bar filter picker, LiveStrip bars) still fire camera reframes during the
+   OUT phase, breaking the "camera holds still through teardown" contract. Gate camera moves
+   (not the state changes) on `!transition.active()`, deferring the reframe to the boundary.
+   Also: gatherLayout's dead `rows` computation, empty/singleton edge tests, the tie-break
+   pin, and Engine's defensive `_pendingBoundary = null` on the reverse-to-origin path
+   (final-review triage, 2026-07-17); plus the pre-existing stale README.md:90
+   "jumps to the ledger" claim (docs sweep).
+7. **Fade-curve consistency sweep:** the ledger centre-block's boolean visibility pop gets
    the `mat.color`-scaling fade (review finding); the trail-block opacity+emissive double
    scale is either adopted everywhere deliberately (documented curve) or reduced to the
    single-channel linear fade used by every other material — one curve family, not three.
