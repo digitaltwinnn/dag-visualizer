@@ -39,11 +39,24 @@ mode !== "ledger"`):
   tablet/phone dock icon trays. The bespoke marks that remain text/SVG on purpose are the identity
   dots, the ECG mark, and the Tooltip's `‹›` punctuation.
 
-Only `hyper`↔`geo` **morph** (`morph` 0→1, eased each frame); the blue L0 core literally
-**grows out into the globe** (`scene/views/HyperView.ts`) as the nodes fly to their map positions. `ledger`
-is a separate 3D layout (not part of the morph — it pins `morph` at 0 and hard-places the
-reused node meshes into its lanes; see *Per-view behaviour*). The flat placeholder views sit
-at the hyper end with the canvas hidden.
+Every switch **among the three 3D views** (`hyper`↔`geo`↔`ledger`, any pair) runs the SAME
+staged **gather choreography** (`domain/viewTransition.ts`'s `ViewTransition`, spec
+`docs/superpowers/specs/2026-07-17-view-transitions-design.md`) instead of a cut or a live
+morph flight: **OUT** (0.9s) — the from-view's furniture fades via `furnitureAlpha` while its
+nodes fly, staggered (a 0.25s spread, rank-ordered within each network's own grid), up to
+per-network near-square **staging grids** on a camera-anchored plane at the top of the
+viewport (`domain/gatherLayout.ts`) — then **BOUNDARY**, one invisible frame where the nodes
+are fully gathered and both furnitures are dark: the destination layout snaps in (`morph`
+set, `applyLedgerLayout`, `layers.setLedger`, filters re-asserted) and the camera focus/tween
+starts — then **IN** (1.0s) — the to-view's furniture builds back in while its nodes disperse,
+staggered, to their real destination poses and the camera flies. **1.9s total.** `morph` and
+`ledgerT` are now **BOUNDARY-APPLIED LAYOUT PARAMETERS** the machine snaps, not eased flight
+blends — the old hyper↔geo core-grow-into-the-globe flight and the Snapshots view's
+"appears already-formed, no entry animation" rule are both **RETIRED** (deliberate reversals,
+2026-07-17): the ledger chamber now has a real build-in/teardown too. Retargeting (flipping
+the switch again mid-flight) keeps flight weights continuous, no teleports. Picking is
+suppressed for the whole choreography (raycasting nodes mid-flight misleads). The flat
+placeholder views are untouched by any of this — `SceneCanvas` just cross-fades the canvas.
 
 ## The rules — invariants that hold in every change
 
@@ -239,6 +252,24 @@ store-value imports**, enforced by `layerBoundaries.test.ts`). Each ships coloca
   their explorer node browsers — hyper + geo), as
   DATA. The single source of truth for what each view turns on (see *Per-view behaviour*).
 - `morph.ts` — the hyper↔geo morph easing + derived visibility ramps.
+- `viewTransition.ts` — the ONE 3D↔3D view-switch choreographer (`ViewTransition`, `View3D`):
+  every switch among `hyper`/`geo`/`ledger` runs **OUT** (`DUR_OUT` 0.9s — the from-view's
+  furniture fades via `furnitureAlpha`, nodes fly staggered [`STAGGER_SPREAD` 0.25s spread,
+  rank-ordered within each network's grid] to the gathering slots) → **BOUNDARY** (`tick()`
+  returns `true` exactly once, mid-flight, invisible — the Engine applies the destination
+  layout there) → **IN** (`DUR_IN` 1.0s — the to-view's furniture builds, nodes disperse to
+  their destination poses, the camera flies). `morph`/`ledgerT` are now BOUNDARY-APPLIED
+  layout parameters the machine snaps, not eased flight blends. Retargeting (flipping the
+  switch mid-flight) keeps flight weights continuous via the `FLIGHT_OUT`/`FLIGHT_IN`
+  denominators (`DUR_OUT`/`DUR_IN` minus the stagger spread) — no teleports. Picking is
+  suppressed while `transition.active()`. Pure and allocation-free; `gatherWeight`/
+  `furnitureAlpha` are read per node/per frame by the scene.
+- `gatherLayout.ts` — `gatherSlots()`: the staging-grid layout each network's nodes gather
+  into mid-transition — one near-square grid per network, packed left→right sorted
+  size-desc (`GATHER_GUTTER` 1.5 cells between squares), on the camera-anchored staging plane
+  at the top of the viewport (the Engine rebuilds the frame every frame from the live camera;
+  `Globe.setGatherCell` scales the cell by camera aspect so phone-width viewports still fit
+  the row). Peer to `hyperLayout.ts`/`ledgerLayout.ts`/`geoLayout.ts`.
 - `nodeLayout.ts` — the node placement math: the Hypergraph's ARMILLARY "atom" rings
   (`armillaryFrame`/`ringFramePos`/`armillaryRings`/`armillaryPos` — nodes on same-diameter
   rings at different tilts; replaced the old fibonacci scatter shells, hypergraph-redesign
@@ -324,8 +355,12 @@ GPU; no store/react**):
   animated backdrop read as distracting). Only `uTime`/`uMorph` drive it.
 - `views/HyperView.ts` — Hypergraph-only furniture: the Global L0 **core** and the orbiting
   metagraph **hubs** (from `config.METAGRAPHS`). The core is parented to the scene (not
-  `root`) so the morph can **grow it out to the globe's radius and dissolve it** as the Earth
-  fades in. Hubs fade out early.
+  `root`) so the morph's root-collapse doesn't drag it; it **dissolves in place** as the Earth
+  fades in (the old grow-into-the-globe swell was removed 2026-07-12 — stale comments/docs
+  claiming it were fixed 2026-07-17 alongside the view-transition work). Hubs fade out early
+  on the morph. `setViewAlpha()` rides `transition.furnitureAlpha("hyper")` on top of that
+  morph fade — the whole furniture blacks out during a transition's OUT/BOUNDARY and builds
+  back in during IN, same mechanism `LedgerView.setViewAlpha` uses for the chamber.
 - `views/GeoView.ts` — the geo globe SURFACE: body sphere, graticule, atmosphere rim, the polar
   **compass roses** (hairline dial + micro N/S letter over each pole, in `globe.group` so they
   rotate truthfully — E/W are deliberately not floated), and the
@@ -1044,11 +1079,15 @@ event, `ledger.update(dt)` per frame).
 - **Reuse, not clones:** the producer NODES are the SAME `InstancedMesh` instances from
   hyper/geo (`globe.nodes` / `globe.metaNodes`); the `if (this.ledger)` branches in
   `globe.setMorph`/`update` rewrite *those* instances' matrices to the lane positions. The
-  Engine **freezes `morph`** while `mode === "ledger"`; `globe.ledgerT` is the hyper/geo→lane
-  placement blend. The metagraph **hubs are hidden** (`layers.setLedger` →
-  `hub.visible = false`). The **globe surface AND the starfield are gated OFF in ledger**
-  (not eased by morph) — `globe.setMorph` zeroes `surf`/`extras` when `this.ledger`, and the
-  Engine passes `background.update(.., 0)` — so neither lingers when arriving from geo.
+  Engine **freezes `morph`** while settled in `mode === "ledger"` (it carries whatever value
+  the view was entered with); `globe.ledgerT` is now a **BOUNDARY-SNAPPED layout parameter**
+  (0/1, set by `applyLedgerLayout` at the transition's invisible mid-flight boundary), not an
+  eased blend — the flight that used to BE that ease is now the gather choreography's IN-phase
+  dissolve (see *the staged gather choreography* in the overview). The metagraph **hubs are
+  hidden** (`layers.setLedger` → `hub.visible = false`, applied at the same boundary). The
+  **globe surface AND the starfield are gated OFF in ledger** (not eased by morph) —
+  `globe.setMorph` zeroes `surf`/`extras` when `this.ledger`, and the Engine passes
+  `background.update(.., 0)` — so neither lingers when arriving from geo.
 - **`LedgerView` owns:** the glass floor **panes** (`_paneMat`, one colour; floors named by
   subtle flat edge-aligned text labels — `FLOOR_LABELS`/`_makeLabel`, not billboards); the
   centred live **global snapshot block** + its left-trailing **`_trail`** (individual
@@ -1104,11 +1143,21 @@ event, `ledger.update(dt)` per frame).
   sizes/tiles/links/pulses/rings come from live data — nothing fabricated. **TODO:** draw
   DAG L1 **blocks** (`global.blocks`) on the hypergraph-L1 floor flowing up into the global
   (+ a DAG-L1 participation ring tied to it).
-- **Camera + static entry:** `FOCI.ledger` frames the latest block bottom-right looking
-  ~along −X (trails recede as background); orbit stays enabled. The view appears
-  **already-formed — no entry animation**: the Engine `_snapTo`s the camera (a tween read as
-  the planes swinging in), `setLedger` snaps the globe spin to 0, and pins `ledgerT = 1`.
-  To screenshot a ledger state headless, seed `mode: "ledger"` in `store.ts`.
+- **Camera + build-in reveal:** `FOCI.ledger` frames the latest block bottom-right looking
+  ~along −X (trails recede as background); orbit stays enabled. The old **"appears
+  already-formed — no entry animation"** rule is **RETIRED** (2026-07-17, the view-transition
+  choreography — a deliberate reversal): arriving in `ledger` from another 3D view now runs
+  the same staged OUT→BOUNDARY→IN choreography as any 3D↔3D switch, so the chamber has a real
+  **build-in/teardown** — `LedgerView.setViewAlpha` (fed `transition.furnitureAlpha("ledger")`)
+  ramps its floors/tiles/links/dials up from black while the gathered nodes disperse into
+  their lane positions and the camera flies to `FOCI.ledger` (or a resumed layer framing) via
+  the ordinary tween (`focus()` → `_tweenTo` — there is no more camera-snapping `_snapTo`).
+  The Engine is the **sole owner of `ledger.group.visible`** (`= ledgerActive && ledgerAlpha >
+  0.001`, where `ledgerActive` is true while settled in ledger OR a transition touches it) —
+  `LedgerView.setViewAlpha` only fades opacity now, so the two can't fight over the flag. A
+  boot straight into `ledger` (no prior 3D view) still settles instantly (`transition.settle`)
+  with no choreography, same as any direct boot. To screenshot a ledger state headless, seed
+  `mode: "ledger"` in `store.ts`.
 
 ## Anchoring, fees & the metagraph data layer
 

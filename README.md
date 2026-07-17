@@ -26,7 +26,9 @@ can understand how it works and why it's powerful:
     each metagraph as an orbiting hub with its **own L0 / data-L1 / currency-L1 nodes** in
     concentric shells. The DAG is modelled as just another **metagraph-shaped core** (one unified
     node model — a node is *hybrid* or *dedicated*, never a separate "L0 cluster" vs "L1 cluster").
-    Smoothly **morphs** into the globe (the core grows out into the Earth).
+    Switching into any other 3D view runs a brief staged **transition**: nodes gather into
+    small per-network squares, the layout swaps behind that cover, then everything flies out
+    to its new pose (~2 seconds) — instead of an instant cut.
   - **Node geography** — a 3D globe with every node plotted at its **real geographic location**
     (solid raised continents from world-atlas land data, with glowing coastal cliffs), co-located
     machines stacked into honeycomb chip towers, and travelling-packet connection arcs. The
