@@ -21,9 +21,15 @@ export interface SceneColors {
   dagCore: number; // --core      (DAG hypergraph-core blue — the validator-node fallback hue + rim
   //                               light; ONE hue for the core, L0/L1 are NOT colour-distinguished)
   bg: number; //      --background (scene clear colour + fog + background depth)
+  border: number; //  --border     (panel/pill hairline RGB, 90,140,255 — the scene's label chips
+  //                               reuse it at the SAME alphas as the .role-chip pill: .22 / .05)
+  panel: number; //   --panel      (translucent glass panel RGB, 12,16,32 — the label chips fill
+  //                               with it so the badge reads as glass, not the disc behind it)
+  muted: number; //   --muted-foreground (the muted text tone — the label-chip CODE text, matching
+  //                               the React .role-chip pill's text-muted-foreground)
 }
 
-export type SceneColorVar = "--primary" | "--core" | "--background";
+export type SceneColorVar = "--primary" | "--core" | "--background" | "--border" | "--panel" | "--muted-foreground";
 
 // Resolve one CSS colour expression (e.g. "var(--primary)") to a packed 0xRRGGBB. Two steps, because
 // the computed-colour STRING format varies by browser (a token authored in oklch resolves to
@@ -69,5 +75,8 @@ export function readSceneColors(): SceneColors {
     core: readColorToken("--primary"),
     dagCore: readColorToken("--core"),
     bg: readColorToken("--background"),
+    border: readColorToken("--border"),
+    panel: readColorToken("--panel"),
+    muted: readColorToken("--muted-foreground"),
   };
 }

@@ -9,7 +9,7 @@ export interface NetworkEvents {
   global: { reset: boolean; snapshots?: GlobalSnapshot[]; snapshot?: GlobalSnapshot; latest: GlobalSnapshot | null };
   status: { live: boolean; lastGoodAt: number | null };
   cluster: { l0: ClusterNode[]; l1: ClusterNode[]; dag: DagCore };
-  anchor: { metaId: string; timestamps: string[] };
+  anchor: { metaId: string; timestamps: string[]; seed: boolean };
 }
 
 // One record in a metagraph's rolling snapshot buffer (metaSnaps).
@@ -180,6 +180,11 @@ export class NetworkData {
       e.layer = e.roles[0]; // primary layer for plotting (l0 if present, else cl1)
       return e;
     });
+    // CANONICAL ORDER — cluster/info returns peers in an unstable order, and the scene places
+    // nodes by list INDEX (armillary ring slots, honeycomb stacks). Without this, the 25s
+    // membership poll could reshuffle indices and visibly SNAP every node to a new ring
+    // position mid-rotation (user bug).
+    nodes.sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
     return {
       id: "dag", name: "DAG", symbol: "DAG", isRoot: true, color: COLORS.core, nodes,
       description:
@@ -310,7 +315,7 @@ export class NetworkData {
       if (oldestKey === undefined) break;
       this.anchorIndex.delete(oldestKey);
     }
-    this._emit("anchor", { metaId: m.id, timestamps: fresh.map((r) => r.ts) });
+    this._emit("anchor", { metaId: m.id, timestamps: fresh.map((r) => r.ts), seed: lastOrd === -1 });
   }
 
   // Aggregate fee + count of the metagraph snapshots anchored into a given global
