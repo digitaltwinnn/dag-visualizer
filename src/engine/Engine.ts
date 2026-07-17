@@ -18,10 +18,18 @@ import { FOCI, hyperFocusFraming, geoFraming, ledgerLayerFraming, nodeFraming, h
 import { countryFraming } from "./domain/countryShape";
 import { R as GEO_R, LAND_H } from "./domain/geoLayout";
 import { clickActions, pickActive } from "./domain/pickActions";
+import { ViewTransition, type View3D } from "./domain/viewTransition";
 import type { GlobalSnapshot, PickDescriptor } from "@/src/data/types";
 import type { ClusterNode, DagCore, GeoMap, RouteMetagraph } from "@/src/data/types";
 
 type Vec = THREE.Vector3;
+
+// View-transition staging plane (the gather grids the nodes fly to at the top of the viewport).
+// GATHER_DIST = the plane's depth in front of the camera; GATHER_TOP_FRAC = fraction of the
+// frustum half-height above centre where the band sits (the top third). Both camera-anchored, so
+// the grids read the same at any pose.
+const GATHER_DIST = 34;
+const GATHER_TOP_FRAC = 0.62;
 
 // id[] -> { id: sceneColorNumber }, resolved through the identity map (Task 1). The scene
 // layer never imports the TS generator — the Engine owns the map and hands scene colors
@@ -77,6 +85,15 @@ export class Engine {
   private _hubWorld = new THREE.Vector3(); // scratch: hub local pos tilted into world for framing
   private _hubNormal = new THREE.Vector3(); // scratch: atom ring-plane normal in world (for framing)
   private _hyperSpinY = 0; // shared hyper-structure spin angle (globe group + root + core, in lockstep)
+
+  // The ONE view-transition state machine (domain/viewTransition). Every 3D↔3D view switch runs the
+  // staged gather choreography through it; the render loop advances it + feeds the furniture alphas,
+  // and the boundary (tick() true once) applies the destination layout while the nodes are gathered.
+  private transition = new ViewTransition();
+  private _gatherO = new THREE.Vector3(); // scratch: staging-plane origin (world), per frame
+  private _gatherR = new THREE.Vector3(); // scratch: staging-plane right (world)
+  private _gatherU2 = new THREE.Vector3(); // scratch: staging-plane up (world)
+  private _pendingBoundary: Mode | null = null; // destination whose layout applies at the boundary
 
   private geoMap: GeoMap = {};
   private dagCore: DagCore | null = null;
@@ -164,6 +181,8 @@ export class Engine {
     // HyperView only ever has these 10 config hubs, so this map never needs updating.
     this.layers = new HyperView(this.ctx.scene, colors, sceneColorsFor(METAGRAPHS.map((m) => m.id)));
     this.globe = new Globe(this.ctx.scene, this.layers, this.ctx.camera, colors);
+    // The Globe reads the transition machine each frame (geo furniture alpha + the node gather).
+    this.globe.transition = this.transition;
     // ONE identity colour system everywhere: the ledger + globe are handed the same identity
     // SCENE map the hubs were born with, at construction, so nothing anywhere is built from a raw
     // config colour ("dag" included — its own brand hue, distinct from structural cyan; see
@@ -204,6 +223,9 @@ export class Engine {
     // Booting straight into geo (deep link / persisted view): snap to the globe —
     // there's nothing to morph from on a fresh load (matches the old #geo behaviour).
     if (this.mode === "geo") this.morph = 1;
+    // Seed the transition machine on the settled boot view (setMode below re-settles on the same
+    // value — harmless — but this guarantees a valid state before the first render frame).
+    this.transition.settle(this.mode === "geo" ? "geo" : this.mode === "ledger" ? "ledger" : "hyper");
     this.unsub.push(
       useStore.subscribe((st, prev) => {
         if (st.mode !== prev.mode) this.setMode(st.mode);
@@ -430,6 +452,7 @@ export class Engine {
 
   // ---- view + filter (ports ui.setMode / _applyFilter / camera focus) ----
   setMode(mode: Mode) {
+    const prevMode = this.mode; // capture BEFORE the reassignment — the choreography branches on it
     this.mode = mode;
     this._hyperRoll = false; // the rolled camera-up is a hyper-focus-only pose; every view switch levels it
     // A view switch re-lays the scene under a stationary pointer, so any in-flight hover
@@ -438,6 +461,8 @@ export class Engine {
     this._clearHover();
     const policy = VIEW_POLICIES[mode];
     // View-derived sim gates → the scene modules (the render loop reads the rest of the policy).
+    // These + the filter dim / country clear apply IMMEDIATELY (the choreography defers only the
+    // destination LAYOUT + the camera flight to the mid-flight boundary).
     this.globe.setSimFlags(policy.sims);
     this.layers.setHubOrbits(policy.sims.hubOrbits);
     // Zoom floor: geo keeps the camera outside the globe surface (see viewPolicy.minCamDist).
@@ -445,11 +470,6 @@ export class Engine {
     // Polar clamp: globe views keep the "no pole crossing" limit; hyper relaxes it so the ring
     // layout can be viewed straight from the top (viewPolicy.minPolarAngle).
     this.ctx.controls.minPolarAngle = policy.minPolarAngle;
-    // Snapshots view reuses the SAME hub/node meshes, laid out into planar rows. Toggle that
-    // layout on the meshes (off restores the orbit/globe layout) and lock orbit so it reads 2D.
-    const inLedger = mode === "ledger";
-    this.layers.setLedger(inLedger);
-    this.globe.setLedger(inLedger);
     this.ctx.controls.enableRotate = true; // the 3D layer stack is meant to be looked around
     // The country drill-down is geo-only; drop it on any view change so it can't
     // linger as a stale leaderboard highlight + mismatched zoom after leaving geo.
@@ -458,6 +478,38 @@ export class Engine {
       this.globe.setCountry(null);
       useStore.getState().setCountry(null);
     }
+
+    const is3D = (m: Mode): m is View3D => m === "hyper" || m === "geo" || m === "ledger";
+    if (is3D(prevMode) && is3D(mode) && prevMode !== mode) {
+      // 3D → 3D: run the staged gather choreography. The machine handles retargeting (a switch
+      // mid-flight) without teleports; the render loop applies _pendingBoundary's layout + camera
+      // at the OUT→IN boundary, while the nodes are gathered and both furnitures are dark.
+      this.transition.start(prevMode, mode);
+      this._pendingBoundary = mode;
+    } else {
+      // Boot, a flat interlude, or flat→3D: no choreography (SceneCanvas cross-fades the canvas).
+      // Cancel any in-flight boundary; settle the machine on the destination (a flat view that
+      // interrupted a 3D transition settles it on the in-progress target so the alpha doesn't
+      // strand a half-lit furniture). _applyDestLayout runs immediately, as before.
+      this._pendingBoundary = null;
+      if (is3D(mode)) this.transition.settle(mode);
+      else if (this.transition.active()) this.transition.settle(this.transition.to!);
+      this._applyDestLayout(mode);
+    }
+  }
+
+  // The per-view destination LAYOUT + camera framing, applied either immediately (flat/boot path)
+  // or at the mid-flight transition boundary (3D↔3D). Moved here verbatim from setMode's per-mode
+  // blocks; the ledger LAYOUT snaps (globe.applyLedgerLayout + layers.setLedger's hard hide) belong
+  // at the boundary so the hyper furniture FADES out under the alpha instead of vanishing at switch
+  // time, and the camera flies during the IN phase rather than at transition start.
+  private _applyDestLayout(mode: Mode) {
+    // Snapshots view reuses the SAME hub/node meshes, laid into planar rows / lanes. These are the
+    // boundary-only layout snaps (invisible: the nodes are gathered): the hyper furniture hard
+    // hide/show and the node lane placement.
+    const inLedger = mode === "ledger";
+    this.layers.setLedger(inLedger);
+    this.globe.applyLedgerLayout(inLedger);
     // The Snapshots view: keep the reused meshes visible (the render loop places them into the
     // planar rows + shows the centered live snapshot); just dim non-selected columns and frame it.
     if (mode === "ledger") {
@@ -467,9 +519,9 @@ export class Engine {
       this.globe.setFilter(this.filter); // dim non-selected metagraph columns (no camera move)
       this.ledger.setFilter(this.filter); // neutralise the other lanes' tiles/links
       this._refreshLedger();
-      // Ledger uses the SHARED overview camera — the camera never moves on a view switch; the group
-      // transform (config.viewRotY/viewScale) frames the resting pose central/untilted. If a layer
-      // is already committed, resume its tilted layer-focus framing instead.
+      // Ledger uses the SHARED overview camera — the group transform (config.viewRotY/viewScale)
+      // frames the resting pose central/untilted. If a layer is already committed, resume its
+      // tilted layer-focus framing instead.
       const selLayer = useStore.getState().layer;
       if (selLayer) this._focusLayer(selLayer.layerId);
       else this.focus("overview");
@@ -727,6 +779,7 @@ export class Engine {
     // Mid-drag (orbiting): no hover picking — raycasting the planes every move would flicker the
     // layer highlight across the stack while the user is just navigating.
     if (e.buttons !== 0) return;
+    if (this.transition.active()) return; // nodes are mid-flight; raycasting moving targets misleads (spec)
     const p = this._pickAt(e);
     this.canvas.style.cursor = p ? "pointer" : "grab";
     const st = useStore.getState();
@@ -771,6 +824,7 @@ export class Engine {
   private _handleClick(e: MouseEvent) {
     // A click that ends a drag (orbit/pan) is navigation, not selection — see onDown.
     if (Math.hypot(e.clientX - this._downX, e.clientY - this._downY) > 5) return;
+    if (this.transition.active()) return; // nodes are mid-flight; raycasting moving targets misleads (spec)
     const p = this._pickAt(e);
     // With nothing picked, resolve the drillable country under the cursor (geo only — the
     // land-sphere hit is analytic; the Globe resolves WHICH country in its rotated frame).
@@ -911,12 +965,49 @@ export class Engine {
       this.ctx.bloom.radius = pb.radius;
       this.ctx.bloom.threshold = pb.threshold;
 
+      // ---- view-transition choreography ------------------------------------------------------
+      // Advance the machine; tick() returns TRUE exactly once, at the OUT→IN boundary. The nodes
+      // are then fully gathered and both furnitures are dark, so snapping the destination layout +
+      // morph + starting the camera flight here is invisible.
+      if (this.transition.tick(dt) && this._pendingBoundary) {
+        const dest = this._pendingBoundary;
+        this._pendingBoundary = null;
+        if (dest === "geo") this.morph = 1;
+        if (dest === "hyper") this.morph = 0;
+        // ledger snaps nothing — it freezes morph at the source view's value (below).
+        this._applyDestLayout(dest);
+      }
+      // The staging plane: a camera-anchored band across the TOP of the viewport (world space;
+      // the Globe converts to group-local). Height from the frustum so the grids read the same at
+      // any camera pose.
+      if (this.transition.active()) {
+        this.ctx.camera.getWorldDirection(this._gatherR); // reuse _gatherR as the forward vector
+        this._gatherO.copy(this.ctx.camera.position).addScaledVector(this._gatherR, GATHER_DIST);
+        this._gatherU2.copy(this.ctx.camera.up).normalize();
+        const h = Math.tan(THREE.MathUtils.degToRad(this.ctx.camera.fov / 2)) * GATHER_DIST;
+        this._gatherO.addScaledVector(this._gatherU2, h * GATHER_TOP_FRAC);
+        // right = fwd × up is screen-LEFT in three.js's right-handed frame; negate so +u runs
+        // screen-RIGHT (verified on screen: the network squares fill left→right across the band).
+        this._gatherR.cross(this._gatherU2).normalize().negate();
+        this.globe.setGatherFrame(this._gatherO, this._gatherR, this._gatherU2);
+      }
+
       // Ledger freezes morph at the view we entered from, so the reused node meshes fly in from
-      // THAT layout (globe.ledgerT drives the lane fly-in instead). hyper/geo ease as usual.
+      // THAT layout (globe.ledgerT drives the lane fly-in instead). hyper/geo ease as usual —
+      // but a transition FREEZES morph (the boundary snaps it), so the OUT phase keeps the source
+      // layout and the IN phase the destination one.
       const target = policy.morph === "toGeo" ? 1 : policy.morph === "frozen" ? this.morph : 0;
-      this.morph += (target - this.morph) * Math.min(1, dt * 1.1);
-      this.layers.root.visible = this.morph < 0.985;
+      if (!this.transition.active()) this.morph += (target - this.morph) * Math.min(1, dt * 1.1);
+      // Keep the hyper root alive across a whole transition (its scale collapses at morph≈1, but the
+      // gathered nodes live in globe.group; the furniture fades under setViewAlpha, not this flag).
+      this.layers.root.visible = this.morph < 0.985 || this.transition.active();
       this.layers.root.scale.setScalar(Math.max(0.0001, 1 - this.morph));
+
+      // Per-view furniture build/teardown alphas. geo's alpha is read inside globe.setMorph via
+      // globe.transition; hyper + ledger read it here (each multiplies its own furniture opacity).
+      this.layers.setViewAlpha(this.transition.furnitureAlpha("hyper"));
+      const ledgerAlpha = this.transition.furnitureAlpha("ledger");
+      this.ledger.setViewAlpha(ledgerAlpha);
 
       this.globe.setMorph(this.morph);
       // Core-dim target: the DAG core fades back when a specific metagraph is the effective subject
@@ -965,13 +1056,23 @@ export class Engine {
       //  - globeSurface: the shared node group (+ earth surface).
       //  - ledger: the settlement chamber.
       // (There is no skydome — the scene's solid clear colour + fog are the whole backdrop.)
-      if (!show.hyperFurniture) {
+      // Force-manage the hyper root/core ONLY in a settled non-hyper/geo view. During a transition
+      // the morph collapse + furnitureAlpha (fed to HyperView above) govern the core/hub fade —
+      // hard-hiding coreGroup here every frame would make the core VANISH at switch time (mode flips
+      // to ledger immediately) instead of fading out under the alpha.
+      if (!show.hyperFurniture && !this.transition.active()) {
         this.layers.root.visible = show.ledger; // ledger: hubs become the metagraph-L0 row; flat: hidden
         this.layers.coreGroup.visible = false;
       }
-      this.globe.group.visible = show.globeSurface;
-      this.ledger.group.visible = show.ledger;
-      if (show.ledger) {
+      this.globe.group.visible = show.globeSurface; // true for all three 3D views — the shared nodes never blink out mid-flight
+      // Ledger chamber is live while settled in ledger OR a transition involving it is running (the
+      // build/teardown must animate). The Engine is the SINGLE owner of ledger.group.visible —
+      // LedgerView.setViewAlpha no longer writes it (the two would fight). The alpha gates whether it
+      // currently shows; ledgerActive gates whether it CAN (so it hides in unrelated views/flights).
+      const ledgerActive = this.mode === "ledger" ||
+        (this.transition.active() && (this.transition.from === "ledger" || this.transition.to === "ledger"));
+      this.ledger.group.visible = ledgerActive && ledgerAlpha > 0.001;
+      if (ledgerActive) {
         if (this._ledgerDirty) this._refreshLedger();
         this.ledger.update(dt);
       } else this.ledger.spotOff(); // its update() stops ticking off-view — don't leave the light lit

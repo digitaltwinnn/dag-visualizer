@@ -524,7 +524,8 @@ export class LedgerView {
   // instances (Globe/NodeFabric) are NOT gated here — only this view's own furniture.
   setViewAlpha(a: number): void {
     this._viewAlpha = a;
-    this.group.visible = a > 0.001;
+    // group.visible is owned SOLELY by the Engine (it composes this alpha with the ledger-active
+    // gate so the chamber can't linger in an unrelated view/flight); writing it here would fight that.
     if (a <= 0.001) this._spot.blackout();
   }
 

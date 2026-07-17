@@ -863,8 +863,6 @@ export class Globe implements GeoViewHost {
   }
 
   // -------------------------------------------------- morph between layouts
-  setLedger(on: boolean): void { this.applyLedgerLayout(on); } // TEMP alias — removed in the Engine wiring task
-
   // BOUNDARY-applied ledger layout (view-transition choreography): called by the Engine at the
   // invisible mid-transition boundary — nodes are gathered, so the snap can't be seen. ledgerT
   // stopped being an eased flight; it is now a pure layout parameter (the IN-phase flight is the
