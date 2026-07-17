@@ -855,9 +855,10 @@ signal channel.**
 Every rail card leads with `CardHead` (`components/CardHead.tsx`), ONE head anatomy on all
 cards: **eyebrow / title / INSET hairline / body**.
 
-- **Eyebrow**: uppercase 8.5px — either a view tag ("HYPERGRAPH · ABOUT") or one simple
-  "Selected <subject>" label ("SELECTED NETWORK" / "SELECTED NODE" / "SELECTED SNAPSHOT" —
-  no breadcrumb grammar). `eyebrowMuted` dims it when the feed behind the card is down.
+- **Eyebrow**: uppercase 8.5px — either a view tag ("HYPERGRAPH · ABOUT") or the bare slot
+  noun ("METAGRAPH" / "NODE" / "SNAPSHOT" / "LAYER" — the "Selected " prefix was dropped,
+  user 2026-07-17: the populated card wears the same slot label as its ghost state; no
+  breadcrumb grammar). `eyebrowMuted` dims it when the feed behind the card is down.
 - **Title**: one standard — 15px / semibold / leading-[1.2]. Pass `titleKey` to key the
   `roll-in` remount on a subject change (synced with the edge pulse). Panel titles carry a
   leading identity dot on the shared `dot-beat`. Rich titles are nodes: the dossier renders

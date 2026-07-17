@@ -174,13 +174,13 @@ export default function Inspector() {
   const detailPane: Record<string, ReactNode> = {
     // geoLive reads the node from the store; its × is CardHead's shared close like every card.
     node: (
-      <CardPane key="node" pick={{ kind: "geoLive" }} eyebrow="Selected node" onClose={() => applyClickActions([{ kind: "inspect", pick: null }])} />
+      <CardPane key="node" pick={{ kind: "geoLive" }} eyebrow="Node" onClose={() => applyClickActions([{ kind: "inspect", pick: null }])} />
     ),
     snap: snap ? (
-      <CardPane key="snap" pick={snap} eyebrow="Selected snapshot" onClose={() => applyClickActions([{ kind: "snapshot", pick: null }])} />
+      <CardPane key="snap" pick={snap} eyebrow="Snapshot" onClose={() => applyClickActions([{ kind: "snapshot", pick: null }])} />
     ) : null,
     layer: layer ? (
-      <CardPane key="layer" pick={layer} eyebrow="Selected layer" onClose={() => applyClickActions([{ kind: "layer", pick: null }])} />
+      <CardPane key="layer" pick={layer} eyebrow="Layer" onClose={() => applyClickActions([{ kind: "layer", pick: null }])} />
     ) : null,
   };
   // Slots in TWO groups (user refinement): POPULATED cards first, then every GHOST pushed to
