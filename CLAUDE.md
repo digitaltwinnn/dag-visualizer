@@ -576,7 +576,7 @@ mechanism is the `VIEW_POLICIES` table in `domain/viewPolicy.ts`** — one row p
 
 Same idea throughout: a new view is inert (no picks, no DoF, no hints) until its `viewPolicy`
 row opts it in. The `ledger` row shows the pattern: `pickSources: ["ledger", "globe"]`,
-`morph: "frozen"` (nodes fly into lanes), `show.ledger: true` + `show.hyperFurniture: false`
+`morph: "frozen"` (kept at whatever value it entered with; nodes reach their lane poses via the transition's IN-phase gather dissolve, not a live morph ease), `show.ledger: true` + `show.hyperFurniture: false`
 (hubs hidden), `dofEligible: false`. Its hidden hubs are kept **out of `pickSources`**, not
 relied on being invisible — per the raycaster rule above.
 
