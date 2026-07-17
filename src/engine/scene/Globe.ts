@@ -17,6 +17,8 @@ import * as THREE from "three";
 import { METAGRAPHS, DEFAULT_META_COLOR } from "../config";
 import { metaAnchor, META_LAYERS, META_RING, DAG_L0, DAG_L1, HYPER_TILT } from "../domain/hyperLayout";
 import { LEDGER, ledgerSite, ledgerSpread, clusterRadius } from "../domain/ledgerLayout";
+import { gatherSlots } from "../domain/gatherLayout";
+import type { ViewTransition } from "../domain/viewTransition";
 import type { SceneColors } from "../sceneColors";
 import * as geoStats from "../domain/geoStats";
 import { R, LAND_H, CHIP_PITCH, HEX_H, VALIDATOR_HEX_R, META_HEX_R, latLonToVec3, vec3ToLatLon } from "../domain/geoLayout";
@@ -49,7 +51,12 @@ import type {
 const HEX_BASE_R = R + LAND_H + 0.02 + HEX_H / 2;
 const hexPitchDeg = (r: number) => ((2 * r * 1.04) / (R + LAND_H)) * (180 / Math.PI);
 
-const _focusMat = new THREE.Matrix4(); // scratch for reading an instance's live transform
+// View-transition staging grid: the cell pitch (world units) at the DESKTOP reference aspect.
+// The Engine scales this down for narrower (e.g. phone-portrait) viewports — see setGatherCell —
+// so the packed row of per-network squares (domain/gatherLayout) still fits the frustum width;
+// unscaled it overflowed badly at phone aspect (verified live, Task 8).
+export const GATHER_CELL = 0.55;
+
 // The ledger's whole-view orientation (tilt ∘ rotY), baked into every node's ledger position so the
 // nodes match the LedgerView group's transform. Scale is applied separately (uniform).
 const _LEDGER_M = new THREE.Matrix4()
@@ -101,6 +108,13 @@ export class Globe implements GeoViewHost {
   private _glowDim = 1; // eased 1→~0.2 while a country is drilled, so its highlight isn't overruled
   private _glowAllDim = 1; // eased ~0.62 in "all" (overlapping per-network planes stack additively)
   morph = 0;
+  // The view-transition state machine (Engine-owned, set once); null = no transition support wired
+  // yet at that call site. Read each frame by _frameCtx into ctx.transition for NodeFabric's gather.
+  transition: ViewTransition | null = null;
+  private _invM = new THREE.Matrix4(); // scratch: this.group's inverse world matrix (setGatherFrame)
+  private _gatherN = new THREE.Vector3(); //  scratch: the staging plane's camera-facing normal
+  private _gatherZ = new THREE.Vector3(); //  scratch: the staging basis' Z (= -up)
+  private _gatherM = new THREE.Matrix4(); //  scratch: the staging orientation basis
   private ledgerT = 0; // 0->1 ease as the reused node meshes fly from their source view into the lanes
   clock = 0;
   private spin: SpinState | null = null;
@@ -195,6 +209,8 @@ export class Globe implements GeoViewHost {
       },
       dim: 0, dimScaleV: 0, dimScaleMetaV: 0, clock: 0, camN: this._camN, hasCam: false,
       ledgerT: 0, dt: 0, flashDecay: 0, group: this.group,
+      transition: null,
+      gather: { origin: new THREE.Vector3(), right: new THREE.Vector3(), up: new THREE.Vector3(), quat: new THREE.Quaternion(), cell: GATHER_CELL },
     };
 
     // The geo globe surface (body, graticule, atmosphere, continents) — it sets the surface handles
@@ -222,8 +238,10 @@ export class Globe implements GeoViewHost {
   // Set the hyper-structure spin: the node group is tilted by HYPER_TILT and spun about its own
   // vertical axis by `y` (Euler XYZ → tilt applied AFTER the Y-spin). Driven by the Engine with the
   // SAME angle it gives HyperView, so nodes and hoops rotate in lockstep. Only meaningful in hyper.
-  setHyperSpin(y: number): void {
-    if (!this.simSpin && !this.ledger) this.group.rotation.set(HYPER_TILT, y, 0);
+  setHyperSpin(y: number, tiltX: number = HYPER_TILT): void {
+    // `tiltX` is the Engine-eased shared structure tilt: HYPER_TILT at rest, easing to
+    // HYPER_TILT_FOCUS while a metagraph is committed (discs read horizontal from the side).
+    if (!this.simSpin && !this.ledger) this.group.rotation.set(tiltX, y, 0);
   }
 
   // The wall is always the structural accent (the geo hologram hue). Kept as a setter so the Engine
@@ -296,6 +314,7 @@ export class Globe implements GeoViewHost {
           spinAxis: new THREE.Vector3(Math.random() * 2 - 1, Math.random() * 2 - 1, Math.random() * 2 - 1).normalize(),
           spinSpeed: 0.3 + Math.random() * 0.5, spinPhase: Math.random() * 6.2831,
           pick,
+          gU: 0, gV: 0, gRank: 0, gCount: 0,
         };
         this.nodes.push(u);
         idx++;
@@ -326,7 +345,71 @@ export class Globe implements GeoViewHost {
     // Fan out the filter-active nodes and (re)build the density rings + arcs.
     this._relayoutGeo();
     this._buildDensityGlow(); // light pools follow the validator sites too
+    this._assignGatherSlots(); // a validator-only rebuild must not leave stale ranks either
     this.setMorph(this.morph); // place at current morph
+  }
+
+  // Staging-grid slots for the view-transition choreography (event-time: data rebuilds). Reads
+  // BOTH record arrays as they currently stand, so it's safe to call from either setNodes or
+  // setMetagraphs — whichever rebuilt, the other array's slots are recomputed too (harmless: the
+  // layout is a pure function of the current counts).
+  private _assignGatherSlots(): void {
+    // Group by MACHINE, not shell instance: a hybrid validator/metagraph machine holds a record
+    // PER LAYER it runs (e.g. an l0 record + a cl1 twin), but only one — the geoPrimary — renders
+    // on the globe; in hyper all of them render. Sizing/slotting the grid by raw record count
+    // double-counted hybrids (the DAG block came out ~2× too many slots) and made the fill
+    // inconsistent by source view (full arriving from hyper, half-empty/moth-eaten from geo). A
+    // machine gets exactly ONE staging slot, keyed by `nodeId` (the validator's `node.id` / the
+    // metagraph node's `node.ip` — both already used as the machine identity elsewhere, e.g.
+    // `setSelectedNode`'s lookups). Every shell record for that machine copies the slot verbatim,
+    // so all its instances CONVERGE to one grid pixel during OUT (sharing the stagger rank) and
+    // fan back out to their separate hyper shells during IN — the square is identical regardless
+    // of which view the transition started from. Grouping by nodeId (not filtering by the
+    // `geoPrimary` flag) naturally collapses every shell record of one machine into one group even
+    // in an edge case where the flag were missing/duplicated.
+    const dagByMachine = new Map<string, ValidatorRecord[]>();
+    let dagAnonSeq = 0;
+    for (const u of this.nodes) {
+      const key = u.nodeId != null ? `id:${u.nodeId}` : `anon:${dagAnonSeq++}`; // no id: never shared, its own machine
+      let a = dagByMachine.get(key);
+      if (!a) dagByMachine.set(key, (a = []));
+      a.push(u);
+    }
+    const groups: { id: string; count: number }[] = [{ id: "dag", count: dagByMachine.size }];
+
+    const byMeta = new Map<string, MetaNodeRecord[]>();
+    for (const r of this.metaNodes) {
+      let a = byMeta.get(r.metaId);
+      if (!a) byMeta.set(r.metaId, (a = []));
+      a.push(r);
+    }
+    const metaByMachine = new Map<string, Map<string, MetaNodeRecord[]>>();
+    for (const [id, arr] of byMeta) {
+      const byMachine = new Map<string, MetaNodeRecord[]>();
+      for (const r of arr) {
+        let a = byMachine.get(r.nodeId);
+        if (!a) byMachine.set(r.nodeId, (a = []));
+        a.push(r);
+      }
+      metaByMachine.set(id, byMachine);
+      groups.push({ id, count: byMachine.size });
+    }
+
+    const slots = gatherSlots(groups);
+    const apply = (recs: { gU: number; gV: number; gRank: number; gCount: number }[], s: { u: number; v: number; rank: number; count: number }) =>
+      recs.forEach((r) => { r.gU = s.u; r.gV = s.v; r.gRank = s.rank; r.gCount = s.count; });
+
+    const dagSlots = slots.get("dag");
+    if (dagSlots) {
+      let i = 0;
+      for (const arr of dagByMachine.values()) { const s = dagSlots[i++]; if (s) apply(arr, s); }
+    }
+    for (const [id, byMachine] of metaByMachine) {
+      const ss = slots.get(id);
+      if (!ss) continue;
+      let i = 0;
+      for (const arr of byMachine.values()) { const s = ss[i++]; if (s) apply(arr, s); }
+    }
   }
 
   // -------------------------------------------------- metagraph nodes
@@ -401,24 +484,29 @@ export class Globe implements GeoViewHost {
             spinSpeed: 0.3 + Math.random() * 0.5, spinPhase: Math.random() * 6.2831,
             dim: 0, dimTarget: 0,
             pick,
+            gU: 0, gV: 0, gRank: 0, gCount: 0,
           });
         });
       });
       hoopPresent.set(m.id, present);
     }
     this.layers?.setHoopPresence(hoopPresent);
-    if (!recs.length) return;
-
-    this.fabric.buildMetaNodes(recs);
-    this.metaNodes = recs;
-    // Re-assert the filter's dim on the fresh records — but a data REBUILD is not a filter
-    // switch, so a live country drill survives it (setFilter clears the drill by design for
-    // real switches; without the restore, every cluster poll wiped the drill's dim + border).
-    const drill = this.countryFilter;
-    this.setFilter(this.filter);
-    if (drill) this.setCountry(drill);
-    this.setSelectedNode(this._selectedNodeId); // re-resolve the spotlight's record on fresh data
-    this._buildDensityGlow();
+    if (recs.length) {
+      this.fabric.buildMetaNodes(recs);
+      this.metaNodes = recs;
+      // Re-assert the filter's dim on the fresh records — but a data REBUILD is not a filter
+      // switch, so a live country drill survives it (setFilter clears the drill by design for
+      // real switches; without the restore, every cluster poll wiped the drill's dim + border).
+      const drill = this.countryFilter;
+      this.setFilter(this.filter);
+      if (drill) this.setCountry(drill);
+      this.setSelectedNode(this._selectedNodeId); // re-resolve the spotlight's record on fresh data
+      this._buildDensityGlow();
+    }
+    // Staging-grid slots for the view-transition choreography (event-time: data rebuilds); this.metaNodes
+    // was just reset (to `recs`, or to `[]` above if `!recs.length`), so the "dag" group's slots need
+    // recomputing here too (the packed row shifts when a metagraph appears/vanishes).
+    this._assignGatherSlots();
   }
 
   // A soft additive "light pool" under each dense node cluster on the globe — LIGHTING driven by the
@@ -623,18 +711,41 @@ export class Globe implements GeoViewHost {
   }
 
   // World position of a node's HYPERGRAPH point by its id — read from its live instance transform.
+  // The node's HYPER LAYOUT position in world space — from the layout DATA, deliberately NOT
+  // the rendered instance matrix: mid-transition the instance sits at the staging grid, and a
+  // camera framing must aim where the node will LAND, not where it happens to be in flight
+  // (user bug: geo node selected → hyper flew the camera to the staging area, "focus lost").
+  // Event-time (a focus click), so the allocation is fine.
   hyperWorldPos(id: string | null): THREE.Vector3 | null {
     if (!id) return null;
     const u = this.nodes.find((n) => n.nodeId === id);
-    if (u && this.fabric.instSphere) {
-      this.fabric.instSphere.getMatrixAt(u.index, _focusMat);
-      return this.group.localToWorld(new THREE.Vector3().setFromMatrixPosition(_focusMat));
-    }
+    if (u) return this.group.localToWorld(new THREE.Vector3().copy(u.hyperPos));
     const r = this.metaNodes && this.metaNodes.find((n) => n.nodeId === id);
-    if (r && this.fabric.metaSphere) {
-      this.fabric.metaSphere.getMatrixAt(r.index, _focusMat);
-      return this.group.localToWorld(new THREE.Vector3().setFromMatrixPosition(_focusMat));
+    if (r) {
+      // Same composition writeMetaFrame renders: the hub's world position expressed in the
+      // group's local frame, plus the node's hub-local offset, back out to world.
+      const v = new THREE.Vector3();
+      if (r.hubGroup) {
+        r.hubGroup.getWorldPosition(v);
+        this.group.worldToLocal(v).add(r.offset);
+      } else {
+        v.copy(r.hyperPos);
+      }
+      return this.group.localToWorld(v);
     }
+    return null;
+  }
+
+  // The node's LEDGER LANE position in world space — layout data (ledgerPos carries the
+  // chamber orientation bake), NOT the rendered instance matrix, for the same reason as
+  // hyperWorldPos: mid-transition the instance is at the staging grid, and the camera must
+  // frame where the chip will LAND. Event-time (a focus), allocation fine.
+  ledgerWorldPos(id: string | null): THREE.Vector3 | null {
+    if (!id) return null;
+    const u = this.nodes.find((n) => n.nodeId === id);
+    if (u) return this.group.localToWorld(new THREE.Vector3().copy(u.ledgerPos));
+    const r = this.metaNodes && this.metaNodes.find((n) => n.nodeId === id);
+    if (r) return this.group.localToWorld(new THREE.Vector3().copy(r.ledgerPos));
     return null;
   }
 
@@ -809,18 +920,55 @@ export class Globe implements GeoViewHost {
     ctx.ledgerT = this.ledgerT;
     ctx.dt = dt;
     ctx.flashDecay = flashDecay;
+    ctx.transition = this.transition;
     return ctx;
   }
 
+  // The camera-anchored staging plane (view-transition choreography), converted to group-LOCAL
+  // once per frame (the instanced matrices NodeFabric writes are in group space). World-space in;
+  // stored on the persistent ctx.gather object NodeFabric's _applyGather reads.
+  setGatherFrame(origin: THREE.Vector3, right: THREE.Vector3, up: THREE.Vector3): void {
+    // Force a FRESH world matrix before converting: group.matrixWorld is otherwise only
+    // recomputed at render time, so a rotation applied earlier THIS frame (the boundary's
+    // destination spin/lean snap, the per-frame spin ease) would leave the conversion one
+    // frame stale — every staged node visibly jumped a few pixels and snapped back on the
+    // hyper→geo boundary (user, 2026-07-17). One matrix chain per transition frame.
+    this.group.updateWorldMatrix(true, false);
+    const g = this._ctx.gather;
+    g.origin.copy(origin);
+    this.group.worldToLocal(g.origin);
+    this._invM.copy(this.group.matrixWorld).invert();
+    g.right.copy(right).transformDirection(this._invM);
+    g.up.copy(up).transformDirection(this._invM);
+    // The staging ORIENTATION (group-local): chips face the camera with their top cap —
+    // local +Y (the cylinder axis / biggest surface) aims at the viewer (right × up = the
+    // plane's camera-facing normal), local X pinned to grid-right and Z = X × Y = -up, so
+    // the parked squares hold still with no residual tumble. Scratch fields, zero-alloc.
+    this._gatherN.crossVectors(g.right, g.up).normalize();
+    this._gatherZ.copy(g.up).negate();
+    this._gatherM.makeBasis(g.right, this._gatherN, this._gatherZ);
+    g.quat.setFromRotationMatrix(this._gatherM);
+  }
+
+  // Narrow (e.g. phone-portrait) viewports: the Engine scales the cell down from GATHER_CELL so
+  // the packed staging row still fits the frustum width (verified live, Task 8 — unscaled, the
+  // DAG's big square ran off the right edge at phone aspect).
+  setGatherCell(cell: number): void {
+    this._ctx.gather.cell = cell;
+  }
+
   // -------------------------------------------------- morph between layouts
-  setLedger(on: boolean): void {
-    if (this.ledger === on) return;
+  // BOUNDARY-applied ledger layout (view-transition choreography): called by the Engine at the
+  // invisible mid-transition boundary — nodes are gathered, so the snap can't be seen. ledgerT
+  // stopped being an eased flight; it is now a pure layout parameter (the IN-phase flight is the
+  // gather dissolve).
+  applyLedgerLayout(on: boolean): void {
     this.ledger = on;
-    // The Snapshots view appears DIRECTLY in position — no entry animation: axis-aligned (spin
-    // snapped to 0) and the nodes placed straight into their lanes (ledgerT = 1). Only the camera eases.
     if (on) {
       this.group.rotation.set(0, 0, 0);
       this.ledgerT = 1;
+    } else {
+      this.ledgerT = 0;
     }
   }
 
@@ -831,9 +979,12 @@ export class Globe implements GeoViewHost {
     this.pickables = this.fabric.placeValidators(this.nodes, ctx);
 
     // The globe surface fades in only once nodes are well on their way; arcs later still. In
-    // ledger the surface is hidden OUTRIGHT (not eased by morph).
-    const surf = this.ledger ? 0 : surfFade(m);
-    const extras = this.ledger ? 0 : extrasFade(m);
+    // ledger the surface is hidden OUTRIGHT (not eased by morph). Also rides the transition's
+    // furniture alpha (view-transition choreography): the geo furniture only lights while geo is
+    // the lit view (never mid-flight, per furnitureAlpha's contract).
+    const vAlpha = this.transition ? this.transition.furnitureAlpha("geo") : 1;
+    const surf = this.ledger ? 0 : surfFade(m) * vAlpha;
+    const extras = this.ledger ? 0 : extrasFade(m) * vAlpha;
     for (const f of this.geoFades) f.mat.opacity = f.base * surf;
     // Density light pools: morph fade × the country-drill recede (so a drilled country's own
     // highlight isn't washed out by the pools).
@@ -860,6 +1011,33 @@ export class Globe implements GeoViewHost {
     if (this.landWallUniforms) this.landWallUniforms.uOpacity.value = surf;
     if (this.landFillMesh) this.landFillMesh.visible = !this.ledger && m > 0.05; // opacity via geoFades
     this.arcs.setUM(extras);
+  }
+
+  // The globe group's ROTATION integration (spin tween / idle spin / ledger hold), split out
+  // of update() so the Engine can run it BEFORE deriving the camera-anchored staging plane.
+  // With the easing inside update() (after the plane conversion), the geo destination's fast
+  // focusDensest tween made every staged node lag the globe by one frame of angular velocity —
+  // the hyper→geo "few pixels up and back" snap (user, 2026-07-17); the other direction never
+  // showed it because hyper's 0.06 rad/s drift is sub-pixel per frame.
+  updateRotation(dt: number): void {
+    if (this.ledger) {
+      // ledgerT is a pure layout parameter now (snapped to 1 at the transition boundary in
+      // applyLedgerLayout) — the IN-phase gather-dissolve flight is what used to be this ease.
+      this.group.rotation.set(0, 0, 0);
+    } else if (this.spin) {
+      // Ease-in-out to the focus orientation (longitude + tilt), then hold there.
+      const s = this.spin;
+      if (s.t < 1) {
+        s.t = Math.min(1, s.t + dt / s.dur);
+        const e = s.t < 0.5 ? 2 * s.t * s.t : 1 - Math.pow(-2 * s.t + 2, 2) / 2;
+        this.group.rotation.y = s.from + (s.to - s.from) * e;
+        this.group.rotation.x = (s.fromX || 0) + ((s.toX || 0) - (s.fromX || 0)) * e;
+      }
+    } else if (this.simSpin) {
+      this.group.rotation.y += dt * 0.03; // idle spin (gated by the view policy's globeSpin)
+      // Ease any focus tilt back to level when idling.
+      if (this.group.rotation.x) this.group.rotation.x += (0 - this.group.rotation.x) * Math.min(1, dt * 2.2);
+    }
   }
 
   update(dt: number): void {
@@ -889,24 +1067,6 @@ export class Globe implements GeoViewHost {
     if (this.landWallUniforms) {
       this._edgeColor.lerp(this._edgeTarget, Math.min(1, dt * 3));
       this.landWallUniforms.uColor.value.copy(this._edgeColor);
-    }
-    if (this.ledger) {
-      // Ease the lane fly-in (ledgerT 0->1); the spin was already snapped to 0 in setLedger.
-      this.ledgerT += (1 - this.ledgerT) * Math.min(1, dt * 2.2);
-      this.group.rotation.set(0, 0, 0);
-    } else if (this.spin) {
-      // Ease-in-out to the focus orientation (longitude + tilt), then hold there.
-      const s = this.spin;
-      if (s.t < 1) {
-        s.t = Math.min(1, s.t + dt / s.dur);
-        const e = s.t < 0.5 ? 2 * s.t * s.t : 1 - Math.pow(-2 * s.t + 2, 2) / 2;
-        this.group.rotation.y = s.from + (s.to - s.from) * e;
-        this.group.rotation.x = (s.fromX || 0) + ((s.toX || 0) - (s.fromX || 0)) * e;
-      }
-    } else if (this.simSpin) {
-      this.group.rotation.y += dt * 0.03; // idle spin (gated by the view policy's globeSpin)
-      // Ease any focus tilt back to level when idling.
-      if (this.group.rotation.x) this.group.rotation.x += (0 - this.group.rotation.x) * Math.min(1, dt * 2.2);
     }
     const m = this.morph;
     const flashDecay = Math.max(0, 1 - dt * 5); // ~0.2s glow tail after a hit

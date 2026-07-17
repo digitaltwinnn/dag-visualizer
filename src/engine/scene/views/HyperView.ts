@@ -126,6 +126,7 @@ export class HyperView {
   private _spotN = new THREE.Vector3();
   private _coreDim = 0; // eased 0→1: the DAG core fades back when a specific metagraph is the subject
   private _core: number; // the structural accent (colors.core) — the core sphere hue
+  private _viewAlpha = 1; // furnitureAlpha("hyper") — the view-transition build/teardown fade
 
   // `sceneColors` (id -> 0xRRGGBB) is the identity SCENE-lane colour map (Task 3), handed in by
   // the Engine at construction — HyperView builds all its hubs synchronously from
@@ -173,6 +174,13 @@ export class HyperView {
   // hub constellation freezes; in geo/flat the hubs are already invisible so this is a no-op there.
   setHubOrbits(on: boolean) {
     this.hubOrbits = on;
+  }
+
+  // The view-transition furniture multiplier (Engine, per frame). At 0 the spot is also
+  // blacked out — a lit stage light over dark furniture is the lingering-light bug class.
+  setViewAlpha(a: number): void {
+    this._viewAlpha = a;
+    if (a <= 0.001) this._spot.blackout();
   }
 
   // Hide/show the metagraph hubs + their tethers/pulses for the Snapshots view. Hidden state is
@@ -325,9 +333,9 @@ export class HyperView {
   // Spin the hub + core structure about its own vertical axis by `y`, keeping the HYPER_TILT (Euler
   // XYZ → tilt applied after the Y-spin). The Engine drives this with the SAME angle it gives the
   // node group, so hubs/core/hoops and the nodes stay registered while the whole atom rotates.
-  setHyperSpin(y: number) {
-    this.root.rotation.set(HYPER_TILT, y, 0);
-    this.coreGroup.rotation.set(HYPER_TILT, y, 0);
+  setHyperSpin(y: number, tiltX: number = HYPER_TILT) {
+    this.root.rotation.set(tiltX, y, 0);
+    this.coreGroup.rotation.set(tiltX, y, 0);
   }
 
   // A metagraph's 3 layer hoops render SOLID where the layer has nodes and DOTTED where the layer
@@ -466,16 +474,16 @@ export class HyperView {
     }
     // Dim the glow as it dissolves so the fading sphere doesn't bloom out the view.
     const coreMat = this.core.material as THREE.MeshStandardMaterial;
-    coreMat.emissiveIntensity = (0.6 + flash * 0.9) * coreF * coreReveal * (1 - 0.5 * (1 - coreReveal)) * (1 - this._coreDim * 0.6);
-    coreMat.opacity = coreOpacity * coreReveal;
+    coreMat.emissiveIntensity = (0.6 + flash * 0.9) * coreF * coreReveal * (1 - 0.5 * (1 - coreReveal)) * (1 - this._coreDim * 0.6) * this._viewAlpha;
+    coreMat.opacity = coreOpacity * coreReveal * this._viewAlpha;
     this.coreGroup.visible = coreReveal > 0.001;
     // The DAG core's cyan "sun" hoops fade with the core on the morph, and dim with it when a
     // specific metagraph is the subject (_coreDim).
     const coreHoopOp = HOOP_OP * coreReveal * (1 - this._coreDim * 0.5);
-    for (const h of this._coreRings) (h.material as THREE.LineBasicMaterial).opacity = coreHoopOp;
+    for (const h of this._coreRings) (h.material as THREE.LineBasicMaterial).opacity = coreHoopOp * this._viewAlpha;
     // The core shells' rim-fill disks fade the same way (same treatment as a metagraph's fills).
     const coreFillOp = FILL_OP * coreReveal * (1 - this._coreDim * 0.5);
-    for (const f of this._coreFills) (f.material as THREE.MeshBasicMaterial).opacity = coreFillOp;
+    for (const f of this._coreFills) (f.material as THREE.MeshBasicMaterial).opacity = coreFillOp * this._viewAlpha;
     if (this.coreFlash) this.coreFlash = Math.max(0, this.coreFlash - dt * 1.6);
 
     // Metagraphs — orbit, spin, tether pulses. While ANY metagraph is selected (focusId), the
@@ -512,7 +520,7 @@ export class HyperView {
       // buried (user: decrease the inactive dim); their rings are all-dotted (setHoopPresence).
       const glowMul = (m.active ? 1 : 0.35) * fdim;
       const hubMat = m.hub.material as THREE.MeshStandardMaterial;
-      hubMat.opacity = metaOpacity * (m.active ? 1 : 0.8) * (focusOther ? 0.78 : 1);
+      hubMat.opacity = metaOpacity * (m.active ? 1 : 0.8) * (focusOther ? 0.78 : 1) * this._viewAlpha;
 
       // The tether is a 2-vertex line fixed at the origin → hub. Write the moving endpoint
       // (vertex 1) straight into the existing buffer instead of setFromPoints, which would
@@ -520,13 +528,13 @@ export class HyperView {
       const tetherPos = m.tether.geometry.attributes.position;
       tetherPos.setXYZ(1, _pos.x, _pos.y, _pos.z);
       tetherPos.needsUpdate = true;
-      (m.tether.material as THREE.LineBasicMaterial).opacity = 0.22 * metaF * (m.active ? 1 : 0.6) * fdim;
+      (m.tether.material as THREE.LineBasicMaterial).opacity = 0.22 * metaF * (m.active ? 1 : 0.6) * fdim * this._viewAlpha;
       // The cyan layer hoops fade with the hubs on the morph, dim on inactive / out-of-focus hubs.
       const hoopOp = HOOP_OP * metaF * (m.active ? 1 : 0.7) * fdim;
-      for (const h of m.hoops) (h.material as THREE.LineBasicMaterial).opacity = hoopOp;
+      for (const h of m.hoops) (h.material as THREE.LineBasicMaterial).opacity = hoopOp * this._viewAlpha;
       // The rim-fill disks fade with the hoops (populated rings only — empty ones were hidden).
       const fillOp = FILL_OP * metaF * (m.active ? 1 : 0.7) * fdim;
-      for (const f of m.fills) (f.material as THREE.MeshBasicMaterial).opacity = fillOp;
+      for (const f of m.fills) (f.material as THREE.MeshBasicMaterial).opacity = fillOp * this._viewAlpha;
 
 
       // Anchor packets: launch one per pending snapshot (staggered), advance the in-flight ones
@@ -552,9 +560,9 @@ export class HyperView {
         }
         pk.mesh.visible = true;
         pk.mesh.position.copy(_pos).multiplyScalar(1 - pk.t); // hub (t=0) → core (t=1)
-        mat.opacity = Math.sin(pk.t * Math.PI) * 0.9 * metaF;
+        mat.opacity = Math.sin(pk.t * Math.PI) * 0.9 * metaF * this._viewAlpha;
       }
-      hubMat.emissiveIntensity = (0.72 + m.glow * 0.5) * metaF * glowMul;
+      hubMat.emissiveIntensity = (0.72 + m.glow * 0.5) * metaF * glowMul * this._viewAlpha;
       // Stash the FOCUSED hub's root-local position for the spotlight block below (the loop's
       // `_pos` scratch is overwritten per hub).
       if (m.cfg.id === this.focusId) this._spotPos.copy(m.group.position);
@@ -566,7 +574,7 @@ export class HyperView {
     // and fades with its subject on the morph; rests dark otherwise.
     const spotMeta = this.focusId != null && this.metas.some((m) => m.cfg.id === this.focusId);
     const spotOn = spotMeta || dagFocused;
-    this._spot.update(dt, spotOn, spotMeta ? hubFade : coreReveal);
+    this._spot.update(dt, spotOn, (spotMeta ? hubFade : coreReveal) * this._viewAlpha);
     if (spotOn) {
       // Only while focused: resolve the subject to world once per frame (root tilt+spin+scale) —
       // the metagraph loop stashed its hub's ROOT-LOCAL position; the DAG core sits at the origin.

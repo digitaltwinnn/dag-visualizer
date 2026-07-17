@@ -1,0 +1,179 @@
+// The ONE view-transition state machine (spec: docs/superpowers/specs/
+// 2026-07-17-view-transitions-design.md). Every 3D-view switch runs the staged choreography:
+//   OUT  (t: 0→DUR_OUT)  — the from-view's furniture fades out while nodes fly, staggered,
+//                          to the gathering grids (gatherWeight 0→1).
+//   BOUNDARY (one frame)  — tick() returns true exactly once; the Engine applies the
+//                          destination layout (morph snap, ledger placement, spin) while the
+//                          nodes are fully gathered and both furnitures are dark.
+//   IN   (t: 0→DUR_IN)   — the to-view's furniture builds while nodes fly, staggered, to
+//                          their destination poses (gatherWeight 1→0); the camera flies.
+// Pure and allocation-free; the scene calls gatherWeight per node per frame.
+import { smooth, smoother } from "./nodeLayout";
+
+export type View3D = "hyper" | "geo" | "ledger";
+
+// Live-reviewed at 4x/20x/40x-stretched slow motion (Task 8, chrome-devtools MCP screenshots)
+// across all six 3D transition directions: the per-network squares read as tidy distinct
+// blocks (DAG's clearly biggest), the stagger reads as an assembling wave rather than a swarm,
+// and nothing overlaps the furniture mid-flight.
+export const DUR_OUT = 0.9; //         teardown + gather, incl. the stagger spread
+// The IN phase DECOUPLES its two ramps (user, 2026-07-17): the furniture builds fast
+// (FURN_IN — the room is fully lit early) while the node placement takes its time
+// (DUR_IN, 3× the original 1.0s — nodes keep arriving into the already-drawn view).
+// Total switch ≈ DUR_OUT + DUR_IN ≈ 3.9s; the wait reads as staging, not loading,
+// because the destination view is complete long before the last node lands.
+export const DUR_IN = 3.0; //          node placement (phase length), incl. the stagger spread
+export const FURN_IN = 1.0; //         the to-view's furniture build, inside the IN phase
+export const STAGGER_SPREAD = 0.25; // window over which node flights START (rank-ordered)
+
+// A node's flight lasts the phase minus the spread, so the LAST starter still lands in-phase.
+const FLIGHT_OUT = DUR_OUT - STAGGER_SPREAD;
+const FLIGHT_IN = DUR_IN - STAGGER_SPREAD;
+
+export class ViewTransition {
+  // "staged" = parked at the gathering grids with NO destination (a "soon"/placeholder view
+  // is active): step 1 ran, step 2 waits for the next 3D view (user, 2026-07-17). The grids
+  // are the universal parked state, so every navigation reads as the same choreography.
+  phase: "idle" | "out" | "in" | "staged" = "idle";
+  from: View3D | null = null;
+  to: View3D | null = null; // while idle: the SETTLED view; null while staging/staged
+  private t = 0;
+
+  // Adopt `view` as the settled state with no animation (boot, or a non-3D interlude).
+  settle(view: View3D): void {
+    this.phase = "idle";
+    this.from = null;
+    this.to = view;
+    this.t = 0;
+  }
+
+  // Park at the grids instantly, no animation — booting straight into a "soon" view (the
+  // nodes were never seen, so the first 3D view entered later runs step 2 from the grids).
+  stageInstant(): void {
+    this.phase = "staged";
+    this.from = null;
+    this.to = null;
+    this.t = 0;
+  }
+
+  // Step 1 only: gather out of `from` toward the grids with NO destination (entering a
+  // "soon" view). From IN, re-gathers with weight continuity like any retarget.
+  stage(from: View3D): void {
+    if (this.phase === "staged") return;
+    if (this.phase === "out") {
+      this.to = null; // keep gathering; just drop the destination
+      return;
+    }
+    if (this.phase === "in") {
+      this.from = this.to;
+      this.to = null;
+      this.t = (1 - this.t / FLIGHT_IN) * FLIGHT_OUT; // base-weight continuity
+      this.phase = "out";
+      return;
+    }
+    this.from = from;
+    this.to = null;
+    this.phase = "out";
+    this.t = 0;
+  }
+
+  // Step 2 from the parked state (leaving a "soon" view for a 3D one). Returns how the
+  // caller must apply the destination layout: "immediate" (nodes are parked and no boundary
+  // will fire — apply now, it's invisible) or "atBoundary" (still gathering; the normal
+  // boundary fires when the OUT completes).
+  place(to: View3D): "immediate" | "atBoundary" {
+    if (this.phase === "out") {
+      this.to = to; // still flying to the grids — adopt the destination, boundary as usual
+      return "atBoundary";
+    }
+    // parked (staged): begin the IN dissolve right away
+    this.from = null;
+    this.to = to;
+    this.phase = "in";
+    this.t = 0;
+    return "immediate";
+  }
+
+  active(): boolean {
+    return this.phase !== "idle";
+  }
+
+  // Begin or RETARGET a transition (spec: no teleports — weights stay continuous).
+  start(from: View3D, to: View3D): void {
+    if (this.phase === "idle") {
+      this.from = from;
+      this.to = to;
+      this.phase = "out";
+      this.t = 0;
+      return;
+    }
+    if (this.phase === "out") {
+      if (to === this.from) {
+        // Flipped back to the origin mid-gather → reverse into IN, seeding t so the
+        // UN-staggered base weight is continuous (per-node stagger reorders slightly).
+        this.to = this.from;
+        this.from = from;
+        // Continuity inverts against FLIGHT_* — the gatherWeight denominators — NOT the raw DUR_* phase lengths; inverting against DUR_* breaks the no-teleport contract (the retarget tests below prove it).
+        this.t = (1 - this.t / FLIGHT_OUT) * FLIGHT_IN;
+        this.phase = "in";
+      } else {
+        this.to = to; // gather continues; only the destination changes
+      }
+      return;
+    }
+    // phase === "in": nodes are dispersing toward this.to — gather them again toward `to`.
+    if (to === this.to) return; // already heading there
+    this.from = this.to;
+    this.to = to;
+    // Continuity inverts against FLIGHT_* — the gatherWeight denominators — NOT the raw DUR_* phase lengths; inverting against DUR_* breaks the no-teleport contract (the retarget tests below prove it).
+    this.t = (1 - this.t / FLIGHT_IN) * FLIGHT_OUT; // base-weight continuity (see test)
+    this.phase = "out";
+  }
+
+  // Advance the clock. Returns TRUE exactly once — on the frame the OUT phase completes
+  // (the boundary): the caller applies the destination layout then.
+  tick(dt: number): boolean {
+    if (this.phase === "idle" || this.phase === "staged") return false;
+    this.t += dt;
+    if (this.phase === "out" && this.t >= DUR_OUT) {
+      if (this.to === null) {
+        // Stage-bound gather (a "soon" view): park at the grids — NO boundary (there is no
+        // destination layout to apply until place() names one).
+        this.stageInstant();
+        return false;
+      }
+      this.t -= DUR_OUT;
+      this.phase = "in";
+      return true;
+    }
+    if (this.phase === "in" && this.t >= DUR_IN) {
+      this.settle(this.to!);
+    }
+    return false;
+  }
+
+  // This frame's gather weight for the node ranked `rank` of `count` in its staging grid
+  // (row-major within its network square): 0 = at its view pose, 1 = at its grid slot.
+  gatherWeight(rank: number, count: number): number {
+    if (this.phase === "idle") return 0;
+    if (this.phase === "staged") return 1; // parked at the grids
+    const delay = (rank / Math.max(1, count - 1)) * STAGGER_SPREAD;
+    // `smoother` (quintic), not `smooth`: a pronounced glide — slow launch, fast cruise for
+    // the big distance, slow landing (user). Same 0.5-symmetry, so retarget continuity holds.
+    if (this.phase === "out") {
+      return smoother(Math.min(1, Math.max(0, (this.t - delay) / FLIGHT_OUT)));
+    }
+    return 1 - smoother(Math.min(1, Math.max(0, (this.t - delay) / FLIGHT_IN)));
+  }
+
+  // Furniture multiplier for `view` this frame. At most one view is ever lit (spec:
+  // furniture never overlaps the flight); idle lights only the settled view. The IN branch
+  // runs on FURN_IN, not the phase length — the room finishes building while the nodes are
+  // still placing (the decoupled ramps, see the constants note).
+  furnitureAlpha(view: View3D): number {
+    if (this.phase === "idle") return view === this.to ? 1 : 0;
+    if (this.phase === "staged") return 0; // every furniture dark behind the hidden canvas
+    if (this.phase === "out") return view === this.from ? 1 - smooth(Math.min(1, this.t / DUR_OUT)) : 0;
+    return view === this.to ? smooth(Math.min(1, this.t / FURN_IN)) : 0;
+  }
+}

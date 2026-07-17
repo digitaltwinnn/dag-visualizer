@@ -16,7 +16,9 @@ export const FOCI: Record<string, { pos: THREE.Vector3; target: THREE.Vector3 }>
   // Pulled back (60 → 68, user): every view's START pose gets the same zoom-out the globe
   // needs — the whole scene rests inside the rail-free centre of the frame. Shared by the
   // hyper resting pose, the ledger overview and the placeholder idle.
-  overview: { pos: new THREE.Vector3(0, 17, 68), target: new THREE.Vector3(0, 2, 0) },
+  // Pulled back 68 → 76 with META_ORBIT 25 → 29 (user, 2026-07-17) so the widened hub ring
+  // still fits the frame with no selection.
+  overview: { pos: new THREE.Vector3(0, 21, 80), target: new THREE.Vector3(0, 2, 0) },
   // The whole DAG core: pulled back enough to frame the outer cL1 (purple) shell (radius 14).
   dag: { pos: new THREE.Vector3(0, 9, 38), target: new THREE.Vector3(0, 1, 0) },
   // Geo targets the globe CENTRE — the downward-tilt composition comes from camera HEIGHT
@@ -175,6 +177,16 @@ export function ledgerLayerFraming(y: number, out: CameraFraming): void {
   // composition now comes from the camera OFFSET alone (left + above → trail recedes top-left).
   out.pos.set(-7, y + 6.2, 23.5); // ~22% closer than the first tuning (user: zoom in a bit more)
   out.target.set(0, y - 1, 0);
+}
+
+// Snapshots NODE zoom — the level AFTER the layer zoom (user, 2026-07-17), mirroring geo's
+// country→node ladder: the layer pose is the "country" level, this frames the selected node's
+// chip itself. Same diagonal viewing direction as ledgerLayerFraming (left + above, trail
+// receding top-left), much closer; the target sits slightly above the chip so it settles just
+// below centre (the house rule-of-thirds node composition). `node` is the chip's WORLD position.
+export function ledgerNodeFraming(node: THREE.Vector3, out: CameraFraming): void {
+  out.pos.set(node.x - 2.6, node.y + 2.8, node.z + 8.5);
+  out.target.set(node.x, node.y + 0.4, node.z);
 }
 
 // Engine.ts:784 `_updateTween`'s inline ease, lifted verbatim.

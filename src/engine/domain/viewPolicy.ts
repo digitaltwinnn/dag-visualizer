@@ -102,7 +102,9 @@ export const VIEW_POLICIES: Record<Mode, ViewPolicy> = {
     sims: { arcs: false, hubOrbits: true, globeSpin: false },
     show: { hyperFurniture: true, globeSurface: true, ledger: false },
     pickSources: ["globe", "layers"],
-    dofEligible: true,
+    // DoF dropped (user, 2026-07-17): the bokeh read as FUZZ on the selected atom. No view is
+    // DoF-eligible now; the BokehPass machinery stays wired for a future re-tune.
+    dofEligible: false,
     countryHover: false,
     minCamDist: 12,
     minCamAlt: null,
