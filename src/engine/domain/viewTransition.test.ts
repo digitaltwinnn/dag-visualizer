@@ -62,7 +62,7 @@ describe("gatherWeight (staggered)", () => {
   it("runs 1 -> 0 during IN (staggered dissolve)", () => {
     const tr = settled();
     tr.start("hyper", "geo");
-    tr.tick(DUR_OUT + 1e-6); // boundary crossed
+    tr.tick(DUR_OUT); // boundary crossed exactly (residual 0)
     expect(tr.gatherWeight(0, 10)).toBe(1);
     tr.tick(DUR_IN / 2);
     const mid = tr.gatherWeight(0, 10);
@@ -128,7 +128,8 @@ describe("retargeting", () => {
   it("mid-IN to a third view re-enters OUT seeded from the current weight", () => {
     const tr = settled("hyper");
     tr.start("hyper", "geo");
-    tr.tick(DUR_OUT + DUR_IN * 0.4); // 40% into IN (weight descending)
+    tr.tick(DUR_OUT);
+    tr.tick(DUR_IN * 0.4); // 40% into IN via the real frame path (weight descending)
     const w = tr.gatherWeight(0, 1);
     tr.start("geo", "ledger");
     expect(tr.phase).toBe("out");

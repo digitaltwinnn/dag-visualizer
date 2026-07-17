@@ -25,7 +25,6 @@ export class ViewTransition {
   from: View3D | null = null;
   to: View3D | null = null; // while idle: the SETTLED view
   private t = 0;
-  private justBoundary = false;
 
   // Adopt `view` as the settled state with no animation (boot, or a non-3D interlude).
   settle(view: View3D): void {
@@ -33,7 +32,6 @@ export class ViewTransition {
     this.from = null;
     this.to = view;
     this.t = 0;
-    this.justBoundary = false;
   }
 
   active(): boolean {
@@ -47,7 +45,6 @@ export class ViewTransition {
       this.to = to;
       this.phase = "out";
       this.t = 0;
-      this.justBoundary = false;
       return;
     }
     if (this.phase === "out") {
@@ -56,23 +53,21 @@ export class ViewTransition {
         // UN-staggered base weight is continuous (per-node stagger reorders slightly).
         this.to = this.from;
         this.from = from;
+        // Continuity inverts against FLIGHT_* — the gatherWeight denominators — NOT the raw DUR_* phase lengths; inverting against DUR_* breaks the no-teleport contract (the retarget tests below prove it).
         this.t = (1 - this.t / FLIGHT_OUT) * FLIGHT_IN;
         this.phase = "in";
       } else {
         this.to = to; // gather continues; only the destination changes
       }
-      this.justBoundary = false;
       return;
     }
     // phase === "in": nodes are dispersing toward this.to — gather them again toward `to`.
     if (to === this.to) return; // already heading there
     this.from = this.to;
     this.to = to;
-    // If at the boundary, use t=0 so weight stays continuous from the 1 that justBoundary reported
-    const t_for_continuity = this.justBoundary ? 0 : this.t;
-    this.t = (1 - t_for_continuity / FLIGHT_IN) * FLIGHT_OUT; // base-weight continuity (see test)
+    // Continuity inverts against FLIGHT_* — the gatherWeight denominators — NOT the raw DUR_* phase lengths; inverting against DUR_* breaks the no-teleport contract (the retarget tests below prove it).
+    this.t = (1 - this.t / FLIGHT_IN) * FLIGHT_OUT; // base-weight continuity (see test)
     this.phase = "out";
-    this.justBoundary = false;
   }
 
   // Advance the clock. Returns TRUE exactly once — on the frame the OUT phase completes
@@ -83,13 +78,10 @@ export class ViewTransition {
     if (this.phase === "out" && this.t >= DUR_OUT) {
       this.t -= DUR_OUT;
       this.phase = "in";
-      this.justBoundary = true;
       return true;
     }
     if (this.phase === "in" && this.t >= DUR_IN) {
       this.settle(this.to!);
-    } else {
-      this.justBoundary = false;
     }
     return false;
   }
@@ -98,7 +90,6 @@ export class ViewTransition {
   // (row-major within its network square): 0 = at its view pose, 1 = at its grid slot.
   gatherWeight(rank: number, count: number): number {
     if (this.phase === "idle") return 0;
-    if (this.justBoundary) return 1; // boundary frame: nodes fully gathered
     const delay = (rank / Math.max(1, count - 1)) * STAGGER_SPREAD;
     if (this.phase === "out") {
       return smooth(Math.min(1, Math.max(0, (this.t - delay) / FLIGHT_OUT)));
