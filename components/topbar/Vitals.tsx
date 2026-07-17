@@ -12,7 +12,7 @@ import { cn } from "@/lib/utils";
 import type { NodeInfo } from "@/src/data/types";
 
 // Structural cyan for the live-activity sparklines (lane-correct: cyan = the live accent).
-const CYAN = "#2af5ff";
+const CYAN = "var(--primary)";
 
 function Vital({ label, value, spark }: { label: string; value: React.ReactNode; spark?: number[] }) {
   return (
