@@ -1046,14 +1046,17 @@ export class Engine {
       // the Globe converts to group-local). Height from the frustum so the grids read the same at
       // any camera pose.
       if (this.transition.active()) {
-        this.ctx.camera.getWorldDirection(this._gatherR); // reuse _gatherR as the forward vector
-        this._gatherO.copy(this.ctx.camera.position).addScaledVector(this._gatherR, GATHER_DIST);
-        this._gatherU2.copy(this.ctx.camera.up).normalize();
+        // The plane's basis comes from the camera's ACTUAL orientation (its quaternion), NOT
+        // the raw camera.up — .up is only the lookAt CONSTRAINT, and while the hyper focus
+        // roll is active (or easing back) it diverges from the true screen-up, which anchored
+        // the grid below the top of the view and slightly tilted (user: focused NDT → geo).
+        // Local +X/+Y through the quaternion ARE screen-right/screen-up, exactly, roll or not.
+        this._gatherR.set(1, 0, 0).applyQuaternion(this.ctx.camera.quaternion); // screen-right
+        this._gatherU2.set(0, 1, 0).applyQuaternion(this.ctx.camera.quaternion); // screen-up
+        this.ctx.camera.getWorldDirection(this._gatherO); // forward (scratch reuse)
+        this._gatherO.multiplyScalar(GATHER_DIST).add(this.ctx.camera.position);
         const h = Math.tan(THREE.MathUtils.degToRad(this.ctx.camera.fov / 2)) * GATHER_DIST;
         this._gatherO.addScaledVector(this._gatherU2, h * GATHER_TOP_FRAC);
-        // right = fwd × up is screen-LEFT in three.js's right-handed frame; negate so +u runs
-        // screen-RIGHT (verified on screen: the network squares fill left→right across the band).
-        this._gatherR.cross(this._gatherU2).normalize().negate();
         this.globe.setGatherFrame(this._gatherO, this._gatherR, this._gatherU2);
         // Phone/narrow viewports: shrink the cell so the row's total width still fits — never
         // grow it past the reference aspect's size (Math.min(1, …)).
