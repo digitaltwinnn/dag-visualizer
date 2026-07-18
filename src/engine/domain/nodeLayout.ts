@@ -66,6 +66,13 @@ export function armillaryFrame(k: number, numRings: number, tilt: number): RingF
   };
 }
 
+// The ring PLANE's normal — the axis nodes orbit / hoops face. One home for the t×b
+// cross-product three scene sites used to inline (Globe's shell axes, HyperView's hoop normal).
+// Writes into `out` (callers pass their own scratch or an event-time temp) and returns it.
+export function ringNormal(frame: { t: THREE.Vector3; b: THREE.Vector3 }, out: THREE.Vector3): THREE.Vector3 {
+  return out.crossVectors(frame.t, frame.b).normalize();
+}
+
 // Position of node j of `count` evenly spaced on the ring described by `frame` at `radius`.
 export function ringFramePos(j: number, count: number, radius: number, frame: RingFrame, phase = 0): THREE.Vector3 {
   const a = (j / Math.max(1, count)) * Math.PI * 2 + phase;

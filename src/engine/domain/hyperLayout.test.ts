@@ -1,7 +1,8 @@
 import { describe, it, expect } from "vitest";
+import * as THREE from "three";
 import {
   META_ORBIT, metaAnchor,
-  META_LAYERS, META_RING, DAG_L0, DAG_L1, HYPER_TILT, HYPER_TILT_FOCUS,
+  META_LAYERS, META_RING, DAG_L0, DAG_L1, HYPER_TILT, HYPER_TILT_FOCUS, applyHyperRig,
 } from "./hyperLayout";
 
 describe("metaAnchor", () => {
@@ -68,5 +69,23 @@ describe("HYPER_TILT / HYPER_TILT_FOCUS (the shared structure tilt)", () => {
 
   it("focusing a metagraph eases the structure MUCH flatter than the resting overview tilt", () => {
     expect(HYPER_TILT_FOCUS).toBeLessThan(HYPER_TILT * 0.25);
+  });
+});
+
+describe("applyHyperRig", () => {
+  it("composes tiltX/spinY/0 into the rotation Euler (XYZ order, tilt after spin)", () => {
+    const e = new THREE.Euler();
+    applyHyperRig({ rotation: e }, 1.2, 0.5);
+    expect(e.x).toBe(0.5);
+    expect(e.y).toBe(1.2);
+    expect(e.z).toBe(0);
+  });
+
+  it("defaults tiltX to HYPER_TILT when omitted", () => {
+    const e = new THREE.Euler();
+    applyHyperRig({ rotation: e }, 0.9);
+    expect(e.x).toBe(HYPER_TILT);
+    expect(e.y).toBe(0.9);
+    expect(e.z).toBe(0);
   });
 });

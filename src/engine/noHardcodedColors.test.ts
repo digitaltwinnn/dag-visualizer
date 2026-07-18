@@ -15,20 +15,27 @@ import { join } from "node:path";
 // from the material colour (the token). The repo has no ESLint config; architectural rules are vitest
 // tests that run in `npm test` — the same gate as layerBoundaries.test.ts. (2026-07-17: the
 // components/ scan was added — the handful of legacy literals it found were migrated to tokens where
-// a clean `var(--…)` equivalent existed; the rest are genuine one-offs, documented in ALLOWED below.)
+// a clean `var(--…)` equivalent existed; the rest are genuine one-offs, documented in the allowlists
+// below.) Per-directory allowlists prevent accidental cross-layer leakage: a components-only colour
+// (e.g. 0x141a2e, TopBar gradient) must not silently validate a scene file containing the same hex.
 
 const ENGINE_DIR = join(import.meta.dirname, ".");
 const COMPONENTS_DIR = join(import.meta.dirname, "..", "..", "components");
 
-// The ONLY permitted CHROMATIC literals, each a deliberate non-token colour, keyed by 0xRRGGBB:
-const ALLOWED = new Set<number>([
+// The ONLY permitted CHROMATIC literals per directory, each a deliberate non-token colour, keyed by 0xRRGGBB:
+
+// Engine / scene-layer allowlist:
+const ENGINE_ALLOWED = new Set<number>([
   // Scene LIGHTING literals — lighting is a rendering technicality (it shades emissive materials),
   // deliberately decoupled from the palette; a light is not a surface/identity hue (see SceneContext).
   0x4a5a8c, // ambient FILL light (cool grey)
   0xccd6e6, // key light (neutral cool-white)
   0x5a6f9c, // rim light (muted cool)
   0x223046, // dimmed-node tone (Globe + NodeFabric) — TODO: derive from a token
+]);
 
+// Components-layer allowlist:
+const COMPONENTS_ALLOWED = new Set<number>([
   // components/RailThread.tsx — the SVG thread ruler + node-dot ring. Kept as literal strings on
   // purpose: these are native SVG presentation ATTRIBUTES (`stroke="…"`, not a `style` prop), and
   // this codebase's own tested finding is that a `var(--…)` there doesn't reliably resolve the same
@@ -92,10 +99,10 @@ function tsAndTsxFiles(dir: string): string[] {
 
 const LITERAL = /0x[0-9a-fA-F]{6}\b|#[0-9a-fA-F]{6}\b|#[0-9a-fA-F]{3}\b|rgba?\([^)]*\)/g;
 
-// Shared scan: every non-grayscale colour literal in `files` must be in ALLOWED, else it's an offender
-// line `label:lineNo  literal  trimmed-source` (paths displayed relative to `displayRoot`, prefixed
-// with `label` for readability).
-function chromaticOffenders(files: string[], displayRoot: string, label: string): string[] {
+// Shared scan: every non-grayscale colour literal in `files` must be in the given `allowlist`, else
+// it's an offender line `label:lineNo  literal  trimmed-source` (paths displayed relative to
+// `displayRoot`, prefixed with `label` for readability).
+function chromaticOffenders(files: string[], displayRoot: string, label: string, allowlist: Set<number>): string[] {
   const offenders: string[] = [];
   for (const file of files) {
     readFileSync(file, "utf8").split("\n").forEach((line, i) => {
@@ -104,7 +111,7 @@ function chromaticOffenders(files: string[], displayRoot: string, label: string)
         if (!c) continue;
         if (c.r === c.g && c.g === c.b) continue; // grayscale = luminance/intensity, allowed
         const packed = (c.r << 16) | (c.g << 8) | c.b;
-        if (!ALLOWED.has(packed)) {
+        if (!allowlist.has(packed)) {
           offenders.push(`${label}${file.replace(displayRoot, "")}:${i + 1}  ${m[0]}  ${line.trim()}`);
         }
       }
@@ -121,8 +128,8 @@ describe("no hardcoded structural colours in the engine", () => {
   });
 
   it("has no CHROMATIC colour literal (0x / #hex / rgb()) outside the documented allowlist", () => {
-    const offenders = chromaticOffenders(files, import.meta.dirname, "engine");
-    expect(offenders, `hardcoded chromatic colour(s) — source the HUE from the CSS tokens via readSceneColors, or (if genuinely non-palette) add to ALLOWED with a reason:\n${offenders.join("\n")}`).toEqual([]);
+    const offenders = chromaticOffenders(files, import.meta.dirname, "engine", ENGINE_ALLOWED);
+    expect(offenders, `hardcoded chromatic colour(s) — source the HUE from the CSS tokens via readSceneColors, or (if genuinely non-palette) add to ENGINE_ALLOWED with a reason:\n${offenders.join("\n")}`).toEqual([]);
   });
 });
 
@@ -134,7 +141,7 @@ describe("no hardcoded structural colours in components/", () => {
   });
 
   it("has no CHROMATIC colour literal (0x / #hex / rgb()) outside the documented allowlist", () => {
-    const offenders = chromaticOffenders(files, join(COMPONENTS_DIR, ".."), "components");
-    expect(offenders, `hardcoded chromatic colour(s) — source the HUE from a CSS var(--…) token, or (if genuinely non-palette) add to ALLOWED with a reason:\n${offenders.join("\n")}`).toEqual([]);
+    const offenders = chromaticOffenders(files, join(COMPONENTS_DIR, ".."), "components", COMPONENTS_ALLOWED);
+    expect(offenders, `hardcoded chromatic colour(s) — source the HUE from a CSS var(--…) token, or (if genuinely non-palette) add to COMPONENTS_ALLOWED with a reason:\n${offenders.join("\n")}`).toEqual([]);
   });
 });

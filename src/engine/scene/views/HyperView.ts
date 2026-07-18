@@ -8,10 +8,14 @@
 
 import * as THREE from "three";
 import { METAGRAPHS, type MetaConfig } from "../../config";
-import { metaAnchor, META_RING, META_LAYERS, HYPER_TILT } from "../../domain/hyperLayout";
-import { armillaryFrame, ringFramePos, type RingFrame } from "../../domain/nodeLayout";
+import { metaAnchor, META_RING, META_LAYERS, HYPER_TILT, applyHyperRig } from "../../domain/hyperLayout";
+import { armillaryFrame, ringFramePos, ringNormal, type RingFrame } from "../../domain/nodeLayout";
 import { FocusSpot } from "../objects/FocusSpot";
+import type { StageLights } from "../objects/StageLights";
+import { STAGE_LIGHTS } from "../../domain/stageLight";
+import { FadeSet } from "../objects/FadeSet";
 import { ORB_FRESNEL_GLSL, ORB_FRESNEL_MIX } from "../objects/NodeFabric";
+import { makeRadialGradientTexture } from "../objects/gradientTexture";
 import type { SceneColors } from "../../sceneColors";
 import type { SceneView } from "./SceneView";
 
@@ -32,33 +36,9 @@ const PKT_POOL = 14; // reusable packet meshes per metagraph (caps simultaneous 
 
 // The focus SPOTLIGHT (see scene/objects/FocusSpot) — staged above the focused metagraph's ring
 // plane (or the DAG core's, a bigger stage) so the selected atom catches a stage-light wash.
-const SPOT_H = 9; //     height above the ring plane, along the atom's normal
-const SPOT_ANGLE = 0.9; // cone covers the outer cL1 ring (5.4) with margin at SPOT_H — see penumbra note below
-const SPOT_I = 2.4; //   full intensity when focused
-// The DAG core is the same subject at a bigger scale (L1 shell radius 12.5 vs 5.4): higher stage,
-// wider-reaching cone (same angle at that height covers it), so selecting DAG gets the same wash.
-const SPOT_H_DAG = 17;
+// Values live in domain/stageLight.ts's STAGE_LIGHTS.hyper row (angle/distance/intensity/
+// penumbra/height/heightDag) — the viewPolicy idiom, one row per view.
 
-
-// A rim-weighted radial gradient (white; the material tints it cyan) for the ring fill disks:
-// transparent at the centre, ramping to a soft band at the OUTER edge (the ring), so a CircleGeometry
-// reads as a filled ring that fades quickly inward. CircleGeometry's rim samples at gradient r≈1.
-function makeRingFillTexture(): THREE.Texture {
-  const s = 128;
-  const c = document.createElement("canvas");
-  c.width = c.height = s;
-  const ctx = c.getContext("2d")!;
-  const g = ctx.createRadialGradient(s / 2, s / 2, 0, s / 2, s / 2, s / 2);
-  g.addColorStop(0, "rgba(255,255,255,0)");
-  g.addColorStop(0.84, "rgba(255,255,255,0)");
-  g.addColorStop(0.96, "rgba(255,255,255,0.35)");
-  g.addColorStop(1, "rgba(255,255,255,0.8)");
-  ctx.fillStyle = g;
-  ctx.fillRect(0, 0, s, s);
-  const tex = new THREE.CanvasTexture(c);
-  tex.colorSpace = THREE.SRGBColorSpace;
-  return tex;
-}
 
 // Give a single (non-instanced) emissive sphere the SAME fresnel-rim ORB look as the node instances
 // (NodeFabric._makeNodeMaterial): a view-dependent rim multiplied onto its emissive so the core /
@@ -127,19 +107,22 @@ export class HyperView implements SceneView {
   private _spotN = new THREE.Vector3();
   private _coreDim = 0; // eased 0→1: the DAG core fades back when a specific metagraph is the subject
   private _core: number; // the structural accent (colors.core) — the core sphere hue
-  private _viewAlpha = 1; // furnitureAlpha("hyper") — the view-transition build/teardown fade
+  // furnitureAlpha("hyper") — the view-transition build/teardown fade. FadeSet is the single owner
+  // of the alpha; every site here is a DYNAMIC per-frame expression (verified — zero static
+  // registrations in this view today), so they all just read `_fades.alpha`.
+  private _fades = new FadeSet();
 
   // `sceneColors` (id -> 0xRRGGBB) is the identity SCENE-lane colour map (Task 3), handed in by
   // the Engine at construction — HyperView builds all its hubs synchronously from
   // config.METAGRAPHS right here, before any API data exists, so the map has to arrive as a ctor
   // arg for the hubs to be born in the identity colour with no recolor pass / no first-paint flash.
-  constructor(scene: THREE.Scene, colors: SceneColors, sceneColors?: Record<string, number>) {
+  constructor(scene: THREE.Scene, colors: SceneColors, stage: StageLights, sceneColors?: Record<string, number>) {
     this.scene = scene;
     this._core = colors.core;
     this.root = new THREE.Group();
     // Tilt the hub/tether/hoop structure to read top-down from the shared overview camera (Globe
     // tilts the node group + HyperView the core by the same HYPER_TILT, so all three stay registered).
-    this.root.rotation.x = HYPER_TILT;
+    applyHyperRig(this.root, 0);
     scene.add(this.root);
 
     // The focus spotlight (world-space — the hub position is resolved through root's tilt+spin each
@@ -147,7 +130,8 @@ export class HyperView implements SceneView {
     // distance 40 clears the DAG stage's farthest shell node (~21). Penumbra kept SMALL on purpose:
     // the full-intensity cone is angle·(1−penumbra), and a soft-edged cone lit only the inner rings —
     // the outer dL1/cL1 rings sat in the falloff and read like a DIFFERENT material (user bug).
-    this._spot = new FocusSpot(scene, { angle: SPOT_ANGLE, distance: 40, intensity: SPOT_I, penumbra: 0.25 });
+    this._spot = new FocusSpot(scene, STAGE_LIGHTS.hyper);
+    stage.register("hyper", this._spot);
 
     this.pickables = [];
     this.metas = [];
@@ -177,11 +161,10 @@ export class HyperView implements SceneView {
     this.hubOrbits = on;
   }
 
-  // The view-transition furniture multiplier (Engine, per frame). At 0 the spot is also
-  // blacked out — a lit stage light over dark furniture is the lingering-light bug class.
+  // The view-transition furniture multiplier (Engine, per frame). The spot's OFF lifecycle is
+  // now centralized (Engine's StageLights.gate, spec A#3) — this view only drives it while lit.
   setViewAlpha(a: number): void {
-    this._viewAlpha = a;
-    if (a <= 0.001) this._spot.blackout();
+    this._fades.apply(a);
   }
 
   // Hide/show the metagraph hubs + their tethers/pulses for the Snapshots view. Hidden state is
@@ -192,7 +175,8 @@ export class HyperView implements SceneView {
     this.ledger = on;
     // The spot lives in the SHARED scene (not root) and its easing runs in update(), which
     // early-returns in ledger — without this instant off, a spot lit by a focused atom would
-    // linger and wash the ledger chamber (the same bug class LedgerView.spotOff() guards).
+    // linger and wash the ledger chamber (a within-view re-stage, not the view-lifecycle
+    // off centralized in StageLights.gate).
     if (on) this._spot.blackout();
     // The Hypergraph furniture is hidden in the Snapshots chamber (update() early-returns there, so
     // it can't fade these itself): the DAG core + its cyan hoops, and each hub + its layer hoops.
@@ -215,7 +199,7 @@ export class HyperView implements SceneView {
   // ---------------------------------------------------------------- Core
   private _buildCore() {
     this.coreGroup = new THREE.Group();
-    this.coreGroup.rotation.x = HYPER_TILT; // match the tilted node group + hubs (see root)
+    applyHyperRig(this.coreGroup, 0); // match the tilted node group + hubs (see root)
     const mat = new THREE.MeshStandardMaterial({
       color: this._core, emissive: this._core, emissiveIntensity: 1.4,
       roughness: 0.5, metalness: 0.2, transparent: true, // match the node orbs (smooth + fresnel)
@@ -335,8 +319,8 @@ export class HyperView implements SceneView {
   // XYZ → tilt applied after the Y-spin). The Engine drives this with the SAME angle it gives the
   // node group, so hubs/core/hoops and the nodes stay registered while the whole atom rotates.
   setHyperSpin(y: number, tiltX: number = HYPER_TILT) {
-    this.root.rotation.set(tiltX, y, 0);
-    this.coreGroup.rotation.set(tiltX, y, 0);
+    applyHyperRig(this.root, y, tiltX);
+    applyHyperRig(this.coreGroup, y, tiltX);
   }
 
   // A metagraph's 3 layer hoops render SOLID where the layer has nodes and DOTTED where the layer
@@ -375,7 +359,18 @@ export class HyperView implements SceneView {
   // is weighted to the OUTER edge and fades quickly to transparent inward (like the geo pools, but
   // rim-first). Adds cyan body to the ring + a surface for its label to sit on. Populated rings only.
   private _makeRingFill(frame: RingFrame, radius: number): THREE.Mesh {
-    if (!this._fillTex) this._fillTex = makeRingFillTexture();
+    // A rim-weighted radial gradient (white; the material tints it cyan) for the ring fill disks:
+    // transparent at the centre, ramping to a soft band at the OUTER edge (the ring), so a
+    // CircleGeometry reads as a filled ring that fades quickly inward. CircleGeometry's rim
+    // samples at gradient r≈1.
+    if (!this._fillTex) {
+      this._fillTex = makeRadialGradientTexture([
+        [0, "rgba(255,255,255,0)"],
+        [0.84, "rgba(255,255,255,0)"],
+        [0.96, "rgba(255,255,255,0.35)"],
+        [1, "rgba(255,255,255,0.8)"],
+      ]);
+    }
     const geo = new THREE.CircleGeometry(radius, 96);
     const mat = new THREE.MeshBasicMaterial({
       map: this._fillTex, color: new THREE.Color(this._core), transparent: true,
@@ -384,7 +379,7 @@ export class HyperView implements SceneView {
     const mesh = new THREE.Mesh(geo, mat);
     // Orient the disk into the ring's tilted plane: CircleGeometry lies in XY (+Z normal) → map its
     // X/Y/Z axes onto the ring's t / b / (t×b) basis.
-    const n = frame.t.clone().cross(frame.b).normalize();
+    const n = ringNormal(frame, new THREE.Vector3()); // event-time
     mesh.quaternion.setFromRotationMatrix(new THREE.Matrix4().makeBasis(frame.t, frame.b, n));
     mesh.renderOrder = -1; // behind the hoops + nodes
     return mesh;
@@ -475,16 +470,16 @@ export class HyperView implements SceneView {
     }
     // Dim the glow as it dissolves so the fading sphere doesn't bloom out the view.
     const coreMat = this.core.material as THREE.MeshStandardMaterial;
-    coreMat.emissiveIntensity = (0.6 + flash * 0.9) * coreF * coreReveal * (1 - 0.5 * (1 - coreReveal)) * (1 - this._coreDim * 0.6) * this._viewAlpha;
-    coreMat.opacity = coreOpacity * coreReveal * this._viewAlpha;
+    coreMat.emissiveIntensity = (0.6 + flash * 0.9) * coreF * coreReveal * (1 - 0.5 * (1 - coreReveal)) * (1 - this._coreDim * 0.6) * this._fades.alpha;
+    coreMat.opacity = coreOpacity * coreReveal * this._fades.alpha;
     this.coreGroup.visible = coreReveal > 0.001;
     // The DAG core's cyan "sun" hoops fade with the core on the morph, and dim with it when a
     // specific metagraph is the subject (_coreDim).
     const coreHoopOp = HOOP_OP * coreReveal * (1 - this._coreDim * 0.5);
-    for (const h of this._coreRings) (h.material as THREE.LineBasicMaterial).opacity = coreHoopOp * this._viewAlpha;
+    for (const h of this._coreRings) (h.material as THREE.LineBasicMaterial).opacity = coreHoopOp * this._fades.alpha;
     // The core shells' rim-fill disks fade the same way (same treatment as a metagraph's fills).
     const coreFillOp = FILL_OP * coreReveal * (1 - this._coreDim * 0.5);
-    for (const f of this._coreFills) (f.material as THREE.MeshBasicMaterial).opacity = coreFillOp * this._viewAlpha;
+    for (const f of this._coreFills) (f.material as THREE.MeshBasicMaterial).opacity = coreFillOp * this._fades.alpha;
     if (this.coreFlash) this.coreFlash = Math.max(0, this.coreFlash - dt * 1.6);
 
     // Metagraphs — orbit, spin, tether pulses. While ANY metagraph is selected (focusId), the
@@ -521,7 +516,7 @@ export class HyperView implements SceneView {
       // buried (user: decrease the inactive dim); their rings are all-dotted (setHoopPresence).
       const glowMul = (m.active ? 1 : 0.35) * fdim;
       const hubMat = m.hub.material as THREE.MeshStandardMaterial;
-      hubMat.opacity = metaOpacity * (m.active ? 1 : 0.8) * (focusOther ? 0.78 : 1) * this._viewAlpha;
+      hubMat.opacity = metaOpacity * (m.active ? 1 : 0.8) * (focusOther ? 0.78 : 1) * this._fades.alpha;
 
       // The tether is a 2-vertex line fixed at the origin → hub. Write the moving endpoint
       // (vertex 1) straight into the existing buffer instead of setFromPoints, which would
@@ -529,13 +524,13 @@ export class HyperView implements SceneView {
       const tetherPos = m.tether.geometry.attributes.position;
       tetherPos.setXYZ(1, _pos.x, _pos.y, _pos.z);
       tetherPos.needsUpdate = true;
-      (m.tether.material as THREE.LineBasicMaterial).opacity = 0.22 * metaF * (m.active ? 1 : 0.6) * fdim * this._viewAlpha;
+      (m.tether.material as THREE.LineBasicMaterial).opacity = 0.22 * metaF * (m.active ? 1 : 0.6) * fdim * this._fades.alpha;
       // The cyan layer hoops fade with the hubs on the morph, dim on inactive / out-of-focus hubs.
       const hoopOp = HOOP_OP * metaF * (m.active ? 1 : 0.7) * fdim;
-      for (const h of m.hoops) (h.material as THREE.LineBasicMaterial).opacity = hoopOp * this._viewAlpha;
+      for (const h of m.hoops) (h.material as THREE.LineBasicMaterial).opacity = hoopOp * this._fades.alpha;
       // The rim-fill disks fade with the hoops (populated rings only — empty ones were hidden).
       const fillOp = FILL_OP * metaF * (m.active ? 1 : 0.7) * fdim;
-      for (const f of m.fills) (f.material as THREE.MeshBasicMaterial).opacity = fillOp * this._viewAlpha;
+      for (const f of m.fills) (f.material as THREE.MeshBasicMaterial).opacity = fillOp * this._fades.alpha;
 
 
       // Anchor packets: launch one per pending snapshot (staggered), advance the in-flight ones
@@ -561,9 +556,9 @@ export class HyperView implements SceneView {
         }
         pk.mesh.visible = true;
         pk.mesh.position.copy(_pos).multiplyScalar(1 - pk.t); // hub (t=0) → core (t=1)
-        mat.opacity = Math.sin(pk.t * Math.PI) * 0.9 * metaF * this._viewAlpha;
+        mat.opacity = Math.sin(pk.t * Math.PI) * 0.9 * metaF * this._fades.alpha;
       }
-      hubMat.emissiveIntensity = (0.72 + m.glow * 0.5) * metaF * glowMul * this._viewAlpha;
+      hubMat.emissiveIntensity = (0.72 + m.glow * 0.5) * metaF * glowMul * this._fades.alpha;
       // Stash the FOCUSED hub's root-local position for the spotlight block below (the loop's
       // `_pos` scratch is overwritten per hub).
       if (m.cfg.id === this.focusId) this._spotPos.copy(m.group.position);
@@ -575,7 +570,7 @@ export class HyperView implements SceneView {
     // and fades with its subject on the morph; rests dark otherwise.
     const spotMeta = this.focusId != null && this.metas.some((m) => m.cfg.id === this.focusId);
     const spotOn = spotMeta || dagFocused;
-    this._spot.update(dt, spotOn, (spotMeta ? hubFade : coreReveal) * this._viewAlpha);
+    this._spot.update(dt, spotOn, (spotMeta ? hubFade : coreReveal) * this._fades.alpha);
     if (spotOn) {
       // Only while focused: resolve the subject to world once per frame (root tilt+spin+scale) —
       // the metagraph loop stashed its hub's ROOT-LOCAL position; the DAG core sits at the origin.
@@ -583,7 +578,7 @@ export class HyperView implements SceneView {
       this._spotN.set(0, 1, 0).applyEuler(this.root.rotation); // the ring-plane normal (world)
       if (spotMeta) this._spotPos.applyEuler(this.root.rotation).multiplyScalar(this.root.scale.x);
       else this._spotPos.set(0, 0, 0);
-      this._spot.aim(this._spotPos, this._spotN, spotMeta ? SPOT_H : SPOT_H_DAG);
+      this._spot.aim(this._spotPos, this._spotN, spotMeta ? STAGE_LIGHTS.hyper.height : STAGE_LIGHTS.hyper.heightDag!);
     }
   }
 

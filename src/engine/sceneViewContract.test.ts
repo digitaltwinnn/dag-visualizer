@@ -67,4 +67,18 @@ describe("scene-view contract", () => {
       }
     }
   });
+
+  it("views never write their root group's `visible` — the Engine/policy owns it (spec A#5)", () => {
+    // Root-group visibility is VIEW LIFECYCLE (which view is on) — Engine territory. Views own
+    // opacity/alpha (FadeSet) + child-mesh visibility. `this.group.visible =` in a view is the
+    // two-writers bug class (the Engine/LedgerView fight the transitions branch fixed).
+    const ROOT_VIS = /this\.(group|root)\.visible\s*=/;
+    for (const f of sourceFiles(join(HERE, "scene/views"))) {
+      const src = readFileSync(f, "utf8");
+      for (const [i, line] of src.split("\n").entries()) {
+        const code = line.split("//")[0];
+        expect(ROOT_VIS.test(code), `${f.split("/src/")[1]}:${i + 1} writes the view root's visible — Engine/policy owns root visibility; views fade via alpha`).toBe(false);
+      }
+    }
+  });
 });

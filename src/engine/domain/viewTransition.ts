@@ -98,6 +98,14 @@ export class ViewTransition {
     return this.phase !== "idle";
   }
 
+  // While the OUT phase runs, the camera HOLDS STILL through the teardown (spec A#6): HUD
+  // commits (filter picker, strip bars) may change state, but their camera reframe is
+  // suppressed — the boundary re-derives the pose from the committed state anyway, so
+  // nothing is lost. IN-phase flights are live (the transition's own camera flight runs).
+  holdCamera(): boolean {
+    return this.phase === "out";
+  }
+
   // Begin or RETARGET a transition (spec: no teleports — weights stay continuous).
   start(from: View3D, to: View3D): void {
     if (this.phase === "idle") {
