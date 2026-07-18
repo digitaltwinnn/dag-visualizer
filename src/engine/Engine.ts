@@ -272,9 +272,13 @@ export class Engine {
           // Switching network clears any country drill-down (matches the old geo UX).
           this.country = null;
           if (prev.country != null) useStore.getState().setCountry(null);
-          // In hyper, a selected node card is tied to the node you clicked; changing the
-          // network selection drops it (the node may no longer be in view).
-          if (st.mode === "hyper" && st.inspect) useStore.getState().setInspect(null);
+          // A filter switch is a NETWORK-level event (focusLadder): it drops every finer
+          // selection — node (any view; in geo the switch can hide the inspected node outright),
+          // cohort, country — so _resolveFocus lands on the network rung. The ordering contract
+          // holds because nodeSelectActions emits filter FIRST and inspect/cohort AFTER it: this
+          // clear runs on the filter write, then the later actions re-commit the new ancestry.
+          if (st.inspect) useStore.getState().setInspect(null);
+          if (st.cohort) useStore.getState().setCohort(null);
           this.applyFilter();
         }
         // Country drill-down is geo-only — gate on the view so a re-entrant clear
