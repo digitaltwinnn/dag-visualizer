@@ -68,6 +68,17 @@ export function nodeFraming(out: CameraFraming): void {
   out.target.set(0, 19.5, 2);
 }
 
+// ---- the geo COHORT/provider pose ----------------------------------------------------------
+// One rung wider than the node pose (spec Part 4): frames the whole honeycomb stack field of
+// a committed city×provider cohort. Rides the SAME Globe lean contract as nodeFraming
+// (focusCohort aims the cohort centroid with the NODE_RAISE lift), so like nodeFraming it is
+// ABSOLUTE / CAM_ZOOM-dolly-EXEMPT (composed far-up look-at — see the CAM_ZOOM note).
+// Seed values tuned live against Falkenstein·Hetzner (the tallest stack field).
+export function cohortFraming(out: CameraFraming): void {
+  out.pos.set(0, 5.4, 23.5);
+  out.target.set(0, 18.8, 2);
+}
+
 // ---- the hyper NODE pose --------------------------------------------------------------------
 // Fly to a node's live shell point: pulled back along its outward radial, lifted a touch,
 // looking at the node itself (Engine's `hyperNode` resolver).

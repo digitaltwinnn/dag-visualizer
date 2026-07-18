@@ -16,7 +16,7 @@ import { LEDGER, LAYER_GEOM, ledgerSite } from "./domain/ledgerLayout";
 import { HYPER_TILT, HYPER_TILT_FOCUS } from "./domain/hyperLayout";
 import { readSceneColors } from "./sceneColors";
 import { VIEW_POLICIES, type ViewPolicy } from "./domain/viewPolicy";
-import { FOCI, hubFraming, geoFraming, ledgerLayerFraming, ledgerNodeFraming, nodeFraming, hyperNodeFraming, dollyBack, easeInOutQuad, type CameraFraming } from "./domain/cameraRig";
+import { FOCI, hubFraming, geoFraming, ledgerLayerFraming, ledgerNodeFraming, nodeFraming, cohortFraming, hyperNodeFraming, dollyBack, easeInOutQuad, type CameraFraming } from "./domain/cameraRig";
 import { countryFraming } from "./domain/countryShape";
 import { R as GEO_R, LAND_H } from "./domain/geoLayout";
 import { autoLayerForNode, clickActions, pickActive } from "./domain/pickActions";
@@ -298,6 +298,7 @@ export class Engine {
         // is inert until Task 5, but the channel is live now).
         if (st.cohort !== prev.cohort) {
           this.cohortSel = st.cohort;
+          this.globe.setSelectedCohort(st.cohort); // the glow is geo-gated by the fabric's morph ramps
           if (st.mode === "geo") this._resolveFocus();
         }
         // The selected node card (geo or hyper) keeps that node's layer shells lit on the globe.
@@ -696,7 +697,13 @@ export class Engine {
       this._focusNode();
       return true;
     },
-    geoCohort: () => false, // Task 5 (feature) — inert fall-through until then
+    geoCohort: () => {
+      if (!this.globe.focusCohort()) return false;
+      this.ctx.controls.autoRotate = false;
+      cohortFraming(this._framingOut);
+      this._tweenTo(this._framingOut.pos, this._framingOut.target, false); // dolly-exempt, like nodeFraming
+      return true;
+    },
     geoCountry: () => {
       if (this.country == null) return false;
       // Country drill: the country's SHAPE leads — spin to its polygon centroid and frame its
