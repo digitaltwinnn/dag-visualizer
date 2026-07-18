@@ -29,6 +29,8 @@ import { ArcSim, type ArcEndpoint } from "../domain/arcSim";
 import type { MetaNodeRecord, ValidatorRecord } from "../domain/records";
 import { buildGeoView, setCountryBorder, setCountryFillMask, HOVER_MASK_BOOST, type GeoViewHost } from "./views/GeoView";
 import { FocusSpot } from "./objects/FocusSpot";
+import type { StageLights } from "./objects/StageLights";
+import { STAGE_LIGHTS } from "../domain/stageLight";
 import { ccToNumeric, countryCcAt, countryLean, geometryRings, mainPolygonRings, ringsAngularRadius, ringsCentroid, type Ring } from "../domain/countryShape";
 import { closeness, NODE_RAISE } from "../domain/cameraRig";
 import { NodeFabric, type FrameCtx } from "./objects/NodeFabric";
@@ -186,11 +188,12 @@ export class Globe implements GeoViewHost {
   // allocation fix — this used to allocate a fresh FrameCtx + DimContext object twice per frame).
   private _ctx!: FrameCtx;
 
-  constructor(scene: THREE.Scene, layers: HyperView | null, camera: THREE.Camera | null, colors: SceneColors) {
+  constructor(scene: THREE.Scene, layers: HyperView | null, camera: THREE.Camera | null, colors: SceneColors, stage: StageLights) {
     this.group = new THREE.Group();
     scene.add(this.group);
     // Node-pick stage light: tight cone over one chip stack (radius ≈ 6·tan(0.36) ≈ 2.3).
-    this._spot = new FocusSpot(scene, { angle: 0.36, distance: 22, intensity: 1.5 });
+    this._spot = new FocusSpot(scene, STAGE_LIGHTS.geo);
+    stage.register("geo", this._spot);
     this.layers = layers; // for gluing metagraph nodes to their orbiting hubs
     this.camera = camera; // for the view-dependent disc falloff at the limb
     this.geoColor = colors.core;   // the geo hologram = the accent (calm via opacity); wall + grid + graticule
@@ -1055,7 +1058,7 @@ export class Globe implements GeoViewHost {
       this._spotN.copy(this._spotPos).normalize(); // surface normal ≈ radial
       this.group.localToWorld(this._spotPos);
       this._spotN.transformDirection(this.group.matrixWorld);
-      this._spot.aim(this._spotPos, this._spotN, 6);
+      this._spot.aim(this._spotPos, this._spotN, STAGE_LIGHTS.geo.height);
     }
     // Recede the density light pools while a country is drilled (so its highlight leads), eased.
     this._glowDim += ((this.countryFilter ? 0.2 : 1) - this._glowDim) * Math.min(1, dt * 3);

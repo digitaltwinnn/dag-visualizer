@@ -35,6 +35,8 @@ import { LedgerModel, SLOT_SP, slotFade, curvePoint } from "../../domain/ledgerM
 import type { GlobalSnapshot, Anchor, PickDescriptor } from "@/src/data/types";
 import { LEDGER_LAYERS } from "@/src/data/ledgerLayers"; // shared display copy + ORDER — floor labels = panel rows
 import { FocusSpot } from "../objects/FocusSpot";
+import type { StageLights } from "../objects/StageLights";
+import { STAGE_LIGHTS } from "../../domain/stageLight";
 import { FadeSet } from "../objects/FadeSet";
 import type { SceneView } from "./SceneView";
 
@@ -223,7 +225,7 @@ export class LedgerView implements SceneView {
   // once at construction; every dynamic per-frame write below reads `_fades.alpha`.
   private _fades = new FadeSet();
 
-  constructor(scene: THREE.Scene, colors: SceneColors, sceneColors: Record<string, number>) {
+  constructor(scene: THREE.Scene, colors: SceneColors, sceneColors: Record<string, number>, stage: StageLights) {
     this._core = colors.core;
     this._border = colors.border;
     this._panel = colors.panel;
@@ -242,7 +244,8 @@ export class LedgerView implements SceneView {
     scene.add(this.group);
     // Layer stage light: a wide, higher pool over the committed floor's lead area — the floors span
     // the whole lane depth, so the cone is wide (radius ≈ 14·tan(0.75) ≈ 13 covers the mid lanes).
-    this._spot = new FocusSpot(scene, { angle: 0.75, distance: 44, intensity: 2.6 });
+    this._spot = new FocusSpot(scene, STAGE_LIGHTS.ledger);
+    stage.register("ledger", this._spot);
     this.pickables = [];
     this.t = 0;
     this._latest = null;
@@ -526,14 +529,13 @@ export class LedgerView implements SceneView {
     return mesh;
   }
 
-  // The view-transition furniture multiplier (Engine, per frame). At 0 the spot is also blacked
-  // out — a lit stage light over dark furniture is the lingering-light bug class. The reused NODE
-  // instances (Globe/NodeFabric) are NOT gated here — only this view's own furniture.
+  // The view-transition furniture multiplier (Engine, per frame). The spot's OFF lifecycle is now
+  // centralized (Engine's StageLights.gate, spec A#3) — this view only drives it while lit. The
+  // reused NODE instances (Globe/NodeFabric) are NOT gated here — only this view's own furniture.
   setViewAlpha(a: number): void {
     this._fades.apply(a);
     // group.visible is owned SOLELY by the Engine (it composes this alpha with the ledger-active
     // gate so the chamber can't linger in an unrelated view/flight); writing it here would fight that.
-    if (a <= 0.001) this._spot.blackout();
   }
 
   // Highlight one floor plane by layer id — brighten its frame + edge fill (the fill stays airy —
@@ -542,12 +544,6 @@ export class LedgerView implements SceneView {
   // (the overview planes cover most of the screen, so the cursor is nearly always over one — a
   // hover that dimmed the rest read as "filtering dims the layers", user bug). null id restores
   // every plane to rest. Every plane owns its materials (see _buildFloors).
-  // Instant spotlight off — the Engine calls this on non-ledger frames: update() stops ticking when
-  // the view hides, so without it a lit layer spot would linger into the next view.
-  spotOff(): void {
-    this._spot.blackout();
-  }
-
   setHighlight(id: string | null, dimOthers = false): void {
     // A COMMITTED layer (dimOthers) also stages the focus spotlight over that floor (see update()).
     this._spotLayerId = dimOthers && id ? id : null;
@@ -776,7 +772,7 @@ export class LedgerView implements SceneView {
       this._spotPos.set(0, spotGeom.y, spotGeom.laneZ);
       this.group.localToWorld(this._spotPos);
       this._spotN.set(0, 1, 0).applyQuaternion(this.group.quaternion); // the floors' world up
-      this._spot.aim(this._spotPos, this._spotN, 14);
+      this._spot.aim(this._spotPos, this._spotN, STAGE_LIGHTS.ledger.height);
     }
 
     // View-transition furniture fade: the floor panes ride the multiplier unconditionally — they

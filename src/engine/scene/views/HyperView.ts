@@ -11,6 +11,8 @@ import { METAGRAPHS, type MetaConfig } from "../../config";
 import { metaAnchor, META_RING, META_LAYERS, HYPER_TILT, applyHyperRig } from "../../domain/hyperLayout";
 import { armillaryFrame, ringFramePos, ringNormal, type RingFrame } from "../../domain/nodeLayout";
 import { FocusSpot } from "../objects/FocusSpot";
+import type { StageLights } from "../objects/StageLights";
+import { STAGE_LIGHTS } from "../../domain/stageLight";
 import { FadeSet } from "../objects/FadeSet";
 import { ORB_FRESNEL_GLSL, ORB_FRESNEL_MIX } from "../objects/NodeFabric";
 import { makeRadialGradientTexture } from "../objects/gradientTexture";
@@ -34,12 +36,8 @@ const PKT_POOL = 14; // reusable packet meshes per metagraph (caps simultaneous 
 
 // The focus SPOTLIGHT (see scene/objects/FocusSpot) — staged above the focused metagraph's ring
 // plane (or the DAG core's, a bigger stage) so the selected atom catches a stage-light wash.
-const SPOT_H = 9; //     height above the ring plane, along the atom's normal
-const SPOT_ANGLE = 0.9; // cone covers the outer cL1 ring (5.4) with margin at SPOT_H — see penumbra note below
-const SPOT_I = 2.4; //   full intensity when focused
-// The DAG core is the same subject at a bigger scale (L1 shell radius 12.5 vs 5.4): higher stage,
-// wider-reaching cone (same angle at that height covers it), so selecting DAG gets the same wash.
-const SPOT_H_DAG = 17;
+// Values live in domain/stageLight.ts's STAGE_LIGHTS.hyper row (angle/distance/intensity/
+// penumbra/height/heightDag) — the viewPolicy idiom, one row per view.
 
 
 // Give a single (non-instanced) emissive sphere the SAME fresnel-rim ORB look as the node instances
@@ -118,7 +116,7 @@ export class HyperView implements SceneView {
   // the Engine at construction — HyperView builds all its hubs synchronously from
   // config.METAGRAPHS right here, before any API data exists, so the map has to arrive as a ctor
   // arg for the hubs to be born in the identity colour with no recolor pass / no first-paint flash.
-  constructor(scene: THREE.Scene, colors: SceneColors, sceneColors?: Record<string, number>) {
+  constructor(scene: THREE.Scene, colors: SceneColors, stage: StageLights, sceneColors?: Record<string, number>) {
     this.scene = scene;
     this._core = colors.core;
     this.root = new THREE.Group();
@@ -132,7 +130,8 @@ export class HyperView implements SceneView {
     // distance 40 clears the DAG stage's farthest shell node (~21). Penumbra kept SMALL on purpose:
     // the full-intensity cone is angle·(1−penumbra), and a soft-edged cone lit only the inner rings —
     // the outer dL1/cL1 rings sat in the falloff and read like a DIFFERENT material (user bug).
-    this._spot = new FocusSpot(scene, { angle: SPOT_ANGLE, distance: 40, intensity: SPOT_I, penumbra: 0.25 });
+    this._spot = new FocusSpot(scene, STAGE_LIGHTS.hyper);
+    stage.register("hyper", this._spot);
 
     this.pickables = [];
     this.metas = [];
@@ -162,11 +161,10 @@ export class HyperView implements SceneView {
     this.hubOrbits = on;
   }
 
-  // The view-transition furniture multiplier (Engine, per frame). At 0 the spot is also
-  // blacked out — a lit stage light over dark furniture is the lingering-light bug class.
+  // The view-transition furniture multiplier (Engine, per frame). The spot's OFF lifecycle is
+  // now centralized (Engine's StageLights.gate, spec A#3) — this view only drives it while lit.
   setViewAlpha(a: number): void {
     this._fades.apply(a);
-    if (a <= 0.001) this._spot.blackout();
   }
 
   // Hide/show the metagraph hubs + their tethers/pulses for the Snapshots view. Hidden state is
@@ -177,7 +175,8 @@ export class HyperView implements SceneView {
     this.ledger = on;
     // The spot lives in the SHARED scene (not root) and its easing runs in update(), which
     // early-returns in ledger — without this instant off, a spot lit by a focused atom would
-    // linger and wash the ledger chamber (the same bug class LedgerView.spotOff() guards).
+    // linger and wash the ledger chamber (a within-view re-stage, not the view-lifecycle
+    // off centralized in StageLights.gate).
     if (on) this._spot.blackout();
     // The Hypergraph furniture is hidden in the Snapshots chamber (update() early-returns there, so
     // it can't fade these itself): the DAG core + its cyan hoops, and each hub + its layer hoops.
@@ -579,7 +578,7 @@ export class HyperView implements SceneView {
       this._spotN.set(0, 1, 0).applyEuler(this.root.rotation); // the ring-plane normal (world)
       if (spotMeta) this._spotPos.applyEuler(this.root.rotation).multiplyScalar(this.root.scale.x);
       else this._spotPos.set(0, 0, 0);
-      this._spot.aim(this._spotPos, this._spotN, spotMeta ? SPOT_H : SPOT_H_DAG);
+      this._spot.aim(this._spotPos, this._spotN, spotMeta ? STAGE_LIGHTS.hyper.height : STAGE_LIGHTS.hyper.heightDag!);
     }
   }
 

@@ -9,6 +9,7 @@ import { createScene, type SceneCtx } from "./scene/SceneContext";
 import { HyperView, type MetaHubRec } from "./scene/views/HyperView";
 import { Globe, GATHER_CELL } from "./scene/Globe";
 import { LedgerView } from "./scene/views/LedgerView";
+import { StageLights } from "./scene/objects/StageLights";
 import { loadGeoCache, resolveMissing } from "@/src/data/geoResolve";
 import { METAGRAPHS, COLORS } from "@/src/engine/config";
 import { LEDGER, LAYER_GEOM, ledgerSite } from "./domain/ledgerLayout";
@@ -62,6 +63,12 @@ export class Engine {
   private layers: HyperView;
   private globe: Globe;
   private ledger: LedgerView;
+  // The ONE stage-light lifecycle owner (spec A#3): every view's FocusSpot registers here at
+  // construction; the render loop gates it once per frame with the per-view furniture alphas so
+  // a view can no longer forget its own spotOff (the lingering-light bug class this replaced).
+  private _stageLights = new StageLights();
+  // Per-frame gate-call scratch (zero-allocation) — mutated in place, never re-literal'd.
+  private _lightAlphas: Record<View3D, number> = { hyper: 0, geo: 0, ledger: 0 };
   private _ledgerDirty = false; // rebuild the ledger geometry next frame (set on data events)
   // The frame timer — THREE.Timer (THREE.Clock was deprecated in r180). Unlike Clock it must be
   // updated once per frame before reading the delta; the render loop does that.
@@ -185,8 +192,8 @@ export class Engine {
     // handed in at construction — passing it as a 2nd ctor arg (read by _buildMetagraphs) means
     // the hubs are born in the identity color with no recolor pass and no first-paint flash.
     // HyperView only ever has these 10 config hubs, so this map never needs updating.
-    this.layers = new HyperView(this.ctx.scene, colors, sceneColorsFor(METAGRAPHS.map((m) => m.id)));
-    this.globe = new Globe(this.ctx.scene, this.layers, this.ctx.camera, colors);
+    this.layers = new HyperView(this.ctx.scene, colors, this._stageLights, sceneColorsFor(METAGRAPHS.map((m) => m.id)));
+    this.globe = new Globe(this.ctx.scene, this.layers, this.ctx.camera, colors, this._stageLights);
     // The Globe reads the transition machine each frame (geo furniture alpha + the node gather).
     this.globe.transition = this.transition;
     // ONE identity colour system everywhere: the ledger + globe are handed the same identity
@@ -194,7 +201,7 @@ export class Engine {
     // config colour ("dag" included — its own brand hue, distinct from structural cyan; see
     // palette/identity.ts). refreshMeta below refreshes/extends both once the live set is known.
     const initialSceneColors = sceneColorsFor([...METAGRAPHS.map((m) => m.id), "dag"]);
-    this.ledger = new LedgerView(this.ctx.scene, colors, initialSceneColors);
+    this.ledger = new LedgerView(this.ctx.scene, colors, initialSceneColors, this._stageLights);
     // The globe colours the DAG's own validator nodes (the L0/cL1 shells) with sceneColors["dag"]
     // (see globe.js setNodes) — seed it here, synchronously, so it's populated before the first
     // setNodes call (which can fire from the "cluster" event before refreshMeta's API round-trip
@@ -1112,7 +1119,8 @@ export class Engine {
 
       // Per-view furniture build/teardown alphas. geo's alpha is read inside globe.setMorph via
       // globe.transition; hyper + ledger read it here (each multiplies its own furniture opacity).
-      this.layers.setViewAlpha(this.transition.furnitureAlpha("hyper"));
+      const hyperAlpha = this.transition.furnitureAlpha("hyper");
+      this.layers.setViewAlpha(hyperAlpha);
       const ledgerAlpha = this.transition.furnitureAlpha("ledger");
       this.ledger.setViewAlpha(ledgerAlpha);
 
@@ -1154,7 +1162,14 @@ export class Engine {
       if (ledgerActive) {
         if (this._ledgerDirty) this._refreshLedger();
         this.ledger.update(dt);
-      } else this.ledger.spotOff(); // its update() stops ticking off-view — don't leave the light lit
+      }
+      // Central stage-light gate: any view whose furniture is dark gets its spot blacked out
+      // here — a view cannot forget its own off-switch (spec A#3). update() stops ticking a
+      // view's own spot off-view, so without this a lit spot would otherwise linger.
+      this._lightAlphas.hyper = hyperAlpha;
+      this._lightAlphas.geo = this.transition.furnitureAlpha("geo");
+      this._lightAlphas.ledger = ledgerActive ? ledgerAlpha : 0;
+      this._stageLights.gate(this._lightAlphas);
 
       // Depth of field: only a single focused metagraph, and only where the policy allows it (hyper).
       const metaSel = this.filter !== "all" && this.filter !== "dag";
