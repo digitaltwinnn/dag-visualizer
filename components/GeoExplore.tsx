@@ -12,11 +12,12 @@ import { identityHudHex } from "@/src/palette/identity";
 import { SELECTED_ROW, SelectedRowMark } from "@/components/selection";
 import { ccToFlag } from "@/src/util/format";
 import { hoverKeyOf } from "@/src/data/hoverSubject";
-import { countryToggleActions, nodeSelectActions } from "@/src/engine/domain/pickActions";
+import { countryToggleActions, nodeSelectActions, cohortToggleActions, sameCohort } from "@/src/engine/domain/pickActions";
 import { applyClickActions } from "@/src/store/applyClickActions";
 import { subjectPairing } from "@/components/useSubjectPairing";
 import { DisclosureRow, NodePickerRow } from "@/components/ExploreRows";
 import type { NodeRow } from "@/src/data/types";
+import type { CohortSel } from "@/src/engine/domain/focusLadder";
 
 // Geography's single **explore** card (one frame, the bare "Explore" eyebrow — the view name
 // was dropped from card eyebrows, user 2026-07-12: the view switch already says where you
@@ -69,6 +70,12 @@ export default function GeoExplore() {
   // tested table as the scene's empty-click country toggle (zoom-level rule included).
   const drill = (cc: string) =>
     applyClickActions(countryToggleActions(cc, { country, hasInspect: !!sel, cohort }));
+
+  // Click a cohort row: commit/clear the city×provider zoom-level rung — same
+  // disclosure-AND-commit-in-one-click idiom as the country row (`drill`), through the same
+  // tested table/executor. `target` carries the enclosing country row's `cc`.
+  const commitCohort = (target: CohortSel) =>
+    applyClickActions(cohortToggleActions(target, { cohort, hasInspect: !!sel }));
 
   // Selection's nodes grouped by country **name** — the join key both the leaderboard and the
   // node list derive from `geo.country` (`cc` can be absent, the name can't). Each country's
@@ -168,6 +175,8 @@ export default function GeoExplore() {
           {rows.map((c) => {
             const open = c.cc === country;
             const nodes = nodesByCountry.get(c.country) ?? [];
+            // Captured for the cohort rows nested below — their own map's `c` shadows this one.
+            const cc = c.cc;
             // The open group's wash box gets the SAME ±6px outset as the country button
             // (px-1.5 -mx-1.5), so the drilled row's hover/selection box and the dropdown group
             // behind it share edges — the button used to overhang the wash by 6px on both sides
@@ -244,61 +253,73 @@ export default function GeoExplore() {
                     {nodes.length === 0 ? (
                       <p className="mt-1 mx-1 mb-1.5 text-label text-muted-foreground">No locatable nodes here yet.</p>
                     ) : (
-                      cohortsOf(nodes).map((c) => {
-                        const isOpen = openCohort === c.key;
+                      cohortsOf(nodes).map((ch) => {
+                        const isOpen = openCohort === ch.key;
                         const holdsSel =
                           selIp != null &&
-                          c.rows.some(
+                          ch.rows.some(
                             (r) => r.layer === selLayer && "node" in r.pick && r.pick.node?.ip === selIp,
                           );
+                        // Committed cohort: this row IS the cc/city/isp rung applyClickActions
+                        // wrote via the shared table — wins the ✓/SELECTED_ROW over `holdsSel`.
+                        const on = sameCohort(cohort, { cc, city: ch.city, isp: ch.isp });
                         return (
-                          <div key={c.key}>
+                          <div key={ch.key}>
                             {/* The cohort row: one line per city × provider — the honeycomb
-                                as a list row. A DISCLOSURE (chevron), not a selection; no
-                                leading dot (a cohort can host many networks). */}
+                                as a list row. A DISCLOSURE AND a COMMIT in one click (the
+                                country-row idiom): it opens/closes its id rows AND commits/
+                                clears the cohort zoom-level rung through the same tested
+                                table (`cohortToggleActions`) the scene click and the node's
+                                full-ancestry commit use. */}
                             <DisclosureRow
                               open={isOpen}
+                              on={on}
                               holdsSel={holdsSel}
-                              title={`${c.city ?? "Unlocated"}${c.isp ? ` · ${c.isp}` : ""} · ${c.rows.length} node${c.rows.length > 1 ? "s" : ""}`}
+                              title={`${ch.city ?? "Unlocated"}${ch.isp ? ` · ${ch.isp}` : ""} · ${ch.rows.length} node${ch.rows.length > 1 ? "s" : ""}`}
                               onToggle={() => {
-                                setOpenCohort(isOpen ? null : c.key);
-                                // A single-node cohort has no further choice — expand AND select its one node in one click.
-                                if (c.rows.length === 1) {
-                                  const r = c.rows[0];
-                                  const on =
+                                setOpenCohort(isOpen ? null : ch.key);
+                                if (ch.rows.length === 1) {
+                                  // A single-node cohort has no further choice — expand AND
+                                  // select its one node in one click; the node's full-ancestry
+                                  // commit (nodeSelectActions) already commits this cohort, so
+                                  // don't ALSO commitCohort here (a double toggle would clear it).
+                                  const r = ch.rows[0];
+                                  const nodeOn =
                                     selIp != null && r.layer === selLayer && "node" in r.pick && r.pick.node?.ip === selIp;
-                                  selectNode(r.pick, on && isOpen);
+                                  selectNode(r.pick, nodeOn && isOpen);
+                                } else {
+                                  commitCohort({ cc, city: ch.city, isp: ch.isp });
                                 }
                               }}
                               onHoverEnter={() => {
-                                setHoverCohort(c.rows.map((r) => hoverKeyOf(r.pick)).filter((k): k is string => !!k));
-                                setHoverCountry(c.rows[0] && "geo" in c.rows[0].pick ? c.rows[0].pick.geo?.cc ?? null : null);
+                                setHoverCohort(ch.rows.map((r) => hoverKeyOf(r.pick)).filter((k): k is string => !!k));
+                                setHoverCountry(ch.rows[0] && "geo" in ch.rows[0].pick ? ch.rows[0].pick.geo?.cc ?? null : null);
                               }}
                               onHoverLeave={() => setHoverCohort(null)}
                             >
-                              <span className="flex-none text-body whitespace-nowrap">{c.city ?? "Unlocated"}</span>
-                              {c.isp && (
+                              <span className="flex-none text-body whitespace-nowrap">{ch.city ?? "Unlocated"}</span>
+                              {ch.isp && (
                                 <span className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-label text-muted-foreground">
-                                  {c.isp}
+                                  {ch.isp}
                                 </span>
                               )}
-                              <span className="ml-auto flex-none tabular-nums text-body font-semibold">{c.rows.length}</span>
+                              <span className="ml-auto flex-none tabular-nums text-body font-semibold">{ch.rows.length}</span>
                             </DisclosureRow>
 
                             {isOpen && (
                               <div className="mb-1 ml-[7px] pl-2 border-l border-border">
-                                {c.rows.map((r, i) => {
-                                  const on =
+                                {ch.rows.map((r, i) => {
+                                  const nodeOn =
                                     selIp != null && r.layer === selLayer &&
                                     "node" in r.pick && r.pick.node?.ip === selIp;
                                   return (
                                     <NodePickerRow
                                       key={(r.id ?? r.label) + i}
                                       row={r}
-                                      selected={on}
+                                      selected={nodeOn}
                                       hoverNodeId={hoverNodeId}
                                       setHoverNodeId={setHoverNodeId}
-                                      onSelect={() => selectNode(r.pick, on)}
+                                      onSelect={() => selectNode(r.pick, nodeOn)}
                                       onHoverEnter={() => setHoverCountry("geo" in r.pick ? r.pick.geo?.cc ?? null : null)}
                                     />
                                   );

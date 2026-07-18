@@ -17,8 +17,13 @@ import type { NodeRow } from "@/src/data/types";
 // chrome + the trailing affordance (the ✓ when it holds the selection while collapsed, else the
 // hover-revealed chevron that rotates when open). `children` = the row's own middle content
 // (which should end with an `ml-auto` count so it and the affordance sit right).
+// `on` = the row itself is a COMMITTED selection (geo's cohort rung, the country-row idiom) —
+// wears SELECTED_ROW + the ✓ unconditionally (it wins over `holdsSel`, the collapsed-holds-a-
+// selected-node case, when both are true). Optional: hyper's composition groups are disclosure-
+// only and never pass it.
 export function DisclosureRow({
   open,
+  on,
   holdsSel,
   title,
   onToggle,
@@ -27,6 +32,7 @@ export function DisclosureRow({
   children,
 }: {
   open: boolean;
+  on?: boolean;
   holdsSel: boolean;
   title: string;
   onToggle: () => void;
@@ -41,6 +47,7 @@ export function DisclosureRow({
         "group/disc relative flex items-center gap-2 w-[calc(100%+6px)] py-[5px] pl-2 pr-2 my-px rounded-sm border border-transparent bg-transparent cursor-pointer text-left text-foreground-dim transition-colors duration-[140ms]",
         "hover:bg-wash-hover hover:text-foreground",
         "focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--primary)] focus-visible:outline-offset-[-2px]",
+        on && SELECTED_ROW,
       )}
       aria-expanded={open}
       title={title}
@@ -49,7 +56,7 @@ export function DisclosureRow({
       onMouseLeave={onHoverLeave}
     >
       {children}
-      {holdsSel && !open ? (
+      {on || (holdsSel && !open) ? (
         <SelectedRowMark className="flex-none" />
       ) : (
         <ChevronRight
