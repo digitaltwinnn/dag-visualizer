@@ -4,12 +4,17 @@ import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 
 // ENFORCEMENT (spec Part B #3): the per-frame render path allocates nothing. We scan the BODIES
-// of per-frame methods in scene/ and flag `new THREE.*` / `.clone()` on any line lacking an
-// `event-time` marker (the escape hatch for genuine event-driven allocation inside a branch).
-// Heuristic — the markers ARE the documentation of every intentional allocation.
-const SCENE = join(import.meta.dirname, "scene");
+// of per-frame methods in scene/ + Engine.ts and flag `new THREE.*` / `.clone()` on any line
+// lacking an `event-time` marker (the escape hatch for genuine event-driven allocation inside a
+// branch). Heuristic — the markers ARE the documentation of every intentional allocation.
+const HERE = import.meta.dirname;
+const SCENE = join(HERE, "scene");
+// Engine.ts's render-loop phase methods (Task 7, spec C#1) join the scan: the loop closure used
+// to hide this code from the gate entirely (its body lived in a closure, not a method the walk
+// could see) — extracting it into named phases brings it under the same enforcement.
+const ENGINE_FILE = join(HERE, "Engine.ts");
 // Method names whose bodies run every frame (or per-record within a frame).
-const PER_FRAME = /^\s*(?:private\s+|public\s+)?(update|updateRotation|setMorph|write\w+|place\w+|_apply\w+)\s*\(/;
+const PER_FRAME = /^\s*(?:private\s+|public\s+)?(update|updateRotation|setMorph|write\w+|place\w+|_apply\w+|_integrate\w+|_derive\w+|_write\w+)\s*\(/;
 const ALLOC = /new\s+THREE\.\w+\(|\.clone\(\)/;
 
 function tsFiles(dir: string): string[] {
@@ -39,9 +44,10 @@ function perFrameBodies(lines: string[]): [number, number][] {
   return ranges;
 }
 
-describe("no per-frame allocations in scene/", () => {
-  for (const file of tsFiles(SCENE)) {
-    it(`${file.split("/scene/")[1]} allocates nothing in per-frame bodies (or marks it event-time)`, () => {
+describe("no per-frame allocations in scene/ + Engine.ts", () => {
+  for (const file of [...tsFiles(SCENE), ENGINE_FILE]) {
+    const label = file.slice(HERE.length + 1); // "scene/objects/NodeFabric.ts" / "Engine.ts"
+    it(`${label} allocates nothing in per-frame bodies (or marks it event-time)`, () => {
       const lines = readFileSync(file, "utf8").split("\n");
       const offenders: string[] = [];
       for (const [a, b] of perFrameBodies(lines)) {
