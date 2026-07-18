@@ -32,9 +32,9 @@ orthogonal question and owns one "signature" detail card, so the views never ove
 
 | View | Question | Explore tool (left rail) | Signature (detail) slot |
 |------|----------|--------------------------|-------------------------|
-| **Hypergraph** | *who / what* — architecture + economic weight | *(none — the dossier + node card carry the structure)* | **Node card**; structure counts live in the top-bar vitals |
-| **Node geography** | *where* — footprint & decentralization | country→nodes explorer (the selection's nodes, grouped by country) | **Node card** (state, roles, location) |
-| **Snapshots** | *when* — how the ledger advances + cost | the layered-design explainer | **Snapshot card** (DAG position, anchors, fees) |
+| **Hypergraph** | *who / what* — architecture + economic weight | nodes-by-network explorer | **Node card**; structure counts live in the top-bar vitals |
+| **Node geography** | *where* — footprint & decentralization | country→nodes explorer (countries → provider cohorts → nodes) | **Node card** (state, roles, location) + country / provider cards |
+| **Snapshots** | *when* — how the ledger advances + cost | settlement-layers explorer (floors disclose each lane's nodes) | **Snapshot card** (DAG position, anchors, fees) |
 
 Visual uniformity is enforced with shared design tokens in one stylesheet (`app/globals.css`):
 one spacing scale, one panel radius, one "selected" treatment (`--sel-bg` / `--sel-border`),

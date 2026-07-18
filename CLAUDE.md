@@ -110,7 +110,9 @@ to break one, that's a design conversation, not a workaround.
 7. **Per-view behaviour is an allow-list** — `domain/viewPolicy.ts` has one row per `Mode`;
    a new view is inert until its row opts in; never `mode === "x"` guards, never deny-lists.
 8. **One home per concern** — the camera lives in `domain/cameraRig.ts` (presets, framings,
-   the global `CAM_ZOOM` dolly + its documented exemption rule), country-shape math in
+   the global `CAM_ZOOM` dolly + its documented exemption rule), the focus/zoom LADDER in
+   `domain/focusLadder.ts` (rung order, carry policy, deselect-step data — the Engine's
+   `_resolveFocus` and `pickActions` both consume it), country-shape math in
    `domain/countryShape.ts`, click semantics in `domain/pickActions.ts`. Don't grow a second
    copy of any of these in the Engine or a component.
 9. **The scene↔HUD hover pairing is sacrosanct** — the shared store channels (`hoverFilter`,
@@ -207,7 +209,9 @@ Gotchas that will save you time:
   regardless. To inspect transition mid-flight states, use **`?slowmo=N`** (e.g.
   `http://localhost:3000/?slowmo=4` — dev flag like `?stats`): it scales the choreography clock
   AND the camera tween while a transition is live, so screenshots catch the flight without
-  hand-stretching `DUR_*` in source; settled-state focus flights stay full speed.
+  hand-stretching `DUR_*` in source; settled-state focus flights stay full speed. `N` is clamped
+  to `[0.1, 20]` and **values <1 SPEED UP** the choreography instead — e.g. `?slowmo=0.3` shrinks
+  the ~3.9s 3D↔3D switch to ~1.2s, handy for a quick UI/UX pass without waiting out the full flight.
 - **Benign console noise to ignore** when grepping logs: `mojo ... rejected`,
   `gcm/... PHONE_REGISTRATION_ERROR`, `BackForwardCache`.
 
@@ -246,7 +250,11 @@ Zustand store. **Two data lanes:** (A) high-freq visuals subscribe straight to
   `format.ts` (`hex`/`fmtDag`/`ccToFlag`), `relativeAge.ts`, `odometer.ts`.
   **`src/palette/`** — the identity-hue generator (see *Two colour lanes*).
 - **`src/engine/Engine.ts`** — the imperative engine and **the one bridge** (store ⇄ domain ⇄
-  scene). Owns the render loop, morph, camera-focus tweens (`FOCI`), DoF, picking, and the
+  scene). Owns the render loop, morph, camera-focus tweens (`FOCI`), DoF, picking, the
+  **focus resolution** (`_resolveFocus` — the ONE camera walk over `focusLadder.LADDERS`;
+  the per-rung resolvers are small Engine methods because they carry real scene side effects
+  (globe lean/spin, autoRotate); every selection-driven camera move routes through it,
+  including the transition boundary's re-derive and the reversal-gap re-resolve), and the
   **command bridge**: it `useStore.subscribe`s and reacts to mode/filter/country/hover channels
   and writes picks + hovers back to the store — the ONLY layer that touches the store. Each
   frame it consults `VIEW_POLICIES[mode]` (the per-view allow-list) and translates the flags
@@ -277,8 +285,19 @@ store-value imports**, enforced by `layerBoundaries.test.ts`). Each ships coloca
   (geo also sets `minCamAlt: 18` — a camera-ALTITUDE floor the Engine enforces after each controls
   update, because the orbit target is off-centre in geo so the stock target-distance clamp alone
   is inconsistent around the globe) / `nodeList` (which views publish `store.selNodes` for
-  their explorer node browsers — hyper + geo), as
+  their explorer node browsers — hyper + geo + ledger), as
   DATA. The single source of truth for what each view turns on (see *Per-view behaviour*).
+- `focusLadder.ts` — the FOCUS/ZOOM LADDER as data (spec 2026-07-18): one ordered rung table
+  per 3D view (`LADDERS` — geo `node → cohort → country → network → all`, hyper `node →
+  network → all`, ledger `node → layer → network → all`), each rung a pure `active(sel)`
+  predicate + a resolver KEY the Engine implements (`_resolveFocus` walks finest→coarsest;
+  first active rung whose resolver succeeds wins the camera, failure falls through — the
+  per-view fallback chains, made uniform). Also `finerLevels()` (the deselect-stepping data
+  `pickActions` derives its drop-the-finer rules from — one level list, two consumers) and
+  `LEVEL_CARRY` (cross-view carry: node/network carry always; cohort/country/layer are
+  VIEW-SCOPED — cleared when leaving their view, so no view-scoped card ever lingers).
+  In ledger, `layer` sits deliberately FINER than `network`: a committed layer wins the
+  camera and lane-slides on a filter change; the network rung fires only with nothing finer.
 - `morph.ts` — the hyper↔geo morph easing + derived visibility ramps.
 - `viewTransition.ts` — the ONE 3D↔3D view-switch choreographer (`ViewTransition`, `View3D`):
   every switch among `hyper`/`geo`/`ledger` runs **OUT** (`DUR_OUT` 0.9s — the from-view's
@@ -343,9 +362,15 @@ store-value imports**, enforced by `layerBoundaries.test.ts`). Each ships coloca
   scene-click). Also `pickNetId` + **`pickActive`** (which picks respond AT ALL per view:
   node-less hubs never, geo off-filter nodes never, hyper everything). Ordering contracts are
   tested invariants: filter-first (only when it CHANGES — no drill churn) → node's country →
-  inspect-LAST (the node camera wins); deselect-before-drill on the country toggle; the LIVE
+  node's cohort → inspect-LAST (the node camera wins — FULL-ANCESTRY rule, spec 2026-07-18:
+  a node select commits every coarser rung so deselects step down predictably; in ledger the
+  ancestry is the browser row's parent floor, else `autoLayerForNode`); deselect-before-drill
+  on the country toggle (which also drops a committed cohort); the cohort/provider toggle
+  (`cohortToggleActions` + `sameCohort` — geo's city×provider rung); the LIVE
   strip tip (re-)follows while older bars pin; layer/filter toggles (`layerToggleActions`,
-  `filterToggleActions` — the picker's committed-row step-back-to-all). The table self-gates
+  `filterToggleActions` — the picker's committed-row step-back-to-all). Deselect stepping
+  derives from `focusLadder.finerLevels` (one level list, two consumers — a colocated test
+  pins that the two can't drift). The table self-gates
   by mode. Every caller applies actions through the ONE executor
   **`src/store/applyClickActions.ts`** (tested — action kind → exactly one store effect; a
   snapshot CLEAR leaves `following` to the FollowController). **ENFORCED by
@@ -353,15 +378,19 @@ store-value imports**, enforced by `layerBoundaries.test.ts`). Each ships coloca
   selection setter directly — the rule is WRITE-based, so read-only facts cards cost nothing
   and every future explorer card inherits the table; sole allowlisted exception:
   `FollowController` (the follow SYSTEM, not a user pick). New click/select semantics go in
-  the table with a test, their effects in the executor — never inline anywhere. The ORDERING contracts are tested invariants: a node
-  click sets filter FIRST (its subscription clears any old drill) → the node's country → inspect
-  LAST (the node camera wins); the empty-click country toggle drops a selected node before
-  moving the drill level. New click semantics go HERE with a test, not inline in the Engine.
+  the table with a test, their effects in the executor — never inline anywhere. NB a filter
+  SWITCH is a network-level event Engine-side: its subscription drops the node card (EVERY
+  view — a geo switch can hide the inspected node outright; was hyper-only), the cohort and
+  the country, while the ledger LAYER deliberately survives (it composes with the filter —
+  the lane-aware layer framing slides). New click semantics go HERE with a test, not inline
+  in the Engine.
 - `cameraRig.ts` — the ONE camera home: `FOCI` presets, every framing function (`hubFraming`,
   `nodeFraming` (geo node — ABSOLUTE/dolly-exempt, solved against `NODE_RAISE`, the residual
   Globe.focusNode leans every node to — a documented cross-layer CONTRACT), `hyperNodeFraming`,
   `geoFraming` (the no-topology FALLBACK — the real drill pose is countryShape.countryFraming),
-  `ledgerLayerFraming`), the global **`CAM_ZOOM` dolly** (`dollyBack()` — one lever widening
+  `cohortFraming` (the geo provider-cohort pose — one rung wider than the node zoom, same
+  `NODE_RAISE` lean contract via `Globe.focusCohort`, ABSOLUTE/dolly-exempt like
+  `nodeFraming`), `ledgerLayerFraming`), the global **`CAM_ZOOM` dolly** (`dollyBack()` — one lever widening
   every pose; a pose with a composed non-subject target must opt out explicitly or the dolly
   drags the camera off the subject, the bug that hit the node pose), and **`closeness()`**
   (camera altitude → the surface-sharpening factor GeoView's shaders consume). Easings too.
@@ -541,12 +570,21 @@ views and caused the ledger red-dots bug; that pattern is forbidden.
   long comet tails (`ARC_TAIL 14`, `ARC_TAIL_FRAC 0.42`), longer rests between hops.
 - **The filter** lives in the top command bar (`TopBar` → `FilterPicker`); everything routes
   through `Engine.applyFilter()`, which behaves per-view:
-  - **Geography — three zoom LEVELS** (user design), each deselect stepping back up one:
+  - **Geography — FOUR zoom LEVELS** (user design; the ladder is data —
+    `focusLadder.LADDERS.geo`: network → country → provider cohort → node), each deselect
+    stepping back up one:
     `globe.setFilter()` isolates/dims the selection, the leaderboard refreshes, and
     `globe.focusDensest()` rotates the globe so the **densest part of the selection faces the
     camera** (north stays up — Y rotation only). A **metagraph** selection frames WIDE
     (`FOCI.geoNetwork`, deliberately farther out than the country pose so drilling still reads
     as a zoom); a **country** drill frames the country's real SHAPE (see the drill-down bullet);
+    a **provider COHORT** (city × provider, committed via the explorer's cohort rows —
+    `store.cohort`, internal name `cohort`, user-facing word **provider**) leans the globe to
+    the stack field's centroid (`Globe.focusCohort`, the same `NODE_RAISE` contract as the
+    node pose) and frames it one rung wider than the node zoom (`cohortFraming` — ABSOLUTE/
+    dolly-exempt like `nodeFraming`) while the member stacks hold a STEADY committed glow
+    (same strength as the hover preview; a live hover wins while active; membership matches
+    by falsy-normalized cc+city+isp — the data layer normalizes unresolved fields to "");
     a **node** pick zooms close in a
     LATITUDE-INDEPENDENT pose (`Globe.focusNode` leans the globe UNCAPPED with a 0.42 raise, so
     every node rests at the same residual elevation — Helsinki read flatter than the rest with
@@ -609,8 +647,18 @@ views and caused the ledger red-dots bug; that pattern is forbidden.
     (`_isPickActive`): only the in-focus selection's nodes are hoverable/clickable. Clicking
     a node sets the filter to its network (consistent with geo) + opens its node card —
     `GeoExplore.selectNode` mirrors the same two-step for explorer rows.
-  - The selected network filter **persists across view switches**; the country drill-down is
-    geo-only and cleared on view switch.
+  - **Snapshots**: the ledger ladder is `node → layer → network → all`
+    (`focusLadder.LADDERS.ledger`; `layer` deliberately FINER than `network` — a committed
+    layer wins the camera and lane-slides on a filter change). Committing a filter with
+    nothing finer committed frames the metagraph's LANE at its L0 floor (the `ledgerNetwork`
+    resolver — `_focusLayer("ml0")`, `"dag"` → `"hypl0"`; camera-only, no layer commit, so
+    the layer card stays a ghost); entering ledger with a filter committed arrives on that
+    lane too. "all" rests at the shared overview.
+  - **Cross-view carry is data** (`focusLadder.LEVEL_CARRY`): the network filter and a node
+    selection carry across view switches; country + cohort are geo-only and layer is
+    ledger-only — each cleared on leaving its view (so no view-scoped card lingers; the layer
+    card used to follow into hyper/geo). A filter SWITCH additionally drops node + cohort +
+    country in EVERY view (network-level event; the layer survives — it composes).
 - **Hover preview**: hovering a filter-picker row OR a metagraph hub in hyper sets
   `store.hoverFilter`, which previews that selection's dim in any view via
   `globe.setHoverFilter` (+ `ledger.setFilter`), without committing `filter`. The hover
@@ -619,7 +667,11 @@ views and caused the ledger red-dots bug; that pattern is forbidden.
   hover must NOT do is the *click*'s camera flight). Hovering an explorer node row glows that node's shells on the
   globe (`hoverNodeId` → `globe.setHoverNode`), matching a 3D raycast hover; hovering a
   country row previews that country's border outline at a whisper level (`hoverCountry` →
-  `globe.setHoverCountry` — the committed drill's full hairline wins).
+  `globe.setHoverCountry` — the committed drill's full hairline wins). Hovering a cohort row
+  glows the whole stack (`hoverCohort` ids → `globe.setHoverCohort`); a COMMITTED cohort
+  holds the same glow steadily (`globe.setSelectedCohort` — same strength, the live hover
+  wins while active; hover-pairing on cohort/provider subjects is outward-only by inherited
+  convention — the scene never writes `hoverCohort` back).
 
 ## Per-view behaviour — allow-list, not deny-list
 
@@ -712,18 +764,39 @@ and keep changing, so they're examples, not the contract.
   layers" (not "Nodes by…": its subjects are strata, not nodes). Card EYEBROWS are the bare
   role words ("About" / "Explore") — the view name was dropped (user, 2026-07-12: the view
   switch already says where you are), and each explorer's usage hint LEADS the card (top,
-  descriptive) instead of trailing it), ledger → `LedgerPanel`.
+  descriptive) instead of trailing it), ledger → `LedgerPanel` — since the focus-ladder work
+  (2026-07-18) ALSO the ledger's node browser: the four node-kind floors (`ml1`/`ml0`/
+  `hypl0`/`hypl1`; never the snapshot floors) are DISCLOSURES — commit+expand in one click
+  (`layerToggleActions`), disclosure = the committed layer (single-open by construction) —
+  opening onto the committed filter's cluster/node rows for that floor (per-metagraph groups
+  on the ml floors, hover-glowing their 3D stacks via `hoverCohort`; node id rows run
+  `nodeSelectActions` with the floor as `ledgerLayerId` ancestry) PLUS one **LANE row** per
+  OTHER network serving the floor (identity dot + name + per-floor role-derived count;
+  0-located dimmed with the bare 0) that COMMITS the filter via `filterToggleActions` — the
+  HyperExplore idiom bent onto strata: the browser's network level IS the filter, so "all"
+  enumerates every lane instead of an empty state (user, 2026-07-18); lane-row hover
+  previews via `hoverFilter`.
   The placeholder views have just the About card.
 - **Right rail** (`#rightcol`, `Inspector`) = the **facts** scope (read-only), a set of
-  **FIXED card SLOTS** in one stable order — network dossier, node, snapshot, layer (user
-  design, 2026-07-10; replaced the recency stack + the floating pick-hint): every card the
+  **FIXED card SLOTS** in one stable order — network dossier, **country**, **provider**,
+  node, snapshot, layer (user
+  design, 2026-07-10; replaced the recency stack + the floating pick-hint; the country +
+  provider slots landed with the focus ladder, 2026-07-18): every card the
   current view CAN produce is always visible — POPULATED when its subject is selected
-  (`ContextCard` mirrors the filter; the **node card** `geoLive` — location-first title, id
+  (`ContextCard` mirrors the filter; the **country card** — flag+name title, Nodes/Share/
+  Cities/Providers from `store.selNodes`, geo-scoped like layer is ledger-scoped; the
+  **provider card** — "City · Provider" title, Nodes/Networks/ASN/Country; both rendered
+  straight from their store channels by Inspector's `CountryPane`/`ProviderPane` since
+  neither subject is a PickDescriptor, collapsible like every RIGHT card; the **node card**
+  `geoLive` — location-first title, id
   demoted to a mono subtitle, status pill in the head aside; the **snapshot** and **layer**
   cards), else as a quiet **GHOST hint card** (a dashed one-liner:
   kind mark · slot label · instruction — no halo/animation) saying what to interact with — so the rail shows the view's whole possibility space and a deselect
   returns its slot to the ghost in place. Slot availability + hint copy live in the rail
-  manifest (`railCards.ts`), the same source the dock trays read. An **instrument-channel
+  manifest (`railCards.ts`), the same source the dock trays read, and
+  **`components/railLadderBoundary.test.ts`** enforces the ladder↔rail contract: every
+  committable `focusLadder` rung below "all" must map to a hinted card slot (exemptions
+  need an explicit documented entry) — a future rung can't land without deciding its card. An **instrument-channel
   thread** (`RailThread`) runs each rail's outer edge.
 - **Bottom** (`BottomStream`) = the live/time lane: the slim `LiveStrip` bar-chart in EVERY
   view; it publishes `--bottom-reserve`.
@@ -963,7 +1036,9 @@ Every rail card leads with `CardHead` (`components/CardHead.tsx`), ONE head anat
 cards: **eyebrow / title / INSET hairline / body**.
 
 - **Eyebrow**: uppercase 8.5px — either a view tag ("HYPERGRAPH · ABOUT") or the bare slot
-  noun ("METAGRAPH" / "NODE" / "SNAPSHOT" / "LAYER" — the "Selected " prefix was dropped,
+  noun ("METAGRAPH" / "COUNTRY" / "PROVIDER" / "NODE" / "SNAPSHOT" / "LAYER" — the
+  provider card's user-facing word is **provider** while every internal identifier stays
+  `cohort` (one concept, two registers — deliberate, spec 2026-07-18); the "Selected " prefix was dropped,
   user 2026-07-17: the populated card wears the same slot label as its ghost state; no
   breadcrumb grammar). `eyebrowMuted` dims it when the feed behind the card is down.
 - **Title**: one standard — 15px / semibold / leading-[1.2]. Pass `titleKey` to key the
@@ -1034,9 +1109,11 @@ cards: **eyebrow / title / INSET hairline / body**.
 
 Each right-rail slot's empty state is a **GHOST card** (`Inspector.GhostCard`; shown on
 `/design`) — availability + copy derive from the rail manifest (`railCards.ts` `hint`
-fields), an allow-list mirroring the pick registry: hyper/geo invite node picks, ledger
+fields), an allow-list mirroring the pick registry: hyper/geo invite node picks, geo also
+invites the country drill + the provider (cohort) row, ledger
 invites snapshot + layer picks, the network slot invites the top-bar filter, the flat
-placeholder views get no ghosts. Honesty rules carried over from the old single pick-hint:
+placeholder views get no ghosts. The allow-list is EXECUTABLE since 2026-07-18:
+`railLadderBoundary.test.ts` asserts every committable ladder rung has a hinted slot. Honesty rules carried over from the old single pick-hint:
 when the filtered network has nothing pickable in geo the node ghost turns into the honest
 variant ("<TICKER> has no locatable nodes — explore it in the Hypergraph view"); "all" with
 0 nodes = boot → that ghost stays silent rather than flashing a false invite. A populated
@@ -1315,9 +1392,9 @@ can't fetch them — but the **Next Node server can**:
 - **`app/api/metagraphs/route.ts`** lists the dagexplorer directory, fetches each
   `{l0,cl1,dl1}` `/cluster/info` server-side (the three run **concurrently** per metagraph;
   `present` keeps `l0 > dl1 > cl1` priority), geolocates IPs (ip-api batch), computes each
-  metagraph's identity hue, and returns `{ metagraphs, geo }`. **Falls back to the bundled
-  `data/*.json`** (imported, so it ships in serverless deploys) if the live fetch
-  fails/empties.
+  metagraph's identity hue, and returns `{ metagraphs, geo }`. **On failure it answers an
+  honest 503** (user decision — NO pre-baked fallback; the client keeps its last good data
+  and re-pulls on the next cycle).
   - **Caching:** the inner fetches use `cache: "no-store"`, which by itself makes the route
     *dynamic* — so the live fetch is wrapped in **`unstable_cache(…, { revalidate: 600 })`**
     (runs at most ~once per 10 min, shared across requests/instances; throwing on an empty
@@ -1344,11 +1421,12 @@ can't fetch them — but the **Next Node server can**:
   (Vercel never restarts; ISR only freshens the *server* cache, so an idle tab must re-pull —
   `Engine.refreshMeta`, rebuilds only on change). Snapshot/cluster feeds are live via
   `NetworkData` client polling.
-- **`data/*.json` are a static baked snapshot** (as of ~2026-06) — the imported seed/fallback
-  the routes use when the live fetch fails. The Python bake scripts that once regenerated them were removed
-  (2026-07-10, unmaintained); if the seeds ever need refreshing, regenerate by hand from the
-  live routes' output. `data/metagraphs.json` shape: each metagraph has
-  `name/symbol/description/siteUrl/nodes`; each node `ip/state/layer/roles`.
+- **`data/` holds only baked BUILD artifacts now** — `brand-hues.json`,
+  `brand-hue-overrides.json`, `country-codes.json` (see their bullets below). The old
+  `data/metagraphs.json`/geo seed-fallbacks were REMOVED along with the route fallback
+  (the routes 503 honestly instead); the Python bake scripts went earlier (2026-07-10,
+  unmaintained). (Stale references to a bundled metagraphs seed were cleaned from this file
+  2026-07-18.)
 - **`data/brand-hues.json`** is baked OFFLINE by `npx tsx scripts/bake-brand-hues.ts` (run
   manually whenever the metagraph set changes; `jimp` is a devDependency used only by this
   script). It extracts each metagraph's identity hue from its real brand (logo fills,

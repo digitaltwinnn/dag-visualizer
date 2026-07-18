@@ -16,6 +16,9 @@ export function applyClickActions(actions: ClickAction[]): void {
       case "country":
         st.setCountry(a.cc);
         break;
+      case "cohort":
+        st.setCohort(a.sel);
+        break;
       case "inspect":
         st.setInspect(a.pick);
         break;

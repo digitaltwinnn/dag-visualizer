@@ -352,7 +352,15 @@
     transition: top 0.25s ease-out;
     width: var(--rail-w);
     display: flex; flex-direction: column; gap: var(--rail-gap);
-    max-height: calc(100vh - var(--rail-top) - var(--topbar-extra, 0px) - 14px);
+    /* The box's own bottom must never enter the LiveStrip's reserved band — the rail-clip fade
+       below only dims PIXELS (mask-image), it doesn't disable clicks, so a box that physically
+       overlapped the strip left a masked-to-invisible card control still fully interactive —
+       and since #livestrip mounts after this rail at the same z-index, it won the hit-test
+       underneath (bug, 2026-07-18: a 5-card #rightcol stack's trailing card × silently clicked
+       a LiveStrip bar it was invisibly sitting on top of). Subtracting --bottom-reserve here
+       keeps the box entirely above the strip; the rail-clip mask/runway then fades/scrolls
+       purely WITHIN that bound, never over live chrome. */
+    max-height: calc(100vh - var(--rail-top) - var(--topbar-extra, 0px) - var(--bottom-reserve, 0px) - 14px);
     overflow-y: auto;
   }
   /* Rail cards are flex-none SO THE RAIL SCROLLS — an expanded card (the country accordion)
@@ -370,7 +378,10 @@
     transition: top 0.25s ease-out;
     width: var(--detail-w);
     display: flex; flex-direction: column; gap: var(--rail-gap);
-    max-height: calc(100vh - var(--rail-top) - var(--topbar-extra, 0px) - 14px);
+    /* Must never enter the LiveStrip's reserved band — see the matching #leftcol comment above
+       (same bug: a masked-invisible trailing card was still fully clickable, and #livestrip's
+       later DOM position won the hit-test at equal z-index). */
+    max-height: calc(100vh - var(--rail-top) - var(--topbar-extra, 0px) - var(--bottom-reserve, 0px) - 14px);
     overflow-y: auto;
     pointer-events: none;
   }

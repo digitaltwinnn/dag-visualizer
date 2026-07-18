@@ -33,10 +33,12 @@ import type { StageLights } from "./objects/StageLights";
 import { STAGE_LIGHTS } from "../domain/stageLight";
 import { ccToNumeric, countryCcAt, countryLean, geometryRings, mainPolygonRings, ringsAngularRadius, ringsCentroid, type Ring } from "../domain/countryShape";
 import { closeness, NODE_RAISE } from "../domain/cameraRig";
+import type { CohortSel } from "../domain/focusLadder";
 import { NodeFabric, type FrameCtx } from "./objects/NodeFabric";
 import { Arcs } from "./objects/Arcs";
 import { makeRadialGradientTexture } from "./objects/gradientTexture";
 import type { HyperView } from "./views/HyperView";
+import { hoverKeyOf } from "@/src/data/hoverSubject";
 import type {
   CountryStat,
   DagCore,
@@ -150,6 +152,10 @@ export class Globe implements GeoViewHost {
   private _hoverNodeId: string | null = null;
   private _hoverCohort: Set<string> | null = null; // cohort-row hover — the whole stack glows
   private _selectedNodeId: string | null = null;
+  private _selCohort: CohortSel | null = null;
+  private _selCohortIds: Set<string> | null = null; // committed-glow membership (event-time)
+  private _selCohortDir = new THREE.Vector3(); // resolved centroid unit dir (scratch)
+  private _selCohortOk = false;
   private _hoverCountryCc: string | null = null; // explorer row hover — border preview only
   // The geo focus SPOTLIGHT (scene/objects/FocusSpot): staged above the SELECTED node's chip stack
   // so the zoomed-in node pick catches a stage-light wash (user; hyper/ledger have their own).
@@ -346,6 +352,7 @@ export class Globe implements GeoViewHost {
     this.fabric.buildValidators(this.nodes);
     this.pickables = this.fabric.pickables;
     this.setSelectedNode(this._selectedNodeId); // re-resolve the spotlight's record on fresh data
+    this.setSelectedCohort(this._selCohort); // re-resolve the cohort membership/centroid too
 
     // Fan out the filter-active nodes and (re)build the density rings + arcs.
     this._relayoutGeo();
@@ -506,6 +513,7 @@ export class Globe implements GeoViewHost {
       this.setFilter(this.filter);
       if (drill) this.setCountry(drill);
       this.setSelectedNode(this._selectedNodeId); // re-resolve the spotlight's record on fresh data
+      this.setSelectedCohort(this._selCohort); // re-resolve the cohort membership/centroid too
       this._buildDensityGlow();
     }
     // Staging-grid slots for the view-transition choreography (event-time: data rebuilds); this.metaNodes
@@ -724,6 +732,46 @@ export class Globe implements GeoViewHost {
         null;
   }
 
+  // Commit/clear the cohort selection: resolve member ids + the representative direction from
+  // the CURRENT node records by cc+city+isp match (event-time — re-run by the data-rebuild
+  // sites exactly like setSelectedNode's re-resolve). Membership matching mirrors
+  // GeoExplore.cohortsOf: geoPrimary rows only, keyed on geo.cc/city/isp.
+  setSelectedCohort(sel: CohortSel | null): void {
+    this._selCohort = sel;
+    this._selCohortIds = null;
+    this._selCohortOk = false;
+    if (!sel) return;
+    const ids = new Set<string>(); // event-time
+    let lat = 0, lon = 0, n = 0;
+    // The data layer normalizes an unresolved city/isp to "" (geoResolve), and the falsy
+    // normalization ("" -> null) is the UI-wide keying convention (GeoExplore.cohortsOf,
+    // ProviderCard/ProviderPane both use `r.city || null`); `?? null` only catches
+    // null/undefined, so an unlocated-city cohort ("" !== null) matched ZERO members here and
+    // the 3D glow never lit even though the card showed real counts. Match falsy-normalized.
+    const match = (g: GeoInfo | undefined) =>
+      !!g && g.cc === sel.cc && (g.city || null) === sel.city && (g.isp || null) === sel.isp;
+    const add = (key: string | null, g: GeoInfo) => {
+      if (key) ids.add(key);
+      lat += g.lat ?? 0;
+      lon += g.lon ?? 0;
+      n++;
+    };
+    for (const u of this.nodes) {
+      if (u.noGeo || !u.geoPrimary) continue;
+      const g = geoOf(u.pick);
+      if (match(g)) add(hoverKeyOf(u.pick), g!);
+    }
+    for (const r of this.metaNodes) {
+      if (!(r.geoPrimary ?? true)) continue;
+      const g = geoOf(r.pick);
+      if (match(g)) add(hoverKeyOf(r.pick), g!);
+    }
+    if (n === 0) return;
+    this._selCohortIds = ids;
+    this._selCohortDir.copy(latLonToVec3(lat / n, lon / n, 1)).normalize(); // event-time
+    this._selCohortOk = true;
+  }
+
   // World position of a node's HYPERGRAPH point by its id — read from its live instance transform.
   // The node's HYPER LAYOUT position in world space — from the layout DATA, deliberately NOT
   // the rendered instance matrix: mid-transition the instance sits at the staging grid, and a
@@ -809,6 +857,15 @@ export class Globe implements GeoViewHost {
   focusNode(geo: { lat?: number; lon?: number } | null | undefined): boolean {
     if (!geo || geo.lat == null || geo.lon == null) return false;
     this._aimAt(latLonToVec3(geo.lat, geo.lon, 1).normalize(), Math.PI / 2, NODE_RAISE);
+    return true;
+  }
+
+  // Aim the committed cohort's centroid to the front — the same lean contract as focusNode
+  // (NODE_RAISE), so cohortFraming can be one fixed pose. false = nothing resolved (caller
+  // falls down the ladder).
+  focusCohort(): boolean {
+    if (!this._selCohortOk) return false;
+    this._aimAt(this._selCohortDir, Math.PI / 2, NODE_RAISE);
     return true;
   }
 
@@ -908,7 +965,7 @@ export class Globe implements GeoViewHost {
     c.countryFilter = null;
     c.countryMix = 0;
     c.hoverNodeId = this._hoverNodeId;
-    c.hoverCohort = this._hoverCohort;
+    c.hoverCohort = this._hoverCohort ?? this._selCohortIds;
     c.selectedNodeId = this._selectedNodeId;
     c.filter = this.filter;
     ctx.dim = this.dim;
