@@ -156,6 +156,14 @@ export class Engine {
   // FPS/ms monitor — dev only, or in prod via `?stats`/`#stats` for ad-hoc checks, so
   // it never shows for real users. Click the panel to cycle FPS → ms → MB.
   private stats?: Stats;
+  // Transition slow-motion — dev only, or via `?slowmo=4` in prod (like ?stats): scales the
+  // choreography clock so mid-flight states are screenshotable WITHOUT hand-stretching the
+  // DUR_* constants in source (spec C#4 — three separate hand-stretch-and-revert rounds).
+  // Clamped ≥1; applies to the transition machine AND the camera tween while a transition is
+  // live, so the flight and the camera stay in sync. No param → stays 1 → the whole mechanism
+  // is a no-op, so the parse itself is the dev/prod gate (unlike `stats`, which toggles a
+  // visible DOM panel and so needs an explicit environment check).
+  private _slowmo = 1;
   // Fired once, after the first frame actually renders (see start()'s loop) — lets callers
   // (SceneCanvas → store.engineReady) know the scene has painted, not just constructed.
   private _onReady?: () => void;
@@ -230,6 +238,9 @@ export class Engine {
       d.style.bottom = "56px"; // clear the bottom-left logo + the ribbon
       document.body.appendChild(d);
     }
+
+    const smMatch = /[?#&]slowmo=([\d.]+)/.exec(window.location.search + window.location.hash);
+    this._slowmo = Math.max(1, smMatch ? parseFloat(smMatch[1]) || 1 : 1);
 
     // Apply current store state, then react to changes (Lane B command bridge).
     const s = useStore.getState();
@@ -1020,8 +1031,9 @@ export class Engine {
     this._focusEuler.set(HYPER_TILT_FOCUS, this.layers.root.rotation.y, 0);
     this._hubWorld.copy(meta.group.position).applyEuler(this._focusEuler);
     // Plain radial hub framing, world-up, NO camera roll and NO core-corner composition
-    // (user, 2026-07-17: the rolled hyperFocusFraming + DoF read fuzzy/off — keep the focused
-    // pose simple and correct; hyperFocusFraming stays in cameraRig, currently unused).
+    // (user, 2026-07-17: the rolled pose + DoF read fuzzy/off — keep the focused pose simple
+    // and correct; the rolled hub-focus camera-roll pose was deleted — structure-tilt + plain
+    // hubFraming won).
     hubFraming(this._hubWorld, this._framingOut);
     this._tweenTo(this._framingOut.pos, this._framingOut.target);
   }
@@ -1074,7 +1086,7 @@ export class Engine {
     // Advance the machine; tick() returns TRUE exactly once, at the OUT→IN boundary. The nodes
     // are then fully gathered and both furnitures are dark, so snapping the destination layout +
     // morph + starting the camera flight here is invisible.
-    if (this.transition.tick(dt) && this._pendingBoundary) {
+    if (this.transition.tick(dt / this._slowmo) && this._pendingBoundary) {
       const dest = this._pendingBoundary;
       this._pendingBoundary = null;
       this._applyBoundary(dest);
@@ -1239,7 +1251,9 @@ export class Engine {
   private _updateTween(dt: number) {
     const tw = this._tween;
     if (!tw.active) return;
-    tw.t = Math.min(1, tw.t + dt / tw.dur);
+    // Scale ONLY while the transition choreography is live, so an ordinary focus flight (a
+    // click while settled — no transition running) stays full speed under ?slowmo.
+    tw.t = Math.min(1, tw.t + dt / (tw.dur * (this.transition.active() ? this._slowmo : 1)));
     const e = easeInOutQuad(tw.t);
     this.ctx.camera.position.lerpVectors(tw.fromPos, tw.toPos, e);
     this.ctx.controls.target.lerpVectors(tw.fromTgt, tw.toTgt, e);
