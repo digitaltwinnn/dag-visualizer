@@ -552,12 +552,14 @@ export class Engine {
       // the canvas out; the parked grids are the state the next 3D view resumes from. From a
       // flat/boot origin there is nothing to gather — the machine parks instantly.
       this._pendingBoundary = null;
+      this._resettleFocus = false; // any pending reversal re-resolve is moot — this path resolves/parks on its own
       if (is3D(prevMode)) this.transition.stage(prevMode);
       else this.transition.stageInstant();
     } else {
       // Flat/boot → 3D: STEP 2 from the parked grids — the nodes dissolve out of staging into
       // the destination. place() says whether the layout applies NOW (parked: it's invisible —
       // the boundary-equivalent) or at the normal boundary (still mid-gather toward the grids).
+      this._resettleFocus = false; // any pending reversal re-resolve is moot — this path resolves/parks on its own
       if (this.transition.place(mode) === "immediate") {
         this._pendingBoundary = null;
         this._applyBoundary(mode);
