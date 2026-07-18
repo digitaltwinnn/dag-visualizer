@@ -3,6 +3,9 @@ import { ABOUT_ICON, EXPLORE_ICON, iconForPick } from "@/components/icons";
 import { hoverKeyOf } from "@/src/data/hoverSubject";
 import type { Mode } from "@/src/store/store";
 import type { PickDescriptor } from "@/src/data/types";
+// Type-only — railCards stays a plain-data module; CohortSel is defined once in the domain
+// focus-ladder module (the store mirrors the same type-only import).
+import type { CohortSel } from "@/src/engine/domain/focusLadder";
 
 // ─────────────────────────────────────────────────────────────────────────────────────────────
 // The RAIL MANIFEST — ONE source of truth for "which cards does each rail host, in what order".
@@ -20,7 +23,7 @@ import type { PickDescriptor } from "@/src/data/types";
 // Hue + active-flag stay with the tray builders (per-rail presentation), not here.
 // ─────────────────────────────────────────────────────────────────────────────────────────────
 
-export type RailCardKind = "about" | "tool" | "context" | "node" | "snap" | "layer";
+export type RailCardKind = "about" | "tool" | "context" | "country" | "cohort" | "node" | "snap" | "layer";
 
 export interface RailCard {
   /** Stable id within the rail (also the tray-icon key + the render-map key). */
@@ -54,6 +57,10 @@ export interface RailManifestState {
   selNodesCount: number;
   /** The filtered network's display ticker/name (for the honest geo variant). */
   filterLabel: string | null;
+  /** The committed country drill (cc code), or null — geo's coarse focus-ladder rung. */
+  country: string | null;
+  /** The committed city×provider cohort — geo's rung between a country and a node. */
+  cohort: CohortSel | null;
 }
 
 const isNodePick = (p: PickDescriptor | null): boolean =>
@@ -110,11 +117,20 @@ function snapHint(s: RailManifestState): string | null {
 function layerHint(s: RailManifestState): string | null {
   return s.mode === "ledger" ? "Click a floor plane (or a row in the explorer) to inspect it." : null;
 }
+// Country/cohort are geo-only focus-ladder rungs (the drill + the city×provider commit) — their
+// ghosts only ever invite in geo, same allow-list idiom as every other slot.
+function countryHint(s: RailManifestState): string | null {
+  return s.mode === "geo" ? "Drill a country on the globe (or a row in the explorer) to inspect it." : null;
+}
+function cohortHint(s: RailManifestState): string | null {
+  return s.mode === "geo" ? "Open a city · provider row in the explorer to inspect it." : null;
+}
 
-// RIGHT rail (Details): FIXED slots in a stable order — the Context dossier, then node, snapshot,
-// layer. Each slot renders its populated card when selected, else its GHOST hint when the view
-// can produce it (see `hint` above) — so the rail always shows the view's full possibility space
-// and a deselect returns a slot to its ghost in place (spatially stable; the old recency
+// RIGHT rail (Details): FIXED slots in a stable order — the Context dossier, then country,
+// cohort, node, snapshot, layer (coarse→fine, matching the geo focus ladder; snapshot/layer stay
+// at the tail). Each slot renders its populated card when selected, else its GHOST hint when the
+// view can produce it (see `hint` above) — so the rail always shows the view's full possibility
+// space and a deselect returns a slot to its ghost in place (spatially stable; the old recency
 // reordering made cards jump). Callers filter to `present` for the tray icons.
 export function detailsCards(s: RailManifestState): RailCard[] {
   const context: RailCard = {
@@ -126,6 +142,22 @@ export function detailsCards(s: RailManifestState): RailCard[] {
     // filter the app sets ("dag" + real metagraph ids), null for "all".
     present: s.filter !== "all",
     hint: contextHint(s),
+  };
+  const country: RailCard = {
+    id: "country",
+    kind: "country",
+    icon: iconForPick("country"),
+    subjectKey: s.country,
+    present: s.country != null,
+    hint: countryHint(s),
+  };
+  const cohort: RailCard = {
+    id: "cohort",
+    kind: "cohort",
+    icon: iconForPick("cohort"),
+    subjectKey: s.cohort ? `${s.cohort.cc}|${s.cohort.city}|${s.cohort.isp}` : null,
+    present: s.cohort != null,
+    hint: cohortHint(s),
   };
   const node: RailCard = {
     id: "node",
@@ -151,5 +183,5 @@ export function detailsCards(s: RailManifestState): RailCard[] {
     present: !!s.layer,
     hint: layerHint(s),
   };
-  return [context, node, snap, layer];
+  return [context, country, cohort, node, snap, layer];
 }
