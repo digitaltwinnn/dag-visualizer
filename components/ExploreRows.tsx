@@ -16,17 +16,21 @@ import type { NodeRow } from "@/src/data/types";
 // The ONE disclosure-chevron affordance, used by every explorer row that expands/collapses
 // (extracted 2026-07-18 from DisclosureRow, its original/canonical treatment — a ledger fix had
 // hand-copied it and dropped the hover-reveal, the exact drift a shared component prevents):
-// invisible at rest, fades in on row hover/focus (always visible on touch, no hover to reveal
-// it), rotates 90° while open. CONTRACT: the consuming row must carry the (unscoped) `group`
-// class itself — `group-hover`/`group-focus-visible` below target it — and reserve this
-// component's `flex-none` slot in its trailing column (e.g. next to a count) so the row's layout
-// doesn't shift when the chevron is invisible.
+// invisible at rest, EASES IN over 150ms on row hover/focus (always visible on touch, no hover to
+// reveal it — the house signal language is calm/faded, never an instant snap, 2026-07-18: geo/
+// hyper's rows used to fade via `transition-opacity` while DisclosureRow's own chevron only had
+// `transition-transform`, so the extraction had briefly made the fade instant everywhere; both
+// opacity AND transform are now transitioned so the reveal eases in AND the open-rotation animates,
+// in every consumer), rotates 90° while open. CONTRACT: the consuming row must carry the
+// (unscoped) `group` class itself — `group-hover`/`group-focus-visible` below target it — and
+// reserve this component's `flex-none` slot in its trailing column (e.g. next to a count) so the
+// row's layout doesn't shift when the chevron is invisible.
 export function DisclosureChevron({ open }: { open: boolean }) {
   return (
     <ChevronRight
       aria-hidden
       className={cn(
-        "size-3.5 flex-none transition-transform duration-150 motion-reduce:transition-none text-muted-foreground opacity-0 group-hover:opacity-100 group-focus-visible:opacity-100 [@media(hover:none)]:opacity-100",
+        "size-3.5 flex-none transition-[opacity,transform] duration-150 motion-reduce:transition-none text-muted-foreground opacity-0 group-hover:opacity-100 group-focus-visible:opacity-100 [@media(hover:none)]:opacity-100",
         open && "rotate-90 opacity-100",
       )}
     />
