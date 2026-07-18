@@ -233,7 +233,6 @@ export class LedgerView implements SceneView {
     this._coreCol = new THREE.Color(colors.core);
     this.sceneColors = sceneColors;
     this.group = new THREE.Group();
-    this.group.visible = false;
     // Whole-view orientation (tilt ∘ rotY) + scale so the ledger frames well under the SHARED overview
     // camera — the camera never moves; the group does. Globe bakes the SAME matrix (Rx·Ry) into the
     // node ledger positions so planes + nodes stay aligned — set the quaternion from that exact matrix.

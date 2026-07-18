@@ -99,9 +99,10 @@ to break one, that's a design conversation, not a workaround.
 6. **Scene-view contract** (`src/engine/scene/views/sceneView.test.ts` +
    `src/engine/sceneViewContract.test.ts`) — the bespoke views (`HyperView`/`LedgerView`)
    `implement SceneView` (the type-level furniture build/teardown shape; `GeoView` exempt, its
-   alpha rides Globe's `geoFades`); scene modules never compare `Mode` strings; and Engine
+   alpha rides Globe's `geoFades`); scene modules never compare `Mode` strings; Engine
    framing math reads LAYOUT data, not rendered transforms (marker-gated `getWorldPosition`/
-   `getMatrixAt`). → *Per-view behaviour*.
+   `getMatrixAt`); and views never write their root group's `visible` — Engine/policy owns
+   root visibility, views own opacity/alpha. → *Per-view behaviour*.
 
 **Standing conventions (each detailed in its section):**
 
