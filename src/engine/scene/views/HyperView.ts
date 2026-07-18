@@ -13,6 +13,7 @@ import { armillaryFrame, ringFramePos, type RingFrame } from "../../domain/nodeL
 import { FocusSpot } from "../objects/FocusSpot";
 import { ORB_FRESNEL_GLSL, ORB_FRESNEL_MIX } from "../objects/NodeFabric";
 import type { SceneColors } from "../../sceneColors";
+import type { SceneView } from "./SceneView";
 
 const _pos = new THREE.Vector3(); // scratch for hub orbit positions (reused each frame)
 
@@ -102,7 +103,7 @@ export interface MetaHubRec {
   fills: THREE.Mesh[]; // soft radial fill disks under each ring (rim-weighted, fade to transparent)
 }
 
-export class HyperView {
+export class HyperView implements SceneView {
   scene: THREE.Scene;
   root: THREE.Group;
   pickables: THREE.Object3D[];

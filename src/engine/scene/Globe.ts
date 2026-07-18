@@ -24,6 +24,7 @@ import * as geoStats from "../domain/geoStats";
 import { R, LAND_H, CHIP_PITCH, HEX_H, VALIDATOR_HEX_R, META_HEX_R, latLonToVec3, vec3ToLatLon } from "../domain/geoLayout";
 import { armillaryFrame, ringFramePos, armillaryRings, armillaryPos, nodeRoles, spreadCoLocated } from "../domain/nodeLayout";
 import { surfFade, extrasFade } from "../domain/morph";
+import { dimScale } from "../domain/dimModel";
 import { ArcSim, type ArcEndpoint } from "../domain/arcSim";
 import type { MetaNodeRecord, ValidatorRecord } from "../domain/records";
 import { buildGeoView, setCountryBorder, setCountryFillMask, HOVER_MASK_BOOST, type GeoViewHost } from "./views/GeoView";
@@ -207,7 +208,7 @@ export class Globe implements GeoViewHost {
         morph: 0, hoverFilterActive: false, ledger: false, countryFilter: null,
         countryMix: 0, hoverNodeId: null, hoverCohort: null, selectedNodeId: null, filter: "all",
       },
-      dim: 0, dimScaleV: 0, dimScaleMetaV: 0, clock: 0, camN: this._camN, hasCam: false,
+      dim: 0, dimScaleV: 0, clock: 0, camN: this._camN, hasCam: false,
       ledgerT: 0, dt: 0, flashDecay: 0, group: this.group,
       transition: null,
       gather: { origin: new THREE.Vector3(), right: new THREE.Vector3(), up: new THREE.Vector3(), quat: new THREE.Quaternion(), cell: GATHER_CELL },
@@ -877,21 +878,6 @@ export class Globe implements GeoViewHost {
     this.group.worldToLocal(this._camN).normalize();
   }
 
-  // How strong the VALIDATOR network dim is, ramped by the morph. (The hover-preview
-  // forced-strong 0.85 branch is gone — user: the hub hover/click dim in hyper was far harder
-  // than the regular dim; previews now dim at the committed strength.)
-  private _dimScale(): number {
-    return 0.32 + 0.68 * this.morph;
-  }
-
-  // The METAGRAPH pool's own dim strength — ZERO in hyper (metagraph nodes REST at the dimmed
-  // look there, baked into writeMetaFrame's base size/glow; hover previews and committed
-  // filters leave them at rest), full on the globe. Mirrors domain/dimModel.metaDimScale —
-  // change BOTH (the tested reference spec, see dimModel's file header).
-  private _metaDimScale(): number {
-    return this.morph;
-  }
-
   // Write this frame's values into the persistent FrameCtx (`this._ctx`, built once in the
   // constructor) and return it — `camN`/`group` are the same persistent objects, so only the
   // scalars + the nested DimContext fields need updating (Task 15 allocation fix: this used to
@@ -913,8 +899,11 @@ export class Globe implements GeoViewHost {
     c.selectedNodeId = this._selectedNodeId;
     c.filter = this.filter;
     ctx.dim = this.dim;
-    ctx.dimScaleV = this._dimScale();
-    ctx.dimScaleMetaV = this._metaDimScale();
+    // domain/dimModel.dimScale(c) — the VALIDATOR morph-ramped dim strength; still read
+    // directly by NodeFabric.placeValidators' scale/visibility writes. (No metaDimScale
+    // counterpart here — the metagraph loop now calls metaNodeDim(c, ...) directly, the only
+    // consumer that strength ever had.)
+    ctx.dimScaleV = dimScale(c);
     ctx.clock = this.clock;
     ctx.hasCam = this._hasCam;
     ctx.ledgerT = this.ledgerT;

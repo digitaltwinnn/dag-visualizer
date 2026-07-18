@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { METAGRAPHS } from "../config";
-import { LEDGER, HYP_SPLIT, LAYER_GEOM, ledgerSite, clusterRadius, ledgerSpread } from "./ledgerLayout";
+import { LEDGER, HYP_SPLIT, LAYER_GEOM, ledgerSite, clusterRadius, ledgerSpread, DIAL_R } from "./ledgerLayout";
 
 describe("LAYER_GEOM", () => {
   it("covers each settlement layer exactly once", () => {
@@ -62,6 +62,17 @@ describe("clusterRadius", () => {
     expect(r20).toBeGreaterThan(r1);
     const laneGap = Math.abs(ledgerSite(1, METAGRAPHS.length).z - ledgerSite(0, METAGRAPHS.length).z);
     expect(clusterRadius(10_000)).toBeLessThanOrEqual(laneGap * 0.46 + 1e-9);
+  });
+});
+
+describe("DIAL_R (the one fixed station-dial radius)", () => {
+  it("matches the documented formula (0.38 of the lane gap)", () => {
+    const laneGap = Math.abs(ledgerSite(1, METAGRAPHS.length).z - ledgerSite(0, METAGRAPHS.length).z);
+    expect(DIAL_R).toBeCloseTo(laneGap * 0.38, 10);
+  });
+
+  it("sits outside clusterRadius's cap, so even a huge group's dots stay inside the dial", () => {
+    expect(clusterRadius(10_000)).toBeLessThan(DIAL_R);
   });
 });
 

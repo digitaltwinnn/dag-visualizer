@@ -35,6 +35,7 @@ import { LedgerModel, SLOT_SP, slotFade, curvePoint } from "../../domain/ledgerM
 import type { GlobalSnapshot, Anchor, PickDescriptor } from "@/src/data/types";
 import { LEDGER_LAYERS } from "@/src/data/ledgerLayers"; // shared display copy + ORDER — floor labels = panel rows
 import { FocusSpot } from "../objects/FocusSpot";
+import type { SceneView } from "./SceneView";
 
 // Floor plane geometry comes from the shared domain table (ledgerLayout.LAYER_GEOM): the FULL-WIDTH
 // floors are exactly its laneZ === 0 entries; the split hypergraph panes (hypl0/hypl1, laneZ ≠ 0)
@@ -141,7 +142,7 @@ interface QueueItem {
   dueAt: number;
 }
 
-export class LedgerView {
+export class LedgerView implements SceneView {
   group: THREE.Group;
   private _core: number;             // the structural accent (colors.core), as a number
   private _border: number;           // colors.border — the label-chip hairline/wash (the .role-chip pill)

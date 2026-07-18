@@ -1,5 +1,8 @@
 import { describe, it, expect } from "vitest";
-import { META_ORBIT, metaAnchor } from "./hyperLayout";
+import {
+  META_ORBIT, metaAnchor,
+  META_LAYERS, META_RING, DAG_L0, DAG_L1, HYPER_TILT, HYPER_TILT_FOCUS,
+} from "./hyperLayout";
 
 describe("metaAnchor", () => {
   it("is deterministic (same slot in, same anchor out)", () => {
@@ -25,5 +28,45 @@ describe("metaAnchor", () => {
     const { x, z, a, radius, incl } = metaAnchor(5, 10);
     expect(x).toBeCloseTo(Math.cos(a) * radius, 10);
     expect(z).toBeCloseTo(Math.sin(a) * radius * Math.cos(incl), 10);
+  });
+});
+
+describe("META_LAYERS / META_RING (the per-metagraph armillary atom)", () => {
+  it("lists exactly the three layers, inner→outer radius order (L0 < dL1 < cL1, like the DAG)", () => {
+    expect(META_LAYERS).toEqual(["l0", "dl1", "cl1"]);
+    expect(META_RING.radii.l0).toBeLessThan(META_RING.radii.dl1);
+    expect(META_RING.radii.dl1).toBeLessThan(META_RING.radii.cl1);
+  });
+
+  it("uses a shallow (near-flat) tilt shared by every ring", () => {
+    expect(META_RING.tilt).toBeGreaterThan(0);
+    expect(META_RING.tilt).toBeLessThan(Math.PI / 2);
+  });
+});
+
+describe("DAG_L0 / DAG_L1 (the core's own two shells)", () => {
+  it("keeps L1 (native $DAG currency) a clearly separated OUTER shell from L0", () => {
+    expect(DAG_L0.radius).toBeLessThan(DAG_L1.radius);
+  });
+
+  it("shares one tilt between the two core shells (they must read as one atom)", () => {
+    expect(DAG_L0.tilt).toBe(DAG_L1.tilt);
+  });
+
+  it("the core sits well clear of the metagraph hub orbit (META_ORBIT), so a hub never overlaps it", () => {
+    expect(DAG_L1.radius).toBeLessThan(META_ORBIT);
+  });
+});
+
+describe("HYPER_TILT / HYPER_TILT_FOCUS (the shared structure tilt)", () => {
+  it("both are valid, non-degenerate tilt angles (never edge-on/collapsed, never a right angle)", () => {
+    for (const t of [HYPER_TILT, HYPER_TILT_FOCUS]) {
+      expect(t).toBeGreaterThan(0);
+      expect(t).toBeLessThan(Math.PI / 2);
+    }
+  });
+
+  it("focusing a metagraph eases the structure MUCH flatter than the resting overview tilt", () => {
+    expect(HYPER_TILT_FOCUS).toBeLessThan(HYPER_TILT * 0.25);
   });
 });

@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import * as THREE from "three";
 import {
   ccToNumeric,
+  numericToCc,
   geometryRings,
   mainPolygonRings,
   ringsCentroid,
@@ -10,6 +11,11 @@ import {
   ringsToSegments,
   COUNTRY_VIEW_ELEV,
   countryLean,
+  GLOBE_LEAN_MAX,
+  ZENITH_CAP,
+  AIM_BELOW_CENTROID,
+  pointInRings,
+  countryCcAt,
   type Ring,
 } from "./countryShape";
 import { R, LAND_H, latLonToVec3 } from "./geoLayout";
@@ -35,6 +41,33 @@ describe("ccToNumeric", () => {
     expect(ccToNumeric("ZZ")).toBeNull();
     expect(ccToNumeric(null)).toBeNull();
     expect(ccToNumeric(undefined)).toBeNull();
+  });
+});
+
+describe("numericToCc", () => {
+  it("reverses ccToNumeric for the same country", () => {
+    expect(numericToCc(ccToNumeric("US")!)).toBe("US");
+    expect(numericToCc(ccToNumeric("DE")!)).toBe("DE");
+    expect(numericToCc(ccToNumeric("FI")!)).toBe("FI");
+  });
+  it("is null for an id absent from the topology join", () => {
+    expect(numericToCc("999999")).toBeNull();
+  });
+});
+
+describe("GLOBE_LEAN_MAX / ZENITH_CAP (countryLean's two regimes)", () => {
+  it("caps the lean at GLOBE_LEAN_MAX for latitudes not yet needing the zenith stretch", () => {
+    // need = |latAngle| - (ZENITH_CAP - COUNTRY_VIEW_ELEV) is negative here, so max(...) picks
+    // GLOBE_LEAN_MAX and the country sits GLOBE_LEAN_MAX back from its true latitude.
+    expect(countryLean(0.5)).toBeCloseTo(GLOBE_LEAN_MAX, 10);
+    expect(countryLean(-0.5)).toBeCloseTo(-GLOBE_LEAN_MAX, 10);
+  });
+  it("stretches beyond GLOBE_LEAN_MAX at high latitude so the residual elevation never crosses ZENITH_CAP", () => {
+    const lat = 1.5; // near the pole
+    const lean = countryLean(lat);
+    expect(lean).toBeGreaterThan(GLOBE_LEAN_MAX);
+    const e = lat - lean; // residual elevation post-lean
+    expect(e + COUNTRY_VIEW_ELEV).toBeCloseTo(ZENITH_CAP, 10); // the camera stays on the front side of the zenith
   });
 });
 
@@ -154,6 +187,54 @@ describe("countryFraming", () => {
     countryFraming(0.5, 0.3, out);
     expect(out.pos).toBe(pos);
     expect(out.target).toBe(target);
+  });
+
+  it("AIM_BELOW_CENTROID is the exact near-end aim-drop bias (t=0 at the distance floor)", () => {
+    // At the distance floor (D=3.9, angularRadius tiny) t = (D-3.9)/14.6 = 0, so the lerp in
+    // countryFraming picks AIM_BELOW_CENTROID exactly — hand-computed target from the formula.
+    const lat = 0.9;
+    countryFraming(lat, 0.02, out);
+    const c = C(lat);
+    const e = lat - countryLean(lat);
+    const D = 3.9;
+    const drop = Math.tan(AIM_BELOW_CENTROID) * D;
+    expect(out.target.y).toBeCloseTo(c.y - Math.cos(e) * drop, 9);
+    expect(out.target.z).toBeCloseTo(c.z + Math.sin(e) * drop, 9);
+  });
+});
+
+describe("pointInRings (even-odd inside/outside test)", () => {
+  it("is true at the centre of a ring and false far outside it", () => {
+    const ring = square(10, 20, 2);
+    expect(pointInRings(10, 20, [ring])).toBe(true);
+    expect(pointInRings(50, 50, [ring])).toBe(false);
+  });
+
+  it("handles a ring straddling the antimeridian without a global unwrap", () => {
+    const ring = square(0, 180, 3); // lon 177..183
+    expect(pointInRings(0, 179, [ring])).toBe(true);
+    expect(pointInRings(0, -179, [ring])).toBe(true); // -179 == 181, still inside
+    expect(pointInRings(0, 170, [ring])).toBe(false); // just west of the ring, same side of the seam
+  });
+});
+
+describe("countryCcAt", () => {
+  const ring = square(10, 20, 2);
+  const geoms: [string, { type: string; coordinates: unknown }][] = [
+    [ccToNumeric("US")!, { type: "Polygon", coordinates: [ring] }],
+  ];
+
+  it("resolves a lat/lon inside a geometry to its alpha-2 code", () => {
+    expect(countryCcAt(10, 20, geoms)).toBe("US");
+  });
+
+  it("returns null outside every geometry", () => {
+    expect(countryCcAt(50, 50, geoms)).toBeNull();
+  });
+
+  it("respects the eligible() gate (an ineligible country reads as no hit)", () => {
+    expect(countryCcAt(10, 20, geoms, (cc) => cc !== "US")).toBeNull();
+    expect(countryCcAt(10, 20, geoms, (cc) => cc === "US")).toBe("US");
   });
 });
 
