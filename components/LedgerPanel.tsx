@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 import CardHead from "@/components/CardHead";
 import { Card } from "@/components/ui/card";
@@ -189,6 +190,13 @@ export default function LedgerPanel() {
   // other explorers' cohort/composition groups. Keyed `floorId|metaId` so a stale key after a
   // filter/floor switch simply matches nothing.
   const [openCluster, setOpenCluster] = useState<string | null>(null);
+  // Which NODE floor is disclosed — mirrors `sel` (store.layer) but kept as its own fast local
+  // state so the first click opens the dropdown in the SAME frame it commits, instead of
+  // waiting a render for the store round-trip (that lag read as "closed" on the first click —
+  // the reported bug). `open` below is `on || openFloor === l.id`: whichever arrives first
+  // (the synchronous local set or the store's `on`) already renders open, and a floor committed
+  // from elsewhere (a 3D plane click, autoLayerForNode) is open purely via `on`, no extra wiring.
+  const [openFloor, setOpenFloor] = useState<string | null>(null);
 
   // The selected node, matched by IP **and** layer — copies GeoExplore's selIp/selLayer: one
   // machine can sit in both an L0 and L1 cluster (same IP, two rows).
@@ -198,9 +206,16 @@ export default function LedgerPanel() {
   const selLayer = selNode ? (selNode.kind === "metanode" ? selNode.node?.layer ?? null : selNode.kind) : null;
 
   // Rows run the SAME tested toggle as the scene's floor-plane click, through the shared
-  // executor — the panel and the 3D planes can't drift (see domain/pickActions).
-  const commit = (l: (typeof LAYERS)[number]) =>
+  // executor — the panel and the 3D planes can't drift (see domain/pickActions). `openFloor`
+  // is set in the SAME call, synchronously, so the disclosure never lags the commit by a
+  // render: clicking an uncommitted node floor opens it, re-clicking the committed/open one
+  // clears + closes it (symmetric with the existing commit/clear toggle), and clicking any
+  // OTHER floor (node or snapshot) closes whatever was open — a single rule covers all three.
+  const commit = (l: (typeof LAYERS)[number]) => {
+    const wasOn = sel === l.id;
     applyClickActions(layerToggleActions({ kind: "layer", layerId: l.id }, sel));
+    setOpenFloor(NODE_FLOORS.has(l.id) && !wasOn ? l.id : null);
+  };
   // A node row's click runs the full-ancestry table with THIS floor as the ledger layer rung
   // (nodeSelectActions' ledgerLayerId) — so a browsed node commits the floor it was found on,
   // not whatever autoLayerForNode would guess.
@@ -239,6 +254,29 @@ export default function LedgerPanel() {
               const pair = subjectPairing<string>(hilite, l.id, setHilite, filterAccent(filter));
               const discloses = NODE_FLOORS.has(l.id);
               const rows = discloses ? rowsForFloor(l.id, selNodes) : [];
+              // Hoisted OUT of the disclosure body (was computed only when `on`) so the floor
+              // row's own header can show an honest trailing count AT REST, before anything is
+              // clicked — the same data the opened dropdown lists, never a second, disagreeing
+              // number.
+              const isMetaFloor = discloses && CLUSTER_FLOORS.has(l.id); // ml0/ml1
+              const clusters = isMetaFloor ? clustersOf(rows) : [];
+              const showValidatorRows = discloses && !isMetaFloor && !committedMeta; // hypl0/hypl1 under "all"/"dag"
+              const lanes: LaneMeta[] = !discloses
+                ? []
+                : isMetaFloor
+                  ? laneMetagraphsFor(l.id as "ml0" | "ml1")
+                  : committedMeta
+                    ? [dagLane(l.id as "hypl0" | "hypl1")]
+                    : [];
+              // The dropdown's total: its own rows plus every lane row's own count — literally
+              // everything the opened list will render, so the resting number can never disagree
+              // with what appears once it's open.
+              const floorCount = rows.length + lanes.reduce((sum, x) => sum + x.count, 0);
+              const hasContentAbove = clusters.length > 0 || (showValidatorRows && rows.length > 0);
+              // Open iff committed (as before) OR this panel just opened it locally — see
+              // `commit`'s comment. A floor committed from elsewhere (a 3D plane click,
+              // autoLayerForNode) is open purely via `on`, no extra plumbing needed.
+              const open = discloses && (on || openFloor === l.id);
               return (
                 <div key={l.id}>
                 <button
@@ -250,12 +288,13 @@ export default function LedgerPanel() {
                   onBlur={pair.onMouseLeave}
                   aria-pressed={on}
                   className={cn(
-                    // `relative pr-7` reserves the shared trailing ✓ slot so the text never shifts
-                    // when a layer is selected — the SAME committed-selection language as the filter
-                    // picker's row (SELECTED_ROW: wash + inset ring as one box-shadow + Check mark).
                     // `nb-row border border-transparent` hosts the pairing wash (box-shadow-based
-                    // SELECTED_ROW composes under it, same as the geo node rows).
-                    "nb-row relative text-left border border-transparent cursor-pointer rounded-sm pl-1.5 pr-7 py-1.5 bg-transparent transition-[background] duration-150",
+                    // SELECTED_ROW composes under it, same as the geo node rows). The trailing
+                    // mark now lives IN-FLOW at the end of the title row (below) — same idiom as
+                    // the inner cluster/lane rows' `ml-auto` count — instead of an absolutely
+                    // positioned overlay, so it can never overlap the badge/name text and every
+                    // row's trailing column is built the same way.
+                    "nb-row relative text-left border border-transparent cursor-pointer rounded-sm pl-1.5 pr-2 py-1.5 bg-transparent transition-[background] duration-150",
                     "hover:bg-wash-hover",
                     "focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--primary)] focus-visible:outline-offset-[-2px]",
                     on && SELECTED_ROW,
@@ -265,7 +304,13 @@ export default function LedgerPanel() {
                 >
                   {/* The layer's STACK-LEVEL badge (LEDGER_LAYERS.level — up from the base:
                       Global snapshots = 1, the split hypergraph plane = sub-levels 2.1/2.2),
-                      mirrored by the 3D floor labels so panel row and plane pair at a glance. */}
+                      mirrored by the 3D floor labels so panel row and plane pair at a glance.
+                      The trailing slot mirrors DisclosureRow's: node-kind floors get their honest
+                      count (the same total the opened dropdown lists — see `floorCount` above)
+                      plus a ChevronRight (identical size/muted colour/rotate-on-open, copied from
+                      components/ExploreRows.tsx) that flips to the committed ✓ once `on`;
+                      snapshot floors (msnap/gl0) render neither — the slot just collapses, no
+                      reserved gap, since there's nothing to disclose. */}
                   <span className="flex items-center gap-2 min-w-0">
                     <span
                       aria-hidden
@@ -278,35 +323,38 @@ export default function LedgerPanel() {
                     >
                       {l.level}
                     </span>
-                    <span className={cn("block text-body text-foreground", on && "font-semibold")}>{l.name}</span>
+                    <span className={cn("flex-1 min-w-0 truncate text-body text-foreground", on && "font-semibold")}>
+                      {l.name}
+                    </span>
+                    {discloses ? (
+                      <span className="flex-none flex items-center gap-1.5">
+                        <span className="tabular-nums text-label font-semibold text-muted-foreground">{floorCount}</span>
+                        {on ? (
+                          <SelectedRowMark />
+                        ) : (
+                          <ChevronRight
+                            aria-hidden
+                            className={cn(
+                              "size-3.5 flex-none transition-transform duration-150 motion-reduce:transition-none text-muted-foreground",
+                              open && "rotate-90",
+                            )}
+                          />
+                        )}
+                      </span>
+                    ) : (
+                      // Snapshot floors (msnap/gl0) never disclose — no count, no chevron — but
+                      // still wear the committed ✓ like any other selectable row.
+                      on && <SelectedRowMark className="flex-none" />
+                    )}
                   </span>
                   <span className="block pl-[26px] text-label text-muted-foreground leading-snug mt-0.5">{l.desc}</span>
-                  {/* top-[8px] centres the 14px check on the SAME line as the 18px level badge
-                      (row pad 6 + 18/2 = 15px centre; 8 + 14/2 = 15). */}
-                  {on && <SelectedRowMark className="absolute right-2 top-[8px]" />}
                 </button>
 
-                {/* Node browser disclosure — one per NODE floor, committed row auto-opens (the
-                    country-row idiom: the layer button's click already commits AND opens/closes
-                    this, no separate expand state). Leaving the list clears the scene hover-glows. */}
-                {discloses && on && (() => {
-                  const isMetaFloor = CLUSTER_FLOORS.has(l.id); // ml0/ml1
-                  // (a) the committed filter's actual cluster/node rows, where it serves this
-                  // floor — unchanged from before this task.
-                  const clusters = isMetaFloor ? clustersOf(rows) : [];
-                  const showValidatorRows = !isMetaFloor && !committedMeta; // hypl0/hypl1 under "all"/"dag"
-                  // (b) one lane row per OTHER network that serves this floor — the browser's
-                  // network level IS the filter (HyperExplore idiom): metagraph floors always
-                  // list every other metagraph; DAG floors get the DAG's own lane, but only once
-                  // a metagraph is actually committed (under "all"/"dag" the real validator rows
-                  // above already occupy the floor).
-                  const lanes: LaneMeta[] = isMetaFloor
-                    ? laneMetagraphsFor(l.id as "ml0" | "ml1")
-                    : committedMeta
-                      ? [dagLane(l.id as "hypl0" | "hypl1")]
-                      : [];
-                  const hasContentAbove = clusters.length > 0 || (showValidatorRows && rows.length > 0);
-                  return (
+                {/* Node browser disclosure — one per NODE floor. `open` decouples the dropdown's
+                    visibility from the commit's store round-trip (see `commit`'s + `open`'s
+                    comments above) so the first click reveals it in the same frame it commits.
+                    Leaving the list clears the scene hover-glows. */}
+                {discloses && open && (
                   <div
                     className="mb-1.5 ml-[9px] py-0.5 pl-3 border-l border-border"
                     onMouseLeave={() => {
@@ -400,8 +448,7 @@ export default function LedgerPanel() {
                       </>
                     )}
                   </div>
-                  );
-                })()}
+                )}
                 </div>
               );
             })}
