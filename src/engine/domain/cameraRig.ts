@@ -92,10 +92,6 @@ export function closeness(altitude: number): number {
 const _out = new THREE.Vector3();
 const _side = new THREE.Vector3();
 const _up = new THREE.Vector3(0, 1, 0);
-const _d = new THREE.Vector3(); // hyperFocusFraming: hub radial
-const _f0 = new THREE.Vector3(); //  "  view direction
-const _r0 = new THREE.Vector3(); //  "  screen-right
-const _u0 = new THREE.Vector3(); //  "  screen-up
 
 // Hypergraph metagraph-hub framing (Engine.ts:699-707 `_focusFilter` verbatim): camera pulled
 // back along the hub's outward radial, offset sideways and lifted, looking at the hub itself.
@@ -109,48 +105,6 @@ export function hubFraming(hubLocalPos: THREE.Vector3, out: CameraFraming): void
     .addScaledVector(_side, -6)
     .addScaledVector(_up, 5.5);
   out.target.copy(hubLocalPos);
-}
-
-// Focused-metagraph pose (the CURRENT hyper hub focus): read as WIDE, HORIZONTAL discs AND pin the
-// global hypergraph (the DAG core at the world origin) to a CONSISTENT corner of the frame — the same
-// place for every metagraph (user: a consistent look). This needs a custom camera ROLL, so the pose
-// carries its own `up` (the Engine tweens camera.up to it; OrbitControls' per-frame lookAt reads it).
-//   • up = the ring normal `n` → the disc always foreshortens vertically → its major axis stays
-//     horizontal at ANY spin, regardless of the view direction.
-//   • Position: behind the hub along the radial `d` (away from the core, so the core sits BEHIND) and
-//     lifted along `n` above the ring plane (oblique → the disc is a flat wide ellipse, ratio ≈
-//     HF_UP/√(HF_BACK²+HF_UP²)). Because the whole offset is expressed in the camera's own screen
-//     axes (r0,u0), the core lands at a FIXED screen offset (−right, +up) for every hub slot → the
-//     same corner every time.
-// `planeNormal` = root.rotation·+Y. Target is the subject → CAM_ZOOM dolly applies normally.
-const HF_BACK = 12; // pull behind the hub along the radial (away from the core) — closer = more zoom (user)
-const HF_UP = 6.5; //  lift above the ring plane (sets disc flatness; ratio to HF_BACK kept)
-const HF_OR = 14; //   in-screen shift that drops the core to one side (LEFT) — larger = nearer the corner
-const HF_OU = 6; //    in-screen shift that lifts the core (TOP), on top of the natural above-plane lift
-export function hyperFocusFraming(hubWorld: THREE.Vector3, planeNormal: THREE.Vector3, out: CameraFraming): void {
-  _out.copy(planeNormal).normalize(); // n
-  _d.copy(hubWorld);
-  if (_d.lengthSq() < 1e-6) _d.set(0, 0, 1);
-  _d.normalize(); // radial: core → hub
-  // view direction toward the hub from "behind + above": f0 = −(HF_BACK·d + HF_UP·n), normalized
-  _f0.copy(_d).multiplyScalar(-HF_BACK).addScaledVector(_out, -HF_UP).normalize();
-  _r0.crossVectors(_f0, _out).normalize(); // screen-right (⟂ n → disc major axis horizontal)
-  _u0.crossVectors(_r0, _f0).normalize(); //  screen-up
-  if (_u0.dot(_out) < 0) {
-    _r0.negate();
-    _u0.negate();
-  } // orient so +u0 is the up (n) side
-  out.pos
-    .copy(hubWorld)
-    .addScaledVector(_d, HF_BACK)
-    .addScaledVector(_out, HF_UP)
-    // Parallax: the core is FARTHER than the target, so it shifts WITH the camera — shift the camera
-    // screen-LEFT and slightly screen-UP to drop the core into the frame's top-left. (The in-plane
-    // "horizon" effect already lifts the distant core; the up-nudge just firms the corner.)
-    .addScaledVector(_r0, -HF_OR)
-    .addScaledVector(_u0, HF_OU);
-  out.target.copy(hubWorld);
-  // The camera ROLL (up = this ring normal) is applied by the Engine — it reads planeNormal directly.
 }
 
 // FALLBACK country framing (concentration-based) — used ONLY while the countries topology

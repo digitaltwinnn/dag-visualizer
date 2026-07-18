@@ -20,7 +20,7 @@ export function gatherSlots(groups: { id: string; count: number }[]): Map<string
   // First pass: each group's grid dims + the packed row's total width (in cells).
   const dims = live.map((g) => {
     const cols = Math.ceil(Math.sqrt(g.count));
-    return { g, cols, rows: Math.ceil(g.count / cols) };
+    return { g, cols };
   });
   const totalW = dims.reduce((w, d) => w + d.cols, 0) + GATHER_GUTTER * Math.max(0, dims.length - 1);
   // Second pass: slots, packed left→right starting at -totalW/2.

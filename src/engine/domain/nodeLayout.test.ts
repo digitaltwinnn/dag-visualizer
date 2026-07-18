@@ -3,7 +3,7 @@ import * as THREE from "three";
 import {
   GOLDEN_ANGLE, lerp, smooth, smoother, discFall, fibShellPos, spreadCoLocated,
   stackSizes, STACK_MIN, STACK_MAX,
-  armillaryFrame, ringFramePos, armillaryRings, armillaryPos,
+  armillaryFrame, ringFramePos, ringNormal, armillaryRings, armillaryPos,
   nodeRoles, hexCell,
 } from "./nodeLayout";
 
@@ -270,6 +270,17 @@ describe("hexCell (axial hex spiral)", () => {
     expect(Math.hypot(...Object.values(hexCell(1)) as [number, number])).toBeCloseTo(1, 9); // ring 1 corner
     expect(Math.hypot(...Object.values(hexCell(7)) as [number, number])).toBeCloseTo(2, 9); // ring 2 corner
     expect(Math.hypot(...Object.values(hexCell(19)) as [number, number])).toBeCloseTo(3, 9); // ring 3 corner
+  });
+});
+
+describe("ringNormal", () => {
+  it("returns the unit normal of the t×b plane, orthogonal to both", () => {
+    const frame = { t: new THREE.Vector3(1, 0, 0), b: new THREE.Vector3(0, 0, -1) };
+    const out = ringNormal(frame, new THREE.Vector3());
+    expect(out.y).toBeCloseTo(1); // right-handed: x × (−z) = +y
+    expect(out.length()).toBeCloseTo(1);
+    expect(out.dot(frame.t)).toBeCloseTo(0);
+    expect(out.dot(frame.b)).toBeCloseTo(0);
   });
 });
 

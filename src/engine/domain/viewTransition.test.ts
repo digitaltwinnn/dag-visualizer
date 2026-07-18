@@ -178,6 +178,45 @@ describe("staging (the 'soon'-view parked state)", () => {
   });
 });
 
+describe("holdCamera (OUT-phase camera gate, spec A#6)", () => {
+  it("is false settled, true through OUT, false again once the boundary flips to IN", () => {
+    const tr = settled("hyper");
+    expect(tr.holdCamera()).toBe(false);
+    tr.start("hyper", "geo");
+    expect(tr.holdCamera()).toBe(true);
+    expect(tr.tick(DUR_OUT)).toBe(true); // boundary — tick() flips phase to "in" before returning
+    expect(tr.holdCamera()).toBe(false);
+    tr.tick(DUR_IN);
+    expect(tr.phase).toBe("idle");
+    expect(tr.holdCamera()).toBe(false);
+  });
+
+  it("holds through a parked gather too (stage()) and releases once instantly parked", () => {
+    const tr = settled("hyper");
+    tr.stage("hyper");
+    expect(tr.holdCamera()).toBe(true); // out phase, gathering toward the grids
+    expect(tr.tick(DUR_OUT)).toBe(false); // parks — no boundary
+    expect(tr.phase).toBe("staged");
+    expect(tr.holdCamera()).toBe(false); // parked isn't "out" — nothing left to hold against
+  });
+
+  it("stageInstant() (flat-view boot) never holds — there was no teardown to hide", () => {
+    const tr = new ViewTransition();
+    tr.stageInstant();
+    expect(tr.holdCamera()).toBe(false);
+  });
+
+  it("stage() re-entering from IN drops back into out, so the hold resumes", () => {
+    const tr = settled("hyper");
+    tr.start("hyper", "geo");
+    tr.tick(DUR_OUT); // boundary → in
+    expect(tr.holdCamera()).toBe(false);
+    tr.stage("geo"); // re-gather with no destination
+    expect(tr.phase).toBe("out");
+    expect(tr.holdCamera()).toBe(true);
+  });
+});
+
 describe("retargeting", () => {
   it("mid-OUT to a new destination just swaps `to` (gather continues uninterrupted)", () => {
     const tr = settled("hyper");
