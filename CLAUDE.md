@@ -62,7 +62,7 @@ placeholder views are untouched by any of this — `SceneCanvas` just cross-fade
 
 ## The rules — invariants that hold in every change
 
-The application is governed by a small set of architectural rules. THREE ARE EXECUTABLE —
+The application is governed by a small set of architectural rules. SIX ARE EXECUTABLE —
 `npm test` fails when they're violated — the rest are standing conventions detailed in their
 own sections below. Check any change against this list before committing; when a change wants
 to break one, that's a design conversation, not a workaround.
@@ -82,29 +82,42 @@ to break one, that's a design conversation, not a workaround.
    so read-only facts cards cost nothing. New click/select semantics = a table builder + a
    test + (if a new action kind) its executor effect. → *the `pickActions.ts` bullet*.
 3. **One colour source** (`src/engine/noHardcodedColors.test.ts`) — `app/globals.css` tokens
-   are canonical; the scene reads them at boot via `readSceneColors()`; no raw hex in
-   `scene/` outside the documented allowlist. Two lanes never mix: structural cyan = the sole
-   accent/affordance; identity hues (deterministic, `src/palette/`) appear only on subject
-   marks, matched by metagraph id everywhere. → *The design system → Two colour lanes*.
+   are canonical; the scene reads them at boot via `readSceneColors()`; no raw hex in `scene/`
+   **or `components/`** outside the documented allowlist. Two lanes never mix: structural cyan =
+   the sole accent/affordance; identity hues (deterministic, `src/palette/`) appear only on
+   subject marks, matched by metagraph id everywhere. → *The design system → Two colour lanes*.
+4. **Domain-export coverage** (`src/engine/domainExportCoverage.test.ts`) — every VALUE export
+   of a `domain/` module is referenced by its sibling `*.test.ts`; the executable form of "new
+   domain behaviour lands WITH a colocated test" (type-only exports are skipped). → *Engine
+   layer rules & render-loop discipline*.
+5. **Zero-allocation render loop** (`src/engine/noFrameAllocations.test.ts`) — per-frame method
+   bodies in `scene/` (`update`/`write*`/`place*`/`_apply*`/`setMorph`/`updateRotation`) carry
+   no `new THREE.*`/`.clone()` unless the line marks it `event-time`. The fuller convention —
+   every instanced slot written or zero-scaled each frame, sims emitting ring-buffer events
+   their owning adapter drains (no cross-view mutation) — is the standing discipline the test
+   backstops. → *Engine layer rules & render-loop discipline*.
+6. **Scene-view contract** (`src/engine/scene/views/sceneView.test.ts` +
+   `src/engine/sceneViewContract.test.ts`) — the bespoke views (`HyperView`/`LedgerView`)
+   `implement SceneView` (the type-level furniture build/teardown shape; `GeoView` exempt, its
+   alpha rides Globe's `geoFades`); scene modules never compare `Mode` strings; and Engine
+   framing math reads LAYOUT data, not rendered transforms (marker-gated `getWorldPosition`/
+   `getMatrixAt`). → *Per-view behaviour*.
 
 **Standing conventions (each detailed in its section):**
 
-4. **Per-view behaviour is an allow-list** — `domain/viewPolicy.ts` has one row per `Mode`;
+7. **Per-view behaviour is an allow-list** — `domain/viewPolicy.ts` has one row per `Mode`;
    a new view is inert until its row opts in; never `mode === "x"` guards, never deny-lists.
-5. **One home per concern** — the camera lives in `domain/cameraRig.ts` (presets, framings,
+8. **One home per concern** — the camera lives in `domain/cameraRig.ts` (presets, framings,
    the global `CAM_ZOOM` dolly + its documented exemption rule), country-shape math in
    `domain/countryShape.ts`, click semantics in `domain/pickActions.ts`. Don't grow a second
    copy of any of these in the Engine or a component.
-6. **Zero-allocation render loop** — per-frame code reuses construction-time scratch; every
-   instanced slot is written or zero-scaled each frame; sims emit ring-buffer events their
-   owning adapter drains (no cross-view mutation). Event-driven allocation is fine — comment it.
-7. **The scene↔HUD hover pairing is sacrosanct** — the shared store channels (`hoverFilter`,
+9. **The scene↔HUD hover pairing is sacrosanct** — the shared store channels (`hoverFilter`,
    `hoverNodeId`, `hoverSnapOrd`, `hoverCountry`, `ledgerHilite`) + `.subject-paired` +
    the marker classes survive every refactor; hovers PREVIEW, never commit.
-8. **Honesty over decoration** — every visual quantity comes from live data; absent data is
+10. **Honesty over decoration** — every visual quantity comes from live data; absent data is
    an instrument state (NO SIGNAL / acquiring / standby), never a fabricated number; floors
    are labelled floors (`~`, `FLOOR`); don't "fix" honest gaps.
-9. **Design tokens first** — the HUD type scale + structural tokens for all styling; an
+11. **Design tokens first** — the HUD type scale + structural tokens for all styling; an
    arbitrary value only for a documented one-off; new `text-*`/`rounded-*`/`tracking-*`
    tokens must be registered in `lib/utils.ts` (twMerge). `/design` is the TOKEN REFERENCE
    (colour lanes + type scale, read live from the tokens/palette — accurate by construction);
@@ -281,9 +294,12 @@ store-value imports**, enforced by `layerBoundaries.test.ts`). Each ships coloca
   branch; `HyperView._makeHoop` draws its cyan hoops from the SAME `ringFramePos` curve so
   nodes and hoops can never drift), the sphere→disc geo positions, `spreadCoLocated()`
   honeycomb chip-stack fan-out.
-- `dimModel.ts` — pure filter/hover/country dim + emissive resolution; a tested reference spec
-  the scene layer currently reimplements inline (`NodeFabric`'s glow writers, `Globe._dimScale`/
-  `_applyDim`) rather than calling. The DAG core dims as ONE value (the old per-layer `{l0,l1}`
+- `dimModel.ts` — pure filter/hover/country dim + emissive resolution, and the SINGLE SOURCE of
+  that math: the scene CALLS these functions directly (`NodeFabric`'s glow writers call
+  `validatorDim`/`nodeEmissive` + `metaNodeDim`/`metaNodeEmissive`/`hubMatchBoost`; `Globe._frameCtx`
+  sources its dim strengths from `dimScale`/`metaDimScale`) — the old inline mirror ("change BOTH
+  places") is RETIRED (2026-07-18; it drifted twice), and the colocated tests are its executable
+  spec. The DAG core dims as ONE value (the old per-layer `{l0,l1}`
   pair always moved in lockstep and was collapsed, 2026-07-09); node glow is STEADY (the
   decorative twinkle shimmer was removed, user) with PER-POOL resting bases — validators
   `lerp(0.47, 0.37, morph)`, metagraph nodes `lerp(0.33, 0.37, morph)` (they rest at the dim
@@ -1142,7 +1158,7 @@ event, `ledger.update(dt)` per frame).
   `LEDGER.dagCell` disc is gone).
 - **Metagraph filter dims the OTHER lanes** (`ledger.setFilter`, wired alongside
   `globe.setFilter`): the selected lane keeps full colour; other metagraphs' tiles/links/dials
-  are strongly dimmed (×0.22) and their nodes too (the morph-ramped `_dimScale` is too weak in
+  are strongly dimmed (×0.22) and their nodes too (the morph-ramped `dimScale` is too weak in
   ledger, so it's forced), and only the selected metagraph emits pulses (so only ITS dials
   light).
 - **Slot model + history seed:** every new tick all chains advance one slot left; tiles
