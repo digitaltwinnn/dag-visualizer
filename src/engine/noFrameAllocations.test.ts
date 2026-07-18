@@ -7,6 +7,10 @@ import { join } from "node:path";
 // of per-frame methods in scene/ + Engine.ts and flag `new THREE.*` / `.clone()` on any line
 // lacking an `event-time` marker (the escape hatch for genuine event-driven allocation inside a
 // branch). Heuristic — the markers ARE the documentation of every intentional allocation.
+// The regex's known holes (object/array literals, un-namespaced constructors) are DELIBERATE
+// (Plan 2 Task 9 triage): the scene imports THREE as a namespace everywhere (an un-namespaced
+// `new Vector3()` would need an import-style change layerBoundaries.test.ts flags), and
+// object-literal detection is too noisy for a grep gate.
 const HERE = import.meta.dirname;
 const SCENE = join(HERE, "scene");
 // Engine.ts's render-loop phase methods (Task 7, spec C#1) join the scan: the loop closure used

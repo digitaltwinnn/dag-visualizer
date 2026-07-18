@@ -18,11 +18,6 @@ import { join } from "node:path";
 // a clean `var(--…)` equivalent existed; the rest are genuine one-offs, documented in the allowlists
 // below.) Per-directory allowlists prevent accidental cross-layer leakage: a components-only colour
 // (e.g. 0x141a2e, TopBar gradient) must not silently validate a scene file containing the same hex.
-//
-// NOTE: the allocation gate's regex holes (object/array literals, un-namespaced constructors) are
-// left as-is — the scene imports THREE as a namespace everywhere (un-namespaced `new Vector3()` would
-// require an import-style change that layerBoundaries.test.ts would flag), and object-literal detection
-// is too noisy for a grep gate. Intent is already documented via the `// event-time` marker system.
 
 const ENGINE_DIR = join(import.meta.dirname, ".");
 const COMPONENTS_DIR = join(import.meta.dirname, "..", "..", "components");
