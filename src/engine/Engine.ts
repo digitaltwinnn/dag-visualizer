@@ -21,6 +21,7 @@ import { countryFraming } from "./domain/countryShape";
 import { R as GEO_R, LAND_H } from "./domain/geoLayout";
 import { autoLayerForNode, clickActions, pickActive } from "./domain/pickActions";
 import { ViewTransition, type View3D } from "./domain/viewTransition";
+import type { CohortSel } from "./domain/focusLadder";
 import type { GlobalSnapshot, PickDescriptor } from "@/src/data/types";
 import type { ClusterNode, DagCore, GeoMap, RouteMetagraph } from "@/src/data/types";
 
@@ -84,6 +85,10 @@ export class Engine {
   private filter = "all";
   private _hoverFilter: string | null = null; // previewed filter (chip/hub hover); drives the core dim
   private country: string | null = null;
+  // Committed cohort (city×provider) selection, mirrored from the store — read by
+  // `_handleClick`'s `clickActions` call (kept in sync by the subscription below; Task 3 also
+  // reads it for camera resolution).
+  private cohortSel: CohortSel | null = null;
   private morph = 0; // 0 = hypergraph, 1 = globe (eased each frame)
   // A persistent tween record (never re-allocated per focus) — `active` replaces the old
   // null-the-object pattern; `_tweenTo` copies into these four vectors instead of `.clone()`ing.
@@ -246,6 +251,7 @@ export class Engine {
     const s = useStore.getState();
     this.mode = s.mode;
     this.filter = s.filter;
+    this.cohortSel = s.cohort;
     this._layerCommitted = s.layer != null; // seed — subscription only sees CHANGES (HMR remount)
     // Booting straight into geo (deep link / persisted view): seed morph=1 so the boot layout
     // is the globe from the first frame.
@@ -278,6 +284,9 @@ export class Engine {
           this.globe.setCountry(st.country);
           this._applyGeoFocus();
         }
+        // Keep the mirrored cohort field in sync so `_handleClick`'s clickActions call never
+        // reads stale state (Task 3 grows this into the cohort camera resolution).
+        if (st.cohort !== prev.cohort) this.cohortSel = st.cohort;
         // The selected node card (geo or hyper) keeps that node's layer shells lit on the globe.
         if (st.inspect !== prev.inspect) this.globe.setSelectedNode(this._pickNodeId(st.inspect));
         // Geo: clicking a node (on the globe or in the left explorer both set `inspect`)
@@ -941,6 +950,7 @@ export class Engine {
           country: st.country,
           hasInspect: !!st.inspect,
           layerId: st.layer?.layerId ?? null,
+          cohort: this.cohortSel,
         },
       }),
     );

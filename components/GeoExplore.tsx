@@ -28,6 +28,7 @@ import type { NodeRow } from "@/src/data/types";
 export default function GeoExplore() {
   const lb = useStore((s) => s.leaderboard);
   const country = useStore((s) => s.country);
+  const cohort = useStore((s) => s.cohort); // read-only — the selection WRITE still goes through applyClickActions
   const selNodes = useStore((s) => s.selNodes);
   const inspect = useStore((s) => s.inspect);
   const setHoverNodeId = useStore((s) => s.setHoverNodeId);
@@ -67,7 +68,7 @@ export default function GeoExplore() {
   // accordion's "which row is open", so the globe and the list stay one source of truth. Same
   // tested table as the scene's empty-click country toggle (zoom-level rule included).
   const drill = (cc: string) =>
-    applyClickActions(countryToggleActions(cc, { country, hasInspect: !!sel }));
+    applyClickActions(countryToggleActions(cc, { country, hasInspect: !!sel, cohort }));
 
   // Selection's nodes grouped by country **name** — the join key both the leaderboard and the
   // node list derive from `geo.country` (`cc` can be absent, the name can't). Each country's
