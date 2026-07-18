@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import { ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 import ExplorerShell from "@/components/ExplorerShell";
 import { SELECTED_ROW, SelectedRowMark } from "@/components/selection";
@@ -13,7 +12,7 @@ import { hoverKeyOf } from "@/src/data/hoverSubject";
 import { useStore } from "@/src/store/store";
 import { filterToggleActions, layerToggleActions, nodeSelectActions } from "@/src/engine/domain/pickActions";
 import { applyClickActions } from "@/src/store/applyClickActions";
-import { DisclosureRow, NodePickerRow } from "@/components/ExploreRows";
+import { DisclosureChevron, DisclosureRow, NodePickerRow } from "@/components/ExploreRows";
 import { LEDGER_LAYERS } from "@/src/data/ledgerLayers";
 import type { MetaInfo, NodeRow } from "@/src/data/types";
 
@@ -306,7 +305,7 @@ export default function LedgerPanel() {
                     // the inner cluster/lane rows' `ml-auto` count — instead of an absolutely
                     // positioned overlay, so it can never overlap the badge/name text and every
                     // row's trailing column is built the same way.
-                    "nb-row relative text-left border border-transparent cursor-pointer rounded-sm pl-1.5 pr-2 py-1.5 bg-transparent transition-[background] duration-150",
+                    "nb-row group relative text-left border border-transparent cursor-pointer rounded-sm pl-1.5 pr-2 py-1.5 bg-transparent transition-[background] duration-150",
                     "hover:bg-wash-hover",
                     "focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--primary)] focus-visible:outline-offset-[-2px]",
                     on && SELECTED_ROW,
@@ -319,10 +318,10 @@ export default function LedgerPanel() {
                       mirrored by the 3D floor labels so panel row and plane pair at a glance.
                       The trailing slot mirrors DisclosureRow's: node-kind floors get their honest
                       count (the same total the opened dropdown lists — see `floorCount` above)
-                      plus a ChevronRight (identical size/muted colour/rotate-on-open, copied from
-                      components/ExploreRows.tsx) that flips to the committed ✓ once `on`;
-                      snapshot floors (msnap/gl0) render neither — the slot just collapses, no
-                      reserved gap, since there's nothing to disclose. */}
+                      plus the shared hover-revealed DisclosureChevron (components/ExploreRows.tsx
+                      — the button above carries the `group` class its reveal needs) that flips to
+                      the committed ✓ once `on`; snapshot floors (msnap/gl0) render neither — the
+                      slot just collapses, no reserved gap, since there's nothing to disclose. */}
                   <span className="flex items-center gap-2 min-w-0">
                     <span
                       aria-hidden
@@ -344,13 +343,7 @@ export default function LedgerPanel() {
                         {on ? (
                           <SelectedRowMark />
                         ) : (
-                          <ChevronRight
-                            aria-hidden
-                            className={cn(
-                              "size-3.5 flex-none transition-transform duration-150 motion-reduce:transition-none text-muted-foreground",
-                              open && "rotate-90",
-                            )}
-                          />
+                          <DisclosureChevron open={open} />
                         )}
                       </span>
                     ) : (

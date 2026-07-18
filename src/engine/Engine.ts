@@ -169,10 +169,12 @@ export class Engine {
   // Transition slow-motion — dev only, or via `?slowmo=4` in prod (like ?stats): scales the
   // choreography clock so mid-flight states are screenshotable WITHOUT hand-stretching the
   // DUR_* constants in source (spec C#4 — three separate hand-stretch-and-revert rounds).
-  // Clamped ≥1; applies to the transition machine AND the camera tween while a transition is
-  // live, so the flight and the camera stay in sync. No param → stays 1 → the whole mechanism
-  // is a no-op, so the parse itself is the dev/prod gate (unlike `stats`, which toggles a
-  // visible DOM panel and so needs an explicit environment check).
+  // Clamped to [0.1, 20]; applies to the transition machine AND the camera tween while a
+  // transition is live, so the flight and the camera stay in sync. Values <1 SPEED UP the
+  // choreography instead (e.g. `?slowmo=0.3` for a quick UI/UX pass — the ~3.9s 3D↔3D switch
+  // completes in ~1.2s) — dt is divided by `_slowmo` at both call sites, so a fraction grows dt.
+  // No param → stays 1 → the whole mechanism is a no-op, so the parse itself is the dev/prod gate
+  // (unlike `stats`, which toggles a visible DOM panel and so needs an explicit environment check).
   private _slowmo = 1;
   // Fired once, after the first frame actually renders (see start()'s loop) — lets callers
   // (SceneCanvas → store.engineReady) know the scene has painted, not just constructed.
@@ -250,7 +252,8 @@ export class Engine {
     }
 
     const smMatch = /[?#&]slowmo=([\d.]+)/.exec(window.location.search + window.location.hash);
-    this._slowmo = Math.max(1, smMatch ? parseFloat(smMatch[1]) || 1 : 1);
+    const smVal = smMatch ? parseFloat(smMatch[1]) : NaN;
+    this._slowmo = Number.isFinite(smVal) && smVal > 0 ? Math.min(20, Math.max(0.1, smVal)) : 1;
 
     // Apply current store state, then react to changes (Lane B command bridge).
     const s = useStore.getState();

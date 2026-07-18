@@ -209,7 +209,9 @@ Gotchas that will save you time:
   regardless. To inspect transition mid-flight states, use **`?slowmo=N`** (e.g.
   `http://localhost:3000/?slowmo=4` — dev flag like `?stats`): it scales the choreography clock
   AND the camera tween while a transition is live, so screenshots catch the flight without
-  hand-stretching `DUR_*` in source; settled-state focus flights stay full speed.
+  hand-stretching `DUR_*` in source; settled-state focus flights stay full speed. `N` is clamped
+  to `[0.1, 20]` and **values <1 SPEED UP** the choreography instead — e.g. `?slowmo=0.3` shrinks
+  the ~3.9s 3D↔3D switch to ~1.2s, handy for a quick UI/UX pass without waiting out the full flight.
 - **Benign console noise to ignore** when grepping logs: `mojo ... rejected`,
   `gcm/... PHONE_REGISTRATION_ERROR`, `BackForwardCache`.
 

@@ -26,3 +26,23 @@ describe("explorer-chrome boundary (the three tool cards render the shared shell
     expect(bad, "every explorer must render <ExplorerShell — add it instead of hand-rolling chrome").toEqual([]);
   });
 });
+
+// DISCLOSURE-CHEVRON BOUNDARY (user, 2026-07-18 — set alongside the shared DisclosureChevron
+// extraction): a ledger fix had hand-copied ExploreRows' DisclosureRow chevron treatment and
+// dropped its hover-reveal (always-visible instead), the exact drift the user predicted a shared
+// component would prevent. The cheap backstop: no explorer may import ChevronRight itself — the
+// disclosure affordance comes ONLY from components/ExploreRows.tsx (DisclosureChevron directly,
+// or DisclosureRow which wraps it), so there is nowhere left for a hand-copy to drift from.
+describe("disclosure-chevron boundary (the three explorers never import ChevronRight directly)", () => {
+  it("every explorer gets its disclosure chevron via ExploreRows, not lucide-react directly", () => {
+    const bad: string[] = [];
+    for (const name of EXPLORERS) {
+      const src = readFileSync(join(COMPONENTS, name), "utf8");
+      if (src.includes("ChevronRight")) bad.push(name);
+    }
+    expect(
+      bad,
+      "no explorer may reference ChevronRight — use DisclosureChevron/DisclosureRow from components/ExploreRows.tsx instead",
+    ).toEqual([]);
+  });
+});

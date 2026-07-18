@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import { ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useStore } from "@/src/store/store";
 import ExplorerShell from "@/components/ExplorerShell";
@@ -14,7 +13,7 @@ import { hoverKeyOf } from "@/src/data/hoverSubject";
 import { filterToggleActions, nodeSelectActions } from "@/src/engine/domain/pickActions";
 import { applyClickActions } from "@/src/store/applyClickActions";
 import { subjectPairing } from "@/components/useSubjectPairing";
-import { DisclosureRow, NodePickerRow } from "@/components/ExploreRows";
+import { DisclosureChevron, DisclosureRow, NodePickerRow } from "@/components/ExploreRows";
 import type { NodeRow } from "@/src/data/types";
 
 // Hypergraph's single **explore** card — the architectural sibling of GeoExplore: each view's
@@ -130,10 +129,7 @@ export default function HyperExplore() {
                     {open ? (
                       <SelectedRowMark className="flex-none" />
                     ) : (
-                      <ChevronRight
-                        aria-hidden
-                        className="size-3.5 flex-none transition-opacity duration-150 motion-reduce:transition-none text-muted-foreground opacity-0 group-hover:opacity-100 group-focus-visible:opacity-100 [@media(hover:none)]:opacity-100"
-                      />
+                      <DisclosureChevron open={open} />
                     )}
                   </button>
 
