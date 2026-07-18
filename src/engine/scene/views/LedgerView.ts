@@ -796,13 +796,15 @@ export class LedgerView implements SceneView {
     // only, colour stays) while an OLDER snapshot is selected so the selected row reads brightest.
     this._flash = Math.max(0, this._flash - dt * 2.2);
     const leadDimmed = selectedSlot > 0;
-    this.centerMat.color.copy(this._coreCol);
+    this.centerMat.color.copy(this._coreCol).multiplyScalar(this._fades.alpha);
     this.centerMat.emissive.copy(this._coreCol);
     this.centerMat.emissiveIntensity = (leadDimmed ? 0.26 : 0.44 + this._flash * 0.5) * this._fades.alpha;
-    // centerMat is OPAQUE (no `transparent`), so emissiveIntensity alone can't fade it to nothing —
-    // ambient/directional light would still light its base colour at alpha 0. An explicit visibility
-    // gate closes that gap (setData already drives `true` when a live snapshot exists; this ANDs the
-    // view-transition alpha on top, every frame, since setData runs per-tick not per-frame).
+    // centerMat is OPAQUE (no `transparent`), so emissiveIntensity alone can't fade it to nothing — its
+    // lit body would still show at alpha 0. The color write above rides the same alpha curve so the
+    // ambient/lit response fades WITH the emissive instead of popping at the cutoff frame; the visible
+    // gate below is just the alpha≈0 short-circuit (setData already drives `true` when a live snapshot
+    // exists; this ANDs the view-transition alpha on top, every frame, since setData runs per-tick not
+    // per-frame).
     this.center.visible = this._fades.alpha > 0.001;
 
     // Hypergraph-L0 participation ring: glows as the global L0 produces each snapshot, then fades.
@@ -822,7 +824,10 @@ export class LedgerView implements SceneView {
       const sel = t.slot === selectedSlot;
       mat.color.copy(this._coreCol);
       mat.emissive.copy(this._coreCol);
-      mat.emissiveIntensity = (sel ? 0.9 : 0.34) * this._fades.alpha;
+      // Single-channel fade: opacity alone carries the alpha curve (the trail material IS transparent,
+      // unlike the centre block) — emissiveIntensity stays alpha-free so the two channels don't compound
+      // into a quadratic fade against every other linearly-fading material in the chamber.
+      mat.emissiveIntensity = sel ? 0.9 : 0.34;
       const target = (sel ? 0.95 : 0.88 * slotFade(t.slot)) * this._fades.alpha; // trail blocks kept near-solid (user)
       mat.opacity += (target - mat.opacity) * k;
     }
