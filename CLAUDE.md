@@ -91,7 +91,8 @@ to break one, that's a design conversation, not a workaround.
    domain behaviour lands WITH a colocated test" (type-only exports are skipped). → *Engine
    layer rules & render-loop discipline*.
 5. **Zero-allocation render loop** (`src/engine/noFrameAllocations.test.ts`) — per-frame method
-   bodies in `scene/` (`update`/`write*`/`place*`/`_apply*`/`setMorph`/`updateRotation`) carry
+   bodies in `scene/` AND `Engine.ts`'s loop-phase methods (`update`/`write*`/`place*`/`_apply*`/
+   `setMorph`/`updateRotation`/`_integrate*`/`_derive*`/`_write*`) carry
    no `new THREE.*`/`.clone()` unless the line marks it `event-time`. The fuller convention —
    every instanced slot written or zero-scaled each frame, sims emitting ring-buffer events
    their owning adapter drains (no cross-view mutation) — is the standing discipline the test
@@ -203,7 +204,10 @@ Gotchas that will save you time:
   Booting in `geo` snaps `morph=1` (engine constructor), so the globe SURFACE is settled from
   frame 1 — but a fresh 3D boot also plays the ~4s staging-dissolve intro (nodes disperse from
   the top grids), so a one-shot may catch the nodes mid-flight; the surface/layout is correct
-  regardless. For hyper camera tweens, temporarily shorten the tween `dur` in `Engine._tweenTo`.
+  regardless. To inspect transition mid-flight states, use **`?slowmo=N`** (e.g.
+  `http://localhost:3000/?slowmo=4` — dev flag like `?stats`): it scales the choreography clock
+  AND the camera tween while a transition is live, so screenshots catch the flight without
+  hand-stretching `DUR_*` in source; settled-state focus flights stay full speed.
 - **Benign console noise to ignore** when grepping logs: `mojo ... rejected`,
   `gcm/... PHONE_REGISTRATION_ERROR`, `BackForwardCache`.
 
@@ -246,8 +250,14 @@ Zustand store. **Two data lanes:** (A) high-freq visuals subscribe straight to
   **command bridge**: it `useStore.subscribe`s and reacts to mode/filter/country/hover channels
   and writes picks + hovers back to the store — the ONLY layer that touches the store. Each
   frame it consults `VIEW_POLICIES[mode]` (the per-view allow-list) and translates the flags
-  into scene state. Drives the typed `domain/` + `scene/` modules below (see *Engine layer
-  rules*).
+  into scene state. **The render loop is FIVE NAMED PHASES in a fixed order** —
+  `_integrateInputs` (policy/bloom + transition tick/boundary) → `_integrateCamera` (tween →
+  controls → altitude clamp) → `_integrateMotion` (hyper spin/tilt + globe rotation) →
+  `_deriveFrames` (the camera-anchored staging plane) → `_writeScene` (morph/alphas/visibility/
+  view updates/DoF) — under the frame-order CONTRACT: *nothing may mutate a pose after the
+  phase that derives from it* (three staging bugs were same-frame ordering bugs; new per-frame
+  work goes in the phase whose inputs it needs, never earlier). Drives the typed `domain/` +
+  `scene/` modules below (see *Engine layer rules*).
 - **`src/engine/config.ts`** — PURE STATIC DATA the app is parameterized by, nothing else: API
   endpoints, the `COLORS` palette mirror, the `METAGRAPHS` catalog, `POLL` (data cadence/
   retention tuning). **Config principles (hold in every change):** no math and no derived tables
@@ -281,7 +291,10 @@ store-value imports**, enforced by `layerBoundaries.test.ts`). Each ships coloca
   layout parameters the machine snaps, not eased flight blends. Retargeting (flipping the
   switch mid-flight) keeps flight weights continuous via the `FLIGHT_OUT`/`FLIGHT_IN`
   denominators (`DUR_OUT`/`DUR_IN` minus the stagger spread) — no teleports. Picking is
-  suppressed while `transition.active()`. Pure and allocation-free; `gatherWeight`/
+  suppressed while `transition.active()`, and **HUD-commit camera reframes are HELD during the
+  OUT phase** (`holdCamera()` gates `Engine._tweenTo` — the state commit stands; the boundary's
+  `_applyDestLayout` re-derives the pose from committed state, so the camera holds still
+  through the teardown and nothing is lost). Pure and allocation-free; `gatherWeight`/
   `furnitureAlpha` are read per node/per frame by the scene.
 - `gatherLayout.ts` — `gatherSlots()`: the staging-grid layout each network's nodes gather
   into mid-transition — one near-square grid per network, packed left→right sorted
@@ -310,7 +323,13 @@ store-value imports**, enforced by `layerBoundaries.test.ts`). Each ships coloca
   node→node. **Emits flash EVENTS via a ring buffer** — no cross-view side-channel mutation.
 - `ledgerModel.ts` — the Snapshots chamber's layout/slot/tile model over the live snapshot data.
 - `hyperLayout.ts` — the Hypergraph view's layout home: `metaAnchor()` (hub orbit-slot),
-  `META_ORBIT`. Per-view layout peers: `ledgerLayout.ts`, `geoLayout.ts`.
+  `META_ORBIT`, and `applyHyperRig()` (the ONE tilt+spin Euler composition every hyper-structure
+  group runs through — HyperView root/core + Globe's node group can't desync).
+  Per-view layout peers: `ledgerLayout.ts`, `geoLayout.ts`.
+- `stageLight.ts` — the per-view stage-light constants table (`STAGE_LIGHTS`: angle/distance/
+  intensity/penumbra/aim height per 3D view — the viewPolicy idiom; the values are deliberate
+  per-view tuning, the mechanism is one). Consumed by each view's `FocusSpot` construction; the
+  OFF-lifecycle is the Engine's central `StageLights` gate (see *scene objects*).
 - `ledgerLayout.ts` — the Snapshots view's layout home: `LEDGER` (floor heights + the whole-view
   group transform), `HYP_SPLIT` (the hypergraph level's 2/3+1/3 cut), `LAYER_GEOM` (layer id →
   height/lane-centre; ids shared with the UI copy table `src/data/ledgerLayers.ts` and the scene's
@@ -346,6 +365,13 @@ store-value imports**, enforced by `layerBoundaries.test.ts`). Each ships coloca
   every pose; a pose with a composed non-subject target must opt out explicitly or the dolly
   drags the camera off the subject, the bug that hit the node pose), and **`closeness()`**
   (camera altitude → the surface-sharpening factor GeoView's shaders consume). Easings too.
+  **Two camera PRINCIPLES** (2026-07-17 live-review lessons, both enforced/settled): (1)
+  *framing math consumes LAYOUT data* (records, anchors, orbit slots) — never rendered
+  transforms (`getWorldPosition`/`getMatrixAt` in Engine framing paths need a justified
+  `render-state OK` marker; two focus bugs came from framing animated/collapsed groups); (2)
+  *view emphasis moves the STRUCTURE, not the camera* — shared, lockstep, policy-driven (the
+  hyper focus tilt) beats composed camera cleverness; the rolled focus pose + DoF fell to
+  deletion, and camera poses stay dumb.
 - `records.ts` — the plain node/metagraph record types (`ValidatorRecord`/`MetaNodeRecord`) the
   scene consumes.
 - `geoLayout.ts` — shared geo constants (`R`, `LAND_H`) + `latLonToVec3`.
@@ -375,6 +401,17 @@ GPU; no store/react**):
 - `objects/Background.ts` — the skydome. The **geo** end is the twinkling starfield + faint
   nebula; the **hyper** end is a **single flat colour** (no animation, no gradient, no tint — an
   animated backdrop read as distracting). Only `uTime`/`uMorph` drive it.
+- `objects/FadeSet.ts` — the ONE furniture-fade registry (extracted from Globe's `geoFades`
+  pattern): a view registers its STATIC materials (`{mat, base}`; opacity = base × alpha) and
+  owns exactly one alpha — `setViewAlpha` forwards to `FadeSet.apply`, dynamic per-frame writes
+  read `.alpha`. HyperView + LedgerView compose one; a cross-cutting fade change is one edit here.
+- `objects/FocusSpot.ts` + `objects/StageLights.ts` — the focus stage-light: each view DRIVES
+  its own lit `FocusSpot` (aim + eased intensity, constants from `domain/stageLight.ts`), but
+  the OFF-lifecycle is CENTRAL — every spot registers with the Engine-owned `StageLights`, whose
+  per-frame `gate(alphas)` blacks out any view at furniture-alpha ≈ 0 (a view can't forget its
+  own off-switch; the lingering-spotlight bug class is dead).
+- `objects/gradientTexture.ts` — `makeRadialGradientTexture(stops)`, the one canvas
+  radial-gradient sprite factory (geo glow pools + hyper ring fills differ only in stops).
 - `views/HyperView.ts` — Hypergraph-only furniture: the Global L0 **core** and the orbiting
   metagraph **hubs** (from `config.METAGRAPHS`). The core is parented to the scene (not
   `root`) so the morph's root-collapse doesn't drag it; it **dissolves in place** as the Earth
@@ -563,10 +600,10 @@ views and caused the ledger red-dots bug; that pattern is forbidden.
     pose; the structure moves, never the camera rolling), and `_focusFilter` flies the camera
     to the selected hub with the plain radial `hubFraming` (using the hub's **local/unscaled** position — `layers.root` is morph-scaled,
     so `getWorldPosition` would aim at the origin mid-morph), world-up, NO camera roll. The
-    rolled `hyperFocusFraming` pose (core pinned upper-left) AND depth-of-field were DROPPED
+    rolled focus pose (core pinned upper-left) AND depth-of-field were DROPPED
     2026-07-17 (user: the bokeh read as fuzz on the selected atom and the composed pose fought
-    the transition choreography — simple and correct wins; `hyperFocusFraming` stays in
-    cameraRig unused, the BokehPass stays wired but no view is `dofEligible`). The hub's
+    the transition choreography — simple and correct wins; the dead framing function was
+    swept from cameraRig 2026-07-18, the BokehPass stays wired but no view is `dofEligible`). The hub's
     **orbit is paused while focused** (`layers.focusId`) so it stays framed, AND the
     non-selected nodes + hubs dim back so the selection stands out. Picking is filter-gated in hyper too
     (`_isPickActive`): only the in-focus selection's nodes are hoverable/clickable. Clicking
@@ -576,10 +613,10 @@ views and caused the ledger red-dots bug; that pattern is forbidden.
     geo-only and cleared on view switch.
 - **Hover preview**: hovering a filter-picker row OR a metagraph hub in hyper sets
   `store.hoverFilter`, which previews that selection's dim in any view via
-  `globe.setHoverFilter` (+ `ledger.setFilter`), without committing `filter`. The hover dim
-  is forced **strong** (`_hoverFilterActive` → `_dimScale` 0.85) so it's visible even in
-  hyper where the committed-filter dim is weak (the *click* also flies the camera + adds DoF,
-  which a hover must not). Hovering an explorer node row glows that node's shells on the
+  `globe.setHoverFilter` (+ `ledger.setFilter`), without committing `filter`. The hover
+  previews at the SAME per-view strength as a committed filter (the old forced-strong 0.85
+  branch was removed 2026-07-11 — it dimmed the rest far harder than the regular dim; what a
+  hover must NOT do is the *click*'s camera flight). Hovering an explorer node row glows that node's shells on the
   globe (`hoverNodeId` → `globe.setHoverNode`), matching a 3D raycast hover; hovering a
   country row previews that country's border outline at a whisper level (`hoverCountry` →
   `globe.setHoverCountry` — the committed drill's full hairline wins).
