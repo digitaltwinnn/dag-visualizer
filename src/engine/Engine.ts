@@ -115,6 +115,11 @@ export class Engine {
   private _gatherR = new THREE.Vector3(); // scratch: staging-plane right (world)
   private _gatherU2 = new THREE.Vector3(); // scratch: staging-plane up (world)
   private _pendingBoundary: Mode | null = null; // destination whose layout applies at the boundary
+  // Set when a 3D→3D retarget reverses straight back to its origin mid-OUT (no boundary will
+  // fire, so the held camera never replays a mid-flight commit) — re-resolve focus once the
+  // transition settles. See _integrateInputs' completion-edge check below.
+  private _resettleFocus = false;
+  private _wasTransitionActive = false; // last frame's transition.active(), for the completion-edge check
 
   private geoMap: GeoMap = {};
   private dagCore: DagCore | null = null;
@@ -518,13 +523,16 @@ export class Engine {
     // layout can be viewed straight from the top (viewPolicy.minPolarAngle).
     this.ctx.controls.minPolarAngle = policy.minPolarAngle;
     this.ctx.controls.enableRotate = true; // the 3D layer stack is meant to be looked around
-    // The country drill-down is geo-only; drop it on any view change so it can't
-    // linger as a stale leaderboard highlight + mismatched zoom after leaving geo.
-    if (this.country != null) {
-      this.country = null;
-      this.globe.setCountry(null);
-      useStore.getState().setCountry(null);
+    // View-scoped selections (focusLadder.LEVEL_CARRY): country + cohort live only in geo,
+    // layer only in ledger — clear them when the destination view isn't theirs, so no
+    // view-scoped card/framing lingers (the layer card used to follow into hyper/geo).
+    const st0 = useStore.getState();
+    if (mode !== "geo") {
+      if (this.country != null) { this.country = null; this.globe.setCountry(null); }
+      if (st0.country != null) st0.setCountry(null);
+      if (st0.cohort != null) st0.setCohort(null);
     }
+    if (mode !== "ledger" && st0.layer != null) st0.setLayer(null);
 
     const is3D = (m: Mode): m is View3D => m === "hyper" || m === "geo" || m === "ledger";
     if (is3D(prevMode) && is3D(mode) && prevMode !== mode) {
@@ -536,6 +544,7 @@ export class Engine {
       // fire) and the origin's layout is still applied — clear the stale pending so no
       // later tick can mis-apply it (defensive; provably unreachable today).
       this._pendingBoundary = this.transition.phase === "in" ? null : mode;
+      this._resettleFocus = this.transition.phase === "in"; // no boundary will fire — re-derive at settle
     } else if (!is3D(mode)) {
       // Entering a "soon"/placeholder view: STEP 1 ONLY (user, 2026-07-17) — the old view's
       // furniture fades and the nodes fly to the staging grids, where they PARK (the machine
@@ -1116,6 +1125,15 @@ export class Engine {
       this._pendingBoundary = null;
       this._applyBoundary(dest);
     }
+    // Reversal-gap completion edge: a 3D→3D retarget that flipped straight back to its origin
+    // mid-OUT never fires a boundary, so a commit landing mid-flight only updated the store —
+    // the camera was held (transition.holdCamera()) and never replayed. Re-derive it once the
+    // transition settles.
+    if (this._wasTransitionActive && !this.transition.active() && this._resettleFocus) {
+      this._resettleFocus = false;
+      this._resolveFocus(); // a mid-OUT commit's framing was held — re-derive from committed state
+    }
+    this._wasTransitionActive = this.transition.active();
   }
 
   private _integrateCamera(dt: number) {
