@@ -52,4 +52,36 @@ describe("gatherSlots", () => {
     expect(a.get("x")).toEqual(b.get("x"));
     expect(a.has("empty")).toBe(false);
   });
+
+  it("empty input returns an empty map", () => {
+    expect(gatherSlots([])).toEqual(new Map());
+  });
+
+  it("a single-network single-node input is one 1x1 grid at the packing origin", () => {
+    const m = gatherSlots([{ id: "solo", count: 1 }]);
+    expect(m.size).toBe(1);
+    const s = m.get("solo")!;
+    expect(s).toEqual([{ u: 0, v: -0.5, rank: 0, count: 1 }]);
+  });
+
+  // The comparator carries an EXPLICIT secondary key (`a.id.localeCompare(b.id)`) for ties,
+  // not a bare reliance on Array.prototype.sort's stability — so two equal-count groups pack
+  // by id ASCENDING regardless of input order. Pin that as the contract: a future rewrite
+  // that drops the secondary key (leaving ties to raw input order) must fail this test.
+  it("equal-count groups tie-break by id ascending, independent of input order", () => {
+    const inOrder = gatherSlots([
+      { id: "zzz", count: 5 },
+      { id: "aaa", count: 5 },
+    ]);
+    const reversed = gatherSlots([
+      { id: "aaa", count: 5 },
+      { id: "zzz", count: 5 },
+    ]);
+    // "aaa" sorts first (leftmost, most-negative u) in BOTH calls.
+    const leftMost = (m: Map<string, { u: number }[]>, id: string) => Math.min(...m.get(id)!.map((s) => s.u));
+    expect(leftMost(inOrder, "aaa")).toBeLessThan(leftMost(inOrder, "zzz"));
+    expect(leftMost(reversed, "aaa")).toBeLessThan(leftMost(reversed, "zzz"));
+    expect(inOrder.get("aaa")).toEqual(reversed.get("aaa"));
+    expect(inOrder.get("zzz")).toEqual(reversed.get("zzz"));
+  });
 });

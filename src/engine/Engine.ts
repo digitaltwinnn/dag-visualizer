@@ -504,7 +504,10 @@ export class Engine {
       // mid-flight) without teleports; the render loop applies _pendingBoundary's layout + camera
       // at the OUT→IN boundary, while the nodes are gathered and both furnitures are dark.
       this.transition.start(prevMode, mode);
-      this._pendingBoundary = mode;
+      // Reverse-to-origin retarget: the machine flips straight to IN (no boundary will
+      // fire) and the origin's layout is still applied — clear the stale pending so no
+      // later tick can mis-apply it (defensive; provably unreachable today).
+      this._pendingBoundary = this.transition.phase === "in" ? null : mode;
     } else if (!is3D(mode)) {
       // Entering a "soon"/placeholder view: STEP 1 ONLY (user, 2026-07-17) — the old view's
       // furniture fades and the nodes fly to the staging grids, where they PARK (the machine
@@ -936,6 +939,9 @@ export class Engine {
 
 
   private _tweenTo(toPos: Vec, toTgt: Vec, dolly = true) {
+    // OUT-phase camera hold (spec A#6): the state commit stands; the boundary's
+    // _applyDestLayout re-derives this pose from it, so dropping the tween loses nothing.
+    if (this.transition.holdCamera()) return;
     const tw = this._tween;
     tw.fromPos.copy(this.ctx.camera.position);
     // The global CAM_ZOOM dolly (see cameraRig) — writes straight into tw.toPos, no extra
