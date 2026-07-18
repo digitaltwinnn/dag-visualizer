@@ -1,6 +1,6 @@
 "use client";
 
-import { type CSSProperties, type ReactNode } from "react";
+import { useMemo, useState, type CSSProperties, type ReactNode } from "react";
 import { cn } from "@/lib/utils";
 import { useStore } from "@/src/store/store";
 import { applyClickActions } from "@/src/store/applyClickActions";
@@ -8,7 +8,7 @@ import { filterAccent, metagraphById, CORE_HEX } from "@/src/data/network";
 import { identityHudHex } from "@/src/palette/identity";
 import { hoverKeyOf } from "@/src/data/hoverSubject";
 import { subjectPairing } from "@/components/useSubjectPairing";
-import { RIGHT_CARD } from "@/components/CardHead";
+import CardHead, { RIGHT_CARD } from "@/components/CardHead";
 import { Card } from "@/components/ui/card";
 import InspectorCard from "@/components/InspectorCard";
 import ContextCard from "@/components/ContextCard";
@@ -18,9 +18,12 @@ import { useBreakpoint } from "@/components/useBreakpoint";
 import { PulseEdge, useEdgePulse } from "@/components/EdgePulse";
 import { detailsCards, type RailCard } from "@/components/railCards";
 import { useTrayActives } from "@/components/useTrayActives";
+import { countryToggleActions, cohortToggleActions } from "@/src/engine/domain/pickActions";
+import { CountryTitle, CountryCard, ProviderTitle, ProviderCard } from "@/components/inspector/cards";
 import type { TabSignal } from "@/components/RailDock";
 import type { PickDescriptor } from "@/src/data/types";
 import type { Mode } from "@/src/store/store";
+import type { CohortSel } from "@/src/engine/domain/focusLadder";
 
 // One pane in the right-rail **card stack**. Each pane is its own panel with its own
 // "new subject" edge pulse (keyed on its subject) and its own close — rendering every card
@@ -95,6 +98,80 @@ function CardPane({
   );
 }
 
+// The COUNTRY and PROVIDER (internal id: cohort) panes — the geo focus ladder's two coarse rungs.
+// Neither `store.country` (a bare cc code) nor `store.cohort` (a `CohortSel`) is a PickDescriptor,
+// so they don't fit CardPane's `pick`-dispatch above; rendering them directly from the store
+// channel here (same head/body split, same RIGHT_CARD frame, same close-through-the-executor
+// rule) is the smaller change than widening PickDescriptor + InspectorCard's switch for two
+// kinds that only this rail ever shows. See the task report for this call.
+function CountryPane({ cc, onClose }: { cc: string; onClose: () => void }) {
+  const hoverCountry = useStore((s) => s.hoverCountry);
+  const setHoverCountry = useStore((s) => s.setHoverCountry);
+  // Same channel + hue GeoExplore's own country rows pair on — structural cyan (a PLACE, not an
+  // identity), so hovering this card previews the border on the globe and vice versa.
+  const pair = subjectPairing<string>(hoverCountry, cc, setHoverCountry, "var(--primary)");
+  const pulseKey = useEdgePulse(cc);
+  // Right cards are collapsible too (CLAUDE.md) — same +/− idiom InspectorCard uses: local
+  // state per slot, body gated on it, collapsed = eyebrow + title only.
+  const [collapsed, setCollapsed] = useState(false);
+  return (
+    <Card asChild className={cn(RIGHT_CARD, "sig-left", pair.className)}>
+      <aside style={pair.style} onMouseEnter={pair.onMouseEnter} onMouseLeave={pair.onMouseLeave}>
+        <CardHead
+          eyebrow="Country"
+          title={<CountryTitle cc={cc} />}
+          titleKey={cc}
+          onClose={onClose}
+          collapsed={collapsed}
+          onToggle={() => setCollapsed((c) => !c)}
+        />
+        {!collapsed && <CountryCard cc={cc} />}
+        <PulseEdge pulseKey={pulseKey} rail="right" />
+      </aside>
+    </Card>
+  );
+}
+
+function ProviderPane({ sel, onClose }: { sel: CohortSel; onClose: () => void }) {
+  const selNodes = useStore((s) => s.selNodes);
+  const setHoverCohort = useStore((s) => s.setHoverCohort);
+  const subjectKey = `${sel.cc}|${sel.city}|${sel.isp}`;
+  const pulseKey = useEdgePulse(subjectKey);
+  // hoverCohort is an id ARRAY (the whole 3D honeycomb stack glows together), not a scalar the
+  // shared subjectPairing helper can compare — so this card only drives hover OUTWARD (card →
+  // scene glow), the same member match ProviderCard's body uses.
+  const ids = useMemo(
+    () =>
+      selNodes
+        .filter((r) => {
+          const geo = "geo" in r.pick ? r.pick.geo : undefined;
+          return r.cc === sel.cc && (r.city || null) === sel.city && (geo?.isp || null) === sel.isp;
+        })
+        .map((r) => hoverKeyOf(r.pick))
+        .filter((k): k is string => !!k),
+    [selNodes, sel.cc, sel.city, sel.isp],
+  );
+  // Right cards are collapsible too (CLAUDE.md) — same +/− idiom InspectorCard uses: local
+  // state per slot, body gated on it, collapsed = eyebrow + title only.
+  const [collapsed, setCollapsed] = useState(false);
+  return (
+    <Card asChild className={cn(RIGHT_CARD, "sig-left")}>
+      <aside onMouseEnter={() => setHoverCohort(ids)} onMouseLeave={() => setHoverCohort(null)}>
+        <CardHead
+          eyebrow="Provider"
+          title={<ProviderTitle sel={sel} />}
+          titleKey={subjectKey}
+          onClose={onClose}
+          collapsed={collapsed}
+          onToggle={() => setCollapsed((c) => !c)}
+        />
+        {!collapsed && <ProviderCard sel={sel} />}
+        <PulseEdge pulseKey={pulseKey} rail="right" />
+      </aside>
+    </Card>
+  );
+}
+
 // A GHOST card — the hint state of a Detail slot (user design, 2026-07-10; replaces the single
 // floating pick-invite). Every card the current view CAN produce is always visible: populated
 // with its subject, or as this quiet placeholder saying what to interact with. AS SUBTLE AS
@@ -103,7 +180,7 @@ function CardPane({
 // rail losing its calm. Availability + copy come from the rail manifest (railCards.ts), the
 // same single source of truth the dock trays read.
 const GHOST_EYEBROW: Record<string, string> = {
-  context: "Metagraph", node: "Node", snap: "Snapshot", layer: "Layer",
+  context: "Metagraph", country: "Country", cohort: "Provider", node: "Node", snap: "Snapshot", layer: "Layer",
 };
 export function GhostCard({ card }: { card: RailCard }) {
   const Icon = card.icon;
@@ -147,6 +224,8 @@ export default function Inspector() {
   const inspect = useStore((s) => s.inspect);
   const snap = useStore((s) => s.snap);
   const layer = useStore((s) => s.layer);
+  const country = useStore((s) => s.country);
+  const cohort = useStore((s) => s.cohort);
   const filter = useStore((s) => s.filter);
   const mode = useStore((s) => s.mode) as Mode;
 
@@ -167,11 +246,28 @@ export default function Inspector() {
   const selNodes = useStore((s) => s.selNodes);
   const filterCfg = metagraphById(filter);
   const manifest = detailsCards({
-    mode, filter, inspect, snap, layer,
+    mode, filter, inspect, snap, layer, country, cohort,
     selNodesCount: selNodes.length,
     filterLabel: filterCfg ? filterCfg.ticker || filterCfg.name : null,
   });
   const detailPane: Record<string, ReactNode> = {
+    // Country/provider toggle CLOSED through the same tested table a row re-click runs — the ×
+    // is the ladder's own step-back, not a bespoke clear (countryToggleActions also drops any
+    // finer rung first, matching the zoom-level rule).
+    country: country ? (
+      <CountryPane
+        key="country"
+        cc={country}
+        onClose={() => applyClickActions(countryToggleActions(country, { country, hasInspect: !!inspect, cohort }))}
+      />
+    ) : null,
+    cohort: cohort ? (
+      <ProviderPane
+        key="cohort"
+        sel={cohort}
+        onClose={() => applyClickActions(cohortToggleActions(cohort, { cohort, hasInspect: !!inspect }))}
+      />
+    ) : null,
     // geoLive reads the node from the store; its × is CardHead's shared close like every card.
     node: (
       <CardPane key="node" pick={{ kind: "geoLive" }} eyebrow="Node" onClose={() => applyClickActions([{ kind: "inspect", pick: null }])} />

@@ -13,12 +13,41 @@ import { shortHash, CORE_HEX } from "@/src/data/network";
 import { identityHudHex } from "@/src/palette/identity";
 import type { NodeRow } from "@/src/data/types";
 
+// The ONE disclosure-chevron affordance, used by every explorer row that expands/collapses
+// (extracted 2026-07-18 from DisclosureRow, its original/canonical treatment — a ledger fix had
+// hand-copied it and dropped the hover-reveal, the exact drift a shared component prevents):
+// invisible at rest, EASES IN over 150ms on row hover/focus (always visible on touch, no hover to
+// reveal it — the house signal language is calm/faded, never an instant snap, 2026-07-18: geo/
+// hyper's rows used to fade via `transition-opacity` while DisclosureRow's own chevron only had
+// `transition-transform`, so the extraction had briefly made the fade instant everywhere; both
+// opacity AND transform are now transitioned so the reveal eases in AND the open-rotation animates,
+// in every consumer), rotates 90° while open. CONTRACT: the consuming row must carry the
+// (unscoped) `group` class itself — `group-hover`/`group-focus-visible` below target it — and
+// reserve this component's `flex-none` slot in its trailing column (e.g. next to a count) so the
+// row's layout doesn't shift when the chevron is invisible.
+export function DisclosureChevron({ open }: { open: boolean }) {
+  return (
+    <ChevronRight
+      aria-hidden
+      className={cn(
+        "size-3.5 flex-none transition-[opacity,transform] duration-150 motion-reduce:transition-none text-muted-foreground opacity-0 group-hover:opacity-100 group-focus-visible:opacity-100 [@media(hover:none)]:opacity-100",
+        open && "rotate-90 opacity-100",
+      )}
+    />
+  );
+}
+
 // A single-open DISCLOSURE row (geo's country-cohort, hyper's composition group): the button
 // chrome + the trailing affordance (the ✓ when it holds the selection while collapsed, else the
 // hover-revealed chevron that rotates when open). `children` = the row's own middle content
 // (which should end with an `ml-auto` count so it and the affordance sit right).
+// `on` = the row itself is a COMMITTED selection (geo's cohort rung, the country-row idiom) —
+// wears SELECTED_ROW + the ✓ unconditionally (it wins over `holdsSel`, the collapsed-holds-a-
+// selected-node case, when both are true). Optional: hyper's composition groups are disclosure-
+// only and never pass it.
 export function DisclosureRow({
   open,
+  on,
   holdsSel,
   title,
   onToggle,
@@ -27,6 +56,7 @@ export function DisclosureRow({
   children,
 }: {
   open: boolean;
+  on?: boolean;
   holdsSel: boolean;
   title: string;
   onToggle: () => void;
@@ -38,9 +68,10 @@ export function DisclosureRow({
     <button
       type="button"
       className={cn(
-        "group/disc relative flex items-center gap-2 w-[calc(100%+6px)] py-[5px] pl-2 pr-2 my-px rounded-sm border border-transparent bg-transparent cursor-pointer text-left text-foreground-dim transition-colors duration-[140ms]",
+        "group relative flex items-center gap-2 w-[calc(100%+6px)] py-[5px] pl-2 pr-2 my-px rounded-sm border border-transparent bg-transparent cursor-pointer text-left text-foreground-dim transition-colors duration-[140ms]",
         "hover:bg-wash-hover hover:text-foreground",
         "focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--primary)] focus-visible:outline-offset-[-2px]",
+        on && SELECTED_ROW,
       )}
       aria-expanded={open}
       title={title}
@@ -49,16 +80,10 @@ export function DisclosureRow({
       onMouseLeave={onHoverLeave}
     >
       {children}
-      {holdsSel && !open ? (
+      {on || (holdsSel && !open) ? (
         <SelectedRowMark className="flex-none" />
       ) : (
-        <ChevronRight
-          aria-hidden
-          className={cn(
-            "size-3.5 flex-none transition-transform duration-150 motion-reduce:transition-none text-muted-foreground opacity-0 group-hover/disc:opacity-100 group-focus-visible/disc:opacity-100 [@media(hover:none)]:opacity-100",
-            open && "rotate-90 opacity-100",
-          )}
-        />
+        <DisclosureChevron open={open} />
       )}
     </button>
   );

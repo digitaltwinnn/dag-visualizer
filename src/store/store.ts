@@ -1,13 +1,16 @@
 import { create } from "zustand";
 import type { GlobalSnapshot, LeaderboardData, MetaInfo, NodeRow, PickDescriptor, SnapshotExact } from "@/src/data/types";
 import type { HoverSubject } from "@/src/data/hoverSubject";
+// Type-only — the store may not import domain VALUES (layerBoundaries rule), but a type-only
+// import of a domain type is legal and keeps CohortSel defined in exactly one place.
+import type { CohortSel } from "@/src/engine/domain/focusLadder";
 
 // The active view. `hyper`/`geo` drive the 3D scene (morph between them); the rest are flat
 // views (the canvas is hidden) — `ledger` has the live ribbon, the others are placeholders.
 export type Mode = "hyper" | "geo" | "ledger" | "status" | "transactions" | "staking";
 
 // One slot in the right-rail card stack (extend with future card types — e.g. "tx").
-export type SelSlot = "node" | "snap" | "layer";
+export type SelSlot = "node" | "snap" | "layer" | "country" | "cohort";
 
 // Move `slot` to the FRONT of the recency stack when it becomes active, or drop it when cleared.
 function bumpStack(stack: SelSlot[], slot: SelSlot, active: boolean): SelSlot[] {
@@ -88,6 +91,10 @@ interface AppState {
   hover: HoverSubject | null;
   // Country drill-down within the network filter (geo view), or null.
   country: string | null;
+  // Committed city×provider COHORT selection (geo, country-scoped) — the focus-ladder rung
+  // between a node and its country (finerLevels("geo","country") = ["node","cohort"]). Matches
+  // GeoExplore's cohort key fields (cc/city/isp); a selStack slot like `layer`/`country`.
+  cohort: CohortSel | null;
   // Per-country breakdown + distribution score for the active filter (engine-pushed).
   leaderboard: LeaderboardData | null;
   // The active selection's nodes, for the geo node browser (engine-pushed; [] off geo).
@@ -149,6 +156,7 @@ interface AppState {
   setFollowing: (following: boolean) => void;
   setHover: (hover: HoverSubject | null) => void;
   setCountry: (cc: string | null) => void;
+  setCohort: (c: CohortSel | null) => void;
   setLeaderboard: (lb: LeaderboardData | null) => void;
   setSelNodes: (nodes: NodeRow[]) => void;
   setSnapshotExact: (data: SnapshotExact) => void;
@@ -187,6 +195,7 @@ export const useStore = create<AppState>((set) => ({
   following: false,
   hover: null,
   country: null,
+  cohort: null,
   leaderboard: null,
   selNodes: [],
   snapshotExact: {},
@@ -217,7 +226,8 @@ export const useStore = create<AppState>((set) => ({
   setLayer: (layer) => set((s) => ({ layer, selStack: bumpStack(s.selStack, "layer", !!layer) })),
   setFollowing: (following) => set({ following }),
   setHover: (hover) => set({ hover }),
-  setCountry: (country) => set({ country }),
+  setCountry: (country) => set((s) => ({ country, selStack: bumpStack(s.selStack, "country", !!country) })),
+  setCohort: (cohort) => set((s) => ({ cohort, selStack: bumpStack(s.selStack, "cohort", !!cohort) })),
   setLeaderboard: (leaderboard) => set({ leaderboard }),
   setSelNodes: (selNodes) => set({ selNodes }),
   setSnapshotExact: (data) =>

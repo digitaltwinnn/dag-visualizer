@@ -1,11 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { cn } from "@/lib/utils";
 import { useStore } from "@/src/store/store";
 import { shortHash, CORE_HEX, getNetwork, metagraphById } from "@/src/data/network";
 import { identityHudHex } from "@/src/palette/identity";
-import { hex, fmtDag, fmtKB } from "@/src/util/format";
+import { hex, fmtDag, fmtKB, ccToFlag } from "@/src/util/format";
 import { relativeAge } from "@/src/util/relativeAge";
 import { statusBreakdown } from "@/src/data/nodeStatus";
 import type { GlobalSnapshot, MetaCfg, PickDescriptor } from "@/src/data/types";
@@ -15,13 +15,15 @@ import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { SonarRing, NodeStars, NoSignalDot } from "@/components/state/StateAtoms";
-import { VIEW_ICONS, LAYER_ICON, SNAPSHOT_ICON, KIND_MARK_CLASS } from "@/components/icons";
+import { VIEW_ICONS, LAYER_ICON, SNAPSHOT_ICON, COUNTRY_ICON, PROVIDER_ICON, KIND_MARK_CLASS } from "@/components/icons";
 import { ExternalLink } from "lucide-react";
 import { useMinHold } from "@/components/useMinHold";
 import { POLL } from "@/src/engine/config";
-import { Desc, StatusMark, CompositionRows, StatusBreakdown, RoleChips, networkKind } from "./parts";
+import { Desc, StatusMark, CompositionRows, StatusBreakdown, RoleChips, IdentityDot, networkKind } from "./parts";
 import { compositionRows, nodeCompositionLabel } from "@/src/data/composition";
 import { ledgerLayerById } from "@/src/data/ledgerLayers";
+import { pickNetId } from "@/src/engine/domain/pickActions";
+import type { CohortSel } from "@/src/engine/domain/focusLadder";
 
 type PickOf<K extends PickDescriptor["kind"]> = Extract<PickDescriptor, { kind: K }>;
 
@@ -506,5 +508,145 @@ export function LayerCard({ p }: { p: PickOf<"layer"> }) {
         </div>
       )}
     </>
+  );
+}
+
+// ── The COUNTRY card (Geography · country drill) ────────────────────────────────────────────
+// Selected via the geo focus ladder's country rung (`store.country`, a bare cc code — NOT a
+// PickDescriptor, so it isn't routed through InspectorCard's dispatch; Inspector.tsx renders it
+// directly from the store channel, mirroring this same head/body split). Facts derive from
+// `store.selNodes` — deliberately the explorer's scope, the same data lane GeoExplore's own
+// leaderboard/accordion reads, matched here by `cc` instead of grouped by display name.
+
+// Head title: the country mark + flag + display name (rolls via titleKey=cc, synced with the
+// edge pulse) — same "kind mark leads the title" grammar as every other card head.
+export function CountryTitle({ cc }: { cc: string }) {
+  const selNodes = useStore((s) => s.selNodes);
+  // No countryName(cc) lookup exists anywhere in the app — the display name only ever arrives
+  // on a NodeRow (copied verbatim off the geo-IP lookup), so it's read off a matching row here,
+  // same as GeoExplore's own leaderboard rows resolve their name.
+  const name = selNodes.find((r) => r.cc === cc)?.country ?? cc;
+  const Mark = COUNTRY_ICON;
+  return (
+    <span className="inline-flex items-center gap-2 min-w-0">
+      <Mark aria-hidden className={cn(KIND_MARK_CLASS, "text-[var(--filter-accent,var(--primary))]")} />
+      <span className="truncate">
+        {ccToFlag(cc)} {name}
+      </span>
+    </span>
+  );
+}
+
+export function CountryCard({ cc }: { cc: string }) {
+  const selNodes = useStore((s) => s.selNodes);
+  const rows = useMemo(() => selNodes.filter((r) => r.cc === cc), [selNodes, cc]);
+  const cities = useMemo(
+    () => new Set(rows.map((r) => r.city).filter((c): c is string => !!c)),
+    [rows],
+  );
+  const providers = useMemo(
+    () =>
+      new Set(
+        rows
+          .map((r) => ("geo" in r.pick ? r.pick.geo?.isp : undefined))
+          .filter((p): p is string => !!p),
+      ),
+    [rows],
+  );
+  const share = selNodes.length > 0 ? Math.round((rows.length / selNodes.length) * 100) : 0;
+  const facts: { label: string; value: string }[] = [
+    { label: "Nodes", value: String(rows.length) },
+    { label: "Share of selection", value: `${share}%` },
+    { label: "Cities", value: String(cities.size) },
+    { label: "Providers", value: String(providers.size) },
+  ];
+  return (
+    <div className="flex flex-col gap-2">
+      {facts.map((f) => (
+        <div key={f.label} className="flex items-start justify-between gap-2.5">
+          <span className="text-body text-muted-foreground">{f.label}</span>
+          <span className="text-body text-foreground tabular-nums">{f.value}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// ── The PROVIDER card (Geography · city×provider cohort) ────────────────────────────────────
+// Selected via the ladder's rung between a node and its country (`store.cohort`, a `CohortSel`
+// {cc, city, isp} — internal name stays `cohort`, ALL user-facing copy says "provider", per the
+// naming split the spec records). Member match mirrors GeoExplore's `cohortsOf` grouping exactly
+// (same city + same `geo.isp`, `null` counting as a match), just applied against one fixed key
+// instead of building the whole group.
+
+export function ProviderTitle({ sel }: { sel: CohortSel }) {
+  const Mark = PROVIDER_ICON;
+  return (
+    <span className="inline-flex items-center gap-2 min-w-0">
+      <Mark aria-hidden className={cn(KIND_MARK_CLASS, "text-[var(--filter-accent,var(--primary))]")} />
+      <span className="truncate">
+        {sel.city ?? "Unlocated"} · {sel.isp ?? "Unknown provider"}
+      </span>
+    </span>
+  );
+}
+
+export function ProviderCard({ sel }: { sel: CohortSel }) {
+  const selNodes = useStore((s) => s.selNodes);
+  const members = useMemo(
+    () =>
+      selNodes.filter((r) => {
+        const geo = "geo" in r.pick ? r.pick.geo : undefined;
+        return r.cc === sel.cc && (r.city || null) === sel.city && (geo?.isp || null) === sel.isp;
+      }),
+    [selNodes, sel.cc, sel.city, sel.isp],
+  );
+  // Distinct networks among the members, first-seen order — "dag" resolves through
+  // metagraphById like every other subject id.
+  const networkIds = useMemo(() => {
+    const seen: string[] = [];
+    for (const r of members) {
+      const id = pickNetId(r.pick);
+      if (id && !seen.includes(id)) seen.push(id);
+    }
+    return seen;
+  }, [members]);
+  const firstGeo = members[0] && "geo" in members[0].pick ? members[0].pick.geo : undefined;
+  const countryName = selNodes.find((r) => r.cc === sel.cc)?.country ?? sel.cc;
+  return (
+    <div className="flex flex-col gap-2">
+      <div className="flex items-start justify-between gap-2.5">
+        <span className="text-body text-muted-foreground">Nodes</span>
+        <span className="text-body text-foreground tabular-nums">{members.length}</span>
+      </div>
+      <div className="flex items-start justify-between gap-2.5">
+        <span className="text-body text-muted-foreground flex-none">Networks</span>
+        <span className="flex flex-wrap justify-end items-center gap-x-2 gap-y-1 min-w-0">
+          {networkIds.length === 0 ? (
+            <span className="text-body text-foreground">—</span>
+          ) : (
+            networkIds.map((id) => {
+              const cfg = metagraphById(id);
+              return (
+                <span key={id} className="inline-flex items-center gap-1.5 text-body text-foreground">
+                  <IdentityDot hue={identityHudHex(id)} />
+                  {cfg?.ticker || cfg?.name || id}
+                </span>
+              );
+            })
+          )}
+        </span>
+      </div>
+      <div className="flex items-start justify-between gap-2.5">
+        <span className="text-body text-muted-foreground">ASN</span>
+        <span className="text-body text-foreground tabular-nums">{firstGeo?.asn ?? "—"}</span>
+      </div>
+      <div className="flex items-start justify-between gap-2.5">
+        <span className="text-body text-muted-foreground">Country</span>
+        <span className="text-body text-foreground">
+          {ccToFlag(sel.cc)} {countryName}
+        </span>
+      </div>
+    </div>
   );
 }

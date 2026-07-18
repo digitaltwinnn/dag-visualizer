@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { autoLayerForNode, clickActions, countryToggleActions, filterToggleActions, layerToggleActions, nodeSelectActions, snapshotSelectActions, pickActive, pickNetId, type ClickAction } from "./pickActions";
+import { autoLayerForNode, clickActions, cohortToggleActions, countryToggleActions, filterToggleActions, layerToggleActions, nodeSelectActions, sameCohort, snapshotSelectActions, pickActive, pickNetId, type ClickAction } from "./pickActions";
+import { finerLevels } from "./focusLadder";
 import type { PickDescriptor } from "@/src/data/types";
 
 // Minimal pick fixtures — only the fields the table reads.
@@ -14,12 +15,19 @@ type LayerPick = Extract<PickDescriptor, { kind: "layer" }>;
 const layerPick = (id = "ml0"): LayerPick => ({ kind: "layer", layerId: id }) as unknown as LayerPick;
 
 const state = (
-  over: Partial<{ filter: string; country: string | null; hasInspect: boolean; layerId: string | null }> = {},
+  over: Partial<{
+    filter: string;
+    country: string | null;
+    hasInspect: boolean;
+    layerId: string | null;
+    cohort: { cc: string; city: string | null; isp: string | null } | null;
+  }> = {},
 ) => ({
   filter: "all",
   country: null,
   hasInspect: false,
   layerId: null,
+  cohort: null,
   ...over,
 });
 
@@ -85,19 +93,20 @@ describe("clickActions — hub / snapshot / layer", () => {
 });
 
 describe("clickActions — node clicks (the ordering contracts)", () => {
-  it("GEO: filter FIRST, then the node's country, inspect LAST", () => {
+  it("GEO: filter FIRST, then the node's country + cohort (full-ancestry rule), inspect LAST", () => {
     const p = nodePick("DE");
     const acts = clickActions({ mode: "geo", pick: p, countryCc: null, current: state() });
     expect(acts).toEqual([
       { kind: "filter", id: "dor" },
       { kind: "country", cc: "DE" },
+      { kind: "cohort", sel: { cc: "DE", city: null, isp: null } },
       { kind: "inspect", pick: p },
     ]);
   });
   it("GEO: the filter step is SKIPPED when the node's network is already selected (no drill churn)", () => {
     const p = nodePick("DE");
     const acts = clickActions({ mode: "geo", pick: p, countryCc: null, current: state({ filter: "dor" }) });
-    expect(kinds(acts)).toEqual(["country", "inspect"]);
+    expect(kinds(acts)).toEqual(["country", "cohort", "inspect"]);
   });
   it("GEO: a node without a resolvable country skips the drill (no country action)", () => {
     const acts = clickActions({ mode: "geo", pick: nodePick(null), countryCc: null, current: state() });
@@ -115,10 +124,11 @@ describe("clickActions — node clicks (the ordering contracts)", () => {
       "inspect",
     ]);
   });
-  it("LEDGER: filter + inspect only — the settlement diagram must not gain drills/rotation", () => {
+  it("LEDGER: filter + its L0 floor + inspect — no country/cohort drills (those are geo concepts)", () => {
     const p = nodePick("DE");
     expect(kinds(clickActions({ mode: "ledger", pick: p, countryCc: null, current: state() }))).toEqual([
       "filter",
+      "layer",
       "inspect",
     ]);
   });
@@ -170,13 +180,13 @@ describe("pickActive — which picks respond at all, per view", () => {
 
 describe("the shared component builders (GeoExplore rows + LiveStrip bars run the SAME table)", () => {
   it("countryToggleActions === the scene's empty-click semantics (drill, toggle, deselect-first)", () => {
-    expect(countryToggleActions("DE", { country: null, hasInspect: false })).toEqual([
+    expect(countryToggleActions("DE", { country: null, hasInspect: false, cohort: null })).toEqual([
       { kind: "country", cc: "DE" },
     ]);
-    expect(countryToggleActions("DE", { country: "DE", hasInspect: false })).toEqual([
+    expect(countryToggleActions("DE", { country: "DE", hasInspect: false, cohort: null })).toEqual([
       { kind: "country", cc: null },
     ]);
-    expect(countryToggleActions("FI", { country: "DE", hasInspect: true })).toEqual([
+    expect(countryToggleActions("FI", { country: "DE", hasInspect: true, cohort: null })).toEqual([
       { kind: "inspect", pick: null },
       { kind: "country", cc: "FI" },
     ]);
@@ -231,5 +241,73 @@ describe("layerToggleActions / filterToggleActions (the remaining rail interacti
     expect(filterToggleActions("dor", "all")).toEqual([{ kind: "filter", id: "dor" }]);
     expect(filterToggleActions("dor", "dor")).toEqual([{ kind: "filter", id: "all" }]);
     expect(filterToggleActions("all", "all")).toEqual([{ kind: "filter", id: "all" }]);
+  });
+});
+
+const CO = { cc: "DE", city: "Falkenstein", isp: "Hetzner" };
+
+describe("cohortToggleActions — the provider/cohort rung toggle (spec Part 4)", () => {
+  it("commits the cohort, dropping a selected node first (zoom-level rule)", () => {
+    expect(cohortToggleActions(CO, { cohort: null, hasInspect: true })).toEqual([
+      { kind: "inspect", pick: null },
+      { kind: "cohort", sel: CO },
+    ]);
+  });
+  it("re-clicking the committed cohort clears it (one toggle language)", () => {
+    expect(cohortToggleActions(CO, { cohort: CO, hasInspect: false })).toEqual([
+      { kind: "cohort", sel: null },
+    ]);
+  });
+  it("sameCohort matches by cc+city+isp, null-safe", () => {
+    expect(sameCohort(CO, { ...CO })).toBe(true);
+    expect(sameCohort(CO, { ...CO, isp: "OVH" })).toBe(false);
+    expect(sameCohort(null, CO)).toBe(false);
+    expect(sameCohort(null, null)).toBe(false); // no committed cohort ≠ "same"
+  });
+});
+
+describe("ladder-derived stepping — pickActions cannot drift from focusLadder", () => {
+  it("the country toggle drops exactly geo's finer levels (node + cohort)", () => {
+    const acts = countryToggleActions("DE", { country: null, hasInspect: true, cohort: CO });
+    const dropped = acts.filter((a) => (a.kind === "inspect" && a.pick === null) || (a.kind === "cohort" && a.sel === null));
+    // finerLevels("geo","country") = ["node","cohort"] — one clearing action per finer level.
+    expect(finerLevels("geo", "country")).toEqual(["node", "cohort"]);
+    expect(dropped).toHaveLength(2);
+    expect(acts[acts.length - 1]).toEqual({ kind: "country", cc: "DE" });
+  });
+  it("the cohort toggle drops exactly geo's finer levels (node)", () => {
+    expect(finerLevels("geo", "cohort")).toEqual(["node"]);
+    const acts = cohortToggleActions(CO, { cohort: null, hasInspect: true });
+    expect(acts.filter((a) => a.kind === "inspect")).toHaveLength(1);
+  });
+});
+
+describe("nodeSelectActions ancestry (spec Part 3 — full-ancestry rule)", () => {
+  const geoPick = {
+    kind: "metanode", meta: { id: "dor" },
+    geo: { cc: "DE", city: "Falkenstein", isp: "Hetzner" },
+  } as unknown as PickDescriptor;
+  it("geo: filter → country → cohort → inspect LAST", () => {
+    const acts = nodeSelectActions(geoPick, { mode: "geo", currentFilter: "all" });
+    expect(acts.map((a) => a.kind)).toEqual(["filter", "country", "cohort", "inspect"]);
+    expect(acts[2]).toEqual({ kind: "cohort", sel: { cc: "DE", city: "Falkenstein", isp: "Hetzner" } });
+  });
+  it("geo: a pick without isp/city still commits its cohort (nullable fields)", () => {
+    const p = { kind: "l0", node: { id: "x" }, geo: { cc: "FI" } } as unknown as PickDescriptor;
+    const acts = nodeSelectActions(p, { mode: "geo", currentFilter: "dag" });
+    expect(acts.find((a) => a.kind === "cohort")).toEqual({ kind: "cohort", sel: { cc: "FI", city: null, isp: null } });
+  });
+  it("ledger: browser row commits its parent floor before inspect", () => {
+    const acts = nodeSelectActions(geoPick, { mode: "ledger", currentFilter: "dor", ledgerLayerId: "ml1" });
+    expect(acts.map((a) => a.kind)).toEqual(["layer", "inspect"]);
+    expect(acts[0]).toEqual({ kind: "layer", pick: { kind: "layer", layerId: "ml1" } });
+  });
+  it("ledger: scene click commits the autoLayerForNode L0 floor", () => {
+    const acts = nodeSelectActions(geoPick, { mode: "ledger", currentFilter: "dor" });
+    expect(acts[0]).toEqual({ kind: "layer", pick: { kind: "layer", layerId: "ml0" } });
+  });
+  it("deselect stays a bare inspect-clear", () => {
+    expect(nodeSelectActions(geoPick, { mode: "geo", currentFilter: "all", deselect: true }))
+      .toEqual([{ kind: "inspect", pick: null }]);
   });
 });

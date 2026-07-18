@@ -28,7 +28,7 @@ const COMPONENTS = join(import.meta.dirname, ".");
 // not a user pick). Anything else that needs an exemption should instead get a table entry.
 const ALLOW = new Set(["FollowController.tsx"]);
 
-const SELECTION_SETTERS = /\bset(Filter|Country|Inspect|Snap|Layer|Following)\b/;
+const SELECTION_SETTERS = /\bset(Filter|Country|Inspect|Snap|Layer|Following|Cohort)\b/;
 
 function sourceFiles(dir: string): string[] {
   const out: string[] = [];

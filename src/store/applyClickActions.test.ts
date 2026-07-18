@@ -79,4 +79,18 @@ describe("applyClickActions", () => {
     applyClickActions([]);
     expect(useStore.getState().filter).toBe(before.filter);
   });
+
+  it('"cohort" maps to setCohort (and only that)', () => {
+    const CO = { cc: "DE", city: "Falkenstein", isp: "Hetzner" };
+    applyClickActions([{ kind: "cohort", sel: CO }]);
+    expect(useStore.getState().cohort).toEqual(CO);
+    applyClickActions([{ kind: "cohort", sel: null }]);
+    expect(useStore.getState().cohort).toBeNull();
+  });
+  it("setCohort participates in the selStack (the provider card slot)", () => {
+    useStore.getState().setCohort({ cc: "DE", city: null, isp: null });
+    expect(useStore.getState().selStack[0]).toBe("cohort");
+    useStore.getState().setCohort(null);
+    expect(useStore.getState().selStack).not.toContain("cohort");
+  });
 });

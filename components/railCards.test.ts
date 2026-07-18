@@ -18,6 +18,8 @@ const details = (over: Partial<RailManifestState>): RailManifestState => ({
   inspect: null,
   snap: null,
   layer: null,
+  country: null,
+  cohort: null,
   selNodesCount: 10,
   filterLabel: null,
   ...over,
@@ -56,9 +58,9 @@ describe("detailsCards — RIGHT rail (Details): fixed slots + ghost hints", () 
   it("the DAG filter → Context dossier populated", () => {
     expect(presentKinds(detailsCards(details({ filter: "dag" })))).toEqual(["context"]);
   });
-  it("slots come in ONE fixed order (context, node, snap, layer) regardless of selection", () => {
+  it("slots come in ONE fixed order (context, country, cohort, node, snap, layer) regardless of selection", () => {
     const ids = detailsCards(details({ filter: "dor", inspect: nodePick, snap: snapPick })).map((c) => c.id);
-    expect(ids).toEqual(["context", "node", "snap", "layer"]);
+    expect(ids).toEqual(["context", "country", "cohort", "node", "snap", "layer"]);
   });
   it("ledger ghosts: context + node + snapshot + layer invites (nodes pick in the chamber too)", () => {
     expect(ghostIds(detailsCards(details({})))).toEqual(["context", "node", "snap", "layer"]);
@@ -66,8 +68,18 @@ describe("detailsCards — RIGHT rail (Details): fixed slots + ghost hints", () 
   it("hyper ghosts: context + node + snapshot invites (the strip runs in every view)", () => {
     expect(ghostIds(detailsCards(details({ mode: "hyper" })))).toEqual(["context", "node", "snap"]);
   });
-  it("geo ghosts: context + node + snapshot invites (the strip runs in every view)", () => {
-    expect(ghostIds(detailsCards(details({ mode: "geo" })))).toEqual(["context", "node", "snap"]);
+  it("geo ghosts cover the whole ladder: context + country + cohort + node + snapshot invites", () => {
+    expect(ghostIds(detailsCards(details({ mode: "geo" })))).toEqual([
+      "context", "country", "cohort", "node", "snap",
+    ]);
+  });
+  it("country/cohort cards never ghost outside geo", () => {
+    for (const mode of ["hyper", "ledger"] as const) {
+      const s = details({ mode });
+      for (const id of ["country", "cohort"]) {
+        expect(detailsCards(s).find((c) => c.id === id)?.hint).toBeNull();
+      }
+    }
   });
   it("geo node ghost turns HONEST when the filtered network plots nothing", () => {
     const cards = detailsCards(details({ mode: "geo", filter: "tbc", selNodesCount: 0, filterLabel: "TBC" }));
@@ -93,5 +105,16 @@ describe("detailsCards — RIGHT rail (Details): fixed slots + ghost hints", () 
     expect(byId.context).toBe("dor");
     expect(byId.node).toBe("9.9.9.9");
     expect(byId.snap).toBe(42);
+  });
+  it("a committed country/cohort populates its slot with a stable joined subjectKey", () => {
+    const cards = detailsCards(
+      details({ mode: "geo", country: "de", cohort: { cc: "de", city: "Falkenstein", isp: "Hetzner" } }),
+    );
+    const country = cards.find((c) => c.id === "country")!;
+    const cohort = cards.find((c) => c.id === "cohort")!;
+    expect(country.present).toBe(true);
+    expect(country.subjectKey).toBe("de");
+    expect(cohort.present).toBe(true);
+    expect(cohort.subjectKey).toBe("de|Falkenstein|Hetzner");
   });
 });

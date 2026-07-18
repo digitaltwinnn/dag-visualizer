@@ -145,7 +145,8 @@ export const VIEW_POLICIES: Record<Mode, ViewPolicy> = {
     minCamDist: 12,
     minCamAlt: null,
     minPolarAngle: 0.25,
-    nodeList: false,
+    // The Snapshots node browser (LedgerPanel's floor disclosures) reads store.selNodes.
+    nodeList: true,
     bloom: BLOOM_CALM, // the reference look the design likes — unchanged
   },
   status: FLAT,

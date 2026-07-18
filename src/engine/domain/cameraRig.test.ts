@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import * as THREE from "three";
-import { FOCI, hubFraming, geoFraming, ledgerLayerFraming, ledgerNodeFraming, easeInOutQuad, CAM_ZOOM, dollyBack, nodeFraming, hyperNodeFraming, closeness, CLOSE_FAR_ALT, CLOSE_NEAR_ALT, NODE_RAISE } from "./cameraRig";
+import { FOCI, hubFraming, geoFraming, ledgerLayerFraming, ledgerNodeFraming, easeInOutQuad, CAM_ZOOM, dollyBack, nodeFraming, cohortFraming, hyperNodeFraming, closeness, CLOSE_FAR_ALT, CLOSE_NEAR_ALT, NODE_RAISE } from "./cameraRig";
 
 describe("FOCI", () => {
   it("carries the camera presets (ledger has none — it uses `overview` + a rotated group)", () => {
@@ -164,6 +164,20 @@ describe("nodeFraming (the geo node pose — ABSOLUTE, dolly-exempt)", () => {
     nodeFraming(out);
     expect(out.pos).toEqual(new THREE.Vector3(0, 4.6, 19.2));
     expect(out.target).toEqual(new THREE.Vector3(0, 19.5, 2));
+  });
+});
+
+describe("cohortFraming (the geo COHORT/provider pose)", () => {
+  it("sits BETWEEN the country band and the node pose (the ladder's zoom order)", () => {
+    const out = { pos: new THREE.Vector3(), target: new THREE.Vector3() };
+    cohortFraming(out);
+    const cohortDist = out.pos.length();
+    nodeFraming(out);
+    const nodeDist = out.pos.length();
+    // Wider than the node pose, tighter than the country framing floor (countryShape dist ≥ 4.3
+    // from R≈15-based math — assert against the node pose + the geoNetwork preset instead).
+    expect(cohortDist).toBeGreaterThan(nodeDist);
+    expect(cohortDist).toBeLessThan(FOCI.geoNetwork.pos.length());
   });
 });
 

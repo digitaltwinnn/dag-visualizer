@@ -9,6 +9,8 @@ import {
   Info,
   Telescope,
   Box,
+  MapPin,
+  Server,
   type LucideIcon,
 } from "lucide-react";
 import type { Mode } from "@/src/store/store";
@@ -57,6 +59,14 @@ export const SNAPSHOT_ICON: LucideIcon = Box;
 // EXPLORE_ICON: dedicated non-view marks get a constant here, view subjects borrow VIEW_ICONS.
 export const LAYER_ICON: LucideIcon = Layers2;
 
+// The COUNTRY drill's mark (the geo focus ladder's country rung — card head, ghost, dock tray):
+// a place pin — distinct from VIEW_ICONS.geo (the whole globe) and the node's Globe mark.
+export const COUNTRY_ICON: LucideIcon = MapPin;
+
+// The PROVIDER (internal id: cohort — city × hosting-provider rung) mark: a server rack, reading
+// as "hosting infrastructure" — distinct from the country pin and the node's Globe mark.
+export const PROVIDER_ICON: LucideIcon = Server;
+
 // The ONE size every card-head/title KIND MARK renders at — About's Info, the tool cards'
 // Telescope, the node card's Globe, the snapshot card's Box (CardHead's panel `icon` + the inspector
 // titles in inspector/cards.tsx). 16px (`size-4`): the old 14px read timid next to the 15px
@@ -68,12 +78,18 @@ export const KIND_MARK_CLASS = "flex-none size-4";
 // The inspector card KINDS map onto one glyph set shared with the dock icon trays: the metagraph
 // dossier is the Hypergraph subject (Orbit), a node is the Geography subject (Globe), a snapshot
 // is the BLOCK (SNAPSHOT_ICON), a layer is one stratum (LAYER_ICON).
-export function iconForPick(kind: PickDescriptor["kind"] | "l0" | "l1" | "metanode"): LucideIcon {
+export function iconForPick(
+  kind: PickDescriptor["kind"] | "l0" | "l1" | "metanode" | "country" | "cohort",
+): LucideIcon {
   switch (kind) {
     case "snapshot":
       return SNAPSHOT_ICON; // the block, not the whole-stack view mark (see its constant above)
     case "layer":
       return LAYER_ICON; // dedicated mark (see its constant above) — not a view subject
+    case "country":
+      return COUNTRY_ICON; // the geo drill rung (see its constant above)
+    case "cohort":
+      return PROVIDER_ICON; // the geo city×provider rung (see its constant above); user copy "provider"
 
     case "geoLive":
     case "l0":

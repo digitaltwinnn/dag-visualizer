@@ -5,16 +5,22 @@
 //     the named builders below — so the scene and the panels can never drift in semantics.
 // The ORDERING contracts are tested invariants:
 //   - selecting a node sets the network filter FIRST (its store subscription clears any old
-//     country drill), then commits the node's own country, then inspect LAST so the
-//     node-focus camera flight wins over the network/country framings;
-//   - the country toggle drops a selected node BEFORE moving the drill level (the zoom-level
-//     rule: moving between levels deselects the finer one).
+//     country drill), then commits the node's own country AND cohort (full-ancestry rule,
+//     spec Part 3 — every rung above the node commits so a deselect steps back down the same
+//     ladder regardless of how the node was reached), then inspect LAST so the node-focus
+//     camera flight wins over the network/country/cohort framings;
+//   - a zoom-level toggle (country, cohort) drops every FINER rung first (moving between
+//     levels deselects the finer ones); the "ladder-derived stepping" tests assert this
+//     matches `domain/focusLadder.ts`'s finerLevels() exactly, so pickActions can't drift
+//     from the ladder even though the drop list is hand-written per builder.
 import type { Mode } from "@/src/store/store";
 import type { PickDescriptor } from "@/src/data/types";
+import type { CohortSel } from "./focusLadder";
 
 export type ClickAction =
   | { kind: "filter"; id: string }                                             // commit the network filter
   | { kind: "country"; cc: string | null }                                     // commit/clear the country drill
+  | { kind: "cohort"; sel: CohortSel | null }                                  // commit/clear the city×provider cohort (geo)
   | { kind: "inspect"; pick: PickDescriptor | null }                           // open/clear the node card
   // Select a snapshot (follow decides pin vs heartbeat) — or CLEAR it (pick null, follow
   // omitted: the follow state is untouched; FollowController owns the re-follow).
@@ -48,33 +54,65 @@ export function pickActive(
 }
 
 // The country zoom-level TOGGLE — shared by the scene's empty-click-on-a-country and
-// GeoExplore's country row (`drill`). Entering/leaving a country level drops a selected node
-// first (the zoom-level rule).
+// GeoExplore's country row (`drill`). Entering/leaving a country level drops the finer rungs
+// first (the zoom-level rule — finerLevels("geo","country") = ["node","cohort"]): a selected
+// node, then a committed cohort.
 export function countryToggleActions(
   cc: string,
-  current: { country: string | null; hasInspect: boolean },
+  current: { country: string | null; hasInspect: boolean; cohort: CohortSel | null },
 ): ClickAction[] {
   const acts: ClickAction[] = [];
   if (current.hasInspect) acts.push({ kind: "inspect", pick: null });
+  if (current.cohort) acts.push({ kind: "cohort", sel: null });
   acts.push({ kind: "country", cc: current.country === cc ? null : cc });
+  return acts;
+}
+
+// Cohort identity — cc+city+isp (all three; city/isp may be null and must match as null).
+export const sameCohort = (a: CohortSel | null, b: CohortSel | null): boolean =>
+  !!a && !!b && a.cc === b.cc && a.city === b.city && a.isp === b.isp;
+
+// The cohort/provider zoom-level TOGGLE (spec Part 4) — GeoExplore's cohort row. Entering/
+// leaving the cohort level drops the finer node selection first (finerLevels("geo","cohort")).
+export function cohortToggleActions(
+  c: CohortSel,
+  current: { cohort: CohortSel | null; hasInspect: boolean },
+): ClickAction[] {
+  const acts: ClickAction[] = [];
+  if (current.hasInspect) acts.push({ kind: "inspect", pick: null });
+  acts.push({ kind: "cohort", sel: sameCohort(current.cohort, c) ? null : c });
   return acts;
 }
 
 // Selecting a NODE — shared by the scene node click and GeoExplore's node row (`selectNode`).
 // Drills the global filter into the node's network (only when it actually changes — no churn),
-// selects the node's COUNTRY in geo (border + firmer land + expanded explorer row beneath the
-// selection), and sets inspect LAST so the node camera wins the flight. `deselect` is the
-// row's re-click toggle (one toggle language everywhere — the × on the card does the same);
-// a scene click never deselects.
+// selects the node's full geo ANCESTRY in geo (country + cohort — border/firmer land/expanded
+// explorer rows beneath the selection) or its ledger LAYER ancestry in ledger, and sets inspect
+// LAST so the node camera wins the flight. Full-ancestry rule (spec Part 3): committing every
+// rung above the node means a deselect steps back down the SAME ladder regardless of how the
+// node was reached (scene click, explorer row, or a jump straight from "all"). `deselect` is
+// the row's re-click toggle (one toggle language everywhere — the × on the card does the
+// same); a scene click never deselects.
 export function nodeSelectActions(
   p: PickDescriptor,
-  opts: { mode: Mode; currentFilter: string; deselect?: boolean },
+  opts: { mode: Mode; currentFilter: string; deselect?: boolean; ledgerLayerId?: string | null },
 ): ClickAction[] {
   if (opts.deselect) return [{ kind: "inspect", pick: null }];
   const acts: ClickAction[] = [];
   const netId = pickNetId(p);
   if (netId && netId !== opts.currentFilter) acts.push({ kind: "filter", id: netId });
-  if (opts.mode === "geo" && "geo" in p && p.geo?.cc) acts.push({ kind: "country", cc: p.geo.cc });
+  if (opts.mode === "geo" && "geo" in p && p.geo?.cc) {
+    acts.push({ kind: "country", cc: p.geo.cc });
+    // Full-ancestry rule (spec Part 3): the node's cohort commits too, so deselect steps
+    // node → cohort → country → network regardless of how the node was reached.
+    acts.push({ kind: "cohort", sel: { cc: p.geo.cc, city: p.geo.city ?? null, isp: p.geo.isp ?? null } });
+  }
+  if (opts.mode === "ledger") {
+    // Ledger ancestry: the browser row's parent floor, else the node's related-L0 floor
+    // (the same mapping the view-entry auto-commit uses).
+    const layerId = opts.ledgerLayerId ?? autoLayerForNode(p.kind);
+    if (layerId) acts.push({ kind: "layer", pick: { kind: "layer", layerId } });
+  }
   acts.push({ kind: "inspect", pick: p });
   return acts;
 }
@@ -122,7 +160,7 @@ export function clickActions(input: {
   // The drillable country under the cursor when NOTHING was picked (the Engine resolves the
   // land-sphere hit, policy-gated to geo); null elsewhere/over ocean.
   countryCc: string | null;
-  current: { filter: string; country: string | null; hasInspect: boolean; layerId: string | null };
+  current: { filter: string; country: string | null; hasInspect: boolean; layerId: string | null; cohort: CohortSel | null };
 }): ClickAction[] {
   const { mode, pick: p, countryCc, current } = input;
 
