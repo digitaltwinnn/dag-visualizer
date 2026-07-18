@@ -21,7 +21,7 @@ import { countryFraming } from "./domain/countryShape";
 import { R as GEO_R, LAND_H } from "./domain/geoLayout";
 import { autoLayerForNode, clickActions, pickActive } from "./domain/pickActions";
 import { ViewTransition, type View3D } from "./domain/viewTransition";
-import type { CohortSel } from "./domain/focusLadder";
+import { LADDERS, type CohortSel, type SelectionSnapshot, type ResolverKey } from "./domain/focusLadder";
 import type { GlobalSnapshot, PickDescriptor } from "@/src/data/types";
 import type { ClusterNode, DagCore, GeoMap, RouteMetagraph } from "@/src/data/types";
 
@@ -282,18 +282,22 @@ export class Engine {
         if (st.country !== prev.country && st.filter === prev.filter && st.mode === "geo") {
           this.country = st.country;
           this.globe.setCountry(st.country);
-          this._applyGeoFocus();
+          this._resolveFocus();
         }
         // Keep the mirrored cohort field in sync so `_handleClick`'s clickActions call never
-        // reads stale state (Task 3 grows this into the cohort camera resolution).
-        if (st.cohort !== prev.cohort) this.cohortSel = st.cohort;
+        // reads stale state; a geo cohort commit/clear re-walks the ladder (the geoCohort rung
+        // is inert until Task 5, but the channel is live now).
+        if (st.cohort !== prev.cohort) {
+          this.cohortSel = st.cohort;
+          if (st.mode === "geo") this._resolveFocus();
+        }
         // The selected node card (geo or hyper) keeps that node's layer shells lit on the globe.
         if (st.inspect !== prev.inspect) this.globe.setSelectedNode(this._pickNodeId(st.inspect));
         // Geo: clicking a node (on the globe or in the left explorer both set `inspect`)
         // flies the camera to it; clearing it returns to the selection framing.
-        if (st.inspect !== prev.inspect && st.mode === "geo") this._focusInspectNode(st.inspect);
+        if (st.inspect !== prev.inspect && st.mode === "geo") this._resolveFocus();
         // Ledger: the same ladder — a node pick zooms to its chip, a clear steps back to the layer.
-        if (st.inspect !== prev.inspect && st.mode === "ledger") this._focusLedgerInspect(st.inspect);
+        if (st.inspect !== prev.inspect && st.mode === "ledger") this._resolveFocus();
         // Ledger: keep the hovered/selected snapshot coloured in the trail (hover wins, then the
         // clicked `snap`); everything else fades to the neutral background tone.
         if (st.hoverSnapOrd !== prev.hoverSnapOrd || st.snap !== prev.snap) {
@@ -326,10 +330,7 @@ export class Engine {
         // Committing a layer flies the camera to the tilted layer-focus view of its plane (an
         // exploration move — the resting ledger pose is central/untilted); clearing returns to the
         // shared overview. Ledger-only: the planes exist nowhere else.
-        if (st.layer !== prev.layer && st.mode === "ledger") {
-          if (st.layer) this._focusLayer(st.layer.layerId);
-          else this.focus("overview");
-        }
+        if (st.layer !== prev.layer && st.mode === "ledger") this._resolveFocus();
       }),
     );
 
@@ -608,19 +609,17 @@ export class Engine {
       // layer level, geo's country→node ladder mirrored).
       const autoLayer = selLayer ? null : autoLayerForNode(inspect?.kind);
       if (autoLayer) applyClickActions([{ kind: "layer", pick: { kind: "layer", layerId: autoLayer } }]);
-      const layerId = selLayer?.layerId ?? autoLayer;
-      const isNode = !!inspect && (inspect.kind === "l0" || inspect.kind === "l1" || inspect.kind === "metanode");
-      if (isNode && this._focusLedgerNode(inspect!)) { /* node camera wins */ }
-      else if (layerId) this._focusLayer(layerId);
-      else this.focus("overview");
+      // The auto-commit above runs first (through the ONE executor), so the ladder's snapshot
+      // sees the layer it just committed — the node level still wins the camera if selected.
+      this._resolveFocus();
       return;
     }
     // hyper / geo (ledger returned above; flat views never reach here — see the method note):
     this.ctx.controls.autoRotate = mode !== "geo";
-    this.applyFilter(false); // apply the filter's visuals, but leave the camera to _focusSelection
+    this.applyFilter(false); // apply the filter's visuals, but leave the camera to _resolveFocus
     // A selection's camera position carries across view switches: frame the selected node in the
     // new view (geo → its globe spot, hyper → its shell point), else the filter's default framing.
-    this._focusSelection();
+    this._resolveFocus();
   }
 
   // `focusCamera` is false for BACKGROUND data refreshes (new cluster/meta/geo arriving) — they
@@ -640,24 +639,22 @@ export class Engine {
       // — without the re-assert, the poll silently wiped the drill's dim + border seconds
       // after every drill while the store/engine still said drilled (long-standing bug).
       if (this.country != null) this.globe.setCountry(this.country);
-      if (focusCamera) this._applyGeoFocus();
+      if (focusCamera) this._resolveFocus();
     } else if (this.mode === "hyper") {
       // Dim the non-selected nodes ("the others") so the selected network stands out, on top
       // of the camera focus + DoF. "all" dims nothing (setFilter no-ops the dim).
       this.globe.setFilter(this.filter);
-      if (focusCamera) {
-        this.globe.focusDensest(false);
-        this._focusFilter(this.filter);
-      }
+      if (focusCamera) this._resolveFocus();
     } else if (this.mode === "ledger") {
       // Dim the non-selected metagraph columns so the selection stands out. The ledger neutralises
       // the other lanes' tiles/links. The camera stays put — EXCEPT when a layer is focused: the
       // layer framing is lane-aware (centres the selected metagraph's lane), so a filter change
-      // re-runs it to slide over to the newly-selected lane.
+      // re-runs it to slide over to the newly-selected lane. ⚠️ With no layer committed, the
+      // ladder's "all" rung re-tweens to the overview pose it's already at — a no-op in practice
+      // (the only way to be settled in ledger with no layer).
       this.globe.setFilter(this.filter);
       this.ledger.setFilter(this.filter);
-      const selLayer = useStore.getState().layer;
-      if (focusCamera && selLayer) this._focusLayer(selLayer.layerId);
+      if (focusCamera) this._resolveFocus();
     }
     this._publishLeaderboard();
     // Tint the globe's land edge with the selected metagraph's SCENE colour (null → default
@@ -672,82 +669,107 @@ export class Engine {
     this.globe.setEdgeColor(accent);
   }
 
-  // Aim/zoom the globe for the current network + country selection (ports
-  // ui.js _applyGeoFocus): narrowed selections swing to the densest cluster, but only a
-  // COUNTRY drill-down zooms in (proportional to concentration). A metagraph selection just
-  // rotates the globe to its densest area at the DEFAULT geo distance — no zoom (node picks
-  // zoom via _focusNode); "all" sits at the wide geo overview.
-  private _applyGeoFocus() {
-    const narrowed = this.filter !== "all" || this.country != null;
-    // Country drill: the country's SHAPE leads — spin to its polygon centroid and frame its
-    // angular extent (domain countryShape), so the country itself sits centred regardless of
-    // where its nodes cluster. Falls back to the node-mean concentration framing while the
-    // countries topology is still loading / for a cc it doesn't cover.
-    if (this.country != null) {
+  // The ladder walk (domain/focusLadder): first ACTIVE rung whose resolver succeeds wins the
+  // camera; resolver failure (unlocatable subject, topology not loaded) falls through — the
+  // per-view fallback chains, made uniform. Resolvers are the ONLY camera-framing entry points
+  // for selection state; they keep their scene side effects (globe lean/spin, autoRotate).
+  private _resolvers: Record<ResolverKey, () => boolean> = {
+    geoNode: () => {
+      const p = useStore.getState().inspect;
+      if (!p || !("geo" in p) || !this.globe.focusNode(p.geo)) return false;
+      this.ctx.controls.autoRotate = false;
+      this._focusNode();
+      return true;
+    },
+    geoCohort: () => false, // Task 5 (feature) — inert fall-through until then
+    geoCountry: () => {
+      if (this.country == null) return false;
+      // Country drill: the country's SHAPE leads — spin to its polygon centroid and frame its
+      // angular extent (domain countryShape), so the country itself sits centred regardless of
+      // where its nodes cluster.
       const shape = this.globe.focusCountryShape(this.country);
       if (shape) {
         countryFraming(shape.latAngle, shape.angularRadius, this._framingOut);
         this._tweenTo(this._framingOut.pos, this._framingOut.target);
-        return;
+        return true;
       }
-    }
-    const R = this.globe.focusDensest(narrowed);
-    // Three zoom LEVELS (user design): metagraph = a WIDE network pose (rotated to the densest
-    // cluster, held clearly farther out than the country pose so the country drill still reads
-    // as a zoom), country = the tilted mid framing (concentration-scaled), node = _focusNode.
-    // Each deselect steps back up one level ("all" = the resting overview).
-    if (this.country != null && R != null) this._focusGeo(R);
-    else if (narrowed && R != null) this.focus("geoNetwork");
-    else this.focus("geo");
-  }
-
-  // Frame the current SELECTION in whichever view we're in — so a selection's camera position
-  // carries across view switches (geo → its globe spot, hyper → its shell point). No node
-  // selected → the filter's default framing. One place, so every view stays consistent.
-  private _focusSelection() {
-    const inspect = useStore.getState().inspect;
-    const isNode =
-      !!inspect && (inspect.kind === "l0" || inspect.kind === "l1" || inspect.kind === "metanode");
-    if (this.mode === "geo") {
-      if (isNode) this._focusInspectNode(inspect);
-      else this._applyGeoFocus();
-    } else if (this.mode === "hyper") {
-      if (isNode) this._focusHyperNode(inspect!);
-      else {
-        this.globe.focusDensest(false);
-        this._focusFilter(this.filter);
-      }
-    }
-  }
-
-  // Geo node selection (globe click or left-rail explorer): swing the node to the front
-  // (with tilt) and zoom in closer than a country focus. Clearing the pick — or a pick we
-  // can't locate — falls back to the current selection framing.
-  private _focusInspectNode(p: PickDescriptor | null) {
-    if (p && (p.kind === "l0" || p.kind === "l1" || p.kind === "metanode")) {
-      if (this.globe.focusNode(p.geo)) {
-        this.ctx.controls.autoRotate = false;
-        this._focusNode();
-      }
-    } else {
-      this._applyGeoFocus();
-    }
-  }
-
-  // Hypergraph node framing: fly to the node's live shell point (pulled back along its radial,
-  // lifted a touch). Falls back to the network framing if the node can't be located.
-  private _focusHyperNode(p: PickDescriptor) {
-    const id = p.kind === "metanode" ? p.node?.ip : p.kind === "l0" || p.kind === "l1" ? p.node?.id : null;
-    const pos = id ? this.globe.hyperWorldPos(id) : null;
-    if (!pos) {
+      // Degraded mode while the countries topology loads: the node-mean concentration framing
+      // (still a COUNTRY-level pose — this rung handles its own fallback, it does not fall to
+      // the network rung; matches the pre-ladder behaviour).
+      const R = this.globe.focusDensest(true);
+      if (R == null) return false;
+      this._focusGeo(R);
+      return true;
+    },
+    geoNetwork: () => {
+      const R = this.globe.focusDensest(true);
+      if (R == null) return false;
+      // Three zoom LEVELS (user design): metagraph = a WIDE network pose (rotated to the
+      // densest cluster, held clearly farther out than the country pose so the country drill
+      // still reads as a zoom).
+      this.focus("geoNetwork");
+      return true;
+    },
+    geoOverview: () => {
       this.globe.focusDensest(false);
-      this._focusFilter(this.filter);
-      return;
+      this.focus("geo");
+      return true;
+    },
+    hyperNode: () => {
+      const p = useStore.getState().inspect;
+      const id = !p ? null : p.kind === "metanode" ? p.node?.ip : p.kind === "l0" || p.kind === "l1" ? p.node?.id : null;
+      const pos = id ? this.globe.hyperWorldPos(id) : null;
+      if (!pos) return false;
+      this.ctx.controls.autoRotate = false;
+      this.layers.focusId = null;
+      hyperNodeFraming(pos, this._framingOut);
+      this._tweenTo(this._framingOut.pos, this._framingOut.target);
+      return true;
+    },
+    hyperNetwork: () => {
+      this.globe.focusDensest(false);
+      this._focusFilter(this.filter); // handles hub-not-found by falling to overview internally
+      return true;
+    },
+    hyperOverview: () => {
+      this.globe.focusDensest(false);
+      this._focusFilter("all"); // the existing "all" path: focusId cleared, tilt eased, overview pose
+      return true;
+    },
+    ledgerNode: () => {
+      const p = useStore.getState().inspect;
+      return !!p && this._focusLedgerNode(p);
+    },
+    ledgerLayer: () => {
+      const layerId = useStore.getState().layer?.layerId;
+      if (!layerId) return false;
+      this._focusLayer(layerId);
+      return true;
+    },
+    ledgerOverview: () => {
+      this.focus("overview");
+      return true;
+    },
+  };
+
+  // Resolve the camera for the CURRENT selection state by walking the current view's ladder
+  // (domain/focusLadder.LADDERS) — the one entry point every selection-driven camera flight
+  // goes through (a filter/country/cohort/layer/inspect change, a view switch, a transition
+  // boundary). No-ops outside the three 3D views.
+  private _resolveFocus(): void {
+    const st = useStore.getState();
+    if (this.mode !== "hyper" && this.mode !== "geo" && this.mode !== "ledger") return;
+    const sel: SelectionSnapshot = {
+      inspectIsNode:
+        !!st.inspect && (st.inspect.kind === "l0" || st.inspect.kind === "l1" || st.inspect.kind === "metanode"),
+      cohort: st.cohort,
+      country: this.country,
+      layerId: st.layer?.layerId ?? null,
+      filter: this.filter,
+    };
+    for (const rung of LADDERS[this.mode]) {
+      if (rung.active(sel) && this._resolvers[rung.resolver]()) return;
     }
-    this.ctx.controls.autoRotate = false;
-    this.layers.focusId = null;
-    hyperNodeFraming(pos, this._framingOut);
-    this._tweenTo(this._framingOut.pos, this._framingOut.target);
   }
 
   // Snapshots NODE zoom (user, 2026-07-17): the level after the layer zoom, mirroring geo's
@@ -761,17 +783,6 @@ export class Engine {
     ledgerNodeFraming(pos, this._framingOut);
     this._tweenTo(this._framingOut.pos, this._framingOut.target);
     return true;
-  }
-
-  // Ledger inspect-change camera: a node pick zooms to its chip (the node level); clearing it
-  // steps back UP one level to the committed layer's framing, else the resting overview —
-  // the same deselect ladder as geo's node → country → selection.
-  private _focusLedgerInspect(p: PickDescriptor | null) {
-    const isNode = !!p && (p.kind === "l0" || p.kind === "l1" || p.kind === "metanode");
-    if (isNode && this._focusLedgerNode(p!)) return;
-    const selLayer = useStore.getState().layer;
-    if (selLayer) this._focusLayer(selLayer.layerId);
-    else this.focus("overview");
   }
 
   // Node framing: zoomed in, camera low in front of the node, line of sight skimming across the

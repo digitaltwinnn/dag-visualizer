@@ -70,7 +70,7 @@ export function nodeFraming(out: CameraFraming): void {
 
 // ---- the hyper NODE pose --------------------------------------------------------------------
 // Fly to a node's live shell point: pulled back along its outward radial, lifted a touch,
-// looking at the node itself (Engine._focusHyperNode).
+// looking at the node itself (Engine's `hyperNode` resolver).
 export function hyperNodeFraming(nodeWorldPos: THREE.Vector3, out: CameraFraming): void {
   _out.copy(nodeWorldPos).normalize();
   out.pos.copy(nodeWorldPos).addScaledVector(_out, 9);
