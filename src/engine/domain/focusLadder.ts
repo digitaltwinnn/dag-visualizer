@@ -26,7 +26,7 @@ export interface SelectionSnapshot {
 export type ResolverKey =
   | "geoNode" | "geoCohort" | "geoCountry" | "geoNetwork" | "geoOverview"
   | "hyperNode" | "hyperNetwork" | "hyperOverview"
-  | "ledgerNode" | "ledgerLayer" | "ledgerOverview";
+  | "ledgerNode" | "ledgerLayer" | "ledgerNetwork" | "ledgerOverview";
 
 export interface Rung {
   level: FocusLevel;
@@ -48,9 +48,13 @@ export const LADDERS: Record<View3D, Rung[]> = {
     { level: "network", active: (s) => s.filter !== "all", resolver: "hyperNetwork" },
     { level: "all",     active: () => true,                resolver: "hyperOverview" },
   ],
+  // The layer rung sits FINER than network deliberately: a committed layer wins the camera and
+  // composes with the filter (the lane-aware layer framing slides on a filter change, see
+  // Engine._focusLayer); the network rung only fires when no layer/node is committed.
   ledger: [
     { level: "node",    active: (s) => s.inspectIsNode,    resolver: "ledgerNode" },
     { level: "layer",   active: (s) => s.layerId != null,  resolver: "ledgerLayer" },
+    { level: "network", active: (s) => s.filter !== "all", resolver: "ledgerNetwork" },
     { level: "all",     active: () => true,                resolver: "ledgerOverview" },
   ],
 };

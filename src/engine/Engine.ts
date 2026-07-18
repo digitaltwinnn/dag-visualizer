@@ -663,11 +663,11 @@ export class Engine {
       if (focusCamera) this._resolveFocus();
     } else if (this.mode === "ledger") {
       // Dim the non-selected metagraph columns so the selection stands out. The ledger neutralises
-      // the other lanes' tiles/links. The camera stays put — EXCEPT when a layer is focused: the
-      // layer framing is lane-aware (centres the selected metagraph's lane), so a filter change
-      // re-runs it to slide over to the newly-selected lane. ⚠️ With no layer committed, the
-      // ladder's "all" rung re-tweens to the overview pose it's already at — a no-op in practice
-      // (the only way to be settled in ledger with no layer).
+      // the other lanes' tiles/links. A committed LAYER wins the camera (finer than network): its
+      // framing is lane-aware (centres the selected metagraph's lane), so a filter change re-runs
+      // it to slide over to the newly-selected lane. With no layer committed, the ladder's NETWORK
+      // rung frames the filtered metagraph's lane at its L0 floor (ledgerNetwork resolver, 2026-07-18
+      // — replaced the old fall-through to the overview pose); "all" still resolves to overview.
       this.globe.setFilter(this.filter);
       this.ledger.setFilter(this.filter);
       if (focusCamera) this._resolveFocus();
@@ -766,6 +766,13 @@ export class Engine {
       const layerId = useStore.getState().layer?.layerId;
       if (!layerId) return false;
       this._focusLayer(layerId);
+      return true;
+    },
+    ledgerNetwork: () => {
+      // Frame the committed network's LANE at its L0 floor (user, 2026-07-18): the lane-aware
+      // layer framing, camera-only — no store.layer commit, so the layer card stays a ghost.
+      // "dag" lives at lane-centre on the hypergraph-L0 floor; metagraphs on their ml0 row.
+      this._focusLayer(this.filter === "dag" ? "hypl0" : "ml0");
       return true;
     },
     ledgerOverview: () => {

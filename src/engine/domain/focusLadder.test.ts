@@ -10,7 +10,7 @@ describe("focusLadder — the per-view rung tables (spec 2026-07-18)", () => {
   it("pins each view's rung order, finest→coarsest", () => {
     expect(LADDERS.geo.map((r) => r.level)).toEqual(["node", "cohort", "country", "network", "all"]);
     expect(LADDERS.hyper.map((r) => r.level)).toEqual(["node", "network", "all"]);
-    expect(LADDERS.ledger.map((r) => r.level)).toEqual(["node", "layer", "all"]);
+    expect(LADDERS.ledger.map((r) => r.level)).toEqual(["node", "layer", "network", "all"]);
   });
 
   it("every ladder ends in an unconditional 'all' rung (the walk always resolves)", () => {
@@ -40,6 +40,8 @@ describe("focusLadder — the per-view rung tables (spec 2026-07-18)", () => {
     expect(LADDERS.ledger[0].active(sel({ inspectIsNode: true }))).toBe(true);
     expect(LADDERS.ledger[1].active(sel({ layerId: "ml0" }))).toBe(true);
     expect(LADDERS.ledger[1].active(sel())).toBe(false);
+    expect(LADDERS.ledger[2].active(sel({ filter: "dor" }))).toBe(true);
+    expect(LADDERS.ledger[2].active(sel({ filter: "all" }))).toBe(false);
   });
 
   it("resolver keys are view-prefixed and unique within a view", () => {
@@ -55,6 +57,7 @@ describe("focusLadder — the per-view rung tables (spec 2026-07-18)", () => {
     expect(finerLevels("geo", "cohort")).toEqual(["node"]);
     expect(finerLevels("geo", "node")).toEqual([]);
     expect(finerLevels("ledger", "layer")).toEqual(["node"]);
+    expect(finerLevels("ledger", "network")).toEqual(["node", "layer"]);
     expect(finerLevels("hyper", "network")).toEqual(["node"]);
   });
 
