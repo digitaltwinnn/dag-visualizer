@@ -219,8 +219,8 @@ export class LedgerView implements SceneView {
   // in sync with whatever highlight is currently committed/hovered.
   private _hiliteId: string | null = null;
   private _hiliteDim = false;
-  // The view-transition furniture multiplier (Engine, per frame; Task 7 wires it up). At 0 the
-  // spot is also blacked out — a lit stage light over dark furniture is the lingering-light bug class.
+  // The view-transition furniture multiplier (Engine, per frame). The spot's dark-view blackout
+  // lives in the Engine's central StageLights gate, not here.
   // FadeSet is the single owner of the alpha: static entries (the labels, the DAG-L1 dial) register
   // once at construction; every dynamic per-frame write below reads `_fades.alpha`.
   private _fades = new FadeSet();
