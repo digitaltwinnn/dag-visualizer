@@ -4,6 +4,7 @@ import {
   GOLDEN_ANGLE, lerp, smooth, smoother, discFall, fibShellPos, spreadCoLocated,
   stackSizes, STACK_MIN, STACK_MAX,
   armillaryFrame, ringFramePos, armillaryRings, armillaryPos,
+  nodeRoles, hexCell,
 } from "./nodeLayout";
 
 describe("lerp / smooth / GOLDEN_ANGLE", () => {
@@ -228,6 +229,47 @@ describe("spreadCoLocated levels (chip stacks)", () => {
     const levels: number[] = [];
     spreadCoLocated(dirs, undefined, levels);
     expect(levels).toEqual([0]);
+  });
+});
+
+describe("nodeRoles", () => {
+  it("returns the node's own roles when it has any", () => {
+    expect(nodeRoles({ roles: ["l0", "cl1"] }, "fallback")).toEqual(["l0", "cl1"]);
+  });
+  it("falls back to [fallback] when roles is missing, empty, or the node is absent", () => {
+    expect(nodeRoles({ roles: [] }, "fallback")).toEqual(["fallback"]);
+    expect(nodeRoles({}, "fallback")).toEqual(["fallback"]);
+    expect(nodeRoles(null, "fallback")).toEqual(["fallback"]);
+    expect(nodeRoles(undefined, "fallback")).toEqual(["fallback"]);
+  });
+});
+
+describe("hexCell (axial hex spiral)", () => {
+  it("cell 0 is the centre", () => {
+    expect(hexCell(0)).toEqual({ x: 0, y: 0 });
+  });
+
+  it("is deterministic", () => {
+    for (let i = 0; i < 30; i++) expect(hexCell(i)).toEqual(hexCell(i));
+  });
+
+  it("ring 1 (cells 1..6) sit exactly one unit from the centre — the neighbour distance", () => {
+    for (let i = 1; i <= 6; i++) {
+      const c = hexCell(i);
+      expect(Math.hypot(c.x, c.y)).toBeCloseTo(1, 9);
+    }
+  });
+
+  it("adjacent ring-1 cells are exactly one unit apart (regular hexagons tile edge-to-edge)", () => {
+    const a = hexCell(1);
+    const b = hexCell(2);
+    expect(Math.hypot(a.x - b.x, a.y - b.y)).toBeCloseTo(1, 9);
+  });
+
+  it("ring corners (the first cell of each ring) sit exactly `ring` units out", () => {
+    expect(Math.hypot(...Object.values(hexCell(1)) as [number, number])).toBeCloseTo(1, 9); // ring 1 corner
+    expect(Math.hypot(...Object.values(hexCell(7)) as [number, number])).toBeCloseTo(2, 9); // ring 2 corner
+    expect(Math.hypot(...Object.values(hexCell(19)) as [number, number])).toBeCloseTo(3, 9); // ring 3 corner
   });
 });
 
