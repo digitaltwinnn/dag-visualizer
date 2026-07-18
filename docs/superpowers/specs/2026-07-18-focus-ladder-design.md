@@ -191,6 +191,27 @@ committed, ghost otherwise. This surfaces an EXISTING gap (country) plus the new
   flip back) settling on the correct framing; the layer card no longer lingering outside
   ledger.
 
+## Amendments (2026-07-18, during implementation — all user-adjudicated)
+
+1. **Filter switch = network-level event, every view.** A filter change drops node + cohort
+   + country in EVERY view (was: node cleared in hyper only). Closes two camera regressions
+   the review found in the plan's own `applyFilter` rewrite; the ledger LAYER deliberately
+   survives (it composes with the filter — lane-aware).
+2. **Ledger network rung.** The ledger ladder is `node → layer → network → all` (not the
+   spec's original `node → layer → all`): a filter commit with nothing finer committed
+   frames the metagraph's LANE at its L0 floor (`ml0`; `dag` → `hypl0`), camera-only.
+   `layer` sits deliberately finer than `network`. This replaces an interim accepted
+   overview-re-frame behaviour.
+3. **Ledger floor LANE rows.** The browser's network level IS the filter (HyperExplore's
+   idiom bent onto strata): a node-kind floor lists the committed filter's real cluster/node
+   rows plus one lane row per OTHER network serving the floor (per-floor role-derived
+   counts; 0-located dimmed), committing the filter on click — so "all" enumerates every
+   lane instead of showing an empty state.
+4. **Minor accepted deviations:** an unlocatable geo node falls down the ladder instead of
+   doing nothing (previously: no camera response); the provider card's hover pairing is
+   outward-only (inherited — the scene never writes `hoverCohort` back); Globe cohort
+   matching falsy-normalizes city/isp (the data layer normalizes unresolved fields to `""`).
+
 ## Non-goals
 
 - No visual redesign of existing poses/framings — the per-view *values* stay; the
