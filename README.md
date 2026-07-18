@@ -14,7 +14,7 @@ can understand how it works and why it's powerful.
 - Hover any element for a tooltip; **click** for an inspector with real on-chain values and other details alongside **live
   activity** cards
 - The top bar carries view-specific
-  vitals (structure / footprint / live activity.
+  vitals (structure / footprint / live activity).
 
 ## Design language
 
@@ -85,17 +85,19 @@ Browser ──poll──> Constellation block explorer API   (snapshots / cluste
 
 ## Architecture rules
 
-The codebase is held together by a small set of rules — three of them are *executable*
+The codebase is held together by a small set of rules — six of them are *executable*
 (vitest fails if they're broken), the rest are conventions the code and docs follow
 everywhere. If you contribute (human or AI), these are the contract:
 
 **1. The engine is three layers with one-way dependencies** *(enforced:
-`src/engine/layerBoundaries.test.ts`)*. `domain/` is pure logic and data — layout math,
-simulations, decision tables, camera framings; it may use THREE's math classes but never the
-scene, React, or store values, so every behaviour is unit-testable in isolation. `scene/`
-owns meshes and GPU writes; it reads domain, never the store. `Engine.ts` is the single
-bridge: it subscribes to the store and translates state into scene commands. New logic goes
-into `domain/` with a test; the scene stays a dumb adapter.
+`src/engine/layerBoundaries.test.ts`; `domainExportCoverage.test.ts` requires every domain
+export to be covered by its colocated test; the scene-view contract tests keep scene modules
+mode-agnostic and views on the shared `SceneView` shape)*. `domain/` is pure logic and data —
+layout math, simulations, decision tables, camera framings; it may use THREE's math classes
+but never the scene, React, or store values, so every behaviour is unit-testable in
+isolation. `scene/` owns meshes and GPU writes; it reads domain, never the store. `Engine.ts`
+is the single bridge: it subscribes to the store and translates state into scene commands.
+New logic goes into `domain/` with a test; the scene stays a dumb adapter.
 
 **2. Selections have one write path** *(enforced: `components/selectionBoundary.test.ts`)*.
 Every interactive surface — a 3D raycast click, an explorer row, a strip bar, a picker row, a
@@ -119,9 +121,9 @@ view is inert until its row opts in. The same idea repeats at smaller scales: th
 one home (`domain/cameraRig.ts`, including the global zoom lever), and the click semantics
 one table.
 
-**5. The render loop allocates nothing.** Per-frame code reuses construction-time scratch
-objects; simulations communicate through ring-buffer events their owning adapter drains —
-never by mutating another view's objects.
+**5. The render loop allocates nothing** *(enforced: `src/engine/noFrameAllocations.test.ts`)*.
+Per-frame code reuses construction-time scratch objects; simulations communicate through
+ring-buffer events their owning adapter drains — never by mutating another view's objects.
 
 **6. The scene↔HUD hover pairing is sacrosanct.** Hovering a row glows the 3D object and
 hovering the 3D object washes the row, through shared store channels (`hoverFilter`,
