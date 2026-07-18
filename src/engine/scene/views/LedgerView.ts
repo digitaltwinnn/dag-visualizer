@@ -76,6 +76,9 @@ const _col = new THREE.Color();
 const _p = new THREE.Vector3();
 const _q = new THREE.Vector3(); // scratch for link curve points
 const _gx = new Map<number, number>(); // reused per-frame: slot → global block X
+// "r,g,b" 0-255 triplet for canvas fillStyle composition — kills the 4× Math.round copy-paste.
+const rgbTriplet = (c: THREE.Color): string =>
+  `${Math.round(c.r * 255)},${Math.round(c.g * 255)},${Math.round(c.b * 255)}`;
 // The trail tiles/links keep their identity/accent colour; recency is carried by slotFade brightness
 // alone (the neutral-tone + depth-fog recency treatment was removed — a future session may revisit).
 // Station-dial brightness model: REST (inactive — deliberately dim so the lit state carries the
@@ -467,17 +470,17 @@ export class LedgerView implements SceneView {
     // Structural accent (colors.core — the SAME token the floor frames use), solid-bright for
     // legibility (user: labels read unclear, make them cyan); derived from the token, no literal.
     const cc = new THREE.Color(this._core);
-    const tone = `rgba(${Math.round(cc.r * 255)},${Math.round(cc.g * 255)},${Math.round(cc.b * 255)},0.85)`;
+    const tone = `rgba(${rgbTriplet(cc)},0.85)`;
     const mc = new THREE.Color(this._muted);
-    const mtone = `rgba(${Math.round(mc.r * 255)},${Math.round(mc.g * 255)},${Math.round(mc.b * 255)},0.95)`;
+    const mtone = `rgba(${rgbTriplet(mc)},0.95)`;
     // The level badge box wears the SAME glass backing + border HUE as the React .role-chip pill —
     // `--panel` fill (opaque enough that the floor plane behind it doesn't bleed through) + `--border`
     // blue hairline — via the unified SceneColors bridge so the scene chip and the pill share one
     // colour source.
     const bc = new THREE.Color(this._border);
-    const brgb = `${Math.round(bc.r * 255)},${Math.round(bc.g * 255)},${Math.round(bc.b * 255)}`;
+    const brgb = rgbTriplet(bc);
     const pc = new THREE.Color(this._panel);
-    const prgb = `${Math.round(pc.r * 255)},${Math.round(pc.g * 255)},${Math.round(pc.b * 255)}`;
+    const prgb = rgbTriplet(pc);
     ctx.font = `400 ${22 * SS}px system-ui, -apple-system, sans-serif`;
     const boxW = Math.max(34 * SS, Math.ceil(ctx.measureText(level).width) + 16 * SS); // fits "2.1" sub-levels
     const bx = 6 * SS, by = 15 * SS, bh = 34 * SS, br = 6 * SS;

@@ -15,14 +15,14 @@
 
 import * as THREE from "three";
 import { METAGRAPHS, DEFAULT_META_COLOR } from "../config";
-import { metaAnchor, META_LAYERS, META_RING, DAG_L0, DAG_L1, HYPER_TILT } from "../domain/hyperLayout";
+import { metaAnchor, META_LAYERS, META_RING, DAG_L0, DAG_L1, HYPER_TILT, applyHyperRig } from "../domain/hyperLayout";
 import { LEDGER, ledgerSite, ledgerSpread, clusterRadius } from "../domain/ledgerLayout";
 import { gatherSlots } from "../domain/gatherLayout";
 import type { ViewTransition } from "../domain/viewTransition";
 import type { SceneColors } from "../sceneColors";
 import * as geoStats from "../domain/geoStats";
 import { R, LAND_H, CHIP_PITCH, HEX_H, VALIDATOR_HEX_R, META_HEX_R, latLonToVec3, vec3ToLatLon } from "../domain/geoLayout";
-import { armillaryFrame, ringFramePos, armillaryRings, armillaryPos, nodeRoles, spreadCoLocated } from "../domain/nodeLayout";
+import { armillaryFrame, ringFramePos, ringNormal, armillaryRings, armillaryPos, nodeRoles, spreadCoLocated } from "../domain/nodeLayout";
 import { surfFade, extrasFade } from "../domain/morph";
 import { dimScale } from "../domain/dimModel";
 import { ArcSim, type ArcEndpoint } from "../domain/arcSim";
@@ -33,6 +33,7 @@ import { ccToNumeric, countryCcAt, countryLean, geometryRings, mainPolygonRings,
 import { closeness, NODE_RAISE } from "../domain/cameraRig";
 import { NodeFabric, type FrameCtx } from "./objects/NodeFabric";
 import { Arcs } from "./objects/Arcs";
+import { makeRadialGradientTexture } from "./objects/gradientTexture";
 import type { HyperView } from "./views/HyperView";
 import type {
   CountryStat,
@@ -232,7 +233,7 @@ export class Globe implements GeoViewHost {
     // stay registered). A leftover geo rotation would otherwise offset them.
     if (!this.simSpin && !this.ledger) {
       this.spin = null;
-      this.group.rotation.set(HYPER_TILT, 0, 0);
+      applyHyperRig(this.group, 0);
     }
   }
 
@@ -242,7 +243,7 @@ export class Globe implements GeoViewHost {
   setHyperSpin(y: number, tiltX: number = HYPER_TILT): void {
     // `tiltX` is the Engine-eased shared structure tilt: HYPER_TILT at rest, easing to
     // HYPER_TILT_FOCUS while a metagraph is committed (discs read horizontal from the side).
-    if (!this.simSpin && !this.ledger) this.group.rotation.set(tiltX, y, 0);
+    if (!this.simSpin && !this.ledger) applyHyperRig(this.group, y, tiltX);
   }
 
   // The wall is always the structural accent (the geo hologram hue). Kept as a setter so the Engine
@@ -281,7 +282,7 @@ export class Globe implements GeoViewHost {
         const hyperPos = armillaryPos(i, n, ring.radius, ring.numRings, ring.tilt);
         // The node's ring normal — nodes orbit ALONG their shell around this axis (see update()).
         const _rf = armillaryFrame(i % ring.numRings, ring.numRings, ring.tilt);
-        const ringAxis = _rf.t.clone().cross(_rf.b).normalize();
+        const ringAxis = ringNormal(_rf, new THREE.Vector3()); // event-time
         const g = geoMap[node.ip];
         const geoDir = g ? latLonToVec3(g.lat!, g.lon!, 1).normalize() : null;
 
@@ -457,7 +458,7 @@ export class Globe implements GeoViewHost {
         const cnt = nodeList.length;
         present[li] = cnt > 0;
         const frame = armillaryFrame(li, META_LAYERS.length, META_RING.tilt);
-        const ringAxis = frame.t.clone().cross(frame.b).normalize(); // nodes orbit along this shell
+        const ringAxis = ringNormal(frame, new THREE.Vector3()); // event-time — nodes orbit along this shell
         nodeList.forEach((node, i) => {
           const g = geoMap[node.ip]!;
           const primary = !seen.has(node.ip);
@@ -520,7 +521,16 @@ export class Globe implements GeoViewHost {
       (m.material as THREE.Material).dispose(); // the map is the shared _glowTex — kept alive
     }
     this._densityGlow = [];
-    if (!this._glowTex) this._glowTex = makeGlowTexture();
+    // A soft radial-gradient sprite (white centre → transparent edge) for the geo density light
+    // pools. White so the per-mesh `color` tints it; additive blending turns overlaps into
+    // brighter light.
+    if (!this._glowTex) {
+      this._glowTex = makeRadialGradientTexture([
+        [0, "rgba(255,255,255,1.0)"],
+        [0.32, "rgba(255,255,255,0.5)"],
+        [1, "rgba(255,255,255,0)"],
+      ]);
+    }
 
     // Build a pool per site×network ALWAYS (all nodes, each tagged with its network + identity hue);
     // the committed filter just SHOWS/HIDES pools (setFilter → _applyGlowFilter), no recluster needed.
@@ -1091,21 +1101,3 @@ export class Globe implements GeoViewHost {
 
 
 const _PLANE_N = new THREE.Vector3(0, 0, 1); // PlaneGeometry's default facing (for orienting glow pools)
-
-// A soft radial-gradient sprite (white centre → transparent edge) for the geo density light pools.
-// White so the per-mesh `color` tints it; additive blending turns overlaps into brighter light.
-function makeGlowTexture(): THREE.Texture {
-  const s = 128;
-  const c = document.createElement("canvas");
-  c.width = c.height = s;
-  const ctx = c.getContext("2d")!;
-  const g = ctx.createRadialGradient(s / 2, s / 2, 0, s / 2, s / 2, s / 2);
-  g.addColorStop(0, "rgba(255,255,255,1.0)");
-  g.addColorStop(0.32, "rgba(255,255,255,0.5)");
-  g.addColorStop(1, "rgba(255,255,255,0)");
-  ctx.fillStyle = g;
-  ctx.fillRect(0, 0, s, s);
-  const tex = new THREE.CanvasTexture(c);
-  tex.colorSpace = THREE.SRGBColorSpace;
-  return tex;
-}

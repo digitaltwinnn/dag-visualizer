@@ -8,10 +8,11 @@
 
 import * as THREE from "three";
 import { METAGRAPHS, type MetaConfig } from "../../config";
-import { metaAnchor, META_RING, META_LAYERS, HYPER_TILT } from "../../domain/hyperLayout";
-import { armillaryFrame, ringFramePos, type RingFrame } from "../../domain/nodeLayout";
+import { metaAnchor, META_RING, META_LAYERS, HYPER_TILT, applyHyperRig } from "../../domain/hyperLayout";
+import { armillaryFrame, ringFramePos, ringNormal, type RingFrame } from "../../domain/nodeLayout";
 import { FocusSpot } from "../objects/FocusSpot";
 import { ORB_FRESNEL_GLSL, ORB_FRESNEL_MIX } from "../objects/NodeFabric";
+import { makeRadialGradientTexture } from "../objects/gradientTexture";
 import type { SceneColors } from "../../sceneColors";
 import type { SceneView } from "./SceneView";
 
@@ -39,26 +40,6 @@ const SPOT_I = 2.4; //   full intensity when focused
 // wider-reaching cone (same angle at that height covers it), so selecting DAG gets the same wash.
 const SPOT_H_DAG = 17;
 
-
-// A rim-weighted radial gradient (white; the material tints it cyan) for the ring fill disks:
-// transparent at the centre, ramping to a soft band at the OUTER edge (the ring), so a CircleGeometry
-// reads as a filled ring that fades quickly inward. CircleGeometry's rim samples at gradient r≈1.
-function makeRingFillTexture(): THREE.Texture {
-  const s = 128;
-  const c = document.createElement("canvas");
-  c.width = c.height = s;
-  const ctx = c.getContext("2d")!;
-  const g = ctx.createRadialGradient(s / 2, s / 2, 0, s / 2, s / 2, s / 2);
-  g.addColorStop(0, "rgba(255,255,255,0)");
-  g.addColorStop(0.84, "rgba(255,255,255,0)");
-  g.addColorStop(0.96, "rgba(255,255,255,0.35)");
-  g.addColorStop(1, "rgba(255,255,255,0.8)");
-  ctx.fillStyle = g;
-  ctx.fillRect(0, 0, s, s);
-  const tex = new THREE.CanvasTexture(c);
-  tex.colorSpace = THREE.SRGBColorSpace;
-  return tex;
-}
 
 // Give a single (non-instanced) emissive sphere the SAME fresnel-rim ORB look as the node instances
 // (NodeFabric._makeNodeMaterial): a view-dependent rim multiplied onto its emissive so the core /
@@ -139,7 +120,7 @@ export class HyperView implements SceneView {
     this.root = new THREE.Group();
     // Tilt the hub/tether/hoop structure to read top-down from the shared overview camera (Globe
     // tilts the node group + HyperView the core by the same HYPER_TILT, so all three stay registered).
-    this.root.rotation.x = HYPER_TILT;
+    applyHyperRig(this.root, 0);
     scene.add(this.root);
 
     // The focus spotlight (world-space — the hub position is resolved through root's tilt+spin each
@@ -215,7 +196,7 @@ export class HyperView implements SceneView {
   // ---------------------------------------------------------------- Core
   private _buildCore() {
     this.coreGroup = new THREE.Group();
-    this.coreGroup.rotation.x = HYPER_TILT; // match the tilted node group + hubs (see root)
+    applyHyperRig(this.coreGroup, 0); // match the tilted node group + hubs (see root)
     const mat = new THREE.MeshStandardMaterial({
       color: this._core, emissive: this._core, emissiveIntensity: 1.4,
       roughness: 0.5, metalness: 0.2, transparent: true, // match the node orbs (smooth + fresnel)
@@ -335,8 +316,8 @@ export class HyperView implements SceneView {
   // XYZ → tilt applied after the Y-spin). The Engine drives this with the SAME angle it gives the
   // node group, so hubs/core/hoops and the nodes stay registered while the whole atom rotates.
   setHyperSpin(y: number, tiltX: number = HYPER_TILT) {
-    this.root.rotation.set(tiltX, y, 0);
-    this.coreGroup.rotation.set(tiltX, y, 0);
+    applyHyperRig(this.root, y, tiltX);
+    applyHyperRig(this.coreGroup, y, tiltX);
   }
 
   // A metagraph's 3 layer hoops render SOLID where the layer has nodes and DOTTED where the layer
@@ -375,7 +356,18 @@ export class HyperView implements SceneView {
   // is weighted to the OUTER edge and fades quickly to transparent inward (like the geo pools, but
   // rim-first). Adds cyan body to the ring + a surface for its label to sit on. Populated rings only.
   private _makeRingFill(frame: RingFrame, radius: number): THREE.Mesh {
-    if (!this._fillTex) this._fillTex = makeRingFillTexture();
+    // A rim-weighted radial gradient (white; the material tints it cyan) for the ring fill disks:
+    // transparent at the centre, ramping to a soft band at the OUTER edge (the ring), so a
+    // CircleGeometry reads as a filled ring that fades quickly inward. CircleGeometry's rim
+    // samples at gradient r≈1.
+    if (!this._fillTex) {
+      this._fillTex = makeRadialGradientTexture([
+        [0, "rgba(255,255,255,0)"],
+        [0.84, "rgba(255,255,255,0)"],
+        [0.96, "rgba(255,255,255,0.35)"],
+        [1, "rgba(255,255,255,0.8)"],
+      ]);
+    }
     const geo = new THREE.CircleGeometry(radius, 96);
     const mat = new THREE.MeshBasicMaterial({
       map: this._fillTex, color: new THREE.Color(this._core), transparent: true,
@@ -384,7 +376,7 @@ export class HyperView implements SceneView {
     const mesh = new THREE.Mesh(geo, mat);
     // Orient the disk into the ring's tilted plane: CircleGeometry lies in XY (+Z normal) → map its
     // X/Y/Z axes onto the ring's t / b / (t×b) basis.
-    const n = frame.t.clone().cross(frame.b).normalize();
+    const n = ringNormal(frame, new THREE.Vector3()); // event-time
     mesh.quaternion.setFromRotationMatrix(new THREE.Matrix4().makeBasis(frame.t, frame.b, n));
     mesh.renderOrder = -1; // behind the hoops + nodes
     return mesh;
