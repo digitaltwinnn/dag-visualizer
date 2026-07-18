@@ -4,9 +4,7 @@ import { useState } from "react";
 import { ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useStore } from "@/src/store/store";
-import CardHead from "@/components/CardHead";
-import { Card } from "@/components/ui/card";
-import { EXPLORE_ICON } from "@/components/icons";
+import ExplorerShell from "@/components/ExplorerShell";
 import { CORE_HEX, metagraphById } from "@/src/data/network";
 import { compositionRows } from "@/src/data/composition";
 import { identityHudHex } from "@/src/palette/identity";
@@ -39,7 +37,6 @@ export default function HyperExplore() {
   const hoverNodeId = useStore((s) => s.hoverNodeId);
   const setHoverNodeId = useStore((s) => s.setHoverNodeId);
   const setHoverCohort = useStore((s) => s.setHoverCohort);
-  const [collapsed, setCollapsed] = useState(false);
 
   // Row selections run the SAME tested decision table as the scene clicks (domain/pickActions)
   // through the SAME executor (store/applyClickActions) — a network row IS a hub click, a node
@@ -84,27 +81,16 @@ export default function HyperExplore() {
   const selIp = sel?.node?.ip ?? null;
 
   return (
-    <Card
-      asChild
-      className="sig-right flex flex-col flex-none gap-0 p-0 [--spine:var(--filter-accent,var(--primary))]"
+    // The shell owns the Card frame, CardHead, collapse state, and the padded body — HyperExplore
+    // is the architectural sibling of GeoExplore and shares its chrome exactly (both migrated
+    // onto ExplorerShell together, pixel-neutral).
+    <ExplorerShell
+      id="hyperexplore"
+      title="Nodes by network"
+      hint="Every network on the hypergraph — hover or click one to see how it is composed of different nodes that each play a role in settlement."
     >
-      <aside id="hyperexplore">
-        <CardHead
-          panel
-          icon={EXPLORE_ICON}
-          title="Nodes by network"
-          eyebrow="Explore"
-          collapsed={collapsed}
-          onToggle={() => setCollapsed((c) => !c)}
-        />
-        <div className={cn("flex flex-col", collapsed && "hidden")}>
-          {/* The usage hint LEADS the card (matches GeoExplore) — what it holds + the click. */}
-          <div className="pt-2 px-4 pb-1 text-label text-muted-foreground">
-            Every network on the hypergraph — hover or click one to see how it is composed of different nodes that each play a role in settlement.
-          </div>
-          <div className="pt-1.5 px-[14px] pb-2">
-            {/* Sorted by fleet size (user, 2026-07-12) — the biggest networks lead. */}
-            {[...metaList].sort((a, b) => b.nodes.length - a.nodes.length).map((m) => {
+      {/* Sorted by fleet size (user, 2026-07-12) — the biggest networks lead. */}
+      {[...metaList].sort((a, b) => b.nodes.length - a.nodes.length).map((m) => {
               const cfg = metagraphById(m.id);
               const name = cfg?.name ?? m.id;
               const hue = m.id === "dag" ? CORE_HEX : identityHudHex(m.id);
@@ -229,9 +215,6 @@ export default function HyperExplore() {
                 </div>
               );
             })}
-          </div>
-        </div>
-      </aside>
-    </Card>
+    </ExplorerShell>
   );
 }

@@ -3,9 +3,7 @@
 import { useState } from "react";
 import { ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
-import CardHead from "@/components/CardHead";
-import { Card } from "@/components/ui/card";
-import { EXPLORE_ICON } from "@/components/icons";
+import ExplorerShell from "@/components/ExplorerShell";
 import { SELECTED_ROW, SelectedRowMark } from "@/components/selection";
 import { subjectPairing } from "@/components/useSubjectPairing";
 import { CORE_HEX, filterAccent, metagraphById } from "@/src/data/network";
@@ -119,7 +117,18 @@ function LaneRow({
     <button
       type="button"
       title={`${lane.name} · ${lane.count} node${lane.count === 1 ? "" : "s"}`}
-      onClick={() => applyClickActions(filterToggleActions(lane.id, filter))}
+      onClick={() => {
+        // Commit the filter, then clear the hover PREVIEW alongside it (the FilterPicker
+        // precedent, components/topbar/FilterPicker.tsx:58 — but that one is container-level;
+        // this is the CLICK-side belt): committing a lane row can remove it from this floor's
+        // lane list (its network is no longer an "other" network once committed), so the row
+        // self-unmounts under the pointer and its own `mouseleave` never fires, leaving
+        // `hoverFilter` stuck on the just-committed id. The body-level `onLeave` on
+        // ExplorerShell is the other belt (catches the case where the whole disclosure closes
+        // instead of just this row).
+        applyClickActions(filterToggleActions(lane.id, filter));
+        setHoverFilter(null);
+      }}
       onMouseEnter={pair.onMouseEnter}
       onMouseLeave={pair.onMouseLeave}
       className={cn(
@@ -141,7 +150,6 @@ function LaneRow({
 }
 
 export default function LedgerPanel() {
-  const [collapsed, setCollapsed] = useState(false);
   // The COMMITTED selection lives in the store (store.layer — it's the layer card's pick, cleared
   // by the card's × too); hover writes the transient preview channel, leave clears it (the engine
   // falls back to the committed layer).
@@ -224,28 +232,32 @@ export default function LedgerPanel() {
       nodeSelectActions(pick, { mode: "ledger", currentFilter: filter, deselect: selected, ledgerLayerId: floorId }),
     );
   return (
-    // flex-none + no inner overflow (same treatment as GeoExplore, user: consistent rail
-    // behaviour): the card grows with its content and the RAIL scrolls/fades into the chart
-    // band — the old shrink-to-fit + inner scrollbox kept the rail from ever overflowing, so
-    // the bottom fade never engaged in this view.
-    <Card asChild className="sig-right block p-0 flex-none [--spine:var(--filter-accent,var(--primary))]">
-      <aside id="ledger-view">
-        <CardHead
-          panel
-          icon={EXPLORE_ICON}
-          title="Settlement layers"
-          eyebrow="Explore"
-          collapsed={collapsed}
-          onToggle={() => setCollapsed((c) => !c)}
-        />
-        <div className={cn("flex flex-col px-3 pt-1.5 pb-2.5", collapsed && "hidden")}>
-          {/* The usage hint LEADS the card (matches the other explorers) — what it holds + what
-              you learn. px-1 nets the same ~16px inset as the sibling cards' px-4 hints. */}
-          <div className="px-1 pt-0.5 pb-1.5 text-label text-muted-foreground">
-            Every layer that participates in creating a snapshot — hover or click one to see what it does in the settlement stack.
-          </div>
-          <div className="flex flex-col gap-0.5" onMouseLeave={() => setHilite(null)}>
-            {LAYERS.map((l) => {
+    // The shell owns the Card frame, CardHead, collapse state, and the padded body — chrome-
+    // normalized onto GeoExplore's exact treatment (flex-none + no inner overflow, the same
+    // "consistent rail behaviour" the old hand-rolled chrome aimed for but drifted from — this
+    // also retires the stray bottom separator the old combined-padding wrapper carried).
+    <ExplorerShell
+      id="ledger-view"
+      title="Settlement layers"
+      hint="Every layer that participates in creating a snapshot — hover or click one to see what it does in the settlement stack."
+      onLeave={() => {
+        // Structural fix for the review's stuck-hoverFilter bug: a LANE row's click commits
+        // the filter, which can remove that lane (or close the whole floor disclosure it lives
+        // in) out from under the pointer before its own `mouseleave` ever fires — the browser
+        // doesn't synthesize one for a node removed mid-hover. This container-level boundary
+        // is the backstop: leaving the WHOLE card body clears every hover channel this card's
+        // rows write to (hilite for the layer rows, hoverFilter for the lane rows, hoverCohort/
+        // hoverNodeId for the cluster/node rows), regardless of which row set it or whether
+        // that row is still mounted to clear it itself. LaneRow's own click handler clears
+        // hoverFilter too, as the second belt (the precise row-vanishes-without-leave path).
+        setHilite(null);
+        setHoverFilter(null);
+        setHoverCohort(null);
+        setHoverNodeId(null);
+      }}
+    >
+      <div className="flex flex-col gap-0.5">
+        {LAYERS.map((l) => {
               const on = sel === l.id;
               // The SAME scene↔HUD hover pairing as GeoExplore's node rows: hovering the row
               // previews the plane highlight, hovering the 3D plane pairs this row back — wearing
@@ -452,9 +464,7 @@ export default function LedgerPanel() {
                 </div>
               );
             })}
-          </div>
-        </div>
-      </aside>
-    </Card>
+      </div>
+    </ExplorerShell>
   );
 }

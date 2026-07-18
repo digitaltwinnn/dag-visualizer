@@ -4,9 +4,7 @@ import { useMemo, useState } from "react";
 import { ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useStore } from "@/src/store/store";
-import CardHead from "@/components/CardHead";
-import { Card } from "@/components/ui/card";
-import { EXPLORE_ICON } from "@/components/icons";
+import ExplorerShell from "@/components/ExplorerShell";
 import { metagraphById } from "@/src/data/network";
 import { identityHudHex } from "@/src/palette/identity";
 import { SELECTED_ROW, SelectedRowMark } from "@/components/selection";
@@ -38,7 +36,6 @@ export default function GeoExplore() {
   const hoverCountry = useStore((s) => s.hoverCountry);
   const hoverNodeId = useStore((s) => s.hoverNodeId);
   const filter = useStore((s) => s.filter);
-  const [collapsed, setCollapsed] = useState(false);
 
   // Row selections run the SAME tested decision table as the scene clicks (domain/pickActions)
   // through the SAME executor (store/applyClickActions), so the explorer and the globe can
@@ -134,44 +131,37 @@ export default function GeoExplore() {
   const selLayer = sel ? (sel.kind === "metanode" ? sel.node?.layer ?? null : sel.kind) : null;
 
   return (
-    // flex-none + no inner list overflow: the card grows with its content and the RAIL
-    // scrolls (runway + fade) — the old inner-scroll flex card capped the node list in a cramped
-    // scrollbox whose tail was easy to miss (user); rail scrolling matches the tablet sheet.
-    <Card
-      asChild
-      className="sig-right flex flex-col flex-none gap-0 p-0 [--spine:var(--filter-accent,var(--primary))]"
+    // The shell owns the Card frame, CardHead, collapse state, and the padded body (flex-none +
+    // no inner list overflow: the card grows with its content and the RAIL scrolls — runway +
+    // fade — the old inner-scroll flex card capped the node list in a cramped scrollbox whose
+    // tail was easy to miss, user; rail scrolling matches the tablet sheet). GeoExplore is the
+    // shell's REFERENCE look, so this render is byte-identical to the pre-extraction JSX modulo
+    // the chrome that moved into ExplorerShell.
+    <ExplorerShell
+      id="geoexplore"
+      title="Nodes by country"
+      hint={
+        // The footprint's headline figures (Nodes / Countries / Ready) live in the top-bar
+        // vitals now; this card is purely the country→nodes accordion. The usage hint LEADS
+        // the card (user, 2026-07-12 — a bottom hint read as an afterthought) and says what
+        // the card holds, not just the click. Quiet-empty has nothing to browse — no hint.
+        quietEmpty
+          ? null
+          : "Every country hosting nodes — hover or click one to see how the network is geographically distributed."
+      }
     >
-      <aside id="geoexplore">
-      <CardHead
-        panel
-        icon={EXPLORE_ICON}
-        title="Nodes by country"
-        eyebrow="Explore"
-        collapsed={collapsed}
-        onToggle={() => setCollapsed((c) => !c)}
-      />
-      <div className={cn("flex flex-col", collapsed && "hidden")}>
-        {/* The footprint's headline figures (Nodes / Countries / Ready) live in the top-bar
-            vitals now; this card is purely the country→nodes accordion. The usage hint LEADS
-            the card (user, 2026-07-12 — a bottom hint read as an afterthought) and says what
-            the card holds, not just the click. */}
-        {!quietEmpty && (
-          <div className="pt-2 px-4 pb-1 text-label text-muted-foreground">
-            Every country hosting nodes — hover or click one to see how the network is geographically distributed.
-          </div>
-        )}
-        {quietEmpty ? (
-          // Quiet-empty, in the standard LEFT-ALIGNED card/hint typography (the old centered
-          // block — plus a stray absolutely-positioned standby dot that escaped its unsized
-          // wrapper — read as a bolt-on). Same padding as the country list it stands in for.
-          // One message, no jump link (user refinement: the "See it in the Hypergraph →" link
-          // was removed — the explanation already says where the metagraph still appears).
-          <div className="pt-2 px-[14px] pb-3">
-            <p className="text-body text-foreground m-0 mb-1">No locatable nodes</p>
-            <p className="text-label text-muted-foreground m-0">{tickerOrName} has no validators we can place on the map right now. It still appears in the Hypergraph.</p>
-          </div>
-        ) : (
-        <div className="pt-1.5 px-[14px] pb-2">
+      {quietEmpty ? (
+        // Quiet-empty, in the standard LEFT-ALIGNED card/hint typography (the old centered
+        // block — plus a stray absolutely-positioned standby dot that escaped its unsized
+        // wrapper — read as a bolt-on). One message, no jump link (user refinement: the "See
+        // it in the Hypergraph →" link was removed — the explanation already says where the
+        // metagraph still appears).
+        <>
+          <p className="text-body text-foreground m-0 mb-1">No locatable nodes</p>
+          <p className="text-label text-muted-foreground m-0">{tickerOrName} has no validators we can place on the map right now. It still appears in the Hypergraph.</p>
+        </>
+      ) : (
+        <>
           {rows.map((c) => {
             const open = c.cc === country;
             const nodes = nodesByCountry.get(c.country) ?? [];
@@ -335,11 +325,8 @@ export default function GeoExplore() {
               </div>
             );
           })}
-        </div>
-        )}
-
-      </div>
-      </aside>
-    </Card>
+        </>
+      )}
+    </ExplorerShell>
   );
 }
