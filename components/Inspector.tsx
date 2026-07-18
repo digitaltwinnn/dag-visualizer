@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, type CSSProperties, type ReactNode } from "react";
+import { useMemo, useState, type CSSProperties, type ReactNode } from "react";
 import { cn } from "@/lib/utils";
 import { useStore } from "@/src/store/store";
 import { applyClickActions } from "@/src/store/applyClickActions";
@@ -111,11 +111,21 @@ function CountryPane({ cc, onClose }: { cc: string; onClose: () => void }) {
   // identity), so hovering this card previews the border on the globe and vice versa.
   const pair = subjectPairing<string>(hoverCountry, cc, setHoverCountry, "var(--primary)");
   const pulseKey = useEdgePulse(cc);
+  // Right cards are collapsible too (CLAUDE.md) — same +/− idiom InspectorCard uses: local
+  // state per slot, body gated on it, collapsed = eyebrow + title only.
+  const [collapsed, setCollapsed] = useState(false);
   return (
     <Card asChild className={cn(RIGHT_CARD, "sig-left", pair.className)}>
       <aside style={pair.style} onMouseEnter={pair.onMouseEnter} onMouseLeave={pair.onMouseLeave}>
-        <CardHead eyebrow="Country" title={<CountryTitle cc={cc} />} titleKey={cc} onClose={onClose} />
-        <CountryCard cc={cc} />
+        <CardHead
+          eyebrow="Country"
+          title={<CountryTitle cc={cc} />}
+          titleKey={cc}
+          onClose={onClose}
+          collapsed={collapsed}
+          onToggle={() => setCollapsed((c) => !c)}
+        />
+        {!collapsed && <CountryCard cc={cc} />}
         <PulseEdge pulseKey={pulseKey} rail="right" />
       </aside>
     </Card>
@@ -141,11 +151,21 @@ function ProviderPane({ sel, onClose }: { sel: CohortSel; onClose: () => void })
         .filter((k): k is string => !!k),
     [selNodes, sel.cc, sel.city, sel.isp],
   );
+  // Right cards are collapsible too (CLAUDE.md) — same +/− idiom InspectorCard uses: local
+  // state per slot, body gated on it, collapsed = eyebrow + title only.
+  const [collapsed, setCollapsed] = useState(false);
   return (
     <Card asChild className={cn(RIGHT_CARD, "sig-left")}>
       <aside onMouseEnter={() => setHoverCohort(ids)} onMouseLeave={() => setHoverCohort(null)}>
-        <CardHead eyebrow="Provider" title={<ProviderTitle sel={sel} />} titleKey={subjectKey} onClose={onClose} />
-        <ProviderCard sel={sel} />
+        <CardHead
+          eyebrow="Provider"
+          title={<ProviderTitle sel={sel} />}
+          titleKey={subjectKey}
+          onClose={onClose}
+          collapsed={collapsed}
+          onToggle={() => setCollapsed((c) => !c)}
+        />
+        {!collapsed && <ProviderCard sel={sel} />}
         <PulseEdge pulseKey={pulseKey} rail="right" />
       </aside>
     </Card>

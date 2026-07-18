@@ -743,8 +743,13 @@ export class Globe implements GeoViewHost {
     if (!sel) return;
     const ids = new Set<string>(); // event-time
     let lat = 0, lon = 0, n = 0;
+    // The data layer normalizes an unresolved city/isp to "" (geoResolve), and the falsy
+    // normalization ("" -> null) is the UI-wide keying convention (GeoExplore.cohortsOf,
+    // ProviderCard/ProviderPane both use `r.city || null`); `?? null` only catches
+    // null/undefined, so an unlocated-city cohort ("" !== null) matched ZERO members here and
+    // the 3D glow never lit even though the card showed real counts. Match falsy-normalized.
     const match = (g: GeoInfo | undefined) =>
-      !!g && g.cc === sel.cc && (g.city ?? null) === sel.city && (g.isp ?? null) === sel.isp;
+      !!g && g.cc === sel.cc && (g.city || null) === sel.city && (g.isp || null) === sel.isp;
     const add = (key: string | null, g: GeoInfo) => {
       if (key) ids.add(key);
       lat += g.lat ?? 0;
