@@ -40,8 +40,8 @@ mode !== "ledger"`):
   dots, the ECG mark, and the Tooltip's `‹›` punctuation.
 
 Every switch **among the three 3D views** (`hyper`↔`geo`↔`ledger`, any pair) runs the SAME
-staged **gather choreography** (`domain/viewTransition.ts`'s `ViewTransition`, spec
-`docs/superpowers/specs/2026-07-17-view-transitions-design.md`) instead of a cut or a live
+staged **gather choreography** (`domain/viewTransition.ts`'s `ViewTransition`; the
+2026-07-17 view-transitions design spec is in git history — see *Historical docs*) instead of a cut or a live
 morph flight: **OUT** (0.9s) — the from-view's furniture fades via `furnitureAlpha` while its
 nodes fly, staggered (a 0.25s spread, rank-ordered within each network's own grid), up to
 per-network near-square **staging grids** on a camera-anchored plane at the top of the
@@ -1441,5 +1441,7 @@ Target host is **Vercel** (any Node host works). No env vars / secrets are requi
 
 The full migration/design-session history (plans, specs, screenshots, the design-concerns
 log) lived in `docs/superpowers/` and was harvested into this file, then removed
-(2026-07-05) — git history preserves all of it, and `.superpowers/sdd/progress.md` remains
-the running work ledger.
+(2026-07-05). The folder later re-accumulated the 2026-07 feature specs/plans (engine-domain
+refactor, view transitions, consistency hardening, focus ladder) and was removed again
+entirely (2026-07-19) — git history preserves all of it, and `.superpowers/sdd/progress.md`
+remains the running work ledger. Durable decisions from those specs live in this file.
