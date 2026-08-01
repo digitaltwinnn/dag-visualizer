@@ -122,6 +122,11 @@ interface AppState {
   // (Outside-tap does NOT dismiss it — `onInteractOutside` is `preventDefault`-blocked so the
   // scene/other dock stays interactive underneath.) Unused on tablet/desktop.
   phoneDock: "explore" | "details" | null;
+  // Which of the two shell SECTIONS is presented (spec 2026-08-01): "scene" = the 3D shell,
+  // "data" = the per-view raw-data table below it. Written by SectionSlider (drag/wheel snap)
+  // and the strip's chevron; SectionSlider owns the tween that realizes it. UI state, not
+  // selection (the selection boundary rule doesn't apply); session-only, like phoneDock.
+  section: "scene" | "data";
   // PHONE ONLY: whether the top bar's vitals row is expanded (the bar grows downward by one
   // full-width row showing the active view's vitals). A USER CHOICE that persists across view
   // switches (the row's CONTENT swaps per view; only the user's toggle opens/closes it) —
@@ -167,6 +172,7 @@ interface AppState {
   setSelNodes: (nodes: NodeRow[]) => void;
   setSnapshotExact: (data: SnapshotExact) => void;
   setPhoneDock: (dock: "explore" | "details" | null) => void;
+  setSection: (section: "scene" | "data") => void;
   setPhoneVitals: (open: boolean) => void;
   setPhoneSheetPx: (px: number | null) => void;
   setRailCollapse: (id: string, collapsed: boolean | null) => void;
@@ -208,6 +214,7 @@ export const useStore = create<AppState>((set) => ({
   selNodes: [],
   snapshotExact: {},
   phoneDock: null,
+  section: "scene",
   phoneVitals: false,
   railCollapse: {},
   phoneSheetPx: null,
@@ -258,6 +265,7 @@ export const useStore = create<AppState>((set) => ({
   // Fully closing the dock also drops the drag-chosen sheet height, so the next open starts at
   // the default; switching halves (a non-null → non-null transition) keeps it.
   setPhoneDock: (phoneDock) => set(phoneDock === null ? { phoneDock, phoneSheetPx: null } : { phoneDock }),
+  setSection: (section) => set({ section }),
   setPhoneVitals: (phoneVitals) => set({ phoneVitals }),
   setRailCollapse: (id, collapsed) =>
     set((s) => {

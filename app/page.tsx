@@ -12,24 +12,31 @@ import RailScroll from "@/components/RailScroll";
 import FollowController from "@/components/FollowController";
 import RawSnapshotBridge from "@/components/RawSnapshotBridge";
 import Tooltip from "@/components/Tooltip";
+import SectionSlider from "@/components/SectionSlider";
+import DataSection from "@/components/DataSection";
 
-// Single-page shell. The 3D scene is one persistent canvas; views (hyper/geo/ledger)
-// and panels are driven by store state. The top command bar (status + filter + view
-// switch + view-specific vitals) is one centered capsule.
+// Single-page shell in TWO sections (spec 2026-08-01): SectionSlider carries the whole fixed
+// scene shell (canvas + rails + strip — section 1) and the per-view data table (section 2);
+// the LiveStrip at section 1's bottom edge is the divider/drag-handle between them. TopBar +
+// the banner stay OUTSIDE the slider (fixed to the real viewport, visible in both sections),
+// as do the non-visual bridges and the pointer-anchored Tooltip (a transformed ancestor would
+// re-anchor its fixed positioning).
 export default function Home() {
   return (
     <main>
-      <SceneCanvas />
-      <Blueprint />
-      <BootOverlay />
       <ExperimentalBanner />
-      <DataBridge />
       <TopBar />
-      <ExploreRail />
-      <Inspector />
-      <PhoneDockSweep />
-      <RailScroll />
-      <BottomStream />
+      <SectionSlider dataSection={<DataSection />}>
+        <SceneCanvas />
+        <Blueprint />
+        <BootOverlay />
+        <ExploreRail />
+        <Inspector />
+        <PhoneDockSweep />
+        <RailScroll />
+        <BottomStream />
+      </SectionSlider>
+      <DataBridge />
       <FollowController />
       <RawSnapshotBridge />
       <Tooltip />
