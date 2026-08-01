@@ -6,6 +6,7 @@ import { Draggable } from "gsap/Draggable";
 import { InertiaPlugin } from "gsap/InertiaPlugin";
 import { Observer } from "gsap/Observer";
 import { useStore } from "@/src/store/store";
+import { SHELL_ID } from "@/lib/shellOffset";
 
 gsap.registerPlugin(Draggable, InertiaPlugin, Observer);
 
@@ -17,33 +18,60 @@ gsap.registerPlugin(Draggable, InertiaPlugin, Observer);
 // is the one source of truth — the strip's chevron and the snap-commit both write it, and this
 // component owns the tween that realizes it. TopBar stays OUTSIDE (fixed to the real viewport,
 // shared by both sections); portalled UI (sheets, tooltips) doesn't ride the transform — RailDock
-// gates its sheets on `section`, LiveStrip portals its tip.
+// gates its sheets on `section`, LiveStrip portals its tip. Measurements taken INSIDE the wrapper
+// carry the translate: `lib/shellOffset.ts` is the correction every such consumer applies.
 export default function SectionSlider({ children, dataSection }: { children: ReactNode; dataSection: ReactNode }) {
   const wrapRef = useRef<HTMLDivElement>(null);
-  const sec2Ref = useRef<HTMLDivElement>(null);
+  const sec2Ref = useRef<HTMLElement>(null);
 
   useEffect(() => {
     const wrap = wrapRef.current;
     const sec2 = sec2Ref.current;
     const strip = document.getElementById("livestrip");
+    const topbar = document.getElementById("topbar");
     if (!wrap || !sec2 || !strip) return;
-    const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    // Read live, not cached: an OS-level motion-preference flip mid-session takes effect the way
+    // it does for every CSS-driven animation in the app.
+    const mq = window.matchMedia("(prefers-reduced-motion: reduce)");
 
     // The open offset: translate until the strip's top edge lands under the command bar
     // (the strip is section 2's header/way back). Rects are corrected by the live translate
     // so the measure is pose-independent; re-run on resize (event-time work, not per-frame).
     const openY = () => {
       const y = Number(gsap.getProperty(wrap, "y")) || 0;
-      const topBottom = document.getElementById("topbar")?.getBoundingClientRect().bottom ?? 0;
+      const topBottom = topbar?.getBoundingClientRect().bottom ?? 0;
       return -Math.max(0, strip.getBoundingClientRect().top - y - topBottom);
     };
+    // The strip floats clear of the shell's bottom edge (`bottom-4`, and a phone-dock offset on
+    // phone). Section 2 starts at the strip's BOTTOM, not the shell's — otherwise that offset
+    // shows as a sliver of live scene between the divider and the table (64px on phone).
+    const stripGap = () => {
+      const y = Number(gsap.getProperty(wrap, "y")) || 0;
+      return Math.max(0, window.innerHeight - (strip.getBoundingClientRect().bottom - y));
+    };
     // Section 2 fills exactly the viewport remainder below the docked strip.
-    const size = () => { sec2.style.height = `${-openY()}px`; };
-    size();
-    window.addEventListener("resize", size);
+    const size = () => {
+      const gap = stripGap();
+      sec2.style.marginTop = `${-gap}px`;
+      sec2.style.height = `${-openY() + gap}px`;
+    };
 
     const goTo = (section: "scene" | "data") =>
-      gsap.to(wrap, { y: section === "data" ? openY() : 0, duration: reduced ? 0 : 0.55, ease: "power3.out", overwrite: "auto" });
+      gsap.to(wrap, { y: section === "data" ? openY() : 0, duration: mq.matches ? 0 : 0.55, ease: "power3.out", overwrite: "auto" });
+
+    // Re-measure AND re-dock. `openY` is pose-independent, but the wrapper's committed `y` is not:
+    // after a viewport resize — or the command bar growing/shrinking its attached filter strip,
+    // which changes `#topbar`'s height under us — a shell left open would sit at the stale offset
+    // with a stale section-2 height. Both are event-time, so re-running the tween is cheap.
+    const resync = () => {
+      size();
+      goTo(useStore.getState().section);
+    };
+    size();
+    window.addEventListener("resize", resync);
+    // The command bar's filter strip is a LAYOUT participant that grows the bar (--topbar-extra).
+    const topRo = topbar ? new ResizeObserver(resync) : null;
+    if (topbar && topRo) topRo.observe(topbar);
 
     // External writers (the strip chevron, wheel below) drive the tween through the store.
     const unsub = useStore.subscribe((s, prev) => {
@@ -63,7 +91,7 @@ export default function SectionSlider({ children, dataSection }: { children: Rea
       trigger: strip,
       // The WHOLE strip is the handle — bars/buttons inside still click on a sub-threshold press.
       dragClickables: true,
-      inertia: !reduced,
+      inertia: !mq.matches,
       onPress(this: Draggable) { this.applyBounds({ minY: openY(), maxY: 0 }); },
       snap: (v: number) => (Math.abs(v - openY()) < Math.abs(v) ? openY() : 0),
       // `isThrowing` is a Draggable PROPERTY, not a method — no inertia throw → settle now.
@@ -82,20 +110,32 @@ export default function SectionSlider({ children, dataSection }: { children: Rea
     });
 
     return () => {
-      window.removeEventListener("resize", size);
+      window.removeEventListener("resize", resync);
+      topRo?.disconnect();
       unsub();
       drag.kill();
       obs.kill();
+      gsap.killTweensOf(wrap);
     };
   }, []);
+
+  // The off-screen section is `inert`: nothing in it takes focus or a pointer event while the
+  // other one is presented (section 2's table is a grid of real controls).
+  const section = useStore((s) => s.section);
 
   return (
     // The inline identity transform is REQUIRED from first paint: it flips the fixed children's
     // containing block to this wrapper before anything renders, so geometry never jumps when
     // GSAP later writes the same property.
-    <div ref={wrapRef} className="fixed inset-0 will-change-transform" style={{ transform: "translateY(0px)" }}>
+    <div ref={wrapRef} id={SHELL_ID} className="fixed inset-0 will-change-transform" style={{ transform: "translateY(0px)" }}>
       {children}
-      <section ref={sec2Ref} id="datasection" aria-label="Raw data" className="absolute top-full inset-x-0 overflow-hidden bg-background">
+      <section
+        ref={sec2Ref}
+        id="datasection"
+        aria-label="Raw data"
+        inert={section !== "data"}
+        className="absolute top-full inset-x-0 overflow-hidden bg-background"
+      >
         {dataSection}
       </section>
     </div>

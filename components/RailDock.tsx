@@ -143,9 +143,10 @@ export default function RailDock({
   const [openState, setOpen] = useState(false);
   const open = openProp ?? openState;
   // Sheets portal to document.body, so they DON'T ride the SectionSlider transform — in the
-  // data section they'd float over the table. Gate them (and the phone bar, which lands in the
-  // sliver between strip and table when translated) off while section 2 is presented; the
-  // internal open state is kept, so returning to the scene restores what was open.
+  // data section they'd float over the table. Gate them off while section 2 is presented (the
+  // phone bar below rides the transform instead, and is gated for its own reason); the internal
+  // open state is kept, so returning to the scene restores what was open. The tablet edge TAB
+  // rides the transform too, so it translates off-screen on its own — no gate needed.
   const section = useStore((s) => s.section);
   const shellVisible = section === "scene";
   const handleOpenChange = (next: boolean) => {
@@ -310,8 +311,9 @@ export default function RailDock({
           className={cn(
             "fixed z-[42] bottom-0 w-1/2 h-[var(--phone-dock-h)] hidden max-[699px]:flex rounded-none",
             side === "left" ? "left-0" : "right-0",
-            // Section 2 is presented: the bar would land in the sliver between the docked strip
-            // and the table (it's fixed to the real viewport, outside the slider's transform).
+            // Section 2 is presented: the bar rides the slider's transform (RailDock renders
+            // inside the shell wrapper), so it would sit in the sliver at the shell's bottom
+            // edge, half off-screen and pointing at a hidden rail.
             // Overrides the phone-breakpoint `max-[699px]:flex` above (same twMerge group+variant,
             // so the later class wins) — a bare `hidden` wouldn't, the variant would still show it.
             !shellVisible && "max-[699px]:hidden",

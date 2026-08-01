@@ -4,6 +4,7 @@ import { useEffect, useState, type CSSProperties } from "react";
 import { useStore } from "@/src/store/store";
 import { filterAccent, CORE_HEX } from "@/src/data/network";
 import { PulseEdge, useEdgePulse } from "@/components/EdgePulse";
+import { shellOffsetY } from "@/lib/shellOffset";
 
 // A rail's instrument-channel thread, a fixed SVG running down the rail's OUTER edge (in the margin,
 // just outside the cards). Measured from the live layout (ResizeObserver / MutationObserver / scroll)
@@ -79,6 +80,11 @@ export default function RailThread({ side = "right" }: { side?: Side }) {
     const measure = () => {
       raf = 0;
       const r = rail.getBoundingClientRect();
+      // The thread is `fixed` INSIDE the two-section shell wrapper, so its `top` is wrapper-
+      // relative while the measured rect is viewport-relative — subtract the shell's live
+      // translate or a measurement taken while section 2 is presented renders a viewport away
+      // (the rail cards mutate on every live tick, so the observers do fire down there).
+      const off = shellOffsetY();
       // Every rail card carries `.ig-panel` (the shared glass frame); the thread drops a dot at
       // each one's middle. (Was `:scope > .panel` before the Card-frame swap retired 12-panel-system.)
       const cards = Array.from(rail.querySelectorAll<HTMLElement>(":scope > .ig-panel"));
@@ -88,7 +94,7 @@ export default function RailThread({ side = "right" }: { side?: Side }) {
       // Sit in the margin just OUTSIDE the cards: right → at the rail's right edge; left → the thread's
       // width to the LEFT of the rail's left edge (so its ticks reach toward the screen edge).
       const left = side === "right" ? r.right : r.left - W;
-      setG({ top: r.top, left, height: Math.round(r.height), dots });
+      setG({ top: r.top - off, left, height: Math.round(r.height), dots });
     };
     const schedule = () => { if (!raf) raf = requestAnimationFrame(measure); };
     schedule();

@@ -15,7 +15,7 @@ export default function NodeCountReadout() {
   const live = useStore((s) => s.live);
   const total = metaList.reduce((a, m) => a + m.located, 0);
   if (metaList.length === 0)
-    return <span className="text-muted-foreground text-label">{live ? "Acquiring nodes…" : "NO SIGNAL"}</span>;
+    return <span className="flex-1 text-muted-foreground text-label">{live ? "Acquiring nodes…" : "NO SIGNAL"}</span>;
   return (
     <div className="flex-1 flex items-center gap-4 overflow-hidden">
       <span className="text-body text-foreground tabular-nums flex-none">
