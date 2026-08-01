@@ -444,6 +444,10 @@ GPU; no store/react**):
   with the patched smooth-shaded `MeshStandardMaterial` (per-instance `aBase`/`aEmissive`).
 - `objects/Arcs.ts` — the ONE `LineSegments` draw call for the arcs; rewrites head/tail
   positions each frame from `arcSim`'s state and **applies its flash events** to the nodes.
+  It shares the surface's camera-**facing** + closeness uniforms (`Arcs.setFacing`, handed over
+  right after `buildGeoView`): the hologram has no opaque body sphere, so nothing depth-occludes
+  a comet over the far hemisphere — it fades itself, the same recipe the walls and graticule use
+  (user, 2026-08-01: arcs read as flying through the globe).
 - `objects/Background.ts` — the skydome. The **geo** end is the twinkling starfield + faint
   nebula; the **hyper** end is a **single flat colour** (no animation, no gradient, no tint — an
   animated backdrop read as distracting). Only `uTime`/`uMorph` drive it.
