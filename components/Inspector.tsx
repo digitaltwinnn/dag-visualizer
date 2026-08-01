@@ -1,6 +1,7 @@
 "use client";
 
-import { useMemo, useState, type CSSProperties, type ReactNode } from "react";
+import { useMemo, type CSSProperties, type ReactNode } from "react";
+import { ChevronsDownUp, ChevronsUpDown, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useStore } from "@/src/store/store";
 import { applyClickActions } from "@/src/store/applyClickActions";
@@ -16,9 +17,9 @@ import RailThread from "@/components/RailThread";
 import RailDock from "@/components/RailDock";
 import { useBreakpoint } from "@/components/useBreakpoint";
 import { PulseEdge, useEdgePulse } from "@/components/EdgePulse";
-import { detailsCards, type RailCard } from "@/components/railCards";
+import { detailsCards, ladderSlotIds, type RailCard } from "@/components/railCards";
 import { useTrayActives } from "@/components/useTrayActives";
-import { countryToggleActions, cohortToggleActions } from "@/src/engine/domain/pickActions";
+import { countryToggleActions, cohortToggleActions, clearAllActions } from "@/src/engine/domain/pickActions";
 import { CountryTitle, CountryCard, ProviderTitle, ProviderCard } from "@/components/inspector/cards";
 import type { TabSignal } from "@/components/RailDock";
 import type { PickDescriptor } from "@/src/data/types";
@@ -33,10 +34,16 @@ function CardPane({
   pick,
   eyebrow,
   onClose,
+  collapsed,
+  onToggle,
 }: {
   pick: PickDescriptor;
   eyebrow: string;
   onClose: () => void;
+  // CONTROLLED collapse from the ladder lane (ancestors rest collapsed); omitted → InspectorCard
+  // falls back to its own local +/−.
+  collapsed?: boolean;
+  onToggle?: () => void;
 }) {
   const inspect = useStore((s) => s.inspect);
   const hoverNodeId = useStore((s) => s.hoverNodeId);
@@ -91,7 +98,7 @@ function CardPane({
       >
         {/* Every card's × is CardHead's shared ghost-Button close — one baseline close (the node
             card's old hand-rolled × was removed). */}
-        <InspectorCard p={pick} eyebrow={eyebrow} onClose={onClose} />
+        <InspectorCard p={pick} eyebrow={eyebrow} onClose={onClose} collapsed={collapsed} onToggle={onToggle} />
         <PulseEdge pulseKey={pulseKey} rail="right" />
       </aside>
     </Card>
@@ -104,16 +111,13 @@ function CardPane({
 // channel here (same head/body split, same RIGHT_CARD frame, same close-through-the-executor
 // rule) is the smaller change than widening PickDescriptor + InspectorCard's switch for two
 // kinds that only this rail ever shows. See the task report for this call.
-function CountryPane({ cc, onClose }: { cc: string; onClose: () => void }) {
+function CountryPane({ cc, onClose, collapsed, onToggle }: { cc: string; onClose: () => void; collapsed: boolean; onToggle: () => void }) {
   const hoverCountry = useStore((s) => s.hoverCountry);
   const setHoverCountry = useStore((s) => s.setHoverCountry);
   // Same channel + hue GeoExplore's own country rows pair on — structural cyan (a PLACE, not an
   // identity), so hovering this card previews the border on the globe and vice versa.
   const pair = subjectPairing<string>(hoverCountry, cc, setHoverCountry, "var(--primary)");
   const pulseKey = useEdgePulse(cc);
-  // Right cards are collapsible too (CLAUDE.md) — same +/− idiom InspectorCard uses: local
-  // state per slot, body gated on it, collapsed = eyebrow + title only.
-  const [collapsed, setCollapsed] = useState(false);
   return (
     <Card asChild className={cn(RIGHT_CARD, "sig-left", pair.className)}>
       <aside style={pair.style} onMouseEnter={pair.onMouseEnter} onMouseLeave={pair.onMouseLeave}>
@@ -123,7 +127,7 @@ function CountryPane({ cc, onClose }: { cc: string; onClose: () => void }) {
           titleKey={cc}
           onClose={onClose}
           collapsed={collapsed}
-          onToggle={() => setCollapsed((c) => !c)}
+          onToggle={onToggle}
         />
         {!collapsed && <CountryCard cc={cc} />}
         <PulseEdge pulseKey={pulseKey} rail="right" />
@@ -132,7 +136,7 @@ function CountryPane({ cc, onClose }: { cc: string; onClose: () => void }) {
   );
 }
 
-function ProviderPane({ sel, onClose }: { sel: CohortSel; onClose: () => void }) {
+function ProviderPane({ sel, onClose, collapsed, onToggle }: { sel: CohortSel; onClose: () => void; collapsed: boolean; onToggle: () => void }) {
   const selNodes = useStore((s) => s.selNodes);
   const setHoverCohort = useStore((s) => s.setHoverCohort);
   const subjectKey = `${sel.cc}|${sel.city}|${sel.isp}`;
@@ -151,9 +155,6 @@ function ProviderPane({ sel, onClose }: { sel: CohortSel; onClose: () => void })
         .filter((k): k is string => !!k),
     [selNodes, sel.cc, sel.city, sel.isp],
   );
-  // Right cards are collapsible too (CLAUDE.md) — same +/− idiom InspectorCard uses: local
-  // state per slot, body gated on it, collapsed = eyebrow + title only.
-  const [collapsed, setCollapsed] = useState(false);
   return (
     <Card asChild className={cn(RIGHT_CARD, "sig-left")}>
       <aside onMouseEnter={() => setHoverCohort(ids)} onMouseLeave={() => setHoverCohort(null)}>
@@ -163,7 +164,7 @@ function ProviderPane({ sel, onClose }: { sel: CohortSel; onClose: () => void })
           titleKey={subjectKey}
           onClose={onClose}
           collapsed={collapsed}
-          onToggle={() => setCollapsed((c) => !c)}
+          onToggle={onToggle}
         />
         {!collapsed && <ProviderCard sel={sel} />}
         <PulseEdge pulseKey={pulseKey} rail="right" />
@@ -213,7 +214,41 @@ export function GhostCard({ card }: { card: RailCard }) {
   );
 }
 
-// Right column — the **facts** rail: a STACK of selected-subject cards, ordered by recency
+// The rail-top CONTROLS (desktop, variant-A descent spine, 2026-07-19): the desktop equivalent
+// of the tablet dock's collapsibility, hoisted to an explicit control cluster the user asked for.
+// Three quiet instrument buttons — minimize all (collapse every present card to eyebrow+title),
+// expand all, and clear all (deselect the whole ladder back to the overview). Monochrome lucide
+// glyphs (the ONE icon system), muted at rest; no card chrome — it reads as a toolbar in the
+// rail's margin, not another panel. Shown only when the rail actually hosts a card.
+function RailControls({
+  onMinimize,
+  onExpand,
+  onClear,
+}: {
+  onMinimize: () => void;
+  onExpand: () => void;
+  onClear: () => void;
+}) {
+  const btn =
+    "inline-flex items-center justify-center size-6 rounded-[var(--radius-xs)] text-muted-foreground hover:text-foreground hover:bg-wash-soft transition-colors cursor-pointer focus-visible:outline-1 focus-visible:outline-ring/60";
+  return (
+    <div className="pointer-events-auto flex items-center justify-end gap-0.5 pb-0.5 pr-0.5" role="group" aria-label="Details controls">
+      <button type="button" className={btn} title="Minimize all cards" aria-label="Minimize all cards" onClick={onMinimize}>
+        <ChevronsDownUp aria-hidden className="size-3.5" />
+      </button>
+      <button type="button" className={btn} title="Expand all cards" aria-label="Expand all cards" onClick={onExpand}>
+        <ChevronsUpDown aria-hidden className="size-3.5" />
+      </button>
+      <button type="button" className={btn} title="Clear all selections" aria-label="Clear all selections" onClick={onClear}>
+        <X aria-hidden className="size-3.5" />
+      </button>
+    </div>
+  );
+}
+
+// Right column — the **facts** rail: a DESCENT-SPINE LADDER of selected-subject cards (variant-A
+// redesign, 2026-07-19). The focus-ladder rungs (network → country → provider → node in geo;
+// network → layer → node in ledger; network → node in hyper) render in a `.rail-ladder` lane
 // (`store.selStack`, most-recent first → on top), so you can hold several selections at once
 // (a node AND a snapshot AND, later, more) and the one you picked last sits on top. Each card
 // type is one entry in the registry below — add a future card by adding a slot (a store field +
@@ -250,6 +285,25 @@ export default function Inspector() {
     selNodesCount: selNodes.length,
     filterLabel: filterCfg ? filterCfg.ticker || filterCfg.name : null,
   });
+
+  // ── The descent-spine ladder collapse model (variant-A, 2026-07-19) ──────────────────────────
+  // The facts rail's focus-ladder rungs render in a lane, coarsest→finest, indented one step per
+  // level. Only the FOCUSED rung (the finest committed one) rests expanded; its committed
+  // ANCESTORS auto-collapse to eyebrow+title — that's what makes the containment read at a glance.
+  // A per-slot store override (`railCollapse`, written by the card's own +/− or the rail-top
+  // minimize/expand controls) beats the auto default; a non-ladder card (snapshot) defaults open.
+  const railCollapse = useStore((s) => s.railCollapse);
+  const setRailCollapse = useStore((s) => s.setRailCollapse);
+  const setRailCollapseMany = useStore((s) => s.setRailCollapseMany);
+  const ladderIds = ladderSlotIds(mode);
+  const presentOf = (id: string) => manifest.find((c) => c.id === id)?.present ?? false;
+  const presentLadder = ladderIds.filter(presentOf);
+  const focusId = presentLadder.length ? presentLadder[presentLadder.length - 1] : null;
+  const autoCollapsed = (id: string) => ladderIds.includes(id) && presentOf(id) && id !== focusId;
+  const effCollapsed = (id: string) => railCollapse[id] ?? autoCollapsed(id);
+  const toggleCollapse = (id: string) => setRailCollapse(id, !effCollapsed(id));
+  const cx = (id: string) => ({ collapsed: effCollapsed(id), onToggle: () => toggleCollapse(id) });
+
   const detailPane: Record<string, ReactNode> = {
     // Country/provider toggle CLOSED through the same tested table a row re-click runs — the ×
     // is the ladder's own step-back, not a bespoke clear (countryToggleActions also drops any
@@ -259,6 +313,7 @@ export default function Inspector() {
         key="country"
         cc={country}
         onClose={() => applyClickActions(countryToggleActions(country, { country, hasInspect: !!inspect, cohort }))}
+        {...cx("country")}
       />
     ) : null,
     cohort: cohort ? (
@@ -266,23 +321,85 @@ export default function Inspector() {
         key="cohort"
         sel={cohort}
         onClose={() => applyClickActions(cohortToggleActions(cohort, { cohort, hasInspect: !!inspect }))}
+        {...cx("cohort")}
       />
     ) : null,
     // geoLive reads the node from the store; its × is CardHead's shared close like every card.
     node: (
-      <CardPane key="node" pick={{ kind: "geoLive" }} eyebrow="Node" onClose={() => applyClickActions([{ kind: "inspect", pick: null }])} />
+      <CardPane key="node" pick={{ kind: "geoLive" }} eyebrow="Node" onClose={() => applyClickActions([{ kind: "inspect", pick: null }])} {...cx("node")} />
     ),
     snap: snap ? (
-      <CardPane key="snap" pick={snap} eyebrow="Snapshot" onClose={() => applyClickActions([{ kind: "snapshot", pick: null }])} />
+      <CardPane key="snap" pick={snap} eyebrow="Snapshot" onClose={() => applyClickActions([{ kind: "snapshot", pick: null }])} {...cx("snap")} />
     ) : null,
     layer: layer ? (
-      <CardPane key="layer" pick={layer} eyebrow="Layer" onClose={() => applyClickActions([{ kind: "layer", pick: null }])} />
+      <CardPane key="layer" pick={layer} eyebrow="Layer" onClose={() => applyClickActions([{ kind: "layer", pick: null }])} {...cx("layer")} />
     ) : null,
   };
+
+  // ── The desktop LADDER LANE (the descent spine) + the flat tablet/phone stack ─────────────────
+  // Ladder slots render in a `.rail-ladder` lane, in display order, each in a `.rung` whose body
+  // indents by its depth (`--depth`); the finest present rung is `data-focus`. Context is special:
+  // ALWAYS mounted (self-nulling on "all") so its EdgePulse survives the dossier⇄nothing swap —
+  // so its rung always renders ContextCard, plus the context ghost when nothing's committed there.
+  const ladderLane = (
+    <div className="rail-ladder">
+      {ladderIds.map((id, depth) => {
+        const card = manifest.find((c) => c.id === id);
+        if (!card) return null;
+        const body: ReactNode =
+          id === "context" ? (
+            <>
+              <ContextCard {...cx("context")} />
+              {!card.present && card.hint != null && <GhostCard card={card} />}
+            </>
+          ) : card.present ? (
+            detailPane[id]
+          ) : card.hint != null ? (
+            <GhostCard card={card} />
+          ) : null;
+        if (!body) return null;
+        return (
+          <div key={id} className="rung" data-focus={id === focusId ? "" : undefined}>
+            <div className="rung-body" style={{ ["--depth"]: depth } as CSSProperties}>
+              {body}
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+  // Cards that AREN'T ladder rungs (the snapshot slot in every 3D view) render below the lane —
+  // present card first, else its ghost — plus, in flat/placeholder views (no ladder), everything.
+  const nonLadder = manifest.filter((c) => c.kind !== "context" && !ladderIds.includes(c.id));
+  const trailingPanes = nonLadder.filter((c) => c.present).map((c) => detailPane[c.id]);
+  const trailingGhosts = nonLadder
+    .filter((c) => !c.present && c.hint != null)
+    .map((c) => <GhostCard key={`${c.id}-ghost`} card={c} />);
+
+  // Rail-top controls act on EVERY present card (ladder + snapshot). Clear-all sweeps the whole
+  // ladder back to the overview through the tested `clearAllActions` table AND drops any collapse
+  // overrides so a fresh selection starts from the auto default again.
+  const presentIds = manifest.filter((c) => c.present).map((c) => c.id);
+  const hasCards = presentIds.length > 0;
+  const minimizeAll = () => setRailCollapseMany(Object.fromEntries(presentIds.map((id) => [id, true])));
+  const expandAll = () => setRailCollapseMany(Object.fromEntries(presentIds.map((id) => [id, false])));
+  const clearAll = () => {
+    for (const id of presentIds) setRailCollapse(id, null);
+    applyClickActions(
+      clearAllActions({
+        hasInspect: presentOf("node"),
+        hasSnap: presentOf("snap"),
+        cohort,
+        country,
+        layerId: layer ? layer.layerId : null,
+        filter,
+      }),
+    );
+  };
+
   // Slots in TWO groups (user refinement): POPULATED cards first, then every GHOST pushed to
-  // the bottom — each group in the manifest's stable slot order. A deselect drops the card's
-  // ghost into the bottom group; activating a ghost lifts it into the populated group. Context
-  // is rendered separately (always-mounted, self-nulling) — only its ghost comes from here.
+  // the bottom — each group in the manifest's stable slot order. The tablet/phone sheets keep
+  // this FLAT stack (no ladder lane on a small screen); the desktop rail uses the lane above.
   const panes = manifest.filter((c) => c.kind !== "context" && c.present).map((c) => detailPane[c.id]);
   const ghosts = manifest
     .filter((c) => !c.present && c.hint != null)
@@ -314,7 +431,7 @@ export default function Inspector() {
   // bottom sheet (bottom-right button) instead of a side sheet — see below.
   const content = (
     <>
-      <ContextCard />
+      <ContextCard {...cx("context")} />
       {panes}
       {ghosts}
     </>
@@ -336,9 +453,10 @@ export default function Inspector() {
           className="max-[1100px]:!w-[288px] max-[860px]:!w-[min(300px,calc(100vw-32px))] max-[1099px]:!hidden"
           style={accent}
         >
-          <ContextCard />
-          {panes}
-          {ghosts}
+          {hasCards && <RailControls onMinimize={minimizeAll} onExpand={expandAll} onClear={clearAll} />}
+          {ladderLane}
+          {trailingPanes}
+          {trailingGhosts}
         </div>
       </>
     );

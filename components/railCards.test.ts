@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { exploreCards, detailsCards, type RailManifestState } from "@/components/railCards";
+import { exploreCards, detailsCards, ladderSlotIds, type RailManifestState } from "@/components/railCards";
 import type { PickDescriptor } from "@/src/data/types";
 
 // Present card kinds in render order — the exact set/order both the rail and the tray consume.
@@ -116,5 +116,25 @@ describe("detailsCards — RIGHT rail (Details): fixed slots + ghost hints", () 
     expect(country.subjectKey).toBe("de");
     expect(cohort.present).toBe(true);
     expect(cohort.subjectKey).toBe("de|Falkenstein|Hetzner");
+  });
+});
+
+describe("ladderSlotIds — the descent-spine lane (display order = reversed rung order)", () => {
+  it("mirrors focusLadder.LADDERS coarsest→coarsest per 3D view", () => {
+    expect(ladderSlotIds("geo")).toEqual(["context", "country", "cohort", "node"]);
+    expect(ladderSlotIds("hyper")).toEqual(["context", "node"]);
+    // Ledger: LAYER sits above NODE (ladder order — layer is deliberately finer than network
+    // but coarser than node), a deliberate reorder of the fixed slot stack.
+    expect(ladderSlotIds("ledger")).toEqual(["context", "layer", "node"]);
+  });
+  it("flat views have no ladder", () => {
+    expect(ladderSlotIds("status")).toEqual([]);
+    expect(ladderSlotIds("transactions")).toEqual([]);
+    expect(ladderSlotIds("staking")).toEqual([]);
+  });
+  it("every ladder slot id exists in the details manifest (the lane can't invent a slot)", () => {
+    const ids = detailsCards(details({ mode: "geo" })).map((c) => c.id);
+    for (const view of ["geo", "hyper", "ledger"] as const)
+      for (const slot of ladderSlotIds(view)) expect(ids).toContain(slot);
   });
 });

@@ -582,9 +582,9 @@ export function CountryCard({ cc }: { cc: string }) {
 export function ProviderTitle({ sel }: { sel: CohortSel }) {
   const Mark = PROVIDER_ICON;
   return (
-    <span className="inline-flex items-center gap-2 min-w-0">
+    <span className="flex items-center gap-2 min-w-0 max-w-full">
       <Mark aria-hidden className={cn(KIND_MARK_CLASS, "text-[var(--filter-accent,var(--primary))]")} />
-      <span className="truncate">
+      <span className="truncate min-w-0">
         {sel.city ?? "Unlocated"} · {sel.isp ?? "Unknown provider"}
       </span>
     </span>

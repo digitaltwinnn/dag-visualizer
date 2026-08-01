@@ -131,6 +131,12 @@ interface AppState {
   // Shared by BOTH dock sheets so switching halves keeps the chosen height; reset to null the
   // moment the dock fully closes (`setPhoneDock(null)`) so reopening starts at the default.
   phoneSheetPx: number | null;
+  // Per-slot rail-card collapse OVERRIDES (slot id → collapsed), written by a user's +/− toggle
+  // or the rail-top minimize/expand-all controls. A slot with NO entry falls back to the rail's
+  // AUTO default (Inspector: ladder ancestors of the focused rung rest collapsed) — so `null`
+  // via setRailCollapse returns a slot to auto. UI state, not selection (the selection boundary
+  // rule doesn't apply); session-only, like phoneDock.
+  railCollapse: Record<string, boolean>;
 
   setLive: (live: boolean, lastGoodAt?: number) => void;
   setEngineReady: (v: boolean) => void;
@@ -163,6 +169,8 @@ interface AppState {
   setPhoneDock: (dock: "explore" | "details" | null) => void;
   setPhoneVitals: (open: boolean) => void;
   setPhoneSheetPx: (px: number | null) => void;
+  setRailCollapse: (id: string, collapsed: boolean | null) => void;
+  setRailCollapseMany: (entries: Record<string, boolean>) => void;
 }
 
 // Keep the exact-snapshot cache bounded (one small object per ordinal); drop the oldest.
@@ -201,6 +209,7 @@ export const useStore = create<AppState>((set) => ({
   snapshotExact: {},
   phoneDock: null,
   phoneVitals: false,
+  railCollapse: {},
   phoneSheetPx: null,
 
   setLive: (live, lastGoodAt) => set((s) => ({ live, lastGoodAt: lastGoodAt ?? s.lastGoodAt })),
@@ -250,5 +259,13 @@ export const useStore = create<AppState>((set) => ({
   // the default; switching halves (a non-null → non-null transition) keeps it.
   setPhoneDock: (phoneDock) => set(phoneDock === null ? { phoneDock, phoneSheetPx: null } : { phoneDock }),
   setPhoneVitals: (phoneVitals) => set({ phoneVitals }),
+  setRailCollapse: (id, collapsed) =>
+    set((s) => {
+      const railCollapse = { ...s.railCollapse };
+      if (collapsed === null) delete railCollapse[id];
+      else railCollapse[id] = collapsed;
+      return { railCollapse };
+    }),
+  setRailCollapseMany: (entries) => set((s) => ({ railCollapse: { ...s.railCollapse, ...entries } })),
   setPhoneSheetPx: (phoneSheetPx) => set({ phoneSheetPx }),
 }));

@@ -105,7 +105,11 @@ export default function CardHead({
 }) {
   const rolled =
     titleKey != null ? (
-      <span key={titleKey} className="roll-in">
+      // `min-w-0 max-w-full` bounds this inline-block wrapper to its parent's width so a long
+      // title inside (e.g. a provider's "City · Long Provider GmbH") can actually truncate — an
+      // unbounded inline-block shrinks to content and lets the inner `.truncate` overflow the card
+      // (surfaced once the ladder lane narrows the deeper cards, 2026-07-19).
+      <span key={titleKey} className="roll-in min-w-0 max-w-full">
         {title}
       </span>
     ) : (
