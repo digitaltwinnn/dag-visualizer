@@ -1,13 +1,23 @@
 "use client";
 
-// Section 2 (spec 2026-08-01): the per-view raw-data table. Task 6 lands the real tables;
-// until then every view shows the honest not-built state (no fabricated rows).
+import { useStore } from "@/src/store/store";
+import AnchorLogTable from "@/components/datasection/AnchorLogTable";
+import NodeRosterTable from "@/components/datasection/NodeRosterTable";
+
+// Section 2 (spec 2026-08-01): the per-view raw-data table — ledger = the anchor log,
+// hyper/geo = the node roster (location-first in geo). The flat placeholder views have no
+// dataset yet: the same honest preview language as Blueprint, never a fabricated table.
 export default function DataSection() {
+  const mode = useStore((s) => s.mode);
   return (
-    <div className="h-full flex">
-      <p className="m-auto text-label text-muted-foreground uppercase tracking-caps">
-        data table · in development
-      </p>
+    <div className="h-full flex flex-col px-6 py-3">
+      {mode === "ledger" ? (
+        <AnchorLogTable />
+      ) : mode === "hyper" || mode === "geo" ? (
+        <NodeRosterTable mode={mode} />
+      ) : (
+        <p className="m-auto text-label text-muted-foreground uppercase tracking-caps">preview · in development</p>
+      )}
     </div>
   );
 }
