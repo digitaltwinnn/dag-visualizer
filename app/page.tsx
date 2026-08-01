@@ -16,17 +16,18 @@ import SectionSlider from "@/components/SectionSlider";
 import DataSection from "@/components/DataSection";
 
 // Single-page shell in TWO sections (spec 2026-08-01): SectionSlider carries the whole fixed
-// scene shell (canvas + rails + strip — section 1) and the per-view data table (section 2);
-// the LiveStrip at section 1's bottom edge is the divider/drag-handle between them. TopBar +
-// the banner stay OUTSIDE the slider (fixed to the real viewport, visible in both sections),
-// as do the non-visual bridges and the pointer-anchored Tooltip (a transformed ancestor would
-// re-anchor its fixed positioning).
+// scene shell (canvas + rails — section 1) and the per-view data table (section 2); the
+// LiveStrip at section 1's bottom edge is the divider/drag-handle between them, passed as its
+// own `divider` slot so it stays interactive while EITHER section is inert (it is the only way
+// back up). TopBar + the banner stay OUTSIDE the slider (fixed to the real viewport, visible in
+// both sections), as do the non-visual bridges and the pointer-anchored Tooltip (a transformed
+// ancestor would re-anchor its fixed positioning).
 export default function Home() {
   return (
     <main>
       <ExperimentalBanner />
       <TopBar />
-      <SectionSlider dataSection={<DataSection />}>
+      <SectionSlider dataSection={<DataSection />} divider={<BottomStream />}>
         <SceneCanvas />
         <Blueprint />
         <BootOverlay />
@@ -34,7 +35,6 @@ export default function Home() {
         <Inspector />
         <PhoneDockSweep />
         <RailScroll />
-        <BottomStream />
       </SectionSlider>
       <DataBridge />
       <FollowController />

@@ -20,7 +20,7 @@ gsap.registerPlugin(Draggable, InertiaPlugin, Observer);
 // shared by both sections); portalled UI (sheets, tooltips) doesn't ride the transform — RailDock
 // gates its sheets on `section`, LiveStrip portals its tip. Measurements taken INSIDE the wrapper
 // carry the translate: `lib/shellOffset.ts` is the correction every such consumer applies.
-export default function SectionSlider({ children, dataSection }: { children: ReactNode; dataSection: ReactNode }) {
+export default function SectionSlider({ children, divider, dataSection }: { children: ReactNode; divider: ReactNode; dataSection: ReactNode }) {
   const wrapRef = useRef<HTMLDivElement>(null);
   const sec2Ref = useRef<HTMLElement>(null);
 
@@ -119,8 +119,11 @@ export default function SectionSlider({ children, dataSection }: { children: Rea
     };
   }, []);
 
-  // The off-screen section is `inert`: nothing in it takes focus or a pointer event while the
-  // other one is presented (section 2's table is a grid of real controls).
+  // Whichever section is off-screen is `inert`: nothing in it takes focus or a pointer event
+  // while the other one is presented (both sections are full of real controls — rails and
+  // canvas up here, a sortable table down there). The DIVIDER is deliberately outside both
+  // boundaries: the strip is section 2's header and the only way back, so it stays live in
+  // either pose.
   const section = useStore((s) => s.section);
 
   return (
@@ -128,7 +131,10 @@ export default function SectionSlider({ children, dataSection }: { children: Rea
     // containing block to this wrapper before anything renders, so geometry never jumps when
     // GSAP later writes the same property.
     <div ref={wrapRef} id={SHELL_ID} className="fixed inset-0 will-change-transform" style={{ transform: "translateY(0px)" }}>
-      {children}
+      {/* A plain div — no transform/filter/will-change — so it does NOT become a containing
+         block for the fixed scene shell inside it; it exists only to carry `inert`. */}
+      <div inert={section === "data"}>{children}</div>
+      {divider}
       <section
         ref={sec2Ref}
         id="datasection"
