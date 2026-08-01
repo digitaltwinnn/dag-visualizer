@@ -129,12 +129,10 @@ function nodeHint(s: RailManifestState): string | null {
   return null;
 }
 function snapHint(s: RailManifestState): string | null {
-  // The LiveStrip runs in EVERY view and a bar click opens the snapshot card from anywhere
-  // (jumping to Snapshots from hyper/geo) — so the invite is honest in all 3D views, and
-  // closing a carried snapshot card returns to a ghost instead of vanishing (user bug).
-  if (s.mode === "ledger") return "Click a snapshot block (or a bar in the strip below) to inspect it.";
-  if (IN_3D(s.mode)) return "Click a bar in the strip below to inspect a snapshot.";
-  return null;
+  // LEDGER-SCOPED (spec 2026-08-01, a deliberate reversal of the old carry-across-views rule):
+  // the strip's bars now run only in ledger and leaving the view clears the pin (Engine.setMode),
+  // so the slot invites — and exists — only there.
+  return s.mode === "ledger" ? "Click a snapshot block (or a bar in the strip below) to inspect it." : null;
 }
 function layerHint(s: RailManifestState): string | null {
   return s.mode === "ledger" ? "Click a floor plane (or a row in the explorer) to inspect it." : null;

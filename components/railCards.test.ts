@@ -65,12 +65,12 @@ describe("detailsCards — RIGHT rail (Details): fixed slots + ghost hints", () 
   it("ledger ghosts: context + node + snapshot + layer invites (nodes pick in the chamber too)", () => {
     expect(ghostIds(detailsCards(details({})))).toEqual(["context", "node", "snap", "layer"]);
   });
-  it("hyper ghosts: context + node + snapshot invites (the strip runs in every view)", () => {
-    expect(ghostIds(detailsCards(details({ mode: "hyper" })))).toEqual(["context", "node", "snap"]);
+  it("hyper ghosts: context + node only (the snapshot slot is ledger-scoped, spec 2026-08-01)", () => {
+    expect(ghostIds(detailsCards(details({ mode: "hyper" })))).toEqual(["context", "node"]);
   });
-  it("geo ghosts cover the whole ladder: context + country + cohort + node + snapshot invites", () => {
+  it("geo ghosts cover the whole ladder: context + country + cohort + node invites (snapshot ledger-only)", () => {
     expect(ghostIds(detailsCards(details({ mode: "geo" })))).toEqual([
-      "context", "country", "cohort", "node", "snap",
+      "context", "country", "cohort", "node",
     ]);
   });
   it("country/cohort cards never ghost outside geo", () => {
