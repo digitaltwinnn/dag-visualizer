@@ -16,7 +16,7 @@ import { DisclosureChevron, DisclosureRow, NodePickerRow, ROW_NEST, ROW_OUTSET }
 import { LEDGER_LAYERS } from "@/src/data/ledgerLayers";
 import type { MetaInfo, NodeRow } from "@/src/data/types";
 
-// The Snapshots view's left-rail tool: the layered-design explainer. Lists the settlement stack
+// The Snapshots view's left-rail tool: the layered-design explainer. Lists the anchoring stack
 // top→bottom; HOVERING a layer previews its plane highlight in the 3D view (store.ledgerHilite, the
 // transient channel), CLICKING commits the selection (store.layer — opens the layer card on the
 // right facts rail AND keeps the plane highlighted; click again to clear). The engine resolves
@@ -237,8 +237,8 @@ export default function LedgerPanel() {
     // also retires the stray bottom separator the old combined-padding wrapper carried).
     <ExplorerShell
       id="ledger-view"
-      title="Settlement layers"
-      hint="Every layer that participates in creating a snapshot — hover or click one to see what it does in the settlement stack."
+      title="Anchoring layers"
+      hint="Every layer that participates in creating a snapshot — hover or click one to see what it does in the anchoring stack."
       onLeave={() => {
         // Structural fix for the review's stuck-hoverFilter bug: a LANE row's click commits
         // the filter, which can remove that lane (or close the whole floor disclosure it lives

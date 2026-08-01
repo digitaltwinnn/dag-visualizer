@@ -86,7 +86,7 @@ export default function HyperExplore() {
     <ExplorerShell
       id="hyperexplore"
       title="Nodes by network"
-      hint="Every network on the hypergraph — hover or click one to see how it is composed of different nodes that each play a role in settlement."
+      hint="Every network on the hypergraph — hover or click one to see how it is composed of different nodes that each play a role in validation."
     >
       {/* Sorted by fleet size (user, 2026-07-12) — the biggest networks lead. */}
       {[...metaList].sort((a, b) => b.nodes.length - a.nodes.length).map((m) => {

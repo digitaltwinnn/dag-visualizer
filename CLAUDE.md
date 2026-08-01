@@ -1397,6 +1397,14 @@ event, `ledger.update(dt)` per frame).
 
 ## Anchoring, fees & the metagraph data layer
 
+**Vocabulary rule (user, 2026-08-01):** in USER-FACING copy the Snapshots stack **anchors
+state** — "settlement" is reserved for the DAG a snapshot actually pays (the snapshot card's
+fee/size rows). One word for both read as if Snapshots were where *money* settles, which is
+what the separate Transactions view is for. So: "Anchoring layers", "When the network anchors",
+"the base ledger", "N KB anchored"; and hyper's core copy says "security + consensus". Internal
+identifiers/comments keep their existing names (`LedgerView`, the settlement chamber) — the rule
+is about words the user reads, not code.
+
 Verified live against mainnet:
 
 - **Each metagraph snapshots independently and faster than Global L0** (e.g. DED ~9.5/min vs

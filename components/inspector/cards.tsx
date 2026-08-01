@@ -253,7 +253,7 @@ export function SnapshotCard({ data: d }: { data: GlobalSnapshot }) {
               <span className="text-body text-muted-foreground">Fees paid</span>
               <span className="flex flex-col items-end text-body text-foreground tabular-nums">
                 <span className="animate-resolve-in motion-reduce:animate-none whitespace-nowrap"><b className="font-bold">{fmtDag(exact.totalFee)}</b> DAG</span>
-                <span className="text-label text-muted-foreground">{fmtKB(exact.totalSizeKB)} settled</span>
+                <span className="text-label text-muted-foreground">{fmtKB(exact.totalSizeKB)} anchored</span>
               </span>
             </div>
           )}
@@ -409,8 +409,8 @@ function GeoLiveNode({ p }: { p: PickOf<"l0" | "l1" | "metanode"> }) {
   );
 }
 
-// ── The LAYER card (Snapshots · settlement-stack layer) ─────────────────────────────────────
-// Selected from the Snapshots·Explore panel (LedgerPanel): each layer of the settlement stack is a
+// ── The LAYER card (Snapshots · anchoring-stack layer) ─────────────────────────────────────
+// Selected from the Snapshots·Explore panel (LedgerPanel): each layer of the anchoring stack is a
 // clickable subject whose card = what the layer IS (the pick carries the panel's description) plus
 // its LIVE footprint right now, derived from data already in the store — node counts from the
 // metagraph list (a hybrid counts in every layer it runs, matching the top-bar vitals taxonomy),
