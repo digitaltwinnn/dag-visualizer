@@ -2,9 +2,7 @@
 
 import { useEffect, useRef, useState, type CSSProperties } from "react";
 import { createPortal } from "react-dom";
-import { ChevronsDown, ChevronsUp } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { Button } from "@/components/ui/button";
 import { latestRelevant } from "@/src/data/follow";
 import { useStore } from "@/src/store/store";
 import { useSnapshotFeed } from "@/components/useSnapshotFeed";
@@ -212,28 +210,6 @@ export default function LiveStrip() {
       ) : (
         <NodeCountReadout />
       )}
-      <SectionToggle />
     </section>
-  );
-}
-
-// The strip's trailing section control: the a11y/discoverability fallback for the drag gesture
-// (SectionSlider makes the WHOLE strip a drag handle), and the handle scripts can click. Renders
-// in every view — the strip is section 1's bottom edge and section 2's header in all of them.
-// `section` is UI state, not a selection, so the selection-boundary rule doesn't apply here.
-function SectionToggle() {
-  const section = useStore((s) => s.section);
-  const setSection = useStore((s) => s.setSection);
-  const open = section === "data";
-  return (
-    <Button
-      variant="ghost"
-      size="icon-xs"
-      className="flex-none ml-2 text-muted-foreground"
-      aria-label={open ? "Back to the scene" : "Open the data table"}
-      onClick={() => setSection(open ? "scene" : "data")}
-    >
-      {open ? <ChevronsDown /> : <ChevronsUp />}
-    </Button>
   );
 }

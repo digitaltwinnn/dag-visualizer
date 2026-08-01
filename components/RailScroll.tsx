@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect } from "react";
-import { shellOffsetY } from "@/lib/shellOffset";
 
 // Grab-and-drag scrolling on the rails. Tablets already pan natively (CSS `touch-action: pan-y`
 // + momentum); this adds the same feel for a MOUSE — press on a rail's non-interactive area and
@@ -45,12 +44,9 @@ export default function RailScroll() {
         // Space above the band, NO tolerance: any entry into the chart band fades (a +24px
         // slack let the rail overlap the chart unfaded — user bug; the content-height measure
         // is DOM-change-driven, so borderline flicker isn't a concern the way it was for the
-        // old rect-based measure). The rect is corrected by the two-section shell's live
-        // translate: the rail and the strip ride it together, so the comparison is against the
-        // SHELL's height, not the viewport — uncorrected, a measure taken while section 2 is
-        // presented reads a huge `avail`, drops `.rail-clip`, and re-opens the unmasked-rail
-        // overlap bug on the way back.
-        const avail = window.innerHeight - reserve - (r.top - shellOffsetY());
+        // old rect-based measure). The shell no longer translates (the raw data layer surfaces
+        // in place — SectionShell), so the measured rect IS the viewport position.
+        const avail = window.innerHeight - reserve - r.top;
         el.classList.toggle("rail-clip", reserve > 0 && contentH > avail);
       };
       const scheduleClip = () => { if (!raf) raf = requestAnimationFrame(syncClip); };

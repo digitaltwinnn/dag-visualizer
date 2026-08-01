@@ -142,11 +142,10 @@ export default function RailDock({
 }) {
   const [openState, setOpen] = useState(false);
   const open = openProp ?? openState;
-  // Sheets portal to document.body, so they DON'T ride the SectionSlider transform — in the
-  // data section they'd float over the table. Gate them off while section 2 is presented (the
-  // phone bar below rides the transform instead, and is gated for its own reason); the internal
-  // open state is kept, so returning to the scene restores what was open. The tablet edge TAB
-  // rides the transform too, so it translates off-screen on its own — no gate needed.
+  // Sheets portal to document.body, so they DON'T ride the SectionShell scene layer — while the
+  // raw data layer is up they'd float over the table. Gate them off in that pose (the phone bar
+  // rides the scene layer and fades with it); the internal open state is kept, so returning to
+  // the scene restores what was open. The tablet edge TAB fades with the HUD — no gate needed.
   const section = useStore((s) => s.section);
   const shellVisible = section === "scene";
   const handleOpenChange = (next: boolean) => {

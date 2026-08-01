@@ -32,8 +32,9 @@ mode !== "ledger"`):
   a faint abstract wireframe schematic of what the view will become, labelled
   `preview · in development` so it never reads as live data (no numbers, no fabricated
   values). The left rail shows only the view's About card; the bottom lane (`LiveStrip`)
-  is ALWAYS present regardless of view — as the section divider, carrying the
-  `NodeCountReadout` here (the tick bars are ledger-only), over a section 2 that says
+  is ALWAYS present regardless of view — carrying the
+  `NodeCountReadout` here (the tick bars are ledger-only), under a command bar whose RAW switch
+  opens a raw data layer that says
   `preview · in development` too. **Interface glyphs are ONE icon system: `lucide-react`,
   monochrome via `currentColor`** (so the accent/identity tinting inherits), **never emoji** (emoji
   ignore CSS `color` / the accent). The centralized view→icon map is `components/icons.tsx`
@@ -134,9 +135,10 @@ to break one, that's a design conversation, not a workaround.
 
 Next.js **16** app (Turbopack is the bundler for BOTH `dev` and `build`) — needs Node ≥20.9.
 Three.js and friends come from npm (`three`, `three/addons/*`, `topojson-client`); no CDN deps.
-**`gsap`** drives the two-section shell only (`SectionSlider` — Draggable + InertiaPlugin +
-Observer, all free in 3.15 and SSR-safe); the 3D scene's own animation stays hand-rolled in the
-engine, and HUD micro-animation stays CSS. Don't reach for GSAP elsewhere without a reason.
+**`gsap`** drives the scene↔raw-layer depth transition only (`SectionShell` — the core timeline,
+no plugins: the Draggable/Inertia/Observer gestures went with the retired slide navigation); the
+3D scene's own animation stays hand-rolled in the engine, and HUD micro-animation stays CSS.
+Don't reach for GSAP elsewhere without a reason.
 
 ```bash
 npm install
@@ -233,21 +235,22 @@ Zustand store. **Two data lanes:** (A) high-freq visuals subscribe straight to
 - **`components/`** — React panels, each reads/writes the store: `SceneCanvas` (mounts the
   engine, dynamic-imported so Three never enters the server bundle), `Blueprint` (placeholder
   schematics), `BootOverlay`, `TopBar` (the full-width top command bar: status + filter +
-  view switch + view vitals; `components/topbar/` holds `Vitals`, `FilterPicker`, `EcgMark`),
+  view switch + view vitals + the RAW switch; `components/topbar/` holds `Vitals`,
+  `FilterPicker`, `EcgMark`, `RawToggle`),
   `ExploreRail` (the left explore rail), `Inspector` (the right facts rail), `ContextCard`,
   `InspectorCard` (a thin frame dispatching to the per-kind cards in `components/inspector/`),
   `CardHead` (the ONE card header + the `RIGHT_CARD` frame), `RailThread`, `RailDock`
   (tablet/phone sheets), `RailScroll`, `EdgePulse`, `selection.tsx`, `Tooltip`,
   `FollowController` (ledger snapshot follow), `DataBridge` (boots the data),
-  `RawSnapshotBridge` (fetches the exact raw-L0 read for the focused ticks), `SectionSlider`
-  (the GSAP two-section shell), `BottomStream` +
-  `LiveStrip` (the bottom lane — divider everywhere, bars in ledger) + `NodeCountReadout` (the
-  strip's non-ledger content), `DataSection` + `components/datasection/` (section 2's per-view
+  `RawSnapshotBridge` (fetches the exact raw-L0 read for the focused ticks), `SectionShell`
+  (the GSAP scene↔raw-layer depth transition), `BottomStream` +
+  `LiveStrip` (the bottom lane — bars in ledger) + `NodeCountReadout` (the
+  strip's non-ledger content), `DataSection` + `components/datasection/` (the raw layer's per-view
   tables), `Odometer`, `Sparkline`, `state/StateAtoms`, and the
   hooks `useSnapshotFeed`, `useBreakpoint`, `useBootPhase`, `useMinHold`, `useSubjectPairing`.
 - **`src/store/store.ts`** — the Zustand store (mode, filter, country, inspect, snap,
   selStack, following, metaList, leaderboard, selNodes, activity, snapshotExact, the hover
-  channels `hoverFilter`/`hoverNodeId`/`hoverSnapOrd`, `section` (which of the two sections is
+  channels `hoverFilter`/`hoverNodeId`/`hoverSnapOrd`, `section` (which of the two shell LAYERS is
   presented — UI state, not selection, so it sits outside the one-selection-write-path rule),
   phone UI state, …). **`src/data/`** —
   `network.ts` wraps the typed `NetworkData` singleton (`api.ts`) + exposes `getAnchor`/
@@ -258,7 +261,7 @@ Zustand store. **Two data lanes:** (A) high-freq visuals subscribe straight to
   name/desc by layer id; the geometry twin is `domain/ledgerLayout.ts`'s `LAYER_GEOM`; `desc`
   belongs to the LAYER CARD only — an explorer row shows name + count, never the same sentence
   a rail away, see *the explanatory-copy split*),
-  `anchorLog.ts` + `roster.ts` (the PURE row builders behind section 2's tables — anchored
+  `anchorLog.ts` + `roster.ts` (the PURE row builders behind the raw layer's tables — anchored
   metagraph-snapshot rows, and the flat node roster + its column sort),
   `bootPhase.ts`, `breakpoint.ts`. **`src/util/`** —
   `format.ts` (`hex`/`fmtDag`/`ccMark` — the country CODE mark; flag emoji were removed
@@ -720,29 +723,41 @@ row opts it in. The `ledger` row shows the pattern: `pickSources: ["ledger", "gl
 (hubs hidden), `dofEligible: false`. Its hidden hubs are kept **out of `pickSources`**, not
 relied on being invisible — per the raycaster rule above.
 
-## Layout system — the four-zone HUD, over TWO sections
+## Layout system — the four-zone HUD, over a RAW DATA LAYER
 
-The page is ONE fixed shell in **two sections** (`SectionSlider` + `store.section`, spec
-2026-08-01): **section 1** is the four-zone HUD over the 3D canvas, **section 2** is the view's
-raw-data table (`DataSection`), and the `LiveStrip` at section 1's bottom edge is the **DIVIDER**
-between them — drag it, wheel it, or click its chevron and GSAP translates the whole shell
-(0.55s `power3.out`) until the strip docks under the command bar with the table filling the rest.
-**The page never scrolls**: the wrapper is `position:fixed; inset:0` **WITH a transform**, which
-makes it the containing block for every `position:fixed` descendant (canvas, rails, strip), so the
-existing shell CSS works untouched and the WebGL buffer stays viewport-sized — translating the
-wrapper carries the whole shell as one unit. Whichever section is off-screen carries `inert` (no
-focus, no pointer events); the divider deliberately carries it in NEITHER pose — it is section 2's
-header and the only way back up. `TopBar` + the banner stay OUTSIDE the wrapper (fixed to the real
-viewport, shared by both sections), as do the bridges and the pointer-anchored `Tooltip` (a
-transformed ancestor would re-anchor its fixed positioning). Reduced motion makes the section
-change an instant snap (duration 0, no inertia throw).
+The page is ONE fixed shell in **two LAYERS at different depths** (`SectionShell` +
+`store.section`, spec 2026-08-01, revised the same day): the **scene layer** is the four-zone HUD
+over the 3D canvas, and the **raw layer** is the view's raw-data table (`DataSection`) — *the same
+data one level down*, not a second page. Flipping the command bar's **RAW switch** (a shadcn
+`Switch`, the light/dark-mode idiom — `components/topbar/RawToggle.tsx`) runs one GSAP timeline:
+the HUD fades out (0.26s), the whole
+scene shell **recedes** (scale `SCENE_BACK` 0.92 + opacity `SCENE_DIM` 0.26, 0.55s
+`power3.inOut` — still live behind, just pushed into the background), and the raw layer **surfaces
+out of that depth** (opacity 0→1, scale 0.94→1, a small `yPercent` rise, 0.55s `power3.out`,
+overlapping at +0.16s). Back is the mirror, plus **Escape**. Retargeting mid-flight kills the live
+timeline. Reduced motion makes it an instant swap (all durations 0).
 
-⚠️ **The trap this creates:** anything INSIDE the wrapper that measures with
-`getBoundingClientRect()` (viewport coords — they include the translate) and feeds the result back
-into fixed positioning or a viewport comparison **double-counts the offset**. Subtract
-`shellOffsetY()` (`lib/shellOffset.ts`) — `RailThread`'s card dots and `RailScroll`'s available
-height both do. Portalled UI doesn't ride the transform at all, so it's gated instead (`RailDock`
-gates its sheets on `section`; `LiveStrip` portals its tip).
+**The page never scrolls.** The scene wrapper is `position:fixed; inset:0` **WITH an identity
+transform from first paint**, which makes it the containing block for every `position:fixed`
+descendant (canvas, rails) — so the existing shell CSS works untouched, the WebGL buffer stays
+viewport-sized, and GSAP later writing that same `transform` never re-anchors geometry. The raw
+layer is a **SIBLING** of that wrapper (`#datasection`, `.ig-panel fixed z-9`), occupying exactly
+the rails' band via the shared tokens (`--rail-top` + `--topbar-extra` → `--bottom-reserve`,
+edge-aligned 26px desktop / 16px below 1100px), so the receded scene shows around and faintly
+through its glass. The `LiveStrip` is a sibling too (`z-10`) — it belongs to NEITHER pose and stays
+interactive in both. Whichever layer is away carries `inert` (no focus, no pointer events).
+`TopBar` + the banner stay OUTSIDE the shell (fixed to the real viewport, visible in both poses),
+as do the bridges and the pointer-anchored `Tooltip`.
+
+⚠️ **The HUD wrapper is animated by OPACITY ONLY** — deliberately. `opacity` creates a stacking
+context but NOT a containing block; giving that zero-size static div a transform would capture the
+fixed rails inside it. The receding transform belongs to the `fixed inset-0` wrapper, which is
+already their containing block. (The old translate-the-shell-off-screen mechanism — drag/wheel/
+chevron navigation via GSAP Draggable + Inertia + Observer — is RETIRED: scroll fought the Three.js
+camera controls, and the page-swap metaphor read as "the table hides the app". With it went the
+`shellOffsetY()` measurement trap: nothing translates, so `getBoundingClientRect()` inside the
+shell IS the viewport position again. Portalled UI still doesn't ride any of this, so it's gated —
+`RailDock` gates its sheets on `section`; `LiveStrip` portals its tip.)
 
 The HUD is **four fixed zones over the canvas, one SCOPE/role each, stable across views**.
 **Gate new chrome by *which zone/scope it belongs to* — not by what a particular view puts
@@ -770,7 +785,10 @@ and keep changing, so they're examples, not the contract.
   **view switch** (center — a `ToggleGroup` of six monochrome lucide icons: `Orbit` hyper /
   `Globe` geo / `Layers` ledger / `Radar` status / `ArrowLeftRight` transactions / `HandCoins`
   staking, from `VIEW_ICONS`), and the
-  **view vitals** (right, `Vitals`). **The vitals region is constant-width**: all view
+  **view vitals + the RAW switch** (right — `Vitals`, then `RawToggle`, the bar's trailing
+  control: it opens the raw data layer under the view and sits LAST because it acts on
+  everything to its left; the "RAW" word hides ≤940px exactly like the FILTER label). **The
+  vitals region is constant-width**: all view
   clusters render stacked in one grid cell (inactive ones `invisible` + `aria-hidden`) so the
   centered view switch never jumps on a view change; sparklines condense away ≤1240px.
   Below 1100px a slim **selected-view caption** hangs under the bar, right-anchored. The
@@ -850,9 +868,9 @@ and keep changing, so they're examples, not the contract.
   committable `focusLadder` rung below "all" must map to a hinted card slot (exemptions
   need an explicit documented entry) — a future rung can't land without deciding its card. An **instrument-channel
   thread** (`RailThread`) runs each rail's outer edge.
-- **Bottom** (`BottomStream`) = the live/time lane **and the section divider**: the slim
-  `LiveStrip` in EVERY view; it publishes `--bottom-reserve`. Its DIVIDER role is constant (drag
-  handle / wheel surface / chevron into section 2 — see the two-section intro above); its CONTENT
+- **Bottom** (`BottomStream`) = the live/time lane: the slim
+  `LiveStrip` in EVERY view; it publishes `--bottom-reserve`. It belongs to neither layer (it sits
+  outside the scene wrapper and stays interactive in both poses); its CONTENT
   is per-view — the tick bar-chart is **LEDGER-ONLY** (a time series belongs to the *when* view),
   and hyper/geo/flat carry the `NodeCountReadout` in the same slim footprint instead: the located
   total plus one identity dot + count per network, from the live `metaList` tallies.
@@ -1027,8 +1045,10 @@ code — reference the tokens. The SVG `RailThread` mirrors the `--thread-*` lit
   overridden to a faint neutral (the bright accent fill washed text out). `ToggleGroup` —
   the view switch + phone dock halves; the view switch owns its sizing/rounding explicitly
   (`h-9`, `rounded-[8px]!`). **`Sheet`** — the tablet/phone rail docks (non-modal, no
-  overlay, no exit animation). `Badge`/`Avatar`/`Separator` — inspector bodies.
-- **`Table` + `ScrollArea`** — section 2's data tables only (2026-08-01). The stock shadcn
+  overlay, no exit animation). **`Switch`** — the command bar's RAW control (the one scene↔raw-layer
+  affordance; `size="sm"`, wrapped in a `<label>` with its own caption).
+  `Badge`/`Avatar`/`Separator` — inspector bodies.
+- **`Table` + `ScrollArea`** — the raw data layer's tables only (2026-08-01). The stock shadcn
   `Table` is adopted MINUS its scroll-container div: `ScrollArea` owns scrolling, so the header
   can stay `sticky` + opaque while the body scrolls under it. Both come from the unified
   `radix-ui` package already in the tree — no new dependency.
@@ -1089,7 +1109,7 @@ signal channel.**
 - **Calm tempo**: the heartbeat family (ECG scan, filter dot `dot-beat`, card-title dots,
   live dots `breathe`) beats at 1.5s; transient signals (edge pulse, hold-fade) run ~1.2s/
   0.4s. Signals are debounced — a 4s-tick live feed must never read as a strobe. **Navigation
-  moves on its own, slower clock**: the section change is 0.55s `power3.out` (GSAP) and the
+  moves on its own, slower clock**: the scene↔raw-layer depth change is 0.55s (GSAP) and the
   3D↔3D view choreography ~3.9s — a whole-shell or whole-scene move is allowed to take longer
   than a signal, because it's the user's own gesture resolving, not the instrument speaking.
 - **Reduced motion is guarded on EVERY animation**: theme-var animations carry
@@ -1197,15 +1217,16 @@ ghost are both ledger-only.
    pairing wash) and to later-in-layer recipes (`.ig-panel`'s box-shadow silenced the paired
    glow). Unlayered CSS beats every layer at equal specificity. `.subject-paired` and the
    card signal system live unlayered on purpose — new must-win recipes go there too.
-2. **A transform on an ancestor re-anchors every `position:fixed` descendant to it.** This is
-   load-bearing, not incidental: `SectionSlider`'s wrapper is `fixed inset-0` with an inline
-   identity `translateY(0px)` from FIRST PAINT precisely so the canvas + rails resolve their
-   fixed boxes against the wrapper (= the viewport at rest) before anything renders — geometry
-   never jumps when GSAP later writes the same property. Two consequences to respect: a plain
-   `<div>` with no transform/filter/will-change (the `inert` carrier inside it) does NOT create
-   a containing block, so it's safe to nest; and measurements taken inside the wrapper carry the
-   translate (see `lib/shellOffset.ts`). Anything that must stay pinned to the REAL viewport
-   goes outside the wrapper or through a portal.
+2. **A transform on an ancestor re-anchors every `position:fixed` descendant to it** —
+   `opacity` does NOT (it only makes a stacking context). Both halves are load-bearing:
+   `SectionShell`'s scene wrapper is `fixed inset-0` with an inline identity `translateY(0px)`
+   from FIRST PAINT precisely so the canvas + rails resolve their fixed boxes against the wrapper
+   (= the viewport at rest) before anything renders — geometry never jumps when GSAP later writes
+   that same property to make the scene recede. Its HUD child, conversely, is animated by OPACITY
+   ONLY: a transform there would make that zero-size static div the rails' containing block. A
+   plain `<div>` with no transform/filter/will-change (the `inert` carrier) does NOT create a
+   containing block, so it's safe to nest. Anything that must stay pinned to the REAL viewport
+   goes outside the wrapper (TopBar, the strip, the raw layer) or through a portal.
 2. **`bg-[var(--x)]` compiles to background-COLOR.** A token holding a gradient/shorthand
    (e.g. `--axis-hairlines`) silently renders nothing through `bg-[…]` — use the arbitrary
    property form `[background:var(--x)]`.
@@ -1250,9 +1271,8 @@ A global snapshot's real work is **settlement, not blocks** — most carry zero 
 centre + trail blocks are sized by it too); the snapshot card shows the derived **`~DAG`**
 fee, height/sub-height, and a `+N blk` note for the uncommon block-carrying ticks.
 
-**`LiveStrip`** (`components/LiveStrip.tsx`) occupies the bottom lane in every view, but it is
-TWO things at once: the **section divider** everywhere (drag handle / wheel surface / chevron —
-see *Layout system*), and a **bar-chart only in ledger**. The bars: one per tick, height =
+**`LiveStrip`** (`components/LiveStrip.tsx`) occupies the bottom lane in every view, but the
+**bar-chart is ledger-only**. The bars: one per tick, height =
 anchors, crisp cap + faded body, no panel chrome (they blend into the scene).
 Unfiltered, bars plot each tick's TOTAL anchors in cyan. **Filtered, each bar plots THAT
 metagraph's own anchors on its OWN scale in its identity hue — its own cadence, with empty
@@ -1271,7 +1291,7 @@ not Recharts — dense, interactive, slim (Recharts is used for the vitals `Spar
 identity dot and count per network (2026-08-01: a time series is a *when* instrument and the
 other views aren't about time; the readout keeps the lane honest rather than blank).
 
-**Section 2 — the raw-data table** (`components/DataSection.tsx` + `components/datasection/`)
+**The raw data layer's table** (`components/DataSection.tsx` + `components/datasection/`)
 is the same per-view projection idea in table form, dispatching on `mode`: **ledger** →
 `AnchorLogTable` (one row per anchored metagraph snapshot — network, snapshot ordinal, fee, size,
 the global it anchored into, age; row click pins that global snapshot through the same

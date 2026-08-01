@@ -12,30 +12,29 @@ import RailScroll from "@/components/RailScroll";
 import FollowController from "@/components/FollowController";
 import RawSnapshotBridge from "@/components/RawSnapshotBridge";
 import Tooltip from "@/components/Tooltip";
-import SectionSlider from "@/components/SectionSlider";
+import SectionShell from "@/components/SectionShell";
 import DataSection from "@/components/DataSection";
 
-// Single-page shell in TWO sections (spec 2026-08-01): SectionSlider carries the whole fixed
-// scene shell (canvas + rails — section 1) and the per-view data table (section 2); the
-// LiveStrip at section 1's bottom edge is the divider/drag-handle between them, passed as its
-// own `divider` slot so it stays interactive while EITHER section is inert (it is the only way
-// back up). TopBar + the banner stay OUTSIDE the slider (fixed to the real viewport, visible in
-// both sections), as do the non-visual bridges and the pointer-anchored Tooltip (a transformed
-// ancestor would re-anchor its fixed positioning).
+// Single-page shell in TWO LAYERS (spec 2026-08-01): SectionShell carries the fixed scene shell
+// (the canvas in its own `scene` slot, since it recedes rather than hides, + the HUD as children)
+// and the per-view raw data table, which surfaces out of the scene's depth when the LiveStrip's
+// RAW switch is flipped. The strip is passed as its own `divider` slot so it belongs to neither
+// pose and stays interactive in both. TopBar + the banner stay OUTSIDE the shell (fixed to the
+// real viewport, visible in both poses), as do the non-visual bridges and the pointer-anchored
+// Tooltip (a transformed ancestor would re-anchor its fixed positioning).
 export default function Home() {
   return (
     <main>
       <ExperimentalBanner />
       <TopBar />
-      <SectionSlider dataSection={<DataSection />} divider={<BottomStream />}>
-        <SceneCanvas />
+      <SectionShell scene={<SceneCanvas />} raw={<DataSection />} divider={<BottomStream />}>
         <Blueprint />
         <BootOverlay />
         <ExploreRail />
         <Inspector />
         <PhoneDockSweep />
         <RailScroll />
-      </SectionSlider>
+      </SectionShell>
       <DataBridge />
       <FollowController />
       <RawSnapshotBridge />

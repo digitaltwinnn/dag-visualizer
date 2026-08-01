@@ -122,10 +122,11 @@ interface AppState {
   // (Outside-tap does NOT dismiss it — `onInteractOutside` is `preventDefault`-blocked so the
   // scene/other dock stays interactive underneath.) Unused on tablet/desktop.
   phoneDock: "explore" | "details" | null;
-  // Which of the two shell SECTIONS is presented (spec 2026-08-01): "scene" = the 3D shell,
-  // "data" = the per-view raw-data table below it. Written by SectionSlider (drag/wheel snap)
-  // and the strip's chevron; SectionSlider owns the tween that realizes it. UI state, not
-  // selection (the selection boundary rule doesn't apply); session-only, like phoneDock.
+  // Which of the two shell LAYERS is presented (spec 2026-08-01): "scene" = the 3D shell + HUD,
+  // "data" = the per-view raw-data table that surfaces out of the scene's depth over it. Written
+  // by the LiveStrip's RAW switch (and Escape); SectionShell owns the GSAP timeline that realizes
+  // it. UI state, not selection (the selection boundary rule doesn't apply); session-only, like
+  // phoneDock.
   section: "scene" | "data";
   // PHONE ONLY: whether the top bar's vitals row is expanded (the bar grows downward by one
   // full-width row showing the active view's vitals). A USER CHOICE that persists across view
