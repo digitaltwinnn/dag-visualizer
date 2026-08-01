@@ -12,7 +12,7 @@ import { hoverKeyOf } from "@/src/data/hoverSubject";
 import { countryToggleActions, nodeSelectActions, cohortToggleActions, sameCohort } from "@/src/engine/domain/pickActions";
 import { applyClickActions } from "@/src/store/applyClickActions";
 import { subjectPairing } from "@/components/useSubjectPairing";
-import { DisclosureChevron, DisclosureRow, NodePickerRow } from "@/components/ExploreRows";
+import { DisclosureChevron, DisclosureRow, NodePickerRow, ROW_NEST, ROW_OUTSET } from "@/components/ExploreRows";
 import type { NodeRow } from "@/src/data/types";
 import type { CohortSel } from "@/src/engine/domain/focusLadder";
 
@@ -180,11 +180,12 @@ export default function GeoExplore() {
                 <button
                   type="button"
                   className={cn(
-                    // w-[calc(100%+12px)] (not w-full): with w-full the right -mx-1.5 was ignored
+                    // ROW_OUTSET (not w-full): with w-full the right -mx-1.5 was ignored
                     // (overconstrained box) and the row ended 6px SHORT of the column; the calc width
                     // bakes both 6px outsets in, so the row box spans the open group's wash box
                     // edge-to-edge (buttons shrink-to-fit, so an auto width is not an option).
-                    "nb-row group flex items-center gap-2.5 w-[calc(100%+12px)] text-left text-body border border-transparent bg-transparent cursor-pointer py-[5px] px-1.5 -mx-1.5 rounded-sm transition-[background] duration-150",
+                    "nb-row group flex items-center gap-2.5 text-left text-body border border-transparent bg-transparent cursor-pointer py-[5px] rounded-sm transition-[background] duration-150",
+                    ROW_OUTSET,
                     "hover:bg-wash-hover",
                     "focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--primary)] focus-visible:outline-offset-[-2px]",
                     // The drilled country row wears the same shared selection language as the
@@ -230,7 +231,7 @@ export default function GeoExplore() {
                 {open && (
                   // Leaving the node list clears the globe hover-glow.
                   <div
-                    className="mb-1.5 ml-[9px] py-0.5 pl-3 border-l border-border"
+                    className={cn("mb-1.5 ml-[9px] py-0.5 pl-3", ROW_NEST)}
                     onMouseLeave={() => {
                       setHoverNodeId(null);
                       setHoverCountry(null);

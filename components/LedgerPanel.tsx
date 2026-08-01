@@ -12,7 +12,7 @@ import { hoverKeyOf } from "@/src/data/hoverSubject";
 import { useStore } from "@/src/store/store";
 import { filterToggleActions, layerToggleActions, nodeSelectActions } from "@/src/engine/domain/pickActions";
 import { applyClickActions } from "@/src/store/applyClickActions";
-import { DisclosureChevron, DisclosureRow, NodePickerRow } from "@/components/ExploreRows";
+import { DisclosureChevron, DisclosureRow, NodePickerRow, ROW_NEST, ROW_OUTSET } from "@/components/ExploreRows";
 import { LEDGER_LAYERS } from "@/src/data/ledgerLayers";
 import type { MetaInfo, NodeRow } from "@/src/data/types";
 
@@ -304,8 +304,11 @@ export default function LedgerPanel() {
                     // mark now lives IN-FLOW at the end of the title row (below) — same idiom as
                     // the inner cluster/lane rows' `ml-auto` count — instead of an absolutely
                     // positioned overlay, so it can never overlap the badge/name text and every
-                    // row's trailing column is built the same way.
-                    "nb-row group relative text-left border border-transparent cursor-pointer rounded-sm pl-1.5 pr-2 py-1.5 bg-transparent transition-[background] duration-150",
+                    // row's trailing column is built the same way. ROW_OUTSET makes this the same
+                    // top-level row box geo/hyper use: without it the floor rows' wash stopped 6px
+                    // inside every other explorer's (user, 2026-08-01).
+                    "nb-row group relative text-left border border-transparent cursor-pointer rounded-sm py-1.5 bg-transparent transition-[background] duration-150",
+                    ROW_OUTSET,
                     "hover:bg-wash-hover",
                     "focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--primary)] focus-visible:outline-offset-[-2px]",
                     on && SELECTED_ROW,
@@ -361,7 +364,7 @@ export default function LedgerPanel() {
                     Leaving the list clears the scene hover-glows. */}
                 {discloses && open && (
                   <div
-                    className="mb-1.5 ml-[9px] py-0.5 pl-3 border-l border-border"
+                    className={cn("mb-1.5 ml-[9px] py-0.5 pl-3", ROW_NEST)}
                     onMouseLeave={() => {
                       setHoverNodeId(null);
                       setHoverCohort(null);
