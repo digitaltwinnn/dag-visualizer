@@ -350,7 +350,11 @@ store-value imports**, enforced by `layerBoundaries.test.ts`). Each ships coloca
   decorative twinkle shimmer was removed, user) with PER-POOL resting bases — validators
   `lerp(0.47, 0.37, morph)`, metagraph nodes `lerp(0.33, 0.37, morph)` (they rest at the dim
   look in hyper, 2026-07-17: `metaDimScale` = morph zeroes their network dim there; the
-  committed network pops via `hubMatchBoost` to the hub level 0.72).
+  committed network pops via `hubMatchBoost` to the hub level 0.72). **Focus is TIERED, not a
+  flag** (`focusWeightOf` + `GROUP_FOCUS`, 2026-08-01): the hovered/selected NODE takes the full
+  `focusBoost`, a mere member of a focused GROUP (a hovered/committed provider cohort, a hovered
+  composition/cluster group) only `GROUP_FOCUS` of it — otherwise picking a node inside an
+  already-lit cohort changed nothing on screen (user).
 - `arcSim.ts` — the travelling-packet arc simulation: a swarm of comet "agents" that hop
   node→node. **Emits flash EVENTS via a ring buffer** — no cross-view side-channel mutation.
 - `ledgerModel.ts` — the Snapshots chamber's layout/slot/tile model over the live snapshot data.
@@ -596,7 +600,9 @@ views and caused the ledger red-dots bug; that pattern is forbidden.
     the stack field's centroid (`Globe.focusCohort`, the same `NODE_RAISE` contract as the
     node pose) and frames it one rung wider than the node zoom (`cohortFraming` — ABSOLUTE/
     dolly-exempt like `nodeFraming`) while the member stacks hold a STEADY committed glow
-    (same strength as the hover preview; a live hover wins while active; membership matches
+    (same strength as the hover preview, but a GROUP tier — `dimModel.GROUP_FOCUS`, a fraction
+    of the boost a single node takes, so selecting one node inside the lit cohort still pops;
+    a live hover wins while active; membership matches
     by falsy-normalized cc+city+isp — the data layer normalizes unresolved fields to "");
     a **node** pick zooms close in a
     LATITUDE-INDEPENDENT pose (`Globe.focusNode` leans the globe UNCAPPED with a 0.42 raise, so
