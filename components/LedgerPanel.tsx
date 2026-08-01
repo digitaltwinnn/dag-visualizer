@@ -355,7 +355,12 @@ export default function LedgerPanel() {
                       on && <SelectedRowMark className="flex-none" />
                     )}
                   </span>
-                  <span className="block pl-[26px] text-label text-muted-foreground leading-snug mt-0.5">{l.desc}</span>
+                  {/* No per-row description here: `LEDGER_LAYERS.desc` is the LAYER CARD's opening
+                      line (inspector/cards.tsx `LayerCard`), and committing a floor opens that card
+                      in the same click — so a copy under the row said the same sentence twice, one
+                      rail apart, and made the browser list scan like prose instead of rows
+                      (user, 2026-08-01). The explorer rows are the browse surface; the facts rail
+                      explains the subject. Same split GeoExplore/HyperExplore already keep. */}
                 </button>
 
                 {/* Node browser disclosure — one per NODE floor. `open` decouples the dropdown's

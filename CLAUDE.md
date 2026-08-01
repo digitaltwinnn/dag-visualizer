@@ -255,7 +255,9 @@ Zustand store. **Two data lanes:** (A) high-freq visuals subscribe straight to
   (`PickDescriptor` is a `kind`-discriminated union, `SnapshotExact`, `NodeRow`);
   `composition.ts` (node-fabric grouping), `nodeStatus.ts` (the shared status vocabulary),
   `hoverSubject.ts` (`hoverKeyOf`), `ledgerLayers.ts` (the settlement layers' display COPY —
-  name/desc by layer id; the geometry twin is `domain/ledgerLayout.ts`'s `LAYER_GEOM`),
+  name/desc by layer id; the geometry twin is `domain/ledgerLayout.ts`'s `LAYER_GEOM`; `desc`
+  belongs to the LAYER CARD only — an explorer row shows name + count, never the same sentence
+  a rail away, see *the explanatory-copy split*),
   `anchorLog.ts` + `roster.ts` (the PURE row builders behind section 2's tables — anchored
   metagraph-snapshot rows, and the flat node roster + its column sort),
   `bootPhase.ts`, `breakpoint.ts`. **`src/util/`** —
@@ -809,7 +811,12 @@ and keep changing, so they're examples, not the contract.
   layers" (not "Nodes by…": its subjects are strata, not nodes). Card EYEBROWS are the bare
   role words ("About" / "Explore") — the view name was dropped (user, 2026-07-12: the view
   switch already says where you are), and each explorer's usage hint LEADS the card (top,
-  descriptive) instead of trailing it), ledger → `LedgerPanel` — since the focus-ladder work
+  descriptive) instead of trailing it. **The explanatory-copy split**: an explorer ROW is a
+  browse target — mark/name/count and nothing more; the prose that EXPLAINS a subject belongs
+  to that subject's right-rail card, once (user, 2026-08-01: the ledger floor rows repeated
+  `LEDGER_LAYERS.desc` under every name while the layer card opened with the same sentence one
+  rail away, and the list read as prose instead of rows). A row commits its card in the same
+  click, so nothing is lost by leaving the sentence in one place), ledger → `LedgerPanel` — since the focus-ladder work
   (2026-07-18) ALSO the ledger's node browser: the four node-kind floors (`ml1`/`ml0`/
   `hypl0`/`hypl1`; never the snapshot floors) are DISCLOSURES — commit+expand in one click
   (`layerToggleActions`), disclosure = the committed layer (single-open by construction) —
