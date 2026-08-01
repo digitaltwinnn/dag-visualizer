@@ -259,7 +259,8 @@ Zustand store. **Two data lanes:** (A) high-freq visuals subscribe straight to
   `anchorLog.ts` + `roster.ts` (the PURE row builders behind section 2's tables — anchored
   metagraph-snapshot rows, and the flat node roster + its column sort),
   `bootPhase.ts`, `breakpoint.ts`. **`src/util/`** —
-  `format.ts` (`hex`/`fmtDag`/`ccToFlag`), `relativeAge.ts`, `odometer.ts`.
+  `format.ts` (`hex`/`fmtDag`/`ccMark` — the country CODE mark; flag emoji were removed
+  2026-08-01, Windows ships no flag font and emoji ignore CSS `color`), `relativeAge.ts`, `odometer.ts`.
   **`src/palette/`** — the identity-hue generator (see *Two colour lanes*).
 - **`src/engine/Engine.ts`** — the imperative engine and **the one bridge** (store ⇄ domain ⇄
   scene). Owns the render loop, morph, camera-focus tweens (`FOCI`), DoF, picking, the

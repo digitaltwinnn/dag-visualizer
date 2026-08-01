@@ -7,7 +7,7 @@ import ExplorerShell from "@/components/ExplorerShell";
 import { metagraphById } from "@/src/data/network";
 import { identityHudHex } from "@/src/palette/identity";
 import { SELECTED_ROW, SelectedRowMark } from "@/components/selection";
-import { ccToFlag } from "@/src/util/format";
+import { ccMark } from "@/src/util/format";
 import { hoverKeyOf } from "@/src/data/hoverSubject";
 import { countryToggleActions, nodeSelectActions, cohortToggleActions, sameCohort } from "@/src/engine/domain/pickActions";
 import { applyClickActions } from "@/src/store/applyClickActions";
@@ -200,7 +200,7 @@ export default function GeoExplore() {
                   onMouseEnter={pair.onMouseEnter}
                   onMouseLeave={pair.onMouseLeave}
                 >
-                  <span className="text-label w-[17px] text-center flex-none">{ccToFlag(c.cc)}</span>
+                  <span className="w-[17px] text-center flex-none font-mono text-micro text-muted-foreground">{ccMark(c.cc)}</span>
                   <span className="flex-none w-24 text-body text-foreground-dim whitespace-nowrap overflow-hidden text-ellipsis" title={c.country}>
                     {c.country}
                   </span>

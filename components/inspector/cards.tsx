@@ -5,7 +5,7 @@ import { cn } from "@/lib/utils";
 import { useStore } from "@/src/store/store";
 import { shortHash, CORE_HEX, getNetwork, metagraphById } from "@/src/data/network";
 import { identityHudHex } from "@/src/palette/identity";
-import { hex, fmtDag, fmtKB, ccToFlag } from "@/src/util/format";
+import { hex, fmtDag, fmtKB } from "@/src/util/format";
 import { relativeAge } from "@/src/util/relativeAge";
 import { statusBreakdown } from "@/src/data/nodeStatus";
 import type { GlobalSnapshot, MetaCfg, PickDescriptor } from "@/src/data/types";
@@ -518,7 +518,7 @@ export function LayerCard({ p }: { p: PickOf<"layer"> }) {
 // `store.selNodes` — deliberately the explorer's scope, the same data lane GeoExplore's own
 // leaderboard/accordion reads, matched here by `cc` instead of grouped by display name.
 
-// Head title: the country mark + flag + display name (rolls via titleKey=cc, synced with the
+// Head title: the country mark + display name (rolls via titleKey=cc, synced with the
 // edge pulse) — same "kind mark leads the title" grammar as every other card head.
 export function CountryTitle({ cc }: { cc: string }) {
   const selNodes = useStore((s) => s.selNodes);
@@ -530,9 +530,7 @@ export function CountryTitle({ cc }: { cc: string }) {
   return (
     <span className="inline-flex items-center gap-2 min-w-0">
       <Mark aria-hidden className={cn(KIND_MARK_CLASS, "text-[var(--filter-accent,var(--primary))]")} />
-      <span className="truncate">
-        {ccToFlag(cc)} {name}
-      </span>
+      <span className="truncate">{name}</span>
     </span>
   );
 }
@@ -643,9 +641,7 @@ export function ProviderCard({ sel }: { sel: CohortSel }) {
       </div>
       <div className="flex items-start justify-between gap-2.5">
         <span className="text-body text-muted-foreground">Country</span>
-        <span className="text-body text-foreground">
-          {ccToFlag(sel.cc)} {countryName}
-        </span>
+        <span className="text-body text-foreground">{countryName}</span>
       </div>
     </div>
   );

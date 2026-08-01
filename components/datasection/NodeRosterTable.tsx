@@ -9,7 +9,6 @@ import { compositionRows } from "@/src/data/composition";
 import { hoverKeyOf } from "@/src/data/hoverSubject";
 import { nodeSelectActions } from "@/src/engine/domain/pickActions";
 import { applyClickActions } from "@/src/store/applyClickActions";
-import { ccToFlag } from "@/src/util/format";
 import { IdentityDot, RoleChips } from "@/components/inspector/parts";
 import { SelectedRowMark } from "@/components/selection";
 import { cn } from "@/lib/utils";
@@ -86,7 +85,7 @@ export default function NodeRosterTable({ mode }: { mode: "hyper" | "geo" }) {
         );
       }
       case "country":
-        return r.node.country ? `${ccToFlag(r.node.cc)} ${r.node.country}` : "—";
+        return r.node.country || "—";
       case "city":
         return r.node.city ?? "—";
       case "isp":
