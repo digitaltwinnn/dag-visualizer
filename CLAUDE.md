@@ -1103,6 +1103,22 @@ signal channel.**
   rail's clip/mask would blank a child). Only the coloured identity spine rests
   dimmed (`REST_DIM` 60%); the neutral ruler + ticks rest near-full (0.9 — their greys are
   already muted) and the node dots keep full brightness.
+- **The facts rail's thread is its ONE instrument, and it carries the card HIERARCHY**
+  (redesign 2026-08-02, user: *"make the right rail the only instrument, also to show hierarchy
+  of the cards"*). Two encodings, both on the thread:
+  · **connector LENGTH = ladder depth** — each rung's card steps back from the rail
+  (`Inspector`'s `RUNG_STEP`, on the RAIL-facing edge only so the scene-facing edge signals stay
+  aligned) and the thread's tie-line reaches further for it, so containment reads down the rail;
+  · **dot STATE = slot state** — hollow for a ghost, solid for a populated card, solid + a wider
+  halo for the focus rung (the finest committed one). The rail therefore shows the view's whole
+  possibility space *and* where you are.
+  The thread MEASURES each card's real edge rather than sharing the step constant, so the
+  connectors can't drift out of register. The old in-lane **descent spine** (`.rail-ladder` /
+  `.rung` CSS, variant-A 2026-07-19) is **RETIRED** — it duplicated the thread's own vocabulary
+  (spine + tick + node-dot) a rail-width away on the cards' left edge, giving the rail two
+  competing instruments. The ladder lane is now pure layout. **Never grow a second vertical
+  instrument in a rail**; new hierarchy signals belong on the thread.
+
 - **Every card edge signal renders on the SCENE-FACING (inner) edge**: left-rail cards →
   their right edge (`.sig-right::after`), right-rail cards → their left edge (`.sig-left`
   lighting the `.ig-panel::before`). Three levels, and the hierarchy must stay readable at a
@@ -1272,10 +1288,15 @@ ghost are both ledger-only.
    `.rail-dragging` are added/removed at runtime (SceneCanvas, RailScroll); they can't be
    inlined into utility strings.
 5. **Marker classes/ids queried by JS are contracts**: `#leftcol`/`#rightcol` (RailScroll +
-   RailThread + the globals rules), `:scope > .ig-panel` (RailThread's card-dot measurement —
-   every rail card must carry `.ig-panel`, which the `Card` baseline supplies), `.nb-row`
+   RailThread + the globals rules), `.ig-panel` (RailThread's card-dot measurement — every rail
+   card must carry it, which the `Card` baseline supplies) plus the facts rail's per-card
+   attributes `data-depth` / `data-focus` (on the rung wrapper) and `data-ghost` (on a ghost
+   card), which the thread reads for the hierarchy encoding, `.nb-row`
    (the pairing row-wash selector), `#topbar`, `#metapane`, `#tooltip`. Rename only with all
-   consumers.
+   consumers. ⚠️ The card query is deliberately **depth-agnostic** (filtered to outermost
+   panels): it was `:scope > .ig-panel`, which silently matched NOTHING once the ladder lane
+   nested the cards — the thread lost every dot and nobody noticed for two weeks.
+
 6. **Custom `@theme` utilities whose prefix collides with a tailwind-merge group MUST be
    registered in `lib/utils.ts`** (`extendTailwindMerge` — `text-micro/label/body/title` as
    font-size, `tracking-caps`, the custom radii are already there). Unregistered, twMerge

@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, type CSSProperties, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, type CSSProperties, type ReactNode } from "react";
 import { ChevronsDownUp, ChevronsUpDown, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useStore } from "@/src/store/store";
@@ -8,6 +8,7 @@ import { applyClickActions } from "@/src/store/applyClickActions";
 import { filterAccent, metagraphById, CORE_HEX } from "@/src/data/network";
 import { identityHudHex } from "@/src/palette/identity";
 import { hoverKeyOf } from "@/src/data/hoverSubject";
+import { compositionGroups } from "@/src/data/composition";
 import { subjectPairing } from "@/components/useSubjectPairing";
 import CardHead, { RIGHT_CARD } from "@/components/CardHead";
 import { Card } from "@/components/ui/card";
@@ -18,13 +19,18 @@ import RailDock from "@/components/RailDock";
 import { useBreakpoint } from "@/components/useBreakpoint";
 import { PulseEdge, useEdgePulse } from "@/components/EdgePulse";
 import { detailsCards, ladderSlotIds, type RailCard } from "@/components/railCards";
+import { useLadderFocus } from "@/components/useLadderFocus";
 import { useTrayActives } from "@/components/useTrayActives";
-import { countryToggleActions, cohortToggleActions, clearAllActions } from "@/src/engine/domain/pickActions";
-import { CountryTitle, CountryCard, ProviderTitle, ProviderCard } from "@/components/inspector/cards";
+import { countryToggleActions, cohortToggleActions, compositionToggleActions, clearAllActions } from "@/src/engine/domain/pickActions";
+import { CountryTitle, CountryCard, ProviderTitle, ProviderCard, CompositionTitle, CompositionCard } from "@/components/inspector/cards";
 import type { TabSignal } from "@/components/RailDock";
 import type { PickDescriptor } from "@/src/data/types";
 import type { Mode } from "@/src/store/store";
-import type { CohortSel } from "@/src/engine/domain/focusLadder";
+import type { CohortSel, CompositionSel } from "@/src/engine/domain/focusLadder";
+
+// How far each ladder rung steps back from the rail per depth level. The rail thread doesn't share
+// this number — it MEASURES each card's real edge — so tuning it here can't desync the connectors.
+const RUNG_STEP = 10;
 
 // One pane in the right-rail **card stack**. Each pane is its own panel with its own
 // "new subject" edge pulse (keyed on its subject) and its own close — rendering every card
@@ -114,9 +120,13 @@ function CardPane({
 function CountryPane({ cc, onClose, collapsed, onToggle }: { cc: string; onClose: () => void; collapsed: boolean; onToggle: () => void }) {
   const hoverCountry = useStore((s) => s.hoverCountry);
   const setHoverCountry = useStore((s) => s.setHoverCountry);
-  // Same channel + hue GeoExplore's own country rows pair on — structural cyan (a PLACE, not an
-  // identity), so hovering this card previews the border on the globe and vice versa.
-  const pair = subjectPairing<string>(hoverCountry, cc, setHoverCountry, "var(--primary)");
+  const filter = useStore((s) => s.filter);
+  // Same channel GeoExplore's own country rows pair on, so hovering this card previews the
+  // border on the globe and vice versa. The HUE follows the active filter (user, 2026-08-02):
+  // every right-rail card's edge signal now speaks the rail's scope colour — the hardcoded
+  // structural cyan here (a PLACE, not an identity) read as a broken card next to its
+  // metagraph-hued siblings once a network was committed. `filterAccent` still gives cyan on "all".
+  const pair = subjectPairing<string>(hoverCountry, cc, setHoverCountry, filterAccent(filter));
   const pulseKey = useEdgePulse(cc);
   return (
     <Card asChild className={cn(RIGHT_CARD, "sig-left", pair.className)}>
@@ -139,11 +149,17 @@ function CountryPane({ cc, onClose, collapsed, onToggle }: { cc: string; onClose
 function ProviderPane({ sel, onClose, collapsed, onToggle }: { sel: CohortSel; onClose: () => void; collapsed: boolean; onToggle: () => void }) {
   const selNodes = useStore((s) => s.selNodes);
   const setHoverCohort = useStore((s) => s.setHoverCohort);
+  const hoverGroup = useStore((s) => s.hoverGroup);
+  const setHoverGroup = useStore((s) => s.setHoverGroup);
+  const filter = useStore((s) => s.filter);
   const subjectKey = `${sel.cc}|${sel.city}|${sel.isp}`;
   const pulseKey = useEdgePulse(subjectKey);
-  // hoverCohort is an id ARRAY (the whole 3D honeycomb stack glows together), not a scalar the
-  // shared subjectPairing helper can compare — so this card only drives hover OUTWARD (card →
-  // scene glow), the same member match ProviderCard's body uses.
+  // TWO channels, one gesture: `hoverCohort` carries the member ids (the whole 3D honeycomb
+  // stack glows together) and `hoverGroup` carries the group's scalar KEY, which is what
+  // `subjectPairing` can compare — so this card pairs BIDIRECTIONALLY with its explorer row
+  // exactly like the country/node/network cards do (user, 2026-08-02: the group cards were the
+  // odd ones out, lighting nothing in the rail opposite).
+  const pair = subjectPairing<string>(hoverGroup, subjectKey, setHoverGroup, filterAccent(filter));
   const ids = useMemo(
     () =>
       selNodes
@@ -156,8 +172,18 @@ function ProviderPane({ sel, onClose, collapsed, onToggle }: { sel: CohortSel; o
     [selNodes, sel.cc, sel.city, sel.isp],
   );
   return (
-    <Card asChild className={cn(RIGHT_CARD, "sig-left")}>
-      <aside onMouseEnter={() => setHoverCohort(ids)} onMouseLeave={() => setHoverCohort(null)}>
+    <Card asChild className={cn(RIGHT_CARD, "sig-left", pair.className)}>
+      <aside
+        style={pair.style}
+        onMouseEnter={() => {
+          pair.onMouseEnter();
+          setHoverCohort(ids);
+        }}
+        onMouseLeave={() => {
+          pair.onMouseLeave();
+          setHoverCohort(null);
+        }}
+      >
         <CardHead
           eyebrow="Provider"
           title={<ProviderTitle sel={sel} />}
@@ -173,6 +199,63 @@ function ProviderPane({ sel, onClose, collapsed, onToggle }: { sel: CohortSel; o
   );
 }
 
+// Hyper's twin of ProviderPane: the committed COMPOSITION group (make-up × network). Same
+// reasoning for living here rather than in InspectorCard's `pick` switch (a `CompositionSel` is
+// not a PickDescriptor), and the same two-channel hover coupling — `hoverCohort` carries the
+// member ids for the 3D glow, `hoverGroup` the scalar key the row pairing compares.
+function CompositionPane({ sel, onClose, collapsed, onToggle }: { sel: CompositionSel; onClose: () => void; collapsed: boolean; onToggle: () => void }) {
+  const selNodes = useStore((s) => s.selNodes);
+  const setHoverCohort = useStore((s) => s.setHoverCohort);
+  const hoverGroup = useStore((s) => s.hoverGroup);
+  const setHoverGroup = useStore((s) => s.setHoverGroup);
+  const subjectKey = `${sel.netId}|${sel.key}`;
+  const pulseKey = useEdgePulse(subjectKey);
+  // The pairing hue is the group's NETWORK identity — the same expression its explorer row and
+  // this card's own IdentityDot use (the DAG reads structural cyan). Not `filterAccent`: the two
+  // ends of one pairing must light in the same hue, and the row is the fixed end.
+  const pair = subjectPairing<string>(
+    hoverGroup,
+    subjectKey,
+    setHoverGroup,
+    sel.netId === "dag" ? CORE_HEX : identityHudHex(sel.netId),
+  );
+  // The SAME grouping the explorer rows and the Engine's glow resolution use — one helper, so
+  // the card, the row and the 3D highlight always speak about the same machines.
+  const ids = useMemo(
+    () =>
+      (compositionGroups(selNodes).find((g) => g.key === sel.key)?.rows ?? [])
+        .map((r) => hoverKeyOf(r.pick))
+        .filter((k): k is string => !!k),
+    [selNodes, sel.key],
+  );
+  return (
+    <Card asChild className={cn(RIGHT_CARD, "sig-left", pair.className)}>
+      <aside
+        style={pair.style}
+        onMouseEnter={() => {
+          pair.onMouseEnter();
+          setHoverCohort(ids);
+        }}
+        onMouseLeave={() => {
+          pair.onMouseLeave();
+          setHoverCohort(null);
+        }}
+      >
+        <CardHead
+          eyebrow="Composition"
+          title={<CompositionTitle sel={sel} />}
+          titleKey={subjectKey}
+          onClose={onClose}
+          collapsed={collapsed}
+          onToggle={onToggle}
+        />
+        {!collapsed && <CompositionCard sel={sel} />}
+        <PulseEdge pulseKey={pulseKey} rail="right" />
+      </aside>
+    </Card>
+  );
+}
+
 // A GHOST card — the hint state of a Detail slot (user design, 2026-07-10; replaces the single
 // floating pick-invite). Every card the current view CAN produce is always visible: populated
 // with its subject, or as this quiet placeholder saying what to interact with. AS SUBTLE AS
@@ -181,7 +264,7 @@ function ProviderPane({ sel, onClose, collapsed, onToggle }: { sel: CohortSel; o
 // rail losing its calm. Availability + copy come from the rail manifest (railCards.ts), the
 // same single source of truth the dock trays read.
 const GHOST_EYEBROW: Record<string, string> = {
-  context: "Metagraph", country: "Country", cohort: "Provider", node: "Node", snap: "Snapshot", layer: "Layer",
+  context: "Metagraph", country: "Country", cohort: "Provider", composition: "Composition", node: "Node", snap: "Snapshot", layer: "Layer",
 };
 export function GhostCard({ card }: { card: RailCard }) {
   const Icon = card.icon;
@@ -198,7 +281,9 @@ export function GhostCard({ card }: { card: RailCard }) {
         "border-dashed py-3 shadow-none border-border/50 [background:color-mix(in_srgb,var(--panel)_75%,transparent)] [backdrop-filter:none]",
       )}
     >
-      <aside aria-label={`${label} — nothing selected yet`}>
+      {/* `data-ghost` is the RailThread's read: an empty slot gets a HOLLOW node-dot on the rail,
+          a populated card a solid one — so the thread shows the view's whole possibility space. */}
+      <aside data-ghost="" aria-label={`${label} — nothing selected yet`}>
         <p className="m-0 flex items-start gap-2.5 text-label text-muted-foreground">
           <Icon
             aria-hidden
@@ -261,6 +346,7 @@ export default function Inspector() {
   const layer = useStore((s) => s.layer);
   const country = useStore((s) => s.country);
   const cohort = useStore((s) => s.cohort);
+  const composition = useStore((s) => s.composition);
   const filter = useStore((s) => s.filter);
   const mode = useStore((s) => s.mode) as Mode;
 
@@ -281,7 +367,7 @@ export default function Inspector() {
   const selNodes = useStore((s) => s.selNodes);
   const filterCfg = metagraphById(filter);
   const manifest = detailsCards({
-    mode, filter, inspect, snap, layer, country, cohort,
+    mode, filter, inspect, snap, layer, country, cohort, composition,
     selNodesCount: selNodes.length,
     filterLabel: filterCfg ? filterCfg.ticker || filterCfg.name : null,
   });
@@ -297,12 +383,40 @@ export default function Inspector() {
   const setRailCollapseMany = useStore((s) => s.setRailCollapseMany);
   const ladderIds = ladderSlotIds(mode);
   const presentOf = (id: string) => manifest.find((c) => c.id === id)?.present ?? false;
-  const presentLadder = ladderIds.filter(presentOf);
-  const focusId = presentLadder.length ? presentLadder[presentLadder.length - 1] : null;
+  // The focus rung comes from the shared derivation the EXPLORE rail reads too (`focusSlotId`),
+  // so the row emphasis over there and the collapse/halo over here can't disagree.
+  const focusId = useLadderFocus();
   const autoCollapsed = (id: string) => ladderIds.includes(id) && presentOf(id) && id !== focusId;
   const effCollapsed = (id: string) => railCollapse[id] ?? autoCollapsed(id);
   const toggleCollapse = (id: string) => setRailCollapse(id, !effCollapsed(id));
   const cx = (id: string) => ({ collapsed: effCollapsed(id), onToggle: () => toggleCollapse(id) });
+
+  // The overrides are scoped to ONE selection moment (user, 2026-08-02: "only in geo it minimises
+  // the parent card, not in the other views"). They were permanent: expanding the Metagraph card
+  // once wrote `railCollapse.context = false`, which then beat the auto rule FOREVER and in EVERY
+  // view — so the rail looked like it auto-collapsed in the view where the user hadn't touched a
+  // +/− and not in the ones where they had. A new selection is a new moment, so every override is
+  // dropped whenever the committed ladder changes (subject identity, not just depth) and the auto
+  // "only the focus rung is open" default governs again. Within one selection the +/− still holds.
+  const selectionKey = [
+    mode,
+    filter,
+    country ?? "",
+    cohort ? `${cohort.cc}|${cohort.city}|${cohort.isp}` : "",
+    composition ? `${composition.netId}|${composition.key}` : "",
+    inspect ? hoverKeyOf(inspect) ?? "" : "",
+    layer?.layerId ?? "",
+    snap?.data.ordinal ?? "",
+  ].join("§");
+  const lastSelection = useRef(selectionKey);
+  useEffect(() => {
+    if (lastSelection.current === selectionKey) return;
+    lastSelection.current = selectionKey;
+    // Read the live overrides rather than closing over them: `railCollapse` changes on every
+    // +/− too, and this effect must fire on a SELECTION change only.
+    const ids = Object.keys(useStore.getState().railCollapse);
+    if (ids.length) setRailCollapseMany(Object.fromEntries(ids.map((id) => [id, null])));
+  }, [selectionKey, setRailCollapseMany]);
 
   const detailPane: Record<string, ReactNode> = {
     // Country/provider toggle CLOSED through the same tested table a row re-click runs — the ×
@@ -324,6 +438,16 @@ export default function Inspector() {
         {...cx("cohort")}
       />
     ) : null,
+    composition: composition ? (
+      <CompositionPane
+        key="composition"
+        sel={composition}
+        onClose={() =>
+          applyClickActions(compositionToggleActions(composition, { composition, hasInspect: !!inspect, filter }))
+        }
+        {...cx("composition")}
+      />
+    ) : null,
     // geoLive reads the node from the store; its × is CardHead's shared close like every card.
     node: (
       <CardPane key="node" pick={{ kind: "geoLive" }} eyebrow="Node" onClose={() => applyClickActions([{ kind: "inspect", pick: null }])} {...cx("node")} />
@@ -336,13 +460,17 @@ export default function Inspector() {
     ) : null,
   };
 
-  // ── The desktop LADDER LANE (the descent spine) + the flat tablet/phone stack ─────────────────
-  // Ladder slots render in a `.rail-ladder` lane, in display order, each in a `.rung` whose body
-  // indents by its depth (`--depth`); the finest present rung is `data-focus`. Context is special:
-  // ALWAYS mounted (self-nulling on "all") so its EdgePulse survives the dossier⇄nothing swap —
-  // so its rung always renders ContextCard, plus the context ghost when nothing's committed there.
+  // ── The desktop LADDER LANE + the flat tablet/phone stack ────────────────────────────────────
+  // Ladder slots render in a lane, in display order (coarsest→finest). The lane is LAYOUT ONLY —
+  // it draws nothing. Containment is expressed on the ONE rail instrument (RailThread, redesign
+  // 2026-08-02, user: the old in-lane descent spine put a second vertical instrument on the cards'
+  // left edge, duplicating the thread ~320px away): each rung's card STEPS BACK from the rail by
+  // its depth, and the thread's connector reaches further to tie it in. `data-depth`/`data-focus`
+  // are the thread's read — see RailThread's measure(). Context is special: ALWAYS mounted
+  // (self-nulling on "all") so its EdgePulse survives the dossier⇄nothing swap — so its rung always
+  // renders ContextCard, plus the context ghost when nothing's committed there.
   const ladderLane = (
-    <div className="rail-ladder">
+    <div className="flex flex-col gap-[var(--rail-gap)]">
       {ladderIds.map((id, depth) => {
         const card = manifest.find((c) => c.id === id);
         if (!card) return null;
@@ -359,10 +487,10 @@ export default function Inspector() {
           ) : null;
         if (!body) return null;
         return (
-          <div key={id} className="rung" data-focus={id === focusId ? "" : undefined}>
-            <div className="rung-body" style={{ ["--depth"]: depth } as CSSProperties}>
-              {body}
-            </div>
+          <div key={id} data-depth={depth} data-focus={id === focusId ? "" : undefined}>
+            {/* The step-back is on the RAIL-facing edge only; the scene-facing edge stays flush so
+                the card edge signals (`.sig-left`) keep their common alignment. */}
+            <div style={{ marginRight: depth * RUNG_STEP }}>{body}</div>
           </div>
         );
       })}
@@ -390,6 +518,7 @@ export default function Inspector() {
         hasInspect: presentOf("node"),
         hasSnap: presentOf("snap"),
         cohort,
+        composition,
         country,
         layerId: layer ? layer.layerId : null,
         filter,

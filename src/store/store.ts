@@ -78,6 +78,13 @@ interface AppState {
   hoverCountry: string | null;
   // Node ids of a hovered explorer COHORT row — the whole 3D honeycomb stack glows together.
   hoverCohort: string[] | null;
+  // The hovered GROUP RUNG's identity, as a scalar key — the pairing twin of `hoverCohort`
+  // (which carries member ids for the 3D glow and can't be compared by `subjectPairing`).
+  // Both group rungs share this ONE channel because no view shows both: geo's provider cohort
+  // keys as `${cc}|${city}|${isp}`, hyper's composition group as `${netId}|${key}`. Gives the
+  // group cards the same bidirectional card↔row pairing the country/node/network subjects have
+  // (user, 2026-08-02: hovering the composition card lit nothing in the explorer). null = none.
+  hoverGroup: string | null;
   // Ledger layer id (LedgerView FLOOR_LAYERS: "ml1"|"ml0"|"msnap"|"gl0"|"hypl0"|"hypl1") the cursor
   // is HOVERING in the Snapshots·Explore panel — a transient plane-highlight PREVIEW (the committed
   // selection is `layer` below; the engine resolves `ledgerHilite ?? layer?.layerId`). null = none.
@@ -169,6 +176,7 @@ interface AppState {
   setHoverNodeId: (id: string | null) => void;
   setHoverCountry: (cc: string | null) => void;
   setHoverCohort: (ids: string[] | null) => void;
+  setHoverGroup: (key: string | null) => void;
   setLedgerHilite: (id: string | null) => void;
   setLayer: (layer: Extract<PickDescriptor, { kind: "layer" }> | null) => void;
   setFollowing: (following: boolean) => void;
@@ -212,6 +220,7 @@ export const useStore = create<AppState>((set) => ({
   hoverNodeId: null,
   hoverCountry: null,
   hoverCohort: null,
+  hoverGroup: null,
   ledgerHilite: null,
   layer: null,
   following: false,
@@ -247,6 +256,7 @@ export const useStore = create<AppState>((set) => ({
   setHoverNodeId: (hoverNodeId) => set({ hoverNodeId }),
   setHoverCountry: (hoverCountry) => set({ hoverCountry }),
   setHoverCohort: (hoverCohort) => set({ hoverCohort }),
+  setHoverGroup: (hoverGroup) => set({ hoverGroup }),
   setLedgerHilite: (ledgerHilite) => set({ ledgerHilite }),
   setLayer: (layer) => set((s) => ({ layer, selStack: bumpStack(s.selStack, "layer", !!layer) })),
   setFollowing: (following) => set({ following }),

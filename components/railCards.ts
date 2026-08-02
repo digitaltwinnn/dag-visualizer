@@ -48,6 +48,25 @@ export function ladderSlotIds(mode: Mode): string[] {
     .flatMap((r) => (LADDER_SLOT[r.level] ? [LADDER_SLOT[r.level] as string] : []));
 }
 
+/** The selection fields the ladder derivation needs — the manifest state minus the ghost-copy
+ *  inputs (which can't change a slot's presence). */
+export type LadderState = Pick<
+  RailManifestState,
+  "mode" | "filter" | "inspect" | "snap" | "layer" | "country" | "cohort" | "composition"
+>;
+
+// The FOCUS rung: the finest ladder slot currently POPULATED (null = nothing committed). ONE
+// definition, two rails — the facts rail rests only this card expanded and gives its thread dot
+// the halo, and the explorers render every COARSER committed row at ancestor strength
+// (`selectedRow`), so both rails answer "where am I" the same way.
+export function focusSlotId(s: LadderState): string | null {
+  // `selNodesCount`/`filterLabel` only feed ghost COPY — presence is unaffected, so the ladder
+  // question can be answered from the selection alone.
+  const cards = detailsCards({ ...s, selNodesCount: 0, filterLabel: null });
+  const present = ladderSlotIds(s.mode).filter((id) => cards.find((c) => c.id === id)?.present);
+  return present.length ? present[present.length - 1] : null;
+}
+
 export interface RailCard {
   /** Stable id within the rail (also the tray-icon key + the render-map key). */
   id: string;

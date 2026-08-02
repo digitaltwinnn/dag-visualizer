@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { exploreCards, detailsCards, ladderSlotIds, type RailManifestState } from "@/components/railCards";
+import { exploreCards, detailsCards, focusSlotId, ladderSlotIds, type RailManifestState } from "@/components/railCards";
 import type { PickDescriptor } from "@/src/data/types";
 
 // Present card kinds in render order — the exact set/order both the rail and the tray consume.
@@ -142,5 +142,35 @@ describe("ladderSlotIds — the descent-spine lane (display order = reversed run
     const ids = detailsCards(details({ mode: "geo" })).map((c) => c.id);
     for (const view of ["geo", "hyper", "ledger"] as const)
       for (const slot of ladderSlotIds(view)) expect(ids).toContain(slot);
+  });
+});
+
+describe("focusSlotId — the focus rung both rails read", () => {
+  const cohortSel = { cc: "DE", city: "Nuremberg", isp: "Hetzner" };
+  it("is null with nothing committed", () => {
+    expect(focusSlotId(details({ mode: "geo" }))).toBeNull();
+  });
+  it("walks to the FINEST committed rung in geo", () => {
+    expect(focusSlotId(details({ mode: "geo", filter: "dag" }))).toBe("context");
+    expect(focusSlotId(details({ mode: "geo", filter: "dag", country: "DE" }))).toBe("country");
+    expect(focusSlotId(details({ mode: "geo", filter: "dag", country: "DE", cohort: cohortSel }))).toBe("cohort");
+    expect(
+      focusSlotId(details({ mode: "geo", filter: "dag", country: "DE", cohort: cohortSel, inspect: nodePick })),
+    ).toBe("node");
+  });
+  it("uses hyper's composition rung and ledger's layer rung", () => {
+    expect(focusSlotId(details({ mode: "hyper", filter: "dag", composition: { netId: "dag", key: "Hybrid|l0" } }))).toBe(
+      "composition",
+    );
+    const layerPick = { kind: "layer", layerId: "ml0" } as unknown as Extract<PickDescriptor, { kind: "layer" }>;
+    expect(focusSlotId(details({ mode: "ledger", filter: "dag", layer: layerPick }))).toBe("layer");
+    // The node still wins: it's the finest rung in every ladder.
+    expect(focusSlotId(details({ mode: "ledger", filter: "dag", layer: layerPick, inspect: nodePick }))).toBe("node");
+  });
+  it("ignores a pinned snapshot — it is not a ladder rung", () => {
+    expect(focusSlotId(details({ mode: "ledger", snap: snapPick }))).toBeNull();
+  });
+  it("flat views have no focus rung", () => {
+    expect(focusSlotId(details({ mode: "status", filter: "dag", inspect: nodePick }))).toBeNull();
   });
 });
