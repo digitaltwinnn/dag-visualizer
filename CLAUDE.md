@@ -1250,7 +1250,12 @@ fields), an allow-list mirroring the pick registry: hyper/geo invite node picks,
 invites the composition group, geo also
 invites the country drill + the provider (cohort) row, ledger
 invites snapshot + layer picks, the network slot invites the top-bar filter, the flat
-placeholder views get no ghosts. The allow-list is EXECUTABLE since 2026-07-18:
+placeholder views get no ghosts. **A hint is the GESTURE and nothing else** (copy rule,
+2026-08-02): the slot label beside it already names the subject and the dashed frame already says
+"nothing here yet", so every hint used to end "… to inspect it." — four ghosts stacked in the rail
+read as one sentence repeated with the verb swapped. Each now names its own route, and where a
+subject is reached from a PARENT row the hint says which ("under a country" / "under a network" /
+"under a floor"), stating in words the containment the thread encodes. The allow-list is EXECUTABLE since 2026-07-18:
 `railLadderBoundary.test.ts` asserts every committable ladder rung has a hinted slot. Honesty rules carried over from the old single pick-hint:
 when the filtered network has nothing pickable in geo the node ghost turns into the honest
 variant ("<TICKER> has no locatable nodes — explore it in the Hypergraph view"); "all" with

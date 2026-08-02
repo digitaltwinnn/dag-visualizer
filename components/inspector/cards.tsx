@@ -365,7 +365,7 @@ export function GeoLiveCard() {
   if (!node) {
     return (
       <p className="text-muted-foreground text-label mt-[2px] mb-0">
-        Pick a node from the explorer on the left — or click one on the globe — to inspect it here.
+        Click a node on the globe, or in the explorer.
       </p>
     );
   }
