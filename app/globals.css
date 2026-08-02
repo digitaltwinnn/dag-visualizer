@@ -287,6 +287,8 @@
   --sel-bg: rgba(42, 245, 255, 0.12);   /* selected/active fill, reused everywhere */
   --sel-border: rgba(42, 245, 255, 0.5);
   --bottom-reserve: 130px; /* vertical space the always-present LiveStrip lane reserves */
+  --rail-fade: 28px;       /* height of a clipped rail's bottom fade — AND its scroll runway
+                              (globals `.rail-clip` + RailScroll's measure read this one token) */
 
   /* ── Instrument-thread ruler spec (the ONE shared source) ─────────────────────
      Both rails' SVG threads (RailThread.tsx) and the bar-chart axis read identically:
@@ -446,11 +448,16 @@
      toggles `.rail-clip`, see RailScroll). Gating it avoids fading a SHORT rail. The padding
      is the SCROLL RUNWAY: without it, even at max scroll the last card's bottom sat inside
      the faded band forever (user bug) — the runway lets the content scroll fully clear of
-     the fade, sheet-like, while mid-scroll content still fades into the band. */
+     the fade, sheet-like, while mid-scroll content still fades into the band.
+     The fade rides the rail's OWN bottom edge (`--rail-fade` tall) — the rail's max-height
+     already keeps that edge clear of the strip's band, so subtracting `--bottom-reserve` here
+     too double-counted it: the gradient started ~154px above the strip and blanked the last
+     100px of the rail outright (user: "starts way too early"). Runway = the fade height, so
+     RailScroll's measure stays a one-token read. */
   #leftcol.rail-clip, #rightcol.rail-clip {
-    padding-bottom: calc(var(--bottom-reserve, 0px) + 12px);
-    -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - var(--bottom-reserve, 0px) + 6px), transparent calc(100% - var(--bottom-reserve, 0px) + 30px), transparent 100%);
-    mask-image: linear-gradient(to bottom, #000 calc(100% - var(--bottom-reserve, 0px) + 6px), transparent calc(100% - var(--bottom-reserve, 0px) + 30px), transparent 100%);
+    padding-bottom: var(--rail-fade);
+    -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - var(--rail-fade)), transparent 100%);
+    mask-image: linear-gradient(to bottom, #000 calc(100% - var(--rail-fade)), transparent 100%);
   }
   /* BOTH rails hide the native scrollbar — each carries its instrument thread in the outer
      margin (the thread IS the scroll visual) and the bottom fade signals clipped content;

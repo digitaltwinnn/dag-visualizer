@@ -961,6 +961,10 @@ in order:
    RGB at fill alphas) is the ONE mechanism for faint accent fills. Then the **layout
    literals**: `--panel-pad-*`, `--rail-gap`, `--rail-top`, `--rail-w`, `--detail-w`,
    `--sel-bg`/`--sel-border` (the one selection language), `--bottom-reserve`,
+   **`--rail-fade`** (a clipped rail's bottom fade height AND its scroll runway — the ONE token
+   `.rail-clip` and RailScroll's measure both read; the fade rides the rail's own bottom edge,
+   which `max-height` already keeps clear of the strip band, so it must never re-subtract
+   `--bottom-reserve` — that double-count started the gradient ~154px too high, user 2026-08-02),
    `--phone-dock-h`, and the **instrument-thread ruler spec** (`--thread-line`/`--thread-tick`/
    `--thread-tick-major`/**`--thread-faint`**/`--thread-tick-pitch` + `--axis-hairlines`,
    shared by the rails, sheet rulers, and the bar-chart axis). The **`@theme inline`** block
