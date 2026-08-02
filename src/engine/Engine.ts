@@ -19,10 +19,11 @@ import { VIEW_POLICIES, type ViewPolicy } from "./domain/viewPolicy";
 import { FOCI, hubFraming, geoFraming, ledgerLayerFraming, ledgerNodeFraming, nodeFraming, cohortFraming, hyperNodeFraming, dollyBack, easeInOutQuad, type CameraFraming } from "./domain/cameraRig";
 import { countryFraming } from "./domain/countryShape";
 import { R as GEO_R, LAND_H } from "./domain/geoLayout";
-import { autoLayerForNode, clickActions, pickActive } from "./domain/pickActions";
+import { autoLayerForNode, clickActions, pickActive, pickNetId } from "./domain/pickActions";
 import { ViewTransition, type View3D } from "./domain/viewTransition";
-import { LADDERS, type CohortSel, type SelectionSnapshot, type ResolverKey } from "./domain/focusLadder";
-import type { GlobalSnapshot, PickDescriptor } from "@/src/data/types";
+import { LADDERS, type CohortSel, type CompositionSel, type SelectionSnapshot, type ResolverKey } from "./domain/focusLadder";
+import { compositionGroups, compositionKey, compositionRows } from "@/src/data/composition";
+import type { GlobalSnapshot, NodeRow, PickDescriptor } from "@/src/data/types";
 import type { ClusterNode, DagCore, GeoMap, RouteMetagraph } from "@/src/data/types";
 
 type Vec = THREE.Vector3;
@@ -282,11 +283,13 @@ export class Engine {
           if (prev.country != null) useStore.getState().setCountry(null);
           // A filter switch is a NETWORK-level event (focusLadder): it drops every finer
           // selection — node (any view; in geo the switch can hide the inspected node outright),
-          // cohort, country — so _resolveFocus lands on the network rung. The ordering contract
-          // holds because nodeSelectActions emits filter FIRST and inspect/cohort AFTER it: this
-          // clear runs on the filter write, then the later actions re-commit the new ancestry.
+          // cohort, composition, country — so _resolveFocus lands on the network rung. The
+          // ordering contract holds because nodeSelectActions emits filter FIRST and
+          // inspect/cohort/composition AFTER it: this clear runs on the filter write, then the
+          // later actions re-commit the new ancestry.
           if (st.inspect) useStore.getState().setInspect(null);
           if (st.cohort) useStore.getState().setCohort(null);
+          if (st.composition) useStore.getState().setComposition(null);
           this.applyFilter();
         }
         // Country drill-down is geo-only — gate on the view so a re-entrant clear
@@ -303,6 +306,14 @@ export class Engine {
           this.cohortSel = st.cohort;
           this.globe.setSelectedCohort(st.cohort); // the glow is geo-gated by the fabric's morph ramps
           if (st.mode === "geo") this._resolveFocus();
+        }
+        // Hyper's twin channel: the committed COMPOSITION group holds the same steady group-tier
+        // glow a cohort does in geo. Membership is re-resolved whenever EITHER the selection or
+        // the published node list changes (selNodes lands asynchronously after a filter commit,
+        // so resolving only on the selection change would leave the group unlit).
+        if (st.composition !== prev.composition || st.selNodes !== prev.selNodes) {
+          this.globe.setSelectedGroup(this._compositionIds(st.composition, st.selNodes));
+          if (st.composition !== prev.composition && st.mode === "hyper") this._resolveFocus();
         }
         // The selected node card (geo or hyper) keeps that node's layer shells lit on the globe.
         if (st.inspect !== prev.inspect) this.globe.setSelectedNode(this._pickNodeId(st.inspect));
@@ -528,14 +539,16 @@ export class Engine {
     this.ctx.controls.minPolarAngle = policy.minPolarAngle;
     this.ctx.controls.enableRotate = true; // the 3D layer stack is meant to be looked around
     // View-scoped selections (focusLadder.LEVEL_CARRY): country + cohort live only in geo,
-    // layer only in ledger — clear them when the destination view isn't theirs, so no
-    // view-scoped card/framing lingers (the layer card used to follow into hyper/geo).
+    // composition only in hyper, layer only in ledger — clear them when the destination view
+    // isn't theirs, so no view-scoped card/framing lingers (the layer card used to follow into
+    // hyper/geo).
     const st0 = useStore.getState();
     if (mode !== "geo") {
       if (this.country != null) { this.country = null; this.globe.setCountry(null); }
       if (st0.country != null) st0.setCountry(null);
       if (st0.cohort != null) st0.setCohort(null);
     }
+    if (mode !== "hyper" && st0.composition != null) st0.setComposition(null);
     if (mode !== "ledger" && st0.layer != null) st0.setLayer(null);
     // The snapshot card is LEDGER-SCOPED too (spec 2026-08-01): the pin no longer carries out
     // of the view — leaving ledger clears it. `following` stays with the FollowController,
@@ -756,6 +769,13 @@ export class Engine {
       this._tweenTo(this._framingOut.pos, this._framingOut.target);
       return true;
     },
+    hyperComposition: () => {
+      // A composition group is network-scoped by construction (its toggle commits the filter
+      // first), so it has no pose of its own — it frames its NETWORK, the containment the card
+      // describes. Same resolver body as the network rung, kept as its own key so the rung can
+      // grow a pose later without touching the ladder.
+      return this._resolvers.hyperNetwork();
+    },
     hyperNetwork: () => {
       this.globe.focusDensest(false);
       this._focusFilter(this.filter); // handles hub-not-found by falling to overview internally
@@ -800,6 +820,7 @@ export class Engine {
       inspectIsNode:
         !!st.inspect && (st.inspect.kind === "l0" || st.inspect.kind === "l1" || st.inspect.kind === "metanode"),
       cohort: st.cohort,
+      composition: st.composition,
       country: this.country,
       layerId: st.layer?.layerId ?? null,
       filter: this.filter,
@@ -993,6 +1014,10 @@ export class Engine {
         mode: this.mode,
         pick: p,
         countryCc,
+        // Hyper's node ancestry (FULL-ANCESTRY rule): a node click commits the composition group
+        // it belongs to, the same way a ledger node click commits its floor. The group is
+        // derivable from the node itself — its make-up IS the group key — so no list lookup.
+        compositionSel: this._compositionOf(p),
         current: {
           filter: st.filter,
           country: st.country,
@@ -1002,6 +1027,28 @@ export class Engine {
         },
       }),
     );
+  }
+
+  // The composition group a PICK belongs to (hyper only) — network + make-up key. null when the
+  // pick isn't a node or carries no role info (the group would be meaningless).
+  private _compositionOf(p: PickDescriptor | null): CompositionSel | null {
+    if (!p || this.mode !== "hyper") return null;
+    const node = "node" in p ? p.node : null;
+    const netId = pickNetId(p);
+    if (!node || !netId) return null;
+    const comp = compositionRows([node])[0]; // event-time (a click)
+    if (!comp) return null;
+    return { netId, key: compositionKey(comp.label, comp.codes) };
+  }
+
+  // Member ids of a committed composition group, resolved from the published node list the
+  // explorer browses (one id per MACHINE — the same dedupe, so the 3D glow and the row count
+  // can't disagree). null when the group has vanished from the current list.
+  private _compositionIds(sel: CompositionSel | null, rows: NodeRow[]): string[] | null {
+    if (!sel) return null;
+    const g = compositionGroups(rows).find((x) => x.key === sel.key); // event-time
+    if (!g) return null;
+    return g.rows.map((r) => hoverKeyOf(r.pick)).filter((k): k is string => !!k);
   }
 
   private focus(name: string) {

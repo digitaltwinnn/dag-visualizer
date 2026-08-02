@@ -5,7 +5,7 @@ import type { Mode } from "@/src/store/store";
 import type { PickDescriptor } from "@/src/data/types";
 // LADDERS is plain DATA (the domain focus-ladder rung tables) — importing it keeps this module
 // data-only; CohortSel rides along type-only (the store mirrors the same import).
-import { LADDERS, type FocusLevel, type CohortSel } from "@/src/engine/domain/focusLadder";
+import { LADDERS, type FocusLevel, type CohortSel, type CompositionSel } from "@/src/engine/domain/focusLadder";
 
 // ─────────────────────────────────────────────────────────────────────────────────────────────
 // The RAIL MANIFEST — ONE source of truth for "which cards does each rail host, in what order".
@@ -23,7 +23,7 @@ import { LADDERS, type FocusLevel, type CohortSel } from "@/src/engine/domain/fo
 // Hue + active-flag stay with the tray builders (per-rail presentation), not here.
 // ─────────────────────────────────────────────────────────────────────────────────────────────
 
-export type RailCardKind = "about" | "tool" | "context" | "country" | "cohort" | "node" | "snap" | "layer";
+export type RailCardKind = "about" | "tool" | "context" | "country" | "cohort" | "composition" | "node" | "snap" | "layer";
 
 // ── The rail LADDER lane (Inspector's descent spine, variant-A redesign 2026-07-19) ──────────
 // Which facts-rail slots are FOCUS-LADDER rungs in this view, in DISPLAY order (coarsest→finest,
@@ -37,6 +37,7 @@ const LADDER_SLOT: Partial<Record<FocusLevel, string>> = {
   network: "context",
   country: "country",
   cohort: "cohort",
+  composition: "composition",
   node: "node",
   layer: "layer",
 };
@@ -83,6 +84,8 @@ export interface RailManifestState {
   country: string | null;
   /** The committed city×provider cohort — geo's rung between a country and a node. */
   cohort: CohortSel | null;
+  /** The committed composition group — hyper's rung between a network and a node. */
+  composition: CompositionSel | null;
 }
 
 const isNodePick = (p: PickDescriptor | null): boolean =>
@@ -145,10 +148,16 @@ function countryHint(s: RailManifestState): string | null {
 function cohortHint(s: RailManifestState): string | null {
   return s.mode === "geo" ? "Open a city · provider row in the explorer to inspect it." : null;
 }
+// Composition is hyper's own middle rung (2026-08-02) — the make-up groups under a network in
+// the explorer. Hyper-only, same allow-list idiom.
+function compositionHint(s: RailManifestState): string | null {
+  return s.mode === "hyper" ? "Open a composition group in the explorer to inspect it." : null;
+}
 
 // RIGHT rail (Details): FIXED slots in a stable order — the Context dossier, then country,
-// cohort, node, snapshot, layer (coarse→fine, matching the geo focus ladder; snapshot/layer stay
-// at the tail). Each slot renders its populated card when selected, else its GHOST hint when the
+// cohort, composition, node, snapshot, layer (coarse→fine, matching the focus ladders; snapshot/
+// layer stay at the tail). Each slot renders its populated card when selected, else its GHOST hint
+// when the
 // view can produce it (see `hint` above) — so the rail always shows the view's full possibility
 // space and a deselect returns a slot to its ghost in place (spatially stable; the old recency
 // reordering made cards jump). Callers filter to `present` for the tray icons.
@@ -179,6 +188,14 @@ export function detailsCards(s: RailManifestState): RailCard[] {
     present: s.cohort != null,
     hint: cohortHint(s),
   };
+  const composition: RailCard = {
+    id: "composition",
+    kind: "composition",
+    icon: iconForPick("composition"),
+    subjectKey: s.composition ? `${s.composition.netId}|${s.composition.key}` : null,
+    present: s.composition != null,
+    hint: compositionHint(s),
+  };
   const node: RailCard = {
     id: "node",
     kind: "node",
@@ -203,5 +220,5 @@ export function detailsCards(s: RailManifestState): RailCard[] {
     present: !!s.layer,
     hint: layerHint(s),
   };
-  return [context, country, cohort, node, snap, layer];
+  return [context, country, cohort, composition, node, snap, layer];
 }

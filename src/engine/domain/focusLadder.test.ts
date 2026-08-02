@@ -2,14 +2,15 @@ import { describe, it, expect } from "vitest";
 import { LADDERS, LEVEL_CARRY, finerLevels, type SelectionSnapshot } from "./focusLadder";
 
 const sel = (over: Partial<SelectionSnapshot> = {}): SelectionSnapshot => ({
-  inspectIsNode: false, cohort: null, country: null, layerId: null, filter: "all", ...over,
+  inspectIsNode: false, cohort: null, composition: null, country: null, layerId: null, filter: "all", ...over,
 });
 const COHORT = { cc: "DE", city: "Falkenstein", isp: "Hetzner" };
+const COMP = { netId: "dor", key: "Hybrid|L0·dL1" };
 
 describe("focusLadder — the per-view rung tables (spec 2026-07-18)", () => {
   it("pins each view's rung order, finest→coarsest", () => {
     expect(LADDERS.geo.map((r) => r.level)).toEqual(["node", "cohort", "country", "network", "all"]);
-    expect(LADDERS.hyper.map((r) => r.level)).toEqual(["node", "network", "all"]);
+    expect(LADDERS.hyper.map((r) => r.level)).toEqual(["node", "composition", "network", "all"]);
     expect(LADDERS.ledger.map((r) => r.level)).toEqual(["node", "layer", "network", "all"]);
   });
 
@@ -35,8 +36,10 @@ describe("focusLadder — the per-view rung tables (spec 2026-07-18)", () => {
 
   it("active() truth table — hyper and ledger", () => {
     expect(LADDERS.hyper[0].active(sel({ inspectIsNode: true }))).toBe(true);
-    expect(LADDERS.hyper[1].active(sel({ filter: "dag" }))).toBe(true);
+    expect(LADDERS.hyper[1].active(sel({ composition: COMP }))).toBe(true);
     expect(LADDERS.hyper[1].active(sel())).toBe(false);
+    expect(LADDERS.hyper[2].active(sel({ filter: "dag" }))).toBe(true);
+    expect(LADDERS.hyper[2].active(sel())).toBe(false);
     expect(LADDERS.ledger[0].active(sel({ inspectIsNode: true }))).toBe(true);
     expect(LADDERS.ledger[1].active(sel({ layerId: "ml0" }))).toBe(true);
     expect(LADDERS.ledger[1].active(sel())).toBe(false);
@@ -58,13 +61,15 @@ describe("focusLadder — the per-view rung tables (spec 2026-07-18)", () => {
     expect(finerLevels("geo", "node")).toEqual([]);
     expect(finerLevels("ledger", "layer")).toEqual(["node"]);
     expect(finerLevels("ledger", "network")).toEqual(["node", "layer"]);
-    expect(finerLevels("hyper", "network")).toEqual(["node"]);
+    expect(finerLevels("hyper", "network")).toEqual(["node", "composition"]);
+    expect(finerLevels("hyper", "composition")).toEqual(["node"]);
   });
 
   it("carry policy — universal subjects carry, view-scoped rungs clear (spec Part 2)", () => {
     expect(LEVEL_CARRY.node).toBe("always");
     expect(LEVEL_CARRY.network).toBe("always");
     expect(LEVEL_CARRY.cohort).toBe("view-scoped");
+    expect(LEVEL_CARRY.composition).toBe("view-scoped");
     expect(LEVEL_CARRY.country).toBe("view-scoped");
     expect(LEVEL_CARRY.layer).toBe("view-scoped");
   });

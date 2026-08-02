@@ -20,6 +20,7 @@ const details = (over: Partial<RailManifestState>): RailManifestState => ({
   layer: null,
   country: null,
   cohort: null,
+  composition: null,
   selNodesCount: 10,
   filterLabel: null,
   ...over,
@@ -58,20 +59,25 @@ describe("detailsCards — RIGHT rail (Details): fixed slots + ghost hints", () 
   it("the DAG filter → Context dossier populated", () => {
     expect(presentKinds(detailsCards(details({ filter: "dag" })))).toEqual(["context"]);
   });
-  it("slots come in ONE fixed order (context, country, cohort, node, snap, layer) regardless of selection", () => {
+  it("slots come in ONE fixed order (context, country, cohort, composition, node, snap, layer) regardless of selection", () => {
     const ids = detailsCards(details({ filter: "dor", inspect: nodePick, snap: snapPick })).map((c) => c.id);
-    expect(ids).toEqual(["context", "country", "cohort", "node", "snap", "layer"]);
+    expect(ids).toEqual(["context", "country", "cohort", "composition", "node", "snap", "layer"]);
   });
   it("ledger ghosts: context + node + snapshot + layer invites (nodes pick in the chamber too)", () => {
     expect(ghostIds(detailsCards(details({})))).toEqual(["context", "node", "snap", "layer"]);
   });
-  it("hyper ghosts: context + node only (the snapshot slot is ledger-scoped, spec 2026-08-01)", () => {
-    expect(ghostIds(detailsCards(details({ mode: "hyper" })))).toEqual(["context", "node"]);
+  it("hyper ghosts: context + composition + node (the snapshot slot is ledger-scoped, spec 2026-08-01)", () => {
+    expect(ghostIds(detailsCards(details({ mode: "hyper" })))).toEqual(["context", "composition", "node"]);
   });
   it("geo ghosts cover the whole ladder: context + country + cohort + node invites (snapshot ledger-only)", () => {
     expect(ghostIds(detailsCards(details({ mode: "geo" })))).toEqual([
       "context", "country", "cohort", "node",
     ]);
+  });
+  it("the composition card never ghosts outside hyper (its rung is hyper-scoped)", () => {
+    for (const mode of ["geo", "ledger"] as const) {
+      expect(detailsCards(details({ mode })).find((c) => c.id === "composition")?.hint).toBeNull();
+    }
   });
   it("country/cohort cards never ghost outside geo", () => {
     for (const mode of ["hyper", "ledger"] as const) {
@@ -97,7 +103,7 @@ describe("detailsCards — RIGHT rail (Details): fixed slots + ghost hints", () 
     const cards = detailsCards(details({ mode: "hyper", snap: snapPick }));
     const snap = cards.find((c) => c.id === "snap")!;
     expect(snap.present).toBe(true);
-    expect(ghostIds(cards)).toEqual(["context", "node"]); // snap populated → no snap ghost
+    expect(ghostIds(cards)).toEqual(["context", "composition", "node"]); // snap populated → no snap ghost
   });
   it("subjectKeys track each card's EdgePulse subject (filter / node ip / snapshot ordinal)", () => {
     const s = details({ filter: "dor", inspect: nodePick, snap: snapPick });
@@ -122,7 +128,7 @@ describe("detailsCards — RIGHT rail (Details): fixed slots + ghost hints", () 
 describe("ladderSlotIds — the descent-spine lane (display order = reversed rung order)", () => {
   it("mirrors focusLadder.LADDERS coarsest→coarsest per 3D view", () => {
     expect(ladderSlotIds("geo")).toEqual(["context", "country", "cohort", "node"]);
-    expect(ladderSlotIds("hyper")).toEqual(["context", "node"]);
+    expect(ladderSlotIds("hyper")).toEqual(["context", "composition", "node"]);
     // Ledger: LAYER sits above NODE (ladder order — layer is deliberately finer than network
     // but coarser than node), a deliberate reorder of the fixed slot stack.
     expect(ladderSlotIds("ledger")).toEqual(["context", "layer", "node"]);

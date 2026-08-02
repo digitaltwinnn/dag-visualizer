@@ -15,15 +15,15 @@ import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { SonarRing, NodeStars, NoSignalDot } from "@/components/state/StateAtoms";
-import { VIEW_ICONS, LAYER_ICON, SNAPSHOT_ICON, COUNTRY_ICON, PROVIDER_ICON, KIND_MARK_CLASS } from "@/components/icons";
+import { VIEW_ICONS, LAYER_ICON, SNAPSHOT_ICON, COUNTRY_ICON, PROVIDER_ICON, COMPOSITION_ICON, KIND_MARK_CLASS } from "@/components/icons";
 import { ExternalLink } from "lucide-react";
 import { useMinHold } from "@/components/useMinHold";
 import { POLL } from "@/src/engine/config";
 import { Desc, StatusMark, CompositionRows, StatusBreakdown, RoleChips, IdentityDot, networkKind } from "./parts";
-import { compositionRows, nodeCompositionLabel } from "@/src/data/composition";
+import { compositionGroups, compositionRows, nodeCompositionLabel } from "@/src/data/composition";
 import { ledgerLayerById } from "@/src/data/ledgerLayers";
 import { pickNetId } from "@/src/engine/domain/pickActions";
-import type { CohortSel } from "@/src/engine/domain/focusLadder";
+import type { CohortSel, CompositionSel } from "@/src/engine/domain/focusLadder";
 
 type PickOf<K extends PickDescriptor["kind"]> = Extract<PickDescriptor, { kind: K }>;
 
@@ -566,6 +566,65 @@ export function CountryCard({ cc }: { cc: string }) {
           <span className="text-body text-foreground tabular-nums">{f.value}</span>
         </div>
       ))}
+    </div>
+  );
+}
+
+// ── The COMPOSITION card (Hypergraph · make-up group) ───────────────────────────────────────
+// Hyper's rung between a network and a node (`store.composition`, a `CompositionSel`
+// {netId, key}): the machines in one network that run the SAME set of layers — the metagraph
+// card's own composition vocabulary (Hybrid / Data / …), promoted from a browse-only grouping to
+// a committable subject (2026-08-02). Members are re-resolved LIVE from `selNodes` through the
+// shared `compositionGroups` helper — the same dedupe-to-machines the explorer rows use, so the
+// count here and the count on the row can't disagree. The label + layer codes come from the KEY,
+// so the head still reads correctly for a group that has momentarily emptied out.
+const parseCompKey = (key: string): { label: string; codes: string[] } => {
+  const [label = key, codeStr = ""] = key.split("|");
+  return { label, codes: codeStr ? codeStr.split("·") : [] };
+};
+
+export function CompositionTitle({ sel }: { sel: CompositionSel }) {
+  const Mark = COMPOSITION_ICON;
+  const { label } = parseCompKey(sel.key);
+  return (
+    <span className="flex items-center gap-2 min-w-0 max-w-full">
+      <Mark aria-hidden className={cn(KIND_MARK_CLASS, "text-[var(--filter-accent,var(--primary))]")} />
+      <span className="truncate min-w-0">{label}</span>
+    </span>
+  );
+}
+
+export function CompositionCard({ sel }: { sel: CompositionSel }) {
+  const selNodes = useStore((s) => s.selNodes);
+  const { codes } = parseCompKey(sel.key);
+  const groups = useMemo(() => compositionGroups(selNodes), [selNodes]);
+  const members = groups.find((g) => g.key === sel.key)?.rows ?? [];
+  const total = groups.reduce((n, g) => n + g.rows.length, 0);
+  const share = total > 0 ? Math.round((members.length / total) * 100) : 0;
+  const cfg = metagraphById(sel.netId);
+  return (
+    <div className="flex flex-col gap-2">
+      <div className="flex items-start justify-between gap-2.5">
+        <span className="text-body text-muted-foreground flex-none">Runs</span>
+        <span className="flex flex-wrap justify-end items-center gap-1 min-w-0">
+          {codes.length === 0 ? <span className="text-body text-foreground">—</span> : <RoleChips codes={codes} />}
+        </span>
+      </div>
+      <div className="flex items-start justify-between gap-2.5">
+        <span className="text-body text-muted-foreground">Machines</span>
+        <span className="text-body text-foreground tabular-nums">{members.length}</span>
+      </div>
+      <div className="flex items-start justify-between gap-2.5">
+        <span className="text-body text-muted-foreground">Share of network</span>
+        <span className="text-body text-foreground tabular-nums">{share}%</span>
+      </div>
+      <div className="flex items-start justify-between gap-2.5">
+        <span className="text-body text-muted-foreground flex-none">Network</span>
+        <span className="inline-flex items-center gap-1.5 text-body text-foreground min-w-0">
+          <IdentityDot hue={sel.netId === "dag" ? CORE_HEX : identityHudHex(sel.netId)} />
+          <span className="truncate">{cfg?.name || sel.netId}</span>
+        </span>
+      </div>
     </div>
   );
 }

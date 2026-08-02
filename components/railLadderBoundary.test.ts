@@ -10,6 +10,7 @@ const LEVEL_CARD: Record<Exclude<FocusLevel, "all">, string> = {
   node: "node",
   country: "country",
   cohort: "cohort",
+  composition: "composition",
   layer: "layer",
 };
 const EXEMPT: Partial<Record<Exclude<FocusLevel, "all">, string>> = {
@@ -24,6 +25,7 @@ const stateFor = (mode: RailManifestState["mode"]): RailManifestState => ({
   layer: null,
   country: null,
   cohort: null,
+  composition: null,
   selNodesCount: 5,
   filterLabel: null,
 });
