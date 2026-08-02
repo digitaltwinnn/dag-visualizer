@@ -10,7 +10,10 @@ import NodeRosterTable from "@/components/datasection/NodeRosterTable";
 export default function DataSection() {
   const mode = useStore((s) => s.mode);
   return (
-    <div className="h-full flex flex-col px-6 py-3">
+    // The right pad is wider than the left ON PURPOSE: it reserves the corner the layer's own ×
+    // occupies (SectionShell). Below 1100px the tables outgrow the panel and scroll sideways, so
+    // without the gutter the sticky header slid under the close mark (2026-08-02).
+    <div className="h-full flex flex-col pl-6 pr-10 py-3">
       {mode === "ledger" ? (
         <AnchorLogTable />
       ) : mode === "hyper" || mode === "geo" ? (
