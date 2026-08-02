@@ -884,10 +884,13 @@ and keep changing, so they're examples, not the contract.
   current view CAN produce is always visible — POPULATED when its subject is selected
   (`ContextCard` mirrors the filter; the **country card** — `ccMark` code + name title, Nodes/Share/
   Cities/Providers from `store.selNodes`, geo-scoped like layer is ledger-scoped; the
-  **provider card** — "City · Provider" title, Nodes/Networks/ASN/Country; both rendered
+  **provider card** — the PROVIDER alone as the title, City/Nodes/Networks/ASN in the body (user,
+  2026-08-02: the city is a labelled fact, and the country is deliberately absent — the parent
+  country card states it one slot up, and a facts rail shouldn't say the same thing twice); both rendered
   straight from their store channels by Inspector's `CountryPane`/`ProviderPane` since
   neither subject is a PickDescriptor, collapsible like every RIGHT card; the **node card**
-  `geoLive` — location-first title, id
+  `geoLive` — CITY-first title (the country moved into the body's labelled rows with the rest,
+  user 2026-08-02), id
   demoted to a mono subtitle, status pill in the head aside; the **snapshot** and **layer**
   cards), else as a quiet **GHOST hint card** (a dashed one-liner:
   kind mark · slot label · instruction — no halo/animation) saying what to interact with — so the rail shows the view's whole possibility space and a deselect
@@ -1193,14 +1196,16 @@ cards: **eyebrow / title / INSET hairline / body**.
   `MetaTitle` (avatar + name + ticker + a muted type descriptor — "data metagraph" /
   "currency metagraph" / "data and currency metagraph" / DAG = "hypergraph"; 0-node
   metagraphs say just "metagraph"); the snapshot title's Odometer owns its own roll; the
-  node card is **location-first** (place as title; the `subtitle` is the node's sentence-cased
+  node card is **city-first** (the CITY alone as title — the country left the head 2026-08-02;
+  the `subtitle` is the node's sentence-cased
   composition word + its layer codes as squared PILLS — `Hybrid [L0][cL1][dL1]`
   (`nodeCompositionLabel` + `compositionRows` codes via the shared `RoleChips`; the joined
   `L0·cL1` text read as one token, user 2026-07-12); the BODY is
-  labelled rows in importance order: HOSTING, then **NODE ID last** — the unique reference
+  labelled rows in importance order: COUNTRY (name + the `ccMark` code), HOSTING, then
+  **NODE ID last** — the unique reference
   sits where references sit, truncated with the full hash on hover (user, 2026-07-11; this
   replaced the one-node CompositionRows block whose count was always "1"); id-as-title
-  fallback when unresolved). **Card-head kind MARKS tint with
+  fallback when the city is unresolved). **Card-head kind MARKS tint with
   the active filter's identity** via `text-[var(--filter-accent,var(--primary))]` (the rail
   sets `--filter-accent`; cyan on "all") — never hardcode a mark to cyan (a recurring bug;
   the snapshot Layers mark + the layer plane mark both follow this; node marks use their

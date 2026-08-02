@@ -5,7 +5,7 @@ import { cn } from "@/lib/utils";
 import { useStore } from "@/src/store/store";
 import { shortHash, CORE_HEX, getNetwork, metagraphById } from "@/src/data/network";
 import { identityHudHex } from "@/src/palette/identity";
-import { hex, fmtDag, fmtKB } from "@/src/util/format";
+import { hex, fmtDag, fmtKB, ccMark } from "@/src/util/format";
 import { relativeAge } from "@/src/util/relativeAge";
 import { statusBreakdown } from "@/src/data/nodeStatus";
 import type { GlobalSnapshot, MetaCfg, PickDescriptor } from "@/src/data/types";
@@ -137,16 +137,17 @@ function inspectedNode(inspect: ReturnType<typeof useStore.getState>["inspect"])
     : null;
 }
 
-// The node's resolved place ("City, Country") — "" when geolocation hasn't resolved.
-function nodePlace(node: NonNullable<ReturnType<typeof inspectedNode>>): string {
-  const g = node.geo;
-  return g ? `${g.city ? g.city + ", " : ""}${g.country ?? ""}`.trim() : "";
+// The node's resolved CITY — the title's place word ("" when geolocation hasn't resolved). The
+// COUNTRY left the title (user, 2026-08-02): it is a labelled fact like hosting and the node id,
+// so it reads in the body with the rest rather than doubling the headline.
+function nodeCity(node: NonNullable<ReturnType<typeof inspectedNode>>): string {
+  return node.geo?.city ?? "";
 }
 
 // Node title: the Geography view mark (Globe — the Geography view's top-bar icon, same view-glyph
-// vocabulary as the snapshot head's Layers; identity-hued) + the node's LOCATION ("City, Country" — user-agreed:
-// where the node sits is the headline; its hash is bookkeeping, demoted to the subtitle below).
-// Fallback when geolocation hasn't resolved: the truncated id (mono) stays the title, no
+// vocabulary as the snapshot head's Layers; identity-hued) + the node's CITY — user-agreed:
+// where the node sits is the headline; its hash is bookkeeping, demoted to the subtitle below.
+// Fallback when the city hasn't resolved: the truncated id (mono) stays the title, no
 // subtitle. The roll-in stays keyed on the node ID — the subject's identity, not the title text
 // (a new node in the same city still rolls).
 export function GeoLiveTitle() {
@@ -154,14 +155,14 @@ export function GeoLiveTitle() {
   const node = inspectedNode(inspect);
   if (!node) return null;
   const id = node.node?.id;
-  const place = nodePlace(node);
-  const title = place || (id ? shortHash(id) : node.node?.ip || "Node");
+  const city = nodeCity(node);
+  const title = city || (id ? shortHash(id) : node.node?.ip || "Node");
   const color = node.kind === "metanode" ? (node.meta ? identityHudHex(node.meta.id) : undefined) : CORE_HEX;
   const Mark = VIEW_ICONS.geo;
   return (
     <span className="inline-flex items-center gap-2 min-w-0">
       {color && <Mark className={KIND_MARK_CLASS} style={{ color }} aria-hidden />}
-      <span key={id ?? title} className={cn("min-w-0 roll-in", !place && "font-mono tabular-nums break-all")}>{title}</span>
+      <span key={id ?? title} className={cn("min-w-0 roll-in", !city && "font-mono tabular-nums break-all")}>{title}</span>
     </span>
   );
 }
@@ -387,11 +388,12 @@ export function GeoLiveCard() {
   return <GeoLiveNode p={node} />;
 }
 
-// The selected-node block. The node's LOCATION + id + status pill are all the card HEAD now
+// The selected-node block. The node's CITY + id + status pill are all the card HEAD now
 // (GeoLiveTitle/GeoLiveSubtitle/GeoLiveAside above) — the old IP and "Location" body rows are
-// gone (the IP entirely, user-agreed; the location because it IS the title). The body is what
-// remains that the globe can't show: the node's layer composition. The slot eyebrow reads
-// "Selected node"; the × is CardHead's shared close (the outer pane).
+// gone (the IP entirely, user-agreed; the city because it IS the title). The body is the labelled
+// facts the globe can't show: the country that completes the place, the hosting provider, and the
+// node's own reference. The slot eyebrow reads "Node"; the × is CardHead's shared close (the
+// outer pane).
 function GeoLiveNode({ p }: { p: PickOf<"l0" | "l1" | "metanode"> }) {
   // Hosting provider from the node's IP lookup (GeoInfo.isp/asn) — the one machine fact the
   // globe can't show. Absent = the lookup didn't know; the line simply doesn't render
@@ -401,6 +403,17 @@ function GeoLiveNode({ p }: { p: PickOf<"l0" | "l1" | "metanode"> }) {
   // so the glow lights the card's rounded edge.
   return (
     <>
+      {/* COUNTRY — the half of the place the head no longer carries (user, 2026-08-02), with the
+          app's country CODE mark as the quiet suffix, the same shape as HOSTING's `isp · asn`. */}
+      {geo?.country && (
+        <div className="my-2">
+          <span className="text-micro tracking-[0.1em] uppercase text-muted-foreground">Country</span>
+          <div className="text-body text-foreground-dim mt-0.5">
+            {geo.country}
+            {geo.cc && <span className="font-mono text-label text-muted-foreground"> · {ccMark(geo.cc)}</span>}
+          </div>
+        </div>
+      )}
       {geo?.isp && (
         <div className="my-2">
           <span className="text-micro tracking-[0.1em] uppercase text-muted-foreground">Hosting</span>
@@ -658,9 +671,9 @@ export function ProviderTitle({ sel }: { sel: CohortSel }) {
   return (
     <span className="flex items-center gap-2 min-w-0 max-w-full">
       <Mark aria-hidden className={cn(KIND_MARK_CLASS, "text-[var(--filter-accent,var(--primary))]")} />
-      <span className="truncate min-w-0">
-        {sel.city ?? "Unlocated"} · {sel.isp ?? "Unknown provider"}
-      </span>
+      {/* The PROVIDER alone is the headline (user, 2026-08-02) — the city is a labelled fact in
+          the body, and the country belongs to the parent country card the cohort sits under. */}
+      <span className="truncate min-w-0">{sel.isp ?? "Unknown provider"}</span>
     </span>
   );
 }
@@ -686,9 +699,15 @@ export function ProviderCard({ sel }: { sel: CohortSel }) {
     return seen;
   }, [members]);
   const firstGeo = members[0] && "geo" in members[0].pick ? members[0].pick.geo : undefined;
-  const countryName = selNodes.find((r) => r.cc === sel.cc)?.country ?? sel.cc;
   return (
     <div className="flex flex-col gap-2">
+      {/* CITY — the half of the cohort key the head no longer carries. The COUNTRY is deliberately
+          absent: the cohort always sits under a committed country, whose own card states it one
+          slot up (user, 2026-08-02 — a facts rail shouldn't say the same thing twice). */}
+      <div className="flex items-start justify-between gap-2.5">
+        <span className="text-body text-muted-foreground">City</span>
+        <span className="text-body text-foreground">{sel.city ?? "Unlocated"}</span>
+      </div>
       <div className="flex items-start justify-between gap-2.5">
         <span className="text-body text-muted-foreground">Nodes</span>
         <span className="text-body text-foreground tabular-nums">{members.length}</span>
@@ -714,10 +733,6 @@ export function ProviderCard({ sel }: { sel: CohortSel }) {
       <div className="flex items-start justify-between gap-2.5">
         <span className="text-body text-muted-foreground">ASN</span>
         <span className="text-body text-foreground tabular-nums">{firstGeo?.asn ?? "—"}</span>
-      </div>
-      <div className="flex items-start justify-between gap-2.5">
-        <span className="text-body text-muted-foreground">Country</span>
-        <span className="text-body text-foreground">{countryName}</span>
       </div>
     </div>
   );
