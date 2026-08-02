@@ -876,10 +876,12 @@ and keep changing, so they're examples, not the contract.
   total plus one identity dot + count per network, from the live `metaList` tallies.
 
 **Per-view vitals** (contents, not the rule): **hyper** = the structure (filter-aware
-MACHINE counts per composition — Data / Hybrid / Currency, the same vocabulary as the
+MACHINE counts per composition — Hybrid / Consensus / Currency / Data, the same vocabulary as the
 dossier table + hyper explorer (2026-07-12, replaced the per-layer L0/cL1/dL1 role counts);
-cluster entries dedupe to machines; an em-dash for a composition the selection doesn't have;
-NB dedicated-L0 "Consensus" machines have no column — visible in the dossier breakdown). **geo** = the footprint (`Nodes` / `Countries` /
+cluster entries dedupe to machines; an em-dash for a composition the selection doesn't have.
+**The columns are EVERY label `compositionRows` can emit, so they SUM to the selection** —
+dedicated-L0 "Consensus" machines had no column and hyper read 184 where geo read 206 for the
+same "all" (user, 2026-08-02); a new composition label needs a column, not an exclusion). **geo** = the footprint (`Nodes` / `Countries` /
 `Providers` — distinct known ISPs over `store.selNodes`; replaced Ready %, user 2026-07-11:
 health belongs to the cards + the future network-health view).
 **ledger** = live activity (`Snaps/hr` / `Anchors/hr` with cyan trend sparklines from

@@ -43,15 +43,18 @@ function Vital({ label, value, spark }: { label: string; value: React.ReactNode;
 // L0/cL1/dL1 role counts: the composition vocabulary is what the hyper explorer + the dossier
 // table speak, so the vitals now agree with them). Cluster entries are deduped to machines
 // first (a hybrid appears once per cluster it runs), then counted by their composition label
-// (src/data/composition). NB "Consensus" (dedicated-L0) machines — the DAG core has some —
-// have no column (user picked the three); they're visible in the dossier/explorer breakdowns.
+// (src/data/composition). The columns are EVERY label that vocabulary can produce, so they SUM
+// to the selection (2026-08-02: "Consensus" — dedicated-L0, 16 of them on the DAG core — had no
+// column, so hyper read 146 machines where geo read 162 nodes for the same selection; user).
 // Filtered: an em-dash for a composition the selection doesn't have (stable columns, no reflow).
 function HyperVitals() {
   const filter = useStore((s) => s.filter);
   const metaList = useStore((s) => s.metaList);
   const cfg = metagraphById(filter);
 
-  const counts: Record<string, number> = { Data: 0, Hybrid: 0, Currency: 0 };
+  // Order: the make-up that dominates every real network first, then the dedicated roles in
+  // layer order (L0 → cL1 → dL1) — the same order `compositionRows` emits them in.
+  const counts: Record<string, number> = { Hybrid: 0, Consensus: 0, Currency: 0, Data: 0 };
   const cores = cfg ? metaList.filter((m) => m.id === cfg.id) : metaList;
   for (const mg of cores) {
     const machines = new Map<string, NodeInfo>();
@@ -68,9 +71,9 @@ function HyperVitals() {
 
   return (
     <>
-      <Vital label="Data" value={cell(counts.Data!)} />
-      <Vital label="Hybrid" value={cell(counts.Hybrid!)} />
-      <Vital label="Currency" value={cell(counts.Currency!)} />
+      {Object.entries(counts).map(([label, n]) => (
+        <Vital key={label} label={label} value={cell(n)} />
+      ))}
     </>
   );
 }
