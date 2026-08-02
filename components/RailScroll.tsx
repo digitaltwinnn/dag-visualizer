@@ -44,7 +44,8 @@ export default function RailScroll() {
         // Space above the band, NO tolerance: any entry into the chart band fades (a +24px
         // slack let the rail overlap the chart unfaded — user bug; the content-height measure
         // is DOM-change-driven, so borderline flicker isn't a concern the way it was for the
-        // old rect-based measure).
+        // old rect-based measure). The shell no longer translates (the raw data layer surfaces
+        // in place — SectionShell), so the measured rect IS the viewport position.
         const avail = window.innerHeight - reserve - r.top;
         el.classList.toggle("rail-clip", reserve > 0 && contentH > avail);
       };

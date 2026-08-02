@@ -16,7 +16,7 @@ import * as THREE from "three";
 import { LEDGER } from "../../domain/ledgerLayout";
 import { HEX_H } from "../../domain/geoLayout";
 import { discFall, lerp, smooth } from "../../domain/nodeLayout";
-import { validatorDim, metaNodeDim, nodeEmissive, metaNodeEmissive, hubMatchBoost } from "../../domain/dimModel";
+import { validatorDim, metaNodeDim, nodeEmissive, metaNodeEmissive, hubMatchBoost, focusWeightOf } from "../../domain/dimModel";
 import type { DimContext } from "../../domain/dimModel";
 import type { MetaNodeRecord, ValidatorRecord } from "../../domain/records";
 import type { ViewTransition } from "../../domain/viewTransition";
@@ -444,7 +444,13 @@ export class NodeFabric {
       // country dim outside the drilled-into country (geo only) — CALLS the domain function
       // directly now (no inline mirror).
       const d = validatorDim(c, dim, geoCc);
-      const isFocus = !!(focusId && (u.nodeId === c.hoverNodeId || u.nodeId === c.selectedNodeId || (!!u.nodeId && c.hoverCohort?.has(u.nodeId))));
+      // dimModel.focusWeightOf: the hovered/selected node itself takes the FULL boost, a mere
+      // member of a focused group (a hovered/committed provider cohort) only a share — so
+      // picking one node inside a lit cohort still reads (user, 2026-08-01).
+      const fw = focusWeightOf(
+        u.nodeId === c.hoverNodeId || u.nodeId === c.selectedNodeId,
+        !!u.nodeId && !!c.hoverCohort?.has(u.nodeId),
+      );
       // dimModel.nodeEmissive: SAME glow model as the metagraph nodes (user: the DAG's globe
       // hexes must read like any metagraph's — one node language). Base LIFTED in hyper (nodes
       // read too dim on the flat backdrop) and eased DOWN on the globe (they read too hot
@@ -452,7 +458,7 @@ export class NodeFabric {
       // the live validator endpoints (0.47 hyper -> 0.37 globe). Steady; the old twinkle
       // shimmer was removed. Also composes the hover/selection focus boost/dim-back inside.
       const flRaw = u._flash || 0; // brief flash when an arc pulse reaches this node
-      emi[u.index] = nodeEmissive(c, d, flRaw, isFocus, !!focusId && dimOthersOnFocus, 0.47, 0.37);
+      emi[u.index] = nodeEmissive(c, d, flRaw, fw, !!focusId && dimOthersOnFocus, 0.47, 0.37);
       if (flRaw) u._flash = flRaw * flashDecay;
 
       if (recolour) {
@@ -507,11 +513,15 @@ export class NodeFabric {
       // like its hub instead of sitting at the dimmer node base (user). Fades out with the hubs
       // by morph 0.3 — there's no hub on the globe.
       const hubBoost = hubMatchBoost(c, glow, c.filter === r.metaId);
-      const isFocus = !!(focusId && (r.nodeId === c.hoverNodeId || r.nodeId === c.selectedNodeId || c.hoverCohort?.has(r.nodeId)));
+      // Tiered focus, same ranking as the validator loop (dimModel.focusWeightOf).
+      const fw = focusWeightOf(
+        r.nodeId === c.hoverNodeId || r.nodeId === c.selectedNodeId,
+        !!c.hoverCohort?.has(r.nodeId),
+      );
       const flRaw = r._flash || 0; // brief flash when an arc pulse reaches this node
       // dimModel.metaNodeEmissive: composes glow + arc flash + hubBoost inside its floor, then
       // the hover/selection focus boost/dim-back — same composition the inline code had.
-      emi[r.index] = metaNodeEmissive(c, dEff, flRaw, isFocus, !!focusId && dimOthersOnFocus, baseG, hubBoost);
+      emi[r.index] = metaNodeEmissive(c, dEff, flRaw, fw, !!focusId && dimOthersOnFocus, baseG, hubBoost);
       if (flRaw) r._flash = flRaw * flashDecay;
 
       const col = _col.copy(r.color).lerp(DIM, dEff * 0.85);

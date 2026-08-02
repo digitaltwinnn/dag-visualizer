@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { autoLayerForNode, clickActions, cohortToggleActions, countryToggleActions, filterToggleActions, layerToggleActions, nodeSelectActions, sameCohort, snapshotSelectActions, pickActive, pickNetId, type ClickAction } from "./pickActions";
+import { autoLayerForNode, clearAllActions, clickActions, cohortToggleActions, countryToggleActions, filterToggleActions, layerToggleActions, nodeSelectActions, sameCohort, snapshotSelectActions, pickActive, pickNetId, type ClickAction } from "./pickActions";
 import { finerLevels } from "./focusLadder";
 import type { PickDescriptor } from "@/src/data/types";
 
@@ -309,5 +309,30 @@ describe("nodeSelectActions ancestry (spec Part 3 — full-ancestry rule)", () =
   it("deselect stays a bare inspect-clear", () => {
     expect(nodeSelectActions(geoPick, { mode: "geo", currentFilter: "all", deselect: true }))
       .toEqual([{ kind: "inspect", pick: null }]);
+  });
+});
+
+describe("clearAllActions (the rail-controls sweep)", () => {
+  it("drops every committed channel finest→coarsest, filter last", () => {
+    const acts = clearAllActions({
+      hasInspect: true, hasSnap: true,
+      cohort: { cc: "DE", city: "Falkenstein", isp: "Hetzner" },
+      country: "DE", layerId: "ml0", filter: "dor",
+    });
+    expect(kinds(acts)).toEqual(["inspect", "snapshot", "cohort", "country", "layer", "filter"]);
+    expect(acts[acts.length - 1]).toEqual({ kind: "filter", id: "all" });
+    // The snapshot clear must not carry `follow` — re-following is the FollowController's.
+    expect(acts[1]).toEqual({ kind: "snapshot", pick: null });
+  });
+  it("already-clear channels emit nothing (a fully clear state is a no-op)", () => {
+    expect(clearAllActions({
+      hasInspect: false, hasSnap: false, cohort: null, country: null, layerId: null, filter: "all",
+    })).toEqual([]);
+  });
+  it("a partial state clears only what is set", () => {
+    const acts = clearAllActions({
+      hasInspect: false, hasSnap: false, cohort: null, country: null, layerId: "hypl0", filter: "dag",
+    });
+    expect(kinds(acts)).toEqual(["layer", "filter"]);
   });
 });

@@ -11,6 +11,7 @@ import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import Vitals, { VitalsCluster, VitalsToggle } from "@/components/topbar/Vitals";
 import FilterPicker from "@/components/topbar/FilterPicker";
 import EcgMark from "@/components/topbar/EcgMark";
+import RawToggle from "@/components/topbar/RawToggle";
 import { useBreakpoint } from "@/components/useBreakpoint";
 import type { Mode } from "@/src/store/store";
 
@@ -217,6 +218,12 @@ export default function TopBar() {
         {bp === "phone" && (
           <VitalsToggle open={phoneVitals} onClick={() => setPhoneVitals(!phoneVitals)} />
         )}
+
+        {/* RAW — the bar's trailing control: surfaces the raw data layer under the view. It sits
+            in the COMMAND bar (this zone's scope is the whole instrument) rather than the live
+            lane, and LAST because it acts on everything to its left. */}
+        <span className="w-px self-stretch bg-border my-1 max-[820px]:hidden" />
+        <RawToggle />
         </div>
       </div>
 

@@ -13,6 +13,25 @@ import { shortHash, CORE_HEX } from "@/src/data/network";
 import { identityHudHex } from "@/src/palette/identity";
 import type { NodeRow } from "@/src/data/types";
 
+// The ONE explorer-row RIGHT-EDGE contract (2026-08-01, user: "explorer dropdown rows
+// misaligned on the right edge when hover/selected; the snapshot view's top rows too"). Every
+// row in every explorer, at every nesting depth, must end on the SAME vertical — the row box is
+// invisible at rest, so a mismatch only surfaces when a hover/selected wash paints it, which is
+// exactly when it reads as a bug. Three depths had drifted into three different edges: the
+// top-level rows outset ±6px past the card body's padding, `DisclosureRow` hand-rolled a
+// +6px-right calc to match them, and the leaf picker/lane rows (plain `w-full`) stopped 6px
+// short — while the ledger's floor rows carried no outset at all and sat 6px inside geo/hyper's.
+//
+// The rule now: the OUTSET is owned by two places only — the top-level row (`ROW_OUTSET`) and
+// the level-1 dropdown container (`ROW_NEST`) — and every row inside a container is a plain
+// `w-full`, inheriting the edge instead of re-deriving it. Nested containers BELOW level 1 must
+// NOT re-apply `ROW_NEST`'s negative margin (it would compound to +12px); they only indent.
+export const ROW_OUTSET = "w-[calc(100%+12px)] -mx-1.5 pl-1.5 pr-2";
+// The level-1 dropdown container: indents its rows from the left with the hairline rule, and
+// extends 6px right so its `w-full` children reach the top-level row's edge. `pr-2` on the rows
+// themselves then puts every trailing ✓/chevron in one column across depths.
+export const ROW_NEST = "-mr-1.5 border-l border-border";
+
 // The ONE disclosure-chevron affordance, used by every explorer row that expands/collapses
 // (extracted 2026-07-18 from DisclosureRow, its original/canonical treatment — a ledger fix had
 // hand-copied it and dropped the hover-reveal, the exact drift a shared component prevents):
@@ -68,7 +87,7 @@ export function DisclosureRow({
     <button
       type="button"
       className={cn(
-        "group relative flex items-center gap-2 w-[calc(100%+6px)] py-[5px] pl-2 pr-2 my-px rounded-sm border border-transparent bg-transparent cursor-pointer text-left text-foreground-dim transition-colors duration-[140ms]",
+        "group relative flex items-center gap-2 w-full py-[5px] pl-2 pr-2 my-px rounded-sm border border-transparent bg-transparent cursor-pointer text-left text-foreground-dim transition-colors duration-[140ms]",
         "hover:bg-wash-hover hover:text-foreground",
         "focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--primary)] focus-visible:outline-offset-[-2px]",
         on && SELECTED_ROW,

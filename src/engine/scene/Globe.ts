@@ -229,6 +229,11 @@ export class Globe implements GeoViewHost {
     // The countries topology arrives async: re-assert any drill/hover border made before then.
     this.onCountriesReady = () => this._updateCountryBorder();
     buildGeoView(this);
+    // The arcs share the surface's camera-FACING + closeness uniforms (created by buildGeoView,
+    // hence after it): the hologram has no opaque body sphere, so nothing depth-occludes a comet
+    // flying over the far hemisphere — it has to fade itself, exactly like the walls and the
+    // graticule do (user, 2026-08-01: "arcs are visible through the globe").
+    this.arcs.setFacing(this.facingUniform, this.closeUniform);
   }
 
   // View-derived sim gates from VIEW_POLICIES (the Engine calls this on every mode change). Only the

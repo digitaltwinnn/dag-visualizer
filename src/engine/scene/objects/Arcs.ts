@@ -32,10 +32,24 @@ export class Arcs {
   private _cometPts: THREE.Vector3[] | null = null;
   private _sim: ArcSim | null = null;
   private _poolRecs: FlashRec[] = [];
+  // The globe surface's shared camera-facing + closeness uniforms (GeoView builds them; Globe
+  // hands them over once). See setFacing.
+  private _camN: { value: THREE.Vector3 } = { value: new THREE.Vector3(0, 0, 1) };
+  private _close: { value: number } = { value: 0 };
   hasArcs = false;
 
   constructor(parent: THREE.Group) {
     this.parent = parent;
+  }
+
+  // Adopt the surface's facing/closeness uniforms so a comet over the FAR hemisphere fades the
+  // same way the walls and the graticule do. The holographic globe deliberately has no opaque
+  // body sphere, so there is nothing to depth-occlude an arc — additive lines on the back side
+  // otherwise draw at full strength straight through the planet (user, 2026-08-01). Called once,
+  // right after buildGeoView; the material picks the refs up when it is next (re)built.
+  setFacing(camN?: { value: THREE.Vector3 }, close?: { value: number }): void {
+    if (camN) this._camN = camN;
+    if (close) this._close = close;
   }
 
   // js/globe.js:359-427 (`_buildArcs`) minus the agent seeding (that's ArcSim.rebuild). Sizes the
@@ -86,19 +100,31 @@ export class Arcs {
 
     this.mat = new THREE.ShaderMaterial({
       transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
-      uniforms: { uM: { value: 0 } }, // morph fade-in (geography view)
+      uniforms: {
+        uM: { value: 0 }, // morph fade-in (geography view)
+        uCamN: this._camN, // shared with the graticule/walls — see setFacing
+        uClose: this._close,
+      },
       vertexShader: `
         attribute float aTail; attribute vec3 aColor;
-        varying float vB; varying vec3 vColor;
+        varying float vB; varying vec3 vColor; varying vec3 vDir;
         void main() {
           vB = 1.0 - aTail;                 // bright (1) at the head -> 0 at the tail tip
           vColor = aColor;
+          vDir = normalize(position);       // direction from the globe centre (group-local)
           gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
         }`,
       fragmentShader: `
-        uniform float uM; varying float vB; varying vec3 vColor;
+        uniform float uM; uniform vec3 uCamN; uniform float uClose;
+        varying float vB; varying vec3 vColor; varying vec3 vDir;
         void main() {
-          float a = vB * vB * uM;
+          // FACING dim, the surface's own recipe (GeoView's graticule/walls): a comet over the
+          // far hemisphere stays faintly present — the hologram reads through — but clearly
+          // BEHIND, and damps to near-nothing as the camera closes in, where seeing through the
+          // globe was pure noise. The arc apex rises above the surface, so the smoothstep window
+          // is what keeps a comet crossing the limb from popping.
+          float facing = mix(mix(0.22, 0.03, uClose), 1.0, smoothstep(-0.25, 0.12, dot(vDir, uCamN)));
+          float a = vB * vB * uM * facing;
           if (a < 0.01) discard;
           gl_FragColor = vec4(vColor * (0.5 + vB), a);
         }`,

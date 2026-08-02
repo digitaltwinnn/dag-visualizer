@@ -8,6 +8,7 @@ import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { PulseEdge, useEdgePulse } from "@/components/EdgePulse";
 import { ListTree, ChevronLeft, ChevronRight, ChevronUp, ChevronDown, X, type LucideIcon } from "lucide-react";
 import { EXPLORE_ICON } from "@/components/icons";
+import { useStore } from "@/src/store/store";
 
 // One entry in a dock's icon TRAY (user redesign 2026-07-05 — supersedes the old hint dot + the
 // dot↔glyph morph, on the edge tabs AND the phone dock halves): the tray is a quiet LEGEND of the
@@ -141,6 +142,12 @@ export default function RailDock({
 }) {
   const [openState, setOpen] = useState(false);
   const open = openProp ?? openState;
+  // Sheets portal to document.body, so they DON'T ride the SectionShell scene layer — while the
+  // raw data layer is up they'd float over the table. Gate them off in that pose (the phone bar
+  // rides the scene layer and fades with it); the internal open state is kept, so returning to
+  // the scene restores what was open. The tablet edge TAB fades with the HUD — no gate needed.
+  const section = useStore((s) => s.section);
+  const shellVisible = section === "scene";
   const handleOpenChange = (next: boolean) => {
     setOpen(next);
     onOpenChange?.(next);
@@ -303,6 +310,12 @@ export default function RailDock({
           className={cn(
             "fixed z-[42] bottom-0 w-1/2 h-[var(--phone-dock-h)] hidden max-[699px]:flex rounded-none",
             side === "left" ? "left-0" : "right-0",
+            // The raw data layer is presented: the dock belongs to the scene shell (RailDock
+            // renders inside it), which has receded and dimmed behind the layer — so the bar
+            // would sit under the raw table pointing at a hidden rail.
+            // Overrides the phone-breakpoint `max-[699px]:flex` above (same twMerge group+variant,
+            // so the later class wins) — a bare `hidden` wouldn't, the variant would still show it.
+            !shellVisible && "max-[699px]:hidden",
           )}
         >
           <ToggleGroupItem
@@ -391,7 +404,7 @@ export default function RailDock({
           two bar-half docks are mutually exclusive via the CONTROLLED `open` prop (driven by
           `store.phoneDock` from the caller), not by anything in here — RailDock itself still just
           renders whatever `open` it's given. */}
-      <Sheet open={open} onOpenChange={handleOpenChange} modal={false}>
+      <Sheet open={open && shellVisible} onOpenChange={handleOpenChange} modal={false}>
         <SheetContent
           side={sheetSide ?? side}
           // Drag-chosen height override (phone bottom sheet): inline height + unlocked max-height

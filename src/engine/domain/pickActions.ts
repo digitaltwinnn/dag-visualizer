@@ -143,6 +143,28 @@ export function filterToggleActions(id: string, currentFilter: string): ClickAct
   return [{ kind: "filter", id: id !== "all" && id === currentFilter ? "all" : id }];
 }
 
+// The rail-controls CLEAR-ALL — one sweep back to the "all" overview: drop every committed
+// rung finest→coarsest (mirroring the ladder's deselect stepping), the snapshot pin included
+// (pick null, no `follow` — re-following stays with the FollowController, like every snapshot
+// clear). Each channel is gated so an already-clear one emits no action (no store churn).
+export function clearAllActions(current: {
+  hasInspect: boolean;
+  hasSnap: boolean;
+  cohort: CohortSel | null;
+  country: string | null;
+  layerId: string | null;
+  filter: string;
+}): ClickAction[] {
+  const acts: ClickAction[] = [];
+  if (current.hasInspect) acts.push({ kind: "inspect", pick: null });
+  if (current.hasSnap) acts.push({ kind: "snapshot", pick: null });
+  if (current.cohort) acts.push({ kind: "cohort", sel: null });
+  if (current.country) acts.push({ kind: "country", cc: null });
+  if (current.layerId) acts.push({ kind: "layer", pick: null });
+  if (current.filter !== "all") acts.push({ kind: "filter", id: "all" });
+  return acts;
+}
+
 // Selecting a SNAPSHOT — shared by the ledger's tile click and LiveStrip's bar click:
 // clicking the LIVE tip (re-)follows the heartbeat; anything older pins that snapshot
 // (the FollowController only auto-advances while following).

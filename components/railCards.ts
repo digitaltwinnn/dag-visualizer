@@ -3,9 +3,9 @@ import { ABOUT_ICON, EXPLORE_ICON, iconForPick } from "@/components/icons";
 import { hoverKeyOf } from "@/src/data/hoverSubject";
 import type { Mode } from "@/src/store/store";
 import type { PickDescriptor } from "@/src/data/types";
-// Type-only — railCards stays a plain-data module; CohortSel is defined once in the domain
-// focus-ladder module (the store mirrors the same type-only import).
-import type { CohortSel } from "@/src/engine/domain/focusLadder";
+// LADDERS is plain DATA (the domain focus-ladder rung tables) — importing it keeps this module
+// data-only; CohortSel rides along type-only (the store mirrors the same import).
+import { LADDERS, type FocusLevel, type CohortSel } from "@/src/engine/domain/focusLadder";
 
 // ─────────────────────────────────────────────────────────────────────────────────────────────
 // The RAIL MANIFEST — ONE source of truth for "which cards does each rail host, in what order".
@@ -24,6 +24,28 @@ import type { CohortSel } from "@/src/engine/domain/focusLadder";
 // ─────────────────────────────────────────────────────────────────────────────────────────────
 
 export type RailCardKind = "about" | "tool" | "context" | "country" | "cohort" | "node" | "snap" | "layer";
+
+// ── The rail LADDER lane (Inspector's descent spine, variant-A redesign 2026-07-19) ──────────
+// Which facts-rail slots are FOCUS-LADDER rungs in this view, in DISPLAY order (coarsest→finest,
+// top-down — the reverse of the domain rung tables, which walk finest→coarsest). Derived from
+// `focusLadder.LADDERS` so the spine can never disagree with the camera walk / deselect
+// stepping: a future rung lands on the ladder lane automatically (and
+// `railLadderBoundary.test.ts` already forces it a card slot). Flat views have no ladder.
+// NB in ledger this puts the LAYER slot ABOVE the node slot (ladder order), a deliberate
+// reorder of the fixed slot stack — the lane shows containment, so display order = rung order.
+const LADDER_SLOT: Partial<Record<FocusLevel, string>> = {
+  network: "context",
+  country: "country",
+  cohort: "cohort",
+  node: "node",
+  layer: "layer",
+};
+export function ladderSlotIds(mode: Mode): string[] {
+  if (mode !== "hyper" && mode !== "geo" && mode !== "ledger") return [];
+  return [...LADDERS[mode]]
+    .reverse()
+    .flatMap((r) => (LADDER_SLOT[r.level] ? [LADDER_SLOT[r.level] as string] : []));
+}
 
 export interface RailCard {
   /** Stable id within the rail (also the tray-icon key + the render-map key). */
@@ -107,12 +129,10 @@ function nodeHint(s: RailManifestState): string | null {
   return null;
 }
 function snapHint(s: RailManifestState): string | null {
-  // The LiveStrip runs in EVERY view and a bar click opens the snapshot card from anywhere
-  // (jumping to Snapshots from hyper/geo) — so the invite is honest in all 3D views, and
-  // closing a carried snapshot card returns to a ghost instead of vanishing (user bug).
-  if (s.mode === "ledger") return "Click a snapshot block (or a bar in the strip below) to inspect it.";
-  if (IN_3D(s.mode)) return "Click a bar in the strip below to inspect a snapshot.";
-  return null;
+  // LEDGER-SCOPED (spec 2026-08-01, a deliberate reversal of the old carry-across-views rule):
+  // the strip's bars now run only in ledger and leaving the view clears the pin (Engine.setMode),
+  // so the slot invites — and exists — only there.
+  return s.mode === "ledger" ? "Click a snapshot block (or a bar in the strip below) to inspect it." : null;
 }
 function layerHint(s: RailManifestState): string | null {
   return s.mode === "ledger" ? "Click a floor plane (or a row in the explorer) to inspect it." : null;

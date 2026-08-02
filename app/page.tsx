@@ -12,24 +12,30 @@ import RailScroll from "@/components/RailScroll";
 import FollowController from "@/components/FollowController";
 import RawSnapshotBridge from "@/components/RawSnapshotBridge";
 import Tooltip from "@/components/Tooltip";
+import SectionShell from "@/components/SectionShell";
+import DataSection from "@/components/DataSection";
 
-// Single-page shell. The 3D scene is one persistent canvas; views (hyper/geo/ledger)
-// and panels are driven by store state. The top command bar (status + filter + view
-// switch + view-specific vitals) is one centered capsule.
+// Single-page shell in TWO LAYERS (spec 2026-08-01): SectionShell carries the fixed scene shell
+// (the canvas in its own `scene` slot, since it recedes rather than hides, + the HUD as children)
+// and the per-view raw data table, which surfaces out of the scene's depth when the command bar's
+// RAW switch is flipped. The live/time lane is passed as its own `strip` slot so it belongs to
+// neither pose and stays interactive in both. TopBar + the banner stay OUTSIDE the shell (fixed to
+// the real viewport, visible in both poses), as do the non-visual bridges and the pointer-anchored
+// Tooltip (a transformed ancestor would re-anchor its fixed positioning).
 export default function Home() {
   return (
     <main>
-      <SceneCanvas />
-      <Blueprint />
-      <BootOverlay />
       <ExperimentalBanner />
-      <DataBridge />
       <TopBar />
-      <ExploreRail />
-      <Inspector />
-      <PhoneDockSweep />
-      <RailScroll />
-      <BottomStream />
+      <SectionShell scene={<SceneCanvas />} raw={<DataSection />} strip={<BottomStream />}>
+        <Blueprint />
+        <BootOverlay />
+        <ExploreRail />
+        <Inspector />
+        <PhoneDockSweep />
+        <RailScroll />
+      </SectionShell>
+      <DataBridge />
       <FollowController />
       <RawSnapshotBridge />
       <Tooltip />

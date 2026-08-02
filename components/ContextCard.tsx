@@ -18,7 +18,15 @@ import type { PickDescriptor } from "@/src/data/types";
 // (Task 13 follow-up, user: it added little value and took space; the counts live in the filter
 // picker's All row). Non-dismissible while shown (it IS the filter) — the × clears the filter.
 // Read-only identity; its live readout is the top-bar vitals.
-export default function ContextCard() {
+export default function ContextCard({
+  collapsed,
+  onToggle,
+}: {
+  // CONTROLLED collapse from Inspector's ladder lane (the network rung); omitted on tablet/phone
+  // where the card falls back to its own local +/−.
+  collapsed?: boolean;
+  onToggle?: () => void;
+} = {}) {
   const filter = useStore((s) => s.filter);
   const hoverFilter = useStore((s) => s.hoverFilter);
   const setHoverFilter = useStore((s) => s.setHoverFilter);
@@ -46,6 +54,8 @@ export default function ContextCard() {
           p={context}
           eyebrow="Metagraph"
           onClose={() => applyClickActions([{ kind: "filter", id: "all" }])}
+          collapsed={collapsed}
+          onToggle={onToggle}
         />
         {/* Scene-facing (left) edge pulse on a new subject (metagraph picked) — synced with the
             dossier title's own roll-in (MetaCard keys it on cfg.name; both fire on the filter

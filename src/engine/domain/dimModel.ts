@@ -77,6 +77,17 @@ export const focusDim = (c: DimContext): number =>
 export const focusBoost = (c: DimContext): number =>
   c.ledger ? 0.7 : 1.4 - 0.7 * c.morph; // hyper 1.4 · geo 0.7 · ledger 0.7
 
+// Focus is TIERED, not a flag (user, 2026-08-01: "selecting a provider highlights its nodes,
+// but selecting a node afterwards has no visual effect" — the node was already lit at exactly
+// the group's strength, so the finer selection said nothing, while the same click over a
+// drilled country reads immediately). A GROUP focus (a hovered/committed provider cohort, a
+// hovered composition or cluster group) takes a FRACTION of the boost; the PRIMARY subject —
+// the one hovered or selected node — always takes all of it, so it stands out from its own
+// group. `focusWeightOf` is the one place that ranking lives; the node loops call it per node.
+export const GROUP_FOCUS = 0.45; // share of focusBoost a group member gets
+export const focusWeightOf = (primary: boolean, group: boolean): number =>
+  primary ? 1 : group ? GROUP_FOCUS : 0;
+
 // Validator (DAG-core) dim: the eased whole-core dim (ONE value — the old per-layer {l0,l1}
 // split always carried identical values and was collapsed; the DAG core is one subject) scaled
 // by the morph-ramped strength, then raised by countryMix outside the drilled country. `geoCc`
@@ -99,8 +110,9 @@ export function metaNodeDim(c: DimContext, recDim: number, geoCc: string | null)
   return d;
 }
 
-// Validator emissive glow. `flash` is the node's raw (undecayed) arc-arrival flash. `isFocus` =
-// this node IS the hovered/selected focus target. `dimOthersOnFocus` = the caller has already
+// Validator emissive glow. `flash` is the node's raw (undecayed) arc-arrival flash. `focus` =
+// this node's focus WEIGHT from focusWeightOf (1 = it is the hovered/selected subject,
+// GROUP_FOCUS = it is only a member of a focused group, 0 = not in focus). `dimOthersOnFocus` = the caller has already
 // ANDed "some focus target exists" into the filter-based flag — with no focus target at all
 // neither the boost nor the dim-back branch should fire, and this pure function has no side
 // channel to detect "no focus", so the caller must fold that into the flag it passes.
@@ -110,7 +122,7 @@ export function nodeEmissive(
   c: DimContext,
   d: number,
   flash: number,
-  isFocus: boolean,
+  focus: number,
   dimOthersOnFocus: boolean,
   baseLo: number,
   baseHi: number,
@@ -120,7 +132,7 @@ export function nodeEmissive(
   let v = Math.max(0.02, ei * (1 - d * 0.92) + fl); // suppress glow when dimmed
   // Hover/selection pairing: the focused machine's every layer-shell glows together,
   // and the rest dim back so it stands out (only when not already isolating a metagraph).
-  if (isFocus) v += focusBoost(c);
+  if (focus > 0) v += focusBoost(c) * focus;
   else if (dimOthersOnFocus) v *= focusDim(c);
   return v;
 }
@@ -149,7 +161,7 @@ export function metaNodeEmissive(
   c: DimContext,
   d: number,
   flash: number,
-  isFocus: boolean,
+  focus: number,
   dimOthersOnFocus: boolean,
   base: number,
   hubBoost = 0,
@@ -157,7 +169,7 @@ export function metaNodeEmissive(
   const glow = base * (1 - d * 0.9);
   const fl = flash * c.morph; // arcs are a geo-only visual — their flash must not bleed into hyper
   let v = Math.max(0.03, glow + fl + hubBoost);
-  if (isFocus) v += focusBoost(c);
+  if (focus > 0) v += focusBoost(c) * focus;
   else if (dimOthersOnFocus) v *= focusDim(c);
   return v;
 }

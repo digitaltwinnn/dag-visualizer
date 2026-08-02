@@ -19,9 +19,13 @@ export const fmtKB = (kb: number) =>
       ? `${Math.round(kb).toLocaleString()} KB`
       : `${kb.toFixed(1)} KB`;
 
-// Two-letter country code → flag emoji (a regional-indicator pair); a neutral flag when the
-// code is absent or malformed. Shared by the geo leaderboard rows + the top-bar "Densest" vital.
-export const ccToFlag = (cc?: string | null) =>
-  !cc || cc.length !== 2
-    ? "🏳️"
-    : String.fromCodePoint(...[...cc.toUpperCase()].map((ch) => 0x1f1e6 + ch.charCodeAt(0) - 65));
+// Two-letter country code → the compact uppercase CODE mark the HUD shows where a country row
+// needs a leading glyph (`··` when the code is absent or malformed, so the column keeps its
+// width). This used to emit a flag EMOJI (a regional-indicator pair) and was replaced
+// 2026-08-01 (user: "country icons don't render in Edge, only the code text shows"): Windows
+// ships no flag-emoji font at all, so every browser there falls back to the bare letters or
+// tofu — and emoji ignore CSS `color` anyway, so a flag could never inherit the muted tone or
+// the accent like every other interface glyph (CLAUDE.md's one-icon-system rule). The code is
+// real data, monochrome, and renders identically everywhere. Where the country NAME already
+// sits next to it (card titles, table cells) the mark was simply dropped as redundant.
+export const ccMark = (cc?: string | null) => (!cc || cc.length !== 2 ? "··" : cc.toUpperCase());

@@ -12,11 +12,11 @@ import { hoverKeyOf } from "@/src/data/hoverSubject";
 import { useStore } from "@/src/store/store";
 import { filterToggleActions, layerToggleActions, nodeSelectActions } from "@/src/engine/domain/pickActions";
 import { applyClickActions } from "@/src/store/applyClickActions";
-import { DisclosureChevron, DisclosureRow, NodePickerRow } from "@/components/ExploreRows";
+import { DisclosureChevron, DisclosureRow, NodePickerRow, ROW_NEST, ROW_OUTSET } from "@/components/ExploreRows";
 import { LEDGER_LAYERS } from "@/src/data/ledgerLayers";
 import type { MetaInfo, NodeRow } from "@/src/data/types";
 
-// The Snapshots view's left-rail tool: the layered-design explainer. Lists the settlement stack
+// The Snapshots view's left-rail tool: the layered-design explainer. Lists the anchoring stack
 // top→bottom; HOVERING a layer previews its plane highlight in the 3D view (store.ledgerHilite, the
 // transient channel), CLICKING commits the selection (store.layer — opens the layer card on the
 // right facts rail AND keeps the plane highlighted; click again to clear). The engine resolves
@@ -237,8 +237,8 @@ export default function LedgerPanel() {
     // also retires the stray bottom separator the old combined-padding wrapper carried).
     <ExplorerShell
       id="ledger-view"
-      title="Settlement layers"
-      hint="Every layer that participates in creating a snapshot — hover or click one to see what it does in the settlement stack."
+      title="Anchoring layers"
+      hint="Every layer that participates in creating a snapshot — hover or click one to see what it does in the anchoring stack."
       onLeave={() => {
         // Structural fix for the review's stuck-hoverFilter bug: a LANE row's click commits
         // the filter, which can remove that lane (or close the whole floor disclosure it lives
@@ -304,8 +304,11 @@ export default function LedgerPanel() {
                     // mark now lives IN-FLOW at the end of the title row (below) — same idiom as
                     // the inner cluster/lane rows' `ml-auto` count — instead of an absolutely
                     // positioned overlay, so it can never overlap the badge/name text and every
-                    // row's trailing column is built the same way.
-                    "nb-row group relative text-left border border-transparent cursor-pointer rounded-sm pl-1.5 pr-2 py-1.5 bg-transparent transition-[background] duration-150",
+                    // row's trailing column is built the same way. ROW_OUTSET makes this the same
+                    // top-level row box geo/hyper use: without it the floor rows' wash stopped 6px
+                    // inside every other explorer's (user, 2026-08-01).
+                    "nb-row group relative text-left border border-transparent cursor-pointer rounded-sm py-1.5 bg-transparent transition-[background] duration-150",
+                    ROW_OUTSET,
                     "hover:bg-wash-hover",
                     "focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--primary)] focus-visible:outline-offset-[-2px]",
                     on && SELECTED_ROW,
@@ -352,7 +355,12 @@ export default function LedgerPanel() {
                       on && <SelectedRowMark className="flex-none" />
                     )}
                   </span>
-                  <span className="block pl-[26px] text-label text-muted-foreground leading-snug mt-0.5">{l.desc}</span>
+                  {/* No per-row description here: `LEDGER_LAYERS.desc` is the LAYER CARD's opening
+                      line (inspector/cards.tsx `LayerCard`), and committing a floor opens that card
+                      in the same click — so a copy under the row said the same sentence twice, one
+                      rail apart, and made the browser list scan like prose instead of rows
+                      (user, 2026-08-01). The explorer rows are the browse surface; the facts rail
+                      explains the subject. Same split GeoExplore/HyperExplore already keep. */}
                 </button>
 
                 {/* Node browser disclosure — one per NODE floor. `open` decouples the dropdown's
@@ -361,7 +369,7 @@ export default function LedgerPanel() {
                     Leaving the list clears the scene hover-glows. */}
                 {discloses && open && (
                   <div
-                    className="mb-1.5 ml-[9px] py-0.5 pl-3 border-l border-border"
+                    className={cn("mb-1.5 ml-[9px] py-0.5 pl-3", ROW_NEST)}
                     onMouseLeave={() => {
                       setHoverNodeId(null);
                       setHoverCohort(null);
