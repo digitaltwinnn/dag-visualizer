@@ -749,7 +749,9 @@ the HUD fades out (0.26s), the whole
 scene shell **recedes** (scale `SCENE_BACK` 0.92 + opacity `SCENE_DIM` 0.26, 0.55s
 `power3.inOut` — still live behind, just pushed into the background), and the raw layer **surfaces
 out of that depth** (opacity 0→1, scale 0.94→1, a small `yPercent` rise, 0.55s `power3.out`,
-overlapping at +0.16s). Back is the mirror, plus **Escape**. Retargeting mid-flight kills the live
+overlapping at +0.16s). Back is the mirror, and there are THREE ways to ask for it — the switch
+again, **Escape**, and the layer's own **× close** (top-right of the raw panel, the house ghost-×;
+all three call the same `setSection("scene")`). Retargeting mid-flight kills the live
 timeline. Reduced motion makes it an instant swap (all durations 0).
 
 **The page never scrolls.** The scene wrapper is `position:fixed; inset:0` **WITH an identity
