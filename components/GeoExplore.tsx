@@ -4,14 +4,15 @@ import { useMemo, useState } from "react";
 import { cn } from "@/lib/utils";
 import { useStore } from "@/src/store/store";
 import ExplorerShell from "@/components/ExplorerShell";
-import { metagraphById } from "@/src/data/network";
+import { filterAccent, metagraphById } from "@/src/data/network";
 import { identityHudHex } from "@/src/palette/identity";
-import { SELECTED_ROW, SelectedRowMark } from "@/components/selection";
+import { SelectedRowMark, selectedRow } from "@/components/selection";
 import { ccMark } from "@/src/util/format";
 import { hoverKeyOf } from "@/src/data/hoverSubject";
 import { countryToggleActions, nodeSelectActions, cohortToggleActions, sameCohort } from "@/src/engine/domain/pickActions";
 import { applyClickActions } from "@/src/store/applyClickActions";
 import { subjectPairing } from "@/components/useSubjectPairing";
+import { useLadderFocus } from "@/components/useLadderFocus";
 import { DisclosureChevron, DisclosureRow, NodePickerRow, ROW_NEST, ROW_OUTSET } from "@/components/ExploreRows";
 import type { NodeRow } from "@/src/data/types";
 import type { CohortSel } from "@/src/engine/domain/focusLadder";
@@ -33,8 +34,13 @@ export default function GeoExplore() {
   const setHoverCountry = useStore((s) => s.setHoverCountry);
   const setHoverCohort = useStore((s) => s.setHoverCohort);
   const hoverCountry = useStore((s) => s.hoverCountry);
+  const hoverGroup = useStore((s) => s.hoverGroup);
+  const setHoverGroup = useStore((s) => s.setHoverGroup);
   const hoverNodeId = useStore((s) => s.hoverNodeId);
   const filter = useStore((s) => s.filter);
+  // Which rung currently holds the focus — the committed rows COARSER than it wear the
+  // ancestor strength of the selection mark (see components/useLadderFocus.ts).
+  const focus = useLadderFocus();
 
   // Row selections run the SAME tested decision table as the scene clicks (domain/pickActions)
   // through the SAME executor (store/applyClickActions), so the explorer and the globe can
@@ -172,9 +178,12 @@ export default function GeoExplore() {
             // (user: "nodes dropdown not aligned with the parent").
             // Bidirectional pairing: hovering the row previews the country's border on the
             // globe, and hovering the COUNTRY IN THE SCENE washes this row (same channel,
-            // same .subject-paired language as the node rows; structural cyan — a place, not
-            // an identity).
-            const pair = subjectPairing(hoverCountry, c.cc, setHoverCountry, "var(--primary)");
+            // same .subject-paired language as the node rows). The hue follows the committed
+            // filter — a place carries no identity of its own, so on "all" this IS structural
+            // cyan; with a network committed the country's numbers are that network's, and
+            // both ends of the pairing (this row and the country card's edge) must light in
+            // the same hue.
+            const pair = subjectPairing(hoverCountry, c.cc, setHoverCountry, filterAccent(filter));
             return (
               <div key={c.cc} className={cn(open && "bg-wash-faint rounded-btn my-0.5 -mx-1.5 px-1.5")}>
                 <button
@@ -189,9 +198,10 @@ export default function GeoExplore() {
                     "hover:bg-wash-hover",
                     "focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--primary)] focus-visible:outline-offset-[-2px]",
                     // The drilled country row wears the same shared selection language as the
-                    // picker's committed row (SELECTED_ROW) — no ✓ though: an open accordion's
-                    // state cue is its ▾ chevron, not a selection check.
-                    open && SELECTED_ROW,
+                    // picker's committed row — no ✓ though: an open accordion's state cue is its
+                    // ▾ chevron, not a selection check. At ANCESTOR strength once a finer rung
+                    // (a provider cohort, a node) is committed, so the list keeps one head.
+                    open && selectedRow(focus === "country"),
                     pair.paired && pair.className,
                   )}
                   style={pair.style}
@@ -222,7 +232,7 @@ export default function GeoExplore() {
                     where there's no hover. Both occupy the same flex-none slot, so the count
                     column never shifts. */}
                 {open ? (
-                  <SelectedRowMark className="flex-none" />
+                  <SelectedRowMark className="flex-none" muted={focus !== "country"} />
                 ) : (
                   <DisclosureChevron open={open} />
                 )}
@@ -235,6 +245,7 @@ export default function GeoExplore() {
                     onMouseLeave={() => {
                       setHoverNodeId(null);
                       setHoverCountry(null);
+                      setHoverGroup(null);
                     }}
                   >
                     {nodes.length === 0 ? (
@@ -261,6 +272,7 @@ export default function GeoExplore() {
                             <DisclosureRow
                               open={isOpen}
                               on={on}
+                              focused={focus === "cohort"}
                               holdsSel={holdsSel}
                               title={`${ch.city ?? "Unlocated"}${ch.isp ? ` · ${ch.isp}` : ""} · ${ch.rows.length} node${ch.rows.length > 1 ? "s" : ""}`}
                               onToggle={() => {
@@ -283,6 +295,16 @@ export default function GeoExplore() {
                                 setHoverCountry(ch.rows[0] && "geo" in ch.rows[0].pick ? ch.rows[0].pick.geo?.cc ?? null : null);
                               }}
                               onHoverLeave={() => setHoverCohort(null)}
+                              // The provider card's own subject key (`CohortSel` = cc|city|isp),
+                              // so hovering either end lights the other — the cohort row's list
+                              // key is country-SCOPED and can't serve as the shared identity.
+                              // The hue follows the committed filter like its sibling country
+                              // row (cyan on "all"): no single identity hue can speak for a
+                              // cohort — a provider hosts many networks.
+                              groupKey={`${cc}|${ch.city}|${ch.isp}`}
+                              hoverGroup={hoverGroup}
+                              setHoverGroup={setHoverGroup}
+                              hue={filterAccent(filter)}
                             >
                               <span className="flex-none text-body whitespace-nowrap">{ch.city ?? "Unlocated"}</span>
                               {ch.isp && (

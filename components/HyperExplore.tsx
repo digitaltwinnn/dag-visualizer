@@ -1,77 +1,78 @@
 "use client";
 
-import { useState } from "react";
 import { cn } from "@/lib/utils";
 import { useStore } from "@/src/store/store";
 import ExplorerShell from "@/components/ExplorerShell";
 import { CORE_HEX, metagraphById } from "@/src/data/network";
-import { compositionRows } from "@/src/data/composition";
+import { compositionGroups } from "@/src/data/composition";
 import { identityHudHex } from "@/src/palette/identity";
 import { IdentityDot, RoleChips } from "@/components/inspector/parts";
-import { SELECTED_ROW, SelectedRowMark } from "@/components/selection";
+import { SelectedRowMark, selectedRow } from "@/components/selection";
 import { hoverKeyOf } from "@/src/data/hoverSubject";
-import { filterToggleActions, nodeSelectActions } from "@/src/engine/domain/pickActions";
+import { compositionToggleActions, filterToggleActions, nodeSelectActions } from "@/src/engine/domain/pickActions";
 import { applyClickActions } from "@/src/store/applyClickActions";
 import { subjectPairing } from "@/components/useSubjectPairing";
+import { useLadderFocus } from "@/components/useLadderFocus";
 import { DisclosureChevron, DisclosureRow, NodePickerRow, ROW_NEST, ROW_OUTSET } from "@/components/ExploreRows";
 import type { NodeRow } from "@/src/data/types";
 
 // Hypergraph's single **explore** card — the architectural sibling of GeoExplore: each view's
 // explorer breaks the node set down along the view's OWN dimension (geo = where → country →
-// cohort → node; hyper = who/what → network → layer shell → node). The NETWORK rows mirror the
-// filter picker on purpose (clicking one commits the filter through the same tested table a 3D
-// hub click runs — the top-bar filter stays the global scope control, this is the view's
-// browsing surface); the LAYER rows under the drilled network map one-to-one onto the
-// concentric shells around its hub, and are DISCLOSURES ONLY (grouping on the way to a node —
-// NEVER layer-card selectors: the layer card is a ledger-scoped subject, and wiring these rows
-// to layerToggleActions would blur the two views' semantics). The terminal subject here is a
-// node.
+// cohort → node; hyper = who/what → network → composition group → node). The NETWORK rows mirror
+// the filter picker on purpose (clicking one commits the filter through the same tested table a
+// 3D hub click runs — the top-bar filter stays the global scope control, this is the view's
+// browsing surface). The COMPOSITION rows under the drilled network are COMMITTABLE (user
+// reversal, 2026-08-02, of the disclosures-only rule): the make-up group is now a real focus
+// rung with its own right-rail card, geo's provider-cohort idiom bent onto architecture — one
+// click commits AND expands it, so the disclosure state IS the committed composition (single-open
+// by construction). The terminal subject is still a node.
 export default function HyperExplore() {
   const metaList = useStore((s) => s.metaList);
   const filter = useStore((s) => s.filter);
   const selNodes = useStore((s) => s.selNodes);
   const inspect = useStore((s) => s.inspect);
+  const composition = useStore((s) => s.composition);
   const hoverFilter = useStore((s) => s.hoverFilter);
   const setHoverFilter = useStore((s) => s.setHoverFilter);
   const hoverNodeId = useStore((s) => s.hoverNodeId);
   const setHoverNodeId = useStore((s) => s.setHoverNodeId);
   const setHoverCohort = useStore((s) => s.setHoverCohort);
+  const hoverGroup = useStore((s) => s.hoverGroup);
+  const setHoverGroup = useStore((s) => s.setHoverGroup);
+  // Which rung currently holds the focus — the committed rows COARSER than it wear the
+  // ancestor strength of the selection mark (see components/useLadderFocus.ts).
+  const focus = useLadderFocus();
 
   // Row selections run the SAME tested decision table as the scene clicks (domain/pickActions)
   // through the SAME executor (store/applyClickActions) — a network row IS a hub click, a node
   // row IS a 3D node click; re-clicking the committed network steps back to "all" (the filter
   // picker's toggle rule), re-clicking the selected node deselects.
   const toggleNetwork = (id: string) => applyClickActions(filterToggleActions(id, filter));
-  const selectNode = (pick: NodeRow["pick"], selected: boolean) =>
-    applyClickActions(nodeSelectActions(pick, { mode: "hyper", currentFilter: filter, deselect: selected }));
+  const selectNode = (pick: NodeRow["pick"], selected: boolean, compKey: string) =>
+    applyClickActions(
+      nodeSelectActions(pick, {
+        mode: "hyper",
+        currentFilter: filter,
+        deselect: selected,
+        // FULL-ANCESTRY: a node select commits its parent group too, so a deselect steps back
+        // onto the composition rung (ledger's `ledgerLayerId` twin).
+        compositionSel: { netId: filter, key: compKey },
+      }),
+    );
+  const toggleComposition = (compKey: string) =>
+    applyClickActions(
+      compositionToggleActions({ netId: filter, key: compKey }, { composition, hasInspect: !!inspect, filter }),
+    );
 
   // The drilled network's nodes grouped by COMPOSITION (user, 2026-07-12 — was by layer
   // shell): the same make-up vocabulary as the metagraph card's composition table (Hybrid /
-  // Data / …), each group showing WHICH layers it runs as the squared pills. Entries are
-  // deduped to MACHINES first (a hybrid machine appears once per cluster it runs — one row
-  // per machine here, so the group counts match the dossier's), groups sorted by size.
-  type CompGroup = { key: string; label: string; codes: string[]; rows: NodeRow[] };
-  const compsOf = (rows: NodeRow[]): CompGroup[] => {
-    const machines = new Map<string, NodeRow>();
-    for (const r of rows) {
-      const mk = ("node" in r.pick && r.pick.node?.ip) || r.id || r.label;
-      if (!machines.has(mk)) machines.set(mk, r);
-    }
-    const by = new Map<string, CompGroup>();
-    for (const r of machines.values()) {
-      const node = "node" in r.pick ? r.pick.node : null;
-      const comp = node ? compositionRows([node])[0] : undefined;
-      const label = comp?.label ?? "Node";
-      const codes = comp?.codes ?? [];
-      const key = `${label}|${codes.join("·")}`;
-      (by.get(key) ?? by.set(key, { key, label, codes, rows: [] }).get(key)!).rows.push(r);
-    }
-    for (const g of by.values()) g.rows.sort((a, b) => (a.id || a.label).localeCompare(b.id || b.label));
-    return [...by.values()].sort((a, b) => b.rows.length - a.rows.length);
-  };
-  // Which composition group is disclosed (single-open, like geo's cohorts); keys are
-  // network-scoped so a stale key after a filter switch simply matches nothing.
-  const [openComp, setOpenComp] = useState<string | null>(null);
+  // Data / …), each group showing WHICH layers it runs as the squared pills. The grouping itself
+  // lives in `src/data/composition.ts` — shared with the composition CARD and the Engine's glow
+  // resolution, so a count can't drift between the row, the card and the 3D highlight.
+  //
+  // The DISCLOSURE state is the COMMITTED composition (store.composition), not local state:
+  // committing and expanding are one click, and single-open falls out for free.
+  const openCompKey = composition && composition.netId === filter ? composition.key : null;
 
   // The selected node, matched by IP alone — the id rows here are MACHINE rows (one per
   // machine after the dedupe), so the geo browser's ip+layer double-row problem can't occur.
@@ -108,8 +109,10 @@ export default function HyperExplore() {
                       "hover:bg-wash-hover",
                       "focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--primary)] focus-visible:outline-offset-[-2px]",
                       // The committed network wears the shared selection language; its state
-                      // cue is the open accordion, not a ✓ (geo's drilled-country rule).
-                      open && SELECTED_ROW,
+                      // cue is the open accordion, not a ✓ (geo's drilled-country rule). At
+                      // ANCESTOR strength once a finer rung (a composition group, a node) is
+                      // committed, so the list keeps one head.
+                      open && selectedRow(focus === "context"),
                       // 0-node networks dim like the filter picker's 0-count rows
                       // (opacity-45 there too) — real and clickable, just quiet.
                       m.nodes.length === 0 && "opacity-45",
@@ -128,7 +131,7 @@ export default function HyperExplore() {
                     </span>
                     <span className="flex-none text-right text-body tabular-nums font-semibold">{m.nodes.length}</span>
                     {open ? (
-                      <SelectedRowMark className="flex-none" />
+                      <SelectedRowMark className="flex-none" muted={focus !== "context"} />
                     ) : (
                       <DisclosureChevron open={open} />
                     )}
@@ -141,6 +144,7 @@ export default function HyperExplore() {
                       onMouseLeave={() => {
                         setHoverNodeId(null);
                         setHoverCohort(null);
+                        setHoverGroup(null);
                       }}
                     >
                       {selNodes.length === 0 ? (
@@ -149,7 +153,7 @@ export default function HyperExplore() {
                         <p className="mt-1 mx-1 mb-1.5 text-label text-muted-foreground">No nodes reported.</p>
                       ) : (
                         (() => {
-                          const groups = compsOf(selNodes);
+                          const groups = compositionGroups(selNodes);
                           // The label column sizes to the LONGEST label PRESENT (user — a fixed
                           // width left dead air when only short words showed): every label span
                           // stacks an invisible copy of the longest word behind its own text
@@ -157,7 +161,7 @@ export default function HyperExplore() {
                           const longest = groups.reduce((a, g) => (g.label.length > a.length ? g.label : a), "");
                           return groups.map((g) => {
                           const key = `${m.id}|${g.key}`;
-                          const isOpen = openComp === key;
+                          const isOpen = openCompKey === g.key;
                           const holdsSel =
                             selIp != null &&
                             g.rows.some((r) => "node" in r.pick && r.pick.node?.ip === selIp);
@@ -165,15 +169,22 @@ export default function HyperExplore() {
                             <div key={key}>
                               {/* The composition-group row — the metagraph card's table
                                   vocabulary (Hybrid / Data / …) with the layer-code pills.
-                                  A DISCLOSURE (chevron) on the way to a node, never a
-                                  layer-card selector. */}
+                                  COMMITS the group (its own right-rail card + the steady 3D
+                                  group glow) and expands it in the same click; re-clicking
+                                  steps back to the network. */}
                               <DisclosureRow
                                 open={isOpen}
+                                on={isOpen}
+                                focused={focus === "composition"}
                                 holdsSel={holdsSel}
                                 title={`${g.label} · ${g.rows.length} node${g.rows.length > 1 ? "s" : ""}`}
-                                onToggle={() => setOpenComp(isOpen ? null : key)}
+                                onToggle={() => toggleComposition(g.key)}
                                 onHoverEnter={() => setHoverCohort(g.rows.map((r) => hoverKeyOf(r.pick)).filter((k): k is string => !!k))}
                                 onHoverLeave={() => setHoverCohort(null)}
+                                groupKey={key}
+                                hoverGroup={hoverGroup}
+                                setHoverGroup={setHoverGroup}
+                                hue={hue}
                               >
                                 <span className="inline-grid flex-none text-body text-foreground">
                                   <span className="col-start-1 row-start-1">{g.label}</span>
@@ -196,7 +207,7 @@ export default function HyperExplore() {
                                         selected={on}
                                         hoverNodeId={hoverNodeId}
                                         setHoverNodeId={setHoverNodeId}
-                                        onSelect={() => selectNode(r.pick, on)}
+                                        onSelect={() => selectNode(r.pick, on, g.key)}
                                       />
                                     );
                                   })}

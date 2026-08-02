@@ -3,8 +3,9 @@
 import { useState } from "react";
 import { cn } from "@/lib/utils";
 import ExplorerShell from "@/components/ExplorerShell";
-import { SELECTED_ROW, SelectedRowMark } from "@/components/selection";
+import { SelectedRowMark, selectedRow } from "@/components/selection";
 import { subjectPairing } from "@/components/useSubjectPairing";
+import { useLadderFocus } from "@/components/useLadderFocus";
 import { CORE_HEX, filterAccent, metagraphById } from "@/src/data/network";
 import { identityHudHex } from "@/src/palette/identity";
 import { IdentityDot } from "@/components/inspector/parts";
@@ -179,6 +180,9 @@ export default function LedgerPanel() {
   const dagNodeCounts = useStore((s) => s.nodes);
   const hoverFilter = useStore((s) => s.hoverFilter);
   const setHoverFilter = useStore((s) => s.setHoverFilter);
+  // Which rung currently holds the focus — the committed rows COARSER than it wear the
+  // ancestor strength of the selection mark (see components/useLadderFocus.ts).
+  const focus = useLadderFocus();
   // "A browser's network level IS the filter" (HyperExplore idiom): a REAL metagraph is
   // committed exactly when the filter isn't "all" (nothing narrower) or "dag" (the DAG's own
   // floors, not a metagraph's) — the same two values every metagraph floor's rowsForFloor
@@ -322,7 +326,9 @@ export default function LedgerPanel() {
                     ROW_OUTSET,
                     "hover:bg-wash-hover",
                     "focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--primary)] focus-visible:outline-offset-[-2px]",
-                    on && SELECTED_ROW,
+                    // ANCESTOR strength once a node inside the floor is selected — the finer
+                    // rung is the head of the path then (see components/useLadderFocus.ts).
+                    on && selectedRow(focus === "layer"),
                     pair.paired && pair.className,
                   )}
                   style={pair.style}
@@ -355,7 +361,7 @@ export default function LedgerPanel() {
                       <span className="flex-none flex items-center gap-1.5">
                         <span className="tabular-nums text-label font-semibold text-muted-foreground">{floorCount}</span>
                         {on ? (
-                          <SelectedRowMark />
+                          <SelectedRowMark muted={focus !== "layer"} />
                         ) : (
                           <DisclosureChevron open={open} />
                         )}
@@ -363,7 +369,7 @@ export default function LedgerPanel() {
                     ) : (
                       // Snapshot floors (msnap/gl0) never disclose — no count, no chevron — but
                       // still wear the committed ✓ like any other selectable row.
-                      on && <SelectedRowMark className="flex-none" />
+                      on && <SelectedRowMark className="flex-none" muted={focus !== "layer"} />
                     )}
                   </span>
                   {/* No per-row description here: `LEDGER_LAYERS.desc` is the LAYER CARD's opening
@@ -405,7 +411,14 @@ export default function LedgerPanel() {
                               <div key={key}>
                                 {/* The cluster group row — one per metagraph lane. IdentityDot is
                                     correct here (one lane, one metagraph, unlike geo's mixed-network
-                                    cohorts). A disclosure on the way to a node. */}
+                                    cohorts). A disclosure on the way to a node — and the ONE
+                                    explorer row level that stays disclosure-only on purpose (the
+                                    exemption to "every explorer level is a ladder rung with its own
+                                    card", CLAUDE.md): `selNodes` publishes only the COMMITTED
+                                    filter's nodes, so this row's metagraph IS the committed filter
+                                    and its dossier card is already open on the facts rail. Running
+                                    `filterToggleActions` here could only step back to "all" and
+                                    throw away the browse context. */}
                                 <DisclosureRow
                                   open={isOpen}
                                   holdsSel={holdsSel}

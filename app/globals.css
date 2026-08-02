@@ -286,6 +286,11 @@
   --detail-w: 320px;       /* right details rail width */
   --sel-bg: rgba(42, 245, 255, 0.12);   /* selected/active fill, reused everywhere */
   --sel-border: rgba(42, 245, 255, 0.5);
+  --sel-bg-dim: rgba(42, 245, 255, 0.05);  /* the same mark at ANCESTOR strength: an explorer row
+                                              whose rung is committed but no longer the focus (a
+                                              finer rung is) — same language, half a voice, so one
+                                              list can't show three equally loud selections */
+  --sel-border-dim: rgba(42, 245, 255, 0.22);
   --bottom-reserve: 130px; /* vertical space the always-present LiveStrip lane reserves */
   --rail-fade: 28px;       /* height of a clipped rail's bottom fade — AND its scroll runway
                               (globals `.rail-clip` + RailScroll's measure read this one token) */
