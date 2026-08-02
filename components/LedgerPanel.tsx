@@ -29,25 +29,36 @@ const LAYERS = LEDGER_LAYERS;
 // The four NODE-kind floors — the ones with a live cluster of validators/metanodes standing on
 // them (msnap/gl0 are snapshot-output floors, rowProducers has no panel row at all: see
 // CLAUDE.md's ledger layer model). Each disclosure reads `store.selNodes` — published per the
-// CURRENT FILTER (geoStats.listNodes: "all"/"dag" → validators, a metagraph id → that
-// metagraph's nodes), so ml0/ml1 only have CLUSTER rows under a metagraph filter and hypl0/hypl1
-// only have VALIDATOR rows under "all"/"dag". That's still true, but it's no longer the whole
-// story: "a browser's network level IS the filter" (the HyperExplore idiom) — every floor also
-// lists a LANE ROW per other network that serves it, so a floor is never actually empty once
-// live data has arrived (see the lane-row block below the committed rows/clusters).
+// CURRENT FILTER (geoStats.listNodes: "dag" → validators, a metagraph id → that metagraph's
+// nodes, "all" → every network's) and narrows it in `rowsForFloor`, so ml0/ml1 only have CLUSTER
+// rows under a metagraph filter and hypl0/hypl1 only have VALIDATOR rows under "all"/"dag". The
+// rest is the network level: "a browser's network level IS the filter" (the HyperExplore idiom) —
+// every floor also lists a LANE ROW per other network that serves it, so a floor is never
+// actually empty once live data has arrived (see the lane-row block below the rows/clusters).
 const NODE_FLOORS = new Set(["ml1", "ml0", "hypl0", "hypl1"]);
 const CLUSTER_FLOORS = new Set(["ml1", "ml0"]); // group by metagraph before the node rows
 
-function rowsForFloor(id: string, selNodes: NodeRow[]): NodeRow[] {
+function rowsForFloor(id: string, selNodes: NodeRow[], committedMeta: string | null): NodeRow[] {
   switch (id) {
     case "hypl0":
       return selNodes.filter((r) => r.pick.kind === "l0");
     case "hypl1":
       return selNodes.filter((r) => r.pick.kind === "l1");
+    // The metagraph floors browse the COMMITTED network's nodes. Under "all" the floor's own
+    // affordance is its LANE list — pick a network first (the browser's network level IS the
+    // filter). `selNodes` carries every network's nodes under "all" since 2026-08-02
+    // (geoStats.listNodes), so this has to say so explicitly; without the guard each floor would
+    // render a cluster row AND a lane row for the same metagraph, and double its resting count.
     case "ml0":
-      return selNodes.filter((r) => r.pick.kind === "metanode" && r.roles.includes("l0"));
+      return committedMeta
+        ? selNodes.filter((r) => r.pick.kind === "metanode" && r.roles.includes("l0"))
+        : [];
     case "ml1":
-      return selNodes.filter((r) => r.pick.kind === "metanode" && (r.roles.includes("cl1") || r.roles.includes("dl1")));
+      return committedMeta
+        ? selNodes.filter(
+            (r) => r.pick.kind === "metanode" && (r.roles.includes("cl1") || r.roles.includes("dl1")),
+          )
+        : [];
     default:
       return [];
   }
@@ -264,7 +275,7 @@ export default function LedgerPanel() {
               // `.nb-row.subject-paired` row-wash recipe.
               const pair = subjectPairing<string>(hilite, l.id, setHilite, filterAccent(filter));
               const discloses = NODE_FLOORS.has(l.id);
-              const rows = discloses ? rowsForFloor(l.id, selNodes) : [];
+              const rows = discloses ? rowsForFloor(l.id, selNodes, committedMeta) : [];
               // Hoisted OUT of the disclosure body (was computed only when `on`) so the floor
               // row's own header can show an honest trailing count AT REST, before anything is
               // clicked — the same data the opened dropdown lists, never a second, disagreeing

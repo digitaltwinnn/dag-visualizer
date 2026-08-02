@@ -24,7 +24,14 @@ const nodeOf = (pick: PickDescriptor) => ("node" in pick ? pick.node : undefined
 // Tally located nodes by country, keyed per network id so the leaderboard and the distribution
 // score can both read one selection out of it:
 //   dag — the validator set (the DAG core); <metaId> — one metagraph's nodes;
-//   all — the combined validator set (what the unfiltered leaderboard shows).
+//   all — EVERY network's nodes, the whole plotted footprint.
+//
+// "all" used to mean the validator set alone (2026-08-02: it was the same loop as "dag"), so the
+// unfiltered leaderboard, the geo vitals and the country card all silently answered for the DAG
+// core while the globe plotted every metagraph's nodes too — two totals for one selection. A node
+// is a network participant, not a machine: the five mainnet machines that run both a validator and
+// a metagraph node are two nodes here, exactly as they are two chips on the globe and two entries
+// in the strip's per-network readout.
 export function countryTallies(
   nodes: GeoStatNode[],
   metaNodes: GeoStatNode[],
@@ -43,7 +50,11 @@ export function countryTallies(
     bump("dag", geoOf(u.pick));
     bump("all", geoOf(u.pick));
   }
-  for (const r of metaNodes) if (r.geoPrimary ?? true) bump(r.metaId!, geoOf(r.pick));
+  for (const r of metaNodes)
+    if (r.geoPrimary ?? true) {
+      bump(r.metaId!, geoOf(r.pick));
+      bump("all", geoOf(r.pick));
+    }
   return nets;
 }
 
@@ -54,10 +65,11 @@ export function countryStats(nodes: GeoStatNode[], metaNodes: GeoStatNode[], fil
   return m ? Object.values(m).sort((a, b) => b.count - a.count) : [];
 }
 
-// Flat node list for one filter selection — drives the React node browser. Read-only: it just
+// Flat node list for one filter selection — drives the React node browsers. Read-only: it just
 // surfaces each plotted node's existing `pick` descriptor (so a click reuses the exact same
 // inspector card as clicking the node on the globe) plus the few fields the browser groups/sorts
-// on. all/dag → validators; <metaId> → that metagraph's nodes.
+// on. dag → validators; <metaId> → that metagraph's nodes; all → both, the whole plotted set
+// (see countryTallies for why "all" is a union of NODES, not of machines).
 export function listNodes(nodes: GeoStatNode[], metaNodes: GeoStatNode[], filter: string): NodeRow[] {
   const rows: NodeRow[] = [];
   const push = (pick: PickDescriptor, layer: string) => {
@@ -83,9 +95,10 @@ export function listNodes(nodes: GeoStatNode[], metaNodes: GeoStatNode[], filter
       if (u.noGeo || !u.geoPrimary) continue; // one row per machine (skip hybrid siblings)
       push(u.pick, u.layer);
     }
-  } else {
+  }
+  if (filter !== "dag") {
     for (const r of metaNodes) {
-      if (r.metaId === filter && (r.geoPrimary ?? true)) push(r.pick, r.layer); // one row per node
+      if ((filter === "all" || r.metaId === filter) && (r.geoPrimary ?? true)) push(r.pick, r.layer); // one row per node
     }
   }
   return rows;

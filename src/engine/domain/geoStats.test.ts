@@ -45,8 +45,12 @@ describe("countryStats", () => {
     ]);
   });
 
-  it("mirrors dag under all (all = the combined validator set, not merged with metagraphs)", () => {
-    expect(countryStats(validators, metaNodes, "all")).toEqual(countryStats(validators, metaNodes, "dag"));
+  it("counts every network under 'all' — the whole plotted footprint, not just the validators", () => {
+    expect(countryStats(validators, metaNodes, "all")).toEqual([
+      { country: "Germany", cc: "DE", count: 2 },
+      { country: "France", cc: "FR", count: 1 },
+      { country: "Portugal", cc: "PT", count: 1 },
+    ]);
   });
 
   it("tallies a metagraph filter independently of the validator set", () => {
@@ -64,12 +68,24 @@ describe("countryTallies", () => {
     expect(nets.dag?.Germany).toEqual({ country: "Germany", cc: "DE", count: 2 });
     expect(nets.dor?.Portugal).toEqual({ country: "Portugal", cc: "PT", count: 1 });
   });
+
+  it("counts a node ONCE PER NETWORK under 'all' — a machine serving two networks is two nodes", () => {
+    // The same machine (one IP) reported by both the validator set and a metagraph, exactly as
+    // mainnet does it: two chips on the globe, two rows in the browser, two counts here.
+    const shared: GeoStatNode[] = [
+      { layer: "l0", metaId: "dor", geoPrimary: true, pick: metaPick("v1", "Berlin", "Germany", "DE") },
+    ];
+    const nets = countryTallies(validators, shared);
+    expect(nets.all?.Germany.count).toBe(3); // 2 validators + the metagraph node on one of them
+    expect(nets.dag?.Germany.count).toBe(2);
+    expect(nets.dor?.Germany.count).toBe(1);
+  });
 });
 
 describe("listNodes", () => {
-  it("lists DAG validators for 'all', skipping the unlocatable sibling", () => {
+  it("lists EVERY network's nodes for 'all', skipping the unlocatable sibling", () => {
     const rows = listNodes(validators, metaNodes, "all");
-    expect(rows.map((r) => r.id)).toEqual(["v1", "v2", "v3"]);
+    expect(rows.map((r) => r.id)).toEqual(["v1", "v2", "v3", "m1"]);
     expect(rows[0]).toMatchObject({
       id: "v1",
       city: "Berlin",
@@ -80,8 +96,10 @@ describe("listNodes", () => {
     });
   });
 
-  it("lists the same rows for 'dag' as for 'all'", () => {
-    expect(listNodes(validators, metaNodes, "dag")).toEqual(listNodes(validators, metaNodes, "all"));
+  it("lists the validators alone for 'dag' — 'all' adds the metagraph nodes on top", () => {
+    const dag = listNodes(validators, metaNodes, "dag");
+    expect(dag.map((r) => r.id)).toEqual(["v1", "v2", "v3"]);
+    expect(listNodes(validators, metaNodes, "all").slice(0, dag.length)).toEqual(dag);
   });
 
   it("lists only the matching metagraph's nodes for a metagraph filter", () => {

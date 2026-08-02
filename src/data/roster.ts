@@ -18,7 +18,9 @@ export function buildRoster(selNodes: readonly NodeRow[]): RosterRow[] {
   return selNodes.map((node, i) => {
     const geo: GeoInfo | undefined = "geo" in node.pick ? node.pick.geo : undefined;
     return {
-      key: node.id ?? `${node.label}#${i}`,
+      // Unique by construction: under the "all" filter the same machine can appear once per
+      // network it serves, and both rows can report the same node id — the index disambiguates.
+      key: `${node.id ?? node.label}#${i}`,
       node,
       netId: pickNetId(node.pick),
       isp: geo?.isp ?? null,
