@@ -208,6 +208,18 @@ export function snapshotSelectActions(
   return [{ kind: "snapshot", pick: p, follow: isLiveTip }];
 }
 
+// The snapshot card's LIVE-MODE switch (user, 2026-08-02). The card no longer opens itself on
+// entering the ledger — it is a picked subject like every other card — so following the
+// heartbeat is now an explicit act, and the card's own live/age element is the switch. Turning
+// it ON hands the subject back to the FollowController (its `following` effect re-points at the
+// latest relevant snapshot); turning it OFF pins whatever is on screen at that moment.
+export function followToggleActions(
+  shown: Extract<PickDescriptor, { kind: "snapshot" }>,
+  following: boolean,
+): ClickAction[] {
+  return [{ kind: "snapshot", pick: shown, follow: !following }];
+}
+
 export function clickActions(input: {
   mode: Mode;
   // The raycast pick (already drag-suppressed + pickActive-gated by the Engine), or null.

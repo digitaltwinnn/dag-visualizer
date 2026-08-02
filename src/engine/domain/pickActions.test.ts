@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { autoLayerForNode, clearAllActions, clickActions, cohortToggleActions, compositionToggleActions, countryToggleActions, filterToggleActions, layerToggleActions, nodeSelectActions, sameCohort, sameComposition, snapshotSelectActions, pickActive, pickNetId, type ClickAction } from "./pickActions";
+import { autoLayerForNode, clearAllActions, clickActions, cohortToggleActions, compositionToggleActions, countryToggleActions, filterToggleActions, followToggleActions, layerToggleActions, nodeSelectActions, sameCohort, sameComposition, snapshotSelectActions, pickActive, pickNetId, type ClickAction } from "./pickActions";
 import { finerLevels } from "./focusLadder";
 import type { PickDescriptor } from "@/src/data/types";
 
@@ -206,6 +206,12 @@ describe("the shared component builders (GeoExplore rows + LiveStrip bars run th
     const p = snapPick();
     expect(snapshotSelectActions(p, true)).toEqual([{ kind: "snapshot", pick: p, follow: true }]);
     expect(snapshotSelectActions(p, false)).toEqual([{ kind: "snapshot", pick: p, follow: false }]);
+  });
+
+  it("followToggleActions: the card's live switch flips following, keeping the shown subject", () => {
+    const p = snapPick();
+    expect(followToggleActions(p, false)).toEqual([{ kind: "snapshot", pick: p, follow: true }]);
+    expect(followToggleActions(p, true)).toEqual([{ kind: "snapshot", pick: p, follow: false }]);
   });
 });
 

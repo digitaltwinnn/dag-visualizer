@@ -22,7 +22,8 @@ import { POLL } from "@/src/engine/config";
 import { Desc, StatusMark, CompositionRows, StatusBreakdown, RoleChips, IdentityDot, networkKind } from "./parts";
 import { compositionGroups, compositionRows, nodeCompositionLabel } from "@/src/data/composition";
 import { ledgerLayerById } from "@/src/data/ledgerLayers";
-import { pickNetId } from "@/src/engine/domain/pickActions";
+import { pickNetId, followToggleActions } from "@/src/engine/domain/pickActions";
+import { applyClickActions } from "@/src/store/applyClickActions";
 import type { CohortSel, CompositionSel } from "@/src/engine/domain/focusLadder";
 
 type PickOf<K extends PickDescriptor["kind"]> = Extract<PickDescriptor, { kind: K }>;
@@ -50,27 +51,41 @@ export function SnapshotTitle({ data: d }: { data: GlobalSnapshot }) {
   );
 }
 
-// Snapshot title-row aside: live-now dot / coarse relative age / the no-signal state.
+// Snapshot title-row aside: the LIVE-MODE switch — a beating cyan dot while the card follows the
+// heartbeat, the snapshot's coarse age while it is pinned, and the no-signal state when the feed
+// is down (nothing to follow, so that one is not a control). Since the card no longer opens
+// itself on entering the ledger (user, 2026-08-02), this element is how live mode is turned on
+// and off; the write goes through the table + executor like every other selection.
+// While following a metagraph lane, the newest snapshot it anchored into may be minutes old — the
+// age rides alongside "live" rather than being replaced by it, so the label never overstates.
 export function SnapshotAside({ data: d }: { data: GlobalSnapshot }) {
   const latest = useStore((s) => s.latestSnapshot);
   const live = useStore((s) => s.live);
+  const following = useStore((s) => s.following);
+  const snap = useStore((s) => s.snap);
   const isLive = latest != null && d.ordinal === latest.ordinal;
   // Relative recency for an older pick — coarse (freshness, not a ticking clock). Guarded
   // against an unparseable timestamp (→ no age suffix rather than "NaN").
   const rel = relativeAge(Date.now() - Date.parse(d.timestamp));
+  const cls = "inline-flex items-center gap-1.5 text-xs text-muted-foreground whitespace-nowrap";
+  if (!live) return <span className={cls}><NoSignalDot /> no signal</span>;
   return (
-    <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground whitespace-nowrap">
-      {!live ? (
-        <><NoSignalDot /> no signal</>
-      ) : isLive ? (
+    <button
+      type="button"
+      aria-pressed={following}
+      title={following ? "Stop following the live snapshot" : "Follow the live snapshot"}
+      className={cn(cls, "rounded-xs hover:text-foreground transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary/60")}
+      onClick={() => snap && applyClickActions(followToggleActions(snap, following))}
+    >
+      {following ? (
         <>
           <span className="w-2 h-2 rounded-full bg-primary shadow-[0_0_0_3px_color-mix(in_oklch,var(--primary)_30%,transparent)] animate-dot-beat motion-reduce:animate-none" />
-          {" "}live now
+          {isLive ? "live now" : <>live · {rel}</>}
         </>
       ) : (
         <>◷ {rel}</>
       )}
-    </span>
+    </button>
   );
 }
 

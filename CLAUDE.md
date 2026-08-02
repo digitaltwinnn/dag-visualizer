@@ -921,11 +921,18 @@ health belongs to the cards + the future network-health view).
 cost). Activity metrics belong to ledger, structure to hyper — don't cross-pollinate.
 
 **The snapshot card is ledger-scoped — the pin does NOT carry out of the view** (spec
-2026-08-01, a deliberate reversal of the old carry-across-views rule). `FollowController` follows
-the live snapshot and the ledger view follows live by default; a *selected* snapshot pins until
+2026-08-01, a deliberate reversal of the old carry-across-views rule) — and it **never opens
+itself**: entering ledger leaves the slot on its ghost hint like every other card (user,
+2026-08-02, reversing the old follow-live-on-entry default). Live-following is now OPT-IN, and
+the card's own head aside IS the switch (`SnapshotAside` → `pickActions.followToggleActions` →
+`applyClickActions`, so the write stays on the one selection path): ON = the beating cyan dot +
+`live now` (`live · {age}` while a metagraph lane's newest anchor is older than the tip — the
+label never overstates), OFF = the pinned snapshot's coarse age; toggling ON hands the subject
+back to `FollowController` (its `following` effect re-points at the latest relevant snapshot),
+toggling OFF pins whatever is on screen. A *selected* snapshot pins until
 deselected **or until you leave ledger** — `Engine.setMode` clears `store.snap` on any switch away
 (the same `LEVEL_CARRY` logic that already scoped country/cohort to geo and layer to ledger;
-`following` is left to the FollowController, whose mode effect has already flipped it false, so
+`following` is left to the FollowController, whose mode effect flips it false outside ledger, so
 the clear sticks). The rail's snapshot ghost hint (`railCards.snapHint`) is gated to ledger to
 match. Clicking a `LiveStrip` bar selects that snapshot IN PLACE — no view switch — but since the
 bars now render only in ledger, that click is a ledger interaction by construction. Clicking the
