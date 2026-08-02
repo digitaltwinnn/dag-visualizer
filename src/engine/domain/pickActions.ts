@@ -131,6 +131,20 @@ export function nodeSelectActions(
   const acts: ClickAction[] = [];
   const netId = pickNetId(p);
   if (netId && netId !== opts.currentFilter) acts.push({ kind: "filter", id: netId });
+  acts.push(...nodeAncestryActions(p, opts));
+  acts.push({ kind: "inspect", pick: p });
+  return acts;
+}
+
+// The rungs ABOVE a node in the destination view's ladder — the ONE definition of a node's
+// ancestry, shared by a node SELECT (below the filter, above the inspect) and by a VIEW ENTRY
+// (viewEntryActions). Each view contributes only the rungs it scopes to itself: hyper the
+// composition group, geo the country + the provider cohort, ledger the floor.
+function nodeAncestryActions(
+  p: PickDescriptor,
+  opts: { mode: Mode; ledgerLayerId?: string | null; compositionSel?: CompositionSel | null },
+): ClickAction[] {
+  const acts: ClickAction[] = [];
   if (opts.mode === "hyper" && opts.compositionSel) acts.push({ kind: "composition", sel: opts.compositionSel });
   if (opts.mode === "geo" && "geo" in p && p.geo?.cc) {
     acts.push({ kind: "country", cc: p.geo.cc });
@@ -144,8 +158,25 @@ export function nodeSelectActions(
     const layerId = opts.ledgerLayerId ?? autoLayerForNode(p.kind);
     if (layerId) acts.push({ kind: "layer", pick: { kind: "layer", layerId } });
   }
-  acts.push({ kind: "inspect", pick: p });
   return acts;
+}
+
+// ARRIVING in a view with a node still selected. Node + network CARRY across a switch, but the
+// view-scoped rungs do not (focusLadder.LEVEL_CARRY): country/cohort are geo's, composition is
+// hyper's, layer is ledger's, and each is cleared on the way out. Without this the carried node
+// would sit in the destination rail with every parent slot back on its ghost, and a deselect
+// would step straight to the network (user, 2026-08-02: every card up to the selection belongs
+// on the rail, in every view). So the entry re-derives exactly the ancestry a click on that node
+// IN the destination view would have committed — no filter (it carried), no inspect (it's already
+// open). `ledgerLayerId` carries an already-committed floor so a resumed layer is never
+// overwritten; a non-node pick (a dossier, a snapshot) has no ancestry and yields nothing.
+export function viewEntryActions(opts: {
+  mode: Mode;
+  pick: PickDescriptor | null;
+  ledgerLayerId?: string | null;
+  compositionSel?: CompositionSel | null;
+}): ClickAction[] {
+  return opts.pick ? nodeAncestryActions(opts.pick, opts) : [];
 }
 
 // The layer TOGGLE — shared by the scene's floor-plane click and LedgerPanel's rows: commit

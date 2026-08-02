@@ -146,22 +146,21 @@ export function DisclosureRow({
 }
 
 // The leaf PICKER row — "Node <id>" — the terminal subject in both explorers. Computes its own
-// identity hue + the scene↔row hover pairing (same in both); the parent supplies the select +
-// an optional extra hover effect (geo also previews the node's country border).
+// identity hue + the scene↔row hover pairing (same in both); the parent supplies the select. The
+// hover raises the NODE channel and nothing else (user, 2026-08-02): geo used to preview the
+// node's country border here too, so a node hover lit a subject the row isn't about.
 export function NodePickerRow({
   row,
   selected,
   hoverNodeId,
   setHoverNodeId,
   onSelect,
-  onHoverEnter,
 }: {
   row: NodeRow;
   selected: boolean;
   hoverNodeId: string | null;
   setHoverNodeId: (id: string | null) => void;
   onSelect: () => void;
-  onHoverEnter?: () => void;
 }) {
   const hoverKey = hoverKeyOf(row.pick);
   const hue = row.pick.kind === "metanode" && row.pick.meta ? identityHudHex(row.pick.meta.id) : CORE_HEX;
@@ -180,10 +179,7 @@ export function NodePickerRow({
       style={pair.style}
       title={`${row.label} · ${row.state ?? "—"}`}
       onClick={onSelect}
-      onMouseEnter={() => {
-        pair.onMouseEnter();
-        onHoverEnter?.();
-      }}
+      onMouseEnter={pair.onMouseEnter}
     >
       {/* Just "Node" + the mono id — the row is a pure picker; the parent row carries the
           composition / place / provider. */}

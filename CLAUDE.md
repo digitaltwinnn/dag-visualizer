@@ -397,7 +397,10 @@ store-value imports**, enforced by `layerBoundaries.test.ts`). Each ships coloca
   tested invariants: filter-first (only when it CHANGES — no drill churn) → node's country →
   node's cohort → inspect-LAST (the node camera wins — FULL-ANCESTRY rule, spec 2026-07-18:
   a node select commits every coarser rung so deselects step down predictably; in ledger the
-  ancestry is the browser row's parent floor, else `autoLayerForNode`); deselect-before-drill
+  ancestry is the browser row's parent floor, else `autoLayerForNode`. That ancestry is ONE
+  private definition inside the module, and **`viewEntryActions`** is its second consumer: a node
+  SWITCHING INTO a view re-commits the same rungs there, since the view-scoped ones were cleared
+  on the way out — see *Cross-view carry*); deselect-before-drill
   on the country toggle (which also drops a committed cohort); the cohort/provider toggle
   (`cohortToggleActions` + `sameCohort` — geo's city×provider rung); the composition toggle
   (`compositionToggleActions` + `sameComposition` — hyper's make-up rung, filter-first when
@@ -702,16 +705,30 @@ views and caused the ledger red-dots bug; that pattern is forbidden.
     ledger-only — each cleared on leaving its view (so no view-scoped card lingers; the layer
     card used to follow into hyper/geo). A filter SWITCH additionally drops node + cohort +
     country + composition in EVERY view (network-level event; the layer survives — it composes).
+    But a view-scoped rung being cleared on the way OUT doesn't mean the destination shows a
+    naked node: **arriving with a node selected RE-DERIVES that view's own ancestry**
+    (`pickActions.viewEntryActions`, applied by `Engine._commitViewEntryAncestry` inside
+    `_applyDestLayout`, before the focus walk) — geo re-commits the node's country + provider,
+    hyper its composition group, ledger its floor, exactly the rungs a click on that node IN the
+    destination view would have committed (ONE ancestry definition, shared with
+    `nodeSelectActions` and pinned by a colocated equality test). So every card up to the
+    selection is on the rail in every view, and a deselect steps back down the local ladder
+    instead of jumping to the network (user, 2026-08-02; this generalized the older
+    ledger-only auto-commit of a carried node's L0 floor). An already-committed layer is never
+    overwritten, and the node rung still wins the camera.
 - **Hover preview**: hovering a filter-picker row OR a metagraph hub in hyper sets
   `store.hoverFilter`, which previews that selection's dim in any view via
   `globe.setHoverFilter` (+ `ledger.setFilter`), without committing `filter`. The hover
   previews at the SAME per-view strength as a committed filter (the old forced-strong 0.85
   branch was removed 2026-07-11 — it dimmed the rest far harder than the regular dim; what a
   hover must NOT do is the *click*'s camera flight). Hovering an explorer node row glows that node's shells on the
-  globe (`hoverNodeId` → `globe.setHoverNode`), matching a 3D raycast hover; hovering a
+  globe (`hoverNodeId` → `globe.setHoverNode`) and NOTHING else — it used to preview the node's
+  country border too, lighting a subject the row isn't about (user, 2026-08-02); hovering a
   country row previews that country's border outline at a whisper level (`hoverCountry` →
   `globe.setHoverCountry` — the committed drill's full hairline wins). Hovering a cohort row
-  glows the whole stack (`hoverCohort` ids → `globe.setHoverCohort`); a COMMITTED cohort
+  glows the whole stack (`hoverCohort` ids → `globe.setHoverCohort`) AND lights its country
+  border, clearing both on leave (a hover cleans up after itself — otherwise the border outlived
+  the cohort hover into the node rows below it); a COMMITTED cohort
   holds the same glow steadily (`globe.setSelectedCohort` — same strength, the live hover
   wins while active; hover-pairing on cohort/provider subjects is outward-only by inherited
   convention — the scene never writes `hoverCohort` back).

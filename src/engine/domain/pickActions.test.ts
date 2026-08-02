@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { autoLayerForNode, clearAllActions, clickActions, cohortToggleActions, compositionToggleActions, countryToggleActions, filterToggleActions, followToggleActions, layerToggleActions, nodeSelectActions, sameCohort, sameComposition, snapshotSelectActions, pickActive, pickNetId, type ClickAction } from "./pickActions";
+import { autoLayerForNode, viewEntryActions, clearAllActions, clickActions, cohortToggleActions, compositionToggleActions, countryToggleActions, filterToggleActions, followToggleActions, layerToggleActions, nodeSelectActions, sameCohort, sameComposition, snapshotSelectActions, pickActive, pickNetId, type ClickAction } from "./pickActions";
 import { finerLevels } from "./focusLadder";
 import type { PickDescriptor } from "@/src/data/types";
 
@@ -230,6 +230,53 @@ describe("autoLayerForNode (node selection carrying into Snapshots)", () => {
     expect(autoLayerForNode("snapshot")).toBe(null);
     expect(autoLayerForNode(null)).toBe(null);
     expect(autoLayerForNode(undefined)).toBe(null);
+  });
+});
+
+// Arriving in a view with a node still selected: the view-scoped rungs (cleared on the way out
+// by focusLadder.LEVEL_CARRY) must come back, so every parent card up to the selection is on the
+// rail again. The drift guard is the equality with nodeSelectActions' own ancestry — the two
+// must always name the same rungs.
+describe("viewEntryActions (a carried node's ancestry in the destination view)", () => {
+  const COMP = { netId: "dor", key: "Hybrid|L0,cL1" };
+  const ancestryOf = (acts: ClickAction[]) => acts.filter((a) => a.kind !== "filter" && a.kind !== "inspect");
+
+  it("geo: re-commits the node's country AND provider cohort", () => {
+    const p = nodePick("DE");
+    expect(viewEntryActions({ mode: "geo", pick: p })).toEqual([
+      { kind: "country", cc: "DE" },
+      { kind: "cohort", sel: { cc: "DE", city: null, isp: null } },
+    ]);
+  });
+
+  it("hyper: re-commits the node's composition group", () => {
+    expect(viewEntryActions({ mode: "hyper", pick: nodePick(), compositionSel: COMP })).toEqual([
+      { kind: "composition", sel: COMP },
+    ]);
+  });
+
+  it("ledger: commits the node's related floor, but never overwrites a committed layer", () => {
+    expect(viewEntryActions({ mode: "ledger", pick: nodePick() })).toEqual([
+      { kind: "layer", pick: { kind: "layer", layerId: "ml0" } },
+    ]);
+    expect(viewEntryActions({ mode: "ledger", pick: nodePick(), ledgerLayerId: "msnap" })).toEqual([
+      { kind: "layer", pick: { kind: "layer", layerId: "msnap" } },
+    ]);
+  });
+
+  it("names exactly the rungs a node CLICK in that view commits (no drift)", () => {
+    const p = nodePick("DE");
+    for (const mode of ["geo", "hyper", "ledger"] as const) {
+      expect(viewEntryActions({ mode, pick: p, compositionSel: COMP })).toEqual(
+        ancestryOf(nodeSelectActions(p, { mode, currentFilter: "dor", compositionSel: COMP })),
+      );
+    }
+  });
+
+  it("has nothing to say without a node selection (a dossier or a snapshot carries no ancestry)", () => {
+    expect(viewEntryActions({ mode: "geo", pick: null })).toEqual([]);
+    expect(viewEntryActions({ mode: "geo", pick: hubPick() })).toEqual([]);
+    expect(viewEntryActions({ mode: "ledger", pick: snapPick() })).toEqual([]);
   });
 });
 

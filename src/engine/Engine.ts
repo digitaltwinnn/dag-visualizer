@@ -19,7 +19,7 @@ import { VIEW_POLICIES, type ViewPolicy } from "./domain/viewPolicy";
 import { FOCI, hubFraming, geoFraming, ledgerLayerFraming, ledgerNodeFraming, nodeFraming, cohortFraming, hyperNodeFraming, dollyBack, easeInOutQuad, type CameraFraming } from "./domain/cameraRig";
 import { countryFraming } from "./domain/countryShape";
 import { R as GEO_R, LAND_H } from "./domain/geoLayout";
-import { autoLayerForNode, clickActions, pickActive, pickNetId } from "./domain/pickActions";
+import { clickActions, pickActive, pickNetId, viewEntryActions } from "./domain/pickActions";
 import { ViewTransition, type View3D } from "./domain/viewTransition";
 import { LADDERS, type CohortSel, type CompositionSel, type SelectionSnapshot, type ResolverKey } from "./domain/focusLadder";
 import { compositionGroups, compositionKey, compositionRows } from "@/src/data/composition";
@@ -636,27 +636,40 @@ export class Engine {
       this.ledger.setFilter(this.filter); // neutralise the other lanes' tiles/links
       this._refreshLedger();
       // Ledger uses the SHARED overview camera — the group transform (config.viewRotY/viewScale)
-      // frames the resting pose central/untilted. If a layer is already committed, resume its
-      // tilted layer-focus framing instead.
-      const selLayer = useStore.getState().layer;
-      const inspect = useStore.getState().inspect;
-      // A selected NODE carries into Snapshots as its related L0 layer (user, 2026-07-17):
-      // auto-commit the layer (through the ONE executor, like the panel row's toggle) so the
-      // rail/dims reflect the row — then the NODE zoom wins the camera (the level after the
-      // layer level, geo's country→node ladder mirrored).
-      const autoLayer = selLayer ? null : autoLayerForNode(inspect?.kind);
-      if (autoLayer) applyClickActions([{ kind: "layer", pick: { kind: "layer", layerId: autoLayer } }]);
-      // The auto-commit above runs first (through the ONE executor), so the ladder's snapshot
-      // sees the layer it just committed — the node level still wins the camera if selected.
+      // frames the resting pose central/untilted. A carried node re-commits its floor here (and
+      // an already-committed layer resumes its tilted layer-focus framing instead).
+      this._commitViewEntryAncestry(mode);
+      // That commit runs first (through the ONE executor), so the ladder's snapshot sees the
+      // layer — the node level still wins the camera if one is selected.
       this._resolveFocus();
       return;
     }
     // hyper / geo (ledger returned above; flat views never reach here — see the method note):
     this.ctx.controls.autoRotate = mode !== "geo";
     this.applyFilter(false); // apply the filter's visuals, but leave the camera to _resolveFocus
+    // The carried node's ancestry for THIS view (country + provider in geo, the composition
+    // group in hyper) — committed before the focus walk, so the finer node rung still wins the
+    // camera and every parent card is on the rail.
+    this._commitViewEntryAncestry(mode);
     // A selection's camera position carries across view switches: frame the selected node in the
     // new view (geo → its globe spot, hyper → its shell point), else the filter's default framing.
     this._resolveFocus();
+  }
+
+  // Re-derive the destination view's own ancestry rungs for a node selection that carried into it
+  // (domain/pickActions.viewEntryActions — the same table a click in this view runs), and apply
+  // them through the ONE executor. View-scoped rungs are cleared on leaving their view, so this is
+  // what puts the country/provider (geo), the composition group (hyper) or the floor (ledger) back
+  // under the carried node instead of leaving its parent card slots on their ghosts.
+  private _commitViewEntryAncestry(mode: Mode) {
+    const st = useStore.getState();
+    const acts = viewEntryActions({
+      mode,
+      pick: st.inspect,
+      ledgerLayerId: st.layer?.layerId ?? null,
+      compositionSel: this._compositionOf(st.inspect),
+    });
+    if (acts.length) applyClickActions(acts);
   }
 
   // `focusCamera` is false for BACKGROUND data refreshes (new cluster/meta/geo arriving) — they

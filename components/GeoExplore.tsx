@@ -294,7 +294,14 @@ export default function GeoExplore() {
                                 setHoverCohort(ch.rows.map((r) => hoverKeyOf(r.pick)).filter((k): k is string => !!k));
                                 setHoverCountry(ch.rows[0] && "geo" in ch.rows[0].pick ? ch.rows[0].pick.geo?.cc ?? null : null);
                               }}
-                              onHoverLeave={() => setHoverCohort(null)}
+                              // Clean up BOTH previews this row raised — the border must not
+                              // outlive the cohort hover (moving down into the row's own node
+                              // list would otherwise leave the country lit under a node hover,
+                              // user 2026-08-02: a node hover is the node's signal alone).
+                              onHoverLeave={() => {
+                                setHoverCohort(null);
+                                setHoverCountry(null);
+                              }}
                               // The provider card's own subject key (`CohortSel` = cc|city|isp),
                               // so hovering either end lights the other — the cohort row's list
                               // key is country-SCOPED and can't serve as the shared identity.
@@ -329,7 +336,6 @@ export default function GeoExplore() {
                                       hoverNodeId={hoverNodeId}
                                       setHoverNodeId={setHoverNodeId}
                                       onSelect={() => selectNode(r.pick, nodeOn)}
-                                      onHoverEnter={() => setHoverCountry("geo" in r.pick ? r.pick.geo?.cc ?? null : null)}
                                     />
                                   );
                                 })}
