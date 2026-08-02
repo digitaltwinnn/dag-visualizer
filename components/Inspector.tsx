@@ -22,7 +22,7 @@ import { detailsCards, ladderSlotIds, type RailCard } from "@/components/railCar
 import { useLadderFocus } from "@/components/useLadderFocus";
 import { useTrayActives } from "@/components/useTrayActives";
 import { countryToggleActions, cohortToggleActions, compositionToggleActions, clearAllActions } from "@/src/engine/domain/pickActions";
-import { CountryTitle, CountryCard, ProviderTitle, ProviderCard, CompositionTitle, CompositionCard, CompositionAside } from "@/components/inspector/cards";
+import { CountryTitle, CountryCard, ProviderTitle, ProviderCard, ProviderAside, CompositionTitle, CompositionCard, CompositionAside } from "@/components/inspector/cards";
 import type { TabSignal } from "@/components/RailDock";
 import type { PickDescriptor } from "@/src/data/types";
 import type { Mode } from "@/src/store/store";
@@ -187,6 +187,7 @@ function ProviderPane({ sel, onClose, collapsed, onToggle }: { sel: CohortSel; o
         <CardHead
           eyebrow="Provider"
           title={<ProviderTitle sel={sel} />}
+          aside={<ProviderAside sel={sel} />}
           titleKey={subjectKey}
           onClose={onClose}
           collapsed={collapsed}

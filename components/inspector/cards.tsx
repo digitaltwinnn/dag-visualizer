@@ -678,6 +678,23 @@ export function ProviderTitle({ sel }: { sel: CohortSel }) {
   );
 }
 
+// The cohort's AS number, right-aligned on the head's title row (user, 2026-08-02): it identifies
+// the provider rather than measuring it, so it belongs beside the name — subtle mono, and it stays
+// readable while the card is collapsed. Members of one city×provider cohort share an ASN.
+export function ProviderAside({ sel }: { sel: CohortSel }) {
+  const selNodes = useStore((s) => s.selNodes);
+  const asn = useMemo(() => {
+    for (const r of selNodes) {
+      const geo = "geo" in r.pick ? r.pick.geo : undefined;
+      if (r.cc === sel.cc && (r.city || null) === sel.city && (geo?.isp || null) === sel.isp && geo?.asn)
+        return geo.asn;
+    }
+    return null;
+  }, [selNodes, sel.cc, sel.city, sel.isp]);
+  if (!asn) return null;
+  return <span className="font-mono text-label text-muted-foreground tabular-nums">{asn}</span>;
+}
+
 export function ProviderCard({ sel }: { sel: CohortSel }) {
   const selNodes = useStore((s) => s.selNodes);
   const members = useMemo(
@@ -698,7 +715,6 @@ export function ProviderCard({ sel }: { sel: CohortSel }) {
     }
     return seen;
   }, [members]);
-  const firstGeo = members[0] && "geo" in members[0].pick ? members[0].pick.geo : undefined;
   return (
     <div className="flex flex-col gap-2">
       {/* CITY — the half of the cohort key the head no longer carries. The COUNTRY is deliberately
@@ -729,10 +745,6 @@ export function ProviderCard({ sel }: { sel: CohortSel }) {
             })
           )}
         </span>
-      </div>
-      <div className="flex items-start justify-between gap-2.5">
-        <span className="text-body text-muted-foreground">ASN</span>
-        <span className="text-body text-foreground tabular-nums">{firstGeo?.asn ?? "—"}</span>
       </div>
     </div>
   );

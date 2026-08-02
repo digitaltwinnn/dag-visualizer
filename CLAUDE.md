@@ -884,7 +884,9 @@ and keep changing, so they're examples, not the contract.
   current view CAN produce is always visible — POPULATED when its subject is selected
   (`ContextCard` mirrors the filter; the **country card** — `ccMark` code + name title, Nodes/Share/
   Cities/Providers from `store.selNodes`, geo-scoped like layer is ledger-scoped; the
-  **provider card** — the PROVIDER alone as the title, City/Nodes/Networks/ASN in the body (user,
+  **provider card** — the PROVIDER alone as the title with its **ASN as the head's `aside`**
+  (subtle mono, right-aligned on the title row — it identifies the provider rather than measuring
+  it, and it stays readable while the card is collapsed), City/Nodes/Networks in the body (user,
   2026-08-02: the city is a labelled fact, and the country is deliberately absent — the parent
   country card states it one slot up, and a facts rail shouldn't say the same thing twice); both rendered
   straight from their store channels by Inspector's `CountryPane`/`ProviderPane` since
