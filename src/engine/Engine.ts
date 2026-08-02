@@ -537,6 +537,11 @@ export class Engine {
       if (st0.cohort != null) st0.setCohort(null);
     }
     if (mode !== "ledger" && st0.layer != null) st0.setLayer(null);
+    // The snapshot card is LEDGER-SCOPED too (spec 2026-08-01): the pin no longer carries out
+    // of the view — leaving ledger clears it. `following` stays with the FollowController,
+    // whose mode effect already flips it false outside ledger (no fight: with `following`
+    // false its tick is a no-op, so the clear sticks).
+    if (mode !== "ledger" && st0.snap != null) st0.setSnap(null);
 
     const is3D = (m: Mode): m is View3D => m === "hyper" || m === "geo" || m === "ledger";
     if (is3D(prevMode) && is3D(mode) && prevMode !== mode) {

@@ -13,7 +13,7 @@ import { hoverKeyOf } from "@/src/data/hoverSubject";
 import { filterToggleActions, nodeSelectActions } from "@/src/engine/domain/pickActions";
 import { applyClickActions } from "@/src/store/applyClickActions";
 import { subjectPairing } from "@/components/useSubjectPairing";
-import { DisclosureChevron, DisclosureRow, NodePickerRow } from "@/components/ExploreRows";
+import { DisclosureChevron, DisclosureRow, NodePickerRow, ROW_NEST, ROW_OUTSET } from "@/components/ExploreRows";
 import type { NodeRow } from "@/src/data/types";
 
 // Hypergraph's single **explore** card — the architectural sibling of GeoExplore: each view's
@@ -86,7 +86,7 @@ export default function HyperExplore() {
     <ExplorerShell
       id="hyperexplore"
       title="Nodes by network"
-      hint="Every network on the hypergraph — hover or click one to see how it is composed of different nodes that each play a role in settlement."
+      hint="Every network on the hypergraph — hover or click one to see how it is composed of different nodes that each play a role in validation."
     >
       {/* Sorted by fleet size (user, 2026-07-12) — the biggest networks lead. */}
       {[...metaList].sort((a, b) => b.nodes.length - a.nodes.length).map((m) => {
@@ -103,7 +103,8 @@ export default function HyperExplore() {
                   <button
                     type="button"
                     className={cn(
-                      "nb-row group flex items-center gap-2.5 w-[calc(100%+12px)] text-left text-body border border-transparent bg-transparent cursor-pointer py-[5px] px-1.5 -mx-1.5 rounded-sm transition-[background] duration-150",
+                      "nb-row group flex items-center gap-2.5 text-left text-body border border-transparent bg-transparent cursor-pointer py-[5px] rounded-sm transition-[background] duration-150",
+                      ROW_OUTSET,
                       "hover:bg-wash-hover",
                       "focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--primary)] focus-visible:outline-offset-[-2px]",
                       // The committed network wears the shared selection language; its state
@@ -136,7 +137,7 @@ export default function HyperExplore() {
                   {open && (
                     // Leaving the shell list clears the scene hover-glows.
                     <div
-                      className="mb-1.5 ml-[9px] py-0.5 pl-3 border-l border-border"
+                      className={cn("mb-1.5 ml-[9px] py-0.5 pl-3", ROW_NEST)}
                       onMouseLeave={() => {
                         setHoverNodeId(null);
                         setHoverCohort(null);

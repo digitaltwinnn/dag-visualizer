@@ -5,8 +5,9 @@ import type { HoverSubject } from "@/src/data/hoverSubject";
 // import of a domain type is legal and keeps CohortSel defined in exactly one place.
 import type { CohortSel } from "@/src/engine/domain/focusLadder";
 
-// The active view. `hyper`/`geo` drive the 3D scene (morph between them); the rest are flat
-// views (the canvas is hidden) — `ledger` has the live ribbon, the others are placeholders.
+// The active view. `hyper`/`geo`/`ledger` all drive the 3D scene (every switch among them runs
+// the gather choreography); `status`/`transactions`/`staking` are flat scaffolded placeholders
+// (the canvas is hidden).
 export type Mode = "hyper" | "geo" | "ledger" | "status" | "transactions" | "staking";
 
 // One slot in the right-rail card stack (extend with future card types — e.g. "tx").
@@ -122,6 +123,12 @@ interface AppState {
   // (Outside-tap does NOT dismiss it — `onInteractOutside` is `preventDefault`-blocked so the
   // scene/other dock stays interactive underneath.) Unused on tablet/desktop.
   phoneDock: "explore" | "details" | null;
+  // Which of the two shell LAYERS is presented (spec 2026-08-01): "scene" = the 3D shell + HUD,
+  // "data" = the per-view raw-data table that surfaces out of the scene's depth over it. Written
+  // by the command bar's RAW switch (and Escape); SectionShell owns the GSAP timeline that
+  // realizes it. UI state, not selection (the selection boundary rule doesn't apply);
+  // session-only, like phoneDock.
+  section: "scene" | "data";
   // PHONE ONLY: whether the top bar's vitals row is expanded (the bar grows downward by one
   // full-width row showing the active view's vitals). A USER CHOICE that persists across view
   // switches (the row's CONTENT swaps per view; only the user's toggle opens/closes it) —
@@ -131,6 +138,12 @@ interface AppState {
   // Shared by BOTH dock sheets so switching halves keeps the chosen height; reset to null the
   // moment the dock fully closes (`setPhoneDock(null)`) so reopening starts at the default.
   phoneSheetPx: number | null;
+  // Per-slot rail-card collapse OVERRIDES (slot id → collapsed), written by a user's +/− toggle
+  // or the rail-top minimize/expand-all controls. A slot with NO entry falls back to the rail's
+  // AUTO default (Inspector: ladder ancestors of the focused rung rest collapsed) — so `null`
+  // via setRailCollapse returns a slot to auto. UI state, not selection (the selection boundary
+  // rule doesn't apply); session-only, like phoneDock.
+  railCollapse: Record<string, boolean>;
 
   setLive: (live: boolean, lastGoodAt?: number) => void;
   setEngineReady: (v: boolean) => void;
@@ -161,8 +174,11 @@ interface AppState {
   setSelNodes: (nodes: NodeRow[]) => void;
   setSnapshotExact: (data: SnapshotExact) => void;
   setPhoneDock: (dock: "explore" | "details" | null) => void;
+  setSection: (section: "scene" | "data") => void;
   setPhoneVitals: (open: boolean) => void;
   setPhoneSheetPx: (px: number | null) => void;
+  setRailCollapse: (id: string, collapsed: boolean | null) => void;
+  setRailCollapseMany: (entries: Record<string, boolean | null>) => void;
 }
 
 // Keep the exact-snapshot cache bounded (one small object per ordinal); drop the oldest.
@@ -200,7 +216,9 @@ export const useStore = create<AppState>((set) => ({
   selNodes: [],
   snapshotExact: {},
   phoneDock: null,
+  section: "scene",
   phoneVitals: false,
+  railCollapse: {},
   phoneSheetPx: null,
 
   setLive: (live, lastGoodAt) => set((s) => ({ live, lastGoodAt: lastGoodAt ?? s.lastGoodAt })),
@@ -249,6 +267,25 @@ export const useStore = create<AppState>((set) => ({
   // Fully closing the dock also drops the drag-chosen sheet height, so the next open starts at
   // the default; switching halves (a non-null → non-null transition) keeps it.
   setPhoneDock: (phoneDock) => set(phoneDock === null ? { phoneDock, phoneSheetPx: null } : { phoneDock }),
+  setSection: (section) => set({ section }),
   setPhoneVitals: (phoneVitals) => set({ phoneVitals }),
+  setRailCollapse: (id, collapsed) =>
+    set((s) => {
+      const railCollapse = { ...s.railCollapse };
+      if (collapsed === null) delete railCollapse[id];
+      else railCollapse[id] = collapsed;
+      return { railCollapse };
+    }),
+  // The batch form of setRailCollapse, same null-returns-a-slot-to-auto semantics — so
+  // "collapse all" / "expand all" / the clear-all reset are each ONE store write.
+  setRailCollapseMany: (entries) =>
+    set((s) => {
+      const railCollapse = { ...s.railCollapse };
+      for (const [id, collapsed] of Object.entries(entries)) {
+        if (collapsed === null) delete railCollapse[id];
+        else railCollapse[id] = collapsed;
+      }
+      return { railCollapse };
+    }),
   setPhoneSheetPx: (phoneSheetPx) => set({ phoneSheetPx }),
 }));

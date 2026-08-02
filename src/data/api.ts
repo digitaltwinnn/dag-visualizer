@@ -13,7 +13,7 @@ export interface NetworkEvents {
 }
 
 // One record in a metagraph's rolling snapshot buffer (metaSnaps).
-interface MetaSnapRecord {
+export interface MetaSnapRecord {
   ordinal: number;
   hash: string;
   parent: string;

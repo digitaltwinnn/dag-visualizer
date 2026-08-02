@@ -5,7 +5,7 @@ import { cn } from "@/lib/utils";
 import { useStore } from "@/src/store/store";
 import { shortHash, CORE_HEX, getNetwork, metagraphById } from "@/src/data/network";
 import { identityHudHex } from "@/src/palette/identity";
-import { hex, fmtDag, fmtKB, ccToFlag } from "@/src/util/format";
+import { hex, fmtDag, fmtKB } from "@/src/util/format";
 import { relativeAge } from "@/src/util/relativeAge";
 import { statusBreakdown } from "@/src/data/nodeStatus";
 import type { GlobalSnapshot, MetaCfg, PickDescriptor } from "@/src/data/types";
@@ -253,7 +253,7 @@ export function SnapshotCard({ data: d }: { data: GlobalSnapshot }) {
               <span className="text-body text-muted-foreground">Fees paid</span>
               <span className="flex flex-col items-end text-body text-foreground tabular-nums">
                 <span className="animate-resolve-in motion-reduce:animate-none whitespace-nowrap"><b className="font-bold">{fmtDag(exact.totalFee)}</b> DAG</span>
-                <span className="text-label text-muted-foreground">{fmtKB(exact.totalSizeKB)} settled</span>
+                <span className="text-label text-muted-foreground">{fmtKB(exact.totalSizeKB)} anchored</span>
               </span>
             </div>
           )}
@@ -409,8 +409,8 @@ function GeoLiveNode({ p }: { p: PickOf<"l0" | "l1" | "metanode"> }) {
   );
 }
 
-// ── The LAYER card (Snapshots · settlement-stack layer) ─────────────────────────────────────
-// Selected from the Snapshots·Explore panel (LedgerPanel): each layer of the settlement stack is a
+// ── The LAYER card (Snapshots · anchoring-stack layer) ─────────────────────────────────────
+// Selected from the Snapshots·Explore panel (LedgerPanel): each layer of the anchoring stack is a
 // clickable subject whose card = what the layer IS (the pick carries the panel's description) plus
 // its LIVE footprint right now, derived from data already in the store — node counts from the
 // metagraph list (a hybrid counts in every layer it runs, matching the top-bar vitals taxonomy),
@@ -518,7 +518,7 @@ export function LayerCard({ p }: { p: PickOf<"layer"> }) {
 // `store.selNodes` — deliberately the explorer's scope, the same data lane GeoExplore's own
 // leaderboard/accordion reads, matched here by `cc` instead of grouped by display name.
 
-// Head title: the country mark + flag + display name (rolls via titleKey=cc, synced with the
+// Head title: the country mark + display name (rolls via titleKey=cc, synced with the
 // edge pulse) — same "kind mark leads the title" grammar as every other card head.
 export function CountryTitle({ cc }: { cc: string }) {
   const selNodes = useStore((s) => s.selNodes);
@@ -530,9 +530,7 @@ export function CountryTitle({ cc }: { cc: string }) {
   return (
     <span className="inline-flex items-center gap-2 min-w-0">
       <Mark aria-hidden className={cn(KIND_MARK_CLASS, "text-[var(--filter-accent,var(--primary))]")} />
-      <span className="truncate">
-        {ccToFlag(cc)} {name}
-      </span>
+      <span className="truncate">{name}</span>
     </span>
   );
 }
@@ -582,9 +580,9 @@ export function CountryCard({ cc }: { cc: string }) {
 export function ProviderTitle({ sel }: { sel: CohortSel }) {
   const Mark = PROVIDER_ICON;
   return (
-    <span className="inline-flex items-center gap-2 min-w-0">
+    <span className="flex items-center gap-2 min-w-0 max-w-full">
       <Mark aria-hidden className={cn(KIND_MARK_CLASS, "text-[var(--filter-accent,var(--primary))]")} />
-      <span className="truncate">
+      <span className="truncate min-w-0">
         {sel.city ?? "Unlocated"} · {sel.isp ?? "Unknown provider"}
       </span>
     </span>
@@ -643,9 +641,7 @@ export function ProviderCard({ sel }: { sel: CohortSel }) {
       </div>
       <div className="flex items-start justify-between gap-2.5">
         <span className="text-body text-muted-foreground">Country</span>
-        <span className="text-body text-foreground">
-          {ccToFlag(sel.cc)} {countryName}
-        </span>
+        <span className="text-body text-foreground">{countryName}</span>
       </div>
     </div>
   );

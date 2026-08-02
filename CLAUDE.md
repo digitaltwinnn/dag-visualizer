@@ -31,8 +31,11 @@ mode !== "ledger"`):
   (`staking`) — **scaffolded placeholders**: the canvas fades out and `Blueprint.tsx` renders
   a faint abstract wireframe schematic of what the view will become, labelled
   `preview · in development` so it never reads as live data (no numbers, no fabricated
-  values). The left rail shows only the view's About card; the bottom stream (`LiveStrip`)
-  is ALWAYS present regardless of view. **Interface glyphs are ONE icon system: `lucide-react`,
+  values). The left rail shows only the view's About card; the bottom lane (`LiveStrip`)
+  is ALWAYS present regardless of view — carrying the
+  `NodeCountReadout` here (the tick bars are ledger-only), under a command bar whose RAW switch
+  opens a raw data layer that says
+  `preview · in development` too. **Interface glyphs are ONE icon system: `lucide-react`,
   monochrome via `currentColor`** (so the accent/identity tinting inherits), **never emoji** (emoji
   ignore CSS `color` / the accent). The centralized view→icon map is `components/icons.tsx`
   (`VIEW_ICONS` + `iconForPick`), shared by the view switch, the card-head kind marks, and the
@@ -40,8 +43,8 @@ mode !== "ledger"`):
   dots, the ECG mark, and the Tooltip's `‹›` punctuation.
 
 Every switch **among the three 3D views** (`hyper`↔`geo`↔`ledger`, any pair) runs the SAME
-staged **gather choreography** (`domain/viewTransition.ts`'s `ViewTransition`, spec
-`docs/superpowers/specs/2026-07-17-view-transitions-design.md`) instead of a cut or a live
+staged **gather choreography** (`domain/viewTransition.ts`'s `ViewTransition`; the
+2026-07-17 view-transitions design spec is in git history — see *Historical docs*) instead of a cut or a live
 morph flight: **OUT** (0.9s) — the from-view's furniture fades via `furnitureAlpha` while its
 nodes fly, staggered (a 0.25s spread, rank-ordered within each network's own grid), up to
 per-network near-square **staging grids** on a camera-anchored plane at the top of the
@@ -132,6 +135,10 @@ to break one, that's a design conversation, not a workaround.
 
 Next.js **16** app (Turbopack is the bundler for BOTH `dev` and `build`) — needs Node ≥20.9.
 Three.js and friends come from npm (`three`, `three/addons/*`, `topojson-client`); no CDN deps.
+**`gsap`** drives the scene↔raw-layer depth transition only (`SectionShell` — the core timeline,
+no plugins: the Draggable/Inertia/Observer gestures went with the retired slide navigation); the
+3D scene's own animation stays hand-rolled in the engine, and HUD micro-animation stays CSS.
+Don't reach for GSAP elsewhere without a reason.
 
 ```bash
 npm install
@@ -228,26 +235,37 @@ Zustand store. **Two data lanes:** (A) high-freq visuals subscribe straight to
 - **`components/`** — React panels, each reads/writes the store: `SceneCanvas` (mounts the
   engine, dynamic-imported so Three never enters the server bundle), `Blueprint` (placeholder
   schematics), `BootOverlay`, `TopBar` (the full-width top command bar: status + filter +
-  view switch + view vitals; `components/topbar/` holds `Vitals`, `FilterPicker`, `EcgMark`),
+  view switch + view vitals + the RAW switch; `components/topbar/` holds `Vitals`,
+  `FilterPicker`, `EcgMark`, `RawToggle`),
   `ExploreRail` (the left explore rail), `Inspector` (the right facts rail), `ContextCard`,
   `InspectorCard` (a thin frame dispatching to the per-kind cards in `components/inspector/`),
   `CardHead` (the ONE card header + the `RIGHT_CARD` frame), `RailThread`, `RailDock`
   (tablet/phone sheets), `RailScroll`, `EdgePulse`, `selection.tsx`, `Tooltip`,
   `FollowController` (ledger snapshot follow), `DataBridge` (boots the data),
-  `RawSnapshotBridge` (fetches the exact raw-L0 read for the focused ticks), `BottomStream` +
-  `LiveStrip` (the bottom live lane), `Odometer`, `Sparkline`, `state/StateAtoms`, and the
+  `RawSnapshotBridge` (fetches the exact raw-L0 read for the focused ticks), `SectionShell`
+  (the GSAP scene↔raw-layer depth transition), `BottomStream` +
+  `LiveStrip` (the bottom lane — bars in ledger) + `NodeCountReadout` (the
+  strip's non-ledger content), `DataSection` + `components/datasection/` (the raw layer's per-view
+  tables), `Odometer`, `Sparkline`, `state/StateAtoms`, and the
   hooks `useSnapshotFeed`, `useBreakpoint`, `useBootPhase`, `useMinHold`, `useSubjectPairing`.
 - **`src/store/store.ts`** — the Zustand store (mode, filter, country, inspect, snap,
   selStack, following, metaList, leaderboard, selNodes, activity, snapshotExact, the hover
-  channels `hoverFilter`/`hoverNodeId`/`hoverSnapOrd`, phone UI state, …). **`src/data/`** —
+  channels `hoverFilter`/`hoverNodeId`/`hoverSnapOrd`, `section` (which of the two shell LAYERS is
+  presented — UI state, not selection, so it sits outside the one-selection-write-path rule),
+  phone UI state, …). **`src/data/`** —
   `network.ts` wraps the typed `NetworkData` singleton (`api.ts`) + exposes `getAnchor`/
   `metagraphById`/`filterAccent`/`CORE_HEX`/etc; `follow.ts` = follow logic; `types.ts`
   (`PickDescriptor` is a `kind`-discriminated union, `SnapshotExact`, `NodeRow`);
   `composition.ts` (node-fabric grouping), `nodeStatus.ts` (the shared status vocabulary),
   `hoverSubject.ts` (`hoverKeyOf`), `ledgerLayers.ts` (the settlement layers' display COPY —
-  name/desc by layer id; the geometry twin is `domain/ledgerLayout.ts`'s `LAYER_GEOM`),
+  name/desc by layer id; the geometry twin is `domain/ledgerLayout.ts`'s `LAYER_GEOM`; `desc`
+  belongs to the LAYER CARD only — an explorer row shows name + count, never the same sentence
+  a rail away, see *the explanatory-copy split*),
+  `anchorLog.ts` + `roster.ts` (the PURE row builders behind the raw layer's tables — anchored
+  metagraph-snapshot rows, and the flat node roster + its column sort),
   `bootPhase.ts`, `breakpoint.ts`. **`src/util/`** —
-  `format.ts` (`hex`/`fmtDag`/`ccToFlag`), `relativeAge.ts`, `odometer.ts`.
+  `format.ts` (`hex`/`fmtDag`/`ccMark` — the country CODE mark; flag emoji were removed
+  2026-08-01, Windows ships no flag font and emoji ignore CSS `color`), `relativeAge.ts`, `odometer.ts`.
   **`src/palette/`** — the identity-hue generator (see *Two colour lanes*).
 - **`src/engine/Engine.ts`** — the imperative engine and **the one bridge** (store ⇄ domain ⇄
   scene). Owns the render loop, morph, camera-focus tweens (`FOCI`), DoF, picking, the
@@ -337,7 +355,11 @@ store-value imports**, enforced by `layerBoundaries.test.ts`). Each ships coloca
   decorative twinkle shimmer was removed, user) with PER-POOL resting bases — validators
   `lerp(0.47, 0.37, morph)`, metagraph nodes `lerp(0.33, 0.37, morph)` (they rest at the dim
   look in hyper, 2026-07-17: `metaDimScale` = morph zeroes their network dim there; the
-  committed network pops via `hubMatchBoost` to the hub level 0.72).
+  committed network pops via `hubMatchBoost` to the hub level 0.72). **Focus is TIERED, not a
+  flag** (`focusWeightOf` + `GROUP_FOCUS`, 2026-08-01): the hovered/selected NODE takes the full
+  `focusBoost`, a mere member of a focused GROUP (a hovered/committed provider cohort, a hovered
+  composition/cluster group) only `GROUP_FOCUS` of it — otherwise picking a node inside an
+  already-lit cohort changed nothing on screen (user).
 - `arcSim.ts` — the travelling-packet arc simulation: a swarm of comet "agents" that hop
   node→node. **Emits flash EVENTS via a ring buffer** — no cross-view side-channel mutation.
 - `ledgerModel.ts` — the Snapshots chamber's layout/slot/tile model over the live snapshot data.
@@ -427,6 +449,10 @@ GPU; no store/react**):
   with the patched smooth-shaded `MeshStandardMaterial` (per-instance `aBase`/`aEmissive`).
 - `objects/Arcs.ts` — the ONE `LineSegments` draw call for the arcs; rewrites head/tail
   positions each frame from `arcSim`'s state and **applies its flash events** to the nodes.
+  It shares the surface's camera-**facing** + closeness uniforms (`Arcs.setFacing`, handed over
+  right after `buildGeoView`): the hologram has no opaque body sphere, so nothing depth-occludes
+  a comet over the far hemisphere — it fades itself, the same recipe the walls and graticule use
+  (user, 2026-08-01: arcs read as flying through the globe).
 - `objects/Background.ts` — the skydome. The **geo** end is the twinkling starfield + faint
   nebula; the **hyper** end is a **single flat colour** (no animation, no gradient, no tint — an
   animated backdrop read as distracting). Only `uTime`/`uMorph` drive it.
@@ -583,7 +609,9 @@ views and caused the ledger red-dots bug; that pattern is forbidden.
     the stack field's centroid (`Globe.focusCohort`, the same `NODE_RAISE` contract as the
     node pose) and frames it one rung wider than the node zoom (`cohortFraming` — ABSOLUTE/
     dolly-exempt like `nodeFraming`) while the member stacks hold a STEADY committed glow
-    (same strength as the hover preview; a live hover wins while active; membership matches
+    (same strength as the hover preview, but a GROUP tier — `dimModel.GROUP_FOCUS`, a fraction
+    of the boost a single node takes, so selecting one node inside the lit cohort still pops;
+    a live hover wins while active; membership matches
     by falsy-normalized cc+city+isp — the data layer normalizes unresolved fields to "");
     a **node** pick zooms close in a
     LATITUDE-INDEPENDENT pose (`Globe.focusNode` leans the globe UNCAPPED with a 0.42 raise, so
@@ -695,7 +723,41 @@ row opts it in. The `ledger` row shows the pattern: `pickSources: ["ledger", "gl
 (hubs hidden), `dofEligible: false`. Its hidden hubs are kept **out of `pickSources`**, not
 relied on being invisible — per the raycaster rule above.
 
-## Layout system — the four-zone HUD
+## Layout system — the four-zone HUD, over a RAW DATA LAYER
+
+The page is ONE fixed shell in **two LAYERS at different depths** (`SectionShell` +
+`store.section`, spec 2026-08-01, revised the same day): the **scene layer** is the four-zone HUD
+over the 3D canvas, and the **raw layer** is the view's raw-data table (`DataSection`) — *the same
+data one level down*, not a second page. Flipping the command bar's **RAW switch** (a shadcn
+`Switch`, the light/dark-mode idiom — `components/topbar/RawToggle.tsx`) runs one GSAP timeline:
+the HUD fades out (0.26s), the whole
+scene shell **recedes** (scale `SCENE_BACK` 0.92 + opacity `SCENE_DIM` 0.26, 0.55s
+`power3.inOut` — still live behind, just pushed into the background), and the raw layer **surfaces
+out of that depth** (opacity 0→1, scale 0.94→1, a small `yPercent` rise, 0.55s `power3.out`,
+overlapping at +0.16s). Back is the mirror, plus **Escape**. Retargeting mid-flight kills the live
+timeline. Reduced motion makes it an instant swap (all durations 0).
+
+**The page never scrolls.** The scene wrapper is `position:fixed; inset:0` **WITH an identity
+transform from first paint**, which makes it the containing block for every `position:fixed`
+descendant (canvas, rails) — so the existing shell CSS works untouched, the WebGL buffer stays
+viewport-sized, and GSAP later writing that same `transform` never re-anchors geometry. The raw
+layer is a **SIBLING** of that wrapper (`#datasection`, `.ig-panel fixed z-9`), occupying exactly
+the rails' band via the shared tokens (`--rail-top` + `--topbar-extra` → `--bottom-reserve`,
+edge-aligned 26px desktop / 16px below 1100px), so the receded scene shows around and faintly
+through its glass. The `LiveStrip` is a sibling too (`z-10`) — it belongs to NEITHER pose and stays
+interactive in both. Whichever layer is away carries `inert` (no focus, no pointer events).
+`TopBar` + the banner stay OUTSIDE the shell (fixed to the real viewport, visible in both poses),
+as do the bridges and the pointer-anchored `Tooltip`.
+
+⚠️ **The HUD wrapper is animated by OPACITY ONLY** — deliberately. `opacity` creates a stacking
+context but NOT a containing block; giving that zero-size static div a transform would capture the
+fixed rails inside it. The receding transform belongs to the `fixed inset-0` wrapper, which is
+already their containing block. (The old translate-the-shell-off-screen mechanism — drag/wheel/
+chevron navigation via GSAP Draggable + Inertia + Observer — is RETIRED: scroll fought the Three.js
+camera controls, and the page-swap metaphor read as "the table hides the app". With it went the
+`shellOffsetY()` measurement trap: nothing translates, so `getBoundingClientRect()` inside the
+shell IS the viewport position again. Portalled UI still doesn't ride any of this, so it's gated —
+`RailDock` gates its sheets on `section`; `LiveStrip` portals its tip.)
 
 The HUD is **four fixed zones over the canvas, one SCOPE/role each, stable across views**.
 **Gate new chrome by *which zone/scope it belongs to* — not by what a particular view puts
@@ -723,7 +785,10 @@ and keep changing, so they're examples, not the contract.
   **view switch** (center — a `ToggleGroup` of six monochrome lucide icons: `Orbit` hyper /
   `Globe` geo / `Layers` ledger / `Radar` status / `ArrowLeftRight` transactions / `HandCoins`
   staking, from `VIEW_ICONS`), and the
-  **view vitals** (right, `Vitals`). **The vitals region is constant-width**: all view
+  **view vitals + the RAW switch** (right — `Vitals`, then `RawToggle`, the bar's trailing
+  control: it opens the raw data layer under the view and sits LAST because it acts on
+  everything to its left; the "RAW" word hides ≤940px exactly like the FILTER label). **The
+  vitals region is constant-width**: all view
   clusters render stacked in one grid cell (inactive ones `invisible` + `aria-hidden`) so the
   centered view switch never jumps on a view change; sparklines condense away ≤1240px.
   Below 1100px a slim **selected-view caption** hangs under the bar, right-anchored. The
@@ -764,7 +829,12 @@ and keep changing, so they're examples, not the contract.
   layers" (not "Nodes by…": its subjects are strata, not nodes). Card EYEBROWS are the bare
   role words ("About" / "Explore") — the view name was dropped (user, 2026-07-12: the view
   switch already says where you are), and each explorer's usage hint LEADS the card (top,
-  descriptive) instead of trailing it), ledger → `LedgerPanel` — since the focus-ladder work
+  descriptive) instead of trailing it. **The explanatory-copy split**: an explorer ROW is a
+  browse target — mark/name/count and nothing more; the prose that EXPLAINS a subject belongs
+  to that subject's right-rail card, once (user, 2026-08-01: the ledger floor rows repeated
+  `LEDGER_LAYERS.desc` under every name while the layer card opened with the same sentence one
+  rail away, and the list read as prose instead of rows). A row commits its card in the same
+  click, so nothing is lost by leaving the sentence in one place), ledger → `LedgerPanel` — since the focus-ladder work
   (2026-07-18) ALSO the ledger's node browser: the four node-kind floors (`ml1`/`ml0`/
   `hypl0`/`hypl1`; never the snapshot floors) are DISCLOSURES — commit+expand in one click
   (`layerToggleActions`), disclosure = the committed layer (single-open by construction) —
@@ -783,7 +853,7 @@ and keep changing, so they're examples, not the contract.
   design, 2026-07-10; replaced the recency stack + the floating pick-hint; the country +
   provider slots landed with the focus ladder, 2026-07-18): every card the
   current view CAN produce is always visible — POPULATED when its subject is selected
-  (`ContextCard` mirrors the filter; the **country card** — flag+name title, Nodes/Share/
+  (`ContextCard` mirrors the filter; the **country card** — `ccMark` code + name title, Nodes/Share/
   Cities/Providers from `store.selNodes`, geo-scoped like layer is ledger-scoped; the
   **provider card** — "City · Provider" title, Nodes/Networks/ASN/Country; both rendered
   straight from their store channels by Inspector's `CountryPane`/`ProviderPane` since
@@ -798,8 +868,12 @@ and keep changing, so they're examples, not the contract.
   committable `focusLadder` rung below "all" must map to a hinted card slot (exemptions
   need an explicit documented entry) — a future rung can't land without deciding its card. An **instrument-channel
   thread** (`RailThread`) runs each rail's outer edge.
-- **Bottom** (`BottomStream`) = the live/time lane: the slim `LiveStrip` bar-chart in EVERY
-  view; it publishes `--bottom-reserve`.
+- **Bottom** (`BottomStream`) = the live/time lane: the slim
+  `LiveStrip` in EVERY view; it publishes `--bottom-reserve`. It belongs to neither layer (it sits
+  outside the scene wrapper and stays interactive in both poses); its CONTENT
+  is per-view — the tick bar-chart is **LEDGER-ONLY** (a time series belongs to the *when* view),
+  and hyper/geo/flat carry the `NodeCountReadout` in the same slim footprint instead: the located
+  total plus one identity dot + count per network, from the live `metaList` tallies.
 
 **Per-view vitals** (contents, not the rule): **hyper** = the structure (filter-aware
 MACHINE counts per composition — Data / Hybrid / Currency, the same vocabulary as the
@@ -815,12 +889,17 @@ health belongs to the cards + the future network-health view).
 (architecture), **geo = where** (footprint), **ledger = when** (the ledger over time +
 cost). Activity metrics belong to ledger, structure to hyper — don't cross-pollinate.
 
-**The snapshot card is ledger-scoped.** `FollowController` follows the live snapshot and the
-ledger view follows live by default; once a snapshot is *selected* it's pinned and carries
-across views until deselected. Clicking a `LiveStrip` bar selects that snapshot IN PLACE —
-no view switch (the old jump-to-ledger was dropped); the card shows in whatever view you're
-in. Clicking the LIVE tip (re-)follows the heartbeat; an older bar pins
-(`snapshotSelectActions` — the same tested table the ledger's 3D tile click runs).
+**The snapshot card is ledger-scoped — the pin does NOT carry out of the view** (spec
+2026-08-01, a deliberate reversal of the old carry-across-views rule). `FollowController` follows
+the live snapshot and the ledger view follows live by default; a *selected* snapshot pins until
+deselected **or until you leave ledger** — `Engine.setMode` clears `store.snap` on any switch away
+(the same `LEVEL_CARRY` logic that already scoped country/cohort to geo and layer to ledger;
+`following` is left to the FollowController, whose mode effect has already flipped it false, so
+the clear sticks). The rail's snapshot ghost hint (`railCards.snapHint`) is gated to ledger to
+match. Clicking a `LiveStrip` bar selects that snapshot IN PLACE — no view switch — but since the
+bars now render only in ledger, that click is a ledger interaction by construction. Clicking the
+LIVE tip (re-)follows the heartbeat; an older bar pins (`snapshotSelectActions` — the same tested
+table the ledger's 3D tile click runs).
 
 ### Responsive shell
 
@@ -966,7 +1045,13 @@ code — reference the tokens. The SVG `RailThread` mirrors the `--thread-*` lit
   overridden to a faint neutral (the bright accent fill washed text out). `ToggleGroup` —
   the view switch + phone dock halves; the view switch owns its sizing/rounding explicitly
   (`h-9`, `rounded-[8px]!`). **`Sheet`** — the tablet/phone rail docks (non-modal, no
-  overlay, no exit animation). `Badge`/`Avatar`/`Separator` — inspector bodies.
+  overlay, no exit animation). **`Switch`** — the command bar's RAW control (the one scene↔raw-layer
+  affordance; `size="sm"`, wrapped in a `<label>` with its own caption).
+  `Badge`/`Avatar`/`Separator` — inspector bodies.
+- **`Table` + `ScrollArea`** — the raw data layer's tables only (2026-08-01). The stock shadcn
+  `Table` is adopted MINUS its scroll-container div: `ScrollArea` owns scrolling, so the header
+  can stay `sticky` + opaque while the body scrolls under it. Both come from the unified
+  `radix-ui` package already in the tree — no new dependency.
 - The engine-anchored `Tooltip` stays custom (component-local pointermove positioning; the
   engine writes the hover subject to the store) — a Radix tooltip can't track a raycast.
 
@@ -1023,7 +1108,10 @@ signal channel.**
   static vivid icons, no beat, blink-not-sweep pulse.
 - **Calm tempo**: the heartbeat family (ECG scan, filter dot `dot-beat`, card-title dots,
   live dots `breathe`) beats at 1.5s; transient signals (edge pulse, hold-fade) run ~1.2s/
-  0.4s. Signals are debounced — a 4s-tick live feed must never read as a strobe.
+  0.4s. Signals are debounced — a 4s-tick live feed must never read as a strobe. **Navigation
+  moves on its own, slower clock**: the scene↔raw-layer depth change is 0.55s (GSAP) and the
+  3D↔3D view choreography ~3.9s — a whole-shell or whole-scene move is allowed to take longer
+  than a signal, because it's the user's own gesture resolving, not the instrument speaking.
 - **Reduced motion is guarded on EVERY animation**: theme-var animations carry
   `motion-reduce:animate-none` at the call site; CSS recipes carry their own
   `@media (prefers-reduced-motion: reduce)` override (the edge pulse degrades to one static
@@ -1117,8 +1205,10 @@ placeholder views get no ghosts. The allow-list is EXECUTABLE since 2026-07-18:
 when the filtered network has nothing pickable in geo the node ghost turns into the honest
 variant ("<TICKER> has no locatable nodes — explore it in the Hypergraph view"); "all" with
 0 nodes = boot → that ghost stays silent rather than flashing a false invite. A populated
-card renders in ANY view (e.g. a pinned snapshot carried out of ledger); the ghost only
-appears where the view can actually produce the card.
+card renders in ANY view (e.g. a node selected in hyper and carried into geo); the ghost only
+appears where the view can actually produce the card. NB the snapshot slot is the one subject
+that no longer carries — it's cleared on leaving ledger (spec 2026-08-01), so its card and its
+ghost are both ledger-only.
 
 ### CSS traps (learned the hard way)
 
@@ -1127,6 +1217,16 @@ appears where the view can actually produce the card.
    pairing wash) and to later-in-layer recipes (`.ig-panel`'s box-shadow silenced the paired
    glow). Unlayered CSS beats every layer at equal specificity. `.subject-paired` and the
    card signal system live unlayered on purpose — new must-win recipes go there too.
+2. **A transform on an ancestor re-anchors every `position:fixed` descendant to it** —
+   `opacity` does NOT (it only makes a stacking context). Both halves are load-bearing:
+   `SectionShell`'s scene wrapper is `fixed inset-0` with an inline identity `translateY(0px)`
+   from FIRST PAINT precisely so the canvas + rails resolve their fixed boxes against the wrapper
+   (= the viewport at rest) before anything renders — geometry never jumps when GSAP later writes
+   that same property to make the scene recede. Its HUD child, conversely, is animated by OPACITY
+   ONLY: a transform there would make that zero-size static div the rails' containing block. A
+   plain `<div>` with no transform/filter/will-change (the `inert` carrier) does NOT create a
+   containing block, so it's safe to nest. Anything that must stay pinned to the REAL viewport
+   goes outside the wrapper (TopBar, the strip, the raw layer) or through a portal.
 2. **`bg-[var(--x)]` compiles to background-COLOR.** A token holding a gradient/shorthand
    (e.g. `--axis-hairlines`) silently renders nothing through `bg-[…]` — use the arbitrary
    property form `[background:var(--x)]`.
@@ -1171,21 +1271,37 @@ A global snapshot's real work is **settlement, not blocks** — most carry zero 
 centre + trail blocks are sized by it too); the snapshot card shows the derived **`~DAG`**
 fee, height/sub-height, and a `+N blk` note for the uncommon block-carrying ticks.
 
-**`LiveStrip`** (`components/LiveStrip.tsx`) is the bottom lane in EVERY view: one bar per
-tick, height = anchors, crisp cap + faded body, no panel chrome (bars blend into the scene).
+**`LiveStrip`** (`components/LiveStrip.tsx`) occupies the bottom lane in every view, but the
+**bar-chart is ledger-only**. The bars: one per tick, height =
+anchors, crisp cap + faded body, no panel chrome (they blend into the scene).
 Unfiltered, bars plot each tick's TOTAL anchors in cyan. **Filtered, each bar plots THAT
 metagraph's own anchors on its OWN scale in its identity hue — its own cadence, with empty
 ticks as honest gaps** (deliberate: a ~1-anchor-per-tick metagraph reads sparse/degenerate,
 and 0-in-window reads blank; that honesty is the design, don't "fix" it). Clicking a bar
-selects that snapshot IN PLACE (no view switch — the old hyper/geo jump-to-ledger was
-dropped): the LIVE tip (re-)follows, an older bar pins, via `snapshotSelectActions` +
-`applyClickActions` (the same table/executor as the ledger's 3D tile). Hovering a bar
+selects that snapshot IN PLACE (no view switch), via `snapshotSelectActions` +
+`applyClickActions` (the same table/executor as the ledger's 3D tile): the LIVE tip
+(re-)follows, an older bar pins. Hovering a bar
 cross-highlights the matching ledger block (`hoverSnapOrd`); the hover is cleared on each
 new tick (bars shift under a stationary cursor, which never fires mouseleave, so a hover
 would otherwise stick and trail). Selection is store-driven (`inspect`/`following`/`snap`
-via the shared `useSnapshotFeed` hook), so the highlighted snapshot stays consistent across
-views. Phone renders fewer bars (`PHONE_BARS`) from the same buffer. Hand-rolled CSS bars,
+via the shared `useSnapshotFeed` hook). Phone renders fewer bars (`PHONE_BARS`) from the same
+buffer. Hand-rolled CSS bars,
 not Recharts — dense, interactive, slim (Recharts is used for the vitals `Sparkline`s).
+**Outside ledger the same footprint carries `NodeCountReadout`** — the located node total + one
+identity dot and count per network (2026-08-01: a time series is a *when* instrument and the
+other views aren't about time; the readout keeps the lane honest rather than blank).
+
+**The raw data layer's table** (`components/DataSection.tsx` + `components/datasection/`)
+is the same per-view projection idea in table form, dispatching on `mode`: **ledger** →
+`AnchorLogTable` (one row per anchored metagraph snapshot — network, snapshot ordinal, fee, size,
+the global it anchored into, age; row click pins that global snapshot through the same
+`snapshotSelectActions`, hover writes `hoverSnapOrd`), **hyper/geo** → `NodeRosterTable` (one row
+per node, with per-view COLUMN ORDER — geo leads location-first `Country · City · Provider`,
+hyper leads `Network · Node · Layer` — click-to-sort headers, row click running
+`nodeSelectActions`), **flat views** → the honest `preview · in development` line, never a
+fabricated table. The rows come from the pure builders `src/data/anchorLog.ts` +
+`src/data/roster.ts`; every selection still routes through the tested `pickActions` builders +
+`applyClickActions`, so a table row and a scene click can't drift.
 
 > **Live tick — total is instant, breakdown/fee come from the exact read.** The *total*
 > (`metagraphSnapshotCount`) is final immediately; the per-metagraph breakdown + fee are
@@ -1300,6 +1416,14 @@ event, `ledger.update(dt)` per frame).
   `mode: "ledger"` in `store.ts`.
 
 ## Anchoring, fees & the metagraph data layer
+
+**Vocabulary rule (user, 2026-08-01):** in USER-FACING copy the Snapshots stack **anchors
+state** — "settlement" is reserved for the DAG a snapshot actually pays (the snapshot card's
+fee/size rows). One word for both read as if Snapshots were where *money* settles, which is
+what the separate Transactions view is for. So: "Anchoring layers", "When the network anchors",
+"the base ledger", "N KB anchored"; and hyper's core copy says "security + consensus". Internal
+identifiers/comments keep their existing names (`LedgerView`, the settlement chamber) — the rule
+is about words the user reads, not code.
 
 Verified live against mainnet:
 
@@ -1519,5 +1643,10 @@ Target host is **Vercel** (any Node host works). No env vars / secrets are requi
 
 The full migration/design-session history (plans, specs, screenshots, the design-concerns
 log) lived in `docs/superpowers/` and was harvested into this file, then removed
-(2026-07-05) — git history preserves all of it, and `.superpowers/sdd/progress.md` remains
-the running work ledger.
+(2026-07-05). The folder later re-accumulated the 2026-07 feature specs/plans (engine-domain
+refactor, view transitions, consistency hardening, focus ladder) and was removed again
+entirely (2026-07-19) — git history preserves all of it, and `.superpowers/sdd/progress.md`
+remains the running work ledger. Durable decisions from those specs live in this file. The
+same happened once more with the 2026-08-01 LiveStrip-sections spec/plan: its mechanism was
+reversed during implementation (the drag/wheel divider became the command bar's RAW switch),
+so the documents described a design that never shipped and were removed with it.

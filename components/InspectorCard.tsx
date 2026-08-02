@@ -53,18 +53,29 @@ export default function InspectorCard({
   p,
   eyebrow,
   onClose,
+  collapsed: collapsedProp,
+  onToggle: onToggleProp,
 }: {
   p: PickDescriptor;
   eyebrow?: string;
   // When set, CardHead renders the card's absolute × — the ONE baseline close every dismissible
   // card shares (label: CardHead's "Clear selection" default; no per-card variants).
   onClose?: () => void;
+  // CONTROLLED collapse (Inspector's descent-spine ladder, 2026-07-19): when both are passed the
+  // card's collapse is driven from outside (the store's railCollapse override composed with the
+  // ladder's auto default — ancestors rest collapsed) instead of the local fallback state. Passing
+  // neither keeps the original per-card local +/− (any non-ladder usage).
+  collapsed?: boolean;
+  onToggle?: () => void;
 }) {
   // Right cards are COLLAPSIBLE too (user, 2026-07-12 — the left rail's tool cards already
   // were): the +/− ghost rides beside the ×, collapsing to eyebrow + title (no hairline, no
-  // body). Local state per slot — it survives subject changes within the slot on purpose (a
-  // reader who parked the dossier collapsed wants it to STAY parked across filter switches).
-  const [collapsed, setCollapsed] = useState(false);
+  // body). Local state is the FALLBACK when the slot isn't ladder-controlled (survives subject
+  // changes within the slot on purpose — a reader who parked a card collapsed keeps it parked).
+  const [localCollapsed, setLocalCollapsed] = useState(false);
+  const controlled = collapsedProp !== undefined;
+  const collapsed = controlled ? collapsedProp : localCollapsed;
+  const onToggle = controlled ? onToggleProp : () => setLocalCollapsed((c) => !c);
   // NO SIGNAL — the explorer feed is unreachable: SnapshotCard swaps to its own "no signal" body,
   // and the frame's eyebrow dims along with it (carried forward from `.no-signal .insp-eyebrow`).
   const live = useStore((s) => s.live);
@@ -91,7 +102,7 @@ export default function InspectorCard({
         aside={head.aside ?? (site ? <MetaSiteAction site={site} /> : undefined)}
         onClose={onClose}
         collapsed={collapsed}
-        onToggle={() => setCollapsed((c) => !c)}
+        onToggle={onToggle}
         eyebrowMuted={eyebrowMuted}
       />
       {!collapsed && <CardBody p={p} />}

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { getNetwork } from "@/src/data/network";
+import { getNetwork, initNetwork } from "@/src/data/network";
 import type { GlobalEvent, GlobalSnapshot } from "@/src/data/types";
 
 // Shared Global L0 snapshot subscription — the live tail both the full ribbon
@@ -14,7 +14,14 @@ export function useSnapshotFeed(max: number) {
   const [, setAnchorTick] = useState(0);
 
   useEffect(() => {
-    const net = getNetwork();
+    // Boot-order-INDEPENDENT on purpose. `DataBridge` owns the boot, but this hook's consumer
+    // (`LiveStrip`) lives inside `SectionShell`, which React renders — and whose effects therefore
+    // run — BEFORE the bridge's. Reading `getNetwork()` alone returned null there and the effect
+    // (deps `[max]`) never re-ran, so the strip silently sat on "Waiting for snapshots…" forever
+    // while every other panel had live data (found in a browser pass, 2026-08-02; the old page
+    // order happened to mount the bridge first, so the raw-layer redesign exposed it). `initNetwork`
+    // is idempotent, so claiming the singleton here costs nothing and can't wedge on mount order.
+    const net = getNetwork() ?? initNetwork();
     if (!net) return;
 
     // Seed from the buffer (the "reset" event may have fired before we mounted).

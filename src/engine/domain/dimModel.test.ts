@@ -4,6 +4,8 @@ import {
   metaDimScale,
   focusDim,
   focusBoost,
+  focusWeightOf,
+  GROUP_FOCUS,
   hubMatchBoost,
   dimTargetsFor,
   validatorDim,
@@ -80,12 +82,43 @@ describe("focusDim / focusBoost (per-view hover/selection strength)", () => {
 
   it("the emissive functions consume them: a geo-focused node gains 0.7, a geo dim-back is ×0.65", () => {
     const c = ctx({ morph: 1 });
-    const base = nodeEmissive(c, 0, 0, false, false, 0.5, 0.22);
-    expect(nodeEmissive(c, 0, 0, true, true, 0.5, 0.22)).toBeCloseTo(base + 0.7, 10);
-    expect(nodeEmissive(c, 0, 0, false, true, 0.5, 0.22)).toBeCloseTo(base * 0.65, 10);
-    const mBase = metaNodeEmissive(c, 0, 0, false, false, 0.5);
-    expect(metaNodeEmissive(c, 0, 0, true, true, 0.5)).toBeCloseTo(mBase + 0.7, 10);
-    expect(metaNodeEmissive(c, 0, 0, false, true, 0.5)).toBeCloseTo(mBase * 0.65, 10);
+    const base = nodeEmissive(c, 0, 0, 0, false, 0.5, 0.22);
+    expect(nodeEmissive(c, 0, 0, 1, true, 0.5, 0.22)).toBeCloseTo(base + 0.7, 10);
+    expect(nodeEmissive(c, 0, 0, 0, true, 0.5, 0.22)).toBeCloseTo(base * 0.65, 10);
+    const mBase = metaNodeEmissive(c, 0, 0, 0, false, 0.5);
+    expect(metaNodeEmissive(c, 0, 0, 1, true, 0.5)).toBeCloseTo(mBase + 0.7, 10);
+    expect(metaNodeEmissive(c, 0, 0, 0, true, 0.5)).toBeCloseTo(mBase * 0.65, 10);
+  });
+});
+
+// Focus is TIERED so a finer selection always says something: picking a node inside an already
+// lit provider cohort used to change nothing at all (user, 2026-08-01), because group membership
+// and being the subject were the same boolean.
+describe("focusWeightOf / GROUP_FOCUS (the focus ranking)", () => {
+  it("primary wins outright, a group member takes only a share, neither = 0", () => {
+    expect(focusWeightOf(true, false)).toBe(1);
+    expect(focusWeightOf(true, true)).toBe(1); // the subject inside its own group is still primary
+    expect(focusWeightOf(false, true)).toBe(GROUP_FOCUS);
+    expect(focusWeightOf(false, false)).toBe(0);
+    expect(GROUP_FOCUS).toBeGreaterThan(0);
+    expect(GROUP_FOCUS).toBeLessThan(1);
+  });
+
+  it("the emissive functions scale the boost by the weight, so the subject outshines its group", () => {
+    const c = ctx({ morph: 1 });
+    const off = nodeEmissive(c, 0, 0, 0, false, 0.5, 0.22);
+    const group = nodeEmissive(c, 0, 0, focusWeightOf(false, true), true, 0.5, 0.22);
+    const primary = nodeEmissive(c, 0, 0, focusWeightOf(true, true), true, 0.5, 0.22);
+    expect(group).toBeCloseTo(off + 0.7 * GROUP_FOCUS, 10);
+    expect(primary).toBeCloseTo(off + 0.7, 10);
+    expect(primary).toBeGreaterThan(group);
+    expect(group).toBeGreaterThan(off);
+    // …and the same ranking holds in the metagraph loop.
+    const mOff = metaNodeEmissive(c, 0, 0, 0, false, 0.5);
+    expect(metaNodeEmissive(c, 0, 0, focusWeightOf(true, true), true, 0.5)).toBeGreaterThan(
+      metaNodeEmissive(c, 0, 0, focusWeightOf(false, true), true, 0.5),
+    );
+    expect(metaNodeEmissive(c, 0, 0, focusWeightOf(false, true), true, 0.5)).toBeGreaterThan(mOff);
   });
 });
 
@@ -186,7 +219,7 @@ describe("hubMatchBoost (the committed metagraph's hub-level bloom)", () => {
   it("composes INSIDE metaNodeEmissive's floor, exactly as the render path does", () => {
     const c = ctx({ morph: 0 });
     const boost = hubMatchBoost(c, 0.33, true);
-    expect(metaNodeEmissive(c, 0, 0, false, false, 0.33, boost)).toBeCloseTo(0.72, 10);
+    expect(metaNodeEmissive(c, 0, 0, 0, false, 0.33, boost)).toBeCloseTo(0.72, 10);
   });
 });
 
@@ -196,12 +229,12 @@ describe("nodeEmissive (validator loop, js/globe.js:1043-1054)", () => {
   it("at morph=0, no flash/dim/focus: base is exactly baseLo, floored at 0.02", () => {
     const c = ctx({ morph: 0 });
     // lerp(0.5,0.22,0)=0.5; d=0 -> *(1-0)=0.5; +0 flash
-    expect(nodeEmissive(c, 0, 0, false, false, baseLo, baseHi)).toBeCloseTo(0.5, 10);
+    expect(nodeEmissive(c, 0, 0, 0, false, baseLo, baseHi)).toBeCloseTo(0.5, 10);
   });
 
   it("at morph=1 with d=0, base is exactly baseHi", () => {
     const c = ctx({ morph: 1 });
-    expect(nodeEmissive(c, 0, 0, false, false, baseLo, baseHi)).toBeCloseTo(0.22, 10);
+    expect(nodeEmissive(c, 0, 0, 0, false, baseLo, baseHi)).toBeCloseTo(0.22, 10);
   });
 
   it("suppresses glow by (1 - d*0.92) and adds the morph-scaled flash", () => {
@@ -209,29 +242,29 @@ describe("nodeEmissive (validator loop, js/globe.js:1043-1054)", () => {
     const d = 0.5;
     const flash = 1;
     const expected = 0.22 * (1 - d * 0.92) + flash * 1;
-    expect(nodeEmissive(c, d, flash, false, false, baseLo, baseHi)).toBeCloseTo(expected, 10);
+    expect(nodeEmissive(c, d, flash, 0, false, baseLo, baseHi)).toBeCloseTo(expected, 10);
   });
 
   it("floors at 0.02 when fully dimmed with no flash", () => {
     const c = ctx({ morph: 1 });
-    expect(nodeEmissive(c, 1, 0, false, false, baseLo, baseHi)).toBeCloseTo(0.02, 10);
+    expect(nodeEmissive(c, 1, 0, 0, false, baseLo, baseHi)).toBeCloseTo(0.02, 10);
   });
 
   it("boosts the focused node by +1.4, ignoring dimOthersOnFocus", () => {
     const c = ctx({ morph: 0 });
-    const base = nodeEmissive(c, 0, 0, false, false, baseLo, baseHi);
-    expect(nodeEmissive(c, 0, 0, true, true, baseLo, baseHi)).toBeCloseTo(base + 1.4, 10);
+    const base = nodeEmissive(c, 0, 0, 0, false, baseLo, baseHi);
+    expect(nodeEmissive(c, 0, 0, 1, true, baseLo, baseHi)).toBeCloseTo(base + 1.4, 10);
   });
 
   it("dims a non-focused node by *0.45 only when dimOthersOnFocus is set", () => {
     const c = ctx({ morph: 0 });
-    const base = nodeEmissive(c, 0, 0, false, false, baseLo, baseHi);
-    expect(nodeEmissive(c, 0, 0, false, true, baseLo, baseHi)).toBeCloseTo(base * 0.45, 10);
+    const base = nodeEmissive(c, 0, 0, 0, false, baseLo, baseHi);
+    expect(nodeEmissive(c, 0, 0, 0, true, baseLo, baseHi)).toBeCloseTo(base * 0.45, 10);
   });
 
   it("does nothing extra when there's no focus target at all (isFocus and dimOthersOnFocus both false)", () => {
     const c = ctx({ morph: 0 });
-    const base = nodeEmissive(c, 0, 0, false, false, baseLo, baseHi);
+    const base = nodeEmissive(c, 0, 0, 0, false, baseLo, baseHi);
     expect(base).toBeCloseTo(0.5, 10);
   });
 });
@@ -241,44 +274,44 @@ describe("metaNodeEmissive (metagraph loop, js/globe.js:1099-1107)", () => {
 
   it("at morph=0, no dim/flash: glow is exactly base, no lerp toward a second endpoint", () => {
     const c = ctx({ morph: 0 });
-    expect(metaNodeEmissive(c, 0, 0, false, false, base)).toBeCloseTo(0.5, 10);
+    expect(metaNodeEmissive(c, 0, 0, 0, false, base)).toBeCloseTo(0.5, 10);
   });
 
   it("suppresses glow by (1 - d*0.9) — the metagraph coefficient, not the validator's 0.92", () => {
     const c = ctx({ morph: 0 });
     const d = 0.5;
     const expected = base * (1 - d * 0.9);
-    expect(metaNodeEmissive(c, d, 0, false, false, base)).toBeCloseTo(expected, 10);
+    expect(metaNodeEmissive(c, d, 0, 0, false, base)).toBeCloseTo(expected, 10);
   });
 
   it("floors at 0.03 (not the validator's 0.02) when fully dimmed with no flash", () => {
     const c = ctx({ morph: 0 });
     // base=0.2, d=1 -> glow = 0.2*(1-0.9) = 0.02, below the 0.03 floor -> clamped up to it.
-    expect(metaNodeEmissive(c, 1, 0, false, false, 0.2)).toBeCloseTo(0.03, 10);
+    expect(metaNodeEmissive(c, 1, 0, 0, false, 0.2)).toBeCloseTo(0.03, 10);
   });
 
   it("adds the morph-scaled flash", () => {
     const c = ctx({ morph: 1 });
     const flash = 2;
     const expected = base * (1 - 0 * 0.9) + flash * 1;
-    expect(metaNodeEmissive(c, 0, flash, false, false, base)).toBeCloseTo(expected, 10);
+    expect(metaNodeEmissive(c, 0, flash, 0, false, base)).toBeCloseTo(expected, 10);
   });
 
   it("boosts the focused node by +1.4", () => {
     const c = ctx({ morph: 0 });
-    const b = metaNodeEmissive(c, 0, 0, false, false, base);
-    expect(metaNodeEmissive(c, 0, 0, true, true, base)).toBeCloseTo(b + 1.4, 10);
+    const b = metaNodeEmissive(c, 0, 0, 0, false, base);
+    expect(metaNodeEmissive(c, 0, 0, 1, true, base)).toBeCloseTo(b + 1.4, 10);
   });
 
   it("dims a non-focused node by *0.45 only when dimOthersOnFocus is set", () => {
     const c = ctx({ morph: 0 });
-    const b = metaNodeEmissive(c, 0, 0, false, false, base);
-    expect(metaNodeEmissive(c, 0, 0, false, true, base)).toBeCloseTo(b * 0.45, 10);
+    const b = metaNodeEmissive(c, 0, 0, 0, false, base);
+    expect(metaNodeEmissive(c, 0, 0, 0, true, base)).toBeCloseTo(b * 0.45, 10);
   });
 
   it("does nothing extra when there's no focus target at all (isFocus and dimOthersOnFocus both false)", () => {
     const c = ctx({ morph: 0 });
-    const b = metaNodeEmissive(c, 0, 0, false, false, base);
+    const b = metaNodeEmissive(c, 0, 0, 0, false, base);
     expect(b).toBeCloseTo(0.5, 10);
   });
 });
