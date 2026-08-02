@@ -594,9 +594,17 @@ export function CompositionTitle({ sel }: { sel: CompositionSel }) {
   );
 }
 
+// The layer codes ride the HEAD's aside, not a body row (user, 2026-08-02): they are what the
+// group IS — the head's own qualifier, like the node card's status pill — so they sit on the title
+// row where every other card puts its subject mark, and they survive a collapse.
+export function CompositionAside({ sel }: { sel: CompositionSel }) {
+  const { codes } = parseCompKey(sel.key);
+  if (codes.length === 0) return <span className="text-body text-muted-foreground">—</span>;
+  return <RoleChips codes={codes} />;
+}
+
 export function CompositionCard({ sel }: { sel: CompositionSel }) {
   const selNodes = useStore((s) => s.selNodes);
-  const { codes } = parseCompKey(sel.key);
   const groups = useMemo(() => compositionGroups(selNodes), [selNodes]);
   const members = groups.find((g) => g.key === sel.key)?.rows ?? [];
   const total = groups.reduce((n, g) => n + g.rows.length, 0);
@@ -604,12 +612,6 @@ export function CompositionCard({ sel }: { sel: CompositionSel }) {
   const cfg = metagraphById(sel.netId);
   return (
     <div className="flex flex-col gap-2">
-      <div className="flex items-start justify-between gap-2.5">
-        <span className="text-body text-muted-foreground flex-none">Runs</span>
-        <span className="flex flex-wrap justify-end items-center gap-1 min-w-0">
-          {codes.length === 0 ? <span className="text-body text-foreground">—</span> : <RoleChips codes={codes} />}
-        </span>
-      </div>
       <div className="flex items-start justify-between gap-2.5">
         <span className="text-body text-muted-foreground">Machines</span>
         <span className="text-body text-foreground tabular-nums">{members.length}</span>
