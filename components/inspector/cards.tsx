@@ -167,31 +167,6 @@ export function GeoLiveTitle() {
   );
 }
 
-// Node subtitle: the truncated id — small/muted/mono, under the location title (CardHead's
-// `subtitle` slot supplies the standard block styling). Renders ONLY when the location made it
-// to the title; in the no-location fallback the id IS the title.
-export function GeoLiveSubtitle() {
-  const inspect = useStore((s) => s.inspect);
-  const node = inspectedNode(inspect);
-  if (!node) return null;
-  // The subtitle = the composition word + its layer codes as squared pills (RoleChips — the
-  // same rendering the metagraph card's composition rows use; user 2026-07-12: the joined
-  // "L0·cL1" text read as one token). Sentence-cased ("Hybrid") to match the composition
-  // rows' label style — the caps RULE: text-micro is the UPPERCASE lane (eyebrows/section
-  // tags); word labels at text-label/body are sentence case. The id lives in the body's
-  // NODE ID row, last: the reference number sits where references sit.
-  const compWord = node.node ? nodeCompositionLabel(node.node) : null;
-  const comp = compWord ? compWord.charAt(0).toUpperCase() + compWord.slice(1) : null;
-  const codes = node.node ? compositionRows([node.node])[0]?.codes : undefined;
-  if (!comp) return null;
-  return (
-    <span className="inline-flex items-center gap-1.5 min-w-0">
-      <span>{comp}</span>
-      {codes && codes.length > 0 && <RoleChips codes={codes} />}
-    </span>
-  );
-}
-
 // Node title-row aside: the status pill.
 export function GeoLiveAside() {
   const inspect = useStore((s) => s.inspect);
@@ -388,17 +363,25 @@ export function GeoLiveCard() {
   return <GeoLiveNode p={node} />;
 }
 
-// The selected-node block. The node's CITY + id + status pill are all the card HEAD now
-// (GeoLiveTitle/GeoLiveSubtitle/GeoLiveAside above) — the old IP and "Location" body rows are
-// gone (the IP entirely, user-agreed; the city because it IS the title). The body is the labelled
-// facts the globe can't show: the country that completes the place, the hosting provider, and the
-// node's own reference. The slot eyebrow reads "Node"; the × is CardHead's shared close (the
-// outer pane).
+// The selected-node block. The node's CITY + status pill are the card HEAD (GeoLiveTitle/
+// GeoLiveAside above) — the old IP and "Location" body rows are gone (the IP entirely,
+// user-agreed; the city because it IS the title). The body is the labelled facts the globe
+// can't show: the country that completes the place, the node's make-up, the hosting provider,
+// and the node's own reference. The slot eyebrow reads "Node"; the × is CardHead's shared close
+// (the outer pane).
 function GeoLiveNode({ p }: { p: PickOf<"l0" | "l1" | "metanode"> }) {
   // Hosting provider from the node's IP lookup (GeoInfo.isp/asn) — the one machine fact the
   // globe can't show. Absent = the lookup didn't know; the line simply doesn't render
   // (honesty: no "Unknown" filler in a facts card).
   const geo = "geo" in p ? p.geo : undefined;
+  // The node's make-up: the composition word + its layer codes as squared pills (RoleChips — the
+  // same rendering the metagraph card's composition rows use; user 2026-07-12: the joined
+  // "L0·cL1" text read as one token). Sentence-cased ("Hybrid" / "Currency") to match the
+  // composition rows' label style — text-micro is the UPPERCASE lane (labels), word values at
+  // text-body are sentence case.
+  const compWord = p.node ? nodeCompositionLabel(p.node) : null;
+  const comp = compWord ? compWord.charAt(0).toUpperCase() + compWord.slice(1) : null;
+  const codes = p.node ? compositionRows([p.node])[0]?.codes : undefined;
   // NB: the hover pairing (synced 3D glow) lives on the OUTER pane (Inspector.CardPane), not here,
   // so the glow lights the card's rounded edge.
   return (
@@ -411,6 +394,19 @@ function GeoLiveNode({ p }: { p: PickOf<"l0" | "l1" | "metanode"> }) {
           <div className="text-body text-foreground-dim mt-0.5">
             {geo.country}
             {geo.cc && <span className="font-mono text-label text-muted-foreground"> · {ccMark(geo.cc)}</span>}
+          </div>
+        </div>
+      )}
+      {/* COMPOSITION — the node's role in the network, a labelled fact like the rest (user,
+          2026-08-02: it used to ride the head as a subtitle, which made the head carry three
+          different registers). Sits second: the reading order is place → role → host →
+          reference, with health as the head's status pill. */}
+      {comp && (
+        <div className="my-2">
+          <span className="text-micro tracking-[0.1em] uppercase text-muted-foreground">Composition</span>
+          <div className="flex items-center gap-1.5 text-body text-foreground-dim mt-0.5">
+            <span>{comp}</span>
+            {codes && codes.length > 0 && <RoleChips codes={codes} />}
           </div>
         </div>
       )}

@@ -891,9 +891,9 @@ and keep changing, so they're examples, not the contract.
   country card states it one slot up, and a facts rail shouldn't say the same thing twice); both rendered
   straight from their store channels by Inspector's `CountryPane`/`ProviderPane` since
   neither subject is a PickDescriptor, collapsible like every RIGHT card; the **node card**
-  `geoLive` — CITY-first title (the country moved into the body's labelled rows with the rest,
-  user 2026-08-02), id
-  demoted to a mono subtitle, status pill in the head aside; the **snapshot** and **layer**
+  `geoLive` — CITY-first title with the status pill in the head aside and NOTHING else in the
+  head (the country, the make-up and the id are all labelled body rows now — user 2026-08-02:
+  the head names the node, the body states its facts); the **snapshot** and **layer**
   cards), else as a quiet **GHOST hint card** (a dashed one-liner:
   kind mark · slot label · instruction — no halo/animation) saying what to interact with — so the rail shows the view's whole possibility space and a deselect
   returns its slot to the ghost in place. Slot availability + hint copy live in the rail
@@ -1198,16 +1198,18 @@ cards: **eyebrow / title / INSET hairline / body**.
   `MetaTitle` (avatar + name + ticker + a muted type descriptor — "data metagraph" /
   "currency metagraph" / "data and currency metagraph" / DAG = "hypergraph"; 0-node
   metagraphs say just "metagraph"); the snapshot title's Odometer owns its own roll; the
-  node card is **city-first** (the CITY alone as title — the country left the head 2026-08-02;
-  the `subtitle` is the node's sentence-cased
-  composition word + its layer codes as squared PILLS — `Hybrid [L0][cL1][dL1]`
-  (`nodeCompositionLabel` + `compositionRows` codes via the shared `RoleChips`; the joined
-  `L0·cL1` text read as one token, user 2026-07-12); the BODY is
-  labelled rows in importance order: COUNTRY (name + the `ccMark` code), HOSTING, then
+  node card is **city-first with a SUBTITLE-LESS head** (the CITY alone as title — the country
+  left the head 2026-08-02, and the composition line followed it into the body the same day:
+  a head that named the place *and* classified the machine was doing two jobs, and the make-up
+  is a fact like the others). The BODY is
+  labelled rows in importance order: COUNTRY (name + the `ccMark` code), COMPOSITION (the
+  node's sentence-cased composition word + its layer codes as squared PILLS — `Hybrid
+  [L0][cL1][dL1]`, from `nodeCompositionLabel` + `compositionRows` codes via the shared
+  `RoleChips`; the joined `L0·cL1` text read as one token, user 2026-07-12), HOSTING, then
   **NODE ID last** — the unique reference
   sits where references sit, truncated with the full hash on hover (user, 2026-07-11; this
   replaced the one-node CompositionRows block whose count was always "1"); id-as-title
-  fallback when the city is unresolved). **Card-head kind MARKS tint with
+  fallback when the city is unresolved. **Card-head kind MARKS tint with
   the active filter's identity** via `text-[var(--filter-accent,var(--primary))]` (the rail
   sets `--filter-accent`; cyan on "all") — never hardcode a mark to cyan (a recurring bug;
   the snapshot Layers mark + the layer plane mark both follow this; node marks use their
