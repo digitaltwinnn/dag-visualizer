@@ -17,17 +17,17 @@ import DataSection from "@/components/DataSection";
 
 // Single-page shell in TWO LAYERS (spec 2026-08-01): SectionShell carries the fixed scene shell
 // (the canvas in its own `scene` slot, since it recedes rather than hides, + the HUD as children)
-// and the per-view raw data table, which surfaces out of the scene's depth when the LiveStrip's
-// RAW switch is flipped. The strip is passed as its own `divider` slot so it belongs to neither
-// pose and stays interactive in both. TopBar + the banner stay OUTSIDE the shell (fixed to the
-// real viewport, visible in both poses), as do the non-visual bridges and the pointer-anchored
+// and the per-view raw data table, which surfaces out of the scene's depth when the command bar's
+// RAW switch is flipped. The live/time lane is passed as its own `strip` slot so it belongs to
+// neither pose and stays interactive in both. TopBar + the banner stay OUTSIDE the shell (fixed to
+// the real viewport, visible in both poses), as do the non-visual bridges and the pointer-anchored
 // Tooltip (a transformed ancestor would re-anchor its fixed positioning).
 export default function Home() {
   return (
     <main>
       <ExperimentalBanner />
       <TopBar />
-      <SectionShell scene={<SceneCanvas />} raw={<DataSection />} divider={<BottomStream />}>
+      <SectionShell scene={<SceneCanvas />} raw={<DataSection />} strip={<BottomStream />}>
         <Blueprint />
         <BootOverlay />
         <ExploreRail />

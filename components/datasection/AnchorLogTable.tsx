@@ -13,17 +13,18 @@ import { IdentityDot } from "@/components/inspector/parts";
 import { cn } from "@/lib/utils";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { POLL } from "@/src/engine/config";
 
-// Matches VIS/POLL.maxSnapshots (the retained global window the log joins against) — the same
-// buffer the strip's bars plot, one row per anchored metagraph snapshot inside it.
-const MAX = 52;
+// The retained global window the log joins against — the same buffer the strip's bars plot,
+// one row per anchored metagraph snapshot inside it.
+const MAX = POLL.maxSnapshots;
 
 // The ledger data table (spec 2026-08-01): the per-metagraph ANCHOR LOG — one row per anchored
 // metagraph snapshot in the retained window, finer-grained than the strip's per-tick bars.
 // Chronological by construction (newest tick first) — no sortable headers here; the roster
 // table is the sortable one. A row click selects the GLOBAL snapshot the row anchored into
 // (the metagraph snapshot itself is not a selectable subject) through the SAME tested builder
-// as a bar/tile click; selection happens silently — the user drags back up to see the card.
+// as a bar/tile click; selection happens silently — flip the RAW switch back to see the card.
 export default function AnchorLogTable() {
   useSnapshotFeed(MAX); // re-render driver: global + anchor events (the buffers below refresh)
   const filter = useStore((s) => s.filter);

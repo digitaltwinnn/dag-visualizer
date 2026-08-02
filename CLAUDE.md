@@ -853,7 +853,7 @@ and keep changing, so they're examples, not the contract.
   design, 2026-07-10; replaced the recency stack + the floating pick-hint; the country +
   provider slots landed with the focus ladder, 2026-07-18): every card the
   current view CAN produce is always visible — POPULATED when its subject is selected
-  (`ContextCard` mirrors the filter; the **country card** — flag+name title, Nodes/Share/
+  (`ContextCard` mirrors the filter; the **country card** — `ccMark` code + name title, Nodes/Share/
   Cities/Providers from `store.selNodes`, geo-scoped like layer is ledger-scoped; the
   **provider card** — "City · Provider" title, Nodes/Networks/ASN/Country; both rendered
   straight from their store channels by Inspector's `CountryPane`/`ProviderPane` since
@@ -1646,4 +1646,7 @@ log) lived in `docs/superpowers/` and was harvested into this file, then removed
 (2026-07-05). The folder later re-accumulated the 2026-07 feature specs/plans (engine-domain
 refactor, view transitions, consistency hardening, focus ladder) and was removed again
 entirely (2026-07-19) — git history preserves all of it, and `.superpowers/sdd/progress.md`
-remains the running work ledger. Durable decisions from those specs live in this file.
+remains the running work ledger. Durable decisions from those specs live in this file. The
+same happened once more with the 2026-08-01 LiveStrip-sections spec/plan: its mechanism was
+reversed during implementation (the drag/wheel divider became the command bar's RAW switch),
+so the documents described a design that never shipped and were removed with it.

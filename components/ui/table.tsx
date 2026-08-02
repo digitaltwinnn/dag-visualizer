@@ -4,7 +4,7 @@ import * as React from "react";
 
 import { cn } from "@/lib/utils";
 
-// shadcn's Table, minus its stock scroll-container `<div>`: section 2 wraps the table in our
+// shadcn's Table, minus its stock scroll-container `<div>`: the raw data layer wraps the table in our
 // ScrollArea (which owns scrolling + the slim instrument scrollbar), so a second overflow box
 // would nest two scrollers and break the sticky header. Call sites restyle via `cn` — the HUD
 // type scale (text-micro heads / text-body cells) is applied there, not baked in here.

@@ -1,7 +1,7 @@
 import type { GeoInfo, NodeRow } from "@/src/data/types";
 import { pickNetId } from "@/src/engine/domain/pickActions";
 
-// The section-2 node-roster rows (spec 2026-08-01): a flat, sortable projection of
+// The raw layer's node-roster rows (spec 2026-08-01): a flat, sortable projection of
 // `store.selNodes` — the same records the explorers browse, denser. Pure so the sorting/
 // derivation is unit-tested; NodeRosterTable feeds it live and owns the column order per view.
 export interface RosterRow {

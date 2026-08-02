@@ -5,8 +5,9 @@ import type { HoverSubject } from "@/src/data/hoverSubject";
 // import of a domain type is legal and keeps CohortSel defined in exactly one place.
 import type { CohortSel } from "@/src/engine/domain/focusLadder";
 
-// The active view. `hyper`/`geo` drive the 3D scene (morph between them); the rest are flat
-// views (the canvas is hidden) — `ledger` has the live ribbon, the others are placeholders.
+// The active view. `hyper`/`geo`/`ledger` all drive the 3D scene (every switch among them runs
+// the gather choreography); `status`/`transactions`/`staking` are flat scaffolded placeholders
+// (the canvas is hidden).
 export type Mode = "hyper" | "geo" | "ledger" | "status" | "transactions" | "staking";
 
 // One slot in the right-rail card stack (extend with future card types — e.g. "tx").
@@ -124,9 +125,9 @@ interface AppState {
   phoneDock: "explore" | "details" | null;
   // Which of the two shell LAYERS is presented (spec 2026-08-01): "scene" = the 3D shell + HUD,
   // "data" = the per-view raw-data table that surfaces out of the scene's depth over it. Written
-  // by the LiveStrip's RAW switch (and Escape); SectionShell owns the GSAP timeline that realizes
-  // it. UI state, not selection (the selection boundary rule doesn't apply); session-only, like
-  // phoneDock.
+  // by the command bar's RAW switch (and Escape); SectionShell owns the GSAP timeline that
+  // realizes it. UI state, not selection (the selection boundary rule doesn't apply);
+  // session-only, like phoneDock.
   section: "scene" | "data";
   // PHONE ONLY: whether the top bar's vitals row is expanded (the bar grows downward by one
   // full-width row showing the active view's vitals). A USER CHOICE that persists across view
@@ -177,7 +178,7 @@ interface AppState {
   setPhoneVitals: (open: boolean) => void;
   setPhoneSheetPx: (px: number | null) => void;
   setRailCollapse: (id: string, collapsed: boolean | null) => void;
-  setRailCollapseMany: (entries: Record<string, boolean>) => void;
+  setRailCollapseMany: (entries: Record<string, boolean | null>) => void;
 }
 
 // Keep the exact-snapshot cache bounded (one small object per ordinal); drop the oldest.
@@ -275,6 +276,16 @@ export const useStore = create<AppState>((set) => ({
       else railCollapse[id] = collapsed;
       return { railCollapse };
     }),
-  setRailCollapseMany: (entries) => set((s) => ({ railCollapse: { ...s.railCollapse, ...entries } })),
+  // The batch form of setRailCollapse, same null-returns-a-slot-to-auto semantics — so
+  // "collapse all" / "expand all" / the clear-all reset are each ONE store write.
+  setRailCollapseMany: (entries) =>
+    set((s) => {
+      const railCollapse = { ...s.railCollapse };
+      for (const [id, collapsed] of Object.entries(entries)) {
+        if (collapsed === null) delete railCollapse[id];
+        else railCollapse[id] = collapsed;
+      }
+      return { railCollapse };
+    }),
   setPhoneSheetPx: (phoneSheetPx) => set({ phoneSheetPx }),
 }));

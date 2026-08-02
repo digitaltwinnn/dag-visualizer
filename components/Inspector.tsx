@@ -384,7 +384,7 @@ export default function Inspector() {
   const minimizeAll = () => setRailCollapseMany(Object.fromEntries(presentIds.map((id) => [id, true])));
   const expandAll = () => setRailCollapseMany(Object.fromEntries(presentIds.map((id) => [id, false])));
   const clearAll = () => {
-    for (const id of presentIds) setRailCollapse(id, null);
+    setRailCollapseMany(Object.fromEntries(presentIds.map((id) => [id, null])));
     applyClickActions(
       clearAllActions({
         hasInspect: presentOf("node"),

@@ -13,9 +13,10 @@ import { snapshotSelectActions } from "@/src/engine/domain/pickActions";
 import { applyClickActions } from "@/src/store/applyClickActions";
 import { relativeAge } from "@/src/util/relativeAge";
 import NodeCountReadout from "@/components/NodeCountReadout";
+import { POLL } from "@/src/engine/config";
 
-// Matches VIS.maxSnapshots (the buffer cap) so the strip fills with the full retained window.
-const MAX = 52;
+// The buffer cap itself, so the strip fills with the full retained window.
+const MAX = POLL.maxSnapshots;
 // Phone renders fewer bars (from the same buffer) so each stays a usable width/tap-target.
 const PHONE_BARS = 24;
 
@@ -122,7 +123,7 @@ export default function LiveStrip() {
             }}
             onMouseLeave={() => { barHover.current = false; setTip(null); setHoverSnapOrd(null); }}
           >
-            {snaps.length === 0 && <span className="text-muted-foreground text-xs self-center">Waiting for snapshots…</span>}
+            {snaps.length === 0 && <span className="text-muted-foreground text-label self-center">Waiting for snapshots…</span>}
             {bars.map(({ d, total, mine }, i) => {
               const isLatest = i === bars.length - 1; // the newest bar (renamed: don't shadow the store `live`)
               const active = d.ordinal === activeOrd;

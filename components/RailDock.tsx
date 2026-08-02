@@ -310,9 +310,9 @@ export default function RailDock({
           className={cn(
             "fixed z-[42] bottom-0 w-1/2 h-[var(--phone-dock-h)] hidden max-[699px]:flex rounded-none",
             side === "left" ? "left-0" : "right-0",
-            // Section 2 is presented: the bar rides the slider's transform (RailDock renders
-            // inside the shell wrapper), so it would sit in the sliver at the shell's bottom
-            // edge, half off-screen and pointing at a hidden rail.
+            // The raw data layer is presented: the dock belongs to the scene shell (RailDock
+            // renders inside it), which has receded and dimmed behind the layer — so the bar
+            // would sit under the raw table pointing at a hidden rail.
             // Overrides the phone-breakpoint `max-[699px]:flex` above (same twMerge group+variant,
             // so the later class wins) — a bare `hidden` wouldn't, the variant would still show it.
             !shellVisible && "max-[699px]:hidden",

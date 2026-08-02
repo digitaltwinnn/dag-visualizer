@@ -19,7 +19,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 // projection of the same `selNodes` the explorers browse (complementary, not a replacement).
 // Column order is the view's lens: geo leads with location, hyper with network/architecture.
 // A row click = the explorer row click (nodeSelectActions: filter→ancestry→inspect; re-click
-// deselects); it commits silently — the user drags back up to see the card/camera. Row hover
+// deselects); it commits silently — flip the RAW switch back to see the card/camera. Row hover
 // glows the node's 3D shells (hoverNodeId, outward-only — the cohort-row convention).
 const COLS: Record<"hyper" | "geo", { key: RosterSortKey; label: string }[]> = {
   geo: [
@@ -104,6 +104,7 @@ export default function NodeRosterTable({ mode }: { mode: "hyper" | "geo" }) {
                 aria-sort={sort.key === c.key ? (sort.dir === 1 ? "ascending" : "descending") : "none"}
               >
                 <button
+                  type="button"
                   className="flex items-center gap-1 text-micro uppercase tracking-caps text-muted-foreground hover:text-foreground cursor-pointer"
                   onClick={() => setSort((s) => ({ key: c.key, dir: s.key === c.key ? ((s.dir * -1) as 1 | -1) : 1 }))}
                 >

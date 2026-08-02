@@ -286,7 +286,7 @@
   --detail-w: 320px;       /* right details rail width */
   --sel-bg: rgba(42, 245, 255, 0.12);   /* selected/active fill, reused everywhere */
   --sel-border: rgba(42, 245, 255, 0.5);
-  --bottom-reserve: 170px; /* default; BottomStream overrides per view (slim vs full) */
+  --bottom-reserve: 130px; /* vertical space the always-present LiveStrip lane reserves */
 
   /* ── Instrument-thread ruler spec (the ONE shared source) ─────────────────────
      Both rails' SVG threads (RailThread.tsx) and the bar-chart axis read identically:

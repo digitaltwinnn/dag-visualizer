@@ -9,7 +9,7 @@ import { cn } from "@/lib/utils";
 // every primitive in this folder — Popover/Sheet/ToggleGroup do the same); it already ships
 // @radix-ui/react-scroll-area, so no new dependency is needed.
 //
-// BOTH scrollbars are rendered (stock ships the vertical one only): section 2's tables scroll
+// BOTH scrollbars are rendered (stock ships the vertical one only): the raw layer's tables scroll
 // horizontally on tablet/phone when the column set overflows. Radix hides a scrollbar whose axis
 // isn't scrollable, so the horizontal one costs nothing on desktop.
 function ScrollArea({ className, children, ...props }: React.ComponentProps<typeof ScrollAreaPrimitive.Root>) {

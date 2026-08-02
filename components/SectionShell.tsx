@@ -7,11 +7,11 @@ import { useStore } from "@/src/store/store";
 // The two-section shell (spec 2026-08-01; **re-designed 2026-08-01** — the raw table SURFACES out
 // of the scene instead of the shell sliding off the top).
 //
-// The old mechanism translated the whole fixed shell up by a viewport height, so section 2 read as
-// a second PAGE that replaced the scene — navigation, with a drag/wheel gesture the 3D camera
+// The old mechanism translated the whole fixed shell up by a viewport height, so the raw table read
+// as a second PAGE that replaced the scene — navigation, with a drag/wheel gesture the 3D camera
 // controls quietly compete with (user). The table is not a second page: it is the RAW DATA LAYER
 // UNDER the view you are looking at. So the two poses are now a DEPTH change on one screen, driven
-// by one discrete switch in the LiveStrip (the light/dark-mode idiom, user):
+// by one discrete switch in the command bar (the light/dark-mode idiom, user):
 //
 //   scene → data : the HUD (rails, cards, overlays) fades out, the SCENE recedes — scaled back and
 //                  dimmed, still live behind the glass — and the raw layer rises out of that depth
@@ -30,8 +30,8 @@ import { useStore } from "@/src/store/store";
 // containing block, so the fixed rails inside it keep resolving against the wrapper.
 //
 // The raw layer is a SIBLING of the wrapper (it must not inherit the scene's fade) and so is the
-// LiveStrip — the strip is the constant live lane and the host of the switch, so it belongs to
-// neither pose. TopBar stays outside as before; portalled UI (sheets, tooltips) doesn't ride the
+// LiveStrip — the strip is the constant live lane, so it belongs to neither pose. TopBar stays
+// outside as before (it hosts the RAW switch); portalled UI (sheets, tooltips) doesn't ride the
 // transform — RailDock gates its sheets on `section`, LiveStrip portals its tip.
 export const SHELL_ID = "shell";
 
@@ -43,15 +43,15 @@ const SCENE_DIM = 0.26;
 export default function SectionShell({
   scene,
   children,
-  divider,
+  strip,
   raw,
 }: {
   /** The 3D canvas — a direct child of the transformed wrapper (it recedes, it does not hide). */
   scene: ReactNode;
   /** The HUD: rails, overlays, everything that hides while the raw layer is up. */
   children: ReactNode;
-  /** The LiveStrip — outside both poses, always live. */
-  divider: ReactNode;
+  /** The LiveStrip lane — outside both poses, always live. */
+  strip: ReactNode;
   /** The per-view raw data table. */
   raw: ReactNode;
 }) {
@@ -128,8 +128,7 @@ export default function SectionShell({
 
   // Whichever layer is not presented is `inert`: nothing in it takes focus or a pointer event
   // (both are full of real controls — rails and canvas up here, a sortable table down there).
-  // The DIVIDER is deliberately in NEITHER boundary: the strip carries the switch and stays live
-  // in both poses.
+  // The STRIP is deliberately in NEITHER boundary: the live lane stays live in both poses.
   const section = useStore((s) => s.section);
 
   return (
@@ -166,7 +165,7 @@ export default function SectionShell({
         {raw}
       </section>
 
-      {divider}
+      {strip}
     </>
   );
 }

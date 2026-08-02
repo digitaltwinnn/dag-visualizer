@@ -4,7 +4,7 @@ import { useStore } from "@/src/store/store";
 import AnchorLogTable from "@/components/datasection/AnchorLogTable";
 import NodeRosterTable from "@/components/datasection/NodeRosterTable";
 
-// Section 2 (spec 2026-08-01): the per-view raw-data table — ledger = the anchor log,
+// The raw data layer (spec 2026-08-01): the per-view raw-data table — ledger = the anchor log,
 // hyper/geo = the node roster (location-first in geo). The flat placeholder views have no
 // dataset yet: the same honest preview language as Blueprint, never a fabricated table.
 export default function DataSection() {
