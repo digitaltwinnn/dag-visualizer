@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { LADDERS, LEVEL_CARRY, finerLevels, type SelectionSnapshot } from "./focusLadder";
+import { LADDERS, LEVEL_CARRY, finerLevels, hasLevel, type SelectionSnapshot } from "./focusLadder";
 
 const sel = (over: Partial<SelectionSnapshot> = {}): SelectionSnapshot => ({
   inspectIsNode: false, cohort: null, composition: null, country: null, layerId: null, filter: "all", ...over,
@@ -63,6 +63,14 @@ describe("focusLadder — the per-view rung tables (spec 2026-07-18)", () => {
     expect(finerLevels("ledger", "network")).toEqual(["node", "layer"]);
     expect(finerLevels("hyper", "network")).toEqual(["node", "composition"]);
     expect(finerLevels("hyper", "composition")).toEqual(["node"]);
+  });
+
+  it("hasLevel — a rung exists only where its view's ladder lists it", () => {
+    expect(hasLevel("hyper", "composition")).toBe(true);
+    expect(hasLevel("geo", "composition")).toBe(false);
+    expect(hasLevel("ledger", "composition")).toBe(false);
+    expect(hasLevel("geo", "cohort")).toBe(true);
+    expect(hasLevel("ledger", "layer")).toBe(true);
   });
 
   it("carry policy — universal subjects carry, view-scoped rungs clear (spec Part 2)", () => {

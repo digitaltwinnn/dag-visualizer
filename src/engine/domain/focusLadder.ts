@@ -91,3 +91,10 @@ export function finerLevels(view: View3D, level: FocusLevel): FocusLevel[] {
   const i = order.indexOf(level);
   return i < 0 ? [] : order.slice(0, i);
 }
+
+// Does this view's ladder have this rung at all? The allow-list read of "is this subject a thing
+// here" — the ladder table already says which rungs a view carries, so a consumer asking (e.g. the
+// Engine deriving a pick's composition group) reads THAT instead of naming the view.
+export function hasLevel(view: View3D, level: FocusLevel): boolean {
+  return LADDERS[view].some((r) => r.level === level);
+}

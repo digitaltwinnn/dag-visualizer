@@ -20,8 +20,8 @@ import { FOCI, hubFraming, geoFraming, ledgerLayerFraming, ledgerNodeFraming, no
 import { countryFraming } from "./domain/countryShape";
 import { R as GEO_R, LAND_H } from "./domain/geoLayout";
 import { clickActions, pickActive, pickNetId, viewEntryActions } from "./domain/pickActions";
-import { ViewTransition, type View3D } from "./domain/viewTransition";
-import { LADDERS, type CohortSel, type CompositionSel, type SelectionSnapshot, type ResolverKey } from "./domain/focusLadder";
+import { ViewTransition, is3D, type View3D } from "./domain/viewTransition";
+import { LADDERS, hasLevel, type CohortSel, type CompositionSel, type SelectionSnapshot, type ResolverKey } from "./domain/focusLadder";
 import { compositionGroups, compositionKey, compositionRows } from "@/src/data/composition";
 import type { GlobalSnapshot, NodeRow, PickDescriptor } from "@/src/data/types";
 import type { ClusterNode, DagCore, GeoMap, RouteMetagraph } from "@/src/data/types";
@@ -556,7 +556,6 @@ export class Engine {
     // false its tick is a no-op, so the clear sticks).
     if (mode !== "ledger" && st0.snap != null) st0.setSnap(null);
 
-    const is3D = (m: Mode): m is View3D => m === "hyper" || m === "geo" || m === "ledger";
     if (is3D(prevMode) && is3D(mode) && prevMode !== mode) {
       // 3D → 3D: run the staged gather choreography. The machine handles retargeting (a switch
       // mid-flight) without teleports; the render loop applies _pendingBoundary's layout + camera
@@ -1042,10 +1041,11 @@ export class Engine {
     );
   }
 
-  // The composition group a PICK belongs to (hyper only) — network + make-up key. null when the
-  // pick isn't a node or carries no role info (the group would be meaningless).
+  // The composition group a PICK belongs to — network + make-up key. null when the pick isn't a
+  // node, carries no role info (the group would be meaningless), or the CURRENT view's ladder has
+  // no composition rung (today: hyper alone, but the ladder table says so, not this method).
   private _compositionOf(p: PickDescriptor | null): CompositionSel | null {
-    if (!p || this.mode !== "hyper") return null;
+    if (!p || !is3D(this.mode) || !hasLevel(this.mode, "composition")) return null;
     const node = "node" in p ? p.node : null;
     const netId = pickNetId(p);
     if (!node || !netId) return null;
