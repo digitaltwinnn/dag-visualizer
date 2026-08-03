@@ -58,7 +58,7 @@ export default function BootOverlay() {
       </div>
       <p
         className={cn(
-          "text-xs tracking-[0.08em] lowercase m-0",
+          "text-label tracking-[0.08em] lowercase m-0",
           dead ? "text-muted-foreground" : "text-[color-mix(in_oklch,var(--primary)_80%,var(--foreground))]",
         )}
       >

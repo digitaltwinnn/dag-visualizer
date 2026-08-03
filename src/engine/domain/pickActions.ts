@@ -15,12 +15,13 @@
 //     from the ladder even though the drop list is hand-written per builder.
 import type { Mode } from "@/src/store/store";
 import type { PickDescriptor } from "@/src/data/types";
-import type { CohortSel } from "./focusLadder";
+import type { CohortSel, CompositionSel } from "./focusLadder";
 
 export type ClickAction =
   | { kind: "filter"; id: string }                                             // commit the network filter
   | { kind: "country"; cc: string | null }                                     // commit/clear the country drill
   | { kind: "cohort"; sel: CohortSel | null }                                  // commit/clear the city×provider cohort (geo)
+  | { kind: "composition"; sel: CompositionSel | null }                        // commit/clear the composition group (hyper)
   | { kind: "inspect"; pick: PickDescriptor | null }                           // open/clear the node card
   // Select a snapshot (follow decides pin vs heartbeat) — or CLEAR it (pick null, follow
   // omitted: the follow state is untouched; FollowController owns the re-follow).
@@ -84,6 +85,26 @@ export function cohortToggleActions(
   return acts;
 }
 
+// Composition-group identity — network + group key (the `${label}|${codes}` HyperExplore builds).
+export const sameComposition = (a: CompositionSel | null, b: CompositionSel | null): boolean =>
+  !!a && !!b && a.netId === b.netId && a.key === b.key;
+
+// The COMPOSITION zoom-level TOGGLE (user, 2026-08-02) — HyperExplore's group row. A group is
+// network-scoped, so the row commits its NETWORK first (only when it changes, the no-churn rule;
+// the Engine's filter subscription clears every finer rung, which is why the composition commit
+// must come after it), then drops the finer node selection (finerLevels("hyper","composition")),
+// then commits the group itself. Re-clicking the committed group clears it — one toggle language.
+export function compositionToggleActions(
+  c: CompositionSel,
+  current: { composition: CompositionSel | null; hasInspect: boolean; filter: string },
+): ClickAction[] {
+  const acts: ClickAction[] = [];
+  if (c.netId !== current.filter) acts.push({ kind: "filter", id: c.netId });
+  if (current.hasInspect) acts.push({ kind: "inspect", pick: null });
+  acts.push({ kind: "composition", sel: sameComposition(current.composition, c) ? null : c });
+  return acts;
+}
+
 // Selecting a NODE — shared by the scene node click and GeoExplore's node row (`selectNode`).
 // Drills the global filter into the node's network (only when it actually changes — no churn),
 // selects the node's full geo ANCESTRY in geo (country + cohort — border/firmer land/expanded
@@ -95,12 +116,36 @@ export function cohortToggleActions(
 // same); a scene click never deselects.
 export function nodeSelectActions(
   p: PickDescriptor,
-  opts: { mode: Mode; currentFilter: string; deselect?: boolean; ledgerLayerId?: string | null },
+  opts: {
+    mode: Mode;
+    currentFilter: string;
+    deselect?: boolean;
+    ledgerLayerId?: string | null;
+    /** HYPER ancestry: the composition group the node belongs to (the explorer row's parent
+     *  group, or the one the Engine derives for a scene click). Same role `ledgerLayerId` plays
+     *  in ledger — the caller resolves it, because the group vocabulary lives in the data layer. */
+    compositionSel?: CompositionSel | null;
+  },
 ): ClickAction[] {
   if (opts.deselect) return [{ kind: "inspect", pick: null }];
   const acts: ClickAction[] = [];
   const netId = pickNetId(p);
   if (netId && netId !== opts.currentFilter) acts.push({ kind: "filter", id: netId });
+  acts.push(...nodeAncestryActions(p, opts));
+  acts.push({ kind: "inspect", pick: p });
+  return acts;
+}
+
+// The rungs ABOVE a node in the destination view's ladder — the ONE definition of a node's
+// ancestry, shared by a node SELECT (below the filter, above the inspect) and by a VIEW ENTRY
+// (viewEntryActions). Each view contributes only the rungs it scopes to itself: hyper the
+// composition group, geo the country + the provider cohort, ledger the floor.
+function nodeAncestryActions(
+  p: PickDescriptor,
+  opts: { mode: Mode; ledgerLayerId?: string | null; compositionSel?: CompositionSel | null },
+): ClickAction[] {
+  const acts: ClickAction[] = [];
+  if (opts.mode === "hyper" && opts.compositionSel) acts.push({ kind: "composition", sel: opts.compositionSel });
   if (opts.mode === "geo" && "geo" in p && p.geo?.cc) {
     acts.push({ kind: "country", cc: p.geo.cc });
     // Full-ancestry rule (spec Part 3): the node's cohort commits too, so deselect steps
@@ -113,8 +158,25 @@ export function nodeSelectActions(
     const layerId = opts.ledgerLayerId ?? autoLayerForNode(p.kind);
     if (layerId) acts.push({ kind: "layer", pick: { kind: "layer", layerId } });
   }
-  acts.push({ kind: "inspect", pick: p });
   return acts;
+}
+
+// ARRIVING in a view with a node still selected. Node + network CARRY across a switch, but the
+// view-scoped rungs do not (focusLadder.LEVEL_CARRY): country/cohort are geo's, composition is
+// hyper's, layer is ledger's, and each is cleared on the way out. Without this the carried node
+// would sit in the destination rail with every parent slot back on its ghost, and a deselect
+// would step straight to the network (user, 2026-08-02: every card up to the selection belongs
+// on the rail, in every view). So the entry re-derives exactly the ancestry a click on that node
+// IN the destination view would have committed — no filter (it carried), no inspect (it's already
+// open). `ledgerLayerId` carries an already-committed floor so a resumed layer is never
+// overwritten; a non-node pick (a dossier, a snapshot) has no ancestry and yields nothing.
+export function viewEntryActions(opts: {
+  mode: Mode;
+  pick: PickDescriptor | null;
+  ledgerLayerId?: string | null;
+  compositionSel?: CompositionSel | null;
+}): ClickAction[] {
+  return opts.pick ? nodeAncestryActions(opts.pick, opts) : [];
 }
 
 // The layer TOGGLE — shared by the scene's floor-plane click and LedgerPanel's rows: commit
@@ -151,6 +213,7 @@ export function clearAllActions(current: {
   hasInspect: boolean;
   hasSnap: boolean;
   cohort: CohortSel | null;
+  composition: CompositionSel | null;
   country: string | null;
   layerId: string | null;
   filter: string;
@@ -159,6 +222,7 @@ export function clearAllActions(current: {
   if (current.hasInspect) acts.push({ kind: "inspect", pick: null });
   if (current.hasSnap) acts.push({ kind: "snapshot", pick: null });
   if (current.cohort) acts.push({ kind: "cohort", sel: null });
+  if (current.composition) acts.push({ kind: "composition", sel: null });
   if (current.country) acts.push({ kind: "country", cc: null });
   if (current.layerId) acts.push({ kind: "layer", pick: null });
   if (current.filter !== "all") acts.push({ kind: "filter", id: "all" });
@@ -175,6 +239,18 @@ export function snapshotSelectActions(
   return [{ kind: "snapshot", pick: p, follow: isLiveTip }];
 }
 
+// The snapshot card's LIVE-MODE switch (user, 2026-08-02). The card no longer opens itself on
+// entering the ledger — it is a picked subject like every other card — so following the
+// heartbeat is now an explicit act, and the card's own live/age element is the switch. Turning
+// it ON hands the subject back to the FollowController (its `following` effect re-points at the
+// latest relevant snapshot); turning it OFF pins whatever is on screen at that moment.
+export function followToggleActions(
+  shown: Extract<PickDescriptor, { kind: "snapshot" }>,
+  following: boolean,
+): ClickAction[] {
+  return [{ kind: "snapshot", pick: shown, follow: !following }];
+}
+
 export function clickActions(input: {
   mode: Mode;
   // The raycast pick (already drag-suppressed + pickActive-gated by the Engine), or null.
@@ -182,6 +258,9 @@ export function clickActions(input: {
   // The drillable country under the cursor when NOTHING was picked (the Engine resolves the
   // land-sphere hit, policy-gated to geo); null elsewhere/over ocean.
   countryCc: string | null;
+  // HYPER only: the composition group the picked node belongs to, resolved by the Engine (the
+  // group vocabulary lives in the data layer) — the node's ancestry rung, like the ledger floor.
+  compositionSel?: CompositionSel | null;
   current: { filter: string; country: string | null; hasInspect: boolean; layerId: string | null; cohort: CohortSel | null };
 }): ClickAction[] {
   const { mode, pick: p, countryCc, current } = input;
@@ -202,5 +281,5 @@ export function clickActions(input: {
 
   // A node, in any view. (No autoRotate action: geo disables the controls' rotation at mode
   // entry and the inspect subscription re-asserts it on the node flight.)
-  return nodeSelectActions(p, { mode, currentFilter: current.filter });
+  return nodeSelectActions(p, { mode, currentFilter: current.filter, compositionSel: input.compositionSel });
 }

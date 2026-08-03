@@ -11,6 +11,7 @@ import {
   Box,
   MapPin,
   Server,
+  Component,
   type LucideIcon,
 } from "lucide-react";
 import type { Mode } from "@/src/store/store";
@@ -67,6 +68,12 @@ export const COUNTRY_ICON: LucideIcon = MapPin;
 // as "hosting infrastructure" — distinct from the country pin and the node's Globe mark.
 export const PROVIDER_ICON: LucideIcon = Server;
 
+// The COMPOSITION group's mark (hyper's make-up rung — the machines in a network that run the
+// same set of layers). Component: a shape assembled from smaller ones, reading as "made up of" —
+// distinct from LAYER_ICON (one stratum of the ledger stack), which it would otherwise be
+// confused with, since both talk about layers.
+export const COMPOSITION_ICON: LucideIcon = Component;
+
 // The ONE size every card-head/title KIND MARK renders at — About's Info, the tool cards'
 // Telescope, the node card's Globe, the snapshot card's Box (CardHead's panel `icon` + the inspector
 // titles in inspector/cards.tsx). 16px (`size-4`): the old 14px read timid next to the 15px
@@ -79,7 +86,7 @@ export const KIND_MARK_CLASS = "flex-none size-4";
 // dossier is the Hypergraph subject (Orbit), a node is the Geography subject (Globe), a snapshot
 // is the BLOCK (SNAPSHOT_ICON), a layer is one stratum (LAYER_ICON).
 export function iconForPick(
-  kind: PickDescriptor["kind"] | "l0" | "l1" | "metanode" | "country" | "cohort",
+  kind: PickDescriptor["kind"] | "l0" | "l1" | "metanode" | "country" | "cohort" | "composition",
 ): LucideIcon {
   switch (kind) {
     case "snapshot":
@@ -90,6 +97,8 @@ export function iconForPick(
       return COUNTRY_ICON; // the geo drill rung (see its constant above)
     case "cohort":
       return PROVIDER_ICON; // the geo city×provider rung (see its constant above); user copy "provider"
+    case "composition":
+      return COMPOSITION_ICON; // hyper's make-up rung (see its constant above)
 
     case "geoLive":
     case "l0":

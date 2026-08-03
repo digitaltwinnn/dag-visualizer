@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { exploreCards, detailsCards, ladderSlotIds, type RailManifestState } from "@/components/railCards";
+import { exploreCards, detailsCards, focusSlotId, ladderSlotIds, type RailManifestState } from "@/components/railCards";
 import type { PickDescriptor } from "@/src/data/types";
 
 // Present card kinds in render order — the exact set/order both the rail and the tray consume.
@@ -20,6 +20,7 @@ const details = (over: Partial<RailManifestState>): RailManifestState => ({
   layer: null,
   country: null,
   cohort: null,
+  composition: null,
   selNodesCount: 10,
   filterLabel: null,
   ...over,
@@ -58,20 +59,25 @@ describe("detailsCards — RIGHT rail (Details): fixed slots + ghost hints", () 
   it("the DAG filter → Context dossier populated", () => {
     expect(presentKinds(detailsCards(details({ filter: "dag" })))).toEqual(["context"]);
   });
-  it("slots come in ONE fixed order (context, country, cohort, node, snap, layer) regardless of selection", () => {
+  it("slots come in ONE fixed order (context, country, cohort, composition, node, snap, layer) regardless of selection", () => {
     const ids = detailsCards(details({ filter: "dor", inspect: nodePick, snap: snapPick })).map((c) => c.id);
-    expect(ids).toEqual(["context", "country", "cohort", "node", "snap", "layer"]);
+    expect(ids).toEqual(["context", "country", "cohort", "composition", "node", "snap", "layer"]);
   });
   it("ledger ghosts: context + node + snapshot + layer invites (nodes pick in the chamber too)", () => {
     expect(ghostIds(detailsCards(details({})))).toEqual(["context", "node", "snap", "layer"]);
   });
-  it("hyper ghosts: context + node only (the snapshot slot is ledger-scoped, spec 2026-08-01)", () => {
-    expect(ghostIds(detailsCards(details({ mode: "hyper" })))).toEqual(["context", "node"]);
+  it("hyper ghosts: context + composition + node (the snapshot slot is ledger-scoped, spec 2026-08-01)", () => {
+    expect(ghostIds(detailsCards(details({ mode: "hyper" })))).toEqual(["context", "composition", "node"]);
   });
   it("geo ghosts cover the whole ladder: context + country + cohort + node invites (snapshot ledger-only)", () => {
     expect(ghostIds(detailsCards(details({ mode: "geo" })))).toEqual([
       "context", "country", "cohort", "node",
     ]);
+  });
+  it("the composition card never ghosts outside hyper (its rung is hyper-scoped)", () => {
+    for (const mode of ["geo", "ledger"] as const) {
+      expect(detailsCards(details({ mode })).find((c) => c.id === "composition")?.hint).toBeNull();
+    }
   });
   it("country/cohort cards never ghost outside geo", () => {
     for (const mode of ["hyper", "ledger"] as const) {
@@ -97,7 +103,7 @@ describe("detailsCards — RIGHT rail (Details): fixed slots + ghost hints", () 
     const cards = detailsCards(details({ mode: "hyper", snap: snapPick }));
     const snap = cards.find((c) => c.id === "snap")!;
     expect(snap.present).toBe(true);
-    expect(ghostIds(cards)).toEqual(["context", "node"]); // snap populated → no snap ghost
+    expect(ghostIds(cards)).toEqual(["context", "composition", "node"]); // snap populated → no snap ghost
   });
   it("subjectKeys track each card's EdgePulse subject (filter / node ip / snapshot ordinal)", () => {
     const s = details({ filter: "dor", inspect: nodePick, snap: snapPick });
@@ -122,7 +128,7 @@ describe("detailsCards — RIGHT rail (Details): fixed slots + ghost hints", () 
 describe("ladderSlotIds — the descent-spine lane (display order = reversed rung order)", () => {
   it("mirrors focusLadder.LADDERS coarsest→coarsest per 3D view", () => {
     expect(ladderSlotIds("geo")).toEqual(["context", "country", "cohort", "node"]);
-    expect(ladderSlotIds("hyper")).toEqual(["context", "node"]);
+    expect(ladderSlotIds("hyper")).toEqual(["context", "composition", "node"]);
     // Ledger: LAYER sits above NODE (ladder order — layer is deliberately finer than network
     // but coarser than node), a deliberate reorder of the fixed slot stack.
     expect(ladderSlotIds("ledger")).toEqual(["context", "layer", "node"]);
@@ -136,5 +142,35 @@ describe("ladderSlotIds — the descent-spine lane (display order = reversed run
     const ids = detailsCards(details({ mode: "geo" })).map((c) => c.id);
     for (const view of ["geo", "hyper", "ledger"] as const)
       for (const slot of ladderSlotIds(view)) expect(ids).toContain(slot);
+  });
+});
+
+describe("focusSlotId — the focus rung both rails read", () => {
+  const cohortSel = { cc: "DE", city: "Nuremberg", isp: "Hetzner" };
+  it("is null with nothing committed", () => {
+    expect(focusSlotId(details({ mode: "geo" }))).toBeNull();
+  });
+  it("walks to the FINEST committed rung in geo", () => {
+    expect(focusSlotId(details({ mode: "geo", filter: "dag" }))).toBe("context");
+    expect(focusSlotId(details({ mode: "geo", filter: "dag", country: "DE" }))).toBe("country");
+    expect(focusSlotId(details({ mode: "geo", filter: "dag", country: "DE", cohort: cohortSel }))).toBe("cohort");
+    expect(
+      focusSlotId(details({ mode: "geo", filter: "dag", country: "DE", cohort: cohortSel, inspect: nodePick })),
+    ).toBe("node");
+  });
+  it("uses hyper's composition rung and ledger's layer rung", () => {
+    expect(focusSlotId(details({ mode: "hyper", filter: "dag", composition: { netId: "dag", key: "Hybrid|l0" } }))).toBe(
+      "composition",
+    );
+    const layerPick = { kind: "layer", layerId: "ml0" } as unknown as Extract<PickDescriptor, { kind: "layer" }>;
+    expect(focusSlotId(details({ mode: "ledger", filter: "dag", layer: layerPick }))).toBe("layer");
+    // The node still wins: it's the finest rung in every ladder.
+    expect(focusSlotId(details({ mode: "ledger", filter: "dag", layer: layerPick, inspect: nodePick }))).toBe("node");
+  });
+  it("ignores a pinned snapshot — it is not a ladder rung", () => {
+    expect(focusSlotId(details({ mode: "ledger", snap: snapPick }))).toBeNull();
+  });
+  it("flat views have no focus rung", () => {
+    expect(focusSlotId(details({ mode: "status", filter: "dag", inspect: nodePick }))).toBeNull();
   });
 });

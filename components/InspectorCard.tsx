@@ -5,7 +5,7 @@ import type { PickDescriptor } from "@/src/data/types";
 import { useStore } from "@/src/store/store";
 import CardHead from "@/components/CardHead";
 import {
-  GeoLiveAside, GeoLiveCard, GeoLiveSubtitle, GeoLiveTitle, LayerCard, LayerTitle,
+  GeoLiveAside, GeoLiveCard, GeoLiveTitle, LayerCard, LayerTitle,
   MetaCard, MetaSiteAction, MetaTitle, SnapshotAside, SnapshotCard, SnapshotTitle,
 } from "@/components/inspector/cards";
 
@@ -26,9 +26,8 @@ function CardBody({ p }: { p: PickDescriptor }) {
 // renders in CardHead's title slot (one head anatomy: eyebrow / title / inset hairline / body;
 // Task 13 follow-up). The dossier name rolls via `titleKey`; the snapshot ordinal rolls via its
 // own Odometer; the node title self-keys its roll-in on the node ID (all defined in
-// inspector/cards.tsx). The node head is LOCATION-FIRST: place as the title, the demoted id hash
-// as the subtitle (GeoLiveSubtitle renders null in the no-location fallback, where the id stays
-// the title).
+// inspector/cards.tsx). The node head is LOCATION-FIRST: place as the title, health as the aside;
+// its make-up and its id are labelled rows in the body (user, 2026-08-02).
 function headFor(p: PickDescriptor): {
   title?: ReactNode; titleKey?: string; subtitle?: ReactNode; aside?: ReactNode;
 } {
@@ -39,7 +38,7 @@ function headFor(p: PickDescriptor): {
     // one-line variant was tried and rejected, 2026-07-12 — see MetaTitle's note).
     case "meta": return { title: <MetaTitle cfg={p.cfg} />, titleKey: p.cfg.name };
     case "snapshot": return { title: <SnapshotTitle data={p.data} />, aside: <SnapshotAside data={p.data} /> };
-    case "geoLive": return { title: <GeoLiveTitle />, subtitle: <GeoLiveSubtitle />, aside: <GeoLiveAside /> };
+    case "geoLive": return { title: <GeoLiveTitle />, aside: <GeoLiveAside /> };
     // The layer head: the dedicated single-plane mark + name; rolls (titleKey) on the layer id.
     case "layer": return { title: <LayerTitle p={p} />, titleKey: p.layerId };
     default: return {};

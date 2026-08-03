@@ -154,6 +154,7 @@ export class Globe implements GeoViewHost {
   private _selectedNodeId: string | null = null;
   private _selCohort: CohortSel | null = null;
   private _selCohortIds: Set<string> | null = null; // committed-glow membership (event-time)
+  private _selGroupIds: Set<string> | null = null; // committed composition-group glow (hyper)
   private _selCohortDir = new THREE.Vector3(); // resolved centroid unit dir (scratch)
   private _selCohortOk = false;
   private _hoverCountryCc: string | null = null; // explorer row hover — border preview only
@@ -725,6 +726,13 @@ export class Globe implements GeoViewHost {
     this._hoverCohort = ids?.length ? new Set(ids) : null;
   }
 
+  // The committed composition GROUP (hyper's middle rung — the explorer's make-up group), held
+  // at the same steady group-tier glow a committed cohort gets in geo. Membership is resolved
+  // Engine-side from the live node list (one id per machine), so this adapter only holds the set.
+  setSelectedGroup(ids: string[] | null): void {
+    this._selGroupIds = ids?.length ? new Set(ids) : null; // event-time
+  }
+
   // The persistently selected node (a clicked node card) — glows every layer shell it runs.
   setSelectedNode(id: string | null): void {
     this._selectedNodeId = id || null;
@@ -970,7 +978,10 @@ export class Globe implements GeoViewHost {
     c.countryFilter = null;
     c.countryMix = 0;
     c.hoverNodeId = this._hoverNodeId;
-    c.hoverCohort = this._hoverCohort ?? this._selCohortIds;
+    // Group-tier glow, one channel, three sources in precedence order: a LIVE hover wins, then
+    // geo's committed cohort, then hyper's committed composition group (the two committed kinds
+    // are view-scoped, so they can never both be set).
+    c.hoverCohort = this._hoverCohort ?? this._selCohortIds ?? this._selGroupIds;
     c.selectedNodeId = this._selectedNodeId;
     c.filter = this.filter;
     ctx.dim = this.dim;

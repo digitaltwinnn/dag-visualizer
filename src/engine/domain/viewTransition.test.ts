@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { ViewTransition, DUR_OUT, DUR_IN, FURN_IN, STAGGER_SPREAD } from "./viewTransition";
+import { ViewTransition, is3D, DUR_OUT, DUR_IN, FURN_IN, STAGGER_SPREAD } from "./viewTransition";
 
 const settled = (v: "hyper" | "geo" | "ledger" = "hyper") => {
   const tr = new ViewTransition();
@@ -251,5 +251,12 @@ describe("retargeting", () => {
     expect(tr.from).toBe("geo");
     expect(tr.to).toBe("ledger");
     expect(tr.gatherWeight(0, 1)).toBeCloseTo(w, 5); // base-weight continuity
+  });
+});
+
+describe("is3D", () => {
+  it("narrows the three scene views and rejects the flat placeholders", () => {
+    expect(["hyper", "geo", "ledger"].every(is3D)).toBe(true);
+    expect(["status", "transactions", "staking"].some(is3D)).toBe(false);
   });
 });

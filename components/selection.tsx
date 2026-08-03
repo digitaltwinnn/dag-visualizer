@@ -15,11 +15,29 @@ import { cn } from "@/lib/utils";
 export const SELECTED_ROW =
   "text-foreground shadow-[inset_0_0_0_1px_var(--sel-border),inset_0_0_0_9999px_var(--sel-bg)]";
 
+// The ANCESTOR strength of the same mark (2026-08-02, the facts rail's hierarchy redesign carried
+// into the explorer): a committed row whose rung is no longer the FOCUS — a drilled country under
+// a committed provider, a network under a composition group, a floor under a selected node — keeps
+// the ✓ and the ring, at a fraction of the voice. Without it a drill-down list ends up showing
+// three equally loud selections and none of them reads as "you are here". Same two inset layers,
+// so it composes with the cursor/pairing washes exactly like the full-strength mark; the row's own
+// rest text colour is left alone (only the focused row brightens to `text-foreground`).
+export const SELECTED_ROW_ANCESTOR =
+  "shadow-[inset_0_0_0_1px_var(--sel-border-dim),inset_0_0_0_9999px_var(--sel-bg-dim)]";
+
+/** The committed-row mark at the strength this rung has earned — full for the focus rung, the
+ *  ancestor strength for a coarser committed one. The ONE place callers choose between them. */
+export function selectedRow(focused: boolean): string {
+  return focused ? SELECTED_ROW : SELECTED_ROW_ANCESTOR;
+}
+
 // The deliberate glyph cue that makes the mark unmistakably "selected" (not a stray hover): a
 // monochrome Check (lucide) in the accent — the same treatment as the view switch's on-glyph
 // (text-primary). Rows RESERVE the trailing slot (`pr-7` on every row) and the mark renders
 // absolutely inside it (`right-2`), the stock shadcn SelectItem pattern — so counts/status stay
 // column-aligned and nothing shifts when the selection moves.
-export function SelectedRowMark({ className }: { className?: string }) {
-  return <Check className={cn("size-3.5 text-primary", className)} aria-hidden />;
+// `muted` is the ✓'s half of the ANCESTOR strength above: on a coarser committed rung the check
+// still says "committed" but stops competing with the focus row's own mark.
+export function SelectedRowMark({ className, muted }: { className?: string; muted?: boolean }) {
+  return <Check className={cn("size-3.5", muted ? "text-primary/55" : "text-primary", className)} aria-hidden />;
 }

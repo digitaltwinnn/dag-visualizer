@@ -3,7 +3,7 @@ import type { GlobalSnapshot, LeaderboardData, MetaInfo, NodeRow, PickDescriptor
 import type { HoverSubject } from "@/src/data/hoverSubject";
 // Type-only — the store may not import domain VALUES (layerBoundaries rule), but a type-only
 // import of a domain type is legal and keeps CohortSel defined in exactly one place.
-import type { CohortSel } from "@/src/engine/domain/focusLadder";
+import type { CohortSel, CompositionSel } from "@/src/engine/domain/focusLadder";
 
 // The active view. `hyper`/`geo`/`ledger` all drive the 3D scene (every switch among them runs
 // the gather choreography); `status`/`transactions`/`staking` are flat scaffolded placeholders
@@ -11,7 +11,7 @@ import type { CohortSel } from "@/src/engine/domain/focusLadder";
 export type Mode = "hyper" | "geo" | "ledger" | "status" | "transactions" | "staking";
 
 // One slot in the right-rail card stack (extend with future card types — e.g. "tx").
-export type SelSlot = "node" | "snap" | "layer" | "country" | "cohort";
+export type SelSlot = "node" | "snap" | "layer" | "country" | "cohort" | "composition";
 
 // Move `slot` to the FRONT of the recency stack when it becomes active, or drop it when cleared.
 function bumpStack(stack: SelSlot[], slot: SelSlot, active: boolean): SelSlot[] {
@@ -78,6 +78,13 @@ interface AppState {
   hoverCountry: string | null;
   // Node ids of a hovered explorer COHORT row — the whole 3D honeycomb stack glows together.
   hoverCohort: string[] | null;
+  // The hovered GROUP RUNG's identity, as a scalar key — the pairing twin of `hoverCohort`
+  // (which carries member ids for the 3D glow and can't be compared by `subjectPairing`).
+  // Both group rungs share this ONE channel because no view shows both: geo's provider cohort
+  // keys as `${cc}|${city}|${isp}`, hyper's composition group as `${netId}|${key}`. Gives the
+  // group cards the same bidirectional card↔row pairing the country/node/network subjects have
+  // (user, 2026-08-02: hovering the composition card lit nothing in the explorer). null = none.
+  hoverGroup: string | null;
   // Ledger layer id (LedgerView FLOOR_LAYERS: "ml1"|"ml0"|"msnap"|"gl0"|"hypl0"|"hypl1") the cursor
   // is HOVERING in the Snapshots·Explore panel — a transient plane-highlight PREVIEW (the committed
   // selection is `layer` below; the engine resolves `ledgerHilite ?? layer?.layerId`). null = none.
@@ -96,6 +103,11 @@ interface AppState {
   // between a node and its country (finerLevels("geo","country") = ["node","cohort"]). Matches
   // GeoExplore's cohort key fields (cc/city/isp); a selStack slot like `layer`/`country`.
   cohort: CohortSel | null;
+  // Committed COMPOSITION group (hyper, network-scoped) — the focus-ladder rung between a node
+  // and its network: HyperExplore's middle browse level (Hybrid [L0][cL1][dL1] / Data / …).
+  // `{netId, key}` only — the card re-resolves the group's members off `selNodes` each render,
+  // so a data refresh can never leave it showing a stale count. A selStack slot like `cohort`.
+  composition: CompositionSel | null;
   // Per-country breakdown + distribution score for the active filter (engine-pushed).
   leaderboard: LeaderboardData | null;
   // The active selection's nodes, for the geo node browser (engine-pushed; [] off geo).
@@ -164,12 +176,14 @@ interface AppState {
   setHoverNodeId: (id: string | null) => void;
   setHoverCountry: (cc: string | null) => void;
   setHoverCohort: (ids: string[] | null) => void;
+  setHoverGroup: (key: string | null) => void;
   setLedgerHilite: (id: string | null) => void;
   setLayer: (layer: Extract<PickDescriptor, { kind: "layer" }> | null) => void;
   setFollowing: (following: boolean) => void;
   setHover: (hover: HoverSubject | null) => void;
   setCountry: (cc: string | null) => void;
   setCohort: (c: CohortSel | null) => void;
+  setComposition: (c: CompositionSel | null) => void;
   setLeaderboard: (lb: LeaderboardData | null) => void;
   setSelNodes: (nodes: NodeRow[]) => void;
   setSnapshotExact: (data: SnapshotExact) => void;
@@ -206,12 +220,14 @@ export const useStore = create<AppState>((set) => ({
   hoverNodeId: null,
   hoverCountry: null,
   hoverCohort: null,
+  hoverGroup: null,
   ledgerHilite: null,
   layer: null,
   following: false,
   hover: null,
   country: null,
   cohort: null,
+  composition: null,
   leaderboard: null,
   selNodes: [],
   snapshotExact: {},
@@ -240,12 +256,15 @@ export const useStore = create<AppState>((set) => ({
   setHoverNodeId: (hoverNodeId) => set({ hoverNodeId }),
   setHoverCountry: (hoverCountry) => set({ hoverCountry }),
   setHoverCohort: (hoverCohort) => set({ hoverCohort }),
+  setHoverGroup: (hoverGroup) => set({ hoverGroup }),
   setLedgerHilite: (ledgerHilite) => set({ ledgerHilite }),
   setLayer: (layer) => set((s) => ({ layer, selStack: bumpStack(s.selStack, "layer", !!layer) })),
   setFollowing: (following) => set({ following }),
   setHover: (hover) => set({ hover }),
   setCountry: (country) => set((s) => ({ country, selStack: bumpStack(s.selStack, "country", !!country) })),
   setCohort: (cohort) => set((s) => ({ cohort, selStack: bumpStack(s.selStack, "cohort", !!cohort) })),
+  setComposition: (composition) =>
+    set((s) => ({ composition, selStack: bumpStack(s.selStack, "composition", !!composition) })),
   setLeaderboard: (leaderboard) => set({ leaderboard }),
   setSelNodes: (selNodes) => set({ selNodes }),
   setSnapshotExact: (data) =>

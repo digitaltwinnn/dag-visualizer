@@ -12,6 +12,11 @@ import { smooth, smoother } from "./nodeLayout";
 
 export type View3D = "hyper" | "geo" | "ledger";
 
+// The one narrowing predicate for "is this Mode one of the three 3D views" — the flat placeholder
+// views have no choreography, no ladder and no scene. Lives here, next to the type it narrows to,
+// because Engine and the domain both ask.
+export const is3D = (m: string): m is View3D => m === "hyper" || m === "geo" || m === "ledger";
+
 // Live-reviewed at 4x/20x/40x-stretched slow motion (Task 8, chrome-devtools MCP screenshots)
 // across all six 3D transition directions: the per-network squares read as tidy distinct
 // blocks (DAG's clearly biggest), the stagger reads as an assembling wave rather than a swarm,

@@ -13,8 +13,23 @@ import CardHead, { RIGHT_CARD } from "@/components/CardHead";
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
 import { GhostCard } from "@/components/Inspector";
-import { ABOUT_ICON, EXPLORE_ICON, iconForPick } from "@/components/icons";
+import { detailsCards } from "@/components/railCards";
+import { ABOUT_ICON, EXPLORE_ICON } from "@/components/icons";
 import { cn } from "@/lib/utils";
+
+// The geo NODE slot, ghosted — read from the rail manifest itself rather than hand-written here.
+const GEO_NODE_GHOST = detailsCards({
+  mode: "geo",
+  filter: "all",
+  inspect: null,
+  snap: null,
+  layer: null,
+  selNodesCount: 1,
+  filterLabel: null,
+  country: null,
+  cohort: null,
+  composition: null,
+}).find((c) => c.id === "node")!;
 
 export default function CardHeadDemo() {
   const [toolCollapsed, setToolCollapsed] = useState(false);
@@ -23,17 +38,10 @@ export default function CardHeadDemo() {
   return (
     <div className="grid grid-cols-1 items-start gap-4 sm:grid-cols-2 max-w-2xl">
       {/* GHOST — a facts slot's empty state: the card the view CAN produce is always visible as
-          a quiet dashed hint (kind mark · slot label · instruction) until its subject is picked. */}
-      <GhostCard
-        card={{
-          id: "node",
-          kind: "node",
-          icon: iconForPick("geoLive"),
-          subjectKey: null,
-          present: false,
-          hint: "Click a node on the globe (or a row in the explorer) to inspect it.",
-        }}
-      />
+          a quiet dashed hint (kind mark · slot label · instruction) until its subject is picked.
+          The descriptor comes from the REAL rail manifest (geo's node slot), so the demo can't
+          drift from the copy the app ships. */}
+      <GhostCard card={GEO_NODE_GHOST} />
 
       {/* PANEL tool card — active, and collapsible via the whole-head +/− disclosure. */}
       <Card asChild className="block p-0">

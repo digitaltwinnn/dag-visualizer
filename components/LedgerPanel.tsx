@@ -3,8 +3,9 @@
 import { useState } from "react";
 import { cn } from "@/lib/utils";
 import ExplorerShell from "@/components/ExplorerShell";
-import { SELECTED_ROW, SelectedRowMark } from "@/components/selection";
+import { SelectedRowMark, selectedRow } from "@/components/selection";
 import { subjectPairing } from "@/components/useSubjectPairing";
+import { useLadderFocus } from "@/components/useLadderFocus";
 import { CORE_HEX, filterAccent, metagraphById } from "@/src/data/network";
 import { identityHudHex } from "@/src/palette/identity";
 import { IdentityDot } from "@/components/inspector/parts";
@@ -29,25 +30,36 @@ const LAYERS = LEDGER_LAYERS;
 // The four NODE-kind floors — the ones with a live cluster of validators/metanodes standing on
 // them (msnap/gl0 are snapshot-output floors, rowProducers has no panel row at all: see
 // CLAUDE.md's ledger layer model). Each disclosure reads `store.selNodes` — published per the
-// CURRENT FILTER (geoStats.listNodes: "all"/"dag" → validators, a metagraph id → that
-// metagraph's nodes), so ml0/ml1 only have CLUSTER rows under a metagraph filter and hypl0/hypl1
-// only have VALIDATOR rows under "all"/"dag". That's still true, but it's no longer the whole
-// story: "a browser's network level IS the filter" (the HyperExplore idiom) — every floor also
-// lists a LANE ROW per other network that serves it, so a floor is never actually empty once
-// live data has arrived (see the lane-row block below the committed rows/clusters).
+// CURRENT FILTER (geoStats.listNodes: "dag" → validators, a metagraph id → that metagraph's
+// nodes, "all" → every network's) and narrows it in `rowsForFloor`, so ml0/ml1 only have CLUSTER
+// rows under a metagraph filter and hypl0/hypl1 only have VALIDATOR rows under "all"/"dag". The
+// rest is the network level: "a browser's network level IS the filter" (the HyperExplore idiom) —
+// every floor also lists a LANE ROW per other network that serves it, so a floor is never
+// actually empty once live data has arrived (see the lane-row block below the rows/clusters).
 const NODE_FLOORS = new Set(["ml1", "ml0", "hypl0", "hypl1"]);
 const CLUSTER_FLOORS = new Set(["ml1", "ml0"]); // group by metagraph before the node rows
 
-function rowsForFloor(id: string, selNodes: NodeRow[]): NodeRow[] {
+function rowsForFloor(id: string, selNodes: NodeRow[], committedMeta: string | null): NodeRow[] {
   switch (id) {
     case "hypl0":
       return selNodes.filter((r) => r.pick.kind === "l0");
     case "hypl1":
       return selNodes.filter((r) => r.pick.kind === "l1");
+    // The metagraph floors browse the COMMITTED network's nodes. Under "all" the floor's own
+    // affordance is its LANE list — pick a network first (the browser's network level IS the
+    // filter). `selNodes` carries every network's nodes under "all" since 2026-08-02
+    // (geoStats.listNodes), so this has to say so explicitly; without the guard each floor would
+    // render a cluster row AND a lane row for the same metagraph, and double its resting count.
     case "ml0":
-      return selNodes.filter((r) => r.pick.kind === "metanode" && r.roles.includes("l0"));
+      return committedMeta
+        ? selNodes.filter((r) => r.pick.kind === "metanode" && r.roles.includes("l0"))
+        : [];
     case "ml1":
-      return selNodes.filter((r) => r.pick.kind === "metanode" && (r.roles.includes("cl1") || r.roles.includes("dl1")));
+      return committedMeta
+        ? selNodes.filter(
+            (r) => r.pick.kind === "metanode" && (r.roles.includes("cl1") || r.roles.includes("dl1")),
+          )
+        : [];
     default:
       return [];
   }
@@ -168,6 +180,9 @@ export default function LedgerPanel() {
   const dagNodeCounts = useStore((s) => s.nodes);
   const hoverFilter = useStore((s) => s.hoverFilter);
   const setHoverFilter = useStore((s) => s.setHoverFilter);
+  // Which rung currently holds the focus — the committed rows COARSER than it wear the
+  // ancestor strength of the selection mark (see components/useLadderFocus.ts).
+  const focus = useLadderFocus();
   // "A browser's network level IS the filter" (HyperExplore idiom): a REAL metagraph is
   // committed exactly when the filter isn't "all" (nothing narrower) or "dag" (the DAG's own
   // floors, not a metagraph's) — the same two values every metagraph floor's rowsForFloor
@@ -264,7 +279,7 @@ export default function LedgerPanel() {
               // `.nb-row.subject-paired` row-wash recipe.
               const pair = subjectPairing<string>(hilite, l.id, setHilite, filterAccent(filter));
               const discloses = NODE_FLOORS.has(l.id);
-              const rows = discloses ? rowsForFloor(l.id, selNodes) : [];
+              const rows = discloses ? rowsForFloor(l.id, selNodes, committedMeta) : [];
               // Hoisted OUT of the disclosure body (was computed only when `on`) so the floor
               // row's own header can show an honest trailing count AT REST, before anything is
               // clicked — the same data the opened dropdown lists, never a second, disagreeing
@@ -311,7 +326,9 @@ export default function LedgerPanel() {
                     ROW_OUTSET,
                     "hover:bg-wash-hover",
                     "focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--primary)] focus-visible:outline-offset-[-2px]",
-                    on && SELECTED_ROW,
+                    // ANCESTOR strength once a node inside the floor is selected — the finer
+                    // rung is the head of the path then (see components/useLadderFocus.ts).
+                    on && selectedRow(focus === "layer"),
                     pair.paired && pair.className,
                   )}
                   style={pair.style}
@@ -344,7 +361,7 @@ export default function LedgerPanel() {
                       <span className="flex-none flex items-center gap-1.5">
                         <span className="tabular-nums text-label font-semibold text-muted-foreground">{floorCount}</span>
                         {on ? (
-                          <SelectedRowMark />
+                          <SelectedRowMark muted={focus !== "layer"} />
                         ) : (
                           <DisclosureChevron open={open} />
                         )}
@@ -352,7 +369,7 @@ export default function LedgerPanel() {
                     ) : (
                       // Snapshot floors (msnap/gl0) never disclose — no count, no chevron — but
                       // still wear the committed ✓ like any other selectable row.
-                      on && <SelectedRowMark className="flex-none" />
+                      on && <SelectedRowMark className="flex-none" muted={focus !== "layer"} />
                     )}
                   </span>
                   {/* No per-row description here: `LEDGER_LAYERS.desc` is the LAYER CARD's opening
@@ -394,7 +411,14 @@ export default function LedgerPanel() {
                               <div key={key}>
                                 {/* The cluster group row — one per metagraph lane. IdentityDot is
                                     correct here (one lane, one metagraph, unlike geo's mixed-network
-                                    cohorts). A disclosure on the way to a node. */}
+                                    cohorts). A disclosure on the way to a node — and the ONE
+                                    explorer row level that stays disclosure-only on purpose (the
+                                    exemption to "every explorer level is a ladder rung with its own
+                                    card", CLAUDE.md): `selNodes` publishes only the COMMITTED
+                                    filter's nodes, so this row's metagraph IS the committed filter
+                                    and its dossier card is already open on the facts rail. Running
+                                    `filterToggleActions` here could only step back to "all" and
+                                    throw away the browse context. */}
                                 <DisclosureRow
                                   open={isOpen}
                                   holdsSel={holdsSel}

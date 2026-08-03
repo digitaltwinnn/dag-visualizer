@@ -93,4 +93,14 @@ describe("applyClickActions", () => {
     useStore.getState().setCohort(null);
     expect(useStore.getState().selStack).not.toContain("cohort");
   });
+
+  it('"composition" maps to setComposition (and only that)', () => {
+    const CP = { netId: "dor", key: "Hybrid|L0·dL1" };
+    applyClickActions([{ kind: "composition", sel: CP }]);
+    expect(useStore.getState().composition).toEqual(CP);
+    expect(useStore.getState().selStack[0]).toBe("composition");
+    applyClickActions([{ kind: "composition", sel: null }]);
+    expect(useStore.getState().composition).toBeNull();
+    expect(useStore.getState().selStack).not.toContain("composition");
+  });
 });

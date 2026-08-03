@@ -6,18 +6,26 @@
 // (globe lean/spin, autoRotate) that don't belong in domain/. viewPolicy's sibling idiom.
 import type { View3D } from "./viewTransition";
 
-export type FocusLevel = "node" | "cohort" | "country" | "layer" | "network" | "all";
+export type FocusLevel = "node" | "cohort" | "composition" | "country" | "layer" | "network" | "all";
 
 // The committed cohort (city × provider) selection — geo-only, country-scoped. Matches
 // GeoExplore's cohort key fields; internal name stays `cohort`, user-facing copy says
 // "provider" (spec Part 6 records the deliberate two-register naming).
 export interface CohortSel { cc: string; city: string | null; isp: string | null }
 
+// The committed COMPOSITION group — hyper-only, network-scoped: HyperExplore's middle browse
+// level (Hybrid [L0][cL1][dL1] / Data / Consensus / …), the hyper twin of geo's provider cohort
+// and ledger's floor (user, 2026-08-02: the only explorer level with no card of its own). Keyed
+// by the group's `${label}|${codes.join("·")}` — the SAME key HyperExplore's grouping builds —
+// so the card re-resolves live off `selNodes` instead of caching a count that could go stale.
+export interface CompositionSel { netId: string; key: string }
+
 // Plain selection snapshot the Engine builds from the store each resolve — keeps the table
 // store-free (domain rule).
 export interface SelectionSnapshot {
   inspectIsNode: boolean;
   cohort: CohortSel | null;
+  composition: CompositionSel | null;
   country: string | null;
   layerId: string | null;
   filter: string; // "all" | "dag" | metagraph id
@@ -25,7 +33,7 @@ export interface SelectionSnapshot {
 
 export type ResolverKey =
   | "geoNode" | "geoCohort" | "geoCountry" | "geoNetwork" | "geoOverview"
-  | "hyperNode" | "hyperNetwork" | "hyperOverview"
+  | "hyperNode" | "hyperComposition" | "hyperNetwork" | "hyperOverview"
   | "ledgerNode" | "ledgerLayer" | "ledgerNetwork" | "ledgerOverview";
 
 export interface Rung {
@@ -43,10 +51,15 @@ export const LADDERS: Record<View3D, Rung[]> = {
     { level: "network", active: (s) => s.filter !== "all", resolver: "geoNetwork" },
     { level: "all",     active: () => true,                resolver: "geoOverview" },
   ],
+  // The composition rung sits between node and network: a group is always network-scoped (its
+  // toggle commits the filter first), so it has no pose of its own — `hyperComposition` frames
+  // the group's NETWORK, the containment its card describes. It stays a rung anyway so the
+  // deselect stepping, the carry policy, and the rail's ladder lane all see it.
   hyper: [
-    { level: "node",    active: (s) => s.inspectIsNode,    resolver: "hyperNode" },
-    { level: "network", active: (s) => s.filter !== "all", resolver: "hyperNetwork" },
-    { level: "all",     active: () => true,                resolver: "hyperOverview" },
+    { level: "node",        active: (s) => s.inspectIsNode,     resolver: "hyperNode" },
+    { level: "composition", active: (s) => s.composition != null, resolver: "hyperComposition" },
+    { level: "network",     active: (s) => s.filter !== "all",  resolver: "hyperNetwork" },
+    { level: "all",         active: () => true,                 resolver: "hyperOverview" },
   ],
   // The layer rung sits FINER than network deliberately: a committed layer wins the camera and
   // composes with the filter (the lane-aware layer framing slides on a filter change, see
@@ -66,6 +79,7 @@ export const LEVEL_CARRY: Record<Exclude<FocusLevel, "all">, "always" | "view-sc
   node: "always",
   network: "always",
   cohort: "view-scoped",
+  composition: "view-scoped",
   country: "view-scoped",
   layer: "view-scoped",
 };
@@ -76,4 +90,11 @@ export function finerLevels(view: View3D, level: FocusLevel): FocusLevel[] {
   const order = LADDERS[view].map((r) => r.level);
   const i = order.indexOf(level);
   return i < 0 ? [] : order.slice(0, i);
+}
+
+// Does this view's ladder have this rung at all? The allow-list read of "is this subject a thing
+// here" — the ladder table already says which rungs a view carries, so a consumer asking (e.g. the
+// Engine deriving a pick's composition group) reads THAT instead of naming the view.
+export function hasLevel(view: View3D, level: FocusLevel): boolean {
+  return LADDERS[view].some((r) => r.level === level);
 }

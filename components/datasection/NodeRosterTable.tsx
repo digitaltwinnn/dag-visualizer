@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { ArrowDown, ArrowUp } from "lucide-react";
 import { useStore } from "@/src/store/store";
-import { metagraphById, filterAccent } from "@/src/data/network";
+import { metagraphById, filterAccent, shortHash } from "@/src/data/network";
 import { buildRoster, sortRoster, type RosterRow, type RosterSortKey } from "@/src/data/roster";
 import { compositionRows } from "@/src/data/composition";
 import { hoverKeyOf } from "@/src/data/hoverSubject";
@@ -70,7 +70,15 @@ export default function NodeRosterTable({ mode }: { mode: "hyper" | "geo" }) {
         );
       }
       case "id":
-        return <span className="font-mono text-foreground-dim">{r.node.id ?? r.node.label}</span>;
+        // The SHORT hash, the explorer's `NodePickerRow` treatment (2026-08-02): the full 64-char
+        // id is `whitespace-nowrap` in a table cell, so it blew the NODE column — and with it the
+        // table — past the raw layer's width. The id is a reference, not a reading column; the
+        // full hash stays one hover away.
+        return (
+          <span className="font-mono tabular-nums text-foreground-dim" title={r.node.id ?? undefined}>
+            {r.node.id ? shortHash(r.node.id) : r.node.label}
+          </span>
+        );
       case "layer": {
         // The shared composition vocabulary (the node card's subtitle idiom): the make-up word
         // plus its layer codes as pills — never a raw role array.

@@ -52,6 +52,16 @@ const GEOM: Record<Side, {
 // attributes don't resolve CSS vars; the group uses a style prop instead — see below).
 const REST_DIM = "var(--rail-rest-dim, 0.6)";
 
+// The dark punch behind a node-dot, separating it from the identity spine it sits on. NB a real
+// hex, not var(--panel): an SVG `fill`/`stroke` ATTRIBUTE doesn't resolve CSS custom properties.
+const PUNCH = "#0c1020";
+
+/** One card's marker on the thread. `inset` = how far the card is stepped back from the rail (its
+ *  ladder depth, measured rather than shared as a constant — see Inspector's RUNG_STEP), so the
+ *  connector reaches exactly to its edge; `focus` = the finest committed rung; `ghost` = an empty
+ *  slot showing its hint. */
+type Mark = { y: number; inset: number; focus: boolean; ghost: boolean };
+
 export default function RailThread({ side = "right" }: { side?: Side }) {
   const filter = useStore((s) => s.filter);
   const mode = useStore((s) => s.mode);
@@ -60,7 +70,8 @@ export default function RailThread({ side = "right" }: { side?: Side }) {
   // on "all". Fall back to the core hex for the var() case.
   const rawAccent = filterAccent(filter);
   const accent = rawAccent.startsWith("var(") ? CORE_HEX : rawAccent;
-  const [g, setG] = useState<{ top: number; left: number; height: number; dots: number[] } | null>(null);
+  const [g, setG] = useState<{ top: number; left: number; height: number; marks: Mark[] } | null>(null);
+
   // View-switch AND filter-change signal: either plays the SAME travelling-light language as the
   // cards on BOTH threads — the shared `useEdgePulse` hook (once per change, debounced, skips
   // mount, reduced-motion → CSS static blink) driving the shared `.edge-pulse` recipe, overlaid
@@ -81,14 +92,35 @@ export default function RailThread({ side = "right" }: { side?: Side }) {
       const r = rail.getBoundingClientRect();
       // Every rail card carries `.ig-panel` (the shared glass frame); the thread drops a dot at
       // each one's middle. (Was `:scope > .panel` before the Card-frame swap retired 12-panel-system.)
-      const cards = Array.from(rail.querySelectorAll<HTMLElement>(":scope > .ig-panel"));
-      const dots = cards
-        .map((c) => { const cr = c.getBoundingClientRect(); return cr.top + cr.height / 2 - r.top; })
-        .filter((y) => y >= 6 && y <= r.height - 6); // only dots inside the visible rail
+      // NB the query is DEPTH-AGNOSTIC (2026-08-02): the facts rail nests its ladder rungs in a
+      // lane, so `:scope >` matched nothing and the thread silently lost every card dot. Nested
+      // panels (a card inside a card) would double-count, so only outermost ones count.
+      const cards = Array.from(rail.querySelectorAll<HTMLElement>(".ig-panel")).filter(
+        (c) => !c.parentElement?.closest(".ig-panel"),
+      );
+      const raw = cards
+        .map((c) => {
+          const cr = c.getBoundingClientRect();
+          const rung = c.closest<HTMLElement>("[data-depth]");
+          return {
+            y: cr.top + cr.height / 2 - r.top,
+            // Measured, not derived from a shared step constant — a scrollbar or a future layout
+            // tweak can't put the connectors out of register with the real card edges.
+            inset: side === "right" ? r.right - cr.right : cr.left - r.left,
+            focus: !!rung?.hasAttribute("data-focus"),
+            ghost: c.hasAttribute("data-ghost"),
+          };
+        })
+        .filter((m) => m.y >= 6 && m.y <= r.height - 6); // only dots inside the visible rail
+      // Normalise: the shallowest card defines "flush", so a scrollbar (or any constant gutter)
+      // offsets nothing and depth 0 always reads as depth 0.
+      const base = raw.length ? Math.min(...raw.map((m) => m.inset)) : 0;
+      const marks = raw.map((m) => ({ ...m, inset: Math.round(m.inset - base) }));
       // Sit in the margin just OUTSIDE the cards: right → at the rail's right edge; left → the thread's
       // width to the LEFT of the rail's left edge (so its ticks reach toward the screen edge).
       const left = side === "right" ? r.right : r.left - W;
-      setG({ top: r.top, left, height: Math.round(r.height), dots });
+      setG({ top: r.top, left, height: Math.round(r.height), marks });
+
     };
     const schedule = () => { if (!raf) raf = requestAnimationFrame(measure); };
     schedule();
@@ -156,17 +188,34 @@ export default function RailThread({ side = "right" }: { side?: Side }) {
              spineless at rest). The line is the selection's hue. */}
           <line x1={gm.identity} y1={0} x2={gm.identity} y2={H} stroke={accent} strokeWidth={2} />
         </g>
-        {/* node-dots — OUTSIDE the dim group at original full brightness (user adjustment): one
-           per card at its middle, tethered to the card edge by the connector. */}
-        {g.dots.map((y, i) => (
-          <g key={i}>
-            <line x1={gm.conn} y1={y} x2={gm.dot} y2={y} stroke={accent} strokeWidth={1.25} opacity={0.7} />
-            <circle cx={gm.dot} cy={y} r={5} fill={accent} opacity={0.16} />
-            {/* dark ring punches the dot off the identity line. NB a real hex, not var(--panel): an SVG
-               stroke ATTRIBUTE doesn't resolve CSS custom properties (same trap as the accent above). */}
-            <circle cx={gm.dot} cy={y} r={3.4} fill={accent} stroke="#0c1020" strokeWidth={1.5} />
-          </g>
-        ))}
+        {/* node-dots — OUTSIDE the dim group at original full brightness (user adjustment): one per
+           card at its middle, tethered to the card edge by the connector. The thread is the rail's
+           ONE instrument (2026-08-02), so it also carries the card stack's HIERARCHY:
+           · connector LENGTH = the card's ladder depth (it steps back from the rail, the thread
+             reaches for it) — containment reads down the rail instead of needing a second spine;
+           · dot STATE = the slot's state — hollow for a ghost (an empty slot showing its hint),
+             solid for a populated card, solid + a wider halo for the focus rung (the finest
+             committed one). So the rail shows the view's whole possibility space and where you are. */}
+        {g.marks.map((m, i) => {
+          const x1 = side === "right" ? gm.conn - m.inset : gm.conn + m.inset;
+          return (
+            <g key={i} opacity={m.ghost ? 0.5 : 1}>
+              <line x1={x1} y1={m.y} x2={gm.dot} y2={m.y} stroke={accent} strokeWidth={1.25} opacity={m.focus ? 0.9 : 0.7} />
+              {m.ghost ? (
+                <>
+                  {/* punch first, then the ring — a hollow dot still has to sit ON the spine */}
+                  <circle cx={gm.dot} cy={m.y} r={4.2} fill={PUNCH} />
+                  <circle cx={gm.dot} cy={m.y} r={3.2} fill="none" stroke={accent} strokeWidth={1.3} />
+                </>
+              ) : (
+                <>
+                  <circle cx={gm.dot} cy={m.y} r={m.focus ? 7 : 5} fill={accent} opacity={m.focus ? 0.26 : 0.16} />
+                  <circle cx={gm.dot} cy={m.y} r={3.4} fill={accent} stroke={PUNCH} strokeWidth={1.5} />
+                </>
+              )}
+            </g>
+          );
+        })}
       </svg>
       {/* View-switch pulse — the SAME `.edge-pulse` recipe the cards use (soft line fade-in, bright
          gradient-tipped segment sweeping down, fade-out; reduced motion → one static blink),

@@ -17,9 +17,12 @@ import { IdentityDot } from "@/components/inspector/parts";
 // desc so 0-located metagraphs sink to the end (dimmed with their honest 0, never hidden). The
 // committed pick wears the view switch's on-state (SELECTED_ROW wash + ring — chips are
 // controls, not list rows, so no trailing ✓); hovering a chip PREVIEWS its dim in the scene
-// (setHoverFilter), leaving the strip clears the preview. Picking does NOT close the strip —
-// exploring several networks in a row is the point; the FILTER button (or Escape) closes it.
-export default function FilterPicker() {
+// (setHoverFilter), leaving the strip clears the preview. Picking CLOSES the strip (user,
+// 2026-08-02 — a deliberate reversal of the 2026-07-12 "keep it open to browse several
+// networks" rule: the hover preview already covers browsing without committing, and the open
+// strip pushed the whole layout down over the scene you just filtered). TopBar owns the open
+// state, so the close arrives as `onPicked`.
+export default function FilterPicker({ onPicked }: { onPicked?: () => void }) {
   const filter = useStore((s) => s.filter);
   const setHoverFilter = useStore((s) => s.setHoverFilter);
   const metaList = useStore((s) => s.metaList);
@@ -31,8 +34,14 @@ export default function FilterPicker() {
   const totalNodes = useMemo(() => rows.reduce((s, m) => s + (m.located ?? 0), 0), [rows]);
   const mappedCount = useMemo(() => rows.filter((m) => (m.located ?? 0) > 0).length, [rows]);
 
-  // Re-picking the COMMITTED metagraph deselects back to "all" — the tested table rule.
-  const pick = (id: string) => applyClickActions(filterToggleActions(id, filter));
+  // Re-picking the COMMITTED metagraph deselects back to "all" — the tested table rule. The
+  // hover PREVIEW is dropped explicitly: the strip collapses out from under the pointer, so its
+  // own mouseleave can't be relied on to clear the channel.
+  const pick = (id: string) => {
+    applyClickActions(filterToggleActions(id, filter));
+    setHoverFilter(null);
+    onPicked?.();
+  };
 
   const chipClass = (active: boolean, off: boolean) =>
     cn(
