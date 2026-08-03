@@ -28,6 +28,12 @@ describe("buildRoster", () => {
     const rows = buildRoster([validator, sameId]);
     expect(new Set(rows.map((r) => r.key)).size).toBe(2);
   });
+  it("a row keeps its key when an EARLIER row leaves the list", () => {
+    const other = row({ pick: { kind: "l0" }, id: "v2" });
+    const before = buildRoster([validator, other]);
+    const after = buildRoster([other]);
+    expect(after[0].key).toBe(before[1].key);
+  });
 });
 
 describe("sortRoster", () => {
