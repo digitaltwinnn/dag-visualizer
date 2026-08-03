@@ -20,7 +20,7 @@ import { ExternalLink } from "lucide-react";
 import { useMinHold } from "@/components/useMinHold";
 import { POLL } from "@/src/engine/config";
 import { Desc, StatusMark, CompositionRows, StatusBreakdown, RoleChips, IdentityDot, networkKind } from "./parts";
-import { compositionGroups, compositionRows, nodeCompositionLabel } from "@/src/data/composition";
+import { compositionGroups, compositionRows, nodeCompositionLabel, parseCompositionKey } from "@/src/data/composition";
 import { ledgerLayerById } from "@/src/data/ledgerLayers";
 import { pickNetId, followToggleActions } from "@/src/engine/domain/pickActions";
 import { applyClickActions } from "@/src/store/applyClickActions";
@@ -601,15 +601,11 @@ export function CountryCard({ cc }: { cc: string }) {
 // a committable subject (2026-08-02). Members are re-resolved LIVE from `selNodes` through the
 // shared `compositionGroups` helper — the same dedupe-to-machines the explorer rows use, so the
 // count here and the count on the row can't disagree. The label + layer codes come from the KEY,
-// so the head still reads correctly for a group that has momentarily emptied out.
-const parseCompKey = (key: string): { label: string; codes: string[] } => {
-  const [label = key, codeStr = ""] = key.split("|");
-  return { label, codes: codeStr ? codeStr.split("·") : [] };
-};
-
+// so the head still reads correctly for a group that has momentarily emptied out — read back
+// through `parseCompositionKey`, the builder's own inverse, so the key format lives in ONE module.
 export function CompositionTitle({ sel }: { sel: CompositionSel }) {
   const Mark = COMPOSITION_ICON;
-  const { label } = parseCompKey(sel.key);
+  const { label } = parseCompositionKey(sel.key);
   return (
     <span className="flex items-center gap-2 min-w-0 max-w-full">
       <Mark aria-hidden className={cn(KIND_MARK_CLASS, "text-[var(--filter-accent,var(--primary))]")} />
@@ -622,7 +618,7 @@ export function CompositionTitle({ sel }: { sel: CompositionSel }) {
 // group IS — the head's own qualifier, like the node card's status pill — so they sit on the title
 // row where every other card puts its subject mark, and they survive a collapse.
 export function CompositionAside({ sel }: { sel: CompositionSel }) {
-  const { codes } = parseCompKey(sel.key);
+  const { codes } = parseCompositionKey(sel.key);
   if (codes.length === 0) return <span className="text-body text-muted-foreground">—</span>;
   return <RoleChips codes={codes} />;
 }

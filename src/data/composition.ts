@@ -49,8 +49,19 @@ export function compositionRows(nodes: NodeInfo[]): CompRow[] {
 // CompositionSel carries.
 export interface CompGroup { key: string; label: string; codes: string[]; rows: NodeRow[]; }
 
+const KEY_SEP = "|";
+const CODE_SEP = "·";
+
 export function compositionKey(label: string, codes: string[]): string {
-  return `${label}|${codes.join("·")}`;
+  return `${label}${KEY_SEP}${codes.join(CODE_SEP)}`;
+}
+
+// The inverse, living next to the builder ON PURPOSE: the composition card reads the label + codes
+// back out of the key (so its head still reads correctly for a group that has momentarily emptied
+// out), and a format encoded in two modules is a format that drifts.
+export function parseCompositionKey(key: string): { label: string; codes: string[] } {
+  const [label = key, codeStr = ""] = key.split(KEY_SEP);
+  return { label, codes: codeStr ? codeStr.split(CODE_SEP) : [] };
 }
 
 export function compositionGroups(rows: NodeRow[]): CompGroup[] {
@@ -66,7 +77,9 @@ export function compositionGroups(rows: NodeRow[]): CompGroup[] {
     const label = comp?.label ?? "Node";
     const codes = comp?.codes ?? [];
     const key = compositionKey(label, codes);
-    (by.get(key) ?? by.set(key, { key, label, codes, rows: [] }).get(key)!).rows.push(r);
+    let group = by.get(key);
+    if (!group) by.set(key, (group = { key, label, codes, rows: [] }));
+    group.rows.push(r);
   }
   for (const g of by.values()) g.rows.sort((a, b) => (a.id || a.label).localeCompare(b.id || b.label));
   return [...by.values()].sort((a, b) => b.rows.length - a.rows.length);
