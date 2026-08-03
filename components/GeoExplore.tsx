@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import { cn } from "@/lib/utils";
 import { useStore } from "@/src/store/store";
 import ExplorerShell from "@/components/ExplorerShell";
@@ -123,9 +123,11 @@ export default function GeoExplore() {
         (a.city ?? "\uffff").localeCompare(b.city ?? "\uffff"),
     );
   };
-  // Which cohort is disclosed (single-open keeps the list calm); keys are country-scoped so a
-  // stale key after switching countries simply matches nothing.
-  const [openCohort, setOpenCohort] = useState<string | null>(null);
+  // The disclosure state IS the committed cohort (`store.cohort`), the same way hyper's
+  // composition groups are `store.composition` — a cohort row commits AND opens in one click, so
+  // a second source of truth could only disagree with the first. Single-open by construction, and
+  // a node CARRIED into geo (whose ancestry commits its cohort) arrives with its own row already
+  // open instead of a ✓ on a collapsed row nobody expanded.
 
   // The selected node, matched by IP **and** layer: one machine can sit in both the l0 and
   // l1 clusters (same IP, two rows), so IP alone highlighted both. `selLayer` is the picked
@@ -252,15 +254,16 @@ export default function GeoExplore() {
                       <p className="mt-1 mx-1 mb-1.5 text-label text-muted-foreground">No locatable nodes here yet.</p>
                     ) : (
                       cohortsOf(nodes).map((ch) => {
-                        const isOpen = openCohort === ch.key;
                         const holdsSel =
                           selIp != null &&
                           ch.rows.some(
                             (r) => r.layer === selLayer && "node" in r.pick && r.pick.node?.ip === selIp,
                           );
                         // Committed cohort: this row IS the cc/city/isp rung applyClickActions
-                        // wrote via the shared table — wins the ✓/SELECTED_ROW over `holdsSel`.
+                        // wrote via the shared table — wins the ✓/SELECTED_ROW over `holdsSel`,
+                        // and IS the disclosure.
                         const on = sameCohort(cohort, { cc, city: ch.city, isp: ch.isp });
+                        const isOpen = on;
                         return (
                           <div key={ch.key}>
                             {/* The cohort row: one line per city × provider — the honeycomb
@@ -276,7 +279,6 @@ export default function GeoExplore() {
                               holdsSel={holdsSel}
                               title={`${ch.city ?? "Unlocated"}${ch.isp ? ` · ${ch.isp}` : ""} · ${ch.rows.length} node${ch.rows.length > 1 ? "s" : ""}`}
                               onToggle={() => {
-                                setOpenCohort(isOpen ? null : ch.key);
                                 if (ch.rows.length === 1) {
                                   // A single-node cohort has no further choice — expand AND
                                   // select its one node in one click; the node's full-ancestry
