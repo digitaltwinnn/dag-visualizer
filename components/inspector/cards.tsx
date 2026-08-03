@@ -67,7 +67,7 @@ export function SnapshotAside({ data: d }: { data: GlobalSnapshot }) {
   // Relative recency for an older pick — coarse (freshness, not a ticking clock). Guarded
   // against an unparseable timestamp (→ no age suffix rather than "NaN").
   const rel = relativeAge(Date.now() - Date.parse(d.timestamp));
-  const cls = "inline-flex items-center gap-1.5 text-xs text-muted-foreground whitespace-nowrap";
+  const cls = "inline-flex items-center gap-1.5 text-label text-muted-foreground whitespace-nowrap";
   if (!live) return <span className={cls}><NoSignalDot /> no signal</span>;
   return (
     <button
