@@ -21,14 +21,17 @@ function Vital({ label, value, spark }: { label: string; value: React.ReactNode;
       <span
         className={cn(
           "flex items-center gap-[7px]",
-          // Sparklines condense away at ≤1360px (was 1240, before that 1020): the
-          // constant-width vitals reservation (VitalsCluster's overlay grid) is sized by the
-          // WIDEST cluster — the sparkline-bearing ledger one — whose width GROWS WITH THE
-          // NETWORK's live figures (anchors/hr crossing 1,000 added a digit and pushed the
-          // overflow point from ~1240 to ~1300, clipping the bar off-screen at 1280 — user
-          // bug). 1360 keeps headroom for another digit; condensing ALL clusters at the same
-          // width caps the reservation without breaking the no-jump guarantee.
-          "max-[1360px]:gap-0 max-[1360px]:[&_.recharts-wrapper]:hidden",
+          // Sparklines condense away at ≤1460px (1240 → 1360 → 1460): the constant-width vitals
+          // reservation (VitalsCluster's overlay grid) is sized by the WIDEST cluster — the
+          // sparkline-bearing ledger one — so its width tracks both the network's live figures
+          // (anchors/hr crossing 1,000 added a digit) and the cluster's own slot count. The
+          // ORDINAL vital claimed the reserved third slot, and at 1400px the row then needed
+          // 1360px inside a 1346px bar: the overflow clipped the RAW switch off the bar's right
+          // edge (measured 2026-08-03). Condensing frees ~134px (2 × 60px chart + gap), which
+          // leaves ~47px of digit headroom at the new threshold. NB the sizing is DATA-dependent,
+          // so this is a floor, not a proof — check the row's scrollWidth against its clientWidth
+          // after adding a vital, don't reason about it.
+          "max-[1460px]:gap-0 max-[1460px]:[&_.recharts-wrapper]:hidden",
         )}
       >
         <span className="font-mono font-bold text-foreground tabular-nums whitespace-nowrap max-[1120px]:text-body">{value}</span>
