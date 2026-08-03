@@ -23,6 +23,17 @@ describe("buildRoster", () => {
     const rows = buildRoster([metaNode, metaNode]);
     expect(new Set(rows.map((r) => r.key)).size).toBe(2);
   });
+  it("keys are unique when two networks report the SAME id (one machine, two nodes under 'all')", () => {
+    const sameId = row({ pick: { kind: "metanode", meta: { id: "dor" } as never }, id: "v1" });
+    const rows = buildRoster([validator, sameId]);
+    expect(new Set(rows.map((r) => r.key)).size).toBe(2);
+  });
+  it("a row keeps its key when an EARLIER row leaves the list", () => {
+    const other = row({ pick: { kind: "l0" }, id: "v2" });
+    const before = buildRoster([validator, other]);
+    const after = buildRoster([other]);
+    expect(after[0].key).toBe(before[1].key);
+  });
 });
 
 describe("sortRoster", () => {

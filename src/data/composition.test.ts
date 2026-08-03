@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { compositionRows, nodeCompositionLabel } from "./composition";
+import { compositionRows, nodeCompositionLabel, compositionKey, parseCompositionKey } from "./composition";
 import type { NodeInfo } from "@/src/data/types";
 
 const n = (roles: string[]): NodeInfo => ({ ip: "x", state: "Ready", layer: roles[0], roles }) as NodeInfo;
@@ -37,5 +37,17 @@ describe("nodeCompositionLabel (the node card's subtitle word)", () => {
   });
   it("is null when the node carries no role/layer info", () => {
     expect(nodeCompositionLabel({})).toBeNull();
+  });
+});
+
+// The composition key is a FORMAT with two consumers (the explorer/Engine build it, the card reads
+// it back), so the pair is pinned here: whatever the builder emits, the parser must return.
+describe("compositionKey / parseCompositionKey", () => {
+  it("round-trips a hybrid group's label and codes", () => {
+    const k = compositionKey("Hybrid", ["L0", "cL1", "dL1"]);
+    expect(parseCompositionKey(k)).toEqual({ label: "Hybrid", codes: ["L0", "cL1", "dL1"] });
+  });
+  it("round-trips a group with no codes", () => {
+    expect(parseCompositionKey(compositionKey("Node", []))).toEqual({ label: "Node", codes: [] });
   });
 });

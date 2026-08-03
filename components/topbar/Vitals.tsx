@@ -21,14 +21,17 @@ function Vital({ label, value, spark }: { label: string; value: React.ReactNode;
       <span
         className={cn(
           "flex items-center gap-[7px]",
-          // Sparklines condense away at ≤1360px (was 1240, before that 1020): the
-          // constant-width vitals reservation (VitalsCluster's overlay grid) is sized by the
-          // WIDEST cluster — the sparkline-bearing ledger one — whose width GROWS WITH THE
-          // NETWORK's live figures (anchors/hr crossing 1,000 added a digit and pushed the
-          // overflow point from ~1240 to ~1300, clipping the bar off-screen at 1280 — user
-          // bug). 1360 keeps headroom for another digit; condensing ALL clusters at the same
-          // width caps the reservation without breaking the no-jump guarantee.
-          "max-[1360px]:gap-0 max-[1360px]:[&_.recharts-wrapper]:hidden",
+          // Sparklines condense away at ≤1460px (1240 → 1360 → 1460): the constant-width vitals
+          // reservation (VitalsCluster's overlay grid) is sized by the WIDEST cluster — the
+          // sparkline-bearing ledger one — so its width tracks both the network's live figures
+          // (anchors/hr crossing 1,000 added a digit) and the cluster's own slot count. The
+          // ORDINAL vital claimed the reserved third slot, and at 1400px the row then needed
+          // 1360px inside a 1346px bar: the overflow clipped the RAW switch off the bar's right
+          // edge (measured 2026-08-03). Condensing frees ~134px (2 × 60px chart + gap), which
+          // leaves ~47px of digit headroom at the new threshold. NB the sizing is DATA-dependent,
+          // so this is a floor, not a proof — check the row's scrollWidth against its clientWidth
+          // after adding a vital, don't reason about it.
+          "max-[1460px]:gap-0 max-[1460px]:[&_.recharts-wrapper]:hidden",
         )}
       >
         <span className="font-mono font-bold text-foreground tabular-nums whitespace-nowrap max-[1120px]:text-body">{value}</span>
@@ -43,15 +46,18 @@ function Vital({ label, value, spark }: { label: string; value: React.ReactNode;
 // L0/cL1/dL1 role counts: the composition vocabulary is what the hyper explorer + the dossier
 // table speak, so the vitals now agree with them). Cluster entries are deduped to machines
 // first (a hybrid appears once per cluster it runs), then counted by their composition label
-// (src/data/composition). NB "Consensus" (dedicated-L0) machines — the DAG core has some —
-// have no column (user picked the three); they're visible in the dossier/explorer breakdowns.
+// (src/data/composition). The columns are EVERY label that vocabulary can produce, so they SUM
+// to the selection (2026-08-02: "Consensus" — dedicated-L0, 16 of them on the DAG core — had no
+// column, so hyper read 146 machines where geo read 162 nodes for the same selection; user).
 // Filtered: an em-dash for a composition the selection doesn't have (stable columns, no reflow).
 function HyperVitals() {
   const filter = useStore((s) => s.filter);
   const metaList = useStore((s) => s.metaList);
   const cfg = metagraphById(filter);
 
-  const counts: Record<string, number> = { Data: 0, Hybrid: 0, Currency: 0 };
+  // Order: the make-up that dominates every real network first, then the dedicated roles in
+  // layer order (L0 → cL1 → dL1) — the same order `compositionRows` emits them in.
+  const counts: Record<string, number> = { Hybrid: 0, Consensus: 0, Currency: 0, Data: 0 };
   const cores = cfg ? metaList.filter((m) => m.id === cfg.id) : metaList;
   for (const mg of cores) {
     const machines = new Map<string, NodeInfo>();
@@ -68,9 +74,9 @@ function HyperVitals() {
 
   return (
     <>
-      <Vital label="Data" value={cell(counts.Data!)} />
-      <Vital label="Hybrid" value={cell(counts.Hybrid!)} />
-      <Vital label="Currency" value={cell(counts.Currency!)} />
+      {Object.entries(counts).map(([label, n]) => (
+        <Vital key={label} label={label} value={cell(n)} />
+      ))}
     </>
   );
 }

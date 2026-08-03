@@ -1,4 +1,4 @@
-import type { NodeInfo } from "@/src/data/types";
+import type { NodeInfo, NodeRow } from "@/src/data/types";
 
 // The shared composition vocabulary: group a metagraph's nodes into rows that sum to the total.
 // Hybrids (nodes running >1 layer) group by their EXACT code set, so two make-ups render as two
@@ -38,6 +38,51 @@ export function compositionRows(nodes: NodeInfo[]): CompRow[] {
     count: dedByRole[r],
   }));
   return [...hybridRows, ...dedRows];
+}
+
+// A node LIST grouped by composition — the hyper explorer's middle level AND the composition
+// card's subject resolver (2026-08-02: the group became a committable rung, so both the browser
+// row and the right-rail card must derive the same members from the same live `selNodes`; one
+// helper so a count can't drift between the two). Entries dedupe to MACHINES first (a hybrid
+// machine appears once per cluster it runs), so the group counts match the dossier's table.
+// `key` is the composition's stable identity within a network — the same string the store's
+// CompositionSel carries.
+export interface CompGroup { key: string; label: string; codes: string[]; rows: NodeRow[]; }
+
+const KEY_SEP = "|";
+const CODE_SEP = "·";
+
+export function compositionKey(label: string, codes: string[]): string {
+  return `${label}${KEY_SEP}${codes.join(CODE_SEP)}`;
+}
+
+// The inverse, living next to the builder ON PURPOSE: the composition card reads the label + codes
+// back out of the key (so its head still reads correctly for a group that has momentarily emptied
+// out), and a format encoded in two modules is a format that drifts.
+export function parseCompositionKey(key: string): { label: string; codes: string[] } {
+  const [label = key, codeStr = ""] = key.split(KEY_SEP);
+  return { label, codes: codeStr ? codeStr.split(CODE_SEP) : [] };
+}
+
+export function compositionGroups(rows: NodeRow[]): CompGroup[] {
+  const machines = new Map<string, NodeRow>();
+  for (const r of rows) {
+    const mk = ("node" in r.pick && r.pick.node?.ip) || r.id || r.label;
+    if (!machines.has(mk)) machines.set(mk, r);
+  }
+  const by = new Map<string, CompGroup>();
+  for (const r of machines.values()) {
+    const node = "node" in r.pick ? r.pick.node : null;
+    const comp = node ? compositionRows([node])[0] : undefined;
+    const label = comp?.label ?? "Node";
+    const codes = comp?.codes ?? [];
+    const key = compositionKey(label, codes);
+    let group = by.get(key);
+    if (!group) by.set(key, (group = { key, label, codes, rows: [] }));
+    group.rows.push(r);
+  }
+  for (const g of by.values()) g.rows.sort((a, b) => (a.id || a.label).localeCompare(b.id || b.label));
+  return [...by.values()].sort((a, b) => b.rows.length - a.rows.length);
 }
 
 // A SINGLE node's composition as one lowercase WORD — "hybrid" / "consensus" / "data" /

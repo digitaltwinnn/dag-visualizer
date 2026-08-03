@@ -19,6 +19,9 @@ export function applyClickActions(actions: ClickAction[]): void {
       case "cohort":
         st.setCohort(a.sel);
         break;
+      case "composition":
+        st.setComposition(a.sel);
+        break;
       case "inspect":
         st.setInspect(a.pick);
         break;

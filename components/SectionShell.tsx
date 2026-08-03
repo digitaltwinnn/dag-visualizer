@@ -2,7 +2,9 @@
 
 import { useEffect, useRef, type ReactNode } from "react";
 import gsap from "gsap";
+import { X } from "lucide-react";
 import { useStore } from "@/src/store/store";
+import { Button } from "@/components/ui/button";
 
 // The two-section shell (spec 2026-08-01; **re-designed 2026-08-01** — the raw table SURFACES out
 // of the scene instead of the shell sliding off the top).
@@ -163,6 +165,22 @@ export default function SectionShell({
         style={{ visibility: "hidden", willChange: "transform, opacity" }}
       >
         {raw}
+        {/* The layer's own dismiss — the third way back (the command bar's RAW switch and Escape
+            are the other two; all three call the same `setSection("scene")`, so the depth timeline
+            can't diverge). The switch is far away in the top-right of the command bar while the
+            layer covers the view, and Escape is invisible: a control ON the surface you want to
+            leave is the one that needs no hunting. The house card-close treatment — the ghost ×,
+            here labelled for the layer rather than a selection. */}
+        <Button
+          variant="ghost"
+          size="icon-xs"
+          aria-label="Close the raw data layer"
+          title="Close the raw data layer"
+          className="absolute top-4 right-3 z-20 text-muted-foreground hover:text-foreground"
+          onClick={() => useStore.getState().setSection("scene")}
+        >
+          <X aria-hidden />
+        </Button>
       </section>
 
       {strip}

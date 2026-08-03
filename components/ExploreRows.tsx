@@ -6,7 +6,7 @@
 // so the two explorers can't drift on row styling.
 import { ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { SELECTED_ROW, SelectedRowMark } from "@/components/selection";
+import { SELECTED_ROW, SelectedRowMark, selectedRow } from "@/components/selection";
 import { subjectPairing } from "@/components/useSubjectPairing";
 import { hoverKeyOf } from "@/src/data/hoverSubject";
 import { shortHash, CORE_HEX } from "@/src/data/network";
@@ -31,6 +31,10 @@ export const ROW_OUTSET = "w-[calc(100%+12px)] -mx-1.5 pl-1.5 pr-2";
 // extends 6px right so its `w-full` children reach the top-level row's edge. `pr-2` on the rows
 // themselves then puts every trailing ✓/chevron in one column across depths.
 export const ROW_NEST = "-mr-1.5 border-l border-border";
+
+// Stable no-op for a DisclosureRow rendered without the group-pairing channel (the ledger's
+// floor/lane rows) — a fresh arrow each render would be a new `set` every time.
+const NO_PAIR = () => {};
 
 // The ONE disclosure-chevron affordance, used by every explorer row that expands/collapses
 // (extracted 2026-07-18 from DisclosureRow, its original/canonical treatment — a ledger fix had
@@ -61,28 +65,53 @@ export function DisclosureChevron({ open }: { open: boolean }) {
 // hover-revealed chevron that rotates when open). `children` = the row's own middle content
 // (which should end with an `ml-auto` count so it and the affordance sit right).
 // `on` = the row itself is a COMMITTED selection (geo's cohort rung, the country-row idiom) —
-// wears SELECTED_ROW + the ✓ unconditionally (it wins over `holdsSel`, the collapsed-holds-a-
-// selected-node case, when both are true). Optional: hyper's composition groups are disclosure-
-// only and never pass it.
+// wears the selection mark + the ✓ unconditionally (it wins over `holdsSel`, the collapsed-holds-a-
+// selected-node case, when both are true). `focused` says whether that rung is the FINEST committed
+// one: the focus rung wears the full mark, a coarser committed rung the ancestor strength
+// (`selectedRow`) — see components/useLadderFocus.ts.
+//
+// GROUP PAIRING (optional, `groupKey` + the `hoverGroup` channel): the same bidirectional
+// scene↔HUD coupling `NodePickerRow` has, for the two GROUP rungs — geo's provider cohort and
+// hyper's composition group. Their right-rail cards write the same scalar channel, so hovering
+// the card lights this row and vice versa (user, 2026-08-02: the metagraph + node cards flashed
+// their explorer row, the group cards didn't — one language, no exceptions). Callers keep their
+// own `onHoverEnter`/`onHoverLeave` for the member-id glow (`hoverCohort`); the two compose.
+// The ledger's floor/lane rows pass no group props, so the pairing stays inert there.
 export function DisclosureRow({
   open,
   on,
+  focused,
   holdsSel,
   title,
   onToggle,
   onHoverEnter,
   onHoverLeave,
+  groupKey,
+  hoverGroup,
+  setHoverGroup,
+  hue,
   children,
 }: {
   open: boolean;
   on?: boolean;
+  focused?: boolean;
   holdsSel: boolean;
   title: string;
   onToggle: () => void;
   onHoverEnter?: () => void;
   onHoverLeave?: () => void;
+  groupKey?: string;
+  hoverGroup?: string | null;
+  setHoverGroup?: (key: string | null) => void;
+  hue?: string;
   children: React.ReactNode;
 }) {
+  const pair = subjectPairing<string>(
+    hoverGroup ?? null,
+    groupKey ?? null,
+    setHoverGroup ?? NO_PAIR,
+    hue ?? "var(--primary)",
+  );
   return (
     <button
       type="button"
@@ -90,17 +119,25 @@ export function DisclosureRow({
         "group relative flex items-center gap-2 w-full py-[5px] pl-2 pr-2 my-px rounded-sm border border-transparent bg-transparent cursor-pointer text-left text-foreground-dim transition-colors duration-[140ms]",
         "hover:bg-wash-hover hover:text-foreground",
         "focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--primary)] focus-visible:outline-offset-[-2px]",
-        on && SELECTED_ROW,
+        on && selectedRow(focused ?? true),
+        pair.paired && pair.className,
       )}
+      style={pair.style}
       aria-expanded={open}
       title={title}
       onClick={onToggle}
-      onMouseEnter={onHoverEnter}
-      onMouseLeave={onHoverLeave}
+      onMouseEnter={() => {
+        pair.onMouseEnter();
+        onHoverEnter?.();
+      }}
+      onMouseLeave={() => {
+        pair.onMouseLeave();
+        onHoverLeave?.();
+      }}
     >
       {children}
       {on || (holdsSel && !open) ? (
-        <SelectedRowMark className="flex-none" />
+        <SelectedRowMark className="flex-none" muted={on && focused === false} />
       ) : (
         <DisclosureChevron open={open} />
       )}
@@ -109,22 +146,21 @@ export function DisclosureRow({
 }
 
 // The leaf PICKER row — "Node <id>" — the terminal subject in both explorers. Computes its own
-// identity hue + the scene↔row hover pairing (same in both); the parent supplies the select +
-// an optional extra hover effect (geo also previews the node's country border).
+// identity hue + the scene↔row hover pairing (same in both); the parent supplies the select. The
+// hover raises the NODE channel and nothing else (user, 2026-08-02): geo used to preview the
+// node's country border here too, so a node hover lit a subject the row isn't about.
 export function NodePickerRow({
   row,
   selected,
   hoverNodeId,
   setHoverNodeId,
   onSelect,
-  onHoverEnter,
 }: {
   row: NodeRow;
   selected: boolean;
   hoverNodeId: string | null;
   setHoverNodeId: (id: string | null) => void;
   onSelect: () => void;
-  onHoverEnter?: () => void;
 }) {
   const hoverKey = hoverKeyOf(row.pick);
   const hue = row.pick.kind === "metanode" && row.pick.meta ? identityHudHex(row.pick.meta.id) : CORE_HEX;
@@ -135,16 +171,15 @@ export function NodePickerRow({
         "nb-row relative flex items-center gap-2 w-full py-1 pl-2 pr-7 my-px rounded-sm border border-transparent bg-transparent cursor-pointer text-left text-foreground-dim transition-colors duration-[140ms]",
         "hover:bg-wash-hover hover:text-foreground",
         "focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--primary)] focus-visible:outline-offset-[-2px]",
+        // Always the FULL mark: the node is the finest rung in every ladder, so a selected node
+        // row is by definition the focus — it never needs the ancestor strength.
         selected && SELECTED_ROW,
         pair.paired && pair.className,
       )}
       style={pair.style}
       title={`${row.label} · ${row.state ?? "—"}`}
       onClick={onSelect}
-      onMouseEnter={() => {
-        pair.onMouseEnter();
-        onHoverEnter?.();
-      }}
+      onMouseEnter={pair.onMouseEnter}
     >
       {/* Just "Node" + the mono id — the row is a pure picker; the parent row carries the
           composition / place / provider. */}

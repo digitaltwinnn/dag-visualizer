@@ -27,7 +27,7 @@ export default function RailScroll() {
     const attach = (id: string, el: HTMLElement) => {
       // Toggle `.rail-clip` (the bottom fade mask + its scroll RUNWAY padding) only while this
       // rail's CONTENT actually extends down into the chart's band — otherwise a short rail
-      // would be masked to nothing. The class itself adds `--bottom-reserve` of padding (the
+      // would be masked to nothing. The class itself adds `--rail-fade` of padding (the
       // runway that lets the last card scroll clear of the fade), so the measure must EXCLUDE
       // that padding or applying the class would re-trigger itself and never release. Content
       // height (scrollHeight minus the applied runway) vs the space above the band is
@@ -35,11 +35,11 @@ export default function RailScroll() {
       let raf = 0;
       const syncClip = () => {
         raf = 0;
-        const reserve = parseFloat(
-          getComputedStyle(document.documentElement).getPropertyValue("--bottom-reserve"),
-        ) || 0;
+        const root = getComputedStyle(document.documentElement);
+        const px = (name: string) => parseFloat(root.getPropertyValue(name)) || 0;
+        const reserve = px("--bottom-reserve");
         const r = el.getBoundingClientRect();
-        const runway = el.classList.contains("rail-clip") ? reserve + 12 : 0; // globals.css .rail-clip
+        const runway = el.classList.contains("rail-clip") ? px("--rail-fade") : 0; // globals.css .rail-clip
         const contentH = el.scrollHeight - runway;
         // Space above the band, NO tolerance: any entry into the chart band fades (a +24px
         // slack let the rail overlap the chart unfaded — user bug; the content-height measure

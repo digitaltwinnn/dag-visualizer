@@ -40,8 +40,9 @@ export default function TopBar() {
 
   // The filter strip's open state — COLLAPSED BY DEFAULT (user): it's a persistent part of the
   // bar, not a popup, but starts closed on every load/view. The FILTER button toggles it, Escape
-  // closes it (picking a chip deliberately does NOT — see the strip note below). The phone effect
-  // below still force-closes it if the viewport becomes phone-width after a manual open.
+  // closes it, and picking a chip closes it too (user, 2026-08-02 — see the strip note below).
+  // The phone effect below still force-closes it if the viewport becomes phone-width after a
+  // manual open.
   const [open, setOpen] = useState(false);
 
   const bp = useBreakpoint();
@@ -140,8 +141,18 @@ export default function TopBar() {
           {/* The "FILTER" text label on wide bars; on the condensed breakpoints (≤940px) it
               simply hides — the identity dot + network name ARE the control's face there (the
               lucide funnel stand-in was tried and removed: too busy, and it crowded the phone
-              bar off-balance). */}
-          <span className="text-micro tracking-caps uppercase text-muted-foreground max-[940px]:hidden">Filter</span>
+              bar off-balance). It goes ACCENT while the strip is open — the same on-state the
+              RAW label wears when its layer is showing (user, 2026-08-02): both are the bar's
+              two "this control is currently doing something" words, so they speak one language. */}
+          <span
+            className={cn(
+              "text-micro tracking-caps uppercase max-[940px]:hidden",
+              "transition-colors duration-150 motion-reduce:transition-none",
+              open ? "text-primary" : "text-muted-foreground",
+            )}
+          >
+            Filter
+          </span>
           <span
             className="w-[9px] h-[9px] rounded-full flex-none animate-dot-beat motion-reduce:animate-none"
             style={{ background: face.dot }}
@@ -231,8 +242,11 @@ export default function TopBar() {
           grid-rows collapse as the phone vitals row below): every network as a hoverable/
           clickable chip, so the SCENE previews the selection live while browsing (user,
           2026-07-12 — this replaces the detached popover, whose glass covered the scene).
-          Picking keeps the strip open (exploring several networks in a row is the point);
-          the FILTER button or Escape closes it. */}
+          Picking a chip CLOSES the strip again (user, 2026-08-02 — reversed the earlier
+          keep-it-open rule: hovering already previews a network without committing, so the
+          strip's job is done the moment you commit one, and leaving it open kept the whole
+          layout pushed down over the scene you just filtered); the FILTER button or Escape
+          closes it too. */}
       <div
         id="filter-strip"
         className={cn(
@@ -244,7 +258,7 @@ export default function TopBar() {
       >
         <div className={cn("overflow-hidden min-h-0", !open && "invisible")}>
           <div ref={stripInner}>
-            <FilterPicker />
+            <FilterPicker onPicked={() => setOpen(false)} />
           </div>
         </div>
       </div>

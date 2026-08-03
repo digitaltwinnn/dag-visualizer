@@ -5,7 +5,7 @@ import { cn } from "@/lib/utils";
 import { useStore } from "@/src/store/store";
 import { shortHash, CORE_HEX, getNetwork, metagraphById } from "@/src/data/network";
 import { identityHudHex } from "@/src/palette/identity";
-import { hex, fmtDag, fmtKB } from "@/src/util/format";
+import { hex, fmtDag, fmtKB, ccMark } from "@/src/util/format";
 import { relativeAge } from "@/src/util/relativeAge";
 import { statusBreakdown } from "@/src/data/nodeStatus";
 import type { GlobalSnapshot, MetaCfg, PickDescriptor } from "@/src/data/types";
@@ -15,15 +15,16 @@ import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { SonarRing, NodeStars, NoSignalDot } from "@/components/state/StateAtoms";
-import { VIEW_ICONS, LAYER_ICON, SNAPSHOT_ICON, COUNTRY_ICON, PROVIDER_ICON, KIND_MARK_CLASS } from "@/components/icons";
+import { VIEW_ICONS, LAYER_ICON, SNAPSHOT_ICON, COUNTRY_ICON, PROVIDER_ICON, COMPOSITION_ICON, KIND_MARK_CLASS } from "@/components/icons";
 import { ExternalLink } from "lucide-react";
 import { useMinHold } from "@/components/useMinHold";
 import { POLL } from "@/src/engine/config";
 import { Desc, StatusMark, CompositionRows, StatusBreakdown, RoleChips, IdentityDot, networkKind } from "./parts";
-import { compositionRows, nodeCompositionLabel } from "@/src/data/composition";
+import { compositionGroups, compositionRows, nodeCompositionLabel, parseCompositionKey } from "@/src/data/composition";
 import { ledgerLayerById } from "@/src/data/ledgerLayers";
-import { pickNetId } from "@/src/engine/domain/pickActions";
-import type { CohortSel } from "@/src/engine/domain/focusLadder";
+import { pickNetId, followToggleActions } from "@/src/engine/domain/pickActions";
+import { applyClickActions } from "@/src/store/applyClickActions";
+import type { CohortSel, CompositionSel } from "@/src/engine/domain/focusLadder";
 
 type PickOf<K extends PickDescriptor["kind"]> = Extract<PickDescriptor, { kind: K }>;
 
@@ -50,27 +51,41 @@ export function SnapshotTitle({ data: d }: { data: GlobalSnapshot }) {
   );
 }
 
-// Snapshot title-row aside: live-now dot / coarse relative age / the no-signal state.
+// Snapshot title-row aside: the LIVE-MODE switch — a beating cyan dot while the card follows the
+// heartbeat, the snapshot's coarse age while it is pinned, and the no-signal state when the feed
+// is down (nothing to follow, so that one is not a control). Since the card no longer opens
+// itself on entering the ledger (user, 2026-08-02), this element is how live mode is turned on
+// and off; the write goes through the table + executor like every other selection.
+// While following a metagraph lane, the newest snapshot it anchored into may be minutes old — the
+// age rides alongside "live" rather than being replaced by it, so the label never overstates.
 export function SnapshotAside({ data: d }: { data: GlobalSnapshot }) {
   const latest = useStore((s) => s.latestSnapshot);
   const live = useStore((s) => s.live);
+  const following = useStore((s) => s.following);
+  const snap = useStore((s) => s.snap);
   const isLive = latest != null && d.ordinal === latest.ordinal;
   // Relative recency for an older pick — coarse (freshness, not a ticking clock). Guarded
   // against an unparseable timestamp (→ no age suffix rather than "NaN").
   const rel = relativeAge(Date.now() - Date.parse(d.timestamp));
+  const cls = "inline-flex items-center gap-1.5 text-label text-muted-foreground whitespace-nowrap";
+  if (!live) return <span className={cls}><NoSignalDot /> no signal</span>;
   return (
-    <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground whitespace-nowrap">
-      {!live ? (
-        <><NoSignalDot /> no signal</>
-      ) : isLive ? (
+    <button
+      type="button"
+      aria-pressed={following}
+      title={following ? "Stop following the live snapshot" : "Follow the live snapshot"}
+      className={cn(cls, "rounded-xs hover:text-foreground transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary/60")}
+      onClick={() => snap && applyClickActions(followToggleActions(snap, following))}
+    >
+      {following ? (
         <>
           <span className="w-2 h-2 rounded-full bg-primary shadow-[0_0_0_3px_color-mix(in_oklch,var(--primary)_30%,transparent)] animate-dot-beat motion-reduce:animate-none" />
-          {" "}live now
+          {isLive ? "live now" : <>live · {rel}</>}
         </>
       ) : (
         <>◷ {rel}</>
       )}
-    </span>
+    </button>
   );
 }
 
@@ -122,16 +137,17 @@ function inspectedNode(inspect: ReturnType<typeof useStore.getState>["inspect"])
     : null;
 }
 
-// The node's resolved place ("City, Country") — "" when geolocation hasn't resolved.
-function nodePlace(node: NonNullable<ReturnType<typeof inspectedNode>>): string {
-  const g = node.geo;
-  return g ? `${g.city ? g.city + ", " : ""}${g.country ?? ""}`.trim() : "";
+// The node's resolved CITY — the title's place word ("" when geolocation hasn't resolved). The
+// COUNTRY left the title (user, 2026-08-02): it is a labelled fact like hosting and the node id,
+// so it reads in the body with the rest rather than doubling the headline.
+function nodeCity(node: NonNullable<ReturnType<typeof inspectedNode>>): string {
+  return node.geo?.city ?? "";
 }
 
 // Node title: the Geography view mark (Globe — the Geography view's top-bar icon, same view-glyph
-// vocabulary as the snapshot head's Layers; identity-hued) + the node's LOCATION ("City, Country" — user-agreed:
-// where the node sits is the headline; its hash is bookkeeping, demoted to the subtitle below).
-// Fallback when geolocation hasn't resolved: the truncated id (mono) stays the title, no
+// vocabulary as the snapshot head's Layers; identity-hued) + the node's CITY — user-agreed:
+// where the node sits is the headline; its hash is bookkeeping, demoted to the subtitle below.
+// Fallback when the city hasn't resolved: the truncated id (mono) stays the title, no
 // subtitle. The roll-in stays keyed on the node ID — the subject's identity, not the title text
 // (a new node in the same city still rolls).
 export function GeoLiveTitle() {
@@ -139,39 +155,14 @@ export function GeoLiveTitle() {
   const node = inspectedNode(inspect);
   if (!node) return null;
   const id = node.node?.id;
-  const place = nodePlace(node);
-  const title = place || (id ? shortHash(id) : node.node?.ip || "Node");
+  const city = nodeCity(node);
+  const title = city || (id ? shortHash(id) : node.node?.ip || "Node");
   const color = node.kind === "metanode" ? (node.meta ? identityHudHex(node.meta.id) : undefined) : CORE_HEX;
   const Mark = VIEW_ICONS.geo;
   return (
     <span className="inline-flex items-center gap-2 min-w-0">
       {color && <Mark className={KIND_MARK_CLASS} style={{ color }} aria-hidden />}
-      <span key={id ?? title} className={cn("min-w-0 roll-in", !place && "font-mono tabular-nums break-all")}>{title}</span>
-    </span>
-  );
-}
-
-// Node subtitle: the truncated id — small/muted/mono, under the location title (CardHead's
-// `subtitle` slot supplies the standard block styling). Renders ONLY when the location made it
-// to the title; in the no-location fallback the id IS the title.
-export function GeoLiveSubtitle() {
-  const inspect = useStore((s) => s.inspect);
-  const node = inspectedNode(inspect);
-  if (!node) return null;
-  // The subtitle = the composition word + its layer codes as squared pills (RoleChips — the
-  // same rendering the metagraph card's composition rows use; user 2026-07-12: the joined
-  // "L0·cL1" text read as one token). Sentence-cased ("Hybrid") to match the composition
-  // rows' label style — the caps RULE: text-micro is the UPPERCASE lane (eyebrows/section
-  // tags); word labels at text-label/body are sentence case. The id lives in the body's
-  // NODE ID row, last: the reference number sits where references sit.
-  const compWord = node.node ? nodeCompositionLabel(node.node) : null;
-  const comp = compWord ? compWord.charAt(0).toUpperCase() + compWord.slice(1) : null;
-  const codes = node.node ? compositionRows([node.node])[0]?.codes : undefined;
-  if (!comp) return null;
-  return (
-    <span className="inline-flex items-center gap-1.5 min-w-0">
-      <span>{comp}</span>
-      {codes && codes.length > 0 && <RoleChips codes={codes} />}
+      <span key={id ?? title} className={cn("min-w-0 roll-in", !city && "font-mono tabular-nums break-all")}>{title}</span>
     </span>
   );
 }
@@ -365,27 +356,60 @@ export function GeoLiveCard() {
   if (!node) {
     return (
       <p className="text-muted-foreground text-label mt-[2px] mb-0">
-        Pick a node from the explorer on the left — or click one on the globe — to inspect it here.
+        Click a node on the globe, or in the explorer.
       </p>
     );
   }
   return <GeoLiveNode p={node} />;
 }
 
-// The selected-node block. The node's LOCATION + id + status pill are all the card HEAD now
-// (GeoLiveTitle/GeoLiveSubtitle/GeoLiveAside above) — the old IP and "Location" body rows are
-// gone (the IP entirely, user-agreed; the location because it IS the title). The body is what
-// remains that the globe can't show: the node's layer composition. The slot eyebrow reads
-// "Selected node"; the × is CardHead's shared close (the outer pane).
+// The selected-node block. The node's CITY + status pill are the card HEAD (GeoLiveTitle/
+// GeoLiveAside above) — the old IP and "Location" body rows are gone (the IP entirely,
+// user-agreed; the city because it IS the title). The body is the labelled facts the globe
+// can't show: the country that completes the place, the node's make-up, the hosting provider,
+// and the node's own reference. The slot eyebrow reads "Node"; the × is CardHead's shared close
+// (the outer pane).
 function GeoLiveNode({ p }: { p: PickOf<"l0" | "l1" | "metanode"> }) {
   // Hosting provider from the node's IP lookup (GeoInfo.isp/asn) — the one machine fact the
   // globe can't show. Absent = the lookup didn't know; the line simply doesn't render
   // (honesty: no "Unknown" filler in a facts card).
   const geo = "geo" in p ? p.geo : undefined;
+  // The node's make-up: the composition word + its layer codes as squared pills (RoleChips — the
+  // same rendering the metagraph card's composition rows use; user 2026-07-12: the joined
+  // "L0·cL1" text read as one token). Sentence-cased ("Hybrid" / "Currency") to match the
+  // composition rows' label style — text-micro is the UPPERCASE lane (labels), word values at
+  // text-body are sentence case.
+  const compWord = p.node ? nodeCompositionLabel(p.node) : null;
+  const comp = compWord ? compWord.charAt(0).toUpperCase() + compWord.slice(1) : null;
+  const codes = p.node ? compositionRows([p.node])[0]?.codes : undefined;
   // NB: the hover pairing (synced 3D glow) lives on the OUTER pane (Inspector.CardPane), not here,
   // so the glow lights the card's rounded edge.
   return (
     <>
+      {/* COUNTRY — the half of the place the head no longer carries (user, 2026-08-02), with the
+          app's country CODE mark as the quiet suffix, the same shape as HOSTING's `isp · asn`. */}
+      {geo?.country && (
+        <div className="my-2">
+          <span className="text-micro tracking-[0.1em] uppercase text-muted-foreground">Country</span>
+          <div className="text-body text-foreground-dim mt-0.5">
+            {geo.country}
+            {geo.cc && <span className="font-mono text-label text-muted-foreground"> · {ccMark(geo.cc)}</span>}
+          </div>
+        </div>
+      )}
+      {/* COMPOSITION — the node's role in the network, a labelled fact like the rest (user,
+          2026-08-02: it used to ride the head as a subtitle, which made the head carry three
+          different registers). Sits second: the reading order is place → role → host →
+          reference, with health as the head's status pill. */}
+      {comp && (
+        <div className="my-2">
+          <span className="text-micro tracking-[0.1em] uppercase text-muted-foreground">Composition</span>
+          <div className="flex items-center gap-1.5 text-body text-foreground-dim mt-0.5">
+            <span>{comp}</span>
+            {codes && codes.length > 0 && <RoleChips codes={codes} />}
+          </div>
+        </div>
+      )}
       {geo?.isp && (
         <div className="my-2">
           <span className="text-micro tracking-[0.1em] uppercase text-muted-foreground">Hosting</span>
@@ -570,6 +594,63 @@ export function CountryCard({ cc }: { cc: string }) {
   );
 }
 
+// ── The COMPOSITION card (Hypergraph · make-up group) ───────────────────────────────────────
+// Hyper's rung between a network and a node (`store.composition`, a `CompositionSel`
+// {netId, key}): the machines in one network that run the SAME set of layers — the metagraph
+// card's own composition vocabulary (Hybrid / Data / …), promoted from a browse-only grouping to
+// a committable subject (2026-08-02). Members are re-resolved LIVE from `selNodes` through the
+// shared `compositionGroups` helper — the same dedupe-to-machines the explorer rows use, so the
+// count here and the count on the row can't disagree. The label + layer codes come from the KEY,
+// so the head still reads correctly for a group that has momentarily emptied out — read back
+// through `parseCompositionKey`, the builder's own inverse, so the key format lives in ONE module.
+export function CompositionTitle({ sel }: { sel: CompositionSel }) {
+  const Mark = COMPOSITION_ICON;
+  const { label } = parseCompositionKey(sel.key);
+  return (
+    <span className="flex items-center gap-2 min-w-0 max-w-full">
+      <Mark aria-hidden className={cn(KIND_MARK_CLASS, "text-[var(--filter-accent,var(--primary))]")} />
+      <span className="truncate min-w-0">{label}</span>
+    </span>
+  );
+}
+
+// The layer codes ride the HEAD's aside, not a body row (user, 2026-08-02): they are what the
+// group IS — the head's own qualifier, like the node card's status pill — so they sit on the title
+// row where every other card puts its subject mark, and they survive a collapse.
+export function CompositionAside({ sel }: { sel: CompositionSel }) {
+  const { codes } = parseCompositionKey(sel.key);
+  if (codes.length === 0) return <span className="text-body text-muted-foreground">—</span>;
+  return <RoleChips codes={codes} />;
+}
+
+export function CompositionCard({ sel }: { sel: CompositionSel }) {
+  const selNodes = useStore((s) => s.selNodes);
+  const groups = useMemo(() => compositionGroups(selNodes), [selNodes]);
+  const members = groups.find((g) => g.key === sel.key)?.rows ?? [];
+  const total = groups.reduce((n, g) => n + g.rows.length, 0);
+  const share = total > 0 ? Math.round((members.length / total) * 100) : 0;
+  const cfg = metagraphById(sel.netId);
+  return (
+    <div className="flex flex-col gap-2">
+      <div className="flex items-start justify-between gap-2.5">
+        <span className="text-body text-muted-foreground">Machines</span>
+        <span className="text-body text-foreground tabular-nums">{members.length}</span>
+      </div>
+      <div className="flex items-start justify-between gap-2.5">
+        <span className="text-body text-muted-foreground">Share of network</span>
+        <span className="text-body text-foreground tabular-nums">{share}%</span>
+      </div>
+      <div className="flex items-start justify-between gap-2.5">
+        <span className="text-body text-muted-foreground flex-none">Network</span>
+        <span className="inline-flex items-center gap-1.5 text-body text-foreground min-w-0">
+          <IdentityDot hue={sel.netId === "dag" ? CORE_HEX : identityHudHex(sel.netId)} />
+          <span className="truncate">{cfg?.name || sel.netId}</span>
+        </span>
+      </div>
+    </div>
+  );
+}
+
 // ── The PROVIDER card (Geography · city×provider cohort) ────────────────────────────────────
 // Selected via the ladder's rung between a node and its country (`store.cohort`, a `CohortSel`
 // {cc, city, isp} — internal name stays `cohort`, ALL user-facing copy says "provider", per the
@@ -582,11 +663,28 @@ export function ProviderTitle({ sel }: { sel: CohortSel }) {
   return (
     <span className="flex items-center gap-2 min-w-0 max-w-full">
       <Mark aria-hidden className={cn(KIND_MARK_CLASS, "text-[var(--filter-accent,var(--primary))]")} />
-      <span className="truncate min-w-0">
-        {sel.city ?? "Unlocated"} · {sel.isp ?? "Unknown provider"}
-      </span>
+      {/* The PROVIDER alone is the headline (user, 2026-08-02) — the city is a labelled fact in
+          the body, and the country belongs to the parent country card the cohort sits under. */}
+      <span className="truncate min-w-0">{sel.isp ?? "Unknown provider"}</span>
     </span>
   );
+}
+
+// The cohort's AS number, right-aligned on the head's title row (user, 2026-08-02): it identifies
+// the provider rather than measuring it, so it belongs beside the name — subtle mono, and it stays
+// readable while the card is collapsed. Members of one city×provider cohort share an ASN.
+export function ProviderAside({ sel }: { sel: CohortSel }) {
+  const selNodes = useStore((s) => s.selNodes);
+  const asn = useMemo(() => {
+    for (const r of selNodes) {
+      const geo = "geo" in r.pick ? r.pick.geo : undefined;
+      if (r.cc === sel.cc && (r.city || null) === sel.city && (geo?.isp || null) === sel.isp && geo?.asn)
+        return geo.asn;
+    }
+    return null;
+  }, [selNodes, sel.cc, sel.city, sel.isp]);
+  if (!asn) return null;
+  return <span className="font-mono text-label text-muted-foreground tabular-nums">{asn}</span>;
 }
 
 export function ProviderCard({ sel }: { sel: CohortSel }) {
@@ -609,10 +707,15 @@ export function ProviderCard({ sel }: { sel: CohortSel }) {
     }
     return seen;
   }, [members]);
-  const firstGeo = members[0] && "geo" in members[0].pick ? members[0].pick.geo : undefined;
-  const countryName = selNodes.find((r) => r.cc === sel.cc)?.country ?? sel.cc;
   return (
     <div className="flex flex-col gap-2">
+      {/* CITY — the half of the cohort key the head no longer carries. The COUNTRY is deliberately
+          absent: the cohort always sits under a committed country, whose own card states it one
+          slot up (user, 2026-08-02 — a facts rail shouldn't say the same thing twice). */}
+      <div className="flex items-start justify-between gap-2.5">
+        <span className="text-body text-muted-foreground">City</span>
+        <span className="text-body text-foreground">{sel.city ?? "Unlocated"}</span>
+      </div>
       <div className="flex items-start justify-between gap-2.5">
         <span className="text-body text-muted-foreground">Nodes</span>
         <span className="text-body text-foreground tabular-nums">{members.length}</span>
@@ -634,14 +737,6 @@ export function ProviderCard({ sel }: { sel: CohortSel }) {
             })
           )}
         </span>
-      </div>
-      <div className="flex items-start justify-between gap-2.5">
-        <span className="text-body text-muted-foreground">ASN</span>
-        <span className="text-body text-foreground tabular-nums">{firstGeo?.asn ?? "—"}</span>
-      </div>
-      <div className="flex items-start justify-between gap-2.5">
-        <span className="text-body text-muted-foreground">Country</span>
-        <span className="text-body text-foreground">{countryName}</span>
       </div>
     </div>
   );

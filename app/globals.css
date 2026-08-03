@@ -286,7 +286,14 @@
   --detail-w: 320px;       /* right details rail width */
   --sel-bg: rgba(42, 245, 255, 0.12);   /* selected/active fill, reused everywhere */
   --sel-border: rgba(42, 245, 255, 0.5);
+  --sel-bg-dim: rgba(42, 245, 255, 0.05);  /* the same mark at ANCESTOR strength: an explorer row
+                                              whose rung is committed but no longer the focus (a
+                                              finer rung is) — same language, half a voice, so one
+                                              list can't show three equally loud selections */
+  --sel-border-dim: rgba(42, 245, 255, 0.22);
   --bottom-reserve: 130px; /* vertical space the always-present LiveStrip lane reserves */
+  --rail-fade: 28px;       /* height of a clipped rail's bottom fade — AND its scroll runway
+                              (globals `.rail-clip` + RailScroll's measure read this one token) */
 
   /* ── Instrument-thread ruler spec (the ONE shared source) ─────────────────────
      Both rails' SVG threads (RailThread.tsx) and the bar-chart axis read identically:
@@ -386,48 +393,13 @@
     pointer-events: none;
   }
 
-  /* ── The facts-rail DESCENT SPINE (Inspector.tsx ladder lane, variant-A 2026-07-19) ──────────
-     The focus-ladder rungs (network ⊃ country ⊃ provider ⊃ node in geo; network ⊃ layer ⊃ node
-     in ledger; network ⊃ node in hyper) render in this lane so their CONTAINMENT reads at a
-     glance — the old flat stack of equal cards hid it. A single identity-hued spine (the filter
-     accent, cyan on "all") runs the lane's left edge; each rung is tethered to it by a tick +
-     node-dot and its card indents one step per depth. The finest committed rung (`data-focus`)
-     is the only expanded card — its ancestors collapse to eyebrow+title (Inspector's auto
-     default). The lane is a flex column matching #rightcol's own rail-gap. */
-  .rail-ladder {
-    position: relative;
-    display: flex; flex-direction: column; gap: var(--rail-gap);
-    padding-left: 18px;   /* the gutter the spine + connectors live in, left of the cards */
-  }
-  /* The spine — the rail's identity hue at the shared resting dim (like RailThread's spine), inset
-     top/bottom so it reads as an instrument channel, not a hard bar. */
-  .rail-ladder::before {
-    content: ""; position: absolute; left: 5px; top: 10px; bottom: 10px; width: 1px;
-    background: var(--filter-accent, var(--primary));
-    opacity: var(--rail-rest-dim, 0.6);
-    pointer-events: none;
-  }
-  .rung { position: relative; }
-  /* Connector tick — a short stub from the spine toward the card; fixed length, so a deeper
-     (more-indented) card floats further from it and the indent reads. */
-  .rung::before {
-    content: ""; position: absolute; left: -13px; top: 15px; width: 10px; height: 1px;
-    background: var(--filter-accent, var(--primary)); opacity: 0.5; pointer-events: none;
-  }
-  /* Node-dot on the spine — hollow (background-punched) at rest, FILLED + glowing on the focused
-     rung (the finest committed one), so the eye lands on the card you're actually inspecting. */
-  .rung::after {
-    content: ""; position: absolute; left: -16px; top: 12px; width: 7px; height: 7px;
-    border-radius: 999px; box-sizing: border-box;
-    background: var(--background); border: 1.5px solid var(--filter-accent, var(--primary));
-    pointer-events: none;
-  }
-  .rung[data-focus]::after {
-    background: var(--filter-accent, var(--primary));
-    box-shadow: 0 0 7px color-mix(in oklch, var(--filter-accent, var(--primary)) 70%, transparent);
-  }
-  /* The card indents one step per ladder depth (context 0 → node 3 in geo). */
-  .rung-body { margin-left: calc(var(--depth, 0) * 12px); }
+  /* NB the facts rail's LADDER LANE draws nothing of its own (Inspector.tsx renders it as a plain
+     flex column). Containment is expressed on the ONE rail instrument — RailThread — by stepping
+     each rung's card back from the rail and reaching for it with a longer connector. An in-lane
+     descent spine used to live here (variant-A 2026-07-19) and was removed 2026-08-02 (user): it
+     put a second vertical instrument on the cards' left edge, duplicating the thread's own
+     vocabulary — spine + tick + node-dot — a rail-width away from it. */
+
 
   /* The rails' strip-follow slide (top rides --topbar-extra) — motion off under reduce. */
   @media (prefers-reduced-motion: reduce) {
@@ -446,11 +418,16 @@
      toggles `.rail-clip`, see RailScroll). Gating it avoids fading a SHORT rail. The padding
      is the SCROLL RUNWAY: without it, even at max scroll the last card's bottom sat inside
      the faded band forever (user bug) — the runway lets the content scroll fully clear of
-     the fade, sheet-like, while mid-scroll content still fades into the band. */
+     the fade, sheet-like, while mid-scroll content still fades into the band.
+     The fade rides the rail's OWN bottom edge (`--rail-fade` tall) — the rail's max-height
+     already keeps that edge clear of the strip's band, so subtracting `--bottom-reserve` here
+     too double-counted it: the gradient started ~154px above the strip and blanked the last
+     100px of the rail outright (user: "starts way too early"). Runway = the fade height, so
+     RailScroll's measure stays a one-token read. */
   #leftcol.rail-clip, #rightcol.rail-clip {
-    padding-bottom: calc(var(--bottom-reserve, 0px) + 12px);
-    -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - var(--bottom-reserve, 0px) + 6px), transparent calc(100% - var(--bottom-reserve, 0px) + 30px), transparent 100%);
-    mask-image: linear-gradient(to bottom, #000 calc(100% - var(--bottom-reserve, 0px) + 6px), transparent calc(100% - var(--bottom-reserve, 0px) + 30px), transparent 100%);
+    padding-bottom: var(--rail-fade);
+    -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - var(--rail-fade)), transparent 100%);
+    mask-image: linear-gradient(to bottom, #000 calc(100% - var(--rail-fade)), transparent 100%);
   }
   /* BOTH rails hide the native scrollbar — each carries its instrument thread in the outer
      margin (the thread IS the scroll visual) and the bottom fade signals clipped content;

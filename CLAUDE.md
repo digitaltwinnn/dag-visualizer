@@ -248,7 +248,8 @@ Zustand store. **Two data lanes:** (A) high-freq visuals subscribe straight to
   strip's non-ledger content), `DataSection` + `components/datasection/` (the raw layer's per-view
   tables), `Odometer`, `Sparkline`, `state/StateAtoms`, and the
   hooks `useSnapshotFeed`, `useBreakpoint`, `useBootPhase`, `useMinHold`, `useSubjectPairing`.
-- **`src/store/store.ts`** — the Zustand store (mode, filter, country, inspect, snap,
+- **`src/store/store.ts`** — the Zustand store (mode, filter, country, cohort, composition,
+  inspect, snap,
   selStack, following, metaList, leaderboard, selNodes, activity, snapshotExact, the hover
   channels `hoverFilter`/`hoverNodeId`/`hoverSnapOrd`, `section` (which of the two shell LAYERS is
   presented — UI state, not selection, so it sits outside the one-selection-write-path rule),
@@ -307,15 +308,25 @@ store-value imports**, enforced by `layerBoundaries.test.ts`). Each ships coloca
   DATA. The single source of truth for what each view turns on (see *Per-view behaviour*).
 - `focusLadder.ts` — the FOCUS/ZOOM LADDER as data (spec 2026-07-18): one ordered rung table
   per 3D view (`LADDERS` — geo `node → cohort → country → network → all`, hyper `node →
-  network → all`, ledger `node → layer → network → all`), each rung a pure `active(sel)`
+  composition → network → all`, ledger `node → layer → network → all`), each rung a pure `active(sel)`
   predicate + a resolver KEY the Engine implements (`_resolveFocus` walks finest→coarsest;
   first active rung whose resolver succeeds wins the camera, failure falls through — the
   per-view fallback chains, made uniform). Also `finerLevels()` (the deselect-stepping data
   `pickActions` derives its drop-the-finer rules from — one level list, two consumers) and
-  `LEVEL_CARRY` (cross-view carry: node/network carry always; cohort/country/layer are
-  VIEW-SCOPED — cleared when leaving their view, so no view-scoped card ever lingers).
+  `LEVEL_CARRY` (cross-view carry: node/network carry always; cohort/country/composition/layer
+  are VIEW-SCOPED — cleared when leaving their view, so no view-scoped card ever lingers).
   In ledger, `layer` sits deliberately FINER than `network`: a committed layer wins the
   camera and lane-slides on a filter change; the network rung fires only with nothing finer.
+  Hyper's middle rung is the COMPOSITION group (`CompositionSel {netId, key}` where key =
+  `${label}|${codes}` — the make-up group HyperExplore browses; user, 2026-08-02). **Each
+  view's explorer level IS a ladder rung with its own facts card** — geo `country/provider`,
+  hyper `composition`, ledger `layer` — differing only in the subject the view can produce;
+  `railLadderBoundary.test.ts` is that rule made executable. ONE deliberate exemption: the
+  ledger's per-metagraph CLUSTER row under an ml0/ml1 floor is a pure disclosure, because
+  `selNodes` only ever carries the COMMITTED filter's nodes — that row's network is already
+  committed and its dossier card is already on the rail, so a "commit" there could only step
+  BACK to "all" and destroy the browse context. A disclosure-only row is correct exactly when
+  its subject's card is already open; anywhere else it's the gap this rule closes.
 - `morph.ts` — the hyper↔geo morph easing + derived visibility ramps.
 - `viewTransition.ts` — the ONE 3D↔3D view-switch choreographer (`ViewTransition`, `View3D`):
   every switch among `hyper`/`geo`/`ledger` runs **OUT** (`DUR_OUT` 0.9s — the from-view's
@@ -386,9 +397,14 @@ store-value imports**, enforced by `layerBoundaries.test.ts`). Each ships coloca
   tested invariants: filter-first (only when it CHANGES — no drill churn) → node's country →
   node's cohort → inspect-LAST (the node camera wins — FULL-ANCESTRY rule, spec 2026-07-18:
   a node select commits every coarser rung so deselects step down predictably; in ledger the
-  ancestry is the browser row's parent floor, else `autoLayerForNode`); deselect-before-drill
+  ancestry is the browser row's parent floor, else `autoLayerForNode`. That ancestry is ONE
+  private definition inside the module, and **`viewEntryActions`** is its second consumer: a node
+  SWITCHING INTO a view re-commits the same rungs there, since the view-scoped ones were cleared
+  on the way out — see *Cross-view carry*); deselect-before-drill
   on the country toggle (which also drops a committed cohort); the cohort/provider toggle
-  (`cohortToggleActions` + `sameCohort` — geo's city×provider rung); the LIVE
+  (`cohortToggleActions` + `sameCohort` — geo's city×provider rung); the composition toggle
+  (`compositionToggleActions` + `sameComposition` — hyper's make-up rung, filter-first when
+  the group's network isn't the committed one); the LIVE
   strip tip (re-)follows while older bars pin; layer/filter toggles (`layerToggleActions`,
   `filterToggleActions` — the picker's committed-row step-back-to-all). Deselect stepping
   derives from `focusLadder.finerLevels` (one level list, two consumers — a colocated test
@@ -402,7 +418,8 @@ store-value imports**, enforced by `layerBoundaries.test.ts`). Each ships coloca
   `FollowController` (the follow SYSTEM, not a user pick). New click/select semantics go in
   the table with a test, their effects in the executor — never inline anywhere. NB a filter
   SWITCH is a network-level event Engine-side: its subscription drops the node card (EVERY
-  view — a geo switch can hide the inspected node outright; was hyper-only), the cohort and
+  view — a geo switch can hide the inspected node outright; was hyper-only), the cohort,
+  the composition group (network-scoped by construction) and
   the country, while the ledger LAYER deliberately survives (it composes with the filter —
   the lane-aware layer framing slides). New click semantics go HERE with a test, not inline
   in the Engine.
@@ -683,20 +700,35 @@ views and caused the ledger red-dots bug; that pattern is forbidden.
     the layer card stays a ghost); entering ledger with a filter committed arrives on that
     lane too. "all" rests at the shared overview.
   - **Cross-view carry is data** (`focusLadder.LEVEL_CARRY`): the network filter and a node
-    selection carry across view switches; country + cohort are geo-only and layer is
+    selection carry across view switches; country + cohort are geo-only, composition is
+    hyper-only and layer is
     ledger-only — each cleared on leaving its view (so no view-scoped card lingers; the layer
     card used to follow into hyper/geo). A filter SWITCH additionally drops node + cohort +
-    country in EVERY view (network-level event; the layer survives — it composes).
+    country + composition in EVERY view (network-level event; the layer survives — it composes).
+    But a view-scoped rung being cleared on the way OUT doesn't mean the destination shows a
+    naked node: **arriving with a node selected RE-DERIVES that view's own ancestry**
+    (`pickActions.viewEntryActions`, applied by `Engine._commitViewEntryAncestry` inside
+    `_applyDestLayout`, before the focus walk) — geo re-commits the node's country + provider,
+    hyper its composition group, ledger its floor, exactly the rungs a click on that node IN the
+    destination view would have committed (ONE ancestry definition, shared with
+    `nodeSelectActions` and pinned by a colocated equality test). So every card up to the
+    selection is on the rail in every view, and a deselect steps back down the local ladder
+    instead of jumping to the network (user, 2026-08-02; this generalized the older
+    ledger-only auto-commit of a carried node's L0 floor). An already-committed layer is never
+    overwritten, and the node rung still wins the camera.
 - **Hover preview**: hovering a filter-picker row OR a metagraph hub in hyper sets
   `store.hoverFilter`, which previews that selection's dim in any view via
   `globe.setHoverFilter` (+ `ledger.setFilter`), without committing `filter`. The hover
   previews at the SAME per-view strength as a committed filter (the old forced-strong 0.85
   branch was removed 2026-07-11 — it dimmed the rest far harder than the regular dim; what a
   hover must NOT do is the *click*'s camera flight). Hovering an explorer node row glows that node's shells on the
-  globe (`hoverNodeId` → `globe.setHoverNode`), matching a 3D raycast hover; hovering a
+  globe (`hoverNodeId` → `globe.setHoverNode`) and NOTHING else — it used to preview the node's
+  country border too, lighting a subject the row isn't about (user, 2026-08-02); hovering a
   country row previews that country's border outline at a whisper level (`hoverCountry` →
   `globe.setHoverCountry` — the committed drill's full hairline wins). Hovering a cohort row
-  glows the whole stack (`hoverCohort` ids → `globe.setHoverCohort`); a COMMITTED cohort
+  glows the whole stack (`hoverCohort` ids → `globe.setHoverCohort`) AND lights its country
+  border, clearing both on leave (a hover cleans up after itself — otherwise the border outlived
+  the cohort hover into the node rows below it); a COMMITTED cohort
   holds the same glow steadily (`globe.setSelectedCohort` — same strength, the live hover
   wins while active; hover-pairing on cohort/provider subjects is outward-only by inherited
   convention — the scene never writes `hoverCohort` back).
@@ -734,7 +766,9 @@ the HUD fades out (0.26s), the whole
 scene shell **recedes** (scale `SCENE_BACK` 0.92 + opacity `SCENE_DIM` 0.26, 0.55s
 `power3.inOut` — still live behind, just pushed into the background), and the raw layer **surfaces
 out of that depth** (opacity 0→1, scale 0.94→1, a small `yPercent` rise, 0.55s `power3.out`,
-overlapping at +0.16s). Back is the mirror, plus **Escape**. Retargeting mid-flight kills the live
+overlapping at +0.16s). Back is the mirror, and there are THREE ways to ask for it — the switch
+again, **Escape**, and the layer's own **× close** (top-right of the raw panel, the house ghost-×;
+all three call the same `setSection("scene")`). Retargeting mid-flight kills the live
 timeline. Reduced motion makes it an instant swap (all durations 0).
 
 **The page never scrolls.** The scene wrapper is `position:fixed; inset:0` **WITH an identity
@@ -773,9 +807,12 @@ and keep changing, so they're examples, not the contract.
   surface (identity dot + name + located count, sorted located-desc, 0-located dimmed with a
   bare 0; the committed chip wears the view switch's SELECTED_ROW on-state, no ✓). User
   reversal 2026-07-12 of the 2026-07-04 detached-popover decision: hovering chips previews
-  the dim while the SCENE reacts in the open (the popover glass covered it); picking keeps
-  the strip OPEN (browsing several networks is the point) — the button/Escape close it. It is
-  EXPANDED BY DEFAULT (non-phone; phone closes it once the breakpoint resolves — no room for a
+  the dim while the SCENE reacts in the open (the popover glass covered it); picking a chip
+  CLOSES the strip again (user reversal 2026-08-02 of the 2026-07-12 keep-it-open rule — the
+  hover preview already covers browsing without committing, and an open strip keeps the whole
+  layout pushed down over the scene you just filtered), as do the button and Escape. It is
+  COLLAPSED BY DEFAULT on every load/view (phone force-closes it once the breakpoint resolves
+  too — no room for a
   persistent strip). The strip is a LAYOUT participant, not a popup: TopBar publishes its
   rendered height as `--topbar-extra` (ResizeObserver), and BOTH the rails AND the scene canvas
   add it to their `top` (globals.css) — the rails slide down and the 3D canvas slides down with
@@ -820,10 +857,17 @@ and keep changing, so they're examples, not the contract.
   `filterToggleActions` (a row IS a hub click, re-click steps back to all) and pair on the
   `hoverFilter` channel; the composition groups use the metagraph card's exact table
   vocabulary (Hybrid / Data / … + the RoleChips code pills), dedupe cluster entries to
-  MACHINES so counts match the dossier, are DISCLOSURES ONLY (never layer-card selectors —
-  the layer card stays ledger-scoped), and hover-glow all member instances via `hoverCohort`;
+  MACHINES so counts match the dossier, and hover-glow all member instances via `hoverCohort`.
+  A composition group is **COMMITTABLE** (user reversal, 2026-08-02, of the
+  disclosures-only rule): it's a real focus rung with its own right-rail card, geo's
+  provider-cohort idiom bent onto architecture — one click commits AND expands it via
+  `compositionToggleActions`, so the disclosure state IS `store.composition` (single-open by
+  construction, no local state) and re-clicking steps back to the network. The grouping math
+  lives ONCE in `src/data/composition.ts` (`compositionGroups`/`compositionKey`), shared by
+  the row, the card and the Engine's group glow, so a count can't drift between them;
   the id rows are bare mono ids (the group label carries the word) running
-  `nodeSelectActions`. Feeds off `store.selNodes`, published per `ViewPolicy.nodeList`. The
+  `nodeSelectActions` with the group as `compositionSel` ancestry (ledger's `ledgerLayerId`
+  twin). Feeds off `store.selNodes`, published per `ViewPolicy.nodeList`. The
   tool-card NAMING rule: About = the view's point of view ("How the network is built"); the
   tool says what you BROWSE — "Nodes by network" / "Nodes by country" / ledger's "Settlement
   layers" (not "Nodes by…": its subjects are strata, not nodes). Card EYEBROWS are the bare
@@ -849,17 +893,24 @@ and keep changing, so they're examples, not the contract.
   The placeholder views have just the About card.
 - **Right rail** (`#rightcol`, `Inspector`) = the **facts** scope (read-only), a set of
   **FIXED card SLOTS** in one stable order — network dossier, **country**, **provider**,
-  node, snapshot, layer (user
+  **composition**, node, snapshot, layer (user
   design, 2026-07-10; replaced the recency stack + the floating pick-hint; the country +
-  provider slots landed with the focus ladder, 2026-07-18): every card the
+  provider slots landed with the focus ladder, 2026-07-18; the composition slot with hyper's
+  middle rung, 2026-08-02 — Runs / Machines / Share of network / Network, hyper-scoped like
+  country is geo-scoped): every card the
   current view CAN produce is always visible — POPULATED when its subject is selected
   (`ContextCard` mirrors the filter; the **country card** — `ccMark` code + name title, Nodes/Share/
   Cities/Providers from `store.selNodes`, geo-scoped like layer is ledger-scoped; the
-  **provider card** — "City · Provider" title, Nodes/Networks/ASN/Country; both rendered
+  **provider card** — the PROVIDER alone as the title with its **ASN as the head's `aside`**
+  (subtle mono, right-aligned on the title row — it identifies the provider rather than measuring
+  it, and it stays readable while the card is collapsed), City/Nodes/Networks in the body (user,
+  2026-08-02: the city is a labelled fact, and the country is deliberately absent — the parent
+  country card states it one slot up, and a facts rail shouldn't say the same thing twice); both rendered
   straight from their store channels by Inspector's `CountryPane`/`ProviderPane` since
   neither subject is a PickDescriptor, collapsible like every RIGHT card; the **node card**
-  `geoLive` — location-first title, id
-  demoted to a mono subtitle, status pill in the head aside; the **snapshot** and **layer**
+  `geoLive` — CITY-first title with the status pill in the head aside and NOTHING else in the
+  head (the country, the make-up and the id are all labelled body rows now — user 2026-08-02:
+  the head names the node, the body states its facts); the **snapshot** and **layer**
   cards), else as a quiet **GHOST hint card** (a dashed one-liner:
   kind mark · slot label · instruction — no halo/animation) saying what to interact with — so the rail shows the view's whole possibility space and a deselect
   returns its slot to the ghost in place. Slot availability + hint copy live in the rail
@@ -876,10 +927,12 @@ and keep changing, so they're examples, not the contract.
   total plus one identity dot + count per network, from the live `metaList` tallies.
 
 **Per-view vitals** (contents, not the rule): **hyper** = the structure (filter-aware
-MACHINE counts per composition — Data / Hybrid / Currency, the same vocabulary as the
+MACHINE counts per composition — Hybrid / Consensus / Currency / Data, the same vocabulary as the
 dossier table + hyper explorer (2026-07-12, replaced the per-layer L0/cL1/dL1 role counts);
-cluster entries dedupe to machines; an em-dash for a composition the selection doesn't have;
-NB dedicated-L0 "Consensus" machines have no column — visible in the dossier breakdown). **geo** = the footprint (`Nodes` / `Countries` /
+cluster entries dedupe to machines; an em-dash for a composition the selection doesn't have.
+**The columns are EVERY label `compositionRows` can emit, so they SUM to the selection** —
+dedicated-L0 "Consensus" machines had no column and hyper read 184 where geo read 206 for the
+same "all" (user, 2026-08-02); a new composition label needs a column, not an exclusion). **geo** = the footprint (`Nodes` / `Countries` /
 `Providers` — distinct known ISPs over `store.selNodes`; replaced Ready %, user 2026-07-11:
 health belongs to the cards + the future network-health view).
 **ledger** = live activity (`Snaps/hr` / `Anchors/hr` with cyan trend sparklines from
@@ -890,11 +943,18 @@ health belongs to the cards + the future network-health view).
 cost). Activity metrics belong to ledger, structure to hyper — don't cross-pollinate.
 
 **The snapshot card is ledger-scoped — the pin does NOT carry out of the view** (spec
-2026-08-01, a deliberate reversal of the old carry-across-views rule). `FollowController` follows
-the live snapshot and the ledger view follows live by default; a *selected* snapshot pins until
+2026-08-01, a deliberate reversal of the old carry-across-views rule) — and it **never opens
+itself**: entering ledger leaves the slot on its ghost hint like every other card (user,
+2026-08-02, reversing the old follow-live-on-entry default). Live-following is now OPT-IN, and
+the card's own head aside IS the switch (`SnapshotAside` → `pickActions.followToggleActions` →
+`applyClickActions`, so the write stays on the one selection path): ON = the beating cyan dot +
+`live now` (`live · {age}` while a metagraph lane's newest anchor is older than the tip — the
+label never overstates), OFF = the pinned snapshot's coarse age; toggling ON hands the subject
+back to `FollowController` (its `following` effect re-points at the latest relevant snapshot),
+toggling OFF pins whatever is on screen. A *selected* snapshot pins until
 deselected **or until you leave ledger** — `Engine.setMode` clears `store.snap` on any switch away
 (the same `LEVEL_CARRY` logic that already scoped country/cohort to geo and layer to ledger;
-`following` is left to the FollowController, whose mode effect has already flipped it false, so
+`following` is left to the FollowController, whose mode effect flips it false outside ledger, so
 the clear sticks). The rail's snapshot ghost hint (`railCards.snapHint`) is gated to ledger to
 match. Clicking a `LiveStrip` bar selects that snapshot IN PLACE — no view switch — but since the
 bars now render only in ledger, that click is a ledger interaction by construction. Clicking the
@@ -961,6 +1021,10 @@ in order:
    RGB at fill alphas) is the ONE mechanism for faint accent fills. Then the **layout
    literals**: `--panel-pad-*`, `--rail-gap`, `--rail-top`, `--rail-w`, `--detail-w`,
    `--sel-bg`/`--sel-border` (the one selection language), `--bottom-reserve`,
+   **`--rail-fade`** (a clipped rail's bottom fade height AND its scroll runway — the ONE token
+   `.rail-clip` and RailScroll's measure both read; the fade rides the rail's own bottom edge,
+   which `max-height` already keeps clear of the strip band, so it must never re-subtract
+   `--bottom-reserve` — that double-count started the gradient ~154px too high, user 2026-08-02),
    `--phone-dock-h`, and the **instrument-thread ruler spec** (`--thread-line`/`--thread-tick`/
    `--thread-tick-major`/**`--thread-faint`**/`--thread-tick-pitch` + `--axis-hairlines`,
    shared by the rails, sheet rulers, and the bar-chart axis). The **`@theme inline`** block
@@ -1070,6 +1134,22 @@ signal channel.**
   rail's clip/mask would blank a child). Only the coloured identity spine rests
   dimmed (`REST_DIM` 60%); the neutral ruler + ticks rest near-full (0.9 — their greys are
   already muted) and the node dots keep full brightness.
+- **The facts rail's thread is its ONE instrument, and it carries the card HIERARCHY**
+  (redesign 2026-08-02, user: *"make the right rail the only instrument, also to show hierarchy
+  of the cards"*). Two encodings, both on the thread:
+  · **connector LENGTH = ladder depth** — each rung's card steps back from the rail
+  (`Inspector`'s `RUNG_STEP`, on the RAIL-facing edge only so the scene-facing edge signals stay
+  aligned) and the thread's tie-line reaches further for it, so containment reads down the rail;
+  · **dot STATE = slot state** — hollow for a ghost, solid for a populated card, solid + a wider
+  halo for the focus rung (the finest committed one). The rail therefore shows the view's whole
+  possibility space *and* where you are.
+  The thread MEASURES each card's real edge rather than sharing the step constant, so the
+  connectors can't drift out of register. The old in-lane **descent spine** (`.rail-ladder` /
+  `.rung` CSS, variant-A 2026-07-19) is **RETIRED** — it duplicated the thread's own vocabulary
+  (spine + tick + node-dot) a rail-width away on the cards' left edge, giving the rail two
+  competing instruments. The ladder lane is now pure layout. **Never grow a second vertical
+  instrument in a rail**; new hierarchy signals belong on the thread.
+
 - **Every card edge signal renders on the SCENE-FACING (inner) edge**: left-rail cards →
   their right edge (`.sig-right::after`), right-rail cards → their left edge (`.sig-left`
   lighting the `.ig-panel::before`). Three levels, and the hierarchy must stay readable at a
@@ -1135,14 +1215,18 @@ cards: **eyebrow / title / INSET hairline / body**.
   `MetaTitle` (avatar + name + ticker + a muted type descriptor — "data metagraph" /
   "currency metagraph" / "data and currency metagraph" / DAG = "hypergraph"; 0-node
   metagraphs say just "metagraph"); the snapshot title's Odometer owns its own roll; the
-  node card is **location-first** (place as title; the `subtitle` is the node's sentence-cased
-  composition word + its layer codes as squared PILLS — `Hybrid [L0][cL1][dL1]`
-  (`nodeCompositionLabel` + `compositionRows` codes via the shared `RoleChips`; the joined
-  `L0·cL1` text read as one token, user 2026-07-12); the BODY is
-  labelled rows in importance order: HOSTING, then **NODE ID last** — the unique reference
+  node card is **city-first with a SUBTITLE-LESS head** (the CITY alone as title — the country
+  left the head 2026-08-02, and the composition line followed it into the body the same day:
+  a head that named the place *and* classified the machine was doing two jobs, and the make-up
+  is a fact like the others). The BODY is
+  labelled rows in importance order: COUNTRY (name + the `ccMark` code), COMPOSITION (the
+  node's sentence-cased composition word + its layer codes as squared PILLS — `Hybrid
+  [L0][cL1][dL1]`, from `nodeCompositionLabel` + `compositionRows` codes via the shared
+  `RoleChips`; the joined `L0·cL1` text read as one token, user 2026-07-12), HOSTING, then
+  **NODE ID last** — the unique reference
   sits where references sit, truncated with the full hash on hover (user, 2026-07-11; this
   replaced the one-node CompositionRows block whose count was always "1"); id-as-title
-  fallback when unresolved). **Card-head kind MARKS tint with
+  fallback when the city is unresolved. **Card-head kind MARKS tint with
   the active filter's identity** via `text-[var(--filter-accent,var(--primary))]` (the rail
   sets `--filter-accent`; cyan on "all") — never hardcode a mark to cyan (a recurring bug;
   the snapshot Layers mark + the layer plane mark both follow this; node marks use their
@@ -1197,10 +1281,16 @@ cards: **eyebrow / title / INSET hairline / body**.
 
 Each right-rail slot's empty state is a **GHOST card** (`Inspector.GhostCard`; shown on
 `/design`) — availability + copy derive from the rail manifest (`railCards.ts` `hint`
-fields), an allow-list mirroring the pick registry: hyper/geo invite node picks, geo also
+fields), an allow-list mirroring the pick registry: hyper/geo invite node picks, hyper also
+invites the composition group, geo also
 invites the country drill + the provider (cohort) row, ledger
 invites snapshot + layer picks, the network slot invites the top-bar filter, the flat
-placeholder views get no ghosts. The allow-list is EXECUTABLE since 2026-07-18:
+placeholder views get no ghosts. **A hint is the GESTURE and nothing else** (copy rule,
+2026-08-02): the slot label beside it already names the subject and the dashed frame already says
+"nothing here yet", so every hint used to end "… to inspect it." — four ghosts stacked in the rail
+read as one sentence repeated with the verb swapped. Each now names its own route, and where a
+subject is reached from a PARENT row the hint says which ("under a country" / "under a network" /
+"under a floor"), stating in words the containment the thread encodes. The allow-list is EXECUTABLE since 2026-07-18:
 `railLadderBoundary.test.ts` asserts every committable ladder rung has a hinted slot. Honesty rules carried over from the old single pick-hint:
 when the filtered network has nothing pickable in geo the node ghost turns into the honest
 variant ("<TICKER> has no locatable nodes — explore it in the Hypergraph view"); "all" with
@@ -1238,10 +1328,15 @@ ghost are both ledger-only.
    `.rail-dragging` are added/removed at runtime (SceneCanvas, RailScroll); they can't be
    inlined into utility strings.
 5. **Marker classes/ids queried by JS are contracts**: `#leftcol`/`#rightcol` (RailScroll +
-   RailThread + the globals rules), `:scope > .ig-panel` (RailThread's card-dot measurement —
-   every rail card must carry `.ig-panel`, which the `Card` baseline supplies), `.nb-row`
+   RailThread + the globals rules), `.ig-panel` (RailThread's card-dot measurement — every rail
+   card must carry it, which the `Card` baseline supplies) plus the facts rail's per-card
+   attributes `data-depth` / `data-focus` (on the rung wrapper) and `data-ghost` (on a ghost
+   card), which the thread reads for the hierarchy encoding, `.nb-row`
    (the pairing row-wash selector), `#topbar`, `#metapane`, `#tooltip`. Rename only with all
-   consumers.
+   consumers. ⚠️ The card query is deliberately **depth-agnostic** (filtered to outermost
+   panels): it was `:scope > .ig-panel`, which silently matched NOTHING once the ladder lane
+   nested the cards — the thread lost every dot and nobody noticed for two weeks.
+
 6. **Custom `@theme` utilities whose prefix collides with a tailwind-merge group MUST be
    registered in `lib/utils.ts`** (`extendTailwindMerge` — `text-micro/label/body/title` as
    font-size, `tracking-caps`, the custom radii are already there). Unregistered, twMerge

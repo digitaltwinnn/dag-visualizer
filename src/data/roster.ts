@@ -5,7 +5,7 @@ import { pickNetId } from "@/src/engine/domain/pickActions";
 // `store.selNodes` — the same records the explorers browse, denser. Pure so the sorting/
 // derivation is unit-tested; NodeRosterTable feeds it live and owns the column order per view.
 export interface RosterRow {
-  key: string; // stable render key — the node id when present, else label+index
+  key: string; // stable render key — network + node + layer, disambiguated only on a real collision
   node: NodeRow;
   netId: string | null; // "dag" | metagraph id (identity-hue + name lookup)
   isp: string | null;
@@ -15,12 +15,22 @@ export interface RosterRow {
 export type RosterSortKey = "net" | "id" | "layer" | "country" | "city" | "isp";
 
 export function buildRoster(selNodes: readonly NodeRow[]): RosterRow[] {
-  return selNodes.map((node, i) => {
+  // The key is the row's own IDENTITY, not its position: under the "all" filter the same machine
+  // appears once per network it serves and both rows report the same node id, so the network and
+  // layer join it. A bare index suffix would have done the same job, but it re-keys every row
+  // after a removal — a filter change would remount the whole table instead of the rows that
+  // actually changed. A leftover duplicate (same network, node and layer) still gets a counter.
+  const seen = new Map<string, number>();
+  return selNodes.map((node) => {
     const geo: GeoInfo | undefined = "geo" in node.pick ? node.pick.geo : undefined;
+    const netId = pickNetId(node.pick);
+    const base = `${netId ?? "?"}|${node.id ?? node.label}|${node.layer ?? ""}`;
+    const dup = seen.get(base) ?? 0;
+    seen.set(base, dup + 1);
     return {
-      key: node.id ?? `${node.label}#${i}`,
+      key: dup === 0 ? base : `${base}#${dup}`,
       node,
-      netId: pickNetId(node.pick),
+      netId,
       isp: geo?.isp ?? null,
       asn: geo?.asn ?? null,
     };
