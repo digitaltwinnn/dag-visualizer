@@ -20,7 +20,10 @@ import { cn } from "@/lib/utils";
 // located-DESC and simply CLIPS, fading out at the right edge (the LiveStrip's own mask idiom,
 // mirrored): whatever fits is fully readable, the quietest networks fall off the end first, and
 // the total on the left always accounts for all of them. The fade is measured, not assumed — it
-// only appears when the list actually overflows, or it would dim a tail entry that fits.
+// only appears when the list actually overflows, or it would dim a tail entry that fits. The
+// measurement is FRACTIONAL (the last entry's own right edge vs the box's): `scrollWidth -
+// clientWidth` is integer-rounded, so a real ~1.7px clip reads as 1 and a hard-cut ticker slipped
+// through unfaded at tablet width.
 export default function NodeCountReadout() {
   const metaList = useStore((s) => s.metaList);
   const live = useStore((s) => s.live);
@@ -29,7 +32,10 @@ export default function NodeCountReadout() {
   useEffect(() => {
     const el = listRef.current;
     if (!el) return;
-    const check = () => setClipped(el.scrollWidth - el.clientWidth > 1);
+    const check = () => {
+      const last = el.lastElementChild;
+      setClipped(!!last && last.getBoundingClientRect().right - el.getBoundingClientRect().right > 0.5);
+    };
     check();
     const ro = new ResizeObserver(check);
     ro.observe(el);
