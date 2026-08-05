@@ -139,3 +139,88 @@ export function ledgerSpread(
     z: cell.y * cellPitch,
   };
 }
+
+// ─────────────────────────────────────────────────────────────────────────────────────────────
+// THE TWO-FLOOR CHAMBER (redesign 2026-08-04). Only snapshot layers get a plane; the four node
+// layers render as RAILS on the front edge of the floor they belong to (see ledgerRails.ts).
+//
+// Local frame (the group is rotated -90° about Y, so local (x,y,z) → world (-z,y,x)):
+//   +X = toward the camera; the lead slot is x=0 and the trail runs to -X.
+//   +Y = floor height.
+//   +Z = the lane / width field; ledgerSite(0,n).z is the -Z end, screen RIGHT is -Z.
+// ─────────────────────────────────────────────────────────────────────────────────────────────
+
+export type LedgerFloorId = "msnap" | "gl0";
+export const FLOOR_IDS: readonly LedgerFloorId[] = ["msnap", "gl0"];
+
+// The five retired planes are REMOVED, not redistributed — the two survivors keep the heights
+// (and therefore the 13.5-unit ribbon run) they already had.
+export const FLOOR_Y: Record<LedgerFloorId, number> = {
+  msnap: LEDGER.rowMSnap,
+  gl0: LEDGER.rowGL0,
+};
+
+/** Half the Z extent the metagraph lanes spread over (ledgerSite's outermost |z|). */
+export const LANE_HALF_Z = (LEDGER.depth * LANE_SPREAD) / 2;
+
+// ── Gutters (spec §4.5) — a narrow strip beyond the lane field, screen-right (−Z) on both
+// floors: the currency status line above, the $DAG blocks below. ~1/6 of the field.
+export const GUTTER_W = (2 * LANE_HALF_Z) / 6;
+export const GUTTER_CZ = -LANE_HALF_Z - GUTTER_W / 2;
+
+// ── The byte bar (spec §4.2) — fixed height and depth; WIDTH (the Z extent) alone encodes the
+// bytes the tick carried. It starts at lane 0's end so band order and lane order agree and the
+// ribbons splay without crossing.
+export const BAR_Z0 = -LANE_HALF_Z;
+export const BAR_MAX_W = 2 * LANE_HALF_Z;
+export const BAR_MIN_W = 0.55; // the zero-anchor SEAM: a tick that carried nothing still happened
+export const BAR_H = 0.9;
+export const BAR_D = 1.6;
+
+/** The fixed scale reference: KB carried at which the bar fills the floor. Calibrated to the p99
+ *  of anchored KB per tick (spec §6.3) and baked offline by `scripts/bake-ledger-scale.ts`;
+ *  ticks above it clip at the floor edge and state their overflow as a multiplier. Provisional
+ *  value from the 533-tick sample of 2026-08-04 (p99 = 31 KB over 6 of 10 metagraphs), scaled for
+ *  the metagraphs and unlisted channels that sample missed. */
+export const BYTE_SCALE_KB = 60;
+
+// ── Node rails (spec §4.4) — run along Z at the FRONT (+X, camera-side) edge of their floor,
+// one rail per non-empty make-up group, stepping toward the camera as more rails appear.
+export type RailGroup = "meta" | "dag";
+export const RAIL_GROUP_FLOOR: Record<RailGroup, LedgerFloorId> = { meta: "msnap", dag: "gl0" };
+
+export const RAIL_X0 = 3.2;          // the first rail, clear of the lead slot's tiles
+export const RAIL_PITCH_X = 1.7;     // step toward the camera per visible rail
+export const RAIL_Y_LIFT = 0.35;     // chips stand ON the floor plane
+export const RAIL_CHIP_PITCH_Z = 0.62;
+export const RAIL_ROW_LIFT = 0.34;   // an over-long rail wraps into stacked rows, chip-stack idiom
+/** Machines per rail row before it wraps upward. */
+export const RAIL_CAP = Math.floor((2 * LANE_HALF_Z) / RAIL_CHIP_PITCH_Z) + 1;
+
+export function railX(visibleIndex: number): number {
+  return RAIL_X0 + visibleIndex * RAIL_PITCH_X;
+}
+
+export function railY(group: RailGroup, row: number): number {
+  return FLOOR_Y[RAIL_GROUP_FLOOR[group]] + RAIL_Y_LIFT + row * RAIL_ROW_LIFT;
+}
+
+// ── The committed-filter rearrangement (spec §5.2): "Committing rearranges the upper floor: the
+// lane takes the whole floor, other lanes' tiles leave, rails dim non-member machines." So a lane
+// is not merely dimmed under a filter — it gives up its slice, and the committed lane grows into
+// the whole Z field so its tiles read at the same size the "all" view gives ten lanes together.
+export type LaneSpan = {
+  /** Lane centre in local Z. */
+  cz: number;
+  /** Half the Z extent this lane may lay tiles across. */
+  hz: number;
+  /** True when another lane is committed and this one lays no tiles at all. */
+  hidden: boolean;
+};
+
+export function laneSpan(i: number, n: number, committedIdx: number | null): LaneSpan {
+  if (committedIdx === null) return { cz: ledgerSite(i, n).z, hz: LANE_HALF_Z / n, hidden: false };
+  if (committedIdx === i) return { cz: 0, hz: LANE_HALF_Z, hidden: false };
+  return { cz: ledgerSite(i, n).z, hz: LANE_HALF_Z / n, hidden: true };
+}
+
