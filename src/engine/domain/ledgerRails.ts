@@ -14,7 +14,8 @@ import { railX, railY, RAIL_CAP, RAIL_CHIP_PITCH_Z, LANE_HALF_Z, type RailGroup 
 
 export type RailKind = "l1only" | "hybrid" | "l0only";
 
-/** Fixed rail order, front (camera-side) first: L1 work arrives, hybrids sit between, L0 seals. */
+/** Fixed rail order, nearest the floor's tile boundary first (railX's index 0): L1 work arrives
+ *  at the boundary, hybrids sit between, L0 seals furthest toward the camera. */
 export const RAIL_ORDER: readonly RailKind[] = ["l1only", "hybrid", "l0only"];
 
 /** A machine's rail from its roles. `null` = it runs nothing this chamber renders. */

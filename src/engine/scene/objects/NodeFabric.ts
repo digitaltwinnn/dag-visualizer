@@ -547,14 +547,18 @@ export class NodeFabric {
 
       _dummy.position.copy(_geoVec);
       if (c.ledger) {
-        // Ledger: a standing CHIP on the floor plane (the geo cylinder, HEX_H tall — see the
-        // validator loop) — same size rule as the validators (uniform dot for every cluster).
-        // Filtered-out nodes shrink out (1 - dEff).
-        _dummy.quaternion.identity(); // standing on the floor — cylinder axis is +Y
-        const visL = (1 - dEff) + dEff * gw; // parked squares show the whole fleet
-        const sL = r.hyperSize * LEDGER.dot * visL;
-        _dummy.scale.set(sL, HEX_H * visL, sL);
-        this._applyGather(ctx, r.gU, r.gV, gw, prim);
+        if (r.ledgerHide) {
+          _dummy.scale.setScalar(0);
+        } else {
+          // Ledger: a standing CHIP on the floor plane (the geo cylinder, HEX_H tall — see the
+          // validator loop) — same size rule as the validators (uniform dot for every cluster).
+          // Filtered-out nodes shrink out (1 - dEff).
+          _dummy.quaternion.identity(); // standing on the floor — cylinder axis is +Y
+          const visL = (1 - dEff) + dEff * gw; // parked squares show the whole fleet
+          const sL = r.hyperSize * LEDGER.dot * visL;
+          _dummy.scale.set(sL, HEX_H * visL, sL);
+          this._applyGather(ctx, r.gU, r.gV, gw, prim);
+        }
         _dummy.updateMatrix();
         this.metaHex.setMatrixAt(r.index, _dummy.matrix);
         _dummy.scale.setScalar(0);
