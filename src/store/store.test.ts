@@ -19,3 +19,15 @@ describe("store.engineReady", () => {
     expect(useStore.getState().engineReady).toBe(true);
   });
 });
+
+describe("the metagraph-snapshot slot", () => {
+  it("holds one metagraph snapshot and bumps the selection stack like every other slot", () => {
+    const sel = { metaId: "DAG0", ordinal: 745190, hash: "abc", globalOrdinal: 4200, ts: "t" };
+    useStore.getState().setMetaSnap(sel);
+    expect(useStore.getState().metaSnap).toEqual(sel);
+    expect(useStore.getState().selStack[0]).toBe("metaSnap");
+    useStore.getState().setMetaSnap(null);
+    expect(useStore.getState().metaSnap).toBeNull();
+    expect(useStore.getState().selStack).not.toContain("metaSnap");
+  });
+});

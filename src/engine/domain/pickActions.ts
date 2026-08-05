@@ -14,7 +14,7 @@
 //     matches `domain/focusLadder.ts`'s finerLevels() exactly, so pickActions can't drift
 //     from the ladder even though the drop list is hand-written per builder.
 import type { Mode } from "@/src/store/store";
-import type { PickDescriptor } from "@/src/data/types";
+import type { PickDescriptor, MetaSnapSel } from "@/src/data/types";
 import type { CohortSel, CompositionSel } from "./focusLadder";
 
 export type ClickAction =
@@ -26,6 +26,7 @@ export type ClickAction =
   // Select a snapshot (follow decides pin vs heartbeat) — or CLEAR it (pick null, follow
   // omitted: the follow state is untouched; FollowController owns the re-follow).
   | { kind: "snapshot"; pick: Extract<PickDescriptor, { kind: "snapshot" }> | null; follow?: boolean }
+  | { kind: "metaSnap"; sel: MetaSnapSel | null }
   | { kind: "layer"; pick: Extract<PickDescriptor, { kind: "layer" }> | null }; // commit/clear the layer card
 
 // The network a node pick belongs to: its metagraph, or the DAG core for a validator.

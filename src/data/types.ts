@@ -34,6 +34,18 @@ export interface SnapshotExact {
   perMeta: Record<string, { count: number; fee: number; bytes: number }>;
 }
 
+/** A selected METAGRAPH SNAPSHOT — a tile on the upper floor (redesign 2026-08-04, spec §7.1).
+ *  A card SLOT, not a focus-ladder rung: like the global snapshot it has its own store channel
+ *  and a fixed rail slot, and appears in no LADDER. `metaId` is the metagraph's id, which IS its
+ *  state-channel address, so it keys `SnapshotExact.perMeta` directly. */
+export interface MetaSnapSel {
+  metaId: string;
+  ordinal: number;       // the metagraph snapshot's OWN ordinal
+  hash: string;
+  globalOrdinal: number; // the global tick it anchored into
+  ts: string;            // that tick's timestamp — the anchor join
+}
+
 // Per-tick anchor aggregate from NetworkData.anchorIndex (see getAnchor).
 export interface Anchor {
   fee: number; // datum (1 DAG = 1e8 datum)
