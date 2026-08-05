@@ -16,7 +16,7 @@ import { LEDGER, LAYER_GEOM, ledgerSite } from "./domain/ledgerLayout";
 import { HYPER_TILT, HYPER_TILT_FOCUS } from "./domain/hyperLayout";
 import { readSceneColors } from "./sceneColors";
 import { VIEW_POLICIES, type ViewPolicy } from "./domain/viewPolicy";
-import { FOCI, hubFraming, geoFraming, ledgerLayerFraming, ledgerNodeFraming, nodeFraming, cohortFraming, hyperNodeFraming, dollyBack, easeInOutQuad, type CameraFraming } from "./domain/cameraRig";
+import { FOCI, hubFraming, geoFraming, ledgerFloorFraming, ledgerNodeFraming, nodeFraming, cohortFraming, hyperNodeFraming, dollyBack, easeInOutQuad, type CameraFraming } from "./domain/cameraRig";
 import { countryFraming } from "./domain/countryShape";
 import { R as GEO_R, LAND_H } from "./domain/geoLayout";
 import { clickActions, pickActive, pickNetId, viewEntryActions } from "./domain/pickActions";
@@ -1089,15 +1089,15 @@ export class Engine {
   }
 
 
-  // Fly to the tilted diagonal view of a settlement layer's floor plane (Snapshots view) — the
-  // "nice tilted view" is an exploration move on layer selection, not the resting pose. The plane's
+  // Fly to the tilted diagonal view of a settlement floor's floor plane (Snapshots view) — the
+  // "nice tilted view" is an exploration move on floor selection, not the resting pose. The plane's
   // height is scaled by the ledger group's viewScale (the framing works in world units). For the
   // split hypergraph panes the framing also shifts LATERALLY so the sub-pane sits centred: the
   // group's viewRotY (−90°) maps the pane's local lane-centre z → world x = −laneZ (then scaled).
   private _focusLayer(layerId: string) {
     const l = LAYER_GEOM.find((x) => x.id === layerId);
     if (!l) return;
-    ledgerLayerFraming(l.y * LEDGER.viewScale, this._framingOut);
+    ledgerFloorFraming(l.y * LEDGER.viewScale, this._framingOut);
     // Lateral centring: the METAGRAPH layers centre the selected metagraph's lane (its node ring /
     // snapshot cluster) when a network filter is active; the split hypergraph panes centre their
     // own pane; the global chain sits at lane-centre 0. The group's viewRotY (−90°) maps a local
