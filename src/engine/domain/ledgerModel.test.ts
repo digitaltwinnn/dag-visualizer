@@ -9,6 +9,7 @@ import {
   curvePoint,
   anchorTiles,
   LedgerModel,
+  LEAD_SETTLE_MS,
 } from "./ledgerModel";
 import { METAGRAPHS } from "../config";
 import { LEDGER, ledgerSite } from "./ledgerLayout";
@@ -159,8 +160,9 @@ describe("LedgerModel.setData — tick advance (js/ledger.js:511-533 verbatim)",
     const changes = model.setData([s1, s2], (ts) => (ts === "T2" ? anchor({ [idA]: 2 }) : null));
 
     expect(model.tickOrdinal).toBe(101);
-    // the tick that just completed (100) drops into the trail at slot 1.
-    expect(model.trail).toEqual([{ ordinal: 100, slot: 1 }]);
+    // the tick that just completed (100) drops into the trail at slot 1, carrying its OWN
+    // timestamp ("T1") — not the new live tick's ("T2").
+    expect(model.trail).toEqual([{ ordinal: 100, slot: 1, ts: "T1" }]);
 
     const lane = model.lanes.get(idA)!;
     // its tick-1 tiles (real, slot 0 at the time) are now at slot 1 ...
@@ -244,12 +246,52 @@ describe("LedgerModel — history seeding (js/ledger.js:370-393, _seedHistory ve
 
     expect(model.tickOrdinal).toBe(102);
     expect(model.trail).toEqual([
-      { ordinal: 101, slot: 1 },
-      { ordinal: 100, slot: 2 },
+      { ordinal: 101, slot: 1, ts: "T1" },
+      { ordinal: 100, slot: 2, ts: "T0" },
     ]);
     const lane = model.lanes.get(idA)!;
     expect(lane.blocks.filter((b) => b.slot === 1 && b.filled).length).toBe(anchorTiles(2).length);
     expect(lane.blocks.some((b) => b.slot === 2 && !b.filled)).toBe(true);
     expect(changes).toEqual([]); // the live tick (T2) itself reported no anchor in this call
+  });
+});
+
+describe("slot identity + the forming lead row (redesign 2026-08-04)", () => {
+  const anchorAt = (touched: number, counts: [string, number][]): Anchor => ({
+    fee: 0,
+    count: counts.reduce((a, [, n]) => a + n, 0),
+    metaIds: new Set(counts.map(([id]) => id)),
+    metaCounts: new Map(counts),
+    touched,
+  });
+
+  it("carries each trail slot's own timestamp, so a tile can name its snapshot", () => {
+    const m = new LedgerModel();
+    const id = METAGRAPHS[0].id;
+    m.setData([snap(1, "t1"), snap(2, "t2")], () => anchorAt(Date.now(), [[id, 2]]));
+    // NOTE (deviation from the task brief, see task-4-report.md "Deviations from the brief"):
+    // `trail` does NOT gain a "t2" entry here. Slot 0 (the live tick) is never a trail member —
+    // it's tracked separately via `tickOrdinal`/the lanes' slot-0 blocks; `trail` is completed
+    // ticks only (`recomputeSelectedSlot` special-cases `selectedOrd === tickOrdinal` as slot 0
+    // precisely because the trail doesn't carry it, and `seedHistory` deliberately loops only
+    // `n-1` ticks behind the latest). The live tick's identity is asserted via `tickTs` below.
+    expect(m.tickTs).toBe("t2");
+    const lane = m.lanes.get(id)!;
+    const lead = lane.blocks.find((b) => b.slot === 0)!;
+    expect(lead.ts).toBe("t2");
+    expect(lead.count).toBe(2);
+  });
+
+  it("says the lead row is forming until the anchor count goes quiet", () => {
+    const m = new LedgerModel();
+    const id = METAGRAPHS[0].id;
+    m.setData([snap(1, "t1")], () => anchorAt(Date.now(), [[id, 1]]));
+    expect(m.leadForming).toBe(true);
+    m.setData([snap(1, "t1")], () => anchorAt(Date.now() - LEAD_SETTLE_MS - 1, [[id, 1]]));
+    expect(m.leadForming).toBe(false);
+  });
+
+  it("holds the ~7s settling idiom AnchoredTags already uses", () => {
+    expect(LEAD_SETTLE_MS).toBe(7000);
   });
 });
