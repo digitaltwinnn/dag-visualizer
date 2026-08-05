@@ -1,5 +1,6 @@
 import { create } from "zustand";
-import type { GlobalSnapshot, LeaderboardData, MetaInfo, NodeRow, PickDescriptor, SnapshotExact, MetaSnapSel } from "@/src/data/types";
+import type { GlobalSnapshot, LeaderboardData, MetaInfo, NodeRow, PickDescriptor, SnapshotExact, MetaSnapSel, ChannelSnapDeep } from "@/src/data/types";
+import { metaSnapDeepKey } from "@/src/data/types";
 import type { HoverSubject } from "@/src/data/hoverSubject";
 // Type-only — the store may not import domain VALUES (layerBoundaries rule), but a type-only
 // import of a domain type is legal and keeps CohortSel defined in exactly one place.
@@ -119,6 +120,10 @@ interface AppState {
   // RawSnapshotBridge from /api/snapshot/[ordinal] for the live + selected ticks, so ANY view
   // can read final fees without the polling floor. Missing key = not fetched / unavailable (pruned).
   snapshotExact: Record<number, SnapshotExact>;
+  // Deep channel reads (full decode of one metagraph snapshot), keyed by metaSnapDeepKey(globalOrdinal, metaId).
+  // Immutably cached — fetched from /api/snapshot/[ordinal]/channel/[address] on explicit gesture,
+  // never on poll or mass reads.
+  metaSnapDeep: Record<string, ChannelSnapDeep>;
 
   // Active view. The scene is one persistent canvas; the engine morphs between hyper
   // and geo and hides it for the flat views, all driven by this.
@@ -191,6 +196,7 @@ interface AppState {
   setLeaderboard: (lb: LeaderboardData | null) => void;
   setSelNodes: (nodes: NodeRow[]) => void;
   setSnapshotExact: (data: SnapshotExact) => void;
+  setMetaSnapDeep: (d: ChannelSnapDeep) => void;
   setPhoneDock: (dock: "explore" | "details" | null) => void;
   setSection: (section: "scene" | "data") => void;
   setPhoneVitals: (open: boolean) => void;
@@ -201,6 +207,7 @@ interface AppState {
 
 // Keep the exact-snapshot cache bounded (one small object per ordinal); drop the oldest.
 const EXACT_MAX = 120;
+const DEEP_MAX = 24;
 
 export const useStore = create<AppState>((set) => ({
   live: false,
@@ -236,6 +243,7 @@ export const useStore = create<AppState>((set) => ({
   leaderboard: null,
   selNodes: [],
   snapshotExact: {},
+  metaSnapDeep: {},
   phoneDock: null,
   section: "scene",
   phoneVitals: false,
@@ -289,6 +297,14 @@ export const useStore = create<AppState>((set) => ({
       }
       return { snapshotExact: next };
     }),
+  setMetaSnapDeep: (d) => set((s) => {
+    const key = metaSnapDeepKey(d.globalOrdinal, d.metaId);
+    if (s.metaSnapDeep[key]) return {}; // a decoded snapshot is immutable
+    const next = { ...s.metaSnapDeep, [key]: d };
+    const keys = Object.keys(next);
+    if (keys.length > DEEP_MAX) delete next[keys[0]];
+    return { metaSnapDeep: next };
+  }),
   // Fully closing the dock also drops the drag-chosen sheet height, so the next open starts at
   // the default; switching halves (a non-null → non-null transition) keeps it.
   setPhoneDock: (phoneDock) => set(phoneDock === null ? { phoneDock, phoneSheetPx: null } : { phoneDock }),

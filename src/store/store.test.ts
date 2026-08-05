@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { useStore } from "./store";
+import { metaSnapDeepKey } from "@/src/data/types";
 
 describe("store.live / lastGoodAt", () => {
   it("records lastGoodAt on a live read and keeps it through a drop", () => {
@@ -29,5 +30,21 @@ describe("the metagraph-snapshot slot", () => {
     useStore.getState().setMetaSnap(null);
     expect(useStore.getState().metaSnap).toBeNull();
     expect(useStore.getState().selStack).not.toContain("metaSnap");
+  });
+});
+
+describe("the deep channel read cache", () => {
+  it("keys a decode by the tick AND the metagraph, and keeps the first value", () => {
+    const d = {
+      globalOrdinal: 42, metaId: "DAG0", ordinal: 7, height: 8, subHeight: 9, epochProgress: 10,
+      lastSnapshotHash: "h", fee: 1, bytes: 2, blocks: 0, signers: ["04917e4b"],
+      stateKeys: [{ key: "updates", count: 3 }], stateBytes: 929, stateProof: "p",
+      state: "{}", dataBlockSigners: [],
+    };
+    expect(metaSnapDeepKey(42, "DAG0")).toBe("42:DAG0");
+    useStore.getState().setMetaSnapDeep(d);
+    expect(useStore.getState().metaSnapDeep[metaSnapDeepKey(42, "DAG0")]).toEqual(d);
+    useStore.getState().setMetaSnapDeep({ ...d, bytes: 999 });
+    expect(useStore.getState().metaSnapDeep[metaSnapDeepKey(42, "DAG0")].bytes).toBe(2);
   });
 });

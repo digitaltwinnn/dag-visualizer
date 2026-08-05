@@ -1,5 +1,28 @@
 // Shapes coming off the data layer (src/data/api.ts, typed). Loose where the source is loose.
 
+/** The full decode of ONE anchored metagraph snapshot (spec §7.3). Fetched only on a deliberate
+ *  gesture — it re-downloads the ~2.5 MB global to reach one entry. */
+export interface ChannelSnapDeep {
+  globalOrdinal: number;
+  metaId: string;
+  ordinal: number;
+  height: number;
+  subHeight: number;
+  epochProgress: number;
+  lastSnapshotHash: string;
+  fee: number;
+  bytes: number;
+  blocks: number;
+  signers: string[];
+  stateKeys: { key: string; count: number }[];
+  stateBytes: number;
+  stateProof: string | null;
+  state: string;
+  dataBlockSigners: string[];
+}
+
+export const metaSnapDeepKey = (globalOrdinal: number, metaId: string): string => `${globalOrdinal}:${metaId}`;
+
 export interface GlobalSnapshot {
   ordinal: number;
   timestamp: string;
