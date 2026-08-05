@@ -213,6 +213,7 @@ export function filterToggleActions(id: string, currentFilter: string): ClickAct
 export function clearAllActions(current: {
   hasInspect: boolean;
   hasSnap: boolean;
+  hasMetaSnap: boolean;
   cohort: CohortSel | null;
   composition: CompositionSel | null;
   country: string | null;
@@ -221,6 +222,7 @@ export function clearAllActions(current: {
 }): ClickAction[] {
   const acts: ClickAction[] = [];
   if (current.hasInspect) acts.push({ kind: "inspect", pick: null });
+  if (current.hasMetaSnap) acts.push({ kind: "metaSnap", sel: null });
   if (current.hasSnap) acts.push({ kind: "snapshot", pick: null });
   if (current.cohort) acts.push({ kind: "cohort", sel: null });
   if (current.composition) acts.push({ kind: "composition", sel: null });
@@ -238,6 +240,43 @@ export function snapshotSelectActions(
   isLiveTip: boolean,
 ): ClickAction[] {
   return [{ kind: "snapshot", pick: p, follow: isLiveTip }];
+}
+
+// Metagraph snapshot identity — metaId + ordinal (the snapshot's own ordinal, not the global one).
+export const sameMetaSnap = (a: MetaSnapSel | null, b: MetaSnapSel | null): boolean =>
+  a === b || (!!a && !!b && a.metaId === b.metaId && a.ordinal === b.ordinal);
+
+/** A TILE on the ledger's upper floor (spec §5.3): the metagraph snapshot itself. Filter-first,
+ *  then the global tick it anchored into, subject LAST — the same full-ancestry contract a node
+ *  select follows, so deselecting the tile steps back to the tick rather than to the network.
+ *  `follow: false` because pinning a tile pins its tick; the live heartbeat is the strip's job. */
+export function metaSnapSelectActions(
+  sel: MetaSnapSel,
+  global: Extract<PickDescriptor, { kind: "snapshot" }>,
+  current: { filter: string; metaSnap: MetaSnapSel | null },
+): ClickAction[] {
+  if (sameMetaSnap(current.metaSnap, sel)) return [{ kind: "metaSnap", sel: null }];
+  const out: ClickAction[] = [];
+  if (current.filter !== sel.metaId) out.push({ kind: "filter", id: sel.metaId });
+  out.push({ kind: "snapshot", pick: global, follow: false });
+  out.push({ kind: "metaSnap", sel });
+  return out;
+}
+
+/** A BAND on the byte bar (spec §5.3): an aggregate of that metagraph's snapshots in one tick, so
+ *  it selects the PAIR — the metagraph and the tick — and drops any finer tile. The neutral
+ *  unlisted band names no metagraph, so it commits only the tick. */
+export function bandSelectActions(
+  metaId: string,
+  global: Extract<PickDescriptor, { kind: "snapshot" }>,
+  current: { filter: string; metaSnap: MetaSnapSel | null },
+): ClickAction[] {
+  const out: ClickAction[] = [];
+  const listed = metaId !== "unlisted";
+  if (listed && current.filter !== metaId) out.push({ kind: "filter", id: metaId });
+  if (current.metaSnap) out.push({ kind: "metaSnap", sel: null });
+  out.push({ kind: "snapshot", pick: global, follow: false });
+  return out;
 }
 
 // The snapshot card's LIVE-MODE switch (user, 2026-08-02). The card no longer opens itself on

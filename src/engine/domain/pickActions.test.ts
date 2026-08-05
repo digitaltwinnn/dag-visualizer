@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
-import { autoLayerForNode, viewEntryActions, clearAllActions, clickActions, cohortToggleActions, compositionToggleActions, countryToggleActions, filterToggleActions, followToggleActions, layerToggleActions, nodeSelectActions, sameCohort, sameComposition, snapshotSelectActions, pickActive, pickNetId, type ClickAction } from "./pickActions";
+import { autoLayerForNode, viewEntryActions, clearAllActions, clickActions, cohortToggleActions, compositionToggleActions, countryToggleActions, filterToggleActions, followToggleActions, layerToggleActions, nodeSelectActions, sameCohort, sameComposition, snapshotSelectActions, pickActive, pickNetId, metaSnapSelectActions, bandSelectActions, sameMetaSnap, type ClickAction } from "./pickActions";
 import { finerLevels } from "./focusLadder";
-import type { PickDescriptor } from "@/src/data/types";
+import type { PickDescriptor, MetaSnapSel } from "@/src/data/types";
 
 // Minimal pick fixtures — only the fields the table reads.
 const nodePick = (cc: string | null = "DE"): PickDescriptor =>
@@ -408,10 +408,71 @@ describe("nodeSelectActions ancestry (spec Part 3 — full-ancestry rule)", () =
   });
 });
 
+describe("metaSnapSelectActions (a tile on the upper floor)", () => {
+  const SEL: MetaSnapSel = { metaId: "DAG-A", ordinal: 745190, hash: "h1", globalOrdinal: 4200, ts: "t" };
+  const GLOBAL = {
+    kind: "snapshot" as const,
+    data: { ordinal: 4200, timestamp: "t", hash: "g" },
+    title: "Global snapshot #4200",
+  };
+
+  it("commits ancestry first and the subject last", () => {
+    const a = metaSnapSelectActions(SEL, GLOBAL, { filter: "all", metaSnap: null });
+    expect(a.map((x) => x.kind)).toEqual(["filter", "snapshot", "metaSnap"]);
+    expect(a[0]).toEqual({ kind: "filter", id: "DAG-A" });
+    expect(a[1]).toEqual({ kind: "snapshot", pick: GLOBAL, follow: false });
+    expect(a[2]).toEqual({ kind: "metaSnap", sel: SEL });
+  });
+
+  it("does not churn the filter when it is already committed", () => {
+    const a = metaSnapSelectActions(SEL, GLOBAL, { filter: "DAG-A", metaSnap: null });
+    expect(a.map((x) => x.kind)).toEqual(["snapshot", "metaSnap"]);
+  });
+
+  it("steps back to the tick when the same tile is picked again", () => {
+    const a = metaSnapSelectActions(SEL, GLOBAL, { filter: "DAG-A", metaSnap: { ...SEL } });
+    expect(a).toEqual([{ kind: "metaSnap", sel: null }]);
+  });
+});
+
+describe("bandSelectActions (a band on the byte bar)", () => {
+  const GLOBAL = {
+    kind: "snapshot" as const,
+    data: { ordinal: 4200, timestamp: "t", hash: "g" },
+    title: "Global snapshot #4200",
+  };
+  const SEL: MetaSnapSel = { metaId: "DAG-A", ordinal: 745190, hash: "h1", globalOrdinal: 4200, ts: "t" };
+
+  it("selects the metagraph and the tick, and drops the finer tile", () => {
+    const a = bandSelectActions("DAG-A", GLOBAL, { filter: "all", metaSnap: SEL });
+    expect(a).toEqual([
+      { kind: "filter", id: "DAG-A" },
+      { kind: "metaSnap", sel: null },
+      { kind: "snapshot", pick: GLOBAL, follow: false },
+    ]);
+  });
+
+  it("leaves an unlisted band without a filter commit", () => {
+    const a = bandSelectActions("unlisted", GLOBAL, { filter: "all", metaSnap: null });
+    expect(a).toEqual([{ kind: "snapshot", pick: GLOBAL, follow: false }]);
+  });
+});
+
+describe("sameMetaSnap", () => {
+  const SEL: MetaSnapSel = { metaId: "DAG-A", ordinal: 745190, hash: "h1", globalOrdinal: 4200, ts: "t" };
+
+  it("matches on the metagraph and its own ordinal", () => {
+    expect(sameMetaSnap(SEL, { ...SEL })).toBe(true);
+    expect(sameMetaSnap(SEL, { ...SEL, ordinal: 1 })).toBe(false);
+    expect(sameMetaSnap(SEL, null)).toBe(false);
+    expect(sameMetaSnap(null, null)).toBe(true);
+  });
+});
+
 describe("clearAllActions (the rail-controls sweep)", () => {
   it("drops every committed channel finest→coarsest, filter last", () => {
     const acts = clearAllActions({
-      hasInspect: true, hasSnap: true,
+      hasInspect: true, hasSnap: true, hasMetaSnap: false,
       cohort: { cc: "DE", city: "Falkenstein", isp: "Hetzner" },
       composition: { netId: "dor", key: "Hybrid|L0·dL1" },
       country: "DE", layerId: "ml0", filter: "dor",
@@ -423,13 +484,20 @@ describe("clearAllActions (the rail-controls sweep)", () => {
   });
   it("already-clear channels emit nothing (a fully clear state is a no-op)", () => {
     expect(clearAllActions({
-      hasInspect: false, hasSnap: false, cohort: null, composition: null, country: null, layerId: null, filter: "all",
+      hasInspect: false, hasSnap: false, hasMetaSnap: false, cohort: null, composition: null, country: null, layerId: null, filter: "all",
     })).toEqual([]);
   });
   it("a partial state clears only what is set", () => {
     const acts = clearAllActions({
-      hasInspect: false, hasSnap: false, cohort: null, composition: null, country: null, layerId: "hypl0", filter: "dag",
+      hasInspect: false, hasSnap: false, hasMetaSnap: false, cohort: null, composition: null, country: null, layerId: "hypl0", filter: "dag",
     });
     expect(kinds(acts)).toEqual(["layer", "filter"]);
+  });
+  it("sweeps the metagraph-snapshot slot too", () => {
+    const a = clearAllActions({
+      hasInspect: false, hasSnap: false, hasMetaSnap: true, cohort: null,
+      composition: null, country: null, layerId: null, filter: "all",
+    });
+    expect(a).toContainEqual({ kind: "metaSnap", sel: null });
   });
 });

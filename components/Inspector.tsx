@@ -519,6 +519,7 @@ export default function Inspector() {
       clearAllActions({
         hasInspect: presentOf("node"),
         hasSnap: presentOf("snap"),
+        hasMetaSnap: presentOf("metaSnap"),
         cohort,
         composition,
         country,
