@@ -10,6 +10,20 @@ export interface GlobalSnapshot {
   blocks?: unknown[];
 }
 
+/** One anchored metagraph snapshot inside a global tick, from the exact read (spec §7.2 tier 2). */
+export interface ChannelSnapRow {
+  metaId: string;      // the state-channel address
+  ordinal: number;     // the metagraph snapshot's own ordinal (0 when the payload can't be decoded)
+  decoded: boolean;
+  fee: number;
+  bytes: number;
+  signers: string[];   // truncated validator ids
+  blocks: number;
+  hasState: boolean;
+  stateBytes: number;
+  stateProof: string | null;
+}
+
 // EXACT per-tick anchor totals read straight from the raw L0 snapshot's stateChannelSnapshots
 // (every anchored metagraph snapshot carries its own `value.fee`), via /api/snapshot/[ordinal].
 // Unlike the polled `Anchor` (a settling floor), this is final + complete the instant it's
@@ -32,6 +46,7 @@ export interface SnapshotExact {
   // is that metagraph's measured serialized size (Σ content byte length), shown as KB on the
   // expanded row — NOT derived from the fee.
   perMeta: Record<string, { count: number; fee: number; bytes: number }>;
+  rows: ChannelSnapRow[];
 }
 
 /** A selected METAGRAPH SNAPSHOT — a tile on the upper floor (redesign 2026-08-04, spec §7.1).
