@@ -6,16 +6,20 @@ import ExplorerShell from "@/components/ExplorerShell";
 import { SelectedRowMark, selectedRow } from "@/components/selection";
 import { subjectPairing } from "@/components/useSubjectPairing";
 import { useLadderFocus } from "@/components/useLadderFocus";
+import { useSnapshotFeed } from "@/components/useSnapshotFeed";
 import { CORE_HEX, filterAccent, metagraphById } from "@/src/data/network";
+import { latestRelevant } from "@/src/data/follow";
 import { identityHudHex } from "@/src/palette/identity";
 import { IdentityDot } from "@/components/inspector/parts";
 import { hoverKeyOf } from "@/src/data/hoverSubject";
 import { useStore } from "@/src/store/store";
-import { filterToggleActions, layerToggleActions, nodeSelectActions } from "@/src/engine/domain/pickActions";
+import { filterToggleActions, layerToggleActions, nodeSelectActions, snapshotSelectActions } from "@/src/engine/domain/pickActions";
 import { applyClickActions } from "@/src/store/applyClickActions";
 import { DisclosureChevron, DisclosureRow, NodePickerRow, ROW_NEST, ROW_OUTSET } from "@/components/ExploreRows";
 import { LEDGER_LAYERS } from "@/src/data/ledgerLayers";
-import type { MetaInfo, NodeRow } from "@/src/data/types";
+import { SLOT_N } from "@/src/engine/domain/ledgerModel";
+import { fmtKB } from "@/src/util/format";
+import type { GlobalSnapshot, MetaInfo, NodeRow } from "@/src/data/types";
 
 // The Snapshots view's left-rail tool: the layered-design explainer. Lists the anchoring stack
 // top→bottom; HOVERING a layer previews its plane highlight in the 3D view (store.ledgerHilite, the
@@ -38,6 +42,18 @@ const LAYERS = LEDGER_LAYERS;
 // actually empty once live data has arrived (see the lane-row block below the rows/clusters).
 const NODE_FLOORS = new Set(["ml1", "ml0", "hypl0", "hypl1"]);
 const CLUSTER_FLOORS = new Set(["ml1", "ml0"]); // group by metagraph before the node rows
+
+// The two SNAPSHOT-output floors (msnap/gl0) disclose too — but onto TICK rows (one per visible
+// global snapshot), not node/cluster rows. Disjoint from NODE_FLOORS; DISCLOSABLE_FLOORS is the
+// union the shared open/commit plumbing below gates on.
+const TICK_FLOORS = new Set(["msnap", "gl0"]);
+const DISCLOSABLE_FLOORS = new Set([...NODE_FLOORS, ...TICK_FLOORS]);
+
+// The explorer's two headed groups, matching the chamber's own floors-vs-rails split (Task 16's
+// LEDGER_LAYERS.level: "rail" for the four node layers, a digit for the two snapshot floors) —
+// grouping reads straight off that field rather than a second id list, so the two can't drift.
+const FLOOR_LAYERS = LEDGER_LAYERS.filter((l) => l.level !== "rail");
+const RAIL_LAYERS = LEDGER_LAYERS.filter((l) => l.level === "rail");
 
 function rowsForFloor(id: string, selNodes: NodeRow[], committedMeta: string | null): NodeRow[] {
   switch (id) {
@@ -160,6 +176,62 @@ function LaneRow({
   );
 }
 
+// A TICK row — one per visible global snapshot, under the msnap/gl0 floor disclosures. Runs the
+// SAME tested `snapshotSelectActions` the LiveStrip bar and the ledger's 3D tile click run (the
+// reference consumer, components/LiveStrip.tsx), so a row and a scene click can't drift: the LIVE
+// tip (re-)follows, an older tick pins. `metric` is the one honest, per-floor fact — msnap shows
+// the tick's anchored count (GlobalSnapshot.metagraphSnapshotCount, exact + final immediately per
+// CLAUDE.md's tick lifecycle); gl0 shows the measured bytes carried (store.snapshotExact's
+// totalSizeKB) — but ONLY once the exact read has landed for that ordinal. A tick with no exact
+// read yet shows an honest dash, never a number guessed from count or fee (the honesty rule).
+function TickRow({
+  d,
+  metric,
+  selected,
+  hoverSnapOrd,
+  setHoverSnapOrd,
+  accent,
+}: {
+  d: GlobalSnapshot;
+  metric: { label: string; value: string };
+  selected: boolean;
+  hoverSnapOrd: number | null;
+  setHoverSnapOrd: (ord: number | null) => void;
+  accent: string;
+}) {
+  const pair = subjectPairing(hoverSnapOrd, d.ordinal, setHoverSnapOrd, accent);
+  return (
+    <button
+      type="button"
+      title={`Global snapshot #${d.ordinal} · ${metric.label} ${metric.value}`}
+      onClick={() =>
+        applyClickActions(
+          snapshotSelectActions(
+            { kind: "snapshot", title: `Global snapshot #${d.ordinal}`, data: d },
+            latestRelevant("all")?.ordinal === d.ordinal,
+          ),
+        )
+      }
+      onMouseEnter={pair.onMouseEnter}
+      onMouseLeave={pair.onMouseLeave}
+      className={cn(
+        "nb-row flex items-center gap-2 w-full py-1 pl-2 pr-2 my-px rounded-sm border border-transparent bg-transparent cursor-pointer text-left transition-colors duration-[140ms]",
+        "hover:bg-wash-hover",
+        "focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--primary)] focus-visible:outline-offset-[-2px]",
+        selected && selectedRow(true),
+        pair.paired && pair.className,
+      )}
+      style={pair.style}
+    >
+      <span className="flex-1 min-w-0 text-body tabular-nums text-foreground whitespace-nowrap overflow-hidden text-ellipsis">
+        #{d.ordinal}
+      </span>
+      <span className="flex-none tabular-nums text-label font-semibold text-muted-foreground">{metric.value}</span>
+      {selected && <SelectedRowMark className="flex-none" />}
+    </button>
+  );
+}
+
 export default function LedgerPanel() {
   // The COMMITTED selection lives in the store (store.layer — it's the layer card's pick, cleared
   // by the card's × too); hover writes the transient preview channel, leave clears it (the engine
@@ -180,6 +252,18 @@ export default function LedgerPanel() {
   const dagNodeCounts = useStore((s) => s.nodes);
   const hoverFilter = useStore((s) => s.hoverFilter);
   const setHoverFilter = useStore((s) => s.setHoverFilter);
+  // Tick-row data for the two snapshot floors (msnap/gl0): the SAME live buffer LiveStrip reads,
+  // capped to the chamber's own visible-slot count (domain/ledgerModel.SLOT_N) so "visible ticks"
+  // matches what the 3D trail actually shows. gl0's KB metric only has a value once the exact read
+  // has landed for that ordinal (store.snapshotExact, RawSnapshotBridge) — absent = an honest dash,
+  // never derived from fee/count (CLAUDE.md's honesty rule). `activeSnapOrd` mirrors LiveStrip's
+  // own `activeOrd`: the pinned-or-live snapshot a tick row's ✓ tracks.
+  const { snaps } = useSnapshotFeed(SLOT_N);
+  const snapshotExact = useStore((s) => s.snapshotExact);
+  const hoverSnapOrd = useStore((s) => s.hoverSnapOrd);
+  const setHoverSnapOrd = useStore((s) => s.setHoverSnapOrd);
+  const snap = useStore((s) => s.snap);
+  const activeSnapOrd = snap?.data.ordinal ?? null;
   // Which rung currently holds the focus — the committed rows COARSER than it wear the
   // ancestor strength of the selection mark (see components/useLadderFocus.ts).
   const focus = useLadderFocus();
@@ -236,7 +320,7 @@ export default function LedgerPanel() {
   const commit = (l: (typeof LAYERS)[number]) => {
     const wasOn = sel === l.id;
     applyClickActions(layerToggleActions({ kind: "layer", layerId: l.id }, sel));
-    setOpenFloor(NODE_FLOORS.has(l.id) && !wasOn ? l.id : null);
+    setOpenFloor(DISCLOSABLE_FLOORS.has(l.id) && !wasOn ? l.id : null);
   };
   // A node row's click runs the full-ancestry table with THIS floor as the ledger layer rung
   // (nodeSelectActions' ledgerLayerId) — so a browsed node commits the floor it was found on,
@@ -245,6 +329,261 @@ export default function LedgerPanel() {
     applyClickActions(
       nodeSelectActions(pick, { mode: "ledger", currentFilter: filter, deselect: selected, ledgerLayerId: floorId }),
     );
+
+  // One row renderer for BOTH groups (Floors and Rails share the exact same disclosure/commit
+  // machinery — only WHAT the disclosure opens onto differs). Extracted out of the old single
+  // flat `.map()` so the Floors/Rails split below is two calls, not two copies of ~150 lines.
+  const renderRow = (l: (typeof LAYERS)[number]) => {
+    const on = sel === l.id;
+    // The SAME scene↔HUD hover pairing as GeoExplore's node rows: hovering the row
+    // previews the plane highlight, hovering the 3D plane pairs this row back — wearing
+    // the active filter's identity hue (`filterAccent`, cyan on "all"), via the shared
+    // `.nb-row.subject-paired` row-wash recipe.
+    const pair = subjectPairing<string>(hilite, l.id, setHilite, filterAccent(filter));
+    const isTickFloor = TICK_FLOORS.has(l.id); // msnap/gl0 — opens onto tick rows, not node rows
+    const discloses = DISCLOSABLE_FLOORS.has(l.id);
+    const rows = discloses && !isTickFloor ? rowsForFloor(l.id, selNodes, committedMeta) : [];
+    // Hoisted OUT of the disclosure body (was computed only when `on`) so the floor
+    // row's own header can show an honest trailing count AT REST, before anything is
+    // clicked — the same data the opened dropdown lists, never a second, disagreeing
+    // number.
+    const isMetaFloor = discloses && CLUSTER_FLOORS.has(l.id); // ml0/ml1
+    const clusters = isMetaFloor ? clustersOf(rows) : [];
+    const showValidatorRows = discloses && !isMetaFloor && !isTickFloor && !committedMeta; // hypl0/hypl1 under "all"/"dag"
+    const lanes: LaneMeta[] = !discloses || isTickFloor
+      ? []
+      : isMetaFloor
+        ? laneMetagraphsFor(l.id as "ml0" | "ml1")
+        : committedMeta
+          ? [dagLane(l.id as "hypl0" | "hypl1")]
+          : [];
+    // The dropdown's total: its own rows plus every lane row's own count — literally
+    // everything the opened list will render, so the resting number can never disagree
+    // with what appears once it's open. A tick floor's total is simply how many ticks
+    // are visible (the same buffer the disclosure below lists, newest first).
+    const floorCount = isTickFloor ? snaps.length : rows.length + lanes.reduce((sum, x) => sum + x.count, 0);
+    const hasContentAbove = clusters.length > 0 || (showValidatorRows && rows.length > 0);
+    // Open iff committed (as before) OR this panel just opened it locally — see
+    // `commit`'s comment. A floor committed from elsewhere (a 3D plane click,
+    // autoLayerForNode) is open purely via `on`, no extra plumbing needed.
+    const open = discloses && (on || openFloor === l.id);
+    // Newest-first — the same chronological convention the raw layer's AnchorLogTable already
+    // uses for the same kind of row (src/data/anchorLog.ts).
+    const orderedSnaps = isTickFloor ? [...snaps].reverse() : [];
+    return (
+      <div key={l.id}>
+      <button
+        type="button"
+        onClick={() => commit(l)}
+        onMouseEnter={pair.onMouseEnter}
+        onMouseLeave={pair.onMouseLeave}
+        onFocus={pair.onMouseEnter}
+        onBlur={pair.onMouseLeave}
+        aria-pressed={on}
+        className={cn(
+          // `nb-row border border-transparent` hosts the pairing wash (box-shadow-based
+          // SELECTED_ROW composes under it, same as the geo node rows). The trailing
+          // mark now lives IN-FLOW at the end of the title row (below) — same idiom as
+          // the inner cluster/lane rows' `ml-auto` count — instead of an absolutely
+          // positioned overlay, so it can never overlap the badge/name text and every
+          // row's trailing column is built the same way. ROW_OUTSET makes this the same
+          // top-level row box geo/hyper use: without it the floor rows' wash stopped 6px
+          // inside every other explorer's (user, 2026-08-01).
+          "nb-row group relative text-left border border-transparent cursor-pointer rounded-sm py-1.5 bg-transparent transition-[background] duration-150",
+          ROW_OUTSET,
+          "hover:bg-wash-hover",
+          "focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--primary)] focus-visible:outline-offset-[-2px]",
+          // ANCESTOR strength once a node inside the floor is selected — the finer
+          // rung is the head of the path then (see components/useLadderFocus.ts).
+          on && selectedRow(focus === "layer"),
+          pair.paired && pair.className,
+        )}
+        style={pair.style}
+      >
+        {/* The layer's STACK-LEVEL badge (LEDGER_LAYERS.level — up from the base:
+            Global snapshots = 1, the split hypergraph plane = sub-levels 2.1/2.2),
+            mirrored by the 3D floor labels so panel row and plane pair at a glance.
+            The trailing slot mirrors DisclosureRow's: every disclosing floor gets its
+            honest count (the same total the opened dropdown lists — see `floorCount`
+            above) plus the shared hover-revealed DisclosureChevron
+            (components/ExploreRows.tsx — the button above carries the `group` class
+            its reveal needs) that flips to the committed ✓ once `on`. */}
+        <span className="flex items-center gap-2 min-w-0">
+          <span
+            aria-hidden
+            className={cn(
+              "flex-none min-w-[18px] h-[18px] px-1 rounded-xs border flex items-center justify-center text-micro tabular-nums leading-none",
+              on
+                ? "border-[var(--filter-accent,var(--primary))] text-[var(--filter-accent,var(--primary))]"
+                : "border-border text-muted-foreground",
+            )}
+          >
+            {l.level}
+          </span>
+          <span className={cn("flex-1 min-w-0 truncate text-body text-foreground", on && "font-semibold")}>
+            {l.name}
+          </span>
+          {discloses ? (
+            <span className="flex-none flex items-center gap-1.5">
+              <span className="tabular-nums text-label font-semibold text-muted-foreground">{floorCount}</span>
+              {on ? (
+                <SelectedRowMark muted={focus !== "layer"} />
+              ) : (
+                <DisclosureChevron open={open} />
+              )}
+            </span>
+          ) : (
+            on && <SelectedRowMark className="flex-none" muted={focus !== "layer"} />
+          )}
+        </span>
+        {/* No per-row description here: `LEDGER_LAYERS.desc` is the LAYER CARD's opening
+            line (inspector/cards.tsx `LayerCard`), and committing a floor opens that card
+            in the same click — so a copy under the row said the same sentence twice, one
+            rail apart, and made the browser list scan like prose instead of rows
+            (user, 2026-08-01). The explorer rows are the browse surface; the facts rail
+            explains the subject. Same split GeoExplore/HyperExplore already keep. */}
+      </button>
+
+      {/* Disclosure body — one per disclosing floor. `open` decouples the dropdown's
+          visibility from the commit's store round-trip (see `commit`'s + `open`'s
+          comments above) so the first click reveals it in the same frame it commits.
+          Leaving the list clears the scene hover-glows (node/cohort for node floors,
+          snapshot hover for tick floors). */}
+      {discloses && open && (
+        <div
+          className={cn("mb-1.5 ml-[9px] py-0.5 pl-3", ROW_NEST)}
+          onMouseLeave={() => {
+            setHoverNodeId(null);
+            setHoverCohort(null);
+            setHoverSnapOrd(null);
+          }}
+        >
+          {isTickFloor ? (
+            orderedSnaps.length === 0 ? (
+              // True-boot fallback (CLAUDE.md "Honesty over decoration") — the buffer
+              // hasn't received a tick yet; matches LiveStrip's own empty copy.
+              <p className="mt-1 mx-1 mb-1.5 text-label text-muted-foreground">Waiting for snapshots…</p>
+            ) : (
+              orderedSnaps.map((d) => (
+                <TickRow
+                  key={d.ordinal}
+                  d={d}
+                  metric={
+                    l.id === "msnap"
+                      ? { label: "anchored", value: String(d.metagraphSnapshotCount ?? 0) }
+                      : {
+                          label: "carried",
+                          value:
+                            snapshotExact[d.ordinal]?.totalSizeKB != null
+                              ? fmtKB(snapshotExact[d.ordinal]!.totalSizeKB)
+                              : "—",
+                        }
+                  }
+                  selected={d.ordinal === activeSnapOrd}
+                  hoverSnapOrd={hoverSnapOrd}
+                  setHoverSnapOrd={setHoverSnapOrd}
+                  accent={filterAccent(filter)}
+                />
+              ))
+            )
+          ) : !hasContentAbove && lanes.length === 0 ? (
+            // True-boot fallback only (CLAUDE.md "Honesty over decoration") — reachable
+            // just before metaList/validator data has arrived; once it has, every floor
+            // always has SOMETHING to show (its own rows and/or lane rows to the other
+            // networks), so this line no longer means "wrong filter for this floor".
+            <p className="mt-1 mx-1 mb-1.5 text-label text-muted-foreground">No nodes reported yet.</p>
+          ) : (
+            <>
+              {isMetaFloor &&
+                clusters.map((g) => {
+                  const key = `${l.id}|${g.id}`;
+                  const isOpen = openCluster === key;
+                  const holdsSel =
+                    selIp != null &&
+                    g.rows.some((r) => r.layer === selLayer && "node" in r.pick && r.pick.node?.ip === selIp);
+                  return (
+                    <div key={key}>
+                      {/* The cluster group row — one per metagraph lane. IdentityDot is
+                          correct here (one lane, one metagraph, unlike geo's mixed-network
+                          cohorts). A disclosure on the way to a node — and the ONE
+                          explorer row level that stays disclosure-only on purpose (the
+                          exemption to "every explorer level is a ladder rung with its own
+                          card", CLAUDE.md): `selNodes` publishes only the COMMITTED
+                          filter's nodes, so this row's metagraph IS the committed filter
+                          and its dossier card is already open on the facts rail. Running
+                          `filterToggleActions` here could only step back to "all" and
+                          throw away the browse context. */}
+                      <DisclosureRow
+                        open={isOpen}
+                        holdsSel={holdsSel}
+                        title={`${g.name} · ${g.rows.length} node${g.rows.length > 1 ? "s" : ""}`}
+                        onToggle={() => setOpenCluster(isOpen ? null : key)}
+                        onHoverEnter={() =>
+                          setHoverCohort(g.rows.map((r) => hoverKeyOf(r.pick)).filter((k): k is string => !!k))
+                        }
+                        onHoverLeave={() => setHoverCohort(null)}
+                      >
+                        <IdentityDot hue={g.hue} />
+                        <span className="flex-1 min-w-0 text-body text-foreground whitespace-nowrap overflow-hidden text-ellipsis">
+                          {g.name}
+                        </span>
+                        <span className="ml-auto flex-none tabular-nums text-body font-semibold">{g.rows.length}</span>
+                      </DisclosureRow>
+
+                      {isOpen && (
+                        <div className="mb-1 ml-[7px] pl-2 border-l border-border">
+                          {g.rows.map((r, i) => {
+                            const nodeOn =
+                              selIp != null && r.layer === selLayer && "node" in r.pick && r.pick.node?.ip === selIp;
+                            return (
+                              <NodePickerRow
+                                key={(r.id ?? r.label) + i}
+                                row={r}
+                                selected={nodeOn}
+                                hoverNodeId={hoverNodeId}
+                                setHoverNodeId={setHoverNodeId}
+                                onSelect={() => selectNode(r.pick, l.id, nodeOn)}
+                              />
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+
+              {showValidatorRows &&
+                // hypl0/hypl1 under "all"/"dag": one lane (the DAG core) — no cluster
+                // grouping, node rows render directly.
+                rows.map((r, i) => {
+                  const nodeOn = selIp != null && r.layer === selLayer && "node" in r.pick && r.pick.node?.ip === selIp;
+                  return (
+                    <NodePickerRow
+                      key={(r.id ?? r.label) + i}
+                      row={r}
+                      selected={nodeOn}
+                      hoverNodeId={hoverNodeId}
+                      setHoverNodeId={setHoverNodeId}
+                      onSelect={() => selectNode(r.pick, l.id, nodeOn)}
+                    />
+                  );
+                })}
+
+              {lanes.length > 0 && (
+                <div className={cn("flex flex-col gap-0.5", hasContentAbove && "mt-1 pt-1 border-t border-border/60")}>
+                  {lanes.map((lane) => (
+                    <LaneRow key={lane.id} lane={lane} filter={filter} hoverFilter={hoverFilter} setHoverFilter={setHoverFilter} />
+                  ))}
+                </div>
+              )}
+            </>
+          )}
+        </div>
+      )}
+      </div>
+    );
+  };
+
   return (
     // The shell owns the Card frame, CardHead, collapse state, and the padded body — chrome-
     // normalized onto GeoExplore's exact treatment (flex-none + no inner overflow, the same
@@ -261,234 +600,27 @@ export default function LedgerPanel() {
         // doesn't synthesize one for a node removed mid-hover. This container-level boundary
         // is the backstop: leaving the WHOLE card body clears every hover channel this card's
         // rows write to (hilite for the layer rows, hoverFilter for the lane rows, hoverCohort/
-        // hoverNodeId for the cluster/node rows), regardless of which row set it or whether
-        // that row is still mounted to clear it itself. LaneRow's own click handler clears
-        // hoverFilter too, as the second belt (the precise row-vanishes-without-leave path).
+        // hoverNodeId for the cluster/node rows, hoverSnapOrd for the tick rows), regardless of
+        // which row set it or whether that row is still mounted to clear it itself. LaneRow's
+        // own click handler clears hoverFilter too, as the second belt (the precise
+        // row-vanishes-without-leave path).
         setHilite(null);
         setHoverFilter(null);
         setHoverCohort(null);
         setHoverNodeId(null);
+        setHoverSnapOrd(null);
       }}
     >
       <div className="flex flex-col gap-0.5">
-        {LAYERS.map((l) => {
-              const on = sel === l.id;
-              // The SAME scene↔HUD hover pairing as GeoExplore's node rows: hovering the row
-              // previews the plane highlight, hovering the 3D plane pairs this row back — wearing
-              // the active filter's identity hue (`filterAccent`, cyan on "all"), via the shared
-              // `.nb-row.subject-paired` row-wash recipe.
-              const pair = subjectPairing<string>(hilite, l.id, setHilite, filterAccent(filter));
-              const discloses = NODE_FLOORS.has(l.id);
-              const rows = discloses ? rowsForFloor(l.id, selNodes, committedMeta) : [];
-              // Hoisted OUT of the disclosure body (was computed only when `on`) so the floor
-              // row's own header can show an honest trailing count AT REST, before anything is
-              // clicked — the same data the opened dropdown lists, never a second, disagreeing
-              // number.
-              const isMetaFloor = discloses && CLUSTER_FLOORS.has(l.id); // ml0/ml1
-              const clusters = isMetaFloor ? clustersOf(rows) : [];
-              const showValidatorRows = discloses && !isMetaFloor && !committedMeta; // hypl0/hypl1 under "all"/"dag"
-              const lanes: LaneMeta[] = !discloses
-                ? []
-                : isMetaFloor
-                  ? laneMetagraphsFor(l.id as "ml0" | "ml1")
-                  : committedMeta
-                    ? [dagLane(l.id as "hypl0" | "hypl1")]
-                    : [];
-              // The dropdown's total: its own rows plus every lane row's own count — literally
-              // everything the opened list will render, so the resting number can never disagree
-              // with what appears once it's open.
-              const floorCount = rows.length + lanes.reduce((sum, x) => sum + x.count, 0);
-              const hasContentAbove = clusters.length > 0 || (showValidatorRows && rows.length > 0);
-              // Open iff committed (as before) OR this panel just opened it locally — see
-              // `commit`'s comment. A floor committed from elsewhere (a 3D plane click,
-              // autoLayerForNode) is open purely via `on`, no extra plumbing needed.
-              const open = discloses && (on || openFloor === l.id);
-              return (
-                <div key={l.id}>
-                <button
-                  type="button"
-                  onClick={() => commit(l)}
-                  onMouseEnter={pair.onMouseEnter}
-                  onMouseLeave={pair.onMouseLeave}
-                  onFocus={pair.onMouseEnter}
-                  onBlur={pair.onMouseLeave}
-                  aria-pressed={on}
-                  className={cn(
-                    // `nb-row border border-transparent` hosts the pairing wash (box-shadow-based
-                    // SELECTED_ROW composes under it, same as the geo node rows). The trailing
-                    // mark now lives IN-FLOW at the end of the title row (below) — same idiom as
-                    // the inner cluster/lane rows' `ml-auto` count — instead of an absolutely
-                    // positioned overlay, so it can never overlap the badge/name text and every
-                    // row's trailing column is built the same way. ROW_OUTSET makes this the same
-                    // top-level row box geo/hyper use: without it the floor rows' wash stopped 6px
-                    // inside every other explorer's (user, 2026-08-01).
-                    "nb-row group relative text-left border border-transparent cursor-pointer rounded-sm py-1.5 bg-transparent transition-[background] duration-150",
-                    ROW_OUTSET,
-                    "hover:bg-wash-hover",
-                    "focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--primary)] focus-visible:outline-offset-[-2px]",
-                    // ANCESTOR strength once a node inside the floor is selected — the finer
-                    // rung is the head of the path then (see components/useLadderFocus.ts).
-                    on && selectedRow(focus === "layer"),
-                    pair.paired && pair.className,
-                  )}
-                  style={pair.style}
-                >
-                  {/* The layer's STACK-LEVEL badge (LEDGER_LAYERS.level — up from the base:
-                      Global snapshots = 1, the split hypergraph plane = sub-levels 2.1/2.2),
-                      mirrored by the 3D floor labels so panel row and plane pair at a glance.
-                      The trailing slot mirrors DisclosureRow's: node-kind floors get their honest
-                      count (the same total the opened dropdown lists — see `floorCount` above)
-                      plus the shared hover-revealed DisclosureChevron (components/ExploreRows.tsx
-                      — the button above carries the `group` class its reveal needs) that flips to
-                      the committed ✓ once `on`; snapshot floors (msnap/gl0) render neither — the
-                      slot just collapses, no reserved gap, since there's nothing to disclose. */}
-                  <span className="flex items-center gap-2 min-w-0">
-                    <span
-                      aria-hidden
-                      className={cn(
-                        "flex-none min-w-[18px] h-[18px] px-1 rounded-xs border flex items-center justify-center text-micro tabular-nums leading-none",
-                        on
-                          ? "border-[var(--filter-accent,var(--primary))] text-[var(--filter-accent,var(--primary))]"
-                          : "border-border text-muted-foreground",
-                      )}
-                    >
-                      {l.level}
-                    </span>
-                    <span className={cn("flex-1 min-w-0 truncate text-body text-foreground", on && "font-semibold")}>
-                      {l.name}
-                    </span>
-                    {discloses ? (
-                      <span className="flex-none flex items-center gap-1.5">
-                        <span className="tabular-nums text-label font-semibold text-muted-foreground">{floorCount}</span>
-                        {on ? (
-                          <SelectedRowMark muted={focus !== "layer"} />
-                        ) : (
-                          <DisclosureChevron open={open} />
-                        )}
-                      </span>
-                    ) : (
-                      // Snapshot floors (msnap/gl0) never disclose — no count, no chevron — but
-                      // still wear the committed ✓ like any other selectable row.
-                      on && <SelectedRowMark className="flex-none" muted={focus !== "layer"} />
-                    )}
-                  </span>
-                  {/* No per-row description here: `LEDGER_LAYERS.desc` is the LAYER CARD's opening
-                      line (inspector/cards.tsx `LayerCard`), and committing a floor opens that card
-                      in the same click — so a copy under the row said the same sentence twice, one
-                      rail apart, and made the browser list scan like prose instead of rows
-                      (user, 2026-08-01). The explorer rows are the browse surface; the facts rail
-                      explains the subject. Same split GeoExplore/HyperExplore already keep. */}
-                </button>
-
-                {/* Node browser disclosure — one per NODE floor. `open` decouples the dropdown's
-                    visibility from the commit's store round-trip (see `commit`'s + `open`'s
-                    comments above) so the first click reveals it in the same frame it commits.
-                    Leaving the list clears the scene hover-glows. */}
-                {discloses && open && (
-                  <div
-                    className={cn("mb-1.5 ml-[9px] py-0.5 pl-3", ROW_NEST)}
-                    onMouseLeave={() => {
-                      setHoverNodeId(null);
-                      setHoverCohort(null);
-                    }}
-                  >
-                    {!hasContentAbove && lanes.length === 0 ? (
-                      // True-boot fallback only (CLAUDE.md "Honesty over decoration") — reachable
-                      // just before metaList/validator data has arrived; once it has, every floor
-                      // always has SOMETHING to show (its own rows and/or lane rows to the other
-                      // networks), so this line no longer means "wrong filter for this floor".
-                      <p className="mt-1 mx-1 mb-1.5 text-label text-muted-foreground">No nodes reported yet.</p>
-                    ) : (
-                      <>
-                        {isMetaFloor &&
-                          clusters.map((g) => {
-                            const key = `${l.id}|${g.id}`;
-                            const isOpen = openCluster === key;
-                            const holdsSel =
-                              selIp != null &&
-                              g.rows.some((r) => r.layer === selLayer && "node" in r.pick && r.pick.node?.ip === selIp);
-                            return (
-                              <div key={key}>
-                                {/* The cluster group row — one per metagraph lane. IdentityDot is
-                                    correct here (one lane, one metagraph, unlike geo's mixed-network
-                                    cohorts). A disclosure on the way to a node — and the ONE
-                                    explorer row level that stays disclosure-only on purpose (the
-                                    exemption to "every explorer level is a ladder rung with its own
-                                    card", CLAUDE.md): `selNodes` publishes only the COMMITTED
-                                    filter's nodes, so this row's metagraph IS the committed filter
-                                    and its dossier card is already open on the facts rail. Running
-                                    `filterToggleActions` here could only step back to "all" and
-                                    throw away the browse context. */}
-                                <DisclosureRow
-                                  open={isOpen}
-                                  holdsSel={holdsSel}
-                                  title={`${g.name} · ${g.rows.length} node${g.rows.length > 1 ? "s" : ""}`}
-                                  onToggle={() => setOpenCluster(isOpen ? null : key)}
-                                  onHoverEnter={() =>
-                                    setHoverCohort(g.rows.map((r) => hoverKeyOf(r.pick)).filter((k): k is string => !!k))
-                                  }
-                                  onHoverLeave={() => setHoverCohort(null)}
-                                >
-                                  <IdentityDot hue={g.hue} />
-                                  <span className="flex-1 min-w-0 text-body text-foreground whitespace-nowrap overflow-hidden text-ellipsis">
-                                    {g.name}
-                                  </span>
-                                  <span className="ml-auto flex-none tabular-nums text-body font-semibold">{g.rows.length}</span>
-                                </DisclosureRow>
-
-                                {isOpen && (
-                                  <div className="mb-1 ml-[7px] pl-2 border-l border-border">
-                                    {g.rows.map((r, i) => {
-                                      const nodeOn =
-                                        selIp != null && r.layer === selLayer && "node" in r.pick && r.pick.node?.ip === selIp;
-                                      return (
-                                        <NodePickerRow
-                                          key={(r.id ?? r.label) + i}
-                                          row={r}
-                                          selected={nodeOn}
-                                          hoverNodeId={hoverNodeId}
-                                          setHoverNodeId={setHoverNodeId}
-                                          onSelect={() => selectNode(r.pick, l.id, nodeOn)}
-                                        />
-                                      );
-                                    })}
-                                  </div>
-                                )}
-                              </div>
-                            );
-                          })}
-
-                        {showValidatorRows &&
-                          // hypl0/hypl1 under "all"/"dag": one lane (the DAG core) — no cluster
-                          // grouping, node rows render directly.
-                          rows.map((r, i) => {
-                            const nodeOn = selIp != null && r.layer === selLayer && "node" in r.pick && r.pick.node?.ip === selIp;
-                            return (
-                              <NodePickerRow
-                                key={(r.id ?? r.label) + i}
-                                row={r}
-                                selected={nodeOn}
-                                hoverNodeId={hoverNodeId}
-                                setHoverNodeId={setHoverNodeId}
-                                onSelect={() => selectNode(r.pick, l.id, nodeOn)}
-                              />
-                            );
-                          })}
-
-                        {lanes.length > 0 && (
-                          <div className={cn("flex flex-col gap-0.5", hasContentAbove && "mt-1 pt-1 border-t border-border/60")}>
-                            {lanes.map((lane) => (
-                              <LaneRow key={lane.id} lane={lane} filter={filter} hoverFilter={hoverFilter} setHoverFilter={setHoverFilter} />
-                            ))}
-                          </div>
-                        )}
-                      </>
-                    )}
-                  </div>
-                )}
-                </div>
-              );
-            })}
+        {/* Two groups matching the chamber itself: the two SNAPSHOT floors (what the stack
+            produces) lead, then the four node RAILS that feed them (LEDGER_LAYERS.level —
+            "1"/"2" vs the literal "rail" — is the same split, so this heading pair is just
+            that field made visible). Bare uppercase group labels, not cards of their own —
+            the row below still carries its own name + count (explanatory-copy split). */}
+        <div className="px-1 pt-0.5 pb-1 text-micro tracking-caps uppercase text-muted-foreground">Floors</div>
+        {FLOOR_LAYERS.map(renderRow)}
+        <div className="px-1 pt-2 pb-1 text-micro tracking-caps uppercase text-muted-foreground">Rails</div>
+        {RAIL_LAYERS.map(renderRow)}
       </div>
     </ExplorerShell>
   );
