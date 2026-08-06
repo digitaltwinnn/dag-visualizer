@@ -4,6 +4,10 @@ import { METAGRAPHS } from "@/src/engine/config";
 import { classifyActivity } from "@/src/data/currencyActivity";
 import type { CurrencyActivity } from "@/src/data/types";
 
+// The ROUTE-SEGMENT config is what makes the route prerender/CDN-cache (`○ 10m` in the build
+// table); the unstable_cache option below only shares the expensive fetch between invocations.
+// Both are needed — /api/geo and /api/metagraphs declare the same pair.
+export const revalidate = 600;
 export const maxDuration = 30;
 
 const BE = "https://be-mainnet.constellationnetwork.io";

@@ -150,7 +150,13 @@ export const BAR_D = 1.6;
  *  over 1838 ticks (p50 5 · p95 23 · p99 71 · max 149 KB) and inflated by the observed unlisted
  *  byte share. Ticks past this clip at the floor edge and carry an overflow multiplier on their
  *  label. Re-running the sample minutes later moved the p99 by ~2 KB — the constant is meant to be
- *  re-baked when the metagraph set or mainnet traffic changes, not tracked live. */
+ *  re-baked when the metagraph set or mainnet traffic changes, not tracked live.
+ *  ⚠️ KNOWN GAP in the calibration: the bake sums only the LISTED metagraphs' `sizeInKB` and
+ *  applies a flat ×1.08 for unlisted channels, while the bar renders the exact read's
+ *  `totalSizeKB` — which counts EVERY channel. So this reference is deliberately approximate and
+ *  runs low: live ticks of 80–90 KB were observed within minutes of baking, i.e. the reference is
+ *  exceeded more often than "p99" suggests. That is handled honestly (clip + overflow multiplier),
+ *  not hidden. A future re-bake should calibrate against exact-read totals instead. */
 export const BYTE_SCALE_KB = 77;
 
 // ── Node rails (spec §4.4) — run along Z at the FRONT (+X, camera-side) edge of their floor,

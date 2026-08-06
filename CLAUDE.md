@@ -453,7 +453,7 @@ store-value imports**, enforced by `layerBoundaries.test.ts`). Each ships coloca
   `geoFraming` (the no-topology FALLBACK — the real drill pose is countryShape.countryFraming),
   `cohortFraming` (the geo provider-cohort pose — one rung wider than the node zoom, same
   `NODE_RAISE` lean contract via `Globe.focusCohort`, ABSOLUTE/dolly-exempt like
-  `nodeFraming`), `ledgerLayerFraming`), the global **`CAM_ZOOM` dolly** (`dollyBack()` — one lever widening
+  `nodeFraming`), `ledgerFloorFraming`/`ledgerRailFraming`/`ledgerNodeFraming`), the global **`CAM_ZOOM` dolly** (`dollyBack()` — one lever widening
   every pose; a pose with a composed non-subject target must opt out explicitly or the dolly
   drags the camera off the subject, the bug that hit the node pose), and **`closeness()`**
   (camera altitude → the surface-sharpening factor GeoView's shaders consume). Easings too.
