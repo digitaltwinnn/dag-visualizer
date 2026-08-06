@@ -104,3 +104,13 @@ describe("applyClickActions", () => {
     expect(useStore.getState().selStack).not.toContain("composition");
   });
 });
+
+describe("metaSnap action", () => {
+  it("applies a metaSnap action to exactly the metaSnap channel", () => {
+    const sel = { metaId: "DAG0", ordinal: 7, hash: "h", globalOrdinal: 42, ts: "t" };
+    applyClickActions([{ kind: "metaSnap", sel }]);
+    expect(useStore.getState().metaSnap).toEqual(sel);
+    applyClickActions([{ kind: "metaSnap", sel: null }]);
+    expect(useStore.getState().metaSnap).toBeNull();
+  });
+});

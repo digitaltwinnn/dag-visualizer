@@ -59,12 +59,12 @@ describe("detailsCards — RIGHT rail (Details): fixed slots + ghost hints", () 
   it("the DAG filter → Context dossier populated", () => {
     expect(presentKinds(detailsCards(details({ filter: "dag" })))).toEqual(["context"]);
   });
-  it("slots come in ONE fixed order (context, country, cohort, composition, node, snap, layer) regardless of selection", () => {
+  it("slots come in ONE fixed order (context, metaSnap, country, cohort, composition, node, snap, layer) regardless of selection", () => {
     const ids = detailsCards(details({ filter: "dor", inspect: nodePick, snap: snapPick })).map((c) => c.id);
-    expect(ids).toEqual(["context", "country", "cohort", "composition", "node", "snap", "layer"]);
+    expect(ids).toEqual(["context", "metaSnap", "country", "cohort", "composition", "node", "snap", "layer"]);
   });
-  it("ledger ghosts: context + node + snapshot + layer invites (nodes pick in the chamber too)", () => {
-    expect(ghostIds(detailsCards(details({})))).toEqual(["context", "node", "snap", "layer"]);
+  it("ledger ghosts: context + metaSnap + node + snapshot + layer invites (nodes pick in the chamber too)", () => {
+    expect(ghostIds(detailsCards(details({})))).toEqual(["context", "metaSnap", "node", "snap", "layer"]);
   });
   it("hyper ghosts: context + composition + node (the snapshot slot is ledger-scoped, spec 2026-08-01)", () => {
     expect(ghostIds(detailsCards(details({ mode: "hyper" })))).toEqual(["context", "composition", "node"]);
@@ -122,6 +122,31 @@ describe("detailsCards — RIGHT rail (Details): fixed slots + ghost hints", () 
     expect(country.subjectKey).toBe("de");
     expect(cohort.present).toBe(true);
     expect(cohort.subjectKey).toBe("de|Falkenstein|Hetzner");
+  });
+});
+
+describe("the metagraph snapshot slot", () => {
+  const base = {
+    mode: "ledger" as const, filter: "all", inspect: null, snap: null, layer: null,
+    metaSnap: null, selNodesCount: 0, filterLabel: "All networks",
+    country: null, cohort: null, composition: null,
+  };
+  it("sits between the network and the node slots", () => {
+    const ids = detailsCards(base).map((c) => c.id);
+    expect(ids.indexOf("metaSnap")).toBeGreaterThan(ids.indexOf("context"));
+    expect(ids.indexOf("metaSnap")).toBeLessThan(ids.indexOf("node"));
+  });
+  it("is ledger-scoped, and its hint names the route rather than the verb", () => {
+    const inLedger = detailsCards(base).find((c) => c.id === "metaSnap")!;
+    expect(inLedger.hint).toBe("Click a tile under a lane.");
+    const inGeo = detailsCards({ ...base, mode: "geo" }).find((c) => c.id === "metaSnap")!;
+    expect(inGeo.hint).toBeNull();
+  });
+  it("is present once a tile is selected", () => {
+    const sel = { metaId: "DAG0", ordinal: 745190, hash: "abc", globalOrdinal: 42, ts: "t" };
+    const c = detailsCards({ ...base, metaSnap: sel }).find((x) => x.id === "metaSnap")!;
+    expect(c.present).toBe(true);
+    expect(c.subjectKey).toBe("DAG0:745190");
   });
 });
 

@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import * as THREE from "three";
-import { FOCI, hubFraming, geoFraming, ledgerLayerFraming, ledgerNodeFraming, easeInOutQuad, CAM_ZOOM, dollyBack, nodeFraming, cohortFraming, hyperNodeFraming, closeness, CLOSE_FAR_ALT, CLOSE_NEAR_ALT, NODE_RAISE } from "./cameraRig";
+import { FOCI, hubFraming, geoFraming, ledgerFloorFraming, ledgerRailFraming, ledgerNodeFraming, easeInOutQuad, CAM_ZOOM, dollyBack, nodeFraming, cohortFraming, hyperNodeFraming, closeness, CLOSE_FAR_ALT, CLOSE_NEAR_ALT, NODE_RAISE } from "./cameraRig";
 
 describe("FOCI", () => {
   it("carries the camera presets (ledger has none — it uses `overview` + a rotated group)", () => {
@@ -72,15 +72,15 @@ describe("ledgerNodeFraming (the Snapshots node zoom level)", () => {
     expect(node).toEqual(new THREE.Vector3(4, -2, 7)); // input untouched
   });
 
-  it("zooms CLOSER than the layer pose — the ladder's next level (geo's country→node mirrored)", () => {
+  it("zooms CLOSER than the floor pose — the ladder's next level (geo's country→node mirrored)", () => {
     const node = new THREE.Vector3(0, 3, 0);
     const n = out();
     ledgerNodeFraming(node, n);
     const nodeDist = n.pos.distanceTo(n.target);
     const l = out();
-    ledgerLayerFraming(3, l); // the same height's layer pose
-    const layerDist = l.pos.distanceTo(l.target);
-    expect(nodeDist).toBeLessThan(layerDist * 0.55); // clearly a level deeper, not a nudge
+    ledgerFloorFraming(3, l); // the same height's floor pose
+    const floorDist = l.pos.distanceTo(l.target);
+    expect(nodeDist).toBeLessThan(floorDist * 0.55); // clearly a level deeper, not a nudge
   });
 });
 
@@ -209,5 +209,26 @@ describe("closeness (camera altitude → surface-sharpening factor)", () => {
     expect(closeness(CLOSE_NEAR_ALT)).toBe(1);
     expect(closeness(CLOSE_NEAR_ALT - 5)).toBe(1);
     expect(closeness((CLOSE_FAR_ALT + CLOSE_NEAR_ALT) / 2)).toBeCloseTo(0.5, 9);
+  });
+});
+
+describe("ledger framings (two-floor chamber)", () => {
+  it("frames a floor on the same diagonal the layer focus always used", () => {
+    const out = { pos: new THREE.Vector3(), target: new THREE.Vector3() };
+    ledgerFloorFraming(4, out);
+    expect(out.pos.toArray()).toEqual([-7, 10.2, 23.5]);
+    expect(out.target.toArray()).toEqual([0, 3, 0]);
+  });
+
+  it("frames a rail from in front of it, looking along the field", () => {
+    const out = { pos: new THREE.Vector3(), target: new THREE.Vector3() };
+    ledgerRailFraming(3.2, 2.85, out);
+    // In front of the rail (further toward the camera) and slightly above it.
+    expect(out.pos.z).toBeGreaterThan(0);
+    expect(out.pos.y).toBeGreaterThan(2.85);
+    expect(out.target.x).toBeCloseTo(0, 6);
+    expect(out.target.y).toBeCloseTo(2.85, 6);
+    // The rail runs across Z, so the pose must not be pushed off to one end of it.
+    expect(out.target.z).toBeCloseTo(0, 6);
   });
 });

@@ -32,6 +32,9 @@ export function applyClickActions(actions: ClickAction[]): void {
         if (a.follow !== undefined) st.setFollowing(a.follow);
         st.setSnap(a.pick);
         break;
+      case "metaSnap":
+        st.setMetaSnap(a.sel);
+        break;
       case "layer":
         st.setLayer(a.pick);
         break;

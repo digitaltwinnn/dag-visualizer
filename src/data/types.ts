@@ -1,5 +1,28 @@
 // Shapes coming off the data layer (src/data/api.ts, typed). Loose where the source is loose.
 
+/** The full decode of ONE anchored metagraph snapshot (spec §7.3). Fetched only on a deliberate
+ *  gesture — it re-downloads the ~2.5 MB global to reach one entry. */
+export interface ChannelSnapDeep {
+  globalOrdinal: number;
+  metaId: string;
+  ordinal: number;
+  height: number;
+  subHeight: number;
+  epochProgress: number;
+  lastSnapshotHash: string;
+  fee: number;
+  bytes: number;
+  blocks: number;
+  signers: string[];
+  stateKeys: { key: string; count: number }[];
+  stateBytes: number;
+  stateProof: string | null;
+  state: string;
+  dataBlockSigners: string[];
+}
+
+export const metaSnapDeepKey = (globalOrdinal: number, metaId: string): string => `${globalOrdinal}:${metaId}`;
+
 export interface GlobalSnapshot {
   ordinal: number;
   timestamp: string;
@@ -8,6 +31,20 @@ export interface GlobalSnapshot {
   subHeight?: number;
   metagraphSnapshotCount?: number;
   blocks?: unknown[];
+}
+
+/** One anchored metagraph snapshot inside a global tick, from the exact read (spec §7.2 tier 2). */
+export interface ChannelSnapRow {
+  metaId: string;      // the state-channel address
+  ordinal: number;     // the metagraph snapshot's own ordinal (0 when the payload can't be decoded)
+  decoded: boolean;
+  fee: number;
+  bytes: number;
+  signers: string[];   // truncated validator ids
+  blocks: number;
+  hasState: boolean;
+  stateBytes: number;
+  stateProof: string | null;
 }
 
 // EXACT per-tick anchor totals read straight from the raw L0 snapshot's stateChannelSnapshots
@@ -32,6 +69,26 @@ export interface SnapshotExact {
   // is that metagraph's measured serialized size (Σ content byte length), shown as KB on the
   // expanded row — NOT derived from the fee.
   perMeta: Record<string, { count: number; fee: number; bytes: number }>;
+  rows: ChannelSnapRow[];
+}
+
+/** A selected METAGRAPH SNAPSHOT — a tile on the upper floor (redesign 2026-08-04, spec §7.1).
+ *  A card SLOT, not a focus-ladder rung: like the global snapshot it has its own store channel
+ *  and a fixed rail slot, and appears in no LADDER. `metaId` is the metagraph's id, which IS its
+ *  state-channel address, so it keys `SnapshotExact.perMeta` directly. */
+export interface MetaSnapSel {
+  metaId: string;
+  ordinal: number;       // the metagraph snapshot's OWN ordinal
+  hash: string;
+  globalOrdinal: number; // the global tick it anchored into
+  ts: string;            // that tick's timestamp — the anchor join
+}
+
+/** Whether a metagraph's own token is moving — the ledger's currency-gutter status (spec §6.7). */
+export interface CurrencyActivity {
+  metaId: string;
+  state: "active" | "dormant" | "none";
+  lastTs: string | null;
 }
 
 // Per-tick anchor aggregate from NetworkData.anchorIndex (see getAnchor).
@@ -186,4 +243,9 @@ export type PickDescriptor =
   // A settlement-stack LAYER, selected from the Snapshots·Explore panel or a 3D floor plane.
   // Carries ONLY the id (matching domain/ledgerLayout's LAYER_GEOM) — the display name/description
   // are UI copy, resolved through src/data/ledgerLayers.ts by every surface that shows words.
-  | (PickBase & { kind: "layer"; layerId: string });
+  | (PickBase & { kind: "layer"; layerId: string })
+  // A metagraph-snapshot TILE on the ledger's upper floor (redesign 2026-08-04, spec §7.1). Like
+  // `layer` it is a pickable 3D subject with its own store channel and card slot — not a focus
+  // rung. It carries the selection payload plus the GLOBAL tick descriptor it anchored into, so
+  // the click table can commit the pair (tile + its tick) without a second lookup.
+  | (PickBase & { kind: "metaSnap"; sel: MetaSnapSel; global: Extract<PickDescriptor, { kind: "snapshot" }> });

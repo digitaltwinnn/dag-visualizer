@@ -1,5 +1,6 @@
 import { create } from "zustand";
-import type { GlobalSnapshot, LeaderboardData, MetaInfo, NodeRow, PickDescriptor, SnapshotExact } from "@/src/data/types";
+import type { GlobalSnapshot, LeaderboardData, MetaInfo, NodeRow, PickDescriptor, SnapshotExact, MetaSnapSel, ChannelSnapDeep } from "@/src/data/types";
+import { metaSnapDeepKey } from "@/src/data/types";
 import type { HoverSubject } from "@/src/data/hoverSubject";
 // Type-only — the store may not import domain VALUES (layerBoundaries rule), but a type-only
 // import of a domain type is legal and keeps CohortSel defined in exactly one place.
@@ -11,7 +12,7 @@ import type { CohortSel, CompositionSel } from "@/src/engine/domain/focusLadder"
 export type Mode = "hyper" | "geo" | "ledger" | "status" | "transactions" | "staking";
 
 // One slot in the right-rail card stack (extend with future card types — e.g. "tx").
-export type SelSlot = "node" | "snap" | "layer" | "country" | "cohort" | "composition";
+export type SelSlot = "node" | "snap" | "metaSnap" | "layer" | "country" | "cohort" | "composition";
 
 // Move `slot` to the FRONT of the recency stack when it becomes active, or drop it when cleared.
 function bumpStack(stack: SelSlot[], slot: SelSlot, active: boolean): SelSlot[] {
@@ -63,6 +64,9 @@ interface AppState {
   // adding a slot field + a `setSel(...)` call + a registry entry in Inspector — nothing else.
   inspect: PickDescriptor | null;
   snap: Extract<PickDescriptor, { kind: "snapshot" }> | null;
+  // The selected METAGRAPH SNAPSHOT (a tile on the ledger's upper floor). LEDGER-SCOPED like
+  // `snap`: Engine.setMode clears it on the way out of the view. A selStack slot like `snap`.
+  metaSnap: MetaSnapSel | null;
   selStack: SelSlot[];
   // Ordinal of the snapshot the cursor is hovering in the LiveStrip bar-chart (transient highlight —
   // the ledger re-colours that snapshot's tiles). null = not hovering.
@@ -116,6 +120,10 @@ interface AppState {
   // RawSnapshotBridge from /api/snapshot/[ordinal] for the live + selected ticks, so ANY view
   // can read final fees without the polling floor. Missing key = not fetched / unavailable (pruned).
   snapshotExact: Record<number, SnapshotExact>;
+  // Deep channel reads (full decode of one metagraph snapshot), keyed by metaSnapDeepKey(globalOrdinal, metaId).
+  // Immutably cached — fetched from /api/snapshot/[ordinal]/channel/[address] on explicit gesture,
+  // never on poll or mass reads.
+  metaSnapDeep: Record<string, ChannelSnapDeep>;
 
   // Active view. The scene is one persistent canvas; the engine morphs between hyper
   // and geo and hides it for the flat views, all driven by this.
@@ -171,6 +179,7 @@ interface AppState {
   setMetaList: (list: MetaInfo[]) => void;
   setInspect: (pick: PickDescriptor | null) => void;
   setSnap: (snap: Extract<PickDescriptor, { kind: "snapshot" }> | null) => void;
+  setMetaSnap: (sel: MetaSnapSel | null) => void;
   setHoverSnapOrd: (ordinal: number | null) => void;
   setHoverFilter: (filter: string | null) => void;
   setHoverNodeId: (id: string | null) => void;
@@ -187,6 +196,7 @@ interface AppState {
   setLeaderboard: (lb: LeaderboardData | null) => void;
   setSelNodes: (nodes: NodeRow[]) => void;
   setSnapshotExact: (data: SnapshotExact) => void;
+  setMetaSnapDeep: (d: ChannelSnapDeep) => void;
   setPhoneDock: (dock: "explore" | "details" | null) => void;
   setSection: (section: "scene" | "data") => void;
   setPhoneVitals: (open: boolean) => void;
@@ -197,6 +207,7 @@ interface AppState {
 
 // Keep the exact-snapshot cache bounded (one small object per ordinal); drop the oldest.
 const EXACT_MAX = 120;
+const DEEP_MAX = 24;
 
 export const useStore = create<AppState>((set) => ({
   live: false,
@@ -214,6 +225,7 @@ export const useStore = create<AppState>((set) => ({
   metaList: [],
   inspect: null,
   snap: null,
+  metaSnap: null,
   selStack: [],
   hoverSnapOrd: null,
   hoverFilter: null,
@@ -231,6 +243,7 @@ export const useStore = create<AppState>((set) => ({
   leaderboard: null,
   selNodes: [],
   snapshotExact: {},
+  metaSnapDeep: {},
   phoneDock: null,
   section: "scene",
   phoneVitals: false,
@@ -251,6 +264,7 @@ export const useStore = create<AppState>((set) => ({
   setMetaList: (metaList) => set({ metaList }),
   setInspect: (inspect) => set((s) => ({ inspect, selStack: bumpStack(s.selStack, "node", !!inspect) })),
   setSnap: (snap) => set((s) => ({ snap, selStack: bumpStack(s.selStack, "snap", !!snap) })),
+  setMetaSnap: (metaSnap) => set((s) => ({ metaSnap, selStack: bumpStack(s.selStack, "metaSnap", !!metaSnap) })),
   setHoverSnapOrd: (hoverSnapOrd) => set({ hoverSnapOrd }),
   setHoverFilter: (hoverFilter) => set({ hoverFilter }),
   setHoverNodeId: (hoverNodeId) => set({ hoverNodeId }),
@@ -283,6 +297,14 @@ export const useStore = create<AppState>((set) => ({
       }
       return { snapshotExact: next };
     }),
+  setMetaSnapDeep: (d) => set((s) => {
+    const key = metaSnapDeepKey(d.globalOrdinal, d.metaId);
+    if (s.metaSnapDeep[key]) return {}; // a decoded snapshot is immutable
+    const next = { ...s.metaSnapDeep, [key]: d };
+    const keys = Object.keys(next);
+    if (keys.length > DEEP_MAX) delete next[keys[0]];
+    return { metaSnapDeep: next };
+  }),
   // Fully closing the dock also drops the drag-chosen sheet height, so the next open starts at
   // the default; switching halves (a non-null → non-null transition) keeps it.
   setPhoneDock: (phoneDock) => set(phoneDock === null ? { phoneDock, phoneSheetPx: null } : { phoneDock }),

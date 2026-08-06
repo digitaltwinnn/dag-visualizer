@@ -1,9 +1,10 @@
 import { useStore } from "@/src/store/store";
-import type { Anchor, GlobalSnapshot } from "@/src/data/types";
+import type { Anchor, GlobalSnapshot, MetaInfo, NodeRow } from "@/src/data/types";
 import { NetworkData, shortHash } from "@/src/data/api";
 import { METAGRAPHS, COLORS as RAW_COLORS, DEFAULT_META_COLOR as RAW_DEFAULT_META } from "@/src/engine/config";
 import { hex } from "@/src/util/format";
 import { identityHudNumber } from "@/src/palette/identity";
+import { pickNetId } from "@/src/engine/domain/pickActions";
 
 export { shortHash };
 export const COLORS = RAW_COLORS;
@@ -74,6 +75,47 @@ export function isAnchorSettling(ts: string, total: number | null): boolean {
   const a = net?.getAnchor(ts);
   if (!a || total == null) return false;
   return total > a.count && Date.now() - a.touched < ANCHOR_SETTLE_MS;
+}
+
+// A metagraph snapshot's `signers` (decodeChannel.ts's shortSigner — the proof list's node ids,
+// truncated to SIGNER_LEN chars server-side to keep the payload small) live in the SAME id space
+// as a live node's full `NodeInfo.id` (the cluster-info hash) — but the scene's glow set keys
+// metagraph nodes by `nodeId = node.ip` (Globe.ts's MetaNodeRecord construction; validators use
+// `node.id` instead, an existing asymmetry — see Engine._pickNodeId). So a truncated signer can
+// never be compared directly against the glow key: it has to be resolved to the matching node's
+// IP first. This is that resolution, over the live per-metagraph node list the store already
+// carries (`store.metaList`) — a prefix match against each candidate's full id.
+export function resolveSignerIps(
+  metaList: MetaInfo[],
+  metaId: string,
+  signers: readonly string[] | null,
+): string[] | null {
+  const prefixes = signers?.filter(Boolean);
+  if (!prefixes?.length) return null;
+  const meta = metaList.find((m) => m.id === metaId);
+  if (!meta) return null;
+  const ips: string[] = [];
+  for (const n of meta.nodes) {
+    if (!n.ip || !n.id) continue;
+    if (prefixes.some((p) => n.id!.startsWith(p))) ips.push(n.ip);
+  }
+  return ips.length ? ips : null;
+}
+
+// The card-side twin of resolveSignerIps: given ONE signer's truncated id, find the matching
+// live NODE ROW (the same rows the ledger explorer/roster browse — `store.selNodes`) so the
+// metagraph-snapshot card can render a clickable/hoverable row per signer instead of a bare
+// hash. Scoped to the snapshot's own network first (a truncated prefix could theoretically
+// collide across metagraphs; pickNetId keeps the match honest), then prefix-matched like
+// resolveSignerIps. Returns the first match or null (not every signer resolves — a node can
+// have rotated off the live set since it signed).
+export function matchSignerRow(selNodes: NodeRow[], metaId: string, signerPrefix: string): NodeRow | null {
+  if (!signerPrefix) return null;
+  for (const r of selNodes) {
+    if (pickNetId(r.pick) !== metaId) continue;
+    if (r.id && r.id.startsWith(signerPrefix)) return r;
+  }
+  return null;
 }
 
 // The DAG modelled as a core, resolvable like a metagraph config (its live nodes come from

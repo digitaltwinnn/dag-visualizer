@@ -128,13 +128,15 @@ export function geoFraming(R: number, out: CameraFraming): void {
   out.target.set(0, THREE.MathUtils.lerp(10.5, 11.5, t), 2.5);
 }
 
-// Layer-focus framing (Snapshots view): selecting a settlement layer flies the camera to the nice
-// DIAGONAL view of that layer's floor plane — elevated, yawed off-axis from the LEFT so the live
+// The FLOOR focus pose (renamed from ledgerLayerFraming with the two-floor redesign, 2026-08-04):
+// the DIAGONAL is deliberately kept as the layer-focus move — the resting pose stays face-on, and
+// stepping onto a floor is what tilts the room. Selecting a settlement floor flies the camera to
+// the nice DIAGONAL view of that floor plane — elevated, yawed off-axis from the LEFT so the live
 // lead block sits toward the BOTTOM-RIGHT and the old blocks recede to the TOP-LEFT — centred on
 // the plane's height `y` (already viewScale'd by the caller). The resting pose stays central/
 // untilted; this tilt is an EXPLORATION move (the user can freely orbit from here, like the geo
 // drill zoom).
-export function ledgerLayerFraming(y: number, out: CameraFraming): void {
+export function ledgerFloorFraming(y: number, out: CameraFraming): void {
   // Close-in framing (user-tuned). The TARGET sits exactly at the lane's LEAD point (x=0, z=0 —
   // the caller shifts pos+target laterally by the focused lane's world x), so the node ring /
   // snapshot cluster projects at the exact screen centre. Earlier x/z target offsets (−6, −9,
@@ -144,9 +146,19 @@ export function ledgerLayerFraming(y: number, out: CameraFraming): void {
   out.target.set(0, y - 1, 0);
 }
 
-// Snapshots NODE zoom — the level AFTER the layer zoom (user, 2026-07-17), mirroring geo's
-// country→node ladder: the layer pose is the "country" level, this frames the selected node's
-// chip itself. Same diagonal viewing direction as ledgerLayerFraming (left + above, trail
+// A RAIL focus pose (spec §5.1): rails run across Z at the front (+X) edge of their floor, so the
+// camera drops to their height and stands off in front, looking back along the field. The target
+// stays at z=0 so a long rail is framed centred rather than at one end. `x` arrives PRE-SCALED by
+// the ledger group's view scale (the caller multiplies), so the stand-off nudge below is in the
+// same world units.
+export function ledgerRailFraming(x: number, y: number, out: CameraFraming): void {
+  out.pos.set(x + 2.5, y + 3.4, 16.5);
+  out.target.set(0, y, 0);
+}
+
+// Snapshots NODE zoom — the level AFTER the floor zoom (user, 2026-07-17), mirroring geo's
+// country→node ladder: the floor pose is the "country" level, this frames the selected node's
+// chip itself. Same diagonal viewing direction as ledgerFloorFraming (left + above, trail
 // receding top-left), much closer; the target sits slightly above the chip so it settles just
 // below centre (the house rule-of-thirds node composition). `node` is the chip's WORLD position.
 export function ledgerNodeFraming(node: THREE.Vector3, out: CameraFraming): void {

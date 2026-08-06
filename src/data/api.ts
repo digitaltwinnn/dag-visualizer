@@ -20,6 +20,10 @@ export interface MetaSnapRecord {
   ts: string;
   fee: number;
   sizeInKB: number;
+  height: number;        // the metagraph's OWN block-DAG depth
+  subHeight: number;     // orders snapshots that share a height
+  blocks: number;        // rare on mainnet; an honest 0 beats omitting it
+  epochProgress: number;
 }
 
 // Raw shape of a `/currency/{id}/snapshots` list entry (only the fields we read).
@@ -30,6 +34,10 @@ interface RawMetaSnapshot {
   timestamp: string;
   fee?: number;
   sizeInKB?: number;
+  height?: number;
+  subHeight?: number;
+  blocks?: unknown[];
+  epochProgress?: number;
 }
 
 export interface Activity {
@@ -58,7 +66,7 @@ export class NetworkData {
   // Shared per-metagraph snapshot history + the anchor index that joins them to
   // the Global L0 spine. Both the ribbon's derived DAG fee and the ledger view
   // read from these. Keyed by metagraph id.
-  metaSnaps: Map<string, MetaSnapRecord[]>; // id -> [{ ordinal, hash, parent, ts, fee, sizeInKB }] oldest->newest
+  metaSnaps: Map<string, MetaSnapRecord[]>; // id -> [{ ordinal, hash, parent, ts, fee, sizeInKB, height, subHeight, blocks, epochProgress }] oldest->newest
   // global snapshot timestamp -> aggregate of the metagraph snapshots anchored into that tick
   // (from the metagraphs we track). The authoritative anchored COUNT is the global snapshot's
   // own `metagraphSnapshotCount`; `count` here is how many of those WE identified (the rest =
@@ -283,6 +291,9 @@ export class NetworkData {
     this._recordMetaSnaps(m, list.map((s) => ({
       ordinal: s.ordinal, hash: s.hash, parent: s.lastSnapshotHash,
       ts: s.timestamp, fee: s.fee || 0, sizeInKB: s.sizeInKB || 0,
+      height: s.height || 0, subHeight: s.subHeight || 0,
+      blocks: Array.isArray(s.blocks) ? s.blocks.length : 0,
+      epochProgress: s.epochProgress || 0,
     })));
   }
 

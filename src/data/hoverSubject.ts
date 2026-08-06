@@ -1,6 +1,6 @@
 import type { PickDescriptor } from "./types";
 import { hex } from "@/src/util/format";
-import { COLORS } from "@/src/engine/config";
+import { COLORS, METAGRAPHS } from "@/src/engine/config";
 import { identityHudHex } from "@/src/palette/identity";
 import { ledgerLayerById } from "./ledgerLayers";
 
@@ -48,6 +48,14 @@ export function tooltipSubject(p: PickDescriptor | null | undefined): HoverSubje
       return { ident: p.cfg.ticker || p.cfg.name, name: p.cfg.name, color: identityHudHex(p.cfg.id), mono: false };
     case "snapshot":
       return { ident: "L0", name: "#" + p.data.ordinal, color: CORE, mono: false };
+    case "metaSnap": {
+      // A tile on the metagraph-snapshot floor. Same vocabulary as its card: the metagraph's own
+      // ticker as the identity, its OWN ordinal as the subject. An UNLISTED channel has no config
+      // row, so its address is the only name it has (the card's fallback, shortened here).
+      const cfg = METAGRAPHS.find((m) => m.id === p.sel.metaId);
+      const ident = cfg?.ticker || cfg?.name || p.sel.metaId.slice(0, 6) + "…";
+      return { ident, name: "#" + p.sel.ordinal, color: identityHudHex(p.sel.metaId), mono: false };
+    }
     case "layer":
       // A settlement-stack floor plane (Snapshots view) — structural, so core cyan. The pick
       // carries only the id; the display name resolves through the UI copy table.

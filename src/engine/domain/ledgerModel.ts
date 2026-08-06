@@ -30,9 +30,8 @@
 // next call that does carry anchor data. Kept verbatim below rather than "fixed" (the observable
 // behaviour must match js/ledger.js exactly since Task 13 will diff against it).
 
-import * as THREE from "three";
 import { METAGRAPHS } from "../config";
-import { LEDGER, ledgerSite } from "./ledgerLayout";
+import { ledgerSite } from "./ledgerLayout";
 import type { GlobalSnapshot, Anchor } from "@/src/data/types";
 
 export const SLOT_SP = 3.6; // js/ledger.js:41 — X spacing of one tick/slot
@@ -44,34 +43,14 @@ export const BLOCK_SIZE = 0.48; // max size of an individual metagraph-snapshot 
 // ledgerSite exactly as the source does (shared by the whole METAGRAPHS roster, not per-lane).
 export const LANE_GAP_Z = Math.abs(ledgerSite(1, METAGRAPHS.length).z - ledgerSite(0, METAGRAPHS.length).z);
 
-// js/ledger.js:49 — fraction of the anchor curve that drops straight down (MSnap->ML0) before the
-// cubic swing-in begins. Not exported (not part of the brief's export list) — only curvePoint uses it.
-const LINK_VFRAC = 0.55;
-
 // js/ledger.js:53 verbatim — recency fade: 1 at the freshest completed slot, 0 by the oldest visible.
 export const slotFade = (slot: number): number => Math.min(1, Math.max(0, 1 - (slot - 1) / (SLOT_N - 1)));
 
-// js/ledger.js:56-58 verbatim — one component of a cubic bezier (p0->p1, controls c0,c1) at t.
-const cubic = (t: number, p0: number, c0: number, c1: number, p1: number): number => {
-  const u = 1 - t;
-  return u * u * u * p0 + 3 * u * u * t * c0 + 3 * u * t * t * c1 + t * t * t * p1;
-};
-
-// A point at parameter t on the LITERAL production->anchor curve, in the metagraph's lane (sx, sz):
-// straight DOWN the column from the metagraph L1 (top) through L0 to the metagraph snapshot tile for
-// t<LINK_VFRAC, then a cubic that swings to the lane CENTRE (z->0) by the hypergraph-L0 floor,
-// landing in the global block at (gx, LEDGER.rowGL0, 0). Fills the pre-allocated `out` in place.
-export function curvePoint(t: number, sx: number, sz: number, gx: number, out: THREE.Vector3): THREE.Vector3 {
-  const top = LEDGER.rowML1, snap = LEDGER.rowMSnap, ey = LEDGER.rowGL0;
-  if (t <= LINK_VFRAC) return out.set(sx, top + (snap - top) * (t / LINK_VFRAC), sz);
-  const u = (t - LINK_VFRAC) / (1 - LINK_VFRAC);
-  const dy = (snap - ey) * 0.5;
-  // Z reaches the lane CENTRE (0) BY the swing's midpoint — which is the hypergraph-L0 floor, since
-  // rowHypL0 == (rowMSnap+rowGL0)/2 — then holds at 0. So the link threads straight THROUGH the L0
-  // cluster's ring (0, rowHypL0, 0) instead of arriving there offset by half the lane width.
-  const z = u <= 0.5 ? cubic(u / 0.5, sz, sz, 0, 0) : 0;
-  return out.set(cubic(u, sx, sx, gx, gx), cubic(u, snap, snap - dy, ey + dy, ey), z);
-}
+// A tick keeps collecting metagraph snapshots for seconds after it appears (the anchor index's
+// `touched` grows). The lead row says so rather than pretending it is final — the same ~7s window
+// AnchoredTags uses for its FLOOR/COMPLETE gate. The BAR below does not settle: once the exact
+// read measures it, it is final.
+export const LEAD_SETTLE_MS = 7000;
 
 export interface TileSpec {
   ox: number;
@@ -111,6 +90,8 @@ export interface LaneBlock {
   ox: number;
   oz: number;
   link: boolean;
+  ts: string;     // the anchoring global tick's timestamp — the tile's identity join (spec §6.1)
+  count: number;  // snapshots this metagraph anchored into this tick
 }
 
 // js/ledger.js:127/202-210 (`_metaLanes` entry, minus `color` — a scene-layer concern, resolved
@@ -130,13 +111,20 @@ export interface TickChange {
 }
 
 export class LedgerModel {
-  // js/ledger.js:122 (`_trail`), minus `mesh` — `{ ordinal, slot }` is exactly what a scene-layer
-  // trail mesh needs looked up by index/ordinal.
-  trail: { ordinal: number; slot: number }[] = [];
+  // js/ledger.js:122 (`_trail`), minus `mesh` — `{ ordinal, slot, ts }` is exactly what a scene-layer
+  // trail mesh needs looked up by index/ordinal. `ts` is that COMPLETED tick's own timestamp (not
+  // the live tick's) — trail entries are historical only; the live tick is tracked via `tickOrdinal`/
+  // `tickTs` and its lanes' slot-0 blocks, never as a trail member (see the redesign test file).
+  trail: { ordinal: number; slot: number; ts: string }[] = [];
   // js/ledger.js:127 (`_metaLanes`), keyed by metagraph id (unchanged key).
   lanes: Map<string, LaneState> = new Map();
   // js/ledger.js:110 (`_tickOrdinal`).
   tickOrdinal: number | null = null;
+  // The live tick's own timestamp — the identity join a slot-0 tile's `LaneBlock.ts` mirrors.
+  tickTs: string | null = null;
+  // True while the live tick's anchor count is still growing (within LEAD_SETTLE_MS of its last
+  // growth) — the lead row is a WORK IN PROGRESS, not a final count, until this goes quiet.
+  leadForming = false;
   // js/ledger.js:114 (`_selectedOrd`).
   selectedOrd: number | null = null;
   // js/ledger.js:115 (`_selectedSlot`), same -1 "nothing selected" sentinel.
@@ -159,7 +147,9 @@ export class LedgerModel {
   // js/ledger.js:235-249 (`_anchorMetaBlock`) verbatim, minus the mesh/link-draw side effects.
   // A metagraph anchored into the LIVE tick -> (re)build its slot-0 cluster: one tile per anchored
   // snapshot, preserving the current slot-0 x/fade (so the caller's easing continues smoothly).
-  private anchorMetaBlock(id: string, count: number): void {
+  // `ts` is the live tick's timestamp (the caller's `this.tickTs`), threaded onto every tile so a
+  // slot-0 block can name the snapshot it belongs to without a lookup.
+  private anchorMetaBlock(id: string, count: number, ts: string): void {
     const i = METAGRAPHS.findIndex((m) => m.id === id);
     if (i < 0) return; // unlisted — no lane
     const lane = this.lane(id, i);
@@ -168,7 +158,7 @@ export class LedgerModel {
       if (lane.blocks[j].slot === 0) { bx = lane.blocks[j].x; bfade = lane.blocks[j].fade; lane.blocks.splice(j, 1); }
     }
     for (const tl of anchorTiles(count)) {
-      lane.blocks.unshift({ x: bx, slot: 0, fade: bfade, ox: tl.ox, oz: tl.oz, size: tl.size, filled: true, link: tl.link });
+      lane.blocks.unshift({ x: bx, slot: 0, fade: bfade, ox: tl.ox, oz: tl.oz, size: tl.size, filled: true, link: tl.link, ts, count });
     }
   }
 
@@ -180,7 +170,7 @@ export class LedgerModel {
     const count = Math.min(SLOT_N, n - 1); // ticks behind the latest (the latest is the live centre)
     for (let s = 1; s <= count; s++) {
       const snap = snaps[n - 1 - s];
-      this.trail.push({ ordinal: snap.ordinal, slot: s });
+      this.trail.push({ ordinal: snap.ordinal, slot: s, ts: snap.timestamp });
       const a = getAnchor ? getAnchor(snap.timestamp) : null;
       const counts = a && a.metaCounts ? a.metaCounts : null;
       for (let i = 0; i < METAGRAPHS.length; i++) {
@@ -189,10 +179,10 @@ export class LedgerModel {
         const lane = this.lane(id, i);
         if (nc > 0) {
           for (const tl of anchorTiles(nc)) {
-            lane.blocks.push({ x: -s * SLOT_SP, slot: s, fade: slotFade(s), ox: tl.ox, oz: tl.oz, size: tl.size, filled: true, link: tl.link });
+            lane.blocks.push({ x: -s * SLOT_SP, slot: s, fade: slotFade(s), ox: tl.ox, oz: tl.oz, size: tl.size, filled: true, link: tl.link, ts: snap.timestamp, count: nc });
           }
         } else {
-          lane.blocks.push({ x: -s * SLOT_SP, slot: s, fade: slotFade(s), ox: 0, oz: 0, size: 0.24, filled: false, link: false });
+          lane.blocks.push({ x: -s * SLOT_SP, slot: s, fade: slotFade(s), ox: 0, oz: 0, size: 0.24, filled: false, link: false, ts: snap.timestamp, count: 0 });
         }
       }
     }
@@ -223,12 +213,13 @@ export class LedgerModel {
     const a = getAnchor ? getAnchor(latest.timestamp) : null;
 
     if (isNewTick) {
-      // The previous snapshot completed -> drop it into the global trail and advance every lane one
-      // slot; then seed the new live tick with an empty placeholder at slot 0 for each metagraph
+      // The previous snapshot completed -> drop it into the global trail (carrying ITS OWN
+      // timestamp, captured before `tickTs` is overwritten below) and advance every lane one slot;
+      // then seed the new live tick with an empty placeholder at slot 0 for each metagraph
       // (upgraded to a real block when it anchors).
       if (this.tickOrdinal !== null) {
         for (const t of this.trail) t.slot += 1;
-        this.trail.unshift({ ordinal: this.tickOrdinal, slot: 1 });
+        this.trail.unshift({ ordinal: this.tickOrdinal, slot: 1, ts: this.tickTs ?? "" });
         while (this.trail.length > SLOT_N) this.trail.pop();
 
         for (const lane of this.lanes.values()) {
@@ -238,14 +229,18 @@ export class LedgerModel {
       }
       this.emitted.clear();
       this.tickOrdinal = latest.ordinal;
+      this.tickTs = latest.timestamp;
       // The new LIVE tick starts with an empty placeholder at slot 0 for EVERY metagraph (shown on
       // the latest too); anchorMetaBlock upgrades it to a real, sized block if the metagraph anchors.
       for (let i = 0; i < METAGRAPHS.length; i++) {
-        this.lane(METAGRAPHS[i].id, i).blocks.unshift({ x: 0, slot: 0, fade: 0, ox: 0, oz: 0, size: 0.24, filled: false, link: false });
+        this.lane(METAGRAPHS[i].id, i).blocks.unshift({ x: 0, slot: 0, fade: 0, ox: 0, oz: 0, size: 0.24, filled: false, link: false, ts: this.tickTs, count: 0 });
       }
     }
 
-    if (!a || !a.metaCounts) return []; // see file-header DEVIATION note — verbatim quirk
+    // `touched` is the ms the anchor count last GREW; quiet for LEAD_SETTLE_MS = settled.
+    this.leadForming = !!a && Date.now() - a.touched < LEAD_SETTLE_MS;
+
+    if (!a || !a.metaCounts) { this.leadForming = false; return []; } // see file-header DEVIATION note — verbatim quirk
 
     const changes: TickChange[] = [];
     for (const [id, n] of a.metaCounts) {
@@ -253,7 +248,7 @@ export class LedgerModel {
       if (n <= prev) continue;
       const i = METAGRAPHS.findIndex((m) => m.id === id);
       if (i < 0) { this.emitted.set(id, n); continue; } // unlisted: no lane, but don't re-check
-      this.anchorMetaBlock(id, n); // draw the real block at the lead now + animate the anchoring
+      this.anchorMetaBlock(id, n, this.tickTs ?? ""); // draw the real block at the lead now + animate the anchoring
       changes.push({ id, count: n, delta: n - prev });
       this.emitted.set(id, n);
     }
