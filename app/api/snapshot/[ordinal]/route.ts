@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import { unstable_cache } from "next/cache";
 import { METAGRAPHS } from "@/src/engine/config";
-import type { SnapshotExact } from "@/src/data/types";
+import type { SnapshotExact, ChannelSnapRow } from "@/src/data/types";
+import { decodeChannelContent } from "../decodeChannel";
 
 // EXACT per-tick anchor totals, read straight from the raw L0 global snapshot. The block explorer
 // only gives `metagraphSnapshotCount`; the L0 node's `stateChannelSnapshots` carries EVERY anchored
@@ -59,6 +60,7 @@ async function fetchExact(ordinal: number): Promise<SnapshotExact> {
     listedCount = 0,
     unlistedCount = 0;
   const perMeta: Record<string, { count: number; fee: number; bytes: number }> = {};
+  const rows: ChannelSnapRow[] = [];
   for (const [addr, snaps] of Object.entries(sc)) {
     const listed = LISTED.has(addr);
     let count = 0,
@@ -78,6 +80,20 @@ async function fetchExact(ordinal: number): Promise<SnapshotExact> {
       totalFee += f;
       if (listed) listedFee += f;
       else unlistedFee += f;
+
+      const decoded = await decodeChannelContent(s?.value?.content);
+      rows.push({
+        metaId: addr,
+        ordinal: decoded?.ordinal ?? 0,
+        decoded: !!decoded,
+        fee: f,
+        bytes,
+        signers: decoded?.signers ?? [],
+        blocks: decoded?.blocks ?? 0,
+        hasState: decoded?.hasState ?? false,
+        stateBytes: decoded?.stateBytes ?? 0,
+        stateProof: decoded?.stateProof ?? null,
+      });
     }
     // Per-metagraph size (bytes) alongside count + fee — the snapshot card reveals it as KB on the
     // selected/expanded row. Measured from content byte length, same as the total (not fee-derived).
@@ -97,6 +113,7 @@ async function fetchExact(ordinal: number): Promise<SnapshotExact> {
     listedCount,
     unlistedCount,
     perMeta,
+    rows,
   };
 }
 
@@ -121,3 +138,4 @@ export async function GET(_req: Request, ctx: { params: Promise<{ ordinal: strin
     return NextResponse.json({ available: false, ordinal: n }, { status: 404 });
   }
 }
+

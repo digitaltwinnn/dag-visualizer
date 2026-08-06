@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { LADDERS, type FocusLevel } from "@/src/engine/domain/focusLadder";
 import { detailsCards, type RailManifestState } from "@/components/railCards";
+import { LEDGER_LAYERS } from "@/src/data/ledgerLayers";
 
 // THE LADDER↔RAIL CONTRACT (spec Part 6): every committable ladder rung has a right-rail
 // facts slot — a future rung cannot land without deciding its card. Exemptions must be
@@ -47,4 +48,14 @@ describe("ladder↔rail boundary — every rung has a facts slot", () => {
       }
     });
   }
+});
+
+// Task 18 — the explorer's floors-and-rails vocabulary: LEDGER_LAYERS' `level` field IS the
+// floor/rail split the panel groups its rows by (rail = the four node layers, "1"/"2" = the
+// two snapshot floors). Confirms the contract before touching LedgerPanel's rendering.
+it("the ledger explorer still browses every node layer, now as rails", () => {
+  const rails = LEDGER_LAYERS.filter((l) => l.level === "rail").map((l) => l.id).sort();
+  expect(rails).toEqual(["hypl0", "hypl1", "ml0", "ml1"]);
+  const floors = LEDGER_LAYERS.filter((l) => l.level !== "rail").map((l) => l.id).sort();
+  expect(floors).toEqual(["gl0", "msnap"]);
 });

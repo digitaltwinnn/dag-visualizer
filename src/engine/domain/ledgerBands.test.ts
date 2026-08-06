@@ -1,0 +1,99 @@
+import { describe, it, expect } from "vitest";
+import {
+  UNLISTED_KEY, makeBarSpec, fillBarSpec, ribbonQuad, RIBBON_LANE_HALF,
+  type RibbonQuad,
+} from "./ledgerBands";
+import { BAR_Z0, BAR_MAX_W, BAR_MIN_W, BYTE_SCALE_KB, LANE_HALF_Z } from "./ledgerLayout";
+import { METAGRAPHS } from "../config";
+
+const KB = 1024;
+const ORDER = METAGRAPHS.map((m) => m.id);
+const A = ORDER[0], B = ORDER[1];
+
+describe("fillBarSpec", () => {
+  it("renders an unmeasured tick at minimum width with no bands", () => {
+    const s = fillBarSpec(makeBarSpec(), null, ORDER, 4);
+    expect(s.measured).toBe(false);
+    expect(s.width).toBeCloseTo(BAR_MIN_W, 6);
+    expect(s.bandCount).toBe(0);
+    expect(s.anchored).toBe(4);
+    expect(s.kb).toBe(0);
+  });
+
+  it("renders a measured tick that anchored nothing as a minimum-width seam", () => {
+    const s = fillBarSpec(makeBarSpec(), new Map(), ORDER, 0);
+    expect(s.measured).toBe(true);
+    expect(s.width).toBeCloseTo(BAR_MIN_W, 6);
+    expect(s.bandCount).toBe(0);
+  });
+
+  it("scales width against the fixed reference and never below the seam", () => {
+    const half = fillBarSpec(makeBarSpec(), new Map([[A, (BYTE_SCALE_KB / 2) * KB]]), ORDER, 1);
+    expect(half.width).toBeCloseTo(BAR_MAX_W / 2, 4);
+    expect(half.clipped).toBe(false);
+    expect(half.overflow).toBe(1);
+    const tiny = fillBarSpec(makeBarSpec(), new Map([[A, 1]]), ORDER, 1);
+    expect(tiny.width).toBeCloseTo(BAR_MIN_W, 6);
+  });
+
+  it("clips an over-reference tick and states the overflow multiplier", () => {
+    const s = fillBarSpec(makeBarSpec(), new Map([[A, BYTE_SCALE_KB * 12 * KB]]), ORDER, 40);
+    expect(s.width).toBeCloseTo(BAR_MAX_W, 6);
+    expect(s.clipped).toBe(true);
+    expect(s.overflow).toBeCloseTo(12, 3);
+    expect(s.kb).toBeCloseTo(BYTE_SCALE_KB * 12, 3);
+  });
+
+  it("lays bands proportionally, contiguously, in lane order from BAR_Z0", () => {
+    const s = fillBarSpec(
+      makeBarSpec(),
+      new Map([[B, 3 * KB], [A, 1 * KB]]), // insertion order deliberately not lane order
+      ORDER,
+      2,
+    );
+    expect(s.bandCount).toBe(2);
+    expect(s.bands[0].key).toBe(A);
+    expect(s.bands[1].key).toBe(B);
+    expect(s.bands[0].z0).toBeCloseTo(BAR_Z0, 6);
+    expect(s.bands[0].z1).toBeCloseTo(s.bands[1].z0, 6);
+    expect(s.bands[1].z1).toBeCloseTo(BAR_Z0 + s.width, 6);
+    // 1:3 of the width
+    expect(s.bands[0].z1 - s.bands[0].z0).toBeCloseTo(s.width / 4, 5);
+  });
+
+  it("puts unlisted bytes in a neutral band at the end", () => {
+    const s = fillBarSpec(makeBarSpec(), new Map([[A, KB], [UNLISTED_KEY, KB]]), ORDER, 2);
+    expect(s.bandCount).toBe(2);
+    expect(s.bands[1].key).toBe(UNLISTED_KEY);
+    expect(s.bands[1].z1).toBeCloseTo(BAR_Z0 + s.width, 6);
+  });
+
+  it("reuses the same spec object and array entries across fills (event-time only)", () => {
+    const s = makeBarSpec();
+    const bands = s.bands;
+    const first = bands[0];
+    fillBarSpec(s, new Map([[A, KB], [B, KB]]), ORDER, 2);
+    fillBarSpec(s, new Map([[A, KB]]), ORDER, 1);
+    expect(s.bands).toBe(bands);
+    expect(s.bands[0]).toBe(first);
+    expect(s.bandCount).toBe(1);
+  });
+});
+
+describe("ribbonQuad", () => {
+  it("tapers from the lane's fixed footprint onto the band's own span", () => {
+    const band = { key: A, z0: -4, z1: 2, bytes: 10 };
+    const out: RibbonQuad = { topZ0: 0, topZ1: 0, botZ0: 0, botZ1: 0 };
+    ribbonQuad(5, RIBBON_LANE_HALF, band, out);
+    expect(out.topZ0).toBeCloseTo(5 - RIBBON_LANE_HALF, 6);
+    expect(out.topZ1).toBeCloseTo(5 + RIBBON_LANE_HALF, 6);
+    expect(out.botZ0).toBe(-4);
+    expect(out.botZ1).toBe(2);
+    expect(out).toBe(ribbonQuad(5, RIBBON_LANE_HALF, band, out));
+  });
+
+  it("keeps the lane footprint inside the field", () => {
+    expect(RIBBON_LANE_HALF).toBeGreaterThan(0);
+    expect(RIBBON_LANE_HALF).toBeLessThan(LANE_HALF_Z);
+  });
+});

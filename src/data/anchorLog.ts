@@ -1,6 +1,21 @@
 import type { MetaSnapRecord } from "@/src/data/api";
 import type { GlobalSnapshot } from "@/src/data/types";
 
+/** The metagraph snapshots one metagraph anchored into ONE global tick, oldest first.
+ *  This is what makes a ledger tile identifiable without a fetch (spec §6.1): the 4s poll already
+ *  stamps every metagraph snapshot with the timestamp of the global it anchored into, so the tile
+ *  the upper floor draws can name its own snapshot. A tick older than the polled buffer yields an
+ *  empty list — an ANONYMOUS tile: drawn, because it happened, but not pickable. */
+export function snapsAtTick(
+  metaSnaps: ReadonlyMap<string, MetaSnapRecord[]>,
+  metaId: string,
+  ts: string,
+): MetaSnapRecord[] {
+  const recs = metaSnaps.get(metaId);
+  if (!recs) return [];
+  return recs.filter((r) => r.ts === ts);
+}
+
 // One row of the ledger data table (spec 2026-08-01): a single METAGRAPH snapshot, joined to
 // the global tick it anchored into (the record's ts IS the anchoring global timestamp — the
 // exact join api.ts's anchorIndex uses). Pure over the NetworkData buffers so it's testable;

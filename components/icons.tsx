@@ -9,6 +9,7 @@ import {
   Info,
   Telescope,
   Box,
+  Boxes,
   MapPin,
   Server,
   Component,
@@ -60,6 +61,11 @@ export const SNAPSHOT_ICON: LucideIcon = Box;
 // EXPLORE_ICON: dedicated non-view marks get a constant here, view subjects borrow VIEW_ICONS.
 export const LAYER_ICON: LucideIcon = Layers2;
 
+// A metagraph SNAPSHOT's mark (spec 2026-08-04 — a tile on the ledger's upper floor, its own card
+// slot): a metagraph snapshot is one of the many sealed states a single global tick carries, so it
+// wears the plural cube — distinct from SNAPSHOT_ICON (the ONE global block it anchors into).
+export const METASNAP_ICON: LucideIcon = Boxes;
+
 // The COUNTRY drill's mark (the geo focus ladder's country rung — card head, ghost, dock tray):
 // a place pin — distinct from VIEW_ICONS.geo (the whole globe) and the node's Globe mark.
 export const COUNTRY_ICON: LucideIcon = MapPin;
@@ -91,6 +97,8 @@ export function iconForPick(
   switch (kind) {
     case "snapshot":
       return SNAPSHOT_ICON; // the block, not the whole-stack view mark (see its constant above)
+    case "metaSnap":
+      return METASNAP_ICON; // a metagraph snapshot tile (see its constant above)
     case "layer":
       return LAYER_ICON; // dedicated mark (see its constant above) — not a view subject
     case "country":

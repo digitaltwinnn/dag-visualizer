@@ -59,4 +59,9 @@ describe("selection-write boundary (components → pickActions table → applyCl
       expect(existsSync(join(COMPONENTS, name)), `${name} vanished — drop it from ALLOW`).toBe(true);
     }
   });
+
+  it("the channel state panel reads the store and never writes a selection", () => {
+    const src = readFileSync("components/datasection/ChannelStatePanel.tsx", "utf8");
+    expect(src).not.toMatch(/set(Inspect|Snap|MetaSnap|Layer|Filter|Country|Cohort|Composition)\(/);
+  });
 });

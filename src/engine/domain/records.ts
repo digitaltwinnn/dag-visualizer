@@ -67,6 +67,9 @@ export interface MetaNodeRecord {
    *  this axis (the offset is spun around it each frame; the hoop is a full circle so it stays on it). */
   ringAxis: THREE.Vector3;
   ledgerPos: THREE.Vector3;
+  /** A hybrid MACHINE produces one record per layer, but the ledger's rails show each machine
+   *  ONCE (spec §4.4) — the non-primary record is hidden there, mirroring ValidatorRecord. */
+  ledgerHide: boolean;
   geoPrimary: boolean;
   nodeId: string;
   hyperPos: THREE.Vector3;

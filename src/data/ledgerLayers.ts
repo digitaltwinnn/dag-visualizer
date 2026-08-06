@@ -2,8 +2,9 @@
 // vocabulary as the geometry (src/engine/domain/ledgerLayout.ts LAYER_GEOM) and the scene's pick
 // descriptors. UI copy lives HERE (the data/UI side), never in the engine: a `layer` pick carries
 // only its `layerId`, and every surface that shows words (the Snapshots·Explore panel rows, the
-// layer card, the hover tooltip) resolves them through this table. Ordered top→bottom (the panel
-// renders this order).
+// layer card, the hover tooltip) resolves them through this table. Its ORDER mirrors LAYER_GEOM's
+// (a test pins the two together): top→bottom through the chamber, each floor preceded by the rails
+// that feed it.
 //
 // VOCABULARY (user, 2026-08-01): user-facing copy says the stack ANCHORS state — "settlement" is
 // reserved for the DAG a snapshot actually pays (the snapshot card's fee), because this app also
@@ -15,20 +16,27 @@ export interface LedgerLayerCopy {
   id: LedgerLayerId;
   name: string;
   desc: string;
-  /** STACK LEVEL, counting up from the base ledger (Global snapshots = 1). The split
-   *  hypergraph plane is ONE physical level with SUB-levels: L0 = 2.1, L1 = 2.2 (user scheme).
+  /** STACK LEVEL, counting up from the base ledger. Only the two SNAPSHOT layers are floors now
+   *  (global = "1", metagraph = "2"); the four NODE layers ride as rails on the floor they serve
+   *  and carry the literal level `"rail"` instead of a digit — they are not a storey of their own.
    *  Shown as the panel rows' badge + the 3D floor labels' digit box — display copy, so it
    *  lives here with the names. */
   level: string;
 }
 
 export const LEDGER_LAYERS: LedgerLayerCopy[] = [
-  { id: "ml1", level: "5", name: "Metagraph L1", desc: "Currency-L1 (wallet transactions) and data-L1 (producer updates) validate incoming work into blocks." },
-  { id: "ml0", level: "4", name: "Metagraph L0", desc: "Collects those L1 blocks into the metagraph's snapshot." },
-  { id: "msnap", level: "3", name: "Metagraph snapshots", desc: "Each metagraph's ledger output — they anchor into a global snapshot." },
-  { id: "hypl0", level: "2.1", name: "Hypergraph L0", desc: "The Global L0 validators that produce the global snapshot." },
-  { id: "hypl1", level: "2.2", name: "Hypergraph L1", desc: "The native $DAG currency — its own lane beside L0." },
-  { id: "gl0", level: "1", name: "Global snapshots", desc: "The base ledger: where every metagraph snapshot anchors." },
+  { id: "ml1", level: "rail", name: "Metagraph L1",
+    desc: "The machines that take in transactions and data updates for a metagraph and hand them to its L0." },
+  { id: "ml0", level: "rail", name: "Metagraph L0",
+    desc: "The machines that reach consensus for a metagraph and produce its snapshots." },
+  { id: "msnap", level: "2", name: "Metagraph snapshots",
+    desc: "Each metagraph seals its own state on its own cadence, in its own lane. These are the snapshots waiting to be anchored." },
+  { id: "hypl0", level: "rail", name: "Hypergraph L0",
+    desc: "The DAG's validators, reaching global consensus and producing the base ledger." },
+  { id: "hypl1", level: "rail", name: "Hypergraph L1",
+    desc: "The DAG's own transaction layer — the machines that accept $DAG transfers." },
+  { id: "gl0", level: "1", name: "Global snapshots",
+    desc: "The base ledger. Every few seconds one global snapshot anchors the state every metagraph handed up, and its width here is the bytes it carried." },
 ];
 
 export const ledgerLayerById = (id: string): LedgerLayerCopy | undefined =>
