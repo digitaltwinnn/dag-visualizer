@@ -2,7 +2,7 @@ import * as THREE from "three";
 import Stats from "stats.js";
 import { useStore, type Mode } from "@/src/store/store";
 import { applyClickActions } from "@/src/store/applyClickActions";
-import { metagraphById, initNetwork, getNetwork, getAnchor, DEFAULT_META_COLOR } from "@/src/data/network";
+import { metagraphById, initNetwork, getNetwork, getAnchor, DEFAULT_META_COLOR, resolveSignerIps } from "@/src/data/network";
 import { hoverKeyOf, tooltipSubject } from "@/src/data/hoverSubject";
 import { identityMap, identitySceneHex } from "@/src/palette/identity";
 import { createScene, type SceneCtx } from "./scene/SceneContext";
@@ -364,17 +364,20 @@ export class Engine {
           }
         }
         // spec §5.3 — a selected metagraph snapshot lights the chips that SIGNED it on the ml0
-        // rail (the pairing back is free: chips write hoverNodeId like any other node). Signers are
-        // node ids; the shallow exact row carries them too, so the glow lands before the deep
-        // fetch resolves and simply sharpens after.
-        if (st.metaSnap !== prev.metaSnap || st.metaSnapDeep !== prev.metaSnapDeep) {
+        // rail (the pairing back is free: chips write hoverNodeId like any other node). Signers
+        // are truncated node-id prefixes (decodeChannel.SIGNER_LEN); the shallow exact row
+        // carries them too, so the glow lands before the deep fetch resolves and simply sharpens
+        // after. The scene keys metagraph nodes by IP, not id (see resolveSignerIps), so the
+        // prefixes are resolved against the live metaList before reaching the glow set.
+        if (st.metaSnap !== prev.metaSnap || st.metaSnapDeep !== prev.metaSnapDeep || st.metaList !== prev.metaList) {
           const sel = st.metaSnap;
           if (!sel) this.globe.setSignerIds(null);
           else {
             const deep = st.metaSnapDeep[metaSnapDeepKey(sel.globalOrdinal, sel.metaId)];
             const ex = st.snapshotExact[sel.globalOrdinal];
             const row = ex?.rows?.find((r) => r.metaId === sel.metaId && r.ordinal === sel.ordinal);
-            this.globe.setSignerIds(deep?.signers ?? row?.signers ?? null);
+            const signers = deep?.signers ?? row?.signers ?? null;
+            this.globe.setSignerIds(resolveSignerIps(st.metaList, sel.metaId, signers));
           }
         }
         // Filter-chip hover: PREVIEW that selection's dim in any view (same per-view effect as the

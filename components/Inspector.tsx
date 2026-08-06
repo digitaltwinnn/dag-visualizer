@@ -23,6 +23,7 @@ import { useLadderFocus } from "@/components/useLadderFocus";
 import { useTrayActives } from "@/components/useTrayActives";
 import { countryToggleActions, cohortToggleActions, compositionToggleActions, clearAllActions } from "@/src/engine/domain/pickActions";
 import { CountryTitle, CountryCard, ProviderTitle, ProviderCard, ProviderAside, CompositionTitle, CompositionCard, CompositionAside } from "@/components/inspector/cards";
+import MetaSnapPane from "@/components/inspector/MetaSnapPane";
 import type { TabSignal } from "@/components/RailDock";
 import type { PickDescriptor } from "@/src/data/types";
 import type { Mode } from "@/src/store/store";
@@ -267,6 +268,7 @@ function CompositionPane({ sel, onClose, collapsed, onToggle }: { sel: Compositi
 // same single source of truth the dock trays read.
 const GHOST_EYEBROW: Record<string, string> = {
   context: "Metagraph", country: "Country", cohort: "Provider", composition: "Composition", node: "Node", snap: "Snapshot", layer: "Layer",
+  metaSnap: "Metagraph snapshot",
 };
 export function GhostCard({ card }: { card: RailCard }) {
   const Icon = card.icon;
@@ -346,6 +348,7 @@ export default function Inspector() {
   const inspect = useStore((s) => s.inspect);
   const snap = useStore((s) => s.snap);
   const layer = useStore((s) => s.layer);
+  const metaSnap = useStore((s) => s.metaSnap);
   const country = useStore((s) => s.country);
   const cohort = useStore((s) => s.cohort);
   const composition = useStore((s) => s.composition);
@@ -369,7 +372,7 @@ export default function Inspector() {
   const selNodes = useStore((s) => s.selNodes);
   const filterCfg = metagraphById(filter);
   const manifest = detailsCards({
-    mode, filter, inspect, snap, layer, country, cohort, composition,
+    mode, filter, inspect, snap, layer, country, cohort, composition, metaSnap,
     selNodesCount: selNodes.length,
     filterLabel: filterCfg ? filterCfg.ticker || filterCfg.name : null,
   });
@@ -409,6 +412,7 @@ export default function Inspector() {
     inspect ? hoverKeyOf(inspect) ?? "" : "",
     layer?.layerId ?? "",
     snap?.data.ordinal ?? "",
+    metaSnap ? `${metaSnap.metaId}:${metaSnap.ordinal}` : "",
   ].join("§");
   const lastSelection = useRef(selectionKey);
   useEffect(() => {
@@ -459,6 +463,11 @@ export default function Inspector() {
     ) : null,
     layer: layer ? (
       <CardPane key="layer" pick={layer} eyebrow="Layer" onClose={() => applyClickActions([{ kind: "layer", pick: null }])} {...cx("layer")} />
+    ) : null,
+    // The metagraph-snapshot tile: a card slot with no ladder rung (spec §7.1), so its × just
+    // clears its own channel — there is no coarser rung for it to step back to.
+    metaSnap: metaSnap ? (
+      <MetaSnapPane key="metaSnap" onClose={() => applyClickActions([{ kind: "metaSnap", sel: null }])} {...cx("metaSnap")} />
     ) : null,
   };
 

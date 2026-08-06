@@ -2,7 +2,7 @@ import type { LucideIcon } from "lucide-react";
 import { ABOUT_ICON, EXPLORE_ICON, iconForPick } from "@/components/icons";
 import { hoverKeyOf } from "@/src/data/hoverSubject";
 import type { Mode } from "@/src/store/store";
-import type { PickDescriptor } from "@/src/data/types";
+import type { PickDescriptor, MetaSnapSel } from "@/src/data/types";
 // LADDERS is plain DATA (the domain focus-ladder rung tables) — importing it keeps this module
 // data-only; CohortSel rides along type-only (the store mirrors the same import).
 import { LADDERS, type FocusLevel, type CohortSel, type CompositionSel } from "@/src/engine/domain/focusLadder";
@@ -23,7 +23,7 @@ import { LADDERS, type FocusLevel, type CohortSel, type CompositionSel } from "@
 // Hue + active-flag stay with the tray builders (per-rail presentation), not here.
 // ─────────────────────────────────────────────────────────────────────────────────────────────
 
-export type RailCardKind = "about" | "tool" | "context" | "country" | "cohort" | "composition" | "node" | "snap" | "layer";
+export type RailCardKind = "about" | "tool" | "context" | "metaSnap" | "country" | "cohort" | "composition" | "node" | "snap" | "layer";
 
 // ── The rail LADDER lane (Inspector's descent spine, variant-A redesign 2026-07-19) ──────────
 // Which facts-rail slots are FOCUS-LADDER rungs in this view, in DISPLAY order (coarsest→finest,
@@ -105,6 +105,10 @@ export interface RailManifestState {
   cohort: CohortSel | null;
   /** The committed composition group — hyper's rung between a network and a node. */
   composition: CompositionSel | null;
+  /** The selected metagraph-snapshot TILE — ledger's own card slot (spec 2026-08-04), not a
+   *  ladder rung. Optional: the ladder derivation (`LadderState`) and its callers never carry
+   *  this field, so `detailsCards` treats an absent key the same as `null`. */
+  metaSnap?: MetaSnapSel | null;
 }
 
 const isNodePick = (p: PickDescriptor | null): boolean =>
@@ -181,6 +185,11 @@ function cohortHint(s: RailManifestState): string | null {
 function compositionHint(s: RailManifestState): string | null {
   return s.mode === "hyper" ? "Open a make-up group under a network." : null;
 }
+// A metagraph snapshot is a ledger-only card SLOT (spec 2026-08-04) — not a ladder rung, so it
+// has no ancestor row to name; the route is straight to the 3D tile.
+function metaSnapHint(s: RailManifestState): string | null {
+  return s.mode === "ledger" ? "Click a tile under a lane." : null;
+}
 
 // RIGHT rail (Details): FIXED slots in a stable order — the Context dossier, then country,
 // cohort, composition, node, snapshot, layer (coarse→fine, matching the focus ladders; snapshot/
@@ -199,6 +208,14 @@ export function detailsCards(s: RailManifestState): RailCard[] {
     // filter the app sets ("dag" + real metagraph ids), null for "all".
     present: s.filter !== "all",
     hint: contextHint(s),
+  };
+  const metaSnap: RailCard = {
+    id: "metaSnap",
+    kind: "metaSnap",
+    icon: iconForPick("metaSnap"),
+    subjectKey: s.metaSnap ? `${s.metaSnap.metaId}:${s.metaSnap.ordinal}` : null,
+    present: !!s.metaSnap,
+    hint: metaSnapHint(s),
   };
   const country: RailCard = {
     id: "country",
@@ -248,5 +265,5 @@ export function detailsCards(s: RailManifestState): RailCard[] {
     present: !!s.layer,
     hint: layerHint(s),
   };
-  return [context, country, cohort, composition, node, snap, layer];
+  return [context, metaSnap, country, cohort, composition, node, snap, layer];
 }
