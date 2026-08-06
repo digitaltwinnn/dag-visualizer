@@ -328,11 +328,13 @@ export class Engine {
           this.ledger.setSelected(st.hoverSnapOrd ?? st.snap?.data?.ordinal ?? null);
         }
         // Filter-chip hover: PREVIEW that selection's dim in any view (same per-view effect as the
-        // real filter), without committing it. null restores the committed filter.
+        // real filter), without committing it. null restores the committed filter. In the ledger
+        // the preview is dim-ONLY — `setFilter` there also rearranges the lane field, which a hover
+        // must never do, so the hover has its own entry point.
         if (st.hoverFilter !== prev.hoverFilter) {
           this._hoverFilter = st.hoverFilter;
           this.globe.setHoverFilter(st.hoverFilter);
-          this.ledger.setFilter(st.hoverFilter ?? this.filter);
+          this.ledger.setHoverFilter(st.hoverFilter);
         }
         // Geo explorer list-row hover → glow that node's shells on the globe (same as a 3D hover).
         if (st.hoverNodeId !== prev.hoverNodeId) this.globe.setHoverNode(st.hoverNodeId);

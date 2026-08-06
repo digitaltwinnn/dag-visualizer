@@ -3,27 +3,25 @@
 // Layer display COPY (names/descriptions) is deliberately NOT here — it lives UI-side in
 // src/data/ledgerLayers.ts; this module owns only geometry.
 //
-// The view is a 3D stack of transparent wireframe FLOORS (one per layer) on Y, viewed from an
-// angle. Each metagraph gets its own Z-LANE; its snapshot blocks lead at x=0 and trail LEFT (-X)
-// along the lane (same direction + spacing as the global chain), so a metagraph block and the
-// global block it anchored share an X and are linked. The factual flow (Constellation docs):
-// metagraph L1 (cl1+dl1) → blocks → metagraph L0 → metagraph snapshots → Global L0; DAG L1 → $DAG
-// blocks into the Global L0 snapshot (the global snapshot IS the $DAG ledger's L0). The floor
-// heights are a LITERAL "what sits on what" stack (top→bottom):
-//   rowML1  metagraph L1 nodes — cL1 (currency-L1: wallet TRANSACTIONS) + dL1 (data-L1: producer
-//     DataUpdates) — the top of the visible stack (external producers are not drawn) ·
-//   rowML0  metagraph L0 nodes (collect L1 blocks → the snapshot) ·
-//   rowMSnap  METAGRAPH SNAPSHOTS — the metagraph L0's ledger output ·
-//   rowHypL0  hypergraph L0 nodes — the global validators (the anchor line threads through their
-//     cluster). This floor is CUT along Z (HYP_SPLIT below): the 2/3 (+Z/centre) is hypergraph L0;
-//     the −Z 1/3 is a reserved lane for rowDAGL1 (hypergraph L1 — native $DAG currency), at the
-//     SAME height ·
-//   rowGL0  GLOBAL SNAPSHOTS — the hypergraph L0's ledger output (the base settlement layer).
-// NODES sit directly ABOVE the SNAPSHOT they produce (metagraph L0 → metagraph snapshot;
-// hypergraph L0 → global snapshot); DAG L1 is a peer of hypergraph L0 (its own −Z third of that
-// plane), both feeding down into the global snapshot. The X axis (time / trailing) is owned by
-// LedgerView (SLOT_SP); this module owns the Z lane geometry + the row heights, shared by
-// HyperView, Globe and LedgerView.
+// The view is a TWO-FLOOR chamber (redesign 2026-08-04): only the two SNAPSHOT layers get a glass
+// plane, and the four NODE layers ride as RAILS on the front edge of the floor they serve (see
+// ledgerRails.ts). Each metagraph gets its own Z-LANE on the upper floor; its snapshot tiles lead
+// at x=0 and trail LEFT (-X), so a metagraph tile and the global bar it anchored into share an X.
+// The factual flow (Constellation docs): metagraph L1 (cl1+dl1) → blocks → metagraph L0 → metagraph
+// snapshots → Global L0; DAG L1 → $DAG blocks into the Global L0 snapshot (the global snapshot IS
+// the $DAG ledger's L0). The two floors, top→bottom:
+//   rowMSnap  METAGRAPH SNAPSHOTS — the metagraph L0's ledger output. Its rails carry the metagraph
+//     L1 + L0 machines (ml1 / ml0) ·
+//   rowGL0  GLOBAL SNAPSHOTS — the hypergraph L0's ledger output (the base ledger), drawn as the
+//     BYTE BAR whose width is the bytes the tick carried. Its rails carry the hypergraph L1 + L0
+//     machines (hypl1 / hypl0).
+// NODES therefore still sit with the SNAPSHOT they produce, just on the floor's edge instead of a
+// plane of their own; RIBBONS run from a lane's tiles down to that metagraph's band in the bar.
+// The X axis (time / trailing) is owned by LedgerView (SLOT_SP); this module owns the Z lane
+// geometry, the floor heights and the rail/bar geometry, shared by HyperView, Globe and LedgerView.
+// (The retired seven-floor stack — rowML1/rowML0/rowHypL0/rowDAGL1 planes and the HYP_SPLIT cut —
+// left the geometry with Task 16; the row constants below stay only where something still reads
+// them.)
 
 import { METAGRAPHS } from "../config";
 import { hexCell } from "./nodeLayout";
@@ -53,34 +51,13 @@ export const LEDGER = {
   viewScale: 1.5,         // bigger in frame without moving the camera
 };
 
-// The hypergraph-L0 level's 2/3 + 1/3 split along Z (shared by LedgerView's panes and the
-// layer-focus camera): the seam sits at the 1/3 mark, a small gap separates the two sub-panes.
-const HYP_SEAM = -LEDGER.depth / 2 + LEDGER.depth / 3;
-const HYP_GAP = 3.5;
-export const HYP_SPLIT = {
-  gap: HYP_GAP,
-  l1Edge: HYP_SEAM - HYP_GAP / 2, // hypergraph-L1 pane's inner (+Z) edge
-  l0Edge: HYP_SEAM + HYP_GAP / 2, // hypergraph-L0 pane's inner (−Z) edge
-  l1Cz: (-LEDGER.depth / 2 + HYP_SEAM - HYP_GAP / 2) / 2, // −Z third centre
-  l0Cz: (HYP_SEAM + HYP_GAP / 2 + LEDGER.depth / 2) / 2,  // +Z 2/3 centre
-};
-
-// The settlement-stack layer ids — one per floor plane (the split hypergraph level contributes
-// two). Shared vocabulary between this geometry table, the scene's pick descriptors, the store's
-// layer pick, and the UI copy table (src/data/ledgerLayers.ts).
+// The settlement-stack layer ids — the six focus rungs. TWO of them are floors (the snapshot
+// layers); the other four are NODE layers, which the two-floor redesign renders as RAILS on the
+// front edge of the floor they serve (see ledgerRails.ts). Shared vocabulary between this geometry
+// table, the scene's pick descriptors, the store's layer pick, and the UI copy table
+// (src/data/ledgerLayers.ts). LAYER_GEOM itself lives at the foot of this module — it is derived
+// from the floor heights + rail geometry declared further down.
 export type LedgerLayerId = "ml1" | "ml0" | "msnap" | "hypl0" | "hypl1" | "gl0";
-
-// Per-layer GEOMETRY (height + the pane's lane-centre Z — non-zero only for the split hypergraph
-// panes; the layer-focus camera shifts laterally so the pane sits centred in frame). Ordered
-// top→bottom. Display copy lives in src/data/ledgerLayers.ts, keyed by the same ids.
-export const LAYER_GEOM: { id: LedgerLayerId; y: number; laneZ: number }[] = [
-  { id: "ml1", y: LEDGER.rowML1, laneZ: 0 },
-  { id: "ml0", y: LEDGER.rowML0, laneZ: 0 },
-  { id: "msnap", y: LEDGER.rowMSnap, laneZ: 0 },
-  { id: "hypl0", y: LEDGER.rowHypL0, laneZ: HYP_SPLIT.l0Cz },
-  { id: "hypl1", y: LEDGER.rowDAGL1, laneZ: HYP_SPLIT.l1Cz },
-  { id: "gl0", y: LEDGER.rowGL0, laneZ: 0 },
-];
 
 // The lead SITE (x,z) of metagraph `i` of `n` — its Z-LANE (a distinct depth), leading at x=0.
 // Shared by HyperView, Globe's node clusters and LedgerView so a metagraph's nodes, rings and
@@ -92,29 +69,20 @@ export function ledgerSite(i: number, n: number): { x: number; z: number } {
 }
 
 // The ring/cluster radius for a node group of `count` nodes — grows with count (so the ring fits
-// the dots) but is capped WELL INSIDE the station dial (DIAL_R below) so a big group's dots never
-// poke outside their dial.
+// the dots) but is capped WELL INSIDE its lane's Z step so a big group's dots never spill into the
+// neighbouring lane. (It used to be phrased against the station dial; the dials are retired.)
 export function clusterRadius(count: number): number {
   const laneGap = (LEDGER.depth * LANE_SPREAD) / Math.max(1, METAGRAPHS.length - 1); // = ledgerSite's Z step
   const cap = laneGap * 0.3;
   return Math.min(cap, 0.55 + Math.sqrt(Math.max(1, count)) * 0.3);
 }
 
-// The station DIAL radius — ONE fixed size for every metagraph regardless of node count (the
-// resting identity mark; the ledger's analog of the hypergraph hubs). Sized so neighbouring
-// lanes' dials keep clear spacing even with the tick tips (the dial geometry's ticks reach
-// 1.2× its radius): 2 × 0.38 × 1.2 = 0.912 of the lane gap, leaving ~9% air between dials.
-// The global L0 / DAG L1 clusters use the SAME dial (user, 2026-07-12 — one size in
-// design and code; with the honeycomb-stack spread their bigger fleets simply stack HIGHER
-// inside the same footprint; the old larger DIAL_R_GLOBAL + its dagCell disc are gone).
-export const DIAL_R = ((LEDGER.depth * LANE_SPREAD) / Math.max(1, METAGRAPHS.length - 1)) * 0.38;
-
 // Deterministic HONEYCOMB + STACK spread for a node cluster (user, 2026-07-12 — the old
-// golden-angle disc overlapped chips once a cluster outgrew its dial; this is geo's chip-stack
-// language laid flat on the floor): hex cells of `cellPitch` fill the dial spiralling out from
+// golden-angle disc overlapped chips once a cluster outgrew its footprint; this is geo's chip-stack
+// language laid flat on the floor): hex cells of `cellPitch` fill the footprint spiralling out from
 // the centre (nodeLayout.hexCell), and when the cells inside `radius` run out the layout goes
 // UP — `levelPitch` per level on Y, reusing the same cells — so every chip stays inside the
-// dial and nothing overlaps. All units are the caller's (pre-viewScale). No random jitter.
+// footprint and nothing overlaps. All units are the caller's (pre-viewScale). No random jitter.
 export function ledgerSpread(
   k: number,
   cnt: number,
@@ -123,7 +91,7 @@ export function ledgerSpread(
   levelPitch: number,
 ): { x: number; y: number; z: number } {
   if (cnt <= 1) return { x: 0, y: 0, z: 0 };
-  // How many spiral cells fit inside the dial (the centre cell always does). The spiral's
+  // How many spiral cells fit inside the footprint (the centre cell always does). The spiral's
   // per-ring distances aren't strictly monotonic, so stop at the FIRST cell that pokes out —
   // every used cell is provably inside.
   let capacity = 1;
@@ -223,4 +191,19 @@ export function laneSpan(i: number, n: number, committedIdx: number | null): Lan
   if (committedIdx === i) return { cz: 0, hz: LANE_HALF_Z, hidden: false };
   return { cz: ledgerSite(i, n).z, hz: LANE_HALF_Z / n, hidden: true };
 }
+
+// Per-layer GEOMETRY: the height the layer-focus camera aims at, plus `isRail` (a node layer living
+// on a rail, not a plane of its own). `laneZ` is 0 for every rung now — the split hypergraph panes
+// are gone, so nothing is laterally offset and the camera never shifts sideways for a layer.
+// Ordered top→bottom. Display copy lives in src/data/ledgerLayers.ts, keyed by the same ids.
+// (Declared HERE, at the foot of the module, because it reads FLOOR_Y/railY above — hoisting a
+// const initializer above them would hit the temporal dead zone at import time.)
+export const LAYER_GEOM: { id: LedgerLayerId; y: number; laneZ: number; isRail: boolean }[] = [
+  { id: "ml1", y: railY("meta", 0), laneZ: 0, isRail: true },
+  { id: "ml0", y: railY("meta", 0), laneZ: 0, isRail: true },
+  { id: "msnap", y: FLOOR_Y.msnap, laneZ: 0, isRail: false },
+  { id: "hypl0", y: railY("dag", 0), laneZ: 0, isRail: true },
+  { id: "hypl1", y: railY("dag", 0), laneZ: 0, isRail: true },
+  { id: "gl0", y: FLOOR_Y.gl0, laneZ: 0, isRail: false },
+];
 

@@ -1,4 +1,3 @@
-import * as THREE from "three";
 import { describe, it, expect } from "vitest";
 import {
   SLOT_SP,
@@ -6,18 +5,13 @@ import {
   BLOCK_SIZE,
   LANE_GAP_Z,
   slotFade,
-  curvePoint,
   anchorTiles,
   LedgerModel,
   LEAD_SETTLE_MS,
 } from "./ledgerModel";
 import { METAGRAPHS } from "../config";
-import { LEDGER, ledgerSite } from "./ledgerLayout";
+import { ledgerSite } from "./ledgerLayout";
 import type { GlobalSnapshot, Anchor } from "@/src/data/types";
-
-// LINK_VFRAC (js/ledger.js:49) — kept module-private in ledgerModel.ts (not part of the brief's
-// export list); hardcoded here same as the other domain tests hardcode source constants verbatim.
-const LINK_VFRAC = 0.55;
 
 function snap(ordinal: number, ts: string, count = 0): GlobalSnapshot {
   return { ordinal, timestamp: ts, hash: `h${ordinal}`, metagraphSnapshotCount: count };
@@ -72,45 +66,6 @@ describe("slotFade (js/ledger.js:53 verbatim)", () => {
   it("clamps to [0,1] outside the visible range", () => {
     expect(slotFade(0)).toBe(1);
     expect(slotFade(SLOT_N + 5)).toBe(0);
-  });
-});
-
-describe("curvePoint (js/ledger.js:66-74 verbatim)", () => {
-  it("is continuous across the t=LINK_VFRAC seam (straight-down segment meets the swing-in cubic)", () => {
-    const out = new THREE.Vector3();
-    const sx = 2.5, sz = -3.1, gx = 0;
-    curvePoint(LINK_VFRAC, sx, sz, gx, out);
-    expect(out.x).toBeCloseTo(sx, 10);
-    expect(out.y).toBeCloseTo(LEDGER.rowMSnap, 10);
-    expect(out.z).toBeCloseTo(sz, 10);
-
-    // just past the seam the point must be close to the seam value, not jump (the two branches'
-    // SLOPES need not match — only the position — so keep epsilon tight relative to the tolerance).
-    const after = new THREE.Vector3();
-    curvePoint(LINK_VFRAC + 0.0001, sx, sz, gx, after);
-    expect(after.distanceTo(out)).toBeLessThan(0.01);
-  });
-
-  it("lands exactly at (gx, LEDGER.rowGL0, 0) at t=1", () => {
-    const out = new THREE.Vector3();
-    curvePoint(1, 2.5, -3.1, 7.3, out);
-    expect(out.x).toBeCloseTo(7.3, 10);
-    expect(out.y).toBeCloseTo(LEDGER.rowGL0, 10);
-    expect(out.z).toBeCloseTo(0, 10);
-  });
-
-  it("starts straight down the column at t=0: (sx, LEDGER.rowML1, sz)", () => {
-    const out = new THREE.Vector3();
-    curvePoint(0, 2.5, -3.1, 7.3, out);
-    expect(out.x).toBeCloseTo(2.5, 10);
-    expect(out.y).toBeCloseTo(LEDGER.rowML1, 10);
-    expect(out.z).toBeCloseTo(-3.1, 10);
-  });
-
-  it("returns the same `out` reference it was given (no allocation)", () => {
-    const out = new THREE.Vector3();
-    const ret = curvePoint(0.2, 1, 1, 1, out);
-    expect(ret).toBe(out);
   });
 });
 

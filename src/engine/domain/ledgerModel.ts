@@ -30,9 +30,8 @@
 // next call that does carry anchor data. Kept verbatim below rather than "fixed" (the observable
 // behaviour must match js/ledger.js exactly since Task 13 will diff against it).
 
-import * as THREE from "three";
 import { METAGRAPHS } from "../config";
-import { LEDGER, ledgerSite } from "./ledgerLayout";
+import { ledgerSite } from "./ledgerLayout";
 import type { GlobalSnapshot, Anchor } from "@/src/data/types";
 
 export const SLOT_SP = 3.6; // js/ledger.js:41 — X spacing of one tick/slot
@@ -44,10 +43,6 @@ export const BLOCK_SIZE = 0.48; // max size of an individual metagraph-snapshot 
 // ledgerSite exactly as the source does (shared by the whole METAGRAPHS roster, not per-lane).
 export const LANE_GAP_Z = Math.abs(ledgerSite(1, METAGRAPHS.length).z - ledgerSite(0, METAGRAPHS.length).z);
 
-// js/ledger.js:49 — fraction of the anchor curve that drops straight down (MSnap->ML0) before the
-// cubic swing-in begins. Not exported (not part of the brief's export list) — only curvePoint uses it.
-const LINK_VFRAC = 0.55;
-
 // js/ledger.js:53 verbatim — recency fade: 1 at the freshest completed slot, 0 by the oldest visible.
 export const slotFade = (slot: number): number => Math.min(1, Math.max(0, 1 - (slot - 1) / (SLOT_N - 1)));
 
@@ -56,28 +51,6 @@ export const slotFade = (slot: number): number => Math.min(1, Math.max(0, 1 - (s
 // AnchoredTags uses for its FLOOR/COMPLETE gate. The BAR below does not settle: once the exact
 // read measures it, it is final.
 export const LEAD_SETTLE_MS = 7000;
-
-// js/ledger.js:56-58 verbatim — one component of a cubic bezier (p0->p1, controls c0,c1) at t.
-const cubic = (t: number, p0: number, c0: number, c1: number, p1: number): number => {
-  const u = 1 - t;
-  return u * u * u * p0 + 3 * u * u * t * c0 + 3 * u * t * t * c1 + t * t * t * p1;
-};
-
-// A point at parameter t on the LITERAL production->anchor curve, in the metagraph's lane (sx, sz):
-// straight DOWN the column from the metagraph L1 (top) through L0 to the metagraph snapshot tile for
-// t<LINK_VFRAC, then a cubic that swings to the lane CENTRE (z->0) by the hypergraph-L0 floor,
-// landing in the global block at (gx, LEDGER.rowGL0, 0). Fills the pre-allocated `out` in place.
-export function curvePoint(t: number, sx: number, sz: number, gx: number, out: THREE.Vector3): THREE.Vector3 {
-  const top = LEDGER.rowML1, snap = LEDGER.rowMSnap, ey = LEDGER.rowGL0;
-  if (t <= LINK_VFRAC) return out.set(sx, top + (snap - top) * (t / LINK_VFRAC), sz);
-  const u = (t - LINK_VFRAC) / (1 - LINK_VFRAC);
-  const dy = (snap - ey) * 0.5;
-  // Z reaches the lane CENTRE (0) BY the swing's midpoint — which is the hypergraph-L0 floor, since
-  // rowHypL0 == (rowMSnap+rowGL0)/2 — then holds at 0. So the link threads straight THROUGH the L0
-  // cluster's ring (0, rowHypL0, 0) instead of arriving there offset by half the lane width.
-  const z = u <= 0.5 ? cubic(u / 0.5, sz, sz, 0, 0) : 0;
-  return out.set(cubic(u, sx, sx, gx, gx), cubic(u, snap, snap - dy, ey + dy, ey), z);
-}
 
 export interface TileSpec {
   ox: number;
