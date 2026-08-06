@@ -33,6 +33,7 @@ import {
   FLOOR_Y,
   GUTTER_CZ,
   GUTTER_W,
+  LANE_HALF_Z,
   laneSpan,
   type RailGroup,
 } from "../../domain/ledgerLayout";
@@ -74,6 +75,13 @@ const PULSE_MAX = 220;
 const PULSE_STAGGER = 0.035;
 const META_TRAIL_MAX = 1500;
 const GUTTER_OP = 0.75;
+
+/** The lead row's "forming…" note: quieter than a floor label, and it eases rather than blinks. */
+const FORMING_OP = 0.6;
+const FORMING_EASE = 2.2;
+/** Just camera-side of the lead slot (x = 0), reading in from the +Z edge of the lane field. */
+const FORMING_X = 1.4;
+const FORMING_Z = LANE_HALF_Z + 8;
 
 const _dummy = new THREE.Object3D();
 const _col = new THREE.Color();
@@ -161,6 +169,10 @@ export class LedgerView implements SceneView {
   // ── the currency gutter (spec §4.5/§6.7)
   private _gutterLabel: THREE.Mesh | null = null;
   private _activity: Record<string, CurrencyActivity | null> = {};
+
+  // ── the lead row's honesty label: the newest tick's anchor count is still growing
+  private _formingLabel: THREE.Mesh | null = null;
+  private _formingW = 0;
 
   // ── stage light + fades
   private _spot: FocusSpot;
@@ -349,6 +361,15 @@ export class LedgerView implements SceneView {
       this.group.add(m);
       this._fades.register(m.material as THREE.MeshBasicMaterial, 1);
     }
+
+    // The lead row is annotated, not decorated: while the live tick's anchor count is still
+    // GROWING, say so. It reads out from the +Z edge of the lane field toward the lead slot's own
+    // tiles (x ≈ 0), so it can only ever be about that row. Opacity is driven per frame in
+    // _applyFloorAlpha (it rides the view alpha like every other piece of furniture), so it is
+    // deliberately NOT registered with the fade set.
+    this._formingLabel = this._makeLabel("", "forming…", FORMING_X, FLOOR_Y.msnap, FORMING_Z);
+    (this._formingLabel.material as THREE.MeshBasicMaterial).opacity = 0;
+    this.group.add(this._formingLabel);
   }
 
   /** A flat, edge-aligned label plane — the chamber's only text. A blank `level` = no digit box. */
@@ -458,6 +479,9 @@ export class LedgerView implements SceneView {
     if (this._gutterLabel)
       (this._gutterLabel.material as THREE.MeshBasicMaterial).opacity =
         GUTTER_OP * this._fades.alpha;
+    if (this._formingLabel)
+      (this._formingLabel.material as THREE.MeshBasicMaterial).opacity =
+        FORMING_OP * this._formingW * this._fades.alpha;
   }
 
   setSceneColors(map: Record<string, number>): void {
@@ -484,7 +508,10 @@ export class LedgerView implements SceneView {
   // ── data ─────────────────────────────────────────────────────────────────
 
   setData(snaps: GlobalSnapshot[], getAnchor: (ts: string) => Anchor | null) {
-    const latest = snaps[0];
+    // `globalSnapshots` is oldest→NEWEST, so the live tick is the LAST entry (LedgerModel.setData
+    // reads the same end). Reading snaps[0] pins _latest to the oldest tick, and `isNewTick` then
+    // never fires while the buffer is below cap — the pulse stagger would drift unbounded.
+    const latest = snaps[snaps.length - 1];
     if (!latest) return;
     const isNewTick = this._latest?.ordinal !== latest.ordinal;
     this._latest = latest;
@@ -703,6 +730,10 @@ export class LedgerView implements SceneView {
 
   update(dt: number) {
     this.t += dt;
+
+    // The lead row's honesty note eases in while the live tick's anchor count is still growing.
+    this._formingW +=
+      ((this.model.leadForming ? 1 : 0) - this._formingW) * Math.min(1, dt * FORMING_EASE);
 
     const spotGeom = this._spotLayerId
       ? LAYER_GEOM.find((l) => l.id === this._spotLayerId)
