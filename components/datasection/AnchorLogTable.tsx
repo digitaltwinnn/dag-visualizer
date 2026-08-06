@@ -4,8 +4,7 @@ import { useStore } from "@/src/store/store";
 import { useSnapshotFeed } from "@/components/useSnapshotFeed";
 import { getNetwork, metagraphById, filterAccent } from "@/src/data/network";
 import { buildAnchorLog } from "@/src/data/anchorLog";
-import { latestRelevant } from "@/src/data/follow";
-import { snapshotSelectActions } from "@/src/engine/domain/pickActions";
+import { metaSnapSelectActions } from "@/src/engine/domain/pickActions";
 import { applyClickActions } from "@/src/store/applyClickActions";
 import { fmtDag, fmtKB } from "@/src/util/format";
 import { relativeAge } from "@/src/util/relativeAge";
@@ -22,14 +21,16 @@ const MAX = POLL.maxSnapshots;
 // The ledger data table (spec 2026-08-01): the per-metagraph ANCHOR LOG — one row per anchored
 // metagraph snapshot in the retained window, finer-grained than the strip's per-tick bars.
 // Chronological by construction (newest tick first) — no sortable headers here; the roster
-// table is the sortable one. A row click selects the GLOBAL snapshot the row anchored into
-// (the metagraph snapshot itself is not a selectable subject) through the SAME tested builder
-// as a bar/tile click; selection happens silently — flip the RAW switch back to see the card.
+// table is the sortable one. A row click names its own METAGRAPH SNAPSHOT — the same subject a
+// tile click on the upper floor names — through the SAME tested `metaSnapSelectActions` builder
+// (Task 20): it already pins the global tick the row anchored into, so the row and a tile click
+// mean exactly the same thing.
 export default function AnchorLogTable() {
   useSnapshotFeed(MAX); // re-render driver: global + anchor events (the buffers below refresh)
   const filter = useStore((s) => s.filter);
   const live = useStore((s) => s.live);
   const snap = useStore((s) => s.snap);
+  const metaSnap = useStore((s) => s.metaSnap);
   const setHoverSnapOrd = useStore((s) => s.setHoverSnapOrd);
   const net = getNetwork();
   // Rebuilt per render on purpose: renders here are event-driven (a tick / an anchor fill every
@@ -47,9 +48,6 @@ export default function AnchorLogTable() {
       </p>
     );
 
-  // The live tip (re-)follows the heartbeat on click; anything older pins — the exact semantics
-  // of a strip bar / a 3D tile, because it is the same builder.
-  const liveOrd = latestRelevant("all")?.ordinal ?? null;
   const now = Date.now();
 
   return (
@@ -85,9 +83,10 @@ export default function AnchorLogTable() {
                 onMouseLeave={() => setHoverSnapOrd(null)}
                 onClick={() =>
                   applyClickActions(
-                    snapshotSelectActions(
+                    metaSnapSelectActions(
+                      { metaId: r.metaId, ordinal: r.ordinal, hash: r.hash, globalOrdinal: r.global.ordinal, ts: r.ts },
                       { kind: "snapshot", title: `Global snapshot #${r.global.ordinal}`, data: r.global },
-                      liveOrd === r.global.ordinal,
+                      { filter, metaSnap },
                     ),
                   )
                 }
