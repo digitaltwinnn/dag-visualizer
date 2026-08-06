@@ -85,7 +85,6 @@ interface SpinState {
 type MetaLayout = RouteMetagraph & {
   color: number;
   _anchor: ReturnType<typeof metaAnchor>;
-  _ledgerCol: number;
 };
 
 const geoOf = (pick: PickDescriptor): GeoInfo | undefined => ("geo" in pick ? pick.geo : undefined);
@@ -463,7 +462,6 @@ export class Globe implements GeoViewHost {
       const cfg = ci >= 0 ? METAGRAPHS[ci] : null;
       m.color = (this.sceneColors && this.sceneColors[m.id]) ?? (cfg ? cfg.color : DEFAULT_META_COLOR);
       m._anchor = metaAnchor(ci >= 0 ? ci : 0, n);
-      m._ledgerCol = ci >= 0 ? ci : 0; // column slot in the Snapshots view (config order)
     });
     this.metaList = withNodes;
 

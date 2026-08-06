@@ -296,13 +296,11 @@ export default function LedgerPanel() {
   // other explorers' cohort/composition groups. Keyed `floorId|metaId` so a stale key after a
   // filter/floor switch simply matches nothing.
   const [openCluster, setOpenCluster] = useState<string | null>(null);
-  // Which NODE floor is disclosed — mirrors `sel` (store.layer) but kept as its own fast local
-  // state so the first click opens the dropdown in the SAME frame it commits, instead of
-  // waiting a render for the store round-trip (that lag read as "closed" on the first click —
-  // the reported bug). `open` below is `on || openFloor === l.id`: whichever arrives first
-  // (the synchronous local set or the store's `on`) already renders open, and a floor committed
-  // from elsewhere (a 3D plane click, autoLayerForNode) is open purely via `on`, no extra wiring.
-  const [openFloor, setOpenFloor] = useState<string | null>(null);
+  // There is NO local "which floor is open" state: the COMMITTED layer (`sel`, store.layer) IS the
+  // disclosure — single-open by construction, the house idiom (hyper's composition group, geo's
+  // cohort). Deriving it is what keeps the panel truthful when the layer is cleared from anywhere
+  // else (a 3D plane click, "Clear all selections", a carried-node ancestry commit); the old local
+  // mirror kept a floor visually open after a clear.
 
   // The selected node, matched by IP **and** layer — copies GeoExplore's selIp/selLayer: one
   // machine can sit in both an L0 and L1 cluster (same IP, two rows).
@@ -312,15 +310,12 @@ export default function LedgerPanel() {
   const selLayer = selNode ? (selNode.kind === "metanode" ? selNode.node?.layer ?? null : selNode.kind) : null;
 
   // Rows run the SAME tested toggle as the scene's floor-plane click, through the shared
-  // executor — the panel and the 3D planes can't drift (see domain/pickActions). `openFloor`
-  // is set in the SAME call, synchronously, so the disclosure never lags the commit by a
-  // render: clicking an uncommitted node floor opens it, re-clicking the committed/open one
-  // clears + closes it (symmetric with the existing commit/clear toggle), and clicking any
-  // OTHER floor (node or snapshot) closes whatever was open — a single rule covers all three.
+  // executor — the panel and the 3D planes can't drift (see domain/pickActions). The commit IS
+  // the disclosure: clicking an uncommitted node floor commits + opens it, re-clicking the
+  // committed one clears + closes it, and clicking any OTHER floor closes whatever was open —
+  // all three fall out of `sel` being the single source, no second state to keep in step.
   const commit = (l: (typeof LAYERS)[number]) => {
-    const wasOn = sel === l.id;
     applyClickActions(layerToggleActions({ kind: "layer", layerId: l.id }, sel));
-    setOpenFloor(DISCLOSABLE_FLOORS.has(l.id) && !wasOn ? l.id : null);
   };
   // A node row's click runs the full-ancestry table with THIS floor as the ledger layer rung
   // (nodeSelectActions' ledgerLayerId) — so a browsed node commits the floor it was found on,
@@ -363,10 +358,10 @@ export default function LedgerPanel() {
     // are visible (the same buffer the disclosure below lists, newest first).
     const floorCount = isTickFloor ? snaps.length : rows.length + lanes.reduce((sum, x) => sum + x.count, 0);
     const hasContentAbove = clusters.length > 0 || (showValidatorRows && rows.length > 0);
-    // Open iff committed (as before) OR this panel just opened it locally — see
-    // `commit`'s comment. A floor committed from elsewhere (a 3D plane click,
-    // autoLayerForNode) is open purely via `on`, no extra plumbing needed.
-    const open = discloses && (on || openFloor === l.id);
+    // Open iff COMMITTED — the store's layer is the disclosure (see the note by `openCluster`).
+    // A floor committed from elsewhere (a 3D plane click, autoLayerForNode) opens the same way,
+    // and a cleared layer closes it, with no local state to fall out of sync.
+    const open = discloses && on;
     // Newest-first — the same chronological convention the raw layer's AnchorLogTable already
     // uses for the same kind of row (src/data/anchorLog.ts).
     const orderedSnaps = isTickFloor ? [...snaps].reverse() : [];

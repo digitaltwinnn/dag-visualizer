@@ -19,24 +19,19 @@
 // plane of their own; RIBBONS run from a lane's tiles down to that metagraph's band in the bar.
 // The X axis (time / trailing) is owned by LedgerView (SLOT_SP); this module owns the Z lane
 // geometry, the floor heights and the rail/bar geometry, shared by HyperView, Globe and LedgerView.
-// (The retired seven-floor stack — rowML1/rowML0/rowHypL0/rowDAGL1 planes and the HYP_SPLIT cut —
-// left the geometry with Task 16; the row constants below stay only where something still reads
-// them.)
+// (The retired seven-floor stack — its rowML1/rowML0/rowHypL0/rowDAGL1 planes and the HYP_SPLIT
+// cut — left the geometry with Task 16; their row constants are gone too, so the only heights
+// declared below are the two floors FLOOR_Y actually reads.)
 
 import { METAGRAPHS } from "../config";
 import { hexCell } from "./nodeLayout";
 
 export const LEDGER = {
   depth: 44,        // Z span the metagraph lanes spread over
-  rowML1: 16,       // metagraph L1 node floor (cL1 + dL1; validate producer updates into blocks)
-  rowML0: 9.25,     // metagraph L0 node floor (packages blocks into the snapshot)
   rowMSnap: 2.5,    // metagraph SNAPSHOTS floor (the metagraph L0's ledger output)
-  rowHypL0: -4.25,  // hypergraph L0 node floor — global validators; the anchor line passes through them
   rowGL0: -11,      // global snapshots floor (hypergraph L0's ledger output) — the base settlement layer
-  // DAG L1 (hypergraph L1) — native $DAG currency. Same HEIGHT as hypergraph L0, in its own −Z third
-  // of that plane (a plane cut 2/3 L0 + 1/3 L1). TODO: draw DAG L1 BLOCKS (global.blocks) flowing
-  // from this lane into the global snapshot.
-  rowDAGL1: -4.25,  // == rowHypL0 (shares the hypergraph-L0 level; its own −Z third of that plane)
+  // DAG L1 (hypergraph L1) — native $DAG currency — keeps its own −Z third of the lane field.
+  // TODO: draw DAG L1 BLOCKS (global.blocks) flowing from this lane into the global snapshot.
   dagLaneZ: -14.7,  // −Z centre of the reserved 1/3 (−depth/2 + depth/6) — where the DAG-L1 cluster sits
   dot: 0.55,        // node-sphere scale in this view — uniform for EVERY cluster (a 3-node metagraph's
                     // dot = a global-L0 dot; small groups get presence from the station DIAL, not dot size)

@@ -39,7 +39,7 @@ import {
 } from "../../domain/ledgerLayout";
 import type { SceneColors } from "../../sceneColors";
 import { LedgerModel, SLOT_SP, SLOT_N, LANE_GAP_Z, slotFade } from "../../domain/ledgerModel";
-import { makeBarSpec, fillBarSpec, type BarSpec } from "../../domain/ledgerBands";
+import { makeBarSpec, fillBarSpec, UNLISTED_KEY, type BarSpec } from "../../domain/ledgerBands";
 import type { RailKind } from "../../domain/ledgerRails";
 import type {
   GlobalSnapshot,
@@ -618,7 +618,14 @@ export class LedgerView implements SceneView {
   private _bytesByKey(ex: SnapshotExact): Map<string, number> {
     this._bytes.clear();
     // event-time: the exact read's own summed per-metagraph bytes (never a per-frame sum of rows).
-    for (const [id, v] of Object.entries(ex.perMeta)) this._bytes.set(id, v.bytes);
+    // `perMeta` is keyed by EVERY state-channel address — listed AND unlisted — but the bar only
+    // has lanes for the listed ones, so every non-lane address folds into UNLISTED_KEY (the
+    // aggregation `fillBarSpec` documents). Copying keys verbatim inflated the total while the
+    // unlisted band read 0, stretching the last listed band over bytes it never produced.
+    for (const [id, v] of Object.entries(ex.perMeta)) {
+      const key = this._laneOrder.includes(id) ? id : UNLISTED_KEY; // _laneOrder IS the band order
+      this._bytes.set(key, (this._bytes.get(key) ?? 0) + v.bytes);
+    }
     return this._bytes;
   }
 
@@ -842,7 +849,18 @@ export class LedgerView implements SceneView {
         i++;
       }
     }
-    if (i < this._pulses.length) this._pulses = this._pulses.filter((p) => p.t < 1); // event-time
+    if (i < this._pulses.length) {
+      // In-place compaction — the old `.filter(…)` allocated a fresh array on any frame where a
+      // pulse was skipped-but-alive (a stale ribbon index), not only when one expired. Drops
+      // exactly what the filter dropped: the pulses that finished; a skipped live one is retried.
+      let w = 0;
+      for (let r = 0; r < this._pulses.length; r++) {
+        const p = this._pulses[r];
+        if (p.t >= 1) continue;
+        this._pulses[w++] = p;
+      }
+      this._pulses.length = w;
+    }
     const prevDrawn = this._lastDrawn || 0;
     if (i < prevDrawn) {
       _dummy.scale.setScalar(0);

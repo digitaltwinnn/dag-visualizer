@@ -99,6 +99,8 @@ export class Ribbons {
 
   centreLine(row: 0 | 1, i: number, t: number, out: THREE.Vector3): THREE.Vector3 {
     const st = this._rows[row];
+    // Caller contract: bound the loop by ribbonCount(row) — an empty row has no quad to walk.
+    if (st.count === 0) return out;
     const q = st.quads[Math.min(i, st.count - 1)];
     const x = -st.slot * SLOT_SP;
     const topZ = (q.topZ0 + q.topZ1) / 2;
@@ -107,7 +109,14 @@ export class Ribbons {
   }
 
   setAlpha(a: number): void { this._alpha = a; }
-  setFilter(filter: string): void { this._filter = filter; }
+  /** The dim is baked into the VERTEX COLOURS, so a change has to rewrite the sheet — a hover
+   *  preview would otherwise leave the ribbons lit until the next tick rebuilt a row. */
+  setFilter(filter: string): void {
+    const next = filter || "all";
+    if (next === this._filter) return;
+    this._filter = next;
+    this._writeGeometry(); // event-time: a hover/commit transition, not a frame
+  }
 
   update(dt: number): void {
     const k = Math.min(1, dt * 5);

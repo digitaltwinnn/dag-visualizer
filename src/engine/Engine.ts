@@ -358,9 +358,12 @@ export class Engine {
         // reads it from the scene, and the view re-reads it on entry via _refreshLedger.
         if (st.snapshotExact !== prev.snapshotExact) {
           if (this.mode === "ledger") this.ledger.setExact(st.snapshotExact);
-          // event-time: one pass per landing exact read, over a ~30-entry record.
-          for (const [k, v] of Object.entries(st.snapshotExact)) {
-            if (prev.snapshotExact[Number(k)] === undefined) this._noteTickKb(v.totalSizeKB);
+          // event-time: one pass per landing exact read, over a ~30-entry record. Gated on the
+          // dev-only scale check itself (`_scaleWatchOn`) so production never walks the record.
+          if (this._scaleWatchOn()) {
+            for (const [k, v] of Object.entries(st.snapshotExact)) {
+              if (prev.snapshotExact[Number(k)] === undefined) this._noteTickKb(v.totalSizeKB);
+            }
           }
         }
         // spec §5.3 — a selected metagraph snapshot lights the chips that SIGNED it on the ml0
@@ -603,8 +606,13 @@ export class Engine {
    *  idiom as the config.COLORS ↔ CSS-token drift check. */
   private _kbSamples: number[] = [];
   private _warnedScale = false;
+  /** Whether the sampling is live at all — hoisted so the subscription can skip its whole
+   *  Object.entries walk in production (and once the warning has fired). */
+  private _scaleWatchOn(): boolean {
+    return process.env.NODE_ENV !== "production" && !this._warnedScale;
+  }
   private _noteTickKb(kb: number): void {
-    if (process.env.NODE_ENV === "production" || this._warnedScale) return;
+    if (!this._scaleWatchOn()) return;
     this._kbSamples.push(kb);
     if (this._kbSamples.length < 200) return;
     const sorted = [...this._kbSamples].sort((a, b) => a - b); // event-time: once per 200 ticks
@@ -1229,6 +1237,10 @@ export class Engine {
       // stand on), never mirrored here — so the camera can't frame a rail the chips didn't populate.
       const group: RailGroup = layerId === "ml0" || layerId === "ml1" ? "meta" : "dag";
       const kinds = this.globe.railKinds(group);
+      // Deliberate: `findIndex` frames the LEFTMOST rail this layer lights — for `ml1` that is the
+      // HYBRID rail, since a hybrid machine carries the L1 role too and reads as the layer's front.
+      // Deliberate: `Math.max(0, idx)` falls back to rail 0 when the layer lights none, so a layer
+      // whose chips haven't been built yet still frames the rail column instead of jumping to x=0.
       const idx = kinds.findIndex((k) => railLit(layerId, group, k));
       ledgerRailFraming(railX(Math.max(0, idx)) * LEDGER.viewScale, y, this._framingOut);
     } else {

@@ -35,7 +35,6 @@ interface Slot {
    *  measured tick that anchored nothing (bandCount === 0). Both are honest "no bytes to show"
    *  states, distinct from `measured` (which only tracks whether the exact read landed). */
   seam: boolean;
-  hot: boolean;
   keys: string[];
   used: number;
 }
@@ -75,7 +74,7 @@ export class ByteBar {
       this.group.add(outline);
       this._slots.push({
         ordinal: -1, bands, mats, outline, outMat,
-        measured: false, seam: true, hot: false, keys: [], used: 0,
+        measured: false, seam: true, keys: [], used: 0,
       });
     }
   }

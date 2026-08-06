@@ -6,10 +6,6 @@
 
 import * as THREE from "three";
 
-// The ledger group's uniform scale; rail X positions are handed in pre-scaled, this is the
-// stand-off nudge in the same units.
-const LEDGER_VIEW_SCALE = 1;
-
 export interface CameraFraming {
   pos: THREE.Vector3;
   target: THREE.Vector3;
@@ -152,9 +148,11 @@ export function ledgerFloorFraming(y: number, out: CameraFraming): void {
 
 // A RAIL focus pose (spec §5.1): rails run across Z at the front (+X) edge of their floor, so the
 // camera drops to their height and stands off in front, looking back along the field. The target
-// stays at z=0 so a long rail is framed centred rather than at one end.
+// stays at z=0 so a long rail is framed centred rather than at one end. `x` arrives PRE-SCALED by
+// the ledger group's view scale (the caller multiplies), so the stand-off nudge below is in the
+// same world units.
 export function ledgerRailFraming(x: number, y: number, out: CameraFraming): void {
-  out.pos.set(x * LEDGER_VIEW_SCALE + 2.5, y + 3.4, 16.5);
+  out.pos.set(x + 2.5, y + 3.4, 16.5);
   out.target.set(0, y, 0);
 }
 
