@@ -21,12 +21,13 @@ mode !== "ledger"`):
 - **Node geography** (`geo`, 3D) — a globe with every node at its real geolocation, a density
   travelling-packet connection arcs, and the country→nodes explorer (the old density heatmap +
   rings were removed entirely, 2026-07-09 — the honeycomb node stacks themselves show density).
-- **Snapshots** (`ledger`, 3D) — a built 3D "settlement chamber" (`scene/views/LedgerView.ts`):
-  a stack of transparent glass FLOORS (layers) on Y. It **REUSES the same node meshes** from
-  hyper/geo (placed into per-metagraph Z-lanes by `scene/Globe.ts`), and draws its own centred live
-  global-snapshot block + a left-trailing chain of completed snapshots, each metagraph's lane
-  of snapshot blocks, the node-group rings, and per-block anchor links + pulses. See *The
-  Snapshots (ledger) view* below.
+- **Snapshots** (`ledger`, 3D) — a built 3D anchoring chamber (`scene/views/LedgerView.ts`):
+  **TWO** transparent glass floors on Y (redesign 2026-08-04) — metagraph snapshots above, the
+  global ledger below. It **REUSES the same node meshes** from hyper/geo, which `scene/Globe.ts`
+  now places on **RAILS** along the camera-side edge of the floor each machine serves, and draws
+  each metagraph's lane of snapshot tiles, the **byte bar** that IS the global snapshot (width =
+  bytes carried, split into per-metagraph bands), the **ribbons** falling from lane tiles to their
+  own band, and the anchor pulses. See *The Snapshots (ledger) view* below.
 - **Network status** (`status`), **Transactions** (`transactions`), **Delegated staking**
   (`staking`) — **scaffolded placeholders**: the canvas fades out and `Blueprint.tsx` renders
   a faint abstract wireframe schematic of what the view will become, labelled
@@ -230,8 +231,10 @@ Zustand store. **Two data lanes:** (A) high-freq visuals subscribe straight to
 
 - **`app/`** — Next App Router. `layout.tsx`, `page.tsx` (mounts every panel + the canvas),
   **`globals.css` (the ONE stylesheet — see *The design system*)**, `design/page.tsx` (the
-  static token reference at `/design`). **`app/api/metagraphs/route.ts`**, **`app/api/geo/route.ts`**
-  and **`app/api/snapshot/[ordinal]/route.ts`** are server-side data routes (see *Data*).
+  static token reference at `/design`). **`app/api/metagraphs/route.ts`**, **`app/api/geo/route.ts`**,
+  **`app/api/snapshot/[ordinal]/route.ts`** (+ its `channel/[address]` deep read and the shared
+  `app/api/snapshot/decodeChannel.ts` helper) and **`app/api/currency-activity/route.ts`** are
+  server-side data routes (see *Data*).
 - **`components/`** — React panels, each reads/writes the store: `SceneCanvas` (mounts the
   engine, dynamic-imported so Three never enters the server bundle), `Blueprint` (placeholder
   schematics), `BootOverlay`, `TopBar` (the full-width top command bar: status + filter +
@@ -242,24 +245,32 @@ Zustand store. **Two data lanes:** (A) high-freq visuals subscribe straight to
   `CardHead` (the ONE card header + the `RIGHT_CARD` frame), `RailThread`, `RailDock`
   (tablet/phone sheets), `RailScroll`, `EdgePulse`, `selection.tsx`, `Tooltip`,
   `FollowController` (ledger snapshot follow), `DataBridge` (boots the data),
-  `RawSnapshotBridge` (fetches the exact raw-L0 read for the focused ticks), `SectionShell`
+  `RawSnapshotBridge` (fetches the exact raw-L0 read for the focused ticks, backfills a cold
+  trail once, and pulls the deep channel read for the ONE selected metagraph snapshot),
+  `SectionShell`
   (the GSAP scene↔raw-layer depth transition), `BottomStream` +
   `LiveStrip` (the bottom lane — bars in ledger) + `NodeCountReadout` (the
   strip's non-ledger content), `DataSection` + `components/datasection/` (the raw layer's per-view
-  tables), `Odometer`, `Sparkline`, `state/StateAtoms`, and the
+  tables + `ChannelStatePanel`), `Odometer`, `Sparkline`, `state/StateAtoms`, and the
   hooks `useSnapshotFeed`, `useBreakpoint`, `useBootPhase`, `useMinHold`, `useSubjectPairing`.
 - **`src/store/store.ts`** — the Zustand store (mode, filter, country, cohort, composition,
-  inspect, snap,
+  inspect, snap, `metaSnap` (+ the immutable `metaSnapDeep` cache keyed by `metaSnapDeepKey`),
   selStack, following, metaList, leaderboard, selNodes, activity, snapshotExact, the hover
   channels `hoverFilter`/`hoverNodeId`/`hoverSnapOrd`, `section` (which of the two shell LAYERS is
   presented — UI state, not selection, so it sits outside the one-selection-write-path rule),
   phone UI state, …). **`src/data/`** —
   `network.ts` wraps the typed `NetworkData` singleton (`api.ts`) + exposes `getAnchor`/
-  `metagraphById`/`filterAccent`/`CORE_HEX`/etc; `follow.ts` = follow logic; `types.ts`
-  (`PickDescriptor` is a `kind`-discriminated union, `SnapshotExact`, `NodeRow`);
+  `metagraphById`/`filterAccent`/`CORE_HEX`/`resolveSignerIps`/etc; `follow.ts` = follow logic;
+  `types.ts`
+  (`PickDescriptor` is a `kind`-discriminated union, `SnapshotExact` + its `ChannelSnapRow[]`,
+  `ChannelSnapDeep`, `MetaSnapSel`, `CurrencyActivity`, `NodeRow`);
   `composition.ts` (node-fabric grouping), `nodeStatus.ts` (the shared status vocabulary),
-  `hoverSubject.ts` (`hoverKeyOf`), `ledgerLayers.ts` (the settlement layers' display COPY —
-  name/desc by layer id; the geometry twin is `domain/ledgerLayout.ts`'s `LAYER_GEOM`; `desc`
+  `currencyActivity.ts` (the per-metagraph currency reading + the gutter's `activityLine` wording,
+  measured against an absolute clock),
+  `hoverSubject.ts` (`hoverKeyOf`), `ledgerLayers.ts` (the anchoring layers' display COPY —
+  name/desc/`level` by layer id (`"1"`/`"2"` for the two floors, `"rail"` for the four node
+  layers — they are not a storey of their own); the geometry twin is `domain/ledgerLayout.ts`'s
+  `LAYER_GEOM`; `desc`
   belongs to the LAYER CARD only — an explorer row shows name + count, never the same sentence
   a rail away, see *the explanatory-copy split*),
   `anchorLog.ts` + `roster.ts` (the PURE row builders behind the raw layer's tables — anchored
@@ -383,9 +394,22 @@ store-value imports**, enforced by `layerBoundaries.test.ts`). Each ships coloca
   per-view tuning, the mechanism is one). Consumed by each view's `FocusSpot` construction; the
   OFF-lifecycle is the Engine's central `StageLights` gate (see *scene objects*).
 - `ledgerLayout.ts` — the Snapshots view's layout home: `LEDGER` (floor heights + the whole-view
-  group transform), `HYP_SPLIT` (the hypergraph level's 2/3+1/3 cut), `LAYER_GEOM` (layer id →
-  height/lane-centre; ids shared with the UI copy table `src/data/ledgerLayers.ts` and the scene's
-  `layer` picks), `ledgerSite`, `clusterRadius`, `ledgerSpread`.
+  group transform), the two-floor frame (`FLOOR_IDS`/`FLOOR_Y`, `LANE_HALF_Z`, `laneSpan` — the
+  committed lane takes the whole floor and hides the rest), the byte bar's geometry
+  (`BAR_Z0`/`BAR_MAX_W`/`BAR_MIN_W`/`BAR_H`/`BAR_D` + the baked `BYTE_SCALE_KB`), the gutters
+  (`GUTTER_W`/`GUTTER_CZ`), the rail frame (`RAIL_*`, `railX`, `railY`, `RAIL_GROUP_FLOOR`), and
+  `LAYER_GEOM` (layer id → height + `isRail`; ids shared with the UI copy table
+  `src/data/ledgerLayers.ts` and the scene's `layer` picks — `laneZ` is 0 for every rung now,
+  `HYP_SPLIT` is retired), plus `ledgerSite`, `clusterRadius`, `ledgerSpread`.
+- `ledgerBands.ts` — the byte bar's spec as pure data (`BarSpec`/`Band`, `makeBarSpec` +
+  `fillBarSpec`, `BYTES_FULL`, `UNLISTED_KEY`, `ribbonQuad`): width from bytes against the fixed
+  reference, bands in lane order so ribbons never cross, and **the honesty encoded here rather
+  than in the adapter** — unmeasured → minimum width and NO bands, measured-but-empty → a seam,
+  over the reference → clipped with an overflow multiplier.
+- `ledgerRails.ts` — which machine stands on which rail: `RailKind`/`RAIL_ORDER`, `railKindOf`
+  (one MACHINE, one rail — hybrids counted once), `visibleRails` (empties collapse away),
+  `railChipPos`, `railLayerId`, and `railLit` — the `ml0`/`ml1` rungs deliberately OVERLAP on the
+  hybrid rail, which is the point.
 - `pickActions.ts` — the CLICK/SELECT DECISION TABLE: what picking a subject means per view ×
   pick kind, as pure data-in/actions-out logic with TWO kinds of executor: the Engine's
   `_handleClick` (scene raycast clicks, via `clickActions` → ordered `ClickAction[]`) AND the
@@ -484,6 +508,11 @@ GPU; no store/react**):
   own off-switch; the lingering-spotlight bug class is dead).
 - `objects/gradientTexture.ts` — `makeRadialGradientTexture(stops)`, the one canvas
   radial-gradient sprite factory (geo glow pools + hyper ring fills differ only in stops).
+- `objects/ByteBar.ts` / `objects/Ribbons.ts` / `objects/NodeRails.ts` — the Snapshots view's
+  three composed adapters over `domain/ledgerBands.ts` + `domain/ledgerRails.ts` (the byte bar
+  and its pickable per-metagraph bands; the tapering lane→band ribbons, LEAD + HOT rows only;
+  the rail guides/labels/pick proxies whose chips are the shared node InstancedMeshes). See
+  *The Snapshots (ledger) 3D view*.
 - `views/HyperView.ts` — Hypergraph-only furniture: the Global L0 **core** and the orbiting
   metagraph **hubs** (from `config.METAGRAPHS`). The core is parented to the scene (not
   `root`) so the morph's root-collapse doesn't drag it; it **dissolves in place** as the Earth
@@ -514,8 +543,9 @@ GPU; no store/react**):
   BOTH the walls' and the graticule's far-hemisphere facing floor drops to near-zero (looking
   THROUGH the globe distracted at close range, user). Nodes/arcs sit on the plateau
   (`R+LAND_H+ε`).
-- `views/LedgerView.ts` — the Snapshots view's 3D settlement chamber over `ledgerModel` (see
-  its own section below).
+- `views/LedgerView.ts` — the Snapshots view's 3D anchoring chamber over `ledgerModel` (see
+  its own section below). Composes the three ledger-only adapters `objects/ByteBar.ts`,
+  `objects/Ribbons.ts` and `objects/NodeRails.ts`.
 
 **`src/data/`** feeds the engine live network data (no simulation):
 
@@ -869,7 +899,7 @@ and keep changing, so they're examples, not the contract.
   `nodeSelectActions` with the group as `compositionSel` ancestry (ledger's `ledgerLayerId`
   twin). Feeds off `store.selNodes`, published per `ViewPolicy.nodeList`. The
   tool-card NAMING rule: About = the view's point of view ("How the network is built"); the
-  tool says what you BROWSE — "Nodes by network" / "Nodes by country" / ledger's "Settlement
+  tool says what you BROWSE — "Nodes by network" / "Nodes by country" / ledger's "Anchoring
   layers" (not "Nodes by…": its subjects are strata, not nodes). Card EYEBROWS are the bare
   role words ("About" / "Explore") — the view name was dropped (user, 2026-07-12: the view
   switch already says where you are), and each explorer's usage hint LEADS the card (top,
@@ -878,26 +908,46 @@ and keep changing, so they're examples, not the contract.
   to that subject's right-rail card, once (user, 2026-08-01: the ledger floor rows repeated
   `LEDGER_LAYERS.desc` under every name while the layer card opened with the same sentence one
   rail away, and the list read as prose instead of rows). A row commits its card in the same
-  click, so nothing is lost by leaving the sentence in one place), ledger → `LedgerPanel` — since the focus-ladder work
-  (2026-07-18) ALSO the ledger's node browser: the four node-kind floors (`ml1`/`ml0`/
-  `hypl0`/`hypl1`; never the snapshot floors) are DISCLOSURES — commit+expand in one click
-  (`layerToggleActions`), disclosure = the committed layer (single-open by construction) —
-  opening onto the committed filter's cluster/node rows for that floor (per-metagraph groups
-  on the ml floors, hover-glowing their 3D stacks via `hoverCohort`; node id rows run
-  `nodeSelectActions` with the floor as `ledgerLayerId` ancestry) PLUS one **LANE row** per
-  OTHER network serving the floor (identity dot + name + per-floor role-derived count;
-  0-located dimmed with the bare 0) that COMMITS the filter via `filterToggleActions` — the
-  HyperExplore idiom bent onto strata: the browser's network level IS the filter, so "all"
-  enumerates every lane instead of an empty state (user, 2026-07-18); lane-row hover
-  previews via `hoverFilter`.
+  click, so nothing is lost by leaving the sentence in one place), ledger → `LedgerPanel`
+  ("Anchoring layers" — renamed from "Settlement layers" with the anchors-state vocabulary
+  rule). Since the two-floor redesign (2026-08-04) the list is **TWO HEADED GROUPS mirroring
+  the chamber itself — `Floors` then `Rails`** — and the split is DERIVED, not a second id
+  list: `LEDGER_LAYERS.level` (`"1"`/`"2"` = a real floor plane, `"rail"` = a node layer)
+  partitions the same table into `FLOOR_LAYERS`/`RAIL_LAYERS`, so panel and geometry can't
+  drift. ONE row renderer serves both groups (same disclosure/commit plumbing), and there are
+  **two KINDS of disclosure** (`DISCLOSABLE_FLOORS` = their union):
+  · the four node-kind rails (`ml1`/`ml0`/`hypl0`/`hypl1`) open onto the committed filter's
+  cluster/node rows (per-metagraph groups on the ml rails, hover-glowing their 3D stacks via
+  `hoverCohort`; node id rows run `nodeSelectActions` with the layer as `ledgerLayerId`
+  ancestry) PLUS one **LANE row** per OTHER network serving the layer (identity dot + name +
+  a per-layer ROLE-DERIVED count — `metaFloorCount` off `MetaInfo.nodes[].roles`, the
+  count-honesty boundary: never the filter strip's whole-fleet `located`, which answers a
+  different question) that COMMITS the filter via `filterToggleActions` — the HyperExplore
+  idiom bent onto strata: the browser's network level IS the filter, so "all" enumerates every
+  lane instead of an empty state (user, 2026-07-18; `rowsForFloor` returns `[]` for ml0/ml1
+  without a committed network EXACTLY so the lane list is that layer's affordance there —
+  `selNodes` carries every network under "all", and without the guard each layer would render
+  a cluster row and a lane row for the same metagraph and double its count);
+  · the two snapshot FLOORS (`msnap`/`gl0`) open onto **TICK rows** — one per visible global
+  snapshot, from the same `useSnapshotFeed(SLOT_N)` buffer `LiveStrip` reads and capped to the
+  chamber's own visible-slot count so "visible ticks" matches the 3D trail. A tick row carries
+  ONE honest per-floor metric — msnap `anchored N` (`metagraphSnapshotCount`, final on arrival),
+  gl0 `carried N KB` (only once the EXACT read has landed for that ordinal; absent = a dash,
+  never derived from fee/count) — and clicking it runs the shared `snapshotSelectActions` (live
+  tip re-follows, older pins), hovering writes `hoverSnapOrd`. Empty buffer = "Waiting for
+  snapshots…", matching LiveStrip's own copy.
+  Disclosure state = the committed layer (single-open by construction), commit+expand in one
+  click via `layerToggleActions`; lane-row hover previews via `hoverFilter`.
   The placeholder views have just the About card.
 - **Right rail** (`#rightcol`, `Inspector`) = the **facts** scope (read-only), a set of
-  **FIXED card SLOTS** in one stable order — network dossier, **country**, **provider**,
+  **FIXED card SLOTS** in one stable order — network dossier, **metagraph snapshot**,
+  **country**, **provider**,
   **composition**, node, snapshot, layer (user
   design, 2026-07-10; replaced the recency stack + the floating pick-hint; the country +
   provider slots landed with the focus ladder, 2026-07-18; the composition slot with hyper's
   middle rung, 2026-08-02 — Runs / Machines / Share of network / Network, hyper-scoped like
-  country is geo-scoped): every card the
+  country is geo-scoped; the metagraph-snapshot slot with the two-floor ledger, 2026-08-04 —
+  it sits right after the dossier because its subject is one network's own artifact): every card the
   current view CAN produce is always visible — POPULATED when its subject is selected
   (`ContextCard` mirrors the filter; the **country card** — `ccMark` code + name title, Nodes/Share/
   Cities/Providers from `store.selNodes`, geo-scoped like layer is ledger-scoped; the
@@ -910,7 +960,13 @@ and keep changing, so they're examples, not the contract.
   neither subject is a PickDescriptor, collapsible like every RIGHT card; the **node card**
   `geoLive` — CITY-first title with the status pill in the head aside and NOTHING else in the
   head (the country, the make-up and the id are all labelled body rows now — user 2026-08-02:
-  the head names the node, the body states its facts); the **snapshot** and **layer**
+  the head names the node, the body states its facts); the **metagraph snapshot card**
+  (`components/inspector/MetaSnapPane.tsx`, rendered directly like Country/Provider/Composition
+  since `MetaSnapSel` is not a PickDescriptor, subject key `${metaId}:${ordinal}`) — **THREE
+  TIERS, each honest about where it came from**: tier 1 is free from the 4-second poll (it is
+  what named the tile), tier 2 arrives with that tick's exact read, and tier 3 is the
+  application state, disclosed **as a SHAPE here and as a payload one level down** in the raw
+  layer; the **snapshot** and **layer**
   cards), else as a quiet **GHOST hint card** (a dashed one-liner:
   kind mark · slot label · instruction — no halo/animation) saying what to interact with — so the rail shows the view's whole possibility space and a deselect
   returns its slot to the ghost in place. Slot availability + hint copy live in the rail
@@ -1284,7 +1340,8 @@ Each right-rail slot's empty state is a **GHOST card** (`Inspector.GhostCard`; s
 fields), an allow-list mirroring the pick registry: hyper/geo invite node picks, hyper also
 invites the composition group, geo also
 invites the country drill + the provider (cohort) row, ledger
-invites snapshot + layer picks, the network slot invites the top-bar filter, the flat
+invites snapshot + layer picks **plus the metagraph snapshot** ("Click a tile under a lane." —
+ledger-only, like the snapshot slot), the network slot invites the top-bar filter, the flat
 placeholder views get no ghosts. **A hint is the GESTURE and nothing else** (copy rule,
 2026-08-02): the slot label beside it already names the subject and the dashed frame already says
 "nothing here yet", so every hint used to end "… to inspect it." — four ghosts stacked in the rail
@@ -1298,7 +1355,9 @@ variant ("<TICKER> has no locatable nodes — explore it in the Hypergraph view"
 card renders in ANY view (e.g. a node selected in hyper and carried into geo); the ghost only
 appears where the view can actually produce the card. NB the snapshot slot is the one subject
 that no longer carries — it's cleared on leaving ledger (spec 2026-08-01), so its card and its
-ghost are both ledger-only.
+ghost are both ledger-only; the **metagraph snapshot** slot is scoped the same way, and like the
+global snapshot it is a card SLOT with **no focus-ladder rung** (the boundary test asserts
+rung → slot, not the reverse, so a slot without a rung is fine — a rung without a slot is not).
 
 ### CSS traps (learned the hard way)
 
@@ -1390,7 +1449,12 @@ other views aren't about time; the readout keeps the lane honest rather than bla
 is the same per-view projection idea in table form, dispatching on `mode`: **ledger** →
 `AnchorLogTable` (one row per anchored metagraph snapshot — network, snapshot ordinal, fee, size,
 the global it anchored into, age; row click pins that global snapshot through the same
-`snapshotSelectActions`, hover writes `hoverSnapOrd`), **hyper/geo** → `NodeRosterTable` (one row
+`snapshotSelectActions`, hover writes `hoverSnapOrd`) **plus `ChannelStatePanel`** — the raw
+layer's half of the metagraph-snapshot card's **two-step disclosure**: the CARD states the SHAPE
+of a metagraph's application state, and this renders the PAYLOAD, one level down, on a second
+deliberate gesture, because one anchoring channel publishes personal records and a payload should
+never appear just because a tile was clicked (its empty state says so: "Select a metagraph
+snapshot to read its application state."), **hyper/geo** → `NodeRosterTable` (one row
 per node, with per-view COLUMN ORDER — geo leads location-first `Country · City · Provider`,
 hyper leads `Network · Node · Layer` — click-to-sort headers, row click running
 `nodeSelectActions`), **flat views** → the honest `preview · in development` line, never a
@@ -1406,109 +1470,141 @@ fabricated table. The rows come from the pure builders `src/data/anchorLog.ts` +
 
 ## The Snapshots (ledger) 3D view — `scene/views/LedgerView.ts` (over `domain/ledgerModel.ts`)
 
-A 3D "settlement chamber" on the shared canvas. The `LedgerView` class is driven by the Engine
-(`_refreshLedger()` → `ledger.setData(globalSnapshots, getAnchor)` on each tick/anchor
-event, `ledger.update(dt)` per frame).
+A 3D anchoring chamber on the shared canvas, **redesigned 2026-08-04 into TWO FLOORS and a byte
+bar**. The `LedgerView` class is driven by the Engine (`_refreshLedger()` →
+`ledger.setData(globalSnapshots, getAnchor)` on each tick/anchor event, `ledger.update(dt)` per
+frame). It composes three adapters — `objects/ByteBar.ts`, `objects/Ribbons.ts`,
+`objects/NodeRails.ts` — over two pure modules, `domain/ledgerBands.ts` and
+`domain/ledgerRails.ts`, next to the existing `domain/ledgerLayout.ts` / `ledgerModel.ts`.
 
-- **Layer model (`config.LEDGER`) — a LITERAL top-down validation stack.** Floors stack on
-  **Y**, evenly spaced, top→bottom: `rowProducers` · `rowML1` · `rowML0` · `rowMSnap` ·
-  `rowHypL0` · `rowGL0` · `rowDAGL1`. Two KINDS of floor: **node/validator** layers and
-  **snapshot/ledger** layers (the *output* an L0 produces — the artifacts this view is
-  about, not a node role). **Nodes sit directly ABOVE the snapshot they produce**,
-  consistently: metagraph L0 → metagraph snapshots, and **hypergraph L0 → global snapshots**.
-  The anchor line threads DOWN through every node cluster — producers → metagraph L1/L0
-  rings → metagraph snapshot → **the global-L0 cluster** (the line swings to lane-centre z=0
-  to pass through it) → the global block. **Full node symmetry**: each L0 shows its node
-  cluster AND its snapshot output; the global-L0 nodes are the DAG core's `l0` instances
-  (`Globe.ts`: `l0`→`rowHypL0`, `cl1`→`rowDAGL1`). The **DAG L1** (bottom) feeds $DAG blocks
-  UP into the global. **Data producers** (top) is **symbolic** — external sources POSTing
-  DataUpdates to the metagraph **dl1** (cL1 = wallet txns, dL1 = producer data; the DAG L1
-  is cL1-only); their count is in no API, so it's a labelled floor + the flow line, **no
-  nodes** (don't fabricate). Each metagraph gets its own **Z-lane** (`ledgerSite`); **X** is
-  time (chains trail LEFT, `SLOT_SP` apart, `SLOT_N` visible; X owned by `LedgerView`, Y/Z by
-  config).
-- **Reuse, not clones:** the producer NODES are the SAME `InstancedMesh` instances from
-  hyper/geo (`globe.nodes` / `globe.metaNodes`); the `if (this.ledger)` branches in
-  `globe.setMorph`/`update` rewrite *those* instances' matrices to the lane positions. The
-  Engine **freezes `morph`** while settled in `mode === "ledger"` (it carries whatever value
-  the view was entered with); `globe.ledgerT` is now a **BOUNDARY-SNAPPED layout parameter**
-  (0/1, set by `applyLedgerLayout` at the transition's invisible mid-flight boundary), not an
-  eased blend — the flight that used to BE that ease is now the gather choreography's IN-phase
-  dissolve (see *the staged gather choreography* in the overview). The metagraph **hubs are
-  hidden** (`layers.setLedger` → `hub.visible = false`, applied at the same boundary). The
-  **globe surface AND the starfield are gated OFF in ledger** (not eased by morph) —
-  `globe.setMorph` zeroes `surf`/`extras` when `this.ledger`, and the Engine passes
-  `background.update(.., 0)` — so neither lingers when arriving from geo.
-- **`LedgerView` owns:** the glass floor **panes** (`_paneMat`, one colour; floors named by
-  subtle flat edge-aligned text labels — `FLOOR_LABELS`/`_makeLabel`, not billboards); the
-  centred live **global snapshot block** + its left-trailing **`_trail`** (individual
-  pickable `Mesh`es, the `snapshot` pick); each metagraph's lane of snapshot **TILES** —
-  **one tile per anchored snapshot** (`metaCounts.get(id)=n` → `n` tiles, **no cap**;
-  `_anchorTiles` lays them in a rectangular GRID filling that tick's cell with a **uniform
-  pitch** (`SLOT_SP/cols` × `LANE_GAP_Z/rows`, grid inset) so gaps are equal within a tick,
-  between ticks, and between lanes), empty placeholder where a metagraph didn't anchor; the
-  node-group **station DIALS** (`_makeDial`/`buildDialGeometry` — a hairline circle + radial
-  ruler ticks, the instrument-thread language bent into a circle; **ONE fixed radius for every
-  metagraph**, `ledgerLayout.DIAL_R`, regardless of node count — the resting identity mark that
-  gives a 3-node metagraph the same footprint as a big one; **visible at rest** at
-  `DIAL_REST_OP`, brightened + slightly scaled while an anchor pulse passes; the global L0 +
-  DAG L1 clusters wear the same dial in the DAG's identity hue (`sceneColors["dag"]` — matching
-  the node instances inside them) at the SAME `DIAL_R` (one dial size in design and code,
-  user 2026-07-12 — their bigger fleets just stack higher); `_gL0Ring` additionally glows via
-  `_gL0Glow` when a pulse reaches that floor. **Every ledger colour resolves through the ONE
-  identity system** — the identity SCENE map is a required LedgerView ctor arg (like HyperView)
-  and `setSceneColors()` re-tints on live refresh; nothing falls back to a raw
-  `config.METAGRAPHS` colour. Node size is uniform too: `LEDGER.dot` applies to every cluster
-  equally — small groups get presence from the dial, not from bigger dots — and ledger nodes
-  render as the SAME standing **CHIPS** as geo (hex/cylinder instances, `LEDGER.dot` × `HEX_H` —
-  replaced the squashed-sphere coins 2026-07-12: edge-lit, visible, and raycastable)); and the anchor **links** +
-  travelling **pulses** along the
-  shared **`curvePoint`** — the literal production→anchor column down from the producers
-  floor through the L1/L0 ring centres → the snapshot tile → swinging to centre through the
-  global-L0 cluster → cubic into the global block (`LINK_SEG` segments; one link per
-  cluster, from its centre tile).
-- **Recency is `slotFade` brightness only (2026-07-09).** The old neutral-tone + ledger-specific
-  linear depth fog recency treatment was REMOVED at the user's direction (a replacement may be
-  designed later): tiles/links/trail blocks keep their identity/accent colour all the way down
-  the trail, fading gently by `slotFade`. There is NO scene fog at all any more (the shared
-  `FogExp2` was removed 2026-07-11, user: zooming out darkened the scene — it must stay clear
-  and coloured at every zoom; depth reads through DoF/facing/closeness instead. The
-  `ViewPolicy.fog` field + Engine fog swap were already gone).
-- **Emphasis is brightness, not a colour switch.** `model.isRowHot` still enforces exactly ONE
-  hot row (a selected/hovered older snapshot beats the live lead): the hot row's tiles/links
-  render near-full-brightness (bloom), everything else stays dim-but-coloured; the centre block
-  dims (`leadDimmed`) while an older snapshot is selected. Selection comes from the LiveStrip:
-  the Engine forwards `hoverSnapOrd ?? snap.data.ordinal` to `ledger.setSelected(ordinal)`; the
-  ledger maps ordinal → slot each tick (`_recomputeSelectedSlot`). The DAG node-cluster spread
-  follows the same `clusterRadius`-capped honeycomb footprint as every lane (the old
-  `LEDGER.dagCell` disc is gone).
-- **Metagraph filter dims the OTHER lanes** (`ledger.setFilter`, wired alongside
-  `globe.setFilter`): the selected lane keeps full colour; other metagraphs' tiles/links/dials
-  are strongly dimmed (×0.22) and their nodes too (the morph-ramped `dimScale` is too weak in
-  ledger, so it's forced), and only the selected metagraph emits pulses (so only ITS dials
-  light).
-- **Slot model + history seed:** every new tick all chains advance one slot left; tiles
-  appear at the lead as a metagraph anchors (`_anchorMetaBlock` rebuilds the slot-0 cluster
-  as the count settles). On first data, `_seedHistory` pre-populates the trail + lanes from
-  the retained `globalSnapshots` window (via `getAnchor(ts).metaCounts`). All
-  sizes/tiles/links/pulses/rings come from live data — nothing fabricated. **TODO:** draw
-  DAG L1 **blocks** (`global.blocks`) on the hypergraph-L1 floor flowing up into the global
-  (+ a DAG-L1 participation ring tied to it).
-- **Camera + build-in reveal:** `FOCI.ledger` frames the latest block bottom-right looking
-  ~along −X (trails recede as background); orbit stays enabled. The old **"appears
-  already-formed — no entry animation"** rule is **RETIRED** (2026-07-17, the view-transition
-  choreography — a deliberate reversal): arriving in `ledger` from another 3D view now runs
-  the same staged OUT→BOUNDARY→IN choreography as any 3D↔3D switch, so the chamber has a real
-  **build-in/teardown** — `LedgerView.setViewAlpha` (fed `transition.furnitureAlpha("ledger")`)
-  ramps its floors/tiles/links/dials up from black while the gathered nodes disperse into
-  their lane positions and the camera flies to `FOCI.ledger` (or a resumed layer framing) via
-  the ordinary tween (`focus()` → `_tweenTo` — there is no more camera-snapping `_snapTo`).
-  The Engine is the **sole owner of `ledger.group.visible`** (`= ledgerActive && ledgerAlpha >
-  0.001`, where `ledgerActive` is true while settled in ledger OR a transition touches it) —
-  `LedgerView.setViewAlpha` only fades opacity now, so the two can't fight over the flag. A
-  boot straight into `ledger` (no prior 3D view) still settles instantly (`transition.settle`)
-  with no choreography, same as any direct boot. To screenshot a ledger state headless, seed
+- **Two floors, not seven.** `FLOOR_IDS = ["msnap","gl0"]` — only the two SNAPSHOT layers get a
+  glass plane, because only they are artifacts the view is about. The four NODE layers
+  (`ml1`/`ml0`/`hypl0`/`hypl1`) render as **rails** on the camera-side edge of the floor whose
+  output they produce. The survivors keep the heights they already had (`FLOOR_Y.msnap =
+  LEDGER.rowMSnap`, `FLOOR_Y.gl0 = LEDGER.rowGL0`), so the 13.5-unit run the ribbons fall through
+  is deliberately unchanged. **The local frame** (the group is rotated `viewRotY = -90°` about Y):
+  **+X toward the camera** — the lead slot is `x=0` and time trails to −X, `SLOT_SP` apart,
+  `SLOT_N` visible; **+Y** floor height; **+Z** the lane/width field, with screen-RIGHT at −Z.
+  X is owned by `LedgerView`, Y/Z by `ledgerLayout`.
+- **The byte bar IS the global snapshot** (`objects/ByteBar.ts` over `domain/ledgerBands.ts`).
+  One bar per tick on the `gl0` floor, fixed height/depth (`BAR_H`/`BAR_D`); its **WIDTH alone
+  encodes the bytes that tick carried**, against the FIXED reference `BYTE_SCALE_KB` (baked by
+  `scripts/bake-ledger-scale.ts` — the p99 of anchored KB/tick, so the rare monster clips at the
+  floor edge with an honest `×N` overflow on its label instead of rescaling the whole past). It
+  starts at lane 0's end (`BAR_Z0 = -LANE_HALF_Z`) and grows across the field
+  (`BAR_MAX_W = 2 * LANE_HALF_Z`) so **band order and lane order agree and the ribbons never
+  cross**. The bar is **split into BANDS**, one per contributing metagraph plus `unlisted` — each
+  band is its own pickable `Mesh` (picking one selects that metagraph AND that tick), from a pool
+  of `SLOT_N × (METAGRAPHS.length + 1)` allocated once and positioned or zero-scaled on a tick,
+  never per frame.
+- **The honesty is in the DOMAIN, not the adapter** (`ledgerBands.ts`). `fillBarSpec` writes a
+  `BarSpec {measured, anchored, kb, z0, width, clipped, overflow, bands, bandCount}`: **no exact
+  read → `measured:false`, minimum width, NO BANDS** — a composition is never inferred from the
+  anchor count and never from the fee; **measured but nothing anchored → a minimum-width SEAM**
+  (the tick still happened); **over the reference → clipped with `overflow`**. `BAR_MIN_W` is that
+  seam width and `SEAM_OP` draws it as a dashed hairline outline, so an unmeasured tick and an
+  empty one look like what they are and never like a small one.
+- **Ribbons carry the anchor** (`objects/Ribbons.ts`): one tapering sheet per anchoring lane, from
+  that metagraph's lane tiles on `msnap` down to **its own band** in the bar on `gl0` — the
+  literal statement of which bytes came from where. `RIBBON_ROWS = 2`: only the **LEAD row and the
+  HOT row** get a sheet (one Mesh, one preallocated geometry, rewritten event-time); every older
+  tick keeps a hairline strut drawn by the view. This replaces the old cubic `curvePoint` anchor
+  links entirely.
+- **Node rails** (`objects/NodeRails.ts` over `domain/ledgerRails.ts`) — the machines, on the
+  front edge of the floor they serve (`RAIL_GROUP_FLOOR = {meta:"msnap", dag:"gl0"}`), stepping
+  toward the camera (`railX`) as more rails appear and wrapping into stacked rows at `RAIL_CAP`
+  (`railY`). `railKindOf(roles)` partitions each **MACHINE** onto exactly ONE rail —
+  `RAIL_ORDER = ["l1only","hybrid","l0only"]`, L1 work arriving at the tile boundary, hybrids
+  between, L0 sealing nearest the camera — so a hybrid is counted once, not twice, and
+  `visibleRails` drops the empties (applied to the DAG's validators the same rule yields two rails
+  and hides the empty hybrid). **The layer rungs deliberately OVERLAP**: `railLit` lights
+  L1-only + hybrid for `ml1` and L0-only + hybrid for `ml0` — the visual statement that they are
+  the same machines, which is exactly what the old two-floor-per-metagraph layout got wrong. The
+  adapter draws a hairline guide + label + pick proxy per rail; **the CHIPS are the shared node
+  InstancedMeshes** `Globe` places (`RAIL_REST_OP` / `RAIL_LIT_OP` / `RAIL_DIM_OP`), and
+  `Globe`'s `ledgerHide = railKind == null || role !== primaryLayer` keeps it to one chip per
+  machine.
+- **Reuse, not clones:** the node chips are the SAME `InstancedMesh` instances from hyper/geo
+  (`globe.nodes` / `globe.metaNodes`); the `if (this.ledger)` branches in `globe.setMorph`/`update`
+  rewrite *those* instances' matrices to the rail positions. The Engine **freezes `morph`** while
+  settled in `mode === "ledger"`; `globe.ledgerT` is a **BOUNDARY-SNAPPED layout parameter** (0/1,
+  set by `applyLedgerLayout` at the transition's invisible mid-flight boundary), not an eased
+  blend. The metagraph **hubs are hidden** (`layers.setLedger`, same boundary), and the **globe
+  surface AND the starfield are gated OFF** (`globe.setMorph` zeroes `surf`/`extras` when
+  `this.ledger`; the Engine passes `background.update(.., 0)`) so neither lingers when arriving
+  from geo.
+- **Lanes: a committed metagraph takes the whole floor.** `laneSpan(i, n, committedIdx)` →
+  `{cz, hz, hidden}`: with nothing committed each lane owns its own slice (`hz = LANE_HALF_Z/n`);
+  **committed, that lane moves to `cz:0` with `hz:LANE_HALF_Z` and every other lane is `hidden`**
+  (lays no tiles). `LedgerView.setFilter` is the ONE entry point allowed to rearrange the lane
+  field (`_relayoutLaneField` → `_applyDim` → `_rebuildAllSlots` → `_rebuildGutter`);
+  **`setHoverFilter` previews the DIM ONLY** — no relayout, no gutter change, no pulse re-gating,
+  and bands dim rather than disappear. Hover previews, commit rearranges: that split is the rule.
+- **Gutters** — a narrow strip beyond the lane field on the screen-right (−Z) side of both floors
+  (`GUTTER_W = (2*LANE_HALF_Z)/6`, `GUTTER_CZ`). On `msnap` it carries the **currency status
+  line**, rebuilt only under a committed metagraph from `activityLine(activity, ticker, now)` in
+  `src/data/currencyActivity.ts` — which owns the NO SIGNAL / NO CURRENCY wording and measures
+  against an **absolute clock**, not the visible window, so a dormant token never reads as merely
+  "quiet right now". The `gl0` gutter is reserved for the $DAG blocks (not drawn yet — a labelled
+  reservation, no fabricated content).
+- **Floor labels + `forming…`**: floors are named by subtle flat edge-aligned text
+  (`FLOOR_LABELS`/`_makeLabel`, not billboards), each carrying its `LEDGER_LAYERS.level` digit.
+  On the lead row of `msnap` a `forming…` note **eases** in and out (`FORMING_EASE`/`FORMING_OP`,
+  never blinks) while `model.leadForming` holds — i.e. while the tick's count is still settling
+  (`Date.now() - anchor.touched < LEAD_SETTLE_MS`), which is the *when* view stating its own
+  settling window instead of pretending a partial breakdown is final.
+- **Emphasis is brightness, not a colour switch.** Floors rest at `FLOOR_FRAME_OP 0.11` /
+  `FLOOR_FILL_OP 0.03` and rise to `_HI 0.4 / 0.055` when highlighted (the frame colour is
+  HDR-overdriven ×2, so the opacities read about half the perceived line brightness); bands run
+  `REST_OP 0.5` / `HOT_OP 0.95` / `DIM_OP 0.16`. `model.isRowHot` still enforces exactly ONE hot
+  row (a selected/hovered older snapshot beats the live lead). Selection comes from the LiveStrip:
+  the Engine forwards `hoverSnapOrd ?? snap.data.ordinal` to `ledger.setSelected(ordinal)`, and
+  the ledger maps ordinal → slot each tick (`_recomputeSelectedSlot`). There is NO scene fog
+  anywhere any more (removed 2026-07-11) and recency is `slotFade` brightness only — tiles, bands
+  and struts keep their identity colour all the way down the trail.
+- **Picking + tile identity.** `_syncPickables()` publishes the floor picks, `_rails.pickables`,
+  `_bar.pickables`, and the lane tiles — the tiles **only once a tile resolver exists**.
+  `Engine.setTileResolver((metaId, ts, k) => …)` names a tile from the POLLED feed
+  (`snapsAtTick(net.metaSnaps, metaId, ts)[k]` + the global at that timestamp), where `k` is the
+  tile's index within its tick. **A tile the buffer can't name is ANONYMOUS: drawn, not
+  pickable** — the chamber shows that the anchor happened without inventing an identity for it.
+- **Selection plumbing.** `pickActions.ts` gained `metaSnapSelectActions` and `bandSelectActions`
+  (+ `sameMetaSnap`) and the action kind `{kind:"metaSnap", sel}`, applied by the one executor
+  `applyClickActions.ts`; the store carries `metaSnap: MetaSnapSel | null` (`setMetaSnap` bumps
+  `selStack`, `SelSlot` includes `"metaSnap"`) plus `metaSnapDeep` keyed by
+  `metaSnapDeepKey(globalOrdinal, metaId)` — a decoded snapshot is immutable, so it is never
+  overwritten. **`focusLadder.ts` is untouched: the metagraph snapshot is a card SLOT with no
+  ladder rung**, exactly like the global snapshot. The Engine clears `store.metaSnap` on any mode
+  switch away from ledger and on a filter switch.
+- **Signer glow.** When `metaSnap`/`metaSnapDeep`/`metaList` change, the Engine resolves the
+  snapshot's signers to IPs (`resolveSignerIps` in `src/data/network.ts`) and hands them to
+  `globe.setSignerIds` — the scene keys metagraph nodes by IP, not id, so the machines that
+  actually signed the selected snapshot light up on the rails. `Globe._signerIds` joins the
+  committed-group precedence chain: `hoverCohort ?? selCohortIds ?? selGroupIds ?? signerIds`.
+- **Camera.** `cameraRig.ts` gained `ledgerFloorFraming(y)`, `ledgerRailFraming(x, y)` and
+  `ledgerNodeFraming(node)`; `Engine._focusLayer(layerId)` reads `LAYER_GEOM` and lets
+  **`l.isRail` choose rail-vs-floor framing**. `LAYER_GEOM.laneZ` is **0 for every rung** now —
+  `HYP_SPLIT` is retired and the camera never shifts sideways for a layer. `FOCI.ledger` still
+  frames the lead bottom-right looking ~along −X, orbit stays enabled.
+- **Build-in reveal:** arriving in `ledger` from another 3D view runs the same staged
+  OUT→BOUNDARY→IN choreography as any 3D↔3D switch — `LedgerView.setViewAlpha` (fed
+  `transition.furnitureAlpha("ledger")`) ramps floors/tiles/bands/ribbons/rails up from black
+  while the gathered nodes disperse into their rail positions and the camera flies. The Engine is
+  the **sole owner of `ledger.group.visible`** (`= ledgerActive && ledgerAlpha > 0.001`);
+  `setViewAlpha` only fades opacity, so the two can't fight over the flag. A boot straight into
+  `ledger` settles instantly (`transition.settle`). To screenshot a ledger state headless, seed
   `mode: "ledger"` in `store.ts`.
+- **Slot model + history seed:** every new tick all chains advance one slot toward −X; tiles
+  appear at the lead as a metagraph anchors. On first data, `_seedHistory` pre-populates the trail
+  + lanes from the retained `globalSnapshots` window (via `getAnchor(ts).metaCounts`). Everything
+  drawn comes from live data — nothing fabricated.
+- **Retired with the redesign (do not reintroduce):** the seven-floor stack and its five deleted
+  planes (`rowProducers` · `rowML1` · `rowML0` · `rowHypL0` · `rowDAGL1` as *planes* — the row
+  constants survive only where something still reads them); the symbolic **data-producers** floor;
+  the **station DIALS** (`DIAL_R`, `_makeDial`/`buildDialGeometry`, `_gL0Ring`/`_gL0Glow`); the
+  **cubic anchor links** along `curvePoint`; the **centred live global block + its plain trail**
+  (the byte bar replaced both); and **`HYP_SPLIT`**, the hypergraph level's 2/3+1/3 lateral cut.
+  `clusterRadius`'s own comment records that it used to be phrased against the dial.
 
 ## Anchoring, fees & the metagraph data layer
 
@@ -1517,8 +1613,10 @@ state** — "settlement" is reserved for the DAG a snapshot actually pays (the s
 fee/size rows). One word for both read as if Snapshots were where *money* settles, which is
 what the separate Transactions view is for. So: "Anchoring layers", "When the network anchors",
 "the base ledger", "N KB anchored"; and hyper's core copy says "security + consensus". Internal
-identifiers/comments keep their existing names (`LedgerView`, the settlement chamber) — the rule
-is about words the user reads, not code.
+identifiers keep their existing names (`LedgerView`, `ledgerT`, …) — the rule is about words the
+user reads, not code. THIS FILE's design prose follows the user-facing register, so the view is
+described as the **anchoring chamber** throughout (2026-08-06); a few older code COMMENTS still
+say "settlement chamber" and are left alone as internal wording.
 
 Verified live against mainnet:
 
@@ -1631,11 +1729,36 @@ can't fetch them — but the **Next Node server can**:
   globe plots instantly from one request; `geoResolve.ts resolveMissing` fills any misses.
 - **`app/api/snapshot/[ordinal]/route.ts`** reads the **raw L0 global snapshot** (~2.5 MB)
   and returns a tiny `SnapshotExact` (exact fee, size KB, state-record count, per-metagraph
-  breakdown incl. unlisted). **Cached per ordinal** (`unstable_cache`, immutable; throws on
+  breakdown incl. unlisted). Since the two-floor ledger it also carries **`rows:
+  ChannelSnapRow[]`** — one row per anchored state-channel entry (`metaId`, ordinal, `decoded`,
+  fee, bytes, signers, blocks, `hasState`/`stateBytes`/`stateProof`), brotli-decoded by the
+  helper `app/api/snapshot/decodeChannel.ts` (colocated test); `ordinal: 0` marks a payload the
+  decoder couldn't read, which the UI must show as undecoded rather than as zero.
+  **Cached per ordinal** (`unstable_cache`, immutable; throws on
   a miss so a not-yet/pruned tick retries). Only recent ticks resolve (the L0 node prunes
   after ~30 min) → 404 → client keeps the polled floor. `RawSnapshotBridge` calls it for the
   live + selected tick only — **never** the whole chain or a poll loop (that's what would
-  make it expensive on Vercel).
+  make it expensive on Vercel) — plus a ONE-TIME paced **backfill** of the previous
+  `BACKFILL_N` ordinals (`BACKFILL_GAP_MS` apart) on a cold load, because the trail otherwise
+  opens as a row of unmeasured seams; each of those ordinals is immutable and cached, so the
+  backfill costs at most once per ordinal ever.
+- **`app/api/snapshot/[ordinal]/channel/[address]/route.ts`** is the **DEEP read** behind the
+  metagraph-snapshot card's third tier: it re-downloads the same ~2.5 MB global to reach ONE
+  state-channel entry and returns a `ChannelSnapDeep` (height/subHeight, epoch progress, last
+  hash, fee, bytes, blocks, signers, `stateKeys[]`, state bytes/proof, the decoded state, data
+  block signers). The cost is accepted deliberately: **cached immutably per (ordinal, address)
+  and only ever run on an explicit gesture on one card** — never on a poll, never across the
+  chain. `maxDuration = 30`, 8s fetch timeout. `RawSnapshotBridge` fetches it for the single
+  selected metagraph snapshot (`deepInflight` dedupe) and stores it under
+  `metaSnapDeepKey(globalOrdinal, metaId)`, which is never overwritten — a decoded snapshot is
+  immutable.
+- **`app/api/currency-activity/route.ts`** answers each metagraph's **last transaction
+  timestamp** (`be-mainnet` `/currency/{id}/transactions?limit=1`), classified by
+  `classifyActivity` into `active` / `dormant` / `none`. `unstable_cache(…, { revalidate: 600 })`,
+  `maxDuration = 30`, inner fetches `cache:"no-store"` + 5s timeout. **A metagraph with no
+  currency answers nothing — that IS the reading**, and `src/data/currencyActivity.ts` owns the
+  NO SIGNAL / NO CURRENCY wording for the ledger's currency gutter line (measured against an
+  absolute clock, not the visible window).
 - The client (`Engine`) fetches `/api/metagraphs` on mount **and re-pulls every 10 min**
   (Vercel never restarts; ISR only freshens the *server* cache, so an idle tab must re-pull —
   `Engine.refreshMeta`, rebuilds only on change). Snapshot/cluster feeds are live via

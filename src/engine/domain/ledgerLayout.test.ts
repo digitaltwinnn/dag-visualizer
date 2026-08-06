@@ -118,7 +118,7 @@ describe("two-floor chamber (redesign 2026-08-04)", () => {
   });
 
   it("carries the baked p99 scale reference in KB", () => {
-    expect(BYTE_SCALE_KB).toBe(60);
+    expect(BYTE_SCALE_KB).toBe(77);
   });
 
   it("steps rails toward the camera and stacks overflow rows upward", () => {

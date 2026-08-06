@@ -145,12 +145,13 @@ export const BAR_MIN_W = 0.55; // the zero-anchor SEAM: a tick that carried noth
 export const BAR_H = 0.9;
 export const BAR_D = 1.6;
 
-/** The fixed scale reference: KB carried at which the bar fills the floor. Calibrated to the p99
- *  of anchored KB per tick (spec §6.3) and baked offline by `scripts/bake-ledger-scale.ts`;
- *  ticks above it clip at the floor edge and state their overflow as a multiplier. Provisional
- *  value from the 533-tick sample of 2026-08-04 (p99 = 31 KB over 6 of 10 metagraphs), scaled for
- *  the metagraphs and unlisted channels that sample missed. */
-export const BYTE_SCALE_KB = 60;
+/** The fixed scale reference: KB carried at which the bar fills the floor (spec §6.3).
+ *  p99 of anchored KB per global tick, measured by scripts/bake-ledger-scale.ts on 2026-08-06
+ *  over 1838 ticks (p50 5 · p95 23 · p99 71 · max 149 KB) and inflated by the observed unlisted
+ *  byte share. Ticks past this clip at the floor edge and carry an overflow multiplier on their
+ *  label. Re-running the sample minutes later moved the p99 by ~2 KB — the constant is meant to be
+ *  re-baked when the metagraph set or mainnet traffic changes, not tracked live. */
+export const BYTE_SCALE_KB = 77;
 
 // ── Node rails (spec §4.4) — run along Z at the FRONT (+X, camera-side) edge of their floor,
 // one rail per non-empty make-up group, stepping toward the camera as more rails appear.
