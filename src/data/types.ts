@@ -243,4 +243,9 @@ export type PickDescriptor =
   // A settlement-stack LAYER, selected from the Snapshots·Explore panel or a 3D floor plane.
   // Carries ONLY the id (matching domain/ledgerLayout's LAYER_GEOM) — the display name/description
   // are UI copy, resolved through src/data/ledgerLayers.ts by every surface that shows words.
-  | (PickBase & { kind: "layer"; layerId: string });
+  | (PickBase & { kind: "layer"; layerId: string })
+  // A metagraph-snapshot TILE on the ledger's upper floor (redesign 2026-08-04, spec §7.1). Like
+  // `layer` it is a pickable 3D subject with its own store channel and card slot — not a focus
+  // rung. It carries the selection payload plus the GLOBAL tick descriptor it anchored into, so
+  // the click table can commit the pair (tile + its tick) without a second lookup.
+  | (PickBase & { kind: "metaSnap"; sel: MetaSnapSel; global: Extract<PickDescriptor, { kind: "snapshot" }> });

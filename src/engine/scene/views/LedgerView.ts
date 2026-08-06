@@ -76,6 +76,14 @@ const PULSE_STAGGER = 0.035;
 const META_TRAIL_MAX = 1500;
 const GUTTER_OP = 0.75;
 
+/** The glass floors' footprint, and the X the edge-aligned labels read from. Module scope because
+ *  the gutter label has to land on the SAME edge as the floor labels (it used to be derived from
+ *  LEDGER.depth and floated ~9 units in front of the chamber). */
+const FLOOR_W = 39.5;
+const FLOOR_D = 44;
+const FLOOR_CX = -13.25;
+const FLOOR_LABEL_X = FLOOR_CX + FLOOR_W / 2 - 0.4;
+
 /** The lead row's "forming…" note: quieter than a floor label, and it eases rather than blinks. */
 const FORMING_OP = 0.6;
 const FORMING_EASE = 2.2;
@@ -251,8 +259,9 @@ export class LedgerView implements SceneView {
     for (let i = 0; i < META_TRAIL_MAX; i++) this._metaTrailMesh.setMatrixAt(i, _dummy.matrix);
     this._metaTrailMesh.instanceMatrix.needsUpdate = true;
     // A raycast hit's `instanceId` resolves through this array — tiles are instances, so they can't
-    // each carry a userData.pick of their own.
-    this._metaTrailMesh.userData.instancePicks = this._tilePicks;
+    // each carry a userData.pick of their own. `picks` is the name the Engine's raycast reader
+    // already implements for every instanced pool (Globe uses the same key).
+    this._metaTrailMesh.userData.picks = this._tilePicks;
     this.group.add(this._metaTrailMesh);
   }
 
@@ -292,9 +301,9 @@ export class LedgerView implements SceneView {
   }
 
   private _buildFloors() {
-    const W = 39.5;
-    const D = 44;
-    const cx = -13.25;
+    const W = FLOOR_W;
+    const D = FLOOR_D;
+    const cx = FLOOR_CX;
     const frameMat = new THREE.LineBasicMaterial({
       color: new THREE.Color(this._core).multiplyScalar(2),
       transparent: true,
@@ -349,7 +358,7 @@ export class LedgerView implements SceneView {
     for (const id of FLOOR_IDS) frame(W, D, FLOOR_Y[id], 0, id);
 
     const copyOf = (id: string) => LEDGER_LAYERS.find((l) => l.id === id);
-    const lx = cx + W / 2 - 0.4;
+    const lx = FLOOR_LABEL_X;
     for (const id of FLOOR_IDS) {
       const m = this._makeLabel(
         copyOf(id)?.level ?? "",
@@ -676,9 +685,14 @@ export class LedgerView implements SceneView {
     let mi = 0;
     for (const lane of this.model.lanes.values()) {
       if (this._laneHidden.get(lane.id)) continue;
+      // `k` is the tile's index WITHIN ITS TICK — the resolver looks a snapshot up by
+      // (metagraph, tick) and indexes that tick's own list. A lane's blocks are contiguous per
+      // tick (anchorTiles pushes a tick's tiles together), so the counter resets on each new ts.
       let k = 0;
+      let kTs = "";
       for (const b of lane.blocks) {
         if (mi >= META_TRAIL_MAX) break;
+        if (b.ts !== kTs) { kTs = b.ts; k = 0; }
         this._tilePicks[mi] = b.filled ? fn(lane.id, b.ts, k) : null; // event-time
         if (b.filled) k++;
         mi++;
@@ -717,7 +731,7 @@ export class LedgerView implements SceneView {
     const mesh = this._makeLabel(
       "",
       text,
-      LEDGER.depth / 2 - 6.9,
+      FLOOR_LABEL_X,
       FLOOR_Y.msnap,
       GUTTER_CZ + GUTTER_W / 2,
     );
