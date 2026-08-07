@@ -32,8 +32,10 @@ export const BAR_TUNE_DEFAULTS: BarTune = { hot: 0.7, rest: 0.05 };
 
 /** The HOVER-preview tier (user, 2026-08-07): a hovered snapshot row shows its identity
  *  colours at this fraction of the hot level — the ACTIVE row stays fully coloured, the
- *  preview reads as "this is what a click pins". Shared with the tiles. */
-export const SNAP_PREVIEW = 0.45;
+ *  preview reads as "this is what a click pins". Deliberately the OFF-FILTER dim's family
+ *  (RIBBON_DIM 0.2), a bit brighter — one dim language, two nearby levels. Shared with the
+ *  tiles and the hover ribbon row. */
+export const SNAP_PREVIEW = 0.3;
 
 interface Slot {
   ordinal: number;

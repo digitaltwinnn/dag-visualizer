@@ -44,7 +44,10 @@ export interface DimContext {
 // (The old hover-preview FORCED-STRONG 0.85 branch is gone — user 2026-07-11: hovering/
 // clicking a hub in hyper dimmed the rest far harder than the regular dim; the preview now
 // dims at the same per-view strength as a committed filter.)
-export const dimScale = (c: DimContext): number => 0.32 + 0.68 * c.morph;
+// (Ledger override 2026-08-07, matching metaNodeDim: morph is frozen there, and full strength
+// cascades to near-black through the chip writer — the flat 0.5 lands the validator chips at
+// the same COLORED-dim tier as the metagraph chips.)
+export const dimScale = (c: DimContext): number => (c.ledger ? 0.5 : 0.32 + 0.68 * c.morph);
 
 // The METAGRAPH pool's own dim strength: ZERO in the Hypergraph, full on the globe. Metagraph
 // nodes REST at the dimmed look in hyper (user, 2026-07-17 — the base size/glow in

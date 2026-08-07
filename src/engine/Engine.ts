@@ -9,7 +9,7 @@ import { createScene, type SceneCtx } from "./scene/SceneContext";
 import { HyperView, type MetaHubRec } from "./scene/views/HyperView";
 import { Globe, GATHER_CELL } from "./scene/Globe";
 import { LedgerView } from "./scene/views/LedgerView";
-import {  } from "./domain/ledgerModel";
+import { LANE_IDS } from "./domain/ledgerModel";
 import { UNLISTED_KEY } from "./domain/ledgerBands";
 
 // The public catalog's ids — the unknown-lane tile resolver splits listed from unlisted rows.
@@ -17,7 +17,7 @@ const LISTED_IDS = new Set(METAGRAPHS.map((m) => m.id));
 import { StageLights } from "./scene/objects/StageLights";
 import { loadGeoCache, resolveMissing } from "@/src/data/geoResolve";
 import { METAGRAPHS, COLORS } from "@/src/engine/config";
-import { BYTE_SCALE_KB, type RailGroup } from "./domain/ledgerLayout";
+import { BYTE_SCALE_KB, LEDGER, ledgerSite, type RailGroup } from "./domain/ledgerLayout";
 import { HYPER_TILT, HYPER_TILT_FOCUS } from "./domain/hyperLayout";
 import { readSceneColors } from "./sceneColors";
 import { VIEW_POLICIES, type ViewPolicy } from "./domain/viewPolicy";
@@ -925,11 +925,21 @@ export class Engine {
       return !!p && this._focusLedgerNode(p);
     },
     ledgerNetwork: () => {
-      // NO fly-to-lane (user reversal, 2026-08-07 — the second camera reversal of the day
-      // settles it): committing a network DIMS the others in place (colored dim on
-      // tiles/bands/ribbons) and auto-selects its latest snapshot; the camera holds the
-      // shared overview.
-      this.focus("ledger");
+      // No fly-to-lane, but a SUBTLE acknowledgement (user, 2026-08-07): from the overview
+      // pose, nudge a fraction toward the committed lane and dolly in slightly — enough to
+      // say something happened, while the colored dim carries the real emphasis.
+      const f = FOCI.ledger;
+      this._framingOut.pos.copy(f.pos);
+      this._framingOut.target.copy(f.target);
+      const i = LANE_IDS.indexOf(this.filter);
+      if (i >= 0) {
+        const laneX = -ledgerSite(i, LANE_IDS.length).z * LEDGER.viewScale;
+        this._framingOut.pos.x += laneX * 0.3;
+        this._framingOut.target.x += laneX * 0.3;
+      }
+      // Dolly in ~12% along the view ray — a nudge, not a zoom-to.
+      this._framingOut.pos.lerp(this._framingOut.target, 0.12);
+      this._tweenTo(this._framingOut.pos, this._framingOut.target);
       return true;
     },
     ledgerOverview: () => {
