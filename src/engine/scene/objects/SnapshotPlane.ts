@@ -27,10 +27,10 @@ export interface PlaneTune {
 }
 
 export const GLOBAL_PLANE_TUNE_DEFAULTS: PlaneTune = {
-  fillOp: 0.035, innerOp: 0.01, edge: 0.95, trayOp: 0.085,
+  fillOp: 0.035, innerOp: 0.01, edge: 0.95, trayOp: 0.025,
 };
 export const META_PLANE_TUNE_DEFAULTS: PlaneTune = {
-  fillOp: 0.035, innerOp: 0.01, edge: 0.98, trayOp: 0.085, // edge user-tuned via ?tune, 2026-08-07
+  fillOp: 0.035, innerOp: 0.01, edge: 0.98, trayOp: 0.025, // edge+tray user-tuned via ?tune, 2026-08-07
 };
 
 /** The planes' corner radius — SQUARE (rounded corners belong to the trays). */

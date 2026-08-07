@@ -246,7 +246,7 @@ export default function LedgerPanel() {
           const label = previewOrd != null ? "Pinned" : following ? "Live" : pinned ? "Pinned" : "Live";
           // Filtered live mode follows the NETWORK's anchors, not every global tick (the trail
           // holds its newest anchored row at the front) — say so (user, 2026-08-07).
-          const liveTicker = metagraphById(filter)?.ticker;
+          const liveTicker = metagraphById(filter)?.ticker ?? (filter === "unlisted" ? "unlisted" : null);
           const sub =
             previewOrd != null
               ? previewOrd.toLocaleString()
@@ -288,7 +288,15 @@ export default function LedgerPanel() {
               )}
             >
               {beating ? (
-                <span className="flex-none w-2 h-2 rounded-full bg-primary shadow-[0_0_0_3px_color-mix(in_oklch,var(--primary)_30%,transparent)] animate-dot-beat motion-reduce:animate-none" />
+                // The beating dot wears the FOLLOWED subject's identity (user, 2026-08-07 — the
+                // filter-face idiom: identity dot beside structural text); cyan on "all".
+                <span
+                  className="flex-none w-2 h-2 rounded-full animate-dot-beat motion-reduce:animate-none"
+                  style={{
+                    background: filter === "unlisted" ? "var(--core)" : accent,
+                    boxShadow: `0 0 0 3px color-mix(in oklch, ${filter === "unlisted" ? "var(--core)" : accent} 30%, transparent)`,
+                  }}
+                />
               ) : (
                 <span className={cn("flex-none w-2 h-2 rounded-full border", pinned && previewOrd == null ? "border-primary/80" : "border-muted-foreground/70")} />
               )}

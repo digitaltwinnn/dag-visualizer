@@ -1,6 +1,9 @@
 import { getNetwork, getAnchor, metagraphById } from "@/src/data/network";
+import { METAGRAPHS } from "@/src/engine/config";
 import { useStore } from "@/src/store/store";
 import type { GlobalSnapshot } from "@/src/data/types";
+
+const LISTED_IDS = new Set(METAGRAPHS.map((m) => m.id));
 
 // The latest snapshot worth showing while following: for a metagraph filter, the
 // newest one it ACTUALLY anchored into — or null if it hasn't anchored in the buffered
@@ -17,6 +20,16 @@ export function latestRelevant(filter: string): GlobalSnapshot | null {
       if (a && a.metaIds.has(filter)) return list[i];
     }
     return null; // this metagraph hasn't anchored into any buffered snapshot
+  }
+  if (filter === "unlisted") {
+    // The uncataloged channels follow the SAME rule as a listed metagraph (user, 2026-08-07):
+    // the newest tick they actually anchored into. Only the EXACT reads know them — scan the
+    // measured window (the live tick's read + the backfill keep it populated while following).
+    const exact = useStore.getState().snapshotExact;
+    for (let i = list.length - 1; i >= 0; i--) {
+      if ((exact[list[i].ordinal]?.unlistedCount ?? 0) > 0) return list[i];
+    }
+    return null;
   }
   return list[list.length - 1];
 }
@@ -52,6 +65,17 @@ export function followLatest() {
       }
       return;
     }
+  }
+  if (filter === "unlisted" && latest) {
+    // Same live card chain for the uncataloged channels: the newest unlisted row of the newest
+    // tick they anchored into (`latest` already resolved to that tick above).
+    const row = useStore
+      .getState()
+      .snapshotExact[latest.ordinal]?.rows?.find((r) => !LISTED_IDS.has(r.metaId));
+    if (row && (metaSnap?.metaId !== row.metaId || metaSnap.ordinal !== row.ordinal)) {
+      advanceMetaSnap({ metaId: row.metaId, ordinal: row.ordinal, hash: "", globalOrdinal: latest.ordinal, ts: latest.timestamp });
+    }
+    return;
   }
   // Not a metagraph follow (or nothing buffered): a followed card never shows a stale foreign
   // metagraph snapshot — clear it (explicit pins aren't in follow mode, so this can't fire there).
