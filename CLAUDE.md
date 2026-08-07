@@ -396,13 +396,13 @@ store-value imports**, enforced by `layerBoundaries.test.ts`). Each ships coloca
   group transform), the storey frame (`FLOOR_IDS`/`FLOOR_Y`, `LANE_HALF_Z`, `laneSpan`, and the
   per-metagraph plane geometry `LANE_PLANE_GAP`/`lanePlaneHalf` — one gapped plane per lane,
   sized from the lane PITCH), the byte bar's geometry
-  (`BAR_Z0`/`BAR_MAX_W`/`BAR_MIN_W`/`BAR_H`/`BAR_D` + the baked `BYTE_SCALE_KB`), the gl0
-  gutter (`GUTTER_W`/`GUTTER_CZ`), and
+  (`BAR_Z0`/`BAR_MAX_W`/`BAR_MIN_W`/`BAR_H`/`BAR_D` + the baked `BYTE_SCALE_KB`),
+  `PLANE_FIELD_HALF` (the symmetric plane-field half extent the global plane and the validator
+  tray span), and
   `LAYER_GEOM` (the two storeys' camera heights only, since the layer-navigation retirement
   2026-08-06 — display copy for them lives in `src/data/ledgerLayers.ts`), the tray
-  literals (`CONT_X`/`CONT_TOP_GAP`/`CONT_CHIP_Z`/`CONT_ROW_Y`/`CONT_PAD`/`CONT_Z0`/`CONT_Z1`)
-  and the gutter-plane split (`FLOOR_MAIN_Z0`/`GUTTER_GAP`), plus `ledgerSite`, `clusterRadius`,
-  `ledgerSpread`.
+  literals (`CONT_X`/`CONT_TOP_GAP`/`CONT_CHIP_Z`/`CONT_ROW_Y`/`CONT_PAD`/`CONT_Z0`/`CONT_Z1`;
+  chip grids CENTRE in their tray), plus `ledgerSite`, `clusterRadius`, `ledgerSpread`.
 - `ledgerBands.ts` — the byte bar's spec as pure data (`BarSpec`/`Band`, `makeBarSpec` +
   `fillBarSpec`, `BYTES_FULL`, `UNLISTED_KEY`, `ribbonQuad`): width from bytes against the fixed
   reference, **CENTERED on the lane field** (`z0 = -width/2`, user 2026-08-06), bands in lane
@@ -1481,8 +1481,9 @@ frame). It composes three adapters — `objects/ByteBar.ts`, `objects/Ribbons.ts
 `domain/ledgerRails.ts`, next to the existing `domain/ledgerLayout.ts` / `ledgerModel.ts`.
 
 - **Two storeys; the upper one is PER-METAGRAPH PLANES** (redesign 2026-08-07). The `gl0`
-  floor is ONE whole plane (+ its reserved $DAG-blocks gutter past the seam,
-  `FLOOR_MAIN_Z0`/`GUTTER_GAP`) — the only place the metagraphs come together. The `msnap`
+  floor is ONE whole plane spanning the SAME symmetric field as the metagraph planes
+  (`PLANE_FIELD_HALF`, centred — it sits square beneath them; the reserved gutter strip is
+  gone) — the only place the metagraphs come together. The `msnap`
   storey is NOT a shared floor: one narrow plane per lane (the unknown lane included), gapped
   (`LANE_PLANE_GAP`, width from the lane pitch via `lanePlaneHalf`), each carrying a small
   TICKER label ("unlisted" for the unknown lane; the collective "Metagraph snapshots" floor
@@ -1511,10 +1512,11 @@ frame). It composes three adapters — `objects/ByteBar.ts`, `objects/Ribbons.ts
 - **The honesty is in the DOMAIN, not the adapter** (`ledgerBands.ts`). `fillBarSpec` writes a
   `BarSpec {measured, anchored, kb, z0, width, clipped, overflow, bands, bandCount}`: **no exact
   read → `measured:false`, minimum width, NO BANDS** — a composition is never inferred from the
-  anchor count and never from the fee; **measured but nothing anchored → a minimum-width SEAM**
-  (the tick still happened); **over the reference → clipped with `overflow`**. `BAR_MIN_W` is that
-  seam width and `SEAM_OP` draws it as a dashed hairline outline, so an unmeasured tick and an
-  empty one look like what they are and never like a small one.
+  anchor count and never from the fee; **over the reference → clipped with `overflow`**.
+  An unmeasured or empty tick **draws no bar at all** (the dashed seam outline is RETIRED,
+  user 2026-08-07 — the per-row ordinal label already marks that the tick happened, so nothing
+  is drawn that could read as a small bar); `BAR_MIN_W` survives only as the width floor of a
+  tiny MEASURED bar.
 - **Ribbons carry the anchor** (`objects/Ribbons.ts`): one tapering sheet per anchoring lane, from
   that metagraph's lane tiles on `msnap` down to **its own band** in the bar on `gl0` — the
   literal statement of which bytes came from where. The sheet is **CURVED** (2026-08-06):
@@ -1525,8 +1527,9 @@ frame). It composes three adapters — `objects/ByteBar.ts`, `objects/Ribbons.ts
   restOp/dimOp/brightness/curve; `RIBBON_TUNE_DEFAULTS` is the shipped look). The dev
   **`?tune`** flag (present at page LOAD, the ?stats idiom) mounts a tweakpane panel
   (`src/engine/devTune.ts`, dynamic import — never in the normal bundle) with folders for the
-  ribbons, the byte bar (`BarTune` — rest/hot/seam opacities), the lane tiles
-  (`TileTune` — hot/rest/off-filter brightness) and TWO plane folders — **"global plane" and
+  ribbons, the byte bar (`BarTune`) and the lane tiles (`TileTune`) — the two snapshot
+  instruments share ONE parameter vocabulary, `hot`/`rest`/`dim` (user, 2026-08-07: no
+  snapshot blueprint, but the same tuning language) — and TWO plane folders — **"global plane" and
   "metagraph planes"**, the same `PlaneTune` shape (edge-fill/centre-fill/drop-off/tray fill)
   tuned separately per channel (user, 2026-08-07) — each backed by a
   `*_TUNE_DEFAULTS` shipped look; chosen values get baked back into those constants. `RIBBON_ROWS = 2`: only the **LEAD row and the HOT
@@ -1569,20 +1572,21 @@ frame). It composes three adapters — `objects/ByteBar.ts`, `objects/Ribbons.ts
   flies to the committed metagraph's lane (`ledgerFloorFraming` shifted laterally by the lane's
   world X) so its snapshots sit at screen centre. `setFilter` = dim only;
   `setHoverFilter` previews the dim.
-- **The gutter** — a narrow strip beyond the lane field on the screen-right (−Z) side of the
-  `gl0` floor only (`GUTTER_W = (2*LANE_HALF_Z)/6`, `GUTTER_CZ`), reserved for the $DAG blocks
-  (not drawn yet — a labelled reservation, no fabricated content). The `msnap` CURRENCY gutter
-  plane + its status line were DROPPED with the per-metagraph planes (2026-08-07); the whole
-  currency-activity lane went with it — `/api/currency-activity`, `src/data/currencyActivity.ts`
-  and the `CurrencyActivity` type were removed (git history keeps the recipe if a future
-  currency surface wants the reading back).
-- **Labels + `forming…`**: the global floor is named by subtle flat edge-aligned text
-  (`_makeLabel`, not billboards) carrying its `LEDGER_LAYERS.level` digit; each metagraph plane
-  carries a smaller ticker label the same way (height 0.62, no digit).
-  On the lead row of `msnap` a `forming…` note **eases** in and out (`FORMING_EASE`/`FORMING_OP`,
-  never blinks) while `model.leadForming` holds — i.e. while the tick's count is still settling
-  (`Date.now() - anchor.touched < LEAD_SETTLE_MS`), which is the *when* view stating its own
-  settling window instead of pretending a partial breakdown is final.
+- **No gutters** (2026-08-07): the `msnap` CURRENCY gutter plane + its status line were
+  DROPPED with the per-metagraph planes, and the whole currency-activity lane went with it —
+  `/api/currency-activity`, `src/data/currencyActivity.ts` and the `CurrencyActivity` type were
+  removed (git history keeps the recipe if a future currency surface wants the reading back).
+  The `gl0` reserved $DAG-blocks gutter strip followed the same day when the global plane went
+  symmetric — a future $DAG-blocks surface is a new design, not a held reservation.
+- **Labels**: the global floor is named by subtle flat edge-aligned text
+  (`SnapshotPlane.makeEdgeLabel`, not billboards) carrying its `LEDGER_LAYERS.level` digit;
+  each metagraph plane carries a smaller ticker label the same way (height 0.62, no digit,
+  CENTRED on its own width). Every visible tick row is named by a small **GLOBAL SNAPSHOT
+  ORDINAL label** (`#N`) at the global plane's screen-left edge — keyed by ordinal so a label
+  rides its row down the trail, one new canvas per tick (this replaced the lead row's
+  `forming…` note, 2026-08-07; `model.leadForming` remains domain data with no consumer).
+  Empty-tick lane placeholders draw NOTHING (the small dimmed block is gone) — the ordinal
+  label is what says the tick happened.
 - **The glass fill shader is shared, the LOOKS are split** (`objects/glassFill.ts`, 2026-08-07):
   the PLANES are SQUARE (radius 0) with the soft-rim drop-off (`PlaneTune` —
   edge-fill/centre-fill/drop-off); the NODE TRAYS are FLAT rounded-corner panels (rim channel
@@ -1784,8 +1788,8 @@ can't fetch them — but the **Next Node server can**:
   live + selected tick only — **never** the whole chain or a poll loop (that's what would
   make it expensive on Vercel) — plus a ONE-TIME paced **backfill** of the previous
   `BACKFILL_N` ordinals (`BACKFILL_GAP_MS` apart) on a cold load, because the trail otherwise
-  opens as a row of unmeasured seams; each of those ordinals is immutable and cached, so the
-  backfill costs at most once per ordinal ever.
+  opens with its unmeasured rows drawing no bars; each of those ordinals is immutable and
+  cached, so the backfill costs at most once per ordinal ever.
 - **`app/api/snapshot/[ordinal]/channel/[address]/route.ts`** is the **DEEP read** behind the
   metagraph-snapshot card's third tier: it re-downloads the same ~2.5 MB global to reach ONE
   state-channel entry and returns a `ChannelSnapDeep` (height/subHeight, epoch progress, last

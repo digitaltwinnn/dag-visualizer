@@ -36,14 +36,14 @@ export async function mountDevTune(targets: DevTuneTargets): Promise<DevTuneHand
   // The ribbon dim/brightness are baked into vertex colours — a change must rewrite the sheet.
   rf.on("change", () => targets.ledger.ribbons.setTune({}));
 
-  // The global snapshots — the byte bar's band/seam opacities (read per frame, no rebuild).
+  // The global snapshots — the byte bar's band opacities, in the SAME vocabulary as the tiles
+  // (user, 2026-08-07: hot / rest across both snapshot instruments; the seam is retired).
   const bf = pane.addFolder({ title: "global snapshots (bar)" });
   const bt = targets.ledger.bar.tune;
-  bf.addBinding(bt, "restOp", { min: 0, max: 1, step: 0.01, label: "opacity" });
-  bf.addBinding(bt, "hotOp", { min: 0, max: 1, step: 0.01, label: "hot opacity" });
-  // (no dimOp binding: it only shows while a committed/hovered network dims the other
+  bf.addBinding(bt, "hot", { min: 0, max: 1, step: 0.01, label: "hot" });
+  bf.addBinding(bt, "rest", { min: 0, max: 1, step: 0.01, label: "rest" });
+  // (no dim binding: it only shows while a committed/hovered network dims the other
   // networks' bands, so it read as inert in the panel — the mechanism keeps its default)
-  bf.addBinding(bt, "seamOp", { min: 0, max: 1, step: 0.01, label: "seam opacity" });
 
   // The two plane-tune channels — the SAME SnapshotPlane blueprint, tuned separately (user,
   // 2026-08-07): glass transparency + drop-off + the plane's own tray fill (read per frame).
