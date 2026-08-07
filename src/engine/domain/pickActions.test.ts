@@ -191,10 +191,10 @@ describe("the shared component builders (GeoExplore rows + LiveStrip bars run th
     // Pinned + re-clicked → clear (finer slot first); following is left to the FollowController.
     expect(snapshotSelectActions(p, false, { pinnedOrdinal: ord, metaSnap: child })).toEqual([
       { kind: "metaSnap", sel: null },
-      { kind: "snapshot", pick: null },
+      { kind: "snapshot", pick: null, follow: true },
     ]);
     expect(snapshotSelectActions(p, false, { pinnedOrdinal: ord, metaSnap: null })).toEqual([
-      { kind: "snapshot", pick: null },
+      { kind: "snapshot", pick: null, follow: true },
     ]);
     // A DIFFERENT pinned tick, or the live tip itself, still selects normally.
     expect(snapshotSelectActions(p, false, { pinnedOrdinal: ord + 1, metaSnap: null })).toEqual([

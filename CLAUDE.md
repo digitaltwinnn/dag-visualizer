@@ -1001,10 +1001,12 @@ health belongs to the cards + the future network-health view).
 cost). Activity metrics belong to ledger, structure to hyper — don't cross-pollinate.
 
 **The snapshot card is ledger-scoped — the pin does NOT carry out of the view** (spec
-2026-08-01, a deliberate reversal of the old carry-across-views rule) — and it **never opens
-itself**: entering ledger leaves the slot on its ghost hint like every other card (user,
-2026-08-02, reversing the old follow-live-on-entry default). Live-following is now OPT-IN, and
-the card's own head aside IS the switch (`SnapshotAside` → `pickActions.followToggleActions` →
+2026-08-01, a deliberate reversal of the old carry-across-views rule). **LIVE IS THE DEFAULT**
+(user, 2026-08-07 — superseding the 2026-08-02 opt-in-entry rule, itself a reversal of the
+original default; the full circle is deliberate): entering ledger starts following under ANY
+filter, browsing/pinning drops it, DESELECTING a pin resumes it (`snapshotSelectActions`' clear
+carries `follow: true`), and leaving + re-entering restores it. The card's head aside is still
+a manual switch (`SnapshotAside` → `pickActions.followToggleActions` →
 `applyClickActions`, so the write stays on the one selection path): ON = the beating cyan dot +
 `live now` (`live · {age}` while a metagraph lane's newest anchor is older than the tip — the
 label never overstates), OFF = the pinned snapshot's coarse age; toggling ON hands the subject
@@ -1588,7 +1590,8 @@ frame). It composes three adapters — `objects/ByteBar.ts`, `objects/Ribbons.ts
   the neutral trail, so the committed network leads while the rest stay identifiable.
   A committed metagraph puts the view in **LIVE METAGRAPH MODE** (user, 2026-08-07):
   entering the ledger with one committed — or committing one while there — flips `following`
-  ON (FollowController's mode/filter effect; "all"/"dag" keep the opt-in idle entry), and
+  ON (FollowController's mode/filter effect; since the live-by-default rule, "all"/"dag" enter
+  live too — theirs follows every global tick), and
   `followLatest` rides the WHOLE card chain on the heartbeat — the anchoring global
   (`advanceSnap`) AND the metagraph-snapshot card (`advanceMetaSnap`, the non-bumping twin) at
   that network's newest buffered snapshot. **"Live" under a filter means the NETWORK's

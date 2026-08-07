@@ -212,12 +212,13 @@ export function snapshotSelectActions(
   current?: { pinnedOrdinal: number | null; metaSnap: MetaSnapSel | null },
 ): ClickAction[] {
   // RE-CLICKING the pinned tick DESELECTS (2026-08-07 — the toggle every other rung already
-  // speaks): the finer metaSnap slot drops with it and the clear leaves `following` to the
-  // FollowController, so the scene slides back to the live/idle front — the parent selection.
+  // speaks): the finer metaSnap slot drops with it, and the deselect RESUMES LIVE (live is the
+  // default until something is clicked — the FollowController repopulates the card chain and
+  // the trail slides back to the live front).
   if (!isLiveTip && current && current.pinnedOrdinal != null && current.pinnedOrdinal === p.data.ordinal) {
     const out: ClickAction[] = [];
     if (current.metaSnap) out.push({ kind: "metaSnap", sel: null });
-    out.push({ kind: "snapshot", pick: null });
+    out.push({ kind: "snapshot", pick: null, follow: true });
     return out;
   }
   return [{ kind: "snapshot", pick: p, follow: isLiveTip }];
