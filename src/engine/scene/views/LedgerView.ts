@@ -72,6 +72,8 @@ const FLOOR_LABEL_X = FLOOR_CX + FLOOR_W / 2 - 0.4;
  *  2026-08-07 — replaced the lead row's `forming…` note): every visible tick row is named by
  *  the ordinal it anchors, quieter than the plane label. */
 const ORD_OP = 0.55;
+/** The committed lane's plane edge-fill multiplier (its plane leads with its snapshots). */
+const LANE_FILL_BOOST = 3;
 const ORD_H = 0.78;
 /** The label's text anchor — just outside the widest bar's screen-left end, reading inward. */
 const ORD_Z = LANE_HALF_Z + 0.35;
@@ -331,7 +333,7 @@ export class LedgerView implements SceneView {
     this._globalPlanes.push(
       new SnapshotPlane(this.group, this._colors, {
         w: W, d: 2 * PLANE_FIELD_HALF, y: FLOOR_Y.gl0, cx, cz: 0,
-        label: { text: gl?.name ?? "gl0", x: lx, z: PLANE_FIELD_HALF - 0.12 },
+        label: { text: gl?.name ?? "gl0", x: lx, z: 0, align: "center" },
       }),
     );
     const n = this._laneOrder.length;
@@ -369,7 +371,11 @@ export class LedgerView implements SceneView {
     // rim reads as one width everywhere; narrow pieces clamp it inside SnapshotPlane.
     const a = this._fades.alpha;
     for (const p of this._globalPlanes) p.applyAlpha(this.globalTune, a, FLOOR_D / 2);
-    for (const p of this._metaPlanes.values()) p.applyAlpha(this.metaTune, a, FLOOR_D / 2);
+    // The committed (or hover-previewed) network's OWN plane glows a step brighter — the
+    // plane-level twin of the colored dim (user, 2026-08-07).
+    const netKey = this._netDimKey();
+    for (const [key, p] of this._metaPlanes)
+      p.applyAlpha(this.metaTune, a, FLOOR_D / 2, key === netKey ? LANE_FILL_BOOST : 1);
     for (const o of this._ordLabels.values()) {
       const front = this._fadeAtX(LEAD_X - o.slot * SLOT_SP + this._trailOff);
       (o.mesh.material as THREE.MeshBasicMaterial).opacity = ORD_OP * front * a;

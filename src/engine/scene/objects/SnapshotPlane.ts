@@ -159,9 +159,10 @@ export class SnapshotPlane {
 
   /** Per-frame look: the caller passes ITS tune channel (global vs metagraph planes) and the
    *  furniture alpha. `rimRef` is the shared drop-off reference depth so the rim reads as one
-   *  width across planes; narrow pieces clamp it to stay a rim. */
-  applyAlpha(tune: PlaneTune, alpha: number, rimRef: number): void {
-    this._fillU.uOpacity.value = tune.fillOp * alpha;
+   *  width across planes; narrow pieces clamp it to stay a rim. `fillBoost` lifts the edge
+   *  fill alone — the committed lane's plane glows a step brighter (user, 2026-08-07). */
+  applyAlpha(tune: PlaneTune, alpha: number, rimRef: number, fillBoost = 1): void {
+    this._fillU.uOpacity.value = tune.fillOp * fillBoost * alpha;
     this._fillU.uInner.value = tune.innerOp * alpha;
     this._fillU.uEdgeW.value = Math.min((1 - tune.edge) * rimRef, 0.8 * this._minHalf);
     if (this._trayU && this._tray?.visible) {
