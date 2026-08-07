@@ -38,8 +38,11 @@ export interface RibbonTune {
 }
 
 export const RIBBON_TUNE_DEFAULTS: RibbonTune = {
-  restOp: 0.32,
-  dimOp: 0.1,
+  // User-tuned via ?tune, 2026-08-07: rest == dim (an off-filter ribbon keeps the same quiet
+  // level — under a commit the hidden lanes draw no ribbon at all, so dim only ever meant the
+  // hover preview, and equal reads calmer).
+  restOp: 0.15,
+  dimOp: 0.15,
   brightness: 0.85,
   curve: 1,
 };

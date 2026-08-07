@@ -26,8 +26,11 @@ export interface BarTune {
 }
 
 export const BAR_TUNE_DEFAULTS: BarTune = {
-  restOp: 0.5,
-  hotOp: 0.95,
+  // restOp/hotOp user-tuned via ?tune, 2026-08-07. dimOp stays a mechanism value (it only
+  // shows while a committed/hovered network dims the OTHER networks' bands — inert under
+  // "all", which is why it left the tune panel).
+  restOp: 0.2,
+  hotOp: 0.7,
   dimOp: 0.16,
   seamOp: 0.3,
 };

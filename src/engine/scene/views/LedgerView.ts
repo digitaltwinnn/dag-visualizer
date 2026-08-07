@@ -115,7 +115,8 @@ export interface TileTune {
   dim: number;  // the whole-lane multiplier while the lane is off-filter
 }
 
-export const TILE_TUNE_DEFAULTS: TileTune = { hot: 1.3, rest: 0.7, dim: 0.22 };
+// hot/rest user-tuned via ?tune, 2026-08-07 — the same levels as the byte bar's hot/rest.
+export const TILE_TUNE_DEFAULTS: TileTune = { hot: 0.7, rest: 0.2, dim: 0.22 };
 
 export class LedgerView implements SceneView {
   group: THREE.Group;

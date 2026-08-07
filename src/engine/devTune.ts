@@ -41,7 +41,8 @@ export async function mountDevTune(targets: DevTuneTargets): Promise<DevTuneHand
   const bt = targets.ledger.bar.tune;
   bf.addBinding(bt, "restOp", { min: 0, max: 1, step: 0.01, label: "opacity" });
   bf.addBinding(bt, "hotOp", { min: 0, max: 1, step: 0.01, label: "hot opacity" });
-  bf.addBinding(bt, "dimOp", { min: 0, max: 0.5, step: 0.01, label: "dim opacity" });
+  // (no dimOp binding: it only shows while a committed/hovered network dims the other
+  // networks' bands, so it read as inert in the panel — the mechanism keeps its default)
   bf.addBinding(bt, "seamOp", { min: 0, max: 1, step: 0.01, label: "seam opacity" });
 
   // The metagraph snapshots — the lane tiles' brightness multipliers (read per frame).
