@@ -174,6 +174,18 @@ describe("LedgerModel.setSelected / isRowHot — the binary colour rule (js/ledg
     expect(model.isRowHot(1)).toBe(false);
   });
 
+  it("slotOf maps an ordinal to its current slot without touching the selection", () => {
+    const model = new LedgerModel();
+    const s1 = snap(100, "T1", 1);
+    model.setData([s1], () => anchor({ [idA]: 1 }));
+    const s2 = snap(101, "T2", 1);
+    model.setData([s1, s2], (ts) => (ts === "T2" ? anchor({ [idA]: 1 }) : null));
+    expect(model.slotOf(101)).toBe(0); // the live lead
+    expect(model.slotOf(100)).toBe(1); // in the trail
+    expect(model.slotOf(42)).toBe(-1); // not visible
+    expect(model.selectedSlot).toBe(-1); // a pure lookup — no selection side effect
+  });
+
   it("setSelected(null) clears the selection back to live-lead-hot", () => {
     const model = new LedgerModel();
     model.setSelected(100);

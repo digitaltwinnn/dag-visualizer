@@ -1007,7 +1007,14 @@ the card's own head aside IS the switch (`SnapshotAside` → `pickActions.follow
 `live now` (`live · {age}` while a metagraph lane's newest anchor is older than the tip — the
 label never overstates), OFF = the pinned snapshot's coarse age; toggling ON hands the subject
 back to `FollowController` (its `following` effect re-points at the latest relevant snapshot),
-toggling OFF pins whatever is on screen. A *selected* snapshot pins until
+toggling OFF pins whatever is on screen. **The explorer's LIVE control is the explicit face of
+the same switch** (user, 2026-08-07 — the card aside alone was too easy to miss): a full-width
+toggle row at the top of the Snapshots tool card with THREE resting states — LIVE (beating cyan
+dot, "following new snapshots"), PINNED (hollow dot + the pinned ordinal, click returns to
+live) and IDLE (entering the view follows nothing — hollow dot, "off · click to follow", click
+follows the latest) — and a hover PREVIEW: hovering any snapshot (an explorer row, a strip bar,
+a scene tile — the shared `hoverSnapOrd` channel) shows the dashed pinned state it would enter.
+Same tested write path (`followToggleActions` + the executor). A *selected* snapshot pins until
 deselected **or until you leave ledger** — `Engine.setMode` clears `store.snap` on any switch away
 (the same `LEVEL_CARRY` logic that already scoped country/cohort to geo;
 `following` is left to the FollowController, whose mode effect flips it false outside ledger, so
@@ -1610,8 +1617,10 @@ frame). It composes three adapters — `objects/ByteBar.ts`, `objects/Ribbons.ts
   position, so the active selection owns the front instead of fighting the live lead's arrivals;
   rows newer than the selection slide past the front edge and dissolve (`_fadeAtX`, one slot of
   travel; `Ribbons.setRowFade` fades the live lead's sheet), and re-following slides everything
-  back. The offset target tracks `model.selectedSlot`, so each new tick keeps the pinned row at
-  the front. Selection comes from the LiveStrip:
+  back. The rewind follows ONLY the COMMITTED pin (`setPinned`/`model.slotOf` — the Engine
+  forwards the pinned ordinal separately from the hover channel): a hover previews the hot row
+  IN PLACE, only a click moves the trail (user, 2026-08-07 — scanning a list must never drag
+  the chamber). Each new tick keeps the pinned row at the front. Selection comes from the LiveStrip:
   the Engine forwards `hoverSnapOrd ?? snap.data.ordinal` to `ledger.setSelected(ordinal)`, and
   the ledger maps ordinal → slot each tick (`_recomputeSelectedSlot`). There is NO scene fog
   anywhere any more (removed 2026-07-11) and recency is `slotFade` brightness only. IDENTITY

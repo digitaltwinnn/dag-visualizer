@@ -192,8 +192,11 @@ export class LedgerView implements SceneView {
   /** The labels+lines ride the trail rewind as one group. */
   private _ordGroup = new THREE.Group();
   /** The TRAIL REWIND offset (user, 2026-08-07): >0 slides the whole time trail +X so the
-   *  SELECTED row sits at the lead position instead of fighting the live lead for the front. */
+   *  PINNED row sits at the lead position instead of fighting the live lead for the front.
+   *  Keyed to the COMMITTED pin (`setPinned`), never the hover — hover previews the hot row
+   *  in place, only a click moves the trail. */
   private _trailOff = 0;
+  private _pinnedOrd: number | null = null;
 
   // ── fades (the ledger's stage light went with the layer navigation, 2026-08-06 — nothing
   // committable is left for a spot to dramatise)
@@ -477,6 +480,11 @@ export class LedgerView implements SceneView {
     this._syncRibbonRows();
   }
 
+  /** The COMMITTED (clicked) snapshot — the only thing the trail rewind follows. */
+  setPinned(ordinal: number | null) {
+    this._pinnedOrd = ordinal;
+  }
+
   /** The COMMITTED network. Since the off-filter dim was removed entirely (user, 2026-08-07)
    *  this only GATES THE ANCHOR PULSES (the committed lane's pulses spawn, the rest stay
    *  quiet) — the lane field never moves, nothing dims, and the camera fly-to-lane is the
@@ -665,7 +673,8 @@ export class LedgerView implements SceneView {
     // time trail forward until that row sits at the lead position — the active selection owns
     // the front instead of fighting the live lead's arrivals. Rows newer than the selection
     // slide past the front edge and dissolve (_fadeAtX); re-following slides everything back.
-    const offTarget = this.model.selectedSlot > 0 ? this.model.selectedSlot * SLOT_SP : 0;
+    const pinnedSlot = this._pinnedOrd != null ? this.model.slotOf(this._pinnedOrd) : -1;
+    const offTarget = pinnedSlot > 0 ? pinnedSlot * SLOT_SP : 0;
     this._trailOff += (offTarget - this._trailOff) * Math.min(1, dt * 3.2);
     if (Math.abs(offTarget - this._trailOff) < 0.002) this._trailOff = offTarget;
     this._bar.setOffset(this._trailOff);

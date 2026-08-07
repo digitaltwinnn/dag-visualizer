@@ -11,10 +11,11 @@ import { latestRelevant } from "@/src/data/follow";
 import { identityHudHex } from "@/src/palette/identity";
 import { IdentityDot } from "@/components/inspector/parts";
 import { useStore } from "@/src/store/store";
-import { bandSelectActions, metaSnapSelectActions, snapshotSelectActions, sameMetaSnap } from "@/src/engine/domain/pickActions";
+import { bandSelectActions, metaSnapSelectActions, snapshotSelectActions, sameMetaSnap, followToggleActions } from "@/src/engine/domain/pickActions";
 import { applyClickActions } from "@/src/store/applyClickActions";
 import { DisclosureChevron, DisclosureRow, ROW_NEST, ROW_OUTSET } from "@/components/ExploreRows";
 import { LEDGER_LAYERS } from "@/src/data/ledgerLayers";
+import { NoSignalDot } from "@/components/state/StateAtoms";
 import { buildAnchorLog, type AnchorLogRow } from "@/src/data/anchorLog";
 import { SLOT_N } from "@/src/engine/domain/ledgerModel";
 import { fmtKB } from "@/src/util/format";
@@ -115,6 +116,9 @@ export default function LedgerPanel() {
   const hoverSnapOrd = useStore((s) => s.hoverSnapOrd);
   const setHoverSnapOrd = useStore((s) => s.setHoverSnapOrd);
   const snap = useStore((s) => s.snap);
+  const following = useStore((s) => s.following);
+  const latestSnapshot = useStore((s) => s.latestSnapshot);
+  const live = useStore((s) => s.live);
   const metaSnap = useStore((s) => s.metaSnap);
   const snapshotExact = useStore((s) => s.snapshotExact);
   // The visible window: the same live buffer LiveStrip reads, capped to the chamber's own
@@ -206,6 +210,73 @@ export default function LedgerPanel() {
       }}
     >
       <div className="flex flex-col gap-0.5">
+        {/* ── the LIVE control (user, 2026-08-07): the ONE explicit way to see and toggle the
+            follow state. LIVE = the beating cyan dot while the chamber follows the heartbeat;
+            PINNED = the pinned ordinal, click to return to live. Hovering ANY snapshot — a row
+            here, a strip bar, a scene tile (the shared hoverSnapOrd channel) — PREVIEWS the
+            pinned state it would enter (dashed frame, hollow dot). The write goes through the
+            tested followToggleActions + the one executor, like every selection. */}
+        {(() => {
+          if (!live)
+            return (
+              <span className="flex items-center gap-2 mb-1 py-1.5 px-2 rounded-sm border border-border text-label text-muted-foreground">
+                <NoSignalDot /> no signal
+              </span>
+            );
+          const liveOrd = latestSnapshot?.ordinal ?? null;
+          const previewOrd = hoverSnapOrd != null && hoverSnapOrd !== liveOrd ? hoverSnapOrd : null;
+          // THREE resting states: FOLLOWING (beating dot), PINNED (a clicked snapshot holds the
+          // front), and IDLE (entering the view follows nothing — live-follow is opt-in,
+          // 2026-08-02). A hover previews the pinned state it would enter, dashed.
+          const pinned = !following && snap != null;
+          const beating = following && previewOrd == null;
+          const label = previewOrd != null ? "Pinned" : following ? "Live" : pinned ? "Pinned" : "Live";
+          const sub =
+            previewOrd != null
+              ? previewOrd.toLocaleString()
+              : following
+                ? "following new snapshots"
+                : pinned
+                  ? `${snap!.data.ordinal.toLocaleString()} · click for live`
+                  : "off · click to follow";
+          return (
+            <button
+              type="button"
+              aria-pressed={following}
+              title={
+                following
+                  ? "Following the live snapshot — click to pin the one on screen"
+                  : "Follow the live snapshot"
+              }
+              onClick={() => {
+                // From IDLE there is nothing pinned to hand back — follow the latest instead.
+                const shown =
+                  snap ??
+                  (latestSnapshot
+                    ? ({ kind: "snapshot", title: `Global snapshot #${latestSnapshot.ordinal}`, data: latestSnapshot } as const)
+                    : null);
+                if (shown) applyClickActions(followToggleActions(shown, following));
+              }}
+              className={cn(
+                "nb-row group flex items-center gap-2 w-full mb-1 py-1.5 px-2 rounded-sm border text-left cursor-pointer transition-colors duration-150",
+                "focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--primary)] focus-visible:outline-offset-[-2px]",
+                beating ? "border-primary/25 bg-wash-faint hover:bg-wash-soft" : "border-border hover:bg-wash-hover",
+                previewOrd != null && "border-dashed",
+              )}
+            >
+              {beating ? (
+                <span className="flex-none w-2 h-2 rounded-full bg-primary shadow-[0_0_0_3px_color-mix(in_oklch,var(--primary)_30%,transparent)] animate-dot-beat motion-reduce:animate-none" />
+              ) : (
+                <span className="flex-none w-2 h-2 rounded-full border border-muted-foreground/70" />
+              )}
+              <span className={cn("text-micro tracking-caps uppercase", beating ? "text-primary" : "text-muted-foreground")}>
+                {label}
+              </span>
+              <span className="ml-auto min-w-0 truncate tabular-nums text-label text-muted-foreground">{sub}</span>
+            </button>
+          );
+        })()}
+
         {/* ── [2] Metagraph snapshots → metagraphs → snapshot ids ── */}
         {floorHeader("msnap", rows.length)}
         {openFloor === "msnap" && (

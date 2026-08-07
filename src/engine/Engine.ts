@@ -382,8 +382,11 @@ export class Engine {
         if (st.inspect !== prev.inspect && st.mode === "ledger") this._resolveFocus();
         // Ledger: keep the hovered/selected snapshot coloured in the trail (hover wins, then the
         // clicked `snap`); everything else fades to the neutral background tone.
-        if (st.hoverSnapOrd !== prev.hoverSnapOrd || st.snap !== prev.snap) {
+        if (st.hoverSnapOrd !== prev.hoverSnapOrd || st.snap !== prev.snap || st.following !== prev.following) {
           this.ledger.setSelected(st.hoverSnapOrd ?? st.snap?.data?.ordinal ?? null);
+          // The REWIND follows only the COMMITTED pin (a hover previews the hot row in place —
+          // it must never drag the trail while scanning a list; user, 2026-08-07).
+          this.ledger.setPinned(!st.following ? st.snap?.data?.ordinal ?? null : null);
         }
         // A landing EXACT read is what turns a tick from an unmeasured seam into a measured byte
         // bar (spec §6.3), so re-hand the map the moment it changes. Ledger-only: nothing else

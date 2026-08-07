@@ -270,6 +270,16 @@ export class LedgerModel {
     this.recomputeSelectedSlot();
   }
 
+  /** Ordinal → its current slot (0 = the live lead, else its trail slot, −1 = not visible).
+   *  The REWIND's offset target reads this for the COMMITTED pin — deliberately separate from
+   *  `selectedSlot`, which also follows the transient hover (hover previews the hot row IN
+   *  PLACE; only a click moves the trail — user, 2026-08-07). */
+  slotOf(ordinal: number): number {
+    if (ordinal === this.tickOrdinal) return 0;
+    const t = this.trail.find((x) => x.ordinal === ordinal);
+    return t ? t.slot : -1;
+  }
+
   // The binary colour rule: colour belongs to the LIVE lead (slot<=0) OR to a SELECTED older
   // snapshot (exclusively — selecting one neutralises the live lead). (The laneOff parameter went
   // with the off-filter dim, 2026-08-07 — a committed filter changes the camera, never a row.)
