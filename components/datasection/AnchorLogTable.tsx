@@ -2,8 +2,9 @@
 
 import { useStore } from "@/src/store/store";
 import { useSnapshotFeed } from "@/components/useSnapshotFeed";
-import { getNetwork, metagraphById, filterAccent } from "@/src/data/network";
+import { getNetwork } from "@/src/data/network";
 import { buildAnchorLog } from "@/src/data/anchorLog";
+import { displayNetwork, unlistedLog, UNLISTED_ID } from "@/src/data/unlisted";
 import { metaSnapSelectActions } from "@/src/engine/domain/pickActions";
 import { applyClickActions } from "@/src/store/applyClickActions";
 import { fmtDag, fmtKB } from "@/src/util/format";
@@ -30,12 +31,24 @@ export default function AnchorLogTable() {
   const filter = useStore((s) => s.filter);
   const live = useStore((s) => s.live);
   const snap = useStore((s) => s.snap);
+  const following = useStore((s) => s.following);
   const metaSnap = useStore((s) => s.metaSnap);
   const setHoverSnapOrd = useStore((s) => s.setHoverSnapOrd);
   const net = getNetwork();
   // Rebuilt per render on purpose: renders here are event-driven (a tick / an anchor fill every
   // few seconds), and the buffers mutate in place, so a memo key would go stale, not save work.
-  const rows = net ? buildAnchorLog(net.metaSnaps, net.globalSnapshots, filter) : [];
+  // The UNLISTED channels join from the exact reads (2026-08-07 — the polled buffers only track
+  // the catalog, so under the "unlisted" filter the listed builder is empty by construction and
+  // these rows ARE the table; under "all" they complete it).
+  const snapshotExact = useStore((s) => s.snapshotExact);
+  const listedRows = net ? buildAnchorLog(net.metaSnaps, net.globalSnapshots, filter) : [];
+  const unlistedRows =
+    net && (filter === "all" || filter === UNLISTED_ID)
+      ? unlistedLog(net.globalSnapshots, snapshotExact)
+      : [];
+  const rows = [...listedRows, ...unlistedRows].sort((a, b) =>
+    a.ts === b.ts ? b.ordinal - a.ordinal : a.ts < b.ts ? 1 : -1,
+  );
 
   if (rows.length === 0)
     return (
@@ -67,7 +80,7 @@ export default function AnchorLogTable() {
         </TableHeader>
         <TableBody>
           {rows.map((r) => {
-            const cfg = metagraphById(r.metaId);
+            const cfg = displayNetwork(r.metaId) ?? null;
             // Several rows can share one anchoring global — they ALL wash when it's selected.
             // Honest: they anchored into the selected snapshot. (The wash alone, not the
             // SELECTED_ROW box-shadow: box-shadow doesn't paint on a collapsed table row.)
@@ -86,15 +99,20 @@ export default function AnchorLogTable() {
                     metaSnapSelectActions(
                       { metaId: r.metaId, ordinal: r.ordinal, hash: r.hash, globalOrdinal: r.global.ordinal, ts: r.ts },
                       { kind: "snapshot", title: `Global snapshot #${r.global.ordinal}`, data: r.global },
-                      { filter, metaSnap },
+                      { filter, metaSnap, following },
                     ),
                   )
                 }
               >
                 <TableCell>
                   <span className="flex items-center gap-2">
-                    <IdentityDot hue={filterAccent(r.metaId)} />
-                    {cfg?.name ?? r.metaId}
+                    <IdentityDot hue={cfg?.hue ?? "var(--core)"} />
+                    {cfg && !cfg.virtual ? (
+                      cfg.name
+                    ) : (
+                      // An uncataloged channel: the core tone + its address, honestly unnamed.
+                      <span className="italic text-muted-foreground">unlisted · {r.metaId.slice(0, 10)}…</span>
+                    )}
                   </span>
                 </TableCell>
                 <TableCell className="font-mono tabular-nums text-foreground-dim">{r.ordinal.toLocaleString()}</TableCell>

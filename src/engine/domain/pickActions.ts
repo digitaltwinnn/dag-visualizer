@@ -235,9 +235,12 @@ export const sameMetaSnap = (a: MetaSnapSel | null, b: MetaSnapSel | null): bool
 export function metaSnapSelectActions(
   sel: MetaSnapSel,
   global: Extract<PickDescriptor, { kind: "snapshot" }>,
-  current: { filter: string; metaSnap: MetaSnapSel | null },
+  current: { filter: string; metaSnap: MetaSnapSel | null; following?: boolean },
 ): ClickAction[] {
-  if (sameMetaSnap(current.metaSnap, sel)) return [{ kind: "metaSnap", sel: null }];
+  // The deselect-toggle applies only to a PINNED selection. While FOLLOWING, the shown subject
+  // is auto-selected — clicking it must CONVERT the auto-selection into an explicit pin (the
+  // click-scoped decode rule, user 2026-08-07), not silently deselect.
+  if (sameMetaSnap(current.metaSnap, sel) && !current.following) return [{ kind: "metaSnap", sel: null }];
   const out: ClickAction[] = [];
   // Filter-first only for a LISTED metagraph — an UNKNOWN-lane tile carries a raw state-channel
   // address (2026-08-07, inspectable tiles): the filter vocabulary doesn't know it, so like the
@@ -255,7 +258,7 @@ export function metaSnapSelectActions(
 export function bandSelectActions(
   metaId: string,
   global: Extract<PickDescriptor, { kind: "snapshot" }>,
-  current: { filter: string; metaSnap: MetaSnapSel | null },
+  current: { filter: string; metaSnap: MetaSnapSel | null; following?: boolean },
 ): ClickAction[] {
   const out: ClickAction[] = [];
   const listed = metaId !== "unlisted";

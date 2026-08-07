@@ -158,6 +158,14 @@ export default function MetaSnapPane({
               <Fact label="Exact read">unavailable — tick pruned</Fact>
             )}
 
+            {/* An uncataloged channel the decoder couldn't read (ordinal 0 marks it): the state
+                may exist but is UNREADABLE — say so instead of silently omitting the whole
+                tier (user, 2026-08-07: the missing "show state" read as a bug). */}
+            {row && !row.decoded && (
+              <Fact label="State">
+                <span className="text-muted-foreground italic">undecodable payload</span>
+              </Fact>
+            )}
             {/* ── Tier 3: the application state, STATE-AWARE — a metagraph whose state is
                 genuinely empty gets no invitation (a currency-only metagraph never has one). ── */}
             {row?.hasState && (

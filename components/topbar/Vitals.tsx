@@ -3,6 +3,7 @@
 import { Gauge } from "lucide-react";
 import { useStore } from "@/src/store/store";
 import { metagraphById, filterAccent } from "@/src/data/network";
+import { displayNetwork } from "@/src/data/unlisted";
 import Sparkline from "@/components/Sparkline";
 import Odometer from "@/components/Odometer";
 import { NoSignalDot } from "@/components/state/StateAtoms";
@@ -58,9 +59,9 @@ function HyperVitals() {
   // Order: the make-up that dominates every real network first, then the dedicated roles in
   // layer order (L0 → cL1 → dL1) — the same order `compositionRows` emits them in.
   const counts: Record<string, number> = { Hybrid: 0, Consensus: 0, Currency: 0, Data: 0 };
-  // "unlisted" is committed-but-machineless BY NATURE (2026-08-07): an empty selection with
-  // em-dashes, never the whole network's numbers (cfg null must not fall through to "all").
-  const isUnlisted = filter === "unlisted";
+  // A VIRTUAL network (the unlisted set) is committed-but-machineless BY NATURE (2026-08-07,
+  // one-home design): an empty selection with em-dashes, never the whole network's numbers.
+  const isUnlisted = displayNetwork(filter)?.virtual === true;
   const cores = cfg ? metaList.filter((m) => m.id === cfg.id) : isUnlisted ? [] : metaList;
   for (const mg of cores) {
     const machines = new Map<string, NodeInfo>();

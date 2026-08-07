@@ -933,10 +933,17 @@ and keep changing, so they're examples, not the contract.
   **`unlisted` group** (2026-08-07) rides after the listed ones — neutral dot, italic, sourced
   from the EXACT reads (the only honest source for uncataloged channels), its rows labelled by
   the channel snapshot's own ordinal (or the address when undecoded), same tested select.
-  **`unlisted` is a first-class FILTER too**: a picker chip (dimmed like a 0-located
-  metagraph, neutral dot — TopBar's face knows the label), committable in every view — geo/
-  hyper land in the honest quiet-empty state (no machines are knowable), the ledger lights the
-  unlisted lane and dims the rest;
+  **`unlisted` is a first-class network with ONE HOME** (`src/data/unlisted.ts`, 2026-08-07 —
+  user: the scattered `filter === "unlisted"` branches each grew bugs): the module owns its
+  IDENTITY (`displayNetwork(id)` — the one lookup wherever a catalog metagraph OR the unlisted
+  pseudo-network may appear: core-blue hue, italic, `virtual: true`) and its DATA
+  (`unlistedLog`/`latestUnlistedTick` over the EXACT reads — the only honest source; the
+  polled buffers only track the catalog). Consumers — the picker chip, TopBar face, LIVE
+  control, explorer group + per-tick contributor row, anchor log, vitals guard, follow system
+  — all read the module; `ledgerBands.UNLISTED_KEY` carries the same id string so the lane/
+  band/dim machinery matches by construction. Committable in every view — geo/hyper land in
+  the honest quiet-empty state (no machines are knowable), the ledger lights the unlisted lane
+  and dims the rest;
   · **Global snapshots** → TICK rows first (user, 2026-08-07 — the snapshot leads; metric =
   the exact read's measured KB, dash until it lands), each row selecting via the shared
   `snapshotSelectActions` AND disclosing its contributor METAGRAPH child rows in the same

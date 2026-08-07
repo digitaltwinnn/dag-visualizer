@@ -7,7 +7,7 @@ import { SelectedRowMark, selectedRow } from "@/components/selection";
 import { subjectPairing } from "@/components/useSubjectPairing";
 import { useSnapshotFeed } from "@/components/useSnapshotFeed";
 import { getNetwork, filterAccent, metagraphById } from "@/src/data/network";
-import { METAGRAPHS } from "@/src/engine/config";
+import { displayNetwork, unlistedLog, UNLISTED_ID, LISTED_IDS } from "@/src/data/unlisted";
 import { latestRelevant } from "@/src/data/follow";
 import { identityHudHex } from "@/src/palette/identity";
 import { IdentityDot } from "@/components/inspector/parts";
@@ -131,17 +131,9 @@ export default function LedgerPanel() {
   // render, same as the raw layer's AnchorLogTable — the buffers mutate in place).
   const rows = net ? buildAnchorLog(net.metaSnaps, net.globalSnapshots, "all").filter((r) => visibleTs.has(r.ts)) : [];
   const groups = groupByMeta(rows);
-  // The UNLISTED channels (user, 2026-08-07 — navigable like any network): the EXACT reads are
-  // the only honest source (the polled buffers only track the public catalog). One entry per
-  // unlisted state-channel snapshot in the visible window, newest tick first.
-  const LISTED = new Set(METAGRAPHS.map((m) => m.id));
-  const unlistedRows = [...snaps].reverse().flatMap((g) => {
-    const ex = snapshotExact[g.ordinal];
-    if (!ex?.rows) return [];
-    return ex.rows
-      .filter((r) => !LISTED.has(r.metaId))
-      .map((r) => ({ row: r, global: g }));
-  });
+  // The UNLISTED channels (user, 2026-08-07 — navigable like any network): the one-home row
+  // source (src/data/unlisted.ts — the exact reads, the only honest source), windowed here.
+  const unlistedEntries = unlistedLog([...snaps].reverse(), snapshotExact);
   const orderedSnaps = [...snaps].reverse(); // newest first, the log convention
   const activeSnapOrd = snap?.data.ordinal ?? null;
 
@@ -246,7 +238,7 @@ export default function LedgerPanel() {
           const label = previewOrd != null ? "Pinned" : following ? "Live" : pinned ? "Pinned" : "Live";
           // Filtered live mode follows the NETWORK's anchors, not every global tick (the trail
           // holds its newest anchored row at the front) — say so (user, 2026-08-07).
-          const liveTicker = metagraphById(filter)?.ticker ?? (filter === "unlisted" ? "unlisted" : null);
+          const liveTicker = displayNetwork(filter)?.ticker ?? null;
           const sub =
             previewOrd != null
               ? previewOrd.toLocaleString()
@@ -340,7 +332,7 @@ export default function LedgerPanel() {
                                     metaSnapSelectActions(
                                       sel,
                                       { kind: "snapshot", title: `Global snapshot #${r.global.ordinal}`, data: r.global },
-                                      { filter, metaSnap },
+                                      { filter, metaSnap, following },
                                     ),
                                   )
                                 }
@@ -355,13 +347,13 @@ export default function LedgerPanel() {
             {/* The UNLISTED group — neutral dot (no single hue can speak for a mixed set),
                 snapshot rows labelled by their own ordinal (or the channel address when the
                 payload couldn't be decoded), the SAME tested select a chamber tile runs. */}
-            {unlistedRows.length > 0 && (
+            {unlistedEntries.length > 0 && (
               <div>
                 <DisclosureRow
                   key="msnap|unlisted"
                   open={openMeta === "msnap|unlisted"}
-                  holdsSel={metaSnap != null && !LISTED.has(metaSnap.metaId)}
-                  title={`unlisted · ${unlistedRows.length} snapshot${unlistedRows.length === 1 ? "" : "s"} from uncataloged channels`}
+                  holdsSel={metaSnap != null && !LISTED_IDS.has(metaSnap.metaId)}
+                  title={`unlisted · ${unlistedEntries.length} snapshot${unlistedEntries.length === 1 ? "" : "s"} from uncataloged channels`}
                   onToggle={() => setOpenMeta(openMeta === "msnap|unlisted" ? null : "msnap|unlisted")}
                   onHoverEnter={() => setHoverFilter("unlisted")}
                   onHoverLeave={() => setHoverFilter(null)}
@@ -373,26 +365,26 @@ export default function LedgerPanel() {
                 </DisclosureRow>
                 {openMeta === "msnap|unlisted" && (
                   <div className="mb-1 ml-[7px] pl-2 border-l border-border">
-                    {unlistedRows.map(({ row: r, global: g }, i) => {
-                      const sel = { metaId: r.metaId, ordinal: r.ordinal, hash: "", globalOrdinal: g.ordinal, ts: g.timestamp };
+                    {unlistedEntries.map((r, i) => {
+                      const sel = { metaId: r.metaId, ordinal: r.ordinal, hash: "", globalOrdinal: r.global.ordinal, ts: r.ts };
                       const isSel = sameMetaSnap(metaSnap, sel);
                       return (
                         <SnapRow
-                          key={`${g.ordinal}:${r.metaId}:${i}`}
+                          key={`${r.global.ordinal}:${r.metaId}:${i}`}
                           label={r.ordinal > 0 ? r.ordinal.toLocaleString() : `${r.metaId.slice(0, 10)}…`}
-                          metric={fmtKB(r.bytes / 1024)}
+                          metric={fmtKB(r.sizeInKB)}
                           selected={isSel}
                           hoverOrd={hoverSnapOrd}
-                          pairOrd={g.ordinal}
+                          pairOrd={r.global.ordinal}
                           setHoverOrd={setHoverSnapOrd}
                           accent="var(--core)"
-                          title={`Unlisted channel ${r.metaId} · anchored into global #${g.ordinal}`}
+                          title={`Unlisted channel ${r.metaId} · anchored into global #${r.global.ordinal}`}
                           onClick={() =>
                             applyClickActions(
                               metaSnapSelectActions(
                                 sel,
-                                { kind: "snapshot", title: `Global snapshot #${g.ordinal}`, data: g },
-                                { filter, metaSnap },
+                                { kind: "snapshot", title: `Global snapshot #${r.global.ordinal}`, data: r.global },
+                                { filter, metaSnap, following },
                               ),
                             )
                           }
@@ -416,6 +408,7 @@ export default function LedgerPanel() {
               ? empty
               : orderedSnaps.map((d) => {
                   const tickRows = rows.filter((r) => r.global.ordinal === d.ordinal);
+                  const tickUnlisted = snapshotExact[d.ordinal]?.unlistedCount ?? 0;
                   const tickGroups = groupByMeta(tickRows);
                   const isOpen = openMeta === `gl0|${d.ordinal}`;
                   const globalPick = {
@@ -472,7 +465,7 @@ export default function LedgerPanel() {
                                   onClick={() =>
                                     // A metagraph under a tick is the BAND: the (metagraph, tick)
                                     // pair — same tested semantics as clicking its band in the bar.
-                                    applyClickActions(bandSelectActions(g.id, globalPick, { filter, metaSnap }))
+                                    applyClickActions(bandSelectActions(g.id, globalPick, { filter, metaSnap, following }))
                                   }
                                   onMouseEnter={() => setHoverFilter(g.id)}
                                   onMouseLeave={() => setHoverFilter(null)}
@@ -492,6 +485,29 @@ export default function LedgerPanel() {
                                 </button>
                               );
                             })
+                          )}
+                          {/* The UNLISTED contributor row (one-home design): present whenever
+                              the tick's exact read counted uncataloged anchors — the band click,
+                              like the listed rows. */}
+                          {tickUnlisted > 0 && (
+                            <button
+                              type="button"
+                              className="nb-row group flex items-center gap-2.5 w-full text-left text-body border border-transparent bg-transparent cursor-pointer py-[5px] px-2 rounded-sm transition-[background] duration-150 hover:bg-wash-hover"
+                              title={`${tickUnlisted} uncataloged snapshot${tickUnlisted === 1 ? "" : "s"} anchored into #${d.ordinal}`}
+                              onClick={() =>
+                                applyClickActions(bandSelectActions(UNLISTED_ID, globalPick, { filter, metaSnap, following }))
+                              }
+                              onMouseEnter={() => setHoverFilter(UNLISTED_ID)}
+                              onMouseLeave={() => setHoverFilter(null)}
+                            >
+                              <IdentityDot hue="var(--core)" />
+                              <span className="flex-1 min-w-0 text-body text-foreground italic whitespace-nowrap overflow-hidden text-ellipsis">
+                                unlisted
+                              </span>
+                              <span className="flex-none tabular-nums text-label font-semibold text-muted-foreground">
+                                {tickUnlisted}
+                              </span>
+                            </button>
                           )}
                         </div>
                       )}

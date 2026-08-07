@@ -258,7 +258,7 @@ function CompositionPane({ sel, onClose, collapsed, onToggle }: { sel: Compositi
 // rail losing its calm. Availability + copy come from the rail manifest (railCards.ts), the
 // same single source of truth the dock trays read.
 const GHOST_EYEBROW: Record<string, string> = {
-  context: "Metagraph", country: "Country", cohort: "Provider", composition: "Composition", node: "Node", snap: "Snapshot",
+  context: "Metagraph", country: "Country", cohort: "Provider", composition: "Composition", node: "Node", snap: "Global snapshot",
   metaSnap: "Metagraph snapshot",
 };
 export function GhostCard({ card }: { card: RailCard }) {
@@ -453,7 +453,7 @@ export default function Inspector() {
       <CardPane key="node" pick={{ kind: "geoLive" }} eyebrow="Node" onClose={() => applyClickActions([{ kind: "inspect", pick: null }])} {...cx("node")} />
     ),
     snap: snap ? (
-      <CardPane key="snap" pick={snap} eyebrow="Snapshot" onClose={() => applyClickActions([{ kind: "snapshot", pick: null }])} {...cx("snap")} />
+      <CardPane key="snap" pick={snap} eyebrow="Global snapshot" onClose={() => applyClickActions([{ kind: "snapshot", pick: null }])} {...cx("snap")} />
     ) : null,
     // The metagraph-snapshot tile: a card slot with no ladder rung (spec §7.1), so its × just
     // clears its own channel — there is no coarser rung for it to step back to.
