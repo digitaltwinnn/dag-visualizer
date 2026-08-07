@@ -937,8 +937,10 @@ export class Engine {
         this._framingOut.pos.x += laneX * 0.3;
         this._framingOut.target.x += laneX * 0.3;
       }
-      // Dolly in ~12% along the view ray — a nudge, not a zoom-to.
+      // Dolly in ~12% along the view ray and TILT slightly up (user, 2026-08-07 — the aim
+      // rises so the metagraph planes read in the acknowledged pose) — a nudge, not a zoom-to.
       this._framingOut.pos.lerp(this._framingOut.target, 0.12);
+      this._framingOut.target.y += 2;
       this._tweenTo(this._framingOut.pos, this._framingOut.target);
       return true;
     },
@@ -1194,6 +1196,8 @@ export class Engine {
           country: st.country,
           hasInspect: !!st.inspect,
           cohort: this.cohortSel,
+          pinnedOrdinal: !st.following ? st.snap?.data?.ordinal ?? null : null,
+          metaSnap: st.metaSnap,
         },
       }),
     );

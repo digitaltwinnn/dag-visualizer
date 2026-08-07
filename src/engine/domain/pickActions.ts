@@ -209,7 +209,17 @@ export function clearAllActions(current: {
 export function snapshotSelectActions(
   p: Extract<PickDescriptor, { kind: "snapshot" }>,
   isLiveTip: boolean,
+  current?: { pinnedOrdinal: number | null; metaSnap: MetaSnapSel | null },
 ): ClickAction[] {
+  // RE-CLICKING the pinned tick DESELECTS (2026-08-07 — the toggle every other rung already
+  // speaks): the finer metaSnap slot drops with it and the clear leaves `following` to the
+  // FollowController, so the scene slides back to the live/idle front — the parent selection.
+  if (!isLiveTip && current && current.pinnedOrdinal != null && current.pinnedOrdinal === p.data.ordinal) {
+    const out: ClickAction[] = [];
+    if (current.metaSnap) out.push({ kind: "metaSnap", sel: null });
+    out.push({ kind: "snapshot", pick: null });
+    return out;
+  }
   return [{ kind: "snapshot", pick: p, follow: isLiveTip }];
 }
 
@@ -276,7 +286,12 @@ export function clickActions(input: {
   // HYPER only: the composition group the picked node belongs to, resolved by the Engine (the
   // group vocabulary lives in the data layer) — the node's ancestry rung, like the ledger floor.
   compositionSel?: CompositionSel | null;
-  current: { filter: string; country: string | null; hasInspect: boolean; cohort: CohortSel | null };
+  current: {
+    filter: string; country: string | null; hasInspect: boolean; cohort: CohortSel | null;
+    // Ledger: the pinned tick + its metaSnap child — a scene band click on the pinned tick
+    // deselects, same as the explorer row (the toggle rule; omitted = never toggles).
+    pinnedOrdinal?: number | null; metaSnap?: MetaSnapSel | null;
+  };
 }): ClickAction[] {
   const { mode, pick: p, countryCc, current } = input;
 
@@ -288,8 +303,13 @@ export function clickActions(input: {
   // A hub click selects the metagraph (opens its context pane + frames it).
   if (p.kind === "meta") return [{ kind: "filter", id: p.cfg.id }];
 
-  // The ledger's snapshot tile: a scene tile is never the strip's live tip — always pin.
-  if (p.kind === "snapshot") return snapshotSelectActions(p, false);
+  // The ledger's snapshot bands: a scene band is never the strip's live tip — it pins, and
+  // re-clicking the pinned tick's band deselects (the same tested toggle the explorer runs).
+  if (p.kind === "snapshot")
+    return snapshotSelectActions(p, false, {
+      pinnedOrdinal: current.pinnedOrdinal ?? null,
+      metaSnap: current.metaSnap ?? null,
+    });
 
   // A node, in any view. (No autoRotate action: geo disables the controls' rotation at mode
   // entry and the inspect subscription re-asserts it on the node flight.)

@@ -184,6 +184,27 @@ describe("the shared component builders (GeoExplore rows + LiveStrip bars run th
     expect(snapshotSelectActions(p, false)).toEqual([{ kind: "snapshot", pick: p, follow: false }]);
   });
 
+  it("snapshotSelectActions: re-clicking the PINNED tick deselects, dropping the metaSnap child", () => {
+    const p = snapPick();
+    const ord = (p as unknown as { data: { ordinal: number } }).data.ordinal;
+    const child = { metaId: "dor", ordinal: 1, hash: "h", globalOrdinal: ord, ts: "T" } as MetaSnapSel;
+    // Pinned + re-clicked → clear (finer slot first); following is left to the FollowController.
+    expect(snapshotSelectActions(p, false, { pinnedOrdinal: ord, metaSnap: child })).toEqual([
+      { kind: "metaSnap", sel: null },
+      { kind: "snapshot", pick: null },
+    ]);
+    expect(snapshotSelectActions(p, false, { pinnedOrdinal: ord, metaSnap: null })).toEqual([
+      { kind: "snapshot", pick: null },
+    ]);
+    // A DIFFERENT pinned tick, or the live tip itself, still selects normally.
+    expect(snapshotSelectActions(p, false, { pinnedOrdinal: ord + 1, metaSnap: null })).toEqual([
+      { kind: "snapshot", pick: p, follow: false },
+    ]);
+    expect(snapshotSelectActions(p, true, { pinnedOrdinal: ord, metaSnap: null })).toEqual([
+      { kind: "snapshot", pick: p, follow: true },
+    ]);
+  });
+
   it("followToggleActions: the card's live switch flips following, keeping the shown subject", () => {
     const p = snapPick();
     expect(followToggleActions(p, false)).toEqual([{ kind: "snapshot", pick: p, follow: true }]);

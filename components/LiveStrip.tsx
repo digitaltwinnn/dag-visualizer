@@ -82,6 +82,10 @@ export default function LiveStrip() {
       snapshotSelectActions(
         { kind: "snapshot", title: `Global snapshot #${d.ordinal}`, data: d },
         latestRelevant("all")?.ordinal === d.ordinal,
+        {
+          pinnedOrdinal: !useStore.getState().following ? useStore.getState().snap?.data.ordinal ?? null : null,
+          metaSnap: useStore.getState().metaSnap,
+        },
       ),
     );
 

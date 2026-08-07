@@ -369,7 +369,10 @@ export default function LedgerPanel() {
                         title={`Global snapshot #${d.ordinal} · ${d.metagraphSnapshotCount ?? 0} anchored`}
                         onClick={() => {
                           applyClickActions(
-                            snapshotSelectActions(globalPick, latestRelevant("all")?.ordinal === d.ordinal),
+                            snapshotSelectActions(globalPick, latestRelevant("all")?.ordinal === d.ordinal, {
+                              pinnedOrdinal: !following && snap ? snap.data.ordinal : null,
+                              metaSnap,
+                            }),
                           );
                           setOpenMeta(isOpen ? null : `gl0|${d.ordinal}`);
                         }}
