@@ -5,7 +5,7 @@ import {
   FLOOR_IDS, FLOOR_Y, LANE_HALF_Z, GUTTER_W, GUTTER_CZ, GUTTER_GAP, FLOOR_MAIN_Z0,
   BAR_MAX_W, BAR_MIN_W, BAR_H, BAR_D, BYTE_SCALE_KB,
   CONT_X, CONT_TOP_GAP, CONT_CHIP_Z, CONT_ROW_Y, CONT_PAD, CONT_GAP, CONT_Z0, CONT_Z1, FLOOR_Z1,
-  CONT_LABEL_W, LEAD_X,
+  CONT_LABEL_W, LEAD_X, TILE_LIFT, BAR_LIFT,
   RAIL_GROUP_FLOOR, laneSpan,
 } from "./ledgerLayout";
 
@@ -132,6 +132,12 @@ describe("two-floor chamber (redesign 2026-08-04)", () => {
     // The lead slot sits well forward of centre but inside the floors' front edge (~6.5 local).
     expect(LEAD_X).toBeGreaterThan(0);
     expect(LEAD_X).toBeLessThan(6.5);
+  });
+
+  it("floats the snapshots just above their planes (bottoms never pierce the glass)", () => {
+    expect(TILE_LIFT).toBeGreaterThan(0);
+    expect(BAR_LIFT).toBeGreaterThan(0);
+    expect(Math.max(TILE_LIFT, BAR_LIFT)).toBeLessThan(0.5);
   });
 
   it("keeps every lane in its own slice with nothing committed", () => {

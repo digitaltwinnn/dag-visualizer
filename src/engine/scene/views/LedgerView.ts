@@ -35,12 +35,13 @@ import {
   FLOOR_MAIN_Z0,
   FLOOR_Z1,
   LEAD_X,
+  TILE_LIFT,
   LANE_HALF_Z,
   laneSpan,
   type RailGroup,
 } from "../../domain/ledgerLayout";
 import type { SceneColors } from "../../sceneColors";
-import { LedgerModel, SLOT_SP, SLOT_N, LANE_GAP_Z, slotFade } from "../../domain/ledgerModel";
+import { LedgerModel, LANE_IDS, SLOT_SP, SLOT_N, LANE_GAP_Z, slotFade } from "../../domain/ledgerModel";
 import { makeBarSpec, fillBarSpec, UNLISTED_KEY, type BarSpec } from "../../domain/ledgerBands";
 import type { ContainerSpec } from "../../domain/ledgerRails";
 import type {
@@ -166,8 +167,9 @@ export class LedgerView implements SceneView {
   /** The floor planes' live-tunable look — read per frame by _applyFloorAlpha. */
   floors: FloorTune = { ...FLOOR_TUNE_DEFAULTS };
 
-  // ── the lane field (construction-time; never reallocated per frame)
-  private readonly _laneOrder: string[] = METAGRAPHS.map((m) => m.id);
+  // ── the lane field (construction-time; never reallocated per frame) — the SHARED roster
+  // (ledgerModel.LANE_IDS): every listed metagraph plus the "unknown" lane at the screen-left end.
+  private readonly _laneOrder: string[] = [...LANE_IDS];
   private readonly _laneZ = new Map<string, number>();
   private readonly _laneHZ = new Map<string, number>();
   private readonly _laneHidden = new Map<string, boolean>();
@@ -182,6 +184,11 @@ export class LedgerView implements SceneView {
   private readonly _specs: BarSpec[] = [];
   private readonly _slotSnap: (GlobalSnapshot | null)[] = [];
   private readonly _byOrd = new Map<number, GlobalSnapshot>();
+  private readonly _byTs = new Map<string, GlobalSnapshot>();
+  // The last setData inputs — setExact re-runs the model with them so a landing exact read
+  // fills the unknown lane's tiles without waiting for the next tick/anchor event.
+  private _lastSnaps: GlobalSnapshot[] | null = null;
+  private _lastGetAnchor: ((ts: string) => Anchor | null) | null = null;
   private readonly _bytes = new Map<string, number>();
   private _exact: Record<number, SnapshotExact> = {};
 
@@ -345,11 +352,11 @@ export class LedgerView implements SceneView {
       fragmentShader: `
         uniform vec3 uColor; uniform float uOpacity; uniform float uInner; uniform float uEdge; varying vec2 vP;
         void main() {
-          float GRID = 48.0;
-          vec2 cell = (floor(vP * GRID) + 0.5) / GRID;
-          float e = max(abs(cell.x), abs(cell.y));
-          float band = smoothstep(uEdge, 1.0, e);
-          band = floor(band * 3.0 + 0.5) / 3.0;
+          // SMOOTH edge glow (user, 2026-08-07 — the old version snapped uv to a 48-cell grid and
+          // quantized the gradient into 3 steps, which read as chunky/cubic): a continuous
+          // rounded-rect distance field from the uEdge inset to the rim, eased by smoothstep.
+          vec2 q = max(abs(vP) - vec2(uEdge), 0.0) / max(1.0 - uEdge, 1e-4);
+          float band = smoothstep(0.0, 1.0, length(q));
           float a = uOpacity * band + uInner;
           if (a <= 0.002) discard;
           gl_FragColor = vec4(uColor, a);
@@ -539,11 +546,32 @@ export class LedgerView implements SceneView {
     const isNewTick = this._latest?.ordinal !== latest.ordinal;
     this._latest = latest;
 
-    const changes = this.model.setData(snaps, getAnchor);
-
-    // event-time: one ordinal index per tick (the trail carries ordinals, not snapshots)
+    // event-time: one ordinal index per tick (the trail carries ordinals, not snapshots).
+    // Built BEFORE the model runs — the wrapped anchor resolver below needs the ts join.
     this._byOrd.clear();
-    for (const s of snaps) this._byOrd.set(s.ordinal, s);
+    this._byTs.clear();
+    for (const s of snaps) { this._byOrd.set(s.ordinal, s); this._byTs.set(s.timestamp, s); }
+
+    // The UNKNOWN lane's counts (user, 2026-08-07): fold the EXACT read's unlistedCount into the
+    // anchor aggregate as a pseudo-metagraph. Exact-only on purpose — the polled floor
+    // (total − identified) is transiently high while a tick settles, and lane tiles never
+    // shrink, so a floor-fed lane would show phantom snapshots. No exact read → no unknown
+    // tiles for that tick (the same honesty rule as the byte bar's bands).
+    this._lastSnaps = snaps;
+    this._lastGetAnchor = getAnchor;
+    const wrapped = (ts: string): Anchor | null => {
+      const a = getAnchor(ts);
+      const snap = this._byTs.get(ts);
+      const u = snap ? this._exact[snap.ordinal]?.unlistedCount ?? 0 : 0;
+      if (u <= 0) return a;
+      const metaCounts = new Map(a?.metaCounts ?? []); // event-time
+      metaCounts.set(UNLISTED_KEY, u);
+      return a
+        ? { fee: a.fee, count: a.count, metaIds: a.metaIds, metaCounts, touched: a.touched }
+        : { fee: 0, count: u, metaIds: new Set([UNLISTED_KEY]), metaCounts, touched: 0 };
+    };
+
+    const changes = this.model.setData(snaps, wrapped);
     for (let s = 0; s < SLOT_N; s++) this._slotSnap[s] = null;
     if (this.model.tickOrdinal != null)
       this._slotSnap[0] = this._byOrd.get(this.model.tickOrdinal) ?? null;
@@ -567,10 +595,14 @@ export class LedgerView implements SceneView {
     }
   }
 
-  /** The exact per-ordinal byte reads — the ONLY source a bar's width may come from (spec §6.2). */
+  /** The exact per-ordinal byte reads — the ONLY source a bar's width may come from (spec §6.2),
+   *  and since 2026-08-07 the only source of the unknown lane's tile counts too. */
   setExact(byOrdinal: Record<number, SnapshotExact>): void {
     this._exact = byOrdinal;
-    this._rebuildAllSlots();
+    // Re-run the model with the stored inputs so a landing read fills the unknown lane now
+    // (setData rebuilds the slots itself); before any data, just rebuild the bars.
+    if (this._lastSnaps && this._lastGetAnchor) this.setData(this._lastSnaps, this._lastGetAnchor);
+    else this._rebuildAllSlots();
   }
 
   setTileResolver(fn: TilePickResolver | null): void {
@@ -691,7 +723,7 @@ export class LedgerView implements SceneView {
     for (let i = 0; i < spec.bandCount; i++) {
       const band = spec.bands[i];
       if (band.bytes <= 0) continue;
-      if (band.key !== UNLISTED_KEY && this._laneHidden.get(band.key)) continue; // no sheet → no index
+      if (this._laneHidden.get(band.key)) continue; // no sheet → no index (unknown lane included)
       if (band.key === key) return n;
       n++;
     }
@@ -797,7 +829,10 @@ export class LedgerView implements SceneView {
         if (mi >= META_TRAIL_MAX) break;
         b.x += (LEAD_X - b.slot * SLOT_SP - b.x) * k;
         b.fade += (slotFade(b.slot) - b.fade) * k;
-        _dummy.position.set(b.x + b.ox, FLOOR_Y.msnap, cz + b.oz * zScale);
+        // Bottom just above the plane (user, 2026-08-07): the box is centred, so lift by half its
+        // world height (geometry depth 0.35 × scale.z becomes the height under the -90° X spin).
+        const tileH = 0.35 * b.size * (b.filled ? 1 : 0.18);
+        _dummy.position.set(b.x + b.ox, FLOOR_Y.msnap + TILE_LIFT + tileH / 2, cz + b.oz * zScale);
         _dummy.rotation.set(-Math.PI / 2, 0, 0);
         _dummy.scale.set(b.size, b.size, b.size * (b.filled ? 1 : 0.18));
         _dummy.updateMatrix();

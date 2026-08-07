@@ -32,7 +32,15 @@
 
 import { METAGRAPHS } from "../config";
 import { ledgerSite, LEAD_X } from "./ledgerLayout";
+import { UNLISTED_KEY } from "./ledgerBands";
 import type { GlobalSnapshot, Anchor } from "@/src/data/types";
+
+/** The lane roster (user, 2026-08-07): every listed metagraph plus ONE "unknown" lane for the
+ *  unlisted channels, at the END of the order — the +Z / screen-LEFT edge of the field, matching
+ *  the byte bar's unlisted band (always appended last), so the ribbon between them never crosses
+ *  a listed one. The unknown lane's counts come ONLY from the exact read (see LedgerView.setData:
+ *  the polled floor is transiently high while a tick settles, and lane tiles never shrink). */
+export const LANE_IDS: readonly string[] = [...METAGRAPHS.map((m) => m.id), UNLISTED_KEY];
 
 export const SLOT_SP = 3.6; // js/ledger.js:41 — X spacing of one tick/slot
 export const SLOT_N = 9; // js/ledger.js:42 — visible blocks per chain
@@ -41,7 +49,7 @@ export const BLOCK_SIZE = 0.48; // max size of an individual metagraph-snapshot 
 
 // js/ledger.js:45 — Z width of one lane (the grid's depth budget for anchorTiles), derived from
 // ledgerSite exactly as the source does (shared by the whole METAGRAPHS roster, not per-lane).
-export const LANE_GAP_Z = Math.abs(ledgerSite(1, METAGRAPHS.length).z - ledgerSite(0, METAGRAPHS.length).z);
+export const LANE_GAP_Z = Math.abs(ledgerSite(1, LANE_IDS.length).z - ledgerSite(0, LANE_IDS.length).z);
 
 // js/ledger.js:53 verbatim — recency fade: 1 at the freshest completed slot, 0 by the oldest visible.
 export const slotFade = (slot: number): number => Math.min(1, Math.max(0, 1 - (slot - 1) / (SLOT_N - 1)));
@@ -138,7 +146,7 @@ export class LedgerModel {
   private lane(id: string, i: number): LaneState {
     let lane = this.lanes.get(id);
     if (!lane) {
-      lane = { id, z: ledgerSite(i, METAGRAPHS.length).z, blocks: [] };
+      lane = { id, z: ledgerSite(i, LANE_IDS.length).z, blocks: [] };
       this.lanes.set(id, lane);
     }
     return lane;
@@ -150,8 +158,8 @@ export class LedgerModel {
   // `ts` is the live tick's timestamp (the caller's `this.tickTs`), threaded onto every tile so a
   // slot-0 block can name the snapshot it belongs to without a lookup.
   private anchorMetaBlock(id: string, count: number, ts: string): void {
-    const i = METAGRAPHS.findIndex((m) => m.id === id);
-    if (i < 0) return; // unlisted — no lane
+    const i = LANE_IDS.indexOf(id);
+    if (i < 0) return; // not a lane (an unlisted ADDRESS — those aggregate into the unknown lane)
     const lane = this.lane(id, i);
     let bx = 0, bfade = 0;
     for (let j = lane.blocks.length - 1; j >= 0; j--) {
@@ -173,8 +181,8 @@ export class LedgerModel {
       this.trail.push({ ordinal: snap.ordinal, slot: s, ts: snap.timestamp });
       const a = getAnchor ? getAnchor(snap.timestamp) : null;
       const counts = a && a.metaCounts ? a.metaCounts : null;
-      for (let i = 0; i < METAGRAPHS.length; i++) {
-        const id = METAGRAPHS[i].id;
+      for (let i = 0; i < LANE_IDS.length; i++) {
+        const id = LANE_IDS[i];
         const nc = counts ? counts.get(id) || 0 : 0;
         const lane = this.lane(id, i);
         if (nc > 0) {
@@ -232,8 +240,8 @@ export class LedgerModel {
       this.tickTs = latest.timestamp;
       // The new LIVE tick starts with an empty placeholder at slot 0 for EVERY metagraph (shown on
       // the latest too); anchorMetaBlock upgrades it to a real, sized block if the metagraph anchors.
-      for (let i = 0; i < METAGRAPHS.length; i++) {
-        this.lane(METAGRAPHS[i].id, i).blocks.unshift({ x: 0, slot: 0, fade: 0, ox: 0, oz: 0, size: 0.24, filled: false, link: false, ts: this.tickTs, count: 0 });
+      for (let i = 0; i < LANE_IDS.length; i++) {
+        this.lane(LANE_IDS[i], i).blocks.unshift({ x: 0, slot: 0, fade: 0, ox: 0, oz: 0, size: 0.24, filled: false, link: false, ts: this.tickTs, count: 0 });
       }
     }
 
@@ -246,8 +254,8 @@ export class LedgerModel {
     for (const [id, n] of a.metaCounts) {
       const prev = this.emitted.get(id) || 0;
       if (n <= prev) continue;
-      const i = METAGRAPHS.findIndex((m) => m.id === id);
-      if (i < 0) { this.emitted.set(id, n); continue; } // unlisted: no lane, but don't re-check
+      const i = LANE_IDS.indexOf(id);
+      if (i < 0) { this.emitted.set(id, n); continue; } // an unlisted ADDRESS: not a lane, but don't re-check
       this.anchorMetaBlock(id, n, this.tickTs ?? ""); // draw the real block at the lead now + animate the anchoring
       changes.push({ id, count: n, delta: n - prev });
       this.emitted.set(id, n);

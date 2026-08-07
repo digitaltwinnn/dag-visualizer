@@ -7,9 +7,9 @@ import {
   slotFade,
   anchorTiles,
   LedgerModel,
-  LEAD_SETTLE_MS,
-} from "./ledgerModel";
+  LEAD_SETTLE_MS, LANE_IDS } from "./ledgerModel";
 import { METAGRAPHS } from "../config";
+import { UNLISTED_KEY } from "./ledgerBands";
 import { ledgerSite } from "./ledgerLayout";
 import type { GlobalSnapshot, Anchor } from "@/src/data/types";
 
@@ -248,5 +248,26 @@ describe("slot identity + the forming lead row (redesign 2026-08-04)", () => {
 
   it("holds the ~7s settling idiom AnchoredTags already uses", () => {
     expect(LEAD_SETTLE_MS).toBe(7000);
+  });
+});
+
+describe("LANE_IDS (the unknown lane, 2026-08-07)", () => {
+  it("is every listed metagraph plus the unknown lane LAST (the +Z / screen-left end)", () => {
+    expect(LANE_IDS.slice(0, -1)).toEqual(METAGRAPHS.map((m) => m.id));
+    expect(LANE_IDS[LANE_IDS.length - 1]).toBe(UNLISTED_KEY);
+  });
+
+  it("gives the unknown lane real tiles when the anchor aggregate carries its count", () => {
+    const model = new LedgerModel();
+    const snaps = [
+      { ordinal: 1, timestamp: "t1" },
+      { ordinal: 2, timestamp: "t2" },
+    ] as never[];
+    const anchor = (ts: string) =>
+      ({ fee: 0, count: 3, metaIds: new Set([UNLISTED_KEY]), metaCounts: new Map([[UNLISTED_KEY, 3]]), touched: 0 }) as never;
+    model.setData(snaps as never, anchor as never);
+    const lane = model.lanes.get(UNLISTED_KEY)!;
+    expect(lane).toBeTruthy();
+    expect(lane.blocks.filter((b) => b.filled).length).toBeGreaterThan(0);
   });
 });

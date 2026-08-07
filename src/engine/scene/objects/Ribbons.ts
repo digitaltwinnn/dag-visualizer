@@ -19,9 +19,10 @@
 import * as THREE from "three";
 import type { SceneColors } from "../../sceneColors";
 import { METAGRAPHS } from "../../config";
-import { FLOOR_Y, LEAD_X } from "../../domain/ledgerLayout";
+import { BAR_H, BAR_LIFT, FLOOR_Y, LEAD_X, TILE_LIFT } from "../../domain/ledgerLayout";
 import { SLOT_SP } from "../../domain/ledgerModel";
 import { ribbonQuad, RIBBON_LANE_HALF, UNLISTED_KEY, type BarSpec, type RibbonQuad } from "../../domain/ledgerBands";
+
 
 export const RIBBON_ROWS = 2;
 /** Vertical subdivisions per ribbon — enough for the eased sweep to read as a curve. */
@@ -109,9 +110,10 @@ export class Ribbons {
     this._writeGeometry();
   }
 
-  /** `laneZ` returns the lane centre for a metagraph key — null when the lane is HIDDEN (another
-   *  network committed): a hidden lane laid no tiles, so it gets no ribbon either. An unlisted
-   *  anchor never has a lane; its ribbon starts in mid-air above its band (spec §6.6). */
+  /** `laneZ` returns the lane centre for a band key — null when the lane is HIDDEN (another
+   *  network committed): a hidden lane laid no tiles, so it gets no ribbon either. The unlisted
+   *  channels have a real lane of their own now (the "unknown" lane at the screen-left end,
+   *  2026-08-07), so every band resolves the same way — the old mid-air start is retired. */
   setRow(row: 0 | 1, slot: number, spec: BarSpec | null, laneZ: (key: string) => number | null): void {
     const st = this._rows[row];
     st.slot = slot;
@@ -122,12 +124,9 @@ export class Ribbons {
     for (let i = 0; i < spec.bandCount; i++) {
       const band = spec.bands[i];
       if (band.bytes <= 0) continue;
-      const unlisted = band.key === UNLISTED_KEY;
-      const z = unlisted ? null : laneZ(band.key);
-      if (!unlisted && z == null) continue; // hidden lane → no sheet
-      // An unlisted anchor has no lane, so its ribbon starts above the band it lands on.
-      const centre = z ?? (band.z0 + band.z1) / 2;
-      ribbonQuad(centre, z == null ? RIBBON_LANE_HALF * 0.4 : RIBBON_LANE_HALF, band, st.quads[st.count]);
+      const z = laneZ(band.key);
+      if (z == null) continue; // hidden lane → no sheet
+      ribbonQuad(z, RIBBON_LANE_HALF, band, st.quads[st.count]);
       st.keys.push(band.key);
       st.count++;
     }
@@ -153,7 +152,9 @@ export class Ribbons {
     const topZ = (q.topZ0 + q.topZ1) / 2;
     const botZ = (q.botZ0 + q.botZ1) / 2;
     const s = sweep(t, this.tune.curve);
-    return out.set(x, FLOOR_Y.msnap + (FLOOR_Y.gl0 - FLOOR_Y.msnap) * t, topZ + (botZ - topZ) * s);
+    const yTop = FLOOR_Y.msnap + TILE_LIFT;
+    const yBot = FLOOR_Y.gl0 + BAR_LIFT + BAR_H; // the bar's TOP — the sheet flows into it
+    return out.set(x, yTop + (yBot - yTop) * t, topZ + (botZ - topZ) * s);
   }
 
   setAlpha(a: number): void { this._alpha = a; }
@@ -186,8 +187,9 @@ export class Ribbons {
     for (let r = 0; r < RIBBON_ROWS; r++) {
       const st = this._rows[r];
       const x = LEAD_X - st.slot * SLOT_SP;
-      const yTop = FLOOR_Y.msnap;
-      const yBot = FLOOR_Y.gl0;
+      // Tile-bottom → bar-top (the snapshots sit ON their planes now, 2026-08-07).
+      const yTop = FLOOR_Y.msnap + TILE_LIFT;
+      const yBot = FLOOR_Y.gl0 + BAR_LIFT + BAR_H;
       for (let i = 0; i < st.count; i++) {
         const q = st.quads[i];
         const key = st.keys[i];

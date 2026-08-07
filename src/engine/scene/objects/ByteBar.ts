@@ -11,7 +11,7 @@ import * as THREE from "three";
 import type { SceneColors } from "../../sceneColors";
 import type { PickDescriptor } from "@/src/data/types";
 import { METAGRAPHS } from "../../config";
-import { BAR_H, BAR_D, BAR_MIN_W, FLOOR_Y, LEAD_X } from "../../domain/ledgerLayout";
+import { BAR_H, BAR_D, BAR_MIN_W, BAR_LIFT, FLOOR_Y, LEAD_X } from "../../domain/ledgerLayout";
 import { UNLISTED_KEY, type BarSpec } from "../../domain/ledgerBands";
 import { SLOT_SP, SLOT_N, slotFade } from "../../domain/ledgerModel";
 
@@ -102,7 +102,8 @@ export class ByteBar {
     s.ordinal = ordinal;
     s.keys.length = 0;
     const x = LEAD_X - slot * SLOT_SP;
-    const y = FLOOR_Y.gl0;
+    // Bottom just above the plane (user, 2026-08-07) — the box is centred, so lift by half height.
+    const y = FLOOR_Y.gl0 + BAR_LIFT + BAR_H / 2;
 
     if (!spec || !spec.measured || spec.bandCount === 0) {
       // No exact read yet, or a measured tick that anchored nothing: the seam outline stands in

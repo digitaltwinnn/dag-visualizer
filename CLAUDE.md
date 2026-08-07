@@ -1493,7 +1493,9 @@ frame). It composes three adapters — `objects/ByteBar.ts`, `objects/Ribbons.ts
   One bar per tick on the `gl0` floor, fixed height/depth (`BAR_H`/`BAR_D`); its **WIDTH alone
   encodes the bytes that tick carried**, against the FIXED reference `BYTE_SCALE_KB` (baked by
   `scripts/bake-ledger-scale.ts` — the p99 of anchored KB/tick, so the rare monster clips at the
-  floor edge with an honest `×N` overflow on its label instead of rescaling the whole past). It
+  floor edge with an honest `×N` overflow on its label instead of rescaling the whole past). Bars
+  and tiles SIT ON their planes (`BAR_LIFT`/`TILE_LIFT`, 2026-08-07 — they used to be centred on
+  the plane height and pierce the glass), and the ribbons run tile-bottom → bar-top. It
   is **CENTERED on the lane field** (`z0 = -width/2`, user 2026-08-06; `BAR_MAX_W = 2 *
   LANE_HALF_Z`) and bands follow lane order, so **band order and lane order agree and the
   ribbons never cross**. The bar is **split into BANDS**, one per contributing metagraph plus `unlisted` — each

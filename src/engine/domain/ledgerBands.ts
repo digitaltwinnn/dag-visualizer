@@ -87,6 +87,7 @@ export function fillBarSpec(
   let z = out.z0;
   let n = 0;
   for (let i = 0; i < order.length && n < MAX_BANDS; i++) {
+    if (order[i] === UNLISTED_KEY) continue; // the unknown lane's band is appended LAST below
     const bytes = bytesByKey.get(order[i]) ?? 0;
     if (bytes <= 0) continue;
     const band = out.bands[n++];
@@ -116,8 +117,9 @@ export function fillBarSpec(
 // the relationship.
 export interface RibbonQuad { topZ0: number; topZ1: number; botZ0: number; botZ1: number }
 
-/** Half the Z footprint a lane's ribbon leaves from — the lane cell, not the tile grid. */
-export const RIBBON_LANE_HALF = LANE_HALF_Z / METAGRAPHS.length;
+/** Half the Z footprint a lane's ribbon leaves from — the lane cell, not the tile grid
+ *  (+1: the unknown lane, 2026-08-07). */
+export const RIBBON_LANE_HALF = LANE_HALF_Z / (METAGRAPHS.length + 1);
 
 export function ribbonQuad(laneZ: number, laneHalf: number, band: Band, out: RibbonQuad): RibbonQuad {
   out.topZ0 = laneZ - laneHalf;

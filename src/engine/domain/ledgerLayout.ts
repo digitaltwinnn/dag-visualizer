@@ -149,6 +149,10 @@ export const BAR_MAX_W = 2 * LANE_HALF_Z;
 export const BAR_MIN_W = 0.55; // the zero-anchor SEAM: a tick that carried nothing still happened
 export const BAR_H = 0.9;
 export const BAR_D = 1.6;
+/** The snapshots SIT ON their planes (user, 2026-08-07 — they used to be centred on the plane
+ *  height and poked through it): bottoms float just above the glass. */
+export const TILE_LIFT = 0.05; // metagraph tiles above the msnap plane
+export const BAR_LIFT = 0.05;  // byte bars above the gl0 plane
 
 /** The fixed scale reference: KB carried at which the bar fills the floor (spec §6.3).
  *  p99 of anchored KB per global tick, measured by scripts/bake-ledger-scale.ts on 2026-08-06
