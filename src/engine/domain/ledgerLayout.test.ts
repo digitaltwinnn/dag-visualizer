@@ -3,7 +3,7 @@ import { METAGRAPHS } from "../config";
 import {
   LEDGER, LAYER_GEOM, ledgerSite, clusterRadius, ledgerSpread,
   FLOOR_IDS, FLOOR_Y, LANE_HALF_Z, PLANE_FIELD_HALF,
-  BAR_MAX_W, BAR_MIN_W, BAR_H, BAR_D, BYTE_SCALE_KB,
+  BAR_MAX_W, BAR_MIN_W, BAR_H, BAR_D, BYTE_SCALE_KB, BAR_EDGE_MARGIN,
   CONT_X, CONT_TOP_GAP, CONT_CHIP_Z, CONT_ROW_Y, CONT_PAD, CONT_Z0, CONT_Z1,
   LEAD_X, TILE_LIFT, BAR_LIFT,
   LANE_PLANE_GAP, lanePlaneHalf, laneSpan,
@@ -96,8 +96,9 @@ describe("two-floor chamber (redesign 2026-08-04)", () => {
     expect(PLANE_FIELD_HALF).toBeGreaterThan(LANE_HALF_Z);
   });
 
-  it("lets the byte bar grow across the whole field", () => {
-    expect(BAR_MAX_W).toBeCloseTo(2 * LANE_HALF_Z, 6);
+  it("lets the byte bar grow across the field, clear of the ordinal labels", () => {
+    expect(BAR_MAX_W).toBeCloseTo(2 * (LANE_HALF_Z - BAR_EDGE_MARGIN), 6);
+    expect(BAR_EDGE_MARGIN).toBeGreaterThan(0);
     expect(BAR_MIN_W).toBeGreaterThan(0);
     expect(BAR_MIN_W).toBeLessThan(BAR_MAX_W);
     expect(BAR_H).toBeGreaterThan(0);
@@ -106,7 +107,7 @@ describe("two-floor chamber (redesign 2026-08-04)", () => {
   });
 
   it("carries the baked p99 scale reference in KB", () => {
-    expect(BYTE_SCALE_KB).toBe(77);
+    expect(BYTE_SCALE_KB).toBe(89);
   });
 
   it("hangs the node trays under their plane's front edge, facing the camera", () => {

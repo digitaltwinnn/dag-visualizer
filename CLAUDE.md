@@ -1513,8 +1513,9 @@ frame). It composes three adapters — `objects/ByteBar.ts`, `objects/Ribbons.ts
   floor edge with an honest `×N` overflow on its label instead of rescaling the whole past). Bars
   and tiles SIT ON their planes (`BAR_LIFT`/`TILE_LIFT`, 2026-08-07 — they used to be centred on
   the plane height and pierce the glass), and the ribbons run tile-bottom → bar-top. It
-  is **CENTERED on the lane field** (`z0 = -width/2`, user 2026-08-06; `BAR_MAX_W = 2 *
-  LANE_HALF_Z`) and bands follow lane order, so **band order and lane order agree and the
+  is **CENTERED on the lane field** (`z0 = -width/2`, user 2026-08-06; `BAR_MAX_W = 2 * (LANE_HALF_Z −
+  BAR_EDGE_MARGIN)` — the margin keeps even a clipped max-width bar clear of the per-row
+  ordinal labels, 2026-08-07) and bands follow lane order, so **band order and lane order agree and the
   ribbons never cross**. The bar is **split into BANDS**, one per contributing metagraph plus `unlisted` — each
   band is its own pickable `Mesh` (picking one selects that metagraph AND that tick), from a pool
   of `SLOT_N × (METAGRAPHS.length + 1)` allocated once and positioned or zero-scaled on a tick,

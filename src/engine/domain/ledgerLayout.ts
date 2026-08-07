@@ -135,7 +135,11 @@ export const LEAD_X = 3.9;
 // bytes the tick carried. It is CENTERED on the lane field (z0 = -width/2 — user, 2026-08-06;
 // replaced the old left-aligned BAR_Z0 start): bands still follow lane order, so the ribbons
 // splay symmetrically without crossing.
-export const BAR_MAX_W = 2 * LANE_HALF_Z;
+/** The byte bar's edge margin (user, 2026-08-07): the per-row ORDINAL LABELS live at the
+ *  plane's screen-left edge, so even a clipped max-width bar stops short of the lane field on
+ *  BOTH sides (centred bar, one margin each end) instead of running into the text. */
+export const BAR_EDGE_MARGIN = 2.4;
+export const BAR_MAX_W = 2 * (LANE_HALF_Z - BAR_EDGE_MARGIN);
 export const BAR_MIN_W = 0.55; // the zero-anchor SEAM: a tick that carried nothing still happened
 export const BAR_H = 0.9;
 export const BAR_D = 1.6;
@@ -168,7 +172,7 @@ export function lanePlaneHalf(n: number): number {
  *  runs low: live ticks of 80–90 KB were observed within minutes of baking, i.e. the reference is
  *  exceeded more often than "p99" suggests. That is handled honestly (clip + overflow multiplier),
  *  not hidden. A future re-bake should calibrate against exact-read totals instead. */
-export const BYTE_SCALE_KB = 77;
+export const BYTE_SCALE_KB = 89; // rebaked 2026-08-07 (p99 rose with mainnet traffic)
 
 // ── Node trays (redesign 2026-08-07 — ONE tray per snapshot plane, no role split): glass trays
 // hanging under the FRONT (+X, camera-side) edge of the plane their machines serve, facing the
