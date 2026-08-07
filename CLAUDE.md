@@ -514,10 +514,11 @@ GPU; no store/react**):
   own off-switch; the lingering-spotlight bug class is dead).
 - `objects/gradientTexture.ts` — `makeRadialGradientTexture(stops)`, the one canvas
   radial-gradient sprite factory (geo glow pools + hyper ring fills differ only in stops).
-- `objects/ByteBar.ts` / `objects/Ribbons.ts` / `objects/NodeRails.ts` — the Snapshots view's
-  three composed adapters over `domain/ledgerBands.ts` + `domain/ledgerRails.ts` (the byte bar
+- `objects/ByteBar.ts` / `objects/Ribbons.ts` / `objects/SnapshotPlane.ts` — the Snapshots
+  view's composed pieces over `domain/ledgerBands.ts` + `domain/ledgerRails.ts` (the byte bar
   and its pickable per-metagraph bands; the tapering lane→band ribbons, LEAD + HOT rows only;
-  the rail guides/labels/pick proxies whose chips are the shared node InstancedMeshes). See
+  the reusable PLANE BLUEPRINT — glass + edge label + the plane's own machine tray — that both
+  the global floor and every metagraph plane instantiate). See
   *The Snapshots (ledger) 3D view*.
 - `views/HyperView.ts` — Hypergraph-only furniture: the Global L0 **core** and the orbiting
   metagraph **hubs** (from `config.METAGRAPHS`). The core is parented to the scene (not
@@ -557,8 +558,8 @@ GPU; no store/react**):
   THROUGH the globe distracted at close range, user). Nodes/arcs sit on the plateau
   (`R+LAND_H+ε`).
 - `views/LedgerView.ts` — the Snapshots view's 3D anchoring chamber over `ledgerModel` (see
-  its own section below). Composes the three ledger-only adapters `objects/ByteBar.ts`,
-  `objects/Ribbons.ts` and `objects/NodeRails.ts`.
+  its own section below). Composes the ledger-only pieces `objects/ByteBar.ts`,
+  `objects/Ribbons.ts` and the `objects/SnapshotPlane.ts` blueprint instances.
 
 **`src/data/`** feeds the engine live network data (no simulation):
 
@@ -1476,7 +1477,7 @@ A 3D anchoring chamber on the shared canvas, **redesigned 2026-08-04 into TWO FL
 bar**. The `LedgerView` class is driven by the Engine (`_refreshLedger()` →
 `ledger.setData(globalSnapshots, getAnchor)` on each tick/anchor event, `ledger.update(dt)` per
 frame). It composes three adapters — `objects/ByteBar.ts`, `objects/Ribbons.ts`,
-`objects/NodeRails.ts` — over two pure modules, `domain/ledgerBands.ts` and
+`objects/SnapshotPlane.ts` — over two pure modules, `domain/ledgerBands.ts` and
 `domain/ledgerRails.ts`, next to the existing `domain/ledgerLayout.ts` / `ledgerModel.ts`.
 
 - **Two storeys; the upper one is PER-METAGRAPH PLANES** (redesign 2026-08-07). The `gl0`
@@ -1525,12 +1526,22 @@ frame). It composes three adapters — `objects/ByteBar.ts`, `objects/Ribbons.ts
   **`?tune`** flag (present at page LOAD, the ?stats idiom) mounts a tweakpane panel
   (`src/engine/devTune.ts`, dynamic import — never in the normal bundle) with folders for the
   ribbons, the byte bar (`BarTune` — rest/hot/seam opacities), the lane tiles
-  (`TileTune` — hot/rest/off-filter brightness) and the floor planes (`FloorTune` —
-  frame/edge-fill/centre-fill opacities + the `edge` drop-off uniform), each backed by a
+  (`TileTune` — hot/rest/off-filter brightness) and TWO plane folders — **"global plane" and
+  "metagraph planes"**, the same `PlaneTune` shape (edge-fill/centre-fill/drop-off/tray fill)
+  tuned separately per channel (user, 2026-08-07) — each backed by a
   `*_TUNE_DEFAULTS` shipped look; chosen values get baked back into those constants. `RIBBON_ROWS = 2`: only the **LEAD row and the HOT
   row** get a sheet (one Mesh, one preallocated geometry, rewritten event-time); every older
   tick keeps a hairline strut drawn by the view.
-- **Node trays** (`objects/NodeRails.ts` over `domain/ledgerRails.ts`, redesign 2026-08-07 —
+- **The plane BLUEPRINT** (`objects/SnapshotPlane.ts`, refactor 2026-08-07): every storey
+  surface is the SAME composed unit — glass plane + optional edge label + the plane's own
+  TRAY — instantiated per position: the global floor (level digit + full-width validator
+  tray), its label-less gutter piece, and one per metagraph lane (ticker label + its tray).
+  What it deliberately does NOT own: the snapshots — tiles/bars/ribbons stay POOLED instanced
+  meshes spanning every plane (draw calls + the zero-allocation loop), and the lead-identity/
+  neutral-trail rule stays one shared code path. Each instance is driven per frame by ONE of
+  two `PlaneTune` channels (`LedgerView.globalTune` / `metaTune` — same blueprint, tuned
+  separately). `makeEdgeLabel` (the chamber's only text) lives here too.
+- **Node trays** (`SnapshotPlane.setTray` over `domain/ledgerRails.ts`, redesign 2026-08-07 —
   ONE tray per snapshot plane, no role split): each metagraph's machines hang in a flat
   rounded glass tray under ITS OWN plane's front edge (spanning that plane's width), the whole
   validator fleet in one full-width tray under the global floor (`CONT_Z0..CONT_Z1`), all
@@ -1573,9 +1584,9 @@ frame). It composes three adapters — `objects/ByteBar.ts`, `objects/Ribbons.ts
   (`Date.now() - anchor.touched < LEAD_SETTLE_MS`), which is the *when* view stating its own
   settling window instead of pretending a partial breakdown is final.
 - **The glass fill shader is shared, the LOOKS are split** (`objects/glassFill.ts`, 2026-08-07):
-  the FLOORS are SQUARE planes (radius 0) with the soft-rim drop-off (`FloorTune` —
+  the PLANES are SQUARE (radius 0) with the soft-rim drop-off (`PlaneTune` —
   edge-fill/centre-fill/drop-off); the NODE TRAYS are FLAT rounded-corner panels (rim channel
-  off, one `TrayTune.fillOp` level, radius `CONT_CORNER_R`) — rounded corners are the trays'
+  off, the same tune's `trayOp` level) — rounded corners are the trays'
   signature, the drop-off is the floors' (user split the two looks the same day they were
   unified). The floors are also pick BLOCKERS (`userData.blocker` →
   `Engine._pickAt` returns null on a glass hit): a normal surface swallows the ray, so content

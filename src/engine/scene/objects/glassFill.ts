@@ -3,7 +3,7 @@
 // language). A rounded-rectangle signed-distance field in the plane's LOCAL units: outside the
 // rounded rect is clipped (the smooth corners), a rim band rises toward the edge over `uEdgeW`
 // units, and `uInner` is the flat centre whisper. The look is driven per frame from the owner's
-// FloorTune (LedgerView._applyFloorAlpha / NodeRails.update) — this module owns only the shader.
+// PlaneTune channel (SnapshotPlane.applyAlpha) — this module owns only the shader.
 import * as THREE from "three";
 
 export interface GlassFillUniforms {

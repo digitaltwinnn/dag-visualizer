@@ -45,16 +45,17 @@ export async function mountDevTune(targets: DevTuneTargets): Promise<DevTuneHand
   // networks' bands, so it read as inert in the panel — the mechanism keeps its default)
   bf.addBinding(bt, "seamOp", { min: 0, max: 1, step: 0.01, label: "seam opacity" });
 
-  // The floor planes — transparency + the colour drop-off toward the centre (read per frame).
-  const ff = pane.addFolder({ title: "floor planes" });
-  const flt = targets.ledger.floors;
-  ff.addBinding(flt, "fillOp", { min: 0, max: 0.3, step: 0.005, label: "edge fill" });
-  ff.addBinding(flt, "innerOp", { min: 0, max: 0.1, step: 0.002, label: "centre fill" });
-  ff.addBinding(flt, "edge", { min: 0, max: 0.99, step: 0.01, label: "drop-off" });
-
-  // The node trays — a flat rounded panel with one opacity (read per frame).
-  const yf = pane.addFolder({ title: "node trays" });
-  yf.addBinding(targets.ledger.trays.tune, "fillOp", { min: 0, max: 0.3, step: 0.005, label: "fill" });
+  // The two plane-tune channels — the SAME SnapshotPlane blueprint, tuned separately (user,
+  // 2026-08-07): glass transparency + drop-off + the plane's own tray fill (read per frame).
+  const planeFolder = (title: string, t: typeof targets.ledger.globalTune) => {
+    const f = pane.addFolder({ title });
+    f.addBinding(t, "fillOp", { min: 0, max: 0.3, step: 0.005, label: "edge fill" });
+    f.addBinding(t, "innerOp", { min: 0, max: 0.1, step: 0.002, label: "centre fill" });
+    f.addBinding(t, "edge", { min: 0, max: 0.99, step: 0.01, label: "drop-off" });
+    f.addBinding(t, "trayOp", { min: 0, max: 0.3, step: 0.005, label: "tray fill" });
+  };
+  planeFolder("global plane", targets.ledger.globalTune);
+  planeFolder("metagraph planes", targets.ledger.metaTune);
 
   // The metagraph snapshots — the lane tiles' brightness multipliers (read per frame).
   const tf = pane.addFolder({ title: "metagraph snapshots (tiles)" });

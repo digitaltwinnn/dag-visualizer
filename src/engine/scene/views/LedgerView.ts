@@ -10,8 +10,9 @@
 // (objects/Ribbons) tie each lane's tiles above to its own band below. The dials, the cubic anchor
 // links and the centred lead block are RETIRED with the seven-floor stack.
 //
-// This class owns the floors, their labels, the metagraph-snapshot lane tiles, the currency gutter
-// line and the anchor pulses; everything else is composed from the three adapters.
+// This class owns the SnapshotPlane instances (the reusable plane blueprint: glass + edge label
+// + tray — objects/SnapshotPlane.ts), the metagraph-snapshot lane tiles and the anchor pulses;
+// everything else is composed from the adapters.
 //
 // ─── STATE vs. MESH split ──────────────────────────────────────────────────────────────────────
 // This class is the SCENE ADAPTER over LedgerModel (domain/ledgerModel.ts): the domain owns which
@@ -52,27 +53,10 @@ import type {
 } from "@/src/data/types";
 import { LEDGER_LAYERS } from "@/src/data/ledgerLayers"; // shared display copy — floor labels = panel rows
 import { ByteBar } from "../objects/ByteBar";
-import { makeGlassFill, type GlassFillUniforms } from "../objects/glassFill";
 import { Ribbons } from "../objects/Ribbons";
-import { NodeRails } from "../objects/NodeRails";
+import { SnapshotPlane, makeEdgeLabel, GLOBAL_PLANE_TUNE_DEFAULTS, META_PLANE_TUNE_DEFAULTS, type PlaneTune } from "../objects/SnapshotPlane";
 import { FadeSet } from "../objects/FadeSet";
 import type { SceneView } from "./SceneView";
-
-/** The live-tunable FLOOR look (objects/glassFill.ts at radius 0 — square planes with the
- *  soft-rim drop-off; the node trays have their OWN flat rounded fill, user 2026-08-07).
- *  `edge` is where the drop-off starts (1 = only the rim, 0 = solid): converted to a rim
- *  WIDTH in local units by _applyFloorAlpha. (The hairline FRAME is gone entirely.) */
-export interface FloorTune {
-  fillOp: number;  // the edge-band fill
-  innerOp: number; // the flat centre level
-  edge: number;    // drop-off start
-}
-
-export const FLOOR_TUNE_DEFAULTS: FloorTune = {
-  fillOp: 0.035,
-  innerOp: 0.01,
-  edge: 0.95,
-};
 
 const PULSE_MAX = 220;
 const PULSE_STAGGER = 0.035;
@@ -86,10 +70,6 @@ const FLOOR_D = 44;
 const FLOOR_CX = -13.25;
 const FLOOR_LABEL_X = FLOOR_CX + FLOOR_W / 2 - 0.4;
 
-/** The floors' corner radius — SQUARE (user, 2026-08-07: rounded corners belong to the node
- *  trays, not the snapshot planes; radius 0 makes the SDF a plain rect). */
-const FLOOR_CORNER_R = 0;
-
 /** The lead row's "forming…" note: quieter than a floor label, and it eases rather than blinks. */
 const FORMING_OP = 0.6;
 const FORMING_EASE = 2.2;
@@ -100,9 +80,6 @@ const FORMING_Z = LANE_HALF_Z + 8;
 const _dummy = new THREE.Object3D();
 const _col = new THREE.Color();
 const _p = new THREE.Vector3();
-
-const rgbTriplet = (c: THREE.Color): string =>
-  `${Math.round(c.r * 255)},${Math.round(c.g * 255)},${Math.round(c.b * 255)}`;
 
 /** One anchor travelling down a lane's ribbon, from its tile above onto its band below. */
 interface Pulse {
@@ -144,35 +121,32 @@ export class LedgerView implements SceneView {
   /** The HOVERED network, a pure preview that overrides the committed one for DIMMING only. */
   private _hover: string | null = null;
 
+  private _colors: SceneColors;
   private _core: number;
   private readonly _coreCol = new THREE.Color();
-  private _border: number;
-  private _panel: number;
-  private _muted: number;
 
   // ── floors (visual aid since 2026-08-06 — never pick SUBJECTS, but since 2026-08-07 they are
   // pick BLOCKERS: a normal surface swallows the ray, so a bar under the metagraph floor can't
   // be hovered/clicked through the glass — see Engine._pickAt's `userData.blocker` rule).
   // `minHalf` clamps the rim width on the narrow gutter piece so the band can't swallow the
   // whole plane.
-  private _floorMats = new Map<
-    string,
-    { fill: GlassFillUniforms; minHalf: number }[]
-  >();
   private _floorBlockers: THREE.Object3D[] = [];
+  /** The plane blueprint instances: the global floor (main + gutter) and one per metagraph lane. */
+  private _globalPlanes: SnapshotPlane[] = [];
+  private _metaPlanes = new Map<string, SnapshotPlane>();
 
-  // ── the three adapters (spec §4.2–§4.4)
-  private _rails: NodeRails;
+  // ── the adapters (spec §4.2–§4.4)
   private _bar: ByteBar;
   private _ribbons: Ribbons;
   /** Dev-only access for the ?tune panel (Engine.mountDevTune) — not part of the frame path. */
   get ribbons(): Ribbons { return this._ribbons; }
   get bar(): ByteBar { return this._bar; }
-  get trays(): NodeRails { return this._rails; }
   /** The tiles' live-tunable look — read per frame by update()'s tile pass. */
   tiles: TileTune = { ...TILE_TUNE_DEFAULTS };
-  /** The floor planes' live-tunable look — read per frame by _applyFloorAlpha. */
-  floors: FloorTune = { ...FLOOR_TUNE_DEFAULTS };
+  /** The two plane-tune channels (user, 2026-08-07): the global plane and the metagraph planes
+   *  are the SAME blueprint tuned separately — read per frame by _applyFloorAlpha. */
+  globalTune: PlaneTune = { ...GLOBAL_PLANE_TUNE_DEFAULTS };
+  metaTune: PlaneTune = { ...META_PLANE_TUNE_DEFAULTS };
 
   // ── the lane field (construction-time; never reallocated per frame) — the SHARED roster
   // (ledgerModel.LANE_IDS): every listed metagraph plus the "unknown" lane at the screen-left end.
@@ -225,11 +199,9 @@ export class LedgerView implements SceneView {
     colors: SceneColors,
     sceneColors: Record<string, number>,
   ) {
+    this._colors = colors;
     this._core = colors.core;
     this._coreCol.setHex(colors.core);
-    this._border = colors.border;
-    this._panel = colors.panel;
-    this._muted = colors.muted;
     this.sceneColors = sceneColors;
 
     this.group = new THREE.Group();
@@ -256,10 +228,9 @@ export class LedgerView implements SceneView {
 
     this._buildFloors();
 
-    this._rails = new NodeRails(colors);
     this._bar = new ByteBar(colors, sceneColors);
     this._ribbons = new Ribbons(colors, sceneColors);
-    this.group.add(this._rails.group, this._bar.group, this._ribbons.group);
+    this.group.add(this._bar.group, this._ribbons.group);
 
     this._buildMetaTrail();
     this._buildPulses();
@@ -331,56 +302,40 @@ export class LedgerView implements SceneView {
     const W = FLOOR_W;
     const D = FLOOR_D;
     const cx = FLOOR_CX;
-    // The SHARED glass fill (objects/glassFill.ts — the same rounded-corner, soft-rim surface
-    // the node containers wear; user 2026-08-07): per-piece material, sized in local units.
-    const frame = (w: number, d: number, y: number, x: number, z: number, id: string) => {
-      const fm = makeGlassFill(this._core, w / 2, d / 2, FLOOR_CORNER_R);
-      const fill = new THREE.Mesh(new THREE.PlaneGeometry(w, d), fm);
-      fill.rotation.x = -Math.PI / 2;
-      fill.position.set(x, y, z);
-      fill.renderOrder = -2;
-      fill.userData.blocker = true; // a normal surface: rays stop here (no pick, no pass-through)
-      this._floorBlockers.push(fill);
-      this.group.add(fill);
-      const list = this._floorMats.get(id) ?? [];
-      list.push({ fill: fm.uniforms as unknown as GlassFillUniforms, minHalf: Math.min(w, d) / 2 });
-      this._floorMats.set(id, list);
-    };
-    // The GLOBAL floor is ONE whole plane (+ its reserved $DAG-blocks gutter beyond the seam) —
-    // the only place the metagraphs come together. The UPPER storey is not a shared floor any
-    // more: EACH METAGRAPH GETS ITS OWN narrow plane over its lane (user, 2026-08-07 — the
-    // currency gutter plane went with the shared floor), separated by visible gaps, each carrying
-    // its own ticker label and its own node tray. Independence made literal.
+    const lx = FLOOR_LABEL_X;
+    // Every storey surface is the SAME blueprint (objects/SnapshotPlane.ts — glass + edge label
+    // + tray), positioned per instance. The GLOBAL floor is ONE whole plane (+ its reserved
+    // $DAG-blocks gutter beyond the seam, label-less) — the only place the metagraphs come
+    // together. The UPPER storey is one narrow plane PER METAGRAPH over its lane (user,
+    // 2026-08-07), gapped, each named by its ticker. Independence made literal.
     const mainZ1 = FLOOR_Z1; // == FLOOR_D/2 — promoted to the domain so the containers share it
     const mainD = mainZ1 - FLOOR_MAIN_Z0;
-    frame(W, mainD, FLOOR_Y.gl0, cx, (mainZ1 + FLOOR_MAIN_Z0) / 2, "gl0");
-    frame(W, GUTTER_W + 1.0, FLOOR_Y.gl0, cx, GUTTER_CZ, "gl0");
+    const gl = LEDGER_LAYERS.find((l) => l.id === "gl0");
+    this._globalPlanes.push(
+      new SnapshotPlane(this.group, this._colors, {
+        w: W, d: mainD, y: FLOOR_Y.gl0, cx, cz: (mainZ1 + FLOOR_MAIN_Z0) / 2,
+        label: { level: gl?.level ?? "", text: gl?.name ?? "gl0", x: lx, z: D / 2 - 1.2 },
+      }),
+      new SnapshotPlane(this.group, this._colors, {
+        w: W, d: GUTTER_W + 1.0, y: FLOOR_Y.gl0, cx, cz: GUTTER_CZ,
+      }),
+    );
     const n = this._laneOrder.length;
     const hz = lanePlaneHalf(n);
     for (let i = 0; i < n; i++) {
-      frame(W, hz * 2, FLOOR_Y.msnap, cx, laneSpan(i, n).cz, "msnap");
-    }
-
-    const lx = FLOOR_LABEL_X;
-    const gl = LEDGER_LAYERS.find((l) => l.id === "gl0");
-    const glLabel = this._makeLabel(gl?.level ?? "", gl?.name ?? "gl0", lx, FLOOR_Y.gl0, D / 2 - 1.2);
-    this.group.add(glLabel);
-    this._fades.register(glLabel.material as THREE.MeshBasicMaterial, 1);
-    // Per-plane TICKER labels (the collective "Metagraph snapshots" label went with the shared
-    // floor — each plane names itself, the explorer names the group).
-    for (let i = 0; i < n; i++) {
       const key = this._laneOrder[i];
       const meta = METAGRAPHS.find((m) => m.id === key);
-      const t = this._makeLabel(
-        "",
-        meta?.ticker ?? "unlisted",
-        lx,
-        FLOOR_Y.msnap,
-        laneSpan(i, n).cz + hz - 0.12,
-        0.62,
-      );
-      this.group.add(t);
-      this._fades.register(t.material as THREE.MeshBasicMaterial, 1);
+      const cz = laneSpan(i, n).cz;
+      // (The collective "Metagraph snapshots" label went with the shared floor — each plane
+      // names itself, the explorer names the group.)
+      this._metaPlanes.set(key, new SnapshotPlane(this.group, this._colors, {
+        w: W, d: hz * 2, y: FLOOR_Y.msnap, cx, cz,
+        label: { level: "", text: meta?.ticker ?? "unlisted", x: lx, z: cz + hz - 0.12, height: 0.62 },
+      }));
+    }
+    for (const p of [...this._globalPlanes, ...this._metaPlanes.values()]) {
+      this._floorBlockers.push(p.fill);
+      if (p.label) this._fades.register(p.label.material as THREE.MeshBasicMaterial, 1);
     }
 
     // The lead row is annotated, not decorated: while the live tick's anchor count is still
@@ -388,107 +343,27 @@ export class LedgerView implements SceneView {
     // tiles (x ≈ 0), so it can only ever be about that row. Opacity is driven per frame in
     // _applyFloorAlpha (it rides the view alpha like every other piece of furniture), so it is
     // deliberately NOT registered with the fade set.
-    this._formingLabel = this._makeLabel("", "forming…", FORMING_X, FLOOR_Y.msnap, FORMING_Z);
+    this._formingLabel = makeEdgeLabel(this._colors, "", "forming…", FORMING_X, FLOOR_Y.msnap, FORMING_Z);
     (this._formingLabel.material as THREE.MeshBasicMaterial).opacity = 0;
     this.group.add(this._formingLabel);
-  }
-
-  /** A flat, edge-aligned label plane — the chamber's only text. A blank `level` = no digit box. */
-  private _makeLabel(
-    level: string,
-    text: string,
-    frontX: number,
-    y: number,
-    leftZ: number,
-    height = 1.05,
-  ): THREE.Mesh {
-    const c = document.createElement("canvas");
-    const SS = 2;
-    c.width = 512 * SS;
-    c.height = 64 * SS;
-    const ctx = c.getContext("2d")!;
-    const cc = new THREE.Color(this._core);
-    const tone = `rgba(${rgbTriplet(cc)},0.85)`;
-    const mc = new THREE.Color(this._muted);
-    const mtone = `rgba(${rgbTriplet(mc)},0.95)`;
-    const bc = new THREE.Color(this._border);
-    const brgb = rgbTriplet(bc);
-    const pc = new THREE.Color(this._panel);
-    const prgb = rgbTriplet(pc);
-    let textX = 6 * SS;
-    if (level) {
-      ctx.font = `400 ${22 * SS}px system-ui, -apple-system, sans-serif`;
-      const boxW = Math.max(34 * SS, Math.ceil(ctx.measureText(level).width) + 16 * SS);
-      const bx = 6 * SS,
-        by = 15 * SS,
-        bh = 34 * SS,
-        br = 6 * SS;
-      ctx.beginPath();
-      ctx.roundRect(bx, by, boxW, bh, br);
-      ctx.fillStyle = `rgba(${prgb},0.9)`;
-      ctx.fill();
-      ctx.strokeStyle = `rgba(${brgb},0.6)`;
-      ctx.lineWidth = 2 * SS;
-      ctx.stroke();
-      ctx.fillStyle = mtone;
-      ctx.textAlign = "center";
-      ctx.textBaseline = "middle";
-      ctx.fillText(level, 6 * SS + boxW / 2, (15 + 17 + 1) * SS);
-      textX = 6 * SS + boxW + 12 * SS;
-    }
-    ctx.font = `400 ${26 * SS}px system-ui, -apple-system, sans-serif`;
-    ctx.textAlign = "left";
-    ctx.textBaseline = "middle";
-    ctx.fillStyle = tone;
-    ctx.fillText(text, textX, c.height / 2 + 2 * SS);
-    const tex = new THREE.CanvasTexture(c);
-    tex.minFilter = THREE.LinearFilter;
-    tex.colorSpace = THREE.SRGBColorSpace;
-    const h = height,
-      w = h * (c.width / c.height);
-    const mesh = new THREE.Mesh(
-      new THREE.PlaneGeometry(w, h),
-      new THREE.MeshBasicMaterial({
-        map: tex,
-        transparent: true,
-        depthWrite: false,
-        depthTest: false,
-      }),
-    );
-    mesh.quaternion.setFromRotationMatrix(
-      new THREE.Matrix4().makeBasis(
-        new THREE.Vector3(0, 0, -1),
-        new THREE.Vector3(-1, 0, 0),
-        new THREE.Vector3(0, 1, 0),
-      ),
-    );
-    mesh.position.set(frontX - h / 2, y + 0.06, leftZ - w / 2);
-    mesh.renderOrder = 2;
-    return mesh;
   }
 
   // ── view alpha / highlight ───────────────────────────────────────────────
 
   setViewAlpha(a: number): void {
     this._fades.apply(a);
-    this._rails.setAlpha(a);
     this._bar.setAlpha(a);
     this._ribbons.setAlpha(a);
     // group.visible is owned SOLELY by the Engine — a view fades, it never hides itself.
   }
 
   private _applyFloorAlpha(): void {
-    // The tune's `edge` (0..1, drop-off start) → a rim width in local units, shared by every
-    // glass piece (floors AND the node containers — NodeRails reads the same tune object) so
-    // the rim reads as one width everywhere; narrow pieces clamp it to stay a rim.
-    const rimW = (1 - this.floors.edge) * (FLOOR_D / 2);
-    for (const [, list] of this._floorMats) {
-      for (const m of list) {
-        m.fill.uOpacity.value = this.floors.fillOp * this._fades.alpha;
-        m.fill.uInner.value = this.floors.innerOp * this._fades.alpha;
-        m.fill.uEdgeW.value = Math.min(rimW, 0.8 * m.minHalf);
-      }
-    }
+    // Each plane applies ITS tune channel (the global floor vs the metagraph planes — same
+    // blueprint, two knobs; user 2026-08-07). FLOOR_D/2 is the shared drop-off reference so the
+    // rim reads as one width everywhere; narrow pieces clamp it inside SnapshotPlane.
+    const a = this._fades.alpha;
+    for (const p of this._globalPlanes) p.applyAlpha(this.globalTune, a, FLOOR_D / 2);
+    for (const p of this._metaPlanes.values()) p.applyAlpha(this.metaTune, a, FLOOR_D / 2);
     if (this._formingLabel)
       (this._formingLabel.material as THREE.MeshBasicMaterial).opacity =
         FORMING_OP * this._formingW * this._fades.alpha;
@@ -593,8 +468,10 @@ export class LedgerView implements SceneView {
   }
 
   setContainers(group: RailGroup, specs: ContainerSpec[]): void {
-    this._rails.setContainers(group, specs); // event-time: a data rebuild, not a frame
-    this._syncPickables();
+    // event-time: a data rebuild. Each tray routes to ITS OWN plane by key ("dag" / metagraph
+    // id) — the blueprint owns the tray glass, the chips stay Globe's shared InstancedMeshes.
+    if (group === "dag") this._globalPlanes[0]?.setTray(specs[0] ?? null);
+    else for (const [key, p] of this._metaPlanes) p.setTray(specs.find((s) => s.key === key) ?? null);
   }
 
   setSelected(ordinal: number | null) {
@@ -745,7 +622,6 @@ export class LedgerView implements SceneView {
 
     this._applyFloorAlpha();
 
-    this._rails.update(dt);
     this._bar.update(dt);
     this._ribbons.update(dt);
 
@@ -859,7 +735,9 @@ export class LedgerView implements SceneView {
   }
 
   dispose() {
-    this._rails.dispose();
+    for (const p of [...this._globalPlanes, ...this._metaPlanes.values()]) p.dispose();
+    this._globalPlanes.length = 0;
+    this._metaPlanes.clear();
     this._bar.dispose();
     this._ribbons.dispose();
     for (const o of this.group.children.slice()) {
