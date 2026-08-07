@@ -1552,13 +1552,13 @@ frame). It composes three adapters — `objects/ByteBar.ts`, `objects/Ribbons.ts
   surface AND the starfield are gated OFF** (`globe.setMorph` zeroes `surf`/`extras` when
   `this.ledger`; the Engine passes `background.update(.., 0)`) so neither lingers when arriving
   from geo.
-- **Lanes: a committed metagraph takes the whole floor.** `laneSpan(i, n, committedIdx)` →
-  `{cz, hz, hidden}`: with nothing committed each lane owns its own slice (`hz = LANE_HALF_Z/n`);
-  **committed, that lane moves to `cz:0` with `hz:LANE_HALF_Z` and every other lane is `hidden`**
-  (lays no tiles). `LedgerView.setFilter` is the ONE entry point allowed to rearrange the lane
-  field (`_relayoutLaneField` → `_applyDim` → `_rebuildAllSlots` → `_rebuildGutter`);
-  **`setHoverFilter` previews the DIM ONLY** — no relayout, no gutter change, no pulse re-gating,
-  and bands dim rather than disappear. Hover previews, commit rearranges: that split is the rule.
+- **Lanes: the field is FIXED** (user reversal 2026-08-07 of the spec §5.2 committed-lane
+  rearrangement): `laneSpan(i, n)` → `{cz, hz}` — every lane always owns its own slice, and a
+  committed filter NEVER moves or hides geometry. The emphasis is the dim (bands/tiles/ribbons
+  dim in place, the committed network stays lit) plus the CAMERA: the `ledgerNetwork` resolver
+  flies to the committed metagraph's lane (`ledgerFloorFraming` shifted laterally by the lane's
+  world X) so its snapshots sit at screen centre. `setFilter` = dim + gutter only;
+  `setHoverFilter` previews the dim.
 - **Gutters** — a narrow strip beyond the lane field on the screen-right (−Z) side of both floors
   (`GUTTER_W = (2*LANE_HALF_Z)/6`, `GUTTER_CZ`). On `msnap` it carries the **currency status
   line**, rebuilt only under a committed metagraph from `activityLine(activity, ticker, now)` in

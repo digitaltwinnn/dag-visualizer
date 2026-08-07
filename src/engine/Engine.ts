@@ -9,10 +9,11 @@ import { createScene, type SceneCtx } from "./scene/SceneContext";
 import { HyperView, type MetaHubRec } from "./scene/views/HyperView";
 import { Globe, GATHER_CELL } from "./scene/Globe";
 import { LedgerView } from "./scene/views/LedgerView";
+import { LANE_IDS } from "./domain/ledgerModel";
 import { StageLights } from "./scene/objects/StageLights";
 import { loadGeoCache, resolveMissing } from "@/src/data/geoResolve";
 import { METAGRAPHS, COLORS } from "@/src/engine/config";
-import { LEDGER, LAYER_GEOM, BYTE_SCALE_KB, type RailGroup } from "./domain/ledgerLayout";
+import { LEDGER, LAYER_GEOM, BYTE_SCALE_KB, ledgerSite, type RailGroup } from "./domain/ledgerLayout";
 import { HYPER_TILT, HYPER_TILT_FOCUS } from "./domain/hyperLayout";
 import { readSceneColors } from "./sceneColors";
 import { VIEW_POLICIES, type ViewPolicy } from "./domain/viewPolicy";
@@ -903,10 +904,22 @@ export class Engine {
       return !!p && this._focusLedgerNode(p);
     },
     ledgerNetwork: () => {
-      // Frame the committed network's floor: a metagraph's lane spans the metagraph-snapshot
-      // floor, the DAG's own output is the global floor. Camera-only — the floors are visual
-      // aid, not committable subjects (layer navigation retired 2026-08-06).
-      return this._focusFloor(this.filter === "dag" ? "gl0" : "msnap");
+      // Fly to the committed network's LANE (user, 2026-08-07 — the lane field is FIXED now: a
+      // filter dims the others in place instead of hiding them, and the CAMERA carries the
+      // focus by centring the committed metagraph's lane of snapshots). The DAG's own output
+      // is the global floor. Camera-only — the floors are visual aid, not committable subjects.
+      if (this.filter === "dag") return this._focusFloor("gl0");
+      const i = LANE_IDS.indexOf(this.filter);
+      if (i < 0) return this._focusFloor("msnap");
+      const msnap = LAYER_GEOM.find((l) => l.id === "msnap")!;
+      ledgerFloorFraming(msnap.y * LEDGER.viewScale, this._framingOut);
+      // The lane's world X (ledger-local z → world -z, scaled): shift pos+target laterally so
+      // the lane projects at screen centre — the composition ledgerFloorFraming documents.
+      const laneX = -ledgerSite(i, LANE_IDS.length).z * LEDGER.viewScale;
+      this._framingOut.pos.x += laneX;
+      this._framingOut.target.x += laneX;
+      this._tweenTo(this._framingOut.pos, this._framingOut.target);
+      return true;
     },
     ledgerOverview: () => {
       this.focus("overview");

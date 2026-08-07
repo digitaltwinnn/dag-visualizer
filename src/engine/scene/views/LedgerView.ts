@@ -61,21 +61,17 @@ import { FadeSet } from "../objects/FadeSet";
 import type { SceneView } from "./SceneView";
 
 /** The live-tunable GLASS look — the floors AND the node containers share it (one fill
- *  language, objects/glassFill.ts). NB the frame material's colour is HDR-overdriven ×2 (see
- *  _buildFloors), so its opacity reads roughly HALF the perceived line brightness. `edge` is
- *  where the drop-off starts (1 = only the rim, 0 = solid): converted to a shared rim WIDTH in
- *  local units by _applyFloorAlpha / NodeRails.update. */
+ *  language, objects/glassFill.ts). `edge` is where the drop-off starts (1 = only the rim,
+ *  0 = solid): converted to a shared rim WIDTH in local units by _applyFloorAlpha /
+ *  NodeRails.update. (The hairline FRAME is gone entirely — user, 2026-08-07: the rim is the
+ *  whole edge statement.) */
 export interface FloorTune {
-  frameOp: number; // the hairline frame
   fillOp: number;  // the edge-band fill
   innerOp: number; // the flat centre level
-  edge: number;    // drop-off start (uEdge uniform — smoothstep(edge → 1) over |uv|)
+  edge: number;    // drop-off start
 }
 
 export const FLOOR_TUNE_DEFAULTS: FloorTune = {
-  // User-tuned via ?tune, 2026-08-07/3: a whisper of frame back over the rounded glass, soft
-  // rim, centre whisper, drop-off tight against the rim.
-  frameOp: 0.015,
   fillOp: 0.035,
   innerOp: 0.01,
   edge: 0.95,
@@ -163,7 +159,7 @@ export class LedgerView implements SceneView {
   // whole plane.
   private _floorMats = new Map<
     string,
-    { frame: THREE.LineBasicMaterial; fill: GlassFillUniforms; minHalf: number }[]
+    { fill: GlassFillUniforms; minHalf: number }[]
   >();
   private _floorBlockers: THREE.Object3D[] = [];
 
@@ -184,13 +180,9 @@ export class LedgerView implements SceneView {
   private readonly _laneOrder: string[] = [...LANE_IDS];
   private readonly _laneZ = new Map<string, number>();
   private readonly _laneHZ = new Map<string, number>();
-  private readonly _laneHidden = new Map<string, boolean>();
-  private _committedLane: number | null = null;
-  /** Ribbons' lane resolver: null for a HIDDEN lane (another network committed) so it draws no
-   *  sheet — a hidden lane laid no tiles, and its old-position ribbon would overlap the committed
-   *  lane's field (finetune 2026-08-06). */
-  private readonly _laneZOf = (key: string): number | null =>
-    this._laneHidden.get(key) ? null : this._laneZ.get(key) ?? null;
+  /** Ribbons' lane resolver. The lane field is FIXED now (user reversal 2026-08-07 — a filter
+   *  dims, it never hides/moves lanes), so every roster key resolves. */
+  private readonly _laneZOf = (key: string): number | null => this._laneZ.get(key) ?? null;
 
   // ── per-slot bar specs + the snapshot each slot stands for
   private readonly _specs: BarSpec[] = [];
@@ -341,13 +333,6 @@ export class LedgerView implements SceneView {
     const W = FLOOR_W;
     const D = FLOOR_D;
     const cx = FLOOR_CX;
-    const frameMat = new THREE.LineBasicMaterial({
-      color: new THREE.Color(this._core).multiplyScalar(2),
-      transparent: true,
-      opacity: FLOOR_TUNE_DEFAULTS.frameOp,
-      blending: THREE.AdditiveBlending,
-      depthWrite: false,
-    });
     // The SHARED glass fill (objects/glassFill.ts — the same rounded-corner, soft-rim surface
     // the node containers wear; user 2026-08-07): per-piece material, sized in local units.
     const frame = (w: number, d: number, y: number, x: number, z: number, id: string) => {
@@ -359,14 +344,8 @@ export class LedgerView implements SceneView {
       fill.userData.blocker = true; // a normal surface: rays stop here (no pick, no pass-through)
       this._floorBlockers.push(fill);
       this.group.add(fill);
-      const lm = frameMat.clone();
-      const f = new THREE.LineSegments(new THREE.EdgesGeometry(new THREE.PlaneGeometry(w, d)), lm);
-      f.rotation.x = -Math.PI / 2;
-      f.position.set(x, y, z);
-      f.renderOrder = -1;
-      this.group.add(f);
       const list = this._floorMats.get(id) ?? [];
-      list.push({ frame: lm, fill: fm.uniforms as unknown as GlassFillUniforms, minHalf: Math.min(w, d) / 2 });
+      list.push({ fill: fm.uniforms as unknown as GlassFillUniforms, minHalf: Math.min(w, d) / 2 });
       this._floorMats.set(id, list);
     };
     // TWO floors now — the node layers hang in containers under their edges, not storeys of their
@@ -494,7 +473,6 @@ export class LedgerView implements SceneView {
     const rimW = (1 - this.floors.edge) * (FLOOR_D / 2);
     for (const [, list] of this._floorMats) {
       for (const m of list) {
-        m.frame.opacity = this.floors.frameOp * this._fades.alpha;
         m.fill.uOpacity.value = this.floors.fillOp * this._fades.alpha;
         m.fill.uInner.value = this.floors.innerOp * this._fades.alpha;
         m.fill.uEdgeW.value = Math.min(rimW, 0.8 * m.minHalf);
@@ -517,15 +495,15 @@ export class LedgerView implements SceneView {
 
   // ── the lane field ───────────────────────────────────────────────────────
 
-  /** Event-time only (a filter COMMIT). The committed lane takes the floor; the rest step out. */
+  /** Construction-time only — the lane field is FIXED (user reversal 2026-08-07): a committed
+   *  filter dims and flies the camera to the lane (Engine), it never moves geometry. */
   private _relayoutLaneField(): void {
     const n = this._laneOrder.length;
     for (let i = 0; i < n; i++) {
-      const s = laneSpan(i, n, this._committedLane);
+      const s = laneSpan(i, n);
       const key = this._laneOrder[i];
       this._laneZ.set(key, s.cz);
       this._laneHZ.set(key, s.hz);
-      this._laneHidden.set(key, s.hidden);
     }
   }
 
@@ -621,16 +599,11 @@ export class LedgerView implements SceneView {
     this._syncRibbonRows();
   }
 
-  /** The COMMITTED network. This is the ONE entry point that may rearrange the lane field — a hover
-   *  previews the highlight (setHoverFilter), never the rearrangement. */
+  /** The COMMITTED network. DIM only since the fixed-lane reversal (user, 2026-08-07) — the
+   *  lane field never moves; the camera fly-to-lane is the Engine's ledgerNetwork resolver. */
   setFilter(filter: string) {
     this._filter = filter || "all"; // event-time
-    const idx =
-      this._filter === "all" || this._filter === "dag" ? -1 : this._laneOrder.indexOf(this._filter);
-    this._committedLane = idx >= 0 ? idx : null;
-    this._relayoutLaneField();
     this._applyDim();
-    this._rebuildAllSlots();
     this._rebuildGutter();
   }
 
@@ -717,7 +690,6 @@ export class LedgerView implements SceneView {
     for (let i = 0; i < spec.bandCount; i++) {
       const band = spec.bands[i];
       if (band.bytes <= 0) continue;
-      if (this._laneHidden.get(band.key)) continue; // no sheet → no index (unknown lane included)
       if (band.key === key) return n;
       n++;
     }
@@ -733,7 +705,6 @@ export class LedgerView implements SceneView {
     }
     let mi = 0;
     for (const lane of this.model.lanes.values()) {
-      if (this._laneHidden.get(lane.id)) continue;
       // `k` is the tile's index WITHIN ITS TICK — the resolver looks a snapshot up by
       // (metagraph, tick) and indexes that tick's own list. A lane's blocks are contiguous per
       // tick (anchorTiles pushes a tick's tiles together), so the counter resets on each new ts.
@@ -771,7 +742,9 @@ export class LedgerView implements SceneView {
       old.dispose();
       this._gutterLabel = null;
     }
-    const id = this._committedLane != null ? this._laneOrder[this._committedLane] : null;
+    const id = this._filter !== "all" && this._filter !== "dag" && this._laneOrder.includes(this._filter)
+      ? this._filter
+      : null;
     if (!id) return;
     const meta = METAGRAPHS.find((m) => m.id === id);
     // Measured against an ABSOLUTE clock, not the visible window — a dormant token must not read
@@ -814,7 +787,6 @@ export class LedgerView implements SceneView {
     // ── lane tiles on the metagraph-snapshot floor
     let mi = 0;
     for (const lane of this.model.lanes.values()) {
-      if (this._laneHidden.get(lane.id)) continue;
       const laneOff = mf != null && lane.id !== mf;
       const laneColor = this._laneColor(lane.id);
       const cz = this._laneZ.get(lane.id) ?? lane.z;

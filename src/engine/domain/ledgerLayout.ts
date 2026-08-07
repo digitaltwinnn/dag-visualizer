@@ -176,11 +176,11 @@ export type RailGroup = "meta" | "dag";
 export const RAIL_GROUP_FLOOR: Record<RailGroup, LedgerFloorId> = { meta: "msnap", dag: "gl0" };
 
 export const CONT_X = 6.2;        // the containers' shared X plane — just inside the floors' front edge
-export const CONT_TOP_GAP = 0.55; // floor plane → first container frame top
+export const CONT_TOP_GAP = 0.15; // floor plane → first container frame top (tight — user 2026-08-07)
 export const CONT_CHIP_Z = 0.46;  // chip pitch along Z (columns) — tightened with the smaller chips
 export const CONT_ROW_Y = 0.46;   // row pitch downward
 export const CONT_PAD = 0.16;     // frame padding around the chip grid — a tight hairline margin
-export const CONT_GAP = 0.5;      // VERTICAL gap between stacked containers
+export const CONT_GAP = 0.3;      // VERTICAL gap between stacked containers
 /** The label strip INSIDE the frame's screen-left end — the chips start after it (the role code
  *  sits in the tray like the floor labels sit on the plane; user, 2026-08-07). */
 export const CONT_LABEL_W = 2.1;
@@ -189,23 +189,19 @@ export const CONT_LABEL_W = 2.1;
 export const CONT_Z0 = FLOOR_MAIN_Z0 + 0.3;
 export const CONT_Z1 = FLOOR_Z1 - 0.6;
 
-// ── The committed-filter rearrangement (spec §5.2): "Committing rearranges the upper floor: the
-// lane takes the whole floor, other lanes' tiles leave, rails dim non-member machines." So a lane
-// is not merely dimmed under a filter — it gives up its slice, and the committed lane grows into
-// the whole Z field so its tiles read at the same size the "all" view gives ten lanes together.
+// ── The lane field is FIXED (user reversal, 2026-08-07, of the spec §5.2 committed-lane
+// rearrangement): a committed filter no longer moves geometry or hides the other lanes — the
+// focus/dim effects carry the emphasis and the CAMERA flies to the committed lane instead
+// (Engine's ledgerNetwork resolver). Every lane always owns its own slice.
 export type LaneSpan = {
   /** Lane centre in local Z. */
   cz: number;
   /** Half the Z extent this lane may lay tiles across. */
   hz: number;
-  /** True when another lane is committed and this one lays no tiles at all. */
-  hidden: boolean;
 };
 
-export function laneSpan(i: number, n: number, committedIdx: number | null): LaneSpan {
-  if (committedIdx === null) return { cz: ledgerSite(i, n).z, hz: LANE_HALF_Z / n, hidden: false };
-  if (committedIdx === i) return { cz: 0, hz: LANE_HALF_Z, hidden: false };
-  return { cz: ledgerSite(i, n).z, hz: LANE_HALF_Z / n, hidden: true };
+export function laneSpan(i: number, n: number): LaneSpan {
+  return { cz: ledgerSite(i, n).z, hz: LANE_HALF_Z / n };
 }
 
 // Per-FLOOR camera geometry: the height the floor-focus framing aims at. The old six-rung

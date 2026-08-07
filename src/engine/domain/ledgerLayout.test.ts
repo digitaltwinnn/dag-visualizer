@@ -140,25 +140,13 @@ describe("two-floor chamber (redesign 2026-08-04)", () => {
     expect(Math.max(TILE_LIFT, BAR_LIFT)).toBeLessThan(0.5);
   });
 
-  it("keeps every lane in its own slice with nothing committed", () => {
-    const n = METAGRAPHS.length;
+  it("keeps every lane in its own FIXED slice — a filter never moves or hides lanes (user reversal 2026-08-07)", () => {
+    const n = METAGRAPHS.length + 1; // the roster incl. the unknown lane
     for (let i = 0; i < n; i++) {
-      const s = laneSpan(i, n, null);
-      expect(s.hidden).toBe(false);
+      const s = laneSpan(i, n);
       expect(s.cz).toBeCloseTo(ledgerSite(i, n).z, 6);
       // Each lane owns one slice of the field, so n lanes tile it without overlapping.
       expect(s.hz).toBeCloseTo(LANE_HALF_Z / n, 6);
-    }
-  });
-
-  it("gives a committed lane the whole floor and takes the others away (spec §5.2)", () => {
-    const n = METAGRAPHS.length;
-    const on = laneSpan(3, n, 3);
-    expect(on.hidden).toBe(false);
-    expect(on.cz).toBeCloseTo(0, 6);
-    expect(on.hz).toBeCloseTo(LANE_HALF_Z, 6);
-    for (const i of [0, 2, 4, n - 1]) {
-      expect(laneSpan(i, n, 3).hidden).toBe(true);
     }
   });
 });
