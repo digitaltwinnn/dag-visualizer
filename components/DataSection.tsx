@@ -10,22 +10,23 @@ import NodeRosterTable from "@/components/datasection/NodeRosterTable";
 // dataset yet: the same honest preview language as Blueprint, never a fabricated table.
 export default function DataSection() {
   const mode = useStore((s) => s.mode);
-  const metaSnap = useStore((s) => s.metaSnap);
   return (
     // The right pad is wider than the left ON PURPOSE: it reserves the corner the layer's own ×
     // occupies (SectionShell). Below 1100px the tables outgrow the panel and scroll sideways, so
     // without the gutter the sticky header slid under the close mark (2026-08-02).
     <div className="h-full flex flex-col pl-6 pr-10 py-3">
       {mode === "ledger" ? (
-        <div className="h-full flex flex-col gap-4 min-h-0">
-          <div className="flex-1 min-h-0 flex flex-col">
+        // MASTER–DETAIL (item 9, 2026-08-06): the anchor log is the index on the left; the right
+        // pane renders the SELECTED metagraph snapshot's contents (the deep read + the JSON tree),
+        // or its own quiet hint while nothing is selected. The pane is always present so the log
+        // never reflows on selection.
+        <div className="h-full flex gap-5 min-h-0">
+          <div className="flex-1 min-w-0 flex flex-col">
             <AnchorLogTable />
           </div>
-          {metaSnap && (
-            <div className="flex-none max-h-[55%] overflow-auto border-t border-border/50 pt-3">
-              <ChannelStatePanel />
-            </div>
-          )}
+          <div className="w-[36%] max-w-[520px] flex-none min-w-0 flex flex-col border-l border-border/50 pl-5">
+            <ChannelStatePanel />
+          </div>
         </div>
       ) : mode === "hyper" || mode === "geo" ? (
         <NodeRosterTable mode={mode} />

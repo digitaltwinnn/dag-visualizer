@@ -12,7 +12,6 @@ const LEVEL_CARD: Record<Exclude<FocusLevel, "all">, string> = {
   country: "country",
   cohort: "cohort",
   composition: "composition",
-  layer: "layer",
 };
 const EXEMPT: Partial<Record<Exclude<FocusLevel, "all">, string>> = {
   // (none today — add `level: "reason"` only with a spec decision)
@@ -23,7 +22,6 @@ const stateFor = (mode: RailManifestState["mode"]): RailManifestState => ({
   filter: "all",
   inspect: null,
   snap: null,
-  layer: null,
   country: null,
   cohort: null,
   composition: null,
@@ -50,12 +48,9 @@ describe("ladder↔rail boundary — every rung has a facts slot", () => {
   }
 });
 
-// Task 18 — the explorer's floors-and-rails vocabulary: LEDGER_LAYERS' `level` field IS the
-// floor/rail split the panel groups its rows by (rail = the four node layers, "1"/"2" = the
-// two snapshot floors). Confirms the contract before touching LedgerPanel's rendering.
-it("the ledger explorer still browses every node layer, now as rails", () => {
-  const rails = LEDGER_LAYERS.filter((l) => l.level === "rail").map((l) => l.id).sort();
-  expect(rails).toEqual(["hypl0", "hypl1", "ml0", "ml1"]);
-  const floors = LEDGER_LAYERS.filter((l) => l.level !== "rail").map((l) => l.id).sort();
-  expect(floors).toEqual(["gl0", "msnap"]);
+// Snapshots-first explorer (2026-08-06): only the two snapshot FLOORS carry display copy — the
+// node layers are per-role containers (ledgerRails.ROLE_CODE) and no layer is committable.
+it("the ledger explorer's floor vocabulary is exactly the two snapshot floors", () => {
+  expect(LEDGER_LAYERS.map((l) => l.id).sort()).toEqual(["gl0", "msnap"]);
+  expect(LEDGER_LAYERS.map((l) => l.level).sort()).toEqual(["1", "2"]);
 });

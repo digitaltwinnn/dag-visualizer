@@ -1,85 +1,97 @@
 import { describe, it, expect } from "vitest";
 import * as THREE from "three";
 import {
-  RAIL_ORDER, railKindOf, visibleRails, railChipPos, railLayerId, railLit,
-  type RailKind,
+  ROLE_ORDER, ROLE_CODE, railRolesOf, recordRole, containerLayout, containerChipPos,
+  type RailRole, type ContainerSpec,
 } from "./ledgerRails";
-import { railX, railY, RAIL_CAP, RAIL_CHIP_PITCH_Z, LANE_HALF_Z } from "./ledgerLayout";
+import {
+  CONT_X, CONT_TOP_GAP, CONT_CHIP_Z, CONT_ROW_Y, CONT_PAD, CONT_GAP,
+  FLOOR_Y, RAIL_GROUP_FLOOR,
+} from "./ledgerLayout";
 
-const counts = (o: Partial<Record<RailKind, number>>) =>
-  new Map<RailKind, number>(Object.entries(o) as [RailKind, number][]);
+const counts = (pairs: [RailRole, number][]) => new Map<RailRole, number>(pairs);
 
-describe("railKindOf", () => {
-  it("partitions machines by make-up, each machine on exactly one rail", () => {
-    expect(railKindOf(["l0", "cl1", "dl1"])).toBe("hybrid");
-    expect(railKindOf(["l0", "dl1"])).toBe("hybrid");
-    expect(railKindOf(["dl1"])).toBe("l1only");
-    expect(railKindOf(["cl1"])).toBe("l1only");
-    expect(railKindOf(["l0"])).toBe("l0only");
+describe("role membership (containers 2026-08-06)", () => {
+  it("puts a machine in EVERY role container it serves — hybrids duplicated by design", () => {
+    expect(railRolesOf("meta", ["l0", "cl1", "dl1"])).toEqual(["l0", "cl1", "dl1"]);
+    expect(railRolesOf("meta", ["l0", "dl1"])).toEqual(["l0", "dl1"]);
+    expect(railRolesOf("meta", ["dl1"])).toEqual(["dl1"]);
+    expect(railRolesOf("meta", [])).toEqual([]);
   });
 
-  it("returns null for a machine with no ledger-relevant role", () => {
-    expect(railKindOf([])).toBeNull();
-    expect(railKindOf(["unknown"])).toBeNull();
-  });
-});
-
-describe("visibleRails", () => {
-  it("keeps the fixed order and hides empty rails so the rest collapse up", () => {
-    expect(visibleRails(counts({ l1only: 19, hybrid: 3, l0only: 0 }))).toEqual(["l1only", "hybrid"]);
-    expect(visibleRails(counts({ hybrid: 3 }))).toEqual(["hybrid"]);
-    // The DAG's own validators: L0-only and L1-only machines, no hybrids — the same rule, a
-    // different outcome.
-    expect(visibleRails(counts({ l1only: 40, l0only: 160 }))).toEqual(["l1only", "l0only"]);
-    expect(visibleRails(counts({}))).toEqual([]);
-    expect([...RAIL_ORDER]).toEqual(["l1only", "hybrid", "l0only"]);
-  });
-});
-
-describe("railChipPos", () => {
-  it("lays chips along Z at the rail's own X, centred on the field", () => {
-    const out = new THREE.Vector3();
-    railChipPos("meta", 1, 0, out);
-    expect(out.x).toBeCloseTo(railX(1), 6);
-    expect(out.y).toBeCloseTo(railY("meta", 0), 6);
-    expect(out.z).toBeCloseTo(-LANE_HALF_Z, 6);
-    railChipPos("meta", 1, 2, out);
-    expect(out.z).toBeCloseTo(-LANE_HALF_Z + 2 * RAIL_CHIP_PITCH_Z, 6);
+  it("presents the DAG's currency layer as L1", () => {
+    expect(railRolesOf("dag", ["l0", "cl1"])).toEqual(["l0", "l1"]);
+    expect(railRolesOf("dag", ["cl1"])).toEqual(["l1"]);
+    expect(railRolesOf("dag", ["l0"])).toEqual(["l0"]);
   });
 
-  it("wraps an over-long rail into a stacked row rather than running off the floor", () => {
-    const out = new THREE.Vector3();
-    railChipPos("dag", 0, RAIL_CAP, out);
-    expect(out.y).toBeCloseTo(railY("dag", 1), 6);
-    expect(out.z).toBeCloseTo(-LANE_HALF_Z, 6);
+  it("maps ONE record (a (machine, layer) instance) to exactly its own container", () => {
+    expect(recordRole("meta", "l0")).toBe("l0");
+    expect(recordRole("meta", "cl1")).toBe("cl1");
+    expect(recordRole("meta", "dl1")).toBe("dl1");
+    expect(recordRole("meta", "other")).toBeNull();
+    expect(recordRole("dag", "l0")).toBe("l0");
+    expect(recordRole("dag", "cl1")).toBe("l1");
+    expect(recordRole("dag", "dl1")).toBe("l1");
   });
 
-  it("returns the out vector it was given", () => {
-    const out = new THREE.Vector3();
-    expect(railChipPos("meta", 0, 0, out)).toBe(out);
+  it("orders containers in the user's own listing order with display codes", () => {
+    expect([...ROLE_ORDER.meta]).toEqual(["l0", "cl1", "dl1"]);
+    expect([...ROLE_ORDER.dag]).toEqual(["l0", "l1"]);
+    expect(ROLE_CODE.cl1).toBe("cL1");
   });
 });
 
-describe("railLayerId / railLit", () => {
-  it("names each rail's own layer, hybrid siding with the L0 that produces the floor below", () => {
-    expect(railLayerId("meta", "l1only")).toBe("ml1");
-    expect(railLayerId("meta", "hybrid")).toBe("ml0");
-    expect(railLayerId("meta", "l0only")).toBe("ml0");
-    expect(railLayerId("dag", "l1only")).toBe("hypl1");
-    expect(railLayerId("dag", "l0only")).toBe("hypl0");
+describe("containerLayout", () => {
+  it("hides empty roles and lays the rest side by side, centred on z = 0", () => {
+    const specs = containerLayout("meta", counts([["l0", 14], ["dl1", 25]]));
+    expect(specs.map((s) => s.role)).toEqual(["l0", "dl1"]); // cl1 empty → hidden
+    // Side by side with a gap, screen-left (+Z) first.
+    const [a, b] = specs;
+    expect(a.cz).toBeGreaterThan(b.cz);
+    expect(a.cz - a.hz - (b.cz + b.hz)).toBeCloseTo(CONT_GAP, 6);
+    // Centred: the row's extremes are symmetric about z = 0.
+    expect(a.cz + a.hz).toBeCloseTo(-(b.cz - b.hz), 6);
   });
 
-  it("lights rails by OVERLAP — the hybrid rail answers to both rungs", () => {
-    expect(railLit("ml1", "meta", "l1only")).toBe(true);
-    expect(railLit("ml1", "meta", "hybrid")).toBe(true);
-    expect(railLit("ml1", "meta", "l0only")).toBe(false);
-    expect(railLit("ml0", "meta", "l0only")).toBe(true);
-    expect(railLit("ml0", "meta", "hybrid")).toBe(true);
-    expect(railLit("ml0", "meta", "l1only")).toBe(false);
-    expect(railLit("hypl0", "dag", "l0only")).toBe(true);
-    expect(railLit("hypl1", "dag", "l1only")).toBe(true);
-    // A rung on the other group's floor never lights these rails.
-    expect(railLit("hypl0", "meta", "hybrid")).toBe(false);
-    expect(railLit("msnap", "meta", "hybrid")).toBe(false);
+  it("hangs under the group's floor, below the frame-top gap", () => {
+    for (const group of ["meta", "dag"] as const) {
+      const [s] = containerLayout(group, counts([["l0", 6]]));
+      const floorY = FLOOR_Y[RAIL_GROUP_FLOOR[group]];
+      expect(s.cy + s.hy).toBeCloseTo(floorY - CONT_TOP_GAP, 6);
+    }
+  });
+
+  it("sizes the frame to the chip grid plus padding", () => {
+    const [s] = containerLayout("meta", counts([["l0", 10]]));
+    expect(s.rows).toBe(Math.ceil(10 / s.cols));
+    expect(s.hz * 2).toBeCloseTo(s.cols * CONT_CHIP_Z + 2 * CONT_PAD, 6);
+    expect(s.hy * 2).toBeCloseTo(s.rows * CONT_ROW_Y + 2 * CONT_PAD, 6);
+  });
+});
+
+describe("containerChipPos", () => {
+  const spec = (): ContainerSpec => containerLayout("meta", counts([["l0", 7]]))[0];
+
+  it("fills columns along −Z then wraps to the next row down", () => {
+    const s = spec();
+    const p0 = containerChipPos(s, 0, new THREE.Vector3());
+    const p1 = containerChipPos(s, 1, new THREE.Vector3());
+    const pw = containerChipPos(s, s.cols, new THREE.Vector3());
+    expect(p0.x).toBeCloseTo(CONT_X, 6);
+    expect(p1.z).toBeCloseTo(p0.z - CONT_CHIP_Z, 6);
+    expect(p1.y).toBeCloseTo(p0.y, 6);
+    expect(pw.y).toBeCloseTo(p0.y - CONT_ROW_Y, 6);
+    expect(pw.z).toBeCloseTo(p0.z, 6);
+  });
+
+  it("keeps every chip inside its container frame", () => {
+    const s = spec();
+    const p = new THREE.Vector3();
+    for (let k = 0; k < s.count; k++) {
+      containerChipPos(s, k, p);
+      expect(Math.abs(p.z - s.cz)).toBeLessThanOrEqual(s.hz + 1e-9);
+      expect(Math.abs(p.y - s.cy)).toBeLessThanOrEqual(s.hy + 1e-9);
+    }
   });
 });

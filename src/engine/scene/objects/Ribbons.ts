@@ -3,6 +3,17 @@
 // snapshots, the band measures bytes, and the ribbon is the relationship between the two — which is
 // what replaced the old cubic anchor links.
 //
+// The sheet is CURVED (finetune 2026-08-06): each ribbon is subdivided into SEG vertical segments
+// and its Z sweep eased (smootherstep, blended by `tune.curve`), so it falls from the lane, sweeps
+// mid-run and lands vertically on its band instead of slicing diagonally across the chamber. Bands
+// follow lane order (fillBarSpec), and both edges of adjacent ribbons interpolate with the SAME
+// ease, so ribbons can never cross each other. A HIDDEN lane (another network is committed) draws
+// NO ribbon at all — its lane laid no tiles, so a sheet from its old position would just overlap
+// the committed lane's field (the caller's laneZ resolver returns null for it).
+//
+// Brightness/opacity are TUNABLE (RibbonTune) — the dev ?tune panel binds them live; the defaults
+// here are the shipped look.
+//
 // Drawn on the LEAD row and the HOT row only, so the trail stays calm; older ticks keep a hairline
 // strut drawn by the view. One Mesh, one preallocated geometry, rewritten event-time.
 import * as THREE from "three";
@@ -13,10 +24,31 @@ import { SLOT_SP } from "../../domain/ledgerModel";
 import { ribbonQuad, RIBBON_LANE_HALF, UNLISTED_KEY, type BarSpec, type RibbonQuad } from "../../domain/ledgerBands";
 
 export const RIBBON_ROWS = 2;
+/** Vertical subdivisions per ribbon — enough for the eased sweep to read as a curve. */
+export const RIBBON_SEG = 16;
 const PER_ROW = METAGRAPHS.length + 1;
-const VERTS_PER_RIBBON = 6; // two triangles
-const REST_OP = 0.5;
-const DIM_OP = 0.12;
+const VERTS_PER_RIBBON = RIBBON_SEG * 6; // two triangles per segment
+
+/** The live-tunable ribbon look (dev `?tune` panel binds these; the values are the shipped look). */
+export interface RibbonTune {
+  restOp: number;    // resting sheet opacity (× view alpha)
+  dimOp: number;     // opacity for an off-filter ribbon (baked into vertex colours)
+  brightness: number; // vertex-colour multiplier (additive blending → perceived brightness)
+  curve: number;     // 0 = straight diagonal sheet, 1 = full smootherstep S-sweep
+}
+
+export const RIBBON_TUNE_DEFAULTS: RibbonTune = {
+  restOp: 0.32,
+  dimOp: 0.1,
+  brightness: 0.85,
+  curve: 1,
+};
+
+/** The eased Z progress at vertical progress `t` — linear blended toward smootherstep. */
+function sweep(t: number, curve: number): number {
+  const s = t * t * t * (t * (t * 6 - 15) + 10); // smootherstep
+  return t + (s - t) * curve;
+}
 
 interface RowState {
   slot: number;
@@ -27,6 +59,7 @@ interface RowState {
 
 export class Ribbons {
   group = new THREE.Group();
+  tune: RibbonTune = { ...RIBBON_TUNE_DEFAULTS };
   private _geo = new THREE.BufferGeometry();
   private _pos: THREE.Float32BufferAttribute;
   private _col: THREE.Float32BufferAttribute;
@@ -67,8 +100,15 @@ export class Ribbons {
 
   setSceneColors(map: Record<string, number>): void { this._sceneColors = map; }
 
-  /** `laneZ` returns the lane centre for a metagraph key, or null for one with no lane
-   *  (an unlisted anchor's ribbon starts in mid-air — spec §6.6). */
+  /** Live-tune the look (dev panel). Event-time: rewrites the sheet. */
+  setTune(t: Partial<RibbonTune>): void {
+    Object.assign(this.tune, t);
+    this._writeGeometry();
+  }
+
+  /** `laneZ` returns the lane centre for a metagraph key — null when the lane is HIDDEN (another
+   *  network committed): a hidden lane laid no tiles, so it gets no ribbon either. An unlisted
+   *  anchor never has a lane; its ribbon starts in mid-air above its band (spec §6.6). */
   setRow(row: 0 | 1, slot: number, spec: BarSpec | null, laneZ: (key: string) => number | null): void {
     const st = this._rows[row];
     st.slot = slot;
@@ -79,7 +119,9 @@ export class Ribbons {
     for (let i = 0; i < spec.bandCount; i++) {
       const band = spec.bands[i];
       if (band.bytes <= 0) continue;
-      const z = band.key === UNLISTED_KEY ? null : laneZ(band.key);
+      const unlisted = band.key === UNLISTED_KEY;
+      const z = unlisted ? null : laneZ(band.key);
+      if (!unlisted && z == null) continue; // hidden lane → no sheet
       // An unlisted anchor has no lane, so its ribbon starts above the band it lands on.
       const centre = z ?? (band.z0 + band.z1) / 2;
       ribbonQuad(centre, z == null ? RIBBON_LANE_HALF * 0.4 : RIBBON_LANE_HALF, band, st.quads[st.count]);
@@ -97,6 +139,8 @@ export class Ribbons {
 
   ribbonCount(row: 0 | 1): number { return this._rows[row].count; }
 
+  /** A point on ribbon `i`'s centre line at vertical progress `t` — follows the SAME eased sweep
+   *  the sheet is drawn with, so the anchor pulses ride the curve. */
   centreLine(row: 0 | 1, i: number, t: number, out: THREE.Vector3): THREE.Vector3 {
     const st = this._rows[row];
     // Caller contract: bound the loop by ribbonCount(row) — an empty row has no quad to walk.
@@ -105,7 +149,8 @@ export class Ribbons {
     const x = -st.slot * SLOT_SP;
     const topZ = (q.topZ0 + q.topZ1) / 2;
     const botZ = (q.botZ0 + q.botZ1) / 2;
-    return out.set(x, FLOOR_Y.msnap + (FLOOR_Y.gl0 - FLOOR_Y.msnap) * t, topZ + (botZ - topZ) * t);
+    const s = sweep(t, this.tune.curve);
+    return out.set(x, FLOOR_Y.msnap + (FLOOR_Y.gl0 - FLOOR_Y.msnap) * t, topZ + (botZ - topZ) * s);
   }
 
   setAlpha(a: number): void { this._alpha = a; }
@@ -120,7 +165,7 @@ export class Ribbons {
 
   update(dt: number): void {
     const k = Math.min(1, dt * 5);
-    const target = REST_OP * this._alpha;
+    const target = this.tune.restOp * this._alpha;
     this._mat.opacity += (target - this._mat.opacity) * k;
   }
 
@@ -128,7 +173,13 @@ export class Ribbons {
   private _writeGeometry(): void {
     const p = this._pos.array as Float32Array;
     const c = this._col.array as Float32Array;
+    const { curve, dimOp, restOp, brightness } = this.tune;
     let v = 0;
+    const push = (x: number, z: number, y: number, r: number, g: number, b: number) => {
+      p[v * 3] = x; p[v * 3 + 1] = y; p[v * 3 + 2] = z;
+      c[v * 3] = r; c[v * 3 + 1] = g; c[v * 3 + 2] = b;
+      v++;
+    };
     for (let r = 0; r < RIBBON_ROWS; r++) {
       const st = this._rows[r];
       const x = -st.slot * SLOT_SP;
@@ -140,14 +191,17 @@ export class Ribbons {
         const hex = key === UNLISTED_KEY ? this._neutral : (this._sceneColors[key] ?? this._neutral);
         this._c.setHex(hex);
         const off = this._filter !== "all" && key !== this._filter;
-        const s = off ? DIM_OP / REST_OP : 1;
-        const push = (z: number, y: number) => {
-          p[v * 3] = x; p[v * 3 + 1] = y; p[v * 3 + 2] = z;
-          c[v * 3] = this._c.r * s; c[v * 3 + 1] = this._c.g * s; c[v * 3 + 2] = this._c.b * s;
-          v++;
-        };
-        push(q.topZ0, yTop); push(q.topZ1, yTop); push(q.botZ1, yBot);
-        push(q.topZ0, yTop); push(q.botZ1, yBot); push(q.botZ0, yBot);
+        const s = (off ? dimOp / restOp : 1) * brightness;
+        const cr = this._c.r * s, cg = this._c.g * s, cb = this._c.b * s;
+        for (let j = 0; j < RIBBON_SEG; j++) {
+          const t0 = j / RIBBON_SEG, t1 = (j + 1) / RIBBON_SEG;
+          const s0 = sweep(t0, curve), s1 = sweep(t1, curve);
+          const y0 = yTop + (yBot - yTop) * t0, y1 = yTop + (yBot - yTop) * t1;
+          const l0 = q.topZ0 + (q.botZ0 - q.topZ0) * s0, r0 = q.topZ1 + (q.botZ1 - q.topZ1) * s0;
+          const l1 = q.topZ0 + (q.botZ0 - q.topZ0) * s1, r1 = q.topZ1 + (q.botZ1 - q.topZ1) * s1;
+          push(x, l0, y0, cr, cg, cb); push(x, r0, y0, cr, cg, cb); push(x, r1, y1, cr, cg, cb);
+          push(x, l0, y0, cr, cg, cb); push(x, r1, y1, cr, cg, cb); push(x, l1, y1, cr, cg, cb);
+        }
       }
     }
     this._geo.setDrawRange(0, v);

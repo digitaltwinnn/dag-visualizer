@@ -11,7 +11,7 @@ import * as THREE from "three";
 import type { SceneColors } from "../../sceneColors";
 import type { PickDescriptor } from "@/src/data/types";
 import { METAGRAPHS } from "../../config";
-import { BAR_H, BAR_D, BAR_MIN_W, BAR_Z0, FLOOR_Y } from "../../domain/ledgerLayout";
+import { BAR_H, BAR_D, BAR_MIN_W, FLOOR_Y } from "../../domain/ledgerLayout";
 import { UNLISTED_KEY, type BarSpec } from "../../domain/ledgerBands";
 import { SLOT_SP, SLOT_N, slotFade } from "../../domain/ledgerModel";
 
@@ -100,7 +100,7 @@ export class ByteBar {
       s.measured = !!spec && spec.measured;
       s.seam = true;
       s.outline.visible = true;
-      s.outline.position.set(x, y, BAR_Z0 + BAR_MIN_W / 2);
+      s.outline.position.set(x, y, 0); // the seam is centered, like the bar (z0 = -width/2)
       this._syncPickables();
       return;
     }

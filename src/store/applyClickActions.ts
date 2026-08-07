@@ -35,9 +35,6 @@ export function applyClickActions(actions: ClickAction[]): void {
       case "metaSnap":
         st.setMetaSnap(a.sel);
         break;
-      case "layer":
-        st.setLayer(a.pick);
-        break;
     }
   }
 }

@@ -23,7 +23,7 @@ import { LADDERS, type FocusLevel, type CohortSel, type CompositionSel } from "@
 // Hue + active-flag stay with the tray builders (per-rail presentation), not here.
 // ─────────────────────────────────────────────────────────────────────────────────────────────
 
-export type RailCardKind = "about" | "tool" | "context" | "metaSnap" | "country" | "cohort" | "composition" | "node" | "snap" | "layer";
+export type RailCardKind = "about" | "tool" | "context" | "metaSnap" | "country" | "cohort" | "composition" | "node" | "snap";
 
 // ── The rail LADDER lane (Inspector's descent spine, variant-A redesign 2026-07-19) ──────────
 // Which facts-rail slots are FOCUS-LADDER rungs in this view, in DISPLAY order (coarsest→finest,
@@ -31,29 +31,38 @@ export type RailCardKind = "about" | "tool" | "context" | "metaSnap" | "country"
 // `focusLadder.LADDERS` so the spine can never disagree with the camera walk / deselect
 // stepping: a future rung lands on the ladder lane automatically (and
 // `railLadderBoundary.test.ts` already forces it a card slot). Flat views have no ladder.
-// NB in ledger this puts the LAYER slot ABOVE the node slot (ladder order), a deliberate
-// reorder of the fixed slot stack — the lane shows containment, so display order = rung order.
 const LADDER_SLOT: Partial<Record<FocusLevel, string>> = {
   network: "context",
   country: "country",
   cohort: "cohort",
   composition: "composition",
   node: "node",
-  layer: "layer",
 };
 export function ladderSlotIds(mode: Mode): string[] {
   if (mode !== "hyper" && mode !== "geo" && mode !== "ledger") return [];
-  return [...LADDERS[mode]]
+  const ids = [...LADDERS[mode]]
     .reverse()
     .flatMap((r) => (LADDER_SLOT[r.level] ? [LADDER_SLOT[r.level] as string] : []));
+  if (mode === "ledger") {
+    // The ledger's SNAPSHOT CHAIN rides the display lane between the network and the node
+    // (item 8, 2026-08-06): a metagraph snapshot anchors INTO a global snapshot, so the two
+    // card slots render as parent→child under the dossier — display hierarchy only, they stay
+    // card slots with no focus-ladder rung (the camera/deselect walk is unchanged).
+    ids.splice(ids.indexOf("node"), 0, "snap", "metaSnap");
+  }
+  return ids;
 }
 
 /** The selection fields the ladder derivation needs — the manifest state minus the ghost-copy
  *  inputs (which can't change a slot's presence). */
 export type LadderState = Pick<
   RailManifestState,
-  "mode" | "filter" | "inspect" | "snap" | "layer" | "country" | "cohort" | "composition"
->;
+  "mode" | "filter" | "inspect" | "snap" | "metaSnap" | "country" | "cohort" | "composition"
+> & {
+  /** The store's selection recency (most-recent-FIRST) — the collapse rule reads it (item 8):
+   *  the most recently selected present card is the ACTIVE one; the rest rest collapsed. */
+  selStack?: readonly string[];
+};
 
 // The FOCUS rung: the finest ladder slot currently POPULATED (null = nothing committed). ONE
 // definition, two rails — the facts rail rests only this card expanded and gives its thread dot
@@ -63,8 +72,18 @@ export function focusSlotId(s: LadderState): string | null {
   // `selNodesCount`/`filterLabel` only feed ghost COPY — presence is unaffected, so the ladder
   // question can be answered from the selection alone.
   const cards = detailsCards({ ...s, selNodesCount: 0, filterLabel: null });
-  const present = ladderSlotIds(s.mode).filter((id) => cards.find((c) => c.id === id)?.present);
-  return present.length ? present[present.length - 1] : null;
+  const lane = ladderSlotIds(s.mode);
+  const present = lane.filter((id) => cards.find((c) => c.id === id)?.present);
+  if (!present.length) return null;
+  // The ACTIVE card is the most recently selected present one (store.selStack, item 8 —
+  // "keep the active card open, collapse the others"); the slot ids match the SelSlot names
+  // except the ladder's node slot. Falls back to the finest present slot (e.g. only the
+  // filter committed — selStack carries no "network" entry).
+  for (const slot of s.selStack ?? []) {
+    const id = slot === "node" ? "node" : slot;
+    if (present.includes(id)) return id;
+  }
+  return present[present.length - 1];
 }
 
 export interface RailCard {
@@ -94,7 +113,6 @@ export interface RailManifestState {
   filter: string;
   inspect: PickDescriptor | null;
   snap: Extract<PickDescriptor, { kind: "snapshot" }> | null;
-  layer: Extract<PickDescriptor, { kind: "layer" }> | null;
   /** How many nodes the current selection plots in geo (store.selNodes.length). */
   selNodesCount: number;
   /** The filtered network's display ticker/name (for the honest geo variant). */
@@ -160,7 +178,7 @@ function nodeHint(s: RailManifestState): string | null {
   }
   // Nodes are pickable in the chamber too (user, 2026-07-12 — the standing chips are a real pick
   // target), so the slot announces it.
-  if (s.mode === "ledger") return "Click a node in the chamber, or under a floor.";
+  if (s.mode === "ledger") return "Click a node in a container under a floor.";
   return null;
 }
 function snapHint(s: RailManifestState): string | null {
@@ -168,9 +186,6 @@ function snapHint(s: RailManifestState): string | null {
   // the strip's bars now run only in ledger and leaving the view clears the pin (Engine.setMode),
   // so the slot invites — and exists — only there.
   return s.mode === "ledger" ? "Click a snapshot block, or a bar in the strip below." : null;
-}
-function layerHint(s: RailManifestState): string | null {
-  return s.mode === "ledger" ? "Click a floor plane in the chamber, or in the explorer." : null;
 }
 // Country/cohort are geo-only focus-ladder rungs (the drill + the city×provider commit) — their
 // ghosts only ever invite in geo, same allow-list idiom as every other slot.
@@ -185,19 +200,19 @@ function cohortHint(s: RailManifestState): string | null {
 function compositionHint(s: RailManifestState): string | null {
   return s.mode === "hyper" ? "Open a make-up group under a network." : null;
 }
-// A metagraph snapshot is a ledger-only card SLOT (spec 2026-08-04) — not a ladder rung, so it
-// has no ancestor row to name; the route is straight to the 3D tile.
+// A metagraph snapshot is a ledger-only card SLOT (spec 2026-08-04) — not a ladder rung; the
+// routes are the 3D tile and the explorer's metagraph-snapshot rows.
 function metaSnapHint(s: RailManifestState): string | null {
-  return s.mode === "ledger" ? "Click a tile under a lane." : null;
+  return s.mode === "ledger" ? "Click a tile under a lane, or a snapshot in the explorer." : null;
 }
 
 // RIGHT rail (Details): FIXED slots in a stable order — the Context dossier, then country,
-// cohort, composition, node, snapshot, layer (coarse→fine, matching the focus ladders; snapshot/
-// layer stay at the tail). Each slot renders its populated card when selected, else its GHOST hint
-// when the
-// view can produce it (see `hint` above) — so the rail always shows the view's full possibility
-// space and a deselect returns a slot to its ghost in place (spatially stable; the old recency
-// reordering made cards jump). Callers filter to `present` for the tray icons.
+// cohort, composition, the snapshot chain (global, then the metagraph snapshot that anchors into
+// it), then node (coarse→fine, matching the focus ladders + the ledger's display lane). Each slot
+// renders its populated card when selected, else its GHOST hint when the view can produce it (see
+// `hint` above) — so the rail always shows the view's full possibility space and a deselect
+// returns a slot to its ghost in place (spatially stable; the old recency reordering made cards
+// jump). Callers filter to `present` for the tray icons.
 export function detailsCards(s: RailManifestState): RailCard[] {
   const context: RailCard = {
     id: "context",
@@ -257,13 +272,5 @@ export function detailsCards(s: RailManifestState): RailCard[] {
     present: !!s.snap,
     hint: snapHint(s),
   };
-  const layer: RailCard = {
-    id: "layer",
-    kind: "layer",
-    icon: iconForPick("layer"),
-    subjectKey: s.layer ? s.layer.layerId : null,
-    present: !!s.layer,
-    hint: layerHint(s),
-  };
-  return [context, metaSnap, country, cohort, composition, node, snap, layer];
+  return [context, country, cohort, composition, snap, metaSnap, node];
 }

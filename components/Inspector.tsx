@@ -64,8 +64,6 @@ function CardPane({
   // `subjectKey` is the SAME identity that keys the body's title roll-in (node id row / ordinal
   // Odometer), so the title roll and the edge pulse fire together as one "new subject" moment —
   // and it is stable across same-subject data refreshes (no pulse on a re-render, only a new pick).
-  const ledgerHilite = useStore((s) => s.ledgerHilite);
-  const setLedgerHilite = useStore((s) => s.setLedgerHilite);
   let pair;
   let subjectKey: string | number | null;
   if (pick.kind === "snapshot") {
@@ -74,13 +72,6 @@ function CardPane({
     // that exact line (metagraphById resolves "dag" through the identity map too).
     pair = subjectPairing<number>(hoverSnapOrd, pick.data.ordinal, setHoverSnapOrd, filterAccent(filter));
     subjectKey = pick.data.ordinal;
-  } else if (pick.kind === "layer") {
-    // Layer pairing rides the plane-highlight PREVIEW channel: hovering the card highlights its
-    // floor plane in the 3D view (the reverse direction: hovering the plane pairs the card too).
-    // Hue follows the active filter's identity like the snapshot card (`filterAccent`): the
-    // selected metagraph's brand hue, or structural cyan on "all".
-    pair = subjectPairing<string>(ledgerHilite, pick.layerId, setLedgerHilite, filterAccent(filter));
-    subjectKey = pick.layerId;
   } else {
     // geoLive → the selected node, read from the store like GeoLiveCard does.
     const node =
@@ -267,7 +258,7 @@ function CompositionPane({ sel, onClose, collapsed, onToggle }: { sel: Compositi
 // rail losing its calm. Availability + copy come from the rail manifest (railCards.ts), the
 // same single source of truth the dock trays read.
 const GHOST_EYEBROW: Record<string, string> = {
-  context: "Metagraph", country: "Country", cohort: "Provider", composition: "Composition", node: "Node", snap: "Snapshot", layer: "Layer",
+  context: "Metagraph", country: "Country", cohort: "Provider", composition: "Composition", node: "Node", snap: "Snapshot",
   metaSnap: "Metagraph snapshot",
 };
 export function GhostCard({ card }: { card: RailCard }) {
@@ -337,7 +328,8 @@ function RailControls({
 
 // Right column — the **facts** rail: a DESCENT-SPINE LADDER of selected-subject cards (variant-A
 // redesign, 2026-07-19). The focus-ladder rungs (network → country → provider → node in geo;
-// network → layer → node in ledger; network → node in hyper) render in a `.rail-ladder` lane
+// network → snapshot → metagraph snapshot → node in ledger; network → composition → node in
+// hyper) render in a `.rail-ladder` lane
 // (`store.selStack`, most-recent first → on top), so you can hold several selections at once
 // (a node AND a snapshot AND, later, more) and the one you picked last sits on top. Each card
 // type is one entry in the registry below — add a future card by adding a slot (a store field +
@@ -347,7 +339,6 @@ export default function Inspector() {
   const bp = useBreakpoint();
   const inspect = useStore((s) => s.inspect);
   const snap = useStore((s) => s.snap);
-  const layer = useStore((s) => s.layer);
   const metaSnap = useStore((s) => s.metaSnap);
   const country = useStore((s) => s.country);
   const cohort = useStore((s) => s.cohort);
@@ -372,7 +363,7 @@ export default function Inspector() {
   const selNodes = useStore((s) => s.selNodes);
   const filterCfg = metagraphById(filter);
   const manifest = detailsCards({
-    mode, filter, inspect, snap, layer, country, cohort, composition, metaSnap,
+    mode, filter, inspect, snap, country, cohort, composition, metaSnap,
     selNodesCount: selNodes.length,
     filterLabel: filterCfg ? filterCfg.ticker || filterCfg.name : null,
   });
@@ -403,6 +394,7 @@ export default function Inspector() {
   // +/− and not in the ones where they had. A new selection is a new moment, so every override is
   // dropped whenever the committed ladder changes (subject identity, not just depth) and the auto
   // "only the focus rung is open" default governs again. Within one selection the +/− still holds.
+  const following = useStore((s) => s.following);
   const selectionKey = [
     mode,
     filter,
@@ -410,8 +402,10 @@ export default function Inspector() {
     cohort ? `${cohort.cc}|${cohort.city}|${cohort.isp}` : "",
     composition ? `${composition.netId}|${composition.key}` : "",
     inspect ? hoverKeyOf(inspect) ?? "" : "",
-    layer?.layerId ?? "",
-    snap?.data.ordinal ?? "",
+    // While FOLLOWING, the auto-advancing ordinal is NOT a new selection moment — the heartbeat
+    // must not drop the user's +/− overrides every ~4s (item 8; advanceSnap already keeps the
+    // recency stack still for the same reason).
+    following ? (snap ? "live" : "") : snap?.data.ordinal ?? "",
     metaSnap ? `${metaSnap.metaId}:${metaSnap.ordinal}` : "",
   ].join("§");
   const lastSelection = useRef(selectionKey);
@@ -460,9 +454,6 @@ export default function Inspector() {
     ),
     snap: snap ? (
       <CardPane key="snap" pick={snap} eyebrow="Snapshot" onClose={() => applyClickActions([{ kind: "snapshot", pick: null }])} {...cx("snap")} />
-    ) : null,
-    layer: layer ? (
-      <CardPane key="layer" pick={layer} eyebrow="Layer" onClose={() => applyClickActions([{ kind: "layer", pick: null }])} {...cx("layer")} />
     ) : null,
     // The metagraph-snapshot tile: a card slot with no ladder rung (spec §7.1), so its × just
     // clears its own channel — there is no coarser rung for it to step back to.
@@ -532,7 +523,6 @@ export default function Inspector() {
         cohort,
         composition,
         country,
-        layerId: layer ? layer.layerId : null,
         filter,
       }),
     );

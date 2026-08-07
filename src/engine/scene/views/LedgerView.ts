@@ -28,11 +28,11 @@ import * as THREE from "three";
 import { METAGRAPHS } from "../../config";
 import {
   LEDGER,
-  LAYER_GEOM,
   FLOOR_IDS,
   FLOOR_Y,
   GUTTER_CZ,
   GUTTER_W,
+  FLOOR_MAIN_Z0,
   LANE_HALF_Z,
   laneSpan,
   type RailGroup,
@@ -40,7 +40,7 @@ import {
 import type { SceneColors } from "../../sceneColors";
 import { LedgerModel, SLOT_SP, SLOT_N, LANE_GAP_Z, slotFade } from "../../domain/ledgerModel";
 import { makeBarSpec, fillBarSpec, UNLISTED_KEY, type BarSpec } from "../../domain/ledgerBands";
-import type { RailKind } from "../../domain/ledgerRails";
+import type { ContainerSpec } from "../../domain/ledgerRails";
 import type {
   GlobalSnapshot,
   Anchor,
@@ -53,23 +53,15 @@ import { activityLine } from "@/src/data/currencyActivity";
 import { ByteBar } from "../objects/ByteBar";
 import { Ribbons } from "../objects/Ribbons";
 import { NodeRails } from "../objects/NodeRails";
-import { FocusSpot } from "../objects/FocusSpot";
-import type { StageLights } from "../objects/StageLights";
-import { STAGE_LIGHTS } from "../../domain/stageLight";
 import { FadeSet } from "../objects/FadeSet";
 import type { SceneView } from "./SceneView";
 
-// Floor-frame + edge-fill opacities at rest and when a plane is highlighted from the explore panel.
-// NB the frame material's colour is HDR-overdriven ×2 (see _buildFloors), so these opacities are
-// roughly HALF the perceived line brightness.
+// Floor-frame + edge-fill opacities. NB the frame material's colour is HDR-overdriven ×2 (see
+// _buildFloors), so these opacities are roughly HALF the perceived line brightness. (The
+// highlighted/dimmed variants went with the layer navigation, 2026-08-06.)
 const FLOOR_FRAME_OP = 0.11,
   FLOOR_FILL_OP = 0.03,
   FLOOR_INNER_OP = 0;
-const FLOOR_FRAME_HI = 0.4,
-  FLOOR_FILL_HI = 0.055,
-  FLOOR_INNER_HI = 0.008;
-const FLOOR_FRAME_OFF = 0.055,
-  FLOOR_FILL_OFF = 0.015;
 
 const PULSE_MAX = 220;
 const PULSE_STAGGER = 0.035;
@@ -132,17 +124,18 @@ export class LedgerView implements SceneView {
   private _panel: number;
   private _muted: number;
 
-  // ── floors
+  // ── floors (visual aid only since 2026-08-06 — not pick targets)
   private _floorMats = new Map<
     string,
-    { frame: THREE.LineBasicMaterial; fill: THREE.ShaderMaterial }
+    { frame: THREE.LineBasicMaterial; fill: THREE.ShaderMaterial }[]
   >();
-  private _floorPicks: THREE.Object3D[] = [];
 
   // ── the three adapters (spec §4.2–§4.4)
   private _rails: NodeRails;
   private _bar: ByteBar;
   private _ribbons: Ribbons;
+  /** Dev-only access for the ?tune panel (Engine.mountDevTune) — not part of the frame path. */
+  get ribbons(): Ribbons { return this._ribbons; }
 
   // ── the lane field (construction-time; never reallocated per frame)
   private readonly _laneOrder: string[] = METAGRAPHS.map((m) => m.id);
@@ -150,7 +143,11 @@ export class LedgerView implements SceneView {
   private readonly _laneHZ = new Map<string, number>();
   private readonly _laneHidden = new Map<string, boolean>();
   private _committedLane: number | null = null;
-  private readonly _laneZOf = (key: string): number | null => this._laneZ.get(key) ?? null;
+  /** Ribbons' lane resolver: null for a HIDDEN lane (another network committed) so it draws no
+   *  sheet — a hidden lane laid no tiles, and its old-position ribbon would overlap the committed
+   *  lane's field (finetune 2026-08-06). */
+  private readonly _laneZOf = (key: string): number | null =>
+    this._laneHidden.get(key) ? null : this._laneZ.get(key) ?? null;
 
   // ── per-slot bar specs + the snapshot each slot stands for
   private readonly _specs: BarSpec[] = [];
@@ -182,20 +179,14 @@ export class LedgerView implements SceneView {
   private _formingLabel: THREE.Mesh | null = null;
   private _formingW = 0;
 
-  // ── stage light + fades
-  private _spot: FocusSpot;
-  private _spotLayerId: string | null = null;
-  private _spotPos = new THREE.Vector3();
-  private _spotN = new THREE.Vector3();
-  private _hiliteId: string | null = null;
-  private _hiliteDim = false;
+  // ── fades (the ledger's stage light went with the layer navigation, 2026-08-06 — nothing
+  // committable is left for a spot to dramatise)
   private _fades = new FadeSet();
 
   constructor(
     scene: THREE.Scene,
     colors: SceneColors,
     sceneColors: Record<string, number>,
-    stage: StageLights,
   ) {
     this._core = colors.core;
     this._border = colors.border;
@@ -211,9 +202,6 @@ export class LedgerView implements SceneView {
     );
     this.group.scale.setScalar(LEDGER.viewScale);
     scene.add(this.group);
-
-    this._spot = new FocusSpot(scene, STAGE_LIGHTS.ledger);
-    stage.register("ledger", this._spot);
 
     this.pickables = [];
     this.t = 0;
@@ -337,25 +325,33 @@ export class LedgerView implements SceneView {
           gl_FragColor = vec4(uColor, a);
         }`,
     });
-    const frame = (w: number, d: number, y: number, z: number, id: string) => {
+    const frame = (w: number, d: number, y: number, x: number, z: number, id: string) => {
       const fm = fillMat.clone();
       const fill = new THREE.Mesh(new THREE.PlaneGeometry(w, d), fm);
       fill.rotation.x = -Math.PI / 2;
-      fill.position.set(cx, y, z);
+      fill.position.set(x, y, z);
       fill.renderOrder = -2;
-      fill.userData.pick = { kind: "layer", layerId: id };
-      this._floorPicks.push(fill);
       this.group.add(fill);
       const lm = frameMat.clone();
       const f = new THREE.LineSegments(new THREE.EdgesGeometry(new THREE.PlaneGeometry(w, d)), lm);
       f.rotation.x = -Math.PI / 2;
-      f.position.set(cx, y, z);
+      f.position.set(x, y, z);
       f.renderOrder = -1;
       this.group.add(f);
-      this._floorMats.set(id, { frame: lm, fill: fm });
+      const list = this._floorMats.get(id) ?? [];
+      list.push({ frame: lm, fill: fm });
+      this._floorMats.set(id, list);
     };
-    // TWO floors now — the node layers are rails along their edges, not storeys of their own.
-    for (const id of FLOOR_IDS) frame(W, D, FLOOR_Y[id], 0, id);
+    // TWO floors now — the node layers hang in containers under their edges, not storeys of their
+    // own. Each floor is a MAIN plane (the lane field + label margin) plus its GUTTER as a small
+    // separate plane beyond a visible seam (finetune 2026-08-06): the currency strip above, the
+    // reserved $DAG-blocks strip below — a distinct instrument, not a corner of the floor.
+    const mainZ1 = D / 2;
+    const mainD = mainZ1 - FLOOR_MAIN_Z0;
+    for (const id of FLOOR_IDS) {
+      frame(W, mainD, FLOOR_Y[id], cx, (mainZ1 + FLOOR_MAIN_Z0) / 2, id);
+      frame(W, GUTTER_W + 1.0, FLOOR_Y[id], cx, GUTTER_CZ, id);
+    }
 
     const copyOf = (id: string) => LEDGER_LAYERS.find((l) => l.id === id);
     const lx = FLOOR_LABEL_X;
@@ -464,26 +460,13 @@ export class LedgerView implements SceneView {
     // group.visible is owned SOLELY by the Engine — a view fades, it never hides itself.
   }
 
-  setHighlight(id: string | null, dimOthers = false): void {
-    this._spotLayerId = dimOthers && id ? id : null;
-    this._hiliteId = id;
-    this._hiliteDim = dimOthers;
-    // The LAYER rung: the four node layers now live on the rails, so they highlight there.
-    this._rails.setHighlight(id, dimOthers);
-    this._applyFloorAlpha();
-  }
-
   private _applyFloorAlpha(): void {
-    const id = this._hiliteId;
-    const dimOthers = this._hiliteDim;
-    for (const [k, m] of this._floorMats) {
-      const on = id === k;
-      const off = id != null && dimOthers;
-      m.frame.opacity =
-        (on ? FLOOR_FRAME_HI : off ? FLOOR_FRAME_OFF : FLOOR_FRAME_OP) * this._fades.alpha;
-      m.fill.uniforms.uOpacity.value =
-        (on ? FLOOR_FILL_HI : off ? FLOOR_FILL_OFF : FLOOR_FILL_OP) * this._fades.alpha;
-      m.fill.uniforms.uInner.value = (on ? FLOOR_INNER_HI : FLOOR_INNER_OP) * this._fades.alpha;
+    for (const [, list] of this._floorMats) {
+      for (const m of list) {
+        m.frame.opacity = FLOOR_FRAME_OP * this._fades.alpha;
+        m.fill.uniforms.uOpacity.value = FLOOR_FILL_OP * this._fades.alpha;
+        m.fill.uniforms.uInner.value = FLOOR_INNER_OP * this._fades.alpha;
+      }
     }
     if (this._gutterLabel)
       (this._gutterLabel.material as THREE.MeshBasicMaterial).opacity =
@@ -570,8 +553,8 @@ export class LedgerView implements SceneView {
     this._rebuildGutter();
   }
 
-  setRails(group: RailGroup, kinds: RailKind[]): void {
-    this._rails.setRails(group, kinds); // event-time: a data rebuild, not a frame
+  setContainers(group: RailGroup, specs: ContainerSpec[]): void {
+    this._rails.setContainers(group, specs); // event-time: a data rebuild, not a frame
     this._syncPickables();
   }
 
@@ -669,14 +652,16 @@ export class LedgerView implements SceneView {
   }
 
   /** The ribbon index a metagraph's band occupies in a row — mirrors the order Ribbons.setRow walks
-   *  (one ribbon per band with bytes > 0, in band order). Returns −1 when the band is absent. */
+   *  (one ribbon per band with bytes > 0 whose lane isn't hidden, in band order). −1 when absent. */
   private _ribbonIndexOf(slot: number, key: string): number {
     const spec = this._specs[slot];
     if (!spec || !spec.measured) return -1;
     let n = 0;
     for (let i = 0; i < spec.bandCount; i++) {
-      if (spec.bands[i].bytes <= 0) continue;
-      if (spec.bands[i].key === key) return n;
+      const band = spec.bands[i];
+      if (band.bytes <= 0) continue;
+      if (band.key !== UNLISTED_KEY && this._laneHidden.get(band.key)) continue; // no sheet → no index
+      if (band.key === key) return n;
       n++;
     }
     return -1;
@@ -710,8 +695,6 @@ export class LedgerView implements SceneView {
 
   private _syncPickables(): void {
     this.pickables.length = 0;
-    for (const o of this._floorPicks) this.pickables.push(o);
-    for (const o of this._rails.pickables) this.pickables.push(o);
     for (const o of this._bar.pickables) this.pickables.push(o);
     // Tiles only become raycast targets once a resolver can turn an instance id into a snapshot.
     if (this._tileResolver) this.pickables.push(this._metaTrailMesh);
@@ -756,16 +739,6 @@ export class LedgerView implements SceneView {
     this._formingW +=
       ((this.model.leadForming ? 1 : 0) - this._formingW) * Math.min(1, dt * FORMING_EASE);
 
-    const spotGeom = this._spotLayerId
-      ? LAYER_GEOM.find((l) => l.id === this._spotLayerId)
-      : undefined;
-    this._spot.update(dt, spotGeom != null && this.group.visible, this._fades.alpha);
-    if (spotGeom) {
-      this._spotPos.set(0, spotGeom.y, spotGeom.laneZ);
-      this.group.localToWorld(this._spotPos);
-      this._spotN.set(0, 1, 0).applyQuaternion(this.group.quaternion);
-      this._spot.aim(this._spotPos, this._spotN, STAGE_LIGHTS.ledger.height);
-    }
     this._applyFloorAlpha();
 
     this._rails.update(dt);
@@ -886,6 +859,5 @@ export class LedgerView implements SceneView {
       obj.dispose?.();
     }
     this.pickables = [];
-    this._floorPicks.length = 0;
   }
 }

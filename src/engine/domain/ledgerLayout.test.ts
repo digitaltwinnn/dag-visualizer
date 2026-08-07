@@ -2,30 +2,19 @@ import { describe, it, expect } from "vitest";
 import { METAGRAPHS } from "../config";
 import {
   LEDGER, LAYER_GEOM, ledgerSite, clusterRadius, ledgerSpread,
-  FLOOR_IDS, FLOOR_Y, LANE_HALF_Z, GUTTER_W, GUTTER_CZ,
-  BAR_Z0, BAR_MAX_W, BAR_MIN_W, BAR_H, BAR_D, BYTE_SCALE_KB,
-  RAIL_X0, RAIL_PITCH_X, RAIL_Y_LIFT, RAIL_CHIP_PITCH_Z, RAIL_ROW_LIFT, RAIL_CAP,
-  RAIL_GROUP_FLOOR, railX, railY, laneSpan,
+  FLOOR_IDS, FLOOR_Y, LANE_HALF_Z, GUTTER_W, GUTTER_CZ, GUTTER_GAP, FLOOR_MAIN_Z0,
+  BAR_MAX_W, BAR_MIN_W, BAR_H, BAR_D, BYTE_SCALE_KB,
+  CONT_X, CONT_TOP_GAP, CONT_CHIP_Z, CONT_ROW_Y, CONT_PAD, CONT_GAP,
+  RAIL_GROUP_FLOOR, laneSpan,
 } from "./ledgerLayout";
 
-describe("LAYER_GEOM after the two-floor redesign", () => {
-  it("keeps every focus rung — four of them now resolve to rails, not planes", () => {
-    expect(LAYER_GEOM.map((l) => l.id).sort()).toEqual(["gl0", "hypl0", "hypl1", "ml0", "ml1", "msnap"]);
-    const rails = LAYER_GEOM.filter((l) => l.isRail).map((l) => l.id).sort();
-    expect(rails).toEqual(["hypl0", "hypl1", "ml0", "ml1"]);
-  });
-
-  it("puts the two snapshot floors at their own heights and the rails above the floor they serve", () => {
+describe("LAYER_GEOM after the layer-navigation retirement (2026-08-06)", () => {
+  it("frames only the two snapshot floors, at their own heights", () => {
+    expect(LAYER_GEOM.map((l) => l.id)).toEqual(["msnap", "gl0"]);
     expect(LAYER_GEOM.find((l) => l.id === "msnap")!.y).toBe(FLOOR_Y.msnap);
     expect(LAYER_GEOM.find((l) => l.id === "gl0")!.y).toBe(FLOOR_Y.gl0);
-    expect(LAYER_GEOM.find((l) => l.id === "ml0")!.y).toBe(railY("meta", 0));
-    expect(LAYER_GEOM.find((l) => l.id === "hypl0")!.y).toBe(railY("dag", 0));
     expect(RAIL_GROUP_FLOOR.meta).toBe("msnap");
     expect(RAIL_GROUP_FLOOR.dag).toBe("gl0");
-  });
-
-  it("no longer centres anything laterally — every rung sits on the shared lane field", () => {
-    for (const l of LAYER_GEOM) expect(l.laneZ).toBe(0);
   });
 });
 
@@ -101,14 +90,15 @@ describe("two-floor chamber (redesign 2026-08-04)", () => {
     expect(ledgerSite(n - 1, n).z).toBeCloseTo(LANE_HALF_Z, 6);
   });
 
-  it("puts the gutter outside the lane field, on the screen-right (−Z) side", () => {
-    expect(GUTTER_CZ).toBeLessThan(-LANE_HALF_Z);
-    expect(GUTTER_CZ + GUTTER_W / 2).toBeLessThanOrEqual(-LANE_HALF_Z + 1e-9);
+  it("splits the gutter onto its own plane beyond the lane field, screen-right (−Z)", () => {
+    expect(FLOOR_MAIN_Z0).toBeLessThan(-LANE_HALF_Z); // the main plane still covers the lane field
+    // The gutter plane sits wholly beyond the main plane's edge, past a visible seam.
+    expect(GUTTER_GAP).toBeGreaterThan(0);
+    expect(GUTTER_CZ + GUTTER_W / 2).toBeCloseTo(FLOOR_MAIN_Z0 - GUTTER_GAP, 6);
     expect(GUTTER_W).toBeCloseTo((2 * LANE_HALF_Z) / 6, 6);
   });
 
-  it("starts the byte bar at lane 0's end and can grow across the whole field", () => {
-    expect(BAR_Z0).toBeCloseTo(-LANE_HALF_Z, 6);
+  it("lets the byte bar grow across the whole field", () => {
     expect(BAR_MAX_W).toBeCloseTo(2 * LANE_HALF_Z, 6);
     expect(BAR_MIN_W).toBeGreaterThan(0);
     expect(BAR_MIN_W).toBeLessThan(BAR_MAX_W);
@@ -121,14 +111,13 @@ describe("two-floor chamber (redesign 2026-08-04)", () => {
     expect(BYTE_SCALE_KB).toBe(77);
   });
 
-  it("steps rails toward the camera and stacks overflow rows upward", () => {
-    expect(railX(0)).toBeCloseTo(RAIL_X0, 6);
-    expect(railX(2)).toBeCloseTo(RAIL_X0 + 2 * RAIL_PITCH_X, 6);
-    expect(railY("meta", 0)).toBeCloseTo(FLOOR_Y.msnap + RAIL_Y_LIFT, 6);
-    expect(railY("dag", 1)).toBeCloseTo(FLOOR_Y.gl0 + RAIL_Y_LIFT + RAIL_ROW_LIFT, 6);
-    expect(RAIL_GROUP_FLOOR.meta).toBe("msnap");
-    expect(RAIL_GROUP_FLOOR.dag).toBe("gl0");
-    expect(RAIL_CAP).toBe(Math.floor((2 * LANE_HALF_Z) / RAIL_CHIP_PITCH_Z) + 1);
+  it("hangs the node containers under their floor's front edge, facing the camera", () => {
+    // The shared container X plane sits camera-side (+X), the frames below the floor plane.
+    expect(CONT_X).toBeGreaterThan(0);
+    expect(CONT_TOP_GAP).toBeGreaterThan(0);
+    // Chip/row pitches and frame chrome are positive and modest against the lane field.
+    for (const v of [CONT_CHIP_Z, CONT_ROW_Y, CONT_PAD, CONT_GAP]) expect(v).toBeGreaterThan(0);
+    expect(CONT_GAP).toBeLessThan(LANE_HALF_Z);
   });
 
   it("keeps every lane in its own slice with nothing committed", () => {

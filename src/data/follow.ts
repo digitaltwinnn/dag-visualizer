@@ -26,8 +26,10 @@ export function latestRelevant(filter: string): GlobalSnapshot | null {
 // metagraph with no recent snapshots), clear a stale snapshot card rather than show a
 // misleading one — the metagraph context pane still conveys the selection.
 export function followLatest() {
-  const { filter, snap, setSnap } = useStore.getState();
+  // `advanceSnap`, not `setSnap`: the heartbeat advance must not bump the selection recency the
+  // facts rail's collapse rule reads (store.selStack — a tick is not a user act).
+  const { filter, snap, advanceSnap } = useStore.getState();
   const latest = latestRelevant(filter);
-  if (latest) setSnap({ kind: "snapshot", title: `Global snapshot #${latest.ordinal}`, data: latest });
-  else if (snap) setSnap(null);
+  if (latest) advanceSnap({ kind: "snapshot", title: `Global snapshot #${latest.ordinal}`, data: latest });
+  else if (snap) advanceSnap(null);
 }

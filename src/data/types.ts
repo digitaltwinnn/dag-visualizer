@@ -29,6 +29,9 @@ export interface GlobalSnapshot {
   hash: string;
   height?: number;
   subHeight?: number;
+  /** The parent global snapshot's hash — the chain link (present on the explorer feed). */
+  lastSnapshotHash?: string;
+  epochProgress?: number;
   metagraphSnapshotCount?: number;
   blocks?: unknown[];
 }
@@ -63,6 +66,10 @@ export interface SnapshotExact {
   unlistedFee: number; // datum from metagraphs outside the public catalog
   listedCount: number;
   unlistedCount: number;
+  /** How many validators SIGNED the global snapshot (`proofs.length` on the raw L0 read) — the
+   *  same Signed[] structure the metagraph snapshots carry, exposed for the snapshot card's
+   *  structure rows (item 10, 2026-08-06). 0 on entries cached before the field existed. */
+  signerCount?: number;
   // Per-metagraph breakdown by address/id → {count, fee, bytes}. Addresses matching config.METAGRAPHS
   // are "listed" (named/coloured pills); the rest are the genuinely-unlisted ones (aggregated as
   // unlistedCount). This is the exact, complete answer to "which metagraphs anchored here". `bytes`
@@ -240,12 +247,8 @@ export type PickDescriptor =
   // hint). The selection's footprint summary lives in the top-bar vitals. Reads the store
   // itself (no payload).
   | (PickBase & { kind: "geoLive" })
-  // A settlement-stack LAYER, selected from the Snapshots·Explore panel or a 3D floor plane.
-  // Carries ONLY the id (matching domain/ledgerLayout's LAYER_GEOM) — the display name/description
-  // are UI copy, resolved through src/data/ledgerLayers.ts by every surface that shows words.
-  | (PickBase & { kind: "layer"; layerId: string })
-  // A metagraph-snapshot TILE on the ledger's upper floor (redesign 2026-08-04, spec §7.1). Like
-  // `layer` it is a pickable 3D subject with its own store channel and card slot — not a focus
-  // rung. It carries the selection payload plus the GLOBAL tick descriptor it anchored into, so
-  // the click table can commit the pair (tile + its tick) without a second lookup.
+  // A metagraph-snapshot TILE on the ledger's upper floor (redesign 2026-08-04, spec §7.1) — a
+  // pickable 3D subject with its own store channel and card slot, not a focus rung. It carries
+  // the selection payload plus the GLOBAL tick descriptor it anchored into, so the click table
+  // can commit the pair (tile + its tick) without a second lookup.
   | (PickBase & { kind: "metaSnap"; sel: MetaSnapSel; global: Extract<PickDescriptor, { kind: "snapshot" }> });

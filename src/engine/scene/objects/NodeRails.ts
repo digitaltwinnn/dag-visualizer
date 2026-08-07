@@ -1,79 +1,107 @@
-// The ledger's NODE RAILS (redesign 2026-08-04): hairline guides with a label, one per non-empty
-// make-up rail, along the front edge of each snapshot floor. The CHIPS themselves are the shared
-// node InstancedMeshes that Globe places — this adapter owns only the rail furniture and the pick
-// proxies, so the machines on a rail stay the same objects the other views render.
+// The ledger's NODE CONTAINERS (finetune 2026-08-06, replacing the on-floor rails): one framed
+// tray per ROLE, hanging under the front edge of each snapshot floor and facing the camera. The
+// CHIPS themselves are the shared node InstancedMeshes that Globe places on the same
+// `containerLayout` specs — this adapter owns only the frames and the role labels.
+//
+// Containers are PURE VISUAL AID (user, 2026-08-06): no pick proxies, no layer-rung highlight —
+// the machines inside stay pickable as nodes, the frame itself is furniture.
 import * as THREE from "three";
 import type { SceneColors } from "../../sceneColors";
-import { railX, railY, LANE_HALF_Z, type RailGroup } from "../../domain/ledgerLayout";
-import { railLayerId, railLit, RAIL_ORDER, type RailKind } from "../../domain/ledgerRails";
+import { CONT_X, type RailGroup } from "../../domain/ledgerLayout";
+import { ROLE_CODE, type ContainerSpec } from "../../domain/ledgerRails";
 
-const RAIL_REST_OP = 0.16;
-const RAIL_LIT_OP = 0.5;
-const RAIL_DIM_OP = 0.05;
+const FRAME_OP = 0.16;
+const LABEL_OP = 0.6;
+/** Per-group container pool — three roles is the most a group can have. */
+const MAX_PER_GROUP = 3;
 
-interface Rail {
-  kind: RailKind;
+const rgbTriplet = (c: THREE.Color): string =>
+  `${Math.round(c.r * 255)},${Math.round(c.g * 255)},${Math.round(c.b * 255)}`;
+
+interface Slot {
   group: RailGroup;
-  line: THREE.LineSegments;
-  mat: THREE.LineBasicMaterial;
-  proxy: THREE.Mesh;
-  visible: boolean;
-  target: number;
+  frame: THREE.LineSegments;
+  frameMat: THREE.LineBasicMaterial;
+  label: THREE.Mesh;
+  labelMat: THREE.MeshBasicMaterial;
+  used: boolean;
 }
 
 export class NodeRails {
   group = new THREE.Group();
+  /** Kept for LedgerView's pickable sync — always empty now (containers are not pickable). */
   pickables: THREE.Object3D[] = [];
-  private _rails: Rail[] = [];
+  private _slots: Slot[] = [];
   private _alpha = 0;
-  private _hilite: string | null = null;
-  private _dimOthers = false;
+  private _muted: number;
 
   constructor(colors: SceneColors) {
-    // One rail object per (group, kind) up front — six in total, so nothing allocates later.
+    this._muted = colors.muted;
+    // One frame + label object per (group, index) up front — geometry/texture are rewritten on a
+    // data rebuild (event-time), nothing allocates per frame.
     for (const group of ["meta", "dag"] as RailGroup[]) {
-      for (const kind of RAIL_ORDER) {
-        const geo = new THREE.BufferGeometry();
-        geo.setAttribute("position", new THREE.Float32BufferAttribute(
-          [0, 0, -LANE_HALF_Z, 0, 0, LANE_HALF_Z], 3,
-        ));
-        const mat = new THREE.LineBasicMaterial({ color: colors.core, transparent: true, opacity: 0 });
-        const line = new THREE.LineSegments(geo, mat);
-        const proxy = new THREE.Mesh(
-          new THREE.PlaneGeometry(1.1, 2 * LANE_HALF_Z),
-          new THREE.MeshBasicMaterial({ visible: false }),
-        );
-        proxy.rotation.x = -Math.PI / 2;
-        proxy.userData.pick = { kind: "layer", layerId: railLayerId(group, kind) };
-        line.visible = false;
-        proxy.visible = false;
-        this.group.add(line, proxy);
-        this._rails.push({ kind, group, line, mat, proxy, visible: false, target: 0 });
+      for (let i = 0; i < MAX_PER_GROUP; i++) {
+        const frameMat = new THREE.LineBasicMaterial({
+          color: colors.core, transparent: true, opacity: 0, depthWrite: false,
+        });
+        const frame = new THREE.LineSegments(new THREE.BufferGeometry(), frameMat);
+        frame.visible = false;
+        const labelMat = new THREE.MeshBasicMaterial({
+          transparent: true, opacity: 0, depthWrite: false, depthTest: false,
+        });
+        const label = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), labelMat);
+        label.visible = false;
+        this.group.add(frame, label);
+        this._slots.push({ group, frame, frameMat, label, labelMat, used: false });
       }
     }
   }
 
-  /** Place the rails a group actually has. Called on a data rebuild only. */
-  setRails(group: RailGroup, kinds: RailKind[]): void {
-    for (const r of this._rails) {
-      if (r.group !== group) continue;
-      const idx = kinds.indexOf(r.kind);
-      r.visible = idx >= 0;
-      r.line.visible = r.visible;
-      r.proxy.visible = r.visible;
-      if (idx < 0) continue;
-      const x = railX(idx);
-      const y = railY(group, 0) - 0.02;
-      r.line.position.set(x, y, 0);
-      r.proxy.position.set(x, y, 0);
+  /** Lay out a group's containers. Called on a data rebuild only (event-time). */
+  setContainers(group: RailGroup, specs: ContainerSpec[]): void {
+    let i = 0;
+    for (const s of this._slots) {
+      if (s.group !== group) continue;
+      const spec = specs[i++];
+      s.used = !!spec;
+      s.frame.visible = s.used;
+      s.label.visible = s.used;
+      if (!spec) continue;
+
+      // The frame: a rounded-feel hairline rect in the Y-Z plane at the shared container X,
+      // facing the camera (+X).
+      s.frame.geometry.dispose();
+      s.frame.geometry = new THREE.EdgesGeometry(new THREE.PlaneGeometry(spec.hz * 2, spec.hy * 2));
+      s.frame.rotation.set(0, Math.PI / 2, 0);
+      s.frame.position.set(CONT_X - 0.05, spec.cy, spec.cz);
+
+      // The role label — a small canvas plane over the frame's top screen-left corner.
+      this._drawLabel(s, ROLE_CODE[spec.role]);
+      s.label.rotation.set(0, Math.PI / 2, 0);
+      s.label.position.set(CONT_X - 0.04, spec.cy + spec.hy + 0.34, spec.cz + spec.hz - 0.7);
     }
-    this.pickables.length = 0;
-    for (const r of this._rails) if (r.visible) this.pickables.push(r.proxy);
   }
 
-  setHighlight(layerId: string | null, dimOthers: boolean): void {
-    this._hilite = layerId;
-    this._dimOthers = dimOthers;
+  private _drawLabel(s: Slot, text: string): void {
+    const c = document.createElement("canvas");
+    const SS = 2;
+    c.width = 128 * SS;
+    c.height = 40 * SS;
+    const ctx = c.getContext("2d")!;
+    const mc = new THREE.Color(this._muted);
+    ctx.font = `500 ${24 * SS}px system-ui, -apple-system, sans-serif`;
+    ctx.textAlign = "left";
+    ctx.textBaseline = "middle";
+    ctx.fillStyle = `rgba(${rgbTriplet(mc)},0.95)`;
+    ctx.fillText(text, 2 * SS, c.height / 2);
+    s.labelMat.map?.dispose();
+    const tex = new THREE.CanvasTexture(c);
+    tex.minFilter = THREE.LinearFilter;
+    tex.colorSpace = THREE.SRGBColorSpace;
+    s.labelMat.map = tex;
+    s.labelMat.needsUpdate = true;
+    const h = 0.52;
+    s.label.scale.set(h * (c.width / c.height), h, 1);
   }
 
   setAlpha(a: number): void {
@@ -82,23 +110,22 @@ export class NodeRails {
 
   update(dt: number): void {
     const k = Math.min(1, dt * 6);
-    for (const r of this._rails) {
-      if (!r.visible) continue;
-      const lit = this._hilite ? railLit(this._hilite, r.group, r.kind) : false;
-      const base = lit ? RAIL_LIT_OP : this._dimOthers ? RAIL_DIM_OP : RAIL_REST_OP;
-      r.target = base * this._alpha;
-      r.mat.opacity += (r.target - r.mat.opacity) * k;
+    for (const s of this._slots) {
+      if (!s.used) continue;
+      s.frameMat.opacity += (FRAME_OP * this._alpha - s.frameMat.opacity) * k;
+      s.labelMat.opacity += (LABEL_OP * this._alpha - s.labelMat.opacity) * k;
     }
   }
 
   dispose(): void {
-    for (const r of this._rails) {
-      r.line.geometry.dispose();
-      r.mat.dispose();
-      r.proxy.geometry.dispose();
-      (r.proxy.material as THREE.Material).dispose();
+    for (const s of this._slots) {
+      s.frame.geometry.dispose();
+      s.frameMat.dispose();
+      s.label.geometry.dispose();
+      s.labelMat.map?.dispose();
+      s.labelMat.dispose();
     }
-    this._rails.length = 0;
+    this._slots.length = 0;
     this.pickables.length = 0;
   }
 }

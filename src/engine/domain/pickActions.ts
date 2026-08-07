@@ -26,8 +26,7 @@ export type ClickAction =
   // Select a snapshot (follow decides pin vs heartbeat) — or CLEAR it (pick null, follow
   // omitted: the follow state is untouched; FollowController owns the re-follow).
   | { kind: "snapshot"; pick: Extract<PickDescriptor, { kind: "snapshot" }> | null; follow?: boolean }
-  | { kind: "metaSnap"; sel: MetaSnapSel | null }
-  | { kind: "layer"; pick: Extract<PickDescriptor, { kind: "layer" }> | null }; // commit/clear the layer card
+  | { kind: "metaSnap"; sel: MetaSnapSel | null };
 
 // The network a node pick belongs to: its metagraph, or the DAG core for a validator.
 export const pickNetId = (p: PickDescriptor): string | null =>
@@ -51,7 +50,7 @@ export function pickActive(
   if (p.kind === "meta") return !activeMetaIds || activeMetaIds.has(p.cfg.id);
   if (mode !== "geo") return true;
   const id = p.kind === "l0" || p.kind === "l1" ? "dag" : p.kind === "metanode" ? p.meta?.id : undefined;
-  if (id === undefined) return true; // non-node picks (snapshot/layer) are view-gated by pickSources
+  if (id === undefined) return true; // non-node picks (snapshot) are view-gated by pickSources
   return filter === "all" || filter === id;
 }
 
@@ -121,10 +120,9 @@ export function nodeSelectActions(
     mode: Mode;
     currentFilter: string;
     deselect?: boolean;
-    ledgerLayerId?: string | null;
     /** HYPER ancestry: the composition group the node belongs to (the explorer row's parent
-     *  group, or the one the Engine derives for a scene click). Same role `ledgerLayerId` plays
-     *  in ledger — the caller resolves it, because the group vocabulary lives in the data layer. */
+     *  group, or the one the Engine derives for a scene click). The caller resolves it, because
+     *  the group vocabulary lives in the data layer. */
     compositionSel?: CompositionSel | null;
   },
 ): ClickAction[] {
@@ -140,10 +138,11 @@ export function nodeSelectActions(
 // The rungs ABOVE a node in the destination view's ladder — the ONE definition of a node's
 // ancestry, shared by a node SELECT (below the filter, above the inspect) and by a VIEW ENTRY
 // (viewEntryActions). Each view contributes only the rungs it scopes to itself: hyper the
-// composition group, geo the country + the provider cohort, ledger the floor.
+// composition group, geo the country + the provider cohort. The ledger contributes NOTHING
+// since the layer rung's retirement (2026-08-06) — its floors/containers are visual aid.
 function nodeAncestryActions(
   p: PickDescriptor,
-  opts: { mode: Mode; ledgerLayerId?: string | null; compositionSel?: CompositionSel | null },
+  opts: { mode: Mode; compositionSel?: CompositionSel | null },
 ): ClickAction[] {
   const acts: ClickAction[] = [];
   if (opts.mode === "hyper" && opts.compositionSel) acts.push({ kind: "composition", sel: opts.compositionSel });
@@ -153,50 +152,23 @@ function nodeAncestryActions(
     // node → cohort → country → network regardless of how the node was reached.
     acts.push({ kind: "cohort", sel: { cc: p.geo.cc, city: p.geo.city ?? null, isp: p.geo.isp ?? null } });
   }
-  if (opts.mode === "ledger") {
-    // Ledger ancestry: the browser row's parent floor, else the node's related-L0 floor
-    // (the same mapping the view-entry auto-commit uses).
-    const layerId = opts.ledgerLayerId ?? autoLayerForNode(p.kind);
-    if (layerId) acts.push({ kind: "layer", pick: { kind: "layer", layerId } });
-  }
   return acts;
 }
 
 // ARRIVING in a view with a node still selected. Node + network CARRY across a switch, but the
 // view-scoped rungs do not (focusLadder.LEVEL_CARRY): country/cohort are geo's, composition is
-// hyper's, layer is ledger's, and each is cleared on the way out. Without this the carried node
-// would sit in the destination rail with every parent slot back on its ghost, and a deselect
-// would step straight to the network (user, 2026-08-02: every card up to the selection belongs
-// on the rail, in every view). So the entry re-derives exactly the ancestry a click on that node
-// IN the destination view would have committed — no filter (it carried), no inspect (it's already
-// open). `ledgerLayerId` carries an already-committed floor so a resumed layer is never
-// overwritten; a non-node pick (a dossier, a snapshot) has no ancestry and yields nothing.
+// hyper's, and each is cleared on the way out. Without this the carried node would sit in the
+// destination rail with every parent slot back on its ghost, and a deselect would step straight
+// to the network (user, 2026-08-02: every card up to the selection belongs on the rail, in every
+// view). So the entry re-derives exactly the ancestry a click on that node IN the destination
+// view would have committed — no filter (it carried), no inspect (it's already open). A non-node
+// pick (a dossier, a snapshot) has no ancestry and yields nothing.
 export function viewEntryActions(opts: {
   mode: Mode;
   pick: PickDescriptor | null;
-  ledgerLayerId?: string | null;
   compositionSel?: CompositionSel | null;
 }): ClickAction[] {
   return opts.pick ? nodeAncestryActions(opts.pick, opts) : [];
-}
-
-// The layer TOGGLE — shared by the scene's floor-plane click and LedgerPanel's rows: commit
-// the clicked layer, or clear when it's already the committed one.
-export function layerToggleActions(
-  p: Extract<PickDescriptor, { kind: "layer" }>,
-  currentLayerId: string | null,
-): ClickAction[] {
-  return [{ kind: "layer", pick: currentLayerId === p.layerId ? null : p }];
-}
-
-// A selected NODE entering the Snapshots view auto-commits its RELATED L0 layer (user,
-// 2026-07-17) so the camera arrives on the settlement row the node belongs to: a metagraph
-// node → the metagraph-L0 row, a DAG validator (either shell) → the hypergraph-L0 row.
-// null = no node selected / not a node pick → no auto-selection (the resting overview).
-export function autoLayerForNode(kind: PickDescriptor["kind"] | null | undefined): "ml0" | "hypl0" | null {
-  if (kind === "metanode") return "ml0";
-  if (kind === "l0" || kind === "l1") return "hypl0";
-  return null;
 }
 
 // The network-filter TOGGLE — the FilterPicker's committed-row rule: picking the committed
@@ -217,7 +189,6 @@ export function clearAllActions(current: {
   cohort: CohortSel | null;
   composition: CompositionSel | null;
   country: string | null;
-  layerId: string | null;
   filter: string;
 }): ClickAction[] {
   const acts: ClickAction[] = [];
@@ -227,7 +198,6 @@ export function clearAllActions(current: {
   if (current.cohort) acts.push({ kind: "cohort", sel: null });
   if (current.composition) acts.push({ kind: "composition", sel: null });
   if (current.country) acts.push({ kind: "country", cc: null });
-  if (current.layerId) acts.push({ kind: "layer", pick: null });
   if (current.filter !== "all") acts.push({ kind: "filter", id: "all" });
   return acts;
 }
@@ -301,7 +271,7 @@ export function clickActions(input: {
   // HYPER only: the composition group the picked node belongs to, resolved by the Engine (the
   // group vocabulary lives in the data layer) — the node's ancestry rung, like the ledger floor.
   compositionSel?: CompositionSel | null;
-  current: { filter: string; country: string | null; hasInspect: boolean; layerId: string | null; cohort: CohortSel | null };
+  current: { filter: string; country: string | null; hasInspect: boolean; cohort: CohortSel | null };
 }): ClickAction[] {
   const { mode, pick: p, countryCc, current } = input;
 
@@ -315,9 +285,6 @@ export function clickActions(input: {
 
   // The ledger's snapshot tile: a scene tile is never the strip's live tip — always pin.
   if (p.kind === "snapshot") return snapshotSelectActions(p, false);
-
-  // A floor PLANE click = the explore panel's row click: toggle the committed layer.
-  if (p.kind === "layer") return layerToggleActions(p, current.layerId);
 
   // A node, in any view. (No autoRotate action: geo disables the controls' rotation at mode
   // entry and the inspect subscription re-asserts it on the node flight.)

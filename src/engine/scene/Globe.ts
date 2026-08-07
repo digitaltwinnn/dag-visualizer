@@ -17,7 +17,7 @@ import * as THREE from "three";
 import { METAGRAPHS, DEFAULT_META_COLOR } from "../config";
 import { metaAnchor, META_LAYERS, META_RING, DAG_L0, DAG_L1, HYPER_TILT, applyHyperRig } from "../domain/hyperLayout";
 import { LEDGER, type RailGroup } from "../domain/ledgerLayout";
-import { railKindOf, visibleRails, railChipPos, type RailKind } from "../domain/ledgerRails";
+import { recordRole, containerLayout, containerChipPos, type RailRole, type ContainerSpec } from "../domain/ledgerRails";
 import { gatherSlots } from "../domain/gatherLayout";
 import type { ViewTransition } from "../domain/viewTransition";
 import type { SceneColors } from "../sceneColors";
@@ -146,10 +146,10 @@ export class Globe implements GeoViewHost {
   private _selCohort: CohortSel | null = null;
   private _selCohortIds: Set<string> | null = null; // committed-glow membership (event-time)
   private _selGroupIds: Set<string> | null = null; // committed composition-group glow (hyper)
-  // Which rails each group actually has, from the last data rebuild — LedgerView builds its rail
-  // furniture from this and the Engine frames a rail by its visible index, so the furniture and the
-  // chips can never disagree about which rails exist.
-  private _railKinds: Record<RailGroup, RailKind[]> = { meta: [], dag: [] };
+  // The per-role container layout of each group, from the last data rebuild — LedgerView builds
+  // its container frames from this and Globe places the chips on the same specs, so the furniture
+  // and the chips can never disagree about the trays.
+  private _contSpecs: Record<RailGroup, ContainerSpec[]> = { meta: [], dag: [] };
   // The signers of the selected metagraph snapshot (spec §5.3) — a COMMITTED group, so it joins the
   // existing group-tier channel at the end of the precedence chain.
   private _signerIds: Set<string> | null = null;
@@ -278,26 +278,16 @@ export class Globe implements GeoViewHost {
     this.l0Count = l0List.length;
     this.l1Count = cl1List.length;
 
-    // LEDGER PRE-PASS: one slot per MACHINE across the whole floor, in lane order then cluster
-    // order. Because the rails are shared furniture (spec §4.4) these counters are global — a
-    // per-metagraph counter would put every lane's first machine on slot 0. The DAG validators are
-    // one cluster (no metagraph prefix on the key); a machine may appear in BOTH `l0List` and
-    // `cl1List` (a hybrid), so the second pass skips a key it already slotted.
-    // event-time: runs on a data rebuild, never per frame.
-    const dagRailCounts = new Map<RailKind, number>();
-    const dagRailSlot = new Map<string, number>();
-    for (const list of [l0List, cl1List]) {
-      for (const node of list) {
-        const railKind = railKindOf(node.roles || []);
-        if (!railKind) continue;
-        const key = node.ip || node.id || "";
-        if (dagRailSlot.has(key)) continue; // a hybrid machine is ONE machine, counted once
-        dagRailSlot.set(key, dagRailCounts.get(railKind) ?? 0);
-        dagRailCounts.set(railKind, (dagRailCounts.get(railKind) ?? 0) + 1);
-      }
-    }
-    const dagRailVis = visibleRails(dagRailCounts);
-    this._railKinds.dag = dagRailVis;
+    // LEDGER PRE-PASS (containers, 2026-08-06): one CONTAINER per role under the gl0 floor's front
+    // edge (dag group: L0 / L1). A record is one (machine, role) instance, and EVERY record gets a
+    // slot in its role's container — a hybrid machine shows in both (user: the container answers
+    // "who serves this role"). event-time: runs on a data rebuild, never per frame.
+    const dagContCounts = new Map<RailRole, number>();
+    if (l0List.length) dagContCounts.set("l0", l0List.length);
+    if (cl1List.length) dagContCounts.set("l1", cl1List.length);
+    const dagSpecs = containerLayout("dag", dagContCounts);
+    this._contSpecs.dag = dagSpecs;
+    const dagContSlot = new Map<RailRole, number>(); // next free slot per container
 
     const seen = new Set<string>();
     let idx = 0;
@@ -320,16 +310,17 @@ export class Globe implements GeoViewHost {
         const g = geoMap[node.ip];
         const geoDir = g ? latLonToVec3(g.lat!, g.lon!, 1).normalize() : null;
 
-        // LEDGER: machines line up on RAILS along the front edge of the floor they belong to,
-        // partitioned by make-up. A hybrid machine appears once, on the hybrid rail, from its l0
-        // record; its cl1 twin is hidden.
-        const railKind = railKindOf(node.roles || [role]);
-        const primaryLayer = railKind === "hybrid" ? "l0" : role;
-        const ledgerHide = railKind == null || role !== primaryLayer;
-        const railIdx = railKind ? dagRailVis.indexOf(railKind) : -1;
-        const slot = dagRailSlot.get(node.ip || node.id || "") ?? 0;
+        // LEDGER: this record's role container under the gl0 floor (containers 2026-08-06 — a
+        // hybrid machine's l0 and cl1 records each stand in their own role's container).
+        const contRole = recordRole("dag", role);
+        const contSpec = contRole ? dagSpecs.find((s) => s.role === contRole) : undefined;
+        const ledgerHide = !contSpec;
         const ledgerPos = new THREE.Vector3(); // event-time: one per node record, on data rebuild
-        if (railIdx >= 0) railChipPos("dag", railIdx, slot, ledgerPos);
+        if (contSpec && contRole) {
+          const slot = dagContSlot.get(contRole) ?? 0;
+          dagContSlot.set(contRole, slot + 1);
+          containerChipPos(contSpec, slot, ledgerPos);
+        }
         ledgerPos.applyMatrix4(_LEDGER_M).multiplyScalar(LEDGER.viewScale);
 
         const pick = {
@@ -476,28 +467,27 @@ export class Globe implements GeoViewHost {
     // DIFFERENT tilt angles (layer index = ring index; same primitive as the DAG core), so L0 / dL1 /
     // cL1 read as distinct tilted rings around a cyan hub. HyperView draws a matching tilted hoop.
     const rolesOf = (node: RouteNode) => nodeRoles(node, node.layer as string);
-    // LEDGER PRE-PASS: one slot per MACHINE across the whole floor, in lane order then cluster
-    // order. Because the rails are shared furniture (spec §4.4) these counters are global — a
-    // per-metagraph counter would put every lane's first machine on slot 0. `located` is computed
-    // once here and reused by the main build loop below (same filter, one pass).
+    // LEDGER PRE-PASS (containers, 2026-08-06): count records per ROLE across ALL metagraphs —
+    // one container per role (L0 / cL1 / dL1) under the msnap floor's front edge, shared by every
+    // network. Records are per (machine, layer) cluster entry, so a hybrid machine naturally
+    // appears in each role container it serves. `located` is computed once here and reused by the
+    // main build loop below (same filter, one pass).
     // event-time: runs on a data rebuild, never per frame.
     const locatedByMeta = new Map<string, RouteNode[]>();
-    const railCounts = new Map<RailKind, number>();
-    const railSlot = new Map<string, number>(); // machine key → slot within its own rail
+    const metaContCounts = new Map<RailRole, number>();
     for (const m of withNodes) {
       const located = m.nodes.filter((node) => geoMap[node.ip]);
       locatedByMeta.set(m.id, located);
-      for (const node of located) {
-        const railKind = railKindOf(rolesOf(node));
-        if (!railKind) continue;
-        const key = `${m.id}|${node.ip}`;
-        if (railSlot.has(key)) continue; // a hybrid machine is ONE machine, counted once
-        railSlot.set(key, railCounts.get(railKind) ?? 0);
-        railCounts.set(railKind, (railCounts.get(railKind) ?? 0) + 1);
+      for (const layer of META_LAYERS) {
+        const role = recordRole("meta", layer);
+        if (!role) continue;
+        const n = located.filter((node) => rolesOf(node).includes(layer)).length;
+        if (n) metaContCounts.set(role, (metaContCounts.get(role) ?? 0) + n);
       }
     }
-    const railVis = visibleRails(railCounts);
-    this._railKinds.meta = railVis;
+    const metaSpecs = containerLayout("meta", metaContCounts);
+    this._contSpecs.meta = metaSpecs;
+    const metaContSlot = new Map<RailRole, number>(); // next free slot per container
     // Which layers each metagraph actually PLOTS a node in — HyperView hides the hoop for an absent
     // layer (a data-only metagraph like DED has no cL1, so its outer ring must not draw empty).
     const hoopPresent = new Map<string, boolean[]>();
@@ -519,16 +509,17 @@ export class Globe implements GeoViewHost {
           seen.add(node.ip);
           const offset = ringFramePos(i, cnt, META_RING.radii[layer], frame);
           const dir = latLonToVec3(g.lat!, g.lon!, 1).normalize(); // real location; fanned out below
-          // LEDGER: machines line up on RAILS along the front edge of the floor they belong to,
-          // partitioned by make-up. A hybrid machine appears once, on the hybrid rail, from its l0
-          // record; its dl1/cl1 twin is hidden.
-          const railKind = railKindOf(rolesOf(node));
-          const primaryLayer = railKind === "hybrid" ? "l0" : layer;
-          const ledgerHide = railKind == null || layer !== primaryLayer;
-          const railIdx = railKind ? railVis.indexOf(railKind) : -1;
-          const slot = railSlot.get(`${m.id}|${node.ip}`) ?? 0;
+          // LEDGER: this record's role container under the msnap floor (containers 2026-08-06 —
+          // a hybrid machine's l0/cl1/dl1 records each stand in their own role's container).
+          const contRole = recordRole("meta", layer);
+          const contSpec = contRole ? metaSpecs.find((s) => s.role === contRole) : undefined;
+          const ledgerHide = !contSpec;
           const ledgerPos = new THREE.Vector3(); // event-time: one per node record, on data rebuild
-          if (railIdx >= 0) railChipPos("meta", railIdx, slot, ledgerPos);
+          if (contSpec && contRole) {
+            const slot = metaContSlot.get(contRole) ?? 0;
+            metaContSlot.set(contRole, slot + 1);
+            containerChipPos(contSpec, slot, ledgerPos);
+          }
           ledgerPos.applyMatrix4(_LEDGER_M).multiplyScalar(LEDGER.viewScale); // match the LedgerView group transform
           const pick = {
             kind: "metanode", meta: m, node, geo: g, layer,
@@ -777,9 +768,9 @@ export class Globe implements GeoViewHost {
     this._selGroupIds = ids?.length ? new Set(ids) : null; // event-time
   }
 
-  /** The rails a group has, in visible order (index = the rail's X step). */
-  railKinds(group: RailGroup): RailKind[] {
-    return this._railKinds[group];
+  /** The per-role container layout of a group (LedgerView draws its frames from this). */
+  containerSpecs(group: RailGroup): ContainerSpec[] {
+    return this._contSpecs[group];
   }
 
   // The selected metagraph snapshot's SIGNERS. `proofs[].id` are node ids, so the chips that sealed

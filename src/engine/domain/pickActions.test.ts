@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { autoLayerForNode, viewEntryActions, clearAllActions, clickActions, cohortToggleActions, compositionToggleActions, countryToggleActions, filterToggleActions, followToggleActions, layerToggleActions, nodeSelectActions, sameCohort, sameComposition, snapshotSelectActions, pickActive, pickNetId, metaSnapSelectActions, bandSelectActions, sameMetaSnap, type ClickAction } from "./pickActions";
+import { viewEntryActions, clearAllActions, clickActions, cohortToggleActions, compositionToggleActions, countryToggleActions, filterToggleActions, followToggleActions, nodeSelectActions, sameCohort, sameComposition, snapshotSelectActions, pickActive, pickNetId, metaSnapSelectActions, bandSelectActions, sameMetaSnap, type ClickAction } from "./pickActions";
 import { finerLevels } from "./focusLadder";
 import type { PickDescriptor, MetaSnapSel } from "@/src/data/types";
 
@@ -11,22 +11,17 @@ const validatorPick = (): PickDescriptor =>
 const hubPick = (): PickDescriptor => ({ kind: "meta", cfg: { id: "dor" } }) as unknown as PickDescriptor;
 type SnapPick = Extract<PickDescriptor, { kind: "snapshot" }>;
 const snapPick = (): SnapPick => ({ kind: "snapshot", data: { ordinal: 42 } }) as unknown as SnapPick;
-type LayerPick = Extract<PickDescriptor, { kind: "layer" }>;
-const layerPick = (id = "ml0"): LayerPick => ({ kind: "layer", layerId: id }) as unknown as LayerPick;
-
 const state = (
   over: Partial<{
     filter: string;
     country: string | null;
     hasInspect: boolean;
-    layerId: string | null;
     cohort: { cc: string; city: string | null; isp: string | null } | null;
   }> = {},
 ) => ({
   filter: "all",
   country: null,
   hasInspect: false,
-  layerId: null,
   cohort: null,
   ...over,
 });
@@ -69,7 +64,7 @@ describe("clickActions — empty click (the land-sphere country toggle, geo)", (
   });
 });
 
-describe("clickActions — hub / snapshot / layer", () => {
+describe("clickActions — hub / snapshot", () => {
   it("a hub click selects its metagraph, nothing else", () => {
     expect(clickActions({ mode: "hyper", pick: hubPick(), countryCc: null, current: state() })).toEqual([
       { kind: "filter", id: "dor" },
@@ -80,15 +75,6 @@ describe("clickActions — hub / snapshot / layer", () => {
     expect(clickActions({ mode: "ledger", pick: p, countryCc: null, current: state() })).toEqual([
       { kind: "snapshot", pick: p, follow: false },
     ]);
-  });
-  it("a layer plane toggles the committed layer (on, then off on the same plane)", () => {
-    const p = layerPick("ml0");
-    expect(clickActions({ mode: "ledger", pick: p, countryCc: null, current: state() })).toEqual([
-      { kind: "layer", pick: p },
-    ]);
-    expect(
-      clickActions({ mode: "ledger", pick: p, countryCc: null, current: state({ layerId: "ml0" }) }),
-    ).toEqual([{ kind: "layer", pick: null }]);
   });
 });
 
@@ -124,11 +110,10 @@ describe("clickActions — node clicks (the ordering contracts)", () => {
       "inspect",
     ]);
   });
-  it("LEDGER: filter + its L0 floor + inspect — no country/cohort drills (those are geo concepts)", () => {
+  it("LEDGER: filter + inspect — no floor ancestry (layers retired 2026-08-06), no geo drills", () => {
     const p = nodePick("DE");
     expect(kinds(clickActions({ mode: "ledger", pick: p, countryCc: null, current: state() }))).toEqual([
       "filter",
-      "layer",
       "inspect",
     ]);
   });
@@ -139,15 +124,6 @@ describe("clickActions — flat/placeholder + non-geo safety (the table gates it
     for (const mode of ["hyper", "ledger", "status", "transactions", "staking"] as const) {
       expect(clickActions({ mode, pick: null, countryCc: "DE", current: state() })).toEqual([]);
     }
-  });
-});
-
-describe("clickActions — layer SWITCH (a different plane while one is committed)", () => {
-  it("commits the newly clicked plane instead of toggling off", () => {
-    const p = layerPick("msnap");
-    expect(
-      clickActions({ mode: "ledger", pick: p, countryCc: null, current: state({ layerId: "ml0" }) }),
-    ).toEqual([{ kind: "layer", pick: p }]);
   });
 });
 
@@ -172,9 +148,8 @@ describe("pickActive — which picks respond at all, per view", () => {
     expect(pickActive(nodePick(), "hyper", "swap", null)).toBe(true);
     expect(pickActive(nodePick(), "ledger", "swap", null)).toBe(true);
   });
-  it("non-node picks (snapshot/layer) pass — their view gating is pickSources", () => {
+  it("non-node picks (snapshot) pass — their view gating is pickSources", () => {
     expect(pickActive(snapPick(), "ledger", "dor", null)).toBe(true);
-    expect(pickActive(layerPick(), "ledger", "dor", null)).toBe(true);
   });
 });
 
@@ -215,24 +190,6 @@ describe("the shared component builders (GeoExplore rows + LiveStrip bars run th
   });
 });
 
-describe("autoLayerForNode (node selection carrying into Snapshots)", () => {
-  it("maps a metagraph node to the metagraph-L0 row", () => {
-    expect(autoLayerForNode("metanode")).toBe("ml0");
-  });
-
-  it("maps a DAG validator (either shell) to the hypergraph-L0 row", () => {
-    expect(autoLayerForNode("l0")).toBe("hypl0");
-    expect(autoLayerForNode("l1")).toBe("hypl0");
-  });
-
-  it("returns null for non-node picks and no selection (resting overview)", () => {
-    expect(autoLayerForNode("meta")).toBe(null);
-    expect(autoLayerForNode("snapshot")).toBe(null);
-    expect(autoLayerForNode(null)).toBe(null);
-    expect(autoLayerForNode(undefined)).toBe(null);
-  });
-});
-
 // Arriving in a view with a node still selected: the view-scoped rungs (cleared on the way out
 // by focusLadder.LEVEL_CARRY) must come back, so every parent card up to the selection is on the
 // rail again. The drift guard is the equality with nodeSelectActions' own ancestry — the two
@@ -255,13 +212,8 @@ describe("viewEntryActions (a carried node's ancestry in the destination view)",
     ]);
   });
 
-  it("ledger: commits the node's related floor, but never overwrites a committed layer", () => {
-    expect(viewEntryActions({ mode: "ledger", pick: nodePick() })).toEqual([
-      { kind: "layer", pick: { kind: "layer", layerId: "ml0" } },
-    ]);
-    expect(viewEntryActions({ mode: "ledger", pick: nodePick(), ledgerLayerId: "msnap" })).toEqual([
-      { kind: "layer", pick: { kind: "layer", layerId: "msnap" } },
-    ]);
+  it("ledger: contributes nothing — its floors/containers are visual aid (layer retired 2026-08-06)", () => {
+    expect(viewEntryActions({ mode: "ledger", pick: nodePick() })).toEqual([]);
   });
 
   it("names exactly the rungs a node CLICK in that view commits (no drift)", () => {
@@ -280,16 +232,7 @@ describe("viewEntryActions (a carried node's ancestry in the destination view)",
   });
 });
 
-describe("layerToggleActions / filterToggleActions (the remaining rail interactions)", () => {
-  it("layer rows == the scene's floor-plane toggle (commit, switch, clear)", () => {
-    const p = layerPick("ml0");
-    expect(layerToggleActions(p, null)).toEqual([{ kind: "layer", pick: p }]);
-    expect(layerToggleActions(p, "msnap")).toEqual([{ kind: "layer", pick: p }]);
-    expect(layerToggleActions(p, "ml0")).toEqual([{ kind: "layer", pick: null }]);
-    // identical to the scene click through clickActions
-    expect(clickActions({ mode: "ledger", pick: p, countryCc: null, current: state({ layerId: "ml0" }) }))
-      .toEqual(layerToggleActions(p, "ml0"));
-  });
+describe("filterToggleActions (the remaining rail interaction)", () => {
   it("the filter picker's committed-row rule: re-picking steps back to 'all'; 'all' never toggles", () => {
     expect(filterToggleActions("dor", "all")).toEqual([{ kind: "filter", id: "dor" }]);
     expect(filterToggleActions("dor", "dor")).toEqual([{ kind: "filter", id: "all" }]);
@@ -384,14 +327,9 @@ describe("nodeSelectActions ancestry (spec Part 3 — full-ancestry rule)", () =
     const acts = nodeSelectActions(p, { mode: "geo", currentFilter: "dag" });
     expect(acts.find((a) => a.kind === "cohort")).toEqual({ kind: "cohort", sel: { cc: "FI", city: null, isp: null } });
   });
-  it("ledger: browser row commits its parent floor before inspect", () => {
-    const acts = nodeSelectActions(geoPick, { mode: "ledger", currentFilter: "dor", ledgerLayerId: "ml1" });
-    expect(acts.map((a) => a.kind)).toEqual(["layer", "inspect"]);
-    expect(acts[0]).toEqual({ kind: "layer", pick: { kind: "layer", layerId: "ml1" } });
-  });
-  it("ledger: scene click commits the autoLayerForNode L0 floor", () => {
+  it("ledger: no layer ancestry (retired 2026-08-06) — filter (if changed) then inspect", () => {
     const acts = nodeSelectActions(geoPick, { mode: "ledger", currentFilter: "dor" });
-    expect(acts[0]).toEqual({ kind: "layer", pick: { kind: "layer", layerId: "ml0" } });
+    expect(acts.map((a) => a.kind)).toEqual(["inspect"]);
   });
   it("hyper: the node's composition GROUP commits before inspect (full ancestry)", () => {
     const acts = nodeSelectActions(geoPick, { mode: "hyper", currentFilter: "all", compositionSel: COMP });
@@ -475,28 +413,28 @@ describe("clearAllActions (the rail-controls sweep)", () => {
       hasInspect: true, hasSnap: true, hasMetaSnap: false,
       cohort: { cc: "DE", city: "Falkenstein", isp: "Hetzner" },
       composition: { netId: "dor", key: "Hybrid|L0·dL1" },
-      country: "DE", layerId: "ml0", filter: "dor",
+      country: "DE", filter: "dor",
     });
-    expect(kinds(acts)).toEqual(["inspect", "snapshot", "cohort", "composition", "country", "layer", "filter"]);
+    expect(kinds(acts)).toEqual(["inspect", "snapshot", "cohort", "composition", "country", "filter"]);
     expect(acts[acts.length - 1]).toEqual({ kind: "filter", id: "all" });
     // The snapshot clear must not carry `follow` — re-following is the FollowController's.
     expect(acts[1]).toEqual({ kind: "snapshot", pick: null });
   });
   it("already-clear channels emit nothing (a fully clear state is a no-op)", () => {
     expect(clearAllActions({
-      hasInspect: false, hasSnap: false, hasMetaSnap: false, cohort: null, composition: null, country: null, layerId: null, filter: "all",
+      hasInspect: false, hasSnap: false, hasMetaSnap: false, cohort: null, composition: null, country: null, filter: "all",
     })).toEqual([]);
   });
   it("a partial state clears only what is set", () => {
     const acts = clearAllActions({
-      hasInspect: false, hasSnap: false, hasMetaSnap: false, cohort: null, composition: null, country: null, layerId: "hypl0", filter: "dag",
+      hasInspect: false, hasSnap: false, hasMetaSnap: false, cohort: null, composition: null, country: null, filter: "dag",
     });
-    expect(kinds(acts)).toEqual(["layer", "filter"]);
+    expect(kinds(acts)).toEqual(["filter"]);
   });
   it("sweeps the metagraph-snapshot slot too", () => {
     const a = clearAllActions({
       hasInspect: false, hasSnap: false, hasMetaSnap: true, cohort: null,
-      composition: null, country: null, layerId: null, filter: "all",
+      composition: null, country: null, filter: "all",
     });
     expect(a).toContainEqual({ kind: "metaSnap", sel: null });
   });
