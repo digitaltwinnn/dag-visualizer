@@ -10,6 +10,7 @@ import { applyClickActions } from "@/src/store/applyClickActions";
 import { fmtDag, fmtKB } from "@/src/util/format";
 import { relativeAge } from "@/src/util/relativeAge";
 import { IdentityDot } from "@/components/inspector/parts";
+import { SelectedRowMark } from "@/components/selection";
 import { cn } from "@/lib/utils";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -81,16 +82,20 @@ export default function AnchorLogTable() {
         <TableBody>
           {rows.map((r) => {
             const cfg = displayNetwork(r.metaId) ?? null;
-            // Several rows can share one anchoring global — they ALL wash when it's selected.
-            // Honest: they anchored into the selected snapshot. (The wash alone, not the
-            // SELECTED_ROW box-shadow: box-shadow doesn't paint on a collapsed table row.)
-            const selected = snap?.data.ordinal === r.global.ordinal;
+            // TWO selection strengths (user, 2026-08-07 — "which row did I click?"): the
+            // CLICKED metagraph snapshot wears the full selection wash + the ✓; its tick-mates
+            // (rows sharing the anchoring global) keep a fainter wash — honest, they anchored
+            // into the selected tick. (Washes, not the SELECTED_ROW box-shadow: box-shadow
+            // doesn't paint on a collapsed table row.)
+            const rowSel = metaSnap?.metaId === r.metaId && metaSnap?.ordinal === r.ordinal;
+            const tickMate = !rowSel && snap?.data.ordinal === r.global.ordinal;
             return (
               <TableRow
                 key={`${r.metaId}:${r.ordinal}`}
                 className={cn(
                   "cursor-pointer text-body hover:bg-wash-faint",
-                  selected && "bg-[var(--sel-bg)] text-foreground",
+                  rowSel && "bg-[var(--sel-bg)] text-foreground",
+                  tickMate && "bg-wash-faint",
                 )}
                 onMouseEnter={() => setHoverSnapOrd(r.global.ordinal)}
                 onMouseLeave={() => setHoverSnapOrd(null)}
@@ -115,7 +120,13 @@ export default function AnchorLogTable() {
                     )}
                   </span>
                 </TableCell>
-                <TableCell className="font-mono tabular-nums text-foreground-dim">{r.ordinal.toLocaleString()}</TableCell>
+                <TableCell className="font-mono tabular-nums text-foreground-dim">
+                  {/* The ✓ slot is ALWAYS reserved so the column never shifts on select. */}
+                  <span className="inline-flex items-center gap-1.5">
+                    {r.ordinal.toLocaleString()}
+                    <span className="inline-flex w-3.5 flex-none">{rowSel && <SelectedRowMark />}</span>
+                  </span>
+                </TableCell>
                 <TableCell className="text-right tabular-nums">{fmtDag(r.fee)}</TableCell>
                 <TableCell className="text-right tabular-nums text-foreground-dim">{fmtKB(r.sizeInKB)}</TableCell>
                 <TableCell className="text-right font-mono tabular-nums">{r.global.ordinal.toLocaleString()}</TableCell>
