@@ -1578,16 +1578,18 @@ frame). It composes three adapters — `objects/ByteBar.ts`, `objects/Ribbons.ts
   from geo.
 - **Lanes: the field is FIXED** (user reversal 2026-08-07 of the spec §5.2 committed-lane
   rearrangement): `laneSpan(i, n)` → `{cz, hz}` — every lane always owns its own slice, and a
-  committed filter NEVER moves or hides geometry. **The emphasis is the CAMERA plus a COLORED
-  dim on the always-coloured elements** (revised 2026-08-07, same day the flat off-filter dim
-  was removed): tiles/bands stay untouched by a filter, but the other metagraphs' RIBBONS drop
-  to their identity hue at `RIBBON_DIM` (0.35) and their tray chips carry the dim model's
-  emissive dim — a tier between full colour and the neutral trail, so the committed network
-  leads while the rest stay identifiable. The `ledgerNetwork` resolver
-  flies to the committed metagraph's lane (`ledgerFloorFraming` shifted laterally by the lane's
-  world X) so its snapshots sit at screen centre. `LedgerView.setFilter` only GATES THE ANCHOR
-  PULSES (while filtered, only the committed lane's pulses spawn); the chamber has no filter
-  hover preview.
+  committed filter NEVER moves or hides geometry, and — settled after two same-day camera
+  reversals (2026-08-07) — **it never moves the CAMERA either**: the `ledgerNetwork` resolver
+  holds the shared overview. The emphasis is the **COLORED dim** on every identity-coloured
+  element: the other metagraphs' tiles, bands and ribbons drop to their own hue at
+  `RIBBON_DIM` (0.35) and their tray chips to the dim model's flat ledger dim (0.5 — 0.82 read
+  near-black through the chip writer's colour+glow cascade) — a tier between full colour and
+  the neutral trail, so the committed network leads while the rest stay identifiable.
+  Committing a metagraph also **AUTO-SELECTS its latest snapshot**
+  (`Engine._autoSelectLatestMetaSnap` → the same tested `metaSnapSelectActions` a tile click
+  runs — pins the anchoring global, opens the metagraph-snapshot card), so the card chain
+  populates without a camera move. `setHoverFilter` previews the dim at commit strength (the
+  house hover rule); `setFilter` also gates the anchor pulses to the committed lane.
 - **No gutters** (2026-08-07): the `msnap` CURRENCY gutter plane + its status line were
   DROPPED with the per-metagraph planes, and the whole currency-activity lane went with it —
   `/api/currency-activity`, `src/data/currencyActivity.ts` and the `CurrencyActivity` type were
@@ -1631,7 +1633,9 @@ frame). It composes three adapters — `objects/ByteBar.ts`, `objects/Ribbons.ts
   the chamber). Each new tick keeps the pinned row at the front. Selection comes from the LiveStrip:
   the Engine forwards `hoverSnapOrd ?? snap.data.ordinal` to `ledger.setSelected(ordinal)`, and
   the ledger maps ordinal → slot each tick (`_recomputeSelectedSlot`). There is NO scene fog
-  anywhere any more (removed 2026-07-11) and recency is `slotFade` brightness only. IDENTITY
+  anywhere any more (removed 2026-07-11), and the drawn trail has NO depth fade either (user,
+  2026-08-07 — every row keeps one brightness; recency reads from position + the per-row
+  ordinal labels; `slotFade` survives only as the model's spawn-ease seed). IDENTITY
   colour belongs to the front (lead) row and the hovered/selected row alone (user, 2026-08-07)
   — every other snapshot (tiles AND bands) rests in the neutral cyan tone.
 - **Picking + tile identity.** `_syncPickables()` publishes `_bar.pickables` and the lane

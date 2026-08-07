@@ -9,7 +9,7 @@ import { createScene, type SceneCtx } from "./scene/SceneContext";
 import { HyperView, type MetaHubRec } from "./scene/views/HyperView";
 import { Globe, GATHER_CELL } from "./scene/Globe";
 import { LedgerView } from "./scene/views/LedgerView";
-import { LANE_IDS } from "./domain/ledgerModel";
+import {  } from "./domain/ledgerModel";
 import { UNLISTED_KEY } from "./domain/ledgerBands";
 
 // The public catalog's ids — the unknown-lane tile resolver splits listed from unlisted rows.
@@ -17,11 +17,11 @@ const LISTED_IDS = new Set(METAGRAPHS.map((m) => m.id));
 import { StageLights } from "./scene/objects/StageLights";
 import { loadGeoCache, resolveMissing } from "@/src/data/geoResolve";
 import { METAGRAPHS, COLORS } from "@/src/engine/config";
-import { LEDGER, LAYER_GEOM, BYTE_SCALE_KB, ledgerSite, type RailGroup } from "./domain/ledgerLayout";
+import { BYTE_SCALE_KB, type RailGroup } from "./domain/ledgerLayout";
 import { HYPER_TILT, HYPER_TILT_FOCUS } from "./domain/hyperLayout";
 import { readSceneColors } from "./sceneColors";
 import { VIEW_POLICIES, type ViewPolicy } from "./domain/viewPolicy";
-import { FOCI, hubFraming, geoFraming, ledgerFloorFraming, ledgerNodeFraming, nodeFraming, cohortFraming, hyperNodeFraming, dollyBack, easeInOutQuad, type CameraFraming } from "./domain/cameraRig";
+import { FOCI, hubFraming, geoFraming, ledgerNodeFraming, nodeFraming, cohortFraming, hyperNodeFraming, dollyBack, easeInOutQuad, type CameraFraming } from "./domain/cameraRig";
 import { countryFraming } from "./domain/countryShape";
 import { R as GEO_R, LAND_H } from "./domain/geoLayout";
 import { clickActions, pickActive, pickNetId, viewEntryActions, metaSnapSelectActions, bandSelectActions } from "./domain/pickActions";
@@ -349,6 +349,11 @@ export class Engine {
           // A metagraph snapshot belongs to exactly ONE network, so a switch can only orphan it.
           if (st.metaSnap) useStore.getState().setMetaSnap(null);
           this.applyFilter();
+          // Committing a METAGRAPH in the ledger auto-selects its LATEST snapshot (user,
+          // 2026-08-07): the card chain populates immediately — the dim carries the emphasis,
+          // the camera stays put.
+          if (st.mode === "ledger" && st.filter !== "all" && st.filter !== "dag")
+            this._autoSelectLatestMetaSnap(st.filter);
         }
         // Country drill-down is geo-only — gate on the view so a re-entrant clear
         // (e.g. from setMode while switching away) can't run a geo focus in hyper.
@@ -427,6 +432,7 @@ export class Engine {
         if (st.hoverFilter !== prev.hoverFilter) {
           this._hoverFilter = st.hoverFilter;
           this.globe.setHoverFilter(st.hoverFilter);
+          this.ledger.setHoverFilter(st.hoverFilter); // the colored-dim preview (same strength as commit)
         }
         // Geo explorer list-row hover → glow that node's shells on the globe (same as a 3D hover).
         if (st.hoverNodeId !== prev.hoverNodeId) this.globe.setHoverNode(st.hoverNodeId);
@@ -919,21 +925,11 @@ export class Engine {
       return !!p && this._focusLedgerNode(p);
     },
     ledgerNetwork: () => {
-      // Fly to the committed network's LANE (user, 2026-08-07 — the lane field is FIXED now: a
-      // filter dims the others in place instead of hiding them, and the CAMERA carries the
-      // focus by centring the committed metagraph's lane of snapshots). The DAG's own output
-      // is the global floor. Camera-only — the floors are visual aid, not committable subjects.
-      if (this.filter === "dag") return this._focusFloor("gl0");
-      const i = LANE_IDS.indexOf(this.filter);
-      if (i < 0) return this._focusFloor("msnap");
-      const msnap = LAYER_GEOM.find((l) => l.id === "msnap")!;
-      ledgerFloorFraming(msnap.y * LEDGER.viewScale, this._framingOut);
-      // The lane's world X (ledger-local z → world -z, scaled): shift pos+target laterally so
-      // the lane projects at screen centre — the composition ledgerFloorFraming documents.
-      const laneX = -ledgerSite(i, LANE_IDS.length).z * LEDGER.viewScale;
-      this._framingOut.pos.x += laneX;
-      this._framingOut.target.x += laneX;
-      this._tweenTo(this._framingOut.pos, this._framingOut.target);
+      // NO fly-to-lane (user reversal, 2026-08-07 — the second camera reversal of the day
+      // settles it): committing a network DIMS the others in place (colored dim on
+      // tiles/bands/ribbons) and auto-selects its latest snapshot; the camera holds the
+      // shared overview.
+      this.focus("ledger");
       return true;
     },
     ledgerOverview: () => {
@@ -941,6 +937,29 @@ export class Engine {
       return true;
     },
   };
+
+  /** Committing a metagraph in the ledger auto-selects its newest snapshot in the buffer (the
+   *  same tested metaSnapSelectActions a tile click runs — pins the anchoring global, opens the
+   *  metagraph-snapshot card). Skips silently when the buffer holds nothing yet. */
+  private _autoSelectLatestMetaSnap(metaId: string): void {
+    const net = getNetwork() as unknown as {
+      metaSnaps?: Map<string, { ordinal: number; hash: string; ts: string }[]>;
+      globalSnapshots?: GlobalSnapshot[];
+    } | null;
+    const list = net?.metaSnaps?.get(metaId);
+    if (!list?.length) return;
+    let m = list[0];
+    for (const x of list) if (x.ordinal > m.ordinal) m = x;
+    const g = net?.globalSnapshots?.find((gs) => gs.timestamp === m.ts);
+    if (!g) return; // anchored outside the retained window — nothing to pin honestly
+    applyClickActions(
+      metaSnapSelectActions(
+        { metaId, ordinal: m.ordinal, hash: m.hash, globalOrdinal: g.ordinal, ts: m.ts },
+        { kind: "snapshot", title: `Global snapshot #${g.ordinal}`, data: g },
+        { filter: metaId, metaSnap: null },
+      ),
+    );
+  }
 
   // Resolve the camera for the CURRENT selection state by walking the current view's ladder
   // (domain/focusLadder.LADDERS) — the one entry point every selection-driven camera flight
@@ -1217,18 +1236,6 @@ export class Engine {
     tw.active = true;
   }
 
-
-  // Fly to a snapshot FLOOR (Snapshots view) — camera-only framing math; the floors are visual
-  // aid, not committable subjects (layer navigation retired 2026-08-06). Heights are scaled by
-  // the ledger group's viewScale (the framing works in world units). Returns false when the id
-  // names no floor, so the focus ladder can fall through.
-  private _focusFloor(floorId: string): boolean {
-    const l = LAYER_GEOM.find((x) => x.id === floorId);
-    if (!l) return false;
-    ledgerFloorFraming(l.y * LEDGER.viewScale, this._framingOut);
-    this._tweenTo(this._framingOut.pos, this._framingOut.target);
-    return true;
-  }
 
   private _focusGeo(R: number) {
     // Look head-on at the FRONT of the globe (target pushed forward in +Z, toward where the

@@ -39,7 +39,7 @@ import {
   type RailGroup,
 } from "../../domain/ledgerLayout";
 import type { SceneColors } from "../../sceneColors";
-import { LedgerModel, LANE_IDS, SLOT_SP, SLOT_N, LANE_GAP_Z, slotFade } from "../../domain/ledgerModel";
+import { LedgerModel, LANE_IDS, SLOT_SP, SLOT_N, LANE_GAP_Z } from "../../domain/ledgerModel";
 import { makeBarSpec, fillBarSpec, UNLISTED_KEY, type BarSpec } from "../../domain/ledgerBands";
 import type { ContainerSpec } from "../../domain/ledgerRails";
 import type {
@@ -50,6 +50,7 @@ import type {
 } from "@/src/data/types";
 import { LEDGER_LAYERS } from "@/src/data/ledgerLayers"; // shared display copy — floor labels = panel rows
 import { ByteBar, SNAP_PREVIEW } from "../objects/ByteBar";
+import { RIBBON_DIM } from "../objects/Ribbons";
 import { Ribbons } from "../objects/Ribbons";
 import { SnapshotPlane, makeEdgeLabel, GLOBAL_PLANE_TUNE_DEFAULTS, META_PLANE_TUNE_DEFAULTS, type PlaneTune } from "../objects/SnapshotPlane";
 import { FadeSet } from "../objects/FadeSet";
@@ -202,6 +203,8 @@ export class LedgerView implements SceneView {
    *  identity colour at SNAP_PREVIEW without demoting the active row. */
   private _hoverOrd: number | null = null;
   private _hoverSlot = -1;
+  /** Filter-chip / metagraph-row HOVER — previews the colored network dim at commit strength. */
+  private _hoverNet: string | null = null;
 
   // ── fades (the ledger's stage light went with the layer navigation, 2026-08-06 — nothing
   // committable is left for a spot to dramatise)
@@ -509,9 +512,27 @@ export class LedgerView implements SceneView {
    *  Engine's ledgerNetwork resolver. */
   setFilter(filter: string) {
     this._filter = filter || "all"; // event-time
-    // The other metagraphs' sheets take the COLORED dim (identity hue at RIBBON_DIM) — the
-    // committed lane's ribbons lead; chips get the same tier from the dim model's emissive.
-    this._ribbons.setFilter(this._filter);
+    this._applyNetDim();
+  }
+
+  /** Filter-chip / metagraph-row hover: previews the colored dim at the SAME strength as a
+   *  commit (the house hover rule); null falls back to the committed filter. */
+  setHoverFilter(filter: string | null) {
+    this._hoverNet = filter || null; // event-time
+    this._applyNetDim();
+  }
+
+  /** The network the dim resolves against — the live hover wins, else the committed filter. */
+  private _netDimKey(): string {
+    return this._hoverNet ?? this._filter;
+  }
+
+  private _applyNetDim(): void {
+    const d = this._netDimKey();
+    // The other metagraphs' elements take the COLORED dim (identity hue at RIBBON_DIM):
+    // ribbons + bands here, tiles in the per-frame pass, chips via the dim model's emissive.
+    this._ribbons.setFilter(d);
+    this._bar.setFilter(d);
   }
 
 
@@ -743,7 +764,9 @@ export class LedgerView implements SceneView {
         if (mi >= META_TRAIL_MAX) break;
         if (pinnedHold) b.x = LEAD_X - b.slot * SLOT_SP;
         else b.x += (LEAD_X - b.slot * SLOT_SP - b.x) * k;
-        b.fade += (slotFade(b.slot) - b.fade) * k;
+        // No depth fade (user, 2026-08-07): every trail row eases to FULL brightness — recency
+        // reads from position + the ordinal labels, not a gradient into the dark.
+        b.fade += (1 - b.fade) * k;
         // A tick this lane anchored NOTHING into draws NOTHING (user, 2026-08-07 — the small
         // dimmed placeholder block is gone; the model keeps the slot, the mesh zero-scales).
         if (!b.filled) {
@@ -765,6 +788,8 @@ export class LedgerView implements SceneView {
         this._metaTrailMesh.setMatrixAt(mi, _dummy.matrix);
         const hot = this.model.isRowHot(b.slot);
         const hov = !hot && b.slot > 0 && b.slot === this._hoverSlot;
+        const dimNet = this._netDimKey();
+        const offNet = dimNet !== "all" && lane.id !== dimNet;
         // Three tiers (user, 2026-08-07): the ACTIVE row (lead/pinned) full identity, the
         // HOVERED row identity at the preview fraction, every other snapshot the neutral trail.
         const ident = hot || hov || b.slot <= 0 ||
@@ -775,6 +800,7 @@ export class LedgerView implements SceneView {
             : hov
               ? Math.max(b.fade, 0.9) * this.tiles.hot * SNAP_PREVIEW
               : b.fade * this.tiles.rest) *
+          (offNet ? RIBBON_DIM : 1) *
           this._fadeAtX(b.x + this._trailOff) *
           this._fades.alpha;
         this._metaTrailMesh.setColorAt(mi, _col.copy(ident ? laneColor : this._coreCol).multiplyScalar(bright));

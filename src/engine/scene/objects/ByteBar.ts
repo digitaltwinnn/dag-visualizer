@@ -13,7 +13,8 @@ import type { PickDescriptor } from "@/src/data/types";
 import { METAGRAPHS } from "../../config";
 import { BAR_H, BAR_D, BAR_LIFT, FLOOR_Y, LEAD_X } from "../../domain/ledgerLayout";
 import { UNLISTED_KEY, type BarSpec } from "../../domain/ledgerBands";
-import { SLOT_SP, SLOT_N, slotFade } from "../../domain/ledgerModel";
+import { SLOT_SP, SLOT_N } from "../../domain/ledgerModel";
+import { RIBBON_DIM } from "./Ribbons";
 
 const BANDS_PER_SLOT = METAGRAPHS.length + 1;
 
@@ -57,6 +58,7 @@ export class ByteBar {
   private _selected = -1;
   private _hovered = -1;
   private _off = 0;
+  private _filter = "all";
 
   constructor(colors: SceneColors, sceneColors: Record<string, number>) {
     this._sceneColors = sceneColors;
@@ -134,6 +136,9 @@ export class ByteBar {
   setSelected(slot: number): void { this._selected = slot; }
   /** The transient hover row — colored-dim preview, never demotes the active row. */
   setHovered(slot: number): void { this._hovered = slot; }
+  /** Committed-or-hovered network → the other metagraphs' bands take the COLORED dim
+   *  (identity hue at RIBBON_DIM; the unlisted band dims with them). */
+  setFilter(filter: string): void { this._filter = filter || "all"; }
 
   /** The trail-REWIND offset (LedgerView drives it): the whole bar group slides +X so the
    *  selected row sits at the lead position; rows past the front edge fade in update(). */
@@ -146,7 +151,9 @@ export class ByteBar {
     const k = Math.min(1, dt * 5);
     for (let si = 0; si < this._slots.length; si++) {
       const s = this._slots[si];
-      const fade = slotFade(si);
+      // No depth fade (user, 2026-08-07 — the trail keeps one brightness; recency reads from
+      // position + the per-row ordinal labels, not a gradient into the dark).
+      const fade = 1;
       const hot = si === this._selected || si === 0;
       const hov = !hot && si === this._hovered;
       // Rows the rewind pushed past the front edge dissolve within one slot of travel.
@@ -155,9 +162,11 @@ export class ByteBar {
       for (let i = 0; i < s.used; i++) {
         // Three tiers (user, 2026-08-07): the ACTIVE row (lead/pinned) full identity, the
         // HOVERED row identity at the preview fraction (a colored dim — the active never
-        // demotes for a hover), everything else the neutral trail.
+        // demotes for a hover), everything else the neutral trail. A committed/hovered
+        // NETWORK additionally dims the other networks' bands in their own hue.
+        const offNet = this._filter !== "all" && s.keys[i] !== this._filter;
         const base = hot ? this.tune.hot : hov ? this.tune.hot * SNAP_PREVIEW : this.tune.rest;
-        const t = base * fade * front * this._alpha;
+        const t = base * fade * front * (offNet ? RIBBON_DIM : 1) * this._alpha;
         s.mats[i].opacity += (t - s.mats[i].opacity) * k;
         s.mats[i].color.setHex(hot || hov ? s.colors[i] : this._neutral);
       }

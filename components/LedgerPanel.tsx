@@ -186,10 +186,11 @@ export default function LedgerPanel() {
         onHoverLeave={() => setHoverFilter(null)}
       >
         <IdentityDot hue={hue} />
+        {/* No visible count (user, 2026-08-07 — window-scoped figures read as network facts);
+            the count stays in the tooltip, scoped by its own wording. */}
         <span className="flex-1 min-w-0 text-body text-foreground whitespace-nowrap overflow-hidden text-ellipsis">
           {name}
         </span>
-        <span className="ml-auto flex-none tabular-nums text-body font-semibold">{count}</span>
       </DisclosureRow>
     );
   };

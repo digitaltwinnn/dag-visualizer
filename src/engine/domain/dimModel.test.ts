@@ -185,9 +185,9 @@ describe("metaNodeDim", () => {
     expect(metaNodeDim(c, 1, null)).toBeCloseTo(0, 10);
   });
 
-  it("forces a flat 0.82 multiplier in the ledger view, ignoring dimScale/morph", () => {
+  it("forces a flat 0.5 multiplier in the ledger view, ignoring dimScale/morph", () => {
     const c = ctx({ morph: 0, ledger: true });
-    expect(metaNodeDim(c, 0.5, null)).toBeCloseTo(0.5 * 0.82, 10);
+    expect(metaNodeDim(c, 0.5, null)).toBeCloseTo(0.5 * 0.5, 10);
   });
 
   it("raises to countryMix outside the drilled country", () => {
