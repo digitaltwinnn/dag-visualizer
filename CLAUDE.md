@@ -757,8 +757,9 @@ views and caused the ledger red-dots bug; that pattern is forbidden.
     and a deselect steps back down the local ladder instead of jumping to the network (user,
     2026-08-02). The node rung still wins the camera.
 - **Hover preview**: hovering a filter-picker row OR a metagraph hub in hyper sets
-  `store.hoverFilter`, which previews that selection's dim in any view via
-  `globe.setHoverFilter` (+ `ledger.setFilter`), without committing `filter`. The hover
+  `store.hoverFilter`, which previews that selection's dim via
+  `globe.setHoverFilter` (the ledger chamber deliberately has no dim to preview since the
+  off-filter removal, 2026-08-07), without committing `filter`. The hover
   previews at the SAME per-view strength as a committed filter (the old forced-strong 0.85
   branch was removed 2026-07-11 — it dimmed the rest far harder than the regular dim; what a
   hover must NOT do is the *click*'s camera flight). Hovering an explorer node row glows that node's shells on the
@@ -924,7 +925,7 @@ and keep changing, so they're examples, not the contract.
   groups are the two snapshot ARTIFACTS themselves, mirroring the chamber's floors and keeping
   their level badges [2]/[1]:
   · **Metagraph snapshots** → metagraph rows (identity dot + name + count in the visible
-  window, hover previews the lane dim via `hoverFilter`) → that metagraph's snapshot id rows —
+  window, hover pairs on the `hoverFilter` channel) → that metagraph's snapshot id rows —
   a snapshot row IS the clickable tile, running the same tested `metaSnapSelectActions`
   (filter-first, pins the anchoring global, opens the metagraph-snapshot card);
   · **Global snapshots** → TICK rows first (user, 2026-08-07 — the snapshot leads; metric =
@@ -1528,8 +1529,9 @@ frame). It composes three adapters — `objects/ByteBar.ts`, `objects/Ribbons.ts
   **`?tune`** flag (present at page LOAD, the ?stats idiom) mounts a tweakpane panel
   (`src/engine/devTune.ts`, dynamic import — never in the normal bundle) with folders for the
   ribbons, the byte bar (`BarTune`) and the lane tiles (`TileTune`) — the two snapshot
-  instruments share ONE parameter vocabulary, `hot`/`rest`/`dim` (user, 2026-08-07: no
-  snapshot blueprint, but the same tuning language) — and TWO plane folders — **"global plane" and
+  instruments share ONE parameter vocabulary, `hot`/`rest` (user, 2026-08-07: no
+  snapshot blueprint, but the same tuning language; the off-filter `dim` was removed with the
+  ledger's dim mechanism) — and TWO plane folders — **"global plane" and
   "metagraph planes"**, the same `PlaneTune` shape (edge-fill/centre-fill/drop-off/tray fill)
   tuned separately per channel (user, 2026-08-07) — each backed by a
   `*_TUNE_DEFAULTS` shipped look; chosen values get baked back into those constants. `RIBBON_ROWS = 2`: only the **LEAD row and the HOT
@@ -1567,11 +1569,13 @@ frame). It composes three adapters — `objects/ByteBar.ts`, `objects/Ribbons.ts
   from geo.
 - **Lanes: the field is FIXED** (user reversal 2026-08-07 of the spec §5.2 committed-lane
   rearrangement): `laneSpan(i, n)` → `{cz, hz}` — every lane always owns its own slice, and a
-  committed filter NEVER moves or hides geometry. The emphasis is the dim (bands/tiles/ribbons
-  dim in place, the committed network stays lit) plus the CAMERA: the `ledgerNetwork` resolver
+  committed filter NEVER moves or hides geometry. **The emphasis is the CAMERA alone** (the
+  off-filter dim was removed entirely, user 2026-08-07 — tiles/bands/ribbons render the same
+  under any filter): the `ledgerNetwork` resolver
   flies to the committed metagraph's lane (`ledgerFloorFraming` shifted laterally by the lane's
-  world X) so its snapshots sit at screen centre. `setFilter` = dim only;
-  `setHoverFilter` previews the dim.
+  world X) so its snapshots sit at screen centre. `LedgerView.setFilter` only GATES THE ANCHOR
+  PULSES (while filtered, only the committed lane's pulses spawn); the chamber has no filter
+  hover preview.
 - **No gutters** (2026-08-07): the `msnap` CURRENCY gutter plane + its status line were
   DROPPED with the per-metagraph planes, and the whole currency-activity lane went with it —
   `/api/currency-activity`, `src/data/currencyActivity.ts` and the `CurrencyActivity` type were
@@ -1596,7 +1600,8 @@ frame). It composes three adapters — `objects/ByteBar.ts`, `objects/Ribbons.ts
   `Engine._pickAt` returns null on a glass hit): a normal surface swallows the ray, so content
   under a floor can never be hovered/clicked through it. **Emphasis is brightness, not a colour
   switch**: bands run
-  `REST_OP 0.5` / `HOT_OP 0.95` / `DIM_OP 0.16`. `model.isRowHot` still enforces exactly ONE hot
+  `BarTune` hot 0.7 / rest 0.1 (the tiles' `TileTune` speaks the same hot/rest vocabulary; the
+  off-filter dim level is gone). `model.isRowHot(slot)` still enforces exactly ONE hot
   row (a selected/hovered older snapshot beats the live lead). Selection comes from the LiveStrip:
   the Engine forwards `hoverSnapOrd ?? snap.data.ordinal` to `ledger.setSelected(ordinal)`, and
   the ledger maps ordinal → slot each tick (`_recomputeSelectedSlot`). There is NO scene fog

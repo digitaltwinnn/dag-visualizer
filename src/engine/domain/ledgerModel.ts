@@ -270,10 +270,10 @@ export class LedgerModel {
     this.recomputeSelectedSlot();
   }
 
-  // js/ledger.js:640 verbatim — the binary colour rule: colour belongs to the LIVE lead (slot<=0)
-  // OR to a SELECTED older snapshot (exclusively — selecting one neutralises the live lead), never
-  // to a filtered-out lane.
-  isRowHot(laneOff: boolean, slot: number): boolean {
-    return !laneOff && (this.selectedSlot > 0 ? slot === this.selectedSlot : slot <= 0);
+  // The binary colour rule: colour belongs to the LIVE lead (slot<=0) OR to a SELECTED older
+  // snapshot (exclusively — selecting one neutralises the live lead). (The laneOff parameter went
+  // with the off-filter dim, 2026-08-07 — a committed filter changes the camera, never a row.)
+  isRowHot(slot: number): boolean {
+    return this.selectedSlot > 0 ? slot === this.selectedSlot : slot <= 0;
   }
 }

@@ -422,7 +422,6 @@ export class Engine {
         if (st.hoverFilter !== prev.hoverFilter) {
           this._hoverFilter = st.hoverFilter;
           this.globe.setHoverFilter(st.hoverFilter);
-          this.ledger.setHoverFilter(st.hoverFilter);
         }
         // Geo explorer list-row hover → glow that node's shells on the globe (same as a 3D hover).
         if (st.hoverNodeId !== prev.hoverNodeId) this.globe.setHoverNode(st.hoverNodeId);
@@ -751,7 +750,7 @@ export class Engine {
       this.globe.focusDensest(false);
       this.ctx.controls.autoRotate = false;
       this.globe.setFilter(this.filter); // dim non-selected metagraph columns (no camera move)
-      this.ledger.setFilter(this.filter); // neutralise the other lanes' tiles/links
+      this.ledger.setFilter(this.filter); // gates the anchor pulses only (no dim)
       this._refreshLedger();
       // Ledger uses the SHARED overview camera — the group transform (config.viewRotY/viewScale)
       // frames the resting pose central/untilted; the node level wins the camera if one carried.
@@ -809,9 +808,10 @@ export class Engine {
       this.globe.setFilter(this.filter);
       if (focusCamera) this._resolveFocus();
     } else if (this.mode === "ledger") {
-      // Dim the non-selected metagraph columns so the selection stands out. The ledger neutralises
-      // the other lanes' tiles/links. The ladder's NETWORK rung frames the filtered metagraph's
-      // lane at the metagraph-snapshot floor (ledgerNetwork resolver); "all" resolves to overview.
+      // Dim the non-selected metagraph columns so the selection stands out. The ledger only
+      // gates its anchor pulses (the off-filter dim was removed, 2026-08-07). The ladder's
+      // NETWORK rung frames the filtered metagraph's lane at the metagraph-snapshot floor
+      // (ledgerNetwork resolver); "all" resolves to overview.
       this.globe.setFilter(this.filter);
       this.ledger.setFilter(this.filter);
       if (focusCamera) this._resolveFocus();

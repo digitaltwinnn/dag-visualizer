@@ -30,7 +30,6 @@ export async function mountDevTune(targets: DevTuneTargets): Promise<DevTuneHand
   const rf = pane.addFolder({ title: "ribbons" });
   const rt = targets.ledger.ribbons.tune;
   rf.addBinding(rt, "restOp", { min: 0, max: 1, step: 0.01, label: "opacity" });
-  rf.addBinding(rt, "dimOp", { min: 0, max: 0.5, step: 0.01, label: "dim opacity" });
   rf.addBinding(rt, "brightness", { min: 0.1, max: 2, step: 0.05 });
   rf.addBinding(rt, "curve", { min: 0, max: 1, step: 0.05 });
   // The ribbon dim/brightness are baked into vertex colours — a change must rewrite the sheet.
@@ -42,8 +41,6 @@ export async function mountDevTune(targets: DevTuneTargets): Promise<DevTuneHand
   const bt = targets.ledger.bar.tune;
   bf.addBinding(bt, "hot", { min: 0, max: 1, step: 0.01, label: "hot" });
   bf.addBinding(bt, "rest", { min: 0, max: 1, step: 0.01, label: "rest" });
-  // (no dim binding: it only shows while a committed/hovered network dims the other
-  // networks' bands, so it read as inert in the panel — the mechanism keeps its default)
 
   // The two plane-tune channels — the SAME SnapshotPlane blueprint, tuned separately (user,
   // 2026-08-07): glass transparency + drop-off + the plane's own tray fill (read per frame).
@@ -62,7 +59,6 @@ export async function mountDevTune(targets: DevTuneTargets): Promise<DevTuneHand
   const tt = targets.ledger.tiles;
   tf.addBinding(tt, "hot", { min: 0, max: 2.5, step: 0.05, label: "hot" });
   tf.addBinding(tt, "rest", { min: 0, max: 2, step: 0.05, label: "rest" });
-  tf.addBinding(tt, "dim", { min: 0, max: 1, step: 0.01, label: "off-filter" });
 
   return { dispose: () => pane.dispose() };
 }

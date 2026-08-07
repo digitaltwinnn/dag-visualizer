@@ -23,17 +23,11 @@ const BANDS_PER_SLOT = METAGRAPHS.length + 1;
 export interface BarTune {
   hot: number;  // the lead/selected row's bands
   rest: number; // a resting band's opacity
-  dim: number;  // an off-filter band (never removed — spec §5.2)
 }
 
-export const BAR_TUNE_DEFAULTS: BarTune = {
-  // hot/rest user-tuned via ?tune, 2026-08-07. dim stays a mechanism value (it only shows
-  // while a committed/hovered network dims the OTHER networks' bands — inert under "all",
-  // which is why it left the tune panel).
-  hot: 0.7,
-  rest: 0.1,
-  dim: 0.16,
-};
+// hot/rest user-tuned via ?tune, 2026-08-07. (The off-filter dim was removed entirely the same
+// day — a committed filter changes the CAMERA, never the bar.)
+export const BAR_TUNE_DEFAULTS: BarTune = { hot: 0.7, rest: 0.1 };
 
 interface Slot {
   ordinal: number;
@@ -55,7 +49,6 @@ export class ByteBar {
   private _sceneColors: Record<string, number>;
   private _neutral: number;
   private _alpha = 0;
-  private _filter = "all";
   private _selected = -1;
 
   constructor(colors: SceneColors, sceneColors: Record<string, number>) {
@@ -131,7 +124,6 @@ export class ByteBar {
   }
 
   setAlpha(a: number): void { this._alpha = a; }
-  setFilter(filter: string): void { this._filter = filter; }
   setSelected(slot: number): void { this._selected = slot; }
 
   update(dt: number): void {
@@ -141,11 +133,9 @@ export class ByteBar {
       const fade = slotFade(si);
       const hot = si === this._selected || si === 0;
       for (let i = 0; i < s.used; i++) {
-        const key = s.keys[i];
-        // A filter never removes a band — the bar keeps its full composition and the committed
-        // metagraph's share simply lights (spec §5.2).
-        const off = this._filter !== "all" && key !== this._filter;
-        const base = off ? this.tune.dim : hot ? this.tune.hot : this.tune.rest;
+        // A filter never changes a band — the bar keeps its full composition at full strength
+        // (the off-filter dim was removed entirely, user 2026-08-07; the camera is the emphasis).
+        const base = hot ? this.tune.hot : this.tune.rest;
         const t = base * fade * this._alpha;
         s.mats[i].opacity += (t - s.mats[i].opacity) * k;
         // IDENTITY colour on the front (lead) and hovered/selected rows alone (user, 2026-08-07);

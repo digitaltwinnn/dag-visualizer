@@ -99,11 +99,10 @@ export type TilePickResolver = (metaId: string, tickTs: string, k: number) => Pi
 export interface TileTune {
   hot: number;  // the hot row's filled tiles
   rest: number; // a resting filled tile
-  dim: number;  // the whole-lane multiplier while the lane is off-filter
 }
 
 // hot/rest user-tuned via ?tune, 2026-08-07 — the same levels as the byte bar's hot/rest.
-export const TILE_TUNE_DEFAULTS: TileTune = { hot: 0.7, rest: 0.1, dim: 0.22 };
+export const TILE_TUNE_DEFAULTS: TileTune = { hot: 0.7, rest: 0.1 };
 
 export class LedgerView implements SceneView {
   group: THREE.Group;
@@ -116,7 +115,6 @@ export class LedgerView implements SceneView {
   /** The COMMITTED network — the only thing that may move geometry (the lane field, the gutter). */
   private _filter: string;
   /** The HOVERED network, a pure preview that overrides the committed one for DIMMING only. */
-  private _hover: string | null = null;
 
   private _colors: SceneColors;
   private _core: number;
@@ -465,29 +463,12 @@ export class LedgerView implements SceneView {
     this._syncRibbonRows();
   }
 
-  /** The COMMITTED network. DIM only since the fixed-lane reversal (user, 2026-08-07) — the
-   *  lane field never moves; the camera fly-to-lane is the Engine's ledgerNetwork resolver. */
+  /** The COMMITTED network. Since the off-filter dim was removed entirely (user, 2026-08-07)
+   *  this only GATES THE ANCHOR PULSES (the committed lane's pulses spawn, the rest stay
+   *  quiet) — the lane field never moves, nothing dims, and the camera fly-to-lane is the
+   *  Engine's ledgerNetwork resolver. */
   setFilter(filter: string) {
     this._filter = filter || "all"; // event-time
-    this._applyDim();
-  }
-
-  /** Filter-chip / hub HOVER: preview that network's highlight only. No relayout, no gutter change,
-   *  no pulse re-gating — null falls back to the committed filter. */
-  setHoverFilter(filter: string | null) {
-    this._hover = filter || null; // event-time
-    this._applyDim();
-  }
-
-  /** The key the DIM lanes are resolved against: the live hover wins, else the committed filter. */
-  private _dimKey(): string {
-    return this._hover ?? this._filter;
-  }
-
-  private _applyDim(): void {
-    const d = this._dimKey();
-    this._bar.setFilter(d); // bands dim, never disappear (spec §5.2)
-    this._ribbons.setFilter(d);
   }
 
 
@@ -640,14 +621,10 @@ export class LedgerView implements SceneView {
 
     if (!this._latest) return;
     const k = Math.min(1, dt * 3);
-    // The live hover previews the dim; the committed filter is the resting state.
-    const dim = this._dimKey();
-    const mf = dim !== "all" ? dim : null;
 
     // ── lane tiles on the metagraph-snapshot floor
     let mi = 0;
     for (const lane of this.model.lanes.values()) {
-      const laneOff = mf != null && lane.id !== mf;
       const laneColor = this._laneColor(lane.id);
       const cz = this._laneZ.get(lane.id) ?? lane.z;
       const hz = this._laneHZ.get(lane.id) ?? LANE_GAP_Z / 2;
@@ -677,14 +654,13 @@ export class LedgerView implements SceneView {
         _dummy.scale.set(b.size, b.size, b.size);
         _dummy.updateMatrix();
         this._metaTrailMesh.setMatrixAt(mi, _dummy.matrix);
-        const hot = this.model.isRowHot(laneOff, b.slot);
+        const hot = this.model.isRowHot(b.slot);
         // IDENTITY colour belongs to the front (lead) row and the hovered/selected one alone
         // (user, 2026-08-07) — every other snapshot rests in the neutral cyan tone.
         const ident =
           b.slot <= 0 || (this.model.selectedSlot > 0 && b.slot === this.model.selectedSlot);
         const bright =
           (hot ? Math.max(b.fade, 0.9) * this.tiles.hot : b.fade * this.tiles.rest) *
-          (laneOff ? this.tiles.dim : 1) *
           this._fades.alpha;
         this._metaTrailMesh.setColorAt(mi, _col.copy(ident ? laneColor : this._coreCol).multiplyScalar(bright));
         mi++;

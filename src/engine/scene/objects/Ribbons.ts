@@ -33,17 +33,14 @@ const VERTS_PER_RIBBON = RIBBON_SEG * 6; // two triangles per segment
 /** The live-tunable ribbon look (dev `?tune` panel binds these; the values are the shipped look). */
 export interface RibbonTune {
   restOp: number;    // resting sheet opacity (× view alpha)
-  dimOp: number;     // opacity for an off-filter ribbon (baked into vertex colours)
   brightness: number; // vertex-colour multiplier (additive blending → perceived brightness)
   curve: number;     // 0 = straight diagonal sheet, 1 = full smootherstep S-sweep
 }
 
+// User-tuned via ?tune, 2026-08-07. (The off-filter dim was removed entirely the same day —
+// a committed filter changes the CAMERA, never the sheets.)
 export const RIBBON_TUNE_DEFAULTS: RibbonTune = {
-  // User-tuned via ?tune, 2026-08-07: rest == dim (an off-filter ribbon keeps the same quiet
-  // level — under a commit the hidden lanes draw no ribbon at all, so dim only ever meant the
-  // hover preview, and equal reads calmer).
   restOp: 0.15,
-  dimOp: 0.15,
   brightness: 0.85,
   curve: 1,
 };
@@ -73,7 +70,6 @@ export class Ribbons {
   private _sceneColors: Record<string, number>;
   private _neutral: number;
   private _alpha = 0;
-  private _filter = "all";
   private _c = new THREE.Color();
 
   constructor(colors: SceneColors, sceneColors: Record<string, number>) {
@@ -158,14 +154,6 @@ export class Ribbons {
   }
 
   setAlpha(a: number): void { this._alpha = a; }
-  /** The dim is baked into the VERTEX COLOURS, so a change has to rewrite the sheet — a hover
-   *  preview would otherwise leave the ribbons lit until the next tick rebuilt a row. */
-  setFilter(filter: string): void {
-    const next = filter || "all";
-    if (next === this._filter) return;
-    this._filter = next;
-    this._writeGeometry(); // event-time: a hover/commit transition, not a frame
-  }
 
   update(dt: number): void {
     const k = Math.min(1, dt * 5);
@@ -177,7 +165,7 @@ export class Ribbons {
   private _writeGeometry(): void {
     const p = this._pos.array as Float32Array;
     const c = this._col.array as Float32Array;
-    const { curve, dimOp, restOp, brightness } = this.tune;
+    const { curve, brightness } = this.tune;
     let v = 0;
     const push = (x: number, z: number, y: number, r: number, g: number, b: number) => {
       p[v * 3] = x; p[v * 3 + 1] = y; p[v * 3 + 2] = z;
@@ -195,9 +183,7 @@ export class Ribbons {
         const key = st.keys[i];
         const hex = key === UNLISTED_KEY ? this._neutral : (this._sceneColors[key] ?? this._neutral);
         this._c.setHex(hex);
-        const off = this._filter !== "all" && key !== this._filter;
-        const s = (off ? dimOp / restOp : 1) * brightness;
-        const cr = this._c.r * s, cg = this._c.g * s, cb = this._c.b * s;
+        const cr = this._c.r * brightness, cg = this._c.g * brightness, cb = this._c.b * brightness;
         for (let j = 0; j < RIBBON_SEG; j++) {
           const t0 = j / RIBBON_SEG, t1 = (j + 1) / RIBBON_SEG;
           const s0 = sweep(t0, curve), s1 = sweep(t1, curve);

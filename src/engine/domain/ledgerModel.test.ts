@@ -148,14 +148,9 @@ describe("LedgerModel.setSelected / isRowHot — the binary colour rule (js/ledg
   it("with nothing selected, the LIVE lead (slot<=0) is hot and everything else is not", () => {
     const model = new LedgerModel();
     expect(model.selectedSlot).toBe(-1);
-    expect(model.isRowHot(false, 0)).toBe(true);
-    expect(model.isRowHot(false, 1)).toBe(false);
-    expect(model.isRowHot(false, -1)).toBe(true);
-  });
-
-  it("a filtered-out lane (laneOff) is never hot, live lead or not", () => {
-    const model = new LedgerModel();
-    expect(model.isRowHot(true, 0)).toBe(false);
+    expect(model.isRowHot(0)).toBe(true);
+    expect(model.isRowHot(1)).toBe(false);
+    expect(model.isRowHot(-1)).toBe(true);
   });
 
   it("selecting an older ordinal follows its block leftward as ticks advance, and flips the hot row", () => {
@@ -168,15 +163,15 @@ describe("LedgerModel.setSelected / isRowHot — the binary colour rule (js/ledg
 
     model.setSelected(100); // the ordinal now sitting in the trail
     expect(model.selectedSlot).toBe(1);
-    expect(model.isRowHot(false, 1)).toBe(true); // selected older row is hot
-    expect(model.isRowHot(false, 0)).toBe(false); // live lead goes neutral once an older row is selected
+    expect(model.isRowHot(1)).toBe(true); // selected older row is hot
+    expect(model.isRowHot(0)).toBe(false); // live lead goes neutral once an older row is selected
 
     // one more tick: ordinal 100's block should keep following, now at slot 2.
     const s3 = snap(102, "T3", 1);
     model.setData([s1, s2, s3], (ts) => (ts === "T3" ? anchor({ [idA]: 1 }) : null));
     expect(model.selectedSlot).toBe(2);
-    expect(model.isRowHot(false, 2)).toBe(true);
-    expect(model.isRowHot(false, 1)).toBe(false);
+    expect(model.isRowHot(2)).toBe(true);
+    expect(model.isRowHot(1)).toBe(false);
   });
 
   it("setSelected(null) clears the selection back to live-lead-hot", () => {
@@ -184,7 +179,7 @@ describe("LedgerModel.setSelected / isRowHot — the binary colour rule (js/ledg
     model.setSelected(100);
     model.setSelected(null);
     expect(model.selectedSlot).toBe(-1);
-    expect(model.isRowHot(false, 0)).toBe(true);
+    expect(model.isRowHot(0)).toBe(true);
   });
 });
 
