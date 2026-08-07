@@ -260,19 +260,24 @@ export default function LedgerPanel() {
               className={cn(
                 "nb-row group flex items-center gap-2 w-full mb-1 py-1.5 px-2 rounded-sm border text-left cursor-pointer transition-colors duration-150",
                 "focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--primary)] focus-visible:outline-offset-[-2px]",
-                beating ? "border-primary/25 bg-wash-faint hover:bg-wash-soft" : "border-border hover:bg-wash-hover",
+                beating && "border-primary/25 bg-wash-faint hover:bg-wash-soft",
+                // PINNED is a COMMITTED state, very much active (user, 2026-08-07 — the plain
+                // grey read as disabled): it wears the one committed-selection language, the
+                // sel wash + ring, like a selected row.
+                pinned && previewOrd == null && cn("border-transparent", selectedRow(true)),
+                !beating && !(pinned && previewOrd == null) && "border-border hover:bg-wash-hover",
                 previewOrd != null && "border-dashed",
               )}
             >
               {beating ? (
                 <span className="flex-none w-2 h-2 rounded-full bg-primary shadow-[0_0_0_3px_color-mix(in_oklch,var(--primary)_30%,transparent)] animate-dot-beat motion-reduce:animate-none" />
               ) : (
-                <span className="flex-none w-2 h-2 rounded-full border border-muted-foreground/70" />
+                <span className={cn("flex-none w-2 h-2 rounded-full border", pinned && previewOrd == null ? "border-primary/80" : "border-muted-foreground/70")} />
               )}
-              <span className={cn("text-micro tracking-caps uppercase", beating ? "text-primary" : "text-muted-foreground")}>
+              <span className={cn("text-micro tracking-caps uppercase", beating ? "text-primary" : pinned && previewOrd == null ? "text-foreground" : "text-muted-foreground")}>
                 {label}
               </span>
-              <span className="ml-auto min-w-0 truncate tabular-nums text-label text-muted-foreground">{sub}</span>
+              <span className={cn("ml-auto min-w-0 truncate tabular-nums text-label", pinned && previewOrd == null ? "text-foreground-dim" : "text-muted-foreground")}>{sub}</span>
             </button>
           );
         })()}

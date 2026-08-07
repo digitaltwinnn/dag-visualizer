@@ -49,7 +49,7 @@ import type {
   SnapshotExact,
 } from "@/src/data/types";
 import { LEDGER_LAYERS } from "@/src/data/ledgerLayers"; // shared display copy — floor labels = panel rows
-import { ByteBar } from "../objects/ByteBar";
+import { ByteBar, SNAP_PREVIEW } from "../objects/ByteBar";
 import { Ribbons } from "../objects/Ribbons";
 import { SnapshotPlane, makeEdgeLabel, GLOBAL_PLANE_TUNE_DEFAULTS, META_PLANE_TUNE_DEFAULTS, type PlaneTune } from "../objects/SnapshotPlane";
 import { FadeSet } from "../objects/FadeSet";
@@ -198,6 +198,10 @@ export class LedgerView implements SceneView {
   private _trailOff = 0;
   private _pinnedOrd: number | null = null;
   private _pinnedSlotPrev = -1;
+  /** The transient HOVER row (split from the committed selection, user 2026-08-07): previews in
+   *  identity colour at SNAP_PREVIEW without demoting the active row. */
+  private _hoverOrd: number | null = null;
+  private _hoverSlot = -1;
 
   // ── fades (the ledger's stage light went with the layer navigation, 2026-08-06 — nothing
   // committable is left for a spot to dramatise)
@@ -436,6 +440,7 @@ export class LedgerView implements SceneView {
       if (tr.slot >= 0 && tr.slot < SLOT_N)
         this._slotSnap[tr.slot] = this._byOrd.get(tr.ordinal) ?? null;
 
+    this._recomputeHoverSlot();
     this._rebuildAllSlots();
 
     if (isNewTick) {
@@ -481,6 +486,18 @@ export class LedgerView implements SceneView {
     this._syncRibbonRows();
   }
 
+  /** The transient hover — the colored-dim PREVIEW tier (the committed row stays fully hot). */
+  setHovered(ordinal: number | null) {
+    this._hoverOrd = ordinal;
+    this._recomputeHoverSlot();
+    this._syncRibbonRows();
+  }
+
+  private _recomputeHoverSlot(): void {
+    this._hoverSlot = this._hoverOrd != null ? this.model.slotOf(this._hoverOrd) : -1;
+    this._bar.setHovered(this._hoverSlot);
+  }
+
   /** The COMMITTED (clicked) snapshot — the only thing the trail rewind follows. */
   setPinned(ordinal: number | null) {
     this._pinnedOrd = ordinal;
@@ -492,6 +509,9 @@ export class LedgerView implements SceneView {
    *  Engine's ledgerNetwork resolver. */
   setFilter(filter: string) {
     this._filter = filter || "all"; // event-time
+    // The other metagraphs' sheets take the COLORED dim (identity hue at RIBBON_DIM) — the
+    // committed lane's ribbons lead; chips get the same tier from the dim model's emissive.
+    this._ribbons.setFilter(this._filter);
   }
 
 
@@ -609,10 +629,17 @@ export class LedgerView implements SceneView {
 
   private _syncRibbonRows(): void {
     this._ribbons.setRow(0, 0, this._slotSnap[0] ? this._specs[0] : null, this._laneZOf);
+    // Row 1: the COMMITTED row at full strength, else the HOVERED row as the colored-dim
+    // preview (user, 2026-08-07 — the active row keeps its ribbons regardless of hover).
     const hot = this.model.selectedSlot;
-    if (hot > 0 && hot < SLOT_N && this._slotSnap[hot])
+    const hov = this._hoverSlot;
+    if (hot > 0 && hot < SLOT_N && this._slotSnap[hot]) {
       this._ribbons.setRow(1, hot, this._specs[hot], this._laneZOf);
-    else this._ribbons.clearRow(1);
+      this._ribbons.setRowFade(1, 1);
+    } else if (hov > 0 && hov < SLOT_N && this._slotSnap[hov]) {
+      this._ribbons.setRow(1, hov, this._specs[hov], this._laneZOf);
+      this._ribbons.setRowFade(1, SNAP_PREVIEW);
+    } else this._ribbons.clearRow(1);
   }
 
   /** The ribbon index a metagraph's band occupies in a row — mirrors the order Ribbons.setRow walks
@@ -737,12 +764,17 @@ export class LedgerView implements SceneView {
         _dummy.updateMatrix();
         this._metaTrailMesh.setMatrixAt(mi, _dummy.matrix);
         const hot = this.model.isRowHot(b.slot);
-        // IDENTITY colour belongs to the front (lead) row and the hovered/selected one alone
-        // (user, 2026-08-07) — every other snapshot rests in the neutral cyan tone.
-        const ident =
-          b.slot <= 0 || (this.model.selectedSlot > 0 && b.slot === this.model.selectedSlot);
+        const hov = !hot && b.slot > 0 && b.slot === this._hoverSlot;
+        // Three tiers (user, 2026-08-07): the ACTIVE row (lead/pinned) full identity, the
+        // HOVERED row identity at the preview fraction, every other snapshot the neutral trail.
+        const ident = hot || hov || b.slot <= 0 ||
+          (this.model.selectedSlot > 0 && b.slot === this.model.selectedSlot);
         const bright =
-          (hot ? Math.max(b.fade, 0.9) * this.tiles.hot : b.fade * this.tiles.rest) *
+          (hot
+            ? Math.max(b.fade, 0.9) * this.tiles.hot
+            : hov
+              ? Math.max(b.fade, 0.9) * this.tiles.hot * SNAP_PREVIEW
+              : b.fade * this.tiles.rest) *
           this._fadeAtX(b.x + this._trailOff) *
           this._fades.alpha;
         this._metaTrailMesh.setColorAt(mi, _col.copy(ident ? laneColor : this._coreCol).multiplyScalar(bright));

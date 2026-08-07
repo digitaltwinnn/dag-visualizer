@@ -37,8 +37,12 @@ export interface RibbonTune {
   curve: number;     // 0 = straight diagonal sheet, 1 = full smootherstep S-sweep
 }
 
-// User-tuned via ?tune, 2026-08-07. (The off-filter dim was removed entirely the same day —
-// a committed filter changes the CAMERA, never the sheets.)
+/** COLORED dim for an off-filter ribbon (user, 2026-08-07): the sheet keeps its identity hue
+ *  at a fraction of full strength — a tier between full colour and the neutral trail, so the
+ *  committed metagraph's ribbons lead while the others stay identifiable. */
+export const RIBBON_DIM = 0.35;
+
+// User-tuned via ?tune, 2026-08-07.
 export const RIBBON_TUNE_DEFAULTS: RibbonTune = {
   restOp: 0.25,
   brightness: 0.85,
@@ -71,8 +75,9 @@ export class Ribbons {
   private _neutral: number;
   private _alpha = 0;
   /** Per-row brightness scale — the trail REWIND fades the live lead row's sheet while an older
-   *  snapshot owns the front (LedgerView drives it during the ease). */
+   *  snapshot owns the front, and the HOVER-preview row rides below full (LedgerView drives). */
   private _rowFade = [1, 1];
+  private _filter = "all";
   private _c = new THREE.Color();
 
   constructor(colors: SceneColors, sceneColors: Record<string, number>) {
@@ -166,6 +171,15 @@ export class Ribbons {
 
   setAlpha(a: number): void { this._alpha = a; }
 
+  /** COMMITTED filter → the other metagraphs' sheets take the COLORED dim (identity hue at
+   *  RIBBON_DIM). Baked into vertex colours, so a change rewrites the sheet (event-time). */
+  setFilter(filter: string): void {
+    const next = filter || "all";
+    if (next === this._filter) return;
+    this._filter = next;
+    this._writeGeometry(); // event-time: a filter commit, not a frame
+  }
+
   update(dt: number): void {
     const k = Math.min(1, dt * 5);
     const target = this.tune.restOp * this._alpha;
@@ -195,7 +209,9 @@ export class Ribbons {
         const key = st.keys[i];
         const hex = key === UNLISTED_KEY ? this._neutral : (this._sceneColors[key] ?? this._neutral);
         this._c.setHex(hex);
-        const cr = this._c.r * brightness * rowFade, cg = this._c.g * brightness * rowFade, cb = this._c.b * brightness * rowFade;
+        const off = this._filter !== "all" && key !== this._filter;
+        const sc = brightness * rowFade * (off ? RIBBON_DIM : 1);
+        const cr = this._c.r * sc, cg = this._c.g * sc, cb = this._c.b * sc;
         for (let j = 0; j < RIBBON_SEG; j++) {
           const t0 = j / RIBBON_SEG, t1 = (j + 1) / RIBBON_SEG;
           const s0 = sweep(t0, curve), s1 = sweep(t1, curve);

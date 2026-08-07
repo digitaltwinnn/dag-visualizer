@@ -1576,9 +1576,12 @@ frame). It composes three adapters — `objects/ByteBar.ts`, `objects/Ribbons.ts
   from geo.
 - **Lanes: the field is FIXED** (user reversal 2026-08-07 of the spec §5.2 committed-lane
   rearrangement): `laneSpan(i, n)` → `{cz, hz}` — every lane always owns its own slice, and a
-  committed filter NEVER moves or hides geometry. **The emphasis is the CAMERA alone** (the
-  off-filter dim was removed entirely, user 2026-08-07 — tiles/bands/ribbons render the same
-  under any filter): the `ledgerNetwork` resolver
+  committed filter NEVER moves or hides geometry. **The emphasis is the CAMERA plus a COLORED
+  dim on the always-coloured elements** (revised 2026-08-07, same day the flat off-filter dim
+  was removed): tiles/bands stay untouched by a filter, but the other metagraphs' RIBBONS drop
+  to their identity hue at `RIBBON_DIM` (0.35) and their tray chips carry the dim model's
+  emissive dim — a tier between full colour and the neutral trail, so the committed network
+  leads while the rest stay identifiable. The `ledgerNetwork` resolver
   flies to the committed metagraph's lane (`ledgerFloorFraming` shifted laterally by the lane's
   world X) so its snapshots sit at screen centre. `LedgerView.setFilter` only GATES THE ANCHOR
   PULSES (while filtered, only the committed lane's pulses spawn); the chamber has no filter
@@ -1607,11 +1610,14 @@ frame). It composes three adapters — `objects/ByteBar.ts`, `objects/Ribbons.ts
   signature, the drop-off is the floors' (user split the two looks the same day they were
   unified). The floors are also pick BLOCKERS (`userData.blocker` →
   `Engine._pickAt` returns null on a glass hit): a normal surface swallows the ray, so content
-  under a floor can never be hovered/clicked through it. **Emphasis is brightness, not a colour
-  switch**: bands run
-  `BarTune` hot 0.7 / rest 0.1 (the tiles' `TileTune` speaks the same hot/rest vocabulary; the
-  off-filter dim level is gone). `model.isRowHot(slot)` still enforces exactly ONE hot
-  row (a selected/hovered older snapshot beats the live lead). **Selecting a non-live snapshot
+  under a floor can never be hovered/clicked through it. **Emphasis is brightness in THREE COLOUR TIERS**
+  (user, 2026-08-07): the ACTIVE row (the live lead, or the committed pin) takes full identity
+  at `hot`; a HOVERED row takes identity colour at `SNAP_PREVIEW` (0.45 of hot — tiles, bands
+  AND its ribbon row via `Ribbons.setRowFade`) WITHOUT demoting the active row (the hover is a
+  preview of what a click pins, split from the committed selection end-to-end —
+  `LedgerView.setHovered`/`ByteBar.setHovered` vs `setSelected`); every other snapshot rests
+  neutral cyan (`BarTune`/`TileTune` hot 0.7 / rest). `model.isRowHot(slot)` enforces exactly
+  ONE hot row (a COMMITTED older snapshot beats the live lead; a hover no longer steals it). **Selecting a non-live snapshot
   REWINDS the trail** (user, 2026-08-07): `LedgerView._trailOff` eases the whole time trail —
   bars, tiles, ribbons, ordinal labels, pulses — forward until the selected row sits AT the lead
   position, so the active selection owns the front instead of fighting the live lead's arrivals;

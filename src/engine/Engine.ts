@@ -383,9 +383,11 @@ export class Engine {
         // Ledger: keep the hovered/selected snapshot coloured in the trail (hover wins, then the
         // clicked `snap`); everything else fades to the neutral background tone.
         if (st.hoverSnapOrd !== prev.hoverSnapOrd || st.snap !== prev.snap || st.following !== prev.following) {
-          this.ledger.setSelected(st.hoverSnapOrd ?? st.snap?.data?.ordinal ?? null);
-          // The REWIND follows only the COMMITTED pin (a hover previews the hot row in place —
-          // it must never drag the trail while scanning a list; user, 2026-08-07).
+          // COMMITTED and HOVER ride separate channels (user, 2026-08-07): the committed row is
+          // the hot one, the hover is a colored-dim PREVIEW that never demotes it, and the
+          // REWIND follows only the committed pin (a hover must never drag the trail).
+          this.ledger.setSelected(st.snap?.data?.ordinal ?? null);
+          this.ledger.setHovered(st.hoverSnapOrd ?? null);
           this.ledger.setPinned(!st.following ? st.snap?.data?.ordinal ?? null : null);
         }
         // A landing EXACT read is what turns a tick from an unmeasured seam into a measured byte

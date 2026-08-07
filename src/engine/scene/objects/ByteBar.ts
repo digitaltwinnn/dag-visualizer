@@ -29,6 +29,11 @@ export interface BarTune {
 // day — a committed filter changes the CAMERA, never the bar.)
 export const BAR_TUNE_DEFAULTS: BarTune = { hot: 0.7, rest: 0.05 };
 
+/** The HOVER-preview tier (user, 2026-08-07): a hovered snapshot row shows its identity
+ *  colours at this fraction of the hot level — the ACTIVE row stays fully coloured, the
+ *  preview reads as "this is what a click pins". Shared with the tiles. */
+export const SNAP_PREVIEW = 0.45;
+
 interface Slot {
   ordinal: number;
   bands: THREE.Mesh[];
@@ -50,6 +55,7 @@ export class ByteBar {
   private _neutral: number;
   private _alpha = 0;
   private _selected = -1;
+  private _hovered = -1;
   private _off = 0;
 
   constructor(colors: SceneColors, sceneColors: Record<string, number>) {
@@ -126,6 +132,8 @@ export class ByteBar {
 
   setAlpha(a: number): void { this._alpha = a; }
   setSelected(slot: number): void { this._selected = slot; }
+  /** The transient hover row — colored-dim preview, never demotes the active row. */
+  setHovered(slot: number): void { this._hovered = slot; }
 
   /** The trail-REWIND offset (LedgerView drives it): the whole bar group slides +X so the
    *  selected row sits at the lead position; rows past the front edge fade in update(). */
@@ -140,18 +148,18 @@ export class ByteBar {
       const s = this._slots[si];
       const fade = slotFade(si);
       const hot = si === this._selected || si === 0;
+      const hov = !hot && si === this._hovered;
       // Rows the rewind pushed past the front edge dissolve within one slot of travel.
       const over = (LEAD_X - si * SLOT_SP + this._off - LEAD_X) / (SLOT_SP * 0.9);
       const front = over <= 0 ? 1 : Math.max(0, 1 - over);
       for (let i = 0; i < s.used; i++) {
-        // A filter never changes a band — the bar keeps its full composition at full strength
-        // (the off-filter dim was removed entirely, user 2026-08-07; the camera is the emphasis).
-        const base = hot ? this.tune.hot : this.tune.rest;
+        // Three tiers (user, 2026-08-07): the ACTIVE row (lead/pinned) full identity, the
+        // HOVERED row identity at the preview fraction (a colored dim — the active never
+        // demotes for a hover), everything else the neutral trail.
+        const base = hot ? this.tune.hot : hov ? this.tune.hot * SNAP_PREVIEW : this.tune.rest;
         const t = base * fade * front * this._alpha;
         s.mats[i].opacity += (t - s.mats[i].opacity) * k;
-        // IDENTITY colour on the front (lead) and hovered/selected rows alone (user, 2026-08-07);
-        // the rest of the trail rests neutral cyan. setHex is allocation-free.
-        s.mats[i].color.setHex(hot ? s.colors[i] : this._neutral);
+        s.mats[i].color.setHex(hot || hov ? s.colors[i] : this._neutral);
       }
     }
   }
