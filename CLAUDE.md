@@ -1822,6 +1822,11 @@ real payload rides in its blocks' `dataTransactions`, not necessarily in `onChai
 backend, the chain holds the tamper-proof roots. `decodeChannelContent` therefore surfaces
 `dataTxCount`/`dataTx` (the decoded transaction values); the metagraph-snapshot card shows
 "Data updates: N" and the raw layer renders the transactions as a second tree under the state.
+This is STRUCTURAL, not per-network (probed all anchoring channels across 12 live ticks,
+2026-08-07: zero undecodable entries; DOR's 128 txs are DTM device check-ins
+`publicId|dts|dtmCheckInHash|…` — a different schema than DED's batch messages, captured by
+the same generic value extraction; one unlisted channel carries real non-empty STATE instead;
+the rest are idle heartbeat snapshots with neither — all three shapes render honestly).
 
 ## Data — server-side routes
 
