@@ -1478,7 +1478,8 @@ frame). It composes three adapters — `objects/ByteBar.ts`, `objects/Ribbons.ts
   bullet). The floors keep the heights they already had (`FLOOR_Y.msnap =
   LEDGER.rowMSnap`, `FLOOR_Y.gl0 = LEDGER.rowGL0`), so the 13.5-unit run the ribbons fall through
   is deliberately unchanged. **The local frame** (the group is rotated `viewRotY = -90°` about Y):
-  **+X toward the camera** — the lead slot is `x=0` and time trails to −X, `SLOT_SP` apart,
+  **+X toward the camera** — the lead slot is `x = LEAD_X` (well toward the camera-side floor
+  edge; user 2026-08-07 — the snapshots sat too deep in the plane) and time trails to −X, `SLOT_SP` apart,
   `SLOT_N` visible; **+Y** floor height; **+Z** the lane/width field, with screen-RIGHT at −Z.
   X is owned by `LedgerView`, Y/Z by `ledgerLayout`.
 - **The byte bar IS the global snapshot** (`objects/ByteBar.ts` over `domain/ledgerBands.ts`).
@@ -1509,9 +1510,10 @@ frame). It composes three adapters — `objects/ByteBar.ts`, `objects/Ribbons.ts
   restOp/dimOp/brightness/curve; `RIBBON_TUNE_DEFAULTS` is the shipped look). The dev
   **`?tune`** flag (present at page LOAD, the ?stats idiom) mounts a tweakpane panel
   (`src/engine/devTune.ts`, dynamic import — never in the normal bundle) with folders for the
-  ribbons, the byte bar (`BarTune` — rest/hot/dim/seam opacities) and the lane tiles
-  (`TileTune` — hot/rest/off-filter brightness), each backed by a `*_TUNE_DEFAULTS` shipped
-  look; chosen values get baked back into those constants. `RIBBON_ROWS = 2`: only the **LEAD row and the HOT
+  ribbons, the byte bar (`BarTune` — rest/hot/seam opacities), the lane tiles
+  (`TileTune` — hot/rest/off-filter brightness) and the floor planes (`FloorTune` —
+  frame/edge-fill/centre-fill opacities + the `edge` drop-off uniform), each backed by a
+  `*_TUNE_DEFAULTS` shipped look; chosen values get baked back into those constants. `RIBBON_ROWS = 2`: only the **LEAD row and the HOT
   row** get a sheet (one Mesh, one preallocated geometry, rewritten event-time); every older
   tick keeps a hairline strut drawn by the view.
 - **Node containers** (`objects/NodeRails.ts` over `domain/ledgerRails.ts`, 2026-08-06 —
@@ -1519,8 +1521,11 @@ frame). It composes three adapters — `objects/ByteBar.ts`, `objects/Ribbons.ts
   the DAG: L0 / L1), hanging under the front edge of the floor its machines serve
   (`RAIL_GROUP_FLOOR = {meta:"msnap", dag:"gl0"}`), facing the camera on the shared `CONT_X`
   plane — **STACKED below each other** (user, 2026-08-07; replaced the side-by-side row), each
-  spanning the FULL front width of the main floor plane (`CONT_Z0..CONT_Z1`), growing DOWNWARD
-  in rows as counts grow (`containerLayout`). **A machine appears in EVERY
+  spanning the FULL front width of the main floor plane (`CONT_Z0..CONT_Z1`), LARGEST group
+  first (count desc, ROLE_ORDER tiebreak), growing DOWNWARD in rows as counts grow
+  (`containerLayout`). The role-code label sits INSIDE the frame's screen-left end on a
+  reserved strip (`CONT_LABEL_W`), drawn in the floor labels' own text treatment; padding is a
+  tight hairline (`CONT_PAD`) and the chips are small (`LEDGER.dot 0.38`). **A machine appears in EVERY
   role container it serves** (user: the container answers "who serves this role" — hybrids
   duplicated by design; the duplication comes free because node records are per (machine,
   layer) cluster entry, so `Globe` simply places each record in its `recordRole` container via

@@ -31,7 +31,7 @@
 // behaviour must match js/ledger.js exactly since Task 13 will diff against it).
 
 import { METAGRAPHS } from "../config";
-import { ledgerSite } from "./ledgerLayout";
+import { ledgerSite, LEAD_X } from "./ledgerLayout";
 import type { GlobalSnapshot, Anchor } from "@/src/data/types";
 
 export const SLOT_SP = 3.6; // js/ledger.js:41 — X spacing of one tick/slot
@@ -179,10 +179,10 @@ export class LedgerModel {
         const lane = this.lane(id, i);
         if (nc > 0) {
           for (const tl of anchorTiles(nc)) {
-            lane.blocks.push({ x: -s * SLOT_SP, slot: s, fade: slotFade(s), ox: tl.ox, oz: tl.oz, size: tl.size, filled: true, link: tl.link, ts: snap.timestamp, count: nc });
+            lane.blocks.push({ x: LEAD_X - s * SLOT_SP, slot: s, fade: slotFade(s), ox: tl.ox, oz: tl.oz, size: tl.size, filled: true, link: tl.link, ts: snap.timestamp, count: nc });
           }
         } else {
-          lane.blocks.push({ x: -s * SLOT_SP, slot: s, fade: slotFade(s), ox: 0, oz: 0, size: 0.24, filled: false, link: false, ts: snap.timestamp, count: 0 });
+          lane.blocks.push({ x: LEAD_X - s * SLOT_SP, slot: s, fade: slotFade(s), ox: 0, oz: 0, size: 0.24, filled: false, link: false, ts: snap.timestamp, count: 0 });
         }
       }
     }

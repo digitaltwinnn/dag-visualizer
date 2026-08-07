@@ -34,6 +34,7 @@ import {
   GUTTER_W,
   FLOOR_MAIN_Z0,
   FLOOR_Z1,
+  LEAD_X,
   LANE_HALF_Z,
   laneSpan,
   type RailGroup,
@@ -57,12 +58,23 @@ import { NodeRails } from "../objects/NodeRails";
 import { FadeSet } from "../objects/FadeSet";
 import type { SceneView } from "./SceneView";
 
-// Floor-frame + edge-fill opacities. NB the frame material's colour is HDR-overdriven ×2 (see
-// _buildFloors), so these opacities are roughly HALF the perceived line brightness. (The
-// highlighted/dimmed variants went with the layer navigation, 2026-08-06.)
-const FLOOR_FRAME_OP = 0.11,
-  FLOOR_FILL_OP = 0.03,
-  FLOOR_INNER_OP = 0;
+/** The live-tunable FLOOR-PLANE look (dev `?tune` panel binds these; the values are the shipped
+ *  look). NB the frame material's colour is HDR-overdriven ×2 (see _buildFloors), so the
+ *  opacities read roughly HALF the perceived line brightness. `edge` is where the fill's
+ *  edge-band starts (the colour drop-off toward the centre: 1 = only the rim, 0 = solid). */
+export interface FloorTune {
+  frameOp: number; // the hairline frame
+  fillOp: number;  // the edge-band fill
+  innerOp: number; // the flat centre level
+  edge: number;    // drop-off start (uEdge uniform — smoothstep(edge → 1) over |uv|)
+}
+
+export const FLOOR_TUNE_DEFAULTS: FloorTune = {
+  frameOp: 0.11,
+  fillOp: 0.03,
+  innerOp: 0,
+  edge: 0.88,
+};
 
 const PULSE_MAX = 220;
 const PULSE_STAGGER = 0.035;
@@ -80,8 +92,8 @@ const FLOOR_LABEL_X = FLOOR_CX + FLOOR_W / 2 - 0.4;
 /** The lead row's "forming…" note: quieter than a floor label, and it eases rather than blinks. */
 const FORMING_OP = 0.6;
 const FORMING_EASE = 2.2;
-/** Just camera-side of the lead slot (x = 0), reading in from the +Z edge of the lane field. */
-const FORMING_X = 1.4;
+/** Just camera-side of the lead slot, reading in from the +Z edge of the lane field. */
+const FORMING_X = LEAD_X + 1.4;
 const FORMING_Z = LANE_HALF_Z + 8;
 
 const _dummy = new THREE.Object3D();
@@ -151,6 +163,8 @@ export class LedgerView implements SceneView {
   get bar(): ByteBar { return this._bar; }
   /** The tiles' live-tunable look — read per frame by update()'s tile pass. */
   tiles: TileTune = { ...TILE_TUNE_DEFAULTS };
+  /** The floor planes' live-tunable look — read per frame by _applyFloorAlpha. */
+  floors: FloorTune = { ...FLOOR_TUNE_DEFAULTS };
 
   // ── the lane field (construction-time; never reallocated per frame)
   private readonly _laneOrder: string[] = METAGRAPHS.map((m) => m.id);
@@ -310,7 +324,7 @@ export class LedgerView implements SceneView {
     const frameMat = new THREE.LineBasicMaterial({
       color: new THREE.Color(this._core).multiplyScalar(2),
       transparent: true,
-      opacity: FLOOR_FRAME_OP,
+      opacity: FLOOR_TUNE_DEFAULTS.frameOp,
       blending: THREE.AdditiveBlending,
       depthWrite: false,
     });
@@ -321,19 +335,20 @@ export class LedgerView implements SceneView {
       blending: THREE.AdditiveBlending,
       uniforms: {
         uColor: { value: new THREE.Color(this._core) },
-        uOpacity: { value: FLOOR_FILL_OP },
-        uInner: { value: FLOOR_INNER_OP },
+        uOpacity: { value: FLOOR_TUNE_DEFAULTS.fillOp },
+        uInner: { value: FLOOR_TUNE_DEFAULTS.innerOp },
+        uEdge: { value: FLOOR_TUNE_DEFAULTS.edge },
       },
       vertexShader: `
         varying vec2 vP;
         void main() { vP = uv * 2.0 - 1.0; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
       fragmentShader: `
-        uniform vec3 uColor; uniform float uOpacity; uniform float uInner; varying vec2 vP;
+        uniform vec3 uColor; uniform float uOpacity; uniform float uInner; uniform float uEdge; varying vec2 vP;
         void main() {
           float GRID = 48.0;
           vec2 cell = (floor(vP * GRID) + 0.5) / GRID;
           float e = max(abs(cell.x), abs(cell.y));
-          float band = smoothstep(0.88, 1.0, e);
+          float band = smoothstep(uEdge, 1.0, e);
           band = floor(band * 3.0 + 0.5) / 3.0;
           float a = uOpacity * band + uInner;
           if (a <= 0.002) discard;
@@ -478,9 +493,10 @@ export class LedgerView implements SceneView {
   private _applyFloorAlpha(): void {
     for (const [, list] of this._floorMats) {
       for (const m of list) {
-        m.frame.opacity = FLOOR_FRAME_OP * this._fades.alpha;
-        m.fill.uniforms.uOpacity.value = FLOOR_FILL_OP * this._fades.alpha;
-        m.fill.uniforms.uInner.value = FLOOR_INNER_OP * this._fades.alpha;
+        m.frame.opacity = this.floors.frameOp * this._fades.alpha;
+        m.fill.uniforms.uOpacity.value = this.floors.fillOp * this._fades.alpha;
+        m.fill.uniforms.uInner.value = this.floors.innerOp * this._fades.alpha;
+        m.fill.uniforms.uEdge.value = this.floors.edge;
       }
     }
     if (this._gutterLabel)
@@ -779,7 +795,7 @@ export class LedgerView implements SceneView {
       const zScale = (2 * hz) / LANE_GAP_Z;
       for (const b of lane.blocks) {
         if (mi >= META_TRAIL_MAX) break;
-        b.x += (-b.slot * SLOT_SP - b.x) * k;
+        b.x += (LEAD_X - b.slot * SLOT_SP - b.x) * k;
         b.fade += (slotFade(b.slot) - b.fade) * k;
         _dummy.position.set(b.x + b.ox, FLOOR_Y.msnap, cz + b.oz * zScale);
         _dummy.rotation.set(-Math.PI / 2, 0, 0);

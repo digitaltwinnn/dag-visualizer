@@ -7,11 +7,11 @@
 // the machines inside stay pickable as nodes, the frame itself is furniture.
 import * as THREE from "three";
 import type { SceneColors } from "../../sceneColors";
-import { CONT_X, type RailGroup } from "../../domain/ledgerLayout";
+import { CONT_X, CONT_PAD, type RailGroup } from "../../domain/ledgerLayout";
 import { ROLE_CODE, type ContainerSpec } from "../../domain/ledgerRails";
 
 const FRAME_OP = 0.16;
-const LABEL_OP = 0.6;
+const LABEL_OP = 0.85;
 /** Per-group container pool — three roles is the most a group can have. */
 const MAX_PER_GROUP = 3;
 
@@ -33,10 +33,10 @@ export class NodeRails {
   pickables: THREE.Object3D[] = [];
   private _slots: Slot[] = [];
   private _alpha = 0;
-  private _muted: number;
+  private _core: number;
 
   constructor(colors: SceneColors) {
-    this._muted = colors.muted;
+    this._core = colors.core;
     // One frame + label object per (group, index) up front — geometry/texture are rewritten on a
     // data rebuild (event-time), nothing allocates per frame.
     for (const group of ["meta", "dag"] as RailGroup[]) {
@@ -75,32 +75,40 @@ export class NodeRails {
       s.frame.rotation.set(0, Math.PI / 2, 0);
       s.frame.position.set(CONT_X - 0.05, spec.cy, spec.cz);
 
-      // The role label — a small canvas plane over the frame's top screen-left corner.
+      // The role label — INSIDE the frame's screen-left end, on the reserved label strip
+      // (the floor-label idiom: the plane names itself along its left edge; user 2026-08-07).
       this._drawLabel(s, ROLE_CODE[spec.role]);
       s.label.rotation.set(0, Math.PI / 2, 0);
-      s.label.position.set(CONT_X - 0.04, spec.cy + spec.hy + 0.34, spec.cz + spec.hz - 0.7);
+      const labelW = s.label.scale.x;
+      s.label.position.set(
+        CONT_X + 0.02,
+        spec.cy,
+        spec.cz + spec.hz - CONT_PAD - labelW / 2,
+      );
     }
   }
 
+  // The SAME text treatment as the floor labels (LedgerView._makeLabel: system-ui 26px on the
+  // core tone at 0.85) — the tray names itself in the plane's own voice, not a muted variant.
   private _drawLabel(s: Slot, text: string): void {
     const c = document.createElement("canvas");
     const SS = 2;
     c.width = 128 * SS;
-    c.height = 40 * SS;
+    c.height = 44 * SS;
     const ctx = c.getContext("2d")!;
-    const mc = new THREE.Color(this._muted);
-    ctx.font = `500 ${24 * SS}px system-ui, -apple-system, sans-serif`;
+    const cc = new THREE.Color(this._core);
+    ctx.font = `400 ${26 * SS}px system-ui, -apple-system, sans-serif`;
     ctx.textAlign = "left";
     ctx.textBaseline = "middle";
-    ctx.fillStyle = `rgba(${rgbTriplet(mc)},0.95)`;
-    ctx.fillText(text, 2 * SS, c.height / 2);
+    ctx.fillStyle = `rgba(${rgbTriplet(cc)},0.85)`;
+    ctx.fillText(text, 2 * SS, c.height / 2 + 2 * SS);
     s.labelMat.map?.dispose();
     const tex = new THREE.CanvasTexture(c);
     tex.minFilter = THREE.LinearFilter;
     tex.colorSpace = THREE.SRGBColorSpace;
     s.labelMat.map = tex;
     s.labelMat.needsUpdate = true;
-    const h = 0.52;
+    const h = 0.5;
     s.label.scale.set(h * (c.width / c.height), h, 1);
   }
 

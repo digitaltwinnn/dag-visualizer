@@ -45,6 +45,14 @@ export async function mountDevTune(targets: DevTuneTargets): Promise<DevTuneHand
   // networks' bands, so it read as inert in the panel — the mechanism keeps its default)
   bf.addBinding(bt, "seamOp", { min: 0, max: 1, step: 0.01, label: "seam opacity" });
 
+  // The floor planes — transparency + the colour drop-off toward the centre (read per frame).
+  const ff = pane.addFolder({ title: "floor planes" });
+  const flt = targets.ledger.floors;
+  ff.addBinding(flt, "frameOp", { min: 0, max: 0.6, step: 0.005, label: "frame" });
+  ff.addBinding(flt, "fillOp", { min: 0, max: 0.3, step: 0.005, label: "edge fill" });
+  ff.addBinding(flt, "innerOp", { min: 0, max: 0.1, step: 0.002, label: "centre fill" });
+  ff.addBinding(flt, "edge", { min: 0, max: 0.99, step: 0.01, label: "drop-off" });
+
   // The metagraph snapshots — the lane tiles' brightness multipliers (read per frame).
   const tf = pane.addFolder({ title: "metagraph snapshots (tiles)" });
   const tt = targets.ledger.tiles;

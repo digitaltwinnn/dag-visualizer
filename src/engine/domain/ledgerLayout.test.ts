@@ -5,6 +5,7 @@ import {
   FLOOR_IDS, FLOOR_Y, LANE_HALF_Z, GUTTER_W, GUTTER_CZ, GUTTER_GAP, FLOOR_MAIN_Z0,
   BAR_MAX_W, BAR_MIN_W, BAR_H, BAR_D, BYTE_SCALE_KB,
   CONT_X, CONT_TOP_GAP, CONT_CHIP_Z, CONT_ROW_Y, CONT_PAD, CONT_GAP, CONT_Z0, CONT_Z1, FLOOR_Z1,
+  CONT_LABEL_W, LEAD_X,
   RAIL_GROUP_FLOOR, laneSpan,
 } from "./ledgerLayout";
 
@@ -122,6 +123,15 @@ describe("two-floor chamber (redesign 2026-08-04)", () => {
     expect(CONT_Z0).toBeGreaterThan(FLOOR_MAIN_Z0);
     expect(CONT_Z1).toBeLessThan(FLOOR_Z1);
     expect(CONT_Z1 - CONT_Z0).toBeGreaterThan(2 * LANE_HALF_Z);
+    // The in-frame label strip leaves most of the width to the chips.
+    expect(CONT_LABEL_W).toBeGreaterThan(0);
+    expect(CONT_LABEL_W).toBeLessThan((CONT_Z1 - CONT_Z0) / 4);
+  });
+
+  it("leads the time trail toward the camera-side floor edge", () => {
+    // The lead slot sits well forward of centre but inside the floors' front edge (~6.5 local).
+    expect(LEAD_X).toBeGreaterThan(0);
+    expect(LEAD_X).toBeLessThan(6.5);
   });
 
   it("keeps every lane in its own slice with nothing committed", () => {

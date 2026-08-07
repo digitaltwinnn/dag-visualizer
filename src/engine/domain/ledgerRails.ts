@@ -14,7 +14,7 @@
 import * as THREE from "three";
 import {
   CONT_X, CONT_TOP_GAP, CONT_CHIP_Z, CONT_ROW_Y, CONT_PAD, CONT_GAP, CONT_Z0, CONT_Z1,
-  FLOOR_Y, RAIL_GROUP_FLOOR, type RailGroup,
+  CONT_LABEL_W, FLOOR_Y, RAIL_GROUP_FLOOR, type RailGroup,
 } from "./ledgerLayout";
 
 /** A container's role. Metagraph machines use their cluster roles verbatim; the DAG's native
@@ -72,19 +72,22 @@ export function containerLayout(group: RailGroup, counts: ReadonlyMap<RailRole, 
   const floorY = FLOOR_Y[RAIL_GROUP_FLOOR[group]];
   const cz = (CONT_Z0 + CONT_Z1) / 2;
   const hz = (CONT_Z1 - CONT_Z0) / 2;
-  const cols = Math.max(1, Math.floor((CONT_Z1 - CONT_Z0 - 2 * CONT_PAD) / CONT_CHIP_Z));
+  // The role-code label lives INSIDE the frame's screen-left end — the chip grid starts after it.
+  const cols = Math.max(1, Math.floor((CONT_Z1 - CONT_Z0 - 2 * CONT_PAD - CONT_LABEL_W) / CONT_CHIP_Z));
+  // Largest group first (user, 2026-08-07) — count desc, ROLE_ORDER as the stable tiebreak.
+  const present = [...ROLE_ORDER[group]].filter((r) => (counts.get(r) ?? 0) > 0);
+  present.sort((a, b) => (counts.get(b) ?? 0) - (counts.get(a) ?? 0) || ROLE_ORDER[group].indexOf(a) - ROLE_ORDER[group].indexOf(b));
   const specs: ContainerSpec[] = [];
   let top = floorY - CONT_TOP_GAP; // the current container's frame-top Y
-  for (const role of ROLE_ORDER[group]) {
-    const count = counts.get(role) ?? 0;
-    if (count <= 0) continue; // an empty role's container hides and the stack closes up
+  for (const role of present) {
+    const count = counts.get(role)!;
     const rows = Math.ceil(count / cols);
     const h = rows * CONT_ROW_Y + 2 * CONT_PAD;
     specs.push({
       role, count, cols, rows,
       cy: top - h / 2, cz, hy: h / 2, hz,
       chipY0: top - CONT_PAD - CONT_ROW_Y / 2,
-      chipZ0: CONT_Z1 - CONT_PAD - CONT_CHIP_Z / 2,
+      chipZ0: CONT_Z1 - CONT_PAD - CONT_LABEL_W - CONT_CHIP_Z / 2,
     });
     top -= h + CONT_GAP;
   }

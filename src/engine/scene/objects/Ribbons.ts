@@ -19,7 +19,7 @@
 import * as THREE from "three";
 import type { SceneColors } from "../../sceneColors";
 import { METAGRAPHS } from "../../config";
-import { FLOOR_Y } from "../../domain/ledgerLayout";
+import { FLOOR_Y, LEAD_X } from "../../domain/ledgerLayout";
 import { SLOT_SP } from "../../domain/ledgerModel";
 import { ribbonQuad, RIBBON_LANE_HALF, UNLISTED_KEY, type BarSpec, type RibbonQuad } from "../../domain/ledgerBands";
 
@@ -149,7 +149,7 @@ export class Ribbons {
     // Caller contract: bound the loop by ribbonCount(row) — an empty row has no quad to walk.
     if (st.count === 0) return out;
     const q = st.quads[Math.min(i, st.count - 1)];
-    const x = -st.slot * SLOT_SP;
+    const x = LEAD_X - st.slot * SLOT_SP;
     const topZ = (q.topZ0 + q.topZ1) / 2;
     const botZ = (q.botZ0 + q.botZ1) / 2;
     const s = sweep(t, this.tune.curve);
@@ -185,7 +185,7 @@ export class Ribbons {
     };
     for (let r = 0; r < RIBBON_ROWS; r++) {
       const st = this._rows[r];
-      const x = -st.slot * SLOT_SP;
+      const x = LEAD_X - st.slot * SLOT_SP;
       const yTop = FLOOR_Y.msnap;
       const yBot = FLOOR_Y.gl0;
       for (let i = 0; i < st.count; i++) {

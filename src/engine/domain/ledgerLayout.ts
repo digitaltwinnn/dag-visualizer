@@ -33,8 +33,8 @@ export const LEDGER = {
   // DAG L1 (hypergraph L1) — native $DAG currency — keeps its own −Z third of the lane field.
   // TODO: draw DAG L1 BLOCKS (global.blocks) flowing from this lane into the global snapshot.
   dagLaneZ: -14.7,  // −Z centre of the reserved 1/3 (−depth/2 + depth/6) — where the DAG-L1 cluster sits
-  dot: 0.55,        // node-sphere scale in this view — uniform for EVERY cluster (a 3-node metagraph's
-                    // dot = a global-L0 dot; small groups get presence from the station DIAL, not dot size)
+  dot: 0.38,        // node-chip scale in this view — uniform for EVERY cluster (a 3-node metagraph's
+                    // dot = a global-L0 dot); shrunk with the tray tightening (user, 2026-08-07)
   // Whole-view ORIENTATION applied to the ledger so it frames well under the SHARED overview camera
   // (the one hyper/geo use) — the camera never moves on a view switch; the ledger GROUP is
   // rotated/scaled instead, and the SAME transform is baked into every node's ledger position
@@ -136,6 +136,11 @@ export const FLOOR_Z1 = 22;
 export const GUTTER_GAP = 1.4;
 export const GUTTER_CZ = FLOOR_MAIN_Z0 - GUTTER_GAP - GUTTER_W / 2;
 
+/** The LEAD slot's X — the whole time trail (lane tiles, byte bars, ribbons) leads well toward
+ *  the camera-side floor edge and trails to −X from here (user, 2026-08-07: the snapshots sat
+ *  too deep in the plane). The floors' front edge is at ~6.5 local. */
+export const LEAD_X = 4.6;
+
 // ── The byte bar (spec §4.2) — fixed height and depth; WIDTH (the Z extent) alone encodes the
 // bytes the tick carried. It is CENTERED on the lane field (z0 = -width/2 — user, 2026-08-06;
 // replaced the old left-aligned BAR_Z0 start): bands still follow lane order, so the ribbons
@@ -167,11 +172,14 @@ export type RailGroup = "meta" | "dag";
 export const RAIL_GROUP_FLOOR: Record<RailGroup, LedgerFloorId> = { meta: "msnap", dag: "gl0" };
 
 export const CONT_X = 6.2;        // the containers' shared X plane — just inside the floors' front edge
-export const CONT_TOP_GAP = 0.9;  // floor plane → first container frame top (fits the role label)
-export const CONT_CHIP_Z = 0.62;  // chip pitch along Z (columns)
-export const CONT_ROW_Y = 0.62;   // row pitch downward
-export const CONT_PAD = 0.45;     // frame padding around the chip grid
-export const CONT_GAP = 0.85;     // VERTICAL gap between stacked containers (fits the role label)
+export const CONT_TOP_GAP = 0.55; // floor plane → first container frame top
+export const CONT_CHIP_Z = 0.46;  // chip pitch along Z (columns) — tightened with the smaller chips
+export const CONT_ROW_Y = 0.46;   // row pitch downward
+export const CONT_PAD = 0.16;     // frame padding around the chip grid — a tight hairline margin
+export const CONT_GAP = 0.5;      // VERTICAL gap between stacked containers
+/** The label strip INSIDE the frame's screen-left end — the chips start after it (the role code
+ *  sits in the tray like the floor labels sit on the plane; user, 2026-08-07). */
+export const CONT_LABEL_W = 2.1;
 /** The containers' Z extents — the FULL front width of the main floor plane (user, 2026-08-07:
  *  stacked below each other instead of side by side), inset slightly from both plane edges. */
 export const CONT_Z0 = FLOOR_MAIN_Z0 + 0.3;

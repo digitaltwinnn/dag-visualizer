@@ -6,7 +6,7 @@ import {
 } from "./ledgerRails";
 import {
   CONT_X, CONT_TOP_GAP, CONT_CHIP_Z, CONT_ROW_Y, CONT_PAD, CONT_GAP, CONT_Z0, CONT_Z1,
-  FLOOR_Y, RAIL_GROUP_FLOOR,
+  CONT_LABEL_W, FLOOR_Y, RAIL_GROUP_FLOOR,
 } from "./ledgerLayout";
 
 const counts = (pairs: [RailRole, number][]) => new Map<RailRole, number>(pairs);
@@ -43,9 +43,10 @@ describe("role membership (containers 2026-08-06)", () => {
 });
 
 describe("containerLayout (stacked full-width, 2026-08-07)", () => {
-  it("hides empty roles and STACKS the rest below each other, each spanning the plane front", () => {
+  it("stacks the non-empty roles below each other, LARGEST first, each spanning the plane front", () => {
     const specs = containerLayout("meta", counts([["l0", 14], ["dl1", 250]]));
-    expect(specs.map((s) => s.role)).toEqual(["l0", "dl1"]); // cl1 empty → hidden, stack closes up
+    // cl1 empty → hidden; dl1 leads (count desc — user, 2026-08-07), the stack closes up.
+    expect(specs.map((s) => s.role)).toEqual(["dl1", "l0"]);
     const [a, b] = specs;
     // Full width, shared by every container.
     for (const s of specs) {
@@ -54,9 +55,12 @@ describe("containerLayout (stacked full-width, 2026-08-07)", () => {
     }
     // Stacked: the second container's top sits one CONT_GAP below the first one's bottom.
     expect(a.cy - a.hy - (b.cy + b.hy)).toBeCloseTo(CONT_GAP, 6);
-    // A bigger count grows DOWNWARD (more rows), never sideways.
-    expect(b.rows).toBeGreaterThan(a.rows);
-    expect(b.cols).toBe(a.cols);
+    // The bigger count has more rows; column capacity is the shared full-width grid.
+    expect(a.rows).toBeGreaterThan(b.rows);
+    expect(a.cols).toBe(b.cols);
+    // Equal counts keep the ROLE_ORDER tiebreak.
+    const tie = containerLayout("meta", counts([["l0", 3], ["dl1", 3]]));
+    expect(tie.map((s) => s.role)).toEqual(["l0", "dl1"]);
   });
 
   it("hangs under the group's floor, below the frame-top gap", () => {
@@ -67,11 +71,13 @@ describe("containerLayout (stacked full-width, 2026-08-07)", () => {
     }
   });
 
-  it("sizes the frame height to the chip rows plus padding", () => {
+  it("sizes the frame height to the chip rows plus padding, reserving the label strip", () => {
     const [s] = containerLayout("meta", counts([["l0", 10]]));
     expect(s.rows).toBe(Math.ceil(10 / s.cols));
-    expect(s.cols).toBe(Math.floor((CONT_Z1 - CONT_Z0 - 2 * CONT_PAD) / CONT_CHIP_Z));
+    expect(s.cols).toBe(Math.floor((CONT_Z1 - CONT_Z0 - 2 * CONT_PAD - CONT_LABEL_W) / CONT_CHIP_Z));
     expect(s.hy * 2).toBeCloseTo(s.rows * CONT_ROW_Y + 2 * CONT_PAD, 6);
+    // The chip grid starts after the in-frame label strip at the screen-left end.
+    expect(s.chipZ0).toBeCloseTo(CONT_Z1 - CONT_PAD - CONT_LABEL_W - CONT_CHIP_Z / 2, 6);
   });
 });
 
