@@ -263,7 +263,7 @@ describe("LANE_IDS (the unknown lane, 2026-08-07)", () => {
       { ordinal: 1, timestamp: "t1" },
       { ordinal: 2, timestamp: "t2" },
     ] as never[];
-    const anchor = (ts: string) =>
+    const anchor = () =>
       ({ fee: 0, count: 3, metaIds: new Set([UNLISTED_KEY]), metaCounts: new Map([[UNLISTED_KEY, 3]]), touched: 0 }) as never;
     model.setData(snaps as never, anchor as never);
     const lane = model.lanes.get(UNLISTED_KEY)!;

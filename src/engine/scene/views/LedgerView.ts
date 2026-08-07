@@ -71,10 +71,12 @@ export interface FloorTune {
 }
 
 export const FLOOR_TUNE_DEFAULTS: FloorTune = {
-  frameOp: 0.11,
-  fillOp: 0.03,
-  innerOp: 0,
-  edge: 0.88,
+  // User-tuned via ?tune, 2026-08-07: a quieter frame, and a flat whisper of centre fill so the
+  // glass reads as one surface with a soft rim (edge band starts at 0.90).
+  frameOp: 0.05,
+  fillOp: 0.025,
+  innerOp: 0.025,
+  edge: 0.9,
 };
 
 const PULSE_MAX = 220;
