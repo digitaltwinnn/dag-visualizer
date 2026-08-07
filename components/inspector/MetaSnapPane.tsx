@@ -179,7 +179,12 @@ export default function MetaSnapPane({
               if (undecodable)
                 return (
                   <Fact label="State">
-                    <span className="text-muted-foreground italic">undecodable payload</span>
+                    {/* PINNED and the full unpack is in flight — the deep decoder often reads
+                        what the quick summary couldn't, so don't render its verdict as final
+                        until the deep read answers (user, 2026-08-07). */}
+                    <span className="text-muted-foreground italic">
+                      {following ? "undecodable payload" : "decoding…"}
+                    </span>
                   </Fact>
                 );
               if (!hasState) return null;
