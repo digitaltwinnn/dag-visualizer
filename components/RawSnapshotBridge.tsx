@@ -59,6 +59,7 @@ export default function RawSnapshotBridge() {
   const liveOrd = useStore((s) => s.latestSnapshot?.ordinal ?? null);
   const selOrd = useStore((s) => s.snap?.data.ordinal ?? null);
   const deepSel = useStore((s) => s.metaSnap);
+  const following = useStore((s) => s.following);
   const backfilled = useRef(false);
 
   useEffect(() => ensure(liveOrd), [liveOrd]);
@@ -83,11 +84,11 @@ export default function RawSnapshotBridge() {
   // The deeper read: only ever for the ONE selected metagraph snapshot, never a poll.
   useEffect(() => {
     if (!deepSel) return;
-    // LIVE METAGRAPH MODE guard (2026-08-07): while FOLLOWING, the metaSnap card auto-advances
-    // every tick — fetching the ~2.5 MB deep read per tick would turn the explicit-gesture-only
-    // route into a poll. The deep read stays reserved for a pinned (explicit) selection; the
-    // live card's third tier shows its acquiring state instead.
-    if (useStore.getState().following) return;
+    // The decode rule is CLICK-scoped (user, 2026-08-07): while following, the shown snapshot
+    // was never clicked — fetching its ~2.5 MB decode per tick would turn the explicit-gesture
+    // route into a poll. `following` is a DEPENDENCY, not just a guard: pinning via the LIVE
+    // control (no metaSnap change) must fire the decode for the snapshot already on screen.
+    if (following) return;
     const key = metaSnapDeepKey(deepSel.globalOrdinal, deepSel.metaId);
     const st = useStore.getState();
     if (st.metaSnapDeep[key] || deepInflight.has(key)) return;
@@ -99,7 +100,7 @@ export default function RawSnapshotBridge() {
       })
       .catch(() => {})
       .finally(() => deepInflight.delete(key));
-  }, [deepSel]);
+  }, [deepSel, following]);
 
   return null;
 }

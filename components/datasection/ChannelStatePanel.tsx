@@ -52,12 +52,11 @@ export function ChannelStatePanel() {
       </div>
 
       {!deep ? (
-        // While FOLLOWING, the heavy per-snapshot decode is deliberately not fetched (the card
-        // advances every tick — that would be a poll of the explicit-gesture-only route). Say
-        // so honestly instead of pretending to read (user, 2026-08-07: "why can't I see the
-        // contents?" — the answer must be on the instrument, not in the docs).
+        // The decode rule is CLICK-scoped (user, 2026-08-07 — "decode what I click", live mode
+        // is irrelevant to it): an unclicked (auto-followed) snapshot invites the pin; a
+        // clicked one that hasn't landed yet is genuinely reading.
         <p className="text-label text-muted-foreground">
-          {following ? "following live — pin this snapshot to decode its state" : "reading…"}
+          {following ? "pin this snapshot to decode its state" : "reading…"}
         </p>
       ) : (
         <>
