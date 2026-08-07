@@ -129,6 +129,9 @@ export const LANE_HALF_Z = (LEDGER.depth * LANE_SPREAD) / 2;
 export const GUTTER_W = (2 * LANE_HALF_Z) / 6;
 /** The main floor plane's −Z edge: the lane field plus a small margin. */
 export const FLOOR_MAIN_Z0 = -LANE_HALF_Z - 0.8;
+/** The floor planes' +Z (screen-left) edge — LedgerView's FLOOR_D/2, promoted here so the
+ *  containers can span the plane's full front width. */
+export const FLOOR_Z1 = 22;
 /** The seam between the main plane and the gutter plane. */
 export const GUTTER_GAP = 1.4;
 export const GUTTER_CZ = FLOOR_MAIN_Z0 - GUTTER_GAP - GUTTER_W / 2;
@@ -164,11 +167,15 @@ export type RailGroup = "meta" | "dag";
 export const RAIL_GROUP_FLOOR: Record<RailGroup, LedgerFloorId> = { meta: "msnap", dag: "gl0" };
 
 export const CONT_X = 6.2;        // the containers' shared X plane — just inside the floors' front edge
-export const CONT_TOP_GAP = 0.55; // floor plane → container frame top
+export const CONT_TOP_GAP = 0.9;  // floor plane → first container frame top (fits the role label)
 export const CONT_CHIP_Z = 0.62;  // chip pitch along Z (columns)
 export const CONT_ROW_Y = 0.62;   // row pitch downward
 export const CONT_PAD = 0.45;     // frame padding around the chip grid
-export const CONT_GAP = 1.1;      // Z gap between neighbouring containers
+export const CONT_GAP = 0.85;     // VERTICAL gap between stacked containers (fits the role label)
+/** The containers' Z extents — the FULL front width of the main floor plane (user, 2026-08-07:
+ *  stacked below each other instead of side by side), inset slightly from both plane edges. */
+export const CONT_Z0 = FLOOR_MAIN_Z0 + 0.3;
+export const CONT_Z1 = FLOOR_Z1 - 0.6;
 
 // ── The committed-filter rearrangement (spec §5.2): "Committing rearranges the upper floor: the
 // lane takes the whole floor, other lanes' tiles leave, rails dim non-member machines." So a lane

@@ -11,14 +11,13 @@ import { latestRelevant } from "@/src/data/follow";
 import { identityHudHex } from "@/src/palette/identity";
 import { IdentityDot } from "@/components/inspector/parts";
 import { useStore } from "@/src/store/store";
-import { metaSnapSelectActions, snapshotSelectActions, sameMetaSnap } from "@/src/engine/domain/pickActions";
+import { bandSelectActions, metaSnapSelectActions, snapshotSelectActions, sameMetaSnap } from "@/src/engine/domain/pickActions";
 import { applyClickActions } from "@/src/store/applyClickActions";
 import { DisclosureChevron, DisclosureRow, ROW_NEST, ROW_OUTSET } from "@/components/ExploreRows";
 import { LEDGER_LAYERS } from "@/src/data/ledgerLayers";
 import { buildAnchorLog, type AnchorLogRow } from "@/src/data/anchorLog";
 import { SLOT_N } from "@/src/engine/domain/ledgerModel";
 import { fmtKB } from "@/src/util/format";
-import type { GlobalSnapshot } from "@/src/data/types";
 
 // The Snapshots view's left-rail tool — SNAPSHOTS-FIRST navigation (user, 2026-08-06, replacing
 // the layer/rail navigation: floors and node containers are pure visual aid now). The explorer's
@@ -36,14 +35,12 @@ import type { GlobalSnapshot } from "@/src/data/types";
 
 const FLOOR_COPY = Object.fromEntries(LEDGER_LAYERS.map((l) => [l.id, l]));
 
-/** One metagraph's anchored snapshots inside the visible window. */
+/** One metagraph's anchored snapshots inside a window (the whole trail, or one tick). */
 interface MetaGroup {
   id: string;
   name: string;
   hue: string;
   rows: AnchorLogRow[];
-  /** Distinct global ordinals this metagraph anchored into (the gl0 browse level). */
-  globals: GlobalSnapshot[];
 }
 
 function groupByMeta(rows: AnchorLogRow[]): MetaGroup[] {
@@ -52,11 +49,10 @@ function groupByMeta(rows: AnchorLogRow[]): MetaGroup[] {
     let g = by.get(r.metaId);
     if (!g) {
       const cfg = metagraphById(r.metaId);
-      g = { id: r.metaId, name: cfg?.name ?? r.metaId, hue: identityHudHex(r.metaId), rows: [], globals: [] };
+      g = { id: r.metaId, name: cfg?.name ?? r.metaId, hue: identityHudHex(r.metaId), rows: [] };
       by.set(r.metaId, g);
     }
     g.rows.push(r);
-    if (!g.globals.some((x) => x.ordinal === r.global.ordinal)) g.globals.push(r.global);
   }
   return [...by.values()].sort((a, b) => b.rows.length - a.rows.length || a.name.localeCompare(b.name));
 }
@@ -258,31 +254,29 @@ export default function LedgerPanel() {
           </div>
         )}
 
-        {/* ── [1] Global snapshots → All networks + metagraphs → global ordinals ── */}
+        {/* ── [1] Global snapshots → tick rows → the metagraphs that anchored into each ──
+            (user, 2026-08-07: the snapshot leads, the networks are its children — the mirror of
+            the msnap group, where the network leads and its snapshots are the children). */}
         {floorHeader("gl0", snaps.length)}
         {openFloor === "gl0" && (
           <div className={cn("mb-1.5 ml-[9px] py-0.5 pl-3", ROW_NEST)} onMouseLeave={() => setHoverSnapOrd(null)}>
-            {orderedSnaps.length === 0 ? (
-              empty
-            ) : (
-              <>
-                {/* The whole heartbeat first: every visible tick, no network lens. */}
-                <DisclosureRow
-                  open={openMeta === "gl0|all"}
-                  holdsSel={false}
-                  title={`All networks · ${snaps.length} global snapshot${snaps.length === 1 ? "" : "s"}`}
-                  onToggle={() => setOpenMeta(openMeta === "gl0|all" ? null : "gl0|all")}
-                >
-                  <span className="flex-1 min-w-0 text-body text-foreground whitespace-nowrap overflow-hidden text-ellipsis">
-                    All networks
-                  </span>
-                  <span className="ml-auto flex-none tabular-nums text-body font-semibold">{snaps.length}</span>
-                </DisclosureRow>
-                {openMeta === "gl0|all" && (
-                  <div className="mb-1 ml-[7px] pl-2 border-l border-border">
-                    {orderedSnaps.map((d) => (
+            {orderedSnaps.length === 0
+              ? empty
+              : orderedSnaps.map((d) => {
+                  const tickRows = rows.filter((r) => r.global.ordinal === d.ordinal);
+                  const tickGroups = groupByMeta(tickRows);
+                  const isOpen = openMeta === `gl0|${d.ordinal}`;
+                  const globalPick = {
+                    kind: "snapshot",
+                    title: `Global snapshot #${d.ordinal}`,
+                    data: d,
+                  } as const;
+                  return (
+                    <div key={d.ordinal}>
+                      {/* The tick row SELECTS (pin / live re-follow — the same tested table the
+                          strip's bars run) AND discloses its contributors in the same click,
+                          the commit-is-disclosure idiom. */}
                       <SnapRow
-                        key={d.ordinal}
                         label={`#${d.ordinal.toLocaleString()}`}
                         // The one honest per-tick byte figure: the exact read's measured KB;
                         // absent = a dash, never derived from count or fee (the honesty rule).
@@ -297,51 +291,58 @@ export default function LedgerPanel() {
                         setHoverOrd={setHoverSnapOrd}
                         accent={accent}
                         title={`Global snapshot #${d.ordinal} · ${d.metagraphSnapshotCount ?? 0} anchored`}
-                        onClick={() =>
+                        onClick={() => {
                           applyClickActions(
-                            snapshotSelectActions(
-                              { kind: "snapshot", title: `Global snapshot #${d.ordinal}`, data: d },
-                              latestRelevant("all")?.ordinal === d.ordinal,
-                            ),
-                          )
-                        }
+                            snapshotSelectActions(globalPick, latestRelevant("all")?.ordinal === d.ordinal),
+                          );
+                          setOpenMeta(isOpen ? null : `gl0|${d.ordinal}`);
+                        }}
                       />
-                    ))}
-                  </div>
-                )}
-                {/* Then the network lens: the globals each metagraph anchored into. */}
-                {groups.map((g) => (
-                  <div key={g.id}>
-                    {metaRow("gl0", g.id, g.name, g.hue, g.globals.length, false)}
-                    {openMeta === `gl0|${g.id}` && (
-                      <div className="mb-1 ml-[7px] pl-2 border-l border-border">
-                        {g.globals.map((d) => (
-                          <SnapRow
-                            key={d.ordinal}
-                            label={`#${d.ordinal.toLocaleString()}`}
-                            metric={String(g.rows.filter((r) => r.global.ordinal === d.ordinal).length)}
-                            selected={d.ordinal === activeSnapOrd}
-                            hoverOrd={hoverSnapOrd}
-                            pairOrd={d.ordinal}
-                            setHoverOrd={setHoverSnapOrd}
-                            accent={g.hue}
-                            title={`Global snapshot #${d.ordinal} · ${g.name} anchored ${g.rows.filter((r) => r.global.ordinal === d.ordinal).length} snapshot(s) into it`}
-                            onClick={() =>
-                              applyClickActions(
-                                snapshotSelectActions(
-                                  { kind: "snapshot", title: `Global snapshot #${d.ordinal}`, data: d },
-                                  latestRelevant("all")?.ordinal === d.ordinal,
-                                ),
-                              )
-                            }
-                          />
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                ))}
-              </>
-            )}
+                      {isOpen && (
+                        <div className="mb-1 ml-[7px] pl-2 border-l border-border">
+                          {tickGroups.length === 0 ? (
+                            // The polled buffer identified none of this tick's anchors (yet, or
+                            // it batched only unlisted channels) — say so, never fabricate rows.
+                            <p className="mt-1 mx-1 mb-1.5 text-label text-muted-foreground">
+                              No identified metagraph snapshots in this tick.
+                            </p>
+                          ) : (
+                            tickGroups.map((g) => {
+                              const pair = `${g.id}`;
+                              return (
+                                <button
+                                  key={pair}
+                                  type="button"
+                                  title={`${g.name} · ${g.rows.length} snapshot${g.rows.length === 1 ? "" : "s"} anchored into #${d.ordinal}`}
+                                  onClick={() =>
+                                    // A metagraph under a tick is the BAND: the (metagraph, tick)
+                                    // pair — same tested semantics as clicking its band in the bar.
+                                    applyClickActions(bandSelectActions(g.id, globalPick, { filter, metaSnap }))
+                                  }
+                                  onMouseEnter={() => setHoverFilter(g.id)}
+                                  onMouseLeave={() => setHoverFilter(null)}
+                                  className={cn(
+                                    "nb-row flex items-center gap-2 w-full py-1 pl-2 pr-2 my-px rounded-sm border border-transparent bg-transparent cursor-pointer text-left transition-colors duration-[140ms]",
+                                    "hover:bg-wash-hover",
+                                    "focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--primary)] focus-visible:outline-offset-[-2px]",
+                                  )}
+                                >
+                                  <IdentityDot hue={g.hue} />
+                                  <span className="flex-1 min-w-0 text-body text-foreground whitespace-nowrap overflow-hidden text-ellipsis">
+                                    {g.name}
+                                  </span>
+                                  <span className="flex-none tabular-nums text-label font-semibold text-muted-foreground">
+                                    {g.rows.length}
+                                  </span>
+                                </button>
+                              );
+                            })
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
           </div>
         )}
       </div>

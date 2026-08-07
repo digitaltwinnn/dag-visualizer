@@ -5,7 +5,7 @@ import {
   type RailRole, type ContainerSpec,
 } from "./ledgerRails";
 import {
-  CONT_X, CONT_TOP_GAP, CONT_CHIP_Z, CONT_ROW_Y, CONT_PAD, CONT_GAP,
+  CONT_X, CONT_TOP_GAP, CONT_CHIP_Z, CONT_ROW_Y, CONT_PAD, CONT_GAP, CONT_Z0, CONT_Z1,
   FLOOR_Y, RAIL_GROUP_FLOOR,
 } from "./ledgerLayout";
 
@@ -42,16 +42,21 @@ describe("role membership (containers 2026-08-06)", () => {
   });
 });
 
-describe("containerLayout", () => {
-  it("hides empty roles and lays the rest side by side, centred on z = 0", () => {
-    const specs = containerLayout("meta", counts([["l0", 14], ["dl1", 25]]));
-    expect(specs.map((s) => s.role)).toEqual(["l0", "dl1"]); // cl1 empty → hidden
-    // Side by side with a gap, screen-left (+Z) first.
+describe("containerLayout (stacked full-width, 2026-08-07)", () => {
+  it("hides empty roles and STACKS the rest below each other, each spanning the plane front", () => {
+    const specs = containerLayout("meta", counts([["l0", 14], ["dl1", 250]]));
+    expect(specs.map((s) => s.role)).toEqual(["l0", "dl1"]); // cl1 empty → hidden, stack closes up
     const [a, b] = specs;
-    expect(a.cz).toBeGreaterThan(b.cz);
-    expect(a.cz - a.hz - (b.cz + b.hz)).toBeCloseTo(CONT_GAP, 6);
-    // Centred: the row's extremes are symmetric about z = 0.
-    expect(a.cz + a.hz).toBeCloseTo(-(b.cz - b.hz), 6);
+    // Full width, shared by every container.
+    for (const s of specs) {
+      expect(s.cz).toBeCloseTo((CONT_Z0 + CONT_Z1) / 2, 6);
+      expect(s.hz).toBeCloseTo((CONT_Z1 - CONT_Z0) / 2, 6);
+    }
+    // Stacked: the second container's top sits one CONT_GAP below the first one's bottom.
+    expect(a.cy - a.hy - (b.cy + b.hy)).toBeCloseTo(CONT_GAP, 6);
+    // A bigger count grows DOWNWARD (more rows), never sideways.
+    expect(b.rows).toBeGreaterThan(a.rows);
+    expect(b.cols).toBe(a.cols);
   });
 
   it("hangs under the group's floor, below the frame-top gap", () => {
@@ -62,10 +67,10 @@ describe("containerLayout", () => {
     }
   });
 
-  it("sizes the frame to the chip grid plus padding", () => {
+  it("sizes the frame height to the chip rows plus padding", () => {
     const [s] = containerLayout("meta", counts([["l0", 10]]));
     expect(s.rows).toBe(Math.ceil(10 / s.cols));
-    expect(s.hz * 2).toBeCloseTo(s.cols * CONT_CHIP_Z + 2 * CONT_PAD, 6);
+    expect(s.cols).toBe(Math.floor((CONT_Z1 - CONT_Z0 - 2 * CONT_PAD) / CONT_CHIP_Z));
     expect(s.hy * 2).toBeCloseTo(s.rows * CONT_ROW_Y + 2 * CONT_PAD, 6);
   });
 });

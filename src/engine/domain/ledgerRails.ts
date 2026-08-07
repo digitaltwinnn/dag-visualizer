@@ -1,7 +1,8 @@
 // NODE CONTAINERS (finetune 2026-08-06, replacing the on-floor make-up rails): the machines leave
 // the floor surface and line up in framed CONTAINERS hanging under the FRONT edge of the floor
 // they serve, facing the camera — one container per ROLE (metagraphs: L0 / cL1 / dL1; the DAG:
-// L0 / L1), laid side by side along Z.
+// L0 / L1), STACKED below each other, each spanning the full front width of the main floor plane
+// (user, 2026-08-07 — replaced the side-by-side row).
 //
 // A machine appears in EVERY role container it serves (user, 2026-08-06): a hybrid machine shows
 // in both the L0 and the L1 containers — the container answers "who serves this role", so the
@@ -12,7 +13,7 @@
 // places the shared node InstancedMesh chips on the same specs, so the two can never disagree.
 import * as THREE from "three";
 import {
-  CONT_X, CONT_TOP_GAP, CONT_CHIP_Z, CONT_ROW_Y, CONT_PAD, CONT_GAP,
+  CONT_X, CONT_TOP_GAP, CONT_CHIP_Z, CONT_ROW_Y, CONT_PAD, CONT_GAP, CONT_Z0, CONT_Z1,
   FLOOR_Y, RAIL_GROUP_FLOOR, type RailGroup,
 } from "./ledgerLayout";
 
@@ -48,9 +49,6 @@ export function recordRole(group: RailGroup, layer: string): RailRole | null {
   return layer === "l0" || layer === "cl1" || layer === "dl1" ? (layer as RailRole) : null;
 }
 
-/** Wide grid: roughly 3:1 cols:rows, so containers read as shallow trays under the floor edge. */
-const CONT_ASPECT = 3;
-
 export interface ContainerSpec {
   role: RailRole;
   count: number;
@@ -66,36 +64,29 @@ export interface ContainerSpec {
   chipZ0: number;
 }
 
-/** Lay out the non-empty role containers of a group side by side along Z, centred on z = 0,
- *  hanging under the group's floor. Event-time (a data rebuild), allocation is fine here. */
+/** Lay out the non-empty role containers of a group STACKED below each other (user, 2026-08-07 —
+ *  replaced the side-by-side row), each spanning the FULL front width of the main floor plane
+ *  (CONT_Z0..CONT_Z1), hanging under the group's floor. Event-time (a data rebuild),
+ *  allocation is fine here. */
 export function containerLayout(group: RailGroup, counts: ReadonlyMap<RailRole, number>): ContainerSpec[] {
   const floorY = FLOOR_Y[RAIL_GROUP_FLOOR[group]];
-  const topY = floorY - CONT_TOP_GAP;
-  const present = ROLE_ORDER[group].filter((r) => (counts.get(r) ?? 0) > 0);
+  const cz = (CONT_Z0 + CONT_Z1) / 2;
+  const hz = (CONT_Z1 - CONT_Z0) / 2;
+  const cols = Math.max(1, Math.floor((CONT_Z1 - CONT_Z0 - 2 * CONT_PAD) / CONT_CHIP_Z));
   const specs: ContainerSpec[] = [];
-  let totalW = 0;
-  for (const role of present) {
-    const count = counts.get(role)!;
-    const cols = Math.max(1, Math.ceil(Math.sqrt(count * CONT_ASPECT)));
+  let top = floorY - CONT_TOP_GAP; // the current container's frame-top Y
+  for (const role of ROLE_ORDER[group]) {
+    const count = counts.get(role) ?? 0;
+    if (count <= 0) continue; // an empty role's container hides and the stack closes up
     const rows = Math.ceil(count / cols);
-    const gridW = cols * CONT_CHIP_Z;
-    const gridH = rows * CONT_ROW_Y;
-    const w = gridW + 2 * CONT_PAD;
-    const h = gridH + 2 * CONT_PAD;
+    const h = rows * CONT_ROW_Y + 2 * CONT_PAD;
     specs.push({
       role, count, cols, rows,
-      cy: topY - h / 2, cz: 0, hy: h / 2, hz: w / 2,
-      chipY0: topY - CONT_PAD - CONT_ROW_Y / 2, chipZ0: 0,
+      cy: top - h / 2, cz, hy: h / 2, hz,
+      chipY0: top - CONT_PAD - CONT_ROW_Y / 2,
+      chipZ0: CONT_Z1 - CONT_PAD - CONT_CHIP_Z / 2,
     });
-    totalW += w;
-  }
-  totalW += Math.max(0, specs.length - 1) * CONT_GAP;
-  let cursor = totalW / 2; // screen-left (+Z) end of the row
-  for (const s of specs) {
-    const w = s.hz * 2;
-    s.cz = cursor - w / 2;
-    s.chipZ0 = s.cz + (s.cols * CONT_CHIP_Z) / 2 - CONT_CHIP_Z / 2;
-    cursor -= w + CONT_GAP;
+    top -= h + CONT_GAP;
   }
   return specs;
 }

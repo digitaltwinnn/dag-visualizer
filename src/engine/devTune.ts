@@ -18,6 +18,9 @@ export interface DevTuneHandle {
 export async function mountDevTune(targets: DevTuneTargets): Promise<DevTuneHandle> {
   const { Pane } = await import("tweakpane");
   const pane = new Pane({ title: "ledger tune" });
+  // Discoverability: the mount only happens on a full page LOAD with ?tune in the URL (the
+  // ?stats idiom) — say so, so a missing panel is diagnosable from the console.
+  console.info("[tune] panel mounted — ?tune must be present at page load");
   const el = pane.element.parentElement;
   if (el) {
     el.style.zIndex = "60"; // above the HUD rails

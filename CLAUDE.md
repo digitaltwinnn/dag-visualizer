@@ -25,7 +25,8 @@ mode !== "ledger"`):
   **TWO** transparent glass floors on Y (redesign 2026-08-04), each with its GUTTER split off as
   its own small plane (finetune 2026-08-06) — metagraph snapshots above, the global ledger below.
   It **REUSES the same node meshes** from hyper/geo, which `scene/Globe.ts` places in framed
-  per-ROLE **CONTAINERS** (L0 / cL1 / dL1; hybrids appear in each role container they serve)
+  per-ROLE **CONTAINERS** (L0 / cL1 / dL1; hybrids appear in each role container they serve),
+  STACKED below each other and each spanning the full front width of the main floor plane,
   hanging under the front edge of the floor each machine serves, and draws each metagraph's lane
   of snapshot tiles, the **byte bar** that IS the global snapshot (CENTERED on the field; width =
   bytes carried, split into per-metagraph bands), the CURVED **ribbons** falling from lane tiles
@@ -916,10 +917,11 @@ and keep changing, so they're examples, not the contract.
   window, hover previews the lane dim via `hoverFilter`) → that metagraph's snapshot id rows —
   a snapshot row IS the clickable tile, running the same tested `metaSnapSelectActions`
   (filter-first, pins the anchoring global, opens the metagraph-snapshot card);
-  · **Global snapshots** → an "All networks" row (every visible tick; metric = the exact
-  read's measured KB, dash until it lands) plus metagraph rows → the global ordinals that
-  network anchored into (metric = its snapshots in that tick), each running the shared
-  `snapshotSelectActions`.
+  · **Global snapshots** → TICK rows first (user, 2026-08-07 — the snapshot leads; metric =
+  the exact read's measured KB, dash until it lands), each row selecting via the shared
+  `snapshotSelectActions` AND disclosing its contributor METAGRAPH child rows in the same
+  click (name + its snapshot count in that tick; clicking one is the BAND — the (metagraph,
+  tick) pair via `bandSelectActions`).
   The browse window is the chamber's own visible trail (`useSnapshotFeed(SLOT_N)` joined with
   `buildAnchorLog`), so the list shows exactly what the 3D scene shows. Disclosure state is
   plain local UI state (nothing here commits a layer — that rung is retired); leaf rows hover
@@ -1513,7 +1515,9 @@ frame). It composes three adapters — `objects/ByteBar.ts`, `objects/Ribbons.ts
   replacing the on-floor make-up rails): one framed tray per ROLE (metagraphs: L0 / cL1 / dL1;
   the DAG: L0 / L1), hanging under the front edge of the floor its machines serve
   (`RAIL_GROUP_FLOOR = {meta:"msnap", dag:"gl0"}`), facing the camera on the shared `CONT_X`
-  plane, laid side by side along Z and centred (`containerLayout`). **A machine appears in EVERY
+  plane — **STACKED below each other** (user, 2026-08-07; replaced the side-by-side row), each
+  spanning the FULL front width of the main floor plane (`CONT_Z0..CONT_Z1`), growing DOWNWARD
+  in rows as counts grow (`containerLayout`). **A machine appears in EVERY
   role container it serves** (user: the container answers "who serves this role" — hybrids
   duplicated by design; the duplication comes free because node records are per (machine,
   layer) cluster entry, so `Globe` simply places each record in its `recordRole` container via

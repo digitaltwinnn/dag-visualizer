@@ -4,7 +4,7 @@ import {
   LEDGER, LAYER_GEOM, ledgerSite, clusterRadius, ledgerSpread,
   FLOOR_IDS, FLOOR_Y, LANE_HALF_Z, GUTTER_W, GUTTER_CZ, GUTTER_GAP, FLOOR_MAIN_Z0,
   BAR_MAX_W, BAR_MIN_W, BAR_H, BAR_D, BYTE_SCALE_KB,
-  CONT_X, CONT_TOP_GAP, CONT_CHIP_Z, CONT_ROW_Y, CONT_PAD, CONT_GAP,
+  CONT_X, CONT_TOP_GAP, CONT_CHIP_Z, CONT_ROW_Y, CONT_PAD, CONT_GAP, CONT_Z0, CONT_Z1, FLOOR_Z1,
   RAIL_GROUP_FLOOR, laneSpan,
 } from "./ledgerLayout";
 
@@ -118,6 +118,10 @@ describe("two-floor chamber (redesign 2026-08-04)", () => {
     // Chip/row pitches and frame chrome are positive and modest against the lane field.
     for (const v of [CONT_CHIP_Z, CONT_ROW_Y, CONT_PAD, CONT_GAP]) expect(v).toBeGreaterThan(0);
     expect(CONT_GAP).toBeLessThan(LANE_HALF_Z);
+    // The stacked containers span the main plane's full front width, inset from both edges.
+    expect(CONT_Z0).toBeGreaterThan(FLOOR_MAIN_Z0);
+    expect(CONT_Z1).toBeLessThan(FLOOR_Z1);
+    expect(CONT_Z1 - CONT_Z0).toBeGreaterThan(2 * LANE_HALF_Z);
   });
 
   it("keeps every lane in its own slice with nothing committed", () => {

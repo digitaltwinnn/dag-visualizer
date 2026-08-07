@@ -33,6 +33,7 @@ import {
   GUTTER_CZ,
   GUTTER_W,
   FLOOR_MAIN_Z0,
+  FLOOR_Z1,
   LANE_HALF_Z,
   laneSpan,
   type RailGroup,
@@ -346,7 +347,7 @@ export class LedgerView implements SceneView {
     // own. Each floor is a MAIN plane (the lane field + label margin) plus its GUTTER as a small
     // separate plane beyond a visible seam (finetune 2026-08-06): the currency strip above, the
     // reserved $DAG-blocks strip below — a distinct instrument, not a corner of the floor.
-    const mainZ1 = D / 2;
+    const mainZ1 = FLOOR_Z1; // == FLOOR_D/2 — promoted to the domain so the containers share it
     const mainD = mainZ1 - FLOOR_MAIN_Z0;
     for (const id of FLOOR_IDS) {
       frame(W, mainD, FLOOR_Y[id], cx, (mainZ1 + FLOOR_MAIN_Z0) / 2, id);
