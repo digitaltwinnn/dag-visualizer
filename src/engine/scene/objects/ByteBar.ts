@@ -31,7 +31,7 @@ export const BAR_TUNE_DEFAULTS: BarTune = {
   // while a committed/hovered network dims the OTHER networks' bands — inert under "all",
   // which is why it left the tune panel).
   hot: 0.7,
-  rest: 0.2,
+  rest: 0.1,
   dim: 0.16,
 };
 

@@ -103,7 +103,7 @@ export interface TileTune {
 }
 
 // hot/rest user-tuned via ?tune, 2026-08-07 — the same levels as the byte bar's hot/rest.
-export const TILE_TUNE_DEFAULTS: TileTune = { hot: 0.7, rest: 0.2, dim: 0.22 };
+export const TILE_TUNE_DEFAULTS: TileTune = { hot: 0.7, rest: 0.1, dim: 0.22 };
 
 export class LedgerView implements SceneView {
   group: THREE.Group;
