@@ -1590,7 +1590,11 @@ frame). It composes three adapters — `objects/ByteBar.ts`, `objects/Ribbons.ts
   ON (FollowController's mode/filter effect; "all"/"dag" keep the opt-in idle entry), and
   `followLatest` rides the WHOLE card chain on the heartbeat — the anchoring global
   (`advanceSnap`) AND the metagraph-snapshot card (`advanceMetaSnap`, the non-bumping twin) at
-  that network's newest buffered snapshot. Browsing/pinning drops live mode; leaving clears
+  that network's newest buffered snapshot. **"Live" under a filter means the NETWORK's
+  anchors** (the LIVE control says "following <TICKER> anchors"): the rewind tracks the shown
+  snapshot in every committed state (`setPinned` gets it following or not), so the network's
+  newest anchored row HOLDS the front through anchor-less global ticks (the same-ordinal slot
+  shift jumps the offset; an ordinal CHANGE — a fresh anchor — eases the trail forward). Browsing/pinning drops live mode; leaving clears
   the cards, so coming back starts live again. ⚠️ The ~2.5 MB DEEP read stays gated to
   EXPLICIT pins (`RawSnapshotBridge` skips it while `following` — an auto-advancing card must
   not turn the explicit-gesture route into a poll). `setHoverFilter` previews the dim at commit strength (the

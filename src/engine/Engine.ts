@@ -391,7 +391,11 @@ export class Engine {
           // REWIND follows only the committed pin (a hover must never drag the trail).
           this.ledger.setSelected(st.snap?.data?.ordinal ?? null);
           this.ledger.setHovered(st.hoverSnapOrd ?? null);
-          this.ledger.setPinned(!st.following ? st.snap?.data?.ordinal ?? null : null);
+          // The rewind tracks the shown snapshot in EVERY committed state (2026-08-07): a pin,
+          // or the filtered live follow — where the card sits on the network's newest ANCHORED
+          // tick, the trail holds that row at the front and only advances when the network
+          // anchors again (following "all" the shown snap IS the lead, so the offset is 0).
+          this.ledger.setPinned(st.snap?.data?.ordinal ?? null);
         }
         // A landing EXACT read is what turns a tick from an unmeasured seam into a measured byte
         // bar (spec §6.3), so re-hand the map the moment it changes. Ledger-only: nothing else
