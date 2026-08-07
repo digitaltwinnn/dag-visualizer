@@ -3,7 +3,10 @@ import * as THREE from "three";
 import { FOCI, hubFraming, geoFraming, ledgerFloorFraming, ledgerRailFraming, ledgerNodeFraming, easeInOutQuad, CAM_ZOOM, dollyBack, nodeFraming, cohortFraming, hyperNodeFraming, closeness, CLOSE_FAR_ALT, CLOSE_NEAR_ALT, NODE_RAISE } from "./cameraRig";
 
 describe("FOCI", () => {
-  it("carries the camera presets (ledger has none — it uses `overview` + a rotated group)", () => {
+  it("carries the camera presets (ledger gained its own frontal resting pose, 2026-08-07)", () => {
+    // The Snapshots view rests FRONTAL and zoomed (user) — straight onto the chamber's face.
+    expect(FOCI.ledger.pos).toEqual(new THREE.Vector3(0, 13, 50));
+    expect(FOCI.ledger.target).toEqual(new THREE.Vector3(0, -6, -2));
     expect(FOCI.overview.pos).toEqual(new THREE.Vector3(0, 21, 80)); // pulled back again with META_ORBIT 29 (user: whole ring visible unselected, clear of the LiveStrip band)
     expect(FOCI.overview.target).toEqual(new THREE.Vector3(0, 2, 0));
     expect(FOCI.dag.pos).toEqual(new THREE.Vector3(0, 9, 38));
@@ -13,8 +16,6 @@ describe("FOCI", () => {
     expect(FOCI.geo.target).toEqual(new THREE.Vector3(0, 0, 0));
     // Metagraph pose sits between the overview (z 36) and the country framing (z 29..25).
     expect(FOCI.geoNetwork.pos).toEqual(new THREE.Vector3(0, 5, 33));
-    // The Snapshots view shares `overview` (no own preset — the ledger GROUP is rotated instead).
-    expect(FOCI.ledger).toBeUndefined();
   });
 });
 

@@ -44,8 +44,8 @@ export const LANE_IDS: readonly string[] = [...METAGRAPHS.map((m) => m.id), UNLI
 
 export const SLOT_SP = 3.6; // js/ledger.js:41 — X spacing of one tick/slot
 export const SLOT_N = 9; // js/ledger.js:42 — visible blocks per chain
-export const BLOCK_SIZE = 0.72; // max size of an individual metagraph-snapshot tile (bumped again
-  // 2026-08-07, user: bigger blocks on the metagraph pane; was 0.48, originally 0.34)
+export const BLOCK_SIZE = 0.48; // max size of an individual metagraph-snapshot tile (a 0.72 bump
+  // was tried and reverted the same day, 2026-08-07; originally 0.34)
 
 // js/ledger.js:45 — Z width of one lane (the grid's depth budget for anchorTiles), derived from
 // ledgerSite exactly as the source does (shared by the whole METAGRAPHS roster, not per-lane).

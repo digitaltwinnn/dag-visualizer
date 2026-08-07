@@ -16,6 +16,7 @@
 import type { Mode } from "@/src/store/store";
 import type { PickDescriptor, MetaSnapSel } from "@/src/data/types";
 import type { CohortSel, CompositionSel } from "./focusLadder";
+import { METAGRAPHS } from "../config";
 
 export type ClickAction =
   | { kind: "filter"; id: string }                                             // commit the network filter
@@ -227,7 +228,11 @@ export function metaSnapSelectActions(
 ): ClickAction[] {
   if (sameMetaSnap(current.metaSnap, sel)) return [{ kind: "metaSnap", sel: null }];
   const out: ClickAction[] = [];
-  if (current.filter !== sel.metaId) out.push({ kind: "filter", id: sel.metaId });
+  // Filter-first only for a LISTED metagraph — an UNKNOWN-lane tile carries a raw state-channel
+  // address (2026-08-07, inspectable tiles): the filter vocabulary doesn't know it, so like the
+  // unlisted band it commits only the tick + the subject.
+  const listed = METAGRAPHS.some((m) => m.id === sel.metaId);
+  if (listed && current.filter !== sel.metaId) out.push({ kind: "filter", id: sel.metaId });
   out.push({ kind: "snapshot", pick: global, follow: false });
   out.push({ kind: "metaSnap", sel });
   return out;

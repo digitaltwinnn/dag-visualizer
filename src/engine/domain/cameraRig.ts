@@ -35,8 +35,11 @@ export const FOCI: Record<string, { pos: THREE.Vector3; target: THREE.Vector3 }>
   // Camera held LOW (near the equator plane, like the country/node poses) — a higher camera
   // stacked on the densest-cluster lean read as "viewing the globe from the north" (user).
   geoNetwork: { pos: new THREE.Vector3(0, 5, 33), target: new THREE.Vector3(0, 2, 0) },
-  // (The Snapshots view has no camera of its own — it uses `overview`. The ledger GROUP is rotated/
-  // tilted/scaled instead, config.viewRotY/viewTiltX/viewScale, so the camera never moves on a switch.)
+  // The Snapshots RESTING pose (user, 2026-08-07 — it used to share `overview`): FRONTAL and
+  // zoomed in, straight onto the chamber's camera-side face, so the ribbon sheets (which span
+  // the lane field) and the node trays (which face +Z) present flat-on. Slightly elevated,
+  // aimed between the floors.
+  ledger: { pos: new THREE.Vector3(0, 13, 50), target: new THREE.Vector3(0, -6, -2) },
 };
 
 // ---- the ONE global zoom lever ------------------------------------------------------------

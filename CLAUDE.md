@@ -1585,8 +1585,9 @@ frame). It composes three adapters — `objects/ByteBar.ts`, `objects/Ribbons.ts
   row (a selected/hovered older snapshot beats the live lead). Selection comes from the LiveStrip:
   the Engine forwards `hoverSnapOrd ?? snap.data.ordinal` to `ledger.setSelected(ordinal)`, and
   the ledger maps ordinal → slot each tick (`_recomputeSelectedSlot`). There is NO scene fog
-  anywhere any more (removed 2026-07-11) and recency is `slotFade` brightness only — tiles, bands
-  and struts keep their identity colour all the way down the trail.
+  anywhere any more (removed 2026-07-11) and recency is `slotFade` brightness only. IDENTITY
+  colour belongs to the front (lead) row and the hovered/selected row alone (user, 2026-08-07)
+  — every other snapshot (tiles AND bands) rests in the neutral cyan tone.
 - **Picking + tile identity.** `_syncPickables()` publishes `_bar.pickables` and the lane
   tiles — floors and containers are NOT pick targets (2026-08-06) — the tiles **only once a
   tile resolver exists**.

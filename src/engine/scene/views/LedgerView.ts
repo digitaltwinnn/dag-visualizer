@@ -148,6 +148,7 @@ export class LedgerView implements SceneView {
   private _hover: string | null = null;
 
   private _core: number;
+  private readonly _coreCol = new THREE.Color();
   private _border: number;
   private _panel: number;
   private _muted: number;
@@ -229,6 +230,7 @@ export class LedgerView implements SceneView {
     sceneColors: Record<string, number>,
   ) {
     this._core = colors.core;
+    this._coreCol.setHex(colors.core);
     this._border = colors.border;
     this._panel = colors.panel;
     this._muted = colors.muted;

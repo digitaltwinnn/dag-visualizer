@@ -47,6 +47,8 @@ interface Slot {
    *  states, distinct from `measured` (which only tracks whether the exact read landed). */
   seam: boolean;
   keys: string[];
+  /** Per-band identity hex, parallel to `keys` — update() picks identity vs neutral per frame. */
+  colors: number[];
   used: number;
 }
 
@@ -86,7 +88,7 @@ export class ByteBar {
       this.group.add(outline);
       this._slots.push({
         ordinal: -1, bands, mats, outline, outMat,
-        measured: false, seam: true, keys: [], used: 0,
+        measured: false, seam: true, keys: [], colors: [], used: 0,
       });
     }
   }
@@ -101,6 +103,7 @@ export class ByteBar {
     if (!s) return;
     s.ordinal = ordinal;
     s.keys.length = 0;
+    s.colors.length = 0;
     const x = LEAD_X - slot * SLOT_SP;
     // Bottom just above the plane (user, 2026-08-07) — the box is centred, so lift by half height.
     const y = FLOOR_Y.gl0 + BAR_LIFT + BAR_H / 2;
@@ -131,12 +134,13 @@ export class ByteBar {
       // The bar runs along Z (the lane/width field); X is time, so the box's own X is its depth.
       mesh.scale.set(BAR_D, 1, w);
       mesh.position.set(x, y, band.z0 + w / 2);
-      s.mats[i].color.setHex(
-        band.key === UNLISTED_KEY ? this._neutral : (this._sceneColors[band.key] ?? this._neutral),
-      );
+      const identityHex =
+        band.key === UNLISTED_KEY ? this._neutral : (this._sceneColors[band.key] ?? this._neutral);
+      s.mats[i].color.setHex(identityHex);
       mesh.userData.pick = pick;
       mesh.userData.bandKey = band.key;
       s.keys.push(band.key);
+      s.colors.push(identityHex);
     }
     s.used = n;
     this._syncPickables();
@@ -168,6 +172,9 @@ export class ByteBar {
         const base = off ? this.tune.dimOp : hot ? this.tune.hotOp : this.tune.restOp;
         const t = base * fade * this._alpha;
         s.mats[i].opacity += (t - s.mats[i].opacity) * k;
+        // IDENTITY colour on the front (lead) and hovered/selected rows alone (user, 2026-08-07);
+        // the rest of the trail rests neutral cyan. setHex is allocation-free.
+        s.mats[i].color.setHex(hot ? s.colors[i] : this._neutral);
       }
     }
   }

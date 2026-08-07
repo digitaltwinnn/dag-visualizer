@@ -10,6 +10,10 @@ import { HyperView, type MetaHubRec } from "./scene/views/HyperView";
 import { Globe, GATHER_CELL } from "./scene/Globe";
 import { LedgerView } from "./scene/views/LedgerView";
 import { LANE_IDS } from "./domain/ledgerModel";
+import { UNLISTED_KEY } from "./domain/ledgerBands";
+
+// The public catalog's ids — the unknown-lane tile resolver splits listed from unlisted rows.
+const LISTED_IDS = new Set(METAGRAPHS.map((m) => m.id));
 import { StageLights } from "./scene/objects/StageLights";
 import { loadGeoCache, resolveMissing } from "@/src/data/geoResolve";
 import { METAGRAPHS, COLORS } from "@/src/engine/config";
@@ -240,14 +244,33 @@ export class Engine {
     this.ledger.setTileResolver((metaId, ts, k) => {
       const net = getNetwork();
       if (!net) return null;
-      const s = snapsAtTick(net.metaSnaps, metaId, ts)[k];
-      if (!s) return null;
       const g = net.globalSnapshots.find((gs) => gs.timestamp === ts);
       if (!g) return null;
+      const global = {
+        kind: "snapshot",
+        data: g,
+        title: `Global snapshot #${g.ordinal}`,
+      } as Extract<PickDescriptor, { kind: "snapshot" }>;
+      if (metaId === UNLISTED_KEY) {
+        // The UNKNOWN lane's tiles (user, 2026-08-07: inspectable like any other): the exact
+        // read is the only source that knows the unlisted channels — resolve tile `k` to the
+        // k-th unlisted row, whose real state-channel ADDRESS becomes the metaSnap subject
+        // (the deep read works for any address; the card names it by its address).
+        const ex = useStore.getState().snapshotExact[g.ordinal];
+        const row = ex?.rows?.filter((r) => !LISTED_IDS.has(r.metaId))[k];
+        if (!row) return null;
+        return {
+          kind: "metaSnap",
+          sel: { metaId: row.metaId, ordinal: row.ordinal, hash: "", globalOrdinal: g.ordinal, ts },
+          global,
+        };
+      }
+      const s = snapsAtTick(net.metaSnaps, metaId, ts)[k];
+      if (!s) return null;
       return {
         kind: "metaSnap",
         sel: { metaId, ordinal: s.ordinal, hash: s.hash, globalOrdinal: g.ordinal, ts },
-        global: { kind: "snapshot", data: g, title: `Global snapshot #${g.ordinal}` },
+        global,
       };
     });
     // The globe colours the DAG's own validator nodes (the L0/cL1 shells) with sceneColors["dag"]
@@ -922,7 +945,7 @@ export class Engine {
       return true;
     },
     ledgerOverview: () => {
-      this.focus("overview");
+      this.focus("ledger"); // the frontal resting pose (FOCI.ledger, 2026-08-07)
       return true;
     },
   };
