@@ -165,32 +165,36 @@ export default function MetaSnapPane({
               <Fact label="Exact read">unavailable — tick pruned</Fact>
             )}
 
-            {/* ── Tier 3: the application state, keyed on the BEST AVAILABLE knowledge (user,
-                2026-08-07 — the gate used the exact read's per-row hasState alone, and the two
-                decoders disagree: DED rows the quick decoder missed hid the invitation while
-                the deep read had the state all along). Precedence: the DEEP read (the fuller
-                decoder) wins; the exact row answers while deep hasn't landed; a decoded row
-                with NO state anywhere gets no invitation (a currency-only metagraph never has
-                one); an undecodable row says so. ── */}
+            {/* ── Tier 3: the application state — ONE RULE (user, 2026-08-07: DED's empty
+                state hid the invitation while the raw layer rendered the decoded shape; the
+                two surfaces must apply one standard): if the payload DECODED, the tier shows
+                and the invitation stands — an empty state says "empty" honestly instead of
+                hiding. Both routes share one decoder, so decoded-ness itself can't disagree;
+                a genuinely unreadable payload says so (and "decoding…" while the pin's full
+                unpack is in flight). ── */}
             {(() => {
-              const stateBytes = deep ? deep.stateBytes : row?.hasState ? row.stateBytes : 0;
-              const hasState = deep ? deep.stateBytes > 0 || deep.stateKeys.length > 0 || !!deep.state : !!row?.hasState;
-              const undecodable = !hasState && row != null && !row.decoded && !deep;
-              if (undecodable)
+              const decodedOk = deep != null || row?.decoded === true;
+              if (!decodedOk) {
+                if (row == null) return null; // no exact row yet — tier 2's reading state covers it
                 return (
                   <Fact label="State">
-                    {/* PINNED and the full unpack is in flight — the deep decoder often reads
-                        what the quick summary couldn't, so don't render its verdict as final
-                        until the deep read answers (user, 2026-08-07). */}
                     <span className="text-muted-foreground italic">
                       {following ? "undecodable payload" : "decoding…"}
                     </span>
                   </Fact>
                 );
-              if (!hasState) return null;
+              }
+              const stateBytes = deep ? deep.stateBytes : (row?.stateBytes ?? 0);
+              const empty = deep ? !deep.stateKeys.some((k) => k.count > 0) : !row?.hasState;
               return (
                 <>
-                  {stateBytes > 0 && <Fact label="State">{fmtKB(stateBytes / 1024)}</Fact>}
+                  {empty ? (
+                    <Fact label="State">
+                      <span className="text-muted-foreground italic">empty</span>
+                    </Fact>
+                  ) : (
+                    stateBytes > 0 && <Fact label="State">{fmtKB(stateBytes / 1024)}</Fact>
+                  )}
                   {deep && deep.stateKeys.length > 0 && (
                     <Fact label="State records">{deep.stateKeys.map((k) => `${k.key} ${k.count}`).join(" · ")}</Fact>
                   )}
