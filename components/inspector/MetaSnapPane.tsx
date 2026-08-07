@@ -59,6 +59,7 @@ export default function MetaSnapPane({
   const sel = useStore((s) => s.metaSnap);
   const exact = useStore((s) => (sel ? s.snapshotExact[sel.globalOrdinal] : undefined));
   const deep = useStore((s) => (sel ? s.metaSnapDeep[metaSnapDeepKey(sel.globalOrdinal, sel.metaId)] : undefined));
+  const following = useStore((s) => s.following);
   const setSection = useStore((s) => s.setSection);
   // Spec §5.3's pairing runs on the EXISTING node-hover channel — a hover, never a selection, so
   // this card stays outside the one-selection-write-path rule.
@@ -164,6 +165,13 @@ export default function MetaSnapPane({
                 <Fact label="State">{fmtKB(row.stateBytes / 1024)}</Fact>
                 {deep && deep.stateKeys.length > 0 && (
                   <Fact label="State records">{deep.stateKeys.map((k) => `${k.key} ${k.count}`).join(" · ")}</Fact>
+                )}
+                {/* The deep decode is pin-gated while following (the live card advances every
+                    tick — fetching it would poll the heavy route). Honest hint in place. */}
+                {!deep && following && (
+                  <Fact label="State records">
+                    <span className="text-muted-foreground italic">pin to decode</span>
+                  </Fact>
                 )}
                 {deep && deep.dataBlockSigners.length > 0 && (
                   <Fact label="Data blocks">{deep.dataBlockSigners.length} signers</Fact>

@@ -18,6 +18,7 @@ import JsonTree from "@/components/datasection/JsonTree";
 export function ChannelStatePanel() {
   const sel = useStore((s) => s.metaSnap);
   const deep = useStore((s) => (sel ? s.metaSnapDeep[metaSnapDeepKey(sel.globalOrdinal, sel.metaId)] : undefined));
+  const following = useStore((s) => s.following);
 
   const state = useMemo(() => {
     if (!deep?.state) return null;
@@ -51,7 +52,13 @@ export function ChannelStatePanel() {
       </div>
 
       {!deep ? (
-        <p className="text-label text-muted-foreground">reading…</p>
+        // While FOLLOWING, the heavy per-snapshot decode is deliberately not fetched (the card
+        // advances every tick — that would be a poll of the explicit-gesture-only route). Say
+        // so honestly instead of pretending to read (user, 2026-08-07: "why can't I see the
+        // contents?" — the answer must be on the instrument, not in the docs).
+        <p className="text-label text-muted-foreground">
+          {following ? "following live — pin this snapshot to decode its state" : "reading…"}
+        </p>
       ) : (
         <>
           {/* The snapshot's own structure facts, straight off the deep read. */}
