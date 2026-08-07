@@ -17,7 +17,8 @@ import * as THREE from "three";
 import { METAGRAPHS, DEFAULT_META_COLOR } from "../config";
 import { metaAnchor, META_LAYERS, META_RING, DAG_L0, DAG_L1, HYPER_TILT, applyHyperRig } from "../domain/hyperLayout";
 import { LEDGER, type RailGroup } from "../domain/ledgerLayout";
-import { recordRole, containerLayout, containerChipPos, type RailRole, type ContainerSpec } from "../domain/ledgerRails";
+import { metaTrayLayout, dagTrayLayout, containerChipPos, type ContainerSpec } from "../domain/ledgerRails";
+import { LANE_IDS } from "../domain/ledgerModel";
 import { gatherSlots } from "../domain/gatherLayout";
 import type { ViewTransition } from "../domain/viewTransition";
 import type { SceneColors } from "../sceneColors";
@@ -286,16 +287,20 @@ export class Globe implements GeoViewHost {
     this.l0Count = l0List.length;
     this.l1Count = cl1List.length;
 
-    // LEDGER PRE-PASS (containers, 2026-08-06): one CONTAINER per role under the gl0 floor's front
-    // edge (dag group: L0 / L1). A record is one (machine, role) instance, and EVERY record gets a
-    // slot in its role's container — a hybrid machine shows in both (user: the container answers
-    // "who serves this role"). event-time: runs on a data rebuild, never per frame.
-    const dagContCounts = new Map<RailRole, number>();
-    if (l0List.length) dagContCounts.set("l0", l0List.length);
-    if (cl1List.length) dagContCounts.set("l1", cl1List.length);
-    const dagSpecs = containerLayout("dag", dagContCounts);
+    // LEDGER PRE-PASS (single tray, 2026-08-07): ONE full-width tray of validators under the gl0
+    // floor — each MACHINE once, roles ignored (other views dissect roles; user).
+    // event-time: runs on a data rebuild, never per frame.
+    let dagMachines = 0;
+    {
+      const s = new Set<string>();
+      for (const node of [...l0List, ...cl1List]) {
+        if (node.id == null || !s.has(node.id)) dagMachines++;
+        if (node.id != null) s.add(node.id);
+      }
+    }
+    const dagSpecs = dagTrayLayout(dagMachines);
     this._contSpecs.dag = dagSpecs;
-    const dagContSlot = new Map<RailRole, number>(); // next free slot per container
+    let dagContSlot = 0; // next free chip slot in the one tray
 
     const seen = new Set<string>();
     let idx = 0;
@@ -318,17 +323,12 @@ export class Globe implements GeoViewHost {
         const g = geoMap[node.ip];
         const geoDir = g ? latLonToVec3(g.lat!, g.lon!, 1).normalize() : null;
 
-        // LEDGER: this record's role container under the gl0 floor (containers 2026-08-06 — a
-        // hybrid machine's l0 and cl1 records each stand in their own role's container).
-        const contRole = recordRole("dag", role);
-        const contSpec = contRole ? dagSpecs.find((s) => s.role === contRole) : undefined;
-        const ledgerHide = !contSpec;
+        // LEDGER: one chip per MACHINE in the single validator tray (2026-08-07) — the machine's
+        // geo-primary record carries the chip, its other role instances hide.
+        const contSpec = dagSpecs[0];
+        const ledgerHide = !primary || !contSpec;
         const ledgerPos = new THREE.Vector3(); // event-time: one per node record, on data rebuild
-        if (contSpec && contRole) {
-          const slot = dagContSlot.get(contRole) ?? 0;
-          dagContSlot.set(contRole, slot + 1);
-          containerChipPos(contSpec, slot, ledgerPos);
-        }
+        if (!ledgerHide) containerChipPos(contSpec, dagContSlot++, ledgerPos);
         ledgerPos.applyMatrix4(_LEDGER_M).multiplyScalar(LEDGER.viewScale);
 
         const pick = {
@@ -475,27 +475,21 @@ export class Globe implements GeoViewHost {
     // DIFFERENT tilt angles (layer index = ring index; same primitive as the DAG core), so L0 / dL1 /
     // cL1 read as distinct tilted rings around a cyan hub. HyperView draws a matching tilted hoop.
     const rolesOf = (node: RouteNode) => nodeRoles(node, node.layer as string);
-    // LEDGER PRE-PASS (containers, 2026-08-06): count records per ROLE across ALL metagraphs —
-    // one container per role (L0 / cL1 / dL1) under the msnap floor's front edge, shared by every
-    // network. Records are per (machine, layer) cluster entry, so a hybrid machine naturally
-    // appears in each role container it serves. `located` is computed once here and reused by the
-    // main build loop below (same filter, one pass).
-    // event-time: runs on a data rebuild, never per frame.
+    // LEDGER PRE-PASS (per-metagraph trays, 2026-08-07): each metagraph's OWN plane carries its
+    // OWN tray of machines — deduped by IP (a hybrid appears once; roles belong to other views).
+    // `located` is computed once here and reused by the main build loop below (same filter, one
+    // pass). event-time: runs on a data rebuild, never per frame.
     const locatedByMeta = new Map<string, RouteNode[]>();
-    const metaContCounts = new Map<RailRole, number>();
+    const metaMachineCounts = new Map<string, number>();
     for (const m of withNodes) {
       const located = m.nodes.filter((node) => geoMap[node.ip]);
       locatedByMeta.set(m.id, located);
-      for (const layer of META_LAYERS) {
-        const role = recordRole("meta", layer);
-        if (!role) continue;
-        const n = located.filter((node) => rolesOf(node).includes(layer)).length;
-        if (n) metaContCounts.set(role, (metaContCounts.get(role) ?? 0) + n);
-      }
+      const machines = new Set(located.map((node) => node.ip)).size;
+      if (machines) metaMachineCounts.set(m.id, machines);
     }
-    const metaSpecs = containerLayout("meta", metaContCounts);
-    this._contSpecs.meta = metaSpecs;
-    const metaContSlot = new Map<RailRole, number>(); // next free slot per container
+    const metaSpecs = metaTrayLayout(metaMachineCounts, LANE_IDS);
+    this._contSpecs.meta = [...metaSpecs.values()];
+    const metaContSlot = new Map<string, number>(); // next free chip slot per metagraph tray
     // Which layers each metagraph actually PLOTS a node in — HyperView hides the hoop for an absent
     // layer (a data-only metagraph like DED has no cL1, so its outer ring must not draw empty).
     const hoopPresent = new Map<string, boolean[]>();
@@ -517,15 +511,14 @@ export class Globe implements GeoViewHost {
           seen.add(node.ip);
           const offset = ringFramePos(i, cnt, META_RING.radii[layer], frame);
           const dir = latLonToVec3(g.lat!, g.lon!, 1).normalize(); // real location; fanned out below
-          // LEDGER: this record's role container under the msnap floor (containers 2026-08-06 —
-          // a hybrid machine's l0/cl1/dl1 records each stand in their own role's container).
-          const contRole = recordRole("meta", layer);
-          const contSpec = contRole ? metaSpecs.find((s) => s.role === contRole) : undefined;
-          const ledgerHide = !contSpec;
+          // LEDGER: one chip per MACHINE in this metagraph's own tray (2026-08-07) — the
+          // machine's primary record carries the chip, its other layer instances hide.
+          const contSpec = metaSpecs.get(m.id);
+          const ledgerHide = !primary || !contSpec;
           const ledgerPos = new THREE.Vector3(); // event-time: one per node record, on data rebuild
-          if (contSpec && contRole) {
-            const slot = metaContSlot.get(contRole) ?? 0;
-            metaContSlot.set(contRole, slot + 1);
+          if (!ledgerHide && contSpec) {
+            const slot = metaContSlot.get(m.id) ?? 0;
+            metaContSlot.set(m.id, slot + 1);
             containerChipPos(contSpec, slot, ledgerPos);
           }
           ledgerPos.applyMatrix4(_LEDGER_M).multiplyScalar(LEDGER.viewScale); // match the LedgerView group transform

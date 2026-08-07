@@ -30,7 +30,7 @@ import { LADDERS, hasLevel, type CohortSel, type CompositionSel, type SelectionS
 import { compositionGroups, compositionKey, compositionRows } from "@/src/data/composition";
 import { metaSnapDeepKey } from "@/src/data/types";
 import { snapsAtTick } from "@/src/data/anchorLog";
-import type { CurrencyActivity, GlobalSnapshot, NodeRow, PickDescriptor } from "@/src/data/types";
+import type { GlobalSnapshot, NodeRow, PickDescriptor } from "@/src/data/types";
 import type { ClusterNode, DagCore, GeoMap, RouteMetagraph } from "@/src/data/types";
 
 type Vec = THREE.Vector3;
@@ -474,19 +474,6 @@ export class Engine {
       this._buildGlobe();
       this._applyMetagraphs();
     });
-
-    // Whether each metagraph's own token is moving — the ledger's currency gutter (spec §6.7).
-    // Non-blocking and fetched ONCE: it's a slow-moving fact, and the gutter is honest without it
-    // (activityLine renders the NO SIGNAL wording for a missing entry).
-    fetch("/api/currency-activity")
-      .then((r) => (r.ok ? r.json() : null))
-      .then((j) => {
-        // event-time: one map per load. The route answers { items }, the view wants it keyed by id.
-        const byId: Record<string, CurrencyActivity | null> = {};
-        for (const it of (j?.items ?? []) as CurrencyActivity[]) byId[it.metaId] = it;
-        this.ledger.setCurrencyActivity(byId);
-      })
-      .catch(() => this.ledger.setCurrencyActivity({}));
 
     // Live metagraphs + their geolocated node IPs (server-side; Phase 6 route).
     await this.refreshMeta(true);

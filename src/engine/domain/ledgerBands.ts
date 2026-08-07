@@ -10,7 +10,7 @@
 //
 // Allocation-free after construction: `makeBarSpec()` preallocates one band record per listed
 // metagraph plus the unlisted aggregate, and `fillBarSpec()` only writes into them.
-import { BAR_MAX_W, BAR_MIN_W, BYTE_SCALE_KB, LANE_HALF_Z } from "./ledgerLayout";
+import { BAR_MAX_W, BAR_MIN_W, BYTE_SCALE_KB, lanePlaneHalf } from "./ledgerLayout";
 import { METAGRAPHS } from "../config";
 
 /** The band key for every anchor from a metagraph that isn't publicly listed. */
@@ -119,7 +119,7 @@ export interface RibbonQuad { topZ0: number; topZ1: number; botZ0: number; botZ1
 
 /** Half the Z footprint a lane's ribbon leaves from — the lane cell, not the tile grid
  *  (+1: the unknown lane, 2026-08-07). */
-export const RIBBON_LANE_HALF = LANE_HALF_Z / (METAGRAPHS.length + 1);
+export const RIBBON_LANE_HALF = lanePlaneHalf(METAGRAPHS.length + 1);
 
 export function ribbonQuad(laneZ: number, laneHalf: number, band: Band, out: RibbonQuad): RibbonQuad {
   out.topZ0 = laneZ - laneHalf;

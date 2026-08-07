@@ -28,12 +28,12 @@ import * as THREE from "three";
 import { METAGRAPHS } from "../../config";
 import {
   LEDGER,
-  FLOOR_IDS,
   FLOOR_Y,
   GUTTER_CZ,
   GUTTER_W,
   FLOOR_MAIN_Z0,
   FLOOR_Z1,
+  lanePlaneHalf,
   LEAD_X,
   TILE_LIFT,
   LANE_HALF_Z,
@@ -49,10 +49,8 @@ import type {
   Anchor,
   PickDescriptor,
   SnapshotExact,
-  CurrencyActivity,
 } from "@/src/data/types";
 import { LEDGER_LAYERS } from "@/src/data/ledgerLayers"; // shared display copy — floor labels = panel rows
-import { activityLine } from "@/src/data/currencyActivity";
 import { ByteBar } from "../objects/ByteBar";
 import { makeGlassFill, type GlassFillUniforms } from "../objects/glassFill";
 import { Ribbons } from "../objects/Ribbons";
@@ -79,7 +77,6 @@ export const FLOOR_TUNE_DEFAULTS: FloorTune = {
 const PULSE_MAX = 220;
 const PULSE_STAGGER = 0.035;
 const META_TRAIL_MAX = 1500;
-const GUTTER_OP = 0.75;
 
 /** The glass floors' footprint, and the X the edge-aligned labels read from. Module scope because
  *  the gutter label has to land on the SAME edge as the floor labels (it used to be derived from
@@ -214,8 +211,6 @@ export class LedgerView implements SceneView {
   private _lastDrawn = 0;
 
   // ── the currency gutter (spec §4.5/§6.7)
-  private _gutterLabel: THREE.Mesh | null = null;
-  private _activity: Record<string, CurrencyActivity | null> = {};
 
   // ── the lead row's honesty label: the newest tick's anchor count is still growing
   private _formingLabel: THREE.Mesh | null = null;
@@ -351,29 +346,41 @@ export class LedgerView implements SceneView {
       list.push({ fill: fm.uniforms as unknown as GlassFillUniforms, minHalf: Math.min(w, d) / 2 });
       this._floorMats.set(id, list);
     };
-    // TWO floors now — the node layers hang in containers under their edges, not storeys of their
-    // own. Each floor is a MAIN plane (the lane field + label margin) plus its GUTTER as a small
-    // separate plane beyond a visible seam (finetune 2026-08-06): the currency strip above, the
-    // reserved $DAG-blocks strip below — a distinct instrument, not a corner of the floor.
+    // The GLOBAL floor is ONE whole plane (+ its reserved $DAG-blocks gutter beyond the seam) —
+    // the only place the metagraphs come together. The UPPER storey is not a shared floor any
+    // more: EACH METAGRAPH GETS ITS OWN narrow plane over its lane (user, 2026-08-07 — the
+    // currency gutter plane went with the shared floor), separated by visible gaps, each carrying
+    // its own ticker label and its own node tray. Independence made literal.
     const mainZ1 = FLOOR_Z1; // == FLOOR_D/2 — promoted to the domain so the containers share it
     const mainD = mainZ1 - FLOOR_MAIN_Z0;
-    for (const id of FLOOR_IDS) {
-      frame(W, mainD, FLOOR_Y[id], cx, (mainZ1 + FLOOR_MAIN_Z0) / 2, id);
-      frame(W, GUTTER_W + 1.0, FLOOR_Y[id], cx, GUTTER_CZ, id);
+    frame(W, mainD, FLOOR_Y.gl0, cx, (mainZ1 + FLOOR_MAIN_Z0) / 2, "gl0");
+    frame(W, GUTTER_W + 1.0, FLOOR_Y.gl0, cx, GUTTER_CZ, "gl0");
+    const n = this._laneOrder.length;
+    const hz = lanePlaneHalf(n);
+    for (let i = 0; i < n; i++) {
+      frame(W, hz * 2, FLOOR_Y.msnap, cx, laneSpan(i, n).cz, "msnap");
     }
 
-    const copyOf = (id: string) => LEDGER_LAYERS.find((l) => l.id === id);
     const lx = FLOOR_LABEL_X;
-    for (const id of FLOOR_IDS) {
-      const m = this._makeLabel(
-        copyOf(id)?.level ?? "",
-        copyOf(id)?.name ?? id,
+    const gl = LEDGER_LAYERS.find((l) => l.id === "gl0");
+    const glLabel = this._makeLabel(gl?.level ?? "", gl?.name ?? "gl0", lx, FLOOR_Y.gl0, D / 2 - 1.2);
+    this.group.add(glLabel);
+    this._fades.register(glLabel.material as THREE.MeshBasicMaterial, 1);
+    // Per-plane TICKER labels (the collective "Metagraph snapshots" label went with the shared
+    // floor — each plane names itself, the explorer names the group).
+    for (let i = 0; i < n; i++) {
+      const key = this._laneOrder[i];
+      const meta = METAGRAPHS.find((m) => m.id === key);
+      const t = this._makeLabel(
+        "",
+        meta?.ticker ?? "unlisted",
         lx,
-        FLOOR_Y[id],
-        D / 2 - 1.2,
+        FLOOR_Y.msnap,
+        laneSpan(i, n).cz + hz - 0.12,
+        0.62,
       );
-      this.group.add(m);
-      this._fades.register(m.material as THREE.MeshBasicMaterial, 1);
+      this.group.add(t);
+      this._fades.register(t.material as THREE.MeshBasicMaterial, 1);
     }
 
     // The lead row is annotated, not decorated: while the live tick's anchor count is still
@@ -393,6 +400,7 @@ export class LedgerView implements SceneView {
     frontX: number,
     y: number,
     leftZ: number,
+    height = 1.05,
   ): THREE.Mesh {
     const c = document.createElement("canvas");
     const SS = 2;
@@ -436,7 +444,7 @@ export class LedgerView implements SceneView {
     const tex = new THREE.CanvasTexture(c);
     tex.minFilter = THREE.LinearFilter;
     tex.colorSpace = THREE.SRGBColorSpace;
-    const h = 1.05,
+    const h = height,
       w = h * (c.width / c.height);
     const mesh = new THREE.Mesh(
       new THREE.PlaneGeometry(w, h),
@@ -481,9 +489,6 @@ export class LedgerView implements SceneView {
         m.fill.uEdgeW.value = Math.min(rimW, 0.8 * m.minHalf);
       }
     }
-    if (this._gutterLabel)
-      (this._gutterLabel.material as THREE.MeshBasicMaterial).opacity =
-        GUTTER_OP * this._fades.alpha;
     if (this._formingLabel)
       (this._formingLabel.material as THREE.MeshBasicMaterial).opacity =
         FORMING_OP * this._formingW * this._fades.alpha;
@@ -506,7 +511,8 @@ export class LedgerView implements SceneView {
       const s = laneSpan(i, n);
       const key = this._laneOrder[i];
       this._laneZ.set(key, s.cz);
-      this._laneHZ.set(key, s.hz);
+      // Tiles fit each lane's OWN PLANE (2026-08-07) — the slice minus the separating gap.
+      this._laneHZ.set(key, lanePlaneHalf(n));
     }
   }
 
@@ -586,11 +592,6 @@ export class LedgerView implements SceneView {
     this._syncPickables();
   }
 
-  setCurrencyActivity(byId: Record<string, CurrencyActivity | null>): void {
-    this._activity = byId;
-    this._rebuildGutter();
-  }
-
   setContainers(group: RailGroup, specs: ContainerSpec[]): void {
     this._rails.setContainers(group, specs); // event-time: a data rebuild, not a frame
     this._syncPickables();
@@ -607,7 +608,6 @@ export class LedgerView implements SceneView {
   setFilter(filter: string) {
     this._filter = filter || "all"; // event-time
     this._applyDim();
-    this._rebuildGutter();
   }
 
   /** Filter-chip / hub HOVER: preview that network's highlight only. No relayout, no gutter change,
@@ -732,38 +732,6 @@ export class LedgerView implements SceneView {
     for (const o of this._bar.pickables) this.pickables.push(o);
     // Tiles only become raycast targets once a resolver can turn an instance id into a snapshot.
     if (this._tileResolver) this.pickables.push(this._metaTrailMesh);
-  }
-
-  // ── the currency gutter ──────────────────────────────────────────────────
-
-  private _rebuildGutter(): void {
-    if (this._gutterLabel) {
-      this.group.remove(this._gutterLabel);
-      this._gutterLabel.geometry.dispose();
-      const old = this._gutterLabel.material as THREE.MeshBasicMaterial;
-      old.map?.dispose();
-      old.dispose();
-      this._gutterLabel = null;
-    }
-    const id = this._filter !== "all" && this._filter !== "dag" && this._laneOrder.includes(this._filter)
-      ? this._filter
-      : null;
-    if (!id) return;
-    const meta = METAGRAPHS.find((m) => m.id === id);
-    // Measured against an ABSOLUTE clock, not the visible window — a dormant token must not read
-    // as "quiet right now" (spec §6.7). activityLine() owns the NO SIGNAL / NO CURRENCY wording.
-    const text = activityLine(this._activity[id] ?? null, meta?.ticker ?? id, Date.now());
-    // event-time: one canvas per filter/activity change
-    const mesh = this._makeLabel(
-      "",
-      text,
-      FLOOR_LABEL_X,
-      FLOOR_Y.msnap,
-      GUTTER_CZ + GUTTER_W / 2,
-    );
-    (mesh.material as THREE.MeshBasicMaterial).opacity = GUTTER_OP * this._fades.alpha;
-    this.group.add(mesh);
-    this._gutterLabel = mesh;
   }
 
   // ── frame ────────────────────────────────────────────────────────────────

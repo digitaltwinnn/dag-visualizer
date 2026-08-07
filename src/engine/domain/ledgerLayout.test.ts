@@ -4,9 +4,9 @@ import {
   LEDGER, LAYER_GEOM, ledgerSite, clusterRadius, ledgerSpread,
   FLOOR_IDS, FLOOR_Y, LANE_HALF_Z, GUTTER_W, GUTTER_CZ, GUTTER_GAP, FLOOR_MAIN_Z0,
   BAR_MAX_W, BAR_MIN_W, BAR_H, BAR_D, BYTE_SCALE_KB,
-  CONT_X, CONT_TOP_GAP, CONT_CHIP_Z, CONT_ROW_Y, CONT_PAD, CONT_GAP, CONT_Z0, CONT_Z1, FLOOR_Z1,
-  CONT_LABEL_W, LEAD_X, TILE_LIFT, BAR_LIFT,
-  RAIL_GROUP_FLOOR, laneSpan,
+  CONT_X, CONT_TOP_GAP, CONT_CHIP_Z, CONT_ROW_Y, CONT_PAD, CONT_Z0, CONT_Z1, FLOOR_Z1,
+  LEAD_X, TILE_LIFT, BAR_LIFT,
+  LANE_PLANE_GAP, lanePlaneHalf, laneSpan,
 } from "./ledgerLayout";
 
 describe("LAYER_GEOM after the layer-navigation retirement (2026-08-06)", () => {
@@ -14,8 +14,6 @@ describe("LAYER_GEOM after the layer-navigation retirement (2026-08-06)", () => 
     expect(LAYER_GEOM.map((l) => l.id)).toEqual(["msnap", "gl0"]);
     expect(LAYER_GEOM.find((l) => l.id === "msnap")!.y).toBe(FLOOR_Y.msnap);
     expect(LAYER_GEOM.find((l) => l.id === "gl0")!.y).toBe(FLOOR_Y.gl0);
-    expect(RAIL_GROUP_FLOOR.meta).toBe("msnap");
-    expect(RAIL_GROUP_FLOOR.dag).toBe("gl0");
   });
 });
 
@@ -112,20 +110,26 @@ describe("two-floor chamber (redesign 2026-08-04)", () => {
     expect(BYTE_SCALE_KB).toBe(77);
   });
 
-  it("hangs the node containers under their floor's front edge, facing the camera", () => {
-    // The shared container X plane sits camera-side (+X), the frames below the floor plane.
+  it("hangs the node trays under their plane's front edge, facing the camera", () => {
+    // The shared tray X plane sits camera-side (+X), the frames below the floor plane.
     expect(CONT_X).toBeGreaterThan(0);
     expect(CONT_TOP_GAP).toBeGreaterThan(0);
     // Chip/row pitches and frame chrome are positive and modest against the lane field.
-    for (const v of [CONT_CHIP_Z, CONT_ROW_Y, CONT_PAD, CONT_GAP]) expect(v).toBeGreaterThan(0);
-    expect(CONT_GAP).toBeLessThan(LANE_HALF_Z);
-    // The stacked containers span the main plane's full front width, inset from both edges.
+    for (const v of [CONT_CHIP_Z, CONT_ROW_Y, CONT_PAD]) expect(v).toBeGreaterThan(0);
+    // The DAG validator tray spans the main plane's full front width, inset from both edges.
     expect(CONT_Z0).toBeGreaterThan(FLOOR_MAIN_Z0);
     expect(CONT_Z1).toBeLessThan(FLOOR_Z1);
     expect(CONT_Z1 - CONT_Z0).toBeGreaterThan(2 * LANE_HALF_Z);
-    // The in-frame label strip leaves most of the width to the chips.
-    expect(CONT_LABEL_W).toBeGreaterThan(0);
-    expect(CONT_LABEL_W).toBeLessThan((CONT_Z1 - CONT_Z0) / 4);
+  });
+
+  it("gives each lane its own plane, gapped, inside its slice (2026-08-07)", () => {
+    const n = METAGRAPHS.length + 1; // the unknown lane included
+    expect(LANE_PLANE_GAP).toBeGreaterThan(0);
+    expect(lanePlaneHalf(n)).toBeGreaterThan(0);
+    expect(lanePlaneHalf(n)).toBeLessThan(LANE_HALF_Z / (n - 1));
+    // Neighbouring planes never touch: centre distance ≥ plane width + gap.
+    const d = Math.abs(ledgerSite(1, n).z - ledgerSite(0, n).z);
+    expect(d).toBeCloseTo(2 * lanePlaneHalf(n) + LANE_PLANE_GAP, 6);
   });
 
   it("leads the time trail toward the camera-side floor edge", () => {

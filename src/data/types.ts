@@ -91,12 +91,6 @@ export interface MetaSnapSel {
   ts: string;            // that tick's timestamp — the anchor join
 }
 
-/** Whether a metagraph's own token is moving — the ledger's currency-gutter status (spec §6.7). */
-export interface CurrencyActivity {
-  metaId: string;
-  state: "active" | "dormant" | "none";
-  lastTs: string | null;
-}
 
 // Per-tick anchor aggregate from NetworkData.anchorIndex (see getAnchor).
 export interface Anchor {

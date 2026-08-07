@@ -154,6 +154,18 @@ export const BAR_D = 1.6;
 export const TILE_LIFT = 0.05; // metagraph tiles above the msnap plane
 export const BAR_LIFT = 0.05;  // byte bars above the gl0 plane
 
+/** EACH METAGRAPH GETS ITS OWN PLANE (user, 2026-08-07): the upper storey is not one shared
+ *  floor but one narrow plane per lane (the unknown lane included), separated by visible gaps —
+ *  the literal statement that metagraphs are unrelated to each other and only come together on
+ *  the global snapshot plane below. */
+export const LANE_PLANE_GAP = 0.6;
+/** Half the Z extent of one lane's own plane — the lane PITCH (ledgerSite spreads the n
+ *  centres over the full field, so pitch = 2·LANE_HALF_Z/(n−1)) minus the separating gap. */
+export function lanePlaneHalf(n: number): number {
+  const pitch = n > 1 ? (2 * LANE_HALF_Z) / (n - 1) : 2 * LANE_HALF_Z;
+  return pitch / 2 - LANE_PLANE_GAP / 2;
+}
+
 /** The fixed scale reference: KB carried at which the bar fills the floor (spec §6.3).
  *  p99 of anchored KB per global tick, measured by scripts/bake-ledger-scale.ts on 2026-08-06
  *  over 1838 ticks (p50 5 · p95 23 · p99 71 · max 149 KB) and inflated by the observed unlisted
@@ -168,24 +180,19 @@ export const BAR_LIFT = 0.05;  // byte bars above the gl0 plane
  *  not hidden. A future re-bake should calibrate against exact-read totals instead. */
 export const BYTE_SCALE_KB = 77;
 
-// ── Node containers (finetune 2026-08-06, replacing the on-floor rails) — framed per-ROLE trays
-// hanging under the FRONT (+X, camera-side) edge of the floor their machines serve, facing the
-// camera. Layout math lives in ledgerRails.ts (containerLayout/containerChipPos); these are the
-// shared literals.
+// ── Node trays (redesign 2026-08-07 — ONE tray per snapshot plane, no role split): glass trays
+// hanging under the FRONT (+X, camera-side) edge of the plane their machines serve, facing the
+// camera. Layout math lives in ledgerRails.ts (metaTrayLayout/dagTrayLayout/containerChipPos);
+// these are the shared literals.
 export type RailGroup = "meta" | "dag";
-export const RAIL_GROUP_FLOOR: Record<RailGroup, LedgerFloorId> = { meta: "msnap", dag: "gl0" };
 
-export const CONT_X = 6.2;        // the containers' shared X plane — just inside the floors' front edge
-export const CONT_TOP_GAP = 0.15; // floor plane → first container frame top (tight — user 2026-08-07)
+export const CONT_X = 6.2;        // the trays' shared X plane — just inside the floors' front edge
+export const CONT_TOP_GAP = 0.15; // floor plane → tray frame top (tight — user 2026-08-07)
 export const CONT_CHIP_Z = 0.46;  // chip pitch along Z (columns) — tightened with the smaller chips
 export const CONT_ROW_Y = 0.46;   // row pitch downward
 export const CONT_PAD = 0.16;     // frame padding around the chip grid — a tight hairline margin
-export const CONT_GAP = 0.3;      // VERTICAL gap between stacked containers
-/** The label strip INSIDE the frame's screen-left end — the chips start after it (the role code
- *  sits in the tray like the floor labels sit on the plane; user, 2026-08-07). */
-export const CONT_LABEL_W = 2.1;
-/** The containers' Z extents — the FULL front width of the main floor plane (user, 2026-08-07:
- *  stacked below each other instead of side by side), inset slightly from both plane edges. */
+/** The DAG validator tray's Z extents — the FULL front width of the global floor plane,
+ *  inset slightly from both plane edges. (Metagraph trays span their own plane instead.) */
 export const CONT_Z0 = FLOOR_MAIN_Z0 + 0.3;
 export const CONT_Z1 = FLOOR_Z1 - 0.6;
 
