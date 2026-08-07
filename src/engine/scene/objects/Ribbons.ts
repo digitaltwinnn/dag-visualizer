@@ -24,7 +24,10 @@ import { SLOT_SP } from "../../domain/ledgerModel";
 import { ribbonQuad, RIBBON_LANE_HALF, UNLISTED_KEY, type BarSpec, type RibbonQuad } from "../../domain/ledgerBands";
 
 
-export const RIBBON_ROWS = 2;
+// THREE rows since 2026-08-07 (was 2): the LEAD row, the COMMITTED/hot row, and the HOVER
+// preview row — with a snapshot pinned, a hover needs its own sheet or the preview ribbon
+// simply never appears (the pinned row owns row 1).
+export const RIBBON_ROWS = 3;
 /** Vertical subdivisions per ribbon — enough for the eased sweep to read as a curve. */
 export const RIBBON_SEG = 16;
 const PER_ROW = METAGRAPHS.length + 1;
@@ -40,7 +43,7 @@ export interface RibbonTune {
 /** COLORED dim for an off-filter ribbon (user, 2026-08-07): the sheet keeps its identity hue
  *  at a fraction of full strength — a tier between full colour and the neutral trail, so the
  *  committed metagraph's ribbons lead while the others stay identifiable. */
-export const RIBBON_DIM = 0.35;
+export const RIBBON_DIM = 0.2; // user-tuned deeper, 2026-08-07
 
 // User-tuned via ?tune, 2026-08-07.
 export const RIBBON_TUNE_DEFAULTS: RibbonTune = {
@@ -76,7 +79,7 @@ export class Ribbons {
   private _alpha = 0;
   /** Per-row brightness scale — the trail REWIND fades the live lead row's sheet while an older
    *  snapshot owns the front, and the HOVER-preview row rides below full (LedgerView drives). */
-  private _rowFade = [1, 1];
+  private _rowFade = [1, 1, 1];
   private _filter = "all";
   private _c = new THREE.Color();
 
@@ -118,7 +121,7 @@ export class Ribbons {
    *  network committed): a hidden lane laid no tiles, so it gets no ribbon either. The unlisted
    *  channels have a real lane of their own now (the "unknown" lane at the screen-left end,
    *  2026-08-07), so every band resolves the same way — the old mid-air start is retired. */
-  setRow(row: 0 | 1, slot: number, spec: BarSpec | null, laneZ: (key: string) => number | null): void {
+  setRow(row: 0 | 1 | 2, slot: number, spec: BarSpec | null, laneZ: (key: string) => number | null): void {
     const st = this._rows[row];
     st.slot = slot;
     st.keys.length = 0;
@@ -137,17 +140,17 @@ export class Ribbons {
     this._writeGeometry();
   }
 
-  clearRow(row: 0 | 1): void {
+  clearRow(row: 0 | 1 | 2): void {
     this._rows[row].count = 0;
     this._rows[row].keys.length = 0;
     this._writeGeometry();
   }
 
-  ribbonCount(row: 0 | 1): number { return this._rows[row].count; }
+  ribbonCount(row: 0 | 1 | 2): number { return this._rows[row].count; }
 
   /** Set a row's brightness scale (0..1). Rewrites the sheet only on real change — called per
    *  frame during the trail-rewind ease, but the rewrite fires ~a handful of times per ease. */
-  setRowFade(row: 0 | 1, f: number): void {
+  setRowFade(row: 0 | 1 | 2, f: number): void {
     if (Math.abs(this._rowFade[row] - f) < 0.012) return;
     this._rowFade[row] = f;
     this._writeGeometry();
@@ -155,7 +158,7 @@ export class Ribbons {
 
   /** A point on ribbon `i`'s centre line at vertical progress `t` — follows the SAME eased sweep
    *  the sheet is drawn with, so the anchor pulses ride the curve. */
-  centreLine(row: 0 | 1, i: number, t: number, out: THREE.Vector3): THREE.Vector3 {
+  centreLine(row: 0 | 1 | 2, i: number, t: number, out: THREE.Vector3): THREE.Vector3 {
     const st = this._rows[row];
     // Caller contract: bound the loop by ribbonCount(row) — an empty row has no quad to walk.
     if (st.count === 0) return out;

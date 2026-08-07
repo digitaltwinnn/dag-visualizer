@@ -650,17 +650,19 @@ export class LedgerView implements SceneView {
 
   private _syncRibbonRows(): void {
     this._ribbons.setRow(0, 0, this._slotSnap[0] ? this._specs[0] : null, this._laneZOf);
-    // Row 1: the COMMITTED row at full strength, else the HOVERED row as the colored-dim
-    // preview (user, 2026-08-07 — the active row keeps its ribbons regardless of hover).
+    // Row 1 = the COMMITTED row (full strength); row 2 = the HOVER preview (colored dim).
+    // Separate rows (2026-08-07): with a snapshot pinned, a hover needs its own sheet — the
+    // active row keeps its ribbons regardless of hover, and the preview never goes missing.
     const hot = this.model.selectedSlot;
-    const hov = this._hoverSlot;
     if (hot > 0 && hot < SLOT_N && this._slotSnap[hot]) {
       this._ribbons.setRow(1, hot, this._specs[hot], this._laneZOf);
       this._ribbons.setRowFade(1, 1);
-    } else if (hov > 0 && hov < SLOT_N && this._slotSnap[hov]) {
-      this._ribbons.setRow(1, hov, this._specs[hov], this._laneZOf);
-      this._ribbons.setRowFade(1, SNAP_PREVIEW);
     } else this._ribbons.clearRow(1);
+    const hov = this._hoverSlot;
+    if (hov > 0 && hov < SLOT_N && hov !== hot && this._slotSnap[hov]) {
+      this._ribbons.setRow(2, hov, this._specs[hov], this._laneZOf);
+      this._ribbons.setRowFade(2, SNAP_PREVIEW);
+    } else this._ribbons.clearRow(2);
   }
 
   /** The ribbon index a metagraph's band occupies in a row — mirrors the order Ribbons.setRow walks
