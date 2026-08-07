@@ -107,6 +107,16 @@ interface QueueItem {
  *  knows returns null — it stays DRAWN but is left out of `pickables` (the anonymous tile, §6.1). */
 export type TilePickResolver = (metaId: string, tickTs: string, k: number) => PickDescriptor | null;
 
+/** The live-tunable metagraph-snapshot TILE look (dev `?tune` panel binds these; the values are
+ *  the shipped look). Brightness multipliers on the tile's identity colour. */
+export interface TileTune {
+  hot: number;  // the hot row's filled tiles
+  rest: number; // a resting filled tile
+  dim: number;  // the whole-lane multiplier while the lane is off-filter
+}
+
+export const TILE_TUNE_DEFAULTS: TileTune = { hot: 1.3, rest: 0.7, dim: 0.22 };
+
 export class LedgerView implements SceneView {
   group: THREE.Group;
   pickables: THREE.Object3D[];
@@ -137,6 +147,9 @@ export class LedgerView implements SceneView {
   private _ribbons: Ribbons;
   /** Dev-only access for the ?tune panel (Engine.mountDevTune) — not part of the frame path. */
   get ribbons(): Ribbons { return this._ribbons; }
+  get bar(): ByteBar { return this._bar; }
+  /** The tiles' live-tunable look — read per frame by update()'s tile pass. */
+  tiles: TileTune = { ...TILE_TUNE_DEFAULTS };
 
   // ── the lane field (construction-time; never reallocated per frame)
   private readonly _laneOrder: string[] = METAGRAPHS.map((m) => m.id);
@@ -773,9 +786,12 @@ export class LedgerView implements SceneView {
         _dummy.updateMatrix();
         this._metaTrailMesh.setMatrixAt(mi, _dummy.matrix);
         const hot = this.model.isRowHot(laneOff, b.slot);
+        // Unfilled (anonymous/ghost) tiles keep their fixed fraction of the tuned filled level.
         const bright =
-          (hot ? Math.max(b.fade, 0.9) * (b.filled ? 1.3 : 0.2) : b.fade * (b.filled ? 0.7 : 0.12)) *
-          (laneOff ? 0.22 : 1) *
+          (hot
+            ? Math.max(b.fade, 0.9) * (b.filled ? this.tiles.hot : this.tiles.hot * 0.15)
+            : b.fade * (b.filled ? this.tiles.rest : this.tiles.rest * 0.17)) *
+          (laneOff ? this.tiles.dim : 1) *
           this._fades.alpha;
         this._metaTrailMesh.setColorAt(mi, _col.copy(laneColor).multiplyScalar(bright));
         mi++;

@@ -1506,9 +1506,12 @@ frame). It composes three adapters — `objects/ByteBar.ts`, `objects/Ribbons.ts
   adjacent ribbons can never cross, and the anchor pulses ride the same curve (`centreLine`). A
   **HIDDEN lane draws no ribbon** (the lane resolver returns null — its old-position sheet would
   overlap the committed lane's field). Its look is **live-tunable** (`RibbonTune` —
-  restOp/dimOp/brightness/curve; `RIBBON_TUNE_DEFAULTS` is the shipped look, and the dev
-  **`?tune`** flag mounts a tweakpane panel (`src/engine/devTune.ts`, dynamic import — never in
-  the normal bundle) to find values by eye). `RIBBON_ROWS = 2`: only the **LEAD row and the HOT
+  restOp/dimOp/brightness/curve; `RIBBON_TUNE_DEFAULTS` is the shipped look). The dev
+  **`?tune`** flag (present at page LOAD, the ?stats idiom) mounts a tweakpane panel
+  (`src/engine/devTune.ts`, dynamic import — never in the normal bundle) with folders for the
+  ribbons, the byte bar (`BarTune` — rest/hot/dim/seam opacities) and the lane tiles
+  (`TileTune` — hot/rest/off-filter brightness), each backed by a `*_TUNE_DEFAULTS` shipped
+  look; chosen values get baked back into those constants. `RIBBON_ROWS = 2`: only the **LEAD row and the HOT
   row** get a sheet (one Mesh, one preallocated geometry, rewritten event-time); every older
   tick keeps a hairline strut drawn by the view.
 - **Node containers** (`objects/NodeRails.ts` over `domain/ledgerRails.ts`, 2026-08-06 —
@@ -1522,9 +1525,10 @@ frame). It composes three adapters — `objects/ByteBar.ts`, `objects/Ribbons.ts
   duplicated by design; the duplication comes free because node records are per (machine,
   layer) cluster entry, so `Globe` simply places each record in its `recordRole` container via
   `containerChipPos`). The adapter draws the hairline frame + role-code label per container;
-  **the CHIPS are the shared node InstancedMeshes** `Globe` places. Containers are **pure
-  visual aid**: no pick proxies, no layer highlight — the machines inside stay pickable as
-  nodes.
+  **the CHIPS are the shared node InstancedMeshes** `Globe` places, oriented CAP-toward-the-
+  camera like the tray face (`_qLedgerChip`, user 2026-08-07 — upright chips read as flat
+  against the vertical tray). Containers are **pure visual aid**: no pick proxies, no layer
+  highlight — the machines inside stay pickable as nodes.
 - **Reuse, not clones:** the node chips are the SAME `InstancedMesh` instances from hyper/geo
   (`globe.nodes` / `globe.metaNodes`); the `if (this.ledger)` branches in `globe.setMorph`/`update`
   rewrite *those* instances' matrices to the container positions. The Engine **freezes `morph`** while

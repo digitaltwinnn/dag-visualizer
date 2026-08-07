@@ -284,7 +284,7 @@ export class Engine {
     if (/[?#&]tune/.test(window.location.search + window.location.hash)) {
       import("./devTune").then(async (m) => {
         if (this.disposed) return;
-        this._devTune = await m.mountDevTune({ ribbons: this.ledger.ribbons });
+        this._devTune = await m.mountDevTune({ ledger: this.ledger });
         if (this.disposed) this._devTune.dispose();
       });
     }

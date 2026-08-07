@@ -16,13 +16,21 @@ import { UNLISTED_KEY, type BarSpec } from "../../domain/ledgerBands";
 import { SLOT_SP, SLOT_N, slotFade } from "../../domain/ledgerModel";
 
 const BANDS_PER_SLOT = METAGRAPHS.length + 1;
-const REST_OP = 0.5;
-const HOT_OP = 0.95;
-const DIM_OP = 0.16;
-/** A tick with no exact read yet, OR a measured tick that anchored nothing, is drawn as a dashed
- *  hairline outline at minimum width — honest about the read not having landed (or the tick
- *  having carried nothing), never a width inferred from anchor count or fee (spec §6.2). */
-const SEAM_OP = 0.3;
+
+/** The live-tunable bar look (dev `?tune` panel binds these; the values are the shipped look). */
+export interface BarTune {
+  restOp: number; // a resting band's opacity
+  hotOp: number;  // the lead/selected row's bands
+  dimOp: number;  // an off-filter band (never removed — spec §5.2)
+  seamOp: number; // the unmeasured/empty tick's dashed seam outline
+}
+
+export const BAR_TUNE_DEFAULTS: BarTune = {
+  restOp: 0.5,
+  hotOp: 0.95,
+  dimOp: 0.16,
+  seamOp: 0.3,
+};
 
 interface Slot {
   ordinal: number;
@@ -42,6 +50,7 @@ interface Slot {
 export class ByteBar {
   group = new THREE.Group();
   pickables: THREE.Object3D[] = [];
+  tune: BarTune = { ...BAR_TUNE_DEFAULTS };
   private _slots: Slot[] = [];
   private _geo = new THREE.BoxGeometry(1, BAR_H, 1);
   private _outGeo: THREE.BufferGeometry;
@@ -140,7 +149,10 @@ export class ByteBar {
       const fade = slotFade(si);
       const hot = si === this._selected || si === 0;
       if (s.seam) {
-        const t = SEAM_OP * fade * this._alpha;
+        // A tick with no exact read yet, OR a measured tick that anchored nothing: the dashed
+        // seam outline — honest about the read not having landed (or the tick having carried
+        // nothing), never a width inferred from anchor count or fee (spec §6.2).
+        const t = this.tune.seamOp * fade * this._alpha;
         s.outMat.opacity += (t - s.outMat.opacity) * k;
         continue;
       }
@@ -149,7 +161,7 @@ export class ByteBar {
         // A filter never removes a band — the bar keeps its full composition and the committed
         // metagraph's share simply lights (spec §5.2).
         const off = this._filter !== "all" && key !== this._filter;
-        const base = off ? DIM_OP : hot ? HOT_OP : REST_OP;
+        const base = off ? this.tune.dimOp : hot ? this.tune.hotOp : this.tune.restOp;
         const t = base * fade * this._alpha;
         s.mats[i].opacity += (t - s.mats[i].opacity) * k;
       }

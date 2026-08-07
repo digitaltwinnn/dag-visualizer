@@ -5,10 +5,10 @@
 // *_TUNE_DEFAULTS constants they came from.
 //
 // Engine owns the mount/dispose; this module only builds the panel.
-import type { Ribbons } from "./scene/objects/Ribbons";
+import type { LedgerView } from "./scene/views/LedgerView";
 
 export interface DevTuneTargets {
-  ribbons: Ribbons;
+  ledger: LedgerView;
 }
 
 export interface DevTuneHandle {
@@ -28,12 +28,28 @@ export async function mountDevTune(targets: DevTuneTargets): Promise<DevTuneHand
   }
 
   const rf = pane.addFolder({ title: "ribbons" });
-  const t = targets.ribbons.tune;
-  rf.addBinding(t, "restOp", { min: 0, max: 1, step: 0.01, label: "opacity" });
-  rf.addBinding(t, "dimOp", { min: 0, max: 0.5, step: 0.01, label: "dim opacity" });
-  rf.addBinding(t, "brightness", { min: 0.1, max: 2, step: 0.05 });
-  rf.addBinding(t, "curve", { min: 0, max: 1, step: 0.05 });
-  rf.on("change", () => targets.ribbons.setTune({}));
+  const rt = targets.ledger.ribbons.tune;
+  rf.addBinding(rt, "restOp", { min: 0, max: 1, step: 0.01, label: "opacity" });
+  rf.addBinding(rt, "dimOp", { min: 0, max: 0.5, step: 0.01, label: "dim opacity" });
+  rf.addBinding(rt, "brightness", { min: 0.1, max: 2, step: 0.05 });
+  rf.addBinding(rt, "curve", { min: 0, max: 1, step: 0.05 });
+  // The ribbon dim/brightness are baked into vertex colours — a change must rewrite the sheet.
+  rf.on("change", () => targets.ledger.ribbons.setTune({}));
+
+  // The global snapshots — the byte bar's band/seam opacities (read per frame, no rebuild).
+  const bf = pane.addFolder({ title: "global snapshots (bar)" });
+  const bt = targets.ledger.bar.tune;
+  bf.addBinding(bt, "restOp", { min: 0, max: 1, step: 0.01, label: "opacity" });
+  bf.addBinding(bt, "hotOp", { min: 0, max: 1, step: 0.01, label: "hot opacity" });
+  bf.addBinding(bt, "dimOp", { min: 0, max: 0.5, step: 0.01, label: "dim opacity" });
+  bf.addBinding(bt, "seamOp", { min: 0, max: 1, step: 0.01, label: "seam opacity" });
+
+  // The metagraph snapshots — the lane tiles' brightness multipliers (read per frame).
+  const tf = pane.addFolder({ title: "metagraph snapshots (tiles)" });
+  const tt = targets.ledger.tiles;
+  tf.addBinding(tt, "hot", { min: 0, max: 2.5, step: 0.05, label: "hot" });
+  tf.addBinding(tt, "rest", { min: 0, max: 2, step: 0.05, label: "rest" });
+  tf.addBinding(tt, "dim", { min: 0, max: 1, step: 0.01, label: "off-filter" });
 
   return { dispose: () => pane.dispose() };
 }
