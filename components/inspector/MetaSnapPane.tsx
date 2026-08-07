@@ -77,10 +77,17 @@ export default function MetaSnapPane({
   }, [sel]);
 
   // Tier 2 — this snapshot's own row inside the tick's exact read.
-  const row = useMemo(
-    () => (sel && exact ? (exact.rows.find((r) => r.metaId === sel.metaId && r.ordinal === sel.ordinal) ?? null) : null),
-    [sel, exact],
-  );
+  const row = useMemo(() => {
+    if (!sel || !exact) return null;
+    // A row the quick decoder couldn't read carries ordinal 0 — fall back to the address match
+    // so the card still finds it (2026-08-07: the miss hid the whole exact tier and the state
+    // invitation for snapshots whose deep decode worked fine).
+    return (
+      exact.rows.find((r) => r.metaId === sel.metaId && r.ordinal === sel.ordinal) ??
+      exact.rows.find((r) => r.metaId === sel.metaId && r.ordinal === 0) ??
+      null
+    );
+  }, [sel, exact]);
   const reading = useMinHold(!!sel && !row);
 
   // The signers, deep read first (it re-reads the same proofs straight off the channel, so it wins
@@ -158,40 +165,51 @@ export default function MetaSnapPane({
               <Fact label="Exact read">unavailable — tick pruned</Fact>
             )}
 
-            {/* An uncataloged channel the decoder couldn't read (ordinal 0 marks it): the state
-                may exist but is UNREADABLE — say so instead of silently omitting the whole
-                tier (user, 2026-08-07: the missing "show state" read as a bug). */}
-            {row && !row.decoded && (
-              <Fact label="State">
-                <span className="text-muted-foreground italic">undecodable payload</span>
-              </Fact>
-            )}
-            {/* ── Tier 3: the application state, STATE-AWARE — a metagraph whose state is
-                genuinely empty gets no invitation (a currency-only metagraph never has one). ── */}
-            {row?.hasState && (
-              <>
-                <Fact label="State">{fmtKB(row.stateBytes / 1024)}</Fact>
-                {deep && deep.stateKeys.length > 0 && (
-                  <Fact label="State records">{deep.stateKeys.map((k) => `${k.key} ${k.count}`).join(" · ")}</Fact>
-                )}
-                {/* The deep decode is pin-gated while following (the live card advances every
-                    tick — fetching it would poll the heavy route). Honest hint in place. */}
-                {!deep && following && (
-                  <Fact label="State records">
-                    <span className="text-muted-foreground italic">pin to decode</span>
+            {/* ── Tier 3: the application state, keyed on the BEST AVAILABLE knowledge (user,
+                2026-08-07 — the gate used the exact read's per-row hasState alone, and the two
+                decoders disagree: DED rows the quick decoder missed hid the invitation while
+                the deep read had the state all along). Precedence: the DEEP read (the fuller
+                decoder) wins; the exact row answers while deep hasn't landed; a decoded row
+                with NO state anywhere gets no invitation (a currency-only metagraph never has
+                one); an undecodable row says so. ── */}
+            {(() => {
+              const stateBytes = deep ? deep.stateBytes : row?.hasState ? row.stateBytes : 0;
+              const hasState = deep ? deep.stateBytes > 0 || deep.stateKeys.length > 0 || !!deep.state : !!row?.hasState;
+              const undecodable = !hasState && row != null && !row.decoded && !deep;
+              if (undecodable)
+                return (
+                  <Fact label="State">
+                    <span className="text-muted-foreground italic">undecodable payload</span>
                   </Fact>
-                )}
-                {deep && deep.dataBlockSigners.length > 0 && (
-                  <Fact label="Data blocks">{deep.dataBlockSigners.length} signers</Fact>
-                )}
-                {row.stateProof && <HashFact label="State proof" value={row.stateProof} />}
-                <div>
-                  <Button variant="link" size="xs" className="px-0" onClick={() => setSection("data")}>
-                    Show the application state
-                  </Button>
-                </div>
-              </>
-            )}
+                );
+              if (!hasState) return null;
+              return (
+                <>
+                  {stateBytes > 0 && <Fact label="State">{fmtKB(stateBytes / 1024)}</Fact>}
+                  {deep && deep.stateKeys.length > 0 && (
+                    <Fact label="State records">{deep.stateKeys.map((k) => `${k.key} ${k.count}`).join(" · ")}</Fact>
+                  )}
+                  {/* The deep decode is pin-gated while following (the live card advances every
+                      tick — fetching it would poll the heavy route). Honest hint in place. */}
+                  {!deep && following && (
+                    <Fact label="State records">
+                      <span className="text-muted-foreground italic">pin to decode</span>
+                    </Fact>
+                  )}
+                  {deep && deep.dataBlockSigners.length > 0 && (
+                    <Fact label="Data blocks">{deep.dataBlockSigners.length} signers</Fact>
+                  )}
+                  {(deep?.stateProof ?? row?.stateProof) && (
+                    <HashFact label="State proof" value={(deep?.stateProof ?? row?.stateProof)!} />
+                  )}
+                  <div>
+                    <Button variant="link" size="xs" className="px-0" onClick={() => setSection("data")}>
+                      Show the application state
+                    </Button>
+                  </div>
+                </>
+              );
+            })()}
 
             {/* The references sit LAST, where references sit (the node card's reading order). */}
             <HashFact label="Hash" value={sel.hash} />
