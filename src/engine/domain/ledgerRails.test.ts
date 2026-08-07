@@ -32,9 +32,9 @@ describe("metaTrayLayout (one tray per metagraph plane, 2026-08-07)", () => {
     expect(s.cols).toBe(Math.max(1, Math.floor((2 * s.hz - 2 * CONT_PAD) / CONT_CHIP_Z)));
     expect(s.rows).toBe(Math.ceil(25 / s.cols));
     expect(s.hy).toBeCloseTo((s.rows * CONT_ROW_Y + 2 * CONT_PAD) / 2, 6);
-    // The first chip sits inside the frame's top-left corner.
+    // The first chip sits on the top row, with the grid CENTRED in the tray.
     expect(s.chipY0).toBeCloseTo(top - CONT_PAD - CONT_ROW_Y / 2, 6);
-    expect(s.chipZ0).toBeCloseTo(s.cz + s.hz - CONT_PAD - CONT_CHIP_Z / 2, 6);
+    expect(s.chipZ0).toBeCloseTo(s.cz + (Math.min(25, s.cols) * CONT_CHIP_Z) / 2 - CONT_CHIP_Z / 2, 6);
   });
 });
 

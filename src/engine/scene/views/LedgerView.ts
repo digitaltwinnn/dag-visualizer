@@ -30,14 +30,10 @@ import { METAGRAPHS } from "../../config";
 import {
   LEDGER,
   FLOOR_Y,
-  GUTTER_CZ,
-  GUTTER_W,
-  FLOOR_MAIN_Z0,
-  FLOOR_Z1,
+  PLANE_FIELD_HALF,
   lanePlaneHalf,
   LEAD_X,
   TILE_LIFT,
-  LANE_HALF_Z,
   laneSpan,
   type RailGroup,
 } from "../../domain/ledgerLayout";
@@ -70,14 +66,15 @@ const FLOOR_D = 44;
 const FLOOR_CX = -13.25;
 const FLOOR_LABEL_X = FLOOR_CX + FLOOR_W / 2 - 0.4;
 
-/** The lead row's "forming…" note: quieter than a floor label, and it eases rather than blinks. */
-const FORMING_OP = 0.6;
-const FORMING_EASE = 2.2;
-/** Just camera-side of the lead slot, reading in from the +Z edge of the lane field. */
-const FORMING_X = LEAD_X + 1.4;
-const FORMING_Z = LANE_HALF_Z + 8;
+/** The per-row GLOBAL SNAPSHOT ID labels at the global plane's screen-left edge (user,
+ *  2026-08-07 — replaced the lead row's `forming…` note): every visible tick row is named by
+ *  the ordinal it anchors, quieter than the plane label. */
+const ORD_OP = 0.55;
+const ORD_H = 0.42;
+const ORD_Z = PLANE_FIELD_HALF - 0.16;
 
 const _dummy = new THREE.Object3D();
+const _ordSeen = new Set<number>(); // scratch for _syncOrdLabels (event-time)
 const _col = new THREE.Color();
 const _p = new THREE.Vector3();
 
@@ -187,8 +184,8 @@ export class LedgerView implements SceneView {
   // ── the currency gutter (spec §4.5/§6.7)
 
   // ── the lead row's honesty label: the newest tick's anchor count is still growing
-  private _formingLabel: THREE.Mesh | null = null;
-  private _formingW = 0;
+  /** ordinal → its row label mesh on the global plane (recycled by ordinal as slots shift). */
+  private _ordLabels = new Map<number, THREE.Mesh>();
 
   // ── fades (the ledger's stage light went with the layer navigation, 2026-08-06 — nothing
   // committable is left for a spot to dramatise)
@@ -300,7 +297,6 @@ export class LedgerView implements SceneView {
 
   private _buildFloors() {
     const W = FLOOR_W;
-    const D = FLOOR_D;
     const cx = FLOOR_CX;
     const lx = FLOOR_LABEL_X;
     // Every storey surface is the SAME blueprint (objects/SnapshotPlane.ts — glass + edge label
@@ -308,16 +304,14 @@ export class LedgerView implements SceneView {
     // $DAG-blocks gutter beyond the seam, label-less) — the only place the metagraphs come
     // together. The UPPER storey is one narrow plane PER METAGRAPH over its lane (user,
     // 2026-08-07), gapped, each named by its ticker. Independence made literal.
-    const mainZ1 = FLOOR_Z1; // == FLOOR_D/2 — promoted to the domain so the containers share it
-    const mainD = mainZ1 - FLOOR_MAIN_Z0;
+    // The global plane sits RIGHT beneath the metagraph planes: the SAME symmetric field extent
+    // (±PLANE_FIELD_HALF, centred on the lane field — user 2026-08-07; the old label-margin
+    // plane read skewed, and the reserved gutter strip went with it).
     const gl = LEDGER_LAYERS.find((l) => l.id === "gl0");
     this._globalPlanes.push(
       new SnapshotPlane(this.group, this._colors, {
-        w: W, d: mainD, y: FLOOR_Y.gl0, cx, cz: (mainZ1 + FLOOR_MAIN_Z0) / 2,
-        label: { level: gl?.level ?? "", text: gl?.name ?? "gl0", x: lx, z: D / 2 - 1.2 },
-      }),
-      new SnapshotPlane(this.group, this._colors, {
-        w: W, d: GUTTER_W + 1.0, y: FLOOR_Y.gl0, cx, cz: GUTTER_CZ,
+        w: W, d: 2 * PLANE_FIELD_HALF, y: FLOOR_Y.gl0, cx, cz: 0,
+        label: { level: gl?.level ?? "", text: gl?.name ?? "gl0", x: lx, z: PLANE_FIELD_HALF - 0.12 },
       }),
     );
     const n = this._laneOrder.length;
@@ -327,10 +321,10 @@ export class LedgerView implements SceneView {
       const meta = METAGRAPHS.find((m) => m.id === key);
       const cz = laneSpan(i, n).cz;
       // (The collective "Metagraph snapshots" label went with the shared floor — each plane
-      // names itself, the explorer names the group.)
+      // names itself, CENTRED on its own width; the explorer names the group.)
       this._metaPlanes.set(key, new SnapshotPlane(this.group, this._colors, {
         w: W, d: hz * 2, y: FLOOR_Y.msnap, cx, cz,
-        label: { level: "", text: meta?.ticker ?? "unlisted", x: lx, z: cz + hz - 0.12, height: 0.62 },
+        label: { level: "", text: meta?.ticker ?? "unlisted", x: lx, z: cz, height: 0.62, align: "center" },
       }));
     }
     for (const p of [...this._globalPlanes, ...this._metaPlanes.values()]) {
@@ -338,14 +332,6 @@ export class LedgerView implements SceneView {
       if (p.label) this._fades.register(p.label.material as THREE.MeshBasicMaterial, 1);
     }
 
-    // The lead row is annotated, not decorated: while the live tick's anchor count is still
-    // GROWING, say so. It reads out from the +Z edge of the lane field toward the lead slot's own
-    // tiles (x ≈ 0), so it can only ever be about that row. Opacity is driven per frame in
-    // _applyFloorAlpha (it rides the view alpha like every other piece of furniture), so it is
-    // deliberately NOT registered with the fade set.
-    this._formingLabel = makeEdgeLabel(this._colors, "", "forming…", FORMING_X, FLOOR_Y.msnap, FORMING_Z);
-    (this._formingLabel.material as THREE.MeshBasicMaterial).opacity = 0;
-    this.group.add(this._formingLabel);
   }
 
   // ── view alpha / highlight ───────────────────────────────────────────────
@@ -364,9 +350,8 @@ export class LedgerView implements SceneView {
     const a = this._fades.alpha;
     for (const p of this._globalPlanes) p.applyAlpha(this.globalTune, a, FLOOR_D / 2);
     for (const p of this._metaPlanes.values()) p.applyAlpha(this.metaTune, a, FLOOR_D / 2);
-    if (this._formingLabel)
-      (this._formingLabel.material as THREE.MeshBasicMaterial).opacity =
-        FORMING_OP * this._formingW * this._fades.alpha;
+    for (const m of this._ordLabels.values())
+      (m.material as THREE.MeshBasicMaterial).opacity = ORD_OP * a;
   }
 
   setSceneColors(map: Record<string, number>): void {
@@ -549,8 +534,40 @@ export class LedgerView implements SceneView {
       this._bar.setBar(s, snap.ordinal, this._specs[s], this._pickFor(snap));
     }
     this._syncRibbonRows();
+    this._syncOrdLabels();
     this._rebuildTilePicks();
     this._syncPickables();
+  }
+
+  /** One GLOBAL SNAPSHOT ID label per visible tick row, at the global plane's screen-left edge.
+   *  Keyed by ordinal so a label rides its row down the trail; one new canvas per tick
+   *  (event-time — recycled labels only move). */
+  private _syncOrdLabels(): void {
+    const seen = _ordSeen;
+    seen.clear();
+    for (let s = 0; s < SLOT_N; s++) {
+      const snap = this._slotSnap[s];
+      if (!snap) continue;
+      seen.add(snap.ordinal);
+      let m = this._ordLabels.get(snap.ordinal);
+      if (!m) {
+        // event-time: one canvas per new tick
+        m = makeEdgeLabel(this._colors, "", `#${snap.ordinal}`, 0, FLOOR_Y.gl0, ORD_Z, ORD_H);
+        (m.material as THREE.MeshBasicMaterial).opacity = 0;
+        this._ordLabels.set(snap.ordinal, m);
+        this.group.add(m);
+      }
+      m.position.x = LEAD_X - s * SLOT_SP;
+    }
+    for (const [ord, m] of this._ordLabels) {
+      if (seen.has(ord)) continue;
+      this.group.remove(m);
+      m.geometry.dispose();
+      const mat = m.material as THREE.MeshBasicMaterial;
+      mat.map?.dispose();
+      mat.dispose();
+      this._ordLabels.delete(ord);
+    }
   }
 
   private _syncRibbonRows(): void {
@@ -616,10 +633,6 @@ export class LedgerView implements SceneView {
   update(dt: number) {
     this.t += dt;
 
-    // The lead row's honesty note eases in while the live tick's anchor count is still growing.
-    this._formingW +=
-      ((this.model.leadForming ? 1 : 0) - this._formingW) * Math.min(1, dt * FORMING_EASE);
-
     this._applyFloorAlpha();
 
     this._bar.update(dt);
@@ -645,12 +658,23 @@ export class LedgerView implements SceneView {
         if (mi >= META_TRAIL_MAX) break;
         b.x += (LEAD_X - b.slot * SLOT_SP - b.x) * k;
         b.fade += (slotFade(b.slot) - b.fade) * k;
+        // A tick this lane anchored NOTHING into draws NOTHING (user, 2026-08-07 — the small
+        // dimmed placeholder block is gone; the model keeps the slot, the mesh zero-scales).
+        if (!b.filled) {
+          _dummy.position.set(0, 0, 0);
+          _dummy.rotation.set(0, 0, 0);
+          _dummy.scale.setScalar(0);
+          _dummy.updateMatrix();
+          this._metaTrailMesh.setMatrixAt(mi, _dummy.matrix);
+          mi++;
+          continue;
+        }
         // Bottom just above the plane (user, 2026-08-07): the box is centred, so lift by half its
         // world height (geometry depth 0.35 × scale.z becomes the height under the -90° X spin).
-        const tileH = 0.35 * b.size * (b.filled ? 1 : 0.18);
+        const tileH = 0.35 * b.size;
         _dummy.position.set(b.x + b.ox, FLOOR_Y.msnap + TILE_LIFT + tileH / 2, cz + b.oz * zScale);
         _dummy.rotation.set(-Math.PI / 2, 0, 0);
-        _dummy.scale.set(b.size, b.size, b.size * (b.filled ? 1 : 0.18));
+        _dummy.scale.set(b.size, b.size, b.size);
         _dummy.updateMatrix();
         this._metaTrailMesh.setMatrixAt(mi, _dummy.matrix);
         const hot = this.model.isRowHot(laneOff, b.slot);
@@ -658,11 +682,8 @@ export class LedgerView implements SceneView {
         // (user, 2026-08-07) — every other snapshot rests in the neutral cyan tone.
         const ident =
           b.slot <= 0 || (this.model.selectedSlot > 0 && b.slot === this.model.selectedSlot);
-        // Unfilled (anonymous/ghost) tiles keep their fixed fraction of the tuned filled level.
         const bright =
-          (hot
-            ? Math.max(b.fade, 0.9) * (b.filled ? this.tiles.hot : this.tiles.hot * 0.15)
-            : b.fade * (b.filled ? this.tiles.rest : this.tiles.rest * 0.17)) *
+          (hot ? Math.max(b.fade, 0.9) * this.tiles.hot : b.fade * this.tiles.rest) *
           (laneOff ? this.tiles.dim : 1) *
           this._fades.alpha;
         this._metaTrailMesh.setColorAt(mi, _col.copy(ident ? laneColor : this._coreCol).multiplyScalar(bright));
@@ -735,6 +756,14 @@ export class LedgerView implements SceneView {
   }
 
   dispose() {
+    for (const m of this._ordLabels.values()) {
+      this.group.remove(m);
+      m.geometry.dispose();
+      const mat = m.material as THREE.MeshBasicMaterial;
+      mat.map?.dispose();
+      mat.dispose();
+    }
+    this._ordLabels.clear();
     for (const p of [...this._globalPlanes, ...this._metaPlanes.values()]) p.dispose();
     this._globalPlanes.length = 0;
     this._metaPlanes.clear();

@@ -122,24 +122,14 @@ export const FLOOR_Y: Record<LedgerFloorId, number> = {
 /** Half the Z extent the metagraph lanes spread over (ledgerSite's outermost |z|). */
 export const LANE_HALF_Z = (LEDGER.depth * LANE_SPREAD) / 2;
 
-// ── Gutters (spec §4.5) — each floor's utility strip beyond the lane field on the screen-right
-// (−Z) side: the currency status above, the $DAG blocks below. Since 2026-08-06 the gutter is its
-// OWN small plane, split off the main floor by a visible seam (`GUTTER_GAP`) so it reads as a
-// distinct instrument rather than a corner of the floor. ~1/6 of the field.
-export const GUTTER_W = (2 * LANE_HALF_Z) / 6;
-/** The main floor plane's −Z edge: the lane field plus a small margin. */
-export const FLOOR_MAIN_Z0 = -LANE_HALF_Z - 0.8;
 /** The floor planes' +Z (screen-left) edge — LedgerView's FLOOR_D/2, promoted here so the
  *  containers can span the plane's full front width. */
-export const FLOOR_Z1 = 22;
 /** The seam between the main plane and the gutter plane. */
-export const GUTTER_GAP = 1.4;
-export const GUTTER_CZ = FLOOR_MAIN_Z0 - GUTTER_GAP - GUTTER_W / 2;
 
 /** The LEAD slot's X — the whole time trail (lane tiles, byte bars, ribbons) leads well toward
  *  the camera-side floor edge and trails to −X from here (user, 2026-08-07: the snapshots sat
  *  too deep in the plane). The floors' front edge is at ~6.5 local. */
-export const LEAD_X = 4.6;
+export const LEAD_X = 3.9;
 
 // ── The byte bar (spec §4.2) — fixed height and depth; WIDTH (the Z extent) alone encodes the
 // bytes the tick carried. It is CENTERED on the lane field (z0 = -width/2 — user, 2026-08-06;
@@ -191,10 +181,15 @@ export const CONT_TOP_GAP = 0.15; // floor plane → tray frame top (tight — u
 export const CONT_CHIP_Z = 0.46;  // chip pitch along Z (columns) — tightened with the smaller chips
 export const CONT_ROW_Y = 0.46;   // row pitch downward
 export const CONT_PAD = 0.16;     // frame padding around the chip grid — a tight hairline margin
+/** The whole plane FIELD's half Z extent: the lane sites span ±LANE_HALF_Z and each end plane
+ *  extends lanePlaneHalf beyond its site. The GLOBAL plane spans exactly this, centred — it sits
+ *  RIGHT beneath the metagraph planes (user, 2026-08-07: the old label-margin plane read skewed). */
+export const PLANE_FIELD_HALF = LANE_HALF_Z + lanePlaneHalf(METAGRAPHS.length + 1);
+
 /** The DAG validator tray's Z extents — the FULL front width of the global floor plane,
  *  inset slightly from both plane edges. (Metagraph trays span their own plane instead.) */
-export const CONT_Z0 = FLOOR_MAIN_Z0 + 0.3;
-export const CONT_Z1 = FLOOR_Z1 - 0.6;
+export const CONT_Z0 = -PLANE_FIELD_HALF + 0.4;
+export const CONT_Z1 = PLANE_FIELD_HALF - 0.4;
 
 // ── The lane field is FIXED (user reversal, 2026-08-07, of the spec §5.2 committed-lane
 // rearrangement): a committed filter no longer moves geometry or hides the other lanes — the

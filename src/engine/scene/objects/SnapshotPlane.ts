@@ -30,7 +30,7 @@ export const GLOBAL_PLANE_TUNE_DEFAULTS: PlaneTune = {
   fillOp: 0.035, innerOp: 0.01, edge: 0.95, trayOp: 0.085,
 };
 export const META_PLANE_TUNE_DEFAULTS: PlaneTune = {
-  fillOp: 0.035, innerOp: 0.01, edge: 0.95, trayOp: 0.085,
+  fillOp: 0.035, innerOp: 0.01, edge: 0.98, trayOp: 0.085, // edge user-tuned via ?tune, 2026-08-07
 };
 
 /** The planes' corner radius — SQUARE (rounded corners belong to the trays). */
@@ -42,15 +42,18 @@ const rgbTriplet = (c: THREE.Color): string =>
   `${Math.round(c.r * 255)},${Math.round(c.g * 255)},${Math.round(c.b * 255)}`;
 
 /** A flat, edge-aligned label plane — the chamber's only text (moved out of LedgerView with the
- *  blueprint; the `forming…` note uses it too). A blank `level` = no digit box. */
+ *  blueprint). A blank `level` = no digit box. `align` reads `z` as the text's LEFT edge
+ *  ("left", the floor-label idiom) or its CENTRE ("center" — the metagraph planes' tickers,
+ *  user 2026-08-07). */
 export function makeEdgeLabel(
   colors: SceneColors,
   level: string,
   text: string,
   frontX: number,
   y: number,
-  leftZ: number,
+  z: number,
   height = 1.05,
+  align: "left" | "center" = "left",
 ): THREE.Mesh {
   const c = document.createElement("canvas");
   const SS = 2;
@@ -87,10 +90,10 @@ export function makeEdgeLabel(
     textX = 6 * SS + boxW + 12 * SS;
   }
   ctx.font = `400 ${26 * SS}px system-ui, -apple-system, sans-serif`;
-  ctx.textAlign = "left";
+  ctx.textAlign = align;
   ctx.textBaseline = "middle";
   ctx.fillStyle = tone;
-  ctx.fillText(text, textX, c.height / 2 + 2 * SS);
+  ctx.fillText(text, align === "center" ? c.width / 2 : textX, c.height / 2 + 2 * SS);
   const tex = new THREE.CanvasTexture(c);
   tex.minFilter = THREE.LinearFilter;
   tex.colorSpace = THREE.SRGBColorSpace;
@@ -112,7 +115,8 @@ export function makeEdgeLabel(
       new THREE.Vector3(0, 1, 0),
     ),
   );
-  mesh.position.set(frontX - h / 2, y + 0.06, leftZ - w / 2);
+  // Centered: the canvas centre (where the text sits) lands on `z`; left: text starts at `z`.
+  mesh.position.set(frontX - h / 2, y + 0.06, align === "center" ? z : z - w / 2);
   mesh.renderOrder = 2;
   return mesh;
 }
@@ -123,8 +127,9 @@ export interface SnapshotPlaneOpts {
   y: number;  // storey height
   cx: number; // plane centre X
   cz: number; // plane centre Z
-  /** The plane's name at its screen-left front edge; omit for an anonymous piece (the gutter). */
-  label?: { level: string; text: string; x: number; z: number; height?: number };
+  /** The plane's name at its front edge; omit for an anonymous piece. `align` defaults left
+   *  (text starts at z); "center" centres the text on z. */
+  label?: { level: string; text: string; x: number; z: number; height?: number; align?: "left" | "center" };
 }
 
 export class SnapshotPlane {
@@ -152,7 +157,7 @@ export class SnapshotPlane {
     this._minHalf = Math.min(o.w, o.d) / 2;
     parent.add(this.fill);
     this.label = o.label
-      ? makeEdgeLabel(colors, o.label.level, o.label.text, o.label.x, o.y, o.label.z, o.label.height)
+      ? makeEdgeLabel(colors, o.label.level, o.label.text, o.label.x, o.y, o.label.z, o.label.height, o.label.align)
       : null;
     if (this.label) parent.add(this.label);
   }

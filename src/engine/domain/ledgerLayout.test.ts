@@ -2,9 +2,9 @@ import { describe, it, expect } from "vitest";
 import { METAGRAPHS } from "../config";
 import {
   LEDGER, LAYER_GEOM, ledgerSite, clusterRadius, ledgerSpread,
-  FLOOR_IDS, FLOOR_Y, LANE_HALF_Z, GUTTER_W, GUTTER_CZ, GUTTER_GAP, FLOOR_MAIN_Z0,
+  FLOOR_IDS, FLOOR_Y, LANE_HALF_Z, PLANE_FIELD_HALF,
   BAR_MAX_W, BAR_MIN_W, BAR_H, BAR_D, BYTE_SCALE_KB,
-  CONT_X, CONT_TOP_GAP, CONT_CHIP_Z, CONT_ROW_Y, CONT_PAD, CONT_Z0, CONT_Z1, FLOOR_Z1,
+  CONT_X, CONT_TOP_GAP, CONT_CHIP_Z, CONT_ROW_Y, CONT_PAD, CONT_Z0, CONT_Z1,
   LEAD_X, TILE_LIFT, BAR_LIFT,
   LANE_PLANE_GAP, lanePlaneHalf, laneSpan,
 } from "./ledgerLayout";
@@ -89,12 +89,11 @@ describe("two-floor chamber (redesign 2026-08-04)", () => {
     expect(ledgerSite(n - 1, n).z).toBeCloseTo(LANE_HALF_Z, 6);
   });
 
-  it("splits the gutter onto its own plane beyond the lane field, screen-right (−Z)", () => {
-    expect(FLOOR_MAIN_Z0).toBeLessThan(-LANE_HALF_Z); // the main plane still covers the lane field
-    // The gutter plane sits wholly beyond the main plane's edge, past a visible seam.
-    expect(GUTTER_GAP).toBeGreaterThan(0);
-    expect(GUTTER_CZ + GUTTER_W / 2).toBeCloseTo(FLOOR_MAIN_Z0 - GUTTER_GAP, 6);
-    expect(GUTTER_W).toBeCloseTo((2 * LANE_HALF_Z) / 6, 6);
+  it("centres the plane field about z=0 — the global plane sits right beneath the lanes", () => {
+    // The field half covers the outermost lane's plane exactly (site + its plane half).
+    const n = METAGRAPHS.length + 1;
+    expect(PLANE_FIELD_HALF).toBeCloseTo(LANE_HALF_Z + lanePlaneHalf(n), 6);
+    expect(PLANE_FIELD_HALF).toBeGreaterThan(LANE_HALF_Z);
   });
 
   it("lets the byte bar grow across the whole field", () => {
@@ -116,9 +115,9 @@ describe("two-floor chamber (redesign 2026-08-04)", () => {
     expect(CONT_TOP_GAP).toBeGreaterThan(0);
     // Chip/row pitches and frame chrome are positive and modest against the lane field.
     for (const v of [CONT_CHIP_Z, CONT_ROW_Y, CONT_PAD]) expect(v).toBeGreaterThan(0);
-    // The DAG validator tray spans the main plane's full front width, inset from both edges.
-    expect(CONT_Z0).toBeGreaterThan(FLOOR_MAIN_Z0);
-    expect(CONT_Z1).toBeLessThan(FLOOR_Z1);
+    // The DAG validator tray spans the global plane's full front width, inset SYMMETRICALLY.
+    expect(CONT_Z0).toBeCloseTo(-CONT_Z1, 6);
+    expect(CONT_Z1).toBeLessThan(PLANE_FIELD_HALF);
     expect(CONT_Z1 - CONT_Z0).toBeGreaterThan(2 * LANE_HALF_Z);
   });
 

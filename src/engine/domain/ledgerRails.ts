@@ -33,11 +33,14 @@ function traySpec(key: string, count: number, cz: number, hz: number, floorY: nu
   const rows = Math.ceil(count / cols);
   const h = rows * CONT_ROW_Y + 2 * CONT_PAD;
   const top = floorY - CONT_TOP_GAP;
+  // The chip grid is CENTRED in the tray (user, 2026-08-07) — a small fleet floats mid-tray
+  // instead of hugging the screen-left edge.
+  const gridCols = Math.min(count, cols);
   return {
     key, count, cols, rows,
     cy: top - h / 2, cz, hy: h / 2, hz,
     chipY0: top - CONT_PAD - CONT_ROW_Y / 2,
-    chipZ0: cz + hz - CONT_PAD - CONT_CHIP_Z / 2,
+    chipZ0: cz + (gridCols * CONT_CHIP_Z) / 2 - CONT_CHIP_Z / 2,
   };
 }
 
