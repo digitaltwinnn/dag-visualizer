@@ -4,6 +4,7 @@ import { useEffect } from "react";
 import { getNetwork } from "@/src/data/network";
 import { useStore } from "@/src/store/store";
 import { followLatest } from "@/src/data/follow";
+import { metagraphById } from "@/src/data/network";
 
 // Drives the "live" (auto-advancing) snapshot card. While following, re-point the inspector at
 // the latest relevant snapshot on each new global snapshot and as the anchor index fills in. The
@@ -43,7 +44,12 @@ export default function FollowController() {
   // (Engine.setMode) and stops following here, so the controller's tick bails gracefully.
   useEffect(() => {
     if (mode !== "ledger") setFollowing(false);
-  }, [mode, setFollowing]);
+    // LIVE METAGRAPH MODE (user, 2026-08-07): arriving in the ledger with a metagraph committed
+    // — or committing one while here — turns live mode ON for that network (the card chain rides
+    // the heartbeat). Browsing/pinning drops it (any pin sets following false); leaving clears
+    // everything, so coming back starts live again. "all"/"dag" keep the opt-in idle entry.
+    else if (metagraphById(filter)) setFollowing(true);
+  }, [mode, filter, setFollowing]);
 
   // When following (enter ledger) or the filter changes while in it, jump to the
   // latest relevant snapshot for the selection.

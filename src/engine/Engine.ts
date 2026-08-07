@@ -349,11 +349,9 @@ export class Engine {
           // A metagraph snapshot belongs to exactly ONE network, so a switch can only orphan it.
           if (st.metaSnap) useStore.getState().setMetaSnap(null);
           this.applyFilter();
-          // Committing a METAGRAPH in the ledger auto-selects its LATEST snapshot (user,
-          // 2026-08-07): the card chain populates immediately — the dim carries the emphasis,
-          // the camera stays put.
-          if (st.mode === "ledger" && st.filter !== "all" && st.filter !== "dag")
-            this._autoSelectLatestMetaSnap(st.filter);
+          // (Committing a METAGRAPH in the ledger turns LIVE MODE on for it — the
+          // FollowController owns that flow now, 2026-08-07: following flips true and
+          // followLatest rides the whole card chain on the heartbeat.)
         }
         // Country drill-down is geo-only — gate on the view so a re-entrant clear
         // (e.g. from setMode while switching away) can't run a geo focus in hyper.
@@ -950,28 +948,6 @@ export class Engine {
     },
   };
 
-  /** Committing a metagraph in the ledger auto-selects its newest snapshot in the buffer (the
-   *  same tested metaSnapSelectActions a tile click runs — pins the anchoring global, opens the
-   *  metagraph-snapshot card). Skips silently when the buffer holds nothing yet. */
-  private _autoSelectLatestMetaSnap(metaId: string): void {
-    const net = getNetwork() as unknown as {
-      metaSnaps?: Map<string, { ordinal: number; hash: string; ts: string }[]>;
-      globalSnapshots?: GlobalSnapshot[];
-    } | null;
-    const list = net?.metaSnaps?.get(metaId);
-    if (!list?.length) return;
-    let m = list[0];
-    for (const x of list) if (x.ordinal > m.ordinal) m = x;
-    const g = net?.globalSnapshots?.find((gs) => gs.timestamp === m.ts);
-    if (!g) return; // anchored outside the retained window — nothing to pin honestly
-    applyClickActions(
-      metaSnapSelectActions(
-        { metaId, ordinal: m.ordinal, hash: m.hash, globalOrdinal: g.ordinal, ts: m.ts },
-        { kind: "snapshot", title: `Global snapshot #${g.ordinal}`, data: g },
-        { filter: metaId, metaSnap: null },
-      ),
-    );
-  }
 
   // Resolve the camera for the CURRENT selection state by walking the current view's ladder
   // (domain/focusLadder.LADDERS) — the one entry point every selection-driven camera flight

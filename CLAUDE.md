@@ -1585,10 +1585,15 @@ frame). It composes three adapters — `objects/ByteBar.ts`, `objects/Ribbons.ts
   `RIBBON_DIM` (0.35) and their tray chips to the dim model's flat ledger dim (0.5 — 0.82 read
   near-black through the chip writer's colour+glow cascade) — a tier between full colour and
   the neutral trail, so the committed network leads while the rest stay identifiable.
-  Committing a metagraph also **AUTO-SELECTS its latest snapshot**
-  (`Engine._autoSelectLatestMetaSnap` → the same tested `metaSnapSelectActions` a tile click
-  runs — pins the anchoring global, opens the metagraph-snapshot card), so the card chain
-  populates without a camera move. `setHoverFilter` previews the dim at commit strength (the
+  A committed metagraph puts the view in **LIVE METAGRAPH MODE** (user, 2026-08-07):
+  entering the ledger with one committed — or committing one while there — flips `following`
+  ON (FollowController's mode/filter effect; "all"/"dag" keep the opt-in idle entry), and
+  `followLatest` rides the WHOLE card chain on the heartbeat — the anchoring global
+  (`advanceSnap`) AND the metagraph-snapshot card (`advanceMetaSnap`, the non-bumping twin) at
+  that network's newest buffered snapshot. Browsing/pinning drops live mode; leaving clears
+  the cards, so coming back starts live again. ⚠️ The ~2.5 MB DEEP read stays gated to
+  EXPLICIT pins (`RawSnapshotBridge` skips it while `following` — an auto-advancing card must
+  not turn the explicit-gesture route into a poll). `setHoverFilter` previews the dim at commit strength (the
   house hover rule); `setFilter` also gates the anchor pulses to the committed lane.
 - **No gutters** (2026-08-07): the `msnap` CURRENCY gutter plane + its status line were
   DROPPED with the per-metagraph planes, and the whole currency-activity lane went with it —

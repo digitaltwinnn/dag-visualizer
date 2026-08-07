@@ -176,6 +176,9 @@ interface AppState {
   setSnap: (snap: Extract<PickDescriptor, { kind: "snapshot" }> | null) => void;
   advanceSnap: (snap: Extract<PickDescriptor, { kind: "snapshot" }> | null) => void;
   setMetaSnap: (sel: MetaSnapSel | null) => void;
+  /** The follow system's heartbeat advance for the metagraph-snapshot card — non-bumping, like
+   *  advanceSnap: a live tick is never a "new selection" (the card recency/collapse order holds). */
+  advanceMetaSnap: (sel: MetaSnapSel | null) => void;
   setHoverSnapOrd: (ordinal: number | null) => void;
   setHoverFilter: (filter: string | null) => void;
   setHoverNodeId: (id: string | null) => void;
@@ -269,6 +272,15 @@ export const useStore = create<AppState>((set) => ({
           : [...s.selStack, "snap"],
     })),
   setMetaSnap: (metaSnap) => set((s) => ({ metaSnap, selStack: bumpStack(s.selStack, "metaSnap", !!metaSnap) })),
+  advanceMetaSnap: (metaSnap) =>
+    set((s) => ({
+      metaSnap,
+      selStack: !metaSnap
+        ? s.selStack.filter((x) => x !== "metaSnap")
+        : s.selStack.includes("metaSnap")
+          ? s.selStack
+          : [...s.selStack, "metaSnap"],
+    })),
   setHoverSnapOrd: (hoverSnapOrd) => set({ hoverSnapOrd }),
   setHoverFilter: (hoverFilter) => set({ hoverFilter }),
   setHoverNodeId: (hoverNodeId) => set({ hoverNodeId }),

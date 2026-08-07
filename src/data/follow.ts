@@ -28,8 +28,32 @@ export function latestRelevant(filter: string): GlobalSnapshot | null {
 export function followLatest() {
   // `advanceSnap`, not `setSnap`: the heartbeat advance must not bump the selection recency the
   // facts rail's collapse rule reads (store.selStack — a tick is not a user act).
-  const { filter, snap, advanceSnap } = useStore.getState();
+  const { filter, snap, metaSnap, advanceSnap, advanceMetaSnap } = useStore.getState();
   const latest = latestRelevant(filter);
   if (latest) advanceSnap({ kind: "snapshot", title: `Global snapshot #${latest.ordinal}`, data: latest });
   else if (snap) advanceSnap(null);
+
+  // LIVE METAGRAPH MODE (user, 2026-08-07): while following with a metagraph committed, the
+  // metagraph-snapshot card rides the heartbeat too — always that network's newest buffered
+  // snapshot (non-bumping, and only on real change so the card doesn't churn). The deep read
+  // stays gated to EXPLICIT selections (RawSnapshotBridge skips it while following).
+  const net = getNetwork();
+  if (metagraphById(filter) && net) {
+    const list = (net as unknown as { metaSnaps?: Map<string, { ordinal: number; hash: string; ts: string }[]> })
+      .metaSnaps?.get(filter);
+    if (list?.length) {
+      let m = list[0];
+      for (const x of list) if (x.ordinal > m.ordinal) m = x;
+      const g = (net as unknown as { globalSnapshots?: GlobalSnapshot[] }).globalSnapshots?.find(
+        (gs) => gs.timestamp === m.ts,
+      );
+      if (g && (metaSnap?.metaId !== filter || metaSnap.ordinal !== m.ordinal)) {
+        advanceMetaSnap({ metaId: filter, ordinal: m.ordinal, hash: m.hash, globalOrdinal: g.ordinal, ts: m.ts });
+      }
+      return;
+    }
+  }
+  // Not a metagraph follow (or nothing buffered): a followed card never shows a stale foreign
+  // metagraph snapshot — clear it (explicit pins aren't in follow mode, so this can't fire there).
+  if (metaSnap) advanceMetaSnap(null);
 }
