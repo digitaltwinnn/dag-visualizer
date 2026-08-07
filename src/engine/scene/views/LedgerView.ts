@@ -355,7 +355,8 @@ export class LedgerView implements SceneView {
     for (const p of this._metaPlanes.values()) p.applyAlpha(this.metaTune, a, FLOOR_D / 2);
     for (const o of this._ordLabels.values()) {
       (o.mesh.material as THREE.MeshBasicMaterial).opacity = ORD_OP * a;
-      (o.line.material as THREE.LineDashedMaterial).opacity = ORD_OP * 0.8 * a;
+      // The anchor line whispers under its label (user, 2026-08-07 — "a bit more subtle").
+      (o.line.material as THREE.LineDashedMaterial).opacity = ORD_OP * 0.45 * a;
     }
   }
 
@@ -542,7 +543,7 @@ export class LedgerView implements SceneView {
       let o = this._ordLabels.get(snap.ordinal);
       if (!o) {
         // event-time: one canvas + one 2-point dashed line per new tick
-        const mesh = makeEdgeLabel(this._colors, `#${snap.ordinal}`, 0, FLOOR_Y.gl0, ORD_Z, ORD_H);
+        const mesh = makeEdgeLabel(this._colors, snap.ordinal.toLocaleString(), 0, FLOOR_Y.gl0, ORD_Z, ORD_H);
         (mesh.material as THREE.MeshBasicMaterial).opacity = 0;
         const lg = new THREE.BufferGeometry().setFromPoints([
           new THREE.Vector3(0, y, ORD_LINE_Z0),

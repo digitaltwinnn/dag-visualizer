@@ -100,7 +100,11 @@ function SnapRow({
         {label}
       </span>
       <span className="flex-none tabular-nums text-label font-semibold text-muted-foreground">{metric}</span>
-      {selected && <SelectedRowMark className="flex-none" />}
+      {/* The trailing slot is ALWAYS reserved (the GeoExplore idiom) so the metric column never
+          shifts when a row gains the selection mark (user, 2026-08-07). */}
+      <span className="flex-none w-3.5 flex items-center justify-center">
+        {selected && <SelectedRowMark />}
+      </span>
     </button>
   );
 }
@@ -152,7 +156,9 @@ export default function LedgerPanel() {
               group; the 3D labels dropped their digit box the same day.) */}
           <span className="flex-1 min-w-0 truncate text-body text-foreground">{copy.name}</span>
           <span className="flex-none flex items-center gap-1.5">
-            <span className="tabular-nums text-label font-semibold text-muted-foreground">{count}</span>
+            {/* Same weight as the other explorers' top-row counts (user, 2026-08-07 — this read
+                smaller/unbold next to GeoExplore/HyperExplore). */}
+            <span className="tabular-nums text-body font-semibold">{count}</span>
             <DisclosureChevron open={open} />
           </span>
         </span>
@@ -219,7 +225,7 @@ export default function LedgerPanel() {
                             return (
                               <SnapRow
                                 key={r.ordinal}
-                                label={`#${r.ordinal.toLocaleString()}`}
+                                label={r.ordinal.toLocaleString()}
                                 metric={fmtKB(r.sizeInKB)}
                                 selected={isSel}
                                 hoverOrd={hoverSnapOrd}
@@ -270,7 +276,7 @@ export default function LedgerPanel() {
                           strip's bars run) AND discloses its contributors in the same click,
                           the commit-is-disclosure idiom. */}
                       <SnapRow
-                        label={`#${d.ordinal.toLocaleString()}`}
+                        label={d.ordinal.toLocaleString()}
                         // The one honest per-tick byte figure: the exact read's measured KB;
                         // absent = a dash, never derived from count or fee (the honesty rule).
                         metric={
