@@ -1572,10 +1572,15 @@ frame). It composes three adapters — `objects/ByteBar.ts`, `objects/Ribbons.ts
   never blinks) while `model.leadForming` holds — i.e. while the tick's count is still settling
   (`Date.now() - anchor.touched < LEAD_SETTLE_MS`), which is the *when* view stating its own
   settling window instead of pretending a partial breakdown is final.
-- **Emphasis is brightness, not a colour switch.** Floors rest at `FLOOR_FRAME_OP 0.11` /
-  `FLOOR_FILL_OP 0.03` (the highlighted/dimmed variants and the ledger stage light went with
-  the layer navigation, 2026-08-06 — the frame colour is still HDR-overdriven ×2, so the
-  opacities read about half the perceived line brightness); bands run
+- **The glass is ONE fill language** (`objects/glassFill.ts`, 2026-08-07): floors AND the node
+  containers wear the same rounded-corner soft-rim shader (rim band + centre whisper, corner
+  radius clipped in a rounded-rect SDF), driven by ONE shared `FloorTune`
+  (frame/edge-fill/centre-fill/drop-off — user-tuned defaults in `FLOOR_TUNE_DEFAULTS`; the
+  ?tune "floor planes" folder styles every pane at once, and NodeRails holds the same tune
+  object, not a copy). The floors are also pick BLOCKERS (`userData.blocker` →
+  `Engine._pickAt` returns null on a glass hit): a normal surface swallows the ray, so content
+  under a floor can never be hovered/clicked through it. **Emphasis is brightness, not a colour
+  switch**: bands run
   `REST_OP 0.5` / `HOT_OP 0.95` / `DIM_OP 0.16`. `model.isRowHot` still enforces exactly ONE hot
   row (a selected/hovered older snapshot beats the live lead). Selection comes from the LiveStrip:
   the Engine forwards `hoverSnapOrd ?? snap.data.ordinal` to `ledger.setSelected(ordinal)`, and

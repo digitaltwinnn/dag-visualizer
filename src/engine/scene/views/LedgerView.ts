@@ -54,15 +54,17 @@ import type {
 import { LEDGER_LAYERS } from "@/src/data/ledgerLayers"; // shared display copy — floor labels = panel rows
 import { activityLine } from "@/src/data/currencyActivity";
 import { ByteBar } from "../objects/ByteBar";
+import { makeGlassFill, type GlassFillUniforms } from "../objects/glassFill";
 import { Ribbons } from "../objects/Ribbons";
 import { NodeRails } from "../objects/NodeRails";
 import { FadeSet } from "../objects/FadeSet";
 import type { SceneView } from "./SceneView";
 
-/** The live-tunable FLOOR-PLANE look (dev `?tune` panel binds these; the values are the shipped
- *  look). NB the frame material's colour is HDR-overdriven ×2 (see _buildFloors), so the
- *  opacities read roughly HALF the perceived line brightness. `edge` is where the fill's
- *  edge-band starts (the colour drop-off toward the centre: 1 = only the rim, 0 = solid). */
+/** The live-tunable GLASS look — the floors AND the node containers share it (one fill
+ *  language, objects/glassFill.ts). NB the frame material's colour is HDR-overdriven ×2 (see
+ *  _buildFloors), so its opacity reads roughly HALF the perceived line brightness. `edge` is
+ *  where the drop-off starts (1 = only the rim, 0 = solid): converted to a shared rim WIDTH in
+ *  local units by _applyFloorAlpha / NodeRails.update. */
 export interface FloorTune {
   frameOp: number; // the hairline frame
   fillOp: number;  // the edge-band fill
@@ -71,10 +73,9 @@ export interface FloorTune {
 }
 
 export const FLOOR_TUNE_DEFAULTS: FloorTune = {
-  // User-tuned via ?tune, 2026-08-07/2: NO frame (the fill's soft rim is the whole edge
-  // statement), a whisper of centre fill, drop-off tight against the rim. The frame mechanism
-  // stays (the slider can bring it back while tuning).
-  frameOp: 0,
+  // User-tuned via ?tune, 2026-08-07/3: a whisper of frame back over the rounded glass, soft
+  // rim, centre whisper, drop-off tight against the rim.
+  frameOp: 0.015,
   fillOp: 0.035,
   innerOp: 0.01,
   edge: 0.95,
@@ -92,6 +93,9 @@ const FLOOR_W = 39.5;
 const FLOOR_D = 44;
 const FLOOR_CX = -13.25;
 const FLOOR_LABEL_X = FLOOR_CX + FLOOR_W / 2 - 0.4;
+
+/** The floors' corner radius (the shared glass fill clips outside it — smooth corners). */
+const FLOOR_CORNER_R = 1.6;
 
 /** The lead row's "forming…" note: quieter than a floor label, and it eases rather than blinks. */
 const FORMING_OP = 0.6;
@@ -152,11 +156,16 @@ export class LedgerView implements SceneView {
   private _panel: number;
   private _muted: number;
 
-  // ── floors (visual aid only since 2026-08-06 — not pick targets)
+  // ── floors (visual aid since 2026-08-06 — never pick SUBJECTS, but since 2026-08-07 they are
+  // pick BLOCKERS: a normal surface swallows the ray, so a bar under the metagraph floor can't
+  // be hovered/clicked through the glass — see Engine._pickAt's `userData.blocker` rule).
+  // `minHalf` clamps the rim width on the narrow gutter piece so the band can't swallow the
+  // whole plane.
   private _floorMats = new Map<
     string,
-    { frame: THREE.LineBasicMaterial; fill: THREE.ShaderMaterial }[]
+    { frame: THREE.LineBasicMaterial; fill: GlassFillUniforms; minHalf: number }[]
   >();
+  private _floorBlockers: THREE.Object3D[] = [];
 
   // ── the three adapters (spec §4.2–§4.4)
   private _rails: NodeRails;
@@ -243,6 +252,7 @@ export class LedgerView implements SceneView {
     scene.add(this.group);
 
     this.pickables = [];
+    this._floorBlockers.length = 0;
     this.t = 0;
     this._latest = null;
     this._filter = "all";
@@ -256,7 +266,7 @@ export class LedgerView implements SceneView {
 
     this._buildFloors();
 
-    this._rails = new NodeRails(colors);
+    this._rails = new NodeRails(colors, this.floors);
     this._bar = new ByteBar(colors, sceneColors);
     this._ribbons = new Ribbons(colors, sceneColors);
     this.group.add(this._rails.group, this._bar.group, this._ribbons.group);
@@ -338,39 +348,16 @@ export class LedgerView implements SceneView {
       blending: THREE.AdditiveBlending,
       depthWrite: false,
     });
-    const fillMat = new THREE.ShaderMaterial({
-      transparent: true,
-      depthWrite: false,
-      side: THREE.DoubleSide,
-      blending: THREE.AdditiveBlending,
-      uniforms: {
-        uColor: { value: new THREE.Color(this._core) },
-        uOpacity: { value: FLOOR_TUNE_DEFAULTS.fillOp },
-        uInner: { value: FLOOR_TUNE_DEFAULTS.innerOp },
-        uEdge: { value: FLOOR_TUNE_DEFAULTS.edge },
-      },
-      vertexShader: `
-        varying vec2 vP;
-        void main() { vP = uv * 2.0 - 1.0; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
-      fragmentShader: `
-        uniform vec3 uColor; uniform float uOpacity; uniform float uInner; uniform float uEdge; varying vec2 vP;
-        void main() {
-          // SMOOTH edge glow (user, 2026-08-07 — the old version snapped uv to a 48-cell grid and
-          // quantized the gradient into 3 steps, which read as chunky/cubic): a continuous
-          // rounded-rect distance field from the uEdge inset to the rim, eased by smoothstep.
-          vec2 q = max(abs(vP) - vec2(uEdge), 0.0) / max(1.0 - uEdge, 1e-4);
-          float band = smoothstep(0.0, 1.0, length(q));
-          float a = uOpacity * band + uInner;
-          if (a <= 0.002) discard;
-          gl_FragColor = vec4(uColor, a);
-        }`,
-    });
+    // The SHARED glass fill (objects/glassFill.ts — the same rounded-corner, soft-rim surface
+    // the node containers wear; user 2026-08-07): per-piece material, sized in local units.
     const frame = (w: number, d: number, y: number, x: number, z: number, id: string) => {
-      const fm = fillMat.clone();
+      const fm = makeGlassFill(this._core, w / 2, d / 2, FLOOR_CORNER_R);
       const fill = new THREE.Mesh(new THREE.PlaneGeometry(w, d), fm);
       fill.rotation.x = -Math.PI / 2;
       fill.position.set(x, y, z);
       fill.renderOrder = -2;
+      fill.userData.blocker = true; // a normal surface: rays stop here (no pick, no pass-through)
+      this._floorBlockers.push(fill);
       this.group.add(fill);
       const lm = frameMat.clone();
       const f = new THREE.LineSegments(new THREE.EdgesGeometry(new THREE.PlaneGeometry(w, d)), lm);
@@ -379,7 +366,7 @@ export class LedgerView implements SceneView {
       f.renderOrder = -1;
       this.group.add(f);
       const list = this._floorMats.get(id) ?? [];
-      list.push({ frame: lm, fill: fm });
+      list.push({ frame: lm, fill: fm.uniforms as unknown as GlassFillUniforms, minHalf: Math.min(w, d) / 2 });
       this._floorMats.set(id, list);
     };
     // TWO floors now — the node layers hang in containers under their edges, not storeys of their
@@ -501,12 +488,16 @@ export class LedgerView implements SceneView {
   }
 
   private _applyFloorAlpha(): void {
+    // The tune's `edge` (0..1, drop-off start) → a rim width in local units, shared by every
+    // glass piece (floors AND the node containers — NodeRails reads the same tune object) so
+    // the rim reads as one width everywhere; narrow pieces clamp it to stay a rim.
+    const rimW = (1 - this.floors.edge) * (FLOOR_D / 2);
     for (const [, list] of this._floorMats) {
       for (const m of list) {
         m.frame.opacity = this.floors.frameOp * this._fades.alpha;
-        m.fill.uniforms.uOpacity.value = this.floors.fillOp * this._fades.alpha;
-        m.fill.uniforms.uInner.value = this.floors.innerOp * this._fades.alpha;
-        m.fill.uniforms.uEdge.value = this.floors.edge;
+        m.fill.uOpacity.value = this.floors.fillOp * this._fades.alpha;
+        m.fill.uInner.value = this.floors.innerOp * this._fades.alpha;
+        m.fill.uEdgeW.value = Math.min(rimW, 0.8 * m.minHalf);
       }
     }
     if (this._gutterLabel)
@@ -761,6 +752,9 @@ export class LedgerView implements SceneView {
 
   private _syncPickables(): void {
     this.pickables.length = 0;
+    // The floor glass FIRST-CLASSES in the raycast as an occluder (userData.blocker): the Engine
+    // returns null when the nearest hit is glass, so content under a floor never picks through it.
+    for (const o of this._floorBlockers) this.pickables.push(o);
     for (const o of this._bar.pickables) this.pickables.push(o);
     // Tiles only become raycast targets once a resolver can turn an instance id into a snapshot.
     if (this._tileResolver) this.pickables.push(this._metaTrailMesh);

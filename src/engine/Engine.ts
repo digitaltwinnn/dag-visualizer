@@ -999,6 +999,10 @@ export class Engine {
     // ignores scale/visibility, so the inactive ones must be skipped explicitly).
     this._hitObj = null;
     for (const h of hits) {
+      // A BLOCKER (the ledger's floor glass) is a normal surface: the ray stops here, and the
+      // glass itself is no subject — content underneath must not pick through it (user,
+      // 2026-08-07). Hits are distance-sorted, so anything before the glass already returned.
+      if (h.object.userData.blocker) return null;
       const pick: PickDescriptor | undefined = h.object.userData.picks
         ? h.object.userData.picks[h.instanceId as number]
         : h.object.userData.pick;
