@@ -197,6 +197,7 @@ export class LedgerView implements SceneView {
    *  in place, only a click moves the trail. */
   private _trailOff = 0;
   private _pinnedOrd: number | null = null;
+  private _pinnedSlotPrev = -1;
 
   // ── fades (the ledger's stage light went with the layer navigation, 2026-08-06 — nothing
   // committable is left for a spot to dramatise)
@@ -675,8 +676,18 @@ export class LedgerView implements SceneView {
     // slide past the front edge and dissolve (_fadeAtX); re-following slides everything back.
     const pinnedSlot = this._pinnedOrd != null ? this.model.slotOf(this._pinnedOrd) : -1;
     const offTarget = pinnedSlot > 0 ? pinnedSlot * SLOT_SP : 0;
+    // CALM while pinned (user, 2026-08-07): a tick advance shifts every slot AND the offset
+    // target by the same SLOT_SP in one event — JUMP the offset with it (no ease) so the pinned
+    // row never moves on a tick. The ease below is only for the pin/unpin gesture itself.
+    if (pinnedSlot > 0 && this._pinnedSlotPrev > 0 && pinnedSlot !== this._pinnedSlotPrev) {
+      this._trailOff += (pinnedSlot - this._pinnedSlotPrev) * SLOT_SP;
+    }
+    this._pinnedSlotPrev = pinnedSlot;
     this._trailOff += (offTarget - this._trailOff) * Math.min(1, dt * 3.2);
     if (Math.abs(offTarget - this._trailOff) < 0.002) this._trailOff = offTarget;
+    // While pinned, tile x holds its slot exactly (the generic per-tick ease would fight the
+    // jumped offset — the trail must read FROZEN); the ease returns with the live follow.
+    const pinnedHold = offTarget > 0;
     this._bar.setOffset(this._trailOff);
     this._ribbons.group.position.x = this._trailOff;
     this._ordGroup.position.x = this._trailOff;
@@ -703,7 +714,8 @@ export class LedgerView implements SceneView {
       const zScale = (2 * hz) / LANE_GAP_Z;
       for (const b of lane.blocks) {
         if (mi >= META_TRAIL_MAX) break;
-        b.x += (LEAD_X - b.slot * SLOT_SP - b.x) * k;
+        if (pinnedHold) b.x = LEAD_X - b.slot * SLOT_SP;
+        else b.x += (LEAD_X - b.slot * SLOT_SP - b.x) * k;
         b.fade += (slotFade(b.slot) - b.fade) * k;
         // A tick this lane anchored NOTHING into draws NOTHING (user, 2026-08-07 — the small
         // dimmed placeholder block is gone; the model keeps the slot, the mesh zero-scales).
