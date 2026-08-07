@@ -1583,12 +1583,14 @@ frame). It composes three adapters — `objects/ByteBar.ts`, `objects/Ribbons.ts
   The `gl0` reserved $DAG-blocks gutter strip followed the same day when the global plane went
   symmetric — a future $DAG-blocks surface is a new design, not a held reservation.
 - **Labels**: the global floor is named by subtle flat edge-aligned text
-  (`SnapshotPlane.makeEdgeLabel`, not billboards) carrying its `LEDGER_LAYERS.level` digit;
-  each metagraph plane carries a smaller ticker label the same way (height 0.62, no digit,
-  CENTRED on its own width). Every visible tick row is named by a small **GLOBAL SNAPSHOT
-  ORDINAL label** (`#N`) at the global plane's screen-left edge — keyed by ordinal so a label
-  rides its row down the trail, one new canvas per tick (this replaced the lead row's
-  `forming…` note, 2026-08-07; `model.leadForming` remains domain data with no consumer).
+  (`SnapshotPlane.makeEdgeLabel`, not billboards); each metagraph plane carries a smaller
+  ticker label the same way (height 0.62, CENTRED on its own width). The stack-level digit —
+  the explorer's [1]/[2] badges AND the 3D labels' digit box — is retired (user, 2026-08-07;
+  `LEDGER_LAYERS` lost its `level` field). Every visible tick row is named by a **GLOBAL
+  SNAPSHOT ORDINAL label** (`#N`, height 0.78) screen-left of the bars, tied to its row's
+  actual bar by a **dotted anchor line** whose end tracks the bar's live width — keyed by
+  ordinal so label + line ride their row down the trail, one canvas per tick (this replaced
+  the lead row's `forming…` note; `model.leadForming` remains domain data with no consumer).
   Empty-tick lane placeholders draw NOTHING (the small dimmed block is gone) — the ordinal
   label is what says the tick happened.
 - **The glass fill shader is shared, the LOOKS are split** (`objects/glassFill.ts`, 2026-08-07):

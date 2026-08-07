@@ -31,6 +31,7 @@ import {
   LEDGER,
   FLOOR_Y,
   PLANE_FIELD_HALF,
+  LANE_HALF_Z,
   lanePlaneHalf,
   LEAD_X,
   TILE_LIFT,
@@ -70,8 +71,11 @@ const FLOOR_LABEL_X = FLOOR_CX + FLOOR_W / 2 - 0.4;
  *  2026-08-07 — replaced the lead row's `forming…` note): every visible tick row is named by
  *  the ordinal it anchors, quieter than the plane label. */
 const ORD_OP = 0.55;
-const ORD_H = 0.42;
-const ORD_Z = PLANE_FIELD_HALF - 0.16;
+const ORD_H = 0.78;
+/** The label's text anchor — just outside the widest bar's screen-left end, reading inward. */
+const ORD_Z = LANE_HALF_Z + 0.35;
+/** Where the text visually ends (≈ the digits' extent) — the dotted anchor line starts here. */
+const ORD_LINE_Z0 = ORD_Z - 2.1;
 
 const _dummy = new THREE.Object3D();
 const _ordSeen = new Set<number>(); // scratch for _syncOrdLabels (event-time)
@@ -182,8 +186,9 @@ export class LedgerView implements SceneView {
   // ── the currency gutter (spec §4.5/§6.7)
 
   // ── the lead row's honesty label: the newest tick's anchor count is still growing
-  /** ordinal → its row label mesh on the global plane (recycled by ordinal as slots shift). */
-  private _ordLabels = new Map<number, THREE.Mesh>();
+  /** ordinal → its row label + the dotted anchor line tying it to the row's actual bar
+   *  (recycled by ordinal as slots shift). */
+  private _ordLabels = new Map<number, { mesh: THREE.Mesh; line: THREE.Line }>();
 
   // ── fades (the ledger's stage light went with the layer navigation, 2026-08-06 — nothing
   // committable is left for a spot to dramatise)
@@ -309,7 +314,7 @@ export class LedgerView implements SceneView {
     this._globalPlanes.push(
       new SnapshotPlane(this.group, this._colors, {
         w: W, d: 2 * PLANE_FIELD_HALF, y: FLOOR_Y.gl0, cx, cz: 0,
-        label: { level: gl?.level ?? "", text: gl?.name ?? "gl0", x: lx, z: PLANE_FIELD_HALF - 0.12 },
+        label: { text: gl?.name ?? "gl0", x: lx, z: PLANE_FIELD_HALF - 0.12 },
       }),
     );
     const n = this._laneOrder.length;
@@ -322,7 +327,7 @@ export class LedgerView implements SceneView {
       // names itself, CENTRED on its own width; the explorer names the group.)
       this._metaPlanes.set(key, new SnapshotPlane(this.group, this._colors, {
         w: W, d: hz * 2, y: FLOOR_Y.msnap, cx, cz,
-        label: { level: "", text: meta?.ticker ?? "unlisted", x: lx, z: cz, height: 0.62, align: "center" },
+        label: { text: meta?.ticker ?? "unlisted", x: lx, z: cz, height: 0.62, align: "center" },
       }));
     }
     for (const p of [...this._globalPlanes, ...this._metaPlanes.values()]) {
@@ -348,8 +353,10 @@ export class LedgerView implements SceneView {
     const a = this._fades.alpha;
     for (const p of this._globalPlanes) p.applyAlpha(this.globalTune, a, FLOOR_D / 2);
     for (const p of this._metaPlanes.values()) p.applyAlpha(this.metaTune, a, FLOOR_D / 2);
-    for (const m of this._ordLabels.values())
-      (m.material as THREE.MeshBasicMaterial).opacity = ORD_OP * a;
+    for (const o of this._ordLabels.values()) {
+      (o.mesh.material as THREE.MeshBasicMaterial).opacity = ORD_OP * a;
+      (o.line.material as THREE.LineDashedMaterial).opacity = ORD_OP * 0.8 * a;
+    }
   }
 
   setSceneColors(map: Record<string, number>): void {
@@ -520,33 +527,58 @@ export class LedgerView implements SceneView {
     this._syncPickables();
   }
 
-  /** One GLOBAL SNAPSHOT ID label per visible tick row, at the global plane's screen-left edge.
-   *  Keyed by ordinal so a label rides its row down the trail; one new canvas per tick
-   *  (event-time — recycled labels only move). */
+  /** One GLOBAL SNAPSHOT ID label per visible tick row, screen-left of the bars, each tied to
+   *  its row's actual bar by a DOTTED anchor line (user, 2026-08-07). Keyed by ordinal so a
+   *  label rides its row down the trail; one new canvas per tick (event-time — recycled labels
+   *  only move, and the line end tracks the bar's live width as the exact read lands). */
   private _syncOrdLabels(): void {
     const seen = _ordSeen;
     seen.clear();
+    const y = FLOOR_Y.gl0 + 0.06;
     for (let s = 0; s < SLOT_N; s++) {
       const snap = this._slotSnap[s];
       if (!snap) continue;
       seen.add(snap.ordinal);
-      let m = this._ordLabels.get(snap.ordinal);
-      if (!m) {
-        // event-time: one canvas per new tick
-        m = makeEdgeLabel(this._colors, "", `#${snap.ordinal}`, 0, FLOOR_Y.gl0, ORD_Z, ORD_H);
-        (m.material as THREE.MeshBasicMaterial).opacity = 0;
-        this._ordLabels.set(snap.ordinal, m);
-        this.group.add(m);
+      let o = this._ordLabels.get(snap.ordinal);
+      if (!o) {
+        // event-time: one canvas + one 2-point dashed line per new tick
+        const mesh = makeEdgeLabel(this._colors, `#${snap.ordinal}`, 0, FLOOR_Y.gl0, ORD_Z, ORD_H);
+        (mesh.material as THREE.MeshBasicMaterial).opacity = 0;
+        const lg = new THREE.BufferGeometry().setFromPoints([
+          new THREE.Vector3(0, y, ORD_LINE_Z0),
+          new THREE.Vector3(0, y, 0),
+        ]);
+        const lm = new THREE.LineDashedMaterial({
+          color: this._core, transparent: true, opacity: 0,
+          depthWrite: false, dashSize: 0.14, gapSize: 0.18,
+        });
+        const line = new THREE.Line(lg, lm);
+        line.renderOrder = 2;
+        o = { mesh, line };
+        this._ordLabels.set(snap.ordinal, o);
+        this.group.add(mesh, line);
       }
-      m.position.x = LEAD_X - s * SLOT_SP;
+      const x = LEAD_X - s * SLOT_SP;
+      o.mesh.position.x = x;
+      // The dotted anchor runs from the text's end to the row's bar edge (its live width/2 —
+      // grows when the exact read lands); with no bar drawn it points at the row's centreline.
+      const spec = this._specs[s];
+      const barEdge = spec.measured && spec.bandCount > 0 ? spec.width / 2 + 0.18 : 0.3;
+      const pos = o.line.geometry.attributes.position as THREE.BufferAttribute;
+      pos.setXYZ(0, x, y, ORD_LINE_Z0);
+      pos.setXYZ(1, x, y, Math.min(barEdge, ORD_LINE_Z0 - 0.2));
+      pos.needsUpdate = true;
+      o.line.computeLineDistances(); // event-time: dashed lines need distances after a move
     }
-    for (const [ord, m] of this._ordLabels) {
+    for (const [ord, o] of this._ordLabels) {
       if (seen.has(ord)) continue;
-      this.group.remove(m);
-      m.geometry.dispose();
-      const mat = m.material as THREE.MeshBasicMaterial;
+      this.group.remove(o.mesh, o.line);
+      o.mesh.geometry.dispose();
+      const mat = o.mesh.material as THREE.MeshBasicMaterial;
       mat.map?.dispose();
       mat.dispose();
+      o.line.geometry.dispose();
+      (o.line.material as THREE.Material).dispose();
       this._ordLabels.delete(ord);
     }
   }
@@ -732,12 +764,14 @@ export class LedgerView implements SceneView {
   }
 
   dispose() {
-    for (const m of this._ordLabels.values()) {
-      this.group.remove(m);
-      m.geometry.dispose();
-      const mat = m.material as THREE.MeshBasicMaterial;
+    for (const o of this._ordLabels.values()) {
+      this.group.remove(o.mesh, o.line);
+      o.mesh.geometry.dispose();
+      const mat = o.mesh.material as THREE.MeshBasicMaterial;
       mat.map?.dispose();
       mat.dispose();
+      o.line.geometry.dispose();
+      (o.line.material as THREE.Material).dispose();
     }
     this._ordLabels.clear();
     for (const p of [...this._globalPlanes, ...this._metaPlanes.values()]) p.dispose();

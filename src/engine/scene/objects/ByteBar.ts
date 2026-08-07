@@ -27,7 +27,7 @@ export interface BarTune {
 
 // hot/rest user-tuned via ?tune, 2026-08-07. (The off-filter dim was removed entirely the same
 // day — a committed filter changes the CAMERA, never the bar.)
-export const BAR_TUNE_DEFAULTS: BarTune = { hot: 0.7, rest: 0.1 };
+export const BAR_TUNE_DEFAULTS: BarTune = { hot: 0.7, rest: 0.05 };
 
 interface Slot {
   ordinal: number;

@@ -42,12 +42,11 @@ const rgbTriplet = (c: THREE.Color): string =>
   `${Math.round(c.r * 255)},${Math.round(c.g * 255)},${Math.round(c.b * 255)}`;
 
 /** A flat, edge-aligned label plane — the chamber's only text (moved out of LedgerView with the
- *  blueprint). A blank `level` = no digit box. `align` reads `z` as the text's LEFT edge
- *  ("left", the floor-label idiom) or its CENTRE ("center" — the metagraph planes' tickers,
- *  user 2026-08-07). */
+ *  blueprint; the stack-level digit box went with the explorer's badges, user 2026-08-07).
+ *  `align` reads `z` as the text's LEFT edge ("left", the floor-label idiom) or its CENTRE
+ *  ("center" — the metagraph planes' tickers, user 2026-08-07). */
 export function makeEdgeLabel(
   colors: SceneColors,
-  level: string,
   text: string,
   frontX: number,
   y: number,
@@ -62,33 +61,7 @@ export function makeEdgeLabel(
   const ctx = c.getContext("2d")!;
   const cc = new THREE.Color(colors.core);
   const tone = `rgba(${rgbTriplet(cc)},0.85)`;
-  const mc = new THREE.Color(colors.muted);
-  const mtone = `rgba(${rgbTriplet(mc)},0.95)`;
-  const bc = new THREE.Color(colors.border);
-  const brgb = rgbTriplet(bc);
-  const pc = new THREE.Color(colors.panel);
-  const prgb = rgbTriplet(pc);
-  let textX = 6 * SS;
-  if (level) {
-    ctx.font = `400 ${22 * SS}px system-ui, -apple-system, sans-serif`;
-    const boxW = Math.max(34 * SS, Math.ceil(ctx.measureText(level).width) + 16 * SS);
-    const bx = 6 * SS,
-      by = 15 * SS,
-      bh = 34 * SS,
-      br = 6 * SS;
-    ctx.beginPath();
-    ctx.roundRect(bx, by, boxW, bh, br);
-    ctx.fillStyle = `rgba(${prgb},0.9)`;
-    ctx.fill();
-    ctx.strokeStyle = `rgba(${brgb},0.6)`;
-    ctx.lineWidth = 2 * SS;
-    ctx.stroke();
-    ctx.fillStyle = mtone;
-    ctx.textAlign = "center";
-    ctx.textBaseline = "middle";
-    ctx.fillText(level, 6 * SS + boxW / 2, (15 + 17 + 1) * SS);
-    textX = 6 * SS + boxW + 12 * SS;
-  }
+  const textX = 6 * SS;
   ctx.font = `400 ${26 * SS}px system-ui, -apple-system, sans-serif`;
   ctx.textAlign = align;
   ctx.textBaseline = "middle";
@@ -129,7 +102,7 @@ export interface SnapshotPlaneOpts {
   cz: number; // plane centre Z
   /** The plane's name at its front edge; omit for an anonymous piece. `align` defaults left
    *  (text starts at z); "center" centres the text on z. */
-  label?: { level: string; text: string; x: number; z: number; height?: number; align?: "left" | "center" };
+  label?: { text: string; x: number; z: number; height?: number; align?: "left" | "center" };
 }
 
 export class SnapshotPlane {
@@ -157,7 +130,7 @@ export class SnapshotPlane {
     this._minHalf = Math.min(o.w, o.d) / 2;
     parent.add(this.fill);
     this.label = o.label
-      ? makeEdgeLabel(colors, o.label.level, o.label.text, o.label.x, o.y, o.label.z, o.label.height, o.label.align)
+      ? makeEdgeLabel(colors, o.label.text, o.label.x, o.y, o.label.z, o.label.height, o.label.align)
       : null;
     if (this.label) parent.add(this.label);
   }

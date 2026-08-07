@@ -40,7 +40,7 @@ export interface RibbonTune {
 // User-tuned via ?tune, 2026-08-07. (The off-filter dim was removed entirely the same day —
 // a committed filter changes the CAMERA, never the sheets.)
 export const RIBBON_TUNE_DEFAULTS: RibbonTune = {
-  restOp: 0.15,
+  restOp: 0.25,
   brightness: 0.85,
   curve: 1,
 };

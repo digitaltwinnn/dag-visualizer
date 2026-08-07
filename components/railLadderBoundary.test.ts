@@ -52,5 +52,4 @@ describe("ladder↔rail boundary — every rung has a facts slot", () => {
 // node layers are per-role containers (ledgerRails.ROLE_CODE) and no layer is committable.
 it("the ledger explorer's floor vocabulary is exactly the two snapshot floors", () => {
   expect(LEDGER_LAYERS.map((l) => l.id).sort()).toEqual(["gl0", "msnap"]);
-  expect(LEDGER_LAYERS.map((l) => l.level).sort()).toEqual(["1", "2"]);
 });

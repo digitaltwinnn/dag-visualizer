@@ -148,15 +148,8 @@ export default function LedgerPanel() {
         )}
       >
         <span className="flex items-center gap-2 min-w-0">
-          {/* The floor's STACK-LEVEL badge — mirrored by the 3D floor labels so row and plane
-              pair at a glance (the one piece of layer chrome that survives: it names a place,
-              not a selectable subject). */}
-          <span
-            aria-hidden
-            className="flex-none min-w-[18px] h-[18px] px-1 rounded-xs border border-border text-muted-foreground flex items-center justify-center text-micro tabular-nums leading-none"
-          >
-            {copy.level}
-          </span>
+          {/* (The stack-level [n] badge is retired, user 2026-08-07 — the name alone carries the
+              group; the 3D labels dropped their digit box the same day.) */}
           <span className="flex-1 min-w-0 truncate text-body text-foreground">{copy.name}</span>
           <span className="flex-none flex items-center gap-1.5">
             <span className="tabular-nums text-label font-semibold text-muted-foreground">{count}</span>

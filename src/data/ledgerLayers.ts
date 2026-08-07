@@ -15,15 +15,14 @@ export interface LedgerLayerCopy {
   id: LedgerFloorId;
   name: string;
   desc: string;
-  /** STACK LEVEL, counting up from the base ledger (global = "1", metagraph = "2") — the panel
-   *  group badge + the 3D floor labels' digit box. */
-  level: string;
 }
 
+// (The stack-level digit — the [1]/[2] badges + the 3D labels' digit box — is retired,
+// user 2026-08-07: the names alone carry the two artifacts.)
 export const LEDGER_LAYERS: LedgerLayerCopy[] = [
-  { id: "msnap", level: "2", name: "Metagraph snapshots",
+  { id: "msnap", name: "Metagraph snapshots",
     desc: "Each metagraph seals its own state on its own cadence, in its own lane. These are the snapshots waiting to be anchored." },
-  { id: "gl0", level: "1", name: "Global snapshots",
+  { id: "gl0", name: "Global snapshots",
     desc: "The base ledger. Every few seconds one global snapshot anchors the state every metagraph handed up, and its width here is the bytes it carried." },
 ];
 
