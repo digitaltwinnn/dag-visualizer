@@ -48,6 +48,8 @@ async function fetchDeep(ordinal: number, address: string): Promise<ChannelSnapD
       stateProof: d.stateProof,
       state: d.state,
       dataBlockSigners: d.dataBlockSigners,
+      dataTxCount: d.dataTxCount,
+      dataTx: d.dataTx,
     };
     if (!best || row.ordinal > best.ordinal) best = row;
   }
@@ -56,7 +58,7 @@ async function fetchDeep(ordinal: number, address: string): Promise<ChannelSnapD
 }
 
 const cachedDeep = (ordinal: number, address: string) =>
-  unstable_cache(() => fetchDeep(ordinal, address), ["snapshot-channel", String(ordinal), address], {
+  unstable_cache(() => fetchDeep(ordinal, address), ["snapshot-channel-v2", String(ordinal), address], {
     revalidate: 86400,
   })();
 

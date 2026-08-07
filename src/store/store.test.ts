@@ -39,7 +39,7 @@ describe("the deep channel read cache", () => {
       globalOrdinal: 42, metaId: "DAG0", ordinal: 7, height: 8, subHeight: 9, epochProgress: 10,
       lastSnapshotHash: "h", fee: 1, bytes: 2, blocks: 0, signers: ["04917e4b"],
       stateKeys: [{ key: "updates", count: 3 }], stateBytes: 929, stateProof: "p",
-      state: "{}", dataBlockSigners: [],
+      state: "{}", dataBlockSigners: [], dataTxCount: 0, dataTx: "",
     };
     expect(metaSnapDeepKey(42, "DAG0")).toBe("42:DAG0");
     useStore.getState().setMetaSnapDeep(d);

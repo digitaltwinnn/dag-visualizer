@@ -19,6 +19,10 @@ export interface ChannelSnapDeep {
   stateProof: string | null;
   state: string;
   dataBlockSigners: string[];
+  /** The data transactions inside the blocks — a data metagraph's real payload (batch
+   *  commitments etc.); count + decoded values as JSON for the raw tree (2026-08-07). */
+  dataTxCount: number;
+  dataTx: string;
 }
 
 export const metaSnapDeepKey = (globalOrdinal: number, metaId: string): string => `${globalOrdinal}:${metaId}`;

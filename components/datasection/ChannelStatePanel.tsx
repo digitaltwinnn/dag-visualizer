@@ -28,6 +28,16 @@ export function ChannelStatePanel() {
       return deep.state; // undecodable → the raw string, rendered as one value
     }
   }, [deep]);
+  // The data TRANSACTIONS (2026-08-07 — a data metagraph's real payload: DED anchors fingerprint
+  // BATCH ROOTS here while its on-chain state stays empty).
+  const dataTx = useMemo(() => {
+    if (!deep?.dataTx) return null;
+    try {
+      return JSON.parse(deep.dataTx) as unknown;
+    } catch {
+      return deep.dataTx;
+    }
+  }, [deep]);
 
   if (!sel) {
     return (
@@ -103,6 +113,17 @@ export function ChannelStatePanel() {
             <div className="min-h-0 flex-1 overflow-auto rounded-sm border border-border/50 bg-wash-faint p-2">
               <JsonTree data={state} />
             </div>
+          )}
+
+          {dataTx != null && (
+            <>
+              <p className="flex-none text-micro tracking-caps text-muted-foreground">
+                data transactions · {deep.dataTxCount}
+              </p>
+              <div className="min-h-0 flex-1 overflow-auto rounded-sm border border-border/50 bg-wash-faint p-2">
+                <JsonTree data={dataTx} />
+              </div>
+            </>
           )}
         </>
       )}

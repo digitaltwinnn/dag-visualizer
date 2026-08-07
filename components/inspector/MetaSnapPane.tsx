@@ -205,6 +205,12 @@ export default function MetaSnapPane({
                       <span className="text-muted-foreground italic">pin to decode</span>
                     </Fact>
                   )}
+                  {/* The data TRANSACTIONS are a data metagraph's real payload (batch
+                      commitments etc. — DED's fingerprint batches ride here while its state
+                      stays empty; 2026-08-07). */}
+                  {deep && deep.dataTxCount > 0 && (
+                    <Fact label="Data updates">{deep.dataTxCount}</Fact>
+                  )}
                   {deep && deep.dataBlockSigners.length > 0 && (
                     <Fact label="Data blocks">{deep.dataBlockSigners.length} signers</Fact>
                   )}

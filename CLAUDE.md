@@ -1814,7 +1814,14 @@ incl. unlisted), else the polled floor for old ticks (or "reading…" mid-fetch)
 shows the **settlement fee** (exact → the figure + `· N KB settled`; old/floor → `at
 least`/`complete`). It deliberately shows **no block count** — blocks aren't the activity
 signal here. (A snapshot's `value.content` is the serialized snapshot as a *byte array*, not
-a list of records — don't surface its length as an update/record count.)
+a list of records — don't surface its length as an update/record count.) **A data metagraph's
+real payload rides in its blocks' `dataTransactions`, not necessarily in `onChainState`**
+(verified live 2026-08-07): DED anchors fingerprint BATCH COMMITMENTS (`MetagraphBatchMessage`
+— batchId + a Merkle `batchRoot` + orgId) per snapshot while its on-chain state stays the empty
+`{"latestOrdinal":{},"latestUpdates":{}}` — the individual fingerprints live in DED's own
+backend, the chain holds the tamper-proof roots. `decodeChannelContent` therefore surfaces
+`dataTxCount`/`dataTx` (the decoded transaction values); the metagraph-snapshot card shows
+"Data updates: N" and the raw layer renders the transactions as a second tree under the state.
 
 ## Data — server-side routes
 
