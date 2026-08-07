@@ -363,12 +363,12 @@ export class NodeFabric {
         } else {
           if (u.noGeo) _vec.copy(u.hyperPos);
           else _vec.copy(u.hyperDir).lerp(u.geoDir!, e).normalize().multiplyScalar(lerp(u.hyperRadius, u.geoRadius, e));
-          let showL = 1 - dim * dimScaleV;
-          showL += (1 - showL) * gw; // the square shows the WHOLE fleet — dim-hidden nodes lift in
           _dummy.position.copy(_vec).lerp(u.ledgerPos, ledgerT);
           _dummy.quaternion.copy(_qLedgerChip); // cap toward the camera, like the tray face
-          const sL = u.hyperSize * LEDGER.dot * showL;
-          _dummy.scale.set(sL, HEX_H * showL, sL);
+          // UNIFORM chip size — dim is EMISSIVE-only, like hyper (user, 2026-08-07; the old
+          // dim-shrink was the committed-lane emphasis, retired with the fixed lane field).
+          const sL = u.hyperSize * LEDGER.dot;
+          _dummy.scale.set(sL, HEX_H, sL);
           this._applyGather(ctx, u.gU, u.gV, gw, prim);
         }
         _dummy.updateMatrix();
@@ -554,13 +554,12 @@ export class NodeFabric {
         if (r.ledgerHide) {
           _dummy.scale.setScalar(0);
         } else {
-          // Ledger: a CHIP in its role container (the geo cylinder, HEX_H tall — see the
-          // validator loop) — same size rule as the validators (uniform dot for every cluster).
-          // Filtered-out nodes shrink out (1 - dEff).
+          // Ledger: a CHIP in its tray (the geo cylinder, HEX_H tall — see the validator loop),
+          // UNIFORM size for every machine — dim is EMISSIVE-only, like hyper (user, 2026-08-07;
+          // the old dim-shrink was the committed-lane emphasis, retired with the fixed field).
           _dummy.quaternion.copy(_qLedgerChip); // cap toward the camera, like the tray face
-          const visL = (1 - dEff) + dEff * gw; // parked squares show the whole fleet
-          const sL = r.hyperSize * LEDGER.dot * visL;
-          _dummy.scale.set(sL, HEX_H * visL, sL);
+          const sL = r.hyperSize * LEDGER.dot;
+          _dummy.scale.set(sL, HEX_H, sL);
           this._applyGather(ctx, r.gU, r.gV, gw, prim);
         }
         _dummy.updateMatrix();
