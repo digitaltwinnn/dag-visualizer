@@ -70,6 +70,9 @@ export class Ribbons {
   private _sceneColors: Record<string, number>;
   private _neutral: number;
   private _alpha = 0;
+  /** Per-row brightness scale — the trail REWIND fades the live lead row's sheet while an older
+   *  snapshot owns the front (LedgerView drives it during the ease). */
+  private _rowFade = [1, 1];
   private _c = new THREE.Color();
 
   constructor(colors: SceneColors, sceneColors: Record<string, number>) {
@@ -137,6 +140,14 @@ export class Ribbons {
 
   ribbonCount(row: 0 | 1): number { return this._rows[row].count; }
 
+  /** Set a row's brightness scale (0..1). Rewrites the sheet only on real change — called per
+   *  frame during the trail-rewind ease, but the rewrite fires ~a handful of times per ease. */
+  setRowFade(row: 0 | 1, f: number): void {
+    if (Math.abs(this._rowFade[row] - f) < 0.012) return;
+    this._rowFade[row] = f;
+    this._writeGeometry();
+  }
+
   /** A point on ribbon `i`'s centre line at vertical progress `t` — follows the SAME eased sweep
    *  the sheet is drawn with, so the anchor pulses ride the curve. */
   centreLine(row: 0 | 1, i: number, t: number, out: THREE.Vector3): THREE.Vector3 {
@@ -174,6 +185,7 @@ export class Ribbons {
     };
     for (let r = 0; r < RIBBON_ROWS; r++) {
       const st = this._rows[r];
+      const rowFade = this._rowFade[r];
       const x = LEAD_X - st.slot * SLOT_SP;
       // Tile-bottom → bar-top (the snapshots sit ON their planes now, 2026-08-07).
       const yTop = FLOOR_Y.msnap + TILE_LIFT;
@@ -183,7 +195,7 @@ export class Ribbons {
         const key = st.keys[i];
         const hex = key === UNLISTED_KEY ? this._neutral : (this._sceneColors[key] ?? this._neutral);
         this._c.setHex(hex);
-        const cr = this._c.r * brightness, cg = this._c.g * brightness, cb = this._c.b * brightness;
+        const cr = this._c.r * brightness * rowFade, cg = this._c.g * brightness * rowFade, cb = this._c.b * brightness * rowFade;
         for (let j = 0; j < RIBBON_SEG; j++) {
           const t0 = j / RIBBON_SEG, t1 = (j + 1) / RIBBON_SEG;
           const s0 = sweep(t0, curve), s1 = sweep(t1, curve);

@@ -187,8 +187,13 @@ export class LedgerView implements SceneView {
 
   // ── the lead row's honesty label: the newest tick's anchor count is still growing
   /** ordinal → its row label + the dotted anchor line tying it to the row's actual bar
-   *  (recycled by ordinal as slots shift). */
-  private _ordLabels = new Map<number, { mesh: THREE.Mesh; line: THREE.Line }>();
+   *  (recycled by ordinal as slots shift; `slot` feeds the rewind's front fade). */
+  private _ordLabels = new Map<number, { mesh: THREE.Mesh; line: THREE.Line; slot: number }>();
+  /** The labels+lines ride the trail rewind as one group. */
+  private _ordGroup = new THREE.Group();
+  /** The TRAIL REWIND offset (user, 2026-08-07): >0 slides the whole time trail +X so the
+   *  SELECTED row sits at the lead position instead of fighting the live lead for the front. */
+  private _trailOff = 0;
 
   // ── fades (the ledger's stage light went with the layer navigation, 2026-08-06 — nothing
   // committable is left for a spot to dramatise)
@@ -230,7 +235,7 @@ export class LedgerView implements SceneView {
 
     this._bar = new ByteBar(colors, sceneColors);
     this._ribbons = new Ribbons(colors, sceneColors);
-    this.group.add(this._bar.group, this._ribbons.group);
+    this.group.add(this._bar.group, this._ribbons.group, this._ordGroup);
 
     this._buildMetaTrail();
     this._buildPulses();
@@ -354,9 +359,10 @@ export class LedgerView implements SceneView {
     for (const p of this._globalPlanes) p.applyAlpha(this.globalTune, a, FLOOR_D / 2);
     for (const p of this._metaPlanes.values()) p.applyAlpha(this.metaTune, a, FLOOR_D / 2);
     for (const o of this._ordLabels.values()) {
-      (o.mesh.material as THREE.MeshBasicMaterial).opacity = ORD_OP * a;
+      const front = this._fadeAtX(LEAD_X - o.slot * SLOT_SP + this._trailOff);
+      (o.mesh.material as THREE.MeshBasicMaterial).opacity = ORD_OP * front * a;
       // The anchor line whispers under its label (user, 2026-08-07 — "a bit more subtle").
-      (o.line.material as THREE.LineDashedMaterial).opacity = ORD_OP * 0.45 * a;
+      (o.line.material as THREE.LineDashedMaterial).opacity = ORD_OP * 0.45 * front * a;
     }
   }
 
@@ -528,6 +534,13 @@ export class LedgerView implements SceneView {
     this._syncPickables();
   }
 
+  /** 1 at/behind the lead position, dissolving within one slot of travel past the front edge —
+   *  the REWIND fade: rows newer than the pinned snapshot slide off the front and vanish. */
+  private _fadeAtX(x: number): number {
+    const over = (x - LEAD_X) / (SLOT_SP * 0.9);
+    return over <= 0 ? 1 : Math.max(0, 1 - over);
+  }
+
   /** One GLOBAL SNAPSHOT ID label per visible tick row, screen-left of the bars, each tied to
    *  its row's actual bar by a DOTTED anchor line (user, 2026-08-07). Keyed by ordinal so a
    *  label rides its row down the trail; one new canvas per tick (event-time — recycled labels
@@ -541,6 +554,7 @@ export class LedgerView implements SceneView {
       if (!snap) continue;
       seen.add(snap.ordinal);
       let o = this._ordLabels.get(snap.ordinal);
+      if (o) o.slot = s;
       if (!o) {
         // event-time: one canvas + one 2-point dashed line per new tick
         const mesh = makeEdgeLabel(this._colors, snap.ordinal.toLocaleString(), 0, FLOOR_Y.gl0, ORD_Z, ORD_H);
@@ -555,9 +569,9 @@ export class LedgerView implements SceneView {
         });
         const line = new THREE.Line(lg, lm);
         line.renderOrder = 2;
-        o = { mesh, line };
+        o = { mesh, line, slot: s };
         this._ordLabels.set(snap.ordinal, o);
-        this.group.add(mesh, line);
+        this._ordGroup.add(mesh, line);
       }
       const x = LEAD_X - s * SLOT_SP;
       o.mesh.position.x = x;
@@ -573,7 +587,7 @@ export class LedgerView implements SceneView {
     }
     for (const [ord, o] of this._ordLabels) {
       if (seen.has(ord)) continue;
-      this.group.remove(o.mesh, o.line);
+      this._ordGroup.remove(o.mesh, o.line);
       o.mesh.geometry.dispose();
       const mat = o.mesh.material as THREE.MeshBasicMaterial;
       mat.map?.dispose();
@@ -647,6 +661,20 @@ export class LedgerView implements SceneView {
   update(dt: number) {
     this.t += dt;
 
+    // ── the TRAIL REWIND (user, 2026-08-07): selecting a non-live snapshot slides the WHOLE
+    // time trail forward until that row sits at the lead position — the active selection owns
+    // the front instead of fighting the live lead's arrivals. Rows newer than the selection
+    // slide past the front edge and dissolve (_fadeAtX); re-following slides everything back.
+    const offTarget = this.model.selectedSlot > 0 ? this.model.selectedSlot * SLOT_SP : 0;
+    this._trailOff += (offTarget - this._trailOff) * Math.min(1, dt * 3.2);
+    if (Math.abs(offTarget - this._trailOff) < 0.002) this._trailOff = offTarget;
+    this._bar.setOffset(this._trailOff);
+    this._ribbons.group.position.x = this._trailOff;
+    this._ordGroup.position.x = this._trailOff;
+    // The live lead's ribbon sheet fades out as it crosses the front (row 1 — the selected
+    // row's sheet — lands exactly AT the front, so it never fades).
+    this._ribbons.setRowFade(0, this._fadeAtX(LEAD_X + this._trailOff));
+
     this._applyFloorAlpha();
 
     this._bar.update(dt);
@@ -682,7 +710,7 @@ export class LedgerView implements SceneView {
         // Bottom just above the plane (user, 2026-08-07): the box is centred, so lift by half its
         // world height (geometry depth 0.35 × scale.z becomes the height under the -90° X spin).
         const tileH = 0.35 * b.size;
-        _dummy.position.set(b.x + b.ox, FLOOR_Y.msnap + TILE_LIFT + tileH / 2, cz + b.oz * zScale);
+        _dummy.position.set(b.x + b.ox + this._trailOff, FLOOR_Y.msnap + TILE_LIFT + tileH / 2, cz + b.oz * zScale);
         _dummy.rotation.set(-Math.PI / 2, 0, 0);
         _dummy.scale.set(b.size, b.size, b.size);
         _dummy.updateMatrix();
@@ -694,6 +722,7 @@ export class LedgerView implements SceneView {
           b.slot <= 0 || (this.model.selectedSlot > 0 && b.slot === this.model.selectedSlot);
         const bright =
           (hot ? Math.max(b.fade, 0.9) * this.tiles.hot : b.fade * this.tiles.rest) *
+          this._fadeAtX(b.x + this._trailOff) *
           this._fades.alpha;
         this._metaTrailMesh.setColorAt(mi, _col.copy(ident ? laneColor : this._coreCol).multiplyScalar(bright));
         mi++;
@@ -733,11 +762,15 @@ export class LedgerView implements SceneView {
         if (p.t >= 1 || p.idx >= nRib) continue;
         this._ribbons.centreLine(0, p.idx, p.t, _p);
         _dummy.position.copy(_p);
+        _dummy.position.x += this._trailOff; // the pulses ride the rewound lead row
         _dummy.scale.setScalar(1);
         _dummy.quaternion.identity();
         _dummy.updateMatrix();
         this._pulseMesh.setMatrixAt(i, _dummy.matrix);
-        this._pulseMesh.setColorAt(i, _col.set(p.color).multiplyScalar(this._fades.alpha));
+        this._pulseMesh.setColorAt(
+          i,
+          _col.set(p.color).multiplyScalar(this._fades.alpha * this._fadeAtX(LEAD_X + this._trailOff)),
+        );
         i++;
       }
     }
@@ -766,7 +799,7 @@ export class LedgerView implements SceneView {
 
   dispose() {
     for (const o of this._ordLabels.values()) {
-      this.group.remove(o.mesh, o.line);
+      this._ordGroup.remove(o.mesh, o.line);
       o.mesh.geometry.dispose();
       const mat = o.mesh.material as THREE.MeshBasicMaterial;
       mat.map?.dispose();

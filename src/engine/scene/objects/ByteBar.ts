@@ -50,6 +50,7 @@ export class ByteBar {
   private _neutral: number;
   private _alpha = 0;
   private _selected = -1;
+  private _off = 0;
 
   constructor(colors: SceneColors, sceneColors: Record<string, number>) {
     this._sceneColors = sceneColors;
@@ -126,17 +127,27 @@ export class ByteBar {
   setAlpha(a: number): void { this._alpha = a; }
   setSelected(slot: number): void { this._selected = slot; }
 
+  /** The trail-REWIND offset (LedgerView drives it): the whole bar group slides +X so the
+   *  selected row sits at the lead position; rows past the front edge fade in update(). */
+  setOffset(off: number): void {
+    this._off = off;
+    this.group.position.x = off;
+  }
+
   update(dt: number): void {
     const k = Math.min(1, dt * 5);
     for (let si = 0; si < this._slots.length; si++) {
       const s = this._slots[si];
       const fade = slotFade(si);
       const hot = si === this._selected || si === 0;
+      // Rows the rewind pushed past the front edge dissolve within one slot of travel.
+      const over = (LEAD_X - si * SLOT_SP + this._off - LEAD_X) / (SLOT_SP * 0.9);
+      const front = over <= 0 ? 1 : Math.max(0, 1 - over);
       for (let i = 0; i < s.used; i++) {
         // A filter never changes a band — the bar keeps its full composition at full strength
         // (the off-filter dim was removed entirely, user 2026-08-07; the camera is the emphasis).
         const base = hot ? this.tune.hot : this.tune.rest;
-        const t = base * fade * this._alpha;
+        const t = base * fade * front * this._alpha;
         s.mats[i].opacity += (t - s.mats[i].opacity) * k;
         // IDENTITY colour on the front (lead) and hovered/selected rows alone (user, 2026-08-07);
         // the rest of the trail rests neutral cyan. setHex is allocation-free.

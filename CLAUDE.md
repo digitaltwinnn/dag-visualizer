@@ -1604,7 +1604,14 @@ frame). It composes three adapters — `objects/ByteBar.ts`, `objects/Ribbons.ts
   switch**: bands run
   `BarTune` hot 0.7 / rest 0.1 (the tiles' `TileTune` speaks the same hot/rest vocabulary; the
   off-filter dim level is gone). `model.isRowHot(slot)` still enforces exactly ONE hot
-  row (a selected/hovered older snapshot beats the live lead). Selection comes from the LiveStrip:
+  row (a selected/hovered older snapshot beats the live lead). **Selecting a non-live snapshot
+  REWINDS the trail** (user, 2026-08-07): `LedgerView._trailOff` eases the whole time trail —
+  bars, tiles, ribbons, ordinal labels, pulses — forward until the selected row sits AT the lead
+  position, so the active selection owns the front instead of fighting the live lead's arrivals;
+  rows newer than the selection slide past the front edge and dissolve (`_fadeAtX`, one slot of
+  travel; `Ribbons.setRowFade` fades the live lead's sheet), and re-following slides everything
+  back. The offset target tracks `model.selectedSlot`, so each new tick keeps the pinned row at
+  the front. Selection comes from the LiveStrip:
   the Engine forwards `hoverSnapOrd ?? snap.data.ordinal` to `ledger.setSelected(ordinal)`, and
   the ledger maps ordinal → slot each tick (`_recomputeSelectedSlot`). There is NO scene fog
   anywhere any more (removed 2026-07-11) and recency is `slotFade` brightness only. IDENTITY
