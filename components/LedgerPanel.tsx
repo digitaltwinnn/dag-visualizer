@@ -7,6 +7,7 @@ import { SelectedRowMark, selectedRow } from "@/components/selection";
 import { subjectPairing } from "@/components/useSubjectPairing";
 import { useSnapshotFeed } from "@/components/useSnapshotFeed";
 import { getNetwork, filterAccent, metagraphById } from "@/src/data/network";
+import { METAGRAPHS } from "@/src/engine/config";
 import { latestRelevant } from "@/src/data/follow";
 import { identityHudHex } from "@/src/palette/identity";
 import { IdentityDot } from "@/components/inspector/parts";
@@ -130,6 +131,17 @@ export default function LedgerPanel() {
   // render, same as the raw layer's AnchorLogTable — the buffers mutate in place).
   const rows = net ? buildAnchorLog(net.metaSnaps, net.globalSnapshots, "all").filter((r) => visibleTs.has(r.ts)) : [];
   const groups = groupByMeta(rows);
+  // The UNLISTED channels (user, 2026-08-07 — navigable like any network): the EXACT reads are
+  // the only honest source (the polled buffers only track the public catalog). One entry per
+  // unlisted state-channel snapshot in the visible window, newest tick first.
+  const LISTED = new Set(METAGRAPHS.map((m) => m.id));
+  const unlistedRows = [...snaps].reverse().flatMap((g) => {
+    const ex = snapshotExact[g.ordinal];
+    if (!ex?.rows) return [];
+    return ex.rows
+      .filter((r) => !LISTED.has(r.metaId))
+      .map((r) => ({ row: r, global: g }));
+  });
   const orderedSnaps = [...snaps].reverse(); // newest first, the log convention
   const activeSnapOrd = snap?.data.ordinal ?? null;
 
@@ -332,6 +344,57 @@ export default function LedgerPanel() {
                     </div>
                   );
                 })}
+            {/* The UNLISTED group — neutral dot (no single hue can speak for a mixed set),
+                snapshot rows labelled by their own ordinal (or the channel address when the
+                payload couldn't be decoded), the SAME tested select a chamber tile runs. */}
+            {unlistedRows.length > 0 && (
+              <div>
+                <DisclosureRow
+                  key="msnap|unlisted"
+                  open={openMeta === "msnap|unlisted"}
+                  holdsSel={metaSnap != null && !LISTED.has(metaSnap.metaId)}
+                  title={`unlisted · ${unlistedRows.length} snapshot${unlistedRows.length === 1 ? "" : "s"} from uncataloged channels`}
+                  onToggle={() => setOpenMeta(openMeta === "msnap|unlisted" ? null : "msnap|unlisted")}
+                  onHoverEnter={() => setHoverFilter("unlisted")}
+                  onHoverLeave={() => setHoverFilter(null)}
+                >
+                  <IdentityDot hue="var(--core)" />
+                  <span className="flex-1 min-w-0 text-body text-foreground italic whitespace-nowrap overflow-hidden text-ellipsis">
+                    unlisted
+                  </span>
+                </DisclosureRow>
+                {openMeta === "msnap|unlisted" && (
+                  <div className="mb-1 ml-[7px] pl-2 border-l border-border">
+                    {unlistedRows.map(({ row: r, global: g }, i) => {
+                      const sel = { metaId: r.metaId, ordinal: r.ordinal, hash: "", globalOrdinal: g.ordinal, ts: g.timestamp };
+                      const isSel = sameMetaSnap(metaSnap, sel);
+                      return (
+                        <SnapRow
+                          key={`${g.ordinal}:${r.metaId}:${i}`}
+                          label={r.ordinal > 0 ? r.ordinal.toLocaleString() : `${r.metaId.slice(0, 10)}…`}
+                          metric={fmtKB(r.bytes / 1024)}
+                          selected={isSel}
+                          hoverOrd={hoverSnapOrd}
+                          pairOrd={g.ordinal}
+                          setHoverOrd={setHoverSnapOrd}
+                          accent="var(--core)"
+                          title={`Unlisted channel ${r.metaId} · anchored into global #${g.ordinal}`}
+                          onClick={() =>
+                            applyClickActions(
+                              metaSnapSelectActions(
+                                sel,
+                                { kind: "snapshot", title: `Global snapshot #${g.ordinal}`, data: g },
+                                { filter, metaSnap },
+                              ),
+                            )
+                          }
+                        />
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         )}
 

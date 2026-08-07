@@ -98,6 +98,22 @@ export default function FilterPicker({ onPicked }: { onPicked?: () => void }) {
           </button>
         );
       })}
+      {/* The UNLISTED channels (user, 2026-08-07): real anchoring state channels absent from the
+          public catalog — a first-class filter like any 0-located metagraph (dimmed, honest 0
+          machines; committing lands geo/hyper in their quiet-empty state, the ledger lights its
+          unlisted lane). Neutral dot: no identity hue can speak for a mixed set. */}
+      <button
+        type="button"
+        aria-pressed={filter === "unlisted"}
+        title="Anchoring state channels not in the public catalog"
+        className={chipClass(filter === "unlisted", true)}
+        onClick={() => pick("unlisted")}
+        onMouseEnter={() => setHoverFilter("unlisted")}
+      >
+        <IdentityDot hue="var(--core)" />
+        <span className="text-body text-foreground italic">unlisted</span>
+        <span className="text-label text-muted-foreground tabular-nums">0</span>
+      </button>
     </div>
   );
 }

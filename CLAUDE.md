@@ -926,10 +926,17 @@ and keep changing, so they're examples, not the contract.
   CLOSED by default, names alone (no level badges, no counts: the old header count was just
   the downloaded window, a buffer size, not a network fact; user 2026-08-07), with the LIVE
   follow control above them:
-  · **Metagraph snapshots** → metagraph rows (identity dot + name + count in the visible
-  window, hover pairs on the `hoverFilter` channel) → that metagraph's snapshot id rows —
+  · **Metagraph snapshots** → metagraph rows (identity dot + name, hover pairs on the
+  `hoverFilter` channel) → that metagraph's snapshot id rows —
   a snapshot row IS the clickable tile, running the same tested `metaSnapSelectActions`
-  (filter-first, pins the anchoring global, opens the metagraph-snapshot card);
+  (filter-first, pins the anchoring global, opens the metagraph-snapshot card). An
+  **`unlisted` group** (2026-08-07) rides after the listed ones — neutral dot, italic, sourced
+  from the EXACT reads (the only honest source for uncataloged channels), its rows labelled by
+  the channel snapshot's own ordinal (or the address when undecoded), same tested select.
+  **`unlisted` is a first-class FILTER too**: a picker chip (dimmed like a 0-located
+  metagraph, neutral dot — TopBar's face knows the label), committable in every view — geo/
+  hyper land in the honest quiet-empty state (no machines are knowable), the ledger lights the
+  unlisted lane and dims the rest;
   · **Global snapshots** → TICK rows first (user, 2026-08-07 — the snapshot leads; metric =
   the exact read's measured KB, dash until it lands), each row selecting via the shared
   `snapshotSelectActions` AND disclosing its contributor METAGRAPH child rows in the same

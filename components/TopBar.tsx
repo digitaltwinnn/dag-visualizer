@@ -29,6 +29,9 @@ const VIEWS = [
 function filterFace(filter: string): { label: string; dot: string } {
   const cfg = metagraphById(filter);
   if (cfg) return { label: cfg.ticker || cfg.name, dot: hex(cfg.color) };
+  // The UNLISTED channels are committable without a catalog entry (2026-08-07) — neutral dot,
+  // no identity hue can speak for the mixed set.
+  if (filter === "unlisted") return { label: "unlisted", dot: "var(--core)" };
   return { label: "All", dot: "var(--primary)" };
 }
 

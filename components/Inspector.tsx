@@ -365,7 +365,7 @@ export default function Inspector() {
   const manifest = detailsCards({
     mode, filter, inspect, snap, country, cohort, composition, metaSnap,
     selNodesCount: selNodes.length,
-    filterLabel: filterCfg ? filterCfg.ticker || filterCfg.name : null,
+    filterLabel: filterCfg ? filterCfg.ticker || filterCfg.name : filter === "unlisted" ? "unlisted" : null,
   });
 
   // ── The descent-spine ladder collapse model (variant-A, 2026-07-19) ──────────────────────────
