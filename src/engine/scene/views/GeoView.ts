@@ -83,7 +83,11 @@ function buildGraticule(globe: GeoViewHost) {
   // The sea graticule (grid lines OVER the ocean): subtle so the continents (the raised, gridded
   // land) clearly lead. 0.03 → 0.06 → 0.045 (user: eased back down a bit — a touch more subtle on
   // the water). Accent hue.
-  const mat = new THREE.LineBasicMaterial({ color: globe.geoColor, transparent: true, opacity: 0 });
+  // depthWrite OFF: the graticule is transparent hologram furniture — with the default depth
+  // write it still stamped the depth buffer at opacity 0 in the LEDGER (the globe group stays
+  // visible there, it hosts the chips), z-rejecting the additive chamber behind it into a BLACK
+  // lined globe silhouette (user, 2026-08-07).
+  const mat = new THREE.LineBasicMaterial({ color: globe.geoColor, transparent: true, opacity: 0, depthWrite: false });
   // FACING dim: far-hemisphere fragments fade to ~30% so the backside reads as behind the globe
   // instead of blending with the front (the hologram keeps its see-through presence, quieter).
   // The floor drops to near-zero as the camera closes in (uClose) — at country/node range the
