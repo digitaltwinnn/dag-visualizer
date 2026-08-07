@@ -135,12 +135,14 @@ export default function LedgerPanel() {
 
   // Disclosure state: one open group per level, plain local UI state — nothing here commits a
   // selection (the layer rung is retired), so there is no store channel to derive from.
-  const [openFloor, setOpenFloor] = useState<string | null>("msnap");
+  // Both groups start CLOSED (user, 2026-08-07) — the LIVE control + the chamber itself are
+  // the view's opening statement; the lists are there when you reach for them.
+  const [openFloor, setOpenFloor] = useState<string | null>(null);
   const [openMeta, setOpenMeta] = useState<string | null>(null); // `${floorId}|${metaId or "all"}`
 
   const accent = filterAccent(filter);
 
-  const floorHeader = (id: "msnap" | "gl0", count: number) => {
+  const floorHeader = (id: "msnap" | "gl0") => {
     const copy = FLOOR_COPY[id];
     const open = openFloor === id;
     return (
@@ -159,12 +161,10 @@ export default function LedgerPanel() {
           {/* (The stack-level [n] badge is retired, user 2026-08-07 — the name alone carries the
               group; the 3D labels dropped their digit box the same day.) */}
           <span className="flex-1 min-w-0 truncate text-body text-foreground">{copy.name}</span>
-          <span className="flex-none flex items-center gap-1.5">
-            {/* Same weight as the other explorers' top-row counts (user, 2026-08-07 — this read
-                smaller/unbold next to GeoExplore/HyperExplore). */}
-            <span className="tabular-nums text-body font-semibold">{count}</span>
-            <DisclosureChevron open={open} />
-          </span>
+          {/* No count here (user, 2026-08-07): the old figure was only the DOWNLOADED window —
+              a buffer size, not a network fact — so the name stands alone; the per-metagraph
+              rows inside keep their in-window counts, scoped where they're honest. */}
+          <DisclosureChevron open={open} />
         </span>
       </button>
     );
@@ -283,7 +283,7 @@ export default function LedgerPanel() {
         })()}
 
         {/* ── [2] Metagraph snapshots → metagraphs → snapshot ids ── */}
-        {floorHeader("msnap", rows.length)}
+        {floorHeader("msnap")}
         {openFloor === "msnap" && (
           <div className={cn("mb-1.5 ml-[9px] py-0.5 pl-3", ROW_NEST)} onMouseLeave={() => setHoverSnapOrd(null)}>
             {groups.length === 0
@@ -332,7 +332,7 @@ export default function LedgerPanel() {
         {/* ── [1] Global snapshots → tick rows → the metagraphs that anchored into each ──
             (user, 2026-08-07: the snapshot leads, the networks are its children — the mirror of
             the msnap group, where the network leads and its snapshots are the children). */}
-        {floorHeader("gl0", snaps.length)}
+        {floorHeader("gl0")}
         {openFloor === "gl0" && (
           <div className={cn("mb-1.5 ml-[9px] py-0.5 pl-3", ROW_NEST)} onMouseLeave={() => setHoverSnapOrd(null)}>
             {orderedSnaps.length === 0

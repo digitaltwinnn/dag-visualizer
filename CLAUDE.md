@@ -922,8 +922,10 @@ and keep changing, so they're examples, not the contract.
   click, so nothing is lost by leaving the sentence in one place), ledger → `LedgerPanel`
   (**"Snapshots" — SNAPSHOTS-FIRST navigation**, user 2026-08-06, replacing the layer/rail
   browser: floors and containers are pure visual aid now, so the explorer's two top-level
-  groups are the two snapshot ARTIFACTS themselves, mirroring the chamber's floors and keeping
-  their level badges [2]/[1]:
+  groups are the two snapshot ARTIFACTS themselves, mirroring the chamber's floors — both
+  CLOSED by default, names alone (no level badges, no counts: the old header count was just
+  the downloaded window, a buffer size, not a network fact; user 2026-08-07), with the LIVE
+  follow control above them:
   · **Metagraph snapshots** → metagraph rows (identity dot + name + count in the visible
   window, hover pairs on the `hoverFilter` channel) → that metagraph's snapshot id rows —
   a snapshot row IS the clickable tile, running the same tested `metaSnapSelectActions`
