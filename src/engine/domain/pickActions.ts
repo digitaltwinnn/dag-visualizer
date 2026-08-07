@@ -209,7 +209,16 @@ export function clearAllActions(current: {
 export function snapshotSelectActions(
   p: Extract<PickDescriptor, { kind: "snapshot" }>,
   isLiveTip: boolean,
-  current?: { pinnedOrdinal: number | null; metaSnap: MetaSnapSel | null },
+  current?: {
+    pinnedOrdinal: number | null;
+    metaSnap: MetaSnapSel | null;
+    /** The committed network filter + whether the clicked tick's anchor set contains it. A
+     *  FILTER IS A STORY (user, 2026-08-07): pinning a tick the committed network did NOT
+     *  anchor into releases the filter back to "all" — otherwise the network dim keeps
+     *  shaping a snapshot that has nothing to do with it. Omitted = the filter holds. */
+    filter?: string;
+    tickHasFilter?: boolean;
+  },
 ): ClickAction[] {
   // RE-CLICKING the pinned tick DESELECTS (2026-08-07 — the toggle every other rung already
   // speaks): the finer metaSnap slot drops with it, and the deselect RESUMES LIVE (live is the
@@ -221,7 +230,15 @@ export function snapshotSelectActions(
     out.push({ kind: "snapshot", pick: null, follow: true });
     return out;
   }
-  return [{ kind: "snapshot", pick: p, follow: isLiveTip }];
+  const out: ClickAction[] = [];
+  if (
+    current?.filter && current.filter !== "all" && current.filter !== "dag" &&
+    current.tickHasFilter === false
+  ) {
+    out.push({ kind: "filter", id: "all" });
+  }
+  out.push({ kind: "snapshot", pick: p, follow: isLiveTip });
+  return out;
 }
 
 // Metagraph snapshot identity — metaId + ordinal (the snapshot's own ordinal, not the global one).
@@ -293,8 +310,9 @@ export function clickActions(input: {
   current: {
     filter: string; country: string | null; hasInspect: boolean; cohort: CohortSel | null;
     // Ledger: the pinned tick + its metaSnap child — a scene band click on the pinned tick
-    // deselects, same as the explorer row (the toggle rule; omitted = never toggles).
-    pinnedOrdinal?: number | null; metaSnap?: MetaSnapSel | null;
+    // deselects, same as the explorer row (the toggle rule; omitted = never toggles) — and
+    // whether the clicked tick's anchors include the committed filter (the filter-releases rule).
+    pinnedOrdinal?: number | null; metaSnap?: MetaSnapSel | null; tickHasFilter?: boolean;
   };
 }): ClickAction[] {
   const { mode, pick: p, countryCc, current } = input;
@@ -313,6 +331,8 @@ export function clickActions(input: {
     return snapshotSelectActions(p, false, {
       pinnedOrdinal: current.pinnedOrdinal ?? null,
       metaSnap: current.metaSnap ?? null,
+      filter: current.filter,
+      tickHasFilter: current.tickHasFilter,
     });
 
   // A node, in any view. (No autoRotate action: geo disables the controls' rotation at mode

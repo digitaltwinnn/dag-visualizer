@@ -205,6 +205,26 @@ describe("the shared component builders (GeoExplore rows + LiveStrip bars run th
     ]);
   });
 
+  it("snapshotSelectActions: the filter RELEASES when its network is absent from the tick", () => {
+    const p = snapPick();
+    // Absent → the filter steps back to "all" before the pin.
+    expect(snapshotSelectActions(p, false, { pinnedOrdinal: null, metaSnap: null, filter: "dor", tickHasFilter: false })).toEqual([
+      { kind: "filter", id: "all" },
+      { kind: "snapshot", pick: p, follow: false },
+    ]);
+    // Present → the filter holds (the tick is part of its story).
+    expect(snapshotSelectActions(p, false, { pinnedOrdinal: null, metaSnap: null, filter: "dor", tickHasFilter: true })).toEqual([
+      { kind: "snapshot", pick: p, follow: false },
+    ]);
+    // "all" / unknown membership → untouched.
+    expect(snapshotSelectActions(p, false, { pinnedOrdinal: null, metaSnap: null, filter: "all", tickHasFilter: false })).toEqual([
+      { kind: "snapshot", pick: p, follow: false },
+    ]);
+    expect(snapshotSelectActions(p, false, { pinnedOrdinal: null, metaSnap: null, filter: "dor" })).toEqual([
+      { kind: "snapshot", pick: p, follow: false },
+    ]);
+  });
+
   it("followToggleActions: the card's live switch flips following, keeping the shown subject", () => {
     const p = snapPick();
     expect(followToggleActions(p, false)).toEqual([{ kind: "snapshot", pick: p, follow: true }]);

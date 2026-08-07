@@ -947,8 +947,13 @@ and keep changing, so they're examples, not the contract.
   · **Global snapshots** → TICK rows first (user, 2026-08-07 — the snapshot leads; metric =
   the exact read's measured KB, dash until it lands), each row selecting via the shared
   `snapshotSelectActions` AND disclosing its contributor METAGRAPH child rows in the same
-  click (name + its snapshot count in that tick; clicking one is the BAND — the (metagraph,
-  tick) pair via `bandSelectActions`).
+  click (name + its snapshot count in that tick, an UNLISTED contributor row included;
+  clicking one is the BAND via `bandSelectActions`). **Under a network filter the list is
+  that network's STORY** (the LiveStrip's filtered idiom): only the ticks it anchored into,
+  each carrying its anchor count in the network's hue before the KB. **A FILTER IS A STORY**
+  (`snapshotSelectActions`' release rule, tested): pinning a tick whose anchors do NOT include
+  the committed network — reachable via the scene's bands or the strip — releases the filter
+  back to "all", so the network dim never shapes a snapshot that has nothing to do with it.
   The browse window is the chamber's own visible trail (`useSnapshotFeed(SLOT_N)` joined with
   `buildAnchorLog`), so the list shows exactly what the 3D scene shows. Disclosure state is
   plain local UI state (nothing here commits a layer — that rung is retired); leaf rows hover

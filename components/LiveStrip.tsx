@@ -77,17 +77,29 @@ export default function LiveStrip() {
   // there). The card is ledger-scoped (Task 1): no cross-view carry, so there's nothing to
   // hand off to another view. Runs the SAME tested decision table as the ledger's 3D tile
   // click (domain/pickActions): the live tip (re-)follows the heartbeat, anything older pins.
-  const pick = (d: GlobalSnapshot) =>
+  const pick = (d: GlobalSnapshot) => {
+    const st = useStore.getState();
+    // The filter releases when its network is absent from the clicked tick's anchors (the
+    // filter-is-a-story rule; the unlisted set answers from the exact read).
+    const tickHasFilter =
+      st.filter === "all" || st.filter === "dag"
+        ? true
+        : st.filter === "unlisted"
+          ? (st.snapshotExact[d.ordinal]?.unlistedCount ?? 0) > 0
+          : (getAnchor(d.timestamp)?.metaCounts?.get(st.filter) ?? 0) > 0;
     applyClickActions(
       snapshotSelectActions(
         { kind: "snapshot", title: `Global snapshot #${d.ordinal}`, data: d },
         latestRelevant("all")?.ordinal === d.ordinal,
         {
-          pinnedOrdinal: !useStore.getState().following ? useStore.getState().snap?.data.ordinal ?? null : null,
-          metaSnap: useStore.getState().metaSnap,
+          pinnedOrdinal: !st.following ? st.snap?.data.ordinal ?? null : null,
+          metaSnap: st.metaSnap,
+          filter: st.filter,
+          tickHasFilter,
         },
       ),
     );
+  };
 
   // Per bar: the tick's total anchors, and (filtered) this metagraph's own anchors. The plotted
   // VALUE is `mine` when a metagraph is filtered (its own cadence on its own scale), else `total`.

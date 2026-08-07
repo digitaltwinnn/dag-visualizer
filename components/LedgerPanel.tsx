@@ -8,6 +8,7 @@ import { subjectPairing } from "@/components/useSubjectPairing";
 import { useSnapshotFeed } from "@/components/useSnapshotFeed";
 import { getNetwork, filterAccent, metagraphById } from "@/src/data/network";
 import { displayNetwork, unlistedLog, UNLISTED_ID, LISTED_IDS } from "@/src/data/unlisted";
+import type { GlobalSnapshot } from "@/src/data/types";
 import { latestRelevant } from "@/src/data/follow";
 import { identityHudHex } from "@/src/palette/identity";
 import { IdentityDot } from "@/components/inspector/parts";
@@ -70,6 +71,7 @@ function SnapRow({
   accent,
   title,
   onClick,
+  mark,
 }: {
   label: string;
   metric: string;
@@ -80,6 +82,9 @@ function SnapRow({
   accent: string;
   title: string;
   onClick: () => void;
+  /** The committed network's anchor count in this tick, in its hue — absent = the network is
+   *  not in this tick's story (and clicking would release the filter; user, 2026-08-07). */
+  mark?: { hue: string; count: number } | null;
 }) {
   const pair = subjectPairing(hoverOrd, pairOrd, setHoverOrd, accent);
   return (
@@ -101,6 +106,11 @@ function SnapRow({
       <span className="flex-1 min-w-0 text-body tabular-nums text-foreground whitespace-nowrap overflow-hidden text-ellipsis">
         {label}
       </span>
+      {mark && (
+        <span className="flex-none tabular-nums text-label font-semibold" style={{ color: mark.hue }}>
+          {mark.count}
+        </span>
+      )}
       <span className="flex-none tabular-nums text-label font-semibold text-muted-foreground">{metric}</span>
       {/* The trailing slot is ALWAYS reserved (the GeoExplore idiom) so the metric column never
           shifts when a row gains the selection mark (user, 2026-08-07). */}
@@ -134,7 +144,18 @@ export default function LedgerPanel() {
   // The UNLISTED channels (user, 2026-08-07 — navigable like any network): the one-home row
   // source (src/data/unlisted.ts — the exact reads, the only honest source), windowed here.
   const unlistedEntries = unlistedLog([...snaps].reverse(), snapshotExact);
-  const orderedSnaps = [...snaps].reverse(); // newest first, the log convention
+  // Under a NETWORK filter the global list shows ONLY that network's story — the ticks it
+  // anchored into, the LiveStrip's filtered idiom (user, 2026-08-07: one mental model, no
+  // two-outcome clicks in the explorer; the scene keeps all ticks and the filter-releases rule
+  // as its safety net). "all"/"dag" list every tick.
+  const filterNet = displayNetwork(filter);
+  const tickFilterCount = (d: GlobalSnapshot): number =>
+    filter === "unlisted"
+      ? (snapshotExact[d.ordinal]?.unlistedCount ?? 0)
+      : rows.filter((r) => r.global.ordinal === d.ordinal && r.metaId === filter).length;
+  const orderedSnaps = [...snaps]
+    .reverse() // newest first, the log convention
+    .filter((d) => !filterNet || tickFilterCount(d) > 0);
   const activeSnapOrd = snap?.data.ordinal ?? null;
 
   // Disclosure state: one open group per level, plain local UI state — nothing here commits a
@@ -422,6 +443,7 @@ export default function LedgerPanel() {
                           strip's bars run) AND discloses its contributors in the same click,
                           the commit-is-disclosure idiom. */}
                       <SnapRow
+                        mark={filterNet ? { hue: filterNet.hue, count: tickFilterCount(d) } : null}
                         label={d.ordinal.toLocaleString()}
                         // The one honest per-tick byte figure: the exact read's measured KB;
                         // absent = a dash, never derived from count or fee (the honesty rule).
@@ -441,6 +463,12 @@ export default function LedgerPanel() {
                             snapshotSelectActions(globalPick, latestRelevant("all")?.ordinal === d.ordinal, {
                               pinnedOrdinal: !following && snap ? snap.data.ordinal : null,
                               metaSnap,
+                              filter,
+                              // The filter releases if ITS network isn't in this tick's story.
+                              tickHasFilter:
+                                filter === "unlisted"
+                                  ? tickUnlisted > 0
+                                  : tickGroups.some((g) => g.id === filter),
                             }),
                           );
                           setOpenMeta(isOpen ? null : `gl0|${d.ordinal}`);
