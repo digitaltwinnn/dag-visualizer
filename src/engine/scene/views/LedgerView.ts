@@ -274,13 +274,13 @@ export class LedgerView implements SceneView {
   // ── build ────────────────────────────────────────────────────────────────
 
   private _buildMetaTrail() {
+    // SOLID chips, not additive glow (user, 2026-08-07: the opacity-faded additive trail read
+    // as fuzzy): normal blending + depth writes make each tile a crisp little block whose
+    // BRIGHTNESS (instance colour) carries the recency fade — the bloom pass still lights the
+    // hot row, so the lead keeps its glow while the trail reads matte.
     this._metaTrailMesh = new THREE.InstancedMesh(
       new THREE.BoxGeometry(1, 1, 0.35),
-      new THREE.MeshBasicMaterial({
-        transparent: true,
-        blending: THREE.AdditiveBlending,
-        depthWrite: false,
-      }),
+      new THREE.MeshBasicMaterial({}),
       META_TRAIL_MAX,
     );
     this._metaTrailMesh.frustumCulled = false;
@@ -810,6 +810,10 @@ export class LedgerView implements SceneView {
         _dummy.updateMatrix();
         this._metaTrailMesh.setMatrixAt(mi, _dummy.matrix);
         const hot = this.model.isRowHot(laneOff, b.slot);
+        // IDENTITY colour belongs to the front (lead) row and the hovered/selected one alone
+        // (user, 2026-08-07) — every other snapshot rests in the neutral cyan tone.
+        const ident =
+          b.slot <= 0 || (this.model.selectedSlot > 0 && b.slot === this.model.selectedSlot);
         // Unfilled (anonymous/ghost) tiles keep their fixed fraction of the tuned filled level.
         const bright =
           (hot
@@ -817,7 +821,7 @@ export class LedgerView implements SceneView {
             : b.fade * (b.filled ? this.tiles.rest : this.tiles.rest * 0.17)) *
           (laneOff ? this.tiles.dim : 1) *
           this._fades.alpha;
-        this._metaTrailMesh.setColorAt(mi, _col.copy(laneColor).multiplyScalar(bright));
+        this._metaTrailMesh.setColorAt(mi, _col.copy(ident ? laneColor : this._coreCol).multiplyScalar(bright));
         mi++;
       }
     }

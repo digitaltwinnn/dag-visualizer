@@ -20,7 +20,7 @@ import { makeGlassFill, type GlassFillUniforms } from "./glassFill";
 export interface TrayTune {
   fillOp: number; // the flat panel fill
 }
-export const TRAY_TUNE_DEFAULTS: TrayTune = { fillOp: 0.05 };
+export const TRAY_TUNE_DEFAULTS: TrayTune = { fillOp: 0.085 }; // user-tuned via ?tune, 2026-08-07
 
 const LABEL_OP = 0.85;
 /** The trays' corner radius (local units) — the smooth-corner clip of the shared glass fill. */

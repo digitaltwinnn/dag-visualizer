@@ -39,7 +39,9 @@ export const FOCI: Record<string, { pos: THREE.Vector3; target: THREE.Vector3 }>
   // zoomed in, straight onto the chamber's camera-side face, so the ribbon sheets (which span
   // the lane field) and the node trays (which face +Z) present flat-on. Slightly elevated,
   // aimed between the floors.
-  ledger: { pos: new THREE.Vector3(0, 13, 50), target: new THREE.Vector3(0, -6, -2) },
+  // Nearly level (user: "more from the front, no tilt") — a ~6° pitch keeps the plane tops
+  // just barely readable while the trays + ribbon sheets present flat-on.
+  ledger: { pos: new THREE.Vector3(0, 3.5, 54), target: new THREE.Vector3(0, -2.5, 0) },
 };
 
 // ---- the ONE global zoom lever ------------------------------------------------------------

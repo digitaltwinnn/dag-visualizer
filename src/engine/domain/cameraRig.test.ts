@@ -5,8 +5,8 @@ import { FOCI, hubFraming, geoFraming, ledgerFloorFraming, ledgerRailFraming, le
 describe("FOCI", () => {
   it("carries the camera presets (ledger gained its own frontal resting pose, 2026-08-07)", () => {
     // The Snapshots view rests FRONTAL and zoomed (user) — straight onto the chamber's face.
-    expect(FOCI.ledger.pos).toEqual(new THREE.Vector3(0, 13, 50));
-    expect(FOCI.ledger.target).toEqual(new THREE.Vector3(0, -6, -2));
+    expect(FOCI.ledger.pos).toEqual(new THREE.Vector3(0, 3.5, 54));
+    expect(FOCI.ledger.target).toEqual(new THREE.Vector3(0, -2.5, 0));
     expect(FOCI.overview.pos).toEqual(new THREE.Vector3(0, 21, 80)); // pulled back again with META_ORBIT 29 (user: whole ring visible unselected, clear of the LiveStrip band)
     expect(FOCI.overview.target).toEqual(new THREE.Vector3(0, 2, 0));
     expect(FOCI.dag.pos).toEqual(new THREE.Vector3(0, 9, 38));
