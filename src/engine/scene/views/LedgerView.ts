@@ -60,11 +60,10 @@ import { NodeRails } from "../objects/NodeRails";
 import { FadeSet } from "../objects/FadeSet";
 import type { SceneView } from "./SceneView";
 
-/** The live-tunable GLASS look — the floors AND the node containers share it (one fill
- *  language, objects/glassFill.ts). `edge` is where the drop-off starts (1 = only the rim,
- *  0 = solid): converted to a shared rim WIDTH in local units by _applyFloorAlpha /
- *  NodeRails.update. (The hairline FRAME is gone entirely — user, 2026-08-07: the rim is the
- *  whole edge statement.) */
+/** The live-tunable FLOOR look (objects/glassFill.ts at radius 0 — square planes with the
+ *  soft-rim drop-off; the node trays have their OWN flat rounded fill, user 2026-08-07).
+ *  `edge` is where the drop-off starts (1 = only the rim, 0 = solid): converted to a rim
+ *  WIDTH in local units by _applyFloorAlpha. (The hairline FRAME is gone entirely.) */
 export interface FloorTune {
   fillOp: number;  // the edge-band fill
   innerOp: number; // the flat centre level
@@ -90,8 +89,9 @@ const FLOOR_D = 44;
 const FLOOR_CX = -13.25;
 const FLOOR_LABEL_X = FLOOR_CX + FLOOR_W / 2 - 0.4;
 
-/** The floors' corner radius (the shared glass fill clips outside it — smooth corners). */
-const FLOOR_CORNER_R = 1.6;
+/** The floors' corner radius — SQUARE (user, 2026-08-07: rounded corners belong to the node
+ *  trays, not the snapshot planes; radius 0 makes the SDF a plain rect). */
+const FLOOR_CORNER_R = 0;
 
 /** The lead row's "forming…" note: quieter than a floor label, and it eases rather than blinks. */
 const FORMING_OP = 0.6;
@@ -171,6 +171,7 @@ export class LedgerView implements SceneView {
   /** Dev-only access for the ?tune panel (Engine.mountDevTune) — not part of the frame path. */
   get ribbons(): Ribbons { return this._ribbons; }
   get bar(): ByteBar { return this._bar; }
+  get trays(): NodeRails { return this._rails; }
   /** The tiles' live-tunable look — read per frame by update()'s tile pass. */
   tiles: TileTune = { ...TILE_TUNE_DEFAULTS };
   /** The floor planes' live-tunable look — read per frame by _applyFloorAlpha. */
@@ -260,7 +261,7 @@ export class LedgerView implements SceneView {
 
     this._buildFloors();
 
-    this._rails = new NodeRails(colors, this.floors);
+    this._rails = new NodeRails(colors);
     this._bar = new ByteBar(colors, sceneColors);
     this._ribbons = new Ribbons(colors, sceneColors);
     this.group.add(this._rails.group, this._bar.group, this._ribbons.group);

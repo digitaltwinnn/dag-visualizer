@@ -1572,12 +1572,12 @@ frame). It composes three adapters — `objects/ByteBar.ts`, `objects/Ribbons.ts
   never blinks) while `model.leadForming` holds — i.e. while the tick's count is still settling
   (`Date.now() - anchor.touched < LEAD_SETTLE_MS`), which is the *when* view stating its own
   settling window instead of pretending a partial breakdown is final.
-- **The glass is ONE fill language** (`objects/glassFill.ts`, 2026-08-07): floors AND the node
-  containers wear the same rounded-corner soft-rim shader (rim band + centre whisper, corner
-  radius clipped in a rounded-rect SDF), driven by ONE shared `FloorTune`
-  (frame/edge-fill/centre-fill/drop-off — user-tuned defaults in `FLOOR_TUNE_DEFAULTS`; the
-  ?tune "floor planes" folder styles every pane at once, and NodeRails holds the same tune
-  object, not a copy). The floors are also pick BLOCKERS (`userData.blocker` →
+- **The glass fill shader is shared, the LOOKS are split** (`objects/glassFill.ts`, 2026-08-07):
+  the FLOORS are SQUARE planes (radius 0) with the soft-rim drop-off (`FloorTune` —
+  edge-fill/centre-fill/drop-off); the NODE TRAYS are FLAT rounded-corner panels (rim channel
+  off, one `TrayTune.fillOp` level, radius `CONT_CORNER_R`) — rounded corners are the trays'
+  signature, the drop-off is the floors' (user split the two looks the same day they were
+  unified). The floors are also pick BLOCKERS (`userData.blocker` →
   `Engine._pickAt` returns null on a glass hit): a normal surface swallows the ray, so content
   under a floor can never be hovered/clicked through it. **Emphasis is brightness, not a colour
   switch**: bands run

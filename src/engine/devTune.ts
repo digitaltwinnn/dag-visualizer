@@ -52,6 +52,10 @@ export async function mountDevTune(targets: DevTuneTargets): Promise<DevTuneHand
   ff.addBinding(flt, "innerOp", { min: 0, max: 0.1, step: 0.002, label: "centre fill" });
   ff.addBinding(flt, "edge", { min: 0, max: 0.99, step: 0.01, label: "drop-off" });
 
+  // The node trays — a flat rounded panel with one opacity (read per frame).
+  const yf = pane.addFolder({ title: "node trays" });
+  yf.addBinding(targets.ledger.trays.tune, "fillOp", { min: 0, max: 0.3, step: 0.005, label: "fill" });
+
   // The metagraph snapshots — the lane tiles' brightness multipliers (read per frame).
   const tf = pane.addFolder({ title: "metagraph snapshots (tiles)" });
   const tt = targets.ledger.tiles;
