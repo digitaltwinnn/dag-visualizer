@@ -525,7 +525,14 @@ GPU; no store/react**):
   on the morph. `setViewAlpha()` rides `transition.furnitureAlpha("hyper")` on top of that
   morph fade — the whole furniture blacks out during a transition's OUT/BOUNDARY and builds
   back in during IN, same mechanism `LedgerView.setViewAlpha` uses for the chamber.
-- `views/GeoView.ts` — the geo globe SURFACE: body sphere, graticule, atmosphere rim, the polar
+- `views/GeoView.ts` — the geo globe SURFACE, built into **`globe.surface`** — a dedicated child
+  subtree of the globe group (2026-08-07): the group itself must stay visible outside geo (it
+  hosts the shared node chips), so the furniture lives one level down where the Engine can
+  hard-hide it as ONE unit (`globe.surface.visible = surfaceAlpha > 0.001` — Globe computes the
+  alpha in setMorph, the Engine owns the flag). Opacity fades (`geoFades`) handle the
+  transitions; visibility handles the OFF state — the structural fix for the
+  invisible-but-depth-writing furniture class (the black lined-globe silhouette in the ledger).
+  The surface: body sphere, graticule, atmosphere rim, the polar
   **compass roses** (hairline dial + micro N/S letter over each pole, in `globe.group` so they
   rotate truthfully — E/W are deliberately not floated), and the
   **solid raised continents**. The topology is **`public/countries-110m.json`** (world-atlas;

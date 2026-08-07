@@ -90,6 +90,10 @@ type MetaLayout = RouteMetagraph & {
 const geoOf = (pick: PickDescriptor): GeoInfo | undefined => ("geo" in pick ? pick.geo : undefined);
 
 export class Globe implements GeoViewHost {
+  surface!: THREE.Group;
+  /** The surface's effective alpha this frame (max of surf/extras fades) — the Engine reads it
+   *  after setMorph to drive `surface.visible` (Engine owns visibility; Globe computes alpha). */
+  surfaceAlpha = 0;
   group: THREE.Group;
   private nodeGroup: THREE.Group;
   private layers: HyperView | null;
@@ -208,6 +212,10 @@ export class Globe implements GeoViewHost {
 
     this.nodeGroup = new THREE.Group();
     this.group.add(this.nodeGroup);
+    // The geo SURFACE subtree (see GeoViewHost.surface): furniture only, hard-hidden as one unit
+    // by the Engine wherever the surface is off — the chips in nodeGroup stay visible everywhere.
+    this.surface = new THREE.Group();
+    this.group.add(this.surface);
 
     this.fabric = new NodeFabric(this.nodeGroup);
     this.arcs = new Arcs(this.group);
@@ -568,7 +576,7 @@ export class Globe implements GeoViewHost {
   // Fades with the morph (geoFades) so it's a geo-only effect. Rebuilt whenever node data changes.
   private _buildDensityGlow(): void {
     for (const m of this._densityGlow) {
-      this.group.remove(m);
+      this.surface.remove(m);
       m.geometry.dispose(); // each pool owns its PlaneGeometry (leaked before, ~2×/25s poll)
       (m.material as THREE.Material).dispose(); // the map is the shared _glowTex — kept alive
     }
@@ -618,7 +626,7 @@ export class Globe implements GeoViewHost {
       // Opacity is driven per-frame in setMorph (morph fade × the country-drill recede), NOT geoFades.
       mesh.userData.glowBase = Math.min(0.28, 0.1 + c.n * 0.024);
       mesh.userData.net = c.net; // which network this pool belongs to (for the filter toggle)
-      this.group.add(mesh);
+      this.surface.add(mesh);
       this._densityGlow.push(mesh);
     }
     this._applyGlowFilter();
@@ -1107,6 +1115,7 @@ export class Globe implements GeoViewHost {
     const vAlpha = this.transition ? this.transition.furnitureAlpha("geo") : 1;
     const surf = this.ledger ? 0 : surfFade(m) * vAlpha;
     const extras = this.ledger ? 0 : extrasFade(m) * vAlpha;
+    this.surfaceAlpha = Math.max(surf, extras);
     for (const f of this.geoFades) f.mat.opacity = f.base * surf;
     // Density light pools: morph fade × the country-drill recede (so a drilled country's own
     // highlight isn't washed out by the pools).
@@ -1131,7 +1140,8 @@ export class Globe implements GeoViewHost {
       }
     }
     if (this.landWallUniforms) this.landWallUniforms.uOpacity.value = surf;
-    if (this.landFillMesh) this.landFillMesh.visible = !this.ledger && m > 0.05; // opacity via geoFades
+    // (No per-mesh visibility gates any more — the Engine hides the whole `surface` subtree
+    // from `surfaceAlpha`, which covers the old ad-hoc landFill gate and every sibling.)
     this.arcs.setUM(extras);
   }
 

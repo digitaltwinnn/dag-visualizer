@@ -1423,6 +1423,11 @@ export class Engine {
     // "soon" views set it false, but the PARKED staging grids live in this group too — the
     // active/staged machine keeps it visible so the fleet shows above the Blueprint.
     this.globe.group.visible = show.globeSurface || this.transition.active();
+    // The geo SURFACE subtree hard-hides as one unit whenever its fades are fully out (settled
+    // ledger/hyper/flat) — the structural fix for the invisible-but-depth-writing furniture class
+    // (2026-08-07): opacity handles the transitions, visibility handles the OFF state. The Engine
+    // owns the flag; Globe.setMorph computes the alpha (one source, no drift).
+    this.globe.surface.visible = this.globe.surfaceAlpha > 0.001;
     // Ledger chamber is live while settled in ledger OR a transition involving it is running (the
     // build/teardown must animate). The Engine is the SINGLE owner of ledger.group.visible —
     // LedgerView.setViewAlpha no longer writes it (the two would fight). The alpha gates whether it
