@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { cn } from "@/lib/utils";
 import ExplorerShell from "@/components/ExplorerShell";
 import { SelectedRowMark, selectedRow } from "@/components/selection";
@@ -164,6 +164,12 @@ export default function LedgerPanel() {
   // the view's opening statement; the lists are there when you reach for them.
   const [openFloor, setOpenFloor] = useState<string | null>(null);
   const [openMeta, setOpenMeta] = useState<string | null>(null); // `${floorId}|${metaId or "all"}`
+  // COMMIT-IS-DISCLOSURE (user, 2026-08-07 — the hyper composition idiom, one rung up): a
+  // committed network arrives with ITS row already disclosed in the Metagraph snapshots group,
+  // so opening the group lands straight on the filtered story. Manual toggling stays free.
+  useEffect(() => {
+    if (displayNetwork(filter)) setOpenMeta(`msnap|${filter}`);
+  }, [filter]);
 
   const accent = filterAccent(filter);
 
