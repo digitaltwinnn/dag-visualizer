@@ -25,7 +25,11 @@ export interface ChannelSnapDeep {
   dataTx: string;
 }
 
-export const metaSnapDeepKey = (globalOrdinal: number, metaId: string): string => `${globalOrdinal}:${metaId}`;
+/** Keyed by tick + address + the snapshot's OWN ordinal (2026-08-07): a fast metagraph batches
+ *  many snapshots into one tick — DOR routinely dozens — so (tick, address) alone made every
+ *  row of the tick share one decode. */
+export const metaSnapDeepKey = (globalOrdinal: number, metaId: string, snapOrdinal: number): string =>
+  `${globalOrdinal}:${metaId}:${snapOrdinal}`;
 
 export interface GlobalSnapshot {
   ordinal: number;

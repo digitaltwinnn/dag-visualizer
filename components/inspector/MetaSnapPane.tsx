@@ -58,7 +58,7 @@ export default function MetaSnapPane({
 }) {
   const sel = useStore((s) => s.metaSnap);
   const exact = useStore((s) => (sel ? s.snapshotExact[sel.globalOrdinal] : undefined));
-  const deep = useStore((s) => (sel ? s.metaSnapDeep[metaSnapDeepKey(sel.globalOrdinal, sel.metaId)] : undefined));
+  const deep = useStore((s) => (sel ? s.metaSnapDeep[metaSnapDeepKey(sel.globalOrdinal, sel.metaId, sel.ordinal)] : undefined));
   const following = useStore((s) => s.following);
   const setSection = useStore((s) => s.setSection);
   // Spec §5.3's pairing runs on the EXISTING node-hover channel — a hover, never a selection, so

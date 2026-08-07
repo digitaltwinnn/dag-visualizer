@@ -312,7 +312,7 @@ export const useStore = create<AppState>((set) => ({
       return { snapshotExact: next };
     }),
   setMetaSnapDeep: (d) => set((s) => {
-    const key = metaSnapDeepKey(d.globalOrdinal, d.metaId);
+    const key = metaSnapDeepKey(d.globalOrdinal, d.metaId, d.ordinal);
     if (s.metaSnapDeep[key]) return {}; // a decoded snapshot is immutable
     const next = { ...s.metaSnapDeep, [key]: d };
     const keys = Object.keys(next);

@@ -34,17 +34,17 @@ describe("the metagraph-snapshot slot", () => {
 });
 
 describe("the deep channel read cache", () => {
-  it("keys a decode by the tick AND the metagraph, and keeps the first value", () => {
+  it("keys a decode by tick + metagraph + the snapshot's OWN ordinal, keeping the first value", () => {
     const d = {
       globalOrdinal: 42, metaId: "DAG0", ordinal: 7, height: 8, subHeight: 9, epochProgress: 10,
       lastSnapshotHash: "h", fee: 1, bytes: 2, blocks: 0, signers: ["04917e4b"],
       stateKeys: [{ key: "updates", count: 3 }], stateBytes: 929, stateProof: "p",
       state: "{}", dataBlockSigners: [], dataTxCount: 0, dataTx: "",
     };
-    expect(metaSnapDeepKey(42, "DAG0")).toBe("42:DAG0");
+    expect(metaSnapDeepKey(42, "DAG0", 7)).toBe("42:DAG0:7");
     useStore.getState().setMetaSnapDeep(d);
-    expect(useStore.getState().metaSnapDeep[metaSnapDeepKey(42, "DAG0")]).toEqual(d);
+    expect(useStore.getState().metaSnapDeep[metaSnapDeepKey(42, "DAG0", 7)]).toEqual(d);
     useStore.getState().setMetaSnapDeep({ ...d, bytes: 999 });
-    expect(useStore.getState().metaSnapDeep[metaSnapDeepKey(42, "DAG0")].bytes).toBe(2);
+    expect(useStore.getState().metaSnapDeep[metaSnapDeepKey(42, "DAG0", 7)].bytes).toBe(2);
   });
 });

@@ -89,14 +89,17 @@ export default function RawSnapshotBridge() {
     // route into a poll. `following` is a DEPENDENCY, not just a guard: pinning via the LIVE
     // control (no metaSnap change) must fire the decode for the snapshot already on screen.
     if (following) return;
-    const key = metaSnapDeepKey(deepSel.globalOrdinal, deepSel.metaId);
+    const key = metaSnapDeepKey(deepSel.globalOrdinal, deepSel.metaId, deepSel.ordinal);
     const st = useStore.getState();
     if (st.metaSnapDeep[key] || deepInflight.has(key)) return;
     deepInflight.add(key);
-    fetch(`/api/snapshot/${deepSel.globalOrdinal}/channel/${deepSel.metaId}`)
+    fetch(`/api/snapshot/${deepSel.globalOrdinal}/channel/${deepSel.metaId}?snap=${deepSel.ordinal}`)
       .then((r) => (r.ok ? (r.json() as Promise<ChannelSnapDeep>) : null))
       .then((d) => {
-        if (d && typeof d.ordinal === "number") st.setMetaSnapDeep(d);
+        // Store under the REQUESTED ordinal: when the route fell back (an undecodable row asks
+        // with 0), the returned decode's own ordinal would file it under a key the card never
+        // reads (2026-08-07 — the per-snapshot keying).
+        if (d && typeof d.ordinal === "number") st.setMetaSnapDeep({ ...d, ordinal: deepSel.ordinal });
       })
       .catch(() => {})
       .finally(() => deepInflight.delete(key));

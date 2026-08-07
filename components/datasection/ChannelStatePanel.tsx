@@ -17,7 +17,7 @@ import JsonTree from "@/components/datasection/JsonTree";
 
 export function ChannelStatePanel() {
   const sel = useStore((s) => s.metaSnap);
-  const deep = useStore((s) => (sel ? s.metaSnapDeep[metaSnapDeepKey(sel.globalOrdinal, sel.metaId)] : undefined));
+  const deep = useStore((s) => (sel ? s.metaSnapDeep[metaSnapDeepKey(sel.globalOrdinal, sel.metaId, sel.ordinal)] : undefined));
   const following = useStore((s) => s.following);
 
   const state = useMemo(() => {

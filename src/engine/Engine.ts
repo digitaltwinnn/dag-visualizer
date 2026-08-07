@@ -420,7 +420,7 @@ export class Engine {
           const sel = st.metaSnap;
           if (!sel) this.globe.setSignerIds(null);
           else {
-            const deep = st.metaSnapDeep[metaSnapDeepKey(sel.globalOrdinal, sel.metaId)];
+            const deep = st.metaSnapDeep[metaSnapDeepKey(sel.globalOrdinal, sel.metaId, sel.ordinal)];
             const ex = st.snapshotExact[sel.globalOrdinal];
             const row = ex?.rows?.find((r) => r.metaId === sel.metaId && r.ordinal === sel.ordinal);
             const signers = deep?.signers ?? row?.signers ?? null;

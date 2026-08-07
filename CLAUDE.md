@@ -1681,8 +1681,10 @@ frame). It composes three adapters — `objects/ByteBar.ts`, `objects/Ribbons.ts
   (+ `sameMetaSnap`) and the action kind `{kind:"metaSnap", sel}`, applied by the one executor
   `applyClickActions.ts`; the store carries `metaSnap: MetaSnapSel | null` (`setMetaSnap` bumps
   `selStack`, `SelSlot` includes `"metaSnap"`) plus `metaSnapDeep` keyed by
-  `metaSnapDeepKey(globalOrdinal, metaId)` — a decoded snapshot is immutable, so it is never
-  overwritten. **The metagraph snapshot is a card SLOT with no ladder rung**, exactly like the
+  `metaSnapDeepKey(globalOrdinal, metaId, snapOrdinal)` — the snapshot's OWN ordinal joined the
+  key 2026-08-07 (a fast metagraph batches dozens into one tick; the (tick, address) key made
+  every row share one decode; the route takes `?snap=`) — a decoded snapshot is immutable, so
+  it is never overwritten. **The metagraph snapshot is a card SLOT with no ladder rung**, exactly like the
   global snapshot — in ledger the two render as the SNAPSHOT CHAIN in the rail's display lane
   (global ⊃ metagraph snapshot), see the right-rail bullet. The Engine clears `store.metaSnap`
   on any mode switch away from ledger and on a filter switch.
@@ -1877,8 +1879,9 @@ can't fetch them — but the **Next Node server can**:
   and only ever run on an explicit gesture on one card** — never on a poll, never across the
   chain. `maxDuration = 30`, 8s fetch timeout. `RawSnapshotBridge` fetches it for the single
   selected metagraph snapshot (`deepInflight` dedupe) and stores it under
-  `metaSnapDeepKey(globalOrdinal, metaId)`, which is never overwritten — a decoded snapshot is
-  immutable.
+  `metaSnapDeepKey(globalOrdinal, metaId, snapOrdinal)` (per-snapshot since 2026-08-07; the
+  route takes `?snap=` and targets that entry, newest as the undecodable-0 fallback), never
+  overwritten — a decoded snapshot is immutable.
 - The client (`Engine`) fetches `/api/metagraphs` on mount **and re-pulls every 10 min**
   (Vercel never restarts; ISR only freshens the *server* cache, so an idle tab must re-pull —
   `Engine.refreshMeta`, rebuilds only on change). Snapshot/cluster feeds are live via
