@@ -36,6 +36,14 @@
   border-color: color-mix(in oklch, var(--row-hue, var(--primary)) 45%, transparent);
   color: var(--foreground);
 }
+/* Unboxed rail ENTRIES (card-redesign 2026-08-08 — the ancestor tier that shed its glass box):
+   no frame to glow, so pairing reads as the row wash, rounded softly. Unlayered like its
+   siblings so it beats the entry's own utilities. */
+.rail-entry.subject-paired {
+  box-shadow: none;
+  background: color-mix(in oklch, var(--row-hue, var(--primary)) 12%, transparent);
+  border-radius: var(--radius-sm);
+}
 @media (prefers-reduced-motion: reduce) { .subject-paired { transition: none; } }
 
 /* ── Card signal system (Task 12 — EdgePulse.tsx + the card's scene-facing edge) ─────────────
@@ -652,10 +660,16 @@
 @keyframes sheetInLeft   { from { transform: translateX(-100%); } to { transform: none; } }
 @keyframes sheetInRight  { from { transform: translateX(100%); }  to { transform: none; } }
 @keyframes sheetInBottom { from { transform: translateY(100%); }  to { transform: none; } }
+/* Card MATERIALIZE (card-redesign 2026-08-08): the facts rail's box tier mounting — a rung
+   becoming THE materialized card (RailPane's entry→box swap remounts the Card subtree, replaying
+   this once). Subtle rise+fade on the navigation clock's fast end; reduced motion is guarded at
+   the call site (`motion-reduce:animate-none`). */
+@keyframes cardMaterialize { from { opacity: 0; transform: translateY(5px) scale(0.985); } to { opacity: 1; transform: none; } }
 @theme inline {
   --animate-sheet-in-left:   sheetInLeft   0.28s cubic-bezier(0.22, 1, 0.36, 1);
   --animate-sheet-in-right:  sheetInRight  0.28s cubic-bezier(0.22, 1, 0.36, 1);
   --animate-sheet-in-bottom: sheetInBottom 0.30s cubic-bezier(0.22, 1, 0.36, 1);
+  --animate-card-in:         cardMaterialize 0.26s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 @layer components {

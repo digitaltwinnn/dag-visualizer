@@ -59,8 +59,23 @@ const PUNCH = "#0c1020";
 /** One card's marker on the thread. `inset` = how far the card is stepped back from the rail (its
  *  ladder depth, measured rather than shared as a constant — see Inspector's RUNG_STEP), so the
  *  connector reaches exactly to its edge; `focus` = the finest committed rung; `ghost` = an empty
- *  slot showing its hint. */
-type Mark = { y: number; inset: number; focus: boolean; ghost: boolean };
+ *  slot showing its hint; `entry` = an UNBOXED ancestor entry (card-redesign 2026-08-08 — its
+ *  connector carries the DEPTH-REACH encoding, see the render note). */
+type Mark = { y: number; inset: number; focus: boolean; ghost: boolean; entry: boolean };
+
+// Depth-reach connectors (card-redesign 2026-08-08, polarity agreed in mockup): an unboxed
+// ancestor entry's tie-line reaches INTO the lane, and the reach FUNNELS onto the box — the
+// coarsest parent reaches furthest, each rung down shrinks by one step, ending at the open box's
+// own short connector (reach = STEP × (entries between it and the box + 1)). The endpoints draw
+// the containment staircase in the lane's empty right side using the thread's own connector
+// vocabulary — no second instrument. Capped so a long entry title can't collide with the line.
+const REACH_STEP = 26;
+const REACH_MAX = 84;
+// The depth-reach lines extend INTO the lane — outside the thread's narrow box — and the SVG's
+// top/bottom fade MASK clips to the element box (ink overflow gets alpha 0, learned live: the
+// lines were drawn but invisible). So the SVG box is WIDENED by this pad on the lane side and
+// every drawn x shifts by it on the right rail (the left rail's lane side is already +x).
+const REACH_PAD = REACH_MAX + 8;
 
 export default function RailThread({ side = "right" }: { side?: Side }) {
   const filter = useStore((s) => s.filter);
@@ -90,25 +105,35 @@ export default function RailThread({ side = "right" }: { side?: Side }) {
     const measure = () => {
       raf = 0;
       const r = rail.getBoundingClientRect();
-      // Every rail card carries `.ig-panel` (the shared glass frame); the thread drops a dot at
-      // each one's middle. (Was `:scope > .panel` before the Card-frame swap retired 12-panel-system.)
-      // NB the query is DEPTH-AGNOSTIC (2026-08-02): the facts rail nests its ladder rungs in a
-      // lane, so `:scope >` matched nothing and the thread silently lost every card dot. Nested
-      // panels (a card inside a card) would double-count, so only outermost ones count.
-      const cards = Array.from(rail.querySelectorAll<HTMLElement>(".ig-panel")).filter(
+      // Every rail card carries a thread marker: `.ig-panel` (the shared glass frame — the ONE
+      // materialized box + the left rail's tool cards) or `.rail-entry` (the unboxed ancestor
+      // entries + ghost hint lines, card-redesign 2026-08-08). The thread drops a dot at each
+      // one's middle. NB the query is DEPTH-AGNOSTIC (2026-08-02): the facts rail nests its
+      // ladder rungs in a lane, so `:scope >` matched nothing and the thread silently lost every
+      // card dot. Nested panels (a card inside a card) would double-count, so only outermost ones
+      // count.
+      const cards = Array.from(rail.querySelectorAll<HTMLElement>(".ig-panel, .rail-entry")).filter(
         (c) => !c.parentElement?.closest(".ig-panel"),
       );
       const raw = cards
         .map((c) => {
           const cr = c.getBoundingClientRect();
           const rung = c.closest<HTMLElement>("[data-depth]");
+          const entry = c.classList.contains("rail-entry") && !c.hasAttribute("data-ghost");
+          // ONE connector anatomy (user, 2026-08-08): every populated mark — unboxed ENTRY and
+          // materialized BOX alike — ties in at its EYEBROW's height (the entry's centre put the
+          // line through the title-row aside; the box's centre wandered with its body height).
+          // Ghosts keep the card-middle tie (their single hint line IS their middle).
+          const eb = !c.hasAttribute("data-ghost") ? c.querySelector("[data-eyebrow]") : null;
+          const er = eb?.getBoundingClientRect();
           return {
-            y: cr.top + cr.height / 2 - r.top,
+            y: (er ? er.top + er.height / 2 : cr.top + cr.height / 2) - r.top,
             // Measured, not derived from a shared step constant — a scrollbar or a future layout
             // tweak can't put the connectors out of register with the real card edges.
             inset: side === "right" ? r.right - cr.right : cr.left - r.left,
             focus: !!rung?.hasAttribute("data-focus"),
             ghost: c.hasAttribute("data-ghost"),
+            entry,
           };
         })
         .filter((m) => m.y >= 6 && m.y <= r.height - 6); // only dots inside the visible rail
@@ -117,8 +142,10 @@ export default function RailThread({ side = "right" }: { side?: Side }) {
       const base = raw.length ? Math.min(...raw.map((m) => m.inset)) : 0;
       const marks = raw.map((m) => ({ ...m, inset: Math.round(m.inset - base) }));
       // Sit in the margin just OUTSIDE the cards: right → at the rail's right edge; left → the thread's
-      // width to the LEFT of the rail's left edge (so its ticks reach toward the screen edge).
-      const left = side === "right" ? r.right : r.left - W;
+      // width to the LEFT of the rail's left edge (so its ticks reach toward the screen edge). The
+      // box is REACH_PAD wider on the lane side (see the constant above) so the depth-reach lines
+      // survive the fade mask; on the right rail that means the box starts REACH_PAD further left.
+      const left = side === "right" ? r.right - REACH_PAD : r.left - W;
       setG({ top: r.top, left, height: Math.round(r.height), marks });
 
     };
@@ -142,6 +169,10 @@ export default function RailThread({ side = "right" }: { side?: Side }) {
   if (!g || g.height <= 0) return null;
   const H = g.height;
   const gm = GEOM[side];
+  // Ink-overflow room for the depth-reach lines: the SVG box grows by REACH_PAD on the LANE side
+  // (see the constant note), and on the right rail every drawn x shifts by it (the left rail's
+  // lane side is already +x, so no shift there).
+  const xOff = side === "right" ? REACH_PAD : 0;
   const ticks: number[] = [];
   for (let y = 10; y <= H - 10; y += TICK_PITCH) ticks.push(y);
 
@@ -154,7 +185,7 @@ export default function RailThread({ side = "right" }: { side?: Side }) {
         // so this hides the fixed thread below the desktop breakpoint until the effect resolves. `!`
         // beats nothing here (the SVG has no id rule), but mirrors the rails' `!hidden` for parity.
         className="fixed z-[11] pointer-events-none overflow-visible max-[1099px]:!hidden"
-        width={W}
+        width={W + REACH_PAD}
         height={H}
         style={{
           top: g.top,
@@ -176,41 +207,65 @@ export default function RailThread({ side = "right" }: { side?: Side }) {
            spine takes the full resting dim, keeping brightness for the signals + node dots. */}
         <g style={{ opacity: 0.9 }}>
           {/* neutral base line — SOFT/muted; carries the ruler ticks. */}
-          <line x1={gm.neut} y1={0} x2={gm.neut} y2={H} stroke={TICK_LINE} strokeWidth={1} />
+          <line x1={gm.neut + xOff} y1={0} x2={gm.neut + xOff} y2={H} stroke={TICK_LINE} strokeWidth={1} />
           {/* ruler ticker hatches — short marks stepping OUTWARD from the neutral line toward the screen
              edge; muted, every 4th a touch longer/brighter (an instrument scale). */}
           {ticks.map((y, i) => (
-            <line key={i} x1={gm.neut} y1={y} x2={i % 4 === 0 ? gm.tickMaj : gm.tickMin} y2={y} stroke={i % 4 === 0 ? TICK_MAJOR : TICK_MINOR} strokeWidth={1} />
+            <line key={i} x1={gm.neut + xOff} y1={y} x2={(i % 4 === 0 ? gm.tickMaj : gm.tickMin) + xOff} y2={y} stroke={i % 4 === 0 ? TICK_MAJOR : TICK_MINOR} strokeWidth={1} />
           ))}
         </g>
         <g style={{ opacity: REST_DIM }}>
           {/* identity line — BOTH rails, mirrored (the HUD's resting identity cue; cards are
              spineless at rest). The line is the selection's hue. */}
-          <line x1={gm.identity} y1={0} x2={gm.identity} y2={H} stroke={accent} strokeWidth={2} />
+          <line x1={gm.identity + xOff} y1={0} x2={gm.identity + xOff} y2={H} stroke={accent} strokeWidth={2} />
         </g>
         {/* node-dots — OUTSIDE the dim group at original full brightness (user adjustment): one per
            card at its middle, tethered to the card edge by the connector. The thread is the rail's
            ONE instrument (2026-08-02), so it also carries the card stack's HIERARCHY:
-           · connector LENGTH = the card's ladder depth (it steps back from the rail, the thread
-             reaches for it) — containment reads down the rail instead of needing a second spine;
+           · connector REACH = ladder containment (card-redesign 2026-08-08): an unboxed ancestor
+             entry's tie-line reaches into the lane, funnelling onto the materialized box —
+             coarsest longest, one REACH_STEP shorter per rung down (see the constants above);
            · dot STATE = the slot's state — hollow for a ghost (an empty slot showing its hint),
              solid for a populated card, solid + a wider halo for the focus rung (the finest
              committed one). So the rail shows the view's whole possibility space and where you are. */}
         {g.marks.map((m, i) => {
-          const x1 = side === "right" ? gm.conn - m.inset : gm.conn + m.inset;
+          // DEPTH-REACH connectors for unboxed entries (card-redesign 2026-08-08): the reach
+          // funnels onto the nearest BOX (the materialized card) — coarsest parent longest,
+          // shrinking one REACH_STEP per entry toward the box, whose own connector stays the
+          // standard short tie. The endpoints draw the containment staircase in the lane; a
+          // terminal tick marks each end. Ghosts keep the whisper-short tie.
+          const boxes = g.marks.filter((b) => !b.entry && !b.ghost);
+          let x1 = side === "right" ? gm.conn - m.inset : gm.conn + m.inset;
+          let tick: number | null = null;
+          if (m.entry) {
+            const nearest = boxes.length
+              ? boxes.reduce((a, b) => (Math.abs(b.y - m.y) < Math.abs(a.y - m.y) ? b : a))
+              : null;
+            const between = nearest
+              ? g.marks.filter(
+                  (x) => x.entry && ((x.y > m.y && x.y < nearest.y) || (x.y < m.y && x.y > nearest.y)),
+                ).length
+              : 0;
+            const reach = Math.min(REACH_STEP * (between + 1), REACH_MAX);
+            x1 = side === "right" ? gm.conn - reach : gm.conn + reach;
+            tick = x1;
+          }
           return (
             <g key={i} opacity={m.ghost ? 0.5 : 1}>
-              <line x1={x1} y1={m.y} x2={gm.dot} y2={m.y} stroke={accent} strokeWidth={1.25} opacity={m.focus ? 0.9 : 0.7} />
+              <line x1={x1 + xOff} y1={m.y} x2={gm.dot + xOff} y2={m.y} stroke={accent} strokeWidth={1.25} opacity={m.focus ? 0.9 : m.entry ? 0.55 : 0.7} />
+              {tick != null && (
+                <line x1={tick + xOff} y1={m.y - 4} x2={tick + xOff} y2={m.y + 4} stroke={accent} strokeWidth={1.25} opacity={0.55} />
+              )}
               {m.ghost ? (
                 <>
                   {/* punch first, then the ring — a hollow dot still has to sit ON the spine */}
-                  <circle cx={gm.dot} cy={m.y} r={4.2} fill={PUNCH} />
-                  <circle cx={gm.dot} cy={m.y} r={3.2} fill="none" stroke={accent} strokeWidth={1.3} />
+                  <circle cx={gm.dot + xOff} cy={m.y} r={4.2} fill={PUNCH} />
+                  <circle cx={gm.dot + xOff} cy={m.y} r={3.2} fill="none" stroke={accent} strokeWidth={1.3} />
                 </>
               ) : (
                 <>
-                  <circle cx={gm.dot} cy={m.y} r={m.focus ? 7 : 5} fill={accent} opacity={m.focus ? 0.26 : 0.16} />
-                  <circle cx={gm.dot} cy={m.y} r={3.4} fill={accent} stroke={PUNCH} strokeWidth={1.5} />
+                  <circle cx={gm.dot + xOff} cy={m.y} r={m.focus ? 7 : 5} fill={accent} opacity={m.focus ? 0.26 : 0.16} />
+                  <circle cx={gm.dot + xOff} cy={m.y} r={3.4} fill={accent} stroke={PUNCH} strokeWidth={1.5} />
                 </>
               )}
             </g>
@@ -228,7 +283,7 @@ export default function RailThread({ side = "right" }: { side?: Side }) {
           className="fixed z-[12] pointer-events-none max-[1099px]:!hidden"
           style={{
             top: g.top,
-            left: g.left + gm.identity - 2.5,
+            left: g.left + gm.identity + xOff - 2.5,
             width: 3,
             height: H,
             ["--spine" as string]: accent,

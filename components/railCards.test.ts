@@ -153,10 +153,12 @@ describe("ladderSlotIds — the descent-spine lane (display order = reversed run
   it("mirrors focusLadder.LADDERS coarsest→coarsest per 3D view", () => {
     expect(ladderSlotIds("geo")).toEqual(["context", "country", "cohort", "node"]);
     expect(ladderSlotIds("hyper")).toEqual(["context", "composition", "node"]);
-    // Ledger: the SNAPSHOT CHAIN (global, then the metagraph snapshot anchoring into it) rides
-    // the display lane between the network and the node (item 8, 2026-08-06) — card slots, not
-    // focus rungs.
-    expect(ladderSlotIds("ledger")).toEqual(["context", "snap", "metaSnap", "node"]);
+    // Ledger: the SNAPSHOT CHAIN rides the display lane between the network and the node —
+    // METAGRAPH SNAPSHOT ABOVE the global (user reversal 2026-08-08): the rail mirrors the
+    // chamber's storeys (metagraph planes on top, ribbons falling into the global floor) and
+    // the filtered story flow (network → its snapshot → the global it anchored INTO) — card
+    // slots, not focus rungs.
+    expect(ladderSlotIds("ledger")).toEqual(["context", "metaSnap", "snap", "node"]);
   });
   it("flat views have no ladder", () => {
     expect(ladderSlotIds("status")).toEqual([]);

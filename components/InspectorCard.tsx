@@ -6,7 +6,7 @@ import { useStore } from "@/src/store/store";
 import CardHead from "@/components/CardHead";
 import {
   GeoLiveAside, GeoLiveCard, GeoLiveTitle,
-  MetaCard, MetaSiteAction, MetaTitle, SnapshotAside, SnapshotCard, SnapshotTitle,
+  MetaCard, MetaTickerAside, MetaTitle, SnapshotAside, SnapshotCard, SnapshotTitle,
 } from "@/components/inspector/cards";
 
 // Only three kinds ever reach the inspector frame now: a metagraph/core dossier (ContextCard),
@@ -31,11 +31,11 @@ function headFor(p: PickDescriptor): {
   title?: ReactNode; titleKey?: string; subtitle?: ReactNode; aside?: ReactNode;
 } {
   switch (p.kind) {
-    // The dossier head is the full identity composition — avatar + name + ticker (MetaTitle;
-    // user refinement restoring the pre-unification header). Still rolls via titleKey on the
-    // name, synced with the edge pulse. It keeps its two-line block even collapsed (a compact
-    // one-line variant was tried and rejected, 2026-07-12 — see MetaTitle's note).
-    case "meta": return { title: <MetaTitle cfg={p.cfg} />, titleKey: p.cfg.name };
+    // The dossier head: avatar + name + kind descriptor (MetaTitle) with the TICKER as the
+    // title-row aside (user, 2026-08-08 — it took the slot the site link held; the link moved
+    // into the body as MetaCard's labelled Site row). Still rolls via titleKey on the name,
+    // synced with the edge pulse.
+    case "meta": return { title: <MetaTitle cfg={p.cfg} />, titleKey: p.cfg.name, aside: <MetaTickerAside cfg={p.cfg} /> };
     case "snapshot": return { title: <SnapshotTitle data={p.data} />, aside: <SnapshotAside data={p.data} /> };
     case "geoLive": return { title: <GeoLiveTitle />, aside: <GeoLiveAside /> };
     default: return {};
@@ -76,17 +76,6 @@ export default function InspectorCard({
   // and the frame's eyebrow dims along with it (carried forward from `.no-signal .insp-eyebrow`).
   const live = useStore((s) => s.live);
   const eyebrowMuted = p.kind === "snapshot" && !live;
-  // The dossier's site link rides the TITLE row's aside slot (user-placed: anchored right on the
-  // avatar + name + ticker line; the name truncates, the icon stays pinned). Resolved HERE (not
-  // inside headFor, which is a plain function and can't hook); passed only when a link actually
-  // exists, so link-less dossiers render no aside at all (no empty gap). Falls back to the
-  // config-level `cfg.siteUrl` for cores the live metaList doesn't carry a site for (the DAG —
-  // Engine publishes it with `siteUrl: undefined`; DAG_CFG supplies constellationnetwork.io).
-  const metaList = useStore((s) => s.metaList);
-  const site =
-    p.kind === "meta"
-      ? (metaList.find((x) => x.id === p.cfg.id)?.siteUrl ?? p.cfg.siteUrl)
-      : undefined;
   const head = headFor(p);
   return (
     <>
@@ -95,7 +84,7 @@ export default function InspectorCard({
         title={head.title}
         titleKey={head.titleKey}
         subtitle={collapsed ? undefined : head.subtitle}
-        aside={head.aside ?? (site ? <MetaSiteAction site={site} /> : undefined)}
+        aside={head.aside}
         onClose={onClose}
         collapsed={collapsed}
         onToggle={onToggle}

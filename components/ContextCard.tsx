@@ -1,13 +1,11 @@
 "use client";
 
-import { cn } from "@/lib/utils";
 import { useStore } from "@/src/store/store";
 import { applyClickActions } from "@/src/store/applyClickActions";
 import { metagraphById } from "@/src/data/network";
 import { hex } from "@/src/util/format";
 import { subjectPairing } from "@/components/useSubjectPairing";
-import { RIGHT_CARD } from "@/components/CardHead";
-import { Card } from "@/components/ui/card";
+import { RailPane } from "@/components/CardHead";
 import InspectorCard from "@/components/InspectorCard";
 import { PulseEdge, useEdgePulse } from "@/components/EdgePulse";
 import type { PickDescriptor } from "@/src/data/types";
@@ -43,25 +41,25 @@ export default function ContextCard({
   // metagraph's hue, via the shared hoverFilter channel.
   const pair = subjectPairing<string>(hoverFilter, mgCfg.id, setHoverFilter, hex(mgCfg.color));
   return (
-    <Card asChild className={cn(RIGHT_CARD, "sig-left", pair.className)}>
-      <aside
-        id="metapane"
-        style={pair.style}
-        onMouseEnter={pair.onMouseEnter}
-        onMouseLeave={pair.onMouseLeave}
-      >
-        <InspectorCard
-          p={context}
-          eyebrow="Metagraph"
-          onClose={() => applyClickActions([{ kind: "filter", id: "all" }])}
-          collapsed={collapsed}
-          onToggle={onToggle}
-        />
-        {/* Scene-facing (left) edge pulse on a new subject (metagraph picked) — synced with the
-            dossier title's own roll-in (MetaCard keys it on cfg.name; both fire on the filter
-            change). */}
-        <PulseEdge pulseKey={pulseKey} rail="right" />
-      </aside>
-    </Card>
+    <RailPane
+      entry={collapsed}
+      id="metapane"
+      className={pair.className}
+      style={pair.style}
+      onMouseEnter={pair.onMouseEnter}
+      onMouseLeave={pair.onMouseLeave}
+    >
+      <InspectorCard
+        p={context}
+        eyebrow="Metagraph"
+        onClose={() => applyClickActions([{ kind: "filter", id: "all" }])}
+        collapsed={collapsed}
+        onToggle={onToggle}
+      />
+      {/* Scene-facing (left) edge pulse on a new subject (metagraph picked) — synced with the
+          dossier title's own roll-in (MetaCard keys it on cfg.name; both fire on the filter
+          change). */}
+      <PulseEdge pulseKey={pulseKey} rail="right" />
+    </RailPane>
   );
 }

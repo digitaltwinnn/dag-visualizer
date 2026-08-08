@@ -44,11 +44,14 @@ export function ladderSlotIds(mode: Mode): string[] {
     .reverse()
     .flatMap((r) => (LADDER_SLOT[r.level] ? [LADDER_SLOT[r.level] as string] : []));
   if (mode === "ledger") {
-    // The ledger's SNAPSHOT CHAIN rides the display lane between the network and the node
-    // (item 8, 2026-08-06): a metagraph snapshot anchors INTO a global snapshot, so the two
-    // card slots render as parent→child under the dossier — display hierarchy only, they stay
-    // card slots with no focus-ladder rung (the camera/deselect walk is unchanged).
-    ids.splice(ids.indexOf("node"), 0, "snap", "metaSnap");
+    // The ledger's SNAPSHOT CHAIN rides the display lane between the network and the node —
+    // METAGRAPH SNAPSHOT ABOVE the global (user reversal 2026-08-08 of the 2026-08-06 order):
+    // the rail mirrors the CHAMBER's own storeys (metagraph planes on top, ribbons falling into
+    // the global floor below) and the story flow under a filter (the network → its snapshot →
+    // the global it anchored INTO; a tile click already derives the global pin from the
+    // metagraph snapshot). Display hierarchy only — both stay card slots with no focus-ladder
+    // rung (the camera/deselect walk is unchanged).
+    ids.splice(ids.indexOf("node"), 0, "metaSnap", "snap");
   }
   return ids;
 }

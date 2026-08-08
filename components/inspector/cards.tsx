@@ -12,12 +12,12 @@ import type { GlobalSnapshot, MetaCfg, PickDescriptor } from "@/src/data/types";
 import AnchoredTags from "./AnchoredTags";
 import Odometer from "@/components/Odometer";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
-import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { SonarRing, NodeStars, NoSignalDot } from "@/components/state/StateAtoms";
 import { VIEW_ICONS, SNAPSHOT_ICON, COUNTRY_ICON, PROVIDER_ICON, COMPOSITION_ICON, KIND_MARK_CLASS } from "@/components/icons";
 import { ExternalLink } from "lucide-react";
 import { useMinHold } from "@/components/useMinHold";
+import { useNowTick } from "@/components/useNowTick";
 import { POLL } from "@/src/engine/config";
 import { Desc, StatusMark, CompositionRows, StatusBreakdown, RoleChips, IdentityDot, networkKind } from "./parts";
 import { compositionGroups, compositionRows, nodeCompositionLabel, parseCompositionKey } from "@/src/data/composition";
@@ -58,14 +58,15 @@ export function SnapshotTitle({ data: d }: { data: GlobalSnapshot }) {
 // While following a metagraph lane, the newest snapshot it anchored into may be minutes old — the
 // age rides alongside "live" rather than being replaced by it, so the label never overstates.
 export function SnapshotAside({ data: d }: { data: GlobalSnapshot }) {
-  const latest = useStore((s) => s.latestSnapshot);
   const live = useStore((s) => s.live);
   const following = useStore((s) => s.following);
   const snap = useStore((s) => s.snap);
-  const isLive = latest != null && d.ordinal === latest.ordinal;
-  // Relative recency for an older pick — coarse (freshness, not a ticking clock). Guarded
+  // Relative recency as a LIVE TICKING counter (user, 2026-08-08 — reversing the old
+  // "coarse freshness, not a ticking clock" choice): the seconds count up between heartbeats
+  // and reset as a new snapshot lands, so a closed snapshot card still FEELS live. Guarded
   // against an unparseable timestamp (→ no age suffix rather than "NaN").
-  const rel = relativeAge(Date.now() - Date.parse(d.timestamp));
+  const now = useNowTick(1000);
+  const rel = relativeAge(now - Date.parse(d.timestamp));
   const cls = "inline-flex items-center gap-1.5 text-label text-muted-foreground whitespace-nowrap";
   if (!live) return <span className={cls}><NoSignalDot /> no signal</span>;
   return (
@@ -79,7 +80,10 @@ export function SnapshotAside({ data: d }: { data: GlobalSnapshot }) {
       {following ? (
         <>
           <span className="w-2 h-2 rounded-full bg-primary shadow-[0_0_0_3px_color-mix(in_oklch,var(--primary)_30%,transparent)] animate-dot-beat motion-reduce:animate-none" />
-          {isLive ? "live now" : <>live · {rel}</>}
+          {/* The tip state counts up from the last heartbeat and resets as the next lands (user,
+              2026-08-08 — replacing the static "live now"; the label still never overstates: the
+              counter IS the shown snapshot's age in both branches). */}
+          live · {rel}
         </>
       ) : (
         <>◷ {rel}</>
@@ -119,10 +123,10 @@ export function MetaTitle({ cfg }: { cfg: MetaCfg }) {
       </Avatar>
       <span className="flex flex-col gap-px min-w-0">
         <span className="leading-[1.1]">{cfg.name}</span>
-        <span className="inline-flex items-baseline gap-1.5 min-w-0">
-          <span className="text-label font-semibold tracking-[0.02em] flex-none" style={{ color: hue }}>{cfg.ticker}</span>
-          <span className="text-label font-normal text-muted-foreground truncate">{kind}</span>
-        </span>
+        {/* The TICKER left this line for the title-row ASIDE (user, 2026-08-08 — MetaTickerAside,
+            taking the slot the site link held; the link moved into the body as a labelled row).
+            The kind descriptor keeps the second line alone. */}
+        <span className="text-label font-normal text-muted-foreground truncate">{kind}</span>
       </span>
     </span>
   );
@@ -300,6 +304,9 @@ export function MetaCard({ cfg }: { cfg: MetaCfg }) {
   const mg = metaList.find((x) => x.id === cfg.id) || null;
   const nodes = mg?.nodes || [];
   const blurb = mg?.description || cfg.blurb;
+  // The site link rides the BODY now (MetaSiteRow — the aside slot carries the ticker). Falls
+  // back to the config-level url for cores the live metaList doesn't carry a site for (the DAG).
+  const site = mg?.siteUrl ?? cfg.siteUrl;
   // The summary row: "Online nodes" + the TOTAL (user, 2026-07-12 — it summarizes the
   // composition table above, whose counts sum to the total; a joining node is online too,
   // just not ready yet). The pill row below appears only when something is NOT ready.
@@ -342,32 +349,47 @@ export function MetaCard({ cfg }: { cfg: MetaCfg }) {
           )}
         </>
       )}
+      {/* The site reference LAST, where references sit (the node card's reading order). */}
+      {site && (
+        <>
+          <Separator className="my-2" />
+          <MetaSiteRow site={site} />
+        </>
+      )}
     </>
   );
 }
 
-// The dossier's site/explorer link (user-agreed: the footer link row was rarely used and ate a
-// full row) — an icon-only ghost ExternalLink riding the TITLE row's aside slot. Flush comes
-// free now: the title row no longer reserves ×-clearance (CardHead dropped its pr — the row
-// sits below the ×), so the aside slot ends AT the card's content edge and the old measured
-// `-mr-[30px]` re-occupation hack is gone with it. 16px glyph — matches the × (user,
-// 2026-07-12: the 14px mark read too small). The glyph rides `text-primary` (the link-variant
-// Button language, softened at rest) so it reads as a LINK at a glance, not muted chrome.
-// Domain in the tooltip/aria-label. Rendered by InspectorCard only when the metagraph actually
-// has a siteUrl, so link-less dossiers render no aside at all.
-export function MetaSiteAction({ site }: { site: string }) {
+// The dossier's title-row aside: the TICKER in the identity hue (user, 2026-08-08 — it took the
+// slot the site link used to hold; the link itself moved into the body, see MetaSiteRow). Reads
+// at the same 11px/hue treatment it had under the name, right-aligned like every head aside.
+export function MetaTickerAside({ cfg }: { cfg: MetaCfg }) {
+  if (!cfg.ticker) return null;
+  return (
+    <span className="text-label font-semibold tracking-[0.02em]" style={{ color: hex(cfg.color) }}>
+      {cfg.ticker}
+    </span>
+  );
+}
+
+// The dossier's site link as a labelled BODY row (user, 2026-08-08 — the icon-only aside link
+// was never used and the aside slot now carries the ticker). References sit last, where
+// references sit: domain text + the ExternalLink glyph, in the link language (`text-primary`).
+function MetaSiteRow({ site }: { site: string }) {
   const domain = site.replace(/^https?:\/\//, "").replace(/\/$/, "");
   return (
-    <Button
-      asChild
-      variant="ghost"
-      size="icon-xs"
-      className="size-auto rounded-md py-1 px-0 leading-none cursor-pointer text-primary/70 hover:bg-transparent hover:text-primary dark:hover:bg-transparent"
-    >
-      <a href={site} target="_blank" rel="noopener noreferrer" aria-label={domain} title={domain}>
-        <ExternalLink aria-hidden className="size-4" />
+    <div className="flex items-start justify-between gap-2.5">
+      <span className="text-body text-muted-foreground">Site</span>
+      <a
+        href={site}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="text-body inline-flex items-center gap-1.5 text-primary/75 hover:text-primary"
+      >
+        {domain}
+        <ExternalLink aria-hidden className="size-3.5" />
       </a>
-    </Button>
+    </div>
   );
 }
 
