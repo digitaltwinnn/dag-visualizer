@@ -30,13 +30,24 @@ export function storyCount(
   return null;
 }
 
-/** The release rule's input: is this tick part of the filter's story? `undefined` = the filter
- *  has no story (the release rule must not fire). */
+/** The polled anchor index needs a settling window after a fresh tick (see CLAUDE.md, the tick
+ *  lifecycle) — a zero read inside it may just be lag, and the release rule must never fire on
+ *  a lagging count. */
+export const STORY_SETTLE_MS = 7000;
+
+/** The release rule's input: is this tick part of the filter's story? `undefined` = unknown or
+ *  no story — the release rule must not fire. Unknown covers a LISTED zero still inside the
+ *  settling window, and an UNLISTED question with no exact read yet (2026-08-08, review fix). */
 export function tickInStory(
   filter: string,
   anchor: Anchor | null | undefined,
   exact: SnapshotExact | undefined,
+  now: number = Date.now(),
 ): boolean | undefined {
   const n = storyCount(filter, anchor, exact);
-  return n == null ? undefined : n > 0;
+  if (n == null) return undefined;
+  if (filter === UNLISTED_ID && !exact) return undefined; // no exact read = no verdict
+  if (n === 0 && filter !== UNLISTED_ID && anchor && now - anchor.touched < STORY_SETTLE_MS)
+    return undefined; // the count may still be settling — never release on lag
+  return n > 0;
 }

@@ -45,14 +45,11 @@ export function followLatest() {
   // stays gated to EXPLICIT selections (RawSnapshotBridge skips it while following).
   const net = getNetwork();
   if (metagraphById(filter) && net) {
-    const list = (net as unknown as { metaSnaps?: Map<string, { ordinal: number; hash: string; ts: string }[]> })
-      .metaSnaps?.get(filter);
+    const list = net.metaSnaps?.get(filter);
     if (list?.length) {
       let m = list[0];
       for (const x of list) if (x.ordinal > m.ordinal) m = x;
-      const g = (net as unknown as { globalSnapshots?: GlobalSnapshot[] }).globalSnapshots?.find(
-        (gs) => gs.timestamp === m.ts,
-      );
+      const g = net.globalSnapshots?.find((gs) => gs.timestamp === m.ts);
       if (g && (metaSnap?.metaId !== filter || metaSnap.ordinal !== m.ordinal)) {
         advanceMetaSnap({ metaId: filter, ordinal: m.ordinal, hash: m.hash, globalOrdinal: g.ordinal, ts: m.ts });
       }

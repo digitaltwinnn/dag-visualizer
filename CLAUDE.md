@@ -1034,8 +1034,14 @@ cost). Activity metrics belong to ledger, structure to hyper — don't cross-pol
 2026-08-01, a deliberate reversal of the old carry-across-views rule). **LIVE IS THE DEFAULT**
 (user, 2026-08-07 — superseding the 2026-08-02 opt-in-entry rule, itself a reversal of the
 original default; the full circle is deliberate): entering ledger starts following under ANY
-filter, browsing/pinning drops it, DESELECTING a pin resumes it (`snapshotSelectActions`' clear
-carries `follow: true`), and leaving + re-entering restores it. The card's head aside is still
+filter (FollowController's effect — keyed on MODE alone), browsing/pinning drops it,
+DESELECTING a pin resumes it (`snapshotSelectActions`' clear carries `follow: true`), and
+leaving + re-entering restores it. **A filter COMMIT (re-)enters live via the EXECUTOR's
+ordered filter effect** (`applyClickActions`, review fix 2026-08-08 — as a React effect on the
+filter channel it fired after any pin whose actions included a filter change, stomping the
+pin: the release rule's step-to-"all" and a cross-network pin's filter-first both hit it; as
+an ordered action effect a later `follow:false` in the same click wins, so pins survive and
+bare commits go live — `followFlow.test.ts`'s COMPOSED cases pin this down). The card's head aside is still
 a manual switch (`SnapshotAside` → `pickActions.followToggleActions` →
 `applyClickActions`, so the write stays on the one selection path): ON = the beating cyan dot +
 `live now` (`live · {age}` while a metagraph lane's newest anchor is older than the tip — the

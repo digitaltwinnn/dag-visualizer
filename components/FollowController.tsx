@@ -43,12 +43,15 @@ export default function FollowController() {
   // (Engine.setMode) and stops following here, so the controller's tick bails gracefully.
   useEffect(() => {
     if (mode !== "ledger") setFollowing(false);
-    // LIVE IS THE DEFAULT (user, 2026-08-07 — superseding the 2026-08-02 opt-in entry):
-    // arriving in the ledger — with ANY filter — starts live mode, and a filter change while
-    // here re-enters it (a metagraph follows its own anchors, "all" follows every tick).
-    // Browsing/pinning drops it until deselect or re-entry.
+    // LIVE IS THE DEFAULT on ENTRY (user, 2026-08-07): arriving in the ledger — with ANY
+    // filter — starts live mode. Deliberately keyed on MODE alone (2026-08-08, review fix):
+    // a FILTER dependency here fired after any pin whose actions included a filter change
+    // (the release rule's step-to-"all", a cross-network pin's filter-first) and stomped the
+    // fresh pin back to live. Filter COMMITS re-enter live via the executor's ordered filter
+    // effect instead (applyClickActions), where a later pin action in the same click wins.
     else setFollowing(true);
-  }, [mode, filter, setFollowing]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mode, setFollowing]);
 
   // When following (enter ledger) or the filter changes while in it, jump to the
   // latest relevant snapshot for the selection.

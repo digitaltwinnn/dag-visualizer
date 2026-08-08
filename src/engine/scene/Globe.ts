@@ -292,6 +292,9 @@ export class Globe implements GeoViewHost {
     // event-time: runs on a data rebuild, never per frame.
     let dagMachines = 0;
     {
+      // ⚠️ SAME machine key as `place()`'s `primary` below (first record per node.id; a null id
+      // is always its own machine) — the tray FRAME is sized from this count while the CHIP
+      // slots are assigned per primary record, so the two rules must never drift.
       const s = new Set<string>();
       for (const node of [...l0List, ...cl1List]) {
         if (node.id == null || !s.has(node.id)) dagMachines++;

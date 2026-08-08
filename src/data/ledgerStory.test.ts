@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { storyCount, tickInStory } from "./ledgerStory";
+import { storyCount, tickInStory, STORY_SETTLE_MS } from "./ledgerStory";
 import { METAGRAPHS } from "@/src/engine/config";
 import type { Anchor, SnapshotExact } from "@/src/data/types";
 
@@ -40,5 +40,17 @@ describe("the filter-is-a-story membership rule (one home)", () => {
     expect(tickInStory("unlisted", null, exact(1))).toBe(true);
     expect(tickInStory("unlisted", null, exact(0))).toBe(false);
     expect(tickInStory("all", anchor({ [LISTED]: 1 }), undefined)).toBeUndefined();
+  });
+
+  it("never releases on a LAGGING count: a listed zero inside the settling window is unknown", () => {
+    const a = anchor({ other: 1 }); // touched: 0
+    // Inside the window (now just after the anchor last grew) → no verdict.
+    expect(tickInStory(LISTED, a, undefined, STORY_SETTLE_MS - 1)).toBeUndefined();
+    // Past the window the zero is real.
+    expect(tickInStory(LISTED, a, undefined, STORY_SETTLE_MS + 1)).toBe(false);
+  });
+
+  it("an unlisted question with NO exact read is unknown, not a zero", () => {
+    expect(tickInStory("unlisted", null, undefined)).toBeUndefined();
   });
 });

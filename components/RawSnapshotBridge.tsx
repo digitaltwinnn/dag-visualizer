@@ -65,21 +65,30 @@ export default function RawSnapshotBridge() {
   useEffect(() => ensure(liveOrd), [liveOrd]);
   useEffect(() => ensure(selOrd), [selOrd]);
 
-  // One-shot, on the first live tick.
+  // One-shot, on the first live tick. The timer lives in a ref and is NOT cleaned per dep
+  // change (2026-08-08, review fix): the queue takes ~3.6s+ and the next tick lands in ~4s,
+  // so a dep-scoped cleanup routinely truncated the backfill and left trail rows unmeasured.
+  const backfillTimer = useRef<ReturnType<typeof setInterval> | null>(null);
   useEffect(() => {
     if (backfilled.current || liveOrd == null) return;
     backfilled.current = true;
     const queue = backfillOrdinals(liveOrd, useStore.getState().snapshotExact);
     let i = 0;
-    const timer = setInterval(() => {
+    backfillTimer.current = setInterval(() => {
       if (i >= queue.length) {
-        clearInterval(timer);
+        if (backfillTimer.current) clearInterval(backfillTimer.current);
+        backfillTimer.current = null;
         return;
       }
       ensure(queue[i++]);
     }, BACKFILL_GAP_MS);
-    return () => clearInterval(timer);
   }, [liveOrd]);
+  useEffect(
+    () => () => {
+      if (backfillTimer.current) clearInterval(backfillTimer.current);
+    },
+    [],
+  );
 
   // The deeper read: only ever for the ONE selected metagraph snapshot, never a poll.
   useEffect(() => {

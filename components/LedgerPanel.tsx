@@ -496,7 +496,7 @@ export default function LedgerPanel() {
                                   onClick={() =>
                                     // A metagraph under a tick is the BAND: the (metagraph, tick)
                                     // pair — same tested semantics as clicking its band in the bar.
-                                    applyClickActions(bandSelectActions(g.id, globalPick, { filter, metaSnap, following }))
+                                    applyClickActions(bandSelectActions(g.id, globalPick, { filter, metaSnap }))
                                   }
                                   onMouseEnter={() => setHoverFilter(g.id)}
                                   onMouseLeave={() => setHoverFilter(null)}
@@ -526,7 +526,13 @@ export default function LedgerPanel() {
                               className="nb-row group flex items-center gap-2.5 w-full text-left text-body border border-transparent bg-transparent cursor-pointer py-[5px] px-2 rounded-sm transition-[background] duration-150 hover:bg-wash-hover"
                               title={`${tickUnlisted} uncataloged snapshot${tickUnlisted === 1 ? "" : "s"} anchored into #${d.ordinal}`}
                               onClick={() =>
-                                applyClickActions(bandSelectActions(UNLISTED_ID, globalPick, { filter, metaSnap, following }))
+                                applyClickActions(
+                                  bandSelectActions(UNLISTED_ID, globalPick, {
+                                    filter,
+                                    metaSnap,
+                                    tickHasFilter: tickInStory(filter, getAnchor(d.timestamp), snapshotExact[d.ordinal]),
+                                  }),
+                                )
                               }
                               onMouseEnter={() => setHoverFilter(UNLISTED_ID)}
                               onMouseLeave={() => setHoverFilter(null)}

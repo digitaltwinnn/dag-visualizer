@@ -36,7 +36,7 @@ const child = (globalOrdinal: number): MetaSnapSel => ({
 const st = () => useStore.getState();
 
 beforeEach(() => {
-  useStore.setState({ following: false, snap: null, metaSnap: null, filter: "all" });
+  useStore.setState({ mode: "ledger", following: false, snap: null, metaSnap: null, filter: "all" });
 });
 
 describe("the follow flow decision table", () => {
@@ -88,6 +88,33 @@ describe("the follow flow decision table", () => {
     );
     expect(st().metaSnap).toBeNull();
     expect(st().snap?.data.ordinal).toBe(100); // the anchoring global holds
+  });
+
+  it("COMPOSED: a bare filter commit in the ledger (re-)enters live mode", () => {
+    // 2026-08-08 review fix: this transition is an ORDERED executor effect, not a React effect
+    // on the filter channel — so it composes with pins instead of stomping them.
+    useStore.setState({ following: false, snap: snapPick(90) });
+    applyClickActions([{ kind: "filter", id: LISTED }]);
+    expect(st().filter).toBe(LISTED);
+    expect(st().following).toBe(true);
+  });
+
+  it("COMPOSED: a filter commit outside the ledger never touches following", () => {
+    useStore.setState({ mode: "hyper", following: false });
+    applyClickActions([{ kind: "filter", id: LISTED }]);
+    expect(st().following).toBe(false);
+  });
+
+  it("COMPOSED: a cross-network pin's filter-first does NOT stomp the pin back to live", () => {
+    // The bug the review caught: filter-first inside a pin click used to re-enter live via the
+    // controller's filter-dep effect, replacing the fresh pin. Ordered actions decide now.
+    useStore.setState({ following: true, snap: snapPick(100), filter: "all" });
+    applyClickActions(
+      metaSnapSelectActions(child(100), snapPick(100), { filter: "all", metaSnap: null, following: true }),
+    );
+    expect(st().filter).toBe(LISTED); // filter-first committed
+    expect(st().following).toBe(false); // …and the PIN won the ordered sequence
+    expect(st().metaSnap?.globalOrdinal).toBe(100);
   });
 
   it("the release rule: pinning an out-of-story tick steps the filter to all first", () => {

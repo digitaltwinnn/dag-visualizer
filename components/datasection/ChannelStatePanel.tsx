@@ -5,7 +5,7 @@
 // never appear just because a tile was clicked. Since the master-detail split (item 9, 2026-08-06)
 // it is the raw layer's RIGHT pane: the anchor log on the left is the index, this is the selected
 // snapshot's contents, rendered through the bespoke JsonTree instead of a flat text dump.
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useStore } from "@/src/store/store";
 import { metaSnapDeepKey } from "@/src/data/types";
@@ -19,6 +19,15 @@ export function ChannelStatePanel() {
   const sel = useStore((s) => s.metaSnap);
   const deep = useStore((s) => (sel ? s.metaSnapDeep[metaSnapDeepKey(sel.globalOrdinal, sel.metaId, sel.ordinal)] : undefined));
   const following = useStore((s) => s.following);
+  // The pinned decode's give-up timer (2026-08-08): "reading…" must terminate honestly when
+  // the deep read 404s (the L0 node prunes after ~30 min).
+  const [gaveUp, setGaveUp] = useState(false);
+  useEffect(() => {
+    setGaveUp(false);
+    if (!sel || following || deep) return;
+    const t = setTimeout(() => setGaveUp(true), 12000);
+    return () => clearTimeout(t);
+  }, [sel, following, deep]);
 
   const state = useMemo(() => {
     if (!deep?.state) return null;
@@ -66,7 +75,11 @@ export function ChannelStatePanel() {
         // is irrelevant to it): an unclicked (auto-followed) snapshot invites the pin; a
         // clicked one that hasn't landed yet is genuinely reading.
         <p className="text-label text-muted-foreground">
-          {following ? "pin this snapshot to decode its state" : "reading…"}
+          {following
+            ? "pin this snapshot to decode its state"
+            : gaveUp
+              ? "decode unavailable — the L0 node keeps ~30 minutes; this tick may be pruned"
+              : "reading…"}
         </p>
       ) : (
         <>

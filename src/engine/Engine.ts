@@ -4,6 +4,7 @@ import { useStore, type Mode } from "@/src/store/store";
 import { applyClickActions } from "@/src/store/applyClickActions";
 import { metagraphById, initNetwork, getNetwork, getAnchor, DEFAULT_META_COLOR, resolveSignerIps } from "@/src/data/network";
 import { tickInStory } from "@/src/data/ledgerStory";
+import { LISTED_IDS } from "@/src/data/unlisted";
 import { hoverKeyOf, tooltipSubject } from "@/src/data/hoverSubject";
 import { identityMap, identitySceneHex } from "@/src/palette/identity";
 import { createScene, type SceneCtx } from "./scene/SceneContext";
@@ -14,7 +15,6 @@ import { LANE_IDS } from "./domain/ledgerModel";
 import { UNLISTED_KEY } from "./domain/ledgerBands";
 
 // The public catalog's ids — the unknown-lane tile resolver splits listed from unlisted rows.
-const LISTED_IDS = new Set(METAGRAPHS.map((m) => m.id));
 import { StageLights } from "./scene/objects/StageLights";
 import { loadGeoCache, resolveMissing } from "@/src/data/geoResolve";
 import { METAGRAPHS, COLORS } from "@/src/engine/config";
@@ -22,7 +22,7 @@ import { BYTE_SCALE_KB, LEDGER, ledgerSite, type RailGroup } from "./domain/ledg
 import { HYPER_TILT, HYPER_TILT_FOCUS } from "./domain/hyperLayout";
 import { readSceneColors } from "./sceneColors";
 import { VIEW_POLICIES, type ViewPolicy } from "./domain/viewPolicy";
-import { FOCI, hubFraming, geoFraming, ledgerNodeFraming, nodeFraming, cohortFraming, hyperNodeFraming, dollyBack, easeInOutQuad, type CameraFraming } from "./domain/cameraRig";
+import { FOCI, hubFraming, geoFraming, ledgerNodeFraming, ledgerLaneNudge, nodeFraming, cohortFraming, hyperNodeFraming, dollyBack, easeInOutQuad, type CameraFraming } from "./domain/cameraRig";
 import { countryFraming } from "./domain/countryShape";
 import { R as GEO_R, LAND_H } from "./domain/geoLayout";
 import { clickActions, pickActive, pickNetId, viewEntryActions, metaSnapSelectActions, bandSelectActions } from "./domain/pickActions";
@@ -928,24 +928,11 @@ export class Engine {
       return !!p && this._focusLedgerNode(p);
     },
     ledgerNetwork: () => {
-      // No fly-to-lane, but a SUBTLE acknowledgement (user, 2026-08-07): from the overview
-      // pose, nudge a fraction toward the committed lane and dolly in slightly — enough to
-      // say something happened, while the colored dim carries the real emphasis.
-      const f = FOCI.ledger;
-      this._framingOut.pos.copy(f.pos);
-      this._framingOut.target.copy(f.target);
+      // The COMMIT ACKNOWLEDGEMENT (cameraRig.ledgerLaneNudge — no fly-to-lane; the colored
+      // dim carries the emphasis, the pose just says something happened).
       const i = LANE_IDS.indexOf(this.filter);
-      if (i >= 0) {
-        const laneX = -ledgerSite(i, LANE_IDS.length).z * LEDGER.viewScale;
-        this._framingOut.pos.x += laneX * 0.3;
-        this._framingOut.target.x += laneX * 0.3;
-      }
-      // Dolly in ~12% along the view ray, RAISE the camera and tilt the aim up (user,
-      // 2026-08-07 ×2 — the straight-on pose read too frontal; the acknowledged pose looks
-      // slightly DOWN over the planes) — a nudge, not a zoom-to.
-      this._framingOut.pos.lerp(this._framingOut.target, 0.12);
-      this._framingOut.pos.y += 10;
-      this._framingOut.target.y += 2;
+      const laneX = i >= 0 ? -ledgerSite(i, LANE_IDS.length).z * LEDGER.viewScale : null;
+      ledgerLaneNudge(FOCI.ledger, laneX, this._framingOut);
       this._tweenTo(this._framingOut.pos, this._framingOut.target);
       return true;
     },
@@ -1162,7 +1149,13 @@ export class Engine {
     // `userData.bandKey` on the same mesh (a band is a slice of a tick, not a subject of its own).
     const bandKey = this._hitObj?.userData.bandKey as string | undefined;
     if (p?.kind === "snapshot" && bandKey) {
-      applyClickActions(bandSelectActions(bandKey, p, { filter: st.filter, metaSnap: st.metaSnap }));
+      applyClickActions(
+        bandSelectActions(bandKey, p, {
+          filter: st.filter,
+          metaSnap: st.metaSnap,
+          tickHasFilter: this._tickHasFilter(p, st.filter),
+        }),
+      );
       return;
     }
     applyClickActions(

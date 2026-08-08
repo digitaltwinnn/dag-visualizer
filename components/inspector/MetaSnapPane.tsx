@@ -5,7 +5,7 @@
 // is the application state — disclosed as a SHAPE here and as a payload in the raw layer.
 // Like the global snapshot card this is a card SLOT, not a focus-ladder rung: it has its own
 // store channel (`store.metaSnap`) and a fixed rail slot, and appears in no ladder.
-import { useMemo, type CSSProperties, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type CSSProperties, type ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import CardHead, { RIGHT_CARD } from "@/components/CardHead";
 import { Card } from "@/components/ui/card";
@@ -89,6 +89,15 @@ export default function MetaSnapPane({
     );
   }, [sel, exact]);
   const reading = useMinHold(!!sel && !row);
+  // The pinned decode's give-up timer (2026-08-08, review fix): a 404'd/pruned deep read left
+  // "decoding…" forever — after a patient window the instrument states the honest terminal.
+  const [decodeGaveUp, setDecodeGaveUp] = useState(false);
+  useEffect(() => {
+    setDecodeGaveUp(false);
+    if (!sel || following || deep) return;
+    const t = setTimeout(() => setDecodeGaveUp(true), 12000);
+    return () => clearTimeout(t);
+  }, [sel, following, deep]);
 
   // The signers, deep read first (it re-reads the same proofs straight off the channel, so it wins
   // when it lands) — but the tick's exact read already carries them, so the rows never wait on it.
@@ -179,7 +188,7 @@ export default function MetaSnapPane({
                 return (
                   <Fact label="State">
                     <span className="text-muted-foreground italic">
-                      {following ? "undecodable payload" : "decoding…"}
+                      {following ? "undecodable payload" : decodeGaveUp ? "decode unavailable — tick pruned" : "decoding…"}
                     </span>
                   </Fact>
                 );

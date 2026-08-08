@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import * as THREE from "three";
-import { FOCI, hubFraming, geoFraming, ledgerFloorFraming, ledgerRailFraming, ledgerNodeFraming, easeInOutQuad, CAM_ZOOM, dollyBack, nodeFraming, cohortFraming, hyperNodeFraming, closeness, CLOSE_FAR_ALT, CLOSE_NEAR_ALT, NODE_RAISE } from "./cameraRig";
+import { FOCI, hubFraming, geoFraming, ledgerFloorFraming, ledgerRailFraming, ledgerNodeFraming, easeInOutQuad, CAM_ZOOM, dollyBack, nodeFraming, cohortFraming, hyperNodeFraming, closeness, CLOSE_FAR_ALT, CLOSE_NEAR_ALT, NODE_RAISE, ledgerLaneNudge, LANE_NUDGE, NUDGE_DOLLY, NUDGE_RAISE, NUDGE_AIM_UP } from "./cameraRig";
 
 describe("FOCI", () => {
   it("carries the camera presets (ledger gained its own frontal resting pose, 2026-08-07)", () => {
@@ -231,5 +231,38 @@ describe("ledger framings (two-floor chamber)", () => {
     expect(out.target.y).toBeCloseTo(2.85, 6);
     // The rail runs across Z, so the pose must not be pushed off to one end of it.
     expect(out.target.z).toBeCloseTo(0, 6);
+  });
+});
+
+describe("ledgerLaneNudge — the commit acknowledgement (2026-08-08)", () => {
+  const base = { pos: new THREE.Vector3(0, 3.5, 54), target: new THREE.Vector3(0, -2.5, 0) };
+  const out = { pos: new THREE.Vector3(), target: new THREE.Vector3() };
+
+  it("nudges a fraction toward the lane, dollies in, raises and lifts the aim", () => {
+    ledgerLaneNudge(base, 10, out);
+    // Lateral: both ends shift by the SAME fraction of the lane X (the aim stays parallel).
+    expect(out.target.x).toBeCloseTo(10 * LANE_NUDGE, 6);
+    // Dolly: the position moved toward the target along the view ray…
+    expect(out.pos.z).toBeLessThan(base.pos.z);
+    expect(out.pos.z).toBeCloseTo(base.pos.z + (base.target.z - base.pos.z) * NUDGE_DOLLY, 6);
+    // …then rises, and the aim lifts.
+    expect(out.pos.y).toBeCloseTo(base.pos.y + (base.target.y - base.pos.y) * NUDGE_DOLLY + NUDGE_RAISE, 6);
+    expect(out.target.y).toBeCloseTo(base.target.y + NUDGE_AIM_UP, 6);
+    // The base FOCI must never be mutated (the resolver reuses it every commit).
+    expect(base.pos.y).toBe(3.5);
+    expect(base.target.x).toBe(0);
+  });
+
+  it("laneX null = no lateral nudge (dag/unknown) — the rest of the pose still applies", () => {
+    ledgerLaneNudge(base, null, out);
+    expect(out.target.x).toBe(0);
+    expect(out.pos.y).toBeGreaterThan(base.pos.y);
+  });
+
+  it("a nudge is not a zoom-to: it keeps most of the overview distance", () => {
+    ledgerLaneNudge(base, 10, out);
+    const d = out.pos.distanceTo(out.target);
+    const d0 = base.pos.distanceTo(base.target);
+    expect(d).toBeGreaterThan(d0 * 0.7);
   });
 });

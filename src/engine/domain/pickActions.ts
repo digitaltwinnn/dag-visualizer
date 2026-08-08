@@ -276,11 +276,15 @@ export function metaSnapSelectActions(
 export function bandSelectActions(
   metaId: string,
   global: Extract<PickDescriptor, { kind: "snapshot" }>,
-  current: { filter: string; metaSnap: MetaSnapSel | null; following?: boolean },
+  current: { filter: string; metaSnap: MetaSnapSel | null; tickHasFilter?: boolean },
 ): ClickAction[] {
   const out: ClickAction[] = [];
   const listed = metaId !== UNLISTED_KEY;
   if (listed && current.filter !== metaId) out.push({ kind: "filter", id: metaId });
+  // The UNLISTED band can't filter-first, so it carries the RELEASE rule itself (2026-08-08,
+  // review fix — a listed band's filter-first makes the new filter in-story by construction,
+  // but the unlisted band of an out-of-story tick would leave a stale filter dimming it).
+  if (!listed && current.tickHasFilter === false) out.push({ kind: "filter", id: "all" });
   if (current.metaSnap) out.push({ kind: "metaSnap", sel: null });
   out.push({ kind: "snapshot", pick: global, follow: false });
   return out;
