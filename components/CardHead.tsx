@@ -70,11 +70,13 @@ export const RIGHT_CARD = "relative block w-auto pointer-events-auto [--spine:tr
 // solid-leaning glass (user, 2026-08-08, twice-strengthened — bare text, then the faint `--panel`
 // fill, both fought the bright 3D scene): `--panel-solid` + light blur, NO border/shadow (a border
 // would re-box it). The ladder's distance-dim rides `--entry-dim` (set by Inspector's rung
-// wrapper) so fill + text fade together — and HOVER RELEASES it (user, 2026-08-08: a hover
+// wrapper) so fill + text fade together — and HOVER lifts the entry (user, 2026-08-08: a hover
 // previews the materialization; full expand-on-hover was rejected — it shifts layout under the
-// pointer): the entry lifts to full luminance while hovered, the click does the actual expand.
+// pointer): the dim RELEASES to full luminance AND a small brightness boost rides on top, so
+// entries resting at dim 1 (the anchor-adjacent ones — found live: the metagraph-snapshot entry
+// had nothing to release) still visibly respond. Click does the actual expand.
 const RAIL_ENTRY =
-  "rail-entry relative block w-auto pointer-events-auto [--spine:transparent] px-[18px] py-1.5 min-h-0 flex-none rounded-md bg-[var(--panel-solid)] [backdrop-filter:blur(10px)] opacity-[var(--entry-dim,1)] hover:opacity-100 transition-opacity duration-150 motion-reduce:transition-none";
+  "rail-entry relative block w-auto pointer-events-auto [--spine:transparent] px-[18px] py-1.5 min-h-0 flex-none rounded-md bg-[var(--panel-solid)] [backdrop-filter:blur(10px)] opacity-[var(--entry-dim,1)] hover:opacity-100 hover:brightness-[1.18] transition-[opacity,filter] duration-150 motion-reduce:transition-none";
 
 // The ONE right-rail pane frame — every facts-rail pane renders through this switch:
 //   • `entry` false → the full glass panel (Card baseline supplies `.ig-panel`; RIGHT_CARD the
