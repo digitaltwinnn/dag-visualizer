@@ -277,5 +277,8 @@ export function detailsCards(s: RailManifestState): RailCard[] {
     present: !!s.snap,
     hint: snapHint(s),
   };
-  return [context, country, cohort, composition, snap, metaSnap, node];
+  // metaSnap BEFORE snap (2026-08-08, with the lane reversal): the manifest order drives the
+  // tablet/phone flat stack + tray icons, and it must agree with the desktop lane — the
+  // metagraph snapshot sits above the global it anchors into, mirroring the chamber's storeys.
+  return [context, country, cohort, composition, metaSnap, snap, node];
 }

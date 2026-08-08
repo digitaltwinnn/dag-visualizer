@@ -58,12 +58,13 @@ describe("detailsCards — RIGHT rail (Details): fixed slots + ghost hints", () 
   it("the DAG filter → Context dossier populated", () => {
     expect(presentKinds(detailsCards(details({ filter: "dag" })))).toEqual(["context"]);
   });
-  it("slots come in ONE fixed order (context, country, cohort, composition, snap, metaSnap, node) regardless of selection", () => {
+  it("slots come in ONE fixed order (context, country, cohort, composition, metaSnap, snap, node) regardless of selection", () => {
+    // metaSnap before snap (2026-08-08): the manifest agrees with the reversed display lane.
     const ids = detailsCards(details({ filter: "dor", inspect: nodePick, snap: snapPick })).map((c) => c.id);
-    expect(ids).toEqual(["context", "country", "cohort", "composition", "snap", "metaSnap", "node"]);
+    expect(ids).toEqual(["context", "country", "cohort", "composition", "metaSnap", "snap", "node"]);
   });
   it("ledger ghosts: context + snapshot + metaSnap + node invites (nodes pick in the chamber too)", () => {
-    expect(ghostIds(detailsCards(details({})))).toEqual(["context", "snap", "metaSnap", "node"]);
+    expect(ghostIds(detailsCards(details({})))).toEqual(["context", "metaSnap", "snap", "node"]);
   });
   it("hyper ghosts: context + composition + node (the snapshot slot is ledger-scoped, spec 2026-08-01)", () => {
     expect(ghostIds(detailsCards(details({ mode: "hyper" })))).toEqual(["context", "composition", "node"]);
