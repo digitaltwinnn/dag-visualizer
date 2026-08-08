@@ -53,6 +53,7 @@ import { ByteBar, SNAP_PREVIEW } from "../objects/ByteBar";
 import { RIBBON_DIM } from "../objects/Ribbons";
 import { Ribbons } from "../objects/Ribbons";
 import { SnapshotPlane, makeEdgeLabel, GLOBAL_PLANE_TUNE_DEFAULTS, META_PLANE_TUNE_DEFAULTS, type PlaneTune } from "../objects/SnapshotPlane";
+import { TrailRewind } from "../objects/TrailRewind";
 import { FadeSet } from "../objects/FadeSet";
 import type { SceneView } from "./SceneView";
 
@@ -194,14 +195,13 @@ export class LedgerView implements SceneView {
   private _ordLabels = new Map<number, { mesh: THREE.Mesh; line: THREE.Line; slot: number }>();
   /** The labels+lines ride the trail rewind as one group. */
   private _ordGroup = new THREE.Group();
-  /** The TRAIL REWIND offset (user, 2026-08-07): >0 slides the whole time trail +X so the
-   *  PINNED row sits at the lead position instead of fighting the live lead for the front.
-   *  Keyed to the COMMITTED pin (`setPinned`), never the hover — hover previews the hot row
-   *  in place, only a click moves the trail. */
+  /** The TRAIL REWIND (objects/TrailRewind.ts — the shown snapshot owns the front). Keyed to
+   *  the COMMITTED/FOLLOWED snapshot (`setPinned`), never the hover — hover previews the hot
+   *  row in place, only a click moves the trail. */
+  private _rewind = new TrailRewind();
+  /** Mirror of the rewind offset for the frame's read sites (updated once per update()). */
   private _trailOff = 0;
-  private _pinnedOrd: number | null = null;
-  private _pinnedSlotPrev = -1;
-  private _pinnedOrdPrev: number | null = null;
+  private _slotOfOrd = (ordinal: number): number => this.model.slotOf(ordinal);
   /** The transient HOVER row (split from the committed selection, user 2026-08-07): previews in
    *  identity colour at SNAP_PREVIEW without demoting the active row. */
   private _hoverOrd: number | null = null;
@@ -346,7 +346,7 @@ export class LedgerView implements SceneView {
       // names itself, CENTRED on its own width; the explorer names the group.)
       this._metaPlanes.set(key, new SnapshotPlane(this.group, this._colors, {
         w: W, d: hz * 2, y: FLOOR_Y.msnap, cx, cz,
-        label: { text: meta?.ticker ?? "unlisted", x: lx, z: cz, height: 0.62, align: "center" },
+        label: { text: meta?.ticker ?? UNLISTED_KEY, x: lx, z: cz, height: 0.62, align: "center" },
       }));
     }
     for (const p of [...this._globalPlanes, ...this._metaPlanes.values()]) {
@@ -377,7 +377,7 @@ export class LedgerView implements SceneView {
     for (const [key, p] of this._metaPlanes)
       p.applyAlpha(this.metaTune, a, FLOOR_D / 2, key === netKey ? LANE_FILL_BOOST : 1);
     for (const o of this._ordLabels.values()) {
-      const front = this._fadeAtX(LEAD_X - o.slot * SLOT_SP + this._trailOff);
+      const front = this._rewind.fadeAtX(LEAD_X - o.slot * SLOT_SP + this._trailOff);
       (o.mesh.material as THREE.MeshBasicMaterial).opacity = ORD_OP * front * a;
       // The anchor line whispers under its label (user, 2026-08-07 — "a bit more subtle").
       (o.line.material as THREE.LineDashedMaterial).opacity = ORD_OP * 0.45 * front * a;
@@ -508,9 +508,9 @@ export class LedgerView implements SceneView {
     this._bar.setHovered(this._hoverSlot);
   }
 
-  /** The COMMITTED (clicked) snapshot — the only thing the trail rewind follows. */
+  /** The COMMITTED (clicked) or followed snapshot — the only thing the trail rewind tracks. */
   setPinned(ordinal: number | null) {
-    this._pinnedOrd = ordinal;
+    this._rewind.setPinned(ordinal);
   }
 
   /** The COMMITTED network. Since the off-filter dim was removed entirely (user, 2026-08-07)
@@ -591,12 +591,6 @@ export class LedgerView implements SceneView {
     this._syncPickables();
   }
 
-  /** 1 at/behind the lead position, dissolving within one slot of travel past the front edge —
-   *  the REWIND fade: rows newer than the pinned snapshot slide off the front and vanish. */
-  private _fadeAtX(x: number): number {
-    const over = (x - LEAD_X) / (SLOT_SP * 0.9);
-    return over <= 0 ? 1 : Math.max(0, 1 - over);
-  }
 
   /** One GLOBAL SNAPSHOT ID label per visible tick row, screen-left of the bars, each tied to
    *  its row's actual bar by a DOTTED anchor line (user, 2026-08-07). Keyed by ordinal so a
@@ -727,36 +721,17 @@ export class LedgerView implements SceneView {
   update(dt: number) {
     this.t += dt;
 
-    // ── the TRAIL REWIND (user, 2026-08-07): selecting a non-live snapshot slides the WHOLE
-    // time trail forward until that row sits at the lead position — the active selection owns
-    // the front instead of fighting the live lead's arrivals. Rows newer than the selection
-    // slide past the front edge and dissolve (_fadeAtX); re-following slides everything back.
-    const pinnedSlot = this._pinnedOrd != null ? this.model.slotOf(this._pinnedOrd) : -1;
-    const offTarget = pinnedSlot > 0 ? pinnedSlot * SLOT_SP : 0;
-    // CALM while pinned (user, 2026-08-07): a tick advance shifts every slot AND the offset
-    // target by the same SLOT_SP in one event — JUMP the offset with it (no ease) so the pinned
-    // row never moves on a tick. Only for the SAME ordinal shifting slots: when the FOLLOWED
-    // ordinal itself changes (filtered live mode — the network anchored a fresh tick), the
-    // offset EASES instead, so the trail glides forward to the new front.
-    if (
-      pinnedSlot > 0 && this._pinnedSlotPrev > 0 && pinnedSlot !== this._pinnedSlotPrev &&
-      this._pinnedOrd === this._pinnedOrdPrev
-    ) {
-      this._trailOff += (pinnedSlot - this._pinnedSlotPrev) * SLOT_SP;
-    }
-    this._pinnedSlotPrev = pinnedSlot;
-    this._pinnedOrdPrev = this._pinnedOrd;
-    this._trailOff += (offTarget - this._trailOff) * Math.min(1, dt * 3.2);
-    if (Math.abs(offTarget - this._trailOff) < 0.002) this._trailOff = offTarget;
-    // While pinned, tile x holds its slot exactly (the generic per-tick ease would fight the
-    // jumped offset — the trail must read FROZEN); the ease returns with the live follow.
-    const pinnedHold = offTarget > 0;
+    // ── the TRAIL REWIND (objects/TrailRewind.ts): the shown snapshot owns the front; rows
+    // newer than it slide past the edge and dissolve. All scalar logic lives in the adapter.
+    this._rewind.update(dt, this._slotOfOrd);
+    this._trailOff = this._rewind.offset;
+    const pinnedHold = this._rewind.holding;
     this._bar.setOffset(this._trailOff);
     this._ribbons.group.position.x = this._trailOff;
     this._ordGroup.position.x = this._trailOff;
     // The live lead's ribbon sheet fades out as it crosses the front (row 1 — the selected
     // row's sheet — lands exactly AT the front, so it never fades).
-    this._ribbons.setRowFade(0, this._fadeAtX(LEAD_X + this._trailOff));
+    this._ribbons.setRowFade(0, this._rewind.fadeAtX(LEAD_X + this._trailOff));
 
     this._applyFloorAlpha();
 
@@ -816,7 +791,7 @@ export class LedgerView implements SceneView {
               ? Math.max(b.fade, 0.9) * this.tiles.hot * SNAP_PREVIEW
               : b.fade * this.tiles.rest) *
           (offNet ? RIBBON_DIM : 1) *
-          this._fadeAtX(b.x + this._trailOff) *
+          this._rewind.fadeAtX(b.x + this._trailOff) *
           this._fades.alpha;
         this._metaTrailMesh.setColorAt(mi, _col.copy(ident ? laneColor : this._coreCol).multiplyScalar(bright));
         mi++;
@@ -863,7 +838,7 @@ export class LedgerView implements SceneView {
         this._pulseMesh.setMatrixAt(i, _dummy.matrix);
         this._pulseMesh.setColorAt(
           i,
-          _col.set(p.color).multiplyScalar(this._fades.alpha * this._fadeAtX(LEAD_X + this._trailOff)),
+          _col.set(p.color).multiplyScalar(this._fades.alpha * this._rewind.fadeAtX(LEAD_X + this._trailOff)),
         );
         i++;
       }

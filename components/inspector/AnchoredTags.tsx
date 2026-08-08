@@ -4,6 +4,7 @@ import { useState } from "react";
 import { ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useStore } from "@/src/store/store";
+import { UNLISTED_ID } from "@/src/data/unlisted";
 import { metagraphById } from "@/src/data/network";
 import { hex, fmtDag, fmtKB } from "@/src/util/format";
 import { NodeStars } from "@/components/state/StateAtoms";
@@ -95,7 +96,7 @@ export default function AnchoredTags({
     const unlistedBytes = Object.entries(exact.perMeta)
       .filter(([addr]) => !metagraphById(addr))
       .reduce((sum, [, v]) => sum + v.bytes, 0);
-    rows.push({ id: "unlisted", label: "unlisted", hue: null, n: exact.unlistedCount, fee: exact.unlistedFee, bytes: unlistedBytes });
+    rows.push({ id: UNLISTED_ID, label: UNLISTED_ID, hue: null, n: exact.unlistedCount, fee: exact.unlistedFee, bytes: unlistedBytes });
   }
 
   const pct = (n: number) => (total > 0 ? (n / total) * 100 : 0);

@@ -3,6 +3,7 @@ import Stats from "stats.js";
 import { useStore, type Mode } from "@/src/store/store";
 import { applyClickActions } from "@/src/store/applyClickActions";
 import { metagraphById, initNetwork, getNetwork, getAnchor, DEFAULT_META_COLOR, resolveSignerIps } from "@/src/data/network";
+import { tickInStory } from "@/src/data/ledgerStory";
 import { hoverKeyOf, tooltipSubject } from "@/src/data/hoverSubject";
 import { identityMap, identitySceneHex } from "@/src/palette/identity";
 import { createScene, type SceneCtx } from "./scene/SceneContext";
@@ -1189,14 +1190,13 @@ export class Engine {
   // The composition group a PICK belongs to — network + make-up key. null when the pick isn't a
   // node, carries no role info (the group would be meaningless), or the CURRENT view's ladder has
   // no composition rung (today: hyper alone, but the ladder table says so, not this method).
-  /** Whether the committed network is in a picked tick's anchor story — the filter-releases
-   *  rule's input for scene band clicks (explorer/strip compute their own from their rows). */
+  /** The filter-releases rule's input for scene band clicks — the ONE story rule
+   *  (src/data/ledgerStory.ts; explorer/strip read the same home). */
   private _tickHasFilter(p: PickDescriptor | null, filter: string): boolean | undefined {
-    if (!p || p.kind !== "snapshot" || filter === "all" || filter === "dag") return undefined;
+    if (!p || p.kind !== "snapshot") return undefined;
     const d = (p as { data?: GlobalSnapshot }).data;
     if (!d) return undefined;
-    if (filter === "unlisted") return (useStore.getState().snapshotExact[d.ordinal]?.unlistedCount ?? 0) > 0;
-    return (getAnchor(d.timestamp)?.metaCounts?.get(filter) ?? 0) > 0;
+    return tickInStory(filter, getAnchor(d.timestamp), useStore.getState().snapshotExact[d.ordinal]);
   }
 
   private _compositionOf(p: PickDescriptor | null): CompositionSel | null {

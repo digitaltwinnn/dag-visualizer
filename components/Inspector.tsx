@@ -4,8 +4,9 @@ import { useEffect, useMemo, useRef, type CSSProperties, type ReactNode } from "
 import { ChevronsDownUp, ChevronsUpDown, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useStore } from "@/src/store/store";
+import { displayNetwork } from "@/src/data/unlisted";
 import { applyClickActions } from "@/src/store/applyClickActions";
-import { filterAccent, metagraphById, CORE_HEX } from "@/src/data/network";
+import { filterAccent, CORE_HEX } from "@/src/data/network";
 import { identityHudHex } from "@/src/palette/identity";
 import { hoverKeyOf } from "@/src/data/hoverSubject";
 import { compositionGroups } from "@/src/data/composition";
@@ -361,11 +362,10 @@ export default function Inspector() {
   // stays ALWAYS-mounted below (via <ContextCard/>, which self-nulls on "all") so its EdgePulse
   // survives the dossier ⇄ nothing swap; the manifest only decides its tray-icon presence.
   const selNodes = useStore((s) => s.selNodes);
-  const filterCfg = metagraphById(filter);
   const manifest = detailsCards({
     mode, filter, inspect, snap, country, cohort, composition, metaSnap,
     selNodesCount: selNodes.length,
-    filterLabel: filterCfg ? filterCfg.ticker || filterCfg.name : filter === "unlisted" ? "unlisted" : null,
+    filterLabel: displayNetwork(filter)?.ticker ?? null, // one lookup — catalog + the unlisted pseudo-network
   });
 
   // ── The descent-spine ladder collapse model (variant-A, 2026-07-19) ──────────────────────────

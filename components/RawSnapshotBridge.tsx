@@ -96,10 +96,10 @@ export default function RawSnapshotBridge() {
     fetch(`/api/snapshot/${deepSel.globalOrdinal}/channel/${deepSel.metaId}?snap=${deepSel.ordinal}`)
       .then((r) => (r.ok ? (r.json() as Promise<ChannelSnapDeep>) : null))
       .then((d) => {
-        // Store under the REQUESTED ordinal: when the route fell back (an undecodable row asks
-        // with 0), the returned decode's own ordinal would file it under a key the card never
-        // reads (2026-08-07 — the per-snapshot keying).
-        if (d && typeof d.ordinal === "number") st.setMetaSnapDeep({ ...d, ordinal: deepSel.ordinal });
+        // Store under the REQUESTED key: when the route fell back (an undecodable row asks
+        // with 0), the decode's own identity would file it where the card never reads — the
+        // decode itself stays untouched (2026-08-08: explicit key, no field override).
+        if (d && typeof d.ordinal === "number") st.setMetaSnapDeep(d, key);
       })
       .catch(() => {})
       .finally(() => deepInflight.delete(key));

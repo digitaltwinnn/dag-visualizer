@@ -403,6 +403,17 @@ store-value imports**, enforced by `layerBoundaries.test.ts`). Each ships coloca
   2026-08-06 — display copy for them lives in `src/data/ledgerLayers.ts`), the tray
   literals (`CONT_X`/`CONT_TOP_GAP`/`CONT_CHIP_Z`/`CONT_ROW_Y`/`CONT_PAD`/`CONT_Z0`/`CONT_Z1`;
   chip grids CENTRE in their tray), plus `ledgerSite`, `clusterRadius`, `ledgerSpread`.
+- `ledgerStory.ts` (in `src/data/`) — the FILTER-IS-A-STORY membership rule's one home
+  (`storyCount`/`tickInStory` — listed networks answer from the polled anchor index, the
+  unlisted set from the exact reads, "all"/"dag" have no story so the release rule never
+  fires; NB the "dag" guard must precede `metagraphById`, which resolves it). The explorer's
+  story-scoped list + marks, the strip's and the scene's release-rule inputs all read it.
+  Enforcement tests added 2026-08-08: `components/unlistedBoundary.test.ts` (the "unlisted"
+  id literal lives only in `src/data/unlisted.ts` + `domain/ledgerBands.ts` — comments free,
+  code must import), `scene/objects/dimTiers.test.ts` (the colour-tier hierarchy
+  hot > preview > off-filter dim > rest stays ordered through tuning), and
+  `src/store/followFlow.test.ts` (the follow decision table — pin/deselect/toggle/convert/
+  release exercised through the real builders + executor + store).
 - `ledgerBands.ts` — the byte bar's spec as pure data (`BarSpec`/`Band`, `makeBarSpec` +
   `fillBarSpec`, `BYTES_FULL`, `UNLISTED_KEY`, `ribbonQuad`): width from bytes against the fixed
   reference, **CENTERED on the lane field** (`z0 = -width/2`, user 2026-08-06), bands in lane
@@ -1568,6 +1579,10 @@ frame). It composes three adapters — `objects/ByteBar.ts`, `objects/Ribbons.ts
   `*_TUNE_DEFAULTS` shipped look; chosen values get baked back into those constants. `RIBBON_ROWS = 2`: only the **LEAD row and the HOT
   row** get a sheet (one Mesh, one preallocated geometry, rewritten event-time); every older
   tick keeps a hairline strut drawn by the view.
+- **The trail REWIND adapter** (`objects/TrailRewind.ts`, extracted 2026-08-08 — behaviour
+  unchanged): the "shown snapshot owns the front" scalar state (offset, calm-jump vs ease,
+  `holding`, `fadeAtX`) beside ByteBar/Ribbons; LedgerView applies the offset to its
+  groups/instances and multiplies brightnesses by the fade.
 - **The plane BLUEPRINT** (`objects/SnapshotPlane.ts`, refactor 2026-08-07): every storey
   surface is the SAME composed unit — glass plane + optional edge label + the plane's own
   TRAY — instantiated per position: the global floor (level digit + full-width validator

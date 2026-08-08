@@ -17,6 +17,7 @@ import type { Mode } from "@/src/store/store";
 import type { PickDescriptor, MetaSnapSel } from "@/src/data/types";
 import type { CohortSel, CompositionSel } from "./focusLadder";
 import { METAGRAPHS } from "../config";
+import { UNLISTED_KEY } from "./ledgerBands";
 
 export type ClickAction =
   | { kind: "filter"; id: string }                                             // commit the network filter
@@ -278,7 +279,7 @@ export function bandSelectActions(
   current: { filter: string; metaSnap: MetaSnapSel | null; following?: boolean },
 ): ClickAction[] {
   const out: ClickAction[] = [];
-  const listed = metaId !== "unlisted";
+  const listed = metaId !== UNLISTED_KEY;
   if (listed && current.filter !== metaId) out.push({ kind: "filter", id: metaId });
   if (current.metaSnap) out.push({ kind: "metaSnap", sel: null });
   out.push({ kind: "snapshot", pick: global, follow: false });

@@ -193,7 +193,9 @@ interface AppState {
   setLeaderboard: (lb: LeaderboardData | null) => void;
   setSelNodes: (nodes: NodeRow[]) => void;
   setSnapshotExact: (data: SnapshotExact) => void;
-  setMetaSnapDeep: (d: ChannelSnapDeep) => void;
+  /** `key` defaults to the decode's own identity; the bridge passes the REQUESTED key when
+   *  the route fell back to another entry (an undecodable row asks with ordinal 0). */
+  setMetaSnapDeep: (d: ChannelSnapDeep, key?: string) => void;
   setPhoneDock: (dock: "explore" | "details" | null) => void;
   setSection: (section: "scene" | "data") => void;
   setPhoneVitals: (open: boolean) => void;
@@ -311,8 +313,8 @@ export const useStore = create<AppState>((set) => ({
       }
       return { snapshotExact: next };
     }),
-  setMetaSnapDeep: (d) => set((s) => {
-    const key = metaSnapDeepKey(d.globalOrdinal, d.metaId, d.ordinal);
+  setMetaSnapDeep: (d, key) => set((s) => {
+    key ??= metaSnapDeepKey(d.globalOrdinal, d.metaId, d.ordinal);
     if (s.metaSnapDeep[key]) return {}; // a decoded snapshot is immutable
     const next = { ...s.metaSnapDeep, [key]: d };
     const keys = Object.keys(next);

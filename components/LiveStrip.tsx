@@ -10,6 +10,7 @@ import { useBreakpoint } from "@/components/useBreakpoint";
 import { getAnchor, metagraphById, filterAccent } from "@/src/data/network";
 import type { GlobalSnapshot } from "@/src/data/types";
 import { snapshotSelectActions } from "@/src/engine/domain/pickActions";
+import { tickInStory } from "@/src/data/ledgerStory";
 import { applyClickActions } from "@/src/store/applyClickActions";
 import { relativeAge } from "@/src/util/relativeAge";
 import NodeCountReadout from "@/components/NodeCountReadout";
@@ -79,14 +80,8 @@ export default function LiveStrip() {
   // click (domain/pickActions): the live tip (re-)follows the heartbeat, anything older pins.
   const pick = (d: GlobalSnapshot) => {
     const st = useStore.getState();
-    // The filter releases when its network is absent from the clicked tick's anchors (the
-    // filter-is-a-story rule; the unlisted set answers from the exact read).
-    const tickHasFilter =
-      st.filter === "all" || st.filter === "dag"
-        ? true
-        : st.filter === "unlisted"
-          ? (st.snapshotExact[d.ordinal]?.unlistedCount ?? 0) > 0
-          : (getAnchor(d.timestamp)?.metaCounts?.get(st.filter) ?? 0) > 0;
+    // The filter-releases rule's input — the ONE story rule (src/data/ledgerStory.ts).
+    const tickHasFilter = tickInStory(st.filter, getAnchor(d.timestamp), st.snapshotExact[d.ordinal]);
     applyClickActions(
       snapshotSelectActions(
         { kind: "snapshot", title: `Global snapshot #${d.ordinal}`, data: d },

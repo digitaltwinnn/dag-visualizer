@@ -6,7 +6,8 @@ import ExplorerShell from "@/components/ExplorerShell";
 import { SelectedRowMark, selectedRow } from "@/components/selection";
 import { subjectPairing } from "@/components/useSubjectPairing";
 import { useSnapshotFeed } from "@/components/useSnapshotFeed";
-import { getNetwork, filterAccent, metagraphById } from "@/src/data/network";
+import { getNetwork, getAnchor, filterAccent, metagraphById } from "@/src/data/network";
+import { storyCount, tickInStory } from "@/src/data/ledgerStory";
 import { displayNetwork, unlistedLog, UNLISTED_ID, LISTED_IDS } from "@/src/data/unlisted";
 import type { GlobalSnapshot } from "@/src/data/types";
 import { latestRelevant } from "@/src/data/follow";
@@ -149,10 +150,9 @@ export default function LedgerPanel() {
   // two-outcome clicks in the explorer; the scene keeps all ticks and the filter-releases rule
   // as its safety net). "all"/"dag" list every tick.
   const filterNet = displayNetwork(filter);
+  // The ONE story rule (src/data/ledgerStory.ts) — the same membership the strip/scene read.
   const tickFilterCount = (d: GlobalSnapshot): number =>
-    filter === "unlisted"
-      ? (snapshotExact[d.ordinal]?.unlistedCount ?? 0)
-      : rows.filter((r) => r.global.ordinal === d.ordinal && r.metaId === filter).length;
+    storyCount(filter, getAnchor(d.timestamp), snapshotExact[d.ordinal]) ?? 0;
   const orderedSnaps = [...snaps]
     .reverse() // newest first, the log convention
     .filter((d) => !filterNet || tickFilterCount(d) > 0);
@@ -312,8 +312,8 @@ export default function LedgerPanel() {
                 <span
                   className="flex-none w-2 h-2 rounded-full animate-dot-beat motion-reduce:animate-none"
                   style={{
-                    background: filter === "unlisted" ? "var(--core)" : accent,
-                    boxShadow: `0 0 0 3px color-mix(in oklch, ${filter === "unlisted" ? "var(--core)" : accent} 30%, transparent)`,
+                    background: displayNetwork(filter)?.hue ?? accent,
+                    boxShadow: `0 0 0 3px color-mix(in oklch, ${displayNetwork(filter)?.hue ?? accent} 30%, transparent)`,
                   }}
                 />
               ) : (
@@ -382,7 +382,7 @@ export default function LedgerPanel() {
                   holdsSel={metaSnap != null && !LISTED_IDS.has(metaSnap.metaId)}
                   title={`unlisted · ${unlistedEntries.length} snapshot${unlistedEntries.length === 1 ? "" : "s"} from uncataloged channels`}
                   onToggle={() => setOpenMeta(openMeta === "msnap|unlisted" ? null : "msnap|unlisted")}
-                  onHoverEnter={() => setHoverFilter("unlisted")}
+                  onHoverEnter={() => setHoverFilter(UNLISTED_ID)}
                   onHoverLeave={() => setHoverFilter(null)}
                 >
                   <IdentityDot hue="var(--core)" />
@@ -471,10 +471,7 @@ export default function LedgerPanel() {
                               metaSnap,
                               filter,
                               // The filter releases if ITS network isn't in this tick's story.
-                              tickHasFilter:
-                                filter === "unlisted"
-                                  ? tickUnlisted > 0
-                                  : tickGroups.some((g) => g.id === filter),
+                              tickHasFilter: tickInStory(filter, getAnchor(d.timestamp), snapshotExact[d.ordinal]),
                             }),
                           );
                           setOpenMeta(isOpen ? null : `gl0|${d.ordinal}`);

@@ -1,6 +1,7 @@
 "use client";
 import { useMemo } from "react";
 import { useStore } from "@/src/store/store";
+import { UNLISTED_ID } from "@/src/data/unlisted";
 import { filterToggleActions } from "@/src/engine/domain/pickActions";
 import { applyClickActions } from "@/src/store/applyClickActions";
 import { hex } from "@/src/util/format";
@@ -104,11 +105,11 @@ export default function FilterPicker({ onPicked }: { onPicked?: () => void }) {
           unlisted lane). Neutral dot: no identity hue can speak for a mixed set. */}
       <button
         type="button"
-        aria-pressed={filter === "unlisted"}
+        aria-pressed={filter === UNLISTED_ID}
         title="Anchoring state channels not in the public catalog"
-        className={chipClass(filter === "unlisted", true)}
-        onClick={() => pick("unlisted")}
-        onMouseEnter={() => setHoverFilter("unlisted")}
+        className={chipClass(filter === UNLISTED_ID, true)}
+        onClick={() => pick(UNLISTED_ID)}
+        onMouseEnter={() => setHoverFilter(UNLISTED_ID)}
       >
         <IdentityDot hue="var(--core)" />
         <span className="text-body text-foreground italic">unlisted</span>
