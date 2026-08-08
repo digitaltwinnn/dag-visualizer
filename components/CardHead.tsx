@@ -77,6 +77,9 @@ export const RIGHT_CARD = "relative block w-auto pointer-events-auto [--spine:tr
 // had nothing to release) still visibly respond. Click does the actual expand.
 const RAIL_ENTRY =
   "rail-entry relative block w-auto pointer-events-auto [--spine:transparent] px-[18px] py-1.5 min-h-0 flex-none rounded-md bg-[var(--panel-solid)] [backdrop-filter:blur(10px)] opacity-[var(--entry-dim,1)] hover:opacity-100 hover:brightness-[1.18] transition-[opacity,filter] duration-150 motion-reduce:transition-none";
+// Exported for the LEFT rail's entry-tier cards (AboutView — the collapsed About sheds its box
+// into the same grammar, 2026-08-08); the right rail routes through RailPane below.
+export { RAIL_ENTRY };
 
 // The ONE right-rail pane frame — every facts-rail pane renders through this switch:
 //   • `entry` false → the full glass panel (Card baseline supplies `.ig-panel`; RIGHT_CARD the
