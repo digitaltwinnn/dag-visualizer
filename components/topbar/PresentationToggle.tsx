@@ -6,23 +6,25 @@ import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { useStore } from "@/src/store/store";
 
 // The command bar's trailing PRESENTATION control (user, 2026-08-08 — evolving the separate
-// Focus icon + RAW switch into ONE axis): how the view's information is presented, three states —
-//   · SCENE — the 3D scene leads; both card rails collapse to their threads (the dots remain as
-//     the minimized possibility map) and the camera leans in (cameraRig.railsDolly);
-//   · CARDS — the default four-zone HUD;
-//   · RAW   — the raw data layer surfaces under the view (SectionShell's depth choreography).
+// Focus icon + RAW switch into ONE axis): how the view's information is presented, three states
+// named for WHICH LAYER OF THE INSTRUMENT LEADS (the house registers — user rejected "cards":
+// it named the furniture, not the state; HUD is the project's own word for the info overlay) —
+//   · SCENE — just the 3D, browsed freely; both card rails collapse to their threads (the dots
+//     remain as the minimized possibility map) and the camera leans in (cameraRig.railsDolly);
+//   · HUD   — the default four-zone overlay: the info cards over the scene;
+//   · RAW   — the data behind the view (SectionShell's depth choreography).
 // One segmented control (the view-switch ToggleGroup idiom, same sizing/on-state), sitting LAST
 // in the bar because it acts on everything to its left. The state derives from the two store
 // fields (`section`, `railsHidden`) and each pick writes both deterministically — Escape / the
 // raw layer's × still land on whichever scene presentation was active before. The SCENE segment
-// is desktop-only (below 1100px the rails are dock sheets); labels hide on condensed widths,
+// is desktop-only (below 1100px the rails are dock sheets); labels condense below 1560px,
 // icons + titles carry the names there.
 type PresentMode = "scene" | "cards" | "raw";
 
-const ITEMS: { id: PresentMode; name: string; icon: typeof Focus; desktopOnly?: boolean }[] = [
-  { id: "scene", name: "Scene", icon: Focus, desktopOnly: true },
-  { id: "cards", name: "Cards", icon: LayoutPanelLeft },
-  { id: "raw", name: "Raw", icon: Table2 },
+const ITEMS: { id: PresentMode; name: string; title: string; icon: typeof Focus; desktopOnly?: boolean }[] = [
+  { id: "scene", name: "Scene", title: "Scene — just the 3D, rails collapse to their threads", icon: Focus, desktopOnly: true },
+  { id: "cards", name: "HUD", title: "HUD — the info cards over the scene", icon: LayoutPanelLeft },
+  { id: "raw", name: "Raw", title: "Raw — the data behind the view", icon: Table2 },
 ];
 
 export default function PresentationToggle() {
@@ -49,7 +51,7 @@ export default function PresentationToggle() {
           <ToggleGroupItem
             key={it.id}
             value={it.id}
-            title={it.name}
+            title={it.title}
             className={cn(
               // The view switch's exact sizing/on-state recipe (see TopBar's note on rounded-btn!).
               "group flex items-center gap-1.5 h-9 py-1.5 px-2.5 rounded-btn!",
