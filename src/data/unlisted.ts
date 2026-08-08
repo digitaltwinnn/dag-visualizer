@@ -6,8 +6,8 @@
 //
 //   · IDENTITY — `displayNetwork(id)`: the one lookup UI surfaces use where a catalog metagraph
 //     OR the unlisted set may appear. Returns the catalog record shaped for display, or the
-//     UNLISTED pseudo-record (core-blue hue — no single identity hue can speak for a mixed
-//     set — italic by convention), or null for "all"/"dag"/unknown.
+//     UNLISTED pseudo-record (neutral gray, both lanes — no single identity hue can speak for a
+//     mixed set, so none does; 2026-08-08 — italic by convention), or null for "all"/"dag"/unknown.
 //   · DATA — the polled buffers only track the public catalog, so the EXACT reads
 //     (store.snapshotExact) are the only honest source for unlisted snapshots.
 //     `unlistedLog` re-exports the pure builder; `latestUnlistedTick` answers the follow
@@ -22,6 +22,16 @@ import { buildUnlistedLog } from "@/src/data/anchorLog";
 import type { GlobalSnapshot, SnapshotExact } from "@/src/data/types";
 
 export const UNLISTED_ID = "unlisted";
+
+// The unlisted set's NEUTRAL identity — gray in BOTH lanes (user, 2026-08-08: it wore three
+// different colours — core-blue chips, cyan scene blocks, and address-hashed hues on the
+// snapshot card. No single identity can speak for a mixed uncataloged set, so none does):
+//   · HUD lane — the muted-foreground token (CSS var, resolves ~#8a96b8);
+//   · scene lane — the same tone as a baked number (the scene can't resolve CSS vars;
+//     Engine folds it into every scene-color map it builds, so lanes/bands/ribbons/tiles
+//     pick it up like any catalog hue).
+export const UNLISTED_HUE = "var(--muted-foreground)";
+export const UNLISTED_SCENE_HEX = 0x8a96b8;
 
 export const LISTED_IDS: ReadonlySet<string> = new Set(METAGRAPHS.map((m) => m.id));
 
@@ -40,7 +50,7 @@ const UNLISTED_DISPLAY: DisplayNetwork = {
   id: UNLISTED_ID,
   name: "unlisted",
   ticker: "unlisted",
-  hue: "var(--core)",
+  hue: UNLISTED_HUE,
   virtual: true,
 };
 

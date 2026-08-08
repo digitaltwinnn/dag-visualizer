@@ -1,5 +1,6 @@
 "use client";
 
+import { CircleHelp } from "lucide-react";
 import { useStore } from "@/src/store/store";
 import { applyClickActions } from "@/src/store/applyClickActions";
 import { metagraphById } from "@/src/data/network";
@@ -9,6 +10,7 @@ import { subjectPairing } from "@/components/useSubjectPairing";
 import CardHead, { RailPane } from "@/components/CardHead";
 import InspectorCard from "@/components/InspectorCard";
 import { PulseEdge, useEdgePulse } from "@/components/EdgePulse";
+import { KIND_MARK_CLASS } from "@/components/icons";
 import type { PickDescriptor } from "@/src/data/types";
 
 // The Context (parent) card at the top of the right-rail subject stack. It mirrors the
@@ -38,10 +40,9 @@ export default function ContextCard({
   // The UNLISTED pseudo-network's dossier (2026-08-08 — committing "unlisted" used to leave the
   // slot an empty HOLE: the manifest marks it present, suppressing the ghost, while this card
   // self-nulled on the missing catalog record). Everything shown comes from the one-home
-  // identity (`displayNetwork`) + honest instrument states — a mixed uncataloged set has no
-  // dossier facts to fabricate. Eyebrow says NETWORK, not Metagraph: the set is many state
-  // channels, not one metagraph (deliberate deviation from the slot noun, honesty over
-  // uniformity).
+  // identity (`displayNetwork`, neutral gray) + honest instrument states — a mixed uncataloged
+  // set has no dossier facts to fabricate. The kind mark is a QUESTION MARK (user): the slot
+  // noun stays Metagraph like every dossier, the "?" says which kind this one is.
   if (filter === UNLISTED_ID) {
     const dn = displayNetwork(UNLISTED_ID)!;
     const pair = subjectPairing<string>(hoverFilter, dn.id, setHoverFilter, dn.hue);
@@ -55,14 +56,10 @@ export default function ContextCard({
         onMouseLeave={pair.onMouseLeave}
       >
         <CardHead
-          eyebrow="Network"
+          eyebrow="Metagraph"
           title={
             <span className="inline-flex items-center gap-2 min-w-0">
-              <span
-                aria-hidden
-                className="size-[7px] rounded-full flex-none"
-                style={{ background: dn.hue }}
-              />
+              <CircleHelp aria-hidden className={KIND_MARK_CLASS} style={{ color: dn.hue }} />
               <span className="italic truncate">{dn.name}</span>
             </span>
           }

@@ -13,6 +13,7 @@ import { useStore } from "@/src/store/store";
 import { metaSnapDeepKey } from "@/src/data/types";
 import type { NodeRow } from "@/src/data/types";
 import { getNetwork, matchSignerRow, metagraphById, shortHash } from "@/src/data/network";
+import { UNLISTED_HUE } from "@/src/data/unlisted";
 import { snapsAtTick } from "@/src/data/anchorLog";
 import { fmtDag, fmtKB } from "@/src/util/format";
 import { relativeAge } from "@/src/util/relativeAge";
@@ -114,9 +115,12 @@ export default function MetaSnapPane({
 
   if (!sel) return null;
   const cfg = metagraphById(sel.metaId);
-  // An UNLISTED metagraph has no config row — its address is the only name it has.
+  // An UNLISTED metagraph has no config row — its address is the only name it has, and its hue
+  // is the unlisted set's NEUTRAL gray (2026-08-08: hashing the address through the identity
+  // palette minted a random hue per channel — pink icons for a set that deliberately has no
+  // identity of its own).
   const ticker = cfg?.ticker || cfg?.name || shortHash(sel.metaId);
-  const hue = identityHudHex(sel.metaId);
+  const hue = cfg ? identityHudHex(sel.metaId) : UNLISTED_HUE;
   const rel = relativeAge(now - Date.parse(sel.ts));
   const asideCls = "inline-flex items-center gap-1.5 text-label text-muted-foreground whitespace-nowrap";
   const aside = (

@@ -4,7 +4,7 @@ import { useStore, type Mode } from "@/src/store/store";
 import { applyClickActions } from "@/src/store/applyClickActions";
 import { metagraphById, initNetwork, getNetwork, getAnchor, DEFAULT_META_COLOR, resolveSignerIps } from "@/src/data/network";
 import { tickInStory } from "@/src/data/ledgerStory";
-import { LISTED_IDS } from "@/src/data/unlisted";
+import { LISTED_IDS, UNLISTED_ID, UNLISTED_SCENE_HEX } from "@/src/data/unlisted";
 import { hoverKeyOf, tooltipSubject } from "@/src/data/hoverSubject";
 import { identityMap, identitySceneHex } from "@/src/palette/identity";
 import { createScene, type SceneCtx } from "./scene/SceneContext";
@@ -54,6 +54,11 @@ const GATHER_CELL_ASPECT_REF = 1.6;
 const sceneColorsFor = (ids: string[]): Record<string, number> => {
   const out: Record<string, number> = {};
   for (const [id, e] of identityMap(ids)) out[id] = parseInt(e.sceneHex.slice(1), 16);
+  // The unlisted pseudo-network rides every map with its NEUTRAL gray (one home: unlisted.ts,
+  // 2026-08-08) — so the lane/band/ribbon/tile machinery colors it like any catalog id and the
+  // scene needs no special case (ByteBar/Ribbons' UNLISTED_KEY→neutral branch was retired with
+  // this). Harmless in maps whose consumer never draws it (HyperView's hub map).
+  out[UNLISTED_ID] = UNLISTED_SCENE_HEX;
   return out;
 };
 
