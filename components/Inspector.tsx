@@ -14,7 +14,7 @@ import CardHead, { RailPane } from "@/components/CardHead";
 import InspectorCard from "@/components/InspectorCard";
 import ContextCard from "@/components/ContextCard";
 import RailThread from "@/components/RailThread";
-import { RailShade, RailShadeToggle } from "@/components/RailShade";
+import { RailShade } from "@/components/RailShade";
 import RailDock from "@/components/RailDock";
 import { useBreakpoint } from "@/components/useBreakpoint";
 import { PulseEdge, useEdgePulse } from "@/components/EdgePulse";
@@ -290,30 +290,35 @@ export function GhostCard({ card }: { card: RailCard }) {
   );
 }
 
-// The rail-top CONTROLS (desktop, variant-A descent spine, 2026-07-19): the desktop equivalent
-// of the tablet dock's collapsibility, hoisted to an explicit control cluster the user asked for.
-// Three quiet instrument buttons — minimize all (collapse every present card to eyebrow+title),
-// expand all, and clear all (deselect the whole ladder back to the overview). Monochrome lucide
-// glyphs (the ONE icon system), muted at rest; no card chrome — it reads as a toolbar in the
-// rail's margin, not another panel. Shown only when the rail actually hosts a card.
+// The rail-top CONTROLS (desktop): the collapse TOGGLE — all-collapsed ⇄ restore (one button,
+// user 2026-08-08: the minimize-all/expand-all pair was two buttons for one axis; "restore"
+// resets the overrides so the auto default governs again — the focus rung materializes, the
+// rest rest as entries, honoring the one-box grammar instead of the old expand-everything) —
+// and clear all (deselect the whole ladder back to the overview). Monochrome lucide glyphs
+// (the ONE icon system), muted at rest; no card chrome — a toolbar in the rail's margin, not
+// another panel. Shown only when the rail actually hosts a card.
 function RailControls({
-  onMinimize,
-  onExpand,
+  allCollapsed,
+  onToggle,
   onClear,
 }: {
-  onMinimize: () => void;
-  onExpand: () => void;
+  allCollapsed: boolean;
+  onToggle: () => void;
   onClear: () => void;
 }) {
   const btn =
     "inline-flex items-center justify-center size-6 rounded-[var(--radius-xs)] text-muted-foreground hover:text-foreground hover:bg-wash-soft transition-colors cursor-pointer focus-visible:outline-1 focus-visible:outline-ring/60";
   return (
     <div className="pointer-events-auto flex items-center justify-end gap-0.5 pb-0.5 pr-0.5" role="group" aria-label="Details controls">
-      <button type="button" className={btn} title="Minimize all cards" aria-label="Minimize all cards" onClick={onMinimize}>
-        <ChevronsDownUp aria-hidden className="size-3.5" />
-      </button>
-      <button type="button" className={btn} title="Expand all cards" aria-label="Expand all cards" onClick={onExpand}>
-        <ChevronsUpDown aria-hidden className="size-3.5" />
+      <button
+        type="button"
+        className={btn}
+        aria-pressed={allCollapsed}
+        title={allCollapsed ? "Restore the active card" : "Minimize all cards"}
+        aria-label={allCollapsed ? "Restore the active card" : "Minimize all cards"}
+        onClick={onToggle}
+      >
+        {allCollapsed ? <ChevronsUpDown aria-hidden className="size-3.5" /> : <ChevronsDownUp aria-hidden className="size-3.5" />}
       </button>
       <button type="button" className={btn} title="Clear all selections" aria-label="Clear all selections" onClick={onClear}>
         <X aria-hidden className="size-3.5" />
@@ -551,8 +556,14 @@ export default function Inspector() {
   // overrides so a fresh selection starts from the auto default again.
   const presentIds = manifest.filter((c) => c.present).map((c) => c.id);
   const hasCards = presentIds.length > 0;
-  const minimizeAll = () => setRailCollapseMany(Object.fromEntries(presentIds.map((id) => [id, true])));
-  const expandAll = () => setRailCollapseMany(Object.fromEntries(presentIds.map((id) => [id, false])));
+  // The one collapse axis (2026-08-08): all-collapsed → restore resets the overrides so the
+  // auto default governs (the focus rung materializes, ancestors rest as entries — the one-box
+  // grammar; the old expand-ALL materialized every card at once).
+  const allCollapsed = presentIds.length > 0 && presentIds.every((id) => effCollapsed(id));
+  const toggleAll = () =>
+    setRailCollapseMany(
+      Object.fromEntries(presentIds.map((id) => [id, allCollapsed ? null : true])),
+    );
   const clearAll = () => {
     setRailCollapseMany(Object.fromEntries(presentIds.map((id) => [id, null])));
     applyClickActions(
@@ -621,9 +632,8 @@ export default function Inspector() {
           className="max-[1100px]:!w-[288px] max-[860px]:!w-[min(300px,calc(100vw-32px))] max-[1099px]:!hidden"
           style={accent}
         >
-          <RailShadeToggle side="right" />
-          <RailShade side="right">
-            {hasCards && <RailControls onMinimize={minimizeAll} onExpand={expandAll} onClear={clearAll} />}
+          <RailShade>
+            {hasCards && <RailControls allCollapsed={allCollapsed} onToggle={toggleAll} onClear={clearAll} />}
             {ladderLane}
             {trailingPanes}
             {trailingGhosts}
