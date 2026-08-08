@@ -238,15 +238,23 @@ export default function RailThread({ side = "right" }: { side?: Side }) {
           let x1 = side === "right" ? gm.conn - m.inset : gm.conn + m.inset;
           let tick: number | null = null;
           if (m.entry) {
+            // The funnel's ANCHOR: the nearest materialized box — or, when NO box is open (the
+            // scene-first view-entry state collapses the whole ladder), the ladder's FOOT (the
+            // bottom-most entry), so the coarsest→finest reach gradient survives a view switch
+            // (found live 2026-08-08: with no box every entry got the minimum reach and the
+            // hierarchy cue vanished).
+            const entryMarks = g.marks.filter((x) => x.entry);
             const nearest = boxes.length
               ? boxes.reduce((a, b) => (Math.abs(b.y - m.y) < Math.abs(a.y - m.y) ? b : a))
-              : null;
-            const between = nearest
-              ? g.marks.filter(
-                  (x) => x.entry && ((x.y > m.y && x.y < nearest.y) || (x.y < m.y && x.y > nearest.y)),
-                ).length
-              : 0;
-            const reach = Math.min(REACH_STEP * (between + 1), REACH_MAX);
+              : entryMarks.reduce((a, b) => (b.y > a.y ? b : a));
+            const between = g.marks.filter(
+              (x) => x.entry && ((x.y > m.y && x.y < nearest.y) || (x.y < m.y && x.y > nearest.y)),
+            ).length;
+            // A box anchor sits OUTSIDE the entry set; an entry anchor is a member of it, so
+            // every other entry counts the anchor itself as one more step (without this the
+            // foot and its neighbour both read the minimum reach).
+            const extra = !boxes.length && nearest !== m ? 1 : 0;
+            const reach = Math.min(REACH_STEP * (between + extra + 1), REACH_MAX);
             x1 = side === "right" ? gm.conn - reach : gm.conn + reach;
             tick = x1;
           }
