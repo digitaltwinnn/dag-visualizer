@@ -2,13 +2,16 @@
 
 import { useState } from "react";
 import { cn } from "@/lib/utils";
-import CardHead from "@/components/CardHead";
+import CardHead, { RAIL_ENTRY } from "@/components/CardHead";
 import { Card } from "@/components/ui/card";
-import { ABOUT_ICON } from "@/components/icons";
+import { ABOUT_ICON, KIND_MARK_CLASS } from "@/components/icons";
 
 // The left-rail "About this view" orientation card, shown at the top of the rail in every view.
-// Same shell as the tool panels so the four-zone HUD stays consistent. Collapsed by default (a
-// single CardHead strip) — the view's scene/tool is the star; expand to read the orientation.
+// It speaks the card-redesign's two-tier grammar (2026-08-08 — the left rail joins the right
+// rail's language): COLLAPSED (the default) it is an unboxed `.rail-entry` — the box below it
+// (the view's tool card) is the rail's working instrument, and About rests as a quiet entry the
+// same way a right-rail ancestor does (whole-entry click to materialize, hover lift, thread
+// dot + reach stub). EXPANDED it materializes as the full glass panel with the orientation copy.
 export default function AboutView({
   title,
   eyebrow,
@@ -21,8 +24,29 @@ export default function AboutView({
   caption?: string;
 }) {
   const [collapsed, setCollapsed] = useState(true);
+  const Icon = ABOUT_ICON;
+  if (collapsed) {
+    return (
+      <aside className={RAIL_ENTRY}>
+        {/* CardHead's inspector layout in entry mode: chrome-less, data-eyebrow for the thread,
+            the whole entry one stretched aria-expanded toggle. */}
+        <CardHead
+          eyebrow={eyebrow}
+          title={
+            <span className="inline-flex items-center gap-2 min-w-0">
+              <Icon aria-hidden className={KIND_MARK_CLASS} style={{ color: "var(--filter-accent, var(--accent))" }} />
+              <span className="truncate">{title}</span>
+            </span>
+          }
+          aside={caption ? <span className="text-micro text-muted-foreground tracking-caps">{caption}</span> : undefined}
+          collapsed
+          onToggle={() => setCollapsed(false)}
+        />
+      </aside>
+    );
+  }
   return (
-    <Card asChild className="sig-right block p-0 [--spine:var(--filter-accent,var(--primary))]">
+    <Card asChild className="sig-right block p-0 [--spine:var(--filter-accent,var(--primary))] animate-card-in motion-reduce:animate-none">
       <aside>
         <CardHead
           panel
@@ -30,10 +54,10 @@ export default function AboutView({
           title={title}
           eyebrow={eyebrow}
           caption={caption || undefined}
-          collapsed={collapsed}
-          onToggle={() => setCollapsed((c) => !c)}
+          collapsed={false}
+          onToggle={() => setCollapsed(true)}
         />
-        <div className={cn("flex flex-col gap-2.5 px-4 pt-3 pb-3.5 overflow-y-auto", collapsed && "hidden")}>
+        <div className="flex flex-col gap-2.5 px-4 pt-3 pb-3.5 overflow-y-auto">
           {lines.map((l, i) => (
             <p
               key={i}

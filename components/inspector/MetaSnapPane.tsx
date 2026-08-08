@@ -7,22 +7,25 @@
 // store channel (`store.metaSnap`) and a fixed rail slot, and appears in no ladder.
 import { useEffect, useMemo, useState, type CSSProperties, type ReactNode } from "react";
 import { Button } from "@/components/ui/button";
-import CardHead, { RIGHT_CARD } from "@/components/CardHead";
-import { Card } from "@/components/ui/card";
+import CardHead, { RailPane } from "@/components/CardHead";
 import { IdentityDot } from "@/components/inspector/parts";
 import { useStore } from "@/src/store/store";
 import { metaSnapDeepKey } from "@/src/data/types";
 import type { NodeRow } from "@/src/data/types";
 import { getNetwork, matchSignerRow, metagraphById, shortHash } from "@/src/data/network";
+import { UNLISTED_HUE } from "@/src/data/unlisted";
 import { snapsAtTick } from "@/src/data/anchorLog";
 import { fmtDag, fmtKB } from "@/src/util/format";
 import { relativeAge } from "@/src/util/relativeAge";
 import { useMinHold } from "@/components/useMinHold";
+import { useNowTick } from "@/components/useNowTick";
 import { subjectPairing } from "@/components/useSubjectPairing";
 import { hoverKeyOf } from "@/src/data/hoverSubject";
 import { identityHudHex } from "@/src/palette/identity";
 import { PulseEdge, useEdgePulse } from "@/components/EdgePulse";
 import { METASNAP_ICON, KIND_MARK_CLASS } from "@/components/icons";
+import { followToggleActions } from "@/src/engine/domain/pickActions";
+import { applyClickActions } from "@/src/store/applyClickActions";
 import { cn } from "@/lib/utils";
 
 // The two body-row shapes the house already uses, side by side because this card carries both
@@ -60,6 +63,7 @@ export default function MetaSnapPane({
   const exact = useStore((s) => (sel ? s.snapshotExact[sel.globalOrdinal] : undefined));
   const deep = useStore((s) => (sel ? s.metaSnapDeep[metaSnapDeepKey(sel.globalOrdinal, sel.metaId, sel.ordinal)] : undefined));
   const following = useStore((s) => s.following);
+  const snap = useStore((s) => s.snap);
   const setSection = useStore((s) => s.setSection);
   // Spec §5.3's pairing runs on the EXISTING node-hover channel — a hover, never a selection, so
   // this card stays outside the one-selection-write-path rule.
@@ -104,18 +108,43 @@ export default function MetaSnapPane({
   const signers = deep?.signers ?? row?.signers ?? null;
 
   const pulseKey = useEdgePulse(sel ? `${sel.metaId}:${sel.ordinal}` : null);
+  // The metagraph snapshot is exactly as LIVE as the global while following (advanceMetaSnap
+  // rides the same heartbeat), so its aside speaks the SAME language as SnapshotAside: beating
+  // dot + a ticking `live · Xs ago` counter, tap-to-toggle through the same tested follow table.
+  const now = useNowTick(1000);
 
   if (!sel) return null;
   const cfg = metagraphById(sel.metaId);
-  // An UNLISTED metagraph has no config row — its address is the only name it has.
+  // An UNLISTED metagraph has no config row — its address is the only name it has, and its hue
+  // is the unlisted set's NEUTRAL gray (2026-08-08: hashing the address through the identity
+  // palette minted a random hue per channel — pink icons for a set that deliberately has no
+  // identity of its own).
   const ticker = cfg?.ticker || cfg?.name || shortHash(sel.metaId);
-  const hue = identityHudHex(sel.metaId);
-  const age = relativeAge(Date.now() - Date.parse(sel.ts));
+  const hue = cfg ? identityHudHex(sel.metaId) : UNLISTED_HUE;
+  const rel = relativeAge(now - Date.parse(sel.ts));
+  const asideCls = "inline-flex items-center gap-1.5 text-label text-muted-foreground whitespace-nowrap";
+  const aside = (
+    <button
+      type="button"
+      aria-pressed={following}
+      title={following ? "Stop following the live snapshot" : "Follow the live snapshot"}
+      className={cn(asideCls, "rounded-xs hover:text-foreground transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary/60")}
+      onClick={() => snap && applyClickActions(followToggleActions(snap, following))}
+    >
+      {following ? (
+        <>
+          <span className="w-2 h-2 rounded-full bg-primary shadow-[0_0_0_3px_color-mix(in_oklch,var(--primary)_30%,transparent)] animate-dot-beat motion-reduce:animate-none" />
+          {rel ? `live · ${rel}` : "live"}
+        </>
+      ) : (
+        <>◷ {rel}</>
+      )}
+    </button>
+  );
 
   return (
-    <Card asChild className={cn(RIGHT_CARD, "sig-left")}>
-      <aside>
-        <CardHead
+    <RailPane entry={collapsed}>
+      <CardHead
           eyebrow="Metagraph snapshot"
           title={
             <span className="inline-flex items-center gap-2 min-w-0">
@@ -126,7 +155,7 @@ export default function MetaSnapPane({
             </span>
           }
           titleKey={`${sel.metaId}:${sel.ordinal}`}
-          aside={age ? <span className="text-micro text-muted-foreground">{age}</span> : undefined}
+          aside={aside}
           onClose={onClose}
           collapsed={collapsed}
           onToggle={onToggle}
@@ -241,8 +270,7 @@ export default function MetaSnapPane({
           </div>
         )}
         <PulseEdge pulseKey={pulseKey} rail="right" />
-      </aside>
-    </Card>
+    </RailPane>
   );
 }
 

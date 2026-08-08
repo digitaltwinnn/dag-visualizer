@@ -6,9 +6,9 @@ import ExplorerShell from "@/components/ExplorerShell";
 import { SelectedRowMark, selectedRow } from "@/components/selection";
 import { subjectPairing } from "@/components/useSubjectPairing";
 import { useSnapshotFeed } from "@/components/useSnapshotFeed";
-import { getNetwork, getAnchor, filterAccent, metagraphById } from "@/src/data/network";
+import { getNetwork, getAnchor, filterAccent, metagraphById, shortHash } from "@/src/data/network";
 import { storyCount, tickInStory } from "@/src/data/ledgerStory";
-import { displayNetwork, unlistedLog, UNLISTED_ID, LISTED_IDS } from "@/src/data/unlisted";
+import { displayNetwork, unlistedLog, UNLISTED_ID, UNLISTED_HUE, LISTED_IDS } from "@/src/data/unlisted";
 import type { GlobalSnapshot } from "@/src/data/types";
 import { latestRelevant } from "@/src/data/follow";
 import { identityHudHex } from "@/src/palette/identity";
@@ -72,6 +72,7 @@ function SnapRow({
   accent,
   title,
   onClick,
+  sub,
   mark,
 }: {
   label: string;
@@ -83,6 +84,11 @@ function SnapRow({
   accent: string;
   title: string;
   onClick: () => void;
+  /** Trailing muted mono marker (the cohort id-row idiom): real per-row info — the unlisted
+   *  rows carry their channel's short ADDRESS here, because the group interleaves several
+   *  channels' independent ordinal sequences and the bare numbers read as out-of-order
+   *  (user, 2026-08-08). */
+  sub?: string;
   /** The committed network's anchor count in this tick, in its hue — absent = the network is
    *  not in this tick's story (and clicking would release the filter; user, 2026-08-07). */
   mark?: { hue: string; count: number } | null;
@@ -107,6 +113,7 @@ function SnapRow({
       <span className="flex-1 min-w-0 text-body tabular-nums text-foreground whitespace-nowrap overflow-hidden text-ellipsis">
         {label}
       </span>
+      {sub && <span className="flex-none font-mono text-micro text-muted-foreground">{sub}</span>}
       {mark && (
         <span className="flex-none tabular-nums text-label font-semibold" style={{ color: mark.hue }}>
           {mark.count}
@@ -385,7 +392,7 @@ export default function LedgerPanel() {
                   onHoverEnter={() => setHoverFilter(UNLISTED_ID)}
                   onHoverLeave={() => setHoverFilter(null)}
                 >
-                  <IdentityDot hue="var(--core)" />
+                  <IdentityDot hue={UNLISTED_HUE} />
                   <span className="flex-1 min-w-0 text-body text-foreground italic whitespace-nowrap overflow-hidden text-ellipsis">
                     unlisted
                   </span>
@@ -399,12 +406,16 @@ export default function LedgerPanel() {
                         <SnapRow
                           key={`${r.global.ordinal}:${r.metaId}:${i}`}
                           label={r.ordinal > 0 ? r.ordinal.toLocaleString() : `${r.metaId.slice(0, 10)}…`}
+                          // Each unlisted row's ordinal belongs to ITS OWN channel's sequence —
+                          // the group interleaves several chains, so the short address says
+                          // which chain a number counts on (2026-08-08).
+                          sub={r.ordinal > 0 ? shortHash(r.metaId) : undefined}
                           metric={fmtKB(r.sizeInKB)}
                           selected={isSel}
                           hoverOrd={hoverSnapOrd}
                           pairOrd={r.global.ordinal}
                           setHoverOrd={setHoverSnapOrd}
-                          accent="var(--core)"
+                          accent={UNLISTED_HUE}
                           title={`Unlisted channel ${r.metaId} · anchored into global #${r.global.ordinal}`}
                           onClick={() =>
                             applyClickActions(
@@ -537,7 +548,7 @@ export default function LedgerPanel() {
                               onMouseEnter={() => setHoverFilter(UNLISTED_ID)}
                               onMouseLeave={() => setHoverFilter(null)}
                             >
-                              <IdentityDot hue="var(--core)" />
+                              <IdentityDot hue={UNLISTED_HUE} />
                               <span className="flex-1 min-w-0 text-body text-foreground italic whitespace-nowrap overflow-hidden text-ellipsis">
                                 unlisted
                               </span>

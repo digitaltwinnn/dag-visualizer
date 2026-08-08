@@ -4,6 +4,7 @@ import { NetworkData, shortHash } from "@/src/data/api";
 import { METAGRAPHS, COLORS as RAW_COLORS, DEFAULT_META_COLOR as RAW_DEFAULT_META } from "@/src/engine/config";
 import { hex } from "@/src/util/format";
 import { identityHudNumber } from "@/src/palette/identity";
+import { UNLISTED_ID, UNLISTED_HUE } from "@/src/data/unlisted";
 import { pickNetId } from "@/src/engine/domain/pickActions";
 
 export { shortHash };
@@ -146,8 +147,12 @@ export function metagraphById(id: string): MetagraphConfig | null {
 }
 
 // The accent colour for the active network filter, as a CSS colour string — the selected
-// core's colour (metagraph or the DAG's own brand hue), or the network cyan for "all".
+// core's colour (metagraph or the DAG's own brand hue), the unlisted set's neutral gray, or
+// the network cyan for "all". (The unlisted import is a deferred-call cycle with unlisted.ts's
+// own metagraphById import — both only dereference inside function bodies, so module init is
+// safe; the id-literal boundary test requires importing rather than re-stating the string.)
 export function filterAccent(filter: string): string {
+  if (filter === UNLISTED_ID) return UNLISTED_HUE;
   const cfg = metagraphById(filter);
   if (cfg) return hex(cfg.color);
   return "var(--primary)";

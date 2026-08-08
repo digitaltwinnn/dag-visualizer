@@ -12,7 +12,7 @@ import type { SceneColors } from "../../sceneColors";
 import type { PickDescriptor } from "@/src/data/types";
 import { METAGRAPHS } from "../../config";
 import { BAR_H, BAR_D, BAR_LIFT, FLOOR_Y, LEAD_X } from "../../domain/ledgerLayout";
-import { UNLISTED_KEY, type BarSpec } from "../../domain/ledgerBands";
+import { type BarSpec } from "../../domain/ledgerBands";
 import { SLOT_SP, SLOT_N } from "../../domain/ledgerModel";
 import { RIBBON_DIM } from "./Ribbons";
 
@@ -123,7 +123,9 @@ export class ByteBar {
       mesh.scale.set(BAR_D, 1, w);
       mesh.position.set(x, y, band.z0 + w / 2);
       const identityHex =
-        band.key === UNLISTED_KEY ? this._neutral : (this._sceneColors[band.key] ?? this._neutral);
+        // The scene-color map carries EVERY drawable id incl. the unlisted gray (Engine's
+        // sceneColorsFor, 2026-08-08 — the old UNLISTED_KEY→neutral branch made unlisted cyan).
+        this._sceneColors[band.key] ?? this._neutral;
       s.mats[i].color.setHex(identityHex);
       mesh.userData.pick = pick;
       mesh.userData.bandKey = band.key;
