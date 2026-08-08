@@ -69,10 +69,12 @@ export const RIGHT_CARD = "relative block w-auto pointer-events-auto [--spine:tr
 // horizontal pad matches RIGHT_CARD's flat pad so entry titles align with box content. It wears a
 // solid-leaning glass (user, 2026-08-08, twice-strengthened — bare text, then the faint `--panel`
 // fill, both fought the bright 3D scene): `--panel-solid` + light blur, NO border/shadow (a border
-// would re-box it); the ladder's distance-dim rides the rung wrapper's opacity, so the fill still
-// fades with depth exactly like the text.
+// would re-box it). The ladder's distance-dim rides `--entry-dim` (set by Inspector's rung
+// wrapper) so fill + text fade together — and HOVER RELEASES it (user, 2026-08-08: a hover
+// previews the materialization; full expand-on-hover was rejected — it shifts layout under the
+// pointer): the entry lifts to full luminance while hovered, the click does the actual expand.
 const RAIL_ENTRY =
-  "rail-entry relative block w-auto pointer-events-auto [--spine:transparent] px-[18px] py-1.5 min-h-0 flex-none rounded-md bg-[var(--panel-solid)] [backdrop-filter:blur(10px)]";
+  "rail-entry relative block w-auto pointer-events-auto [--spine:transparent] px-[18px] py-1.5 min-h-0 flex-none rounded-md bg-[var(--panel-solid)] [backdrop-filter:blur(10px)] opacity-[var(--entry-dim,1)] hover:opacity-100 transition-opacity duration-150 motion-reduce:transition-none";
 
 // The ONE right-rail pane frame — every facts-rail pane renders through this switch:
 //   • `entry` false → the full glass panel (Card baseline supplies `.ig-panel`; RIGHT_CARD the

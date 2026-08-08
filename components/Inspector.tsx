@@ -527,7 +527,10 @@ export default function Inspector() {
           ) : null;
         if (!body) return null;
         return (
-          <div key={id} data-depth={depth} data-focus={id === focusId ? "" : undefined} style={{ opacity: entryDim(id) }}>
+          // The distance-dim rides a VAR, not wrapper opacity (2026-08-08): the entry itself
+          // applies `opacity-[var(--entry-dim,1)]` and RELEASES it on hover (the materialize
+          // preview) — a wrapper opacity would clamp the hover lift from outside.
+          <div key={id} data-depth={depth} data-focus={id === focusId ? "" : undefined} style={{ ["--entry-dim" as string]: entryDim(id) } as CSSProperties}>
             {body}
           </div>
         );
