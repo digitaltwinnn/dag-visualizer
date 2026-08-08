@@ -1,85 +1,78 @@
 import { describe, it, expect } from "vitest";
 import * as THREE from "three";
+import { metaTrayLayout, dagTrayLayout, containerChipPos, type ContainerSpec } from "./ledgerRails";
 import {
-  RAIL_ORDER, railKindOf, visibleRails, railChipPos, railLayerId, railLit,
-  type RailKind,
-} from "./ledgerRails";
-import { railX, railY, RAIL_CAP, RAIL_CHIP_PITCH_Z, LANE_HALF_Z } from "./ledgerLayout";
+  CONT_X, CONT_TOP_GAP, CONT_CHIP_Z, CONT_ROW_Y, CONT_PAD, CONT_Z0, CONT_Z1,
+  FLOOR_Y, LANE_HALF_Z, lanePlaneHalf, ledgerSite,
+} from "./ledgerLayout";
 
-const counts = (o: Partial<Record<RailKind, number>>) =>
-  new Map<RailKind, number>(Object.entries(o) as [RailKind, number][]);
+const LANES = ["a", "b", "c", "unlisted"] as const;
 
-describe("railKindOf", () => {
-  it("partitions machines by make-up, each machine on exactly one rail", () => {
-    expect(railKindOf(["l0", "cl1", "dl1"])).toBe("hybrid");
-    expect(railKindOf(["l0", "dl1"])).toBe("hybrid");
-    expect(railKindOf(["dl1"])).toBe("l1only");
-    expect(railKindOf(["cl1"])).toBe("l1only");
-    expect(railKindOf(["l0"])).toBe("l0only");
+describe("metaTrayLayout (one tray per metagraph plane, 2026-08-07)", () => {
+  it("gives each counted metagraph ONE tray on its own lane, spanning its plane", () => {
+    const specs = metaTrayLayout(new Map([["a", 3], ["c", 25]]), LANES);
+    expect([...specs.keys()]).toEqual(["a", "c"]);
+    const hz = lanePlaneHalf(LANES.length);
+    const a = specs.get("a")!;
+    expect(a.hz).toBeCloseTo(hz, 6);
+    expect(a.cz).toBeCloseTo(ledgerSite(0, LANES.length).z, 6);
+    expect(specs.get("c")!.cz).toBeCloseTo(ledgerSite(2, LANES.length).z, 6);
   });
 
-  it("returns null for a machine with no ledger-relevant role", () => {
-    expect(railKindOf([])).toBeNull();
-    expect(railKindOf(["unknown"])).toBeNull();
-  });
-});
-
-describe("visibleRails", () => {
-  it("keeps the fixed order and hides empty rails so the rest collapse up", () => {
-    expect(visibleRails(counts({ l1only: 19, hybrid: 3, l0only: 0 }))).toEqual(["l1only", "hybrid"]);
-    expect(visibleRails(counts({ hybrid: 3 }))).toEqual(["hybrid"]);
-    // The DAG's own validators: L0-only and L1-only machines, no hybrids — the same rule, a
-    // different outcome.
-    expect(visibleRails(counts({ l1only: 40, l0only: 160 }))).toEqual(["l1only", "l0only"]);
-    expect(visibleRails(counts({}))).toEqual([]);
-    expect([...RAIL_ORDER]).toEqual(["l1only", "hybrid", "l0only"]);
-  });
-});
-
-describe("railChipPos", () => {
-  it("lays chips along Z at the rail's own X, centred on the field", () => {
-    const out = new THREE.Vector3();
-    railChipPos("meta", 1, 0, out);
-    expect(out.x).toBeCloseTo(railX(1), 6);
-    expect(out.y).toBeCloseTo(railY("meta", 0), 6);
-    expect(out.z).toBeCloseTo(-LANE_HALF_Z, 6);
-    railChipPos("meta", 1, 2, out);
-    expect(out.z).toBeCloseTo(-LANE_HALF_Z + 2 * RAIL_CHIP_PITCH_Z, 6);
+  it("skips laneless counts and machine-less lanes (the unknown lane never gets a tray)", () => {
+    const specs = metaTrayLayout(new Map([["a", 0], ["nope", 4], ["unlisted", 2]]), LANES.slice(0, 3));
+    expect(specs.size).toBe(0);
   });
 
-  it("wraps an over-long rail into a stacked row rather than running off the floor", () => {
-    const out = new THREE.Vector3();
-    railChipPos("dag", 0, RAIL_CAP, out);
-    expect(out.y).toBeCloseTo(railY("dag", 1), 6);
-    expect(out.z).toBeCloseTo(-LANE_HALF_Z, 6);
-  });
-
-  it("returns the out vector it was given", () => {
-    const out = new THREE.Vector3();
-    expect(railChipPos("meta", 0, 0, out)).toBe(out);
+  it("hangs under the msnap plane and wraps rows against ITS plane's width", () => {
+    const specs = metaTrayLayout(new Map([["c", 25]]), LANES);
+    const s = specs.get("c")!;
+    const top = FLOOR_Y.msnap - CONT_TOP_GAP;
+    expect(s.cy + s.hy).toBeCloseTo(top, 6);
+    expect(s.cols).toBe(Math.max(1, Math.floor((2 * s.hz - 2 * CONT_PAD) / CONT_CHIP_Z)));
+    expect(s.rows).toBe(Math.ceil(25 / s.cols));
+    expect(s.hy).toBeCloseTo((s.rows * CONT_ROW_Y + 2 * CONT_PAD) / 2, 6);
+    // The first chip sits on the top row, with the grid CENTRED in the tray.
+    expect(s.chipY0).toBeCloseTo(top - CONT_PAD - CONT_ROW_Y / 2, 6);
+    expect(s.chipZ0).toBeCloseTo(s.cz + (Math.min(25, s.cols) * CONT_CHIP_Z) / 2 - CONT_CHIP_Z / 2, 6);
   });
 });
 
-describe("railLayerId / railLit", () => {
-  it("names each rail's own layer, hybrid siding with the L0 that produces the floor below", () => {
-    expect(railLayerId("meta", "l1only")).toBe("ml1");
-    expect(railLayerId("meta", "hybrid")).toBe("ml0");
-    expect(railLayerId("meta", "l0only")).toBe("ml0");
-    expect(railLayerId("dag", "l1only")).toBe("hypl1");
-    expect(railLayerId("dag", "l0only")).toBe("hypl0");
+describe("dagTrayLayout (the single validator tray)", () => {
+  it("is ONE full-front-width tray under the global floor — machines once, roles ignored", () => {
+    const [s] = dagTrayLayout(240);
+    expect(s.key).toBe("dag");
+    expect(s.count).toBe(240);
+    expect(s.cz).toBeCloseTo((CONT_Z0 + CONT_Z1) / 2, 6);
+    expect(s.hz).toBeCloseTo((CONT_Z1 - CONT_Z0) / 2, 6);
+    expect(2 * s.hz).toBeGreaterThan(2 * LANE_HALF_Z); // full width, not a lane slice
+    expect(s.cy + s.hy).toBeCloseTo(FLOOR_Y.gl0 - CONT_TOP_GAP, 6);
   });
 
-  it("lights rails by OVERLAP — the hybrid rail answers to both rungs", () => {
-    expect(railLit("ml1", "meta", "l1only")).toBe(true);
-    expect(railLit("ml1", "meta", "hybrid")).toBe(true);
-    expect(railLit("ml1", "meta", "l0only")).toBe(false);
-    expect(railLit("ml0", "meta", "l0only")).toBe(true);
-    expect(railLit("ml0", "meta", "hybrid")).toBe(true);
-    expect(railLit("ml0", "meta", "l1only")).toBe(false);
-    expect(railLit("hypl0", "dag", "l0only")).toBe(true);
-    expect(railLit("hypl1", "dag", "l1only")).toBe(true);
-    // A rung on the other group's floor never lights these rails.
-    expect(railLit("hypl0", "meta", "hybrid")).toBe(false);
-    expect(railLit("msnap", "meta", "hybrid")).toBe(false);
+  it("returns nothing for an empty fleet", () => {
+    expect(dagTrayLayout(0)).toEqual([]);
+  });
+});
+
+describe("containerChipPos", () => {
+  const spec = (): ContainerSpec => dagTrayLayout(9)[0];
+
+  it("fills row-major from the top-left, marching screen-right (−Z)", () => {
+    const s = spec();
+    const p = new THREE.Vector3();
+    containerChipPos(s, 0, p);
+    expect(p.x).toBeCloseTo(CONT_X, 6);
+    expect(p.y).toBeCloseTo(s.chipY0, 6);
+    expect(p.z).toBeCloseTo(s.chipZ0, 6);
+    containerChipPos(s, 1, p);
+    expect(p.z).toBeCloseTo(s.chipZ0 - CONT_CHIP_Z, 6);
+    containerChipPos(s, s.cols, p); // first chip of the second row
+    expect(p.y).toBeCloseTo(s.chipY0 - CONT_ROW_Y, 6);
+    expect(p.z).toBeCloseTo(s.chipZ0, 6);
+  });
+
+  it("reuses the caller's vector", () => {
+    const p = new THREE.Vector3();
+    expect(containerChipPos(spec(), 3, p)).toBe(p);
   });
 });

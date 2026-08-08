@@ -59,42 +59,60 @@ export default function RawSnapshotBridge() {
   const liveOrd = useStore((s) => s.latestSnapshot?.ordinal ?? null);
   const selOrd = useStore((s) => s.snap?.data.ordinal ?? null);
   const deepSel = useStore((s) => s.metaSnap);
+  const following = useStore((s) => s.following);
   const backfilled = useRef(false);
 
   useEffect(() => ensure(liveOrd), [liveOrd]);
   useEffect(() => ensure(selOrd), [selOrd]);
 
-  // One-shot, on the first live tick.
+  // One-shot, on the first live tick. The timer lives in a ref and is NOT cleaned per dep
+  // change (2026-08-08, review fix): the queue takes ~3.6s+ and the next tick lands in ~4s,
+  // so a dep-scoped cleanup routinely truncated the backfill and left trail rows unmeasured.
+  const backfillTimer = useRef<ReturnType<typeof setInterval> | null>(null);
   useEffect(() => {
     if (backfilled.current || liveOrd == null) return;
     backfilled.current = true;
     const queue = backfillOrdinals(liveOrd, useStore.getState().snapshotExact);
     let i = 0;
-    const timer = setInterval(() => {
+    backfillTimer.current = setInterval(() => {
       if (i >= queue.length) {
-        clearInterval(timer);
+        if (backfillTimer.current) clearInterval(backfillTimer.current);
+        backfillTimer.current = null;
         return;
       }
       ensure(queue[i++]);
     }, BACKFILL_GAP_MS);
-    return () => clearInterval(timer);
   }, [liveOrd]);
+  useEffect(
+    () => () => {
+      if (backfillTimer.current) clearInterval(backfillTimer.current);
+    },
+    [],
+  );
 
   // The deeper read: only ever for the ONE selected metagraph snapshot, never a poll.
   useEffect(() => {
     if (!deepSel) return;
-    const key = metaSnapDeepKey(deepSel.globalOrdinal, deepSel.metaId);
+    // The decode rule is CLICK-scoped (user, 2026-08-07): while following, the shown snapshot
+    // was never clicked — fetching its ~2.5 MB decode per tick would turn the explicit-gesture
+    // route into a poll. `following` is a DEPENDENCY, not just a guard: pinning via the LIVE
+    // control (no metaSnap change) must fire the decode for the snapshot already on screen.
+    if (following) return;
+    const key = metaSnapDeepKey(deepSel.globalOrdinal, deepSel.metaId, deepSel.ordinal);
     const st = useStore.getState();
     if (st.metaSnapDeep[key] || deepInflight.has(key)) return;
     deepInflight.add(key);
-    fetch(`/api/snapshot/${deepSel.globalOrdinal}/channel/${deepSel.metaId}`)
+    fetch(`/api/snapshot/${deepSel.globalOrdinal}/channel/${deepSel.metaId}?snap=${deepSel.ordinal}`)
       .then((r) => (r.ok ? (r.json() as Promise<ChannelSnapDeep>) : null))
       .then((d) => {
-        if (d && typeof d.ordinal === "number") st.setMetaSnapDeep(d);
+        // Store under the REQUESTED key: when the route fell back (an undecodable row asks
+        // with 0), the decode's own identity would file it where the card never reads — the
+        // decode itself stays untouched (2026-08-08: explicit key, no field override).
+        if (d && typeof d.ordinal === "number") st.setMetaSnapDeep(d, key);
       })
       .catch(() => {})
       .finally(() => deepInflight.delete(key));
-  }, [deepSel]);
+  }, [deepSel, following]);
 
   return null;
 }

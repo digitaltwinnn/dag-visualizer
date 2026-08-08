@@ -45,7 +45,11 @@ const _vec = new THREE.Vector3();
 const _geoVec = new THREE.Vector3(); // scratch for the morph-fly interpolation
 const _gatherV = new THREE.Vector3(); // scratch: a node's world-space staging-grid position
 const _qSpin = new THREE.Quaternion();   // hypergraph tumble
-const _qRadial = new THREE.Quaternion(); // outward-facing (globe) orientation
+const _qRadial = new THREE.Quaternion();
+// Ledger containers face the camera (ledger-local +X == world +Z after the baked view rotation),
+// so a chip lies with its CAP toward the viewer — same orientation as its tray (user, 2026-08-07:
+// upright chips read as "flat" against the vertical tray face). Cylinder axis Y → world Z.
+const _qLedgerChip = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), Math.PI / 2); // outward-facing (globe) orientation
 const _col = new THREE.Color();          // scratch colour for dim recolouring
 
 // A pick's optional geo country code (only l0/l1/metanode descriptors carry geo).
@@ -359,12 +363,12 @@ export class NodeFabric {
         } else {
           if (u.noGeo) _vec.copy(u.hyperPos);
           else _vec.copy(u.hyperDir).lerp(u.geoDir!, e).normalize().multiplyScalar(lerp(u.hyperRadius, u.geoRadius, e));
-          let showL = 1 - dim * dimScaleV;
-          showL += (1 - showL) * gw; // the square shows the WHOLE fleet — dim-hidden nodes lift in
           _dummy.position.copy(_vec).lerp(u.ledgerPos, ledgerT);
-          _dummy.quaternion.identity(); // standing on the floor — cylinder axis is +Y
-          const sL = u.hyperSize * LEDGER.dot * showL;
-          _dummy.scale.set(sL, HEX_H * showL, sL);
+          _dummy.quaternion.copy(_qLedgerChip); // cap toward the camera, like the tray face
+          // UNIFORM chip size — dim is EMISSIVE-only, like hyper (user, 2026-08-07; the old
+          // dim-shrink was the committed-lane emphasis, retired with the fixed lane field).
+          const sL = u.hyperSize * LEDGER.dot;
+          _dummy.scale.set(sL, HEX_H, sL);
           this._applyGather(ctx, u.gU, u.gV, gw, prim);
         }
         _dummy.updateMatrix();
@@ -550,13 +554,12 @@ export class NodeFabric {
         if (r.ledgerHide) {
           _dummy.scale.setScalar(0);
         } else {
-          // Ledger: a standing CHIP on the floor plane (the geo cylinder, HEX_H tall — see the
-          // validator loop) — same size rule as the validators (uniform dot for every cluster).
-          // Filtered-out nodes shrink out (1 - dEff).
-          _dummy.quaternion.identity(); // standing on the floor — cylinder axis is +Y
-          const visL = (1 - dEff) + dEff * gw; // parked squares show the whole fleet
-          const sL = r.hyperSize * LEDGER.dot * visL;
-          _dummy.scale.set(sL, HEX_H * visL, sL);
+          // Ledger: a CHIP in its tray (the geo cylinder, HEX_H tall — see the validator loop),
+          // UNIFORM size for every machine — dim is EMISSIVE-only, like hyper (user, 2026-08-07;
+          // the old dim-shrink was the committed-lane emphasis, retired with the fixed field).
+          _dummy.quaternion.copy(_qLedgerChip); // cap toward the camera, like the tray face
+          const sL = r.hyperSize * LEDGER.dot;
+          _dummy.scale.set(sL, HEX_H, sL);
           this._applyGather(ctx, r.gU, r.gV, gw, prim);
         }
         _dummy.updateMatrix();

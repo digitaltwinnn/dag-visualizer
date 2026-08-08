@@ -3,21 +3,26 @@ import Stats from "stats.js";
 import { useStore, type Mode } from "@/src/store/store";
 import { applyClickActions } from "@/src/store/applyClickActions";
 import { metagraphById, initNetwork, getNetwork, getAnchor, DEFAULT_META_COLOR, resolveSignerIps } from "@/src/data/network";
+import { tickInStory } from "@/src/data/ledgerStory";
+import { LISTED_IDS } from "@/src/data/unlisted";
 import { hoverKeyOf, tooltipSubject } from "@/src/data/hoverSubject";
 import { identityMap, identitySceneHex } from "@/src/palette/identity";
 import { createScene, type SceneCtx } from "./scene/SceneContext";
 import { HyperView, type MetaHubRec } from "./scene/views/HyperView";
 import { Globe, GATHER_CELL } from "./scene/Globe";
 import { LedgerView } from "./scene/views/LedgerView";
+import { LANE_IDS } from "./domain/ledgerModel";
+import { UNLISTED_KEY } from "./domain/ledgerBands";
+
+// The public catalog's ids — the unknown-lane tile resolver splits listed from unlisted rows.
 import { StageLights } from "./scene/objects/StageLights";
 import { loadGeoCache, resolveMissing } from "@/src/data/geoResolve";
 import { METAGRAPHS, COLORS } from "@/src/engine/config";
-import { LEDGER, LAYER_GEOM, railX, BYTE_SCALE_KB, type RailGroup } from "./domain/ledgerLayout";
-import { railLit } from "./domain/ledgerRails";
+import { BYTE_SCALE_KB, LEDGER, ledgerSite, type RailGroup } from "./domain/ledgerLayout";
 import { HYPER_TILT, HYPER_TILT_FOCUS } from "./domain/hyperLayout";
 import { readSceneColors } from "./sceneColors";
 import { VIEW_POLICIES, type ViewPolicy } from "./domain/viewPolicy";
-import { FOCI, hubFraming, geoFraming, ledgerFloorFraming, ledgerRailFraming, ledgerNodeFraming, nodeFraming, cohortFraming, hyperNodeFraming, dollyBack, easeInOutQuad, type CameraFraming } from "./domain/cameraRig";
+import { FOCI, hubFraming, geoFraming, ledgerNodeFraming, ledgerLaneNudge, nodeFraming, cohortFraming, hyperNodeFraming, dollyBack, easeInOutQuad, type CameraFraming } from "./domain/cameraRig";
 import { countryFraming } from "./domain/countryShape";
 import { R as GEO_R, LAND_H } from "./domain/geoLayout";
 import { clickActions, pickActive, pickNetId, viewEntryActions, metaSnapSelectActions, bandSelectActions } from "./domain/pickActions";
@@ -26,7 +31,7 @@ import { LADDERS, hasLevel, type CohortSel, type CompositionSel, type SelectionS
 import { compositionGroups, compositionKey, compositionRows } from "@/src/data/composition";
 import { metaSnapDeepKey } from "@/src/data/types";
 import { snapsAtTick } from "@/src/data/anchorLog";
-import type { CurrencyActivity, GlobalSnapshot, NodeRow, PickDescriptor } from "@/src/data/types";
+import type { GlobalSnapshot, NodeRow, PickDescriptor } from "@/src/data/types";
 import type { ClusterNode, DagCore, GeoMap, RouteMetagraph } from "@/src/data/types";
 
 type Vec = THREE.Vector3;
@@ -136,8 +141,6 @@ export class Engine {
   // Metagraph ids with locatable nodes (selectable hubs); null until counts load (all allowed).
   private _activeMetaIds: Set<string> | null = null;
   private _lastFlashOrdinal = -1; // de-dupes the core flash to genuinely new global snapshots
-  // While a layer is committed the 3D floor planes stop being pick targets (panel-only switching).
-  private _layerCommitted = false;
   // The focused metagraph's hub record, cached on filter/mode change — kills the per-frame
   // `metas.find` the DoF read used to do every frame (Task 15 allocation fix).
   private _dofMeta: MetaHubRec | null = null;
@@ -185,6 +188,8 @@ export class Engine {
   // No param → stays 1 → the whole mechanism is a no-op, so the parse itself is the dev/prod gate
   // (unlike `stats`, which toggles a visible DOM panel and so needs an explicit environment check).
   private _slowmo = 1;
+  // The ?tune live-tuning panel's handle (devTune.ts) — dev tooling, disposed with the engine.
+  private _devTune?: { dispose(): void };
   // Fired once, after the first frame actually renders (see start()'s loop) — lets callers
   // (SceneCanvas → store.engineReady) know the scene has painted, not just constructed.
   private _onReady?: () => void;
@@ -233,21 +238,40 @@ export class Engine {
     // config colour ("dag" included — its own brand hue, distinct from structural cyan; see
     // palette/identity.ts). refreshMeta below refreshes/extends both once the live set is known.
     const initialSceneColors = sceneColorsFor([...METAGRAPHS.map((m) => m.id), "dag"]);
-    this.ledger = new LedgerView(this.ctx.scene, colors, initialSceneColors, this._stageLights);
+    this.ledger = new LedgerView(this.ctx.scene, colors, initialSceneColors);
     // A tile's identity comes from the POLLED feed (spec §6.1) — the Engine is the store/data
     // bridge, so the lookup lives here and the model stays pure. A tile the buffer can't name is
     // anonymous: drawn, but not pickable. `k` is the tile's index within ITS TICK.
     this.ledger.setTileResolver((metaId, ts, k) => {
       const net = getNetwork();
       if (!net) return null;
-      const s = snapsAtTick(net.metaSnaps, metaId, ts)[k];
-      if (!s) return null;
       const g = net.globalSnapshots.find((gs) => gs.timestamp === ts);
       if (!g) return null;
+      const global = {
+        kind: "snapshot",
+        data: g,
+        title: `Global snapshot #${g.ordinal}`,
+      } as Extract<PickDescriptor, { kind: "snapshot" }>;
+      if (metaId === UNLISTED_KEY) {
+        // The UNKNOWN lane's tiles (user, 2026-08-07: inspectable like any other): the exact
+        // read is the only source that knows the unlisted channels — resolve tile `k` to the
+        // k-th unlisted row, whose real state-channel ADDRESS becomes the metaSnap subject
+        // (the deep read works for any address; the card names it by its address).
+        const ex = useStore.getState().snapshotExact[g.ordinal];
+        const row = ex?.rows?.filter((r) => !LISTED_IDS.has(r.metaId))[k];
+        if (!row) return null;
+        return {
+          kind: "metaSnap",
+          sel: { metaId: row.metaId, ordinal: row.ordinal, hash: "", globalOrdinal: g.ordinal, ts },
+          global,
+        };
+      }
+      const s = snapsAtTick(net.metaSnaps, metaId, ts)[k];
+      if (!s) return null;
       return {
         kind: "metaSnap",
         sel: { metaId, ordinal: s.ordinal, hash: s.hash, globalOrdinal: g.ordinal, ts },
-        global: { kind: "snapshot", data: g, title: `Global snapshot #${g.ordinal}` },
+        global,
       };
     });
     // The globe colours the DAG's own validator nodes (the L0/cL1 shells) with sceneColors["dag"]
@@ -280,12 +304,21 @@ export class Engine {
     const smVal = smMatch ? parseFloat(smMatch[1]) : NaN;
     this._slowmo = Number.isFinite(smVal) && smVal > 0 ? Math.min(20, Math.max(0.1, smVal)) : 1;
 
+    // Live tuning panel — `?tune` (the ?stats idiom): tweakpane is dynamically imported so it
+    // never enters the normal bundle; the panel binds the scene's *TUNE_DEFAULTS-backed objects.
+    if (/[?#&]tune/.test(window.location.search + window.location.hash)) {
+      import("./devTune").then(async (m) => {
+        if (this.disposed) return;
+        this._devTune = await m.mountDevTune({ ledger: this.ledger });
+        if (this.disposed) this._devTune.dispose();
+      });
+    }
+
     // Apply current store state, then react to changes (Lane B command bridge).
     const s = useStore.getState();
     this.mode = s.mode;
     this.filter = s.filter;
     this.cohortSel = s.cohort;
-    this._layerCommitted = s.layer != null; // seed — subscription only sees CHANGES (HMR remount)
     // Booting straight into geo (deep link / persisted view): seed morph=1 so the boot layout
     // is the globe from the first frame.
     if (this.mode === "geo") this.morph = 1;
@@ -317,6 +350,9 @@ export class Engine {
           // A metagraph snapshot belongs to exactly ONE network, so a switch can only orphan it.
           if (st.metaSnap) useStore.getState().setMetaSnap(null);
           this.applyFilter();
+          // (Committing a METAGRAPH in the ledger turns LIVE MODE on for it — the
+          // FollowController owns that flow now, 2026-08-07: following flips true and
+          // followLatest rides the whole card chain on the heartbeat.)
         }
         // Country drill-down is geo-only — gate on the view so a re-entrant clear
         // (e.g. from setMode while switching away) can't run a geo focus in hyper.
@@ -350,8 +386,17 @@ export class Engine {
         if (st.inspect !== prev.inspect && st.mode === "ledger") this._resolveFocus();
         // Ledger: keep the hovered/selected snapshot coloured in the trail (hover wins, then the
         // clicked `snap`); everything else fades to the neutral background tone.
-        if (st.hoverSnapOrd !== prev.hoverSnapOrd || st.snap !== prev.snap) {
-          this.ledger.setSelected(st.hoverSnapOrd ?? st.snap?.data?.ordinal ?? null);
+        if (st.hoverSnapOrd !== prev.hoverSnapOrd || st.snap !== prev.snap || st.following !== prev.following) {
+          // COMMITTED and HOVER ride separate channels (user, 2026-08-07): the committed row is
+          // the hot one, the hover is a colored-dim PREVIEW that never demotes it, and the
+          // REWIND follows only the committed pin (a hover must never drag the trail).
+          this.ledger.setSelected(st.snap?.data?.ordinal ?? null);
+          this.ledger.setHovered(st.hoverSnapOrd ?? null);
+          // The rewind tracks the shown snapshot in EVERY committed state (2026-08-07): a pin,
+          // or the filtered live follow — where the card sits on the network's newest ANCHORED
+          // tick, the trail holds that row at the front and only advances when the network
+          // anchors again (following "all" the shown snap IS the lead, so the offset is 0).
+          this.ledger.setPinned(st.snap?.data?.ordinal ?? null);
         }
         // A landing EXACT read is what turns a tick from an unmeasured seam into a measured byte
         // bar (spec §6.3), so re-hand the map the moment it changes. Ledger-only: nothing else
@@ -376,7 +421,7 @@ export class Engine {
           const sel = st.metaSnap;
           if (!sel) this.globe.setSignerIds(null);
           else {
-            const deep = st.metaSnapDeep[metaSnapDeepKey(sel.globalOrdinal, sel.metaId)];
+            const deep = st.metaSnapDeep[metaSnapDeepKey(sel.globalOrdinal, sel.metaId, sel.ordinal)];
             const ex = st.snapshotExact[sel.globalOrdinal];
             const row = ex?.rows?.find((r) => r.metaId === sel.metaId && r.ordinal === sel.ordinal);
             const signers = deep?.signers ?? row?.signers ?? null;
@@ -390,7 +435,7 @@ export class Engine {
         if (st.hoverFilter !== prev.hoverFilter) {
           this._hoverFilter = st.hoverFilter;
           this.globe.setHoverFilter(st.hoverFilter);
-          this.ledger.setHoverFilter(st.hoverFilter);
+          this.ledger.setHoverFilter(st.hoverFilter); // the colored-dim preview (same strength as commit)
         }
         // Geo explorer list-row hover → glow that node's shells on the globe (same as a 3D hover).
         if (st.hoverNodeId !== prev.hoverNodeId) this.globe.setHoverNode(st.hoverNodeId);
@@ -399,20 +444,8 @@ export class Engine {
         if (st.hoverCountry !== prev.hoverCountry) this.globe.setHoverCountry(st.hoverCountry);
         // Explorer cohort-row hover → glow the whole 3D stack (every member id together).
         if (st.hoverCohort !== prev.hoverCohort) this.globe.setHoverCohort(st.hoverCohort);
-        // Snapshots·Explore panel: the plane highlight = the transient hover PREVIEW, else the
-        // COMMITTED layer selection (the layer card) — same resolve idiom as hoverFilter ?? filter.
-        // Only a COMMITTED layer dims the other planes; a hover just brightens its own plane.
-        if (st.ledgerHilite !== prev.ledgerHilite || st.layer !== prev.layer) {
-          this.ledger.setHighlight(st.ledgerHilite ?? st.layer?.layerId ?? null, st.layer != null);
-        }
-        // While a layer is COMMITTED, the 3D planes stop being hover/click targets (see _pickAt) —
-        // in the zoomed layer-focus pose the planes fill the screen and every idle mouse move stole
-        // the committed highlight. Deliberate navigation stays: the panel rows + the card's ×.
-        this._layerCommitted = st.layer != null;
-        // Committing a layer flies the camera to the tilted layer-focus view of its plane (an
-        // exploration move — the resting ledger pose is central/untilted); clearing returns to the
-        // shared overview. Ledger-only: the planes exist nowhere else.
-        if (st.layer !== prev.layer && st.mode === "ledger") this._resolveFocus();
+        // (The layer-highlight subscription is RETIRED with the layer navigation, 2026-08-06 —
+        // the floors and containers are pure visual aid now.)
       }),
     );
 
@@ -454,19 +487,6 @@ export class Engine {
       this._buildGlobe();
       this._applyMetagraphs();
     });
-
-    // Whether each metagraph's own token is moving — the ledger's currency gutter (spec §6.7).
-    // Non-blocking and fetched ONCE: it's a slow-moving fact, and the gutter is honest without it
-    // (activityLine renders the NO SIGNAL wording for a missing entry).
-    fetch("/api/currency-activity")
-      .then((r) => (r.ok ? r.json() : null))
-      .then((j) => {
-        // event-time: one map per load. The route answers { items }, the view wants it keyed by id.
-        const byId: Record<string, CurrencyActivity | null> = {};
-        for (const it of (j?.items ?? []) as CurrencyActivity[]) byId[it.metaId] = it;
-        this.ledger.setCurrencyActivity(byId);
-      })
-      .catch(() => this.ledger.setCurrencyActivity({}));
 
     // Live metagraphs + their geolocated node IPs (server-side; Phase 6 route).
     await this.refreshMeta(true);
@@ -547,7 +567,7 @@ export class Engine {
    *  READ from Globe (it derives them while building the records the chips stand on) rather than
    *  mirrored in an Engine field, so the camera can never frame a rail the chips didn't populate. */
   private _pushRails() {
-    for (const g of ["meta", "dag"] as RailGroup[]) this.ledger.setRails(g, this.globe.railKinds(g));
+    for (const g of ["meta", "dag"] as RailGroup[]) this.ledger.setContainers(g, this.globe.containerSpecs(g));
   }
 
   // Push EVERY metagraph from the route data (not just the geo-filtered globe list) to
@@ -649,9 +669,8 @@ export class Engine {
     this.ctx.controls.minPolarAngle = policy.minPolarAngle;
     this.ctx.controls.enableRotate = true; // the 3D layer stack is meant to be looked around
     // View-scoped selections (focusLadder.LEVEL_CARRY): country + cohort live only in geo,
-    // composition only in hyper, layer only in ledger — clear them when the destination view
-    // isn't theirs, so no view-scoped card/framing lingers (the layer card used to follow into
-    // hyper/geo).
+    // composition only in hyper — clear them when the destination view isn't theirs, so no
+    // view-scoped card/framing lingers.
     const st0 = useStore.getState();
     if (mode !== "geo") {
       if (this.country != null) { this.country = null; this.globe.setCountry(null); }
@@ -659,7 +678,6 @@ export class Engine {
       if (st0.cohort != null) st0.setCohort(null);
     }
     if (mode !== "hyper" && st0.composition != null) st0.setComposition(null);
-    if (mode !== "ledger" && st0.layer != null) st0.setLayer(null);
     // The snapshot card is LEDGER-SCOPED too (spec 2026-08-01): the pin no longer carries out
     // of the view — leaving ledger clears it. `following` stays with the FollowController,
     // whose mode effect already flips it false outside ledger (no fight: with `following`
@@ -746,14 +764,10 @@ export class Engine {
       this.globe.focusDensest(false);
       this.ctx.controls.autoRotate = false;
       this.globe.setFilter(this.filter); // dim non-selected metagraph columns (no camera move)
-      this.ledger.setFilter(this.filter); // neutralise the other lanes' tiles/links
+      this.ledger.setFilter(this.filter); // gates the anchor pulses only (no dim)
       this._refreshLedger();
       // Ledger uses the SHARED overview camera — the group transform (config.viewRotY/viewScale)
-      // frames the resting pose central/untilted. A carried node re-commits its floor here (and
-      // an already-committed layer resumes its tilted layer-focus framing instead).
-      this._commitViewEntryAncestry(mode);
-      // That commit runs first (through the ONE executor), so the ladder's snapshot sees the
-      // layer — the node level still wins the camera if one is selected.
+      // frames the resting pose central/untilted; the node level wins the camera if one carried.
       this._resolveFocus();
       return;
     }
@@ -772,14 +786,13 @@ export class Engine {
   // Re-derive the destination view's own ancestry rungs for a node selection that carried into it
   // (domain/pickActions.viewEntryActions — the same table a click in this view runs), and apply
   // them through the ONE executor. View-scoped rungs are cleared on leaving their view, so this is
-  // what puts the country/provider (geo), the composition group (hyper) or the floor (ledger) back
-  // under the carried node instead of leaving its parent card slots on their ghosts.
+  // what puts the country/provider (geo) or the composition group (hyper) back under the carried
+  // node instead of leaving its parent card slots on their ghosts.
   private _commitViewEntryAncestry(mode: Mode) {
     const st = useStore.getState();
     const acts = viewEntryActions({
       mode,
       pick: st.inspect,
-      ledgerLayerId: st.layer?.layerId ?? null,
       compositionSel: this._compositionOf(st.inspect),
     });
     if (acts.length) applyClickActions(acts);
@@ -809,12 +822,10 @@ export class Engine {
       this.globe.setFilter(this.filter);
       if (focusCamera) this._resolveFocus();
     } else if (this.mode === "ledger") {
-      // Dim the non-selected metagraph columns so the selection stands out. The ledger neutralises
-      // the other lanes' tiles/links. A committed LAYER wins the camera (finer than network): its
-      // framing is lane-aware (centres the selected metagraph's lane), so a filter change re-runs
-      // it to slide over to the newly-selected lane. With no layer committed, the ladder's NETWORK
-      // rung frames the filtered metagraph's lane at its L0 floor (ledgerNetwork resolver, 2026-07-18
-      // — replaced the old fall-through to the overview pose); "all" still resolves to overview.
+      // Dim the non-selected metagraph columns so the selection stands out. The ledger only
+      // gates its anchor pulses (the off-filter dim was removed, 2026-08-07). The ladder's
+      // NETWORK rung frames the filtered metagraph's lane at the metagraph-snapshot floor
+      // (ledgerNetwork resolver); "all" resolves to overview.
       this.globe.setFilter(this.filter);
       this.ledger.setFilter(this.filter);
       if (focusCamera) this._resolveFocus();
@@ -916,21 +927,21 @@ export class Engine {
       const p = useStore.getState().inspect;
       return !!p && this._focusLedgerNode(p);
     },
-    ledgerLayer: () => {
-      const layerId = useStore.getState().layer?.layerId;
-      if (!layerId) return false;
-      return this._focusLayer(layerId);
-    },
     ledgerNetwork: () => {
-      // Frame the committed network's L0 rail column (user, 2026-07-18): camera-only — no
-      // store.layer commit, so the layer card stays a ghost. "dag" reads its own rail group.
-      return this._focusLayer(this.filter === "dag" ? "hypl0" : "ml0");
+      // The COMMIT ACKNOWLEDGEMENT (cameraRig.ledgerLaneNudge — no fly-to-lane; the colored
+      // dim carries the emphasis, the pose just says something happened).
+      const i = LANE_IDS.indexOf(this.filter);
+      const laneX = i >= 0 ? -ledgerSite(i, LANE_IDS.length).z * LEDGER.viewScale : null;
+      ledgerLaneNudge(FOCI.ledger, laneX, this._framingOut);
+      this._tweenTo(this._framingOut.pos, this._framingOut.target);
+      return true;
     },
     ledgerOverview: () => {
-      this.focus("overview");
+      this.focus("ledger"); // the frontal resting pose (FOCI.ledger, 2026-08-07)
       return true;
     },
   };
+
 
   // Resolve the camera for the CURRENT selection state by walking the current view's ladder
   // (domain/focusLadder.LADDERS) — the one entry point every selection-driven camera flight
@@ -945,7 +956,6 @@ export class Engine {
       cohort: st.cohort,
       composition: st.composition,
       country: this.country,
-      layerId: st.layer?.layerId ?? null,
       filter: this.filter,
     };
     for (const rung of LADDERS[this.mode]) {
@@ -953,9 +963,8 @@ export class Engine {
     }
   }
 
-  // Snapshots NODE zoom (user, 2026-07-17): the level after the layer zoom, mirroring geo's
-  // country→node ladder. Frames the selected node's chip in the chamber; false when the node
-  // can't be located (caller falls back to the layer framing).
+  // Snapshots NODE zoom (user, 2026-07-17): frames the selected node's chip in the chamber;
+  // false when the node can't be located (caller falls back down the ladder).
   private _focusLedgerNode(p: PickDescriptor): boolean {
     const id = p.kind === "metanode" ? p.node?.ip : p.kind === "l0" || p.kind === "l1" ? p.node?.id : null;
     const pos = id ? this.globe.ledgerWorldPos(id) : null;
@@ -1017,28 +1026,20 @@ export class Engine {
     // Return the first hit that's part of the current selection — nodes filtered out of the
     // geo view are hidden, so they shouldn't be clickable/hoverable either (Three's raycaster
     // ignores scale/visibility, so the inactive ones must be skipped explicitly).
-    // LAYER planes are FALLBACK picks: the big stacked floor planes sit between the camera and
-    // everything below them, so a distance-ordered "first hit" would let the top plane steal every
-    // pick. Content (blocks/nodes/hubs) wins; the nearest plane is returned only when nothing else
-    // was hit along the ray.
-    let layerFallback: PickDescriptor | null = null;
     this._hitObj = null;
     for (const h of hits) {
+      // A BLOCKER (the ledger's floor glass) is a normal surface: the ray stops here, and the
+      // glass itself is no subject — content underneath must not pick through it (user,
+      // 2026-08-07). Hits are distance-sorted, so anything before the glass already returned.
+      if (h.object.userData.blocker) return null;
       const pick: PickDescriptor | undefined = h.object.userData.picks
         ? h.object.userData.picks[h.instanceId as number]
         : h.object.userData.pick;
       if (!pick || !pickActive(pick, this.mode, this.filter, this._activeMetaIds)) continue;
-      if (pick.kind === "layer") {
-        // Planes are only 3D targets while NO layer is committed — once one is selected (the
-        // zoomed layer-focus pose), hovering/clicking the stack must not steal the highlight;
-        // switching layers is the panel's job then (user decision).
-        if (!this._layerCommitted) layerFallback ??= pick;
-        continue;
-      }
       this._hitObj = h.object;
       return pick;
     }
-    return layerFallback;
+    return null;
   }
 
   // The stable per-machine id of a node pick (a validator by its node id, a metagraph node by
@@ -1062,7 +1063,6 @@ export class Engine {
     if (st.hoverFilter != null) st.setHoverFilter(null);
     if (st.hoverCountry != null) st.setHoverCountry(null);
     if (st.hoverCohort != null) st.setHoverCohort(null);
-    if (st.ledgerHilite != null) st.setLedgerHilite(null);
     if (this._hoverKey != null || st.hover != null) {
       this._hoverKey = null;
       st.setHover(null);
@@ -1091,7 +1091,6 @@ export class Engine {
       : p?.kind === "metaSnap" ? p.global.data.ordinal
       : null;
     const metaId = p?.kind === "meta" ? p.cfg?.id ?? null : null;    // hub → metagraph dim preview
-    const layerId = p?.kind === "layer" ? p.layerId : null;          // floor plane → highlight preview
     // Country under the cursor (policy-gated): the SCENE side of the bidirectional country
     // pairing — writes the same hoverCountry channel the explorer rows use, so the border
     // preview + the row wash light from either end. Hovering a NODE hovers its country too
@@ -1111,7 +1110,6 @@ export class Engine {
     if (snapOrd !== st.hoverSnapOrd) st.setHoverSnapOrd(snapOrd);
     if (metaId !== st.hoverFilter) st.setHoverFilter(metaId);
     if (countryCc !== st.hoverCountry) st.setHoverCountry(countryCc);
-    if (layerId !== st.ledgerHilite) st.setLedgerHilite(layerId);    // same channel the panel rows write
 
     // The lean tooltip label — re-write the store only when the subject's identity changes so
     // following the cursor never re-renders React.
@@ -1143,7 +1141,7 @@ export class Engine {
     // A metagraph-snapshot TILE: commit the tile AND pin the global tick it anchored into.
     if (p?.kind === "metaSnap") {
       applyClickActions(
-        metaSnapSelectActions(p.sel, p.global, { filter: st.filter, metaSnap: st.metaSnap }),
+        metaSnapSelectActions(p.sel, p.global, { filter: st.filter, metaSnap: st.metaSnap, following: st.following }),
       );
       return;
     }
@@ -1151,7 +1149,13 @@ export class Engine {
     // `userData.bandKey` on the same mesh (a band is a slice of a tick, not a subject of its own).
     const bandKey = this._hitObj?.userData.bandKey as string | undefined;
     if (p?.kind === "snapshot" && bandKey) {
-      applyClickActions(bandSelectActions(bandKey, p, { filter: st.filter, metaSnap: st.metaSnap }));
+      applyClickActions(
+        bandSelectActions(bandKey, p, {
+          filter: st.filter,
+          metaSnap: st.metaSnap,
+          tickHasFilter: this._tickHasFilter(p, st.filter),
+        }),
+      );
       return;
     }
     applyClickActions(
@@ -1160,15 +1164,17 @@ export class Engine {
         pick: p,
         countryCc,
         // Hyper's node ancestry (FULL-ANCESTRY rule): a node click commits the composition group
-        // it belongs to, the same way a ledger node click commits its floor. The group is
-        // derivable from the node itself — its make-up IS the group key — so no list lookup.
+        // it belongs to. The group is derivable from the node itself — its make-up IS the group
+        // key — so no list lookup.
         compositionSel: this._compositionOf(p),
         current: {
           filter: st.filter,
           country: st.country,
           hasInspect: !!st.inspect,
-          layerId: st.layer?.layerId ?? null,
           cohort: this.cohortSel,
+          pinnedOrdinal: !st.following ? st.snap?.data?.ordinal ?? null : null,
+          metaSnap: st.metaSnap,
+          tickHasFilter: this._tickHasFilter(p, st.filter),
         },
       }),
     );
@@ -1177,6 +1183,15 @@ export class Engine {
   // The composition group a PICK belongs to — network + make-up key. null when the pick isn't a
   // node, carries no role info (the group would be meaningless), or the CURRENT view's ladder has
   // no composition rung (today: hyper alone, but the ladder table says so, not this method).
+  /** The filter-releases rule's input for scene band clicks — the ONE story rule
+   *  (src/data/ledgerStory.ts; explorer/strip read the same home). */
+  private _tickHasFilter(p: PickDescriptor | null, filter: string): boolean | undefined {
+    if (!p || p.kind !== "snapshot") return undefined;
+    const d = (p as { data?: GlobalSnapshot }).data;
+    if (!d) return undefined;
+    return tickInStory(filter, getAnchor(d.timestamp), useStore.getState().snapshotExact[d.ordinal]);
+  }
+
   private _compositionOf(p: PickDescriptor | null): CompositionSel | null {
     if (!p || !is3D(this.mode) || !hasLevel(this.mode, "composition")) return null;
     const node = "node" in p ? p.node : null;
@@ -1221,34 +1236,6 @@ export class Engine {
     tw.active = true;
   }
 
-
-  // Fly to a settlement layer (Snapshots view). Two shapes of subject after the two-floor redesign
-  // (spec §4): a SNAPSHOT layer is a glass floor plane, so the camera frames the plane; a NODE layer
-  // is carried by the vertical RAILS, so the camera frames the rail column instead. Heights are
-  // scaled by the ledger group's viewScale (the framing works in world units); the lateral
-  // lane-centring block is gone — every rung now sits on the shared lane field (`laneZ` is 0 for all
-  // six). Returns false when the id names no layer, so the focus ladder can fall through.
-  private _focusLayer(layerId: string): boolean {
-    const l = LAYER_GEOM.find((x) => x.id === layerId);
-    if (!l) return false;
-    const y = l.y * LEDGER.viewScale;
-    if (l.isRail) {
-      // The rail tally is READ from Globe (which computes it while building the records the chips
-      // stand on), never mirrored here — so the camera can't frame a rail the chips didn't populate.
-      const group: RailGroup = layerId === "ml0" || layerId === "ml1" ? "meta" : "dag";
-      const kinds = this.globe.railKinds(group);
-      // Deliberate: `findIndex` frames the LEFTMOST rail this layer lights — for `ml1` that is the
-      // HYBRID rail, since a hybrid machine carries the L1 role too and reads as the layer's front.
-      // Deliberate: `Math.max(0, idx)` falls back to rail 0 when the layer lights none, so a layer
-      // whose chips haven't been built yet still frames the rail column instead of jumping to x=0.
-      const idx = kinds.findIndex((k) => railLit(layerId, group, k));
-      ledgerRailFraming(railX(Math.max(0, idx)) * LEDGER.viewScale, y, this._framingOut);
-    } else {
-      ledgerFloorFraming(y, this._framingOut);
-    }
-    this._tweenTo(this._framingOut.pos, this._framingOut.target);
-    return true;
-  }
 
   private _focusGeo(R: number) {
     // Look head-on at the FRONT of the globe (target pushed forward in +Z, toward where the
@@ -1475,6 +1462,11 @@ export class Engine {
     // "soon" views set it false, but the PARKED staging grids live in this group too — the
     // active/staged machine keeps it visible so the fleet shows above the Blueprint.
     this.globe.group.visible = show.globeSurface || this.transition.active();
+    // The geo SURFACE subtree hard-hides as one unit whenever its fades are fully out (settled
+    // ledger/hyper/flat) — the structural fix for the invisible-but-depth-writing furniture class
+    // (2026-08-07): opacity handles the transitions, visibility handles the OFF state. The Engine
+    // owns the flag; Globe.setMorph computes the alpha (one source, no drift).
+    this.globe.surface.visible = this.globe.surfaceAlpha > 0.001;
     // Ledger chamber is live while settled in ledger OR a transition involving it is running (the
     // build/teardown must animate). The Engine is the SINGLE owner of ledger.group.visible —
     // LedgerView.setViewAlpha no longer writes it (the two would fight). The alpha gates whether it
@@ -1533,6 +1525,7 @@ export class Engine {
     this.canvas.removeEventListener("pointerleave", this.onLeave);
     window.removeEventListener("resize", this.onResize);
     this.stats?.dom.remove();
+    this._devTune?.dispose();
     this.unsub.forEach((u) => u());
     cancelAnimationFrame(this.raf);
     this.ctx.controls.dispose?.();

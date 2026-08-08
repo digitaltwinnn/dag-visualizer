@@ -32,11 +32,15 @@ async function fetchExact(ordinal: number): Promise<SnapshotExact> {
   // Throw (don't return a sentinel) so unstable_cache never caches a miss — a momentarily
   // unavailable recent tick is retried on the next request.
   if (!r.ok) throw new Error(`l0 ${r.status}`);
-  const j = (await r.json()) as { value?: Record<string, unknown> } & Record<string, unknown>;
+  const j = (await r.json()) as { value?: Record<string, unknown>; proofs?: unknown } & Record<string, unknown>;
   const v = (j.value ?? j) as {
     stateChannelSnapshots?: Record<string, StateChannelSnap[]>;
     rewards?: unknown;
   };
+  // The global snapshot is the SAME Signed[] shape as the metagraph snapshots it anchors —
+  // `proofs` are its validator signatures (item 10, 2026-08-06). Count only; the ids are the
+  // near-full validator set, so a list adds nothing a count doesn't.
+  const signerCount = Array.isArray(j.proofs) ? j.proofs.length : 0;
   const sc = v.stateChannelSnapshots;
   if (!sc) throw new Error("no stateChannelSnapshots");
 
@@ -112,13 +116,16 @@ async function fetchExact(ordinal: number): Promise<SnapshotExact> {
     unlistedFee,
     listedCount,
     unlistedCount,
+    signerCount,
     perMeta,
     rows,
   };
 }
 
 const cachedExact = (ordinal: number) =>
-  unstable_cache(() => fetchExact(ordinal), ["snapshot-exact", String(ordinal)], {
+  // v2: the cache key is versioned WITH the payload shape — signerCount (2026-08-06) would
+  // otherwise be missing from entries cached under the old key for up to a day.
+  unstable_cache(() => fetchExact(ordinal), ["snapshot-exact-v2", String(ordinal)], {
     revalidate: 86400, // ordinals are immutable; a day is plenty (success is cached, misses throw)
   })();
 

@@ -44,7 +44,10 @@ export interface DimContext {
 // (The old hover-preview FORCED-STRONG 0.85 branch is gone — user 2026-07-11: hovering/
 // clicking a hub in hyper dimmed the rest far harder than the regular dim; the preview now
 // dims at the same per-view strength as a committed filter.)
-export const dimScale = (c: DimContext): number => 0.32 + 0.68 * c.morph;
+// (Ledger override 2026-08-07, matching metaNodeDim: morph is frozen there, and full strength
+// cascades to near-black through the chip writer — the flat 0.5 lands the validator chips at
+// the same COLORED-dim tier as the metagraph chips.)
+export const dimScale = (c: DimContext): number => (c.ledger ? 0.5 : 0.32 + 0.68 * c.morph);
 
 // The METAGRAPH pool's own dim strength: ZERO in the Hypergraph, full on the globe. Metagraph
 // nodes REST at the dimmed look in hyper (user, 2026-07-17 — the base size/glow in
@@ -52,7 +55,7 @@ export const dimScale = (c: DimContext): number => 0.32 + 0.68 * c.morph;
 // move them there: a hover preview is inert and a committed filter leaves the others at rest
 // (the selection pops via the hubMatch glow boost + camera/DoF, not by dimming the rest).
 // Geo is unchanged — 1.0 at morph=1, the same ceiling as dimScale, so the off-filter
-// isolate/hide on the globe is bit-identical. The ledger's flat 0.82 override (metaNodeDim)
+// isolate/hide on the globe is bit-identical. The ledger's flat 0.5 override (metaNodeDim)
 // bypasses this ramp entirely, as before. Validators keep dimScale — the DAG core still dims
 // back in hyper when a metagraph is the subject (the core-preview cue).
 export const metaDimScale = (c: DimContext): number => c.morph;
@@ -102,10 +105,12 @@ export function validatorDim(c: DimContext, dim: number, geoCc: string | null): 
 // Metagraph-node per-node dim (js/globe.js:1095-1096): its own eased `recDim`, times the
 // metagraph pool's OWN strength (metaDimScale — zero in hyper, see its note) — except in the
 // Snapshots (ledger) view, where morph is frozen so the ramp alone would be too weak, so the
-// effective dim is forced to a flat 0.82. Raised by countryMix outside the drilled country,
-// same as validatorDim.
+// effective dim is forced to a FLAT 0.5 (was 0.82 under the old recede-the-rest emphasis —
+// the chip writer applies dim to colour AND glow, so 0.82 cascaded to near-black; 0.5 lands
+// the chips at the COLORED-dim tier the ribbons' RIBBON_DIM speaks, user 2026-08-07). Raised
+// by countryMix outside the drilled country, same as validatorDim.
 export function metaNodeDim(c: DimContext, recDim: number, geoCc: string | null): number {
-  let d = recDim * (c.ledger ? 0.82 : metaDimScale(c));
+  let d = recDim * (c.ledger ? 0.5 : metaDimScale(c));
   if (c.countryFilter && (!geoCc || geoCc !== c.countryFilter)) d = Math.max(d, c.countryMix);
   return d;
 }

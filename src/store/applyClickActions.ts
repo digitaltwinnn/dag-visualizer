@@ -12,6 +12,13 @@ export function applyClickActions(actions: ClickAction[]): void {
     switch (a.kind) {
       case "filter":
         st.setFilter(a.id);
+        // COMMITTING a filter in the ledger (re-)enters live mode (2026-08-08 — moved here
+        // from FollowController's filter-dep effect, which fired AFTER any pin whose actions
+        // included a filter change and stomped the pin: the release rule's step-to-"all" and
+        // a cross-network pin's filter-first both hit it). As an ORDERED action effect it
+        // composes correctly: a later {kind:"snapshot", follow:false} in the same click
+        // re-decides, so pins win and bare commits go live.
+        if (st.mode === "ledger") st.setFollowing(true);
         break;
       case "country":
         st.setCountry(a.cc);
@@ -34,9 +41,6 @@ export function applyClickActions(actions: ClickAction[]): void {
         break;
       case "metaSnap":
         st.setMetaSnap(a.sel);
-        break;
-      case "layer":
-        st.setLayer(a.pick);
         break;
     }
   }

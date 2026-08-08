@@ -33,8 +33,8 @@ export const LEDGER = {
   // DAG L1 (hypergraph L1) — native $DAG currency — keeps its own −Z third of the lane field.
   // TODO: draw DAG L1 BLOCKS (global.blocks) flowing from this lane into the global snapshot.
   dagLaneZ: -14.7,  // −Z centre of the reserved 1/3 (−depth/2 + depth/6) — where the DAG-L1 cluster sits
-  dot: 0.55,        // node-sphere scale in this view — uniform for EVERY cluster (a 3-node metagraph's
-                    // dot = a global-L0 dot; small groups get presence from the station DIAL, not dot size)
+  dot: 0.38,        // node-chip scale in this view — uniform for EVERY cluster (a 3-node metagraph's
+                    // dot = a global-L0 dot); shrunk with the tray tightening (user, 2026-08-07)
   // Whole-view ORIENTATION applied to the ledger so it frames well under the SHARED overview camera
   // (the one hyper/geo use) — the camera never moves on a view switch; the ledger GROUP is
   // rotated/scaled instead, and the SAME transform is baked into every node's ledger position
@@ -46,13 +46,9 @@ export const LEDGER = {
   viewScale: 1.5,         // bigger in frame without moving the camera
 };
 
-// The settlement-stack layer ids — the six focus rungs. TWO of them are floors (the snapshot
-// layers); the other four are NODE layers, which the two-floor redesign renders as RAILS on the
-// front edge of the floor they serve (see ledgerRails.ts). Shared vocabulary between this geometry
-// table, the scene's pick descriptors, the store's layer pick, and the UI copy table
-// (src/data/ledgerLayers.ts). LAYER_GEOM itself lives at the foot of this module — it is derived
-// from the floor heights + rail geometry declared further down.
-export type LedgerLayerId = "ml1" | "ml0" | "msnap" | "hypl0" | "hypl1" | "gl0";
+// (The old six-rung LedgerLayerId vocabulary is RETIRED with the layer navigation, 2026-08-06 —
+// the floors' shared vocabulary is LedgerFloorId below, and the node layers are per-role
+// containers labelled by ledgerRails.ROLE_CODE.)
 
 // The lead SITE (x,z) of metagraph `i` of `n` — its Z-LANE (a distinct depth), leading at x=0.
 // Shared by HyperView, Globe's node clusters and LedgerView so a metagraph's nodes, rings and
@@ -126,19 +122,43 @@ export const FLOOR_Y: Record<LedgerFloorId, number> = {
 /** Half the Z extent the metagraph lanes spread over (ledgerSite's outermost |z|). */
 export const LANE_HALF_Z = (LEDGER.depth * LANE_SPREAD) / 2;
 
-// ── Gutters (spec §4.5) — a narrow strip beyond the lane field, screen-right (−Z) on both
-// floors: the currency status line above, the $DAG blocks below. ~1/6 of the field.
-export const GUTTER_W = (2 * LANE_HALF_Z) / 6;
-export const GUTTER_CZ = -LANE_HALF_Z - GUTTER_W / 2;
+/** The floor planes' +Z (screen-left) edge — LedgerView's FLOOR_D/2, promoted here so the
+ *  containers can span the plane's full front width. */
+/** The seam between the main plane and the gutter plane. */
+
+/** The LEAD slot's X — the whole time trail (lane tiles, byte bars, ribbons) leads well toward
+ *  the camera-side floor edge and trails to −X from here (user, 2026-08-07: the snapshots sat
+ *  too deep in the plane). The floors' front edge is at ~6.5 local. */
+export const LEAD_X = 3.9;
 
 // ── The byte bar (spec §4.2) — fixed height and depth; WIDTH (the Z extent) alone encodes the
-// bytes the tick carried. It starts at lane 0's end so band order and lane order agree and the
-// ribbons splay without crossing.
-export const BAR_Z0 = -LANE_HALF_Z;
-export const BAR_MAX_W = 2 * LANE_HALF_Z;
+// bytes the tick carried. It is CENTERED on the lane field (z0 = -width/2 — user, 2026-08-06;
+// replaced the old left-aligned BAR_Z0 start): bands still follow lane order, so the ribbons
+// splay symmetrically without crossing.
+/** The byte bar's edge margin (user, 2026-08-07): the per-row ORDINAL LABELS live at the
+ *  plane's screen-left edge, so even a clipped max-width bar stops short of the lane field on
+ *  BOTH sides (centred bar, one margin each end) instead of running into the text. */
+export const BAR_EDGE_MARGIN = 2.4;
+export const BAR_MAX_W = 2 * (LANE_HALF_Z - BAR_EDGE_MARGIN);
 export const BAR_MIN_W = 0.55; // the zero-anchor SEAM: a tick that carried nothing still happened
 export const BAR_H = 0.9;
 export const BAR_D = 1.6;
+/** The snapshots SIT ON their planes (user, 2026-08-07 — they used to be centred on the plane
+ *  height and poked through it): bottoms float just above the glass. */
+export const TILE_LIFT = 0.05; // metagraph tiles above the msnap plane
+export const BAR_LIFT = 0.05;  // byte bars above the gl0 plane
+
+/** EACH METAGRAPH GETS ITS OWN PLANE (user, 2026-08-07): the upper storey is not one shared
+ *  floor but one narrow plane per lane (the unknown lane included), separated by visible gaps —
+ *  the literal statement that metagraphs are unrelated to each other and only come together on
+ *  the global snapshot plane below. */
+export const LANE_PLANE_GAP = 0.6;
+/** Half the Z extent of one lane's own plane — the lane PITCH (ledgerSite spreads the n
+ *  centres over the full field, so pitch = 2·LANE_HALF_Z/(n−1)) minus the separating gap. */
+export function lanePlaneHalf(n: number): number {
+  const pitch = n > 1 ? (2 * LANE_HALF_Z) / (n - 1) : 2 * LANE_HALF_Z;
+  return pitch / 2 - LANE_PLANE_GAP / 2;
+}
 
 /** The fixed scale reference: KB carried at which the bar fills the floor (spec §6.3).
  *  p99 of anchored KB per global tick, measured by scripts/bake-ledger-scale.ts on 2026-08-06
@@ -152,60 +172,50 @@ export const BAR_D = 1.6;
  *  runs low: live ticks of 80–90 KB were observed within minutes of baking, i.e. the reference is
  *  exceeded more often than "p99" suggests. That is handled honestly (clip + overflow multiplier),
  *  not hidden. A future re-bake should calibrate against exact-read totals instead. */
-export const BYTE_SCALE_KB = 77;
+export const BYTE_SCALE_KB = 89; // rebaked 2026-08-07 (p99 rose with mainnet traffic)
 
-// ── Node rails (spec §4.4) — run along Z at the FRONT (+X, camera-side) edge of their floor,
-// one rail per non-empty make-up group, stepping toward the camera as more rails appear.
+// ── Node trays (redesign 2026-08-07 — ONE tray per snapshot plane, no role split): glass trays
+// hanging under the FRONT (+X, camera-side) edge of the plane their machines serve, facing the
+// camera. Layout math lives in ledgerRails.ts (metaTrayLayout/dagTrayLayout/containerChipPos);
+// these are the shared literals.
 export type RailGroup = "meta" | "dag";
-export const RAIL_GROUP_FLOOR: Record<RailGroup, LedgerFloorId> = { meta: "msnap", dag: "gl0" };
 
-export const RAIL_X0 = 3.2;          // the first rail, clear of the lead slot's tiles
-export const RAIL_PITCH_X = 1.7;     // step toward the camera per visible rail
-export const RAIL_Y_LIFT = 0.35;     // chips stand ON the floor plane
-export const RAIL_CHIP_PITCH_Z = 0.62;
-export const RAIL_ROW_LIFT = 0.34;   // an over-long rail wraps into stacked rows, chip-stack idiom
-/** Machines per rail row before it wraps upward. */
-export const RAIL_CAP = Math.floor((2 * LANE_HALF_Z) / RAIL_CHIP_PITCH_Z) + 1;
+export const CONT_X = 6.2;        // the trays' shared X plane — just inside the floors' front edge
+export const CONT_TOP_GAP = 0.15; // floor plane → tray frame top (tight — user 2026-08-07)
+export const CONT_CHIP_Z = 0.46;  // chip pitch along Z (columns) — tightened with the smaller chips
+export const CONT_ROW_Y = 0.46;   // row pitch downward
+export const CONT_PAD = 0.16;     // frame padding around the chip grid — a tight hairline margin
+/** The whole plane FIELD's half Z extent: the lane sites span ±LANE_HALF_Z and each end plane
+ *  extends lanePlaneHalf beyond its site. The GLOBAL plane spans exactly this, centred — it sits
+ *  RIGHT beneath the metagraph planes (user, 2026-08-07: the old label-margin plane read skewed). */
+export const PLANE_FIELD_HALF = LANE_HALF_Z + lanePlaneHalf(METAGRAPHS.length + 1);
 
-export function railX(visibleIndex: number): number {
-  return RAIL_X0 + visibleIndex * RAIL_PITCH_X;
-}
+/** The DAG validator tray's Z extents — the FULL front width of the global floor plane,
+ *  inset slightly from both plane edges. (Metagraph trays span their own plane instead.) */
+export const CONT_Z0 = -PLANE_FIELD_HALF + 0.4;
+export const CONT_Z1 = PLANE_FIELD_HALF - 0.4;
 
-export function railY(group: RailGroup, row: number): number {
-  return FLOOR_Y[RAIL_GROUP_FLOOR[group]] + RAIL_Y_LIFT + row * RAIL_ROW_LIFT;
-}
-
-// ── The committed-filter rearrangement (spec §5.2): "Committing rearranges the upper floor: the
-// lane takes the whole floor, other lanes' tiles leave, rails dim non-member machines." So a lane
-// is not merely dimmed under a filter — it gives up its slice, and the committed lane grows into
-// the whole Z field so its tiles read at the same size the "all" view gives ten lanes together.
+// ── The lane field is FIXED (user reversal, 2026-08-07, of the spec §5.2 committed-lane
+// rearrangement): a committed filter no longer moves geometry or hides the other lanes — the
+// focus/dim effects carry the emphasis and the CAMERA flies to the committed lane instead
+// (Engine's ledgerNetwork resolver). Every lane always owns its own slice.
 export type LaneSpan = {
   /** Lane centre in local Z. */
   cz: number;
   /** Half the Z extent this lane may lay tiles across. */
   hz: number;
-  /** True when another lane is committed and this one lays no tiles at all. */
-  hidden: boolean;
 };
 
-export function laneSpan(i: number, n: number, committedIdx: number | null): LaneSpan {
-  if (committedIdx === null) return { cz: ledgerSite(i, n).z, hz: LANE_HALF_Z / n, hidden: false };
-  if (committedIdx === i) return { cz: 0, hz: LANE_HALF_Z, hidden: false };
-  return { cz: ledgerSite(i, n).z, hz: LANE_HALF_Z / n, hidden: true };
+export function laneSpan(i: number, n: number): LaneSpan {
+  return { cz: ledgerSite(i, n).z, hz: LANE_HALF_Z / n };
 }
 
-// Per-layer GEOMETRY: the height the layer-focus camera aims at, plus `isRail` (a node layer living
-// on a rail, not a plane of its own). `laneZ` is 0 for every rung now — the split hypergraph panes
-// are gone, so nothing is laterally offset and the camera never shifts sideways for a layer.
+// Per-FLOOR camera geometry: the height the floor-focus framing aims at. The old six-rung
+// LAYER_GEOM (with its rail rows) went with the layer navigation (2026-08-06) — the two floors
+// are the only framable strata left, and they are visual/camera geometry, not pick subjects.
 // Ordered top→bottom. Display copy lives in src/data/ledgerLayers.ts, keyed by the same ids.
-// (Declared HERE, at the foot of the module, because it reads FLOOR_Y/railY above — hoisting a
-// const initializer above them would hit the temporal dead zone at import time.)
-export const LAYER_GEOM: { id: LedgerLayerId; y: number; laneZ: number; isRail: boolean }[] = [
-  { id: "ml1", y: railY("meta", 0), laneZ: 0, isRail: true },
-  { id: "ml0", y: railY("meta", 0), laneZ: 0, isRail: true },
-  { id: "msnap", y: FLOOR_Y.msnap, laneZ: 0, isRail: false },
-  { id: "hypl0", y: railY("dag", 0), laneZ: 0, isRail: true },
-  { id: "hypl1", y: railY("dag", 0), laneZ: 0, isRail: true },
-  { id: "gl0", y: FLOOR_Y.gl0, laneZ: 0, isRail: false },
+export const LAYER_GEOM: { id: LedgerFloorId; y: number }[] = [
+  { id: "msnap", y: FLOOR_Y.msnap },
+  { id: "gl0", y: FLOOR_Y.gl0 },
 ];
 

@@ -2,7 +2,6 @@ import type { PickDescriptor } from "./types";
 import { hex } from "@/src/util/format";
 import { COLORS, METAGRAPHS } from "@/src/engine/config";
 import { identityHudHex } from "@/src/palette/identity";
-import { ledgerLayerById } from "./ledgerLayers";
 
 // Core cyan (the DAG spine) — the identity hue for every NON-metagraph subject (a DAG-core
 // validator, the L0 core, a global snapshot). From the plain-constant config, NOT network.ts
@@ -56,10 +55,6 @@ export function tooltipSubject(p: PickDescriptor | null | undefined): HoverSubje
       const ident = cfg?.ticker || cfg?.name || p.sel.metaId.slice(0, 6) + "…";
       return { ident, name: "#" + p.sel.ordinal, color: identityHudHex(p.sel.metaId), mono: false };
     }
-    case "layer":
-      // A settlement-stack floor plane (Snapshots view) — structural, so core cyan. The pick
-      // carries only the id; the display name resolves through the UI copy table.
-      return { ident: "LAYER", name: ledgerLayerById(p.layerId)?.name ?? p.layerId, color: CORE, mono: false };
     default:
       return null; // geoLive is a rail-only proxy, never a 3D-hover subject
   }

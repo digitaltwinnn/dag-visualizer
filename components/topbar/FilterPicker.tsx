@@ -1,6 +1,7 @@
 "use client";
 import { useMemo } from "react";
 import { useStore } from "@/src/store/store";
+import { UNLISTED_ID } from "@/src/data/unlisted";
 import { filterToggleActions } from "@/src/engine/domain/pickActions";
 import { applyClickActions } from "@/src/store/applyClickActions";
 import { hex } from "@/src/util/format";
@@ -98,6 +99,22 @@ export default function FilterPicker({ onPicked }: { onPicked?: () => void }) {
           </button>
         );
       })}
+      {/* The UNLISTED channels (user, 2026-08-07): real anchoring state channels absent from the
+          public catalog — a first-class filter like any 0-located metagraph (dimmed, honest 0
+          machines; committing lands geo/hyper in their quiet-empty state, the ledger lights its
+          unlisted lane). Neutral dot: no identity hue can speak for a mixed set. */}
+      <button
+        type="button"
+        aria-pressed={filter === UNLISTED_ID}
+        title="Anchoring state channels not in the public catalog"
+        className={chipClass(filter === UNLISTED_ID, true)}
+        onClick={() => pick(UNLISTED_ID)}
+        onMouseEnter={() => setHoverFilter(UNLISTED_ID)}
+      >
+        <IdentityDot hue="var(--core)" />
+        <span className="text-body text-foreground italic">unlisted</span>
+        <span className="text-label text-muted-foreground tabular-nums">0</span>
+      </button>
     </div>
   );
 }

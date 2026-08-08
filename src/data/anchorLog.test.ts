@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildAnchorLog, snapsAtTick } from "@/src/data/anchorLog";
+import { buildAnchorLog, buildUnlistedLog, snapsAtTick } from "@/src/data/anchorLog";
 import type { MetaSnapRecord } from "@/src/data/api";
 import type { GlobalSnapshot } from "@/src/data/types";
 
@@ -43,5 +43,21 @@ describe("snapsAtTick", () => {
   it("returns an empty list for an unknown metagraph or a tick it sat out", () => {
     expect(snapsAtTick(map, "B", "t2")).toEqual([]);
     expect(snapsAtTick(map, "A", "t9")).toEqual([]);
+  });
+});
+
+describe("buildUnlistedLog (2026-08-07 — the exact reads are the only source)", () => {
+  it("emits one row per uncataloged channel snapshot, newest tick first, listed excluded", () => {
+    const g1 = { ordinal: 10, timestamp: "T1", hash: "h1" } as never;
+    const g2 = { ordinal: 11, timestamp: "T2", hash: "h2" } as never;
+    const exact = {
+      10: { rows: [{ metaId: "LISTED", ordinal: 5, fee: 1, bytes: 1024 }, { metaId: "DAGxyz", ordinal: 7, fee: 2, bytes: 2048 }] },
+      11: { rows: [{ metaId: "DAGabc", ordinal: 0, fee: 0, bytes: 512 }] },
+    };
+    const rows = buildUnlistedLog([g1, g2], exact, new Set(["LISTED"]));
+    expect(rows.map((r) => r.metaId)).toEqual(["DAGabc", "DAGxyz"]);
+    expect(rows[0].sizeInKB).toBeCloseTo(0.5, 6);
+    expect(rows[1].global.ordinal).toBe(10);
+    expect(rows[1].hash).toBe("");
   });
 });

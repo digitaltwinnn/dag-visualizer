@@ -10,6 +10,7 @@ import { useBreakpoint } from "@/components/useBreakpoint";
 import { getAnchor, metagraphById, filterAccent } from "@/src/data/network";
 import type { GlobalSnapshot } from "@/src/data/types";
 import { snapshotSelectActions } from "@/src/engine/domain/pickActions";
+import { tickInStory } from "@/src/data/ledgerStory";
 import { applyClickActions } from "@/src/store/applyClickActions";
 import { relativeAge } from "@/src/util/relativeAge";
 import NodeCountReadout from "@/components/NodeCountReadout";
@@ -77,13 +78,23 @@ export default function LiveStrip() {
   // there). The card is ledger-scoped (Task 1): no cross-view carry, so there's nothing to
   // hand off to another view. Runs the SAME tested decision table as the ledger's 3D tile
   // click (domain/pickActions): the live tip (re-)follows the heartbeat, anything older pins.
-  const pick = (d: GlobalSnapshot) =>
+  const pick = (d: GlobalSnapshot) => {
+    const st = useStore.getState();
+    // The filter-releases rule's input — the ONE story rule (src/data/ledgerStory.ts).
+    const tickHasFilter = tickInStory(st.filter, getAnchor(d.timestamp), st.snapshotExact[d.ordinal]);
     applyClickActions(
       snapshotSelectActions(
         { kind: "snapshot", title: `Global snapshot #${d.ordinal}`, data: d },
         latestRelevant("all")?.ordinal === d.ordinal,
+        {
+          pinnedOrdinal: !st.following ? st.snap?.data.ordinal ?? null : null,
+          metaSnap: st.metaSnap,
+          filter: st.filter,
+          tickHasFilter,
+        },
       ),
     );
+  };
 
   // Per bar: the tick's total anchors, and (filtered) this metagraph's own anchors. The plotted
   // VALUE is `mine` when a metagraph is filtered (its own cadence on its own scale), else `total`.

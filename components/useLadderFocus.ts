@@ -9,7 +9,7 @@ import { focusSlotId } from "@/components/railCards";
 // selection mark, every coarser committed row wears the ancestor strength (`selectedRow`), so a
 // drill-down list reads as a path with a head instead of a stack of equal selections.
 //
-// Returns the rail SLOT id ("context" / "country" / "cohort" / "composition" / "node" / "layer"),
+// Returns the rail SLOT id ("context" / "country" / "cohort" / "composition" / "node"),
 // so callers name the rung the same way the rail does.
 export function useLadderFocus(): string | null {
   const mode = useStore((s) => s.mode);
@@ -19,6 +19,7 @@ export function useLadderFocus(): string | null {
   const composition = useStore((s) => s.composition);
   const inspect = useStore((s) => s.inspect);
   const snap = useStore((s) => s.snap);
-  const layer = useStore((s) => s.layer);
-  return focusSlotId({ mode, filter, country, cohort, composition, inspect, snap, layer });
+  const metaSnap = useStore((s) => s.metaSnap);
+  const selStack = useStore((s) => s.selStack);
+  return focusSlotId({ mode, filter, country, cohort, composition, inspect, snap, metaSnap, selStack });
 }

@@ -23,6 +23,13 @@ interface GeoFadeEntry {
 // consumed elsewhere in globe.js — kept optional here for parity with the original handle.
 export interface GeoViewHost {
   group: THREE.Group;
+  /** The geo SURFACE subtree — every piece of geo furniture (graticule, walls, land, roses,
+   *  borders, glow pools) lives here, NOT in `group` directly. A child of `group` so it inherits
+   *  the globe rotation for free, while the Engine can hard-hide it as one unit wherever the
+   *  surface is off (ledger, settled hyper, flat views) — opacity fades handle transitions,
+   *  visibility handles the OFF state. This is the structural fix for the invisible-but-
+   *  depth-writing furniture class (the black lined-globe silhouette, 2026-08-07). */
+  surface: THREE.Group;
   geoFades: GeoFadeEntry[];
   geoColor: number; // the structural accent (--primary), fed from the Engine — grid + graticule hue
   _edgeColor: THREE.Color;
@@ -83,7 +90,11 @@ function buildGraticule(globe: GeoViewHost) {
   // The sea graticule (grid lines OVER the ocean): subtle so the continents (the raised, gridded
   // land) clearly lead. 0.03 → 0.06 → 0.045 (user: eased back down a bit — a touch more subtle on
   // the water). Accent hue.
-  const mat = new THREE.LineBasicMaterial({ color: globe.geoColor, transparent: true, opacity: 0 });
+  // depthWrite OFF: the graticule is transparent hologram furniture — with the default depth
+  // write it still stamped the depth buffer at opacity 0 in the LEDGER (the globe group stays
+  // visible there, it hosts the chips), z-rejecting the additive chamber behind it into a BLACK
+  // lined globe silhouette (user, 2026-08-07).
+  const mat = new THREE.LineBasicMaterial({ color: globe.geoColor, transparent: true, opacity: 0, depthWrite: false });
   // FACING dim: far-hemisphere fragments fade to ~30% so the backside reads as behind the globe
   // instead of blending with the front (the hologram keeps its see-through presence, quieter).
   // The floor drops to near-zero as the camera closes in (uClose) — at country/node range the
@@ -104,7 +115,7 @@ function buildGraticule(globe: GeoViewHost) {
       );
   };
   globe.geoFades.push({ mat, base: 0.045 });
-  globe.group.add(new THREE.LineSegments(geo, mat));
+  globe.surface.add(new THREE.LineSegments(geo, mat));
 }
 
 // POLAR COMPASS ROSE — the subtle orientation cue (user: the tilted country/node poses read
@@ -168,12 +179,12 @@ function buildCompassRose(globe: GeoViewHost) {
     });
     const dial = new THREE.LineSegments(dialGeo, mat);
     dial.position.y = pole.y;
-    globe.group.add(dial);
+    globe.surface.add(dial);
 
     const letter = makeLetter(pole.letter);
     letter.rotation.x = pole.flipX; // lie flat, readable from outside the pole
     letter.position.y = pole.y;
-    globe.group.add(letter);
+    globe.surface.add(letter);
 
     // NOT in geoFades: Globe fades these itself (morph fade × pole facing) each frame.
     globe.poleRoses.push({
@@ -430,7 +441,7 @@ async function buildLand(globe: GeoViewHost) {
       transparent: true, depthWrite: false, side: THREE.BackSide,
       blending: THREE.AdditiveBlending,
     });
-    globe.group.add(new THREE.Mesh(wallGeo, wallMat));
+    globe.surface.add(new THREE.Mesh(wallGeo, wallMat));
 
     // HOLOGRAPHIC LAND. The surface is the geo view's "ledger pane": a faint, CALM structural skin
     // in the SAME accent hue as the ledger tiles (globe.geoColor = --primary), so the two views match
@@ -480,7 +491,7 @@ async function buildLand(globe: GeoViewHost) {
     globe.landFillMesh = new THREE.Mesh(new THREE.SphereGeometry(top, 96, 64), globe.landFillMat);
     globe.landFillMesh.renderOrder = -1; // before the rim/nodes
     globe.landFillMesh.visible = false;  // revealed once the globe materialises (setMorph)
-    globe.group.add(globe.landFillMesh);
+    globe.surface.add(globe.landFillMesh);
 
     // COUNTRY BORDERS — TWO LineSegments, rebuilt per drill/hover change (event-driven; see
     // setCountryBorder): one for the COMMITTED drill, one for the HOVER preview, so hovering
@@ -500,7 +511,7 @@ async function buildLand(globe: GeoViewHost) {
       mesh.visible = false;
       const fade = { mat, base: 0 };
       globe.geoFades.push(fade);
-      globe.group.add(mesh);
+      globe.surface.add(mesh);
       return { mesh, fade };
     };
     globe.countryBorder = makeBorder();

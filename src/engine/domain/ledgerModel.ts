@@ -31,17 +31,25 @@
 // behaviour must match js/ledger.js exactly since Task 13 will diff against it).
 
 import { METAGRAPHS } from "../config";
-import { ledgerSite } from "./ledgerLayout";
+import { ledgerSite, LEAD_X } from "./ledgerLayout";
+import { UNLISTED_KEY } from "./ledgerBands";
 import type { GlobalSnapshot, Anchor } from "@/src/data/types";
+
+/** The lane roster (user, 2026-08-07): every listed metagraph plus ONE "unknown" lane for the
+ *  unlisted channels, at the END of the order — the +Z / screen-LEFT edge of the field, matching
+ *  the byte bar's unlisted band (always appended last), so the ribbon between them never crosses
+ *  a listed one. The unknown lane's counts come ONLY from the exact read (see LedgerView.setData:
+ *  the polled floor is transiently high while a tick settles, and lane tiles never shrink). */
+export const LANE_IDS: readonly string[] = [...METAGRAPHS.map((m) => m.id), UNLISTED_KEY];
 
 export const SLOT_SP = 3.6; // js/ledger.js:41 — X spacing of one tick/slot
 export const SLOT_N = 9; // js/ledger.js:42 — visible blocks per chain
-export const BLOCK_SIZE = 0.48; // max size of an individual metagraph-snapshot tile (bumped from the
-  // js/ledger.js 0.34 — the subjects read too small at the overview camera)
+export const BLOCK_SIZE = 0.48; // max size of an individual metagraph-snapshot tile (a 0.72 bump
+  // was tried and reverted the same day, 2026-08-07; originally 0.34)
 
 // js/ledger.js:45 — Z width of one lane (the grid's depth budget for anchorTiles), derived from
 // ledgerSite exactly as the source does (shared by the whole METAGRAPHS roster, not per-lane).
-export const LANE_GAP_Z = Math.abs(ledgerSite(1, METAGRAPHS.length).z - ledgerSite(0, METAGRAPHS.length).z);
+export const LANE_GAP_Z = Math.abs(ledgerSite(1, LANE_IDS.length).z - ledgerSite(0, LANE_IDS.length).z);
 
 // js/ledger.js:53 verbatim — recency fade: 1 at the freshest completed slot, 0 by the oldest visible.
 export const slotFade = (slot: number): number => Math.min(1, Math.max(0, 1 - (slot - 1) / (SLOT_N - 1)));
@@ -138,7 +146,7 @@ export class LedgerModel {
   private lane(id: string, i: number): LaneState {
     let lane = this.lanes.get(id);
     if (!lane) {
-      lane = { id, z: ledgerSite(i, METAGRAPHS.length).z, blocks: [] };
+      lane = { id, z: ledgerSite(i, LANE_IDS.length).z, blocks: [] };
       this.lanes.set(id, lane);
     }
     return lane;
@@ -150,8 +158,8 @@ export class LedgerModel {
   // `ts` is the live tick's timestamp (the caller's `this.tickTs`), threaded onto every tile so a
   // slot-0 block can name the snapshot it belongs to without a lookup.
   private anchorMetaBlock(id: string, count: number, ts: string): void {
-    const i = METAGRAPHS.findIndex((m) => m.id === id);
-    if (i < 0) return; // unlisted — no lane
+    const i = LANE_IDS.indexOf(id);
+    if (i < 0) return; // not a lane (an unlisted ADDRESS — those aggregate into the unknown lane)
     const lane = this.lane(id, i);
     let bx = 0, bfade = 0;
     for (let j = lane.blocks.length - 1; j >= 0; j--) {
@@ -173,16 +181,16 @@ export class LedgerModel {
       this.trail.push({ ordinal: snap.ordinal, slot: s, ts: snap.timestamp });
       const a = getAnchor ? getAnchor(snap.timestamp) : null;
       const counts = a && a.metaCounts ? a.metaCounts : null;
-      for (let i = 0; i < METAGRAPHS.length; i++) {
-        const id = METAGRAPHS[i].id;
+      for (let i = 0; i < LANE_IDS.length; i++) {
+        const id = LANE_IDS[i];
         const nc = counts ? counts.get(id) || 0 : 0;
         const lane = this.lane(id, i);
         if (nc > 0) {
           for (const tl of anchorTiles(nc)) {
-            lane.blocks.push({ x: -s * SLOT_SP, slot: s, fade: slotFade(s), ox: tl.ox, oz: tl.oz, size: tl.size, filled: true, link: tl.link, ts: snap.timestamp, count: nc });
+            lane.blocks.push({ x: LEAD_X - s * SLOT_SP, slot: s, fade: slotFade(s), ox: tl.ox, oz: tl.oz, size: tl.size, filled: true, link: tl.link, ts: snap.timestamp, count: nc });
           }
         } else {
-          lane.blocks.push({ x: -s * SLOT_SP, slot: s, fade: slotFade(s), ox: 0, oz: 0, size: 0.24, filled: false, link: false, ts: snap.timestamp, count: 0 });
+          lane.blocks.push({ x: LEAD_X - s * SLOT_SP, slot: s, fade: slotFade(s), ox: 0, oz: 0, size: 0.24, filled: false, link: false, ts: snap.timestamp, count: 0 });
         }
       }
     }
@@ -232,8 +240,8 @@ export class LedgerModel {
       this.tickTs = latest.timestamp;
       // The new LIVE tick starts with an empty placeholder at slot 0 for EVERY metagraph (shown on
       // the latest too); anchorMetaBlock upgrades it to a real, sized block if the metagraph anchors.
-      for (let i = 0; i < METAGRAPHS.length; i++) {
-        this.lane(METAGRAPHS[i].id, i).blocks.unshift({ x: 0, slot: 0, fade: 0, ox: 0, oz: 0, size: 0.24, filled: false, link: false, ts: this.tickTs, count: 0 });
+      for (let i = 0; i < LANE_IDS.length; i++) {
+        this.lane(LANE_IDS[i], i).blocks.unshift({ x: 0, slot: 0, fade: 0, ox: 0, oz: 0, size: 0.24, filled: false, link: false, ts: this.tickTs, count: 0 });
       }
     }
 
@@ -246,8 +254,8 @@ export class LedgerModel {
     for (const [id, n] of a.metaCounts) {
       const prev = this.emitted.get(id) || 0;
       if (n <= prev) continue;
-      const i = METAGRAPHS.findIndex((m) => m.id === id);
-      if (i < 0) { this.emitted.set(id, n); continue; } // unlisted: no lane, but don't re-check
+      const i = LANE_IDS.indexOf(id);
+      if (i < 0) { this.emitted.set(id, n); continue; } // an unlisted ADDRESS: not a lane, but don't re-check
       this.anchorMetaBlock(id, n, this.tickTs ?? ""); // draw the real block at the lead now + animate the anchoring
       changes.push({ id, count: n, delta: n - prev });
       this.emitted.set(id, n);
@@ -262,10 +270,20 @@ export class LedgerModel {
     this.recomputeSelectedSlot();
   }
 
-  // js/ledger.js:640 verbatim — the binary colour rule: colour belongs to the LIVE lead (slot<=0)
-  // OR to a SELECTED older snapshot (exclusively — selecting one neutralises the live lead), never
-  // to a filtered-out lane.
-  isRowHot(laneOff: boolean, slot: number): boolean {
-    return !laneOff && (this.selectedSlot > 0 ? slot === this.selectedSlot : slot <= 0);
+  /** Ordinal → its current slot (0 = the live lead, else its trail slot, −1 = not visible).
+   *  The REWIND's offset target reads this for the COMMITTED pin — deliberately separate from
+   *  `selectedSlot`, which also follows the transient hover (hover previews the hot row IN
+   *  PLACE; only a click moves the trail — user, 2026-08-07). */
+  slotOf(ordinal: number): number {
+    if (ordinal === this.tickOrdinal) return 0;
+    const t = this.trail.find((x) => x.ordinal === ordinal);
+    return t ? t.slot : -1;
+  }
+
+  // The binary colour rule: colour belongs to the LIVE lead (slot<=0) OR to a SELECTED older
+  // snapshot (exclusively — selecting one neutralises the live lead). (The laneOff parameter went
+  // with the off-filter dim, 2026-08-07 — a committed filter changes the camera, never a row.)
+  isRowHot(slot: number): boolean {
+    return this.selectedSlot > 0 ? slot === this.selectedSlot : slot <= 0;
   }
 }

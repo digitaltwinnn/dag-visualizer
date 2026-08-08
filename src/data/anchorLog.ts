@@ -50,3 +50,25 @@ export function buildAnchorLog(
   rows.sort((a, b) => (a.ts === b.ts ? b.ordinal - a.ordinal : a.ts < b.ts ? 1 : -1));
   return rows;
 }
+
+/** The UNLISTED channels' log rows (2026-08-07): the polled buffers only track the public
+ *  catalog, so the EXACT reads are the only honest source. One row per uncataloged channel
+ *  snapshot in the measured window — `metaId` is the raw state-channel ADDRESS (hash unknown),
+ *  same shape as the listed rows so every consumer renders them identically. */
+export function buildUnlistedLog(
+  globalSnapshots: readonly GlobalSnapshot[],
+  exactByOrdinal: Readonly<Record<number, { rows?: readonly { metaId: string; ordinal: number; fee: number; bytes: number }[] } | undefined>>,
+  listedIds: ReadonlySet<string>,
+): AnchorLogRow[] {
+  const rows: AnchorLogRow[] = [];
+  for (const g of globalSnapshots) {
+    const ex = exactByOrdinal[g.ordinal];
+    if (!ex?.rows) continue;
+    for (const r of ex.rows) {
+      if (listedIds.has(r.metaId)) continue;
+      rows.push({ metaId: r.metaId, ordinal: r.ordinal, hash: "", fee: r.fee, sizeInKB: r.bytes / 1024, ts: g.timestamp, global: g });
+    }
+  }
+  rows.sort((a, b) => (a.ts === b.ts ? b.ordinal - a.ordinal : a.ts < b.ts ? 1 : -1));
+  return rows;
+}

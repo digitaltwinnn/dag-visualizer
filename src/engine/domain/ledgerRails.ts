@@ -1,58 +1,79 @@
-// NODE RAILS (redesign 2026-08-04, spec §4.4): the validators leave the floors and line up on the
-// FRONT edge of the floor they belong to, partitioned by MAKE-UP — each machine on exactly one
-// rail, so the hybrid machines that run both layers are counted once instead of twice.
+// NODE TRAYS (redesign 2026-08-07, replacing the per-role containers): every snapshot plane
+// carries ONE glass tray of the machines that produce it, hanging under the plane's front edge
+// and facing the camera. Each METAGRAPH has its own plane now, so each has its own tray — the
+// machines are deduped (a hybrid appears ONCE; the role split belongs to other views, user) —
+// and the global floor keeps a single full-width tray with the whole validator fleet.
 //
-// The layer rungs deliberately OVERLAP the rails: committing `ml1` lights the L1-only rail AND the
-// hybrid rail; `ml0` lights L0-only and hybrid. The hybrid rail answering to both rungs is the
-// visual statement that they are the same machines — what the old two-floor layout got wrong.
-//
-// An EMPTY rail hides and the remaining rails collapse up (the explorer's composition groups only
-// ever emit groups that exist). Applied to the DAG's own validators the same rule yields two rails
-// and hides the empty hybrid one.
+// Pure layout math — the scene adapter (objects/NodeRails.ts) draws the tray glass and Globe
+// places the shared node InstancedMesh chips on the same specs, so the two can never disagree.
 import * as THREE from "three";
-import { railX, railY, RAIL_CAP, RAIL_CHIP_PITCH_Z, LANE_HALF_Z, type RailGroup } from "./ledgerLayout";
+import {
+  CONT_X, CONT_TOP_GAP, CONT_CHIP_Z, CONT_ROW_Y, CONT_PAD, CONT_Z0, CONT_Z1,
+  FLOOR_Y, lanePlaneHalf, ledgerSite,
+} from "./ledgerLayout";
 
-export type RailKind = "l1only" | "hybrid" | "l0only";
-
-/** Fixed rail order, nearest the floor's tile boundary first (railX's index 0): L1 work arrives
- *  at the boundary, hybrids sit between, L0 seals furthest toward the camera. */
-export const RAIL_ORDER: readonly RailKind[] = ["l1only", "hybrid", "l0only"];
-
-/** A machine's rail from its roles. `null` = it runs nothing this chamber renders. */
-export function railKindOf(roles: readonly string[]): RailKind | null {
-  const l0 = roles.includes("l0");
-  const l1 = roles.includes("cl1") || roles.includes("dl1");
-  if (l0 && l1) return "hybrid";
-  if (l1) return "l1only";
-  if (l0) return "l0only";
-  return null;
+export interface ContainerSpec {
+  /** What the tray holds: a METAGRAPH id for the per-plane trays, "dag" for the validator tray. */
+  key: string;
+  count: number;
+  cols: number;
+  rows: number;
+  /** Frame centre + half extents (local Y/Z; X is the shared CONT_X plane). */
+  cy: number;
+  cz: number;
+  hy: number;
+  hz: number;
+  /** First chip's centre (top row, screen-left column). */
+  chipY0: number;
+  chipZ0: number;
 }
 
-/** The rails that actually have machines, in RAIL_ORDER — the visible index is the X step. */
-export function visibleRails(counts: ReadonlyMap<RailKind, number>): RailKind[] {
-  return RAIL_ORDER.filter((k) => (counts.get(k) ?? 0) > 0);
+function traySpec(key: string, count: number, cz: number, hz: number, floorY: number): ContainerSpec {
+  const cols = Math.max(1, Math.floor((2 * hz - 2 * CONT_PAD) / CONT_CHIP_Z));
+  const rows = Math.ceil(count / cols);
+  const h = rows * CONT_ROW_Y + 2 * CONT_PAD;
+  const top = floorY - CONT_TOP_GAP;
+  // The chip grid is CENTRED in the tray (user, 2026-08-07) — a small fleet floats mid-tray
+  // instead of hugging the screen-left edge.
+  const gridCols = Math.min(count, cols);
+  return {
+    key, count, cols, rows,
+    cy: top - h / 2, cz, hy: h / 2, hz,
+    chipY0: top - CONT_PAD - CONT_ROW_Y / 2,
+    chipZ0: cz + (gridCols * CONT_CHIP_Z) / 2 - CONT_CHIP_Z / 2,
+  };
 }
 
-/** Chip `slot` (0-based, within its rail) → its position in the local ledger frame. */
-export function railChipPos(group: RailGroup, visibleIndex: number, slot: number, out: THREE.Vector3): THREE.Vector3 {
-  const row = Math.floor(slot / RAIL_CAP);
-  const col = slot - row * RAIL_CAP;
-  out.set(railX(visibleIndex), railY(group, row), -LANE_HALF_Z + col * RAIL_CHIP_PITCH_Z);
-  return out;
+/** The PER-METAGRAPH trays: one tray per metagraph with located machines, under ITS OWN plane
+ *  and spanning that plane's width. `laneIds` is the shared roster (ledgerModel.LANE_IDS) — the
+ *  tray rides its lane's z; a laneless count (or the unknown lane, machine-less by nature)
+ *  simply gets no tray. */
+export function metaTrayLayout(
+  countsById: ReadonlyMap<string, number>,
+  laneIds: readonly string[],
+): Map<string, ContainerSpec> {
+  const n = laneIds.length;
+  const hz = lanePlaneHalf(n);
+  const specs = new Map<string, ContainerSpec>();
+  for (let i = 0; i < n; i++) {
+    const id = laneIds[i];
+    const count = countsById.get(id) ?? 0;
+    if (count <= 0) continue;
+    specs.set(id, traySpec(id, count, ledgerSite(i, n).z, hz, FLOOR_Y.msnap));
+  }
+  return specs;
 }
 
-/** The layer id a rail's own pick commits. Hybrid sides with the L0 that produces the floor it
- *  stands on — the machines are the same, and the L0 rung is the one the snapshot floor is about. */
-export function railLayerId(group: RailGroup, kind: RailKind): "ml0" | "ml1" | "hypl0" | "hypl1" {
-  if (group === "meta") return kind === "l1only" ? "ml1" : "ml0";
-  return kind === "l1only" ? "hypl1" : "hypl0";
+/** The DAG's single validator tray: full front width of the global floor, every machine once. */
+export function dagTrayLayout(count: number): ContainerSpec[] {
+  if (count <= 0) return [];
+  return [traySpec("dag", count, (CONT_Z0 + CONT_Z1) / 2, (CONT_Z1 - CONT_Z0) / 2, FLOOR_Y.gl0)];
 }
 
-/** Does a committed layer rung light this rail? The overlap rule above. */
-export function railLit(layerId: string, group: RailGroup, kind: RailKind): boolean {
-  const l1 = group === "meta" ? "ml1" : "hypl1";
-  const l0 = group === "meta" ? "ml0" : "hypl0";
-  if (layerId === l1) return kind === "l1only" || kind === "hybrid";
-  if (layerId === l0) return kind === "l0only" || kind === "hybrid";
-  return false;
+/** Chip `slot`'s world-ish (pre-group-transform) position inside a tray — row-major from the
+ *  top-left, screen-left → right (−Z direction is screen-right in the ledger frame). */
+export function containerChipPos(spec: ContainerSpec, slot: number, out: THREE.Vector3): THREE.Vector3 {
+  const row = Math.floor(slot / spec.cols);
+  const col = slot % spec.cols;
+  return out.set(CONT_X, spec.chipY0 - row * CONT_ROW_Y, spec.chipZ0 - col * CONT_CHIP_Z);
 }

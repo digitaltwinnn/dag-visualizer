@@ -10,8 +10,9 @@
 // (objects/Ribbons) tie each lane's tiles above to its own band below. The dials, the cubic anchor
 // links and the centred lead block are RETIRED with the seven-floor stack.
 //
-// This class owns the floors, their labels, the metagraph-snapshot lane tiles, the currency gutter
-// line and the anchor pulses; everything else is composed from the three adapters.
+// This class owns the SnapshotPlane instances (the reusable plane blueprint: glass + edge label
+// + tray — objects/SnapshotPlane.ts), the metagraph-snapshot lane tiles and the anchor pulses;
+// everything else is composed from the adapters.
 //
 // ─── STATE vs. MESH split ──────────────────────────────────────────────────────────────────────
 // This class is the SCENE ADAPTER over LedgerModel (domain/ledgerModel.ts): the domain owns which
@@ -28,53 +29,37 @@ import * as THREE from "three";
 import { METAGRAPHS } from "../../config";
 import {
   LEDGER,
-  LAYER_GEOM,
-  FLOOR_IDS,
   FLOOR_Y,
-  GUTTER_CZ,
-  GUTTER_W,
+  PLANE_FIELD_HALF,
   LANE_HALF_Z,
+  lanePlaneHalf,
+  LEAD_X,
+  TILE_LIFT,
   laneSpan,
   type RailGroup,
 } from "../../domain/ledgerLayout";
 import type { SceneColors } from "../../sceneColors";
-import { LedgerModel, SLOT_SP, SLOT_N, LANE_GAP_Z, slotFade } from "../../domain/ledgerModel";
+import { LedgerModel, LANE_IDS, SLOT_SP, SLOT_N, LANE_GAP_Z } from "../../domain/ledgerModel";
 import { makeBarSpec, fillBarSpec, UNLISTED_KEY, type BarSpec } from "../../domain/ledgerBands";
-import type { RailKind } from "../../domain/ledgerRails";
+import type { ContainerSpec } from "../../domain/ledgerRails";
 import type {
   GlobalSnapshot,
   Anchor,
   PickDescriptor,
   SnapshotExact,
-  CurrencyActivity,
 } from "@/src/data/types";
 import { LEDGER_LAYERS } from "@/src/data/ledgerLayers"; // shared display copy — floor labels = panel rows
-import { activityLine } from "@/src/data/currencyActivity";
-import { ByteBar } from "../objects/ByteBar";
+import { ByteBar, SNAP_PREVIEW } from "../objects/ByteBar";
+import { RIBBON_DIM } from "../objects/Ribbons";
 import { Ribbons } from "../objects/Ribbons";
-import { NodeRails } from "../objects/NodeRails";
-import { FocusSpot } from "../objects/FocusSpot";
-import type { StageLights } from "../objects/StageLights";
-import { STAGE_LIGHTS } from "../../domain/stageLight";
+import { SnapshotPlane, makeEdgeLabel, GLOBAL_PLANE_TUNE_DEFAULTS, META_PLANE_TUNE_DEFAULTS, type PlaneTune } from "../objects/SnapshotPlane";
+import { TrailRewind } from "../objects/TrailRewind";
 import { FadeSet } from "../objects/FadeSet";
 import type { SceneView } from "./SceneView";
-
-// Floor-frame + edge-fill opacities at rest and when a plane is highlighted from the explore panel.
-// NB the frame material's colour is HDR-overdriven ×2 (see _buildFloors), so these opacities are
-// roughly HALF the perceived line brightness.
-const FLOOR_FRAME_OP = 0.11,
-  FLOOR_FILL_OP = 0.03,
-  FLOOR_INNER_OP = 0;
-const FLOOR_FRAME_HI = 0.4,
-  FLOOR_FILL_HI = 0.055,
-  FLOOR_INNER_HI = 0.008;
-const FLOOR_FRAME_OFF = 0.055,
-  FLOOR_FILL_OFF = 0.015;
 
 const PULSE_MAX = 220;
 const PULSE_STAGGER = 0.035;
 const META_TRAIL_MAX = 1500;
-const GUTTER_OP = 0.75;
 
 /** The glass floors' footprint, and the X the edge-aligned labels read from. Module scope because
  *  the gutter label has to land on the SAME edge as the floor labels (it used to be derived from
@@ -84,19 +69,22 @@ const FLOOR_D = 44;
 const FLOOR_CX = -13.25;
 const FLOOR_LABEL_X = FLOOR_CX + FLOOR_W / 2 - 0.4;
 
-/** The lead row's "forming…" note: quieter than a floor label, and it eases rather than blinks. */
-const FORMING_OP = 0.6;
-const FORMING_EASE = 2.2;
-/** Just camera-side of the lead slot (x = 0), reading in from the +Z edge of the lane field. */
-const FORMING_X = 1.4;
-const FORMING_Z = LANE_HALF_Z + 8;
+/** The per-row GLOBAL SNAPSHOT ID labels at the global plane's screen-left edge (user,
+ *  2026-08-07 — replaced the lead row's `forming…` note): every visible tick row is named by
+ *  the ordinal it anchors, quieter than the plane label. */
+const ORD_OP = 0.55;
+/** The committed lane's plane edge-fill multiplier (its plane leads with its snapshots). */
+const LANE_FILL_BOOST = 3;
+const ORD_H = 0.78;
+/** The label's text anchor — just outside the widest bar's screen-left end, reading inward. */
+const ORD_Z = LANE_HALF_Z + 0.35;
+/** Where the text visually ends (≈ the digits' extent) — the dotted anchor line starts here. */
+const ORD_LINE_Z0 = ORD_Z - 2.1;
 
 const _dummy = new THREE.Object3D();
+const _ordSeen = new Set<number>(); // scratch for _syncOrdLabels (event-time)
 const _col = new THREE.Color();
 const _p = new THREE.Vector3();
-
-const rgbTriplet = (c: THREE.Color): string =>
-  `${Math.round(c.r * 255)},${Math.round(c.g * 255)},${Math.round(c.b * 255)}`;
 
 /** One anchor travelling down a lane's ribbon, from its tile above onto its band below. */
 interface Pulse {
@@ -114,6 +102,16 @@ interface QueueItem {
  *  knows returns null — it stays DRAWN but is left out of `pickables` (the anonymous tile, §6.1). */
 export type TilePickResolver = (metaId: string, tickTs: string, k: number) => PickDescriptor | null;
 
+/** The live-tunable metagraph-snapshot TILE look (dev `?tune` panel binds these; the values are
+ *  the shipped look). Brightness multipliers on the tile's identity colour. */
+export interface TileTune {
+  hot: number;  // the hot row's filled tiles
+  rest: number; // a resting filled tile
+}
+
+// hot/rest user-tuned via ?tune, 2026-08-07 — the same levels as the byte bar's hot/rest.
+export const TILE_TUNE_DEFAULTS: TileTune = { hot: 0.7, rest: 0.1 };
+
 export class LedgerView implements SceneView {
   group: THREE.Group;
   pickables: THREE.Object3D[];
@@ -125,37 +123,52 @@ export class LedgerView implements SceneView {
   /** The COMMITTED network — the only thing that may move geometry (the lane field, the gutter). */
   private _filter: string;
   /** The HOVERED network, a pure preview that overrides the committed one for DIMMING only. */
-  private _hover: string | null = null;
 
+  private _colors: SceneColors;
   private _core: number;
-  private _border: number;
-  private _panel: number;
-  private _muted: number;
+  private readonly _coreCol = new THREE.Color();
 
-  // ── floors
-  private _floorMats = new Map<
-    string,
-    { frame: THREE.LineBasicMaterial; fill: THREE.ShaderMaterial }
-  >();
-  private _floorPicks: THREE.Object3D[] = [];
+  // ── floors (visual aid since 2026-08-06 — never pick SUBJECTS, but since 2026-08-07 they are
+  // pick BLOCKERS: a normal surface swallows the ray, so a bar under the metagraph floor can't
+  // be hovered/clicked through the glass — see Engine._pickAt's `userData.blocker` rule).
+  // `minHalf` clamps the rim width on the narrow gutter piece so the band can't swallow the
+  // whole plane.
+  private _floorBlockers: THREE.Object3D[] = [];
+  /** The plane blueprint instances: the global floor (main + gutter) and one per metagraph lane. */
+  private _globalPlanes: SnapshotPlane[] = [];
+  private _metaPlanes = new Map<string, SnapshotPlane>();
 
-  // ── the three adapters (spec §4.2–§4.4)
-  private _rails: NodeRails;
+  // ── the adapters (spec §4.2–§4.4)
   private _bar: ByteBar;
   private _ribbons: Ribbons;
+  /** Dev-only access for the ?tune panel (Engine.mountDevTune) — not part of the frame path. */
+  get ribbons(): Ribbons { return this._ribbons; }
+  get bar(): ByteBar { return this._bar; }
+  /** The tiles' live-tunable look — read per frame by update()'s tile pass. */
+  tiles: TileTune = { ...TILE_TUNE_DEFAULTS };
+  /** The two plane-tune channels (user, 2026-08-07): the global plane and the metagraph planes
+   *  are the SAME blueprint tuned separately — read per frame by _applyFloorAlpha. */
+  globalTune: PlaneTune = { ...GLOBAL_PLANE_TUNE_DEFAULTS };
+  metaTune: PlaneTune = { ...META_PLANE_TUNE_DEFAULTS };
 
-  // ── the lane field (construction-time; never reallocated per frame)
-  private readonly _laneOrder: string[] = METAGRAPHS.map((m) => m.id);
+  // ── the lane field (construction-time; never reallocated per frame) — the SHARED roster
+  // (ledgerModel.LANE_IDS): every listed metagraph plus the "unknown" lane at the screen-left end.
+  private readonly _laneOrder: string[] = [...LANE_IDS];
   private readonly _laneZ = new Map<string, number>();
   private readonly _laneHZ = new Map<string, number>();
-  private readonly _laneHidden = new Map<string, boolean>();
-  private _committedLane: number | null = null;
+  /** Ribbons' lane resolver. The lane field is FIXED now (user reversal 2026-08-07 — a filter
+   *  dims, it never hides/moves lanes), so every roster key resolves. */
   private readonly _laneZOf = (key: string): number | null => this._laneZ.get(key) ?? null;
 
   // ── per-slot bar specs + the snapshot each slot stands for
   private readonly _specs: BarSpec[] = [];
   private readonly _slotSnap: (GlobalSnapshot | null)[] = [];
   private readonly _byOrd = new Map<number, GlobalSnapshot>();
+  private readonly _byTs = new Map<string, GlobalSnapshot>();
+  // The last setData inputs — setExact re-runs the model with them so a landing exact read
+  // fills the unknown lane's tiles without waiting for the next tick/anchor event.
+  private _lastSnaps: GlobalSnapshot[] | null = null;
+  private _lastGetAnchor: ((ts: string) => Anchor | null) | null = null;
   private readonly _bytes = new Map<string, number>();
   private _exact: Record<number, SnapshotExact> = {};
 
@@ -175,32 +188,39 @@ export class LedgerView implements SceneView {
   private _lastDrawn = 0;
 
   // ── the currency gutter (spec §4.5/§6.7)
-  private _gutterLabel: THREE.Mesh | null = null;
-  private _activity: Record<string, CurrencyActivity | null> = {};
 
   // ── the lead row's honesty label: the newest tick's anchor count is still growing
-  private _formingLabel: THREE.Mesh | null = null;
-  private _formingW = 0;
+  /** ordinal → its row label + the dotted anchor line tying it to the row's actual bar
+   *  (recycled by ordinal as slots shift; `slot` feeds the rewind's front fade). */
+  private _ordLabels = new Map<number, { mesh: THREE.Mesh; line: THREE.Line; slot: number }>();
+  /** The labels+lines ride the trail rewind as one group. */
+  private _ordGroup = new THREE.Group();
+  /** The TRAIL REWIND (objects/TrailRewind.ts — the shown snapshot owns the front). Keyed to
+   *  the COMMITTED/FOLLOWED snapshot (`setPinned`), never the hover — hover previews the hot
+   *  row in place, only a click moves the trail. */
+  private _rewind = new TrailRewind();
+  /** Mirror of the rewind offset for the frame's read sites (updated once per update()). */
+  private _trailOff = 0;
+  private _slotOfOrd = (ordinal: number): number => this.model.slotOf(ordinal);
+  /** The transient HOVER row (split from the committed selection, user 2026-08-07): previews in
+   *  identity colour at SNAP_PREVIEW without demoting the active row. */
+  private _hoverOrd: number | null = null;
+  private _hoverSlot = -1;
+  /** Filter-chip / metagraph-row HOVER — previews the colored network dim at commit strength. */
+  private _hoverNet: string | null = null;
 
-  // ── stage light + fades
-  private _spot: FocusSpot;
-  private _spotLayerId: string | null = null;
-  private _spotPos = new THREE.Vector3();
-  private _spotN = new THREE.Vector3();
-  private _hiliteId: string | null = null;
-  private _hiliteDim = false;
+  // ── fades (the ledger's stage light went with the layer navigation, 2026-08-06 — nothing
+  // committable is left for a spot to dramatise)
   private _fades = new FadeSet();
 
   constructor(
     scene: THREE.Scene,
     colors: SceneColors,
     sceneColors: Record<string, number>,
-    stage: StageLights,
   ) {
+    this._colors = colors;
     this._core = colors.core;
-    this._border = colors.border;
-    this._panel = colors.panel;
-    this._muted = colors.muted;
+    this._coreCol.setHex(colors.core);
     this.sceneColors = sceneColors;
 
     this.group = new THREE.Group();
@@ -212,10 +232,8 @@ export class LedgerView implements SceneView {
     this.group.scale.setScalar(LEDGER.viewScale);
     scene.add(this.group);
 
-    this._spot = new FocusSpot(scene, STAGE_LIGHTS.ledger);
-    stage.register("ledger", this._spot);
-
     this.pickables = [];
+    this._floorBlockers.length = 0;
     this.t = 0;
     this._latest = null;
     this._filter = "all";
@@ -229,10 +247,9 @@ export class LedgerView implements SceneView {
 
     this._buildFloors();
 
-    this._rails = new NodeRails(colors);
     this._bar = new ByteBar(colors, sceneColors);
     this._ribbons = new Ribbons(colors, sceneColors);
-    this.group.add(this._rails.group, this._bar.group, this._ribbons.group);
+    this.group.add(this._bar.group, this._ribbons.group, this._ordGroup);
 
     this._buildMetaTrail();
     this._buildPulses();
@@ -242,13 +259,13 @@ export class LedgerView implements SceneView {
   // ── build ────────────────────────────────────────────────────────────────
 
   private _buildMetaTrail() {
+    // SOLID chips, not additive glow (user, 2026-08-07: the opacity-faded additive trail read
+    // as fuzzy): normal blending + depth writes make each tile a crisp little block whose
+    // BRIGHTNESS (instance colour) carries the recency fade — the bloom pass still lights the
+    // hot row, so the lead keeps its glow while the trail reads matte.
     this._metaTrailMesh = new THREE.InstancedMesh(
       new THREE.BoxGeometry(1, 1, 0.35),
-      new THREE.MeshBasicMaterial({
-        transparent: true,
-        blending: THREE.AdditiveBlending,
-        depthWrite: false,
-      }),
+      new THREE.MeshBasicMaterial({}),
       META_TRAIL_MAX,
     );
     this._metaTrailMesh.frustumCulled = false;
@@ -302,195 +319,69 @@ export class LedgerView implements SceneView {
 
   private _buildFloors() {
     const W = FLOOR_W;
-    const D = FLOOR_D;
     const cx = FLOOR_CX;
-    const frameMat = new THREE.LineBasicMaterial({
-      color: new THREE.Color(this._core).multiplyScalar(2),
-      transparent: true,
-      opacity: FLOOR_FRAME_OP,
-      blending: THREE.AdditiveBlending,
-      depthWrite: false,
-    });
-    const fillMat = new THREE.ShaderMaterial({
-      transparent: true,
-      depthWrite: false,
-      side: THREE.DoubleSide,
-      blending: THREE.AdditiveBlending,
-      uniforms: {
-        uColor: { value: new THREE.Color(this._core) },
-        uOpacity: { value: FLOOR_FILL_OP },
-        uInner: { value: FLOOR_INNER_OP },
-      },
-      vertexShader: `
-        varying vec2 vP;
-        void main() { vP = uv * 2.0 - 1.0; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
-      fragmentShader: `
-        uniform vec3 uColor; uniform float uOpacity; uniform float uInner; varying vec2 vP;
-        void main() {
-          float GRID = 48.0;
-          vec2 cell = (floor(vP * GRID) + 0.5) / GRID;
-          float e = max(abs(cell.x), abs(cell.y));
-          float band = smoothstep(0.88, 1.0, e);
-          band = floor(band * 3.0 + 0.5) / 3.0;
-          float a = uOpacity * band + uInner;
-          if (a <= 0.002) discard;
-          gl_FragColor = vec4(uColor, a);
-        }`,
-    });
-    const frame = (w: number, d: number, y: number, z: number, id: string) => {
-      const fm = fillMat.clone();
-      const fill = new THREE.Mesh(new THREE.PlaneGeometry(w, d), fm);
-      fill.rotation.x = -Math.PI / 2;
-      fill.position.set(cx, y, z);
-      fill.renderOrder = -2;
-      fill.userData.pick = { kind: "layer", layerId: id };
-      this._floorPicks.push(fill);
-      this.group.add(fill);
-      const lm = frameMat.clone();
-      const f = new THREE.LineSegments(new THREE.EdgesGeometry(new THREE.PlaneGeometry(w, d)), lm);
-      f.rotation.x = -Math.PI / 2;
-      f.position.set(cx, y, z);
-      f.renderOrder = -1;
-      this.group.add(f);
-      this._floorMats.set(id, { frame: lm, fill: fm });
-    };
-    // TWO floors now — the node layers are rails along their edges, not storeys of their own.
-    for (const id of FLOOR_IDS) frame(W, D, FLOOR_Y[id], 0, id);
-
-    const copyOf = (id: string) => LEDGER_LAYERS.find((l) => l.id === id);
     const lx = FLOOR_LABEL_X;
-    for (const id of FLOOR_IDS) {
-      const m = this._makeLabel(
-        copyOf(id)?.level ?? "",
-        copyOf(id)?.name ?? id,
-        lx,
-        FLOOR_Y[id],
-        D / 2 - 1.2,
-      );
-      this.group.add(m);
-      this._fades.register(m.material as THREE.MeshBasicMaterial, 1);
-    }
-
-    // The lead row is annotated, not decorated: while the live tick's anchor count is still
-    // GROWING, say so. It reads out from the +Z edge of the lane field toward the lead slot's own
-    // tiles (x ≈ 0), so it can only ever be about that row. Opacity is driven per frame in
-    // _applyFloorAlpha (it rides the view alpha like every other piece of furniture), so it is
-    // deliberately NOT registered with the fade set.
-    this._formingLabel = this._makeLabel("", "forming…", FORMING_X, FLOOR_Y.msnap, FORMING_Z);
-    (this._formingLabel.material as THREE.MeshBasicMaterial).opacity = 0;
-    this.group.add(this._formingLabel);
-  }
-
-  /** A flat, edge-aligned label plane — the chamber's only text. A blank `level` = no digit box. */
-  private _makeLabel(
-    level: string,
-    text: string,
-    frontX: number,
-    y: number,
-    leftZ: number,
-  ): THREE.Mesh {
-    const c = document.createElement("canvas");
-    const SS = 2;
-    c.width = 512 * SS;
-    c.height = 64 * SS;
-    const ctx = c.getContext("2d")!;
-    const cc = new THREE.Color(this._core);
-    const tone = `rgba(${rgbTriplet(cc)},0.85)`;
-    const mc = new THREE.Color(this._muted);
-    const mtone = `rgba(${rgbTriplet(mc)},0.95)`;
-    const bc = new THREE.Color(this._border);
-    const brgb = rgbTriplet(bc);
-    const pc = new THREE.Color(this._panel);
-    const prgb = rgbTriplet(pc);
-    let textX = 6 * SS;
-    if (level) {
-      ctx.font = `400 ${22 * SS}px system-ui, -apple-system, sans-serif`;
-      const boxW = Math.max(34 * SS, Math.ceil(ctx.measureText(level).width) + 16 * SS);
-      const bx = 6 * SS,
-        by = 15 * SS,
-        bh = 34 * SS,
-        br = 6 * SS;
-      ctx.beginPath();
-      ctx.roundRect(bx, by, boxW, bh, br);
-      ctx.fillStyle = `rgba(${prgb},0.9)`;
-      ctx.fill();
-      ctx.strokeStyle = `rgba(${brgb},0.6)`;
-      ctx.lineWidth = 2 * SS;
-      ctx.stroke();
-      ctx.fillStyle = mtone;
-      ctx.textAlign = "center";
-      ctx.textBaseline = "middle";
-      ctx.fillText(level, 6 * SS + boxW / 2, (15 + 17 + 1) * SS);
-      textX = 6 * SS + boxW + 12 * SS;
-    }
-    ctx.font = `400 ${26 * SS}px system-ui, -apple-system, sans-serif`;
-    ctx.textAlign = "left";
-    ctx.textBaseline = "middle";
-    ctx.fillStyle = tone;
-    ctx.fillText(text, textX, c.height / 2 + 2 * SS);
-    const tex = new THREE.CanvasTexture(c);
-    tex.minFilter = THREE.LinearFilter;
-    tex.colorSpace = THREE.SRGBColorSpace;
-    const h = 1.05,
-      w = h * (c.width / c.height);
-    const mesh = new THREE.Mesh(
-      new THREE.PlaneGeometry(w, h),
-      new THREE.MeshBasicMaterial({
-        map: tex,
-        transparent: true,
-        depthWrite: false,
-        depthTest: false,
+    // Every storey surface is the SAME blueprint (objects/SnapshotPlane.ts — glass + edge label
+    // + tray), positioned per instance. The GLOBAL floor is ONE whole plane (+ its reserved
+    // $DAG-blocks gutter beyond the seam, label-less) — the only place the metagraphs come
+    // together. The UPPER storey is one narrow plane PER METAGRAPH over its lane (user,
+    // 2026-08-07), gapped, each named by its ticker. Independence made literal.
+    // The global plane sits RIGHT beneath the metagraph planes: the SAME symmetric field extent
+    // (±PLANE_FIELD_HALF, centred on the lane field — user 2026-08-07; the old label-margin
+    // plane read skewed, and the reserved gutter strip went with it).
+    const gl = LEDGER_LAYERS.find((l) => l.id === "gl0");
+    this._globalPlanes.push(
+      new SnapshotPlane(this.group, this._colors, {
+        w: W, d: 2 * PLANE_FIELD_HALF, y: FLOOR_Y.gl0, cx, cz: 0,
+        label: { text: gl?.name ?? "gl0", x: lx, z: 0, align: "center" },
       }),
     );
-    mesh.quaternion.setFromRotationMatrix(
-      new THREE.Matrix4().makeBasis(
-        new THREE.Vector3(0, 0, -1),
-        new THREE.Vector3(-1, 0, 0),
-        new THREE.Vector3(0, 1, 0),
-      ),
-    );
-    mesh.position.set(frontX - h / 2, y + 0.06, leftZ - w / 2);
-    mesh.renderOrder = 2;
-    return mesh;
+    const n = this._laneOrder.length;
+    const hz = lanePlaneHalf(n);
+    for (let i = 0; i < n; i++) {
+      const key = this._laneOrder[i];
+      const meta = METAGRAPHS.find((m) => m.id === key);
+      const cz = laneSpan(i, n).cz;
+      // (The collective "Metagraph snapshots" label went with the shared floor — each plane
+      // names itself, CENTRED on its own width; the explorer names the group.)
+      this._metaPlanes.set(key, new SnapshotPlane(this.group, this._colors, {
+        w: W, d: hz * 2, y: FLOOR_Y.msnap, cx, cz,
+        label: { text: meta?.ticker ?? UNLISTED_KEY, x: lx, z: cz, height: 0.62, align: "center" },
+      }));
+    }
+    for (const p of [...this._globalPlanes, ...this._metaPlanes.values()]) {
+      this._floorBlockers.push(p.fill);
+      if (p.label) this._fades.register(p.label.material as THREE.MeshBasicMaterial, 1);
+    }
+
   }
 
   // ── view alpha / highlight ───────────────────────────────────────────────
 
   setViewAlpha(a: number): void {
     this._fades.apply(a);
-    this._rails.setAlpha(a);
     this._bar.setAlpha(a);
     this._ribbons.setAlpha(a);
     // group.visible is owned SOLELY by the Engine — a view fades, it never hides itself.
   }
 
-  setHighlight(id: string | null, dimOthers = false): void {
-    this._spotLayerId = dimOthers && id ? id : null;
-    this._hiliteId = id;
-    this._hiliteDim = dimOthers;
-    // The LAYER rung: the four node layers now live on the rails, so they highlight there.
-    this._rails.setHighlight(id, dimOthers);
-    this._applyFloorAlpha();
-  }
-
   private _applyFloorAlpha(): void {
-    const id = this._hiliteId;
-    const dimOthers = this._hiliteDim;
-    for (const [k, m] of this._floorMats) {
-      const on = id === k;
-      const off = id != null && dimOthers;
-      m.frame.opacity =
-        (on ? FLOOR_FRAME_HI : off ? FLOOR_FRAME_OFF : FLOOR_FRAME_OP) * this._fades.alpha;
-      m.fill.uniforms.uOpacity.value =
-        (on ? FLOOR_FILL_HI : off ? FLOOR_FILL_OFF : FLOOR_FILL_OP) * this._fades.alpha;
-      m.fill.uniforms.uInner.value = (on ? FLOOR_INNER_HI : FLOOR_INNER_OP) * this._fades.alpha;
+    // Each plane applies ITS tune channel (the global floor vs the metagraph planes — same
+    // blueprint, two knobs; user 2026-08-07). FLOOR_D/2 is the shared drop-off reference so the
+    // rim reads as one width everywhere; narrow pieces clamp it inside SnapshotPlane.
+    const a = this._fades.alpha;
+    for (const p of this._globalPlanes) p.applyAlpha(this.globalTune, a, FLOOR_D / 2);
+    // The committed (or hover-previewed) network's OWN plane glows a step brighter — the
+    // plane-level twin of the colored dim (user, 2026-08-07).
+    const netKey = this._netDimKey();
+    for (const [key, p] of this._metaPlanes)
+      p.applyAlpha(this.metaTune, a, FLOOR_D / 2, key === netKey ? LANE_FILL_BOOST : 1);
+    for (const o of this._ordLabels.values()) {
+      const front = this._rewind.fadeAtX(LEAD_X - o.slot * SLOT_SP + this._trailOff);
+      (o.mesh.material as THREE.MeshBasicMaterial).opacity = ORD_OP * front * a;
+      // The anchor line whispers under its label (user, 2026-08-07 — "a bit more subtle").
+      (o.line.material as THREE.LineDashedMaterial).opacity = ORD_OP * 0.45 * front * a;
     }
-    if (this._gutterLabel)
-      (this._gutterLabel.material as THREE.MeshBasicMaterial).opacity =
-        GUTTER_OP * this._fades.alpha;
-    if (this._formingLabel)
-      (this._formingLabel.material as THREE.MeshBasicMaterial).opacity =
-        FORMING_OP * this._formingW * this._fades.alpha;
   }
 
   setSceneColors(map: Record<string, number>): void {
@@ -502,15 +393,16 @@ export class LedgerView implements SceneView {
 
   // ── the lane field ───────────────────────────────────────────────────────
 
-  /** Event-time only (a filter COMMIT). The committed lane takes the floor; the rest step out. */
+  /** Construction-time only — the lane field is FIXED (user reversal 2026-08-07): a committed
+   *  filter dims and flies the camera to the lane (Engine), it never moves geometry. */
   private _relayoutLaneField(): void {
     const n = this._laneOrder.length;
     for (let i = 0; i < n; i++) {
-      const s = laneSpan(i, n, this._committedLane);
+      const s = laneSpan(i, n);
       const key = this._laneOrder[i];
       this._laneZ.set(key, s.cz);
-      this._laneHZ.set(key, s.hz);
-      this._laneHidden.set(key, s.hidden);
+      // Tiles fit each lane's OWN PLANE (2026-08-07) — the slice minus the separating gap.
+      this._laneHZ.set(key, lanePlaneHalf(n));
     }
   }
 
@@ -525,11 +417,32 @@ export class LedgerView implements SceneView {
     const isNewTick = this._latest?.ordinal !== latest.ordinal;
     this._latest = latest;
 
-    const changes = this.model.setData(snaps, getAnchor);
-
-    // event-time: one ordinal index per tick (the trail carries ordinals, not snapshots)
+    // event-time: one ordinal index per tick (the trail carries ordinals, not snapshots).
+    // Built BEFORE the model runs — the wrapped anchor resolver below needs the ts join.
     this._byOrd.clear();
-    for (const s of snaps) this._byOrd.set(s.ordinal, s);
+    this._byTs.clear();
+    for (const s of snaps) { this._byOrd.set(s.ordinal, s); this._byTs.set(s.timestamp, s); }
+
+    // The UNKNOWN lane's counts (user, 2026-08-07): fold the EXACT read's unlistedCount into the
+    // anchor aggregate as a pseudo-metagraph. Exact-only on purpose — the polled floor
+    // (total − identified) is transiently high while a tick settles, and lane tiles never
+    // shrink, so a floor-fed lane would show phantom snapshots. No exact read → no unknown
+    // tiles for that tick (the same honesty rule as the byte bar's bands).
+    this._lastSnaps = snaps;
+    this._lastGetAnchor = getAnchor;
+    const wrapped = (ts: string): Anchor | null => {
+      const a = getAnchor(ts);
+      const snap = this._byTs.get(ts);
+      const u = snap ? this._exact[snap.ordinal]?.unlistedCount ?? 0 : 0;
+      if (u <= 0) return a;
+      const metaCounts = new Map(a?.metaCounts ?? []); // event-time
+      metaCounts.set(UNLISTED_KEY, u);
+      return a
+        ? { fee: a.fee, count: a.count, metaIds: a.metaIds, metaCounts, touched: a.touched }
+        : { fee: 0, count: u, metaIds: new Set([UNLISTED_KEY]), metaCounts, touched: 0 };
+    };
+
+    const changes = this.model.setData(snaps, wrapped);
     for (let s = 0; s < SLOT_N; s++) this._slotSnap[s] = null;
     if (this.model.tickOrdinal != null)
       this._slotSnap[0] = this._byOrd.get(this.model.tickOrdinal) ?? null;
@@ -537,6 +450,7 @@ export class LedgerView implements SceneView {
       if (tr.slot >= 0 && tr.slot < SLOT_N)
         this._slotSnap[tr.slot] = this._byOrd.get(tr.ordinal) ?? null;
 
+    this._recomputeHoverSlot();
     this._rebuildAllSlots();
 
     if (isNewTick) {
@@ -553,10 +467,14 @@ export class LedgerView implements SceneView {
     }
   }
 
-  /** The exact per-ordinal byte reads — the ONLY source a bar's width may come from (spec §6.2). */
+  /** The exact per-ordinal byte reads — the ONLY source a bar's width may come from (spec §6.2),
+   *  and since 2026-08-07 the only source of the unknown lane's tile counts too. */
   setExact(byOrdinal: Record<number, SnapshotExact>): void {
     this._exact = byOrdinal;
-    this._rebuildAllSlots();
+    // Re-run the model with the stored inputs so a landing read fills the unknown lane now
+    // (setData rebuilds the slots itself); before any data, just rebuild the bars.
+    if (this._lastSnaps && this._lastGetAnchor) this.setData(this._lastSnaps, this._lastGetAnchor);
+    else this._rebuildAllSlots();
   }
 
   setTileResolver(fn: TilePickResolver | null): void {
@@ -565,14 +483,11 @@ export class LedgerView implements SceneView {
     this._syncPickables();
   }
 
-  setCurrencyActivity(byId: Record<string, CurrencyActivity | null>): void {
-    this._activity = byId;
-    this._rebuildGutter();
-  }
-
-  setRails(group: RailGroup, kinds: RailKind[]): void {
-    this._rails.setRails(group, kinds); // event-time: a data rebuild, not a frame
-    this._syncPickables();
+  setContainers(group: RailGroup, specs: ContainerSpec[]): void {
+    // event-time: a data rebuild. Each tray routes to ITS OWN plane by key ("dag" / metagraph
+    // id) — the blueprint owns the tray glass, the chips stay Globe's shared InstancedMeshes.
+    if (group === "dag") this._globalPlanes[0]?.setTray(specs[0] ?? null);
+    else for (const [key, p] of this._metaPlanes) p.setTray(specs.find((s) => s.key === key) ?? null);
   }
 
   setSelected(ordinal: number | null) {
@@ -581,35 +496,50 @@ export class LedgerView implements SceneView {
     this._syncRibbonRows();
   }
 
-  /** The COMMITTED network. This is the ONE entry point that may rearrange the lane field — a hover
-   *  previews the highlight (setHoverFilter), never the rearrangement. */
+  /** The transient hover — the colored-dim PREVIEW tier (the committed row stays fully hot). */
+  setHovered(ordinal: number | null) {
+    this._hoverOrd = ordinal;
+    this._recomputeHoverSlot();
+    this._syncRibbonRows();
+  }
+
+  private _recomputeHoverSlot(): void {
+    this._hoverSlot = this._hoverOrd != null ? this.model.slotOf(this._hoverOrd) : -1;
+    this._bar.setHovered(this._hoverSlot);
+  }
+
+  /** The COMMITTED (clicked) or followed snapshot — the only thing the trail rewind tracks. */
+  setPinned(ordinal: number | null) {
+    this._rewind.setPinned(ordinal);
+  }
+
+  /** The COMMITTED network. Since the off-filter dim was removed entirely (user, 2026-08-07)
+   *  this only GATES THE ANCHOR PULSES (the committed lane's pulses spawn, the rest stay
+   *  quiet) — the lane field never moves, nothing dims, and the camera fly-to-lane is the
+   *  Engine's ledgerNetwork resolver. */
   setFilter(filter: string) {
     this._filter = filter || "all"; // event-time
-    const idx =
-      this._filter === "all" || this._filter === "dag" ? -1 : this._laneOrder.indexOf(this._filter);
-    this._committedLane = idx >= 0 ? idx : null;
-    this._relayoutLaneField();
-    this._applyDim();
-    this._rebuildAllSlots();
-    this._rebuildGutter();
+    this._applyNetDim();
   }
 
-  /** Filter-chip / hub HOVER: preview that network's highlight only. No relayout, no gutter change,
-   *  no pulse re-gating — null falls back to the committed filter. */
+  /** Filter-chip / metagraph-row hover: previews the colored dim at the SAME strength as a
+   *  commit (the house hover rule); null falls back to the committed filter. */
   setHoverFilter(filter: string | null) {
-    this._hover = filter || null; // event-time
-    this._applyDim();
+    this._hoverNet = filter || null; // event-time
+    this._applyNetDim();
   }
 
-  /** The key the DIM lanes are resolved against: the live hover wins, else the committed filter. */
-  private _dimKey(): string {
-    return this._hover ?? this._filter;
+  /** The network the dim resolves against — the live hover wins, else the committed filter. */
+  private _netDimKey(): string {
+    return this._hoverNet ?? this._filter;
   }
 
-  private _applyDim(): void {
-    const d = this._dimKey();
-    this._bar.setFilter(d); // bands dim, never disappear (spec §5.2)
+  private _applyNetDim(): void {
+    const d = this._netDimKey();
+    // The other metagraphs' elements take the COLORED dim (identity hue at RIBBON_DIM):
+    // ribbons + bands here, tiles in the per-frame pass, chips via the dim model's emissive.
     this._ribbons.setFilter(d);
+    this._bar.setFilter(d);
   }
 
 
@@ -656,27 +586,96 @@ export class LedgerView implements SceneView {
       this._bar.setBar(s, snap.ordinal, this._specs[s], this._pickFor(snap));
     }
     this._syncRibbonRows();
+    this._syncOrdLabels();
     this._rebuildTilePicks();
     this._syncPickables();
   }
 
+
+  /** One GLOBAL SNAPSHOT ID label per visible tick row, screen-left of the bars, each tied to
+   *  its row's actual bar by a DOTTED anchor line (user, 2026-08-07). Keyed by ordinal so a
+   *  label rides its row down the trail; one new canvas per tick (event-time — recycled labels
+   *  only move, and the line end tracks the bar's live width as the exact read lands). */
+  private _syncOrdLabels(): void {
+    const seen = _ordSeen;
+    seen.clear();
+    const y = FLOOR_Y.gl0 + 0.06;
+    for (let s = 0; s < SLOT_N; s++) {
+      const snap = this._slotSnap[s];
+      if (!snap) continue;
+      seen.add(snap.ordinal);
+      let o = this._ordLabels.get(snap.ordinal);
+      if (o) o.slot = s;
+      if (!o) {
+        // event-time: one canvas + one 2-point dashed line per new tick
+        const mesh = makeEdgeLabel(this._colors, snap.ordinal.toLocaleString(), 0, FLOOR_Y.gl0, ORD_Z, ORD_H);
+        (mesh.material as THREE.MeshBasicMaterial).opacity = 0;
+        const lg = new THREE.BufferGeometry().setFromPoints([
+          new THREE.Vector3(0, y, ORD_LINE_Z0),
+          new THREE.Vector3(0, y, 0),
+        ]);
+        const lm = new THREE.LineDashedMaterial({
+          color: this._core, transparent: true, opacity: 0,
+          depthWrite: false, dashSize: 0.14, gapSize: 0.18,
+        });
+        const line = new THREE.Line(lg, lm);
+        line.renderOrder = 2;
+        o = { mesh, line, slot: s };
+        this._ordLabels.set(snap.ordinal, o);
+        this._ordGroup.add(mesh, line);
+      }
+      const x = LEAD_X - s * SLOT_SP;
+      o.mesh.position.x = x;
+      // The dotted anchor runs from the text's end to the row's bar edge (its live width/2 —
+      // grows when the exact read lands); with no bar drawn it points at the row's centreline.
+      const spec = this._specs[s];
+      const barEdge = spec.measured && spec.bandCount > 0 ? spec.width / 2 + 0.18 : 0.3;
+      const pos = o.line.geometry.attributes.position as THREE.BufferAttribute;
+      pos.setXYZ(0, x, y, ORD_LINE_Z0);
+      pos.setXYZ(1, x, y, Math.min(barEdge, ORD_LINE_Z0 - 0.2));
+      pos.needsUpdate = true;
+      o.line.computeLineDistances(); // event-time: dashed lines need distances after a move
+    }
+    for (const [ord, o] of this._ordLabels) {
+      if (seen.has(ord)) continue;
+      this._ordGroup.remove(o.mesh, o.line);
+      o.mesh.geometry.dispose();
+      const mat = o.mesh.material as THREE.MeshBasicMaterial;
+      mat.map?.dispose();
+      mat.dispose();
+      o.line.geometry.dispose();
+      (o.line.material as THREE.Material).dispose();
+      this._ordLabels.delete(ord);
+    }
+  }
+
   private _syncRibbonRows(): void {
     this._ribbons.setRow(0, 0, this._slotSnap[0] ? this._specs[0] : null, this._laneZOf);
+    // Row 1 = the COMMITTED row (full strength); row 2 = the HOVER preview (colored dim).
+    // Separate rows (2026-08-07): with a snapshot pinned, a hover needs its own sheet — the
+    // active row keeps its ribbons regardless of hover, and the preview never goes missing.
     const hot = this.model.selectedSlot;
-    if (hot > 0 && hot < SLOT_N && this._slotSnap[hot])
+    if (hot > 0 && hot < SLOT_N && this._slotSnap[hot]) {
       this._ribbons.setRow(1, hot, this._specs[hot], this._laneZOf);
-    else this._ribbons.clearRow(1);
+      this._ribbons.setRowFade(1, 1);
+    } else this._ribbons.clearRow(1);
+    const hov = this._hoverSlot;
+    if (hov > 0 && hov < SLOT_N && hov !== hot && this._slotSnap[hov]) {
+      this._ribbons.setRow(2, hov, this._specs[hov], this._laneZOf);
+      this._ribbons.setRowFade(2, SNAP_PREVIEW);
+    } else this._ribbons.clearRow(2);
   }
 
   /** The ribbon index a metagraph's band occupies in a row — mirrors the order Ribbons.setRow walks
-   *  (one ribbon per band with bytes > 0, in band order). Returns −1 when the band is absent. */
+   *  (one ribbon per band with bytes > 0 whose lane isn't hidden, in band order). −1 when absent. */
   private _ribbonIndexOf(slot: number, key: string): number {
     const spec = this._specs[slot];
     if (!spec || !spec.measured) return -1;
     let n = 0;
     for (let i = 0; i < spec.bandCount; i++) {
-      if (spec.bands[i].bytes <= 0) continue;
-      if (spec.bands[i].key === key) return n;
+      const band = spec.bands[i];
+      if (band.bytes <= 0) continue;
+      if (band.key === key) return n;
       n++;
     }
     return -1;
@@ -691,7 +690,6 @@ export class LedgerView implements SceneView {
     }
     let mi = 0;
     for (const lane of this.model.lanes.values()) {
-      if (this._laneHidden.get(lane.id)) continue;
       // `k` is the tile's index WITHIN ITS TICK — the resolver looks a snapshot up by
       // (metagraph, tick) and indexes that tick's own list. A lane's blocks are contiguous per
       // tick (anchorTiles pushes a tick's tiles together), so the counter resets on each new ts.
@@ -710,41 +708,12 @@ export class LedgerView implements SceneView {
 
   private _syncPickables(): void {
     this.pickables.length = 0;
-    for (const o of this._floorPicks) this.pickables.push(o);
-    for (const o of this._rails.pickables) this.pickables.push(o);
+    // The floor glass FIRST-CLASSES in the raycast as an occluder (userData.blocker): the Engine
+    // returns null when the nearest hit is glass, so content under a floor never picks through it.
+    for (const o of this._floorBlockers) this.pickables.push(o);
     for (const o of this._bar.pickables) this.pickables.push(o);
     // Tiles only become raycast targets once a resolver can turn an instance id into a snapshot.
     if (this._tileResolver) this.pickables.push(this._metaTrailMesh);
-  }
-
-  // ── the currency gutter ──────────────────────────────────────────────────
-
-  private _rebuildGutter(): void {
-    if (this._gutterLabel) {
-      this.group.remove(this._gutterLabel);
-      this._gutterLabel.geometry.dispose();
-      const old = this._gutterLabel.material as THREE.MeshBasicMaterial;
-      old.map?.dispose();
-      old.dispose();
-      this._gutterLabel = null;
-    }
-    const id = this._committedLane != null ? this._laneOrder[this._committedLane] : null;
-    if (!id) return;
-    const meta = METAGRAPHS.find((m) => m.id === id);
-    // Measured against an ABSOLUTE clock, not the visible window — a dormant token must not read
-    // as "quiet right now" (spec §6.7). activityLine() owns the NO SIGNAL / NO CURRENCY wording.
-    const text = activityLine(this._activity[id] ?? null, meta?.ticker ?? id, Date.now());
-    // event-time: one canvas per filter/activity change
-    const mesh = this._makeLabel(
-      "",
-      text,
-      FLOOR_LABEL_X,
-      FLOOR_Y.msnap,
-      GUTTER_CZ + GUTTER_W / 2,
-    );
-    (mesh.material as THREE.MeshBasicMaterial).opacity = GUTTER_OP * this._fades.alpha;
-    this.group.add(mesh);
-    this._gutterLabel = mesh;
   }
 
   // ── frame ────────────────────────────────────────────────────────────────
@@ -752,37 +721,29 @@ export class LedgerView implements SceneView {
   update(dt: number) {
     this.t += dt;
 
-    // The lead row's honesty note eases in while the live tick's anchor count is still growing.
-    this._formingW +=
-      ((this.model.leadForming ? 1 : 0) - this._formingW) * Math.min(1, dt * FORMING_EASE);
+    // ── the TRAIL REWIND (objects/TrailRewind.ts): the shown snapshot owns the front; rows
+    // newer than it slide past the edge and dissolve. All scalar logic lives in the adapter.
+    this._rewind.update(dt, this._slotOfOrd);
+    this._trailOff = this._rewind.offset;
+    const pinnedHold = this._rewind.holding;
+    this._bar.setOffset(this._trailOff);
+    this._ribbons.group.position.x = this._trailOff;
+    this._ordGroup.position.x = this._trailOff;
+    // The live lead's ribbon sheet fades out as it crosses the front (row 1 — the selected
+    // row's sheet — lands exactly AT the front, so it never fades).
+    this._ribbons.setRowFade(0, this._rewind.fadeAtX(LEAD_X + this._trailOff));
 
-    const spotGeom = this._spotLayerId
-      ? LAYER_GEOM.find((l) => l.id === this._spotLayerId)
-      : undefined;
-    this._spot.update(dt, spotGeom != null && this.group.visible, this._fades.alpha);
-    if (spotGeom) {
-      this._spotPos.set(0, spotGeom.y, spotGeom.laneZ);
-      this.group.localToWorld(this._spotPos);
-      this._spotN.set(0, 1, 0).applyQuaternion(this.group.quaternion);
-      this._spot.aim(this._spotPos, this._spotN, STAGE_LIGHTS.ledger.height);
-    }
     this._applyFloorAlpha();
 
-    this._rails.update(dt);
     this._bar.update(dt);
     this._ribbons.update(dt);
 
     if (!this._latest) return;
     const k = Math.min(1, dt * 3);
-    // The live hover previews the dim; the committed filter is the resting state.
-    const dim = this._dimKey();
-    const mf = dim !== "all" ? dim : null;
 
     // ── lane tiles on the metagraph-snapshot floor
     let mi = 0;
     for (const lane of this.model.lanes.values()) {
-      if (this._laneHidden.get(lane.id)) continue;
-      const laneOff = mf != null && lane.id !== mf;
       const laneColor = this._laneColor(lane.id);
       const cz = this._laneZ.get(lane.id) ?? lane.z;
       const hz = this._laneHZ.get(lane.id) ?? LANE_GAP_Z / 2;
@@ -791,19 +752,48 @@ export class LedgerView implements SceneView {
       const zScale = (2 * hz) / LANE_GAP_Z;
       for (const b of lane.blocks) {
         if (mi >= META_TRAIL_MAX) break;
-        b.x += (-b.slot * SLOT_SP - b.x) * k;
-        b.fade += (slotFade(b.slot) - b.fade) * k;
-        _dummy.position.set(b.x + b.ox, FLOOR_Y.msnap, cz + b.oz * zScale);
+        if (pinnedHold) b.x = LEAD_X - b.slot * SLOT_SP;
+        else b.x += (LEAD_X - b.slot * SLOT_SP - b.x) * k;
+        // No depth fade (user, 2026-08-07): every trail row eases to FULL brightness — recency
+        // reads from position + the ordinal labels, not a gradient into the dark.
+        b.fade += (1 - b.fade) * k;
+        // A tick this lane anchored NOTHING into draws NOTHING (user, 2026-08-07 — the small
+        // dimmed placeholder block is gone; the model keeps the slot, the mesh zero-scales).
+        if (!b.filled) {
+          _dummy.position.set(0, 0, 0);
+          _dummy.rotation.set(0, 0, 0);
+          _dummy.scale.setScalar(0);
+          _dummy.updateMatrix();
+          this._metaTrailMesh.setMatrixAt(mi, _dummy.matrix);
+          mi++;
+          continue;
+        }
+        // Bottom just above the plane (user, 2026-08-07): the box is centred, so lift by half its
+        // world height (geometry depth 0.35 × scale.z becomes the height under the -90° X spin).
+        const tileH = 0.35 * b.size;
+        _dummy.position.set(b.x + b.ox + this._trailOff, FLOOR_Y.msnap + TILE_LIFT + tileH / 2, cz + b.oz * zScale);
         _dummy.rotation.set(-Math.PI / 2, 0, 0);
-        _dummy.scale.set(b.size, b.size, b.size * (b.filled ? 1 : 0.18));
+        _dummy.scale.set(b.size, b.size, b.size);
         _dummy.updateMatrix();
         this._metaTrailMesh.setMatrixAt(mi, _dummy.matrix);
-        const hot = this.model.isRowHot(laneOff, b.slot);
+        const hot = this.model.isRowHot(b.slot);
+        const hov = !hot && b.slot > 0 && b.slot === this._hoverSlot;
+        const dimNet = this._netDimKey();
+        const offNet = dimNet !== "all" && lane.id !== dimNet;
+        // Three tiers (user, 2026-08-07): the ACTIVE row (lead/pinned) full identity, the
+        // HOVERED row identity at the preview fraction, every other snapshot the neutral trail.
+        const ident = hot || hov || b.slot <= 0 ||
+          (this.model.selectedSlot > 0 && b.slot === this.model.selectedSlot);
         const bright =
-          (hot ? Math.max(b.fade, 0.9) * (b.filled ? 1.3 : 0.2) : b.fade * (b.filled ? 0.7 : 0.12)) *
-          (laneOff ? 0.22 : 1) *
+          (hot
+            ? Math.max(b.fade, 0.9) * this.tiles.hot
+            : hov
+              ? Math.max(b.fade, 0.9) * this.tiles.hot * SNAP_PREVIEW
+              : b.fade * this.tiles.rest) *
+          (offNet ? RIBBON_DIM : 1) *
+          this._rewind.fadeAtX(b.x + this._trailOff) *
           this._fades.alpha;
-        this._metaTrailMesh.setColorAt(mi, _col.copy(laneColor).multiplyScalar(bright));
+        this._metaTrailMesh.setColorAt(mi, _col.copy(ident ? laneColor : this._coreCol).multiplyScalar(bright));
         mi++;
       }
     }
@@ -841,11 +831,15 @@ export class LedgerView implements SceneView {
         if (p.t >= 1 || p.idx >= nRib) continue;
         this._ribbons.centreLine(0, p.idx, p.t, _p);
         _dummy.position.copy(_p);
+        _dummy.position.x += this._trailOff; // the pulses ride the rewound lead row
         _dummy.scale.setScalar(1);
         _dummy.quaternion.identity();
         _dummy.updateMatrix();
         this._pulseMesh.setMatrixAt(i, _dummy.matrix);
-        this._pulseMesh.setColorAt(i, _col.set(p.color).multiplyScalar(this._fades.alpha));
+        this._pulseMesh.setColorAt(
+          i,
+          _col.set(p.color).multiplyScalar(this._fades.alpha * this._rewind.fadeAtX(LEAD_X + this._trailOff)),
+        );
         i++;
       }
     }
@@ -873,7 +867,19 @@ export class LedgerView implements SceneView {
   }
 
   dispose() {
-    this._rails.dispose();
+    for (const o of this._ordLabels.values()) {
+      this._ordGroup.remove(o.mesh, o.line);
+      o.mesh.geometry.dispose();
+      const mat = o.mesh.material as THREE.MeshBasicMaterial;
+      mat.map?.dispose();
+      mat.dispose();
+      o.line.geometry.dispose();
+      (o.line.material as THREE.Material).dispose();
+    }
+    this._ordLabels.clear();
+    for (const p of [...this._globalPlanes, ...this._metaPlanes.values()]) p.dispose();
+    this._globalPlanes.length = 0;
+    this._metaPlanes.clear();
     this._bar.dispose();
     this._ribbons.dispose();
     for (const o of this.group.children.slice()) {
@@ -886,6 +892,5 @@ export class LedgerView implements SceneView {
       obj.dispose?.();
     }
     this.pickables = [];
-    this._floorPicks.length = 0;
   }
 }

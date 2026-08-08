@@ -5,7 +5,7 @@
 // is the application state — disclosed as a SHAPE here and as a payload in the raw layer.
 // Like the global snapshot card this is a card SLOT, not a focus-ladder rung: it has its own
 // store channel (`store.metaSnap`) and a fixed rail slot, and appears in no ladder.
-import { useMemo, type CSSProperties, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type CSSProperties, type ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import CardHead, { RIGHT_CARD } from "@/components/CardHead";
 import { Card } from "@/components/ui/card";
@@ -58,7 +58,8 @@ export default function MetaSnapPane({
 }) {
   const sel = useStore((s) => s.metaSnap);
   const exact = useStore((s) => (sel ? s.snapshotExact[sel.globalOrdinal] : undefined));
-  const deep = useStore((s) => (sel ? s.metaSnapDeep[metaSnapDeepKey(sel.globalOrdinal, sel.metaId)] : undefined));
+  const deep = useStore((s) => (sel ? s.metaSnapDeep[metaSnapDeepKey(sel.globalOrdinal, sel.metaId, sel.ordinal)] : undefined));
+  const following = useStore((s) => s.following);
   const setSection = useStore((s) => s.setSection);
   // Spec §5.3's pairing runs on the EXISTING node-hover channel — a hover, never a selection, so
   // this card stays outside the one-selection-write-path rule.
@@ -76,11 +77,27 @@ export default function MetaSnapPane({
   }, [sel]);
 
   // Tier 2 — this snapshot's own row inside the tick's exact read.
-  const row = useMemo(
-    () => (sel && exact ? (exact.rows.find((r) => r.metaId === sel.metaId && r.ordinal === sel.ordinal) ?? null) : null),
-    [sel, exact],
-  );
+  const row = useMemo(() => {
+    if (!sel || !exact) return null;
+    // A row the quick decoder couldn't read carries ordinal 0 — fall back to the address match
+    // so the card still finds it (2026-08-07: the miss hid the whole exact tier and the state
+    // invitation for snapshots whose deep decode worked fine).
+    return (
+      exact.rows.find((r) => r.metaId === sel.metaId && r.ordinal === sel.ordinal) ??
+      exact.rows.find((r) => r.metaId === sel.metaId && r.ordinal === 0) ??
+      null
+    );
+  }, [sel, exact]);
   const reading = useMinHold(!!sel && !row);
+  // The pinned decode's give-up timer (2026-08-08, review fix): a 404'd/pruned deep read left
+  // "decoding…" forever — after a patient window the instrument states the honest terminal.
+  const [decodeGaveUp, setDecodeGaveUp] = useState(false);
+  useEffect(() => {
+    setDecodeGaveUp(false);
+    if (!sel || following || deep) return;
+    const t = setTimeout(() => setDecodeGaveUp(true), 12000);
+    return () => clearTimeout(t);
+  }, [sel, following, deep]);
 
   // The signers, deep read first (it re-reads the same proofs straight off the channel, so it wins
   // when it lands) — but the tick's exact read already carries them, so the rows never wait on it.
@@ -157,25 +174,66 @@ export default function MetaSnapPane({
               <Fact label="Exact read">unavailable — tick pruned</Fact>
             )}
 
-            {/* ── Tier 3: the application state, STATE-AWARE — a metagraph whose state is
-                genuinely empty gets no invitation (a currency-only metagraph never has one). ── */}
-            {row?.hasState && (
-              <>
-                <Fact label="State">{fmtKB(row.stateBytes / 1024)}</Fact>
-                {deep && deep.stateKeys.length > 0 && (
-                  <Fact label="State records">{deep.stateKeys.map((k) => `${k.key} ${k.count}`).join(" · ")}</Fact>
-                )}
-                {deep && deep.dataBlockSigners.length > 0 && (
-                  <Fact label="Data blocks">{deep.dataBlockSigners.length} signers</Fact>
-                )}
-                {row.stateProof && <HashFact label="State proof" value={row.stateProof} />}
-                <div>
-                  <Button variant="link" size="xs" className="px-0" onClick={() => setSection("data")}>
-                    Show the application state
-                  </Button>
-                </div>
-              </>
-            )}
+            {/* ── Tier 3: the application state — ONE RULE (user, 2026-08-07: DED's empty
+                state hid the invitation while the raw layer rendered the decoded shape; the
+                two surfaces must apply one standard): if the payload DECODED, the tier shows
+                and the invitation stands — an empty state says "empty" honestly instead of
+                hiding. Both routes share one decoder, so decoded-ness itself can't disagree;
+                a genuinely unreadable payload says so (and "decoding…" while the pin's full
+                unpack is in flight). ── */}
+            {(() => {
+              const decodedOk = deep != null || row?.decoded === true;
+              if (!decodedOk) {
+                if (row == null) return null; // no exact row yet — tier 2's reading state covers it
+                return (
+                  <Fact label="State">
+                    <span className="text-muted-foreground italic">
+                      {following ? "undecodable payload" : decodeGaveUp ? "decode unavailable — tick pruned" : "decoding…"}
+                    </span>
+                  </Fact>
+                );
+              }
+              const stateBytes = deep ? deep.stateBytes : (row?.stateBytes ?? 0);
+              const empty = deep ? !deep.stateKeys.some((k) => k.count > 0) : !row?.hasState;
+              return (
+                <>
+                  {empty ? (
+                    <Fact label="State">
+                      <span className="text-muted-foreground italic">empty</span>
+                    </Fact>
+                  ) : (
+                    stateBytes > 0 && <Fact label="State">{fmtKB(stateBytes / 1024)}</Fact>
+                  )}
+                  {deep && deep.stateKeys.length > 0 && (
+                    <Fact label="State records">{deep.stateKeys.map((k) => `${k.key} ${k.count}`).join(" · ")}</Fact>
+                  )}
+                  {/* The deep decode is pin-gated while following (the live card advances every
+                      tick — fetching it would poll the heavy route). Honest hint in place. */}
+                  {!deep && following && (
+                    <Fact label="State records">
+                      <span className="text-muted-foreground italic">pin to decode</span>
+                    </Fact>
+                  )}
+                  {/* The data TRANSACTIONS are a data metagraph's real payload (batch
+                      commitments etc. — DED's fingerprint batches ride here while its state
+                      stays empty; 2026-08-07). */}
+                  {deep && deep.dataTxCount > 0 && (
+                    <Fact label="Data updates">{deep.dataTxCount}</Fact>
+                  )}
+                  {deep && deep.dataBlockSigners.length > 0 && (
+                    <Fact label="Data blocks">{deep.dataBlockSigners.length} signers</Fact>
+                  )}
+                  {(deep?.stateProof ?? row?.stateProof) && (
+                    <HashFact label="State proof" value={(deep?.stateProof ?? row?.stateProof)!} />
+                  )}
+                  <div>
+                    <Button variant="link" size="xs" className="px-0" onClick={() => setSection("data")}>
+                      Show the application state
+                    </Button>
+                  </div>
+                </>
+              );
+            })()}
 
             {/* The references sit LAST, where references sit (the node card's reading order). */}
             <HashFact label="Hash" value={sel.hash} />

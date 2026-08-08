@@ -23,7 +23,6 @@ const GEO_NODE_GHOST = detailsCards({
   filter: "all",
   inspect: null,
   snap: null,
-  layer: null,
   selNodesCount: 1,
   filterLabel: null,
   country: null,

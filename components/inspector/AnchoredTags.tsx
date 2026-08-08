@@ -4,6 +4,7 @@ import { useState } from "react";
 import { ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useStore } from "@/src/store/store";
+import { UNLISTED_ID } from "@/src/data/unlisted";
 import { metagraphById } from "@/src/data/network";
 import { hex, fmtDag, fmtKB } from "@/src/util/format";
 import { NodeStars } from "@/components/state/StateAtoms";
@@ -95,7 +96,7 @@ export default function AnchoredTags({
     const unlistedBytes = Object.entries(exact.perMeta)
       .filter(([addr]) => !metagraphById(addr))
       .reduce((sum, [, v]) => sum + v.bytes, 0);
-    rows.push({ id: "unlisted", label: "unlisted", hue: null, n: exact.unlistedCount, fee: exact.unlistedFee, bytes: unlistedBytes });
+    rows.push({ id: UNLISTED_ID, label: UNLISTED_ID, hue: null, n: exact.unlistedCount, fee: exact.unlistedFee, bytes: unlistedBytes });
   }
 
   const pct = (n: number) => (total > 0 ? (n / total) * 100 : 0);
@@ -104,7 +105,7 @@ export default function AnchoredTags({
     <span className="block flex-1 h-1.5 rounded-xs bg-white/[0.06] overflow-hidden">
       <span
         className="block h-full rounded-xs min-w-[2px]"
-        style={{ width: `${Math.max(pct(n), n > 0 ? 4 : 0)}%`, background: hue ?? "var(--muted-foreground)" }}
+        style={{ width: `${Math.max(pct(n), n > 0 ? 4 : 0)}%`, background: hue ?? "var(--core)" }}
       />
     </span>
   );
@@ -132,7 +133,10 @@ export default function AnchoredTags({
                 // wash (+ the hue ticker below) — reads as "the selection" even while collapsed.
                 style={isSel ? ({ background: `color-mix(in oklch, ${r.hue ?? "var(--primary)"} 16%, transparent)` } as const) : undefined}
               >
-                <span className="w-2 h-2 rounded-full flex-none" style={{ background: r.hue ?? "var(--muted-foreground)" }} />
+                {/* Unlisted wears the CORE tone (2026-08-07) — the same neutral-blue it carries
+                    on the filter chip, the explorer group and the live dot; grey read as a
+                    different, third language. */}
+                <span className="w-2 h-2 rounded-full flex-none" style={{ background: r.hue ?? "var(--core)" }} />
                 <span
                   className={cn(
                     "w-[68px] flex-none text-body truncate",

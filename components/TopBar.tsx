@@ -4,8 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { ChevronDown } from "lucide-react";
 import { VIEW_ICONS } from "@/components/icons";
 import { useStore } from "@/src/store/store";
-import { metagraphById } from "@/src/data/network";
-import { hex } from "@/src/util/format";
+import { displayNetwork } from "@/src/data/unlisted";
 import { cn } from "@/lib/utils";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import Vitals, { VitalsCluster, VitalsToggle } from "@/components/topbar/Vitals";
@@ -27,8 +26,10 @@ const VIEWS = [
 // Collapsed filter face: a small identity dot + the network name in neutral text (no filled
 // chip). All → a neutral cyan dot. Identity is the ONLY colour the filter carries.
 function filterFace(filter: string): { label: string; dot: string } {
-  const cfg = metagraphById(filter);
-  if (cfg) return { label: cfg.ticker || cfg.name, dot: hex(cfg.color) };
+  // ONE lookup for catalog metagraphs AND the unlisted pseudo-network (src/data/unlisted.ts —
+  // the one-home design, 2026-08-07).
+  const net = displayNetwork(filter);
+  if (net) return { label: net.ticker, dot: net.hue };
   return { label: "All", dot: "var(--primary)" };
 }
 
