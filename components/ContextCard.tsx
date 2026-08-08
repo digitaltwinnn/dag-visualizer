@@ -3,9 +3,10 @@
 import { useStore } from "@/src/store/store";
 import { applyClickActions } from "@/src/store/applyClickActions";
 import { metagraphById } from "@/src/data/network";
+import { UNLISTED_ID, displayNetwork } from "@/src/data/unlisted";
 import { hex } from "@/src/util/format";
 import { subjectPairing } from "@/components/useSubjectPairing";
-import { RailPane } from "@/components/CardHead";
+import CardHead, { RailPane } from "@/components/CardHead";
 import InspectorCard from "@/components/InspectorCard";
 import { PulseEdge, useEdgePulse } from "@/components/EdgePulse";
 import type { PickDescriptor } from "@/src/data/types";
@@ -33,6 +34,61 @@ export default function ContextCard({
   // branch — so it stays mounted across the dossier ⇄ nothing swap and a metagraph→metagraph
   // change still pulses.
   const pulseKey = useEdgePulse(filter);
+
+  // The UNLISTED pseudo-network's dossier (2026-08-08 — committing "unlisted" used to leave the
+  // slot an empty HOLE: the manifest marks it present, suppressing the ghost, while this card
+  // self-nulled on the missing catalog record). Everything shown comes from the one-home
+  // identity (`displayNetwork`) + honest instrument states — a mixed uncataloged set has no
+  // dossier facts to fabricate. Eyebrow says NETWORK, not Metagraph: the set is many state
+  // channels, not one metagraph (deliberate deviation from the slot noun, honesty over
+  // uniformity).
+  if (filter === UNLISTED_ID) {
+    const dn = displayNetwork(UNLISTED_ID)!;
+    const pair = subjectPairing<string>(hoverFilter, dn.id, setHoverFilter, dn.hue);
+    return (
+      <RailPane
+        entry={collapsed}
+        id="metapane"
+        className={pair.className}
+        style={pair.style}
+        onMouseEnter={pair.onMouseEnter}
+        onMouseLeave={pair.onMouseLeave}
+      >
+        <CardHead
+          eyebrow="Network"
+          title={
+            <span className="inline-flex items-center gap-2 min-w-0">
+              <span
+                aria-hidden
+                className="size-[7px] rounded-full flex-none"
+                style={{ background: dn.hue }}
+              />
+              <span className="italic truncate">{dn.name}</span>
+            </span>
+          }
+          titleKey={dn.id}
+          onClose={() => applyClickActions([{ kind: "filter", id: "all" }])}
+          collapsed={collapsed}
+          onToggle={onToggle}
+        />
+        {!collapsed && (
+          <>
+            <p className="m-0 text-body text-muted-foreground">
+              State channels anchoring into Global L0 without an entry in the public catalog — a
+              mixed set with no single operator or token.
+            </p>
+            {/* Absent data is an INSTRUMENT STATE, never a fabricated number: the operators'
+                machines are outside every feed this app reads. */}
+            <div className="mt-2 flex items-start justify-between gap-2.5">
+              <span className="text-body text-muted-foreground">Machines</span>
+              <span className="text-body text-muted-foreground italic">not knowable</span>
+            </div>
+          </>
+        )}
+        <PulseEdge pulseKey={pulseKey} rail="right" />
+      </RailPane>
+    );
+  }
 
   if (!mgCfg) return null; // "all" — no resting context card; the rail rests quiet.
 

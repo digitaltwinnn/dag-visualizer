@@ -222,8 +222,10 @@ export function detailsCards(s: RailManifestState): RailCard[] {
     kind: "context",
     icon: iconForPick("meta"),
     subjectKey: s.filter,
-    // Mirrors ContextCard's own null-branch: metagraphById(filter) is truthy for every non-"all"
-    // filter the app sets ("dag" + real metagraph ids), null for "all".
+    // Mirrors ContextCard's own branches: every non-"all" filter renders a card — catalog
+    // metagraphs + "dag" via the dossier, "unlisted" via its honest pseudo-network pane
+    // (2026-08-08; before that pane, unlisted left this slot a hole — present suppressed the
+    // ghost while the card self-nulled).
     present: s.filter !== "all",
     hint: contextHint(s),
   };
