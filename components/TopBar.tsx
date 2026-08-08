@@ -10,8 +10,7 @@ import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import Vitals, { VitalsCluster, VitalsToggle } from "@/components/topbar/Vitals";
 import FilterPicker from "@/components/topbar/FilterPicker";
 import EcgMark from "@/components/topbar/EcgMark";
-import RawToggle from "@/components/topbar/RawToggle";
-import RailsToggle from "@/components/topbar/RailsToggle";
+import PresentationToggle from "@/components/topbar/PresentationToggle";
 import { useBreakpoint } from "@/components/useBreakpoint";
 import type { Mode } from "@/src/store/store";
 
@@ -232,13 +231,13 @@ export default function TopBar() {
           <VitalsToggle open={phoneVitals} onClick={() => setPhoneVitals(!phoneVitals)} />
         )}
 
-        {/* FOCUS + RAW — the bar's trailing controls: FOCUS collapses both card rails to their
-            threads (scene spotlight; desktop-only), RAW surfaces the raw data layer under the
-            view. They sit in the COMMAND bar (this zone's scope is the whole instrument) rather
-            than the live lane, and LAST because they act on everything to their left. */}
+        {/* PRESENTATION — the bar's trailing control: ONE axis for how the view's information
+            is presented (SCENE / CARDS / RAW — replacing the separate Focus icon + RAW switch,
+            user 2026-08-08). It sits in the COMMAND bar (this zone's scope is the whole
+            instrument) rather than the live lane, and LAST because it acts on everything to
+            its left. */}
         <span className="w-px self-stretch bg-border my-1 max-[820px]:hidden" />
-        <RailsToggle />
-        <RawToggle />
+        <PresentationToggle />
         </div>
       </div>
 
