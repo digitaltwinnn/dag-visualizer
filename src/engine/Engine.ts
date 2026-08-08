@@ -179,6 +179,18 @@ export class Engine {
 
   private unsub: Array<() => void> = [];
   private metaTimer: ReturnType<typeof setInterval> | undefined;
+  // Trailing debounce for the direct-manipulation signal (see the constructor's controls
+  // listeners): wheel-zoom fires start/end per notch, so `sceneDragging` only drops after a
+  // quiet 350ms.
+  private _dragEndT: ReturnType<typeof setTimeout> | undefined;
+  private _onControlsStart = () => {
+    clearTimeout(this._dragEndT);
+    if (!useStore.getState().sceneDragging) useStore.getState().setSceneDragging(true);
+  };
+  private _onControlsEnd = () => {
+    clearTimeout(this._dragEndT);
+    this._dragEndT = setTimeout(() => useStore.getState().setSceneDragging(false), 350);
+  };
   private onResize = () => this.ctx.resize?.();
   // FPS/ms monitor — dev only, or in prod via `?stats`/`#stats` for ad-hoc checks, so
   // it never shows for real users. Click the panel to cycle FPS → ms → MB.
@@ -291,6 +303,12 @@ export class Engine {
     // The engine owns the resize handler (createScene no longer adds one) so it's
     // cleaned up on dispose — no leak across StrictMode remounts / HMR.
     window.addEventListener("resize", this.onResize);
+    // DIRECT-MANIPULATION signal (rail dim, 2026-08-08): OrbitControls' `start`/`end` fire on
+    // real pointer/touch/wheel input ONLY — Engine tweens and programmatic camera moves never
+    // do — so `store.sceneDragging` is exactly "the user's hand is on the scene". The trailing
+    // debounce keeps wheel-zoom bursts (start/end per notch) from strobing the rails.
+    this.ctx.controls.addEventListener("start", this._onControlsStart);
+    this.ctx.controls.addEventListener("end", this._onControlsEnd);
 
     const showStats =
       process.env.NODE_ENV === "development" ||
@@ -1529,6 +1547,9 @@ export class Engine {
     this.canvas.removeEventListener("pointerdown", this.onDown);
     this.canvas.removeEventListener("pointerleave", this.onLeave);
     window.removeEventListener("resize", this.onResize);
+    this.ctx.controls.removeEventListener("start", this._onControlsStart);
+    this.ctx.controls.removeEventListener("end", this._onControlsEnd);
+    clearTimeout(this._dragEndT);
     this.stats?.dom.remove();
     this._devTune?.dispose();
     this.unsub.forEach((u) => u());

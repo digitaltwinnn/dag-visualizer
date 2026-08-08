@@ -14,6 +14,7 @@ import CardHead, { RailPane } from "@/components/CardHead";
 import InspectorCard from "@/components/InspectorCard";
 import ContextCard from "@/components/ContextCard";
 import RailThread from "@/components/RailThread";
+import { RailShade, RailShadeToggle } from "@/components/RailShade";
 import RailDock from "@/components/RailDock";
 import { useBreakpoint } from "@/components/useBreakpoint";
 import { PulseEdge, useEdgePulse } from "@/components/EdgePulse";
@@ -567,13 +568,12 @@ export default function Inspector() {
     );
   };
 
-  // Slots in TWO groups (user refinement): POPULATED cards first, then every GHOST pushed to
-  // the bottom — each group in the manifest's stable slot order. The tablet/phone sheets keep
-  // this FLAT stack (no ladder lane on a small screen); the desktop rail uses the lane above.
-  const panes = manifest.filter((c) => c.kind !== "context" && c.present).map((c) => detailPane[c.id]);
-  const ghosts = manifest
-    .filter((c) => !c.present && c.hint != null)
-    .map((c) => <GhostCard key={`${c.id}-ghost`} card={c} />);
+  // The tablet/phone sheets host the SAME LADDER LANE as the desktop rail (card-redesign
+  // 2026-08-08 — sheets used to keep a flat populated-first/ghosts-last stack; with ghosts now
+  // one-line entries the scroll-cost rationale is gone, and the lane brings the entry
+  // distance-dim, the single-open accordion and the lane order in one move). The depth FUNNEL
+  // stays desktop-only regardless (it lives on the thread, which the sheets don't render —
+  // their single instrument is the sheet edge).
 
   // ── Dock icon TRAY (tablet/phone) ───────────────────────────────────────────────────────────
   // GLOBAL CONSTRAINT: nothing here ever opens the sheet — the tray is purely visual; `open` is
@@ -596,14 +596,12 @@ export default function Inspector() {
       active: actives.has(c.id),
     }));
 
-  // Tablet: Context + Detail panes + PickHint together (`content` below), unchanged from Task 3.
-  // Phone: the SAME content (Context + Detail panes + PickHint) but hosted in the "Details"
-  // bottom sheet (bottom-right button) instead of a side sheet — see below.
+  // Tablet + phone host the same ladder-lane `content` (see the note above the lane).
   const content = (
     <>
-      <ContextCard {...cx("context")} />
-      {panes}
-      {ghosts}
+      {ladderLane}
+      {trailingPanes}
+      {trailingGhosts}
     </>
   );
 
@@ -623,10 +621,13 @@ export default function Inspector() {
           className="max-[1100px]:!w-[288px] max-[860px]:!w-[min(300px,calc(100vw-32px))] max-[1099px]:!hidden"
           style={accent}
         >
-          {hasCards && <RailControls onMinimize={minimizeAll} onExpand={expandAll} onClear={clearAll} />}
-          {ladderLane}
-          {trailingPanes}
-          {trailingGhosts}
+          <RailShadeToggle side="right" />
+          <RailShade side="right">
+            {hasCards && <RailControls onMinimize={minimizeAll} onExpand={expandAll} onClear={clearAll} />}
+            {ladderLane}
+            {trailingPanes}
+            {trailingGhosts}
+          </RailShade>
         </div>
       </>
     );
