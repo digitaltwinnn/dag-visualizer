@@ -22,7 +22,7 @@ import { BYTE_SCALE_KB, LEDGER, ledgerSite, type RailGroup } from "./domain/ledg
 import { HYPER_TILT, HYPER_TILT_FOCUS } from "./domain/hyperLayout";
 import { readSceneColors } from "./sceneColors";
 import { VIEW_POLICIES, type ViewPolicy } from "./domain/viewPolicy";
-import { FOCI, hubFraming, geoFraming, ledgerNodeFraming, ledgerLaneNudge, nodeFraming, cohortFraming, hyperNodeFraming, dollyBack, easeInOutQuad, type CameraFraming } from "./domain/cameraRig";
+import { FOCI, hubFraming, geoFraming, ledgerNodeFraming, ledgerLaneNudge, nodeFraming, cohortFraming, hyperNodeFraming, dollyBack, railsDolly, easeInOutQuad, type CameraFraming } from "./domain/cameraRig";
 import { countryFraming } from "./domain/countryShape";
 import { R as GEO_R, LAND_H } from "./domain/geoLayout";
 import { clickActions, pickActive, pickNetId, viewEntryActions, metaSnapSelectActions, bandSelectActions } from "./domain/pickActions";
@@ -183,6 +183,8 @@ export class Engine {
   // listeners): wheel-zoom fires start/end per notch, so `sceneDragging` only drops after a
   // quiet 350ms.
   private _dragEndT: ReturnType<typeof setTimeout> | undefined;
+  // Scratch for the rails-hidden camera lean (event-time — the toggle, not the frame loop).
+  private _railsLeanPos = new THREE.Vector3();
   private _onControlsStart = () => {
     clearTimeout(this._dragEndT);
     if (!useStore.getState().sceneDragging) useStore.getState().setSceneDragging(true);
@@ -356,6 +358,14 @@ export class Engine {
     this.unsub.push(
       useStore.subscribe((st, prev) => {
         if (st.mode !== prev.mode) this.setMode(st.mode);
+        // The rails-hidden camera LEAN (2026-08-08): hiding the card rails hands the scene the
+        // whole frame, so the camera leans IN toward the current orbit target (showing steps
+        // back out by the inverse) — flown with the same tween easing as a focus flight. From
+        // the LIVE pose, dolly-exempt (CAM_ZOOM is already baked into wherever the camera is).
+        if (st.railsHidden !== prev.railsHidden && VIEW_POLICIES[this.mode].canvas) {
+          railsDolly(this.ctx.camera.position, this.ctx.controls.target, st.railsHidden, this._railsLeanPos);
+          this._tweenTo(this._railsLeanPos, this.ctx.controls.target, false);
+        }
         if (st.filter !== prev.filter) {
           this.filter = st.filter;
           // Switching network clears any country drill-down (matches the old geo UX).

@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import * as THREE from "three";
-import { FOCI, hubFraming, geoFraming, ledgerFloorFraming, ledgerRailFraming, ledgerNodeFraming, easeInOutQuad, CAM_ZOOM, dollyBack, nodeFraming, cohortFraming, hyperNodeFraming, closeness, CLOSE_FAR_ALT, CLOSE_NEAR_ALT, NODE_RAISE, ledgerLaneNudge, LANE_NUDGE, NUDGE_DOLLY, NUDGE_RAISE, NUDGE_AIM_UP } from "./cameraRig";
+import { FOCI, hubFraming, geoFraming, ledgerFloorFraming, ledgerRailFraming, ledgerNodeFraming, easeInOutQuad, CAM_ZOOM, dollyBack, RAILS_HIDDEN_DOLLY, railsDolly, nodeFraming, cohortFraming, hyperNodeFraming, closeness, CLOSE_FAR_ALT, CLOSE_NEAR_ALT, NODE_RAISE, ledgerLaneNudge, LANE_NUDGE, NUDGE_DOLLY, NUDGE_RAISE, NUDGE_AIM_UP } from "./cameraRig";
 
 describe("FOCI", () => {
   it("carries the camera presets (ledger gained its own frontal resting pose, 2026-08-07)", () => {
@@ -156,6 +156,26 @@ describe("dollyBack (the one global zoom lever)", () => {
     // inputs untouched (the Engine hands it preset vectors)
     expect(pos.z).toBe(10);
     expect(target.z).toBe(2);
+  });
+});
+
+describe("railsDolly (the rails-hidden camera lean, 2026-08-08)", () => {
+  it("leans IN toward the live target when hiding, by RAILS_HIDDEN_DOLLY", () => {
+    const pos = new THREE.Vector3(0, 0, 12);
+    const target = new THREE.Vector3(0, 0, 2);
+    const out = new THREE.Vector3();
+    railsDolly(pos, target, true, out);
+    expect(out.z).toBeCloseTo(2 + 10 * RAILS_HIDDEN_DOLLY, 9);
+    expect(pos.z).toBe(12); // inputs untouched
+  });
+  it("steps back OUT by the exact inverse when showing — the toggle round-trips", () => {
+    const pos = new THREE.Vector3(3, 4, 12);
+    const target = new THREE.Vector3(1, 0, 2);
+    const inPos = new THREE.Vector3();
+    const back = new THREE.Vector3();
+    railsDolly(pos, target, true, inPos);
+    railsDolly(inPos, target, false, back);
+    expect(back.distanceTo(pos)).toBeLessThan(1e-9);
   });
 });
 
