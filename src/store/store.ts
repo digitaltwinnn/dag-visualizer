@@ -144,6 +144,17 @@ interface AppState {
   // realizes it. UI state, not selection (the selection boundary rule doesn't apply);
   // session-only, like phoneDock.
   section: "scene" | "data";
+  // DESKTOP ONLY (card-redesign follow-up, 2026-08-08): collapse the HUD's card rails to their
+  // THREADS — BOTH rails together (user: the rails are symmetric and the motive, "spotlight the
+  // scene", is whole-HUD; one command-bar toggle beats two subtle per-rail chevrons). Cards fade
+  // out visibility-hidden (layout preserved so the threads keep measuring — their dots remain
+  // as the minimized rails/possibility map). UI state like `section`, session-only.
+  railsHidden: boolean;
+  // TRUE while the user is DIRECTLY manipulating the scene (OrbitControls' `start`→`end`, which
+  // fire on real pointer/touch/wheel input only — Engine tweens and programmatic camera moves
+  // never set this). The rails dim while it holds, so direct manipulation pushes the HUD back
+  // without moving any layout. Written by the Engine (debounced on the trailing edge).
+  sceneDragging: boolean;
   // PHONE ONLY: whether the top bar's vitals row is expanded (the bar grows downward by one
   // full-width row showing the active view's vitals). A USER CHOICE that persists across view
   // switches (the row's CONTENT swaps per view; only the user's toggle opens/closes it) —
@@ -198,6 +209,8 @@ interface AppState {
   setMetaSnapDeep: (d: ChannelSnapDeep, key?: string) => void;
   setPhoneDock: (dock: "explore" | "details" | null) => void;
   setSection: (section: "scene" | "data") => void;
+  setRailsHidden: (hidden: boolean) => void;
+  setSceneDragging: (dragging: boolean) => void;
   setPhoneVitals: (open: boolean) => void;
   setPhoneSheetPx: (px: number | null) => void;
   setRailCollapse: (id: string, collapsed: boolean | null) => void;
@@ -243,6 +256,8 @@ export const useStore = create<AppState>((set) => ({
   metaSnapDeep: {},
   phoneDock: null,
   section: "scene",
+  railsHidden: false,
+  sceneDragging: false,
   phoneVitals: false,
   railCollapse: {},
   phoneSheetPx: null,
@@ -325,6 +340,8 @@ export const useStore = create<AppState>((set) => ({
   // the default; switching halves (a non-null → non-null transition) keeps it.
   setPhoneDock: (phoneDock) => set(phoneDock === null ? { phoneDock, phoneSheetPx: null } : { phoneDock }),
   setSection: (section) => set({ section }),
+  setRailsHidden: (railsHidden) => set({ railsHidden }),
+  setSceneDragging: (sceneDragging) => set({ sceneDragging }),
   setPhoneVitals: (phoneVitals) => set({ phoneVitals }),
   setRailCollapse: (id, collapsed) =>
     set((s) => {

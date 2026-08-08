@@ -2,7 +2,6 @@
 
 import { useEffect, useMemo, useRef, type CSSProperties, type ReactNode } from "react";
 import { ChevronsDownUp, ChevronsUpDown, X } from "lucide-react";
-import { cn } from "@/lib/utils";
 import { useStore } from "@/src/store/store";
 import { displayNetwork } from "@/src/data/unlisted";
 import { applyClickActions } from "@/src/store/applyClickActions";
@@ -11,11 +10,11 @@ import { identityHudHex } from "@/src/palette/identity";
 import { hoverKeyOf } from "@/src/data/hoverSubject";
 import { compositionGroups } from "@/src/data/composition";
 import { subjectPairing } from "@/components/useSubjectPairing";
-import CardHead, { RIGHT_CARD } from "@/components/CardHead";
-import { Card } from "@/components/ui/card";
+import CardHead, { RailPane } from "@/components/CardHead";
 import InspectorCard from "@/components/InspectorCard";
 import ContextCard from "@/components/ContextCard";
 import RailThread from "@/components/RailThread";
+import { RailShade } from "@/components/RailShade";
 import RailDock from "@/components/RailDock";
 import { useBreakpoint } from "@/components/useBreakpoint";
 import { PulseEdge, useEdgePulse } from "@/components/EdgePulse";
@@ -30,9 +29,12 @@ import type { PickDescriptor } from "@/src/data/types";
 import type { Mode } from "@/src/store/store";
 import type { CohortSel, CompositionSel } from "@/src/engine/domain/focusLadder";
 
-// How far each ladder rung steps back from the rail per depth level. The rail thread doesn't share
-// this number — it MEASURES each card's real edge — so tuning it here can't desync the connectors.
-const RUNG_STEP = 10;
+// Luminance stepping (card-redesign 2026-08-08): unboxed ancestor entries dim with their distance
+// from the materialized box — the nearest parent is almost lit, the coarsest faintest — so the
+// path reads as a dimmer→bright run ending at the box. (The old RUNG_STEP width step-back is
+// retired: all slots share ONE fixed width, and depth moved to the thread's connector reach.)
+const ENTRY_DIM_STEP = 0.14;
+const ENTRY_DIM_FLOOR = 0.55;
 
 // One pane in the right-rail **card stack**. Each pane is its own panel with its own
 // "new subject" edge pulse (keyed on its subject) and its own close — rendering every card
@@ -88,19 +90,20 @@ function CardPane({
   return (
     // No steady/selected edge state — the edge is purely transient (pulse + hover pairing);
     // a Detail pane exists only while its pick is live, so a permanent edge would just read
-    // as a spine, which the design removed.
-    <Card asChild className={cn(RIGHT_CARD, "sig-left", pair.className)}>
-      <aside
-        style={pair.style}
-        onMouseEnter={pair.onMouseEnter}
-        onMouseLeave={pair.onMouseLeave}
-      >
-        {/* Every card's × is CardHead's shared ghost-Button close — one baseline close (the node
-            card's old hand-rolled × was removed). */}
-        <InspectorCard p={pick} eyebrow={eyebrow} onClose={onClose} collapsed={collapsed} onToggle={onToggle} />
-        <PulseEdge pulseKey={pulseKey} rail="right" />
-      </aside>
-    </Card>
+    // as a spine, which the design removed. `entry` = the card-redesign's collapsed tier: an
+    // ancestor rung sheds its glass box entirely and rests as a one-line thread entry.
+    <RailPane
+      entry={collapsed}
+      className={pair.className}
+      style={pair.style}
+      onMouseEnter={pair.onMouseEnter}
+      onMouseLeave={pair.onMouseLeave}
+    >
+      {/* Every card's × is CardHead's shared ghost-Button close — one baseline close (the node
+          card's old hand-rolled × was removed). */}
+      <InspectorCard p={pick} eyebrow={eyebrow} onClose={onClose} collapsed={collapsed} onToggle={onToggle} />
+      <PulseEdge pulseKey={pulseKey} rail="right" />
+    </RailPane>
   );
 }
 
@@ -122,20 +125,18 @@ function CountryPane({ cc, onClose, collapsed, onToggle }: { cc: string; onClose
   const pair = subjectPairing<string>(hoverCountry, cc, setHoverCountry, filterAccent(filter));
   const pulseKey = useEdgePulse(cc);
   return (
-    <Card asChild className={cn(RIGHT_CARD, "sig-left", pair.className)}>
-      <aside style={pair.style} onMouseEnter={pair.onMouseEnter} onMouseLeave={pair.onMouseLeave}>
-        <CardHead
-          eyebrow="Country"
-          title={<CountryTitle cc={cc} />}
-          titleKey={cc}
-          onClose={onClose}
-          collapsed={collapsed}
-          onToggle={onToggle}
-        />
-        {!collapsed && <CountryCard cc={cc} />}
-        <PulseEdge pulseKey={pulseKey} rail="right" />
-      </aside>
-    </Card>
+    <RailPane entry={collapsed} className={pair.className} style={pair.style} onMouseEnter={pair.onMouseEnter} onMouseLeave={pair.onMouseLeave}>
+      <CardHead
+        eyebrow="Country"
+        title={<CountryTitle cc={cc} />}
+        titleKey={cc}
+        onClose={onClose}
+        collapsed={collapsed}
+        onToggle={onToggle}
+      />
+      {!collapsed && <CountryCard cc={cc} />}
+      <PulseEdge pulseKey={pulseKey} rail="right" />
+    </RailPane>
   );
 }
 
@@ -165,31 +166,31 @@ function ProviderPane({ sel, onClose, collapsed, onToggle }: { sel: CohortSel; o
     [selNodes, sel.cc, sel.city, sel.isp],
   );
   return (
-    <Card asChild className={cn(RIGHT_CARD, "sig-left", pair.className)}>
-      <aside
-        style={pair.style}
-        onMouseEnter={() => {
-          pair.onMouseEnter();
-          setHoverCohort(ids);
-        }}
-        onMouseLeave={() => {
-          pair.onMouseLeave();
-          setHoverCohort(null);
-        }}
-      >
-        <CardHead
-          eyebrow="Provider"
-          title={<ProviderTitle sel={sel} />}
-          aside={<ProviderAside sel={sel} />}
-          titleKey={subjectKey}
-          onClose={onClose}
-          collapsed={collapsed}
-          onToggle={onToggle}
-        />
-        {!collapsed && <ProviderCard sel={sel} />}
-        <PulseEdge pulseKey={pulseKey} rail="right" />
-      </aside>
-    </Card>
+    <RailPane
+      entry={collapsed}
+      className={pair.className}
+      style={pair.style}
+      onMouseEnter={() => {
+        pair.onMouseEnter();
+        setHoverCohort(ids);
+      }}
+      onMouseLeave={() => {
+        pair.onMouseLeave();
+        setHoverCohort(null);
+      }}
+    >
+      <CardHead
+        eyebrow="Provider"
+        title={<ProviderTitle sel={sel} />}
+        aside={<ProviderAside sel={sel} />}
+        titleKey={subjectKey}
+        onClose={onClose}
+        collapsed={collapsed}
+        onToggle={onToggle}
+      />
+      {!collapsed && <ProviderCard sel={sel} />}
+      <PulseEdge pulseKey={pulseKey} rail="right" />
+    </RailPane>
   );
 }
 
@@ -223,31 +224,31 @@ function CompositionPane({ sel, onClose, collapsed, onToggle }: { sel: Compositi
     [selNodes, sel.key],
   );
   return (
-    <Card asChild className={cn(RIGHT_CARD, "sig-left", pair.className)}>
-      <aside
-        style={pair.style}
-        onMouseEnter={() => {
-          pair.onMouseEnter();
-          setHoverCohort(ids);
-        }}
-        onMouseLeave={() => {
-          pair.onMouseLeave();
-          setHoverCohort(null);
-        }}
-      >
-        <CardHead
-          eyebrow="Composition"
-          title={<CompositionTitle sel={sel} />}
-          aside={<CompositionAside sel={sel} />}
-          titleKey={subjectKey}
-          onClose={onClose}
-          collapsed={collapsed}
-          onToggle={onToggle}
-        />
-        {!collapsed && <CompositionCard sel={sel} />}
-        <PulseEdge pulseKey={pulseKey} rail="right" />
-      </aside>
-    </Card>
+    <RailPane
+      entry={collapsed}
+      className={pair.className}
+      style={pair.style}
+      onMouseEnter={() => {
+        pair.onMouseEnter();
+        setHoverCohort(ids);
+      }}
+      onMouseLeave={() => {
+        pair.onMouseLeave();
+        setHoverCohort(null);
+      }}
+    >
+      <CardHead
+        eyebrow="Composition"
+        title={<CompositionTitle sel={sel} />}
+        aside={<CompositionAside sel={sel} />}
+        titleKey={subjectKey}
+        onClose={onClose}
+        collapsed={collapsed}
+        onToggle={onToggle}
+      />
+      {!collapsed && <CompositionCard sel={sel} />}
+      <PulseEdge pulseKey={pulseKey} rail="right" />
+    </RailPane>
   );
 }
 
@@ -266,59 +267,58 @@ export function GhostCard({ card }: { card: RailCard }) {
   const Icon = card.icon;
   const label = GHOST_EYEBROW[card.id] ?? card.id;
   return (
-    // NEAR-transparent (user-tuned): the ghost drops .ig-panel's glass — the fill is a
-    // background GRADIENT + backdrop blur, so `bg-transparent` (background-color only) can't
-    // clear it; the arbitrary background property replaces the whole shorthand with a bare
-    // HINT of the panel tone (--panel at 75%, user-tuned), no blur/depth shadow, faded dashed hairline.
-    <Card
-      asChild
-      className={cn(
-        RIGHT_CARD,
-        "border-dashed py-3 shadow-none border-border/50 [background:color-mix(in_srgb,var(--panel)_75%,transparent)] [backdrop-filter:none]",
-      )}
+    // UNBOXED (card-redesign 2026-08-08): the ghost sheds its dashed Card frame entirely — the
+    // rail's boxes now mean "you are here", so an empty slot must not be a box at all. It rests
+    // as a quiet hint LINE in the entry lane; the thread's HOLLOW dot (via `data-ghost`) is its
+    // marker. `.rail-entry` keeps it in the thread's query.
+    <aside
+      data-ghost=""
+      aria-label={`${label} — nothing selected yet`}
+      className="rail-entry relative block w-auto pointer-events-auto px-[18px] py-1.5 min-h-0 flex-none"
     >
-      {/* `data-ghost` is the RailThread's read: an empty slot gets a HOLLOW node-dot on the rail,
-          a populated card a solid one — so the thread shows the view's whole possibility space. */}
-      <aside data-ghost="" aria-label={`${label} — nothing selected yet`}>
-        <p className="m-0 flex items-start gap-2.5 text-label text-muted-foreground">
-          <Icon
-            aria-hidden
-            className="size-3.5 flex-none mt-[1px] text-[var(--filter-accent,var(--primary))] opacity-55"
-          />
-          {/* fixed label column (fits the longest slot name, "METAGRAPH") so the instruction
-              text starts at the SAME x on every ghost card (user) */}
-          <span className="flex-none w-[86px] mt-[2px] text-micro tracking-caps uppercase">{label}</span>
-          <span className="min-w-0">{card.hint}</span>
-        </p>
-      </aside>
-    </Card>
+      <p className="m-0 flex items-start gap-2.5 text-label text-muted-foreground/80">
+        <Icon
+          aria-hidden
+          className="size-3.5 flex-none mt-[1px] text-[var(--filter-accent,var(--primary))] opacity-45"
+        />
+        {/* fixed label column (fits the longest slot name, "METAGRAPH") so the instruction
+            text starts at the SAME x on every ghost card (user) */}
+        <span className="flex-none w-[86px] mt-[2px] text-micro tracking-caps uppercase opacity-80">{label}</span>
+        <span className="min-w-0 italic">{card.hint}</span>
+      </p>
+    </aside>
   );
 }
 
-// The rail-top CONTROLS (desktop, variant-A descent spine, 2026-07-19): the desktop equivalent
-// of the tablet dock's collapsibility, hoisted to an explicit control cluster the user asked for.
-// Three quiet instrument buttons — minimize all (collapse every present card to eyebrow+title),
-// expand all, and clear all (deselect the whole ladder back to the overview). Monochrome lucide
-// glyphs (the ONE icon system), muted at rest; no card chrome — it reads as a toolbar in the
-// rail's margin, not another panel. Shown only when the rail actually hosts a card.
+// The rail-top CONTROLS (desktop): the collapse TOGGLE — all-collapsed ⇄ restore (one button,
+// user 2026-08-08: the minimize-all/expand-all pair was two buttons for one axis; "restore"
+// resets the overrides so the auto default governs again — the focus rung materializes, the
+// rest rest as entries, honoring the one-box grammar instead of the old expand-everything) —
+// and clear all (deselect the whole ladder back to the overview). Monochrome lucide glyphs
+// (the ONE icon system), muted at rest; no card chrome — a toolbar in the rail's margin, not
+// another panel. Shown only when the rail actually hosts a card.
 function RailControls({
-  onMinimize,
-  onExpand,
+  allCollapsed,
+  onToggle,
   onClear,
 }: {
-  onMinimize: () => void;
-  onExpand: () => void;
+  allCollapsed: boolean;
+  onToggle: () => void;
   onClear: () => void;
 }) {
   const btn =
     "inline-flex items-center justify-center size-6 rounded-[var(--radius-xs)] text-muted-foreground hover:text-foreground hover:bg-wash-soft transition-colors cursor-pointer focus-visible:outline-1 focus-visible:outline-ring/60";
   return (
     <div className="pointer-events-auto flex items-center justify-end gap-0.5 pb-0.5 pr-0.5" role="group" aria-label="Details controls">
-      <button type="button" className={btn} title="Minimize all cards" aria-label="Minimize all cards" onClick={onMinimize}>
-        <ChevronsDownUp aria-hidden className="size-3.5" />
-      </button>
-      <button type="button" className={btn} title="Expand all cards" aria-label="Expand all cards" onClick={onExpand}>
-        <ChevronsUpDown aria-hidden className="size-3.5" />
+      <button
+        type="button"
+        className={btn}
+        aria-pressed={allCollapsed}
+        title={allCollapsed ? "Restore the active card" : "Minimize all cards"}
+        aria-label={allCollapsed ? "Restore the active card" : "Minimize all cards"}
+        onClick={onToggle}
+      >
+        {allCollapsed ? <ChevronsUpDown aria-hidden className="size-3.5" /> : <ChevronsDownUp aria-hidden className="size-3.5" />}
       </button>
       <button type="button" className={btn} title="Clear all selections" aria-label="Clear all selections" onClick={onClear}>
         <X aria-hidden className="size-3.5" />
@@ -384,7 +384,22 @@ export default function Inspector() {
   const focusId = useLadderFocus();
   const autoCollapsed = (id: string) => ladderIds.includes(id) && presentOf(id) && id !== focusId;
   const effCollapsed = (id: string) => railCollapse[id] ?? autoCollapsed(id);
-  const toggleCollapse = (id: string) => setRailCollapse(id, !effCollapsed(id));
+  // ONE BOX AT A TIME (card-redesign 2026-08-08): the rail's grammar is "the box = you are here",
+  // so manually expanding an entry re-materializes IT as the box and dissolves whichever box was
+  // open — single-open accordion semantics across the present ladder rungs, written as overrides
+  // in one store update. Collapsing the open box just closes it (no box open is a legal rest).
+  const presentLadderIds = ladderIds.filter(presentOf);
+  const toggleCollapse = (id: string) => {
+    const next = !effCollapsed(id);
+    if (!next && ladderIds.includes(id)) {
+      setRailCollapseMany({
+        ...Object.fromEntries(presentLadderIds.filter((x) => x !== id).map((x) => [x, true])),
+        [id]: false,
+      });
+    } else {
+      setRailCollapse(id, next);
+    }
+  };
   const cx = (id: string) => ({ collapsed: effCollapsed(id), onToggle: () => toggleCollapse(id) });
 
   // The overrides are scoped to ONE selection moment (user, 2026-08-02: "only in geo it minimises
@@ -402,21 +417,41 @@ export default function Inspector() {
     cohort ? `${cohort.cc}|${cohort.city}|${cohort.isp}` : "",
     composition ? `${composition.netId}|${composition.key}` : "",
     inspect ? hoverKeyOf(inspect) ?? "" : "",
-    // While FOLLOWING, the auto-advancing ordinal is NOT a new selection moment — the heartbeat
+    // While FOLLOWING, the auto-advancing ordinals are NOT a new selection moment — the heartbeat
     // must not drop the user's +/− overrides every ~4s (item 8; advanceSnap already keeps the
-    // recency stack still for the same reason).
+    // recency stack still for the same reason). Guards BOTH live-advanced cards: the global
+    // (advanceSnap) AND the metagraph snapshot (advanceMetaSnap — found live 2026-08-08: its
+    // unguarded ordinal re-materialized the focus card on every heartbeat in live metagraph mode).
     following ? (snap ? "live" : "") : snap?.data.ordinal ?? "",
-    metaSnap ? `${metaSnap.metaId}:${metaSnap.ordinal}` : "",
+    following ? (metaSnap ? "live" : "") : metaSnap ? `${metaSnap.metaId}:${metaSnap.ordinal}` : "",
   ].join("§");
   const lastSelection = useRef(selectionKey);
+  const lastMode = useRef(mode);
+  const modeEnteredAt = useRef(0);
   useEffect(() => {
     if (lastSelection.current === selectionKey) return;
     lastSelection.current = selectionKey;
+    const modeChanged = lastMode.current !== mode;
+    lastMode.current = mode;
     // Read the live overrides rather than closing over them: `railCollapse` changes on every
     // +/− too, and this effect must fire on a SELECTION change only.
-    const ids = Object.keys(useStore.getState().railCollapse);
-    if (ids.length) setRailCollapseMany(Object.fromEntries(ids.map((id) => [id, null])));
-  }, [selectionKey, setRailCollapseMany]);
+    const staleNulls = Object.fromEntries(Object.keys(useStore.getState().railCollapse).map((id) => [id, null]));
+    // VIEW ENTRY IS SCENE-FIRST (user, 2026-08-08): arriving in a view starts the whole ladder
+    // COLLAPSED — carried selections rest as entries, no materialized box — so the destination
+    // scene leads and the rail stays calm through the switch choreography. The collapse covers
+    // EVERY ladder id (rungs can arrive late) and HOLDS through the transition window: the
+    // boundary's own ancestry re-derive (`viewEntryActions`) and the ledger's live-follow
+    // entry are selection changes, but they're ARRIVAL machinery, not user gestures — only a
+    // selection change after the grace window materializes the focus rung. A manual entry
+    // click materializes immediately at any time (it writes its own override, no reset here).
+    const ENTRY_GRACE_MS = 4200; // ≥ the ~3.9s 3D↔3D choreography
+    if (modeChanged) modeEnteredAt.current = Date.now();
+    if (modeChanged || Date.now() - modeEnteredAt.current < ENTRY_GRACE_MS) {
+      setRailCollapseMany({ ...staleNulls, ...Object.fromEntries(ladderIds.map((id) => [id, true])) });
+      return;
+    }
+    if (Object.keys(staleNulls).length) setRailCollapseMany(staleNulls);
+  }, [selectionKey, setRailCollapseMany]); // eslint-disable-line react-hooks/exhaustive-deps -- mode/ladderIds ride selectionKey (mode is a component of it)
 
   const detailPane: Record<string, ReactNode> = {
     // Country/provider toggle CLOSED through the same tested table a row re-click runs — the ×
@@ -463,14 +498,23 @@ export default function Inspector() {
   };
 
   // ── The desktop LADDER LANE + the flat tablet/phone stack ────────────────────────────────────
-  // Ladder slots render in a lane, in display order (coarsest→finest). The lane is LAYOUT ONLY —
-  // it draws nothing. Containment is expressed on the ONE rail instrument (RailThread, redesign
-  // 2026-08-02, user: the old in-lane descent spine put a second vertical instrument on the cards'
-  // left edge, duplicating the thread ~320px away): each rung's card STEPS BACK from the rail by
-  // its depth, and the thread's connector reaches further to tie it in. `data-depth`/`data-focus`
-  // are the thread's read — see RailThread's measure(). Context is special: ALWAYS mounted
-  // (self-nulling on "all") so its EdgePulse survives the dossier⇄nothing swap — so its rung always
-  // renders ContextCard, plus the context ghost when nothing's committed there.
+  // Ladder slots render in a lane, in display order (coarsest→finest), ALL AT ONE FIXED WIDTH
+  // (card-redesign 2026-08-08 — the RUNG_STEP width step-back is retired). Hierarchy is carried by
+  // STATE CONTRAST along the fixed order: the focus rung is the ONE materialized glass box, its
+  // committed ancestors rest as unboxed entries dimming with distance (ENTRY_DIM_STEP), ghosts are
+  // quiet hint lines below — and the thread mirrors it (halo/solid/hollow dots + depth-reach
+  // connectors, see RailThread). `data-depth`/`data-focus` remain the thread's read. Context is
+  // special: ALWAYS mounted (self-nulling on "all") so its EdgePulse survives the dossier⇄nothing
+  // swap — so its rung always renders ContextCard, plus the context ghost when nothing's committed.
+  const entryDim = (id: string): number | undefined => {
+    if (!presentOf(id) || !effCollapsed(id)) return undefined;
+    const pi = presentLadderIds.indexOf(id);
+    if (pi < 0) return undefined;
+    // Distance to the open box (the focus rung when present, else the finest present rung).
+    const anchor = focusId && presentLadderIds.includes(focusId) ? presentLadderIds.indexOf(focusId) : presentLadderIds.length - 1;
+    const dist = Math.abs(anchor - pi);
+    return Math.max(ENTRY_DIM_FLOOR, 1 - ENTRY_DIM_STEP * dist);
+  };
   const ladderLane = (
     <div className="flex flex-col gap-[var(--rail-gap)]">
       {ladderIds.map((id, depth) => {
@@ -489,10 +533,11 @@ export default function Inspector() {
           ) : null;
         if (!body) return null;
         return (
-          <div key={id} data-depth={depth} data-focus={id === focusId ? "" : undefined}>
-            {/* The step-back is on the RAIL-facing edge only; the scene-facing edge stays flush so
-                the card edge signals (`.sig-left`) keep their common alignment. */}
-            <div style={{ marginRight: depth * RUNG_STEP }}>{body}</div>
+          // The distance-dim rides a VAR, not wrapper opacity (2026-08-08): the entry itself
+          // applies `opacity-[var(--entry-dim,1)]` and RELEASES it on hover (the materialize
+          // preview) — a wrapper opacity would clamp the hover lift from outside.
+          <div key={id} data-depth={depth} data-focus={id === focusId ? "" : undefined} style={{ ["--entry-dim" as string]: entryDim(id) } as CSSProperties}>
+            {body}
           </div>
         );
       })}
@@ -511,8 +556,14 @@ export default function Inspector() {
   // overrides so a fresh selection starts from the auto default again.
   const presentIds = manifest.filter((c) => c.present).map((c) => c.id);
   const hasCards = presentIds.length > 0;
-  const minimizeAll = () => setRailCollapseMany(Object.fromEntries(presentIds.map((id) => [id, true])));
-  const expandAll = () => setRailCollapseMany(Object.fromEntries(presentIds.map((id) => [id, false])));
+  // The one collapse axis (2026-08-08): all-collapsed → restore resets the overrides so the
+  // auto default governs (the focus rung materializes, ancestors rest as entries — the one-box
+  // grammar; the old expand-ALL materialized every card at once).
+  const allCollapsed = presentIds.length > 0 && presentIds.every((id) => effCollapsed(id));
+  const toggleAll = () =>
+    setRailCollapseMany(
+      Object.fromEntries(presentIds.map((id) => [id, allCollapsed ? null : true])),
+    );
   const clearAll = () => {
     setRailCollapseMany(Object.fromEntries(presentIds.map((id) => [id, null])));
     applyClickActions(
@@ -528,13 +579,12 @@ export default function Inspector() {
     );
   };
 
-  // Slots in TWO groups (user refinement): POPULATED cards first, then every GHOST pushed to
-  // the bottom — each group in the manifest's stable slot order. The tablet/phone sheets keep
-  // this FLAT stack (no ladder lane on a small screen); the desktop rail uses the lane above.
-  const panes = manifest.filter((c) => c.kind !== "context" && c.present).map((c) => detailPane[c.id]);
-  const ghosts = manifest
-    .filter((c) => !c.present && c.hint != null)
-    .map((c) => <GhostCard key={`${c.id}-ghost`} card={c} />);
+  // The tablet/phone sheets host the SAME LADDER LANE as the desktop rail (card-redesign
+  // 2026-08-08 — sheets used to keep a flat populated-first/ghosts-last stack; with ghosts now
+  // one-line entries the scroll-cost rationale is gone, and the lane brings the entry
+  // distance-dim, the single-open accordion and the lane order in one move). The depth FUNNEL
+  // stays desktop-only regardless (it lives on the thread, which the sheets don't render —
+  // their single instrument is the sheet edge).
 
   // ── Dock icon TRAY (tablet/phone) ───────────────────────────────────────────────────────────
   // GLOBAL CONSTRAINT: nothing here ever opens the sheet — the tray is purely visual; `open` is
@@ -557,14 +607,12 @@ export default function Inspector() {
       active: actives.has(c.id),
     }));
 
-  // Tablet: Context + Detail panes + PickHint together (`content` below), unchanged from Task 3.
-  // Phone: the SAME content (Context + Detail panes + PickHint) but hosted in the "Details"
-  // bottom sheet (bottom-right button) instead of a side sheet — see below.
+  // Tablet + phone host the same ladder-lane `content` (see the note above the lane).
   const content = (
     <>
-      <ContextCard {...cx("context")} />
-      {panes}
-      {ghosts}
+      {ladderLane}
+      {trailingPanes}
+      {trailingGhosts}
     </>
   );
 
@@ -584,10 +632,12 @@ export default function Inspector() {
           className="max-[1100px]:!w-[288px] max-[860px]:!w-[min(300px,calc(100vw-32px))] max-[1099px]:!hidden"
           style={accent}
         >
-          {hasCards && <RailControls onMinimize={minimizeAll} onExpand={expandAll} onClear={clearAll} />}
-          {ladderLane}
-          {trailingPanes}
-          {trailingGhosts}
+          <RailShade>
+            {hasCards && <RailControls allCollapsed={allCollapsed} onToggle={toggleAll} onClear={clearAll} />}
+            {ladderLane}
+            {trailingPanes}
+            {trailingGhosts}
+          </RailShade>
         </div>
       </>
     );

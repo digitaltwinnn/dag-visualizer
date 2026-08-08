@@ -888,8 +888,12 @@ and keep changing, so they're examples, not the contract.
   switched to filtered values with nothing marking the scope) — the thread language, not a
   spine; "all" renders nothing (defaults carry no mark), numbers/sparklines stay untinted.
 - **Left rail** (`#leftcol`, `ExploreRail`) = the **explore / interact** scope: every view
-  leads with a collapsed **`AboutView`** orientation card (per-view title + eyebrow + copy;
-  scaffolded views carry a `SOON` caption), above the view's ONE tool card if it has one —
+  leads with the **`AboutView`** orientation card, which speaks the card-redesign's two-tier
+  grammar (2026-08-08): COLLAPSED (the default) it is an unboxed `.rail-entry` — the left
+  rail's "box = the working instrument" is the tool card, and About rests as a quiet entry
+  (whole-entry click to materialize, hover lift, `SOON` caption in the aside on scaffolded
+  views) — EXPANDED it materializes as the full panel (per-view title + eyebrow + copy),
+  above the view's ONE tool card if it has one —
   geo → `GeoExplore` (the country→nodes accordion: a country row shows its share, clicking
   it drills the globe AND expands its **COHORT rows** — one row per city × provider
   (`Falkenstein · Hetzner 31`), sorted by count; the old per-node rows repeated the same
@@ -944,14 +948,22 @@ and keep changing, so they're examples, not the contract.
   (filter-first, pins the anchoring global, opens the metagraph-snapshot card). An
   **`unlisted` group** (2026-08-07) rides after the listed ones — neutral dot, italic, sourced
   from the EXACT reads (the only honest source for uncataloged channels), its rows labelled by
-  the channel snapshot's own ordinal (or the address when undecoded), same tested select.
+  the channel snapshot's own ordinal **trailing the channel's short mono ADDRESS** (SnapRow's
+  `sub` slot, 2026-08-08 — the group interleaves SEVERAL channels' independent ordinal
+  counters, so bare numbers read as out-of-order; the address says which chain a number counts
+  on, and answers "how many unregistered metagraphs are there" at a glance), same tested select.
   **`unlisted` is a first-class network with ONE HOME** (`src/data/unlisted.ts`, 2026-08-07 —
   user: the scattered `filter === "unlisted"` branches each grew bugs): the module owns its
   IDENTITY (`displayNetwork(id)` — the one lookup wherever a catalog metagraph OR the unlisted
-  pseudo-network may appear: core-blue hue, italic, `virtual: true`) and its DATA
+  pseudo-network may appear: **NEUTRAL GRAY in BOTH lanes** (2026-08-08 — `UNLISTED_HUE` =
+  `--muted-foreground` on glass, `UNLISTED_SCENE_HEX` in the chamber via the Engine's
+  scene-color maps, the scene special-cases retired; it wore three colours before — no single
+  identity can speak for a mixed set, so none does), italic, `virtual: true`) and its DATA
   (`unlistedLog`/`latestUnlistedTick` over the EXACT reads — the only honest source; the
   polled buffers only track the catalog). Consumers — the picker chip, TopBar face, LIVE
-  control, explorer group + per-tick contributor row, anchor log, vitals guard, follow system
+  control, explorer group + per-tick contributor row, anchor log, vitals guard, follow system,
+  `filterAccent`, the unlisted DOSSIER (ContextCard's honest pane: Metagraph eyebrow +
+  `CircleHelp` mark + "Machines — not knowable")
   — all read the module; `ledgerBands.UNLISTED_KEY` carries the same id string so the lane/
   band/dim machinery matches by construction. Committable in every view — geo/hyper land in
   the honest quiet-empty state (no machines are knowable), the ledger lights the unlisted lane
@@ -974,16 +986,33 @@ and keep changing, so they're examples, not the contract.
   The placeholder views have just the About card.
 - **Right rail** (`#rightcol`, `Inspector`) = the **facts** scope (read-only), a set of
   **FIXED card SLOTS** in one stable order — network dossier, **country**, **provider**,
-  **composition**, then the SNAPSHOT CHAIN (**global snapshot**, then the **metagraph
-  snapshot** that anchors into it), then node (user design, 2026-07-10; reordered 2026-08-06
-  with the ledger display hierarchy — in ledger the lane renders Metagraph → Global snapshot →
-  Metagraph snapshot → Node with depth indents, the snapshot chain being card slots that ride
-  the lane WITHOUT being focus rungs. The COLLAPSE rule is recency: the most recently selected
-  present card is the ACTIVE one and rests open, every other populated card auto-collapses —
-  `focusSlotId` reads `store.selStack`, and the FollowController's heartbeat advance uses the
-  non-bumping `advanceSnap` so a tick is never a "new selection"): every card the
+  **composition**, then the SNAPSHOT CHAIN (**metagraph snapshot** ABOVE the **global
+  snapshot** it anchors into — user reversal 2026-08-08 of the 2026-08-06 order: the rail
+  mirrors the chamber's storeys and the filtered story flow; the filter-is-a-story release
+  rule is what keeps every implied containment truthful, since a global can only coexist
+  with a committed network it actually carries), then node — the snapshot chain being card
+  slots that ride the lane WITHOUT being focus rungs. **THE CARD-REDESIGN GRAMMAR
+  (2026-08-08, mockup-agreed then live-iterated — supersedes the recency-collapse +
+  RUNG_STEP width-stepping): ONE MATERIALIZED BOX, UNBOXED ENTRIES.** Only the focus rung
+  renders as a glass panel (`RailPane`'s entry/box switch in `CardHead.tsx`, an
+  `animate-card-in` rise on materialize); every coarser committed rung sheds its frame into
+  an unboxed **`.rail-entry`** — solid glass (`--panel-solid`, no border/shadow — a border
+  would re-box it), chrome-less (no ×/+−; the WHOLE entry is one stretched aria-expanded
+  toggle), distance-dimmed toward the box (`--entry-dim`, released on hover plus a
+  brightness lift — the materialize PREVIEW; full expand-on-hover was rejected: layout
+  shift under the pointer). Expanding an entry materializes IT and dissolves the open box
+  (single-open accordion); ghost slots shed their dashed frame too — quiet unboxed hint
+  lines. **VIEW ENTRY IS SCENE-FIRST**: arriving in a view starts the whole ladder
+  collapsed, held through the transition's ancestry re-derive by a grace window, and BOTH
+  live-advancing ordinals (snap AND metaSnap) are guarded in Inspector's selectionKey so
+  heartbeats never materialize a card. **The heartbeat is FELT on closed cards**: both
+  snapshot asides tick a `live · Xs` counter every second (shared `useNowTick`; the static
+  "live now" label is retired — the counter is the shown snapshot's age, never overstating)
+  and both are the same tap-to-follow toggle; ordinals roll on change. Every card the
   current view CAN produce is always visible — POPULATED when its subject is selected
-  (`ContextCard` mirrors the filter; the **country card** — `ccMark` code + name title, Nodes/Share/
+  (`ContextCard` mirrors the filter — including an honest **unlisted dossier** (Metagraph
+  eyebrow, `CircleHelp` mark, "Machines — not knowable"; before it the slot was silently a
+  HOLE under the unlisted filter); the **country card** — `ccMark` code + name title, Nodes/Share/
   Cities/Providers from `store.selNodes`, geo-scoped; the
   **provider card** — the PROVIDER alone as the title with its **ASN as the head's `aside`**
   (subtle mono, right-aligned on the title row — it identifies the provider rather than measuring
@@ -991,19 +1020,22 @@ and keep changing, so they're examples, not the contract.
   2026-08-02: the city is a labelled fact, and the country is deliberately absent — the parent
   country card states it one slot up, and a facts rail shouldn't say the same thing twice); both rendered
   straight from their store channels by Inspector's `CountryPane`/`ProviderPane` since
-  neither subject is a PickDescriptor, collapsible like every RIGHT card; the **node card**
+  neither subject is a PickDescriptor; the **node card**
   `geoLive` — CITY-first title with the status pill in the head aside and NOTHING else in the
   head (the country, the make-up and the id are all labelled body rows now — user 2026-08-02:
-  the head names the node, the body states its facts); the **metagraph snapshot card**
+  the head names the node, the body states its facts); the **dossier head** — ticker in the
+  title-row ASIDE (2026-08-08, where the rarely-used site link sat; the site is a labelled
+  body row with the references now); the **metagraph snapshot card**
   (`components/inspector/MetaSnapPane.tsx`, rendered directly like Country/Provider/Composition
   since `MetaSnapSel` is not a PickDescriptor, subject key `${metaId}:${ordinal}`) — **THREE
   TIERS, each honest about where it came from**: tier 1 is free from the 4-second poll (it is
   what named the tile), tier 2 arrives with that tick's exact read, and tier 3 is the
   application state, disclosed **as a SHAPE here and as a payload one level down** in the raw
-  layer; the **snapshot** card), else as a quiet **GHOST hint card** (a dashed one-liner:
-  kind mark · slot label · instruction — no halo/animation) saying what to interact with — so the rail shows the view's whole possibility space and a deselect
+  layer; the **snapshot** card), else as a quiet **GHOST hint line** (kind mark · slot
+  label · instruction) saying what to interact with — so the rail shows the view's whole possibility space and a deselect
   returns its slot to the ghost in place. Slot availability + hint copy live in the rail
-  manifest (`railCards.ts`), the same source the dock trays read, and
+  manifest (`railCards.ts`), the same source the dock trays read (manifest order = lane
+  order, metaSnap before snap), and
   **`components/railLadderBoundary.test.ts`** enforces the ladder↔rail contract: every
   committable `focusLadder` rung below "all" must map to a hinted card slot (exemptions
   need an explicit documented entry) — a future rung can't land without deciding its card. An **instrument-channel
@@ -1045,8 +1077,11 @@ an ordered action effect a later `follow:false` in the same click wins, so pins 
 bare commits go live — `followFlow.test.ts`'s COMPOSED cases pin this down). The card's head aside is still
 a manual switch (`SnapshotAside` → `pickActions.followToggleActions` →
 `applyClickActions`, so the write stays on the one selection path): ON = the beating cyan dot +
-`live now` (`live · {age}` while a metagraph lane's newest anchor is older than the tip — the
-label never overstates), OFF = the pinned snapshot's coarse age; toggling ON hands the subject
+a **TICKING `live · Xs` counter** (2026-08-08, replacing the static "live now" — the counter is
+the shown snapshot's age, counting up between heartbeats and resetting as the next lands, so a
+closed card still FEELS live; one shared `useNowTick` clock, and the METAGRAPH-SNAPSHOT card's
+aside mirrors it exactly — same dot, same counter, same toggle, since `advanceMetaSnap` rides
+the same heartbeat), OFF = the pinned snapshot's ticking age; toggling ON hands the subject
 back to `FollowController` (its `following` effect re-points at the latest relevant snapshot),
 toggling OFF pins whatever is on screen. **The explorer's LIVE control is the explicit face of
 the same switch** (user, 2026-08-07 — the card aside alone was too easy to miss): a full-width
@@ -1240,19 +1275,30 @@ signal channel.**
   already muted) and the node dots keep full brightness.
 - **The facts rail's thread is its ONE instrument, and it carries the card HIERARCHY**
   (redesign 2026-08-02, user: *"make the right rail the only instrument, also to show hierarchy
-  of the cards"*). Two encodings, both on the thread:
-  · **connector LENGTH = ladder depth** — each rung's card steps back from the rail
-  (`Inspector`'s `RUNG_STEP`, on the RAIL-facing edge only so the scene-facing edge signals stay
-  aligned) and the thread's tie-line reaches further for it, so containment reads down the rail;
+  of the cards"*; reworked with the card redesign 2026-08-08). Two encodings, both on the thread:
+  · **connector REACH = the depth FUNNEL** (polarity user-picked from mockups) — an unboxed
+  entry's tie-line reaches INTO the lane at its **EYEBROW's height** (`[data-eyebrow]`
+  measured; the entry's centre put the line through the title-row aside — boxes tie in at
+  their eyebrow too, one anatomy), the COARSEST parent reaching furthest, one `REACH_STEP`
+  shorter per rung, converging on the materialized box's short connector + halo dot. With NO
+  box open (the scene-first view-entry state) the funnel anchors at the ladder's FOOT — the
+  gradient survives a view switch (and an entry anchor counts itself as a step, so it stays
+  strict). All cards sit at ONE fixed width, right edges flush (the RUNG_STEP width-stepping
+  is retired); the SVG box is `REACH_PAD` wider on the lane side because **the thread's fade
+  mask clips ink overflow** — lines drawn outside the box render invisibly (found live:
+  attribute checks pass, pixels don't — screenshots catch what SVG attribute reads can't);
   · **dot STATE = slot state** — hollow for a ghost, solid for a populated card, solid + a wider
   halo for the focus rung (the finest committed one). The rail therefore shows the view's whole
   possibility space *and* where you are.
-  The thread MEASURES each card's real edge rather than sharing the step constant, so the
-  connectors can't drift out of register. The old in-lane **descent spine** (`.rail-ladder` /
+  The old in-lane **descent spine** (`.rail-ladder` /
   `.rung` CSS, variant-A 2026-07-19) is **RETIRED** — it duplicated the thread's own vocabulary
   (spine + tick + node-dot) a rail-width away on the cards' left edge, giving the rail two
   competing instruments. The ladder lane is now pure layout. **Never grow a second vertical
-  instrument in a rail**; new hierarchy signals belong on the thread.
+  instrument in a rail**; new hierarchy signals belong on the thread — the depth funnel passed
+  that bar precisely because it is the thread's own connector vocabulary given room by the
+  unboxed entries. The funnel is DESKTOP-ONLY by design: the tablet/phone sheets keep their
+  own single instrument (the `.ig-sheet-edge` spine) and hierarchy reads from order + the
+  one-box contrast there.
 
 - **Every card edge signal renders on the SCENE-FACING (inner) edge**: left-rail cards →
   their right edge (`.sig-right::after`), right-rail cards → their left edge (`.sig-left`
@@ -1436,7 +1482,9 @@ rung → slot, not the reverse, so a slot without a rung is fine — a rung with
    inlined into utility strings.
 5. **Marker classes/ids queried by JS are contracts**: `#leftcol`/`#rightcol` (RailScroll +
    RailThread + the globals rules), `.ig-panel` (RailThread's card-dot measurement — every rail
-   card must carry it, which the `Card` baseline supplies) plus the facts rail's per-card
+   card must carry it, which the `Card` baseline supplies) **and `.rail-entry`** (the unboxed
+   entry tier, 2026-08-08 — the thread queries both; `[data-eyebrow]` on CardHead's eyebrow
+   span is where an entry's connector anchors vertically), plus the facts rail's per-card
    attributes `data-depth` / `data-focus` (on the rung wrapper) and `data-ghost` (on a ghost
    card), which the thread reads for the hierarchy encoding, `.nb-row`
    (the pairing row-wash selector), `#topbar`, `#metapane`, `#tooltip`. Rename only with all

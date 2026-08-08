@@ -58,12 +58,13 @@ describe("detailsCards — RIGHT rail (Details): fixed slots + ghost hints", () 
   it("the DAG filter → Context dossier populated", () => {
     expect(presentKinds(detailsCards(details({ filter: "dag" })))).toEqual(["context"]);
   });
-  it("slots come in ONE fixed order (context, country, cohort, composition, snap, metaSnap, node) regardless of selection", () => {
+  it("slots come in ONE fixed order (context, country, cohort, composition, metaSnap, snap, node) regardless of selection", () => {
+    // metaSnap before snap (2026-08-08): the manifest agrees with the reversed display lane.
     const ids = detailsCards(details({ filter: "dor", inspect: nodePick, snap: snapPick })).map((c) => c.id);
-    expect(ids).toEqual(["context", "country", "cohort", "composition", "snap", "metaSnap", "node"]);
+    expect(ids).toEqual(["context", "country", "cohort", "composition", "metaSnap", "snap", "node"]);
   });
   it("ledger ghosts: context + snapshot + metaSnap + node invites (nodes pick in the chamber too)", () => {
-    expect(ghostIds(detailsCards(details({})))).toEqual(["context", "snap", "metaSnap", "node"]);
+    expect(ghostIds(detailsCards(details({})))).toEqual(["context", "metaSnap", "snap", "node"]);
   });
   it("hyper ghosts: context + composition + node (the snapshot slot is ledger-scoped, spec 2026-08-01)", () => {
     expect(ghostIds(detailsCards(details({ mode: "hyper" })))).toEqual(["context", "composition", "node"]);
@@ -153,10 +154,12 @@ describe("ladderSlotIds — the descent-spine lane (display order = reversed run
   it("mirrors focusLadder.LADDERS coarsest→coarsest per 3D view", () => {
     expect(ladderSlotIds("geo")).toEqual(["context", "country", "cohort", "node"]);
     expect(ladderSlotIds("hyper")).toEqual(["context", "composition", "node"]);
-    // Ledger: the SNAPSHOT CHAIN (global, then the metagraph snapshot anchoring into it) rides
-    // the display lane between the network and the node (item 8, 2026-08-06) — card slots, not
-    // focus rungs.
-    expect(ladderSlotIds("ledger")).toEqual(["context", "snap", "metaSnap", "node"]);
+    // Ledger: the SNAPSHOT CHAIN rides the display lane between the network and the node —
+    // METAGRAPH SNAPSHOT ABOVE the global (user reversal 2026-08-08): the rail mirrors the
+    // chamber's storeys (metagraph planes on top, ribbons falling into the global floor) and
+    // the filtered story flow (network → its snapshot → the global it anchored INTO) — card
+    // slots, not focus rungs.
+    expect(ladderSlotIds("ledger")).toEqual(["context", "metaSnap", "snap", "node"]);
   });
   it("flat views have no ladder", () => {
     expect(ladderSlotIds("status")).toEqual([]);

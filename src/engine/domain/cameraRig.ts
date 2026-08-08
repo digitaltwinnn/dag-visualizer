@@ -57,6 +57,19 @@ export function dollyBack(pos: THREE.Vector3, target: THREE.Vector3, outPos: THR
   outPos.subVectors(pos, target).multiplyScalar(CAM_ZOOM).add(target);
 }
 
+// The rails-hidden LEAN (2026-08-08, reworked after review): hiding the card rails hands the
+// scene the whole frame, and the camera leans IN by this radial factor toward the pose's own
+// target. It is a property of POSE RESOLUTION, not a one-shot delta — the Engine composes it
+// into EVERY tween destination while the rails are hidden (`_tweenTo`), so focus flights,
+// transition landings and the toggle itself all agree, and showing the rails simply re-resolves
+// the canonical pose (no inverse math, no desync when a reframe happened in between — the
+// original from-the-live-pose delta drifted across holdCamera, flat views and clamps).
+// Safe to call with `outPos === pos` (subVectors reads before it writes).
+export const RAILS_HIDDEN_DOLLY = 0.86;
+export function railsDolly(pos: THREE.Vector3, target: THREE.Vector3, outPos: THREE.Vector3): void {
+  outPos.subVectors(pos, target).multiplyScalar(RAILS_HIDDEN_DOLLY).add(target);
+}
+
 // ---- the geo NODE pose ----------------------------------------------------------------------
 // The lean raise Globe.focusNode applies when aiming a node to the front: with the UNCAPPED
 // lean, every node arrives at the SAME residual elevation (latitude-independent — a tilt cap

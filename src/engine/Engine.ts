@@ -4,7 +4,7 @@ import { useStore, type Mode } from "@/src/store/store";
 import { applyClickActions } from "@/src/store/applyClickActions";
 import { metagraphById, initNetwork, getNetwork, getAnchor, DEFAULT_META_COLOR, resolveSignerIps } from "@/src/data/network";
 import { tickInStory } from "@/src/data/ledgerStory";
-import { LISTED_IDS } from "@/src/data/unlisted";
+import { LISTED_IDS, UNLISTED_ID, UNLISTED_SCENE_HEX } from "@/src/data/unlisted";
 import { hoverKeyOf, tooltipSubject } from "@/src/data/hoverSubject";
 import { identityMap, identitySceneHex } from "@/src/palette/identity";
 import { createScene, type SceneCtx } from "./scene/SceneContext";
@@ -22,7 +22,7 @@ import { BYTE_SCALE_KB, LEDGER, ledgerSite, type RailGroup } from "./domain/ledg
 import { HYPER_TILT, HYPER_TILT_FOCUS } from "./domain/hyperLayout";
 import { readSceneColors } from "./sceneColors";
 import { VIEW_POLICIES, type ViewPolicy } from "./domain/viewPolicy";
-import { FOCI, hubFraming, geoFraming, ledgerNodeFraming, ledgerLaneNudge, nodeFraming, cohortFraming, hyperNodeFraming, dollyBack, easeInOutQuad, type CameraFraming } from "./domain/cameraRig";
+import { FOCI, hubFraming, geoFraming, ledgerNodeFraming, ledgerLaneNudge, nodeFraming, cohortFraming, hyperNodeFraming, dollyBack, railsDolly, easeInOutQuad, type CameraFraming } from "./domain/cameraRig";
 import { countryFraming } from "./domain/countryShape";
 import { R as GEO_R, LAND_H } from "./domain/geoLayout";
 import { clickActions, pickActive, pickNetId, viewEntryActions, metaSnapSelectActions, bandSelectActions } from "./domain/pickActions";
@@ -54,6 +54,11 @@ const GATHER_CELL_ASPECT_REF = 1.6;
 const sceneColorsFor = (ids: string[]): Record<string, number> => {
   const out: Record<string, number> = {};
   for (const [id, e] of identityMap(ids)) out[id] = parseInt(e.sceneHex.slice(1), 16);
+  // The unlisted pseudo-network rides every map with its NEUTRAL gray (one home: unlisted.ts,
+  // 2026-08-08) — so the lane/band/ribbon/tile machinery colors it like any catalog id and the
+  // scene needs no special case (ByteBar/Ribbons' UNLISTED_KEY→neutral branch was retired with
+  // this). Harmless in maps whose consumer never draws it (HyperView's hub map).
+  out[UNLISTED_ID] = UNLISTED_SCENE_HEX;
   return out;
 };
 
@@ -174,6 +179,21 @@ export class Engine {
 
   private unsub: Array<() => void> = [];
   private metaTimer: ReturnType<typeof setInterval> | undefined;
+  // Trailing debounce for the direct-manipulation signal (see the constructor's controls
+  // listeners): wheel-zoom fires start/end per notch, so `sceneDragging` only drops after a
+  // quiet 350ms.
+  private _dragEndT: ReturnType<typeof setTimeout> | undefined;
+  // Store mirror for the rails-hidden camera lean — _tweenTo composes railsDolly into every
+  // destination while it holds (see the subscription note). Seeded from the store at boot.
+  private railsHidden = false;
+  private _onControlsStart = () => {
+    clearTimeout(this._dragEndT);
+    if (!useStore.getState().sceneDragging) useStore.getState().setSceneDragging(true);
+  };
+  private _onControlsEnd = () => {
+    clearTimeout(this._dragEndT);
+    this._dragEndT = setTimeout(() => useStore.getState().setSceneDragging(false), 350);
+  };
   private onResize = () => this.ctx.resize?.();
   // FPS/ms monitor — dev only, or in prod via `?stats`/`#stats` for ad-hoc checks, so
   // it never shows for real users. Click the panel to cycle FPS → ms → MB.
@@ -286,6 +306,12 @@ export class Engine {
     // The engine owns the resize handler (createScene no longer adds one) so it's
     // cleaned up on dispose — no leak across StrictMode remounts / HMR.
     window.addEventListener("resize", this.onResize);
+    // DIRECT-MANIPULATION signal (rail dim, 2026-08-08): OrbitControls' `start`/`end` fire on
+    // real pointer/touch/wheel input ONLY — Engine tweens and programmatic camera moves never
+    // do — so `store.sceneDragging` is exactly "the user's hand is on the scene". The trailing
+    // debounce keeps wheel-zoom bursts (start/end per notch) from strobing the rails.
+    this.ctx.controls.addEventListener("start", this._onControlsStart);
+    this.ctx.controls.addEventListener("end", this._onControlsEnd);
 
     const showStats =
       process.env.NODE_ENV === "development" ||
@@ -316,6 +342,8 @@ export class Engine {
 
     // Apply current store state, then react to changes (Lane B command bridge).
     const s = useStore.getState();
+    // Seed the rails-lean mirror (an HMR/StrictMode remount can boot with the flag already on).
+    this.railsHidden = s.railsHidden;
     this.mode = s.mode;
     this.filter = s.filter;
     this.cohortSel = s.cohort;
@@ -333,6 +361,15 @@ export class Engine {
     this.unsub.push(
       useStore.subscribe((st, prev) => {
         if (st.mode !== prev.mode) this.setMode(st.mode);
+        // The rails-hidden camera LEAN (2026-08-08, review-hardened): the lean is composed into
+        // EVERY tween destination by _tweenTo while the flag holds, so the toggle just mirrors
+        // the flag and RE-RESOLVES the canonical pose — focus flights, transition landings and
+        // the toggle all agree, and no inverse math can desync (holdCamera gates the OUT phase
+        // internally; the boundary's own re-derive composes the lean on arrival).
+        if (st.railsHidden !== prev.railsHidden) {
+          this.railsHidden = st.railsHidden;
+          if (VIEW_POLICIES[this.mode].canvas) this._resolveFocus();
+        }
         if (st.filter !== prev.filter) {
           this.filter = st.filter;
           // Switching network clears any country drill-down (matches the old geo UX).
@@ -1231,6 +1268,10 @@ export class Engine {
     else tw.toPos.copy(toPos);
     tw.fromTgt.copy(this.ctx.controls.target);
     tw.toTgt.copy(toTgt);
+    // The rails-hidden LEAN composes into EVERY destination (2026-08-08, review-hardened): a
+    // property of pose resolution, so focus flights, transition landings and the presentation
+    // toggle can never disagree about it. In place (railsDolly is outPos===pos safe).
+    if (this.railsHidden) railsDolly(tw.toPos, tw.toTgt, tw.toPos);
     tw.t = 0;
     tw.dur = 1.4;
     tw.active = true;
@@ -1524,6 +1565,11 @@ export class Engine {
     this.canvas.removeEventListener("pointerdown", this.onDown);
     this.canvas.removeEventListener("pointerleave", this.onLeave);
     window.removeEventListener("resize", this.onResize);
+    this.ctx.controls.removeEventListener("start", this._onControlsStart);
+    this.ctx.controls.removeEventListener("end", this._onControlsEnd);
+    clearTimeout(this._dragEndT);
+    // A dispose mid-drag must not leave the rails dimmed (StrictMode remount / HMR).
+    if (useStore.getState().sceneDragging) useStore.getState().setSceneDragging(false);
     this.stats?.dom.remove();
     this._devTune?.dispose();
     this.unsub.forEach((u) => u());

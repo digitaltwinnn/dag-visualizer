@@ -1,15 +1,16 @@
 "use client";
 
-import { cn } from "@/lib/utils";
+import { CircleHelp } from "lucide-react";
 import { useStore } from "@/src/store/store";
 import { applyClickActions } from "@/src/store/applyClickActions";
 import { metagraphById } from "@/src/data/network";
+import { UNLISTED_ID, displayNetwork } from "@/src/data/unlisted";
 import { hex } from "@/src/util/format";
 import { subjectPairing } from "@/components/useSubjectPairing";
-import { RIGHT_CARD } from "@/components/CardHead";
-import { Card } from "@/components/ui/card";
+import CardHead, { RailPane } from "@/components/CardHead";
 import InspectorCard from "@/components/InspectorCard";
 import { PulseEdge, useEdgePulse } from "@/components/EdgePulse";
+import { KIND_MARK_CLASS } from "@/components/icons";
 import type { PickDescriptor } from "@/src/data/types";
 
 // The Context (parent) card at the top of the right-rail subject stack. It mirrors the
@@ -36,6 +37,56 @@ export default function ContextCard({
   // change still pulses.
   const pulseKey = useEdgePulse(filter);
 
+  // The UNLISTED pseudo-network's dossier (2026-08-08 — committing "unlisted" used to leave the
+  // slot an empty HOLE: the manifest marks it present, suppressing the ghost, while this card
+  // self-nulled on the missing catalog record). Everything shown comes from the one-home
+  // identity (`displayNetwork`, neutral gray) + honest instrument states — a mixed uncataloged
+  // set has no dossier facts to fabricate. The kind mark is a QUESTION MARK (user): the slot
+  // noun stays Metagraph like every dossier, the "?" says which kind this one is.
+  if (filter === UNLISTED_ID) {
+    const dn = displayNetwork(UNLISTED_ID)!;
+    const pair = subjectPairing<string>(hoverFilter, dn.id, setHoverFilter, dn.hue);
+    return (
+      <RailPane
+        entry={collapsed}
+        id="metapane"
+        className={pair.className}
+        style={pair.style}
+        onMouseEnter={pair.onMouseEnter}
+        onMouseLeave={pair.onMouseLeave}
+      >
+        <CardHead
+          eyebrow="Metagraph"
+          title={
+            <span className="inline-flex items-center gap-2 min-w-0">
+              <CircleHelp aria-hidden className={KIND_MARK_CLASS} style={{ color: dn.hue }} />
+              <span className="italic truncate">{dn.name}</span>
+            </span>
+          }
+          titleKey={dn.id}
+          onClose={() => applyClickActions([{ kind: "filter", id: "all" }])}
+          collapsed={collapsed}
+          onToggle={onToggle}
+        />
+        {!collapsed && (
+          <>
+            <p className="m-0 text-body text-muted-foreground">
+              State channels anchoring into Global L0 without an entry in the public catalog — a
+              mixed set with no single operator or token.
+            </p>
+            {/* Absent data is an INSTRUMENT STATE, never a fabricated number: the operators'
+                machines are outside every feed this app reads. */}
+            <div className="mt-2 flex items-start justify-between gap-2.5">
+              <span className="text-body text-muted-foreground">Machines</span>
+              <span className="text-body text-muted-foreground italic">not knowable</span>
+            </div>
+          </>
+        )}
+        <PulseEdge pulseKey={pulseKey} rail="right" />
+      </RailPane>
+    );
+  }
+
   if (!mgCfg) return null; // "all" — no resting context card; the rail rests quiet.
 
   const context: PickDescriptor = { kind: "meta", title: mgCfg.name, cfg: mgCfg };
@@ -43,25 +94,25 @@ export default function ContextCard({
   // metagraph's hue, via the shared hoverFilter channel.
   const pair = subjectPairing<string>(hoverFilter, mgCfg.id, setHoverFilter, hex(mgCfg.color));
   return (
-    <Card asChild className={cn(RIGHT_CARD, "sig-left", pair.className)}>
-      <aside
-        id="metapane"
-        style={pair.style}
-        onMouseEnter={pair.onMouseEnter}
-        onMouseLeave={pair.onMouseLeave}
-      >
-        <InspectorCard
-          p={context}
-          eyebrow="Metagraph"
-          onClose={() => applyClickActions([{ kind: "filter", id: "all" }])}
-          collapsed={collapsed}
-          onToggle={onToggle}
-        />
-        {/* Scene-facing (left) edge pulse on a new subject (metagraph picked) — synced with the
-            dossier title's own roll-in (MetaCard keys it on cfg.name; both fire on the filter
-            change). */}
-        <PulseEdge pulseKey={pulseKey} rail="right" />
-      </aside>
-    </Card>
+    <RailPane
+      entry={collapsed}
+      id="metapane"
+      className={pair.className}
+      style={pair.style}
+      onMouseEnter={pair.onMouseEnter}
+      onMouseLeave={pair.onMouseLeave}
+    >
+      <InspectorCard
+        p={context}
+        eyebrow="Metagraph"
+        onClose={() => applyClickActions([{ kind: "filter", id: "all" }])}
+        collapsed={collapsed}
+        onToggle={onToggle}
+      />
+      {/* Scene-facing (left) edge pulse on a new subject (metagraph picked) — synced with the
+          dossier title's own roll-in (MetaCard keys it on cfg.name; both fire on the filter
+          change). */}
+      <PulseEdge pulseKey={pulseKey} rail="right" />
+    </RailPane>
   );
 }

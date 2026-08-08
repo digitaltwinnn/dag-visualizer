@@ -8,6 +8,7 @@ import HyperExplore from "@/components/HyperExplore";
 import LedgerPanel from "@/components/LedgerPanel";
 import AboutView from "@/components/AboutView";
 import RailThread from "@/components/RailThread";
+import { RailShade } from "@/components/RailShade";
 import RailDock, { type TabSignal } from "@/components/RailDock";
 import { exploreCards } from "@/components/railCards";
 import { useBreakpoint } from "@/components/useBreakpoint";
@@ -125,7 +126,7 @@ export default function ExploreRail() {
           className="max-[1100px]:!w-[224px] max-[860px]:!w-[210px] max-[860px]:!max-h-[calc(100vh-320px)] max-[1099px]:!hidden"
           style={accent}
         >
-          {content}
+          <RailShade>{content}</RailShade>
         </div>
       </>
     );

@@ -21,7 +21,7 @@ import type { SceneColors } from "../../sceneColors";
 import { METAGRAPHS } from "../../config";
 import { BAR_H, BAR_LIFT, FLOOR_Y, LEAD_X, TILE_LIFT } from "../../domain/ledgerLayout";
 import { SLOT_SP } from "../../domain/ledgerModel";
-import { ribbonQuad, RIBBON_LANE_HALF, UNLISTED_KEY, type BarSpec, type RibbonQuad } from "../../domain/ledgerBands";
+import { ribbonQuad, RIBBON_LANE_HALF, type BarSpec, type RibbonQuad } from "../../domain/ledgerBands";
 
 
 // THREE rows since 2026-08-07 (was 2): the LEAD row, the COMMITTED/hot row, and the HOVER
@@ -210,7 +210,8 @@ export class Ribbons {
       for (let i = 0; i < st.count; i++) {
         const q = st.quads[i];
         const key = st.keys[i];
-        const hex = key === UNLISTED_KEY ? this._neutral : (this._sceneColors[key] ?? this._neutral);
+        // Map-first — the Engine's scene-color map carries the unlisted gray too (2026-08-08).
+        const hex = this._sceneColors[key] ?? this._neutral;
         this._c.setHex(hex);
         const off = this._filter !== "all" && key !== this._filter;
         const sc = brightness * rowFade * (off ? RIBBON_DIM : 1);

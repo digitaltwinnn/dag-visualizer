@@ -1,9 +1,10 @@
 "use client";
 
-import type { ReactNode } from "react";
+import type { CSSProperties, ReactNode } from "react";
 import { Plus, Minus, X, type LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
 import { KIND_MARK_CLASS } from "@/components/icons";
 
 // The ONE HUD card header — every rail card leads with this shared grammar so the whole HUD
@@ -59,6 +60,68 @@ const TITLE = "m-0 text-title font-semibold";
 // their own margins — as the original block box did — rather than gaining a flex gap between the
 // eyebrow and the body.)
 export const RIGHT_CARD = "relative block w-auto pointer-events-auto [--spine:transparent] p-[18px] min-h-0 flex-none";
+
+// The UNBOXED ancestor entry — the card-redesign's (2026-08-08) second presentation tier. Only the
+// FOCUS rung materializes as a full glass panel; every coarser committed rung sheds its box and
+// rests as this quiet one-line entry (eyebrow + title via CardHead's collapsed layout), pinned to
+// the thread. `.rail-entry` is a MARKER CLASS the RailThread queries (alongside `.ig-panel`) to
+// place its node dots and the depth-reach connectors — rename only with that consumer. The 18px
+// horizontal pad matches RIGHT_CARD's flat pad so entry titles align with box content. It wears a
+// solid-leaning glass (user, 2026-08-08, twice-strengthened — bare text, then the faint `--panel`
+// fill, both fought the bright 3D scene): `--panel-solid` + light blur, NO border/shadow (a border
+// would re-box it). The ladder's distance-dim rides `--entry-dim` (set by Inspector's rung
+// wrapper) so fill + text fade together — and HOVER lifts the entry (user, 2026-08-08: a hover
+// previews the materialization; full expand-on-hover was rejected — it shifts layout under the
+// pointer): the dim RELEASES to full luminance AND a small brightness boost rides on top, so
+// entries resting at dim 1 (the anchor-adjacent ones — found live: the metagraph-snapshot entry
+// had nothing to release) still visibly respond. Click does the actual expand.
+const RAIL_ENTRY =
+  "rail-entry relative block w-auto pointer-events-auto [--spine:transparent] px-[18px] py-1.5 min-h-0 flex-none rounded-md bg-[var(--panel-solid)] [backdrop-filter:blur(10px)] opacity-[var(--entry-dim,1)] hover:opacity-100 hover:brightness-[1.18] transition-[opacity,filter] duration-150 motion-reduce:transition-none";
+// Exported for the LEFT rail's entry-tier cards (AboutView — the collapsed About sheds its box
+// into the same grammar, 2026-08-08); the right rail routes through RailPane below.
+export { RAIL_ENTRY };
+
+// The ONE right-rail pane frame — every facts-rail pane renders through this switch:
+//   • `entry` false → the full glass panel (Card baseline supplies `.ig-panel`; RIGHT_CARD the
+//     rail overrides; `.sig-left` the scene-facing signal edge; `animate-card-in` plays the
+//     materialize moment on mount — which is exactly the entry→box swap, since RailPane changes
+//     the element structure and React remounts the subtree).
+//   • `entry` true → the unboxed RAIL_ENTRY above (no glass, no signal edge — the pairing wash
+//     has its own `.rail-entry.subject-paired` recipe in globals.css).
+// Pairing className/style/handlers ride the outer element in both tiers, so scene↔HUD hover
+// pairing survives the swap.
+export function RailPane({
+  entry = false,
+  id,
+  className,
+  style,
+  onMouseEnter,
+  onMouseLeave,
+  children,
+}: {
+  entry?: boolean;
+  id?: string;
+  className?: string;
+  style?: CSSProperties;
+  onMouseEnter?: () => void;
+  onMouseLeave?: () => void;
+  children: ReactNode;
+}) {
+  if (entry) {
+    return (
+      <aside id={id} className={cn(RAIL_ENTRY, className)} style={style} onMouseEnter={onMouseEnter} onMouseLeave={onMouseLeave}>
+        {children}
+      </aside>
+    );
+  }
+  return (
+    <Card asChild className={cn(RIGHT_CARD, "sig-left", "animate-card-in motion-reduce:animate-none", className)}>
+      <aside id={id} style={style} onMouseEnter={onMouseEnter} onMouseLeave={onMouseLeave}>
+        {children}
+      </aside>
+    </Card>
+  );
+}
 
 export default function CardHead({
   eyebrow,
@@ -191,14 +254,16 @@ export default function CardHead({
   // edge, so its aside (status pill, live dot, site link) ends flush with the ×'s glyph and the
   // body's right-aligned columns (user, 2026-07-12 — the 22px title-row clearance double-inset
   // the aside ~40px from the card edge while everything else aligned at ~18px). Right cards are
-  // COLLAPSIBLE too (user, 2026-07-12): the WHOLE head is the toggle (same WAI-ARIA disclosure
-  // pattern + stretched hit area as the panel layout — required for touch), with the +/− as the
-  // decorative indicator on the eyebrow line; the × and the title-row aside float ABOVE the
-  // stretched hit area (z) so closing and the site link keep working. Collapsed = eyebrow +
-  // title only (the caller hides subtitle/body; the hairline goes too).
+  // COLLAPSIBLE too (user, 2026-07-12): expanded (the BOX), the +/− rides the eyebrow line and
+  // the × floats at the corner. COLLAPSED (the unboxed ENTRY, card-redesign 2026-08-08) the
+  // chrome disappears entirely — no ×, no +/− (user: it read as clutter on a one-line entry);
+  // the WHOLE entry is one invisible stretched toggle (aria-expanded, sr-only label), so a click
+  // anywhere re-materializes it as the box. Deselection of an entry happens by stepping down
+  // from the box / clear-all, not per-entry chrome.
+  const entryMode = !!collapsed && !!onToggle;
   return (
     <>
-      {onClose && (
+      {onClose && !entryMode && (
         <Button
           variant="ghost"
           size="icon-xs"
@@ -211,10 +276,24 @@ export default function CardHead({
         </Button>
       )}
       <div className={cn(onToggle && "relative group")}>
-        {(eyebrow || onToggle) && (
-          <div className={cn("flex items-start justify-between gap-2 mb-2", onClose && "pr-[30px]")}>
-            {eyebrow ? <span className={cn("block", eyebrowClass)}>{eyebrow}</span> : <span />}
-            {onToggle && (
+        {entryMode && (
+          <button
+            type="button"
+            aria-expanded={false}
+            title="Expand"
+            onClick={onToggle}
+            className="absolute inset-0 z-[1] appearance-none bg-transparent border-0 p-0 m-0 cursor-pointer rounded-sm focus-visible:outline-1 focus-visible:outline-ring/60"
+          >
+            <span className="sr-only">Expand</span>
+          </button>
+        )}
+        {(eyebrow || (onToggle && !entryMode)) && (
+          <div className={cn("flex items-start justify-between gap-2 mb-2", onClose && !entryMode && "pr-[30px]")}>
+            {/* `data-eyebrow` is RailThread's read: on an unboxed ENTRY the thread runs its
+                depth-reach connector at the EYEBROW's height (user, 2026-08-08 — the entry's
+                vertical centre put the line through the title-row aside's space). */}
+            {eyebrow ? <span data-eyebrow="" className={cn("block", eyebrowClass)}>{eyebrow}</span> : <span />}
+            {onToggle && !entryMode && (
               // -mt aligns the glyph's centre with the ×'s (the × floats at the card corner,
               // outside this row's flow — measured, not eyeballed).
               <button
