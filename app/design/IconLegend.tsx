@@ -12,7 +12,7 @@ const ENTITIES: { label: string; Icon: LucideIcon }[] = [
   { label: "Metagraph", Icon: iconForPick("meta") },
   { label: "Node", Icon: iconForPick("geoLive") },
   { label: "Snapshot", Icon: iconForPick("snapshot") },
-  { label: "Layer", Icon: iconForPick("layer") },
+  { label: "Metagraph snapshot", Icon: iconForPick("metaSnap") },
 ];
 const VIEWS: { label: string; Icon: LucideIcon }[] = [
   { label: "Hypergraph", Icon: VIEW_ICONS.hyper },

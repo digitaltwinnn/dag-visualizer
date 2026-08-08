@@ -2,30 +2,18 @@ import { describe, it, expect } from "vitest";
 import { METAGRAPHS } from "../config";
 import {
   LEDGER, LAYER_GEOM, ledgerSite, clusterRadius, ledgerSpread,
-  FLOOR_IDS, FLOOR_Y, LANE_HALF_Z, GUTTER_W, GUTTER_CZ,
-  BAR_Z0, BAR_MAX_W, BAR_MIN_W, BAR_H, BAR_D, BYTE_SCALE_KB,
-  RAIL_X0, RAIL_PITCH_X, RAIL_Y_LIFT, RAIL_CHIP_PITCH_Z, RAIL_ROW_LIFT, RAIL_CAP,
-  RAIL_GROUP_FLOOR, railX, railY, laneSpan,
+  FLOOR_IDS, FLOOR_Y, LANE_HALF_Z, PLANE_FIELD_HALF,
+  BAR_MAX_W, BAR_MIN_W, BAR_H, BAR_D, BYTE_SCALE_KB, BAR_EDGE_MARGIN,
+  CONT_X, CONT_TOP_GAP, CONT_CHIP_Z, CONT_ROW_Y, CONT_PAD, CONT_Z0, CONT_Z1,
+  LEAD_X, TILE_LIFT, BAR_LIFT,
+  LANE_PLANE_GAP, lanePlaneHalf, laneSpan,
 } from "./ledgerLayout";
 
-describe("LAYER_GEOM after the two-floor redesign", () => {
-  it("keeps every focus rung — four of them now resolve to rails, not planes", () => {
-    expect(LAYER_GEOM.map((l) => l.id).sort()).toEqual(["gl0", "hypl0", "hypl1", "ml0", "ml1", "msnap"]);
-    const rails = LAYER_GEOM.filter((l) => l.isRail).map((l) => l.id).sort();
-    expect(rails).toEqual(["hypl0", "hypl1", "ml0", "ml1"]);
-  });
-
-  it("puts the two snapshot floors at their own heights and the rails above the floor they serve", () => {
+describe("LAYER_GEOM after the layer-navigation retirement (2026-08-06)", () => {
+  it("frames only the two snapshot floors, at their own heights", () => {
+    expect(LAYER_GEOM.map((l) => l.id)).toEqual(["msnap", "gl0"]);
     expect(LAYER_GEOM.find((l) => l.id === "msnap")!.y).toBe(FLOOR_Y.msnap);
     expect(LAYER_GEOM.find((l) => l.id === "gl0")!.y).toBe(FLOOR_Y.gl0);
-    expect(LAYER_GEOM.find((l) => l.id === "ml0")!.y).toBe(railY("meta", 0));
-    expect(LAYER_GEOM.find((l) => l.id === "hypl0")!.y).toBe(railY("dag", 0));
-    expect(RAIL_GROUP_FLOOR.meta).toBe("msnap");
-    expect(RAIL_GROUP_FLOOR.dag).toBe("gl0");
-  });
-
-  it("no longer centres anything laterally — every rung sits on the shared lane field", () => {
-    for (const l of LAYER_GEOM) expect(l.laneZ).toBe(0);
   });
 });
 
@@ -101,15 +89,16 @@ describe("two-floor chamber (redesign 2026-08-04)", () => {
     expect(ledgerSite(n - 1, n).z).toBeCloseTo(LANE_HALF_Z, 6);
   });
 
-  it("puts the gutter outside the lane field, on the screen-right (−Z) side", () => {
-    expect(GUTTER_CZ).toBeLessThan(-LANE_HALF_Z);
-    expect(GUTTER_CZ + GUTTER_W / 2).toBeLessThanOrEqual(-LANE_HALF_Z + 1e-9);
-    expect(GUTTER_W).toBeCloseTo((2 * LANE_HALF_Z) / 6, 6);
+  it("centres the plane field about z=0 — the global plane sits right beneath the lanes", () => {
+    // The field half covers the outermost lane's plane exactly (site + its plane half).
+    const n = METAGRAPHS.length + 1;
+    expect(PLANE_FIELD_HALF).toBeCloseTo(LANE_HALF_Z + lanePlaneHalf(n), 6);
+    expect(PLANE_FIELD_HALF).toBeGreaterThan(LANE_HALF_Z);
   });
 
-  it("starts the byte bar at lane 0's end and can grow across the whole field", () => {
-    expect(BAR_Z0).toBeCloseTo(-LANE_HALF_Z, 6);
-    expect(BAR_MAX_W).toBeCloseTo(2 * LANE_HALF_Z, 6);
+  it("lets the byte bar grow across the field, clear of the ordinal labels", () => {
+    expect(BAR_MAX_W).toBeCloseTo(2 * (LANE_HALF_Z - BAR_EDGE_MARGIN), 6);
+    expect(BAR_EDGE_MARGIN).toBeGreaterThan(0);
     expect(BAR_MIN_W).toBeGreaterThan(0);
     expect(BAR_MIN_W).toBeLessThan(BAR_MAX_W);
     expect(BAR_H).toBeGreaterThan(0);
@@ -118,38 +107,50 @@ describe("two-floor chamber (redesign 2026-08-04)", () => {
   });
 
   it("carries the baked p99 scale reference in KB", () => {
-    expect(BYTE_SCALE_KB).toBe(77);
+    expect(BYTE_SCALE_KB).toBe(89);
   });
 
-  it("steps rails toward the camera and stacks overflow rows upward", () => {
-    expect(railX(0)).toBeCloseTo(RAIL_X0, 6);
-    expect(railX(2)).toBeCloseTo(RAIL_X0 + 2 * RAIL_PITCH_X, 6);
-    expect(railY("meta", 0)).toBeCloseTo(FLOOR_Y.msnap + RAIL_Y_LIFT, 6);
-    expect(railY("dag", 1)).toBeCloseTo(FLOOR_Y.gl0 + RAIL_Y_LIFT + RAIL_ROW_LIFT, 6);
-    expect(RAIL_GROUP_FLOOR.meta).toBe("msnap");
-    expect(RAIL_GROUP_FLOOR.dag).toBe("gl0");
-    expect(RAIL_CAP).toBe(Math.floor((2 * LANE_HALF_Z) / RAIL_CHIP_PITCH_Z) + 1);
+  it("hangs the node trays under their plane's front edge, facing the camera", () => {
+    // The shared tray X plane sits camera-side (+X), the frames below the floor plane.
+    expect(CONT_X).toBeGreaterThan(0);
+    expect(CONT_TOP_GAP).toBeGreaterThan(0);
+    // Chip/row pitches and frame chrome are positive and modest against the lane field.
+    for (const v of [CONT_CHIP_Z, CONT_ROW_Y, CONT_PAD]) expect(v).toBeGreaterThan(0);
+    // The DAG validator tray spans the global plane's full front width, inset SYMMETRICALLY.
+    expect(CONT_Z0).toBeCloseTo(-CONT_Z1, 6);
+    expect(CONT_Z1).toBeLessThan(PLANE_FIELD_HALF);
+    expect(CONT_Z1 - CONT_Z0).toBeGreaterThan(2 * LANE_HALF_Z);
   });
 
-  it("keeps every lane in its own slice with nothing committed", () => {
-    const n = METAGRAPHS.length;
+  it("gives each lane its own plane, gapped, inside its slice (2026-08-07)", () => {
+    const n = METAGRAPHS.length + 1; // the unknown lane included
+    expect(LANE_PLANE_GAP).toBeGreaterThan(0);
+    expect(lanePlaneHalf(n)).toBeGreaterThan(0);
+    expect(lanePlaneHalf(n)).toBeLessThan(LANE_HALF_Z / (n - 1));
+    // Neighbouring planes never touch: centre distance ≥ plane width + gap.
+    const d = Math.abs(ledgerSite(1, n).z - ledgerSite(0, n).z);
+    expect(d).toBeCloseTo(2 * lanePlaneHalf(n) + LANE_PLANE_GAP, 6);
+  });
+
+  it("leads the time trail toward the camera-side floor edge", () => {
+    // The lead slot sits well forward of centre but inside the floors' front edge (~6.5 local).
+    expect(LEAD_X).toBeGreaterThan(0);
+    expect(LEAD_X).toBeLessThan(6.5);
+  });
+
+  it("floats the snapshots just above their planes (bottoms never pierce the glass)", () => {
+    expect(TILE_LIFT).toBeGreaterThan(0);
+    expect(BAR_LIFT).toBeGreaterThan(0);
+    expect(Math.max(TILE_LIFT, BAR_LIFT)).toBeLessThan(0.5);
+  });
+
+  it("keeps every lane in its own FIXED slice — a filter never moves or hides lanes (user reversal 2026-08-07)", () => {
+    const n = METAGRAPHS.length + 1; // the roster incl. the unknown lane
     for (let i = 0; i < n; i++) {
-      const s = laneSpan(i, n, null);
-      expect(s.hidden).toBe(false);
+      const s = laneSpan(i, n);
       expect(s.cz).toBeCloseTo(ledgerSite(i, n).z, 6);
       // Each lane owns one slice of the field, so n lanes tile it without overlapping.
       expect(s.hz).toBeCloseTo(LANE_HALF_Z / n, 6);
-    }
-  });
-
-  it("gives a committed lane the whole floor and takes the others away (spec §5.2)", () => {
-    const n = METAGRAPHS.length;
-    const on = laneSpan(3, n, 3);
-    expect(on.hidden).toBe(false);
-    expect(on.cz).toBeCloseTo(0, 6);
-    expect(on.hz).toBeCloseTo(LANE_HALF_Z, 6);
-    for (const i of [0, 2, 4, n - 1]) {
-      expect(laneSpan(i, n, 3).hidden).toBe(true);
     }
   });
 });

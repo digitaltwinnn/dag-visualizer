@@ -7,9 +7,9 @@ import {
   slotFade,
   anchorTiles,
   LedgerModel,
-  LEAD_SETTLE_MS,
-} from "./ledgerModel";
+  LEAD_SETTLE_MS, LANE_IDS } from "./ledgerModel";
 import { METAGRAPHS } from "../config";
+import { UNLISTED_KEY } from "./ledgerBands";
 import { ledgerSite } from "./ledgerLayout";
 import type { GlobalSnapshot, Anchor } from "@/src/data/types";
 
@@ -148,14 +148,9 @@ describe("LedgerModel.setSelected / isRowHot — the binary colour rule (js/ledg
   it("with nothing selected, the LIVE lead (slot<=0) is hot and everything else is not", () => {
     const model = new LedgerModel();
     expect(model.selectedSlot).toBe(-1);
-    expect(model.isRowHot(false, 0)).toBe(true);
-    expect(model.isRowHot(false, 1)).toBe(false);
-    expect(model.isRowHot(false, -1)).toBe(true);
-  });
-
-  it("a filtered-out lane (laneOff) is never hot, live lead or not", () => {
-    const model = new LedgerModel();
-    expect(model.isRowHot(true, 0)).toBe(false);
+    expect(model.isRowHot(0)).toBe(true);
+    expect(model.isRowHot(1)).toBe(false);
+    expect(model.isRowHot(-1)).toBe(true);
   });
 
   it("selecting an older ordinal follows its block leftward as ticks advance, and flips the hot row", () => {
@@ -168,15 +163,27 @@ describe("LedgerModel.setSelected / isRowHot — the binary colour rule (js/ledg
 
     model.setSelected(100); // the ordinal now sitting in the trail
     expect(model.selectedSlot).toBe(1);
-    expect(model.isRowHot(false, 1)).toBe(true); // selected older row is hot
-    expect(model.isRowHot(false, 0)).toBe(false); // live lead goes neutral once an older row is selected
+    expect(model.isRowHot(1)).toBe(true); // selected older row is hot
+    expect(model.isRowHot(0)).toBe(false); // live lead goes neutral once an older row is selected
 
     // one more tick: ordinal 100's block should keep following, now at slot 2.
     const s3 = snap(102, "T3", 1);
     model.setData([s1, s2, s3], (ts) => (ts === "T3" ? anchor({ [idA]: 1 }) : null));
     expect(model.selectedSlot).toBe(2);
-    expect(model.isRowHot(false, 2)).toBe(true);
-    expect(model.isRowHot(false, 1)).toBe(false);
+    expect(model.isRowHot(2)).toBe(true);
+    expect(model.isRowHot(1)).toBe(false);
+  });
+
+  it("slotOf maps an ordinal to its current slot without touching the selection", () => {
+    const model = new LedgerModel();
+    const s1 = snap(100, "T1", 1);
+    model.setData([s1], () => anchor({ [idA]: 1 }));
+    const s2 = snap(101, "T2", 1);
+    model.setData([s1, s2], (ts) => (ts === "T2" ? anchor({ [idA]: 1 }) : null));
+    expect(model.slotOf(101)).toBe(0); // the live lead
+    expect(model.slotOf(100)).toBe(1); // in the trail
+    expect(model.slotOf(42)).toBe(-1); // not visible
+    expect(model.selectedSlot).toBe(-1); // a pure lookup — no selection side effect
   });
 
   it("setSelected(null) clears the selection back to live-lead-hot", () => {
@@ -184,7 +191,7 @@ describe("LedgerModel.setSelected / isRowHot — the binary colour rule (js/ledg
     model.setSelected(100);
     model.setSelected(null);
     expect(model.selectedSlot).toBe(-1);
-    expect(model.isRowHot(false, 0)).toBe(true);
+    expect(model.isRowHot(0)).toBe(true);
   });
 });
 
@@ -248,5 +255,26 @@ describe("slot identity + the forming lead row (redesign 2026-08-04)", () => {
 
   it("holds the ~7s settling idiom AnchoredTags already uses", () => {
     expect(LEAD_SETTLE_MS).toBe(7000);
+  });
+});
+
+describe("LANE_IDS (the unknown lane, 2026-08-07)", () => {
+  it("is every listed metagraph plus the unknown lane LAST (the +Z / screen-left end)", () => {
+    expect(LANE_IDS.slice(0, -1)).toEqual(METAGRAPHS.map((m) => m.id));
+    expect(LANE_IDS[LANE_IDS.length - 1]).toBe(UNLISTED_KEY);
+  });
+
+  it("gives the unknown lane real tiles when the anchor aggregate carries its count", () => {
+    const model = new LedgerModel();
+    const snaps = [
+      { ordinal: 1, timestamp: "t1" },
+      { ordinal: 2, timestamp: "t2" },
+    ] as never[];
+    const anchor = () =>
+      ({ fee: 0, count: 3, metaIds: new Set([UNLISTED_KEY]), metaCounts: new Map([[UNLISTED_KEY, 3]]), touched: 0 }) as never;
+    model.setData(snaps as never, anchor as never);
+    const lane = model.lanes.get(UNLISTED_KEY)!;
+    expect(lane).toBeTruthy();
+    expect(lane.blocks.filter((b) => b.filled).length).toBeGreaterThan(0);
   });
 });

@@ -35,8 +35,13 @@ export const FOCI: Record<string, { pos: THREE.Vector3; target: THREE.Vector3 }>
   // Camera held LOW (near the equator plane, like the country/node poses) — a higher camera
   // stacked on the densest-cluster lean read as "viewing the globe from the north" (user).
   geoNetwork: { pos: new THREE.Vector3(0, 5, 33), target: new THREE.Vector3(0, 2, 0) },
-  // (The Snapshots view has no camera of its own — it uses `overview`. The ledger GROUP is rotated/
-  // tilted/scaled instead, config.viewRotY/viewTiltX/viewScale, so the camera never moves on a switch.)
+  // The Snapshots RESTING pose (user, 2026-08-07 — it used to share `overview`): FRONTAL and
+  // zoomed in, straight onto the chamber's camera-side face, so the ribbon sheets (which span
+  // the lane field) and the node trays (which face +Z) present flat-on. Slightly elevated,
+  // aimed between the floors.
+  // Nearly level (user: "more from the front, no tilt") — a ~6° pitch keeps the plane tops
+  // just barely readable while the trays + ribbon sheets present flat-on.
+  ledger: { pos: new THREE.Vector3(0, 3.5, 54), target: new THREE.Vector3(0, -2.5, 0) },
 };
 
 // ---- the ONE global zoom lever ------------------------------------------------------------
@@ -136,6 +141,31 @@ export function geoFraming(R: number, out: CameraFraming): void {
 // the plane's height `y` (already viewScale'd by the caller). The resting pose stays central/
 // untilted; this tilt is an EXPLORATION move (the user can freely orbit from here, like the geo
 // drill zoom).
+/** The ledger's COMMIT ACKNOWLEDGEMENT pose (2026-08-08 — moved out of the Engine's resolver,
+ *  rule 8: framing math lives here): from the overview FOCI, nudge a fraction toward the
+ *  committed lane, dolly in slightly, raise the camera and lift the aim — enough to say
+ *  something happened while the colored dim carries the real emphasis. `laneX` = the lane's
+ *  world X (null = no lateral nudge, e.g. "dag"/unknown). */
+export const LANE_NUDGE = 0.3;
+export const NUDGE_DOLLY = 0.12;
+export const NUDGE_RAISE = 10;
+export const NUDGE_AIM_UP = 2;
+export function ledgerLaneNudge(
+  base: { pos: THREE.Vector3; target: THREE.Vector3 },
+  laneX: number | null,
+  out: CameraFraming,
+): void {
+  out.pos.copy(base.pos);
+  out.target.copy(base.target);
+  if (laneX != null) {
+    out.pos.x += laneX * LANE_NUDGE;
+    out.target.x += laneX * LANE_NUDGE;
+  }
+  out.pos.lerp(out.target, NUDGE_DOLLY);
+  out.pos.y += NUDGE_RAISE;
+  out.target.y += NUDGE_AIM_UP;
+}
+
 export function ledgerFloorFraming(y: number, out: CameraFraming): void {
   // Close-in framing (user-tuned). The TARGET sits exactly at the lane's LEAD point (x=0, z=0 —
   // the caller shifts pos+target laterally by the focused lane's world x), so the node ring /

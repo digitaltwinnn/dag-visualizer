@@ -10,7 +10,7 @@
 //
 // Allocation-free after construction: `makeBarSpec()` preallocates one band record per listed
 // metagraph plus the unlisted aggregate, and `fillBarSpec()` only writes into them.
-import { BAR_Z0, BAR_MAX_W, BAR_MIN_W, BYTE_SCALE_KB, LANE_HALF_Z } from "./ledgerLayout";
+import { BAR_MAX_W, BAR_MIN_W, BYTE_SCALE_KB, lanePlaneHalf } from "./ledgerLayout";
 import { METAGRAPHS } from "../config";
 
 /** The band key for every anchor from a metagraph that isn't publicly listed. */
@@ -41,7 +41,7 @@ const BYTES_FULL = BYTE_SCALE_KB * 1024;
 export function makeBarSpec(): BarSpec {
   const bands: Band[] = [];
   for (let i = 0; i < MAX_BANDS; i++) bands.push({ key: "", z0: 0, z1: 0, bytes: 0 });
-  return { measured: false, anchored: 0, kb: 0, z0: BAR_Z0, width: BAR_MIN_W, clipped: false, overflow: 1, bands, bandCount: 0 };
+  return { measured: false, anchored: 0, kb: 0, z0: -BAR_MIN_W / 2, width: BAR_MIN_W, clipped: false, overflow: 1, bands, bandCount: 0 };
 }
 
 /**
@@ -56,7 +56,6 @@ export function fillBarSpec(
   anchored: number,
 ): BarSpec {
   out.anchored = anchored;
-  out.z0 = BAR_Z0;
   out.bandCount = 0;
   out.clipped = false;
   out.overflow = 1;
@@ -65,6 +64,7 @@ export function fillBarSpec(
     out.measured = false;
     out.kb = 0;
     out.width = BAR_MIN_W;
+    out.z0 = -out.width / 2; // centered on the lane field (user, 2026-08-06)
     return out;
   }
 
@@ -80,12 +80,14 @@ export function fillBarSpec(
   } else {
     out.width = Math.max(BAR_MIN_W, (total / BYTES_FULL) * BAR_MAX_W);
   }
+  out.z0 = -out.width / 2; // centered on the lane field (user, 2026-08-06)
 
   if (total <= 0) return out; // a measured tick that anchored nothing: the seam, no bands
 
-  let z = BAR_Z0;
+  let z = out.z0;
   let n = 0;
   for (let i = 0; i < order.length && n < MAX_BANDS; i++) {
+    if (order[i] === UNLISTED_KEY) continue; // the unknown lane's band is appended LAST below
     const bytes = bytesByKey.get(order[i]) ?? 0;
     if (bytes <= 0) continue;
     const band = out.bands[n++];
@@ -105,7 +107,7 @@ export function fillBarSpec(
     band.z1 = z;
   }
   // Absorb float drift into the last band so the bar's right edge is exactly z0 + width.
-  if (n > 0) out.bands[n - 1].z1 = BAR_Z0 + out.width;
+  if (n > 0) out.bands[n - 1].z1 = out.z0 + out.width;
   out.bandCount = n;
   return out;
 }
@@ -115,8 +117,9 @@ export function fillBarSpec(
 // the relationship.
 export interface RibbonQuad { topZ0: number; topZ1: number; botZ0: number; botZ1: number }
 
-/** Half the Z footprint a lane's ribbon leaves from — the lane cell, not the tile grid. */
-export const RIBBON_LANE_HALF = LANE_HALF_Z / METAGRAPHS.length;
+/** Half the Z footprint a lane's ribbon leaves from — the lane cell, not the tile grid
+ *  (+1: the unknown lane, 2026-08-07). */
+export const RIBBON_LANE_HALF = lanePlaneHalf(METAGRAPHS.length + 1);
 
 export function ribbonQuad(laneZ: number, laneHalf: number, band: Band, out: RibbonQuad): RibbonQuad {
   out.topZ0 = laneZ - laneHalf;

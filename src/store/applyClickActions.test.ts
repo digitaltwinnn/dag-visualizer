@@ -8,10 +8,8 @@ import type { PickDescriptor } from "@/src/data/types";
 // executing their output DOES to the store all callers share).
 
 type SnapPick = Extract<PickDescriptor, { kind: "snapshot" }>;
-type LayerPick = Extract<PickDescriptor, { kind: "layer" }>;
 const nodePick = { kind: "metanode", meta: { id: "dor" }, node: { ip: "1.2.3.4" }, geo: { cc: "DE" } } as unknown as PickDescriptor;
 const snapPick = { kind: "snapshot", data: { ordinal: 7 } } as unknown as SnapPick;
-const layerPick = { kind: "layer", layerId: "ml0" } as unknown as LayerPick;
 
 beforeEach(() => {
   const st = useStore.getState();
@@ -20,7 +18,6 @@ beforeEach(() => {
   st.setInspect(null);
   st.setSnap(null);
   st.setFollowing(true);
-  st.setLayer(null);
 });
 
 describe("applyClickActions", () => {
@@ -29,13 +26,11 @@ describe("applyClickActions", () => {
       { kind: "filter", id: "dor" },
       { kind: "country", cc: "DE" },
       { kind: "inspect", pick: nodePick },
-      { kind: "layer", pick: layerPick },
     ]);
     const st = useStore.getState();
     expect(st.filter).toBe("dor");
     expect(st.country).toBe("DE");
     expect(st.inspect).toBe(nodePick);
-    expect(st.layer).toBe(layerPick);
   });
 
   it("a snapshot action sets BOTH the card subject and the follow state", () => {
@@ -58,20 +53,17 @@ describe("applyClickActions", () => {
     expect(after.following).toBe(false); // untouched — FollowController owns the re-follow
   });
 
-  it("clears via null payloads (deselect / un-drill / layer off)", () => {
+  it("clears via null payloads (deselect / un-drill)", () => {
     const st = useStore.getState();
     st.setCountry("DE");
     st.setInspect(nodePick);
-    st.setLayer(layerPick);
     applyClickActions([
       { kind: "inspect", pick: null },
       { kind: "country", cc: null },
-      { kind: "layer", pick: null },
     ]);
     const after = useStore.getState();
     expect(after.inspect).toBeNull();
     expect(after.country).toBeNull();
-    expect(after.layer).toBeNull();
   });
 
   it("an empty action list is a no-op", () => {

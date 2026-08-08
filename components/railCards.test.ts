@@ -17,7 +17,6 @@ const details = (over: Partial<RailManifestState>): RailManifestState => ({
   filter: "all",
   inspect: null,
   snap: null,
-  layer: null,
   country: null,
   cohort: null,
   composition: null,
@@ -37,7 +36,7 @@ describe("exploreCards — LEFT rail (Explore)", () => {
   it("geo hosts About + the Nodes-by-country tool", () => {
     expect(presentKinds(exploreCards({ mode: "geo" }))).toEqual(["about", "tool"]);
   });
-  it("ledger hosts About + the layer-explainer tool", () => {
+  it("ledger hosts About + the snapshots-browser tool", () => {
     expect(presentKinds(exploreCards({ mode: "ledger" }))).toEqual(["about", "tool"]);
   });
   it.each(["status", "transactions", "staking"] as const)("placeholder %s hosts About only", (mode) => {
@@ -59,12 +58,12 @@ describe("detailsCards — RIGHT rail (Details): fixed slots + ghost hints", () 
   it("the DAG filter → Context dossier populated", () => {
     expect(presentKinds(detailsCards(details({ filter: "dag" })))).toEqual(["context"]);
   });
-  it("slots come in ONE fixed order (context, metaSnap, country, cohort, composition, node, snap, layer) regardless of selection", () => {
+  it("slots come in ONE fixed order (context, country, cohort, composition, snap, metaSnap, node) regardless of selection", () => {
     const ids = detailsCards(details({ filter: "dor", inspect: nodePick, snap: snapPick })).map((c) => c.id);
-    expect(ids).toEqual(["context", "metaSnap", "country", "cohort", "composition", "node", "snap", "layer"]);
+    expect(ids).toEqual(["context", "country", "cohort", "composition", "snap", "metaSnap", "node"]);
   });
-  it("ledger ghosts: context + metaSnap + node + snapshot + layer invites (nodes pick in the chamber too)", () => {
-    expect(ghostIds(detailsCards(details({})))).toEqual(["context", "metaSnap", "node", "snap", "layer"]);
+  it("ledger ghosts: context + snapshot + metaSnap + node invites (nodes pick in the chamber too)", () => {
+    expect(ghostIds(detailsCards(details({})))).toEqual(["context", "snap", "metaSnap", "node"]);
   });
   it("hyper ghosts: context + composition + node (the snapshot slot is ledger-scoped, spec 2026-08-01)", () => {
     expect(ghostIds(detailsCards(details({ mode: "hyper" })))).toEqual(["context", "composition", "node"]);
@@ -127,7 +126,7 @@ describe("detailsCards — RIGHT rail (Details): fixed slots + ghost hints", () 
 
 describe("the metagraph snapshot slot", () => {
   const base = {
-    mode: "ledger" as const, filter: "all", inspect: null, snap: null, layer: null,
+    mode: "ledger" as const, filter: "all", inspect: null, snap: null,
     metaSnap: null, selNodesCount: 0, filterLabel: "All networks",
     country: null, cohort: null, composition: null,
   };
@@ -138,7 +137,7 @@ describe("the metagraph snapshot slot", () => {
   });
   it("is ledger-scoped, and its hint names the route rather than the verb", () => {
     const inLedger = detailsCards(base).find((c) => c.id === "metaSnap")!;
-    expect(inLedger.hint).toBe("Click a tile under a lane.");
+    expect(inLedger.hint).toBe("Click a tile under a lane, or a snapshot in the explorer.");
     const inGeo = detailsCards({ ...base, mode: "geo" }).find((c) => c.id === "metaSnap")!;
     expect(inGeo.hint).toBeNull();
   });
@@ -154,9 +153,10 @@ describe("ladderSlotIds — the descent-spine lane (display order = reversed run
   it("mirrors focusLadder.LADDERS coarsest→coarsest per 3D view", () => {
     expect(ladderSlotIds("geo")).toEqual(["context", "country", "cohort", "node"]);
     expect(ladderSlotIds("hyper")).toEqual(["context", "composition", "node"]);
-    // Ledger: LAYER sits above NODE (ladder order — layer is deliberately finer than network
-    // but coarser than node), a deliberate reorder of the fixed slot stack.
-    expect(ladderSlotIds("ledger")).toEqual(["context", "layer", "node"]);
+    // Ledger: the SNAPSHOT CHAIN (global, then the metagraph snapshot anchoring into it) rides
+    // the display lane between the network and the node (item 8, 2026-08-06) — card slots, not
+    // focus rungs.
+    expect(ladderSlotIds("ledger")).toEqual(["context", "snap", "metaSnap", "node"]);
   });
   it("flat views have no ladder", () => {
     expect(ladderSlotIds("status")).toEqual([]);
@@ -183,17 +183,22 @@ describe("focusSlotId — the focus rung both rails read", () => {
       focusSlotId(details({ mode: "geo", filter: "dag", country: "DE", cohort: cohortSel, inspect: nodePick })),
     ).toBe("node");
   });
-  it("uses hyper's composition rung and ledger's layer rung", () => {
+  it("uses hyper's composition rung", () => {
     expect(focusSlotId(details({ mode: "hyper", filter: "dag", composition: { netId: "dag", key: "Hybrid|l0" } }))).toBe(
       "composition",
     );
-    const layerPick = { kind: "layer", layerId: "ml0" } as unknown as Extract<PickDescriptor, { kind: "layer" }>;
-    expect(focusSlotId(details({ mode: "ledger", filter: "dag", layer: layerPick }))).toBe("layer");
-    // The node still wins: it's the finest rung in every ladder.
-    expect(focusSlotId(details({ mode: "ledger", filter: "dag", layer: layerPick, inspect: nodePick }))).toBe("node");
   });
-  it("ignores a pinned snapshot — it is not a ladder rung", () => {
-    expect(focusSlotId(details({ mode: "ledger", snap: snapPick }))).toBeNull();
+  it("a pinned snapshot IS a ledger lane slot now (item 8) — and recency decides the active card", () => {
+    expect(focusSlotId(details({ mode: "ledger", snap: snapPick }))).toBe("snap");
+    // With both a node and a snapshot present, the most recently selected one is active…
+    expect(
+      focusSlotId({ ...details({ mode: "ledger", filter: "dag", snap: snapPick, inspect: nodePick }), selStack: ["snap", "node"] }),
+    ).toBe("snap");
+    expect(
+      focusSlotId({ ...details({ mode: "ledger", filter: "dag", snap: snapPick, inspect: nodePick }), selStack: ["node", "snap"] }),
+    ).toBe("node");
+    // …and with no recency data, the finest present slot wins (the old rule).
+    expect(focusSlotId(details({ mode: "ledger", filter: "dag", snap: snapPick, inspect: nodePick }))).toBe("node");
   });
   it("flat views have no focus rung", () => {
     expect(focusSlotId(details({ mode: "status", filter: "dag", inspect: nodePick }))).toBeNull();

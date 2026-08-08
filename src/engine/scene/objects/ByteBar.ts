@@ -11,50 +11,60 @@ import * as THREE from "three";
 import type { SceneColors } from "../../sceneColors";
 import type { PickDescriptor } from "@/src/data/types";
 import { METAGRAPHS } from "../../config";
-import { BAR_H, BAR_D, BAR_MIN_W, BAR_Z0, FLOOR_Y } from "../../domain/ledgerLayout";
+import { BAR_H, BAR_D, BAR_LIFT, FLOOR_Y, LEAD_X } from "../../domain/ledgerLayout";
 import { UNLISTED_KEY, type BarSpec } from "../../domain/ledgerBands";
-import { SLOT_SP, SLOT_N, slotFade } from "../../domain/ledgerModel";
+import { SLOT_SP, SLOT_N } from "../../domain/ledgerModel";
+import { RIBBON_DIM } from "./Ribbons";
 
 const BANDS_PER_SLOT = METAGRAPHS.length + 1;
-const REST_OP = 0.5;
-const HOT_OP = 0.95;
-const DIM_OP = 0.16;
-/** A tick with no exact read yet, OR a measured tick that anchored nothing, is drawn as a dashed
- *  hairline outline at minimum width — honest about the read not having landed (or the tick
- *  having carried nothing), never a width inferred from anchor count or fee (spec §6.2). */
-const SEAM_OP = 0.3;
+
+/** The live-tunable bar look — the SAME parameter vocabulary as the tiles' TileTune (user,
+ *  2026-08-07: the two snapshot instruments share one tuning language; no blueprint needed,
+ *  the shared names ARE the reuse). Values are the shipped look. */
+export interface BarTune {
+  hot: number;  // the lead/selected row's bands
+  rest: number; // a resting band's opacity
+}
+
+// hot/rest user-tuned via ?tune, 2026-08-07. (The off-filter dim was removed entirely the same
+// day — a committed filter changes the CAMERA, never the bar.)
+export const BAR_TUNE_DEFAULTS: BarTune = { hot: 0.7, rest: 0.05 };
+
+/** The HOVER-preview tier (user, 2026-08-07): a hovered snapshot row shows its identity
+ *  colours at this fraction of the hot level — the ACTIVE row stays fully coloured, the
+ *  preview reads as "this is what a click pins". Deliberately the OFF-FILTER dim's family
+ *  (RIBBON_DIM 0.2), a bit brighter — one dim language, two nearby levels. Shared with the
+ *  tiles and the hover ribbon row. */
+export const SNAP_PREVIEW = 0.3;
 
 interface Slot {
   ordinal: number;
   bands: THREE.Mesh[];
   mats: THREE.MeshBasicMaterial[];
-  outline: THREE.LineSegments;
-  outMat: THREE.LineBasicMaterial;
   measured: boolean;
-  /** True when this slot renders as the seam outline instead of bands — no exact read yet, OR a
-   *  measured tick that anchored nothing (bandCount === 0). Both are honest "no bytes to show"
-   *  states, distinct from `measured` (which only tracks whether the exact read landed). */
-  seam: boolean;
   keys: string[];
+  /** Per-band identity hex, parallel to `keys` — update() picks identity vs neutral per frame. */
+  colors: number[];
   used: number;
 }
 
 export class ByteBar {
   group = new THREE.Group();
   pickables: THREE.Object3D[] = [];
+  tune: BarTune = { ...BAR_TUNE_DEFAULTS };
   private _slots: Slot[] = [];
   private _geo = new THREE.BoxGeometry(1, BAR_H, 1);
-  private _outGeo: THREE.BufferGeometry;
   private _sceneColors: Record<string, number>;
   private _neutral: number;
   private _alpha = 0;
-  private _filter = "all";
   private _selected = -1;
+  private _hovered = -1;
+  private _off = 0;
+  private _filter = "all";
 
   constructor(colors: SceneColors, sceneColors: Record<string, number>) {
     this._sceneColors = sceneColors;
     this._neutral = colors.core;
-    this._outGeo = new THREE.EdgesGeometry(new THREE.BoxGeometry(BAR_D, BAR_H, BAR_MIN_W));
 
     for (let s = 0; s < SLOT_N; s++) {
       const bands: THREE.Mesh[] = [];
@@ -68,13 +78,9 @@ export class ByteBar {
         bands.push(mesh);
         mats.push(mat);
       }
-      const outMat = new THREE.LineBasicMaterial({ color: this._neutral, transparent: true, opacity: 0 });
-      const outline = new THREE.LineSegments(this._outGeo, outMat);
-      outline.visible = false;
-      this.group.add(outline);
       this._slots.push({
-        ordinal: -1, bands, mats, outline, outMat,
-        measured: false, seam: true, keys: [], used: 0,
+        ordinal: -1, bands, mats,
+        measured: false, keys: [], colors: [], used: 0,
       });
     }
   }
@@ -89,25 +95,23 @@ export class ByteBar {
     if (!s) return;
     s.ordinal = ordinal;
     s.keys.length = 0;
-    const x = -slot * SLOT_SP;
-    const y = FLOOR_Y.gl0;
+    s.colors.length = 0;
+    const x = LEAD_X - slot * SLOT_SP;
+    // Bottom just above the plane (user, 2026-08-07) — the box is centred, so lift by half height.
+    const y = FLOOR_Y.gl0 + BAR_LIFT + BAR_H / 2;
 
     if (!spec || !spec.measured || spec.bandCount === 0) {
-      // No exact read yet, or a measured tick that anchored nothing: the seam outline stands in
-      // for the bar either way (the tick still happened; width is never inferred).
+      // No exact read yet, or a measured tick that anchored nothing: draw NOTHING (the dashed
+      // seam outline is retired, user 2026-08-07 — the per-row ordinal label already marks that
+      // the tick happened; width is still never inferred from anchor count or fee).
       for (let i = 0; i < s.used; i++) { s.bands[i].visible = false; s.bands[i].scale.set(0, 0, 0); }
       s.used = 0;
       s.measured = !!spec && spec.measured;
-      s.seam = true;
-      s.outline.visible = true;
-      s.outline.position.set(x, y, BAR_Z0 + BAR_MIN_W / 2);
       this._syncPickables();
       return;
     }
 
     s.measured = true;
-    s.seam = false;
-    s.outline.visible = false;
     const n = spec.bandCount;
     for (let i = 0; i < BANDS_PER_SLOT; i++) {
       const mesh = s.bands[i];
@@ -118,40 +122,55 @@ export class ByteBar {
       // The bar runs along Z (the lane/width field); X is time, so the box's own X is its depth.
       mesh.scale.set(BAR_D, 1, w);
       mesh.position.set(x, y, band.z0 + w / 2);
-      s.mats[i].color.setHex(
-        band.key === UNLISTED_KEY ? this._neutral : (this._sceneColors[band.key] ?? this._neutral),
-      );
+      const identityHex =
+        band.key === UNLISTED_KEY ? this._neutral : (this._sceneColors[band.key] ?? this._neutral);
+      s.mats[i].color.setHex(identityHex);
       mesh.userData.pick = pick;
       mesh.userData.bandKey = band.key;
       s.keys.push(band.key);
+      s.colors.push(identityHex);
     }
     s.used = n;
     this._syncPickables();
   }
 
   setAlpha(a: number): void { this._alpha = a; }
-  setFilter(filter: string): void { this._filter = filter; }
   setSelected(slot: number): void { this._selected = slot; }
+  /** The transient hover row — colored-dim preview, never demotes the active row. */
+  setHovered(slot: number): void { this._hovered = slot; }
+  /** Committed-or-hovered network → the other metagraphs' bands take the COLORED dim
+   *  (identity hue at RIBBON_DIM; the unlisted band dims with them). */
+  setFilter(filter: string): void { this._filter = filter || "all"; }
+
+  /** The trail-REWIND offset (LedgerView drives it): the whole bar group slides +X so the
+   *  selected row sits at the lead position; rows past the front edge fade in update(). */
+  setOffset(off: number): void {
+    this._off = off;
+    this.group.position.x = off;
+  }
 
   update(dt: number): void {
     const k = Math.min(1, dt * 5);
     for (let si = 0; si < this._slots.length; si++) {
       const s = this._slots[si];
-      const fade = slotFade(si);
+      // No depth fade (user, 2026-08-07 — the trail keeps one brightness; recency reads from
+      // position + the per-row ordinal labels, not a gradient into the dark).
+      const fade = 1;
       const hot = si === this._selected || si === 0;
-      if (s.seam) {
-        const t = SEAM_OP * fade * this._alpha;
-        s.outMat.opacity += (t - s.outMat.opacity) * k;
-        continue;
-      }
+      const hov = !hot && si === this._hovered;
+      // Rows the rewind pushed past the front edge dissolve within one slot of travel.
+      const over = (LEAD_X - si * SLOT_SP + this._off - LEAD_X) / (SLOT_SP * 0.9);
+      const front = over <= 0 ? 1 : Math.max(0, 1 - over);
       for (let i = 0; i < s.used; i++) {
-        const key = s.keys[i];
-        // A filter never removes a band — the bar keeps its full composition and the committed
-        // metagraph's share simply lights (spec §5.2).
-        const off = this._filter !== "all" && key !== this._filter;
-        const base = off ? DIM_OP : hot ? HOT_OP : REST_OP;
-        const t = base * fade * this._alpha;
+        // Three tiers (user, 2026-08-07): the ACTIVE row (lead/pinned) full identity, the
+        // HOVERED row identity at the preview fraction (a colored dim — the active never
+        // demotes for a hover), everything else the neutral trail. A committed/hovered
+        // NETWORK additionally dims the other networks' bands in their own hue.
+        const offNet = this._filter !== "all" && s.keys[i] !== this._filter;
+        const base = hot ? this.tune.hot : hov ? this.tune.hot * SNAP_PREVIEW : this.tune.rest;
+        const t = base * fade * front * (offNet ? RIBBON_DIM : 1) * this._alpha;
         s.mats[i].opacity += (t - s.mats[i].opacity) * k;
+        s.mats[i].color.setHex(hot || hov ? s.colors[i] : this._neutral);
       }
     }
   }
@@ -166,10 +185,8 @@ export class ByteBar {
   dispose(): void {
     for (const s of this._slots) {
       for (const m of s.mats) m.dispose();
-      s.outMat.dispose();
     }
     this._geo.dispose();
-    this._outGeo.dispose();
     this._slots.length = 0;
     this.pickables.length = 0;
   }

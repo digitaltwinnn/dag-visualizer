@@ -13,7 +13,9 @@ describe("ledgerLayers (UI copy) ↔ ledgerLayout (geometry)", () => {
     }
   });
   it("ledgerLayerById resolves ids and returns undefined for unknowns", () => {
-    expect(ledgerLayerById("hypl1")?.name).toBe("Hypergraph L1");
+    expect(ledgerLayerById("msnap")?.name).toBe("Metagraph snapshots");
+    expect(ledgerLayerById("gl0")?.name).toBe("Global snapshots");
+    expect(ledgerLayerById("hypl1")).toBeUndefined(); // the node layers left the copy table (2026-08-06)
     expect(ledgerLayerById("nope")).toBeUndefined();
   });
 });

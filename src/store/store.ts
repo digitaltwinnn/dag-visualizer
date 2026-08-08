@@ -12,7 +12,7 @@ import type { CohortSel, CompositionSel } from "@/src/engine/domain/focusLadder"
 export type Mode = "hyper" | "geo" | "ledger" | "status" | "transactions" | "staking";
 
 // One slot in the right-rail card stack (extend with future card types — e.g. "tx").
-export type SelSlot = "node" | "snap" | "metaSnap" | "layer" | "country" | "cohort" | "composition";
+export type SelSlot = "node" | "snap" | "metaSnap" | "country" | "cohort" | "composition";
 
 // Move `slot` to the FRONT of the recency stack when it becomes active, or drop it when cleared.
 function bumpStack(stack: SelSlot[], slot: SelSlot, active: boolean): SelSlot[] {
@@ -89,13 +89,8 @@ interface AppState {
   // group cards the same bidirectional card↔row pairing the country/node/network subjects have
   // (user, 2026-08-02: hovering the composition card lit nothing in the explorer). null = none.
   hoverGroup: string | null;
-  // Ledger layer id (LedgerView FLOOR_LAYERS: "ml1"|"ml0"|"msnap"|"gl0"|"hypl0"|"hypl1") the cursor
-  // is HOVERING in the Snapshots·Explore panel — a transient plane-highlight PREVIEW (the committed
-  // selection is `layer` below; the engine resolves `ledgerHilite ?? layer?.layerId`). null = none.
-  ledgerHilite: string | null;
-  // The COMMITTED layer selection (clicked in the explore panel) — opens the layer card in the
-  // right rail and keeps its plane highlighted. A selStack slot like `inspect`/`snap`.
-  layer: Extract<PickDescriptor, { kind: "layer" }> | null;
+  // (The `ledgerHilite` / `layer` channels are RETIRED, 2026-08-06 — the chamber's floors and
+  // node containers are pure visual aid; the ledger's subjects are the snapshots themselves.)
   // Snapshot card follows the latest relevant snapshot (heartbeat live) vs pinned.
   following: boolean;
   // The lean hover-tooltip subject for the currently-hovered 3D object (identity ticker + short
@@ -105,7 +100,7 @@ interface AppState {
   country: string | null;
   // Committed city×provider COHORT selection (geo, country-scoped) — the focus-ladder rung
   // between a node and its country (finerLevels("geo","country") = ["node","cohort"]). Matches
-  // GeoExplore's cohort key fields (cc/city/isp); a selStack slot like `layer`/`country`.
+  // GeoExplore's cohort key fields (cc/city/isp); a selStack slot like `country`.
   cohort: CohortSel | null;
   // Committed COMPOSITION group (hyper, network-scoped) — the focus-ladder rung between a node
   // and its network: HyperExplore's middle browse level (Hybrid [L0][cL1][dL1] / Data / …).
@@ -179,15 +174,17 @@ interface AppState {
   setMetaList: (list: MetaInfo[]) => void;
   setInspect: (pick: PickDescriptor | null) => void;
   setSnap: (snap: Extract<PickDescriptor, { kind: "snapshot" }> | null) => void;
+  advanceSnap: (snap: Extract<PickDescriptor, { kind: "snapshot" }> | null) => void;
   setMetaSnap: (sel: MetaSnapSel | null) => void;
+  /** The follow system's heartbeat advance for the metagraph-snapshot card — non-bumping, like
+   *  advanceSnap: a live tick is never a "new selection" (the card recency/collapse order holds). */
+  advanceMetaSnap: (sel: MetaSnapSel | null) => void;
   setHoverSnapOrd: (ordinal: number | null) => void;
   setHoverFilter: (filter: string | null) => void;
   setHoverNodeId: (id: string | null) => void;
   setHoverCountry: (cc: string | null) => void;
   setHoverCohort: (ids: string[] | null) => void;
   setHoverGroup: (key: string | null) => void;
-  setLedgerHilite: (id: string | null) => void;
-  setLayer: (layer: Extract<PickDescriptor, { kind: "layer" }> | null) => void;
   setFollowing: (following: boolean) => void;
   setHover: (hover: HoverSubject | null) => void;
   setCountry: (cc: string | null) => void;
@@ -196,7 +193,9 @@ interface AppState {
   setLeaderboard: (lb: LeaderboardData | null) => void;
   setSelNodes: (nodes: NodeRow[]) => void;
   setSnapshotExact: (data: SnapshotExact) => void;
-  setMetaSnapDeep: (d: ChannelSnapDeep) => void;
+  /** `key` defaults to the decode's own identity; the bridge passes the REQUESTED key when
+   *  the route fell back to another entry (an undecodable row asks with ordinal 0). */
+  setMetaSnapDeep: (d: ChannelSnapDeep, key?: string) => void;
   setPhoneDock: (dock: "explore" | "details" | null) => void;
   setSection: (section: "scene" | "data") => void;
   setPhoneVitals: (open: boolean) => void;
@@ -233,8 +232,6 @@ export const useStore = create<AppState>((set) => ({
   hoverCountry: null,
   hoverCohort: null,
   hoverGroup: null,
-  ledgerHilite: null,
-  layer: null,
   following: false,
   hover: null,
   country: null,
@@ -264,15 +261,34 @@ export const useStore = create<AppState>((set) => ({
   setMetaList: (metaList) => set({ metaList }),
   setInspect: (inspect) => set((s) => ({ inspect, selStack: bumpStack(s.selStack, "node", !!inspect) })),
   setSnap: (snap) => set((s) => ({ snap, selStack: bumpStack(s.selStack, "snap", !!snap) })),
+  // FollowController's heartbeat advance: re-point the followed snapshot WITHOUT bumping the
+  // selection recency — a tick is not a user act, and the facts rail's collapse rule reads
+  // `selStack` recency (item 8, 2026-08-06). Present-but-unranked: appended at the END if absent.
+  advanceSnap: (snap) =>
+    set((s) => ({
+      snap,
+      selStack: !snap
+        ? s.selStack.filter((x) => x !== "snap")
+        : s.selStack.includes("snap")
+          ? s.selStack
+          : [...s.selStack, "snap"],
+    })),
   setMetaSnap: (metaSnap) => set((s) => ({ metaSnap, selStack: bumpStack(s.selStack, "metaSnap", !!metaSnap) })),
+  advanceMetaSnap: (metaSnap) =>
+    set((s) => ({
+      metaSnap,
+      selStack: !metaSnap
+        ? s.selStack.filter((x) => x !== "metaSnap")
+        : s.selStack.includes("metaSnap")
+          ? s.selStack
+          : [...s.selStack, "metaSnap"],
+    })),
   setHoverSnapOrd: (hoverSnapOrd) => set({ hoverSnapOrd }),
   setHoverFilter: (hoverFilter) => set({ hoverFilter }),
   setHoverNodeId: (hoverNodeId) => set({ hoverNodeId }),
   setHoverCountry: (hoverCountry) => set({ hoverCountry }),
   setHoverCohort: (hoverCohort) => set({ hoverCohort }),
   setHoverGroup: (hoverGroup) => set({ hoverGroup }),
-  setLedgerHilite: (ledgerHilite) => set({ ledgerHilite }),
-  setLayer: (layer) => set((s) => ({ layer, selStack: bumpStack(s.selStack, "layer", !!layer) })),
   setFollowing: (following) => set({ following }),
   setHover: (hover) => set({ hover }),
   setCountry: (country) => set((s) => ({ country, selStack: bumpStack(s.selStack, "country", !!country) })),
@@ -297,8 +313,8 @@ export const useStore = create<AppState>((set) => ({
       }
       return { snapshotExact: next };
     }),
-  setMetaSnapDeep: (d) => set((s) => {
-    const key = metaSnapDeepKey(d.globalOrdinal, d.metaId);
+  setMetaSnapDeep: (d, key) => set((s) => {
+    key ??= metaSnapDeepKey(d.globalOrdinal, d.metaId, d.ordinal);
     if (s.metaSnapDeep[key]) return {}; // a decoded snapshot is immutable
     const next = { ...s.metaSnapDeep, [key]: d };
     const keys = Object.keys(next);

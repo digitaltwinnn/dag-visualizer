@@ -33,6 +33,12 @@ export interface DecodedChannel {
   /** The decoded state as text — the raw layer renders it; the card never does (spec §7.3). */
   state: string;
   dataBlockSigners: string[];
+  /** The data TRANSACTIONS inside the blocks (2026-08-07 — the missing link for data
+   *  metagraphs like DED: the app's real payload rides here as signed batch commitments, e.g.
+   *  MetagraphBatchMessage batch roots, while onChainState may stay empty). Count + the
+   *  decoded values as JSON text for the raw layer's tree. */
+  dataTxCount: number;
+  dataTx: string;
 }
 
 const asBytes = (v: unknown): Buffer | null =>
@@ -73,12 +79,24 @@ export async function decodeChannelContent(content: unknown): Promise<DecodedCha
 
   const appBlocks = app && Array.isArray(app.blocks) ? (app.blocks as unknown[]) : [];
   const dataBlockSigners: string[] = [];
+  const dataTxValues: unknown[] = [];
   for (const b of appBlocks) {
     const buf = asBytes(b);
     if (!buf) continue;
     try {
-      const blk = JSON.parse(buf.toString("utf8")) as { proofs?: { id?: string }[] };
+      const blk = JSON.parse(buf.toString("utf8")) as {
+        proofs?: { id?: string }[];
+        value?: { dataTransactions?: unknown[]; updates?: unknown[] };
+      };
       for (const p of blk.proofs ?? []) if (p.id) dataBlockSigners.push(shortSigner(p.id));
+      // The transactions arrive as (possibly nested) arrays of signed updates — flatten one
+      // level and keep each update's VALUE (the app record, e.g. a batch-root commitment);
+      // the proofs stay behind (the signers above already witness the block).
+      const txs = blk.value?.dataTransactions ?? blk.value?.updates ?? [];
+      for (const t of (Array.isArray(txs) ? txs : []).flat()) {
+        const v = (t as { value?: unknown })?.value ?? t;
+        if (v != null) dataTxValues.push(v);
+      }
     } catch { /* a block we can't read is one we don't claim */ }
   }
 
@@ -96,5 +114,7 @@ export async function decodeChannelContent(content: unknown): Promise<DecodedCha
     hasState: shape.has,
     state: stateText,
     dataBlockSigners: [...new Set(dataBlockSigners)],
+    dataTxCount: dataTxValues.length,
+    dataTx: dataTxValues.length ? JSON.stringify(dataTxValues) : "",
   };
 }

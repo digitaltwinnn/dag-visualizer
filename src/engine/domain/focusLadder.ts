@@ -6,7 +6,7 @@
 // (globe lean/spin, autoRotate) that don't belong in domain/. viewPolicy's sibling idiom.
 import type { View3D } from "./viewTransition";
 
-export type FocusLevel = "node" | "cohort" | "composition" | "country" | "layer" | "network" | "all";
+export type FocusLevel = "node" | "cohort" | "composition" | "country" | "network" | "all";
 
 // The committed cohort (city × provider) selection — geo-only, country-scoped. Matches
 // GeoExplore's cohort key fields; internal name stays `cohort`, user-facing copy says
@@ -27,14 +27,13 @@ export interface SelectionSnapshot {
   cohort: CohortSel | null;
   composition: CompositionSel | null;
   country: string | null;
-  layerId: string | null;
   filter: string; // "all" | "dag" | metagraph id
 }
 
 export type ResolverKey =
   | "geoNode" | "geoCohort" | "geoCountry" | "geoNetwork" | "geoOverview"
   | "hyperNode" | "hyperComposition" | "hyperNetwork" | "hyperOverview"
-  | "ledgerNode" | "ledgerLayer" | "ledgerNetwork" | "ledgerOverview";
+  | "ledgerNode" | "ledgerNetwork" | "ledgerOverview";
 
 export interface Rung {
   level: FocusLevel;
@@ -61,12 +60,11 @@ export const LADDERS: Record<View3D, Rung[]> = {
     { level: "network",     active: (s) => s.filter !== "all",  resolver: "hyperNetwork" },
     { level: "all",         active: () => true,                 resolver: "hyperOverview" },
   ],
-  // The layer rung sits FINER than network deliberately: a committed layer wins the camera and
-  // composes with the filter (the lane-aware layer framing slides on a filter change, see
-  // Engine._focusLayer); the network rung only fires when no layer/node is committed.
+  // The LAYER rung is RETIRED (user, 2026-08-06): the chamber's floors and node containers are
+  // pure visual aid now — the ledger's committable subjects are the snapshots themselves (the
+  // snapshot/metaSnap card slots, which are not rungs) plus the universal node + network.
   ledger: [
     { level: "node",    active: (s) => s.inspectIsNode,    resolver: "ledgerNode" },
-    { level: "layer",   active: (s) => s.layerId != null,  resolver: "ledgerLayer" },
     { level: "network", active: (s) => s.filter !== "all", resolver: "ledgerNetwork" },
     { level: "all",     active: () => true,                resolver: "ledgerOverview" },
   ],
@@ -81,7 +79,6 @@ export const LEVEL_CARRY: Record<Exclude<FocusLevel, "all">, "always" | "view-sc
   cohort: "view-scoped",
   composition: "view-scoped",
   country: "view-scoped",
-  layer: "view-scoped",
 };
 
 // The levels FINER than `level` in this view's ladder — the deselect-stepping data
