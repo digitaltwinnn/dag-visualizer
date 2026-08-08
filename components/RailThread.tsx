@@ -3,6 +3,7 @@
 import { useEffect, useState, type CSSProperties } from "react";
 import { useStore } from "@/src/store/store";
 import { filterAccent, CORE_HEX } from "@/src/data/network";
+import { UNLISTED_ID, UNLISTED_HUD_HEX } from "@/src/data/unlisted";
 import { PulseEdge, useEdgePulse } from "@/components/EdgePulse";
 
 // A rail's instrument-channel thread, a fixed SVG running down the rail's OUTER edge (in the margin,
@@ -56,11 +57,11 @@ const REST_DIM = "var(--rail-rest-dim, 0.6)";
 // hex, not var(--panel): an SVG `fill`/`stroke` ATTRIBUTE doesn't resolve CSS custom properties.
 const PUNCH = "#0c1020";
 
-/** One card's marker on the thread. `inset` = how far the card is stepped back from the rail (its
- *  ladder depth, measured rather than shared as a constant — see Inspector's RUNG_STEP), so the
- *  connector reaches exactly to its edge; `focus` = the finest committed rung; `ghost` = an empty
- *  slot showing its hint; `entry` = an UNBOXED ancestor entry (card-redesign 2026-08-08 — its
- *  connector carries the DEPTH-REACH encoding, see the render note). */
+/** One card's marker on the thread. `inset` = the card's measured step-back from the rail edge
+ *  (all cards sit flush since the card redesign retired RUNG_STEP — kept measured so a future
+ *  layout change can't desync the connectors); `focus` = the finest committed rung; `ghost` =
+ *  an empty slot showing its hint; `entry` = an UNBOXED ancestor entry (card-redesign
+ *  2026-08-08 — its connector carries the DEPTH-REACH encoding, see the render note). */
 type Mark = { y: number; inset: number; focus: boolean; ghost: boolean; entry: boolean };
 
 // Depth-reach connectors (card-redesign 2026-08-08, polarity agreed in mockup): an unboxed
@@ -80,11 +81,13 @@ const REACH_PAD = REACH_MAX + 8;
 export default function RailThread({ side = "right" }: { side?: Side }) {
   const filter = useStore((s) => s.filter);
   const mode = useStore((s) => s.mode);
-  // Resolve to a real colour: filterAccent returns `var(--primary)` for "all", but an SVG `stroke`
-  // ATTRIBUTE doesn't resolve CSS custom properties — so the identity line + dots rendered invisible
-  // on "all". Fall back to the core hex for the var() case.
+  // Resolve to a real colour: an SVG `stroke` ATTRIBUTE doesn't resolve CSS custom properties,
+  // and filterAccent returns var() for "all" (structural cyan) AND "unlisted" (the neutral
+  // gray) — each var() case falls back to ITS OWN resolved hex (review fix 2026-08-08: the
+  // one-size core-hex fallback repainted the unlisted thread in the core blue the gray retired).
   const rawAccent = filterAccent(filter);
-  const accent = rawAccent.startsWith("var(") ? CORE_HEX : rawAccent;
+  const accent =
+    filter === UNLISTED_ID ? UNLISTED_HUD_HEX : rawAccent.startsWith("var(") ? CORE_HEX : rawAccent;
   const [g, setG] = useState<{ top: number; left: number; height: number; marks: Mark[] } | null>(null);
 
   // View-switch AND filter-change signal: either plays the SAME travelling-light language as the

@@ -82,8 +82,9 @@ export function SnapshotAside({ data: d }: { data: GlobalSnapshot }) {
           <span className="w-2 h-2 rounded-full bg-primary shadow-[0_0_0_3px_color-mix(in_oklch,var(--primary)_30%,transparent)] animate-dot-beat motion-reduce:animate-none" />
           {/* The tip state counts up from the last heartbeat and resets as the next lands (user,
               2026-08-08 — replacing the static "live now"; the label still never overstates: the
-              counter IS the shown snapshot's age in both branches). */}
-          live · {rel}
+              counter IS the shown snapshot's age in both branches). relativeAge returns "" for a
+              clock-skewed (future-stamped) timestamp — say "live" alone, no dangling separator. */}
+          {rel ? `live · ${rel}` : "live"}
         </>
       ) : (
         <>◷ {rel}</>

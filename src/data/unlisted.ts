@@ -31,6 +31,10 @@ export const UNLISTED_ID = "unlisted";
 //     Engine folds it into every scene-color map it builds, so lanes/bands/ribbons/tiles
 //     pick it up like any catalog hue).
 export const UNLISTED_HUE = "var(--muted-foreground)";
+// The same tone as RESOLVED hexes, for the two surfaces that can't resolve a CSS var: SVG
+// attributes (RailThread — review fix 2026-08-08: its var() guard fell back to the core blue,
+// repainting the thread in exactly the colour this identity retired) and the scene.
+export const UNLISTED_HUD_HEX = "#8a96b8";
 export const UNLISTED_SCENE_HEX = 0x8a96b8;
 
 export const LISTED_IDS: ReadonlySet<string> = new Set(METAGRAPHS.map((m) => m.id));

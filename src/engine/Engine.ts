@@ -183,8 +183,9 @@ export class Engine {
   // listeners): wheel-zoom fires start/end per notch, so `sceneDragging` only drops after a
   // quiet 350ms.
   private _dragEndT: ReturnType<typeof setTimeout> | undefined;
-  // Scratch for the rails-hidden camera lean (event-time — the toggle, not the frame loop).
-  private _railsLeanPos = new THREE.Vector3();
+  // Store mirror for the rails-hidden camera lean — _tweenTo composes railsDolly into every
+  // destination while it holds (see the subscription note). Seeded from the store at boot.
+  private railsHidden = false;
   private _onControlsStart = () => {
     clearTimeout(this._dragEndT);
     if (!useStore.getState().sceneDragging) useStore.getState().setSceneDragging(true);
@@ -341,6 +342,8 @@ export class Engine {
 
     // Apply current store state, then react to changes (Lane B command bridge).
     const s = useStore.getState();
+    // Seed the rails-lean mirror (an HMR/StrictMode remount can boot with the flag already on).
+    this.railsHidden = s.railsHidden;
     this.mode = s.mode;
     this.filter = s.filter;
     this.cohortSel = s.cohort;
@@ -358,13 +361,14 @@ export class Engine {
     this.unsub.push(
       useStore.subscribe((st, prev) => {
         if (st.mode !== prev.mode) this.setMode(st.mode);
-        // The rails-hidden camera LEAN (2026-08-08): hiding the card rails hands the scene the
-        // whole frame, so the camera leans IN toward the current orbit target (showing steps
-        // back out by the inverse) — flown with the same tween easing as a focus flight. From
-        // the LIVE pose, dolly-exempt (CAM_ZOOM is already baked into wherever the camera is).
-        if (st.railsHidden !== prev.railsHidden && VIEW_POLICIES[this.mode].canvas) {
-          railsDolly(this.ctx.camera.position, this.ctx.controls.target, st.railsHidden, this._railsLeanPos);
-          this._tweenTo(this._railsLeanPos, this.ctx.controls.target, false);
+        // The rails-hidden camera LEAN (2026-08-08, review-hardened): the lean is composed into
+        // EVERY tween destination by _tweenTo while the flag holds, so the toggle just mirrors
+        // the flag and RE-RESOLVES the canonical pose — focus flights, transition landings and
+        // the toggle all agree, and no inverse math can desync (holdCamera gates the OUT phase
+        // internally; the boundary's own re-derive composes the lean on arrival).
+        if (st.railsHidden !== prev.railsHidden) {
+          this.railsHidden = st.railsHidden;
+          if (VIEW_POLICIES[this.mode].canvas) this._resolveFocus();
         }
         if (st.filter !== prev.filter) {
           this.filter = st.filter;
@@ -1264,6 +1268,10 @@ export class Engine {
     else tw.toPos.copy(toPos);
     tw.fromTgt.copy(this.ctx.controls.target);
     tw.toTgt.copy(toTgt);
+    // The rails-hidden LEAN composes into EVERY destination (2026-08-08, review-hardened): a
+    // property of pose resolution, so focus flights, transition landings and the presentation
+    // toggle can never disagree about it. In place (railsDolly is outPos===pos safe).
+    if (this.railsHidden) railsDolly(tw.toPos, tw.toTgt, tw.toPos);
     tw.t = 0;
     tw.dur = 1.4;
     tw.active = true;
@@ -1560,6 +1568,8 @@ export class Engine {
     this.ctx.controls.removeEventListener("start", this._onControlsStart);
     this.ctx.controls.removeEventListener("end", this._onControlsEnd);
     clearTimeout(this._dragEndT);
+    // A dispose mid-drag must not leave the rails dimmed (StrictMode remount / HMR).
+    if (useStore.getState().sceneDragging) useStore.getState().setSceneDragging(false);
     this.stats?.dom.remove();
     this._devTune?.dispose();
     this.unsub.forEach((u) => u());

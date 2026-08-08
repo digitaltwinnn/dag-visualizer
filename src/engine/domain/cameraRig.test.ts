@@ -160,22 +160,22 @@ describe("dollyBack (the one global zoom lever)", () => {
 });
 
 describe("railsDolly (the rails-hidden camera lean, 2026-08-08)", () => {
-  it("leans IN toward the live target when hiding, by RAILS_HIDDEN_DOLLY", () => {
+  it("leans IN toward the pose's target by RAILS_HIDDEN_DOLLY, leaving the target fixed", () => {
     const pos = new THREE.Vector3(0, 0, 12);
     const target = new THREE.Vector3(0, 0, 2);
     const out = new THREE.Vector3();
-    railsDolly(pos, target, true, out);
+    railsDolly(pos, target, out);
     expect(out.z).toBeCloseTo(2 + 10 * RAILS_HIDDEN_DOLLY, 9);
     expect(pos.z).toBe(12); // inputs untouched
+    expect(target.z).toBe(2);
   });
-  it("steps back OUT by the exact inverse when showing — the toggle round-trips", () => {
+  it("is safe to compose IN PLACE (outPos === pos — the Engine leans tween destinations)", () => {
     const pos = new THREE.Vector3(3, 4, 12);
     const target = new THREE.Vector3(1, 0, 2);
-    const inPos = new THREE.Vector3();
-    const back = new THREE.Vector3();
-    railsDolly(pos, target, true, inPos);
-    railsDolly(inPos, target, false, back);
-    expect(back.distanceTo(pos)).toBeLessThan(1e-9);
+    const expected = new THREE.Vector3();
+    railsDolly(pos, target, expected);
+    railsDolly(pos, target, pos); // in place
+    expect(pos.distanceTo(expected)).toBeLessThan(1e-12);
   });
 });
 
