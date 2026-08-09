@@ -4,7 +4,7 @@ import { metaSnapDeepKey } from "@/src/data/types";
 import type { HoverSubject } from "@/src/data/hoverSubject";
 // Type-only — the store may not import domain VALUES (layerBoundaries rule), but a type-only
 // import of a domain type is legal and keeps CohortSel defined in exactly one place.
-import type { CohortSel, CompositionSel } from "@/src/engine/domain/focusLadder";
+import type { CohortSel, CompositionSel, FocusLevel } from "@/src/engine/domain/focusLadder";
 
 // The active view. `hyper`/`geo`/`ledger` all drive the 3D scene (every switch among them runs
 // the gather choreography); `status`/`transactions`/`staking` are flat scaffolded placeholders
@@ -170,6 +170,16 @@ interface AppState {
   // via setRailCollapse returns a slot to auto. UI state, not selection (the selection boundary
   // rule doesn't apply); session-only, like phoneDock.
   railCollapse: Record<string, boolean>;
+  // THE CAMERA FRAMES THE BOXED RUNG (user, 2026-08-09: "when we click the card, can we also
+  // update the view camera position, we do the same when we click a row in the explorer"). The
+  // rail's open plank and the camera name the same subject, so opening a rung asks the Engine to
+  // re-walk its focus ladder FROM that rung, skipping the finer ones — the same resolvers, the
+  // same poses a row click lands on. NOT a selection write (nothing is committed or released), so
+  // it stays outside the pickActions table: only the finest COMMITTED rung is selection, and this
+  // channel deliberately lets the camera sit at a coarser one while the selection stands.
+  // An OBJECT, not a bare level, because it is a one-shot REQUEST: re-opening the same rung must
+  // fire again, and a fresh reference is what the Engine's `!==` bridge sees.
+  focusRung: { level: FocusLevel } | null;
 
   setLive: (live: boolean, lastGoodAt?: number) => void;
   setEngineReady: (v: boolean) => void;
@@ -215,6 +225,9 @@ interface AppState {
   setPhoneSheetPx: (px: number | null) => void;
   setRailCollapse: (id: string, collapsed: boolean | null) => void;
   setRailCollapseMany: (entries: Record<string, boolean | null>) => void;
+  /** Ask the Engine to frame this ladder rung (see `focusRung`). One-shot; the Engine reads it
+   *  on change and never clears it — the value IS the last request, not a pending queue. */
+  requestFocusRung: (level: FocusLevel) => void;
 }
 
 // Keep the exact-snapshot cache bounded (one small object per ordinal); drop the oldest.
@@ -260,6 +273,7 @@ export const useStore = create<AppState>((set) => ({
   sceneDragging: false,
   phoneVitals: false,
   railCollapse: {},
+  focusRung: null,
   phoneSheetPx: null,
 
   setLive: (live, lastGoodAt) => set((s) => ({ live, lastGoodAt: lastGoodAt ?? s.lastGoodAt })),
@@ -362,4 +376,7 @@ export const useStore = create<AppState>((set) => ({
       return { railCollapse };
     }),
   setPhoneSheetPx: (phoneSheetPx) => set({ phoneSheetPx }),
+  // A fresh object every call — the request is the EVENT, so re-opening the same rung must reach
+  // the Engine's reference-compare bridge again.
+  requestFocusRung: (level) => set({ focusRung: { level } }),
 }));

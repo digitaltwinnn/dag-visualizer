@@ -60,23 +60,19 @@ const PUNCH = "#0c1020";
 /** One card's marker on the thread. `inset` = the card's measured step-back from the rail edge
  *  (all cards sit flush since the card redesign retired RUNG_STEP — kept measured so a future
  *  layout change can't desync the connectors); `focus` = the finest committed rung; `ghost` =
- *  an empty slot showing its hint; `entry` = an UNBOXED ancestor entry (card-redesign
- *  2026-08-08 — its connector carries the DEPTH-REACH encoding, see the render note). */
+ *  an empty slot showing its hint; `entry` = an UNBOXED ancestor entry (its tie-line rests
+ *  dimmer than a box's — a STATE distinction, not a depth one; see the render note). */
 type Mark = { y: number; inset: number; focus: boolean; ghost: boolean; entry: boolean };
 
-// Depth-reach connectors (card-redesign 2026-08-08, polarity agreed in mockup): an unboxed
-// ancestor entry's tie-line reaches INTO the lane, and the reach FUNNELS onto the box — the
-// coarsest parent reaches furthest, each rung down shrinks by one step, ending at the open box's
-// own short connector (reach = STEP × (entries between it and the box + 1)). The endpoints draw
-// the containment staircase in the lane's empty right side using the thread's own connector
-// vocabulary — no second instrument. Capped so a long entry title can't collide with the line.
-const REACH_STEP = 26;
-const REACH_MAX = 84;
-// The depth-reach lines extend INTO the lane — outside the thread's narrow box — and the SVG's
-// top/bottom fade MASK clips to the element box (ink overflow gets alpha 0, learned live: the
-// lines were drawn but invisible). So the SVG box is WIDENED by this pad on the lane side and
-// every drawn x shifts by it on the right rail (the left rail's lane side is already +x).
-const REACH_PAD = REACH_MAX + 8;
+// RETIRED with the SLAB (2026-08-08, same day it shipped): the DEPTH-REACH funnel — an unboxed
+// entry's tie-line reaching into the lane, one REACH_STEP shorter per rung, terminal-ticked,
+// funnelling onto the open box. It encoded ladder containment on the thread, which the slab now
+// states physically (`.rail-ladder`, globals.css: committed entries abut into one pile the focus
+// box breaks out of). Two encodings of the same depth on one rail is the two-instrument problem
+// again, one rail-width narrower — so the labour split is THE STACK CARRIES DEPTH, THE THREAD
+// CARRIES STATE. Every connector is the standard short measured tie again, which also lets the
+// SVG box shrink back to `W` (the funnel needed a REACH_PAD widening on the lane side, because
+// the top/bottom fade MASK clips to the element box and ink outside it draws at alpha 0).
 
 export default function RailThread({ side = "right" }: { side?: Side }) {
   const filter = useStore((s) => s.filter);
@@ -144,12 +140,24 @@ export default function RailThread({ side = "right" }: { side?: Side }) {
       // offsets nothing and depth 0 always reads as depth 0.
       const base = raw.length ? Math.min(...raw.map((m) => m.inset)) : 0;
       const marks = raw.map((m) => ({ ...m, inset: Math.round(m.inset - base) }));
-      // Sit in the margin just OUTSIDE the cards: right → at the rail's right edge; left → the thread's
-      // width to the LEFT of the rail's left edge (so its ticks reach toward the screen edge). The
-      // box is REACH_PAD wider on the lane side (see the constant above) so the depth-reach lines
-      // survive the fade mask; on the right rail that means the box starts REACH_PAD further left.
-      const left = side === "right" ? r.right - REACH_PAD : r.left - W;
-      setG({ top: r.top, left, height: Math.round(r.height), marks });
+      // Sit in the margin just OUTSIDE the cards, MIRRORED: right → the box starts AT the rail's
+      // right edge and runs outward; left → its width to the LEFT of the rail's left edge. Both
+      // land inside the 26px page gutter (`#leftcol`/`#rightcol`), ticks reaching toward the screen
+      // edge. ⚠️ `r.right - W` here (the shape the funnel's `r.right - REACH_PAD` collapsed to when
+      // the pad left the WIDTH but not the ORIGIN) slides the whole thread a full band INSIDE the
+      // rail, so the connectors start under the cards and the ruler lands on their right 22px.
+      const left = side === "right" ? r.right : r.left - W;
+      // FULL-LANE height (user, 2026-08-09: "the left and right can be extended to the view […]
+      // same as we have already in tablet mode"). The rails are content-height (`display: flex` +
+      // `max-height` band, globals.css), so `r.height` ended the ruler at the last card and a
+      // two-card view got a stub of an instrument. The thread now runs the whole lane — top of the
+      // rail to the LiveStrip bound — like the tablet sheet's `.ig-sheet-edge` channel. The band is
+      // READ from the rail's computed `max-height` rather than recomputed here, so the
+      // rail-top/topbar-extra/bottom-reserve token math stays in one place; `|| r.height` covers a
+      // `none`. Marks stay clipped to `r.height` below — a card scrolled out of the rail must not
+      // get a dot just because the ruler is longer than the content.
+      const band = parseFloat(getComputedStyle(rail).maxHeight) || r.height;
+      setG({ top: r.top, left, height: Math.round(Math.max(r.height, band)), marks });
 
     };
     const schedule = () => { if (!raf) raf = requestAnimationFrame(measure); };
@@ -172,10 +180,6 @@ export default function RailThread({ side = "right" }: { side?: Side }) {
   if (!g || g.height <= 0) return null;
   const H = g.height;
   const gm = GEOM[side];
-  // Ink-overflow room for the depth-reach lines: the SVG box grows by REACH_PAD on the LANE side
-  // (see the constant note), and on the right rail every drawn x shifts by it (the left rail's
-  // lane side is already +x, so no shift there).
-  const xOff = side === "right" ? REACH_PAD : 0;
   const ticks: number[] = [];
   for (let y = 10; y <= H - 10; y += TICK_PITCH) ticks.push(y);
 
@@ -188,7 +192,7 @@ export default function RailThread({ side = "right" }: { side?: Side }) {
         // so this hides the fixed thread below the desktop breakpoint until the effect resolves. `!`
         // beats nothing here (the SVG has no id rule), but mirrors the rails' `!hidden` for parity.
         className="fixed z-[11] pointer-events-none overflow-visible max-[1099px]:!hidden"
-        width={W + REACH_PAD}
+        width={W}
         height={H}
         style={{
           top: g.top,
@@ -210,73 +214,44 @@ export default function RailThread({ side = "right" }: { side?: Side }) {
            spine takes the full resting dim, keeping brightness for the signals + node dots. */}
         <g style={{ opacity: 0.9 }}>
           {/* neutral base line — SOFT/muted; carries the ruler ticks. */}
-          <line x1={gm.neut + xOff} y1={0} x2={gm.neut + xOff} y2={H} stroke={TICK_LINE} strokeWidth={1} />
+          <line x1={gm.neut} y1={0} x2={gm.neut} y2={H} stroke={TICK_LINE} strokeWidth={1} />
           {/* ruler ticker hatches — short marks stepping OUTWARD from the neutral line toward the screen
              edge; muted, every 4th a touch longer/brighter (an instrument scale). */}
           {ticks.map((y, i) => (
-            <line key={i} x1={gm.neut + xOff} y1={y} x2={(i % 4 === 0 ? gm.tickMaj : gm.tickMin) + xOff} y2={y} stroke={i % 4 === 0 ? TICK_MAJOR : TICK_MINOR} strokeWidth={1} />
+            <line key={i} x1={gm.neut} y1={y} x2={i % 4 === 0 ? gm.tickMaj : gm.tickMin} y2={y} stroke={i % 4 === 0 ? TICK_MAJOR : TICK_MINOR} strokeWidth={1} />
           ))}
         </g>
         <g style={{ opacity: REST_DIM }}>
           {/* identity line — BOTH rails, mirrored (the HUD's resting identity cue; cards are
              spineless at rest). The line is the selection's hue. */}
-          <line x1={gm.identity + xOff} y1={0} x2={gm.identity + xOff} y2={H} stroke={accent} strokeWidth={2} />
+          <line x1={gm.identity} y1={0} x2={gm.identity} y2={H} stroke={accent} strokeWidth={2} />
         </g>
         {/* node-dots — OUTSIDE the dim group at original full brightness (user adjustment): one per
            card at its middle, tethered to the card edge by the connector. The thread is the rail's
-           ONE instrument (2026-08-02), so it also carries the card stack's HIERARCHY:
-           · connector REACH = ladder containment (card-redesign 2026-08-08): an unboxed ancestor
-             entry's tie-line reaches into the lane, funnelling onto the materialized box —
-             coarsest longest, one REACH_STEP shorter per rung down (see the constants above);
-           · dot STATE = the slot's state — hollow for a ghost (an empty slot showing its hint),
-             solid for a populated card, solid + a wider halo for the focus rung (the finest
-             committed one). So the rail shows the view's whole possibility space and where you are. */}
+           ONE instrument (2026-08-02), and since the SLAB it carries STATE ALONE — depth is stated
+           physically by the cards themselves (committed entries abut into one pile the focus box
+           breaks out of; `.rail-ladder`, globals.css). So: every connector is the same short
+           measured tie, and the DOT says what the slot is — hollow for a ghost (an empty slot
+           showing its hint), solid for a populated card, solid + a wider halo for the focus rung
+           (the finest committed one). The rail still shows the view's whole possibility space and
+           where you are; it just no longer says "how deep" twice. */}
         {g.marks.map((m, i) => {
-          // DEPTH-REACH connectors for unboxed entries (card-redesign 2026-08-08): the reach
-          // funnels onto the nearest BOX (the materialized card) — coarsest parent longest,
-          // shrinking one REACH_STEP per entry toward the box, whose own connector stays the
-          // standard short tie. The endpoints draw the containment staircase in the lane; a
-          // terminal tick marks each end. Ghosts keep the whisper-short tie.
-          const boxes = g.marks.filter((b) => !b.entry && !b.ghost);
-          let x1 = side === "right" ? gm.conn - m.inset : gm.conn + m.inset;
-          let tick: number | null = null;
-          if (m.entry) {
-            // The funnel's ANCHOR: the nearest materialized box — or, when NO box is open (the
-            // scene-first view-entry state collapses the whole ladder), the ladder's FOOT (the
-            // bottom-most entry), so the coarsest→finest reach gradient survives a view switch
-            // (found live 2026-08-08: with no box every entry got the minimum reach and the
-            // hierarchy cue vanished).
-            const entryMarks = g.marks.filter((x) => x.entry);
-            const nearest = boxes.length
-              ? boxes.reduce((a, b) => (Math.abs(b.y - m.y) < Math.abs(a.y - m.y) ? b : a))
-              : entryMarks.reduce((a, b) => (b.y > a.y ? b : a));
-            const between = g.marks.filter(
-              (x) => x.entry && ((x.y > m.y && x.y < nearest.y) || (x.y < m.y && x.y > nearest.y)),
-            ).length;
-            // A box anchor sits OUTSIDE the entry set; an entry anchor is a member of it, so
-            // every other entry counts the anchor itself as one more step (without this the
-            // foot and its neighbour both read the minimum reach).
-            const extra = !boxes.length && nearest !== m ? 1 : 0;
-            const reach = Math.min(REACH_STEP * (between + extra + 1), REACH_MAX);
-            x1 = side === "right" ? gm.conn - reach : gm.conn + reach;
-            tick = x1;
-          }
+          const x1 = side === "right" ? gm.conn - m.inset : gm.conn + m.inset;
           return (
             <g key={i} opacity={m.ghost ? 0.5 : 1}>
-              <line x1={x1 + xOff} y1={m.y} x2={gm.dot + xOff} y2={m.y} stroke={accent} strokeWidth={1.25} opacity={m.focus ? 0.9 : m.entry ? 0.55 : 0.7} />
-              {tick != null && (
-                <line x1={tick + xOff} y1={m.y - 4} x2={tick + xOff} y2={m.y + 4} stroke={accent} strokeWidth={1.25} opacity={0.55} />
-              )}
+              {/* An unboxed ancestor's tie rests dimmer than a box's — a STATE tier (materialized
+                 vs shed its glass), matching the entries' own distance dim, not a depth encoding. */}
+              <line x1={x1} y1={m.y} x2={gm.dot} y2={m.y} stroke={accent} strokeWidth={1.25} opacity={m.focus ? 0.9 : m.entry ? 0.55 : 0.7} />
               {m.ghost ? (
                 <>
                   {/* punch first, then the ring — a hollow dot still has to sit ON the spine */}
-                  <circle cx={gm.dot + xOff} cy={m.y} r={4.2} fill={PUNCH} />
-                  <circle cx={gm.dot + xOff} cy={m.y} r={3.2} fill="none" stroke={accent} strokeWidth={1.3} />
+                  <circle cx={gm.dot} cy={m.y} r={4.2} fill={PUNCH} />
+                  <circle cx={gm.dot} cy={m.y} r={3.2} fill="none" stroke={accent} strokeWidth={1.3} />
                 </>
               ) : (
                 <>
-                  <circle cx={gm.dot + xOff} cy={m.y} r={m.focus ? 7 : 5} fill={accent} opacity={m.focus ? 0.26 : 0.16} />
-                  <circle cx={gm.dot + xOff} cy={m.y} r={3.4} fill={accent} stroke={PUNCH} strokeWidth={1.5} />
+                  <circle cx={gm.dot} cy={m.y} r={m.focus ? 7 : 5} fill={accent} opacity={m.focus ? 0.26 : 0.16} />
+                  <circle cx={gm.dot} cy={m.y} r={3.4} fill={accent} stroke={PUNCH} strokeWidth={1.5} />
                 </>
               )}
             </g>
@@ -294,7 +269,7 @@ export default function RailThread({ side = "right" }: { side?: Side }) {
           className="fixed z-[12] pointer-events-none max-[1099px]:!hidden"
           style={{
             top: g.top,
-            left: g.left + gm.identity + xOff - 2.5,
+            left: g.left + gm.identity - 2.5,
             width: 3,
             height: H,
             ["--spine" as string]: accent,

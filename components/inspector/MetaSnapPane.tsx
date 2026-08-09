@@ -108,9 +108,15 @@ export default function MetaSnapPane({
   const signers = deep?.signers ?? row?.signers ?? null;
 
   const pulseKey = useEdgePulse(sel ? `${sel.metaId}:${sel.ordinal}` : null);
-  // The metagraph snapshot is exactly as LIVE as the global while following (advanceMetaSnap
-  // rides the same heartbeat), so its aside speaks the SAME language as SnapshotAside: beating
-  // dot + a ticking `live · Xs ago` counter, tap-to-toggle through the same tested follow table.
+  // The metagraph snapshot is exactly as LIVE as the global while following (advanceMetaSnap rides
+  // the same heartbeat), so its aside is the same tap-to-follow toggle as SnapshotAside — but it
+  // does NOT repeat the clock. The anchor join is exact (a metagraph snapshot is stamped with the
+  // timestamp of the global it anchored into), so whenever the card above shows that same tick the
+  // two counters were literally the same number twice (user, 2026-08-09: "both say live · x
+  // seconds ago; looks redundant"). The GLOBAL card owns the clock; this one states the relation
+  // instead — `anchored`, the house word for what the Snapshots stack does. The counter comes back
+  // the moment it carries real information: while following a metagraph lane through anchor-less
+  // global ticks this card holds an OLDER tick, and then its age is not a repeat.
   const now = useNowTick(1000);
 
   if (!sel) return null;
@@ -122,6 +128,9 @@ export default function MetaSnapPane({
   const ticker = cfg?.ticker || cfg?.name || shortHash(sel.metaId);
   const hue = cfg ? identityHudHex(sel.metaId) : UNLISTED_HUE;
   const rel = relativeAge(now - Date.parse(sel.ts));
+  // ⚠️ The `!!snap` half is load-bearing: the ledger contributes no ancestry, so the global card
+  // can be a GHOST while this one is populated — there the clock has to stay here.
+  const sameTick = !!snap && snap.data.ordinal === sel.globalOrdinal;
   const asideCls = "inline-flex items-center gap-1.5 text-label text-muted-foreground whitespace-nowrap";
   const aside = (
     <button
@@ -131,14 +140,12 @@ export default function MetaSnapPane({
       className={cn(asideCls, "rounded-xs hover:text-foreground transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary/60")}
       onClick={() => snap && applyClickActions(followToggleActions(snap, following))}
     >
-      {following ? (
-        <>
-          <span className="w-2 h-2 rounded-full bg-primary shadow-[0_0_0_3px_color-mix(in_oklch,var(--primary)_30%,transparent)] animate-dot-beat motion-reduce:animate-none" />
-          {rel ? `live · ${rel}` : "live"}
-        </>
-      ) : (
-        <>◷ {rel}</>
+      {/* The beating dot rides `following` on its own, so the card still FEELS live in the
+          `anchored` state — the heartbeat-on-closed-cards rule doesn't depend on the number. */}
+      {following && (
+        <span className="w-2 h-2 rounded-full bg-primary shadow-[0_0_0_3px_color-mix(in_oklch,var(--primary)_30%,transparent)] animate-dot-beat motion-reduce:animate-none" />
       )}
+      {sameTick ? "anchored" : following ? (rel ? `live · ${rel}` : "live") : <>◷ {rel}</>}
     </button>
   );
 
@@ -151,7 +158,7 @@ export default function MetaSnapPane({
               {/* A subject-specific mark carries its OWN subject's hue (the node-mark idiom) —
                   this card is about one metagraph even when the filter is "all". */}
               <METASNAP_ICON aria-hidden className={KIND_MARK_CLASS} style={{ color: hue } as CSSProperties} />
-              <span className="truncate">#{sel.ordinal.toLocaleString()}</span>
+              <span className="truncate">{sel.ordinal.toLocaleString()}</span>
             </span>
           }
           titleKey={`${sel.metaId}:${sel.ordinal}`}

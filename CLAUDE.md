@@ -371,17 +371,76 @@ floor; geometry shows the fall, the rail states the containment.) The snapshot c
 ride the lane **without being focus rungs** — `railLadderBoundary.test.ts` asserts rung → slot, not the
 reverse, so a slot without a rung is fine and a rung without a slot is not.
 
-**The card grammar: one materialized box, unboxed entries.** Only the focus rung renders as a glass
-panel; every coarser committed rung sheds its frame into an unboxed `.rail-entry` — solid glass, no
-border, chrome-less, the whole entry one stretched toggle, distance-dimmed toward the box and released
-on hover as a materialize preview. Expanding an entry materializes it and dissolves the open box. Full
+**The card grammar: ONE materialized box, unboxed entries, tucked into a SLAB.** Only the expanded rung
+renders as a glass panel; every other committed rung sheds its frame into an unboxed `.rail-entry` —
+solid glass, no border, chrome-less, the whole entry one stretched toggle, distance-dimmed toward the box
+and released on hover as a materialize preview. Expanding an entry materializes it and dissolves the open
+box — single-open accordion, so the box can be ANY committed rung, not just the focus one. Full
 expand-on-hover is deliberately not done: layout shift under the pointer.
+
+The committed rungs **abut into ONE contiguous pile** (the `.rail-ladder` lane at `gap: 0`, seams as 1px
+`--border` hairlines on each member's wrapper `::before` — inset at rest, full width under hover —
+interior corners squared) and the box is
+**the ONE ROUNDED PLANK in that pile**, wherever the expanded rung sits: zero gap to its neighbours, but
+it keeps its full radius on all four corners and its own hairline all the way round, so the pile visibly
+opens around it. Its border is NOT handed to a seam the way an entry↔entry joint is — a rounded border
+curves in at each corner, so it never draws the full-width division the inset-seam rule exists to
+prevent; it reads as the box cut into the pile. **The stack carries DEPTH, the thread carries STATE**;
+adjacency is what reads as containment, which is why the snapshot chain runs coarse→fine above. Ghosts
+stay outside the slab. Nothing in the block animates, so reduced motion is a no-op.
+
+⚠️ **The lift shadow is not the box's distinguisher and can't be** — squaring the box mid-pile was tried
+(2026-08-09) and left it with no geometry at all: square corners, both borders handed to seams, and a
+y-positive-only lift its own following neighbour painted over at `z-index: auto`. The box wrapper is
+raised unconditionally (`position: relative; z-index: 2` — a box FIRST in the lane isn't matched by the
+member+member rule and would stay `static`, making z-index inert) and the shadow casts both ways, but the
+radius is what actually reads.
+
+⚠️ **The slab keys on ONE marker, `data-tier` (`ghost` | `entry` | `box`), written by `Inspector.tsx`
+from the same `effCollapsed` that decides the render** — so marker and render cannot disagree. It was
+`[data-focus]` once, and that was a bug the user reported as "a gap at the bottom to the node card,
+happens in many places": `data-focus` marks the finest committed rung, but the box is whichever rung is
+EXPANDED, and single-open lets that be any of them. Expand a coarser entry and both joints around it
+matched no member arm and fell back to the plain gap. **The tier is what the geometry depends on, so the
+tier is what the wrapper states.** The lane's DOM shape is load-bearing too: members are selected by
+`:has()` on the per-rung WRAPPER divs, so **the selectors must be descendant, not child** — `RailPager`
+nests the box one level deeper inside its gesture wrapper.
+
+**The box can carry a SIBLING PAGER** (`RailPager`): where the expanded rung has 1-N siblings under the
+same committed parent, a slim `‹ n / N ›` plank rides the card's OWN bottom edge, inside the glass, plus
+a horizontal swipe on the body. The set comes from the pure resolver `railSiblings.ts` and every step
+applies `pickActions` through the one executor, so a pager step and the equivalent explorer click can't
+drift. The plank is chrome-less by the same grammar rule (no fill, border or rule of its own) and the
+card reserves its strip with a padding utility — see CSS trap 1. **The gate is BOXED and nothing else**
+(an absolutely-positioned plank over a ~28px collapsed entry is a defect; single-open already makes the
+box unique) — keying it to the FOCUS rung was the same mistake `data-tier` fixed above, and it also shut
+out the two snapshot slots, which ride the lane with no focus rung at all.
+
+**The global snapshot's set is OPEN** (user, 2026-08-09): time is ongoing, so the same plank steps one
+tick at a time but shows **no `n / N`** — a window into an unbounded chain has no total to state, and
+`SiblingSet.open` is what says so. That is also what keeps it from rivalling the `LiveStrip`: **the strip
+is the time INSTRUMENT** (scale, window, cadence), the plank is a nudge to the adjacent tick. It steps the
+strip's own buffer in the strip's own order (oldest→newest) through the same descriptor a bar click
+builds, so stepping back from the front pins and stepping onto the live tip resumes following; a pin aged
+out of the retained window gets no pager rather than a guessed neighbour.
+
+**Expanding a rung's card FLIES THE CAMERA to it** (user, 2026-08-09 — "we do the same when we click a
+row in the explorer"): the box is the subject, so it gets the subject's pose. `ladderLevelOfSlot()` in
+`railCards.ts` is the inverse of the lane's slot table, so a card can only ask for a pose a real rung —
+and therefore a real resolver — already defines, and the two snapshot slots (no rung) ask for nothing.
+The request rides one store channel, `focusRung: { level } | null` (an OBJECT, so re-expanding the same
+rung is a fresh reference the Engine's `!==` bridge sees), and `Engine._resolveFocus(from?)` starts its
+existing ladder walk at that named rung instead of the finest. No second camera path.
 
 **View entry is scene-first**: arriving in a view starts the ladder collapsed, held through the
 transition's ancestry re-derive by a grace window, with both live-advancing ordinals guarded in the
 selection key so heartbeats never materialize a card. Conversely **the heartbeat is felt on closed
-cards**: both snapshot asides tick a `live · Xs` counter (the shown snapshot's age, never overstating)
-and both are the same tap-to-follow toggle.
+cards**: both snapshot asides carry the beating dot and are the same tap-to-follow toggle, but **only
+one of them owns the clock.** The global aside ticks a `live · Xs` counter (the shown snapshot's age,
+never overstating); the metagraph aside says **`anchored`** whenever the card above already shows the
+very tick it anchored into — the anchor join is exact, so a counter there would be the same number
+twice. It falls back to its own counter when that carries real information: a global ghost, or
+following a lane through anchor-less global ticks, where this card holds an older tick.
 
 Every card the current view CAN produce is always visible — populated when its subject is selected,
 else a quiet **ghost hint line** — so the rail shows the view's whole possibility space and a deselect
@@ -391,7 +450,7 @@ returns its slot to the ghost in place.
 frame already says "nothing here yet", so a hint must not end "… to inspect it" — four ghosts stacked
 in a rail would read as one sentence repeated with the verb swapped. Each names its own route, and
 where a subject is reached from a parent row the hint says which ("under a country"), stating in words
-the containment the thread encodes.
+the containment the slab shows.
 
 Two honesty rules: when the filtered network has nothing pickable in geo the node ghost turns into the
 honest variant naming that fact; but "all" with 0 nodes is boot, so that ghost stays silent rather than
@@ -464,16 +523,19 @@ In one line: **thread = resting identity cue; card edge = purely transient signa
 - **Resting identity lives in the rail threads.** Both rails carry a mirrored fixed SVG in the margin —
   neutral ruler and ticks, an identity-hued spine, a node-dot at each card's middle measured live. The
   thread must stay a **sibling** of the rail: the rail's clip/mask would blank a child.
-- **The facts rail's thread is its one instrument, and it carries the card hierarchy.** Two encodings,
-  both on the thread: **connector reach = the depth funnel** (an entry's tie-line reaches into the lane
-  at its eyebrow's height, the coarsest parent reaching furthest, converging on the materialized box's
-  short connector and halo dot; with no box open the funnel anchors at the ladder's foot so the
-  gradient survives a view switch), and **dot state = slot state** (hollow ghost, solid populated,
-  solid + halo for the focus rung). **Never grow a second vertical instrument in a rail** — new
-  hierarchy signals belong on the thread. The funnel is desktop-only by design.
+- **The facts rail's thread is its ONE instrument, and it carries STATE — the SLAB carries depth.** That
+  division of labour is the rule: the pile's abutting geometry says what contains what, and the thread
+  says what each slot IS — **dot state = slot state** (hollow ghost, solid populated, solid + halo for
+  the focus rung), on uniform short measured tie-lines (0.9 opacity at the focus rung, 0.55 for an
+  entry, 0.7 for the box) anchored at each card's `[data-eyebrow]`. A depth-REACH FUNNEL on those ties
+  was tried and **retired** — like the `.rung` descent spine before it, it was a second hierarchy
+  instrument competing with the first. **Never grow a second vertical instrument in a rail**; two
+  attempts are recorded here precisely so a third isn't made.
   ⚠️ The SVG box is drawn wider than the visible lane because **the thread's fade mask clips ink
   overflow** — lines drawn outside the box render invisibly. Attribute checks pass, pixels don't;
-  screenshot it.
+  screenshot it. The same clip makes the box's **ORIGIN** load-bearing: when the funnel's `REACH_PAD`
+  left the ink math it stayed in the width *and* the left offset, silently shifting the whole right-hand
+  thread off the rail. **Width and origin must be changed together.**
 - **Every card edge signal renders on the scene-facing (inner) edge**, in three levels whose hierarchy
   must stay readable at a glance — **grey whisper < hued pairing < moving pulse** (all three run live
   on `/design`). Pairing wins over the whisper by source order. The pulse fires once per subject
@@ -512,11 +574,28 @@ Every rail card leads with `CardHead`: eyebrow / title / inset hairline / body.
   `text-[var(--filter-accent,var(--primary))]`. Hardcoding a mark to cyan is a recurring bug; node
   marks use their node's own hue inline.
 - The **`aside`** is the right-aligned title-row companion — bodies render no title rows of their own.
-- **The hairline is inset** by the card's padding. Full-width rules don't exist inside cards.
+- **Every RESTING division is inset by its card's own horizontal padding** — the head hairline included
+  (user, 2026-08-09). One weight for anything that is simply *there*: the slab's resting seam, the head
+  rule, the Fact-row separators all line up at the same left/right spacing, so a card reads as one body
+  quietly divided rather than a stack of slices. The panel layout insets with `--panel-pad-x`; the
+  inspector layout just sits inside `--card-pad` and needs no bleed at all. Full width is **reserved
+  for the hovered seam**, where it is a transient signal, not a resting edge.
 - **One close**: every dismissible card's × is CardHead's ghost close labelled "Clear selection", with
   no per-card variants. Right cards are collapsible too — the whole head is the disclosure toggle (the
   stretched-hit-area pattern, required for touch), with the × and the aside floating above the overlay
   so closing and links keep working.
+- **The cards ARE the rail's controls — there is no rail toolbar.** The collapse-all/restore + clear-all
+  pair above the pile was removed (2026-08-09): every head is already a disclosure toggle, so a
+  collapse-all button restates what a click says, and its × was the coarsest card's own × — clearing
+  from the top rung cascades down. `clearAllActions` went with it. Don't grow the toolbar back.
+- **A head hairline only exists where there's a body to divide.** Collapsed, the rule would fall on the
+  card's own bottom edge, with nothing above it to separate — both `CardHead` layouts gate it on
+  `!collapsed`.
+- **FULL WIDTH is a hover signal, not a structural weight** — and the slab's seam is the one line that
+  carries both states (user, 2026-08-09): inset at rest, reaching out to full width on hover, because
+  hover is the entry's materialize preview and a materialized card owns its own edges. **Both joints
+  around the hovered entry switch together** (its own `::before` plus the NEXT member's, which draws its
+  bottom edge) or it half-materializes.
 
 ### Selection & pairing
 
@@ -555,10 +634,13 @@ under it. The engine-anchored `Tooltip` stays custom, because a Radix tooltip ca
 
 Nothing tests these. Each has cost real debugging time.
 
-1. **Recipes that must beat element utilities stay UNLAYERED.** Inside `@layer components` a recipe
-   silently loses to Tailwind's utilities layer; unlayered CSS beats every layer at equal specificity.
+1. **Recipes that must beat element utilities stay UNLAYERED.** Tailwind v4 orders `theme, base,
+   components, utilities`, so a rule in `@layer components` loses to a utility **at ANY specificity** —
+   raising the selector weight does nothing. Unlayered CSS beats every layer at equal specificity.
    `.subject-paired` and the card signal system live unlayered on purpose — new must-win recipes go
-   there too.
+   there too. The other escape is to stay in the SAME layer: an arbitrary variant like
+   `[&>.ig-panel]:pb-[30px]` is (0,2,0) in the utilities layer and beats `RIGHT_CARD`'s `p-[18px]`
+   (0,1,0) — how `RailPager` reserves its footer strip without touching globals.css.
 2. **A transform on an ancestor re-anchors every `position:fixed` descendant to it**; `opacity` does
    NOT (it only makes a stacking context). Both halves are load-bearing: the scene wrapper is `fixed
    inset-0` with an inline identity transform **from first paint**, precisely so the canvas and rails
@@ -578,21 +660,28 @@ Nothing tests these. Each has cost real debugging time.
    `lib/utils.ts`.** Unregistered, twMerge classifies e.g. `text-body` as a COLOR, so
    `cn("text-body", "text-muted-foreground")` silently drops the size class and text falls back to
    16px. Register any new `text-*`/`rounded-*`/`tracking-*` token utility in the same breath.
+7. **`:has()` cannot nest inside `:has()`** — CSS forbids it and the whole rule is dropped SILENTLY
+   (the slab's corner-squaring vanished this way). Reach through a sibling with ONE `:has()`
+   (`+ div > .rail-entry`), and comma-join when several subjects need the same rule rather than nesting
+   a second one. `:is()` inside `:has()` is fine.
 
 **Settle any cascade or specificity question by reading the compiled CSS in the browser**, not by
 reasoning about it.
 
 ### Marker classes and ids queried by JS — these are contracts
 
-Rename only with all consumers:
+Rename only with all consumers. These are **CSS contracts as much as JS ones** — the slab's member,
+seam and corner rules select on the same markers the thread measures:
 
 | Marker | Consumer |
 |---|---|
 | `#leftcol` / `#rightcol` | RailScroll, RailThread, the globals rules |
 | `.ig-panel` | RailThread's card-dot measurement — every rail card must carry it (the `Card` baseline supplies it) |
+| `.rail-ladder` | The facts rail's lane — the slab CSS is scoped to it (`gap: 0` + the seams) |
 | `.rail-entry` | The unboxed entry tier; the thread queries both tiers |
-| `[data-eyebrow]` | Where an entry's connector anchors vertically |
-| `data-depth` / `data-focus` / `data-ghost` | The thread's hierarchy encoding |
+| `[data-eyebrow]` | Where a card's tie-line anchors vertically — **both `CardHead` layouts must emit it**; without it the thread silently falls back to the card MIDDLE, which on a tall explorer card drops the mark hundreds of px below its own header |
+| `data-tier` (`ghost`\|`entry`\|`box`) | **The slab's ONE discriminator** — members, seams, squared corners and the box's raise/lift all key off it |
+| `data-depth` / `data-focus` / `data-ghost` | The thread's read — depth dimming and dot state |
 | `.nb-row` | The pairing row-wash selector |
 | `#topbar`, `#metapane`, `#tooltip` | Layout and positioning |
 

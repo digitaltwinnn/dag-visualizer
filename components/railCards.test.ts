@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { exploreCards, detailsCards, focusSlotId, ladderSlotIds, type RailManifestState } from "@/components/railCards";
+import { exploreCards, detailsCards, focusSlotId, ladderLevelOfSlot, ladderSlotIds, type RailManifestState } from "@/components/railCards";
+import { LADDERS } from "@/src/engine/domain/focusLadder";
 import type { PickDescriptor } from "@/src/data/types";
 
 // Present card kinds in render order — the exact set/order both the rail and the tray consume.
@@ -58,13 +59,15 @@ describe("detailsCards — RIGHT rail (Details): fixed slots + ghost hints", () 
   it("the DAG filter → Context dossier populated", () => {
     expect(presentKinds(detailsCards(details({ filter: "dag" })))).toEqual(["context"]);
   });
-  it("slots come in ONE fixed order (context, country, cohort, composition, metaSnap, snap, node) regardless of selection", () => {
-    // metaSnap before snap (2026-08-08): the manifest agrees with the reversed display lane.
+  it("slots come in ONE fixed order (context, country, cohort, composition, snap, metaSnap, node) regardless of selection", () => {
+    // snap before metaSnap (2026-08-08, with the slab): the manifest agrees with the display
+    // lane, where adjacency now reads as containment — the global tick carries the metagraph
+    // snapshot, so the pair runs coarse→fine like every other rung.
     const ids = detailsCards(details({ filter: "dor", inspect: nodePick, snap: snapPick })).map((c) => c.id);
-    expect(ids).toEqual(["context", "country", "cohort", "composition", "metaSnap", "snap", "node"]);
+    expect(ids).toEqual(["context", "country", "cohort", "composition", "snap", "metaSnap", "node"]);
   });
   it("ledger ghosts: context + snapshot + metaSnap + node invites (nodes pick in the chamber too)", () => {
-    expect(ghostIds(detailsCards(details({})))).toEqual(["context", "metaSnap", "snap", "node"]);
+    expect(ghostIds(detailsCards(details({})))).toEqual(["context", "snap", "metaSnap", "node"]);
   });
   it("hyper ghosts: context + composition + node (the snapshot slot is ledger-scoped, spec 2026-08-01)", () => {
     expect(ghostIds(detailsCards(details({ mode: "hyper" })))).toEqual(["context", "composition", "node"]);
@@ -155,11 +158,11 @@ describe("ladderSlotIds — the descent-spine lane (display order = reversed run
     expect(ladderSlotIds("geo")).toEqual(["context", "country", "cohort", "node"]);
     expect(ladderSlotIds("hyper")).toEqual(["context", "composition", "node"]);
     // Ledger: the SNAPSHOT CHAIN rides the display lane between the network and the node —
-    // METAGRAPH SNAPSHOT ABOVE the global (user reversal 2026-08-08): the rail mirrors the
-    // chamber's storeys (metagraph planes on top, ribbons falling into the global floor) and
-    // the filtered story flow (network → its snapshot → the global it anchored INTO) — card
-    // slots, not focus rungs.
-    expect(ladderSlotIds("ledger")).toEqual(["context", "metaSnap", "snap", "node"]);
+    // GLOBAL SNAPSHOT ABOVE the metagraph snapshot it anchors (user, 2026-08-08, settled with
+    // the slab): once the lane's committed cards abut as ONE body, adjacency reads as
+    // CONTAINMENT, so the pair runs coarse→fine like every other rung — the tick carries the
+    // metagraph snapshot. Card slots, not focus rungs.
+    expect(ladderSlotIds("ledger")).toEqual(["context", "snap", "metaSnap", "node"]);
   });
   it("flat views have no ladder", () => {
     expect(ladderSlotIds("status")).toEqual([]);
@@ -170,6 +173,32 @@ describe("ladderSlotIds — the descent-spine lane (display order = reversed run
     const ids = detailsCards(details({ mode: "geo" })).map((c) => c.id);
     for (const view of ["geo", "hyper", "ledger"] as const)
       for (const slot of ladderSlotIds(view)) expect(ids).toContain(slot);
+  });
+});
+
+describe("ladderLevelOfSlot — the inverse read (which RUNG does a slot stand for)", () => {
+  it("names the rung of every slot that is one", () => {
+    expect(ladderLevelOfSlot("context")).toBe("network");
+    expect(ladderLevelOfSlot("country")).toBe("country");
+    expect(ladderLevelOfSlot("cohort")).toBe("cohort");
+    expect(ladderLevelOfSlot("composition")).toBe("composition");
+    expect(ladderLevelOfSlot("node")).toBe("node");
+  });
+  it("slots that are NOT rungs answer null — the camera can only be asked for a real pose", () => {
+    // The two snapshot slots ride the lane without being focus rungs, and About/the tool card
+    // aren't in the lane at all. Expanding one of these must not request a camera flight.
+    expect(ladderLevelOfSlot("snap")).toBeNull();
+    expect(ladderLevelOfSlot("metaSnap")).toBeNull();
+    expect(ladderLevelOfSlot("about")).toBeNull();
+    expect(ladderLevelOfSlot("tool")).toBeNull();
+  });
+  it("every lane slot either names a rung or is a known non-rung slot", () => {
+    for (const view of ["geo", "hyper", "ledger"] as const)
+      for (const slot of ladderSlotIds(view)) {
+        const level = ladderLevelOfSlot(slot);
+        if (!level) expect(["snap", "metaSnap"]).toContain(slot);
+        else expect(LADDERS[view].some((r) => r.level === level)).toBe(true);
+      }
   });
 });
 

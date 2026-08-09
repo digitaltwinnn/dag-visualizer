@@ -59,7 +59,7 @@ const TITLE = "m-0 text-title font-semibold";
 // (`block` neutralises the Card baseline's `flex flex-col gap-4` so the card's children flow with
 // their own margins — as the original block box did — rather than gaining a flex gap between the
 // eyebrow and the body.)
-export const RIGHT_CARD = "relative block w-auto pointer-events-auto [--spine:transparent] p-[18px] min-h-0 flex-none";
+export const RIGHT_CARD = "relative block w-auto pointer-events-auto [--spine:transparent] [--card-pad:18px] p-[var(--card-pad)] min-h-0 flex-none";
 
 // The UNBOXED ancestor entry — the card-redesign's (2026-08-08) second presentation tier. Only the
 // FOCUS rung materializes as a full glass panel; every coarser committed rung sheds its box and
@@ -86,8 +86,11 @@ export { RAIL_ENTRY };
 //     rail overrides; `.sig-left` the scene-facing signal edge; `animate-card-in` plays the
 //     materialize moment on mount — which is exactly the entry→box swap, since RailPane changes
 //     the element structure and React remounts the subtree).
-//   • `entry` true → the unboxed RAIL_ENTRY above (no glass, no signal edge — the pairing wash
-//     has its own `.rail-entry.subject-paired` recipe in globals.css).
+//   • `entry` true → the unboxed RAIL_ENTRY above. It carries `.sig-left` too (2026-08-09): the
+//     entry is a card in the signal system's terms, so hover whisper / pairing edge / pulse all
+//     speak on it — globals.css supplies the pseudo's geometry, since the shared rules light
+//     `.ig-panel::before` and an entry has no panel. Pairing ALSO keeps its own wash recipe
+//     (`.rail-entry.subject-paired`), matching the box's edge-plus-wash pairing.
 // Pairing className/style/handlers ride the outer element in both tiers, so scene↔HUD hover
 // pairing survives the swap.
 export function RailPane({
@@ -109,7 +112,7 @@ export function RailPane({
 }) {
   if (entry) {
     return (
-      <aside id={id} className={cn(RAIL_ENTRY, className)} style={style} onMouseEnter={onMouseEnter} onMouseLeave={onMouseLeave}>
+      <aside id={id} className={cn(RAIL_ENTRY, "sig-left", className)} style={style} onMouseEnter={onMouseEnter} onMouseLeave={onMouseLeave}>
         {children}
       </aside>
     );
@@ -209,7 +212,11 @@ export default function CardHead({
           )}
         >
           <div className="flex flex-col gap-[3px] min-w-0">
-            {eyebrow && <span className={cn("block", eyebrowClass)}>{eyebrow}</span>}
+            {/* `data-eyebrow` — same read as the entry layout below: RailThread ties every
+                populated mark in at its card's EYEBROW height. Without it the thread silently
+                falls back to the card MIDDLE, which on a tall explorer card drops the mark
+                hundreds of px below its own header. One connector anatomy, both layouts. */}
+            {eyebrow && <span data-eyebrow="" className={cn("block", eyebrowClass)}>{eyebrow}</span>}
             <h2 className={cn(TITLE, "inline-flex items-center gap-2 min-w-0")}>
               {toggleable ? (
                 <button
@@ -240,10 +247,14 @@ export default function CardHead({
             )}
           </div>
         </div>
-        {/* The head hairline — INSET by the card's padding (the shared rule weight; the old
-            full-width border-b is gone). A separate element so the inset doesn't eat the head's
-            padding box. */}
-        <div className="mx-[var(--panel-pad-x)] border-b border-border" aria-hidden />
+        {/* The head hairline is INSET by the panel's own horizontal padding (user, 2026-08-09) —
+            the same weight the slab's resting seam carries, so every division that is simply THERE
+            reads as a quiet suggestion inside one body. Full width is reserved for the hovered
+            seam, where it is a transient signal rather than a resting edge.
+            Still a separate element so the inset doesn't fight the head's padding box.
+            ⚠️ COLLAPSED it must not render: with no body it falls on the card's own bottom edge,
+            with nothing to divide. Same `!collapsed` gate the inspector layout below applies. */}
+        {!collapsed && <div className="border-b border-border mx-[var(--panel-pad-x)]" aria-hidden />}
       </>
     );
   }
@@ -326,7 +337,13 @@ export default function CardHead({
           </>
         )}
       </div>
-      {title != null && !collapsed && <div className="border-b border-border mt-2 mb-2.5" aria-hidden />}
+      {/* Head-vs-body sits INSIDE the card's padding here, so it needs no bleed and no inset of its
+          own: the padding box already gives it the same left/right spacing the slab's resting seam
+          has (user, 2026-08-09 — "give the header divider also some spacing on the left/right").
+          One resting weight for every division in the pile; full width belongs to the hovered seam. */}
+      {title != null && !collapsed && (
+        <div className="border-b border-border mt-2 mb-2.5" aria-hidden />
+      )}
     </>
   );
 }

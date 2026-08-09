@@ -27,7 +27,7 @@ import { countryFraming } from "./domain/countryShape";
 import { R as GEO_R, LAND_H } from "./domain/geoLayout";
 import { clickActions, pickActive, pickNetId, viewEntryActions, metaSnapSelectActions, bandSelectActions } from "./domain/pickActions";
 import { ViewTransition, is3D, type View3D } from "./domain/viewTransition";
-import { LADDERS, hasLevel, type CohortSel, type CompositionSel, type SelectionSnapshot, type ResolverKey } from "./domain/focusLadder";
+import { LADDERS, hasLevel, type CohortSel, type CompositionSel, type FocusLevel, type SelectionSnapshot, type ResolverKey } from "./domain/focusLadder";
 import { compositionGroups, compositionKey, compositionRows } from "@/src/data/composition";
 import { metaSnapDeepKey } from "@/src/data/types";
 import { snapsAtTick } from "@/src/data/anchorLog";
@@ -369,6 +369,14 @@ export class Engine {
         if (st.railsHidden !== prev.railsHidden) {
           this.railsHidden = st.railsHidden;
           if (VIEW_POLICIES[this.mode].canvas) this._resolveFocus();
+        }
+        // THE CAMERA FRAMES THE BOXED RUNG (user, 2026-08-09). Opening a rail card asks for that
+        // rung's pose — the same resolver its explorer row would have run, just entered from a
+        // named rung instead of the finest committed one. It writes no selection, so a finer
+        // commitment stands and the NEXT real state change re-derives from it as usual: this is a
+        // one-shot gesture, exactly like a click on a row.
+        if (st.focusRung !== prev.focusRung && st.focusRung && VIEW_POLICIES[this.mode].canvas) {
+          this._resolveFocus(st.focusRung.level);
         }
         if (st.filter !== prev.filter) {
           this.filter = st.filter;
@@ -984,7 +992,12 @@ export class Engine {
   // (domain/focusLadder.LADDERS) — the one entry point every selection-driven camera flight
   // goes through (a filter/country/cohort/layer/inspect change, a view switch, a transition
   // boundary). No-ops outside the three 3D views.
-  private _resolveFocus(): void {
+  //
+  // `from` starts the walk at a COARSER rung, skipping the finer ones: the rail's boxed rung asking
+  // to be framed (store.focusRung). Same rungs, same resolvers, same poses a row click lands on —
+  // the only difference is where the walk begins, so a card and a row can't drift. Falling THROUGH
+  // to coarser rungs stays intact, which is also the safety net if the named rung isn't active.
+  private _resolveFocus(from?: FocusLevel): void {
     const st = useStore.getState();
     if (this.mode !== "hyper" && this.mode !== "geo" && this.mode !== "ledger") return;
     const sel: SelectionSnapshot = {
@@ -995,7 +1008,10 @@ export class Engine {
       country: this.country,
       filter: this.filter,
     };
-    for (const rung of LADDERS[this.mode]) {
+    const rungs = LADDERS[this.mode];
+    const start = from ? rungs.findIndex((r) => r.level === from) : 0;
+    for (let i = Math.max(start, 0); i < rungs.length; i++) {
+      const rung = rungs[i];
       if (rung.active(sel) && this._resolvers[rung.resolver]()) return;
     }
   }

@@ -38,6 +38,17 @@ const LADDER_SLOT: Partial<Record<FocusLevel, string>> = {
   composition: "composition",
   node: "node",
 };
+// The inverse read of the table above: which ladder RUNG does this slot stand for (null = the slot
+// is not a rung — the ledger's two snapshot slots, About, the tool card). The camera's "frame the
+// boxed rung" request goes through this, so a slot can only ask for a pose that a real rung — and
+// therefore a real resolver — already defines. One table, both directions.
+export function ladderLevelOfSlot(id: string): FocusLevel | null {
+  for (const [level, slot] of Object.entries(LADDER_SLOT)) {
+    if (slot === id) return level as FocusLevel;
+  }
+  return null;
+}
+
 export function ladderSlotIds(mode: Mode): string[] {
   if (mode !== "hyper" && mode !== "geo" && mode !== "ledger") return [];
   const ids = [...LADDERS[mode]]
@@ -45,13 +56,14 @@ export function ladderSlotIds(mode: Mode): string[] {
     .flatMap((r) => (LADDER_SLOT[r.level] ? [LADDER_SLOT[r.level] as string] : []));
   if (mode === "ledger") {
     // The ledger's SNAPSHOT CHAIN rides the display lane between the network and the node —
-    // METAGRAPH SNAPSHOT ABOVE the global (user reversal 2026-08-08 of the 2026-08-06 order):
-    // the rail mirrors the CHAMBER's own storeys (metagraph planes on top, ribbons falling into
-    // the global floor below) and the story flow under a filter (the network → its snapshot →
-    // the global it anchored INTO; a tile click already derives the global pin from the
-    // metagraph snapshot). Display hierarchy only — both stay card slots with no focus-ladder
-    // rung (the camera/deselect walk is unchanged).
-    ids.splice(ids.indexOf("node"), 0, "metaSnap", "snap");
+    // GLOBAL SNAPSHOT ABOVE the metagraph snapshot it anchors (user, 2026-08-08, with the slab):
+    // once the lane's committed cards abut as ONE body, adjacency reads as CONTAINMENT, so the
+    // pair must run coarse→fine like every other rung — the global tick CARRIES the metagraph
+    // snapshot, not the other way around. (The chamber's storeys stay as they are: geometry
+    // shows ribbons falling INTO the global floor; the rail states the containment.) Display
+    // hierarchy only — both stay card slots with no focus-ladder rung (the camera/deselect walk
+    // is unchanged).
+    ids.splice(ids.indexOf("node"), 0, "snap", "metaSnap");
   }
   return ids;
 }
@@ -277,8 +289,8 @@ export function detailsCards(s: RailManifestState): RailCard[] {
     present: !!s.snap,
     hint: snapHint(s),
   };
-  // metaSnap BEFORE snap (2026-08-08, with the lane reversal): the manifest order drives the
-  // tablet/phone flat stack + tray icons, and it must agree with the desktop lane — the
-  // metagraph snapshot sits above the global it anchors into, mirroring the chamber's storeys.
-  return [context, country, cohort, composition, metaSnap, snap, node];
+  // snap BEFORE metaSnap (2026-08-08, with the slab): the manifest order drives the tablet/phone
+  // flat stack + tray icons, and it must agree with the desktop lane — the global tick contains
+  // the metagraph snapshot it anchors, so the pair runs coarse→fine like every other rung.
+  return [context, country, cohort, composition, snap, metaSnap, node];
 }
