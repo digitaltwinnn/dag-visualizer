@@ -166,10 +166,11 @@ export default function RailPager({ slot, children }: { slot: RailCardKind; chil
         // ON the card's bottom edge, INSIDE the glass (user, 2026-08-09 — a plank hugging the box
         // from outside read as a second frame under it). The card must RESERVE that strip, and the
         // pad lives here rather than in RIGHT_CARD because only a paged card needs it:
-        // `[&>.ig-panel]:pb-[30px]` compiles to a (0,2,0) rule in the SAME utilities layer as
+        // `[&>.ig-panel]:pb-[36px]` compiles to a (0,2,0) rule in the SAME utilities layer as
         // RIGHT_CARD's `p-[18px]` (0,1,0), so specificity decides and it wins — the equivalent
         // globals.css recipe would have to sit unlayered to beat the utility at all (CSS trap 1).
-        className="relative touch-pan-y select-none transition-transform duration-200 ease-out motion-reduce:transition-none [&>.ig-panel]:pb-[30px]"
+        // 36 rather than 30 (2026-08-10) to seat the divider below with 6px of air either side.
+        className="relative touch-pan-y select-none transition-transform duration-200 ease-out motion-reduce:transition-none [&>.ig-panel]:pb-[36px]"
         style={{ transform: dx ? `translateX(${dx}px)` : undefined, transition: dragging ? "none" : undefined }}
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
@@ -178,9 +179,23 @@ export default function RailPager({ slot, children }: { slot: RailCardKind; chil
         onClickCapture={onClickCapture}
       >
         {children}
+        {/* The plank's own DIVISION (user, 2026-08-10). The card-density redesign made the foot a
+            small muted mono column, which left a CONTROL sitting directly under DATA at the same
+            visual weight — the plank read as one more foot row. This is one inset hairline, the
+            same device Foot uses and at the same inset as every other resting division (the head
+            rule, the Fact separators), NOT a frame around the plank: the chrome-less rule below
+            still holds — no fill, no border, no rule OF ITS OWN.
+            The inset is ARITHMETIC, not an eyeball (CLAUDE.md): this wrapper is the positioning
+            containing block, so an absolute inset measures from the card's BORDER box — 1px
+            border + RIGHT_CARD's 18px pad = 19px to reach the same left edge as the Separators
+            above. At 18 the hairline overhung them by a pixel on each side, which on a 1px rule
+            directly under another 1px rule is the one place that reads. */}
+        <div aria-hidden className="pointer-events-none absolute bottom-[30px] inset-x-[19px] h-px bg-border" />
         {/* CHROME-LESS by rule: the redesign's grammar is ONE materialized box, so the plank adds
-            no fill, border or rule of its own — it is quiet type on the card's own glass, inset to
-            the 18px content pad so it aligns with the body rows above it. The label is the POSITION
+            no fill or border of its own — it is quiet type on the card's own glass, inset to the
+            SAME 19px as the hairline above and the body's own rows (border + content pad, measured
+            from this wrapper's border box — see the arithmetic note above). At 18 the chevrons'
+            hover wash overhung the content edge by a pixel on each side. The label is the POSITION
             ALONE (`n / N`); the parent's name would repeat the ancestor entry one card up, and it
             stays reachable as the group's title/aria label. `pointer-events-auto` because the plank
             is a sibling of the card, not a descendant, and `#rightcol` is pointer-events:none. */}
@@ -188,7 +203,7 @@ export default function RailPager({ slot, children }: { slot: RailCardKind; chil
           role="group"
           aria-label={set.open ? `Step through ${set.parentLabel}` : `Siblings in ${set.parentLabel}`}
           title={set.parentLabel}
-          className="pointer-events-auto absolute bottom-1 inset-x-[18px] flex h-5 items-center gap-1"
+          className="pointer-events-auto absolute bottom-1 inset-x-[19px] flex h-5 items-center gap-1"
         >
           <Button
             variant="ghost"

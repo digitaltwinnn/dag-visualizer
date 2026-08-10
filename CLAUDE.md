@@ -437,8 +437,16 @@ nests the box one level deeper inside its gesture wrapper.
 same committed parent, a slim `‹ n / N ›` plank rides the card's OWN bottom edge, inside the glass, plus
 a horizontal swipe on the body. The set comes from the pure resolver `railSiblings.ts` and every step
 applies `pickActions` through the one executor, so a pager step and the equivalent explorer click can't
-drift. The plank is chrome-less by the same grammar rule (no fill, border or rule of its own) and the
-card reserves its strip with a padding utility — see CSS trap 1. **The gate is BOXED and nothing else**
+drift. The plank stays chrome-less by the same grammar rule — no fill, no border, no frame of its own —
+and the card reserves its strip with a padding utility (see CSS trap 1). It does carry **one inset
+hairline** dividing it from the body (2026-08-10): once the foot became a small muted mono column, a
+CONTROL sat directly under DATA at the same weight and read as one more foot row. That rule is the same
+device `Foot` uses at the same inset, which is the point — **every resting division in a card shares one
+left/right edge, and the inset is ARITHMETIC**: the pager's wrapper is the positioning containing block,
+so an absolute inset measures from the card's BORDER box and the correct value is 1px border + 18px pad
+= **19**, matching the head rule and the `Fact` separators. Both the hairline and the plank row use it;
+at 18 the hairline overhung the separators by a pixel and the chevrons' hover wash overhung the content
+edge. **The gate is BOXED and nothing else**
 (an absolutely-positioned plank over a ~28px collapsed entry is a defect; single-open already makes the
 box unique) — it is the tier's own `boxed` condition, and `railTierBoundary.test.ts` pins that the two
 can't drift. Keying it to the FOCUS rung was the same mistake `data-tier` fixed above, and it also shut
@@ -490,8 +498,17 @@ the containment the slab shows.
 
 Two honesty rules: when the filtered network has nothing pickable in geo the node ghost turns into the
 honest variant naming that fact; but "all" with 0 nodes is boot, so that ghost stays silent rather than
-flashing a false invite. A populated card renders in any view; the ghost only appears where the view
+flashing a false invite. A populated card renders in any 3D view; the ghost only appears where the view
 can actually produce the card.
+
+**The placeholder views host NO facts cards at all** — `detailsCards` returns `[]` outside the three 3D
+views (user, 2026-08-10). A live node card, status pill and real ids beside a `preview · in development`
+wireframe is exactly the mixed signal rule 10 exists to prevent, and it arrived half-formed anyway: with
+no ladder for those views every present card fell through to Inspector's trailing non-ladder pass, which
+excludes the context card, so the node card rendered with **no network plank above it** — and correctly
+re-grew Country and Hosting, since the pile-dedup rule found no ancestors. It is a view gate, not a
+selection change: the store is untouched, so returning to a 3D view restores the whole pile. This
+matches the left rail, which shows About and no tool card there.
 
 **Bottom — the live/time lane.** The slim `LiveStrip` in every view; it publishes `--bottom-reserve`
 and belongs to neither layer, so it stays interactive in both poses. Its content is per-view: the tick
@@ -606,7 +623,10 @@ In one line: **thread = resting identity cue; card edge = purely transient signa
 
 The slab grammar above says how cards sit together; this says what a card BODY is made of. **One row
 grammar everywhere: label left, value right, one line.** The stacked micro-uppercase-label-above-value
-form is retired — it cost two lines per fact and read as a form, not an instrument.
+form is retired — it cost two lines per fact and read as a form, not an instrument. Its last survivor was
+the `Composition` label over the dossier's composition table, which outlived the sweep only because that
+table isn't a `Fact`; dropped 2026-08-10, since each row already names its own composition and without it
+the description above reads as the card's lead.
 
 Three weights, and a fact's weight is a claim about what the card is FOR:
 
@@ -621,12 +641,30 @@ fact row; nothing re-derives the layout locally. They carry no animation, so red
 here exactly as it is for the slab.
 
 **The foot is a look-up column, not a demotion bin.** A value goes there when you'd only ever read it to
-compare it against something else — the node card's NODE ID, the snapshot cards' hash/parent/state
-proof, height and blocks. That is also why the node card's "NODE ID last" rule falls out of the grammar
-rather than being a special case.
+compare it against something else — the node card's NODE ID, the snapshot cards' hash and parent. That
+is also why the node card's "NODE ID last" rule falls out of the grammar rather than being a special
+case.
 
-**Density came from culling, not from tightening.** `Data blocks` (metagraph snapshot) and `Epoch`
-(global snapshot) were removed outright — a fact nobody reads costs more than the pixels it takes.
+On the two snapshot cards the foot has one shape: **the artifact's chain identity — what it is, what it
+links to, what it proves.** They are the same `Signed[]` artifact, so they carry the same set, and the
+metagraph card's `State proof` is the one addition, because only a metagraph snapshot proves an
+application state. **Counters are not chain identity**: `Height`, `Blocks` and `epochProgress` are all
+carried by the types and none of them appear.
+
+**The PILE is the unit of consistency: a card never re-states an ancestor's identity.** Adjacency is what
+the slab uses to say containment, so a leaf repeating its parent at equal weight is noise, not
+reassurance. The node card drops Country, Composition and Hosting exactly when the country, composition
+or provider rung above it is committed — each of those cards states that fact as its own TITLE, and a
+title survives the collapse into an entry, so the plank speaks whether it is open or not. **Gate on
+presence, not view** (convention 7): the `!= null` rung checks, never `mode`, so the rule holds as
+ladders change and the fact grows back wherever nothing above it says it. Read down the pile, the fact
+set is identical in every view — only its distribution across planks moves. Whichever facts survive keep
+one fixed reading order, **place → role → host → reference**, so the card always reads the same way; it
+just has fewer lines.
+
+**Density came from culling, not from tightening.** `Data blocks`, `Height` and `Blocks` (metagraph
+snapshot) and `Epoch` (global snapshot) were removed outright — a fact nobody reads costs more than the
+pixels it takes.
 Measured at 1600×950: the ledger box 649px → 459px, and the ledger's committed ladder went from
 overflowing its lane (831 in 663) to fitting (629 in 641). Don't re-add a culled fact without saying
 what question it answers.
@@ -646,6 +684,11 @@ Every rail card leads with `CardHead`: eyebrow / title / inset hairline / body.
   `text-[var(--filter-accent,var(--primary))]`. Hardcoding a mark to cyan is a recurring bug; node
   marks use their node's own hue inline.
 - The **`aside`** is the right-aligned title-row companion — bodies render no title rows of their own.
+  Every rail card fills it; the country card was the last one leaving it empty, and now carries its ISO
+  code (2026-08-10) — the subject's own short form, the role the dossier's ticker plays, so it takes the
+  same weight but **muted rather than hued**, because a place carries no identity and the head's tinted
+  mark is already the filter accent. It suppresses itself when the display name is unknown, since the
+  title has then fallen back to the code and a head must not say the same thing twice.
 - **Every RESTING division is inset by its card's own horizontal padding** — the head hairline included
   (user, 2026-08-09). One weight for anything that is simply *there*: the slab's resting seam, the head
   rule, the Fact-row separators all line up at the same left/right spacing, so a card reads as one body
@@ -791,8 +834,9 @@ purpose:
 **A global snapshot's real work is settlement, not blocks.** Most carry zero (mainnet: ~1 in 50), so
 block count is the wrong activity signal. The meaningful field is **`metagraphSnapshotCount`** — how
 many metagraph snapshots this global anchored, typically 1–24 and sometimes 100+. So the strip bars
-scale by anchors, and the snapshot card shows the derived fee, height/sub-height and a `+N blk` note
-for the uncommon block-carrying ticks.
+scale by anchors, and the snapshot card leads with the anchors, breaks them down by metagraph and
+states the derived fee and the bytes anchored. **The card carries no height, sub-height or block
+count at all** — a counter that answers no question the card raises, culled 2026-08-10 with the rest.
 
 **`LiveStrip`** occupies the bottom lane in every view, but the bar-chart is ledger-only. One bar per
 tick, height = anchors. Unfiltered, bars plot each tick's total in cyan. **Filtered, each bar plots

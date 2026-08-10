@@ -265,11 +265,14 @@ export function SnapshotCard({ data: d }: { data: GlobalSnapshot }) {
         </FactGroup>
       )}
 
-      {/* FOOT — the global snapshot is the same Signed[] artifact as the metagraph snapshots it
-          anchors, so it carries its own hash and parent link. Both are look-up values (item 10,
-          2026-08-06; moved out of a labelled row block 2026-08-10). `epochProgress` was culled
-          with them: it is the consensus machinery's own counter and answers no question the rest
-          of the card raises. */}
+      {/* FOOT — the artifact's CHAIN IDENTITY: what it is, what it links to, what it proves.
+          The global snapshot is the same Signed[] artifact as the metagraph snapshots it
+          anchors, so the two cards carry the SAME foot set (2026-08-10) — hash + parent here,
+          plus the state proof over on the metagraph card, which is the one real difference
+          between the artifacts. Counters are deliberately NOT chain identity: `epochProgress`
+          was culled with them, and `height`/`blocks` (which this type does carry) never enter —
+          a tick's block count is the wrong activity signal, and its anchors are the fact this
+          card exists to state. */}
       <Foot>
         <FootRow label="Hash" value={shortHash(d.hash)} title={d.hash} />
         {d.lastSnapshotHash && (
@@ -311,9 +314,15 @@ export function MetaCard({ cfg }: { cfg: MetaCfg }) {
               (composition table — rows carry their own counts), then the shared Separator,
               then ONE summary row in the snapshot card's "Fees paid" grammar — muted label
               left, the bold total + per-state breakdown right. Totals sit BELOW their parts;
-              the old "166 nodes with 3 different compositions" header restated the table. */}
+              the old "166 nodes with 3 different compositions" header restated the table.
+              The "Composition" micro-uppercase label above this table was the LAST survivor of
+              the retired stacked label-above-block form (user, 2026-08-10) — it outlived the
+              sweep only because CompositionRows is a table rather than a Fact. Dropped: each
+              row already names its own composition, and with it gone the description above
+              reads as the card's LEAD (which is why the blurb stays in the body rather than
+              moving into the head — a paragraph in CardHead would both special-case the one
+              header standard and blow up this card's ~28px collapsed entry). */}
           <div className="mt-3">
-            <span className="text-micro tracking-[0.1em] uppercase text-muted-foreground">Composition</span>
             <CompositionRows nodes={nodes} />
           </div>
           <Separator className="my-2" />
@@ -397,14 +406,35 @@ export function GeoLiveCard() {
 
 // The selected-node block. The node's CITY + status pill are the card HEAD (GeoLiveTitle/
 // GeoLiveAside above) — the old IP and "Location" body rows are gone (the IP entirely,
-// user-agreed; the city because it IS the title). The body is the labelled facts the globe
-// can't show: the country that completes the place, the node's make-up, the hosting provider,
-// and the node's own reference. The slot eyebrow reads "Node"; the × is CardHead's shared close
-// (the outer pane).
+// user-agreed; the city because it IS the title). The slot eyebrow reads "Node"; the × is
+// CardHead's shared close (the outer pane).
+//
+// THE PILE IS THE UNIT (user, 2026-08-10). This card states its subject's OWN facts and never
+// re-states an ancestor's IDENTITY: the country card's title IS the country, the provider card's
+// title IS the isp, the composition card's title IS the composition word (with the same layer
+// chips in its aside) — and a title survives a collapse into an entry, so the parent plank
+// states it whether it's open or not. The slab's premise is that adjacency reads as containment,
+// so a leaf restating its parent at equal weight is noise, not reassurance. The rule the
+// provider card already followed since 2026-08-02 ("a facts rail shouldn't say the same thing
+// twice"), generalised.
+//
+// The gate is PRESENCE, not view (convention 7): each fact drops exactly when the rung that owns
+// it is committed — the same `!= null` conditions `railCards` uses for its `present` flags — so
+// it stays correct if a ladder changes. What survives per view is the COMPLEMENT of the ladder
+// above: geo (network→country→provider) leaves composition; hyper (network→composition) leaves
+// place + host; ledger (network) leaves all three. Read down the pile the fact set is identical
+// in every view — only its distribution across planks moves.
+//
+// CONSISTENCY LEVER: the ORDER never changes. Whichever facts survive render in the fixed
+// reading order place → role → host → reference, so the card always reads the same way; it just
+// has fewer lines.
 function GeoLiveNode({ p }: { p: PickOf<"l0" | "l1" | "metanode"> }) {
-  // Hosting provider from the node's IP lookup (GeoInfo.isp/asn) — the one machine fact the
-  // globe can't show. Absent = the lookup didn't know; the line simply doesn't render
-  // (honesty: no "Unknown" filler in a facts card).
+  // The three ancestor rungs that can own one of this card's facts.
+  const country = useStore((s) => s.country);
+  const cohort = useStore((s) => s.cohort);
+  const composition = useStore((s) => s.composition);
+  // Hosting provider from the node's IP lookup (GeoInfo.isp/asn) — Absent = the lookup didn't
+  // know; the line simply doesn't render (honesty: no "Unknown" filler in a facts card).
   const geo = "geo" in p ? p.geo : undefined;
   // The node's make-up: the composition word + its layer codes as squared pills (RoleChips — the
   // same rendering the metagraph card's composition rows use; user 2026-07-12: the joined
@@ -420,8 +450,9 @@ function GeoLiveNode({ p }: { p: PickOf<"l0" | "l1" | "metanode"> }) {
     <>
       <FactGroup>
         {/* COUNTRY — the half of the place the head no longer carries (user, 2026-08-02), with the
-            app's country CODE mark as the quiet suffix, the same shape as HOSTING's `isp · asn`. */}
-        {geo?.country && (
+            app's country CODE mark as the quiet suffix, the same shape as HOSTING's `isp · asn`.
+            Yields to the country card's own title once that rung is drilled. */}
+        {country == null && geo?.country && (
           <Fact label="Country">
             {geo.country}
             {geo.cc && <span className="font-mono text-label text-muted-foreground"> · {ccMark(geo.cc)}</span>}
@@ -430,8 +461,9 @@ function GeoLiveNode({ p }: { p: PickOf<"l0" | "l1" | "metanode"> }) {
         {/* COMPOSITION — the node's role in the network, a labelled fact like the rest (user,
             2026-08-02: it used to ride the head as a subtitle, which made the head carry three
             different registers). Sits second: the reading order is place → role → host →
-            reference, with health as the head's status pill. */}
-        {comp && (
+            reference, with health as the head's status pill. Yields to the composition card,
+            which states the same word in its title and the same chips in its aside. */}
+        {composition == null && comp && (
           <Fact label="Composition">
             <span className="inline-flex items-center gap-1.5">
               <span>{comp}</span>
@@ -439,7 +471,9 @@ function GeoLiveNode({ p }: { p: PickOf<"l0" | "l1" | "metanode"> }) {
             </span>
           </Fact>
         )}
-        {geo?.isp && (
+        {/* HOSTING — yields to the provider card, whose title IS the isp and whose body already
+            carries the ASN as the cohort's reference. */}
+        {cohort == null && geo?.isp && (
           <Fact label="Hosting">
             {geo.isp}
             {geo.asn && <span className="font-mono text-label text-muted-foreground"> · {geo.asn}</span>}
@@ -464,19 +498,40 @@ function GeoLiveNode({ p }: { p: PickOf<"l0" | "l1" | "metanode"> }) {
 // `store.selNodes` — deliberately the explorer's scope, the same data lane GeoExplore's own
 // leaderboard/accordion reads, matched here by `cc` instead of grouped by display name.
 
+// No countryName(cc) lookup exists anywhere in the app — the display name only ever arrives on a
+// NodeRow (copied verbatim off the geo-IP lookup), so it's read off a matching row, same as
+// GeoExplore's own leaderboard rows resolve their name. ONE home, shared by the title and the
+// aside, so the two can't disagree about whether a name is even known.
+function countryDisplayName(cc: string, selNodes: ReturnType<typeof useStore.getState>["selNodes"]) {
+  return selNodes.find((r) => r.cc === cc)?.country ?? null;
+}
+
 // Head title: the country mark + display name (rolls via titleKey=cc, synced with the
 // edge pulse) — same "kind mark leads the title" grammar as every other card head.
 export function CountryTitle({ cc }: { cc: string }) {
   const selNodes = useStore((s) => s.selNodes);
-  // No countryName(cc) lookup exists anywhere in the app — the display name only ever arrives
-  // on a NodeRow (copied verbatim off the geo-IP lookup), so it's read off a matching row here,
-  // same as GeoExplore's own leaderboard rows resolve their name.
-  const name = selNodes.find((r) => r.cc === cc)?.country ?? cc;
+  const name = countryDisplayName(cc, selNodes) ?? cc;
   const Mark = COUNTRY_ICON;
   return (
     <span className="inline-flex items-center gap-2 min-w-0">
       <Mark aria-hidden className={cn(KIND_MARK_CLASS, "text-[var(--filter-accent,var(--primary))]")} />
       <span className="truncate">{name}</span>
+    </span>
+  );
+}
+
+// The ISO code rides the title-row ASIDE (user, 2026-08-10): the country was the ONE card head
+// still leaving that slot empty. The code is the subject's own short form — the same role the
+// dossier's ticker plays, so it takes the same weight, but MUTED rather than hued: a place carries
+// no identity, and the head's tinted mark is already the filter's accent.
+// Suppressed when the display name is unknown — the title has then already fallen back to the code
+// itself, and a head must not say the same thing twice (the same rule the pile follows).
+export function CountryAside({ cc }: { cc: string }) {
+  const selNodes = useStore((s) => s.selNodes);
+  if (!countryDisplayName(cc, selNodes)) return null;
+  return (
+    <span className="text-label font-semibold tracking-[0.02em] uppercase text-muted-foreground">
+      {cc}
     </span>
   );
 }

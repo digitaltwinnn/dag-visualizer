@@ -272,10 +272,18 @@ export default function MetaSnapPane({
               </Button>
             )}
 
-            {/* ── FOOT: what you look up rather than read ─────────────────────────────────
-                The three hashes used to cost 114px as stacked label-above blocks and the two
-                bookkeeping numbers a labelled row each. Same values, same full-hash-on-hover,
-                one small muted column (user, 2026-08-10). */}
+            {/* ── FOOT: the artifact's CHAIN IDENTITY ─────────────────────────────────────
+                What it is, what it links to, what it proves — and nothing else. The three
+                hashes used to cost 114px as stacked label-above blocks; same values, same
+                full-hash-on-hover, one small muted column (user, 2026-08-10).
+                HEIGHT and BLOCKS were culled the same day: the global snapshot card's foot
+                carries hash + parent only, and the two cards are the SAME Signed[] artifact, so
+                the asymmetry was an accident of history rather than a difference in the data
+                (GlobalSnapshot carries height/blocks too). Reconciled DOWN, not up — CLAUDE.md
+                already rules that a tick's block count is the wrong activity signal, and the
+                facts that answer a question about this snapshot are all above. `State proof` is
+                the one asymmetry that STAYS: only a metagraph snapshot proves an application
+                state, so it's a real difference in the artifact, not an inconsistency. */}
             <Foot>
               <FootRow label="Hash" value={shortHash(sel.hash)} title={sel.hash} />
               {polled?.parent && (
@@ -284,10 +292,6 @@ export default function MetaSnapPane({
               {stateProof && (
                 <FootRow label="State proof" value={shortHash(stateProof)} title={stateProof} />
               )}
-              {polled && (
-                <FootRow label="Height" mono={false} value={`${polled.height} · ${polled.subHeight}`} />
-              )}
-              {polled && <FootRow label="Blocks" mono={false} value={polled.blocks} />}
             </Foot>
           </div>
         )}
