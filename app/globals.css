@@ -436,8 +436,10 @@
   /* A second muted text tone — brighter than --muted-foreground, dimmer than --foreground.
      The repeated "muted blue-grey" copy tone (dossier description, geo rows, tooltip figures). */
   --foreground-dim: #c7d0ea;
-  /* The experimental-banner advisory amber — NOT --destructive (amber ≠ red): a distinct
-     "work-in-progress / advisory" accent. Only the ExperimentalBanner uses it today. */
+  /* The advisory amber — NOT --destructive (amber ≠ red): a distinct "work-in-progress /
+     advisory" accent. Its home is /about's unofficial-project notice (the always-on experimental
+     banner it was made for was retired 2026-08-09; the token stays because the advisory REGISTER
+     is still a real one, distinct from an error). */
   --warn-soft: #ffd166;
 
   --border: rgba(90, 140, 255, 0.22);        /* panel/hairline border (was the --panel-border alias) */
@@ -480,8 +482,9 @@
                               strip, 2026-07-12) — published live by TopBar via ResizeObserver;
                               the rails add it to their top so the strip PUSHES the layout
                               instead of overlapping it (it's a bigger bar, not a popup). */
-  --rail-top: 115px;       /* top of BOTH side rails — clears the banner + command bar, plus a
-                              comfortable breather under the bar (user refinement 2026-07-05) */
+  --rail-top: 90px;        /* top of BOTH side rails — clears the command bar (top 14px + 54px of
+                              bar) plus a comfortable breather under it (user refinement
+                              2026-07-05; moved up 25px with the retired banner, 2026-08-09) */
   --rail-w: 264px;         /* left control rail width */
   --detail-w: 320px;       /* right details rail width */
   --sel-bg: rgba(42, 245, 255, 0.12);   /* selected/active fill, reused everywhere */
@@ -804,17 +807,21 @@
   .ls-bar-anim { animation: none; }
 }
 
-/* ── Command-list scrollbar (top-bar filter picker) — the SAME slim custom scrollbar as the
-   rails (`#leftcol`/`#rightcol`, above); the default chunky one clashed with the glass popover.
-   Scoped to a class (not the rails' ids) since `CommandList` is a reusable primitive. ── */
+/* ── The app's ONE slim scrollbar — the same instrument the rails carry (`#leftcol`/`#rightcol`,
+   above, where it is hidden outright). Any scroll region ON GLASS wears this: the platform's
+   chunky default reads as a browser part sitting on top of the panel, not part of the instrument.
+   A class rather than ids, because the consumers are reusable primitives (`CommandList`'s filter
+   strip; the raw layer's lane pane, 2026-08-09). BOTH axes are styled — a JSON tree scrolls
+   sideways too. ── */
 @layer components {
-  .cmd-list-scroll {
+  .slim-scroll {
     overscroll-behavior: contain;
   }
-  .cmd-list-scroll::-webkit-scrollbar { width: 6px; }
-  .cmd-list-scroll::-webkit-scrollbar-track { background: transparent; }
-  .cmd-list-scroll::-webkit-scrollbar-thumb { background: rgba(160, 175, 205, 0.28); border-radius: 3px; }
-  .cmd-list-scroll:hover::-webkit-scrollbar-thumb { background: rgba(160, 175, 205, 0.45); }
+  .slim-scroll::-webkit-scrollbar { width: 6px; height: 6px; }
+  .slim-scroll::-webkit-scrollbar-track { background: transparent; }
+  .slim-scroll::-webkit-scrollbar-thumb { background: rgba(160, 175, 205, 0.28); border-radius: 3px; }
+  .slim-scroll:hover::-webkit-scrollbar-thumb { background: rgba(160, 175, 205, 0.45); }
+  .slim-scroll::-webkit-scrollbar-corner { background: transparent; }
 }
 
 /* ── Instrument-Glass surface — the shared panel frame + left accent spine ── */

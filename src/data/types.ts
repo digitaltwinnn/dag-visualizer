@@ -31,6 +31,14 @@ export interface ChannelSnapDeep {
 export const metaSnapDeepKey = (globalOrdinal: number, metaId: string, snapOrdinal: number): string =>
   `${globalOrdinal}:${metaId}:${snapOrdinal}`;
 
+/** The HOVER key of ONE metagraph snapshot (user, 2026-08-09 — hovering a snapshot used to write
+ *  the tick channel, so its whole global tick lit up: "it automatically selects all that are in the
+ *  same global snapshot; that is not logical"). Keyed by metagraph + its own ordinal, which is
+ *  unique across the buffer, so the scene lights exactly one tile and the explorer pairs exactly
+ *  one row. Deliberately NOT the deep key: hover is per snapshot, not per (tick, snapshot) decode. */
+export const metaSnapHoverKey = (metaId: string, snapOrdinal: number): string =>
+  `${metaId}|${snapOrdinal}`;
+
 export interface GlobalSnapshot {
   ordinal: number;
   timestamp: string;
@@ -119,6 +127,10 @@ export interface GlobalEvent {
 export interface NodeInfo {
   ip?: string;
   id?: string;
+  /** EVERY layer id this machine answers to, primary first — a hybrid runs one process per layer
+   *  and each carries its own keypair, so one machine has several peer ids (see the route's
+   *  `idsOf`). Signer matching must use this, not `id` alone. */
+  ids?: string[];
   state?: string;
   layer?: string;
   roles?: string[];
@@ -151,6 +163,7 @@ export interface RouteNode {
   layer?: string;
   roles?: string[];
   id?: string;
+  ids?: string[]; // every layer id (see NodeInfo.ids)
 }
 export interface RouteMetagraph {
   id: string;
@@ -204,6 +217,10 @@ export interface NodeRow {
   pick: PickDescriptor;
   label: string;
   id: string | null; // node ID when present (validators); null for id-less metagraph nodes
+  /** Every layer id this machine answers to (NodeInfo.ids) — what signer matching reads, because
+   *  a hybrid's dL1 id differs from the l0 id in `id`. Absent for validators, whose clusters
+   *  share one id per machine (api.ts `_buildDagCore` merges BY id). */
+  ids?: string[];
   cc: string | null;
   country: string | null;
   city: string | null; // resolved city — the row's location-first primary (country = the group)

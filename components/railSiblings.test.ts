@@ -217,33 +217,47 @@ describe("siblingSet — node rung", () => {
 });
 
 describe("siblingSet — metagraph snapshot rung", () => {
-  const rows: ChannelSnapRow[] = [
-    { metaId: "ded", ordinal: 100, decoded: true, fee: 1, bytes: 10, signers: [], blocks: 0, hasState: false, stateBytes: 0, stateProof: null },
-    { metaId: "dor", ordinal: 900, decoded: true, fee: 2, bytes: 20, signers: [], blocks: 0, hasState: false, stateBytes: 0, stateProof: null },
-    { metaId: "DAG5unknownaddr", ordinal: 0, decoded: false, fee: 0, bytes: 5, signers: [], blocks: 0, hasState: false, stateBytes: 0, stateProof: null },
-  ];
+  const row = (metaId: string, ordinal: number): ChannelSnapRow => ({
+    metaId, ordinal, decoded: ordinal > 0, fee: 1, bytes: 10,
+    signers: [], blocks: 0, hasState: false, stateBytes: 0, stateProof: null,
+  });
+  // One tick with two DED snapshots (a fast metagraph batches several into one global), one DOR,
+  // and one undecodable unlisted channel.
+  const rows: ChannelSnapRow[] = [row("ded", 100), row("dor", 900), row("DAG5unknownaddr", 0), row("ded", 101)];
   const cur = { metaId: "ded", ordinal: 100, hash: "h", globalOrdinal: 42, ts: "T" };
   const s = base({ mode: "ledger", filter: "ded", metaSnap: cur, snap: snapPick, exactRows: rows });
 
-  it("steps the tick's channel rows; labels lead with the ticker (short address when unlisted)", () => {
+  it("is scoped to the SUBJECT'S OWN metagraph — the parent is (network × tick), ordinal desc", () => {
     const set = siblingSet("metaSnap", s)!;
-    expect(set.items.map((i) => i.label)).toEqual(["DED #100", "DOR #900", "DAG5un… #0"]);
-    expect(set.index).toBe(0);
-    expect(set.parentLabel).toBe("Global #42");
+    expect(set.items.map((i) => i.label)).toEqual(["#101", "#100"]);
+    expect(set.index).toBe(1);
+    expect(set.parentLabel).toBe("DED · Global #42");
   });
-  it("a step agrees with metaSnapSelectActions (filter-first for a listed sibling)", () => {
+  it("excludes the tick's OTHER networks — a step must never move the coarser network rung", () => {
     const set = siblingSet("metaSnap", s)!;
-    expect(set.items[1]!.actions).toEqual(
+    const stepped = set.items.flatMap((i) => i.actions);
+    expect(stepped.some((a) => a.kind === "filter" && a.id !== "ded")).toBe(false);
+    expect(stepped.every((a) => a.kind !== "metaSnap" || !a.sel || a.sel.metaId === "ded")).toBe(true);
+  });
+  it("a step agrees with metaSnapSelectActions", () => {
+    const set = siblingSet("metaSnap", s)!;
+    expect(set.items[0]!.actions).toEqual(
       metaSnapSelectActions(
-        { metaId: "dor", ordinal: 900, hash: "", globalOrdinal: 42, ts: "T" },
+        { metaId: "ded", ordinal: 101, hash: "", globalOrdinal: 42, ts: "T" },
         snapPick,
         { filter: "ded", metaSnap: cur },
       ),
     );
   });
-  it("undecodable rows (ordinal 0) get position-unique keys", () => {
-    const twice = [...rows, { ...rows[2]! }];
-    const set = siblingSet("metaSnap", base({ ...s, exactRows: twice }))!;
+  it("a metagraph with a single snapshot in the tick gets NO pager", () => {
+    const only = { ...cur, metaId: "dor", ordinal: 900 };
+    expect(siblingSet("metaSnap", base({ ...s, filter: "dor", metaSnap: only }))).toBeNull();
+  });
+  it("undecodable rows say so and get position-unique keys", () => {
+    const two = [row("ded", 0), row("ded", 0)];
+    const undec = { ...cur, ordinal: 0 };
+    const set = siblingSet("metaSnap", base({ ...s, metaSnap: undec, exactRows: two }))!;
+    expect(set.items.map((i) => i.label)).toEqual(["undecoded", "undecoded"]);
     const keys = set.items.map((i) => i.key);
     expect(new Set(keys).size).toBe(keys.length);
   });

@@ -5,6 +5,7 @@ import { useSnapshotFeed } from "@/components/useSnapshotFeed";
 import { getNetwork } from "@/src/data/network";
 import { buildAnchorLog } from "@/src/data/anchorLog";
 import { displayNetwork, unlistedLog, UNLISTED_ID } from "@/src/data/unlisted";
+import { metaSnapHoverKey } from "@/src/data/types";
 import { metaSnapSelectActions } from "@/src/engine/domain/pickActions";
 import { applyClickActions } from "@/src/store/applyClickActions";
 import { fmtDag, fmtKB } from "@/src/util/format";
@@ -34,7 +35,11 @@ export default function AnchorLogTable() {
   const snap = useStore((s) => s.snap);
   const following = useStore((s) => s.following);
   const metaSnap = useStore((s) => s.metaSnap);
-  const setHoverSnapOrd = useStore((s) => s.setHoverSnapOrd);
+  // A row IS one metagraph snapshot, so its hover rides the snapshot channel, not the tick's
+  // (user, 2026-08-09): `hoverSnapOrd` lights every band of the anchoring global, which lit a row
+  // of snapshots the pointer was not on. Same channel the explorer's leaf rows and the scene's
+  // tiles use, so all three preview exactly the subject a click would commit.
+  const setHoverMetaSnap = useStore((s) => s.setHoverMetaSnap);
   const net = getNetwork();
   // Rebuilt per render on purpose: renders here are event-driven (a tick / an anchor fill every
   // few seconds), and the buffers mutate in place, so a memo key would go stale, not save work.
@@ -97,8 +102,8 @@ export default function AnchorLogTable() {
                   rowSel && "bg-[var(--sel-bg)] text-foreground",
                   tickMate && "bg-wash-faint",
                 )}
-                onMouseEnter={() => setHoverSnapOrd(r.global.ordinal)}
-                onMouseLeave={() => setHoverSnapOrd(null)}
+                onMouseEnter={() => setHoverMetaSnap(metaSnapHoverKey(r.metaId, r.ordinal))}
+                onMouseLeave={() => setHoverMetaSnap(null)}
                 onClick={() =>
                   applyClickActions(
                     metaSnapSelectActions(

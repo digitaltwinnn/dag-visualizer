@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { BAR_TUNE_DEFAULTS, SNAP_PREVIEW } from "./ByteBar";
+import { BAR_TUNE_DEFAULTS, SNAP_PREVIEW, SNAP_ONNET } from "./ByteBar";
 import { RIBBON_DIM, RIBBON_TUNE_DEFAULTS } from "./Ribbons";
 import { TILE_TUNE_DEFAULTS } from "../views/LedgerView";
 
@@ -23,6 +23,15 @@ describe("the ledger's colour-tier hierarchy", () => {
   it("the preview TIER outshines the resting trail (hot × preview > rest)", () => {
     expect(BAR_TUNE_DEFAULTS.hot * SNAP_PREVIEW).toBeGreaterThan(BAR_TUNE_DEFAULTS.rest);
     expect(TILE_TUNE_DEFAULTS.hot * SNAP_PREVIEW).toBeGreaterThan(TILE_TUNE_DEFAULTS.rest);
+  });
+
+  // The committed network's own resting rows (user, 2026-08-09): loud enough that its hue reads
+  // down the whole trail, quiet enough that a hover still previews louder than a standing
+  // commitment and the hot row still leads.
+  it("the committed-network resting tier sits between the neutral rest and the hover preview", () => {
+    expect(SNAP_ONNET).toBeLessThan(SNAP_PREVIEW);
+    expect(BAR_TUNE_DEFAULTS.hot * SNAP_ONNET).toBeGreaterThan(BAR_TUNE_DEFAULTS.rest);
+    expect(TILE_TUNE_DEFAULTS.hot * SNAP_ONNET).toBeGreaterThan(TILE_TUNE_DEFAULTS.rest);
   });
 
   it("ribbons rest visible and dim below rest", () => {

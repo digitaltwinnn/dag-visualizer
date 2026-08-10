@@ -5,12 +5,15 @@ import {
   BLOCK_SIZE,
   LANE_GAP_Z,
   slotFade,
+  HORIZON_X,
+  HORIZON_SPAN,
+  horizonAt,
   anchorTiles,
   LedgerModel,
   LEAD_SETTLE_MS, LANE_IDS } from "./ledgerModel";
 import { METAGRAPHS } from "../config";
 import { UNLISTED_KEY } from "./ledgerBands";
-import { ledgerSite } from "./ledgerLayout";
+import { ledgerSite, LEAD_X } from "./ledgerLayout";
 import type { GlobalSnapshot, Anchor } from "@/src/data/types";
 
 function snap(ordinal: number, ts: string, count = 0): GlobalSnapshot {
@@ -66,6 +69,34 @@ describe("slotFade (js/ledger.js:53 verbatim)", () => {
   it("clamps to [0,1] outside the visible range", () => {
     expect(slotFade(0)).toBe(1);
     expect(slotFade(SLOT_N + 5)).toBe(0);
+  });
+});
+
+describe("the horizon (user, 2026-08-09: the chamber must read as continuing into history)", () => {
+  it("is fully opaque at the lead — the front of the trail is never touched", () => {
+    expect(horizonAt(LEAD_X)).toBe(1);
+  });
+
+  it("reaches zero AT the horizon and clamps beyond it (nothing draws past the end)", () => {
+    expect(horizonAt(HORIZON_X)).toBe(0);
+    expect(horizonAt(HORIZON_X - 10)).toBe(0);
+  });
+
+  it("is back to full one span in front of the horizon, and clamps above it", () => {
+    expect(horizonAt(HORIZON_X + HORIZON_SPAN)).toBe(1);
+    expect(horizonAt(HORIZON_X + HORIZON_SPAN + 10)).toBe(1);
+  });
+
+  it("leaves 8 of the 9 visible rows at full brightness — a terminal dissolve, not a depth fade", () => {
+    for (let s = 0; s <= SLOT_N - 2; s++) expect(horizonAt(LEAD_X - s * SLOT_SP)).toBe(1);
+    const last = horizonAt(LEAD_X - (SLOT_N - 1) * SLOT_SP);
+    expect(last).toBeGreaterThan(0);
+    expect(last).toBeLessThan(1);
+  });
+
+  it("sits beyond the last slot but in FRONT of the floor's own back edge, so the glass ends first", () => {
+    expect(HORIZON_X).toBeLessThan(LEAD_X - (SLOT_N - 1) * SLOT_SP);
+    expect(HORIZON_X).toBeGreaterThan(-33); // LedgerView's FLOOR_CX - FLOOR_W / 2
   });
 });
 

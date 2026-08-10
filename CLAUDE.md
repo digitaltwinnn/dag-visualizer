@@ -54,9 +54,11 @@ Eleven invariants. Six are executable — `npm test` fails when they break.
 | 5 | **Zero-allocation render loop.** No `new THREE.*`/`.clone()` in per-frame bodies unless marked `event-time`. | `src/engine/noFrameAllocations.test.ts` |
 | 6 | **Scene-view contract.** Bespoke views implement `SceneView`; scene modules never compare `Mode` strings; framing math reads layout data, not rendered transforms; views never write their root `visible`. | `src/engine/scene/views/sceneView.test.ts`, `src/engine/sceneViewContract.test.ts` |
 
-Two narrower boundary tests work the same way: `components/unlistedBoundary.test.ts` (the `"unlisted"`
-id literal has exactly two homes) and `components/railLadderBoundary.test.ts` (every committable focus
-rung maps to a hinted rail card slot).
+Four narrower boundary tests work the same way: `components/unlistedBoundary.test.ts` (the `"unlisted"`
+id literal has exactly two homes), `components/railLadderBoundary.test.ts` (every committable focus
+rung maps to a hinted rail card slot), `components/railTierBoundary.test.ts` (`data-focus` has two
+homes and the slab's geometry — the pager included — keys on `data-tier`) and
+`src/data/signerMatchBoundary.test.ts` (a peer-id prefix comparison lives only in `src/data/network.ts`).
 
 Each of these files opens with a header comment giving the rationale, the scope and every exemption
 with its reason. **That header is the rule's authoritative statement** — read it rather than inferring
@@ -71,8 +73,12 @@ scope from the table.
    click semantics → `domain/pickActions.ts`, the unlisted network → `src/data/unlisted.ts`. Don't
    grow a second copy in the Engine or a component.
 9. **The scene↔HUD hover pairing is sacrosanct.** The shared store channels (`hoverFilter`,
-   `hoverNodeId`, `hoverSnapOrd`, `hoverCountry`, `hoverCohort`), `.subject-paired` and the marker
-   classes survive every refactor. Hovers preview, never commit.
+   `hoverNodeId`, `hoverSnapOrd`, `hoverMetaSnap`, `hoverCountry`, `hoverCohort`), `.subject-paired`
+   and the marker classes survive every refactor. Hovers preview, never commit. **A surface hovers the
+   subject it would COMMIT** — `hoverSnapOrd` is a global tick, `hoverMetaSnap` one metagraph
+   snapshot (keyed by `metaSnapHoverKey(metaId, ordinal)`), so the anchor-log row, the explorer's leaf
+   row and the scene's tile all ride `hoverMetaSnap`: a row is a snapshot, not its tick, and the tick
+   channel would light every band of the anchoring global.
 10. **Honesty over decoration.** Every visual quantity comes from live data; absent data is an
     instrument state (NO SIGNAL / acquiring / standby), never a fabricated number; floors are labelled
     floors. Don't "fix" an honest gap.
@@ -155,7 +161,7 @@ nodes.
 
 | Path | Responsibility |
 |---|---|
-| `app/` | Next App Router. `globals.css` is **the one stylesheet**; `design/page.tsx` is the token reference; `api/*` are the server-side data routes. |
+| `app/` | Next App Router. `globals.css` is **the one stylesheet**; `design/page.tsx` is the token reference; `about/page.tsx` is the project's own page — Instrument-Glass like the HUD, and the home of the **experimental disclosure** that used to be an always-on banner (retired 2026-08-09: a permanent banner over a live instrument reads as an alarm; the TopBar links here instead). `--warn-soft` is its amber (shared only with the raw layer's JSON booleans). `api/*` are the server-side data routes. |
 | `components/` | React panels, each reading/writing the store. `SceneCanvas` mounts the engine (dynamic-imported so Three never enters the server bundle). |
 | `components/ui/` | The adopted shadcn/Radix primitives. |
 | `src/store/store.ts` | The Zustand store — mode, filter, selection, hover channels, `section`, phone UI state. |
@@ -195,7 +201,12 @@ goes in the phase whose inputs it needs, never earlier.
    `getWorldPosition`/`getMatrixAt` in an Engine framing path needs a justified `render-state OK`
    marker (rule 6 enforces this).
 2. **View emphasis moves the structure, not the camera.** Shared, lockstep and policy-driven beats
-   composed camera cleverness; camera poses stay dumb.
+   composed camera cleverness; camera poses stay dumb. Where a view *does* answer a commit with the
+   camera, it gets **ONE pose with ONE state-keyed variation** — the ledger's `ledgerCommitTilt`
+   (`domain/cameraRig.ts`) leans the settled chamber pose in when a network is committed and back out
+   when it isn't, and that is the whole vocabulary. Three bespoke ledger framings (a lane nudge, a node
+   framing, a per-lane fly) were built and **retired** because each added a pose the user had to learn;
+   don't grow a fourth.
 
 ⚠️ **Three's raycaster ignores `object.visible`.** Hiding a group does not stop it being picked — it
 has to be left out of `pickSources`.
@@ -274,8 +285,9 @@ the root is morph-scaled, so a world position would aim at the origin mid-morph.
 while focused, and picking is filter-gated to the in-focus selection's nodes. Depth of field is wired
 but no view opts in — the bokeh read as fuzz on the selected atom.
 
-**Snapshots** — the ladder is node → network → all. Committing a filter frames the metagraph's lane;
-floors and trays are visual aid, and the real subjects are the snapshots themselves.
+**Snapshots** — the ladder is node → network → all. Committing a filter leans the chamber pose in (the
+one commit tilt) but never moves the lanes; floors and trays are visual aid, and the real subjects are
+the snapshots themselves.
 
 **Hover previews at the same strength as a committed filter**, but never runs the click's camera
 flight. Hovering an explorer node row glows that node and nothing else; a country row previews its
@@ -337,6 +349,14 @@ The command bar is spineless — the ECG mark is its identity cue. With a networ
 vitals cluster wears a soft-tipped hairline in the filter's identity hue; "all" renders nothing, and
 numbers stay untinted.
 
+**The bar's narrow-width thresholds are MEASURED, not guessed** (2026-08-09): the view-switch labels drop
+at `max-[1299px]`, the wordmark at `max-[1439px]`, and the dividers plus the "soon" placeholder views at
+`max-[820px]` — each measured from where the real cluster starts to crowd, with slack, because the bar's
+content width changes with the committed filter's own name. One threshold per decision, shared by
+everything that must change on the same line. When the labels go, the ACTIVE view's name reappears as a
+caption strip under the bar — a decorative echo of the radiogroup's own state (`aria-hidden`,
+non-interactive), living outside the bar surface so its `overflow-hidden` can't clip it.
+
 ⚠️ The hyper vitals columns are **every label `compositionRows` can emit, so they sum to the
 selection** — a new composition label needs a column, not an exclusion.
 
@@ -350,8 +370,14 @@ decisions inside them are design, not detail:
   commits and expands it and the disclosure state IS `store.composition`, single-open by construction
   with no local state. The grouping math lives once in `src/data/composition.ts`, shared by the row,
   the card and the Engine's group glow, so a count can't drift.
-- ledger's two top-level groups are the two snapshot *artifacts*, closed by default, **names alone** —
-  a header count would only be the downloaded window, a buffer size, not a network fact.
+- ledger's explorer is **ONE AXIS: TIME** (user, 2026-08-09) — a single uniform tree, tick → network →
+  that network's snapshots in the tick → that snapshot's signers, coarse→fine like every other ladder in
+  the app. The transposed second group (network → its ordinals across the window) was **retired**: two
+  dropdowns over the same rows made the user choose an axis before browsing, and time is the view's own
+  axis. Everything is closed by default and **named alone, with no header count** — a count there would
+  only be the downloaded window, a buffer size, not a network fact. **Affordance follows the data**: a
+  row is only a disclosure if it actually has children (a tick with no identified anchors, a snapshot
+  whose signers aren't resolvable) — a chevron that opens onto nothing is a lie about the feed.
 
 **Naming and copy rules:** About states the view's point of view ("How the network is built"); the tool
 card says what you BROWSE ("Nodes by network"). Eyebrows are bare role words, and each explorer's usage
@@ -397,12 +423,13 @@ member+member rule and would stay `static`, making z-index inert) and the shadow
 radius is what actually reads.
 
 ⚠️ **The slab keys on ONE marker, `data-tier` (`ghost` | `entry` | `box`), written by `Inspector.tsx`
-from the same `effCollapsed` that decides the render** — so marker and render cannot disagree. It was
-`[data-focus]` once, and that was a bug the user reported as "a gap at the bottom to the node card,
-happens in many places": `data-focus` marks the finest committed rung, but the box is whichever rung is
-EXPANDED, and single-open lets that be any of them. Expand a coarser entry and both joints around it
-matched no member arm and fell back to the plain gap. **The tier is what the geometry depends on, so the
-tier is what the wrapper states.** The lane's DOM shape is load-bearing too: members are selected by
+from the same `effCollapsed` that decides the render** — so marker and render cannot disagree, and the
+box is whichever rung is EXPANDED, never the finest COMMITTED one. `[data-focus]` here was the bug the
+user reported as "a gap at the bottom to the node card, happens in many places": expand a coarser entry
+and both joints around it matched no member arm and fell back to the plain gap. **The tier is what the
+geometry depends on, so the tier is what the wrapper states** — `components/railTierBoundary.test.ts`
+holds the two markers apart, `data-focus` to the thread's dot state and everything geometric to the
+tier. The lane's DOM shape is load-bearing too: members are selected by
 `:has()` on the per-rung WRAPPER divs, so **the selectors must be descendant, not child** — `RailPager`
 nests the box one level deeper inside its gesture wrapper.
 
@@ -413,8 +440,17 @@ applies `pickActions` through the one executor, so a pager step and the equivale
 drift. The plank is chrome-less by the same grammar rule (no fill, border or rule of its own) and the
 card reserves its strip with a padding utility — see CSS trap 1. **The gate is BOXED and nothing else**
 (an absolutely-positioned plank over a ~28px collapsed entry is a defect; single-open already makes the
-box unique) — keying it to the FOCUS rung was the same mistake `data-tier` fixed above, and it also shut
+box unique) — it is the tier's own `boxed` condition, and `railTierBoundary.test.ts` pins that the two
+can't drift. Keying it to the FOCUS rung was the same mistake `data-tier` fixed above, and it also shut
 out the two snapshot slots, which ride the lane with no focus rung at all.
+
+**A pager's parent scope is whatever the step must NOT change, which for the metagraph snapshot makes it
+a PAIR — this metagraph × this tick** (user, 2026-08-09). The set is the subject's own `metaId` rows of the
+pinned tick's exact read, ordinal-desc, never every contributor: `metaSnapSelectActions` filter-firsts, so
+a cross-network step would move a COARSER rung and a swipe would silently re-commit the network. The
+explorer still browses every network under a tick, because there the network IS a deliberate click with
+its own chamber preview. And the pair is the honest total — a fast metagraph batches dozens of snapshots
+into one tick (DOR routinely 9-plus), so a tick-wide `N` would contradict the breakdown pills.
 
 **The global snapshot's set is OPEN** (user, 2026-08-09): time is ongoing, so the same plank steps one
 tick at a time but shows **no `n / N`** — a window into an unbounded chain has no total to state, and
@@ -536,6 +572,13 @@ In one line: **thread = resting identity cue; card edge = purely transient signa
   screenshot it. The same clip makes the box's **ORIGIN** load-bearing: when the funnel's `REACH_PAD`
   left the ink math it stayed in the width *and* the left offset, silently shifting the whole right-hand
   thread off the rail. **Width and origin must be changed together.**
+  ⚠️ **The thread measures in SHELL-LOCAL coordinates, never viewport ones**: every rect is divided by
+  `k = shellRect.width / shell.offsetWidth`, the live scale of whatever transform an ancestor is running
+  (`components/RailThread.tsx`). Raw viewport rects are correct only while that scale is 1, which is why
+  the dots landed off their eyebrows after `raw → switch view → scene` — GSAP leaves the scene wrapper
+  mid-scale, and **an ancestor transform change fires no ResizeObserver, scroll or resize event**, so
+  there is no signal to re-measure on either. Dividing by the measured scale makes the numbers
+  transform-agnostic and the missing event moot.
 - **Every card edge signal renders on the scene-facing (inner) edge**, in three levels whose hierarchy
   must stay readable at a glance — **grey whisper < hued pairing < moving pulse** (all three run live
   on `/design`). Pairing wins over the whisper by source order. The pulse fires once per subject
@@ -580,10 +623,17 @@ Every rail card leads with `CardHead`: eyebrow / title / inset hairline / body.
   quietly divided rather than a stack of slices. The panel layout insets with `--panel-pad-x`; the
   inspector layout just sits inside `--card-pad` and needs no bleed at all. Full width is **reserved
   for the hovered seam**, where it is a transient signal, not a resting edge.
+  **The inset is ARITHMETIC, not an eyeball**: a division nested inside a body that already has padding
+  carries the difference, so the explorer's instrument/list rule is `mx-[2px]` — 14px of body padding
+  plus 2px to reach the 16px `--panel-pad-x` the head rule uses. Deriving it from the tokens is what
+  makes the lines actually share an edge.
 - **One close**: every dismissible card's × is CardHead's ghost close labelled "Clear selection", with
   no per-card variants. Right cards are collapsible too — the whole head is the disclosure toggle (the
   stretched-hit-area pattern, required for touch), with the × and the aside floating above the overlay
-  so closing and links keep working.
+  so closing and links keep working. ⚠️ **Floating above it means `pointer-events-none` on the wrapper
+  and `pointer-events-auto` on its own links/buttons** (`[&_a]:pointer-events-auto`,
+  `[&_button]:pointer-events-auto`) — a `z-index` alone leaves the whole aside eating the toggle click,
+  which is exactly how a collapsed head stopped expanding.
 - **The cards ARE the rail's controls — there is no rail toolbar.** The collapse-all/restore + clear-all
   pair above the pile was removed (2026-08-09): every head is already a disclosure toggle, so a
   collapse-all button restates what a click says, and its × was the coarsest card's own × — clearing
@@ -664,6 +714,16 @@ Nothing tests these. Each has cost real debugging time.
    (the slab's corner-squaring vanished this way). Reach through a sibling with ONE `:has()`
    (`+ div > .rail-entry`), and comma-join when several subjects need the same rule rather than nesting
    a second one. `:is()` inside `:has()` is fine.
+8. **`max-[N]` is EXCLUSIVE** — Tailwind v4 compiles it to `@media not (min-width: N)`, so it stops
+   applying **at** N, not after it. A tier boundary is therefore written with the SAME number on both
+   arms (`max-[1100px]` / `min-[1100px]`), which is how the rail widths pair. The `max-[1099px]:!hidden`
+   safety nets are the older form and leave exactly 1099px on the desktop arm — harmless (nothing
+   double-renders, the desktop rails simply arrive one pixel early), but don't copy the pattern into a
+   new boundary, and never pair `max-[N]` with `min-[N+1]` thinking it closes the gap: it opens one.
+9. **One slim scrollbar recipe, `.slim-scroll`.** Any scroll region **on glass** wears it — the platform
+   default paints a chunky bright bar that reads as a browser part laid over the panel. It's a class
+   rather than a token because its consumers are reusable primitives (the filter strip's phone overflow,
+   the raw layer's lane pane), and it styles **both axes**, because a JSON tree scrolls sideways too.
 
 **Settle any cascade or specificity question by reading the compiled CSS in the browser**, not by
 reasoning about it.
@@ -715,11 +775,30 @@ tick, because bars shift under a stationary cursor that never fires mouseleave.
 
 **The raw data layer's table** is the same per-view projection in table form, dispatching on `mode`.
 The ledger one is a master–detail split: the anchor log on the left, the channel-state panel as the
-always-present right pane. That pane is the metagraph-snapshot card's **two-step disclosure** — the
-CARD states the SHAPE of the application state, the pane renders the PAYLOAD one level down **on a
-second deliberate gesture, because one anchoring channel publishes personal records.** hyper and geo
-get the node roster with per-view column order; flat views get the honest `preview · in development`
-line, never a fabricated table.
+always-present right pane. hyper and geo get the node roster with per-view column order; flat views get
+the honest `preview · in development` line, never a fabricated table. **The layer opens on a subject**:
+with nothing selected the ledger's log commits its own first row on mount, so the pane opens populated
+instead of on an empty-state the user has to dismiss by guessing where to click; an existing selection is
+never overridden.
+
+That pane is the metagraph-snapshot card's **two-step disclosure** — the CARD states the SHAPE of the
+application state, the pane renders the PAYLOAD one level down **on a second deliberate gesture, because
+one anchoring channel publishes personal records.** Its shape is **ONE LANE AXIS** (2026-08-09): the
+snapshot's facts stay pinned at the top, and the payload sits behind `STATE · DATA · SIGNERS` tabs whose
+labels carry their own counts. **An empty lane gets no tab** — a tab that opens onto "nothing here" is
+chrome pretending to be data — and the first available lane opens by default, so the pane is never
+parked on a chooser.
+
+Every lane renders the **same body grammar: note → shape table → collapsed `RAW JSON`.** The note is the
+lane's one-line summary (bytes and proof for state, record and block counts for data), the table is the
+shape (`src/data/payloadKinds.ts` is the data lane's shape read — kinds and counts, never a guess at
+meaning), and the raw tree is the last tier, collapsed, its open state living on the PANE so switching
+lanes doesn't smuggle a disclosure across. **SIGNERS gets no disclosure**: a signer list is already the
+raw thing.
+
+⚠️ **`table-fixed` on that shape table is load-bearing, not tidiness** (found live 2026-08-09): an
+auto-layout table sizes to its content, so one long field list widened the table past the pane, pushed the
+count column out of view and defeated the cell's own `truncate`.
 
 ## The Snapshots view
 
@@ -776,11 +855,11 @@ rewrite *those* matrices to the tray positions. The Engine freezes `morph` while
 the starfield are gated off so none lingers when arriving from geo.
 
 **Lanes and the committed filter. The field is fixed**: every lane always owns its own slice, and a
-committed filter never moves or hides geometry, nor moves the camera. The emphasis is a **coloured
-dim** on every identity-coloured element — the others drop to their *own hue* at a dim level, a tier
-between full colour and the neutral trail, so the committed network leads while the rest stay
-identifiable. `src/engine/scene/objects/dimTiers.test.ts` keeps the tier hierarchy ordered through
-tuning: **the order is the design**, the numbers may move.
+committed filter never moves or hides geometry — only the shared commit tilt answers it with the camera.
+The emphasis is a **coloured dim** on every identity-coloured element — the others drop to their *own
+hue* at a dim level, a tier between full colour and the neutral trail, so the committed network leads
+while the rest stay identifiable. `src/engine/scene/objects/dimTiers.test.ts` keeps the tier hierarchy
+ordered through tuning: **the order is the design**, the numbers may move.
 
 A committed metagraph puts the view in **live metagraph mode**: entering with one committed, or
 committing one while there, flips following on and the whole card chain rides the heartbeat. **"Live"
@@ -804,21 +883,54 @@ tile is only pickable once a resolver can name it from the polled feed** — a t
 is anonymous, drawn but not pickable. The chamber shows that the anchor happened without inventing an
 identity for it.
 
-**Emphasis is brightness in three colour tiers**: the ACTIVE row (the live lead, or the committed pin)
-takes full identity; a HOVERED row takes identity colour at a preview level **without demoting the
-active row**, because the hover previews what a click would pin; every other snapshot rests neutral
-cyan. Exactly one hot row — a committed older snapshot beats the live lead, a hover doesn't steal it.
+**Emphasis is brightness in four colour tiers**, and the order is the design: the ACTIVE row (the live
+lead, or the committed pin) takes full identity; a HOVERED row takes identity colour at a preview level
+**without demoting the active row**, because the hover previews what a click would pin; with a network
+committed, **that network's OWN bands and lane tiles keep their identity hue down the WHOLE trail** at
+the quieter on-net resting tier (`SNAP_ONNET`), so the committed story reads as one coloured thread
+through the chamber; every other resting snapshot stays neutral cyan. A hover still previews louder than
+a standing commitment — `dimTiers.test.ts` pins hot > preview > on-net > neutral rest. Exactly one hot
+row — a committed older snapshot beats the live lead, a hover doesn't steal it.
 
 **Selecting a non-live snapshot rewinds the trail**: the whole time trail eases forward until the
 selected row sits at the lead position, so the active selection owns the front instead of fighting the
 live lead's arrivals, and rows newer than the selection slide past the front edge and dissolve. The
-rewind follows only the committed pin — a hover previews the hot row in place. There is no scene fog
-and no depth fade on the trail: every row keeps one brightness, and recency reads from position plus
-the ordinal labels.
+rewind follows only the committed pin — a hover previews the hot row in place. There is no scene fog and
+no depth fade on the trail: every row keeps one brightness, and recency reads from position plus the
+ordinal labels.
+
+**The far end is a HORIZON, not an edge** (user, 2026-08-09). The one exception to "no depth fade": the
+trail's last slots dissolve at the far boundary, the mirror of the rewind's own front-edge dissolve, so
+the chamber reads as continuing into history rather than stopping at a hard rim. It is **one function
+with one home** — `horizonAt(x)` in `domain/ledgerModel.ts` (`HORIZON_X`, `HORIZON_SPAN`) — and the
+furniture half is the shared glass shader's `uFadeDir`/`uFadeAt`/`uFadeSpan` plus
+`SnapshotPlane.setHorizon`, so planes, trays and their labels fade on the same ramp. **No trail
+instrument may float on glass that has faded out**: the ordinal labels, their anchor lines, the lane
+tiles and the byte bars all multiply their own brightness by `horizonAt`, because a label hanging over
+dissolved floor is worse than a hard edge. The **node trays are deliberately exempt** — they sit at the
+front of the chamber, where an end is simply the truth. Deliberately **not** a `?tune` knob: it is the
+frame's own shape, not a look.
 
 **Signer glow.** When the selected metagraph snapshot changes, the Engine resolves its signers to IPs
 and lights those machines in the trays — the scene keys metagraph nodes by IP, not id, so the machines
 that actually signed are the ones that glow.
+
+**Two signer groups, and the layer is the point** (`SIGNER_GROUPS` in `src/data/network.ts` is the ONE
+home for their words). A metagraph seals every snapshot with its **own L0 cluster**, so the proof signer
+set IS that cluster — DOR's is the same 3 machines every time, out of 20. Its **data blocks** are produced
+by the **dL1 cluster**, each block by a rotating subset, so that count varies per snapshot and is 0 when a
+snapshot carries none. A bare "signed by 3" against a 20-machine fleet reads as a bug, so all three signer
+surfaces (the rail card, the raw layer's SIGNERS lane, the ledger panel's list) name the producing layer
+beside the count from that one constant. The ledger panel can only ever show the PROOF group — data-block
+signers exist solely in the ~2.5 MB deep read, which browsing must never trigger.
+
+**A signer that can't be named is named as such, once.** `resolveSigner` in `src/data/network.ts` is the
+ONE home for that: given the view's node rows, a metagraph id and a signer prefix it returns either the
+real node or the honest unknown, with `SIGNER_UNKNOWN` carrying the two copies (a network-level and a
+node-level phrasing). It keys on **the DATA, not the network id** — an unlisted channel is just the
+common case of a signer whose machine isn't knowable, and a listed metagraph with an unmatched signer
+gets exactly the same answer. So no surface fabricates a node card, and no surface grows its own
+special-case for unlisted.
 
 ### The unlisted network
 
@@ -956,6 +1068,14 @@ It drives the dossier and inspector text:
 
 - Nodes are **hybrid** (several layers on one machine) or **dedicated**. On mainnet most metagraphs are
   3 hybrid nodes; DOR is the outlier with 3 hybrid + 19 dedicated data-L1 nodes.
+- ⚠️ **A peer id belongs to a LAYER, not to a machine** — each layer process runs its own keypair, so a
+  hybrid answers with a different id on its l0 port than on its dl1 port (verified live 2026-08-09).
+  `/api/metagraphs` therefore emits **`NodeInfo.ids`**, every layer's id for that IP in LAYERS order
+  (`ids[0] === id`, the primary), and **signer matching reads `ids`, never `id` alone** — one matcher in
+  `src/data/network.ts`, kept the only one by `src/data/signerMatchBoundary.test.ts`, because a local
+  prefix compare looks like an ordinary string test and reintroduces the blind spot for that surface
+  alone. Matching the primary only left every hybrid data-block signer rendering as `not in live set`
+  while the machine sat right there in the list — the id set is per layer and so are the signatures.
 - **Currency-L1 is never a standalone node** — every cL1 node is also an L0 node, so the outer cL1
   shell is effectively always empty.
 - **A metagraph has a real token only if it runs a currency-L1 cluster.** The `symbol` field is

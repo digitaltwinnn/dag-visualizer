@@ -11,25 +11,24 @@ import { createScene, type SceneCtx } from "./scene/SceneContext";
 import { HyperView, type MetaHubRec } from "./scene/views/HyperView";
 import { Globe, GATHER_CELL } from "./scene/Globe";
 import { LedgerView } from "./scene/views/LedgerView";
-import { LANE_IDS } from "./domain/ledgerModel";
 import { UNLISTED_KEY } from "./domain/ledgerBands";
 
 // The public catalog's ids — the unknown-lane tile resolver splits listed from unlisted rows.
 import { StageLights } from "./scene/objects/StageLights";
 import { loadGeoCache, resolveMissing } from "@/src/data/geoResolve";
 import { METAGRAPHS, COLORS } from "@/src/engine/config";
-import { BYTE_SCALE_KB, LEDGER, ledgerSite, type RailGroup } from "./domain/ledgerLayout";
+import { BYTE_SCALE_KB, type RailGroup } from "./domain/ledgerLayout";
 import { HYPER_TILT, HYPER_TILT_FOCUS } from "./domain/hyperLayout";
 import { readSceneColors } from "./sceneColors";
 import { VIEW_POLICIES, type ViewPolicy } from "./domain/viewPolicy";
-import { FOCI, hubFraming, geoFraming, ledgerNodeFraming, ledgerLaneNudge, nodeFraming, cohortFraming, hyperNodeFraming, dollyBack, railsDolly, easeInOutQuad, type CameraFraming } from "./domain/cameraRig";
+import { FOCI, hubFraming, geoFraming, nodeFraming, cohortFraming, hyperNodeFraming, ledgerCommitTilt, dollyBack, railsDolly, easeInOutQuad, type CameraFraming } from "./domain/cameraRig";
 import { countryFraming } from "./domain/countryShape";
 import { R as GEO_R, LAND_H } from "./domain/geoLayout";
 import { clickActions, pickActive, pickNetId, viewEntryActions, metaSnapSelectActions, bandSelectActions } from "./domain/pickActions";
 import { ViewTransition, is3D, type View3D } from "./domain/viewTransition";
 import { LADDERS, hasLevel, type CohortSel, type CompositionSel, type FocusLevel, type SelectionSnapshot, type ResolverKey } from "./domain/focusLadder";
 import { compositionGroups, compositionKey, compositionRows } from "@/src/data/composition";
-import { metaSnapDeepKey } from "@/src/data/types";
+import { metaSnapDeepKey, metaSnapHoverKey } from "@/src/data/types";
 import { snapsAtTick } from "@/src/data/anchorLog";
 import type { GlobalSnapshot, NodeRow, PickDescriptor } from "@/src/data/types";
 import type { ClusterNode, DagCore, GeoMap, RouteMetagraph } from "@/src/data/types";
@@ -443,6 +442,11 @@ export class Engine {
           // anchors again (following "all" the shown snap IS the lead, so the offset is 0).
           this.ledger.setPinned(st.snap?.data?.ordinal ?? null);
         }
+        // ONE hovered metagraph snapshot (user, 2026-08-09) — its own channel, so a snapshot's
+        // hover lights its own tile instead of every sibling anchored into the same tick.
+        if (st.hoverMetaSnap !== prev.hoverMetaSnap) {
+          this.ledger.setHoveredMetaSnap(st.hoverMetaSnap);
+        }
         // A landing EXACT read is what turns a tick from an unmeasured seam into a measured byte
         // bar (spec §6.3), so re-hand the map the moment it changes. Ledger-only: nothing else
         // reads it from the scene, and the view re-reads it on entry via _refreshLedger.
@@ -812,7 +816,8 @@ export class Engine {
       this.ledger.setFilter(this.filter); // gates the anchor pulses only (no dim)
       this._refreshLedger();
       // Ledger uses the SHARED overview camera — the group transform (config.viewRotY/viewScale)
-      // frames the resting pose central/untilted; the node level wins the camera if one carried.
+      // frames the resting pose central/untilted, and it is the view's ONE pose: every rung
+      // resolves to it, so arriving with a node or a network carried lands here too.
       this._resolveFocus();
       return;
     }
@@ -867,10 +872,11 @@ export class Engine {
       this.globe.setFilter(this.filter);
       if (focusCamera) this._resolveFocus();
     } else if (this.mode === "ledger") {
-      // Dim the non-selected metagraph columns so the selection stands out. The ledger only
-      // gates its anchor pulses (the off-filter dim was removed, 2026-08-07). The ladder's
-      // NETWORK rung frames the filtered metagraph's lane at the metagraph-snapshot floor
-      // (ledgerNetwork resolver); "all" resolves to overview.
+      // The committed network's COLOURED DIM: the other networks' ribbons, bands and tiles drop to
+      // their own hue, this one's hold identity down the whole trail (four-tier emphasis). Geometry
+      // never moves and the camera's only answer is the shared commit tilt inside the settled ledger
+      // pose — the per-lane and per-node framings were retired (2026-08-09), so the ladder's NETWORK
+      // rung resolves to that one pose, not a lane fly-to.
       this.globe.setFilter(this.filter);
       this.ledger.setFilter(this.filter);
       if (focusCamera) this._resolveFocus();
@@ -968,28 +974,44 @@ export class Engine {
       this._focusFilter("all"); // the existing "all" path: focusId cleared, tilt eased, overview pose
       return true;
     },
-    ledgerNode: () => {
-      const p = useStore.getState().inspect;
-      return !!p && this._focusLedgerNode(p);
-    },
-    ledgerNetwork: () => {
-      // The COMMIT ACKNOWLEDGEMENT (cameraRig.ledgerLaneNudge — no fly-to-lane; the colored
-      // dim carries the emphasis, the pose just says something happened).
-      const i = LANE_IDS.indexOf(this.filter);
-      const laneX = i >= 0 ? -ledgerSite(i, LANE_IDS.length).z * LEDGER.viewScale : null;
-      ledgerLaneNudge(FOCI.ledger, laneX, this._framingOut);
-      this._tweenTo(this._framingOut.pos, this._framingOut.target);
-      return true;
-    },
+    // The Snapshots view has ONE camera POSE (user, 2026-08-09) — both finer rungs delegate to the
+    // overview, so committing a network or a node is answered by COLOUR (plus the overview's own
+    // commit orbit), never by a pose of its own. Two framings were tried here and RETIRED, for the
+    // same reason in two shapes:
+    //
+    //   · `cameraRig.ledgerLaneNudge` shifted the pose a fraction toward the committed lane as a
+    //     commit acknowledgement. But the field is FIXED and symmetric — every lane always owns its
+    //     slice — so any lateral move pushes the far end out of frame, losing geometry the view
+    //     just promised stays put. The colour tiers already say which network leads.
+    //   · `cameraRig.ledgerNodeFraming` flew to the selected chip in its tray. The trays are visual
+    //     aid: machines FILLING the chamber, not the actors in it. The snapshots are the subjects,
+    //     so a node pick commits its cards and leaves the room where it is.
+    //
+    // Kept as their own resolver keys rather than dropped from LADDERS.ledger — the rungs still
+    // drive deselect stepping and their rail slots — and they return TRUE so the walk stops here.
+    // View entry runs through `_resolveFocus`, so falling through would reach this very pose under
+    // another name, and a `false` would read as "no pose available" when there is exactly one.
+    ledgerNode: () => this._resolvers.ledgerOverview(),
+    ledgerNetwork: () => this._resolvers.ledgerOverview(),
     ledgerOverview: () => {
-      this.focus("ledger"); // the frontal resting pose (FOCI.ledger, 2026-08-07)
+      // The frontal resting pose (FOCI.ledger, 2026-08-07) — which ORBITS into a three-quarter
+      // view while a metagraph is committed (cameraRig.ledgerCommitTilt, user 2026-08-09). Keyed on
+      // the FILTER rather than on the rung, so the two finer rungs inherit it by delegating here and
+      // clearing the filter tweens back to frontal on its own.
+      const f = FOCI.ledger;
+      if (!this.filter || this.filter === "all") {
+        this.focus("ledger");
+        return true;
+      }
+      ledgerCommitTilt(f.pos, f.target, this._framingOut.pos);
+      this._framingOut.target.copy(f.target);
+      this._tweenTo(this._framingOut.pos, this._framingOut.target);
       return true;
     },
   };
 
 
-  // Resolve the camera for the CURRENT selection state by walking the current view's ladder
-  // (domain/focusLadder.LADDERS) — the one entry point every selection-driven camera flight
+  // Resolve the camera for the CURRENT selection state by walking the current view's ladder  // (domain/focusLadder.LADDERS) — the one entry point every selection-driven camera flight
   // goes through (a filter/country/cohort/layer/inspect change, a view switch, a transition
   // boundary). No-ops outside the three 3D views.
   //
@@ -1014,18 +1036,6 @@ export class Engine {
       const rung = rungs[i];
       if (rung.active(sel) && this._resolvers[rung.resolver]()) return;
     }
-  }
-
-  // Snapshots NODE zoom (user, 2026-07-17): frames the selected node's chip in the chamber;
-  // false when the node can't be located (caller falls back down the ladder).
-  private _focusLedgerNode(p: PickDescriptor): boolean {
-    const id = p.kind === "metanode" ? p.node?.ip : p.kind === "l0" || p.kind === "l1" ? p.node?.id : null;
-    const pos = id ? this.globe.ledgerWorldPos(id) : null;
-    if (!pos) return false;
-    this.ctx.controls.autoRotate = false;
-    ledgerNodeFraming(pos, this._framingOut);
-    this._tweenTo(this._framingOut.pos, this._framingOut.target);
-    return true;
   }
 
   // Node framing: zoomed in, camera low in front of the node, line of sight skimming across the
@@ -1113,6 +1123,7 @@ export class Engine {
     const st = useStore.getState();
     if (st.hoverNodeId != null) st.setHoverNodeId(null);
     if (st.hoverSnapOrd != null) st.setHoverSnapOrd(null);
+    if (st.hoverMetaSnap != null) st.setHoverMetaSnap(null);
     if (st.hoverFilter != null) st.setHoverFilter(null);
     if (st.hoverCountry != null) st.setHoverCountry(null);
     if (st.hoverCohort != null) st.setHoverCohort(null);
@@ -1138,11 +1149,11 @@ export class Engine {
     // card/row). Only the channel for the hovered kind is set; the others clear — so exactly one
     // subject is "hovered" at a time. Write only on change (mousemove is high-frequency).
     const nodeKey = hoverKeyOf(p);                                   // node → globe shell glow
-    // snapshot → ledger row. A metagraph-snapshot TILE hovers ITS TICK too: the tile sits on the
-    // tick's row, so cross-highlighting the row is the honest preview of what a click would pin.
-    const snapOrd = p?.kind === "snapshot" ? p.data.ordinal
-      : p?.kind === "metaSnap" ? p.global.data.ordinal
-      : null;
+    // snapshot → its ledger row. A metagraph-snapshot TILE routes to the SNAPSHOT channel instead
+    // (user, 2026-08-09): it is one snapshot, not its tick, so hovering it must not light every
+    // sibling that anchored into the same global tick — in the scene OR in the explorer/raw rows.
+    const snapOrd = p?.kind === "snapshot" ? p.data.ordinal : null;
+    const metaSnapKey = p?.kind === "metaSnap" ? metaSnapHoverKey(p.sel.metaId, p.sel.ordinal) : null;
     const metaId = p?.kind === "meta" ? p.cfg?.id ?? null : null;    // hub → metagraph dim preview
     // Country under the cursor (policy-gated): the SCENE side of the bidirectional country
     // pairing — writes the same hoverCountry channel the explorer rows use, so the border
@@ -1161,6 +1172,7 @@ export class Engine {
     if (countryCc) this.canvas.style.cursor = "pointer"; // the border preview invites the drill
     if (nodeKey !== st.hoverNodeId) st.setHoverNodeId(nodeKey);
     if (snapOrd !== st.hoverSnapOrd) st.setHoverSnapOrd(snapOrd);
+    if (metaSnapKey !== st.hoverMetaSnap) st.setHoverMetaSnap(metaSnapKey);
     if (metaId !== st.hoverFilter) st.setHoverFilter(metaId);
     if (countryCc !== st.hoverCountry) st.setHoverCountry(countryCc);
 

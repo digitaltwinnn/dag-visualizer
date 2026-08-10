@@ -5,6 +5,7 @@ import { useStore } from "@/src/store/store";
 import { filterAccent, CORE_HEX } from "@/src/data/network";
 import { UNLISTED_ID, UNLISTED_HUD_HEX } from "@/src/data/unlisted";
 import { PulseEdge, useEdgePulse } from "@/components/EdgePulse";
+import { SHELL_ID } from "@/components/SectionShell";
 
 // A rail's instrument-channel thread, a fixed SVG running down the rail's OUTER edge (in the margin,
 // just outside the cards). Measured from the live layout (ResizeObserver / MutationObserver / scroll)
@@ -104,6 +105,29 @@ export default function RailThread({ side = "right" }: { side?: Side }) {
     const measure = () => {
       raf = 0;
       const r = rail.getBoundingClientRect();
+      // ⚠️ VIEWPORT → SHELL-LOCAL, and it is load-bearing. The rails and this SVG are
+      // `position: fixed` INSIDE the SectionShell wrapper, whose inline transform makes IT their
+      // containing block (CSS trap 2) — so the `top`/`left` written below resolve in the wrapper's
+      // own UNSCALED coordinate space, while getBoundingClientRect reports the TRANSFORMED viewport
+      // box. The two agree only while the wrapper sits at scale 1, which is exactly what the RAW
+      // switch breaks: it scales the wrapper to SCENE_BACK to recede the scene.
+      //
+      // The bug (user, 2026-08-09 — "go to raw mode, switch to another view, exit raw mode and the
+      // rail is not aligned well with the cards"): switching views with the raw layer up mutates the
+      // rail's cards, the MutationObserver measures inside the SCALED frame, and that geometry
+      // survives the trip back — an ancestor transform changes no border box, so NEITHER the
+      // ResizeObserver NOR the MutationObserver fires when the scale returns to 1, and nothing
+      // re-measures. Measuring in local units removes the coupling instead of chasing it: the rail's
+      // local box doesn't move when the shell scales, so a measurement is valid at any scale and
+      // needs no re-run. (`k` is uniform — GSAP tweens `scale`; the shell is `fixed inset-0`, so its
+      // offsetWidth is the unscaled width. No shell → identity, which is what a test/story sees.)
+      const shell = document.getElementById(SHELL_ID);
+      const sr = shell?.getBoundingClientRect();
+      const k = sr && shell!.offsetWidth ? sr.width / shell!.offsetWidth : 1;
+      const px = (v: number) => v / k; // a LENGTH in local units
+      const lx = (v: number) => (v - (sr?.left ?? 0)) / k; // a viewport X → local X
+      const ly = (v: number) => (v - (sr?.top ?? 0)) / k; // a viewport Y → local Y
+      const hRail = px(r.height);
       // Every rail card carries a thread marker: `.ig-panel` (the shared glass frame — the ONE
       // materialized box + the left rail's tool cards) or `.rail-entry` (the unboxed ancestor
       // entries + ghost hint lines, card-redesign 2026-08-08). The thread drops a dot at each
@@ -126,16 +150,16 @@ export default function RailThread({ side = "right" }: { side?: Side }) {
           const eb = !c.hasAttribute("data-ghost") ? c.querySelector("[data-eyebrow]") : null;
           const er = eb?.getBoundingClientRect();
           return {
-            y: (er ? er.top + er.height / 2 : cr.top + cr.height / 2) - r.top,
+            y: px((er ? er.top + er.height / 2 : cr.top + cr.height / 2) - r.top),
             // Measured, not derived from a shared step constant — a scrollbar or a future layout
             // tweak can't put the connectors out of register with the real card edges.
-            inset: side === "right" ? r.right - cr.right : cr.left - r.left,
+            inset: px(side === "right" ? r.right - cr.right : cr.left - r.left),
             focus: !!rung?.hasAttribute("data-focus"),
             ghost: c.hasAttribute("data-ghost"),
             entry,
           };
         })
-        .filter((m) => m.y >= 6 && m.y <= r.height - 6); // only dots inside the visible rail
+        .filter((m) => m.y >= 6 && m.y <= hRail - 6); // only dots inside the visible rail
       // Normalise: the shallowest card defines "flush", so a scrollbar (or any constant gutter)
       // offsets nothing and depth 0 always reads as depth 0.
       const base = raw.length ? Math.min(...raw.map((m) => m.inset)) : 0;
@@ -146,18 +170,19 @@ export default function RailThread({ side = "right" }: { side?: Side }) {
       // edge. ⚠️ `r.right - W` here (the shape the funnel's `r.right - REACH_PAD` collapsed to when
       // the pad left the WIDTH but not the ORIGIN) slides the whole thread a full band INSIDE the
       // rail, so the connectors start under the cards and the ruler lands on their right 22px.
-      const left = side === "right" ? r.right : r.left - W;
+      const left = side === "right" ? lx(r.right) : lx(r.left) - W;
       // FULL-LANE height (user, 2026-08-09: "the left and right can be extended to the view […]
       // same as we have already in tablet mode"). The rails are content-height (`display: flex` +
       // `max-height` band, globals.css), so `r.height` ended the ruler at the last card and a
       // two-card view got a stub of an instrument. The thread now runs the whole lane — top of the
       // rail to the LiveStrip bound — like the tablet sheet's `.ig-sheet-edge` channel. The band is
       // READ from the rail's computed `max-height` rather than recomputed here, so the
-      // rail-top/topbar-extra/bottom-reserve token math stays in one place; `|| r.height` covers a
-      // `none`. Marks stay clipped to `r.height` below — a card scrolled out of the rail must not
-      // get a dot just because the ruler is longer than the content.
-      const band = parseFloat(getComputedStyle(rail).maxHeight) || r.height;
-      setG({ top: r.top, left, height: Math.round(Math.max(r.height, band)), marks });
+      // rail-top/topbar-extra/bottom-reserve token math stays in one place (and is already in local
+      // CSS px, like every value here); `|| hRail` covers a `none`. Marks stay clipped to the rail's
+      // own height above — a card scrolled out of the rail must not get a dot just because the ruler
+      // is longer than the content.
+      const band = parseFloat(getComputedStyle(rail).maxHeight) || hRail;
+      setG({ top: ly(r.top), left, height: Math.round(Math.max(hRail, band)), marks });
 
     };
     const schedule = () => { if (!raf) raf = requestAnimationFrame(measure); };

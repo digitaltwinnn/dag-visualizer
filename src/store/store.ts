@@ -71,6 +71,11 @@ interface AppState {
   // Ordinal of the snapshot the cursor is hovering in the LiveStrip bar-chart (transient highlight —
   // the ledger re-colours that snapshot's tiles). null = not hovering.
   hoverSnapOrd: number | null;
+  // ONE metagraph snapshot the cursor is hovering — `metaSnapHoverKey(metaId, ordinal)`. Its own
+  // channel, separate from `hoverSnapOrd`, because a snapshot is not its tick: keying the hover to
+  // the global ordinal lit every sibling that anchored into the same tick (user, 2026-08-09). The
+  // scene lights that ONE tile; the explorer/raw row pairs back. null = not hovering.
+  hoverMetaSnap: string | null;
   // Filter chip the cursor is hovering (All/DAG/metagraph id) — a transient PREVIEW highlight of that
   // selection's nodes in any view, without committing the actual `filter`. null = not hovering.
   hoverFilter: string | null;
@@ -201,6 +206,7 @@ interface AppState {
    *  advanceSnap: a live tick is never a "new selection" (the card recency/collapse order holds). */
   advanceMetaSnap: (sel: MetaSnapSel | null) => void;
   setHoverSnapOrd: (ordinal: number | null) => void;
+  setHoverMetaSnap: (key: string | null) => void;
   setHoverFilter: (filter: string | null) => void;
   setHoverNodeId: (id: string | null) => void;
   setHoverCountry: (cc: string | null) => void;
@@ -253,6 +259,7 @@ export const useStore = create<AppState>((set) => ({
   metaSnap: null,
   selStack: [],
   hoverSnapOrd: null,
+  hoverMetaSnap: null,
   hoverFilter: null,
   hoverNodeId: null,
   hoverCountry: null,
@@ -313,6 +320,7 @@ export const useStore = create<AppState>((set) => ({
           : [...s.selStack, "metaSnap"],
     })),
   setHoverSnapOrd: (hoverSnapOrd) => set({ hoverSnapOrd }),
+  setHoverMetaSnap: (hoverMetaSnap) => set({ hoverMetaSnap }),
   setHoverFilter: (hoverFilter) => set({ hoverFilter }),
   setHoverNodeId: (hoverNodeId) => set({ hoverNodeId }),
   setHoverCountry: (hoverCountry) => set({ hoverCountry }),

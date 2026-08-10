@@ -233,7 +233,11 @@ export default function CardHead({
               )}
             </h2>
           </div>
-          <div className="flex items-center gap-1.5 flex-none pt-px">
+          {/* Caption + the +/− INDICATOR — both decoration over the title button's stretched
+              `after:inset-0` pseudo, and they paint above it by DOM order. Transparent to the
+              pointer for the same reason the inspector layout's aside is: the head is one
+              gesture, so its right end must not read as dead space. Controls inside opt back in. */}
+          <div className="flex items-center gap-1.5 flex-none pt-px pointer-events-none [&_a]:pointer-events-auto [&_button]:pointer-events-auto">
             {caption != null && (
               <span className="text-micro text-muted-foreground text-right tabular-nums">{caption}</span>
             )}
@@ -323,8 +327,18 @@ export default function CardHead({
           <>
             <div className="flex items-center gap-2 min-w-0">
               <h3 className={cn(TITLE, "text-foreground min-w-0")}>{rolled}</h3>
-              {/* z-10 lifts the aside (site link) above the head's stretched toggle overlay. */}
-              {aside != null && <span className="ml-auto flex-none relative z-10">{aside}</span>}
+              {/* The aside is DECORATION over a stretched toggle, so it must not swallow the
+                  gesture. z-10 lifts it above the head's overlay (a site link has to stay
+                  clickable), and that alone made the title row's right end dead: the ticker /
+                  status pill / age counter is plain text, so a click there did nothing and the
+                  cursor fell back to the default arrow over an otherwise-clickable entry (user,
+                  2026-08-09). So the WRAPPER is transparent and only real controls inside it opt
+                  back in — text falls through to the toggle, links and buttons keep working. */}
+              {aside != null && (
+                <span className="ml-auto flex-none relative z-10 pointer-events-none [&_a]:pointer-events-auto [&_button]:pointer-events-auto">
+                  {aside}
+                </span>
+              )}
             </div>
             {subtitle != null && (
               // No leading-none here: the node card's subtitle carries bordered code pills

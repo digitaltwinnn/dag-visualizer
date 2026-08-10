@@ -261,14 +261,23 @@ export function siblingSet(slot: RailCardKind, s: SiblingState): SiblingSet | nu
     case "metaSnap": {
       const cur = s.metaSnap;
       if (!cur || !s.exactRows) return null;
-      // The siblings are the SAME tick's anchored channel rows; the step re-pins the same
-      // global, so the resolver needs the pinned global pick — and it must BE that tick
-      // (whenever a metaSnap is committed the executor pinned its global, so a mismatch is
-      // stale state, not a case to paper over).
+      // The step re-pins the same global, so the resolver needs the pinned global pick — and it
+      // must BE that tick (whenever a metaSnap is committed the executor pinned its global, so a
+      // mismatch is stale state, not a case to paper over).
       if (!s.snap || s.snap.data.ordinal !== cur.globalOrdinal) return null;
-      const items = s.exactRows.map((r, i) => {
-        const meta = s.metaList.find((m) => m.id === r.metaId);
-        const who = meta?.symbol || meta?.name || `${r.metaId.slice(0, 6)}…`;
+      // The parent scope here is the PAIR — this metagraph × this tick (user, 2026-08-09) — so the
+      // set is the SUBJECT'S OWN channel rows, not every network's. A cross-network step would move
+      // a COARSER rung (metaSnapSelectActions filter-firsts), i.e. a swipe would silently
+      // re-commit the network. The explorer still browses every contributor under a tick, because
+      // there the network is a deliberate click of its own with its own chamber hover preview;
+      // the pager stays inside the committed story. Order mirrors the explorer's leaves: ordinal
+      // desc within the tick (anchorLog's own rule).
+      const rows = s.exactRows
+        .filter((r) => r.metaId === cur.metaId)
+        .sort((a, b) => b.ordinal - a.ordinal);
+      const meta = s.metaList.find((m) => m.id === cur.metaId);
+      const who = meta?.symbol || meta?.name || `${cur.metaId.slice(0, 6)}…`;
+      const items = rows.map((r, i) => {
         const sel: MetaSnapSel = {
           metaId: r.metaId,
           ordinal: r.ordinal,
@@ -280,12 +289,14 @@ export function siblingSet(slot: RailCardKind, s: SiblingState): SiblingSet | nu
           // ordinal 0 marks an undecodable payload — several can share it, so the position
           // disambiguates the React key without inventing an identity.
           key: `${r.metaId}:${r.ordinal}:${i}`,
-          label: `${who} #${r.ordinal}`,
+          // The group names the metagraph, so an item is its ordinal alone — and an undecodable
+          // payload says so rather than claiming #0 (the route's contract).
+          label: r.ordinal > 0 ? `#${r.ordinal.toLocaleString()}` : "undecoded",
           actions: metaSnapSelectActions(sel, s.snap!, { filter: s.filter, metaSnap: cur }),
         };
       });
-      const index = s.exactRows.findIndex((r) => sameMetaSnap(cur, { ...cur, metaId: r.metaId, ordinal: r.ordinal }));
-      return finish(slot, items, index, `Global #${cur.globalOrdinal.toLocaleString()}`);
+      const index = rows.findIndex((r) => sameMetaSnap(cur, { ...cur, ordinal: r.ordinal }));
+      return finish(slot, items, index, `${who} · Global #${cur.globalOrdinal.toLocaleString()}`);
     }
 
     // The GLOBAL snapshot — the one OPEN set: time, stepped one tick at a time. The window is the
