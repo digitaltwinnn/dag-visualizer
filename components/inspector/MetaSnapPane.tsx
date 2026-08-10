@@ -45,11 +45,22 @@ export default function MetaSnapPane({
 }) {
   const sel = useStore((s) => s.metaSnap);
   const exact = useStore((s) => (sel ? s.snapshotExact[sel.globalOrdinal] : undefined));
-  const deep = useStore((s) => (sel ? s.metaSnapDeep[metaSnapDeepKey(sel.globalOrdinal, sel.metaId, sel.ordinal)] : undefined));
+  const deepKey = sel ? metaSnapDeepKey(sel.globalOrdinal, sel.metaId, sel.ordinal) : null;
+  const deep = useStore((s) => (deepKey ? s.metaSnapDeep[deepKey] : undefined));
   const following = useStore((s) => s.following);
   const filter = useStore((s) => s.filter);
   const snap = useStore((s) => s.snap);
   const setSection = useStore((s) => s.setSection);
+  const setDeepWanted = useStore((s) => s.setDeepWanted);
+  const deepWanted = useStore((s) => s.deepWanted);
+  // Has a deep read been ASKED FOR for this exact snapshot? Selecting one is not asking — the card
+  // states the SHAPE and only reads on its button, so a pager skim costs nothing (user, 2026-08-10;
+  // the reasoning lives on `deepWanted` in the store and on the bridge's own gate). Everything in
+  // the block below that used to branch on `following` branches on this instead: `following` was
+  // only ever a proxy for "no read is coming", and it stopped being an accurate one.
+  const deepAsked = !following && deepKey != null && deepKey === deepWanted;
+
+
 
   // Tier 1 — the polled record this tile was named from (free: the metagraph snapshot buffers
   // are already in memory, keyed by the anchoring tick's timestamp).
@@ -74,14 +85,17 @@ export default function MetaSnapPane({
   }, [sel, exact]);
   const reading = useMinHold(!!sel && !row);
   // The pinned decode's give-up timer (2026-08-08, review fix): a 404'd/pruned deep read left
-  // "decoding…" forever — after a patient window the instrument states the honest terminal.
+  // "decoding…" forever — after a patient window the instrument states the honest terminal. It
+  // runs off `deepAsked`, not `following`: a snapshot nobody asked to read has no read to give up
+  // on, and starting the clock anyway would ripen `unread` into a false "unavailable".
   const [decodeGaveUp, setDecodeGaveUp] = useState(false);
   useEffect(() => {
     setDecodeGaveUp(false);
-    if (!sel || following || deep) return;
+    if (!sel || !deepAsked || deep) return;
     const t = setTimeout(() => setDecodeGaveUp(true), 12000);
     return () => clearTimeout(t);
-  }, [sel, following, deep]);
+  }, [sel, deepAsked, deep]);
+
 
   // The signers, deep read first (it re-reads the same proofs straight off the channel, so it wins
   // when it lands) — but the tick's exact read already carries them, so the rows never wait on it.
@@ -167,7 +181,7 @@ export default function MetaSnapPane({
                 Two labelled sections, State and Data — the same two payload lanes the raw layer
                 opens one tier down, so the card states their SHAPE and the pane renders them.
                 Both always render, each honest about its own tier. */}
-            <PayloadBlock row={row} deep={deep ?? null} following={following} decodeGaveUp={decodeGaveUp} />
+            <PayloadBlock row={row} deep={deep ?? null} asked={deepAsked} decodeGaveUp={decodeGaveUp} />
 
             {/* ── DETAIL: the measured facts ─────────────────────────────────────────────── */}
             <Separator className="my-2" />
@@ -221,11 +235,11 @@ export default function MetaSnapPane({
                 Data value slot, an instruction whose control lived elsewhere (the head aside,
                 labelled with a time) and whose verb appeared on nothing clickable.
 
-                It pins because it MUST: a following card advances every ~4s, so a read that left
-                the card following would answer about a snapshot already gone — and re-reading per
-                tick is exactly the poll the explicit-gesture gate exists to prevent. The pin does
-                not need naming here; it announces itself one line up, where the aside flips from
-                `live · Xs → N` to `◷ Xs ago → N` and the dot stops beating.
+                It pins WHEN FOLLOWING, because a following card advances every ~4s and a read that
+                left it following would answer about a snapshot already gone. Pinned already, it
+                pins nothing — it only records the request. The pin does not need naming here; it
+                announces itself one line up, where the aside flips from `live · Xs → N` to
+                `◷ Xs ago → N` and the dot stops beating.
 
                 ⚠️ It pins through `metaSnapSelectActions`, NOT the aside's `followToggleActions`.
                 The aside's builder acts on the GLOBAL descriptor, so it commits the tick as the
@@ -234,30 +248,50 @@ export default function MetaSnapPane({
                 button that says `this snapshot`. The row builder commits the tick with
                 `follow: false` AND re-commits this metagraph snapshot, so the subject never moves.
                 It is the same builder the anchor-log row and the ledger explorer use, which is the
-                point: a read and the equivalent row click cannot drift. Its deselect early-return
-                needs `!current.following`, and this button only exists while following, so the
-                pin can never invert into a clear.
+                point: a read and the equivalent row click cannot drift. ⚠️ Its deselect
+                early-return needs `!current.following`, which is exactly why the call is inside
+                the `if (following)` — re-committing an already-pinned snapshot would CLEAR it.
+
+                ⚠️ The button renders on `!deepAsked`, NOT on `following` (user, 2026-08-10 — "when
+                I read the 1st metagraph snapshot and I use the swipe to go to 2nd, 3rd etc it
+                starts doing it automatically"). Gating on `following` left every OTHER pinned
+                selection reading by itself, so the pager — a BROWSE control, whose whole point is
+                skimming a set — fetched per step: measured live, one tick anchors 20 DOR
+                snapshots at ~1.8s and ~2.5 MB of server↔L0 traffic each. So the read follows the
+                REQUEST, and this button is the only place the card makes one.
 
                 TIER 2 — `Show the application state`. The raw layer, for the payload itself. It
-                now gates on `deep`, not on `decoded`: while following it used to render over an
-                unread snapshot and land on a pane whose own copy said to pin — with the pin
-                control back in the HUD the raw layer has just marked `inert`. A button that
-                leaves the view and then tells you to come back is worse than no button.
+                gates on `deep`, not on `decoded`: it used to render over an unread snapshot and
+                land on a pane whose own copy said to pin — with the pin control back in the HUD
+                the raw layer has just marked `inert`. A button that leaves the view and then tells
+                you to come back is worse than no button. (The raw layer reads on ARRIVAL, because
+                unlike this card it is the payload surface and nothing else is down there.)
 
                 The cost rides the BUTTON's title, not the Data row's: `PAYLOAD_LANES` is one home
                 shared with the raw layer's tabs, and "only when you ask" is stale the moment the
-                read has landed. The cost belongs to the action. */}
+                read has landed. The cost belongs to the action — and it is stated as the SERVER's
+                fetch, because the decoded row that reaches the browser is ~0.6–4.4 KB (measured):
+                what is being rationed is the whole-global pull and the ~1.8s wait, not local
+                bytes. */}
             {deep != null ? (
               <Button variant="link" size="xs" className="mt-1 px-0" onClick={() => setSection("data")}>
                 Show the application state
               </Button>
-            ) : following && row?.decoded === true && snap ? (
+            ) : !deepAsked && row?.decoded === true && snap && sel ? (
               <Button
                 variant="link"
                 size="xs"
                 className="mt-1 px-0"
-                title="Reads this snapshot's payload — a ~2.5 MB fetch, so it runs only when you ask. Holds the card on this snapshot instead of following the live one."
-                onClick={() => applyClickActions(metaSnapSelectActions(sel, snap, { filter, metaSnap: sel, following }))}
+                title="Reads this snapshot's payload — the server pulls the whole ~2.5 MB global to reach this one channel, so it runs only when you ask. Holds the card on this snapshot instead of following the live one."
+                onClick={() => {
+                  // Pin FIRST, and only while following — the read must not answer about a
+                  // snapshot the next heartbeat has already replaced. Pinned already, the pin is
+                  // not just unnecessary but wrong: `metaSnapSelectActions`' deselect early-return
+                  // needs `!current.following`, so re-committing the selected snapshot would CLEAR
+                  // it, on a button that says `read this`.
+                  if (following) applyClickActions(metaSnapSelectActions(sel, snap, { filter, metaSnap: sel, following }));
+                  setDeepWanted(metaSnapDeepKey(sel.globalOrdinal, sel.metaId, sel.ordinal));
+                }}
               >
                 Read this snapshot
               </Button>
@@ -335,12 +369,14 @@ export default function MetaSnapPane({
 function PayloadBlock({
   row,
   deep,
-  following,
+  asked,
   decodeGaveUp,
 }: {
   row: ChannelSnapRow | null;
   deep: ChannelSnapDeep | null;
-  following: boolean;
+  /** A deep read for THIS snapshot has been requested and is in flight. Not the same as "pinned":
+   *  the card reads only on its own button, so a browsed snapshot is `asked: false` and says so. */
+  asked: boolean;
   decodeGaveUp: boolean;
 }) {
   // State's shape is computed server-side (`stateKeys`); Data's is the same mechanical read the
@@ -362,7 +398,7 @@ function PayloadBlock({
     if (row == null) return null; // no exact row yet — the FactGroup's reading state covers it
     return (
       <div className="mt-1.5 text-body text-muted-foreground italic">
-        {following ? "undecodable payload" : decodeGaveUp ? "decode unavailable — tick pruned" : "decoding…"}
+        {!asked ? "undecodable payload" : decodeGaveUp ? "decode unavailable — tick pruned" : "decoding…"}
       </div>
     );
   }
@@ -409,7 +445,7 @@ function PayloadBlock({
     ) : (
       <Quiet>none</Quiet>
     )
-  ) : following ? (
+  ) : !asked ? (
     <Quiet>unread</Quiet>
   ) : decodeGaveUp ? (
     <Quiet>unavailable — tick pruned</Quiet>

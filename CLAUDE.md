@@ -328,6 +328,13 @@ The design rules behind the table, which the tests pin but don't explain:
 - **A filter is a story.** Pinning a global tick whose anchors don't include the committed network
   releases the filter back to "all", so a network's dim never shapes a snapshot that has nothing to do
   with it. The membership rule lives in `src/data/ledgerStory.ts`.
+- **A tick drops the metagraph snapshot it can't contain** (user, 2026-08-10). Stronger than the story
+  rule one rung up: that one is about set membership, this is a one-to-one join
+  (`metagraph.timestamp === global.timestamp`), so committing a DIFFERENT tick provably means the held
+  snapshot didn't anchor here. Left in place it sat directly under the global card in the pile — where
+  ADJACENCY IS CONTAINMENT — stating that tick B contains a snapshot that landed in tick A. It lives in
+  `snapshotSelectActions`, so all four consumers (explorer row, LiveStrip bar, the global card's pager,
+  the 3D band click) inherit it.
 - **New click/select semantics go in the table with a test**, their effects in the executor, never
   inline. `components/selectionBoundary.test.ts` enforces this — and note the rule is **write**-based,
   so read-only facts cards cost nothing and every future explorer card inherits the table.
@@ -392,6 +399,19 @@ decisions inside them are design, not detail:
   only be the downloaded window, a buffer size, not a network fact. **Affordance follows the data**: a
   row is only a disclosure if it actually has children (a tick with no identified anchors, a snapshot
   whose signers aren't resolvable) — a chevron that opens onto nothing is a lie about the feed.
+  Its **network group header DISCLOSES and PREVIEWS but commits nothing** (user, 2026-08-10): it opens
+  the group and its hover still paints that lane in the chamber, but the commit lives one row down on
+  the snapshot itself — a header click that moved the top-bar filter reached past what the row is
+  about, and the pager keeps the same boundary by staying inside this metagraph × this tick.
+  And **a committed filter is a LENS here**: with a network committed, every OTHER network's group
+  under a tick is `previewOnly` (`outOfLens` in `components/LedgerPanel.tsx`). The tick still LISTS
+  them — rule 10 doesn't let a lens edit the facts, and they really did anchor here — they just aren't
+  drillable, the same boundary the chamber's coloured dim draws. Unfiltered, nothing is out.
+  `previewOnly` is `DisclosureRow`'s shared out-of-lens treatment, and it says so AT REST: the chevron
+  is invisible until hover, so an inactive row would otherwise look live right up until you click it.
+  It keeps the hover wash and the scene preview, drops the chevron (keeping its slot, so sibling count
+  columns don't shift), takes the cursor back to `default` and mutes its words one step — but its
+  identity dot stays at full hue, because it did anchor here and identity is not a state.
 
 **Naming and copy rules:** About states the view's point of view ("How the network is built"); the tool
 card says what you BROWSE ("Nodes by network"). Eyebrows are bare role words, and each explorer's usage
@@ -470,8 +490,9 @@ out the two snapshot slots, which ride the lane with no focus rung at all.
 a PAIR — this metagraph × this tick** (user, 2026-08-09). The set is the subject's own `metaId` rows of the
 pinned tick's exact read, ordinal-desc, never every contributor: `metaSnapSelectActions` filter-firsts, so
 a cross-network step would move a COARSER rung and a swipe would silently re-commit the network. The
-explorer still browses every network under a tick, because there the network IS a deliberate click with
-its own chamber preview. And the pair is the honest total — a fast metagraph batches dozens of snapshots
+explorer still LISTS every network under a tick, but it doesn't commit one either — its group header
+discloses and previews only, so both surfaces keep the same boundary. And the pair is the honest total
+— a fast metagraph batches dozens of snapshots
 into one tick (DOR routinely 9-plus), so a tick-wide `N` would contradict the breakdown pills.
 
 **The global snapshot's set is OPEN** (user, 2026-08-09): time is ongoing, so the same plank steps one
@@ -816,7 +837,10 @@ cost is the ~2.5 MB fetch).
 
 **One control position, two tiers**, because there are two costs and the card charges the second only
 once the first is paid: `Read this snapshot` runs the deep read and states the SHAPE in place;
-`Show the application state` opens the raw layer for the payload. Tier 2 gates on the deep read having
+`Show the application state` opens the raw layer for the payload. Tier 1 is the card's ONLY route to
+the read — the card never fetches on its own, because being pinned is not the same as asking (the
+surface gate, under *The Snapshots view*); the button writes `deepWanted` and that is the whole
+request. Tier 2 gates on the deep read having
 LANDED, not on decodability — while following it used to land on a pane whose own copy said to pin,
 with the pin control back in the HUD the raw layer had just marked `inert`. The cost rides the
 **button's** title, never a value row: `PAYLOAD_LANES` is one home shared with the raw pane's tabs, and
@@ -939,7 +963,9 @@ never overridden.
 
 That pane is the metagraph-snapshot card's **two-step disclosure** — the CARD states the SHAPE of the
 application state, the pane renders the PAYLOAD one level down **on a second deliberate gesture, because
-one anchoring channel publishes personal records.** Its shape is **ONE LANE AXIS** (2026-08-09): the
+one anchoring channel publishes personal records.** Arriving here IS that gesture, so the pane reads its
+own subject's payload on arrival (the surface gate, under *The Snapshots view*). Its shape is
+**ONE LANE AXIS** (2026-08-09): the
 snapshot's facts stay pinned at the top, and the payload sits behind `STATE · DATA · SIGNERS` tabs whose
 labels carry their own counts. **An empty lane gets no tab** — a tab that opens onto "nothing here" is
 chrome pretending to be data — and the first available lane opens by default, so the pane is never
@@ -1028,8 +1054,23 @@ under a filter means the NETWORK's anchors**, so the network's newest anchored r
 through anchor-less global ticks. Browsing or pinning drops live mode; leaving clears the cards, so
 coming back starts live again.
 
-⚠️ The ~2.5 MB deep read stays gated to explicit pins — an auto-advancing card must not turn an
-explicit-gesture route into a poll.
+⚠️ **The ~2.5 MB deep read is gated by the SURFACE, not by the mode** (user, 2026-08-10). Being PINNED
+is not the same as ASKING: selection used to be the whole trigger, which put the read behind a BROWSE
+gesture — every pager step and every explorer leaf fetched. So:
+
+- the **card never reads on its own** — it states the SHAPE, and its `Read this snapshot` button writes
+  the store's `deepWanted` key, which IS the request. One press, one read; a pager skim costs nothing.
+- the **raw layer always reads on arrival** — that surface exists for nothing but the payload, so being
+  there is the request, and getting there took a deliberate depth change.
+- `following` stays a hard guard on top: an auto-advancing card must never turn an explicit-gesture
+  route into a poll.
+
+The measurements are the justification: the client only ever receives the decoded row (**599 B** for
+DED, **4.4 KB** for DOR) — what's rationed is the SERVER's fetch of the whole global and the latency
+the user waits through, **~1.8 s cold**, ~1 ms warm from the immutable per-ordinal cache. And it
+MULTIPLIES: tick 6,741,486 anchored **20 DOR snapshots**, so one swipe through that pager was 20 ×
+2.5 MB against Constellation's public L0 LB, ~36 s. Privacy is the other half — one anchoring channel
+publishes personal records, which is why the payload is two deliberate gestures deep at all.
 
 **Labels.** The global floor is named by subtle flat edge-aligned text rather than billboards, and each
 metagraph plane carries a smaller ticker label the same way. Every visible tick row is named by a
@@ -1214,7 +1255,8 @@ them — but the Next Node server can.
   is immutable and cached, so the backfill costs at most once per ordinal ever.
 - **`/api/snapshot/[ordinal]/channel/[address]`** is the deep read behind the metagraph-snapshot card's
   third tier: it re-downloads the same ~2.5 MB global to reach ONE channel entry. The cost is accepted
-  deliberately — cached immutably and only ever run on an explicit gesture on one card, never on a
+  deliberately — cached immutably and run only from the two surfaces that ask for it (the card's
+  `Read this snapshot` button, and arrival in the raw layer), never on a
   poll, never across the chain. The key includes **the snapshot's own ordinal**, because a fast
   metagraph batches dozens into one tick and a (tick, address) key would make every row share one
   decode.
