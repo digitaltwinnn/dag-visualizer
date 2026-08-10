@@ -19,7 +19,7 @@ import { ExternalLink } from "lucide-react";
 import { useMinHold } from "@/components/useMinHold";
 import { useNowTick } from "@/components/useNowTick";
 import { POLL } from "@/src/engine/config";
-import { Desc, StatusMark, CompositionRows, StatusBreakdown, RoleChips, IdentityDot, networkKind } from "./parts";
+import { Desc, StatusMark, CompositionRows, StatusBreakdown, RoleChips, IdentityDot, networkKind, Fact, FactGroup, Foot, FootRow } from "./parts";
 import { compositionGroups, compositionRows, nodeCompositionLabel, parseCompositionKey } from "@/src/data/composition";
 import { pickNetId, followToggleActions } from "@/src/engine/domain/pickActions";
 import { applyClickActions } from "@/src/store/applyClickActions";
@@ -235,64 +235,47 @@ export function SnapshotCard({ data: d }: { data: GlobalSnapshot }) {
           `exact` flips back to null on THAT render but useMinHold's `show` only rises in its
           effect on the NEXT one — without the guard this dereferenced `exact.totalFee`. */}
       {feeHold.show || exact == null ? (
-        <div className="flex flex-col gap-2">
-          <div className="flex items-start justify-between gap-2.5">
-            <span className="text-body text-muted-foreground">Fees paid</span>
-            <span className={cn("flex flex-col items-end text-body text-foreground tabular-nums", feeHold.fading && "animate-hold-fade-out motion-reduce:animate-none")}><NodeStars count={4} /></span>
-          </div>
-        </div>
+        <FactGroup>
+          <Fact label="Fees paid">
+            <span className={cn("flex flex-col items-end", feeHold.fading && "animate-hold-fade-out motion-reduce:animate-none")}><NodeStars count={4} /></span>
+          </Fact>
+        </FactGroup>
       ) : (
-        <div className="flex flex-col gap-2">
+        <FactGroup>
           {exact.totalFee > 0 && (
-            <div className="flex items-start justify-between gap-2.5">
-              <span className="text-body text-muted-foreground">Fees paid</span>
-              <span className="flex flex-col items-end text-body text-foreground tabular-nums">
+            <Fact label="Fees paid">
+              <span className="flex flex-col items-end">
                 <span className="animate-resolve-in motion-reduce:animate-none whitespace-nowrap"><b className="font-bold">{fmtDag(exact.totalFee)}</b> DAG</span>
                 <span className="text-label text-muted-foreground">{fmtKB(exact.totalSizeKB)} anchored</span>
               </span>
-            </div>
+            </Fact>
           )}
           {exact.rewardsDatum > 0 && (
-            <div className="flex items-start justify-between gap-2.5">
-              <span className="text-body text-muted-foreground">Rewards out</span>
-              <span className="flex flex-col items-end text-body text-foreground tabular-nums">
-                <span className="animate-resolve-in motion-reduce:animate-none whitespace-nowrap"><b className="font-bold">{fmtDag(exact.rewardsDatum)}</b> DAG</span>
-              </span>
-            </div>
+            <Fact label="Rewards out">
+              <span className="animate-resolve-in motion-reduce:animate-none whitespace-nowrap"><b className="font-bold">{fmtDag(exact.rewardsDatum)}</b> DAG</span>
+            </Fact>
           )}
-        </div>
+          {/* The validator count is a FACT about this tick — it reads. Its two hashes don't, so
+              they sit in the foot below. */}
+          {exact != null && (exact.signerCount ?? 0) > 0 && (
+            <Fact label="Signed by">
+              <span className="animate-resolve-in motion-reduce:animate-none">{exact.signerCount} validators</span>
+            </Fact>
+          )}
+        </FactGroup>
       )}
 
-      {/* STRUCTURE (item 10, 2026-08-06): the global snapshot is the same Signed[] artifact as
-          the metagraph snapshots it anchors — own hash, parent link, epoch (all from the explorer
-          feed) and its validator signatures (from the exact read; absent until it lands). */}
-      <Separator className="my-2" />
-      <div className="flex flex-col gap-2">
-        <div className="flex items-start justify-between gap-2.5">
-          <span className="text-body text-muted-foreground">Hash</span>
-          <span className="text-body text-foreground font-mono" title={d.hash}>{shortHash(d.hash)}</span>
-        </div>
+      {/* FOOT — the global snapshot is the same Signed[] artifact as the metagraph snapshots it
+          anchors, so it carries its own hash and parent link. Both are look-up values (item 10,
+          2026-08-06; moved out of a labelled row block 2026-08-10). `epochProgress` was culled
+          with them: it is the consensus machinery's own counter and answers no question the rest
+          of the card raises. */}
+      <Foot>
+        <FootRow label="Hash" value={shortHash(d.hash)} title={d.hash} />
         {d.lastSnapshotHash && (
-          <div className="flex items-start justify-between gap-2.5">
-            <span className="text-body text-muted-foreground">Parent</span>
-            <span className="text-body text-foreground font-mono" title={d.lastSnapshotHash}>{shortHash(d.lastSnapshotHash)}</span>
-          </div>
+          <FootRow label="Parent" value={shortHash(d.lastSnapshotHash)} title={d.lastSnapshotHash} />
         )}
-        {typeof d.epochProgress === "number" && (
-          <div className="flex items-start justify-between gap-2.5">
-            <span className="text-body text-muted-foreground">Epoch</span>
-            <span className="text-body text-foreground tabular-nums">{d.epochProgress.toLocaleString()}</span>
-          </div>
-        )}
-        {exact != null && (exact.signerCount ?? 0) > 0 && (
-          <div className="flex items-start justify-between gap-2.5">
-            <span className="text-body text-muted-foreground">Signed by</span>
-            <span className="text-body text-foreground tabular-nums">
-              <span className="animate-resolve-in motion-reduce:animate-none">{exact.signerCount} validators</span>
-            </span>
-          </div>
-        )}
-      </div>
+      </Foot>
     </div>
   );
 }
@@ -334,12 +317,9 @@ export function MetaCard({ cfg }: { cfg: MetaCfg }) {
             <CompositionRows nodes={nodes} />
           </div>
           <Separator className="my-2" />
-          {/* Summary in the snapshot card's "Fees paid" grammar — muted label left, the bold
-              TOTAL right (column-aligned with the composition counts it summarizes). */}
-          <div className="flex items-start justify-between gap-2.5">
-            <span className="text-body text-muted-foreground">Online nodes</span>
-            <span className="text-body text-foreground tabular-nums"><b className="font-bold">{nodes.length}</b></span>
-          </div>
+          {/* Summary in the shared Fact grammar — muted label left, the bold TOTAL right
+              (column-aligned with the composition counts it summarizes). */}
+          <Fact label="Online nodes"><b className="font-bold">{nodes.length}</b></Fact>
           {/* The pill row appears only when something is NOT ready — and then it shows the
               FULL breakdown including the ready pill (user, 2026-07-12: all-ready is the
               silent default; a mixed fleet reads as one complete picture). */}
@@ -379,18 +359,17 @@ export function MetaTickerAside({ cfg }: { cfg: MetaCfg }) {
 function MetaSiteRow({ site }: { site: string }) {
   const domain = site.replace(/^https?:\/\//, "").replace(/\/$/, "");
   return (
-    <div className="flex items-start justify-between gap-2.5">
-      <span className="text-body text-muted-foreground">Site</span>
+    <Fact label="Site">
       <a
         href={site}
         target="_blank"
         rel="noopener noreferrer"
-        className="text-body inline-flex items-center gap-1.5 text-primary/75 hover:text-primary"
+        className="inline-flex items-center gap-1.5 text-primary/75 hover:text-primary"
       >
         {domain}
         <ExternalLink aria-hidden className="size-3.5" />
       </a>
-    </div>
+    </Fact>
   );
 }
 
@@ -439,48 +418,40 @@ function GeoLiveNode({ p }: { p: PickOf<"l0" | "l1" | "metanode"> }) {
   // so the glow lights the card's rounded edge.
   return (
     <>
-      {/* COUNTRY — the half of the place the head no longer carries (user, 2026-08-02), with the
-          app's country CODE mark as the quiet suffix, the same shape as HOSTING's `isp · asn`. */}
-      {geo?.country && (
-        <div className="my-2">
-          <span className="text-micro tracking-[0.1em] uppercase text-muted-foreground">Country</span>
-          <div className="text-body text-foreground-dim mt-0.5">
+      <FactGroup>
+        {/* COUNTRY — the half of the place the head no longer carries (user, 2026-08-02), with the
+            app's country CODE mark as the quiet suffix, the same shape as HOSTING's `isp · asn`. */}
+        {geo?.country && (
+          <Fact label="Country">
             {geo.country}
             {geo.cc && <span className="font-mono text-label text-muted-foreground"> · {ccMark(geo.cc)}</span>}
-          </div>
-        </div>
-      )}
-      {/* COMPOSITION — the node's role in the network, a labelled fact like the rest (user,
-          2026-08-02: it used to ride the head as a subtitle, which made the head carry three
-          different registers). Sits second: the reading order is place → role → host →
-          reference, with health as the head's status pill. */}
-      {comp && (
-        <div className="my-2">
-          <span className="text-micro tracking-[0.1em] uppercase text-muted-foreground">Composition</span>
-          <div className="flex items-center gap-1.5 text-body text-foreground-dim mt-0.5">
-            <span>{comp}</span>
-            {codes && codes.length > 0 && <RoleChips codes={codes} />}
-          </div>
-        </div>
-      )}
-      {geo?.isp && (
-        <div className="my-2">
-          <span className="text-micro tracking-[0.1em] uppercase text-muted-foreground">Hosting</span>
-          <div className="text-body text-foreground-dim mt-0.5">
+          </Fact>
+        )}
+        {/* COMPOSITION — the node's role in the network, a labelled fact like the rest (user,
+            2026-08-02: it used to ride the head as a subtitle, which made the head carry three
+            different registers). Sits second: the reading order is place → role → host →
+            reference, with health as the head's status pill. */}
+        {comp && (
+          <Fact label="Composition">
+            <span className="inline-flex items-center gap-1.5">
+              <span>{comp}</span>
+              {codes && codes.length > 0 && <RoleChips codes={codes} />}
+            </span>
+          </Fact>
+        )}
+        {geo?.isp && (
+          <Fact label="Hosting">
             {geo.isp}
             {geo.asn && <span className="font-mono text-label text-muted-foreground"> · {geo.asn}</span>}
-          </div>
-        </div>
-      )}
-      {/* The unique reference sits LAST — a labelled row like HOSTING (the reading order is
-          place → health → role → host → reference). Truncated display, full hash on hover. */}
+          </Fact>
+        )}
+      </FactGroup>
+      {/* The unique reference sits LAST, where references sit — and in the FOOT, because an id is
+          looked up rather than read (2026-08-10). Truncated display, full hash on hover. */}
       {p.node?.id && (
-        <div className="my-2">
-          <span className="text-micro tracking-[0.1em] uppercase text-muted-foreground">Node id</span>
-          <div className="font-mono tabular-nums text-label text-foreground-dim mt-0.5" title={p.node.id}>
-            {shortHash(p.node.id)}
-          </div>
-        </div>
+        <Foot>
+          <FootRow label="Node id" value={shortHash(p.node.id)} title={p.node.id} />
+        </Foot>
       )}
     </>
   );
@@ -534,14 +505,11 @@ export function CountryCard({ cc }: { cc: string }) {
     { label: "Providers", value: String(providers.size) },
   ];
   return (
-    <div className="flex flex-col gap-2">
+    <FactGroup>
       {facts.map((f) => (
-        <div key={f.label} className="flex items-start justify-between gap-2.5">
-          <span className="text-body text-muted-foreground">{f.label}</span>
-          <span className="text-body text-foreground tabular-nums">{f.value}</span>
-        </div>
+        <Fact key={f.label} label={f.label}>{f.value}</Fact>
       ))}
-    </div>
+    </FactGroup>
   );
 }
 
@@ -582,23 +550,16 @@ export function CompositionCard({ sel }: { sel: CompositionSel }) {
   const share = total > 0 ? Math.round((members.length / total) * 100) : 0;
   const cfg = metagraphById(sel.netId);
   return (
-    <div className="flex flex-col gap-2">
-      <div className="flex items-start justify-between gap-2.5">
-        <span className="text-body text-muted-foreground">Machines</span>
-        <span className="text-body text-foreground tabular-nums">{members.length}</span>
-      </div>
-      <div className="flex items-start justify-between gap-2.5">
-        <span className="text-body text-muted-foreground">Share of network</span>
-        <span className="text-body text-foreground tabular-nums">{share}%</span>
-      </div>
-      <div className="flex items-start justify-between gap-2.5">
-        <span className="text-body text-muted-foreground flex-none">Network</span>
-        <span className="inline-flex items-center gap-1.5 text-body text-foreground min-w-0">
+    <FactGroup>
+      <Fact label="Machines">{members.length}</Fact>
+      <Fact label="Share of network">{share}%</Fact>
+      <Fact label="Network">
+        <span className="inline-flex items-center gap-1.5 min-w-0">
           <IdentityDot hue={sel.netId === "dag" ? CORE_HEX : identityHudHex(sel.netId)} />
           <span className="truncate">{cfg?.name || sel.netId}</span>
         </span>
-      </div>
-    </div>
+      </Fact>
+    </FactGroup>
   );
 }
 
@@ -664,29 +625,22 @@ export function ProviderCard({ sel }: { sel: CohortSel }) {
     return null;
   }, [members]);
   return (
-    <div className="flex flex-col gap-2">
+    <FactGroup>
       {/* ASN — the provider's REFERENCE, in the slot the city vacated when it moved to the head
           (user, 2026-08-09). The COUNTRY is deliberately absent: the cohort always sits under a
           committed country, whose own card states it one slot up (user, 2026-08-02 — a facts rail
           shouldn't say the same thing twice). */}
-      <div className="flex items-start justify-between gap-2.5">
-        <span className="text-body text-muted-foreground">ASN</span>
-        <span className="font-mono text-body text-foreground tabular-nums">{asn ?? "—"}</span>
-      </div>
-      <div className="flex items-start justify-between gap-2.5">
-        <span className="text-body text-muted-foreground">Nodes</span>
-        <span className="text-body text-foreground tabular-nums">{members.length}</span>
-      </div>
-      <div className="flex items-start justify-between gap-2.5">
-        <span className="text-body text-muted-foreground flex-none">Networks</span>
+      <Fact label="ASN"><span className="font-mono">{asn ?? "—"}</span></Fact>
+      <Fact label="Nodes">{members.length}</Fact>
+      <Fact label="Networks">
         <span className="flex flex-wrap justify-end items-center gap-x-2 gap-y-1 min-w-0">
           {networkIds.length === 0 ? (
-            <span className="text-body text-foreground">—</span>
+            <span>—</span>
           ) : (
             networkIds.map((id) => {
               const cfg = metagraphById(id);
               return (
-                <span key={id} className="inline-flex items-center gap-1.5 text-body text-foreground">
+                <span key={id} className="inline-flex items-center gap-1.5">
                   <IdentityDot hue={identityHudHex(id)} />
                   {cfg?.ticker || cfg?.name || id}
                 </span>
@@ -694,7 +648,7 @@ export function ProviderCard({ sel }: { sel: CohortSel }) {
             })
           )}
         </span>
-      </div>
-    </div>
+      </Fact>
+    </FactGroup>
   );
 }

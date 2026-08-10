@@ -602,6 +602,35 @@ In one line: **thread = resting identity cue; card edge = purely transient signa
   pulse degrades to one static blink; a hold collapses its fade (the hold is timing, not motion); a
   signal chip still swaps glyphs, because that's information.
 
+### Inside a card — one grammar, three weights
+
+The slab grammar above says how cards sit together; this says what a card BODY is made of. **One row
+grammar everywhere: label left, value right, one line.** The stacked micro-uppercase-label-above-value
+form is retired — it cost two lines per fact and read as a form, not an instrument.
+
+Three weights, and a fact's weight is a claim about what the card is FOR:
+
+| weight | holds | built from |
+|---|---|---|
+| **lead** | the 1–2 things the card exists to say | composed by the card itself — merges facts onto one line and drops labels the unit already carries (`3.8 KB · 0.0070 DAG`, no "Size"/"Fee") |
+| **detail** | the measured facts | `Fact` inside `FactGroup` |
+| **foot** | hashes, ids, bookkeeping numbers | `Foot` + `FootRow` — small muted mono behind a `Separator`, **always last** |
+
+The four primitives live in `components/inspector/parts.tsx` and are the only way a card body draws a
+fact row; nothing re-derives the layout locally. They carry no animation, so reduced motion is a no-op
+here exactly as it is for the slab.
+
+**The foot is a look-up column, not a demotion bin.** A value goes there when you'd only ever read it to
+compare it against something else — the node card's NODE ID, the snapshot cards' hash/parent/state
+proof, height and blocks. That is also why the node card's "NODE ID last" rule falls out of the grammar
+rather than being a special case.
+
+**Density came from culling, not from tightening.** `Data blocks` (metagraph snapshot) and `Epoch`
+(global snapshot) were removed outright — a fact nobody reads costs more than the pixels it takes.
+Measured at 1600×950: the ledger box 649px → 459px, and the ledger's committed ladder went from
+overflowing its lane (831 in 663) to fitting (629 in 641). Don't re-add a culled fact without saying
+what question it answers.
+
 ### CardHead — the one card header
 
 Every rail card leads with `CardHead`: eyebrow / title / inset hairline / body.

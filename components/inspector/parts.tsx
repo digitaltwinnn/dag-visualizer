@@ -1,9 +1,10 @@
 "use client";
 
-import { Fragment, useState } from "react";
+import { Fragment, useState, type ReactNode } from "react";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Separator } from "@/components/ui/separator";
 import type { NodeInfo } from "@/src/data/types";
 import {
   nodeStatus,
@@ -20,6 +21,89 @@ import { compositionRows } from "@/src/data/composition";
 export const ROLE_FR: Record<string, string> = { l0: "L0", cl1: "currency-L1", dl1: "data-L1" };
 export const ROLE_SHORT: Record<string, string> = { l0: "L0", cl1: "cL1", dl1: "dL1" };
 export const ROLE_ORDER = ["l0", "cl1", "dl1"];
+
+// ── The card body's ONE row grammar, in three weights (user, 2026-08-10) ────────────────────
+// Every rail card body is built from these. Before, two grammars competed with no rule for
+// which was which — this one-line `Fact` (label left, value right) and a STACKED block (micro
+// uppercase label above, value below) that cost twice the height. The stacked form applied to
+// `Hosting` but not `Anchored into`, both one-line facts; the node card was stacked end to end,
+// paying ~188px for four facts. It is retired: one shape, and a long value wraps inside its own
+// column, which the flex row already handles.
+//
+// What varies is WEIGHT, not shape — three tiers, coarse→fine like everything else here:
+//
+//   LEAD    the one or two things the card exists to say. Composed by the card itself (see
+//           MetaSnapPane's `Lead`), not a primitive — a lead line merges facts and drops labels
+//           the unit already carries (`0.0070 DAG` needs no "Fee:").
+//   DETAIL  the measured facts — `Fact` inside a `FactGroup`.
+//   FOOT    the values you LOOK UP rather than read: hashes, ids, block bookkeeping. Same row
+//           shape at a small muted mono treatment, so the foot is a WEIGHT and not a second
+//           grammar (user chose this over a denser wrapping run for exactly that reason).
+//
+// The tiers exist because a flat list charges the same height for a headline number and a
+// parent hash. Nothing here is hidden behind a gesture — the app's disclosure model is already
+// two-step (card states the SHAPE, raw layer renders the PAYLOAD) and a third tier inside the
+// card would be one gesture too many.
+
+// The one fact row. `title` carries the full value for anything the cell truncates.
+export function Fact({
+  label,
+  children,
+  title,
+  className,
+}: {
+  label: ReactNode;
+  children: ReactNode;
+  title?: string;
+  className?: string;
+}) {
+  return (
+    <div className={cn("flex items-start justify-between gap-2.5", className)} title={title}>
+      <span className="shrink-0 text-body text-muted-foreground">{label}</span>
+      <span className="min-w-0 text-body text-foreground tabular-nums text-right">{children}</span>
+    </div>
+  );
+}
+
+// The DETAIL tier — a run of facts at the tight gap. 4px, not the old 8px: at an 18px line the
+// old gap was 44% air, which is section spacing doing row spacing's job. Sections are separated
+// by the `Foot` rule and by `Separator`, so the rows themselves don't need to be.
+export function FactGroup({ children, className }: { children: ReactNode; className?: string }) {
+  return <div className={cn("flex flex-col gap-1", className)}>{children}</div>;
+}
+
+// The FOOT tier — always last in a card, behind its own resting division (inset by the card's
+// own padding by construction: it's a plain child of the padded body, the inspector layout the
+// house rule describes as needing no bleed).
+export function Foot({ children, className }: { children: ReactNode; className?: string }) {
+  return (
+    <div className={cn("mt-2", className)}>
+      <Separator className="mb-2" />
+      <div className="flex flex-col gap-1">{children}</div>
+    </div>
+  );
+}
+
+// One foot row. Mono by default because most of what lands here is a hash or an id; the
+// bookkeeping numbers (height · subHeight, block counts) pass `mono={false}`.
+export function FootRow({
+  label,
+  value,
+  title,
+  mono = true,
+}: {
+  label: string;
+  value: ReactNode;
+  title?: string;
+  mono?: boolean;
+}) {
+  return (
+    <div className="flex items-baseline justify-between gap-2.5" title={title}>
+      <span className="text-micro tracking-caps uppercase text-muted-foreground">{label}</span>
+      <span className={cn("text-label text-foreground-dim tabular-nums", mono && "font-mono")}>{value}</span>
+    </div>
+  );
+}
 
 // A node's roles, falling back to its primary layer when the role list is absent.
 export const rolesOf = (n: NodeInfo) => (n.roles && n.roles.length ? n.roles : [n.layer!]);

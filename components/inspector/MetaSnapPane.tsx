@@ -5,10 +5,10 @@
 // is the application state — disclosed as a SHAPE here and as a payload in the raw layer.
 // Like the global snapshot card this is a card SLOT, not a focus-ladder rung: it has its own
 // store channel (`store.metaSnap`) and a fixed rail slot, and appears in no ladder.
-import { useEffect, useMemo, useState, type CSSProperties, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type CSSProperties } from "react";
 import { Button } from "@/components/ui/button";
 import CardHead, { RailPane } from "@/components/CardHead";
-import { IdentityDot } from "@/components/inspector/parts";
+import { IdentityDot, Fact, FactGroup, Foot, FootRow } from "@/components/inspector/parts";
 import { useStore } from "@/src/store/store";
 import { metaSnapDeepKey } from "@/src/data/types";
 import type { NodeRow } from "@/src/data/types";
@@ -28,27 +28,10 @@ import { followToggleActions } from "@/src/engine/domain/pickActions";
 import { applyClickActions } from "@/src/store/applyClickActions";
 import { cn } from "@/lib/utils";
 
-// The two body-row shapes the house already uses, side by side because this card carries both
-// kinds of fact: a measured NUMBER reads label-left/value-right (CountryCard/LayerCard), a
-// REFERENCE reads label-above/value-below with the full value on hover (the node card's id row).
-function Fact({ label, children, title }: { label: string; children: ReactNode; title?: string }) {
-  return (
-    <div className="flex items-start justify-between gap-2.5" title={title}>
-      <span className="text-body text-muted-foreground">{label}</span>
-      <span className="text-body text-foreground tabular-nums">{children}</span>
-    </div>
-  );
-}
-function HashFact({ label, value }: { label: string; value: string }) {
-  return (
-    <div>
-      <span className="text-micro tracking-[0.1em] uppercase text-muted-foreground">{label}</span>
-      <div className="font-mono tabular-nums text-label text-foreground-dim mt-0.5" title={value}>
-        {shortHash(value)}
-      </div>
-    </div>
-  );
-}
+// The body's row grammar and its three weights live in ./parts (`Fact` / `FactGroup` / `Foot`)
+// — shared with every other rail card, so this one can't drift into a dialect of its own. The
+// LEAD is composed here rather than imported: it merges facts and drops labels their units
+// already carry, which is card-specific by nature.
 
 export default function MetaSnapPane({
   onClose,
@@ -127,6 +110,9 @@ export default function MetaSnapPane({
   // identity of its own).
   const ticker = cfg?.ticker || cfg?.name || shortHash(sel.metaId);
   const hue = cfg ? identityHudHex(sel.metaId) : UNLISTED_HUE;
+  // Hoisted out of the state tier so the FOOT can reach it — it is a hash, and hashes are looked
+  // up, not read. The deep read wins where it exists; the exact row carries it otherwise.
+  const stateProof = deep?.stateProof ?? row?.stateProof;
   const rel = relativeAge(now - Date.parse(sel.ts));
   // ⚠️ The `!!snap` half is load-bearing: the ledger contributes no ancestry, so the global card
   // can be a GHOST while this one is populated — there the clock has to stay here.
@@ -168,119 +154,141 @@ export default function MetaSnapPane({
           onToggle={onToggle}
         />
         {!collapsed && (
-          <div className="flex flex-col gap-2">
-            {/* ── Tier 1: free from the poll ─────────────────────────────────────────────── */}
-            <Fact label="Network">
-              <span className="inline-flex items-center gap-1.5">
-                <IdentityDot hue={hue} />
-                {ticker}
-              </span>
-            </Fact>
-            <Fact label="Anchored into">#{sel.globalOrdinal.toLocaleString()}</Fact>
-            {polled && (
-              <Fact label="Height">
-                {polled.height} · {polled.subHeight}
-              </Fact>
-            )}
-            {polled && <Fact label="Blocks">{polled.blocks}</Fact>}
+          <div>
+            {/* ── LEAD ───────────────────────────────────────────────────────────────────────
+                The two things this card exists to say, merged from four rows that each used to
+                cost a line of their own (Network / Anchored into, Size / Fee). The network's
+                anchor is one relation, so it reads as one line; size and fee carry their own
+                units, so they need no labels. Size leads the pair because the chamber's byte bar
+                IS the bytes — the card's headline number is the one the geometry encodes. */}
+            <div className="flex flex-col gap-1">
+              <div
+                className="flex items-start justify-between gap-2.5"
+                title={`Anchored into global snapshot ${sel.globalOrdinal.toLocaleString()}`}
+              >
+                <span className="inline-flex items-center gap-1.5 min-w-0 text-body text-foreground">
+                  <IdentityDot hue={hue} />
+                  <span className="truncate">{ticker}</span>
+                </span>
+                <span className="text-body text-muted-foreground tabular-nums whitespace-nowrap">
+                  → #{sel.globalOrdinal.toLocaleString()}
+                </span>
+              </div>
+              {row && (
+                <div className="text-body text-foreground tabular-nums">
+                  <b className="font-bold">{fmtKB(row.bytes / 1024)}</b>
+                  <span className="text-muted-foreground"> · </span>
+                  {fmtDag(row.fee)} DAG
+                </div>
+              )}
+            </div>
 
-            {/* ── Tier 2: the tick's exact read ──────────────────────────────────────────── */}
-            {row ? (
-              <>
-                <Fact label="Fee">{fmtDag(row.fee)} DAG</Fact>
-                <Fact label="Size">{fmtKB(row.bytes / 1024)}</Fact>
-                {/* The LAYER is part of the fact: a metagraph's proof is its L0 cluster's, so DOR
-                    shows 3 of its 20 machines by construction (user, 2026-08-09 — the bare count
-                    read as a bug). One home for the words: SIGNER_GROUPS. */}
-                <Fact label="Signed by" title={SIGNER_GROUPS.proof.title}>
-                  {signers?.length ?? 0} {SIGNER_GROUPS.proof.who}
-                </Fact>
-                {signers && signers.length > 0 && (
-                  <SignerRows
-                    ids={signers}
-                    metaId={sel.metaId}
-                    selNodes={selNodes}
-                    hue={hue}
-                    hoverNodeId={hoverNodeId}
-                    setHoverNodeId={setHoverNodeId}
-                  />
-                )}
-              </>
-            ) : reading.show ? (
-              <Fact label="Exact read">
-                <span className={cn(reading.fading && "animate-hold-fade-out motion-reduce:animate-none")}>reading…</span>
-              </Fact>
-            ) : (
-              // The L0 node prunes after ~30 minutes; an old tick keeps its polled facts and says so.
-              <Fact label="Exact read">unavailable — tick pruned</Fact>
-            )}
-
-            {/* ── Tier 3: the application state — ONE RULE (user, 2026-08-07: DED's empty
-                state hid the invitation while the raw layer rendered the decoded shape; the
-                two surfaces must apply one standard): if the payload DECODED, the tier shows
-                and the invitation stands — an empty state says "empty" honestly instead of
-                hiding. Both routes share one decoder, so decoded-ness itself can't disagree;
-                a genuinely unreadable payload says so (and "decoding…" while the pin's full
-                unpack is in flight). ── */}
-            {(() => {
-              const decodedOk = deep != null || row?.decoded === true;
-              if (!decodedOk) {
-                if (row == null) return null; // no exact row yet — tier 2's reading state covers it
-                return (
-                  <Fact label="State">
-                    <span className="text-muted-foreground italic">
-                      {following ? "undecodable payload" : decodeGaveUp ? "decode unavailable — tick pruned" : "decoding…"}
-                    </span>
-                  </Fact>
-                );
-              }
-              const stateBytes = deep ? deep.stateBytes : (row?.stateBytes ?? 0);
-              const empty = deep ? !deep.stateKeys.some((k) => k.count > 0) : !row?.hasState;
-              return (
+            {/* ── DETAIL: the measured facts ─────────────────────────────────────────────── */}
+            <FactGroup className="mt-2.5">
+              {row ? (
                 <>
-                  {empty ? (
-                    <Fact label="State">
-                      <span className="text-muted-foreground italic">empty</span>
-                    </Fact>
-                  ) : (
-                    stateBytes > 0 && <Fact label="State">{fmtKB(stateBytes / 1024)}</Fact>
+                  {/* The LAYER is part of the fact: a metagraph's proof is its L0 cluster's, so DOR
+                      shows 3 of its 20 machines by construction (user, 2026-08-09 — the bare count
+                      read as a bug). One home for the words: SIGNER_GROUPS. */}
+                  <Fact label="Signed by" title={SIGNER_GROUPS.proof.title}>
+                    {signers?.length ?? 0} {SIGNER_GROUPS.proof.who}
+                  </Fact>
+                  {signers && signers.length > 0 && (
+                    <SignerRows
+                      ids={signers}
+                      metaId={sel.metaId}
+                      selNodes={selNodes}
+                      hue={hue}
+                      hoverNodeId={hoverNodeId}
+                      setHoverNodeId={setHoverNodeId}
+                    />
                   )}
-                  {deep && deep.stateKeys.length > 0 && (
-                    <Fact label="State records">{deep.stateKeys.map((k) => `${k.key} ${k.count}`).join(" · ")}</Fact>
-                  )}
-                  {/* The deep decode is pin-gated while following (the live card advances every
-                      tick — fetching it would poll the heavy route). Honest hint in place. */}
-                  {!deep && following && (
-                    <Fact label="State records">
-                      <span className="text-muted-foreground italic">pin to decode</span>
-                    </Fact>
-                  )}
-                  {/* The data TRANSACTIONS are a data metagraph's real payload (batch
-                      commitments etc. — DED's fingerprint batches ride here while its state
-                      stays empty; 2026-08-07). */}
-                  {deep && deep.dataTxCount > 0 && (
-                    <Fact label="Data updates">{deep.dataTxCount}</Fact>
-                  )}
-                  {deep && deep.dataBlockSigners.length > 0 && (
-                    <Fact label="Data blocks" title={SIGNER_GROUPS.dataBlocks.title}>
-                      signed by {deep.dataBlockSigners.length} {SIGNER_GROUPS.dataBlocks.who}
-                    </Fact>
-                  )}
-                  {(deep?.stateProof ?? row?.stateProof) && (
-                    <HashFact label="State proof" value={(deep?.stateProof ?? row?.stateProof)!} />
-                  )}
-                  <div>
-                    <Button variant="link" size="xs" className="px-0" onClick={() => setSection("data")}>
-                      Show the application state
-                    </Button>
-                  </div>
                 </>
-              );
-            })()}
+              ) : reading.show ? (
+                <Fact label="Exact read">
+                  <span className={cn(reading.fading && "animate-hold-fade-out motion-reduce:animate-none")}>reading…</span>
+                </Fact>
+              ) : (
+                // The L0 node prunes after ~30 minutes; an old tick keeps its polled facts and says so.
+                <Fact label="Exact read">unavailable — tick pruned</Fact>
+              )}
 
-            {/* The references sit LAST, where references sit (the node card's reading order). */}
-            <HashFact label="Hash" value={sel.hash} />
-            {polled?.parent && <HashFact label="Parent" value={polled.parent} />}
+              {/* ── The application state — ONE RULE (user, 2026-08-07: DED's empty state hid
+                  the invitation while the raw layer rendered the decoded shape; the two
+                  surfaces must apply one standard): if the payload DECODED, the tier shows and
+                  the invitation stands — an empty state says "empty" honestly instead of
+                  hiding. Both routes share one decoder, so decoded-ness itself can't disagree;
+                  a genuinely unreadable payload says so (and "decoding…" while the pin's full
+                  unpack is in flight). ── */}
+              {(() => {
+                const decodedOk = deep != null || row?.decoded === true;
+                if (!decodedOk) {
+                  if (row == null) return null; // no exact row yet — the reading state above covers it
+                  return (
+                    <Fact label="State">
+                      <span className="text-muted-foreground italic">
+                        {following ? "undecodable payload" : decodeGaveUp ? "decode unavailable — tick pruned" : "decoding…"}
+                      </span>
+                    </Fact>
+                  );
+                }
+                const stateBytes = deep ? deep.stateBytes : (row?.stateBytes ?? 0);
+                const empty = deep ? !deep.stateKeys.some((k) => k.count > 0) : !row?.hasState;
+                return (
+                  <>
+                    {empty ? (
+                      <Fact label="State">
+                        <span className="text-muted-foreground italic">empty</span>
+                      </Fact>
+                    ) : (
+                      stateBytes > 0 && <Fact label="State">{fmtKB(stateBytes / 1024)}</Fact>
+                    )}
+                    {deep && deep.stateKeys.length > 0 && (
+                      <Fact label="State records">{deep.stateKeys.map((k) => `${k.key} ${k.count}`).join(" · ")}</Fact>
+                    )}
+                    {/* The deep decode is pin-gated while following (the live card advances every
+                        tick — fetching it would poll the heavy route). Honest hint in place. */}
+                    {!deep && following && (
+                      <Fact label="State records">
+                        <span className="text-muted-foreground italic">pin to decode</span>
+                      </Fact>
+                    )}
+                    {/* The data TRANSACTIONS are a data metagraph's real payload (batch
+                        commitments etc. — DED's fingerprint batches ride here while its state
+                        stays empty; 2026-08-07). Their PRODUCING LAYER — the dL1 subset that
+                        signed the blocks — was culled from this card (user, 2026-08-10): it
+                        exists only after the deep read, and the raw layer's SIGNERS lane names
+                        both groups beside their counts, which is where a signer question is
+                        actually asked. */}
+                    {deep && deep.dataTxCount > 0 && <Fact label="Data updates">{deep.dataTxCount}</Fact>}
+                  </>
+                );
+              })()}
+            </FactGroup>
+
+            {(deep != null || row?.decoded === true) && (
+              <Button variant="link" size="xs" className="mt-1 px-0" onClick={() => setSection("data")}>
+                Show the application state
+              </Button>
+            )}
+
+            {/* ── FOOT: what you look up rather than read ─────────────────────────────────
+                The three hashes used to cost 114px as stacked label-above blocks and the two
+                bookkeeping numbers a labelled row each. Same values, same full-hash-on-hover,
+                one small muted column (user, 2026-08-10). */}
+            <Foot>
+              <FootRow label="Hash" value={shortHash(sel.hash)} title={sel.hash} />
+              {polled?.parent && (
+                <FootRow label="Parent" value={shortHash(polled.parent)} title={polled.parent} />
+              )}
+              {stateProof && (
+                <FootRow label="State proof" value={shortHash(stateProof)} title={stateProof} />
+              )}
+              {polled && (
+                <FootRow label="Height" mono={false} value={`${polled.height} · ${polled.subHeight}`} />
+              )}
+              {polled && <FootRow label="Blocks" mono={false} value={polled.blocks} />}
+            </Foot>
           </div>
         )}
         <PulseEdge pulseKey={pulseKey} rail="right" />
