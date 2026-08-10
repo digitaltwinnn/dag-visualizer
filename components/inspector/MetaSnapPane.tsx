@@ -120,7 +120,10 @@ export default function MetaSnapPane({
   // the head — the METAGRAPH card sits directly above and states it as its own title — and the
   // ordinal is not a fact ABOUT the snapshot so much as the relation the aside is already naming,
   // so it belongs to the relation word rather than to a body row under it.
-  const anchor = `#${sel.globalOrdinal.toLocaleString()}`;
+  // No `#`: an ordinal is a VALUE and every surface that renders it as one — this card's own title,
+  // the explorer rows, the anchor-log cells — writes it bare. The sigil only ever survived where a
+  // number got glued into a sentence (user, 2026-08-10).
+  const anchor = sel.globalOrdinal.toLocaleString();
   const asideCls = "inline-flex items-center gap-1.5 text-label text-muted-foreground whitespace-nowrap";
   const aside = (
     <button

@@ -289,14 +289,15 @@ export function siblingSet(slot: RailCardKind, s: SiblingState): SiblingSet | nu
           // ordinal 0 marks an undecodable payload — several can share it, so the position
           // disambiguates the React key without inventing an identity.
           key: `${r.metaId}:${r.ordinal}:${i}`,
-          // The group names the metagraph, so an item is its ordinal alone — and an undecodable
-          // payload says so rather than claiming #0 (the route's contract).
-          label: r.ordinal > 0 ? `#${r.ordinal.toLocaleString()}` : "undecoded",
+          // The group names the metagraph, so an item is its ordinal alone — bare, like every
+          // other rendered ordinal — and an undecodable payload says so rather than claiming 0
+          // (the route's contract).
+          label: r.ordinal > 0 ? r.ordinal.toLocaleString() : "undecoded",
           actions: metaSnapSelectActions(sel, s.snap!, { filter: s.filter, metaSnap: cur }),
         };
       });
       const index = rows.findIndex((r) => sameMetaSnap(cur, { ...cur, ordinal: r.ordinal }));
-      return finish(slot, items, index, `${who} · Global #${cur.globalOrdinal.toLocaleString()}`);
+      return finish(slot, items, index, `${who} · Global ${cur.globalOrdinal.toLocaleString()}`);
     }
 
     // The GLOBAL snapshot — the one OPEN set: time, stepped one tick at a time. The window is the
@@ -311,7 +312,7 @@ export function siblingSet(slot: RailCardKind, s: SiblingState): SiblingSet | nu
       if (!cur) return null;
       const items = s.ticks.map((t) => ({
         key: String(t.data.ordinal),
-        label: `#${t.data.ordinal.toLocaleString()}`,
+        label: t.data.ordinal.toLocaleString(),
         actions: snapshotSelectActions(
           { kind: "snapshot", title: `Global snapshot #${t.data.ordinal}`, data: t.data },
           t.isLiveTip,

@@ -495,16 +495,23 @@ transition's ancestry re-derive by a grace window, with both live-advancing ordi
 selection key so heartbeats never materialize a card. Conversely **the heartbeat is felt on closed
 cards**: both snapshot asides carry the beating dot and are the same tap-to-follow toggle, but **only
 one of them owns the clock.** The global aside ticks a `live · Xs` counter (the shown snapshot's age,
-never overstating); the metagraph aside says **`anchored to #N`** whenever the card above already shows
+never overstating); the metagraph aside says **`anchored to N`** whenever the card above already shows
 the very tick it anchored into — the anchor join is exact, so a counter there would be the same number
 twice. It falls back to its own counter when that carries real information: a global ghost, or
 following a lane through anchor-less global ticks, where this card holds an older tick. **The
-anchoring ordinal rides all three states** (`anchored to #N` / `live · Xs ago → #N` / `◷ Xs ago → #N`),
+anchoring ordinal rides all three states** (`anchored to N` / `live · Xs ago → N` / `◷ Xs ago → N`),
 because the two counter states are precisely the ones where the card above shows a *different* tick, so
 the number is then the only thing saying which global this snapshot landed in. It moved into the head
 from a body row on 2026-08-10 — a join is not a fact ABOUT the snapshot, it is the relation the aside
 already names — and the metagraph TICKER that shared that row went with it under the pile rule, since
 the METAGRAPH card sits directly above and this card's own mark already carries the hue.
+
+**An ordinal is written BARE — no `#`** (user, 2026-08-10). Every surface that renders one as a value
+already did (the snapshot card titles, the explorer rows, the anchor-log cells, the LiveStrip's tooltip
+head); the sigil only survived where a number got glued into a sentence — this aside, the raw layer's
+channel pane head, the pager's step labels, the ledger explorer's tooltips and the scene tooltip. It is
+noise in all of them: the label beside it already says what the number is. Internal `PickDescriptor.title`
+strings still read `Global snapshot #N`, but nothing renders that field for a snapshot.
 
 Every card the current view CAN produce is always visible — populated when its subject is selected,
 else a quiet **ghost hint line** — so the rail shows the view's whole possibility space and a deselect

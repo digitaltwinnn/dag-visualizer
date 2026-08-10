@@ -287,7 +287,7 @@ export function ChannelStatePanel() {
         <span className="text-micro tracking-caps uppercase text-muted-foreground">Metagraph snapshot</span>
         <span className="flex items-center gap-2 text-title font-semibold text-foreground">
           <IdentityDot hue={hue} />
-          {ticker} <span className="tabular-nums">#{sel.ordinal.toLocaleString()}</span>
+          {ticker} <span className="tabular-nums">{sel.ordinal.toLocaleString()}</span>
         </span>
       </div>
 

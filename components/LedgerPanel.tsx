@@ -513,7 +513,7 @@ export default function LedgerPanel() {
                       pairOrd={d.ordinal}
                       setHoverOrd={setHoverSnapOrd}
                       accent={accent}
-                      title={`Global snapshot #${d.ordinal} · ${d.metagraphSnapshotCount ?? 0} anchored`}
+                      title={`Global snapshot ${d.ordinal.toLocaleString()} · ${d.metagraphSnapshotCount ?? 0} anchored`}
                       onClick={() => {
                         applyClickActions(
                           snapshotSelectActions(globalPick, latestRelevant("all")?.ordinal === d.ordinal, {
@@ -547,7 +547,7 @@ export default function LedgerPanel() {
                                   // finer metagraph snapshot pinned under it.
                                   on={filter === g.id && activeSnapOrd === d.ordinal && metaSnap == null}
                                   holdsSel={metaSnap?.metaId === g.id && metaSnap.globalOrdinal === d.ordinal}
-                                  title={`${g.name} · ${g.rows.length} snapshot${g.rows.length === 1 ? "" : "s"} anchored into #${d.ordinal}`}
+                                  title={`${g.name} · ${g.rows.length} snapshot${g.rows.length === 1 ? "" : "s"} anchored into ${d.ordinal.toLocaleString()}`}
                                   onToggle={() => {
                                     // A metagraph under a tick is the BAND: the (metagraph, tick)
                                     // pair — the same tested semantics as clicking its band in
@@ -591,7 +591,7 @@ export default function LedgerPanel() {
                                             pairOrd={metaSnapHoverKey(r.metaId, r.ordinal)}
                                             setHoverOrd={setHoverMetaSnap}
                                             accent={g.hue}
-                                            title={`${g.name} snapshot #${r.ordinal} · anchored into global #${r.global.ordinal}${signers.length ? ` · signed by ${signers.length} ${SIGNER_GROUPS.proof.who}` : ""}`}
+                                            title={`${g.name} snapshot ${r.ordinal.toLocaleString()} · anchored into global ${r.global.ordinal.toLocaleString()}${signers.length ? ` · signed by ${signers.length} ${SIGNER_GROUPS.proof.who}` : ""}`}
                                             // The AFFORDANCE FOLLOWS THE DATA: no exact read for
                                             // this tick (pruned, or not yet fetched) means no
                                             // signers are knowable, so the row simply doesn't
@@ -639,7 +639,7 @@ export default function LedgerPanel() {
                                 !LISTED_IDS.has(metaSnap.metaId) &&
                                 metaSnap.globalOrdinal === d.ordinal
                               }
-                              title={`${tickUnlisted} uncataloged snapshot${tickUnlisted === 1 ? "" : "s"} anchored into #${d.ordinal}`}
+                              title={`${tickUnlisted} uncataloged snapshot${tickUnlisted === 1 ? "" : "s"} anchored into ${d.ordinal.toLocaleString()}`}
                               onToggle={() => {
                                 applyClickActions(
                                   bandSelectActions(UNLISTED_ID, globalPick, { filter, metaSnap, tickHasFilter }),
@@ -685,7 +685,7 @@ export default function LedgerPanel() {
                                         pairOrd={metaSnapHoverKey(r.metaId, r.ordinal)}
                                         setHoverOrd={setHoverMetaSnap}
                                         accent={UNLISTED_HUE}
-                                        title={`Unlisted channel ${r.metaId} · anchored into global #${r.global.ordinal}${signers.length ? ` · signed by ${signers.length} ${SIGNER_GROUPS.proof.who}` : ""}`}
+                                        title={`Unlisted channel ${r.metaId} · anchored into global ${r.global.ordinal.toLocaleString()}${signers.length ? ` · signed by ${signers.length} ${SIGNER_GROUPS.proof.who}` : ""}`}
                                         disclose={signers.length > 0 ? { open: sOpen } : undefined}
                                         onClick={() => {
                                           applyClickActions(
