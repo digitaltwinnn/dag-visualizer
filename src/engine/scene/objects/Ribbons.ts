@@ -18,6 +18,7 @@
 // strut drawn by the view. One Mesh, one preallocated geometry, rewritten event-time.
 import * as THREE from "three";
 import type { SceneColors } from "../../sceneColors";
+import type { TuneSchema } from "../../tune";
 import { METAGRAPHS } from "../../config";
 import { BAR_H, BAR_LIFT, FLOOR_Y, LEAD_X, TILE_LIFT } from "../../domain/ledgerLayout";
 import { SLOT_SP } from "../../domain/ledgerModel";
@@ -50,6 +51,14 @@ export const RIBBON_TUNE_DEFAULTS: RibbonTune = {
   restOp: 0.25,
   brightness: 0.85,
   curve: 1,
+};
+
+/** The `?tune` knob ranges (contract: src/engine/tune.ts) — colocated so a range sits next to the
+ *  number it bounds. Type-only import: no runtime coupling to the panel. */
+export const RIBBON_TUNE_SCHEMA: TuneSchema<RibbonTune> = {
+  restOp: { min: 0, max: 1, label: "opacity" },
+  brightness: { min: 0.1, max: 2, step: 0.05 },
+  curve: { min: 0, max: 1, step: 0.05 },
 };
 
 /** The eased Z progress at vertical progress `t` — linear blended toward smootherstep. */

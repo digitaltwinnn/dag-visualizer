@@ -6,6 +6,9 @@ import {
   focusBoost,
   focusWeightOf,
   GROUP_FOCUS,
+  FOCUS_TUNE,
+  FOCUS_TUNE_DEFAULTS,
+  FOCUS_TUNE_SCHEMA,
   hubMatchBoost,
   dimTargetsFor,
   validatorDim,
@@ -316,3 +319,43 @@ describe("metaNodeEmissive (metagraph loop, js/globe.js:1099-1107)", () => {
   });
 });
 
+
+// The `?tune` surface (contract: src/engine/tune.ts). The formulas above were literals until the
+// dev panel needed to bind them; these tests are the regression guard for that move.
+describe("FOCUS_TUNE", () => {
+  it("starts live == defaults, so an untouched panel changes nothing", () => {
+    expect(FOCUS_TUNE).toEqual(FOCUS_TUNE_DEFAULTS);
+  });
+
+  it("keeps GROUP_FOCUS as its groupShare default", () => {
+    expect(FOCUS_TUNE_DEFAULTS.groupShare).toBe(GROUP_FOCUS);
+  });
+
+  it("schemas every knob, and every knob's range contains its default", () => {
+    for (const [key, v] of Object.entries(FOCUS_TUNE_DEFAULTS)) {
+      const knob = FOCUS_TUNE_SCHEMA[key as keyof typeof FOCUS_TUNE_DEFAULTS];
+      expect(knob, `no schema entry for ${key}`).toBeDefined();
+      expect(v).toBeGreaterThanOrEqual(knob!.min);
+      expect(v).toBeLessThanOrEqual(knob!.max);
+    }
+  });
+
+  // The defaults must reproduce the ORIGINAL literal formulas exactly, at every morph — the
+  // refactor renamed the endpoints, it did not retune anything.
+  it("reproduces the pre-refactor formulas at every morph", () => {
+    for (const morph of [0, 0.1, 0.25, 0.5, 0.75, 0.9, 1]) {
+      const c = ctx({ morph });
+      expect(dimScale(c)).toBeCloseTo(0.32 + 0.68 * morph, 10);
+      expect(focusDim(c)).toBeCloseTo(0.45 + 0.2 * morph, 10);
+      expect(focusBoost(c)).toBeCloseTo(1.4 - 0.7 * morph, 10);
+    }
+  });
+
+  it("reproduces the pre-refactor ledger overrides", () => {
+    const c = ctx({ ledger: true, morph: 0.5 });
+    expect(dimScale(c)).toBeCloseTo(0.5, 10);
+    expect(focusDim(c)).toBeCloseTo(0.55, 10);
+    expect(focusBoost(c)).toBeCloseTo(0.7, 10);
+    expect(metaNodeDim(c, 1, null)).toBeCloseTo(0.5, 10);
+  });
+});

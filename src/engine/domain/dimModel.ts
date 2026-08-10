@@ -19,7 +19,7 @@
 // lose exactness.
 
 import { lerp } from "./nodeLayout";
-
+import type { TuneSchema } from "../tune";
 
 export interface DimContext {
   morph: number;
@@ -47,7 +47,8 @@ export interface DimContext {
 // (Ledger override 2026-08-07, matching metaNodeDim: morph is frozen there, and full strength
 // cascades to near-black through the chip writer — the flat 0.5 lands the validator chips at
 // the same COLORED-dim tier as the metagraph chips.)
-export const dimScale = (c: DimContext): number => (c.ledger ? 0.5 : 0.32 + 0.68 * c.morph);
+export const dimScale = (c: DimContext): number =>
+  c.ledger ? FOCUS_TUNE.dimLedger : lerp(FOCUS_TUNE.dimHyper, FOCUS_TUNE.dimGeo, c.morph);
 
 // The METAGRAPH pool's own dim strength: ZERO in the Hypergraph, full on the globe. Metagraph
 // nodes REST at the dimmed look in hyper (user, 2026-07-17 — the base size/glow in
@@ -72,13 +73,13 @@ export const dimTargetsFor = (sel: string, metaIds: string[]) => ({
 // Per-view hover/selection DIM-BACK: how far the OTHER nodes drop when one node is the focus
 // (user): softer in geo (the rest stay brighter), a notch stronger in ledger, hyper unchanged.
 export const focusDim = (c: DimContext): number =>
-  c.ledger ? 0.55 : 0.45 + 0.20 * c.morph; // hyper 0.45 · geo 0.65 · ledger 0.55
+  c.ledger ? FOCUS_TUNE.backLedger : lerp(FOCUS_TUNE.backHyper, FOCUS_TUNE.backGeo, c.morph);
 
 // Per-view hover/selection BOOST: the emissive added to the focused node's shells. Full pop in
 // hyper (the nodes rest dim there, see metaDimScale); HALVED in geo and ledger (user,
 // 2026-07-17: the chips' base glow is brighter there and the flat 1.4 blew out).
 export const focusBoost = (c: DimContext): number =>
-  c.ledger ? 0.7 : 1.4 - 0.7 * c.morph; // hyper 1.4 · geo 0.7 · ledger 0.7
+  c.ledger ? FOCUS_TUNE.boostLedger : lerp(FOCUS_TUNE.boostHyper, FOCUS_TUNE.boostGeo, c.morph);
 
 // Focus is TIERED, not a flag (user, 2026-08-01: "selecting a provider highlights its nodes,
 // but selecting a node afterwards has no visual effect" — the node was already lit at exactly
@@ -87,9 +88,60 @@ export const focusBoost = (c: DimContext): number =>
 // hovered composition or cluster group) takes a FRACTION of the boost; the PRIMARY subject —
 // the one hovered or selected node — always takes all of it, so it stands out from its own
 // group. `focusWeightOf` is the one place that ranking lives; the node loops call it per node.
-export const GROUP_FOCUS = 0.45; // share of focusBoost a group member gets
+export const GROUP_FOCUS = 0.45; // share of focusBoost a group member gets (FOCUS_TUNE's default)
 export const focusWeightOf = (primary: boolean, group: boolean): number =>
-  primary ? 1 : group ? GROUP_FOCUS : 0;
+  primary ? 1 : group ? FOCUS_TUNE.groupShare : 0;
+
+// ---- the EMPHASIS tunable (contract: src/engine/tune.ts) -------------------------------------
+// The per-view dim/focus numbers, hoisted out of the formulas below into one struct so the `?tune`
+// panel can bind them. Two properties keep this non-intrusive:
+//   · `FOCUS_TUNE_DEFAULTS` is the SHIPPED LOOK and is what the tests pin — turning a knob can
+//     never make a test pass or fail.
+//   · Every value is seeded from the literal (or the existing const) it replaced, so the resolved
+//     numbers are unchanged: `lerp(0.32, 1.0, morph)` IS `0.32 + 0.68 * morph`, and naming the
+//     ENDPOINTS is what makes the geo value readable at all.
+export interface FocusTune {
+  /** Network/country dim strength per view — `dimScale`. */
+  dimHyper: number;
+  dimGeo: number;
+  dimLedger: number;
+  /** How far the OTHER nodes drop when one node is the focus — `focusDim`. */
+  backHyper: number;
+  backGeo: number;
+  backLedger: number;
+  /** Emissive added to the focused node — `focusBoost`. */
+  boostHyper: number;
+  boostGeo: number;
+  boostLedger: number;
+  /** Share of the boost a GROUP member gets, vs. the primary subject's full 1. */
+  groupShare: number;
+  /** The ledger's flat metagraph-node dim (morph is frozen there, so the ramp can't apply). */
+  metaDimLedger: number;
+}
+
+export const FOCUS_TUNE_DEFAULTS: Readonly<FocusTune> = {
+  dimHyper: 0.32, dimGeo: 1.0, dimLedger: 0.5,
+  backHyper: 0.45, backGeo: 0.65, backLedger: 0.55,
+  boostHyper: 1.4, boostGeo: 0.7, boostLedger: 0.7,
+  groupShare: GROUP_FOCUS,
+  metaDimLedger: 0.5,
+};
+
+export const FOCUS_TUNE: FocusTune = { ...FOCUS_TUNE_DEFAULTS };
+
+export const FOCUS_TUNE_SCHEMA: TuneSchema<FocusTune> = {
+  dimHyper: { min: 0, max: 1, label: "dim · hyper" },
+  dimGeo: { min: 0, max: 1, label: "dim · geo" },
+  dimLedger: { min: 0, max: 1, label: "dim · ledger" },
+  backHyper: { min: 0, max: 1, label: "dim-back · hyper" },
+  backGeo: { min: 0, max: 1, label: "dim-back · geo" },
+  backLedger: { min: 0, max: 1, label: "dim-back · ledger" },
+  boostHyper: { min: 0, max: 3, step: 0.05, label: "boost · hyper" },
+  boostGeo: { min: 0, max: 3, step: 0.05, label: "boost · geo" },
+  boostLedger: { min: 0, max: 3, step: 0.05, label: "boost · ledger" },
+  groupShare: { min: 0, max: 1, label: "group share" },
+  metaDimLedger: { min: 0, max: 1, label: "meta dim · ledger" },
+};
 
 // Validator (DAG-core) dim: the eased whole-core dim (ONE value — the old per-layer {l0,l1}
 // split always carried identical values and was collapsed; the DAG core is one subject) scaled
@@ -110,7 +162,7 @@ export function validatorDim(c: DimContext, dim: number, geoCc: string | null): 
 // the chips at the COLORED-dim tier the ribbons' RIBBON_DIM speaks, user 2026-08-07). Raised
 // by countryMix outside the drilled country, same as validatorDim.
 export function metaNodeDim(c: DimContext, recDim: number, geoCc: string | null): number {
-  let d = recDim * (c.ledger ? 0.5 : metaDimScale(c));
+  let d = recDim * (c.ledger ? FOCUS_TUNE.metaDimLedger : metaDimScale(c));
   if (c.countryFilter && (!geoCc || geoCc !== c.countryFilter)) d = Math.max(d, c.countryMix);
   return d;
 }

@@ -140,6 +140,35 @@ Gotchas worth knowing before you burn time on them:
   inspect mid-flight states.
 - Benign console noise: `mojo ... rejected`, `PHONE_REGISTRATION_ERROR`, `BackForwardCache`.
 
+### Tuning the look live
+
+The dev **`?tune`** flag (present at page load, the `?stats` idiom) dynamic-imports a tweakpane panel
+from `src/engine/devTune.ts` — never in the normal bundle. The contract is `src/engine/tune.ts`; three
+rules make it non-intrusive, and the header comment there is their authoritative statement:
+
+1. **`*_TUNE_DEFAULTS` is the shipped look and stays what tests pin** — they assert the DEFAULTS, never
+   the live struct, so turning a knob can never make a test pass or fail.
+2. **The hoist rule.** A tunable read inside a per-node loop is loaded into a local in that loop's
+   preamble, so the inner body reads a local exactly as it did when the value was a module const — one
+   property load per FRAME, not per node. Sibling discipline to `noFrameAllocations.test.ts`.
+3. **A knob's range is colocated with the constant it bounds** — a `*_TUNE_SCHEMA` next to its
+   `*_TUNE_DEFAULTS`, typed against its own values so a renamed field is a compile error rather than a
+   silently missing slider. `devTune.ts` is ONLY the manifest plus a generic walker, so adding a knob is
+   one line in the owning module and no edit there.
+
+**The tree is STATIC** — shared groups (`focus & dim`), then one collapsed folder per view, then the
+camera. A folder for a view you aren't in simply sits collapsed; that costs a click and saves the panel
+tracking `mode`, subscribing to anything, or rebuilding itself. Values that are BAKED rather than read
+per frame (ribbon vertex colours, a light's cone) carry an `onChange` that re-pushes them, so an edit
+shows without a reload. Persistence is **opt-in and default OFF** — a silently-restored session is a
+trap, because you would be looking at last week's knobs believing they were the shipped look.
+
+**The camera folder is a READOUT, not sliders**: poses are ~8 constants and each needs its own selection
+state to even see, so orbiting to a pose you like and reading it off beats dragging numbers.
+`capture ← live` dumps the raw `pos`/`target` **with a caution naming the levers the Engine composes on
+top** (`dollyBack`, `railsDolly`, and the subject-relative hub framings). Deliberately raw — per-pose
+inverses would be a second home for pose knowledge that drifts silently.
+
 ## Architecture
 
 A thin React/Next shell around an imperative Three engine, joined by a Zustand store. **Two data
@@ -839,10 +868,8 @@ own tray — instantiated per position. What it deliberately does not own is the
 and ribbons stay pooled instanced meshes spanning every plane, and the lead-identity/neutral-trail rule
 stays one shared code path.
 
-**The chamber's look is live-tunable.** The dev **`?tune`** flag (present at page load, the `?stats`
-idiom) dynamic-imports a tweakpane panel from `src/engine/devTune.ts` — never in the normal bundle —
-with folders for the ribbons, the byte bar, the lane tiles and the two plane channels. Each folder is
-backed by a defaults constant holding the shipped look; chosen values get baked back into it.
+**The chamber's look is live-tunable.** Under `?tune` (see *Tuning the look live*) the `ledger` folder
+carries the ribbons, the byte bar, the lane tiles and the two plane channels.
 
 **Node trays** hold each metagraph's machines under its own plane and the whole validator fleet under
 the global floor, with no role split. **Machines are deduped — a hybrid appears once**, since roles

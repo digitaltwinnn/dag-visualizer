@@ -13,6 +13,13 @@ export class StageLights {
     this.spots.set(view, spot);
   }
 
+  // The registered spot, or undefined for a view that constructs none (the ledger). This class is
+  // already the ONE place that knows which spot belongs to which view, so the `?tune` panel asks
+  // here rather than growing an accessor on each view.
+  get(view: View3D): FocusSpot | undefined {
+    return this.spots.get(view);
+  }
+
   // Per frame: black out every registered spot whose view is dark. Idempotent (blackout of
   // an already-dark spot is a no-op write), so no per-spot state tracking is needed.
   gate(alphas: Record<View3D, number>): void {

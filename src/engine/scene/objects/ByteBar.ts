@@ -15,6 +15,7 @@ import { BAR_H, BAR_D, BAR_LIFT, FLOOR_Y, LEAD_X } from "../../domain/ledgerLayo
 import { type BarSpec } from "../../domain/ledgerBands";
 import { SLOT_SP, SLOT_N, horizonAt } from "../../domain/ledgerModel";
 import { RIBBON_DIM } from "./Ribbons";
+import type { TuneSchema } from "../../tune";
 
 const BANDS_PER_SLOT = METAGRAPHS.length + 1;
 
@@ -29,6 +30,12 @@ export interface BarTune {
 // hot/rest user-tuned via ?tune, 2026-08-07. (The off-filter dim was removed entirely the same
 // day — a committed filter changes the CAMERA, never the bar.)
 export const BAR_TUNE_DEFAULTS: BarTune = { hot: 0.7, rest: 0.05 };
+
+/** The `?tune` knob ranges (contract: src/engine/tune.ts), colocated with the numbers they bound. */
+export const BAR_TUNE_SCHEMA: TuneSchema<BarTune> = {
+  hot: { min: 0, max: 1 },
+  rest: { min: 0, max: 1 },
+};
 
 /** The HOVER-preview tier (user, 2026-08-07): a hovered snapshot row shows its identity
  *  colours at this fraction of the hot level — the ACTIVE row stays fully coloured, the

@@ -2,6 +2,7 @@
 // view, consumed by the view's FocusSpot construction + aim calls. The per-view VALUES are
 // deliberate tuning (non-goals: values stay per-view; the MECHANISM unifies).
 import type { View3D } from "./viewTransition";
+import type { TuneSchema } from "../tune";
 
 export interface StageLightRow {
   angle: number;     // SpotLight cone half-angle (rad)
@@ -18,4 +19,27 @@ export const STAGE_LIGHTS: Record<View3D, StageLightRow> = {
   hyper: { angle: 0.9, distance: 40, intensity: 2.4, penumbra: 0.25, height: 9, heightDag: 17 },
   geo: { angle: 0.36, distance: 22, intensity: 1.5, height: 6 },
   ledger: { angle: 0.75, distance: 44, intensity: 2.6, height: 14 },
+};
+
+// ---- the `?tune` surface (contract: src/engine/tune.ts) --------------------------------------
+// STAGE_LIGHTS' rows are already plain mutable objects, so the panel binds them directly and no
+// production code changes shape. What it needs on top is a defaults copy to reset/diff against —
+// snapshotted at module init, before any panel can exist, so it cannot be a turned knob.
+//
+// ⚠️ `ledger` has a row here but NO FocusSpot: only HyperView (hyper) and Globe (geo) construct and
+// register one. The row is unconsumed — the panel therefore offers hyper and geo only, rather than
+// a folder whose sliders move nothing.
+export const STAGE_LIGHT_DEFAULTS: Readonly<Record<View3D, StageLightRow>> = {
+  hyper: { ...STAGE_LIGHTS.hyper },
+  geo: { ...STAGE_LIGHTS.geo },
+  ledger: { ...STAGE_LIGHTS.ledger },
+};
+
+export const STAGE_LIGHT_SCHEMA: TuneSchema<StageLightRow> = {
+  angle: { min: 0.05, max: 1.4, step: 0.01, label: "cone" },
+  distance: { min: 5, max: 80, step: 1, label: "range" },
+  intensity: { min: 0, max: 10, step: 0.1 },
+  penumbra: { min: 0, max: 1, label: "soft edge" },
+  height: { min: 1, max: 40, step: 0.5, label: "stage height" },
+  heightDag: { min: 1, max: 40, step: 0.5, label: "stage height · DAG" },
 };

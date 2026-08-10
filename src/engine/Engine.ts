@@ -334,7 +334,12 @@ export class Engine {
     if (/[?#&]tune/.test(window.location.search + window.location.hash)) {
       import("./devTune").then(async (m) => {
         if (this.disposed) return;
-        this._devTune = await m.mountDevTune({ ledger: this.ledger });
+        this._devTune = await m.mountDevTune({
+          ledger: this.ledger,
+          stageLights: this._stageLights,
+          camera: this.ctx.camera,
+          controls: this.ctx.controls,
+        });
         if (this.disposed) this._devTune.dispose();
       });
     }

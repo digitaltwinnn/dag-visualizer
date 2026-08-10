@@ -57,6 +57,7 @@ import { SnapshotPlane, makeEdgeLabel, GLOBAL_PLANE_TUNE_DEFAULTS, META_PLANE_TU
 import { TrailRewind } from "../objects/TrailRewind";
 import { FadeSet } from "../objects/FadeSet";
 import type { SceneView } from "./SceneView";
+import type { TuneSchema } from "../../tune";
 
 const PULSE_MAX = 220;
 const PULSE_STAGGER = 0.035;
@@ -112,6 +113,12 @@ export interface TileTune {
 
 // hot/rest user-tuned via ?tune, 2026-08-07 — the same levels as the byte bar's hot/rest.
 export const TILE_TUNE_DEFAULTS: TileTune = { hot: 0.7, rest: 0.1 };
+
+/** The `?tune` knob ranges (contract: src/engine/tune.ts), colocated with the numbers they bound. */
+export const TILE_TUNE_SCHEMA: TuneSchema<TileTune> = {
+  hot: { min: 0, max: 2.5, step: 0.05 },
+  rest: { min: 0, max: 2, step: 0.05 },
+};
 
 export class LedgerView implements SceneView {
   group: THREE.Group;
