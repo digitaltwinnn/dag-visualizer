@@ -8,7 +8,7 @@
 import { useEffect, useMemo, useState, type CSSProperties, type ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import CardHead, { RailPane } from "@/components/CardHead";
-import { IdentityDot, Fact, FactGroup, Foot, FootRow } from "@/components/inspector/parts";
+import { Fact, FactGroup, Foot, FootRow } from "@/components/inspector/parts";
 import { Separator } from "@/components/ui/separator";
 import { useStore } from "@/src/store/store";
 import { metaSnapDeepKey } from "@/src/data/types";
@@ -95,16 +95,17 @@ export default function MetaSnapPane({
   // seconds ago; looks redundant"). The GLOBAL card owns the clock; this one states the relation
   // instead — `anchored`, the house word for what the Snapshots stack does. The counter comes back
   // the moment it carries real information: while following a metagraph lane through anchor-less
-  // global ticks this card holds an OLDER tick, and then its age is not a repeat.
+  // global ticks this card holds an OLDER tick, and then its age is not a repeat. The anchoring
+  // ordinal rides ALL THREE states, because the two counter states are precisely the ones where the
+  // card above shows a different tick (or is a ghost) — there the number is the only thing saying
+  // which global this snapshot actually landed in.
   const now = useNowTick(1000);
 
   if (!sel) return null;
   const cfg = metagraphById(sel.metaId);
-  // An UNLISTED metagraph has no config row — its address is the only name it has, and its hue
-  // is the unlisted set's NEUTRAL gray (2026-08-08: hashing the address through the identity
-  // palette minted a random hue per channel — pink icons for a set that deliberately has no
-  // identity of its own).
-  const ticker = cfg?.ticker || cfg?.name || shortHash(sel.metaId);
+  // An UNLISTED metagraph has no config row, so its hue is the unlisted set's NEUTRAL gray
+  // (2026-08-08: hashing the address through the identity palette minted a random hue per channel —
+  // pink icons for a set that deliberately has no identity of its own).
   const hue = cfg ? identityHudHex(sel.metaId) : UNLISTED_HUE;
   // Hoisted out of the state tier so the FOOT can reach it — it is a hash, and hashes are looked
   // up, not read. The deep read wins where it exists; the exact row carries it otherwise.
@@ -114,6 +115,12 @@ export default function MetaSnapPane({
   // ⚠️ The `!!snap` half is load-bearing: the ledger contributes no ancestry, so the global card
   // can be a GHOST while this one is populated — there the clock has to stay here.
   const sameTick = !!snap && snap.data.ordinal === sel.globalOrdinal;
+  // The tick this snapshot anchored INTO. It used to open the body as a row of its own, paired with
+  // the metagraph's ticker; both are gone (user, 2026-08-10). The ticker was the pile rule broken at
+  // the head — the METAGRAPH card sits directly above and states it as its own title — and the
+  // ordinal is not a fact ABOUT the snapshot so much as the relation the aside is already naming,
+  // so it belongs to the relation word rather than to a body row under it.
+  const anchor = `#${sel.globalOrdinal.toLocaleString()}`;
   const asideCls = "inline-flex items-center gap-1.5 text-label text-muted-foreground whitespace-nowrap";
   const aside = (
     <button
@@ -128,7 +135,7 @@ export default function MetaSnapPane({
       {following && (
         <span className="w-2 h-2 rounded-full bg-primary shadow-[0_0_0_3px_color-mix(in_oklch,var(--primary)_30%,transparent)] animate-dot-beat motion-reduce:animate-none" />
       )}
-      {sameTick ? "anchored" : following ? (rel ? `live · ${rel}` : "live") : <>◷ {rel}</>}
+      {sameTick ? `anchored to ${anchor}` : following ? <>{rel ? `live · ${rel}` : "live"} → {anchor}</> : <>◷ {rel} → {anchor}</>}
     </button>
   );
 
@@ -152,23 +159,6 @@ export default function MetaSnapPane({
         />
         {!collapsed && (
           <div>
-            {/* ── LEAD ───────────────────────────────────────────────────────────────────────
-                What this snapshot IS and where it landed, on one line: the metagraph that
-                produced it and the global tick it anchored into. Size and fee used to ride a
-                second lead line; they moved DOWN into `Fees paid` (user, 2026-08-10) so this card
-                mirrors its sibling above — the global card leads with the anchoring relation,
-                puts the breakdown VISUAL at the centre, and states fee-and-size as one fact
-                below. Bytes and DAG are bookkeeping about the anchor; the payload is the news. */}
-            <div className="flex items-start justify-between gap-2.5" title={`Anchored into global snapshot ${sel.globalOrdinal.toLocaleString()}`}>
-              <span className="inline-flex items-center gap-1.5 min-w-0 text-body text-foreground">
-                <IdentityDot hue={hue} />
-                <span className="truncate">{ticker}</span>
-              </span>
-              <span className="text-body text-muted-foreground tabular-nums whitespace-nowrap">
-                → #{sel.globalOrdinal.toLocaleString()}
-              </span>
-            </div>
-
             {/* ── THE CENTRE: what this metagraph actually anchored ────────────────────────
                 Two labelled sections, State and Data — the same two payload lanes the raw layer
                 opens one tier down, so the card states their SHAPE and the pane renders them.
