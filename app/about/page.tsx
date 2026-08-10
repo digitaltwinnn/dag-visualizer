@@ -22,7 +22,7 @@ export const metadata: Metadata = {
   title: "About — DAG Visualizer",
   description:
     "What DAG Visualizer is: a free, browser-based 3D visualizer of the Constellation Network — " +
-    "the $DAG hypergraph, its metagraphs, the validator world map, and live snapshot anchoring. " +
+    "the $DAG hypergraph, its metagraphs, the node world map, and live snapshot anchoring. " +
     "An unofficial community project.",
   alternates: { canonical: "/about" },
 };
@@ -202,7 +202,7 @@ export default function AboutPage() {
               <ViewCard
                 icon={Globe}
                 name="Geography"
-                blurb="Where the network runs: every validator node at its real location on a holographic globe, with live traffic travelling between them."
+                blurb="Where the network runs: every node at its real location on a holographic globe, with live traffic travelling between them."
               />
               <ViewCard
                 icon={Layers}
@@ -240,8 +240,8 @@ export default function AboutPage() {
           <Section id="data" title="Where the data comes from">
             <p>
               Everything on screen is read from Constellation&apos;s own public endpoints: the
-              global snapshot stream, each metagraph&apos;s cluster info, and each validator&apos;s
-              node status. Validator locations come from geolocating their public IP addresses, so
+              global snapshot stream, each metagraph&apos;s cluster info, and each node&apos;s
+              status. Node locations come from geolocating their public IP addresses, so
               they are accurate to a city and a hosting provider, not to a street.
             </p>
             <p>

@@ -60,6 +60,8 @@ export default function RawSnapshotBridge() {
   const selOrd = useStore((s) => s.snap?.data.ordinal ?? null);
   const deepSel = useStore((s) => s.metaSnap);
   const following = useStore((s) => s.following);
+  const section = useStore((s) => s.section);
+  const deepWanted = useStore((s) => s.deepWanted);
   const backfilled = useRef(false);
 
   useEffect(() => ensure(liveOrd), [liveOrd]);
@@ -99,8 +101,23 @@ export default function RawSnapshotBridge() {
     // control (no metaSnap change) must fire the decode for the snapshot already on screen.
     if (following) return;
     const key = metaSnapDeepKey(deepSel.globalOrdinal, deepSel.metaId, deepSel.ordinal);
+    // …and BEING PINNED IS NOT THE SAME AS ASKING (user, 2026-08-10). Selecting a snapshot used to
+    // be the whole trigger, which made the read follow a BROWSE gesture: every pager step and
+    // every explorer leaf fetched. Measured live, a single tick anchors up to 20 DOR snapshots, so
+    // a swipe through that pager cost 20 × ~2.5 MB against Constellation's public L0 LB at ~1.8s
+    // cold each. The gate is therefore the SURFACE, not the mode:
+    //
+    //   • the CARD states the SHAPE, so it never reads on its own — its `Read this snapshot`
+    //     button writes `deepWanted`, and that is the whole request. One press, one read.
+    //   • the RAW LAYER *is* the payload surface, so being there IS the request — nothing else
+    //     is down there, and arriving took a deliberate depth change.
+    //
+    // Client cost is small either way (the decoded row is ~0.6–4.4 KB); what is being rationed is
+    // the server's fetch of the whole global and the latency the user waits through.
+    if (section !== "data" && deepWanted !== key) return;
     const st = useStore.getState();
     if (st.metaSnapDeep[key] || deepInflight.has(key)) return;
+
     deepInflight.add(key);
     fetch(`/api/snapshot/${deepSel.globalOrdinal}/channel/${deepSel.metaId}?snap=${deepSel.ordinal}`)
       .then((r) => (r.ok ? (r.json() as Promise<ChannelSnapDeep>) : null))
@@ -112,7 +129,7 @@ export default function RawSnapshotBridge() {
       })
       .catch(() => {})
       .finally(() => deepInflight.delete(key));
-  }, [deepSel, following]);
+  }, [deepSel, following, section, deepWanted]);
 
   return null;
 }

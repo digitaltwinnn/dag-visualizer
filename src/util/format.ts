@@ -19,6 +19,11 @@ export const fmtKB = (kb: number) =>
       ? `${Math.round(kb).toLocaleString()} KB`
       : `${kb.toFixed(1)} KB`;
 
+// Byte count → readable string, staying in BYTES under 1 KB. An application state that serializes
+// to 14 bytes is a real state, and `fmtKB` would render it "0.0 KB" — a zero the card would then be
+// asserting about live data (rule 10). Above 1 KB it is the same scale everything else uses.
+export const fmtBytes = (bytes: number) => (bytes < 1024 ? `${bytes.toLocaleString()} B` : fmtKB(bytes / 1024));
+
 // Two-letter country code → the compact uppercase CODE mark the HUD shows where a country row
 // needs a leading glyph (`··` when the code is absent or malformed, so the column keeps its
 // width). This used to emit a flag EMOJI (a regional-indicator pair) and was replaced

@@ -229,6 +229,19 @@ function metaSnapHint(s: RailManifestState): string | null {
 // returns a slot to its ghost in place (spatially stable; the old recency reordering made cards
 // jump). Callers filter to `present` for the tray icons.
 export function detailsCards(s: RailManifestState): RailCard[] {
+  // A PLACEHOLDER VIEW HAS NO FACTS SCOPE (user, 2026-08-10). `status`/`transactions`/`staking`
+  // draw a wireframe captioned `preview · in development` and deliberately show no numbers, so
+  // they never read as live data — but the ladder lane is empty there (`ladderSlotIds` → []), which
+  // dropped every present card into Inspector's trailing non-ladder pass. The result was a fully
+  // populated node card — status pill, ASN, real id — sitting beside the wireframe with nothing to
+  // say it isn't FROM it, which is the exact reading rule 10 exists to prevent. It also arrived
+  // half-formed: `nonLadder` excludes the context kind (ContextCard is only ever mounted inside its
+  // rung, to keep its EdgePulse alive across the dossier⇄nothing swap), so the node showed with no
+  // network above it and no ancestry pile — fall-out, not a decision.
+  // The SELECTION IS UNTOUCHED: this only stops the view speaking for it, so returning to a 3D view
+  // restores the whole pile in place. Gated on the views the facts scope is FOR (convention 7),
+  // and it matches what the left rail already does here — About only, no tool card.
+  if (!IN_3D(s.mode)) return [];
   const context: RailCard = {
     id: "context",
     kind: "context",

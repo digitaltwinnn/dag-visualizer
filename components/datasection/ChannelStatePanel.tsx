@@ -50,23 +50,12 @@ import { useStore } from "@/src/store/store";
 import { metaSnapDeepKey } from "@/src/data/types";
 import type { NodeRow } from "@/src/data/types";
 import { metagraphById, resolveSigner, shortHash, SIGNER_GROUPS, SIGNER_UNKNOWN } from "@/src/data/network";
-import { payloadKinds } from "@/src/data/payloadKinds";
+import { PAYLOAD_LANES, parsePayload, payloadKinds } from "@/src/data/payloadKinds";
 import { identityHudHex } from "@/src/palette/identity";
 import { IdentityDot } from "@/components/inspector/parts";
 import { fmtDag, fmtKB } from "@/src/util/format";
 import JsonTree from "@/components/datasection/JsonTree";
 import { cn } from "@/lib/utils";
-
-/** A decoded payload string → a tree-renderable value, tolerating an undecodable one (which
- *  renders as a single string value rather than being hidden). */
-function parsePayload(s: string | undefined): unknown {
-  if (!s) return null;
-  try {
-    return JSON.parse(s) as unknown;
-  } catch {
-    return s;
-  }
-}
 
 /** Whether a decoded payload carries anything at all — `{}`, `[]` and `""` do NOT open a lane. */
 function nonEmpty(v: unknown): boolean {
@@ -199,7 +188,7 @@ function SignerGroup({
         <span className="text-foreground-dim">{g.layer}</span>
       </LaneNote>
       <LaneTable
-        head={["Machine", "Signer id"]}
+        head={["Node", "Signer id"]}
         rows={ids.map((id) => {
           const r = resolveSigner(selNodes, metaId, id);
           const w = r.known ? null : SIGNER_UNKNOWN[r.reason];
@@ -247,17 +236,17 @@ export function ChannelStatePanel() {
     if (deep.stateKeys.length > 0 || nonEmpty(state)) {
       out.push({
         id: "state",
-        name: "State",
+        name: PAYLOAD_LANES.state.name,
         count: deep.stateKeys.length || null,
-        title: "The metagraph's on-chain application state",
+        title: PAYLOAD_LANES.state.title,
       });
     }
     if (deep.dataTxCount > 0 || nonEmpty(dataTx)) {
       out.push({
         id: "data",
-        name: "Data",
+        name: PAYLOAD_LANES.data.name,
         count: deep.dataTxCount || null,
-        title: "Data transactions carried in this snapshot's blocks",
+        title: PAYLOAD_LANES.data.title,
       });
     }
     if (deep.signers.length > 0 || deep.dataBlockSigners.length > 0) {
@@ -265,7 +254,7 @@ export function ChannelStatePanel() {
         id: "signers",
         name: "Signers",
         count: deep.signers.length || deep.dataBlockSigners.length,
-        title: "The validators whose proofs seal this snapshot",
+        title: "The validators that signed this snapshot, by producing layer",
       });
     }
     return out;
@@ -298,17 +287,23 @@ export function ChannelStatePanel() {
         <span className="text-micro tracking-caps uppercase text-muted-foreground">Metagraph snapshot</span>
         <span className="flex items-center gap-2 text-title font-semibold text-foreground">
           <IdentityDot hue={hue} />
-          {ticker} <span className="tabular-nums">#{sel.ordinal.toLocaleString()}</span>
+          {ticker} <span className="tabular-nums">{sel.ordinal.toLocaleString()}</span>
         </span>
       </div>
 
       {!deep ? (
         // The decode rule is CLICK-scoped (user, 2026-08-07 — "decode what I click", live mode
-        // is irrelevant to it): an unclicked (auto-followed) snapshot invites the pin; a
+        // is irrelevant to it): an unclicked (auto-followed) snapshot invites the read; a
         // clicked one that hasn't landed yet is genuinely reading.
+        //
+        // The invitation names its ROUTE and drops the word "pin" (user, 2026-08-10: "I don't
+        // like the word 'pin' its not very clear to me"). Here that mattered twice over: the
+        // card's own pin control is in the HUD, which this layer has marked `inert`, so the old
+        // copy asked for a gesture that was not available on screen. The row in the anchor log to
+        // the left IS available, and clicking it commits the same selection.
         <p className="text-label text-muted-foreground">
           {following
-            ? "pin this snapshot to decode its state"
+            ? "Click this snapshot's row in the anchor log to read its payload — a ~2.5 MB fetch, so it runs only when you ask."
             : gaveUp
               ? "decode unavailable — the L0 node keeps ~30 minutes; this tick may be pruned"
               : "reading…"}
