@@ -293,11 +293,17 @@ export function ChannelStatePanel() {
 
       {!deep ? (
         // The decode rule is CLICK-scoped (user, 2026-08-07 — "decode what I click", live mode
-        // is irrelevant to it): an unclicked (auto-followed) snapshot invites the pin; a
+        // is irrelevant to it): an unclicked (auto-followed) snapshot invites the read; a
         // clicked one that hasn't landed yet is genuinely reading.
+        //
+        // The invitation names its ROUTE and drops the word "pin" (user, 2026-08-10: "I don't
+        // like the word 'pin' its not very clear to me"). Here that mattered twice over: the
+        // card's own pin control is in the HUD, which this layer has marked `inert`, so the old
+        // copy asked for a gesture that was not available on screen. The row in the anchor log to
+        // the left IS available, and clicking it commits the same selection.
         <p className="text-label text-muted-foreground">
           {following
-            ? "pin this snapshot to decode its state"
+            ? "Click this snapshot's row in the anchor log to read its payload — a ~2.5 MB fetch, so it runs only when you ask."
             : gaveUp
               ? "decode unavailable — the L0 node keeps ~30 minutes; this tick may be pruned"
               : "reading…"}

@@ -795,12 +795,35 @@ fills a value slot a real number is arriving into — it reserves that slot's wi
 when the number lands, and carries no text because the label already names what's coming (the global
 card's `Fees paid`, `AnchoredTags`, the metagraph card's Data count). A **word** is for everything
 else: no slot is being held, so it states the situation and is replaced wholesale — `reading…` for a
-block acquiring, `pin to read` for an invitation where nothing is in flight at all, `unavailable —
-tick pruned` where nothing is coming. Stars on an invitation would promise an arrival that isn't
-coming; a word in a held slot reflows the row when the number replaces it.
+block acquiring, `unread` for a value nobody has looked up yet, `unavailable — tick pruned` where
+nothing is coming. Stars where nothing is in flight would promise an arrival that isn't coming; a word
+in a held slot reflows the row when the number replaces it.
 ⚠️ **Every acquiring state needs its give-up path wired.** A deep read that 404s (the L0 node prunes
 after ~30 min) otherwise shows `reading…` forever, which rule 10 counts as a fabricated state exactly
 like a fabricated number.
+
+**A value slot states a READING; an invitation is a CONTROL** (user, 2026-08-10 — "I don't like the
+word 'pin', it's not very clear to me"). The metagraph snapshot card's Data slot said `pin to read`:
+internal vocabulary in user copy, naming a gesture whose only control was the head aside — top of the
+card, labelled with a *time*. The words moved out of the slot and became the block's own button,
+because the deep read fills **both** payload sections' shape rows, so an instruction sitting in one
+section's value slot was governing the whole block. What stays is the honest reading, and **`unread`
+and `none` are different facts** — haven't looked vs looked and found nothing. Rejected on the way:
+"encrypted"/"decrypt" (it is brotli-compressed public JSON — no key, no cipher, and it says the
+opposite of the one thing that matters, since this read is gated *because* one channel publishes
+personal records in the clear) and "uncompress" (true, but it puts the cost on local bytes when the
+cost is the ~2.5 MB fetch).
+
+**One control position, two tiers**, because there are two costs and the card charges the second only
+once the first is paid: `Read this snapshot` runs the deep read and states the SHAPE in place;
+`Show the application state` opens the raw layer for the payload. Tier 2 gates on the deep read having
+LANDED, not on decodability — while following it used to land on a pane whose own copy said to pin,
+with the pin control back in the HUD the raw layer had just marked `inert`. The cost rides the
+**button's** title, never a value row: `PAYLOAD_LANES` is one home shared with the raw pane's tabs, and
+"only when you ask" is stale the moment the read lands. ⚠️ The read pins through
+**`metaSnapSelectActions`**, not the aside's `followToggleActions` — the aside's builder commits the
+GLOBAL tick as the subject, which moved the box to the Global snapshot card and collapsed the card you
+were reading. Same builder as the anchor-log row, so a read and the equivalent row click can't drift.
 
 ### shadcn primitives
 
@@ -921,6 +944,11 @@ snapshot's facts stay pinned at the top, and the payload sits behind `STATE · D
 labels carry their own counts. **An empty lane gets no tab** — a tab that opens onto "nothing here" is
 chrome pretending to be data — and the first available lane opens by default, so the pane is never
 parked on a chooser.
+
+⚠️ **An empty state must name a gesture available on ITS OWN surface.** The pane's read invitation said
+"pin this snapshot", a gesture whose control lives in the HUD — which the raw layer has marked `inert`,
+so the instruction was unfollowable from where it was read. It names the anchor-log row instead, which
+is right there and commits the same selection.
 
 Every lane renders the **same body grammar: note → shape table → collapsed `RAW JSON`.** The note is the
 lane's one-line summary (bytes and proof for state, record and block counts for data), the table is the

@@ -25,7 +25,7 @@ import { identityHudHex } from "@/src/palette/identity";
 import { PulseEdge, useEdgePulse } from "@/components/EdgePulse";
 import { NodeStars } from "@/components/state/StateAtoms";
 import { METASNAP_ICON, KIND_MARK_CLASS } from "@/components/icons";
-import { followToggleActions } from "@/src/engine/domain/pickActions";
+import { followToggleActions, metaSnapSelectActions } from "@/src/engine/domain/pickActions";
 import { applyClickActions } from "@/src/store/applyClickActions";
 import { cn } from "@/lib/utils";
 
@@ -47,6 +47,7 @@ export default function MetaSnapPane({
   const exact = useStore((s) => (sel ? s.snapshotExact[sel.globalOrdinal] : undefined));
   const deep = useStore((s) => (sel ? s.metaSnapDeep[metaSnapDeepKey(sel.globalOrdinal, sel.metaId, sel.ordinal)] : undefined));
   const following = useStore((s) => s.following);
+  const filter = useStore((s) => s.filter);
   const snap = useStore((s) => s.snap);
   const setSection = useStore((s) => s.setSection);
 
@@ -209,11 +210,58 @@ export default function MetaSnapPane({
               )}
             </FactGroup>
 
-            {(deep != null || row?.decoded === true) && (
+            {/* ── THE ONE CONTROL, TWO TIERS ───────────────────────────────────────────────
+                One button position, two states, because there are two different costs and the
+                card should only charge the second one when the first has been paid.
+
+                TIER 1 — `Read this snapshot`. The deep read (~2.5 MB, one channel entry out of a
+                whole global) fills BOTH payload sections' shape rows in place, so the card can
+                state the SHAPE without a depth change — which is what this card's whole contract
+                claims it does. It was previously reachable ONLY as the words `pin to read` in the
+                Data value slot, an instruction whose control lived elsewhere (the head aside,
+                labelled with a time) and whose verb appeared on nothing clickable.
+
+                It pins because it MUST: a following card advances every ~4s, so a read that left
+                the card following would answer about a snapshot already gone — and re-reading per
+                tick is exactly the poll the explicit-gesture gate exists to prevent. The pin does
+                not need naming here; it announces itself one line up, where the aside flips from
+                `live · Xs → N` to `◷ Xs ago → N` and the dot stops beating.
+
+                ⚠️ It pins through `metaSnapSelectActions`, NOT the aside's `followToggleActions`.
+                The aside's builder acts on the GLOBAL descriptor, so it commits the tick as the
+                subject — correct for a control labelled with the tick's own age, but here it moved
+                the box to the Global snapshot card and COLLAPSED the card you were reading, on a
+                button that says `this snapshot`. The row builder commits the tick with
+                `follow: false` AND re-commits this metagraph snapshot, so the subject never moves.
+                It is the same builder the anchor-log row and the ledger explorer use, which is the
+                point: a read and the equivalent row click cannot drift. Its deselect early-return
+                needs `!current.following`, and this button only exists while following, so the
+                pin can never invert into a clear.
+
+                TIER 2 — `Show the application state`. The raw layer, for the payload itself. It
+                now gates on `deep`, not on `decoded`: while following it used to render over an
+                unread snapshot and land on a pane whose own copy said to pin — with the pin
+                control back in the HUD the raw layer has just marked `inert`. A button that
+                leaves the view and then tells you to come back is worse than no button.
+
+                The cost rides the BUTTON's title, not the Data row's: `PAYLOAD_LANES` is one home
+                shared with the raw layer's tabs, and "only when you ask" is stale the moment the
+                read has landed. The cost belongs to the action. */}
+            {deep != null ? (
               <Button variant="link" size="xs" className="mt-1 px-0" onClick={() => setSection("data")}>
                 Show the application state
               </Button>
-            )}
+            ) : following && row?.decoded === true && snap ? (
+              <Button
+                variant="link"
+                size="xs"
+                className="mt-1 px-0"
+                title="Reads this snapshot's payload — a ~2.5 MB fetch, so it runs only when you ask. Holds the card on this snapshot instead of following the live one."
+                onClick={() => applyClickActions(metaSnapSelectActions(sel, snap, { filter, metaSnap: sel, following }))}
+              >
+                Read this snapshot
+              </Button>
+            ) : null}
 
             {/* ── FOOT: the artifact's CHAIN IDENTITY ─────────────────────────────────────
                 What it is, what it links to, what it proves — and nothing else. The three
@@ -339,8 +387,15 @@ function PayloadBlock({
   // different fact entirely (`Exact read: reading…`, which is replaced wholesale, not filled in).
   //
   // So the three states here are three different things and only one of them twinkles:
-  //   • following  → `pin to read`, an INVITATION. Nothing is in flight and nothing will arrive
-  //     unless the user asks, so stars would promise an arrival that isn't coming.
+  //   • following  → `unread`, a PASSIVE state — a reading, not an instruction. It said `pin to
+  //     read` until 2026-08-10 (user: "I don't like the word 'pin' its not very clear to me"),
+  //     which was internal vocabulary in user copy naming a gesture whose only control was the
+  //     head aside — top of the card, labelled with a TIME. The invitation left this slot
+  //     entirely and became the block's own button, because the deep read fills BOTH sections'
+  //     shape rows: an instruction sitting in one section's value slot was governing the whole
+  //     block, which is the asymmetry the user reacted to. What stays here is the honest reading
+  //     — we have not looked — which is precisely the distinction `none` (we looked, there was
+  //     nothing) cannot carry alone. Stars would promise an arrival that isn't coming.
   //   • pinned, in flight → the count IS coming into this slot. Stars.
   //   • pinned, given up → the honest terminal. The deep read 404s once the L0 node prunes the
   //     global (~30 min), and without this the slot twinkled forever — the same hang the
@@ -355,7 +410,7 @@ function PayloadBlock({
       <Quiet>none</Quiet>
     )
   ) : following ? (
-    <Quiet>pin to read</Quiet>
+    <Quiet>unread</Quiet>
   ) : decodeGaveUp ? (
     <Quiet>unavailable — tick pruned</Quiet>
   ) : (
