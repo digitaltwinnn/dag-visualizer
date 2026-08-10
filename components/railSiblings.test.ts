@@ -229,9 +229,9 @@ describe("siblingSet — metagraph snapshot rung", () => {
 
   it("is scoped to the SUBJECT'S OWN metagraph — the parent is (network × tick), ordinal desc", () => {
     const set = siblingSet("metaSnap", s)!;
-    expect(set.items.map((i) => i.label)).toEqual(["#101", "#100"]);
+    expect(set.items.map((i) => i.label)).toEqual(["101", "100"]);
     expect(set.index).toBe(1);
-    expect(set.parentLabel).toBe("DED · Global #42");
+    expect(set.parentLabel).toBe("DED · Global 42");
   });
   it("excludes the tick's OTHER networks — a step must never move the coarser network rung", () => {
     const set = siblingSet("metaSnap", s)!;
@@ -278,7 +278,7 @@ describe("siblingSet — global snapshot slot (the OPEN set)", () => {
     const set = siblingSet("snap", s)!;
     expect(set.items.map((i) => i.key)).toEqual(["41", "42", "43", "44"]);
     expect(set.index).toBe(1);
-    expect(set.items.map((i) => i.label)).toEqual(["#41", "#42", "#43", "#44"]);
+    expect(set.items.map((i) => i.label)).toEqual(["41", "42", "43", "44"]);
   });
   it("is OPEN — the chain is ongoing, so the plank shows no n / N", () => {
     expect(siblingSet("snap", s)!.open).toBe(true);

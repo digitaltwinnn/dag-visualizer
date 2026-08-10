@@ -124,6 +124,16 @@ interface AppState {
   // Immutably cached — fetched from /api/snapshot/[ordinal]/channel/[address] on explicit gesture,
   // never on poll or mass reads.
   metaSnapDeep: Record<string, ChannelSnapDeep>;
+  // The ONE outstanding request for a deep read, as a `metaSnapDeepKey` — set by the metagraph
+  // snapshot card's `Read this snapshot` button, consumed by RawSnapshotBridge.
+  //
+  // It exists because the read's cost MULTIPLIES, and the gate used to sit on the wrong gesture
+  // (user, 2026-08-10 — "when I read the 1st metagraph snapshot and I use the swipe to go to 2nd,
+  // 3rd etc it starts doing it automatically"). Gating on `following` alone meant every pinned
+  // metaSnap change fetched: one tick measured live anchors 20 DOR snapshots, so a swipe through
+  // that pager was 20 × ~2.5 MB against Constellation's public L0 LB at ~1.8s cold each — for a
+  // SKIM. A stale key simply stops matching, so no explicit clear is needed.
+  deepWanted: string | null;
 
   // Active view. The scene is one persistent canvas; the engine morphs between hyper
   // and geo and hides it for the flat views, all driven by this.
@@ -223,6 +233,7 @@ interface AppState {
   /** `key` defaults to the decode's own identity; the bridge passes the REQUESTED key when
    *  the route fell back to another entry (an undecodable row asks with ordinal 0). */
   setMetaSnapDeep: (d: ChannelSnapDeep, key?: string) => void;
+  setDeepWanted: (key: string | null) => void;
   setPhoneDock: (dock: "explore" | "details" | null) => void;
   setSection: (section: "scene" | "data") => void;
   setRailsHidden: (hidden: boolean) => void;
@@ -274,6 +285,7 @@ export const useStore = create<AppState>((set) => ({
   selNodes: [],
   snapshotExact: {},
   metaSnapDeep: {},
+  deepWanted: null,
   phoneDock: null,
   section: "scene",
   railsHidden: false,
@@ -358,6 +370,7 @@ export const useStore = create<AppState>((set) => ({
     if (keys.length > DEEP_MAX) delete next[keys[0]];
     return { metaSnapDeep: next };
   }),
+  setDeepWanted: (deepWanted) => set({ deepWanted }),
   // Fully closing the dock also drops the drag-chosen sheet height, so the next open starts at
   // the default; switching halves (a non-null → non-null transition) keeps it.
   setPhoneDock: (phoneDock) => set(phoneDock === null ? { phoneDock, phoneSheetPx: null } : { phoneDock }),

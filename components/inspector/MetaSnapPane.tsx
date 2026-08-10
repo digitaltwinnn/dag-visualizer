@@ -8,47 +8,31 @@
 import { useEffect, useMemo, useState, type CSSProperties, type ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import CardHead, { RailPane } from "@/components/CardHead";
-import { IdentityDot } from "@/components/inspector/parts";
+import { Fact, FactGroup, Foot, FootRow } from "@/components/inspector/parts";
+import { Separator } from "@/components/ui/separator";
 import { useStore } from "@/src/store/store";
 import { metaSnapDeepKey } from "@/src/data/types";
-import type { NodeRow } from "@/src/data/types";
-import { getNetwork, resolveSigner, SIGNER_GROUPS, SIGNER_UNKNOWN, metagraphById, shortHash, type SignerResolution } from "@/src/data/network";
+import type { ChannelSnapDeep, ChannelSnapRow } from "@/src/data/types";
+import { getNetwork, SIGNER_GROUPS, metagraphById, shortHash } from "@/src/data/network";
 import { UNLISTED_HUE } from "@/src/data/unlisted";
 import { snapsAtTick } from "@/src/data/anchorLog";
-import { fmtDag, fmtKB } from "@/src/util/format";
+import { PAYLOAD_LANES, parsePayload, payloadKinds } from "@/src/data/payloadKinds";
+import { fmtBytes, fmtDag, fmtKB } from "@/src/util/format";
 import { relativeAge } from "@/src/util/relativeAge";
 import { useMinHold } from "@/components/useMinHold";
 import { useNowTick } from "@/components/useNowTick";
-import { subjectPairing } from "@/components/useSubjectPairing";
-import { hoverKeyOf } from "@/src/data/hoverSubject";
 import { identityHudHex } from "@/src/palette/identity";
 import { PulseEdge, useEdgePulse } from "@/components/EdgePulse";
+import { NodeStars } from "@/components/state/StateAtoms";
 import { METASNAP_ICON, KIND_MARK_CLASS } from "@/components/icons";
-import { followToggleActions } from "@/src/engine/domain/pickActions";
+import { followToggleActions, metaSnapSelectActions } from "@/src/engine/domain/pickActions";
 import { applyClickActions } from "@/src/store/applyClickActions";
 import { cn } from "@/lib/utils";
 
-// The two body-row shapes the house already uses, side by side because this card carries both
-// kinds of fact: a measured NUMBER reads label-left/value-right (CountryCard/LayerCard), a
-// REFERENCE reads label-above/value-below with the full value on hover (the node card's id row).
-function Fact({ label, children, title }: { label: string; children: ReactNode; title?: string }) {
-  return (
-    <div className="flex items-start justify-between gap-2.5" title={title}>
-      <span className="text-body text-muted-foreground">{label}</span>
-      <span className="text-body text-foreground tabular-nums">{children}</span>
-    </div>
-  );
-}
-function HashFact({ label, value }: { label: string; value: string }) {
-  return (
-    <div>
-      <span className="text-micro tracking-[0.1em] uppercase text-muted-foreground">{label}</span>
-      <div className="font-mono tabular-nums text-label text-foreground-dim mt-0.5" title={value}>
-        {shortHash(value)}
-      </div>
-    </div>
-  );
-}
+// The body's row grammar and its three weights live in ./parts (`Fact` / `FactGroup` / `Foot`)
+// — shared with every other rail card, so this one can't drift into a dialect of its own. The
+// LEAD is composed here rather than imported: it merges facts and drops labels their units
+// already carry, which is card-specific by nature.
 
 export default function MetaSnapPane({
   onClose,
@@ -61,15 +45,22 @@ export default function MetaSnapPane({
 }) {
   const sel = useStore((s) => s.metaSnap);
   const exact = useStore((s) => (sel ? s.snapshotExact[sel.globalOrdinal] : undefined));
-  const deep = useStore((s) => (sel ? s.metaSnapDeep[metaSnapDeepKey(sel.globalOrdinal, sel.metaId, sel.ordinal)] : undefined));
+  const deepKey = sel ? metaSnapDeepKey(sel.globalOrdinal, sel.metaId, sel.ordinal) : null;
+  const deep = useStore((s) => (deepKey ? s.metaSnapDeep[deepKey] : undefined));
   const following = useStore((s) => s.following);
+  const filter = useStore((s) => s.filter);
   const snap = useStore((s) => s.snap);
   const setSection = useStore((s) => s.setSection);
-  // Spec §5.3's pairing runs on the EXISTING node-hover channel — a hover, never a selection, so
-  // this card stays outside the one-selection-write-path rule.
-  const hoverNodeId = useStore((s) => s.hoverNodeId);
-  const setHoverNodeId = useStore((s) => s.setHoverNodeId);
-  const selNodes = useStore((s) => s.selNodes);
+  const setDeepWanted = useStore((s) => s.setDeepWanted);
+  const deepWanted = useStore((s) => s.deepWanted);
+  // Has a deep read been ASKED FOR for this exact snapshot? Selecting one is not asking — the card
+  // states the SHAPE and only reads on its button, so a pager skim costs nothing (user, 2026-08-10;
+  // the reasoning lives on `deepWanted` in the store and on the bridge's own gate). Everything in
+  // the block below that used to branch on `following` branches on this instead: `following` was
+  // only ever a proxy for "no read is coming", and it stopped being an accurate one.
+  const deepAsked = !following && deepKey != null && deepKey === deepWanted;
+
+
 
   // Tier 1 — the polled record this tile was named from (free: the metagraph snapshot buffers
   // are already in memory, keyed by the anchoring tick's timestamp).
@@ -94,14 +85,17 @@ export default function MetaSnapPane({
   }, [sel, exact]);
   const reading = useMinHold(!!sel && !row);
   // The pinned decode's give-up timer (2026-08-08, review fix): a 404'd/pruned deep read left
-  // "decoding…" forever — after a patient window the instrument states the honest terminal.
+  // "decoding…" forever — after a patient window the instrument states the honest terminal. It
+  // runs off `deepAsked`, not `following`: a snapshot nobody asked to read has no read to give up
+  // on, and starting the clock anyway would ripen `unread` into a false "unavailable".
   const [decodeGaveUp, setDecodeGaveUp] = useState(false);
   useEffect(() => {
     setDecodeGaveUp(false);
-    if (!sel || following || deep) return;
+    if (!sel || !deepAsked || deep) return;
     const t = setTimeout(() => setDecodeGaveUp(true), 12000);
     return () => clearTimeout(t);
-  }, [sel, following, deep]);
+  }, [sel, deepAsked, deep]);
+
 
   // The signers, deep read first (it re-reads the same proofs straight off the channel, so it wins
   // when it lands) — but the tick's exact read already carries them, so the rows never wait on it.
@@ -116,21 +110,35 @@ export default function MetaSnapPane({
   // seconds ago; looks redundant"). The GLOBAL card owns the clock; this one states the relation
   // instead — `anchored`, the house word for what the Snapshots stack does. The counter comes back
   // the moment it carries real information: while following a metagraph lane through anchor-less
-  // global ticks this card holds an OLDER tick, and then its age is not a repeat.
+  // global ticks this card holds an OLDER tick, and then its age is not a repeat. The anchoring
+  // ordinal rides ALL THREE states, because the two counter states are precisely the ones where the
+  // card above shows a different tick (or is a ghost) — there the number is the only thing saying
+  // which global this snapshot actually landed in.
   const now = useNowTick(1000);
 
   if (!sel) return null;
   const cfg = metagraphById(sel.metaId);
-  // An UNLISTED metagraph has no config row — its address is the only name it has, and its hue
-  // is the unlisted set's NEUTRAL gray (2026-08-08: hashing the address through the identity
-  // palette minted a random hue per channel — pink icons for a set that deliberately has no
-  // identity of its own).
-  const ticker = cfg?.ticker || cfg?.name || shortHash(sel.metaId);
+  // An UNLISTED metagraph has no config row, so its hue is the unlisted set's NEUTRAL gray
+  // (2026-08-08: hashing the address through the identity palette minted a random hue per channel —
+  // pink icons for a set that deliberately has no identity of its own).
   const hue = cfg ? identityHudHex(sel.metaId) : UNLISTED_HUE;
+  // Hoisted out of the state tier so the FOOT can reach it — it is a hash, and hashes are looked
+  // up, not read. The deep read wins where it exists; the exact row carries it otherwise.
+  const stateProof = deep?.stateProof ?? row?.stateProof;
+  const hash = sel.hash || polled?.hash || "";
   const rel = relativeAge(now - Date.parse(sel.ts));
   // ⚠️ The `!!snap` half is load-bearing: the ledger contributes no ancestry, so the global card
   // can be a GHOST while this one is populated — there the clock has to stay here.
   const sameTick = !!snap && snap.data.ordinal === sel.globalOrdinal;
+  // The tick this snapshot anchored INTO. It used to open the body as a row of its own, paired with
+  // the metagraph's ticker; both are gone (user, 2026-08-10). The ticker was the pile rule broken at
+  // the head — the METAGRAPH card sits directly above and states it as its own title — and the
+  // ordinal is not a fact ABOUT the snapshot so much as the relation the aside is already naming,
+  // so it belongs to the relation word rather than to a body row under it.
+  // No `#`: an ordinal is a VALUE and every surface that renders it as one — this card's own title,
+  // the explorer rows, the anchor-log cells — writes it bare. The sigil only ever survived where a
+  // number got glued into a sentence (user, 2026-08-10).
+  const anchor = sel.globalOrdinal.toLocaleString();
   const asideCls = "inline-flex items-center gap-1.5 text-label text-muted-foreground whitespace-nowrap";
   const aside = (
     <button
@@ -145,7 +153,7 @@ export default function MetaSnapPane({
       {following && (
         <span className="w-2 h-2 rounded-full bg-primary shadow-[0_0_0_3px_color-mix(in_oklch,var(--primary)_30%,transparent)] animate-dot-beat motion-reduce:animate-none" />
       )}
-      {sameTick ? "anchored" : following ? (rel ? `live · ${rel}` : "live") : <>◷ {rel}</>}
+      {sameTick ? `anchored to ${anchor}` : following ? <>{rel ? `live · ${rel}` : "live"} → {anchor}</> : <>◷ {rel} → {anchor}</>}
     </button>
   );
 
@@ -168,119 +176,156 @@ export default function MetaSnapPane({
           onToggle={onToggle}
         />
         {!collapsed && (
-          <div className="flex flex-col gap-2">
-            {/* ── Tier 1: free from the poll ─────────────────────────────────────────────── */}
-            <Fact label="Network">
-              <span className="inline-flex items-center gap-1.5">
-                <IdentityDot hue={hue} />
-                {ticker}
-              </span>
-            </Fact>
-            <Fact label="Anchored into">#{sel.globalOrdinal.toLocaleString()}</Fact>
-            {polled && (
-              <Fact label="Height">
-                {polled.height} · {polled.subHeight}
-              </Fact>
-            )}
-            {polled && <Fact label="Blocks">{polled.blocks}</Fact>}
+          <div>
+            {/* ── THE CENTRE: what this metagraph actually anchored ────────────────────────
+                Two labelled sections, State and Data — the same two payload lanes the raw layer
+                opens one tier down, so the card states their SHAPE and the pane renders them.
+                Both always render, each honest about its own tier. */}
+            <PayloadBlock row={row} deep={deep ?? null} asked={deepAsked} decodeGaveUp={decodeGaveUp} />
 
-            {/* ── Tier 2: the tick's exact read ──────────────────────────────────────────── */}
-            {row ? (
-              <>
-                <Fact label="Fee">{fmtDag(row.fee)} DAG</Fact>
-                <Fact label="Size">{fmtKB(row.bytes / 1024)}</Fact>
-                {/* The LAYER is part of the fact: a metagraph's proof is its L0 cluster's, so DOR
-                    shows 3 of its 20 machines by construction (user, 2026-08-09 — the bare count
-                    read as a bug). One home for the words: SIGNER_GROUPS. */}
-                <Fact label="Signed by" title={SIGNER_GROUPS.proof.title}>
-                  {signers?.length ?? 0} {SIGNER_GROUPS.proof.who}
-                </Fact>
-                {signers && signers.length > 0 && (
-                  <SignerRows
-                    ids={signers}
-                    metaId={sel.metaId}
-                    selNodes={selNodes}
-                    hue={hue}
-                    hoverNodeId={hoverNodeId}
-                    setHoverNodeId={setHoverNodeId}
-                  />
-                )}
-              </>
-            ) : reading.show ? (
-              <Fact label="Exact read">
-                <span className={cn(reading.fading && "animate-hold-fade-out motion-reduce:animate-none")}>reading…</span>
-              </Fact>
-            ) : (
-              // The L0 node prunes after ~30 minutes; an old tick keeps its polled facts and says so.
-              <Fact label="Exact read">unavailable — tick pruned</Fact>
-            )}
-
-            {/* ── Tier 3: the application state — ONE RULE (user, 2026-08-07: DED's empty
-                state hid the invitation while the raw layer rendered the decoded shape; the
-                two surfaces must apply one standard): if the payload DECODED, the tier shows
-                and the invitation stands — an empty state says "empty" honestly instead of
-                hiding. Both routes share one decoder, so decoded-ness itself can't disagree;
-                a genuinely unreadable payload says so (and "decoding…" while the pin's full
-                unpack is in flight). ── */}
-            {(() => {
-              const decodedOk = deep != null || row?.decoded === true;
-              if (!decodedOk) {
-                if (row == null) return null; // no exact row yet — tier 2's reading state covers it
-                return (
-                  <Fact label="State">
-                    <span className="text-muted-foreground italic">
-                      {following ? "undecodable payload" : decodeGaveUp ? "decode unavailable — tick pruned" : "decoding…"}
+            {/* ── DETAIL: the measured facts ─────────────────────────────────────────────── */}
+            <Separator className="my-2" />
+            <FactGroup>
+              {row ? (
+                <>
+                  {/* Fee leads, size rides under it — the global card's own two-line value, so
+                      the pair reads identically on both storeys of the chain. */}
+                  <Fact label="Fees paid">
+                    <span className="flex flex-col items-end">
+                      <span className="whitespace-nowrap"><b className="font-bold">{fmtDag(row.fee)}</b> DAG</span>
+                      <span className="text-label text-muted-foreground">{fmtKB(row.bytes / 1024)} anchored</span>
                     </span>
                   </Fact>
-                );
-              }
-              const stateBytes = deep ? deep.stateBytes : (row?.stateBytes ?? 0);
-              const empty = deep ? !deep.stateKeys.some((k) => k.count > 0) : !row?.hasState;
-              return (
-                <>
-                  {empty ? (
-                    <Fact label="State">
-                      <span className="text-muted-foreground italic">empty</span>
-                    </Fact>
-                  ) : (
-                    stateBytes > 0 && <Fact label="State">{fmtKB(stateBytes / 1024)}</Fact>
-                  )}
-                  {deep && deep.stateKeys.length > 0 && (
-                    <Fact label="State records">{deep.stateKeys.map((k) => `${k.key} ${k.count}`).join(" · ")}</Fact>
-                  )}
-                  {/* The deep decode is pin-gated while following (the live card advances every
-                      tick — fetching it would poll the heavy route). Honest hint in place. */}
-                  {!deep && following && (
-                    <Fact label="State records">
-                      <span className="text-muted-foreground italic">pin to decode</span>
-                    </Fact>
-                  )}
-                  {/* The data TRANSACTIONS are a data metagraph's real payload (batch
-                      commitments etc. — DED's fingerprint batches ride here while its state
-                      stays empty; 2026-08-07). */}
-                  {deep && deep.dataTxCount > 0 && (
-                    <Fact label="Data updates">{deep.dataTxCount}</Fact>
-                  )}
+                  {/* The two signer groups, SEPARATED (user, 2026-08-10: "general signing is L0
+                      validator, and data updates are separate and have separate signers as
+                      dL1's? Perhaps that also warrants a separation on the metagraph cards?").
+                      They are different clusters doing different work — the L0 cluster seals the
+                      snapshot (DOR: the same 3 of its 20 machines every time), a rotating dL1
+                      subset produces the data blocks — so one merged count would be a lie about
+                      both. One home for the words: SIGNER_GROUPS. The NAMES behind the counts
+                      live one tier down, in the raw layer's SIGNERS lane, which lists both groups
+                      as a real table; a city column under "Signed by" claimed that cities sign. */}
+                  <Fact label="Signed by" title={SIGNER_GROUPS.proof.title}>
+                    {signers?.length ?? 0} {SIGNER_GROUPS.proof.who}
+                  </Fact>
                   {deep && deep.dataBlockSigners.length > 0 && (
-                    <Fact label="Data blocks" title={SIGNER_GROUPS.dataBlocks.title}>
-                      signed by {deep.dataBlockSigners.length} {SIGNER_GROUPS.dataBlocks.who}
+                    <Fact label="Blocks by" title={SIGNER_GROUPS.dataBlocks.title}>
+                      {deep.dataBlockSigners.length} {SIGNER_GROUPS.dataBlocks.who}
                     </Fact>
                   )}
-                  {(deep?.stateProof ?? row?.stateProof) && (
-                    <HashFact label="State proof" value={(deep?.stateProof ?? row?.stateProof)!} />
-                  )}
-                  <div>
-                    <Button variant="link" size="xs" className="px-0" onClick={() => setSection("data")}>
-                      Show the application state
-                    </Button>
-                  </div>
                 </>
-              );
-            })()}
+              ) : reading.show ? (
+                <Fact label="Exact read">
+                  <span className={cn(reading.fading && "animate-hold-fade-out motion-reduce:animate-none")}>reading…</span>
+                </Fact>
+              ) : (
+                // The L0 node prunes after ~30 minutes; an old tick keeps its polled facts and says so.
+                <Fact label="Exact read">unavailable — tick pruned</Fact>
+              )}
+            </FactGroup>
 
-            {/* The references sit LAST, where references sit (the node card's reading order). */}
-            <HashFact label="Hash" value={sel.hash} />
-            {polled?.parent && <HashFact label="Parent" value={polled.parent} />}
+            {/* ── THE ONE CONTROL, TWO TIERS ───────────────────────────────────────────────
+                One button position, two states, because there are two different costs and the
+                card should only charge the second one when the first has been paid.
+
+                TIER 1 — `Read this snapshot`. The deep read (~2.5 MB, one channel entry out of a
+                whole global) fills BOTH payload sections' shape rows in place, so the card can
+                state the SHAPE without a depth change — which is what this card's whole contract
+                claims it does. It was previously reachable ONLY as the words `pin to read` in the
+                Data value slot, an instruction whose control lived elsewhere (the head aside,
+                labelled with a time) and whose verb appeared on nothing clickable.
+
+                It pins WHEN FOLLOWING, because a following card advances every ~4s and a read that
+                left it following would answer about a snapshot already gone. Pinned already, it
+                pins nothing — it only records the request. The pin does not need naming here; it
+                announces itself one line up, where the aside flips from `live · Xs → N` to
+                `◷ Xs ago → N` and the dot stops beating.
+
+                ⚠️ It pins through `metaSnapSelectActions`, NOT the aside's `followToggleActions`.
+                The aside's builder acts on the GLOBAL descriptor, so it commits the tick as the
+                subject — correct for a control labelled with the tick's own age, but here it moved
+                the box to the Global snapshot card and COLLAPSED the card you were reading, on a
+                button that says `this snapshot`. The row builder commits the tick with
+                `follow: false` AND re-commits this metagraph snapshot, so the subject never moves.
+                It is the same builder the anchor-log row and the ledger explorer use, which is the
+                point: a read and the equivalent row click cannot drift. ⚠️ Its deselect
+                early-return needs `!current.following`, which is exactly why the call is inside
+                the `if (following)` — re-committing an already-pinned snapshot would CLEAR it.
+
+                ⚠️ The button renders on `!deepAsked`, NOT on `following` (user, 2026-08-10 — "when
+                I read the 1st metagraph snapshot and I use the swipe to go to 2nd, 3rd etc it
+                starts doing it automatically"). Gating on `following` left every OTHER pinned
+                selection reading by itself, so the pager — a BROWSE control, whose whole point is
+                skimming a set — fetched per step: measured live, one tick anchors 20 DOR
+                snapshots at ~1.8s and ~2.5 MB of server↔L0 traffic each. So the read follows the
+                REQUEST, and this button is the only place the card makes one.
+
+                TIER 2 — `Show the application state`. The raw layer, for the payload itself. It
+                gates on `deep`, not on `decoded`: it used to render over an unread snapshot and
+                land on a pane whose own copy said to pin — with the pin control back in the HUD
+                the raw layer has just marked `inert`. A button that leaves the view and then tells
+                you to come back is worse than no button. (The raw layer reads on ARRIVAL, because
+                unlike this card it is the payload surface and nothing else is down there.)
+
+                The cost rides the BUTTON's title, not the Data row's: `PAYLOAD_LANES` is one home
+                shared with the raw layer's tabs, and "only when you ask" is stale the moment the
+                read has landed. The cost belongs to the action — and it is stated as the SERVER's
+                fetch, because the decoded row that reaches the browser is ~0.6–4.4 KB (measured):
+                what is being rationed is the whole-global pull and the ~1.8s wait, not local
+                bytes. */}
+            {deep != null ? (
+              <Button variant="link" size="xs" className="mt-1 px-0" onClick={() => setSection("data")}>
+                Show the application state
+              </Button>
+            ) : !deepAsked && row?.decoded === true && snap && sel ? (
+              <Button
+                variant="link"
+                size="xs"
+                className="mt-1 px-0"
+                title="Reads this snapshot's payload — the server pulls the whole ~2.5 MB global to reach this one channel, so it runs only when you ask. Holds the card on this snapshot instead of following the live one."
+                onClick={() => {
+                  // Pin FIRST, and only while following — the read must not answer about a
+                  // snapshot the next heartbeat has already replaced. Pinned already, the pin is
+                  // not just unnecessary but wrong: `metaSnapSelectActions`' deselect early-return
+                  // needs `!current.following`, so re-committing the selected snapshot would CLEAR
+                  // it, on a button that says `read this`.
+                  if (following) applyClickActions(metaSnapSelectActions(sel, snap, { filter, metaSnap: sel, following }));
+                  setDeepWanted(metaSnapDeepKey(sel.globalOrdinal, sel.metaId, sel.ordinal));
+                }}
+              >
+                Read this snapshot
+              </Button>
+            ) : null}
+
+            {/* ── FOOT: the artifact's CHAIN IDENTITY ─────────────────────────────────────
+                What it is, what it links to, what it proves — and nothing else. The three
+                hashes used to cost 114px as stacked label-above blocks; same values, same
+                full-hash-on-hover, one small muted column (user, 2026-08-10).
+                HEIGHT and BLOCKS were culled the same day: the global snapshot card's foot
+                carries hash + parent only, and the two cards are the SAME Signed[] artifact, so
+                the asymmetry was an accident of history rather than a difference in the data
+                (GlobalSnapshot carries height/blocks too). Reconciled DOWN, not up — CLAUDE.md
+                already rules that a tick's block count is the wrong activity signal, and the
+                facts that answer a question about this snapshot are all above. `State proof` is
+                the one asymmetry that STAYS: only a metagraph snapshot proves an application
+                state, so it's a real difference in the artifact, not an inconsistency. */}
+            <Foot>
+              {/* The descriptor's hash is not the only source, and for a PAGER step it isn't a
+                  source at all: `railSiblings` builds its siblings from the tick's exact read,
+                  which carries no hash field (`hash: ""`), so stepping to a sibling left HASH as
+                  an em-dash — while PARENT, one row below, populated fine from the polled record.
+                  Both come off the same record; this row was simply not reading it. So it tiers
+                  like `stateProof` does: descriptor first, polled buffer behind it. The em-dash
+                  survives for the one case that is genuinely unknown — a snapshot stepped to
+                  after it aged out of the retained buffer — where stating the gap is the point. */}
+              <FootRow label="Hash" value={shortHash(hash)} title={hash} />
+              {polled?.parent && (
+                <FootRow label="Parent" value={shortHash(polled.parent)} title={polled.parent} />
+              )}
+              {stateProof && (
+                <FootRow label="State proof" value={shortHash(stateProof)} title={stateProof} />
+              )}
+            </Foot>
           </div>
         )}
         <PulseEdge pulseKey={pulseKey} rail="right" />
@@ -288,87 +333,184 @@ export default function MetaSnapPane({
   );
 }
 
-// One row per signer, each PAIRED to its chip on the ml0 rail (spec §5.3): hovering the row writes
-// `hoverNodeId` and the chip glows; hovering the chip in the scene writes the same channel and the
-// row washes. No new mechanism — the identical coupling an explorer node row already has.
-// A metagraph seals its snapshots with its L0 cluster, so this is a handful of machines: the list
-// renders whole, with no truncation and no "show more".
-function SignerRows({
-  ids,
-  metaId,
-  selNodes,
-  hue,
-  hoverNodeId,
-  setHoverNodeId,
+// ── The payload block: this card's centre of gravity ─────────────────────────────────────────
+// TWO SECTIONS, State and Data, both always present (user, 2026-08-10: "I feel two sections
+// (state & data) with a separator is the clearest way to present it, no?" and "can we make it
+// always show both and be honest if data / state is not applicable or just not present in that
+// particular snapshot"). They are genuinely different reads that were merged into one composed
+// line: STATE is the metagraph's accumulated on-chain state, DATA is what THIS snapshot's blocks
+// carried. Merged, DOR read `1.8 KB of state · 4 data updates` above a bar labelled `updates 4` —
+// a state key that happens to be NAMED `updates` sitting beside an unrelated count of the same
+// number. The section labels are what disambiguate them, and they are the raw layer's own lane
+// words (PAYLOAD_LANES), so the card and the pane can't name one subject two ways.
+//
+// THE SHARE-OF-TOTAL BAR IS GONE and can't come back (user: "if it is filled, how do we measure
+// the length of the bar — I think a bar might not be the right element here"). Correct, and
+// structurally so: `shapeOf` sets each state key's count in whatever unit that branch happens to
+// be — array → length, object → field count, scalar → 1 — so summing them and taking a share is a
+// percentage of a quantity nobody can name (rule 10). It degenerated in both live cases anyway:
+// one key is always 100% (DOR), all-zero keys always 0% (SWAP, which declares three record kinds
+// and carried none of them), so the length encoded nothing either way. The global card's
+// `AnchoredTags` bars STAY, because every one of their rows is the same unit — snapshots
+// anchored — against a real total; the instrument was honest there and borrowed to here. Dropping
+// the track also returns the full width to the key NAMES, which is what actually needed it
+// (`processedRewardWithdrawal` had 68px), and retires the header's "no application state", which
+// contradicted the very keys listed under it.
+//
+// ONE RULE for whether the tier shows at all (user, 2026-08-07: DED's empty state hid the
+// invitation while the raw layer rendered the decoded shape — the two surfaces apply one
+// standard): if the payload DECODED, the block shows; an empty payload says so honestly instead
+// of hiding. Both routes share one decoder, so decoded-ness can't disagree between them.
+//
+// The two tiers of source stay DELIBERATELY asymmetric and now say so PER SECTION, which is a
+// positive argument for the split: State's bytes ride the tick's free exact row, everything else
+// needs the ~2.5 MB deep read, which stays gated to an explicit pin. So a live-following card
+// states its size and Data states the instrument state — it never implies a count it hasn't read.
+function PayloadBlock({
+  row,
+  deep,
+  asked,
+  decodeGaveUp,
 }: {
-  ids: readonly string[];
-  metaId: string;
-  selNodes: NodeRow[];
-  hue: string;
-  hoverNodeId: string | null;
-  setHoverNodeId: (id: string | null) => void;
+  row: ChannelSnapRow | null;
+  deep: ChannelSnapDeep | null;
+  /** A deep read for THIS snapshot has been requested and is in flight. Not the same as "pinned":
+   *  the card reads only on its own button, so a browsed snapshot is `asked: false` and says so. */
+  asked: boolean;
+  decodeGaveUp: boolean;
 }) {
-  // A signer id arrives TRUNCATED (decodeChannel's shortSigner keeps the payload small), so the
-  // live row it names is found by prefix, scoped to this snapshot's own network — the card-side
-  // twin of the scene's `resolveSignerIps`, so a row and its glowing chip resolve the same way.
-  // `resolveSigner` is the ONE shared decision (src/data/network.ts): the ledger explorer's signer
-  // depth reads it too, so the same id can never be described differently in the two places.
-  const rows = useMemo(() => ids.map((id) => ({ id, r: resolveSigner(selNodes, metaId, id) })), [ids, selNodes, metaId]);
+  // State's shape is computed server-side (`stateKeys`); Data's is the same mechanical read the
+  // raw layer's data lane uses, so the two sections' rows mean the same thing.
+  const stateRows = useMemo(
+    () =>
+      deep
+        ? [...deep.stateKeys].sort((a, b) => b.count - a.count).map((k) => ({ name: k.key, count: k.count }))
+        : [],
+    [deep],
+  );
+  const dataRows = useMemo(
+    () => (deep ? payloadKinds(parsePayload(deep.dataTx)).map((k) => ({ name: k.kind, count: k.count })) : []),
+    [deep],
+  );
+
+  const decodedOk = deep != null || row?.decoded === true;
+  if (!decodedOk) {
+    if (row == null) return null; // no exact row yet — the FactGroup's reading state covers it
+    return (
+      <div className="mt-1.5 text-body text-muted-foreground italic">
+        {!asked ? "undecodable payload" : decodeGaveUp ? "decode unavailable — tick pruned" : "decoding…"}
+      </div>
+    );
+  }
+
+  const stateBytes = deep ? deep.stateBytes : (row?.stateBytes ?? 0);
+  // BOTH tiers key on the SAME field, because pinning must not change the answer to a question the
+  // free tier already answered. The row's own `hasState` is not that field: server-side it means
+  // "some top-level branch has count > 0" (`decodeChannel.shapeOf`), so a state that exists as an
+  // empty container — `{"updates":[]}`, 14 bytes, with a state proof — reports false. Calling that
+  // "none" is exactly the conflation this block was rewritten to end. `stateBytes > 0` says there
+  // IS a serialized state; the ROWS say what it carries, and all-zero rows say "declared these
+  // kinds, carried none of them" without the headline having to contradict them.
+  const hasState = stateBytes > 0;
+  // Unread is an INSTRUMENT STATE, never a zero — pre-pin the update count simply isn't known, and
+  // `0` would be a fabricated reading.
+  //
+  // WHICH instrument state is the app's own rule, latent in the two existing acquiring surfaces
+  // and written down here because this row got it wrong: NODE-STARS fill a VALUE SLOT that a
+  // number is actually coming into (they reserve its width, so nothing jumps when it lands — the
+  // global card's `Fees paid` does exactly this); a WORD is for when no slot is being reserved —
+  // a whole block acquiring (`AnchoredTags`' stars + "resolving"), or a state that names a
+  // different fact entirely (`Exact read: reading…`, which is replaced wholesale, not filled in).
+  //
+  // So the three states here are three different things and only one of them twinkles:
+  //   • following  → `unread`, a PASSIVE state — a reading, not an instruction. It said `pin to
+  //     read` until 2026-08-10 (user: "I don't like the word 'pin' its not very clear to me"),
+  //     which was internal vocabulary in user copy naming a gesture whose only control was the
+  //     head aside — top of the card, labelled with a TIME. The invitation left this slot
+  //     entirely and became the block's own button, because the deep read fills BOTH sections'
+  //     shape rows: an instruction sitting in one section's value slot was governing the whole
+  //     block, which is the asymmetry the user reacted to. What stays here is the honest reading
+  //     — we have not looked — which is precisely the distinction `none` (we looked, there was
+  //     nothing) cannot carry alone. Stars would promise an arrival that isn't coming.
+  //   • pinned, in flight → the count IS coming into this slot. Stars.
+  //   • pinned, given up → the honest terminal. The deep read 404s once the L0 node prunes the
+  //     global (~30 min), and without this the slot twinkled forever — the same hang the
+  //     `decodeGaveUp` timer was added to end, which this row was simply not consuming.
+  const dataHeadline = deep ? (
+    deep.dataTxCount > 0 ? (
+      <>
+        <b className="font-bold">{deep.dataTxCount.toLocaleString()}</b> update
+        {deep.dataTxCount === 1 ? "" : "s"}
+      </>
+    ) : (
+      <Quiet>none</Quiet>
+    )
+  ) : !asked ? (
+    <Quiet>unread</Quiet>
+  ) : decodeGaveUp ? (
+    <Quiet>unavailable — tick pruned</Quiet>
+  ) : (
+    <NodeStars count={4} />
+  );
+
   return (
-    <div className="flex flex-col gap-px">
-      {rows.map(({ id, r }) => (
-        <SignerRow key={id} id={id} res={r} hue={hue} hoverNodeId={hoverNodeId} setHoverNodeId={setHoverNodeId} />
-      ))}
+    <div className="mt-1.5">
+      <PayloadSection
+        name={PAYLOAD_LANES.state.name}
+        title={PAYLOAD_LANES.state.title}
+        headline={
+          hasState ? (
+            <b className="font-bold">{fmtBytes(stateBytes)}</b>
+          ) : (
+            <Quiet>none</Quiet>
+          )
+        }
+        rows={stateRows}
+      />
+      <Separator className="my-2" />
+      <PayloadSection
+        name={PAYLOAD_LANES.data.name}
+        title={PAYLOAD_LANES.data.title}
+        headline={dataHeadline}
+        rows={dataRows}
+      />
     </div>
   );
 }
 
-function SignerRow({
-  id,
-  res,
-  hue,
-  hoverNodeId,
-  setHoverNodeId,
+/** An absent or unread value — an instrument state, in the one treatment the card already uses
+ *  for them. A section's bare `none` means a different thing in each lane, which is what the
+ *  section's own `title` carries; the value column stays short so it can't wrap. */
+function Quiet({ children }: { children: ReactNode }) {
+  return <span className="text-muted-foreground italic">{children}</span>;
+}
+
+/** One payload section — the house one-row grammar at TWO weights: the section's own headline
+ *  fact, then its shape rows one weight down. That is the same device `Foot` uses (small, muted,
+ *  tabular), so a shape row is a WEIGHT and not a second grammar, and both weights keep the
+ *  card's one right edge, so a breakdown reads under its own total. */
+function PayloadSection({
+  name,
+  title,
+  headline,
+  rows,
 }: {
-  id: string;
-  res: SignerResolution;
-  hue: string;
-  hoverNodeId: string | null;
-  setHoverNodeId: (id: string | null) => void;
+  name: string;
+  title: string;
+  headline: ReactNode;
+  rows: { name: string; count: number }[];
 }) {
-  // An UNRESOLVED signer states what isn't known instead of pairing on a key it can't light — the
-  // shared words, so this row and the explorer's say the same thing. It stays a SIGNATURE: no node
-  // card, because there is no IP, geolocation, role or status behind it (rule 10). The scene-side
-  // glow is unaffected either way: the Engine resolves signer ids against the live metaList.
-  const node = res.known ? res.row : null;
-  const key = node ? hoverKeyOf(node.pick) : null;
-  const pair = subjectPairing(hoverNodeId, key, setHoverNodeId, hue);
-  const unknown = res.known ? null : SIGNER_UNKNOWN[res.reason];
   return (
-    <div
-      className={cn(
-        "nb-row flex items-baseline gap-1.5 -mx-2 px-2 py-0.5 rounded-sm text-label text-foreground-dim",
-        pair.className,
-      )}
-      style={pair.style}
-      title={unknown ? unknown.title : id}
-      onMouseEnter={pair.onMouseEnter}
-      onMouseLeave={pair.onMouseLeave}
-    >
-      <span
-        className={cn(
-          "flex-1 min-w-0 overflow-hidden text-ellipsis whitespace-nowrap",
-          unknown && "italic text-muted-foreground",
-        )}
-      >
-        {node ? node.city : unknown!.label}
-      </span>
-      {/* A signer id arrives ALREADY truncated (8 chars) — running the house shortener over it
-          would echo its own tail back (`c54ccbea…4ccbea`) and read as a longer hash than exists.
-          Shorten only what is actually long. */}
-      <span className="flex-none font-mono tabular-nums text-micro text-muted-foreground">
-        {id.length > 16 ? shortHash(id) : id}
-      </span>
+    <div className="flex flex-col gap-1">
+      <Fact label={name} title={title}>
+        {headline}
+      </Fact>
+      {rows.map((r) => (
+        <div key={r.name} className="flex items-start justify-between gap-2.5 pl-2" title={r.name}>
+          <span className="min-w-0 truncate text-label text-foreground-dim">{r.name}</span>
+          <span className="shrink-0 text-label text-foreground-dim tabular-nums">{r.count.toLocaleString()}</span>
+        </div>
+      ))}
     </div>
   );
 }

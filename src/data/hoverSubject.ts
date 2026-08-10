@@ -40,20 +40,20 @@ export function tooltipSubject(p: PickDescriptor | null | undefined): HoverSubje
       };
     case "l0":
     case "l1":
-      return { ident: "DAG", name: p.node?.id || p.node?.ip || "validator", color: CORE, mono: !!p.node?.id };
+      return { ident: "DAG", name: p.node?.id || p.node?.ip || "node", color: CORE, mono: !!p.node?.id };
     case "core":
       return { ident: "DAG", name: "Global L0", color: CORE, mono: false };
     case "meta":
       return { ident: p.cfg.ticker || p.cfg.name, name: p.cfg.name, color: identityHudHex(p.cfg.id), mono: false };
     case "snapshot":
-      return { ident: "L0", name: "#" + p.data.ordinal, color: CORE, mono: false };
+      return { ident: "L0", name: p.data.ordinal.toLocaleString(), color: CORE, mono: false };
     case "metaSnap": {
       // A tile on the metagraph-snapshot floor. Same vocabulary as its card: the metagraph's own
       // ticker as the identity, its OWN ordinal as the subject. An UNLISTED channel has no config
       // row, so its address is the only name it has (the card's fallback, shortened here).
       const cfg = METAGRAPHS.find((m) => m.id === p.sel.metaId);
       const ident = cfg?.ticker || cfg?.name || p.sel.metaId.slice(0, 6) + "…";
-      return { ident, name: "#" + p.sel.ordinal, color: identityHudHex(p.sel.metaId), mono: false };
+      return { ident, name: p.sel.ordinal.toLocaleString(), color: identityHudHex(p.sel.metaId), mono: false };
     }
     default:
       return null; // geoLive is a rail-only proxy, never a 3D-hover subject

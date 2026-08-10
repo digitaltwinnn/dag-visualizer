@@ -99,10 +99,17 @@ describe("detailsCards — RIGHT rail (Details): fixed slots + ghost hints", () 
     const cards = detailsCards(details({ mode: "geo", filter: "all", selNodesCount: 0, filterLabel: null }));
     expect(cards.find((c) => c.id === "node")!.hint).toBeNull();
   });
-  it.each(["status", "transactions", "staking"] as const)("placeholder %s has NO ghosts", (mode) => {
-    expect(ghostIds(detailsCards(details({ mode })))).toEqual([]);
+  // A placeholder view has NO FACTS SCOPE AT ALL (user, 2026-08-10) — not just no ghosts. Its
+  // canvas is a wireframe captioned `preview · in development` that deliberately shows no numbers;
+  // a live populated card beside it reads as data FROM it. The selection itself is untouched, so
+  // this only asserts the view stops speaking for it.
+  it.each(["status", "transactions", "staking"] as const)("placeholder %s hosts NO details cards", (mode) => {
+    expect(detailsCards(details({ mode }))).toEqual([]);
+    // …including when every subject a 3D view could commit is still selected.
+    const held = details({ mode, filter: "dor", inspect: nodePick, snap: snapPick, country: "US" });
+    expect(detailsCards(held)).toEqual([]);
   });
-  it("a populated slot loses its ghost but keeps rendering anywhere (pinned snap in hyper)", () => {
+  it("a populated slot loses its ghost but keeps rendering in any 3D view (pinned snap in hyper)", () => {
     const cards = detailsCards(details({ mode: "hyper", snap: snapPick }));
     const snap = cards.find((c) => c.id === "snap")!;
     expect(snap.present).toBe(true);

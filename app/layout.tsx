@@ -15,11 +15,11 @@ const base = process.env.VERCEL_PROJECT_PRODUCTION_URL
 
 // SEO copy (2026-07-10, user-approved): the title carries the BRAND (= the domain, "DAG
 // Visualizer") + the terms people actually search (Constellation Network, DAG); the
-// description carries the long-tail keywords ($DAG, metagraphs, snapshots, validator map).
+// description carries the long-tail keywords ($DAG, metagraphs, snapshots, node map).
 const title = "DAG Visualizer — live 3D map of the Constellation Network";
 const description =
   "Interactive 3D visualizer of the Constellation Network: explore the $DAG hypergraph, " +
-  "metagraphs, the validator world map, and live global snapshot settlement in real time.";
+  "metagraphs, the node world map, and live global snapshot settlement in real time.";
 
 export const metadata: Metadata = {
   metadataBase: new URL(base),

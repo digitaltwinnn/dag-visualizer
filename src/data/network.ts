@@ -165,26 +165,35 @@ export function resolveSigner(selNodes: NodeRow[], metaId: string, signerPrefix:
  *  view didn't publish them. */
 export const SIGNER_UNKNOWN: Record<"network" | "node", { label: string; title: string }> = {
   network: {
-    label: "unknown machine",
-    title: "This network's machines aren't known here — the signature is all we have.",
+    label: "unknown node",
+    title: "This network's nodes aren't known here — the signature is all we have.",
   },
   node: {
     label: "not in live set",
-    title: "No machine in the live node set carries this signer id.",
+    title: "No node in the live set carries this signer id.",
   },
 };
 
-/** WHICH CLUSTER produced a group of signatures — one home, so the three surfaces that list signers
- *  (the raw layer's SIGNERS lane, the metagraph-snapshot card, the ledger explorer's signer depth)
- *  name the same layer in the same words.
+/** WHICH LAYER produced a group of signatures — one home, so the surfaces that count or list signers
+ *  (the raw layer's SIGNERS lane, the two snapshot cards, the ledger explorer's signer depth) name
+ *  the same layer in the same words.
+ *
+ *  ⚠️ **A VALIDATOR IS A LAYER, NEVER A MACHINE.** The app's vocabulary has three levels and one word
+ *  each: a **node** is the host (one machine, one IP, one city, one status); a **layer** is a process
+ *  it runs (L0 / cL1 / dL1, each with its own keypair and therefore its own peer id — which is why
+ *  `signerMatchesNode` matches against `ids`, not `id`); a node's **composition** is the set of layers
+ *  it runs. A layer ACTING is a **validator**, and the word is always layer-qualified — "L0 validator",
+ *  "dL1 validator". So there is no such thing as a "hybrid validator": a hybrid is a NODE that runs an
+ *  L0 validator and a dL1 validator. Anything counting signatures is counting validators; anything
+ *  counting machines is counting nodes. Use `who` rather than writing either word inline.
  *
  *  This exists because the counts are confusing without it (user, 2026-08-09 — DOR's "signed by" is
  *  always 3 while DOR runs 20 machines). Both facts are verified live: a metagraph's snapshot proof
- *  is sealed by its **L0** cluster, which for DOR *is* exactly its 3 hybrid machines, so the count
- *  is constant by construction; its data blocks are produced by the **data-L1** cluster, each block
- *  by a rotating subset of that fleet, so that count varies per snapshot (3 and 6 both observed) and
- *  can be 0 on an idle snapshot. Naming the layer is what turns a constant 3 from a suspicious
- *  number into a structural one. */
+ *  is sealed by its **L0** cluster, which for DOR *is* exactly its 3 hybrid nodes, so the count is
+ *  constant by construction; its data blocks are produced by the **dL1** cluster, each block by a
+ *  rotating subset of that fleet, so that count varies per snapshot (3 and 6 both observed) and can
+ *  be 0 on an idle snapshot. Naming the layer is what turns a constant 3 from a suspicious number
+ *  into a structural one. */
 export const SIGNER_GROUPS = {
   proof: {
     /** The group's noun (the raw lane's note). */
@@ -198,10 +207,21 @@ export const SIGNER_GROUPS = {
   },
   dataBlocks: {
     label: "data blocks",
-    layer: "data-L1, rotating",
-    who: "data-L1 machines",
+    layer: "dL1, rotating",
+    who: "dL1 validators",
     title:
-      "Data blocks are produced by the metagraph's data-L1 cluster, each block by a rotating subset of that fleet — so this count varies per snapshot, and a hybrid machine appears under its dL1 id rather than its L0 one.",
+      "Data blocks are produced by the metagraph's dL1 cluster, each block by a rotating subset of that fleet — so this count varies per snapshot, and a hybrid node signs here under its dL1 id rather than its L0 one.",
+  },
+  /** The GLOBAL snapshot's own seal. The DAG is a metagraph-shaped core under the unified node model,
+   *  so its proof group is the same shape as a metagraph's — its own L0 cluster — and reads with the
+   *  same words. Its own title, because the metagraph one explains a 3-of-20 that has no analogue at
+   *  network scale. */
+  globalProof: {
+    label: "snapshot proof",
+    layer: "L0 cluster",
+    who: "L0 validators",
+    title:
+      "The global snapshot is sealed by the DAG's own L0 cluster — one validator per participating node, so this is how much of the network signed this tick.",
   },
 } as const;
 

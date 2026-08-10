@@ -22,7 +22,7 @@ import { detailsCards, ladderSlotIds, ladderLevelOfSlot, type RailCard } from "@
 import { useLadderFocus } from "@/components/useLadderFocus";
 import { useTrayActives } from "@/components/useTrayActives";
 import { countryToggleActions, cohortToggleActions, compositionToggleActions } from "@/src/engine/domain/pickActions";
-import { CountryTitle, CountryCard, ProviderTitle, ProviderCard, ProviderAside, CompositionTitle, CompositionCard, CompositionAside } from "@/components/inspector/cards";
+import { CountryTitle, CountryAside, CountryCard, ProviderTitle, ProviderCard, ProviderAside, CompositionTitle, CompositionCard, CompositionAside } from "@/components/inspector/cards";
 import MetaSnapPane from "@/components/inspector/MetaSnapPane";
 import type { TabSignal } from "@/components/RailDock";
 import type { PickDescriptor } from "@/src/data/types";
@@ -129,6 +129,7 @@ function CountryPane({ cc, onClose, collapsed, onToggle }: { cc: string; onClose
       <CardHead
         eyebrow="Country"
         title={<CountryTitle cc={cc} />}
+        aside={<CountryAside cc={cc} />}
         titleKey={cc}
         onClose={onClose}
         collapsed={collapsed}

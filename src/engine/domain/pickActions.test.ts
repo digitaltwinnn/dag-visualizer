@@ -205,6 +205,38 @@ describe("the shared component builders (GeoExplore rows + LiveStrip bars run th
     ]);
   });
 
+  it("snapshotSelectActions: committing a DIFFERENT tick drops the metaSnap it can't contain", () => {
+    const p = snapPick();
+    const ord = (p as unknown as { data: { ordinal: number } }).data.ordinal;
+    const here = { metaId: "dor", ordinal: 1, hash: "h", globalOrdinal: ord, ts: "T" } as MetaSnapSel;
+    const elsewhere = { ...here, globalOrdinal: ord - 7 } as MetaSnapSel;
+    // A metagraph snapshot anchors into exactly ONE tick, so one from another tick is released —
+    // in the pile it would sit under this tick's card claiming to be part of it.
+    expect(snapshotSelectActions(p, false, { pinnedOrdinal: null, metaSnap: elsewhere })).toEqual([
+      { kind: "metaSnap", sel: null },
+      { kind: "snapshot", pick: p, follow: false },
+    ]);
+    // Its OWN tick keeps it — this is the ancestry a metaSnap select already committed.
+    expect(snapshotSelectActions(p, false, { pinnedOrdinal: null, metaSnap: here })).toEqual([
+      { kind: "snapshot", pick: p, follow: false },
+    ]);
+    // The live tip is no exception: re-following a different tick can't keep a foreign child.
+    expect(snapshotSelectActions(p, true, { pinnedOrdinal: null, metaSnap: elsewhere })).toEqual([
+      { kind: "metaSnap", sel: null },
+      { kind: "snapshot", pick: p, follow: true },
+    ]);
+    // Both releases can fire, and both precede the subject.
+    expect(
+      snapshotSelectActions(p, false, {
+        pinnedOrdinal: null, metaSnap: elsewhere, filter: "dor", tickHasFilter: false,
+      }),
+    ).toEqual([
+      { kind: "filter", id: "all" },
+      { kind: "metaSnap", sel: null },
+      { kind: "snapshot", pick: p, follow: false },
+    ]);
+  });
+
   it("snapshotSelectActions: the filter RELEASES when its network is absent from the tick", () => {
     const p = snapPick();
     // Absent → the filter steps back to "all" before the pin.

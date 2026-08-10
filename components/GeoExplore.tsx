@@ -165,7 +165,7 @@ export default function GeoExplore() {
         // metagraph still appears).
         <>
           <p className="text-body text-foreground m-0 mb-1">No locatable nodes</p>
-          <p className="text-label text-muted-foreground m-0">{tickerOrName} has no validators we can place on the map right now. It still appears in the Hypergraph.</p>
+          <p className="text-label text-muted-foreground m-0">{tickerOrName} has no nodes we can place on the map right now. It still appears in the Hypergraph.</p>
         </>
       ) : (
         <>

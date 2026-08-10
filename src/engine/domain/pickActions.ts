@@ -214,6 +214,15 @@ export function snapshotSelectActions(
   ) {
     out.push({ kind: "filter", id: "all" });
   }
+  // A METAGRAPH SNAPSHOT ANCHORS INTO EXACTLY ONE TICK, so committing a DIFFERENT tick drops it
+  // (user, 2026-08-10). This is stronger than the filter's story rule one rung up: that one is
+  // about set membership, this is a one-to-one join (`metagraph.timestamp === global.timestamp`),
+  // so the held snapshot provably did not anchor here. Left in place it sat directly under the
+  // global card in the pile — where ADJACENCY IS CONTAINMENT — stating that tick B contains a
+  // snapshot that landed in tick A. Releases first, subject last, like the filter above.
+  if (current?.metaSnap && current.metaSnap.globalOrdinal !== p.data.ordinal) {
+    out.push({ kind: "metaSnap", sel: null });
+  }
   out.push({ kind: "snapshot", pick: p, follow: isLiveTip });
   return out;
 }

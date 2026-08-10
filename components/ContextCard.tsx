@@ -11,6 +11,7 @@ import CardHead, { RailPane } from "@/components/CardHead";
 import InspectorCard from "@/components/InspectorCard";
 import { PulseEdge, useEdgePulse } from "@/components/EdgePulse";
 import { KIND_MARK_CLASS } from "@/components/icons";
+import { Fact } from "@/components/inspector/parts";
 import type { PickDescriptor } from "@/src/data/types";
 
 // The Context (parent) card at the top of the right-rail subject stack. It mirrors the
@@ -76,10 +77,9 @@ export default function ContextCard({
             </p>
             {/* Absent data is an INSTRUMENT STATE, never a fabricated number: the operators'
                 machines are outside every feed this app reads. */}
-            <div className="mt-2 flex items-start justify-between gap-2.5">
-              <span className="text-body text-muted-foreground">Machines</span>
-              <span className="text-body text-muted-foreground italic">not knowable</span>
-            </div>
+            <Fact className="mt-2" label="Machines">
+              <span className="text-muted-foreground italic">not knowable</span>
+            </Fact>
           </>
         )}
         <PulseEdge pulseKey={pulseKey} rail="right" />

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { kindOf, payloadKinds } from "./payloadKinds";
+import { kindOf, PAYLOAD_LANES, parsePayload, payloadKinds } from "./payloadKinds";
 
 describe("kindOf", () => {
   it("names a single-key wrapper by its key — the shape mainnet actually anchors", () => {
@@ -50,5 +50,35 @@ describe("payloadKinds", () => {
     expect(payloadKinds(null)).toEqual([]);
     expect(payloadKinds(undefined)).toEqual([]);
     expect(payloadKinds([])).toEqual([]);
+  });
+});
+
+// The lane words are shared by the metagraph-snapshot CARD's two sections and the raw layer's two
+// lane tabs — one subject disclosed at two levels, so they must be the same two words.
+describe("PAYLOAD_LANES", () => {
+  it("names both lanes and titles each, since a bare `none` means a different thing in each", () => {
+    for (const lane of [PAYLOAD_LANES.state, PAYLOAD_LANES.data]) {
+      expect(lane.name.length).toBeGreaterThan(0);
+      expect(lane.title.length).toBeGreaterThan(0);
+    }
+    expect(PAYLOAD_LANES.state.name).not.toBe(PAYLOAD_LANES.data.name);
+    expect(PAYLOAD_LANES.state.title).not.toBe(PAYLOAD_LANES.data.title);
+  });
+});
+
+describe("parsePayload", () => {
+  it("decodes JSON, and feeds payloadKinds directly", () => {
+    expect(parsePayload('[{"a":1},{"a":2}]')).toEqual([{ a: 1 }, { a: 2 }]);
+    expect(payloadKinds(parsePayload('[{"a":1},{"a":2}]'))).toEqual([{ kind: "a", count: 2 }]);
+  });
+
+  it("keeps an undecodable payload as its own string rather than hiding it", () => {
+    expect(parsePayload("not json")).toBe("not json");
+  });
+
+  it("treats an absent payload as nothing, which yields no kinds", () => {
+    expect(parsePayload(undefined)).toBeNull();
+    expect(parsePayload("")).toBeNull();
+    expect(payloadKinds(parsePayload(undefined))).toEqual([]);
   });
 });
