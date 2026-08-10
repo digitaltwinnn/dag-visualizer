@@ -23,6 +23,7 @@ import { useMinHold } from "@/components/useMinHold";
 import { useNowTick } from "@/components/useNowTick";
 import { identityHudHex } from "@/src/palette/identity";
 import { PulseEdge, useEdgePulse } from "@/components/EdgePulse";
+import { NodeStars } from "@/components/state/StateAtoms";
 import { METASNAP_ICON, KIND_MARK_CLASS } from "@/components/icons";
 import { followToggleActions } from "@/src/engine/domain/pickActions";
 import { applyClickActions } from "@/src/store/applyClickActions";
@@ -108,6 +109,7 @@ export default function MetaSnapPane({
   // Hoisted out of the state tier so the FOOT can reach it — it is a hash, and hashes are looked
   // up, not read. The deep read wins where it exists; the exact row carries it otherwise.
   const stateProof = deep?.stateProof ?? row?.stateProof;
+  const hash = sel.hash || polled?.hash || "";
   const rel = relativeAge(now - Date.parse(sel.ts));
   // ⚠️ The `!!snap` half is load-bearing: the ledger contributes no ancestry, so the global card
   // can be a GHOST while this one is populated — there the clock has to stay here.
@@ -233,7 +235,15 @@ export default function MetaSnapPane({
                 the one asymmetry that STAYS: only a metagraph snapshot proves an application
                 state, so it's a real difference in the artifact, not an inconsistency. */}
             <Foot>
-              <FootRow label="Hash" value={shortHash(sel.hash)} title={sel.hash} />
+              {/* The descriptor's hash is not the only source, and for a PAGER step it isn't a
+                  source at all: `railSiblings` builds its siblings from the tick's exact read,
+                  which carries no hash field (`hash: ""`), so stepping to a sibling left HASH as
+                  an em-dash — while PARENT, one row below, populated fine from the polled record.
+                  Both come off the same record; this row was simply not reading it. So it tiers
+                  like `stateProof` does: descriptor first, polled buffer behind it. The em-dash
+                  survives for the one case that is genuinely unknown — a snapshot stepped to
+                  after it aged out of the retained buffer — where stating the gap is the point. */}
+              <FootRow label="Hash" value={shortHash(hash)} title={hash} />
               {polled?.parent && (
                 <FootRow label="Parent" value={shortHash(polled.parent)} title={polled.parent} />
               )}
@@ -325,10 +335,39 @@ function PayloadBlock({
   // IS a serialized state; the ROWS say what it carries, and all-zero rows say "declared these
   // kinds, carried none of them" without the headline having to contradict them.
   const hasState = stateBytes > 0;
-  // Unread is an INSTRUMENT STATE, never a zero — pre-pin the update count simply isn't known,
-  // and `0` would be a fabricated reading. It also carries the invitation, which is why the old
-  // trailing "pin to read the payload" line is gone: it now sits on the row it qualifies.
-  const unread = !deep ? (following ? "pin to read" : "reading…") : null;
+  // Unread is an INSTRUMENT STATE, never a zero — pre-pin the update count simply isn't known, and
+  // `0` would be a fabricated reading.
+  //
+  // WHICH instrument state is the app's own rule, latent in the two existing acquiring surfaces
+  // and written down here because this row got it wrong: NODE-STARS fill a VALUE SLOT that a
+  // number is actually coming into (they reserve its width, so nothing jumps when it lands — the
+  // global card's `Fees paid` does exactly this); a WORD is for when no slot is being reserved —
+  // a whole block acquiring (`AnchoredTags`' stars + "resolving"), or a state that names a
+  // different fact entirely (`Exact read: reading…`, which is replaced wholesale, not filled in).
+  //
+  // So the three states here are three different things and only one of them twinkles:
+  //   • following  → `pin to read`, an INVITATION. Nothing is in flight and nothing will arrive
+  //     unless the user asks, so stars would promise an arrival that isn't coming.
+  //   • pinned, in flight → the count IS coming into this slot. Stars.
+  //   • pinned, given up → the honest terminal. The deep read 404s once the L0 node prunes the
+  //     global (~30 min), and without this the slot twinkled forever — the same hang the
+  //     `decodeGaveUp` timer was added to end, which this row was simply not consuming.
+  const dataHeadline = deep ? (
+    deep.dataTxCount > 0 ? (
+      <>
+        <b className="font-bold">{deep.dataTxCount.toLocaleString()}</b> update
+        {deep.dataTxCount === 1 ? "" : "s"}
+      </>
+    ) : (
+      <Quiet>none</Quiet>
+    )
+  ) : following ? (
+    <Quiet>pin to read</Quiet>
+  ) : decodeGaveUp ? (
+    <Quiet>unavailable — tick pruned</Quiet>
+  ) : (
+    <NodeStars count={4} />
+  );
 
   return (
     <div className="mt-1.5">
@@ -348,18 +387,7 @@ function PayloadBlock({
       <PayloadSection
         name={PAYLOAD_LANES.data.name}
         title={PAYLOAD_LANES.data.title}
-        headline={
-          unread ? (
-            <Quiet>{unread}</Quiet>
-          ) : deep && deep.dataTxCount > 0 ? (
-            <>
-              <b className="font-bold">{deep.dataTxCount.toLocaleString()}</b> update
-              {deep.dataTxCount === 1 ? "" : "s"}
-            </>
-          ) : (
-            <Quiet>none</Quiet>
-          )
-        }
+        headline={dataHeadline}
         rows={dataRows}
       />
     </div>

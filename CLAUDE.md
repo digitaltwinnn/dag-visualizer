@@ -777,6 +777,18 @@ then eases out — no blink. **Steady** states like NO SIGNAL and STANDBY never 
 persist by nature. Boot latches once live, so a later feed drop is the per-panel NO SIGNAL rather than
 the boot overlay returning.
 
+**Acquiring has two forms, and the choice is about the SLOT, not the wait** (2026-08-10). `NodeStars`
+fills a value slot a real number is arriving into — it reserves that slot's width so nothing reflows
+when the number lands, and carries no text because the label already names what's coming (the global
+card's `Fees paid`, `AnchoredTags`, the metagraph card's Data count). A **word** is for everything
+else: no slot is being held, so it states the situation and is replaced wholesale — `reading…` for a
+block acquiring, `pin to read` for an invitation where nothing is in flight at all, `unavailable —
+tick pruned` where nothing is coming. Stars on an invitation would promise an arrival that isn't
+coming; a word in a held slot reflows the row when the number replaces it.
+⚠️ **Every acquiring state needs its give-up path wired.** A deep read that 404s (the L0 node prunes
+after ~30 min) otherwise shows `reading…` forever, which rule 10 counts as a fabricated state exactly
+like a fabricated number.
+
 ### shadcn primitives
 
 `components/ui/` holds the adopted primitives; compose classes with `cn()`. **`Button` is adopted only
