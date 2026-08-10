@@ -198,7 +198,7 @@ export class NetworkData {
       description:
         "The DAG is the Hypergraph's base network — its Global L0 runs PRO consensus and " +
         "settles every metagraph's snapshots, and its currency-L1 carries $DAG. It's the root " +
-        "every metagraph anchors into, secured by $DAG-staked validators.",
+        "every metagraph anchors into, secured by $DAG-staked nodes.",
     };
   }
 

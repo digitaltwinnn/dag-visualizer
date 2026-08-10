@@ -9,18 +9,17 @@ import { useEffect, useMemo, useState, type CSSProperties } from "react";
 import { Button } from "@/components/ui/button";
 import CardHead, { RailPane } from "@/components/CardHead";
 import { IdentityDot, Fact, FactGroup, Foot, FootRow } from "@/components/inspector/parts";
+import { Separator } from "@/components/ui/separator";
 import { useStore } from "@/src/store/store";
 import { metaSnapDeepKey } from "@/src/data/types";
-import type { NodeRow } from "@/src/data/types";
-import { getNetwork, resolveSigner, SIGNER_GROUPS, SIGNER_UNKNOWN, metagraphById, shortHash, type SignerResolution } from "@/src/data/network";
+import type { ChannelSnapDeep, ChannelSnapRow } from "@/src/data/types";
+import { getNetwork, SIGNER_GROUPS, metagraphById, shortHash } from "@/src/data/network";
 import { UNLISTED_HUE } from "@/src/data/unlisted";
 import { snapsAtTick } from "@/src/data/anchorLog";
 import { fmtDag, fmtKB } from "@/src/util/format";
 import { relativeAge } from "@/src/util/relativeAge";
 import { useMinHold } from "@/components/useMinHold";
 import { useNowTick } from "@/components/useNowTick";
-import { subjectPairing } from "@/components/useSubjectPairing";
-import { hoverKeyOf } from "@/src/data/hoverSubject";
 import { identityHudHex } from "@/src/palette/identity";
 import { PulseEdge, useEdgePulse } from "@/components/EdgePulse";
 import { METASNAP_ICON, KIND_MARK_CLASS } from "@/components/icons";
@@ -48,11 +47,6 @@ export default function MetaSnapPane({
   const following = useStore((s) => s.following);
   const snap = useStore((s) => s.snap);
   const setSection = useStore((s) => s.setSection);
-  // Spec §5.3's pairing runs on the EXISTING node-hover channel — a hover, never a selection, so
-  // this card stays outside the one-selection-write-path rule.
-  const hoverNodeId = useStore((s) => s.hoverNodeId);
-  const setHoverNodeId = useStore((s) => s.setHoverNodeId);
-  const selNodes = useStore((s) => s.selNodes);
 
   // Tier 1 — the polled record this tile was named from (free: the metagraph snapshot buffers
   // are already in memory, keyed by the anchoring tick's timestamp).
@@ -156,52 +150,60 @@ export default function MetaSnapPane({
         {!collapsed && (
           <div>
             {/* ── LEAD ───────────────────────────────────────────────────────────────────────
-                The two things this card exists to say, merged from four rows that each used to
-                cost a line of their own (Network / Anchored into, Size / Fee). The network's
-                anchor is one relation, so it reads as one line; size and fee carry their own
-                units, so they need no labels. Size leads the pair because the chamber's byte bar
-                IS the bytes — the card's headline number is the one the geometry encodes. */}
-            <div className="flex flex-col gap-1">
-              <div
-                className="flex items-start justify-between gap-2.5"
-                title={`Anchored into global snapshot ${sel.globalOrdinal.toLocaleString()}`}
-              >
-                <span className="inline-flex items-center gap-1.5 min-w-0 text-body text-foreground">
-                  <IdentityDot hue={hue} />
-                  <span className="truncate">{ticker}</span>
-                </span>
-                <span className="text-body text-muted-foreground tabular-nums whitespace-nowrap">
-                  → #{sel.globalOrdinal.toLocaleString()}
-                </span>
-              </div>
-              {row && (
-                <div className="text-body text-foreground tabular-nums">
-                  <b className="font-bold">{fmtKB(row.bytes / 1024)}</b>
-                  <span className="text-muted-foreground"> · </span>
-                  {fmtDag(row.fee)} DAG
-                </div>
-              )}
+                What this snapshot IS and where it landed, on one line: the metagraph that
+                produced it and the global tick it anchored into. Size and fee used to ride a
+                second lead line; they moved DOWN into `Fees paid` (user, 2026-08-10) so this card
+                mirrors its sibling above — the global card leads with the anchoring relation,
+                puts the breakdown VISUAL at the centre, and states fee-and-size as one fact
+                below. Bytes and DAG are bookkeeping about the anchor; the payload is the news. */}
+            <div className="flex items-start justify-between gap-2.5" title={`Anchored into global snapshot ${sel.globalOrdinal.toLocaleString()}`}>
+              <span className="inline-flex items-center gap-1.5 min-w-0 text-body text-foreground">
+                <IdentityDot hue={hue} />
+                <span className="truncate">{ticker}</span>
+              </span>
+              <span className="text-body text-muted-foreground tabular-nums whitespace-nowrap">
+                → #{sel.globalOrdinal.toLocaleString()}
+              </span>
             </div>
 
+            {/* ── THE CENTRE: what this metagraph actually anchored ────────────────────────
+                The global card's `AnchoredTags` answers "what did this tick carry" with a
+                header line plus a ranked bar list; one storey up, the same question is "what did
+                this snapshot carry", so it takes the same instrument (user, 2026-08-10: the
+                global card "put a nice visual at the centre for its main information"). Header
+                from the free exact row, bars from the pin-gated deep read — the asymmetry is
+                honest and says so in place. */}
+            <StateBlock row={row} deep={deep ?? null} following={following} decodeGaveUp={decodeGaveUp} hue={hue} />
+
             {/* ── DETAIL: the measured facts ─────────────────────────────────────────────── */}
-            <FactGroup className="mt-2.5">
+            <Separator className="my-2" />
+            <FactGroup>
               {row ? (
                 <>
-                  {/* The LAYER is part of the fact: a metagraph's proof is its L0 cluster's, so DOR
-                      shows 3 of its 20 machines by construction (user, 2026-08-09 — the bare count
-                      read as a bug). One home for the words: SIGNER_GROUPS. */}
+                  {/* Fee leads, size rides under it — the global card's own two-line value, so
+                      the pair reads identically on both storeys of the chain. */}
+                  <Fact label="Fees paid">
+                    <span className="flex flex-col items-end">
+                      <span className="whitespace-nowrap"><b className="font-bold">{fmtDag(row.fee)}</b> DAG</span>
+                      <span className="text-label text-muted-foreground">{fmtKB(row.bytes / 1024)} anchored</span>
+                    </span>
+                  </Fact>
+                  {/* The two signer groups, SEPARATED (user, 2026-08-10: "general signing is L0
+                      validator, and data updates are separate and have separate signers as
+                      dL1's? Perhaps that also warrants a separation on the metagraph cards?").
+                      They are different clusters doing different work — the L0 cluster seals the
+                      snapshot (DOR: the same 3 of its 20 machines every time), a rotating dL1
+                      subset produces the data blocks — so one merged count would be a lie about
+                      both. One home for the words: SIGNER_GROUPS. The NAMES behind the counts
+                      live one tier down, in the raw layer's SIGNERS lane, which lists both groups
+                      as a real table; a city column under "Signed by" claimed that cities sign. */}
                   <Fact label="Signed by" title={SIGNER_GROUPS.proof.title}>
                     {signers?.length ?? 0} {SIGNER_GROUPS.proof.who}
                   </Fact>
-                  {signers && signers.length > 0 && (
-                    <SignerRows
-                      ids={signers}
-                      metaId={sel.metaId}
-                      selNodes={selNodes}
-                      hue={hue}
-                      hoverNodeId={hoverNodeId}
-                      setHoverNodeId={setHoverNodeId}
-                    />
+                  {deep && deep.dataBlockSigners.length > 0 && (
+                    <Fact label="Blocks by" title={SIGNER_GROUPS.dataBlocks.title}>
+                      {deep.dataBlockSigners.length} {SIGNER_GROUPS.dataBlocks.who}
+                    </Fact>
                   )}
                 </>
               ) : reading.show ? (
@@ -212,58 +214,6 @@ export default function MetaSnapPane({
                 // The L0 node prunes after ~30 minutes; an old tick keeps its polled facts and says so.
                 <Fact label="Exact read">unavailable — tick pruned</Fact>
               )}
-
-              {/* ── The application state — ONE RULE (user, 2026-08-07: DED's empty state hid
-                  the invitation while the raw layer rendered the decoded shape; the two
-                  surfaces must apply one standard): if the payload DECODED, the tier shows and
-                  the invitation stands — an empty state says "empty" honestly instead of
-                  hiding. Both routes share one decoder, so decoded-ness itself can't disagree;
-                  a genuinely unreadable payload says so (and "decoding…" while the pin's full
-                  unpack is in flight). ── */}
-              {(() => {
-                const decodedOk = deep != null || row?.decoded === true;
-                if (!decodedOk) {
-                  if (row == null) return null; // no exact row yet — the reading state above covers it
-                  return (
-                    <Fact label="State">
-                      <span className="text-muted-foreground italic">
-                        {following ? "undecodable payload" : decodeGaveUp ? "decode unavailable — tick pruned" : "decoding…"}
-                      </span>
-                    </Fact>
-                  );
-                }
-                const stateBytes = deep ? deep.stateBytes : (row?.stateBytes ?? 0);
-                const empty = deep ? !deep.stateKeys.some((k) => k.count > 0) : !row?.hasState;
-                return (
-                  <>
-                    {empty ? (
-                      <Fact label="State">
-                        <span className="text-muted-foreground italic">empty</span>
-                      </Fact>
-                    ) : (
-                      stateBytes > 0 && <Fact label="State">{fmtKB(stateBytes / 1024)}</Fact>
-                    )}
-                    {deep && deep.stateKeys.length > 0 && (
-                      <Fact label="State records">{deep.stateKeys.map((k) => `${k.key} ${k.count}`).join(" · ")}</Fact>
-                    )}
-                    {/* The deep decode is pin-gated while following (the live card advances every
-                        tick — fetching it would poll the heavy route). Honest hint in place. */}
-                    {!deep && following && (
-                      <Fact label="State records">
-                        <span className="text-muted-foreground italic">pin to decode</span>
-                      </Fact>
-                    )}
-                    {/* The data TRANSACTIONS are a data metagraph's real payload (batch
-                        commitments etc. — DED's fingerprint batches ride here while its state
-                        stays empty; 2026-08-07). Their PRODUCING LAYER — the dL1 subset that
-                        signed the blocks — was culled from this card (user, 2026-08-10): it
-                        exists only after the deep read, and the raw layer's SIGNERS lane names
-                        both groups beside their counts, which is where a signer question is
-                        actually asked. */}
-                    {deep && deep.dataTxCount > 0 && <Fact label="Data updates">{deep.dataTxCount}</Fact>}
-                  </>
-                );
-              })()}
             </FactGroup>
 
             {(deep != null || row?.decoded === true) && (
@@ -300,87 +250,107 @@ export default function MetaSnapPane({
   );
 }
 
-// One row per signer, each PAIRED to its chip on the ml0 rail (spec §5.3): hovering the row writes
-// `hoverNodeId` and the chip glows; hovering the chip in the scene writes the same channel and the
-// row washes. No new mechanism — the identical coupling an explorer node row already has.
-// A metagraph seals its snapshots with its L0 cluster, so this is a handful of machines: the list
-// renders whole, with no truncation and no "show more".
-function SignerRows({
-  ids,
-  metaId,
-  selNodes,
+// ── The application-state block: this card's centre of gravity ────────────────────────────────
+// The sibling instrument to the global card's `AnchoredTags` — same grammar (a header line, then
+// a ranked share-of-total bar list), one storey up, so the two cards in the chain answer "what
+// did this carry" the same way. Rows are the top-level record kinds inside the state, all in the
+// metagraph's OWN hue: they are one subject's records, not competing identities.
+//
+// ONE RULE for whether the tier shows at all (user, 2026-08-07: DED's empty state hid the
+// invitation while the raw layer rendered the decoded shape — the two surfaces apply one
+// standard): if the payload DECODED, the block shows and the invitation stands; an empty state
+// says so honestly instead of hiding. Both routes share one decoder, so decoded-ness can't
+// disagree between them.
+//
+// The two tiers of source are DELIBERATELY asymmetric and say so in place: the header's bytes ride
+// the tick's free exact row, the bars need the ~2.5 MB deep read, which stays gated to an explicit
+// pin. So a live-following card states its size and offers the pin; it never fabricates a
+// breakdown it hasn't read.
+function StateBlock({
+  row,
+  deep,
+  following,
+  decodeGaveUp,
   hue,
-  hoverNodeId,
-  setHoverNodeId,
 }: {
-  ids: readonly string[];
-  metaId: string;
-  selNodes: NodeRow[];
+  row: ChannelSnapRow | null;
+  deep: ChannelSnapDeep | null;
+  following: boolean;
+  decodeGaveUp: boolean;
   hue: string;
-  hoverNodeId: string | null;
-  setHoverNodeId: (id: string | null) => void;
 }) {
-  // A signer id arrives TRUNCATED (decodeChannel's shortSigner keeps the payload small), so the
-  // live row it names is found by prefix, scoped to this snapshot's own network — the card-side
-  // twin of the scene's `resolveSignerIps`, so a row and its glowing chip resolve the same way.
-  // `resolveSigner` is the ONE shared decision (src/data/network.ts): the ledger explorer's signer
-  // depth reads it too, so the same id can never be described differently in the two places.
-  const rows = useMemo(() => ids.map((id) => ({ id, r: resolveSigner(selNodes, metaId, id) })), [ids, selNodes, metaId]);
-  return (
-    <div className="flex flex-col gap-px">
-      {rows.map(({ id, r }) => (
-        <SignerRow key={id} id={id} res={r} hue={hue} hoverNodeId={hoverNodeId} setHoverNodeId={setHoverNodeId} />
-      ))}
-    </div>
-  );
-}
+  const keys = useMemo(() => (deep ? [...deep.stateKeys].sort((a, b) => b.count - a.count) : []), [deep]);
 
-function SignerRow({
-  id,
-  res,
-  hue,
-  hoverNodeId,
-  setHoverNodeId,
-}: {
-  id: string;
-  res: SignerResolution;
-  hue: string;
-  hoverNodeId: string | null;
-  setHoverNodeId: (id: string | null) => void;
-}) {
-  // An UNRESOLVED signer states what isn't known instead of pairing on a key it can't light — the
-  // shared words, so this row and the explorer's say the same thing. It stays a SIGNATURE: no node
-  // card, because there is no IP, geolocation, role or status behind it (rule 10). The scene-side
-  // glow is unaffected either way: the Engine resolves signer ids against the live metaList.
-  const node = res.known ? res.row : null;
-  const key = node ? hoverKeyOf(node.pick) : null;
-  const pair = subjectPairing(hoverNodeId, key, setHoverNodeId, hue);
-  const unknown = res.known ? null : SIGNER_UNKNOWN[res.reason];
+  const decodedOk = deep != null || row?.decoded === true;
+  if (!decodedOk) {
+    if (row == null) return null; // no exact row yet — the FactGroup's reading state covers it
+    return (
+      <div className="mt-1.5 text-body text-muted-foreground italic">
+        {following ? "undecodable payload" : decodeGaveUp ? "decode unavailable — tick pruned" : "decoding…"}
+      </div>
+    );
+  }
+
+  const stateBytes = deep ? deep.stateBytes : (row?.stateBytes ?? 0);
+  const empty = deep ? !keys.some((k) => k.count > 0) : !row?.hasState;
+  const updates = deep?.dataTxCount ?? 0;
+  const total = keys.reduce((s, k) => s + k.count, 0);
+  const pct = (n: number) => (total > 0 ? (n / total) * 100 : 0);
+
   return (
-    <div
-      className={cn(
-        "nb-row flex items-baseline gap-1.5 -mx-2 px-2 py-0.5 rounded-sm text-label text-foreground-dim",
-        pair.className,
-      )}
-      style={pair.style}
-      title={unknown ? unknown.title : id}
-      onMouseEnter={pair.onMouseEnter}
-      onMouseLeave={pair.onMouseLeave}
-    >
-      <span
-        className={cn(
-          "flex-1 min-w-0 overflow-hidden text-ellipsis whitespace-nowrap",
-          unknown && "italic text-muted-foreground",
+    <div className="mt-1.5">
+      {/* Header — the free tier. On-chain STATE and data UPDATES are different things (a data
+          metagraph's real payload rides in its blocks' dataTransactions while its on-chain state
+          stays empty), so they compose rather than substitute; whichever is real leads. Bytes
+          are free with the tick, updates only exist after the pin, so a live card states the
+          state and invites the pin for the rest — it never implies an update count it hasn't
+          read. An empty state is a FACT about the snapshot, not a missing reading. */}
+      <div className="flex items-baseline gap-2 flex-wrap mb-1.5">
+        {empty && updates === 0 ? (
+          <span className="text-body text-muted-foreground italic">no application state</span>
+        ) : (
+          <span className="text-body text-foreground">
+            {!empty && (
+              <>
+                <b className="font-bold">{fmtKB(stateBytes / 1024)}</b> of state
+              </>
+            )}
+            {!empty && updates > 0 && <span className="text-muted-foreground"> · </span>}
+            {updates > 0 && (
+              <>
+                <b className="font-bold">{updates.toLocaleString()}</b> data update{updates === 1 ? "" : "s"}
+              </>
+            )}
+          </span>
         )}
-      >
-        {node ? node.city : unknown!.label}
-      </span>
-      {/* A signer id arrives ALREADY truncated (8 chars) — running the house shortener over it
-          would echo its own tail back (`c54ccbea…4ccbea`) and read as a longer hash than exists.
-          Shorten only what is actually long. */}
-      <span className="flex-none font-mono tabular-nums text-micro text-muted-foreground">
-        {id.length > 16 ? shortHash(id) : id}
-      </span>
+      </div>
+
+      {keys.length > 0 && (
+        <div className="flex flex-col gap-y-1">
+          {keys.map((k) => (
+            <div key={k.key} className="flex items-center gap-2 py-[3px]" title={k.key}>
+              <span className="w-[68px] flex-none text-body text-foreground truncate">{k.key}</span>
+              <span className="block flex-1 h-1.5 rounded-xs bg-white/[0.06] overflow-hidden">
+                <span
+                  className="block h-full rounded-xs min-w-[2px]"
+                  style={{ width: `${Math.max(pct(k.count), k.count > 0 ? 4 : 0)}%`, background: hue }}
+                />
+              </span>
+              <span className="min-w-7 flex-none text-right text-body text-foreground tabular-nums">
+                {k.count.toLocaleString()}
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* The pin gate, stated where the breakdown would be — an instrument state, not an absence.
+          It is NOT conditioned on the state being non-empty: the deep read is what reveals the
+          data updates too, and a metagraph whose on-chain state is empty is exactly the one whose
+          payload rides in its blocks. */}
+      {!deep && following && (
+        <div className="text-label text-muted-foreground italic">pin to read the payload</div>
+      )}
     </div>
   );
 }

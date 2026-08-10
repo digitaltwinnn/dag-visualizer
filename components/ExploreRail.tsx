@@ -28,7 +28,7 @@ const ABOUT: Record<Mode, { title: string; eyebrow: string; lines: string[]; cap
     title: "Where the network runs",
     eyebrow: "About",
     lines: [
-      "Where the network runs — every validator plotted at its real geolocation, co-located machines stacked into honeycomb chip towers, with travelling-packet connection arcs between them.",
+      "Where the network runs — every node plotted at its real geolocation, co-located nodes stacked into honeycomb chip towers, with travelling-packet connection arcs between them.",
       "Drill into a country to see its nodes; filtering a metagraph narrows the map to that network's footprint.",
     ],
   },
@@ -45,7 +45,7 @@ const ABOUT: Record<Mode, { title: string; eyebrow: string; lines: string[]; cap
     eyebrow: "About",
     caption: "SOON",
     lines: [
-      "Live health of the network — validator uptime, node states (Ready / waiting / offline), and software-version spread across the Global L0 and the metagraphs.",
+      "Live health of the network — node uptime, node states (Ready / waiting / offline), and software-version spread across the Global L0 and the metagraphs.",
       "A single at-a-glance read of whether the network is healthy, and where any trouble is.",
     ],
   },
@@ -59,11 +59,11 @@ const ABOUT: Record<Mode, { title: string; eyebrow: string; lines: string[]; cap
     ],
   },
   staking: {
-    title: "Who backs the validators",
+    title: "Who backs the nodes",
     eyebrow: "About",
     caption: "SOON",
     lines: [
-      "Delegated staking across the network — who is staked to which validators, total $DAG delegated, and the rewards flowing back.",
+      "Delegated staking across the network — who is staked to which nodes, total $DAG delegated, and the rewards flowing back.",
       "How stake (and therefore consensus weight) is distributed, and how that shifts over time.",
     ],
   },

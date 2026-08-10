@@ -234,6 +234,20 @@ rail in every view, and a deselect steps back down the local ladder instead of j
 
 ## Nodes, layers & the filter
 
+**Vocabulary rule — a validator is a LAYER, never a machine** (user, 2026-08-10, app-wide sweep): a
+**node** is one host — one machine, one IP, one city, one status; a **layer** is an L0 / cL1 / dL1
+process on it, with **its own keypair and its own peer id**; a node's **composition** is the set of
+layers it runs; and a **validator** is a layer acting, so the word is *always* layer-qualified and never
+a synonym for "node". The global snapshot card's bare `155 validators` is what surfaced this — under
+the unified node model its seal is the DAG's own L0 cluster, so it reads `155 L0 validators` like every
+other signer count. There is **ONE layer vocabulary** app-wide, the codes the composition chips already
+use (`L0` / `cL1` / `dL1`); the signer copy's `data-L1` was a second dialect for the same three layers
+and is gone, `ROLE_FR` with it. `src/data/network.test.ts` makes both halves executable — every
+`SIGNER_GROUPS.who` must match `/^(L0|cL1|dL1) validators$/`, and no group's words may say `data-L1`.
+Internal identifiers keep their existing names (`validatorDim`, `NodeFabric`, `machineRows`) — one
+concept, two registers — and a phrase naming a SHELL rather than a machine ("the validator shells around
+it") is correct as it stands.
+
 Validators and metagraph nodes are `InstancedMesh`es with a patched smooth-shaded material. In hyper
 they're small spheres; on the globe they cross-fade to standing round chips, edge-lit so stacks read
 as lit chips rather than a flat mass; in the ledger they're the same chips in the trays.
@@ -632,7 +646,7 @@ Three weights, and a fact's weight is a claim about what the card is FOR:
 
 | weight | holds | built from |
 |---|---|---|
-| **lead** | the 1–2 things the card exists to say | composed by the card itself — merges facts onto one line and drops labels the unit already carries (`3.8 KB · 0.0070 DAG`, no "Size"/"Fee") |
+| **lead** | the 1–2 things the card exists to say | composed by the card itself — merges facts onto one line and drops labels the unit already carries (`1.8 KB of state · 4 data updates`, no "State"/"Updates") |
 | **detail** | the measured facts | `Fact` inside `FactGroup` |
 | **foot** | hashes, ids, bookkeeping numbers | `Foot` + `FootRow` — small muted mono on its own BASE PLATE, **always last** |
 
@@ -1009,14 +1023,27 @@ frame's own shape, not a look.
 and lights those machines in the trays — the scene keys metagraph nodes by IP, not id, so the machines
 that actually signed are the ones that glow.
 
-**Two signer groups, and the layer is the point** (`SIGNER_GROUPS` in `src/data/network.ts` is the ONE
+**Three signer groups, and the layer is the point** (`SIGNER_GROUPS` in `src/data/network.ts` is the ONE
 home for their words). A metagraph seals every snapshot with its **own L0 cluster**, so the proof signer
 set IS that cluster — DOR's is the same 3 machines every time, out of 20. Its **data blocks** are produced
 by the **dL1 cluster**, each block by a rotating subset, so that count varies per snapshot and is 0 when a
-snapshot carries none. A bare "signed by 3" against a 20-machine fleet reads as a bug, so all three signer
-surfaces (the rail card, the raw layer's SIGNERS lane, the ledger panel's list) name the producing layer
-beside the count from that one constant. The ledger panel can only ever show the PROOF group — data-block
-signers exist solely in the ~2.5 MB deep read, which browsing must never trigger.
+snapshot carries none. The third group is the **global** snapshot's own proof, which is the same thing one
+storey down: the DAG's own L0 cluster. A bare "signed by 3" against a 20-machine fleet reads as a bug, so
+every signer surface (the two snapshot cards, the raw layer's SIGNERS lane, the ledger panel's list) names
+the producing layer beside the count from that one constant. The ledger panel can only ever show the PROOF
+group — data-block signers exist solely in the ~2.5 MB deep read, which browsing must never trigger.
+
+**The two snapshot cards are ONE shape** (user, 2026-08-10 — "global has no signed table, just a count"):
+composed lead → the payload block with its bars → `Fees paid` (DAG over `N KB anchored`) → the signer
+COUNTS → foot. So the metagraph card's own signer TABLE is gone: a list whose first column was a CITY
+said cities sign, it sat at equal weight below the facts with nothing dividing it, and it put the
+secondary fact first. The good version already lives one tier down in the raw layer's SIGNERS lane, which
+is what the card's "Show the application state" link opens — the card states the SHAPE, the pane renders
+the payload. The named cost is the card's signer↔tray hover pairing; the Engine's signer glow on
+selection is separate and unaffected. The card gains `Blocks by N dL1 validators` beside
+`Signed by N L0 validators`, because the user's question — "general signing is L0 validator, and data
+updates are separate and have separate signers as dL1's?" — is exactly right, and two counts of two
+different things need two labelled lines.
 
 **A signer that can't be named is named as such, once.** `resolveSigner` in `src/data/network.ts` is the
 ONE home for that: given the view's node rows, a metagraph id and a signer prefix it returns either the
@@ -1161,7 +1188,7 @@ metagraph's hue from its real brand, snapped into the palette's allowed zones, w
 It drives the dossier and inspector text:
 
 - Nodes are **hybrid** (several layers on one machine) or **dedicated**. On mainnet most metagraphs are
-  3 hybrid nodes; DOR is the outlier with 3 hybrid + 19 dedicated data-L1 nodes.
+  3 hybrid nodes; DOR is the outlier with 3 hybrid + 19 dedicated dL1 nodes.
 - ⚠️ **A peer id belongs to a LAYER, not to a machine** — each layer process runs its own keypair, so a
   hybrid answers with a different id on its l0 port than on its dl1 port (verified live 2026-08-09).
   `/api/metagraphs` therefore emits **`NodeInfo.ids`**, every layer's id for that IP in LAYERS order
@@ -1170,9 +1197,9 @@ It drives the dossier and inspector text:
   prefix compare looks like an ordinary string test and reintroduces the blind spot for that surface
   alone. Matching the primary only left every hybrid data-block signer rendering as `not in live set`
   while the machine sat right there in the list — the id set is per layer and so are the signatures.
-- **Currency-L1 is never a standalone node** — every cL1 node is also an L0 node, so the outer cL1
+- **cL1 is never a standalone node** — every cL1 node is also an L0 node, so the outer cL1
   shell is effectively always empty.
-- **A metagraph has a real token only if it runs a currency-L1 cluster.** The `symbol` field is
+- **A metagraph has a real token only if it runs a cL1 cluster.** The `symbol` field is
   *always* set, so it is not a token signal (DED has a "DED" symbol but no token). The dossier's type
   descriptor derives from node roles, and a 0-node metagraph says just "metagraph" — type is unknowable
   without nodes.

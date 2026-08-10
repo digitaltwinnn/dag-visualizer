@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { cn } from "@/lib/utils";
 import { useStore } from "@/src/store/store";
-import { shortHash, CORE_HEX, metagraphById } from "@/src/data/network";
+import { shortHash, CORE_HEX, metagraphById, SIGNER_GROUPS } from "@/src/data/network";
 import { identityHudHex } from "@/src/palette/identity";
 import { hex, fmtDag, fmtKB } from "@/src/util/format";
 import { relativeAge } from "@/src/util/relativeAge";
@@ -255,11 +255,18 @@ export function SnapshotCard({ data: d }: { data: GlobalSnapshot }) {
               <span className="animate-resolve-in motion-reduce:animate-none whitespace-nowrap"><b className="font-bold">{fmtDag(exact.rewardsDatum)}</b> DAG</span>
             </Fact>
           )}
-          {/* The validator count is a FACT about this tick — it reads. Its two hashes don't, so
-              they sit in the foot below. */}
+          {/* The signer count is a FACT about this tick — it reads. Its two hashes don't, so
+              they sit in the foot below.
+              The LAYER is part of the fact, exactly as on the metagraph snapshot card (user,
+              2026-08-10: "why do we call it 'validators' for global snapshot and in metagraph L0
+              validators?"). A bare "validators" was the odd one out, not the qualified one — a
+              global snapshot is sealed by the DAG's OWN L0 cluster under the unified node model,
+              so it is the same kind of fact and takes the same words. One home: SIGNER_GROUPS. */}
           {exact != null && (exact.signerCount ?? 0) > 0 && (
-            <Fact label="Signed by">
-              <span className="animate-resolve-in motion-reduce:animate-none">{exact.signerCount} validators</span>
+            <Fact label="Signed by" title={SIGNER_GROUPS.globalProof.title}>
+              <span className="animate-resolve-in motion-reduce:animate-none">
+                {exact.signerCount} {SIGNER_GROUPS.globalProof.who}
+              </span>
             </Fact>
           )}
         </FactGroup>

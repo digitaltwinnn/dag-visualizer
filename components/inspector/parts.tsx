@@ -17,7 +17,10 @@ import { compositionRows } from "@/src/data/composition";
 // Shared building blocks for the inspector cards (the React port of ui.js _cardBody),
 // split out so each per-kind card reads as its own small file.
 
-export const ROLE_FR: Record<string, string> = { l0: "L0", cl1: "currency-L1", dl1: "data-L1" };
+// ONE layer vocabulary, app-wide: a layer is `L0` / `cL1` / `dL1` wherever it is named (the rule
+// lives with SIGNER_GROUPS in src/data/network.ts). A second long-form map ("currency-L1",
+// "data-L1") used to sit here and fed the composition `parts` strings, so the same layer could
+// read two ways within one card — the chips beside them have always used these codes.
 export const ROLE_SHORT: Record<string, string> = { l0: "L0", cl1: "cL1", dl1: "dL1" };
 export const ROLE_ORDER = ["l0", "cl1", "dl1"];
 
@@ -264,7 +267,7 @@ export interface Composition {
   present: string[]; // role keys present, in ROLE_ORDER
   hybrid: number; // nodes running more than one layer
   dedBy: Record<string, number>; // dedicated-node count per role
-  parts: string[]; // e.g. ["3 hybrid", "19 dedicated data-L1"]
+  parts: string[]; // e.g. ["3 hybrid", "19 dedicated dL1"]
   total: number;
   hasCurrency: boolean; // runs a currency-L1 cluster → has a real token
 }
@@ -277,7 +280,7 @@ export function nodeComposition(nodes: NodeInfo[]): Composition {
     if (r.length === 1) dedBy[r[0]!] = (dedBy[r[0]!] || 0) + 1;
   }
   const parts = (hybrid ? [`${hybrid} hybrid`] : []).concat(
-    present.filter((r) => dedBy[r]).map((r) => `${dedBy[r]} dedicated ${ROLE_FR[r]}`),
+    present.filter((r) => dedBy[r]).map((r) => `${dedBy[r]} dedicated ${ROLE_SHORT[r]}`),
   );
   const total = hybrid + Object.values(dedBy).reduce((a, b) => a + b, 0);
   return { present, hybrid, dedBy, parts, total, hasCurrency: present.includes("cl1") };

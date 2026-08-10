@@ -40,7 +40,7 @@ export function tooltipSubject(p: PickDescriptor | null | undefined): HoverSubje
       };
     case "l0":
     case "l1":
-      return { ident: "DAG", name: p.node?.id || p.node?.ip || "validator", color: CORE, mono: !!p.node?.id };
+      return { ident: "DAG", name: p.node?.id || p.node?.ip || "node", color: CORE, mono: !!p.node?.id };
     case "core":
       return { ident: "DAG", name: "Global L0", color: CORE, mono: false };
     case "meta":

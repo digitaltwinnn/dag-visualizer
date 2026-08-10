@@ -199,7 +199,7 @@ function SignerGroup({
         <span className="text-foreground-dim">{g.layer}</span>
       </LaneNote>
       <LaneTable
-        head={["Machine", "Signer id"]}
+        head={["Node", "Signer id"]}
         rows={ids.map((id) => {
           const r = resolveSigner(selNodes, metaId, id);
           const w = r.known ? null : SIGNER_UNKNOWN[r.reason];
@@ -265,7 +265,7 @@ export function ChannelStatePanel() {
         id: "signers",
         name: "Signers",
         count: deep.signers.length || deep.dataBlockSigners.length,
-        title: "The validators whose proofs seal this snapshot",
+        title: "The validators that signed this snapshot, by producing layer",
       });
     }
     return out;
