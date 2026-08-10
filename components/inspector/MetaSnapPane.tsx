@@ -12,7 +12,7 @@ import { IdentityDot } from "@/components/inspector/parts";
 import { useStore } from "@/src/store/store";
 import { metaSnapDeepKey } from "@/src/data/types";
 import type { NodeRow } from "@/src/data/types";
-import { getNetwork, matchSignerRow, metagraphById, shortHash } from "@/src/data/network";
+import { getNetwork, resolveSigner, SIGNER_GROUPS, SIGNER_UNKNOWN, metagraphById, shortHash, type SignerResolution } from "@/src/data/network";
 import { UNLISTED_HUE } from "@/src/data/unlisted";
 import { snapsAtTick } from "@/src/data/anchorLog";
 import { fmtDag, fmtKB } from "@/src/util/format";
@@ -31,9 +31,9 @@ import { cn } from "@/lib/utils";
 // The two body-row shapes the house already uses, side by side because this card carries both
 // kinds of fact: a measured NUMBER reads label-left/value-right (CountryCard/LayerCard), a
 // REFERENCE reads label-above/value-below with the full value on hover (the node card's id row).
-function Fact({ label, children }: { label: string; children: ReactNode }) {
+function Fact({ label, children, title }: { label: string; children: ReactNode; title?: string }) {
   return (
-    <div className="flex items-start justify-between gap-2.5">
+    <div className="flex items-start justify-between gap-2.5" title={title}>
       <span className="text-body text-muted-foreground">{label}</span>
       <span className="text-body text-foreground tabular-nums">{children}</span>
     </div>
@@ -108,9 +108,15 @@ export default function MetaSnapPane({
   const signers = deep?.signers ?? row?.signers ?? null;
 
   const pulseKey = useEdgePulse(sel ? `${sel.metaId}:${sel.ordinal}` : null);
-  // The metagraph snapshot is exactly as LIVE as the global while following (advanceMetaSnap
-  // rides the same heartbeat), so its aside speaks the SAME language as SnapshotAside: beating
-  // dot + a ticking `live · Xs ago` counter, tap-to-toggle through the same tested follow table.
+  // The metagraph snapshot is exactly as LIVE as the global while following (advanceMetaSnap rides
+  // the same heartbeat), so its aside is the same tap-to-follow toggle as SnapshotAside — but it
+  // does NOT repeat the clock. The anchor join is exact (a metagraph snapshot is stamped with the
+  // timestamp of the global it anchored into), so whenever the card above shows that same tick the
+  // two counters were literally the same number twice (user, 2026-08-09: "both say live · x
+  // seconds ago; looks redundant"). The GLOBAL card owns the clock; this one states the relation
+  // instead — `anchored`, the house word for what the Snapshots stack does. The counter comes back
+  // the moment it carries real information: while following a metagraph lane through anchor-less
+  // global ticks this card holds an OLDER tick, and then its age is not a repeat.
   const now = useNowTick(1000);
 
   if (!sel) return null;
@@ -122,6 +128,9 @@ export default function MetaSnapPane({
   const ticker = cfg?.ticker || cfg?.name || shortHash(sel.metaId);
   const hue = cfg ? identityHudHex(sel.metaId) : UNLISTED_HUE;
   const rel = relativeAge(now - Date.parse(sel.ts));
+  // ⚠️ The `!!snap` half is load-bearing: the ledger contributes no ancestry, so the global card
+  // can be a GHOST while this one is populated — there the clock has to stay here.
+  const sameTick = !!snap && snap.data.ordinal === sel.globalOrdinal;
   const asideCls = "inline-flex items-center gap-1.5 text-label text-muted-foreground whitespace-nowrap";
   const aside = (
     <button
@@ -131,14 +140,12 @@ export default function MetaSnapPane({
       className={cn(asideCls, "rounded-xs hover:text-foreground transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary/60")}
       onClick={() => snap && applyClickActions(followToggleActions(snap, following))}
     >
-      {following ? (
-        <>
-          <span className="w-2 h-2 rounded-full bg-primary shadow-[0_0_0_3px_color-mix(in_oklch,var(--primary)_30%,transparent)] animate-dot-beat motion-reduce:animate-none" />
-          {rel ? `live · ${rel}` : "live"}
-        </>
-      ) : (
-        <>◷ {rel}</>
+      {/* The beating dot rides `following` on its own, so the card still FEELS live in the
+          `anchored` state — the heartbeat-on-closed-cards rule doesn't depend on the number. */}
+      {following && (
+        <span className="w-2 h-2 rounded-full bg-primary shadow-[0_0_0_3px_color-mix(in_oklch,var(--primary)_30%,transparent)] animate-dot-beat motion-reduce:animate-none" />
       )}
+      {sameTick ? "anchored" : following ? (rel ? `live · ${rel}` : "live") : <>◷ {rel}</>}
     </button>
   );
 
@@ -151,7 +158,7 @@ export default function MetaSnapPane({
               {/* A subject-specific mark carries its OWN subject's hue (the node-mark idiom) —
                   this card is about one metagraph even when the filter is "all". */}
               <METASNAP_ICON aria-hidden className={KIND_MARK_CLASS} style={{ color: hue } as CSSProperties} />
-              <span className="truncate">#{sel.ordinal.toLocaleString()}</span>
+              <span className="truncate">{sel.ordinal.toLocaleString()}</span>
             </span>
           }
           titleKey={`${sel.metaId}:${sel.ordinal}`}
@@ -182,7 +189,12 @@ export default function MetaSnapPane({
               <>
                 <Fact label="Fee">{fmtDag(row.fee)} DAG</Fact>
                 <Fact label="Size">{fmtKB(row.bytes / 1024)}</Fact>
-                <Fact label="Signed by">{signers?.length ?? 0} validators</Fact>
+                {/* The LAYER is part of the fact: a metagraph's proof is its L0 cluster's, so DOR
+                    shows 3 of its 20 machines by construction (user, 2026-08-09 — the bare count
+                    read as a bug). One home for the words: SIGNER_GROUPS. */}
+                <Fact label="Signed by" title={SIGNER_GROUPS.proof.title}>
+                  {signers?.length ?? 0} {SIGNER_GROUPS.proof.who}
+                </Fact>
                 {signers && signers.length > 0 && (
                   <SignerRows
                     ids={signers}
@@ -250,7 +262,9 @@ export default function MetaSnapPane({
                     <Fact label="Data updates">{deep.dataTxCount}</Fact>
                   )}
                   {deep && deep.dataBlockSigners.length > 0 && (
-                    <Fact label="Data blocks">{deep.dataBlockSigners.length} signers</Fact>
+                    <Fact label="Data blocks" title={SIGNER_GROUPS.dataBlocks.title}>
+                      signed by {deep.dataBlockSigners.length} {SIGNER_GROUPS.dataBlocks.who}
+                    </Fact>
                   )}
                   {(deep?.stateProof ?? row?.stateProof) && (
                     <HashFact label="State proof" value={(deep?.stateProof ?? row?.stateProof)!} />
@@ -297,14 +311,13 @@ function SignerRows({
   // A signer id arrives TRUNCATED (decodeChannel's shortSigner keeps the payload small), so the
   // live row it names is found by prefix, scoped to this snapshot's own network — the card-side
   // twin of the scene's `resolveSignerIps`, so a row and its glowing chip resolve the same way.
-  const rows = useMemo(
-    () => ids.map((id) => ({ id, node: matchSignerRow(selNodes, metaId, id) })),
-    [ids, selNodes, metaId],
-  );
+  // `resolveSigner` is the ONE shared decision (src/data/network.ts): the ledger explorer's signer
+  // depth reads it too, so the same id can never be described differently in the two places.
+  const rows = useMemo(() => ids.map((id) => ({ id, r: resolveSigner(selNodes, metaId, id) })), [ids, selNodes, metaId]);
   return (
     <div className="flex flex-col gap-px">
-      {rows.map(({ id, node }) => (
-        <SignerRow key={id} id={id} node={node} hue={hue} hoverNodeId={hoverNodeId} setHoverNodeId={setHoverNodeId} />
+      {rows.map(({ id, r }) => (
+        <SignerRow key={id} id={id} res={r} hue={hue} hoverNodeId={hoverNodeId} setHoverNodeId={setHoverNodeId} />
       ))}
     </div>
   );
@@ -312,22 +325,25 @@ function SignerRows({
 
 function SignerRow({
   id,
-  node,
+  res,
   hue,
   hoverNodeId,
   setHoverNodeId,
 }: {
   id: string;
-  node: NodeRow | null;
+  res: SignerResolution;
   hue: string;
   hoverNodeId: string | null;
   setHoverNodeId: (id: string | null) => void;
 }) {
-  // With another network committed, `selNodes` doesn't carry THIS metagraph's nodes — so the row
-  // degrades to a bare id rather than pairing on a key it can't light. The scene-side glow is
-  // unaffected: the Engine resolves the signer ids against the live metaList (Task 13).
+  // An UNRESOLVED signer states what isn't known instead of pairing on a key it can't light — the
+  // shared words, so this row and the explorer's say the same thing. It stays a SIGNATURE: no node
+  // card, because there is no IP, geolocation, role or status behind it (rule 10). The scene-side
+  // glow is unaffected either way: the Engine resolves signer ids against the live metaList.
+  const node = res.known ? res.row : null;
   const key = node ? hoverKeyOf(node.pick) : null;
   const pair = subjectPairing(hoverNodeId, key, setHoverNodeId, hue);
+  const unknown = res.known ? null : SIGNER_UNKNOWN[res.reason];
   return (
     <div
       className={cn(
@@ -335,11 +351,18 @@ function SignerRow({
         pair.className,
       )}
       style={pair.style}
-      title={id}
+      title={unknown ? unknown.title : id}
       onMouseEnter={pair.onMouseEnter}
       onMouseLeave={pair.onMouseLeave}
     >
-      <span className="flex-1 min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">{node?.city ?? "—"}</span>
+      <span
+        className={cn(
+          "flex-1 min-w-0 overflow-hidden text-ellipsis whitespace-nowrap",
+          unknown && "italic text-muted-foreground",
+        )}
+      >
+        {node ? node.city : unknown!.label}
+      </span>
       {/* A signer id arrives ALREADY truncated (8 chars) — running the house shortener over it
           would echo its own tail back (`c54ccbea…4ccbea`) and read as a longer hash than exists.
           Shorten only what is actually long. */}
