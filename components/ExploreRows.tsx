@@ -84,6 +84,7 @@ export function DisclosureRow({
   holdsSel,
   title,
   onToggle,
+  previewOnly,
   onHoverEnter,
   onHoverLeave,
   groupKey,
@@ -98,6 +99,14 @@ export function DisclosureRow({
   holdsSel: boolean;
   title: string;
   onToggle: () => void;
+  /** PREVIEW-ONLY: the row still HOVERS — it keeps its wash and still writes whatever channel its
+   *  caller previews on the scene — but it neither opens nor commits (user, 2026-08-10). It is the
+   *  row's answer to being out of the committed lens, so it drops the chevron (the affordance is
+   *  the promise; there is nothing to open), takes the cursor back to `default`, and mutes its
+   *  words a step so the state reads AT REST — the chevron is invisible until hover, so without
+   *  the mute an inactive row looks exactly like a live one right up until you click it. Its
+   *  identity dot stays at full hue: it did anchor here, and identity is not a state. */
+  previewOnly?: boolean;
   onHoverEnter?: () => void;
   onHoverLeave?: () => void;
   groupKey?: string;
@@ -116,16 +125,18 @@ export function DisclosureRow({
     <button
       type="button"
       className={cn(
-        "group relative flex items-center gap-2 w-full py-[5px] pl-2 pr-2 my-px rounded-sm border border-transparent bg-transparent cursor-pointer text-left text-foreground-dim transition-colors duration-[140ms]",
-        "hover:bg-wash-hover hover:text-foreground",
+        "group relative flex items-center gap-2 w-full py-[5px] pl-2 pr-2 my-px rounded-sm border border-transparent bg-transparent text-left text-foreground-dim transition-colors duration-[140ms]",
+        "hover:bg-wash-hover",
+        previewOnly ? "cursor-default text-muted-foreground" : "cursor-pointer hover:text-foreground",
         "focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--primary)] focus-visible:outline-offset-[-2px]",
         on && selectedRow(focused ?? true),
         pair.paired && pair.className,
       )}
       style={pair.style}
-      aria-expanded={open}
+      aria-expanded={previewOnly ? undefined : open}
+      aria-disabled={previewOnly || undefined}
       title={title}
-      onClick={onToggle}
+      onClick={previewOnly ? undefined : onToggle}
       onMouseEnter={() => {
         pair.onMouseEnter();
         onHoverEnter?.();
@@ -136,7 +147,12 @@ export function DisclosureRow({
       }}
     >
       {children}
-      {on || (holdsSel && !open) ? (
+      {previewOnly ? (
+        // The chevron's own reserved slot, kept empty — the DisclosureChevron contract says the row
+        // owns this width, and a preview-only row sits directly among live siblings, so dropping it
+        // would shift their count column against each other.
+        <span aria-hidden className="size-3.5 flex-none" />
+      ) : on || (holdsSel && !open) ? (
         <SelectedRowMark className="flex-none" muted={on && focused === false} />
       ) : (
         <DisclosureChevron open={open} />

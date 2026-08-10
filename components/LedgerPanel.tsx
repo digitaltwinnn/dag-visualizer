@@ -15,7 +15,7 @@ import { latestRelevant } from "@/src/data/follow";
 import { identityHudHex } from "@/src/palette/identity";
 import { IdentityDot } from "@/components/inspector/parts";
 import { useStore } from "@/src/store/store";
-import { bandSelectActions, metaSnapSelectActions, snapshotSelectActions, sameMetaSnap, followToggleActions, nodeSelectActions } from "@/src/engine/domain/pickActions";
+import { metaSnapSelectActions, snapshotSelectActions, sameMetaSnap, followToggleActions, nodeSelectActions } from "@/src/engine/domain/pickActions";
 import { applyClickActions } from "@/src/store/applyClickActions";
 import { DisclosureChevron, DisclosureRow, NodePickerRow, ROW_NEST, ROW_OUTSET } from "@/components/ExploreRows";
 import { NoSignalDot } from "@/components/state/StateAtoms";
@@ -49,6 +49,16 @@ import { fmtKB } from "@/src/util/format";
 // explorer row and a 3D click can never drift. The browse window is the chamber's own visible
 // trail (SLOT_N ticks — the same buffer LiveStrip plots), so "what the list shows" is exactly
 // "what the 3D scene shows".
+
+/** A COMMITTED FILTER IS A LENS, and inside a tick the lens decides what is drillable: with a
+ *  network committed, every OTHER network's group is preview-only (user, 2026-08-10). The tick still
+ *  lists them — rule 10 doesn't let a lens edit the facts, and they really did anchor here — but a
+ *  row under a tick must never reach past the filter and change it, which is the same boundary the
+ *  card's pager keeps by staying inside this metagraph × this tick. Unfiltered, nothing is out.
+ *  Takes the id rather than the group so the unlisted row shares it: one rule, no special case. */
+function outOfLens(filter: string, id: string): boolean {
+  return filter !== "all" && filter !== id;
+}
 
 /** One metagraph's anchored snapshots inside a window (the whole trail, or one tick). */
 interface MetaGroup {
@@ -537,7 +547,8 @@ export default function LedgerPanel() {
                         ) : (
                           tickGroups.map((g) => {
                             const key = `${d.ordinal}|${g.id}`;
-                            const gOpen = openContrib === key;
+                            const lensedOut = outOfLens(filter, g.id);
+                            const gOpen = openContrib === key && !lensedOut;
                             return (
                               <div key={g.id}>
                                 <DisclosureRow
@@ -548,13 +559,38 @@ export default function LedgerPanel() {
                                   on={filter === g.id && activeSnapOrd === d.ordinal && metaSnap == null}
                                   holdsSel={metaSnap?.metaId === g.id && metaSnap.globalOrdinal === d.ordinal}
                                   title={`${g.name} · ${g.rows.length} snapshot${g.rows.length === 1 ? "" : "s"} anchored into ${d.ordinal.toLocaleString()}`}
-                                  onToggle={() => {
-                                    // A metagraph under a tick is the BAND: the (metagraph, tick)
-                                    // pair — the same tested semantics as clicking its band in
-                                    // the byte bar — and the click opens its snapshots too.
-                                    applyClickActions(bandSelectActions(g.id, globalPick, { filter, metaSnap }));
-                                    setOpenContrib(gOpen ? null : key);
-                                  }}
+                                  // A NETWORK UNDER A TICK IS A GROUP HEADER, NOT A COMMIT (user,
+                                  // 2026-08-10: "a click directly changes the filter which I feel
+                                  // will often happen accidentally not purposefully"). It ran
+                                  // `bandSelectActions`, so opening a tick's contributors to see
+                                  // who anchored — the browse this tree exists for — silently
+                                  // re-committed the app-wide filter, dimming every view and
+                                  // outliving the visit. The user's own PAGER rule already says
+                                  // this one surface over: a step must not move a COARSER rung,
+                                  // which is why the card's swipe stays inside this metagraph and
+                                  // this tick. A group header is coarser still.
+                                  //
+                                  // So it opens and it PREVIEWS (`hoverFilter` below still paints
+                                  // the chamber, which is the whole answer to "what is this
+                                  // network's story here" without committing to it). Committing
+                                  // stays with the deliberate clicks: a SNAPSHOT row inside, which
+                                  // filter-firsts through `metaSnapSelectActions`, the byte-bar
+                                  // band in the scene — where there is no disclosure, so a click
+                                  // must mean something — or the top bar's own picker.
+                                  onToggle={() => setOpenContrib(gOpen ? null : key)}
+                                  // …and under a COMMITTED FILTER the other networks stop being
+                                  // browsable at all (user, 2026-08-10: "a click here commits and
+                                  // this feels unintended because we lose the metagraph filter").
+                                  // The tick still LISTS them, because they really did anchor here
+                                  // and rule 10 doesn't let the lens edit the facts — but only the
+                                  // committed network is drillable, so nothing under a tick can
+                                  // reach past the filter and change it. That is the same boundary
+                                  // the scene draws with its coloured dim and the pager draws by
+                                  // staying inside this metagraph × this tick. The hover survives
+                                  // untouched: `hoverFilter` below still paints that lane in the
+                                  // chamber, which is the whole "where is it" answer the user
+                                  // called nice, and previewing has never been committing.
+                                  previewOnly={lensedOut}
                                   onHoverEnter={() => setHoverFilter(g.id)}
                                   onHoverLeave={() => setHoverFilter(null)}
                                 >
@@ -632,7 +668,7 @@ export default function LedgerPanel() {
                         {tickUnlisted > 0 && (
                           <div>
                             <DisclosureRow
-                              open={openContrib === `${d.ordinal}|${UNLISTED_ID}`}
+                              open={openContrib === `${d.ordinal}|${UNLISTED_ID}` && !outOfLens(filter, UNLISTED_ID)}
                               on={filter === UNLISTED_ID && activeSnapOrd === d.ordinal && metaSnap == null}
                               holdsSel={
                                 metaSnap != null &&
@@ -641,12 +677,14 @@ export default function LedgerPanel() {
                               }
                               title={`${tickUnlisted} uncataloged snapshot${tickUnlisted === 1 ? "" : "s"} anchored into ${d.ordinal.toLocaleString()}`}
                               onToggle={() => {
-                                applyClickActions(
-                                  bandSelectActions(UNLISTED_ID, globalPick, { filter, metaSnap, tickHasFilter }),
-                                );
+                                // Disclose only, like every listed group header above it.
                                 const key = `${d.ordinal}|${UNLISTED_ID}`;
                                 setOpenContrib(openContrib === key ? null : key);
                               }}
+                              // …and out of the lens under any other committed filter, like them
+                              // too. `unlisted` is a first-class network here as everywhere: the
+                              // one home makes it the common case, never a special case.
+                              previewOnly={outOfLens(filter, UNLISTED_ID)}
                               onHoverEnter={() => setHoverFilter(UNLISTED_ID)}
                               onHoverLeave={() => setHoverFilter(null)}
                             >
