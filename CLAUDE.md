@@ -634,7 +634,7 @@ Three weights, and a fact's weight is a claim about what the card is FOR:
 |---|---|---|
 | **lead** | the 1–2 things the card exists to say | composed by the card itself — merges facts onto one line and drops labels the unit already carries (`3.8 KB · 0.0070 DAG`, no "Size"/"Fee") |
 | **detail** | the measured facts | `Fact` inside `FactGroup` |
-| **foot** | hashes, ids, bookkeeping numbers | `Foot` + `FootRow` — small muted mono behind a `Separator`, **always last** |
+| **foot** | hashes, ids, bookkeeping numbers | `Foot` + `FootRow` — small muted mono on its own BASE PLATE, **always last** |
 
 The four primitives live in `components/inspector/parts.tsx` and are the only way a card body draws a
 fact row; nothing re-derives the layout locally. They carry no animation, so reduced motion is a no-op
@@ -644,6 +644,17 @@ here exactly as it is for the slab.
 compare it against something else — the node card's NODE ID, the snapshot cards' hash and parent. That
 is also why the node card's "NODE ID last" rule falls out of the grammar rather than being a special
 case.
+
+**The foot changes GROUND, not just type** (user, 2026-08-10 — the tier read as "only the font"). It
+full-bleeds by the card's own padding to the panel's bottom edge, picks the inner radius back up and
+sits on `--panel-plate`; that replaces the `Separator` outright, because a rule on top of a ground
+change is redundant noise. **The fill is a neutral white LIFT, and the mechanism is the rule**: a dark
+scrim composites multiplicatively, so it separates beautifully over the ledger's glow and dies to a
+~4/255 step over the black scene the right rail actually rests on — it shipped that way for an
+afternoon before being measured on both grounds. A white overlay is additive and therefore
+ground-independent. Keep it neutral: `--wash-*` is accent-hued and IS the selection language, so a
+tinted lift would read as selected. The bottom bleed is `--foot-bleed`, which `RailPager` overrides to
+its own strip height so a paged box's plank rides ON the plate — one number, two consumers.
 
 On the two snapshot cards the foot has one shape: **the artifact's chain identity — what it is, what it
 links to, what it proves.** They are the same `Signed[]` artifact, so they carry the same set, and the

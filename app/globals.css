@@ -468,6 +468,16 @@
   --panel: rgba(12, 16, 32, 0.72);
   --panel-light: rgba(12, 16, 32, 0.35);
   --panel-solid: rgba(8, 12, 26, 0.92);
+  /* --panel-plate is the BASE PLATE a card's FOOT sits on (user, 2026-08-10: the foot's tier
+     change "is only the font", asked for more). A NEUTRAL WHITE lift, and the mechanism is the
+     whole point — measured live against both grounds: a dark scrim (tried first, at black 40%)
+     composites MULTIPLICATIVELY, so its delta is proportional to whatever the glass is currently
+     showing. Over the bright ledger glow it read beautifully; over the black scene the right rail
+     actually rests on it vanished to a ~4/255 step. A white overlay is ADDITIVE — a constant lift
+     on any ground — so the foot reads as its own tier everywhere. Keep it NEUTRAL: the --wash-*
+     family is accent-hued and IS the selection language, so a blue-tinted lift here would read as
+     selected, which for look-up data is backwards. */
+  --panel-plate: rgba(255, 255, 255, 0.045);
 
   /* Dot-size scale (documented, not tokenised — the w-/h- micro-dots read cleaner as literals at
      the call site than as size utilities): 3px xs · 5px sm · 7px md · 9px lg (odd, +2px steps) —

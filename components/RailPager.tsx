@@ -166,11 +166,16 @@ export default function RailPager({ slot, children }: { slot: RailCardKind; chil
         // ON the card's bottom edge, INSIDE the glass (user, 2026-08-09 — a plank hugging the box
         // from outside read as a second frame under it). The card must RESERVE that strip, and the
         // pad lives here rather than in RIGHT_CARD because only a paged card needs it:
-        // `[&>.ig-panel]:pb-[36px]` compiles to a (0,2,0) rule in the SAME utilities layer as
-        // RIGHT_CARD's `p-[18px]` (0,1,0), so specificity decides and it wins — the equivalent
-        // globals.css recipe would have to sit unlayered to beat the utility at all (CSS trap 1).
-        // 36 rather than 30 (2026-08-10) to seat the divider below with 6px of air either side.
-        className="relative touch-pan-y select-none transition-transform duration-200 ease-out motion-reduce:transition-none [&>.ig-panel]:pb-[36px]"
+        // `[&>.ig-panel]:pb-[var(--pager-strip)]` compiles to a (0,2,0) rule in the SAME utilities
+        // layer as RIGHT_CARD's `p-[18px]` (0,1,0), so specificity decides and it wins — the
+        // equivalent globals.css recipe would have to sit unlayered to beat the utility at all
+        // (CSS trap 1). 36 rather than 30 (2026-08-10) to seat the divider below with 6px of air
+        // either side.
+        // ONE number, TWO consumers: `--foot-bleed` hands the same 36 to `Foot`, whose base plate
+        // full-bleeds to the panel's bottom edge. Without it the plate would stop at the default
+        // 18 and leave the plank floating on bare glass below its own ground; with it the plank
+        // and its hairline (siblings of the panel, so painted after it) ride ON the plate.
+        className="relative touch-pan-y select-none transition-transform duration-200 ease-out motion-reduce:transition-none [--pager-strip:36px] [--foot-bleed:var(--pager-strip)] [&>.ig-panel]:pb-[var(--pager-strip)]"
         style={{ transform: dx ? `translateX(${dx}px)` : undefined, transition: dragging ? "none" : undefined }}
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}

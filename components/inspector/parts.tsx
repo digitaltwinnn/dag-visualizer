@@ -4,7 +4,6 @@ import { Fragment, useState, type ReactNode } from "react";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Separator } from "@/components/ui/separator";
 import type { NodeInfo } from "@/src/data/types";
 import {
   nodeStatus,
@@ -72,14 +71,37 @@ export function FactGroup({ children, className }: { children: ReactNode; classN
   return <div className={cn("flex flex-col gap-1", className)}>{children}</div>;
 }
 
-// The FOOT tier — always last in a card, behind its own resting division (inset by the card's
-// own padding by construction: it's a plain child of the padded body, the inspector layout the
-// house rule describes as needing no bleed).
+// The FOOT tier — always last in a card, and now a BASE PLATE rather than a run of rows behind a
+// hairline (user, 2026-08-10: "the visual difference … is not very clear; I think it's only the
+// font — can you do a bit more?"). It wasn't only the font (the rows already dropped to
+// micro/label, `foreground-dim` and mono), but the LABEL had gone uppercase + caps-tracked, which
+// in this aesthetic reads as a heading — so the label got louder as the value got quieter and the
+// tier netted out flat, on the same ground, behind the same hairline every other resting division
+// uses. A hairline says "division"; it can't say "different tier".
+//
+// So the foot changes GROUND. It full-bleeds by the card's own padding to the panel's bottom edge,
+// picking the inner radius back up (`--radius` minus the 1px border), and sits on `--panel-plate`
+// — see that token for why the fill is a neutral white LIFT and not the dark scrim this shipped as
+// for an afternoon. The plate replaces the `Separator` outright: a rule on top of a ground change
+// is redundant noise. (A `--wash-faint` tray was tried and rejected — that family is the
+// accent/selection lane, so it read as SELECTED, backwards for look-up data. Pushing contrast
+// alone was tried too and read as disabled.)
+//
+// The bottom bleed is a var so the PAGED box still reaches its own bottom edge: RailPager reserves
+// a 36px strip on the panel and overrides `--foot-bleed` to the same number, so the plank and its
+// hairline (siblings of the panel, painted after it) ride ON the plate instead of below it.
 export function Foot({ children, className }: { children: ReactNode; className?: string }) {
   return (
-    <div className={cn("mt-2", className)}>
-      <Separator className="mb-2" />
-      <div className="flex flex-col gap-1">{children}</div>
+    <div
+      className={cn(
+        "mt-3 flex flex-col gap-1",
+        "-mx-[var(--card-pad)] px-[var(--card-pad)]",
+        "-mb-[var(--foot-bleed,var(--card-pad))] pb-[var(--foot-bleed,var(--card-pad))] pt-[11px]",
+        "rounded-b-[calc(var(--radius)-1px)] bg-[var(--panel-plate)]",
+        className,
+      )}
+    >
+      {children}
     </div>
   );
 }
