@@ -5,7 +5,7 @@ import { cn } from "@/lib/utils";
 import { useStore } from "@/src/store/store";
 import { shortHash, CORE_HEX, metagraphById } from "@/src/data/network";
 import { identityHudHex } from "@/src/palette/identity";
-import { hex, fmtDag, fmtKB, ccMark } from "@/src/util/format";
+import { hex, fmtDag, fmtKB } from "@/src/util/format";
 import { relativeAge } from "@/src/util/relativeAge";
 import { statusBreakdown } from "@/src/data/nodeStatus";
 import type { GlobalSnapshot, MetaCfg, PickDescriptor } from "@/src/data/types";
@@ -428,6 +428,16 @@ export function GeoLiveCard() {
 // CONSISTENCY LEVER: the ORDER never changes. Whichever facts survive render in the fixed
 // reading order place → role → host → reference, so the card always reads the same way; it just
 // has fewer lines.
+//
+// THE CODES ARE CULLED, and the ASN moves DOWN a weight (user, 2026-08-10 — asked whether this
+// card wanted a third column). It didn't: three columns break the one row grammar (label left,
+// value right, one line), the codes run 2ch (`US`) to 8ch (`AS212317`) so a fixed column is either
+// gappy or truncating, and the layer codes are a CHIP — pulling them out detaches them from the
+// composition word they qualify. Measured live, the raggedness is at the LEFT of the value block
+// anyway, so a right-aligned column tidies an edge that was never ragged.
+// `US` is simply dropped: it restates "United States" and, unlike a hash, nobody looks a country
+// code UP. `AS212317` is exactly a look-up value, so it goes where look-up values go — the foot,
+// under the same `cohort == null` gate, since the provider card carries it as its own reference.
 function GeoLiveNode({ p }: { p: PickOf<"l0" | "l1" | "metanode"> }) {
   // The three ancestor rungs that can own one of this card's facts.
   const country = useStore((s) => s.country);
@@ -444,25 +454,24 @@ function GeoLiveNode({ p }: { p: PickOf<"l0" | "l1" | "metanode"> }) {
   const compWord = p.node ? nodeCompositionLabel(p.node) : null;
   const comp = compWord ? compWord.charAt(0).toUpperCase() + compWord.slice(1) : null;
   const codes = p.node ? compositionRows([p.node])[0]?.codes : undefined;
+  // The host's ASN rides the FOOT, but it answers to the provider rung exactly as the Hosting
+  // line above does — one condition, so the two can't disagree about who owns the host.
+  const asn = cohort == null ? geo?.asn : null;
   // NB: the hover pairing (synced 3D glow) lives on the OUTER pane (Inspector.CardPane), not here,
   // so the glow lights the card's rounded edge.
   return (
     <>
       <FactGroup>
-        {/* COUNTRY — the half of the place the head no longer carries (user, 2026-08-02), with the
-            app's country CODE mark as the quiet suffix, the same shape as HOSTING's `isp · asn`.
+        {/* COUNTRY — the half of the place the head no longer carries (user, 2026-08-02). The
+            country CODE suffix is gone (2026-08-10): it restated the name it sat beside.
             Yields to the country card's own title once that rung is drilled. */}
-        {country == null && geo?.country && (
-          <Fact label="Country">
-            {geo.country}
-            {geo.cc && <span className="font-mono text-label text-muted-foreground"> · {ccMark(geo.cc)}</span>}
-          </Fact>
-        )}
+        {country == null && geo?.country && <Fact label="Country">{geo.country}</Fact>}
         {/* COMPOSITION — the node's role in the network, a labelled fact like the rest (user,
             2026-08-02: it used to ride the head as a subtitle, which made the head carry three
             different registers). Sits second: the reading order is place → role → host →
             reference, with health as the head's status pill. Yields to the composition card,
-            which states the same word in its title and the same chips in its aside. */}
+            which states the same word in its title and the same chips in its aside. The chips
+            STAY on this line — they qualify the word, and a value column can't hold them. */}
         {composition == null && comp && (
           <Fact label="Composition">
             <span className="inline-flex items-center gap-1.5">
@@ -471,20 +480,17 @@ function GeoLiveNode({ p }: { p: PickOf<"l0" | "l1" | "metanode"> }) {
             </span>
           </Fact>
         )}
-        {/* HOSTING — yields to the provider card, whose title IS the isp and whose body already
-            carries the ASN as the cohort's reference. */}
-        {cohort == null && geo?.isp && (
-          <Fact label="Hosting">
-            {geo.isp}
-            {geo.asn && <span className="font-mono text-label text-muted-foreground"> · {geo.asn}</span>}
-          </Fact>
-        )}
+        {/* HOSTING — the provider's NAME only; its ASN is a look-up value and sits in the foot.
+            Yields to the provider card, whose title IS the isp. */}
+        {cohort == null && geo?.isp && <Fact label="Hosting">{geo.isp}</Fact>}
       </FactGroup>
-      {/* The unique reference sits LAST, where references sit — and in the FOOT, because an id is
-          looked up rather than read (2026-08-10). Truncated display, full hash on hover. */}
-      {p.node?.id && (
+      {/* The look-up column: the host's reference, then the node's own — the unique reference
+          LAST, where references sit, which falls out of the grammar rather than being a rule of
+          its own. Truncated display, full hash on hover. */}
+      {(asn || p.node?.id) && (
         <Foot>
-          <FootRow label="Node id" value={shortHash(p.node.id)} title={p.node.id} />
+          {asn && <FootRow label="ASN" value={asn} />}
+          {p.node?.id && <FootRow label="Node id" value={shortHash(p.node.id)} title={p.node.id} />}
         </Foot>
       )}
     </>
