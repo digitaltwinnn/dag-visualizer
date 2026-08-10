@@ -5,7 +5,7 @@
 // is the application state — disclosed as a SHAPE here and as a payload in the raw layer.
 // Like the global snapshot card this is a card SLOT, not a focus-ladder rung: it has its own
 // store channel (`store.metaSnap`) and a fixed rail slot, and appears in no ladder.
-import { useEffect, useMemo, useState, type CSSProperties } from "react";
+import { useEffect, useMemo, useState, type CSSProperties, type ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import CardHead, { RailPane } from "@/components/CardHead";
 import { IdentityDot, Fact, FactGroup, Foot, FootRow } from "@/components/inspector/parts";
@@ -16,7 +16,8 @@ import type { ChannelSnapDeep, ChannelSnapRow } from "@/src/data/types";
 import { getNetwork, SIGNER_GROUPS, metagraphById, shortHash } from "@/src/data/network";
 import { UNLISTED_HUE } from "@/src/data/unlisted";
 import { snapsAtTick } from "@/src/data/anchorLog";
-import { fmtDag, fmtKB } from "@/src/util/format";
+import { PAYLOAD_LANES, parsePayload, payloadKinds } from "@/src/data/payloadKinds";
+import { fmtBytes, fmtDag, fmtKB } from "@/src/util/format";
 import { relativeAge } from "@/src/util/relativeAge";
 import { useMinHold } from "@/components/useMinHold";
 import { useNowTick } from "@/components/useNowTick";
@@ -167,13 +168,10 @@ export default function MetaSnapPane({
             </div>
 
             {/* ── THE CENTRE: what this metagraph actually anchored ────────────────────────
-                The global card's `AnchoredTags` answers "what did this tick carry" with a
-                header line plus a ranked bar list; one storey up, the same question is "what did
-                this snapshot carry", so it takes the same instrument (user, 2026-08-10: the
-                global card "put a nice visual at the centre for its main information"). Header
-                from the free exact row, bars from the pin-gated deep read — the asymmetry is
-                honest and says so in place. */}
-            <StateBlock row={row} deep={deep ?? null} following={following} decodeGaveUp={decodeGaveUp} hue={hue} />
+                Two labelled sections, State and Data — the same two payload lanes the raw layer
+                opens one tier down, so the card states their SHAPE and the pane renders them.
+                Both always render, each honest about its own tier. */}
+            <PayloadBlock row={row} deep={deep ?? null} following={following} decodeGaveUp={decodeGaveUp} />
 
             {/* ── DETAIL: the measured facts ─────────────────────────────────────────────── */}
             <Separator className="my-2" />
@@ -250,36 +248,63 @@ export default function MetaSnapPane({
   );
 }
 
-// ── The application-state block: this card's centre of gravity ────────────────────────────────
-// The sibling instrument to the global card's `AnchoredTags` — same grammar (a header line, then
-// a ranked share-of-total bar list), one storey up, so the two cards in the chain answer "what
-// did this carry" the same way. Rows are the top-level record kinds inside the state, all in the
-// metagraph's OWN hue: they are one subject's records, not competing identities.
+// ── The payload block: this card's centre of gravity ─────────────────────────────────────────
+// TWO SECTIONS, State and Data, both always present (user, 2026-08-10: "I feel two sections
+// (state & data) with a separator is the clearest way to present it, no?" and "can we make it
+// always show both and be honest if data / state is not applicable or just not present in that
+// particular snapshot"). They are genuinely different reads that were merged into one composed
+// line: STATE is the metagraph's accumulated on-chain state, DATA is what THIS snapshot's blocks
+// carried. Merged, DOR read `1.8 KB of state · 4 data updates` above a bar labelled `updates 4` —
+// a state key that happens to be NAMED `updates` sitting beside an unrelated count of the same
+// number. The section labels are what disambiguate them, and they are the raw layer's own lane
+// words (PAYLOAD_LANES), so the card and the pane can't name one subject two ways.
+//
+// THE SHARE-OF-TOTAL BAR IS GONE and can't come back (user: "if it is filled, how do we measure
+// the length of the bar — I think a bar might not be the right element here"). Correct, and
+// structurally so: `shapeOf` sets each state key's count in whatever unit that branch happens to
+// be — array → length, object → field count, scalar → 1 — so summing them and taking a share is a
+// percentage of a quantity nobody can name (rule 10). It degenerated in both live cases anyway:
+// one key is always 100% (DOR), all-zero keys always 0% (SWAP, which declares three record kinds
+// and carried none of them), so the length encoded nothing either way. The global card's
+// `AnchoredTags` bars STAY, because every one of their rows is the same unit — snapshots
+// anchored — against a real total; the instrument was honest there and borrowed to here. Dropping
+// the track also returns the full width to the key NAMES, which is what actually needed it
+// (`processedRewardWithdrawal` had 68px), and retires the header's "no application state", which
+// contradicted the very keys listed under it.
 //
 // ONE RULE for whether the tier shows at all (user, 2026-08-07: DED's empty state hid the
 // invitation while the raw layer rendered the decoded shape — the two surfaces apply one
-// standard): if the payload DECODED, the block shows and the invitation stands; an empty state
-// says so honestly instead of hiding. Both routes share one decoder, so decoded-ness can't
-// disagree between them.
+// standard): if the payload DECODED, the block shows; an empty payload says so honestly instead
+// of hiding. Both routes share one decoder, so decoded-ness can't disagree between them.
 //
-// The two tiers of source are DELIBERATELY asymmetric and say so in place: the header's bytes ride
-// the tick's free exact row, the bars need the ~2.5 MB deep read, which stays gated to an explicit
-// pin. So a live-following card states its size and offers the pin; it never fabricates a
-// breakdown it hasn't read.
-function StateBlock({
+// The two tiers of source stay DELIBERATELY asymmetric and now say so PER SECTION, which is a
+// positive argument for the split: State's bytes ride the tick's free exact row, everything else
+// needs the ~2.5 MB deep read, which stays gated to an explicit pin. So a live-following card
+// states its size and Data states the instrument state — it never implies a count it hasn't read.
+function PayloadBlock({
   row,
   deep,
   following,
   decodeGaveUp,
-  hue,
 }: {
   row: ChannelSnapRow | null;
   deep: ChannelSnapDeep | null;
   following: boolean;
   decodeGaveUp: boolean;
-  hue: string;
 }) {
-  const keys = useMemo(() => (deep ? [...deep.stateKeys].sort((a, b) => b.count - a.count) : []), [deep]);
+  // State's shape is computed server-side (`stateKeys`); Data's is the same mechanical read the
+  // raw layer's data lane uses, so the two sections' rows mean the same thing.
+  const stateRows = useMemo(
+    () =>
+      deep
+        ? [...deep.stateKeys].sort((a, b) => b.count - a.count).map((k) => ({ name: k.key, count: k.count }))
+        : [],
+    [deep],
+  );
+  const dataRows = useMemo(
+    () => (deep ? payloadKinds(parsePayload(deep.dataTx)).map((k) => ({ name: k.kind, count: k.count })) : []),
+    [deep],
+  );
 
   const decodedOk = deep != null || row?.decoded === true;
   if (!decodedOk) {
@@ -292,65 +317,88 @@ function StateBlock({
   }
 
   const stateBytes = deep ? deep.stateBytes : (row?.stateBytes ?? 0);
-  const empty = deep ? !keys.some((k) => k.count > 0) : !row?.hasState;
-  const updates = deep?.dataTxCount ?? 0;
-  const total = keys.reduce((s, k) => s + k.count, 0);
-  const pct = (n: number) => (total > 0 ? (n / total) * 100 : 0);
+  // BOTH tiers key on the SAME field, because pinning must not change the answer to a question the
+  // free tier already answered. The row's own `hasState` is not that field: server-side it means
+  // "some top-level branch has count > 0" (`decodeChannel.shapeOf`), so a state that exists as an
+  // empty container — `{"updates":[]}`, 14 bytes, with a state proof — reports false. Calling that
+  // "none" is exactly the conflation this block was rewritten to end. `stateBytes > 0` says there
+  // IS a serialized state; the ROWS say what it carries, and all-zero rows say "declared these
+  // kinds, carried none of them" without the headline having to contradict them.
+  const hasState = stateBytes > 0;
+  // Unread is an INSTRUMENT STATE, never a zero — pre-pin the update count simply isn't known,
+  // and `0` would be a fabricated reading. It also carries the invitation, which is why the old
+  // trailing "pin to read the payload" line is gone: it now sits on the row it qualifies.
+  const unread = !deep ? (following ? "pin to read" : "reading…") : null;
 
   return (
     <div className="mt-1.5">
-      {/* Header — the free tier. On-chain STATE and data UPDATES are different things (a data
-          metagraph's real payload rides in its blocks' dataTransactions while its on-chain state
-          stays empty), so they compose rather than substitute; whichever is real leads. Bytes
-          are free with the tick, updates only exist after the pin, so a live card states the
-          state and invites the pin for the rest — it never implies an update count it hasn't
-          read. An empty state is a FACT about the snapshot, not a missing reading. */}
-      <div className="flex items-baseline gap-2 flex-wrap mb-1.5">
-        {empty && updates === 0 ? (
-          <span className="text-body text-muted-foreground italic">no application state</span>
-        ) : (
-          <span className="text-body text-foreground">
-            {!empty && (
-              <>
-                <b className="font-bold">{fmtKB(stateBytes / 1024)}</b> of state
-              </>
-            )}
-            {!empty && updates > 0 && <span className="text-muted-foreground"> · </span>}
-            {updates > 0 && (
-              <>
-                <b className="font-bold">{updates.toLocaleString()}</b> data update{updates === 1 ? "" : "s"}
-              </>
-            )}
-          </span>
-        )}
-      </div>
+      <PayloadSection
+        name={PAYLOAD_LANES.state.name}
+        title={PAYLOAD_LANES.state.title}
+        headline={
+          hasState ? (
+            <b className="font-bold">{fmtBytes(stateBytes)}</b>
+          ) : (
+            <Quiet>none</Quiet>
+          )
+        }
+        rows={stateRows}
+      />
+      <Separator className="my-2" />
+      <PayloadSection
+        name={PAYLOAD_LANES.data.name}
+        title={PAYLOAD_LANES.data.title}
+        headline={
+          unread ? (
+            <Quiet>{unread}</Quiet>
+          ) : deep && deep.dataTxCount > 0 ? (
+            <>
+              <b className="font-bold">{deep.dataTxCount.toLocaleString()}</b> update
+              {deep.dataTxCount === 1 ? "" : "s"}
+            </>
+          ) : (
+            <Quiet>none</Quiet>
+          )
+        }
+        rows={dataRows}
+      />
+    </div>
+  );
+}
 
-      {keys.length > 0 && (
-        <div className="flex flex-col gap-y-1">
-          {keys.map((k) => (
-            <div key={k.key} className="flex items-center gap-2 py-[3px]" title={k.key}>
-              <span className="w-[68px] flex-none text-body text-foreground truncate">{k.key}</span>
-              <span className="block flex-1 h-1.5 rounded-xs bg-white/[0.06] overflow-hidden">
-                <span
-                  className="block h-full rounded-xs min-w-[2px]"
-                  style={{ width: `${Math.max(pct(k.count), k.count > 0 ? 4 : 0)}%`, background: hue }}
-                />
-              </span>
-              <span className="min-w-7 flex-none text-right text-body text-foreground tabular-nums">
-                {k.count.toLocaleString()}
-              </span>
-            </div>
-          ))}
+/** An absent or unread value — an instrument state, in the one treatment the card already uses
+ *  for them. A section's bare `none` means a different thing in each lane, which is what the
+ *  section's own `title` carries; the value column stays short so it can't wrap. */
+function Quiet({ children }: { children: ReactNode }) {
+  return <span className="text-muted-foreground italic">{children}</span>;
+}
+
+/** One payload section — the house one-row grammar at TWO weights: the section's own headline
+ *  fact, then its shape rows one weight down. That is the same device `Foot` uses (small, muted,
+ *  tabular), so a shape row is a WEIGHT and not a second grammar, and both weights keep the
+ *  card's one right edge, so a breakdown reads under its own total. */
+function PayloadSection({
+  name,
+  title,
+  headline,
+  rows,
+}: {
+  name: string;
+  title: string;
+  headline: ReactNode;
+  rows: { name: string; count: number }[];
+}) {
+  return (
+    <div className="flex flex-col gap-1">
+      <Fact label={name} title={title}>
+        {headline}
+      </Fact>
+      {rows.map((r) => (
+        <div key={r.name} className="flex items-start justify-between gap-2.5 pl-2" title={r.name}>
+          <span className="min-w-0 truncate text-label text-foreground-dim">{r.name}</span>
+          <span className="shrink-0 text-label text-foreground-dim tabular-nums">{r.count.toLocaleString()}</span>
         </div>
-      )}
-
-      {/* The pin gate, stated where the breakdown would be — an instrument state, not an absence.
-          It is NOT conditioned on the state being non-empty: the deep read is what reveals the
-          data updates too, and a metagraph whose on-chain state is empty is exactly the one whose
-          payload rides in its blocks. */}
-      {!deep && following && (
-        <div className="text-label text-muted-foreground italic">pin to read the payload</div>
-      )}
+      ))}
     </div>
   );
 }

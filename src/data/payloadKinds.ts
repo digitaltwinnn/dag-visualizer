@@ -11,6 +11,28 @@
 // multi-field record has no name, so its own field list stands in as its signature; anything that
 // isn't an object is named by its JSON type.
 
+/** The two payload lanes' words. ONE home, because the same two reads are disclosed at two
+ *  levels — as SECTIONS on the metagraph-snapshot card (the shape) and as LANES in the raw
+ *  layer's channel pane (the payload) — and a card whose sections disagreed with the pane's tabs
+ *  would read as two different subjects rather than one subject twice. The titles carry the
+ *  nuance the short values can't: `State` is the accumulated on-chain state, `Data` is what THIS
+ *  snapshot's blocks carried, which is why a bare "none" means a different thing in each. */
+export const PAYLOAD_LANES = {
+  state: { name: "State", title: "The metagraph's on-chain application state" },
+  data: { name: "Data", title: "Data transactions carried in this snapshot's blocks" },
+} as const;
+
+/** A decoded payload string → a tree-renderable value, tolerating an undecodable one (which
+ *  renders as a single string value rather than being hidden). */
+export function parsePayload(s: string | undefined): unknown {
+  if (!s) return null;
+  try {
+    return JSON.parse(s) as unknown;
+  } catch {
+    return s;
+  }
+}
+
 /** One record's kind: its wrapper name, its field signature, or its JSON type. */
 export function kindOf(v: unknown): string {
   if (v === null) return "null";

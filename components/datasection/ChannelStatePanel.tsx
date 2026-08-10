@@ -50,23 +50,12 @@ import { useStore } from "@/src/store/store";
 import { metaSnapDeepKey } from "@/src/data/types";
 import type { NodeRow } from "@/src/data/types";
 import { metagraphById, resolveSigner, shortHash, SIGNER_GROUPS, SIGNER_UNKNOWN } from "@/src/data/network";
-import { payloadKinds } from "@/src/data/payloadKinds";
+import { PAYLOAD_LANES, parsePayload, payloadKinds } from "@/src/data/payloadKinds";
 import { identityHudHex } from "@/src/palette/identity";
 import { IdentityDot } from "@/components/inspector/parts";
 import { fmtDag, fmtKB } from "@/src/util/format";
 import JsonTree from "@/components/datasection/JsonTree";
 import { cn } from "@/lib/utils";
-
-/** A decoded payload string → a tree-renderable value, tolerating an undecodable one (which
- *  renders as a single string value rather than being hidden). */
-function parsePayload(s: string | undefined): unknown {
-  if (!s) return null;
-  try {
-    return JSON.parse(s) as unknown;
-  } catch {
-    return s;
-  }
-}
 
 /** Whether a decoded payload carries anything at all — `{}`, `[]` and `""` do NOT open a lane. */
 function nonEmpty(v: unknown): boolean {
@@ -247,17 +236,17 @@ export function ChannelStatePanel() {
     if (deep.stateKeys.length > 0 || nonEmpty(state)) {
       out.push({
         id: "state",
-        name: "State",
+        name: PAYLOAD_LANES.state.name,
         count: deep.stateKeys.length || null,
-        title: "The metagraph's on-chain application state",
+        title: PAYLOAD_LANES.state.title,
       });
     }
     if (deep.dataTxCount > 0 || nonEmpty(dataTx)) {
       out.push({
         id: "data",
-        name: "Data",
+        name: PAYLOAD_LANES.data.name,
         count: deep.dataTxCount || null,
-        title: "Data transactions carried in this snapshot's blocks",
+        title: PAYLOAD_LANES.data.title,
       });
     }
     if (deep.signers.length > 0 || deep.dataBlockSigners.length > 0) {
