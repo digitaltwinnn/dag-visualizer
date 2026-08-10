@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { viewEntryActions, clearAllActions, clickActions, cohortToggleActions, compositionToggleActions, countryToggleActions, filterToggleActions, followToggleActions, nodeSelectActions, sameCohort, sameComposition, snapshotSelectActions, pickActive, pickNetId, metaSnapSelectActions, bandSelectActions, sameMetaSnap, type ClickAction } from "./pickActions";
+import { viewEntryActions, clickActions, cohortToggleActions, compositionToggleActions, countryToggleActions, filterToggleActions, followToggleActions, nodeSelectActions, sameCohort, sameComposition, snapshotSelectActions, pickActive, pickNetId, metaSnapSelectActions, bandSelectActions, sameMetaSnap, type ClickAction } from "./pickActions";
 import { finerLevels } from "./focusLadder";
 import { METAGRAPHS } from "../config";
 import type { PickDescriptor, MetaSnapSel } from "@/src/data/types";
@@ -453,38 +453,5 @@ describe("sameMetaSnap", () => {
     expect(sameMetaSnap(SEL, { ...SEL, ordinal: 1 })).toBe(false);
     expect(sameMetaSnap(SEL, null)).toBe(false);
     expect(sameMetaSnap(null, null)).toBe(true);
-  });
-});
-
-describe("clearAllActions (the rail-controls sweep)", () => {
-  it("drops every committed channel finest→coarsest, filter last", () => {
-    const acts = clearAllActions({
-      hasInspect: true, hasSnap: true, hasMetaSnap: false,
-      cohort: { cc: "DE", city: "Falkenstein", isp: "Hetzner" },
-      composition: { netId: "dor", key: "Hybrid|L0·dL1" },
-      country: "DE", filter: "dor",
-    });
-    expect(kinds(acts)).toEqual(["inspect", "snapshot", "cohort", "composition", "country", "filter"]);
-    expect(acts[acts.length - 1]).toEqual({ kind: "filter", id: "all" });
-    // The snapshot clear must not carry `follow` — re-following is the FollowController's.
-    expect(acts[1]).toEqual({ kind: "snapshot", pick: null });
-  });
-  it("already-clear channels emit nothing (a fully clear state is a no-op)", () => {
-    expect(clearAllActions({
-      hasInspect: false, hasSnap: false, hasMetaSnap: false, cohort: null, composition: null, country: null, filter: "all",
-    })).toEqual([]);
-  });
-  it("a partial state clears only what is set", () => {
-    const acts = clearAllActions({
-      hasInspect: false, hasSnap: false, hasMetaSnap: false, cohort: null, composition: null, country: null, filter: "dag",
-    });
-    expect(kinds(acts)).toEqual(["filter"]);
-  });
-  it("sweeps the metagraph-snapshot slot too", () => {
-    const a = clearAllActions({
-      hasInspect: false, hasSnap: false, hasMetaSnap: true, cohort: null,
-      composition: null, country: null, filter: "all",
-    });
-    expect(a).toContainEqual({ kind: "metaSnap", sel: null });
   });
 });

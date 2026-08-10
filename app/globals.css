@@ -37,12 +37,16 @@
   color: var(--foreground);
 }
 /* Unboxed rail ENTRIES (card-redesign 2026-08-08 — the ancestor tier that shed its glass box):
-   no frame to glow, so pairing reads as the row wash, rounded softly. Unlayered like its
-   siblings so it beats the entry's own utilities. */
+   no frame to glow, so pairing reads as the row wash. Unlayered like its siblings so it beats
+   the entry's own utilities. Two deliberate details for the SLAB (below): the wash rides
+   `background-image` so it COMPOSITES OVER the entry's `--panel-solid` fill instead of replacing
+   it (a translucent mix over nothing punches a transparent hole through the pile), and it sets
+   NO border-radius — the slab squares interior corners, and a rounding change on hover jitters. */
 .rail-entry.subject-paired {
   box-shadow: none;
-  background: color-mix(in oklch, var(--row-hue, var(--primary)) 12%, transparent);
-  border-radius: var(--radius-sm);
+  background-image: linear-gradient(
+    color-mix(in oklch, var(--row-hue, var(--primary)) 12%, transparent) 0 100%
+  );
 }
 @media (prefers-reduced-motion: reduce) { .subject-paired { transition: none; } }
 
@@ -151,6 +155,30 @@
    spine). Hue appears EXCLUSIVELY via the `.subject-paired` declarations below, present only while
    the pairing class is; a pairing leave falls back to this neutral for its 0.16s fade — calm, no
    colour transition anywhere. */
+/* Unboxed rail ENTRIES join the signal system (user, 2026-08-09: "the hover effect looks standard
+   while on the active card it does give the nice highlight on its edges"). The whisper and pairing
+   rules light `.sig-left::before`, whose GEOMETRY lives on `.ig-panel::before` — an entry has no
+   glass panel, so it had no edge at all and its hover fell back to the bare brightness lift, which
+   reads as a stock hover next to the box's instrument edge. This supplies the same pseudo on the
+   entry so all three levels (whisper → pairing → pulse) speak on both tiers; the brightness lift
+   stays, since it is the materialize preview and answers a different question ("this will open").
+   Tighter 5px end insets than the panel's 10px: an entry is one short row, and the panel's insets
+   would eat most of the line. MUST precede the hover/pairing rules below — same (0,2,1)
+   specificity, so source order is what lets them win. LEFT-rail entries (AboutView collapsed) need
+   nothing: `.sig-right::after` already carries its own geometry. */
+.rail-entry.sig-left::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 5px;
+  bottom: 5px;
+  width: 2px;
+  border-radius: 2px;
+  opacity: 0;
+  transition: opacity 0.16s ease;
+  pointer-events: none;
+}
+
 /* THE ONE edge-line recipe (user refinement): EVERY hover-edge signal — the neutral whisper AND
    the hued pairing line, both rails, any variant — renders the SAME soft gradient-faded tips
    (transparent→line→transparent, the travelling-pulse tip treatment; no hard ends anywhere on
@@ -201,7 +229,171 @@
    not the ig-panel's). MUST stay last: equal specificity vs the pairing rules above, so source
    order wins. */
 .sheet-cards .ig-panel::before,
+.sheet-cards .rail-entry::before,
 .sheet-cards .sig-right::after { opacity: 0; box-shadow: none; }
+
+/* ── The facts-rail SLAB (`.rail-ladder`, card-redesign variant A, 2026-08-08) ────────────────
+   The right rail already IS a stack — coarsest→finest, distance-dimmed, single-open accordion —
+   but `--rail-gap` between every rung broke it into floating slivers, so the ancestry read as a
+   list of unrelated chips. The slab closes the gap between every COMMITTED rung: their bodies abut
+   into one contiguous pile with the materialized box as one plank in it. The pile is the ancestry;
+   the box is where you are.
+   ⚠️ This is NOT the retired in-lane descent spine (variant-A 2026-07-19): that drew a LINE with
+   the thread's own vocabulary (spine + tick + node-dot) a rail-width from the thread, giving the
+   rail two competing instruments. Nothing is drawn here — the cards touch. The rule it forces is
+   the division of labour: THE STACK CARRIES DEPTH, THE THREAD CARRIES STATE (hollow ghost /
+   solid populated / solid+halo focus), which is why the thread's reach funnel goes with it.
+   Unlayered: the corner/spacing overrides must beat the entries' own Tailwind utilities.
+
+   Structure note — the lane's flex children are per-rung WRAPPER divs, not the cards, so
+   `:first-child`/`+` on `.rail-entry` can never match. Every rule below therefore keys off
+   `data-tier` on the WRAPPER (`entry` | `box` | `ghost`, written by Inspector from the same
+   `effCollapsed` the render uses). That marker replaced a `:has()` sniff of the rendered tier
+   (2026-08-09) which read the box off `[data-focus]` — WRONG, because the materialized box is
+   whichever rung is expanded and single-open lets you expand ANY committed entry, demoting the
+   focus rung to an entry. Both joints around a manually-expanded box then matched nothing and fell
+   back to `--rail-gap` (user: "click composition and there's a gap to the node card"). The tier is
+   what the geometry actually depends on, so the tier is what the wrapper states.
+   Members are the two committed tiers; GHOSTS stay outside the slab and keep the plain gap. */
+.rail-ladder { gap: 0; }
+.rail-ladder > * + * { margin-top: var(--rail-gap); }
+
+/* Any committed rung directly following another committed rung joins the pile — the box included,
+   in either direction (box-then-entry happens whenever a coarser rung is manually expanded). */
+.rail-ladder > :is([data-tier="entry"], [data-tier="box"]) + :is([data-tier="entry"], [data-tier="box"]) {
+  margin-top: 0;
+  position: relative;
+  /* The seam pseudo must paint ABOVE the entry: the entry is `position: relative` too, so with
+     both at `z-index: auto` tree order wins and the entry's `--panel-solid` (0.92 alpha) covers
+     the hairline down to ~8% — invisible. `isolation` makes this wrapper a stacking context so
+     the pseudo's z-index below lifts it over the entry and CANNOT escape into the rail. */
+  isolation: isolate;
+}
+/* The seam between abutting ENTRIES. Two weights, one per state (user, 2026-08-09 — "I kinda like
+   it with the spacing when it is at rest, but when hovering it does look strange"):
+   AT REST it is INSET by the cards' own 18px padding, so the pile reads as ONE body quietly
+   divided rather than a stack of separate slices — the resting seam is a suggestion, not an edge.
+   ON HOVER it reaches out to FULL WIDTH, because hover IS the entry's materialize preview (it lifts
+   to opacity 1 + brightness) and a materialized card owns its own edges — the same full-width
+   division the box's head hairline draws when the rung is really open. So the seam weight tracks
+   the card's tier the way everything else in the slab does.
+   BOTH joints around the hovered entry must switch together — its OWN `::before` (its top edge) and
+   the NEXT member's (which draws its bottom edge) — or it half-materializes: crisp on top, inset
+   below. A joint with the BOX needs no arm: there the box's own rounded hairline is the line.
+   ⚠️ `:hover` inside `:has()` is fine — that is NOT a nested `:has()` (CSS trap 7).
+   It rides the wrapper, not the card, so the pairing wash (which clears the card's box-shadow)
+   can't blink it out on hover. */
+.rail-ladder > [data-tier="entry"] + [data-tier="entry"]::before {
+  content: "";
+  position: absolute;
+  left: 18px;
+  right: 18px;
+  top: 0;
+  height: 1px;
+  /* The card-border weight exactly — a seam IS a hairline border, and `--border` is already a
+     0.22-alpha wash, so dialling it down further (a 60% color-mix landed at 0.13) rendered
+     nothing on glass. Verified in the running app, not by reading the rule. */
+  background: var(--border);
+  z-index: 1;
+  pointer-events: none;
+  /* The reach-out rides the entry's own 150ms hover tempo, so seam and lift move as one gesture.
+     Paint-only on an absolutely-positioned pseudo — no layout for the pile. */
+  transition: left 150ms ease, right 150ms ease;
+}
+.rail-ladder > [data-tier="entry"] + [data-tier="entry"]:has(.rail-entry:hover)::before,
+.rail-ladder > [data-tier="entry"]:has(.rail-entry:hover) + [data-tier="entry"]::before {
+  left: 0;
+  right: 0;
+}
+@media (prefers-reduced-motion: reduce) {
+  .rail-ladder > [data-tier="entry"] + [data-tier="entry"]::before { transition: none; }
+}
+/* Interior corners square so the pile reads as one body — but ONLY on the ENTRIES. The box keeps
+   its full radius on all four corners wherever it sits: the pile is squared, and the box is the
+   ONE rounded thing in it (user, 2026-08-09). Squaring it mid-pile left it with no geometry at all
+   — square corners, borders handed to the seams, and a y-positive lift its own following neighbour
+   painted over — so an expanded rung between two entries was indistinguishable from them.
+   Both tiers are still targeted through ONE `:is()` on the card, as a DESCENDANT — the box may sit
+   inside RailPager's gesture wrapper, so a child combinator would miss it.
+   ⚠️ `:has()` CANNOT NEST inside `:has()` — an early draft tested the next sibling with
+   `:has(+ div:has(> .rail-entry))` and silently matched nothing, so every member kept its bottom
+   radius. `:is()` inside `:has()` is fine, which is what the tier markers buy here. */
+.rail-ladder > :is([data-tier="entry"], [data-tier="box"]) + [data-tier="entry"] :is(.rail-entry, .ig-panel) {
+  border-top-left-radius: 0;
+  border-top-right-radius: 0;
+}
+.rail-ladder > [data-tier="entry"]:has(+ :is([data-tier="entry"], [data-tier="box"])) :is(.rail-entry, .ig-panel) {
+  border-bottom-left-radius: 0;
+  border-bottom-right-radius: 0;
+}
+
+/* The box is a ROUNDED PLANK IN the pile, not a break-out (user, 2026-08-09): it abuts its
+   neighbours at ZERO gap, so ancestry + subject read as ONE body, but it keeps its own radius and
+   its own hairline all the way round, so the pile visibly opens around it. That is why its border
+   is NOT handed to a seam the way an entry↔entry joint is: a rounded border curves in at each
+   corner, so it never draws the full-width division the inset-seam rule exists to prevent — it
+   reads as the box cut into the pile. A gap survives only where the box does NOT touch a committed
+   rung (after a ghost, or alone in the lane): there the hand-back above gives it `--rail-gap`.
+   The LIFT is what makes it read as raised rather than inset, and it only works if it PAINTS:
+   mid-pile the following entry is later in tree order with a 0.92-alpha fill, so at `z-index: auto`
+   it covered the shadow entirely. Hence the wrapper raise below — unconditional, because a box
+   FIRST in the lane isn't matched by the member+member rule and would stay `position: static`,
+   making z-index inert. The shadow casts BOTH ways for the same reason: y-positive alone left the
+   top joint flat while the bottom had depth. It EXTENDS `.ig-panel`'s ambient drop rather than
+   stacking a competitor, and it stays a shadow, never an outline.
+   Skipped while paired so the identity glow (which owns the whole box-shadow list) still wins. */
+.rail-ladder > [data-tier="box"] {
+  position: relative;
+  z-index: 2;
+}
+.rail-ladder > [data-tier="box"] .ig-panel:not(.subject-paired) {
+  box-shadow: 0 10px 26px -12px rgba(0, 0, 0, 0.85), 0 -8px 22px -14px rgba(0, 0, 0, 0.8),
+    0 8px 30px rgba(0, 0, 0, 0.35);
+}
+
+/* CORNER PATCHES — the plane continues UNDER the box's rounded corners (user, 2026-08-09: "where the
+   rounded corners are there is a gap where you directly see the scene"). A radius cuts the fill out of
+   the box's own corners while the neighbour's fill stops dead at the joint, so each corner was a ~14px
+   hole straight through the pile. The box must read as a plank sitting ON the plane, so the plane is
+   what has to be there — four quarter-corner patches, one 14px band per joint.
+   The patch is the NEIGHBOURING ENTRY'S OWN `::after`, not a pseudo on its wrapper. That is the whole
+   point of the second pass (user, 2026-08-09: the patched corner "almost looks the same when I hover
+   another card" — a wrapper pseudo had to re-state `--entry-dim` by hand and knew nothing about hover,
+   so the entry lifted and its corner stayed dull, redrawing the notch as a dead square). Painting it
+   on the entry ELEMENT makes the entry the single owner of its whole surface: `opacity` and `filter`
+   on an element apply to its pseudos, so the distance-dim, the hover release to full opacity and the
+   1.18 brightness lift all reach the corner for free, through the same transition, with no state
+   copied anywhere. The wrapper-level `:has()` survives only to supply the one thing the entry cannot
+   know about itself — WHICH edge the box is on.
+   It stays UNDER the box because the box wrapper is `z-index: 2` and the entry's is `auto`, so a
+   patch belonging to the neighbour paints below the plank by construction: plane below, plank above,
+   no z-index bookkeeping. Reached as a DESCENDANT, per the lane's usual rule.
+   A GHOST neighbour is deliberately not matched: there the box keeps the plain gap and the scene
+   SHOULD show through. */
+.rail-ladder > [data-tier="entry"]:has(+ [data-tier="box"]) .rail-entry::after,
+.rail-ladder > [data-tier="box"] + [data-tier="entry"] .rail-entry::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: var(--radius);
+  /* The entry's own glass. No opacity or filter of its own — it INHERITS the entry's rendering, and
+     `background-image: inherit` finishes the job for the one state that isn't a filter: the pairing
+     wash rides `background-image` on `.rail-entry.subject-paired`, so inheriting it composites the
+     same mix over the same fill. Verified live — with a flat `--panel-solid` here the band stayed
+     COLD while the entry washed warm on a paired hover, which is the dead-corner read one state
+     further along. The wash is a flat `0 100%` gradient, so the pseudo's own box size is moot. */
+  background-color: var(--panel-solid);
+  background-image: inherit;
+  backdrop-filter: blur(10px);
+  pointer-events: none;
+}
+.rail-ladder > [data-tier="entry"]:has(+ [data-tier="box"]) .rail-entry::after {
+  bottom: calc(-1 * var(--radius));
+}
+.rail-ladder > [data-tier="box"] + [data-tier="entry"] .rail-entry::after {
+  top: calc(-1 * var(--radius));
+}
 
 /* ── Structural lane (chrome + status) — shadcn CSS variables in oklch ── */
 :root {
@@ -244,8 +436,10 @@
   /* A second muted text tone — brighter than --muted-foreground, dimmer than --foreground.
      The repeated "muted blue-grey" copy tone (dossier description, geo rows, tooltip figures). */
   --foreground-dim: #c7d0ea;
-  /* The experimental-banner advisory amber — NOT --destructive (amber ≠ red): a distinct
-     "work-in-progress / advisory" accent. Only the ExperimentalBanner uses it today. */
+  /* The advisory amber — NOT --destructive (amber ≠ red): a distinct "work-in-progress /
+     advisory" accent. Its home is /about's unofficial-project notice (the always-on experimental
+     banner it was made for was retired 2026-08-09; the token stays because the advisory REGISTER
+     is still a real one, distinct from an error). */
   --warn-soft: #ffd166;
 
   --border: rgba(90, 140, 255, 0.22);        /* panel/hairline border (was the --panel-border alias) */
@@ -288,8 +482,9 @@
                               strip, 2026-07-12) — published live by TopBar via ResizeObserver;
                               the rails add it to their top so the strip PUSHES the layout
                               instead of overlapping it (it's a bigger bar, not a popup). */
-  --rail-top: 115px;       /* top of BOTH side rails — clears the banner + command bar, plus a
-                              comfortable breather under the bar (user refinement 2026-07-05) */
+  --rail-top: 90px;        /* top of BOTH side rails — clears the command bar (top 14px + 54px of
+                              bar) plus a comfortable breather under it (user refinement
+                              2026-07-05; moved up 25px with the retired banner, 2026-08-09) */
   --rail-w: 264px;         /* left control rail width */
   --detail-w: 320px;       /* right details rail width */
   --sel-bg: rgba(42, 245, 255, 0.12);   /* selected/active fill, reused everywhere */
@@ -411,12 +606,13 @@
     pointer-events: none;
   }
 
-  /* NB the facts rail's LADDER LANE draws nothing of its own (Inspector.tsx renders it as a plain
-     flex column). Containment is expressed on the ONE rail instrument — RailThread — by stepping
-     each rung's card back from the rail and reaching for it with a longer connector. An in-lane
-     descent spine used to live here (variant-A 2026-07-19) and was removed 2026-08-02 (user): it
-     put a second vertical instrument on the cards' left edge, duplicating the thread's own
-     vocabulary — spine + tick + node-dot — a rail-width away from it. */
+  /* NB the facts rail's LADDER LANE is `.rail-ladder`, whose only CSS is the SLAB (unlayered, near
+     the top of this file): committed entries abut into one pile and the focus box breaks out of it.
+     Depth therefore lives in the STACK, and RailThread carries STATE alone (hollow / solid /
+     solid+halo dots) — the old depth-reach funnel went with the slab. Nothing is DRAWN in the lane,
+     which is what keeps the rail at one instrument: an in-lane descent spine did live here
+     (variant-A 2026-07-19, removed 2026-08-02, user) and it duplicated the thread's own vocabulary
+     — spine + tick + node-dot — a rail-width away from it. The slab is the cards' own bodies. */
 
 
   /* The rails' strip-follow slide (top rides --topbar-extra) — motion off under reduce. */
@@ -611,17 +807,21 @@
   .ls-bar-anim { animation: none; }
 }
 
-/* ── Command-list scrollbar (top-bar filter picker) — the SAME slim custom scrollbar as the
-   rails (`#leftcol`/`#rightcol`, above); the default chunky one clashed with the glass popover.
-   Scoped to a class (not the rails' ids) since `CommandList` is a reusable primitive. ── */
+/* ── The app's ONE slim scrollbar — the same instrument the rails carry (`#leftcol`/`#rightcol`,
+   above, where it is hidden outright). Any scroll region ON GLASS wears this: the platform's
+   chunky default reads as a browser part sitting on top of the panel, not part of the instrument.
+   A class rather than ids, because the consumers are reusable primitives (`CommandList`'s filter
+   strip; the raw layer's lane pane, 2026-08-09). BOTH axes are styled — a JSON tree scrolls
+   sideways too. ── */
 @layer components {
-  .cmd-list-scroll {
+  .slim-scroll {
     overscroll-behavior: contain;
   }
-  .cmd-list-scroll::-webkit-scrollbar { width: 6px; }
-  .cmd-list-scroll::-webkit-scrollbar-track { background: transparent; }
-  .cmd-list-scroll::-webkit-scrollbar-thumb { background: rgba(160, 175, 205, 0.28); border-radius: 3px; }
-  .cmd-list-scroll:hover::-webkit-scrollbar-thumb { background: rgba(160, 175, 205, 0.45); }
+  .slim-scroll::-webkit-scrollbar { width: 6px; height: 6px; }
+  .slim-scroll::-webkit-scrollbar-track { background: transparent; }
+  .slim-scroll::-webkit-scrollbar-thumb { background: rgba(160, 175, 205, 0.28); border-radius: 3px; }
+  .slim-scroll:hover::-webkit-scrollbar-thumb { background: rgba(160, 175, 205, 0.45); }
+  .slim-scroll::-webkit-scrollbar-corner { background: transparent; }
 }
 
 /* ── Instrument-Glass surface — the shared panel frame + left accent spine ── */

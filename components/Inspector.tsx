@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useMemo, useRef, type CSSProperties, type ReactNode } from "react";
-import { ChevronsDownUp, ChevronsUpDown, X } from "lucide-react";
 import { useStore } from "@/src/store/store";
 import { displayNetwork } from "@/src/data/unlisted";
 import { applyClickActions } from "@/src/store/applyClickActions";
@@ -16,12 +15,13 @@ import ContextCard from "@/components/ContextCard";
 import RailThread from "@/components/RailThread";
 import { RailShade } from "@/components/RailShade";
 import RailDock from "@/components/RailDock";
+import RailPager from "@/components/RailPager";
 import { useBreakpoint } from "@/components/useBreakpoint";
 import { PulseEdge, useEdgePulse } from "@/components/EdgePulse";
-import { detailsCards, ladderSlotIds, type RailCard } from "@/components/railCards";
+import { detailsCards, ladderSlotIds, ladderLevelOfSlot, type RailCard } from "@/components/railCards";
 import { useLadderFocus } from "@/components/useLadderFocus";
 import { useTrayActives } from "@/components/useTrayActives";
-import { countryToggleActions, cohortToggleActions, compositionToggleActions, clearAllActions } from "@/src/engine/domain/pickActions";
+import { countryToggleActions, cohortToggleActions, compositionToggleActions } from "@/src/engine/domain/pickActions";
 import { CountryTitle, CountryCard, ProviderTitle, ProviderCard, ProviderAside, CompositionTitle, CompositionCard, CompositionAside } from "@/components/inspector/cards";
 import MetaSnapPane from "@/components/inspector/MetaSnapPane";
 import type { TabSignal } from "@/components/RailDock";
@@ -274,7 +274,7 @@ export function GhostCard({ card }: { card: RailCard }) {
     <aside
       data-ghost=""
       aria-label={`${label} — nothing selected yet`}
-      className="rail-entry relative block w-auto pointer-events-auto px-[18px] py-1.5 min-h-0 flex-none"
+      className="rail-entry relative block w-auto pointer-events-auto px-[18px] py-2 min-h-0 flex-none"
     >
       <p className="m-0 flex items-start gap-2.5 text-label text-muted-foreground/80">
         <Icon
@@ -290,42 +290,11 @@ export function GhostCard({ card }: { card: RailCard }) {
   );
 }
 
-// The rail-top CONTROLS (desktop): the collapse TOGGLE — all-collapsed ⇄ restore (one button,
-// user 2026-08-08: the minimize-all/expand-all pair was two buttons for one axis; "restore"
-// resets the overrides so the auto default governs again — the focus rung materializes, the
-// rest rest as entries, honoring the one-box grammar instead of the old expand-everything) —
-// and clear all (deselect the whole ladder back to the overview). Monochrome lucide glyphs
-// (the ONE icon system), muted at rest; no card chrome — a toolbar in the rail's margin, not
-// another panel. Shown only when the rail actually hosts a card.
-function RailControls({
-  allCollapsed,
-  onToggle,
-  onClear,
-}: {
-  allCollapsed: boolean;
-  onToggle: () => void;
-  onClear: () => void;
-}) {
-  const btn =
-    "inline-flex items-center justify-center size-6 rounded-[var(--radius-xs)] text-muted-foreground hover:text-foreground hover:bg-wash-soft transition-colors cursor-pointer focus-visible:outline-1 focus-visible:outline-ring/60";
-  return (
-    <div className="pointer-events-auto flex items-center justify-end gap-0.5 pb-0.5 pr-0.5" role="group" aria-label="Details controls">
-      <button
-        type="button"
-        className={btn}
-        aria-pressed={allCollapsed}
-        title={allCollapsed ? "Restore the active card" : "Minimize all cards"}
-        aria-label={allCollapsed ? "Restore the active card" : "Minimize all cards"}
-        onClick={onToggle}
-      >
-        {allCollapsed ? <ChevronsUpDown aria-hidden className="size-3.5" /> : <ChevronsDownUp aria-hidden className="size-3.5" />}
-      </button>
-      <button type="button" className={btn} title="Clear all selections" aria-label="Clear all selections" onClick={onClear}>
-        <X aria-hidden className="size-3.5" />
-      </button>
-    </div>
-  );
-}
+// NO rail-top toolbar (user 2026-08-09, removing the last of it): the cards ARE the controls. Every
+// head is a disclosure toggle, so a collapse-all button is a second way to say what a click already
+// says, and its × was the coarsest card's own × — clearing the ladder from the top rung cascades
+// down anyway. A toolbar in the rail's margin is chrome the grammar doesn't need; the pile speaks
+// for itself. Don't grow it back.
 
 // Right column — the **facts** rail: a DESCENT-SPINE LADDER of selected-subject cards (variant-A
 // redesign, 2026-07-19). The focus-ladder rungs (network → country → provider → node in geo;
@@ -377,6 +346,7 @@ export default function Inspector() {
   const railCollapse = useStore((s) => s.railCollapse);
   const setRailCollapse = useStore((s) => s.setRailCollapse);
   const setRailCollapseMany = useStore((s) => s.setRailCollapseMany);
+  const requestFocusRung = useStore((s) => s.requestFocusRung);
   const ladderIds = ladderSlotIds(mode);
   const presentOf = (id: string) => manifest.find((c) => c.id === id)?.present ?? false;
   // The focus rung comes from the shared derivation the EXPLORE rail reads too (`focusSlotId`),
@@ -398,6 +368,17 @@ export default function Inspector() {
       });
     } else {
       setRailCollapse(id, next);
+    }
+    // THE CAMERA FRAMES THE BOXED RUNG (user, 2026-08-09: "when we click the card, can we also
+    // update the view camera position, we do the same when we click a row in the explorer"). Only
+    // on OPEN, and only for a real rung — closing a box leaves no subject to frame, and the
+    // snapshot slots aren't rungs (no pose of their own). The Engine re-walks its own ladder from
+    // this rung, so the card lands the pose its explorer row would have, without re-applying the
+    // row's actions — those are TOGGLES, and feeding a committed rung back through one would
+    // DESELECT it. Nothing is committed or released here, so the finest selection stands.
+    if (!next) {
+      const level = ladderLevelOfSlot(id);
+      if (level) requestFocusRung(level);
     }
   };
   const cx = (id: string) => ({ collapsed: effCollapsed(id), onToggle: () => toggleCollapse(id) });
@@ -502,8 +483,13 @@ export default function Inspector() {
   // (card-redesign 2026-08-08 — the RUNG_STEP width step-back is retired). Hierarchy is carried by
   // STATE CONTRAST along the fixed order: the focus rung is the ONE materialized glass box, its
   // committed ancestors rest as unboxed entries dimming with distance (ENTRY_DIM_STEP), ghosts are
-  // quiet hint lines below — and the thread mirrors it (halo/solid/hollow dots + depth-reach
-  // connectors, see RailThread). `data-depth`/`data-focus` remain the thread's read. Context is
+  // quiet hint lines below. Since the SLAB (`.rail-ladder`, globals.css) the committed rungs also
+  // ABUT — no gap, hairline seams, squared interior corners — so the ancestry and the box read as
+  // one pile. That is a physical stack, NOT the retired in-lane descent spine (which
+  // drew a line in the thread's own vocabulary and gave the rail two instruments): nothing is drawn,
+  // the cards simply touch. It splits the labour — THE STACK CARRIES DEPTH, THE THREAD CARRIES
+  // STATE (hollow ghost / solid populated / solid+halo focus, see RailThread).
+  // `data-depth`/`data-focus` are the thread's read; the slab keys off `data-tier` alone. Context is
   // special: ALWAYS mounted (self-nulling on "all") so its EdgePulse survives the dossier⇄nothing
   // swap — so its rung always renders ContextCard, plus the context ghost when nothing's committed.
   const entryDim = (id: string): number | undefined => {
@@ -516,7 +502,7 @@ export default function Inspector() {
     return Math.max(ENTRY_DIM_FLOOR, 1 - ENTRY_DIM_STEP * dist);
   };
   const ladderLane = (
-    <div className="flex flex-col gap-[var(--rail-gap)]">
+    <div className="rail-ladder flex flex-col">
       {ladderIds.map((id, depth) => {
         const card = manifest.find((c) => c.id === id);
         if (!card) return null;
@@ -532,12 +518,29 @@ export default function Inspector() {
             <GhostCard card={card} />
           ) : null;
         if (!body) return null;
+        // The rung's PRESENTATION TIER, stated on the wrapper for the slab CSS (globals.css) —
+        // `entry` | `box` | `ghost`, from the same `effCollapsed` that decides what renders, so
+        // marker and render can't disagree. The slab needs the tier and nothing else: it was
+        // previously sniffed with `:has()` and the box read off `[data-focus]`, which is wrong
+        // whenever a coarser rung is manually expanded (single-open then demotes the focus rung to
+        // an entry and the box sits mid-pile) — both joints around it fell back to `--rail-gap`.
+        const boxed = card.present && !effCollapsed(id);
+        const tier = !card.present ? "ghost" : boxed ? "box" : "entry";
+        // The materialized BOX carries the sibling pager + swipe — the plank is drawn on the card's
+        // own bottom edge, so it must never ride a one-line entry. That's the whole gate: `boxed`,
+        // not the focus rung. Single-open makes the box unique, and it can be ANY committed rung, so
+        // keying on `[data-focus]` here had the same bug the tier marker fixed above — and it also
+        // shut out the two SNAPSHOT slots, which are lane members with no focus rung at all
+        // (`railLadderBoundary.test.ts` asserts rung → slot, never the reverse). RailPager renders
+        // children untouched when the rung has no sibling set.
+        const focused = id === focusId;
+        const wrapped = boxed ? <RailPager slot={card.kind}>{body}</RailPager> : body;
         return (
           // The distance-dim rides a VAR, not wrapper opacity (2026-08-08): the entry itself
           // applies `opacity-[var(--entry-dim,1)]` and RELEASES it on hover (the materialize
           // preview) — a wrapper opacity would clamp the hover lift from outside.
-          <div key={id} data-depth={depth} data-focus={id === focusId ? "" : undefined} style={{ ["--entry-dim" as string]: entryDim(id) } as CSSProperties}>
-            {body}
+          <div key={id} data-depth={depth} data-tier={tier} data-focus={focused ? "" : undefined} style={{ ["--entry-dim" as string]: entryDim(id) } as CSSProperties}>
+            {wrapped}
           </div>
         );
       })}
@@ -551,40 +554,16 @@ export default function Inspector() {
     .filter((c) => !c.present && c.hint != null)
     .map((c) => <GhostCard key={`${c.id}-ghost`} card={c} />);
 
-  // Rail-top controls act on EVERY present card (ladder + snapshot). Clear-all sweeps the whole
-  // ladder back to the overview through the tested `clearAllActions` table AND drops any collapse
-  // overrides so a fresh selection starts from the auto default again.
-  const presentIds = manifest.filter((c) => c.present).map((c) => c.id);
-  const hasCards = presentIds.length > 0;
-  // The one collapse axis (2026-08-08): all-collapsed → restore resets the overrides so the
-  // auto default governs (the focus rung materializes, ancestors rest as entries — the one-box
-  // grammar; the old expand-ALL materialized every card at once).
-  const allCollapsed = presentIds.length > 0 && presentIds.every((id) => effCollapsed(id));
-  const toggleAll = () =>
-    setRailCollapseMany(
-      Object.fromEntries(presentIds.map((id) => [id, allCollapsed ? null : true])),
-    );
-  const clearAll = () => {
-    setRailCollapseMany(Object.fromEntries(presentIds.map((id) => [id, null])));
-    applyClickActions(
-      clearAllActions({
-        hasInspect: presentOf("node"),
-        hasSnap: presentOf("snap"),
-        hasMetaSnap: presentOf("metaSnap"),
-        cohort,
-        composition,
-        country,
-        filter,
-      }),
-    );
-  };
+
 
   // The tablet/phone sheets host the SAME LADDER LANE as the desktop rail (card-redesign
   // 2026-08-08 — sheets used to keep a flat populated-first/ghosts-last stack; with ghosts now
   // one-line entries the scroll-cost rationale is gone, and the lane brings the entry
-  // distance-dim, the single-open accordion and the lane order in one move). The depth FUNNEL
-  // stays desktop-only regardless (it lives on the thread, which the sheets don't render —
-  // their single instrument is the sheet edge).
+  // distance-dim, the single-open accordion and the lane order in one move). The tucked SLAB
+  // rides along (its CSS is `.rail-ladder`-scoped, so it applies wherever the lane renders) —
+  // that's intended: the slab is the cards' own geometry, not an instrument. What IS
+  // desktop-only is the THREAD, which the sheets don't render — their single instrument is the
+  // sheet edge.
 
   // ── Dock icon TRAY (tablet/phone) ───────────────────────────────────────────────────────────
   // GLOBAL CONSTRAINT: nothing here ever opens the sheet — the tray is purely visual; `open` is
@@ -633,7 +612,6 @@ export default function Inspector() {
           style={accent}
         >
           <RailShade>
-            {hasCards && <RailControls allCollapsed={allCollapsed} onToggle={toggleAll} onClear={clearAll} />}
             {ladderLane}
             {trailingPanes}
             {trailingGhosts}

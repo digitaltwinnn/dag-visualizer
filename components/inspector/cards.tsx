@@ -614,28 +614,24 @@ export function ProviderTitle({ sel }: { sel: CohortSel }) {
   return (
     <span className="flex items-center gap-2 min-w-0 max-w-full">
       <Mark aria-hidden className={cn(KIND_MARK_CLASS, "text-[var(--filter-accent,var(--primary))]")} />
-      {/* The PROVIDER alone is the headline (user, 2026-08-02) — the city is a labelled fact in
-          the body, and the country belongs to the parent country card the cohort sits under. */}
+      {/* The PROVIDER alone is the headline (user, 2026-08-02) — the city rides the head's aside
+          (2026-08-09), and the country belongs to the parent country card the cohort sits under. */}
       <span className="truncate min-w-0">{sel.isp ?? "Unknown provider"}</span>
     </span>
   );
 }
 
-// The cohort's AS number, right-aligned on the head's title row (user, 2026-08-02): it identifies
-// the provider rather than measuring it, so it belongs beside the name — subtle mono, and it stays
-// readable while the card is collapsed. Members of one city×provider cohort share an ASN.
+// The cohort's CITY, right-aligned on the head's title row (user, 2026-08-09 — swapped with the
+// ASN that used to sit here). City×provider IS the cohort key, so both halves now read as one line
+// while the card is collapsed, and the ASN moves down to the body as a labelled reference — the
+// same rule the node card follows with NODE ID. `truncate` + a max width so a long city name yields
+// to the provider name rather than crushing it (the aside is `flex-none` in CardHead).
 export function ProviderAside({ sel }: { sel: CohortSel }) {
-  const selNodes = useStore((s) => s.selNodes);
-  const asn = useMemo(() => {
-    for (const r of selNodes) {
-      const geo = "geo" in r.pick ? r.pick.geo : undefined;
-      if (r.cc === sel.cc && (r.city || null) === sel.city && (geo?.isp || null) === sel.isp && geo?.asn)
-        return geo.asn;
-    }
-    return null;
-  }, [selNodes, sel.cc, sel.city, sel.isp]);
-  if (!asn) return null;
-  return <span className="font-mono text-label text-muted-foreground tabular-nums">{asn}</span>;
+  return (
+    <span className="max-w-[52%] truncate text-label text-muted-foreground">
+      {sel.city ?? "Unlocated"}
+    </span>
+  );
 }
 
 export function ProviderCard({ sel }: { sel: CohortSel }) {
@@ -658,14 +654,24 @@ export function ProviderCard({ sel }: { sel: CohortSel }) {
     }
     return seen;
   }, [members]);
+  // Members of one city×provider cohort share an AS number, so the first member that reports one
+  // speaks for the cohort.
+  const asn = useMemo(() => {
+    for (const r of members) {
+      const geo = "geo" in r.pick ? r.pick.geo : undefined;
+      if (geo?.asn) return geo.asn;
+    }
+    return null;
+  }, [members]);
   return (
     <div className="flex flex-col gap-2">
-      {/* CITY — the half of the cohort key the head no longer carries. The COUNTRY is deliberately
-          absent: the cohort always sits under a committed country, whose own card states it one
-          slot up (user, 2026-08-02 — a facts rail shouldn't say the same thing twice). */}
+      {/* ASN — the provider's REFERENCE, in the slot the city vacated when it moved to the head
+          (user, 2026-08-09). The COUNTRY is deliberately absent: the cohort always sits under a
+          committed country, whose own card states it one slot up (user, 2026-08-02 — a facts rail
+          shouldn't say the same thing twice). */}
       <div className="flex items-start justify-between gap-2.5">
-        <span className="text-body text-muted-foreground">City</span>
-        <span className="text-body text-foreground">{sel.city ?? "Unlocated"}</span>
+        <span className="text-body text-muted-foreground">ASN</span>
+        <span className="font-mono text-body text-foreground tabular-nums">{asn ?? "—"}</span>
       </div>
       <div className="flex items-start justify-between gap-2.5">
         <span className="text-body text-muted-foreground">Nodes</span>

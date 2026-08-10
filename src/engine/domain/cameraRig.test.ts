@@ -1,17 +1,28 @@
 import { describe, it, expect } from "vitest";
 import * as THREE from "three";
-import { FOCI, hubFraming, geoFraming, ledgerFloorFraming, ledgerRailFraming, ledgerNodeFraming, easeInOutQuad, CAM_ZOOM, dollyBack, RAILS_HIDDEN_DOLLY, railsDolly, nodeFraming, cohortFraming, hyperNodeFraming, closeness, CLOSE_FAR_ALT, CLOSE_NEAR_ALT, NODE_RAISE, ledgerLaneNudge, LANE_NUDGE, NUDGE_DOLLY, NUDGE_RAISE, NUDGE_AIM_UP } from "./cameraRig";
+import { FOCI, hubFraming, geoFraming, ledgerFloorFraming, ledgerRailFraming, ledgerCommitTilt, LEDGER_TILT_YAW, LEDGER_TILT_PITCH, LEDGER_TILT_DOLLY, easeInOutQuad, CAM_ZOOM, dollyBack, RAILS_HIDDEN_DOLLY, railsDolly, nodeFraming, cohortFraming, hyperNodeFraming, closeness, CLOSE_FAR_ALT, CLOSE_NEAR_ALT, NODE_RAISE } from "./cameraRig";
+
+// The Snapshots POSES that used to be pinned here are gone with the poses themselves (2026-08-09):
+// `ledgerNodeFraming` (the tray-chip zoom) and `ledgerLaneNudge` (the lateral commit nudge) are
+// retired — the view has one pose, `FOCI.ledger`, and colour carries every commit. Its one
+// variation is `ledgerCommitTilt`, the commit ORBIT, pinned below. See the ⚠️ note above
+// `ledgerFloorFraming` in cameraRig.ts; the floor/rail poses are the same kind of leftover, still
+// pinned only because they're still exported.
 
 describe("FOCI", () => {
   it("carries the camera presets (ledger gained its own frontal resting pose, 2026-08-07)", () => {
     // The Snapshots view rests FRONTAL and zoomed (user) — straight onto the chamber's face.
-    expect(FOCI.ledger.pos).toEqual(new THREE.Vector3(0, 3.5, 54));
-    expect(FOCI.ledger.target).toEqual(new THREE.Vector3(0, -2.5, 0));
+    // Lowered by a uniform 4.5 on BOTH pos.y and target.y (user, 2026-08-09): a pure frustum
+    // translation, so the ~6° pitch is untouched and the chamber centres in the HUD's band.
+    expect(FOCI.ledger.pos).toEqual(new THREE.Vector3(0, -1, 54));
+    expect(FOCI.ledger.target).toEqual(new THREE.Vector3(0, -7, 0));
     expect(FOCI.overview.pos).toEqual(new THREE.Vector3(0, 21, 80)); // pulled back again with META_ORBIT 29 (user: whole ring visible unselected, clear of the LiveStrip band)
     expect(FOCI.overview.target).toEqual(new THREE.Vector3(0, 2, 0));
     expect(FOCI.dag.pos).toEqual(new THREE.Vector3(0, 9, 38));
     expect(FOCI.dag.target).toEqual(new THREE.Vector3(0, 1, 0));
-    expect(FOCI.geo.pos).toEqual(new THREE.Vector3(0, 12.5, 41.5)); // pulled back (whole globe inside the rail-free centre)
+    // Pulled back once more (×1.08 around the target, user 2026-08-09) — the composition is
+    // preserved because pos is scaled about the target, only the fit changes.
+    expect(FOCI.geo.pos).toEqual(new THREE.Vector3(0, 13.5, 44.8));
     // Geo targets the globe CENTRE (manual orbits stay concentric — no wobble).
     expect(FOCI.geo.target).toEqual(new THREE.Vector3(0, 0, 0));
     // Metagraph pose sits between the overview (z 36) and the country framing (z 29..25).
@@ -56,34 +67,6 @@ describe("hubFraming", () => {
   });
 });
 
-
-describe("ledgerNodeFraming (the Snapshots node zoom level)", () => {
-  const out = () => ({ pos: new THREE.Vector3(), target: new THREE.Vector3() });
-
-  it("targets just above the chip and keeps a constant diagonal offset", () => {
-    const node = new THREE.Vector3(4, -2, 7);
-    const o = out();
-    ledgerNodeFraming(node, o);
-    expect(o.target.x).toBeCloseTo(4, 10);
-    expect(o.target.y).toBeCloseTo(-2 + 0.4, 10);
-    expect(o.target.z).toBeCloseTo(7, 10);
-    expect(o.pos.x).toBeCloseTo(4 - 2.6, 10);
-    expect(o.pos.y).toBeCloseTo(-2 + 2.8, 10);
-    expect(o.pos.z).toBeCloseTo(7 + 8.5, 10);
-    expect(node).toEqual(new THREE.Vector3(4, -2, 7)); // input untouched
-  });
-
-  it("zooms CLOSER than the floor pose — the ladder's next level (geo's country→node mirrored)", () => {
-    const node = new THREE.Vector3(0, 3, 0);
-    const n = out();
-    ledgerNodeFraming(node, n);
-    const nodeDist = n.pos.distanceTo(n.target);
-    const l = out();
-    ledgerFloorFraming(3, l); // the same height's floor pose
-    const floorDist = l.pos.distanceTo(l.target);
-    expect(nodeDist).toBeLessThan(floorDist * 0.55); // clearly a level deeper, not a nudge
-  });
-});
 
 describe("geoFraming", () => {
   // The node-zoom TILT held farther out (user: the old framing read too top-down) —
@@ -233,6 +216,47 @@ describe("closeness (camera altitude → surface-sharpening factor)", () => {
   });
 });
 
+describe("ledgerCommitTilt (the Snapshots commit ORBIT, 2026-08-09)", () => {
+  const pos = () => FOCI.ledger.pos.clone();
+  const tgt = () => FOCI.ledger.target.clone();
+
+  it("is an ORBIT about the target, not a lateral translation — the retired lane nudge's whole failure", () => {
+    // The distinction is the reason this framing is allowed where `ledgerLaneNudge` was retired: a
+    // translation walks the symmetric field's far end out of frame, an orbit only changes the angle.
+    // So the ONLY radial change is the documented dolly factor, and the azimuth moves by the yaw.
+    const out = new THREE.Vector3();
+    ledgerCommitTilt(pos(), tgt(), out);
+    const before = new THREE.Spherical().setFromVector3(pos().sub(tgt()));
+    const after = new THREE.Spherical().setFromVector3(out.clone().sub(tgt()));
+    expect(after.radius).toBeCloseTo(before.radius * LEDGER_TILT_DOLLY, 9);
+    expect(after.theta).toBeCloseTo(before.theta + LEDGER_TILT_YAW, 9);
+    expect(after.phi).toBeCloseTo(before.phi - LEDGER_TILT_PITCH, 9);
+  });
+
+  it("swings toward +X and RISES (a three-quarter view looking a little further down)", () => {
+    const out = new THREE.Vector3();
+    ledgerCommitTilt(pos(), tgt(), out);
+    expect(out.x).toBeGreaterThan(FOCI.ledger.pos.x); // lanes spread on X (LEDGER.viewRotY)
+    expect(out.y).toBeGreaterThan(FOCI.ledger.pos.y); // phi − pitch lifts the camera
+  });
+
+  it("stays MODEST — a nicer 3D read, not a new pose (the flat edge labels must stay legible)", () => {
+    expect(LEDGER_TILT_YAW).toBeGreaterThan(0);
+    expect(LEDGER_TILT_YAW).toBeLessThan(Math.PI / 6); // < 30°
+    expect(LEDGER_TILT_PITCH).toBeGreaterThan(0);
+    expect(LEDGER_TILT_PITCH).toBeLessThan(LEDGER_TILT_YAW); // the yaw leads, the pitch supports
+    expect(LEDGER_TILT_DOLLY).toBeGreaterThan(1); // never closer than the frontal pose
+  });
+
+  it("is safe to compose IN PLACE (outPos === pos — the Engine tweens from a preset)", () => {
+    const expected = new THREE.Vector3();
+    ledgerCommitTilt(pos(), tgt(), expected);
+    const p = pos();
+    ledgerCommitTilt(p, tgt(), p);
+    expect(p.distanceTo(expected)).toBeLessThan(1e-12);
+  });
+});
+
 describe("ledger framings (two-floor chamber)", () => {
   it("frames a floor on the same diagonal the layer focus always used", () => {
     const out = { pos: new THREE.Vector3(), target: new THREE.Vector3() };
@@ -251,38 +275,5 @@ describe("ledger framings (two-floor chamber)", () => {
     expect(out.target.y).toBeCloseTo(2.85, 6);
     // The rail runs across Z, so the pose must not be pushed off to one end of it.
     expect(out.target.z).toBeCloseTo(0, 6);
-  });
-});
-
-describe("ledgerLaneNudge — the commit acknowledgement (2026-08-08)", () => {
-  const base = { pos: new THREE.Vector3(0, 3.5, 54), target: new THREE.Vector3(0, -2.5, 0) };
-  const out = { pos: new THREE.Vector3(), target: new THREE.Vector3() };
-
-  it("nudges a fraction toward the lane, dollies in, raises and lifts the aim", () => {
-    ledgerLaneNudge(base, 10, out);
-    // Lateral: both ends shift by the SAME fraction of the lane X (the aim stays parallel).
-    expect(out.target.x).toBeCloseTo(10 * LANE_NUDGE, 6);
-    // Dolly: the position moved toward the target along the view ray…
-    expect(out.pos.z).toBeLessThan(base.pos.z);
-    expect(out.pos.z).toBeCloseTo(base.pos.z + (base.target.z - base.pos.z) * NUDGE_DOLLY, 6);
-    // …then rises, and the aim lifts.
-    expect(out.pos.y).toBeCloseTo(base.pos.y + (base.target.y - base.pos.y) * NUDGE_DOLLY + NUDGE_RAISE, 6);
-    expect(out.target.y).toBeCloseTo(base.target.y + NUDGE_AIM_UP, 6);
-    // The base FOCI must never be mutated (the resolver reuses it every commit).
-    expect(base.pos.y).toBe(3.5);
-    expect(base.target.x).toBe(0);
-  });
-
-  it("laneX null = no lateral nudge (dag/unknown) — the rest of the pose still applies", () => {
-    ledgerLaneNudge(base, null, out);
-    expect(out.target.x).toBe(0);
-    expect(out.pos.y).toBeGreaterThan(base.pos.y);
-  });
-
-  it("a nudge is not a zoom-to: it keeps most of the overview distance", () => {
-    ledgerLaneNudge(base, 10, out);
-    const d = out.pos.distanceTo(out.target);
-    const d0 = base.pos.distanceTo(base.target);
-    expect(d).toBeGreaterThan(d0 * 0.7);
   });
 });

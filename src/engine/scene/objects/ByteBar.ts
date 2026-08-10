@@ -13,7 +13,7 @@ import type { PickDescriptor } from "@/src/data/types";
 import { METAGRAPHS } from "../../config";
 import { BAR_H, BAR_D, BAR_LIFT, FLOOR_Y, LEAD_X } from "../../domain/ledgerLayout";
 import { type BarSpec } from "../../domain/ledgerBands";
-import { SLOT_SP, SLOT_N } from "../../domain/ledgerModel";
+import { SLOT_SP, SLOT_N, horizonAt } from "../../domain/ledgerModel";
 import { RIBBON_DIM } from "./Ribbons";
 
 const BANDS_PER_SLOT = METAGRAPHS.length + 1;
@@ -36,6 +36,16 @@ export const BAR_TUNE_DEFAULTS: BarTune = { hot: 0.7, rest: 0.05 };
  *  (RIBBON_DIM 0.2), a bit brighter — one dim language, two nearby levels. Shared with the
  *  tiles and the hover ribbon row. */
 export const SNAP_PREVIEW = 0.3;
+
+/** The COMMITTED-NETWORK resting tier (user, 2026-08-09 — "when a metagraph is selected, give
+ *  all the blocks their real metagraph color and not the neutral cyan"): with a filter committed,
+ *  that network's OWN bands and lane tiles keep their identity hue down the WHOLE trail, not just
+ *  on the hot row — the committed story reads as one coloured thread through the chamber while
+ *  every other network's resting rows stay the neutral trail. Expressed as a fraction of `hot`,
+ *  like the preview tier; it sits BELOW the preview (a hover still previews louder than a
+ *  standing commitment) and above the neutral rest, which `dimTiers.test.ts` pins. Shared by the
+ *  bar and the tiles. */
+export const SNAP_ONNET = 0.17;
 
 interface Slot {
   ordinal: number;
@@ -155,24 +165,35 @@ export class ByteBar {
     const k = Math.min(1, dt * 5);
     for (let si = 0; si < this._slots.length; si++) {
       const s = this._slots[si];
+      const x = LEAD_X - si * SLOT_SP + this._off;
       // No depth fade (user, 2026-08-07 — the trail keeps one brightness; recency reads from
-      // position + the per-row ordinal labels, not a gradient into the dark).
-      const fade = 1;
+      // position + the per-row ordinal labels, not a gradient into the dark). What DOES apply is
+      // the HORIZON (user, 2026-08-09): a terminal dissolve at the far boundary, the mirror of
+      // the front one below, so no bar floats on glass that has already faded out.
+      const fade = horizonAt(x);
       const hot = si === this._selected || si === 0;
       const hov = !hot && si === this._hovered;
       // Rows the rewind pushed past the front edge dissolve within one slot of travel.
-      const over = (LEAD_X - si * SLOT_SP + this._off - LEAD_X) / (SLOT_SP * 0.9);
+      const over = (x - LEAD_X) / (SLOT_SP * 0.9);
       const front = over <= 0 ? 1 : Math.max(0, 1 - over);
       for (let i = 0; i < s.used; i++) {
-        // Three tiers (user, 2026-08-07): the ACTIVE row (lead/pinned) full identity, the
-        // HOVERED row identity at the preview fraction (a colored dim — the active never
-        // demotes for a hover), everything else the neutral trail. A committed/hovered
-        // NETWORK additionally dims the other networks' bands in their own hue.
+        // Four tiers: the ACTIVE row (lead/pinned) full identity, the HOVERED row identity at
+        // the preview fraction (a colored dim — the active never demotes for a hover), the
+        // COMMITTED NETWORK's own bands at the on-net resting tier so its thread stays its own
+        // colour all the way down the trail, everything else the neutral trail. A committed or
+        // hovered NETWORK additionally dims the other networks' bands in their own hue.
         const offNet = this._filter !== "all" && s.keys[i] !== this._filter;
-        const base = hot ? this.tune.hot : hov ? this.tune.hot * SNAP_PREVIEW : this.tune.rest;
+        const onNet = !hot && !hov && this._filter !== "all" && s.keys[i] === this._filter;
+        const base = hot
+          ? this.tune.hot
+          : hov
+            ? this.tune.hot * SNAP_PREVIEW
+            : onNet
+              ? this.tune.hot * SNAP_ONNET
+              : this.tune.rest;
         const t = base * fade * front * (offNet ? RIBBON_DIM : 1) * this._alpha;
         s.mats[i].opacity += (t - s.mats[i].opacity) * k;
-        s.mats[i].color.setHex(hot || hov ? s.colors[i] : this._neutral);
+        s.mats[i].color.setHex(hot || hov || onNet ? s.colors[i] : this._neutral);
       }
     }
   }

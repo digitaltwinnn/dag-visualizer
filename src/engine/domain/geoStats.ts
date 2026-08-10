@@ -80,6 +80,9 @@ export function listNodes(nodes: GeoStatNode[], metaNodes: GeoStatNode[], filter
       // Prefer the node ID (the stable identity); fall back to IP/place when absent.
       label: (node && (node.id || node.ip)) || (g && (g.city || g.country)) || "node",
       id: (node && node.id) || null,
+      // Every layer id (see NodeInfo.ids) — the signer resolvers match against ALL of them,
+      // because a hybrid machine's dL1 id is not the l0 id in `id`.
+      ids: (node && node.ids) || undefined,
       cc: g ? g.cc || null : null,
       country: g ? g.country || null : null,
       city: g ? g.city || null : null,

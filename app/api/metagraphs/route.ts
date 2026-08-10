@@ -26,7 +26,7 @@ const LAYERS: Array<[string, string]> = [
   ["cl1", "cl1"],
 ];
 
-interface MetaNode { ip: string; state: string; layer: string; roles: string[]; id: string }
+interface MetaNode { ip: string; state: string; layer: string; roles: string[]; id: string; ids: string[] }
 interface Metagraph {
   id: string; name: string; symbol: string; description: string;
   siteUrl: string; iconUrl: string; nodes: MetaNode[];
@@ -89,9 +89,19 @@ async function fetchLive(): Promise<{ metagraphs: Metagraph[]; geo: GeoMap }> {
       const roles: Record<string, string[]> = {};
       const stateOf: Record<string, string> = {};
       const idOf: Record<string, string> = {};
+      // ⚠️ A machine's peer id is PER LAYER, not per machine (verified live 2026-08-09: DOR's
+      // 35.81.47.27 is `f2724252…` in its l0 cluster and `6270ff66…` in its dl1 cluster — each
+      // layer process runs its own keypair). So a hybrid node has SEVERAL ids and only one of
+      // them is the primary layer's. Keeping just `idOf` made every data-block signer that
+      // happens to be a hybrid machine unresolvable ("not in live set") even though the machine
+      // was right there in the list — the block proofs are dL1 ids, the snapshot proofs l0 ones.
+      // Collected in LAYERS order, so `ids[0] === id`.
+      const idsOf: Record<string, string[]> = {};
       present.forEach(([, layer], i) => {
         for (const n of nodesByLayer[i]) {
           (roles[n.ip] ??= []).push(layer);
+          const ids = (idsOf[n.ip] ??= []);
+          if (n.id && !ids.includes(n.id)) ids.push(n.id);
           if (!(n.ip in primary)) {
             primary[n.ip] = layer;
             stateOf[n.ip] = n.state;
@@ -108,6 +118,7 @@ async function fetchLive(): Promise<{ metagraphs: Metagraph[]; geo: GeoMap }> {
         .sort()
         .map((ip) => ({
           ip, state: stateOf[ip], layer: primary[ip], roles: roles[ip], id: idOf[ip],
+          ids: idsOf[ip] ?? [],
         }));
       return {
         id, name: m.name || id, symbol: m.symbol || "",
@@ -132,7 +143,7 @@ const getLive = unstable_cache(
     if (!live.metagraphs.length) throw new Error("empty live result");
     return live;
   },
-  ["metagraphs-live-v2"], // v2: +isp/asn geo fields (key bump busts the pre-provider cache)
+  ["metagraphs-live-v3"], // v3: +per-layer node `ids` (v2 was +isp/asn geo fields)
   { revalidate },
 );
 

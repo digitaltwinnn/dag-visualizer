@@ -74,13 +74,41 @@ export default function TopBar() {
     };
   }, [open]);
 
+  // DEV-ONLY overflow alarm. The bar is `overflow-hidden` (the filter strip needs the rounded
+  // clip), so when its row stops fitting nothing breaks visibly — the trailing control just
+  // vanishes off the right edge, and the only way to notice is to resize and look. That has now
+  // shipped twice (the labeled switch at 1100, then at 1210). Every breakpoint in the JSX below is
+  // tuned against measured content, so measured content is what should complain when it drifts.
+  const barRow = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (process.env.NODE_ENV === "production") return;
+    const el = barRow.current;
+    if (!el) return;
+    const check = () => {
+      const over = el.scrollWidth - el.clientWidth;
+      if (over > 0)
+        console.warn(
+          `[TopBar] the command bar overflows by ${over}px at ${window.innerWidth}px — ` +
+            "the trailing control is being clipped. Raise a breakpoint in components/TopBar.tsx.",
+        );
+    };
+    check();
+    const ro = new ResizeObserver(check);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
   return (
     <div>
       {/* Fixed wrapper = the bar + the hanging view caption below it. pointer-events-none so the
           caption strip under the bar doesn't block clicks on the scene; the bar itself restores
           pointer-events-auto. On desktop the bar's edges align with the rail columns (26px, the
-          rails' outer margin since the mirrored threads landed); smaller breakpoints keep 16px. */}
-      <div className="fixed top-[39px] inset-x-4 min-[1100px]:inset-x-[26px] z-40 pointer-events-none">
+          rails' outer margin since the mirrored threads landed); smaller breakpoints keep 16px.
+          `top-14px` since the experimental banner was retired (user, 2026-08-09): the bar was at
+          39px to clear the banner's 28px ribbon plus an 11px breather, and it now floats at the
+          viewport edge with a breather of its own — close to the 16px side inset, so the glass
+          sits in an even frame. Everything below rides `--rail-top`, which moved by the same 25px. */}
+      <div className="fixed top-[14px] inset-x-4 min-[1100px]:inset-x-[26px] z-40 pointer-events-none">
       <div
         id="topbar"
         className={cn(
@@ -93,6 +121,7 @@ export default function TopBar() {
         )}
       >
       <div
+        ref={barRow}
         className={cn(
           "flex items-center gap-3 py-2 px-3.5",
           "max-[1260px]:gap-2.5",
@@ -110,16 +139,38 @@ export default function TopBar() {
         {/* LEFT zone (phone grid): brand + filter. `contents` above 700px = invisible to the
             flex row, so tablet/desktop layout is byte-identical. */}
         <div className="contents max-[699px]:flex max-[699px]:items-center max-[699px]:gap-1.5 max-[699px]:min-w-0">
-        {/* Brand */}
-        <div className="flex items-center gap-2">
+        {/* Brand — AND the one route to /about (user, 2026-08-09, replacing the always-on
+            experimental banner). The identity mark is the honest affordance for "what is this
+            thing?": clicking the app's own name to read what it is, who made it and that it's
+            unofficial needs no new chrome in a bar that has none to spare, and it works at every
+            breakpoint because the ECG mark survives when the wordmark hides. A plain <a>, not a
+            Link: /about is a separate document with its own scroll, and the app is a long-lived
+            WebGL tab — a client-side route change would tear the engine down and rebuild it on
+            return, so the full navigation is the cheaper one. */}
+        <a
+          href="/about"
+          title="About DAG Visualizer — an unofficial community project"
+          className={cn(
+            "flex items-center gap-2 rounded-btn -mx-1 px-1 py-0.5 no-underline",
+            "hover:bg-wash-soft transition-colors duration-150 motion-reduce:transition-none",
+            "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--primary)]",
+          )}
+        >
           <EcgMark />
-          {/* wordmark hides below 1300 (not 1210 with the labels): between 1210 and ~1300 it
-                  wrapped to two lines and grew the bar (review finding) */}
-              <span className="font-semibold tracking-[-0.01em] text-title whitespace-nowrap max-[1299px]:hidden">
+          {/* Wordmark hides below 1439. The thresholds in this bar are MEASURED, not guessed —
+              the bar is `overflow-hidden`, so anything that doesn't fit is silently clipped off
+              the right edge, and the first thing to go is the presentation toggle (user bug,
+              2026-08-09: "the right view type buttons go out of view"). Measured needs, at the
+              vitals cluster's present 250px: labels + wordmark → 1392px; labels alone → 1257px.
+              So the wordmark waits for 1439 and the labels for 1299, each with real slack. (`max-[N]`
+              compiles to `not (min-width: N)` — EXCLUSIVE, so N itself is already the wide face.)
+              Raise them together with any part that grows; the dev overflow warning in the effect
+              above shouts if they drift again. */}
+              <span className="font-semibold tracking-[-0.01em] text-title whitespace-nowrap max-[1439px]:hidden">
             <span className={live ? "text-foreground" : "text-muted-foreground opacity-70"}>DAG</span>{" "}
             <span className={cn("text-muted-foreground", !live && "opacity-70")}>Visualizer</span>
           </span>
-        </div>
+        </a>
         <span className="w-px self-stretch bg-border my-1 max-[820px]:hidden" />
 
         {/* Filter (toned, de-nested) — toggles the ATTACHED filter strip below (user,
@@ -201,17 +252,22 @@ export default function TopBar() {
                 "hover:text-foreground hover:bg-wash-soft",
                 "data-[state=on]:text-foreground data-[state=on]:bg-[var(--sel-bg)]",
                 "data-[state=on]:shadow-[inset_0_0_0_1px_var(--sel-border)]",
-                "max-[1099px]:min-h-11 max-[1099px]:min-w-11 max-[1209px]:justify-center",
+                "max-[1099px]:min-h-11 max-[1099px]:min-w-11 max-[1299px]:justify-center",
                 "max-[1120px]:px-2 max-[1120px]:py-1.5 max-[1120px]:text-label",
                 // Phone keeps the ≥44px touch WIDTH (the min-w-11 above still applies — the old
                 // `max-[699px]:min-w-0` override made the icon-only radios too narrow to press);
                 // only the padding condenses. Room is fine: phone shows just the 3 working views.
                 "max-[699px]:p-1.5",
-                "soon" in v && v.soon && "opacity-45",
+                // The three "soon" placeholders also stand down on a NARROW TABLET (700–819px):
+                // measured, the six-icon switch needs 771px and the bar is clipped below that, so
+                // the first thing sacrificed is the dead weight — same argument the phone makes,
+                // one breakpoint up. The threshold is the DIVIDERS' own `max-[820px]` so the
+                // condensed and the full face change on one line. Tablet ≥820 and desktop keep six.
+                "soon" in v && v.soon && "opacity-45 max-[820px]:hidden",
               )}
             >
               <Icon aria-hidden className="size-4 group-data-[state=on]:text-primary" />
-              <span className="text-label max-[1209px]:hidden">{v.name}</span>
+              <span className="text-label max-[1299px]:hidden">{v.name}</span>
             </ToggleGroupItem>
           );
           })}
@@ -290,9 +346,10 @@ export default function TopBar() {
       )}
       </div>
 
-      {/* Selected-view label — only on the icon-only breakpoints (<1210px, where the switch
-          drops its text labels — raised from 1100 when the live vitals figures grew a digit
-          and the LABELED switch stopped fitting beside them, clipping the bar; user bug):
+      {/* Selected-view label — only on the icon-only breakpoints (<1300, where the switch drops
+          its text labels; this threshold MUST track the labels' own, see the wordmark note above:
+          it was 1100, then 1210 when the vitals figures grew a digit, and 1300 since the measured
+          fit showed 1210–1256 was still clipping the bar's right edge — user bug):
           the ACTIVE view's name as a quiet caption HANGING BELOW the
           bar, anchored under its right corner (user refinement — the centered in-bar second row
           read misaligned with the bar's buttons). Lives OUTSIDE the bar surface (a sibling in
@@ -300,7 +357,7 @@ export default function TopBar() {
           eyebrow language + keyed roll-in on view change (the HUD grammar). Decorative echo of
           the radiogroup's own accessible state, so aria-hidden; non-interactive (the wrapper's
           pointer-events-none passes scene clicks through the caption strip). */}
-      <div className="hidden max-[1209px]:flex justify-end pr-2.5 mt-1.5" aria-hidden>
+      <div className="hidden max-[1299px]:flex justify-end pr-2.5 mt-1.5" aria-hidden>
         <span key={mode} className="roll-in text-micro tracking-caps uppercase text-muted-foreground leading-none">
           {VIEWS.find((v) => v.id === mode)?.name}
         </span>

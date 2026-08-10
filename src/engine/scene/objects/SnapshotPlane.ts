@@ -112,6 +112,7 @@ export class SnapshotPlane {
   readonly label: THREE.Mesh | null;
   private readonly _fillU: GlassFillUniforms;
   private readonly _minHalf: number;
+  private readonly _cx: number;
   private readonly _parent: THREE.Group;
   private readonly _colors: SceneColors;
   private _tray: THREE.Mesh | null = null;
@@ -128,6 +129,7 @@ export class SnapshotPlane {
     this.fill.userData.blocker = true; // a normal surface: rays stop here (no pick, no pass-through)
     this._fillU = fm.uniforms as unknown as GlassFillUniforms;
     this._minHalf = Math.min(o.w, o.d) / 2;
+    this._cx = o.cx;
     parent.add(this.fill);
     this.label = o.label
       ? makeEdgeLabel(colors, o.label.text, o.label.x, o.y, o.label.z, o.label.height, o.label.align)
@@ -155,6 +157,18 @@ export class SnapshotPlane {
     this._tray.rotation.set(0, Math.PI / 2, 0);
     this._tray.position.set(CONT_X - 0.05, spec.cy, spec.cz);
     this._trayU!.uHalf.value.set(spec.hz, spec.hy);
+  }
+
+  /** The HORIZON — dissolve the glass out before its own far edge, so the surface the time trail
+   *  runs away into has no visible end (user, 2026-08-09: "the snapshot lanes logically go all the
+   *  way to the back […] currently there is a hard edge"). `atX` is the GROUP-space x where the
+   *  alpha reaches zero, `span` the ramp length in front of it; the plane's local +x is the group's
+   *  +x, so the ramp is a plain offset. Construction-time — the trays never call it (they sit at
+   *  the front, where an end is the truth). */
+  setHorizon(atX: number, span: number): void {
+    this._fillU.uFadeDir.value.set(1, 0);
+    this._fillU.uFadeAt.value = atX - this._cx;
+    this._fillU.uFadeSpan.value = span;
   }
 
   /** Per-frame look: the caller passes ITS tune channel (global vs metagraph planes) and the

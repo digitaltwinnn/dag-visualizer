@@ -54,6 +54,30 @@ export const LANE_GAP_Z = Math.abs(ledgerSite(1, LANE_IDS.length).z - ledgerSite
 // js/ledger.js:53 verbatim — recency fade: 1 at the freshest completed slot, 0 by the oldest visible.
 export const slotFade = (slot: number): number => Math.min(1, Math.max(0, 1 - (slot - 1) / (SLOT_N - 1)));
 
+// ── the HORIZON (user, 2026-08-09: "the snapshot lanes etc logically go all the way to the back
+// since there will be many historic snapshots; how can we visualize this because currently there is
+// a hard edge"). The trail runs away from the camera along −X, and both the glass planes and the
+// rows on them simply STOPPED: the planes at their own geometric edge (rim band and all), the rows
+// at full brightness in the last slot. The chamber read as a finite box rather than a window onto a
+// chain that keeps going.
+//
+// This is NOT the recency fade `slotFade` describes and the trail deliberately does not use (see
+// LedgerView's "No depth fade" note): it is a TERMINAL DISSOLVE at the trail's far boundary — the
+// exact mirror of `TrailRewind.fadeAtX`, which already dissolves rows sliding off the FRONT edge.
+// Recency is still position plus the ordinal labels: `HORIZON_X` is placed beyond the last visible
+// slot, so 8 of the 9 rows stay at full brightness and only the oldest has begun to go.
+//
+// ONE band for the furniture and the rows alike, because they must agree: the glass has to be gone
+// before its own back edge is reached, and a row must not float on glass that has already left.
+export const HORIZON_X = LEAD_X - (SLOT_N + 0.6) * SLOT_SP;
+export const HORIZON_SPAN = 2.2 * SLOT_SP;
+
+/** How present the chamber still is at a group-X of `x`: 1 in the lit body, easing to 0 at the
+ *  horizon. Feed it the row's LIVE x (its rewind offset included), so the band stays put in the
+ *  world while the trail slides through it. */
+export const horizonAt = (x: number): number =>
+  Math.min(1, Math.max(0, (x - HORIZON_X) / HORIZON_SPAN));
+
 // A tick keeps collecting metagraph snapshots for seconds after it appears (the anchor index's
 // `touched` grows). The lead row says so rather than pretending it is final — the same ~7s window
 // AnchoredTags uses for its FLOOR/COMPLETE gate. The BAR below does not settle: once the exact

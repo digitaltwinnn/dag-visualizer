@@ -39,7 +39,7 @@ import {
   type RailGroup,
 } from "../../domain/ledgerLayout";
 import type { SceneColors } from "../../sceneColors";
-import { LedgerModel, LANE_IDS, SLOT_SP, SLOT_N, LANE_GAP_Z } from "../../domain/ledgerModel";
+import { LedgerModel, LANE_IDS, SLOT_SP, SLOT_N, LANE_GAP_Z, HORIZON_X, HORIZON_SPAN, horizonAt } from "../../domain/ledgerModel";
 import { makeBarSpec, fillBarSpec, UNLISTED_KEY, type BarSpec } from "../../domain/ledgerBands";
 import type { ContainerSpec } from "../../domain/ledgerRails";
 import type {
@@ -48,8 +48,9 @@ import type {
   PickDescriptor,
   SnapshotExact,
 } from "@/src/data/types";
+import { metaSnapHoverKey } from "@/src/data/types";
 import { LEDGER_LAYERS } from "@/src/data/ledgerLayers"; // shared display copy — floor labels = panel rows
-import { ByteBar, SNAP_PREVIEW } from "../objects/ByteBar";
+import { ByteBar, SNAP_PREVIEW, SNAP_ONNET } from "../objects/ByteBar";
 import { RIBBON_DIM } from "../objects/Ribbons";
 import { Ribbons } from "../objects/Ribbons";
 import { SnapshotPlane, makeEdgeLabel, GLOBAL_PLANE_TUNE_DEFAULTS, META_PLANE_TUNE_DEFAULTS, type PlaneTune } from "../objects/SnapshotPlane";
@@ -206,6 +207,12 @@ export class LedgerView implements SceneView {
    *  identity colour at SNAP_PREVIEW without demoting the active row. */
   private _hoverOrd: number | null = null;
   private _hoverSlot = -1;
+  /** ONE hovered metagraph snapshot, as `metaSnapHoverKey(metaId, ordinal)` — the tile-level hover
+   *  (user, 2026-08-09). Separate from `_hoverOrd`, which is a whole TICK ROW: hovering one
+   *  snapshot must light its own tile, not every sibling that anchored into the same tick.
+   *  `_hoverTile` is the instance index it resolves to, so the frame body compares integers. */
+  private _hoverMetaKey: string | null = null;
+  private _hoverTile = -1;
   /** Filter-chip / metagraph-row HOVER — previews the colored network dim at commit strength. */
   private _hoverNet: string | null = null;
 
@@ -352,6 +359,10 @@ export class LedgerView implements SceneView {
     for (const p of [...this._globalPlanes, ...this._metaPlanes.values()]) {
       this._floorBlockers.push(p.fill);
       if (p.label) this._fades.register(p.label.material as THREE.MeshBasicMaterial, 1);
+      // Every storey dissolves into the SAME horizon, so the chamber reads as continuing into
+      // history rather than stopping at a lit back edge (user, 2026-08-09). The trays don't —
+      // they sit at the front, where an end is honest.
+      p.setHorizon(HORIZON_X, HORIZON_SPAN);
     }
 
   }
@@ -377,7 +388,10 @@ export class LedgerView implements SceneView {
     for (const [key, p] of this._metaPlanes)
       p.applyAlpha(this.metaTune, a, FLOOR_D / 2, key === netKey ? LANE_FILL_BOOST : 1);
     for (const o of this._ordLabels.values()) {
-      const front = this._rewind.fadeAtX(LEAD_X - o.slot * SLOT_SP + this._trailOff);
+      const ox = LEAD_X - o.slot * SLOT_SP + this._trailOff;
+      // Both boundaries at once: the rewind's front dissolve and the horizon's — no instrument
+      // may float on glass that has already faded out (user, 2026-08-09).
+      const front = this._rewind.fadeAtX(ox) * horizonAt(ox);
       (o.mesh.material as THREE.MeshBasicMaterial).opacity = ORD_OP * front * a;
       // The anchor line whispers under its label (user, 2026-08-07 — "a bit more subtle").
       (o.line.material as THREE.LineDashedMaterial).opacity = ORD_OP * 0.45 * front * a;
@@ -508,15 +522,38 @@ export class LedgerView implements SceneView {
     this._bar.setHovered(this._hoverSlot);
   }
 
+  /** The hovered METAGRAPH SNAPSHOT (`metaSnapHoverKey`) — lights exactly the one tile that stands
+   *  for it, wherever it sits in the trail. The tile↔row pairing's scene end. */
+  setHoveredMetaSnap(key: string | null) {
+    this._hoverMetaKey = key; // event-time
+    this._syncHoverTile();
+  }
+
+  /** Resolve the hovered snapshot to its INSTANCE INDEX over the pick table update() draws in
+   *  lockstep with. Event-time only — on a hover change and on every pick-table rebuild, since a
+   *  data refresh reshuffles the indices under a held hover. */
+  private _syncHoverTile(): void {
+    const key = this._hoverMetaKey;
+    if (key == null) { this._hoverTile = -1; return; }
+    for (let i = 0; i < META_TRAIL_MAX; i++) {
+      const p = this._tilePicks[i];
+      if (p != null && p.kind === "metaSnap" && metaSnapHoverKey(p.sel.metaId, p.sel.ordinal) === key) {
+        this._hoverTile = i;
+        return;
+      }
+    }
+    this._hoverTile = -1;
+  }
+
   /** The COMMITTED (clicked) or followed snapshot — the only thing the trail rewind tracks. */
   setPinned(ordinal: number | null) {
     this._rewind.setPinned(ordinal);
   }
 
-  /** The COMMITTED network. Since the off-filter dim was removed entirely (user, 2026-08-07)
-   *  this only GATES THE ANCHOR PULSES (the committed lane's pulses spawn, the rest stay
-   *  quiet) — the lane field never moves, nothing dims, and the camera fly-to-lane is the
-   *  Engine's ledgerNetwork resolver. */
+  /** The COMMITTED network. It drives the COLOURED DIM (the other networks drop to their own hue at
+   *  `RIBBON_DIM`, this network's own rows hold identity down the trail) and gates the anchor pulses
+   *  to the committed lane. What it deliberately does NOT do: move or hide any geometry. The camera's
+   *  only answer is the shared `ledgerCommitTilt` (the per-lane fly-to was retired 2026-08-09). */
   setFilter(filter: string) {
     this._filter = filter || "all"; // event-time
     this._applyNetDim();
@@ -686,6 +723,7 @@ export class LedgerView implements SceneView {
     const fn = this._tileResolver;
     if (!fn) {
       this._tilePicks.fill(null);
+      this._hoverTile = -1;
       return;
     }
     let mi = 0;
@@ -704,6 +742,8 @@ export class LedgerView implements SceneView {
       }
     }
     for (let j = mi; j < META_TRAIL_MAX; j++) this._tilePicks[j] = null;
+    // A held hover's tile index is only valid against THIS table.
+    this._syncHoverTile();
   }
 
   private _syncPickables(): void {
@@ -778,20 +818,31 @@ export class LedgerView implements SceneView {
         this._metaTrailMesh.setMatrixAt(mi, _dummy.matrix);
         const hot = this.model.isRowHot(b.slot);
         const hov = !hot && b.slot > 0 && b.slot === this._hoverSlot;
+        // THIS tile's own hover (user, 2026-08-09): the explorer/raw row for ONE snapshot lights
+        // just its tile, not the whole tick row. Resolved to an instance index at event time
+        // (_syncHoverTile), so the frame body is an integer compare.
+        const hovTile = mi === this._hoverTile;
         const dimNet = this._netDimKey();
         const offNet = dimNet !== "all" && lane.id !== dimNet;
-        // Three tiers (user, 2026-08-07): the ACTIVE row (lead/pinned) full identity, the
-        // HOVERED row identity at the preview fraction, every other snapshot the neutral trail.
-        const ident = hot || hov || b.slot <= 0 ||
+        const onNet = !hot && !hov && dimNet !== "all" && lane.id === dimNet;
+        // Four tiers: the ACTIVE row (lead/pinned) full identity, the HOVERED row identity at
+        // the preview fraction, the COMMITTED NETWORK's own tiles at the on-net resting tier
+        // (user, 2026-08-09 — its lane keeps its real colour down the whole trail, not just on
+        // the hot row), every other snapshot the neutral trail. A single hovered TILE takes the
+        // preview tier on its own, without lifting its row.
+        const ident = hot || hov || hovTile || onNet || b.slot <= 0 ||
           (this.model.selectedSlot > 0 && b.slot === this.model.selectedSlot);
         const bright =
           (hot
             ? Math.max(b.fade, 0.9) * this.tiles.hot
-            : hov
+            : hov || hovTile
               ? Math.max(b.fade, 0.9) * this.tiles.hot * SNAP_PREVIEW
-              : b.fade * this.tiles.rest) *
-          (offNet ? RIBBON_DIM : 1) *
+              : onNet
+                ? b.fade * this.tiles.hot * SNAP_ONNET
+                : b.fade * this.tiles.rest) *
+          (offNet && !hovTile ? RIBBON_DIM : 1) *
           this._rewind.fadeAtX(b.x + this._trailOff) *
+          horizonAt(b.x + this._trailOff) *
           this._fades.alpha;
         this._metaTrailMesh.setColorAt(mi, _col.copy(ident ? laneColor : this._coreCol).multiplyScalar(bright));
         mi++;

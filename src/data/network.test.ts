@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { matchSignerRow, resolveSignerIps } from "@/src/data/network";
+import { matchSignerRow, resolveSigner, resolveSignerIps, SIGNER_GROUPS, SIGNER_UNKNOWN } from "@/src/data/network";
 import type { MetaInfo, NodeRow } from "@/src/data/types";
 
-const meta = (id: string, nodes: { ip?: string; id?: string }[]): MetaInfo => ({
+const meta = (id: string, nodes: { ip?: string; id?: string; ids?: string[] }[]): MetaInfo => ({
   id,
   name: id,
   color: 0,
@@ -50,13 +50,29 @@ describe("resolveSignerIps", () => {
     ];
     expect(resolveSignerIps(metaList, "dor", ["abcdef01"])).toBeNull();
   });
+
+  // The regression that motivated `NodeInfo.ids` (found live 2026-08-09): a machine's peer id is per
+  // LAYER, so a hybrid's dL1 id is NOT the l0 id in `id`. Data blocks are signed by the dL1 cluster,
+  // so matching `id` alone left every hybrid data-block signer unresolvable while the machine sat
+  // right there in the list.
+  it("matches a hybrid machine's SECONDARY layer id, not only its primary one", () => {
+    const metaList = [
+      meta("dor", [
+        { ip: "1.1.1.1", id: "c54ccbea2a000000", ids: ["c54ccbea2a000000", "5faa4745ce000000"] },
+        { ip: "2.2.2.2", id: "ffffff9999999999", ids: ["ffffff9999999999"] },
+      ]),
+    ];
+    expect(resolveSignerIps(metaList, "dor", ["c54ccbea"])).toEqual(["1.1.1.1"]); // l0 proof signer
+    expect(resolveSignerIps(metaList, "dor", ["5faa4745"])).toEqual(["1.1.1.1"]); // its dL1 identity
+  });
 });
 
 // The card-side twin: a signer prefix → the live NodeRow the metagraph-snapshot card renders.
-const nodeRow = (metaId: string, id: string, city: string): NodeRow => ({
+const nodeRow = (metaId: string, id: string, city: string, ids?: string[]): NodeRow => ({
   pick: { kind: "metanode", node: { id, ip: `ip-${id}` }, meta: { id: metaId } as never },
   label: city,
   id,
+  ids,
   cc: "DE",
   country: "Germany",
   city,
@@ -83,5 +99,75 @@ describe("matchSignerRow", () => {
     expect(matchSignerRow(rows, "dor", "")).toBeNull();
     expect(matchSignerRow(rows, "nope", "abcdef01")).toBeNull();
     expect(matchSignerRow(rows, "dor", "zzzzzzzz")).toBeNull();
+  });
+
+  // The card-side half of the per-layer-id regression above: a DATA-BLOCK signer names the machine
+  // by its dL1 id, so the row must be findable by any of its layer ids.
+  it("finds a hybrid by any of its layer ids, so a data-block signer resolves too", () => {
+    const hybrid = [nodeRow("dor", "c54ccbea2a000000", "Seattle", ["c54ccbea2a000000", "5faa4745ce000000"])];
+    expect(matchSignerRow(hybrid, "dor", "c54ccbea")?.city).toBe("Seattle");
+    expect(matchSignerRow(hybrid, "dor", "5faa4745")?.city).toBe("Seattle");
+  });
+});
+
+// The words for WHICH CLUSTER signed — one home, because the confusion the constant answers (DOR's
+// "signed by" is always 3 of its 20 machines) only clears if all three signer surfaces name the same
+// layer the same way.
+describe("SIGNER_GROUPS", () => {
+  it("names a distinct producing layer for each group, in every register a site needs", () => {
+    expect(SIGNER_GROUPS.proof.layer).not.toBe(SIGNER_GROUPS.dataBlocks.layer);
+    expect(SIGNER_GROUPS.proof.who).not.toBe(SIGNER_GROUPS.dataBlocks.who);
+    for (const g of [SIGNER_GROUPS.proof, SIGNER_GROUPS.dataBlocks]) {
+      for (const s of [g.label, g.layer, g.who, g.title]) expect(s.length).toBeGreaterThan(0);
+    }
+  });
+
+  it("names the LAYER in each group's wording — that is the whole point of the constant", () => {
+    // The proof is the L0 cluster's; the blocks are the data-L1 cluster's. A group whose words
+    // don't say which layer signed is back to the bare number the user found confusing.
+    expect(SIGNER_GROUPS.proof.who).toMatch(/L0/);
+    expect(SIGNER_GROUPS.proof.title).toMatch(/L0/);
+    expect(SIGNER_GROUPS.dataBlocks.who).toMatch(/L1/);
+    expect(SIGNER_GROUPS.dataBlocks.title).toMatch(/L1/);
+  });
+});
+
+// The generic unknown-signer rule (user, 2026-08-09 — "I want it to be a generic solution and not a
+// spot solution"). `resolveSigner` is the ONE decision both signer lists read, and it is keyed on
+// the DATA: the unlisted channel is not a special case, it is just the branch every network takes
+// when nothing about its cluster is published.
+describe("resolveSigner", () => {
+  const rows = [
+    nodeRow("dor", "abcdef0123456789", "Falkenstein"),
+    nodeRow("ded", "ffffff9999999999", "Ashburn"),
+  ];
+
+  it("resolves to the node, which is the only arm that carries one", () => {
+    const r = resolveSigner(rows, "dor", "abcdef01");
+    expect(r.known).toBe(true);
+    expect(r.known && r.row.city).toBe("Falkenstein");
+  });
+
+  it("says NETWORK when no row of that network is here at all (the unlisted case)", () => {
+    // An unlisted channel's id never appears in any published node row, so every one of its
+    // signers takes this branch — with no mention of "unlisted" anywhere in the logic.
+    expect(resolveSigner(rows, "DAG5unknownchannel", "c54ccbea")).toEqual({ known: false, reason: "network" });
+    expect(resolveSigner([], "dor", "abcdef01")).toEqual({ known: false, reason: "network" });
+  });
+
+  it("says NODE when the network IS here but nothing carries the prefix", () => {
+    expect(resolveSigner(rows, "dor", "zzzzzzzz")).toEqual({ known: false, reason: "node" });
+    // An empty prefix can't match, and the network is present — same branch.
+    expect(resolveSigner(rows, "ded", "")).toEqual({ known: false, reason: "node" });
+  });
+
+  it("carries words for both unresolved reasons, and they differ", () => {
+    // Both render sites read these, so a missing or duplicated entry would let the two lists
+    // describe the same id differently.
+    expect(SIGNER_UNKNOWN.network.label).not.toBe(SIGNER_UNKNOWN.node.label);
+    for (const w of [SIGNER_UNKNOWN.network, SIGNER_UNKNOWN.node]) {
+      expect(w.label.length).toBeGreaterThan(0);
+      expect(w.title.length).toBeGreaterThan(0);
+    }
   });
 });

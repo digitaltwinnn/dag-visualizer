@@ -29,7 +29,10 @@ export const FOCI: Record<string, { pos: THREE.Vector3; target: THREE.Vector3 }>
   // Pulled back (36 → 41.5, user): the whole globe must rest inside the VISIBLE centre of
   // the frame — the rails carve the sides and the LiveStrip the bottom, so the fit is set by
   // the bottom-strip vertical band, not the raw FOV.
-  geo: { pos: new THREE.Vector3(0, 12.5, 41.5), target: new THREE.Vector3(0, 0, 0) },
+  // Pulled back again (41.5 → 44.8, user 2026-08-09: "the globe view at rest needs to zoom out a
+  // little"): pos is scaled AROUND the target (×1.08), so the composition — the downward tilt and
+  // the globe's screen-centre — is preserved exactly and only the fit changes.
+  geo: { pos: new THREE.Vector3(0, 13.5, 44.8), target: new THREE.Vector3(0, 0, 0) },
   // Metagraph-selection pose: rotated-to-densest at a WIDE distance — deliberately farther out
   // than the country framing (geoFraming z 29..25) so the country drill reads as a real zoom-in.
   // Camera held LOW (near the equator plane, like the country/node poses) — a higher camera
@@ -41,7 +44,13 @@ export const FOCI: Record<string, { pos: THREE.Vector3; target: THREE.Vector3 }>
   // aimed between the floors.
   // Nearly level (user: "more from the front, no tilt") — a ~6° pitch keeps the plane tops
   // just barely readable while the trays + ribbon sheets present flat-on.
-  ledger: { pos: new THREE.Vector3(0, 3.5, 54), target: new THREE.Vector3(0, -2.5, 0) },
+  // Raised in FRAME (user, 2026-08-09 — "the scene elements sit too close to the bottom of the
+  // viewport", then "lower it a little bit, in HUD mode it's too high now"): pos.y and target.y
+  // are lowered by the SAME 4.5, which translates the frustum down without touching the view
+  // direction — so the ~6° pitch is preserved exactly and the chamber centres in the band between
+  // the topbar and the LiveStrip. Both global levers survive it: dollyBack and railsDolly scale
+  // (pos − target) around the target, so a pure translation of the pair is invariant under them.
+  ledger: { pos: new THREE.Vector3(0, -1, 54), target: new THREE.Vector3(0, -7, 0) },
 };
 
 // ---- the ONE global zoom lever ------------------------------------------------------------
@@ -121,6 +130,7 @@ export function closeness(altitude: number): number {
 const _out = new THREE.Vector3();
 const _side = new THREE.Vector3();
 const _up = new THREE.Vector3(0, 1, 0);
+const _sph = new THREE.Spherical();
 
 // Hypergraph metagraph-hub framing (Engine.ts:699-707 `_focusFilter` verbatim): camera pulled
 // back along the hub's outward radial, offset sideways and lifted, looking at the hub itself.
@@ -146,39 +156,22 @@ export function geoFraming(R: number, out: CameraFraming): void {
   out.target.set(0, THREE.MathUtils.lerp(10.5, 11.5, t), 2.5);
 }
 
-// The FLOOR focus pose (renamed from ledgerLayerFraming with the two-floor redesign, 2026-08-04):
-// the DIAGONAL is deliberately kept as the layer-focus move — the resting pose stays face-on, and
-// stepping onto a floor is what tilts the room. Selecting a settlement floor flies the camera to
-// the nice DIAGONAL view of that floor plane — elevated, yawed off-axis from the LEFT so the live
-// lead block sits toward the BOTTOM-RIGHT and the old blocks recede to the TOP-LEFT — centred on
-// the plane's height `y` (already viewScale'd by the caller). The resting pose stays central/
-// untilted; this tilt is an EXPLORATION move (the user can freely orbit from here, like the geo
-// drill zoom).
-/** The ledger's COMMIT ACKNOWLEDGEMENT pose (2026-08-08 — moved out of the Engine's resolver,
- *  rule 8: framing math lives here): from the overview FOCI, nudge a fraction toward the
- *  committed lane, dolly in slightly, raise the camera and lift the aim — enough to say
- *  something happened while the colored dim carries the real emphasis. `laneX` = the lane's
- *  world X (null = no lateral nudge, e.g. "dag"/unknown). */
-export const LANE_NUDGE = 0.3;
-export const NUDGE_DOLLY = 0.12;
-export const NUDGE_RAISE = 10;
-export const NUDGE_AIM_UP = 2;
-export function ledgerLaneNudge(
-  base: { pos: THREE.Vector3; target: THREE.Vector3 },
-  laneX: number | null,
-  out: CameraFraming,
-): void {
-  out.pos.copy(base.pos);
-  out.target.copy(base.target);
-  if (laneX != null) {
-    out.pos.x += laneX * LANE_NUDGE;
-    out.target.x += laneX * LANE_NUDGE;
-  }
-  out.pos.lerp(out.target, NUDGE_DOLLY);
-  out.pos.y += NUDGE_RAISE;
-  out.target.y += NUDGE_AIM_UP;
-}
-
+// ---- the Snapshots view's ONE pose, and its ONE commit-time variation -----------------------
+// ⚠️ The Snapshots view has exactly ONE camera POSE — `FOCI.ledger`, which every rung on its ladder
+// resolves to (Engine's `ledgerNode`/`ledgerNetwork` both delegate to `ledgerOverview`). Three
+// framings have been tried in this view and all three are RETIRED, which is why the fact is
+// recorded here rather than left to be inferred from an empty file:
+//
+//   · `ledgerLaneNudge` (2026-08-08 → 2026-08-09) TRANSLATED laterally toward the committed lane.
+//     The field is FIXED and symmetric, so any lateral move pushes its far end out of frame.
+//   · `ledgerNodeFraming` (2026-07-17 → 2026-08-09) zoomed to a chip in its tray. The trays are
+//     visual aid — machines filling the chamber; the snapshots are the subjects.
+//   · the floor and rail poses below predate the two-storey redesign: neither floors nor rails are
+//     focus rungs any more, so nothing in the Engine calls them.
+//
+// **Don't grow a fourth.** Emphasis in this view is COLOUR — the four dim tiers in
+// `scene/objects/dimTiers.ts` carry every commit — plus the one ORBIT below. The two framings kept
+// here are the record of that, and the numbers their tests still pin.
 export function ledgerFloorFraming(y: number, out: CameraFraming): void {
   // Close-in framing (user-tuned). The TARGET sits exactly at the lane's LEAD point (x=0, z=0 —
   // the caller shifts pos+target laterally by the focused lane's world x), so the node ring /
@@ -199,17 +192,36 @@ export function ledgerRailFraming(x: number, y: number, out: CameraFraming): voi
   out.target.set(0, y, 0);
 }
 
-// Snapshots NODE zoom — the level AFTER the floor zoom (user, 2026-07-17), mirroring geo's
-// country→node ladder: the floor pose is the "country" level, this frames the selected node's
-// chip itself. Same diagonal viewing direction as ledgerFloorFraming (left + above, trail
-// receding top-left), much closer; the target sits slightly above the chip so it settles just
-// below centre (the house rule-of-thirds node composition). `node` is the chip's WORLD position.
-export function ledgerNodeFraming(node: THREE.Vector3, out: CameraFraming): void {
-  out.pos.set(node.x - 2.6, node.y + 2.8, node.z + 8.5);
-  out.target.set(node.x, node.y + 0.4, node.z);
-}
-
 // Engine.ts:784 `_updateTween`'s inline ease, lifted verbatim.
 export function easeInOutQuad(t: number): number {
   return t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
+}
+
+// ---- the Snapshots COMMIT ORBIT -------------------------------------------------------------
+// With a metagraph filter committed, the frontal resting pose ORBITS a little into a
+// three-quarter view (user, 2026-08-09: "when there is a filter on a metagraph, tilt the camera a
+// bit to give it a nicer 3d effect") — the chamber's depth (two storeys, the trail running away
+// from the lead edge) then reads as 3D instead of as a flat elevation. Keyed on the FILTER, not on
+// a rung, so it is a property of the committed STATE: every ledger rung inherits it by delegating
+// to `ledgerOverview`, and clearing the filter tweens back to frontal.
+//
+// ⚠️ This is NOT the retired `ledgerLaneNudge` in another shape, and the difference is exactly why
+// it's allowed: the nudge translated laterally, which walks the symmetric field's far end out of
+// frame. An ORBIT about the field's own centre keeps every lane in frame — it only changes the
+// angle they are seen at — and the radius factor pays for the wider projected diagonal a yawed
+// field presents. The composition is still filter-independent: the orbit is the same for every
+// network, so no lane is ever framed better than another.
+//
+// Composes cleanly with both global levers (`dollyBack`, `railsDolly`): they scale (pos − target)
+// about the target, which commutes with a rotation about that same target. Safe to call with
+// `outPos === pos` — the scratch read happens before the write.
+export const LEDGER_TILT_YAW = 0.23; // rad ≈ 13°, orbiting toward +X (the lane field's right end)
+export const LEDGER_TILT_PITCH = 0.1; // rad ≈ 5.7° of extra look-down, so the two storeys separate
+export const LEDGER_TILT_DOLLY = 1.08; // pays for the yawed field's wider projected diagonal
+export function ledgerCommitTilt(pos: THREE.Vector3, target: THREE.Vector3, outPos: THREE.Vector3): void {
+  _sph.setFromVector3(_out.subVectors(pos, target));
+  _sph.theta += LEDGER_TILT_YAW;
+  _sph.phi -= LEDGER_TILT_PITCH; // phi is measured from +Y, so subtracting RAISES the camera
+  _sph.radius *= LEDGER_TILT_DOLLY;
+  outPos.setFromSpherical(_sph).add(target);
 }
