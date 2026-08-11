@@ -833,9 +833,17 @@ export class LedgerView implements SceneView {
         // No depth fade (user, 2026-08-07): every trail row eases to FULL brightness — recency
         // reads from position + the ordinal labels, not a gradient into the dark.
         b.fade += (1 - b.fade) * k;
+        // The two POSITION dissolves — the rewind's front edge and the horizon at the far end.
+        // A row that has finished either one is no longer IN the chamber, so it must stop
+        // existing rather than linger (user, 2026-08-11): these tiles are opaque and depth-writing,
+        // so a zero-brightness one is a BLACK BLOCK sitting in front of the active row, occluding
+        // the ribbons and glass behind it — and the raycaster ignores `visible`, so it would still
+        // eat a click. Zero-scaling is the same answer an unfilled tick already gets.
+        const wx = b.x + this._trailOff;
+        const edge = this._rewind.fadeAtX(wx) * horizonAt(wx);
         // A tick this lane anchored NOTHING into draws NOTHING (user, 2026-08-07 — the small
         // dimmed placeholder block is gone; the model keeps the slot, the mesh zero-scales).
-        if (!b.filled) {
+        if (!b.filled || edge <= 0) {
           _dummy.position.set(0, 0, 0);
           _dummy.rotation.set(0, 0, 0);
           _dummy.scale.setScalar(0);
@@ -847,7 +855,7 @@ export class LedgerView implements SceneView {
         // Bottom just above the plane (user, 2026-08-07): the box is centred, so lift by half its
         // world height (geometry depth 0.35 × scale.z becomes the height under the -90° X spin).
         const tileH = 0.35 * b.size;
-        _dummy.position.set(b.x + b.ox + this._trailOff, FLOOR_Y.msnap + TILE_LIFT + tileH / 2, cz + b.oz * zScale);
+        _dummy.position.set(wx + b.ox, FLOOR_Y.msnap + TILE_LIFT + tileH / 2, cz + b.oz * zScale);
         _dummy.rotation.set(-Math.PI / 2, 0, 0);
         _dummy.scale.set(b.size, b.size, b.size);
         _dummy.updateMatrix();
@@ -875,10 +883,7 @@ export class LedgerView implements SceneView {
         // lane — under a filter it reaches the committed network's tile alone (`snapFocusOf`).
         const focus = hovTile ? 1 : snapFocusOf(pinned, hov, offNet);
         const bright =
-          snapBright(this.tiles.rest * b.fade, offNet, focus, dimBack) *
-          this._rewind.fadeAtX(b.x + this._trailOff) *
-          horizonAt(b.x + this._trailOff) *
-          this._fades.alpha;
+          snapBright(this.tiles.rest * b.fade, offNet, focus, dimBack) * edge * this._fades.alpha;
         this._metaTrailMesh.setColorAt(mi, _col.copy(ident ? laneColor : this._coreCol).multiplyScalar(bright));
         mi++;
       }

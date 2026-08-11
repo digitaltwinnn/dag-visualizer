@@ -1029,6 +1029,14 @@ rewind follows only the committed pin — a hover previews the hot row in place.
 no depth fade on the trail: every row keeps one brightness, and recency reads from position plus the
 ordinal labels.
 
+⚠️ **A DISSOLVED ROW MUST ZERO-SCALE, NOT JUST GO DARK** (user, 2026-08-11). The lane tiles are one
+instanced mesh on an **opaque, depth-writing** material whose brightness rides the instance COLOUR, so a
+row multiplied to brightness 0 is a BLACK BLOCK — it occluded the ribbons and glass behind it in front
+of the active row, and the raycaster ignores `visible`, so it still ate clicks. Both POSITION dissolves
+(the rewind's front edge and the horizon below) resolve to one `edge` factor per row, and `edge <= 0`
+takes the same zero-scale branch an unfilled tick already gets. The byte bar never showed this — its
+bands are `transparent` with `depthWrite: false`, which is why a brightness dissolve is enough there.
+
 **The far end is a HORIZON, not an edge** (user, 2026-08-09). The one exception to "no depth fade": the
 trail's last slots dissolve at the far boundary, the mirror of the rewind's own front-edge dissolve, so
 the chamber reads as continuing into history rather than stopping at a hard rim. It is **one function
