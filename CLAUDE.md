@@ -156,13 +156,20 @@ rules make it non-intrusive, and the header comment there is their authoritative
    silently missing slider. `devTune.ts` is ONLY the manifest plus a generic walker, so adding a knob is
    one line in the owning module and no edit there.
 
-**The tree is STATIC** — shared groups (`focus & dim`), then one collapsed folder per view, then the
+**The tree is STATIC** — shared groups, then one collapsed folder per view, then the
 camera. A folder for a view you aren't in simply sits collapsed; that costs a click and saves the panel
 tracking `mode`, subscribing to anything, or rebuilding itself. Values that are BAKED rather than read
 per frame (the ribbons' vertex colours) carry an `onChange` that re-pushes them, so an edit shows
 without a reload — **prefer reading the row per frame and needing no callback at all**, which is what
 the stage light does. Persistence is **opt-in and default OFF** — a silently-restored session is a
 trap, because you would be looking at last week's knobs believing they were the shipped look.
+
+**A knob belongs to the view whose look it changes, even when central code applies it** (user,
+2026-08-11). Emphasis and lighting are both `Record<View3D, Row>` + ONE row schema — `FOCUS_TUNE`
+(`domain/dimModel.ts`) and `STAGE_LIGHTS` (`domain/stageLight.ts`) — so each view folder holds its own
+`focus & dim` and, where it stages one, its `spotlight`. Only what is genuinely cross-view stays above
+them; today that is the focus TIER ranking alone. `dimModel`'s four resolvers all go through one
+`viewMix(c, field)`, so a new emphasis number is a field on the row and nothing else.
 
 **The camera folder is a READOUT, not sliders**: poses are ~8 constants and each needs its own selection
 state to even see, so orbiting to a pose you like and reading it off beats dragging numbers.

@@ -15,8 +15,9 @@ import { RIBBON_TUNE_DEFAULTS, RIBBON_TUNE_SCHEMA } from "./scene/objects/Ribbon
 import { BAR_TUNE_DEFAULTS, BAR_TUNE_SCHEMA } from "./scene/objects/ByteBar";
 import { GLOBAL_PLANE_TUNE_DEFAULTS, META_PLANE_TUNE_DEFAULTS, PLANE_TUNE_SCHEMA } from "./scene/objects/SnapshotPlane";
 import { TILE_TUNE_DEFAULTS, TILE_TUNE_SCHEMA } from "./scene/views/LedgerView";
-import { FOCUS_TUNE, FOCUS_TUNE_DEFAULTS, FOCUS_TUNE_SCHEMA } from "./domain/dimModel";
+import { FOCUS_TUNE, FOCUS_TUNE_DEFAULTS, FOCUS_ROW_SCHEMA, FOCUS_SHARED, FOCUS_SHARED_DEFAULTS, FOCUS_SHARED_SCHEMA } from "./domain/dimModel";
 import { STAGE_LIGHTS, STAGE_LIGHT_DEFAULTS, STAGE_LIGHT_SCHEMA, type StagedView } from "./domain/stageLight";
+import type { View3D } from "./domain/viewTransition";
 import { CAM_ZOOM, RAILS_HIDDEN_DOLLY } from "./domain/cameraRig";
 import {
   renderGroup, restoreTuned, savePersisted, setPersist, tuningPersisted, exportAll, dump,
@@ -38,14 +39,17 @@ export async function mountDevTune(targets: DevTuneTargets): Promise<DevTuneHand
   const { ledger, camera, controls } = targets;
 
   // ---- the manifest ---------------------------------------------------------------------------
-  // Shared groups: these shape EVERY view, so they sit above the per-view folders.
+  // Shared groups: these shape EVERY view, so they sit above the per-view folders. Emphasis is
+  // NOT one of them — dim/focus numbers are per-view values that central code applies (user,
+  // 2026-08-11), so they live in the view folders below and only the focus TIER ranking, which
+  // every view shares, stays up here.
   const shared: TuneGroup[] = [
     {
-      title: "focus & dim",
-      values: FOCUS_TUNE,
-      defaults: FOCUS_TUNE_DEFAULTS,
-      schema: FOCUS_TUNE_SCHEMA,
-      home: "domain/dimModel.ts · FOCUS_TUNE_DEFAULTS",
+      title: "focus tiers",
+      values: FOCUS_SHARED,
+      defaults: FOCUS_SHARED_DEFAULTS,
+      schema: FOCUS_SHARED_SCHEMA,
+      home: "domain/dimModel.ts · FOCUS_SHARED_DEFAULTS",
     },
   ];
 
@@ -60,10 +64,21 @@ export async function mountDevTune(targets: DevTuneTargets): Promise<DevTuneHand
     home: `domain/stageLight.ts · STAGE_LIGHT_DEFAULTS.${view}`,
   });
 
+  // Every 3D view has one, same shape as the spotlight above: one row, one shared schema.
+  const focusGroup = (view: View3D): TuneGroup => ({
+    title: `${view} · focus & dim`,
+    values: FOCUS_TUNE[view],
+    defaults: FOCUS_TUNE_DEFAULTS[view],
+    schema: FOCUS_ROW_SCHEMA,
+    // No onChange: the dim formulas read the row per frame.
+    home: `domain/dimModel.ts · FOCUS_TUNE_DEFAULTS.${view}`,
+  });
+
   const perView: Record<string, TuneGroup[]> = {
-    hyper: [spotGroup("hyper")],
-    geo: [spotGroup("geo")],
+    hyper: [focusGroup("hyper"), spotGroup("hyper")],
+    geo: [focusGroup("geo"), spotGroup("geo")],
     ledger: [
+      focusGroup("ledger"),
       {
         title: "ribbons",
         values: ledger.ribbons.tune,

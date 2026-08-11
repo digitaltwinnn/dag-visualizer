@@ -19,6 +19,7 @@
 // lose exactness.
 
 import { lerp } from "./nodeLayout";
+import type { View3D } from "./viewTransition";
 import type { TuneSchema } from "../tune";
 
 export interface DimContext {
@@ -47,19 +48,18 @@ export interface DimContext {
 // (Ledger override 2026-08-07, matching metaNodeDim: morph is frozen there, and full strength
 // cascades to near-black through the chip writer — the flat 0.5 lands the validator chips at
 // the same COLORED-dim tier as the metagraph chips.)
-export const dimScale = (c: DimContext): number =>
-  c.ledger ? FOCUS_TUNE.dimLedger : lerp(FOCUS_TUNE.dimHyper, FOCUS_TUNE.dimGeo, c.morph);
+export const dimScale = (c: DimContext): number => viewMix(c, "core");
 
 // The METAGRAPH pool's own dim strength: ZERO in the Hypergraph, full on the globe. Metagraph
 // nodes REST at the dimmed look in hyper (user, 2026-07-17 — the base size/glow in
 // NodeFabric.writeMetaFrame carry the old dim appearance instead), so the network dim must not
 // move them there: a hover preview is inert and a committed filter leaves the others at rest
 // (the selection pops via the hubMatch glow boost + camera/DoF, not by dimming the rest).
-// Geo is unchanged — 1.0 at morph=1, the same ceiling as dimScale, so the off-filter
-// isolate/hide on the globe is bit-identical. The ledger's flat 0.5 override (metaNodeDim)
-// bypasses this ramp entirely, as before. Validators keep dimScale — the DAG core still dims
-// back in hyper when a metagraph is the subject (the core-preview cue).
-export const metaDimScale = (c: DimContext): number => c.morph;
+// Geo is unchanged — 1.0, the same ceiling as dimScale, so the off-filter isolate/hide on the
+// globe is bit-identical. The ledger's flat 0.5 is just this row's own value (morph is frozen
+// there, so the ramp can't apply). Validators keep dimScale — the DAG core still dims back in
+// hyper when a metagraph is the subject (the core-preview cue).
+export const metaDimScale = (c: DimContext): number => viewMix(c, "meta");
 
 // Set the dim TARGETS for a selection (the dim itself eases each frame; the per-view STRENGTH is
 // applied in the node loops). The validators ARE the DAG core → lit under "all"/"dag", dimmed only
@@ -72,14 +72,12 @@ export const dimTargetsFor = (sel: string, metaIds: string[]) => ({
 
 // Per-view hover/selection DIM-BACK: how far the OTHER nodes drop when one node is the focus
 // (user): softer in geo (the rest stay brighter), a notch stronger in ledger, hyper unchanged.
-export const focusDim = (c: DimContext): number =>
-  c.ledger ? FOCUS_TUNE.backLedger : lerp(FOCUS_TUNE.backHyper, FOCUS_TUNE.backGeo, c.morph);
+export const focusDim = (c: DimContext): number => viewMix(c, "back");
 
 // Per-view hover/selection BOOST: the emissive added to the focused node's shells. Full pop in
 // hyper (the nodes rest dim there, see metaDimScale); HALVED in geo and ledger (user,
 // 2026-07-17: the chips' base glow is brighter there and the flat 1.4 blew out).
-export const focusBoost = (c: DimContext): number =>
-  c.ledger ? FOCUS_TUNE.boostLedger : lerp(FOCUS_TUNE.boostHyper, FOCUS_TUNE.boostGeo, c.morph);
+export const focusBoost = (c: DimContext): number => viewMix(c, "boost");
 
 // Focus is TIERED, not a flag (user, 2026-08-01: "selecting a provider highlights its nodes,
 // but selecting a node afterwards has no visual effect" — the node was already lit at exactly
@@ -88,59 +86,73 @@ export const focusBoost = (c: DimContext): number =>
 // hovered composition or cluster group) takes a FRACTION of the boost; the PRIMARY subject —
 // the one hovered or selected node — always takes all of it, so it stands out from its own
 // group. `focusWeightOf` is the one place that ranking lives; the node loops call it per node.
-export const GROUP_FOCUS = 0.45; // share of focusBoost a group member gets (FOCUS_TUNE's default)
+export const GROUP_FOCUS = 0.45; // share of focusBoost a group member gets (FOCUS_SHARED's default)
 export const focusWeightOf = (primary: boolean, group: boolean): number =>
-  primary ? 1 : group ? FOCUS_TUNE.groupShare : 0;
+  primary ? 1 : group ? FOCUS_SHARED.groupShare : 0;
 
 // ---- the EMPHASIS tunable (contract: src/engine/tune.ts) -------------------------------------
-// The per-view dim/focus numbers, hoisted out of the formulas below into one struct so the `?tune`
-// panel can bind them. Two properties keep this non-intrusive:
+// The dim/focus numbers, hoisted out of the formulas above into ONE ROW PER VIEW so the `?tune`
+// panel binds them inside that view's own folder — these read as view-specific even though the
+// code that applies them is central (user, 2026-08-11). Same shape as STAGE_LIGHTS: a Record
+// keyed by view plus one schema reused for every row. Three properties keep it non-intrusive:
 //   · `FOCUS_TUNE_DEFAULTS` is the SHIPPED LOOK and is what the tests pin — turning a knob can
 //     never make a test pass or fail.
 //   · Every value is seeded from the literal (or the existing const) it replaced, so the resolved
 //     numbers are unchanged: `lerp(0.32, 1.0, morph)` IS `0.32 + 0.68 * morph`, and naming the
 //     ENDPOINTS is what makes the geo value readable at all.
-export interface FocusTune {
-  /** Network/country dim strength per view — `dimScale`. */
-  dimHyper: number;
-  dimGeo: number;
-  dimLedger: number;
+//   · `meta` folds in what used to be the bare `metaDimScale = c.morph` ramp plus the ledger's
+//     flat override: 0 → 1 across the morph IS lerp(hyper.meta, geo.meta) at those seeds, so the
+//     metagraph pool's dim becomes tunable per view without moving a pixel. It answers "what
+//     control affects the OTHER metagraphs?" — in hyper the honest answer was "none, by design",
+//     and a knob resting at 0 states that where an absent knob couldn't.
+export interface FocusRow {
+  /** Network/country dim strength for the DAG CORE (validators) — `dimScale`. */
+  core: number;
+  /** …and for the METAGRAPH pool — `metaDimScale`. Hyper rests at 0 on purpose; see its note. */
+  meta: number;
   /** How far the OTHER nodes drop when one node is the focus — `focusDim`. */
-  backHyper: number;
-  backGeo: number;
-  backLedger: number;
+  back: number;
   /** Emissive added to the focused node — `focusBoost`. */
-  boostHyper: number;
-  boostGeo: number;
-  boostLedger: number;
-  /** Share of the boost a GROUP member gets, vs. the primary subject's full 1. */
-  groupShare: number;
-  /** The ledger's flat metagraph-node dim (morph is frozen there, so the ramp can't apply). */
-  metaDimLedger: number;
+  boost: number;
 }
 
-export const FOCUS_TUNE_DEFAULTS: Readonly<FocusTune> = {
-  dimHyper: 0.32, dimGeo: 1.0, dimLedger: 0.5,
-  backHyper: 0.45, backGeo: 0.65, backLedger: 0.55,
-  boostHyper: 1.4, boostGeo: 0.7, boostLedger: 0.7,
-  groupShare: GROUP_FOCUS,
-  metaDimLedger: 0.5,
+/** Genuinely cross-view: it ranks focus TIERS, which every view shares. */
+export interface FocusShared {
+  /** Share of the boost a GROUP member gets, vs. the primary subject's full 1. */
+  groupShare: number;
+}
+
+export const FOCUS_TUNE_DEFAULTS: Readonly<Record<View3D, Readonly<FocusRow>>> = {
+  hyper: { core: 0.32, meta: 0, back: 0.45, boost: 1.4 },
+  geo: { core: 1.0, meta: 1.0, back: 0.65, boost: 0.7 },
+  ledger: { core: 0.5, meta: 0.5, back: 0.55, boost: 0.7 },
 };
 
-export const FOCUS_TUNE: FocusTune = { ...FOCUS_TUNE_DEFAULTS };
+export const FOCUS_SHARED_DEFAULTS: Readonly<FocusShared> = { groupShare: GROUP_FOCUS };
 
-export const FOCUS_TUNE_SCHEMA: TuneSchema<FocusTune> = {
-  dimHyper: { min: 0, max: 1, label: "dim · hyper" },
-  dimGeo: { min: 0, max: 1, label: "dim · geo" },
-  dimLedger: { min: 0, max: 1, label: "dim · ledger" },
-  backHyper: { min: 0, max: 1, label: "dim-back · hyper" },
-  backGeo: { min: 0, max: 1, label: "dim-back · geo" },
-  backLedger: { min: 0, max: 1, label: "dim-back · ledger" },
-  boostHyper: { min: 0, max: 3, step: 0.05, label: "boost · hyper" },
-  boostGeo: { min: 0, max: 3, step: 0.05, label: "boost · geo" },
-  boostLedger: { min: 0, max: 3, step: 0.05, label: "boost · ledger" },
+export const FOCUS_TUNE: Record<View3D, FocusRow> = {
+  hyper: { ...FOCUS_TUNE_DEFAULTS.hyper },
+  geo: { ...FOCUS_TUNE_DEFAULTS.geo },
+  ledger: { ...FOCUS_TUNE_DEFAULTS.ledger },
+};
+
+export const FOCUS_SHARED: FocusShared = { ...FOCUS_SHARED_DEFAULTS };
+
+// The one resolver every formula above goes through: the ledger takes its row flat (morph is
+// frozen there), hyper↔geo lerp by the morph. One shape for all four fields, so a new emphasis
+// number is a field on the row and nothing else.
+const viewMix = (c: DimContext, k: keyof FocusRow): number =>
+  c.ledger ? FOCUS_TUNE.ledger[k] : lerp(FOCUS_TUNE.hyper[k], FOCUS_TUNE.geo[k], c.morph);
+
+export const FOCUS_ROW_SCHEMA: TuneSchema<FocusRow> = {
+  core: { min: 0, max: 1, label: "dim · DAG core" },
+  meta: { min: 0, max: 1, label: "dim · metagraphs" },
+  back: { min: 0, max: 1, label: "dim-back on focus" },
+  boost: { min: 0, max: 3, step: 0.05, label: "focus boost" },
+};
+
+export const FOCUS_SHARED_SCHEMA: TuneSchema<FocusShared> = {
   groupShare: { min: 0, max: 1, label: "group share" },
-  metaDimLedger: { min: 0, max: 1, label: "meta dim · ledger" },
 };
 
 // Validator (DAG-core) dim: the eased whole-core dim (ONE value — the old per-layer {l0,l1}
@@ -155,14 +167,14 @@ export function validatorDim(c: DimContext, dim: number, geoCc: string | null): 
 }
 
 // Metagraph-node per-node dim (js/globe.js:1095-1096): its own eased `recDim`, times the
-// metagraph pool's OWN strength (metaDimScale — zero in hyper, see its note) — except in the
-// Snapshots (ledger) view, where morph is frozen so the ramp alone would be too weak, so the
-// effective dim is forced to a FLAT 0.5 (was 0.82 under the old recede-the-rest emphasis —
-// the chip writer applies dim to colour AND glow, so 0.82 cascaded to near-black; 0.5 lands
-// the chips at the COLORED-dim tier the ribbons' RIBBON_DIM speaks, user 2026-08-07). Raised
-// by countryMix outside the drilled country, same as validatorDim.
+// metagraph pool's OWN strength (metaDimScale — zero in hyper, see its note). In the Snapshots
+// (ledger) view that resolves to the row's flat 0.5, because morph is frozen there and the ramp
+// alone would be too weak (was 0.82 under the old recede-the-rest emphasis — the chip writer
+// applies dim to colour AND glow, so 0.82 cascaded to near-black; 0.5 lands the chips at the
+// COLORED-dim tier the ribbons' RIBBON_DIM speaks, user 2026-08-07). Raised by countryMix
+// outside the drilled country, same as validatorDim.
 export function metaNodeDim(c: DimContext, recDim: number, geoCc: string | null): number {
-  let d = recDim * (c.ledger ? FOCUS_TUNE.metaDimLedger : metaDimScale(c));
+  let d = recDim * metaDimScale(c);
   if (c.countryFilter && (!geoCc || geoCc !== c.countryFilter)) d = Math.max(d, c.countryMix);
   return d;
 }

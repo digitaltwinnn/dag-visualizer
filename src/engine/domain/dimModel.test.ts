@@ -8,7 +8,10 @@ import {
   GROUP_FOCUS,
   FOCUS_TUNE,
   FOCUS_TUNE_DEFAULTS,
-  FOCUS_TUNE_SCHEMA,
+  FOCUS_ROW_SCHEMA,
+  FOCUS_SHARED,
+  FOCUS_SHARED_DEFAULTS,
+  FOCUS_SHARED_SCHEMA,
   hubMatchBoost,
   dimTargetsFor,
   validatorDim,
@@ -65,6 +68,12 @@ describe("metaDimScale", () => {
 
   it("is the bare morph at a midpoint", () => {
     expect(metaDimScale(ctx({ morph: 0.5 }))).toBeCloseTo(0.5, 10);
+  });
+
+  // Morph is frozen in the ledger, so the ramp can't apply — the row's own flat value does.
+  it("is the ledger row's flat 0.5 in the Snapshots view, whatever the morph", () => {
+    expect(metaDimScale(ctx({ morph: 0, ledger: true }))).toBeCloseTo(0.5, 10);
+    expect(metaDimScale(ctx({ morph: 1, ledger: true }))).toBeCloseTo(0.5, 10);
   });
 });
 
@@ -325,18 +334,43 @@ describe("metaNodeEmissive (metagraph loop, js/globe.js:1099-1107)", () => {
 describe("FOCUS_TUNE", () => {
   it("starts live == defaults, so an untouched panel changes nothing", () => {
     expect(FOCUS_TUNE).toEqual(FOCUS_TUNE_DEFAULTS);
+    expect(FOCUS_SHARED).toEqual(FOCUS_SHARED_DEFAULTS);
+  });
+
+  // The live rows must be COPIES: the panel writes into them, and a shared reference would let a
+  // knob mutate the shipped look these tests pin.
+  it("holds its own row objects, not the frozen defaults", () => {
+    for (const view of ["hyper", "geo", "ledger"] as const) {
+      expect(FOCUS_TUNE[view]).not.toBe(FOCUS_TUNE_DEFAULTS[view]);
+    }
+    expect(FOCUS_SHARED).not.toBe(FOCUS_SHARED_DEFAULTS);
   });
 
   it("keeps GROUP_FOCUS as its groupShare default", () => {
-    expect(FOCUS_TUNE_DEFAULTS.groupShare).toBe(GROUP_FOCUS);
+    expect(FOCUS_SHARED_DEFAULTS.groupShare).toBe(GROUP_FOCUS);
   });
 
   it("schemas every knob, and every knob's range contains its default", () => {
-    for (const [key, v] of Object.entries(FOCUS_TUNE_DEFAULTS)) {
-      const knob = FOCUS_TUNE_SCHEMA[key as keyof typeof FOCUS_TUNE_DEFAULTS];
+    for (const row of Object.values(FOCUS_TUNE_DEFAULTS)) {
+      for (const [key, v] of Object.entries(row)) {
+        const knob = FOCUS_ROW_SCHEMA[key as keyof typeof row];
+        expect(knob, `no schema entry for ${key}`).toBeDefined();
+        expect(v).toBeGreaterThanOrEqual(knob!.min);
+        expect(v).toBeLessThanOrEqual(knob!.max);
+      }
+    }
+    for (const [key, v] of Object.entries(FOCUS_SHARED_DEFAULTS)) {
+      const knob = FOCUS_SHARED_SCHEMA[key as keyof typeof FOCUS_SHARED_DEFAULTS];
       expect(knob, `no schema entry for ${key}`).toBeDefined();
       expect(v).toBeGreaterThanOrEqual(knob!.min);
       expect(v).toBeLessThanOrEqual(knob!.max);
+    }
+  });
+
+  // Every row carries the same fields, which is what lets ONE schema serve all three folders.
+  it("gives every 3D view a complete row", () => {
+    for (const row of Object.values(FOCUS_TUNE_DEFAULTS)) {
+      expect(Object.keys(row).sort()).toEqual(Object.keys(FOCUS_ROW_SCHEMA).sort());
     }
   });
 
@@ -348,6 +382,8 @@ describe("FOCUS_TUNE", () => {
       expect(dimScale(c)).toBeCloseTo(0.32 + 0.68 * morph, 10);
       expect(focusDim(c)).toBeCloseTo(0.45 + 0.2 * morph, 10);
       expect(focusBoost(c)).toBeCloseTo(1.4 - 0.7 * morph, 10);
+      // `meta` used to be a bare `c.morph` ramp with no knob at all — lerp(0, 1) IS that.
+      expect(metaDimScale(c)).toBeCloseTo(morph, 10);
     }
   });
 
