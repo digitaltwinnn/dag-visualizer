@@ -117,18 +117,37 @@ describe("SIGNER_GROUPS", () => {
   it("names a distinct producing layer for each group, in every register a site needs", () => {
     expect(SIGNER_GROUPS.proof.layer).not.toBe(SIGNER_GROUPS.dataBlocks.layer);
     expect(SIGNER_GROUPS.proof.who).not.toBe(SIGNER_GROUPS.dataBlocks.who);
-    for (const g of [SIGNER_GROUPS.proof, SIGNER_GROUPS.dataBlocks]) {
+    for (const g of [SIGNER_GROUPS.proof, SIGNER_GROUPS.dataBlocks, SIGNER_GROUPS.globalProof]) {
       for (const s of [g.label, g.layer, g.who, g.title]) expect(s.length).toBeGreaterThan(0);
     }
   });
 
   it("names the LAYER in each group's wording — that is the whole point of the constant", () => {
-    // The proof is the L0 cluster's; the blocks are the data-L1 cluster's. A group whose words
+    // The proof is the L0 cluster's; the blocks are the dL1 cluster's. A group whose words
     // don't say which layer signed is back to the bare number the user found confusing.
     expect(SIGNER_GROUPS.proof.who).toMatch(/L0/);
     expect(SIGNER_GROUPS.proof.title).toMatch(/L0/);
     expect(SIGNER_GROUPS.dataBlocks.who).toMatch(/L1/);
     expect(SIGNER_GROUPS.dataBlocks.title).toMatch(/L1/);
+  });
+
+  // The vocabulary rule made executable (user, 2026-08-10 — "why do we call it 'validators' for
+  // global snapshot and in metagraph L0 validators?"). A VALIDATOR IS A LAYER, so the word is
+  // never bare: every `who` is a count's noun phrase and must lead with the layer that acted.
+  // The global snapshot is included deliberately — it was the surface that read "155 validators",
+  // and under the unified node model its seal is the DAG's own L0 cluster, no different in kind.
+  it("qualifies every `who` with a layer code — the word 'validators' is never bare", () => {
+    for (const g of Object.values(SIGNER_GROUPS)) {
+      expect(g.who).toMatch(/^(L0|cL1|dL1) validators$/);
+    }
+  });
+
+  // ONE layer vocabulary app-wide: the codes the composition chips use. "data-L1" / "currency-L1"
+  // were a second dialect for the same three layers.
+  it("spells layers in the app's own codes, not a long form", () => {
+    for (const g of Object.values(SIGNER_GROUPS)) {
+      for (const s of [g.layer, g.who, g.title]) expect(s).not.toMatch(/data-L1|currency-L1/);
+    }
   });
 });
 

@@ -345,6 +345,20 @@ rail in every view, and a deselect steps back down the local ladder instead of j
 
 ## Nodes, layers & the filter
 
+**Vocabulary rule — a validator is a LAYER, never a machine** (user, 2026-08-10, app-wide sweep): a
+**node** is one host — one machine, one IP, one city, one status; a **layer** is an L0 / cL1 / dL1
+process on it, with **its own keypair and its own peer id**; a node's **composition** is the set of
+layers it runs; and a **validator** is a layer acting, so the word is *always* layer-qualified and never
+a synonym for "node". The global snapshot card's bare `155 validators` is what surfaced this — under
+the unified node model its seal is the DAG's own L0 cluster, so it reads `155 L0 validators` like every
+other signer count. There is **ONE layer vocabulary** app-wide, the codes the composition chips already
+use (`L0` / `cL1` / `dL1`); the signer copy's `data-L1` was a second dialect for the same three layers
+and is gone, `ROLE_FR` with it. `src/data/network.test.ts` makes both halves executable — every
+`SIGNER_GROUPS.who` must match `/^(L0|cL1|dL1) validators$/`, and no group's words may say `data-L1`.
+Internal identifiers keep their existing names (`validatorDim`, `NodeFabric`, `machineRows`) — one
+concept, two registers — and a phrase naming a SHELL rather than a machine ("the validator shells around
+it") is correct as it stands.
+
 Validators and metagraph nodes are `InstancedMesh`es with a patched smooth-shaded material. In hyper
 they're small spheres; on the globe they cross-fade to standing round chips, edge-lit so stacks read
 as lit chips rather than a flat mass; in the ledger they're the same chips in the trays.
@@ -432,6 +446,13 @@ The design rules behind the table, which the tests pin but don't explain:
   the subject, a lie once the click lands on a node. `dimModel.ancestryGlow` is the rule and its test
   the spec; the ledger's signer set stays outside it (not ancestry — a relation from a different
   subject), and hover is untouched. One call site: `Globe._frameCtx`'s glow channel.
+- **A tick drops the metagraph snapshot it can't contain** (user, 2026-08-10). Stronger than the story
+  rule one rung up: that one is about set membership, this is a one-to-one join
+  (`metagraph.timestamp === global.timestamp`), so committing a DIFFERENT tick provably means the held
+  snapshot didn't anchor here. Left in place it sat directly under the global card in the pile — where
+  ADJACENCY IS CONTAINMENT — stating that tick B contains a snapshot that landed in tick A. It lives in
+  `snapshotSelectActions`, so all four consumers (explorer row, LiveStrip bar, the global card's pager,
+  the 3D band click) inherit it.
 - **New click/select semantics go in the table with a test**, their effects in the executor, never
   inline. `components/selectionBoundary.test.ts` enforces this — and note the rule is **write**-based,
   so read-only facts cards cost nothing and every future explorer card inherits the table.
@@ -496,6 +517,19 @@ decisions inside them are design, not detail:
   only be the downloaded window, a buffer size, not a network fact. **Affordance follows the data**: a
   row is only a disclosure if it actually has children (a tick with no identified anchors, a snapshot
   whose signers aren't resolvable) — a chevron that opens onto nothing is a lie about the feed.
+  Its **network group header DISCLOSES and PREVIEWS but commits nothing** (user, 2026-08-10): it opens
+  the group and its hover still paints that lane in the chamber, but the commit lives one row down on
+  the snapshot itself — a header click that moved the top-bar filter reached past what the row is
+  about, and the pager keeps the same boundary by staying inside this metagraph × this tick.
+  And **a committed filter is a LENS here**: with a network committed, every OTHER network's group
+  under a tick is `previewOnly` (`outOfLens` in `components/LedgerPanel.tsx`). The tick still LISTS
+  them — rule 10 doesn't let a lens edit the facts, and they really did anchor here — they just aren't
+  drillable, the same boundary the chamber's coloured dim draws. Unfiltered, nothing is out.
+  `previewOnly` is `DisclosureRow`'s shared out-of-lens treatment, and it says so AT REST: the chevron
+  is invisible until hover, so an inactive row would otherwise look live right up until you click it.
+  It keeps the hover wash and the scene preview, drops the chevron (keeping its slot, so sibling count
+  columns don't shift), takes the cursor back to `default` and mutes its words one step — but its
+  identity dot stays at full hue, because it did anchor here and identity is not a state.
 
 **Naming and copy rules:** About states the view's point of view ("How the network is built"); the tool
 card says what you BROWSE ("Nodes by network"). Eyebrows are bare role words, and each explorer's usage
@@ -555,8 +589,16 @@ nests the box one level deeper inside its gesture wrapper.
 same committed parent, a slim `‹ n / N ›` plank rides the card's OWN bottom edge, inside the glass, plus
 a horizontal swipe on the body. The set comes from the pure resolver `railSiblings.ts` and every step
 applies `pickActions` through the one executor, so a pager step and the equivalent explorer click can't
-drift. The plank is chrome-less by the same grammar rule (no fill, border or rule of its own) and the
-card reserves its strip with a padding utility — see CSS trap 1. **The gate is BOXED and nothing else**
+drift. The plank stays chrome-less by the same grammar rule — no fill, no border, no frame of its own —
+and the card reserves its strip with a padding utility (see CSS trap 1). It does carry **one inset
+hairline** dividing it from the body (2026-08-10): once the foot became a small muted mono column, a
+CONTROL sat directly under DATA at the same weight and read as one more foot row. That rule is the same
+device `Foot` uses at the same inset, which is the point — **every resting division in a card shares one
+left/right edge, and the inset is ARITHMETIC**: the pager's wrapper is the positioning containing block,
+so an absolute inset measures from the card's BORDER box and the correct value is 1px border + 18px pad
+= **19**, matching the head rule and the `Fact` separators. Both the hairline and the plank row use it;
+at 18 the hairline overhung the separators by a pixel and the chevrons' hover wash overhung the content
+edge. **The gate is BOXED and nothing else**
 (an absolutely-positioned plank over a ~28px collapsed entry is a defect; single-open already makes the
 box unique) — it is the tier's own `boxed` condition, and `railTierBoundary.test.ts` pins that the two
 can't drift. Keying it to the FOCUS rung was the same mistake `data-tier` fixed above, and it also shut
@@ -566,8 +608,9 @@ out the two snapshot slots, which ride the lane with no focus rung at all.
 a PAIR — this metagraph × this tick** (user, 2026-08-09). The set is the subject's own `metaId` rows of the
 pinned tick's exact read, ordinal-desc, never every contributor: `metaSnapSelectActions` filter-firsts, so
 a cross-network step would move a COARSER rung and a swipe would silently re-commit the network. The
-explorer still browses every network under a tick, because there the network IS a deliberate click with
-its own chamber preview. And the pair is the honest total — a fast metagraph batches dozens of snapshots
+explorer still LISTS every network under a tick, but it doesn't commit one either — its group header
+discloses and previews only, so both surfaces keep the same boundary. And the pair is the honest total
+— a fast metagraph batches dozens of snapshots
 into one tick (DOR routinely 9-plus), so a tick-wide `N` would contradict the breakdown pills.
 
 **The global snapshot's set is OPEN** (user, 2026-08-09): time is ongoing, so the same plank steps one
@@ -591,10 +634,23 @@ transition's ancestry re-derive by a grace window, with both live-advancing ordi
 selection key so heartbeats never materialize a card. Conversely **the heartbeat is felt on closed
 cards**: both snapshot asides carry the beating dot and are the same tap-to-follow toggle, but **only
 one of them owns the clock.** The global aside ticks a `live · Xs` counter (the shown snapshot's age,
-never overstating); the metagraph aside says **`anchored`** whenever the card above already shows the
-very tick it anchored into — the anchor join is exact, so a counter there would be the same number
+never overstating); the metagraph aside says **`anchored to N`** whenever the card above already shows
+the very tick it anchored into — the anchor join is exact, so a counter there would be the same number
 twice. It falls back to its own counter when that carries real information: a global ghost, or
-following a lane through anchor-less global ticks, where this card holds an older tick.
+following a lane through anchor-less global ticks, where this card holds an older tick. **The
+anchoring ordinal rides all three states** (`anchored to N` / `live · Xs ago → N` / `◷ Xs ago → N`),
+because the two counter states are precisely the ones where the card above shows a *different* tick, so
+the number is then the only thing saying which global this snapshot landed in. It moved into the head
+from a body row on 2026-08-10 — a join is not a fact ABOUT the snapshot, it is the relation the aside
+already names — and the metagraph TICKER that shared that row went with it under the pile rule, since
+the METAGRAPH card sits directly above and this card's own mark already carries the hue.
+
+**An ordinal is written BARE — no `#`** (user, 2026-08-10). Every surface that renders one as a value
+already did (the snapshot card titles, the explorer rows, the anchor-log cells, the LiveStrip's tooltip
+head); the sigil only survived where a number got glued into a sentence — this aside, the raw layer's
+channel pane head, the pager's step labels, the ledger explorer's tooltips and the scene tooltip. It is
+noise in all of them: the label beside it already says what the number is. Internal `PickDescriptor.title`
+strings still read `Global snapshot #N`, but nothing renders that field for a snapshot.
 
 Every card the current view CAN produce is always visible — populated when its subject is selected,
 else a quiet **ghost hint line** — so the rail shows the view's whole possibility space and a deselect
@@ -608,8 +664,17 @@ the containment the slab shows.
 
 Two honesty rules: when the filtered network has nothing pickable in geo the node ghost turns into the
 honest variant naming that fact; but "all" with 0 nodes is boot, so that ghost stays silent rather than
-flashing a false invite. A populated card renders in any view; the ghost only appears where the view
+flashing a false invite. A populated card renders in any 3D view; the ghost only appears where the view
 can actually produce the card.
+
+**The placeholder views host NO facts cards at all** — `detailsCards` returns `[]` outside the three 3D
+views (user, 2026-08-10). A live node card, status pill and real ids beside a `preview · in development`
+wireframe is exactly the mixed signal rule 10 exists to prevent, and it arrived half-formed anyway: with
+no ladder for those views every present card fell through to Inspector's trailing non-ladder pass, which
+excludes the context card, so the node card rendered with **no network plank above it** — and correctly
+re-grew Country and Hosting, since the pile-dedup rule found no ancestors. It is a view gate, not a
+selection change: the store is untouched, so returning to a 3D view restores the whole pile. This
+matches the left rail, which shows About and no tool card there.
 
 **Bottom — the live/time lane.** The slim `LiveStrip` in every view; it publishes `--bottom-reserve`
 and belongs to neither layer, so it stays interactive in both poses. Its content is per-view: the tick
@@ -720,6 +785,77 @@ In one line: **thread = resting identity cue; card edge = purely transient signa
   pulse degrades to one static blink; a hold collapses its fade (the hold is timing, not motion); a
   signal chip still swaps glyphs, because that's information.
 
+### Inside a card — one grammar, three weights
+
+The slab grammar above says how cards sit together; this says what a card BODY is made of. **One row
+grammar everywhere: label left, value right, one line.** The stacked micro-uppercase-label-above-value
+form is retired — it cost two lines per fact and read as a form, not an instrument. Its last survivor was
+the `Composition` label over the dossier's composition table, which outlived the sweep only because that
+table isn't a `Fact`; dropped 2026-08-10, since each row already names its own composition and without it
+the description above reads as the card's lead.
+
+Three weights, and a fact's weight is a claim about what the card is FOR:
+
+| weight | holds | built from |
+|---|---|---|
+| **lead** | the 1–2 things the card exists to say | composed by the card itself — merges facts onto one line and drops labels the unit already carries (`1.8 KB of state · 4 data updates`, no "State"/"Updates") |
+| **detail** | the measured facts | `Fact` inside `FactGroup` |
+| **foot** | hashes, ids, bookkeeping numbers | `Foot` + `FootRow` — small muted mono on its own BASE PLATE, **always last** |
+
+The four primitives live in `components/inspector/parts.tsx` and are the only way a card body draws a
+fact row; nothing re-derives the layout locally. They carry no animation, so reduced motion is a no-op
+here exactly as it is for the slab.
+
+**The foot is a look-up column, not a demotion bin.** A value goes there when you'd only ever read it to
+compare it against something else — the node card's NODE ID, the snapshot cards' hash and parent. That
+is also why the node card's "NODE ID last" rule falls out of the grammar rather than being a special
+case.
+
+**The foot changes GROUND, not just type** (user, 2026-08-10 — the tier read as "only the font"). It
+full-bleeds by the card's own padding to the panel's bottom edge, picks the inner radius back up and
+sits on `--panel-plate`; that replaces the `Separator` outright, because a rule on top of a ground
+change is redundant noise. **The fill is a neutral white LIFT, and the mechanism is the rule**: a dark
+scrim composites multiplicatively, so it separates beautifully over the ledger's glow and dies to a
+~4/255 step over the black scene the right rail actually rests on — it shipped that way for an
+afternoon before being measured on both grounds. A white overlay is additive and therefore
+ground-independent. Keep it neutral: `--wash-*` is accent-hued and IS the selection language, so a
+tinted lift would read as selected. The bottom bleed is `--foot-bleed`, which `RailPager` overrides to
+its own strip height so a paged box's plank rides ON the plate — one number, two consumers.
+
+On the two snapshot cards the foot has one shape: **the artifact's chain identity — what it is, what it
+links to, what it proves.** They are the same `Signed[]` artifact, so they carry the same set, and the
+metagraph card's `State proof` is the one addition, because only a metagraph snapshot proves an
+application state. **Counters are not chain identity**: `Height`, `Blocks` and `epochProgress` are all
+carried by the types and none of them appear.
+
+**The PILE is the unit of consistency: a card never re-states an ancestor's identity.** Adjacency is what
+the slab uses to say containment, so a leaf repeating its parent at equal weight is noise, not
+reassurance. The node card drops Country, Composition and Hosting exactly when the country, composition
+or provider rung above it is committed — each of those cards states that fact as its own TITLE, and a
+title survives the collapse into an entry, so the plank speaks whether it is open or not. **Gate on
+presence, not view** (convention 7): the `!= null` rung checks, never `mode`, so the rule holds as
+ladders change and the fact grows back wherever nothing above it says it. Read down the pile, the fact
+set is identical in every view — only its distribution across planks moves. Whichever facts survive keep
+one fixed reading order, **place → role → host → reference**, so the card always reads the same way; it
+just has fewer lines.
+
+**Density came from culling, not from tightening.** `Data blocks`, `Height` and `Blocks` (metagraph
+snapshot) and `Epoch` (global snapshot) were removed outright — a fact nobody reads costs more than the
+pixels it takes.
+Measured at 1600×950: the ledger box 649px → 459px, and the ledger's committed ladder went from
+overflowing its lane (831 in 663) to fitting (629 in 641). Don't re-add a culled fact without saying
+what question it answers.
+
+**A code appended to a value is a THIRD COLUMN in disguise** (user, 2026-08-10 — asked whether the node
+card wanted three columns). It doesn't want one: three columns break the one row grammar, and the codes
+themselves ran 2ch (`US`) to 8ch (`AS212317`), so a fixed column is either gappy or truncating. The codes
+are **culled** instead — `US` restates "United States" and nobody looks a country code up — and the ASN
+moves **down a weight** to the foot, where it belongs by the look-up rule: `AS212317` is exactly a value
+you only ever read to compare. It answers to the **provider rung** in the same condition as the Hosting
+line above it, so the two can't disagree about who owns the host. The role chips STAY on the Composition
+line: they qualify the word, and a value column can't hold them. Measured live, the raggedness was at the
+**left** edge of the value block anyway — a third column would not have addressed it.
+
 ### CardHead — the one card header
 
 Every rail card leads with `CardHead`: eyebrow / title / inset hairline / body.
@@ -735,6 +871,11 @@ Every rail card leads with `CardHead`: eyebrow / title / inset hairline / body.
   `text-[var(--filter-accent,var(--primary))]`. Hardcoding a mark to cyan is a recurring bug; node
   marks use their node's own hue inline.
 - The **`aside`** is the right-aligned title-row companion — bodies render no title rows of their own.
+  Every rail card fills it; the country card was the last one leaving it empty, and now carries its ISO
+  code (2026-08-10) — the subject's own short form, the role the dossier's ticker plays, so it takes the
+  same weight but **muted rather than hued**, because a place carries no identity and the head's tinted
+  mark is already the filter accent. It suppresses itself when the display name is unknown, since the
+  title has then fallen back to the code and a head must not say the same thing twice.
 - **Every RESTING division is inset by its card's own horizontal padding** — the head hairline included
   (user, 2026-08-09). One weight for anything that is simply *there*: the slab's resting seam, the head
   rule, the Fact-row separators all line up at the same left/right spacing, so a card reads as one body
@@ -787,6 +928,44 @@ sonar ring is remounted per retry, so the animation IS the retry.
 then eases out — no blink. **Steady** states like NO SIGNAL and STANDBY never hold or fade; they
 persist by nature. Boot latches once live, so a later feed drop is the per-panel NO SIGNAL rather than
 the boot overlay returning.
+
+**Acquiring has two forms, and the choice is about the SLOT, not the wait** (2026-08-10). `NodeStars`
+fills a value slot a real number is arriving into — it reserves that slot's width so nothing reflows
+when the number lands, and carries no text because the label already names what's coming (the global
+card's `Fees paid`, `AnchoredTags`, the metagraph card's Data count). A **word** is for everything
+else: no slot is being held, so it states the situation and is replaced wholesale — `reading…` for a
+block acquiring, `unread` for a value nobody has looked up yet, `unavailable — tick pruned` where
+nothing is coming. Stars where nothing is in flight would promise an arrival that isn't coming; a word
+in a held slot reflows the row when the number replaces it.
+⚠️ **Every acquiring state needs its give-up path wired.** A deep read that 404s (the L0 node prunes
+after ~30 min) otherwise shows `reading…` forever, which rule 10 counts as a fabricated state exactly
+like a fabricated number.
+
+**A value slot states a READING; an invitation is a CONTROL** (user, 2026-08-10 — "I don't like the
+word 'pin', it's not very clear to me"). The metagraph snapshot card's Data slot said `pin to read`:
+internal vocabulary in user copy, naming a gesture whose only control was the head aside — top of the
+card, labelled with a *time*. The words moved out of the slot and became the block's own button,
+because the deep read fills **both** payload sections' shape rows, so an instruction sitting in one
+section's value slot was governing the whole block. What stays is the honest reading, and **`unread`
+and `none` are different facts** — haven't looked vs looked and found nothing. Rejected on the way:
+"encrypted"/"decrypt" (it is brotli-compressed public JSON — no key, no cipher, and it says the
+opposite of the one thing that matters, since this read is gated *because* one channel publishes
+personal records in the clear) and "uncompress" (true, but it puts the cost on local bytes when the
+cost is the ~2.5 MB fetch).
+
+**One control position, two tiers**, because there are two costs and the card charges the second only
+once the first is paid: `Read this snapshot` runs the deep read and states the SHAPE in place;
+`Show the application state` opens the raw layer for the payload. Tier 1 is the card's ONLY route to
+the read — the card never fetches on its own, because being pinned is not the same as asking (the
+surface gate, under *The Snapshots view*); the button writes `deepWanted` and that is the whole
+request. Tier 2 gates on the deep read having
+LANDED, not on decodability — while following it used to land on a pane whose own copy said to pin,
+with the pin control back in the HUD the raw layer had just marked `inert`. The cost rides the
+**button's** title, never a value row: `PAYLOAD_LANES` is one home shared with the raw pane's tabs, and
+"only when you ask" is stale the moment the read lands. ⚠️ The read pins through
+**`metaSnapSelectActions`**, not the aside's `followToggleActions` — the aside's builder commits the
+GLOBAL tick as the subject, which moved the box to the Global snapshot card and collapsed the card you
+were reading. Same builder as the anchor-log row, so a read and the equivalent row click can't drift.
 
 ### shadcn primitives
 
@@ -880,8 +1059,9 @@ purpose:
 **A global snapshot's real work is settlement, not blocks.** Most carry zero (mainnet: ~1 in 50), so
 block count is the wrong activity signal. The meaningful field is **`metagraphSnapshotCount`** — how
 many metagraph snapshots this global anchored, typically 1–24 and sometimes 100+. So the strip bars
-scale by anchors, and the snapshot card shows the derived fee, height/sub-height and a `+N blk` note
-for the uncommon block-carrying ticks.
+scale by anchors, and the snapshot card leads with the anchors, breaks them down by metagraph and
+states the derived fee and the bytes anchored. **The card carries no height, sub-height or block
+count at all** — a counter that answers no question the card raises, culled 2026-08-10 with the rest.
 
 **`LiveStrip`** occupies the bottom lane in every view, but the bar-chart is ledger-only. One bar per
 tick, height = anchors. Unfiltered, bars plot each tick's total in cyan. **Filtered, each bar plots
@@ -901,11 +1081,18 @@ never overridden.
 
 That pane is the metagraph-snapshot card's **two-step disclosure** — the CARD states the SHAPE of the
 application state, the pane renders the PAYLOAD one level down **on a second deliberate gesture, because
-one anchoring channel publishes personal records.** Its shape is **ONE LANE AXIS** (2026-08-09): the
+one anchoring channel publishes personal records.** Arriving here IS that gesture, so the pane reads its
+own subject's payload on arrival (the surface gate, under *The Snapshots view*). Its shape is
+**ONE LANE AXIS** (2026-08-09): the
 snapshot's facts stay pinned at the top, and the payload sits behind `STATE · DATA · SIGNERS` tabs whose
 labels carry their own counts. **An empty lane gets no tab** — a tab that opens onto "nothing here" is
 chrome pretending to be data — and the first available lane opens by default, so the pane is never
 parked on a chooser.
+
+⚠️ **An empty state must name a gesture available on ITS OWN surface.** The pane's read invitation said
+"pin this snapshot", a gesture whose control lives in the HUD — which the raw layer has marked `inert`,
+so the instruction was unfollowable from where it was read. It names the anchor-log row instead, which
+is right there and commits the same selection.
 
 Every lane renders the **same body grammar: note → shape table → collapsed `RAW JSON`.** The note is the
 lane's one-line summary (bytes and proof for state, record and block counts for data), the table is the
@@ -983,8 +1170,23 @@ under a filter means the NETWORK's anchors**, so the network's newest anchored r
 through anchor-less global ticks. Browsing or pinning drops live mode; leaving clears the cards, so
 coming back starts live again.
 
-⚠️ The ~2.5 MB deep read stays gated to explicit pins — an auto-advancing card must not turn an
-explicit-gesture route into a poll.
+⚠️ **The ~2.5 MB deep read is gated by the SURFACE, not by the mode** (user, 2026-08-10). Being PINNED
+is not the same as ASKING: selection used to be the whole trigger, which put the read behind a BROWSE
+gesture — every pager step and every explorer leaf fetched. So:
+
+- the **card never reads on its own** — it states the SHAPE, and its `Read this snapshot` button writes
+  the store's `deepWanted` key, which IS the request. One press, one read; a pager skim costs nothing.
+- the **raw layer always reads on arrival** — that surface exists for nothing but the payload, so being
+  there is the request, and getting there took a deliberate depth change.
+- `following` stays a hard guard on top: an auto-advancing card must never turn an explicit-gesture
+  route into a poll.
+
+The measurements are the justification: the client only ever receives the decoded row (**599 B** for
+DED, **4.4 KB** for DOR) — what's rationed is the SERVER's fetch of the whole global and the latency
+the user waits through, **~1.8 s cold**, ~1 ms warm from the immutable per-ordinal cache. And it
+MULTIPLIES: tick 6,741,486 anchored **20 DOR snapshots**, so one swipe through that pager was 20 ×
+2.5 MB against Constellation's public L0 LB, ~36 s. Privacy is the other half — one anchoring channel
+publishes personal records, which is why the payload is two deliberate gestures deep at all.
 
 **Labels.** The global floor is named by subtle flat edge-aligned text rather than billboards, and each
 metagraph plane carries a smaller ticker label the same way. Every visible tick row is named by a
@@ -1079,14 +1281,29 @@ frame's own shape, not a look.
 and lights those machines in the trays — the scene keys metagraph nodes by IP, not id, so the machines
 that actually signed are the ones that glow.
 
-**Two signer groups, and the layer is the point** (`SIGNER_GROUPS` in `src/data/network.ts` is the ONE
+**Three signer groups, and the layer is the point** (`SIGNER_GROUPS` in `src/data/network.ts` is the ONE
 home for their words). A metagraph seals every snapshot with its **own L0 cluster**, so the proof signer
 set IS that cluster — DOR's is the same 3 machines every time, out of 20. Its **data blocks** are produced
 by the **dL1 cluster**, each block by a rotating subset, so that count varies per snapshot and is 0 when a
-snapshot carries none. A bare "signed by 3" against a 20-machine fleet reads as a bug, so all three signer
-surfaces (the rail card, the raw layer's SIGNERS lane, the ledger panel's list) name the producing layer
-beside the count from that one constant. The ledger panel can only ever show the PROOF group — data-block
-signers exist solely in the ~2.5 MB deep read, which browsing must never trigger.
+snapshot carries none. The third group is the **global** snapshot's own proof, which is the same thing one
+storey down: the DAG's own L0 cluster. A bare "signed by 3" against a 20-machine fleet reads as a bug, so
+every signer surface (the two snapshot cards, the raw layer's SIGNERS lane, the ledger panel's list) names
+the producing layer beside the count from that one constant. The ledger panel can only ever show the PROOF
+group — data-block signers exist solely in the ~2.5 MB deep read, which browsing must never trigger.
+
+**The two snapshot cards are ONE shape** (user, 2026-08-10 — "global has no signed table, just a count"):
+lead → the payload block with its bars → `Fees paid` (DAG over `N KB anchored`) → the signer
+COUNTS → foot. The global card composes its lead as a body row; the metagraph card's lead moved INTO its
+head (above), so its body opens straight on the payload. So the metagraph card's own signer TABLE is
+gone: a list whose first column was a CITY
+said cities sign, it sat at equal weight below the facts with nothing dividing it, and it put the
+secondary fact first. The good version already lives one tier down in the raw layer's SIGNERS lane, which
+is what the card's "Show the application state" link opens — the card states the SHAPE, the pane renders
+the payload. The named cost is the card's signer↔tray hover pairing; the Engine's signer glow on
+selection is separate and unaffected. The card gains `Blocks by N dL1 validators` beside
+`Signed by N L0 validators`, because the user's question — "general signing is L0 validator, and data
+updates are separate and have separate signers as dL1's?" — is exactly right, and two counts of two
+different things need two labelled lines.
 
 **A signer that can't be named is named as such, once.** `resolveSigner` in `src/data/network.ts` is the
 ONE home for that: given the view's node rows, a metagraph id and a signer prefix it returns either the
@@ -1202,7 +1419,8 @@ them — but the Next Node server can.
   is immutable and cached, so the backfill costs at most once per ordinal ever.
 - **`/api/snapshot/[ordinal]/channel/[address]`** is the deep read behind the metagraph-snapshot card's
   third tier: it re-downloads the same ~2.5 MB global to reach ONE channel entry. The cost is accepted
-  deliberately — cached immutably and only ever run on an explicit gesture on one card, never on a
+  deliberately — cached immutably and run only from the two surfaces that ask for it (the card's
+  `Read this snapshot` button, and arrival in the raw layer), never on a
   poll, never across the chain. The key includes **the snapshot's own ordinal**, because a fast
   metagraph batches dozens into one tick and a (tick, address) key would make every row share one
   decode.
@@ -1231,7 +1449,7 @@ metagraph's hue from its real brand, snapped into the palette's allowed zones, w
 It drives the dossier and inspector text:
 
 - Nodes are **hybrid** (several layers on one machine) or **dedicated**. On mainnet most metagraphs are
-  3 hybrid nodes; DOR is the outlier with 3 hybrid + 19 dedicated data-L1 nodes.
+  3 hybrid nodes; DOR is the outlier with 3 hybrid + 19 dedicated dL1 nodes.
 - ⚠️ **A peer id belongs to a LAYER, not to a machine** — each layer process runs its own keypair, so a
   hybrid answers with a different id on its l0 port than on its dl1 port (verified live 2026-08-09).
   `/api/metagraphs` therefore emits **`NodeInfo.ids`**, every layer's id for that IP in LAYERS order
@@ -1240,9 +1458,9 @@ It drives the dossier and inspector text:
   prefix compare looks like an ordinary string test and reintroduces the blind spot for that surface
   alone. Matching the primary only left every hybrid data-block signer rendering as `not in live set`
   while the machine sat right there in the list — the id set is per layer and so are the signatures.
-- **Currency-L1 is never a standalone node** — every cL1 node is also an L0 node, so the outer cL1
+- **cL1 is never a standalone node** — every cL1 node is also an L0 node, so the outer cL1
   shell is effectively always empty.
-- **A metagraph has a real token only if it runs a currency-L1 cluster.** The `symbol` field is
+- **A metagraph has a real token only if it runs a cL1 cluster.** The `symbol` field is
   *always* set, so it is not a token signal (DED has a "DED" symbol but no token). The dossier's type
   descriptor derives from node roles, and a 0-node metagraph says just "metagraph" — type is unknowable
   without nodes.

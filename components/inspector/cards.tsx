@@ -3,9 +3,9 @@
 import { useEffect, useMemo, useState } from "react";
 import { cn } from "@/lib/utils";
 import { useStore } from "@/src/store/store";
-import { shortHash, CORE_HEX, metagraphById } from "@/src/data/network";
+import { shortHash, CORE_HEX, metagraphById, SIGNER_GROUPS } from "@/src/data/network";
 import { identityHudHex } from "@/src/palette/identity";
-import { hex, fmtDag, fmtKB, ccMark } from "@/src/util/format";
+import { hex, fmtDag, fmtKB } from "@/src/util/format";
 import { relativeAge } from "@/src/util/relativeAge";
 import { statusBreakdown } from "@/src/data/nodeStatus";
 import type { GlobalSnapshot, MetaCfg, PickDescriptor } from "@/src/data/types";
@@ -19,7 +19,7 @@ import { ExternalLink } from "lucide-react";
 import { useMinHold } from "@/components/useMinHold";
 import { useNowTick } from "@/components/useNowTick";
 import { POLL } from "@/src/engine/config";
-import { Desc, StatusMark, CompositionRows, StatusBreakdown, RoleChips, IdentityDot, networkKind } from "./parts";
+import { Desc, StatusMark, CompositionRows, StatusBreakdown, RoleChips, IdentityDot, networkKind, Fact, FactGroup, Foot, FootRow } from "./parts";
 import { compositionGroups, compositionRows, nodeCompositionLabel, parseCompositionKey } from "@/src/data/composition";
 import { pickNetId, followToggleActions } from "@/src/engine/domain/pickActions";
 import { applyClickActions } from "@/src/store/applyClickActions";
@@ -235,64 +235,57 @@ export function SnapshotCard({ data: d }: { data: GlobalSnapshot }) {
           `exact` flips back to null on THAT render but useMinHold's `show` only rises in its
           effect on the NEXT one — without the guard this dereferenced `exact.totalFee`. */}
       {feeHold.show || exact == null ? (
-        <div className="flex flex-col gap-2">
-          <div className="flex items-start justify-between gap-2.5">
-            <span className="text-body text-muted-foreground">Fees paid</span>
-            <span className={cn("flex flex-col items-end text-body text-foreground tabular-nums", feeHold.fading && "animate-hold-fade-out motion-reduce:animate-none")}><NodeStars count={4} /></span>
-          </div>
-        </div>
+        <FactGroup>
+          <Fact label="Fees paid">
+            <span className={cn("flex flex-col items-end", feeHold.fading && "animate-hold-fade-out motion-reduce:animate-none")}><NodeStars count={4} /></span>
+          </Fact>
+        </FactGroup>
       ) : (
-        <div className="flex flex-col gap-2">
+        <FactGroup>
           {exact.totalFee > 0 && (
-            <div className="flex items-start justify-between gap-2.5">
-              <span className="text-body text-muted-foreground">Fees paid</span>
-              <span className="flex flex-col items-end text-body text-foreground tabular-nums">
+            <Fact label="Fees paid">
+              <span className="flex flex-col items-end">
                 <span className="animate-resolve-in motion-reduce:animate-none whitespace-nowrap"><b className="font-bold">{fmtDag(exact.totalFee)}</b> DAG</span>
                 <span className="text-label text-muted-foreground">{fmtKB(exact.totalSizeKB)} anchored</span>
               </span>
-            </div>
+            </Fact>
           )}
           {exact.rewardsDatum > 0 && (
-            <div className="flex items-start justify-between gap-2.5">
-              <span className="text-body text-muted-foreground">Rewards out</span>
-              <span className="flex flex-col items-end text-body text-foreground tabular-nums">
-                <span className="animate-resolve-in motion-reduce:animate-none whitespace-nowrap"><b className="font-bold">{fmtDag(exact.rewardsDatum)}</b> DAG</span>
-              </span>
-            </div>
+            <Fact label="Rewards out">
+              <span className="animate-resolve-in motion-reduce:animate-none whitespace-nowrap"><b className="font-bold">{fmtDag(exact.rewardsDatum)}</b> DAG</span>
+            </Fact>
           )}
-        </div>
+          {/* The signer count is a FACT about this tick — it reads. Its two hashes don't, so
+              they sit in the foot below.
+              The LAYER is part of the fact, exactly as on the metagraph snapshot card (user,
+              2026-08-10: "why do we call it 'validators' for global snapshot and in metagraph L0
+              validators?"). A bare "validators" was the odd one out, not the qualified one — a
+              global snapshot is sealed by the DAG's OWN L0 cluster under the unified node model,
+              so it is the same kind of fact and takes the same words. One home: SIGNER_GROUPS. */}
+          {exact != null && (exact.signerCount ?? 0) > 0 && (
+            <Fact label="Signed by" title={SIGNER_GROUPS.globalProof.title}>
+              <span className="animate-resolve-in motion-reduce:animate-none">
+                {exact.signerCount} {SIGNER_GROUPS.globalProof.who}
+              </span>
+            </Fact>
+          )}
+        </FactGroup>
       )}
 
-      {/* STRUCTURE (item 10, 2026-08-06): the global snapshot is the same Signed[] artifact as
-          the metagraph snapshots it anchors — own hash, parent link, epoch (all from the explorer
-          feed) and its validator signatures (from the exact read; absent until it lands). */}
-      <Separator className="my-2" />
-      <div className="flex flex-col gap-2">
-        <div className="flex items-start justify-between gap-2.5">
-          <span className="text-body text-muted-foreground">Hash</span>
-          <span className="text-body text-foreground font-mono" title={d.hash}>{shortHash(d.hash)}</span>
-        </div>
+      {/* FOOT — the artifact's CHAIN IDENTITY: what it is, what it links to, what it proves.
+          The global snapshot is the same Signed[] artifact as the metagraph snapshots it
+          anchors, so the two cards carry the SAME foot set (2026-08-10) — hash + parent here,
+          plus the state proof over on the metagraph card, which is the one real difference
+          between the artifacts. Counters are deliberately NOT chain identity: `epochProgress`
+          was culled with them, and `height`/`blocks` (which this type does carry) never enter —
+          a tick's block count is the wrong activity signal, and its anchors are the fact this
+          card exists to state. */}
+      <Foot>
+        <FootRow label="Hash" value={shortHash(d.hash)} title={d.hash} />
         {d.lastSnapshotHash && (
-          <div className="flex items-start justify-between gap-2.5">
-            <span className="text-body text-muted-foreground">Parent</span>
-            <span className="text-body text-foreground font-mono" title={d.lastSnapshotHash}>{shortHash(d.lastSnapshotHash)}</span>
-          </div>
+          <FootRow label="Parent" value={shortHash(d.lastSnapshotHash)} title={d.lastSnapshotHash} />
         )}
-        {typeof d.epochProgress === "number" && (
-          <div className="flex items-start justify-between gap-2.5">
-            <span className="text-body text-muted-foreground">Epoch</span>
-            <span className="text-body text-foreground tabular-nums">{d.epochProgress.toLocaleString()}</span>
-          </div>
-        )}
-        {exact != null && (exact.signerCount ?? 0) > 0 && (
-          <div className="flex items-start justify-between gap-2.5">
-            <span className="text-body text-muted-foreground">Signed by</span>
-            <span className="text-body text-foreground tabular-nums">
-              <span className="animate-resolve-in motion-reduce:animate-none">{exact.signerCount} validators</span>
-            </span>
-          </div>
-        )}
-      </div>
+      </Foot>
     </div>
   );
 }
@@ -328,18 +321,21 @@ export function MetaCard({ cfg }: { cfg: MetaCfg }) {
               (composition table — rows carry their own counts), then the shared Separator,
               then ONE summary row in the snapshot card's "Fees paid" grammar — muted label
               left, the bold total + per-state breakdown right. Totals sit BELOW their parts;
-              the old "166 nodes with 3 different compositions" header restated the table. */}
+              the old "166 nodes with 3 different compositions" header restated the table.
+              The "Composition" micro-uppercase label above this table was the LAST survivor of
+              the retired stacked label-above-block form (user, 2026-08-10) — it outlived the
+              sweep only because CompositionRows is a table rather than a Fact. Dropped: each
+              row already names its own composition, and with it gone the description above
+              reads as the card's LEAD (which is why the blurb stays in the body rather than
+              moving into the head — a paragraph in CardHead would both special-case the one
+              header standard and blow up this card's ~28px collapsed entry). */}
           <div className="mt-3">
-            <span className="text-micro tracking-[0.1em] uppercase text-muted-foreground">Composition</span>
             <CompositionRows nodes={nodes} />
           </div>
           <Separator className="my-2" />
-          {/* Summary in the snapshot card's "Fees paid" grammar — muted label left, the bold
-              TOTAL right (column-aligned with the composition counts it summarizes). */}
-          <div className="flex items-start justify-between gap-2.5">
-            <span className="text-body text-muted-foreground">Online nodes</span>
-            <span className="text-body text-foreground tabular-nums"><b className="font-bold">{nodes.length}</b></span>
-          </div>
+          {/* Summary in the shared Fact grammar — muted label left, the bold TOTAL right
+              (column-aligned with the composition counts it summarizes). */}
+          <Fact label="Online nodes"><b className="font-bold">{nodes.length}</b></Fact>
           {/* The pill row appears only when something is NOT ready — and then it shows the
               FULL breakdown including the ready pill (user, 2026-07-12: all-ready is the
               silent default; a mixed fleet reads as one complete picture). */}
@@ -379,18 +375,17 @@ export function MetaTickerAside({ cfg }: { cfg: MetaCfg }) {
 function MetaSiteRow({ site }: { site: string }) {
   const domain = site.replace(/^https?:\/\//, "").replace(/\/$/, "");
   return (
-    <div className="flex items-start justify-between gap-2.5">
-      <span className="text-body text-muted-foreground">Site</span>
+    <Fact label="Site">
       <a
         href={site}
         target="_blank"
         rel="noopener noreferrer"
-        className="text-body inline-flex items-center gap-1.5 text-primary/75 hover:text-primary"
+        className="inline-flex items-center gap-1.5 text-primary/75 hover:text-primary"
       >
         {domain}
         <ExternalLink aria-hidden className="size-3.5" />
       </a>
-    </div>
+    </Fact>
   );
 }
 
@@ -418,14 +413,45 @@ export function GeoLiveCard() {
 
 // The selected-node block. The node's CITY + status pill are the card HEAD (GeoLiveTitle/
 // GeoLiveAside above) — the old IP and "Location" body rows are gone (the IP entirely,
-// user-agreed; the city because it IS the title). The body is the labelled facts the globe
-// can't show: the country that completes the place, the node's make-up, the hosting provider,
-// and the node's own reference. The slot eyebrow reads "Node"; the × is CardHead's shared close
-// (the outer pane).
+// user-agreed; the city because it IS the title). The slot eyebrow reads "Node"; the × is
+// CardHead's shared close (the outer pane).
+//
+// THE PILE IS THE UNIT (user, 2026-08-10). This card states its subject's OWN facts and never
+// re-states an ancestor's IDENTITY: the country card's title IS the country, the provider card's
+// title IS the isp, the composition card's title IS the composition word (with the same layer
+// chips in its aside) — and a title survives a collapse into an entry, so the parent plank
+// states it whether it's open or not. The slab's premise is that adjacency reads as containment,
+// so a leaf restating its parent at equal weight is noise, not reassurance. The rule the
+// provider card already followed since 2026-08-02 ("a facts rail shouldn't say the same thing
+// twice"), generalised.
+//
+// The gate is PRESENCE, not view (convention 7): each fact drops exactly when the rung that owns
+// it is committed — the same `!= null` conditions `railCards` uses for its `present` flags — so
+// it stays correct if a ladder changes. What survives per view is the COMPLEMENT of the ladder
+// above: geo (network→country→provider) leaves composition; hyper (network→composition) leaves
+// place + host; ledger (network) leaves all three. Read down the pile the fact set is identical
+// in every view — only its distribution across planks moves.
+//
+// CONSISTENCY LEVER: the ORDER never changes. Whichever facts survive render in the fixed
+// reading order place → role → host → reference, so the card always reads the same way; it just
+// has fewer lines.
+//
+// THE CODES ARE CULLED, and the ASN moves DOWN a weight (user, 2026-08-10 — asked whether this
+// card wanted a third column). It didn't: three columns break the one row grammar (label left,
+// value right, one line), the codes run 2ch (`US`) to 8ch (`AS212317`) so a fixed column is either
+// gappy or truncating, and the layer codes are a CHIP — pulling them out detaches them from the
+// composition word they qualify. Measured live, the raggedness is at the LEFT of the value block
+// anyway, so a right-aligned column tidies an edge that was never ragged.
+// `US` is simply dropped: it restates "United States" and, unlike a hash, nobody looks a country
+// code UP. `AS212317` is exactly a look-up value, so it goes where look-up values go — the foot,
+// under the same `cohort == null` gate, since the provider card carries it as its own reference.
 function GeoLiveNode({ p }: { p: PickOf<"l0" | "l1" | "metanode"> }) {
-  // Hosting provider from the node's IP lookup (GeoInfo.isp/asn) — the one machine fact the
-  // globe can't show. Absent = the lookup didn't know; the line simply doesn't render
-  // (honesty: no "Unknown" filler in a facts card).
+  // The three ancestor rungs that can own one of this card's facts.
+  const country = useStore((s) => s.country);
+  const cohort = useStore((s) => s.cohort);
+  const composition = useStore((s) => s.composition);
+  // Hosting provider from the node's IP lookup (GeoInfo.isp/asn) — Absent = the lookup didn't
+  // know; the line simply doesn't render (honesty: no "Unknown" filler in a facts card).
   const geo = "geo" in p ? p.geo : undefined;
   // The node's make-up: the composition word + its layer codes as squared pills (RoleChips — the
   // same rendering the metagraph card's composition rows use; user 2026-07-12: the joined
@@ -435,52 +461,44 @@ function GeoLiveNode({ p }: { p: PickOf<"l0" | "l1" | "metanode"> }) {
   const compWord = p.node ? nodeCompositionLabel(p.node) : null;
   const comp = compWord ? compWord.charAt(0).toUpperCase() + compWord.slice(1) : null;
   const codes = p.node ? compositionRows([p.node])[0]?.codes : undefined;
+  // The host's ASN rides the FOOT, but it answers to the provider rung exactly as the Hosting
+  // line above does — one condition, so the two can't disagree about who owns the host.
+  const asn = cohort == null ? geo?.asn : null;
   // NB: the hover pairing (synced 3D glow) lives on the OUTER pane (Inspector.CardPane), not here,
   // so the glow lights the card's rounded edge.
   return (
     <>
-      {/* COUNTRY — the half of the place the head no longer carries (user, 2026-08-02), with the
-          app's country CODE mark as the quiet suffix, the same shape as HOSTING's `isp · asn`. */}
-      {geo?.country && (
-        <div className="my-2">
-          <span className="text-micro tracking-[0.1em] uppercase text-muted-foreground">Country</span>
-          <div className="text-body text-foreground-dim mt-0.5">
-            {geo.country}
-            {geo.cc && <span className="font-mono text-label text-muted-foreground"> · {ccMark(geo.cc)}</span>}
-          </div>
-        </div>
-      )}
-      {/* COMPOSITION — the node's role in the network, a labelled fact like the rest (user,
-          2026-08-02: it used to ride the head as a subtitle, which made the head carry three
-          different registers). Sits second: the reading order is place → role → host →
-          reference, with health as the head's status pill. */}
-      {comp && (
-        <div className="my-2">
-          <span className="text-micro tracking-[0.1em] uppercase text-muted-foreground">Composition</span>
-          <div className="flex items-center gap-1.5 text-body text-foreground-dim mt-0.5">
-            <span>{comp}</span>
-            {codes && codes.length > 0 && <RoleChips codes={codes} />}
-          </div>
-        </div>
-      )}
-      {geo?.isp && (
-        <div className="my-2">
-          <span className="text-micro tracking-[0.1em] uppercase text-muted-foreground">Hosting</span>
-          <div className="text-body text-foreground-dim mt-0.5">
-            {geo.isp}
-            {geo.asn && <span className="font-mono text-label text-muted-foreground"> · {geo.asn}</span>}
-          </div>
-        </div>
-      )}
-      {/* The unique reference sits LAST — a labelled row like HOSTING (the reading order is
-          place → health → role → host → reference). Truncated display, full hash on hover. */}
-      {p.node?.id && (
-        <div className="my-2">
-          <span className="text-micro tracking-[0.1em] uppercase text-muted-foreground">Node id</span>
-          <div className="font-mono tabular-nums text-label text-foreground-dim mt-0.5" title={p.node.id}>
-            {shortHash(p.node.id)}
-          </div>
-        </div>
+      <FactGroup>
+        {/* COUNTRY — the half of the place the head no longer carries (user, 2026-08-02). The
+            country CODE suffix is gone (2026-08-10): it restated the name it sat beside.
+            Yields to the country card's own title once that rung is drilled. */}
+        {country == null && geo?.country && <Fact label="Country">{geo.country}</Fact>}
+        {/* COMPOSITION — the node's role in the network, a labelled fact like the rest (user,
+            2026-08-02: it used to ride the head as a subtitle, which made the head carry three
+            different registers). Sits second: the reading order is place → role → host →
+            reference, with health as the head's status pill. Yields to the composition card,
+            which states the same word in its title and the same chips in its aside. The chips
+            STAY on this line — they qualify the word, and a value column can't hold them. */}
+        {composition == null && comp && (
+          <Fact label="Composition">
+            <span className="inline-flex items-center gap-1.5">
+              <span>{comp}</span>
+              {codes && codes.length > 0 && <RoleChips codes={codes} />}
+            </span>
+          </Fact>
+        )}
+        {/* HOSTING — the provider's NAME only; its ASN is a look-up value and sits in the foot.
+            Yields to the provider card, whose title IS the isp. */}
+        {cohort == null && geo?.isp && <Fact label="Hosting">{geo.isp}</Fact>}
+      </FactGroup>
+      {/* The look-up column: the host's reference, then the node's own — the unique reference
+          LAST, where references sit, which falls out of the grammar rather than being a rule of
+          its own. Truncated display, full hash on hover. */}
+      {(asn || p.node?.id) && (
+        <Foot>
+          {asn && <FootRow label="ASN" value={asn} />}
+          {p.node?.id && <FootRow label="Node id" value={shortHash(p.node.id)} title={p.node.id} />}
+        </Foot>
       )}
     </>
   );
@@ -493,19 +511,40 @@ function GeoLiveNode({ p }: { p: PickOf<"l0" | "l1" | "metanode"> }) {
 // `store.selNodes` — deliberately the explorer's scope, the same data lane GeoExplore's own
 // leaderboard/accordion reads, matched here by `cc` instead of grouped by display name.
 
+// No countryName(cc) lookup exists anywhere in the app — the display name only ever arrives on a
+// NodeRow (copied verbatim off the geo-IP lookup), so it's read off a matching row, same as
+// GeoExplore's own leaderboard rows resolve their name. ONE home, shared by the title and the
+// aside, so the two can't disagree about whether a name is even known.
+function countryDisplayName(cc: string, selNodes: ReturnType<typeof useStore.getState>["selNodes"]) {
+  return selNodes.find((r) => r.cc === cc)?.country ?? null;
+}
+
 // Head title: the country mark + display name (rolls via titleKey=cc, synced with the
 // edge pulse) — same "kind mark leads the title" grammar as every other card head.
 export function CountryTitle({ cc }: { cc: string }) {
   const selNodes = useStore((s) => s.selNodes);
-  // No countryName(cc) lookup exists anywhere in the app — the display name only ever arrives
-  // on a NodeRow (copied verbatim off the geo-IP lookup), so it's read off a matching row here,
-  // same as GeoExplore's own leaderboard rows resolve their name.
-  const name = selNodes.find((r) => r.cc === cc)?.country ?? cc;
+  const name = countryDisplayName(cc, selNodes) ?? cc;
   const Mark = COUNTRY_ICON;
   return (
     <span className="inline-flex items-center gap-2 min-w-0">
       <Mark aria-hidden className={cn(KIND_MARK_CLASS, "text-[var(--filter-accent,var(--primary))]")} />
       <span className="truncate">{name}</span>
+    </span>
+  );
+}
+
+// The ISO code rides the title-row ASIDE (user, 2026-08-10): the country was the ONE card head
+// still leaving that slot empty. The code is the subject's own short form — the same role the
+// dossier's ticker plays, so it takes the same weight, but MUTED rather than hued: a place carries
+// no identity, and the head's tinted mark is already the filter's accent.
+// Suppressed when the display name is unknown — the title has then already fallen back to the code
+// itself, and a head must not say the same thing twice (the same rule the pile follows).
+export function CountryAside({ cc }: { cc: string }) {
+  const selNodes = useStore((s) => s.selNodes);
+  if (!countryDisplayName(cc, selNodes)) return null;
+  return (
+    <span className="text-label font-semibold tracking-[0.02em] uppercase text-muted-foreground">
+      {cc}
     </span>
   );
 }
@@ -534,14 +573,11 @@ export function CountryCard({ cc }: { cc: string }) {
     { label: "Providers", value: String(providers.size) },
   ];
   return (
-    <div className="flex flex-col gap-2">
+    <FactGroup>
       {facts.map((f) => (
-        <div key={f.label} className="flex items-start justify-between gap-2.5">
-          <span className="text-body text-muted-foreground">{f.label}</span>
-          <span className="text-body text-foreground tabular-nums">{f.value}</span>
-        </div>
+        <Fact key={f.label} label={f.label}>{f.value}</Fact>
       ))}
-    </div>
+    </FactGroup>
   );
 }
 
@@ -582,23 +618,16 @@ export function CompositionCard({ sel }: { sel: CompositionSel }) {
   const share = total > 0 ? Math.round((members.length / total) * 100) : 0;
   const cfg = metagraphById(sel.netId);
   return (
-    <div className="flex flex-col gap-2">
-      <div className="flex items-start justify-between gap-2.5">
-        <span className="text-body text-muted-foreground">Machines</span>
-        <span className="text-body text-foreground tabular-nums">{members.length}</span>
-      </div>
-      <div className="flex items-start justify-between gap-2.5">
-        <span className="text-body text-muted-foreground">Share of network</span>
-        <span className="text-body text-foreground tabular-nums">{share}%</span>
-      </div>
-      <div className="flex items-start justify-between gap-2.5">
-        <span className="text-body text-muted-foreground flex-none">Network</span>
-        <span className="inline-flex items-center gap-1.5 text-body text-foreground min-w-0">
+    <FactGroup>
+      <Fact label="Machines">{members.length}</Fact>
+      <Fact label="Share of network">{share}%</Fact>
+      <Fact label="Network">
+        <span className="inline-flex items-center gap-1.5 min-w-0">
           <IdentityDot hue={sel.netId === "dag" ? CORE_HEX : identityHudHex(sel.netId)} />
           <span className="truncate">{cfg?.name || sel.netId}</span>
         </span>
-      </div>
-    </div>
+      </Fact>
+    </FactGroup>
   );
 }
 
@@ -664,29 +693,22 @@ export function ProviderCard({ sel }: { sel: CohortSel }) {
     return null;
   }, [members]);
   return (
-    <div className="flex flex-col gap-2">
+    <FactGroup>
       {/* ASN — the provider's REFERENCE, in the slot the city vacated when it moved to the head
           (user, 2026-08-09). The COUNTRY is deliberately absent: the cohort always sits under a
           committed country, whose own card states it one slot up (user, 2026-08-02 — a facts rail
           shouldn't say the same thing twice). */}
-      <div className="flex items-start justify-between gap-2.5">
-        <span className="text-body text-muted-foreground">ASN</span>
-        <span className="font-mono text-body text-foreground tabular-nums">{asn ?? "—"}</span>
-      </div>
-      <div className="flex items-start justify-between gap-2.5">
-        <span className="text-body text-muted-foreground">Nodes</span>
-        <span className="text-body text-foreground tabular-nums">{members.length}</span>
-      </div>
-      <div className="flex items-start justify-between gap-2.5">
-        <span className="text-body text-muted-foreground flex-none">Networks</span>
+      <Fact label="ASN"><span className="font-mono">{asn ?? "—"}</span></Fact>
+      <Fact label="Nodes">{members.length}</Fact>
+      <Fact label="Networks">
         <span className="flex flex-wrap justify-end items-center gap-x-2 gap-y-1 min-w-0">
           {networkIds.length === 0 ? (
-            <span className="text-body text-foreground">—</span>
+            <span>—</span>
           ) : (
             networkIds.map((id) => {
               const cfg = metagraphById(id);
               return (
-                <span key={id} className="inline-flex items-center gap-1.5 text-body text-foreground">
+                <span key={id} className="inline-flex items-center gap-1.5">
                   <IdentityDot hue={identityHudHex(id)} />
                   {cfg?.ticker || cfg?.name || id}
                 </span>
@@ -694,7 +716,7 @@ export function ProviderCard({ sel }: { sel: CohortSel }) {
             })
           )}
         </span>
-      </div>
-    </div>
+      </Fact>
+    </FactGroup>
   );
 }

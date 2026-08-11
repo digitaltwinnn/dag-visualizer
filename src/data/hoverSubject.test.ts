@@ -44,7 +44,7 @@ describe("tooltipSubject", () => {
     expect(s?.color).not.toBe(CORE);
   });
   it("labels a snapshot by ordinal in core cyan", () => {
-    expect(tooltipSubject({ kind: "snapshot", data: { ordinal: 42 } } as never)).toEqual({ ident: "L0", name: "#42", color: CORE, mono: false });
+    expect(tooltipSubject({ kind: "snapshot", data: { ordinal: 42 } } as never)).toEqual({ ident: "L0", name: "42", color: CORE, mono: false });
   });
   it("labels the core", () => {
     expect(tooltipSubject({ kind: "core" } as never)).toEqual({ ident: "DAG", name: "Global L0", color: CORE, mono: false });
