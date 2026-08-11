@@ -1,22 +1,26 @@
-// Reference + regression spec for the validator + metagraph per-frame dim/emissive resolution —
-// and the SINGLE SOURCE for that math. The render path CALLS these functions directly:
-// NodeFabric.writeValidatorGlow/writeMetaFrame (scene/objects/NodeFabric.ts) call
-// validatorDim/metaNodeDim + nodeEmissive/metaNodeEmissive + hubMatchBoost per node/record, and
-// Globe._frameCtx (scene/Globe.ts) sources its FrameCtx.dimScaleV from dimScale(c) each frame.
-// There is no separate inline copy left to drift — the tests colocated with this file are the
-// executable spec, and changing a formula here changes the render immediately.
+// Reference + regression spec for the per-frame node dim/emissive resolution — and the SINGLE
+// SOURCE for that math. The render path CALLS these functions directly: NodeFabric's two node
+// loops (scene/objects/NodeFabric.ts) call nodeDim + nodeEmissive + hideFrac + hubMatchBoost per
+// record. There is no separate inline copy left to drift — the tests colocated with this file are
+// the executable spec, and changing a formula here changes the render immediately.
 //
-// DEVIATION from the Task 9 brief: the brief's single `nodeEmissive(..., baseLo, baseHi)`
-// signature exactly expresses the VALIDATOR loop (js/globe.js:1043-1054) — its base term really
-// does lerp(0.5, 0.22, morph) — but it can NOT also express the metagraph loop
-// (js/globe.js:1099-1107): its glow-suppression coefficient is 0.9 (not 0.92) and its
-// floor is 0.03 (not 0.02) — historic per-loop tuning kept verbatim. (The loops' base terms
-// and twinkle have since been unified/removed.) Those differences are not reachable through
-// (baseLo, baseHi) alone. Per the brief's own escape hatch ("splitting into validatorEmissive +
-// metaNodeEmissive is acceptable if documented"), this file keeps `nodeEmissive` exactly as
-// specified (== the validator formula) and adds a sibling `metaNodeEmissive` carrying the
-// metagraph loop's own hardcoded coefficients, rather than force-fit one function onto both and
-// lose exactness.
+// ONE NODE MODEL (user, 2026-08-11): "Across all views I want no difference between dag nodes and
+// other metagraphs — they are the same network topology, only positioned differently in some
+// views. Dim effects and code should be shared, not split." The DAG core is a metagraph-shaped
+// core (see CLAUDE.md), so its validators are metagraph nodes that happen to orbit the origin.
+// This file therefore has ONE dim strength, ONE dim resolver and ONE glow model, and both loops
+// call them with nothing but their own record. What was split, and why it looked like a design
+// decision when it was really one number applied twice:
+//   · `core`/`meta` were two row fields. geo and ledger already carried IDENTICAL values in both;
+//     only hyper differed (0.32 vs 0) — and its 0 was forced, not chosen (below).
+//   · `META_REST_SCALE = 0.68` and a `baseG = 0.33` resting glow in NodeFabric were hyper's 0.32
+//     dim BAKED INTO CONSTANTS: 1 - 0.32 is 0.68, and 0.47 * (1 - 0.32*0.92) is 0.33. With the dim
+//     pre-applied as the resting look, the live dim HAD to be zeroed or it would apply twice. That
+//     is the whole origin of the split — and why the new `hide` knob appeared to affect the DAG
+//     core alone: `hideFrac` is a fraction OF a dim, and the metagraph pool's dim was 0.
+//   · Two emissive functions differed only in historic per-loop tuning carried over verbatim from
+//     js/globe.js (suppression 0.92 vs 0.9, floor 0.02 vs 0.03) — a sub-1% difference that no eye
+//     resolves, standing in the way of one shared model. Unified on the validator's coefficients.
 
 import { lerp } from "./nodeLayout";
 import type { View3D } from "./viewTransition";
@@ -36,30 +40,19 @@ export interface DimContext {
   filter: string;
 }
 
-// How strong the network/country dim is, ramped by the morph: SUBTLE in the Hypergraph
-// (a gentle "out of focus" push — nodes stay full-strength-ish and visible) and FULL on the
-// globe (off-filter nodes fade out entirely). EVERY dim consumer — node scale AND glow, for
-// BOTH validators and metagraph nodes — multiplies the raw eased dim by this one value, so
-// they can never drift apart (the old bug: the validator *scale* used the raw, un-ramped dim
-// and so scaled the nodes to nothing in hyper, while their glow only dimmed).
+// How strong the network/country dim is, ramped by the morph: SUBTLE in the Hypergraph (a gentle
+// "out of focus" push — nodes stay visible and full-size, muting in place) and FULL on the globe
+// (off-filter nodes vanish — the isolate, see hideFrac). ONE value for EVERY node, DAG core and
+// metagraph alike, and every consumer — scale AND glow AND colour — multiplies the raw eased dim
+// by it, so they can never drift apart (the old bug: the validator *scale* used the raw,
+// un-ramped dim and so scaled the nodes to nothing in hyper, while their glow only dimmed).
 // (The old hover-preview FORCED-STRONG 0.85 branch is gone — user 2026-07-11: hovering/
 // clicking a hub in hyper dimmed the rest far harder than the regular dim; the preview now
 // dims at the same per-view strength as a committed filter.)
-// (Ledger override 2026-08-07, matching metaNodeDim: morph is frozen there, and full strength
-// cascades to near-black through the chip writer — the flat 0.5 lands the validator chips at
-// the same COLORED-dim tier as the metagraph chips.)
-export const dimScale = (c: DimContext): number => viewMix(c, "core");
-
-// The METAGRAPH pool's own dim strength: ZERO in the Hypergraph, full on the globe. Metagraph
-// nodes REST at the dimmed look in hyper (user, 2026-07-17 — the base size/glow in
-// NodeFabric.writeMetaFrame carry the old dim appearance instead), so the network dim must not
-// move them there: a hover preview is inert and a committed filter leaves the others at rest
-// (the selection pops via the hubMatch glow boost + camera/DoF, not by dimming the rest).
-// Geo is unchanged — 1.0, the same ceiling as dimScale, so the off-filter isolate/hide on the
-// globe is bit-identical. The ledger's flat 0.5 is just this row's own value (morph is frozen
-// there, so the ramp can't apply). Validators keep dimScale — the DAG core still dims back in
-// hyper when a metagraph is the subject (the core-preview cue).
-export const metaDimScale = (c: DimContext): number => viewMix(c, "meta");
+// (Ledger override 2026-08-07: morph is frozen there, and full strength cascades to near-black
+// through the chip writer — the flat 0.5 lands the chips at the same COLORED-dim tier the
+// ribbons' RIBBON_DIM speaks.)
+export const nodeDimScale = (c: DimContext): number => viewMix(c, "dim");
 
 // HIDE IS NOT DIM (user, 2026-08-11). A dim `d` mutes a node three ways — colour toward DIM,
 // emissive suppression, and SHRINK — but the third one isn't a dim at all: it's geo's ISOLATE,
@@ -87,7 +80,7 @@ export const dimTargetsFor = (sel: string, metaIds: string[]) => ({
 export const focusDim = (c: DimContext): number => viewMix(c, "back");
 
 // Per-view hover/selection BOOST: the emissive added to the focused node's shells. Full pop in
-// hyper (the nodes rest dim there, see metaDimScale); HALVED in geo and ledger (user,
+// hyper (the nodes rest dimmer there against the flat backdrop); HALVED in geo and ledger (user,
 // 2026-07-17: the chips' base glow is brighter there and the flat 1.4 blew out).
 export const focusBoost = (c: DimContext): number => viewMix(c, "boost");
 
@@ -112,16 +105,12 @@ export const focusWeightOf = (primary: boolean, group: boolean): number =>
 //   · Every value is seeded from the literal (or the existing const) it replaced, so the resolved
 //     numbers are unchanged: `lerp(0.32, 1.0, morph)` IS `0.32 + 0.68 * morph`, and naming the
 //     ENDPOINTS is what makes the geo value readable at all.
-//   · `meta` folds in what used to be the bare `metaDimScale = c.morph` ramp plus the ledger's
-//     flat override: 0 → 1 across the morph IS lerp(hyper.meta, geo.meta) at those seeds, so the
-//     metagraph pool's dim becomes tunable per view without moving a pixel. It answers "what
-//     control affects the OTHER metagraphs?" — in hyper the honest answer was "none, by design",
-//     and a knob resting at 0 states that where an absent knob couldn't.
+//   · `dim` is ONE row field for every node (see the ONE NODE MODEL header). It answers "what
+//     control affects the other networks?" with one number per view, where the old pair of fields
+//     answered it twice and disagreed in hyper for a reason that was an implementation accident.
 export interface FocusRow {
-  /** Network/country dim strength for the DAG CORE (validators) — `dimScale`. */
-  core: number;
-  /** …and for the METAGRAPH pool — `metaDimScale`. Hyper rests at 0 on purpose; see its note. */
-  meta: number;
+  /** Network/country dim strength for EVERY node — DAG core and metagraph alike (`nodeDimScale`). */
+  dim: number;
   /** How much of that dim SHRINKS the node away rather than muting it — `hideFrac`. */
   hide: number;
   /** How far the OTHER nodes drop when one node is the focus — `focusDim`. */
@@ -137,9 +126,9 @@ export interface FocusShared {
 }
 
 export const FOCUS_TUNE_DEFAULTS: Readonly<Record<View3D, Readonly<FocusRow>>> = {
-  hyper: { core: 0.32, meta: 0, hide: 0, back: 0.45, boost: 1.4 },
-  geo: { core: 1.0, meta: 1.0, hide: 1, back: 0.65, boost: 0.7 },
-  ledger: { core: 0.5, meta: 0.5, hide: 0, back: 0.55, boost: 0.7 },
+  hyper: { dim: 0.32, hide: 0, back: 0.45, boost: 1.4 },
+  geo: { dim: 1.0, hide: 1, back: 0.65, boost: 0.7 },
+  ledger: { dim: 0.5, hide: 0, back: 0.55, boost: 0.7 },
 };
 
 export const FOCUS_SHARED_DEFAULTS: Readonly<FocusShared> = { groupShare: GROUP_FOCUS };
@@ -159,8 +148,7 @@ const viewMix = (c: DimContext, k: keyof FocusRow): number =>
   c.ledger ? FOCUS_TUNE.ledger[k] : lerp(FOCUS_TUNE.hyper[k], FOCUS_TUNE.geo[k], c.morph);
 
 export const FOCUS_ROW_SCHEMA: TuneSchema<FocusRow> = {
-  core: { min: 0, max: 1, label: "dim · DAG core" },
-  meta: { min: 0, max: 1, label: "dim · metagraphs" },
+  dim: { min: 0, max: 1, label: "dim · off-filter" },
   hide: { min: 0, max: 1, label: "hide (vs mute)" },
   back: { min: 0, max: 1, label: "dim-back on focus" },
   boost: { min: 0, max: 3, step: 0.05, label: "focus boost" },
@@ -170,37 +158,38 @@ export const FOCUS_SHARED_SCHEMA: TuneSchema<FocusShared> = {
   groupShare: { min: 0, max: 1, label: "group share" },
 };
 
-// Validator (DAG-core) dim: the eased whole-core dim (ONE value — the old per-layer {l0,l1}
-// split always carried identical values and was collapsed; the DAG core is one subject) scaled
-// by the morph-ramped strength, then raised by countryMix outside the drilled country. `geoCc`
-// is the node's geo country code (null when unlocated).
-export function validatorDim(c: DimContext, dim: number, geoCc: string | null): number {
-  let d = dim * dimScale(c);
+// Per-node dim: the record's own eased dim (the DAG core eases ONE value for the whole core — the
+// old per-layer {l0,l1} split always carried identical values and was collapsed; a metagraph eases
+// its own) times the morph-ramped strength, then raised by countryMix outside the drilled country.
+// `geoCc` is the node's geo country code (null when unlocated). ONE function for both pools — the
+// two used to differ only in which strength they read.
+export function nodeDim(c: DimContext, raw: number, geoCc: string | null): number {
+  let d = raw * nodeDimScale(c);
   // outside the drilled-into country? dim it on top of the network dim (geo only).
   if (c.countryFilter && (!geoCc || geoCc !== c.countryFilter)) d = Math.max(d, c.countryMix);
   return d;
 }
 
-// Metagraph-node per-node dim (js/globe.js:1095-1096): its own eased `recDim`, times the
-// metagraph pool's OWN strength (metaDimScale — zero in hyper, see its note). In the Snapshots
-// (ledger) view that resolves to the row's flat 0.5, because morph is frozen there and the ramp
-// alone would be too weak (was 0.82 under the old recede-the-rest emphasis — the chip writer
-// applies dim to colour AND glow, so 0.82 cascaded to near-black; 0.5 lands the chips at the
-// COLORED-dim tier the ribbons' RIBBON_DIM speaks, user 2026-08-07). Raised by countryMix
-// outside the drilled country, same as validatorDim.
-export function metaNodeDim(c: DimContext, recDim: number, geoCc: string | null): number {
-  let d = recDim * metaDimScale(c);
-  if (c.countryFilter && (!geoCc || geoCc !== c.countryFilter)) d = Math.max(d, c.countryMix);
-  return d;
-}
+// The node emissive BASE, hyper → globe: lifted in hyper (nodes read too dim on the flat backdrop)
+// and eased down on the globe (they read too hot against the density light pools, especially the
+// dense DAG stacks) — user. One pair for every node; the metagraph pool's old 0.33 was this same
+// 0.47 with hyper's dim pre-applied (see the file header).
+const BASE_HYPER = 0.47;
+const BASE_GLOBE = 0.37;
 
-// Validator emissive glow. `flash` is the node's raw (undecayed) arc-arrival flash. `focus` =
-// this node's focus WEIGHT from focusWeightOf (1 = it is the hovered/selected subject,
-// GROUP_FOCUS = it is only a member of a focused group, 0 = not in focus). `dimOthersOnFocus` = the caller has already
-// ANDed "some focus target exists" into the filter-based flag — with no focus target at all
-// neither the boost nor the dim-back branch should fire, and this pure function has no side
-// channel to detect "no focus", so the caller must fold that into the flag it passes.
-// `baseLo`/`baseHi` are the emissive base's Hypergraph/globe endpoints, lerped by morph.
+// A node's glow before the floor and the focus terms — the dim's own suppression of the base.
+// Exported because the render path needs it to measure hubMatchBoost's gap up to the hub level,
+// and re-deriving it at the call site would be exactly the inline mirror this file exists to stop.
+export const nodeGlow = (c: DimContext, d: number): number =>
+  lerp(BASE_HYPER, BASE_GLOBE, c.morph) * (1 - d * 0.92);
+
+// Node emissive glow. `flash` is the node's raw (undecayed) arc-arrival flash. `focus` = this
+// node's focus WEIGHT from focusWeightOf (1 = it is the hovered/selected subject, GROUP_FOCUS = it
+// is only a member of a focused group, 0 = not in focus). `dimOthersOnFocus` = the caller has
+// already ANDed "some focus target exists" into the filter-based flag — with no focus target at
+// all neither the boost nor the dim-back branch should fire, and this pure function has no side
+// channel to detect "no focus", so the caller must fold that into the flag it passes. `hubBoost`
+// is hubMatchBoost(...) below — added INSIDE the floor, exactly as the render path composes it.
 // STEADY: the old decorative twinkle shimmer was removed (user) — only data-driven pulses animate.
 export function nodeEmissive(
   c: DimContext,
@@ -208,12 +197,10 @@ export function nodeEmissive(
   flash: number,
   focus: number,
   dimOthersOnFocus: boolean,
-  baseLo: number,
-  baseHi: number,
+  hubBoost = 0,
 ): number {
-  const ei = lerp(baseLo, baseHi, c.morph);
   const fl = flash * c.morph; // arcs are a geo-only visual — their flash must not bleed into hyper
-  let v = Math.max(0.02, ei * (1 - d * 0.92) + fl); // suppress glow when dimmed
+  let v = Math.max(0.02, nodeGlow(c, d) + fl + hubBoost);
   // Hover/selection pairing: the focused machine's every layer-shell glows together,
   // and the rest dim back so it stands out (only when not already isolating a metagraph).
   if (focus > 0) v += focusBoost(c) * focus;
@@ -226,34 +213,11 @@ export function nodeEmissive(
 // bloom like their hub (user). Derived from the node's own pre-floor `glow` (the boost is the
 // GAP up to 0.72, never negative) and fading out with the hubs by morph 0.3 — there's no hub on
 // the globe. `committed` = this node's metagraph IS the committed filter.
+// The DAG core deliberately does NOT take this: it has no orbiting hub to match, it IS the core
+// sphere at the centre, which carries its own reveal/dim in HyperView. That is furniture, not the
+// node model — the one asymmetry left, and it is about what a node orbits, not about what it is.
 export function hubMatchBoost(c: DimContext, glow: number, committed: boolean): number {
   if (!committed) return 0;
   const hubFade = Math.min(1, Math.max(0, 1 - c.morph / 0.3));
   return Math.max(0, 0.72 - glow) * hubFade;
-}
-
-// Metagraph-node emissive glow — see the file-header deviation note: its suppression/floor
-// coefficients differ from the validator's and aren't reachable through nodeEmissive's
-// (baseLo, baseHi) parameterisation, so it's a sibling function with its own (single,
-// unlerped) `base`. STEADY: the decorative twinkle shimmer was removed (user).
-// `dimOthersOnFocus` = the caller has already ANDed "some focus target exists" into the
-// filter-based flag — with no focus target at all neither the boost nor the dim-back branch
-// should fire, and this pure function has no side channel to detect "no focus", so the
-// caller must fold that into the flag it passes. `hubBoost` is hubMatchBoost(...) above —
-// added INSIDE the floor, exactly as the render path composes it.
-export function metaNodeEmissive(
-  c: DimContext,
-  d: number,
-  flash: number,
-  focus: number,
-  dimOthersOnFocus: boolean,
-  base: number,
-  hubBoost = 0,
-): number {
-  const glow = base * (1 - d * 0.9);
-  const fl = flash * c.morph; // arcs are a geo-only visual — their flash must not bleed into hyper
-  let v = Math.max(0.03, glow + fl + hubBoost);
-  if (focus > 0) v += focusBoost(c) * focus;
-  else if (dimOthersOnFocus) v *= focusDim(c);
-  return v;
 }

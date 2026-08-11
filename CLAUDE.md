@@ -173,10 +173,22 @@ them; today that is the focus TIER ranking alone. `dimModel`'s four resolvers al
 
 ⚠️ **HIDE IS NOT DIM** (user, 2026-08-11). A dim number used to drive three effects, and one of them —
 scaling the node to nothing — is geo's ISOLATE, not a mute. It only rode along because hyper's
-metagraph dim was pinned to 0, so the shrink was never seen there; the moment the knob existed it was
-the first thing it did. The shrink is now its own row field, `hide`, resolved by `hideFrac()` — geo
+metagraph dim was then pinned to 0, so the shrink was never seen there; the moment the knob existed it
+was the first thing it did. The shrink is now its own row field, `hide`, resolved by `hideFrac()` — geo
 keeps `1` (off-filter nodes vanish on the globe), hyper and the ledger `0`, so a dim there mutes in
 place. Any new effect a dim number reaches must ask the same question before joining it.
+
+⚠️ **ONE NODE MODEL** (user, 2026-08-11). *"Across all views I want no difference between DAG nodes and
+other metagraphs — they are the same network topology, only positioned differently in some views."* The
+dim code had FOUR split points, all of them hyper-only (geo and the ledger already carried identical
+numbers for both pools): separate `core`/`meta` row fields, twin `validatorDim`/`metaNodeDim` with
+identical bodies, twin emissive resolvers differing by a sub-1% coefficient, and — the root — hyper's
+`0.32` dim BAKED into `NodeFabric`'s resting constants (`1 − 0.32 = 0.68` scale, `0.47 × (1 − 0.32×0.92)
+≈ 0.33` glow). With the dim pre-applied as the resting look, the live dim *had* to be zeroed or it would
+apply twice; that zero is the whole origin of the split, never a design decision. `domain/dimModel.ts`
+now exposes ONE `dim` row field and one `nodeDim`/`nodeGlow`/`nodeEmissive` triple that both pools call.
+The one surviving asymmetry is deliberate: `hubMatchBoost` targets the metagraph **hub's** resting glow,
+which is view furniture — about what a node orbits, not what a node is.
 
 **The camera folder is a READOUT, not sliders**: poses are ~8 constants and each needs its own selection
 state to even see, so orbiting to a pose you like and reading it off beats dragging numbers.
