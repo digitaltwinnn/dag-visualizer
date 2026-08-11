@@ -87,6 +87,11 @@ export const dimTargetsFor = (sel: string, metaIds: string[]) => ({
 // counterpart of `dim`, and it exists because that furniture had been carrying a hardcoded number
 // of its own (hyper's `fdim` 0.62) while the nodes beside it answered to a knob.
 //
+// The DAG core's OWN furniture is furniture too (user, 2026-08-11: "dim elements in hyper view does
+// not affect the rings of the core in the middle") — ONE NODE MODEL, the core is a metagraph-shaped
+// hub, so its hoops, rim fills and glow read this knob like every other hub's, lerped by the core's
+// eased `_coreDim` instead of a hub's binary off-focus flag.
+//
 // Read PER VIEW, not morph-lerped like the four node fields: furniture belongs to one view and
 // fades out with it, so blending the neighbour view's value in would only describe elements that
 // are no longer drawn. Two of the three views read 0, and both zeros are honest rather than

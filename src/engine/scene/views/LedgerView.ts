@@ -223,8 +223,6 @@ export class LedgerView implements SceneView {
    *  `_hoverTile` is the instance index it resolves to, so the frame body compares integers. */
   private _hoverMetaKey: string | null = null;
   private _hoverTile = -1;
-  /** The shown snapshot is the LIVE FOLLOW, not a committed pin — so it is not a focus (`_focusSlot`). */
-  private _following = false;
   /** Filter-chip / metagraph-row HOVER — previews the colored network dim at commit strength. */
   private _hoverNet: string | null = null;
 
@@ -522,18 +520,6 @@ export class LedgerView implements SceneView {
     this._syncRibbonRows();
   }
 
-  /** Is the shown snapshot the LIVE FOLLOW rather than an explicit pin? Only the pin is a focus
-   *  (user, 2026-08-11) — a follow is the chamber advancing on its own, and a row it walks onto by
-   *  itself must not arrive pre-boosted with nothing left for a hover or a click to add. */
-  setFollowing(following: boolean) {
-    this._following = following;
-  }
-
-  /** The row that owns a DELIBERATE focus, or -1: the committed pin, never the live follow. */
-  private _focusSlot(): number {
-    return this._following ? -1 : this.model.selectedSlot;
-  }
-
   /** The transient hover — the colored-dim PREVIEW tier (the committed row stays fully hot). */
   setHovered(ordinal: number | null) {
     this._hoverOrd = ordinal;
@@ -793,9 +779,8 @@ export class LedgerView implements SceneView {
     this._rewind.update(dt, this._slotOfOrd);
     this._trailOff = this._rewind.offset;
     const pinnedHold = this._rewind.holding;
-    // Hoisted per frame (the tune hoist rule): the ONE row that owns a deliberate focus, or -1.
-    const pinSlot = this._focusSlot();
-    this._bar.setFocusSlot(pinSlot);
+    // Hoisted per frame (the tune hoist rule): the SELECTED row — the one that owns the focus — or -1.
+    const pinSlot = this.model.selectedSlot;
     this._bar.setOffset(this._trailOff);
     this._ribbons.group.position.x = this._trailOff;
     this._ordGroup.position.x = this._trailOff;
@@ -815,9 +800,10 @@ export class LedgerView implements SceneView {
     let mi = 0;
     // Hoisted per frame (the tune hoist rule): one read for every lane's every tile.
     const dimNet = this._netDimKey();
-    // A DELIBERATE focus — a hovered row, a hovered tile, or an explicit pin. Neither the live lead
-    // nor the live FOLLOW is one: they are simply the shown row, and dimming the whole trail back
-    // against a row the view advances to on its own would make `back` a second `rest`.
+    // A focus is a SELECTED row (pinned or live-followed — how it was reached is not what it is),
+    // a hovered row or a hovered tile. The bare lead is none of them: with nothing selected the
+    // chamber is simply running, and stepping the whole trail back against a row it advanced onto
+    // by itself would make `back` a second `rest`.
     const dimBack = this._hoverSlot >= 0 || this._hoverTile >= 0 || pinSlot >= 0;
     for (const lane of this.model.lanes.values()) {
       const laneColor = this._laneColor(lane.id);
@@ -862,7 +848,7 @@ export class LedgerView implements SceneView {
         this._metaTrailMesh.setMatrixAt(mi, _dummy.matrix);
         const hot = this.model.isRowHot(b.slot);
         const hov = this._hoverSlot >= 0 && b.slot === this._hoverSlot;
-        // An explicit PIN is the primary subject; a live follow is not (see `dimBack`).
+        // The SELECTED row (see `dimBack`) — pinned or live-followed, they read alike.
         const pinned = pinSlot >= 0 && b.slot === pinSlot;
         // THIS tile's own hover (user, 2026-08-09): the explorer/raw row for ONE snapshot lights
         // just its tile, not the whole tick row. Resolved to an instance index at event time
@@ -882,8 +868,14 @@ export class LedgerView implements SceneView {
         // whatever the filter says. Every other focus here is the ROW's, and a row spans every
         // lane — under a filter it reaches the committed network's tile alone (`snapFocusOf`).
         const focus = hovTile ? 1 : snapFocusOf(pinned, hov, offNet);
+        // `back` is the ROW's answer, so the focused row never steps back — its OFF-FILTER members
+        // included (user, 2026-08-11). They take the dim and nothing else, which is exactly what
+        // the RIBBON leaving this tile takes, so a ribbon and the two ends it connects now read at
+        // one level; compounding dim × back left the endpoints near-black under their own ribbon.
+        const rowFocus = pinned || hov;
         const bright =
-          snapBright(this.tiles.rest * b.fade, offNet, focus, dimBack) * edge * this._fades.alpha;
+          snapBright(this.tiles.rest * b.fade, offNet, focus, dimBack && !rowFocus)
+          * edge * this._fades.alpha;
         this._metaTrailMesh.setColorAt(mi, _col.copy(ident ? laneColor : this._coreCol).multiplyScalar(bright));
         mi++;
       }

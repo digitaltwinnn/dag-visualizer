@@ -460,6 +460,16 @@ export class HyperView implements SceneView {
     const coreOpacity = 1;
     const metaOpacity = hubFade;
 
+    // Hoisted per frame (the tune hoist rule): ONE read for the core and all 10 hubs. The per-network
+    // furniture's off-focus dim is hyper's `elem` knob — the same "the view's own ELEMENTS drop when
+    // off-subject" number the ledger spends on its bands, tiles and ribbons.
+    const hubOffMul = offNetMul("hyper");
+    // The hub BODY is the softer of the knob's two channels: glow/tether/hoops/fills take the
+    // full drop, the solid body only HUB_BODY_SOFT of it, so an out-of-focus hub stays clearly
+    // present while its light recedes. Derived, not a second magic number — at the shipped
+    // default the two read 0.62 and 0.78, and `elem: 0` still turns BOTH off.
+    const hubBodyMul = 1 - (1 - hubOffMul) * HUB_BODY_SOFT;
+
     // Core pulse + flash. The core no longer SWELLS out into the globe on the morph (user removed
     // the grow-into-globe transition): it just dissolves in place (coreReveal) while the Earth fades
     // in on its own, so geo/ledger simply appear rather than being born from the core. The node
@@ -477,17 +487,24 @@ export class HyperView implements SceneView {
       this.core.rotation.y += dt * 0.25;
       this.core.rotation.x += dt * 0.12;
     }
-    // Dim the glow as it dissolves so the fading sphere doesn't bloom out the view.
+    // ONE NODE MODEL (user, 2026-08-11): the core is a metagraph-shaped hub, so ITS furniture answers
+    // the same `elem` knob every other hub's does. It used to fade on two magic coefficients of its
+    // own (0.6 for the glow, 0.5 for the hoops/fills), so turning `elem` down left the DAG's rings
+    // sitting at full brightness while every metagraph's dropped. `_coreDim` is the core's own eased
+    // stand-in for a hub's binary `focusOther`, so the knob is lerped by it rather than switched.
+    const coreOffMul = 1 - this._coreDim * (1 - hubOffMul);
     const coreMat = this.core.material as THREE.MeshStandardMaterial;
-    coreMat.emissiveIntensity = (0.6 + flash * 0.9) * coreF * coreReveal * (1 - 0.5 * (1 - coreReveal)) * (1 - this._coreDim * 0.6) * this._fades.alpha;
+    coreMat.emissiveIntensity = (0.6 + flash * 0.9) * coreF * coreReveal * (1 - 0.5 * (1 - coreReveal)) * coreOffMul * this._fades.alpha;
+    // The core BODY keeps full opacity — a hub's soft channel (hubBodyMul) taken to its limit,
+    // because the one sphere at the origin is the structure's centre and always reads as a position.
     coreMat.opacity = coreOpacity * coreReveal * this._fades.alpha;
     this.coreGroup.visible = coreReveal > 0.001;
-    // The DAG core's cyan "sun" hoops fade with the core on the morph, and dim with it when a
-    // specific metagraph is the subject (_coreDim).
-    const coreHoopOp = HOOP_OP * coreReveal * (1 - this._coreDim * 0.5);
+    // The DAG core's cyan "sun" hoops fade with the core on the morph, and take the full `elem` drop
+    // when a specific metagraph is the subject — exactly what a metagraph's own layer hoops take.
+    const coreHoopOp = HOOP_OP * coreReveal * coreOffMul;
     for (const h of this._coreRings) (h.material as THREE.LineBasicMaterial).opacity = coreHoopOp * this._fades.alpha;
     // The core shells' rim-fill disks fade the same way (same treatment as a metagraph's fills).
-    const coreFillOp = FILL_OP * coreReveal * (1 - this._coreDim * 0.5);
+    const coreFillOp = FILL_OP * coreReveal * coreOffMul;
     for (const f of this._coreFills) (f.material as THREE.MeshBasicMaterial).opacity = coreFillOp * this._fades.alpha;
     if (this.coreFlash) this.coreFlash = Math.max(0, this.coreFlash - dt * 1.6);
 
@@ -498,15 +515,6 @@ export class HyperView implements SceneView {
     // The constellation holds still when a hub is focused (focusId) OR the view policy turns hub
     // orbits off (hubOrbits) — the two freezes are independent but drive the same hold.
     const frozen = this.focusId != null || !this.hubOrbits;
-    // Hoisted per frame (the tune hoist rule): one read for all 10 hubs. The hub furniture's
-    // off-focus dim is hyper's `elem` knob — the same "the view's own per-network ELEMENTS drop
-    // when off-subject" number the ledger spends on its bands, tiles and ribbons.
-    const hubOffMul = offNetMul("hyper");
-    // The hub BODY is the softer of the knob's two channels: glow/tether/hoops/fills take the
-    // full drop, the solid body only HUB_BODY_SOFT of it, so an out-of-focus hub stays clearly
-    // present while its light recedes. Derived, not a second magic number — at the shipped
-    // default the two read 0.62 and 0.78, and `elem: 0` still turns BOTH off.
-    const hubBodyMul = 1 - (1 - hubOffMul) * HUB_BODY_SOFT;
     for (const m of this.metas) {
       if (!frozen) m.orbit += dt * 0.03;
       const a = m.orbit;

@@ -60,6 +60,16 @@ describe("the ledger's brightness-tier hierarchy", () => {
       expect(off).toBeLessThan(t.rest);
       expect(off).toBeGreaterThan(0);
     });
+
+    // …but `back` is the ROW's own answer, so the focused row does not step ITSELF back: its
+    // off-filter members take the dim alone — the very tier the RIBBON between them takes
+    // (Ribbons._writeGeometry passes no focus at all). Compounding the two knobs made a band and
+    // the tile above it read near-black under a ribbon that was only gently dimmed.
+    it(`${what}: an off-filter member of the FOCUSED row takes the dim alone`, () => {
+      const t = tiers(rest);
+      expect(snapBright(rest, true, snapFocusOf(true, false, true), false)).toBe(t.offFilter);
+      expect(t.offFilter).toBeGreaterThan(snapBright(rest, true, 0, true));
+    });
   }
 
   it("ribbons rest visible, and dim on the same one knob", () => {

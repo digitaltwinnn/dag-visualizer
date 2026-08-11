@@ -196,6 +196,15 @@ same element where the look needs it: hyper's hub BODY takes a fraction of the d
 so an unfocused hub stays legible as a position while its light goes; `elem: 0` removes both, which is
 what keeps it one knob.
 
+⚠️ **THE DAG CORE'S OWN FURNITURE IS FURNITURE TOO** (user, 2026-08-11 — *"dim elements in hyper view
+does not affect the rings of the core in the middle"*). ONE NODE MODEL: the core is a metagraph-shaped
+hub, so its hoops, rim fills and glow read `elem` like every other hub's — they had kept three magic
+coefficients of their own (0.5, 0.5, 0.6) and so sat at full brightness while every metagraph's dropped.
+The one difference is the switch: a hub flips on a binary `focusOther`, the core eases on `_coreDim`
+(the DAG tracks the highlight state gradually), so the knob is LERPED by it — `coreOffMul = 1 −
+_coreDim × (1 − hubOffMul)`. The core BODY keeps full opacity, which is the hub's soft channel taken to
+its limit: the one sphere at the origin is the structure's centre and always reads as a position.
+
 ⚠️ **A SNAPSHOT IS DATA, NOT FURNITURE** (user, 2026-08-11). `elem` is hyper's alone, because both
 other views honestly answer `0`: geo's globe draws no per-network furniture (its off-filter answer is
 the nodes' `hide` isolate), and everything the chamber emphasises — the byte bands, the lane tiles, the
@@ -986,24 +995,26 @@ identity for it.
 **Emphasis is TWO independent readings — brightness, and colour** (user, 2026-08-11), and in both the
 order is the design.
 
-*Brightness is the node vocabulary*, resolved for every band, tile and ribbon by `snapBright()`: an
-EXPLICITLY PINNED row takes the `ledger` row's full focus `boost`; a HOVERED row takes the same boost at
-the group tier, **without demoting the pinned row**, because the hover previews what a click would pin;
+*Brightness is the node vocabulary*, resolved for every band, tile and ribbon by `snapBright()`: the
+SELECTED row takes the `ledger` row's full focus `boost`; a HOVERED row takes the same boost at
+the group tier, **without demoting the selected row**, because the hover previews what a click would pin;
 while any focus exists every other row steps back by `back`; and an off-filter network drops by `dim`,
 the same knob its node chips in the trays answer to. `dimTiers.test.ts`
 pins primary > preview > resting > stepped back, and that off-filter dims without vanishing. Exactly one
 hot row — a committed older snapshot beats the live lead, a hover doesn't steal it.
 
-⚠️ **THE BOOST ANSWERS A DELIBERATE GESTURE — A HOVER OR AN EXPLICIT PIN, NEVER A LIVE FOLLOW** (user,
-2026-08-11). The live lead is simply the shown row, already named by its place at the front edge and by
-keeping identity hue; and committing a metagraph flips **live metagraph mode** on, so the followed row
-carried a `selectedSlot` and arrived pre-boosted. Both made `boost` a second `rest` — the whole trail
-permanently stepped back against a row the chamber walked onto by itself, with nothing left for a hover
-or a click to add. That is also what made the RIBBONS read as undimmed: a ribbon takes no boost, so an
+⚠️ **THE BOOST ANSWERS THE SELECTION, AND THE BARE LEAD IS NOT ONE** (user, 2026-08-11). With nothing
+selected the chamber is simply running: its front row is already named by its place at the front edge
+and by keeping identity hue, so lifting it made `boost` a second `rest` — the whole trail permanently
+stepped back against a row the chamber walked onto by itself, with nothing left for a hover or a click
+to add. That is also what made the RIBBONS read as undimmed: a ribbon takes no boost, so an
 automatically-boosted band separated from its off-filter neighbours ~30× while the ribbons only halved
 by `1 − dim`, and the mismatch read as the dim missing from the ribbon rather than as a boost that
-shouldn't be there. `LedgerView._focusSlot()` is the one home for the question (following → no focus),
-and the Engine feeds it `st.following` beside the pin it already pushes.
+shouldn't be there. But **live/not-live is HOW a row was reached, not WHAT it is** (user, 2026-08-11):
+a live follow's row IS selected, so it reads exactly like a pin. Suppressing the boost while following
+left live metagraph mode — which the committed filter turns on by itself — with no focus at all, and
+the user read the whole chamber as dull. So there is one question and `model.selectedSlot` answers it;
+the scene no longer reads `following`, and `LedgerView._focusSlot()` / `ByteBar.setFocusSlot()` are gone.
 
 ⚠️ **A ROW'S FOCUS IS THE COMMITTED NETWORK'S, NOT THE WHOLE ROW'S** (user, 2026-08-11). A row is a
 TICK, and a tick holds every network's snapshot side by side — so under a filter the boost reaches the
@@ -1014,6 +1025,14 @@ one exception is a directly hovered TILE — that IS the subject, so it takes th
 the filter says, the same answer the node model gives a hovered off-filter node. Kept OUT of
 `snapBright` on purpose: subject identity is a call-site question, like colour, and `snapBright` stays
 term-for-term faithful to `nodeEmissive`.
+
+⚠️ **`back` IS THE ROW'S ANSWER, SO THE FOCUSED ROW NEVER STEPS ITSELF BACK** (user, 2026-08-11 — *"the
+snapshots look dimmed too much, almost gray/black, next to a ribbon I like the colour of"*). Its
+OFF-FILTER members included: they take the `dim` alone, which is exactly the tier the RIBBON landing on
+them takes (`Ribbons` passes no focus and no back at all), so a ribbon and its two endpoints read at one
+level. Compounding the two knobs made `dim × back` ≈ 0.28 against the ribbon's 0.5 and left the band and
+the tile above it near-black under a sheet that was only gently dimmed. `dimTiers.test.ts` pins it per
+instrument.
 
 *Colour is decided separately at the call sites and no dim knob may touch it.* The active and hovered
 rows take identity hue; with a network committed, **that network's OWN bands and lane tiles keep their

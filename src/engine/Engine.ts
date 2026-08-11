@@ -432,7 +432,7 @@ export class Engine {
         if (st.inspect !== prev.inspect && st.mode === "ledger") this._resolveFocus();
         // Ledger: keep the hovered/selected snapshot coloured in the trail (hover wins, then the
         // clicked `snap`); everything else fades to the neutral background tone.
-        if (st.hoverSnapOrd !== prev.hoverSnapOrd || st.snap !== prev.snap || st.following !== prev.following) {
+        if (st.hoverSnapOrd !== prev.hoverSnapOrd || st.snap !== prev.snap) {
           // COMMITTED and HOVER ride separate channels (user, 2026-08-07): the committed row is
           // the hot one, the hover is a colored-dim PREVIEW that never demotes it, and the
           // REWIND follows only the committed pin (a hover must never drag the trail).
@@ -443,9 +443,6 @@ export class Engine {
           // tick, the trail holds that row at the front and only advances when the network
           // anchors again (following "all" the shown snap IS the lead, so the offset is 0).
           this.ledger.setPinned(st.snap?.data?.ordinal ?? null);
-          // …but the BOOST answers a deliberate gesture only, and a follow is the chamber
-          // advancing on its own — so following tells the view its shown row is not a focus.
-          this.ledger.setFollowing(st.following);
         }
         // ONE hovered metagraph snapshot (user, 2026-08-09) — its own channel, so a snapshot's
         // hover lights its own tile instead of every sibling anchored into the same tick.
