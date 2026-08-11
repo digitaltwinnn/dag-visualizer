@@ -986,13 +986,24 @@ identity for it.
 **Emphasis is TWO independent readings — brightness, and colour** (user, 2026-08-11), and in both the
 order is the design.
 
-*Brightness is the node vocabulary*, resolved for every band, tile and ribbon by `snapBright()`: the
-ACTIVE row (the live lead, or the committed pin) takes the `ledger` row's full focus `boost`; a HOVERED
-row takes the same boost at the group tier, **without demoting the active row**, because the hover
-previews what a click would pin; while any focus exists every other row steps back by `back`; and an
-off-filter network drops by `dim`, the same knob its node chips in the trays answer to. `dimTiers.test.ts`
+*Brightness is the node vocabulary*, resolved for every band, tile and ribbon by `snapBright()`: an
+EXPLICITLY PINNED row takes the `ledger` row's full focus `boost`; a HOVERED row takes the same boost at
+the group tier, **without demoting the pinned row**, because the hover previews what a click would pin;
+while any focus exists every other row steps back by `back`; and an off-filter network drops by `dim`,
+the same knob its node chips in the trays answer to. `dimTiers.test.ts`
 pins primary > preview > resting > stepped back, and that off-filter dims without vanishing. Exactly one
 hot row — a committed older snapshot beats the live lead, a hover doesn't steal it.
+
+⚠️ **THE BOOST ANSWERS A DELIBERATE GESTURE — A HOVER OR AN EXPLICIT PIN, NEVER A LIVE FOLLOW** (user,
+2026-08-11). The live lead is simply the shown row, already named by its place at the front edge and by
+keeping identity hue; and committing a metagraph flips **live metagraph mode** on, so the followed row
+carried a `selectedSlot` and arrived pre-boosted. Both made `boost` a second `rest` — the whole trail
+permanently stepped back against a row the chamber walked onto by itself, with nothing left for a hover
+or a click to add. That is also what made the RIBBONS read as undimmed: a ribbon takes no boost, so an
+automatically-boosted band separated from its off-filter neighbours ~30× while the ribbons only halved
+by `1 − dim`, and the mismatch read as the dim missing from the ribbon rather than as a boost that
+shouldn't be there. `LedgerView._focusSlot()` is the one home for the question (following → no focus),
+and the Engine feeds it `st.following` beside the pin it already pushes.
 
 ⚠️ **A ROW'S FOCUS IS THE COMMITTED NETWORK'S, NOT THE WHOLE ROW'S** (user, 2026-08-11). A row is a
 TICK, and a tick holds every network's snapshot side by side — so under a filter the boost reaches the

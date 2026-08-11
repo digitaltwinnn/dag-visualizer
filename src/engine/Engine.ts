@@ -443,6 +443,9 @@ export class Engine {
           // tick, the trail holds that row at the front and only advances when the network
           // anchors again (following "all" the shown snap IS the lead, so the offset is 0).
           this.ledger.setPinned(st.snap?.data?.ordinal ?? null);
+          // …but the BOOST answers a deliberate gesture only, and a follow is the chamber
+          // advancing on its own — so following tells the view its shown row is not a focus.
+          this.ledger.setFollowing(st.following);
         }
         // ONE hovered metagraph snapshot (user, 2026-08-09) — its own channel, so a snapshot's
         // hover lights its own tile instead of every sibling anchored into the same tick.

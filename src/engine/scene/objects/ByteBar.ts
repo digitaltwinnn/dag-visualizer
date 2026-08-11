@@ -58,6 +58,7 @@ export class ByteBar {
   private _neutral: number;
   private _alpha = 0;
   private _selected = -1;
+  private _focus = -1;
   private _hovered = -1;
   private _off = 0;
   private _filter = "all";
@@ -137,7 +138,12 @@ export class ByteBar {
   }
 
   setAlpha(a: number): void { this._alpha = a; }
+  /** The shown row — it keeps identity hue down the trail. Colour only: whether it also LEADS in
+   *  brightness is `setFocusSlot`'s question, and a live follow answers no. */
   setSelected(slot: number): void { this._selected = slot; }
+  /** The row that owns a DELIBERATE focus (LedgerView resolves it: an explicit pin, never the live
+   *  follow), or -1. The one row the boost lifts and the one that dims the rest back. */
+  setFocusSlot(slot: number): void { this._focus = slot; }
   /** The transient hover row — colored-dim preview, never demotes the active row. */
   setHovered(slot: number): void { this._hovered = slot; }
   /** Committed-or-hovered network → the other metagraphs' bands take the COLORED dim (identity hue
@@ -153,10 +159,10 @@ export class ByteBar {
 
   update(dt: number): void {
     const k = Math.min(1, dt * 5);
-    // A DELIBERATE focus — a hovered row or an explicit pin. The live lead is not one: it is
-    // simply the shown row, and dimming the whole trail back against it permanently would make
-    // `back` a second `rest` rather than a focus effect.
-    const dimBack = this._hovered >= 0 || this._selected > 0;
+    // A DELIBERATE focus — a hovered row or an explicit pin. Neither the live lead nor the live
+    // FOLLOW is one: they are simply the shown row, and dimming the whole trail back against a row
+    // the view advances to on its own would make `back` a second `rest` rather than a focus effect.
+    const dimBack = this._hovered >= 0 || this._focus >= 0;
     for (let si = 0; si < this._slots.length; si++) {
       const s = this._slots[si];
       const x = LEAD_X - si * SLOT_SP + this._off;
@@ -166,7 +172,9 @@ export class ByteBar {
       // the front one below, so no bar floats on glass that has already faded out.
       const fade = horizonAt(x);
       const hot = si === this._selected || si === 0;
-      const hov = !hot && si === this._hovered;
+      const hov = si === this._hovered;
+      // The one row that owns a deliberate focus (see `dimBack`) — `_focus` is -1 when none does.
+      const pinned = si === this._focus;
       // Rows the rewind pushed past the front edge dissolve within one slot of travel.
       const over = (x - LEAD_X) / (SLOT_SP * 0.9);
       const front = over <= 0 ? 1 : Math.max(0, 1 - over);
@@ -176,12 +184,14 @@ export class ByteBar {
         // identity hue all the way down the trail, everything else stays the neutral trail.
         const offNet = this._filter !== "all" && s.keys[i] !== this._filter;
         const onNet = !hot && !hov && this._filter !== "all" && s.keys[i] === this._filter;
-        // A row is a GROUP of bands, so a hovered row previews at the group tier while the shown
-        // row — the pin, or the live lead — is the primary subject. But the focus is the ROW's,
-        // and a row holds every network's bytes: under a committed filter it reaches that
-        // network's band alone (`snapFocusOf`), or the undimmed boost would lift the very bands
-        // the dim is there to push behind it.
-        const focus = snapFocusOf(hot, hov, offNet);
+        // The BOOST answers a deliberate focus only — the same rule `dimBack` above states, now
+        // applied to the lift as well (user, 2026-08-11): the live lead is simply the shown row,
+        // already named by its place at the front edge and by keeping identity hue, so lifting it
+        // automatically made `boost` a second `rest` and left a hover with nothing to add. And the
+        // focus is the ROW's, while a row holds every network's bytes: under a committed filter it
+        // reaches that network's band alone (`snapFocusOf`), or the undimmed boost would lift the
+        // very bands the dim is there to push behind it.
+        const focus = snapFocusOf(pinned, hov, offNet);
         const t = snapBright(this.tune.rest, offNet, focus, dimBack) * fade * front * this._alpha;
         s.mats[i].opacity += (t - s.mats[i].opacity) * k;
         s.mats[i].color.setHex(hot || hov || onNet ? s.colors[i] : this._neutral);
