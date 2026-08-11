@@ -178,6 +178,13 @@ was the first thing it did. The shrink is now its own row field, `hide`, resolve
 keeps `1` (off-filter nodes vanish on the globe), hyper and the ledger `0`, so a dim there mutes in
 place. Any new effect a dim number reaches must ask the same question before joining it.
 
+**The two are INDEPENDENT readings of the same raw ramp, not a knob and its fraction** (user,
+2026-08-11 — *"dim · off-filter actually also resizes"*). `hideFrac` first took the RESOLVED dim, which
+made shrink `raw × dim × hide` against mute's `raw × dim`: `dim` was a master gain over both effects,
+so turning it down shrank nodes less as well as muting them less. It now reads the raw ramp, so each
+knob moves exactly one effect. A corollary that matters: the country drill's `countryMix` raise is a
+MUTE, and reading the raw ramp is what guarantees a lens can never shrink what it looks past.
+
 ⚠️ **ONE NODE MODEL** (user, 2026-08-11). *"Across all views I want no difference between DAG nodes and
 other metagraphs — they are the same network topology, only positioned differently in some views."* The
 dim code had FOUR split points, all of them hyper-only (geo and the ledger already carried identical

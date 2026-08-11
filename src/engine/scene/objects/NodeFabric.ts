@@ -380,9 +380,9 @@ export class NodeFabric {
       }
 
       // Off-filter nodes SHRINK AWAY on the globe and merely mute in hyper — dimModel.hideFrac
-      // owns that split (the dim itself is nodeDim, the same call the glow loop makes, so there
-      // is no inline mirror of the country-raise left here to drift).
-      let show = 1 - hideFrac(c, nodeDim(c, dim, geoCcOf(u.pick)));
+      // owns that split. It reads the RAW ramp, not the resolved dim, so the two knobs are
+      // independent (and the country drill's mute can never shrink a node — lens, not filter).
+      let show = 1 - hideFrac(c, dim);
       show += (1 - show) * gw; // parked squares show the whole fleet (dim re-applies on landing)
 
       // Sphere: tumbling on its own axis, cross-fading into the chip ALONG the gather flight
@@ -493,10 +493,11 @@ export class NodeFabric {
       // makes (user, 2026-08-11: one node model), raised by the country dim when outside the
       // drilled-into country (geo only); LEDGER forces its flat row value (morph frozen).
       const dEff = nodeDim(c, r.dim, geoCc);
-      // dimModel.hideFrac: how much of that dim SHRINKS the node rather than muting it — 1 on the
-      // globe (the isolate), 0 in hyper, where a turned-up dim mutes in place at full size. The
-      // gather escape hatch lifts it back: parked squares show the whole fleet.
-      const hid = hideFrac(c, dEff);
+      // dimModel.hideFrac: how far an off-filter node SHRINKS AWAY — 1 on the globe (the isolate),
+      // 0 in hyper, where a turned-up dim mutes in place at full size. It reads the RAW ramp, not
+      // dEff, so `dim` and `hide` move one effect each. The gather escape hatch lifts it back:
+      // parked squares show the whole fleet.
+      const hid = hideFrac(c, r.dim);
       const vis = (1 - hid) + hid * gw;
       // dimModel.hubMatchBoost: the COMMITTED metagraph's own nodes glow at the hub's resting
       // level (HyperView hub base 0.72) in the Hypergraph, so the picked network's nodes bloom

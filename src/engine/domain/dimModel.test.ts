@@ -63,11 +63,11 @@ describe("nodeDimScale", () => {
   });
 });
 
-describe("hideFrac (the shrink half of a dim, split out from the mute half)", () => {
-  // HIDE IS NOT DIM (user, 2026-08-11). A dim mutes three ways — colour, emissive, and SHRINK —
-  // and the third is geo's ISOLATE, not an emphasis at all. Splitting it onto its own row field
-  // is what lets hyper's dim mute a node in place instead of shrinking it away.
-  it("is the FULL dim on the globe — the off-filter isolate is bit-identical", () => {
+describe("hideFrac (the shrink, an independent reading of the same ramp as the dim)", () => {
+  // HIDE IS NOT DIM (user, 2026-08-11). A dim mutes two ways — colour and emissive — and geo does a
+  // third thing that is not an emphasis at all: the ISOLATE. It gets its own row field, which is
+  // what lets hyper's dim mute a node in place instead of shrinking it away.
+  it("is the FULL ramp on the globe — the off-filter isolate is bit-identical", () => {
     expect(hideFrac(ctx({ morph: 1 }), 1)).toBeCloseTo(1, 10);
     expect(hideFrac(ctx({ morph: 1 }), 0.4)).toBeCloseTo(0.4, 10);
   });
@@ -84,6 +84,30 @@ describe("hideFrac (the shrink half of a dim, split out from the mute half)", ()
 
   it("ramps with the morph, so the isolate arrives as the nodes land", () => {
     expect(hideFrac(ctx({ morph: 0.5 }), 1)).toBeCloseTo(0.5, 10);
+  });
+
+  // The knob-independence rule (user, 2026-08-11: "dim.off-filter also resizes when hide is 0.5").
+  // hideFrac reads the RAW ramp, so it is untouched by the `dim` field — one knob, one effect.
+  it("does NOT move when the dim strength moves — the two knobs are independent", () => {
+    const c = ctx({ morph: 1 });
+    const before = hideFrac(c, 1);
+    const restore = FOCUS_TUNE.geo.dim;
+    try {
+      FOCUS_TUNE.geo.dim = 0.1;
+      expect(hideFrac(c, 1)).toBeCloseTo(before, 10);
+      FOCUS_TUNE.geo.dim = 0;
+      expect(hideFrac(c, 1)).toBeCloseTo(before, 10);
+    } finally {
+      FOCUS_TUNE.geo.dim = restore;
+    }
+  });
+
+  // The country drill is a LENS, not a filter: nodeDim's countryMix raise is a mute and must never
+  // reach the shrink. Reading the raw ramp is what guarantees it.
+  it("ignores the country-drill mute — a lens never shrinks what it looks past", () => {
+    const drilled = ctx({ morph: 1, countryFilter: "DE", countryMix: 0.8 });
+    expect(nodeDim(drilled, 0, "US")).toBeCloseTo(0.8, 10); // the mute lands…
+    expect(hideFrac(drilled, 0)).toBeCloseTo(0, 10); // …the shrink does not
   });
 });
 

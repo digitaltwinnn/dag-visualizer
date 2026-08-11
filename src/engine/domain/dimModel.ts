@@ -54,17 +54,23 @@ export interface DimContext {
 // ribbons' RIBBON_DIM speaks.)
 export const nodeDimScale = (c: DimContext): number => viewMix(c, "dim");
 
-// HIDE IS NOT DIM (user, 2026-08-11). A dim `d` mutes a node three ways — colour toward DIM,
-// emissive suppression, and SHRINK — but the third one isn't a dim at all: it's geo's ISOLATE,
-// "off-filter nodes vanish on the globe" (js/globe.js:896-904). It rode the same number only
-// because that number was pinned in hyper, so the shrink was never visible there; the moment the
-// strengths became tunable it was the FIRST thing a turned-up knob did, and a node dimmed to
-// nothing can't be "more muted". So the row says what FRACTION of the dim hides rather than
-// mutes: 1 on the globe (bit-identical isolate), 0 in hyper (mute in place, full size) and 0 in
-// the ledger, whose chips are uniform-sized by their own rule anyway.
-// Given a node's already-resolved dim, this returns how far it shrinks; the callers compose the
-// gather escape hatch (parked squares show the whole fleet) on top.
-export const hideFrac = (c: DimContext, d: number): number => d * viewMix(c, "hide");
+// HIDE IS NOT DIM (user, 2026-08-11). A dim mutes a node two ways — colour toward DIM and emissive
+// suppression — but geo does a third thing that isn't a dim at all: the ISOLATE, "off-filter nodes
+// vanish on the globe" (js/globe.js:896-904). It rode the same number only because that number was
+// pinned in hyper, so the shrink was never visible there; the moment the strengths became tunable it
+// was the FIRST thing a turned-up knob did, and a node dimmed to nothing can't be "more muted".
+//
+// So `hide` is its own STRENGTH ON THE SAME RAW RAMP as `dim`, not a fraction of the dim's output
+// (user, 2026-08-11: turning `dim` was resizing nodes whenever `hide` was non-zero — one knob moving
+// two effects is not a knob). Two independent readings of one ramp: `dim` says how far an off-filter
+// node mutes, `hide` how far it shrinks away. 1 on the globe (bit-identical isolate, since geo's dim
+// is 1.0 too), 0 in hyper (mute in place, full size) and 0 in the ledger, whose chips are
+// uniform-sized by their own rule anyway.
+//
+// Reading the RAW ramp is also what keeps the country drill a LENS: `nodeDim`'s countryMix raise is
+// a mute, and must never shrink the nodes it looks past.
+// Callers compose the gather escape hatch (parked squares show the whole fleet) on top.
+export const hideFrac = (c: DimContext, raw: number): number => raw * viewMix(c, "hide");
 
 // Set the dim TARGETS for a selection (the dim itself eases each frame; the per-view STRENGTH is
 // applied in the node loops). The validators ARE the DAG core → lit under "all"/"dag", dimmed only
@@ -111,7 +117,7 @@ export const focusWeightOf = (primary: boolean, group: boolean): number =>
 export interface FocusRow {
   /** Network/country dim strength for EVERY node — DAG core and metagraph alike (`nodeDimScale`). */
   dim: number;
-  /** How much of that dim SHRINKS the node away rather than muting it — `hideFrac`. */
+  /** How far an off-filter node SHRINKS AWAY — geo's isolate. Independent of `dim`; see `hideFrac`. */
   hide: number;
   /** How far the OTHER nodes drop when one node is the focus — `focusDim`. */
   back: number;
@@ -149,7 +155,7 @@ const viewMix = (c: DimContext, k: keyof FocusRow): number =>
 
 export const FOCUS_ROW_SCHEMA: TuneSchema<FocusRow> = {
   dim: { min: 0, max: 1, label: "dim · off-filter" },
-  hide: { min: 0, max: 1, label: "hide (vs mute)" },
+  hide: { min: 0, max: 1, label: "hide · off-filter" },
   back: { min: 0, max: 1, label: "dim-back on focus" },
   boost: { min: 0, max: 3, step: 0.05, label: "focus boost" },
 };
