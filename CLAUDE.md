@@ -171,6 +171,13 @@ trap, because you would be looking at last week's knobs believing they were the 
 them; today that is the focus TIER ranking alone. `dimModel`'s four resolvers all go through one
 `viewMix(c, field)`, so a new emphasis number is a field on the row and nothing else.
 
+⚠️ **HIDE IS NOT DIM** (user, 2026-08-11). A dim number used to drive three effects, and one of them —
+scaling the node to nothing — is geo's ISOLATE, not a mute. It only rode along because hyper's
+metagraph dim was pinned to 0, so the shrink was never seen there; the moment the knob existed it was
+the first thing it did. The shrink is now its own row field, `hide`, resolved by `hideFrac()` — geo
+keeps `1` (off-filter nodes vanish on the globe), hyper and the ledger `0`, so a dim there mutes in
+place. Any new effect a dim number reaches must ask the same question before joining it.
+
 **The camera folder is a READOUT, not sliders**: poses are ~8 constants and each needs its own selection
 state to even see, so orbiting to a pose you like and reading it off beats dragging numbers.
 `capture ← live` dumps the raw `pos`/`target` **with a caution naming the levers the Engine composes on

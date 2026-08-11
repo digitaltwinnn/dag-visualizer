@@ -61,6 +61,18 @@ export const dimScale = (c: DimContext): number => viewMix(c, "core");
 // hyper when a metagraph is the subject (the core-preview cue).
 export const metaDimScale = (c: DimContext): number => viewMix(c, "meta");
 
+// HIDE IS NOT DIM (user, 2026-08-11). A dim `d` mutes a node three ways — colour toward DIM,
+// emissive suppression, and SHRINK — but the third one isn't a dim at all: it's geo's ISOLATE,
+// "off-filter nodes vanish on the globe" (js/globe.js:896-904). It rode the same number only
+// because that number was pinned in hyper, so the shrink was never visible there; the moment the
+// strengths became tunable it was the FIRST thing a turned-up knob did, and a node dimmed to
+// nothing can't be "more muted". So the row says what FRACTION of the dim hides rather than
+// mutes: 1 on the globe (bit-identical isolate), 0 in hyper (mute in place, full size) and 0 in
+// the ledger, whose chips are uniform-sized by their own rule anyway.
+// Given a node's already-resolved dim, this returns how far it shrinks; the callers compose the
+// gather escape hatch (parked squares show the whole fleet) on top.
+export const hideFrac = (c: DimContext, d: number): number => d * viewMix(c, "hide");
+
 // Set the dim TARGETS for a selection (the dim itself eases each frame; the per-view STRENGTH is
 // applied in the node loops). The validators ARE the DAG core → lit under "all"/"dag", dimmed only
 // when a metagraph is selected (both layers together — the L0/L1 split filters are gone).
@@ -110,6 +122,8 @@ export interface FocusRow {
   core: number;
   /** …and for the METAGRAPH pool — `metaDimScale`. Hyper rests at 0 on purpose; see its note. */
   meta: number;
+  /** How much of that dim SHRINKS the node away rather than muting it — `hideFrac`. */
+  hide: number;
   /** How far the OTHER nodes drop when one node is the focus — `focusDim`. */
   back: number;
   /** Emissive added to the focused node — `focusBoost`. */
@@ -123,9 +137,9 @@ export interface FocusShared {
 }
 
 export const FOCUS_TUNE_DEFAULTS: Readonly<Record<View3D, Readonly<FocusRow>>> = {
-  hyper: { core: 0.32, meta: 0, back: 0.45, boost: 1.4 },
-  geo: { core: 1.0, meta: 1.0, back: 0.65, boost: 0.7 },
-  ledger: { core: 0.5, meta: 0.5, back: 0.55, boost: 0.7 },
+  hyper: { core: 0.32, meta: 0, hide: 0, back: 0.45, boost: 1.4 },
+  geo: { core: 1.0, meta: 1.0, hide: 1, back: 0.65, boost: 0.7 },
+  ledger: { core: 0.5, meta: 0.5, hide: 0, back: 0.55, boost: 0.7 },
 };
 
 export const FOCUS_SHARED_DEFAULTS: Readonly<FocusShared> = { groupShare: GROUP_FOCUS };
@@ -147,6 +161,7 @@ const viewMix = (c: DimContext, k: keyof FocusRow): number =>
 export const FOCUS_ROW_SCHEMA: TuneSchema<FocusRow> = {
   core: { min: 0, max: 1, label: "dim · DAG core" },
   meta: { min: 0, max: 1, label: "dim · metagraphs" },
+  hide: { min: 0, max: 1, label: "hide (vs mute)" },
   back: { min: 0, max: 1, label: "dim-back on focus" },
   boost: { min: 0, max: 3, step: 0.05, label: "focus boost" },
 };

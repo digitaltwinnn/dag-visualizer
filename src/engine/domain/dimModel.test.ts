@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import {
   dimScale,
   metaDimScale,
+  hideFrac,
   focusDim,
   focusBoost,
   focusWeightOf,
@@ -74,6 +75,30 @@ describe("metaDimScale", () => {
   it("is the ledger row's flat 0.5 in the Snapshots view, whatever the morph", () => {
     expect(metaDimScale(ctx({ morph: 0, ledger: true }))).toBeCloseTo(0.5, 10);
     expect(metaDimScale(ctx({ morph: 1, ledger: true }))).toBeCloseTo(0.5, 10);
+  });
+});
+
+describe("hideFrac (the shrink half of a dim, split out from the mute half)", () => {
+  // HIDE IS NOT DIM (user, 2026-08-11). A dim mutes three ways — colour, emissive, and SHRINK —
+  // and the third is geo's ISOLATE, not an emphasis at all. Splitting it onto its own row field
+  // is what lets hyper's dim mute a node in place instead of shrinking it away.
+  it("is the FULL dim on the globe — the off-filter isolate is bit-identical", () => {
+    expect(hideFrac(ctx({ morph: 1 }), 1)).toBeCloseTo(1, 10);
+    expect(hideFrac(ctx({ morph: 1 }), 0.4)).toBeCloseTo(0.4, 10);
+  });
+
+  it("is ZERO in hyper at any dim — a turned-up dim mutes in place, at full size", () => {
+    expect(hideFrac(ctx({ morph: 0 }), 1)).toBeCloseTo(0, 10);
+    expect(hideFrac(ctx({ morph: 0 }), 0.5)).toBeCloseTo(0, 10);
+  });
+
+  it("is ZERO in the ledger, whose chips are uniform-sized by their own rule", () => {
+    expect(hideFrac(ctx({ morph: 0, ledger: true }), 1)).toBeCloseTo(0, 10);
+    expect(hideFrac(ctx({ morph: 1, ledger: true }), 1)).toBeCloseTo(0, 10);
+  });
+
+  it("ramps with the morph, so the isolate arrives as the nodes land", () => {
+    expect(hideFrac(ctx({ morph: 0.5 }), 1)).toBeCloseTo(0.5, 10);
   });
 });
 
@@ -384,6 +409,18 @@ describe("FOCUS_TUNE", () => {
       expect(focusBoost(c)).toBeCloseTo(1.4 - 0.7 * morph, 10);
       // `meta` used to be a bare `c.morph` ramp with no knob at all — lerp(0, 1) IS that.
       expect(metaDimScale(c)).toBeCloseTo(morph, 10);
+    }
+  });
+
+  // The GEO isolate is the shipped behaviour `hide` was split out of, and it must not move:
+  // there, hide is 1, so the shrink is the whole dim exactly as the inline `1 - dEff` was.
+  // Hyper is the deliberate change — it used to shrink the DAG core by dim×0.32 and now mutes
+  // it in place (user, 2026-08-11). Mid-morph values are unobservable: `morph` is snapped at the
+  // transition's invisible boundary frame, never eased through.
+  it("leaves the geo isolate bit-identical while releasing hyper's shrink", () => {
+    for (const d of [0.25, 0.5, 1]) {
+      expect(hideFrac(ctx({ morph: 1 }), d)).toBeCloseTo(d, 10);
+      expect(hideFrac(ctx({ morph: 0 }), d)).toBeCloseTo(0, 10);
     }
   });
 

@@ -26,7 +26,6 @@ import * as geoStats from "../domain/geoStats";
 import { R, LAND_H, CHIP_PITCH, HEX_H, VALIDATOR_HEX_R, META_HEX_R, latLonToVec3, vec3ToLatLon } from "../domain/geoLayout";
 import { armillaryFrame, ringFramePos, ringNormal, armillaryRings, armillaryPos, nodeRoles, spreadCoLocated } from "../domain/nodeLayout";
 import { surfFade, extrasFade } from "../domain/morph";
-import { dimScale } from "../domain/dimModel";
 import { ArcSim, type ArcEndpoint } from "../domain/arcSim";
 import type { MetaNodeRecord, ValidatorRecord } from "../domain/records";
 import { buildGeoView, setCountryBorder, setCountryFillMask, HOVER_MASK_BOOST, type GeoViewHost } from "./views/GeoView";
@@ -225,7 +224,7 @@ export class Globe implements GeoViewHost {
         morph: 0, hoverFilterActive: false, ledger: false, countryFilter: null,
         countryMix: 0, hoverNodeId: null, hoverCohort: null, selectedNodeId: null, filter: "all",
       },
-      dim: 0, dimScaleV: 0, clock: 0, camN: this._camN, hasCam: false,
+      dim: 0, clock: 0, camN: this._camN, hasCam: false,
       ledgerT: 0, dt: 0, flashDecay: 0, group: this.group,
       transition: null,
       gather: { origin: new THREE.Vector3(), right: new THREE.Vector3(), up: new THREE.Vector3(), quat: new THREE.Quaternion(), cell: GATHER_CELL },
@@ -1035,11 +1034,6 @@ export class Globe implements GeoViewHost {
     c.selectedNodeId = this._selectedNodeId;
     c.filter = this.filter;
     ctx.dim = this.dim;
-    // domain/dimModel.dimScale(c) — the VALIDATOR morph-ramped dim strength; still read
-    // directly by NodeFabric.placeValidators' scale/visibility writes. (No metaDimScale
-    // counterpart here — the metagraph loop now calls metaNodeDim(c, ...) directly, the only
-    // consumer that strength ever had.)
-    ctx.dimScaleV = dimScale(c);
     ctx.clock = this.clock;
     ctx.hasCam = this._hasCam;
     ctx.ledgerT = this.ledgerT;

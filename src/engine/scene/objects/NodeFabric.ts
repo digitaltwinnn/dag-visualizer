@@ -16,7 +16,7 @@ import * as THREE from "three";
 import { LEDGER } from "../../domain/ledgerLayout";
 import { HEX_H } from "../../domain/geoLayout";
 import { discFall, lerp, smooth } from "../../domain/nodeLayout";
-import { validatorDim, metaNodeDim, nodeEmissive, metaNodeEmissive, hubMatchBoost, focusWeightOf } from "../../domain/dimModel";
+import { validatorDim, metaNodeDim, nodeEmissive, metaNodeEmissive, hubMatchBoost, focusWeightOf, hideFrac } from "../../domain/dimModel";
 import type { DimContext } from "../../domain/dimModel";
 import type { MetaNodeRecord, ValidatorRecord } from "../../domain/records";
 import type { ViewTransition } from "../../domain/viewTransition";
@@ -61,13 +61,9 @@ const geoCcOf = (pick: PickDescriptor): string | null =>
 export interface FrameCtx {
   c: DimContext;        // the pure dim context (morph/filter/country/hover/ledger…)
   dim: number;          // Globe's eased whole-core validator dim (ONE value for the DAG core)
-  // domain/dimModel.dimScale(c) — the VALIDATOR morph-ramped dim strength. Still read directly
-  // by placeValidators' scale/visibility writes (showL/show); writeValidatorGlow no longer
-  // reads it — validatorDim(c, dim, geoCc) recomputes it internally. (No `dimScaleMetaV` twin:
-  // the metagraph loop's only consumer of that strength was its own dim calc, now entirely
-  // inside metaNodeDim(c, r.dim, geoCc) — nothing else read the raw value, so the field was
-  // dropped rather than kept unused.)
-  dimScaleV: number;
+  // (No `dimScaleV`/`dimScaleMetaV` fields: BOTH loops resolve their own strength through the
+  // domain — validatorDim(c, dim, geoCc) and metaNodeDim(c, r.dim, geoCc) — so passing the raw
+  // ramp alongside them would only be a second copy of the same number waiting to disagree.)
   clock: number;        // Globe.clock (accumulated seconds)
   camN: THREE.Vector3;  // camera direction in the group's local frame (disc falloff)
   hasCam: boolean;
@@ -338,7 +334,7 @@ export class NodeFabric {
   // morph (or the ledger lane placement), sets their visibility, and returns the reused pickables.
   placeValidators(records: ValidatorRecord[], ctx: FrameCtx): THREE.Object3D[] {
     if (!this.instSphere || !this.instHex) return this.pickables;
-    const { c, dim, dimScaleV, ledgerT, clock: t, camN, hasCam } = ctx;
+    const { c, dim, ledgerT, clock: t, camN, hasCam } = ctx;
     const m = c.morph;
     const e = smooth(m);
     // Keep the spheres full-size for the whole flight so their movement reads clearly, then
@@ -388,12 +384,10 @@ export class NodeFabric {
         _dummy.position.copy(dir).multiplyScalar(lerp(u.hyperRadius, u.geoRadius, e));
       }
 
-      // Off-filter nodes vanish on the hyper->globe morph but stay visible (just dimmed) in hyper —
-      // the hide scales with the morph `m` (via dimScaleV). See js/globe.js:896-904.
-      let hideV = dim;
-      const geoCc = geoCcOf(u.pick);
-      if (c.countryFilter && (!geoCc || geoCc !== c.countryFilter)) hideV = Math.max(hideV, c.countryMix);
-      let show = 1 - hideV * dimScaleV; // SAME ramped dim as the validator glow
+      // Off-filter nodes SHRINK AWAY on the globe and merely mute in hyper — dimModel.hideFrac
+      // owns that split (the dim itself is validatorDim, the same call the glow loop makes, so
+      // there is no inline mirror of the country-raise left here to drift).
+      let show = 1 - hideFrac(c, validatorDim(c, dim, geoCcOf(u.pick)));
       show += (1 - show) * gw; // parked squares show the whole fleet (dim re-applies on landing)
 
       // Sphere: tumbling on its own axis, cross-fading into the chip ALONG the gather flight
@@ -506,6 +500,11 @@ export class NodeFabric {
       // when outside the drilled-into country (geo only); LEDGER forces a flat 0.82 (morph
       // frozen). CALLS the domain function directly now (no inline mirror).
       const dEff = metaNodeDim(c, r.dim, geoCc);
+      // dimModel.hideFrac: how much of that dim SHRINKS the node rather than muting it — 1 on the
+      // globe (the isolate), 0 in hyper, where a turned-up dim mutes in place at full size. The
+      // gather escape hatch lifts it back: parked squares show the whole fleet.
+      const hid = hideFrac(c, dEff);
+      const vis = (1 - hid) + hid * gw;
       // Base glow rests LOW in hyper (0.33 — the old 0.47 × the retired 0.32-dim suppression:
       // the dimmed look IS the resting look now, user 2026-07-17), easing UP to the unchanged
       // globe value (0.37) as the nodes land. Passed to metaNodeEmissive as `base`; also needed
@@ -572,24 +571,21 @@ export class NodeFabric {
 
       // Sphere: tumbling on its own axis, cross-fading out as the node lands (see the validator
       // loop), resting at META_REST_SCALE in hyper and easing back to full size over the flight
-      // (so the sphere→chip handoff stays exactly as before). Filtered-out metagraph nodes
-      // shrink fully (1 - dEff; geo only — dEff is pinned 0 in hyper).
+      // (so the sphere→chip handoff stays exactly as before). Off-filter metagraph nodes shrink
+      // fully out on the globe and stay full-size (just muted) in hyper — `vis`, above.
       _qSpin.setFromAxisAngle(r.spinAxis, r.spinPhase + clock * r.spinSpeed);
       _dummy.quaternion.copy(_qSpin);
       const rest = META_REST_SCALE + (1 - META_REST_SCALE) * m;
-      const visM = (1 - dEff) + dEff * gw; // parked squares show the whole fleet
-      _dummy.scale.setScalar(r.hyperSize * rest * (1 - wEff) * visM);
+      _dummy.scale.setScalar(r.hyperSize * rest * (1 - wEff) * vis);
       this._applyGather(ctx, r.gU, r.gV, gw, prim);
       _dummy.updateMatrix();
       this.metaSphere.setMatrixAt(r.index, _dummy.matrix);
 
-      // HEX PRISM standing tangent at geoPos (honeycomb cell + stack level baked in). Hide (not
-      // dim) metagraph nodes outside the selection — the (1 - dEff) factor shrinks them fully out.
+      // HEX PRISM standing tangent at geoPos (honeycomb cell + stack level baked in).
       const fall = hasCam ? discFall(r.geoDir.dot(camN)) : 1;
       _qRadial.setFromUnitVectors(Y_AXIS, r.geoDir);
       _dummy.quaternion.copy(_qRadial);
-      const visH = (1 - dEff) + dEff * gw;
-      const gM = wEff * (fall + (1 - fall) * gw) * visH; // fall lifts with gw (see validators)
+      const gM = wEff * (fall + (1 - fall) * gw) * vis; // fall lifts with gw (see validators)
       _dummy.scale.set(r.geoSize * gM, HEX_H * gM, r.geoSize * gM);
       this._applyGather(ctx, r.gU, r.gV, gw, prim);
       _dummy.updateMatrix();
