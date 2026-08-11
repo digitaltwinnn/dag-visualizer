@@ -14,38 +14,28 @@ import { METAGRAPHS } from "../../config";
 import { BAR_H, BAR_D, BAR_LIFT, FLOOR_Y, LEAD_X } from "../../domain/ledgerLayout";
 import { type BarSpec } from "../../domain/ledgerBands";
 import { SLOT_SP, SLOT_N, horizonAt } from "../../domain/ledgerModel";
-import { RIBBON_DIM } from "./Ribbons";
+import { snapBright, snapFocusOf, emphasisK } from "../../domain/dimModel";
+import type { TuneSchema } from "../../tune";
 
 const BANDS_PER_SLOT = METAGRAPHS.length + 1;
 
-/** The live-tunable bar look — the SAME parameter vocabulary as the tiles' TileTune (user,
- *  2026-08-07: the two snapshot instruments share one tuning language; no blueprint needed,
- *  the shared names ARE the reuse). Values are the shipped look. */
+/** The live-tunable bar look. `rest` is the bands' own resting OPACITY — the one number the bar
+ *  still keeps of its own, because the tiles' matching `rest` is a colour multiplier and the two
+ *  are different quantities. Everything above rest is the shared snapshot vocabulary
+ *  (domain/dimModel.ts · snapBright): the off-filter dim, the focus boost and the dim-back are the
+ *  ledger row's knobs, the same ones the node chips in the trays answer to. */
 export interface BarTune {
-  hot: number;  // the lead/selected row's bands
   rest: number; // a resting band's opacity
 }
 
-// hot/rest user-tuned via ?tune, 2026-08-07. (The off-filter dim was removed entirely the same
-// day — a committed filter changes the CAMERA, never the bar.)
-export const BAR_TUNE_DEFAULTS: BarTune = { hot: 0.7, rest: 0.05 };
+// rest user-tuned via ?tune, 2026-08-07. (`hot` retired 2026-08-11 — it was exactly the ledger
+// row's `boost`, and a snapshot is data, so it takes the node's focus knob instead.)
+export const BAR_TUNE_DEFAULTS: BarTune = { rest: 0.05 };
 
-/** The HOVER-preview tier (user, 2026-08-07): a hovered snapshot row shows its identity
- *  colours at this fraction of the hot level — the ACTIVE row stays fully coloured, the
- *  preview reads as "this is what a click pins". Deliberately the OFF-FILTER dim's family
- *  (RIBBON_DIM 0.2), a bit brighter — one dim language, two nearby levels. Shared with the
- *  tiles and the hover ribbon row. */
-export const SNAP_PREVIEW = 0.3;
-
-/** The COMMITTED-NETWORK resting tier (user, 2026-08-09 — "when a metagraph is selected, give
- *  all the blocks their real metagraph color and not the neutral cyan"): with a filter committed,
- *  that network's OWN bands and lane tiles keep their identity hue down the WHOLE trail, not just
- *  on the hot row — the committed story reads as one coloured thread through the chamber while
- *  every other network's resting rows stay the neutral trail. Expressed as a fraction of `hot`,
- *  like the preview tier; it sits BELOW the preview (a hover still previews louder than a
- *  standing commitment) and above the neutral rest, which `dimTiers.test.ts` pins. Shared by the
- *  bar and the tiles. */
-export const SNAP_ONNET = 0.17;
+/** The `?tune` knob ranges (contract: src/engine/tune.ts), colocated with the numbers they bound. */
+export const BAR_TUNE_SCHEMA: TuneSchema<BarTune> = {
+  rest: { min: 0, max: 1 },
+};
 
 interface Slot {
   ordinal: number;
@@ -147,11 +137,15 @@ export class ByteBar {
   }
 
   setAlpha(a: number): void { this._alpha = a; }
+  /** The SHOWN row — an explicit pin, or the row a live follow is sitting on. It keeps identity hue
+   *  down the trail AND owns the focus: how it was reached is not what it is (user, 2026-08-11), so
+   *  live and pinned read alike. What is NOT a focus is the bare lead with nothing selected.
+   *  A SLOT, so the view re-pushes it every frame — every tick re-slots the trail under it. */
   setSelected(slot: number): void { this._selected = slot; }
   /** The transient hover row — colored-dim preview, never demotes the active row. */
   setHovered(slot: number): void { this._hovered = slot; }
-  /** Committed-or-hovered network → the other metagraphs' bands take the COLORED dim
-   *  (identity hue at RIBBON_DIM; the unlisted band dims with them). */
+  /** Committed-or-hovered network → the other metagraphs' bands take the COLORED dim (identity hue
+   *  at the ledger row's `dim`, the same knob its node chips answer; unlisted dims with them). */
   setFilter(filter: string): void { this._filter = filter || "all"; }
 
   /** The trail-REWIND offset (LedgerView drives it): the whole bar group slides +X so the
@@ -162,7 +156,14 @@ export class ByteBar {
   }
 
   update(dt: number): void {
-    const k = Math.min(1, dt * 5);
+    // dimModel.emphasisK: the ONE emphasis-easing rate, shared with the node fabric and the lane
+    // tiles. It replaces the local rate this bar used to ease its opacity at (slightly faster now);
+    // `k` drives nothing geometric here, only `s.mats[i].opacity`.
+    const k = emphasisK(dt);
+    // A focus is a SELECTED row or a hovered one. The bare lead is neither: with nothing selected
+    // the chamber is simply running, and stepping the whole trail back against a row it advanced
+    // onto by itself would make `back` a second `rest` rather than a focus effect.
+    const anyFocus = this._hovered >= 0 || this._selected >= 0;
     for (let si = 0; si < this._slots.length; si++) {
       const s = this._slots[si];
       const x = LEAD_X - si * SLOT_SP + this._off;
@@ -172,26 +173,36 @@ export class ByteBar {
       // the front one below, so no bar floats on glass that has already faded out.
       const fade = horizonAt(x);
       const hot = si === this._selected || si === 0;
-      const hov = !hot && si === this._hovered;
+      const hov = si === this._hovered;
+      // The one row that owns the focus (see `anyFocus`) — `_selected` is -1 when none does. Note
+      // this is NOT `hot`, which also colours the bare lead: the lead keeps identity hue whether or
+      // not it is selected, but hue is the chamber's own reading and never lifts brightness.
+      const pinned = si === this._selected;
       // Rows the rewind pushed past the front edge dissolve within one slot of travel.
       const over = (x - LEAD_X) / (SLOT_SP * 0.9);
       const front = over <= 0 ? 1 : Math.max(0, 1 - over);
       for (let i = 0; i < s.used; i++) {
-        // Four tiers: the ACTIVE row (lead/pinned) full identity, the HOVERED row identity at
-        // the preview fraction (a colored dim — the active never demotes for a hover), the
-        // COMMITTED NETWORK's own bands at the on-net resting tier so its thread stays its own
-        // colour all the way down the trail, everything else the neutral trail. A committed or
-        // hovered NETWORK additionally dims the other networks' bands in their own hue.
+        // Brightness is the node vocabulary (snapBright); COLOUR is the chamber's own independent
+        // reading — the shown row, a hover preview and the committed network's own bands carry
+        // identity hue all the way down the trail, everything else stays the neutral trail.
         const offNet = this._filter !== "all" && s.keys[i] !== this._filter;
         const onNet = !hot && !hov && this._filter !== "all" && s.keys[i] === this._filter;
-        const base = hot
-          ? this.tune.hot
-          : hov
-            ? this.tune.hot * SNAP_PREVIEW
-            : onNet
-              ? this.tune.hot * SNAP_ONNET
-              : this.tune.rest;
-        const t = base * fade * front * (offNet ? RIBBON_DIM : 1) * this._alpha;
+        // The BOOST answers the SELECTION, not the front position (user, 2026-08-11): the bare
+        // lead is simply where the chamber is running, already named by its place at the front edge
+        // and by keeping identity hue, so lifting it automatically made `boost` a second `rest` and
+        // left a hover with nothing to add. A live follow's row IS selected, so it reads exactly
+        // like a pin — how the selection was reached is not what it is. And the focus is the ROW's,
+        // while a row holds every network's bytes: under a committed filter it reaches that
+        // network's band alone (`snapFocusOf`), or the undimmed boost would lift the very bands the
+        // dim is there to push behind it.
+        const focus = snapFocusOf(pinned, hov, offNet);
+        // `back` is the ROW's answer, so the focused row never steps back — its OFF-FILTER bands
+        // included (user, 2026-08-11): they take the dim alone, the same tier the RIBBON landing on
+        // this band takes, so a ribbon and its two endpoints read at one level. Compounding
+        // dim × back left a band near-black under a ribbon that was only gently dimmed.
+        const rowFocus = pinned || hov;
+        const t = snapBright(this.tune.rest, offNet, focus, anyFocus && !rowFocus)
+          * fade * front * this._alpha;
         s.mats[i].opacity += (t - s.mats[i].opacity) * k;
         s.mats[i].color.setHex(hot || hov || onNet ? s.colors[i] : this._neutral);
       }

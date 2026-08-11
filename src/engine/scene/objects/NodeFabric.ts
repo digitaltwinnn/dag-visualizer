@@ -16,7 +16,7 @@ import * as THREE from "three";
 import { LEDGER } from "../../domain/ledgerLayout";
 import { HEX_H } from "../../domain/geoLayout";
 import { discFall, lerp, smooth } from "../../domain/nodeLayout";
-import { validatorDim, metaNodeDim, nodeEmissive, metaNodeEmissive, hubMatchBoost, focusWeightOf } from "../../domain/dimModel";
+import { nodeDim, nodeEmissive, nodeGlow, hubMatchBoost, focusWeightOf, hideFrac, emphasisK } from "../../domain/dimModel";
 import type { DimContext } from "../../domain/dimModel";
 import type { MetaNodeRecord, ValidatorRecord } from "../../domain/records";
 import type { ViewTransition } from "../../domain/viewTransition";
@@ -33,11 +33,6 @@ export const ORB_FRESNEL_MIX = "(0.72 + 0.9 * fres)";
 // The geo hex prisms' resting opacity — slightly glassy (user: replaces the wireframe overlay,
 // which never read as clean edges). Depth-write stays ON so stacks occlude normally.
 const HEX_ALPHA = 0.92;
-// Metagraph spheres' RESTING scale in the Hypergraph — the old 0.32-dim shrink (×0.68) baked in
-// as the normal state (user, 2026-07-17: the hover-dim size IS the right size; the dim itself is
-// inert in hyper now, see domain/dimModel.metaDimScale). Eases back to full size over the morph,
-// so the sphere→chip handoff and the hex chips' geo sizing are unchanged.
-const META_REST_SCALE = 0.68;
 const GATHER_SCALE = 0.22; // uniform node size at the staging grid (tidy, equal pixels)
 const DIM = new THREE.Color(0x223046);
 const _dummy = new THREE.Object3D(); // reused to compose per-instance matrices
@@ -61,13 +56,9 @@ const geoCcOf = (pick: PickDescriptor): string | null =>
 export interface FrameCtx {
   c: DimContext;        // the pure dim context (morph/filter/country/hover/ledger…)
   dim: number;          // Globe's eased whole-core validator dim (ONE value for the DAG core)
-  // domain/dimModel.dimScale(c) — the VALIDATOR morph-ramped dim strength. Still read directly
-  // by placeValidators' scale/visibility writes (showL/show); writeValidatorGlow no longer
-  // reads it — validatorDim(c, dim, geoCc) recomputes it internally. (No `dimScaleMetaV` twin:
-  // the metagraph loop's only consumer of that strength was its own dim calc, now entirely
-  // inside metaNodeDim(c, r.dim, geoCc) — nothing else read the raw value, so the field was
-  // dropped rather than kept unused.)
-  dimScaleV: number;
+  // (No `dimScaleV` field: BOTH loops resolve their strength through the domain's one
+  // nodeDim(c, raw, geoCc), so passing the raw ramp alongside it would only be a second copy of
+  // the same number waiting to disagree.)
   clock: number;        // Globe.clock (accumulated seconds)
   camN: THREE.Vector3;  // camera direction in the group's local frame (disc falloff)
   hasCam: boolean;
@@ -338,7 +329,7 @@ export class NodeFabric {
   // morph (or the ledger lane placement), sets their visibility, and returns the reused pickables.
   placeValidators(records: ValidatorRecord[], ctx: FrameCtx): THREE.Object3D[] {
     if (!this.instSphere || !this.instHex) return this.pickables;
-    const { c, dim, dimScaleV, ledgerT, clock: t, camN, hasCam } = ctx;
+    const { c, dim, ledgerT, clock: t, camN, hasCam } = ctx;
     const m = c.morph;
     const e = smooth(m);
     // Keep the spheres full-size for the whole flight so their movement reads clearly, then
@@ -388,12 +379,10 @@ export class NodeFabric {
         _dummy.position.copy(dir).multiplyScalar(lerp(u.hyperRadius, u.geoRadius, e));
       }
 
-      // Off-filter nodes vanish on the hyper->globe morph but stay visible (just dimmed) in hyper —
-      // the hide scales with the morph `m` (via dimScaleV). See js/globe.js:896-904.
-      let hideV = dim;
-      const geoCc = geoCcOf(u.pick);
-      if (c.countryFilter && (!geoCc || geoCc !== c.countryFilter)) hideV = Math.max(hideV, c.countryMix);
-      let show = 1 - hideV * dimScaleV; // SAME ramped dim as the validator glow
+      // Off-filter nodes SHRINK AWAY on the globe and merely mute in hyper — dimModel.hideFrac
+      // owns that split. It reads the RAW ramp, not the resolved dim, so the two knobs are
+      // independent (and the country drill's mute can never shrink a node — lens, not filter).
+      let show = 1 - hideFrac(c, dim);
       show += (1 - show) * gw; // parked squares show the whole fleet (dim re-applies on landing)
 
       // Sphere: tumbling on its own axis, cross-fading into the chip ALONG the gather flight
@@ -431,38 +420,50 @@ export class NodeFabric {
   // country drill is in flight) the base colour; decays each node's arc flash.
   writeValidatorGlow(records: ValidatorRecord[], ctx: FrameCtx): void {
     if (!this.instSphere || !this.instHex || !this.aEmiSphere || !this.aEmiHex) return;
-    const { c, dim, flashDecay } = ctx;
+    const { c, dim, dt, flashDecay } = ctx;
     const cf = c.countryFilter, cmix = c.countryMix;
+    // dimModel.emphasisK: emphasis EASES rather than snapping (user, 2026-08-11). Hoisted here,
+    // read as a local in the loop — the tune hoist rule.
+    const ek = emphasisK(dt);
     // While a country drill-down is active, per-node dim varies, so recolour every frame; otherwise
     // only during a layer-dim transition.
     const recolour = cf != null || cmix > 0.001 ||
       Math.abs(dim - this._appliedDim) > 0.001;
     const base = this.baseArr;
     const emi = this.emiArr;
-    // A hovered/selected node dims the rest so it stands out — same in both views.
+    // A hovered/selected node dims the rest so it stands out — same in every view, and NOT gated
+    // on the committed filter (user, 2026-08-11): `dim` answers filter membership and `back`
+    // answers focus, one effect each, so making `back` a function of the filter handed it the
+    // other knob's job. The gate is why the ledger's node trays never stepped back while its
+    // snapshots did — nodes and snapshots are two subjects sharing one emphasis vocabulary, and
+    // within each the dim-back must fire exactly when that subject's focus takes its boost.
     const focusId = c.hoverNodeId || c.selectedNodeId || c.hoverCohort;
-    const dimOthersOnFocus = c.filter === "all" || c.filter === "dag";
     for (const u of records) {
       const geoCc = geoCcOf(u.pick);
-      // dimModel.validatorDim: dim * dimScale(c) (the morph-ramped strength), raised by the
+      // dimModel.nodeDim: dim * nodeDimScale(c) (the morph-ramped strength), raised by the
       // country dim outside the drilled-into country (geo only) — CALLS the domain function
       // directly now (no inline mirror).
-      const d = validatorDim(c, dim, geoCc);
+      const d = nodeDim(c, dim, geoCc);
       // dimModel.focusWeightOf: the hovered/selected node itself takes the FULL boost, a mere
       // member of a focused group (a hovered/committed provider cohort) only a share — so
-      // picking one node inside a lit cohort still reads (user, 2026-08-01).
+      // picking one node inside a lit cohort still reads (user, 2026-08-01). Since 2026-08-11 a
+      // COMMITTED group yields the channel to a committed node (Globe._frameCtx), so this tier
+      // now ranks a group that is either hovered or the finest committed rung — the case it was
+      // written for, hovering a node inside a lit cohort, is unchanged.
       const fw = focusWeightOf(
         u.nodeId === c.hoverNodeId || u.nodeId === c.selectedNodeId,
         !!u.nodeId && !!c.hoverCohort?.has(u.nodeId),
       );
-      // dimModel.nodeEmissive: SAME glow model as the metagraph nodes (user: the DAG's globe
-      // hexes must read like any metagraph's — one node language). Base LIFTED in hyper (nodes
-      // read too dim on the flat backdrop) and eased DOWN on the globe (they read too hot
-      // against the density light pools, esp. the dense DAG stacks) — user. baseLo/baseHi are
-      // the live validator endpoints (0.47 hyper -> 0.37 globe). Steady; the old twinkle
-      // shimmer was removed. Also composes the hover/selection focus boost/dim-back inside.
+      // dimModel.nodeEmissive: the SAME glow model the metagraph loop below calls (user: one node
+      // model — the DAG core's nodes are metagraph nodes that orbit the origin). The base's
+      // hyper→globe endpoints live in the domain, so the two call sites cannot pass different
+      // ones. Steady; the old twinkle shimmer was removed. Also composes the hover/selection
+      // focus boost/dim-back inside. No hubBoost: the core has no orbiting hub to match.
       const flRaw = u._flash || 0; // brief flash when an arc pulse reaches this node
-      emi[u.index] = nodeEmissive(c, d, flRaw, fw, !!focusId && dimOthersOnFocus, 0.47, 0.37);
+      // The buffer IS the easing state — emiArr persists across frames and a node keeps its slot,
+      // so approaching the target in place costs one array read and allocates nothing.
+      const emiT = nodeEmissive(c, d, flRaw, fw, !!focusId);
+      emi[u.index] += (emiT - emi[u.index]) * ek;
       if (flRaw) u._flash = flRaw * flashDecay;
 
       if (recolour) {
@@ -491,41 +492,44 @@ export class NodeFabric {
     const e = smooth(m);                                              // flight progress
     const w = smooth(THREE.MathUtils.clamp((m - 0.82) / 0.16, 0, 1)); // sphere → chip squash phase
     const kk = Math.min(1, dt * 4);
+    const ek = emphasisK(dt); // emphasis easing — hoisted once per frame (the tune hoist rule)
     const emi = this.metaEmi;
     const base = this.metaBaseArr;
-    const focusId = c.hoverNodeId || c.selectedNodeId || c.hoverCohort;
-    const dimOthersOnFocus = c.filter === "all" || c.filter === "dag";
+    const focusId = c.hoverNodeId || c.selectedNodeId || c.hoverCohort; // see the validator loop
     for (const r of records) {
       r.dim += (r.dimTarget - r.dim) * kk;
       const gw = this._gatherW(ctx, r.gRank, r.gCount);
       const prim = r.geoPrimary !== false;
       const wEff = w + (1 - w) * gw; // staging shape = the chip (see the validator loop)
       const geoCc = geoCcOf(r.pick);
-      // dimModel.metaNodeDim: r.dim × the METAGRAPH strength (ZERO in hyper: these nodes rest
-      // at the dimmed look there, so hover/commit can't move them), raised by the country dim
-      // when outside the drilled-into country (geo only); LEDGER forces a flat 0.82 (morph
-      // frozen). CALLS the domain function directly now (no inline mirror).
-      const dEff = metaNodeDim(c, r.dim, geoCc);
-      // Base glow rests LOW in hyper (0.33 — the old 0.47 × the retired 0.32-dim suppression:
-      // the dimmed look IS the resting look now, user 2026-07-17), easing UP to the unchanged
-      // globe value (0.37) as the nodes land. Passed to metaNodeEmissive as `base`; also needed
-      // here to derive `glow` so hubMatchBoost can measure the gap up to the hub's resting level.
-      const baseG = 0.33 + 0.04 * m;
-      const glow = baseG * (1 - dEff * 0.9);
+      // dimModel.nodeDim: r.dim × the morph-ramped strength — the SAME call the validator loop
+      // makes (user, 2026-08-11: one node model), raised by the country dim when outside the
+      // drilled-into country (geo only); LEDGER forces its flat row value (morph frozen).
+      const dEff = nodeDim(c, r.dim, geoCc);
+      // dimModel.hideFrac: how far an off-filter node SHRINKS AWAY — 1 on the globe (the isolate),
+      // 0 in hyper, where a turned-up dim mutes in place at full size. It reads the RAW ramp, not
+      // dEff, so `dim` and `hide` move one effect each. The gather escape hatch lifts it back:
+      // parked squares show the whole fleet.
+      const hid = hideFrac(c, r.dim);
+      const vis = (1 - hid) + hid * gw;
       // dimModel.hubMatchBoost: the COMMITTED metagraph's own nodes glow at the hub's resting
       // level (HyperView hub base 0.72) in the Hypergraph, so the picked network's nodes bloom
       // like its hub instead of sitting at the dimmer node base (user). Fades out with the hubs
-      // by morph 0.3 — there's no hub on the globe.
-      const hubBoost = hubMatchBoost(c, glow, c.filter === r.metaId);
+      // by morph 0.3 — there's no hub on the globe. It measures the GAP up from this node's own
+      // pre-floor glow, which is why the domain exports nodeGlow rather than leaving the call
+      // site to re-derive it.
+      const hubBoost = hubMatchBoost(c, nodeGlow(c, dEff), c.filter === r.metaId);
       // Tiered focus, same ranking as the validator loop (dimModel.focusWeightOf).
       const fw = focusWeightOf(
         r.nodeId === c.hoverNodeId || r.nodeId === c.selectedNodeId,
         !!c.hoverCohort?.has(r.nodeId),
       );
       const flRaw = r._flash || 0; // brief flash when an arc pulse reaches this node
-      // dimModel.metaNodeEmissive: composes glow + arc flash + hubBoost inside its floor, then
-      // the hover/selection focus boost/dim-back — same composition the inline code had.
-      emi[r.index] = metaNodeEmissive(c, dEff, flRaw, fw, !!focusId && dimOthersOnFocus, baseG, hubBoost);
+      // dimModel.nodeEmissive: composes glow + arc flash + hubBoost inside its floor, then the
+      // hover/selection focus boost/dim-back — one function, both loops. The write EASES toward it
+      // (dimModel.emphasisK), with metaEmi itself as the state — same as the validator loop.
+      const emiT = nodeEmissive(c, dEff, flRaw, fw, !!focusId, hubBoost);
+      emi[r.index] += (emiT - emi[r.index]) * ek;
       if (flRaw) r._flash = flRaw * flashDecay;
 
       const col = _col.copy(r.color).lerp(DIM, dEff * 0.85);
@@ -570,26 +574,23 @@ export class NodeFabric {
         continue;
       }
 
-      // Sphere: tumbling on its own axis, cross-fading out as the node lands (see the validator
-      // loop), resting at META_REST_SCALE in hyper and easing back to full size over the flight
-      // (so the sphere→chip handoff stays exactly as before). Filtered-out metagraph nodes
-      // shrink fully (1 - dEff; geo only — dEff is pinned 0 in hyper).
+      // Sphere: tumbling on its own axis, cross-fading out as the node lands — the SAME scale
+      // expression the validator loop uses (user, 2026-08-11: one node model; the old
+      // META_REST_SCALE ×0.68 here was hyper's 0.32 dim baked in as the resting look, which is
+      // exactly what forced the live dim to be zeroed for this pool). Off-filter metagraph nodes
+      // shrink fully out on the globe and stay full-size (just muted) in hyper — `vis`, above.
       _qSpin.setFromAxisAngle(r.spinAxis, r.spinPhase + clock * r.spinSpeed);
       _dummy.quaternion.copy(_qSpin);
-      const rest = META_REST_SCALE + (1 - META_REST_SCALE) * m;
-      const visM = (1 - dEff) + dEff * gw; // parked squares show the whole fleet
-      _dummy.scale.setScalar(r.hyperSize * rest * (1 - wEff) * visM);
+      _dummy.scale.setScalar(r.hyperSize * (1 - wEff) * vis);
       this._applyGather(ctx, r.gU, r.gV, gw, prim);
       _dummy.updateMatrix();
       this.metaSphere.setMatrixAt(r.index, _dummy.matrix);
 
-      // HEX PRISM standing tangent at geoPos (honeycomb cell + stack level baked in). Hide (not
-      // dim) metagraph nodes outside the selection — the (1 - dEff) factor shrinks them fully out.
+      // HEX PRISM standing tangent at geoPos (honeycomb cell + stack level baked in).
       const fall = hasCam ? discFall(r.geoDir.dot(camN)) : 1;
       _qRadial.setFromUnitVectors(Y_AXIS, r.geoDir);
       _dummy.quaternion.copy(_qRadial);
-      const visH = (1 - dEff) + dEff * gw;
-      const gM = wEff * (fall + (1 - fall) * gw) * visH; // fall lifts with gw (see validators)
+      const gM = wEff * (fall + (1 - fall) * gw) * vis; // fall lifts with gw (see validators)
       _dummy.scale.set(r.geoSize * gM, HEX_H * gM, r.geoSize * gM);
       this._applyGather(ctx, r.gU, r.gV, gw, prim);
       _dummy.updateMatrix();

@@ -1,13 +1,11 @@
 import { describe, it, expect } from "vitest";
 import * as THREE from "three";
-import { FOCI, hubFraming, geoFraming, ledgerFloorFraming, ledgerRailFraming, ledgerCommitTilt, LEDGER_TILT_YAW, LEDGER_TILT_PITCH, LEDGER_TILT_DOLLY, easeInOutQuad, CAM_ZOOM, dollyBack, RAILS_HIDDEN_DOLLY, railsDolly, nodeFraming, cohortFraming, hyperNodeFraming, closeness, CLOSE_FAR_ALT, CLOSE_NEAR_ALT, NODE_RAISE } from "./cameraRig";
+import { FOCI, hubFraming, geoFraming, ledgerCommitTilt, LEDGER_TILT_YAW, LEDGER_TILT_PITCH, LEDGER_TILT_DOLLY, easeInOutQuad, CAM_ZOOM, dollyBack, RAILS_HIDDEN_DOLLY, railsDolly, nodeFraming, cohortFraming, hyperNodeFraming, closeness, CLOSE_FAR_ALT, CLOSE_NEAR_ALT, NODE_RAISE } from "./cameraRig";
 
-// The Snapshots POSES that used to be pinned here are gone with the poses themselves (2026-08-09):
-// `ledgerNodeFraming` (the tray-chip zoom) and `ledgerLaneNudge` (the lateral commit nudge) are
-// retired — the view has one pose, `FOCI.ledger`, and colour carries every commit. Its one
-// variation is `ledgerCommitTilt`, the commit ORBIT, pinned below. See the ⚠️ note above
-// `ledgerFloorFraming` in cameraRig.ts; the floor/rail poses are the same kind of leftover, still
-// pinned only because they're still exported.
+// NO Snapshots framing is pinned here, because the view HAS none: it owns one pose, `FOCI.ledger`,
+// with one state-keyed variation — `ledgerCommitTilt`, the commit ORBIT, pinned below. Five framings
+// were tried and all five are retired; the ⚠️ note in cameraRig.ts is the record of why, and the
+// reason this comment exists is so a future test doesn't re-pin numbers for a sixth.
 
 describe("FOCI", () => {
   it("carries the camera presets (ledger gained its own frontal resting pose, 2026-08-07)", () => {
@@ -254,26 +252,5 @@ describe("ledgerCommitTilt (the Snapshots commit ORBIT, 2026-08-09)", () => {
     const p = pos();
     ledgerCommitTilt(p, tgt(), p);
     expect(p.distanceTo(expected)).toBeLessThan(1e-12);
-  });
-});
-
-describe("ledger framings (two-floor chamber)", () => {
-  it("frames a floor on the same diagonal the layer focus always used", () => {
-    const out = { pos: new THREE.Vector3(), target: new THREE.Vector3() };
-    ledgerFloorFraming(4, out);
-    expect(out.pos.toArray()).toEqual([-7, 10.2, 23.5]);
-    expect(out.target.toArray()).toEqual([0, 3, 0]);
-  });
-
-  it("frames a rail from in front of it, looking along the field", () => {
-    const out = { pos: new THREE.Vector3(), target: new THREE.Vector3() };
-    ledgerRailFraming(3.2, 2.85, out);
-    // In front of the rail (further toward the camera) and slightly above it.
-    expect(out.pos.z).toBeGreaterThan(0);
-    expect(out.pos.y).toBeGreaterThan(2.85);
-    expect(out.target.x).toBeCloseTo(0, 6);
-    expect(out.target.y).toBeCloseTo(2.85, 6);
-    // The rail runs across Z, so the pose must not be pushed off to one end of it.
-    expect(out.target.z).toBeCloseTo(0, 6);
   });
 });

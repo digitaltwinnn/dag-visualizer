@@ -17,6 +17,7 @@ import type { SceneColors } from "../../sceneColors";
 import { CONT_X } from "../../domain/ledgerLayout";
 import type { ContainerSpec } from "../../domain/ledgerRails";
 import { makeGlassFill, type GlassFillUniforms } from "./glassFill";
+import type { TuneSchema } from "../../tune";
 
 /** One plane's live-tunable look (dev `?tune` panel binds it; the values are the shipped look). */
 export interface PlaneTune {
@@ -31,6 +32,15 @@ export const GLOBAL_PLANE_TUNE_DEFAULTS: PlaneTune = {
 };
 export const META_PLANE_TUNE_DEFAULTS: PlaneTune = {
   fillOp: 0.035, innerOp: 0.01, edge: 0.98, trayOp: 0.025, // edge+tray user-tuned via ?tune, 2026-08-07
+};
+
+/** The `?tune` knob ranges (contract: src/engine/tune.ts) — ONE schema for both plane channels,
+ *  since they are the same blueprint tuned separately. */
+export const PLANE_TUNE_SCHEMA: TuneSchema<PlaneTune> = {
+  fillOp: { min: 0, max: 0.3, step: 0.005, label: "edge fill" },
+  innerOp: { min: 0, max: 0.1, step: 0.002, label: "centre fill" },
+  edge: { min: 0, max: 0.99, label: "drop-off" },
+  trayOp: { min: 0, max: 0.3, step: 0.005, label: "tray fill" },
 };
 
 /** The planes' corner radius — SQUARE (rounded corners belong to the trays). */
