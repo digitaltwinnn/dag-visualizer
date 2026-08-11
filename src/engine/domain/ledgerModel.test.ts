@@ -134,6 +134,23 @@ describe("LedgerModel.setData — first tick (no history to seed, snaps.length==
     const changes2 = model.setData([s1], () => anchor({ [idA]: 5 })); // grew mid-tick
     expect(changes2).toEqual([{ id: idA, count: 5, delta: 3 }]);
   });
+
+  it("a mid-tick re-anchor CARRIES the lead cluster's eased brightness, so the tiles never flash", () => {
+    // The live tick keeps collecting anchors for its whole settling window, and each growth
+    // REBUILDS the lane's slot-0 cluster. `bright` is eased render state living on the block (next
+    // to `x` and `fade`), so the rebuild has to salvage it exactly as it salvages those two —
+    // otherwise every re-anchor would reset the lead's tiles to black and ease them up again.
+    const model = new LedgerModel();
+    const s1 = snap(100, "T1", 3);
+    model.setData([s1], () => anchor({ [idA]: 2 }));
+    const lane = model.lanes.get(idA)!;
+    for (const b of lane.blocks) if (b.slot === 0) b.bright = 0.8; // what the view eased it to
+
+    model.setData([s1], () => anchor({ [idA]: 5 })); // grew mid-tick -> cluster rebuilt
+    const lead = lane.blocks.filter((b) => b.slot === 0);
+    expect(lead.length).toBe(anchorTiles(5).length);
+    expect(lead.every((b) => b.bright === 0.8)).toBe(true);
+  });
 });
 
 describe("LedgerModel.setData — tick advance (js/ledger.js:511-533 verbatim)", () => {

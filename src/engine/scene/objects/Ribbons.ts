@@ -18,10 +18,12 @@
 // strut drawn by the view. One Mesh, one preallocated geometry, rewritten event-time.
 import * as THREE from "three";
 import type { SceneColors } from "../../sceneColors";
+import type { TuneSchema } from "../../tune";
 import { METAGRAPHS } from "../../config";
 import { BAR_H, BAR_LIFT, FLOOR_Y, LEAD_X, TILE_LIFT } from "../../domain/ledgerLayout";
 import { SLOT_SP } from "../../domain/ledgerModel";
 import { ribbonQuad, RIBBON_LANE_HALF, type BarSpec, type RibbonQuad } from "../../domain/ledgerBands";
+import { snapBright } from "../../domain/dimModel";
 
 
 // THREE rows since 2026-08-07 (was 2): the LEAD row, the COMMITTED/hot row, and the HOVER
@@ -40,16 +42,19 @@ export interface RibbonTune {
   curve: number;     // 0 = straight diagonal sheet, 1 = full smootherstep S-sweep
 }
 
-/** COLORED dim for an off-filter ribbon (user, 2026-08-07): the sheet keeps its identity hue
- *  at a fraction of full strength — a tier between full colour and the neutral trail, so the
- *  committed metagraph's ribbons lead while the others stay identifiable. */
-export const RIBBON_DIM = 0.2; // user-tuned deeper, 2026-08-07
-
 // User-tuned via ?tune, 2026-08-07.
 export const RIBBON_TUNE_DEFAULTS: RibbonTune = {
   restOp: 0.25,
   brightness: 0.85,
   curve: 1,
+};
+
+/** The `?tune` knob ranges (contract: src/engine/tune.ts) — colocated so a range sits next to the
+ *  number it bounds. Type-only import: no runtime coupling to the panel. */
+export const RIBBON_TUNE_SCHEMA: TuneSchema<RibbonTune> = {
+  restOp: { min: 0, max: 1, label: "opacity" },
+  brightness: { min: 0.1, max: 2, step: 0.05 },
+  curve: { min: 0, max: 1, step: 0.05 },
 };
 
 /** The eased Z progress at vertical progress `t` — linear blended toward smootherstep. */
@@ -76,7 +81,6 @@ export class Ribbons {
   private _rows: RowState[] = [];
   private _sceneColors: Record<string, number>;
   private _neutral: number;
-  private _alpha = 0;
   /** Per-row brightness scale — the trail REWIND fades the live lead row's sheet while an older
    *  snapshot owns the front, and the HOVER-preview row rides below full (LedgerView drives). */
   private _rowFade = [1, 1, 1];
@@ -172,21 +176,25 @@ export class Ribbons {
     return out.set(x, yTop + (yBot - yTop) * t, topZ + (botZ - topZ) * s);
   }
 
-  setAlpha(a: number): void { this._alpha = a; }
+  /** The view fade, applied DIRECTLY (the Engine calls this every frame, so the opacity IS the
+   *  state and there is no `_alpha` to hold). It used to be eased toward at `dt * 5` — a fade of a
+   *  fade: `a` is already the transition's own curve, and every sibling in the chamber (the floors,
+   *  the bar, the tiles, the labels) multiplies by it as given, so the ease alone left the sheet
+   *  visibly trailing them out of the view by ~half a second. `restOp` is read per frame here like
+   *  every other tune row, so the knob still lives without an onChange. */
+  setAlpha(a: number): void {
+    this._mat.opacity = this.tune.restOp * a;
+  }
 
-  /** COMMITTED filter → the other metagraphs' sheets take the COLORED dim (identity hue at
-   *  RIBBON_DIM). Baked into vertex colours, so a change rewrites the sheet (event-time). */
+  /** COMMITTED filter → the other metagraphs' sheets take the COLORED dim (identity hue at the
+   *  ledger row's `dim` — a ribbon states which bytes came from where, so it is DATA and answers
+   *  the same knob its snapshots do). Baked into vertex colours, so a change rewrites the sheet —
+   *  which is why the panel's ledger focus group carries an onChange (event-time). */
   setFilter(filter: string): void {
     const next = filter || "all";
     if (next === this._filter) return;
     this._filter = next;
     this._writeGeometry(); // event-time: a filter commit, not a frame
-  }
-
-  update(dt: number): void {
-    const k = Math.min(1, dt * 5);
-    const target = this.tune.restOp * this._alpha;
-    this._mat.opacity += (target - this._mat.opacity) * k;
   }
 
   /** event-time: the whole sheet is rewritten when a row changes. */
@@ -214,7 +222,7 @@ export class Ribbons {
         const hex = this._sceneColors[key] ?? this._neutral;
         this._c.setHex(hex);
         const off = this._filter !== "all" && key !== this._filter;
-        const sc = brightness * rowFade * (off ? RIBBON_DIM : 1);
+        const sc = snapBright(brightness * rowFade, off);
         const cr = this._c.r * sc, cg = this._c.g * sc, cb = this._c.b * sc;
         for (let j = 0; j < RIBBON_SEG; j++) {
           const t0 = j / RIBBON_SEG, t1 = (j + 1) / RIBBON_SEG;

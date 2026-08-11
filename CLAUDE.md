@@ -70,8 +70,8 @@ scope from the table.
    is inert until its row opts in. Gate on the view a behaviour is FOR — not `mode === "x"` guards,
    not deny-lists (a deny-list grows a line per view).
 8. **One home per concern.** Camera → `domain/cameraRig.ts`, focus ladder → `domain/focusLadder.ts`,
-   click semantics → `domain/pickActions.ts`, the unlisted network → `src/data/unlisted.ts`. Don't
-   grow a second copy in the Engine or a component.
+   click semantics → `domain/pickActions.ts`, the unlisted network → `src/data/unlisted.ts`, the stage
+   light → `scene/objects/StageLight.ts`. Don't grow a second copy in the Engine or a component.
 9. **The scene↔HUD hover pairing is sacrosanct.** The shared store channels (`hoverFilter`,
    `hoverNodeId`, `hoverSnapOrd`, `hoverMetaSnap`, `hoverCountry`, `hoverCohort`), `.subject-paired`
    and the marker classes survive every refactor. Hovers preview, never commit. **A surface hovers the
@@ -140,6 +140,103 @@ Gotchas worth knowing before you burn time on them:
   inspect mid-flight states.
 - Benign console noise: `mojo ... rejected`, `PHONE_REGISTRATION_ERROR`, `BackForwardCache`.
 
+### Tuning the look live
+
+The dev **`?tune`** flag (present at page load, the `?stats` idiom) dynamic-imports a tweakpane panel
+from `src/engine/devTune.ts` — never in the normal bundle. The contract is `src/engine/tune.ts`; three
+rules make it non-intrusive, and the header comment there is their authoritative statement:
+
+1. **`*_TUNE_DEFAULTS` is the shipped look and stays what tests pin** — they assert the DEFAULTS, never
+   the live struct, so turning a knob can never make a test pass or fail.
+2. **The hoist rule.** A tunable read inside a per-node loop is loaded into a local in that loop's
+   preamble, so the inner body reads a local exactly as it did when the value was a module const — one
+   property load per FRAME, not per node. Sibling discipline to `noFrameAllocations.test.ts`.
+3. **A knob's range is colocated with the constant it bounds** — a `*_TUNE_SCHEMA` next to its
+   `*_TUNE_DEFAULTS`, typed against its own values so a renamed field is a compile error rather than a
+   silently missing slider. `devTune.ts` is ONLY the manifest plus a generic walker, so adding a knob is
+   one line in the owning module and no edit there.
+
+**The tree is STATIC** — shared groups, then one collapsed folder per view, then the
+camera. A folder for a view you aren't in simply sits collapsed; that costs a click and saves the panel
+tracking `mode`, subscribing to anything, or rebuilding itself. Values that are BAKED rather than read
+per frame (the ribbons' vertex colours) carry an `onChange` that re-pushes them, so an edit shows
+without a reload — **prefer reading the row per frame and needing no callback at all**, which is what
+the stage light does. Persistence is **opt-in and default OFF** — a silently-restored session is a
+trap, because you would be looking at last week's knobs believing they were the shipped look.
+
+**A knob belongs to the view whose look it changes, even when central code applies it** (user,
+2026-08-11). Emphasis and lighting are both `Record<View3D, Row>` + ONE row schema — `FOCUS_TUNE`
+(`domain/dimModel.ts`) and `STAGE_LIGHTS` (`domain/stageLight.ts`) — so each view folder holds its own
+`focus & dim` and, where it stages one, its `spotlight`. Only what is genuinely cross-view stays above
+them; today that is the focus TIER ranking alone. `dimModel`'s four resolvers all go through one
+`viewMix(c, field)`, so a new emphasis number is a field on the row and nothing else.
+
+⚠️ **HIDE IS NOT DIM** (user, 2026-08-11). A dim number used to drive three effects, and one of them —
+scaling the node to nothing — is geo's ISOLATE, not a mute. It only rode along because hyper's
+metagraph dim was then pinned to 0, so the shrink was never seen there; the moment the knob existed it
+was the first thing it did. The shrink is now its own row field, `hide`, resolved by `hideFrac()` — geo
+keeps `1` (off-filter nodes vanish on the globe), hyper and the ledger `0`, so a dim there mutes in
+place. Any new effect a dim number reaches must ask the same question before joining it.
+
+**The two are INDEPENDENT readings of the same raw ramp, not a knob and its fraction** (user,
+2026-08-11 — *"dim · off-filter actually also resizes"*). `hideFrac` first took the RESOLVED dim, which
+made shrink `raw × dim × hide` against mute's `raw × dim`: `dim` was a master gain over both effects,
+so turning it down shrank nodes less as well as muting them less. It now reads the raw ramp, so each
+knob moves exactly one effect. A corollary that matters: the country drill's `countryMix` raise is a
+MUTE, and reading the raw ramp is what guarantees a lens can never shrink what it looks past.
+
+**A view's own FURNITURE dims on its own field, `elem`** (user, 2026-08-11). `dim` mutes off-filter
+NODES; the per-network furniture a view draws around them — hyper's hubs, tethers and hoops — used to
+fade by two unrelated magic numbers (`HyperView`'s local `fdim = 0.62`, `Ribbons`' exported
+`RIBBON_DIM = 0.2`). One row field replaces both, resolved by `offNetMul(view)`, which returns the
+SURVIVING brightness so the knob keeps `dim`/`hide`'s strength polarity (0 = off). It is read **per
+view, not `viewMix`ed**: furniture belongs to one view and fades out with it, so blending a neighbour's
+value would describe elements that are no longer drawn. One knob may still drive two CHANNELS of the
+same element where the look needs it: hyper's hub BODY takes a fraction of the drop (`HUB_BODY_SOFT`)
+so an unfocused hub stays legible as a position while its light goes; `elem: 0` removes both, which is
+what keeps it one knob.
+
+⚠️ **THE DAG CORE'S OWN FURNITURE IS FURNITURE TOO** (user, 2026-08-11 — *"dim elements in hyper view
+does not affect the rings of the core in the middle"*). ONE NODE MODEL: the core is a metagraph-shaped
+hub, so its hoops, rim fills and glow read `elem` like every other hub's — they had kept three magic
+coefficients of their own (0.5, 0.5, 0.6) and so sat at full brightness while every metagraph's dropped.
+The one difference is the switch: a hub flips on a binary `focusOther`, the core eases on `_coreDim`
+(the DAG tracks the highlight state gradually), so the knob is LERPED by it — `coreOffMul = 1 −
+_coreDim × (1 − hubOffMul)`. The core BODY keeps full opacity, which is the hub's soft channel taken to
+its limit: the one sphere at the origin is the structure's centre and always reads as a position.
+
+⚠️ **A SNAPSHOT IS DATA, NOT FURNITURE** (user, 2026-08-11). `elem` is hyper's alone, because both
+other views honestly answer `0`: geo's globe draws no per-network furniture (its off-filter answer is
+the nodes' `hide` isolate), and everything the chamber emphasises — the byte bands, the lane tiles, the
+ribbons — is a real snapshot, so it reads the NODE vocabulary instead. `snapBright()` in
+`domain/dimModel.ts` is that one call: the ledger row's own `dim`, `boost` and `back`, exactly what the
+chips in its trays answer to, applied to whichever resting level the instrument owns (the bar's is an
+opacity, the tiles' a colour multiplier — two numbers, one per instrument, and nothing else left in
+those `*_TUNE_DEFAULTS`). So the chamber gained the focus boost and the dim-back it never had, and one
+knob moves one effect across nodes and snapshots alike. **COLOUR stays fully independent** — identity
+hue vs the neutral trail is the chamber's own second reading, decided at the call sites and untouched
+by any of these knobs.
+
+⚠️ **ONE NODE MODEL** (user, 2026-08-11). *"Across all views I want no difference between DAG nodes and
+other metagraphs — they are the same network topology, only positioned differently in some views."* The
+dim code had FOUR split points, all of them hyper-only (geo and the ledger already carried identical
+numbers for both pools): separate `core`/`meta` row fields, twin `validatorDim`/`metaNodeDim` with
+identical bodies, twin emissive resolvers differing by a sub-1% coefficient, and — the root — hyper's
+`0.32` dim BAKED into `NodeFabric`'s resting constants (`1 − 0.32 = 0.68` scale, `0.47 × (1 − 0.32×0.92)
+≈ 0.33` glow). With the dim pre-applied as the resting look, the live dim *had* to be zeroed or it would
+apply twice; that zero is the whole origin of the split, never a design decision. `domain/dimModel.ts`
+now exposes ONE `dim` row field and one `nodeDim`/`nodeGlow`/`nodeEmissive` triple that both pools call.
+The one surviving asymmetry is deliberate: `hubMatchBoost` targets the metagraph **hub's** resting glow,
+which is view furniture — about what a node orbits, not what a node is. The core's own SPHERE follows
+the same rule and is now the shared `HUB_ORB` geometry at hub size (was r 1.5 vs the hubs' 0.9): *"its
+central position already tells it's a bit different from the others, not size"* (user, 2026-08-11).
+
+**The camera folder is a READOUT, not sliders**: poses are ~8 constants and each needs its own selection
+state to even see, so orbiting to a pose you like and reading it off beats dragging numbers.
+`capture ← live` dumps the raw `pos`/`target` **with a caution naming the levers the Engine composes on
+top** (`dollyBack`, `railsDolly`, and the subject-relative hub framings). Deliberately raw — per-pose
+inverses would be a second home for pose knowledge that drifts silently.
+
 ## Architecture
 
 A thin React/Next shell around an imperative Three engine, joined by a Zustand store. **Two data
@@ -194,6 +291,20 @@ you start:
 Five named phases in a fixed order: inputs → camera → motion → derived frames → scene writes. **The
 contract is that nothing may mutate a pose after the phase that derives from it.** New per-frame work
 goes in the phase whose inputs it needs, never earlier.
+
+### The stage light claims, it is never switched off
+
+There is ONE `THREE.SpotLight` for the whole app (`scene/objects/StageLight.ts`). The Engine sets its
+per-view presence each frame *before* the view updates; a view that wants it calls `claim(view,
+subject, …)` and the strongest claim wins; `update(dt)` stages from `STAGE_LIGHTS[claimed]`, eases,
+then **releases the claim**. So **not claiming IS off** — there is no `spotOff` to forget, which is the
+bug class the previous per-view-light + registry arrangement kept guarding against. A view's presence
+is already applied centrally, so a claim must not multiply by its own fade again.
+
+`StagedView` (`domain/stageLight.ts`) is the type that says which views stage a light, and the `?tune`
+panel builds a spotlight folder only for those — the ledger deliberately stages none (its chamber is
+lit by its own glass and emissive snapshots; emphasis there is the four colour dim tiers). Claiming
+for an unstaged view is a compile error, not a silent no-op.
 
 ### Two camera principles
 
@@ -328,6 +439,13 @@ The design rules behind the table, which the tests pin but don't explain:
 - **A filter is a story.** Pinning a global tick whose anchors don't include the committed network
   releases the filter back to "all", so a network's dim never shapes a snapshot that has nothing to do
   with it. The membership rule lives in `src/data/ledgerStory.ts`.
+- **A committed ancestry rung borrows its members' glow only while it is the FINEST committed rung**
+  (user, 2026-08-11). Every other rung has a 3D counterpart you could have clicked — the hub, the
+  border, the chip; the **group** rungs (geo's provider cohort, hyper's composition group) have none,
+  so lighting their members is the only way they appear in the scene at all. Honest while the group IS
+  the subject, a lie once the click lands on a node. `dimModel.ancestryGlow` is the rule and its test
+  the spec; the ledger's signer set stays outside it (not ancestry — a relation from a different
+  subject), and hover is untouched. One call site: `Globe._frameCtx`'s glow channel.
 - **A tick drops the metagraph snapshot it can't contain** (user, 2026-08-10). Stronger than the story
   rule one rung up: that one is about set membership, this is a one-to-one join
   (`metagraph.timestamp === global.timestamp`), so committing a DIFFERENT tick provably means the held
@@ -1026,10 +1144,8 @@ own tray — instantiated per position. What it deliberately does not own is the
 and ribbons stay pooled instanced meshes spanning every plane, and the lead-identity/neutral-trail rule
 stays one shared code path.
 
-**The chamber's look is live-tunable.** The dev **`?tune`** flag (present at page load, the `?stats`
-idiom) dynamic-imports a tweakpane panel from `src/engine/devTune.ts` — never in the normal bundle —
-with folders for the ribbons, the byte bar, the lane tiles and the two plane channels. Each folder is
-backed by a defaults constant holding the shipped look; chosen values get baked back into it.
+**The chamber's look is live-tunable.** Under `?tune` (see *Tuning the look live*) the `ledger` folder
+carries the ribbons, the byte bar, the lane tiles and the two plane channels.
 
 **Node trays** hold each metagraph's machines under its own plane and the whole validator fleet under
 the global floor, with no role split. **Machines are deduped — a hybrid appears once**, since roles
@@ -1044,9 +1160,9 @@ the starfield are gated off so none lingers when arriving from geo.
 **Lanes and the committed filter. The field is fixed**: every lane always owns its own slice, and a
 committed filter never moves or hides geometry — only the shared commit tilt answers it with the camera.
 The emphasis is a **coloured dim** on every identity-coloured element — the others drop to their *own
-hue* at a dim level, a tier between full colour and the neutral trail, so the committed network leads
-while the rest stay identifiable. `src/engine/scene/objects/dimTiers.test.ts` keeps the tier hierarchy
-ordered through tuning: **the order is the design**, the numbers may move.
+hue* at the row's `dim`, a tier between full colour and the neutral trail, so the committed network
+leads while the rest stay identifiable. `src/engine/scene/objects/dimTiers.test.ts` keeps the tier
+hierarchy ordered through tuning: **the order is the design**, the numbers may move.
 
 A committed metagraph puts the view in **live metagraph mode**: entering with one committed, or
 committing one while there, flips following on and the whole card chain rides the heartbeat. **"Live"
@@ -1085,14 +1201,54 @@ tile is only pickable once a resolver can name it from the polled feed** — a t
 is anonymous, drawn but not pickable. The chamber shows that the anchor happened without inventing an
 identity for it.
 
-**Emphasis is brightness in four colour tiers**, and the order is the design: the ACTIVE row (the live
-lead, or the committed pin) takes full identity; a HOVERED row takes identity colour at a preview level
-**without demoting the active row**, because the hover previews what a click would pin; with a network
-committed, **that network's OWN bands and lane tiles keep their identity hue down the WHOLE trail** at
-the quieter on-net resting tier (`SNAP_ONNET`), so the committed story reads as one coloured thread
-through the chamber; every other resting snapshot stays neutral cyan. A hover still previews louder than
-a standing commitment — `dimTiers.test.ts` pins hot > preview > on-net > neutral rest. Exactly one hot
-row — a committed older snapshot beats the live lead, a hover doesn't steal it.
+**Emphasis is TWO independent readings — brightness, and colour** (user, 2026-08-11), and in both the
+order is the design.
+
+*Brightness is the node vocabulary*, resolved for every band, tile and ribbon by `snapBright()`: the
+SELECTED row takes the `ledger` row's full focus `boost`; a HOVERED row takes the same boost at
+the group tier, **without demoting the selected row**, because the hover previews what a click would pin;
+while any focus exists every other row steps back by `back`; and an off-filter network drops by `dim`,
+the same knob its node chips in the trays answer to. `dimTiers.test.ts`
+pins primary > preview > resting > stepped back, and that off-filter dims without vanishing. Exactly one
+hot row — a committed older snapshot beats the live lead, a hover doesn't steal it.
+
+⚠️ **THE BOOST ANSWERS THE SELECTION, AND THE BARE LEAD IS NOT ONE** (user, 2026-08-11). With nothing
+selected the chamber is simply running: its front row is already named by its place at the front edge
+and by keeping identity hue, so lifting it made `boost` a second `rest` — the whole trail permanently
+stepped back against a row the chamber walked onto by itself, with nothing left for a hover or a click
+to add. That is also what made the RIBBONS read as undimmed: a ribbon takes no boost, so an
+automatically-boosted band separated from its off-filter neighbours ~30× while the ribbons only halved
+by `1 − dim`, and the mismatch read as the dim missing from the ribbon rather than as a boost that
+shouldn't be there. But **live/not-live is HOW a row was reached, not WHAT it is** (user, 2026-08-11):
+a live follow's row IS selected, so it reads exactly like a pin. Suppressing the boost while following
+left live metagraph mode — which the committed filter turns on by itself — with no focus at all, and
+the user read the whole chamber as dull. So there is one question and `model.selectedSlot` answers it;
+the scene no longer reads `following`, and `LedgerView._focusSlot()` / `ByteBar.setFocusSlot()` are gone.
+
+⚠️ **A ROW'S FOCUS IS THE COMMITTED NETWORK'S, NOT THE WHOLE ROW'S** (user, 2026-08-11). A row is a
+TICK, and a tick holds every network's snapshot side by side — so under a filter the boost reaches the
+committed network's band and tile alone (`snapFocusOf()`, the one home). The boost is added UNDIMMED,
+which is exactly what made a row-wide focus swamp the dim: on the shown row every band came up together
+by the same `+boost`, so at the moment the filter matters most the committed network had no lead. The
+one exception is a directly hovered TILE — that IS the subject, so it takes the primary weight whatever
+the filter says, the same answer the node model gives a hovered off-filter node. Kept OUT of
+`snapBright` on purpose: subject identity is a call-site question, like colour, and `snapBright` stays
+term-for-term faithful to `nodeEmissive`.
+
+⚠️ **`back` IS THE ROW'S ANSWER, SO THE FOCUSED ROW NEVER STEPS ITSELF BACK** (user, 2026-08-11 — *"the
+snapshots look dimmed too much, almost gray/black, next to a ribbon I like the colour of"*). Its
+OFF-FILTER members included: they take the `dim` alone, which is exactly the tier the RIBBON landing on
+them takes (`Ribbons` passes no focus and no back at all), so a ribbon and its two endpoints read at one
+level. Compounding the two knobs made `dim × back` ≈ 0.28 against the ribbon's 0.5 and left the band and
+the tile above it near-black under a sheet that was only gently dimmed. `dimTiers.test.ts` pins it per
+instrument.
+
+*Colour is decided separately at the call sites and no dim knob may touch it.* The active and hovered
+rows take identity hue; with a network committed, **that network's OWN bands and lane tiles keep their
+identity hue down the WHOLE trail**, so the committed story reads as one coloured thread through the
+chamber, while every other resting snapshot stays neutral cyan. Under a filter the trail therefore
+separates by HUE where it used to separate by brightness as well — `dim · off-filter` is the knob that
+buys contrast back if the thread ever reads too quiet.
 
 **Selecting a non-live snapshot rewinds the trail**: the whole time trail eases forward until the
 selected row sits at the lead position, so the active selection owns the front instead of fighting the
@@ -1100,6 +1256,14 @@ live lead's arrivals, and rows newer than the selection slide past the front edg
 rewind follows only the committed pin — a hover previews the hot row in place. There is no scene fog and
 no depth fade on the trail: every row keeps one brightness, and recency reads from position plus the
 ordinal labels.
+
+⚠️ **A DISSOLVED ROW MUST ZERO-SCALE, NOT JUST GO DARK** (user, 2026-08-11). The lane tiles are one
+instanced mesh on an **opaque, depth-writing** material whose brightness rides the instance COLOUR, so a
+row multiplied to brightness 0 is a BLACK BLOCK — it occluded the ribbons and glass behind it in front
+of the active row, and the raycaster ignores `visible`, so it still ate clicks. Both POSITION dissolves
+(the rewind's front edge and the horizon below) resolve to one `edge` factor per row, and `edge <= 0`
+takes the same zero-scale branch an unfilled tick already gets. The byte bar never showed this — its
+bands are `transparent` with `depthWrite: false`, which is why a brightness dissolve is enough there.
 
 **The far end is a HORIZON, not an edge** (user, 2026-08-09). The one exception to "no depth fade": the
 trail's last slots dissolve at the far boundary, the mirror of the rewind's own front-edge dissolve, so
