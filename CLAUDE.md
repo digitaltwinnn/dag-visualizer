@@ -185,6 +185,18 @@ so turning it down shrank nodes less as well as muting them less. It now reads t
 knob moves exactly one effect. A corollary that matters: the country drill's `countryMix` raise is a
 MUTE, and reading the raw ramp is what guarantees a lens can never shrink what it looks past.
 
+**A view's own ELEMENTS dim on their own field, `elem`** (user, 2026-08-11). `dim` mutes off-filter
+NODES; the per-network furniture a view draws around them — hyper's hubs, the ledger's lane tiles, byte
+bands and ribbons — used to fade by two unrelated magic numbers (`HyperView`'s local `fdim = 0.62`,
+`Ribbons`' exported `RIBBON_DIM = 0.2`). One row field replaces both, resolved by `offNetMul(view)`,
+which returns the SURVIVING brightness so the knob keeps `dim`/`hide`'s strength polarity (0 = off).
+It is read **per view, not `viewMix`ed**: furniture belongs to one view and fades out with it, so
+blending a neighbour's value would describe elements that are no longer drawn. geo's honest value is
+`0` — the globe has no per-network furniture, and its off-filter answer is the nodes' `hide` isolate.
+One knob may still drive two CHANNELS of the same element where the look needs it: hyper's hub BODY
+takes a fraction of the drop (`HUB_BODY_SOFT`) so an unfocused hub stays legible as a position while
+its light goes; `elem: 0` removes both, which is what keeps it one knob.
+
 ⚠️ **ONE NODE MODEL** (user, 2026-08-11). *"Across all views I want no difference between DAG nodes and
 other metagraphs — they are the same network topology, only positioned differently in some views."* The
 dim code had FOUR split points, all of them hyper-only (geo and the ledger already carried identical

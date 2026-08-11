@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import {
   nodeDimScale,
   hideFrac,
+  offNetMul,
   focusDim,
   focusBoost,
   focusWeightOf,
@@ -108,6 +109,41 @@ describe("hideFrac (the shrink, an independent reading of the same ramp as the d
     const drilled = ctx({ morph: 1, countryFilter: "DE", countryMix: 0.8 });
     expect(nodeDim(drilled, 0, "US")).toBeCloseTo(0.8, 10); // the mute lands…
     expect(hideFrac(drilled, 0)).toBeCloseTo(0, 10); // …the shrink does not
+  });
+});
+
+describe("offNetMul (the off-filter dim for a view's own ELEMENTS, not its nodes)", () => {
+  // The two hardcoded numbers it replaced (2026-08-11): hyper's hub `fdim` 0.62 and the ledger's
+  // RIBBON_DIM 0.2, which the bands, tiles and ribbons all read.
+  it("keeps the shipped look each view had before it was a knob", () => {
+    expect(offNetMul("hyper")).toBeCloseTo(0.62, 10);
+    expect(offNetMul("ledger")).toBeCloseTo(0.2, 10);
+  });
+
+  // The globe has no per-network furniture — its off-filter answer is the nodes vanishing
+  // (hideFrac). 0 is the honest reading, not an unset field.
+  it("is a no-op in geo, which has no per-network furniture", () => {
+    expect(offNetMul("geo")).toBeCloseTo(1, 10);
+  });
+
+  // Same STRENGTH polarity as `dim` and `hide` — 0 is off — so a row reads consistently in the
+  // panel, and the resolver is what flips it into a surviving brightness.
+  it("reads the strength row per view, with 0 meaning no dim at all", () => {
+    const prev = FOCUS_TUNE.ledger.elem;
+    try {
+      FOCUS_TUNE.ledger.elem = 0;
+      expect(offNetMul("ledger")).toBeCloseTo(1, 10);
+      FOCUS_TUNE.ledger.elem = 1;
+      expect(offNetMul("ledger")).toBeCloseTo(0, 10);
+    } finally {
+      FOCUS_TUNE.ledger.elem = prev;
+    }
+  });
+
+  // It is deliberately NOT morph-lerped like the four node fields: furniture belongs to one view
+  // and fades out with it, so a blend would describe elements that are no longer drawn.
+  it("is per-view, so hyper's value never leaks into the ledger's", () => {
+    expect(offNetMul("hyper")).not.toBeCloseTo(offNetMul("ledger"), 5);
   });
 });
 

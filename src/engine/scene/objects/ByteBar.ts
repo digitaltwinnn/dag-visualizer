@@ -14,7 +14,7 @@ import { METAGRAPHS } from "../../config";
 import { BAR_H, BAR_D, BAR_LIFT, FLOOR_Y, LEAD_X } from "../../domain/ledgerLayout";
 import { type BarSpec } from "../../domain/ledgerBands";
 import { SLOT_SP, SLOT_N, horizonAt } from "../../domain/ledgerModel";
-import { RIBBON_DIM } from "./Ribbons";
+import { offNetMul } from "../../domain/dimModel";
 import type { TuneSchema } from "../../tune";
 
 const BANDS_PER_SLOT = METAGRAPHS.length + 1;
@@ -40,8 +40,8 @@ export const BAR_TUNE_SCHEMA: TuneSchema<BarTune> = {
 /** The HOVER-preview tier (user, 2026-08-07): a hovered snapshot row shows its identity
  *  colours at this fraction of the hot level — the ACTIVE row stays fully coloured, the
  *  preview reads as "this is what a click pins". Deliberately the OFF-FILTER dim's family
- *  (RIBBON_DIM 0.2), a bit brighter — one dim language, two nearby levels. Shared with the
- *  tiles and the hover ribbon row. */
+ *  (the ledger's `elem` knob, 0.2), a bit brighter — one dim language, two nearby levels. Shared
+ *  with the tiles and the hover ribbon row. */
 export const SNAP_PREVIEW = 0.3;
 
 /** The COMMITTED-NETWORK resting tier (user, 2026-08-09 — "when a metagraph is selected, give
@@ -158,7 +158,7 @@ export class ByteBar {
   /** The transient hover row — colored-dim preview, never demotes the active row. */
   setHovered(slot: number): void { this._hovered = slot; }
   /** Committed-or-hovered network → the other metagraphs' bands take the COLORED dim
-   *  (identity hue at RIBBON_DIM; the unlisted band dims with them). */
+   *  (identity hue at the ledger's `elem` strength; the unlisted band dims with them). */
   setFilter(filter: string): void { this._filter = filter || "all"; }
 
   /** The trail-REWIND offset (LedgerView drives it): the whole bar group slides +X so the
@@ -170,6 +170,8 @@ export class ByteBar {
 
   update(dt: number): void {
     const k = Math.min(1, dt * 5);
+    // Hoisted per frame (the tune hoist rule): one read for every slot's every band.
+    const offMul = offNetMul("ledger");
     for (let si = 0; si < this._slots.length; si++) {
       const s = this._slots[si];
       const x = LEAD_X - si * SLOT_SP + this._off;
@@ -198,7 +200,7 @@ export class ByteBar {
             : onNet
               ? this.tune.hot * SNAP_ONNET
               : this.tune.rest;
-        const t = base * fade * front * (offNet ? RIBBON_DIM : 1) * this._alpha;
+        const t = base * fade * front * (offNet ? offMul : 1) * this._alpha;
         s.mats[i].opacity += (t - s.mats[i].opacity) * k;
         s.mats[i].color.setHex(hot || hov || onNet ? s.colors[i] : this._neutral);
       }

@@ -51,7 +51,7 @@ import type {
 import { metaSnapHoverKey } from "@/src/data/types";
 import { LEDGER_LAYERS } from "@/src/data/ledgerLayers"; // shared display copy — floor labels = panel rows
 import { ByteBar, SNAP_PREVIEW, SNAP_ONNET } from "../objects/ByteBar";
-import { RIBBON_DIM } from "../objects/Ribbons";
+import { offNetMul } from "../../domain/dimModel";
 import { Ribbons } from "../objects/Ribbons";
 import { SnapshotPlane, makeEdgeLabel, GLOBAL_PLANE_TUNE_DEFAULTS, META_PLANE_TUNE_DEFAULTS, type PlaneTune } from "../objects/SnapshotPlane";
 import { TrailRewind } from "../objects/TrailRewind";
@@ -558,9 +558,10 @@ export class LedgerView implements SceneView {
   }
 
   /** The COMMITTED network. It drives the COLOURED DIM (the other networks drop to their own hue at
-   *  `RIBBON_DIM`, this network's own rows hold identity down the trail) and gates the anchor pulses
-   *  to the committed lane. What it deliberately does NOT do: move or hide any geometry. The camera's
-   *  only answer is the shared `ledgerCommitTilt` (the per-lane fly-to was retired 2026-08-09). */
+   *  the ledger's `elem` strength, this network's own rows hold identity down the trail) and gates
+   *  the anchor pulses to the committed lane. What it deliberately does NOT do: move or hide any
+   *  geometry. The camera's only answer is the shared `ledgerCommitTilt` (the per-lane fly-to was
+   *  retired 2026-08-09). */
   setFilter(filter: string) {
     this._filter = filter || "all"; // event-time
     this._applyNetDim();
@@ -580,7 +581,7 @@ export class LedgerView implements SceneView {
 
   private _applyNetDim(): void {
     const d = this._netDimKey();
-    // The other metagraphs' elements take the COLORED dim (identity hue at RIBBON_DIM):
+    // The other metagraphs' elements take the COLORED dim (identity hue at the ledger's `elem`):
     // ribbons + bands here, tiles in the per-frame pass, chips via the dim model's emissive.
     this._ribbons.setFilter(d);
     this._bar.setFilter(d);
@@ -790,6 +791,8 @@ export class LedgerView implements SceneView {
 
     // ── lane tiles on the metagraph-snapshot floor
     let mi = 0;
+    // Hoisted per frame (the tune hoist rule): one read for every lane's every tile.
+    const offMul = offNetMul("ledger");
     for (const lane of this.model.lanes.values()) {
       const laneColor = this._laneColor(lane.id);
       const cz = this._laneZ.get(lane.id) ?? lane.z;
@@ -847,7 +850,7 @@ export class LedgerView implements SceneView {
               : onNet
                 ? b.fade * this.tiles.hot * SNAP_ONNET
                 : b.fade * this.tiles.rest) *
-          (offNet && !hovTile ? RIBBON_DIM : 1) *
+          (offNet && !hovTile ? offMul : 1) *
           this._rewind.fadeAtX(b.x + this._trailOff) *
           horizonAt(b.x + this._trailOff) *
           this._fades.alpha;

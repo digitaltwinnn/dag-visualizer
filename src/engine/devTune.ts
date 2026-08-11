@@ -77,8 +77,10 @@ export async function mountDevTune(targets: DevTuneTargets): Promise<DevTuneHand
   const perView: Record<string, TuneGroup[]> = {
     hyper: [focusGroup("hyper"), spotGroup("hyper")],
     geo: [focusGroup("geo"), spotGroup("geo")],
+    // Almost every dim number is read per frame, so the group needs no onChange — EXCEPT the
+    // ledger's `elem`, which the ribbons bake into their vertex colours. Re-push the sheet there.
     ledger: [
-      focusGroup("ledger"),
+      { ...focusGroup("ledger"), onChange: () => ledger.ribbons.setTune({}) },
       {
         title: "ribbons",
         values: ledger.ribbons.tune,

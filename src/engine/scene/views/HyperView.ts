@@ -14,6 +14,7 @@ import type { StageLight } from "../objects/StageLight";
 import { STAGE_LIGHTS } from "../../domain/stageLight";
 import { FadeSet } from "../objects/FadeSet";
 import { ORB_FRESNEL_GLSL, ORB_FRESNEL_MIX } from "../objects/NodeFabric";
+import { offNetMul } from "../../domain/dimModel";
 import { makeRadialGradientTexture } from "../objects/gradientTexture";
 import type { SceneColors } from "../../sceneColors";
 import type { SceneView } from "./SceneView";
@@ -26,6 +27,11 @@ const HOOP_OP = 0.08;
 // Resting opacity of the soft rim-fill disk under each ring (populated layers only) — more cyan
 // presence + anchors the layer label, which otherwise floated between the thin rings (user).
 const FILL_OP = 0.09;
+// How much of hyper's off-focus `elem` dim the hub BODY takes, versus the glow/tether/hoops/fills
+// that take all of it: the solid orb keeps a hub legible as a place in the structure while its
+// light recedes. A fraction OF the knob rather than its own number, so `elem` stays one knob with
+// one effect (two channels of it) and turning it to 0 removes both.
+const HUB_BODY_SOFT = 0.58;
 
 // Anchor-packet stream tuning: each anchored snapshot launches one packet hub→core; a burst of N
 // streams out staggered, reusing a small pool (which naturally throttles very large bursts).
@@ -492,6 +498,15 @@ export class HyperView implements SceneView {
     // The constellation holds still when a hub is focused (focusId) OR the view policy turns hub
     // orbits off (hubOrbits) — the two freezes are independent but drive the same hold.
     const frozen = this.focusId != null || !this.hubOrbits;
+    // Hoisted per frame (the tune hoist rule): one read for all 10 hubs. The hub furniture's
+    // off-focus dim is hyper's `elem` knob — the same "the view's own per-network ELEMENTS drop
+    // when off-subject" number the ledger spends on its bands, tiles and ribbons.
+    const hubOffMul = offNetMul("hyper");
+    // The hub BODY is the softer of the knob's two channels: glow/tether/hoops/fills take the
+    // full drop, the solid body only HUB_BODY_SOFT of it, so an out-of-focus hub stays clearly
+    // present while its light recedes. Derived, not a second magic number — at the shipped
+    // default the two read 0.62 and 0.78, and `elem: 0` still turns BOTH off.
+    const hubBodyMul = 1 - (1 - hubOffMul) * HUB_BODY_SOFT;
     for (const m of this.metas) {
       if (!frozen) m.orbit += dt * 0.03;
       const a = m.orbit;
@@ -514,12 +529,12 @@ export class HyperView implements SceneView {
       // When a metagraph is selected (focusId), dim the OTHER hubs *subtly* — a gentle
       // out-of-focus push (DoF + camera focus already carry most of the emphasis).
       const focusOther = this.focusId != null && m.cfg.id !== this.focusId;
-      const fdim = focusOther ? 0.62 : 1; // glow / tether
+      const fdim = focusOther ? hubOffMul : 1; // glow / tether
       // Inactive (node-less) metagraphs read as present-but-quiet — dimmer than active, but NOT
       // buried (user: decrease the inactive dim); their rings are all-dotted (setHoopPresence).
       const glowMul = (m.active ? 1 : 0.35) * fdim;
       const hubMat = m.hub.material as THREE.MeshStandardMaterial;
-      hubMat.opacity = metaOpacity * (m.active ? 1 : 0.8) * (focusOther ? 0.78 : 1) * this._fades.alpha;
+      hubMat.opacity = metaOpacity * (m.active ? 1 : 0.8) * (focusOther ? hubBodyMul : 1) * this._fades.alpha;
 
       // The tether is a 2-vertex line fixed at the origin → hub. Write the moving endpoint
       // (vertex 1) straight into the existing buffer instead of setFromPoints, which would

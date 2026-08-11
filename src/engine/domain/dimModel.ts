@@ -51,7 +51,7 @@ export interface DimContext {
 // dims at the same per-view strength as a committed filter.)
 // (Ledger override 2026-08-07: morph is frozen there, and full strength cascades to near-black
 // through the chip writer — the flat 0.5 lands the chips at the same COLORED-dim tier the
-// ribbons' RIBBON_DIM speaks.)
+// ledger's own elements speak, see offNetMul.)
 export const nodeDimScale = (c: DimContext): number => viewMix(c, "dim");
 
 // HIDE IS NOT DIM (user, 2026-08-11). A dim mutes a node two ways — colour toward DIM and emissive
@@ -80,6 +80,19 @@ export const dimTargetsFor = (sel: string, metaIds: string[]) => ({
   dag: sel === "all" || sel === "dag" ? 0 : 1,
   meta: new Map(metaIds.map((id) => [id, sel === "all" || sel === id ? 0 : 1])),
 });
+
+// The brightness an OFF-FILTER ELEMENT keeps — a view's own per-network FURNITURE, as opposed to
+// its nodes: hyper's other hubs (with their tethers, hoops and rim fills) and the ledger's other
+// lanes (bands, tiles, ribbons). It is the element counterpart of `dim`, and it exists because both
+// views had been carrying their own hardcoded number for it (hyper's `fdim` 0.62, the ledger's
+// `RIBBON_DIM` 0.2) while the nodes beside them answered to a knob (user, 2026-08-11: the ledger's
+// snapshots should obey the same off-filter dim its chips do).
+//
+// Read PER VIEW, not morph-lerped like the four node fields: furniture belongs to one view and
+// fades out with it, so blending the neighbour view's value in would only describe elements that
+// are no longer drawn. geo's 0 is the honest reading — the globe has no per-network furniture, and
+// its off-filter answer is the nodes themselves (`hide`, the isolate).
+export const offNetMul = (view: View3D): number => 1 - FOCUS_TUNE[view].elem;
 
 // Per-view hover/selection DIM-BACK: how far the OTHER nodes drop when one node is the focus
 // (user): softer in geo (the rest stay brighter), a notch stronger in ledger, hyper unchanged.
@@ -119,6 +132,8 @@ export interface FocusRow {
   dim: number;
   /** How far an off-filter node SHRINKS AWAY — geo's isolate. Independent of `dim`; see `hideFrac`. */
   hide: number;
+  /** How far the view's own per-network ELEMENTS drop when off-filter — `offNetMul`. */
+  elem: number;
   /** How far the OTHER nodes drop when one node is the focus — `focusDim`. */
   back: number;
   /** Emissive added to the focused node — `focusBoost`. */
@@ -132,9 +147,9 @@ export interface FocusShared {
 }
 
 export const FOCUS_TUNE_DEFAULTS: Readonly<Record<View3D, Readonly<FocusRow>>> = {
-  hyper: { dim: 0.32, hide: 0, back: 0.45, boost: 1.4 },
-  geo: { dim: 1.0, hide: 1, back: 0.65, boost: 0.7 },
-  ledger: { dim: 0.5, hide: 0, back: 0.55, boost: 0.7 },
+  hyper: { dim: 0.32, hide: 0, elem: 0.38, back: 0.45, boost: 1.4 },
+  geo: { dim: 1.0, hide: 1, elem: 0, back: 0.65, boost: 0.7 },
+  ledger: { dim: 0.5, hide: 0, elem: 0.8, back: 0.55, boost: 0.7 },
 };
 
 export const FOCUS_SHARED_DEFAULTS: Readonly<FocusShared> = { groupShare: GROUP_FOCUS };
@@ -156,6 +171,7 @@ const viewMix = (c: DimContext, k: keyof FocusRow): number =>
 export const FOCUS_ROW_SCHEMA: TuneSchema<FocusRow> = {
   dim: { min: 0, max: 1, label: "dim · off-filter" },
   hide: { min: 0, max: 1, label: "hide · off-filter" },
+  elem: { min: 0, max: 1, label: "dim · elements" },
   back: { min: 0, max: 1, label: "dim-back on focus" },
   boost: { min: 0, max: 3, step: 0.05, label: "focus boost" },
 };
