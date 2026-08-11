@@ -158,39 +158,21 @@ export function geoFraming(R: number, out: CameraFraming): void {
 
 // ---- the Snapshots view's ONE pose, and its ONE commit-time variation -----------------------
 // ⚠️ The Snapshots view has exactly ONE camera POSE — `FOCI.ledger`, which every rung on its ladder
-// resolves to (Engine's `ledgerNode`/`ledgerNetwork` both delegate to `ledgerOverview`). Three
-// framings have been tried in this view and all three are RETIRED, which is why the fact is
-// recorded here rather than left to be inferred from an empty file:
+// resolves to (Engine's `ledgerNode`/`ledgerNetwork` both delegate to `ledgerOverview`). FIVE framings
+// have been tried in this view and all five are RETIRED, which is why the fact is recorded here
+// rather than left to be inferred from an empty file:
 //
 //   · `ledgerLaneNudge` (2026-08-08 → 2026-08-09) TRANSLATED laterally toward the committed lane.
 //     The field is FIXED and symmetric, so any lateral move pushes its far end out of frame.
 //   · `ledgerNodeFraming` (2026-07-17 → 2026-08-09) zoomed to a chip in its tray. The trays are
 //     visual aid — machines filling the chamber; the snapshots are the subjects.
-//   · the floor and rail poses below predate the two-storey redesign: neither floors nor rails are
-//     focus rungs any more, so nothing in the Engine calls them.
+//   · `ledgerFloorFraming` / `ledgerRailFraming` (→ 2026-08-11) predated the two-storey redesign:
+//     neither floors nor rails have been focus rungs since, so nothing called them. They outlived
+//     their callers by a release because rule 4 keeps a domain export alive as long as its sibling
+//     test names it — a green test is not a consumer, so check callers before trusting coverage.
 //
-// **Don't grow a fourth.** Emphasis in this view is COLOUR — the four dim tiers in
-// `scene/objects/dimTiers.ts` carry every commit — plus the one ORBIT below. The two framings kept
-// here are the record of that, and the numbers their tests still pin.
-export function ledgerFloorFraming(y: number, out: CameraFraming): void {
-  // Close-in framing (user-tuned). The TARGET sits exactly at the lane's LEAD point (x=0, z=0 —
-  // the caller shifts pos+target laterally by the focused lane's world x), so the node ring /
-  // snapshot cluster projects at the exact screen centre. Earlier x/z target offsets (−6, −9,
-  // meant for composition) each pushed the ring right of centre through the diagonal camera —
-  // composition now comes from the camera OFFSET alone (left + above → trail recedes top-left).
-  out.pos.set(-7, y + 6.2, 23.5); // ~22% closer than the first tuning (user: zoom in a bit more)
-  out.target.set(0, y - 1, 0);
-}
-
-// A RAIL focus pose (spec §5.1): rails run across Z at the front (+X) edge of their floor, so the
-// camera drops to their height and stands off in front, looking back along the field. The target
-// stays at z=0 so a long rail is framed centred rather than at one end. `x` arrives PRE-SCALED by
-// the ledger group's view scale (the caller multiplies), so the stand-off nudge below is in the
-// same world units.
-export function ledgerRailFraming(x: number, y: number, out: CameraFraming): void {
-  out.pos.set(x + 2.5, y + 3.4, 16.5);
-  out.target.set(0, y, 0);
-}
+// **Don't grow a sixth.** Emphasis in this view is COLOUR — the four dim tiers in
+// `scene/objects/dimTiers.ts` carry every commit — plus the one ORBIT below.
 
 // Engine.ts:784 `_updateTween`'s inline ease, lifted verbatim.
 export function easeInOutQuad(t: number): number {

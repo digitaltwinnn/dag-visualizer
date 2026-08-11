@@ -4,8 +4,10 @@ import { STAGE_LIGHTS, STAGE_LIGHT_DEFAULTS, STAGE_LIGHT_SCHEMA } from "./stageL
 // The rows are pinned through STAGE_LIGHT_DEFAULTS, not the live STAGE_LIGHTS: the `?tune` panel
 // binds the live rows, and a test that asserted those would turn a dev knob into a red build.
 describe("STAGE_LIGHTS", () => {
-  it("has a row for every View3D", () => {
-    expect(Object.keys(STAGE_LIGHTS).sort()).toEqual(["geo", "hyper", "ledger"]);
+  // The ledger stages no light, so it has no row — `StagedView` makes that a compile-time fact
+  // rather than a comment, and this assertion is the runtime half.
+  it("has a row for every view that stages a light, and no others", () => {
+    expect(Object.keys(STAGE_LIGHTS).sort()).toEqual(["geo", "hyper"]);
   });
 
   it("pins hyper's row (moved verbatim from HyperView.ts's SPOT_* consts)", () => {
@@ -16,13 +18,6 @@ describe("STAGE_LIGHTS", () => {
 
   it("pins geo's row (moved verbatim from Globe.ts)", () => {
     expect(STAGE_LIGHT_DEFAULTS.geo).toEqual({ angle: 0.36, distance: 22, intensity: 1.5, height: 6 });
-  });
-
-  // ⚠️ UNCONSUMED: no FocusSpot is constructed for the ledger (only HyperView and Globe register
-  // one), so this row currently drives nothing. Kept as the staging values a ledger spot would
-  // take; see the note in stageLight.ts.
-  it("pins ledger's row (moved verbatim from LedgerView.ts)", () => {
-    expect(STAGE_LIGHT_DEFAULTS.ledger).toEqual({ angle: 0.75, distance: 44, intensity: 2.6, height: 14 });
   });
 
   it("starts live == defaults, so an untouched panel changes nothing", () => {

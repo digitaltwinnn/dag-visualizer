@@ -10,8 +10,7 @@ import * as THREE from "three";
 import { METAGRAPHS, type MetaConfig } from "../../config";
 import { metaAnchor, META_RING, META_LAYERS, HYPER_TILT, applyHyperRig } from "../../domain/hyperLayout";
 import { armillaryFrame, ringFramePos, ringNormal, type RingFrame } from "../../domain/nodeLayout";
-import { FocusSpot } from "../objects/FocusSpot";
-import type { StageLights } from "../objects/StageLights";
+import type { StageLight } from "../objects/StageLight";
 import { STAGE_LIGHTS } from "../../domain/stageLight";
 import { FadeSet } from "../objects/FadeSet";
 import { ORB_FRESNEL_GLSL, ORB_FRESNEL_MIX } from "../objects/NodeFabric";
@@ -34,7 +33,7 @@ const PKT_TRAVEL = 0.85; // seconds hub → core
 const PKT_STAGGER = 0.07; // seconds between launches within a burst
 const PKT_POOL = 14; // reusable packet meshes per metagraph (caps simultaneous in-flight)
 
-// The focus SPOTLIGHT (see scene/objects/FocusSpot) — staged above the focused metagraph's ring
+// The focus SPOTLIGHT (see scene/objects/StageLight) — staged above the focused metagraph's ring
 // plane (or the DAG core's, a bigger stage) so the selected atom catches a stage-light wash.
 // Values live in domain/stageLight.ts's STAGE_LIGHTS.hyper row (angle/distance/intensity/
 // penumbra/height/heightDag) — the viewPolicy idiom, one row per view.
@@ -101,8 +100,9 @@ export class HyperView implements SceneView {
   private _coreRings: THREE.LineLoop[] = []; // the DAG core's cyan "sun" hoops (rebuilt on node load)
   private _coreFills: THREE.Mesh[] = []; // the DAG core's shell rim-fill disks (same as a metagraph's)
   private _fillTex?: THREE.Texture; // shared rim-weighted radial gradient for the ring fill disks
-  // The focus spotlight (see SPOT_* above) + per-frame scratch.
-  private _spot!: FocusSpot;
+  // The focus spotlight (see SPOT_* above) + per-frame scratch. The light itself is shared and
+  // owned by the Engine — this view only CLAIMS it while a subject is focused.
+  private readonly stage: StageLight;
   private _spotPos = new THREE.Vector3();
   private _spotN = new THREE.Vector3();
   private _coreDim = 0; // eased 0→1: the DAG core fades back when a specific metagraph is the subject
@@ -116,22 +116,22 @@ export class HyperView implements SceneView {
   // the Engine at construction — HyperView builds all its hubs synchronously from
   // config.METAGRAPHS right here, before any API data exists, so the map has to arrive as a ctor
   // arg for the hubs to be born in the identity colour with no recolor pass / no first-paint flash.
-  constructor(scene: THREE.Scene, colors: SceneColors, stage: StageLights, sceneColors?: Record<string, number>) {
+  constructor(scene: THREE.Scene, colors: SceneColors, stage: StageLight, sceneColors?: Record<string, number>) {
     this.scene = scene;
     this._core = colors.core;
+    this.stage = stage;
     this.root = new THREE.Group();
     // Tilt the hub/tether/hoop structure to read top-down from the shared overview camera (Globe
     // tilts the node group + HyperView the core by the same HYPER_TILT, so all three stay registered).
     applyHyperRig(this.root, 0);
     scene.add(this.root);
 
-    // The focus spotlight (world-space — the hub position is resolved through root's tilt+spin each
-    // frame). Rests dark; eases up only while a metagraph / the DAG is focused (see update()).
-    // distance 40 clears the DAG stage's farthest shell node (~21). Penumbra kept SMALL on purpose:
-    // the full-intensity cone is angle·(1−penumbra), and a soft-edged cone lit only the inner rings —
-    // the outer dL1/cL1 rings sat in the falloff and read like a DIFFERENT material (user bug).
-    this._spot = new FocusSpot(scene, STAGE_LIGHTS.hyper);
-    stage.register("hyper", this._spot);
+    // The focus spotlight is claimed per frame in update() (world-space — the hub position is
+    // resolved through root's tilt+spin there). Its staging row lives in domain/stageLight.ts:
+    // distance 40 clears the DAG stage's farthest shell node (~21), and penumbra is kept SMALL on
+    // purpose — the full-intensity cone is angle·(1−penumbra), and a soft-edged cone lit only the
+    // inner rings, leaving the outer dL1/cL1 rings in the falloff reading like a DIFFERENT
+    // material (user bug).
 
     this.pickables = [];
     this.metas = [];
@@ -161,8 +161,9 @@ export class HyperView implements SceneView {
     this.hubOrbits = on;
   }
 
-  // The view-transition furniture multiplier (Engine, per frame). The spot's OFF lifecycle is
-  // now centralized (Engine's StageLights.gate, spec A#3) — this view only drives it while lit.
+  // The view-transition furniture multiplier (Engine, per frame). The spotlight needs no gate of
+  // its own: the Engine hands the same alpha to StageLight as this view's presence, so a claim
+  // made while the view fades out is scaled to nothing.
   setViewAlpha(a: number): void {
     this._fades.apply(a);
   }
@@ -173,11 +174,6 @@ export class HyperView implements SceneView {
   setLedger(on: boolean) {
     if (this.ledger === on) return;
     this.ledger = on;
-    // The spot lives in the SHARED scene (not root) and its easing runs in update(), which
-    // early-returns in ledger — without this instant off, a spot lit by a focused atom would
-    // linger and wash the ledger chamber (a within-view re-stage, not the view-lifecycle
-    // off centralized in StageLights.gate).
-    if (on) this._spot.blackout();
     // The Hypergraph furniture is hidden in the Snapshots chamber (update() early-returns there, so
     // it can't fade these itself): the DAG core + its cyan hoops, and each hub + its layer hoops.
     // Restored on exit; update() then governs their per-frame fade again.
@@ -566,19 +562,24 @@ export class HyperView implements SceneView {
 
     // Focus SPOTLIGHT: stage a white key above the focused subject's ring plane — a metagraph atom's
     // hub, or the DAG CORE itself (same subject at a bigger scale; higher stage, same cone) — so the
-    // selection catches a real light wash on top of the DoF/dim emphasis (user). Eases via FocusSpot
-    // and fades with its subject on the morph; rests dark otherwise.
+    // selection catches a real light wash on top of the DoF/dim emphasis (user). Rests dark
+    // otherwise: not claiming IS off, so there is no spot to switch back off here.
     const spotMeta = this.focusId != null && this.metas.some((m) => m.cfg.id === this.focusId);
-    const spotOn = spotMeta || dagFocused;
-    this._spot.update(dt, spotOn, (spotMeta ? hubFade : coreReveal) * this._fades.alpha);
-    if (spotOn) {
+    if (spotMeta || dagFocused) {
       // Only while focused: resolve the subject to world once per frame (root tilt+spin+scale) —
       // the metagraph loop stashed its hub's ROOT-LOCAL position; the DAG core sits at the origin.
-      // During the fade-out the light just dims in place.
       this._spotN.set(0, 1, 0).applyEuler(this.root.rotation); // the ring-plane normal (world)
       if (spotMeta) this._spotPos.applyEuler(this.root.rotation).multiplyScalar(this.root.scale.x);
       else this._spotPos.set(0, 0, 0);
-      this._spot.aim(this._spotPos, this._spotN, spotMeta ? STAGE_LIGHTS.hyper.height : STAGE_LIGHTS.hyper.heightDag!);
+      // The fade is the SUBJECT's own ramp only — StageLight applies this view's presence itself,
+      // so passing `_fades.alpha` here too would square it.
+      this.stage.claim(
+        "hyper",
+        this._spotPos,
+        this._spotN,
+        spotMeta ? STAGE_LIGHTS.hyper.height : STAGE_LIGHTS.hyper.heightDag!,
+        spotMeta ? hubFade : coreReveal,
+      );
     }
   }
 

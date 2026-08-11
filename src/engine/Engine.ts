@@ -14,7 +14,7 @@ import { LedgerView } from "./scene/views/LedgerView";
 import { UNLISTED_KEY } from "./domain/ledgerBands";
 
 // The public catalog's ids — the unknown-lane tile resolver splits listed from unlisted rows.
-import { StageLights } from "./scene/objects/StageLights";
+import { StageLight } from "./scene/objects/StageLight";
 import { loadGeoCache, resolveMissing } from "@/src/data/geoResolve";
 import { METAGRAPHS, COLORS } from "@/src/engine/config";
 import { BYTE_SCALE_KB, type RailGroup } from "./domain/ledgerLayout";
@@ -25,7 +25,7 @@ import { FOCI, hubFraming, geoFraming, nodeFraming, cohortFraming, hyperNodeFram
 import { countryFraming } from "./domain/countryShape";
 import { R as GEO_R, LAND_H } from "./domain/geoLayout";
 import { clickActions, pickActive, pickNetId, viewEntryActions, metaSnapSelectActions, bandSelectActions } from "./domain/pickActions";
-import { ViewTransition, is3D, type View3D } from "./domain/viewTransition";
+import { ViewTransition, is3D } from "./domain/viewTransition";
 import { LADDERS, hasLevel, type CohortSel, type CompositionSel, type FocusLevel, type SelectionSnapshot, type ResolverKey } from "./domain/focusLadder";
 import { compositionGroups, compositionKey, compositionRows } from "@/src/data/composition";
 import { metaSnapDeepKey, metaSnapHoverKey } from "@/src/data/types";
@@ -77,12 +77,9 @@ export class Engine {
   private layers: HyperView;
   private globe: Globe;
   private ledger: LedgerView;
-  // The ONE stage-light lifecycle owner (spec A#3): every view's FocusSpot registers here at
-  // construction; the render loop gates it once per frame with the per-view furniture alphas so
-  // a view can no longer forget its own spotOff (the lingering-light bug class this replaced).
-  private _stageLights = new StageLights();
-  // Per-frame gate-call scratch (zero-allocation) — mutated in place, never re-literal'd.
-  private _lightAlphas: Record<View3D, number> = { hyper: 0, geo: 0, ledger: 0 };
+  // THE stage light — one shared SpotLight the focused view CLAIMS per frame (scene/objects/
+  // StageLight). Constructed after the scene exists, so it is assigned in the constructor.
+  private _stageLight!: StageLight;
   private _ledgerDirty = false; // rebuild the ledger geometry next frame (set on data events)
   // The frame timer — THREE.Timer (THREE.Clock was deprecated in r180). Unlike Clock it must be
   // updated once per frame before reading the delta; the render loop does that.
@@ -248,8 +245,9 @@ export class Engine {
     // handed in at construction — passing it as a 2nd ctor arg (read by _buildMetagraphs) means
     // the hubs are born in the identity color with no recolor pass and no first-paint flash.
     // HyperView only ever has these 10 config hubs, so this map never needs updating.
-    this.layers = new HyperView(this.ctx.scene, colors, this._stageLights, sceneColorsFor(METAGRAPHS.map((m) => m.id)));
-    this.globe = new Globe(this.ctx.scene, this.layers, this.ctx.camera, colors, this._stageLights);
+    this._stageLight = new StageLight(this.ctx.scene);
+    this.layers = new HyperView(this.ctx.scene, colors, this._stageLight, sceneColorsFor(METAGRAPHS.map((m) => m.id)));
+    this.globe = new Globe(this.ctx.scene, this.layers, this.ctx.camera, colors, this._stageLight);
     // The Globe reads the transition machine each frame (geo furniture alpha + the node gather).
     this.globe.transition = this.transition;
     // ONE identity colour system everywhere: the ledger + globe are handed the same identity
@@ -336,7 +334,6 @@ export class Engine {
         if (this.disposed) return;
         this._devTune = await m.mountDevTune({
           ledger: this.ledger,
-          stageLights: this._stageLights,
           camera: this.ctx.camera,
           controls: this.ctx.controls,
         });
@@ -1507,6 +1504,10 @@ export class Engine {
     this.layers.setViewAlpha(hyperAlpha);
     const ledgerAlpha = this.transition.furnitureAlpha("ledger");
     this.ledger.setViewAlpha(ledgerAlpha);
+    // The stage light's per-view PRESENCE, published BEFORE the view updates that claim it: a claim
+    // is scaled by its view's furniture alpha, so a fading view's light fades with its furniture and
+    // a dark view's claim is worth nothing. That is the whole off-switch — not claiming IS off.
+    this._stageLight.setPresence(hyperAlpha, this.transition.furnitureAlpha("geo"));
 
     this.globe.setMorph(this.morph);
     // Core-dim target: the DAG core fades back when a specific metagraph is the effective subject
@@ -1552,13 +1553,9 @@ export class Engine {
       if (this._ledgerDirty) this._refreshLedger();
       this.ledger.update(dt);
     }
-    // Central stage-light gate: any view whose furniture is dark gets its spot blacked out
-    // here — a view cannot forget its own off-switch (spec A#3). update() stops ticking a
-    // view's own spot off-view, so without this a lit spot would otherwise linger.
-    this._lightAlphas.hyper = hyperAlpha;
-    this._lightAlphas.geo = this.transition.furnitureAlpha("geo");
-    this._lightAlphas.ledger = ledgerActive ? ledgerAlpha : 0;
-    this._stageLights.gate(this._lightAlphas);
+    // Resolve the frame's stage-light claim (hyper/geo made theirs in their update above): stage,
+    // aim and ease the winner, then release. No claim = the light eases out.
+    this._stageLight.update(dt);
 
     // Depth of field: only a single focused metagraph, and only where the policy allows it (hyper).
     const metaSel = this.filter !== "all" && this.filter !== "dag";

@@ -30,8 +30,7 @@ import { dimScale } from "../domain/dimModel";
 import { ArcSim, type ArcEndpoint } from "../domain/arcSim";
 import type { MetaNodeRecord, ValidatorRecord } from "../domain/records";
 import { buildGeoView, setCountryBorder, setCountryFillMask, HOVER_MASK_BOOST, type GeoViewHost } from "./views/GeoView";
-import { FocusSpot } from "./objects/FocusSpot";
-import type { StageLights } from "./objects/StageLights";
+import type { StageLight } from "./objects/StageLight";
 import { STAGE_LIGHTS } from "../domain/stageLight";
 import { ccToNumeric, countryCcAt, countryLean, geometryRings, mainPolygonRings, ringsAngularRadius, ringsCentroid, type Ring } from "../domain/countryShape";
 import { closeness, NODE_RAISE } from "../domain/cameraRig";
@@ -161,11 +160,11 @@ export class Globe implements GeoViewHost {
   private _selCohortDir = new THREE.Vector3(); // resolved centroid unit dir (scratch)
   private _selCohortOk = false;
   private _hoverCountryCc: string | null = null; // explorer row hover — border preview only
-  // The geo focus SPOTLIGHT (scene/objects/FocusSpot): staged above the SELECTED node's chip stack
-  // so the zoomed-in node pick catches a stage-light wash (user; hyper/ledger have their own).
-  // `_selNodeRec` caches the selected node's geoPrimary record — re-resolved by setSelectedNode,
-  // which the rebuilds (setNodes/setMetagraphs) re-run so the cache never dangles.
-  private _spot: FocusSpot;
+  // The geo focus SPOTLIGHT (scene/objects/StageLight): the SHARED light, claimed per frame and
+  // staged above the SELECTED node's chip stack so the zoomed-in node pick catches a light wash
+  // (user). `_selNodeRec` caches the selected node's geoPrimary record — re-resolved by
+  // setSelectedNode, which the rebuilds (setNodes/setMetagraphs) re-run so the cache never dangles.
+  private readonly stage: StageLight;
   private _selNodeRec: ValidatorRecord | MetaNodeRecord | null = null;
   private _spotPos = new THREE.Vector3();
   private _spotN = new THREE.Vector3();
@@ -198,12 +197,12 @@ export class Globe implements GeoViewHost {
   // allocation fix — this used to allocate a fresh FrameCtx + DimContext object twice per frame).
   private _ctx!: FrameCtx;
 
-  constructor(scene: THREE.Scene, layers: HyperView | null, camera: THREE.Camera | null, colors: SceneColors, stage: StageLights) {
+  constructor(scene: THREE.Scene, layers: HyperView | null, camera: THREE.Camera | null, colors: SceneColors, stage: StageLight) {
     this.group = new THREE.Group();
     scene.add(this.group);
-    // Node-pick stage light: tight cone over one chip stack (radius ≈ 6·tan(0.36) ≈ 2.3).
-    this._spot = new FocusSpot(scene, STAGE_LIGHTS.geo);
-    stage.register("geo", this._spot);
+    // Node-pick stage light: tight cone over one chip stack (radius ≈ 6·tan(0.36) ≈ 2.3), claimed
+    // per frame in update().
+    this.stage = stage;
     this.layers = layers; // for gluing metagraph nodes to their orbiting hubs
     this.camera = camera; // for the view-dependent disc falloff at the limb
     this.geoColor = colors.core;   // the geo hologram = the accent (calm via opacity); wall + grid + graticule
@@ -1170,21 +1169,20 @@ export class Globe implements GeoViewHost {
 
   update(dt: number): void {
     this.clock += dt;
-    // Node-pick SPOTLIGHT (geo only): stage a white key above the selected node's chip stack so the
-    // zoomed-in pick catches a light wash (user; the same FocusSpot pattern as hyper/ledger). The
-    // record's geo position is group-LOCAL — resolve through the globe's spin/lean each frame.
+    // Node-pick SPOTLIGHT (geo only): claim the shared stage light above the selected node's chip
+    // stack so the zoomed-in pick catches a light wash (user). The record's geo position is
+    // group-LOCAL — resolve through the globe's spin/lean each frame.
     const selRec = this._selNodeRec;
-    const spotOn =
-      selRec != null && !this.ledger && this.morph > 0.85 && ("geoPos" in selRec || !selRec.noGeo);
-    this._spot.update(dt, spotOn);
-    if (spotOn) {
-      const rec = selRec!;
+    if (selRec != null && !this.ledger && this.morph > 0.85 && ("geoPos" in selRec || !selRec.noGeo)) {
+      const rec = selRec;
       if ("geoPos" in rec) this._spotPos.copy(rec.geoPos); // metagraph node (fanned stack position)
       else this._spotPos.copy(rec.geoDir!).multiplyScalar(rec.geoRadius); // validator
       this._spotN.copy(this._spotPos).normalize(); // surface normal ≈ radial
       this.group.localToWorld(this._spotPos);
       this._spotN.transformDirection(this.group.matrixWorld);
-      this._spot.aim(this._spotPos, this._spotN, STAGE_LIGHTS.geo.height);
+      // No fade of its own: the light rides this view's PRESENCE, so it builds with the furniture
+      // instead of popping to full the instant the morph crosses 0.85.
+      this.stage.claim("geo", this._spotPos, this._spotN, STAGE_LIGHTS.geo.height);
     }
     // Recede the density light pools while a country is drilled (so its highlight leads), eased.
     this._glowDim += ((this.countryFilter ? 0.2 : 1) - this._glowDim) * Math.min(1, dt * 3);

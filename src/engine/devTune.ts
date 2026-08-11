@@ -11,13 +11,12 @@
 // having to track `mode`, subscribe to anything, or rebuild itself. Engine owns mount/dispose.
 import type * as THREE from "three";
 import type { LedgerView } from "./scene/views/LedgerView";
-import type { StageLights } from "./scene/objects/StageLights";
 import { RIBBON_TUNE_DEFAULTS, RIBBON_TUNE_SCHEMA } from "./scene/objects/Ribbons";
 import { BAR_TUNE_DEFAULTS, BAR_TUNE_SCHEMA } from "./scene/objects/ByteBar";
 import { GLOBAL_PLANE_TUNE_DEFAULTS, META_PLANE_TUNE_DEFAULTS, PLANE_TUNE_SCHEMA } from "./scene/objects/SnapshotPlane";
 import { TILE_TUNE_DEFAULTS, TILE_TUNE_SCHEMA } from "./scene/views/LedgerView";
 import { FOCUS_TUNE, FOCUS_TUNE_DEFAULTS, FOCUS_TUNE_SCHEMA } from "./domain/dimModel";
-import { STAGE_LIGHTS, STAGE_LIGHT_DEFAULTS, STAGE_LIGHT_SCHEMA } from "./domain/stageLight";
+import { STAGE_LIGHTS, STAGE_LIGHT_DEFAULTS, STAGE_LIGHT_SCHEMA, type StagedView } from "./domain/stageLight";
 import { CAM_ZOOM, RAILS_HIDDEN_DOLLY } from "./domain/cameraRig";
 import {
   renderGroup, restoreTuned, savePersisted, setPersist, tuningPersisted, exportAll, dump,
@@ -26,8 +25,6 @@ import {
 
 export interface DevTuneTargets {
   ledger: LedgerView;
-  /** The ONE owner of the per-view FocusSpots — the panel asks it for the spot to re-stage. */
-  stageLights: StageLights;
   camera: THREE.PerspectiveCamera;
   controls: { target: THREE.Vector3 };
 }
@@ -38,7 +35,7 @@ export interface DevTuneHandle {
 
 export async function mountDevTune(targets: DevTuneTargets): Promise<DevTuneHandle> {
   const { Pane } = await import("tweakpane");
-  const { ledger, stageLights, camera, controls } = targets;
+  const { ledger, camera, controls } = targets;
 
   // ---- the manifest ---------------------------------------------------------------------------
   // Shared groups: these shape EVERY view, so they sit above the per-view folders.
@@ -52,16 +49,14 @@ export async function mountDevTune(targets: DevTuneTargets): Promise<DevTuneHand
     },
   ];
 
-  // Per-view groups. `ledger` has a STAGE_LIGHTS row but constructs no FocusSpot, so it gets no
-  // spotlight folder — a slider that moves nothing is worse than an absent one.
-  const spotGroup = (view: "hyper" | "geo"): TuneGroup => ({
+  // Per-view groups. Only the views that STAGE a light get a spotlight folder — `StagedView` is
+  // what says which, so a slider that moves nothing can't be built.
+  const spotGroup = (view: StagedView): TuneGroup => ({
     title: `${view} · spotlight`,
     values: STAGE_LIGHTS[view],
     defaults: STAGE_LIGHT_DEFAULTS[view],
     schema: STAGE_LIGHT_SCHEMA,
-    // The SpotLight bakes cone/range/intensity at construction; re-push them so an edit shows
-    // without a reload. `height` needs nothing — aim() reads it fresh every frame.
-    onChange: () => stageLights.get(view)?.setStaging(STAGE_LIGHTS[view]),
+    // No onChange: StageLight re-reads its row every frame, so an edit is live by construction.
     home: `domain/stageLight.ts · STAGE_LIGHT_DEFAULTS.${view}`,
   });
 

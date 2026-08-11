@@ -70,8 +70,8 @@ scope from the table.
    is inert until its row opts in. Gate on the view a behaviour is FOR — not `mode === "x"` guards,
    not deny-lists (a deny-list grows a line per view).
 8. **One home per concern.** Camera → `domain/cameraRig.ts`, focus ladder → `domain/focusLadder.ts`,
-   click semantics → `domain/pickActions.ts`, the unlisted network → `src/data/unlisted.ts`. Don't
-   grow a second copy in the Engine or a component.
+   click semantics → `domain/pickActions.ts`, the unlisted network → `src/data/unlisted.ts`, the stage
+   light → `scene/objects/StageLight.ts`. Don't grow a second copy in the Engine or a component.
 9. **The scene↔HUD hover pairing is sacrosanct.** The shared store channels (`hoverFilter`,
    `hoverNodeId`, `hoverSnapOrd`, `hoverMetaSnap`, `hoverCountry`, `hoverCohort`), `.subject-paired`
    and the marker classes survive every refactor. Hovers preview, never commit. **A surface hovers the
@@ -159,8 +159,9 @@ rules make it non-intrusive, and the header comment there is their authoritative
 **The tree is STATIC** — shared groups (`focus & dim`), then one collapsed folder per view, then the
 camera. A folder for a view you aren't in simply sits collapsed; that costs a click and saves the panel
 tracking `mode`, subscribing to anything, or rebuilding itself. Values that are BAKED rather than read
-per frame (ribbon vertex colours, a light's cone) carry an `onChange` that re-pushes them, so an edit
-shows without a reload. Persistence is **opt-in and default OFF** — a silently-restored session is a
+per frame (the ribbons' vertex colours) carry an `onChange` that re-pushes them, so an edit shows
+without a reload — **prefer reading the row per frame and needing no callback at all**, which is what
+the stage light does. Persistence is **opt-in and default OFF** — a silently-restored session is a
 trap, because you would be looking at last week's knobs believing they were the shipped look.
 
 **The camera folder is a READOUT, not sliders**: poses are ~8 constants and each needs its own selection
@@ -223,6 +224,20 @@ you start:
 Five named phases in a fixed order: inputs → camera → motion → derived frames → scene writes. **The
 contract is that nothing may mutate a pose after the phase that derives from it.** New per-frame work
 goes in the phase whose inputs it needs, never earlier.
+
+### The stage light claims, it is never switched off
+
+There is ONE `THREE.SpotLight` for the whole app (`scene/objects/StageLight.ts`). The Engine sets its
+per-view presence each frame *before* the view updates; a view that wants it calls `claim(view,
+subject, …)` and the strongest claim wins; `update(dt)` stages from `STAGE_LIGHTS[claimed]`, eases,
+then **releases the claim**. So **not claiming IS off** — there is no `spotOff` to forget, which is the
+bug class the previous per-view-light + registry arrangement kept guarding against. A view's presence
+is already applied centrally, so a claim must not multiply by its own fade again.
+
+`StagedView` (`domain/stageLight.ts`) is the type that says which views stage a light, and the `?tune`
+panel builds a spotlight folder only for those — the ledger deliberately stages none (its chamber is
+lit by its own glass and emissive snapshots; emphasis there is the four colour dim tiers). Claiming
+for an unstaged view is a compile error, not a silent no-op.
 
 ### Two camera principles
 
