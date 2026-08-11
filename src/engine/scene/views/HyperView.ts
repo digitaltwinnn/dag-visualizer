@@ -39,6 +39,13 @@ const PKT_POOL = 14; // reusable packet meshes per metagraph (caps simultaneous 
 // penumbra/height/heightDag) — the viewPolicy idiom, one row per view.
 
 
+// ONE HUB ORB for every network, the DAG core included (user, 2026-08-11): the core used to be a
+// bigger sphere (r 1.5) than the metagraph hubs (r 0.9), which said "different kind of thing" — but
+// its CENTRAL POSITION already says the only thing that is different about it. Shared because it is
+// literally the same object at the same size; these are built once and live for the app's lifetime,
+// so there is nothing to dispose and no reason for N copies of one icosahedron.
+const HUB_ORB = new THREE.IcosahedronGeometry(0.9, 4);
+
 // Give a single (non-instanced) emissive sphere the SAME fresnel-rim ORB look as the node instances
 // (NodeFabric._makeNodeMaterial): a view-dependent rim multiplied onto its emissive so the core /
 // hub read as lit 3D orbs, not flat faceted suns (user). The nodes are instanced (per-instance
@@ -201,7 +208,7 @@ export class HyperView implements SceneView {
       roughness: 0.5, metalness: 0.2, transparent: true, // match the node orbs (smooth + fresnel)
     });
     applyOrbFresnel(mat);
-    this.core = new THREE.Mesh(new THREE.IcosahedronGeometry(1.5, 5), mat);
+    this.core = new THREE.Mesh(HUB_ORB, mat);
     this.core.userData.pick = {
       kind: "core",
       title: "Global L0 — the Hypergraph core",
@@ -255,7 +262,7 @@ export class HyperView implements SceneView {
         roughness: 0.5, metalness: 0.2, transparent: true, // match the node orbs (smooth + fresnel)
       });
       applyOrbFresnel(hubMat);
-      const hub = new THREE.Mesh(new THREE.IcosahedronGeometry(0.9, 4), hubMat);
+      const hub = new THREE.Mesh(HUB_ORB, hubMat);
       hub.userData.pick = { kind: "meta", cfg, title: cfg.name, sub: `Metagraph · ${cfg.ticker}` };
       group.add(hub);
       this.pickables.push(hub);

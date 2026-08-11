@@ -188,7 +188,9 @@ identical bodies, twin emissive resolvers differing by a sub-1% coefficient, and
 apply twice; that zero is the whole origin of the split, never a design decision. `domain/dimModel.ts`
 now exposes ONE `dim` row field and one `nodeDim`/`nodeGlow`/`nodeEmissive` triple that both pools call.
 The one surviving asymmetry is deliberate: `hubMatchBoost` targets the metagraph **hub's** resting glow,
-which is view furniture — about what a node orbits, not what a node is.
+which is view furniture — about what a node orbits, not what a node is. The core's own SPHERE follows
+the same rule and is now the shared `HUB_ORB` geometry at hub size (was r 1.5 vs the hubs' 0.9): *"its
+central position already tells it's a bit different from the others, not size"* (user, 2026-08-11).
 
 **The camera folder is a READOUT, not sliders**: poses are ~8 constants and each needs its own selection
 state to even see, so orbiting to a pose you like and reading it off beats dragging numbers.
