@@ -81,7 +81,6 @@ export class Ribbons {
   private _rows: RowState[] = [];
   private _sceneColors: Record<string, number>;
   private _neutral: number;
-  private _alpha = 0;
   /** Per-row brightness scale — the trail REWIND fades the live lead row's sheet while an older
    *  snapshot owns the front, and the HOVER-preview row rides below full (LedgerView drives). */
   private _rowFade = [1, 1, 1];
@@ -177,7 +176,15 @@ export class Ribbons {
     return out.set(x, yTop + (yBot - yTop) * t, topZ + (botZ - topZ) * s);
   }
 
-  setAlpha(a: number): void { this._alpha = a; }
+  /** The view fade, applied DIRECTLY (the Engine calls this every frame, so the opacity IS the
+   *  state and there is no `_alpha` to hold). It used to be eased toward at `dt * 5` — a fade of a
+   *  fade: `a` is already the transition's own curve, and every sibling in the chamber (the floors,
+   *  the bar, the tiles, the labels) multiplies by it as given, so the ease alone left the sheet
+   *  visibly trailing them out of the view by ~half a second. `restOp` is read per frame here like
+   *  every other tune row, so the knob still lives without an onChange. */
+  setAlpha(a: number): void {
+    this._mat.opacity = this.tune.restOp * a;
+  }
 
   /** COMMITTED filter → the other metagraphs' sheets take the COLORED dim (identity hue at the
    *  ledger row's `dim` — a ribbon states which bytes came from where, so it is DATA and answers
@@ -188,12 +195,6 @@ export class Ribbons {
     if (next === this._filter) return;
     this._filter = next;
     this._writeGeometry(); // event-time: a filter commit, not a frame
-  }
-
-  update(dt: number): void {
-    const k = Math.min(1, dt * 5);
-    const target = this.tune.restOp * this._alpha;
-    this._mat.opacity += (target - this._mat.opacity) * k;
   }
 
   /** event-time: the whole sheet is rewritten when a row changes. */

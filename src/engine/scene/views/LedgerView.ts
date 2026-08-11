@@ -795,7 +795,8 @@ export class LedgerView implements SceneView {
     this._applyFloorAlpha();
 
     this._bar.update(dt);
-    this._ribbons.update(dt);
+    // (no _ribbons.update: the sheet's only per-frame value is its opacity, and setViewAlpha —
+    // called every frame — writes that directly now.)
 
     if (!this._latest) return;
     const k = Math.min(1, dt * 3);
