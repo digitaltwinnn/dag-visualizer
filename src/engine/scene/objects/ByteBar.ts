@@ -14,7 +14,7 @@ import { METAGRAPHS } from "../../config";
 import { BAR_H, BAR_D, BAR_LIFT, FLOOR_Y, LEAD_X } from "../../domain/ledgerLayout";
 import { type BarSpec } from "../../domain/ledgerBands";
 import { SLOT_SP, SLOT_N, horizonAt } from "../../domain/ledgerModel";
-import { snapBright, focusWeightOf } from "../../domain/dimModel";
+import { snapBright, snapFocusOf } from "../../domain/dimModel";
 import type { TuneSchema } from "../../tune";
 
 const BANDS_PER_SLOT = METAGRAPHS.length + 1;
@@ -170,16 +170,18 @@ export class ByteBar {
       // Rows the rewind pushed past the front edge dissolve within one slot of travel.
       const over = (x - LEAD_X) / (SLOT_SP * 0.9);
       const front = over <= 0 ? 1 : Math.max(0, 1 - over);
-      // A row is a GROUP of bands, so a hovered row previews at the group tier while the shown
-      // row — the pin, or the live lead — is the primary subject. The same ranking every node
-      // loop uses (`focusWeightOf`), which is what keeps a hover below a standing commitment.
-      const focus = focusWeightOf(hot, hov);
       for (let i = 0; i < s.used; i++) {
         // Brightness is the node vocabulary (snapBright); COLOUR is the chamber's own independent
         // reading — the shown row, a hover preview and the committed network's own bands carry
         // identity hue all the way down the trail, everything else stays the neutral trail.
         const offNet = this._filter !== "all" && s.keys[i] !== this._filter;
         const onNet = !hot && !hov && this._filter !== "all" && s.keys[i] === this._filter;
+        // A row is a GROUP of bands, so a hovered row previews at the group tier while the shown
+        // row — the pin, or the live lead — is the primary subject. But the focus is the ROW's,
+        // and a row holds every network's bytes: under a committed filter it reaches that
+        // network's band alone (`snapFocusOf`), or the undimmed boost would lift the very bands
+        // the dim is there to push behind it.
+        const focus = snapFocusOf(hot, hov, offNet);
         const t = snapBright(this.tune.rest, offNet, focus, dimBack) * fade * front * this._alpha;
         s.mats[i].opacity += (t - s.mats[i].opacity) * k;
         s.mats[i].color.setHex(hot || hov || onNet ? s.colors[i] : this._neutral);

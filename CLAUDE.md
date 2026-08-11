@@ -994,6 +994,16 @@ off-filter network drops by `dim`, the same knob its node chips in the trays ans
 pins primary > preview > resting > stepped back, and that off-filter dims without vanishing. Exactly one
 hot row — a committed older snapshot beats the live lead, a hover doesn't steal it.
 
+⚠️ **A ROW'S FOCUS IS THE COMMITTED NETWORK'S, NOT THE WHOLE ROW'S** (user, 2026-08-11). A row is a
+TICK, and a tick holds every network's snapshot side by side — so under a filter the boost reaches the
+committed network's band and tile alone (`snapFocusOf()`, the one home). The boost is added UNDIMMED,
+which is exactly what made a row-wide focus swamp the dim: on the shown row every band came up together
+by the same `+boost`, so at the moment the filter matters most the committed network had no lead. The
+one exception is a directly hovered TILE — that IS the subject, so it takes the primary weight whatever
+the filter says, the same answer the node model gives a hovered off-filter node. Kept OUT of
+`snapBright` on purpose: subject identity is a call-site question, like colour, and `snapBright` stays
+term-for-term faithful to `nodeEmissive`.
+
 *Colour is decided separately at the call sites and no dim knob may touch it.* The active and hovered
 rows take identity hue; with a network committed, **that network's OWN bands and lane tiles keep their
 identity hue down the WHOLE trail**, so the committed story reads as one coloured thread through the

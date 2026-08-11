@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { BAR_TUNE_DEFAULTS } from "./ByteBar";
 import { RIBBON_TUNE_DEFAULTS } from "./Ribbons";
-import { snapBright, focusWeightOf, FOCUS_TUNE_DEFAULTS } from "../../domain/dimModel";
+import { snapBright, snapFocusOf, focusWeightOf, FOCUS_TUNE_DEFAULTS } from "../../domain/dimModel";
 import { TILE_TUNE_DEFAULTS } from "../views/LedgerView";
 
 // The chamber's BRIGHTNESS-TIER CONTRACT. Since 2026-08-11 the snapshots read the NODE
@@ -48,6 +48,17 @@ describe("the ledger's brightness-tier hierarchy", () => {
       const t = tiers(rest);
       expect(t.offFilter).toBeLessThan(t.rest);
       expect(t.offFilter).toBeGreaterThan(0);
+    });
+
+    // A row is a TICK, and a tick holds every network's snapshot side by side. So the row's focus
+    // is the COMMITTED network's (snapFocusOf) — the boost is undimmed, and a row-wide one lifted
+    // every band together, leaving the committed one no lead at the moment it matters most.
+    it(`${what}: a row focus lifts the committed network, not the whole row`, () => {
+      const t = tiers(rest);
+      expect(snapBright(rest, false, snapFocusOf(true, false, false), true)).toBe(t.primary);
+      const off = snapBright(rest, true, snapFocusOf(true, false, true), true);
+      expect(off).toBeLessThan(t.rest);
+      expect(off).toBeGreaterThan(0);
     });
   }
 

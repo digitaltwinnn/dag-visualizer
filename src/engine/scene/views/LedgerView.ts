@@ -51,7 +51,7 @@ import type {
 import { metaSnapHoverKey } from "@/src/data/types";
 import { LEDGER_LAYERS } from "@/src/data/ledgerLayers"; // shared display copy — floor labels = panel rows
 import { ByteBar } from "../objects/ByteBar";
-import { snapBright, focusWeightOf } from "../../domain/dimModel";
+import { snapBright, snapFocusOf, focusWeightOf } from "../../domain/dimModel";
 import { Ribbons } from "../objects/Ribbons";
 import { SnapshotPlane, makeEdgeLabel, GLOBAL_PLANE_TUNE_DEFAULTS, META_PLANE_TUNE_DEFAULTS, type PlaneTune } from "../objects/SnapshotPlane";
 import { TrailRewind } from "../objects/TrailRewind";
@@ -851,8 +851,12 @@ export class LedgerView implements SceneView {
         // its row; a hovered ROW is a group, so it previews at the group tier.
         const ident = hot || hov || hovTile || onNet || b.slot <= 0 ||
           (this.model.selectedSlot > 0 && b.slot === this.model.selectedSlot);
+        // A hovered TILE is the subject itself, so it takes the primary weight whatever the filter
+        // says. Every other focus here is the ROW's, and a row spans every lane — under a committed
+        // filter it reaches the committed network's tile alone (`snapFocusOf`).
+        const focus = hovTile ? 1 : snapFocusOf(hot, hov, offNet);
         const bright =
-          snapBright(this.tiles.rest * b.fade, offNet, focusWeightOf(hot || hovTile, hov), dimBack) *
+          snapBright(this.tiles.rest * b.fade, offNet, focus, dimBack) *
           this._rewind.fadeAtX(b.x + this._trailOff) *
           horizonAt(b.x + this._trailOff) *
           this._fades.alpha;

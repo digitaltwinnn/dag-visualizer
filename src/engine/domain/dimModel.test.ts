@@ -19,6 +19,7 @@ import {
   nodeGlow,
   nodeEmissive,
   snapBright,
+  snapFocusOf,
   type DimContext,
 } from "./dimModel";
 
@@ -184,6 +185,33 @@ describe("snapBright (the chamber's snapshots on the node vocabulary)", () => {
     expect(group).toBeGreaterThan(resting);
     expect(resting).toBeGreaterThan(stepped);
     expect(stepped).toBeGreaterThan(0);
+  });
+});
+
+// A ROW-level focus is not a whole-row focus (2026-08-11). A tick holds every network's snapshot
+// side by side, so under a committed filter the row's boost belongs to the committed network alone
+// — the boost is added UNDIMMED (above), which is exactly what let it lift the very bands the
+// off-filter dim exists to push behind.
+describe("snapFocusOf (a row's focus reaches the committed network only)", () => {
+  it("passes the row's own tier through for an on-filter snapshot", () => {
+    expect(snapFocusOf(true, false, false)).toBe(focusWeightOf(true, false));
+    expect(snapFocusOf(false, true, false)).toBe(focusWeightOf(false, true));
+    expect(snapFocusOf(false, false, false)).toBe(0);
+  });
+
+  it("withholds it from an off-filter snapshot, whatever the row is doing", () => {
+    expect(snapFocusOf(true, false, true)).toBe(0);
+    expect(snapFocusOf(false, true, true)).toBe(0);
+  });
+
+  // So the committed network leads by the full boost while the rest keep their dim: the gap the
+  // filter is FOR, instead of every band on the row coming up together.
+  it("keeps the off-filter snapshot below its own resting level on a focused row", () => {
+    const on = snapBright(0.1, false, snapFocusOf(true, false, false), true);
+    const off = snapBright(0.1, true, snapFocusOf(true, false, true), true);
+    expect(off).toBeLessThan(snapBright(0.1, false));
+    expect(off).toBeGreaterThan(0);
+    expect(on).toBeGreaterThan(off);
   });
 });
 

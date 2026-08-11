@@ -249,6 +249,21 @@ export function nodeEmissive(
 //
 // COLOUR IS INDEPENDENT and stays with the callers (user's caveat, same day): identity hue vs the
 // neutral trail is the chamber's own DEPTH reading, and it must never ride these knobs.
+// The focus weight a snapshot takes from a ROW-LEVEL focus. A row is a TICK, and a tick holds every
+// network's snapshot side by side — so under a committed filter the row's focus is NOT the whole
+// row's (user, 2026-08-11: "when we have focus-boost it should only boost the active metagraph in
+// the global snapshot", and "dim · off-filter should also affect the segment in the global snapshot
+// that is not part of the filtered metagraph"). The boost is deliberately UNDIMMED, which is exactly
+// what let a row-wide focus swamp the off-filter dim: on the shown row every band came up together
+// by the same +boost, so the committed network stopped leading and its dim did nothing. An
+// off-filter snapshot simply is not what the row's focus is ABOUT, so it takes none of it.
+//
+// A snapshot the pointer is ON is a different question — that IS the subject, off-filter or not, and
+// its caller passes the primary weight directly. The node model answers the same way: hovering an
+// off-filter node still brings it forward, because the boost is added outside the dim.
+export const snapFocusOf = (primary: boolean, group: boolean, offFilter: boolean): number =>
+  offFilter ? 0 : focusWeightOf(primary, group);
+
 export function snapBright(
   base: number,
   offFilter: boolean,
