@@ -14,7 +14,7 @@ import { METAGRAPHS } from "../../config";
 import { BAR_H, BAR_D, BAR_LIFT, FLOOR_Y, LEAD_X } from "../../domain/ledgerLayout";
 import { type BarSpec } from "../../domain/ledgerBands";
 import { SLOT_SP, SLOT_N, horizonAt } from "../../domain/ledgerModel";
-import { snapBright, snapFocusOf } from "../../domain/dimModel";
+import { snapBright, snapFocusOf, emphasisK } from "../../domain/dimModel";
 import type { TuneSchema } from "../../tune";
 
 const BANDS_PER_SLOT = METAGRAPHS.length + 1;
@@ -139,7 +139,8 @@ export class ByteBar {
   setAlpha(a: number): void { this._alpha = a; }
   /** The SHOWN row — an explicit pin, or the row a live follow is sitting on. It keeps identity hue
    *  down the trail AND owns the focus: how it was reached is not what it is (user, 2026-08-11), so
-   *  live and pinned read alike. What is NOT a focus is the bare lead with nothing selected. */
+   *  live and pinned read alike. What is NOT a focus is the bare lead with nothing selected.
+   *  A SLOT, so the view re-pushes it every frame — every tick re-slots the trail under it. */
   setSelected(slot: number): void { this._selected = slot; }
   /** The transient hover row — colored-dim preview, never demotes the active row. */
   setHovered(slot: number): void { this._hovered = slot; }
@@ -155,11 +156,14 @@ export class ByteBar {
   }
 
   update(dt: number): void {
-    const k = Math.min(1, dt * 5);
+    // dimModel.emphasisK: the ONE emphasis-easing rate, shared with the node fabric and the lane
+    // tiles. It replaces the local rate this bar used to ease its opacity at (slightly faster now);
+    // `k` drives nothing geometric here, only `s.mats[i].opacity`.
+    const k = emphasisK(dt);
     // A focus is a SELECTED row or a hovered one. The bare lead is neither: with nothing selected
     // the chamber is simply running, and stepping the whole trail back against a row it advanced
     // onto by itself would make `back` a second `rest` rather than a focus effect.
-    const dimBack = this._hovered >= 0 || this._selected >= 0;
+    const anyFocus = this._hovered >= 0 || this._selected >= 0;
     for (let si = 0; si < this._slots.length; si++) {
       const s = this._slots[si];
       const x = LEAD_X - si * SLOT_SP + this._off;
@@ -170,7 +174,7 @@ export class ByteBar {
       const fade = horizonAt(x);
       const hot = si === this._selected || si === 0;
       const hov = si === this._hovered;
-      // The one row that owns the focus (see `dimBack`) — `_selected` is -1 when none does. Note
+      // The one row that owns the focus (see `anyFocus`) — `_selected` is -1 when none does. Note
       // this is NOT `hot`, which also colours the bare lead: the lead keeps identity hue whether or
       // not it is selected, but hue is the chamber's own reading and never lifts brightness.
       const pinned = si === this._selected;
@@ -197,7 +201,7 @@ export class ByteBar {
         // this band takes, so a ribbon and its two endpoints read at one level. Compounding
         // dim × back left a band near-black under a ribbon that was only gently dimmed.
         const rowFocus = pinned || hov;
-        const t = snapBright(this.tune.rest, offNet, focus, dimBack && !rowFocus)
+        const t = snapBright(this.tune.rest, offNet, focus, anyFocus && !rowFocus)
           * fade * front * this._alpha;
         s.mats[i].opacity += (t - s.mats[i].opacity) * k;
         s.mats[i].color.setHex(hot || hov || onNet ? s.colors[i] : this._neutral);

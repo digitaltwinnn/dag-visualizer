@@ -3,9 +3,12 @@ import {
   nodeDimScale,
   hideFrac,
   offNetMul,
+  EMPHASIS_EASE,
+  emphasisK,
   focusDim,
   focusBoost,
   focusWeightOf,
+  ancestryGlow,
   GROUP_FOCUS,
   FOCUS_TUNE,
   FOCUS_TUNE_DEFAULTS,
@@ -263,6 +266,25 @@ describe("focusWeightOf / GROUP_FOCUS (the focus ranking)", () => {
   });
 });
 
+describe("ancestryGlow (a committed group yields its glow to a committed node)", () => {
+  const cohort = new Set(["a", "b", "c"]);
+
+  it("passes the group through while it IS the finest committed rung", () => {
+    expect(ancestryGlow(cohort, null)).toBe(cohort);
+  });
+
+  it("yields once a node is committed — the click landed on the node, not the group", () => {
+    expect(ancestryGlow(cohort, "a")).toBeNull();
+    // even a node OUTSIDE the group: the finest rung is what the glow answers to
+    expect(ancestryGlow(cohort, "z")).toBeNull();
+  });
+
+  it("is null-safe, so a caller can chain it with ?? without a pre-check", () => {
+    expect(ancestryGlow(null, null)).toBeNull();
+    expect(ancestryGlow(null, "a")).toBeNull();
+  });
+});
+
 describe("dimTargetsFor", () => {
   // js/globe.js:665-670 (_applyDim) verbatim
   it("lights the dag (0) and every metagraph (0) when sel='all'", () => {
@@ -405,19 +427,19 @@ describe("nodeEmissive", () => {
     expect(nodeEmissive(ctx({ morph: 1 }), 1, 0, 0, false)).toBeCloseTo(0.37 * 0.08, 10);
   });
 
-  it("boosts the focused node by +1.4, ignoring dimOthersOnFocus", () => {
+  it("boosts the focused node by +1.4, ignoring anyFocus", () => {
     const c = ctx({ morph: 0 });
     const base = nodeEmissive(c, 0, 0, 0, false);
     expect(nodeEmissive(c, 0, 0, 1, true)).toBeCloseTo(base + 1.4, 10);
   });
 
-  it("dims a non-focused node by *0.45 only when dimOthersOnFocus is set", () => {
+  it("dims a non-focused node by *0.45 only when anyFocus is set", () => {
     const c = ctx({ morph: 0 });
     const base = nodeEmissive(c, 0, 0, 0, false);
     expect(nodeEmissive(c, 0, 0, 0, true)).toBeCloseTo(base * 0.45, 10);
   });
 
-  it("does nothing extra when there's no focus target at all (isFocus and dimOthersOnFocus both false)", () => {
+  it("does nothing extra when there's no focus target at all (isFocus and anyFocus both false)", () => {
     expect(nodeEmissive(ctx({ morph: 0 }), 0, 0, 0, false)).toBeCloseTo(0.47, 10);
   });
 
@@ -505,5 +527,23 @@ describe("FOCUS_TUNE", () => {
     expect(focusDim(c)).toBeCloseTo(0.55, 10);
     expect(focusBoost(c)).toBeCloseTo(0.7, 10);
     expect(nodeDim(c, 1, null)).toBeCloseTo(0.5, 10);
+  });
+});
+
+// Emphasis EASES rather than snapping (user, 2026-08-11). The ease lives at the WRITE sites, so
+// what this pins is only the rate's shape: a frame-rate-independent approach factor that never
+// overshoots. The tiers themselves are unchanged by it — that is the point of easing the write.
+describe("emphasis easing", () => {
+  it("is a clamped, frame-rate-independent approach factor", () => {
+    expect(emphasisK(0)).toBe(0);
+    expect(emphasisK(1 / 60)).toBeCloseTo(EMPHASIS_EASE / 60, 10);
+    // A long frame (a stall, a background tab resuming) lands exactly on target, never past it.
+    expect(emphasisK(10)).toBe(1);
+  });
+
+  // Slow enough to read as a transition, fast enough that a node's ~200ms arc-flash tail
+  // (Globe: 1 - dt*5) still reads as a flash rather than a bloom.
+  it("settles faster than the arc flash it rides over", () => {
+    expect(EMPHASIS_EASE).toBeGreaterThan(5);
   });
 });

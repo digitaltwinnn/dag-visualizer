@@ -1442,7 +1442,16 @@ export class Engine {
     // slowly-rotating top-down rings (replaces camera autoRotate, which wobbles a tilted
     // structure). ONE shared angle → globe group + root + coreGroup can't desync from the hoops.
     // Frozen when a hub is focused (filter ≠ all) or the camera is zoomed in to inspect.
-    if (this.mode === "hyper") {
+    //
+    // NOT during the OUT phase (user, 2026-08-11 — "the globe jumps to another position when it
+    // starts the fade effect"): the teardown still SHOWS the from-view, so writing the
+    // destination's frame state there snaps it in plain sight. `mode` flips at switch time and
+    // setMode applies the destination's sim gates immediately, which drops geo's `globeSpin` and
+    // so un-gates Globe.setHyperSpin — on the very first faded frame the globe group left geo's
+    // rotation for hyper's Euler rig. The boundary is where the destination's orientation belongs
+    // and _applyBoundary already asserts it there, with the nodes gathered and both furnitures
+    // dark. Same rule as the camera hold (viewTransition.holdCamera), one phase later than `mode`.
+    if (this.mode === "hyper" && this.transition.phase !== "out") {
       if (this.filter === "all" && !zoomedIn) this._hyperSpinY += dt * 0.06;
       // Ease the shared structure tilt: near-flat while a metagraph is committed so its discs
       // read horizontal from the plain side-on hub framing (user, 2026-07-17 — the structure

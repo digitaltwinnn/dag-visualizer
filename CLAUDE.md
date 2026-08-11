@@ -425,6 +425,13 @@ The design rules behind the table, which the tests pin but don't explain:
 - **A filter is a story.** Pinning a global tick whose anchors don't include the committed network
   releases the filter back to "all", so a network's dim never shapes a snapshot that has nothing to do
   with it. The membership rule lives in `src/data/ledgerStory.ts`.
+- **A committed ancestry rung borrows its members' glow only while it is the FINEST committed rung**
+  (user, 2026-08-11). Every other rung has a 3D counterpart you could have clicked — the hub, the
+  border, the chip; the **group** rungs (geo's provider cohort, hyper's composition group) have none,
+  so lighting their members is the only way they appear in the scene at all. Honest while the group IS
+  the subject, a lie once the click lands on a node. `dimModel.ancestryGlow` is the rule and its test
+  the spec; the ledger's signer set stays outside it (not ancestry — a relation from a different
+  subject), and hover is untouched. One call site: `Globe._frameCtx`'s glow channel.
 - **New click/select semantics go in the table with a test**, their effects in the executor, never
   inline. `components/selectionBoundary.test.ts` enforces this — and note the rule is **write**-based,
   so read-only facts cards cost nothing and every future explorer card inherits the table.

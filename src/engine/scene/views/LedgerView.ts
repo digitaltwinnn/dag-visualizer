@@ -51,7 +51,7 @@ import type {
 import { metaSnapHoverKey } from "@/src/data/types";
 import { LEDGER_LAYERS } from "@/src/data/ledgerLayers"; // shared display copy — floor labels = panel rows
 import { ByteBar } from "../objects/ByteBar";
-import { snapBright, snapFocusOf, focusWeightOf } from "../../domain/dimModel";
+import { snapBright, snapFocusOf, focusWeightOf, emphasisK } from "../../domain/dimModel";
 import { Ribbons } from "../objects/Ribbons";
 import { SnapshotPlane, makeEdgeLabel, GLOBAL_PLANE_TUNE_DEFAULTS, META_PLANE_TUNE_DEFAULTS, type PlaneTune } from "../objects/SnapshotPlane";
 import { TrailRewind } from "../objects/TrailRewind";
@@ -516,7 +516,6 @@ export class LedgerView implements SceneView {
 
   setSelected(ordinal: number | null) {
     this.model.setSelected(ordinal);
-    this._bar.setSelected(this.model.selectedSlot);
     this._syncRibbonRows();
   }
 
@@ -782,6 +781,11 @@ export class LedgerView implements SceneView {
     // Hoisted per frame (the tune hoist rule): the SELECTED row — the one that owns the focus — or -1.
     const pinSlot = this.model.selectedSlot;
     this._bar.setOffset(this._trailOff);
+    // Pushed HERE, from the same read the lane tiles use, not once at select time: every new tick
+    // re-slots the whole trail, so a slot handed over on the pin goes stale one row later — the
+    // boost and the identity hue would sit on the row NEWER than the pin while the rewind parks
+    // the pinned row at the lead, drawing the one row you asked for neutral and unboosted.
+    this._bar.setSelected(pinSlot);
     this._ribbons.group.position.x = this._trailOff;
     this._ordGroup.position.x = this._trailOff;
     // The live lead's ribbon sheet fades out as it crosses the front (row 1 — the selected
@@ -795,6 +799,7 @@ export class LedgerView implements SceneView {
 
     if (!this._latest) return;
     const k = Math.min(1, dt * 3);
+    const ek = emphasisK(dt); // emphasis easing — hoisted once per frame (the tune hoist rule)
 
     // ── lane tiles on the metagraph-snapshot floor
     let mi = 0;
@@ -804,7 +809,7 @@ export class LedgerView implements SceneView {
     // a hovered row or a hovered tile. The bare lead is none of them: with nothing selected the
     // chamber is simply running, and stepping the whole trail back against a row it advanced onto
     // by itself would make `back` a second `rest`.
-    const dimBack = this._hoverSlot >= 0 || this._hoverTile >= 0 || pinSlot >= 0;
+    const anyFocus = this._hoverSlot >= 0 || this._hoverTile >= 0 || pinSlot >= 0;
     for (const lane of this.model.lanes.values()) {
       const laneColor = this._laneColor(lane.id);
       const cz = this._laneZ.get(lane.id) ?? lane.z;
@@ -835,6 +840,7 @@ export class LedgerView implements SceneView {
           _dummy.scale.setScalar(0);
           _dummy.updateMatrix();
           this._metaTrailMesh.setMatrixAt(mi, _dummy.matrix);
+          b.bright = 0; // a slot that comes back eases up from dark, not from a stale row
           mi++;
           continue;
         }
@@ -848,7 +854,7 @@ export class LedgerView implements SceneView {
         this._metaTrailMesh.setMatrixAt(mi, _dummy.matrix);
         const hot = this.model.isRowHot(b.slot);
         const hov = this._hoverSlot >= 0 && b.slot === this._hoverSlot;
-        // The SELECTED row (see `dimBack`) — pinned or live-followed, they read alike.
+        // The SELECTED row (see `anyFocus`) — pinned or live-followed, they read alike.
         const pinned = pinSlot >= 0 && b.slot === pinSlot;
         // THIS tile's own hover (user, 2026-08-09): the explorer/raw row for ONE snapshot lights
         // just its tile, not the whole tick row. Resolved to an instance index at event time
@@ -873,9 +879,13 @@ export class LedgerView implements SceneView {
         // the RIBBON leaving this tile takes, so a ribbon and the two ends it connects now read at
         // one level; compounding dim × back left the endpoints near-black under their own ribbon.
         const rowFocus = pinned || hov;
-        const bright =
-          snapBright(this.tiles.rest * b.fade, offNet, focus, dimBack && !rowFocus)
+        const brightT =
+          snapBright(this.tiles.rest * b.fade, offNet, focus, anyFocus && !rowFocus)
           * edge * this._fades.alpha;
+        // Emphasis EASES rather than snapping (dimModel.emphasisK). The state rides the BLOCK, next
+        // to its two other eased fields — an instance-index buffer would hand a block's brightness
+        // to its neighbour every tick, since a new tick shifts every block one slot along.
+        const bright = (b.bright += (brightT - b.bright) * ek);
         this._metaTrailMesh.setColorAt(mi, _col.copy(ident ? laneColor : this._coreCol).multiplyScalar(bright));
         mi++;
       }

@@ -16,7 +16,7 @@ import * as THREE from "three";
 import { LEDGER } from "../../domain/ledgerLayout";
 import { HEX_H } from "../../domain/geoLayout";
 import { discFall, lerp, smooth } from "../../domain/nodeLayout";
-import { nodeDim, nodeEmissive, nodeGlow, hubMatchBoost, focusWeightOf, hideFrac } from "../../domain/dimModel";
+import { nodeDim, nodeEmissive, nodeGlow, hubMatchBoost, focusWeightOf, hideFrac, emphasisK } from "../../domain/dimModel";
 import type { DimContext } from "../../domain/dimModel";
 import type { MetaNodeRecord, ValidatorRecord } from "../../domain/records";
 import type { ViewTransition } from "../../domain/viewTransition";
@@ -420,17 +420,24 @@ export class NodeFabric {
   // country drill is in flight) the base colour; decays each node's arc flash.
   writeValidatorGlow(records: ValidatorRecord[], ctx: FrameCtx): void {
     if (!this.instSphere || !this.instHex || !this.aEmiSphere || !this.aEmiHex) return;
-    const { c, dim, flashDecay } = ctx;
+    const { c, dim, dt, flashDecay } = ctx;
     const cf = c.countryFilter, cmix = c.countryMix;
+    // dimModel.emphasisK: emphasis EASES rather than snapping (user, 2026-08-11). Hoisted here,
+    // read as a local in the loop — the tune hoist rule.
+    const ek = emphasisK(dt);
     // While a country drill-down is active, per-node dim varies, so recolour every frame; otherwise
     // only during a layer-dim transition.
     const recolour = cf != null || cmix > 0.001 ||
       Math.abs(dim - this._appliedDim) > 0.001;
     const base = this.baseArr;
     const emi = this.emiArr;
-    // A hovered/selected node dims the rest so it stands out — same in both views.
+    // A hovered/selected node dims the rest so it stands out — same in every view, and NOT gated
+    // on the committed filter (user, 2026-08-11): `dim` answers filter membership and `back`
+    // answers focus, one effect each, so making `back` a function of the filter handed it the
+    // other knob's job. The gate is why the ledger's node trays never stepped back while its
+    // snapshots did — nodes and snapshots are two subjects sharing one emphasis vocabulary, and
+    // within each the dim-back must fire exactly when that subject's focus takes its boost.
     const focusId = c.hoverNodeId || c.selectedNodeId || c.hoverCohort;
-    const dimOthersOnFocus = c.filter === "all" || c.filter === "dag";
     for (const u of records) {
       const geoCc = geoCcOf(u.pick);
       // dimModel.nodeDim: dim * nodeDimScale(c) (the morph-ramped strength), raised by the
@@ -439,7 +446,10 @@ export class NodeFabric {
       const d = nodeDim(c, dim, geoCc);
       // dimModel.focusWeightOf: the hovered/selected node itself takes the FULL boost, a mere
       // member of a focused group (a hovered/committed provider cohort) only a share — so
-      // picking one node inside a lit cohort still reads (user, 2026-08-01).
+      // picking one node inside a lit cohort still reads (user, 2026-08-01). Since 2026-08-11 a
+      // COMMITTED group yields the channel to a committed node (Globe._frameCtx), so this tier
+      // now ranks a group that is either hovered or the finest committed rung — the case it was
+      // written for, hovering a node inside a lit cohort, is unchanged.
       const fw = focusWeightOf(
         u.nodeId === c.hoverNodeId || u.nodeId === c.selectedNodeId,
         !!u.nodeId && !!c.hoverCohort?.has(u.nodeId),
@@ -450,7 +460,10 @@ export class NodeFabric {
       // ones. Steady; the old twinkle shimmer was removed. Also composes the hover/selection
       // focus boost/dim-back inside. No hubBoost: the core has no orbiting hub to match.
       const flRaw = u._flash || 0; // brief flash when an arc pulse reaches this node
-      emi[u.index] = nodeEmissive(c, d, flRaw, fw, !!focusId && dimOthersOnFocus);
+      // The buffer IS the easing state — emiArr persists across frames and a node keeps its slot,
+      // so approaching the target in place costs one array read and allocates nothing.
+      const emiT = nodeEmissive(c, d, flRaw, fw, !!focusId);
+      emi[u.index] += (emiT - emi[u.index]) * ek;
       if (flRaw) u._flash = flRaw * flashDecay;
 
       if (recolour) {
@@ -479,10 +492,10 @@ export class NodeFabric {
     const e = smooth(m);                                              // flight progress
     const w = smooth(THREE.MathUtils.clamp((m - 0.82) / 0.16, 0, 1)); // sphere → chip squash phase
     const kk = Math.min(1, dt * 4);
+    const ek = emphasisK(dt); // emphasis easing — hoisted once per frame (the tune hoist rule)
     const emi = this.metaEmi;
     const base = this.metaBaseArr;
-    const focusId = c.hoverNodeId || c.selectedNodeId || c.hoverCohort;
-    const dimOthersOnFocus = c.filter === "all" || c.filter === "dag";
+    const focusId = c.hoverNodeId || c.selectedNodeId || c.hoverCohort; // see the validator loop
     for (const r of records) {
       r.dim += (r.dimTarget - r.dim) * kk;
       const gw = this._gatherW(ctx, r.gRank, r.gCount);
@@ -513,8 +526,10 @@ export class NodeFabric {
       );
       const flRaw = r._flash || 0; // brief flash when an arc pulse reaches this node
       // dimModel.nodeEmissive: composes glow + arc flash + hubBoost inside its floor, then the
-      // hover/selection focus boost/dim-back — one function, both loops.
-      emi[r.index] = nodeEmissive(c, dEff, flRaw, fw, !!focusId && dimOthersOnFocus, hubBoost);
+      // hover/selection focus boost/dim-back — one function, both loops. The write EASES toward it
+      // (dimModel.emphasisK), with metaEmi itself as the state — same as the validator loop.
+      const emiT = nodeEmissive(c, dEff, flRaw, fw, !!focusId, hubBoost);
+      emi[r.index] += (emiT - emi[r.index]) * ek;
       if (flRaw) r._flash = flRaw * flashDecay;
 
       const col = _col.copy(r.color).lerp(DIM, dEff * 0.85);

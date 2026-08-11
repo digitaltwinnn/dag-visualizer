@@ -120,6 +120,18 @@ export const GROUP_FOCUS = 0.45; // share of focusBoost a group member gets (FOC
 export const focusWeightOf = (primary: boolean, group: boolean): number =>
   primary ? 1 : group ? FOCUS_SHARED.groupShare : 0;
 
+// A committed ANCESTRY rung borrows its members' glow only while it is the FINEST committed rung
+// (user, 2026-08-11). The group rungs — geo's provider cohort, hyper's composition group — are the
+// only rungs with no 3D counterpart: you can click a hub, a border or a chip, but there is no
+// "provider" or "data ring" object, so lighting their members is the only way they can appear in
+// the scene at all. Honest while the group IS the subject; a lie once a node is committed, because
+// the click landed on the node. The parents keep their rail card and their explorer expansion
+// instead, and each deselect visibly widens the lit set again.
+export const ancestryGlow = (
+  ancestry: ReadonlySet<string> | null,
+  selectedNodeId: string | null,
+): ReadonlySet<string> | null => (selectedNodeId ? null : ancestry);
+
 // ---- the EMPHASIS tunable (contract: src/engine/tune.ts) -------------------------------------
 // The dim/focus numbers, hoisted out of the formulas above into ONE ROW PER VIEW so the `?tune`
 // panel binds them inside that view's own folder — these read as view-specific even though the
@@ -213,10 +225,12 @@ export const nodeGlow = (c: DimContext, d: number): number =>
 
 // Node emissive glow. `flash` is the node's raw (undecayed) arc-arrival flash. `focus` = this
 // node's focus WEIGHT from focusWeightOf (1 = it is the hovered/selected subject, GROUP_FOCUS = it
-// is only a member of a focused group, 0 = not in focus). `dimOthersOnFocus` = the caller has
-// already ANDed "some focus target exists" into the filter-based flag — with no focus target at
-// all neither the boost nor the dim-back branch should fire, and this pure function has no side
-// channel to detect "no focus", so the caller must fold that into the flag it passes. `hubBoost`
+// is only a member of a focused group, 0 = not in focus). `anyFocus` = SOME focus target exists,
+// ANDed with the caller's filter-based flag: with nothing focused at all neither the boost nor the
+// dim-back branch may fire, and a pure function has no side channel to detect that, so the caller
+// must fold it in. It is named for the PRECONDITION rather than the effect because each call site
+// derives it from its own state (a node id, a hovered/selected row, a hovered tile) and every bug
+// this parameter has had was a call site answering "is anything focused?" wrongly. `hubBoost`
 // is hubMatchBoost(...) below — added INSIDE the floor, exactly as the render path composes it.
 // STEADY: the old decorative twinkle shimmer was removed (user) — only data-driven pulses animate.
 export function nodeEmissive(
@@ -224,7 +238,7 @@ export function nodeEmissive(
   d: number,
   flash: number,
   focus: number,
-  dimOthersOnFocus: boolean,
+  anyFocus: boolean,
   hubBoost = 0,
 ): number {
   const fl = flash * c.morph; // arcs are a geo-only visual — their flash must not bleed into hyper
@@ -232,7 +246,7 @@ export function nodeEmissive(
   // Hover/selection pairing: the focused machine's every layer-shell glows together,
   // and the rest dim back so it stands out (only when not already isolating a metagraph).
   if (focus > 0) v += focusBoost(c) * focus;
-  else if (dimOthersOnFocus) v *= focusDim(c);
+  else if (anyFocus) v *= focusDim(c);
   return v;
 }
 
@@ -273,12 +287,12 @@ export function snapBright(
   base: number,
   offFilter: boolean,
   focus = 0,
-  dimOthersOnFocus = false,
+  anyFocus = false,
 ): number {
   const row = FOCUS_TUNE.ledger;
   let v = base * (offFilter ? 1 - row.dim : 1);
   if (focus > 0) v += row.boost * focus;
-  else if (dimOthersOnFocus) v *= row.back;
+  else if (anyFocus) v *= row.back;
   return v;
 }
 
@@ -295,3 +309,24 @@ export function hubMatchBoost(c: DimContext, glow: number, committed: boolean): 
   const hubFade = Math.min(1, Math.max(0, 1 - c.morph / 0.3));
   return Math.max(0, 0.72 - glow) * hubFade;
 }
+
+// EMPHASIS EASES, IT DOES NOT SNAP (user, 2026-08-11: "a subtle transition ... to make it less
+// jumpy ... as default as possible in every view, so not a spot solution"). A hover is a PREVIEW,
+// and a preview that arrives in one frame reads as a jump — the boost pops on, and every other
+// element drops by `back` at the same instant, which is the biggest mass change the eye sees.
+//
+// The ease is applied where the resolved value is WRITTEN, never inside the resolvers above. That
+// is what keeps it from being a second emphasis model: `nodeEmissive`/`snapBright` still answer the
+// exact steady-state tier they always did, so every test that pins those tiers stays meaningful and
+// a knob still moves exactly one effect. What eases is the instrument's approach to the answer.
+//
+// ONE rate for every view and every instrument — the node fabric's two loops, the byte bar's bands
+// and the lane tiles. (The ribbons are exempt: they bake their vertex colours at EVENT time on a
+// filter commit and take no focus at all, so there is no per-frame value to approach.)
+// τ ≈ 125 ms: long enough that nothing steps, short enough that a node's ~200 ms arc-flash tail
+// still reads as a flash rather than a bloom.
+export const EMPHASIS_EASE = 8;
+
+/** The per-frame lerp factor for `EMPHASIS_EASE`. HOIST IT ONCE PER FRAME, never per node — the
+ *  tune hoist rule (src/engine/tune.ts): the inner body must read a local, not call per element. */
+export const emphasisK = (dt: number): number => Math.min(1, dt * EMPHASIS_EASE);

@@ -34,6 +34,7 @@ import { STAGE_LIGHTS } from "../domain/stageLight";
 import { ccToNumeric, countryCcAt, countryLean, geometryRings, mainPolygonRings, ringsAngularRadius, ringsCentroid, type Ring } from "../domain/countryShape";
 import { closeness, NODE_RAISE } from "../domain/cameraRig";
 import type { CohortSel } from "../domain/focusLadder";
+import { ancestryGlow } from "../domain/dimModel";
 import { NodeFabric, type FrameCtx } from "./objects/NodeFabric";
 import { Arcs } from "./objects/Arcs";
 import { makeRadialGradientTexture } from "./objects/gradientTexture";
@@ -1027,10 +1028,17 @@ export class Globe implements GeoViewHost {
     c.countryFilter = null;
     c.countryMix = 0;
     c.hoverNodeId = this._hoverNodeId;
-    // Group-tier glow, one channel, four sources in precedence order: a LIVE hover wins, then
-    // geo's committed cohort, then hyper's committed composition group, then ledger's signer set
-    // (spec §5.3) — the three committed kinds are each view/subject-scoped, so at most one is ever set.
-    c.hoverCohort = this._hoverCohort ?? this._selCohortIds ?? this._selGroupIds ?? this._signerIds;
+    // Group-tier glow, one channel, four sources in precedence order: a LIVE hover wins (a group
+    // row previews exactly what clicking it would commit), then geo's committed cohort, then
+    // hyper's committed composition group, then ledger's signer set (spec §5.3) — the three
+    // committed kinds are each view/subject-scoped, so at most one is ever set. The two committed
+    // ANCESTRY kinds are the ones gated by dimModel.ancestryGlow (that function is the rule); the
+    // signer set sits OUTSIDE the gate because it is not ancestry — it is a relation from a
+    // different subject, the selected metagraph snapshot — so it never yields to a node.
+    c.hoverCohort =
+      this._hoverCohort ??
+      ancestryGlow(this._selCohortIds ?? this._selGroupIds, this._selectedNodeId) ??
+      this._signerIds;
     c.selectedNodeId = this._selectedNodeId;
     c.filter = this.filter;
     ctx.dim = this.dim;
