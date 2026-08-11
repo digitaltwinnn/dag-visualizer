@@ -185,17 +185,28 @@ so turning it down shrank nodes less as well as muting them less. It now reads t
 knob moves exactly one effect. A corollary that matters: the country drill's `countryMix` raise is a
 MUTE, and reading the raw ramp is what guarantees a lens can never shrink what it looks past.
 
-**A view's own ELEMENTS dim on their own field, `elem`** (user, 2026-08-11). `dim` mutes off-filter
-NODES; the per-network furniture a view draws around them — hyper's hubs, the ledger's lane tiles, byte
-bands and ribbons — used to fade by two unrelated magic numbers (`HyperView`'s local `fdim = 0.62`,
-`Ribbons`' exported `RIBBON_DIM = 0.2`). One row field replaces both, resolved by `offNetMul(view)`,
-which returns the SURVIVING brightness so the knob keeps `dim`/`hide`'s strength polarity (0 = off).
-It is read **per view, not `viewMix`ed**: furniture belongs to one view and fades out with it, so
-blending a neighbour's value would describe elements that are no longer drawn. geo's honest value is
-`0` — the globe has no per-network furniture, and its off-filter answer is the nodes' `hide` isolate.
-One knob may still drive two CHANNELS of the same element where the look needs it: hyper's hub BODY
-takes a fraction of the drop (`HUB_BODY_SOFT`) so an unfocused hub stays legible as a position while
-its light goes; `elem: 0` removes both, which is what keeps it one knob.
+**A view's own FURNITURE dims on its own field, `elem`** (user, 2026-08-11). `dim` mutes off-filter
+NODES; the per-network furniture a view draws around them — hyper's hubs, tethers and hoops — used to
+fade by two unrelated magic numbers (`HyperView`'s local `fdim = 0.62`, `Ribbons`' exported
+`RIBBON_DIM = 0.2`). One row field replaces both, resolved by `offNetMul(view)`, which returns the
+SURVIVING brightness so the knob keeps `dim`/`hide`'s strength polarity (0 = off). It is read **per
+view, not `viewMix`ed**: furniture belongs to one view and fades out with it, so blending a neighbour's
+value would describe elements that are no longer drawn. One knob may still drive two CHANNELS of the
+same element where the look needs it: hyper's hub BODY takes a fraction of the drop (`HUB_BODY_SOFT`)
+so an unfocused hub stays legible as a position while its light goes; `elem: 0` removes both, which is
+what keeps it one knob.
+
+⚠️ **A SNAPSHOT IS DATA, NOT FURNITURE** (user, 2026-08-11). `elem` is hyper's alone, because both
+other views honestly answer `0`: geo's globe draws no per-network furniture (its off-filter answer is
+the nodes' `hide` isolate), and everything the chamber emphasises — the byte bands, the lane tiles, the
+ribbons — is a real snapshot, so it reads the NODE vocabulary instead. `snapBright()` in
+`domain/dimModel.ts` is that one call: the ledger row's own `dim`, `boost` and `back`, exactly what the
+chips in its trays answer to, applied to whichever resting level the instrument owns (the bar's is an
+opacity, the tiles' a colour multiplier — two numbers, one per instrument, and nothing else left in
+those `*_TUNE_DEFAULTS`). So the chamber gained the focus boost and the dim-back it never had, and one
+knob moves one effect across nodes and snapshots alike. **COLOUR stays fully independent** — identity
+hue vs the neutral trail is the chamber's own second reading, decided at the call sites and untouched
+by any of these knobs.
 
 ⚠️ **ONE NODE MODEL** (user, 2026-08-11). *"Across all views I want no difference between DAG nodes and
 other metagraphs — they are the same network topology, only positioned differently in some views."* The
@@ -946,9 +957,9 @@ the starfield are gated off so none lingers when arriving from geo.
 **Lanes and the committed filter. The field is fixed**: every lane always owns its own slice, and a
 committed filter never moves or hides geometry — only the shared commit tilt answers it with the camera.
 The emphasis is a **coloured dim** on every identity-coloured element — the others drop to their *own
-hue* at a dim level, a tier between full colour and the neutral trail, so the committed network leads
-while the rest stay identifiable. `src/engine/scene/objects/dimTiers.test.ts` keeps the tier hierarchy
-ordered through tuning: **the order is the design**, the numbers may move.
+hue* at the row's `dim`, a tier between full colour and the neutral trail, so the committed network
+leads while the rest stay identifiable. `src/engine/scene/objects/dimTiers.test.ts` keeps the tier
+hierarchy ordered through tuning: **the order is the design**, the numbers may move.
 
 A committed metagraph puts the view in **live metagraph mode**: entering with one committed, or
 committing one while there, flips following on and the whole card chain rides the heartbeat. **"Live"
@@ -972,14 +983,23 @@ tile is only pickable once a resolver can name it from the polled feed** — a t
 is anonymous, drawn but not pickable. The chamber shows that the anchor happened without inventing an
 identity for it.
 
-**Emphasis is brightness in four colour tiers**, and the order is the design: the ACTIVE row (the live
-lead, or the committed pin) takes full identity; a HOVERED row takes identity colour at a preview level
-**without demoting the active row**, because the hover previews what a click would pin; with a network
-committed, **that network's OWN bands and lane tiles keep their identity hue down the WHOLE trail** at
-the quieter on-net resting tier (`SNAP_ONNET`), so the committed story reads as one coloured thread
-through the chamber; every other resting snapshot stays neutral cyan. A hover still previews louder than
-a standing commitment — `dimTiers.test.ts` pins hot > preview > on-net > neutral rest. Exactly one hot
-row — a committed older snapshot beats the live lead, a hover doesn't steal it.
+**Emphasis is TWO independent readings — brightness, and colour** (user, 2026-08-11), and in both the
+order is the design.
+
+*Brightness is the node vocabulary*, resolved for every band, tile and ribbon by `snapBright()`: the
+ACTIVE row (the live lead, or the committed pin) takes the `ledger` row's full focus `boost`; a HOVERED
+row takes the same boost at the group tier, **without demoting the active row**, because the hover
+previews what a click would pin; while any focus exists every other row steps back by `back`; and an
+off-filter network drops by `dim`, the same knob its node chips in the trays answer to. `dimTiers.test.ts`
+pins primary > preview > resting > stepped back, and that off-filter dims without vanishing. Exactly one
+hot row — a committed older snapshot beats the live lead, a hover doesn't steal it.
+
+*Colour is decided separately at the call sites and no dim knob may touch it.* The active and hovered
+rows take identity hue; with a network committed, **that network's OWN bands and lane tiles keep their
+identity hue down the WHOLE trail**, so the committed story reads as one coloured thread through the
+chamber, while every other resting snapshot stays neutral cyan. Under a filter the trail therefore
+separates by HUE where it used to separate by brightness as well — `dim · off-filter` is the knob that
+buys contrast back if the thread ever reads too quiet.
 
 **Selecting a non-live snapshot rewinds the trail**: the whole time trail eases forward until the
 selected row sits at the lead position, so the active selection owns the front instead of fighting the

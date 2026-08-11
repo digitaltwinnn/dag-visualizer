@@ -18,6 +18,7 @@ import {
   nodeDim,
   nodeGlow,
   nodeEmissive,
+  snapBright,
   type DimContext,
 } from "./dimModel";
 
@@ -112,18 +113,20 @@ describe("hideFrac (the shrink, an independent reading of the same ramp as the d
   });
 });
 
-describe("offNetMul (the off-filter dim for a view's own ELEMENTS, not its nodes)", () => {
-  // The two hardcoded numbers it replaced (2026-08-11): hyper's hub `fdim` 0.62 and the ledger's
-  // RIBBON_DIM 0.2, which the bands, tiles and ribbons all read.
-  it("keeps the shipped look each view had before it was a knob", () => {
+describe("offNetMul (the off-filter dim for a view's own FURNITURE, not its data)", () => {
+  // The hardcoded number it replaced (2026-08-11): hyper's hub `fdim` 0.62. The ledger's old
+  // RIBBON_DIM rode here too until the chamber's bands, tiles and ribbons were recognised as DATA
+  // and moved onto the node's own `dim` (snapBright, below) — so hyper is now the only view that
+  // actually draws per-network furniture.
+  it("keeps the shipped look hyper had before it was a knob", () => {
     expect(offNetMul("hyper")).toBeCloseTo(0.62, 10);
-    expect(offNetMul("ledger")).toBeCloseTo(0.2, 10);
   });
 
-  // The globe has no per-network furniture — its off-filter answer is the nodes vanishing
-  // (hideFrac). 0 is the honest reading, not an unset field.
-  it("is a no-op in geo, which has no per-network furniture", () => {
+  // Both zeros are honest readings, not unset fields: the globe's off-filter answer is the nodes
+  // vanishing (hideFrac), and everything the chamber draws per network goes through snapBright.
+  it("is a no-op in geo and the ledger, which draw no per-network furniture", () => {
     expect(offNetMul("geo")).toBeCloseTo(1, 10);
+    expect(offNetMul("ledger")).toBeCloseTo(1, 10);
   });
 
   // Same STRENGTH polarity as `dim` and `hide` — 0 is off — so a row reads consistently in the
@@ -144,6 +147,43 @@ describe("offNetMul (the off-filter dim for a view's own ELEMENTS, not its nodes
   // and fades out with it, so a blend would describe elements that are no longer drawn.
   it("is per-view, so hyper's value never leaks into the ledger's", () => {
     expect(offNetMul("hyper")).not.toBeCloseTo(offNetMul("ledger"), 5);
+  });
+});
+
+// A SNAPSHOT IS DATA, so it reads the NODE's knobs (2026-08-11) — the same `dim`, `back` and
+// `boost` the chips in the trays answer to, which is what makes a chip and the tile it signed dim
+// by exactly one number. The chamber keeps only its own resting level and its own COLOUR rule.
+describe("snapBright (the chamber's snapshots on the node vocabulary)", () => {
+  const { dim, back, boost } = FOCUS_TUNE_DEFAULTS.ledger;
+
+  it("leaves a resting on-filter snapshot at its own level", () => {
+    expect(snapBright(0.1, false)).toBeCloseTo(0.1, 10);
+  });
+
+  it("dims an off-filter snapshot by the ledger row's own `dim` — the chips' number", () => {
+    expect(snapBright(0.1, true)).toBeCloseTo(0.1 * (1 - dim), 10);
+  });
+
+  it("adds the boost UNDIMMED, so a focused off-filter snapshot still reads", () => {
+    expect(snapBright(0.1, false, 1)).toBeCloseTo(0.1 + boost, 10);
+    expect(snapBright(0.1, true, 1)).toBeCloseTo(0.1 * (1 - dim) + boost, 10);
+  });
+
+  it("steps the OTHERS back only when they are not themselves the focus", () => {
+    expect(snapBright(0.1, false, 0, true)).toBeCloseTo(0.1 * back, 10);
+    expect(snapBright(0.1, false, 1, true)).toBeCloseTo(0.1 + boost, 10);
+  });
+
+  // The ranking the eye reads down the trail. Numbers may be tuned; the ORDER is the design.
+  it("ranks primary > group hover > resting > stepped back", () => {
+    const primary = snapBright(0.1, false, focusWeightOf(true, false), true);
+    const group = snapBright(0.1, false, focusWeightOf(false, true), true);
+    const resting = snapBright(0.1, false);
+    const stepped = snapBright(0.1, false, 0, true);
+    expect(primary).toBeGreaterThan(group);
+    expect(group).toBeGreaterThan(resting);
+    expect(resting).toBeGreaterThan(stepped);
+    expect(stepped).toBeGreaterThan(0);
   });
 });
 

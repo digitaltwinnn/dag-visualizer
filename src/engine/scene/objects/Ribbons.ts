@@ -23,7 +23,7 @@ import { METAGRAPHS } from "../../config";
 import { BAR_H, BAR_LIFT, FLOOR_Y, LEAD_X, TILE_LIFT } from "../../domain/ledgerLayout";
 import { SLOT_SP } from "../../domain/ledgerModel";
 import { ribbonQuad, RIBBON_LANE_HALF, type BarSpec, type RibbonQuad } from "../../domain/ledgerBands";
-import { offNetMul } from "../../domain/dimModel";
+import { snapBright } from "../../domain/dimModel";
 
 
 // THREE rows since 2026-08-07 (was 2): the LEAD row, the COMMITTED/hot row, and the HOVER
@@ -180,8 +180,9 @@ export class Ribbons {
   setAlpha(a: number): void { this._alpha = a; }
 
   /** COMMITTED filter → the other metagraphs' sheets take the COLORED dim (identity hue at the
-   *  ledger's `elem` strength). Baked into vertex colours, so a change rewrites the sheet — which
-   *  is why the panel's ledger focus group carries an onChange (event-time). */
+   *  ledger row's `dim` — a ribbon states which bytes came from where, so it is DATA and answers
+   *  the same knob its snapshots do). Baked into vertex colours, so a change rewrites the sheet —
+   *  which is why the panel's ledger focus group carries an onChange (event-time). */
   setFilter(filter: string): void {
     const next = filter || "all";
     if (next === this._filter) return;
@@ -200,9 +201,6 @@ export class Ribbons {
     const p = this._pos.array as Float32Array;
     const c = this._col.array as Float32Array;
     const { curve, brightness } = this.tune;
-    // The off-filter dim, hoisted: one read for the whole rewrite. Shared with the bands and the
-    // lane tiles — the ledger's ELEMENTS all dim on one knob (domain/dimModel.ts · elem).
-    const offMul = offNetMul("ledger");
     let v = 0;
     const push = (x: number, z: number, y: number, r: number, g: number, b: number) => {
       p[v * 3] = x; p[v * 3 + 1] = y; p[v * 3 + 2] = z;
@@ -223,7 +221,7 @@ export class Ribbons {
         const hex = this._sceneColors[key] ?? this._neutral;
         this._c.setHex(hex);
         const off = this._filter !== "all" && key !== this._filter;
-        const sc = brightness * rowFade * (off ? offMul : 1);
+        const sc = snapBright(brightness * rowFade, off);
         const cr = this._c.r * sc, cg = this._c.g * sc, cb = this._c.b * sc;
         for (let j = 0; j < RIBBON_SEG; j++) {
           const t0 = j / RIBBON_SEG, t1 = (j + 1) / RIBBON_SEG;

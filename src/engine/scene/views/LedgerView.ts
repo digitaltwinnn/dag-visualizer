@@ -50,8 +50,8 @@ import type {
 } from "@/src/data/types";
 import { metaSnapHoverKey } from "@/src/data/types";
 import { LEDGER_LAYERS } from "@/src/data/ledgerLayers"; // shared display copy — floor labels = panel rows
-import { ByteBar, SNAP_PREVIEW, SNAP_ONNET } from "../objects/ByteBar";
-import { offNetMul } from "../../domain/dimModel";
+import { ByteBar } from "../objects/ByteBar";
+import { snapBright, focusWeightOf } from "../../domain/dimModel";
 import { Ribbons } from "../objects/Ribbons";
 import { SnapshotPlane, makeEdgeLabel, GLOBAL_PLANE_TUNE_DEFAULTS, META_PLANE_TUNE_DEFAULTS, type PlaneTune } from "../objects/SnapshotPlane";
 import { TrailRewind } from "../objects/TrailRewind";
@@ -104,19 +104,22 @@ interface QueueItem {
  *  knows returns null — it stays DRAWN but is left out of `pickables` (the anonymous tile, §6.1). */
 export type TilePickResolver = (metaId: string, tickTs: string, k: number) => PickDescriptor | null;
 
-/** The live-tunable metagraph-snapshot TILE look (dev `?tune` panel binds these; the values are
- *  the shipped look). Brightness multipliers on the tile's identity colour. */
+/** The live-tunable metagraph-snapshot TILE look. `rest` is the resting brightness MULTIPLIER on
+ *  the tile's identity colour — the one number the tiles keep of their own, because the byte bar's
+ *  matching `rest` is an opacity and the two are different quantities. Everything above rest is the
+ *  shared snapshot vocabulary (domain/dimModel.ts · snapBright): a snapshot is DATA, so its
+ *  off-filter dim, focus boost and dim-back are the ledger row's knobs — the same ones the node
+ *  chips in the trays answer to. */
 export interface TileTune {
-  hot: number;  // the hot row's filled tiles
   rest: number; // a resting filled tile
 }
 
-// hot/rest user-tuned via ?tune, 2026-08-07 — the same levels as the byte bar's hot/rest.
-export const TILE_TUNE_DEFAULTS: TileTune = { hot: 0.7, rest: 0.1 };
+// rest user-tuned via ?tune, 2026-08-07. (`hot` retired 2026-08-11 — it was exactly the ledger
+// row's `boost`, and a snapshot is data, so it takes the node's focus knob instead.)
+export const TILE_TUNE_DEFAULTS: TileTune = { rest: 0.1 };
 
 /** The `?tune` knob ranges (contract: src/engine/tune.ts), colocated with the numbers they bound. */
 export const TILE_TUNE_SCHEMA: TuneSchema<TileTune> = {
-  hot: { min: 0, max: 2.5, step: 0.05 },
   rest: { min: 0, max: 2, step: 0.05 },
 };
 
@@ -210,8 +213,8 @@ export class LedgerView implements SceneView {
   /** Mirror of the rewind offset for the frame's read sites (updated once per update()). */
   private _trailOff = 0;
   private _slotOfOrd = (ordinal: number): number => this.model.slotOf(ordinal);
-  /** The transient HOVER row (split from the committed selection, user 2026-08-07): previews in
-   *  identity colour at SNAP_PREVIEW without demoting the active row. */
+  /** The transient HOVER row (split from the committed selection, user 2026-08-07): previews at the
+   *  GROUP focus tier without demoting the active row. */
   private _hoverOrd: number | null = null;
   private _hoverSlot = -1;
   /** ONE hovered metagraph snapshot, as `metaSnapHoverKey(metaId, ordinal)` — the tile-level hover
@@ -707,7 +710,9 @@ export class LedgerView implements SceneView {
     const hov = this._hoverSlot;
     if (hov > 0 && hov < SLOT_N && hov !== hot && this._slotSnap[hov]) {
       this._ribbons.setRow(2, hov, this._specs[hov], this._laneZOf);
-      this._ribbons.setRowFade(2, SNAP_PREVIEW);
+      // The hover ribbon IS the group tier — a hovered row is a preview of what a click would pin,
+      // so it rides the same shared focus ranking every node loop uses.
+      this._ribbons.setRowFade(2, focusWeightOf(false, true));
     } else this._ribbons.clearRow(2);
   }
 
@@ -792,7 +797,11 @@ export class LedgerView implements SceneView {
     // ── lane tiles on the metagraph-snapshot floor
     let mi = 0;
     // Hoisted per frame (the tune hoist rule): one read for every lane's every tile.
-    const offMul = offNetMul("ledger");
+    const dimNet = this._netDimKey();
+    // A DELIBERATE focus — a hovered row, a hovered tile, or an explicit pin. The live lead is not
+    // one: it is simply the shown row, and dimming the whole trail back against it permanently
+    // would make `back` a second `rest` rather than a focus effect.
+    const dimBack = this._hoverSlot >= 0 || this._hoverTile >= 0 || this.model.selectedSlot > 0;
     for (const lane of this.model.lanes.values()) {
       const laneColor = this._laneColor(lane.id);
       const cz = this._laneZ.get(lane.id) ?? lane.z;
@@ -832,25 +841,18 @@ export class LedgerView implements SceneView {
         // just its tile, not the whole tick row. Resolved to an instance index at event time
         // (_syncHoverTile), so the frame body is an integer compare.
         const hovTile = mi === this._hoverTile;
-        const dimNet = this._netDimKey();
         const offNet = dimNet !== "all" && lane.id !== dimNet;
         const onNet = !hot && !hov && dimNet !== "all" && lane.id === dimNet;
-        // Four tiers: the ACTIVE row (lead/pinned) full identity, the HOVERED row identity at
-        // the preview fraction, the COMMITTED NETWORK's own tiles at the on-net resting tier
-        // (user, 2026-08-09 — its lane keeps its real colour down the whole trail, not just on
-        // the hot row), every other snapshot the neutral trail. A single hovered TILE takes the
-        // preview tier on its own, without lifting its row.
+        // COLOUR is the chamber's own independent reading: the ACTIVE row (lead/pinned), a hover
+        // preview and the COMMITTED NETWORK's own tiles carry identity hue down the whole trail
+        // (user, 2026-08-09), every other snapshot the neutral trail. BRIGHTNESS is the shared node
+        // vocabulary — a snapshot is data, so it dims, boosts and steps back on exactly the knobs
+        // the chips in the trays answer to. A hovered TILE is primary on its own, without lifting
+        // its row; a hovered ROW is a group, so it previews at the group tier.
         const ident = hot || hov || hovTile || onNet || b.slot <= 0 ||
           (this.model.selectedSlot > 0 && b.slot === this.model.selectedSlot);
         const bright =
-          (hot
-            ? Math.max(b.fade, 0.9) * this.tiles.hot
-            : hov || hovTile
-              ? Math.max(b.fade, 0.9) * this.tiles.hot * SNAP_PREVIEW
-              : onNet
-                ? b.fade * this.tiles.hot * SNAP_ONNET
-                : b.fade * this.tiles.rest) *
-          (offNet && !hovTile ? offMul : 1) *
+          snapBright(this.tiles.rest * b.fade, offNet, focusWeightOf(hot || hovTile, hov), dimBack) *
           this._rewind.fadeAtX(b.x + this._trailOff) *
           horizonAt(b.x + this._trailOff) *
           this._fades.alpha;

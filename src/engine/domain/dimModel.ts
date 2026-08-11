@@ -50,8 +50,9 @@ export interface DimContext {
 // clicking a hub in hyper dimmed the rest far harder than the regular dim; the preview now
 // dims at the same per-view strength as a committed filter.)
 // (Ledger override 2026-08-07: morph is frozen there, and full strength cascades to near-black
-// through the chip writer — the flat 0.5 lands the chips at the same COLORED-dim tier the
-// ledger's own elements speak, see offNetMul.)
+// through the chip writer — the flat 0.5 lands the chips at a COLORED-dim tier. Since 2026-08-11
+// the chamber's SNAPSHOTS read the same field through `snapBright`, so a chip and the tile it
+// signed dim off-filter by exactly one number.)
 export const nodeDimScale = (c: DimContext): number => viewMix(c, "dim");
 
 // HIDE IS NOT DIM (user, 2026-08-11). A dim mutes a node two ways — colour toward DIM and emissive
@@ -82,16 +83,16 @@ export const dimTargetsFor = (sel: string, metaIds: string[]) => ({
 });
 
 // The brightness an OFF-FILTER ELEMENT keeps — a view's own per-network FURNITURE, as opposed to
-// its nodes: hyper's other hubs (with their tethers, hoops and rim fills) and the ledger's other
-// lanes (bands, tiles, ribbons). It is the element counterpart of `dim`, and it exists because both
-// views had been carrying their own hardcoded number for it (hyper's `fdim` 0.62, the ledger's
-// `RIBBON_DIM` 0.2) while the nodes beside them answered to a knob (user, 2026-08-11: the ledger's
-// snapshots should obey the same off-filter dim its chips do).
+// its DATA: hyper's other hubs, with their tethers, hoops and rim fills. It is the element
+// counterpart of `dim`, and it exists because that furniture had been carrying a hardcoded number
+// of its own (hyper's `fdim` 0.62) while the nodes beside it answered to a knob.
 //
 // Read PER VIEW, not morph-lerped like the four node fields: furniture belongs to one view and
 // fades out with it, so blending the neighbour view's value in would only describe elements that
-// are no longer drawn. geo's 0 is the honest reading — the globe has no per-network furniture, and
-// its off-filter answer is the nodes themselves (`hide`, the isolate).
+// are no longer drawn. Two of the three views read 0, and both zeros are honest rather than
+// unused: geo's globe has no per-network furniture at all — its off-filter answer is the nodes
+// themselves (`hide`, the isolate) — and everything the ledger draws per network is DATA, so its
+// bands, tiles and ribbons take the node's own `dim` through `snapBright` (user, 2026-08-11).
 export const offNetMul = (view: View3D): number => 1 - FOCUS_TUNE[view].elem;
 
 // Per-view hover/selection DIM-BACK: how far the OTHER nodes drop when one node is the focus
@@ -149,7 +150,7 @@ export interface FocusShared {
 export const FOCUS_TUNE_DEFAULTS: Readonly<Record<View3D, Readonly<FocusRow>>> = {
   hyper: { dim: 0.32, hide: 0, elem: 0.38, back: 0.45, boost: 1.4 },
   geo: { dim: 1.0, hide: 1, elem: 0, back: 0.65, boost: 0.7 },
-  ledger: { dim: 0.5, hide: 0, elem: 0.8, back: 0.55, boost: 0.7 },
+  ledger: { dim: 0.5, hide: 0, elem: 0, back: 0.55, boost: 0.7 },
 };
 
 export const FOCUS_SHARED_DEFAULTS: Readonly<FocusShared> = { groupShare: GROUP_FOCUS };
@@ -227,6 +228,37 @@ export function nodeEmissive(
   // and the rest dim back so it stands out (only when not already isolating a metagraph).
   if (focus > 0) v += focusBoost(c) * focus;
   else if (dimOthersOnFocus) v *= focusDim(c);
+  return v;
+}
+
+// A SNAPSHOT IS DATA, NOT FURNITURE (user, 2026-08-11): "the snapshots in the Snapshots view are
+// not furniture — they represent real data created by the network, so they must behave just like a
+// node: same `dim · off-filter`, same `dim-back on focus`, same `focus boost`." The chamber's two
+// snapshot instruments (the byte bar's bands, the lane tiles) and the ribbons that join them ran
+// their own four-way cascade of bespoke fractions instead — `hot`, `hot × SNAP_PREVIEW`,
+// `hot × SNAP_ONNET`, `rest` — and took their off-filter drop from `elem`, the ELEMENTS knob, which
+// exists for a view's own FURNITURE. So the ledger's data answered to the furniture's knob while
+// the node chips beside it answered to the node's, and no focus reached it at all: a hover had an
+// effect, but nothing was a focus, so nothing ever dimmed back.
+//
+// This is `nodeEmissive`'s shape, term for term: the instrument's resting level takes the
+// off-filter dim, the focused snapshot ADDS the boost UNDIMMED (so an off-filter row you hover
+// still comes forward), and everything else drops back while a focus exists. `base` stays per
+// instrument — a band's opacity and a tile's colour multiplier are different quantities — and is
+// the only number the two still keep of their own.
+//
+// COLOUR IS INDEPENDENT and stays with the callers (user's caveat, same day): identity hue vs the
+// neutral trail is the chamber's own DEPTH reading, and it must never ride these knobs.
+export function snapBright(
+  base: number,
+  offFilter: boolean,
+  focus = 0,
+  dimOthersOnFocus = false,
+): number {
+  const row = FOCUS_TUNE.ledger;
+  let v = base * (offFilter ? 1 - row.dim : 1);
+  if (focus > 0) v += row.boost * focus;
+  else if (dimOthersOnFocus) v *= row.back;
   return v;
 }
 

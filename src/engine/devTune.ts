@@ -78,7 +78,7 @@ export async function mountDevTune(targets: DevTuneTargets): Promise<DevTuneHand
     hyper: [focusGroup("hyper"), spotGroup("hyper")],
     geo: [focusGroup("geo"), spotGroup("geo")],
     // Almost every dim number is read per frame, so the group needs no onChange — EXCEPT the
-    // ledger's `elem`, which the ribbons bake into their vertex colours. Re-push the sheet there.
+    // ledger's `dim`, which the ribbons bake into their vertex colours. Re-push the sheet there.
     ledger: [
       { ...focusGroup("ledger"), onChange: () => ledger.ribbons.setTune({}) },
       {
