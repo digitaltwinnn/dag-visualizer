@@ -168,8 +168,12 @@ import { useBreakpoint } from "@/components/useBreakpoint";
 // the DATA PIPELINE (we resolved these), not about the two facts themselves, and its active head
 // glued to a passive tail is why it read badly. So the opening line now ENUMERATES the pair it is
 // about ("two things: where it actually runs, and which provider hosts it"), which makes the whole
-// second paragraph resolvable and shortens its opener to "Neither is prescribed." A paragraph that
-// opens on a back-reference is only as clear as the sentence it points at.
+// second paragraph resolvable. A paragraph that opens on a back-reference is only as clear as the
+// sentence it points at — and the cheapest fix for one is to DELETE it: the bridging "Neither is
+// prescribed." was cut outright on 2026-08-12 (user, "skip this line"). It only ever announced what
+// the sentence behind it already demonstrates, since a range from the big clouds down to single
+// regional ISPs IS the absence of a rule. Naming the absence first made the reader hold an
+// abstraction until the evidence arrived.
 //
 // ⚠️ …AND "EACH NETWORK PLACES ITSELF" NEEDED THE FORCES (user, 2026-08-12 — "extend a little bit on
 // that; so based on their geographic needs (data gravity?), costs (cheap vs preferred or even
@@ -179,7 +183,14 @@ import { useBreakpoint } from "@/components/useBreakpoint";
 // why the map looks different per network — data gravity wants concentration, resilience wants
 // spread, and cost/mandate can override both. It takes its own paragraph (geo's third, hyper's
 // ceiling) rather than growing the second, because it answers a different question: paragraph two
-// says what varies, this says why. ~78 words, still well under the ~100 ceiling.
+// says what varies, this says why. ~80 words, still well under the ~100 ceiling.
+// ⚠️ But NAME THE DECIDER, NOT THE PHYSICS (user, 2026-08-12 — "just say they decided themselves
+// based on factors that matter to their business / use case"). "Places itself against several
+// pressures" made the placement sound like a force balance the network is subject to; it is a
+// DECISION somebody made for a reason. "Chooses its own placement, on whatever matters to the
+// business it runs" says the same three factors are inputs to a choice, which is also what makes the
+// map worth reading: every position on it is somebody's answer. Sibling of the no-meta-commentary
+// rule above — both are about naming the subject plainly instead of dressing it.
 const ABOUT: Record<Mode, { title: string; eyebrow: string; lines: string[]; caption?: string }> = {
   hyper: {
     title: "How the network is built",
@@ -195,8 +206,8 @@ const ABOUT: Record<Mode, { title: string; eyebrow: string; lines: string[]; cap
     eyebrow: "About",
     lines: [
       "Every node here shows two things: where it actually runs, and which provider hosts it.",
-      "Neither is prescribed. Hosts run from the big clouds down to single regional ISPs, and a network's nodes may sit in one country or spread across many.",
-      "Each network places itself against several pressures: it may want to sit close to the data it serves, some providers are cheaper and some are required, and spreading across providers and regions is what survives one of them failing.",
+      "Hosts run from the big clouds down to single regional ISPs, and a network's nodes may sit in one country or spread across many.",
+      "Each network chooses its own placement, on whatever matters to the business it runs: it may want to sit close to the data it serves, some providers are cheaper and some are required, and spreading across providers and regions is what survives one of them failing.",
     ],
   },
   ledger: {
