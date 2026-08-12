@@ -219,18 +219,34 @@ describe("snapFocusOf (a row's focus reaches the committed network only)", () =>
 });
 
 describe("focusDim / focusBoost (per-view hover/selection strength)", () => {
-  it("focusDim: hyper 0.22 · geo 0.65 · ledger 0.55", () => {
-    expect(focusDim(ctx({ morph: 0 }))).toBeCloseTo(0.22, 10);
-    expect(focusDim(ctx({ morph: 1 }))).toBeCloseTo(0.65, 10);
-    expect(focusDim(ctx({ morph: 0, ledger: true }))).toBeCloseTo(0.55, 10);
+  // WIRING, not numbers: each resolver reads its own view's row, and hyper↔geo lerp by morph.
+  // Asserting against FOCUS_TUNE_DEFAULTS rather than re-stating the literals is what keeps a
+  // ?tune bake a one-file edit — the numbers are a look and are meant to move; the row a
+  // resolver reads is the design. (Still the DEFAULTS, never the live FOCUS_TUNE struct, so
+  // turning a knob can't make this pass or fail.) The ORDER is pinned separately below.
+  it("focusDim reads each view's own `back`", () => {
+    expect(focusDim(ctx({ morph: 0 }))).toBeCloseTo(FOCUS_TUNE_DEFAULTS.hyper.back, 10);
+    expect(focusDim(ctx({ morph: 1 }))).toBeCloseTo(FOCUS_TUNE_DEFAULTS.geo.back, 10);
+    expect(focusDim(ctx({ morph: 0, ledger: true }))).toBeCloseTo(FOCUS_TUNE_DEFAULTS.ledger.back, 10);
   });
 
-  // The focused node's glow pop is HALVED in geo/ledger (user, 2026-07-17: the chips' brighter
-  // base blew out at the flat 1.4); hyper keeps the full pop over its dim resting nodes.
-  it("focusBoost: hyper 1.4 · geo 0.7 · ledger 0.7", () => {
-    expect(focusBoost(ctx({ morph: 0 }))).toBeCloseTo(1.4, 10);
-    expect(focusBoost(ctx({ morph: 1 }))).toBeCloseTo(0.7, 10);
-    expect(focusBoost(ctx({ morph: 0, ledger: true }))).toBeCloseTo(0.7, 10);
+  it("focusBoost reads each view's own `boost`", () => {
+    expect(focusBoost(ctx({ morph: 0 }))).toBeCloseTo(FOCUS_TUNE_DEFAULTS.hyper.boost, 10);
+    expect(focusBoost(ctx({ morph: 1 }))).toBeCloseTo(FOCUS_TUNE_DEFAULTS.geo.boost, 10);
+    expect(focusBoost(ctx({ morph: 0, ledger: true }))).toBeCloseTo(FOCUS_TUNE_DEFAULTS.ledger.boost, 10);
+  });
+
+  // The design relations the numbers must keep, whatever a ?tune session moves them to: the
+  // focused node's glow pop is LOUDEST in hyper, where it sits over dim resting nodes, and
+  // softer in geo/ledger, whose chips have a brighter base and blew out at hyper's value
+  // (user, 2026-07-17); and hyper's dim-back is the SHALLOWEST, because its shells are dense
+  // enough that muting them hard reads as the view going dark rather than as one node leading.
+  it("keeps the per-view emphasis ranking", () => {
+    const d = FOCUS_TUNE_DEFAULTS;
+    expect(d.hyper.boost).toBeGreaterThan(d.geo.boost);
+    expect(d.hyper.boost).toBeGreaterThan(d.ledger.boost);
+    expect(d.hyper.back).toBeLessThan(d.geo.back);
+    expect(d.hyper.back).toBeLessThan(d.ledger.back);
   });
 
   it("the emissive function consumes them: a geo-focused node gains 0.7, a geo dim-back is ×0.65", () => {
@@ -434,16 +450,16 @@ describe("nodeEmissive", () => {
     expect(nodeEmissive(ctx({ morph: 1 }), 1, 0, 0, false)).toBeCloseTo(0.37 * 0.08, 10);
   });
 
-  it("boosts the focused node by +1.4, ignoring anyFocus", () => {
+  it("boosts the focused node by hyper's `boost`, ignoring anyFocus", () => {
     const c = ctx({ morph: 0 });
     const base = nodeEmissive(c, 0, 0, 0, false);
-    expect(nodeEmissive(c, 0, 0, 1, true)).toBeCloseTo(base + 1.4, 10);
+    expect(nodeEmissive(c, 0, 0, 1, true)).toBeCloseTo(base + FOCUS_TUNE_DEFAULTS.hyper.boost, 10);
   });
 
-  it("dims a non-focused node by *0.22 only when anyFocus is set", () => {
+  it("dims a non-focused node by hyper's `back` only when anyFocus is set", () => {
     const c = ctx({ morph: 0 });
     const base = nodeEmissive(c, 0, 0, 0, false);
-    expect(nodeEmissive(c, 0, 0, 0, true)).toBeCloseTo(base * 0.22, 10);
+    expect(nodeEmissive(c, 0, 0, 0, true)).toBeCloseTo(base * FOCUS_TUNE_DEFAULTS.hyper.back, 10);
   });
 
   it("does nothing extra when there's no focus target at all (isFocus and anyFocus both false)", () => {
@@ -503,19 +519,22 @@ describe("FOCUS_TUNE", () => {
     }
   });
 
-  // The defaults must reproduce the ORIGINAL literal formulas exactly, at every morph — the
-  // refactor renamed the endpoints, it did not retune anything. Two deliberate exceptions, and
-  // a value only belongs here once it is named as one: the metagraph pool, whose `meta` ramp is
-  // GONE by design (see the ONE NODE MODEL header), so both pools now read this one `dim` row
-  // and there is no second formula left to reproduce; and hyper's `back`, retuned 0.45 → 0.22
-  // from a ?tune session (user, 2026-08-12) so a focused node in hyper reads against a darker
-  // field. Geo and the ledger are untouched, which is why only the hyper endpoint moves.
-  it("reproduces the pre-refactor formulas at every morph", () => {
+  // The defaults must reproduce the ORIGINAL literal formulas' SHAPE at every morph — the
+  // refactor renamed the endpoints, it did not change how they blend: one linear lerp from the
+  // hyper row to the geo row, which is what `viewMix` promises. The ENDPOINTS are read from the
+  // rows rather than re-stated, because they are a look and get re-tuned (hyper's `back` and
+  // `boost` both have; see the row's own note). One deliberate structural exception, and a value
+  // only belongs here once it is named as one: the metagraph pool, whose `meta` ramp is GONE by
+  // design (see the ONE NODE MODEL header), so both pools now read this one `dim` row and there
+  // is no second formula left to reproduce.
+  it("blends hyper→geo linearly at every morph", () => {
+    const d = FOCUS_TUNE_DEFAULTS;
+    const at = (a: number, b: number, m: number) => a + (b - a) * m;
     for (const morph of [0, 0.1, 0.25, 0.5, 0.75, 0.9, 1]) {
       const c = ctx({ morph });
-      expect(nodeDimScale(c)).toBeCloseTo(0.32 + 0.68 * morph, 10);
-      expect(focusDim(c)).toBeCloseTo(0.22 + 0.43 * morph, 10);
-      expect(focusBoost(c)).toBeCloseTo(1.4 - 0.7 * morph, 10);
+      expect(nodeDimScale(c)).toBeCloseTo(at(d.hyper.dim, d.geo.dim, morph), 10);
+      expect(focusDim(c)).toBeCloseTo(at(d.hyper.back, d.geo.back, morph), 10);
+      expect(focusBoost(c)).toBeCloseTo(at(d.hyper.boost, d.geo.boost, morph), 10);
     }
   });
 

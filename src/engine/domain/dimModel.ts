@@ -174,7 +174,10 @@ export interface FocusShared {
 }
 
 export const FOCUS_TUNE_DEFAULTS: Readonly<Record<View3D, Readonly<FocusRow>>> = {
-  hyper: { dim: 0.32, hide: 0, elem: 0.38, back: 0.22, boost: 1.4 },
+  // hyper's `back`/`boost` re-tuned live (user, 2026-08-12): the shells are dense and evenly
+  // lit, so a focused node needed both a louder boost and a deeper step-back from its
+  // neighbours before it read as the subject rather than as one bright node among many.
+  hyper: { dim: 0.32, hide: 0, elem: 0.38, back: 0.41, boost: 1.85 },
   geo: { dim: 1.0, hide: 1, elem: 0, back: 0.65, boost: 0.7 },
   ledger: { dim: 0.5, hide: 0, elem: 0, back: 0.55, boost: 0.7 },
 };
