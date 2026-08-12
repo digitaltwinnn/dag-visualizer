@@ -369,7 +369,7 @@ export default function LedgerPanel() {
     <ExplorerShell
       id="ledger-view"
       title="Snapshots"
-      hint="Recent snapshots, newest first — open one for the networks that anchored into it."
+      hint="Recent snapshots, newest first. Open one for the networks that anchored into it."
       onLeave={() => {
         // Container-level hover backstop (the LaneRow lesson, 2026-08-02): leaving the whole card
         // body clears every hover channel its rows write, regardless of which row set it or

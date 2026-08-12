@@ -21,8 +21,8 @@ import { cn } from "@/lib/utils";
 export const metadata: Metadata = {
   title: "About — DAG Visualizer",
   description:
-    "What DAG Visualizer is: a free, browser-based 3D visualizer of the Constellation Network — " +
-    "the $DAG hypergraph, its metagraphs, the node world map, and live snapshot anchoring. " +
+    "What DAG Visualizer is: a free, browser-based 3D visualizer of the Constellation Network. " +
+    "The $DAG hypergraph, its metagraphs, the node world map, and live snapshot anchoring. " +
     "An unofficial community project.",
   alternates: { canonical: "/about" },
 };
@@ -170,7 +170,7 @@ export default function AboutPage() {
           <p className="mt-5 text-base text-foreground-dim leading-relaxed">
             DAG Visualizer is a free, browser-based visualizer that shows the Constellation
             Network as a living 3D scene. It connects to the network&apos;s public APIs and renders
-            what is actually happening right now — real nodes, real locations, real activity.
+            what is actually happening right now: real nodes, real locations, real activity.
           </p>
 
           {/* The honesty rule, stated as the product's one promise. It earns a panel because it is
@@ -182,8 +182,8 @@ export default function AboutPage() {
               Nothing is estimated, and nothing is filled in with a plausible-looking placeholder.
             </p>
             <p className="mt-2 text-label text-muted-foreground leading-relaxed">
-              When a feed is unavailable, the instrument says so — <span className="font-mono">NO SIGNAL</span>,{" "}
-              <span className="font-mono">acquiring</span>, <span className="font-mono">standby</span> — instead of
+              When a feed is unavailable, the instrument says so, with <span className="font-mono">NO SIGNAL</span>,{" "}
+              <span className="font-mono">acquiring</span> or <span className="font-mono">standby</span>, instead of
               showing a number it does not have.
             </p>
             {/* ⚠️ THE ARCS ARE THE ONE EXCEPTION AND THE PAGE MUST SAY SO (2026-08-12). The geo blurb
@@ -204,7 +204,7 @@ export default function AboutPage() {
 
           <Section id="explore" title="What you can explore">
             <p>
-              Three views of the same network, each answering a different question — who and what,
+              Three views of the same network, each answering a different question: who and what,
               where, and when.
             </p>
             {/* ⚠️ THIS PAGE'S READER HAS NOT SEEN THE APP (2026-08-12), which is exactly why the
@@ -223,7 +223,7 @@ export default function AboutPage() {
               <ViewCard
                 icon={Globe}
                 name="Geography"
-                blurb="Where the network runs: every node at the real location it runs from, on a globe you can turn — with the country and the hosting provider behind each one."
+                blurb="Where the network runs: every node at the real location it runs from, on a globe you can turn, with the country and the hosting provider behind each one."
               />
               <ViewCard
                 icon={Layers}
@@ -244,7 +244,7 @@ export default function AboutPage() {
 
           <Section id="metagraph" title="What is a metagraph?">
             <p>
-              A metagraph is an application network built on Constellation — each one runs its own
+              A metagraph is an application network built on Constellation. Each one runs its own
               nodes and produces its own ledger, and periodically <em>anchors</em> that ledger into
               the global network. You can think of metagraphs as independent economies that all
               come together on the same base layer.
@@ -294,7 +294,7 @@ export default function AboutPage() {
               <p className="mt-3 text-foreground-dim leading-relaxed">
                 It is also a work in progress: views arrive unfinished, readings can be wrong, and
                 a feed can go quiet without warning. Nothing here is financial advice or an
-                official record of the network — for anything that matters, use the official
+                official record of the network. For anything that matters, use the official
                 sources.
               </p>
               <p className="mt-3 text-label text-muted-foreground">

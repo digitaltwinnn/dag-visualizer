@@ -22,9 +22,9 @@ import { useStore } from "@/src/store/store";
 type PresentMode = "scene" | "cards" | "raw";
 
 const ITEMS: { id: PresentMode; name: string; title: string; icon: typeof Focus; desktopOnly?: boolean }[] = [
-  { id: "scene", name: "Scene", title: "Scene — just the 3D, rails collapse to their threads", icon: Focus, desktopOnly: true },
-  { id: "cards", name: "HUD", title: "HUD — the info cards over the scene", icon: LayoutPanelLeft },
-  { id: "raw", name: "Raw", title: "Raw — the data behind the view", icon: Table2 },
+  { id: "scene", name: "Scene", title: "Scene: just the 3D, rails collapse to their threads", icon: Focus, desktopOnly: true },
+  { id: "cards", name: "HUD", title: "HUD: the info cards over the scene", icon: LayoutPanelLeft },
+  { id: "raw", name: "Raw", title: "Raw: the data behind the view", icon: Table2 },
 ];
 
 export default function PresentationToggle() {

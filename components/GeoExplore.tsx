@@ -161,7 +161,7 @@ export default function GeoExplore() {
         // down; a hint that skips a rung misdescribes the click it is explaining.
         quietEmpty
           ? null
-          : "Every country hosting nodes, busiest first — open one for the cities and providers behind them."
+          : "Every country hosting nodes, busiest first. Open one for the cities and providers behind them."
       }
     >
       {quietEmpty ? (

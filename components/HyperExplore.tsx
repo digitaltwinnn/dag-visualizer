@@ -87,7 +87,7 @@ export default function HyperExplore() {
     <ExplorerShell
       id="hyperexplore"
       title="Nodes by network"
-      hint="Every network on the hypergraph, biggest fleet first — open one for the roles its nodes play."
+      hint="Every network on the hypergraph, biggest fleet first. Open one for the roles its nodes play."
     >
       {/* Sorted by fleet size (user, 2026-07-12) — the biggest networks lead. */}
       {[...metaList].sort((a, b) => b.nodes.length - a.nodes.length).map((m) => {
