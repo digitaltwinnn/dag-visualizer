@@ -170,6 +170,16 @@ import { useBreakpoint } from "@/components/useBreakpoint";
 // about ("two things: where it actually runs, and which provider hosts it"), which makes the whole
 // second paragraph resolvable and shortens its opener to "Neither is prescribed." A paragraph that
 // opens on a back-reference is only as clear as the sentence it points at.
+//
+// ⚠️ …AND "EACH NETWORK PLACES ITSELF" NEEDED THE FORCES (user, 2026-08-12 — "extend a little bit on
+// that; so based on their geographic needs (data gravity?), costs (cheap vs preferred or even
+// mandated providers), resilience / decentralization"). It was a closing assertion with nothing
+// behind it: the reader is looking at a map of choices and the card named the choosing without ever
+// saying what is being weighed. The three forces are real and they PULL AGAINST each other, which is
+// why the map looks different per network — data gravity wants concentration, resilience wants
+// spread, and cost/mandate can override both. It takes its own paragraph (geo's third, hyper's
+// ceiling) rather than growing the second, because it answers a different question: paragraph two
+// says what varies, this says why. ~78 words, still well under the ~100 ceiling.
 const ABOUT: Record<Mode, { title: string; eyebrow: string; lines: string[]; caption?: string }> = {
   hyper: {
     title: "How the network is built",
@@ -185,7 +195,8 @@ const ABOUT: Record<Mode, { title: string; eyebrow: string; lines: string[]; cap
     eyebrow: "About",
     lines: [
       "Every node here shows two things: where it actually runs, and which provider hosts it.",
-      "Neither is prescribed. Hosts run from the big clouds down to single regional ISPs, and a network's nodes may sit in one country or spread across many. Each network places itself.",
+      "Neither is prescribed. Hosts run from the big clouds down to single regional ISPs, and a network's nodes may sit in one country or spread across many.",
+      "Each network places itself against several pressures: it may want to sit close to the data it serves, some providers are cheaper and some are required, and spreading across providers and regions is what survives one of them failing.",
     ],
   },
   ledger: {
