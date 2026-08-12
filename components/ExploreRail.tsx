@@ -213,7 +213,7 @@ const ABOUT: Record<Mode, { title: string; eyebrow: string; lines: string[]; cap
     lines: [
       "Every node here is geolocated from its IP address, and whatever else that lookup knows comes with it: the city, the country, the provider hosting it.",
       "Hosts run from the big clouds down to single regional ISPs, and a network's nodes may sit in one country or spread across many.",
-      "Each network chooses its own placement, on whatever matters to the business it runs: it may want to sit close to the data it serves, some providers are cheaper and some are required, and spreading across providers and regions is what survives one of them failing.",
+      "Each network chooses its own placement, on whatever matters to the business it runs: it may want to sit close to the data it serves, some providers are cheaper and some are required, and some networks simply want to be spread across the globe.",
     ],
   },
   ledger: {
