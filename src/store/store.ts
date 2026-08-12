@@ -164,6 +164,15 @@ interface AppState {
   // never set this). The rails dim while it holds, so direct manipulation pushes the HUD back
   // without moving any layout. Written by the Engine (debounced on the trailing edge).
   sceneDragging: boolean;
+  // TRUE while the ENGINE is flying the camera in answer to a commit — the counterpart to
+  // `sceneDragging`'s "the user's hand is on the scene" (user, 2026-08-12: "when we swipe a card
+  // or click another one in the card hierarchy the scene moves the camera accordingly; during
+  // this short animation period can we apply a similar effect to the cards/panels as when we
+  // manually use the camera controls"). Both rails and both dock sheets yield to it, because a
+  // commit made from a card is a request to LOOK at what was committed. Written by the Engine on
+  // the tween's edges only (never per frame), and NOT during a view transition: that choreography
+  // is its own 3.9s answer to the user's gesture, so a 1.4s dim inside it would read as a blink.
+  cameraFlying: boolean;
   // PHONE ONLY: whether the top bar's vitals row is expanded (the bar grows downward by one
   // full-width row showing the active view's vitals). A USER CHOICE that persists across view
   // switches (the row's CONTENT swaps per view; only the user's toggle opens/closes it) —
@@ -231,6 +240,7 @@ interface AppState {
   setSection: (section: "scene" | "data") => void;
   setRailsHidden: (hidden: boolean) => void;
   setSceneDragging: (dragging: boolean) => void;
+  setCameraFlying: (flying: boolean) => void;
   setPhoneVitals: (open: boolean) => void;
   setPhoneSheetPx: (px: number | null) => void;
   setRailCollapse: (id: string, collapsed: boolean | null) => void;
@@ -282,6 +292,7 @@ export const useStore = create<AppState>((set) => ({
   section: "scene",
   railsHidden: false,
   sceneDragging: false,
+  cameraFlying: false,
   phoneVitals: false,
   railCollapse: {},
   focusRung: null,
@@ -368,6 +379,7 @@ export const useStore = create<AppState>((set) => ({
   setSection: (section) => set({ section }),
   setRailsHidden: (railsHidden) => set({ railsHidden }),
   setSceneDragging: (sceneDragging) => set({ sceneDragging }),
+  setCameraFlying: (cameraFlying) => set({ cameraFlying }),
   setPhoneVitals: (phoneVitals) => set({ phoneVitals }),
   setRailCollapse: (id, collapsed) =>
     set((s) => {

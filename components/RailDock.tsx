@@ -9,6 +9,7 @@ import { PulseEdge, useEdgePulse } from "@/components/EdgePulse";
 import { ListTree, ChevronLeft, ChevronRight, ChevronUp, ChevronDown, X, type LucideIcon } from "lucide-react";
 import { EXPLORE_ICON } from "@/components/icons";
 import { useStore } from "@/src/store/store";
+import { useSceneYield } from "@/components/RailShade";
 
 // One entry in a dock's icon TRAY (user redesign 2026-07-05 — supersedes the old hint dot + the
 // dot↔glyph morph, on the edge tabs AND the phone dock halves): the tray is a quiet LEGEND of the
@@ -148,6 +149,7 @@ export default function RailDock({
   // the scene restores what was open. The tablet edge TAB fades with the HUD — no gate needed.
   const section = useStore((s) => s.section);
   const shellVisible = section === "scene";
+  const yielding = useSceneYield();
   const handleOpenChange = (next: boolean) => {
     setOpen(next);
     onOpenChange?.(next);
@@ -412,18 +414,25 @@ export default function RailDock({
           // `sheetPx` is null.
           style={isBarHalf && sheetPx != null ? { ...style, height: sheetPx, maxHeight: "none" } : style}
           overlay={false}
+          // The HUD's step-back while the camera moves, under either hand (`useSceneYield`) — the
+          // same yield the desktop rails make, because these sheets ARE the rails here. The dock
+          // BAR and the edge tabs stay solid: they're the handles. The recipe is in globals.css.
+          data-dim={yielding ? "" : undefined}
           // Phone bar-half variant: the sheet sits DIRECTLY ABOVE the persistent dock bar (never
           // covers it — the bar is its visible header/handle), so offset it up by the bar height.
           // `!` beats the base `bottom-0` from the bottom-side placement in sheet.tsx. Snapping
           // animates the height (calm 0.2s; suspended while the finger drags, instant under
           // reduced motion).
+          // reduced motion). `opacity` rides the same list so the scene-yield dim isn't stranded
+          // by this element-level `transition-property` — it takes the sheet's own 0.2s tempo
+          // rather than the rails' 0.3s, which is the honest trade for not fighting the cascade.
           className={
             isBarHalf
               ? cn(
                   "!bottom-[var(--phone-dock-h)]",
                   dragging
                     ? "!transition-none"
-                    : "transition-[height] duration-200 ease-out motion-reduce:!transition-none",
+                    : "transition-[height,opacity] duration-200 ease-out motion-reduce:!transition-none",
                 )
               : undefined
           }

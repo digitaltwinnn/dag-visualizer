@@ -1302,6 +1302,11 @@ export class Engine {
     tw.t = 0;
     tw.dur = 1.4;
     tw.active = true;
+    // The HUD yields while this flight runs (store.cameraFlying — see its comment): a commit made
+    // from a card is a request to LOOK at what was committed, so the cards step back out of the
+    // way exactly as they do under a direct drag. NOT during a view transition: that choreography
+    // is already the 3.9s answer to the user's gesture, and a 1.4s dim inside it reads as a blink.
+    if (!this.transition.active() && !useStore.getState().cameraFlying) useStore.getState().setCameraFlying(true);
   }
 
 
@@ -1591,7 +1596,12 @@ export class Engine {
     const e = easeInOutQuad(tw.t);
     this.ctx.camera.position.lerpVectors(tw.fromPos, tw.toPos, e);
     this.ctx.controls.target.lerpVectors(tw.fromTgt, tw.toTgt, e);
-    if (tw.t >= 1) tw.active = false;
+    if (tw.t >= 1) {
+      tw.active = false;
+      // The flight's trailing edge — one write, and unconditionally, so a tween STARTED before a
+      // transition (or suppressed by one) can never strand the HUD dimmed.
+      if (useStore.getState().cameraFlying) useStore.getState().setCameraFlying(false);
+    }
   }
 
   dispose() {
@@ -1605,8 +1615,10 @@ export class Engine {
     this.ctx.controls.removeEventListener("start", this._onControlsStart);
     this.ctx.controls.removeEventListener("end", this._onControlsEnd);
     clearTimeout(this._dragEndT);
-    // A dispose mid-drag must not leave the rails dimmed (StrictMode remount / HMR).
+    // A dispose mid-drag must not leave the rails dimmed (StrictMode remount / HMR). Same for a
+    // dispose mid-FLIGHT: nothing else clears the flag once the render loop stops.
     if (useStore.getState().sceneDragging) useStore.getState().setSceneDragging(false);
+    if (useStore.getState().cameraFlying) useStore.getState().setCameraFlying(false);
     this.stats?.dom.remove();
     this._devTune?.dispose();
     this.unsub.forEach((u) => u());
