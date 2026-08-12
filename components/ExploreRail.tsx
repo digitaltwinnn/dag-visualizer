@@ -24,21 +24,46 @@ import { useBreakpoint } from "@/components/useBreakpoint";
 // explorer's own hint — About must not restate it, which is what had geo telling you to drill
 // a country three times on one screen. Paragraph 1 = the network fact this view exists to show;
 // paragraph 2 = what to look FOR in it.
+//
+// ⚠️ HYPER'S FACTS, corrected by the user (2026-08-12) — three claims that read plausibly and are
+// wrong: the network is NOT feeless (scalability is the real headline); work is NOT "spread across"
+// networks as if sharded — metagraphs are INDEPENDENT and interlinked; and the unit here is a NODE,
+// never a "machine" (that word belongs to the ledger's trays). The card must also say what is META
+// about a metagraph in plain words — the core keeps a record ABOUT a metagraph's ledger, never its
+// contents — because that is the same fact that explains the scaling, so the two belong in one
+// breath rather than as a claim and an unrelated boast.
+//
+// ⚠️ AND IT MUST ANSWER ITS OWN TITLE (user, 2026-08-12). "How the network is built" was answered
+// with what the network IS and how big each one gets, which is a different question: what this view
+// actually shows is the LAYERS — L0, dL1, cL1 — each with a job inside its own network, and the
+// fact that a network runs only the ones it needs (no token → no cL1). The layers are the FACT and
+// belong here; the rings they are drawn as are the LOOK and stay out, per the rule above.
+//
+// ⚠️ GEO STAYS OFF THE DECENTRALIZATION QUESTION ENTIRELY (user, 2026-08-12). "Decentralization is
+// a claim, and this is where you can check it" was too bold — location is only ONE input to it (who
+// owns the nodes, what they cost, who operates them all matter and none of it is on this globe), so
+// the card was answering a broad, contested question with a partial view. The correction is NOT a
+// hedged version of the same claim: the word doesn't belong on the card at all, because naming it —
+// even to qualify it — is still the card taking up the topic. The copy states the two facts the view
+// carries, place and provider, and the axes along which networks differ; the reader does the rest.
+// Rule: this card describes what there is to explore, and grades nothing.
 const ABOUT: Record<Mode, { title: string; eyebrow: string; lines: string[]; caption?: string }> = {
   hyper: {
     title: "How the network is built",
     eyebrow: "About",
     lines: [
-      "Constellation is a Hypergraph, not a blockchain — work is spread across many networks validating at the same time, which is what lets it scale out and stay feeless for the people using it.",
-      "Each network runs its own machines but borrows its security from the core. What differs is scale and make-up: some are three machines, some a fleet, and the roles they run decide what the network can actually do.",
+      "Constellation is a Hypergraph, not a blockchain: rather than one chain doing all the work, it is many independent networks, interlinked through a shared core.",
+      "Each of those is a metagraph, and what is meta about it is that the core never handles its data — the metagraph keeps its own ledger, and the core keeps only a record about it. So every metagraph runs at its own pace, in parallel with the rest, which is what lets the whole thing scale.",
+      "Inside a network the work is split across layers, and every node runs one or more of them: L0 holds the network's own state and seals its snapshots, data L1 takes in what applications write, and currency L1 moves a token — if the network has one at all.",
+      "A network runs only the layers it needs, which is where the flexibility shows: some are three nodes doing all of it at once, others a fleet with the roles split apart, and plenty carry no currency layer whatsoever.",
     ],
   },
   geo: {
     title: "Where the network runs",
     eyebrow: "About",
     lines: [
-      "Decentralization is a claim, and this is where you can check it — every node sits at the real location it runs from.",
-      "Concentration is the thing to look for: how much of a network sits in one country, or behind a single hosting provider. Neither shows up in a node count.",
+      "Every node sits at the real location it runs from, with the provider hosting it named beside it. Where a network placed itself, and whose hardware it sits on, are two separate facts — and both are here.",
+      "Networks differ along both: some keep every node in one country while others reach across continents, and a network spread wide can still rent all of it from one provider. The map and the provider names are what you compare them by.",
     ],
   },
   ledger: {

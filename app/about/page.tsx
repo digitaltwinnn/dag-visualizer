@@ -178,13 +178,27 @@ export default function AboutPage() {
           <Panel className="mt-6 py-4 px-5">
             <Eyebrow>The one rule</Eyebrow>
             <p className="mt-2 text-base text-foreground leading-relaxed">
-              Every number and every shape comes from live data. Nothing is simulated, and nothing
-              is filled in with a plausible-looking placeholder.
+              Every number on screen, and every shape that carries one, is read from live data.
+              Nothing is estimated, and nothing is filled in with a plausible-looking placeholder.
             </p>
             <p className="mt-2 text-label text-muted-foreground leading-relaxed">
               When a feed is unavailable, the instrument says so — <span className="font-mono">NO SIGNAL</span>,{" "}
               <span className="font-mono">acquiring</span>, <span className="font-mono">standby</span> — instead of
               showing a number it does not have.
+            </p>
+            {/* ⚠️ THE ARCS ARE THE ONE EXCEPTION AND THE PAGE MUST SAY SO (2026-08-12). The geo blurb
+                below used to promise "live traffic travelling between them" — `domain/arcSim.ts` is a
+                pure simulation: real node endpoints, invented motion, targets picked at random. On the
+                one page that promised "Nothing is simulated", that was the sharpest possible false
+                claim — and stating the exception underneath an unchanged promise would only have put
+                the contradiction inside one panel. So the promise is now scoped to what it is actually
+                true of, READINGS (a number, and the geometry that encodes one), and the exception names
+                the one thing on screen that carries no reading. Both halves had to move; fixing only
+                the blurb would have left the false sentence sitting in the louder type. */}
+            <p className="mt-2 text-label text-muted-foreground leading-relaxed">
+              The one thing carrying no reading is the motion: the packets travelling between nodes
+              on the globe are a stand-in for nodes talking to each other, not a measured feed. The
+              nodes they travel between are real.
             </p>
           </Panel>
 
@@ -193,21 +207,28 @@ export default function AboutPage() {
               Three views of the same network, each answering a different question — who and what,
               where, and when.
             </p>
+            {/* ⚠️ THIS PAGE'S READER HAS NOT SEEN THE APP (2026-08-12), which is exactly why the
+                blurbs may describe the picture — and exactly why they may not use the app's INTERNAL
+                vocabulary to do it. "Global L0 core", "validator shells" and "3D anchoring chamber"
+                each named a thing with a word only a reader who already knew the answer could parse.
+                And the Snapshots line said state is "committed": CLAUDE.md's vocabulary rule reserves
+                that register — the Snapshots stack ANCHORS state; settlement is the money word, and
+                the Transactions view is where it belongs. */}
             <div className="grid gap-3 sm:grid-cols-3">
               <ViewCard
                 icon={Orbit}
                 name="Hypergraph"
-                blurb="How the network is built: the Global L0 core with the metagraphs orbiting it, each with its own validator shells."
+                blurb="How the network is built: a shared core at the centre, the independent networks that plug into it around the outside, and every node drawn on the layer it runs."
               />
               <ViewCard
                 icon={Globe}
                 name="Geography"
-                blurb="Where the network runs: every node at its real location on a holographic globe, with live traffic travelling between them."
+                blurb="Where the network runs: every node at the real location it runs from, on a globe you can turn — with the country and the hosting provider behind each one."
               />
               <ViewCard
                 icon={Layers}
                 name="Snapshots"
-                blurb="When state is committed: metagraph snapshots anchoring into global snapshots, tick by tick, in a 3D anchoring chamber."
+                blurb="When the network anchors: each network's own snapshots dropping into the shared record that seals them, one global tick at a time."
               />
             </div>
           </Section>

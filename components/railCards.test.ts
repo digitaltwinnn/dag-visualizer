@@ -146,9 +146,9 @@ describe("the metagraph snapshot slot", () => {
     expect(ids.indexOf("metaSnap")).toBeGreaterThan(ids.indexOf("context"));
     expect(ids.indexOf("metaSnap")).toBeLessThan(ids.indexOf("node"));
   });
-  it("is ledger-scoped, and its hint names the route rather than the verb", () => {
+  it("is ledger-scoped, and its hint names the STOREY that separates it from the byte bar", () => {
     const inLedger = detailsCards(base).find((c) => c.id === "metaSnap")!;
-    expect(inLedger.hint).toBe("Click a tile under a lane, or a snapshot in the explorer.");
+    expect(inLedger.hint).toBe("Click a tile on a plane above the floor.");
     const inGeo = detailsCards({ ...base, mode: "geo" }).find((c) => c.id === "metaSnap")!;
     expect(inGeo.hint).toBeNull();
   });
@@ -241,5 +241,46 @@ describe("focusSlotId — the focus rung both rails read", () => {
   });
   it("flat views have no focus rung", () => {
     expect(focusSlotId(details({ mode: "status", filter: "dag", inspect: nodePick }))).toBeNull();
+  });
+});
+
+// The ghost-hint COPY RULE, made executable (2026-08-12). The prose rule lives in railCards.ts;
+// what a test can hold is the two failure modes it has now hit twice — a refrain shared down the
+// stack, and a hint spending its subject on the noun its own slot label already says. Both were
+// re-introduced by the very edit that fixed the first version of them, which is why they are here
+// rather than in a comment. The exact wording stays free: only the SHAPE is pinned.
+describe("ghost hints — the copy rule", () => {
+  const VIEWS = ["hyper", "geo", "ledger"] as const;
+  // The noun each slot's own eyebrow already carries. A hint that repeats it has spent its one
+  // sentence restating the label ("Country — Drill a country on the globe.").
+  const OWN_NOUN: Record<string, string> = {
+    context: "network", country: "country", cohort: "provider",
+    composition: "composition", snap: "snapshot", metaSnap: "snapshot", node: "node",
+  };
+  const hintsIn = (mode: (typeof VIEWS)[number]) =>
+    detailsCards(details({ mode })).filter((c) => !c.present && c.hint).map((c) => ({ id: c.id, hint: c.hint! }));
+
+  it.each(VIEWS)("%s: no two ghosts in one stack share a trailing clause", (mode) => {
+    const tails = hintsIn(mode).map(({ hint }) => hint.toLowerCase().split(/\s+/).slice(-3).join(" "));
+    expect(new Set(tails).size).toBe(tails.length);
+  });
+  it.each(VIEWS)("%s: no ghost restates the noun its own slot label carries", (mode) => {
+    for (const { id, hint } of hintsIn(mode)) {
+      // The no-locatable-nodes variant is an honest STATEMENT, not an invite — it has to name the
+      // network it is reporting on, so it is exempt.
+      if (hint.includes("has no locatable nodes")) continue;
+      // The defect is the noun standing as the hint's OBJECT ("Drill a country…", "Click a node…"),
+      // which spends the sentence on what the eyebrow just said. The same word used as a DESCRIPTOR
+      // is fine and sometimes necessary: "Open a city · provider row" names the row's own two
+      // columns so you can spot it in the list, and the object is the row.
+      expect(hint.toLowerCase(), `${mode}/${id}`).not.toMatch(
+        new RegExp(`\\b(a|an|the|one)\\s+${OWN_NOUN[id]}\\b`),
+      );
+    }
+  });
+  it("no ghost carries the retired ', or in the explorer.' refrain", () => {
+    for (const mode of VIEWS) {
+      for (const { hint } of hintsIn(mode)) expect(hint).not.toMatch(/in the explorer\.?$/);
+    }
   });
 });

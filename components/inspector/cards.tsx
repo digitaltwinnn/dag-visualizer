@@ -402,11 +402,12 @@ export function GeoLiveCard() {
       : null;
 
   if (!node) {
-    return (
-      <p className="text-muted-foreground text-label mt-[2px] mb-0">
-        Click a node on the globe, or in the explorer.
-      </p>
-    );
+    // UNREACHABLE, and deliberately empty: the manifest's `present` for the node slot is the SAME
+    // `isNodePick(s.inspect)` test as the line above, so the rail renders this card only when a
+    // node is picked and the GHOST owns the empty state — with the hint copy that lives once, in
+    // `railCards.ts`. A second hint here is a copy that can only ever drift (it had: it still read
+    // "or in the explorer" long after the ghosts dropped that shared tail).
+    return null;
   }
   return <GeoLiveNode p={node} />;
 }

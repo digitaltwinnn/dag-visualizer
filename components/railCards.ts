@@ -169,56 +169,76 @@ export function exploreCards(s: Pick<RailManifestState, "mode">): RailCard[] {
 // variant: inviting a click when the filtered network plots nothing would be a dead hint, and
 // "all" with 0 nodes is just boot (no ghost rather than a false one flashing at startup).
 //
-// COPY RULE (2026-08-02): a hint is the GESTURE and nothing else — the slot label beside it
-// already names the subject, and the dashed frame already says "nothing here yet". Every hint
-// used to end "… to inspect it.", so four ghosts stacked in the rail read as one sentence
-// repeated four times with the verb swapped. Each now names its own route instead, and where a
-// subject is reached from a PARENT row the hint says which ("under a country", "under a
-// network", "under a floor") — the containment the rail's thread encodes, said in words.
+// COPY RULE (2026-08-02, sharpened 2026-08-12): a hint is the GESTURE and nothing else — the slot
+// label beside it already names the subject, and the dashed frame already says "nothing here yet".
+// Two rules fall out of that, and BOTH were violated by the first cut:
+//
+//  1. NEVER RESTATE THE LABEL'S NOUN. "Country — Drill a country…", "Node — Click a node…" spends
+//     the sentence's subject on a word the eyebrow just said. The label IS the subject; the hint
+//     names the OBJECT you aim at (the land, a chip, a bar, a tile) and where it is.
+//  2. NO SHARED TAIL. Every hint ended "… to inspect it." until 2026-08-02; the fix then grew a new
+//     one, ", or in the explorer.", on three slots at once, so a stacked rail read as one sentence
+//     repeated with the verb swapped — the same defect one clause down. The explorer is a visible
+//     list of rows and needs no invitation; a ghost's job is the SCENE route, which you cannot
+//     discover by reading. So the explorer is named only where it is the ONLY route (the provider
+//     and composition rungs), where it is the distinguishing fact rather than a refrain.
+//
+// Where a subject is reached from a PARENT the hint still says which ("under a country", "under a
+// network") — the containment the rail's thread encodes, said in words. Ledger's three openers stay
+// "Click" on purpose: they are three real clicks, and the objects (bar / tile / chip) plus their
+// storeys (on the floor / on a plane above it / in a tray) diverge inside four words, so the stack
+// reads as a legend rather than a chant.
 const IN_3D = (m: Mode) => m === "hyper" || m === "geo" || m === "ledger";
 function contextHint(s: RailManifestState): string | null {
   if (!IN_3D(s.mode)) return null;
-  return "Pick a network in the top-bar filter.";
+  // No noun at all: the slot label reads "Metagraph" while the app's broader word is "network", and
+  // this hint used to put BOTH in one line ("Metagraph — Pick a network…").
+  return "Pick one in the top-bar filter.";
 }
 function nodeHint(s: RailManifestState): string | null {
   // NB the hypergraph's HUBS commit the filter (the metagraph slot) — only nodes fill this one,
   // so the hint no longer offers a hub click it can't honour.
-  if (s.mode === "hyper") return "Click a node in the hypergraph, or in the explorer.";
+  if (s.mode === "hyper") return "Click a sphere on a ring around a hub.";
   if (s.mode === "geo") {
     if (s.selNodesCount === 0) {
       if (!s.filterLabel) return null; // boot — the data simply hasn't landed yet
       return `${s.filterLabel} has no locatable nodes — explore it in the Hypergraph view.`;
     }
-    return "Click a node on the globe, or in the explorer.";
+    return "Click a chip in a stack.";
   }
   // Nodes are pickable in the chamber too (user, 2026-07-12 — the standing chips are a real pick
-  // target), so the slot announces it.
-  if (s.mode === "ledger") return "Click a node in a container under a floor.";
+  // target), so the slot announces it. "in a container under a floor" was stale jargon from the
+  // retired per-role split (src/data/ledgerLayers.ts) — the house word is TRAY, and there are many.
+  if (s.mode === "ledger") return "Click a chip in one of the trays.";
   return null;
 }
 function snapHint(s: RailManifestState): string | null {
   // LEDGER-SCOPED (spec 2026-08-01, a deliberate reversal of the old carry-across-views rule):
   // the strip's bars now run only in ledger and leaving the view clears the pin (Engine.setMode),
-  // so the slot invites — and exists — only there.
-  return s.mode === "ledger" ? "Click a snapshot block, or a bar in the strip below." : null;
+  // so the slot invites — and exists — only there. The strip earns its clause (it is a second
+  // route in a different ZONE, not the explorer refrain) and the parallel is real: the same
+  // subject is a bar in both places.
+  return s.mode === "ledger" ? "Click a bar on the floor, or in the strip below." : null;
 }
 // Country/cohort are geo-only focus-ladder rungs (the drill + the city×provider commit) — their
 // ghosts only ever invite in geo, same allow-list idiom as every other slot.
 function countryHint(s: RailManifestState): string | null {
-  return s.mode === "geo" ? "Drill a country on the globe, or in the explorer." : null;
+  return s.mode === "geo" ? "Click the land on the globe." : null;
 }
 function cohortHint(s: RailManifestState): string | null {
+  // Explorer-only rung: no 3D cohort exists to click, so naming the row IS the route.
   return s.mode === "geo" ? "Open a city · provider row under a country." : null;
 }
 // Composition is hyper's own middle rung (2026-08-02) — the make-up groups under a network in
-// the explorer. Hyper-only, same allow-list idiom.
+// the explorer. Hyper-only, same allow-list idiom; explorer-only like the cohort above.
 function compositionHint(s: RailManifestState): string | null {
   return s.mode === "hyper" ? "Open a make-up group under a network." : null;
 }
-// A metagraph snapshot is a ledger-only card SLOT (spec 2026-08-04) — not a ladder rung; the
-// routes are the 3D tile and the explorer's metagraph-snapshot rows.
+// A metagraph snapshot is a ledger-only card SLOT (spec 2026-08-04) — not a ladder rung. Naming the
+// STOREY does the work here: the line above it aims at a bar ON the floor, so "a plane above the
+// floor" separates the two subjects and teaches the chamber's two-storey shape in passing.
 function metaSnapHint(s: RailManifestState): string | null {
-  return s.mode === "ledger" ? "Click a tile under a lane, or a snapshot in the explorer." : null;
+  return s.mode === "ledger" ? "Click a tile on a plane above the floor." : null;
 }
 
 // RIGHT rail (Details): FIXED slots in a stable order — the Context dossier, then country,
