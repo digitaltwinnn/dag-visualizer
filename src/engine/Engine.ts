@@ -334,6 +334,7 @@ export class Engine {
         if (this.disposed) return;
         this._devTune = await m.mountDevTune({
           ledger: this.ledger,
+          hyper: this.layers,
           camera: this.ctx.camera,
           controls: this.ctx.controls,
         });

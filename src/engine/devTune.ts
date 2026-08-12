@@ -11,6 +11,8 @@
 // having to track `mode`, subscribe to anything, or rebuild itself. Engine owns mount/dispose.
 import type * as THREE from "three";
 import type { LedgerView } from "./scene/views/LedgerView";
+import type { HyperView } from "./scene/views/HyperView";
+import { TETHER_TUNE_DEFAULTS, TETHER_TUNE_SCHEMA } from "./scene/views/HyperView";
 import { RIBBON_TUNE_DEFAULTS, RIBBON_TUNE_SCHEMA } from "./scene/objects/Ribbons";
 import { BAR_TUNE_DEFAULTS, BAR_TUNE_SCHEMA } from "./scene/objects/ByteBar";
 import { GLOBAL_PLANE_TUNE_DEFAULTS, META_PLANE_TUNE_DEFAULTS, PLANE_TUNE_SCHEMA } from "./scene/objects/SnapshotPlane";
@@ -26,6 +28,7 @@ import {
 
 export interface DevTuneTargets {
   ledger: LedgerView;
+  hyper: HyperView;
   camera: THREE.PerspectiveCamera;
   controls: { target: THREE.Vector3 };
 }
@@ -36,7 +39,7 @@ export interface DevTuneHandle {
 
 export async function mountDevTune(targets: DevTuneTargets): Promise<DevTuneHandle> {
   const { Pane } = await import("tweakpane");
-  const { ledger, camera, controls } = targets;
+  const { ledger, hyper, camera, controls } = targets;
 
   // ---- the manifest ---------------------------------------------------------------------------
   // Shared groups: these shape EVERY view, so they sit above the per-view folders. Emphasis is
@@ -75,7 +78,20 @@ export async function mountDevTune(targets: DevTuneTargets): Promise<DevTuneHand
   });
 
   const perView: Record<string, TuneGroup[]> = {
-    hyper: [focusGroup("hyper"), spotGroup("hyper")],
+    hyper: [
+      focusGroup("hyper"),
+      spotGroup("hyper"),
+      {
+        title: "tethers",
+        values: hyper.tetherTune,
+        defaults: TETHER_TUNE_DEFAULTS,
+        schema: TETHER_TUNE_SCHEMA,
+        // The tip fades and the colour run are baked into vertex colours — re-bake on a change.
+        // (`restOp` alone is read per frame, but one re-bake per edit costs nothing.)
+        onChange: () => hyper.setTetherTune({}),
+        home: "scene/views/HyperView.ts · TETHER_TUNE_DEFAULTS",
+      },
+    ],
     geo: [focusGroup("geo"), spotGroup("geo")],
     // Almost every dim number is read per frame, so the group needs no onChange — EXCEPT the
     // ledger's `dim`, which the ribbons bake into their vertex colours. Re-push the sheet there.
