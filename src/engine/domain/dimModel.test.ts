@@ -219,8 +219,8 @@ describe("snapFocusOf (a row's focus reaches the committed network only)", () =>
 });
 
 describe("focusDim / focusBoost (per-view hover/selection strength)", () => {
-  it("focusDim: hyper 0.45 · geo 0.65 · ledger 0.55", () => {
-    expect(focusDim(ctx({ morph: 0 }))).toBeCloseTo(0.45, 10);
+  it("focusDim: hyper 0.22 · geo 0.65 · ledger 0.55", () => {
+    expect(focusDim(ctx({ morph: 0 }))).toBeCloseTo(0.22, 10);
     expect(focusDim(ctx({ morph: 1 }))).toBeCloseTo(0.65, 10);
     expect(focusDim(ctx({ morph: 0, ledger: true }))).toBeCloseTo(0.55, 10);
   });
@@ -266,10 +266,10 @@ describe("focusWeightOf / GROUP_FOCUS (the focus ranking)", () => {
   });
 });
 
-describe("ancestryGlow (a committed group yields its glow to a committed node)", () => {
+describe("ancestryGlow (a committed group yields its glow to the finer node subject)", () => {
   const cohort = new Set(["a", "b", "c"]);
 
-  it("passes the group through while it IS the finest committed rung", () => {
+  it("passes the group through while it IS the finest rung in play", () => {
     expect(ancestryGlow(cohort, null)).toBe(cohort);
   });
 
@@ -277,6 +277,13 @@ describe("ancestryGlow (a committed group yields its glow to a committed node)",
     expect(ancestryGlow(cohort, "a")).toBeNull();
     // even a node OUTSIDE the group: the finest rung is what the glow answers to
     expect(ancestryGlow(cohort, "z")).toBeNull();
+  });
+
+  // user, 2026-08-12: expanding a group row commits it, so hovering a node inside the open row
+  // lit the whole group AND the node. A hover previews the commit, and the commit collapses this
+  // glow — so the hover must collapse it too. The call site passes selectedNodeId ?? hoverNodeId.
+  it("yields to a HOVERED node the same way, so the hover previews the click", () => {
+    expect(ancestryGlow(cohort, "b")).toBeNull();
   });
 
   it("is null-safe, so a caller can chain it with ?? without a pre-check", () => {
@@ -433,10 +440,10 @@ describe("nodeEmissive", () => {
     expect(nodeEmissive(c, 0, 0, 1, true)).toBeCloseTo(base + 1.4, 10);
   });
 
-  it("dims a non-focused node by *0.45 only when anyFocus is set", () => {
+  it("dims a non-focused node by *0.22 only when anyFocus is set", () => {
     const c = ctx({ morph: 0 });
     const base = nodeEmissive(c, 0, 0, 0, false);
-    expect(nodeEmissive(c, 0, 0, 0, true)).toBeCloseTo(base * 0.45, 10);
+    expect(nodeEmissive(c, 0, 0, 0, true)).toBeCloseTo(base * 0.22, 10);
   });
 
   it("does nothing extra when there's no focus target at all (isFocus and anyFocus both false)", () => {
@@ -497,14 +504,17 @@ describe("FOCUS_TUNE", () => {
   });
 
   // The defaults must reproduce the ORIGINAL literal formulas exactly, at every morph — the
-  // refactor renamed the endpoints, it did not retune anything. The one deliberate exception is
-  // the metagraph pool, whose `meta` ramp is GONE by design (see the ONE NODE MODEL header): both
-  // pools now read this one `dim` row, so there is no second formula left to reproduce.
+  // refactor renamed the endpoints, it did not retune anything. Two deliberate exceptions, and
+  // a value only belongs here once it is named as one: the metagraph pool, whose `meta` ramp is
+  // GONE by design (see the ONE NODE MODEL header), so both pools now read this one `dim` row
+  // and there is no second formula left to reproduce; and hyper's `back`, retuned 0.45 → 0.22
+  // from a ?tune session (user, 2026-08-12) so a focused node in hyper reads against a darker
+  // field. Geo and the ledger are untouched, which is why only the hyper endpoint moves.
   it("reproduces the pre-refactor formulas at every morph", () => {
     for (const morph of [0, 0.1, 0.25, 0.5, 0.75, 0.9, 1]) {
       const c = ctx({ morph });
       expect(nodeDimScale(c)).toBeCloseTo(0.32 + 0.68 * morph, 10);
-      expect(focusDim(c)).toBeCloseTo(0.45 + 0.2 * morph, 10);
+      expect(focusDim(c)).toBeCloseTo(0.22 + 0.43 * morph, 10);
       expect(focusBoost(c)).toBeCloseTo(1.4 - 0.7 * morph, 10);
     }
   });

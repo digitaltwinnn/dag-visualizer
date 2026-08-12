@@ -1044,9 +1044,14 @@ export class Globe implements GeoViewHost {
     // ANCESTRY kinds are the ones gated by dimModel.ancestryGlow (that function is the rule); the
     // signer set sits OUTSIDE the gate because it is not ancestry — it is a relation from a
     // different subject, the selected metagraph snapshot — so it never yields to a node.
+    // The gate's node subject is the committed node OR the hovered one: a hover previews the
+    // commit, and committing a node collapses the borrowed glow (user, 2026-08-12).
     c.hoverCohort =
       this._hoverCohort ??
-      ancestryGlow(this._selCohortIds ?? this._selGroupIds, this._selectedNodeId) ??
+      ancestryGlow(
+        this._selCohortIds ?? this._selGroupIds,
+        this._selectedNodeId ?? this._hoverNodeId,
+      ) ??
       this._signerIds;
     c.selectedNodeId = this._selectedNodeId;
     c.filter = this.filter;
