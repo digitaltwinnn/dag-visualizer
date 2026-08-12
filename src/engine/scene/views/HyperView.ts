@@ -29,7 +29,7 @@ const _tend = new THREE.Color(); // ditto — the hub-end identity colour
 // opacity, which is the boring version and also the WRONG one: ten flat lines converging on the
 // core pile into a knot exactly where the brightest object in the view already is, and each one
 // ends by stabbing its hub's orb. Subdividing it buys a per-vertex ALPHA PROFILE that fixes both
-// ends — a long fade out of the core (the knot dissolves) and a short one into the hub (the line
+// ends — a fade up out of the core (the knot dissolves) and a shorter one into the hub (the line
 // lands in the orb instead of hitting it) — plus a colour run from the structural core blue toward
 // the metagraph's own identity hue, so the line says WHOSE tether it is on its way out.
 //
@@ -52,15 +52,17 @@ export interface TetherTune {
   coreFade: number; // fraction of the run spent fading UP out of the core (kills the convergence knot)
   hubFade: number;  // fraction spent fading DOWN into the hub orb
   identity: number; // 0 = core blue all the way, 1 = full identity hue at the hub end
+  hueRun: number;   // fraction of the run (from the hub back) that carries the FULL identity hue
   brightness: number; // vertex-colour multiplier (additive blending → perceived brightness)
 }
 
 export const TETHER_TUNE_DEFAULTS: TetherTune = {
   restOp: 0.34,
-  coreFade: 0.58,
+  coreFade: 0.25,
   hubFade: 0.14,
-  identity: 0.85,
-  brightness: 1,
+  identity: 1,
+  hueRun: 0.45,
+  brightness: 0.7,
 };
 
 /** The `?tune` knob ranges (contract: src/engine/tune.ts) — colocated so a range sits next to the
@@ -70,6 +72,7 @@ export const TETHER_TUNE_SCHEMA: TuneSchema<TetherTune> = {
   coreFade: { min: 0, max: 0.9, step: 0.01, label: "fade from core" },
   hubFade: { min: 0, max: 0.5, step: 0.01, label: "fade into hub" },
   identity: { min: 0, max: 1, step: 0.05, label: "identity hue" },
+  hueRun: { min: 0, max: 0.9, step: 0.01, label: "identity run" },
   brightness: { min: 0.1, max: 2, step: 0.05 },
 };
 
@@ -405,23 +408,25 @@ export class HyperView implements SceneView {
   // fades. Baked, not per-frame: nothing here moves. (Not a `_write*`/`_apply*` name on purpose —
   // this is event-time work, outside the render loop rule 5 polices.)
   private _bakeTether(m: MetaHubRec) {
-    const { coreFade, hubFade, identity, brightness } = this.tetherTune;
+    const { coreFade, hubFade, identity, hueRun, brightness } = this.tetherTune;
     _tcol.setHex(this._core);
     _tend.setHex((this.sceneColors && this.sceneColors[m.cfg.id]) ?? m.cfg.color);
     const col = m.tether.geometry.attributes.color as THREE.BufferAttribute;
+    // The handover is a CROSSOVER BAND, not a ramp over the whole run. The lerp is straight RGB and
+    // blue→orange in RGB passes through GREY — measured live, a `t^1.5` ramp made the entire middle
+    // of the line a pale wire, and the `t^4` that fixed that left the identity hue with only the
+    // last tenth. A band gives both: `hueRun` is how much of the line (from the hub back) is FULLY
+    // the metagraph's hue, and the desaturated crossing is squeezed into the half-width just before
+    // it. Extending the run therefore moves the grey band toward the core rather than widening it.
+    const hueEnd = 1 - hueRun;              // fully identity from here to the hub
+    const hueStart = Math.max(0, hueEnd - hueRun * 0.5); // …handing over across this band
     for (let j = 0; j <= TETHER_SEG; j++) {
       const t = TETHER_F[j];
-      // Colour: hold the core blue for most of the run and hand over LATE. The handover is a
-      // straight RGB lerp, and blue→orange in RGB passes through GREY — measured live, a gentle
-      // `t^1.5` ramp made the whole middle of the line a pale wire (which is what "boring" looked
-      // like). `t^4` keeps the desaturated crossing short and puts it where the hub fade is already
-      // taking the line down, so what reads is: structural blue, then the metagraph's own hue as it
-      // lands.
-      const mix = t * t * t * t * identity;
+      const mix = smoothstep(hueStart, hueEnd, t) * identity;
       const r = _tcol.r + (_tend.r - _tcol.r) * mix;
       const g = _tcol.g + (_tend.g - _tcol.g) * mix;
       const b = _tcol.b + (_tend.b - _tcol.b) * mix;
-      // Long fade UP out of the core (dissolves the knot where ten tethers meet), short fade DOWN
+      // Fade UP out of the core (dissolves the knot where ten tethers meet), fade DOWN
       // into the hub (the line lands in the orb instead of stabbing it).
       const a = smoothstep(0, coreFade, t) * smoothstep(0, hubFade, 1 - t) * brightness;
       col.setXYZ(j, r * a, g * a, b * a);
