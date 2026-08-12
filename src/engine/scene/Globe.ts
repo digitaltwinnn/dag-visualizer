@@ -248,14 +248,17 @@ export class Globe implements GeoViewHost {
   setSimFlags(sims: { arcs: boolean; globeSpin: boolean }): void {
     this.simArcs = sims.arcs;
     this.simSpin = sims.globeSpin;
-    // Spin OFF (hyper): the redesigned TILTED node rings register with the Hypergraph's cyan hoops.
-    // Tilt the whole node group by HYPER_TILT so the near-flat ring layout reads top-down from the
-    // SHARED overview camera (HyperView tilts root + coreGroup by the same angle, so nodes + hoops
-    // stay registered). A leftover geo rotation would otherwise offset them.
-    if (!this.simSpin && !this.ledger) {
-      this.spin = null;
-      applyHyperRig(this.group, 0);
-    }
+    // ⚠️ THE GATES FLIP HERE, THE ORIENTATION DOES NOT (user, 2026-08-12 — "when we switch from geo
+    // to another view, the globe rotation changes before it fades"). This used to hard-write hyper's
+    // Euler rig the moment `globeSpin` dropped, and the Engine calls it at switch time, one phase
+    // BEFORE the choreography's boundary — so leaving geo for ANY view (hyper, ledger, or a flat
+    // one, since all three drop the flag and `this.ledger` is still false until the boundary applies
+    // that layout) re-posed the globe on the first frame of the still-visible OUT phase.
+    // The rig belongs where the destination's other frame state already lands: `setHyperSpin` below,
+    // which _applyBoundary calls with the nodes gathered and both furnitures dark, and which the
+    // Engine then re-asserts every hyper frame. Ledger zeroes its own rotation in updateRotation,
+    // and a flat view draws nothing to orient. Same rule as the camera hold (viewTransition
+    // .holdCamera) and the _integrateMotion guard that fixed this bug's sibling half.
   }
 
   // Set the hyper-structure spin: the node group is tilted by HYPER_TILT and spun about its own
@@ -264,7 +267,13 @@ export class Globe implements GeoViewHost {
   setHyperSpin(y: number, tiltX: number = HYPER_TILT): void {
     // `tiltX` is the Engine-eased shared structure tilt: HYPER_TILT at rest, easing to
     // HYPER_TILT_FOCUS while a metagraph is committed (discs read horizontal from the side).
-    if (!this.simSpin && !this.ledger) applyHyperRig(this.group, y, tiltX);
+    if (this.simSpin || this.ledger) return;
+    // The rig OWNS the group's orientation while it applies, so a geo focus tween is dropped as it
+    // takes over — `updateRotation`'s `else if (this.spin)` branch runs ahead of nothing here and
+    // would overwrite the rig with the drill's own longitude on the very next frame. Dropping it at
+    // the handover (rather than at switch time) is what lets the drill keep easing through the fade.
+    this.spin = null;
+    applyHyperRig(this.group, y, tiltX);
   }
 
   // The wall is always the structural accent (the geo hologram hue). Kept as a setter so the Engine
