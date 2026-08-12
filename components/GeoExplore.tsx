@@ -152,9 +152,16 @@ export default function GeoExplore() {
         // vitals now; this card is purely the country→nodes accordion. The usage hint LEADS
         // the card (user, 2026-07-12 — a bottom hint read as an afterthought) and says what
         // the card holds, not just the click. Quiet-empty has nothing to browse — no hint.
+        //
+        // ⚠️ ONE HINT SHAPE ACROSS ALL THREE EXPLORERS (user, 2026-08-12): what the card holds
+        // and its ordering, then "open one for <what the next level down shows>". Geo was the
+        // odd one out — it named its rows but not what opening one gets you, so the card said
+        // less than hyper's and the ledger's about the same gesture. The second half must name
+        // the CHILD ROWS, which here are cohorts (city × provider), not the nodes two levels
+        // down; a hint that skips a rung misdescribes the click it is explaining.
         quietEmpty
           ? null
-          : "Every country hosting nodes, busiest first."
+          : "Every country hosting nodes, busiest first — open one for the cities and providers behind them."
       }
     >
       {quietEmpty ? (

@@ -43,6 +43,15 @@ export default function ExplorerShell({
   title: ReactNode;
   // The leading usage-hint line (geo's "hover or click one to see…" copy). `null` renders no
   // hint line at all (GeoExplore's quiet-empty state, which has nothing to browse yet).
+  //
+  // ⚠️ ONE SHAPE, ALL THREE EXPLORERS (user, 2026-08-12 — "apply this approach consistently"):
+  // **what the card holds and its ordering — "open one for" what the next level down shows.**
+  // Both halves are load-bearing. The ordering is a fact about the list the reader can't get any
+  // other way (hyper was silently sorted by fleet size and said so nowhere), and the "open one
+  // for" half is what makes the row's disclosure worth using — geo named its rows and stopped,
+  // so the same gesture was explained in one view and not the other. The second half names the
+  // CHILD ROWS, never the leaf two rungs down: geo opens onto cohorts (city × provider), not
+  // nodes, and a hint that skips a rung misdescribes the click it exists to explain.
   hint: ReactNode | null;
   // Container-level hover cleanup — see the file comment. Optional: most explorers' committed
   // rows stay rendered after a click (no self-unmount hazard), so most callers omit it.
