@@ -144,9 +144,10 @@ import { useBreakpoint } from "@/components/useBreakpoint";
 // sentence not spent explaining — expensive against the length ceiling above. Swept from all six on
 // the same pass: geo's "a choice it made, not a rule it followed" (rhetorical antithesis arguing a
 // point instead of stating one) and the ledger's "say just as much about" (comparative flourish) went
-// with it. The line the sweep deliberately SPARED is "the thing to watch" in status and staking:
+// with it. The line the sweep deliberately SPARED was "the thing to watch" in status and staking:
 // telling the reader what to look at is orientation, which is the card's actual job — the test is
-// whether a sentence points at the VIEW or at the writing.
+// whether a sentence points at the VIEW or at the writing. (Both are gone now for a different
+// reason, under the placeholder rule below: there is no view yet to point at.)
 // ⚠️ PLAIN SENTENCES, NO DASH CLAUSE (user, 2026-08-12 — "remove the - text that ai often uses and
 // more common human writing style"). Five of the six cards hung a second clause off an em dash, which
 // is the tell people read as machine-written; it is also the lazy join, because the dash lets a
@@ -220,6 +221,28 @@ import { useBreakpoint } from "@/components/useBreakpoint";
 // looks like does the looking FOR them, and it also dates badly, since a gap is only visible at the
 // window and scale the chamber happens to be showing. Three axes stated plainly — frequency, size,
 // shape — and the reader finds them on screen. Sibling of the no-meta-commentary rule above.
+//
+// ⚠️ A PLACEHOLDER VIEW'S CARD SAYS "STAY TUNED." AND NOTHING ELSE (user, 2026-08-12 — "for the
+// descriptive text just say 'stay tuned'"). status, transactions and staking each carried two
+// paragraphs describing a view that does not exist: node states and version spread, tracing a
+// transaction end to end, rewards flowing back. Every one of them was a promise, and an About card
+// is supposed to ORIENT the reader in what is on screen — behind a `preview · in development`
+// wireframe there is nothing to orient in, so the words were describing a design instead. It is the
+// same honesty rule that keeps the Blueprint free of numbers: absent is an instrument state, not
+// something to fill in. The TITLE still names the subject, so the slot reads as a plan rather than a
+// blank, and the `SOON` caption already carries the status.
+// ⚠️ AND A TITLE IS A STATEMENT, NEVER A QUESTION (user, 2026-08-12 — "no questionmark in the
+// header"). status asked "Is the network healthy?" while its five siblings named their subject flat,
+// so one card in six interviewed the reader. The set is now one wh-series — How / Where / When / How
+// / What / Who — which is also what makes a title carry the opening move (the rule above): a
+// question defers the subject to the answer, and the card's first paragraph then has to spend a
+// clause supplying it.
+// ⚠️ AND THE TWO REMAINING TITLES NAME THE THING, NOT THE ABSTRACTION (user, 2026-08-12 — *"'How
+// value moves' is a bit unclear"*). It was a paraphrase of a concrete noun the view will be full of:
+// transactions. "What transactions are happening" costs three words and needs no unpacking. staking
+// takes the same treatment through its own concrete verb — DELEGATION is the act $DAG holders
+// perform and the word the protocol uses, so "Who delegates to which nodes" says what "Who backs the
+// nodes" was gesturing at, and names both sides of the relation the view will draw.
 const ABOUT: Record<Mode, { title: string; eyebrow: string; lines: string[]; caption?: string }> = {
   hyper: {
     title: "How the network is built",
@@ -249,31 +272,22 @@ const ABOUT: Record<Mode, { title: string; eyebrow: string; lines: string[]; cap
     ],
   },
   status: {
-    title: "Is the network healthy?",
+    title: "How healthy the network is",
     eyebrow: "About",
     caption: "SOON",
-    lines: [
-      "Whether the network is healthy right now, and where any trouble is: node uptime, what state each node is in, and how far the software versions have drifted apart.",
-      "Version spread is the quiet one to watch: a network running several releases at once is mid-upgrade, or stuck.",
-    ],
+    lines: ["Stay tuned."],
   },
   transactions: {
-    title: "How value moves",
+    title: "What transactions are happening",
     eyebrow: "About",
     caption: "SOON",
-    lines: [
-      "Value moving between addresses as it happens, in $DAG and in the metagraphs' own currencies.",
-      "Trace a single transaction end to end, or read the totals: how much moved, and how many addresses were active.",
-    ],
+    lines: ["Stay tuned."],
   },
   staking: {
-    title: "Who backs the nodes",
+    title: "Who delegates to which nodes",
     eyebrow: "About",
     caption: "SOON",
-    lines: [
-      "Who is backing which nodes: how much $DAG is delegated, where it is staked, and the rewards flowing back.",
-      "Stake is consensus weight, so the thing to watch is how it concentrates, and whether that is shifting.",
-    ],
+    lines: ["Stay tuned."],
   },
 };
 
