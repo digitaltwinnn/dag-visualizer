@@ -86,7 +86,7 @@ export async function mountDevTune(targets: DevTuneTargets): Promise<DevTuneHand
         values: hyper.tetherTune,
         defaults: TETHER_TUNE_DEFAULTS,
         schema: TETHER_TUNE_SCHEMA,
-        // The tip fades and the colour run are baked into vertex colours — re-bake on a change.
+        // The tip fades are baked into the shared vertex-colour attribute — re-bake on a change.
         // (`restOp` alone is read per frame, but one re-bake per edit costs nothing.)
         onChange: () => hyper.setTetherTune({}),
         home: "scene/views/HyperView.ts · TETHER_TUNE_DEFAULTS",

@@ -22,7 +22,6 @@ import type { SceneView } from "./SceneView";
 
 const _pos = new THREE.Vector3(); // scratch for hub orbit positions (reused each frame)
 const _tcol = new THREE.Color(); // scratch for the tether colour bake (event-time, reused)
-const _tend = new THREE.Color(); // ditto — the hub-end identity colour
 
 // ---------------------------------------------------------------- the tether
 // The line from the DAG core out to each metagraph hub. It was ONE straight segment at a flat 0.22
@@ -30,12 +29,17 @@ const _tend = new THREE.Color(); // ditto — the hub-end identity colour
 // core pile into a knot exactly where the brightest object in the view already is, and each one
 // ends by stabbing its hub's orb. Subdividing it buys a per-vertex ALPHA PROFILE that fixes both
 // ends — a fade up out of the core (the knot dissolves) and a shorter one into the hub (the line
-// lands in the orb instead of hitting it) — plus a colour run from the structural core blue toward
-// the metagraph's own identity hue, so the line says WHOSE tether it is on its way out.
+// lands in the orb instead of hitting it).
+//
+// It carries NO identity hue. A run of the metagraph's own colour along the outer half was built
+// and RETIRED (user, 2026-08-12): the hub it lands on already wears that hue, so the line only
+// restated it — ten coloured wires crossing the same frame, adding noise and no fact. What is left
+// is one structural blue for every tether, which is what the line is actually about: the core.
 //
 // Positions stay pure lerps of the hub position, so the per-frame write is `hubPos × f` with `f`
 // precomputed below: one multiply per vertex, no allocation (rule 5). The COLOURS are baked once
-// (and on a ?tune edit — hence the group's onChange), because nothing about them moves.
+// (and on a ?tune edit — hence the group's onChange), because nothing about them moves. Every
+// tether's profile is identical, so the ten geometries SHARE one colour attribute.
 const TETHER_SEG = 24;
 /** `j / TETHER_SEG` for every vertex — the lerp fraction along core → hub, precomputed once. */
 const TETHER_F = new Float32Array(TETHER_SEG + 1).map((_, j) => j / TETHER_SEG);
@@ -51,8 +55,6 @@ export interface TetherTune {
   restOp: number;   // resting line opacity (× the per-hub fades) — the pre-existing 0.22
   coreFade: number; // fraction of the run spent fading UP out of the core (kills the convergence knot)
   hubFade: number;  // fraction spent fading DOWN into the hub orb
-  identity: number; // 0 = core blue all the way, 1 = full identity hue at the hub end
-  hueRun: number;   // fraction of the run (from the hub back) that carries the FULL identity hue
   brightness: number; // vertex-colour multiplier (additive blending → perceived brightness)
 }
 
@@ -60,8 +62,6 @@ export const TETHER_TUNE_DEFAULTS: TetherTune = {
   restOp: 0.34,
   coreFade: 0.25,
   hubFade: 0.14,
-  identity: 1,
-  hueRun: 0.45,
   brightness: 0.7,
 };
 
@@ -71,8 +71,6 @@ export const TETHER_TUNE_SCHEMA: TuneSchema<TetherTune> = {
   restOp: { min: 0, max: 1, step: 0.01, label: "opacity" },
   coreFade: { min: 0, max: 0.9, step: 0.01, label: "fade from core" },
   hubFade: { min: 0, max: 0.5, step: 0.01, label: "fade into hub" },
-  identity: { min: 0, max: 1, step: 0.05, label: "identity hue" },
-  hueRun: { min: 0, max: 0.9, step: 0.01, label: "identity run" },
   brightness: { min: 0.1, max: 2, step: 0.05 },
 };
 
@@ -181,6 +179,8 @@ export class HyperView implements SceneView {
   private _fades = new FadeSet();
   /** The live look of the core→hub tethers. Baked into vertex colours, so a `?tune` edit re-bakes. */
   tetherTune: TetherTune = { ...TETHER_TUNE_DEFAULTS };
+  /** The one baked tip-fade profile every tether's geometry references (see the block up top). */
+  private _tetherCol = new THREE.Float32BufferAttribute(new Float32Array((TETHER_SEG + 1) * 3), 3);
 
   // `sceneColors` (id -> 0xRRGGBB) is the identity SCENE-lane colour map (Task 3), handed in by
   // the Engine at construction — HyperView builds all its hubs synchronously from
@@ -356,7 +356,7 @@ export class HyperView implements SceneView {
       const tPos = new THREE.Float32BufferAttribute(new Float32Array((TETHER_SEG + 1) * 3), 3);
       tPos.setUsage(THREE.DynamicDrawUsage); // rewritten every frame as the hub orbits
       tGeo.setAttribute("position", tPos);
-      tGeo.setAttribute("color", new THREE.Float32BufferAttribute(new Float32Array((TETHER_SEG + 1) * 3), 3));
+      tGeo.setAttribute("color", this._tetherCol);
       const tether = new THREE.Line(
         tGeo,
         new THREE.LineBasicMaterial({
@@ -389,11 +389,6 @@ export class HyperView implements SceneView {
     });
   }
 
-  /** Re-bake every tether's vertex colours (construction, and on a `?tune` edit). */
-  private _bakeTethers() {
-    for (const m of this.metas) this._bakeTether(m);
-  }
-
   /** Apply the tune knobs (see TETHER_TUNE_DEFAULTS) to the tether's baked look.
    *  `setTetherTune({})` re-bakes with the values the panel has already mutated in place. */
   setTetherTune(t: Partial<TetherTune>) {
@@ -401,35 +396,22 @@ export class HyperView implements SceneView {
     this._bakeTethers();
   }
 
-  // One tether's colour attribute: a run from the core's structural blue toward the metagraph's own
-  // identity hue, multiplied by the tip-fade profile. The ALPHA lives in the colour rather than in a
-  // per-vertex alpha because the material blends ADDITIVELY — black IS invisible there — which keeps
-  // the whole profile in one attribute and the material's own `opacity` free to carry the per-frame
-  // fades. Baked, not per-frame: nothing here moves. (Not a `_write*`/`_apply*` name on purpose —
-  // this is event-time work, outside the render loop rule 5 polices.)
-  private _bakeTether(m: MetaHubRec) {
-    const { coreFade, hubFade, identity, hueRun, brightness } = this.tetherTune;
+  // The tether colour attribute — the core's structural blue at the tip-fade profile, ONE buffer
+  // shared by all ten lines (identical profiles; only the endpoints differ). The ALPHA lives in the
+  // colour rather than in a per-vertex alpha because the material blends ADDITIVELY — black IS
+  // invisible there — which keeps the whole profile in one attribute and the material's own
+  // `opacity` free to carry the per-frame fades. Baked, not per-frame: nothing here moves. (Not a
+  // `_write*`/`_apply*` name on purpose — event-time work, outside the render loop rule 5 polices.)
+  private _bakeTethers() {
+    const { coreFade, hubFade, brightness } = this.tetherTune;
     _tcol.setHex(this._core);
-    _tend.setHex((this.sceneColors && this.sceneColors[m.cfg.id]) ?? m.cfg.color);
-    const col = m.tether.geometry.attributes.color as THREE.BufferAttribute;
-    // The handover is a CROSSOVER BAND, not a ramp over the whole run. The lerp is straight RGB and
-    // blue→orange in RGB passes through GREY — measured live, a `t^1.5` ramp made the entire middle
-    // of the line a pale wire, and the `t^4` that fixed that left the identity hue with only the
-    // last tenth. A band gives both: `hueRun` is how much of the line (from the hub back) is FULLY
-    // the metagraph's hue, and the desaturated crossing is squeezed into the half-width just before
-    // it. Extending the run therefore moves the grey band toward the core rather than widening it.
-    const hueEnd = 1 - hueRun;              // fully identity from here to the hub
-    const hueStart = Math.max(0, hueEnd - hueRun * 0.5); // …handing over across this band
+    const col = this._tetherCol;
     for (let j = 0; j <= TETHER_SEG; j++) {
       const t = TETHER_F[j];
-      const mix = smoothstep(hueStart, hueEnd, t) * identity;
-      const r = _tcol.r + (_tend.r - _tcol.r) * mix;
-      const g = _tcol.g + (_tend.g - _tcol.g) * mix;
-      const b = _tcol.b + (_tend.b - _tcol.b) * mix;
       // Fade UP out of the core (dissolves the knot where ten tethers meet), fade DOWN
       // into the hub (the line lands in the orb instead of stabbing it).
       const a = smoothstep(0, coreFade, t) * smoothstep(0, hubFade, 1 - t) * brightness;
-      col.setXYZ(j, r * a, g * a, b * a);
+      col.setXYZ(j, _tcol.r * a, _tcol.g * a, _tcol.b * a);
     }
     col.needsUpdate = true;
   }
@@ -667,8 +649,8 @@ export class HyperView implements SceneView {
       // The tether is a subdivided line from the origin out to the hub, so write every vertex as a
       // lerp of the live hub position (vertex 0 stays at the core). Straight into the existing
       // buffer rather than setFromPoints, which would rebuild the attribute (and drop its GPU
-      // buffer) every frame. The look — the tip fades and the colour run — is BAKED into the vertex
-      // colours (_bakeTether); this only moves the line.
+      // buffer) every frame. The look — the two tip fades — is BAKED into the shared vertex-colour
+      // attribute (_bakeTethers); this only moves the line.
       const tetherPos = m.tether.geometry.attributes.position;
       for (let j = 1; j <= TETHER_SEG; j++) {
         const f = TETHER_F[j];
