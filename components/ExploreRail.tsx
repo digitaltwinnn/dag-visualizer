@@ -101,14 +101,23 @@ import { useBreakpoint } from "@/components/useBreakpoint";
 // referents — "the base ledger" is the CORE, "a hypergraph" is the WHOLE STRUCTURE — so the word is
 // earned here by being defined in the same breath (many independent ledgers interlinked through one
 // base ledger), never used as a second name for the middle.
-// The WHY is chain-vs-graph and it is the honest scale argument the "not feeless" note demands:
-// a chain confirms in a single line, a graph lets many things advance at once. The app's own data
-// proves it — a snapshot can carry blocks WITHOUT raising `height`, because the block DAG has
-// parallel siblings (see CLAUDE.md's snapshot-stream section). Deliberately NOT spelled out as
-// "directed acyclic graph": "DAG" already means the token and the core network everywhere in this
-// UI (the filter chip, DAG_CFG), so expanding it here would collide with the reader's one meaning.
-// Length: 108 words against the ~100 ceiling below, and it buys the whole explanation because the
-// new first paragraph REPLACES the old one's structure sentence rather than adding to it.
+// The definition IS the explanation, and it opens the card (user, 2026-08-12 — *"start with 'Its
+// shape is a hypergraph: many independent ledgers, interlinked through one base ledger.' I think you
+// can skip the part before that"*). The chain-vs-graph preamble that used to lead ("a chain confirms
+// in one line… a graph lets many things advance at once, which is how this network scales") was two
+// sentences of GENERAL computer science spent before the card said anything about this network, and
+// the reader who needs them is not the reader who opens a hypergraph view. The sentence that survived
+// carries the same load in one line, because "many independent ledgers, interlinked" IS the
+// parallelism the preamble was arguing for. Deliberately NOT spelled out as "directed acyclic graph":
+// "DAG" already means the token and the core network everywhere in this UI (the filter chip,
+// DAG_CFG), so expanding it here would collide with the reader's one meaning.
+//
+// ⚠️ NAME A THING BEFORE SPLITTING IT (user, 2026-08-12 — *"Define 'work'"*). The layers paragraph
+// opened "Work splits across layers", using an abstract noun the card had never introduced and then
+// immediately dividing it; the reader met the split before the thing. It now states what the work IS
+// first — validating what comes in and sealing the result — which also gives the list its shape,
+// since L0 is the layer that performs the seal just named. The definition is free against the length
+// ceiling: cutting the preamble above bought ~25 words and this spends ~11 of them (~87 total).
 //
 // ⚠️ WHAT IS ANCHORED IS DATA, NOT JUST TRANSACTIONS (user, 2026-08-12) — and that is Constellation's
 // actual differentiator, not a detail: a metagraph defines its own data types and validation rules,
@@ -150,23 +159,33 @@ import { useBreakpoint } from "@/components/useBreakpoint";
 // as you already said 'runs only the ones it needs'"). Rewriting a clause is the moment to notice it
 // was redundant: hyper's "currency L1 moves a token — if it has one" restated the qualifier its own
 // sentence opened with, and staking's "which nodes … the nodes it is staked to" named the same nodes
-// twice. Both gone; hyper is ~99 words against the ~100 ceiling, having been 112 before this pass.
+// twice. Both gone.
+//
+// ⚠️ A PRONOUN NEEDS A NOUN IT CAN POINT AT (user, 2026-08-12 — on geo's *"Nothing prescribes either
+// one."*: "that is the start of the new section, what is it talking about?"). "Either one" reached
+// back for two nouns the previous paragraph never actually put on the page: it said nodes are
+// "geolocated to where it actually runs, and the provider hosting it is identified" — a claim about
+// the DATA PIPELINE (we resolved these), not about the two facts themselves, and its active head
+// glued to a passive tail is why it read badly. So the opening line now ENUMERATES the pair it is
+// about ("two things: where it actually runs, and which provider hosts it"), which makes the whole
+// second paragraph resolvable and shortens its opener to "Neither is prescribed." A paragraph that
+// opens on a back-reference is only as clear as the sentence it points at.
 const ABOUT: Record<Mode, { title: string; eyebrow: string; lines: string[]; caption?: string }> = {
   hyper: {
     title: "How the network is built",
     eyebrow: "About",
     lines: [
-      "A chain confirms in one line, everything waiting its turn. A graph lets many things advance at once, which is how this network scales. Its shape is a hypergraph: many independent ledgers, interlinked through one base ledger.",
+      "Its shape is a hypergraph: many independent ledgers, interlinked through one base ledger.",
       "Each of those ledgers is a metagraph, meta because the base keeps a record about its data, never the data itself. Each validates whatever its business runs on.",
-      "Work splits across layers, and a network runs only the ones it needs: L0 seals its own state, data L1 takes in what applications write, currency L1 moves a token. One node can run several.",
+      "The work is validating what comes in and sealing the result. It splits across layers, and a network runs only the ones it needs: L0 seals its own state, data L1 takes in what applications write, currency L1 moves a token. One node can run several.",
     ],
   },
   geo: {
     title: "Where the network runs",
     eyebrow: "About",
     lines: [
-      "Every node here is geolocated to where it actually runs, and the provider hosting it is identified.",
-      "Nothing prescribes either one. Hosts run from the big clouds down to single regional ISPs, and a network's nodes may sit in one country or spread across many. Each network places itself.",
+      "Every node here shows two things: where it actually runs, and which provider hosts it.",
+      "Neither is prescribed. Hosts run from the big clouds down to single regional ISPs, and a network's nodes may sit in one country or spread across many. Each network places itself.",
     ],
   },
   ledger: {
