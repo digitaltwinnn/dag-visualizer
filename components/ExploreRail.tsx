@@ -166,14 +166,20 @@ import { useBreakpoint } from "@/components/useBreakpoint";
 // back for two nouns the previous paragraph never actually put on the page: it said nodes are
 // "geolocated to where it actually runs, and the provider hosting it is identified" — a claim about
 // the DATA PIPELINE (we resolved these), not about the two facts themselves, and its active head
-// glued to a passive tail is why it read badly. So the opening line now ENUMERATES the pair it is
-// about ("two things: where it actually runs, and which provider hosts it"), which makes the whole
-// second paragraph resolvable. A paragraph that opens on a back-reference is only as clear as the
-// sentence it points at — and the cheapest fix for one is to DELETE it: the bridging "Neither is
-// prescribed." was cut outright on 2026-08-12 (user, "skip this line"). It only ever announced what
-// the sentence behind it already demonstrates, since a range from the big clouds down to single
-// regional ISPs IS the absence of a rule. Naming the absence first made the reader hold an
-// abstraction until the evidence arrived.
+// glued to a passive tail is why it read badly. So the opening line names ITS OWN SUBJECT before
+// anything reaches back for it, which makes the whole second paragraph resolvable. A paragraph that
+// opens on a back-reference is only as clear as the sentence it points at — and the cheapest fix for
+// one is to DELETE it: the bridging "Neither is prescribed." was cut outright on 2026-08-12 (user,
+// "skip this line"). It only ever announced what the sentence behind it already demonstrates, since
+// a range from the big clouds down to single regional ISPs IS the absence of a rule. Naming the
+// absence first made the reader hold an abstraction until the evidence arrived.
+// ⚠️ AND THE OPENER STATES THE LOOKUP, NOT A COUNT (user, 2026-08-12 — "it does not show two things,
+// it geolocates the node and looks up additional information (two, three, does not matter)"). The
+// enumerated "two things: where it runs, and which provider hosts it" fixed the referent but paid
+// for it with a number the pipeline does not promise: ONE lookup runs per IP and the card renders
+// whatever it returns — city, country, provider, ASN — so a card that counts to two is wrong the
+// moment a field is added or missing. It names the act and lets the list trail open-ended, which is
+// also the honest version: geolocation is a lookup, not a property a node carries.
 //
 // ⚠️ …AND "EACH NETWORK PLACES ITSELF" NEEDED THE FORCES (user, 2026-08-12 — "extend a little bit on
 // that; so based on their geographic needs (data gravity?), costs (cheap vs preferred or even
@@ -205,7 +211,7 @@ const ABOUT: Record<Mode, { title: string; eyebrow: string; lines: string[]; cap
     title: "Where the network runs",
     eyebrow: "About",
     lines: [
-      "Every node here shows two things: where it actually runs, and which provider hosts it.",
+      "Every node here is geolocated from its IP address, and whatever else that lookup knows comes with it: the city, the country, the provider hosting it.",
       "Hosts run from the big clouds down to single regional ISPs, and a network's nodes may sit in one country or spread across many.",
       "Each network chooses its own placement, on whatever matters to the business it runs: it may want to sit close to the data it serves, some providers are cheaper and some are required, and spreading across providers and regions is what survives one of them failing.",
     ],
