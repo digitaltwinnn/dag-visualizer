@@ -51,13 +51,22 @@ import { useBreakpoint } from "@/components/useBreakpoint";
 // card observing that place and provider are "two separate facts", then inviting a comparison of
 // networks along both — a framing that answers a question nobody asked and never says what the
 // answer would mean. So the "grades nothing" rule is NARROWED to what it was actually about: the
-// decentralization question. The point the view really carries is HOSTING SHAPE, and it is stated
-// plainly at the user's direction. It is also verified rather than plausible (live, 2026-08-12):
-// 162 validators, 9 countries, Hetzner 97 and IONOS 33 leading, and a long tail spanning big clouds
-// (Amazon, DigitalOcean, OVH, Akamai), bare-metal hosts (netcup, Hostinger), enterprise (SunGard)
-// and genuine consumer fibre ISPs (DELTA Fiber, Ezee Fiber, LIWEST, B FIBER) — so "every shape,
-// down to consumer fibre lines" is a reading of the data, not a boast. No COUNT goes in the copy:
-// a hardcoded "9 countries" is exactly the fabricated-once-true number rule 10 forbids.
+// decentralization question. The point the view really carries is that neither place nor host is
+// PRESCRIBED, and the payoff line says exactly that and stops.
+//
+// ⚠️ AND THE EVIDENCE MUST CARRY THE WEIGHT THE SENTENCE PUTS ON IT (user, 2026-08-12 — "why did you
+// suddenly come up with consumer fibre lines? is there any factual data that makes you say this?").
+// There was, and it still didn't support the sentence. Live /api/geo, 2026-08-12: 162 validators over
+// 21 providers, and four of those IPs really are allocated to consumer ISPs (DELTA Fiber Nederland,
+// Ezee Fiber, LIWEST Kabelmedien, B FIBER). But four is 2.5% of the fleet against Hetzner's 97 and
+// IONOS's 33 — 130 of 162 on two German hosts — and an ISP name in a geo lookup identifies the AS an
+// IP is allocated to, not that the machine sits on a domestic line (LIWEST and DELTA sell business
+// connectivity too). "Hosting takes every shape, even consumer fibre lines" therefore made outliers
+// the headline: TRUE ROWS, FALSE PICTURE, which is the same failure as the decentralization claim
+// pointed the other way. What the tail honestly shows is RANGE — big clouds, budget/bare-metal hosts
+// (netcup, Contabo, Hostinger), managed enterprise (SunGard), down to one-off regional ISPs — so the
+// copy says range and nothing more. No COUNT goes in it either: a hardcoded "9 countries" or
+// "21 providers" is exactly the fabricated-once-true number rule 10 forbids, and both move.
 // And paragraph 1 just says what was DONE — geolocated, provider identified — because the previous
 // "sits at the real location it runs from, with the provider named beside it" described a rendering
 // instead of stating a fact (user: "not very clear").
@@ -67,6 +76,22 @@ import { useBreakpoint } from "@/components/useBreakpoint";
 // explanation in the one place a plain phrase would do the work. Same instinct as the "what is meta"
 // correction below: describe the thing, don't name-drop it. The vocabulary rule in CLAUDE.md already
 // prescribes "the base ledger" for the Snapshots stack; this makes hyper agree with it.
+//
+// ⚠️ …AND THE LEDGER CARD JOINS IT TO THE WORD THE SCENE WRITES (user, 2026-08-12 — "still refers to
+// base ledger; in Constellation terminology they often refer to global snapshots, and that's actually
+// written in the scene as well"). Exactly right, and only that one card has the collision: the ledger
+// floor is labelled "Global snapshots" (LEDGER_LAYERS.gl0.name → LedgerView's SnapshotPlane label) and
+// both rail slots say "Global snapshot", so the reader met Constellation's own term everywhere in the
+// view and a second, unexplained phrase in the card meant to orient them. The gloss that once joined
+// the two — gl0's `desc`, which opens "The base ledger." — has had NO renderer since the
+// layer-navigation retirement (2026-08-06), so it reaches nobody.
+// The fix is an EQUIVALENCE, not a replacement, because the two words are not synonyms and the card is
+// the only place both are in scope: the base ledger is the thing, a global snapshot is what it takes.
+// So "takes one global snapshot, anchoring what each network has produced" — Constellation's noun in
+// the reader's sentence, `anchoring` being the vocabulary rule's own verb, and the plain phrase kept
+// for the reader who has never met either. HYPER is deliberately left on the bare "one base ledger":
+// nothing in that view is labelled, so there is no second term to reconcile, and the sentence there is
+// defining the STRUCTURE, not naming the artifact.
 //
 // ⚠️ BUT THE GRAPH ITSELF MUST BE EXPLAINED (user, 2026-08-12 — "now you don't even mention
 // hypergraph and go straight to metagraphs; nothing is explained about what these types of graphs
@@ -118,14 +143,14 @@ const ABOUT: Record<Mode, { title: string; eyebrow: string; lines: string[]; cap
     eyebrow: "About",
     lines: [
       "Every node here is geolocated to where it actually runs, and the provider hosting it identified.",
-      "That hosting takes every shape — rented cloud instances, bare-metal servers, even consumer fibre lines, spread across countries or concentrated in one. Nothing prescribes where a node runs, and that freedom is what lets any network be hosted the way it needs.",
+      "Nothing prescribes either one. The hosts range from the big clouds down to single regional ISPs, and the countries from one nation to a scattering — so where a network sits is a choice it made, not a rule it followed.",
     ],
   },
   ledger: {
     title: "When the network anchors",
     eyebrow: "About",
     lines: [
-      "Every few seconds the base ledger takes in what each network has produced — not just transactions, but whatever that network validates: sensor readings, file fingerprints, a token's balances. Each arrives already sealed, and leaves provable without anyone having to trust who wrote it.",
+      "Every few seconds the base ledger takes one global snapshot, anchoring what each network has produced — not just transactions, but whatever that network validates: sensor readings, file fingerprints, a token's balances. Each arrives already sealed, and leaves provable without anyone having to trust who wrote it.",
       "Which is why what lands here comes in such different sizes and shapes. Busy networks anchor many times a minute and quiet ones leave visible gaps, but the size of each anchor, and the shape of the data inside it, say just as much about the problem that network solves.",
     ],
   },
