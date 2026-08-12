@@ -31,7 +31,7 @@
 // behaviour must match js/ledger.js exactly since Task 13 will diff against it).
 
 import { METAGRAPHS } from "../config";
-import { ledgerSite, LEAD_X } from "./ledgerLayout";
+import { ledgerSite, lanePlaneHalf, LEAD_X } from "./ledgerLayout";
 import { UNLISTED_KEY } from "./ledgerBands";
 import type { GlobalSnapshot, Anchor } from "@/src/data/types";
 
@@ -47,9 +47,15 @@ export const SLOT_N = 9; // js/ledger.js:42 — visible blocks per chain
 export const BLOCK_SIZE = 0.48; // max size of an individual metagraph-snapshot tile (a 0.72 bump
   // was tried and reverted the same day, 2026-08-07; originally 0.34)
 
-// js/ledger.js:45 — Z width of one lane (the grid's depth budget for anchorTiles), derived from
-// ledgerSite exactly as the source does (shared by the whole METAGRAPHS roster, not per-lane).
-export const LANE_GAP_Z = Math.abs(ledgerSite(1, LANE_IDS.length).z - ledgerSite(0, LANE_IDS.length).z);
+// The grid's DEPTH BUDGET: the width of the glass plane a lane's tiles actually rest on — NOT the
+// lane's centre-to-centre spacing (user, 2026-08-12: "the tiles are a bit too large (for DOR)").
+// Those are different numbers, because `lanePlaneHalf` insets each plane by half of LANE_PLANE_GAP
+// so neighbouring planes never touch. Budgeting against the spacing (2.48 at the shipped roster,
+// vs the plane's 1.88) planned a grid 32% wider than its own surface: from count 9 up, DOR's tiles
+// hung off the glass on both sides. Sizes and offsets alike are in DRAWN units now, so LedgerView
+// places `oz` as-is — the previous partial rescale there corrected the positions onto the lane's
+// slice while leaving `size` computed against a pitch nothing ever draws.
+export const LANE_GRID_Z = 2 * lanePlaneHalf(LANE_IDS.length);
 
 // js/ledger.js:53 verbatim — recency fade: 1 at the freshest completed slot, 0 by the oldest visible.
 export const slotFade = (slot: number): number => Math.min(1, Math.max(0, 1 - (slot - 1) / (SLOT_N - 1)));
@@ -96,9 +102,9 @@ export interface TileSpec {
 // touches the neighbouring tick/lane. The k=0 tile carries the single anchor link.
 export function anchorTiles(count: number): TileSpec[] {
   if (count <= 1) return [{ ox: 0, oz: 0, size: BLOCK_SIZE, link: true }];
-  const cols = Math.min(count, Math.max(1, Math.round(Math.sqrt(count * (SLOT_SP / LANE_GAP_Z)))));
+  const cols = Math.min(count, Math.max(1, Math.round(Math.sqrt(count * (SLOT_SP / LANE_GRID_Z)))));
   const rows = Math.ceil(count / cols);
-  const stepX = SLOT_SP / cols, stepZ = LANE_GAP_Z / rows; // uniform pitch -> consistent gaps everywhere
+  const stepX = SLOT_SP / cols, stepZ = LANE_GRID_Z / rows; // uniform pitch -> consistent gaps everywhere
   const size = Math.min(BLOCK_SIZE, 0.7 * Math.min(stepX, stepZ));
   const x0 = -((cols - 1) * stepX) / 2, z0 = -((rows - 1) * stepZ) / 2;
   const tiles: TileSpec[] = [];

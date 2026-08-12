@@ -39,7 +39,7 @@ import {
   type RailGroup,
 } from "../../domain/ledgerLayout";
 import type { SceneColors } from "../../sceneColors";
-import { LedgerModel, LANE_IDS, SLOT_SP, SLOT_N, LANE_GAP_Z, HORIZON_X, HORIZON_SPAN, horizonAt } from "../../domain/ledgerModel";
+import { LedgerModel, LANE_IDS, SLOT_SP, SLOT_N, HORIZON_X, HORIZON_SPAN, horizonAt } from "../../domain/ledgerModel";
 import { makeBarSpec, fillBarSpec, UNLISTED_KEY, type BarSpec } from "../../domain/ledgerBands";
 import type { ContainerSpec } from "../../domain/ledgerRails";
 import type {
@@ -166,7 +166,6 @@ export class LedgerView implements SceneView {
   // (ledgerModel.LANE_IDS): every listed metagraph plus the "unknown" lane at the screen-left end.
   private readonly _laneOrder: string[] = [...LANE_IDS];
   private readonly _laneZ = new Map<string, number>();
-  private readonly _laneHZ = new Map<string, number>();
   /** Ribbons' lane resolver. The lane field is FIXED now (user reversal 2026-08-07 — a filter
    *  dims, it never hides/moves lanes), so every roster key resolves. */
   private readonly _laneZOf = (key: string): number | null => this._laneZ.get(key) ?? null;
@@ -425,8 +424,6 @@ export class LedgerView implements SceneView {
       const s = laneSpan(i, n);
       const key = this._laneOrder[i];
       this._laneZ.set(key, s.cz);
-      // Tiles fit each lane's OWN PLANE (2026-08-07) — the slice minus the separating gap.
-      this._laneHZ.set(key, lanePlaneHalf(n));
     }
   }
 
@@ -814,10 +811,6 @@ export class LedgerView implements SceneView {
     for (const lane of this.model.lanes.values()) {
       const laneColor = this._laneColor(lane.id);
       const cz = this._laneZ.get(lane.id) ?? lane.z;
-      const hz = this._laneHZ.get(lane.id) ?? LANE_GAP_Z / 2;
-      // anchorTiles() grids a tick's tiles against the fixed LANE_GAP_Z budget; rescale onto the
-      // lane's LIVE Z span so a committed lane spreads over the floor it just took.
-      const zScale = (2 * hz) / LANE_GAP_Z;
       for (const b of lane.blocks) {
         if (mi >= META_TRAIL_MAX) break;
         if (pinnedHold) b.x = LEAD_X - b.slot * SLOT_SP;
@@ -848,7 +841,7 @@ export class LedgerView implements SceneView {
         // Bottom just above the plane (user, 2026-08-07): the box is centred, so lift by half its
         // world height (geometry depth 0.35 × scale.z becomes the height under the -90° X spin).
         const tileH = 0.35 * b.size;
-        _dummy.position.set(wx + b.ox, FLOOR_Y.msnap + TILE_LIFT + tileH / 2, cz + b.oz * zScale);
+        _dummy.position.set(wx + b.ox, FLOOR_Y.msnap + TILE_LIFT + tileH / 2, cz + b.oz);
         _dummy.rotation.set(-Math.PI / 2, 0, 0);
         _dummy.scale.set(b.size, b.size, b.size);
         _dummy.updateMatrix();

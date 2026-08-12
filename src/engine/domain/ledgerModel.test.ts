@@ -3,7 +3,7 @@ import {
   SLOT_SP,
   SLOT_N,
   BLOCK_SIZE,
-  LANE_GAP_Z,
+  LANE_GRID_Z,
   slotFade,
   HORIZON_X,
   HORIZON_SPAN,
@@ -12,6 +12,7 @@ import {
   LedgerModel,
   LEAD_SETTLE_MS, LANE_IDS } from "./ledgerModel";
 import { METAGRAPHS } from "../config";
+import { lanePlaneHalf } from "./ledgerLayout";
 import { UNLISTED_KEY } from "./ledgerBands";
 import { ledgerSite, LEAD_X } from "./ledgerLayout";
 import type { GlobalSnapshot, Anchor } from "@/src/data/types";
@@ -42,7 +43,7 @@ describe("anchorTiles (js/ledger.js:217-233, _anchorTiles verbatim)", () => {
     expect(tiles.filter((t) => t.link).length).toBe(1);
     for (const t of tiles) {
       expect(Math.abs(t.ox)).toBeLessThanOrEqual(SLOT_SP / 2);
-      expect(Math.abs(t.oz)).toBeLessThanOrEqual(LANE_GAP_Z / 2);
+      expect(Math.abs(t.oz)).toBeLessThanOrEqual(LANE_GRID_Z / 2);
       expect(t.size).toBeGreaterThan(0);
       expect(t.size).toBeLessThanOrEqual(BLOCK_SIZE);
     }
@@ -50,10 +51,28 @@ describe("anchorTiles (js/ledger.js:217-233, _anchorTiles verbatim)", () => {
 
   it("lays tiles out with UNIFORM pitch (equal spacing between column neighbours)", () => {
     const tiles = anchorTiles(12);
-    // 4 columns (cols = round(sqrt(12 * SLOT_SP/LANE_GAP_Z))) -> the first row's ox values step evenly.
+    // cols = round(sqrt(12 * SLOT_SP/LANE_GRID_Z)) -> the first row's ox values step evenly.
     const row0 = tiles.filter((t) => t.oz === tiles[0].oz).map((t) => t.ox).sort((a, b) => a - b);
     const steps = row0.slice(1).map((v, i) => v - row0[i]);
     for (const s of steps) expect(s).toBeCloseTo(steps[0], 10);
+  });
+
+  it("grids against the lane's own PLANE, so a busy lane's tiles never hang off the glass", () => {
+    // The budget is the plane the tiles rest on, not the lane's centre-to-centre spacing — those
+    // differ by LANE_PLANE_GAP, and budgeting against the wider one overhung from count 9 up
+    // (user, 2026-08-12: DOR's tiles too large). DOR has put 83 snapshots into one tick.
+    expect(LANE_GRID_Z).toBeCloseTo(2 * lanePlaneHalf(LANE_IDS.length), 10);
+    for (const count of [1, 2, 3, 5, 9, 12, 14, 20, 41, 83]) {
+      const tiles = anchorTiles(count);
+      const size = tiles[0].size;
+      const spanZ = Math.max(...tiles.map((t) => t.oz)) - Math.min(...tiles.map((t) => t.oz)) + size;
+      const spanX = Math.max(...tiles.map((t) => t.ox)) - Math.min(...tiles.map((t) => t.ox)) + size;
+      expect(spanZ).toBeLessThanOrEqual(LANE_GRID_Z + 1e-9);
+      expect(spanX).toBeLessThanOrEqual(SLOT_SP + 1e-9);
+    }
+    // A quiet lane is untouched — only the crowded ones shrink.
+    expect(anchorTiles(3)[0].size).toBe(BLOCK_SIZE);
+    expect(anchorTiles(20)[0].size).toBeLessThan(BLOCK_SIZE);
   });
 });
 
