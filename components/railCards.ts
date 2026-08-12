@@ -188,6 +188,24 @@ export function exploreCards(s: Pick<RailManifestState, "mode">): RailCard[] {
 // "Click" on purpose: they are three real clicks, and the objects (bar / tile / chip) plus their
 // storeys (on the floor / on a plane above it / in a tray) diverge inside four words, so the stack
 // reads as a legend rather than a chant.
+//
+// ⚠️ 3. NAME THE THING IN THE NETWORK'S OWN WORDS, NOT THE SCENE'S FURNITURE (user, 2026-08-12 —
+//    "the ghost cards are not in constellation / dag terminology"). Two hints had drifted into
+//    vocabulary that exists nowhere else the reader can see it: "a make-up group" is invented (the
+//    rows it points at say Hybrid / Consensus / Currency / Data over L0 · cL1 · dL1 pills, and the
+//    house word for those is LAYER), and "a ring around a hub" named two pieces of internal scene
+//    geometry — `hub` appears in no user-facing copy at all, while every other hint names its parent
+//    as a "country" or a "network". Both now do: "a layer group", "a layer ring around a network".
+//    Hyper's rings genuinely ARE one layer each (L0 inner, dL1 middle, cL1 outer), so the word is
+//    accurate and teaches the shell shape in passing, the same way metaSnapHint teaches the chamber's
+//    two storeys. The three NODE hints lost their geometry nouns (sphere / chip) with it and refer
+//    back to the label instead — "Click ONE …", contextHint's own device — which reads as one legend
+//    across the views rather than three different objects for one subject.
+// 4. PLAIN SENTENCES, NO DASH CLAUSE (user, 2026-08-12 — "remove the - text that ai often uses").
+//    A statement that needs two clauses gets two sentences ("… has no locatable nodes. Explore it in
+//    the Hypergraph view."). This is an app-wide copy rule, not a ghost-hint one; it applies to every
+//    surface the reader reads (the About cards, the explorer hints, the empty states). Comments and
+//    docs like this one are dev-facing and keep their dashes.
 const IN_3D = (m: Mode) => m === "hyper" || m === "geo" || m === "ledger";
 function contextHint(s: RailManifestState): string | null {
   if (!IN_3D(s.mode)) return null;
@@ -198,18 +216,21 @@ function contextHint(s: RailManifestState): string | null {
 function nodeHint(s: RailManifestState): string | null {
   // NB the hypergraph's HUBS commit the filter (the metagraph slot) — only nodes fill this one,
   // so the hint no longer offers a hub click it can't honour.
-  if (s.mode === "hyper") return "Click a sphere on a ring around a hub.";
+  if (s.mode === "hyper") return "Click one on a layer ring around a network.";
   if (s.mode === "geo") {
     if (s.selNodesCount === 0) {
       if (!s.filterLabel) return null; // boot — the data simply hasn't landed yet
-      return `${s.filterLabel} has no locatable nodes — explore it in the Hypergraph view.`;
+      return `${s.filterLabel} has no locatable nodes. Explore it in the Hypergraph view.`;
     }
-    return "Click a chip in a stack.";
+    // No "…on the globe" here: the COUNTRY ghost one slot up already ends that way, and two
+    // ghosts in one rail sharing a trailing clause is the refrain rule 2 exists to prevent
+    // (the tail test catches it). The stack is only ever on the globe anyway.
+    return "Click one in a stack.";
   }
   // Nodes are pickable in the chamber too (user, 2026-07-12 — the standing chips are a real pick
   // target), so the slot announces it. "in a container under a floor" was stale jargon from the
   // retired per-role split (src/data/ledgerLayers.ts) — the house word is TRAY, and there are many.
-  if (s.mode === "ledger") return "Click a chip in one of the trays.";
+  if (s.mode === "ledger") return "Click one in any of the trays.";
   return null;
 }
 function snapHint(s: RailManifestState): string | null {
@@ -229,10 +250,10 @@ function cohortHint(s: RailManifestState): string | null {
   // Explorer-only rung: no 3D cohort exists to click, so naming the row IS the route.
   return s.mode === "geo" ? "Open a city · provider row under a country." : null;
 }
-// Composition is hyper's own middle rung (2026-08-02) — the make-up groups under a network in
+// Composition is hyper's own middle rung (2026-08-02) — the layer groups under a network in
 // the explorer. Hyper-only, same allow-list idiom; explorer-only like the cohort above.
 function compositionHint(s: RailManifestState): string | null {
-  return s.mode === "hyper" ? "Open a make-up group under a network." : null;
+  return s.mode === "hyper" ? "Open a layer group under a network." : null;
 }
 // A metagraph snapshot is a ledger-only card SLOT (spec 2026-08-04) — not a ladder rung. Naming the
 // STOREY does the work here: the line above it aims at a bar ON the floor, so "a plane above the
