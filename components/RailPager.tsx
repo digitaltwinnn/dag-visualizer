@@ -15,13 +15,39 @@
 // Gesture notes: the drag engages only past a 14px mostly-horizontal threshold (clicks and the
 // rail's vertical scroll stay untouched); past the ends it hard-stops short (no wrap — the strip
 // is honest about the edge); a completed drag swallows the trailing click so the card underneath
-// never mis-fires. Keyboard: ←/→ while focus is inside the card. The step itself swaps the
-// subject in place — the card's own title roll-in + edge pulse are the arrival signal, so the
-// wrapper only snaps its transform back.
+// never mis-fires. It commits on RELEASE TRAVEL or on a FLICK — a fast short throw is the dominant
+// phone paging gesture, and without a velocity rule it read as "the swipe didn't work" (the card
+// sprang back and nothing happened). Keyboard: ←/→ while focus is inside the card. The step itself
+// swaps the subject in place — the card's own title roll-in + edge pulse are the arrival signal, so
+// the wrapper only snaps its transform back.
+//
+// The drag transform is written STRAIGHT TO THE NODE, not through React state (2026-08-13): a
+// `setDx` per pointermove re-rendered this wrapper 60-120×/s mid-drag, and it subscribes to a
+// dozen store slices plus the snapshot feed. `children` keeps its element identity either way, so
+// the card underneath never re-rendered — the cost was all in the wrapper, and it was the literal
+// smoothness the gesture was being judged on.
+//
+// ⚠️ SHADCN'S CAROUSEL (Embla) WAS CONSIDERED AND DECLINED (user, 2026-08-13 — "the card swipe is
+// handcoded and I'd still like to challenge that … it looks much smoother and is designed for
+// exactly this type of UI interaction right?"). The primitive is adopted where its model fits —
+// `Command`, `ScrollArea`, and `Table` MINUS its scroll container — and this is the same test with
+// the opposite answer. Embla's product is a translated track of N RENDERED slides, and this pager
+// renders ONE card:
+//   - to get its smoothness you must render the neighbours, and a neighbour here is a fully
+//     populated rail card for a DIFFERENT subject — its own data reads, its own `titleKey` roll-in
+//     and edge pulse, and its own `.ig-panel`, which `RailThread` measures and the slab's `:has()`
+//     selects. Three panels in the lane is three thread dots and three slab members for one rung;
+//     those markers are contracts, not styling.
+//   - the index here is DERIVED from committed store state (`siblingSet`), while Embla owns its own
+//     selected snap and emits `select` — two sources of truth to keep in sync in both directions.
+//   - the global snapshot's set is OPEN and its window SHIFTS: every new tick drops the oldest, so
+//     every slide index moves under a component that thinks in indices.
+//   - and what the track would buy — a new card sliding in — is a second arrival signal competing
+//     with the title roll-in and edge pulse that already answer the step.
+// The actionable half of the challenge was the FEEL, which is the flick and the render fix above.
 import {
   useMemo,
   useRef,
-  useState,
   type KeyboardEvent,
   type MouseEvent,
   type PointerEvent,
@@ -43,6 +69,16 @@ const ENGAGE_PX = 14; // horizontal travel before the drag claims the pointer
 const STEP_PX = 48; // release travel that commits a step
 const DRAG_LIMIT = 84; // damped travel cap mid-set
 const END_LIMIT = 26; // hard-stop cap past either end (the no-wrap resistance)
+// The travel damping (0.55) is DELIBERATE and stays: there is no neighbour rendered behind the
+// card, so a 1:1 follow would promise a reveal that isn't there. The drag is an affordance saying
+// "you are pulling something that will change", not a spatial transition.
+const DAMP = 0.55;
+const FLICK_V = 0.35; // px/ms at release — a throw this fast commits regardless of travel. Measured
+// live rather than guessed: a deliberate slow pull the user means to cancel runs ~0.11 px/ms, and a
+// quick 30px throw ~0.42-0.6, so the gate sits between them (Hammer's own swipe default is 0.3).
+const FLICK_MS = 90; // velocity is measured over this trailing window, never off one sample:
+// a finger that pauses before lifting reads ~0 (correctly — a pause then lift is not a flick),
+// but a genuine throw's last sample can land 2ms before pointerup and read as noise either way.
 
 export default function RailPager({ slot, children }: { slot: RailCardKind; children: ReactNode }) {
   const mode = useStore((s) => s.mode);
@@ -95,11 +131,24 @@ export default function RailPager({ slot, children }: { slot: RailCardKind; chil
     return siblingSet(slot, state);
   }, [slot, mode, filter, country, cohort, composition, inspect, snap, metaSnap, selNodes, metaList, leaderboard, snapshotExact, following, snaps]);
 
-  // --- swipe state (refs drive the gesture; dx/drag state drive the transform) ---
+  // --- swipe state: ALL refs. Nothing here re-renders — the transform is written to the node. ---
+  const wrap = useRef<HTMLDivElement | null>(null);
   const start = useRef<{ x: number; y: number; id: number } | null>(null);
   const engaged = useRef(false);
-  const [dx, setDx] = useState(0);
-  const [dragging, setDragging] = useState(false);
+  /** Trailing pointer samples inside FLICK_MS, oldest first — the release velocity's baseline. */
+  const trail = useRef<{ x: number; t: number }[]>([]);
+
+  /** Write the drag offset straight to the node. `animate: false` suppresses the class's own
+   *  transition so the card tracks the finger; `true` restores it for the snap back. At rest the
+   *  inline transform is REMOVED rather than zeroed — an identity transform would still make this
+   *  wrapper a containing block for any fixed descendant (CSS trap 2), and `none` interpolates, so
+   *  the snap back still animates. */
+  const setTx = (x: number, animate: boolean) => {
+    const el = wrap.current;
+    if (!el) return;
+    el.style.transition = animate ? "" : "none";
+    el.style.transform = x ? `translateX(${x}px)` : "";
+  };
 
   const step = (dir: -1 | 1) => {
     const it = set?.items[set.index + dir];
@@ -112,6 +161,7 @@ export default function RailPager({ slot, children }: { slot: RailCardKind; chil
     if (e.pointerType === "mouse" && e.button !== 0) return;
     start.current = { x: e.clientX, y: e.clientY, id: e.pointerId };
     engaged.current = false;
+    trail.current = [{ x: e.clientX, t: e.timeStamp }];
   };
   const onPointerMove = (e: PointerEvent<HTMLDivElement>) => {
     const st = start.current;
@@ -122,12 +172,14 @@ export default function RailPager({ slot, children }: { slot: RailCardKind; chil
       // Mostly-horizontal past the threshold — otherwise leave scroll/click alone.
       if (Math.abs(ddx) < ENGAGE_PX || Math.abs(ddx) < Math.abs(ddy) * 1.2) return;
       engaged.current = true;
-      setDragging(true);
       e.currentTarget.setPointerCapture(st.id);
     }
+    const t = e.timeStamp;
+    trail.current.push({ x: e.clientX, t });
+    while (trail.current.length > 1 && t - trail.current[0].t > FLICK_MS) trail.current.shift();
     const atEnd = (ddx < 0 && set.index >= set.items.length - 1) || (ddx > 0 && set.index <= 0);
     const lim = atEnd ? END_LIMIT : DRAG_LIMIT;
-    setDx(Math.max(-lim, Math.min(lim, ddx * 0.55)));
+    setTx(Math.max(-lim, Math.min(lim, ddx * DAMP)), false);
   };
   const endDrag = (e: PointerEvent<HTMLDivElement>) => {
     const st = start.current;
@@ -135,11 +187,18 @@ export default function RailPager({ slot, children }: { slot: RailCardKind; chil
     start.current = null;
     if (engaged.current && e.type === "pointerup") {
       const ddx = e.clientX - st.x;
-      if (ddx <= -STEP_PX) step(1);
-      else if (ddx >= STEP_PX) step(-1);
+      const base = trail.current[0];
+      const dt = base ? e.timeStamp - base.t : 0;
+      const v = base && dt >= 12 ? (e.clientX - base.x) / dt : 0;
+      // A flick commits at any travel past the engage threshold, but only in the direction the
+      // drag actually went — a fast throw BACK at the end of a long pull is a cancel, not a step,
+      // and the travel rule below still answers it.
+      const flick =
+        Math.abs(v) >= FLICK_V && Math.abs(ddx) >= ENGAGE_PX && Math.sign(v) === Math.sign(ddx);
+      if (Math.abs(ddx) >= STEP_PX || flick) step(ddx < 0 ? 1 : -1);
     }
-    setDragging(false);
-    setDx(0);
+    trail.current.length = 0;
+    setTx(0, true);
   };
   // A drag that travelled must not fire the card's click (the collapse toggle spans the head).
   const onClickCapture = (e: MouseEvent<HTMLDivElement>) => {
@@ -161,6 +220,7 @@ export default function RailPager({ slot, children }: { slot: RailCardKind; chil
   return (
     <div onKeyDown={onKeyDown}>
       <div
+        ref={wrap}
         // `relative` + the pb utility make this wrapper the plank's frame: it is the card's own
         // box (a block wrapper around a single block card), so `absolute bottom-0` lands the plank
         // ON the card's bottom edge, INSIDE the glass (user, 2026-08-09 — a plank hugging the box
@@ -176,7 +236,6 @@ export default function RailPager({ slot, children }: { slot: RailCardKind; chil
         // 18 and leave the plank floating on bare glass below its own ground; with it the plank
         // and its hairline (siblings of the panel, so painted after it) ride ON the plate.
         className="relative touch-pan-y select-none transition-transform duration-200 ease-out motion-reduce:transition-none [--pager-strip:36px] [--foot-bleed:var(--pager-strip)] [&>.ig-panel]:pb-[var(--pager-strip)]"
-        style={{ transform: dx ? `translateX(${dx}px)` : undefined, transition: dragging ? "none" : undefined }}
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
         onPointerUp={endDrag}
