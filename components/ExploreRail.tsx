@@ -197,6 +197,29 @@ import { useBreakpoint } from "@/components/useBreakpoint";
 // business it runs" says the same three factors are inputs to a choice, which is also what makes the
 // map worth reading: every position on it is somebody's answer. Sibling of the no-meta-commentary
 // rule above — both are about naming the subject plainly instead of dressing it.
+//
+// ⚠️ THE LEDGER CARD STATES THE TWO LEVELS, AND "LAYER" IS NOT THE WORD FOR THEM (user, 2026-08-12 —
+// *"mention that there are two layers, they do their own thing in snapshotting"*). The chamber is
+// built as two storeys and the card never said why: it opened on the global snapshot "anchoring what
+// each network has produced", which makes a metagraph snapshot sound like an output the base ledger
+// collects rather than a record the network took on its own clock. It now leads on the two levels,
+// then says what the second one is FOR — a network anchors into the global what it wants kept on the
+// shared record, in a schema it defines. That also earns the closing paragraph below, which is the
+// consequence of every network choosing its own.
+// The word is "levels", never "layers": app-wide a LAYER is an L0 / cL1 / dL1 process on a node (see
+// CLAUDE.md's vocabulary rule), so calling the two storeys layers would collide with the three codes
+// the composition chips, the signer copy and hyper's own About card all use.
+// The bridging "So what lands here comes in very different sizes and shapes." was CUT to pay for it,
+// under the delete-the-back-reference rule above: the sentence behind it carries the claim, so
+// stating it first only made the reader hold an abstraction. ~95 words in three paragraphs, under
+// hyper's ceiling. And it stays on "the base ledger" / "the shared record" — "hypergraph" is the
+// WHOLE STRUCTURE and is only earned where it is defined in the same breath, which is hyper's card.
+// ⚠️ AND THE CLOSING PARAGRAPH NAMES THE AXES, IT DOES NOT DESCRIBE THE PICTURE (user, 2026-08-12 —
+// on *"quiet ones leave visible gaps"*: "this about what you seen; just mention instead that
+// frequency can differ"). An About card orients the reader toward the view; narrating what the view
+// looks like does the looking FOR them, and it also dates badly, since a gap is only visible at the
+// window and scale the chamber happens to be showing. Three axes stated plainly — frequency, size,
+// shape — and the reader finds them on screen. Sibling of the no-meta-commentary rule above.
 const ABOUT: Record<Mode, { title: string; eyebrow: string; lines: string[]; caption?: string }> = {
   hyper: {
     title: "How the network is built",
@@ -220,8 +243,9 @@ const ABOUT: Record<Mode, { title: string; eyebrow: string; lines: string[]; cap
     title: "When the network anchors",
     eyebrow: "About",
     lines: [
-      "Every few seconds the base ledger takes one global snapshot, anchoring what each network has produced. Not just transactions, but whatever that network validates: sensor readings, file fingerprints, a token's balances. Each arrives already sealed, and stays provable without anyone having to trust who wrote it.",
-      "So what lands here comes in very different sizes and shapes. Busy networks anchor many times a minute, quiet ones leave visible gaps. The size of each anchor and the shape of the data inside it show what that network is built to do.",
+      "Snapshots happen at two levels. Each network snapshots on its own, at its own pace and to its own schema, holding whatever it validates: sensor readings, file fingerprints, a token's balances.",
+      "Every few seconds the base ledger takes one global snapshot, and a network anchors into it what it wants kept on the shared record. Each arrives already sealed, and stays provable without anyone having to trust who wrote it.",
+      "How often a network anchors differs, and so do the size and the shape of what it anchors. Together they show what that network is built to do.",
     ],
   },
   status: {
