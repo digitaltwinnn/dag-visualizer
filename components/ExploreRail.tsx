@@ -47,15 +47,39 @@ import { useBreakpoint } from "@/components/useBreakpoint";
 // even to qualify it — is still the card taking up the topic. The copy states the two facts the view
 // carries, place and provider, and the axes along which networks differ; the reader does the rest.
 // Rule: this card describes what there is to explore, and grades nothing.
+// ⚠️ ONE NAME FOR THE CORE: "the base ledger" (user, 2026-08-12). Hyper opened on "Constellation
+// is a Hypergraph" and called the core "a shared core", while the ledger card called the same thing
+// "the base ledger" — two names for one thing across two cards, and the brand word carrying the
+// explanation in the one place a plain phrase would do the work. Same instinct as the "what is meta"
+// correction below: describe the thing, don't name-drop it. The vocabulary rule in CLAUDE.md already
+// prescribes "the base ledger" for the Snapshots stack; this makes hyper agree with it.
+//
+// ⚠️ WHAT IS ANCHORED IS DATA, NOT JUST TRANSACTIONS (user, 2026-08-12) — and that is Constellation's
+// actual differentiator, not a detail: a metagraph defines its own data types and validation rules,
+// so the unit anchored into the base ledger is arbitrary application data (sensor readings, file
+// fingerprints, balances), not only token transfers. "Seals a moment" said none of this and was vague
+// on top. The business angle belongs in HYPER — the flexibility to serve any use case follows from
+// that data proposition — and its payoff belongs in the LEDGER, which is where the different shapes
+// are actually visible. So the ledger's busy/quiet observation is kept but COMPLETED: cadence is only
+// one axis; size and structure are the others, and together they read out the business problem the
+// network was built for.
+// ⚠️ NOT "feeless". Constellation's own marketing says it, meaning $DAG transactions — but every
+// metagraph snapshot demonstrably pays a fee (verified live; data metagraphs with no token pay too),
+// and the user has already corrected this once. It must not come back in through online sources.
+// ⚠️ LENGTH IS PART OF THE RULE (user, 2026-08-12 — "suddenly way too much text in hyper view").
+// This card sits in a ~220px rail above the view's tool card; a fourth paragraph turns orientation
+// into a wall nobody reads, and adding a fact is not a reason to grow one — something else gives way.
+// Hyper is the ceiling at ~100 words in three paragraphs (it had drifted to 167 before this pass, and
+// the first rewrite of it went UP to 174 while "adding the business angle"). The TITLE carries the
+// opening move (user, 2026-08-12), so no card spends a clause restating its own headline.
 const ABOUT: Record<Mode, { title: string; eyebrow: string; lines: string[]; caption?: string }> = {
   hyper: {
     title: "How the network is built",
     eyebrow: "About",
     lines: [
-      "Constellation is a Hypergraph, not a blockchain: rather than one chain doing all the work, it is many independent networks, interlinked through a shared core.",
-      "Each of those is a metagraph, and what is meta about it is that the core never handles its data — the metagraph keeps its own ledger, and the core keeps only a record about it. So every metagraph runs at its own pace, in parallel with the rest, which is what lets the whole thing scale.",
-      "Inside a network the work is split across layers, and every node runs one or more of them: L0 holds the network's own state and seals its snapshots, data L1 takes in what applications write, and currency L1 moves a token — if the network has one at all.",
-      "A network runs only the layers it needs, which is where the flexibility shows: some are three nodes doing all of it at once, others a fleet with the roles split apart, and plenty carry no currency layer whatsoever.",
+      "Constellation is not one chain doing all the work: it is many independent networks, each keeping its own ledger, anchoring into one shared base ledger.",
+      "That is what is meta about a metagraph — the base ledger keeps a record about its data, never the data itself. So each runs at its own pace, validating whatever its business actually runs on.",
+      "The work splits across layers, and a network runs only the ones it needs: L0 seals its own state, data L1 takes in what applications write, currency L1 moves a token — if it has one at all. One node can run several.",
     ],
   },
   geo: {
@@ -70,8 +94,8 @@ const ABOUT: Record<Mode, { title: string; eyebrow: string; lines: string[]; cap
     title: "When the network anchors",
     eyebrow: "About",
     lines: [
-      "Every few seconds the base ledger seals a moment, and each network's own snapshots are anchored into it. That shared record is what makes their state provable without them having to trust each other.",
-      "This is the network's recent past: how often each one anchors, how much it wrote, and what it paid. Busy networks anchor many times a minute; quiet ones leave gaps you can see.",
+      "Every few seconds the base ledger takes in what each network has produced — not just transactions, but whatever that network validates: sensor readings, file fingerprints, a token's balances. Each arrives already sealed, and leaves provable without anyone having to trust who wrote it.",
+      "Which is why what lands here comes in such different sizes and shapes. Busy networks anchor many times a minute and quiet ones leave visible gaps, but the size of each anchor, and the shape of the data inside it, say just as much about the problem that network solves.",
     ],
   },
   status: {
