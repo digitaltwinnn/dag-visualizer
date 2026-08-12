@@ -11,18 +11,13 @@
 // scene layer already pairs LedgerModel-shaped data to InstancedMesh slots elsewhere in this
 // refactor (see arcSim.ts's `flashHits` index channel for the analogous pattern).
 //
-// TickChange (this module's own addition, not a literal lift): `setData` needs to tell the scene
-// layer WHICH metagraphs anchored so it can spawn pulses/rings for them (js/ledger.js:536-554's
-// pulse-queue push). The original pushes one queue entry per NEWLY anchored snapshot (`k` from
-// `prev` to `n`) directly into `this._queue` — a side effect this pure function can't perform. So
-// `setData` instead returns one `{ id, count, delta }` per metagraph whose count grew this call:
-// `count` is the metagraph's running anchor total for the CURRENT tick (mirrors `_tickMetas`/the
-// `n` in `a.metaCounts`), `delta` is how many are NEW since the last call (`n - prev`, i.e. exactly
-// how many pulses js/ledger.js would have queued). The single-metagraph pulse FILTER
-// (`this._filter`, js/ledger.js:535/547) is deliberately NOT applied here — `isRowHot`'s `laneOff`
-// parameter shows the same pattern: the model reports facts, the caller (which owns `filter`)
-// decides what to do with them. `setData` returns changes for every anchoring metagraph regardless
-// of filter; Task 13 decides which ones actually spawn a pulse.
+// RETIRED 2026-08-12 — `TickChange`, the `{ id, count, delta }` return `setData` used to hand the
+// scene layer so it could spawn one anchor PULSE per newly anchored snapshot (js/ledger.js:536-554's
+// pulse-queue push, the one part of this module that was never a literal lift). The pulses are gone
+// from LedgerView — see its header for why — and nothing else ever read the return, so the seam went
+// with them and `setData` is a command again. What stays is the `emitted` map: it is not
+// change-reporting bookkeeping, it is the gate that keeps `anchorMetaBlock` from rebuilding a lane's
+// lead cluster on every poll that reports the same count.
 //
 // DEVIATION (documented, not fixed): js/ledger.js:555 only calls `_recomputeSelectedSlot()` when
 // `a && a.metaCounts` is truthy (it's inside the same early-return guard at :534) — so on a tick
@@ -145,14 +140,6 @@ export interface LaneState {
   blocks: LaneBlock[];
 }
 
-// One metagraph's anchor activity reported by a `setData` call — see the file-header note on why
-// this shape (not a literal lift) is the seam between this pure model and the scene layer's pulses.
-export interface TickChange {
-  id: string;
-  count: number; // running anchor total for the CURRENT tick (== `n` in a.metaCounts)
-  delta: number; // how many are NEW since the last setData call (== how many pulses to spawn)
-}
-
 export class LedgerModel {
   // js/ledger.js:122 (`_trail`), minus `mesh` — `{ ordinal, slot, ts }` is exactly what a scene-layer
   // trail mesh needs looked up by index/ordinal. `ts` is that COMPLETED tick's own timestamp (not
@@ -174,7 +161,7 @@ export class LedgerModel {
   selectedSlot = -1;
 
   // js/ledger.js:109 (`_emitted`) — per-CURRENT-tick "how much of this metagraph's count have we
-  // already turned into a TickChange" bookkeeping; cleared every new tick (js/ledger.js:525).
+  // already drawn" bookkeeping; cleared every new tick (js/ledger.js:525).
   private emitted = new Map<string, number>();
 
   // js/ledger.js:201-210 (`_lane`) verbatim, minus `color`.
@@ -245,13 +232,12 @@ export class LedgerModel {
     this.selectedSlot = t ? t.slot : -1;
   }
 
-  // js/ledger.js:483-556 (`setData`) verbatim state-machine, minus every mesh/pick/pulse-queue
-  // side effect (those are Task 13's scene-adapter job). `snaps` = the Global L0 buffer
-  // (oldest->newest); `getAnchor(ts)` = the per-tick anchor aggregate. Returns the metagraphs whose
-  // anchor count grew this call (see TickChange).
-  setData(snaps: GlobalSnapshot[], getAnchor: (ts: string) => Anchor | null): TickChange[] {
+  // js/ledger.js:483-556 (`setData`) verbatim state-machine, minus every mesh/pick side effect
+  // (those are the scene adapter's job). `snaps` = the Global L0 buffer (oldest->newest);
+  // `getAnchor(ts)` = the per-tick anchor aggregate.
+  setData(snaps: GlobalSnapshot[], getAnchor: (ts: string) => Anchor | null): void {
     const latest = snaps && snaps.length ? snaps[snaps.length - 1] : null;
-    if (!latest) return [];
+    if (!latest) return;
 
     // First data after entering the view: seed the trail + lanes from the retained history so it's
     // already built up (instead of filling in live over the next ~SLOT_N ticks).
@@ -288,20 +274,17 @@ export class LedgerModel {
     // `touched` is the ms the anchor count last GREW; quiet for LEAD_SETTLE_MS = settled.
     this.leadForming = !!a && Date.now() - a.touched < LEAD_SETTLE_MS;
 
-    if (!a || !a.metaCounts) { this.leadForming = false; return []; } // see file-header DEVIATION note — verbatim quirk
+    if (!a || !a.metaCounts) { this.leadForming = false; return; } // see file-header DEVIATION note — verbatim quirk
 
-    const changes: TickChange[] = [];
     for (const [id, n] of a.metaCounts) {
       const prev = this.emitted.get(id) || 0;
       if (n <= prev) continue;
       const i = LANE_IDS.indexOf(id);
       if (i < 0) { this.emitted.set(id, n); continue; } // an unlisted ADDRESS: not a lane, but don't re-check
-      this.anchorMetaBlock(id, n, this.tickTs ?? ""); // draw the real block at the lead now + animate the anchoring
-      changes.push({ id, count: n, delta: n - prev });
+      this.anchorMetaBlock(id, n, this.tickTs ?? ""); // draw the real block at the lead now
       this.emitted.set(id, n);
     }
     this.recomputeSelectedSlot(); // slots just shifted on a new tick -> refresh which slot is selected
-    return changes;
   }
 
   // js/ledger.js:560-563 (`setSelected`) verbatim.

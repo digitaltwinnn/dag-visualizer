@@ -11,8 +11,20 @@
 // links and the centred lead block are RETIRED with the seven-floor stack.
 //
 // This class owns the SnapshotPlane instances (the reusable plane blueprint: glass + edge label
-// + tray — objects/SnapshotPlane.ts), the metagraph-snapshot lane tiles and the anchor pulses;
-// everything else is composed from the adapters.
+// + tray — objects/SnapshotPlane.ts) and the metagraph-snapshot lane tiles; everything else is
+// composed from the adapters.
+//
+// RETIRED 2026-08-12 — the ANCHOR PULSES: one additive dot per newly anchored snapshot, riding its
+// ribbon's centre line from the lane tile above down onto its band below (user: "sometimes i see an
+// animation where a snapshot moves from top layer to bottom layer, kinda like in hyper view, but not
+// always — we can remove that animation here completely"). Two reasons it had to go rather than be
+// tuned. It fired only when a lane's anchor count GREW, so the chamber twitched on an interval the
+// user can't predict and can't attribute — the one motion here that answers neither a gesture nor a
+// steady clock. And it duplicated a statement the geometry already makes: the RIBBON is the anchor,
+// permanently drawn from tile to band, so a dot re-tracing that same curve says nothing the sheet
+// under it isn't saying. Don't rebuild it; the travelling-packet idiom belongs to geo's arcs, where
+// the path is otherwise invisible. `Ribbons.centreLine`/`ribbonCount` and `LedgerModel`'s
+// `TickChange` seam went with it — they existed for nothing else.
 //
 // ─── STATE vs. MESH split ──────────────────────────────────────────────────────────────────────
 // This class is the SCENE ADAPTER over LedgerModel (domain/ledgerModel.ts): the domain owns which
@@ -59,8 +71,6 @@ import { FadeSet } from "../objects/FadeSet";
 import type { SceneView } from "./SceneView";
 import type { TuneSchema } from "../../tune";
 
-const PULSE_MAX = 220;
-const PULSE_STAGGER = 0.035;
 const META_TRAIL_MAX = 1500;
 
 /** The glass floors' footprint, and the X the edge-aligned labels read from. Module scope because
@@ -86,19 +96,6 @@ const ORD_LINE_Z0 = ORD_Z - 2.1;
 const _dummy = new THREE.Object3D();
 const _ordSeen = new Set<number>(); // scratch for _syncOrdLabels (event-time)
 const _col = new THREE.Color();
-const _p = new THREE.Vector3();
-
-/** One anchor travelling down a lane's ribbon, from its tile above onto its band below. */
-interface Pulse {
-  idx: number;
-  t: number;
-  speed: number;
-  color: number;
-}
-interface QueueItem {
-  id: string;
-  dueAt: number;
-}
 
 /** Resolves a lane tile to the metagraph snapshot it stands for. A tile the polled buffer no longer
  *  knows returns null — it stays DRAWN but is left out of `pickables` (the anonymous tile, §6.1). */
@@ -189,14 +186,6 @@ export class LedgerView implements SceneView {
   private _tileResolver: TilePickResolver | null = null;
   private readonly _tilePicks: (PickDescriptor | null)[] = new Array(META_TRAIL_MAX).fill(null);
 
-  // ── anchor pulses
-  private _pulseMat!: THREE.MeshBasicMaterial;
-  private _pulseMesh!: THREE.InstancedMesh;
-  private _pulses: Pulse[] = [];
-  private _queue: QueueItem[] = [];
-  private _lastDue = 0;
-  private _lastDrawn = 0;
-
   // ── the currency gutter (spec §4.5/§6.7)
 
   // ── the lead row's honesty label: the newest tick's anchor count is still growing
@@ -268,7 +257,6 @@ export class LedgerView implements SceneView {
     this.group.add(this._bar.group, this._ribbons.group, this._ordGroup);
 
     this._buildMetaTrail();
-    this._buildPulses();
     this._syncPickables();
   }
 
@@ -296,32 +284,6 @@ export class LedgerView implements SceneView {
     // already implements for every instanced pool (Globe uses the same key).
     this._metaTrailMesh.userData.picks = this._tilePicks;
     this.group.add(this._metaTrailMesh);
-  }
-
-  private _buildPulses() {
-    this._pulseMat = new THREE.MeshBasicMaterial({
-      transparent: true,
-      blending: THREE.AdditiveBlending,
-      depthWrite: false,
-    });
-    this._pulseMesh = new THREE.InstancedMesh(
-      new THREE.SphereGeometry(0.17, 8, 8),
-      this._pulseMat,
-      PULSE_MAX,
-    );
-    this._pulseMesh.frustumCulled = false;
-    this._pulseMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
-    for (let i = 0; i < PULSE_MAX; i++) this._pulseMesh.setColorAt(i, _col.set(0xffffff));
-    this._hideAllPulses();
-    this.group.add(this._pulseMesh);
-  }
-
-  private _hideAllPulses() {
-    _dummy.position.set(0, 0, 0);
-    _dummy.scale.setScalar(0);
-    _dummy.updateMatrix();
-    for (let i = 0; i < PULSE_MAX; i++) this._pulseMesh.setMatrixAt(i, _dummy.matrix);
-    this._pulseMesh.instanceMatrix.needsUpdate = true;
   }
 
   private _laneColor(id: string): THREE.Color {
@@ -431,11 +393,10 @@ export class LedgerView implements SceneView {
 
   setData(snaps: GlobalSnapshot[], getAnchor: (ts: string) => Anchor | null) {
     // `globalSnapshots` is oldest→NEWEST, so the live tick is the LAST entry (LedgerModel.setData
-    // reads the same end). Reading snaps[0] pins _latest to the oldest tick, and `isNewTick` then
-    // never fires while the buffer is below cap — the pulse stagger would drift unbounded.
+    // reads the same end). Reading snaps[0] would pin _latest to the OLDEST tick, which never
+    // changes while the buffer is below cap.
     const latest = snaps[snaps.length - 1];
     if (!latest) return;
-    const isNewTick = this._latest?.ordinal !== latest.ordinal;
     this._latest = latest;
 
     // event-time: one ordinal index per tick (the trail carries ordinals, not snapshots).
@@ -463,7 +424,7 @@ export class LedgerView implements SceneView {
         : { fee: 0, count: u, metaIds: new Set([UNLISTED_KEY]), metaCounts, touched: 0 };
     };
 
-    const changes = this.model.setData(snaps, wrapped);
+    this.model.setData(snaps, wrapped);
     for (let s = 0; s < SLOT_N; s++) this._slotSnap[s] = null;
     if (this.model.tickOrdinal != null)
       this._slotSnap[0] = this._byOrd.get(this.model.tickOrdinal) ?? null;
@@ -473,19 +434,6 @@ export class LedgerView implements SceneView {
 
     this._recomputeHoverSlot();
     this._rebuildAllSlots();
-
-    if (isNewTick) {
-      this._queue.length = 0;
-      this._lastDue = this.t;
-    }
-    const mf = this._filter !== "all" && this._filter !== "dag" ? this._filter : null;
-    for (const ch of changes) {
-      if (mf && ch.id !== mf) continue;
-      for (let k = 0; k < ch.delta && this._queue.length < PULSE_MAX * 2; k++) {
-        this._lastDue = Math.max(this.t, this._lastDue + PULSE_STAGGER);
-        this._queue.push({ id: ch.id, dueAt: this._lastDue }); // event-time
-      }
-    }
   }
 
   /** The exact per-ordinal byte reads — the ONLY source a bar's width may come from (spec §6.2),
@@ -557,10 +505,9 @@ export class LedgerView implements SceneView {
   }
 
   /** The COMMITTED network. It drives the COLOURED DIM (the other networks drop to their own hue at
-   *  the ledger's `elem` strength, this network's own rows hold identity down the trail) and gates
-   *  the anchor pulses to the committed lane. What it deliberately does NOT do: move or hide any
-   *  geometry. The camera's only answer is the shared `ledgerCommitTilt` (the per-lane fly-to was
-   *  retired 2026-08-09). */
+   *  the ledger's `elem` strength, this network's own rows hold identity down the trail). What it
+   *  deliberately does NOT do: move or hide any geometry. The camera's only answer is the shared
+   *  `ledgerCommitTilt` (the per-lane fly-to was retired 2026-08-09). */
   setFilter(filter: string) {
     this._filter = filter || "all"; // event-time
     this._applyNetDim();
@@ -710,21 +657,6 @@ export class LedgerView implements SceneView {
       // so it rides the same shared focus ranking every node loop uses.
       this._ribbons.setRowFade(2, focusWeightOf(false, true));
     } else this._ribbons.clearRow(2);
-  }
-
-  /** The ribbon index a metagraph's band occupies in a row — mirrors the order Ribbons.setRow walks
-   *  (one ribbon per band with bytes > 0 whose lane isn't hidden, in band order). −1 when absent. */
-  private _ribbonIndexOf(slot: number, key: string): number {
-    const spec = this._specs[slot];
-    if (!spec || !spec.measured) return -1;
-    let n = 0;
-    for (let i = 0; i < spec.bandCount; i++) {
-      const band = spec.bands[i];
-      if (band.bytes <= 0) continue;
-      if (band.key === key) return n;
-      n++;
-    }
-    return -1;
   }
 
   /** Walks the lane tiles in the SAME order update() draws them, so instance id === pick index. */
@@ -894,63 +826,6 @@ export class LedgerView implements SceneView {
     this._metaLastDrawn = mi;
     this._metaTrailMesh.instanceMatrix.needsUpdate = true;
     if (this._metaTrailMesh.instanceColor) this._metaTrailMesh.instanceColor.needsUpdate = true;
-
-    // ── anchor pulses ride the LEAD row's ribbons (row 0), tile → band.
-    // Ribbons.centreLine indexes quads[min(i, count-1)] — quads[-1] on an empty row — so every
-    // spawn AND every advance is guarded on ribbonCount() > 0.
-    const nRib = this._ribbons.ribbonCount(0);
-    while (this._queue.length && this._queue[0].dueAt <= this.t && this._pulses.length < PULSE_MAX) {
-      const { id } = this._queue.shift()!;
-      if (nRib <= 0) continue;
-      const idx = this._ribbonIndexOf(0, id);
-      if (idx < 0 || idx >= nRib) continue;
-      this._pulses.push({
-        idx,
-        t: 0,
-        speed: 0.85 + Math.random() * 0.25,
-        color: this.sceneColors[id] ?? this._core,
-      }); // event-time
-    }
-    let i = 0;
-    if (nRib > 0) {
-      for (const p of this._pulses) {
-        p.t += dt * p.speed;
-        if (p.t >= 1 || p.idx >= nRib) continue;
-        this._ribbons.centreLine(0, p.idx, p.t, _p);
-        _dummy.position.copy(_p);
-        _dummy.position.x += this._trailOff; // the pulses ride the rewound lead row
-        _dummy.scale.setScalar(1);
-        _dummy.quaternion.identity();
-        _dummy.updateMatrix();
-        this._pulseMesh.setMatrixAt(i, _dummy.matrix);
-        this._pulseMesh.setColorAt(
-          i,
-          _col.set(p.color).multiplyScalar(this._fades.alpha * this._rewind.fadeAtX(LEAD_X + this._trailOff)),
-        );
-        i++;
-      }
-    }
-    if (i < this._pulses.length) {
-      // In-place compaction — the old `.filter(…)` allocated a fresh array on any frame where a
-      // pulse was skipped-but-alive (a stale ribbon index), not only when one expired. Drops
-      // exactly what the filter dropped: the pulses that finished; a skipped live one is retried.
-      let w = 0;
-      for (let r = 0; r < this._pulses.length; r++) {
-        const p = this._pulses[r];
-        if (p.t >= 1) continue;
-        this._pulses[w++] = p;
-      }
-      this._pulses.length = w;
-    }
-    const prevDrawn = this._lastDrawn || 0;
-    if (i < prevDrawn) {
-      _dummy.scale.setScalar(0);
-      _dummy.updateMatrix();
-      for (let j = i; j < prevDrawn; j++) this._pulseMesh.setMatrixAt(j, _dummy.matrix);
-    }
-    this._lastDrawn = i;
-    this._pulseMesh.instanceMatrix.needsUpdate = true;
-    if (this._pulseMesh.instanceColor) this._pulseMesh.instanceColor.needsUpdate = true;
   }
 
   dispose() {

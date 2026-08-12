@@ -812,7 +812,7 @@ export class Engine {
       this.globe.focusDensest(false);
       this.ctx.controls.autoRotate = false;
       this.globe.setFilter(this.filter); // dim non-selected metagraph columns (no camera move)
-      this.ledger.setFilter(this.filter); // gates the anchor pulses only (no dim)
+      this.ledger.setFilter(this.filter); // the chamber's COLOURED dim (no camera move)
       this._refreshLedger();
       // Ledger uses the SHARED overview camera — the group transform (config.viewRotY/viewScale)
       // frames the resting pose central/untilted, and it is the view's ONE pose: every rung
