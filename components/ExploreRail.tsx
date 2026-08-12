@@ -221,6 +221,14 @@ import { useBreakpoint } from "@/components/useBreakpoint";
 // looks like does the looking FOR them, and it also dates badly, since a gap is only visible at the
 // window and scale the chamber happens to be showing. Three axes stated plainly — frequency, size,
 // shape — and the reader finds them on screen. Sibling of the no-meta-commentary rule above.
+// ⚠️ AND THE AXES ARE THE POINT, NOT A READOUT OF PURPOSE (user, 2026-08-12 — on *"Together they
+// show what that network is built to do"*: "it does not really show that"). They do not: cadence,
+// size and shape are three numbers, and no reading of them tells you a network validates sensor
+// data rather than fingerprints. The sentence promised an inference the view cannot support, which
+// is the same overreach the rule above catches one step earlier — there it narrated a picture, here
+// it narrated a conclusion drawn FROM the picture. What the differences honestly say is that each
+// network was built for itself: "what make each network unique, tailored to its own needs", the
+// same shape as geo's closing paragraph, where placement is a choice somebody made for a reason.
 //
 // ⚠️ A PLACEHOLDER VIEW'S CARD SAYS "STAY TUNED." AND NOTHING ELSE (user, 2026-08-12 — "for the
 // descriptive text just say 'stay tuned'"). status, transactions and staking each carried two
@@ -239,10 +247,18 @@ import { useBreakpoint } from "@/components/useBreakpoint";
 // clause supplying it.
 // ⚠️ AND THE TWO REMAINING TITLES NAME THE THING, NOT THE ABSTRACTION (user, 2026-08-12 — *"'How
 // value moves' is a bit unclear"*). It was a paraphrase of a concrete noun the view will be full of:
-// transactions. "What transactions are happening" costs three words and needs no unpacking. staking
-// takes the same treatment through its own concrete verb — DELEGATION is the act $DAG holders
-// perform and the word the protocol uses, so "Who delegates to which nodes" says what "Who backs the
-// nodes" was gesturing at, and names both sides of the relation the view will draw.
+// transactions. "What transactions happen" costs three words and needs no unpacking. staking takes
+// the same treatment through its own concrete verb — DELEGATION is the act $DAG holders perform and
+// the word the protocol uses, so "Who delegates to nodes" says what "Who backs the nodes" was
+// gesturing at, and names both sides of the relation the view will draw.
+// ⚠️ AND A TITLE IS ONE LINE — 202px, MEASURED (user, 2026-08-12 — "the todo views text is a bit too
+// long sometimes"). The three built views' titles run 173–192px in the desktop rail's 202px title
+// lane, so all three set on one line; the first drafts here were "What transactions are happening"
+// (236px) and "Who delegates to which nodes" (217px), which wrapped to two and made the placeholder
+// cards look like a different species in the same rail. Both were cut back INTO that band (187px,
+// 172px) rather than to a word count, because the lane is what decides. "How healthy the network is"
+// (196px) is the widest of the six and stays: it already sets on one line, and the precision is
+// worth the 6px. Anything new here gets measured against the same lane, not eyeballed.
 const ABOUT: Record<Mode, { title: string; eyebrow: string; lines: string[]; caption?: string }> = {
   hyper: {
     title: "How the network is built",
@@ -268,7 +284,7 @@ const ABOUT: Record<Mode, { title: string; eyebrow: string; lines: string[]; cap
     lines: [
       "Snapshots happen at two levels. Each network snapshots on its own, at its own pace and to its own schema, holding whatever it validates: sensor readings, file fingerprints, a token's balances.",
       "Every few seconds the base ledger takes one global snapshot, and a network anchors into it what it wants kept on the shared record. Each arrives already sealed, and stays provable without anyone having to trust who wrote it.",
-      "How often a network anchors differs, and so do the size and the shape of what it anchors. Together they show what that network is built to do.",
+      "How often a network anchors differs, and so do the size and the shape of what it anchors. Those differences are what make each network unique, tailored to its own needs.",
     ],
   },
   status: {
@@ -278,13 +294,13 @@ const ABOUT: Record<Mode, { title: string; eyebrow: string; lines: string[]; cap
     lines: ["Stay tuned."],
   },
   transactions: {
-    title: "What transactions are happening",
+    title: "What transactions happen",
     eyebrow: "About",
     caption: "SOON",
     lines: ["Stay tuned."],
   },
   staking: {
-    title: "Who delegates to which nodes",
+    title: "Who delegates to nodes",
     eyebrow: "About",
     caption: "SOON",
     lines: ["Stay tuned."],
