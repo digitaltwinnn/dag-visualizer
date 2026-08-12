@@ -53,6 +53,16 @@ export interface MetaConfig {
 // (/api/metagraphs). Keep this list in sync with the live route's directory by
 // refreshing the baked data/*.json snapshot.
 export const METAGRAPHS: MetaConfig[] = [
+  // ⚠️ BioFi was MISSING here while the live route listed it (found 2026-08-12), and the symptom
+  // is what "keep this in sync" is guarding: HyperExplore renders `metagraphById(m.id)?.name ?? m.id`,
+  // so its row read as the raw `DAG2JaVh5…` address next to ten real names. `color` is the FALLBACK
+  // hue (the palette's `sceneColors` wins where it has an entry) and is the metagraph's own reported
+  // brand hue from the route, not a pick; `blurb` is likewise the route's own `description`, which is
+  // the fallback shown only until `/api/metagraphs` answers. Its brand hue is still absent from
+  // `data/brand-hues.json`, so its identity hue is the hash fallback until `scripts/bake-brand-hues.ts`
+  // is re-run — the bake is manual by design and rewrites every row, so it is its own deliberate step.
+  { name: "BioFi",               ticker: "BIOFI",    color: 0xed9bf4, id: "DAG2JaVh5yYiPCGLLEFi6tfkKk77WA4FzivVdBek",
+    blurb: "A utility token uniting an ecosystem focused on safeguarding personal data and protecting users from fraud." },
   { name: "Digital Evidence",    ticker: "DED",      color: 0x36e29a, id: "DAG0eQr94qUQSUhmYGNXt6CoBKWu5K6htvRMGC6M",
     blurb: "DoD-vetted data-fingerprinting as a service — immutable proof of data authenticity, anchored to the Global L0." },
   { name: "Cyberlete",           ticker: "LEET",     color: 0xff7ad9, id: "DAG0rgR8sdn8u2YBYb5Ftjy4zmuqUX3v9XsE2j94",
