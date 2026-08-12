@@ -44,15 +44,46 @@ import { useBreakpoint } from "@/components/useBreakpoint";
 // owns the nodes, what they cost, who operates them all matter and none of it is on this globe), so
 // the card was answering a broad, contested question with a partial view. The correction is NOT a
 // hedged version of the same claim: the word doesn't belong on the card at all, because naming it —
-// even to qualify it — is still the card taking up the topic. The copy states the two facts the view
-// carries, place and provider, and the axes along which networks differ; the reader does the rest.
-// Rule: this card describes what there is to explore, and grades nothing.
+// even to qualify it — is still the card taking up the topic.
+//
+// ⚠️ …BUT IT MUST STILL SAY WHY ANY OF IT MATTERS (user, 2026-08-12 — "what does this have to do
+// with 'where the network runs'?? why is that relevant?"). Avoiding the contested claim had left the
+// card observing that place and provider are "two separate facts", then inviting a comparison of
+// networks along both — a framing that answers a question nobody asked and never says what the
+// answer would mean. So the "grades nothing" rule is NARROWED to what it was actually about: the
+// decentralization question. The point the view really carries is HOSTING SHAPE, and it is stated
+// plainly at the user's direction. It is also verified rather than plausible (live, 2026-08-12):
+// 162 validators, 9 countries, Hetzner 97 and IONOS 33 leading, and a long tail spanning big clouds
+// (Amazon, DigitalOcean, OVH, Akamai), bare-metal hosts (netcup, Hostinger), enterprise (SunGard)
+// and genuine consumer fibre ISPs (DELTA Fiber, Ezee Fiber, LIWEST, B FIBER) — so "every shape,
+// down to consumer fibre lines" is a reading of the data, not a boast. No COUNT goes in the copy:
+// a hardcoded "9 countries" is exactly the fabricated-once-true number rule 10 forbids.
+// And paragraph 1 just says what was DONE — geolocated, provider identified — because the previous
+// "sits at the real location it runs from, with the provider named beside it" described a rendering
+// instead of stating a fact (user: "not very clear").
 // ⚠️ ONE NAME FOR THE CORE: "the base ledger" (user, 2026-08-12). Hyper opened on "Constellation
 // is a Hypergraph" and called the core "a shared core", while the ledger card called the same thing
 // "the base ledger" — two names for one thing across two cards, and the brand word carrying the
 // explanation in the one place a plain phrase would do the work. Same instinct as the "what is meta"
 // correction below: describe the thing, don't name-drop it. The vocabulary rule in CLAUDE.md already
 // prescribes "the base ledger" for the Snapshots stack; this makes hyper agree with it.
+//
+// ⚠️ BUT THE GRAPH ITSELF MUST BE EXPLAINED (user, 2026-08-12 — "now you don't even mention
+// hypergraph and go straight to metagraphs; nothing is explained about what these types of graphs
+// actually are, why Constellation uses it"). Removing the word as a NAME FOR THE CORE took the whole
+// concept with it, in the one view that is named after it: the card asserted "not one chain" and then
+// never said what it is instead. The two corrections are compatible because they have different
+// referents — "the base ledger" is the CORE, "a hypergraph" is the WHOLE STRUCTURE — so the word is
+// earned here by being defined in the same breath (many independent ledgers interlinked through one
+// base ledger), never used as a second name for the middle.
+// The WHY is chain-vs-graph and it is the honest scale argument the "not feeless" note demands:
+// a chain confirms in a single line, a graph lets many things advance at once. The app's own data
+// proves it — a snapshot can carry blocks WITHOUT raising `height`, because the block DAG has
+// parallel siblings (see CLAUDE.md's snapshot-stream section). Deliberately NOT spelled out as
+// "directed acyclic graph": "DAG" already means the token and the core network everywhere in this
+// UI (the filter chip, DAG_CFG), so expanding it here would collide with the reader's one meaning.
+// Length: 108 words against the ~100 ceiling below, and it buys the whole explanation because the
+// new first paragraph REPLACES the old one's structure sentence rather than adding to it.
 //
 // ⚠️ WHAT IS ANCHORED IS DATA, NOT JUST TRANSACTIONS (user, 2026-08-12) — and that is Constellation's
 // actual differentiator, not a detail: a metagraph defines its own data types and validation rules,
@@ -77,17 +108,17 @@ const ABOUT: Record<Mode, { title: string; eyebrow: string; lines: string[]; cap
     title: "How the network is built",
     eyebrow: "About",
     lines: [
-      "Constellation is not one chain doing all the work: it is many independent networks, each keeping its own ledger, anchoring into one shared base ledger.",
-      "That is what is meta about a metagraph — the base ledger keeps a record about its data, never the data itself. So each runs at its own pace, validating whatever its business actually runs on.",
-      "The work splits across layers, and a network runs only the ones it needs: L0 seals its own state, data L1 takes in what applications write, currency L1 moves a token — if it has one at all. One node can run several.",
+      "A chain confirms in one line, everything waiting its turn. A graph doesn't — many things advance at once. That is the scale argument, and the shape it takes is a hypergraph: many independent ledgers, interlinked through one base ledger.",
+      "Each of those independent ledgers is a metagraph — meta because the base keeps a record about its data, never the data itself. So each validates whatever its business runs on.",
+      "Work splits across layers, and a network runs only the ones it needs: L0 seals its own state, data L1 takes in what applications write, currency L1 moves a token — if it has one. One node can run several.",
     ],
   },
   geo: {
     title: "Where the network runs",
     eyebrow: "About",
     lines: [
-      "Every node sits at the real location it runs from, with the provider hosting it named beside it. Where a network placed itself, and whose hardware it sits on, are two separate facts — and both are here.",
-      "Networks differ along both: some keep every node in one country while others reach across continents, and a network spread wide can still rent all of it from one provider. The map and the provider names are what you compare them by.",
+      "Every node here is geolocated to where it actually runs, and the provider hosting it identified.",
+      "That hosting takes every shape — rented cloud instances, bare-metal servers, even consumer fibre lines, spread across countries or concentrated in one. Nothing prescribes where a node runs, and that freedom is what lets any network be hosted the way it needs.",
     ],
   },
   ledger: {
