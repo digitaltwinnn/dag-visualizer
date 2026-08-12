@@ -154,7 +154,7 @@ export default function GeoExplore() {
         // the card holds, not just the click. Quiet-empty has nothing to browse — no hint.
         quietEmpty
           ? null
-          : "Every country hosting nodes — hover or click one to see how the network is geographically distributed."
+          : "Every country hosting nodes, busiest first."
       }
     >
       {quietEmpty ? (

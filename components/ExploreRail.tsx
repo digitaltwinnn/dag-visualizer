@@ -15,29 +15,38 @@ import { useBreakpoint } from "@/components/useBreakpoint";
 
 // Per-view "About this view" copy — one orientation card at the top of the left rail in every
 // view (collapsed by default). Built views carry no caption; the scaffolded (SOON) views do.
+//
+// COPY RULE (user, 2026-08-12): About says what you can FIND OUT here and why it is worth
+// knowing — never what the view LOOKS like. The user is already looking at it, so a sentence
+// spent on honeycomb towers, a "3D chamber" or a trail receding to the left buys nothing (and
+// two of those three were factually wrong). It also names no medium: that the scene is 3D is
+// visible, not information. The GESTURE belongs to the right rail's ghost hints and the
+// explorer's own hint — About must not restate it, which is what had geo telling you to drill
+// a country three times on one screen. Paragraph 1 = the network fact this view exists to show;
+// paragraph 2 = what to look FOR in it.
 const ABOUT: Record<Mode, { title: string; eyebrow: string; lines: string[]; caption?: string }> = {
   hyper: {
     title: "How the network is built",
     eyebrow: "About",
     lines: [
-      "Constellation is a Hypergraph, not a blockchain — activity is organized as a DAG, so many parts of the network validate in parallel: horizontally scalable and feeless for users.",
-      "The glowing core is the Global L0 (security + consensus); the validator shells around it bundle activity into the global snapshots streaming along the bottom. The orbiting clusters are metagraphs — independent networks that anchor their state into L0 for shared trust.",
+      "Constellation is a Hypergraph, not a blockchain — work is spread across many networks validating at the same time, which is what lets it scale out and stay feeless for the people using it.",
+      "Each network runs its own machines but borrows its security from the core. What differs is scale and make-up: some are three machines, some a fleet, and the roles they run decide what the network can actually do.",
     ],
   },
   geo: {
     title: "Where the network runs",
     eyebrow: "About",
     lines: [
-      "Where the network runs — every node plotted at its real geolocation, co-located nodes stacked into honeycomb chip towers, with travelling-packet connection arcs between them.",
-      "Drill into a country to see its nodes; filtering a metagraph narrows the map to that network's footprint.",
+      "Decentralization is a claim, and this is where you can check it — every node sits at the real location it runs from.",
+      "Concentration is the thing to look for: how much of a network sits in one country, or behind a single hosting provider. Neither shows up in a node count.",
     ],
   },
   ledger: {
     title: "When the network anchors",
     eyebrow: "About",
     lines: [
-      "When the network anchors — Global L0 produces a snapshot every few seconds, anchoring the metagraphs' own snapshots into shared trust. The 3D chamber stacks the validation layers top-to-bottom, and each global snapshot forms as its layer anchors.",
-      "The live snapshot sits centre-stage and trails off to the left as it ages; click any snapshot (here or in the strip below) to inspect its fee, size and per-metagraph breakdown.",
+      "Every few seconds the base ledger seals a moment, and each network's own snapshots are anchored into it. That shared record is what makes their state provable without them having to trust each other.",
+      "This is the network's recent past: how often each one anchors, how much it wrote, and what it paid. Busy networks anchor many times a minute; quiet ones leave gaps you can see.",
     ],
   },
   status: {
@@ -45,8 +54,8 @@ const ABOUT: Record<Mode, { title: string; eyebrow: string; lines: string[]; cap
     eyebrow: "About",
     caption: "SOON",
     lines: [
-      "Live health of the network — node uptime, node states (Ready / waiting / offline), and software-version spread across the Global L0 and the metagraphs.",
-      "A single at-a-glance read of whether the network is healthy, and where any trouble is.",
+      "Whether the network is healthy right now, and where any trouble is — node uptime, what state each node is in, and how far the software versions have drifted apart.",
+      "Version spread is the quiet one to watch: a network running several releases at once is mid-upgrade, or stuck.",
     ],
   },
   transactions: {
@@ -54,8 +63,8 @@ const ABOUT: Record<Mode, { title: string; eyebrow: string; lines: string[]; cap
     eyebrow: "About",
     caption: "SOON",
     lines: [
-      "The money flow across the network — $DAG and the metagraphs' own currencies moving between addresses, visualized as it happens.",
-      "Look up and trace individual transactions (à la the DAG explorer), and read the network's economic statistics — value moved, active addresses, and more (t.b.d.).",
+      "Value moving across the network as it happens — $DAG and the metagraphs' own currencies, between addresses.",
+      "Trace a single transaction end to end, or read the totals: how much moved, and how many addresses were active doing it.",
     ],
   },
   staking: {
@@ -63,8 +72,8 @@ const ABOUT: Record<Mode, { title: string; eyebrow: string; lines: string[]; cap
     eyebrow: "About",
     caption: "SOON",
     lines: [
-      "Delegated staking across the network — who is staked to which nodes, total $DAG delegated, and the rewards flowing back.",
-      "How stake (and therefore consensus weight) is distributed, and how that shifts over time.",
+      "Who is backing which nodes — delegated $DAG, the nodes it is staked to, and the rewards flowing back.",
+      "Stake is consensus weight, so how it concentrates is the thing to watch, and whether that is shifting.",
     ],
   },
 };
