@@ -369,7 +369,9 @@ export default function LedgerPanel() {
     <ExplorerShell
       id="ledger-view"
       title="Snapshots"
-      hint="Recent snapshots, newest first. Open one for the networks that anchored into it."
+      // No ordering clause (user, 2026-08-12): the list shows its own order. See the hint-shape
+      // note in GeoExplore.tsx, which is the shared rule.
+      hint="Recent snapshots. Open one for the networks that anchored into it."
       onLeave={() => {
         // Container-level hover backstop (the LaneRow lesson, 2026-08-02): leaving the whole card
         // body clears every hover channel its rows write, regardless of which row set it or

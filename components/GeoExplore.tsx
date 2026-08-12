@@ -153,15 +153,19 @@ export default function GeoExplore() {
         // the card (user, 2026-07-12 — a bottom hint read as an afterthought) and says what
         // the card holds, not just the click. Quiet-empty has nothing to browse — no hint.
         //
-        // ⚠️ ONE HINT SHAPE ACROSS ALL THREE EXPLORERS (user, 2026-08-12): what the card holds
-        // and its ordering, then "open one for <what the next level down shows>". Geo was the
-        // odd one out — it named its rows but not what opening one gets you, so the card said
-        // less than hyper's and the ledger's about the same gesture. The second half must name
-        // the CHILD ROWS, which here are cohorts (city × provider), not the nodes two levels
-        // down; a hint that skips a rung misdescribes the click it is explaining.
+        // ⚠️ ONE HINT SHAPE ACROSS ALL THREE EXPLORERS (user, 2026-08-12): what the card holds,
+        // then "open one to <what the next level down is about>". Geo was the odd one out — it
+        // named its rows but not what opening one gets you, so the card said less than hyper's
+        // and the ledger's about the same gesture.
+        //
+        // ⚠️ NO ORDERING CLAUSE, AND NO INVENTORY OF THE CHILD ROWS (user, 2026-08-12, same
+        // sweep): "busiest first" described what the eye already reads off a sorted list, and
+        // listing what a country opens onto (cities, providers) spent the sentence on a
+        // breakdown the row itself shows a click later. The second half names the ASPECT the
+        // drill is about — here, location — which stays true as the rows underneath change.
         quietEmpty
           ? null
-          : "Every country hosting nodes, busiest first. Open one for the cities and providers behind them."
+          : "Every country hosting nodes. Open one to explore where its nodes sit."
       }
     >
       {quietEmpty ? (
