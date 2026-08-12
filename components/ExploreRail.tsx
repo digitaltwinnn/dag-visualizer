@@ -128,12 +128,22 @@ import { useBreakpoint } from "@/components/useBreakpoint";
 // Hyper is the ceiling at ~100 words in three paragraphs (it had drifted to 167 before this pass, and
 // the first rewrite of it went UP to 174 while "adding the business angle"). The TITLE carries the
 // opening move (user, 2026-08-12), so no card spends a clause restating its own headline.
+// ⚠️ NO META-COMMENTARY — a card STATES the thing, it never narrates its own rhetoric (user,
+// 2026-08-12, on hyper's "That is the scale argument": *"why are you referring to argument; makes no
+// sense for an about section to say it in that way"*). The reader wants to know how the network works,
+// not to be walked through the case being made for it, so a sentence about the explanation is a
+// sentence not spent explaining — expensive against the length ceiling above. Swept from all six on
+// the same pass: geo's "a choice it made, not a rule it followed" (rhetorical antithesis arguing a
+// point instead of stating one) and the ledger's "say just as much about" (comparative flourish) went
+// with it. The line the sweep deliberately SPARED is "the thing to watch" in status and staking:
+// telling the reader what to look at is orientation, which is the card's actual job — the test is
+// whether a sentence points at the VIEW or at the writing.
 const ABOUT: Record<Mode, { title: string; eyebrow: string; lines: string[]; caption?: string }> = {
   hyper: {
     title: "How the network is built",
     eyebrow: "About",
     lines: [
-      "A chain confirms in one line, everything waiting its turn. A graph doesn't — many things advance at once. That is the scale argument, and the shape it takes is a hypergraph: many independent ledgers, interlinked through one base ledger.",
+      "A chain confirms in one line, everything waiting its turn. A graph doesn't — many things advance at once, which is how this network scales. Its shape is a hypergraph: many independent ledgers, interlinked through one base ledger.",
       "Each of those independent ledgers is a metagraph — meta because the base keeps a record about its data, never the data itself. So each validates whatever its business runs on.",
       "Work splits across layers, and a network runs only the ones it needs: L0 seals its own state, data L1 takes in what applications write, currency L1 moves a token — if it has one. One node can run several.",
     ],
@@ -143,7 +153,7 @@ const ABOUT: Record<Mode, { title: string; eyebrow: string; lines: string[]; cap
     eyebrow: "About",
     lines: [
       "Every node here is geolocated to where it actually runs, and the provider hosting it identified.",
-      "Nothing prescribes either one. The hosts range from the big clouds down to single regional ISPs, and the countries from one nation to a scattering — so where a network sits is a choice it made, not a rule it followed.",
+      "Nothing prescribes either one. The hosts run from the big clouds down to single regional ISPs, and a network's nodes may sit in one country or spread across many. Each network places itself.",
     ],
   },
   ledger: {
@@ -151,7 +161,7 @@ const ABOUT: Record<Mode, { title: string; eyebrow: string; lines: string[]; cap
     eyebrow: "About",
     lines: [
       "Every few seconds the base ledger takes one global snapshot, anchoring what each network has produced — not just transactions, but whatever that network validates: sensor readings, file fingerprints, a token's balances. Each arrives already sealed, and leaves provable without anyone having to trust who wrote it.",
-      "Which is why what lands here comes in such different sizes and shapes. Busy networks anchor many times a minute and quiet ones leave visible gaps, but the size of each anchor, and the shape of the data inside it, say just as much about the problem that network solves.",
+      "So what lands here comes in very different sizes and shapes. Busy networks anchor many times a minute and quiet ones leave visible gaps; the size of each anchor, and the shape of the data inside it, show what that network is built to do.",
     ],
   },
   status: {
