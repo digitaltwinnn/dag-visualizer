@@ -20,17 +20,12 @@ function bumpStack(stack: SelSlot[], slot: SelSlot, active: boolean): SelSlot[] 
   return active ? [slot, ...without] : without;
 }
 
-// Per-hour rates + per-snapshot series from NetworkData.getActivity().
-export interface Activity {
-  snapsPerHour: number;
-  anchorsPerHour: number;
-  blocksPerHour: number;
-  feesPerHour: number;
-  cadenceSeries: number[];
-  anchoredSeries: number[];
-  blocksSeries: number[];
-  feesSeries: number[];
-}
+// Per-hour rates + per-snapshot series from NetworkData.getActivity(). ONE HOME: this was a
+// hand-copied duplicate of the data layer's interface and drifted the moment a field was added
+// there (2026-08-12) — the store's own copy silently kept the old shape, so a component reading
+// the new field type-errored against a type that no longer described the value it held.
+export type { Activity } from "@/src/data/api";
+import type { Activity } from "@/src/data/api";
 
 // Panel-facing state only (Lane B). The 60fps scene + per-snapshot visuals subscribe
 // to NetworkData directly (Lane A) and never touch this store, so React renders stay
@@ -51,7 +46,6 @@ interface AppState {
   engineFailed: boolean;
   nodes: { l0: number; l1: number };
   metagraphs: number;
-  latestOrdinal: number | null;
   latestSnapshot: GlobalSnapshot | null;
   activity: Activity | null;
   // Baked metagraphs (with engine-computed country counts) — for filter chips + pane.
@@ -202,7 +196,6 @@ interface AppState {
   setEngineFailed: (v: boolean) => void;
   setNodes: (l0: number, l1: number) => void;
   setMetagraphs: (n: number) => void;
-  setLatestOrdinal: (ordinal: number) => void;
   setLatestSnapshot: (snap: GlobalSnapshot | null) => void;
   setActivity: (activity: Activity | null) => void;
   setMode: (mode: Mode) => void;
@@ -259,7 +252,6 @@ export const useStore = create<AppState>((set) => ({
   engineFailed: false,
   nodes: { l0: 0, l1: 0 },
   metagraphs: 0,
-  latestOrdinal: null,
   latestSnapshot: null,
   activity: null,
   mode: "hyper",
@@ -301,7 +293,6 @@ export const useStore = create<AppState>((set) => ({
   setEngineFailed: (engineFailed) => set({ engineFailed }),
   setNodes: (l0, l1) => set({ nodes: { l0, l1 } }),
   setMetagraphs: (metagraphs) => set({ metagraphs }),
-  setLatestOrdinal: (latestOrdinal) => set({ latestOrdinal }),
   setLatestSnapshot: (latestSnapshot) => set({ latestSnapshot }),
   setActivity: (activity) => set({ activity }),
   setMode: (mode) => set({ mode }),

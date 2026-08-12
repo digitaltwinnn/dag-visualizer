@@ -8,6 +8,7 @@ import Sparkline from "@/components/Sparkline";
 import Odometer from "@/components/Odometer";
 import { NoSignalDot } from "@/components/state/StateAtoms";
 import { compositionRows } from "@/src/data/composition";
+import { isGlobalActivityScope, type Activity } from "@/src/data/api";
 import { useBreakpoint } from "@/components/useBreakpoint";
 import { cn } from "@/lib/utils";
 import type { NodeInfo } from "@/src/data/types";
@@ -15,9 +16,19 @@ import type { NodeInfo } from "@/src/data/types";
 // Structural cyan for the live-activity sparklines (lane-correct: cyan = the live accent).
 const CYAN = "var(--primary)";
 
-function Vital({ label, value, spark }: { label: string; value: React.ReactNode; spark?: number[] }) {
+// The one sentence a per-hour vital owes the reader: what it was measured over. The basis is
+// READ, never assumed — `spanHr` comes from the buffer's own timestamps, so this sentence stays
+// true whatever the chain's cadence does. `unit` names what a sample IS in this scope.
+function windowNote(a: Activity | null | undefined, unit: string): string | undefined {
+  if (!a) return undefined;
+  const mins = a.spanHr * 60;
+  const span = mins < 1 ? `${Math.round(mins * 60)}s` : `${Math.round(mins)} min`;
+  return `Rate extrapolated from ${a.samples} ${unit} over ~${span}.`;
+}
+
+function Vital({ label, value, spark, title }: { label: string; value: React.ReactNode; spark?: number[]; title?: string }) {
   return (
-    <div className="flex flex-col gap-0.5 flex-none">
+    <div className="flex flex-col gap-0.5 flex-none" title={title}>
       <span className="text-micro tracking-[0.1em] uppercase text-muted-foreground whitespace-nowrap">{label}</span>
       <span
         className={cn(
@@ -109,17 +120,65 @@ function GeoVitals() {
 }
 
 // Snapshot DAG vitals — the network's **live activity** over time (when + cost): the snapshot
-// cadence and anchors per hour, with trend charts in structural cyan (the live-activity accent,
-// not the filter colour).
+// cadence, what that traffic costs or how much of it there is, and the bytes it anchors, with
+// trend charts in structural cyan (the live-activity accent, not the filter colour).
+//
+// ⚠️ SLOT 2 SWAPS WITH THE SCOPE, because "anchors" is two different quantities (2026-08-12).
+// Globally `anchorsPerHour` is Σ metagraphSnapshotCount — snapshots anchored; filtered it is the
+// distinct global ticks that network landed in, an order of magnitude smaller for a batching
+// metagraph like DOR. One label over two quantities is a lie about whichever one you are not
+// looking at, and the filtered reading is near-redundant with Snaps/hr anyway (every metagraph
+// snapshot anchors). So under a filter the slot shows the network's DAG fees instead — exact,
+// distinct from its neighbours, and it retires a FAKE SPARKLINE: `_metaActivity` sets
+// `anchoredSeries` to the cadence series, "shape only", so the filtered anchors chart was
+// plotting cadence under an anchors label. `feesSeries` is that network's real per-snapshot fees.
+//
+// ⚠️ EVERY RATE HERE IS AN EXTRAPOLATION, so each vital carries a `title` naming its own basis
+// (see Activity.samples / spanHr). The two scopes reach very differently: measured 2026-08-12 the
+// global buffer held 52 ticks over ~24 min (a ×2.5 reach), while DOR's held 160 snapshots over
+// ~7 min (×8.6) — the metagraph buffers cap by snapshot COUNT, so a batching network's window is
+// deep in count and shallow in time. That is the same conditioning the byte vital was dropped
+// over, and it is why the basis is REPORTED rather than assumed: the sentence stays true when the
+// window moves under it. The global readings reconcile against the chain — 126 snaps/hr and
+// 2,985 anchors/hr against 128 and 2,998 measured live over 60 ticks, both within 2%.
 function LedgerVitals() {
   const activity = useStore((s) => s.activity);
-  const latestOrdinal = useStore((s) => s.latestOrdinal);
+  const filter = useStore((s) => s.filter);
+  // The SAME predicate getActivity branches on, so the labels can't describe the other stream.
+  const scoped = !isGlobalActivityScope(filter);
+  const basis = windowNote(activity, scoped ? "snapshots" : "global ticks");
   return (
     <>
-      <Vital label="Snaps/hr" value={<Odometer value={activity?.snapsPerHour} />} spark={activity?.cadenceSeries} />
-      <Vital label="Anchors/hr" value={<Odometer value={activity?.anchorsPerHour} />} spark={activity?.anchoredSeries} />
-      {/* The live chain head — rolls on every tick (was the reserved "soon" slot). */}
-      <Vital label="Ordinal" value={<Odometer int value={latestOrdinal} />} />
+      <Vital
+        label="Snaps/hr"
+        title={basis}
+        value={<Odometer value={activity?.snapsPerHour} />}
+        spark={activity?.cadenceSeries}
+      />
+      {scoped ? (
+        <Vital
+          label="DAG fees/hr"
+          title={basis && `$DAG this network pays to anchor. ${basis}`}
+          value={<Odometer value={activity?.feesPerHour} />}
+          spark={activity?.feesSeries}
+        />
+      ) : (
+        <Vital
+          label="Anchors/hr"
+          title={basis && `Metagraph snapshots anchored into the global chain. ${basis}`}
+          value={<Odometer value={activity?.anchorsPerHour} />}
+          spark={activity?.anchoredSeries}
+        />
+      )}
+      {/* NO BYTE VITAL (user, 2026-08-12: "I want facts not guestimates" — then: drop the column).
+          KB anchored per hour is the natural third reading here, and the same unit the snapshot
+          card states, but every route to it from what the app holds today is an estimate: the
+          polled metagraph buffers carry `sizeInKB` yet are capped by snapshot COUNT, so a batching
+          network's window is deep in count and shallow in time and any rate from it propagates
+          burst density — measured, that read twice the complete figure while labelled a lower
+          bound. Mean size from the exact reads × the measured rate is better conditioned and still
+          an estimate. A vitals slot states facts, so there is no slot until a historical series
+          exists to make it one. See api.ts `_metaActivity` for the numbers behind this. */}
     </>
   );
 }
