@@ -33,7 +33,11 @@ export const ORB_FRESNEL_MIX = "(0.72 + 0.9 * fres)";
 // The geo hex prisms' resting opacity — slightly glassy (user: replaces the wireframe overlay,
 // which never read as clean edges). Depth-write stays ON so stacks occlude normally.
 const HEX_ALPHA = 0.92;
-const GATHER_SCALE = 0.22; // uniform node size at the staging grid (tidy, equal pixels)
+// Uniform node size at the staging grid (tidy, equal pixels) at the reference cell pitch. It is
+// the REFERENCE, not the live value: the chip scale and the cell pitch must move TOGETHER (a
+// bigger cell with the same chip is a sparse scatter, not a square — the nodes ARE the pixels),
+// so Globe.setGatherFit writes both onto ctx.gather by the same factor.
+export const GATHER_SCALE = 0.22;
 const DIM = new THREE.Color(0x223046);
 const _dummy = new THREE.Object3D(); // reused to compose per-instance matrices
 const _vec = new THREE.Vector3();
@@ -68,7 +72,7 @@ export interface FrameCtx {
   group: THREE.Group;   // the (rotating) globe group — for hub world->local conversion
   // View-transition inputs (persistent objects; Globe writes them each frame):
   transition: ViewTransition | null;
-  gather: { origin: THREE.Vector3; right: THREE.Vector3; up: THREE.Vector3; quat: THREE.Quaternion; cell: number };
+  gather: { origin: THREE.Vector3; right: THREE.Vector3; up: THREE.Vector3; quat: THREE.Quaternion; cell: number; scale: number };
 }
 
 export class NodeFabric {
@@ -290,7 +294,7 @@ export class NodeFabric {
   // Blend the composed pose toward the node's staging-grid slot by its staggered gather
   // weight (view-transition choreography). Runs on the already-final _dummy pose so it is
   // the LAST word on position/scale; ctx.gather's vectors are group-LOCAL (Globe converts
-  // the camera-anchored plane once per frame). Uniform GATHER_SCALE reads as tidy grid dots.
+  // the camera-anchored plane once per frame). One uniform ctx.gather.scale reads as tidy grid dots.
   // Per-record gather weight for this frame (0 when no transition is live) — computed ONCE
   // per record at the top of each write loop and shared by the shape crossfade, the
   // visibility lifts, and _applyGather, so the choreography can't self-disagree.
@@ -315,7 +319,7 @@ export class NodeFabric {
     // local +Y (the chip's bright top cap; the cylinder axis) aimed at the viewer, X/Z
     // pinned to the grid's right/up so the parked squares sit still (no residual tumble).
     _dummy.quaternion.slerp(ctx.gather.quat, gw);
-    const s = 1 + (GATHER_SCALE / Math.max(1e-6, _dummy.scale.x) - 1) * gw;
+    const s = 1 + (ctx.gather.scale / Math.max(1e-6, _dummy.scale.x) - 1) * gw;
     _dummy.scale.multiplyScalar(s);
     // Non-primary shell instances share their MACHINE's grid pixel (the squares count
     // machines) — overlapping there exactly would z-fight and read as nodes vanishing

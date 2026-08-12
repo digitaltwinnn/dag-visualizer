@@ -1,6 +1,6 @@
 // src/engine/domain/gatherLayout.test.ts
 import { describe, it, expect } from "vitest";
-import { gatherSlots, GATHER_GUTTER } from "./gatherLayout";
+import { gatherSlots, gatherExtent, gatherBand, GATHER_GUTTER, GATHER_MAX_GROWTH } from "./gatherLayout";
 
 describe("gatherSlots", () => {
   it("gives every node exactly one slot, rank-ordered row-major", () => {
@@ -83,5 +83,98 @@ describe("gatherSlots", () => {
     expect(leftMost(reversed, "aaa")).toBeLessThan(leftMost(reversed, "zzz"));
     expect(inOrder.get("aaa")).toEqual(reversed.get("aaa"));
     expect(inOrder.get("zzz")).toEqual(reversed.get("zzz"));
+  });
+});
+
+// The extent is what the scene fits into the viewport, so it MUST describe the grids that
+// gatherSlots actually lays out — the two share one packing pass precisely so they can't
+// disagree. These tests measure the slots and compare, rather than restating the arithmetic.
+describe("gatherExtent", () => {
+  const measured = (groups: { id: string; count: number }[]) => {
+    const m = gatherSlots(groups);
+    const all = [...m.values()].flat();
+    if (!all.length) return { w: 0, h: 0 };
+    // Slots are cell CENTRES (u = left + 0.5, v = -(row + 0.5)), so the edge-to-edge extent is
+    // the centre span plus one whole cell.
+    const us = all.map((s) => s.u), vs = all.map((s) => s.v);
+    return { w: Math.max(...us) - Math.min(...us) + 1, h: Math.max(...vs) - Math.min(...vs) + 1 };
+  };
+
+  it("matches the extent of the slots gatherSlots actually places", () => {
+    const groups = [
+      { id: "dag", count: 164 },
+      { id: "dor", count: 20 },
+      { id: "paca", count: 12 },
+      { id: "ded", count: 3 },
+    ];
+    expect(gatherExtent(groups)).toEqual(measured(groups));
+  });
+
+  it("counts the gutters between squares, not around them", () => {
+    // Two 2×2 grids: 2 + gutter + 2 cells wide, 2 rows tall.
+    expect(gatherExtent([{ id: "a", count: 4 }, { id: "b", count: 4 }])).toEqual({ w: 4 + GATHER_GUTTER, h: 2 });
+  });
+
+  it("is the TALLEST group's row count, since grids hang from one shared top edge", () => {
+    // 164 → 13 cols × 13 rows; 3 → 2 cols × 2 rows. The band's height is the deeper one.
+    expect(gatherExtent([{ id: "dag", count: 164 }, { id: "tiny", count: 3 }]).h).toBe(13);
+  });
+
+  it("skips zero-count groups and answers 0×0 for nothing at all", () => {
+    expect(gatherExtent([])).toEqual({ w: 0, h: 0 });
+    expect(gatherExtent([{ id: "empty", count: 0 }])).toEqual({ w: 0, h: 0 });
+    expect(gatherExtent([{ id: "x", count: 4 }, { id: "empty", count: 0 }])).toEqual({ w: 2, h: 2 });
+  });
+});
+
+// gatherBand answers in FRUSTUM fractions, so these read them back as pixels the way the Engine
+// does: a point `f` half-heights above centre lands at viewH/2 · (1 − f) px from the top.
+describe("gatherBand", () => {
+  const topPx = (b: { topFrac: number }, viewH: number) => (viewH / 2) * (1 - b.topFrac);
+  const halfWidthPx = (b: { halfWidthFrac: number }, viewW: number) => (viewW / 2) * b.halfWidthFrac;
+
+  it("puts the band's top edge on the rail cards' own top, at any viewport height", () => {
+    // --rail-top is 90px, and the canvas rides --topbar-extra exactly as the rails do, so the
+    // cards' top is 90 canvas-local px whatever the filter strip is doing.
+    expect(topPx(gatherBand(1600, 950, false), 950)).toBeCloseTo(90, 6);
+    expect(topPx(gatherBand(390, 780, false), 780)).toBeCloseTo(90, 6);
+  });
+
+  it("spans wider with the rails hidden than with them showing", () => {
+    const cards = gatherBand(1600, 950, false);
+    const scene = gatherBand(1600, 950, true);
+    expect(halfWidthPx(scene, 1600)).toBeGreaterThan(halfWidthPx(cards, 1600) * 1.5);
+  });
+
+  it("clears the wider rail on BOTH sides — the band is centred on the screen, not on the gap", () => {
+    // Centring on the screen means the band never slides sideways when a rail comes or goes; the
+    // price is that the WIDER rail (the right one, --detail-w 320) binds both edges.
+    const b = gatherBand(1600, 950, false);
+    expect(halfWidthPx(b, 1600)).toBeCloseTo(1600 / 2 - (26 + 320) - 24, 6);
+  });
+
+  it("ignores the rails below the tier where they stop being inline columns", () => {
+    // Under 1100px they are dock sheets over the scene, so there is no column to clear.
+    expect(gatherBand(900, 800, false)).toEqual(gatherBand(900, 800, true));
+  });
+
+  it("leaves the LiveStrip's lane free below the band", () => {
+    const b = gatherBand(1600, 950, false);
+    expect(90 + (950 / 2) * b.heightFrac).toBeLessThanOrEqual(950 - 130);
+  });
+
+  it("never returns a negative box, however cramped the viewport", () => {
+    const b = gatherBand(320, 240, false);
+    expect(b.halfWidthFrac).toBeGreaterThan(0);
+    expect(b.heightFrac).toBeGreaterThanOrEqual(0);
+  });
+});
+
+describe("GATHER_MAX_GROWTH", () => {
+  // Shrinking is deliberately unbounded (phone portrait: fitting is the whole point) and only
+  // GROWTH is capped, so a sparse network set can't blow the staging squares up to fill the
+  // screen. A cap at or below 1 would disable growing entirely.
+  it("caps growth above the tuned size without bounding the shrink", () => {
+    expect(GATHER_MAX_GROWTH).toBeGreaterThan(1);
   });
 });

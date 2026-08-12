@@ -19,7 +19,7 @@ import { metaAnchor, META_LAYERS, META_RING, DAG_L0, DAG_L1, HYPER_TILT, applyHy
 import { LEDGER, type RailGroup } from "../domain/ledgerLayout";
 import { metaTrayLayout, dagTrayLayout, containerChipPos, type ContainerSpec } from "../domain/ledgerRails";
 import { LANE_IDS } from "../domain/ledgerModel";
-import { gatherSlots } from "../domain/gatherLayout";
+import { gatherSlots, gatherExtent, GATHER_MAX_GROWTH, type GatherExtent } from "../domain/gatherLayout";
 import type { ViewTransition } from "../domain/viewTransition";
 import type { SceneColors } from "../sceneColors";
 import * as geoStats from "../domain/geoStats";
@@ -35,7 +35,7 @@ import { ccToNumeric, countryCcAt, countryLean, geometryRings, mainPolygonRings,
 import { closeness, NODE_RAISE } from "../domain/cameraRig";
 import type { CohortSel } from "../domain/focusLadder";
 import { ancestryGlow } from "../domain/dimModel";
-import { NodeFabric, type FrameCtx } from "./objects/NodeFabric";
+import { NodeFabric, GATHER_SCALE, type FrameCtx } from "./objects/NodeFabric";
 import { Arcs } from "./objects/Arcs";
 import { makeRadialGradientTexture } from "./objects/gradientTexture";
 import type { HyperView } from "./views/HyperView";
@@ -58,10 +58,10 @@ import type {
 const HEX_BASE_R = R + LAND_H + 0.02 + HEX_H / 2;
 const hexPitchDeg = (r: number) => ((2 * r * 1.04) / (R + LAND_H)) * (180 / Math.PI);
 
-// View-transition staging grid: the cell pitch (world units) at the DESKTOP reference aspect.
-// The Engine scales this down for narrower (e.g. phone-portrait) viewports — see setGatherCell —
-// so the packed row of per-network squares (domain/gatherLayout) still fits the frustum width;
-// unscaled it overflowed badly at phone aspect (verified live, Task 8).
+// View-transition staging grid: the REFERENCE cell pitch (world units). setGatherFit scales it
+// (with the chip size, by one factor) so the packed row of per-network squares
+// (domain/gatherLayout) fills the band the Engine measured against the HUD — shrinking on a
+// phone-portrait viewport, growing when the rails are away and there is room.
 export const GATHER_CELL = 0.55;
 
 // The ledger's whole-view orientation (tilt ∘ rotY), baked into every node's ledger position so the
@@ -116,6 +116,7 @@ export class Globe implements GeoViewHost {
   private _gatherN = new THREE.Vector3(); //  scratch: the staging plane's camera-facing normal
   private _gatherZ = new THREE.Vector3(); //  scratch: the staging basis' Z (= -up)
   private _gatherM = new THREE.Matrix4(); //  scratch: the staging orientation basis
+  private _gatherExtent: GatherExtent = { w: 0, h: 0 }; // the packed row's size in CELLS (event-time)
   private ledgerT = 0; // 0->1 ease as the reused node meshes fly from their source view into the lanes
   clock = 0;
   private spin: SpinState | null = null;
@@ -228,7 +229,7 @@ export class Globe implements GeoViewHost {
       dim: 0, clock: 0, camN: this._camN, hasCam: false,
       ledgerT: 0, dt: 0, flashDecay: 0, group: this.group,
       transition: null,
-      gather: { origin: new THREE.Vector3(), right: new THREE.Vector3(), up: new THREE.Vector3(), quat: new THREE.Quaternion(), cell: GATHER_CELL },
+      gather: { origin: new THREE.Vector3(), right: new THREE.Vector3(), up: new THREE.Vector3(), quat: new THREE.Quaternion(), cell: GATHER_CELL, scale: GATHER_SCALE },
     };
 
     // The geo globe surface (body, graticule, atmosphere, continents) — it sets the surface handles
@@ -441,6 +442,7 @@ export class Globe implements GeoViewHost {
     }
 
     const slots = gatherSlots(groups);
+    this._gatherExtent = gatherExtent(groups);
     const apply = (recs: { gU: number; gV: number; gRank: number; gCount: number }[], s: { u: number; v: number; rank: number; count: number }) =>
       recs.forEach((r) => { r.gU = s.u; r.gV = s.v; r.gRank = s.rank; r.gCount = s.count; });
 
@@ -1091,11 +1093,21 @@ export class Globe implements GeoViewHost {
     g.quat.setFromRotationMatrix(this._gatherM);
   }
 
-  // Narrow (e.g. phone-portrait) viewports: the Engine scales the cell down from GATHER_CELL so
-  // the packed staging row still fits the frustum width (verified live, Task 8 — unscaled, the
-  // DAG's big square ran off the right edge at phone aspect).
-  setGatherCell(cell: number): void {
-    this._ctx.gather.cell = cell;
+  // Fit the packed staging row into the band the Engine measured (world units on the staging
+  // plane). ONE factor drives BOTH the cell pitch and the chip scale: growing the cell alone
+  // would spread same-size chips into a sparse scatter, and the grid only reads as a square
+  // because the nodes ARE its pixels. Shrinking is unbounded (phone portrait — fitting is the
+  // whole point); growth is capped by GATHER_MAX_GROWTH so a sparse network set can't blow up
+  // to fill the screen.
+  setGatherFit(availW: number, availH: number): void {
+    const e = this._gatherExtent;
+    const g = this._ctx.gather;
+    let s = GATHER_MAX_GROWTH;
+    if (e.w > 0) s = Math.min(s, availW / (e.w * GATHER_CELL));
+    if (e.h > 0) s = Math.min(s, availH / (e.h * GATHER_CELL));
+    if (!Number.isFinite(s) || s <= 0) s = 1;
+    g.cell = GATHER_CELL * s;
+    g.scale = GATHER_SCALE * s;
   }
 
   // -------------------------------------------------- morph between layouts

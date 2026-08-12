@@ -9,7 +9,7 @@ import { hoverKeyOf, tooltipSubject } from "@/src/data/hoverSubject";
 import { identityMap, identitySceneHex } from "@/src/palette/identity";
 import { createScene, type SceneCtx } from "./scene/SceneContext";
 import { HyperView, type MetaHubRec } from "./scene/views/HyperView";
-import { Globe, GATHER_CELL } from "./scene/Globe";
+import { Globe } from "./scene/Globe";
 import { LedgerView } from "./scene/views/LedgerView";
 import { UNLISTED_KEY } from "./domain/ledgerBands";
 
@@ -26,6 +26,7 @@ import { countryFraming } from "./domain/countryShape";
 import { R as GEO_R, LAND_H } from "./domain/geoLayout";
 import { clickActions, pickActive, pickNetId, viewEntryActions, metaSnapSelectActions, bandSelectActions } from "./domain/pickActions";
 import { ViewTransition, is3D } from "./domain/viewTransition";
+import { gatherBand } from "./domain/gatherLayout";
 import { LADDERS, hasLevel, type CohortSel, type CompositionSel, type FocusLevel, type SelectionSnapshot, type ResolverKey } from "./domain/focusLadder";
 import { compositionGroups, compositionKey, compositionRows } from "@/src/data/composition";
 import { metaSnapDeepKey, metaSnapHoverKey } from "@/src/data/types";
@@ -36,16 +37,11 @@ import type { ClusterNode, DagCore, GeoMap, RouteMetagraph } from "@/src/data/ty
 type Vec = THREE.Vector3;
 
 // View-transition staging plane (the gather grids the nodes fly to at the top of the viewport).
-// GATHER_DIST = the plane's depth in front of the camera; GATHER_TOP_FRAC = fraction of the
-// frustum half-height above centre where the band sits (the top third). Both camera-anchored, so
-// the grids read the same at any pose.
+// GATHER_DIST is the plane's depth in front of the camera; WHERE the band sits and how wide it
+// may run is `gatherBand` (domain/gatherLayout), which measures the HUD rather than guessing —
+// the top edge lines up with the rail cards' own top, and the band spans the whole viewport
+// when the rails are hidden (user, 2026-08-12). Camera-anchored, so it reads the same at any pose.
 const GATHER_DIST = 34;
-const GATHER_TOP_FRAC = 0.62;
-// The aspect the staging grid's cell size (Globe's GATHER_CELL) was tuned at (desktop-ish
-// 16:10). Narrower viewports (phone portrait, aspect ~0.46) scale the cell down proportionally
-// so the packed row of per-network squares (domain/gatherLayout) still fits the frustum width —
-// verified live (Task 8): unscaled, the DAG's big square ran off the right edge at phone width.
-const GATHER_CELL_ASPECT_REF = 1.6;
 
 // id[] -> { id: sceneColorNumber }, resolved through the identity map (Task 1). The scene
 // layer never imports the TS generator — the Engine owns the map and hands scene colors
@@ -1484,12 +1480,13 @@ export class Engine {
       this.ctx.camera.getWorldDirection(this._gatherO); // forward (scratch reuse)
       this._gatherO.multiplyScalar(GATHER_DIST).add(this.ctx.camera.position);
       const h = Math.tan(THREE.MathUtils.degToRad(this.ctx.camera.fov / 2)) * GATHER_DIST;
-      this._gatherO.addScaledVector(this._gatherU2, h * GATHER_TOP_FRAC);
+      // The band clears the HUD it flies in front of: its top edge sits on the rail cards' own
+      // top, and it spans the full viewport width when the rails are away. `_gatherO` is the
+      // band's TOP EDGE (gatherLayout hangs every grid downward from it).
+      const band = gatherBand(window.innerWidth, window.innerHeight, this.railsHidden);
+      this._gatherO.addScaledVector(this._gatherU2, h * band.topFrac);
       this.globe.setGatherFrame(this._gatherO, this._gatherR, this._gatherU2);
-      // Phone/narrow viewports: shrink the cell so the row's total width still fits — never
-      // grow it past the reference aspect's size (Math.min(1, …)).
-      const cellScale = Math.min(1, this.ctx.camera.aspect / GATHER_CELL_ASPECT_REF);
-      this.globe.setGatherCell(GATHER_CELL * cellScale);
+      this.globe.setGatherFit(h * this.ctx.camera.aspect * band.halfWidthFrac * 2, h * band.heightFrac);
     }
   }
 
