@@ -16,14 +16,13 @@ import type { ChannelSnapDeep, ChannelSnapRow } from "@/src/data/types";
 import { getNetwork, SIGNER_GROUPS, metagraphById, shortHash } from "@/src/data/network";
 import { UNLISTED_HUE } from "@/src/data/unlisted";
 import { snapsAtTick } from "@/src/data/anchorLog";
-import { PAYLOAD_LANES, parsePayload, payloadKinds } from "@/src/data/payloadKinds";
+import { PAYLOAD_LANES } from "@/src/data/payloadKinds";
 import { fmtBytes, fmtDag, fmtKB } from "@/src/util/format";
 import { relativeAge } from "@/src/util/relativeAge";
 import { useMinHold } from "@/components/useMinHold";
 import { useNowTick } from "@/components/useNowTick";
 import { identityHudHex } from "@/src/palette/identity";
 import { PulseEdge, useEdgePulse } from "@/components/EdgePulse";
-import { NodeStars } from "@/components/state/StateAtoms";
 import { METASNAP_ICON, KIND_MARK_CLASS } from "@/components/icons";
 import { followToggleActions, metaSnapSelectActions } from "@/src/engine/domain/pickActions";
 import { applyClickActions } from "@/src/store/applyClickActions";
@@ -101,11 +100,6 @@ export default function MetaSnapPane({
     const t = setTimeout(() => setDecodeGaveUp(true), 12000);
     return () => clearTimeout(t);
   }, [sel, deepAsked, deep]);
-
-
-  // The signers, deep read first (it re-reads the same proofs straight off the channel, so it wins
-  // when it lands) — but the tick's exact read already carries them, so the rows never wait on it.
-  const signers = deep?.signers ?? row?.signers ?? null;
 
   const pulseKey = useEdgePulse(sel ? `${sel.metaId}:${sel.ordinal}` : null);
   // The metagraph snapshot is exactly as LIVE as the global while following (advanceMetaSnap rides
@@ -195,30 +189,16 @@ export default function MetaSnapPane({
               {row ? (
                 <>
                   {/* Fee leads, size rides under it — the global card's own two-line value, so
-                      the pair reads identically on both storeys of the chain. */}
+                      the pair reads identically on both storeys of the chain. (The two signer
+                      counts moved INTO the payload sections above, each under the bytes its
+                      cluster vouches for — user, 2026-08-13: "two separate types of signers
+                      actually related to those sections". SIGNER_GROUPS still owns the words.) */}
                   <Fact label="Fees paid">
                     <span className="flex flex-col items-end">
                       <span className="whitespace-nowrap"><b className="font-bold">{fmtDag(row.fee)}</b> DAG</span>
                       <span className="text-label text-muted-foreground">{fmtKB(row.bytes / 1024)} anchored</span>
                     </span>
                   </Fact>
-                  {/* The two signer groups, SEPARATED (user, 2026-08-10: "general signing is L0
-                      validator, and data updates are separate and have separate signers as
-                      dL1's? Perhaps that also warrants a separation on the metagraph cards?").
-                      They are different clusters doing different work — the L0 cluster seals the
-                      snapshot (DOR: the same 3 of its 20 machines every time), a rotating dL1
-                      subset produces the data blocks — so one merged count would be a lie about
-                      both. One home for the words: SIGNER_GROUPS. The NAMES behind the counts
-                      live one tier down, in the raw layer's SIGNERS lane, which lists both groups
-                      as a real table; a city column under "Signed by" claimed that cities sign. */}
-                  <Fact label="Signed by" title={SIGNER_GROUPS.proof.title}>
-                    {signers?.length ?? 0} {SIGNER_GROUPS.proof.who}
-                  </Fact>
-                  {deep && deep.dataBlockSigners.length > 0 && (
-                    <Fact label="Blocks by" title={SIGNER_GROUPS.dataBlocks.title}>
-                      {deep.dataBlockSigners.length} {SIGNER_GROUPS.dataBlocks.who}
-                    </Fact>
-                  )}
                 </>
               ) : !row && exact ? (
                 // The tick's exact read landed and is immutable, and this snapshot's row is not
@@ -330,12 +310,12 @@ export default function MetaSnapPane({
                   like `stateProof` does: descriptor first, polled buffer behind it. The em-dash
                   survives for the one case that is genuinely unknown — a snapshot stepped to
                   after it aged out of the retained buffer — where stating the gap is the point. */}
-              <FootRow label="Hash" value={shortHash(hash)} title={hash} />
+              <FootRow label="Hash" value={shortHash(hash)} title={hash} copy={hash || undefined} />
               {polled?.parent && (
-                <FootRow label="Parent" value={shortHash(polled.parent)} title={polled.parent} />
+                <FootRow label="Parent" value={shortHash(polled.parent)} title={polled.parent} copy={polled.parent} />
               )}
               {stateProof && (
-                <FootRow label="State proof" value={shortHash(stateProof)} title={stateProof} />
+                <FootRow label="State proof" value={shortHash(stateProof)} title={stateProof} copy={stateProof} />
               )}
             </Foot>
           </div>
@@ -374,10 +354,12 @@ export default function MetaSnapPane({
 // standard): if the payload DECODED, the block shows; an empty payload says so honestly instead
 // of hiding. Both routes share one decoder, so decoded-ness can't disagree between them.
 //
-// The two tiers of source stay DELIBERATELY asymmetric and now say so PER SECTION, which is a
-// positive argument for the split: State's bytes ride the tick's free exact row, everything else
-// needs the ~2.5 MB deep read, which stays gated to an explicit pin. So a live-following card
-// states its size and Data states the instrument state — it never implies a count it hasn't read.
+// The two tiers of source stay asymmetric only in DEPTH now, not in unit (user, 2026-08-13 —
+// "state section has size on the right side / data has 'x updates'… make it consistent"): BOTH
+// sections headline in bytes-as-carried, and both ride the tick's free exact row (`stateBytes` /
+// `dataBytes`, the same measure: serialized length). What the ~2.5 MB deep read adds is the
+// INSIDE of each section — the shape rows with their counts, and the signer lines — so a
+// live-following card states both sizes and never implies a count it hasn't read.
 function PayloadBlock({
   row,
   deep,
@@ -400,8 +382,11 @@ function PayloadBlock({
         : [],
     [deep],
   );
+  // Data's one shape row is the RECORD COUNT (user, 2026-08-13 — "instead of showing the data
+  // attributes just say 'records'"): the attribute kinds are the raw layer's reading, where the
+  // payload actually renders; on the card they were a truncated field list nobody could finish.
   const dataRows = useMemo(
-    () => (deep ? payloadKinds(parsePayload(deep.dataTx)).map((k) => ({ name: k.kind, count: k.count })) : []),
+    () => (deep && deep.dataTxCount > 0 ? [{ name: "records", count: deep.dataTxCount }] : []),
     [deep],
   );
 
@@ -424,47 +409,13 @@ function PayloadBlock({
   // IS a serialized state; the ROWS say what it carries, and all-zero rows say "declared these
   // kinds, carried none of them" without the headline having to contradict them.
   const hasState = stateBytes > 0;
-  // Unread is an INSTRUMENT STATE, never a zero — pre-pin the update count simply isn't known, and
-  // `0` would be a fabricated reading.
-  //
-  // WHICH instrument state is the app's own rule, latent in the two existing acquiring surfaces
-  // and written down here because this row got it wrong: NODE-STARS fill a VALUE SLOT that a
-  // number is actually coming into (they reserve its width, so nothing jumps when it lands — the
-  // global card's `Fees paid` does exactly this); a WORD is for when no slot is being reserved —
-  // a whole block acquiring (`AnchoredTags`' stars + "resolving"), or a state that names a
-  // different fact entirely (`Exact read: reading…`, which is replaced wholesale, not filled in).
-  //
-  // So the three states here are three different things and only one of them twinkles:
-  //   • following  → `unread`, a PASSIVE state — a reading, not an instruction. It said `pin to
-  //     read` until 2026-08-10 (user: "I don't like the word 'pin' its not very clear to me"),
-  //     which was internal vocabulary in user copy naming a gesture whose only control was the
-  //     head aside — top of the card, labelled with a TIME. The invitation left this slot
-  //     entirely and became the block's own button, because the deep read fills BOTH sections'
-  //     shape rows: an instruction sitting in one section's value slot was governing the whole
-  //     block, which is the asymmetry the user reacted to. What stays here is the honest reading
-  //     — we have not looked — which is precisely the distinction `none` (we looked, there was
-  //     nothing) cannot carry alone. Stars would promise an arrival that isn't coming.
-  //   • pinned, in flight → the count IS coming into this slot. Stars.
-  //   • pinned, given up → the honest terminal. A deep read can fail (upstream blip / timeout —
-  //     NOT pruning: the LB serves the whole ordinal history, verified 2026-08-13), and without
-  //     this the slot twinkled forever — the same hang the `decodeGaveUp` timer was added to end,
-  //     which this row was simply not consuming.
-  const dataHeadline = deep ? (
-    deep.dataTxCount > 0 ? (
-      <>
-        <b className="font-bold">{deep.dataTxCount.toLocaleString()}</b> update
-        {deep.dataTxCount === 1 ? "" : "s"}
-      </>
-    ) : (
-      <Quiet>none</Quiet>
-    )
-  ) : !asked ? (
-    <Quiet>unread</Quiet>
-  ) : decodeGaveUp ? (
-    <Quiet>unavailable — read failed</Quiet>
-  ) : (
-    <NodeStars count={4} />
-  );
+  // Data headlines the same way — its measured serialized size, deep read first, the free exact
+  // row behind it. `undefined` is a read that predates the field (the browser's immutable HTTP
+  // cache can serve one for up to a day after deploy): "unread", never a fabricated `none`.
+  const dataBytes = deep?.dataBytes ?? row?.dataBytes;
+  // The snapshot's PROOF signers ride the free exact row too, so the State section's seal line
+  // renders before any deep read; the dL1 block signers exist only in the deep read.
+  const proofSigners = deep?.signers ?? row?.signers ?? null;
 
   return (
     <div className="mt-1.5">
@@ -479,13 +430,37 @@ function PayloadBlock({
           )
         }
         rows={stateRows}
+        // The section's own signers (user, 2026-08-13 — "two separate types of signers actually
+        // related to those sections"): the L0 cluster seals the snapshot and its state proof, so
+        // its count reads under State; the words stay SIGNER_GROUPS' (the one home).
+        signers={
+          proofSigners && proofSigners.length > 0
+            ? { label: "Signed by", title: SIGNER_GROUPS.proof.title, count: proofSigners.length, who: SIGNER_GROUPS.proof.who }
+            : null
+        }
       />
       <Separator className="my-2" />
       <PayloadSection
         name={PAYLOAD_LANES.data.name}
         title={PAYLOAD_LANES.data.title}
-        headline={dataHeadline}
+        headline={
+          dataBytes == null ? (
+            <Quiet>unread</Quiet>
+          ) : dataBytes > 0 ? (
+            <b className="font-bold">{fmtBytes(dataBytes)}</b>
+          ) : (
+            <Quiet>none</Quiet>
+          )
+        }
         rows={dataRows}
+        // "Signed by" in BOTH sections (user, 2026-08-13 — was "Blocks by"): the layer word
+        // carries the difference (L0 vs dL1 validators), so the label can be one word for one
+        // relation. SIGNER_GROUPS still owns the words and the layer qualification.
+        signers={
+          deep && deep.dataBlockSigners.length > 0
+            ? { label: "Signed by", title: SIGNER_GROUPS.dataBlocks.title, count: deep.dataBlockSigners.length, who: SIGNER_GROUPS.dataBlocks.who }
+            : null
+        }
       />
     </div>
   );
@@ -493,37 +468,54 @@ function PayloadBlock({
 
 /** An absent or unread value — an instrument state, in the one treatment the card already uses
  *  for them. A section's bare `none` means a different thing in each lane, which is what the
- *  section's own `title` carries; the value column stays short so it can't wrap. */
+ *  section's own `title` carries; the value column stays short so it can't wrap. (The old
+ *  count-headline's stars/`unavailable` states retired with it, 2026-08-13: both sizes now ride
+ *  the free exact row, so nothing in a headline slot is ever in flight — the deep read only adds
+ *  the rows below, and its give-up terminal lives on the read button's own copy path.) */
 function Quiet({ children }: { children: ReactNode }) {
   return <span className="text-muted-foreground italic">{children}</span>;
 }
 
-/** One payload section — the house one-row grammar at TWO weights: the section's own headline
- *  fact, then its shape rows one weight down. That is the same device `Foot` uses (small, muted,
- *  tabular), so a shape row is a WEIGHT and not a second grammar, and both weights keep the
- *  card's one right edge, so a breakdown reads under its own total. */
+/** One payload section — a SECTION HEAD row (the caps-micro register every section label in the
+ *  app wears — the raw pane's lane tabs, the shape table's own column heads), its headline fact
+ *  on the same line, then the shape rows one weight down. The head went caps on 2026-08-13
+ *  (user: with one row under it the body-weight label read as a mis-indented sibling; only after
+ *  several rows arrived did State/Data read as headers) — the register says "header" at any row
+ *  count. The optional `signers` line closes the section at the row weight: the cluster that
+ *  vouches for this section's bytes, its words from SIGNER_GROUPS (the one home). */
 function PayloadSection({
   name,
   title,
   headline,
   rows,
+  signers,
 }: {
   name: string;
   title: string;
   headline: ReactNode;
   rows: { name: string; count: number }[];
+  signers?: { label: string; title: string; count: number; who: string } | null;
 }) {
   return (
     <div className="flex flex-col gap-1">
-      <Fact label={name} title={title}>
-        {headline}
-      </Fact>
+      <div className="flex items-start justify-between gap-2.5" title={title}>
+        <span className="text-micro tracking-caps uppercase text-muted-foreground pt-px">{name}</span>
+        <span className="min-w-0 text-body text-foreground tabular-nums text-right">{headline}</span>
+      </div>
       {rows.map((r) => (
         <div key={r.name} className="flex items-start justify-between gap-2.5 pl-2" title={r.name}>
           <span className="min-w-0 truncate text-label text-foreground-dim">{r.name}</span>
           <span className="shrink-0 text-label text-foreground-dim tabular-nums">{r.count.toLocaleString()}</span>
         </div>
       ))}
+      {signers && (
+        <div className="flex items-start justify-between gap-2.5 pl-2" title={signers.title}>
+          <span className="min-w-0 truncate text-label text-muted-foreground">{signers.label}</span>
+          <span className="shrink-0 text-label text-foreground-dim tabular-nums">
+            {signers.count} {signers.who}
+          </span>
+        </div>
+      )}
     </div>
   );
 }

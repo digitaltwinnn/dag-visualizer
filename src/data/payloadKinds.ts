@@ -18,8 +18,14 @@
  *  nuance the short values can't: `State` is the accumulated on-chain state, `Data` is what THIS
  *  snapshot's blocks carried, which is why a bare "none" means a different thing in each. */
 export const PAYLOAD_LANES = {
-  state: { name: "State", title: "The metagraph's on-chain application state" },
-  data: { name: "Data", title: "Data transactions carried in this snapshot's blocks" },
+  // The titles carry the SIZE distinction (user, 2026-08-13 — "state size plus data size does
+  // not match Fees paid's anchored KB. Why?"): each section's size is its DECODED content, while
+  // the anchored figure is the whole snapshot's compressed wire footprint — brotli is applied to
+  // the whole payload, so a per-section as-carried size does not exist, and the envelope (proofs,
+  // header) belongs to neither section. The two readings can never sum, and the titles say which
+  // one each number is.
+  state: { name: "State", title: "The metagraph's on-chain application state. Its size is the decoded content; the anchored KB is the whole snapshot's compressed footprint." },
+  data: { name: "Data", title: "Data records carried in this snapshot's blocks. Its size is the decoded content; the anchored KB is the whole snapshot's compressed footprint." },
 } as const;
 
 /** A decoded payload string → a tree-renderable value, tolerating an undecodable one (which

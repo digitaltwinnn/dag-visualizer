@@ -62,6 +62,7 @@ async function fetchDeep(ordinal: number, address: string, snapOrdinal: number):
       dataBlockSigners: d.dataBlockSigners,
       dataTxCount: d.dataTxCount,
       dataTx: d.dataTx,
+      dataBytes: d.dataBytes,
     };
     if (snapOrdinal > 0 && row.ordinal === snapOrdinal) return row; // the requested one
     if (!best || row.ordinal > best.ordinal) best = row;
@@ -73,8 +74,9 @@ async function fetchDeep(ordinal: number, address: string, snapOrdinal: number):
 const cachedDeep = (ordinal: number, address: string, snapOrdinal: number) =>
   unstable_cache(
     () => fetchDeep(ordinal, address, snapOrdinal),
-    // v4: deterministic misses are cached as {available:false} (shape rides the key, as ever).
-    ["snapshot-channel-v4", String(ordinal), address, String(snapOrdinal)],
+    // v5: rows carry dataBytes (2026-08-13). v4: deterministic misses cached as
+    // {available:false}. The shape rides the key, as ever.
+    ["snapshot-channel-v5", String(ordinal), address, String(snapOrdinal)],
     { revalidate: 86400 },
   )();
 

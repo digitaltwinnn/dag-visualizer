@@ -100,6 +100,7 @@ async function fetchExact(ordinal: number): Promise<SnapshotExact> {
         hasState: decoded?.hasState ?? false,
         stateBytes: decoded?.stateBytes ?? 0,
         stateProof: decoded?.stateProof ?? null,
+        dataBytes: decoded?.dataBytes ?? 0,
       });
     }
     // Per-metagraph size (bytes) alongside count + fee — the snapshot card reveals it as KB on the
@@ -126,9 +127,9 @@ async function fetchExact(ordinal: number): Promise<SnapshotExact> {
 }
 
 const cachedExact = (ordinal: number) =>
-  // v2: the cache key is versioned WITH the payload shape — signerCount (2026-08-06) would
-  // otherwise be missing from entries cached under the old key for up to a day.
-  unstable_cache(() => fetchExact(ordinal), ["snapshot-exact-v2", String(ordinal)], {
+  // The cache key is versioned WITH the payload shape (v3: rows carry dataBytes, 2026-08-13;
+  // v2: signerCount) — entries cached under an old key would otherwise miss fields for a day.
+  unstable_cache(() => fetchExact(ordinal), ["snapshot-exact-v3", String(ordinal)], {
     revalidate: 86400, // ordinals are immutable; a day is plenty (success is cached, misses throw)
   })();
 
