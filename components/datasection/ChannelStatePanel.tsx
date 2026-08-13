@@ -151,18 +151,35 @@ function SchemaKinds({ kinds }: { kinds: { kind: string; fields: string[] | null
   );
 }
 
-/** One record schema as wrapping squared mono chips — the shared token rendering. */
+/** One record schema as wrapping squared mono chips — the shared token rendering, CAPPED
+ *  (user, 2026-08-14 — "some schemas can have many attributes… just show a few and use a …"):
+ *  a wide record shows its first few fields and a `… +N` chip that expands to the full set;
+ *  NESTING is deliberately ignored everywhere (kindOf reads top-level keys only) — the code
+ *  well below carries the real structure, the chips only say what a record is made of. */
+const FIELD_CHIP_CAP = 6;
 function FieldChips({ fields }: { fields: string[] }) {
+  const [all, setAll] = useState(false);
+  const shown = all ? fields : fields.slice(0, FIELD_CHIP_CAP);
+  const hidden = fields.length - shown.length;
+  const chip = "inline-flex items-center rounded-xs border border-border bg-wash-faint px-[5px] py-[2px] font-mono text-micro leading-none text-muted-foreground";
   return (
     <span className="min-w-0 flex flex-wrap gap-1">
-      {fields.map((f) => (
-        <span
-          key={f}
-          className="inline-flex items-center rounded-xs border border-border bg-wash-faint px-[5px] py-[2px] font-mono text-micro leading-none text-muted-foreground"
-        >
+      {shown.map((f) => (
+        <span key={f} className={chip}>
           {f}
         </span>
       ))}
+      {hidden > 0 && (
+        <button
+          type="button"
+          className={cn(chip, "cursor-pointer hover:text-foreground hover:bg-wash-soft focus-visible:outline focus-visible:outline-1 focus-visible:outline-[var(--primary)]")}
+          title={fields.join(" · ")}
+          aria-label={`Show all ${fields.length} fields`}
+          onClick={() => setAll(true)}
+        >
+          … +{hidden}
+        </button>
+      )}
     </span>
   );
 }
