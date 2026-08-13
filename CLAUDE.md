@@ -236,7 +236,7 @@ central position already tells it's a bit different from the others, not size"* 
 **The camera folder is a READOUT, not sliders**: poses are ~8 constants and each needs its own selection
 state to even see, so orbiting to a pose you like and reading it off beats dragging numbers.
 `capture ← live` dumps the raw `pos`/`target` **with a caution naming the levers the Engine composes on
-top** (`dollyBack`, `railsDolly`, and the subject-relative hub framings). Deliberately raw — per-pose
+top** (`dollyBack`, `railsLean`, and the subject-relative hub framings). Deliberately raw — per-pose
 inverses would be a second home for pose knowledge that drifts silently.
 
 ## Architecture
@@ -331,6 +331,17 @@ for an unstaged view is a compile error, not a silent no-op.
    isn't. A node commit is answered in **every** 3D view, gated on the canvas allow-list (convention 7),
    never a list of modes.
 
+⚠️ **The two global camera levers share one exemption, and one of them RAMPS** (user, 2026-08-13).
+`dollyBack` and `railsLean` both scale `(pos − target)` about the target, so a pose whose target is a
+composed look-at rather than the subject — `nodeFraming`, `cohortFraming` — is exempt from BOTH; the
+exemption belongs to the POSE, and `_tweenTo`'s one `dolly` flag gates both levers. And the
+rails-hidden lean fades out as the pose closes in on its subject: hiding the rails frees **horizontal**
+width while the FOV is **vertical**, so the radial dolly buys width by spending vertical fit — free at
+a resting pose, whose subject runs wide, and a crop at a deep rung, whose subject (a co-located stack,
+a hub's shells) is height-bound. `restOrbit(view)` reads the resting orbit out of `FOCI`, so re-tuning
+a resting pose re-tunes the ramp with it, and `RAILS_HIDDEN_DOLLY` stays the one lever — it is what
+"full lean" means, not a second knob.
+
 ⚠️ **Three's raycaster ignores `object.visible`.** Hiding a group does not stop it being picked — it
 has to be left out of `pickSources`.
 
@@ -342,7 +353,7 @@ finger because you navigate a plane; here the pose system owns where the camera 
 pointer down invalidates the pair *and* a running step, because a pinch dollies the same axis; and the
 pair's **second click is eaten**, or it would toggle off the hub / country / tile the first tap just
 committed. A pair landing mid-flight retargets the tween's destination rather than fighting it — and
-not through `_tweenTo`, which would compose `dollyBack` and `railsDolly` in a second time.
+not through `_tweenTo`, which would compose `dollyBack` and `railsLean` in a second time.
 
 ## The 3D↔3D view transition
 

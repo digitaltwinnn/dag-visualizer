@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import * as THREE from "three";
-import { FOCI, hubFraming, geoFraming, ledgerCommitTilt, LEDGER_TILT_YAW, LEDGER_TILT_PITCH, LEDGER_TILT_DOLLY, easeInOutQuad, CAM_ZOOM, dollyBack, RAILS_HIDDEN_DOLLY, railsDolly, nodeFraming, cohortFraming, isSamePose, nudgeMix, NUDGE_AMP, NUDGE_DUR, NUDGE_SAME, closeness, CLOSE_FAR_ALT, CLOSE_NEAR_ALT, NODE_RAISE } from "./cameraRig";
+import { FOCI, hubFraming, geoFraming, ledgerCommitTilt, LEDGER_TILT_YAW, LEDGER_TILT_PITCH, LEDGER_TILT_DOLLY, easeInOutQuad, CAM_ZOOM, dollyBack, RAILS_HIDDEN_DOLLY, railsLean, restOrbit, nodeFraming, cohortFraming, isSamePose, nudgeMix, NUDGE_AMP, NUDGE_DUR, NUDGE_SAME, closeness, CLOSE_FAR_ALT, CLOSE_NEAR_ALT, NODE_RAISE } from "./cameraRig";
 
 // NO Snapshots framing is pinned here, because the view HAS none: it owns one pose, `FOCI.ledger`,
 // with one state-keyed variation — `ledgerCommitTilt`, the commit ORBIT, pinned below. Five framings
@@ -140,23 +140,60 @@ describe("dollyBack (the one global zoom lever)", () => {
   });
 });
 
-describe("railsDolly (the rails-hidden camera lean, 2026-08-08)", () => {
-  it("leans IN toward the pose's target by RAILS_HIDDEN_DOLLY, leaving the target fixed", () => {
+describe("railsLean (the rails-hidden camera lean, 2026-08-08; ramped 2026-08-13)", () => {
+  it("leans IN toward the pose's target by RAILS_HIDDEN_DOLLY at the resting orbit, target fixed", () => {
     const pos = new THREE.Vector3(0, 0, 12);
     const target = new THREE.Vector3(0, 0, 2);
     const out = new THREE.Vector3();
-    railsDolly(pos, target, out);
+    railsLean(pos, target, 10, out); // orbit === restDist → k = 1, the full lean
     expect(out.z).toBeCloseTo(2 + 10 * RAILS_HIDDEN_DOLLY, 9);
     expect(pos.z).toBe(12); // inputs untouched
     expect(target.z).toBe(2);
+  });
+  it("RAMPS OUT as the pose closes in on its subject (user, 2026-08-13)", () => {
+    // Half the resting orbit takes half the lean; a pose sitting ON its subject takes none.
+    const pos = new THREE.Vector3(0, 0, 12);
+    const target = new THREE.Vector3(0, 0, 2);
+    const out = new THREE.Vector3();
+    railsLean(pos, target, 20, out); // k = 0.5
+    expect(out.z).toBeCloseTo(2 + 10 * (1 - (1 - RAILS_HIDDEN_DOLLY) * 0.5), 9);
+    railsLean(pos, target, 1e9, out); // k → 0
+    expect(out.z).toBeCloseTo(12, 6);
+  });
+  it("clamps at full lean — a pose ORBITING WIDER than rest never over-leans", () => {
+    // The ledger commit tilt dollies OUT (×1.08), so k would exceed 1 without the clamp.
+    const pos = new THREE.Vector3(0, 0, 12);
+    const target = new THREE.Vector3(0, 0, 2);
+    const wide = new THREE.Vector3();
+    const at = new THREE.Vector3();
+    railsLean(pos, target, 5, wide);
+    railsLean(pos, target, 10, at);
+    expect(wide.distanceTo(at)).toBeLessThan(1e-12);
+  });
+  it("takes the FULL lean when there is no resting pose to measure against (restDist <= 0)", () => {
+    const pos = new THREE.Vector3(0, 0, 12);
+    const target = new THREE.Vector3(0, 0, 2);
+    const out = new THREE.Vector3();
+    railsLean(pos, target, 0, out);
+    expect(out.z).toBeCloseTo(2 + 10 * RAILS_HIDDEN_DOLLY, 9);
   });
   it("is safe to compose IN PLACE (outPos === pos — the Engine leans tween destinations)", () => {
     const pos = new THREE.Vector3(3, 4, 12);
     const target = new THREE.Vector3(1, 0, 2);
     const expected = new THREE.Vector3();
-    railsDolly(pos, target, expected);
-    railsDolly(pos, target, pos); // in place
+    railsLean(pos, target, 14, expected);
+    railsLean(pos, target, 14, pos); // in place
     expect(pos.distanceTo(expected)).toBeLessThan(1e-12);
+  });
+});
+
+describe("restOrbit (what the lean's ramp measures against)", () => {
+  it("reads each 3D view's resting orbit distance out of FOCI, so re-tuning a pose re-tunes the ramp", () => {
+    for (const [view, key] of [["hyper", "overview"], ["geo", "geo"], ["ledger", "ledger"]] as const) {
+      const f = FOCI[key];
+      expect(restOrbit(view)).toBeCloseTo(f.pos.distanceTo(f.target), 9);
+      expect(restOrbit(view)).toBeGreaterThan(0);
+    }
   });
 });
 

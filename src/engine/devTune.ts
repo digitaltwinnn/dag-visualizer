@@ -180,8 +180,10 @@ export async function mountDevTune(targets: DevTuneTargets): Promise<DevTuneHand
       `target.set(${cam.tx.toFixed(2)}, ${cam.ty.toFixed(2)}, ${cam.tz.toFixed(2)});\n` +
       `// ⚠️ RAW live numbers. The Engine composes levers onto a resolved pose before tweening, so\n` +
       `//    for a pose that takes them these are already lever'd and must be divided back out:\n` +
-      `//      · dollyBack   ×${CAM_ZOOM} — every FOCI preset and framing EXCEPT nodeFraming/cohortFraming\n` +
-      `//      · railsDolly  ×${RAILS_HIDDEN_DOLLY} — composed into every destination while the rails are hidden\n` +
+      `//      · dollyBack  ×${CAM_ZOOM} — every FOCI preset and framing EXCEPT nodeFraming/cohortFraming\n` +
+      `//      · railsLean  ×${RAILS_HIDDEN_DOLLY} at MOST, and only while the rails are hidden. Exempt on the same\n` +
+      `//        poses dollyBack is, and RAMPED by how close the pose orbits vs its view's resting one —\n` +
+      `//        so at a deep rung its factor is near 1 and there is little to divide back out.\n` +
       `//    hubFraming/hyperNodeFraming compose from the SUBJECT's own radial basis, so raw numbers\n` +
       `//    there describe one subject only — read them as a delta, not as constants.`,
     );

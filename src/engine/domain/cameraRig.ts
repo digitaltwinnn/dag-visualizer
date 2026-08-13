@@ -5,6 +5,7 @@
 // Engine's per-focus calls (mousemove-adjacent, filter/country changes) allocate nothing.
 
 import * as THREE from "three";
+import type { View3D } from "./viewTransition";
 
 export interface CameraFraming {
   pos: THREE.Vector3;
@@ -48,7 +49,7 @@ export const FOCI: Record<string, { pos: THREE.Vector3; target: THREE.Vector3 }>
   // viewport", then "lower it a little bit, in HUD mode it's too high now"): pos.y and target.y
   // are lowered by the SAME 4.5, which translates the frustum down without touching the view
   // direction — so the ~6° pitch is preserved exactly and the chamber centres in the band between
-  // the topbar and the LiveStrip. Both global levers survive it: dollyBack and railsDolly scale
+  // the topbar and the LiveStrip. Both global levers survive it: dollyBack and railsLean scale
   // (pos − target) around the target, so a pure translation of the pair is invariant under them.
   ledger: { pos: new THREE.Vector3(0, -1, 54), target: new THREE.Vector3(0, -7, 0) },
 };
@@ -61,6 +62,14 @@ export const FOCI: Record<string, { pos: THREE.Vector3; target: THREE.Vector3 }>
 // along that axis drags the camera away from the node instead of widening the shot — its
 // numbers are ABSOLUTE. Any new pose with a composed (non-subject) target must decide this
 // explicitly.
+//
+// ⚠️ THE EXEMPTION IS THE POSE'S, NOT THIS LEVER'S — `railsLean` INHERITS IT (2026-08-13). Both
+// levers scale (pos − target) about the target, so the argument above is about the AXIS and applies
+// to either of them verbatim: on a composed look-at there is no honest radial to move along. The
+// rails lean was added later and composed centrally, so it never inherited the exemption and leaned
+// geo's node pose 14% down an axis aimed 15 units up the globe's face — the node ended up 3.3×
+// closer and half out of frame in scene mode, which is what the user reported as "it zooms in too
+// much". One flag now gates both (`_tweenTo`'s `dolly`), because there is one reason.
 export const CAM_ZOOM = 1.15;
 export function dollyBack(pos: THREE.Vector3, target: THREE.Vector3, outPos: THREE.Vector3): void {
   outPos.subVectors(pos, target).multiplyScalar(CAM_ZOOM).add(target);
@@ -74,9 +83,33 @@ export function dollyBack(pos: THREE.Vector3, target: THREE.Vector3, outPos: THR
 // the canonical pose (no inverse math, no desync when a reframe happened in between — the
 // original from-the-live-pose delta drifted across holdCamera, flat views and clamps).
 // Safe to call with `outPos === pos` (subVectors reads before it writes).
+//
+// ⚠️ THE LEAN IS A RESTING-POSE TRADE, SO IT FADES OUT AS THE POSE CLOSES IN (user, 2026-08-13 —
+// "looks great in unfiltered mode in scene starting position, but when filtered at the lowest level
+// … it zooms in too much; probably the zoom effect should be reduced depending on how close they
+// sit to the actual subject compared to scene starting position"). The physical argument is the
+// whole rule: what hiding the rails frees is HORIZONTAL width (at 1600px the band goes 908px →
+// 1600px, +76%), but the camera's FOV is VERTICAL, so a radial dolly buys the horizontal gain by
+// spending vertical fit. At the resting pose the subject is width-bound — the globe, the hub ring,
+// the lane field all run wide — so the trade is free. At a deep rung the subject is HEIGHT-bound: a
+// co-located stack grows upward off its surface point, a hub's shells fill the frame vertically. So
+// the same 14% crops exactly where there is nothing left to crop. `railsLean` ramps the factor with
+// the pose's own orbit distance against its view's resting one: full lean at rest, none at the
+// subject. It is the one lever, not a second knob — RAILS_HIDDEN_DOLLY is still what "full" means.
 export const RAILS_HIDDEN_DOLLY = 0.86;
-export function railsDolly(pos: THREE.Vector3, target: THREE.Vector3, outPos: THREE.Vector3): void {
-  outPos.subVectors(pos, target).multiplyScalar(RAILS_HIDDEN_DOLLY).add(target);
+// The resting pose each view's lean is measured against — the user's "scene starting position".
+// Read out of FOCI rather than restated, so re-tuning a resting pose re-tunes the ramp with it.
+const REST_POSE: Record<View3D, keyof typeof FOCI> = { hyper: "overview", geo: "geo", ledger: "ledger" };
+export function restOrbit(view: View3D): number {
+  const f = FOCI[REST_POSE[view]];
+  return f.pos.distanceTo(f.target);
+}
+/** Lean `pos` toward `target`, at full strength only while the pose orbits as wide as its view's
+ *  resting one. `restDist <= 0` means "no resting pose to measure against" (a flat view, which has
+ *  no canvas anyway) and takes the full lean, exactly as the un-ramped lever did. */
+export function railsLean(pos: THREE.Vector3, target: THREE.Vector3, restDist: number, outPos: THREE.Vector3): void {
+  const k = restDist > 0 ? THREE.MathUtils.clamp(pos.distanceTo(target) / restDist, 0, 1) : 1;
+  outPos.subVectors(pos, target).multiplyScalar(1 - (1 - RAILS_HIDDEN_DOLLY) * k).add(target);
 }
 
 // ---- the geo NODE pose ----------------------------------------------------------------------
@@ -246,7 +279,7 @@ export function nudgeMix(t: number): number {
 // field presents. The composition is still filter-independent: the orbit is the same for every
 // network, so no lane is ever framed better than another.
 //
-// Composes cleanly with both global levers (`dollyBack`, `railsDolly`): they scale (pos − target)
+// Composes cleanly with both global levers (`dollyBack`, `railsLean`): they scale (pos − target)
 // about the target, which commutes with a rotation about that same target. Safe to call with
 // `outPos === pos` — the scratch read happens before the write.
 export const LEDGER_TILT_YAW = 0.23; // rad ≈ 13°, orbiting toward +X (the lane field's right end)

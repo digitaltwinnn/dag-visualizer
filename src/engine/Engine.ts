@@ -21,7 +21,7 @@ import { BYTE_SCALE_KB, type RailGroup } from "./domain/ledgerLayout";
 import { HYPER_TILT, HYPER_TILT_FOCUS } from "./domain/hyperLayout";
 import { readSceneColors } from "./sceneColors";
 import { VIEW_POLICIES, type ViewPolicy } from "./domain/viewPolicy";
-import { FOCI, hubFraming, geoFraming, nodeFraming, cohortFraming, ledgerCommitTilt, dollyBack, railsDolly, easeInOutQuad, isSamePose, nudgeMix, NUDGE_DUR, type CameraFraming } from "./domain/cameraRig";
+import { FOCI, hubFraming, geoFraming, nodeFraming, cohortFraming, ledgerCommitTilt, dollyBack, railsLean, restOrbit, easeInOutQuad, isSamePose, nudgeMix, NUDGE_DUR, type CameraFraming } from "./domain/cameraRig";
 import { countryFraming } from "./domain/countryShape";
 import { R as GEO_R, LAND_H } from "./domain/geoLayout";
 import { clickActions, pickActive, pickNetId, viewEntryActions, metaSnapSelectActions, bandSelectActions } from "./domain/pickActions";
@@ -222,8 +222,8 @@ export class Engine {
   // listeners): wheel-zoom fires start/end per notch, so `sceneDragging` only drops after a
   // quiet 350ms. A POINTER gesture doesn't wait for it — see `_onPointerRelease`.
   private _dragEndT: ReturnType<typeof setTimeout> | undefined;
-  // Store mirror for the rails-hidden camera lean — _tweenTo composes railsDolly into every
-  // destination while it holds (see the subscription note). Seeded from the store at boot.
+  // Store mirror for the rails-hidden camera lean — _tweenTo composes railsLean into every
+  // dolly-eligible destination while it holds (see the subscription note). Seeded at boot.
   private railsHidden = false;
   private _onControlsStart = () => {
     clearTimeout(this._dragEndT);
@@ -1376,10 +1376,14 @@ export class Engine {
     else tw.toPos.copy(toPos);
     tw.fromTgt.copy(this.ctx.controls.target);
     tw.toTgt.copy(toTgt);
-    // The rails-hidden LEAN composes into EVERY destination (2026-08-08, review-hardened): a
-    // property of pose resolution, so focus flights, transition landings and the presentation
-    // toggle can never disagree about it. In place (railsDolly is outPos===pos safe).
-    if (this.railsHidden) railsDolly(tw.toPos, tw.toTgt, tw.toPos);
+    // The rails-hidden LEAN composes into every destination a dolly may touch (2026-08-08,
+    // review-hardened): a property of pose resolution, so focus flights, transition landings and
+    // the presentation toggle can never disagree about it. In place (railsLean is outPos===pos
+    // safe). It rides the SAME `dolly` gate as dollyBack — both scale (pos − target) about the
+    // target, so a pose whose target is a composed look-at is exempt from both (see the exemption
+    // note next to CAM_ZOOM). And it RAMPS with how close the pose already sits to the view's
+    // resting orbit, which is what `restOrbit` measures — see railsLean's own note.
+    if (dolly && this.railsHidden) railsLean(tw.toPos, tw.toTgt, is3D(this.mode) ? restOrbit(this.mode) : 0, tw.toPos);
     // THE COMMIT NUDGE (user, 2026-08-13): "we always animate the position but a 'nudge' is allowed
     // which means the new pos will be same as old pos". Every rung answers a click, including the
     // ones whose pose is their parent's — hyper's node and composition rungs resolve to the network
@@ -1688,7 +1692,7 @@ export class Engine {
    * two owners:
    *
    * - A commit flight in the air → scale its DESTINATION once, in place, and let the flight land
-   *   zoomed in. ⚠️ NOT through `_tweenTo`, which composes `dollyBack` and `railsDolly` into every
+   *   zoomed in. ⚠️ NOT through `_tweenTo`, which composes `dollyBack` and `railsLean` into every
    *   destination it is handed — routing a direct dolly through it would apply both levers a
    *   second time.
    * - Settled → the eased step below, which is the only camera motion the Engine owns that isn't
