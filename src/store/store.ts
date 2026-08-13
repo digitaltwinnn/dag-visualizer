@@ -168,10 +168,12 @@ interface AppState {
   // `sceneDragging`'s "the user's hand is on the scene" (user, 2026-08-12: "when we swipe a card
   // or click another one in the card hierarchy the scene moves the camera accordingly; during
   // this short animation period can we apply a similar effect to the cards/panels as when we
-  // manually use the camera controls"). Both rails and both dock sheets yield to it, because a
-  // commit made from a card is a request to LOOK at what was committed. Written by the Engine on
-  // the tween's edges only (never per frame), and NOT during a view transition: that choreography
-  // is its own 3.9s answer to the user's gesture, so a 1.4s dim inside it would read as a blink.
+  // manually use the camera controls"). Consumed by the PHONE dock sheet only — every wider tier
+  // has its own way to step the HUD aside (desktop's SCENE toggle, the tablet edge tab), so they
+  // opt out (user, 2026-08-13 — the ⚠️ block in RailShade.tsx has the reasoning). Written by the
+  // Engine on the tween's edges only (never per frame), and NOT during a view transition: that
+  // choreography is its own 3.9s answer to the user's gesture, so a 1.4s dim inside it would read
+  // as a blink.
   cameraFlying: boolean;
   // PHONE ONLY: whether the top bar's vitals row is expanded (the bar grows downward by one
   // full-width row showing the active view's vitals). A USER CHOICE that persists across view

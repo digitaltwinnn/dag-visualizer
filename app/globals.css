@@ -591,13 +591,15 @@
   /* Rail collapse-to-thread + scene-yield dim (RailShade.tsx, 2026-08-08). `visibility:
      hidden` rather than display:none — layout is PRESERVED so RailThread keeps measuring the
      cards and its dots remain as the minimized rail (the possibility map). The visibility
-     flip is delayed until the opacity fade lands; dim is a plain opacity drop while the
-     CAMERA is moving under either hand (see `useSceneYield`). */
+     flip is delayed until the opacity fade lands; dim is a plain opacity drop while the user's
+     own hand is on the camera (see `useSceneYield`). */
   .rail-shade { transition: opacity 0.3s ease, visibility 0s linear 0s; }
   .rail-shade[data-hidden] { opacity: 0; visibility: hidden; transition: opacity 0.3s ease, visibility 0s linear 0.3s; }
   .rail-shade[data-dim] { opacity: 0.4; }
-  /* The SAME yield on the tablet/phone dock sheets, which are the rails at those widths
-     (RailDock.tsx). The phone bar-half variant declares `transition-[height,opacity]` at the
+  /* The same yield on the tablet/phone dock sheets, which are the rails at those widths
+     (RailDock.tsx) — WIDER on the PHONE half alone: that sheet covers most of a small viewport
+     with no way to step it aside, so it also dims while the engine flies the camera after a
+     commit. The phone bar-half variant declares `transition-[height,opacity]` at the
      element, so it overrides this transition with its own 0.2s tempo — deliberate, and noted
      there; the tablet sheets take the 0.3s below. Only the SHEET dims: the persistent dock bar
      and the edge tabs are the handles and stay solid. */

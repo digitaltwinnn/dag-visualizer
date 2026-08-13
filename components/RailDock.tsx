@@ -149,7 +149,12 @@ export default function RailDock({
   // the scene restores what was open. The tablet edge TAB fades with the HUD — no gate needed.
   const section = useStore((s) => s.section);
   const shellVisible = section === "scene";
-  const yielding = useSceneYield();
+  const isBarHalf = trigger === "bottom-bar-half"; // = the PHONE branch (ExploreRail/Inspector)
+  // PHONE ONLY takes the commit-flight half of the yield (`flight`). The tablet edge-tab sheet is
+  // dismissed by the same tab that opened it and the scene keeps full width behind it, so that
+  // tier has its own step-aside exactly as desktop has SCENE mode; the phone sheet is 60vh of a
+  // small viewport over a persistent dock bar. Both tiers still dim under the user's own hand.
+  const yielding = useSceneYield({ flight: isBarHalf });
   const handleOpenChange = (next: boolean) => {
     setOpen(next);
     onOpenChange?.(next);
@@ -250,7 +255,6 @@ export default function RailDock({
       </span>
     );
 
-  const isBarHalf = trigger === "bottom-bar-half";
   // The icon TRAY (see the `signals` prop doc): the hosted cards' legend. Muted at rest; an
   // `active` (updated-unseen) icon goes vivid in its identity hue + breathes on the shared
   // dot-beat heartbeat (reduced motion → static vivid). Vertical stack on the edge tab,
@@ -414,9 +418,10 @@ export default function RailDock({
           // `sheetPx` is null.
           style={isBarHalf && sheetPx != null ? { ...style, height: sheetPx, maxHeight: "none" } : style}
           overlay={false}
-          // The HUD's step-back while the camera moves, under either hand (`useSceneYield`) — the
-          // same yield the desktop rails make, because these sheets ARE the rails here. The dock
-          // BAR and the edge tabs stay solid: they're the handles. The recipe is in globals.css.
+          // The HUD's step-back while the camera moves (`useSceneYield`). Both tiers yield to the
+          // user's own hand; only the PHONE half also yields to a commit flight (see the call site
+          // above). The dock BAR and the edge tabs stay solid: they're the handles. The recipe is
+          // in globals.css.
           data-dim={yielding ? "" : undefined}
           // Phone bar-half variant: the sheet sits DIRECTLY ABOVE the persistent dock bar (never
           // covers it — the bar is its visible header/handle), so offset it up by the bar height.
