@@ -458,6 +458,10 @@ export default function LedgerPanel() {
                 !beating && !(pinned && previewOrd == null) && "border-border hover:bg-wash-hover",
                 previewOrd != null && "border-dashed",
               )}
+              // The pinned mark speaks the committed network's hue (user, 2026-08-13 — the same
+              // rule as every committed row), exactly as its beating-dot sibling already does:
+              // the filter-face idiom, structural cyan under "all".
+              style={pinned && previewOrd == null ? selectionHue(accent) : undefined}
             >
               {beating ? (
                 // The beating dot wears the FOLLOWED subject's identity (user, 2026-08-07 — the
