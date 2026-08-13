@@ -26,7 +26,7 @@ import { countryFraming } from "./domain/countryShape";
 import { R as GEO_R, LAND_H } from "./domain/geoLayout";
 import { clickActions, pickActive, pickNetId, viewEntryActions, metaSnapSelectActions, bandSelectActions } from "./domain/pickActions";
 import { ViewTransition, is3D } from "./domain/viewTransition";
-import { gatherBand } from "./domain/gatherLayout";
+import { gatherBand, type GatherBand } from "./domain/gatherLayout";
 import { isDoubleTap, tapZoomAround, tapZoomDistance, DOUBLE_TAP_SLOP, TAP_ZOOM_DUR, type Tap } from "./domain/tapZoom";
 import { LADDERS, hasLevel, type CohortSel, type CompositionSel, type FocusLevel, type SelectionSnapshot, type ResolverKey } from "./domain/focusLadder";
 import { compositionGroups, compositionKey, compositionRows } from "@/src/data/composition";
@@ -126,6 +126,7 @@ export class Engine {
   private _gatherO = new THREE.Vector3(); // scratch: staging-plane origin (world), per frame
   private _gatherR = new THREE.Vector3(); // scratch: staging-plane right (world)
   private _gatherU2 = new THREE.Vector3(); // scratch: staging-plane up (world)
+  private _gatherBand: GatherBand = { topFrac: 0, halfWidthFrac: 0, heightFrac: 0 }; // scratch: the measured band
   private _pendingBoundary: Mode | null = null; // destination whose layout applies at the boundary
   // Set when a 3D→3D retarget reverses straight back to its origin mid-OUT (no boundary will
   // fire, so the held camera never replays a mid-flight commit) — re-resolve focus once the
@@ -1359,7 +1360,7 @@ export class Engine {
 
   private focus(name: string) {
     const f = FOCI[name];
-    if (f) this._tweenTo(f.pos, f.target);
+    this._tweenTo(f.pos, f.target);
   }
 
 
@@ -1582,7 +1583,7 @@ export class Engine {
       // The band clears the HUD it flies in front of: its top edge sits on the rail cards' own
       // top, and it spans the full viewport width when the rails are away. `_gatherO` is the
       // band's TOP EDGE (gatherLayout hangs every grid downward from it).
-      const band = gatherBand(window.innerWidth, window.innerHeight, this.railsHidden);
+      const band = gatherBand(window.innerWidth, window.innerHeight, this.railsHidden, this._gatherBand);
       this._gatherO.addScaledVector(this._gatherU2, h * band.topFrac);
       this.globe.setGatherFrame(this._gatherO, this._gatherR, this._gatherU2);
       // The live band, and it decides the pack's DEPTH rather than the chip size: the Globe

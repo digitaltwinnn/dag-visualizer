@@ -3,8 +3,9 @@
 // network's nodes gather into one coloured block (the nodes ARE its pixels, identity-hued),
 // blocks packed in a row sorted by size, so the DAG's big block reads next to the small
 // metagraphs'. Pure 2D CELL units; the scene maps cells onto a camera-anchored plane at the top
-// of the viewport per frame. Event-time only (data rebuilds, and a band whose solved depth
-// changed) — allocation here is fine.
+// of the viewport per frame. The PACK is event-time (data rebuilds, and a band whose solved depth
+// changed) — allocation there is fine. `gatherBand` is the one function on the frame path, and it
+// writes into a caller-provided struct for exactly that reason.
 //
 // ⚠️ THE BLOCK IS WIDTH-FIRST, NOT A SQUARE (user, 2026-08-13 — "use the available width
 // optimally … currently in scene mode DAG does ~10 rows down while we instead should use the
@@ -145,17 +146,21 @@ export interface GatherBand {
  * mode's extra width comes back as a longer, shallower block at the same chip size. Sizing the
  * chips off this width instead — which is what it used to do — is what made the same nodes stage
  * larger in scene mode than in HUD mode.
+ *
+ * ⚠️ This one is called PER FRAME (the Engine re-measures the band while the transition runs), so
+ * unlike everything else in this module it writes into a caller-provided struct rather than
+ * returning a fresh one — the same arrangement, and the same reason, as cameraRig's framing
+ * functions. Returns `out` so a call still reads as an expression.
  */
-export function gatherBand(viewW: number, viewH: number, railsHidden: boolean): GatherBand {
+export function gatherBand(viewW: number, viewH: number, railsHidden: boolean, out: GatherBand): GatherBand {
   const railed = !railsHidden && viewW >= RAILS_TIER;
   const reach = railed ? RAIL_GUTTER + Math.max(LEFT_RAIL_W, RIGHT_RAIL_W) : 0;
   const halfWidthPx = Math.max(1, viewW / 2 - reach - BAND_MARGIN);
-  return {
-    // A point `f` half-heights above centre lands at `viewH/2 * (1 - f)` pixels from the top.
-    topFrac: 1 - (2 * RAIL_TOP) / viewH,
-    halfWidthFrac: halfWidthPx / (viewW / 2),
-    heightFrac: Math.max(0, viewH - RAIL_TOP - BOTTOM_RESERVE - BAND_MARGIN) / (viewH / 2),
-  };
+  // A point `f` half-heights above centre lands at `viewH/2 * (1 - f)` pixels from the top.
+  out.topFrac = 1 - (2 * RAIL_TOP) / viewH;
+  out.halfWidthFrac = halfWidthPx / (viewW / 2);
+  out.heightFrac = Math.max(0, viewH - RAIL_TOP - BOTTOM_RESERVE - BAND_MARGIN) / (viewH / 2);
+  return out;
 }
 
 // The packing pass both public functions read, so the measured extent is always the extent of

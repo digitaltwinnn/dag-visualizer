@@ -276,41 +276,44 @@ describe("gatherExtent", () => {
 // gatherBand answers in FRUSTUM fractions, so these read them back as pixels the way the Engine
 // does: a point `f` half-heights above centre lands at viewH/2 · (1 − f) px from the top.
 describe("gatherBand", () => {
+  // It writes into a caller-provided struct (it is on the frame path), so each call gets its own.
+  const band = (viewW: number, viewH: number, railsHidden: boolean) =>
+    gatherBand(viewW, viewH, railsHidden, { topFrac: 0, halfWidthFrac: 0, heightFrac: 0 });
   const topPx = (b: { topFrac: number }, viewH: number) => (viewH / 2) * (1 - b.topFrac);
   const halfWidthPx = (b: { halfWidthFrac: number }, viewW: number) => (viewW / 2) * b.halfWidthFrac;
 
   it("puts the band's top edge on the rail cards' own top, at any viewport height", () => {
     // --rail-top is 90px, and the canvas rides --topbar-extra exactly as the rails do, so the
     // cards' top is 90 canvas-local px whatever the filter strip is doing.
-    expect(topPx(gatherBand(1600, 950, false), 950)).toBeCloseTo(90, 6);
-    expect(topPx(gatherBand(390, 780, false), 780)).toBeCloseTo(90, 6);
+    expect(topPx(band(1600, 950, false), 950)).toBeCloseTo(90, 6);
+    expect(topPx(band(390, 780, false), 780)).toBeCloseTo(90, 6);
   });
 
   it("spans wider with the rails hidden than with them showing", () => {
-    const cards = gatherBand(1600, 950, false);
-    const scene = gatherBand(1600, 950, true);
+    const cards = band(1600, 950, false);
+    const scene = band(1600, 950, true);
     expect(halfWidthPx(scene, 1600)).toBeGreaterThan(halfWidthPx(cards, 1600) * 1.5);
   });
 
   it("clears the wider rail on BOTH sides — the band is centred on the screen, not on the gap", () => {
     // Centring on the screen means the band never slides sideways when a rail comes or goes; the
     // price is that the WIDER rail (the right one, --detail-w 320) binds both edges.
-    const b = gatherBand(1600, 950, false);
+    const b = band(1600, 950, false);
     expect(halfWidthPx(b, 1600)).toBeCloseTo(1600 / 2 - (26 + 320) - 24, 6);
   });
 
   it("ignores the rails below the tier where they stop being inline columns", () => {
     // Under 1100px they are dock sheets over the scene, so there is no column to clear.
-    expect(gatherBand(900, 800, false)).toEqual(gatherBand(900, 800, true));
+    expect(band(900, 800, false)).toEqual(band(900, 800, true));
   });
 
   it("leaves the LiveStrip's lane free below the band", () => {
-    const b = gatherBand(1600, 950, false);
+    const b = band(1600, 950, false);
     expect(90 + (950 / 2) * b.heightFrac).toBeLessThanOrEqual(950 - 130);
   });
 
   it("never returns a negative box, however cramped the viewport", () => {
-    const b = gatherBand(320, 240, false);
+    const b = band(320, 240, false);
     expect(b.halfWidthFrac).toBeGreaterThan(0);
     expect(b.heightFrac).toBeGreaterThanOrEqual(0);
   });

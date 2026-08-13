@@ -130,6 +130,8 @@ export class Globe implements GeoViewHost {
   private _gatherRows = 0; // the depth that set was packed at (0 = never packed)
   private _gatherBudget = 0; // the band's width in chip pitches, from the last fit
   private _gatherMaxRows = 0; // …and its height, which is where the depth search stops
+  private _gatherFitW = -1; // the band the fit below was last solved for (-1 = never / invalidated)
+  private _gatherFitH = -1;
   private ledgerT = 0; // 0->1 ease as the reused node meshes fly from their source view into the lanes
   clock = 0;
   private spin: SpinState | null = null;
@@ -464,6 +466,7 @@ export class Globe implements GeoViewHost {
     this._gatherExtent = gatherExtent(groups, rows);
     this._gatherGroups = groups;
     this._gatherRows = rows;
+    this._gatherFitW = -1; // the pack changed, so the fit memo below has to re-solve against it
     const apply = (recs: { gU: number; gV: number; gRank: number; gCount: number; gS: number }[], s: GatherSlot) =>
       recs.forEach((r) => { r.gU = s.u; r.gV = s.v; r.gRank = s.rank; r.gCount = s.count; r.gS = s.gs; });
 
@@ -1108,9 +1111,17 @@ export class Globe implements GeoViewHost {
   // So the band decides the pack's SHAPE, not its size (user, 2026-08-13 — "use the screen width
   // optimally before adding rows … vertical only when horizontal runs out"): its width in real
   // pitches is the depth solve's budget, and its HEIGHT in real pitches is where that search
-  // stops, which is what spends the vertical room on rows before any shrink. Re-packing is the
-  // depth CHANGING, so it costs one pass per presentation toggle, not one per frame.
+  // stops, which is what spends the vertical room on rows before any shrink.
+  //
+  // Called every frame of the transition, and the band is CONSTANT across those frames — it moves
+  // only on a resize or a rails toggle. So the whole solve sits behind a memo on the band itself,
+  // which is what makes the sentence above ("one pass per presentation toggle, not one per frame")
+  // true of the guard as well as of the re-pack it guards: `gatherRows` walks and allocates, and
+  // without this it did so ~230 times per transition to answer the same number. A data rebuild
+  // invalidates the memo from `_assignGatherSlots`, because the extent it re-solves is what the
+  // scale below is fitted against.
   setGatherFit(availW: number, availH: number): void {
+    if (availW === this._gatherFitW && availH === this._gatherFitH) return;
     this._gatherBudget = availW / GATHER_CELL;
     this._gatherMaxRows = availH / GATHER_CELL;
     if (gatherRows(this._gatherGroups, this._gatherBudget, this._gatherMaxRows) !== this._gatherRows) this._assignGatherSlots();
@@ -1125,6 +1136,9 @@ export class Globe implements GeoViewHost {
     // In CELLS at the fitted pitch, then back to world units — one multiply so NodeFabric adds a
     // ready offset per node rather than re-deriving the pitch.
     g.spread = gatherSpread(availW / g.cell, e) * g.cell;
+    // Last, because _assignGatherSlots above invalidates this.
+    this._gatherFitW = availW;
+    this._gatherFitH = availH;
   }
 
   // -------------------------------------------------- morph between layouts
