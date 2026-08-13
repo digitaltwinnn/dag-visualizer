@@ -47,11 +47,15 @@ function ensure(ordinal: number | null | undefined) {
   fetch(`/api/snapshot/${ordinal}`)
     .then((r) => (r.ok ? (r.json() as Promise<SnapshotExact>) : null))
     .then((data) => {
-      // On unavailable (pruned/not-yet-there) store nothing — leaves the tick on the polled floor
-      // and lets a later trigger (e.g. selecting it) retry.
       if (data && typeof data.totalFee === "number") st.setSnapshotExact(data);
+      // On unavailable (transient blip / outside the served window) record the MISS instead of
+      // storing nothing: the acquiring surfaces (fee node-stars, "resolving", "reading…") key
+      // their give-up on it, so a failed read on a pinned tick terminates honestly instead of
+      // twinkling forever with nothing in flight (rule 10). A later trigger (reselecting, the
+      // next live tick) still retries exactly as before, and a landing read clears the miss.
+      else st.setExactMiss(ordinal);
     })
-    .catch(() => {})
+    .catch(() => st.setExactMiss(ordinal))
     .finally(() => inflight.delete(ordinal));
 }
 

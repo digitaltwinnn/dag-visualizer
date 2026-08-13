@@ -130,6 +130,8 @@ export default function NodeRosterTable({ mode }: { mode: "hyper" | "geo" }) {
           {rows.map((r) => {
             const key = hoverKeyOf(r.node.pick);
             const selected = key != null && hoverKeyOf(inspect) === key;
+            const commit = () =>
+              applyClickActions(nodeSelectActions(r.node.pick, { mode, currentFilter: filter, deselect: selected }));
             return (
               <TableRow
                 key={r.key}
@@ -138,13 +140,23 @@ export default function NodeRosterTable({ mode }: { mode: "hyper" | "geo" }) {
                 // box-shadow doesn't paint on a border-collapsed table row.)
                 className={cn(
                   "cursor-pointer text-body hover:bg-wash-faint",
+                  "focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--primary)] focus-visible:outline-offset-[-2px]",
                   selected && "bg-[var(--sel-bg)] text-foreground",
                 )}
+                // A <tr> is not natively focusable — tabIndex + Enter/Space give the keyboard the
+                // same commit the click makes, and focus previews what hover previews.
+                tabIndex={0}
                 onMouseEnter={() => r.node.id && setHoverNodeId(r.node.id)}
                 onMouseLeave={() => setHoverNodeId(null)}
-                onClick={() =>
-                  applyClickActions(nodeSelectActions(r.node.pick, { mode, currentFilter: filter, deselect: selected }))
-                }
+                onFocus={() => r.node.id && setHoverNodeId(r.node.id)}
+                onBlur={() => setHoverNodeId(null)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault(); // Space must not scroll the pane
+                    commit();
+                  }
+                }}
+                onClick={commit}
               >
                 {COLS[mode].map((c) => (
                   <TableCell key={c.key}>{cell(r, c.key)}</TableCell>

@@ -98,6 +98,8 @@ function CardPane({
       style={pair.style}
       onMouseEnter={pair.onMouseEnter}
       onMouseLeave={pair.onMouseLeave}
+      onFocus={pair.onFocus}
+      onBlur={pair.onBlur}
     >
       {/* Every card's × is CardHead's shared ghost-Button close — one baseline close (the node
           card's old hand-rolled × was removed). */}
@@ -125,7 +127,7 @@ function CountryPane({ cc, onClose, collapsed, onToggle }: { cc: string; onClose
   const pair = subjectPairing<string>(hoverCountry, cc, setHoverCountry, filterAccent(filter));
   const pulseKey = useEdgePulse(cc);
   return (
-    <RailPane entry={collapsed} className={pair.className} style={pair.style} onMouseEnter={pair.onMouseEnter} onMouseLeave={pair.onMouseLeave}>
+    <RailPane entry={collapsed} className={pair.className} style={pair.style} onMouseEnter={pair.onMouseEnter} onMouseLeave={pair.onMouseLeave} onFocus={pair.onFocus} onBlur={pair.onBlur}>
       <CardHead
         eyebrow="Country"
         title={<CountryTitle cc={cc} />}
@@ -177,6 +179,14 @@ function ProviderPane({ sel, onClose, collapsed, onToggle }: { sel: CohortSel; o
       }}
       onMouseLeave={() => {
         pair.onMouseLeave();
+        setHoverCohort(null);
+      }}
+      onFocus={() => {
+        pair.onFocus();
+        setHoverCohort(ids);
+      }}
+      onBlur={() => {
+        pair.onBlur();
         setHoverCohort(null);
       }}
     >
@@ -235,6 +245,14 @@ function CompositionPane({ sel, onClose, collapsed, onToggle }: { sel: Compositi
       }}
       onMouseLeave={() => {
         pair.onMouseLeave();
+        setHoverCohort(null);
+      }}
+      onFocus={() => {
+        pair.onFocus();
+        setHoverCohort(ids);
+      }}
+      onBlur={() => {
+        pair.onBlur();
         setHoverCohort(null);
       }}
     >

@@ -222,6 +222,8 @@ export default function GeoExplore() {
                   onClick={() => drill(c.cc)}
                   onMouseEnter={pair.onMouseEnter}
                   onMouseLeave={pair.onMouseLeave}
+                  onFocus={pair.onFocus}
+                  onBlur={pair.onBlur}
                 >
                   <span className="w-[17px] text-center flex-none font-mono text-micro text-muted-foreground">{ccMark(c.cc)}</span>
                   <span className="flex-none w-24 text-body text-foreground-dim whitespace-nowrap overflow-hidden text-ellipsis" title={c.country}>
@@ -252,10 +254,16 @@ export default function GeoExplore() {
                 </button>
 
                 {open && (
-                  // Leaving the node list clears the globe hover-glow.
+                  // Leaving the node list clears the globe hover-glow — by mouse or by keyboard
+                  // (onBlur bubbles like focusout; row-to-row moves re-set the channel right after).
                   <div
                     className={cn("mb-1.5 ml-[9px] py-0.5 pl-3", ROW_NEST)}
                     onMouseLeave={() => {
+                      setHoverNodeId(null);
+                      setHoverCountry(null);
+                      setHoverGroup(null);
+                    }}
+                    onBlur={() => {
                       setHoverNodeId(null);
                       setHoverCountry(null);
                       setHoverGroup(null);

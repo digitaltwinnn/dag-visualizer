@@ -48,12 +48,16 @@ export default function AnchoredTags({
 
   const total = anchored ?? exact?.anchored ?? 0;
   const channels = exact?.channels ?? null;
+  // A FAILED exact read (RawSnapshotBridge records it) is this block's give-up signal: the
+  // twinkling stars promise a breakdown that is no longer coming, so they terminate on an honest
+  // word. The header's total stays — it is the polled count, a different (and still live) source.
+  const missed = useStore((s) => s.exactMiss[ordinal] != null) && !exact;
 
   // Hold the ACQUIRING "resolving" row for one calm cycle even if the exact read lands sooner,
   // then fade it out (concern #8) — a fast resolve shouldn't blink the node-stars away. While
   // held (or genuinely pre-exact) we stay on the acquiring branch and suppress the "from M
   // metagraphs" count (it only reads once the breakdown is actually shown).
-  const resolveHold = useMinHold(!exact);
+  const resolveHold = useMinHold(!exact && !missed);
   const acquiring = !exact || resolveHold.show;
 
   // Header (always, even while acquiring): "N snapshots anchored from M metagraphs".
@@ -68,7 +72,12 @@ export default function AnchoredTags({
     return (
       <div className="mt-1">
         {header}
-        {(awaiting || resolveHold.show) && (
+        {missed && !resolveHold.show ? (
+          // The honest terminal: the read failed, nothing is in flight. Word, not stars.
+          <div className="mt-1 text-micro tracking-[0.08em] uppercase text-muted-foreground">
+            exact read failed
+          </div>
+        ) : (awaiting || resolveHold.show) && (
           <div className={cn("flex items-center gap-2 mt-1", resolveHold.fading && "animate-hold-fade-out motion-reduce:animate-none")}>
             <NodeStars count={4} />
             <span className="text-micro tracking-[0.08em] uppercase text-muted-foreground">resolving</span>

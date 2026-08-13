@@ -127,6 +127,8 @@ export default function HyperExplore() {
                     onClick={() => toggleNetwork(m.id)}
                     onMouseEnter={pair.onMouseEnter}
                     onMouseLeave={pair.onMouseLeave}
+                    onFocus={pair.onFocus}
+                    onBlur={pair.onBlur}
                   >
                     <IdentityDot hue={hue} />
                     <span className="flex-1 min-w-0 text-body text-foreground-dim whitespace-nowrap overflow-hidden text-ellipsis" title={name}>
@@ -141,10 +143,15 @@ export default function HyperExplore() {
                   </button>
 
                   {open && (
-                    // Leaving the shell list clears the scene hover-glows.
+                    // Leaving the shell list clears the scene hover-glows — by mouse or keyboard.
                     <div
                       className={cn("mb-1.5 ml-[9px] py-0.5 pl-3", ROW_NEST)}
                       onMouseLeave={() => {
+                        setHoverNodeId(null);
+                        setHoverCohort(null);
+                        setHoverGroup(null);
+                      }}
+                      onBlur={() => {
                         setHoverNodeId(null);
                         setHoverCohort(null);
                         setHoverGroup(null);
