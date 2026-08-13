@@ -3,6 +3,7 @@ import { unstable_cache } from "next/cache";
 import { METAGRAPHS } from "@/src/engine/config";
 import type { SnapshotExact, ChannelSnapRow } from "@/src/data/types";
 import { decodeChannelContent } from "../decodeChannel";
+import { withinServedWindow } from "../ordinalWindow";
 
 // EXACT per-tick anchor totals, read straight from the raw L0 global snapshot. The block explorer
 // only gives `metagraphSnapshotCount`; the L0 node's `stateChannelSnapshots` carries EVERY anchored
@@ -10,8 +11,10 @@ import { decodeChannelContent } from "../decodeChannel";
 // precise per-metagraph breakdown — INCLUDING unlisted metagraphs (no directory needed). The raw
 // payload is heavy (~2.5 MB on a big tick), so this runs server-side and returns a tiny JSON,
 // cached per ordinal (ordinals are immutable) — one fetch is shared across every client/render.
-// Only recent ticks are available (the node prunes old ones); a 404 lets the client fall back to
-// the polled floor.
+// ⚠️ The LB serves the ENTIRE ordinal history (verified 2026-08-13 — the old "prunes after
+// ~30 min" premise is false), so ordinalWindow.ts bounds what this route will ask it for; a 404
+// here means transiently unavailable or outside that served window, and the client falls back to
+// the polled floor either way.
 
 export const maxDuration = 30;
 
@@ -135,13 +138,18 @@ export async function GET(_req: Request, ctx: { params: Promise<{ ordinal: strin
   if (!Number.isFinite(n) || n < 0) {
     return NextResponse.json({ error: "bad ordinal" }, { status: 400 });
   }
+  if (!(await withinServedWindow(n))) {
+    // Outside the window this app can ever ask about (ordinalWindow.ts) — refuse without
+    // touching the upstream, so the route isn't an anonymous walk over ~6.7M ordinals.
+    return NextResponse.json({ available: false, ordinal: n }, { status: 404 });
+  }
   try {
     const data = await cachedExact(n);
     return NextResponse.json(data, {
       headers: { "Cache-Control": "public, max-age=86400, immutable" },
     });
   } catch {
-    // Pruned / not yet available — client keeps the polled floor for this tick.
+    // Transiently unavailable (not yet finalized / upstream blip) — client keeps the polled floor.
     return NextResponse.json({ available: false, ordinal: n }, { status: 404 });
   }
 }
