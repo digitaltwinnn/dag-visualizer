@@ -437,15 +437,23 @@ export function GeoLiveCard() {
 // reading order place → role → host → reference, so the card always reads the same way; it just
 // has fewer lines.
 //
-// THE CODES ARE CULLED, and the ASN moves DOWN a weight (user, 2026-08-10 — asked whether this
-// card wanted a third column). It didn't: three columns break the one row grammar (label left,
-// value right, one line), the codes run 2ch (`US`) to 8ch (`AS212317`) so a fixed column is either
-// gappy or truncating, and the layer codes are a CHIP — pulling them out detaches them from the
-// composition word they qualify. Measured live, the raggedness is at the LEFT of the value block
-// anyway, so a right-aligned column tidies an edge that was never ragged.
-// `US` is simply dropped: it restates "United States" and, unlike a hash, nobody looks a country
-// code UP. `AS212317` is exactly a look-up value, so it goes where look-up values go — the foot,
-// under the same `cohort == null` gate, since the provider card carries it as its own reference.
+// THE CODES ARE CULLED (user, 2026-08-10 — asked whether this card wanted a third column). It
+// didn't: three columns break the one row grammar (label left, value right, one line), the codes
+// run 2ch (`US`) to 8ch (`AS212317`) so a fixed column is either gappy or truncating, and the
+// layer codes are a CHIP — pulling them out detaches them from the composition word they qualify.
+// Measured live, the raggedness is at the LEFT of the value block anyway, so a right-aligned
+// column tidies an edge that was never ragged. `US` is dropped outright: it restates "United
+// States" and, unlike a hash, nobody looks a country code UP.
+//
+// THE ASN IS A BODY FACT, BESIDE THE HOST IT NAMES (user, 2026-08-13). It spent three days in the
+// foot on the look-up rule — a value you only ever read to compare it against something else — and
+// that reading is too literal here: the foot is where the card's own REFERENCES sit, and the ASN
+// is not this node's reference, it is the provider's. Read down the foot it sat above `Node id` as
+// if the two identified the same thing. In the body it lands where the reading order already puts
+// it, one line under the provider NAME it is the number for, and the foot is left saying exactly
+// one thing: which node this card is about. It keeps the `cohort == null` gate the Hosting line
+// above it uses, so the two can't disagree about who owns the host, and it keeps the mono face
+// the provider card's own ASN row carries.
 function GeoLiveNode({ p }: { p: PickOf<"l0" | "l1" | "metanode"> }) {
   // The three ancestor rungs that can own one of this card's facts.
   const country = useStore((s) => s.country);
@@ -462,8 +470,8 @@ function GeoLiveNode({ p }: { p: PickOf<"l0" | "l1" | "metanode"> }) {
   const compWord = p.node ? nodeCompositionLabel(p.node) : null;
   const comp = compWord ? compWord.charAt(0).toUpperCase() + compWord.slice(1) : null;
   const codes = p.node ? compositionRows([p.node])[0]?.codes : undefined;
-  // The host's ASN rides the FOOT, but it answers to the provider rung exactly as the Hosting
-  // line above does — one condition, so the two can't disagree about who owns the host.
+  // The host's ASN answers to the provider rung exactly as the Hosting line above it does — one
+  // condition, so the two can't disagree about who owns the host.
   const asn = cohort == null ? geo?.asn : null;
   // NB: the hover pairing (synced 3D glow) lives on the OUTER pane (Inspector.CardPane), not here,
   // so the glow lights the card's rounded edge.
@@ -488,17 +496,17 @@ function GeoLiveNode({ p }: { p: PickOf<"l0" | "l1" | "metanode"> }) {
             </span>
           </Fact>
         )}
-        {/* HOSTING — the provider's NAME only; its ASN is a look-up value and sits in the foot.
-            Yields to the provider card, whose title IS the isp. */}
+        {/* HOSTING — the provider's NAME, then the ASN that is its number. Both yield to the
+            provider card, whose title IS the isp and whose body carries the same reference. */}
         {cohort == null && geo?.isp && <Fact label="Hosting">{geo.isp}</Fact>}
+        {asn && <Fact label="ASN"><span className="font-mono">{asn}</span></Fact>}
       </FactGroup>
-      {/* The look-up column: the host's reference, then the node's own — the unique reference
+      {/* The look-up column: this node's own reference, and nothing else — the unique reference
           LAST, where references sit, which falls out of the grammar rather than being a rule of
           its own. Truncated display, full hash on hover. */}
-      {(asn || p.node?.id) && (
+      {p.node?.id && (
         <Foot>
-          {asn && <FootRow label="ASN" value={asn} />}
-          {p.node?.id && <FootRow label="Node id" value={shortHash(p.node.id)} title={p.node.id} />}
+          <FootRow label="Node id" value={shortHash(p.node.id)} title={p.node.id} />
         </Foot>
       )}
     </>

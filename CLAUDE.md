@@ -892,12 +892,19 @@ what question it answers.
 **A code appended to a value is a THIRD COLUMN in disguise** (user, 2026-08-10 — asked whether the node
 card wanted three columns). It doesn't want one: three columns break the one row grammar, and the codes
 themselves ran 2ch (`US`) to 8ch (`AS212317`), so a fixed column is either gappy or truncating. The codes
-are **culled** instead — `US` restates "United States" and nobody looks a country code up — and the ASN
-moves **down a weight** to the foot, where it belongs by the look-up rule: `AS212317` is exactly a value
-you only ever read to compare. It answers to the **provider rung** in the same condition as the Hosting
-line above it, so the two can't disagree about who owns the host. The role chips STAY on the Composition
-line: they qualify the word, and a value column can't hold them. Measured live, the raggedness was at the
-**left** edge of the value block anyway — a third column would not have addressed it.
+are **culled** instead — `US` restates "United States" and nobody looks a country code up. The role chips
+STAY on the Composition line: they qualify the word, and a value column can't hold them. Measured live,
+the raggedness was at the **left** edge of the value block anyway — a third column would not have
+addressed it.
+
+**The ASN is a BODY fact, beside the host it names** (user, 2026-08-13). It spent three days in the foot
+on the look-up rule, and that reading is too literal here: the foot holds the card's own REFERENCES, and
+the ASN is not this node's reference, it is the provider's — read down the foot it sat above `Node id` as
+if the two identified the same thing. In the body it lands where the fixed reading order already puts it,
+one line under the provider NAME it is the number for, and the foot is left saying exactly one thing:
+which node this card is about. It keeps the **provider rung** condition the Hosting line above it uses, so
+the two can't disagree about who owns the host. The look-up rule still governs what the foot is FOR; it
+just doesn't reach a value that belongs to a different subject.
 
 ### CardHead — the one card header
 
