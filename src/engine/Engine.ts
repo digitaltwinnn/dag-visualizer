@@ -9,7 +9,7 @@ import { hoverKeyOf, tooltipSubject } from "@/src/data/hoverSubject";
 import { identityMap, identitySceneHex } from "@/src/palette/identity";
 import { createScene, type SceneCtx } from "./scene/SceneContext";
 import { HyperView, type MetaHubRec } from "./scene/views/HyperView";
-import { Globe, GATHER_CELL } from "./scene/Globe";
+import { Globe } from "./scene/Globe";
 import { LedgerView } from "./scene/views/LedgerView";
 import { UNLISTED_KEY } from "./domain/ledgerBands";
 
@@ -21,11 +21,13 @@ import { BYTE_SCALE_KB, type RailGroup } from "./domain/ledgerLayout";
 import { HYPER_TILT, HYPER_TILT_FOCUS } from "./domain/hyperLayout";
 import { readSceneColors } from "./sceneColors";
 import { VIEW_POLICIES, type ViewPolicy } from "./domain/viewPolicy";
-import { FOCI, hubFraming, geoFraming, nodeFraming, cohortFraming, hyperNodeFraming, ledgerCommitTilt, dollyBack, railsDolly, easeInOutQuad, type CameraFraming } from "./domain/cameraRig";
+import { FOCI, hubFraming, geoFraming, nodeFraming, cohortFraming, ledgerCommitTilt, dollyBack, railsLean, restOrbit, easeInOutQuad, isSamePose, nudgeMix, NUDGE_DUR, type CameraFraming, type FocusName } from "./domain/cameraRig";
 import { countryFraming } from "./domain/countryShape";
 import { R as GEO_R, LAND_H } from "./domain/geoLayout";
 import { clickActions, pickActive, pickNetId, viewEntryActions, metaSnapSelectActions, bandSelectActions } from "./domain/pickActions";
 import { ViewTransition, is3D } from "./domain/viewTransition";
+import { gatherBand, type GatherBand } from "./domain/gatherLayout";
+import { isDoubleTap, tapZoomAround, tapZoomDistance, DOUBLE_TAP_SLOP, TAP_ZOOM_DUR, type Tap } from "./domain/tapZoom";
 import { LADDERS, hasLevel, type CohortSel, type CompositionSel, type FocusLevel, type SelectionSnapshot, type ResolverKey } from "./domain/focusLadder";
 import { compositionGroups, compositionKey, compositionRows } from "@/src/data/composition";
 import { metaSnapDeepKey, metaSnapHoverKey } from "@/src/data/types";
@@ -36,16 +38,11 @@ import type { ClusterNode, DagCore, GeoMap, RouteMetagraph } from "@/src/data/ty
 type Vec = THREE.Vector3;
 
 // View-transition staging plane (the gather grids the nodes fly to at the top of the viewport).
-// GATHER_DIST = the plane's depth in front of the camera; GATHER_TOP_FRAC = fraction of the
-// frustum half-height above centre where the band sits (the top third). Both camera-anchored, so
-// the grids read the same at any pose.
+// GATHER_DIST is the plane's depth in front of the camera; WHERE the band sits and how wide it
+// may run is `gatherBand` (domain/gatherLayout), which measures the HUD rather than guessing —
+// the top edge lines up with the rail cards' own top, and the band spans the whole viewport
+// when the rails are hidden (user, 2026-08-12). Camera-anchored, so it reads the same at any pose.
 const GATHER_DIST = 34;
-const GATHER_TOP_FRAC = 0.62;
-// The aspect the staging grid's cell size (Globe's GATHER_CELL) was tuned at (desktop-ish
-// 16:10). Narrower viewports (phone portrait, aspect ~0.46) scale the cell down proportionally
-// so the packed row of per-network squares (domain/gatherLayout) still fits the frustum width —
-// verified live (Task 8): unscaled, the DAG's big square ran off the right edge at phone width.
-const GATHER_CELL_ASPECT_REF = 1.6;
 
 // id[] -> { id: sceneColorNumber }, resolved through the identity map (Task 1). The scene
 // layer never imports the TS generator — the Engine owns the map and hands scene colors
@@ -105,7 +102,7 @@ export class Engine {
   private _tween = {
     fromPos: new THREE.Vector3(), toPos: new THREE.Vector3(),
     fromTgt: new THREE.Vector3(), toTgt: new THREE.Vector3(),
-    t: 0, dur: 1.4, active: false,
+    t: 0, dur: 1.4, active: false, nudge: false,
   };
   // Scratch framing struct handed to hubFraming/geoFraming — its values are copied into
   // `_tween` immediately by `_tweenTo`, so reusing it across every focus call is safe.
@@ -129,6 +126,7 @@ export class Engine {
   private _gatherO = new THREE.Vector3(); // scratch: staging-plane origin (world), per frame
   private _gatherR = new THREE.Vector3(); // scratch: staging-plane right (world)
   private _gatherU2 = new THREE.Vector3(); // scratch: staging-plane up (world)
+  private _gatherBand: GatherBand = { topFrac: 0, halfWidthFrac: 0, heightFrac: 0 }; // scratch: the measured band
   private _pendingBoundary: Mode | null = null; // destination whose layout applies at the boundary
   // Set when a 3D→3D retarget reverses straight back to its origin mid-OUT (no boundary will
   // fire, so the held camera never replays a mid-flight commit) — re-resolve focus once the
@@ -163,12 +161,58 @@ export class Engine {
   // flight). Record where the pointer went down; _handleClick ignores clicks that travelled
   // further than a small threshold, and _handleMove skips hover-picking while the button is held
   // (no highlight flicker mid-orbit). A stationary click keeps full pick behaviour.
-  private onDown = (e: MouseEvent) => {
+  private onDown = (e: PointerEvent) => {
     this._downX = e.clientX;
     this._downY = e.clientY;
+    this._ptrDown++;
+    // A stale eat-flag would swallow the NEXT real click, so every gesture starts clean.
+    this._eatClick = false;
+    if (this._ptrDown > 1) {
+      // Two fingers down is a pinch, not a tap pair: drop any half-recognized pair, and drop a
+      // running step too — pinch dollies the same axis, and the two would fight for 0.4s. A
+      // single-finger orbit is left alone (it rotates, it doesn't dolly) and a pan re-anchors for
+      // free, because the step measures against the live `controls.target` every frame.
+      this._lastTap = null;
+      this._zoom.active = false;
+    }
   };
   private _downX = 0;
   private _downY = 0;
+  // ── Double-tap zoom (domain/tapZoom) ──────────────────────────────────────────
+  // TOUCH ONLY (the `pointerType` gate below, the `RailScroll` idiom): a mouse already has the
+  // wheel, and a double CLICK would fight click-select — the second click of the pair would toggle
+  // off what the first committed.
+  private _ptrDown = 0; //             pointers currently down, for the multi-touch invalidation
+  private _lastTap: Tap | null = null; // the unpaired tap waiting for its partner
+  private _eatClick = false; //        set when a pair fires; `_handleClick` spends it
+  // The step's own eased dolly, owned here because it is not a POSE: it composes onto whatever the
+  // controls and the tween have already put the camera at (see _updateTapZoom's ordering note).
+  private _zoom = { active: false, t: 0, from: 0, to: 0 };
+  private onCancelTap = () => {
+    this._ptrDown = 0;
+    this._lastTap = null;
+  };
+  private onUp = (e: PointerEvent) => {
+    const solo = this._ptrDown === 1; // a pinch's two ups are not two taps
+    this._ptrDown = Math.max(0, this._ptrDown - 1);
+    if (e.pointerType === "mouse") return;
+    // A tap is a touch that didn't travel — same fingertip tolerance the pair itself gets.
+    if (!solo || Math.hypot(e.clientX - this._downX, e.clientY - this._downY) > DOUBLE_TAP_SLOP) {
+      this._lastTap = null;
+      return;
+    }
+    const now: Tap = { t: e.timeStamp, x: e.clientX, y: e.clientY };
+    if (isDoubleTap(this._lastTap, now)) {
+      this._lastTap = null; // a pair is spent — a third tap starts a fresh first one
+      // ⚠️ THE SECOND TAP MUST NOT PICK. `click` fires after this handler, and while a scene click
+      // never deselects a NODE, hub / country / cohort / tile / band clicks all TOGGLE — so an
+      // unsuppressed second tap would undo exactly what the first one just committed.
+      this._eatClick = true;
+      this._tapZoom();
+      return;
+    }
+    this._lastTap = now;
+  };
   private _hoverKey: string | null = null;
   // Reused pickables buffer (never re-allocated) — `_pickablesFor` runs on every pointermove.
   private _pickBuf: THREE.Object3D[] = [];
@@ -177,18 +221,40 @@ export class Engine {
   private metaTimer: ReturnType<typeof setInterval> | undefined;
   // Trailing debounce for the direct-manipulation signal (see the constructor's controls
   // listeners): wheel-zoom fires start/end per notch, so `sceneDragging` only drops after a
-  // quiet 350ms.
+  // quiet 350ms. A POINTER gesture doesn't wait for it — see `_onPointerRelease`.
   private _dragEndT: ReturnType<typeof setTimeout> | undefined;
-  // Store mirror for the rails-hidden camera lean — _tweenTo composes railsDolly into every
-  // destination while it holds (see the subscription note). Seeded from the store at boot.
+  // Store mirror for the rails-hidden camera lean — _tweenTo composes railsLean into every
+  // dolly-eligible destination while it holds (see the subscription note). Seeded at boot.
   private railsHidden = false;
   private _onControlsStart = () => {
     clearTimeout(this._dragEndT);
+    this._dragEndT = undefined;
     if (!useStore.getState().sceneDragging) useStore.getState().setSceneDragging(true);
   };
   private _onControlsEnd = () => {
     clearTimeout(this._dragEndT);
-    this._dragEndT = setTimeout(() => useStore.getState().setSceneDragging(false), 350);
+    this._dragEndT = setTimeout(() => {
+      this._dragEndT = undefined;
+      useStore.getState().setSceneDragging(false);
+    }, 350);
+  };
+  // ⚠️ THE DEBOUNCE IS FOR THE WHEEL, AND A DRAG MUST NOT PAY IT (user, 2026-08-13 — "there is a
+  // slight delay before it re-appears"). A wheel gesture has no end: OrbitControls dispatches
+  // start+end synchronously PER NOTCH, so only a quiet window can say the hand is done, and 350ms
+  // of it sat in front of every fade-back. A drag's end is known exactly — the pointer lifting —
+  // so this handler collapses the wait to zero for that case, leaving the debounce to the one
+  // input that needs it.
+  //
+  // It is gated on a PENDING drop rather than on `sceneDragging`, which is what keeps a pinch
+  // intact: lifting one finger of two makes OrbitControls re-dispatch `start` for the remaining
+  // pointer (its own document-level handler runs before this window-level one), so `_onControlsStart`
+  // has already cleared the timer and this is correctly a no-op. Only a gesture that really ended
+  // leaves a timer standing.
+  private _onPointerRelease = () => {
+    if (this._dragEndT === undefined) return;
+    clearTimeout(this._dragEndT);
+    this._dragEndT = undefined;
+    useStore.getState().setSceneDragging(false);
   };
   private onResize = () => this.ctx.resize?.();
   // FPS/ms monitor — dev only, or in prod via `?stats`/`#stats` for ad-hoc checks, so
@@ -300,6 +366,10 @@ export class Engine {
     canvas.addEventListener("pointermove", this.onMove);
     canvas.addEventListener("pointerdown", this.onDown);
     canvas.addEventListener("pointerleave", this.onLeave);
+    // Double-tap zoom (touch only — see onUp). On the CANVAS rather than the window, so a tap pair
+    // that ends on a rail card can't zoom the scene behind it.
+    canvas.addEventListener("pointerup", this.onUp);
+    canvas.addEventListener("pointercancel", this.onCancelTap);
     // The engine owns the resize handler (createScene no longer adds one) so it's
     // cleaned up on dispose — no leak across StrictMode remounts / HMR.
     window.addEventListener("resize", this.onResize);
@@ -309,6 +379,9 @@ export class Engine {
     // debounce keeps wheel-zoom bursts (start/end per notch) from strobing the rails.
     this.ctx.controls.addEventListener("start", this._onControlsStart);
     this.ctx.controls.addEventListener("end", this._onControlsEnd);
+    // On WINDOW, so it runs after OrbitControls' own document-level pointerup — see the handler.
+    window.addEventListener("pointerup", this._onPointerRelease);
+    window.addEventListener("pointercancel", this._onPointerRelease);
 
     const showStats =
       process.env.NODE_ENV === "development" ||
@@ -334,6 +407,7 @@ export class Engine {
         if (this.disposed) return;
         this._devTune = await m.mountDevTune({
           ledger: this.ledger,
+          hyper: this.layers,
           camera: this.ctx.camera,
           controls: this.ctx.controls,
         });
@@ -425,11 +499,12 @@ export class Engine {
         }
         // The selected node card (geo or hyper) keeps that node's layer shells lit on the globe.
         if (st.inspect !== prev.inspect) this.globe.setSelectedNode(this._pickNodeId(st.inspect));
-        // Geo: clicking a node (on the globe or in the left explorer both set `inspect`)
-        // flies the camera to it; clearing it returns to the selection framing.
-        if (st.inspect !== prev.inspect && st.mode === "geo") this._resolveFocus();
-        // Ledger: the same ladder — a node pick zooms to its chip, a clear steps back to the layer.
-        if (st.inspect !== prev.inspect && st.mode === "ledger") this._resolveFocus();
+        // A node commit is answered by the camera in every 3D view (user, 2026-08-13). The pose is
+        // the view's own business: geo flies to the node, hyper and the ledger resolve to a pose
+        // they may already hold and answer with the NUDGE (_tweenTo). Hyper had no branch here at
+        // all, so a node click there was the one commit the camera never acknowledged. An
+        // allow-list, per convention 7 — the flat views have no camera to move.
+        if (st.inspect !== prev.inspect && VIEW_POLICIES[st.mode].canvas) this._resolveFocus();
         // Ledger: keep the hovered/selected snapshot coloured in the trail (hover wins, then the
         // clicked `snap`); everything else fades to the neutral background tone.
         if (st.hoverSnapOrd !== prev.hoverSnapOrd || st.snap !== prev.snap) {
@@ -815,7 +890,7 @@ export class Engine {
       this.globe.focusDensest(false);
       this.ctx.controls.autoRotate = false;
       this.globe.setFilter(this.filter); // dim non-selected metagraph columns (no camera move)
-      this.ledger.setFilter(this.filter); // gates the anchor pulses only (no dim)
+      this.ledger.setFilter(this.filter); // the chamber's COLOURED dim (no camera move)
       this._refreshLedger();
       // Ledger uses the SHARED overview camera — the group transform (config.viewRotY/viewScale)
       // frames the resting pose central/untilted, and it is the view's ONE pose: every rung
@@ -949,15 +1024,13 @@ export class Engine {
       return true;
     },
     hyperNode: () => {
-      const p = useStore.getState().inspect;
-      const id = !p ? null : p.kind === "metanode" ? p.node?.ip : p.kind === "l0" || p.kind === "l1" ? p.node?.id : null;
-      const pos = id ? this.globe.hyperWorldPos(id) : null;
-      if (!pos) return false;
-      this.ctx.controls.autoRotate = false;
-      this.layers.focusId = null;
-      hyperNodeFraming(pos, this._framingOut);
-      this._tweenTo(this._framingOut.pos, this._framingOut.target);
-      return true;
+      // Hyper's node rung has no pose of its own — it frames the node's NETWORK, exactly as the
+      // composition rung below it does (user, 2026-08-13: arriving here with a node selected "should
+      // behave the same as when (only) a metagraph filter is selected"). The view's subject is the
+      // structure; a node is one bead on a shell, and the retired per-node framing (cameraRig's hyper
+      // block) dived past the hub and shells that say what the bead belongs to. The click is still
+      // answered — the destination is the pose already held, so _tweenTo runs the commit NUDGE.
+      return this._resolvers.hyperNetwork();
     },
     hyperComposition: () => {
       // A composition group is network-scoped by construction (its toggle commits the filter
@@ -1188,6 +1261,12 @@ export class Engine {
   }
 
   private _handleClick(e: MouseEvent) {
+    // The second tap of a double tap zoomed instead — see onUp. Spent here, so it can only ever
+    // eat the one click its own pair produced.
+    if (this._eatClick) {
+      this._eatClick = false;
+      return;
+    }
     // A click that ends a drag (orbit/pan) is navigation, not selection — see onDown.
     if (Math.hypot(e.clientX - this._downX, e.clientY - this._downY) > 5) return;
     if (this.transition.active()) return; // nodes are mid-flight; raycasting moving targets misleads (spec)
@@ -1279,9 +1358,9 @@ export class Engine {
     return g.rows.map((r) => hoverKeyOf(r.pick)).filter((k): k is string => !!k);
   }
 
-  private focus(name: string) {
+  private focus(name: FocusName) {
     const f = FOCI[name];
-    if (f) this._tweenTo(f.pos, f.target);
+    this._tweenTo(f.pos, f.target);
   }
 
 
@@ -1298,13 +1377,30 @@ export class Engine {
     else tw.toPos.copy(toPos);
     tw.fromTgt.copy(this.ctx.controls.target);
     tw.toTgt.copy(toTgt);
-    // The rails-hidden LEAN composes into EVERY destination (2026-08-08, review-hardened): a
-    // property of pose resolution, so focus flights, transition landings and the presentation
-    // toggle can never disagree about it. In place (railsDolly is outPos===pos safe).
-    if (this.railsHidden) railsDolly(tw.toPos, tw.toTgt, tw.toPos);
+    // The rails-hidden LEAN composes into every destination a dolly may touch (2026-08-08,
+    // review-hardened): a property of pose resolution, so focus flights, transition landings and
+    // the presentation toggle can never disagree about it. In place (railsLean is outPos===pos
+    // safe). It rides the SAME `dolly` gate as dollyBack — both scale (pos − target) about the
+    // target, so a pose whose target is a composed look-at is exempt from both (see the exemption
+    // note next to CAM_ZOOM). And it RAMPS with how close the pose already sits to the view's
+    // resting orbit, which is what `restOrbit` measures — see railsLean's own note.
+    if (dolly && this.railsHidden) railsLean(tw.toPos, tw.toTgt, is3D(this.mode) ? restOrbit(this.mode) : 0, tw.toPos);
+    // THE COMMIT NUDGE (user, 2026-08-13): "we always animate the position but a 'nudge' is allowed
+    // which means the new pos will be same as old pos". Every rung answers a click, including the
+    // ones whose pose is their parent's — hyper's node and composition rungs resolve to the network
+    // they belong to, so committing one lands exactly where the camera already is. A dead 1.4s
+    // no-op reads as a broken click; the nudge is the acknowledgement, and it ends on this same
+    // committed pose, so nothing is lost by taking it.
+    tw.nudge = isSamePose(tw.fromPos, tw.fromTgt, tw.toPos, tw.toTgt);
     tw.t = 0;
-    tw.dur = 1.4;
+    tw.dur = tw.nudge ? NUDGE_DUR : 1.4;
     tw.active = true;
+    // The HUD yields while this flight runs (store.cameraFlying — see its comment): a commit made
+    // from a card is a request to LOOK at what was committed, so the cards step back out of the
+    // way exactly as they do under a direct drag. NOT during a view transition: that choreography
+    // is already the 3.9s answer to the user's gesture, and a 1.4s dim inside it reads as a blink.
+    // And NOT for a nudge: the dim exists so the scene can be SEEN changing, and here it doesn't.
+    if (!tw.nudge && !this.transition.active() && !useStore.getState().cameraFlying) useStore.getState().setCameraFlying(true);
   }
 
 
@@ -1422,6 +1518,7 @@ export class Engine {
     // camera by one frame — a visible drift-and-return on the hyper→geo flight (user,
     // 2026-07-17). Tween → roll ease → controls → altitude clamp, THEN the plane.
     this._updateTween(dt);
+    this._updateTapZoom(dt);
     this.ctx.controls.update();
     // Altitude clamp (policy.minCamAlt): OrbitControls' minDistance is target-relative, and
     // the geo target is off-centre — so after the controls settle, push the camera back out
@@ -1483,12 +1580,19 @@ export class Engine {
       this.ctx.camera.getWorldDirection(this._gatherO); // forward (scratch reuse)
       this._gatherO.multiplyScalar(GATHER_DIST).add(this.ctx.camera.position);
       const h = Math.tan(THREE.MathUtils.degToRad(this.ctx.camera.fov / 2)) * GATHER_DIST;
-      this._gatherO.addScaledVector(this._gatherU2, h * GATHER_TOP_FRAC);
+      // The band clears the HUD it flies in front of: its top edge sits on the rail cards' own
+      // top, and it spans the full viewport width when the rails are away. `_gatherO` is the
+      // band's TOP EDGE (gatherLayout hangs every grid downward from it).
+      const band = gatherBand(window.innerWidth, window.innerHeight, this.railsHidden, this._gatherBand);
+      this._gatherO.addScaledVector(this._gatherU2, h * band.topFrac);
       this.globe.setGatherFrame(this._gatherO, this._gatherR, this._gatherU2);
-      // Phone/narrow viewports: shrink the cell so the row's total width still fits — never
-      // grow it past the reference aspect's size (Math.min(1, …)).
-      const cellScale = Math.min(1, this.ctx.camera.aspect / GATHER_CELL_ASPECT_REF);
-      this.globe.setGatherCell(GATHER_CELL * cellScale);
+      // The live band, and it decides the pack's DEPTH rather than the chip size: the Globe
+      // measures it in capped chip pitches and packs the blocks to fit, so a presentation with
+      // more width stages the same chips in fewer, longer rows. Measuring a RAILED band here to
+      // size the chips (which is what this did) is no longer needed — nothing about the chip
+      // depends on the presentation any more.
+      const w = h * this.ctx.camera.aspect * 2;
+      this.globe.setGatherFit(w * band.halfWidthFrac, h * band.heightFrac);
     }
   }
 
@@ -1584,6 +1688,59 @@ export class Engine {
     }
   }
 
+  /**
+   * One double-tap step (domain/tapZoom owns the arithmetic). Two branches, because the camera has
+   * two owners:
+   *
+   * - A commit flight in the air → scale its DESTINATION once, in place, and let the flight land
+   *   zoomed in. ⚠️ NOT through `_tweenTo`, which composes `dollyBack` and `railsLean` into every
+   *   destination it is handed — routing a direct dolly through it would apply both levers a
+   *   second time.
+   * - Settled → the eased step below, which is the only camera motion the Engine owns that isn't
+   *   a pose.
+   */
+  private _tapZoom() {
+    if (!this._policy.canvas) return; // the flat placeholder views are inert (convention 7)
+    if (this.transition.active()) return; // the choreography owns the camera
+    const controls = this.ctx.controls;
+    const tw = this._tween;
+    if (tw.active) {
+      tapZoomAround(tw.toPos, tw.toTgt, controls.minDistance, controls.maxDistance, tw.toPos);
+      return;
+    }
+    // Measured live, so a second pair mid-step continues from where the first one has got to.
+    const from = this.ctx.camera.position.distanceTo(controls.target);
+    const to = tapZoomDistance(from, controls.minDistance, controls.maxDistance);
+    if (to === from) return; // already at the floor — nothing to animate
+    const z = this._zoom;
+    z.from = from;
+    z.to = to;
+    z.t = 0;
+    z.active = true;
+  }
+
+  /**
+   * The step, applied between the tween and `controls.update()` — so OrbitControls recomputes its
+   * spherical from the position we wrote (exactly as it does for the tween), and the altitude
+   * clamp downstream still gets the last word. Distance only: the direction is whatever the user
+   * has orbited to, and the anchor is the live `controls.target`, so a pan mid-step composes.
+   */
+  private _updateTapZoom(dt: number) {
+    const z = this._zoom;
+    if (!z.active) return;
+    // A commit flight is a POSE and outranks a nudge along the view vector — drop the step rather
+    // than fight it for the camera position.
+    if (this._tween.active) {
+      z.active = false;
+      return;
+    }
+    z.t = Math.min(1, z.t + dt / TAP_ZOOM_DUR);
+    const d = z.from + (z.to - z.from) * easeInOutQuad(z.t);
+    const tgt = this.ctx.controls.target;
+    this.ctx.camera.position.sub(tgt).setLength(d).add(tgt);
+    if (z.t >= 1) z.active = false;
+  }
+
   private _updateTween(dt: number) {
     const tw = this._tween;
     if (!tw.active) return;
@@ -1593,7 +1750,16 @@ export class Engine {
     const e = easeInOutQuad(tw.t);
     this.ctx.camera.position.lerpVectors(tw.fromPos, tw.toPos, e);
     this.ctx.controls.target.lerpVectors(tw.fromTgt, tw.toTgt, e);
-    if (tw.t >= 1) tw.active = false;
+    // The nudge rides ON TOP of what is otherwise a zero-length flight: a soft push toward the
+    // pose's own target and back out, contributing exactly 0 at t=1 so the tween still lands on
+    // the committed pose to the pixel.
+    if (tw.nudge) this.ctx.camera.position.lerp(tw.toTgt, nudgeMix(tw.t));
+    if (tw.t >= 1) {
+      tw.active = false;
+      // The flight's trailing edge — one write, and unconditionally, so a tween STARTED before a
+      // transition (or suppressed by one) can never strand the HUD dimmed.
+      if (useStore.getState().cameraFlying) useStore.getState().setCameraFlying(false);
+    }
   }
 
   dispose() {
@@ -1603,12 +1769,18 @@ export class Engine {
     this.canvas.removeEventListener("pointermove", this.onMove);
     this.canvas.removeEventListener("pointerdown", this.onDown);
     this.canvas.removeEventListener("pointerleave", this.onLeave);
+    this.canvas.removeEventListener("pointerup", this.onUp);
+    this.canvas.removeEventListener("pointercancel", this.onCancelTap);
     window.removeEventListener("resize", this.onResize);
     this.ctx.controls.removeEventListener("start", this._onControlsStart);
     this.ctx.controls.removeEventListener("end", this._onControlsEnd);
+    window.removeEventListener("pointerup", this._onPointerRelease);
+    window.removeEventListener("pointercancel", this._onPointerRelease);
     clearTimeout(this._dragEndT);
-    // A dispose mid-drag must not leave the rails dimmed (StrictMode remount / HMR).
+    // A dispose mid-drag must not leave the rails dimmed (StrictMode remount / HMR). Same for a
+    // dispose mid-FLIGHT: nothing else clears the flag once the render loop stops.
     if (useStore.getState().sceneDragging) useStore.getState().setSceneDragging(false);
+    if (useStore.getState().cameraFlying) useStore.getState().setCameraFlying(false);
     this.stats?.dom.remove();
     this._devTune?.dispose();
     this.unsub.forEach((u) => u());

@@ -19,7 +19,7 @@ import { metaAnchor, META_LAYERS, META_RING, DAG_L0, DAG_L1, HYPER_TILT, applyHy
 import { LEDGER, type RailGroup } from "../domain/ledgerLayout";
 import { metaTrayLayout, dagTrayLayout, containerChipPos, type ContainerSpec } from "../domain/ledgerRails";
 import { LANE_IDS } from "../domain/ledgerModel";
-import { gatherSlots } from "../domain/gatherLayout";
+import { gatherSlots, gatherExtent, gatherSpread, gatherRows, type GatherExtent, type GatherSlot } from "../domain/gatherLayout";
 import type { ViewTransition } from "../domain/viewTransition";
 import type { SceneColors } from "../sceneColors";
 import * as geoStats from "../domain/geoStats";
@@ -35,7 +35,7 @@ import { ccToNumeric, countryCcAt, countryLean, geometryRings, mainPolygonRings,
 import { closeness, NODE_RAISE } from "../domain/cameraRig";
 import type { CohortSel } from "../domain/focusLadder";
 import { ancestryGlow } from "../domain/dimModel";
-import { NodeFabric, type FrameCtx } from "./objects/NodeFabric";
+import { NodeFabric, GATHER_SCALE, type FrameCtx } from "./objects/NodeFabric";
 import { Arcs } from "./objects/Arcs";
 import { makeRadialGradientTexture } from "./objects/gradientTexture";
 import type { HyperView } from "./views/HyperView";
@@ -58,11 +58,20 @@ import type {
 const HEX_BASE_R = R + LAND_H + 0.02 + HEX_H / 2;
 const hexPitchDeg = (r: number) => ((2 * r * 1.04) / (R + LAND_H)) * (180 / Math.PI);
 
-// View-transition staging grid: the cell pitch (world units) at the DESKTOP reference aspect.
-// The Engine scales this down for narrower (e.g. phone-portrait) viewports — see setGatherCell —
-// so the packed row of per-network squares (domain/gatherLayout) still fits the frustum width;
-// unscaled it overflowed badly at phone aspect (verified live, Task 8).
-export const GATHER_CELL = 0.55;
+// View-transition staging grid: THE cell pitch (world units). setGatherFit may only shrink it
+// (with the chip size, by one factor) to make the packed row of per-network squares
+// (domain/gatherLayout) fit the band the Engine measured against the HUD — a phone-portrait
+// viewport. Wherever the pack fits, this is the size staged, in every view and both
+// presentations; spare width buys columns and gutters, never size.
+//
+// The pitch against GATHER_SCALE is what sets the AIR between chips — the one knob for "the
+// nodes need just a little bit more spacing" (user, 2026-08-13). At 0.55 the chips sat at ~0.9
+// of the pitch and each square read as a solid mass of touching circles rather than a grid of
+// pixels; 0.62 puts them at ~0.8 and the rows separate. The ratio is what the eye reads and the
+// fit scales both by one factor, so air is fixed and this number is purely the staged SIZE.
+// Raising it never widens the row where the WIDTH binds (the fit divides it straight back out) —
+// it spends the same band on fewer, bigger pixels, packed deeper.
+export const GATHER_CELL = 0.62;
 
 // The ledger's whole-view orientation (tilt ∘ rotY), baked into every node's ledger position so the
 // nodes match the LedgerView group's transform. Scale is applied separately (uniform).
@@ -116,6 +125,13 @@ export class Globe implements GeoViewHost {
   private _gatherN = new THREE.Vector3(); //  scratch: the staging plane's camera-facing normal
   private _gatherZ = new THREE.Vector3(); //  scratch: the staging basis' Z (= -up)
   private _gatherM = new THREE.Matrix4(); //  scratch: the staging orientation basis
+  private _gatherExtent: GatherExtent = { w: 0, h: 0, gaps: 0 }; // the packed row's size in CELLS (event-time)
+  private _gatherGroups: { id: string; count: number }[] = []; // last packed set — re-solved when the band changes
+  private _gatherRows = 0; // the depth that set was packed at (0 = never packed)
+  private _gatherBudget = 0; // the band's width in chip pitches, from the last fit
+  private _gatherMaxRows = 0; // …and its height, which is where the depth search stops
+  private _gatherFitW = -1; // the band the fit below was last solved for (-1 = never / invalidated)
+  private _gatherFitH = -1;
   private ledgerT = 0; // 0->1 ease as the reused node meshes fly from their source view into the lanes
   clock = 0;
   private spin: SpinState | null = null;
@@ -228,7 +244,7 @@ export class Globe implements GeoViewHost {
       dim: 0, clock: 0, camN: this._camN, hasCam: false,
       ledgerT: 0, dt: 0, flashDecay: 0, group: this.group,
       transition: null,
-      gather: { origin: new THREE.Vector3(), right: new THREE.Vector3(), up: new THREE.Vector3(), quat: new THREE.Quaternion(), cell: GATHER_CELL },
+      gather: { origin: new THREE.Vector3(), right: new THREE.Vector3(), up: new THREE.Vector3(), quat: new THREE.Quaternion(), cell: GATHER_CELL, scale: GATHER_SCALE, spread: 0 },
     };
 
     // The geo globe surface (body, graticule, atmosphere, continents) — it sets the surface handles
@@ -248,14 +264,17 @@ export class Globe implements GeoViewHost {
   setSimFlags(sims: { arcs: boolean; globeSpin: boolean }): void {
     this.simArcs = sims.arcs;
     this.simSpin = sims.globeSpin;
-    // Spin OFF (hyper): the redesigned TILTED node rings register with the Hypergraph's cyan hoops.
-    // Tilt the whole node group by HYPER_TILT so the near-flat ring layout reads top-down from the
-    // SHARED overview camera (HyperView tilts root + coreGroup by the same angle, so nodes + hoops
-    // stay registered). A leftover geo rotation would otherwise offset them.
-    if (!this.simSpin && !this.ledger) {
-      this.spin = null;
-      applyHyperRig(this.group, 0);
-    }
+    // ⚠️ THE GATES FLIP HERE, THE ORIENTATION DOES NOT (user, 2026-08-12 — "when we switch from geo
+    // to another view, the globe rotation changes before it fades"). This used to hard-write hyper's
+    // Euler rig the moment `globeSpin` dropped, and the Engine calls it at switch time, one phase
+    // BEFORE the choreography's boundary — so leaving geo for ANY view (hyper, ledger, or a flat
+    // one, since all three drop the flag and `this.ledger` is still false until the boundary applies
+    // that layout) re-posed the globe on the first frame of the still-visible OUT phase.
+    // The rig belongs where the destination's other frame state already lands: `setHyperSpin` below,
+    // which _applyBoundary calls with the nodes gathered and both furnitures dark, and which the
+    // Engine then re-asserts every hyper frame. Ledger zeroes its own rotation in updateRotation,
+    // and a flat view draws nothing to orient. Same rule as the camera hold (viewTransition
+    // .holdCamera) and the _integrateMotion guard that fixed this bug's sibling half.
   }
 
   // Set the hyper-structure spin: the node group is tilted by HYPER_TILT and spun about its own
@@ -264,7 +283,13 @@ export class Globe implements GeoViewHost {
   setHyperSpin(y: number, tiltX: number = HYPER_TILT): void {
     // `tiltX` is the Engine-eased shared structure tilt: HYPER_TILT at rest, easing to
     // HYPER_TILT_FOCUS while a metagraph is committed (discs read horizontal from the side).
-    if (!this.simSpin && !this.ledger) applyHyperRig(this.group, y, tiltX);
+    if (this.simSpin || this.ledger) return;
+    // The rig OWNS the group's orientation while it applies, so a geo focus tween is dropped as it
+    // takes over — `updateRotation`'s `else if (this.spin)` branch runs ahead of nothing here and
+    // would overwrite the rig with the drill's own longitude on the very next frame. Dropping it at
+    // the handover (rather than at switch time) is what lets the drill keep easing through the fade.
+    this.spin = null;
+    applyHyperRig(this.group, y, tiltX);
   }
 
   // The wall is always the structural accent (the geo hologram hue). Kept as a setter so the Engine
@@ -349,7 +374,7 @@ export class Globe implements GeoViewHost {
           spinAxis: new THREE.Vector3(Math.random() * 2 - 1, Math.random() * 2 - 1, Math.random() * 2 - 1).normalize(),
           spinSpeed: 0.3 + Math.random() * 0.5, spinPhase: Math.random() * 6.2831,
           pick,
-          gU: 0, gV: 0, gRank: 0, gCount: 0,
+          gU: 0, gV: 0, gRank: 0, gCount: 0, gS: 0,
         };
         this.nodes.push(u);
         idx++;
@@ -385,8 +410,9 @@ export class Globe implements GeoViewHost {
     this.setMorph(this.morph); // place at current morph
   }
 
-  // Staging-grid slots for the view-transition choreography (event-time: data rebuilds). Reads
-  // BOTH record arrays as they currently stand, so it's safe to call from either setNodes or
+  // Staging-grid slots for the view-transition choreography. Event-time: data rebuilds, plus the
+  // one frame in a transition where the band's solved DEPTH changes (setGatherFit calls back in).
+  // Reads BOTH record arrays as they currently stand, so it's safe to call from either setNodes or
   // setMetagraphs — whichever rebuilt, the other array's slots are recomputed too (harmless: the
   // layout is a pure function of the current counts).
   private _assignGatherSlots(): void {
@@ -431,9 +457,18 @@ export class Globe implements GeoViewHost {
       groups.push({ id, count: byMachine.size });
     }
 
-    const slots = gatherSlots(groups);
-    const apply = (recs: { gU: number; gV: number; gRank: number; gCount: number }[], s: { u: number; v: number; rank: number; count: number }) =>
-      recs.forEach((r) => { r.gU = s.u; r.gV = s.v; r.gRank = s.rank; r.gCount = s.count; });
+    // How deep the blocks may go, from the band the last fit measured: the pack is width-first, so
+    // the depth is solved and the columns follow (domain/gatherLayout). Before any transition frame
+    // the budget is 0 and gatherRows answers the near-square — setGatherFit re-packs on the first
+    // frame it draws, which is why a stale depth here can never be seen.
+    const rows = gatherRows(groups, this._gatherBudget, this._gatherMaxRows);
+    const slots = gatherSlots(groups, rows);
+    this._gatherExtent = gatherExtent(groups, rows);
+    this._gatherGroups = groups;
+    this._gatherRows = rows;
+    this._gatherFitW = -1; // the pack changed, so the fit memo below has to re-solve against it
+    const apply = (recs: { gU: number; gV: number; gRank: number; gCount: number; gS: number }[], s: GatherSlot) =>
+      recs.forEach((r) => { r.gU = s.u; r.gV = s.v; r.gRank = s.rank; r.gCount = s.count; r.gS = s.gs; });
 
     const dagSlots = slots.get("dag");
     if (dagSlots) {
@@ -467,15 +502,21 @@ export class Globe implements GeoViewHost {
     this.metaList = withNodes;
 
     const recs: MetaNodeRecord[] = [];
-    // Each metagraph runs its own L0 + currency-L1 (cl1) + data-L1 (dl1). Concentric fibonacci
-    // shells around the hub — L0 inner, data-L1 middle, currency-L1 outer.
-    // Each metagraph runs its own L0 + currency-L1 (cl1) + data-L1 (dl1). Redesign: concentric flat
-    // RINGS in the hub's plane — L0 inner, data-L1 middle, currency-L1 outer — read top-down as clean
-    // orbital diagrams (was scattered fibonacci shells). One even ring per layer; a small per-layer
-    // phase so the layers' node seams don't align radially.
-    // Each metagraph is a little "atom": its 3 layers become 3 rings of the SAME diameter at 3
-    // DIFFERENT tilt angles (layer index = ring index; same primitive as the DAG core), so L0 / dL1 /
-    // cL1 read as distinct tilted rings around a cyan hub. HyperView draws a matching tilted hoop.
+    // Each metagraph runs its own L0 + currency-L1 (cl1) + data-L1 (dl1), and its nodes are laid out
+    // as a little "atom" — one ARMILLARY ring per layer around the hub, the same primitive the DAG
+    // core uses. The rings differ in BOTH axes: radius (`META_RING.radii`, l0 inner → dl1 → cl1
+    // outer) and plane (`armillaryFrame` turns ring k by k/n·π about Y after the shared X tilt), so
+    // L0 / dL1 / cL1 read as three distinct tilted hoops. HyperView draws a matching hoop per ring.
+    //
+    // ⚠️ A BEAD IS A LAYER, NEVER A MACHINE, and its ring position says nothing about its siblings'
+    // (user, 2026-08-12). A hybrid runs several layers and so gets one bead per ring, but each ring
+    // places its members by index within THAT layer's own list — `ringFramePos(i, cnt, …)` below,
+    // where both `i` and `cnt` are per layer. A 3-hybrid metagraph's three lists coincide, so the
+    // parameters match by accident; DOR's do not (3 on L0, 22 on dL1). Radial correspondence isn't
+    // reachable here anyway: equal ring parameters on differently-tilted rings land in different
+    // planes, so a true spoke would cost the tilt AND even spacing on the busy ring. It is not
+    // wanted — the layer IS the subject in this view, and `setSelectedNode` already lights every
+    // bead a machine runs (they share `nodeId`), so the host is legible on demand.
     const rolesOf = (node: RouteNode) => nodeRoles(node, node.layer as string);
     // LEDGER PRE-PASS (per-metagraph trays, 2026-08-07): each metagraph's OWN plane carries its
     // OWN tray of machines — deduped by IP (a hybrid appears once; roles belong to other views).
@@ -540,7 +581,7 @@ export class Globe implements GeoViewHost {
             spinSpeed: 0.3 + Math.random() * 0.5, spinPhase: Math.random() * 6.2831,
             dim: 0, dimTarget: 0,
             pick,
-            gU: 0, gV: 0, gRank: 0, gCount: 0,
+            gU: 0, gV: 0, gRank: 0, gCount: 0, gS: 0,
           });
         });
       });
@@ -835,44 +876,14 @@ export class Globe implements GeoViewHost {
     this._selCohortOk = true;
   }
 
-  // World position of a node's HYPERGRAPH point by its id — read from its live instance transform.
-  // The node's HYPER LAYOUT position in world space — from the layout DATA, deliberately NOT
-  // the rendered instance matrix: mid-transition the instance sits at the staging grid, and a
-  // camera framing must aim where the node will LAND, not where it happens to be in flight
-  // (user bug: geo node selected → hyper flew the camera to the staging area, "focus lost").
-  // Event-time (a focus click), so the allocation is fine.
-  hyperWorldPos(id: string | null): THREE.Vector3 | null {
-    if (!id) return null;
-    const u = this.nodes.find((n) => n.nodeId === id);
-    if (u) return this.group.localToWorld(new THREE.Vector3().copy(u.hyperPos));
-    const r = this.metaNodes && this.metaNodes.find((n) => n.nodeId === id);
-    if (r) {
-      // Same composition writeMetaFrame renders: the hub's world position expressed in the
-      // group's local frame, plus the node's hub-local offset, back out to world.
-      const v = new THREE.Vector3();
-      if (r.hubGroup) {
-        r.hubGroup.getWorldPosition(v);
-        this.group.worldToLocal(v).add(r.offset);
-      } else {
-        v.copy(r.hyperPos);
-      }
-      return this.group.localToWorld(v);
-    }
-    return null;
-  }
+  // ---- per-node world positions: RETIRED (2026-08-13) ----
+  // `hyperWorldPos` and `ledgerWorldPos` existed for one purpose each: a camera framing on a
+  // single node. Both of those poses are gone — the ledger's on 2026-08-09 (three bespoke ledger
+  // framings retired, one commit tilt kept), hyper's today, because hyper's node rung frames the
+  // node's NETWORK (see the retirement note in domain/cameraRig.ts). Nothing else ever asked a
+  // node where it is in world space, and nothing should: framing math consumes LAYOUT data
+  // (rule 6), which is what these two read on the way out.
 
-  // The node's LEDGER LANE position in world space — layout data (ledgerPos carries the
-  // chamber orientation bake), NOT the rendered instance matrix, for the same reason as
-  // hyperWorldPos: mid-transition the instance is at the staging grid, and the camera must
-  // frame where the chip will LAND. Event-time (a focus), allocation fine.
-  ledgerWorldPos(id: string | null): THREE.Vector3 | null {
-    if (!id) return null;
-    const u = this.nodes.find((n) => n.nodeId === id);
-    if (u) return this.group.localToWorld(new THREE.Vector3().copy(u.ledgerPos));
-    const r = this.metaNodes && this.metaNodes.find((n) => n.nodeId === id);
-    if (r) return this.group.localToWorld(new THREE.Vector3().copy(r.ledgerPos));
-    return null;
-  }
 
   // Whether a node is part of the current network filter. `id` is the core a node belongs to.
   private _isActive(id: string): boolean {
@@ -1035,9 +1046,14 @@ export class Globe implements GeoViewHost {
     // ANCESTRY kinds are the ones gated by dimModel.ancestryGlow (that function is the rule); the
     // signer set sits OUTSIDE the gate because it is not ancestry — it is a relation from a
     // different subject, the selected metagraph snapshot — so it never yields to a node.
+    // The gate's node subject is the committed node OR the hovered one: a hover previews the
+    // commit, and committing a node collapses the borrowed glow (user, 2026-08-12).
     c.hoverCohort =
       this._hoverCohort ??
-      ancestryGlow(this._selCohortIds ?? this._selGroupIds, this._selectedNodeId) ??
+      ancestryGlow(
+        this._selCohortIds ?? this._selGroupIds,
+        this._selectedNodeId ?? this._hoverNodeId,
+      ) ??
       this._signerIds;
     c.selectedNodeId = this._selectedNodeId;
     c.filter = this.filter;
@@ -1077,11 +1093,52 @@ export class Globe implements GeoViewHost {
     g.quat.setFromRotationMatrix(this._gatherM);
   }
 
-  // Narrow (e.g. phone-portrait) viewports: the Engine scales the cell down from GATHER_CELL so
-  // the packed staging row still fits the frustum width (verified live, Task 8 — unscaled, the
-  // DAG's big square ran off the right edge at phone aspect).
-  setGatherCell(cell: number): void {
-    this._ctx.gather.cell = cell;
+  // Fit the packed staging row into the band the Engine measured (world units on the staging
+  // plane). ONE factor drives BOTH the cell pitch and the chip scale: growing the cell alone
+  // would spread same-size chips into a sparse scatter, and a block only reads as one shape
+  // because the nodes ARE its pixels.
+  //
+  // ⚠️ THE FACTOR ONLY EVER SHRINKS (user, 2026-08-13 — "again the nodes have become very large in
+  // scene mode; you fixed it once but broke it again; find a structural fix that does not
+  // reappear"). It used to start at a growth cap and take whichever the band allowed, which made
+  // chip size a function of the band: the two presentations matched only while the cap bound in
+  // both, and a viewport that moved one of them off it staged the same nodes larger with the
+  // rails away — twice, because the cap had twice been re-tuned to whatever filled scene mode's
+  // band, which is a free fit in disguise. Starting at 1 severs that path by construction:
+  // GATHER_CELL is THE staged chip pitch, spare width can only buy columns and then gutters, and
+  // shrinking stays unbounded because a phone that cannot fit the pack has to fit it anyway.
+  //
+  // So the band decides the pack's SHAPE, not its size (user, 2026-08-13 — "use the screen width
+  // optimally before adding rows … vertical only when horizontal runs out"): its width in real
+  // pitches is the depth solve's budget, and its HEIGHT in real pitches is where that search
+  // stops, which is what spends the vertical room on rows before any shrink.
+  //
+  // Called every frame of the transition, and the band is CONSTANT across those frames — it moves
+  // only on a resize or a rails toggle. So the whole solve sits behind a memo on the band itself,
+  // which is what makes the sentence above ("one pass per presentation toggle, not one per frame")
+  // true of the guard as well as of the re-pack it guards: `gatherRows` walks and allocates, and
+  // without this it did so ~230 times per transition to answer the same number. A data rebuild
+  // invalidates the memo from `_assignGatherSlots`, because the extent it re-solves is what the
+  // scale below is fitted against.
+  setGatherFit(availW: number, availH: number): void {
+    if (availW === this._gatherFitW && availH === this._gatherFitH) return;
+    this._gatherBudget = availW / GATHER_CELL;
+    this._gatherMaxRows = availH / GATHER_CELL;
+    if (gatherRows(this._gatherGroups, this._gatherBudget, this._gatherMaxRows) !== this._gatherRows) this._assignGatherSlots();
+    const e = this._gatherExtent;
+    const g = this._ctx.gather;
+    let s = 1;
+    if (e.w > 0) s = Math.min(s, availW / (e.w * GATHER_CELL));
+    if (e.h > 0) s = Math.min(s, availH / (e.h * GATHER_CELL));
+    if (!Number.isFinite(s) || s <= 0) s = 1;
+    g.cell = GATHER_CELL * s;
+    g.scale = GATHER_SCALE * s;
+    // In CELLS at the fitted pitch, then back to world units — one multiply so NodeFabric adds a
+    // ready offset per node rather than re-deriving the pitch.
+    g.spread = gatherSpread(availW / g.cell, e) * g.cell;
+    // Last, because _assignGatherSlots above invalidates this.
+    this._gatherFitW = availW;
+    this._gatherFitH = availH;
   }
 
   // -------------------------------------------------- morph between layouts

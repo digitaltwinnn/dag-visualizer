@@ -35,10 +35,13 @@ export default function AboutView({
           title={
             <span className="inline-flex items-center gap-2 min-w-0">
               <Icon aria-hidden className={KIND_MARK_CLASS} style={{ color: "var(--filter-accent, var(--accent))" }} />
-              <span className="truncate">{title}</span>
+              {/* min-w-0 so this flex item can shrink below its text: without it the inline-flex
+                  above sizes to max-content and `truncate` never engages, which is how a long
+                  title overflowed its own box instead of clipping. */}
+              <span className="truncate min-w-0">{title}</span>
             </span>
           }
-          aside={caption ? <span className="text-micro text-muted-foreground tracking-caps">{caption}</span> : undefined}
+          caption={caption || undefined}
           collapsed
           onToggle={() => setCollapsed(false)}
         />

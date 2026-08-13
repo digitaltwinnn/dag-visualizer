@@ -20,9 +20,9 @@ export default function BootOverlay() {
   // no-engine: the 3D scene can't run (WebGL unavailable). Say so plainly and stop the ping — this
   // is a settled dead-end, not a "still trying" state. Reuse the grey nosignal skin.
   const label = noEngine
-    ? "3D unavailable — WebGL not supported"
+    ? "3D unavailable: WebGL not supported"
     : noSignal
-      ? "No signal — retrying…"
+      ? "No signal, retrying…"
       : "Connecting…";
   const dead = noSignal || noEngine;
   return (

@@ -48,11 +48,22 @@ export interface MetaConfig {
   blurb: string;
 }
 
-// The real mainnet metagraphs (source: dagexplorer). Each pulls live snapshots
-// via its id. Colours match the metagraph node clusters plotted on the globe
-// (/api/metagraphs). Keep this list in sync with the live route's directory by
-// refreshing the baked data/*.json snapshot.
+// The real mainnet metagraphs (source: dagexplorer). Each pulls live snapshots via its id. Keep
+// this list in sync with the live route's directory — there is no baked copy to diff it against
+// (data/metagraphs.json was deleted deliberately), so a metagraph the directory lists and this
+// file doesn't is only visible as a raw address in the UI. `scripts/bake-brand-hues.ts` now reads
+// that same live directory, so re-running it is the other half of adding a row here.
 export const METAGRAPHS: MetaConfig[] = [
+  // ⚠️ BioFi was MISSING here while the live route listed it (found 2026-08-12), and the symptom
+  // is what "keep this in sync" is guarding: HyperExplore renders `metagraphById(m.id)?.name ?? m.id`,
+  // so its row read as the raw `DAG2JaVh5…` address next to ten real names. `color` is only the SEED
+  // for `configPins()`, which the baked `data/brand-hues.json` overlay shadows for every listed
+  // metagraph (`identityPins()` — brand WINS), so it is inert wherever a bake exists: BioFi's
+  // identity is the baked `#00c050`, not this pink, exactly as every other row here diverges from
+  // its own brand read. `blurb` is likewise the route's own `description`, the fallback shown only
+  // until `/api/metagraphs` answers.
+  { name: "BioFi",               ticker: "BIOFI",    color: 0xed9bf4, id: "DAG2JaVh5yYiPCGLLEFi6tfkKk77WA4FzivVdBek",
+    blurb: "A utility token uniting an ecosystem focused on safeguarding personal data and protecting users from fraud." },
   { name: "Digital Evidence",    ticker: "DED",      color: 0x36e29a, id: "DAG0eQr94qUQSUhmYGNXt6CoBKWu5K6htvRMGC6M",
     blurb: "DoD-vetted data-fingerprinting as a service — immutable proof of data authenticity, anchored to the Global L0." },
   { name: "Cyberlete",           ticker: "LEET",     color: 0xff7ad9, id: "DAG0rgR8sdn8u2YBYb5Ftjy4zmuqUX3v9XsE2j94",

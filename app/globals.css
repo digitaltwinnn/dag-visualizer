@@ -504,7 +504,12 @@
                                               finer rung is) — same language, half a voice, so one
                                               list can't show three equally loud selections */
   --sel-border-dim: rgba(42, 245, 255, 0.22);
-  --bottom-reserve: 130px; /* vertical space the always-present LiveStrip lane reserves */
+  --bottom-reserve: 0px;   /* vertical space the bottom LiveStrip lane reserves. The lane is
+                              SNAPSHOTS-ONLY, so 0 is the correct static default — the store boots
+                              in `hyper`, which mounts no strip. `BottomStream` is the one writer
+                              (it publishes the real height from the same policy flag that decides
+                              whether the strip mounts at all), so this value is only ever what the
+                              stylesheet answers before that effect runs. */
   --rail-fade: 28px;       /* height of a clipped rail's bottom fade — AND its scroll runway
                               (globals `.rail-clip` + RailScroll's measure read this one token) */
 
@@ -588,15 +593,39 @@
      as a utility ON each card (GeoExplore): a flex rule here would lose to any flex-*
      utility on the element (utilities layer > components layer, CSS trap #1). */
 
-  /* Rail collapse-to-thread + scene-drag dim (RailShade.tsx, 2026-08-08). `visibility:
+  /* Rail collapse-to-thread + scene-yield dim (RailShade.tsx, 2026-08-08). `visibility:
      hidden` rather than display:none — layout is PRESERVED so RailThread keeps measuring the
      cards and its dots remain as the minimized rail (the possibility map). The visibility
-     flip is delayed until the opacity fade lands; dim is a plain opacity drop while the user
-     directly manipulates the scene. */
-  .rail-shade { transition: opacity 0.3s ease, visibility 0s linear 0s; }
+     flip is delayed until the opacity fade lands; dim is a plain opacity drop while the user's
+     own hand is on the camera (see `useSceneYield`).
+     ⚠️ COMING BACK IS FASTER THAN GOING AWAY (user, 2026-08-13 — "a slight delay before it
+     re-appears"). The base rule is the RETURN for both states, so the two share one tempo by
+     construction, and that is right: stepping aside is the HUD answering a gesture in progress
+     and can afford an ease, while the return answers a gesture already FINISHED — the hand is
+     off the camera, so any ramp-in reads as lag. Hence ease-OUT and a shorter duration here,
+     with the calm 0.3s kept on each away state below. The engine half of the same report is the
+     drop debounce, which a pointer gesture no longer pays (Engine `_onPointerRelease`). */
+  .rail-shade { transition: opacity 0.18s ease-out, visibility 0s linear 0s; }
   .rail-shade[data-hidden] { opacity: 0; visibility: hidden; transition: opacity 0.3s ease, visibility 0s linear 0.3s; }
-  .rail-shade[data-dim] { opacity: 0.4; }
-  @media (prefers-reduced-motion: reduce) { .rail-shade { transition: none; } }
+  .rail-shade[data-dim] { opacity: 0.4; transition: opacity 0.3s ease; }
+  /* The same yield on the tablet/phone dock sheets, which are the rails at those widths
+     (RailDock.tsx) — WIDER on the PHONE half alone: that sheet covers most of a small viewport
+     with no way to step it aside, so it also dims while the engine flies the camera after a
+     commit. The phone bar-half variant declares `transition-[height,opacity]` at the
+     element, so it overrides this transition with its own 0.2s tempo — deliberate, and noted
+     there; the tablet sheets take the pair below. Only the SHEET dims: the persistent dock bar
+     and the edge tabs are the handles and stay solid. */
+  [data-slot="sheet-content"] { transition: opacity 0.18s ease-out; }
+  [data-slot="sheet-content"][data-dim] { opacity: 0.4; transition: opacity 0.3s ease; }
+  /* ⚠️ Every ARM must be listed: the state rules above carry their own `transition` at (0,2,0)
+     — a bare `.rail-shade` reset is (0,1,0) and loses to them (CSS trap 4). */
+  @media (prefers-reduced-motion: reduce) {
+    .rail-shade,
+    .rail-shade[data-hidden],
+    .rail-shade[data-dim],
+    [data-slot="sheet-content"],
+    [data-slot="sheet-content"][data-dim] { transition: none; }
+  }
   #leftcol > aside { width: auto; }
 
   /* Right details rail (`#rightcol`, Inspector.tsx) — the facts scope: a STACK of
@@ -893,11 +922,22 @@
 }
 
 @layer components {
-  /* Side-sheet instrument channel (tablet/phone left+right docks): a cyan identity spine
+  /* Side-sheet instrument channel (the TABLET left+right docks — both phone docks route their
+     sheet to `side="bottom"`, which wears `.ig-sheet-topruler` instead): a cyan identity spine
      (`::before`) + a neutral hairline ruler (`::after`) down the sheet's SCREEN-EDGE side —
      restores, on the overlay sheets, the desktop rails' spine + RailThread ruler (both desktop-
      only). Static decoration, pointer-transparent. `--filter-accent` is set inline by the caller
      (falls back to --primary for "all"). Keyed on the Sheet's own `data-side`. */
+
+  /* ⚠️ THE SOFT ENDS ARE FIXED PIXELS, NOT PERCENTAGES (user, 2026-08-13) — the same correction
+     the desktop RailThread took (components/RailThread.tsx · TOP_FADE/BOT_FADE). A percentage
+     measures against the CHANNEL's own length, so the ramp grew with the viewport: ~90px on a
+     landscape tablet, ~120px in portrait, for a dissolve that has no reason to know how tall the
+     screen is. Unlike the rail's top ramp there is no mark to clear here — nothing anchors to this
+     channel — so the two ends are alike, and one length stated ONCE is what keeps the spine and
+     the ruler from dissolving on different ramps. 44px is the rail's own bottom ramp. */
+  .ig-sheet-edge { --sheet-edge-fade: 44px; }
+
   .ig-sheet-edge::before,
   .ig-sheet-edge::after {
     content: ""; position: fixed; top: 10px; bottom: 10px; pointer-events: none; z-index: 42;
@@ -908,8 +948,8 @@
   .ig-sheet-edge::before {
     width: 2px; border-radius: 2px;
     background: linear-gradient(to bottom,
-      transparent 0, var(--filter-accent, var(--primary)) 12%,
-      var(--filter-accent, var(--primary)) 88%, transparent 100%);
+      transparent 0, var(--filter-accent, var(--primary)) var(--sheet-edge-fade),
+      var(--filter-accent, var(--primary)) calc(100% - var(--sheet-edge-fade)), transparent 100%);
   }
   .ig-sheet-edge[data-side="left"]::before  { left: 0; }
   .ig-sheet-edge[data-side="right"]::before { right: 0; }
@@ -922,8 +962,8 @@
       repeating-linear-gradient(to bottom,
         var(--thread-tick) 0, var(--thread-tick) 1px,
         transparent 1px, transparent var(--thread-tick-pitch)) left top / 5px 100% no-repeat;
-    -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 12%, #000 88%, transparent 100%);
-            mask-image: linear-gradient(to bottom, transparent 0, #000 12%, #000 88%, transparent 100%);
+    -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 var(--sheet-edge-fade), #000 calc(100% - var(--sheet-edge-fade)), transparent 100%);
+            mask-image: linear-gradient(to bottom, transparent 0, #000 var(--sheet-edge-fade), #000 calc(100% - var(--sheet-edge-fade)), transparent 100%);
   }
   .ig-sheet-edge[data-side="left"]::after  { left: 4px; }
   .ig-sheet-edge[data-side="right"]::after { right: 4px; transform: scaleX(-1); }

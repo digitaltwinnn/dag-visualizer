@@ -102,9 +102,9 @@ const SCHEMATIC: Partial<Record<Mode, ReactNode>> = {
 };
 
 const CAPTION: Partial<Record<Mode, string>> = {
-  status: "Network health — node uptime, node states and version spread across the network.",
-  transactions: "Transactions — $DAG and metagraph currencies moving between addresses, plus lookup and economics.",
-  staking: "Delegated staking — who is staked to which nodes, total delegated, and rewards flowing back.",
+  status: "Network health: node uptime, node states and version spread across the network.",
+  transactions: "Transactions: $DAG and metagraph currencies moving between addresses, plus lookup and economics.",
+  staking: "Delegated staking: who is staked to which nodes, total delegated, and rewards flowing back.",
 };
 
 export default function Blueprint() {

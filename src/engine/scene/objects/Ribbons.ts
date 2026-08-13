@@ -150,30 +150,12 @@ export class Ribbons {
     this._writeGeometry();
   }
 
-  ribbonCount(row: 0 | 1 | 2): number { return this._rows[row].count; }
-
   /** Set a row's brightness scale (0..1). Rewrites the sheet only on real change — called per
    *  frame during the trail-rewind ease, but the rewrite fires ~a handful of times per ease. */
   setRowFade(row: 0 | 1 | 2, f: number): void {
     if (Math.abs(this._rowFade[row] - f) < 0.012) return;
     this._rowFade[row] = f;
     this._writeGeometry();
-  }
-
-  /** A point on ribbon `i`'s centre line at vertical progress `t` — follows the SAME eased sweep
-   *  the sheet is drawn with, so the anchor pulses ride the curve. */
-  centreLine(row: 0 | 1 | 2, i: number, t: number, out: THREE.Vector3): THREE.Vector3 {
-    const st = this._rows[row];
-    // Caller contract: bound the loop by ribbonCount(row) — an empty row has no quad to walk.
-    if (st.count === 0) return out;
-    const q = st.quads[Math.min(i, st.count - 1)];
-    const x = LEAD_X - st.slot * SLOT_SP;
-    const topZ = (q.topZ0 + q.topZ1) / 2;
-    const botZ = (q.botZ0 + q.botZ1) / 2;
-    const s = sweep(t, this.tune.curve);
-    const yTop = FLOOR_Y.msnap + TILE_LIFT;
-    const yBot = FLOOR_Y.gl0 + BAR_LIFT + BAR_H; // the bar's TOP — the sheet flows into it
-    return out.set(x, yTop + (yBot - yTop) * t, topZ + (botZ - topZ) * s);
   }
 
   /** The view fade, applied DIRECTLY (the Engine calls this every frame, so the opacity IS the

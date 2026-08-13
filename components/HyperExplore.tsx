@@ -87,7 +87,10 @@ export default function HyperExplore() {
     <ExplorerShell
       id="hyperexplore"
       title="Nodes by network"
-      hint="Every network on the hypergraph — hover or click one to see how it is composed of different nodes that each play a role in validation."
+      // No ordering clause (user, 2026-08-12): a sorted list states its own order, so "biggest
+      // fleet first" only spent words on what the eye already reads. See the hint-shape note in
+      // GeoExplore.tsx, which is the shared rule.
+      hint="Every network on the hypergraph. Open one for the roles its nodes play."
     >
       {/* Sorted by fleet size (user, 2026-07-12) — the biggest networks lead. */}
       {[...metaList].sort((a, b) => b.nodes.length - a.nodes.length).map((m) => {

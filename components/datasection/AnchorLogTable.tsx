@@ -62,7 +62,7 @@ export default function AnchorLogTable() {
         {!live
           ? "NO SIGNAL"
           : filter === "dag"
-            ? "The DAG core anchors nothing — it IS the anchor. Pick a metagraph, or All."
+            ? "The DAG core anchors nothing. It IS the anchor. Pick a metagraph, or All."
             : "Waiting for anchored metagraph snapshots…"}
       </p>
     );

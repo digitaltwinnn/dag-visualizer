@@ -10,7 +10,7 @@ import { useStore } from "@/src/store/store";
 // named for WHICH LAYER OF THE INSTRUMENT LEADS (the house registers — user rejected "cards":
 // it named the furniture, not the state; HUD is the project's own word for the info overlay) —
 //   · SCENE — just the 3D, browsed freely; both card rails collapse to their threads (the dots
-//     remain as the minimized possibility map) and the camera leans in (cameraRig.railsDolly);
+//     remain as the minimized possibility map) and the camera leans in (cameraRig.railsLean);
 //   · HUD   — the default four-zone overlay: the info cards over the scene;
 //   · RAW   — the data behind the view (SectionShell's depth choreography).
 // One segmented control (the view-switch ToggleGroup idiom, same sizing/on-state), sitting LAST
@@ -22,9 +22,9 @@ import { useStore } from "@/src/store/store";
 type PresentMode = "scene" | "cards" | "raw";
 
 const ITEMS: { id: PresentMode; name: string; title: string; icon: typeof Focus; desktopOnly?: boolean }[] = [
-  { id: "scene", name: "Scene", title: "Scene — just the 3D, rails collapse to their threads", icon: Focus, desktopOnly: true },
-  { id: "cards", name: "HUD", title: "HUD — the info cards over the scene", icon: LayoutPanelLeft },
-  { id: "raw", name: "Raw", title: "Raw — the data behind the view", icon: Table2 },
+  { id: "scene", name: "Scene", title: "Scene: just the 3D, rails collapse to their threads", icon: Focus, desktopOnly: true },
+  { id: "cards", name: "HUD", title: "HUD: the info cards over the scene", icon: LayoutPanelLeft },
+  { id: "raw", name: "Raw", title: "Raw: the data behind the view", icon: Table2 },
 ];
 
 export default function PresentationToggle() {

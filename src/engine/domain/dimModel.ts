@@ -120,17 +120,26 @@ export const GROUP_FOCUS = 0.45; // share of focusBoost a group member gets (FOC
 export const focusWeightOf = (primary: boolean, group: boolean): number =>
   primary ? 1 : group ? FOCUS_SHARED.groupShare : 0;
 
-// A committed ANCESTRY rung borrows its members' glow only while it is the FINEST committed rung
+// A committed ANCESTRY rung borrows its members' glow only while it is the FINEST rung in play
 // (user, 2026-08-11). The group rungs — geo's provider cohort, hyper's composition group — are the
 // only rungs with no 3D counterpart: you can click a hub, a border or a chip, but there is no
 // "provider" or "data ring" object, so lighting their members is the only way they can appear in
-// the scene at all. Honest while the group IS the subject; a lie once a node is committed, because
-// the click landed on the node. The parents keep their rail card and their explorer expansion
-// instead, and each deselect visibly widens the lit set again.
+// the scene at all. Honest while the group IS the subject; a lie once the finer subject is a node,
+// because that is where the click landed. The parents keep their rail card and their explorer
+// expansion instead, and each deselect visibly widens the lit set again.
+//
+// A HOVERED node yields it too (user, 2026-08-12: "when I hover role I see the relevant items
+// focus-boosted, but when I expand the row and start hovering the nodes it's additive"). Expanding
+// a group row COMMITS it, so its members stay lit; the per-node boost is tiered, never summed
+// (focusWeightOf returns exactly one of 1 / groupShare / 0), but the lit SET was cumulative — the
+// whole group at group tier PLUS the hovered node at full. Hovers preview what a click would
+// commit (rule 9), and clicking that node collapses the borrowed glow, so the hover must show that
+// collapse: group back to resting, the node alone. Both group rungs read this one function, so geo
+// and hyper cannot answer the gesture differently.
 export const ancestryGlow = (
   ancestry: ReadonlySet<string> | null,
-  selectedNodeId: string | null,
-): ReadonlySet<string> | null => (selectedNodeId ? null : ancestry);
+  nodeSubject: string | null,
+): ReadonlySet<string> | null => (nodeSubject ? null : ancestry);
 
 // ---- the EMPHASIS tunable (contract: src/engine/tune.ts) -------------------------------------
 // The dim/focus numbers, hoisted out of the formulas above into ONE ROW PER VIEW so the `?tune`
@@ -165,7 +174,10 @@ export interface FocusShared {
 }
 
 export const FOCUS_TUNE_DEFAULTS: Readonly<Record<View3D, Readonly<FocusRow>>> = {
-  hyper: { dim: 0.32, hide: 0, elem: 0.38, back: 0.45, boost: 1.4 },
+  // hyper's `back`/`boost` re-tuned live (user, 2026-08-12): the shells are dense and evenly
+  // lit, so a focused node needed both a louder boost and a deeper step-back from its
+  // neighbours before it read as the subject rather than as one bright node among many.
+  hyper: { dim: 0.32, hide: 0, elem: 0.38, back: 0.41, boost: 1.85 },
   geo: { dim: 1.0, hide: 1, elem: 0, back: 0.65, boost: 0.7 },
   ledger: { dim: 0.5, hide: 0, elem: 0, back: 0.55, boost: 0.7 },
 };

@@ -274,7 +274,7 @@ export function GhostCard({ card }: { card: RailCard }) {
     // marker. `.rail-entry` keeps it in the thread's query.
     <aside
       data-ghost=""
-      aria-label={`${label} — nothing selected yet`}
+      aria-label={`${label}: nothing selected yet`}
       className="rail-entry relative block w-auto pointer-events-auto px-[18px] py-2 min-h-0 flex-none"
     >
       <p className="m-0 flex items-start gap-2.5 text-label text-muted-foreground/80">

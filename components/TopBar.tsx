@@ -149,7 +149,7 @@ export default function TopBar() {
             return, so the full navigation is the cheaper one. */}
         <a
           href="/about"
-          title="About DAG Visualizer — an unofficial community project"
+          title="About DAG Visualizer, an unofficial community project"
           className={cn(
             "flex items-center gap-2 rounded-btn -mx-1 px-1 py-0.5 no-underline",
             "hover:bg-wash-soft transition-colors duration-150 motion-reduce:transition-none",

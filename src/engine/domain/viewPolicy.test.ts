@@ -35,6 +35,14 @@ describe("VIEW_POLICIES", () => {
     for (const m of MODES) expect(VIEW_POLICIES[m].show.ledger).toBe(m === "ledger");
   });
 
+  // The bottom lane is a TIME instrument, so it belongs to the *when* view alone — hyper answers
+  // who/what and geo answers where, and neither has a time axis to plot. Pinned here rather than
+  // left to `BottomStream` because the flag governs TWO things that must agree: whether the strip
+  // mounts, and whether `--bottom-reserve` reserves any space for it.
+  it("mounts the bottom time lane ONLY in ledger", () => {
+    for (const m of MODES) expect(VIEW_POLICIES[m].timeLane).toBe(m === "ledger");
+  });
+
   it("gives flat views NO sims, NO picks, NO DoF, NO canvas, NO show", () => {
     for (const m of FLAT_MODES) {
       const p = VIEW_POLICIES[m];
