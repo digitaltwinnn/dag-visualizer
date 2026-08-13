@@ -13,8 +13,17 @@
 // hung ten rows down the viewport while scene mode's band still had hundreds of unused pixels
 // either side. The DEPTH is now solved against the band (`gatherRows`) and the columns fall out
 // of it, so a block fills the width it is given before it wraps, and the wider band answers with
-// a longer, shallower block instead of a bigger one. Chip SIZE is not part of this — see
-// GATHER_MAX_GROWTH.
+// a longer, shallower block instead of a bigger one.
+//
+// ⚠️ SLACK CAN NEVER BECOME SIZE (user, 2026-08-13 — "again the nodes have become very large in
+// scene mode; you fixed it once but broke it again; find a structural fix that does not
+// reappear"). The chip pitch is a FIXED world constant (Globe's GATHER_CELL) and the fit may only
+// ever shrink below it, so a band with room to spare has exactly two things to spend it on:
+// columns (a shallower block) and then the gutters between blocks (`gatherSpread`). That is the
+// structural half of the answer — before it the fit could GROW the pitch up to a cap, which meant
+// the two presentations only matched while the cap happened to bind in both, and any viewport
+// that moved one of them off the cap re-opened the bug. There is no longer a size the band can
+// argue for: it is the same chip everywhere, and only genuine overflow makes it smaller.
 
 export interface GatherSlot {
   u: number; //     x, in cell units, centred on 0 across the whole staging row
@@ -51,58 +60,45 @@ const BOTTOM_RESERVE = 130; // --bottom-reserve, the LiveStrip lane
 const RAILS_TIER = 1100; //    below this the rails are dock sheets, not inline columns
 const BAND_MARGIN = 24; //     breathing room between the band and whatever bounds it
 
-/** How far the band may grow past its tuned cell size when there is room. A sparse network set
- *  would otherwise blow up to fill the screen: a 3-node filter has nothing to fill a band WITH,
- *  so this is the chip size the staging block tops out at. Shrinking below 1 is deliberately
- *  unbounded — that is the phone-portrait case, where fitting is the whole point.
- *
- *  ⚠️ THE CAP IS NOT WHAT KEEPS THE TWO PRESENTATIONS THE SAME SIZE (user, 2026-08-13 — "why is
- *  the node size different when staged at the top for different modes? Size should be same, just
- *  use the width better in scene mode"). It was tuned twice (2.4, then 1.75) to whatever made the
- *  full set FILL the scene-mode band, which is a free fit in disguise: scene mode's band is ~1.8×
- *  the railed one, so every spare pixel went into the CHIPS and the same nodes staged 46% larger
- *  with the rails away. The BAND is now what absorbs that difference — `gatherRows` packs the
- *  same chips into fewer, longer rows when there is more width — so the cap is simply the staged
- *  chip size wherever the solved pack fits, and the fit only shrinks below it when the band
- *  genuinely can't hold the deepest pack (a phone) or is too short for its rows. */
-export const GATHER_MAX_GROWTH = 1.25;
-
 /**
  * How many rows deep the packed row has to go to fit `budgetCells` of width: the SMALLEST depth
  * whose packed width fits, so each block fills the width available to it before it wraps
  * (user, 2026-08-13 — "use the available width first, only then start placing nodes on more rows
- * down"). `budgetCells` is the band measured in CAPPED chip pitches, which is what makes the two
- * halves of the size rule hold at once: the pack that fits that budget is by construction a pack
- * the fit can draw at full chip size, so a wider band answers with a longer block rather than a
- * bigger one.
+ * down"). `budgetCells` is the band measured in REAL chip pitches — the pitch the fit will
+ * actually draw at — so the pack that fits the budget is by construction one the chips are drawn
+ * at full size in, and a wider band answers with a longer block rather than a bigger one.
  *
  * Columns fall out of the depth (`ceil(count / rows)`), so a group smaller than the depth is one
  * column tall — no group is ever deeper than the answer, and the blocks all hang from the same
  * top edge. With no band measured yet (first data load, before any transition frame) it answers
  * the near-square the row used to pack; the first fit replaces it.
  *
- * ⚠️ THE NEAR-SQUARE IS THE FLOOR, NOT JUST THE UNMEASURED ANSWER. A band too narrow to hold ANY
- * pack is the phone case, and there the search must stop rather than keep going deeper: the row's
- * gutters alone can exceed the whole budget (9 networks = 17.6 cells against a portrait band's
- * ~20), so nothing ever fits and an uncapped search walks to one column per group — the DAG's 162
- * nodes in a single 162-row thread, which the fit then shrinks to dust to make it fit the height.
- * Past the square, depth stops buying real width anyway (the gutters don't move), so it is the
- * last shape worth having; overflow from there is the FIT's job, which is exactly how the
- * width-agnostic pack degraded before this.
+ * ⚠️ THE SEARCH STOPS AT `maxRows`, WHICH IS THE BAND'S OWN HEIGHT — not at a near-square (user,
+ * 2026-08-13, twice: "use the screen width optimally before adding rows … vertical only when
+ * horizontal runs out", and before that "size should be same, just use the width better in scene
+ * mode"). Some ceiling is needed, because a band too narrow to hold ANY pack is the phone case
+ * and an uncapped search walks to one column per group — the DAG's 162 nodes in a single
+ * 162-row thread, which the fit then shrinks to dust. `ceil(√deepest)` was that ceiling and it is
+ * the wrong one: it is width-AGNOSTIC, so it stopped the search at a shape the band had nothing
+ * to do with, and shrinking took over while there was still vertical room going unused. The
+ * height the band actually has says exactly when horizontal has run out — every row up to it is
+ * free, and past it a row would not fit on screen anyway. `deepest` bounds it because beyond that
+ * every group is already one column and depth buys nothing.
  */
-export function gatherRows(groups: { id: string; count: number }[], budgetCells: number): number {
+export function gatherRows(groups: { id: string; count: number }[], budgetCells: number, maxRows = 0): number {
   const counts = groups.filter((g) => g.count > 0).map((g) => g.count);
   if (!counts.length) return 1;
   const deepest = Math.max(...counts);
-  const square = Math.ceil(Math.sqrt(deepest)); // the width-agnostic pack: the floor on depth
+  const square = Math.ceil(Math.sqrt(deepest)); // the width-agnostic pack: the unmeasured answer
   if (!Number.isFinite(budgetCells) || budgetCells <= 0) return square;
+  const cap = Number.isFinite(maxRows) && maxRows >= 1 ? Math.min(Math.floor(maxRows), deepest) : square;
   const gutters = GATHER_GUTTER * (counts.length - 1);
-  for (let rows = 1; rows < square; rows++) {
+  for (let rows = 1; rows < cap; rows++) {
     let w = gutters;
     for (const c of counts) w += Math.ceil(c / rows);
     if (w <= budgetCells) return rows;
   }
-  return square;
+  return cap;
 }
 
 /**
@@ -140,7 +136,7 @@ export interface GatherBand {
  * whichever reaches further in, the right one.
  *
  * ⚠️ The band is what the pack is SOLVED against (user, 2026-08-13), not just what it is drawn
- * into: `gatherRows` reads its width in capped chip pitches and answers with a depth, so scene
+ * into: `gatherRows` reads its width in real chip pitches and answers with a depth, so scene
  * mode's extra width comes back as a longer, shallower block at the same chip size. Sizing the
  * chips off this width instead — which is what it used to do — is what made the same nodes stage
  * larger in scene mode than in HUD mode.

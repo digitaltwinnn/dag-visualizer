@@ -2,7 +2,7 @@
 import { describe, it, expect } from "vitest";
 import {
   gatherSlots, gatherExtent, gatherBand, gatherSpread, gatherRows,
-  GATHER_GUTTER, GATHER_GUTTER_MAX, GATHER_MAX_GROWTH,
+  GATHER_GUTTER, GATHER_GUTTER_MAX,
   type GatherExtent,
 } from "./gatherLayout";
 
@@ -131,35 +131,48 @@ describe("gatherSlots", () => {
   });
 });
 
-// The pack's depth is the band's answer, and the band is measured in CAPPED chip pitches — which
-// is what lets the fit hold chip size constant while the block reshapes (user, 2026-08-13).
+// The pack's depth is the band's answer — its width is the budget, its HEIGHT is where the search
+// stops — which is what lets the fit hold chip size constant while the block reshapes
+// (user, 2026-08-13).
 describe("gatherRows", () => {
   const set = [{ id: "dag", count: 162 }, { id: "a", count: 3 }, { id: "b", count: 3 }, { id: "c", count: 3 }, { id: "d", count: 3 }];
   const packedW = (groups: { id: string; count: number }[], rows: number) => gatherExtent(groups, rows).w;
+  const TALL = 40; // a desktop band: deeper than any depth these budgets ask for
 
   it("answers the SHALLOWEST depth whose packed row still fits the budget", () => {
     for (const budget of [26, 34.6, 62.6, 200]) {
-      const rows = gatherRows(set, budget);
+      const rows = gatherRows(set, budget, TALL);
       expect(packedW(set, rows)).toBeLessThanOrEqual(budget);
       if (rows > 1) expect(packedW(set, rows - 1)).toBeGreaterThan(budget); // one row shallower overflows
     }
   });
 
   it("goes shallower as the band gets wider — the same nodes, more of the width used", () => {
-    const hud = gatherRows(set, 34.6); //   1600px viewport with both rails inline
-    const scene = gatherRows(set, 62.6); // …and with them away
+    const hud = gatherRows(set, 34.6, TALL); //   1600px viewport with both rails inline
+    const scene = gatherRows(set, 62.6, TALL); // …and with them away
     expect(scene).toBeLessThan(hud);
     expect(packedW(set, scene)).toBeGreaterThan(packedW(set, hud)); // the width goes into the block
   });
 
-  it("never goes deeper than the near-square, however narrow the band", () => {
-    // The phone: the row's gutters alone outrun the whole budget, so NO depth fits and an
-    // uncapped search would walk to one column per group — 162 rows of DAG, which the fit then
-    // shrinks to dust. Overflow past the square is the fit's job.
-    const square = Math.ceil(Math.sqrt(162)); // 13
-    expect(gatherRows(set, 1)).toBe(square);
-    expect(gatherRows(set, 20)).toBe(square); // a portrait band: 8.8 cells of gutter, ~20 to spend
-    expect(gatherExtent(set, gatherRows(set, 1)).h).toBe(square);
+  // The user's rule twice over (2026-08-13): "use the screen width optimally before adding rows …
+  // vertical only when horizontal runs out". A near-square ceiling stopped the search at a shape
+  // the band had nothing to do with, handing the rest to the shrink while vertical room went
+  // unused; the band's own height is what says when horizontal has genuinely run out.
+  it("spends the band's whole HEIGHT on rows before a narrow band is left to the fit", () => {
+    const square = Math.ceil(Math.sqrt(162)); // 13 — what the ceiling used to be
+    const deep = gatherRows(set, 20, 30);
+    expect(deep).toBeGreaterThan(square);
+    expect(gatherExtent(set, deep).w).toBeLessThanOrEqual(20); // the rows past the square make it FIT
+    expect(gatherExtent(set, square).w).toBeGreaterThan(20); //  …where stopping at the square did not
+    // A shorter band stops sooner: the depth is the height's answer, not the count's.
+    expect(gatherRows(set, 20, 8)).toBe(8);
+  });
+
+  it("never goes deeper than one column per group — past that, depth buys nothing", () => {
+    // The phone: the row's gutters alone outrun the whole budget, so NO depth fits. Overflow from
+    // there is the fit's job; walking deeper would only shrink the block further for nothing.
+    expect(gatherRows(set, 1, 1000)).toBe(162);
+    expect(gatherExtent(set, gatherRows(set, 1, 1000)).w).toBe(5 + GATHER_GUTTER * 4);
   });
 
   it("falls back to the near-square when no band has been measured yet", () => {
@@ -167,11 +180,15 @@ describe("gatherRows", () => {
     // solve against; the fit re-packs on the frame it draws.
     expect(gatherRows([{ id: "dag", count: 164 }], 0)).toBe(13); // ceil(√164)
     expect(gatherRows([{ id: "dag", count: 164 }], Number.NaN)).toBe(13);
+    // A width with no height still solves — it just can't go past the near-square to do it, which
+    // is the old behaviour and is all a caller that never measured a height can honestly ask for.
+    expect(gatherRows([{ id: "dag", count: 164 }], 20)).toBe(9);
+    expect(gatherRows([{ id: "dag", count: 164 }], 2)).toBe(13);
   });
 
   it("answers a usable depth for nothing at all", () => {
-    expect(gatherRows([], 50)).toBe(1);
-    expect(gatherRows([{ id: "empty", count: 0 }], 50)).toBe(1);
+    expect(gatherRows([], 50, TALL)).toBe(1);
+    expect(gatherRows([{ id: "empty", count: 0 }], 50, TALL)).toBe(1);
   });
 });
 
@@ -299,11 +316,22 @@ describe("gatherBand", () => {
   });
 });
 
-describe("GATHER_MAX_GROWTH", () => {
-  // Shrinking is deliberately unbounded (phone portrait: fitting is the whole point) and only
-  // GROWTH is capped, so a sparse network set can't blow the staging squares up to fill the
-  // screen. A cap at or below 1 would disable growing entirely.
-  it("caps growth above the tuned size without bounding the shrink", () => {
-    expect(GATHER_MAX_GROWTH).toBeGreaterThan(1);
+// The size half of the rule, pinned where the shape math can see it: the fit's factor starts at 1
+// and only ever shrinks (Globe.setGatherFit), so what a band with room to spare can buy is exactly
+// two things — a shallower block, then wider gutters. These two are the whole ledger, and neither
+// of them is size (user, 2026-08-13, "find a structural fix that does not reappear").
+describe("spare width has nowhere to go but the shape", () => {
+  const set = [{ id: "dag", count: 162 }, { id: "a", count: 3 }, { id: "b", count: 3 }, { id: "c", count: 3 }, { id: "d", count: 3 }];
+
+  it("gives the wider band a shallower block and wider gutters, at the same pitch", () => {
+    // The two presentations at 1600×950, measured live: the railed band against the open one.
+    const hud = gatherRows(set, 34.94 / 0.62, 25.77 / 0.62);
+    const scene = gatherRows(set, 61.25 / 0.62, 25.77 / 0.62);
+    expect(scene).toBeLessThan(hud);
+    // Both packs fit their own band, so neither one makes the fit shrink — same chip in both.
+    expect(gatherExtent(set, hud).w).toBeLessThanOrEqual(34.94 / 0.62);
+    expect(gatherExtent(set, scene).w).toBeLessThanOrEqual(61.25 / 0.62);
+    // …and the remainder, which the solve leaves because a column is a whole cell, goes to the gaps.
+    expect(gatherSpread(61.25 / 0.62, gatherExtent(set, scene))).toBeGreaterThan(0);
   });
 });

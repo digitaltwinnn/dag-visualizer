@@ -362,13 +362,22 @@ cross-fade the canvas.
 
 **The staging block is WIDTH-FIRST, and the chip size is the same in every presentation**
 (`domain/gatherLayout.ts`, 2026-08-13). The pack's **depth** is solved against the band measured in
-capped chip pitches (`gatherRows`) and the columns fall out of it, so a wider band answers with a
+real chip pitches (`gatherRows`) and the columns fall out of it, so a wider band answers with a
 longer, shallower block rather than a bigger one; the leftover goes to the **gutters between blocks**
 (`gatherSpread`), never to the pitch inside them. ⚠️ The trap this replaced: `cols = ceil(√count)` is
 width-agnostic, so the DAG's 162 nodes hung ten rows down while scene mode's band had hundreds of
-unused pixels either side — and the growth cap had twice been tuned to whatever made *that* band fill,
-which is a free fit in disguise, staging the same nodes 46% larger with the rails away. **Tune the
-band, not the chip.**
+unused pixels either side. **Tune the band, not the chip.**
+
+**Slack can never become size, and the search stops at the band's own HEIGHT.** Two structural rules
+hold the above in place, because it had been fixed once and come back (user, 2026-08-13 — *"find a
+structural fix that does not reappear"*). The pitch is a fixed world constant and **the fit may only
+ever shrink below it**: the growth cap that used to let it scale UP meant the two presentations agreed
+only while the cap bound in both, so any viewport that moved one off the cap re-opened the bug, and
+the cap itself had twice been tuned to whatever made *one* band fill — a free fit in disguise. And the
+depth search is capped by `floor(availH / pitch)` rather than by `ceil(√deepest)`: the near-square is
+width-agnostic, so it stopped the search at a shape the band had nothing to do with and handed the
+rest to shrinking while vertical room went unused. Measured at 1600×897: the same 161 DAG chips stage
+23×7 with the rails in and 54×3 with them away, at one pitch (~19.5px) in both.
 
 
 re-commits the node's country and provider, hyper its composition group — exactly the rungs a click on

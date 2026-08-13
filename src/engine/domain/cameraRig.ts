@@ -199,7 +199,14 @@ export function easeInOutQuad(t: number): number {
 // clock (the smallest member of the navigation clock family), and it must NOT raise `cameraFlying`:
 // that dim exists so the scene under the phone's cards can be seen changing, and here nothing does.
 export const NUDGE_DUR = 0.55; //  seconds
-export const NUDGE_AMP = 0.04; //  peak push, as a fraction of the way toward the pose's target
+// ⚠️ THE NUDGE ONLY HAS TO BE NOTICED, NOT FELT (user, 2026-08-13 — "make the camera nudge much more
+// subtle when pos does not have to change but the selected subject has"). It shipped at 0.04, a 4%
+// push toward the subject, which at hyper's orbit distance is a visible lurch: big enough to read as
+// the camera moving somewhere and then changing its mind, which is the opposite of the reassurance
+// it exists to give. What answers the click is that SOMETHING moved — the eye catches a sub-percent
+// shift on a still frame — so the amplitude is set at the low end of visible, and the 0.55s clock
+// does the rest of the work.
+export const NUDGE_AMP = 0.012; //  peak push, as a fraction of the way toward the pose's target
 // Two poses are "the same" within this fraction of the ORBIT DISTANCE — relative, because the views
 // sit an order of magnitude apart in scale, and because a move too small to see is one the nudge
 // should replace rather than one the epsilon merely forgives.

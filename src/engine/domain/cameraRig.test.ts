@@ -233,9 +233,11 @@ describe("nudgeMix (the pulse's shape)", () => {
   it("peaks at NUDGE_AMP halfway through", () => {
     expect(nudgeMix(0.5)).toBeCloseTo(NUDGE_AMP, 12);
   });
-  it("is a subtle push, well under a tenth of the way to the subject", () => {
+  // The user set this ceiling directly (2026-08-13, "much more subtle"): at 0.04 the push read as
+  // the camera setting off somewhere and turning back. The nudge only has to be NOTICED.
+  it("is a barely-visible push, not a move the eye can follow", () => {
     expect(NUDGE_AMP).toBeGreaterThan(0);
-    expect(NUDGE_AMP).toBeLessThan(0.1);
+    expect(NUDGE_AMP).toBeLessThan(0.02);
   });
   it("eases out of both ends (zero slope), so it composes onto a resting pose without a kick", () => {
     expect(nudgeMix(0.02)).toBeLessThan(nudgeMix(0.5) * 0.02); // far below the linear ramp

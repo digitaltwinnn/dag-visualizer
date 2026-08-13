@@ -19,7 +19,7 @@ import { metaAnchor, META_LAYERS, META_RING, DAG_L0, DAG_L1, HYPER_TILT, applyHy
 import { LEDGER, type RailGroup } from "../domain/ledgerLayout";
 import { metaTrayLayout, dagTrayLayout, containerChipPos, type ContainerSpec } from "../domain/ledgerRails";
 import { LANE_IDS } from "../domain/ledgerModel";
-import { gatherSlots, gatherExtent, gatherSpread, gatherRows, GATHER_MAX_GROWTH, type GatherExtent, type GatherSlot } from "../domain/gatherLayout";
+import { gatherSlots, gatherExtent, gatherSpread, gatherRows, type GatherExtent, type GatherSlot } from "../domain/gatherLayout";
 import type { ViewTransition } from "../domain/viewTransition";
 import type { SceneColors } from "../sceneColors";
 import * as geoStats from "../domain/geoStats";
@@ -58,17 +58,19 @@ import type {
 const HEX_BASE_R = R + LAND_H + 0.02 + HEX_H / 2;
 const hexPitchDeg = (r: number) => ((2 * r * 1.04) / (R + LAND_H)) * (180 / Math.PI);
 
-// View-transition staging grid: the REFERENCE cell pitch (world units). setGatherFit scales it
-// (with the chip size, by one factor) so the packed row of per-network squares
-// (domain/gatherLayout) fills the band the Engine measured against the HUD — shrinking on a
-// phone-portrait viewport, growing when the rails are away and there is room.
+// View-transition staging grid: THE cell pitch (world units). setGatherFit may only shrink it
+// (with the chip size, by one factor) to make the packed row of per-network squares
+// (domain/gatherLayout) fit the band the Engine measured against the HUD — a phone-portrait
+// viewport. Wherever the pack fits, this is the size staged, in every view and both
+// presentations; spare width buys columns and gutters, never size.
 //
 // The pitch against GATHER_SCALE is what sets the AIR between chips — the one knob for "the
 // nodes need just a little bit more spacing" (user, 2026-08-13). At 0.55 the chips sat at ~0.9
 // of the pitch and each square read as a solid mass of touching circles rather than a grid of
-// pixels; 0.62 puts them at ~0.8 and the rows separate. Raising the pitch never widens the row
-// where the WIDTH binds (the fit divides it straight back out) — it spends the same band on
-// fewer, smaller pixels, which is why it is the spacing knob and the cap below is the size one.
+// pixels; 0.62 puts them at ~0.8 and the rows separate. The ratio is what the eye reads and the
+// fit scales both by one factor, so air is fixed and this number is purely the staged SIZE.
+// Raising it never widens the row where the WIDTH binds (the fit divides it straight back out) —
+// it spends the same band on fewer, bigger pixels, packed deeper.
 export const GATHER_CELL = 0.62;
 
 // The ledger's whole-view orientation (tilt ∘ rotY), baked into every node's ledger position so the
@@ -126,7 +128,8 @@ export class Globe implements GeoViewHost {
   private _gatherExtent: GatherExtent = { w: 0, h: 0, gaps: 0 }; // the packed row's size in CELLS (event-time)
   private _gatherGroups: { id: string; count: number }[] = []; // last packed set — re-solved when the band changes
   private _gatherRows = 0; // the depth that set was packed at (0 = never packed)
-  private _gatherBudget = 0; // the band's width in CAPPED chip pitches, from the last fit
+  private _gatherBudget = 0; // the band's width in chip pitches, from the last fit
+  private _gatherMaxRows = 0; // …and its height, which is where the depth search stops
   private ledgerT = 0; // 0->1 ease as the reused node meshes fly from their source view into the lanes
   clock = 0;
   private spin: SpinState | null = null;
@@ -456,7 +459,7 @@ export class Globe implements GeoViewHost {
     // the depth is solved and the columns follow (domain/gatherLayout). Before any transition frame
     // the budget is 0 and gatherRows answers the near-square — setGatherFit re-packs on the first
     // frame it draws, which is why a stale depth here can never be seen.
-    const rows = gatherRows(groups, this._gatherBudget);
+    const rows = gatherRows(groups, this._gatherBudget, this._gatherMaxRows);
     const slots = gatherSlots(groups, rows);
     this._gatherExtent = gatherExtent(groups, rows);
     this._gatherGroups = groups;
@@ -1084,23 +1087,30 @@ export class Globe implements GeoViewHost {
   // Fit the packed staging row into the band the Engine measured (world units on the staging
   // plane). ONE factor drives BOTH the cell pitch and the chip scale: growing the cell alone
   // would spread same-size chips into a sparse scatter, and a block only reads as one shape
-  // because the nodes ARE its pixels. Shrinking is unbounded (phone portrait — fitting is the
-  // whole point); growth is capped by GATHER_MAX_GROWTH so a sparse network set can't blow up
-  // to fill the screen.
+  // because the nodes ARE its pixels.
   //
-  // The band decides the pack's DEPTH, not the chip size (user, 2026-08-13 — "size should be
-  // same, just use the width better in scene mode", then "use the available width first, only
-  // then start placing nodes on more rows down"). Measuring the band in CAPPED pitches and
-  // solving the depth against that budget answers both at once: the pack that fits the budget is
-  // one the chips can be drawn at full size in, so scene mode's extra width comes back as a
-  // longer, shallower block, and only the integer remainder is left for the gutters. Re-packing
-  // is the depth CHANGING, so it costs one pass per presentation toggle, not one per frame.
+  // ⚠️ THE FACTOR ONLY EVER SHRINKS (user, 2026-08-13 — "again the nodes have become very large in
+  // scene mode; you fixed it once but broke it again; find a structural fix that does not
+  // reappear"). It used to start at a growth cap and take whichever the band allowed, which made
+  // chip size a function of the band: the two presentations matched only while the cap bound in
+  // both, and a viewport that moved one of them off it staged the same nodes larger with the
+  // rails away — twice, because the cap had twice been re-tuned to whatever filled scene mode's
+  // band, which is a free fit in disguise. Starting at 1 severs that path by construction:
+  // GATHER_CELL is THE staged chip pitch, spare width can only buy columns and then gutters, and
+  // shrinking stays unbounded because a phone that cannot fit the pack has to fit it anyway.
+  //
+  // So the band decides the pack's SHAPE, not its size (user, 2026-08-13 — "use the screen width
+  // optimally before adding rows … vertical only when horizontal runs out"): its width in real
+  // pitches is the depth solve's budget, and its HEIGHT in real pitches is where that search
+  // stops, which is what spends the vertical room on rows before any shrink. Re-packing is the
+  // depth CHANGING, so it costs one pass per presentation toggle, not one per frame.
   setGatherFit(availW: number, availH: number): void {
-    this._gatherBudget = availW / (GATHER_CELL * GATHER_MAX_GROWTH);
-    if (gatherRows(this._gatherGroups, this._gatherBudget) !== this._gatherRows) this._assignGatherSlots();
+    this._gatherBudget = availW / GATHER_CELL;
+    this._gatherMaxRows = availH / GATHER_CELL;
+    if (gatherRows(this._gatherGroups, this._gatherBudget, this._gatherMaxRows) !== this._gatherRows) this._assignGatherSlots();
     const e = this._gatherExtent;
     const g = this._ctx.gather;
-    let s = GATHER_MAX_GROWTH;
+    let s = 1;
     if (e.w > 0) s = Math.min(s, availW / (e.w * GATHER_CELL));
     if (e.h > 0) s = Math.min(s, availH / (e.h * GATHER_CELL));
     if (!Number.isFinite(s) || s <= 0) s = 1;
