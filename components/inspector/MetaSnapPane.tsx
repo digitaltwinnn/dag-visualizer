@@ -264,7 +264,10 @@ export default function MetaSnapPane({
                 snapshots at ~1.8s and ~2.5 MB of server↔L0 traffic each. So the read follows the
                 REQUEST, and this button is the only place the card makes one.
 
-                TIER 2 — `Show the application state`. The raw layer, for the payload itself. It
+                TIER 2 — `Show the raw data`. The raw layer, for the payload itself — named for
+                the MODE it opens (RAW is the presentation toggle's own word), because the pane
+                shows state AND data AND signers, so naming one lane undersold the destination
+                (user, 2026-08-13; was "Show the application state"). It
                 gates on `deep`, not on `decoded`: it used to render over an unread snapshot and
                 land on a pane whose own copy said to pin — with the pin control back in the HUD
                 the raw layer has just marked `inert`. A button that leaves the view and then tells
@@ -286,7 +289,7 @@ export default function MetaSnapPane({
                 "Read"/"decoding" made three word families for one action. */}
             {deep != null ? (
               <Button variant="link" size="xs" className="mt-1 px-0" onClick={() => setSection("data")}>
-                Show the application state
+                Show the raw data
               </Button>
             ) : !deepAsked && row?.decoded === true && snap && sel ? (
               <Button

@@ -1035,7 +1035,7 @@ cost is the ~2.5 MB fetch).
 
 **One control position, two tiers**, because there are two costs and the card charges the second only
 once the first is paid: `Read this snapshot` runs the deep read and states the SHAPE in place;
-`Show the application state` opens the raw layer for the payload. Tier 1 is the card's ONLY route to
+`Show the raw data` opens the raw layer for the payload (named for the MODE, 2026-08-13 — the pane shows state, data and signers, so naming one lane undersold it). Tier 1 is the card's ONLY route to
 the read — the card never fetches on its own, because being pinned is not the same as asking (the
 surface gate, under *The Snapshots view*); the button writes `deepWanted` and that is the whole
 request. Tier 2 gates on the deep read having
@@ -1380,7 +1380,7 @@ head (above), so its body opens straight on the payload. So the metagraph card's
 gone: a list whose first column was a CITY
 said cities sign, it sat at equal weight below the facts with nothing dividing it, and it put the
 secondary fact first. The good version already lives one tier down in the raw layer's SIGNERS lane, which
-is what the card's "Show the application state" link opens — the card states the SHAPE, the pane renders
+is what the card's "Show the raw data" link opens — the card states the SHAPE, the pane renders
 the payload. The named cost is the card's signer↔tray hover pairing; the Engine's signer glow on
 selection is separate and unaffected. The card gains `Blocks by N dL1 validators` beside
 `Signed by N L0 validators`, because the user's question — "general signing is L0 validator, and data
