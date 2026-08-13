@@ -290,9 +290,9 @@ export function SnapshotCard({ data: d }: { data: GlobalSnapshot }) {
           a tick's block count is the wrong activity signal, and its anchors are the fact this
           card exists to state. */}
       <Foot>
-        <FootRow label="Hash" value={shortHash(d.hash)} title={d.hash} />
+        <FootRow label="Hash" value={shortHash(d.hash)} title={d.hash} copy={d.hash} />
         {d.lastSnapshotHash && (
-          <FootRow label="Parent" value={shortHash(d.lastSnapshotHash)} title={d.lastSnapshotHash} />
+          <FootRow label="Parent" value={shortHash(d.lastSnapshotHash)} title={d.lastSnapshotHash} copy={d.lastSnapshotHash} />
         )}
       </Foot>
     </div>
@@ -361,6 +361,15 @@ export function MetaCard({ cfg }: { cfg: MetaCfg }) {
           <Separator className="my-2" />
           <MetaSiteRow site={site} />
         </>
+      )}
+      {/* FOOT — the network's own chain reference (user, 2026-08-13): a metagraph's id IS its
+          state-channel address, the value every anchor row and exact read keys on, so the
+          dossier states it where references sit. Only for a real catalog metagraph: the DAG
+          core's internal key ("dag") is not an address, and the unlisted set has no single id. */}
+      {cfg.id !== "dag" && metagraphById(cfg.id) && (
+        <Foot>
+          <FootRow label="Network id" value={shortHash(cfg.id)} title={cfg.id} copy={cfg.id} />
+        </Foot>
       )}
     </>
   );
@@ -515,7 +524,7 @@ function GeoLiveNode({ p }: { p: PickOf<"l0" | "l1" | "metanode"> }) {
           its own. Truncated display, full hash on hover. */}
       {p.node?.id && (
         <Foot>
-          <FootRow label="Node id" value={shortHash(p.node.id)} title={p.node.id} />
+          <FootRow label="Node id" value={shortHash(p.node.id)} title={p.node.id} copy={p.node.id} />
         </Foot>
       )}
     </>
