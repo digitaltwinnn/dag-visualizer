@@ -917,11 +917,22 @@
 }
 
 @layer components {
-  /* Side-sheet instrument channel (tablet/phone left+right docks): a cyan identity spine
+  /* Side-sheet instrument channel (the TABLET left+right docks — both phone docks route their
+     sheet to `side="bottom"`, which wears `.ig-sheet-topruler` instead): a cyan identity spine
      (`::before`) + a neutral hairline ruler (`::after`) down the sheet's SCREEN-EDGE side —
      restores, on the overlay sheets, the desktop rails' spine + RailThread ruler (both desktop-
      only). Static decoration, pointer-transparent. `--filter-accent` is set inline by the caller
      (falls back to --primary for "all"). Keyed on the Sheet's own `data-side`. */
+
+  /* ⚠️ THE SOFT ENDS ARE FIXED PIXELS, NOT PERCENTAGES (user, 2026-08-13) — the same correction
+     the desktop RailThread took (components/RailThread.tsx · TOP_FADE/BOT_FADE). A percentage
+     measures against the CHANNEL's own length, so the ramp grew with the viewport: ~90px on a
+     landscape tablet, ~120px in portrait, for a dissolve that has no reason to know how tall the
+     screen is. Unlike the rail's top ramp there is no mark to clear here — nothing anchors to this
+     channel — so the two ends are alike, and one length stated ONCE is what keeps the spine and
+     the ruler from dissolving on different ramps. 44px is the rail's own bottom ramp. */
+  .ig-sheet-edge { --sheet-edge-fade: 44px; }
+
   .ig-sheet-edge::before,
   .ig-sheet-edge::after {
     content: ""; position: fixed; top: 10px; bottom: 10px; pointer-events: none; z-index: 42;
@@ -932,8 +943,8 @@
   .ig-sheet-edge::before {
     width: 2px; border-radius: 2px;
     background: linear-gradient(to bottom,
-      transparent 0, var(--filter-accent, var(--primary)) 12%,
-      var(--filter-accent, var(--primary)) 88%, transparent 100%);
+      transparent 0, var(--filter-accent, var(--primary)) var(--sheet-edge-fade),
+      var(--filter-accent, var(--primary)) calc(100% - var(--sheet-edge-fade)), transparent 100%);
   }
   .ig-sheet-edge[data-side="left"]::before  { left: 0; }
   .ig-sheet-edge[data-side="right"]::before { right: 0; }
@@ -946,8 +957,8 @@
       repeating-linear-gradient(to bottom,
         var(--thread-tick) 0, var(--thread-tick) 1px,
         transparent 1px, transparent var(--thread-tick-pitch)) left top / 5px 100% no-repeat;
-    -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 12%, #000 88%, transparent 100%);
-            mask-image: linear-gradient(to bottom, transparent 0, #000 12%, #000 88%, transparent 100%);
+    -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 var(--sheet-edge-fade), #000 calc(100% - var(--sheet-edge-fade)), transparent 100%);
+            mask-image: linear-gradient(to bottom, transparent 0, #000 var(--sheet-edge-fade), #000 calc(100% - var(--sheet-edge-fade)), transparent 100%);
   }
   .ig-sheet-edge[data-side="left"]::after  { left: 4px; }
   .ig-sheet-edge[data-side="right"]::after { right: 4px; transform: scaleX(-1); }
