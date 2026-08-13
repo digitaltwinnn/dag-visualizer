@@ -28,7 +28,7 @@ import { clickActions, pickActive, pickNetId, viewEntryActions, metaSnapSelectAc
 import { ViewTransition, is3D } from "./domain/viewTransition";
 import { gatherBand, type GatherBand } from "./domain/gatherLayout";
 import { isDoubleTap, tapZoomAround, tapZoomDistance, DOUBLE_TAP_SLOP, TAP_ZOOM_DUR, type Tap } from "./domain/tapZoom";
-import { LADDERS, hasLevel, type CohortSel, type CompositionSel, type FocusLevel, type SelectionSnapshot, type ResolverKey } from "./domain/focusLadder";
+import { LADDERS, LEVEL_CARRY, hasLevel, type CohortSel, type CompositionSel, type FocusLevel, type SelectionSnapshot, type ResolverKey } from "./domain/focusLadder";
 import { compositionGroups, compositionKey, compositionRows } from "@/src/data/composition";
 import { metaSnapDeepKey, metaSnapHoverKey } from "@/src/data/types";
 import { snapsAtTick } from "@/src/data/anchorLog";
@@ -794,16 +794,22 @@ export class Engine {
     // layout can be viewed straight from the top (viewPolicy.minPolarAngle).
     this.ctx.controls.minPolarAngle = policy.minPolarAngle;
     this.ctx.controls.enableRotate = true; // the 3D layer stack is meant to be looked around
-    // View-scoped selections (focusLadder.LEVEL_CARRY): country + cohort live only in geo,
-    // composition only in hyper — clear them when the destination view isn't theirs, so no
-    // view-scoped card/framing lingers.
+    // View-scoped selections: LEVEL_CARRY names the levels that clear when leaving their view,
+    // and the destination LADDER says whether this view is theirs (`hasLevel`) — read from the
+    // table, never re-encoded as `mode !== "x"` here (focusLadder's own rule: "a consumer …
+    // reads THAT instead of naming the view"), so a rung moving between ladders can't leave a
+    // stale clear behind. Each level's clear is its own store write; country also owns scene
+    // state (the drilled border), which is this bridge's half of the job.
     const st0 = useStore.getState();
-    if (mode !== "geo") {
+    const dest3D = is3D(mode) ? mode : null;
+    const carries = (lvl: FocusLevel & keyof typeof LEVEL_CARRY): boolean =>
+      LEVEL_CARRY[lvl] === "always" || (dest3D != null && hasLevel(dest3D, lvl));
+    if (!carries("country")) {
       if (this.country != null) { this.country = null; this.globe.setCountry(null); }
       if (st0.country != null) st0.setCountry(null);
-      if (st0.cohort != null) st0.setCohort(null);
     }
-    if (mode !== "hyper" && st0.composition != null) st0.setComposition(null);
+    if (!carries("cohort") && st0.cohort != null) st0.setCohort(null);
+    if (!carries("composition") && st0.composition != null) st0.setComposition(null);
     // The snapshot card is LEDGER-SCOPED too (spec 2026-08-01): the pin no longer carries out
     // of the view — leaving ledger clears it. `following` stays with the FollowController,
     // whose mode effect already flips it false outside ledger (no fight: with `following`
