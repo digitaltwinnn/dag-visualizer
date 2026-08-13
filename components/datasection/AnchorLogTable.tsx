@@ -1,12 +1,14 @@
 "use client";
 
+import { useEffect, useRef } from "react";
 import { useStore } from "@/src/store/store";
 import { useSnapshotFeed } from "@/components/useSnapshotFeed";
 import { getNetwork } from "@/src/data/network";
 import { buildAnchorLog } from "@/src/data/anchorLog";
 import { displayNetwork, unlistedLog, UNLISTED_ID } from "@/src/data/unlisted";
+import { ledgerLens } from "@/src/data/ledgerStory";
 import { metaSnapHoverKey } from "@/src/data/types";
-import { metaSnapSelectActions } from "@/src/engine/domain/pickActions";
+import { metaSnapArrivalActions, metaSnapSelectActions } from "@/src/engine/domain/pickActions";
 import { applyClickActions } from "@/src/store/applyClickActions";
 import { fmtDag, fmtKB } from "@/src/util/format";
 import { relativeAge } from "@/src/util/relativeAge";
@@ -48,22 +50,49 @@ export default function AnchorLogTable() {
   // these rows ARE the table; under "all" they complete it).
   const snapshotExact = useStore((s) => s.snapshotExact);
   const listedRows = net ? buildAnchorLog(net.metaSnaps, net.globalSnapshots, filter) : [];
+  // Through the ledger's lens: committed DAG reads as the whole log (ledgerLens — every tick IS
+  // a DAG snapshot), so the unlisted rows complete it exactly as under "all". The old
+  // "The DAG core anchors nothing. It IS the anchor." hint retired with the empty state it
+  // explained (user, 2026-08-13).
+  const lens = ledgerLens(filter);
   const unlistedRows =
-    net && (filter === "all" || filter === UNLISTED_ID)
+    net && (lens === "all" || lens === UNLISTED_ID)
       ? unlistedLog(net.globalSnapshots, snapshotExact)
       : [];
   const rows = [...listedRows, ...unlistedRows].sort((a, b) =>
     a.ts === b.ts ? b.ordinal - a.ordinal : a.ts < b.ts ? 1 : -1,
   );
 
+  // THE LAYER OPENS ON A SUBJECT: with nothing selected, the log commits its own first row on
+  // arrival, so the pane opens populated instead of on an empty state the user has to dismiss by
+  // guessing where to click. "Arrival" is the section EDGE, not React mount — this table stays
+  // mounted (hidden, inert) while the layer is away, and it also freshly mounts when the view
+  // switches to ledger with the layer already up, so the arm covers both routes. One commit per
+  // arrival: a deselect while here must stay a deselect, so the arm drops after firing and only
+  // a fresh arrival re-arms it. An existing selection is never overridden (`metaSnap == null`).
+  const section = useStore((s) => s.section);
+  const armed = useRef(false);
+  useEffect(() => {
+    armed.current = section === "data";
+  }, [section]);
+  const first = rows[0] ?? null;
+  useEffect(() => {
+    if (section !== "data" || !armed.current || metaSnap || !first) return;
+    armed.current = false;
+    applyClickActions(
+      metaSnapArrivalActions(
+        { metaId: first.metaId, ordinal: first.ordinal, hash: first.hash, globalOrdinal: first.global.ordinal, ts: first.ts },
+        { kind: "snapshot", title: `Global snapshot #${first.global.ordinal}`, data: first.global },
+      ),
+    );
+    // The first row advances with the feed; only its identity matters for re-running the guard.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [section, metaSnap, first?.metaId, first?.ordinal]);
+
   if (rows.length === 0)
     return (
       <p className="m-auto text-label text-muted-foreground">
-        {!live
-          ? "NO SIGNAL"
-          : filter === "dag"
-            ? "The DAG core anchors nothing. It IS the anchor. Pick a metagraph, or All."
-            : "Waiting for anchored metagraph snapshots…"}
+        {!live ? "NO SIGNAL" : "Waiting for anchored metagraph snapshots…"}
       </p>
     );
 

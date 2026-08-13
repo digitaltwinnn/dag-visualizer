@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { viewEntryActions, clickActions, cohortToggleActions, compositionToggleActions, countryToggleActions, filterToggleActions, followToggleActions, nodeSelectActions, sameCohort, sameComposition, snapshotSelectActions, pickActive, pickNetId, metaSnapSelectActions, bandSelectActions, sameMetaSnap, type ClickAction } from "./pickActions";
+import { viewEntryActions, clickActions, cohortToggleActions, compositionToggleActions, countryToggleActions, filterToggleActions, followToggleActions, nodeSelectActions, sameCohort, sameComposition, snapshotSelectActions, pickActive, pickNetId, metaSnapSelectActions, metaSnapArrivalActions, bandSelectActions, sameMetaSnap, type ClickAction } from "./pickActions";
 import { finerLevels } from "./focusLadder";
 import { METAGRAPHS } from "../config";
 import type { PickDescriptor, MetaSnapSel } from "@/src/data/types";
@@ -451,6 +451,29 @@ describe("metaSnapSelectActions (a tile on the upper floor)", () => {
   it("steps back to the tick when the same tile is picked again", () => {
     const a = metaSnapSelectActions(SEL, GLOBAL, { filter: LISTED, metaSnap: { ...SEL } });
     expect(a).toEqual([{ kind: "metaSnap", sel: null }]);
+  });
+});
+
+describe("metaSnapArrivalActions (the raw layer opens on a subject)", () => {
+  const LISTED = METAGRAPHS[0].id;
+  const SEL: MetaSnapSel = { metaId: LISTED, ordinal: 745190, hash: "h1", globalOrdinal: 4200, ts: "t" };
+  const GLOBAL = {
+    kind: "snapshot" as const,
+    data: { ordinal: 4200, timestamp: "t", hash: "g" },
+    title: "Global snapshot #4200",
+  };
+
+  it("pins the tick and the subject but NEVER the filter — an arrival is not a click on a network", () => {
+    const a = metaSnapArrivalActions(SEL, GLOBAL);
+    expect(a).toEqual([
+      { kind: "snapshot", pick: GLOBAL, follow: false },
+      { kind: "metaSnap", sel: SEL },
+    ]);
+  });
+
+  it("follow is false so the pane's deep read actually fires — the arrival IS the gesture", () => {
+    const snap = metaSnapArrivalActions(SEL, GLOBAL).find((x) => x.kind === "snapshot");
+    expect(snap).toMatchObject({ follow: false });
   });
 });
 
