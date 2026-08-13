@@ -107,6 +107,12 @@ HMR — not just geometry built in constructors. The engine is one long-lived im
 behind a dynamic import, so a swapped module leaves the running instance on its old methods and you
 verify the previous build believing it's the new one. Reload after every engine edit.
 
+⚠️ **Turbopack's persistent cache can serve a STALE `globals.css` compile, and it survives a plain
+restart** — the chunk keeps one filename, so an old body ships under the same URL (found 2026-08-13:
+the phone flight-dim rules were in the source for a day while the served chunk predated them, and
+the "bug" was chased in the state machine first). When a rule is missing from the browser's CSSOM,
+don't debug the cascade: kill the server, `rm -rf .next/dev`, restart.
+
 `next build` and `next dev` don't conflict (dev outputs to `.next/dev`), so the production check can
 run alongside the dev server. Do it at phase boundaries: the build should be clean and
 `/api/metagraphs` should stay `○` (Static) with `10m` revalidate.
