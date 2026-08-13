@@ -273,7 +273,9 @@ export function ChannelStatePanel() {
   if (!sel) {
     return (
       <p className="m-auto max-w-[26ch] text-center text-label text-muted-foreground">
-        Select a metagraph snapshot to read its contents here. Click a row in the log, or a tile in the chamber.
+        {/* Names ONE gesture, on THIS surface (the empty-state rule): the chamber's tiles sit
+            behind this layer, marked inert, so inviting a tile click here was unfollowable. */}
+        Select a metagraph snapshot to read its contents here. Click a row in the anchor log.
       </p>
     );
   }
@@ -315,7 +317,9 @@ export function ChannelStatePanel() {
               `blocks` belongs here rather than in a tab of its own: it is a COUNT with no payload
               behind it (a metagraph snapshot can carry blocks without deepening its height). */}
           <div className="grid grid-cols-2 gap-x-6 gap-y-1 flex-none text-body">
-            <span className="text-muted-foreground">Height</span>
+            {/* Height · sub: the label names both numbers — a bare "Height 0 · 1,957,370" left
+                the second (the sub-height ordering ties at one height) unexplained. */}
+            <span className="text-muted-foreground">Height · sub</span>
             <span className="text-right tabular-nums">{deep.height.toLocaleString()} · {deep.subHeight.toLocaleString()}</span>
             <span className="text-muted-foreground">Parent</span>
             <span className="text-right font-mono" title={deep.lastSnapshotHash}>{shortHash(deep.lastSnapshotHash)}</span>
