@@ -86,6 +86,30 @@ export function stateSchema(
   return Object.entries(state as Record<string, unknown>).map(([key, v]) => {
     const count = Array.isArray(v) ? v.length : v && typeof v === "object" ? Object.keys(v as object).length : v == null ? 0 : 1;
     const items = Array.isArray(v) ? v : v && typeof v === "object" ? Object.values(v as object) : [];
-    return { key, count, kinds: items.length ? payloadKinds(items) : [] };
+    return { key, count, kinds: items.length ? unifyFieldKinds(payloadKinds(items)) : [] };
   });
+}
+
+/** MERGE the field-signature kinds into ONE schema row (user, 2026-08-14 — records differing by
+ *  an optional field counted as distinct kinds, so the lane repeated near-identical chip rows).
+ *  Fields union in first-appearance order, counts sum; a chip then reads "a field records carry"
+ *  (some optionally), which is what a schema line claims. Kinds that are NOT field signatures —
+ *  a wrapper name, a JSON type — stay their own rows: merging distinct record TYPES would mush
+ *  real structure, and the union takes the position of the first field kind. */
+export function unifyFieldKinds(
+  kinds: { kind: string; fields: string[] | null; count: number }[],
+): { kind: string; fields: string[] | null; count: number }[] {
+  const fieldKinds = kinds.filter((k) => k.fields != null);
+  if (fieldKinds.length <= 1) return kinds;
+  const fields: string[] = [];
+  for (const k of fieldKinds) for (const f of k.fields!) if (!fields.includes(f)) fields.push(f);
+  const merged = { kind: fields.join(" · "), fields, count: fieldKinds.reduce((s, k) => s + k.count, 0) };
+  let placed = false;
+  const out: typeof kinds = [];
+  for (const k of kinds) {
+    if (k.fields != null) {
+      if (!placed) { out.push(merged); placed = true; }
+    } else out.push(k);
+  }
+  return out;
 }

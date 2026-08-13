@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { kindOf, PAYLOAD_LANES, parsePayload, payloadKinds, stateSchema } from "./payloadKinds";
+import { kindOf, PAYLOAD_LANES, parsePayload, payloadKinds, stateSchema, unifyFieldKinds } from "./payloadKinds";
 
 describe("kindOf", () => {
   it("names a single-key wrapper by its key — the shape mainnet actually anchors", () => {
@@ -113,5 +113,30 @@ describe("stateSchema (user, 2026-08-14 — the state's record schema, one level
   it("a non-object state has no schema to claim", () => {
     expect(stateSchema("opaque")).toEqual([]);
     expect(stateSchema(null)).toEqual([]);
+  });
+});
+
+describe("unifyFieldKinds (user, 2026-08-14 — near-identical shapes stop repeating)", () => {
+  it("field-signature kinds merge into one union row, counts summed, order first-appearance", () => {
+    const rows = unifyFieldKinds([
+      { kind: "a · b", fields: ["a", "b"], count: 5 },
+      { kind: "a · b · c", fields: ["a", "b", "c"], count: 2 },
+    ]);
+    expect(rows).toEqual([{ kind: "a · b · c", fields: ["a", "b", "c"], count: 7 }]);
+  });
+  it("wrapper/type kinds stay their own rows", () => {
+    const rows = unifyFieldKinds([
+      { kind: "MetagraphBatchMessage", fields: null, count: 3 },
+      { kind: "a · b", fields: ["a", "b"], count: 1 },
+      { kind: "b · d", fields: ["b", "d"], count: 1 },
+    ]);
+    expect(rows).toEqual([
+      { kind: "MetagraphBatchMessage", fields: null, count: 3 },
+      { kind: "a · b · d", fields: ["a", "b", "d"], count: 2 },
+    ]);
+  });
+  it("a single field kind passes through untouched", () => {
+    const one = [{ kind: "a · b", fields: ["a", "b"], count: 4 }];
+    expect(unifyFieldKinds(one)).toEqual(one);
   });
 });

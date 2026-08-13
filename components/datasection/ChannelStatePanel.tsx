@@ -57,7 +57,7 @@ import { metaSnapDeepKey } from "@/src/data/types";
 import type { NodeRow } from "@/src/data/types";
 import { getNetwork, metagraphById, resolveSigner, shortHash, SIGNER_GROUPS, SIGNER_UNKNOWN } from "@/src/data/network";
 import { snapsAtTick } from "@/src/data/anchorLog";
-import { PAYLOAD_LANES, parsePayload, payloadKinds, stateSchema } from "@/src/data/payloadKinds";
+import { PAYLOAD_LANES, parsePayload, payloadKinds, stateSchema, unifyFieldKinds } from "@/src/data/payloadKinds";
 import { identityHudHex } from "@/src/palette/identity";
 import { CopyButton, FootRow, IdentityDot } from "@/components/inspector/parts";
 import { fmtDag, fmtKB } from "@/src/util/format";
@@ -156,10 +156,20 @@ function SchemaKinds({ kinds }: { kinds: { kind: string; fields: string[] | null
  *  a wide record shows its first few fields and a `… +N` chip that expands to the full set;
  *  NESTING is deliberately ignored everywhere (kindOf reads top-level keys only) — the code
  *  well below carries the real structure, the chips only say what a record is made of. */
-const FIELD_CHIP_CAP = 6;
+const FIELD_CHIP_CAP = 5; // user, 2026-08-14 — unlisted channels carry LARGE schemas
+const FIELD_CHIP_BUDGET = 44; // ≈ one line of chips in the pane, so long names cut early too
 function FieldChips({ fields }: { fields: string[] }) {
   const [all, setAll] = useState(false);
-  const shown = all ? fields : fields.slice(0, FIELD_CHIP_CAP);
+  // Two cuts, whichever comes first (both user-called): at most five chips, and at most one
+  // LINE's worth of characters — a count cap alone lets five long unlisted field names wrap.
+  let used = 0;
+  let fit = 0;
+  for (const f of fields) {
+    if (fit >= FIELD_CHIP_CAP || (fit > 0 && used + f.length + 3 > FIELD_CHIP_BUDGET)) break;
+    used += f.length + 3;
+    fit++;
+  }
+  const shown = all ? fields : fields.slice(0, fit);
   const hidden = fields.length - shown.length;
   const chip = "inline-flex items-center rounded-xs border border-border bg-wash-faint px-[5px] py-[2px] font-mono text-micro leading-none text-muted-foreground";
   return (
@@ -349,7 +359,8 @@ export function ChannelStatePanel() {
   const dataTx = useMemo(() => parsePayload(deep?.dataTx), [deep]);
   // Both lanes' shape reads are the same mechanical pass now: the data records' kinds, and the
   // state's per-key record schemas one level down (stateSchema — the DOR lesson, 2026-08-14).
-  const kinds = useMemo(() => payloadKinds(dataTx), [dataTx]);
+  // Unified (unifyFieldKinds): records differing by an optional field are ONE schema row.
+  const kinds = useMemo(() => unifyFieldKinds(payloadKinds(dataTx)), [dataTx]);
   const stateRows = useMemo(() => stateSchema(state), [state]);
 
   // The lanes this snapshot actually has, in a fixed order (payload → payload → proofs) so the bar

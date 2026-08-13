@@ -118,7 +118,7 @@ export function Foot({ children, className }: { children: ReactNode; className?:
 // is hovered or focused (the `group/copy` reveal) — but its slot is always reserved, so nothing
 // shifts under the pointer. Monochrome via currentColor; the check takes `--success` (the
 // ready lane), never an identity hue.
-export function CopyButton({ value, subject }: { value: string; subject: string }) {
+export function CopyButton({ value, subject, className }: { value: string; subject: string; className?: string }) {
   const [copied, setCopied] = useState(false);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   return (
@@ -131,6 +131,7 @@ export function CopyButton({ value, subject }: { value: string; subject: string 
         "text-muted-foreground hover:text-foreground focus-visible:outline focus-visible:outline-1 focus-visible:outline-[var(--primary)]",
         "opacity-0 group-hover/copy:opacity-100 group-focus-within/copy:opacity-100 focus-visible:opacity-100",
         copied && "opacity-100 text-[var(--success)] hover:text-[var(--success)]",
+        className,
       )}
       onClick={() => {
         navigator.clipboard?.writeText(value).then(
@@ -168,9 +169,19 @@ export function FootRow({
   return (
     <div className="group/copy flex items-baseline justify-between gap-2.5" title={title}>
       <span className="text-micro tracking-caps uppercase text-muted-foreground">{label}</span>
-      <span className={cn("inline-flex items-center gap-1.5 min-w-0", mono && "font-mono")}>
+      {/* The value takes the parent's full width (user, 2026-08-14 — the always-reserved copy
+          slot left every row ~22px short of the right edge): the button OVERLAYS the row's end
+          on hover instead of reserving a column, on the foot's own plate colour so a long value
+          is covered, never shifted — the no-shift rule kept by other means. */}
+      <span className={cn("relative inline-flex items-center min-w-0", mono && "font-mono")}>
         <span className="text-label text-foreground-dim tabular-nums truncate">{value}</span>
-        {copy && <CopyButton value={copy} subject={label.toLowerCase()} />}
+        {copy && (
+          <CopyButton
+            value={copy}
+            subject={label.toLowerCase()}
+            className="absolute right-0 top-1/2 -translate-y-1/2 my-0 bg-[var(--panel-plate)]"
+          />
+        )}
       </span>
     </div>
   );
