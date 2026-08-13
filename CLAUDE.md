@@ -102,8 +102,10 @@ npm test           # vitest
 **Dev-server discipline: run ONE, shared** — Next 16 enforces it with a lockfile. Prefer the harness
 background-run facility over `nohup`/`setsid` so the process stays tracked, and kill by PID
 (`pkill -f "next dev"` exits 144 in this sandbox). Turbopack HMR picks up edits; restart only for
-config changes or stale state. **Engine/scene geometry built in constructors needs a full page
-reload**, not HMR.
+config changes or stale state. **Any edit to an engine/scene CLASS needs a full page reload**, not
+HMR — not just geometry built in constructors. The engine is one long-lived imperative instance
+behind a dynamic import, so a swapped module leaves the running instance on its old methods and you
+verify the previous build believing it's the new one. Reload after every engine edit.
 
 `next build` and `next dev` don't conflict (dev outputs to `.next/dev`), so the production check can
 run alongside the dev server. Do it at phase boundaries: the build should be clean and
@@ -234,7 +236,7 @@ central position already tells it's a bit different from the others, not size"* 
 **The camera folder is a READOUT, not sliders**: poses are ~8 constants and each needs its own selection
 state to even see, so orbiting to a pose you like and reading it off beats dragging numbers.
 `capture ← live` dumps the raw `pos`/`target` **with a caution naming the levers the Engine composes on
-top** (`dollyBack`, `railsDolly`, and the subject-relative hub framings). Deliberately raw — per-pose
+top** (`dollyBack`, `railsLean`, and the subject-relative hub framings). Deliberately raw — per-pose
 inverses would be a second home for pose knowledge that drifts silently.
 
 ## Architecture
@@ -306,7 +308,7 @@ panel builds a spotlight folder only for those — the ledger deliberately stage
 lit by its own glass and emissive snapshots; emphasis there is the four colour dim tiers). Claiming
 for an unstaged view is a compile error, not a silent no-op.
 
-### Two camera principles
+### Three camera principles
 
 1. **Framing math consumes layout data** — records, anchors, orbit slots — never rendered transforms.
    `getWorldPosition`/`getMatrixAt` in an Engine framing path needs a justified `render-state OK`
@@ -317,10 +319,41 @@ for an unstaged view is a compile error, not a silent no-op.
    (`domain/cameraRig.ts`) leans the settled chamber pose in when a network is committed and back out
    when it isn't, and that is the whole vocabulary. Three bespoke ledger framings (a lane nudge, a node
    framing, a per-lane fly) were built and **retired** because each added a pose the user had to learn;
-   don't grow a fourth.
+   don't grow a fourth. **Hyper's per-node framing went the same way** (2026-08-13): a node there is one
+   bead on a shell, and diving to it lost the hub and shells that say what it belongs to, so the rung
+   delegates to its network's framing — *"it should behave the same as when (only) a metagraph filter
+   is selected"*. **A rung without a pose of its own inherits its parent's**, it does not invent one.
+3. **Every commit is acknowledged, and a same-pose commit takes the NUDGE.** Principle 2 leaves rungs
+   whose destination is the pose the camera already holds, and a dead 1.4s no-op reads as a broken
+   click. `isSamePose`/`nudgeMix` (`domain/cameraRig.ts`) answer with a 0.55s push toward the pose's own
+   target and back out, contributing exactly 0 at `t=1` so the tween still lands on the committed pose.
+   It does **not** raise `cameraFlying` — that dim exists so the scene can be seen changing, and here it
+   isn't. A node commit is answered in **every** 3D view, gated on the canvas allow-list (convention 7),
+   never a list of modes.
+
+⚠️ **The two global camera levers share one exemption, and one of them RAMPS** (user, 2026-08-13).
+`dollyBack` and `railsLean` both scale `(pos − target)` about the target, so a pose whose target is a
+composed look-at rather than the subject — `nodeFraming`, `cohortFraming` — is exempt from BOTH; the
+exemption belongs to the POSE, and `_tweenTo`'s one `dolly` flag gates both levers. And the
+rails-hidden lean fades out as the pose closes in on its subject: hiding the rails frees **horizontal**
+width while the FOV is **vertical**, so the radial dolly buys width by spending vertical fit — free at
+a resting pose, whose subject runs wide, and a crop at a deep rung, whose subject (a co-located stack,
+a hub's shells) is height-bound. `restOrbit(view)` reads the resting orbit out of `FOCI`, so re-tuning
+a resting pose re-tunes the ramp with it, and `RAILS_HIDDEN_DOLLY` stays the one lever — it is what
+"full lean" means, not a second knob.
 
 ⚠️ **Three's raycaster ignores `object.visible`.** Hiding a group does not stop it being picked — it
 has to be left out of `pickSources`.
+
+**Double-tap zooms, on TOUCH only** (`domain/tapZoom.ts`, 2026-08-13). Not a three.js feature —
+OrbitControls' touch map is one finger rotate, two dolly/pan, with no constant for a tap pair — so the
+recognizer is hand-rolled in the Engine over `pointerup`. Three decisions carry it: the step is a
+**dolly toward the current `controls.target`, never a re-aim onto the tap point** (a map zooms at the
+finger because you navigate a plane; here the pose system owns where the camera looks); a second
+pointer down invalidates the pair *and* a running step, because a pinch dollies the same axis; and the
+pair's **second click is eaten**, or it would toggle off the hub / country / tile the first tap just
+committed. A pair landing mid-flight retargets the tween's destination rather than fighting it — and
+not through `_tweenTo`, which would compose `dollyBack` and `railsLean` in a second time.
 
 ## The 3D↔3D view transition
 
@@ -338,7 +371,26 @@ mid-flight misleads), and HUD-commit camera reframes are held during the out pha
 stands and the boundary re-derives the pose from committed state, so nothing is lost. Flat views just
 cross-fade the canvas.
 
-**Arriving with a node selected re-derives that view's own ancestry** before the focus walk — geo
+**The staging block is WIDTH-FIRST, and the chip size is the same in every presentation**
+(`domain/gatherLayout.ts`, 2026-08-13). The pack's **depth** is solved against the band measured in
+real chip pitches (`gatherRows`) and the columns fall out of it, so a wider band answers with a
+longer, shallower block rather than a bigger one; the leftover goes to the **gutters between blocks**
+(`gatherSpread`), never to the pitch inside them. ⚠️ The trap this replaced: `cols = ceil(√count)` is
+width-agnostic, so the DAG's 162 nodes hung ten rows down while scene mode's band had hundreds of
+unused pixels either side. **Tune the band, not the chip.**
+
+**Slack can never become size, and the search stops at the band's own HEIGHT.** Two structural rules
+hold the above in place, because it had been fixed once and come back (user, 2026-08-13 — *"find a
+structural fix that does not reappear"*). The pitch is a fixed world constant and **the fit may only
+ever shrink below it**: the growth cap that used to let it scale UP meant the two presentations agreed
+only while the cap bound in both, so any viewport that moved one off the cap re-opened the bug, and
+the cap itself had twice been tuned to whatever made *one* band fill — a free fit in disguise. And the
+depth search is capped by `floor(availH / pitch)` rather than by `ceil(√deepest)`: the near-square is
+width-agnostic, so it stopped the search at a shape the band had nothing to do with and handed the
+rest to shrinking while vertical room went unused. Measured at 1600×897: the same 161 DAG chips stage
+23×7 with the rails in and 54×3 with them away, at one pitch (~19.5px) in both.
+
+
 re-commits the node's country and provider, hyper its composition group — exactly the rungs a click on
 that node in the destination view would have committed. So every card up to the selection is on the
 rail in every view, and a deselect steps back down the local ladder instead of jumping to the network.
@@ -461,7 +513,9 @@ The design rules behind the table, which the tests pin but don't explain:
 
 The page is one fixed shell in **two layers at different depths** (`SectionShell` + `store.section`).
 The scene layer is the four-zone HUD over the 3D canvas; the raw layer is the view's raw-data table —
-*the same data one level down*, not a second page. The RAW switch runs one GSAP timeline: the HUD
+*the same data one level down*, not a second page. ⚠️ The store value for that layer is **`"data"`,
+not `"raw"`** — every word the user reads says RAW, so the two registers don't match and grepping for
+`"raw"` finds nothing. The RAW switch runs one GSAP timeline: the HUD
 fades, the scene recedes (still live behind), the raw layer surfaces out of that depth. Back is the
 mirror, with three ways to ask for it — the switch, Escape, the layer's own × — all calling
 `setSection("scene")`. Reduced motion makes it an instant swap.
@@ -676,10 +730,18 @@ re-grew Country and Hosting, since the pile-dedup rule found no ancestors. It is
 selection change: the store is untouched, so returning to a 3D view restores the whole pile. This
 matches the left rail, which shows About and no tool card there.
 
-**Bottom — the live/time lane.** The slim `LiveStrip` in every view; it publishes `--bottom-reserve`
-and belongs to neither layer, so it stays interactive in both poses. Its content is per-view: the tick
-bar-chart is **ledger-only** — a time series belongs to the *when* view — and the other views carry a
-node-count readout in the same footprint, keeping the lane honest rather than blank.
+**Bottom — the live/time lane, and it is SNAPSHOTS-ONLY** (user, 2026-08-12). The lane holds one
+instrument, the `LiveStrip`'s tick bar-chart, and a bar-chart over ticks is a TIME instrument — so it
+belongs to the *when* view and nothing else. hyper and geo carried a node-count readout in the same
+footprint to keep the lane from reading as blank; that answered the wrong question, since a per-network
+node tally is structure and structure is already the subject of the view above it. The lane is now
+simply absent there and the space comes back to the rails and the raw layer.
+
+`BottomStream` is the **one publisher**: it both mounts the strip and writes `--bottom-reserve`, from the
+one policy flag `VIEW_POLICIES[mode].timeLane`, so presence and reserved space can't drift (the previous
+arrangement published the reserve per view while the strip mounted unconditionally — two values for one
+token). The token's static default in `globals.css` is therefore **`0px`**, matching the boot view. The
+lane belongs to neither layer, so where it mounts it stays interactive in both poses.
 
 ### Responsive shell
 
@@ -849,12 +911,19 @@ what question it answers.
 **A code appended to a value is a THIRD COLUMN in disguise** (user, 2026-08-10 — asked whether the node
 card wanted three columns). It doesn't want one: three columns break the one row grammar, and the codes
 themselves ran 2ch (`US`) to 8ch (`AS212317`), so a fixed column is either gappy or truncating. The codes
-are **culled** instead — `US` restates "United States" and nobody looks a country code up — and the ASN
-moves **down a weight** to the foot, where it belongs by the look-up rule: `AS212317` is exactly a value
-you only ever read to compare. It answers to the **provider rung** in the same condition as the Hosting
-line above it, so the two can't disagree about who owns the host. The role chips STAY on the Composition
-line: they qualify the word, and a value column can't hold them. Measured live, the raggedness was at the
-**left** edge of the value block anyway — a third column would not have addressed it.
+are **culled** instead — `US` restates "United States" and nobody looks a country code up. The role chips
+STAY on the Composition line: they qualify the word, and a value column can't hold them. Measured live,
+the raggedness was at the **left** edge of the value block anyway — a third column would not have
+addressed it.
+
+**The ASN is a BODY fact, beside the host it names** (user, 2026-08-13). It spent three days in the foot
+on the look-up rule, and that reading is too literal here: the foot holds the card's own REFERENCES, and
+the ASN is not this node's reference, it is the provider's — read down the foot it sat above `Node id` as
+if the two identified the same thing. In the body it lands where the fixed reading order already puts it,
+one line under the provider NAME it is the number for, and the foot is left saying exactly one thing:
+which node this card is about. It keeps the **provider rung** condition the Hosting line above it uses, so
+the two can't disagree about who owns the host. The look-up rule still governs what the foot is FOR; it
+just doesn't reach a value that belongs to a different subject.
 
 ### CardHead — the one card header
 
@@ -1047,8 +1116,10 @@ seam and corner rules select on the same markers the thread measures:
 
 ## The snapshot stream
 
-Global L0 produces a snapshot every few seconds. Three counters, which the UI keeps separate on
-purpose:
+Global L0 produces a snapshot roughly every **28 seconds** — measured live, mean 28.1s over a full
+window, range 4.6–114.8, so the cadence is irregular and a "few seconds" intuition will mislead any
+timing you build on it (the LiveStrip's window, a hold, a settle gate). Three counters, which the UI
+keeps separate on purpose:
 
 - **`ordinal`** — sequence number, +1 every snapshot even when empty.
 - **`height`** — depth of the *block DAG*. It only rises when blocks actually deepen it, and because
@@ -1063,7 +1134,7 @@ scale by anchors, and the snapshot card leads with the anchors, breaks them down
 states the derived fee and the bytes anchored. **The card carries no height, sub-height or block
 count at all** — a counter that answers no question the card raises, culled 2026-08-10 with the rest.
 
-**`LiveStrip`** occupies the bottom lane in every view, but the bar-chart is ledger-only. One bar per
+**`LiveStrip`** is the bottom lane's one instrument and mounts in **Snapshots alone** (above). One bar per
 tick, height = anchors. Unfiltered, bars plot each tick's total in cyan. **Filtered, each bar plots
 that metagraph's own anchors on its OWN scale in its identity hue** — its own cadence, with empty ticks
 as honest gaps. A ~1-anchor-per-tick metagraph reads sparse and 0-in-window reads blank; that honesty

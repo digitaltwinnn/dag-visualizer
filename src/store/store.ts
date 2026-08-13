@@ -20,17 +20,12 @@ function bumpStack(stack: SelSlot[], slot: SelSlot, active: boolean): SelSlot[] 
   return active ? [slot, ...without] : without;
 }
 
-// Per-hour rates + per-snapshot series from NetworkData.getActivity().
-export interface Activity {
-  snapsPerHour: number;
-  anchorsPerHour: number;
-  blocksPerHour: number;
-  feesPerHour: number;
-  cadenceSeries: number[];
-  anchoredSeries: number[];
-  blocksSeries: number[];
-  feesSeries: number[];
-}
+// Per-hour rates + per-snapshot series from NetworkData.getActivity(). ONE HOME: this was a
+// hand-copied duplicate of the data layer's interface and drifted the moment a field was added
+// there (2026-08-12) — the store's own copy silently kept the old shape, so a component reading
+// the new field type-errored against a type that no longer described the value it held.
+export type { Activity } from "@/src/data/api";
+import type { Activity } from "@/src/data/api";
 
 // Panel-facing state only (Lane B). The 60fps scene + per-snapshot visuals subscribe
 // to NetworkData directly (Lane A) and never touch this store, so React renders stay
@@ -51,7 +46,6 @@ interface AppState {
   engineFailed: boolean;
   nodes: { l0: number; l1: number };
   metagraphs: number;
-  latestOrdinal: number | null;
   latestSnapshot: GlobalSnapshot | null;
   activity: Activity | null;
   // Baked metagraphs (with engine-computed country counts) — for filter chips + pane.
@@ -170,6 +164,17 @@ interface AppState {
   // never set this). The rails dim while it holds, so direct manipulation pushes the HUD back
   // without moving any layout. Written by the Engine (debounced on the trailing edge).
   sceneDragging: boolean;
+  // TRUE while the ENGINE is flying the camera in answer to a commit — the counterpart to
+  // `sceneDragging`'s "the user's hand is on the scene" (user, 2026-08-12: "when we swipe a card
+  // or click another one in the card hierarchy the scene moves the camera accordingly; during
+  // this short animation period can we apply a similar effect to the cards/panels as when we
+  // manually use the camera controls"). Consumed by the PHONE dock sheet only — every wider tier
+  // has its own way to step the HUD aside (desktop's SCENE toggle, the tablet edge tab), so they
+  // opt out (user, 2026-08-13 — the ⚠️ block in RailShade.tsx has the reasoning). Written by the
+  // Engine on the tween's edges only (never per frame), and NOT during a view transition: that
+  // choreography is its own 3.9s answer to the user's gesture, so a 1.4s dim inside it would read
+  // as a blink.
+  cameraFlying: boolean;
   // PHONE ONLY: whether the top bar's vitals row is expanded (the bar grows downward by one
   // full-width row showing the active view's vitals). A USER CHOICE that persists across view
   // switches (the row's CONTENT swaps per view; only the user's toggle opens/closes it) —
@@ -202,7 +207,6 @@ interface AppState {
   setEngineFailed: (v: boolean) => void;
   setNodes: (l0: number, l1: number) => void;
   setMetagraphs: (n: number) => void;
-  setLatestOrdinal: (ordinal: number) => void;
   setLatestSnapshot: (snap: GlobalSnapshot | null) => void;
   setActivity: (activity: Activity | null) => void;
   setMode: (mode: Mode) => void;
@@ -238,6 +242,7 @@ interface AppState {
   setSection: (section: "scene" | "data") => void;
   setRailsHidden: (hidden: boolean) => void;
   setSceneDragging: (dragging: boolean) => void;
+  setCameraFlying: (flying: boolean) => void;
   setPhoneVitals: (open: boolean) => void;
   setPhoneSheetPx: (px: number | null) => void;
   setRailCollapse: (id: string, collapsed: boolean | null) => void;
@@ -259,7 +264,6 @@ export const useStore = create<AppState>((set) => ({
   engineFailed: false,
   nodes: { l0: 0, l1: 0 },
   metagraphs: 0,
-  latestOrdinal: null,
   latestSnapshot: null,
   activity: null,
   mode: "hyper",
@@ -290,6 +294,7 @@ export const useStore = create<AppState>((set) => ({
   section: "scene",
   railsHidden: false,
   sceneDragging: false,
+  cameraFlying: false,
   phoneVitals: false,
   railCollapse: {},
   focusRung: null,
@@ -301,7 +306,6 @@ export const useStore = create<AppState>((set) => ({
   setEngineFailed: (engineFailed) => set({ engineFailed }),
   setNodes: (l0, l1) => set({ nodes: { l0, l1 } }),
   setMetagraphs: (metagraphs) => set({ metagraphs }),
-  setLatestOrdinal: (latestOrdinal) => set({ latestOrdinal }),
   setLatestSnapshot: (latestSnapshot) => set({ latestSnapshot }),
   setActivity: (activity) => set({ activity }),
   setMode: (mode) => set({ mode }),
@@ -377,6 +381,7 @@ export const useStore = create<AppState>((set) => ({
   setSection: (section) => set({ section }),
   setRailsHidden: (railsHidden) => set({ railsHidden }),
   setSceneDragging: (sceneDragging) => set({ sceneDragging }),
+  setCameraFlying: (cameraFlying) => set({ cameraFlying }),
   setPhoneVitals: (phoneVitals) => set({ phoneVitals }),
   setRailCollapse: (id, collapsed) =>
     set((s) => {

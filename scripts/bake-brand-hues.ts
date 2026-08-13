@@ -6,20 +6,24 @@ import { Jimp } from "jimp";
 import { parseSvgFills, pickBrandColor, snapToAllowedZone, hexToOklch, spreadColliding } from "../src/palette/brand";
 
 type Meta = { id: string; name: string; iconUrl: string; siteUrl: string };
-const metas = JSON.parse(readFileSync("data/metagraphs.json", "utf8")) as Meta[];
 const overrides = JSON.parse(readFileSync("data/brand-hue-overrides.json", "utf8")) as Record<string, number>;
 
-// The DAG itself is modelled as a metagraph-shaped "core" (see src/data/network.ts's DAG_CFG) and
-// gets its own brand hue too, distinct from the structural cyan used for the core sphere / "All"
-// filter. Not in data/metagraphs.json (it isn't a listed metagraph) — appended here so
-// spreadColliding sees it alongside the real metagraphs. Uses the official $DAG mark (same
-// Stargazer asset bucket DAG_CFG's iconUrl points at) + the Constellation Network site as the
-// theme-color fallback.
-metas.push({
-  id: "dag", name: "DAG",
-  iconUrl: "https://stargazer-assets.s3.us-east-2.amazonaws.com/logos/dag.png",
-  siteUrl: "https://constellationnetwork.io",
-});
+// The directory comes from the LIVE source, the same one /api/metagraphs reads — there is no
+// baked copy to read: data/metagraphs.json was deleted deliberately (ddd318d, "stale data was
+// worse than an honest error"), which left this script unrunnable and is why a metagraph added to
+// the catalog later had no baked hue at all. `data/` holds build ARTIFACTS, and an input the app
+// itself refuses to keep stale is not one of them.
+const DIRECTORY = "https://production.dagexplorer-api.constellationnetwork.net/mainnet/metagraphs?limit=100";
+
+async function fetchDirectory(): Promise<Meta[]> {
+  const r = await fetch(DIRECTORY, { signal: AbortSignal.timeout(15000) });
+  if (!r.ok) throw new Error(`directory ${r.status} — nothing baked (a partial roster would silently drop rows)`);
+  const list = ((await r.json()) as { data?: Array<Record<string, string>> }).data ?? [];
+  if (!list.length) throw new Error("directory returned no metagraphs — nothing baked");
+  return list.filter((m) => m.id).map((m) => ({
+    id: m.id, name: m.name || m.id, iconUrl: m.iconUrl || "", siteUrl: m.siteUrl || "",
+  }));
+}
 
 async function fetchBuf(url: string): Promise<Buffer | null> {
   try { const r = await fetch(url, { signal: AbortSignal.timeout(8000) }); if (!r.ok) return null; return Buffer.from(await r.arrayBuffer()); }
@@ -73,6 +77,18 @@ async function brandHueFor(m: Meta): Promise<{ hueDeg: number; srcHex: string; s
 // Wrapped in an async main (not top-level await) — the project has no "type": "module" in
 // package.json, so tsx transpiles this file as CJS, which doesn't support top-level await.
 async function main() {
+  const metas = await fetchDirectory();
+  // The DAG itself is modelled as a metagraph-shaped "core" (see src/data/network.ts's DAG_CFG) and
+  // gets its own brand hue too, distinct from the structural cyan used for the core sphere / "All"
+  // filter. Not in the directory (it isn't a listed metagraph) — appended here so spreadColliding
+  // sees it alongside the real metagraphs. Uses the official $DAG mark (same Stargazer asset bucket
+  // DAG_CFG's iconUrl points at) + the Constellation Network site as the theme-color fallback.
+  metas.push({
+    id: "dag", name: "DAG",
+    iconUrl: "https://stargazer-assets.s3.us-east-2.amazonaws.com/logos/dag.png",
+    siteUrl: "https://constellationnetwork.io",
+  });
+
   const out: Record<string, { hueDeg: number; srcHex: string; source: string }> = {};
   for (const m of metas) {
     const r = await brandHueFor(m);

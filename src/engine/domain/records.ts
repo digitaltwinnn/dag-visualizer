@@ -39,11 +39,13 @@ export interface ValidatorRecord {
   /** Brief flash when an arc pulse reaches this node — set dynamically (js/globe.js:996), absent until then. */
   _flash?: number;
   // Staging-grid slot for the view-transition choreography (domain/gatherLayout, assigned
-  // event-time by Globe when the node set is (re)built): cell-unit position + stagger rank.
+  // event-time by Globe when the node set is (re)built): cell-unit position + stagger rank, plus
+  // the centred GROUP index the live band's spare gutter is applied through (GatherSlot.gs).
   gU: number;
   gV: number;
   gRank: number;
   gCount: number;
+  gS: number;
 }
 
 // js/globe.js:549-571 — one instance per metagraph node PER layer shell it runs (l0 / dl1 /
@@ -88,9 +90,11 @@ export interface MetaNodeRecord {
   /** Brief flash when an arc pulse reaches this node — set dynamically (js/globe.js:1109), absent until then. */
   _flash?: number;
   // Staging-grid slot for the view-transition choreography (domain/gatherLayout, assigned
-  // event-time by Globe when the node set is (re)built): cell-unit position + stagger rank.
+  // event-time by Globe when the node set is (re)built): cell-unit position + stagger rank, plus
+  // the centred GROUP index the live band's spare gutter is applied through (GatherSlot.gs).
   gU: number;
   gV: number;
   gRank: number;
   gCount: number;
+  gS: number;
 }

@@ -62,6 +62,13 @@ export function ledgerSite(i: number, n: number): { x: number; z: number } {
 // The ring/cluster radius for a node group of `count` nodes — grows with count (so the ring fits
 // the dots) but is capped WELL INSIDE its lane's Z step so a big group's dots never spill into the
 // neighbouring lane. (It used to be phrased against the station dial; the dials are retired.)
+//
+// ⚠️ The CAP is what ships, and it moves when the catalog does (found 2026-08-12, adding BioFi as
+// the 11th metagraph): more lanes = a narrower Z step = a narrower footprint, and past ~2 nodes the
+// growth term is already above the cap, so every real tray gets exactly `cap`. That's the cap doing
+// its job — the growth term is the guard for a catalog small enough that lanes are wide. Nodes that
+// no longer fit the footprint go UP (ledgerSpread stacks), so a narrower cap makes trays taller, it
+// never overlaps chips.
 export function clusterRadius(count: number): number {
   const laneGap = (LEDGER.depth * LANE_SPREAD) / Math.max(1, METAGRAPHS.length - 1); // = ledgerSite's Z step
   const cap = laneGap * 0.3;

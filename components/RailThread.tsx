@@ -58,6 +58,14 @@ const REST_DIM = "var(--rail-rest-dim, 0.6)";
 // hex, not var(--panel): an SVG `fill`/`stroke` ATTRIBUTE doesn't resolve CSS custom properties.
 const PUNCH = "#0c1020";
 
+// The thread's soft top/bottom entry, in PIXELS — see the render note where it is applied for why
+// a percentage was the wrong unit here. The top ramp is short enough to clear the first card's
+// eyebrow (~16px below the rail's top edge); the bottom keeps the length the percentage used to
+// give it at a typical viewport, since what it dissolves into is the end of the lane.
+const TOP_FADE = 10;
+const BOT_FADE = 44;
+const THREAD_FADE = `linear-gradient(to bottom, transparent 0, #000 ${TOP_FADE}px, #000 calc(100% - ${BOT_FADE}px), transparent 100%)`;
+
 /** One card's marker on the thread. `inset` = the card's measured step-back from the rail edge
  *  (all cards sit flush since the card redesign retired RUNG_STEP — kept measured so a future
  *  layout change can't desync the connectors); `focus` = the finest committed rung; `ghost` =
@@ -175,7 +183,8 @@ export default function RailThread({ side = "right" }: { side?: Side }) {
       // same as we have already in tablet mode"). The rails are content-height (`display: flex` +
       // `max-height` band, globals.css), so `r.height` ended the ruler at the last card and a
       // two-card view got a stub of an instrument. The thread now runs the whole lane — top of the
-      // rail to the LiveStrip bound — like the tablet sheet's `.ig-sheet-edge` channel. The band is
+      // rail to the bottom of its own band — like the tablet sheet's `.ig-sheet-edge` channel. The
+      // band is
       // READ from the rail's computed `max-height` rather than recomputed here, so the
       // rail-top/topbar-extra/bottom-reserve token math stays in one place (and is already in local
       // CSS px, like every value here); `|| hRail` covers a `none`. Marks stay clipped to the rail's
@@ -226,10 +235,18 @@ export default function RailThread({ side = "right" }: { side?: Side }) {
           // (was `.rail-thread`, 13-right-column.css). Kept as inline style, not a Tailwind
           // arbitrary property, since the vendor-prefixed property name doesn't round-trip
           // cleanly through the utility-class syntax.
-          WebkitMaskImage:
-            "linear-gradient(to bottom, transparent 0, #000 7%, #000 93%, transparent 100%)",
-          maskImage:
-            "linear-gradient(to bottom, transparent 0, #000 7%, #000 93%, transparent 100%)",
+          //
+          // ⚠️ THE RAMPS ARE FIXED PIXELS, NOT PERCENTAGES (user, 2026-08-13 — "rail top-fade
+          // should be a bit less, can't see the vertical line that is linked to the metagraph
+          // cards when its collapsed"). What has to clear the top ramp is the FIRST card's
+          // eyebrow, and that sits a fixed ~16px below the rail's top edge whatever the viewport
+          // does — while the old `7%` measured against the whole LANE height, so a taller window
+          // pushed the ramp further down over a mark that never moved (measured at 1600×897: a
+          // 43px ramp over a mark at y=16, leaving the topmost tie-line and dot at ~37% alpha).
+          // TOP_FADE clears that mark outright; BOT_FADE keeps the old ~43px so the lane still
+          // dissolves into the bottom of the band rather than ending on a cut.
+          WebkitMaskImage: THREAD_FADE,
+          maskImage: THREAD_FADE,
         }}
         aria-hidden
         focusable="false"

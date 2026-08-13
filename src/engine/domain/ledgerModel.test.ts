@@ -3,7 +3,7 @@ import {
   SLOT_SP,
   SLOT_N,
   BLOCK_SIZE,
-  LANE_GAP_Z,
+  LANE_GRID_Z,
   slotFade,
   HORIZON_X,
   HORIZON_SPAN,
@@ -12,6 +12,7 @@ import {
   LedgerModel,
   LEAD_SETTLE_MS, LANE_IDS } from "./ledgerModel";
 import { METAGRAPHS } from "../config";
+import { lanePlaneHalf } from "./ledgerLayout";
 import { UNLISTED_KEY } from "./ledgerBands";
 import { ledgerSite, LEAD_X } from "./ledgerLayout";
 import type { GlobalSnapshot, Anchor } from "@/src/data/types";
@@ -42,7 +43,7 @@ describe("anchorTiles (js/ledger.js:217-233, _anchorTiles verbatim)", () => {
     expect(tiles.filter((t) => t.link).length).toBe(1);
     for (const t of tiles) {
       expect(Math.abs(t.ox)).toBeLessThanOrEqual(SLOT_SP / 2);
-      expect(Math.abs(t.oz)).toBeLessThanOrEqual(LANE_GAP_Z / 2);
+      expect(Math.abs(t.oz)).toBeLessThanOrEqual(LANE_GRID_Z / 2);
       expect(t.size).toBeGreaterThan(0);
       expect(t.size).toBeLessThanOrEqual(BLOCK_SIZE);
     }
@@ -50,10 +51,28 @@ describe("anchorTiles (js/ledger.js:217-233, _anchorTiles verbatim)", () => {
 
   it("lays tiles out with UNIFORM pitch (equal spacing between column neighbours)", () => {
     const tiles = anchorTiles(12);
-    // 4 columns (cols = round(sqrt(12 * SLOT_SP/LANE_GAP_Z))) -> the first row's ox values step evenly.
+    // cols = round(sqrt(12 * SLOT_SP/LANE_GRID_Z)) -> the first row's ox values step evenly.
     const row0 = tiles.filter((t) => t.oz === tiles[0].oz).map((t) => t.ox).sort((a, b) => a - b);
     const steps = row0.slice(1).map((v, i) => v - row0[i]);
     for (const s of steps) expect(s).toBeCloseTo(steps[0], 10);
+  });
+
+  it("grids against the lane's own PLANE, so a busy lane's tiles never hang off the glass", () => {
+    // The budget is the plane the tiles rest on, not the lane's centre-to-centre spacing — those
+    // differ by LANE_PLANE_GAP, and budgeting against the wider one overhung from count 9 up
+    // (user, 2026-08-12: DOR's tiles too large). DOR has put 83 snapshots into one tick.
+    expect(LANE_GRID_Z).toBeCloseTo(2 * lanePlaneHalf(LANE_IDS.length), 10);
+    for (const count of [1, 2, 3, 5, 9, 12, 14, 20, 41, 83]) {
+      const tiles = anchorTiles(count);
+      const size = tiles[0].size;
+      const spanZ = Math.max(...tiles.map((t) => t.oz)) - Math.min(...tiles.map((t) => t.oz)) + size;
+      const spanX = Math.max(...tiles.map((t) => t.ox)) - Math.min(...tiles.map((t) => t.ox)) + size;
+      expect(spanZ).toBeLessThanOrEqual(LANE_GRID_Z + 1e-9);
+      expect(spanX).toBeLessThanOrEqual(SLOT_SP + 1e-9);
+    }
+    // A quiet lane is untouched — only the crowded ones shrink.
+    expect(anchorTiles(3)[0].size).toBe(BLOCK_SIZE);
+    expect(anchorTiles(20)[0].size).toBeLessThan(BLOCK_SIZE);
   });
 });
 
@@ -101,14 +120,13 @@ describe("the horizon (user, 2026-08-09: the chamber must read as continuing int
 });
 
 describe("LedgerModel.setData — first tick (no history to seed, snaps.length===1)", () => {
-  it("does not seed the trail, sets tickOrdinal, and reports an anchoring metagraph", () => {
+  it("does not seed the trail, sets tickOrdinal, and lays an anchoring metagraph's lead cluster", () => {
     const model = new LedgerModel();
     const s1 = snap(100, "T1", 3);
-    const changes = model.setData([s1], (ts) => (ts === "T1" ? anchor({ [idA]: 3 }) : null));
+    model.setData([s1], (ts) => (ts === "T1" ? anchor({ [idA]: 3 }) : null));
 
     expect(model.tickOrdinal).toBe(100);
     expect(model.trail).toEqual([]);
-    expect(changes).toEqual([{ id: idA, count: 3, delta: 3 }]);
 
     const lane = model.lanes.get(idA)!;
     expect(lane.z).toBeCloseTo(ledgerSite(0, METAGRAPHS.length).z, 10);
@@ -117,22 +135,29 @@ describe("LedgerModel.setData — first tick (no history to seed, snaps.length==
     for (const b of live) expect(b.filled).toBe(true);
   });
 
-  it("a metagraph id absent from METAGRAPHS (unlisted) produces no TickChange and no lane", () => {
+  it("a metagraph id absent from METAGRAPHS (unlisted) gets no lane", () => {
     const model = new LedgerModel();
     const s1 = snap(100, "T1", 1);
-    const changes = model.setData([s1], () => anchor({ "unlisted-xyz": 5 }));
-    expect(changes).toEqual([]);
+    model.setData([s1], () => anchor({ "unlisted-xyz": 5 }));
     expect(model.lanes.has("unlisted-xyz")).toBe(false);
   });
 
-  it("calling setData again within the SAME tick only reports the NEW delta", () => {
+  it("re-anchoring the SAME count mid-tick leaves the lead cluster alone; a GROWN count rebuilds it", () => {
+    // The `emitted` gate: the poll reports the same tick over and over, and only a real growth may
+    // rebuild the lane's slot-0 cluster (the rebuild is what the brightness-carry test below has to
+    // salvage state across).
     const model = new LedgerModel();
     const s1 = snap(100, "T1", 3);
     model.setData([s1], () => anchor({ [idA]: 2 }));
-    const changes = model.setData([s1], () => anchor({ [idA]: 2 })); // unchanged count
-    expect(changes).toEqual([]);
-    const changes2 = model.setData([s1], () => anchor({ [idA]: 5 })); // grew mid-tick
-    expect(changes2).toEqual([{ id: idA, count: 5, delta: 3 }]);
+    const lane = model.lanes.get(idA)!;
+    const lead = () => lane.blocks.filter((b) => b.slot === 0 && b.filled);
+    expect(lead().length).toBe(anchorTiles(2).length);
+
+    model.setData([s1], () => anchor({ [idA]: 2 })); // unchanged count
+    expect(lead().length).toBe(anchorTiles(2).length);
+
+    model.setData([s1], () => anchor({ [idA]: 5 })); // grew mid-tick
+    expect(lead().length).toBe(anchorTiles(5).length);
   });
 
   it("a mid-tick re-anchor CARRIES the lead cluster's eased brightness, so the tiles never flash", () => {
@@ -160,7 +185,7 @@ describe("LedgerModel.setData — tick advance (js/ledger.js:511-533 verbatim)",
     model.setData([s1], () => anchor({ [idA]: 3 }));
 
     const s2 = snap(101, "T2", 2);
-    const changes = model.setData([s1, s2], (ts) => (ts === "T2" ? anchor({ [idA]: 2 }) : null));
+    model.setData([s1, s2], (ts) => (ts === "T2" ? anchor({ [idA]: 2 }) : null));
 
     expect(model.tickOrdinal).toBe(101);
     // the tick that just completed (100) drops into the trail at slot 1, carrying its OWN
@@ -172,7 +197,6 @@ describe("LedgerModel.setData — tick advance (js/ledger.js:511-533 verbatim)",
     expect(lane.blocks.filter((b) => b.slot === 1).length).toBe(anchorTiles(3).length);
     // ... and the new tick's anchor (2) landed fresh at slot 0.
     expect(lane.blocks.filter((b) => b.slot === 0).length).toBe(anchorTiles(2).length);
-    expect(changes).toEqual([{ id: idA, count: 2, delta: 2 }]);
 
     // every OTHER metagraph also gets an empty placeholder at slot 0 on every new tick.
     const laneB = model.lanes.get(idB)!;
@@ -248,7 +272,7 @@ describe("LedgerModel — history seeding (js/ledger.js:370-393, _seedHistory ve
     const model = new LedgerModel();
     const snaps = [snap(100, "T0", 1), snap(101, "T1", 2), snap(102, "T2", 0)];
     // latest = snaps[2] (ordinal 102); seedHistory runs for s=1..min(SLOT_N, 3-1)=2
-    const changes = model.setData(snaps, (ts) => {
+    model.setData(snaps, (ts) => {
       if (ts === "T1") return anchor({ [idA]: 2 }); // one tick behind latest -> slot 1
       if (ts === "T0") return anchor({}); // two ticks behind -> slot 2, no anchor
       return null; // latest tick (T2) itself: no anchor this call
@@ -262,7 +286,8 @@ describe("LedgerModel — history seeding (js/ledger.js:370-393, _seedHistory ve
     const lane = model.lanes.get(idA)!;
     expect(lane.blocks.filter((b) => b.slot === 1 && b.filled).length).toBe(anchorTiles(2).length);
     expect(lane.blocks.some((b) => b.slot === 2 && !b.filled)).toBe(true);
-    expect(changes).toEqual([]); // the live tick (T2) itself reported no anchor in this call
+    // the live tick (T2) itself reported no anchor in this call, so slot 0 stays a placeholder.
+    expect(lane.blocks.some((b) => b.slot === 0 && b.filled)).toBe(false);
   });
 });
 

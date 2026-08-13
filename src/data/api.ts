@@ -45,14 +45,28 @@ export interface Activity {
   anchorsPerHour: number;
   blocksPerHour: number;
   feesPerHour: number;
+  /** The window every rate above is extrapolated FROM: how many snapshots, over how long. The
+   *  numbers are shown to the user (the vitals state their own basis) — a rate is honest only
+   *  while you can see the span it was measured over. Measured 2026-08-12 over 60 live ticks,
+   *  mainnet global L0 averages ~28 s between ticks but ranges 4.6 s to 115 s, so the 52-tick
+   *  buffer spans ~24 min and /hr is a ×2.5 reach. Read from the buffer's own timestamps, never
+   *  assumed, so the sentence survives a cadence change — and the VARIANCE is why it must be. */
+  samples: number;
+  spanHr: number;
   cadenceSeries: number[];
   anchoredSeries: number[];
   blocksSeries: number[];
   feesSeries: number[];
 }
 
-type Listener<K extends keyof NetworkEvents> = (payload: NetworkEvents[K]) => void;
-// Internal storage is pragmatically loose (a Map keyed by event name can't express the
+// Which activity stream a filter reads — the ONE home for the split `getActivity` branches on,
+// so a surface that must SAY which one it is showing (the ledger vitals label their scope) can
+// never disagree with the data layer about it.
+export function isGlobalActivityScope(filter?: string): boolean {
+  return !filter || filter === "all" || filter === "dag";
+}
+
+type Listener<K extends keyof NetworkEvents> = (payload: NetworkEvents[K]) => void;// Internal storage is pragmatically loose (a Map keyed by event name can't express the
 // per-key payload type without a mapped-type dance); the public on/off surface below is
 // fully typed and is the only thing consumers see.
 type ListenerMap = { [K in keyof NetworkEvents]: Array<Listener<K>> };
@@ -338,14 +352,26 @@ export class NetworkData {
 
   // Header activity rates + per-snapshot trend series, computed from the global
   // snapshot buffer's real timestamps (so they're stable and correct from first
-  // load). Rates are extrapolated to per-HOUR from the buffered window (~5 min):
+  // load). Rates are extrapolated to per-HOUR from the buffered window:
   //   snapshots/hr, anchors/hr (Σ metagraphSnapshotCount), blocks/hr (Σ blocks).
   // Series are per-snapshot for sparklines: cadence, anchored, blocks, fees (shape
   // only — unit-independent).
+  //
+  // ⚠️ THE WINDOW IS MEASURED, NEVER ASSUMED, and the UI states it. POLL.maxSnapshots ticks
+  // is a duration only once you know the cadence, and the cadence is not what a reading of
+  // the poll interval suggests: measured 2026-08-12 over 60 live ticks, mainnet's global L0
+  // averages ~28 s between ticks (we poll every 4s to catch each one promptly), so 52 ticks
+  // is a ~24-MINUTE window and a /hr figure is a ×2.5 extrapolation, not a leap. But that is
+  // today's chain, not a law — and it is not even a STEADY cadence today: those same 60 ticks
+  // ran 4.6 s to 115 s apart. That variance is exactly why `spanHr` and `samples` ride the
+  // result and the vitals render them: an assumed span would be wrong within the hour, while
+  // a stated one moves with the chain and the number stays honest.
+  // Widening the buffer is NOT the tuning knob — maxSnapshots also caps the LiveStrip's bar
+  // count, so it is a visual change too.
   getActivity(filter?: string): Activity | null {
     // A metagraph selection reads ITS own snapshot stream (cadence + fees it pays), not the
     // global L0 ledger. "all" and the DAG core itself ("dag") are the global L0 view.
-    if (filter && filter !== "all" && filter !== "dag") return this._metaActivity(filter);
+    if (!isGlobalActivityScope(filter)) return this._metaActivity(filter!);
     const s = this.globalSnapshots;
     if (s.length < 2) return null;
     const anchored = s.map((x) => (typeof x.metagraphSnapshotCount === "number" ? x.metagraphSnapshotCount : 0));
@@ -367,6 +393,8 @@ export class NetworkData {
       anchorsPerHour: sum(anchored) / spanHr,
       blocksPerHour: sum(blocks) / spanHr,
       feesPerHour: sum(feesDag) / spanHr,
+      samples: s.length,
+      spanHr,
       cadenceSeries: cadence,
       anchoredSeries: anchored,
       blocksSeries: blocks,
@@ -377,6 +405,16 @@ export class NetworkData {
   // Per-metagraph activity, the same shape as the global getActivity() but computed from one
   // metagraph's own snapshot buffer: its snapshot cadence, how many distinct global ticks it
   // anchored into, and the $DAG fees it paid. So the Ledger view scopes to the selection.
+  //
+  // ⚠️ NO BYTE RATE HERE, DELIBERATELY (user, 2026-08-12: "I want facts not guestimates"). The
+  // buffer carries `sizeInKB` per record, so a KB/hr looks one line away — but POLL.metaSnapBuffer
+  // caps the buffer by SNAPSHOT COUNT, not by time, and it fills DURING a burst. A batching
+  // network (DOR anchored 56 snapshots into one tick, measured 2026-08-12) therefore holds a
+  // window that is deep in count and shallow in time, and any rate taken from it propagates burst
+  // density across the hour. Measured against the exact reads, that read 21,273 KB/hr against a
+  // true ~10,672 — twice the complete figure, from a quantity labelled a lower bound. Mean size ×
+  // rate is better conditioned but still an estimate, and a vitals slot states facts. The honest
+  // source is a historical series the app does not keep yet; until it does, the vital stands by.
   private _metaActivity(id: string): Activity | null {
     const buf = this.metaSnaps.get(id) || [];
     if (buf.length < 2) return null;
@@ -393,9 +431,16 @@ export class NetworkData {
     const sum = (arr: number[]) => arr.reduce((a, b) => a + b, 0);
     return {
       snapsPerHour: (buf.length - 1) / spanHr,
+      // ⚠️ NOT THE SAME QUANTITY AS THE GLOBAL anchorsPerHour, which is Σ metagraphSnapshotCount
+      // — snapshots. This is distinct TICKS LANDED IN, and for a batching network the two differ
+      // by an order of magnitude. That is why the vitals do not show it under a filter: one
+      // label over two quantities is the drift, and for a single network the honest reading is
+      // near-redundant with Snaps/hr anyway, since every metagraph snapshot anchors.
       anchorsPerHour: ticks.size / spanHr,
       blocksPerHour: 0,
       feesPerHour: sum(feesDag) / spanHr,
+      samples: buf.length,
+      spanHr,
       cadenceSeries: cadence,
       anchoredSeries: cadence, // shape only — its anchoring tracks its snapshot cadence
       blocksSeries: buf.map(() => 0),

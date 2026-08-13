@@ -9,6 +9,7 @@ import { PulseEdge, useEdgePulse } from "@/components/EdgePulse";
 import { ListTree, ChevronLeft, ChevronRight, ChevronUp, ChevronDown, X, type LucideIcon } from "lucide-react";
 import { EXPLORE_ICON } from "@/components/icons";
 import { useStore } from "@/src/store/store";
+import { useSceneYield } from "@/components/RailShade";
 
 // One entry in a dock's icon TRAY (user redesign 2026-07-05 — supersedes the old hint dot + the
 // dot↔glyph morph, on the edge tabs AND the phone dock halves): the tray is a quiet LEGEND of the
@@ -148,6 +149,12 @@ export default function RailDock({
   // the scene restores what was open. The tablet edge TAB fades with the HUD — no gate needed.
   const section = useStore((s) => s.section);
   const shellVisible = section === "scene";
+  const isBarHalf = trigger === "bottom-bar-half"; // = the PHONE branch (ExploreRail/Inspector)
+  // PHONE ONLY takes the commit-flight half of the yield (`flight`). The tablet edge-tab sheet is
+  // dismissed by the same tab that opened it and the scene keeps full width behind it, so that
+  // tier has its own step-aside exactly as desktop has SCENE mode; the phone sheet is 60vh of a
+  // small viewport over a persistent dock bar. Both tiers still dim under the user's own hand.
+  const yielding = useSceneYield({ flight: isBarHalf });
   const handleOpenChange = (next: boolean) => {
     setOpen(next);
     onOpenChange?.(next);
@@ -248,7 +255,6 @@ export default function RailDock({
       </span>
     );
 
-  const isBarHalf = trigger === "bottom-bar-half";
   // The icon TRAY (see the `signals` prop doc): the hosted cards' legend. Muted at rest; an
   // `active` (updated-unseen) icon goes vivid in its identity hue + breathes on the shared
   // dot-beat heartbeat (reduced motion → static vivid). Vertical stack on the edge tab,
@@ -412,18 +418,26 @@ export default function RailDock({
           // `sheetPx` is null.
           style={isBarHalf && sheetPx != null ? { ...style, height: sheetPx, maxHeight: "none" } : style}
           overlay={false}
+          // The HUD's step-back while the camera moves (`useSceneYield`). Both tiers yield to the
+          // user's own hand; only the PHONE half also yields to a commit flight (see the call site
+          // above). The dock BAR and the edge tabs stay solid: they're the handles. The recipe is
+          // in globals.css.
+          data-dim={yielding ? "" : undefined}
           // Phone bar-half variant: the sheet sits DIRECTLY ABOVE the persistent dock bar (never
           // covers it — the bar is its visible header/handle), so offset it up by the bar height.
           // `!` beats the base `bottom-0` from the bottom-side placement in sheet.tsx. Snapping
           // animates the height (calm 0.2s; suspended while the finger drags, instant under
           // reduced motion).
+          // reduced motion). `opacity` rides the same list so the scene-yield dim isn't stranded
+          // by this element-level `transition-property` — it takes the sheet's own 0.2s tempo
+          // rather than the rails' 0.3s, which is the honest trade for not fighting the cascade.
           className={
             isBarHalf
               ? cn(
                   "!bottom-[var(--phone-dock-h)]",
                   dragging
                     ? "!transition-none"
-                    : "transition-[height] duration-200 ease-out motion-reduce:!transition-none",
+                    : "transition-[height,opacity] duration-200 ease-out motion-reduce:!transition-none",
                 )
               : undefined
           }

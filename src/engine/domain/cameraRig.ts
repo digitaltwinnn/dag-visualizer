@@ -5,6 +5,7 @@
 // Engine's per-focus calls (mousemove-adjacent, filter/country changes) allocate nothing.
 
 import * as THREE from "three";
+import type { View3D } from "./viewTransition";
 
 export interface CameraFraming {
   pos: THREE.Vector3;
@@ -12,7 +13,12 @@ export interface CameraFraming {
 }
 
 // Camera presets (ported from ui.js FOCI; Engine.ts:46-56 verbatim).
-export const FOCI: Record<string, { pos: THREE.Vector3; target: THREE.Vector3 }> = {
+//
+// `satisfies` rather than a `Record<string, …>` annotation, so the KEYS survive into the type: a
+// bare `string` index makes `focus("overvieww")` a silent undefined at runtime instead of the
+// compile error it should be, and it is what let REST_POSE claim to be checked while checking
+// nothing.
+export const FOCI = {
   // Pulled back (60 → 68, user): every view's START pose gets the same zoom-out the globe
   // needs — the whole scene rests inside the rail-free centre of the frame. Shared by the
   // hyper resting pose, the ledger overview and the placeholder idle.
@@ -48,10 +54,12 @@ export const FOCI: Record<string, { pos: THREE.Vector3; target: THREE.Vector3 }>
   // viewport", then "lower it a little bit, in HUD mode it's too high now"): pos.y and target.y
   // are lowered by the SAME 4.5, which translates the frustum down without touching the view
   // direction — so the ~6° pitch is preserved exactly and the chamber centres in the band between
-  // the topbar and the LiveStrip. Both global levers survive it: dollyBack and railsDolly scale
+  // the topbar and the LiveStrip. Both global levers survive it: dollyBack and railsLean scale
   // (pos − target) around the target, so a pure translation of the pair is invariant under them.
   ledger: { pos: new THREE.Vector3(0, -1, 54), target: new THREE.Vector3(0, -7, 0) },
-};
+} satisfies Record<string, CameraFraming>;
+/** A pose that exists. Every caller of `focus()` names one of these, checked. */
+export type FocusName = keyof typeof FOCI;
 
 // ---- the ONE global zoom lever ------------------------------------------------------------
 // Dolly every preset/framing back by CAM_ZOOM (the position pushed out from its target) — one
@@ -61,6 +69,14 @@ export const FOCI: Record<string, { pos: THREE.Vector3; target: THREE.Vector3 }>
 // along that axis drags the camera away from the node instead of widening the shot — its
 // numbers are ABSOLUTE. Any new pose with a composed (non-subject) target must decide this
 // explicitly.
+//
+// ⚠️ THE EXEMPTION IS THE POSE'S, NOT THIS LEVER'S — `railsLean` INHERITS IT (2026-08-13). Both
+// levers scale (pos − target) about the target, so the argument above is about the AXIS and applies
+// to either of them verbatim: on a composed look-at there is no honest radial to move along. The
+// rails lean was added later and composed centrally, so it never inherited the exemption and leaned
+// geo's node pose 14% down an axis aimed 15 units up the globe's face — the node ended up 3.3×
+// closer and half out of frame in scene mode, which is what the user reported as "it zooms in too
+// much". One flag now gates both (`_tweenTo`'s `dolly`), because there is one reason.
 export const CAM_ZOOM = 1.15;
 export function dollyBack(pos: THREE.Vector3, target: THREE.Vector3, outPos: THREE.Vector3): void {
   outPos.subVectors(pos, target).multiplyScalar(CAM_ZOOM).add(target);
@@ -74,9 +90,33 @@ export function dollyBack(pos: THREE.Vector3, target: THREE.Vector3, outPos: THR
 // the canonical pose (no inverse math, no desync when a reframe happened in between — the
 // original from-the-live-pose delta drifted across holdCamera, flat views and clamps).
 // Safe to call with `outPos === pos` (subVectors reads before it writes).
+//
+// ⚠️ THE LEAN IS A RESTING-POSE TRADE, SO IT FADES OUT AS THE POSE CLOSES IN (user, 2026-08-13 —
+// "looks great in unfiltered mode in scene starting position, but when filtered at the lowest level
+// … it zooms in too much; probably the zoom effect should be reduced depending on how close they
+// sit to the actual subject compared to scene starting position"). The physical argument is the
+// whole rule: what hiding the rails frees is HORIZONTAL width (at 1600px the band goes 908px →
+// 1600px, +76%), but the camera's FOV is VERTICAL, so a radial dolly buys the horizontal gain by
+// spending vertical fit. At the resting pose the subject is width-bound — the globe, the hub ring,
+// the lane field all run wide — so the trade is free. At a deep rung the subject is HEIGHT-bound: a
+// co-located stack grows upward off its surface point, a hub's shells fill the frame vertically. So
+// the same 14% crops exactly where there is nothing left to crop. `railsLean` ramps the factor with
+// the pose's own orbit distance against its view's resting one: full lean at rest, none at the
+// subject. It is the one lever, not a second knob — RAILS_HIDDEN_DOLLY is still what "full" means.
 export const RAILS_HIDDEN_DOLLY = 0.86;
-export function railsDolly(pos: THREE.Vector3, target: THREE.Vector3, outPos: THREE.Vector3): void {
-  outPos.subVectors(pos, target).multiplyScalar(RAILS_HIDDEN_DOLLY).add(target);
+// The resting pose each view's lean is measured against — the user's "scene starting position".
+// Read out of FOCI rather than restated, so re-tuning a resting pose re-tunes the ramp with it.
+const REST_POSE: Record<View3D, FocusName> = { hyper: "overview", geo: "geo", ledger: "ledger" };
+export function restOrbit(view: View3D): number {
+  const f = FOCI[REST_POSE[view]];
+  return f.pos.distanceTo(f.target);
+}
+/** Lean `pos` toward `target`, at full strength only while the pose orbits as wide as its view's
+ *  resting one. `restDist <= 0` means "no resting pose to measure against" (a flat view, which has
+ *  no canvas anyway) and takes the full lean, exactly as the un-ramped lever did. */
+export function railsLean(pos: THREE.Vector3, target: THREE.Vector3, restDist: number, outPos: THREE.Vector3): void {
+  const k = restDist > 0 ? THREE.MathUtils.clamp(pos.distanceTo(target) / restDist, 0, 1) : 1;
+  outPos.subVectors(pos, target).multiplyScalar(1 - (1 - RAILS_HIDDEN_DOLLY) * k).add(target);
 }
 
 // ---- the geo NODE pose ----------------------------------------------------------------------
@@ -106,15 +146,21 @@ export function cohortFraming(out: CameraFraming): void {
   out.target.set(0, 18.8, 2);
 }
 
-// ---- the hyper NODE pose --------------------------------------------------------------------
-// Fly to a node's live shell point: pulled back along its outward radial, lifted a touch,
-// looking at the node itself (Engine's `hyperNode` resolver).
-export function hyperNodeFraming(nodeWorldPos: THREE.Vector3, out: CameraFraming): void {
-  _out.copy(nodeWorldPos).normalize();
-  out.pos.copy(nodeWorldPos).addScaledVector(_out, 9);
-  out.pos.y += 3;
-  out.target.copy(nodeWorldPos);
-}
+// ---- the hyper NODE pose: RETIRED (2026-08-13) ------------------------------------------------
+// `hyperNodeFraming` flew to a node's own shell point, pulled back along its outward radial. It is
+// gone and hyper's node rung delegates to its NETWORK's framing, the way the composition rung
+// already did (user, 2026-08-13 — "when a node is selected and i navigate to hyper view, it does
+// not correctly focus on the metagraph. It should behave the same as when (only) a metagraph filter
+// is selected"). The view's subject is the STRUCTURE: a node there is one bead on a shell, and
+// diving onto it loses the shells, the hub and the orbit that say what the bead is part of — the
+// same reason the ledger's node rung resolves to the chamber pose. Arriving from geo with a node
+// selected made it plainest, since the walk starts at the finest rung: the carried node framed
+// itself and the metagraph the user had committed never appeared.
+//
+// It also carried a mid-transition trap worth remembering if a per-node pose is ever tried again:
+// the framing has to read the node's LAYOUT position, never its rendered instance matrix, because
+// mid-flight the instance sits in the staging grid (`Globe.hyperWorldPos`, retired with it).
+// The nudge below is what answers the click now.
 
 // ---- camera CLOSENESS -----------------------------------------------------------------------
 // 0 at/beyond the overview altitude band, 1 at country/node range. The geo surface shaders
@@ -179,6 +225,52 @@ export function easeInOutQuad(t: number): number {
   return t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
 }
 
+// ---- the COMMIT NUDGE -------------------------------------------------------------------------
+// EVERY commit animates the camera, and where the ladder resolves to the pose already held, the
+// animation is a NUDGE (user, 2026-08-13 — "we always animate the position but a 'nudge' is allowed
+// which means the new pos will be same as old pos"). A finer rung that shares its parent's framing
+// used to answer a click with no motion at all, which reads as a dropped input rather than as "you
+// are already looking at it" — and there are now several: every ledger rung delegates to the one
+// chamber pose, and hyper's node and composition rungs delegate to their network's.
+//
+// The nudge is a PULSE, not a flight, and the difference is the whole point: it pushes a little way
+// toward the pose's own target and eases back to exactly where it started, so the framing the user
+// committed is never disturbed. Two consequences the Engine relies on — it runs on its own short
+// clock (the smallest member of the navigation clock family), and it must NOT raise `cameraFlying`:
+// that dim exists so the scene under the phone's cards can be seen changing, and here nothing does.
+export const NUDGE_DUR = 0.55; //  seconds
+// ⚠️ THE NUDGE ONLY HAS TO BE NOTICED, NOT FELT (user, 2026-08-13 — "make the camera nudge much more
+// subtle when pos does not have to change but the selected subject has"). It shipped at 0.04, a 4%
+// push toward the subject, which at hyper's orbit distance is a visible lurch: big enough to read as
+// the camera moving somewhere and then changing its mind, which is the opposite of the reassurance
+// it exists to give. What answers the click is that SOMETHING moved — the eye catches a sub-percent
+// shift on a still frame — so the amplitude is set at the low end of visible, and the 0.55s clock
+// does the rest of the work.
+export const NUDGE_AMP = 0.012; //  peak push, as a fraction of the way toward the pose's target
+// Two poses are "the same" within this fraction of the ORBIT DISTANCE — relative, because the views
+// sit an order of magnitude apart in scale, and because a move too small to see is one the nudge
+// should replace rather than one the epsilon merely forgives.
+export const NUDGE_SAME = 0.004;
+
+/** Is the destination the pose the camera already holds — so this commit gets a nudge, not a flight? */
+export function isSamePose(
+  fromPos: THREE.Vector3,
+  fromTgt: THREE.Vector3,
+  toPos: THREE.Vector3,
+  toTgt: THREE.Vector3,
+): boolean {
+  const eps = NUDGE_SAME * Math.max(fromPos.distanceTo(fromTgt), 1);
+  return fromPos.distanceTo(toPos) <= eps && fromTgt.distanceTo(toTgt) <= eps;
+}
+
+/** The nudge's shape: how far toward the target the camera sits at time `t` (0..1), as a fraction.
+ *  Zero at BOTH ends with zero slope there, peaking at NUDGE_AMP halfway — so it composes onto a
+ *  resting pose without a start or a landing of its own, and t=1 restores that pose exactly. */
+export function nudgeMix(t: number): number {
+  const s = Math.sin(Math.PI * THREE.MathUtils.clamp(t, 0, 1));
+  return NUDGE_AMP * s * s;
+}
+
 // ---- the Snapshots COMMIT ORBIT -------------------------------------------------------------
 // With a metagraph filter committed, the frontal resting pose ORBITS a little into a
 // three-quarter view (user, 2026-08-09: "when there is a filter on a metagraph, tilt the camera a
@@ -194,7 +286,7 @@ export function easeInOutQuad(t: number): number {
 // field presents. The composition is still filter-independent: the orbit is the same for every
 // network, so no lane is ever framed better than another.
 //
-// Composes cleanly with both global levers (`dollyBack`, `railsDolly`): they scale (pos − target)
+// Composes cleanly with both global levers (`dollyBack`, `railsLean`): they scale (pos − target)
 // about the target, which commutes with a rotation about that same target. Safe to call with
 // `outPos === pos` — the scratch read happens before the write.
 export const LEDGER_TILT_YAW = 0.23; // rad ≈ 13°, orbiting toward +X (the lane field's right end)

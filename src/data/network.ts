@@ -24,7 +24,7 @@ export function initNetwork(): NetworkData | null {
   if (net) return net;
 
   net = new NetworkData();
-  const { setLive, setNodes, setMetagraphs, setLatestOrdinal, setLatestSnapshot, setActivity } =
+  const { setLive, setNodes, setMetagraphs, setLatestSnapshot, setActivity } =
     useStore.getState();
 
   setMetagraphs(METAGRAPHS.length); // publicly listed metagraphs we track
@@ -40,7 +40,6 @@ export function initNetwork(): NetworkData | null {
   );
   net.on("global", (evt: { latest: GlobalSnapshot | null }) => {
     if (evt.latest) {
-      setLatestOrdinal(evt.latest.ordinal);
       setLatestSnapshot(evt.latest);
       refreshActivity();
     }

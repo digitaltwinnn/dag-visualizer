@@ -11,6 +11,8 @@
 // having to track `mode`, subscribe to anything, or rebuild itself. Engine owns mount/dispose.
 import type * as THREE from "three";
 import type { LedgerView } from "./scene/views/LedgerView";
+import type { HyperView } from "./scene/views/HyperView";
+import { TETHER_TUNE_DEFAULTS, TETHER_TUNE_SCHEMA } from "./scene/views/HyperView";
 import { RIBBON_TUNE_DEFAULTS, RIBBON_TUNE_SCHEMA } from "./scene/objects/Ribbons";
 import { BAR_TUNE_DEFAULTS, BAR_TUNE_SCHEMA } from "./scene/objects/ByteBar";
 import { GLOBAL_PLANE_TUNE_DEFAULTS, META_PLANE_TUNE_DEFAULTS, PLANE_TUNE_SCHEMA } from "./scene/objects/SnapshotPlane";
@@ -26,6 +28,7 @@ import {
 
 export interface DevTuneTargets {
   ledger: LedgerView;
+  hyper: HyperView;
   camera: THREE.PerspectiveCamera;
   controls: { target: THREE.Vector3 };
 }
@@ -36,7 +39,7 @@ export interface DevTuneHandle {
 
 export async function mountDevTune(targets: DevTuneTargets): Promise<DevTuneHandle> {
   const { Pane } = await import("tweakpane");
-  const { ledger, camera, controls } = targets;
+  const { ledger, hyper, camera, controls } = targets;
 
   // ---- the manifest ---------------------------------------------------------------------------
   // Shared groups: these shape EVERY view, so they sit above the per-view folders. Emphasis is
@@ -75,7 +78,20 @@ export async function mountDevTune(targets: DevTuneTargets): Promise<DevTuneHand
   });
 
   const perView: Record<string, TuneGroup[]> = {
-    hyper: [focusGroup("hyper"), spotGroup("hyper")],
+    hyper: [
+      focusGroup("hyper"),
+      spotGroup("hyper"),
+      {
+        title: "tethers",
+        values: hyper.tetherTune,
+        defaults: TETHER_TUNE_DEFAULTS,
+        schema: TETHER_TUNE_SCHEMA,
+        // The tip fades are baked into the shared vertex-colour attribute — re-bake on a change.
+        // (`restOp` alone is read per frame, but one re-bake per edit costs nothing.)
+        onChange: () => hyper.setTetherTune({}),
+        home: "scene/views/HyperView.ts · TETHER_TUNE_DEFAULTS",
+      },
+    ],
     geo: [focusGroup("geo"), spotGroup("geo")],
     // Almost every dim number is read per frame, so the group needs no onChange — EXCEPT the
     // ledger's `dim`, which the ribbons bake into their vertex colours. Re-push the sheet there.
@@ -164,8 +180,10 @@ export async function mountDevTune(targets: DevTuneTargets): Promise<DevTuneHand
       `target.set(${cam.tx.toFixed(2)}, ${cam.ty.toFixed(2)}, ${cam.tz.toFixed(2)});\n` +
       `// ⚠️ RAW live numbers. The Engine composes levers onto a resolved pose before tweening, so\n` +
       `//    for a pose that takes them these are already lever'd and must be divided back out:\n` +
-      `//      · dollyBack   ×${CAM_ZOOM} — every FOCI preset and framing EXCEPT nodeFraming/cohortFraming\n` +
-      `//      · railsDolly  ×${RAILS_HIDDEN_DOLLY} — composed into every destination while the rails are hidden\n` +
+      `//      · dollyBack  ×${CAM_ZOOM} — every FOCI preset and framing EXCEPT nodeFraming/cohortFraming\n` +
+      `//      · railsLean  ×${RAILS_HIDDEN_DOLLY} at MOST, and only while the rails are hidden. Exempt on the same\n` +
+      `//        poses dollyBack is, and RAMPED by how close the pose orbits vs its view's resting one —\n` +
+      `//        so at a deep rung its factor is near 1 and there is little to divide back out.\n` +
       `//    hubFraming/hyperNodeFraming compose from the SUBJECT's own radial basis, so raw numbers\n` +
       `//    there describe one subject only — read them as a delta, not as constants.`,
     );

@@ -207,49 +207,59 @@ export default function CardHead({
       <>
         <div
           className={cn(
-            "flex items-start justify-between gap-2 py-[var(--panel-pad-y)] px-[var(--panel-pad-x)]",
+            "flex flex-col gap-[3px] py-[var(--panel-pad-y)] px-[var(--panel-pad-x)]",
             toggleable && "relative group",
           )}
         >
-          <div className="flex flex-col gap-[3px] min-w-0">
-            {/* `data-eyebrow` — same read as the entry layout below: RailThread ties every
-                populated mark in at its card's EYEBROW height. Without it the thread silently
-                falls back to the card MIDDLE, which on a tall explorer card drops the mark
-                hundreds of px below its own header. One connector anatomy, both layouts. */}
-            {eyebrow && <span data-eyebrow="" className={cn("block", eyebrowClass)}>{eyebrow}</span>}
-            <h2 className={cn(TITLE, "inline-flex items-center gap-2 min-w-0")}>
-              {toggleable ? (
-                <button
-                  type="button"
-                  aria-expanded={!collapsed}
-                  title={collapsed ? "Expand" : "Collapse"}
-                  onClick={onToggle}
-                  className="appearance-none bg-transparent border-0 p-0 m-0 [font:inherit] text-inherit text-left inline-flex items-center gap-2 min-w-0 rounded-sm focus-visible:outline-1 focus-visible:outline-ring/60 after:absolute after:inset-0 after:cursor-pointer after:content-['']"
-                >
-                  {titleRow}
-                </button>
-              ) : (
-                titleRow
-              )}
-            </h2>
-          </div>
-          {/* Caption + the +/− INDICATOR — both decoration over the title button's stretched
-              `after:inset-0` pseudo, and they paint above it by DOM order. Transparent to the
-              pointer for the same reason the inspector layout's aside is: the head is one
-              gesture, so its right end must not read as dead space. Controls inside opt back in. */}
-          <div className="flex items-center gap-1.5 flex-none pt-px pointer-events-none [&_a]:pointer-events-auto [&_button]:pointer-events-auto">
-            {caption != null && (
-              <span className="text-micro text-muted-foreground text-right tabular-nums">{caption}</span>
-            )}
-            {toggleable && (
-              <span
-                aria-hidden
-                className="inline-flex items-center justify-center w-5 h-[18px] leading-none text-muted-foreground group-hover:text-foreground"
+          {/* ⚠️ The caption + indicator cluster sits on the EYEBROW's row, NOT beside the whole
+              left column (user, 2026-08-12 — "the todo views text is a bit too long sometimes").
+              As a column sibling it reserved its width on EVERY line of the head, so a `SOON` tag
+              12px tall narrowed the title's lane from ~180px to ~145px two lines below itself and
+              wrapped titles that fit the card perfectly well. One head anatomy, both layouts: the
+              inspector layout below has always stacked these as rows. */}
+          {(eyebrow || caption != null || toggleable) && (
+            <div className="flex items-start justify-between gap-2">
+              {/* `data-eyebrow` — same read as the entry layout below: RailThread ties every
+                  populated mark in at its card's EYEBROW height. Without it the thread silently
+                  falls back to the card MIDDLE, which on a tall explorer card drops the mark
+                  hundreds of px below its own header. One connector anatomy, both layouts. */}
+              {eyebrow ? <span data-eyebrow="" className={cn("block", eyebrowClass)}>{eyebrow}</span> : <span />}
+              {/* Caption + the +/− INDICATOR — both decoration over the title button's stretched
+                  `after:inset-0` pseudo, and they paint above it by DOM order. Transparent to the
+                  pointer for the same reason the inspector layout's aside is: the head is one
+                  gesture, so its right end must not read as dead space. Controls inside opt back
+                  in. `-my` keeps the 18px glyph box from setting this row's height and pushing the
+                  title down — the row measures the eyebrow, as it did when they were siblings. */}
+              <div className="flex items-center gap-1.5 flex-none -my-[3px] pt-px pointer-events-none [&_a]:pointer-events-auto [&_button]:pointer-events-auto">
+                {caption != null && (
+                  <span className="text-micro text-muted-foreground text-right tabular-nums">{caption}</span>
+                )}
+                {toggleable && (
+                  <span
+                    aria-hidden
+                    className="inline-flex items-center justify-center w-5 h-[18px] leading-none text-muted-foreground group-hover:text-foreground"
+                  >
+                    {collapsed ? <Plus className="size-3.5" /> : <Minus className="size-3.5" />}
+                  </span>
+                )}
+              </div>
+            </div>
+          )}
+          <h2 className={cn(TITLE, "inline-flex items-center gap-2 min-w-0")}>
+            {toggleable ? (
+              <button
+                type="button"
+                aria-expanded={!collapsed}
+                title={collapsed ? "Expand" : "Collapse"}
+                onClick={onToggle}
+                className="appearance-none bg-transparent border-0 p-0 m-0 [font:inherit] text-inherit text-left inline-flex items-center gap-2 min-w-0 rounded-sm focus-visible:outline-1 focus-visible:outline-ring/60 after:absolute after:inset-0 after:cursor-pointer after:content-['']"
               >
-                {collapsed ? <Plus className="size-3.5" /> : <Minus className="size-3.5" />}
-              </span>
+                {titleRow}
+              </button>
+            ) : (
+              titleRow
             )}
-          </div>
+          </h2>
         </div>
         {/* The head hairline is INSET by the panel's own horizontal padding (user, 2026-08-09) —
             the same weight the slab's resting seam carries, so every division that is simply THERE
@@ -302,24 +312,39 @@ export default function CardHead({
             <span className="sr-only">Expand</span>
           </button>
         )}
-        {(eyebrow || (onToggle && !entryMode)) && (
+        {(eyebrow || caption != null || (onToggle && !entryMode)) && (
           <div className={cn("flex items-start justify-between gap-2 mb-2", onClose && !entryMode && "pr-[30px]")}>
             {/* `data-eyebrow` is RailThread's read: on an unboxed ENTRY the thread runs its
                 depth-reach connector at the EYEBROW's height (user, 2026-08-08 — the entry's
                 vertical centre put the line through the title-row aside's space). */}
             {eyebrow ? <span data-eyebrow="" className={cn("block", eyebrowClass)}>{eyebrow}</span> : <span />}
-            {onToggle && !entryMode && (
-              // -mt aligns the glyph's centre with the ×'s (the × floats at the card corner,
-              // outside this row's flow — measured, not eyeballed).
-              <button
-                type="button"
-                aria-expanded={!collapsed}
-                title={collapsed ? "Expand" : "Collapse"}
-                onClick={onToggle}
-                className="appearance-none bg-transparent border-0 p-0 -mt-[7px] -mb-1 inline-flex items-center justify-center w-5 h-[18px] leading-none text-muted-foreground group-hover:text-foreground rounded-sm focus-visible:outline-1 focus-visible:outline-ring/60 after:absolute after:inset-0 after:cursor-pointer after:content-['']"
-              >
-                {collapsed ? <Plus className="size-3.5" aria-hidden /> : <Minus className="size-3.5" aria-hidden />}
-              </button>
+            {/* The right cluster — caption, then the +/− indicator, the SAME order and the same
+                line the panel layout puts them on. ⚠️ The caption belongs HERE and not in the
+                title row's aside (user, 2026-08-12 — "the network view collapse is broken in the
+                card"): About's collapsed entry passed `SOON` as the aside, so a title that fits
+                the expanded card's 202px lane ran straight THROUGH it in the narrower entry, and
+                since nothing bounds an unbounded inline-flex title it couldn't truncate either.
+                Level with the eyebrow the title gets the whole lane back, and the two tiers stop
+                disagreeing about where a card's status tag lives. */}
+            {(caption != null || (onToggle && !entryMode)) && (
+              <div className="flex items-center gap-1.5 flex-none pointer-events-none [&_a]:pointer-events-auto [&_button]:pointer-events-auto">
+                {caption != null && (
+                  <span className="text-micro text-muted-foreground text-right tabular-nums">{caption}</span>
+                )}
+                {onToggle && !entryMode && (
+                  // -mt aligns the glyph's centre with the ×'s (the × floats at the card corner,
+                  // outside this row's flow — measured, not eyeballed).
+                  <button
+                    type="button"
+                    aria-expanded={!collapsed}
+                    title={collapsed ? "Expand" : "Collapse"}
+                    onClick={onToggle}
+                    className="appearance-none bg-transparent border-0 p-0 -mt-[7px] -mb-1 inline-flex items-center justify-center w-5 h-[18px] leading-none text-muted-foreground group-hover:text-foreground rounded-sm focus-visible:outline-1 focus-visible:outline-ring/60 after:absolute after:inset-0 after:cursor-pointer after:content-['']"
+                  >
+                    {collapsed ? <Plus className="size-3.5" aria-hidden /> : <Minus className="size-3.5" aria-hidden />}
+                  </button>
+                )}
+              </div>
             )}
           </div>
         )}

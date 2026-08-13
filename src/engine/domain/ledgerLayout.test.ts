@@ -33,12 +33,26 @@ describe("ledgerSite", () => {
 });
 
 describe("clusterRadius", () => {
-  it("grows with node count but never exceeds the lane-spacing cap", () => {
-    const r1 = clusterRadius(1);
-    const r20 = clusterRadius(20);
-    expect(r20).toBeGreaterThan(r1);
+  // The two properties, asserted separately because only ONE of them is observable at the shipped
+  // catalog size: with 11 metagraphs the lane step is narrow enough that the cap binds at EVERY
+  // count (it already bound from count 2 at 10 — the growth term's last visible count was 1, whose
+  // radius `ledgerSpread` never reads, since `cnt <= 1` returns the centre cell). So the growth term
+  // is the guard for a SMALLER catalog, not the shipped look, and the shipped look is the cap. A
+  // strict `r20 > r1` therefore asserts the catalog's size, not the layout's design.
+  it("never shrinks as the node count grows", () => {
+    let prev = 0;
+    for (const n of [1, 2, 3, 20, 160, 10_000]) {
+      const r = clusterRadius(n);
+      expect(r).toBeGreaterThanOrEqual(prev);
+      prev = r;
+    }
+  });
+  it("never exceeds the lane-spacing cap, however large the group", () => {
     const laneGap = Math.abs(ledgerSite(1, METAGRAPHS.length).z - ledgerSite(0, METAGRAPHS.length).z);
     expect(clusterRadius(10_000)).toBeLessThanOrEqual(laneGap * 0.46 + 1e-9);
+    // …and the cap is what a real fleet gets, so a lane added to the catalog narrows every tray
+    // rather than letting the widest one spill into its neighbour.
+    expect(clusterRadius(160)).toBe(clusterRadius(10_000));
   });
 });
 

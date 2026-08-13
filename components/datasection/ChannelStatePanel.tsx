@@ -272,7 +272,7 @@ export function ChannelStatePanel() {
   if (!sel) {
     return (
       <p className="m-auto max-w-[26ch] text-center text-label text-muted-foreground">
-        Select a metagraph snapshot — a row in the log, or a tile in the chamber — to read its contents here.
+        Select a metagraph snapshot to read its contents here. Click a row in the log, or a tile in the chamber.
       </p>
     );
   }
@@ -303,9 +303,9 @@ export function ChannelStatePanel() {
         // the left IS available, and clicking it commits the same selection.
         <p className="text-label text-muted-foreground">
           {following
-            ? "Click this snapshot's row in the anchor log to read its payload — a ~2.5 MB fetch, so it runs only when you ask."
+            ? "Click this snapshot's row in the anchor log to read its payload. It is a ~2.5 MB fetch, so it runs only when you ask."
             : gaveUp
-              ? "decode unavailable — the L0 node keeps ~30 minutes; this tick may be pruned"
+              ? "decode unavailable: the L0 node keeps ~30 minutes, so this tick may be pruned"
               : "reading…"}
         </p>
       ) : (
