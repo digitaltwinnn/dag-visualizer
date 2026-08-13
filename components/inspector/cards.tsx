@@ -184,12 +184,15 @@ export function GeoLiveAside() {
 export function SnapshotCard({ data: d }: { data: GlobalSnapshot }) {
   // EXACT totals from the raw L0 snapshot (via RawSnapshotBridge) are the ONLY source for the fee
   // + anchored breakdown — authoritative (the true total, incl. unlisted). If they aren't here yet
-  // the tick is simply "reading…" (ACQUIRING); there is no polled-floor fallback. Every selectable
-  // tick is inside the L0 node's retention window, so exact always resolves.
+  // the tick is "reading…" (ACQUIRING); there is no polled-floor fallback. A FAILED read records
+  // `exactMiss[ordinal]`, which is this card's give-up signal (rule 10: node-stars with nothing in
+  // flight promise an arrival that isn't coming) — the slot terminates on an honest word, and a
+  // later trigger (reselecting, the next live tick) retries.
   const exact = useStore((s) => s.snapshotExact[d.ordinal]);
+  const missed = useStore((s) => s.exactMiss[d.ordinal] != null);
   const live = useStore((s) => s.live);
   const lastGoodAt = useStore((s) => s.lastGoodAt);
-  const awaitingExact = exact == null;
+  const awaitingExact = exact == null && !missed;
   const anchored = typeof d.metagraphSnapshotCount === "number" ? d.metagraphSnapshotCount : null;
   // Hold the ACQUIRING fee atom for one calm cycle even if the exact read lands sooner, then fade
   // it out (concern #8) — so a fast resolve doesn't blink the twinkling node-stars away.
@@ -233,11 +236,17 @@ export function SnapshotCard({ data: d }: { data: GlobalSnapshot }) {
       <Separator className="my-2" />
       {/* `|| exact == null` guards a one-render race: when the live tick rolls to a new ordinal,
           `exact` flips back to null on THAT render but useMinHold's `show` only rises in its
-          effect on the NEXT one — without the guard this dereferenced `exact.totalFee`. */}
+          effect on the NEXT one — without the guard this dereferenced `exact.totalFee`.
+          A recorded MISS (with the hold played out) terminates the stars on an honest word —
+          stars promise an arrival, and after a failed read none is coming. */}
       {feeHold.show || exact == null ? (
         <FactGroup>
           <Fact label="Fees paid">
-            <span className={cn("flex flex-col items-end", feeHold.fading && "animate-hold-fade-out motion-reduce:animate-none")}><NodeStars count={4} /></span>
+            {missed && !feeHold.show ? (
+              <span className="text-muted-foreground italic">unavailable — read failed</span>
+            ) : (
+              <span className={cn("flex flex-col items-end", feeHold.fading && "animate-hold-fade-out motion-reduce:animate-none")}><NodeStars count={4} /></span>
+            )}
           </Fact>
         </FactGroup>
       ) : (

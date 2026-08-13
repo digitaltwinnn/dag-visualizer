@@ -137,12 +137,22 @@ export function DisclosureRow({
       aria-disabled={previewOnly || undefined}
       title={title}
       onClick={previewOnly ? undefined : onToggle}
+      // Focus mirrors hover 1:1 (2026-08-13): the preview pairing must ride the keyboard route
+      // too, or the scene↔HUD language is mouse-only. Same writers, four event props.
       onMouseEnter={() => {
         pair.onMouseEnter();
         onHoverEnter?.();
       }}
       onMouseLeave={() => {
         pair.onMouseLeave();
+        onHoverLeave?.();
+      }}
+      onFocus={() => {
+        pair.onFocus();
+        onHoverEnter?.();
+      }}
+      onBlur={() => {
+        pair.onBlur();
         onHoverLeave?.();
       }}
     >
@@ -196,6 +206,7 @@ export function NodePickerRow({
       title={`${row.label} · ${row.state ?? "—"}`}
       onClick={onSelect}
       onMouseEnter={pair.onMouseEnter}
+      onFocus={pair.onFocus}
     >
       {/* Just "Node" + the mono id — the row is a pure picker; the parent row carries the
           composition / place / provider. */}

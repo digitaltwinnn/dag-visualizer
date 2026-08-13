@@ -92,7 +92,8 @@ export { RAIL_ENTRY };
 //     `.ig-panel::before` and an entry has no panel. Pairing ALSO keeps its own wash recipe
 //     (`.rail-entry.subject-paired`), matching the box's edge-plus-wash pairing.
 // Pairing className/style/handlers ride the outer element in both tiers, so scene↔HUD hover
-// pairing survives the swap.
+// pairing survives the swap. `onFocus`/`onBlur` are the keyboard mirror of the hover pair
+// (2026-08-13): focus inside the card previews exactly what hovering it previews.
 export function RailPane({
   entry = false,
   id,
@@ -100,6 +101,8 @@ export function RailPane({
   style,
   onMouseEnter,
   onMouseLeave,
+  onFocus,
+  onBlur,
   children,
 }: {
   entry?: boolean;
@@ -108,18 +111,20 @@ export function RailPane({
   style?: CSSProperties;
   onMouseEnter?: () => void;
   onMouseLeave?: () => void;
+  onFocus?: () => void;
+  onBlur?: () => void;
   children: ReactNode;
 }) {
   if (entry) {
     return (
-      <aside id={id} className={cn(RAIL_ENTRY, "sig-left", className)} style={style} onMouseEnter={onMouseEnter} onMouseLeave={onMouseLeave}>
+      <aside id={id} className={cn(RAIL_ENTRY, "sig-left", className)} style={style} onMouseEnter={onMouseEnter} onMouseLeave={onMouseLeave} onFocus={onFocus} onBlur={onBlur}>
         {children}
       </aside>
     );
   }
   return (
     <Card asChild className={cn(RIGHT_CARD, "sig-left", "animate-card-in motion-reduce:animate-none", className)}>
-      <aside id={id} style={style} onMouseEnter={onMouseEnter} onMouseLeave={onMouseLeave}>
+      <aside id={id} style={style} onMouseEnter={onMouseEnter} onMouseLeave={onMouseLeave} onFocus={onFocus} onBlur={onBlur}>
         {children}
       </aside>
     </Card>
@@ -140,6 +145,7 @@ export default function CardHead({
   onClose,
   closeTitle = "Clear selection",
   eyebrowMuted = false,
+  entryPlus = false,
 }: {
   eyebrow?: ReactNode;
   title?: ReactNode;
@@ -168,6 +174,12 @@ export default function CardHead({
   // `.no-signal .panel-eyebrow`/`.insp-eyebrow`, restored here since the frame owns the eyebrow
   // and the card body's own `.no-signal` wrapper no longer sits as its ancestor).
   eyebrowMuted?: boolean;
+  // ENTRY-MODE ONLY, opt-in: show the decorative `+` state cue on the collapsed entry (user,
+  // 2026-08-13 — About's entry had no visible hint it opens, while the tool card beside it wears
+  // the panel layout's +/−). The right-rail ancestor entries deliberately DON'T opt in: their
+  // chrome-less look is a recorded decision (the +/− "read as clutter on a one-line entry"), and
+  // their slab position under the box already says they open.
+  entryPlus?: boolean;
 }) {
   const rolled =
     titleKey != null ? (
@@ -286,6 +298,7 @@ export default function CardHead({
   // anywhere re-materializes it as the box. Deselection of an entry happens by stepping down
   // from the box / clear-all, not per-entry chrome.
   const entryMode = !!collapsed && !!onToggle;
+  const showEntryPlus = entryMode && entryPlus;
   return (
     <>
       {onClose && !entryMode && (
@@ -312,7 +325,7 @@ export default function CardHead({
             <span className="sr-only">Expand</span>
           </button>
         )}
-        {(eyebrow || caption != null || (onToggle && !entryMode)) && (
+        {(eyebrow || caption != null || (onToggle && !entryMode) || showEntryPlus) && (
           <div className={cn("flex items-start justify-between gap-2 mb-2", onClose && !entryMode && "pr-[30px]")}>
             {/* `data-eyebrow` is RailThread's read: on an unboxed ENTRY the thread runs its
                 depth-reach connector at the EYEBROW's height (user, 2026-08-08 — the entry's
@@ -326,10 +339,21 @@ export default function CardHead({
                 since nothing bounds an unbounded inline-flex title it couldn't truncate either.
                 Level with the eyebrow the title gets the whole lane back, and the two tiers stop
                 disagreeing about where a card's status tag lives. */}
-            {(caption != null || (onToggle && !entryMode)) && (
+            {(caption != null || (onToggle && !entryMode) || showEntryPlus) && (
               <div className="flex items-center gap-1.5 flex-none pointer-events-none [&_a]:pointer-events-auto [&_button]:pointer-events-auto">
                 {caption != null && (
                   <span className="text-micro text-muted-foreground text-right tabular-nums">{caption}</span>
+                )}
+                {showEntryPlus && (
+                  // Decorative + state cue on a collapsed entry that OPTED IN (`entryPlus`): the
+                  // whole entry is already the stretched toggle above, so this is aria-hidden
+                  // indication, not a control — the panel layout's +/− at the same size and spot.
+                  <span
+                    aria-hidden
+                    className="inline-flex items-center justify-center w-5 h-[18px] -mt-[7px] -mb-1 leading-none text-muted-foreground group-hover:text-foreground"
+                  >
+                    <Plus className="size-3.5" />
+                  </span>
                 )}
                 {onToggle && !entryMode && (
                   // -mt aligns the glyph's centre with the ×'s (the × floats at the card corner,

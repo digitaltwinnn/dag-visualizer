@@ -32,6 +32,7 @@ export default function AboutView({
             the whole entry one stretched aria-expanded toggle. */}
         <CardHead
           eyebrow={eyebrow}
+          entryPlus
           title={
             <span className="inline-flex items-center gap-2 min-w-0">
               <Icon aria-hidden className={KIND_MARK_CLASS} style={{ color: "var(--filter-accent, var(--accent))" }} />

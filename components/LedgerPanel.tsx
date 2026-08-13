@@ -137,6 +137,8 @@ function SnapRow<K extends string | number>({
       aria-expanded={disclose ? disclose.open : undefined}
       onMouseEnter={pair.onMouseEnter}
       onMouseLeave={pair.onMouseLeave}
+      onFocus={pair.onFocus}
+      onBlur={pair.onBlur}
       className={cn(
         "nb-row group flex items-center gap-2 my-px rounded-sm border border-transparent bg-transparent cursor-pointer text-left transition-colors duration-[140ms] py-1",
         outset ? ROW_OUTSET : "w-full pl-2 pr-2",
@@ -483,6 +485,10 @@ export default function LedgerPanel() {
             strip all read. */}
         <div
           onMouseLeave={() => {
+            setHoverSnapOrd(null);
+            setHoverMetaSnap(null);
+          }}
+          onBlur={() => {
             setHoverSnapOrd(null);
             setHoverMetaSnap(null);
           }}

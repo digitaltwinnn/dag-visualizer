@@ -220,15 +220,16 @@ import { useBreakpoint } from "@/components/useBreakpoint";
 // frequency can differ"). An About card orients the reader toward the view; narrating what the view
 // looks like does the looking FOR them, and it also dates badly, since a gap is only visible at the
 // window and scale the chamber happens to be showing. Three axes stated plainly — frequency, size,
-// shape — and the reader finds them on screen. Sibling of the no-meta-commentary rule above.
+// kind of information ("shape" was the first word; too abstract, user 2026-08-13) — and the reader
+// finds them on screen. Sibling of the no-meta-commentary rule above.
 // ⚠️ AND THE AXES ARE THE POINT, NOT A READOUT OF PURPOSE (user, 2026-08-12 — on *"Together they
 // show what that network is built to do"*: "it does not really show that"). They do not: cadence,
 // size and shape are three numbers, and no reading of them tells you a network validates sensor
 // data rather than fingerprints. The sentence promised an inference the view cannot support, which
 // is the same overreach the rule above catches one step earlier — there it narrated a picture, here
 // it narrated a conclusion drawn FROM the picture. What the differences honestly say is that each
-// network was built for itself: "what make each network unique, tailored to its own needs", the
-// same shape as geo's closing paragraph, where placement is a choice somebody made for a reason.
+// network was built for itself: "what make each network unique" — the trailing "tailored to its own
+// needs" was cut (user, 2026-08-13), since it restated "unique" and the sentence lands harder short.
 //
 // ⚠️ A PLACEHOLDER VIEW'S CARD SAYS "STAY TUNED." AND NOTHING ELSE (user, 2026-08-12 — "for the
 // descriptive text just say 'stay tuned'"). status, transactions and staking each carried two
@@ -284,7 +285,7 @@ const ABOUT: Record<Mode, { title: string; eyebrow: string; lines: string[]; cap
     lines: [
       "Snapshots happen at two levels. Each network snapshots on its own, at its own pace and to its own schema, holding whatever it validates: sensor readings, file fingerprints, a token's balances.",
       "Every few seconds the base ledger takes one global snapshot, and a network anchors into it what it wants kept on the shared record. Each arrives already sealed, and stays provable without anyone having to trust who wrote it.",
-      "How often a network anchors differs, and so do the size and the shape of what it anchors. Those differences are what make each network unique, tailored to its own needs.",
+      "How often a network anchors differs, and so do the size and the kind of information it anchors. Those differences are what make each network unique.",
     ],
   },
   status: {

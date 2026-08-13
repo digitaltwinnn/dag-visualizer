@@ -1003,12 +1003,17 @@ fills a value slot a real number is arriving into — it reserves that slot's wi
 when the number lands, and carries no text because the label already names what's coming (the global
 card's `Fees paid`, `AnchoredTags`, the metagraph card's Data count). A **word** is for everything
 else: no slot is being held, so it states the situation and is replaced wholesale — `reading…` for a
-block acquiring, `unread` for a value nobody has looked up yet, `unavailable — tick pruned` where
+block acquiring, `unread` for a value nobody has looked up yet, `unavailable — read failed` where
 nothing is coming. Stars where nothing is in flight would promise an arrival that isn't coming; a word
 in a held slot reflows the row when the number replaces it.
-⚠️ **Every acquiring state needs its give-up path wired.** A deep read that 404s (the L0 node prunes
-after ~30 min) otherwise shows `reading…` forever, which rule 10 counts as a fabricated state exactly
-like a fabricated number.
+⚠️ **Every acquiring state needs its give-up path wired.** A read that fails otherwise shows
+`reading…` forever, which rule 10 counts as a fabricated state exactly
+like a fabricated number. The exact read's signal is `store.exactMiss` (recorded by
+`RawSnapshotBridge`, cleared when the read lands); the deep read's is the 12s `decodeGaveUp` timer.
+⚠️ **The failure is a blip, not pruning.** The L0 LB serves the ENTIRE ordinal history (verified
+2026-08-13: ordinal 1,000,000 answers 200 — the old "prunes after ~30 min" premise is false), so a
+give-up copy must never name pruning as the cause; the bound on what the routes serve is the app's
+own `ordinalWindow.ts`, sized so no legitimate client ask ever hits it.
 
 **A value slot states a READING; an invitation is a CONTROL** (user, 2026-08-10 — "I don't like the
 word 'pin', it's not very clear to me"). The metagraph snapshot card's Data slot said `pin to read`:
@@ -1439,7 +1444,8 @@ lifecycle, and the polled breakdown lags it:
 snapshot's `stateChannelSnapshots` carry every anchored snapshot with its own fee and content, so the
 exact fee, size, breakdown and record count are final the instant the snapshot exists. **The live card
 never falls back to the polled floor** — while the exact read is in flight it shows a brief held
-"reading…", and only old or pruned ticks (the L0 node retains ~30 min) fall back.
+"reading…"; a FAILED read records `store.exactMiss` and the card terminates on an honest word (never
+a hang — the acquiring give-up rule above).
 
 Two mechanisms back the polled fallback, which is used for old ticks, the strip and activity rates
 because exact reads are too heavy across many ticks:
@@ -1484,7 +1490,7 @@ them — but the Next Node server can.
 - **`/api/snapshot/[ordinal]`** reads the raw L0 global snapshot (~2.5 MB) and returns a tiny exact
   summary plus one row per anchored channel entry. **An `ordinal: 0` marks a payload the decoder
   couldn't read, which the UI must show as undecoded rather than as zero.** Cached per ordinal
-  (immutable; throws on a miss so a not-yet or pruned tick retries). It's called for the live and
+  (immutable; a transient upstream failure throws so it retries). It's called for the live and
   selected tick only — never the whole chain, never a poll loop — plus a one-time paced backfill on a
   cold load, because the trail otherwise opens with its unmeasured rows drawing no bars. Each ordinal
   is immutable and cached, so the backfill costs at most once per ordinal ever.
@@ -1494,7 +1500,16 @@ them — but the Next Node server can.
   `Read this snapshot` button, and arrival in the raw layer), never on a
   poll, never across the chain. The key includes **the snapshot's own ordinal**, because a fast
   metagraph batches dozens into one tick and a (tick, address) key would make every row share one
-  decode.
+  decode. **A deterministic miss (the channel provably isn't in this immutable global) is cached
+  like a success** — throwing it made every repeat of the same bad `(ordinal, address)` re-download
+  the whole global, an anonymous amplification loop; only transient failures throw and retry.
+
+⚠️ **Both snapshot routes are bounded by `app/api/snapshot/ordinalWindow.ts`.** The L0 LB serves the
+**entire ordinal history** (verified 2026-08-13 — the old "prunes after ~30 min" belief is false), so
+without a bound the ~6.7M-ordinal space is an anonymous walk of cold ~2.5 MB pulls, decodes and
+day-long data-cache writes, with no rate limiting on Hobby. The window is deliberately ~100× the
+client's deepest legitimate ask and **fails open** when its tiny latest-ordinal reference read fails —
+the route's own upstream fetch is about to fail honestly on the same host anyway.
 - The client fetches `/api/metagraphs` on mount **and re-pulls every 10 min** — Vercel never restarts
   and ISR only freshens the *server* cache, so an idle tab must re-pull. Snapshot and cluster feeds are
   live client polling.

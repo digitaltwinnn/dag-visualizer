@@ -160,6 +160,9 @@ export class ByteBar {
     // tiles. It replaces the local rate this bar used to ease its opacity at (slightly faster now);
     // `k` drives nothing geometric here, only `s.mats[i].opacity`.
     const k = emphasisK(dt);
+    // Hoisted once per frame (the tune hoist rule, src/engine/tune.ts): the band loop below
+    // reads a local, not a live-struct property per band.
+    const rest = this.tune.rest;
     // A focus is a SELECTED row or a hovered one. The bare lead is neither: with nothing selected
     // the chamber is simply running, and stepping the whole trail back against a row it advanced
     // onto by itself would make `back` a second `rest` rather than a focus effect.
@@ -201,7 +204,7 @@ export class ByteBar {
         // this band takes, so a ribbon and its two endpoints read at one level. Compounding
         // dim × back left a band near-black under a ribbon that was only gently dimmed.
         const rowFocus = pinned || hov;
-        const t = snapBright(this.tune.rest, offNet, focus, anyFocus && !rowFocus)
+        const t = snapBright(rest, offNet, focus, anyFocus && !rowFocus)
           * fade * front * this._alpha;
         s.mats[i].opacity += (t - s.mats[i].opacity) * k;
         s.mats[i].color.setHex(hot || hov || onNet ? s.colors[i] : this._neutral);

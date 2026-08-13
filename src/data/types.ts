@@ -69,8 +69,9 @@ export interface ChannelSnapRow {
 // EXACT per-tick anchor totals read straight from the raw L0 snapshot's stateChannelSnapshots
 // (every anchored metagraph snapshot carries its own `value.fee`), via /api/snapshot/[ordinal].
 // Unlike the polled `Anchor` (a settling floor), this is final + complete the instant it's
-// available — it INCLUDES unlisted metagraphs (no directory needed). Only available while the L0
-// node still retains the snapshot (recent ticks); old/pruned ticks fall back to the polled floor.
+// available — it INCLUDES unlisted metagraphs (no directory needed). Served only inside the
+// route's ordinal window (app/api/snapshot/ordinalWindow.ts); a tick whose read fails or falls
+// outside it stays on the polled floor.
 export interface SnapshotExact {
   ordinal: number;
   anchored: number; // total metagraph snapshots (== metagraphSnapshotCount)

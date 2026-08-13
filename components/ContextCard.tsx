@@ -55,6 +55,8 @@ export default function ContextCard({
         style={pair.style}
         onMouseEnter={pair.onMouseEnter}
         onMouseLeave={pair.onMouseLeave}
+        onFocus={pair.onFocus}
+        onBlur={pair.onBlur}
       >
         <CardHead
           eyebrow="Metagraph"
@@ -101,6 +103,8 @@ export default function ContextCard({
       style={pair.style}
       onMouseEnter={pair.onMouseEnter}
       onMouseLeave={pair.onMouseLeave}
+      onFocus={pair.onFocus}
+      onBlur={pair.onBlur}
     >
       <InspectorCard
         p={context}

@@ -735,6 +735,7 @@ export class LedgerView implements SceneView {
     let mi = 0;
     // Hoisted per frame (the tune hoist rule): one read for every lane's every tile.
     const dimNet = this._netDimKey();
+    const tileRest = this.tiles.rest;
     // A focus is a SELECTED row (pinned or live-followed — how it was reached is not what it is),
     // a hovered row or a hovered tile. The bare lead is none of them: with nothing selected the
     // chamber is simply running, and stepping the whole trail back against a row it advanced onto
@@ -806,7 +807,7 @@ export class LedgerView implements SceneView {
         // one level; compounding dim × back left the endpoints near-black under their own ribbon.
         const rowFocus = pinned || hov;
         const brightT =
-          snapBright(this.tiles.rest * b.fade, offNet, focus, anyFocus && !rowFocus)
+          snapBright(tileRest * b.fade, offNet, focus, anyFocus && !rowFocus)
           * edge * this._fades.alpha;
         // Emphasis EASES rather than snapping (dimModel.emphasisK). The state rides the BLOCK, next
         // to its two other eased fields — an instance-index buffer would hand a block's brightness

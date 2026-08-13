@@ -94,25 +94,38 @@ export default function AnchorLogTable() {
             // doesn't paint on a collapsed table row.)
             const rowSel = metaSnap?.metaId === r.metaId && metaSnap?.ordinal === r.ordinal;
             const tickMate = !rowSel && snap?.data.ordinal === r.global.ordinal;
+            const commit = () =>
+              applyClickActions(
+                metaSnapSelectActions(
+                  { metaId: r.metaId, ordinal: r.ordinal, hash: r.hash, globalOrdinal: r.global.ordinal, ts: r.ts },
+                  { kind: "snapshot", title: `Global snapshot #${r.global.ordinal}`, data: r.global },
+                  { filter, metaSnap, following },
+                ),
+              );
             return (
               <TableRow
                 key={`${r.metaId}:${r.ordinal}`}
                 className={cn(
                   "cursor-pointer text-body hover:bg-wash-faint",
+                  "focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--primary)] focus-visible:outline-offset-[-2px]",
                   rowSel && "bg-[var(--sel-bg)] text-foreground",
                   tickMate && "bg-wash-faint",
                 )}
+                // A <tr> is not natively focusable, so the row's click was mouse-only. tabIndex +
+                // Enter/Space give the keyboard the same commit, and focus previews what hover
+                // previews (rule 9's pairing rides both routes).
+                tabIndex={0}
                 onMouseEnter={() => setHoverMetaSnap(metaSnapHoverKey(r.metaId, r.ordinal))}
                 onMouseLeave={() => setHoverMetaSnap(null)}
-                onClick={() =>
-                  applyClickActions(
-                    metaSnapSelectActions(
-                      { metaId: r.metaId, ordinal: r.ordinal, hash: r.hash, globalOrdinal: r.global.ordinal, ts: r.ts },
-                      { kind: "snapshot", title: `Global snapshot #${r.global.ordinal}`, data: r.global },
-                      { filter, metaSnap, following },
-                    ),
-                  )
-                }
+                onFocus={() => setHoverMetaSnap(metaSnapHoverKey(r.metaId, r.ordinal))}
+                onBlur={() => setHoverMetaSnap(null)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault(); // Space must not scroll the pane
+                    commit();
+                  }
+                }}
+                onClick={commit}
               >
                 <TableCell>
                   <span className="flex items-center gap-2">

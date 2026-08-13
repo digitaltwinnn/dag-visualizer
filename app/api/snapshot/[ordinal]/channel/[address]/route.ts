@@ -7,13 +7,23 @@
 import { unstable_cache } from "next/cache";
 import { NextResponse } from "next/server";
 import { decodeChannelContent } from "../../../decodeChannel";
+import { withinServedWindow } from "../../../ordinalWindow";
 import type { ChannelSnapDeep } from "@/src/data/types";
 
 export const maxDuration = 30;
 
 const L0 = "https://l0-lb-mainnet.constellationnetwork.io";
 
-async function fetchDeep(ordinal: number, address: string, snapOrdinal: number): Promise<ChannelSnapDeep> {
+// A DETERMINISTIC miss — the global was fetched fine and this channel/snapshot provably isn't in
+// it. Ordinals are immutable, so this answer never changes and MUST be cached like a success:
+// throwing here left every repeat of the same bad (ordinal, address) re-downloading and re-parsing
+// the whole ~2.5 MB global — an anonymous, unauthenticated amplification loop against both the
+// function budget and Constellation's public LB (verified live 2026-08-13: three identical
+// junk-address requests, three full upstream pulls). Only TRANSIENT failures (upstream non-OK,
+// timeout) still throw, so a blip is never cached and retries on the next request.
+type DeepMiss = { available: false };
+
+async function fetchDeep(ordinal: number, address: string, snapOrdinal: number): Promise<ChannelSnapDeep | DeepMiss> {
   const r = await fetch(`${L0}/global-snapshots/${ordinal}`, {
     cache: "no-store",
     signal: AbortSignal.timeout(8000),
@@ -21,9 +31,9 @@ async function fetchDeep(ordinal: number, address: string, snapOrdinal: number):
   if (!r.ok) throw new Error(`l0 ${r.status}`);
   const j = (await r.json()) as { value?: { stateChannelSnapshots?: Record<string, { value?: { fee?: number; content?: unknown[] } }[]> } };
   const sc = j?.value?.stateChannelSnapshots;
-  if (!sc) throw new Error("no stateChannelSnapshots");
+  if (!sc) return { available: false }; // decoded fine, no channel map — immutable fact
   const entries = sc[address];
-  if (!entries || !entries.length) throw new Error("channel not in this snapshot");
+  if (!entries || !entries.length) return { available: false }; // channel not in this snapshot
 
   // A metagraph can anchor SEVERAL snapshots into one tick (DOR routinely dozens) — the read
   // targets the REQUESTED snapshot's own ordinal (2026-08-07; taking "the newest" made every
@@ -56,14 +66,15 @@ async function fetchDeep(ordinal: number, address: string, snapOrdinal: number):
     if (snapOrdinal > 0 && row.ordinal === snapOrdinal) return row; // the requested one
     if (!best || row.ordinal > best.ordinal) best = row;
   }
-  if (!best) throw new Error("nothing decodable in this channel");
+  if (!best) return { available: false }; // nothing decodable in this channel — immutable fact
   return best;
 }
 
 const cachedDeep = (ordinal: number, address: string, snapOrdinal: number) =>
   unstable_cache(
     () => fetchDeep(ordinal, address, snapOrdinal),
-    ["snapshot-channel-v3", String(ordinal), address, String(snapOrdinal)],
+    // v4: deterministic misses are cached as {available:false} (shape rides the key, as ever).
+    ["snapshot-channel-v4", String(ordinal), address, String(snapOrdinal)],
     { revalidate: 86400 },
   )();
 
@@ -74,13 +85,23 @@ export async function GET(req: Request, ctx: { params: Promise<{ ordinal: string
   if (!Number.isFinite(ordinal) || ordinal <= 0 || !address) {
     return NextResponse.json({ error: "bad request" }, { status: 400 });
   }
+  if (!(await withinServedWindow(ordinal))) {
+    // Outside the window this app can ever ask about (ordinalWindow.ts) — refuse without
+    // touching the upstream, so the deep chain isn't an anonymous walk over all of history.
+    return NextResponse.json({ available: false, ordinal, address }, { status: 404 });
+  }
   try {
     const data = await cachedDeep(ordinal, address, snapOrdinal);
+    if ("available" in data && data.available === false) {
+      // The cached deterministic miss — same honest 404, now without the ~2.5 MB re-pull.
+      return NextResponse.json({ available: false, ordinal, address }, { status: 404 });
+    }
     return NextResponse.json(data, {
       headers: { "Cache-Control": "public, max-age=86400, immutable" },
     });
   } catch {
-    // The L0 node prunes after ~30 min — an honest 404, not a fabricated body.
+    // Transient upstream failure (non-OK / timeout) — an honest 404, never cached, retried
+    // on the next request.
     return NextResponse.json({ available: false, ordinal, address }, { status: 404 });
   }
 }
