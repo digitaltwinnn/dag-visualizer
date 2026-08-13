@@ -730,10 +730,18 @@ re-grew Country and Hosting, since the pile-dedup rule found no ancestors. It is
 selection change: the store is untouched, so returning to a 3D view restores the whole pile. This
 matches the left rail, which shows About and no tool card there.
 
-**Bottom — the live/time lane.** The slim `LiveStrip` in every view; it publishes `--bottom-reserve`
-and belongs to neither layer, so it stays interactive in both poses. Its content is per-view: the tick
-bar-chart is **ledger-only** — a time series belongs to the *when* view — and the other views carry a
-node-count readout in the same footprint, keeping the lane honest rather than blank.
+**Bottom — the live/time lane, and it is SNAPSHOTS-ONLY** (user, 2026-08-12). The lane holds one
+instrument, the `LiveStrip`'s tick bar-chart, and a bar-chart over ticks is a TIME instrument — so it
+belongs to the *when* view and nothing else. hyper and geo carried a node-count readout in the same
+footprint to keep the lane from reading as blank; that answered the wrong question, since a per-network
+node tally is structure and structure is already the subject of the view above it. The lane is now
+simply absent there and the space comes back to the rails and the raw layer.
+
+`BottomStream` is the **one publisher**: it both mounts the strip and writes `--bottom-reserve`, from the
+one policy flag `VIEW_POLICIES[mode].timeLane`, so presence and reserved space can't drift (the previous
+arrangement published the reserve per view while the strip mounted unconditionally — two values for one
+token). The token's static default in `globals.css` is therefore **`0px`**, matching the boot view. The
+lane belongs to neither layer, so where it mounts it stays interactive in both poses.
 
 ### Responsive shell
 
@@ -1126,7 +1134,7 @@ scale by anchors, and the snapshot card leads with the anchors, breaks them down
 states the derived fee and the bytes anchored. **The card carries no height, sub-height or block
 count at all** — a counter that answers no question the card raises, culled 2026-08-10 with the rest.
 
-**`LiveStrip`** occupies the bottom lane in every view, but the bar-chart is ledger-only. One bar per
+**`LiveStrip`** is the bottom lane's one instrument and mounts in **Snapshots alone** (above). One bar per
 tick, height = anchors. Unfiltered, bars plot each tick's total in cyan. **Filtered, each bar plots
 that metagraph's own anchors on its OWN scale in its identity hue** — its own cadence, with empty ticks
 as honest gaps. A ~1-anchor-per-tick metagraph reads sparse and 0-in-window reads blank; that honesty

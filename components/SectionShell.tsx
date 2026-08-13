@@ -32,7 +32,8 @@ import { Button } from "@/components/ui/button";
 // containing block, so the fixed rails inside it keep resolving against the wrapper.
 //
 // The raw layer is a SIBLING of the wrapper (it must not inherit the scene's fade) and so is the
-// LiveStrip — the strip is the constant live lane, so it belongs to neither pose. TopBar stays
+// bottom lane — where the lane mounts at all (Snapshots only, see `BottomStream`) it stays live in
+// both poses, so it belongs to neither. TopBar stays
 // outside as before (it hosts the RAW switch); portalled UI (sheets, tooltips) doesn't ride the
 // transform — RailDock gates its sheets on `section`, LiveStrip portals its tip.
 export const SHELL_ID = "shell";
@@ -52,7 +53,7 @@ export default function SectionShell({
   scene: ReactNode;
   /** The HUD: rails, overlays, everything that hides while the raw layer is up. */
   children: ReactNode;
-  /** The LiveStrip lane — outside both poses, always live. */
+  /** The bottom lane (`BottomStream`) — outside both poses, and live wherever it mounts. */
   strip: ReactNode;
   /** The per-view raw data table. */
   raw: ReactNode;
@@ -150,8 +151,10 @@ export default function SectionShell({
       {/* The raw layer: fixed into exactly the band the rails occupy (the same `--rail-top` /
           `--topbar-extra` / `--bottom-reserve` tokens), edge-aligned with the command bar, wearing
           the app's own glass (`.ig-panel`). z-9 puts it over the receded scene and under the strip
-          (z-10) and the command bar (z-40). It starts `visibility:hidden` so it is out of the paint
-          and hit-test path entirely until it surfaces. */}
+          (z-10, where the strip mounts) and the command bar (z-40). It starts `visibility:hidden` so
+          it is out of the paint and hit-test path entirely until it surfaces. The reserve FALLBACKS
+          are 0, matching the token's own static default — the lane is Snapshots-only, so "no
+          `--bottom-reserve` yet" means no lane, not the ledger's band. */}
       <section
         ref={rawRef}
         id="datasection"
@@ -159,8 +162,8 @@ export default function SectionShell({
         inert={section !== "data"}
         className={
           "ig-panel fixed z-9 overflow-hidden left-4 right-4 min-[1100px]:left-[26px] min-[1100px]:right-[26px] " +
-          "top-[calc(var(--rail-top)+var(--topbar-extra,0px))] bottom-[var(--bottom-reserve,130px)] " +
-          "max-[699px]:bottom-[calc(var(--phone-dock-h,56px)+var(--bottom-reserve,130px))]"
+          "top-[calc(var(--rail-top)+var(--topbar-extra,0px))] bottom-[var(--bottom-reserve,0px)] " +
+          "max-[699px]:bottom-[calc(var(--phone-dock-h,56px)+var(--bottom-reserve,0px))]"
         }
         style={{ visibility: "hidden", willChange: "transform, opacity" }}
       >

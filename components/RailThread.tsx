@@ -183,7 +183,8 @@ export default function RailThread({ side = "right" }: { side?: Side }) {
       // same as we have already in tablet mode"). The rails are content-height (`display: flex` +
       // `max-height` band, globals.css), so `r.height` ended the ruler at the last card and a
       // two-card view got a stub of an instrument. The thread now runs the whole lane — top of the
-      // rail to the LiveStrip bound — like the tablet sheet's `.ig-sheet-edge` channel. The band is
+      // rail to the bottom of its own band — like the tablet sheet's `.ig-sheet-edge` channel. The
+      // band is
       // READ from the rail's computed `max-height` rather than recomputed here, so the
       // rail-top/topbar-extra/bottom-reserve token math stays in one place (and is already in local
       // CSS px, like every value here); `|| hRail` covers a `none`. Marks stay clipped to the rail's

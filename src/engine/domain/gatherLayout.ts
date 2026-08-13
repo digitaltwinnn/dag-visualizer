@@ -56,7 +56,12 @@ const RAIL_TOP = 90; //        --rail-top: top of both rails, i.e. the top of th
 const RAIL_GUTTER = 26; //     both rails' outer margin
 const LEFT_RAIL_W = 264; //    --rail-w
 const RIGHT_RAIL_W = 320; //   --detail-w
-const BOTTOM_RESERVE = 130; // --bottom-reserve, the LiveStrip lane
+const BOTTOM_RESERVE = 130; // --bottom-reserve at its LEDGER value — the LiveStrip lane. Kept as a
+//                            constant rather than read per view: the lane only mounts in ledger, so
+//                            in hyper/geo this reserves ~130px the band could have used. Measured,
+//                            that band is far taller than the pack ever needs (33 rows available vs
+//                            ~7 used), so the depth search never reaches the bound and the layout is
+//                            identical either way. It stays as the conservative floor.
 const RAILS_TIER = 1100; //    below this the rails are dock sheets, not inline columns
 const BAND_MARGIN = 24; //     breathing room between the band and whatever bounds it
 
