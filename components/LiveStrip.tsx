@@ -129,6 +129,7 @@ export default function LiveStrip() {
           WebkitMaskImage: "linear-gradient(to right, transparent 0, #000 60px)",
         }}
         onMouseLeave={() => { barHover.current = false; setTip(null); setHoverSnapOrd(null); }}
+        onBlur={() => setHoverSnapOrd(null)}
       >
         {snaps.length === 0 && <span className="text-muted-foreground text-label self-center">Waiting for snapshots…</span>}
         {bars.map(({ d, total, mine }, i) => {
@@ -161,6 +162,9 @@ export default function LiveStrip() {
               aria-label={`snapshot ${d.ordinal}`}
               onMouseEnter={(e) => { barHover.current = true; setTip({ ordinal: d.ordinal, total, mine, ts: d.timestamp, live: isLatest, x: e.clientX, y: e.clientY }); setHoverSnapOrd(d.ordinal); }}
               onMouseMove={moveTip}
+              // Keyboard focus previews the same subject a hover does (the scene cross-highlight
+              // channel); the tooltip stays mouse-only — it is positioned by the pointer.
+              onFocus={() => setHoverSnapOrd(d.ordinal)}
               onClick={() => pick(d)}
             />
           );
