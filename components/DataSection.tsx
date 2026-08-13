@@ -20,11 +20,21 @@ export default function DataSection() {
         // pane renders the SELECTED metagraph snapshot's contents (the deep read + the JSON tree),
         // or its own quiet hint while nothing is selected. The pane is always present so the log
         // never reflows on selection.
-        <div className="h-full flex gap-5 min-h-0">
-          <div className="flex-1 min-w-0 flex flex-col">
+        // PHONE (<700px, the shell's own tier): the split STACKS (user report 2026-08-13 — the
+        // desktop shape gave the log ~1.5 columns and the pane ~170px, wrapping every fact row).
+        // Log above, pane below at a fixed share with its own scroll; the divider rotates with
+        // the axis (border-l → border-t).
+        <div className="h-full flex gap-5 min-h-0 max-[699px]:flex-col max-[699px]:gap-3">
+          <div className="flex-1 min-w-0 min-h-0 flex flex-col">
             <AnchorLogTable />
           </div>
-          <div className="w-[36%] max-w-[520px] flex-none min-w-0 flex flex-col border-l border-border/50 pl-5">
+          <div
+            className={
+              "w-[36%] max-w-[520px] flex-none min-w-0 flex flex-col border-l border-border/50 pl-5 " +
+              "max-[699px]:w-auto max-[699px]:max-w-none max-[699px]:h-[44%] max-[699px]:border-l-0 " +
+              "max-[699px]:border-t max-[699px]:pl-0 max-[699px]:pt-3 max-[699px]:overflow-y-auto slim-scroll"
+            }
+          >
             <ChannelStatePanel />
           </div>
         </div>
