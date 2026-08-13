@@ -194,7 +194,17 @@ function RawSection({
         />
         raw JSON
       </button>
-      {open && <JsonTree data={data} />}
+      {open && (
+        // THE CODE WELL (user, 2026-08-14 — "put the raw JSON in some sort of code box, like
+        // Discord"): the tree sits on the page's own ground inside a bordered rounded well, so
+        // it reads as a different MATERIAL — raw code recessed into the glass — rather than more
+        // prose. Deliberately `--background` (the raw ground itself), not a plate lift: a code
+        // fence is a window down, not a tier up. Long JSON scrolls sideways INSIDE the well
+        // (.slim-scroll, the one scrollbar recipe), never stretching the pane.
+        <div className="rounded-md border border-border/50 bg-[var(--background)] px-2.5 py-2 overflow-x-auto slim-scroll">
+          <JsonTree data={data} />
+        </div>
+      )}
     </div>
   );
 }
