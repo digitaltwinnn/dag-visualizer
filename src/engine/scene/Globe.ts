@@ -499,15 +499,21 @@ export class Globe implements GeoViewHost {
     this.metaList = withNodes;
 
     const recs: MetaNodeRecord[] = [];
-    // Each metagraph runs its own L0 + currency-L1 (cl1) + data-L1 (dl1). Concentric fibonacci
-    // shells around the hub — L0 inner, data-L1 middle, currency-L1 outer.
-    // Each metagraph runs its own L0 + currency-L1 (cl1) + data-L1 (dl1). Redesign: concentric flat
-    // RINGS in the hub's plane — L0 inner, data-L1 middle, currency-L1 outer — read top-down as clean
-    // orbital diagrams (was scattered fibonacci shells). One even ring per layer; a small per-layer
-    // phase so the layers' node seams don't align radially.
-    // Each metagraph is a little "atom": its 3 layers become 3 rings of the SAME diameter at 3
-    // DIFFERENT tilt angles (layer index = ring index; same primitive as the DAG core), so L0 / dL1 /
-    // cL1 read as distinct tilted rings around a cyan hub. HyperView draws a matching tilted hoop.
+    // Each metagraph runs its own L0 + currency-L1 (cl1) + data-L1 (dl1), and its nodes are laid out
+    // as a little "atom" — one ARMILLARY ring per layer around the hub, the same primitive the DAG
+    // core uses. The rings differ in BOTH axes: radius (`META_RING.radii`, l0 inner → dl1 → cl1
+    // outer) and plane (`armillaryFrame` turns ring k by k/n·π about Y after the shared X tilt), so
+    // L0 / dL1 / cL1 read as three distinct tilted hoops. HyperView draws a matching hoop per ring.
+    //
+    // ⚠️ A BEAD IS A LAYER, NEVER A MACHINE, and its ring position says nothing about its siblings'
+    // (user, 2026-08-12). A hybrid runs several layers and so gets one bead per ring, but each ring
+    // places its members by index within THAT layer's own list — `ringFramePos(i, cnt, …)` below,
+    // where both `i` and `cnt` are per layer. A 3-hybrid metagraph's three lists coincide, so the
+    // parameters match by accident; DOR's do not (3 on L0, 22 on dL1). Radial correspondence isn't
+    // reachable here anyway: equal ring parameters on differently-tilted rings land in different
+    // planes, so a true spoke would cost the tilt AND even spacing on the busy ring. It is not
+    // wanted — the layer IS the subject in this view, and `setSelectedNode` already lights every
+    // bead a machine runs (they share `nodeId`), so the host is legible on demand.
     const rolesOf = (node: RouteNode) => nodeRoles(node, node.layer as string);
     // LEDGER PRE-PASS (per-metagraph trays, 2026-08-07): each metagraph's OWN plane carries its
     // OWN tray of machines — deduped by IP (a hybrid appears once; roles belong to other views).
