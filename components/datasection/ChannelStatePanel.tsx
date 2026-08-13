@@ -21,8 +21,9 @@
 //     is a promise the data doesn't keep — and the surviving tab SET then reads as a statement of
 //     what this metagraph actually anchors: DED shows `data · signers` and no state lane at all,
 //     while a currency metagraph shows its state.
-//   · The counts live in the tab labels, so the lane's weight is legible before opening it — and
-//     nothing repeats them below (the grid's old "Signed by N validators" row went to the tab).
+//   · The tab carries the lane's NAME alone (counts retired 2026-08-13 — user: "at first I
+//     didn't realise they were counts"; a bare number in a tab has no label, and each lane's own
+//     note and table state its weight one line later, where the numbers do).
 // The first available lane opens by default: the pane arrives already reading a real payload
 // instead of an empty frame waiting for a click.
 //
@@ -69,7 +70,7 @@ function nonEmpty(v: unknown): boolean {
 }
 
 type LaneId = "state" | "data" | "signers";
-type Lane = { id: LaneId; name: string; count: number | null; title: string };
+type Lane = { id: LaneId; name: string; title: string };
 
 /** A lane's NOTE — its own facts, in the one position every lane puts them. Uppercase micro like a
  *  card's eyebrow; a caller wraps anything case-sensitive (a hash) in `normal-case`. */
@@ -237,28 +238,13 @@ export function ChannelStatePanel() {
     if (!deep) return [];
     const out: Lane[] = [];
     if (deep.stateKeys.length > 0 || nonEmpty(state)) {
-      out.push({
-        id: "state",
-        name: PAYLOAD_LANES.state.name,
-        count: deep.stateKeys.length || null,
-        title: PAYLOAD_LANES.state.title,
-      });
+      out.push({ id: "state", name: PAYLOAD_LANES.state.name, title: PAYLOAD_LANES.state.title });
     }
     if (deep.dataTxCount > 0 || nonEmpty(dataTx)) {
-      out.push({
-        id: "data",
-        name: PAYLOAD_LANES.data.name,
-        count: deep.dataTxCount || null,
-        title: PAYLOAD_LANES.data.title,
-      });
+      out.push({ id: "data", name: PAYLOAD_LANES.data.name, title: PAYLOAD_LANES.data.title });
     }
     if (deep.signers.length > 0 || deep.dataBlockSigners.length > 0) {
-      out.push({
-        id: "signers",
-        name: "Signers",
-        count: deep.signers.length || deep.dataBlockSigners.length,
-        title: "The validators that signed this snapshot, by producing layer",
-      });
+      out.push({ id: "signers", name: "Signers", title: "The validators that signed this snapshot, by producing layer" });
     }
     return out;
   }, [deep, state, dataTx]);
@@ -353,7 +339,17 @@ export function ChannelStatePanel() {
                 type="single"
                 value={active}
                 onValueChange={(v) => { if (v) setWant(v as LaneId); }}
-                className="flex flex-none gap-0.5 border-b border-border/50 pb-1"
+                // FILE-CABINET TABS (user, 2026-08-13 — "it's not clear the content under those
+                // tabs is related; more like a file cabinet: the tab outline AND the body"). The
+                // segmented-control chips read as free-floating buttons over an unrelated block,
+                // so the active tab now fuses with its body: an outlined rounded-top tab whose
+                // own fill sits OVER the row's underline (the `after:` hairline at z-0, the
+                // active tab at z-1), notching it open exactly under the chosen lane — the
+                // drawer and its label share one contour. Tabs split the pane's width equally
+                // (flex-1) instead of huddling at one end. The COUNTS are gone (user: "at first
+                // I didn't realise they were counts") — each lane's own note and table state its
+                // weight one line later, where the numbers have labels.
+                className="relative flex flex-none w-full gap-1 after:absolute after:inset-x-0 after:bottom-0 after:h-px after:bg-border/50"
                 aria-label="Which part of the snapshot to read"
               >
                 {lanes.map((l) => (
@@ -362,16 +358,15 @@ export function ChannelStatePanel() {
                     value={l.id}
                     title={l.title}
                     className={cn(
-                      "flex items-center gap-1.5 h-7 px-2 rounded-btn!",
+                      "flex-1 flex items-center justify-center h-7 px-2 rounded-t-md! rounded-b-none!",
                       "text-micro tracking-caps uppercase",
-                      "text-muted-foreground bg-transparent border-0",
+                      "text-muted-foreground bg-transparent border border-transparent border-b-0",
                       "hover:text-foreground hover:bg-wash-soft",
-                      "data-[state=on]:text-foreground data-[state=on]:bg-[var(--sel-bg)]",
-                      "data-[state=on]:shadow-[inset_0_0_0_1px_var(--sel-border)]",
+                      "data-[state=on]:z-[1] data-[state=on]:text-foreground",
+                      "data-[state=on]:border-border/50 data-[state=on]:bg-[var(--panel-solid)]",
                     )}
                   >
                     {l.name}
-                    {l.count != null && <span className="tabular-nums opacity-70">{l.count}</span>}
                   </ToggleGroupItem>
                 ))}
               </ToggleGroup>
