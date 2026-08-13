@@ -102,8 +102,10 @@ npm test           # vitest
 **Dev-server discipline: run ONE, shared** — Next 16 enforces it with a lockfile. Prefer the harness
 background-run facility over `nohup`/`setsid` so the process stays tracked, and kill by PID
 (`pkill -f "next dev"` exits 144 in this sandbox). Turbopack HMR picks up edits; restart only for
-config changes or stale state. **Engine/scene geometry built in constructors needs a full page
-reload**, not HMR.
+config changes or stale state. **Any edit to an engine/scene CLASS needs a full page reload**, not
+HMR — not just geometry built in constructors. The engine is one long-lived imperative instance
+behind a dynamic import, so a swapped module leaves the running instance on its old methods and you
+verify the previous build believing it's the new one. Reload after every engine edit.
 
 `next build` and `next dev` don't conflict (dev outputs to `.next/dev`), so the production check can
 run alongside the dev server. Do it at phase boundaries: the build should be clean and
@@ -306,7 +308,7 @@ panel builds a spotlight folder only for those — the ledger deliberately stage
 lit by its own glass and emissive snapshots; emphasis there is the four colour dim tiers). Claiming
 for an unstaged view is a compile error, not a silent no-op.
 
-### Two camera principles
+### Three camera principles
 
 1. **Framing math consumes layout data** — records, anchors, orbit slots — never rendered transforms.
    `getWorldPosition`/`getMatrixAt` in an Engine framing path needs a justified `render-state OK`
@@ -317,10 +319,30 @@ for an unstaged view is a compile error, not a silent no-op.
    (`domain/cameraRig.ts`) leans the settled chamber pose in when a network is committed and back out
    when it isn't, and that is the whole vocabulary. Three bespoke ledger framings (a lane nudge, a node
    framing, a per-lane fly) were built and **retired** because each added a pose the user had to learn;
-   don't grow a fourth.
+   don't grow a fourth. **Hyper's per-node framing went the same way** (2026-08-13): a node there is one
+   bead on a shell, and diving to it lost the hub and shells that say what it belongs to, so the rung
+   delegates to its network's framing — *"it should behave the same as when (only) a metagraph filter
+   is selected"*. **A rung without a pose of its own inherits its parent's**, it does not invent one.
+3. **Every commit is acknowledged, and a same-pose commit takes the NUDGE.** Principle 2 leaves rungs
+   whose destination is the pose the camera already holds, and a dead 1.4s no-op reads as a broken
+   click. `isSamePose`/`nudgeMix` (`domain/cameraRig.ts`) answer with a 0.55s push toward the pose's own
+   target and back out, contributing exactly 0 at `t=1` so the tween still lands on the committed pose.
+   It does **not** raise `cameraFlying` — that dim exists so the scene can be seen changing, and here it
+   isn't. A node commit is answered in **every** 3D view, gated on the canvas allow-list (convention 7),
+   never a list of modes.
 
 ⚠️ **Three's raycaster ignores `object.visible`.** Hiding a group does not stop it being picked — it
 has to be left out of `pickSources`.
+
+**Double-tap zooms, on TOUCH only** (`domain/tapZoom.ts`, 2026-08-13). Not a three.js feature —
+OrbitControls' touch map is one finger rotate, two dolly/pan, with no constant for a tap pair — so the
+recognizer is hand-rolled in the Engine over `pointerup`. Three decisions carry it: the step is a
+**dolly toward the current `controls.target`, never a re-aim onto the tap point** (a map zooms at the
+finger because you navigate a plane; here the pose system owns where the camera looks); a second
+pointer down invalidates the pair *and* a running step, because a pinch dollies the same axis; and the
+pair's **second click is eaten**, or it would toggle off the hub / country / tile the first tap just
+committed. A pair landing mid-flight retargets the tween's destination rather than fighting it — and
+not through `_tweenTo`, which would compose `dollyBack` and `railsDolly` in a second time.
 
 ## The 3D↔3D view transition
 
@@ -338,7 +360,17 @@ mid-flight misleads), and HUD-commit camera reframes are held during the out pha
 stands and the boundary re-derives the pose from committed state, so nothing is lost. Flat views just
 cross-fade the canvas.
 
-**Arriving with a node selected re-derives that view's own ancestry** before the focus walk — geo
+**The staging block is WIDTH-FIRST, and the chip size is the same in every presentation**
+(`domain/gatherLayout.ts`, 2026-08-13). The pack's **depth** is solved against the band measured in
+capped chip pitches (`gatherRows`) and the columns fall out of it, so a wider band answers with a
+longer, shallower block rather than a bigger one; the leftover goes to the **gutters between blocks**
+(`gatherSpread`), never to the pitch inside them. ⚠️ The trap this replaced: `cols = ceil(√count)` is
+width-agnostic, so the DAG's 162 nodes hung ten rows down while scene mode's band had hundreds of
+unused pixels either side — and the growth cap had twice been tuned to whatever made *that* band fill,
+which is a free fit in disguise, staging the same nodes 46% larger with the rails away. **Tune the
+band, not the chip.**
+
+
 re-commits the node's country and provider, hyper its composition group — exactly the rungs a click on
 that node in the destination view would have committed. So every card up to the selection is on the
 rail in every view, and a deselect steps back down the local ladder instead of jumping to the network.
@@ -461,7 +493,9 @@ The design rules behind the table, which the tests pin but don't explain:
 
 The page is one fixed shell in **two layers at different depths** (`SectionShell` + `store.section`).
 The scene layer is the four-zone HUD over the 3D canvas; the raw layer is the view's raw-data table —
-*the same data one level down*, not a second page. The RAW switch runs one GSAP timeline: the HUD
+*the same data one level down*, not a second page. ⚠️ The store value for that layer is **`"data"`,
+not `"raw"`** — every word the user reads says RAW, so the two registers don't match and grepping for
+`"raw"` finds nothing. The RAW switch runs one GSAP timeline: the HUD
 fades, the scene recedes (still live behind), the raw layer surfaces out of that depth. Back is the
 mirror, with three ways to ask for it — the switch, Escape, the layer's own × — all calling
 `setSection("scene")`. Reduced motion makes it an instant swap.
@@ -1047,8 +1081,10 @@ seam and corner rules select on the same markers the thread measures:
 
 ## The snapshot stream
 
-Global L0 produces a snapshot every few seconds. Three counters, which the UI keeps separate on
-purpose:
+Global L0 produces a snapshot roughly every **28 seconds** — measured live, mean 28.1s over a full
+window, range 4.6–114.8, so the cadence is irregular and a "few seconds" intuition will mislead any
+timing you build on it (the LiveStrip's window, a hold, a settle gate). Three counters, which the UI
+keeps separate on purpose:
 
 - **`ordinal`** — sequence number, +1 every snapshot even when empty.
 - **`height`** — depth of the *block DAG*. It only rises when blocks actually deepen it, and because
