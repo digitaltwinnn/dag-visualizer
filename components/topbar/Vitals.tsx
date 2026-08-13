@@ -26,6 +26,12 @@ function windowNote(a: Activity | null | undefined, unit: string): string | unde
   return `Rate extrapolated from ${a.samples} ${unit} over ~${span}.`;
 }
 
+// ⚠️ A `title` alone would make the basis MOUSE-ONLY. It rides a plain `<div>`, which is neither
+// focusable nor named, so a keyboard or screen-reader user has no route to the sentence that says
+// what the number is extrapolated from — and under rule 10 that basis is part of the reading, not
+// decoration. The vital is not a control and must not become a tab stop in the command bar, so the
+// text is carried in the DOM as well, `sr-only`: the tooltip serves the pointer, the span serves
+// everyone else, from one string.
 function Vital({ label, value, spark, title }: { label: string; value: React.ReactNode; spark?: number[]; title?: string }) {
   return (
     <div className="flex flex-col gap-0.5 flex-none" title={title}>
@@ -49,6 +55,7 @@ function Vital({ label, value, spark, title }: { label: string; value: React.Rea
         <span className="font-mono font-bold text-foreground tabular-nums whitespace-nowrap max-[1120px]:text-body">{value}</span>
         {spark && <Sparkline data={spark} color={CYAN} />}
       </span>
+      {title && <span className="sr-only">{title}</span>}
     </div>
   );
 }
