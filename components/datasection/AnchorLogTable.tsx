@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
+import { ArrowDown, ArrowUp } from "lucide-react";
 import { useStore } from "@/src/store/store";
 import { useSnapshotFeed } from "@/components/useSnapshotFeed";
 import { getNetwork } from "@/src/data/network";
-import { buildAnchorLog } from "@/src/data/anchorLog";
+import { buildAnchorLog, sortAnchorLog, type AnchorLogSortKey } from "@/src/data/anchorLog";
 import { displayNetwork, unlistedLog, UNLISTED_ID } from "@/src/data/unlisted";
 import { ledgerLens } from "@/src/data/ledgerStory";
 import { metaSnapHoverKey } from "@/src/data/types";
@@ -25,8 +26,10 @@ const MAX = POLL.maxSnapshots;
 
 // The ledger data table (spec 2026-08-01): the per-metagraph ANCHOR LOG — one row per anchored
 // metagraph snapshot in the retained window, finer-grained than the strip's per-tick bars.
-// Chronological by construction (newest tick first) — no sortable headers here; the roster
-// table is the sortable one. A row click names its own METAGRAPH SNAPSHOT — the same subject a
+// SORTABLE like the roster (user, 2026-08-13 — the no-sort split was revised: one raw-table
+// idiom, not two), resting on its chronological construction (newest tick first = Age ↑);
+// `sortAnchorLog` compares the DISPLAYED network name, the roster's own lesson. A row click
+// names its own METAGRAPH SNAPSHOT — the same subject a
 // tile click on the upper floor names — through the SAME tested `metaSnapSelectActions` builder
 // (Task 20): it already pins the global tick the row anchored into, so the row and a tile click
 // mean exactly the same thing.
@@ -59,8 +62,12 @@ export default function AnchorLogTable() {
     net && (lens === "all" || lens === UNLISTED_ID)
       ? unlistedLog(net.globalSnapshots, snapshotExact)
       : [];
-  const rows = [...listedRows, ...unlistedRows].sort((a, b) =>
-    a.ts === b.ts ? b.ordinal - a.ordinal : a.ts < b.ts ? 1 : -1,
+  const [sort, setSort] = useState<{ key: AnchorLogSortKey; dir: 1 | -1 }>({ key: "age", dir: 1 });
+  const rows = sortAnchorLog(
+    [...listedRows, ...unlistedRows],
+    sort.key,
+    sort.dir,
+    (metaId) => displayNetwork(metaId)?.name ?? metaId,
   );
 
   // THE LAYER OPENS ON A SUBJECT: with nothing selected, the log commits its own first row on
@@ -101,14 +108,35 @@ export default function AnchorLogTable() {
   return (
     <ScrollArea className="flex-1 min-h-0">
       <Table>
-        <TableHeader className="sticky top-0 z-10 bg-background">
+        <TableHeader className="sticky top-0 z-10 bg-[var(--panel-solid)] backdrop-blur-md">
           <TableRow className="border-border">
-            {["Network", "Snapshot", "Fee (DAG)", "Size", "Anchored into", "Age"].map((label, i) => (
+            {(
+              [
+                { key: "net", label: "Network" },
+                { key: "ordinal", label: "Snapshot" },
+                { key: "fee", label: "Fee (DAG)" },
+                { key: "size", label: "Size" },
+                { key: "tick", label: "Anchored into" },
+                { key: "age", label: "Age" },
+              ] as { key: AnchorLogSortKey; label: string }[]
+            ).map((c, i) => (
               <TableHead
-                key={label}
-                className={cn("text-micro uppercase tracking-caps text-muted-foreground font-normal", i >= 2 && "text-right")}
+                key={c.key}
+                aria-sort={sort.key === c.key ? (sort.dir === 1 ? "ascending" : "descending") : "none"}
+                className={cn(i >= 2 && "text-right")}
               >
-                {label}
+                <button
+                  type="button"
+                  className={cn(
+                    "items-center gap-1 text-micro uppercase tracking-caps text-muted-foreground hover:text-foreground cursor-pointer",
+                    i >= 2 ? "inline-flex flex-row-reverse" : "flex",
+                  )}
+                  onClick={() => setSort((s) => ({ key: c.key, dir: s.key === c.key ? ((s.dir * -1) as 1 | -1) : 1 }))}
+                >
+                  {c.label}
+                  {sort.key === c.key &&
+                    (sort.dir === 1 ? <ArrowUp className="size-3" aria-hidden /> : <ArrowDown className="size-3" aria-hidden />)}
+                </button>
               </TableHead>
             ))}
           </TableRow>

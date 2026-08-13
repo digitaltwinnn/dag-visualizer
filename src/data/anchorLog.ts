@@ -54,6 +54,36 @@ export function buildAnchorLog(
   return rows;
 }
 
+/** The anchor log's sortable axes (user, 2026-08-13 — the roster sorts, the log didn't).
+ *  `net` compares the DISPLAYED name via the caller's resolver — the roster's own lesson
+ *  (2026-08-13): sorting the metaId orders hidden hex. Numbers compare numerically; the
+ *  default order stays the log's chronological construction (ts desc, ordinal desc within),
+ *  which is `age` ascending. */
+export type AnchorLogSortKey = "net" | "ordinal" | "fee" | "size" | "tick" | "age";
+
+export function sortAnchorLog(
+  rows: readonly AnchorLogRow[],
+  key: AnchorLogSortKey,
+  dir: 1 | -1,
+  nameOf: (metaId: string) => string,
+): AnchorLogRow[] {
+  const num = (f: (r: AnchorLogRow) => number) => (a: AnchorLogRow, b: AnchorLogRow) => (f(a) - f(b)) * dir;
+  const cmp =
+    key === "net"
+      ? (a: AnchorLogRow, b: AnchorLogRow) => nameOf(a.metaId).localeCompare(nameOf(b.metaId)) * dir
+      : key === "ordinal"
+        ? num((r) => r.ordinal)
+        : key === "fee"
+          ? num((r) => r.fee)
+          : key === "size"
+            ? num((r) => r.sizeInKB)
+            : key === "tick"
+              ? num((r) => r.global.ordinal)
+              : // age ascending = newest first, the log's resting order
+                (a: AnchorLogRow, b: AnchorLogRow) => (a.ts === b.ts ? b.ordinal - a.ordinal : a.ts < b.ts ? 1 : -1) * dir;
+  return [...rows].sort(cmp);
+}
+
 /** The UNLISTED channels' log rows (2026-08-07): the polled buffers only track the public
  *  catalog, so the EXACT reads are the only honest source. One row per uncataloged channel
  *  snapshot in the measured window — `metaId` is the raw state-channel ADDRESS (hash unknown),

@@ -104,7 +104,7 @@ export default function NodeRosterTable({ mode }: { mode: "hyper" | "geo" }) {
   return (
     <ScrollArea className="flex-1 min-h-0">
       <Table>
-        <TableHeader className="sticky top-0 z-10 bg-background">
+        <TableHeader className="sticky top-0 z-10 bg-[var(--panel-solid)] backdrop-blur-md">
           <TableRow className="border-border">
             {COLS[mode].map((c) => (
               <TableHead
