@@ -196,7 +196,14 @@ export default function MetaSnapPane({
                   <Fact label="Fees paid">
                     <span className="flex flex-col items-end">
                       <span className="whitespace-nowrap"><b className="font-bold">{fmtDag(row.fee)}</b> DAG</span>
-                      <span className="text-label text-muted-foreground">{fmtKB(row.bytes / 1024)} anchored</span>
+                      {/* "· compressed" names the BASIS (user, 2026-08-13 — "the state size plus
+                          data size does not match… I think user will expect these to add up"):
+                          this number is the snapshot's brotli-compressed wire footprint as
+                          carried in the global, while the two section sizes above are DECODED
+                          content — the three can never sum, and without the word the mismatch
+                          reads as a bug. Verified in the decoder: `bytes` is the content
+                          byte-array length pre-inflate; stateBytes/dataBytes are post-inflate. */}
+                      <span className="text-label text-muted-foreground">{fmtKB(row.bytes / 1024)} anchored · compressed</span>
                     </span>
                   </Fact>
                 </>

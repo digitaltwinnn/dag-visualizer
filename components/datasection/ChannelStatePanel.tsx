@@ -36,8 +36,10 @@
 //   2. a two-column TABLE, `LaneTable`, so the shape of the payload is what the lane opens with —
 //      the data lane's rows come from `payloadKinds`, the mechanical read that gives it the same
 //      shape table the server already computes for state;
-//   3. the RAW tree, behind ONE collapsed disclosure, so a lane opens as a summary and the tree is
-//      a second gesture. Only the payload lanes have one — the signer ids ARE their payload, so a
+//   3. the RAW tree, behind ONE disclosure — OPEN by default since the redesign (2026-08-13):
+//      this surface exists for nothing but the payload and arriving took a deliberate depth
+//      change, so the tree shows itself and the disclosure is how you fold it AWAY. Only the
+//      payload lanes have one — the signer ids ARE their payload, so a
 //      navigator over them would be the same list twice.
 // The disclosure state is PANE-level: opening raw is the same request in either payload lane, so it
 // survives a lane switch instead of resetting under the user.
@@ -52,7 +54,7 @@ import type { NodeRow } from "@/src/data/types";
 import { metagraphById, resolveSigner, shortHash, SIGNER_GROUPS, SIGNER_UNKNOWN } from "@/src/data/network";
 import { PAYLOAD_LANES, parsePayload, payloadKinds } from "@/src/data/payloadKinds";
 import { identityHudHex } from "@/src/palette/identity";
-import { IdentityDot } from "@/components/inspector/parts";
+import { FootRow, IdentityDot } from "@/components/inspector/parts";
 import { fmtDag, fmtKB } from "@/src/util/format";
 import JsonTree from "@/components/datasection/JsonTree";
 import { cn } from "@/lib/utils";
@@ -267,8 +269,12 @@ export function ChannelStatePanel() {
   const [want, setWant] = useState<LaneId | null>(null);
   const active = lanes.some((l) => l.id === want) ? want! : (lanes[0]?.id ?? null);
   // Pane-level, deliberately: "show me the raw payload" is one request, not a per-lane preference,
-  // so switching state↔data keeps the answer. Closed by default — a lane opens as a summary.
-  const [raw, setRaw] = useState(false);
+  // so switching state↔data keeps the answer. OPEN by default (redesign 2026-08-13): this surface
+  // exists for nothing but the payload and arriving took a deliberate depth change — the same
+  // reasoning that makes the raw layer read on arrival — so parking the payload behind one more
+  // click contradicted the surface's own contract. The disclosure stays as the way to fold the
+  // tree AWAY when the shape table is all you need.
+  const [raw, setRaw] = useState(true);
 
   if (!sel) {
     return (
@@ -284,7 +290,7 @@ export function ChannelStatePanel() {
   const hue = identityHudHex(sel.metaId);
 
   return (
-    <div className="flex flex-col gap-3 min-h-0">
+    <div className="flex flex-col gap-3 min-h-0 h-full">
       {/* The pane's subject head — same grammar as a card head: eyebrow + identity + ordinal. */}
       <div className="flex flex-col gap-1 flex-none">
         <span className="text-micro tracking-caps uppercase text-muted-foreground">Metagraph snapshot</span>
@@ -313,22 +319,22 @@ export function ChannelStatePanel() {
         </p>
       ) : (
         <>
-          {/* The snapshot's own chain facts, straight off the deep read — pinned, never a lane.
-              `blocks` belongs here rather than in a tab of its own: it is a COUNT with no payload
-              behind it (a metagraph snapshot can carry blocks without deepening its height). */}
-          <div className="grid grid-cols-2 gap-x-6 gap-y-1 flex-none text-body">
-            {/* Height · sub: the label names both numbers — a bare "Height 0 · 1,957,370" left
-                the second (the sub-height ordering ties at one height) unexplained. */}
-            <span className="text-muted-foreground">Height · sub</span>
-            <span className="text-right tabular-nums">{deep.height.toLocaleString()} · {deep.subHeight.toLocaleString()}</span>
-            <span className="text-muted-foreground">Parent</span>
-            <span className="text-right font-mono" title={deep.lastSnapshotHash}>{shortHash(deep.lastSnapshotHash)}</span>
-            <span className="text-muted-foreground">Fee</span>
-            <span className="text-right tabular-nums">{fmtDag(deep.fee)} DAG</span>
-            <span className="text-muted-foreground">Size</span>
-            <span className="text-right tabular-nums">{fmtKB(deep.bytes / 1024)}</span>
-            <span className="text-muted-foreground">Blocks</span>
-            <span className="text-right tabular-nums">{deep.blocks.toLocaleString()}</span>
+          {/* The chain facts, TIERED instead of flat (redesign 2026-08-13 — the five-row grid
+              duplicated the HUD card at equal weight and pushed the payload down): the LEAD is
+              the card grammar's own composed line (fee bold, units carrying their labels), the
+              bookkeeping trio rides one muted line under it, and the REFERENCES (parent, state
+              proof) sink to the foot strip at the pane's bottom, where references sit. */}
+          <div className="flex flex-col gap-0.5 flex-none">
+            <p className="text-body text-foreground">
+              <b className="font-bold tabular-nums">{fmtDag(deep.fee)}</b> DAG ·{" "}
+              {/* "· compressed" names the basis — the wire footprint vs the lanes' decoded
+                  sizes; the two readings can never sum (see the card's same note). */}
+              <span className="tabular-nums">{fmtKB(deep.bytes / 1024)}</span> anchored · compressed
+            </p>
+            <p className="text-label text-muted-foreground tabular-nums">
+              height {deep.height.toLocaleString()} · sub {deep.subHeight.toLocaleString()} ·{" "}
+              {deep.blocks.toLocaleString()} block{deep.blocks === 1 ? "" : "s"}
+            </p>
           </div>
 
           {active == null ? (
@@ -376,15 +382,10 @@ export function ChannelStatePanel() {
               <div className="min-h-0 flex-1 overflow-auto slim-scroll">
                 {active === "state" && (
                   <div className="flex flex-col gap-2">
-                    <LaneNote>
-                      state {(deep.stateBytes / 1024).toFixed(1)} KB
-                      {deep.stateProof && (
-                        <>
-                          {" · proof "}
-                          <span className="normal-case font-mono">{shortHash(deep.stateProof)}</span>
-                        </>
-                      )}
-                    </LaneNote>
+                    {/* The proof hash left this note for the foot strip (redesign 2026-08-13):
+                        a hash is a reference, not a lane fact, and cramming it into a caps
+                        caption made the note a run-on mono string. */}
+                    <LaneNote>state {(deep.stateBytes / 1024).toFixed(1)} KB</LaneNote>
                     {deep.stateKeys.length > 0 && (
                       <LaneTable
                         head={["State key", "Records"]}
@@ -401,13 +402,14 @@ export function ChannelStatePanel() {
                         Without it this lane opened on a bare table header while its two siblings
                         opened on a note — the uniform body's first part, missing. */}
                     <LaneNote>
-                      data {deep.dataTxCount} record{deep.dataTxCount === 1 ? "" : "s"}
-                      {deep.blocks > 0 && (
-                        <>
-                          {" · "}
-                          {deep.blocks} block{deep.blocks === 1 ? "" : "s"}
-                        </>
-                      )}
+                      {/* The lane's WEIGHT, the same fact the state note leads with — the tab
+                          already carries the record count, so repeating it here said the same
+                          number twice (redesign 2026-08-13; dataBytes is the decoder's measured
+                          block size, absent only on a pre-field cached body). */}
+                      data{" "}
+                      {deep.dataBytes != null
+                        ? `${(deep.dataBytes / 1024).toFixed(1)} KB`
+                        : `${deep.dataTxCount} record${deep.dataTxCount === 1 ? "" : "s"}`}
                     </LaneNote>
                     {kinds.length > 0 && (
                       <LaneTable
@@ -430,6 +432,22 @@ export function ChannelStatePanel() {
                 )}
               </div>
             </>
+          )}
+
+          {/* THE REFERENCE STRIP (redesign 2026-08-13): the snapshot's chain references — what it
+              links to, what it proves — at the pane's bottom edge, where references sit in every
+              card. Out of the reading path (they were the grid's second row and a caps note's
+              tail), one register (FootRow: micro caps label, mono value), each with the shared
+              copy control. Pinned below the scroll region, so an opened tree never buries them. */}
+          {(deep.lastSnapshotHash || deep.stateProof) && (
+            <div className="flex-none flex flex-col gap-1 border-t border-border/50 pt-2">
+              {deep.lastSnapshotHash && (
+                <FootRow label="Parent" value={shortHash(deep.lastSnapshotHash)} title={deep.lastSnapshotHash} copy={deep.lastSnapshotHash} />
+              )}
+              {deep.stateProof && (
+                <FootRow label="State proof" value={shortHash(deep.stateProof)} title={deep.stateProof} copy={deep.stateProof} />
+              )}
+            </div>
           )}
         </>
       )}
