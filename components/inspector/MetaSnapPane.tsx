@@ -436,13 +436,30 @@ function PayloadBlock({
     );
   }
 
+  // The in-flight word renders PER SECTION (user, 2026-08-13 — a single line under both read as
+  // DATA's alone while STATE sat bare): both sections are being decompressed by the one read, so
+  // both say so, exactly as each states its own verified `none` after it.
+  const pending = asked && !deep ? (decodeGaveUp ? "decompression unavailable — the read failed" : "decompressing…") : null;
+
   return (
     <div className="mt-1.5">
+      {deep && stateRows.length === 0 && dataRows.length === 0 && deep.dataBlockSigners.length === 0 && deep.stateBytes === 0 && (
+        // THE IDLE SNAPSHOT, NAMED — and FIRST (user, 2026-08-13: "it should be the 1st thing
+        // to read so that the rest of the card is easy to ignore"). Post-read only: idleness is
+        // a verified whole-snapshot reading — the anchored bytes are the envelope (chain header
+        // + proofs), the heartbeat of a quiet network. It leads the payload block so the two
+        // `none` sections below become confirmation rather than a puzzle; "idle" is the app's
+        // existing word for a tick that moves nothing (CLAUDE.md, the height counter).
+        <p className="mb-2 text-label text-muted-foreground">
+          An idle snapshot: it anchored only its envelope and proofs.
+        </p>
+      )}
       <PayloadSection
         name={PAYLOAD_LANES.state.name}
         title={PAYLOAD_LANES.state.title}
         rows={stateRows}
         read={!!deep}
+        pending={pending}
       />
       <Separator className="my-2" />
       <PayloadSection
@@ -450,6 +467,7 @@ function PayloadBlock({
         title={PAYLOAD_LANES.data.title}
         rows={dataRows}
         read={!!deep}
+        pending={pending}
         // "Signed by" here as in the body (user, 2026-08-13): the layer word carries the
         // difference (dL1 vs the body's L0), SIGNER_GROUPS owns the words.
         signers={
@@ -458,22 +476,6 @@ function PayloadBlock({
             : null
         }
       />
-      {asked && !deep && (
-        <p className="mt-2 text-label text-muted-foreground italic">
-          {decodeGaveUp ? "decompression unavailable — the read failed" : "decompressing…"}
-        </p>
-      )}
-      {deep && stateRows.length === 0 && dataRows.length === 0 && deep.dataBlockSigners.length === 0 && deep.stateBytes === 0 && (
-        // THE IDLE SNAPSHOT, NAMED (user, 2026-08-13 — "some metagraphs don't appear to do much
-        // other than being idle; should we make that more visible?"). Post-read only: idleness
-        // is a verified whole-snapshot reading — the anchored bytes are the envelope (chain
-        // header + proofs), the heartbeat of a quiet network — so it earns one line of its own
-        // above the per-section `none`s that state the same fact per lane. "Idle" is the app's
-        // existing word for a tick that moves nothing (CLAUDE.md, the height counter).
-        <p className="mt-2 text-label text-muted-foreground">
-          An idle snapshot: it anchored only its envelope and proofs.
-        </p>
-      )}
     </div>
   );
 }
@@ -489,6 +491,7 @@ function PayloadSection({
   title,
   rows,
   read,
+  pending,
   signers,
 }: {
   name: string;
@@ -497,6 +500,8 @@ function PayloadSection({
   /** The deep read has landed — an empty section may now say `none` as a verified fact; before
    *  it, the bare header claims nothing (a `none` pre-read would be a fabricated reading). */
   read: boolean;
+  /** The one read's in-flight/give-up word, rendered under EVERY section it is decompressing. */
+  pending?: string | null;
   signers?: { label: string; title: string; count: number; who: string } | null;
 }) {
   return (
@@ -504,6 +509,7 @@ function PayloadSection({
       <div className="flex items-start" title={title}>
         <span className="text-micro tracking-caps uppercase text-muted-foreground pt-px">{name}</span>
       </div>
+      {pending && <p className="pl-2 text-label text-muted-foreground italic">{pending}</p>}
       {read && rows.length === 0 && !signers && (
         <p className="pl-2 text-label text-muted-foreground italic">none</p>
       )}
