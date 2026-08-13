@@ -13,7 +13,12 @@ export interface CameraFraming {
 }
 
 // Camera presets (ported from ui.js FOCI; Engine.ts:46-56 verbatim).
-export const FOCI: Record<string, { pos: THREE.Vector3; target: THREE.Vector3 }> = {
+//
+// `satisfies` rather than a `Record<string, …>` annotation, so the KEYS survive into the type: a
+// bare `string` index makes `focus("overvieww")` a silent undefined at runtime instead of the
+// compile error it should be, and it is what let REST_POSE claim to be checked while checking
+// nothing.
+export const FOCI = {
   // Pulled back (60 → 68, user): every view's START pose gets the same zoom-out the globe
   // needs — the whole scene rests inside the rail-free centre of the frame. Shared by the
   // hyper resting pose, the ledger overview and the placeholder idle.
@@ -52,7 +57,9 @@ export const FOCI: Record<string, { pos: THREE.Vector3; target: THREE.Vector3 }>
   // the topbar and the LiveStrip. Both global levers survive it: dollyBack and railsLean scale
   // (pos − target) around the target, so a pure translation of the pair is invariant under them.
   ledger: { pos: new THREE.Vector3(0, -1, 54), target: new THREE.Vector3(0, -7, 0) },
-};
+} satisfies Record<string, CameraFraming>;
+/** A pose that exists. Every caller of `focus()` names one of these, checked. */
+export type FocusName = keyof typeof FOCI;
 
 // ---- the ONE global zoom lever ------------------------------------------------------------
 // Dolly every preset/framing back by CAM_ZOOM (the position pushed out from its target) — one
@@ -99,7 +106,7 @@ export function dollyBack(pos: THREE.Vector3, target: THREE.Vector3, outPos: THR
 export const RAILS_HIDDEN_DOLLY = 0.86;
 // The resting pose each view's lean is measured against — the user's "scene starting position".
 // Read out of FOCI rather than restated, so re-tuning a resting pose re-tunes the ramp with it.
-const REST_POSE: Record<View3D, keyof typeof FOCI> = { hyper: "overview", geo: "geo", ledger: "ledger" };
+const REST_POSE: Record<View3D, FocusName> = { hyper: "overview", geo: "geo", ledger: "ledger" };
 export function restOrbit(view: View3D): number {
   const f = FOCI[REST_POSE[view]];
   return f.pos.distanceTo(f.target);
