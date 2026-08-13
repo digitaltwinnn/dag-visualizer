@@ -3,7 +3,7 @@ import Stats from "stats.js";
 import { useStore, type Mode } from "@/src/store/store";
 import { applyClickActions } from "@/src/store/applyClickActions";
 import { metagraphById, initNetwork, getNetwork, getAnchor, DEFAULT_META_COLOR, resolveSignerIps } from "@/src/data/network";
-import { tickInStory } from "@/src/data/ledgerStory";
+import { ledgerLens, tickInStory } from "@/src/data/ledgerStory";
 import { LISTED_IDS, UNLISTED_ID, UNLISTED_SCENE_HEX } from "@/src/data/unlisted";
 import { hoverKeyOf, tooltipSubject } from "@/src/data/hoverSubject";
 import { identityMap, identitySceneHex } from "@/src/palette/identity";
@@ -561,7 +561,9 @@ export class Engine {
         if (st.hoverFilter !== prev.hoverFilter) {
           this._hoverFilter = st.hoverFilter;
           this.globe.setHoverFilter(st.hoverFilter);
-          this.ledger.setHoverFilter(st.hoverFilter); // the colored-dim preview (same strength as commit)
+          // Through the ledger's own lens (ledgerLens): a hovered DAG chip previews the whole
+          // chamber, exactly what committing it means there (user, 2026-08-13).
+          this.ledger.setHoverFilter(st.hoverFilter == null ? null : ledgerLens(st.hoverFilter));
         }
         // Geo explorer list-row hover → glow that node's shells on the globe (same as a 3D hover).
         if (st.hoverNodeId !== prev.hoverNodeId) this.globe.setHoverNode(st.hoverNodeId);
@@ -896,7 +898,7 @@ export class Engine {
       this.globe.focusDensest(false);
       this.ctx.controls.autoRotate = false;
       this.globe.setFilter(this.filter); // dim non-selected metagraph columns (no camera move)
-      this.ledger.setFilter(this.filter); // the chamber's COLOURED dim (no camera move)
+      this.ledger.setFilter(ledgerLens(this.filter)); // the chamber's COLOURED dim, through the ledger's lens (dag = the whole chamber)
       this._refreshLedger();
       // Ledger uses the SHARED overview camera — the group transform (config.viewRotY/viewScale)
       // frames the resting pose central/untilted, and it is the view's ONE pose: every rung
@@ -961,7 +963,7 @@ export class Engine {
       // pose — the per-lane and per-node framings were retired (2026-08-09), so the ladder's NETWORK
       // rung resolves to that one pose, not a lane fly-to.
       this.globe.setFilter(this.filter);
-      this.ledger.setFilter(this.filter);
+      this.ledger.setFilter(ledgerLens(this.filter));
       if (focusCamera) this._resolveFocus();
     }
     this._publishLeaderboard();

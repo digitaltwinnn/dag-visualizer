@@ -1,5 +1,6 @@
 import type { MetaSnapRecord } from "@/src/data/api";
 import type { GlobalSnapshot } from "@/src/data/types";
+import { ledgerLens } from "@/src/data/ledgerStory";
 
 /** The metagraph snapshots one metagraph anchored into ONE global tick, oldest first.
  *  This is what makes a ledger tile identifiable without a fetch (spec §6.1): the 4s poll already
@@ -34,12 +35,14 @@ export interface AnchorLogRow {
 export function buildAnchorLog(
   metaSnaps: ReadonlyMap<string, MetaSnapRecord[]>,
   globalSnapshots: readonly GlobalSnapshot[],
-  filter: string, // "all" | "dag" | metagraph id — dag has no metagraph snapshots → empty
+  filter: string, // "all" | "dag" | metagraph id — dag reads as all (ledgerLens: every global
+  // tick IS a DAG snapshot, so the base ledger's log is the whole log; user, 2026-08-13)
 ): AnchorLogRow[] {
+  const f = ledgerLens(filter);
   const byTs = new Map(globalSnapshots.map((g) => [g.timestamp, g]));
   const rows: AnchorLogRow[] = [];
   for (const [metaId, recs] of metaSnaps) {
-    if (filter !== "all" && filter !== metaId) continue;
+    if (f !== "all" && f !== metaId) continue;
     for (const rec of recs) {
       const global = byTs.get(rec.ts);
       if (!global) continue;

@@ -23,9 +23,12 @@ describe("buildAnchorLog", () => {
     // Within the shared 10:00:00 tick, plain ordinal-desc across metagraphs: ded 90 before dor 10.
     expect(rows.map((x) => x.ordinal)).toEqual([12, 11, 90, 10]);
   });
-  it("filter scopes to one metagraph; dag/unknown ids yield an empty log", () => {
+  it("filter scopes to one metagraph; DAG reads as the whole log (the ledger lens)", () => {
     expect(buildAnchorLog(snaps, globals, "ded").map((x) => x.metaId)).toEqual(["ded"]);
-    expect(buildAnchorLog(snaps, globals, "dag")).toEqual([]);
+    // Every global tick IS a DAG snapshot (ledgerStory.ledgerLens, user 2026-08-13) — the base
+    // ledger's log is the whole log, not an empty one. An unknown id still yields nothing.
+    expect(buildAnchorLog(snaps, globals, "dag").map((x) => x.ordinal)).toEqual([12, 11, 90, 10]);
+    expect(buildAnchorLog(snaps, globals, "nope")).toEqual([]);
   });
 });
 

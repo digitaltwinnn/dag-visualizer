@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { storyCount, tickInStory, STORY_SETTLE_MS } from "./ledgerStory";
+import { ledgerLens, storyCount, tickInStory, STORY_SETTLE_MS } from "./ledgerStory";
 import { METAGRAPHS } from "@/src/engine/config";
 import type { Anchor, SnapshotExact } from "@/src/data/types";
 
@@ -52,5 +52,17 @@ describe("the filter-is-a-story membership rule (one home)", () => {
 
   it("an unlisted question with NO exact read is unknown, not a zero", () => {
     expect(tickInStory("unlisted", null, undefined)).toBeUndefined();
+  });
+});
+
+describe("ledgerLens (the ledger's own reading of the filter)", () => {
+  it("committed DAG reads as the whole chamber; everything else passes through", () => {
+    // Every global tick IS a DAG snapshot — the base ledger has no lane to isolate, so the
+    // ledger surfaces treat DAG as "all" (user, 2026-08-13). The commit still means the DAG
+    // dossier + the node model's own on-filter answer; only the snapshot emphasis maps.
+    expect(ledgerLens("dag")).toBe("all");
+    expect(ledgerLens("all")).toBe("all");
+    expect(ledgerLens("unlisted")).toBe("unlisted");
+    expect(ledgerLens("DAG0CyySf35ftDQDQBnd1bdQ9aPyUdacMghpnCuM")).toBe("DAG0CyySf35ftDQDQBnd1bdQ9aPyUdacMghpnCuM");
   });
 });
