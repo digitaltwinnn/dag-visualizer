@@ -173,18 +173,40 @@ export class Engine {
   private metaTimer: ReturnType<typeof setInterval> | undefined;
   // Trailing debounce for the direct-manipulation signal (see the constructor's controls
   // listeners): wheel-zoom fires start/end per notch, so `sceneDragging` only drops after a
-  // quiet 350ms.
+  // quiet 350ms. A POINTER gesture doesn't wait for it — see `_onPointerRelease`.
   private _dragEndT: ReturnType<typeof setTimeout> | undefined;
   // Store mirror for the rails-hidden camera lean — _tweenTo composes railsDolly into every
   // destination while it holds (see the subscription note). Seeded from the store at boot.
   private railsHidden = false;
   private _onControlsStart = () => {
     clearTimeout(this._dragEndT);
+    this._dragEndT = undefined;
     if (!useStore.getState().sceneDragging) useStore.getState().setSceneDragging(true);
   };
   private _onControlsEnd = () => {
     clearTimeout(this._dragEndT);
-    this._dragEndT = setTimeout(() => useStore.getState().setSceneDragging(false), 350);
+    this._dragEndT = setTimeout(() => {
+      this._dragEndT = undefined;
+      useStore.getState().setSceneDragging(false);
+    }, 350);
+  };
+  // ⚠️ THE DEBOUNCE IS FOR THE WHEEL, AND A DRAG MUST NOT PAY IT (user, 2026-08-13 — "there is a
+  // slight delay before it re-appears"). A wheel gesture has no end: OrbitControls dispatches
+  // start+end synchronously PER NOTCH, so only a quiet window can say the hand is done, and 350ms
+  // of it sat in front of every fade-back. A drag's end is known exactly — the pointer lifting —
+  // so this handler collapses the wait to zero for that case, leaving the debounce to the one
+  // input that needs it.
+  //
+  // It is gated on a PENDING drop rather than on `sceneDragging`, which is what keeps a pinch
+  // intact: lifting one finger of two makes OrbitControls re-dispatch `start` for the remaining
+  // pointer (its own document-level handler runs before this window-level one), so `_onControlsStart`
+  // has already cleared the timer and this is correctly a no-op. Only a gesture that really ended
+  // leaves a timer standing.
+  private _onPointerRelease = () => {
+    if (this._dragEndT === undefined) return;
+    clearTimeout(this._dragEndT);
+    this._dragEndT = undefined;
+    useStore.getState().setSceneDragging(false);
   };
   private onResize = () => this.ctx.resize?.();
   // FPS/ms monitor — dev only, or in prod via `?stats`/`#stats` for ad-hoc checks, so
@@ -305,6 +327,9 @@ export class Engine {
     // debounce keeps wheel-zoom bursts (start/end per notch) from strobing the rails.
     this.ctx.controls.addEventListener("start", this._onControlsStart);
     this.ctx.controls.addEventListener("end", this._onControlsEnd);
+    // On WINDOW, so it runs after OrbitControls' own document-level pointerup — see the handler.
+    window.addEventListener("pointerup", this._onPointerRelease);
+    window.addEventListener("pointercancel", this._onPointerRelease);
 
     const showStats =
       process.env.NODE_ENV === "development" ||
@@ -1614,6 +1639,8 @@ export class Engine {
     window.removeEventListener("resize", this.onResize);
     this.ctx.controls.removeEventListener("start", this._onControlsStart);
     this.ctx.controls.removeEventListener("end", this._onControlsEnd);
+    window.removeEventListener("pointerup", this._onPointerRelease);
+    window.removeEventListener("pointercancel", this._onPointerRelease);
     clearTimeout(this._dragEndT);
     // A dispose mid-drag must not leave the rails dimmed (StrictMode remount / HMR). Same for a
     // dispose mid-FLIGHT: nothing else clears the flag once the render loop stops.

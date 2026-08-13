@@ -11,8 +11,9 @@ import { useStore } from "@/src/store/store";
 //   · `visibility:hidden` (not display:none) so layout is preserved and the thread keeps
 //     measuring its dots — they remain as the minimized rail (the possibility map);
 //   · DIMS while the user's own hand is on the camera — see `useSceneYield`. NOT for a commit
-//     flight: this is the desktop rail, and `flight` is opted into by the sheet tiers alone.
-// States + reduced-motion live in the `.rail-shade` recipe (globals.css).
+//     flight: this is the desktop rail, and `flight` is opted into by the phone dock alone.
+// States + reduced-motion live in the `.rail-shade` recipe (globals.css), which fades the HUD
+// BACK faster than it steps aside — the return answers a gesture already finished.
 export function RailShade({ children }: { children: ReactNode }) {
   const hidden = useStore((s) => s.railsHidden);
   const yielding = useSceneYield();
