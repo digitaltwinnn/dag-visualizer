@@ -45,6 +45,12 @@ export default function MetaSnapPane({
 }) {
   const sel = useStore((s) => s.metaSnap);
   const exact = useStore((s) => (sel ? s.snapshotExact[sel.globalOrdinal] : undefined));
+  // The tick's exact read FAILED (RawSnapshotBridge records the miss) — the give-up signal the
+  // "reading…" state below terminates on. Without it that state could never end: `useMinHold`
+  // only falls when its `active` goes false, and with no failure signal `active` stayed true for
+  // as long as the row was absent, so the old "tick pruned" fallback was unreachable and a failed
+  // read said "reading…" forever with nothing in flight (rule 10).
+  const missedExact = useStore((s) => (sel ? s.exactMiss[sel.globalOrdinal] != null : false));
   const deepKey = sel ? metaSnapDeepKey(sel.globalOrdinal, sel.metaId, sel.ordinal) : null;
   const deep = useStore((s) => (deepKey ? s.metaSnapDeep[deepKey] : undefined));
   const following = useStore((s) => s.following);
@@ -83,8 +89,8 @@ export default function MetaSnapPane({
       null
     );
   }, [sel, exact]);
-  const reading = useMinHold(!!sel && !row);
-  // The pinned decode's give-up timer (2026-08-08, review fix): a 404'd/pruned deep read left
+  const reading = useMinHold(!!sel && !row && !exact && !missedExact);
+  // The pinned decode's give-up timer (2026-08-08, review fix): a failed deep read left
   // "decoding…" forever — after a patient window the instrument states the honest terminal. It
   // runs off `deepAsked`, not `following`: a snapshot nobody asked to read has no read to give up
   // on, and starting the clock anyway would ripen `unread` into a false "unavailable".
@@ -214,13 +220,19 @@ export default function MetaSnapPane({
                     </Fact>
                   )}
                 </>
-              ) : reading.show ? (
+              ) : !row && exact ? (
+                // The tick's exact read landed and is immutable, and this snapshot's row is not
+                // in it (aged past the buffer's join, or never anchored here) — a terminal fact,
+                // stated as one. "reading…" here would claim a read that already finished.
+                <Fact label="Exact read">not in this tick’s read</Fact>
+              ) : missedExact && !reading.show ? (
+                // The read failed (transient blip, or outside the served window) — the honest
+                // terminal. Reselecting or the next live tick retries; the miss clears on landing.
+                <Fact label="Exact read">unavailable — read failed</Fact>
+              ) : (
                 <Fact label="Exact read">
                   <span className={cn(reading.fading && "animate-hold-fade-out motion-reduce:animate-none")}>reading…</span>
                 </Fact>
-              ) : (
-                // The L0 node prunes after ~30 minutes; an old tick keeps its polled facts and says so.
-                <Fact label="Exact read">unavailable — tick pruned</Fact>
               )}
             </FactGroup>
 
@@ -398,7 +410,7 @@ function PayloadBlock({
     if (row == null) return null; // no exact row yet — the FactGroup's reading state covers it
     return (
       <div className="mt-1.5 text-body text-muted-foreground italic">
-        {!asked ? "undecodable payload" : decodeGaveUp ? "decode unavailable — tick pruned" : "decoding…"}
+        {!asked ? "undecodable payload" : decodeGaveUp ? "decode unavailable — the read failed" : "decoding…"}
       </div>
     );
   }
@@ -433,9 +445,10 @@ function PayloadBlock({
   //     — we have not looked — which is precisely the distinction `none` (we looked, there was
   //     nothing) cannot carry alone. Stars would promise an arrival that isn't coming.
   //   • pinned, in flight → the count IS coming into this slot. Stars.
-  //   • pinned, given up → the honest terminal. The deep read 404s once the L0 node prunes the
-  //     global (~30 min), and without this the slot twinkled forever — the same hang the
-  //     `decodeGaveUp` timer was added to end, which this row was simply not consuming.
+  //   • pinned, given up → the honest terminal. A deep read can fail (upstream blip / timeout —
+  //     NOT pruning: the LB serves the whole ordinal history, verified 2026-08-13), and without
+  //     this the slot twinkled forever — the same hang the `decodeGaveUp` timer was added to end,
+  //     which this row was simply not consuming.
   const dataHeadline = deep ? (
     deep.dataTxCount > 0 ? (
       <>
@@ -448,7 +461,7 @@ function PayloadBlock({
   ) : !asked ? (
     <Quiet>unread</Quiet>
   ) : decodeGaveUp ? (
-    <Quiet>unavailable — tick pruned</Quiet>
+    <Quiet>unavailable — read failed</Quiet>
   ) : (
     <NodeStars count={4} />
   );

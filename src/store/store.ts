@@ -112,8 +112,14 @@ interface AppState {
   selNodes: NodeRow[];
   // EXACT per-snapshot totals (fee + listed/unlisted), keyed by ordinal — populated by
   // RawSnapshotBridge from /api/snapshot/[ordinal] for the live + selected ticks, so ANY view
-  // can read final fees without the polling floor. Missing key = not fetched / unavailable (pruned).
+  // can read final fees without the polling floor. Missing key = not fetched / read not landed.
   snapshotExact: Record<number, SnapshotExact>;
+  // Ordinals whose exact read FAILED (non-OK / network), stamped with the attempt time. This is
+  // the give-up signal the acquiring states terminate on (rule 10: a "reading…"/node-stars slot
+  // with nothing in flight is a fabricated state): the bridge records the miss, the fee stars and
+  // "resolving" rows turn into honest words, and the entry is deleted the moment the exact read
+  // lands (a later trigger — reselecting, the next live tick — still retries as before).
+  exactMiss: Record<number, number>;
   // Deep channel reads (full decode of one metagraph snapshot), keyed by metaSnapDeepKey(globalOrdinal, metaId).
   // Immutably cached — fetched from /api/snapshot/[ordinal]/channel/[address] on explicit gesture,
   // never on poll or mass reads.
@@ -234,6 +240,8 @@ interface AppState {
   setLeaderboard: (lb: LeaderboardData | null) => void;
   setSelNodes: (nodes: NodeRow[]) => void;
   setSnapshotExact: (data: SnapshotExact) => void;
+  /** Record a FAILED exact read for this ordinal — the acquiring states' give-up signal. */
+  setExactMiss: (ordinal: number) => void;
   /** `key` defaults to the decode's own identity; the bridge passes the REQUESTED key when
    *  the route fell back to another entry (an undecodable row asks with ordinal 0). */
   setMetaSnapDeep: (d: ChannelSnapDeep, key?: string) => void;
@@ -288,6 +296,7 @@ export const useStore = create<AppState>((set) => ({
   leaderboard: null,
   selNodes: [],
   snapshotExact: {},
+  exactMiss: {},
   metaSnapDeep: {},
   deepWanted: null,
   phoneDock: null,
@@ -364,7 +373,27 @@ export const useStore = create<AppState>((set) => ({
           delete next[k];
         }
       }
-      return { snapshotExact: next };
+      // A landed read supersedes any recorded miss for its ordinal — the give-up state must
+      // never outlive the data it was giving up on.
+      if (s.exactMiss[data.ordinal] == null) return { snapshotExact: next };
+      const miss = { ...s.exactMiss };
+      delete miss[data.ordinal];
+      return { snapshotExact: next, exactMiss: miss };
+    }),
+  setExactMiss: (ordinal) =>
+    set((s) => {
+      // Bounded like the data it shadows: keep only the newest EXACT_MAX miss stamps.
+      const next = { ...s.exactMiss, [ordinal]: Date.now() };
+      const keys = Object.keys(next);
+      if (keys.length > EXACT_MAX) {
+        for (const k of keys
+          .map(Number)
+          .sort((a, b) => a - b)
+          .slice(0, keys.length - EXACT_MAX)) {
+          delete next[k];
+        }
+      }
+      return { exactMiss: next };
     }),
   setMetaSnapDeep: (d, key) => set((s) => {
     key ??= metaSnapDeepKey(d.globalOrdinal, d.metaId, d.ordinal);
