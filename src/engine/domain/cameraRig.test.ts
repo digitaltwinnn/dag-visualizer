@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import * as THREE from "three";
-import { FOCI, hubFraming, geoFraming, ledgerCommitTilt, LEDGER_TILT_YAW, LEDGER_TILT_PITCH, LEDGER_TILT_DOLLY, easeInOutQuad, CAM_ZOOM, dollyBack, RAILS_HIDDEN_DOLLY, railsDolly, nodeFraming, cohortFraming, hyperNodeFraming, closeness, CLOSE_FAR_ALT, CLOSE_NEAR_ALT, NODE_RAISE } from "./cameraRig";
+import { FOCI, hubFraming, geoFraming, ledgerCommitTilt, LEDGER_TILT_YAW, LEDGER_TILT_PITCH, LEDGER_TILT_DOLLY, easeInOutQuad, CAM_ZOOM, dollyBack, RAILS_HIDDEN_DOLLY, railsDolly, nodeFraming, cohortFraming, isSamePose, nudgeMix, NUDGE_AMP, NUDGE_DUR, NUDGE_SAME, closeness, CLOSE_FAR_ALT, CLOSE_NEAR_ALT, NODE_RAISE } from "./cameraRig";
 
 // NO Snapshots framing is pinned here, because the view HAS none: it owns one pose, `FOCI.ledger`,
 // with one state-keyed variation — `ledgerCommitTilt`, the commit ORBIT, pinned below. Five framings
@@ -193,14 +193,61 @@ describe("NODE_RAISE (the Globe.focusNode lean-raise contract paired with nodeFr
   });
 });
 
-describe("hyperNodeFraming", () => {
-  it("pulls back along the node's outward radial, lifted, looking at the node", () => {
-    const node = new THREE.Vector3(0, 0, 20);
-    const out = { pos: new THREE.Vector3(), target: new THREE.Vector3() };
-    hyperNodeFraming(node, out);
-    expect(out.target).toEqual(node);
-    expect(out.pos.z).toBeCloseTo(29, 9); // 20 + 9 along the radial
-    expect(out.pos.y).toBeCloseTo(3, 9);  // the lift
+// The COMMIT NUDGE (user, 2026-08-13): every commit animates, and a rung that resolves to the pose
+// already held answers with a pulse that lands back on it. Two properties carry the whole design —
+// the nudge must never change where the camera ends up, and "the same pose" must scale with the
+// view, since hyper's hub framing sits ~16 units out and the ledger's chamber pose ~55.
+describe("isSamePose (does this commit get a nudge instead of a flight?)", () => {
+  const v = (x: number, y: number, z: number) => new THREE.Vector3(x, y, z);
+  const pos = v(0, 5, 20);
+  const tgt = v(0, 0, 0);
+
+  it("is true for an identical destination — the delegating rung's case", () => {
+    expect(isSamePose(pos, tgt, pos.clone(), tgt.clone())).toBe(true);
+  });
+  it("is true for a move too small to see, so a sub-pixel drift nudges rather than crawls", () => {
+    const dist = pos.distanceTo(tgt);
+    expect(isSamePose(pos, tgt, pos.clone().addScalar(NUDGE_SAME * dist * 0.4), tgt)).toBe(true);
+  });
+  it("is false for a real reframe — a network flight is never swallowed by the epsilon", () => {
+    expect(isSamePose(pos, tgt, v(12, 9, 14), tgt)).toBe(false);
+  });
+  it("is false when only the TARGET moves: a pan is a reframe even from the same point", () => {
+    expect(isSamePose(pos, tgt, pos.clone(), v(0, 8, 0))).toBe(false);
+  });
+  it("scales with the orbit distance — the same absolute delta reads as a move up close", () => {
+    const d = 0.06; // ~0.4% of a 16-unit orbit, ~0.1% of a 55-unit one
+    expect(isSamePose(v(0, 0, 55), tgt, v(0, 0, 55 + d), tgt)).toBe(true);
+    expect(isSamePose(v(0, 0, 8), tgt, v(0, 0, 8 + d), tgt)).toBe(false);
+  });
+  it("keeps a floor under the epsilon so a degenerate pos===target pose can't divide by nothing", () => {
+    expect(isSamePose(tgt, tgt, tgt.clone(), tgt.clone())).toBe(true);
+  });
+});
+
+describe("nudgeMix (the pulse's shape)", () => {
+  it("starts and ENDS at exactly zero — the pose the user committed is restored, not approached", () => {
+    expect(nudgeMix(0)).toBe(0);
+    expect(nudgeMix(1)).toBeCloseTo(0, 12);
+  });
+  it("peaks at NUDGE_AMP halfway through", () => {
+    expect(nudgeMix(0.5)).toBeCloseTo(NUDGE_AMP, 12);
+  });
+  it("is a subtle push, well under a tenth of the way to the subject", () => {
+    expect(NUDGE_AMP).toBeGreaterThan(0);
+    expect(NUDGE_AMP).toBeLessThan(0.1);
+  });
+  it("eases out of both ends (zero slope), so it composes onto a resting pose without a kick", () => {
+    expect(nudgeMix(0.02)).toBeLessThan(nudgeMix(0.5) * 0.02); // far below the linear ramp
+    expect(nudgeMix(0.98)).toBeLessThan(nudgeMix(0.5) * 0.02);
+  });
+  it("clamps outside 0..1 rather than swinging negative (the camera never pulls back)", () => {
+    expect(nudgeMix(1.4)).toBeCloseTo(0, 12);
+    expect(nudgeMix(-0.3)).toBe(0);
+  });
+  it("runs on its own short clock, quicker than the 1.4s commit flight it replaces", () => {
+    expect(NUDGE_DUR).toBeGreaterThan(0.2);
+    expect(NUDGE_DUR).toBeLessThan(1.4);
   });
 });
 

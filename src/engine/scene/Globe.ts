@@ -19,7 +19,7 @@ import { metaAnchor, META_LAYERS, META_RING, DAG_L0, DAG_L1, HYPER_TILT, applyHy
 import { LEDGER, type RailGroup } from "../domain/ledgerLayout";
 import { metaTrayLayout, dagTrayLayout, containerChipPos, type ContainerSpec } from "../domain/ledgerRails";
 import { LANE_IDS } from "../domain/ledgerModel";
-import { gatherSlots, gatherExtent, GATHER_MAX_GROWTH, type GatherExtent } from "../domain/gatherLayout";
+import { gatherSlots, gatherExtent, gatherSpread, gatherRows, GATHER_MAX_GROWTH, type GatherExtent, type GatherSlot } from "../domain/gatherLayout";
 import type { ViewTransition } from "../domain/viewTransition";
 import type { SceneColors } from "../sceneColors";
 import * as geoStats from "../domain/geoStats";
@@ -123,7 +123,10 @@ export class Globe implements GeoViewHost {
   private _gatherN = new THREE.Vector3(); //  scratch: the staging plane's camera-facing normal
   private _gatherZ = new THREE.Vector3(); //  scratch: the staging basis' Z (= -up)
   private _gatherM = new THREE.Matrix4(); //  scratch: the staging orientation basis
-  private _gatherExtent: GatherExtent = { w: 0, h: 0 }; // the packed row's size in CELLS (event-time)
+  private _gatherExtent: GatherExtent = { w: 0, h: 0, gaps: 0 }; // the packed row's size in CELLS (event-time)
+  private _gatherGroups: { id: string; count: number }[] = []; // last packed set — re-solved when the band changes
+  private _gatherRows = 0; // the depth that set was packed at (0 = never packed)
+  private _gatherBudget = 0; // the band's width in CAPPED chip pitches, from the last fit
   private ledgerT = 0; // 0->1 ease as the reused node meshes fly from their source view into the lanes
   clock = 0;
   private spin: SpinState | null = null;
@@ -236,7 +239,7 @@ export class Globe implements GeoViewHost {
       dim: 0, clock: 0, camN: this._camN, hasCam: false,
       ledgerT: 0, dt: 0, flashDecay: 0, group: this.group,
       transition: null,
-      gather: { origin: new THREE.Vector3(), right: new THREE.Vector3(), up: new THREE.Vector3(), quat: new THREE.Quaternion(), cell: GATHER_CELL, scale: GATHER_SCALE },
+      gather: { origin: new THREE.Vector3(), right: new THREE.Vector3(), up: new THREE.Vector3(), quat: new THREE.Quaternion(), cell: GATHER_CELL, scale: GATHER_SCALE, spread: 0 },
     };
 
     // The geo globe surface (body, graticule, atmosphere, continents) — it sets the surface handles
@@ -366,7 +369,7 @@ export class Globe implements GeoViewHost {
           spinAxis: new THREE.Vector3(Math.random() * 2 - 1, Math.random() * 2 - 1, Math.random() * 2 - 1).normalize(),
           spinSpeed: 0.3 + Math.random() * 0.5, spinPhase: Math.random() * 6.2831,
           pick,
-          gU: 0, gV: 0, gRank: 0, gCount: 0,
+          gU: 0, gV: 0, gRank: 0, gCount: 0, gS: 0,
         };
         this.nodes.push(u);
         idx++;
@@ -402,8 +405,9 @@ export class Globe implements GeoViewHost {
     this.setMorph(this.morph); // place at current morph
   }
 
-  // Staging-grid slots for the view-transition choreography (event-time: data rebuilds). Reads
-  // BOTH record arrays as they currently stand, so it's safe to call from either setNodes or
+  // Staging-grid slots for the view-transition choreography. Event-time: data rebuilds, plus the
+  // one frame in a transition where the band's solved DEPTH changes (setGatherFit calls back in).
+  // Reads BOTH record arrays as they currently stand, so it's safe to call from either setNodes or
   // setMetagraphs — whichever rebuilt, the other array's slots are recomputed too (harmless: the
   // layout is a pure function of the current counts).
   private _assignGatherSlots(): void {
@@ -448,10 +452,17 @@ export class Globe implements GeoViewHost {
       groups.push({ id, count: byMachine.size });
     }
 
-    const slots = gatherSlots(groups);
-    this._gatherExtent = gatherExtent(groups);
-    const apply = (recs: { gU: number; gV: number; gRank: number; gCount: number }[], s: { u: number; v: number; rank: number; count: number }) =>
-      recs.forEach((r) => { r.gU = s.u; r.gV = s.v; r.gRank = s.rank; r.gCount = s.count; });
+    // How deep the blocks may go, from the band the last fit measured: the pack is width-first, so
+    // the depth is solved and the columns follow (domain/gatherLayout). Before any transition frame
+    // the budget is 0 and gatherRows answers the near-square — setGatherFit re-packs on the first
+    // frame it draws, which is why a stale depth here can never be seen.
+    const rows = gatherRows(groups, this._gatherBudget);
+    const slots = gatherSlots(groups, rows);
+    this._gatherExtent = gatherExtent(groups, rows);
+    this._gatherGroups = groups;
+    this._gatherRows = rows;
+    const apply = (recs: { gU: number; gV: number; gRank: number; gCount: number; gS: number }[], s: GatherSlot) =>
+      recs.forEach((r) => { r.gU = s.u; r.gV = s.v; r.gRank = s.rank; r.gCount = s.count; r.gS = s.gs; });
 
     const dagSlots = slots.get("dag");
     if (dagSlots) {
@@ -558,7 +569,7 @@ export class Globe implements GeoViewHost {
             spinSpeed: 0.3 + Math.random() * 0.5, spinPhase: Math.random() * 6.2831,
             dim: 0, dimTarget: 0,
             pick,
-            gU: 0, gV: 0, gRank: 0, gCount: 0,
+            gU: 0, gV: 0, gRank: 0, gCount: 0, gS: 0,
           });
         });
       });
@@ -853,44 +864,14 @@ export class Globe implements GeoViewHost {
     this._selCohortOk = true;
   }
 
-  // World position of a node's HYPERGRAPH point by its id — read from its live instance transform.
-  // The node's HYPER LAYOUT position in world space — from the layout DATA, deliberately NOT
-  // the rendered instance matrix: mid-transition the instance sits at the staging grid, and a
-  // camera framing must aim where the node will LAND, not where it happens to be in flight
-  // (user bug: geo node selected → hyper flew the camera to the staging area, "focus lost").
-  // Event-time (a focus click), so the allocation is fine.
-  hyperWorldPos(id: string | null): THREE.Vector3 | null {
-    if (!id) return null;
-    const u = this.nodes.find((n) => n.nodeId === id);
-    if (u) return this.group.localToWorld(new THREE.Vector3().copy(u.hyperPos));
-    const r = this.metaNodes && this.metaNodes.find((n) => n.nodeId === id);
-    if (r) {
-      // Same composition writeMetaFrame renders: the hub's world position expressed in the
-      // group's local frame, plus the node's hub-local offset, back out to world.
-      const v = new THREE.Vector3();
-      if (r.hubGroup) {
-        r.hubGroup.getWorldPosition(v);
-        this.group.worldToLocal(v).add(r.offset);
-      } else {
-        v.copy(r.hyperPos);
-      }
-      return this.group.localToWorld(v);
-    }
-    return null;
-  }
+  // ---- per-node world positions: RETIRED (2026-08-13) ----
+  // `hyperWorldPos` and `ledgerWorldPos` existed for one purpose each: a camera framing on a
+  // single node. Both of those poses are gone — the ledger's on 2026-08-09 (three bespoke ledger
+  // framings retired, one commit tilt kept), hyper's today, because hyper's node rung frames the
+  // node's NETWORK (see the retirement note in domain/cameraRig.ts). Nothing else ever asked a
+  // node where it is in world space, and nothing should: framing math consumes LAYOUT data
+  // (rule 6), which is what these two read on the way out.
 
-  // The node's LEDGER LANE position in world space — layout data (ledgerPos carries the
-  // chamber orientation bake), NOT the rendered instance matrix, for the same reason as
-  // hyperWorldPos: mid-transition the instance is at the staging grid, and the camera must
-  // frame where the chip will LAND. Event-time (a focus), allocation fine.
-  ledgerWorldPos(id: string | null): THREE.Vector3 | null {
-    if (!id) return null;
-    const u = this.nodes.find((n) => n.nodeId === id);
-    if (u) return this.group.localToWorld(new THREE.Vector3().copy(u.ledgerPos));
-    const r = this.metaNodes && this.metaNodes.find((n) => n.nodeId === id);
-    if (r) return this.group.localToWorld(new THREE.Vector3().copy(r.ledgerPos));
-    return null;
-  }
 
   // Whether a node is part of the current network filter. `id` is the core a node belongs to.
   private _isActive(id: string): boolean {
@@ -1102,11 +1083,21 @@ export class Globe implements GeoViewHost {
 
   // Fit the packed staging row into the band the Engine measured (world units on the staging
   // plane). ONE factor drives BOTH the cell pitch and the chip scale: growing the cell alone
-  // would spread same-size chips into a sparse scatter, and the grid only reads as a square
+  // would spread same-size chips into a sparse scatter, and a block only reads as one shape
   // because the nodes ARE its pixels. Shrinking is unbounded (phone portrait — fitting is the
   // whole point); growth is capped by GATHER_MAX_GROWTH so a sparse network set can't blow up
   // to fill the screen.
+  //
+  // The band decides the pack's DEPTH, not the chip size (user, 2026-08-13 — "size should be
+  // same, just use the width better in scene mode", then "use the available width first, only
+  // then start placing nodes on more rows down"). Measuring the band in CAPPED pitches and
+  // solving the depth against that budget answers both at once: the pack that fits the budget is
+  // one the chips can be drawn at full size in, so scene mode's extra width comes back as a
+  // longer, shallower block, and only the integer remainder is left for the gutters. Re-packing
+  // is the depth CHANGING, so it costs one pass per presentation toggle, not one per frame.
   setGatherFit(availW: number, availH: number): void {
+    this._gatherBudget = availW / (GATHER_CELL * GATHER_MAX_GROWTH);
+    if (gatherRows(this._gatherGroups, this._gatherBudget) !== this._gatherRows) this._assignGatherSlots();
     const e = this._gatherExtent;
     const g = this._ctx.gather;
     let s = GATHER_MAX_GROWTH;
@@ -1115,6 +1106,9 @@ export class Globe implements GeoViewHost {
     if (!Number.isFinite(s) || s <= 0) s = 1;
     g.cell = GATHER_CELL * s;
     g.scale = GATHER_SCALE * s;
+    // In CELLS at the fitted pitch, then back to world units — one multiply so NodeFabric adds a
+    // ready offset per node rather than re-deriving the pitch.
+    g.spread = gatherSpread(availW / g.cell, e) * g.cell;
   }
 
   // -------------------------------------------------- morph between layouts

@@ -106,15 +106,21 @@ export function cohortFraming(out: CameraFraming): void {
   out.target.set(0, 18.8, 2);
 }
 
-// ---- the hyper NODE pose --------------------------------------------------------------------
-// Fly to a node's live shell point: pulled back along its outward radial, lifted a touch,
-// looking at the node itself (Engine's `hyperNode` resolver).
-export function hyperNodeFraming(nodeWorldPos: THREE.Vector3, out: CameraFraming): void {
-  _out.copy(nodeWorldPos).normalize();
-  out.pos.copy(nodeWorldPos).addScaledVector(_out, 9);
-  out.pos.y += 3;
-  out.target.copy(nodeWorldPos);
-}
+// ---- the hyper NODE pose: RETIRED (2026-08-13) ------------------------------------------------
+// `hyperNodeFraming` flew to a node's own shell point, pulled back along its outward radial. It is
+// gone and hyper's node rung delegates to its NETWORK's framing, the way the composition rung
+// already did (user, 2026-08-13 — "when a node is selected and i navigate to hyper view, it does
+// not correctly focus on the metagraph. It should behave the same as when (only) a metagraph filter
+// is selected"). The view's subject is the STRUCTURE: a node there is one bead on a shell, and
+// diving onto it loses the shells, the hub and the orbit that say what the bead is part of — the
+// same reason the ledger's node rung resolves to the chamber pose. Arriving from geo with a node
+// selected made it plainest, since the walk starts at the finest rung: the carried node framed
+// itself and the metagraph the user had committed never appeared.
+//
+// It also carried a mid-transition trap worth remembering if a per-node pose is ever tried again:
+// the framing has to read the node's LAYOUT position, never its rendered instance matrix, because
+// mid-flight the instance sits in the staging grid (`Globe.hyperWorldPos`, retired with it).
+// The nudge below is what answers the click now.
 
 // ---- camera CLOSENESS -----------------------------------------------------------------------
 // 0 at/beyond the overview altitude band, 1 at country/node range. The geo surface shaders
@@ -177,6 +183,45 @@ export function geoFraming(R: number, out: CameraFraming): void {
 // Engine.ts:784 `_updateTween`'s inline ease, lifted verbatim.
 export function easeInOutQuad(t: number): number {
   return t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
+}
+
+// ---- the COMMIT NUDGE -------------------------------------------------------------------------
+// EVERY commit animates the camera, and where the ladder resolves to the pose already held, the
+// animation is a NUDGE (user, 2026-08-13 — "we always animate the position but a 'nudge' is allowed
+// which means the new pos will be same as old pos"). A finer rung that shares its parent's framing
+// used to answer a click with no motion at all, which reads as a dropped input rather than as "you
+// are already looking at it" — and there are now several: every ledger rung delegates to the one
+// chamber pose, and hyper's node and composition rungs delegate to their network's.
+//
+// The nudge is a PULSE, not a flight, and the difference is the whole point: it pushes a little way
+// toward the pose's own target and eases back to exactly where it started, so the framing the user
+// committed is never disturbed. Two consequences the Engine relies on — it runs on its own short
+// clock (the smallest member of the navigation clock family), and it must NOT raise `cameraFlying`:
+// that dim exists so the scene under the phone's cards can be seen changing, and here nothing does.
+export const NUDGE_DUR = 0.55; //  seconds
+export const NUDGE_AMP = 0.04; //  peak push, as a fraction of the way toward the pose's target
+// Two poses are "the same" within this fraction of the ORBIT DISTANCE — relative, because the views
+// sit an order of magnitude apart in scale, and because a move too small to see is one the nudge
+// should replace rather than one the epsilon merely forgives.
+export const NUDGE_SAME = 0.004;
+
+/** Is the destination the pose the camera already holds — so this commit gets a nudge, not a flight? */
+export function isSamePose(
+  fromPos: THREE.Vector3,
+  fromTgt: THREE.Vector3,
+  toPos: THREE.Vector3,
+  toTgt: THREE.Vector3,
+): boolean {
+  const eps = NUDGE_SAME * Math.max(fromPos.distanceTo(fromTgt), 1);
+  return fromPos.distanceTo(toPos) <= eps && fromTgt.distanceTo(toTgt) <= eps;
+}
+
+/** The nudge's shape: how far toward the target the camera sits at time `t` (0..1), as a fraction.
+ *  Zero at BOTH ends with zero slope there, peaking at NUDGE_AMP halfway — so it composes onto a
+ *  resting pose without a start or a landing of its own, and t=1 restores that pose exactly. */
+export function nudgeMix(t: number): number {
+  const s = Math.sin(Math.PI * THREE.MathUtils.clamp(t, 0, 1));
+  return NUDGE_AMP * s * s;
 }
 
 // ---- the Snapshots COMMIT ORBIT -------------------------------------------------------------

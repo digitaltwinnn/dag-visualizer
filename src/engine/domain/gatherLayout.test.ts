@@ -1,32 +1,41 @@
 // src/engine/domain/gatherLayout.test.ts
 import { describe, it, expect } from "vitest";
-import { gatherSlots, gatherExtent, gatherBand, GATHER_GUTTER, GATHER_MAX_GROWTH } from "./gatherLayout";
+import {
+  gatherSlots, gatherExtent, gatherBand, gatherSpread, gatherRows,
+  GATHER_GUTTER, GATHER_GUTTER_MAX, GATHER_MAX_GROWTH,
+  type GatherExtent,
+} from "./gatherLayout";
 
 describe("gatherSlots", () => {
   it("gives every node exactly one slot, rank-ordered row-major", () => {
-    const m = gatherSlots([{ id: "dag", count: 5 }]);
+    const m = gatherSlots([{ id: "dag", count: 5 }], 2);
     const s = m.get("dag")!;
     expect(s).toHaveLength(5);
     s.forEach((slot, i) => {
       expect(slot.rank).toBe(i);
       expect(slot.count).toBe(5);
     });
-    // 5 nodes → cols = ceil(√5) = 3: ranks 0..2 on row 0, 3..4 on row 1
+    // 5 nodes, 2 rows deep → cols = ceil(5/2) = 3: ranks 0..2 on row 0, 3..4 on row 1
     expect(s[0].v).toBe(s[2].v);
     expect(s[3].v).toBeLessThan(s[0].v); // rows grow DOWNWARD (negative v)
   });
 
-  it("grids are near-square: cols = ceil(sqrt(n))", () => {
-    const s = gatherSlots([{ id: "dor", count: 21 }]).get("dor")!;
-    const cols = new Set(s.map((x) => x.u)).size;
-    expect(cols).toBe(5); // ceil(√21)
+  // The block is width-FIRST (user, 2026-08-13): the depth is given and the columns follow, so
+  // the same nodes lay out longer and shallower the more width the band has. The old rule was
+  // `cols = ceil(√count)` — width-agnostic, and the origin of the DAG's ten-row block.
+  it("fills the given depth's rows before it wraps: cols = ceil(n / rows)", () => {
+    const cols = (n: number, rows: number) => new Set(gatherSlots([{ id: "dor", count: n }], rows).get("dor")!.map((x) => x.u)).size;
+    expect(cols(21, 1)).toBe(21); // one row: every node side by side
+    expect(cols(21, 3)).toBe(7);
+    expect(cols(21, 5)).toBe(5);
+    expect(cols(21, 100)).toBe(1); // deeper than the count: one column, n rows
   });
 
-  it("a big network's square is visibly wider than a small one's (DAG rule)", () => {
+  it("a big network's block is visibly wider than a small one's (DAG rule)", () => {
     const m = gatherSlots([
       { id: "dag", count: 164 },
       { id: "paca", count: 3 },
-    ]);
+    ], 4);
     const width = (slots: { u: number }[]) =>
       Math.max(...slots.map((s) => s.u)) - Math.min(...slots.map((s) => s.u));
     expect(width(m.get("dag")!)).toBeGreaterThan(width(m.get("paca")!) * 3);
@@ -35,8 +44,8 @@ describe("gatherSlots", () => {
   it("packs groups left-to-right sorted by count desc with the gutter, centred on u=0", () => {
     const m = gatherSlots([
       { id: "small", count: 4 }, // 2×2
-      { id: "big", count: 16 }, // 4×4 — sorts FIRST despite input order
-    ]);
+      { id: "big", count: 16 }, // 8×2 — sorts FIRST despite input order
+    ], 2);
     const big = m.get("big")!, small = m.get("small")!;
     const bigMax = Math.max(...big.map((s) => s.u));
     const smallMin = Math.min(...small.map((s) => s.u));
@@ -47,21 +56,31 @@ describe("gatherSlots", () => {
   });
 
   it("is deterministic and skips zero-count groups", () => {
-    const a = gatherSlots([{ id: "x", count: 7 }, { id: "empty", count: 0 }]);
-    const b = gatherSlots([{ id: "x", count: 7 }, { id: "empty", count: 0 }]);
+    const a = gatherSlots([{ id: "x", count: 7 }, { id: "empty", count: 0 }], 3);
+    const b = gatherSlots([{ id: "x", count: 7 }, { id: "empty", count: 0 }], 3);
     expect(a.get("x")).toEqual(b.get("x"));
     expect(a.has("empty")).toBe(false);
   });
 
   it("empty input returns an empty map", () => {
-    expect(gatherSlots([])).toEqual(new Map());
+    expect(gatherSlots([], 4)).toEqual(new Map());
   });
 
   it("a single-network single-node input is one 1x1 grid at the packing origin", () => {
-    const m = gatherSlots([{ id: "solo", count: 1 }]);
+    const m = gatherSlots([{ id: "solo", count: 1 }], 3);
     expect(m.size).toBe(1);
     const s = m.get("solo")!;
-    expect(s).toEqual([{ u: 0, v: -0.5, rank: 0, count: 1 }]);
+    expect(s).toEqual([{ u: 0, v: -0.5, rank: 0, count: 1, gs: 0 }]);
+  });
+
+  // A depth is a count of rows, so anything that isn't one packs as a single row rather than
+  // dividing by it — the alternative is NaN slots, which would gather every node onto one point.
+  it("treats a nonsense depth as one row", () => {
+    const one = gatherSlots([{ id: "x", count: 4 }], 1).get("x")!;
+    expect(gatherSlots([{ id: "x", count: 4 }], 0).get("x")).toEqual(one);
+    expect(gatherSlots([{ id: "x", count: 4 }], -3).get("x")).toEqual(one);
+    expect(gatherSlots([{ id: "x", count: 4 }], Number.NaN).get("x")).toEqual(one);
+    expect(gatherSlots([{ id: "x", count: 4 }], 2.7).get("x")).toEqual(gatherSlots([{ id: "x", count: 4 }], 2).get("x"));
   });
 
   // The comparator carries an EXPLICIT secondary key (`a.id.localeCompare(b.id)`) for ties,
@@ -72,11 +91,11 @@ describe("gatherSlots", () => {
     const inOrder = gatherSlots([
       { id: "zzz", count: 5 },
       { id: "aaa", count: 5 },
-    ]);
+    ], 2);
     const reversed = gatherSlots([
       { id: "aaa", count: 5 },
       { id: "zzz", count: 5 },
-    ]);
+    ], 2);
     // "aaa" sorts first (leftmost, most-negative u) in BOTH calls.
     const leftMost = (m: Map<string, { u: number }[]>, id: string) => Math.min(...m.get(id)!.map((s) => s.u));
     expect(leftMost(inOrder, "aaa")).toBeLessThan(leftMost(inOrder, "zzz"));
@@ -84,20 +103,123 @@ describe("gatherSlots", () => {
     expect(inOrder.get("aaa")).toEqual(reversed.get("aaa"));
     expect(inOrder.get("zzz")).toEqual(reversed.get("zzz"));
   });
+
+  // `gs` is the lever that slides whole BLOCKS apart without touching the pitch inside one,
+  // so it has to be constant per group and centred on 0 — otherwise spreading would drag the
+  // whole row sideways instead of opening it symmetrically.
+  it("stamps every slot of a group with the same centred group index", () => {
+    const solo = gatherSlots([{ id: "only", count: 9 }], 3);
+    expect(new Set(solo.get("only")!.map((s) => s.gs))).toEqual(new Set([0]));
+
+    const three = gatherSlots([
+      { id: "big", count: 9 },
+      { id: "mid", count: 4 },
+      { id: "small", count: 1 },
+    ], 3);
+    // Packed biggest-first, so big/mid/small are groups 0/1/2 → -1/0/+1, summing to 0.
+    expect(new Set(three.get("big")!.map((s) => s.gs))).toEqual(new Set([-1]));
+    expect(new Set(three.get("mid")!.map((s) => s.gs))).toEqual(new Set([0]));
+    expect(new Set(three.get("small")!.map((s) => s.gs))).toEqual(new Set([1]));
+
+    // An EVEN count straddles the middle rather than favouring a side.
+    const two = gatherSlots([
+      { id: "big", count: 9 },
+      { id: "small", count: 1 },
+    ], 3);
+    expect(two.get("big")![0].gs).toBe(-0.5);
+    expect(two.get("small")![0].gs).toBe(0.5);
+  });
 });
 
-// The extent is what the scene fits into the viewport, so it MUST describe the grids that
+// The pack's depth is the band's answer, and the band is measured in CAPPED chip pitches — which
+// is what lets the fit hold chip size constant while the block reshapes (user, 2026-08-13).
+describe("gatherRows", () => {
+  const set = [{ id: "dag", count: 162 }, { id: "a", count: 3 }, { id: "b", count: 3 }, { id: "c", count: 3 }, { id: "d", count: 3 }];
+  const packedW = (groups: { id: string; count: number }[], rows: number) => gatherExtent(groups, rows).w;
+
+  it("answers the SHALLOWEST depth whose packed row still fits the budget", () => {
+    for (const budget of [26, 34.6, 62.6, 200]) {
+      const rows = gatherRows(set, budget);
+      expect(packedW(set, rows)).toBeLessThanOrEqual(budget);
+      if (rows > 1) expect(packedW(set, rows - 1)).toBeGreaterThan(budget); // one row shallower overflows
+    }
+  });
+
+  it("goes shallower as the band gets wider — the same nodes, more of the width used", () => {
+    const hud = gatherRows(set, 34.6); //   1600px viewport with both rails inline
+    const scene = gatherRows(set, 62.6); // …and with them away
+    expect(scene).toBeLessThan(hud);
+    expect(packedW(set, scene)).toBeGreaterThan(packedW(set, hud)); // the width goes into the block
+  });
+
+  it("never goes deeper than the near-square, however narrow the band", () => {
+    // The phone: the row's gutters alone outrun the whole budget, so NO depth fits and an
+    // uncapped search would walk to one column per group — 162 rows of DAG, which the fit then
+    // shrinks to dust. Overflow past the square is the fit's job.
+    const square = Math.ceil(Math.sqrt(162)); // 13
+    expect(gatherRows(set, 1)).toBe(square);
+    expect(gatherRows(set, 20)).toBe(square); // a portrait band: 8.8 cells of gutter, ~20 to spend
+    expect(gatherExtent(set, gatherRows(set, 1)).h).toBe(square);
+  });
+
+  it("falls back to the near-square when no band has been measured yet", () => {
+    // The first data load packs before any transition frame has run, so there is no budget to
+    // solve against; the fit re-packs on the frame it draws.
+    expect(gatherRows([{ id: "dag", count: 164 }], 0)).toBe(13); // ceil(√164)
+    expect(gatherRows([{ id: "dag", count: 164 }], Number.NaN)).toBe(13);
+  });
+
+  it("answers a usable depth for nothing at all", () => {
+    expect(gatherRows([], 50)).toBe(1);
+    expect(gatherRows([{ id: "empty", count: 0 }], 50)).toBe(1);
+  });
+});
+
+// The spare width goes HERE and nowhere else (user, 2026-08-13): chip size is capped and the
+// depth solve has already spent what it can on columns, so what is left over — the solve is
+// integer, so there always is some — can only buy space BETWEEN the blocks. These pin that the
+// arithmetic is a share-out with both ends closed.
+describe("gatherSpread", () => {
+  const extent = (w: number, gaps: number): GatherExtent => ({ w, h: 2, gaps });
+
+  it("answers 0 when there is no gap to spend it on", () => {
+    expect(gatherSpread(500, extent(4, 0))).toBe(0);
+    expect(gatherSpread(500, extent(0, -1))).toBe(0);
+  });
+
+  it("answers 0 for a band that is not wider than the packed row", () => {
+    expect(gatherSpread(20, extent(20, 1))).toBe(0);
+    expect(gatherSpread(5, extent(20, 1))).toBe(0); // a too-narrow band is the FIT's problem
+    expect(gatherSpread(Number.NaN, extent(20, 1))).toBe(0);
+  });
+
+  it("shares the slack equally between the gaps", () => {
+    expect(gatherSpread(26, extent(20, 3))).toBeCloseTo(2, 6);
+    expect(gatherSpread(26, extent(20, 6))).toBeCloseTo(1, 6);
+  });
+
+  it("caps the total gutter so two networks can't fly to opposite edges", () => {
+    expect(gatherSpread(10_000, extent(20, 1))).toBeCloseTo(GATHER_GUTTER_MAX - GATHER_GUTTER, 6);
+    expect(GATHER_GUTTER + gatherSpread(10_000, extent(20, 1))).toBeCloseTo(GATHER_GUTTER_MAX, 6);
+  });
+});
+
+// The extent is what the scene fits into the viewport, so it MUST describe the blocks that
 // gatherSlots actually lays out — the two share one packing pass precisely so they can't
 // disagree. These tests measure the slots and compare, rather than restating the arithmetic.
 describe("gatherExtent", () => {
-  const measured = (groups: { id: string; count: number }[]) => {
-    const m = gatherSlots(groups);
+  const measured = (groups: { id: string; count: number }[], rows: number) => {
+    const m = gatherSlots(groups, rows);
     const all = [...m.values()].flat();
-    if (!all.length) return { w: 0, h: 0 };
+    if (!all.length) return { w: 0, h: 0, gaps: 0 };
     // Slots are cell CENTRES (u = left + 0.5, v = -(row + 0.5)), so the edge-to-edge extent is
     // the centre span plus one whole cell.
     const us = all.map((s) => s.u), vs = all.map((s) => s.v);
-    return { w: Math.max(...us) - Math.min(...us) + 1, h: Math.max(...vs) - Math.min(...vs) + 1 };
+    return {
+      w: Math.max(...us) - Math.min(...us) + 1,
+      h: Math.max(...vs) - Math.min(...vs) + 1,
+      gaps: groups.filter((g) => g.count > 0).length - 1,
+    };
   };
 
   it("matches the extent of the slots gatherSlots actually places", () => {
@@ -107,23 +229,30 @@ describe("gatherExtent", () => {
       { id: "paca", count: 12 },
       { id: "ded", count: 3 },
     ];
-    expect(gatherExtent(groups)).toEqual(measured(groups));
+    for (const rows of [1, 4, 7, 13, 40]) {
+      const e = gatherExtent(groups, rows), m = measured(groups, rows);
+      expect(e.w).toBeCloseTo(m.w, 6); // summed vs measured: the same width, different float order
+      expect({ h: e.h, gaps: e.gaps }).toEqual({ h: m.h, gaps: m.gaps });
+    }
   });
 
-  it("counts the gutters between squares, not around them", () => {
+  it("counts the gutters between blocks, not around them", () => {
     // Two 2×2 grids: 2 + gutter + 2 cells wide, 2 rows tall.
-    expect(gatherExtent([{ id: "a", count: 4 }, { id: "b", count: 4 }])).toEqual({ w: 4 + GATHER_GUTTER, h: 2 });
+    expect(gatherExtent([{ id: "a", count: 4 }, { id: "b", count: 4 }], 2)).toEqual({ w: 4 + GATHER_GUTTER, h: 2, gaps: 1 });
   });
 
-  it("is the TALLEST group's row count, since grids hang from one shared top edge", () => {
-    // 164 → 13 cols × 13 rows; 3 → 2 cols × 2 rows. The band's height is the deeper one.
-    expect(gatherExtent([{ id: "dag", count: 164 }, { id: "tiny", count: 3 }]).h).toBe(13);
+  it("is the DEEPEST group's row count, which a group smaller than the depth stays under", () => {
+    // 164 at depth 4 → 41 cols × 4 rows; 3 → one column, 3 rows. The band's height is the deeper.
+    expect(gatherExtent([{ id: "dag", count: 164 }, { id: "tiny", count: 3 }], 4).h).toBe(4);
+    // …and with the DAG filtered out, the deepest is that same little column — never the depth
+    // it was allowed, because rows follow the nodes there are.
+    expect(gatherExtent([{ id: "tiny", count: 3 }], 4).h).toBe(3);
   });
 
   it("skips zero-count groups and answers 0×0 for nothing at all", () => {
-    expect(gatherExtent([])).toEqual({ w: 0, h: 0 });
-    expect(gatherExtent([{ id: "empty", count: 0 }])).toEqual({ w: 0, h: 0 });
-    expect(gatherExtent([{ id: "x", count: 4 }, { id: "empty", count: 0 }])).toEqual({ w: 2, h: 2 });
+    expect(gatherExtent([], 3)).toEqual({ w: 0, h: 0, gaps: 0 });
+    expect(gatherExtent([{ id: "empty", count: 0 }], 3)).toEqual({ w: 0, h: 0, gaps: 0 });
+    expect(gatherExtent([{ id: "x", count: 4 }, { id: "empty", count: 0 }], 2)).toEqual({ w: 2, h: 2, gaps: 0 });
   });
 });
 

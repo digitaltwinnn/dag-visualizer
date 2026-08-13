@@ -1,24 +1,40 @@
 // src/engine/domain/gatherLayout.ts
 // The staging-grid layout for the view-transition choreography (spec 2026-07-17): each
-// network's nodes gather into one near-square grid ("a small coloured square" — the nodes
-// ARE the pixels, identity-hued), squares packed in a row sorted by size, so the DAG's big
-// block reads next to the small metagraphs'. Pure 2D CELL units; the scene maps cells onto a
-// camera-anchored plane at the top of the viewport per frame. Event-time only (data
-// rebuilds) — allocation here is fine.
+// network's nodes gather into one coloured block (the nodes ARE its pixels, identity-hued),
+// blocks packed in a row sorted by size, so the DAG's big block reads next to the small
+// metagraphs'. Pure 2D CELL units; the scene maps cells onto a camera-anchored plane at the top
+// of the viewport per frame. Event-time only (data rebuilds, and a band whose solved depth
+// changed) — allocation here is fine.
+//
+// ⚠️ THE BLOCK IS WIDTH-FIRST, NOT A SQUARE (user, 2026-08-13 — "use the available width
+// optimally … currently in scene mode DAG does ~10 rows down while we instead should use the
+// available width first, only then start placing nodes on more rows down"). It was
+// `cols = ceil(√count)`, which is width-AGNOSTIC: the DAG's 162 nodes packed a 13×13 block that
+// hung ten rows down the viewport while scene mode's band still had hundreds of unused pixels
+// either side. The DEPTH is now solved against the band (`gatherRows`) and the columns fall out
+// of it, so a block fills the width it is given before it wraps, and the wider band answers with
+// a longer, shallower block instead of a bigger one. Chip SIZE is not part of this — see
+// GATHER_MAX_GROWTH.
 
 export interface GatherSlot {
   u: number; //     x, in cell units, centred on 0 across the whole staging row
   v: number; //     y, in cell units; 0 = top edge, rows DOWNWARD: v = -(row + 0.5)
   rank: number; //  row-major index within the network's grid — the stagger rank
   count: number; // the network's node count (stagger denominator)
+  /** The slot's own GROUP index, centred: `i - (n-1)/2`. Multiplied by the spare gutter the
+   *  band can afford (gatherSpread) it slides whole blocks apart without touching the pitch
+   *  INSIDE them — which is how leftover width buys spacing instead of chip size. */
+  gs: number;
 }
 
-export const GATHER_GUTTER = 1.5; // empty cells between adjacent network squares
+export const GATHER_GUTTER = 2.2; // empty cells between adjacent network blocks, always
+export const GATHER_GUTTER_MAX = 9; // …and the most spare width may open it to
 
 /** The packed row's extent, in CELL units — what the band has to fit into the viewport. */
 export interface GatherExtent {
   w: number; // total width of the packed row, gutters included
-  h: number; // the tallest group's row count (grids hang DOWNWARD from the band's top edge)
+  h: number; // the deepest group's row count (blocks hang DOWNWARD from the band's top edge)
+  gaps: number; // gutters in the row (groups - 1) — what spare width is shared between
 }
 
 // ── Where the band sits in the viewport ────────────────────────────────────────
@@ -35,22 +51,74 @@ const BOTTOM_RESERVE = 130; // --bottom-reserve, the LiveStrip lane
 const RAILS_TIER = 1100; //    below this the rails are dock sheets, not inline columns
 const BAND_MARGIN = 24; //     breathing room between the band and whatever bounds it
 
-/** How far the band may grow past its tuned cell size when there is room (a sparse network set
- *  would otherwise blow up to fill the screen). Shrinking below 1 is deliberately unbounded —
- *  that is the phone-portrait case, where fitting is the whole point. It stays a cap rather than
- *  a free fit because a 3-node filter has nothing to fill the band WITH — this is the chip size
- *  the staging square tops out at.
+/** How far the band may grow past its tuned cell size when there is room. A sparse network set
+ *  would otherwise blow up to fill the screen: a 3-node filter has nothing to fill a band WITH,
+ *  so this is the chip size the staging block tops out at. Shrinking below 1 is deliberately
+ *  unbounded — that is the phone-portrait case, where fitting is the whole point.
  *
- *  ⚠️ THE CAP IS A SIZE, NOT A FILL (user, 2026-08-13 — "in scene mode the nodes are much larger
- *  and don't fit in the view length"). It was briefly tuned (2.4, 2026-08-12) to the point where
- *  the full network set exactly FILLED the scene-mode band, which made the fit a free one in
- *  disguise: with the rails away the band is ~1.8× wider, so the same row of chips inflated by
- *  1.8× and ran edge to edge with no slack. A wider band means the square gets more ROOM, not
- *  more pixels — at 1.75 the full set spans ~80% of the scene band, centred, still visibly more
- *  extended than the rails leave it, and the chips land near the size the HUD-mode row already
- *  read well at. The cap is what makes scene mode differ from HUD mode at all: HUD is width-bound
- *  at 1600 and never reaches it. */
-export const GATHER_MAX_GROWTH = 1.75;
+ *  ⚠️ THE CAP IS NOT WHAT KEEPS THE TWO PRESENTATIONS THE SAME SIZE (user, 2026-08-13 — "why is
+ *  the node size different when staged at the top for different modes? Size should be same, just
+ *  use the width better in scene mode"). It was tuned twice (2.4, then 1.75) to whatever made the
+ *  full set FILL the scene-mode band, which is a free fit in disguise: scene mode's band is ~1.8×
+ *  the railed one, so every spare pixel went into the CHIPS and the same nodes staged 46% larger
+ *  with the rails away. The BAND is now what absorbs that difference — `gatherRows` packs the
+ *  same chips into fewer, longer rows when there is more width — so the cap is simply the staged
+ *  chip size wherever the solved pack fits, and the fit only shrinks below it when the band
+ *  genuinely can't hold the deepest pack (a phone) or is too short for its rows. */
+export const GATHER_MAX_GROWTH = 1.25;
+
+/**
+ * How many rows deep the packed row has to go to fit `budgetCells` of width: the SMALLEST depth
+ * whose packed width fits, so each block fills the width available to it before it wraps
+ * (user, 2026-08-13 — "use the available width first, only then start placing nodes on more rows
+ * down"). `budgetCells` is the band measured in CAPPED chip pitches, which is what makes the two
+ * halves of the size rule hold at once: the pack that fits that budget is by construction a pack
+ * the fit can draw at full chip size, so a wider band answers with a longer block rather than a
+ * bigger one.
+ *
+ * Columns fall out of the depth (`ceil(count / rows)`), so a group smaller than the depth is one
+ * column tall — no group is ever deeper than the answer, and the blocks all hang from the same
+ * top edge. With no band measured yet (first data load, before any transition frame) it answers
+ * the near-square the row used to pack; the first fit replaces it.
+ *
+ * ⚠️ THE NEAR-SQUARE IS THE FLOOR, NOT JUST THE UNMEASURED ANSWER. A band too narrow to hold ANY
+ * pack is the phone case, and there the search must stop rather than keep going deeper: the row's
+ * gutters alone can exceed the whole budget (9 networks = 17.6 cells against a portrait band's
+ * ~20), so nothing ever fits and an uncapped search walks to one column per group — the DAG's 162
+ * nodes in a single 162-row thread, which the fit then shrinks to dust to make it fit the height.
+ * Past the square, depth stops buying real width anyway (the gutters don't move), so it is the
+ * last shape worth having; overflow from there is the FIT's job, which is exactly how the
+ * width-agnostic pack degraded before this.
+ */
+export function gatherRows(groups: { id: string; count: number }[], budgetCells: number): number {
+  const counts = groups.filter((g) => g.count > 0).map((g) => g.count);
+  if (!counts.length) return 1;
+  const deepest = Math.max(...counts);
+  const square = Math.ceil(Math.sqrt(deepest)); // the width-agnostic pack: the floor on depth
+  if (!Number.isFinite(budgetCells) || budgetCells <= 0) return square;
+  const gutters = GATHER_GUTTER * (counts.length - 1);
+  for (let rows = 1; rows < square; rows++) {
+    let w = gutters;
+    for (const c of counts) w += Math.ceil(c / rows);
+    if (w <= budgetCells) return rows;
+  }
+  return square;
+}
+
+/**
+ * The extra gutter, in cells, that the leftover width buys: with the chip size and the pack's
+ * depth both already decided, what is left over can only be spent on the space BETWEEN the
+ * blocks. `availCells` is the band measured in the fitted cell pitch, so this reads as "cells of
+ * slack, shared between the gaps". The solve is integer — a row is a whole column wider or
+ * narrower — so there is always a remainder for this to take up. Capped so two networks can't fly
+ * to opposite edges of a wide screen, and never negative: a band too narrow for the packed row is
+ * the fit's problem, not the spacing's.
+ */
+export function gatherSpread(availCells: number, extent: GatherExtent): number {
+  if (extent.gaps <= 0 || !Number.isFinite(availCells)) return 0;
+  const extra = (availCells - extent.w) / extent.gaps;
+  return Math.max(0, Math.min(GATHER_GUTTER_MAX - GATHER_GUTTER, extra));
+}
 
 /** The band's box, expressed against the camera frustum so the scene can use it at any pose. */
 export interface GatherBand {
@@ -70,6 +138,12 @@ export interface GatherBand {
  * are not present"). Centred on the SCREEN rather than on the gap, so the band doesn't slide
  * sideways when the rails come and go — it just gets wider — which means the binding rail is
  * whichever reaches further in, the right one.
+ *
+ * ⚠️ The band is what the pack is SOLVED against (user, 2026-08-13), not just what it is drawn
+ * into: `gatherRows` reads its width in capped chip pitches and answers with a depth, so scene
+ * mode's extra width comes back as a longer, shallower block at the same chip size. Sizing the
+ * chips off this width instead — which is what it used to do — is what made the same nodes stage
+ * larger in scene mode than in HUD mode.
  */
 export function gatherBand(viewW: number, viewH: number, railsHidden: boolean): GatherBand {
   const railed = !railsHidden && viewW >= RAILS_TIER;
@@ -84,34 +158,39 @@ export function gatherBand(viewW: number, viewH: number, railsHidden: boolean): 
 }
 
 // The packing pass both public functions read, so the measured extent is always the extent of
-// the grids actually laid out. Live groups only, biggest first (the DAG's block leads), each a
-// near-square grid.
-function packed(groups: { id: string; count: number }[]): { g: { id: string; count: number }; cols: number }[] {
+// the blocks actually laid out. Live groups only, biggest first (the DAG's block leads), each
+// `rows` deep at most — the columns follow from the depth, which is what makes the pack
+// width-first.
+function packed(groups: { id: string; count: number }[], rows: number): { g: { id: string; count: number }; cols: number }[] {
+  const r = Number.isFinite(rows) && rows >= 1 ? Math.floor(rows) : 1;
   return groups
     .filter((g) => g.count > 0)
     .sort((a, b) => b.count - a.count || a.id.localeCompare(b.id))
-    .map((g) => ({ g, cols: Math.ceil(Math.sqrt(g.count)) }));
+    .map((g) => ({ g, cols: Math.ceil(g.count / r) }));
 }
 
-export function gatherExtent(groups: { id: string; count: number }[]): GatherExtent {
-  const dims = packed(groups);
-  const w = dims.reduce((a, d) => a + d.cols, 0) + GATHER_GUTTER * Math.max(0, dims.length - 1);
+export function gatherExtent(groups: { id: string; count: number }[], rows: number): GatherExtent {
+  const dims = packed(groups, rows);
+  const gaps = Math.max(0, dims.length - 1);
+  const w = dims.reduce((a, d) => a + d.cols, 0) + GATHER_GUTTER * gaps;
   const h = dims.reduce((a, d) => Math.max(a, Math.ceil(d.g.count / d.cols)), 0);
-  return { w, h };
+  return { w, h, gaps };
 }
 
-export function gatherSlots(groups: { id: string; count: number }[]): Map<string, GatherSlot[]> {
-  const dims = packed(groups);
-  const totalW = gatherExtent(groups).w;
+export function gatherSlots(groups: { id: string; count: number }[], rows: number): Map<string, GatherSlot[]> {
+  const dims = packed(groups, rows);
+  const totalW = gatherExtent(groups, rows).w;
+  const mid = (dims.length - 1) / 2;
   // Slots, packed left→right starting at -totalW/2.
   const out = new Map<string, GatherSlot[]>();
   let x0 = -totalW / 2;
-  for (const { g, cols } of dims) {
+  for (let gi = 0; gi < dims.length; gi++) {
+    const { g, cols } = dims[gi];
     const slots: GatherSlot[] = [];
     for (let i = 0; i < g.count; i++) {
       const col = i % cols;
       const row = Math.floor(i / cols);
-      slots.push({ u: x0 + col + 0.5, v: -(row + 0.5), rank: i, count: g.count });
+      slots.push({ u: x0 + col + 0.5, v: -(row + 0.5), rank: i, count: g.count, gs: gi - mid });
     }
     out.set(g.id, slots);
     x0 += cols + GATHER_GUTTER;

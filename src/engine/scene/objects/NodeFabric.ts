@@ -55,6 +55,9 @@ const _col = new THREE.Color();          // scratch colour for dim recolouring
 const geoCcOf = (pick: PickDescriptor): string | null =>
   ("geo" in pick && pick.geo ? pick.geo.cc ?? null : null);
 
+// The staging-slot fields _applyGather reads — both record types carry them (domain/records).
+type GatherRef = { gU: number; gV: number; gS: number };
+
 // Everything the per-frame node writes need, in one struct (see file header). Globe builds it each
 // frame after easing its dim state.
 export interface FrameCtx {
@@ -72,7 +75,7 @@ export interface FrameCtx {
   group: THREE.Group;   // the (rotating) globe group — for hub world->local conversion
   // View-transition inputs (persistent objects; Globe writes them each frame):
   transition: ViewTransition | null;
-  gather: { origin: THREE.Vector3; right: THREE.Vector3; up: THREE.Vector3; quat: THREE.Quaternion; cell: number; scale: number };
+  gather: { origin: THREE.Vector3; right: THREE.Vector3; up: THREE.Vector3; quat: THREE.Quaternion; cell: number; scale: number; spread: number };
 }
 
 export class NodeFabric {
@@ -303,17 +306,19 @@ export class NodeFabric {
     return tr && tr.active() ? tr.gatherWeight(rank, count) : 0;
   }
 
-  private _applyGather(ctx: FrameCtx, gU: number, gV: number, gw: number, primary: boolean): void {
+  private _applyGather(ctx: FrameCtx, r: GatherRef, gw: number, primary: boolean): void {
     if (gw <= 0) return;
     // A dynamically-invisible non-primary (e.g. a hybrid's shell record hidden in geo) already
     // wrote a zero scale — it doesn't fly, it stays zero-scaled wherever it is. Without this,
     // GATHER_SCALE/max(1e-6, scale.x) blows up into a huge multiplier that only stays inert
     // because 0×huge=0; bail explicitly instead of relying on that accident.
     if (_dummy.scale.x < 1e-4) return;
+    // gU is the packed column, gS the square's own place in the row: the spare gutter the band
+    // can afford slides whole squares apart and never changes the pitch inside one.
     _gatherV
       .copy(ctx.gather.origin)
-      .addScaledVector(ctx.gather.right, gU * ctx.gather.cell)
-      .addScaledVector(ctx.gather.up, gV * ctx.gather.cell);
+      .addScaledVector(ctx.gather.right, r.gU * ctx.gather.cell + r.gS * ctx.gather.spread)
+      .addScaledVector(ctx.gather.up, r.gV * ctx.gather.cell);
     _dummy.position.lerp(_gatherV, gw);
     // Face the camera with the biggest surface (user): slerp toward the staging basis —
     // local +Y (the chip's bright top cap; the cylinder axis) aimed at the viewer, X/Z
@@ -364,7 +369,7 @@ export class NodeFabric {
           // dim-shrink was the committed-lane emphasis, retired with the fixed lane field).
           const sL = u.hyperSize * LEDGER.dot;
           _dummy.scale.set(sL, HEX_H, sL);
-          this._applyGather(ctx, u.gU, u.gV, gw, prim);
+          this._applyGather(ctx, u, gw, prim);
         }
         _dummy.updateMatrix();
         this.instHex.setMatrixAt(u.index, _dummy.matrix);
@@ -394,7 +399,7 @@ export class NodeFabric {
       _qSpin.setFromAxisAngle(u.spinAxis, u.spinPhase + t * u.spinSpeed);
       _dummy.quaternion.copy(_qSpin);
       _dummy.scale.setScalar(u.hyperSize * (1 - (u.noGeo ? w : wEff)) * (u.noGeo ? 1 - e : 1) * show);
-      this._applyGather(ctx, u.gU, u.gV, gw, prim);
+      this._applyGather(ctx, u, gw, prim);
       _dummy.updateMatrix();
       this.instSphere.setMatrixAt(u.index, _dummy.matrix);
 
@@ -407,7 +412,7 @@ export class NodeFabric {
       // fall lifts with gw: a far-side chip must still fill its staging pixel mid-flight.
       const gV = u.noGeo ? 0 : wEff * (fall + (1 - fall) * gw) * show;
       _dummy.scale.set(u.geoSize * gV, HEX_H * gV, u.geoSize * gV);
-      this._applyGather(ctx, u.gU, u.gV, gw, prim);
+      this._applyGather(ctx, u, gw, prim);
       _dummy.updateMatrix();
       this.instHex.setMatrixAt(u.index, _dummy.matrix);
     }
@@ -568,7 +573,7 @@ export class NodeFabric {
           _dummy.quaternion.copy(_qLedgerChip); // cap toward the camera, like the tray face
           const sL = r.hyperSize * LEDGER.dot;
           _dummy.scale.set(sL, HEX_H, sL);
-          this._applyGather(ctx, r.gU, r.gV, gw, prim);
+          this._applyGather(ctx, r, gw, prim);
         }
         _dummy.updateMatrix();
         this.metaHex.setMatrixAt(r.index, _dummy.matrix);
@@ -586,7 +591,7 @@ export class NodeFabric {
       _qSpin.setFromAxisAngle(r.spinAxis, r.spinPhase + clock * r.spinSpeed);
       _dummy.quaternion.copy(_qSpin);
       _dummy.scale.setScalar(r.hyperSize * (1 - wEff) * vis);
-      this._applyGather(ctx, r.gU, r.gV, gw, prim);
+      this._applyGather(ctx, r, gw, prim);
       _dummy.updateMatrix();
       this.metaSphere.setMatrixAt(r.index, _dummy.matrix);
 
@@ -596,7 +601,7 @@ export class NodeFabric {
       _dummy.quaternion.copy(_qRadial);
       const gM = wEff * (fall + (1 - fall) * gw) * vis; // fall lifts with gw (see validators)
       _dummy.scale.set(r.geoSize * gM, HEX_H * gM, r.geoSize * gM);
-      this._applyGather(ctx, r.gU, r.gV, gw, prim);
+      this._applyGather(ctx, r, gw, prim);
       _dummy.updateMatrix();
       this.metaHex.setMatrixAt(r.index, _dummy.matrix);
     }
