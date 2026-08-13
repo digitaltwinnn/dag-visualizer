@@ -29,21 +29,21 @@ describe("payloadKinds", () => {
       { MetagraphBatchMessage: { a: 2 } },
       { MetagraphBatchMessage: { a: 3 } },
     ]);
-    expect(rows).toEqual([{ kind: "MetagraphBatchMessage", count: 3 }]);
+    expect(rows).toEqual([{ kind: "MetagraphBatchMessage", fields: null, count: 3 }]);
   });
 
   it("keeps kinds in order of first appearance, so the table is deterministic", () => {
     const rows = payloadKinds([{ B: 1 }, { A: 1 }, { B: 2 }]);
     expect(rows.map((r) => r.kind)).toEqual(["B", "A"]);
     expect(rows).toEqual([
-      { kind: "B", count: 2 },
-      { kind: "A", count: 1 },
+      { kind: "B", fields: null, count: 2 },
+      { kind: "A", fields: null, count: 1 },
     ]);
   });
 
   it("counts a non-array payload as the one record it is, rather than hiding it", () => {
-    expect(payloadKinds({ state: { a: 1 } })).toEqual([{ kind: "state", count: 1 }]);
-    expect(payloadKinds(7)).toEqual([{ kind: "number", count: 1 }]);
+    expect(payloadKinds({ state: { a: 1 } })).toEqual([{ kind: "state", fields: null, count: 1 }]);
+    expect(payloadKinds(7)).toEqual([{ kind: "number", fields: null, count: 1 }]);
   });
 
   it("reads an absent or empty payload as no rows — the lane then shows only its raw section", () => {
@@ -69,7 +69,7 @@ describe("PAYLOAD_LANES", () => {
 describe("parsePayload", () => {
   it("decodes JSON, and feeds payloadKinds directly", () => {
     expect(parsePayload('[{"a":1},{"a":2}]')).toEqual([{ a: 1 }, { a: 2 }]);
-    expect(payloadKinds(parsePayload('[{"a":1},{"a":2}]'))).toEqual([{ kind: "a", count: 2 }]);
+    expect(payloadKinds(parsePayload('[{"a":1},{"a":2}]'))).toEqual([{ kind: "a", fields: null, count: 2 }]);
   });
 
   it("keeps an undecodable payload as its own string rather than hiding it", () => {
@@ -80,5 +80,18 @@ describe("parsePayload", () => {
     expect(parsePayload(undefined)).toBeNull();
     expect(parsePayload("")).toBeNull();
     expect(payloadKinds(parsePayload(undefined))).toEqual([]);
+  });
+});
+
+describe("payloadKinds · fields (the schema as structure, 2026-08-13)", () => {
+  it("a flat multi-field record carries its field names in record order; one-word kinds carry null", () => {
+    const rows = payloadKinds([
+      { publicId: 1, signature: "s", dts: 2 },
+      { MetagraphBatchMessage: { root: "r" } },
+      "str",
+    ]);
+    expect(rows.find((r) => r.kind === "publicId · signature · dts")?.fields).toEqual(["publicId", "signature", "dts"]);
+    expect(rows.find((r) => r.kind === "MetagraphBatchMessage")?.fields).toBeNull();
+    expect(rows.find((r) => r.kind === "string")?.fields).toBeNull();
   });
 });

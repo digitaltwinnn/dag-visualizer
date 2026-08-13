@@ -32,8 +32,11 @@
 // behind a button/dropdown section so that it doesn't make the view too busy"). Three lanes had
 // arrived at three different shapes: state opened with a shape table, data with a naked JSON tree,
 // signers with bare rows. Now every lane renders the SAME three parts in the same order:
-//   1. a NOTE — one micro line of the lane's own facts, always in the same position (a lane with
-//      no facts of its own renders none rather than a padded-out placeholder);
+//   1. a NOTE — one micro line of the lane's own facts, in one position when a lane HAS any.
+//      The payload lanes no longer do (user, 2026-08-13): their notes had shrunk to a bare
+//      decoded-KB reading, the number family retired everywhere else that day (card headlines,
+//      tab counts) for confusing against the wire size — so both open straight on their shape
+//      table, and only the signer groups keep notes (cluster + layer: real facts, not sizes);
 //   2. a two-column TABLE, `LaneTable`, so the shape of the payload is what the lane opens with —
 //      the data lane's rows come from `payloadKinds`, the mechanical read that gives it the same
 //      shape table the server already computes for state;
@@ -52,10 +55,11 @@ import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { useStore } from "@/src/store/store";
 import { metaSnapDeepKey } from "@/src/data/types";
 import type { NodeRow } from "@/src/data/types";
-import { metagraphById, resolveSigner, shortHash, SIGNER_GROUPS, SIGNER_UNKNOWN } from "@/src/data/network";
+import { getNetwork, metagraphById, resolveSigner, shortHash, SIGNER_GROUPS, SIGNER_UNKNOWN } from "@/src/data/network";
+import { snapsAtTick } from "@/src/data/anchorLog";
 import { PAYLOAD_LANES, parsePayload, payloadKinds } from "@/src/data/payloadKinds";
 import { identityHudHex } from "@/src/palette/identity";
-import { FootRow, IdentityDot } from "@/components/inspector/parts";
+import { CopyButton, FootRow, IdentityDot } from "@/components/inspector/parts";
 import { fmtDag, fmtKB } from "@/src/util/format";
 import JsonTree from "@/components/datasection/JsonTree";
 import { cn } from "@/lib/utils";
@@ -113,12 +117,46 @@ function LaneTable({
       <TableBody>
         {rows.map((r) => (
           <TableRow key={r.key} title={r.title}>
-            <TableCell className={cn("truncate", r.muted && "italic text-muted-foreground")}>{r.a}</TableCell>
-            <TableCell className="text-right tabular-nums truncate">{r.b}</TableCell>
+            {/* text-label, not the Table default body size (user, 2026-08-13 — "the font of the
+                state key column looks unusually large"): the lane sits in the label/micro
+                register everywhere else, and a JSON key is an identifier, so mono. */}
+            <TableCell className={cn("truncate text-label font-mono", r.muted && "italic font-sans text-muted-foreground")}>{r.a}</TableCell>
+            <TableCell className="text-right tabular-nums truncate text-label">{r.b}</TableCell>
           </TableRow>
         ))}
       </TableBody>
     </Table>
+  );
+}
+
+/** The data lane's SCHEMA read (user, 2026-08-13 — the joined "attribute · attribute · …" kind
+ *  string read as one unparseable token): each record kind renders its field names as discrete
+ *  squared chips that wrap, the count on the head line — a schema as tokens, not prose. A kind
+ *  that is already one word (a wrapper name, a JSON type) renders as a single chip. Mechanical
+ *  like its source (payloadKinds): the chips are the record's own keys, never an inferred schema. */
+function SchemaKinds({ kinds }: { kinds: { kind: string; fields: string[] | null; count: number }[] }) {
+  return (
+    <div className="flex flex-col gap-2">
+      <div className="flex items-baseline justify-between gap-2.5">
+        <span className={LANE_HEAD}>Schema</span>
+        <span className={LANE_HEAD}>Records</span>
+      </div>
+      {kinds.map((k) => (
+        <div key={k.kind} className="flex items-start justify-between gap-3" title={k.kind}>
+          <span className="min-w-0 flex flex-wrap gap-1">
+            {(k.fields ?? [k.kind]).map((f) => (
+              <span
+                key={f}
+                className="inline-flex items-center rounded-xs border border-border bg-wash-faint px-[5px] py-[2px] font-mono text-micro leading-none text-muted-foreground"
+              >
+                {f}
+              </span>
+            ))}
+          </span>
+          <span className="flex-none text-right tabular-nums text-body">{k.count.toLocaleString()}</span>
+        </div>
+      ))}
+    </div>
   );
 }
 
@@ -197,7 +235,24 @@ function SignerGroup({
           const w = r.known ? null : SIGNER_UNKNOWN[r.reason];
           return {
             key: id,
-            a: r.known ? r.row.city : w!.label,
+            // The NODE is the machine's own reference, never its city (user, 2026-08-13 —
+            // "Portland is not signing the data"; the same critique that retired the card's
+            // signer table on 2026-08-10, still living here). A signature ties to a MACHINE:
+            // its node id names it, the signer id beside it is the layer key it signed with —
+            // a hybrid's two ids differing is exactly the fact this table exists to show.
+            // The NODE id takes the copy control (user, 2026-08-13 — the machine's reference is
+            // the value you take elsewhere; the signer id is an 8-char server-truncated prefix,
+            // a match key rather than a reference worth carrying out).
+            a: r.known ? (
+              <span className="group/copy inline-flex items-center gap-1.5 min-w-0">
+                <span className="font-mono text-label truncate" title={r.row.id ?? undefined}>
+                  {r.row.id ? shortHash(r.row.id) : r.row.label}
+                </span>
+                {r.row.id && <CopyButton value={r.row.id} subject="node id" />}
+              </span>
+            ) : (
+              w!.label
+            ),
             muted: !r.known,
             title: w ? w.title : id,
             b: <span className="font-mono text-label text-muted-foreground">{id}</span>,
@@ -274,6 +329,10 @@ export function ChannelStatePanel() {
   const cfg = metagraphById(sel.metaId);
   const ticker = cfg?.ticker || cfg?.name || shortHash(sel.metaId);
   const hue = identityHudHex(sel.metaId);
+  // The snapshot's OWN hash, tiered like the card's foot: descriptor first, polled record behind
+  // it (a pager-stepped or exact-read-built selection carries hash "").
+  const net = getNetwork();
+  const hash = sel.hash || (net ? snapsAtTick(net.metaSnaps, sel.metaId, sel.ts).find((r) => r.ordinal === sel.ordinal)?.hash : "") || "";
 
   return (
     <div className="flex flex-col gap-3 min-h-0 h-full">
@@ -307,22 +366,22 @@ export function ChannelStatePanel() {
         </p>
       ) : (
         <>
-          {/* The chain facts, TIERED instead of flat (redesign 2026-08-13 — the five-row grid
-              duplicated the HUD card at equal weight and pushed the payload down): the LEAD is
-              the card grammar's own composed line (fee bold, units carrying their labels), the
-              bookkeeping trio rides one muted line under it, and the REFERENCES (parent, state
-              proof) sink to the foot strip at the pane's bottom, where references sit. */}
-          <div className="flex flex-col gap-0.5 flex-none">
-            <p className="text-body text-foreground">
-              <b className="font-bold tabular-nums">{fmtDag(deep.fee)}</b> DAG ·{" "}
-              {/* "· compressed" names the basis — the wire footprint vs the lanes' decoded
-                  sizes; the two readings can never sum (see the card's same note). */}
-              <span className="tabular-nums">{fmtKB(deep.bytes / 1024)}</span> anchored · compressed
-            </p>
-            <p className="text-label text-muted-foreground tabular-nums">
-              height {deep.height.toLocaleString()} · sub {deep.subHeight.toLocaleString()} ·{" "}
-              {deep.blocks.toLocaleString()} block{deep.blocks === 1 ? "" : "s"}
-            </p>
+          {/* The chain facts as LABELLED rows at the label size (user, 2026-08-14 — the first
+              redesign borrowed the card's composed lead lines, and "two rows of only values"
+              read as clutter here: the card's lead works because the card names things around
+              it; this pane stands alone in the raw layer, so its facts wear their labels. Four
+              quiet rows, not the old five body-size ones — the REFERENCES stay in the foot
+              strip below, and "· compressed" keeps naming the wire figure's basis against the
+              lanes' decoded sizes. */}
+          <div className="grid grid-cols-[auto_1fr] gap-x-6 gap-y-0.5 flex-none text-label">
+            <span className="text-muted-foreground">Fee</span>
+            <span className="text-right tabular-nums text-foreground"><b className="font-bold">{fmtDag(deep.fee)}</b> DAG</span>
+            <span className="text-muted-foreground">Anchored</span>
+            <span className="text-right tabular-nums text-foreground-dim">{fmtKB(deep.bytes / 1024)} · compressed</span>
+            <span className="text-muted-foreground">Height · sub</span>
+            <span className="text-right tabular-nums text-foreground-dim">{deep.height.toLocaleString()} · {deep.subHeight.toLocaleString()}</span>
+            <span className="text-muted-foreground">Blocks</span>
+            <span className="text-right tabular-nums text-foreground-dim">{deep.blocks.toLocaleString()}</span>
           </div>
 
           {active == null ? (
@@ -379,10 +438,6 @@ export function ChannelStatePanel() {
               <div className="min-h-0 flex-1 overflow-auto slim-scroll">
                 {active === "state" && (
                   <div className="flex flex-col gap-2">
-                    {/* The proof hash left this note for the foot strip (redesign 2026-08-13):
-                        a hash is a reference, not a lane fact, and cramming it into a caps
-                        caption made the note a run-on mono string. */}
-                    <LaneNote>state {(deep.stateBytes / 1024).toFixed(1)} KB</LaneNote>
                     {deep.stateKeys.length > 0 && (
                       <LaneTable
                         head={["State key", "Records"]}
@@ -398,22 +453,7 @@ export function ChannelStatePanel() {
                         lane leads with (the tab's count is the record COUNT, a different number).
                         Without it this lane opened on a bare table header while its two siblings
                         opened on a note — the uniform body's first part, missing. */}
-                    <LaneNote>
-                      {/* The lane's WEIGHT, the same fact the state note leads with — the tab
-                          already carries the record count, so repeating it here said the same
-                          number twice (redesign 2026-08-13; dataBytes is the decoder's measured
-                          block size, absent only on a pre-field cached body). */}
-                      data{" "}
-                      {deep.dataBytes != null
-                        ? `${(deep.dataBytes / 1024).toFixed(1)} KB`
-                        : `${deep.dataTxCount} record${deep.dataTxCount === 1 ? "" : "s"}`}
-                    </LaneNote>
-                    {kinds.length > 0 && (
-                      <LaneTable
-                        head={["Record kind", "Records"]}
-                        rows={kinds.map((k) => ({ key: k.kind, a: k.kind, title: k.kind, b: k.count }))}
-                      />
-                    )}
+                    {kinds.length > 0 && <SchemaKinds kinds={kinds} />}
                     {dataTx != null && <RawSection open={raw} onToggle={() => setRaw((o) => !o)} data={dataTx} />}
                   </div>
                 )}
@@ -437,7 +477,16 @@ export function ChannelStatePanel() {
               tail), one register (FootRow: micro caps label, mono value), each with the shared
               copy control. Pinned below the scroll region, so an opened tree never buries them. */}
           {(deep.lastSnapshotHash || deep.stateProof) && (
-            <div className="flex-none flex flex-col gap-1 border-t border-border/50 pt-2">
+            // The card FOOT's ground (user, 2026-08-13): same tier — look-up references with the
+            // copy control — so the same `--panel-plate` lift under it, as a rounded plate at the
+            // pane's own scale (the card bleeds to its panel edge; the pane's edge is the layer's,
+            // several containers up, so the plate sits as a block rather than a bleed).
+            // THE SAME SET AS THE CARD'S FOOT (user, 2026-08-13 — "hash is missing; re-use and
+            // ensure they are the same attributes"): Hash · Parent · State proof, the artifact's
+            // chain identity in the card's own order and tiering — the descriptor's hash first,
+            // the polled record behind it (the pager-sibling lesson from the card's foot).
+            <div className="flex-none flex flex-col gap-1 rounded-md bg-[var(--panel-plate)] px-2.5 py-2">
+              {hash && <FootRow label="Hash" value={shortHash(hash)} title={hash} copy={hash} />}
               {deep.lastSnapshotHash && (
                 <FootRow label="Parent" value={shortHash(deep.lastSnapshotHash)} title={deep.lastSnapshotHash} copy={deep.lastSnapshotHash} />
               )}

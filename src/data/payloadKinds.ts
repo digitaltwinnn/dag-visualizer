@@ -51,13 +51,23 @@ export function kindOf(v: unknown): string {
 
 /** Group a decoded payload's records by kind, in order of first appearance (so the table is
  *  deterministic and reads in payload order). A non-array payload counts as one record — the whole
- *  value — rather than being hidden. */
-export function payloadKinds(v: unknown): { kind: string; count: number }[] {
+ *  value — rather than being hidden.
+ *
+ *  `fields` carries a flat record's signature as STRUCTURE (user, 2026-08-13 — the joined
+ *  "attribute · attribute · …" string read as one unparseable token): the field names of a
+ *  multi-field record, in the record's own order, so the UI can render a schema as discrete
+ *  tokens. Null for everything whose kind is already one word — a wrapper name, a JSON type. */
+export function payloadKinds(v: unknown): { kind: string; fields: string[] | null; count: number }[] {
   const items = Array.isArray(v) ? v : v == null ? [] : [v];
-  const byKind = new Map<string, number>();
+  const byKind = new Map<string, { fields: string[] | null; count: number }>();
   for (const it of items) {
     const k = kindOf(it);
-    byKind.set(k, (byKind.get(k) ?? 0) + 1);
+    const g = byKind.get(k);
+    if (g) g.count++;
+    else {
+      const keys = it !== null && typeof it === "object" && !Array.isArray(it) ? Object.keys(it as object) : [];
+      byKind.set(k, { fields: keys.length > 1 ? keys : null, count: 1 });
+    }
   }
-  return [...byKind].map(([kind, count]) => ({ kind, count }));
+  return [...byKind].map(([kind, g]) => ({ kind, fields: g.fields, count: g.count }));
 }
