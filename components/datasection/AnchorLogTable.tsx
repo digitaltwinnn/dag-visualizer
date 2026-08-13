@@ -13,7 +13,7 @@ import { applyClickActions } from "@/src/store/applyClickActions";
 import { fmtDag, fmtKB } from "@/src/util/format";
 import { relativeAge } from "@/src/util/relativeAge";
 import { IdentityDot } from "@/components/inspector/parts";
-import { SelectedRowMark } from "@/components/selection";
+import { SelectedRowMark, selectionHue } from "@/components/selection";
 import { cn } from "@/lib/utils";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -144,6 +144,10 @@ export default function AnchorLogTable() {
                 // Enter/Space give the keyboard the same commit, and focus previews what hover
                 // previews (rule 9's pairing rides both routes).
                 tabIndex={0}
+                // The selection follows the subject's identity (selection.tsx · selectionHue):
+                // the row's wash tokens re-hue to its network; unlisted rows keep the core tone
+                // their dot already wears.
+                style={rowSel ? selectionHue(cfg?.hue ?? "var(--core)") : undefined}
                 onMouseEnter={() => setHoverMetaSnap(metaSnapHoverKey(r.metaId, r.ordinal))}
                 onMouseLeave={() => setHoverMetaSnap(null)}
                 onFocus={() => setHoverMetaSnap(metaSnapHoverKey(r.metaId, r.ordinal))}
@@ -171,7 +175,7 @@ export default function AnchorLogTable() {
                   {/* The ✓ slot is ALWAYS reserved so the column never shifts on select. */}
                   <span className="inline-flex items-center gap-1.5">
                     {r.ordinal.toLocaleString()}
-                    <span className="inline-flex w-3.5 flex-none">{rowSel && <SelectedRowMark />}</span>
+                    <span className="inline-flex w-3.5 flex-none">{rowSel && <SelectedRowMark hue={cfg?.hue ?? "var(--core)"} />}</span>
                   </span>
                 </TableCell>
                 <TableCell className="text-right tabular-nums">{fmtDag(r.fee)}</TableCell>

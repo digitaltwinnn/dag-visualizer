@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { cn } from "@/lib/utils";
 import ExplorerShell from "@/components/ExplorerShell";
-import { SelectedRowMark, selectedRow } from "@/components/selection";
+import { SelectedRowMark, selectedRow, selectionHue } from "@/components/selection";
 import { subjectPairing } from "@/components/useSubjectPairing";
 import { useSnapshotFeed } from "@/components/useSnapshotFeed";
 import { getNetwork, getAnchor, filterAccent, metagraphById, shortHash, resolveSigner, SIGNER_GROUPS, SIGNER_UNKNOWN } from "@/src/data/network";
@@ -150,7 +150,10 @@ function SnapRow<K extends string | number>({
         selected && selectedRow(true),
         pair.paired && pair.className,
       )}
-      style={pair.style}
+      // The selection follows the subject's identity (selection.tsx · selectionHue): `accent` is
+      // already the row's own hue — the group's for a leaf, the unlisted gray, the filter accent
+      // for a tick row — so the committed wash/ring and the ✓ speak in it too.
+      style={{ ...((selected || disclose?.holdsSel) ? selectionHue(accent) : undefined), ...pair.style }}
     >
       {/* With a `sub`, the LABEL is the row's identity and must never ellipsize — the flexible
           column is the address instead (it's already an abbreviation, so a further clip still
@@ -185,9 +188,9 @@ function SnapRow<K extends string | number>({
           // the selection, so the slot shows the chevron that closes them; CLOSED, the ✓ is the
           // only trace the selection has left. Without this a leaf that commits AND opens in one
           // click showed a ✓ and no way to see it was open.
-          (selected || disclose.holdsSel) && !disclose.open ? <SelectedRowMark /> : <DisclosureChevron open={disclose.open} />
+          (selected || disclose.holdsSel) && !disclose.open ? <SelectedRowMark hue={accent} /> : <DisclosureChevron open={disclose.open} />
         ) : selected ? (
-          <SelectedRowMark />
+          <SelectedRowMark hue={accent} />
         ) : null}
       </span>
     </button>

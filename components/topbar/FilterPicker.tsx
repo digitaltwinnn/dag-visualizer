@@ -6,7 +6,7 @@ import { filterToggleActions } from "@/src/engine/domain/pickActions";
 import { applyClickActions } from "@/src/store/applyClickActions";
 import { hex } from "@/src/util/format";
 import { cn } from "@/lib/utils";
-import { SELECTED_ROW } from "@/components/selection";
+import { SELECTED_ROW, selectionHue } from "@/components/selection";
 import { IdentityDot } from "@/components/inspector/parts";
 
 // The expanded filter body — a horizontal CHIP STRIP on the command bar's own surface (user,
@@ -98,6 +98,9 @@ export default function FilterPicker({ onPicked }: { onPicked?: () => void }) {
               aria-pressed={filter === m.id}
               title={`${m.name}${m.symbol ? ` · ${m.symbol}` : ""}`}
               className={chipClass(filter === m.id, off)}
+              // The committed chip's wash/ring speak the metagraph's own hue (selection.tsx ·
+              // selectionHue); "All" and unlisted keep the structural cyan — no single identity.
+              style={filter === m.id ? selectionHue(hex(m.color)) : undefined}
               onClick={() => pick(m.id)}
               onMouseEnter={() => setHoverFilter(m.id)}
             >
