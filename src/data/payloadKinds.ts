@@ -71,3 +71,21 @@ export function payloadKinds(v: unknown): { kind: string; fields: string[] | nul
   }
   return [...byKind].map(([kind, g]) => ({ kind, fields: g.fields, count: g.count }));
 }
+
+/** The STATE's schema, one level down (user, 2026-08-14 — DOR's `updates` key is only the
+ *  PARENT of the real record schema, so the state table read `updates · 13` while the data lane
+ *  showed the actual fields of sibling-shaped records). Per top-level key: its record count
+ *  (shapeOf's own units — array length, map size, scalar 1) and the KINDS of the records under
+ *  it, read mechanically off the values exactly as `payloadKinds` reads a payload — a keyed map's
+ *  records are its values, an array's its items, and a scalar has no records to describe. Never
+ *  an inferred schema (rule 10): every chip is a field name a real record carries. */
+export function stateSchema(
+  state: unknown,
+): { key: string; count: number; kinds: { kind: string; fields: string[] | null; count: number }[] }[] {
+  if (!state || typeof state !== "object" || Array.isArray(state)) return [];
+  return Object.entries(state as Record<string, unknown>).map(([key, v]) => {
+    const count = Array.isArray(v) ? v.length : v && typeof v === "object" ? Object.keys(v as object).length : v == null ? 0 : 1;
+    const items = Array.isArray(v) ? v : v && typeof v === "object" ? Object.values(v as object) : [];
+    return { key, count, kinds: items.length ? payloadKinds(items) : [] };
+  });
+}

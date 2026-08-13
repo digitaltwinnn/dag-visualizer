@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { kindOf, PAYLOAD_LANES, parsePayload, payloadKinds } from "./payloadKinds";
+import { kindOf, PAYLOAD_LANES, parsePayload, payloadKinds, stateSchema } from "./payloadKinds";
 
 describe("kindOf", () => {
   it("names a single-key wrapper by its key — the shape mainnet actually anchors", () => {
@@ -93,5 +93,25 @@ describe("payloadKinds · fields (the schema as structure, 2026-08-13)", () => {
     expect(rows.find((r) => r.kind === "publicId · signature · dts")?.fields).toEqual(["publicId", "signature", "dts"]);
     expect(rows.find((r) => r.kind === "MetagraphBatchMessage")?.fields).toBeNull();
     expect(rows.find((r) => r.kind === "string")?.fields).toBeNull();
+  });
+});
+
+describe("stateSchema (user, 2026-08-14 — the state's record schema, one level under each key)", () => {
+  it("an array-valued key carries its records' field chips (the DOR shape)", () => {
+    const rows = stateSchema({ updates: [{ deviceId: "a", dts: 1 }, { deviceId: "b", dts: 2 }] });
+    expect(rows).toEqual([
+      { key: "updates", count: 2, kinds: [{ kind: "deviceId · dts", fields: ["deviceId", "dts"], count: 2 }] },
+    ]);
+  });
+  it("a keyed map reads its VALUES as the records (the DED shape); scalars have none", () => {
+    const rows = stateSchema({ latestUpdates: { addr1: { ordinal: 1, hash: "h" } }, counter: 7 });
+    expect(rows[0]).toEqual({
+      key: "latestUpdates", count: 1, kinds: [{ kind: "ordinal · hash", fields: ["ordinal", "hash"], count: 1 }],
+    });
+    expect(rows[1]).toEqual({ key: "counter", count: 1, kinds: [] });
+  });
+  it("a non-object state has no schema to claim", () => {
+    expect(stateSchema("opaque")).toEqual([]);
+    expect(stateSchema(null)).toEqual([]);
   });
 });

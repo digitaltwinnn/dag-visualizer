@@ -57,7 +57,7 @@ import { metaSnapDeepKey } from "@/src/data/types";
 import type { NodeRow } from "@/src/data/types";
 import { getNetwork, metagraphById, resolveSigner, shortHash, SIGNER_GROUPS, SIGNER_UNKNOWN } from "@/src/data/network";
 import { snapsAtTick } from "@/src/data/anchorLog";
-import { PAYLOAD_LANES, parsePayload, payloadKinds } from "@/src/data/payloadKinds";
+import { PAYLOAD_LANES, parsePayload, payloadKinds, stateSchema } from "@/src/data/payloadKinds";
 import { identityHudHex } from "@/src/palette/identity";
 import { CopyButton, FootRow, IdentityDot } from "@/components/inspector/parts";
 import { fmtDag, fmtKB } from "@/src/util/format";
@@ -143,17 +143,54 @@ function SchemaKinds({ kinds }: { kinds: { kind: string; fields: string[] | null
       </div>
       {kinds.map((k) => (
         <div key={k.kind} className="flex items-start justify-between gap-3" title={k.kind}>
-          <span className="min-w-0 flex flex-wrap gap-1">
-            {(k.fields ?? [k.kind]).map((f) => (
-              <span
-                key={f}
-                className="inline-flex items-center rounded-xs border border-border bg-wash-faint px-[5px] py-[2px] font-mono text-micro leading-none text-muted-foreground"
-              >
-                {f}
-              </span>
-            ))}
-          </span>
-          <span className="flex-none text-right tabular-nums text-body">{k.count.toLocaleString()}</span>
+          <FieldChips fields={k.fields ?? [k.kind]} />
+          <span className="flex-none text-right tabular-nums text-label">{k.count.toLocaleString()}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/** One record schema as wrapping squared mono chips — the shared token rendering. */
+function FieldChips({ fields }: { fields: string[] }) {
+  return (
+    <span className="min-w-0 flex flex-wrap gap-1">
+      {fields.map((f) => (
+        <span
+          key={f}
+          className="inline-flex items-center rounded-xs border border-border bg-wash-faint px-[5px] py-[2px] font-mono text-micro leading-none text-muted-foreground"
+        >
+          {f}
+        </span>
+      ))}
+    </span>
+  );
+}
+
+/** The STATE lane's schema (user, 2026-08-14 — "can the data approach apply to state? DOR's
+ *  `updates` key is only the parent of an underlying schema"): each top-level state key keeps
+ *  its row — the container is the state's real structure — and the records UNDER it render
+ *  their field chips beneath, the same mechanical read the data lane gets from payloadKinds
+ *  (stateSchema reads an array's items or a keyed map's values; a scalar has no records and
+ *  shows none). One schema language across both payload lanes, whatever shape a metagraph is. */
+function StateSchema({ rows }: { rows: { key: string; count: number; kinds: { kind: string; fields: string[] | null; count: number }[] }[] }) {
+  return (
+    <div className="flex flex-col gap-2">
+      <div className="flex items-baseline justify-between gap-2.5">
+        <span className={LANE_HEAD}>State key · schema</span>
+        <span className={LANE_HEAD}>Records</span>
+      </div>
+      {rows.map((r) => (
+        <div key={r.key} className="flex flex-col gap-1">
+          <div className="flex items-baseline justify-between gap-3">
+            <span className="min-w-0 truncate font-mono text-label" title={r.key}>{r.key}</span>
+            <span className="flex-none text-right tabular-nums text-label">{r.count.toLocaleString()}</span>
+          </div>
+          {r.kinds.map((k) => (
+            <div key={k.kind} className="pl-2" title={k.kind}>
+              <FieldChips fields={k.fields ?? [k.kind]} />
+            </div>
+          ))}
         </div>
       ))}
     </div>
@@ -293,9 +330,10 @@ export function ChannelStatePanel() {
   // The data TRANSACTIONS (2026-08-07 — a data metagraph's real payload: DED anchors fingerprint
   // BATCH ROOTS here while its on-chain state stays empty).
   const dataTx = useMemo(() => parsePayload(deep?.dataTx), [deep]);
-  // The data lane's shape table — the mechanical read that makes it structurally identical to the
-  // state lane (whose shape the server already computes into `stateKeys`).
+  // Both lanes' shape reads are the same mechanical pass now: the data records' kinds, and the
+  // state's per-key record schemas one level down (stateSchema — the DOR lesson, 2026-08-14).
   const kinds = useMemo(() => payloadKinds(dataTx), [dataTx]);
+  const stateRows = useMemo(() => stateSchema(state), [state]);
 
   // The lanes this snapshot actually has, in a fixed order (payload → payload → proofs) so the bar
   // never reshuffles between snapshots; only membership changes.
@@ -448,12 +486,7 @@ export function ChannelStatePanel() {
               <div className="min-h-0 flex-1 overflow-auto slim-scroll">
                 {active === "state" && (
                   <div className="flex flex-col gap-2">
-                    {deep.stateKeys.length > 0 && (
-                      <LaneTable
-                        head={["State key", "Records"]}
-                        rows={deep.stateKeys.map((k) => ({ key: k.key, a: k.key, title: k.key, b: k.count }))}
-                      />
-                    )}
+                    {stateRows.length > 0 && <StateSchema rows={stateRows} />}
                     {state != null && <RawSection open={raw} onToggle={() => setRaw((o) => !o)} data={state} />}
                   </div>
                 )}
