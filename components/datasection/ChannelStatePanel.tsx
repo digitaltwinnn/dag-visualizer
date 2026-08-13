@@ -311,11 +311,13 @@ export function ChannelStatePanel() {
         // copy asked for a gesture that was not available on screen. The row in the anchor log to
         // the left IS available, and clicking it commits the same selection.
         <p className="text-label text-muted-foreground">
+          {/* One verb family with the card: compressed → decompress → decompressing
+              (user, 2026-08-13). */}
           {following
-            ? "Click this snapshot's row in the anchor log to read its payload. It is a ~2.5 MB fetch, so it runs only when you ask."
+            ? "Click this snapshot's row in the anchor log to decompress its payload. It is a ~2.5 MB fetch, so it runs only when you ask."
             : gaveUp
-              ? "decode unavailable — the read failed or timed out; selecting the row again retries"
-              : "reading…"}
+              ? "decompression failed or timed out — selecting the row again retries"
+              : "decompressing…"}
         </p>
       ) : (
         <>

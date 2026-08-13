@@ -276,7 +276,14 @@ export default function MetaSnapPane({
                 read has landed. The cost belongs to the action — and it is stated as the SERVER's
                 fetch, because the decoded row that reaches the browser is ~0.6–4.4 KB (measured):
                 what is being rationed is the whole-global pull and the ~1.8s wait, not local
-                bytes. */}
+                bytes.
+
+                ONE VERB FAMILY: compressed → Decompress → decompressing (user, 2026-08-13).
+                "uncompress" was REJECTED on 2026-08-10 for putting the cost on local bytes —
+                but that was before the lead printed "anchored · compressed" directly above this
+                button. With the basis named, the verb closes the loop the old copy left open
+                (WHY a read is needed at all), and the cost still rides this button's title.
+                "Read"/"decoding" made three word families for one action. */}
             {deep != null ? (
               <Button variant="link" size="xs" className="mt-1 px-0" onClick={() => setSection("data")}>
                 Show the application state
@@ -286,7 +293,7 @@ export default function MetaSnapPane({
                 variant="link"
                 size="xs"
                 className="mt-1 px-0"
-                title="Reads this snapshot's payload — the server pulls the whole ~2.5 MB global to reach this one channel, so it runs only when you ask. Holds the card on this snapshot instead of following the live one."
+                title="Decompresses this snapshot's payload — the server pulls the whole ~2.5 MB global to reach this one channel, so it runs only when you ask. Holds the card on this snapshot instead of following the live one."
                 onClick={() => {
                   // Pin FIRST, and only while following — the read must not answer about a
                   // snapshot the next heartbeat has already replaced. Pinned already, the pin is
@@ -297,7 +304,7 @@ export default function MetaSnapPane({
                   setDeepWanted(metaSnapDeepKey(sel.globalOrdinal, sel.metaId, sel.ordinal));
                 }}
               >
-                Read this snapshot
+                Decompress this snapshot
               </Button>
             ) : null}
 
@@ -421,7 +428,7 @@ function PayloadBlock({
     // standard, 2026-08-07); an asked read shows its own state in the same slot.
     return (
       <div className="mt-1.5 text-body text-muted-foreground italic">
-        {!asked ? "undecodable payload" : decodeGaveUp ? "decode unavailable — the read failed" : "decoding…"}
+        {!asked ? "undecodable payload" : decodeGaveUp ? "decompression unavailable — the read failed" : "decompressing…"}
       </div>
     );
   }
@@ -450,7 +457,18 @@ function PayloadBlock({
       />
       {asked && !deep && (
         <p className="mt-2 text-label text-muted-foreground italic">
-          {decodeGaveUp ? "decode unavailable — the read failed" : "decoding…"}
+          {decodeGaveUp ? "decompression unavailable — the read failed" : "decompressing…"}
+        </p>
+      )}
+      {deep && stateRows.length === 0 && dataRows.length === 0 && deep.dataBlockSigners.length === 0 && deep.stateBytes === 0 && (
+        // THE IDLE SNAPSHOT, NAMED (user, 2026-08-13 — "some metagraphs don't appear to do much
+        // other than being idle; should we make that more visible?"). Post-read only: idleness
+        // is a verified whole-snapshot reading — the anchored bytes are the envelope (chain
+        // header + proofs), the heartbeat of a quiet network — so it earns one line of its own
+        // above the per-section `none`s that state the same fact per lane. "Idle" is the app's
+        // existing word for a tick that moves nothing (CLAUDE.md, the height counter).
+        <p className="mt-2 text-label text-muted-foreground">
+          An idle snapshot: it anchored only its envelope and proofs.
         </p>
       )}
     </div>
