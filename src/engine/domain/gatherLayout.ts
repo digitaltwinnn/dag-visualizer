@@ -37,12 +37,20 @@ const BAND_MARGIN = 24; //     breathing room between the band and whatever boun
 
 /** How far the band may grow past its tuned cell size when there is room (a sparse network set
  *  would otherwise blow up to fill the screen). Shrinking below 1 is deliberately unbounded —
- *  that is the phone-portrait case, where fitting is the whole point. Tuned live at 1600×897
- *  (2026-08-12) to the point where the FULL network set just fills the scene-mode band: below
- *  it the cap bound first and the row sat at ~65% of the width the HUD had left it, which is
- *  not "extended across the entire screen width". It stays a cap rather than a free fit because
- *  a 3-node filter has nothing to fill the band WITH — this is the chip size it tops out at. */
-export const GATHER_MAX_GROWTH = 2.4;
+ *  that is the phone-portrait case, where fitting is the whole point. It stays a cap rather than
+ *  a free fit because a 3-node filter has nothing to fill the band WITH — this is the chip size
+ *  the staging square tops out at.
+ *
+ *  ⚠️ THE CAP IS A SIZE, NOT A FILL (user, 2026-08-13 — "in scene mode the nodes are much larger
+ *  and don't fit in the view length"). It was briefly tuned (2.4, 2026-08-12) to the point where
+ *  the full network set exactly FILLED the scene-mode band, which made the fit a free one in
+ *  disguise: with the rails away the band is ~1.8× wider, so the same row of chips inflated by
+ *  1.8× and ran edge to edge with no slack. A wider band means the square gets more ROOM, not
+ *  more pixels — at 1.75 the full set spans ~80% of the scene band, centred, still visibly more
+ *  extended than the rails leave it, and the chips land near the size the HUD-mode row already
+ *  read well at. The cap is what makes scene mode differ from HUD mode at all: HUD is width-bound
+ *  at 1600 and never reaches it. */
+export const GATHER_MAX_GROWTH = 1.75;
 
 /** The band's box, expressed against the camera frustum so the scene can use it at any pose. */
 export interface GatherBand {

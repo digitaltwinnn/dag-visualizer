@@ -62,7 +62,14 @@ const hexPitchDeg = (r: number) => ((2 * r * 1.04) / (R + LAND_H)) * (180 / Math
 // (with the chip size, by one factor) so the packed row of per-network squares
 // (domain/gatherLayout) fills the band the Engine measured against the HUD — shrinking on a
 // phone-portrait viewport, growing when the rails are away and there is room.
-export const GATHER_CELL = 0.55;
+//
+// The pitch against GATHER_SCALE is what sets the AIR between chips — the one knob for "the
+// nodes need just a little bit more spacing" (user, 2026-08-13). At 0.55 the chips sat at ~0.9
+// of the pitch and each square read as a solid mass of touching circles rather than a grid of
+// pixels; 0.62 puts them at ~0.8 and the rows separate. Raising the pitch never widens the row
+// where the WIDTH binds (the fit divides it straight back out) — it spends the same band on
+// fewer, smaller pixels, which is why it is the spacing knob and the cap below is the size one.
+export const GATHER_CELL = 0.62;
 
 // The ledger's whole-view orientation (tilt ∘ rotY), baked into every node's ledger position so the
 // nodes match the LedgerView group's transform. Scale is applied separately (uniform).
