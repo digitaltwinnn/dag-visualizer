@@ -11,7 +11,6 @@ import CardHead, { RailPane } from "@/components/CardHead";
 import InspectorCard from "@/components/InspectorCard";
 import { PulseEdge, useEdgePulse } from "@/components/EdgePulse";
 import { KIND_MARK_CLASS } from "@/components/icons";
-import { Fact } from "@/components/inspector/parts";
 import { UnlistedNetBlock } from "@/components/inspector/cards";
 import type { PickDescriptor } from "@/src/data/types";
 
@@ -83,14 +82,12 @@ export default function ContextCard({
                 them; with none it says so, window-scoped and honest. */}
             <p className="m-0 text-body text-muted-foreground">
               {unlistedIds.length > 0
-                ? "State channels anchoring into Global L0 without an entry in the public catalog. Each network id below is one distinct metagraph; only its chain is public, not its operator or machines."
+                ? "State channels anchoring into Global L0 without an entry in the public catalog. Each network id below is one distinct metagraph; its chain and owner address are public, its operator and machines are not."
                 : "State channels anchoring into Global L0 without an entry in the public catalog. None was seen anchoring in the measured window."}
             </p>
-            {/* Absent data is an INSTRUMENT STATE, never a fabricated number: the operators'
-                machines are outside every feed this app reads. */}
-            <Fact className="mt-2" label="Machines">
-              <span className="text-muted-foreground italic">not knowable</span>
-            </Fact>
+            {/* (The set-level "Machines · not knowable" row is gone — user, 2026-08-14: the
+                per-address blocks below carry each network's own node facts, so a set-level
+                repeat above them was noise.) */}
             {/* The DISTINCT metagraphs inside the mixed set (user, 2026-08-14 — "different
                 network id means different metagraph"): one block per uncataloged address seen
                 anchoring in the measured window. Machines stay unknowable; the chain's own

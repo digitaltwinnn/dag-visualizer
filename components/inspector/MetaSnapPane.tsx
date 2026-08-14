@@ -9,6 +9,7 @@ import { useEffect, useMemo, useState, type CSSProperties } from "react";
 import { Button } from "@/components/ui/button";
 import CardHead, { RailPane } from "@/components/CardHead";
 import { Fact, FactGroup, Foot, FootRow } from "@/components/inspector/parts";
+import { useSnapRecord } from "@/components/useArchive";
 import { Separator } from "@/components/ui/separator";
 import { useStore } from "@/src/store/store";
 import { metaSnapDeepKey } from "@/src/data/types";
@@ -125,7 +126,14 @@ export default function MetaSnapPane({
   // Hoisted out of the state tier so the FOOT can reach it — it is a hash, and hashes are looked
   // up, not read. The deep read wins where it exists; the exact row carries it otherwise.
   const stateProof = deep?.stateProof ?? row?.stateProof;
-  const hash = sel.hash || polled?.hash || "";
+  const polledHash = sel.hash || polled?.hash || "";
+  // The polled buffers track only the catalog, so an UNLISTED snapshot arrived hash-less — a
+  // hash is not a field of the thing it hashes; the indexer computes it. The explorer indexes
+  // every anchoring chain, so one immutable ~330 B record read fills hash AND parent exactly
+  // where the polls can't (user, 2026-08-14). Skipped whenever the polls already answered.
+  const record = useSnapRecord(sel.metaId, sel.ordinal, !!polledHash);
+  const hash = polledHash || record?.hash || "";
+  const parent = polled?.parent || record?.parent || "";
   const rel = relativeAge(now - Date.parse(sel.ts));
   // ⚠️ The `!!snap` half is load-bearing: the ledger contributes no ancestry, so the global card
   // can be a GHOST while this one is populated — there the clock has to stay here.
@@ -335,9 +343,9 @@ export default function MetaSnapPane({
                   like `stateProof` does: descriptor first, polled buffer behind it. The em-dash
                   survives for the one case that is genuinely unknown — a snapshot stepped to
                   after it aged out of the retained buffer — where stating the gap is the point. */}
-              <FootRow label="Hash" value={midHash(hash, 34)} title={hash} copy={hash || undefined} />
-              {polled?.parent && (
-                <FootRow label="Parent hash" value={midHash(polled.parent, 27)} title={polled.parent} copy={polled.parent} />
+              {hash && <FootRow label="Hash" value={midHash(hash, 34)} title={hash} copy={hash} />}
+              {parent && (
+                <FootRow label="Parent hash" value={midHash(parent, 27)} title={parent} copy={parent} />
               )}
               {stateProof && (
                 // "State HASH" (user, 2026-08-14 — "state proof" collided with the signers tab's

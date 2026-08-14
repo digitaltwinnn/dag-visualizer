@@ -15,6 +15,7 @@ const ADDRESS = /^DAG[A-Za-z0-9]{30,45}$/;
 interface BeSnap {
   ordinal?: number;
   timestamp?: string;
+  ownerAddress?: string;
 }
 
 async function readSnap(url: string): Promise<BeSnap | null> {
@@ -43,11 +44,14 @@ async function fetchSpan(address: string) {
     genesisTs: genesis?.timestamp ?? null,
     latestOrdinal: latest.ordinal ?? 0,
     latestTs: latest.timestamp ?? null,
+    // The closest thing to an operator identity the chain publishes (user, 2026-08-14) —
+    // the address that owns the channel, straight off the newest record.
+    owner: latest.ownerAddress ?? null,
   };
 }
 
 const cachedSpan = (address: string) =>
-  unstable_cache(() => fetchSpan(address), ["network-chain-span-v1", address], { revalidate: 300 })();
+  unstable_cache(() => fetchSpan(address), ["network-chain-span-v2", address], { revalidate: 300 })();
 
 export async function GET(_req: Request, ctx: { params: Promise<{ address: string }> }) {
   const { address } = await ctx.params;

@@ -349,6 +349,15 @@ export function UnlistedNetBlock({ id }: { id: string }) {
             )}
           </span>
         </Fact>
+        {/* The closest thing to an operator identity an uncataloged chain publishes: the
+            address that owns the channel, straight off its newest record. */}
+        {span?.owner && (
+          <Fact label="Owner">
+            <span className="font-mono" title={span.owner}>
+              {shortHash(span.owner)}
+            </span>
+          </Fact>
+        )}
       </div>
     </>
   );

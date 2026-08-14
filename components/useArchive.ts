@@ -164,6 +164,9 @@ async function load(): Promise<ArchiveCensus | null> {
 export interface ChainSpan {
   genesisTs: string | null;
   latestOrdinal: number;
+  /** The channel's owner address off its newest record — the closest thing to an operator
+   *  identity an uncataloged chain publishes. */
+  owner: string | null;
 }
 const spans = new Map<string, ChainSpan | null>();
 const spanInflight = new Map<string, Promise<ChainSpan | null>>();
@@ -171,8 +174,8 @@ async function loadSpan(address: string): Promise<ChainSpan | null> {
   try {
     const r = await fetch(`/api/network/${address}/chain`);
     if (!r.ok) return null;
-    const j = (await r.json()) as { genesisTs: string | null; latestOrdinal: number };
-    return { genesisTs: j.genesisTs, latestOrdinal: j.latestOrdinal };
+    const j = (await r.json()) as { genesisTs: string | null; latestOrdinal: number; owner: string | null };
+    return { genesisTs: j.genesisTs, latestOrdinal: j.latestOrdinal, owner: j.owner ?? null };
   } catch {
     return null;
   }
@@ -202,6 +205,45 @@ export function useChainSpan(address: string | null): ChainSpan | null {
     };
   }, [address]);
   return span;
+}
+
+// One snapshot RECORD of any currency chain — the explorer's ~330 B per-ordinal read, used
+// where the polled buffers can't answer (an unlisted snapshot's hash and parent; the polls
+// track only the catalog). Immutable upstream, so cached for the session.
+export interface SnapRecord {
+  hash: string;
+  parent: string;
+}
+const records = new Map<string, SnapRecord | null>();
+export function useSnapRecord(metaId: string | null, ordinal: number, skip: boolean): SnapRecord | null {
+  const key = metaId && ordinal >= 1 ? `${metaId}:${ordinal}` : null;
+  const [rec, setRec] = useState(key ? (records.get(key) ?? null) : null);
+  useEffect(() => {
+    if (!key || skip) {
+      setRec(null);
+      return;
+    }
+    if (records.has(key)) {
+      setRec(records.get(key) ?? null);
+      return;
+    }
+    let dead = false;
+    (async () => {
+      try {
+        const r = await fetch(`/api/network/${metaId}/snapshots/${ordinal}`);
+        const v = r.ok ? ((await r.json()) as { hash?: string; parent?: string }) : null;
+        const rec = v ? { hash: v.hash ?? "", parent: v.parent ?? "" } : null;
+        records.set(key, rec);
+        if (!dead) setRec(rec);
+      } catch {
+        /* transient — next mount retries (nothing cached) */
+      }
+    })();
+    return () => {
+      dead = true;
+    };
+  }, [key, metaId, ordinal, skip]);
+  return key && !skip ? rec : null;
 }
 
 export function useArchive(): ArchiveCensus | null {
