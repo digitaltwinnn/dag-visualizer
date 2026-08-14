@@ -366,7 +366,7 @@ export default function AnchorLogTable() {
         // The windowed lenses state their scope and the way further back (user, 2026-08-14):
         // no merged cross-network history feed exists, so "all"/unlisted page the window only.
         suffix={histNet ? undefined : "in window"}
-        note={histNet ? undefined : "pick a network to page all time"}
+        note={histNet ? undefined : "pick a network to explore all the way back to genesis"}
         onPage={setPageState}
       />
     </>
