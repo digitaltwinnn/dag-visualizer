@@ -186,7 +186,10 @@ export default function TopBar() {
             "flex items-center gap-[7px] bg-transparent border-0 cursor-pointer py-1.5 px-2 rounded-btn",
             "hover:bg-wash-soft",
             open && "bg-wash-soft",
-            "max-[1099px]:min-h-11",
+            // The 44px tap minimum keys on the POINTER, not the width (user, 2026-08-14 —
+      // resizing a desktop window smaller made the bar GROW): a coarse pointer is a
+      // touch device wherever the window edge sits; a fine pointer never needs it.
+      "pointer-coarse:min-h-11",
             "max-[699px]:p-1.5 max-[699px]:gap-[5px]",
           )}
         >
@@ -252,7 +255,7 @@ export default function TopBar() {
                 "hover:text-foreground hover:bg-wash-soft",
                 "data-[state=on]:text-foreground data-[state=on]:bg-[var(--sel-bg)]",
                 "data-[state=on]:shadow-[inset_0_0_0_1px_var(--sel-border)]",
-                "max-[1099px]:min-h-11 max-[1099px]:min-w-11 max-[1299px]:justify-center",
+                "pointer-coarse:min-h-11 pointer-coarse:min-w-11 max-[1299px]:justify-center",
                 "max-[1120px]:px-2 max-[1120px]:py-1.5 max-[1120px]:text-label",
                 // Phone keeps the ≥44px touch WIDTH (the min-w-11 above still applies — the old
                 // `max-[699px]:min-w-0` override made the icon-only radios too narrow to press);

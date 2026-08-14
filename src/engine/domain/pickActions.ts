@@ -255,6 +255,25 @@ export function metaSnapSelectActions(
   return out;
 }
 
+/** The raw layer's ARRIVAL commit — "the layer opens on a subject": with nothing selected the
+ *  anchor log commits its own first row when the layer surfaces, so the channel pane opens
+ *  populated instead of on an empty state. An arrival is NOT a click, so this deliberately
+ *  differs from `metaSnapSelectActions` in one way: it never moves the FILTER — a silently
+ *  committed network would re-filter the very log the user just opened, and no gesture named a
+ *  network. It still pins the tick (`follow: false`), because the pane's deep read is gated on
+ *  not-following (an auto-advancing card must never turn the gesture route into a poll), and
+ *  the arrival IS the deliberate gesture the read is waiting for. The caller guards the other
+ *  half of the rule — an existing selection is never overridden. */
+export function metaSnapArrivalActions(
+  sel: MetaSnapSel,
+  global: Extract<PickDescriptor, { kind: "snapshot" }>,
+): ClickAction[] {
+  return [
+    { kind: "snapshot", pick: global, follow: false },
+    { kind: "metaSnap", sel },
+  ];
+}
+
 /** A BAND on the byte bar (spec §5.3): an aggregate of that metagraph's snapshots in one tick, so
  *  it selects the PAIR — the metagraph and the tick — and drops any finer tile. The neutral
  *  unlisted band names no metagraph, so it commits only the tick. */

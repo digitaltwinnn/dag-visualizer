@@ -1,3 +1,4 @@
+import type { CSSProperties } from "react";
 import { Check } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -31,6 +32,24 @@ export function selectedRow(focused: boolean): string {
   return focused ? SELECTED_ROW : SELECTED_ROW_ANCESTOR;
 }
 
+/** THE SELECTION FOLLOWS THE SUBJECT'S IDENTITY (user, 2026-08-13 — "once the row is selected
+ *  it's still cyan; should be metagraph color… in general if we know the metagraph use those
+ *  colors"). The mark's GEOMETRY stays the one language above — wash, 1px inset ring, ✓ — and
+ *  only its hue moves: this returns element-scoped overrides of the four selection tokens at the
+ *  SAME alphas the cyan tokens carry (globals.css: 0.12 / 0.5 / 0.05 / 0.22), so a hued mark and
+ *  the cyan one read as the same state at the same weight. Callers pass the hue exactly where
+ *  their hover pairing already knows it; no hue (a country, a cohort, a global tick, "All")
+ *  falls through to the tokens' own structural cyan — identity never gets invented. */
+export function selectionHue(hue?: string | null): CSSProperties | undefined {
+  if (!hue) return undefined;
+  return {
+    "--sel-bg": `color-mix(in oklch, ${hue} 12%, transparent)`,
+    "--sel-border": `color-mix(in oklch, ${hue} 50%, transparent)`,
+    "--sel-bg-dim": `color-mix(in oklch, ${hue} 5%, transparent)`,
+    "--sel-border-dim": `color-mix(in oklch, ${hue} 22%, transparent)`,
+  } as CSSProperties;
+}
+
 // The deliberate glyph cue that makes the mark unmistakably "selected" (not a stray hover): a
 // monochrome Check (lucide) in the accent — the same treatment as the view switch's on-glyph
 // (text-primary). Rows RESERVE the trailing slot (`pr-7` on every row) and the mark renders
@@ -38,6 +57,14 @@ export function selectedRow(focused: boolean): string {
 // column-aligned and nothing shifts when the selection moves.
 // `muted` is the ✓'s half of the ANCESTOR strength above: on a coarser committed rung the check
 // still says "committed" but stops competing with the focus row's own mark.
-export function SelectedRowMark({ className, muted }: { className?: string; muted?: boolean }) {
-  return <Check className={cn("size-3.5", muted ? "text-primary/55" : "text-primary", className)} aria-hidden />;
+export function SelectedRowMark({ className, muted, hue }: { className?: string; muted?: boolean; hue?: string | null }) {
+  return (
+    <Check
+      className={cn("size-3.5", muted ? "text-primary/55" : "text-primary", hue && muted && "opacity-55", className)}
+      // The ✓ rides the same identity rule as the wash (selectionHue) — inline hue where the
+      // subject has one, the accent otherwise; `muted` keeps its half-voice via opacity.
+      style={hue ? { color: hue } : undefined}
+      aria-hidden
+    />
+  );
 }

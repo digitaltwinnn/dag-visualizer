@@ -3,9 +3,10 @@
 import { useEffect, useMemo, useState } from "react";
 import { cn } from "@/lib/utils";
 import { useStore } from "@/src/store/store";
-import { shortHash, CORE_HEX, metagraphById, SIGNER_GROUPS } from "@/src/data/network";
+import { shortHash, CORE_HEX, metagraphById, getNetwork, SIGNER_GROUPS } from "@/src/data/network";
+import { UNLISTED_ID, observedUnlistedIds } from "@/src/data/unlisted";
 import { identityHudHex } from "@/src/palette/identity";
-import { hex, fmtDag, fmtKB } from "@/src/util/format";
+import { hex, fmtDag, fmtKB, midHash } from "@/src/util/format";
 import { relativeAge } from "@/src/util/relativeAge";
 import { statusBreakdown } from "@/src/data/nodeStatus";
 import type { GlobalSnapshot, MetaCfg, PickDescriptor } from "@/src/data/types";
@@ -15,8 +16,9 @@ import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Separator } from "@/components/ui/separator";
 import { SonarRing, NodeStars, NoSignalDot } from "@/components/state/StateAtoms";
 import { VIEW_ICONS, SNAPSHOT_ICON, COUNTRY_ICON, PROVIDER_ICON, COMPOSITION_ICON, KIND_MARK_CLASS } from "@/components/icons";
-import { ExternalLink } from "lucide-react";
+import { Check, ExternalLink } from "lucide-react";
 import { useMinHold } from "@/components/useMinHold";
+import { useArchive, archiveDisplay, archiveSummary, fmtSnapCount, fmtReach, useChainSpan } from "@/components/useArchive";
 import { useNowTick } from "@/components/useNowTick";
 import { POLL } from "@/src/engine/config";
 import { Desc, StatusMark, CompositionRows, StatusBreakdown, RoleChips, IdentityDot, networkKind, Fact, FactGroup, Foot, FootRow } from "./parts";
@@ -290,12 +292,80 @@ export function SnapshotCard({ data: d }: { data: GlobalSnapshot }) {
           a tick's block count is the wrong activity signal, and its anchors are the fact this
           card exists to state. */}
       <Foot>
-        <FootRow label="Hash" value={shortHash(d.hash)} title={d.hash} />
+        {/* The raw pane's long mid-ellipsis form, budgeted PER ROW (user, 2026-08-14 — "the
+            hashes attached to the label", then "the hash label still has extra room"): the
+            value fills its own row toward its label, so a short label buys a longer value —
+            head and tail both surviving. Budgets measured at the desktop rail width. */}
+        <FootRow label="Hash" value={midHash(d.hash, 34)} title={d.hash} copy={d.hash} />
         {d.lastSnapshotHash && (
-          <FootRow label="Parent" value={shortHash(d.lastSnapshotHash)} title={d.lastSnapshotHash} />
+          <FootRow label="Parent hash" value={midHash(d.lastSnapshotHash, 27)} title={d.lastSnapshotHash} copy={d.lastSnapshotHash} />
         )}
       </Foot>
     </div>
+  );
+}
+
+// ONE observed unlisted metagraph (user, 2026-08-14 — "different network id means different
+// metagraph; determine cards for the currently unlisted ones"): the FACTS for one distinct
+// uncataloged address seen anchoring in the measured window, rendered INSIDE MetaCard — the
+// unlisted dossier is the same component as every other dossier (user, same day: "I'd rather
+// not just share grammar but prefer sharing components"), so this block carries no foot; the
+// card's one shared Foot states the last member's references. The MACHINES are honestly
+// unknowable (no published cluster), but the CHAIN is not — the explorer indexes every
+// anchoring chain's records. Its own component because the span hook is per address.
+function UnlistedMemberFacts({ id, last }: { id: string; last: boolean }) {
+  const span = useChainSpan(id);
+  const age = span?.genesisTs ? fmtReach(span.genesisTs) : null;
+  return (
+    <>
+      <Separator className="my-2" />
+      {/* With SEVERAL members the block needs its own identity line for association; the LAST
+          block's references live in the card's standard Foot instead — so the common
+          one-member card reads exactly like a regular dossier (user, 2026-08-14: "it should
+          use the same card as any other metagraph"). */}
+      {!last && (
+        <div className="flex items-center justify-between gap-2">
+          <span className="text-micro tracking-caps uppercase text-muted-foreground">Network id</span>
+          <span className="font-mono text-label" title={id}>
+            {shortHash(id)}
+          </span>
+        </div>
+      )}
+      <div className={last ? undefined : "mt-1.5"}>
+        <Fact label="Online nodes">
+          <span className="text-muted-foreground italic" title="This network publishes no node cluster, so its machines are unknowable.">
+            unknown
+          </span>
+        </Fact>
+        <Fact
+          label={
+            <span className="inline-flex items-center gap-1">
+              Full archive nodes <RoleChips codes={["L0"]} />
+            </span>
+          }
+        >
+          <span
+            className="flex flex-col items-end"
+            title={`Whether any machine keeps this chain in full is unknowable — no cluster is published. The chain itself is real: ${
+              span ? `${span.latestOrdinal.toLocaleString()} snapshots${age ? ` since ~${age.replace("~", "")} ago` : ""}.` : "reading its span…"
+            }`}
+          >
+            <span className="text-muted-foreground italic">unknown</span>
+            {age && <span className="text-label text-muted-foreground">chain ~{age}</span>}
+            {span && span.latestOrdinal > 0 && (
+              <span className="text-label text-muted-foreground">{fmtSnapCount(span.latestOrdinal)} snapshots</span>
+            )}
+          </span>
+        </Fact>
+      </div>
+      {!last && span?.owner && (
+        <Fact label="Owner address">
+          <span className="font-mono" title={`The address that registered and controls this metagraph. ${span.owner}`}>
+            {shortHash(span.owner)}
+          </span>
+        </Fact>
+      )}
+    </>
   );
 }
 
@@ -305,8 +375,41 @@ export function SnapshotCard({ data: d }: { data: GlobalSnapshot }) {
 export function MetaCard({ cfg }: { cfg: MetaCfg }) {
   const metaList = useStore((s) => s.metaList);
   const mg = metaList.find((x) => x.id === cfg.id) || null;
+  // The UNLISTED dossier is THIS component (user, 2026-08-14 — shared components, not shared
+  // grammar): its members are the distinct uncataloged addresses observed in the window's
+  // exact reads, subscribed only while unlisted IS the subject so every other dossier pays
+  // nothing.
+  const snapshotExact = useStore((s) => (cfg.id === UNLISTED_ID ? s.snapshotExact : null));
+  const unlistedMembers =
+    cfg.id === UNLISTED_ID && snapshotExact
+      ? observedUnlistedIds(getNetwork()?.globalSnapshots ?? [], snapshotExact).slice(0, 6)
+      : [];
+  // The card's ONE foot subject: the catalog address, or the last observed unlisted member.
+  const footId =
+    cfg.id !== "dag" && metagraphById(cfg.id) ? cfg.id : (unlistedMembers[unlistedMembers.length - 1] ?? null);
+  // The owner and staking addresses, off the chain's newest record (user, 2026-08-14 — the
+  // unlisted card grew them first; every dossier carries the same facts). The DAG core has no
+  // currency chain, so its lookup idles and no rows grow.
+  const chainSpan = useChainSpan(footId);
+  // The network's ARCHIVE reading (user, 2026-08-14 — "how many have genesis? that's useful
+  // information to know about a network"): genesis survival counted across the fleet, or the
+  // deepest reach any of its own machines still serves. The DAG core's chain is "global" in
+  // the census; a chain with no probed machines (unlisted, zero-node) answers null and grows
+  // no row.
+  const archive = useArchive();
+  const archSum = archive ? archiveSummary(archive, cfg.id === "dag" ? "global" : cfg.id) : null;
   const nodes = mg?.nodes || [];
-  const blurb = mg?.description || cfg.blurb;
+  // The unlisted blurb COUNTS its members (user, 2026-08-14) — built here, beside the member
+  // list it describes, so the two can't drift.
+  const blurb =
+    cfg.id === UNLISTED_ID
+      ? "Metagraphs anchoring into Global L0 without an entry in the public catalog. " +
+        (unlistedMembers.length === 0
+          ? "None was seen anchoring in the measured window."
+          : unlistedMembers.length === 1
+            ? "One anchored in the measured window; its chain and owner address are public, its operator and machines are not."
+            : `${unlistedMembers.length} anchored in the measured window; their chains and owner addresses are public, their operators and machines are not.`)
+      : mg?.description || cfg.blurb;
   // The site link rides the BODY now (MetaSiteRow — the aside slot carries the ticker). Falls
   // back to the config-level url for cores the live metaList doesn't carry a site for (the DAG).
   const site = mg?.siteUrl ?? cfg.siteUrl;
@@ -355,12 +458,73 @@ export function MetaCard({ cfg }: { cfg: MetaCfg }) {
           )}
         </>
       )}
+      {/* Fleet-level archive summary, in the same summary block as Online nodes; the DAG
+          dossier carries no composition block, so it brings its own separator. ONE fact in
+          the Fees-paid stacked grammar (user, 2026-08-14, settled over several passes —
+          "from genesis as a separate fact, like a checkmark", then "the ~15 months as an
+          underline like fees paid"): the main line counts the machines keeping the whole
+          chain — ratio bold under the Online nodes total it counts against, checked in the
+          success hue when any exist — and the muted underline carries the fleet's deepest
+          surviving reach in the time register. */}
+      {archSum && (
+        <>
+          {nodes.length === 0 && <Separator className="my-2" />}
+          {/* "Full archive nodes", not "genesis nodes" (user, 2026-08-14): the latter reads as
+              validators PRESENT at genesis — a different claim than keeping the whole chain. */}
+          <Fact
+            label={
+              <span className="inline-flex items-center gap-1">
+                Full archive nodes <RoleChips codes={["L0"]} />
+              </span>
+            }
+          >
+            {/* No checkmark here (user, 2026-08-14 — "it just clutters the view"): the ratio
+                already answers, and the node card's Yes keeps the check where it is the value. */}
+            <span className="flex flex-col items-end" title={`${archSum.genesisTitle} ${archSum.reachTitle}`}>
+              <b className="font-bold">{archSum.genesisRatio}</b>
+              <span className="text-label text-muted-foreground">{archSum.reach}</span>
+              {/* Second underline: what that reach holds in snapshots — absent for the holed
+                  global deep archives, where any count would overclaim. */}
+              {archSum.kept != null && (
+                <span className="text-label text-muted-foreground">{fmtSnapCount(archSum.kept)} snapshots</span>
+              )}
+            </span>
+          </Fact>
+        </>
+      )}
+      {unlistedMembers.map((id, i) => (
+        <UnlistedMemberFacts key={id} id={id} last={i === unlistedMembers.length - 1} />
+      ))}
       {/* The site reference LAST, where references sit (the node card's reading order). */}
       {site && (
         <>
           <Separator className="my-2" />
           <MetaSiteRow site={site} />
         </>
+      )}
+      {/* FOOT — the network's own chain references (user, 2026-08-13/14): a metagraph's id IS
+          its state-channel address, plus the owner and staking addresses its records publish.
+          ONE foot for every dossier — a catalog metagraph's own address, or the last observed
+          unlisted member's. The DAG core's internal key ("dag") is not an address, so it
+          grows none. */}
+      {footId && (
+        <Foot>
+          {/* The snapshot cards' fill rule (user, 2026-08-14 — "the value takes up most of the
+              space and sits against the label"): midHash at per-label budgets, so each address
+              fills its own row toward its label. */}
+          <FootRow label="Network id" value={midHash(footId, 28)} title={footId} copy={footId} />
+          {chainSpan?.owner && (
+            <FootRow
+              label="Owner address"
+              value={midHash(chainSpan.owner, 24)}
+              title={`The address that registered and controls this metagraph. ${chainSpan.owner}`}
+              copy={chainSpan.owner}
+            />
+          )}
+          {/* The staking address deliberately does NOT ride this foot (user, 2026-08-14):
+              it is the fee-model's collateral pointer, and its home is the future Staking
+              view — the dossier keeps the two identity references. */}
+        </Foot>
       )}
     </>
   );
@@ -479,6 +643,27 @@ function GeoLiveNode({ p }: { p: PickOf<"l0" | "l1" | "metanode"> }) {
   const compWord = p.node ? nodeCompositionLabel(p.node) : null;
   const comp = compWord ? compWord.charAt(0).toUpperCase() + compWord.slice(1) : null;
   const codes = p.node ? compositionRows([p.node])[0]?.codes : undefined;
+  // ARCHIVE — what depth of ITS OWN chain this machine serves (user, 2026-08-14: "I find this
+  // info very interesting", then "mention time and/or snapshots... metagraph nodes as well").
+  // The census probes the global L0 cluster and every catalog metagraph's L0 cluster, so a DAG
+  // validator answers for the global chain and a metagraph machine for its currency chain; a
+  // node the probe couldn't reach grows no row (absent data stays absent, never "unknown"
+  // filler). Not part of the pile dedup: no ancestor card states it. The title carries the
+  // census context the one-line value can't.
+  const archive = useArchive();
+  const archEntry = p.node?.ip ? archive?.entries.get(p.node.ip) : undefined;
+  const arch = archEntry && archive ? archiveDisplay(archEntry, archive.since) : null;
+  // A machine that runs NO L0 layer serves no snapshot chain — that is a KNOWN fact, not
+  // missing data, so it gets an honest "None" rather than silent absence (user, 2026-08-14:
+  // DOR's 17 dedicated dL1 machines showed nothing and read as an inconsistency). A machine
+  // WITH an L0 layer but no census entry says "Unmeasured" (user, same day — the truth there
+  // is that the census has no reading, and next to siblings with values silence reads as a
+  // defect): unreachable at probe time, not Ready then, or joined since — the title names the
+  // possibilities, the value only claims the absence of a reading. Roles unknown → no row at
+  // all, since even "None" would be a guess.
+  const archRoles = p.node?.roles ?? [];
+  const archNone = !archEntry && archive != null && archRoles.length > 0 && !archRoles.includes("l0");
+  const archUnmeasured = !archEntry && archive != null && archRoles.includes("l0");
   // The host's ASN answers to the provider rung exactly as the Hosting line above it does — one
   // condition, so the two can't disagree about who owns the host.
   const asn = cohort == null ? geo?.asn : null;
@@ -509,13 +694,65 @@ function GeoLiveNode({ p }: { p: PickOf<"l0" | "l1" | "metanode"> }) {
             provider card, whose title IS the isp and whose body carries the same reference. */}
         {cohort == null && geo?.isp && <Fact label="Hosting">{geo.isp}</Fact>}
         {asn && <Fact label="ASN"><span className="font-mono">{asn}</span></Fact>}
+        {/* Reading order: place → role → host → SERVICE — what this machine serves sits with
+            the host block, above the reference foot. */}
+        {arch && archEntry && archive && (
+          /* The dossier's settled stacked grammar, machine-scoped (user, 2026-08-14 — "in the
+             node card follow the same thinking; still says 'archive'"): Yes/No against the
+             From genesis label (check in the success hue on Yes), the machine's own reach as
+             the first underline, its kept count as the second. */
+          <Fact label="Full archive">
+            <span
+              className="flex flex-col items-end"
+              title={
+                archEntry.kind === "genesis"
+                  ? `Serves its chain's every snapshot, back to ordinal 1`
+                  : archEntry.kind === "deep"
+                    ? `Serves global snapshots back to the metagraph era (${archive.since}), with some gaps — one of ${archive.archivalCount} archival validators of ${archive.total} probed`
+                    : `Serves ~${(archEntry.latest - archEntry.floor).toLocaleString()} recent snapshots of its own chain, back to ordinal ${archEntry.floor.toLocaleString()}; older history is discarded`
+              }
+            >
+              <span className="inline-flex items-center gap-1.5">
+                {arch.genesis && <Check aria-hidden className="size-3 text-[var(--success)]" />}
+                <b className="font-bold">{arch.genesis ? "Yes" : "No"}</b>
+              </span>
+              {arch.reach && <span className="text-label text-muted-foreground">{arch.reach}</span>}
+              {arch.count && <span className="text-label text-muted-foreground">{arch.count}</span>}
+            </span>
+          </Fact>
+        )}
+        {archNone && (
+          <Fact label="Full archive">
+            {/* The layer wears its chip, the same token the Composition line uses — one layer
+                vocabulary everywhere (user, 2026-08-14: "not an L0 validator, use the L0 chip"). */}
+            <span
+              className="flex flex-col items-end"
+              title="A chain's snapshots are served by its L0 validators; this machine runs no L0 process, so it keeps no snapshot archive."
+            >
+              <b className="font-bold">None</b>
+              <span className="inline-flex items-center gap-1 text-label text-muted-foreground">
+                not an <RoleChips codes={["L0"]} /> validator
+              </span>
+            </span>
+          </Fact>
+        )}
+        {archUnmeasured && (
+          <Fact label="Full archive">
+            <span
+              className="text-muted-foreground"
+              title="The archive census (refreshed every few hours) has no reading for this machine — it was unreachable at probe time, not Ready then, or joined the cluster since."
+            >
+              Unmeasured
+            </span>
+          </Fact>
+        )}
       </FactGroup>
       {/* The look-up column: this node's own reference, and nothing else — the unique reference
           LAST, where references sit, which falls out of the grammar rather than being a rule of
           its own. Truncated display, full hash on hover. */}
       {p.node?.id && (
         <Foot>
-          <FootRow label="Node id" value={shortHash(p.node.id)} title={p.node.id} />
+          <FootRow label="Node id" value={midHash(p.node.id, 30)} title={p.node.id} copy={p.node.id} />
         </Foot>
       )}
     </>

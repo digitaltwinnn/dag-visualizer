@@ -23,6 +23,11 @@ export interface ChannelSnapDeep {
    *  commitments etc.); count + decoded values as JSON for the raw tree (2026-08-07). */
   dataTxCount: number;
   dataTx: string;
+  /** The data blocks' measured serialized size (Σ block byte lengths) — the same bytes-as-carried
+   *  reading `stateBytes` gives the state, so the card's two payload sections share one unit.
+   *  Optional because the browser's immutable HTTP cache can serve a pre-field body for up to a
+   *  day after deploy — absent is "not in this read", never 0. */
+  dataBytes?: number;
 }
 
 /** Keyed by tick + address + the snapshot's OWN ordinal (2026-08-07): a fast metagraph batches
@@ -64,6 +69,9 @@ export interface ChannelSnapRow {
   hasState: boolean;
   stateBytes: number;
   stateProof: string | null;
+  /** Measured size of this snapshot's data blocks (Σ block byte lengths) — 0 when it carried
+   *  none, or on rows cached before the field existed (an absent lane, not a reading). */
+  dataBytes?: number;
 }
 
 // EXACT per-tick anchor totals read straight from the raw L0 snapshot's stateChannelSnapshots

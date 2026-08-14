@@ -19,7 +19,7 @@ import { METAGRAPHS } from "@/src/engine/config";
 import { metagraphById } from "@/src/data/network";
 import { hex } from "@/src/util/format";
 import { buildUnlistedLog } from "@/src/data/anchorLog";
-import type { GlobalSnapshot, SnapshotExact } from "@/src/data/types";
+import type { GlobalSnapshot, MetaCfg, SnapshotExact } from "@/src/data/types";
 
 export const UNLISTED_ID = "unlisted";
 
@@ -38,6 +38,17 @@ export const UNLISTED_HUD_HEX = "#8a96b8";
 export const UNLISTED_SCENE_HEX = 0x8a96b8;
 
 export const LISTED_IDS: ReadonlySet<string> = new Set(METAGRAPHS.map((m) => m.id));
+
+/** The unlisted set as a MetaCfg, so the SAME dossier component renders it (user, 2026-08-14 —
+ *  "I'd rather not just share grammar but prefer sharing components"). The blurb is built by
+ *  the card from its observed members, so it stays empty here. */
+export const UNLISTED_CFG: MetaCfg = {
+  id: UNLISTED_ID,
+  name: "unlisted",
+  ticker: "unlisted",
+  color: UNLISTED_SCENE_HEX,
+  blurb: "",
+};
 
 /** How a network presents on glass — catalog metagraphs and the unlisted set through ONE shape. */
 export interface DisplayNetwork {
@@ -74,6 +85,25 @@ export function unlistedLog(
   exactByOrdinal: Readonly<Record<number, SnapshotExact | undefined>>,
 ) {
   return buildUnlistedLog(globalSnapshots, exactByOrdinal, LISTED_IDS);
+}
+
+/** Distinct uncataloged addresses observed in the measured window, newest first. Each IS a
+ *  distinct metagraph — a network id is a chain identity — just absent from the public
+ *  catalog, so the card can state per-address chain facts (user, 2026-08-14) while machines
+ *  stay honestly unknowable. */
+export function observedUnlistedIds(
+  globalSnapshots: readonly GlobalSnapshot[],
+  exactByOrdinal: Readonly<Record<number, SnapshotExact | undefined>>,
+): string[] {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const row of unlistedLog(globalSnapshots, exactByOrdinal)) {
+    if (!seen.has(row.metaId)) {
+      seen.add(row.metaId);
+      out.push(row.metaId);
+    }
+  }
+  return out;
 }
 
 /** The newest tick the unlisted set anchored into — the follow system's "latest relevant". */

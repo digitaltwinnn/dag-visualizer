@@ -95,7 +95,10 @@ export function focusSlotId(s: LadderState): string | null {
   // except the ladder's node slot. Falls back to the finest present slot (e.g. only the
   // filter committed — selStack carries no "network" entry).
   for (const slot of s.selStack ?? []) {
-    const id = slot === "node" ? "node" : slot;
+    // The stack speaks selection slots; the lane speaks card slots — two renames:
+    // the network selection's card is the CONTEXT dossier (user, 2026-08-14: a filter
+    // commit focuses the metagraph card, not whatever snapshot the follow pinned).
+    const id = slot === "network" ? "context" : slot;
     if (present.includes(id)) return id;
   }
   return present[present.length - 1];

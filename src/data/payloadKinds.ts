@@ -18,8 +18,14 @@
  *  nuance the short values can't: `State` is the accumulated on-chain state, `Data` is what THIS
  *  snapshot's blocks carried, which is why a bare "none" means a different thing in each. */
 export const PAYLOAD_LANES = {
-  state: { name: "State", title: "The metagraph's on-chain application state" },
-  data: { name: "Data", title: "Data transactions carried in this snapshot's blocks" },
+  // The titles carry the SIZE distinction (user, 2026-08-13 — "state size plus data size does
+  // not match Fees paid's anchored KB. Why?"): each section's size is its DECODED content, while
+  // the anchored figure is the whole snapshot's compressed wire footprint — brotli is applied to
+  // the whole payload, so a per-section as-carried size does not exist, and the envelope (proofs,
+  // header) belongs to neither section. The two readings can never sum, and the titles say which
+  // one each number is.
+  state: { name: "State", title: "The metagraph's on-chain application state. Its size is the decoded content; the anchored KB is the whole snapshot's compressed footprint." },
+  data: { name: "Data", title: "Data records carried in this snapshot's blocks. Its size is the decoded content; the anchored KB is the whole snapshot's compressed footprint." },
 } as const;
 
 /** A decoded payload string → a tree-renderable value, tolerating an undecodable one (which
@@ -45,13 +51,65 @@ export function kindOf(v: unknown): string {
 
 /** Group a decoded payload's records by kind, in order of first appearance (so the table is
  *  deterministic and reads in payload order). A non-array payload counts as one record — the whole
- *  value — rather than being hidden. */
-export function payloadKinds(v: unknown): { kind: string; count: number }[] {
+ *  value — rather than being hidden.
+ *
+ *  `fields` carries a flat record's signature as STRUCTURE (user, 2026-08-13 — the joined
+ *  "attribute · attribute · …" string read as one unparseable token): the field names of a
+ *  multi-field record, in the record's own order, so the UI can render a schema as discrete
+ *  tokens. Null for everything whose kind is already one word — a wrapper name, a JSON type. */
+export function payloadKinds(v: unknown): { kind: string; fields: string[] | null; count: number }[] {
   const items = Array.isArray(v) ? v : v == null ? [] : [v];
-  const byKind = new Map<string, number>();
+  const byKind = new Map<string, { fields: string[] | null; count: number }>();
   for (const it of items) {
     const k = kindOf(it);
-    byKind.set(k, (byKind.get(k) ?? 0) + 1);
+    const g = byKind.get(k);
+    if (g) g.count++;
+    else {
+      const keys = it !== null && typeof it === "object" && !Array.isArray(it) ? Object.keys(it as object) : [];
+      byKind.set(k, { fields: keys.length > 1 ? keys : null, count: 1 });
+    }
   }
-  return [...byKind].map(([kind, count]) => ({ kind, count }));
+  return [...byKind].map(([kind, g]) => ({ kind, fields: g.fields, count: g.count }));
+}
+
+/** The STATE's schema, one level down (user, 2026-08-14 — DOR's `updates` key is only the
+ *  PARENT of the real record schema, so the state table read `updates · 13` while the data lane
+ *  showed the actual fields of sibling-shaped records). Per top-level key: its record count
+ *  (shapeOf's own units — array length, map size, scalar 1) and the KINDS of the records under
+ *  it, read mechanically off the values exactly as `payloadKinds` reads a payload — a keyed map's
+ *  records are its values, an array's its items, and a scalar has no records to describe. Never
+ *  an inferred schema (rule 10): every chip is a field name a real record carries. */
+export function stateSchema(
+  state: unknown,
+): { key: string; count: number; kinds: { kind: string; fields: string[] | null; count: number }[] }[] {
+  if (!state || typeof state !== "object" || Array.isArray(state)) return [];
+  return Object.entries(state as Record<string, unknown>).map(([key, v]) => {
+    const count = Array.isArray(v) ? v.length : v && typeof v === "object" ? Object.keys(v as object).length : v == null ? 0 : 1;
+    const items = Array.isArray(v) ? v : v && typeof v === "object" ? Object.values(v as object) : [];
+    return { key, count, kinds: items.length ? unifyFieldKinds(payloadKinds(items)) : [] };
+  });
+}
+
+/** MERGE the field-signature kinds into ONE schema row (user, 2026-08-14 — records differing by
+ *  an optional field counted as distinct kinds, so the lane repeated near-identical chip rows).
+ *  Fields union in first-appearance order, counts sum; a chip then reads "a field records carry"
+ *  (some optionally), which is what a schema line claims. Kinds that are NOT field signatures —
+ *  a wrapper name, a JSON type — stay their own rows: merging distinct record TYPES would mush
+ *  real structure, and the union takes the position of the first field kind. */
+export function unifyFieldKinds(
+  kinds: { kind: string; fields: string[] | null; count: number }[],
+): { kind: string; fields: string[] | null; count: number }[] {
+  const fieldKinds = kinds.filter((k) => k.fields != null);
+  if (fieldKinds.length <= 1) return kinds;
+  const fields: string[] = [];
+  for (const k of fieldKinds) for (const f of k.fields!) if (!fields.includes(f)) fields.push(f);
+  const merged = { kind: fields.join(" · "), fields, count: fieldKinds.reduce((s, k) => s + k.count, 0) };
+  let placed = false;
+  const out: typeof kinds = [];
+  for (const k of kinds) {
+    if (k.fields != null) {
+      if (!placed) { out.push(merged); placed = true; }
+    } else out.push(k);
+  }
+  return out;
 }

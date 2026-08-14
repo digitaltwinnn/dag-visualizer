@@ -490,7 +490,12 @@ async function buildLand(globe: GeoViewHost) {
     globe.geoFades.push({ mat: globe.landFillMat, base: 0.38 });
     globe.landFillMesh = new THREE.Mesh(new THREE.SphereGeometry(top, 96, 64), globe.landFillMat);
     globe.landFillMesh.renderOrder = -1; // before the rim/nodes
-    globe.landFillMesh.visible = false;  // revealed once the globe materialises (setMorph)
+    // Visible from birth — its OPACITY starts 0 and rides geoFades (base × surf), and the Engine
+    // hides the whole `surface` subtree when the globe is away. ⚠️ It was `visible = false` here,
+    // "revealed in setMorph" — until 20d103d removed setMorph's per-mesh gate in favour of the
+    // subtree hide and left this initializer behind, so the mesh never woke: the ENTIRE land
+    // glass (and the country fill mask riding it) was dark for a month and read as "the ocean is
+    // void, land is void too" (found 2026-08-13 via the missing drilled-country fill).
     globe.surface.add(globe.landFillMesh);
 
     // COUNTRY BORDERS — TWO LineSegments, rebuilt per drill/hover change (event-driven; see

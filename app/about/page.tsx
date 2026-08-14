@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Globe, Layers, Orbit, TriangleAlert, type LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { ABOUT } from "@/components/aboutCopy";
 
 // A plain-HTML, crawlable ABOUT page — deliberately GENERIC and non-technical (user, 2026-07-10):
 // the app itself is a WebGL canvas with almost no indexable text, so this page carries the
@@ -75,15 +76,21 @@ function Panel({ className, children }: { className?: string; children: React.Re
 // app's own vocabulary (components/icons.tsx → VIEW_ICONS), so the three cards here and the three
 // buttons in the command bar can't disagree. Imported as the lucide symbols directly rather than
 // through VIEW_ICONS, whose `Record<Mode, …>` key type would drag the store's `Mode` into a page
-// that deliberately imports no store.
-function ViewCard({ icon: Icon, name, blurb }: { icon: LucideIcon; name: string; blurb: string }) {
+// that deliberately imports no store. (aboutCopy's own `import type { Mode }` erases at compile,
+// so this page stays store-free at runtime.)
+function ViewCard({ icon: Icon, name, about }: { icon: LucideIcon; name: string; about: { title: string; lines: string[] } }) {
   return (
     <Panel className="p-4">
-      <div className="flex items-center gap-2 mb-2">
+      <div className="flex items-center gap-2">
         <Icon aria-hidden className="size-4 text-primary flex-none" />
         <h3 className="text-title font-semibold text-foreground">{name}</h3>
+        <span className="text-label text-muted-foreground">· {about.title}</span>
       </div>
-      <p className="text-label text-foreground-dim leading-relaxed">{blurb}</p>
+      <div className="mt-2 space-y-2">
+        {about.lines.map((l, i) => (
+          <p key={i} className="text-label text-foreground-dim leading-relaxed">{l}</p>
+        ))}
+      </div>
     </Panel>
   );
 }
@@ -207,29 +214,19 @@ export default function AboutPage() {
               Three views of the same network, each answering a different question: who and what,
               where, and when.
             </p>
-            {/* ⚠️ THIS PAGE'S READER HAS NOT SEEN THE APP (2026-08-12), which is exactly why the
-                blurbs may describe the picture — and exactly why they may not use the app's INTERNAL
-                vocabulary to do it. "Global L0 core", "validator shells" and "3D anchoring chamber"
-                each named a thing with a word only a reader who already knew the answer could parse.
-                And the Snapshots line said state is "committed": CLAUDE.md's vocabulary rule reserves
-                that register — the Snapshots stack ANCHORS state; settlement is the money word, and
-                the Transactions view is where it belongs. */}
-            <div className="grid gap-3 sm:grid-cols-3">
-              <ViewCard
-                icon={Orbit}
-                name="Hypergraph"
-                blurb="How the network is built: a shared core at the centre, the independent networks that plug into it around the outside, and every node drawn on the layer it runs."
-              />
-              <ViewCard
-                icon={Globe}
-                name="Geography"
-                blurb="Where the network runs: every node at the real location it runs from, on a globe you can turn, with the country and the hosting provider behind each one."
-              />
-              <ViewCard
-                icon={Layers}
-                name="Snapshots"
-                blurb="When the network anchors: each network's own snapshots dropping into the shared record that seals them, one global tick at a time."
-              />
+            {/* ONE HOME for the per-view copy (user, 2026-08-13 — "can't we re-use the about
+                card?"): these cards render the SAME lines the in-app About cards carry
+                (components/aboutCopy.ts), so the two surfaces can't drift. The page kept parallel
+                blurbs while the card copy still spoke internal vocabulary ("Global L0 core",
+                "validator shells"); the 2026-08-12 copy rules scrubbed that out, which is what
+                made the sharing possible. Each card leads with the About TITLE (the orientation
+                headline) under the view's NAME, exactly the pairing the command bar's caption
+                strip makes in-app. Single column: three paragraphs per view read as prose, not
+                as grid tiles. */}
+            <div className="grid gap-3">
+              <ViewCard icon={Orbit} name="Hypergraph" about={ABOUT.hyper} />
+              <ViewCard icon={Globe} name="Geography" about={ABOUT.geo} />
+              <ViewCard icon={Layers} name="Snapshots" about={ABOUT.ledger} />
             </div>
           </Section>
 

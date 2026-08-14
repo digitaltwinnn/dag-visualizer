@@ -3,11 +3,11 @@
 import { useState } from "react";
 import { cn } from "@/lib/utils";
 import ExplorerShell from "@/components/ExplorerShell";
-import { SelectedRowMark, selectedRow } from "@/components/selection";
+import { SelectedRowMark, selectedRow, selectionHue } from "@/components/selection";
 import { subjectPairing } from "@/components/useSubjectPairing";
 import { useSnapshotFeed } from "@/components/useSnapshotFeed";
 import { getNetwork, getAnchor, filterAccent, metagraphById, shortHash, resolveSigner, SIGNER_GROUPS, SIGNER_UNKNOWN } from "@/src/data/network";
-import { storyCount, tickInStory } from "@/src/data/ledgerStory";
+import { ledgerLens, storyCount, tickInStory } from "@/src/data/ledgerStory";
 import { displayNetwork, unlistedLog, UNLISTED_ID, UNLISTED_HUE, LISTED_IDS } from "@/src/data/unlisted";
 import type { GlobalSnapshot, NodeRow, SnapshotExact } from "@/src/data/types";
 import { metaSnapHoverKey } from "@/src/data/types";
@@ -57,7 +57,10 @@ import { fmtKB } from "@/src/util/format";
  *  card's pager keeps by staying inside this metagraph × this tick. Unfiltered, nothing is out.
  *  Takes the id rather than the group so the unlisted row shares it: one rule, no special case. */
 function outOfLens(filter: string, id: string): boolean {
-  return filter !== "all" && filter !== id;
+  // Through the ledger's own lens (ledgerStory.ledgerLens): committed DAG reads as the whole
+  // chamber, so nothing is out — every tick belongs to the base ledger (user, 2026-08-13).
+  const f = ledgerLens(filter);
+  return f !== "all" && f !== id;
 }
 
 /** One metagraph's anchored snapshots inside a window (the whole trail, or one tick). */
@@ -147,7 +150,10 @@ function SnapRow<K extends string | number>({
         selected && selectedRow(true),
         pair.paired && pair.className,
       )}
-      style={pair.style}
+      // The selection follows the subject's identity (selection.tsx · selectionHue): `accent` is
+      // already the row's own hue — the group's for a leaf, the unlisted gray, the filter accent
+      // for a tick row — so the committed wash/ring and the ✓ speak in it too.
+      style={{ ...((selected || disclose?.holdsSel) ? selectionHue(accent) : undefined), ...pair.style }}
     >
       {/* With a `sub`, the LABEL is the row's identity and must never ellipsize — the flexible
           column is the address instead (it's already an abbreviation, so a further clip still
@@ -182,9 +188,9 @@ function SnapRow<K extends string | number>({
           // the selection, so the slot shows the chevron that closes them; CLOSED, the ✓ is the
           // only trace the selection has left. Without this a leaf that commits AND opens in one
           // click showed a ✓ and no way to see it was open.
-          (selected || disclose.holdsSel) && !disclose.open ? <SelectedRowMark /> : <DisclosureChevron open={disclose.open} />
+          (selected || disclose.holdsSel) && !disclose.open ? <SelectedRowMark hue={accent} /> : <DisclosureChevron open={disclose.open} />
         ) : selected ? (
-          <SelectedRowMark />
+          <SelectedRowMark hue={accent} />
         ) : null}
       </span>
     </button>
@@ -303,6 +309,7 @@ function SignerList({
 
 export default function LedgerPanel() {
   const filter = useStore((s) => s.filter);
+  const hoverFilter = useStore((s) => s.hoverFilter);
   const setHoverFilter = useStore((s) => s.setHoverFilter);
   const hoverSnapOrd = useStore((s) => s.hoverSnapOrd);
   const setHoverSnapOrd = useStore((s) => s.setHoverSnapOrd);
@@ -338,8 +345,12 @@ export default function LedgerPanel() {
   // Under a NETWORK filter the global list shows ONLY that network's story — the ticks it
   // anchored into, the LiveStrip's filtered idiom (user, 2026-08-07: one mental model, no
   // two-outcome clicks in the explorer; the scene keeps all ticks and the filter-releases rule
-  // as its safety net). "all"/"dag" list every tick.
-  const filterNet = displayNetwork(filter);
+  // as its safety net). "all"/"dag" list every tick — through the ledger's lens, because
+  // `displayNetwork("dag")` RESOLVES (metagraphById answers for the core through the identity
+  // map, the same trap ledgerStory's own guard notes), which made a committed DAG narrow the
+  // list to a story that can never have members (found live 2026-08-13: "Waiting for
+  // snapshots…" with a full buffer behind it).
+  const filterNet = displayNetwork(ledgerLens(filter));
   // The ONE story rule (src/data/ledgerStory.ts) — the same membership the strip/scene read.
   const tickFilterCount = (d: GlobalSnapshot): number =>
     storyCount(filter, getAnchor(d.timestamp), snapshotExact[d.ordinal]) ?? 0;
@@ -447,6 +458,10 @@ export default function LedgerPanel() {
                 !beating && !(pinned && previewOrd == null) && "border-border hover:bg-wash-hover",
                 previewOrd != null && "border-dashed",
               )}
+              // The pinned mark speaks the committed network's hue (user, 2026-08-13 — the same
+              // rule as every committed row), exactly as its beating-dot sibling already does:
+              // the filter-face idiom, structural cyan under "all".
+              style={pinned && previewOrd == null ? selectionHue(accent) : undefined}
             >
               {beating ? (
                 // The beating dot wears the FOLLOWED subject's identity (user, 2026-08-07 — the
@@ -599,8 +614,16 @@ export default function LedgerPanel() {
                                   // chamber, which is the whole "where is it" answer the user
                                   // called nice, and previewing has never been committing.
                                   previewOnly={lensedOut}
-                                  onHoverEnter={() => setHoverFilter(g.id)}
-                                  onHoverLeave={() => setHoverFilter(null)}
+                                  // The row's hover IS the network's filter preview, so it takes
+                                  // the identity-hued pairing the hyper explorer's network rows
+                                  // wear (user, 2026-08-13): same channel it always wrote
+                                  // (`hoverFilter` paints the lane in the chamber), now paired,
+                                  // so the row washes in the metagraph's own hue and a scene-side
+                                  // hover of that lane lights this row back.
+                                  groupKey={g.id}
+                                  hoverGroup={hoverFilter}
+                                  setHoverGroup={setHoverFilter}
+                                  hue={g.hue}
                                 >
                                   <IdentityDot hue={g.hue} />
                                   <span className="flex-1 min-w-0 text-body whitespace-nowrap overflow-hidden text-ellipsis">

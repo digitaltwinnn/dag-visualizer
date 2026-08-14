@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildAnchorLog, buildUnlistedLog, snapsAtTick } from "@/src/data/anchorLog";
+import { buildAnchorLog, sortAnchorLog, buildUnlistedLog, snapsAtTick } from "@/src/data/anchorLog";
 import type { MetaSnapRecord } from "@/src/data/api";
 import type { GlobalSnapshot } from "@/src/data/types";
 
@@ -23,9 +23,12 @@ describe("buildAnchorLog", () => {
     // Within the shared 10:00:00 tick, plain ordinal-desc across metagraphs: ded 90 before dor 10.
     expect(rows.map((x) => x.ordinal)).toEqual([12, 11, 90, 10]);
   });
-  it("filter scopes to one metagraph; dag/unknown ids yield an empty log", () => {
+  it("filter scopes to one metagraph; DAG reads as the whole log (the ledger lens)", () => {
     expect(buildAnchorLog(snaps, globals, "ded").map((x) => x.metaId)).toEqual(["ded"]);
-    expect(buildAnchorLog(snaps, globals, "dag")).toEqual([]);
+    // Every global tick IS a DAG snapshot (ledgerStory.ledgerLens, user 2026-08-13) — the base
+    // ledger's log is the whole log, not an empty one. An unknown id still yields nothing.
+    expect(buildAnchorLog(snaps, globals, "dag").map((x) => x.ordinal)).toEqual([12, 11, 90, 10]);
+    expect(buildAnchorLog(snaps, globals, "nope")).toEqual([]);
   });
 });
 
@@ -59,5 +62,30 @@ describe("buildUnlistedLog (2026-08-07 — the exact reads are the only source)"
     expect(rows[0].sizeInKB).toBeCloseTo(0.5, 6);
     expect(rows[1].global.ordinal).toBe(10);
     expect(rows[1].hash).toBe("");
+  });
+});
+
+describe("sortAnchorLog (user, 2026-08-13 — the log sorts like the roster)", () => {
+  const mk = (metaId: string, ordinal: number, fee: number, kb: number, ts: string, tick: number) =>
+    ({ metaId, ordinal, hash: "", fee, sizeInKB: kb, ts, global: { ordinal: tick, timestamp: ts, hash: "" } });
+  const rows = [
+    mk("dor", 10, 5, 2, "2026-08-13T10:00:01Z", 2),
+    mk("ded", 90, 1, 9, "2026-08-13T10:00:00Z", 1),
+    mk("dor", 11, 3, 4, "2026-08-13T10:00:01Z", 2),
+  ];
+  const nameOf = (id: string) => (id === "dor" ? "Dor Technologies" : "Digital Evidence");
+
+  it("age ascending IS the log's resting order: newest tick first, ordinal desc within", () => {
+    expect(sortAnchorLog(rows, "age", 1, nameOf).map((r) => r.ordinal)).toEqual([11, 10, 90]);
+  });
+  it("net compares the DISPLAYED name, never the id (the roster's lesson)", () => {
+    // by id "ded" < "dor", by name Digital Evidence < Dor Technologies — here they agree, so
+    // pin the reverse direction too to prove dir flips the NAME order.
+    expect(sortAnchorLog(rows, "net", -1, nameOf)[0].metaId).toBe("dor");
+  });
+  it("numeric keys compare numerically", () => {
+    expect(sortAnchorLog(rows, "fee", 1, nameOf).map((r) => r.fee)).toEqual([1, 3, 5]);
+    expect(sortAnchorLog(rows, "size", -1, nameOf).map((r) => r.sizeInKB)).toEqual([9, 4, 2]);
+    expect(sortAnchorLog(rows, "tick", 1, nameOf).map((r) => r.global.ordinal)).toEqual([1, 2, 2]);
   });
 });

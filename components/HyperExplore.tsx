@@ -7,7 +7,7 @@ import { CORE_HEX, metagraphById } from "@/src/data/network";
 import { compositionGroups } from "@/src/data/composition";
 import { identityHudHex } from "@/src/palette/identity";
 import { IdentityDot, RoleChips } from "@/components/inspector/parts";
-import { SelectedRowMark, selectedRow } from "@/components/selection";
+import { SelectedRowMark, selectedRow, selectionHue } from "@/components/selection";
 import { hoverKeyOf } from "@/src/data/hoverSubject";
 import { compositionToggleActions, filterToggleActions, nodeSelectActions } from "@/src/engine/domain/pickActions";
 import { applyClickActions } from "@/src/store/applyClickActions";
@@ -121,7 +121,8 @@ export default function HyperExplore() {
                       m.nodes.length === 0 && "opacity-45",
                       pair.paired && pair.className,
                     )}
-                    style={pair.style}
+                    // The selection follows the subject's identity (selection.tsx · selectionHue).
+                    style={{ ...(open ? selectionHue(hue) : undefined), ...pair.style }}
                     aria-expanded={open}
                     title={`${name} · ${m.nodes.length} node${m.nodes.length === 1 ? "" : "s"}`}
                     onClick={() => toggleNetwork(m.id)}

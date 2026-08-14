@@ -1,4 +1,5 @@
 import { getNetwork, getAnchor, metagraphById } from "@/src/data/network";
+import { ledgerLens } from "@/src/data/ledgerStory";
 import { UNLISTED_ID, latestUnlistedTick, unlistedLog } from "@/src/data/unlisted";
 import { useStore } from "@/src/store/store";
 import type { GlobalSnapshot } from "@/src/data/types";
@@ -8,7 +9,12 @@ import type { GlobalSnapshot } from "@/src/data/types";
 // window (don't fall back to an unrelated global snapshot; that would mislabel it as
 // "real-time · PACA" while following snapshots PACA isn't in). For All/L0/L1, the
 // newest global snapshot. (Ports ui.js _latestRelevantSnapshot, minus the bad fallback.)
-export function latestRelevant(filter: string): GlobalSnapshot | null {
+export function latestRelevant(rawFilter: string): GlobalSnapshot | null {
+  // Through the ledger's lens (user, 2026-08-13): DAG follows the base ledger itself — every
+  // global tick is its own. ⚠️ Without this, `metagraphById("dag")` resolves (the identity map
+  // answers for the core) and the scan below looks for anchors keyed "dag", which never exist —
+  // a permanent null that emptied the explorer and killed the follow under a committed DAG.
+  const filter = ledgerLens(rawFilter);
   const net = getNetwork();
   const list: GlobalSnapshot[] = net?.globalSnapshots ?? [];
   if (!list.length) return null;
@@ -34,7 +40,8 @@ export function latestRelevant(filter: string): GlobalSnapshot | null {
 export function followLatest() {
   // `advanceSnap`, not `setSnap`: the heartbeat advance must not bump the selection recency the
   // facts rail's collapse rule reads (store.selStack — a tick is not a user act).
-  const { filter, snap, metaSnap, advanceSnap, advanceMetaSnap } = useStore.getState();
+  const { filter: rawFilter, snap, metaSnap, advanceSnap, advanceMetaSnap } = useStore.getState();
+  const filter = ledgerLens(rawFilter); // dag = the base ledger's own follow (see latestRelevant)
   const latest = latestRelevant(filter);
   if (latest) advanceSnap({ kind: "snapshot", title: `Global snapshot #${latest.ordinal}`, data: latest });
   else if (snap) advanceSnap(null);

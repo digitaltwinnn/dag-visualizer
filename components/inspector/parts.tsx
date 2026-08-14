@@ -1,6 +1,7 @@
 "use client";
 
-import { Fragment, useState, type ReactNode } from "react";
+import { Fragment, useRef, useState, type ReactNode } from "react";
+import { Check, Copy } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -109,23 +110,82 @@ export function Foot({ children, className }: { children: ReactNode; className?:
   );
 }
 
+// The ONE copy control for reference values (user, 2026-08-13): hashes and ids are shown
+// truncated everywhere (the full value lived only in a hover title), so there was no way to get
+// one OUT of the app. A small ghost button that writes the FULL value to the clipboard and
+// answers with the check for one calm cycle (~1.2s, the transient-signal tempo). The glyph swap
+// is information, so it stays under reduced motion. Quiet at rest — visible only while its ROW
+// is hovered or focused (the `group/copy` reveal) — but its slot is always reserved, so nothing
+// shifts under the pointer. Monochrome via currentColor; the check takes `--success` (the
+// ready lane), never an identity hue.
+export function CopyButton({ value, subject, className }: { value: string; subject: string; className?: string }) {
+  const [copied, setCopied] = useState(false);
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  return (
+    <button
+      type="button"
+      aria-label={`Copy ${subject}`}
+      title={`Copy ${subject}`}
+      className={cn(
+        "flex-none inline-flex items-center justify-center size-4 -my-0.5 rounded-xs cursor-pointer",
+        "text-muted-foreground hover:text-foreground focus-visible:outline focus-visible:outline-1 focus-visible:outline-[var(--primary)]",
+        "opacity-0 group-hover/copy:opacity-100 group-focus-within/copy:opacity-100 focus-visible:opacity-100",
+        copied && "opacity-100 text-[var(--success)] hover:text-[var(--success)]",
+        className,
+      )}
+      onClick={() => {
+        navigator.clipboard?.writeText(value).then(
+          () => {
+            setCopied(true);
+            if (timer.current) clearTimeout(timer.current);
+            timer.current = setTimeout(() => setCopied(false), 1200);
+          },
+          () => {}, // a denied clipboard stays quiet — the hover title still carries the value
+        );
+      }}
+    >
+      {copied ? <Check aria-hidden className="size-3" /> : <Copy aria-hidden className="size-3" />}
+    </button>
+  );
+}
+
 // One foot row. Mono by default because most of what lands here is a hash or an id; the
-// bookkeeping numbers (height · subHeight, block counts) pass `mono={false}`.
+// bookkeeping numbers (height · subHeight, block counts) pass `mono={false}`. `copy` is the
+// FULL untruncated value — when present the row carries the shared CopyButton (revealed on the
+// row's own hover/focus via the `group/copy` scope).
 export function FootRow({
   label,
   value,
   title,
   mono = true,
+  copy,
 }: {
   label: string;
   value: ReactNode;
   title?: string;
   mono?: boolean;
+  copy?: string;
 }) {
   return (
-    <div className="flex items-baseline justify-between gap-2.5" title={title}>
-      <span className="text-micro tracking-caps uppercase text-muted-foreground">{label}</span>
-      <span className={cn("text-label text-foreground-dim tabular-nums", mono && "font-mono")}>{value}</span>
+    <div className="group/copy flex items-baseline justify-between gap-2.5" title={title}>
+      {/* shrink-0: the label column is exactly its words (user, 2026-08-14 — "State proof"
+          wrapped to two rows once the values took the pane's width); the VALUE is the column
+          that truncates. */}
+      <span className="shrink-0 whitespace-nowrap text-micro tracking-caps uppercase text-muted-foreground">{label}</span>
+      {/* The value takes the parent's full width (user, 2026-08-14 — the always-reserved copy
+          slot left every row ~22px short of the right edge): the button OVERLAYS the row's end
+          on hover instead of reserving a column, on the foot's own plate colour so a long value
+          is covered, never shifted — the no-shift rule kept by other means. */}
+      <span className={cn("relative inline-flex items-center min-w-0", mono && "font-mono")}>
+        <span className="text-label text-foreground-dim tabular-nums truncate">{value}</span>
+        {copy && (
+          <CopyButton
+            value={copy}
+            subject={label.toLowerCase()}
+            className="absolute right-0 top-1/2 -translate-y-1/2 my-0 bg-[var(--panel-plate)]"
+          />
+        )}
+      </span>
     </div>
   );
 }
