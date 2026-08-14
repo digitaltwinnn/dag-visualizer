@@ -11,10 +11,11 @@ import NodeRosterTable from "@/components/datasection/NodeRosterTable";
 export default function DataSection() {
   const mode = useStore((s) => s.mode);
   return (
-    // The right pad is wider than the left ON PURPOSE: it reserves the corner the layer's own ×
-    // occupies (SectionShell). Below 1100px the tables outgrow the panel and scroll sideways, so
-    // without the gutter the sticky header slid under the close mark (2026-08-02).
-    <div className="h-full flex flex-col pl-6 pr-10 py-3">
+    // The ×-gutter is now NARROW-ONLY (user, 2026-08-14 — the pane left a dead strip on the
+    // right): its recorded reason is the <1100px sideways scroll, where the sticky header slid
+    // under the close mark (2026-08-02) — at desktop the tables fit and nothing runs beneath
+    // the ×, so both pads match and the pane takes the width.
+    <div className="h-full flex flex-col pl-6 pr-6 max-[1099px]:pr-10 py-3">
       {mode === "ledger" ? (
         // MASTER–DETAIL (item 9, 2026-08-06): the anchor log is the index on the left; the right
         // pane renders the SELECTED metagraph snapshot's contents (the deep read + the JSON tree),

@@ -14,7 +14,7 @@ import {
   Server,
   Component,
   Database,
-  FileText,
+  Blocks,
   Signature,
   type LucideIcon,
 } from "lucide-react";
@@ -94,7 +94,10 @@ export const COMPOSITION_ICON: LucideIcon = Component;
  *  currentColor like every glyph, so the tab's own on/off colour carries them. */
 export const LANE_ICONS: Record<"state" | "data" | "signers", LucideIcon> = {
   state: Database,
-  data: FileText,
+  // Blocks, not a file (user, 2026-08-14): the lane's records ride in DATA BLOCKS — the mark
+  // says what the chain actually carries. Distinct from Box (the global snapshot) and Boxes
+  // (the metagraph snapshot tile).
+  data: Blocks,
   signers: Signature,
 };
 
