@@ -89,13 +89,14 @@ export function archiveSummary(c: ArchiveCensus, chain: string): { ratio: string
       title: `No machine serves the chain back to genesis; ${deep} of ${total} keep deep history to the metagraph era (${c.since}), with some gaps.`,
     };
   }
-  // A window-only fleet: the zero ratio still counts genesis keepers, and the deepest reach
-  // any machine serves leads the qualifier — everything older lives nowhere on these machines.
+  // A window-only fleet: the deepest reach any machine serves is the whole qualifier — one
+  // register, not two (user, 2026-08-14: "choose, either from genesis or x months"); the zero
+  // ratio still reads against the label, and the title says "from genesis" in full.
   const best = entries.reduce((a, b) => (b.floor < a.floor ? b : a));
   const reach = best.floorTs ? fmtReach(best.floorTs) : null;
   return {
     ratio: `0 / ${total}`,
-    qualifier: `${reach ? `~${reach}` : `~${fmtSnapCount(best.latest - best.floor)} snapshots`} · from genesis`,
+    qualifier: reach ? `~${reach}` : `~${fmtSnapCount(best.latest - best.floor)} snapshots`,
     title: `No machine serves the chain back to genesis — the deepest archive reaches back to ordinal ${best.floor.toLocaleString()}; the chain's first ${fmtSnapCount(best.floor)} snapshots are not served by any of them (the explorer's index still lists their records).`,
   };
 }

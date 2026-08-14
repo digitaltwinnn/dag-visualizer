@@ -72,7 +72,7 @@ describe("archive summary", () => {
     const now = Date.now();
     const ts = new Date(now - 450 * 86_400_000).toISOString();
     const c = census([e("a", "dor", "window", 14_650_870, 27_227_757, ts), e("b", "dor", "window", 15_000_000, 27_227_757, ts)]);
-    expect(archiveSummary(c, "dor")).toMatchObject({ ratio: "0 / 2", qualifier: "~15 months · from genesis" });
+    expect(archiveSummary(c, "dor")).toMatchObject({ ratio: "0 / 2", qualifier: "~15 months" });
   });
 
   it("answers null for a chain with no probed machines", () => {
