@@ -3,8 +3,8 @@
 import { CircleHelp } from "lucide-react";
 import { useStore } from "@/src/store/store";
 import { applyClickActions } from "@/src/store/applyClickActions";
-import { metagraphById } from "@/src/data/network";
-import { UNLISTED_ID, displayNetwork } from "@/src/data/unlisted";
+import { UNLISTED_ID, displayNetwork, observedUnlistedIds } from "@/src/data/unlisted";
+import { getNetwork, metagraphById } from "@/src/data/network";
 import { hex } from "@/src/util/format";
 import { subjectPairing } from "@/components/useSubjectPairing";
 import CardHead, { RailPane } from "@/components/CardHead";
@@ -12,6 +12,7 @@ import InspectorCard from "@/components/InspectorCard";
 import { PulseEdge, useEdgePulse } from "@/components/EdgePulse";
 import { KIND_MARK_CLASS } from "@/components/icons";
 import { Fact } from "@/components/inspector/parts";
+import { UnlistedNetBlock } from "@/components/inspector/cards";
 import type { PickDescriptor } from "@/src/data/types";
 
 // The Context (parent) card at the top of the right-rail subject stack. It mirrors the
@@ -30,6 +31,9 @@ export default function ContextCard({
   onToggle?: () => void;
 } = {}) {
   const filter = useStore((s) => s.filter);
+  // The exact reads are the unlisted card's only honest source for who is inside the mixed
+  // set — subscribed only while unlisted IS the filter, so other filters pay nothing.
+  const snapshotExact = useStore((s) => (s.filter === UNLISTED_ID ? s.snapshotExact : null));
   const hoverFilter = useStore((s) => s.hoverFilter);
   const setHoverFilter = useStore((s) => s.setHoverFilter);
   const mgCfg = metagraphById(filter);
@@ -46,6 +50,7 @@ export default function ContextCard({
   // noun stays Metagraph like every dossier, the "?" says which kind this one is.
   if (filter === UNLISTED_ID) {
     const dn = displayNetwork(UNLISTED_ID)!;
+    const unlistedIds = observedUnlistedIds(getNetwork()?.globalSnapshots ?? [], snapshotExact ?? {}).slice(0, 6);
     const pair = subjectPairing<string>(hoverFilter, dn.id, setHoverFilter, dn.hue);
     return (
       <RailPane
@@ -82,6 +87,13 @@ export default function ContextCard({
             <Fact className="mt-2" label="Machines">
               <span className="text-muted-foreground italic">not knowable</span>
             </Fact>
+            {/* The DISTINCT metagraphs inside the mixed set (user, 2026-08-14 — "different
+                network id means different metagraph"): one block per uncataloged address seen
+                anchoring in the measured window. Machines stay unknowable; the chain's own
+                span is real (the explorer indexes every anchoring chain). */}
+            {unlistedIds.map((id) => (
+              <UnlistedNetBlock key={id} id={id} />
+            ))}
           </>
         )}
         <PulseEdge pulseKey={pulseKey} rail="right" />

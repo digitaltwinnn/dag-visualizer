@@ -76,6 +76,25 @@ export function unlistedLog(
   return buildUnlistedLog(globalSnapshots, exactByOrdinal, LISTED_IDS);
 }
 
+/** Distinct uncataloged addresses observed in the measured window, newest first. Each IS a
+ *  distinct metagraph — a network id is a chain identity — just absent from the public
+ *  catalog, so the card can state per-address chain facts (user, 2026-08-14) while machines
+ *  stay honestly unknowable. */
+export function observedUnlistedIds(
+  globalSnapshots: readonly GlobalSnapshot[],
+  exactByOrdinal: Readonly<Record<number, SnapshotExact | undefined>>,
+): string[] {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const row of unlistedLog(globalSnapshots, exactByOrdinal)) {
+    if (!seen.has(row.metaId)) {
+      seen.add(row.metaId);
+      out.push(row.metaId);
+    }
+  }
+  return out;
+}
+
 /** The newest tick the unlisted set anchored into — the follow system's "latest relevant". */
 export function latestUnlistedTick(
   globalSnapshots: readonly GlobalSnapshot[],

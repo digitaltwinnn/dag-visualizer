@@ -158,6 +158,52 @@ async function load(): Promise<ArchiveCensus | null> {
   }
 }
 
+// A single chain's span — genesis date + newest ordinal — for the unlisted card's per-address
+// blocks (user, 2026-08-14). Cached per address for the session; a miss caches too (the
+// explorer answered; asking again next session is soon enough).
+export interface ChainSpan {
+  genesisTs: string | null;
+  latestOrdinal: number;
+}
+const spans = new Map<string, ChainSpan | null>();
+const spanInflight = new Map<string, Promise<ChainSpan | null>>();
+async function loadSpan(address: string): Promise<ChainSpan | null> {
+  try {
+    const r = await fetch(`/api/network/${address}/chain`);
+    if (!r.ok) return null;
+    const j = (await r.json()) as { genesisTs: string | null; latestOrdinal: number };
+    return { genesisTs: j.genesisTs, latestOrdinal: j.latestOrdinal };
+  } catch {
+    return null;
+  }
+}
+export function useChainSpan(address: string | null): ChainSpan | null {
+  const [span, setSpan] = useState(address ? (spans.get(address) ?? null) : null);
+  useEffect(() => {
+    if (!address || spans.has(address)) {
+      setSpan(address ? (spans.get(address) ?? null) : null);
+      return;
+    }
+    let dead = false;
+    let p = spanInflight.get(address);
+    if (!p) {
+      p = loadSpan(address).then((v) => {
+        spans.set(address, v);
+        spanInflight.delete(address);
+        return v;
+      });
+      spanInflight.set(address, p);
+    }
+    p.then((v) => {
+      if (!dead) setSpan(v);
+    });
+    return () => {
+      dead = true;
+    };
+  }, [address]);
+  return span;
+}
+
 export function useArchive(): ArchiveCensus | null {
   const [census, setCensus] = useState(cached);
   useEffect(() => {

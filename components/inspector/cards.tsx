@@ -17,7 +17,7 @@ import { SonarRing, NodeStars, NoSignalDot } from "@/components/state/StateAtoms
 import { VIEW_ICONS, SNAPSHOT_ICON, COUNTRY_ICON, PROVIDER_ICON, COMPOSITION_ICON, KIND_MARK_CLASS } from "@/components/icons";
 import { Check, ExternalLink } from "lucide-react";
 import { useMinHold } from "@/components/useMinHold";
-import { useArchive, archiveDisplay, archiveSummary, fmtSnapCount } from "@/components/useArchive";
+import { useArchive, archiveDisplay, archiveSummary, fmtSnapCount, fmtReach, useChainSpan } from "@/components/useArchive";
 import { useNowTick } from "@/components/useNowTick";
 import { POLL } from "@/src/engine/config";
 import { Desc, StatusMark, CompositionRows, StatusBreakdown, RoleChips, IdentityDot, networkKind, Fact, FactGroup, Foot, FootRow } from "./parts";
@@ -300,6 +300,56 @@ export function SnapshotCard({ data: d }: { data: GlobalSnapshot }) {
   );
 }
 
+// ONE observed unlisted metagraph (user, 2026-08-14 — "different network id means different
+// metagraph; determine cards for the currently unlisted ones"): a block inside the unlisted
+// dossier, per distinct uncataloged address seen anchoring in the measured window. The
+// MACHINES are honestly unknowable (no published cluster), but the CHAIN is not — the
+// explorer indexes every anchoring chain's records, so the block states its real span. Its
+// own component because the span hook is per address.
+export function UnlistedNetBlock({ id }: { id: string }) {
+  const span = useChainSpan(id);
+  const age = span?.genesisTs ? fmtReach(span.genesisTs) : null;
+  return (
+    <>
+      <Separator className="my-2" />
+      {/* The identity line a catalog card carries in its head: here the address IS the name. */}
+      <div className="flex items-center justify-between gap-2">
+        <span className="text-micro tracking-caps uppercase text-muted-foreground">Network id</span>
+        <span className="font-mono text-label" title={id}>
+          {shortHash(id)}
+        </span>
+      </div>
+      <div className="mt-1.5">
+        <Fact label="Online nodes">
+          <span className="text-muted-foreground italic" title="This network publishes no node cluster, so its machines are unknowable.">
+            unknown
+          </span>
+        </Fact>
+        <Fact
+          label={
+            <span className="inline-flex items-center gap-1">
+              Full archive nodes <RoleChips codes={["L0"]} />
+            </span>
+          }
+        >
+          <span
+            className="flex flex-col items-end"
+            title={`Whether any machine keeps this chain in full is unknowable — no cluster is published. The chain itself is real: ${
+              span ? `${span.latestOrdinal.toLocaleString()} snapshots${age ? ` since ~${age.replace("~", "")} ago` : ""}.` : "reading its span…"
+            }`}
+          >
+            <span className="text-muted-foreground italic">unknown</span>
+            {age && <span className="text-label text-muted-foreground">chain ~{age}</span>}
+            {span && span.latestOrdinal > 0 && (
+              <span className="text-label text-muted-foreground">{fmtSnapCount(span.latestOrdinal)} snapshots</span>
+            )}
+          </span>
+        </Fact>
+      </div>
+    </>
+  );
+}
+
 // The metagraph context pane (top-right "context" slot): identity only — description,
 // make-up rows, website. Its live/economic counterpart is the top-bar vitals (filter-aware
 // "live activity"), so the dossier stays a stable identity card.
@@ -376,7 +426,13 @@ export function MetaCard({ cfg }: { cfg: MetaCfg }) {
           {nodes.length === 0 && <Separator className="my-2" />}
           {/* "Full archive nodes", not "genesis nodes" (user, 2026-08-14): the latter reads as
               validators PRESENT at genesis — a different claim than keeping the whole chain. */}
-          <Fact label="Full archive nodes">
+          <Fact
+            label={
+              <span className="inline-flex items-center gap-1">
+                Full archive nodes <RoleChips codes={["L0"]} />
+              </span>
+            }
+          >
             {/* No checkmark here (user, 2026-08-14 — "it just clutters the view"): the ratio
                 already answers, and the node card's Yes keeps the check where it is the value. */}
             <span className="flex flex-col items-end" title={`${archSum.genesisTitle} ${archSum.reachTitle}`}>
