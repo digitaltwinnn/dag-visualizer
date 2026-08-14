@@ -16,6 +16,7 @@ interface BeSnap {
   ordinal?: number;
   timestamp?: string;
   ownerAddress?: string;
+  stakingAddress?: string;
 }
 
 async function readSnap(url: string): Promise<BeSnap | null> {
@@ -44,14 +45,16 @@ async function fetchSpan(address: string) {
     genesisTs: genesis?.timestamp ?? null,
     latestOrdinal: latest.ordinal ?? 0,
     latestTs: latest.timestamp ?? null,
-    // The closest thing to an operator identity the chain publishes (user, 2026-08-14) —
-    // the address that owns the channel, straight off the newest record.
+    // The two addresses a chain publishes about itself, straight off the newest record
+    // (user, 2026-08-14): the owner (registered and controls the metagraph) and the staking
+    // address (holds its staked collateral).
     owner: latest.ownerAddress ?? null,
+    staking: latest.stakingAddress ?? null,
   };
 }
 
 const cachedSpan = (address: string) =>
-  unstable_cache(() => fetchSpan(address), ["network-chain-span-v2", address], { revalidate: 300 })();
+  unstable_cache(() => fetchSpan(address), ["network-chain-span-v3", address], { revalidate: 300 })();
 
 export async function GET(_req: Request, ctx: { params: Promise<{ address: string }> }) {
   const { address } = await ctx.params;

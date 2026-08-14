@@ -361,20 +361,25 @@ export function UnlistedNetBlock({ id, last }: { id: string; last: boolean }) {
           <FootRow label="Network id" value={shortHash(id)} title={id} copy={id} />
           {span?.owner && (
             <FootRow
-              label="Owner wallet"
+              label="Owner address"
               value={shortHash(span.owner)}
-              title={`The wallet that registered and controls this metagraph (its records' ownerAddress) — distinct from its staking address, which holds staked collateral. ${span.owner}`}
+              title={`The address that registered and controls this metagraph. ${span.owner}`}
               copy={span.owner}
+            />
+          )}
+          {span?.staking && (
+            <FootRow
+              label="Staking address"
+              value={shortHash(span.staking)}
+              title={`The address holding this metagraph's staked collateral. ${span.staking}`}
+              copy={span.staking}
             />
           )}
         </Foot>
       )}
       {!last && span?.owner && (
-        <Fact label="Owner wallet">
-          <span
-            className="font-mono"
-            title={`The wallet that registered and controls this metagraph (its records' ownerAddress) — distinct from its staking address, which holds staked collateral. ${span.owner}`}
-          >
+        <Fact label="Owner address">
+          <span className="font-mono" title={`The address that registered and controls this metagraph. ${span.owner}`}>
             {shortHash(span.owner)}
           </span>
         </Fact>
@@ -389,7 +394,7 @@ export function UnlistedNetBlock({ id, last }: { id: string; last: boolean }) {
 export function MetaCard({ cfg }: { cfg: MetaCfg }) {
   const metaList = useStore((s) => s.metaList);
   const mg = metaList.find((x) => x.id === cfg.id) || null;
-  // The Owner wallet, off the chain's newest record (user, 2026-08-14 — the unlisted card
+  // The owner and staking addresses, off the chain's newest record (user, 2026-08-14 — the unlisted card
   // grew it first; the regular card carries the same fact). The DAG core has no currency
   // chain, so its lookup idles and no row grows.
   const chainSpan = useChainSpan(cfg.id !== "dag" && metagraphById(cfg.id) ? cfg.id : null);
@@ -500,10 +505,18 @@ export function MetaCard({ cfg }: { cfg: MetaCfg }) {
           <FootRow label="Network id" value={shortHash(cfg.id)} title={cfg.id} copy={cfg.id} />
           {chainSpan?.owner && (
             <FootRow
-              label="Owner wallet"
+              label="Owner address"
               value={shortHash(chainSpan.owner)}
-              title={`The wallet that registered and controls this metagraph (its records' ownerAddress) — distinct from its staking address, which holds staked collateral. ${chainSpan.owner}`}
+              title={`The address that registered and controls this metagraph. ${chainSpan.owner}`}
               copy={chainSpan.owner}
+            />
+          )}
+          {chainSpan?.staking && (
+            <FootRow
+              label="Staking address"
+              value={shortHash(chainSpan.staking)}
+              title={`The address holding this metagraph's staked collateral. ${chainSpan.staking}`}
+              copy={chainSpan.staking}
             />
           )}
         </Foot>
