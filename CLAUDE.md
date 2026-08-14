@@ -1018,11 +1018,14 @@ in a held slot reflows the row when the number replaces it.
 `reading…` forever, which rule 10 counts as a fabricated state exactly
 like a fabricated number. The exact read's signal is `store.exactMiss` (recorded by
 `RawSnapshotBridge`, cleared when the read lands); the deep read's is the 12s `decodeGaveUp` timer.
-⚠️ **The payload host serves a BAND, not the whole history** (measured 2026-08-14: roughly the
-last ~240k ordinals ≈ 78 days; 2026-08-13's "entire history" probe does not reproduce, and the
-original "~30 min" premise was also false). So a failed old read may be PERMANENT — the give-up
-copy names the horizon — while the explorer serves tiny full-history RECORDS at any depth, which
-is what the anchor log's history paging and the timestamp→ordinal resolver ride.
+⚠️ **The payload host's depth is NONDETERMINISTIC — the LB fronts nodes of different archival
+depth.** Genesis-era ordinals (766,780, ~2.75y) answered 200 with full payload on 2026-08-14, the
+day after the same probe measured a hard ~78-day / ~240k-ordinal band with fast 404s below it —
+both measurements were real, which is only consistent with per-request routing to mixed-depth
+nodes. So **no failed old read is provably permanent** and no serving horizon may be stated in
+copy; the give-up copy invites a retry instead. The explorer separately serves tiny full-history
+RECORDS at any depth, which is what the anchor log's history paging and the timestamp→ordinal
+resolver ride.
 
 **A value slot states a READING; an invitation is a CONTROL** (user, 2026-08-10 — "I don't like the
 word 'pin', it's not very clear to me"). The metagraph snapshot card's Data slot said `pin to read`:
@@ -1516,10 +1519,10 @@ them — but the Next Node server can.
 ⚠️ **The snapshot routes' PAST bound is DROPPED** (user, 2026-08-14 — the anchor log pages a
 network's whole history and the payload follows the rows; "if abused I'll switch to Pro for DDoS
 protection"). `app/api/snapshot/ordinalWindow.ts` remains the one home and still bounds the FUTURE
-(+5, nonsense is not history) and **fails open** when its reference read fails. The accepted cost is
-bounded by the LB's own ~78-day serving band (older ordinals 404 upstream in ~0.6s with no
-payload); within it, any ordinal is a valid anonymous ~2.5 MB pull + decode + cache write — once
-per ordinal ever, since they're immutable. Re-tighten here when the plan changes.
+(+5, nonsense is not history) and **fails open** when its reference read fails. The accepted cost:
+any historical ordinal is a valid anonymous ~2.5 MB pull + decode + cache write — once per ordinal
+ever, since they're immutable. (The LB's serving depth varies per request — see the payload-depth
+note above — so the band is no cost bound.) Re-tighten here when the plan changes.
 - The client fetches `/api/metagraphs` on mount **and re-pulls every 5 min** — Vercel never restarts
   and ISR only freshens the *server* cache, so an idle tab must re-pull. Snapshot and cluster feeds are
   live client polling.

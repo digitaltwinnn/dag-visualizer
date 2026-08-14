@@ -7,10 +7,11 @@ describe("relativeAge", () => {
     expect(relativeAge(90_000)).toBe("2m ago");     // rounds
     expect(relativeAge(3 * 3_600_000)).toBe("3h ago");
   });
-  it("scales to days and decimal years for history-mode rows", () => {
+  it("scales to days, months and rounded years for history-mode rows", () => {
     expect(relativeAge(3 * 86_400_000)).toBe("3d ago");
-    // ~2.75y — the anchor log's genesis-era rows; "24118h ago" was the bug this tier fixes
-    expect(relativeAge(24_118 * 3_600_000)).toBe("2.8y ago");
+    expect(relativeAge(90 * 86_400_000)).toBe("3mo ago");
+    // ~2.75y — the anchor log's genesis-era rows; single rounded unit, the common convention
+    expect(relativeAge(24_118 * 3_600_000)).toBe("3y ago");
   });
   it("floors sub-second to 1s", () => {
     expect(relativeAge(200)).toBe("1s ago");
