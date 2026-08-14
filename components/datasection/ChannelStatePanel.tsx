@@ -63,6 +63,7 @@ import { identityHudHex } from "@/src/palette/identity";
 import { CopyButton, FootRow, IdentityDot, RoleChips } from "@/components/inspector/parts";
 import { fmtDag, fmtKB } from "@/src/util/format";
 import JsonTree from "@/components/datasection/JsonTree";
+import { LANE_ICONS } from "@/components/icons";
 import TablePager from "@/components/datasection/TablePager";
 import { cn } from "@/lib/utils";
 
@@ -530,23 +531,27 @@ export function ChannelStatePanel() {
                 className="relative flex flex-none w-full gap-1 after:absolute after:inset-x-0 after:bottom-0 after:h-px after:bg-border/50"
                 aria-label="Which part of the snapshot to read"
               >
-                {lanes.map((l) => (
-                  <ToggleGroupItem
-                    key={l.id}
-                    value={l.id}
-                    title={l.title}
-                    className={cn(
-                      "flex-1 flex items-center justify-center h-7 px-2 rounded-t-md! rounded-b-none!",
-                      "text-micro tracking-caps uppercase",
-                      "text-muted-foreground bg-transparent border border-transparent border-b-0",
-                      "hover:text-foreground hover:bg-wash-soft",
-                      "data-[state=on]:z-[1] data-[state=on]:text-foreground",
-                      "data-[state=on]:border-border/50 data-[state=on]:bg-[var(--panel-solid)]",
-                    )}
-                  >
-                    {l.name}
-                  </ToggleGroupItem>
-                ))}
+                {lanes.map((l) => {
+                  const LaneIcon = LANE_ICONS[l.id];
+                  return (
+                    <ToggleGroupItem
+                      key={l.id}
+                      value={l.id}
+                      title={l.title}
+                      className={cn(
+                        "flex-1 flex items-center justify-center gap-1.5 h-7 px-2 rounded-t-md! rounded-b-none!",
+                        "text-micro tracking-caps uppercase",
+                        "text-muted-foreground bg-transparent border border-transparent border-b-0",
+                        "hover:text-foreground hover:bg-wash-soft",
+                        "data-[state=on]:z-[1] data-[state=on]:text-foreground",
+                        "data-[state=on]:border-border/50 data-[state=on]:bg-[var(--panel-solid)]",
+                      )}
+                    >
+                      <LaneIcon aria-hidden className="size-3.5 flex-none" />
+                      {l.name}
+                    </ToggleGroupItem>
+                  );
+                })}
               </ToggleGroup>
 
               {/* ONE scroll region, and it takes the whole remaining pane — the point of the axis:

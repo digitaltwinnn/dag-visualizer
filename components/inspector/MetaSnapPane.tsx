@@ -200,7 +200,10 @@ export default function MetaSnapPane({
                           content — the three can never sum, and without the word the mismatch
                           reads as a bug. Verified in the decoder: `bytes` is the content
                           byte-array length pre-inflate; stateBytes/dataBytes are post-inflate. */}
-                      <span className="text-label text-muted-foreground">{fmtKB(row.bytes / 1024)} anchored · compressed</span>
+                      {/* "N KB compressed" (user, 2026-08-14): the head's aside already says "anchored
+                          to N", so the word was doing the same work twice — the subline states the
+                          wire weight alone, basis included. */}
+                      <span className="text-label text-muted-foreground">{fmtKB(row.bytes / 1024)} compressed</span>
                     </span>
                   </Fact>
                   {/* The L0 seal is a BODY fact again (user's post-read rework, 2026-08-13): it
