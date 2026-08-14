@@ -374,7 +374,9 @@ export function MetaCard({ cfg }: { cfg: MetaCfg }) {
       {archSum && (
         <>
           {nodes.length === 0 && <Separator className="my-2" />}
-          <Fact label="From genesis">
+          {/* "Full archive nodes", not "genesis nodes" (user, 2026-08-14): the latter reads as
+              validators PRESENT at genesis — a different claim than keeping the whole chain. */}
+          <Fact label="Full archive nodes">
             {/* No checkmark here (user, 2026-08-14 — "it just clutters the view"): the ratio
                 already answers, and the node card's Yes keeps the check where it is the value. */}
             <span className="flex flex-col items-end" title={`${archSum.genesisTitle} ${archSum.reachTitle}`}>
@@ -580,7 +582,7 @@ function GeoLiveNode({ p }: { p: PickOf<"l0" | "l1" | "metanode"> }) {
              node card follow the same thinking; still says 'archive'"): Yes/No against the
              From genesis label (check in the success hue on Yes), the machine's own reach as
              the first underline, its kept count as the second. */
-          <Fact label="From genesis">
+          <Fact label="Full archive">
             <span
               className="flex flex-col items-end"
               title={
@@ -601,7 +603,7 @@ function GeoLiveNode({ p }: { p: PickOf<"l0" | "l1" | "metanode"> }) {
           </Fact>
         )}
         {archNone && (
-          <Fact label="From genesis">
+          <Fact label="Full archive">
             {/* The layer wears its chip, the same token the Composition line uses — one layer
                 vocabulary everywhere (user, 2026-08-14: "not an L0 validator, use the L0 chip"). */}
             <span
@@ -616,7 +618,7 @@ function GeoLiveNode({ p }: { p: PickOf<"l0" | "l1" | "metanode"> }) {
           </Fact>
         )}
         {archUnmeasured && (
-          <Fact label="From genesis">
+          <Fact label="Full archive">
             <span
               className="text-muted-foreground"
               title="The archive census (refreshed every few hours) has no reading for this machine — it was unreachable at probe time, not Ready then, or joined the cluster since."
