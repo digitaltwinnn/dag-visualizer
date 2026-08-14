@@ -1018,14 +1018,19 @@ in a held slot reflows the row when the number replaces it.
 `reading…` forever, which rule 10 counts as a fabricated state exactly
 like a fabricated number. The exact read's signal is `store.exactMiss` (recorded by
 `RawSnapshotBridge`, cleared when the read lands); the deep read's is the 12s `decodeGaveUp` timer.
-⚠️ **The payload host's depth is NONDETERMINISTIC — the LB fronts nodes of different archival
-depth.** Genesis-era ordinals (766,780, ~2.75y) answered 200 with full payload on 2026-08-14, the
-day after the same probe measured a hard ~78-day / ~240k-ordinal band with fast 404s below it —
-both measurements were real, which is only consistent with per-request routing to mixed-depth
-nodes. So **no failed old read is provably permanent** and no serving horizon may be stated in
-copy; the give-up copy invites a retry instead. The explorer separately serves tiny full-history
-RECORDS at any depth, which is what the anchor log's history paging and the timestamp→ordinal
-resolver ride.
+⚠️ **The payload host's depth is a PER-REQUEST LOTTERY — the LB fronts pruned and archival
+nodes.** Probed node-by-node 2026-08-14: of 152 Ready L0 validators, **143 serve only a rolling
+~78-day window and 9 serve deep history**, so a deep read through the LB succeeds on roughly a
+1-in-17 draw — which is how the same probe measured "entire history" one day, a hard ~78-day band
+the next, and genesis again the day after. All three were real. Deep history itself starts at
+**ordinal 766,718 (2023-11-13 11:44 UTC** — right after a 27-minute cadence gap, the
+metagraph-era upgrade restart); nothing behind the LB serves anything older, and nothing needs
+to: every metagraph snapshot ever anchored postdates it (DOR's genesis anchored 43 minutes
+after). So **no failed old read is provably permanent** and no serving horizon may be stated in
+copy — the give-up copy invites a retry, and the channel route's upstream-404-throws-as-transient
+choice is what makes each retry a fresh draw. The explorer separately serves tiny full-history
+RECORDS at any depth (its own indexer storage, not the validators), which is what the anchor
+log's history paging and the timestamp→ordinal resolver ride.
 
 **A value slot states a READING; an invitation is a CONTROL** (user, 2026-08-10 — "I don't like the
 word 'pin', it's not very clear to me"). The metagraph snapshot card's Data slot said `pin to read`:
