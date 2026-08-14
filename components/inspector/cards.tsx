@@ -5,7 +5,7 @@ import { cn } from "@/lib/utils";
 import { useStore } from "@/src/store/store";
 import { shortHash, CORE_HEX, metagraphById, SIGNER_GROUPS } from "@/src/data/network";
 import { identityHudHex } from "@/src/palette/identity";
-import { hex, fmtDag, fmtKB } from "@/src/util/format";
+import { hex, fmtDag, fmtKB, midHash } from "@/src/util/format";
 import { relativeAge } from "@/src/util/relativeAge";
 import { statusBreakdown } from "@/src/data/nodeStatus";
 import type { GlobalSnapshot, MetaCfg, PickDescriptor } from "@/src/data/types";
@@ -291,9 +291,13 @@ export function SnapshotCard({ data: d }: { data: GlobalSnapshot }) {
           a tick's block count is the wrong activity signal, and its anchors are the fact this
           card exists to state. */}
       <Foot>
-        <FootRow label="Hash" value={shortHash(d.hash)} title={d.hash} copy={d.hash} />
+        {/* The raw pane's long mid-ellipsis form, budgeted PER ROW (user, 2026-08-14 — "the
+            hashes attached to the label", then "the hash label still has extra room"): the
+            value fills its own row toward its label, so a short label buys a longer value —
+            head and tail both surviving. Budgets measured at the desktop rail width. */}
+        <FootRow label="Hash" value={midHash(d.hash, 34)} title={d.hash} copy={d.hash} />
         {d.lastSnapshotHash && (
-          <FootRow label="Parent hash" value={shortHash(d.lastSnapshotHash)} title={d.lastSnapshotHash} copy={d.lastSnapshotHash} />
+          <FootRow label="Parent hash" value={midHash(d.lastSnapshotHash, 27)} title={d.lastSnapshotHash} copy={d.lastSnapshotHash} />
         )}
       </Foot>
     </div>

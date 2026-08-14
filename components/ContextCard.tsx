@@ -78,9 +78,13 @@ export default function ContextCard({
         />
         {!collapsed && (
           <>
+            {/* The blurb tracks what the card now shows (user, 2026-08-14 — the old "mixed set"
+                sentence predated the per-address blocks): with members observed it introduces
+                them; with none it says so, window-scoped and honest. */}
             <p className="m-0 text-body text-muted-foreground">
-              State channels anchoring into Global L0 without an entry in the public catalog — a
-              mixed set with no single operator or token.
+              {unlistedIds.length > 0
+                ? "State channels anchoring into Global L0 without an entry in the public catalog. Each network id below is one distinct metagraph; only its chain is public, not its operator or machines."
+                : "State channels anchoring into Global L0 without an entry in the public catalog. None was seen anchoring in the measured window."}
             </p>
             {/* Absent data is an INSTRUMENT STATE, never a fabricated number: the operators'
                 machines are outside every feed this app reads. */}

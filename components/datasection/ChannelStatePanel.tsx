@@ -61,7 +61,7 @@ import { UNLISTED_HUE } from "@/src/data/unlisted";
 import { PAYLOAD_LANES, parsePayload, payloadKinds, stateSchema, unifyFieldKinds } from "@/src/data/payloadKinds";
 import { identityHudHex } from "@/src/palette/identity";
 import { CopyButton, FootRow, IdentityDot, RoleChips } from "@/components/inspector/parts";
-import { fmtDag, fmtKB } from "@/src/util/format";
+import { fmtDag, fmtKB, midHash } from "@/src/util/format";
 import JsonTree from "@/components/datasection/JsonTree";
 import { LANE_ICONS } from "@/components/icons";
 import TablePager from "@/components/datasection/TablePager";
@@ -80,7 +80,7 @@ function nonEmpty(v: unknown): boolean {
  *  while this pane runs ~3× that — the labels need no more than their words, so the value
  *  takes the room (user, 2026-08-14). Head AND tail kept, like shortHash: a chain hash's tail
  *  is what gets compared. */
-const paneHash = (v: string): string => (v.length <= 46 ? v : `${v.slice(0, 26)}…${v.slice(-18)}`);
+const paneHash = (v: string): string => midHash(v, 46);
 
 type LaneId = "state" | "data" | "signers";
 type Lane = { id: LaneId; name: string; title: string };

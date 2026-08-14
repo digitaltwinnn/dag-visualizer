@@ -34,3 +34,13 @@ export const fmtBytes = (bytes: number) => (bytes < 1024 ? `${bytes.toLocaleStri
 // real data, monochrome, and renders identically everywhere. Where the country NAME already
 // sits next to it (card titles, table cells) the mark was simply dropped as redundant.
 export const ccMark = (cc?: string | null) => (!cc || cc.length !== 2 ? "··" : cc.toUpperCase());
+
+// Mid-ellipsis hash display (user, 2026-08-14 — the raw pane's long hashes "attached to the
+// label" read better than the cards' short form): head and tail both survive at a character
+// budget, because the head is what a reader recognizes and the tail is what they compare.
+// The budget is per surface — the raw pane fits 46, a rail card ~27.
+export function midHash(v: string, max = 46): string {
+  if (v.length <= max) return v;
+  const tail = Math.floor((max - 1) * 0.4);
+  return `${v.slice(0, max - 1 - tail)}…${v.slice(-tail)}`;
+}

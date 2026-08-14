@@ -13,11 +13,11 @@ import { Separator } from "@/components/ui/separator";
 import { useStore } from "@/src/store/store";
 import { metaSnapDeepKey } from "@/src/data/types";
 import type { ChannelSnapDeep, ChannelSnapRow } from "@/src/data/types";
-import { getNetwork, SIGNER_GROUPS, metagraphById, shortHash } from "@/src/data/network";
+import { getNetwork, SIGNER_GROUPS, metagraphById } from "@/src/data/network";
 import { UNLISTED_HUE } from "@/src/data/unlisted";
 import { snapsAtTick } from "@/src/data/anchorLog";
 import { PAYLOAD_LANES } from "@/src/data/payloadKinds";
-import { fmtDag, fmtKB } from "@/src/util/format";
+import { fmtDag, fmtKB, midHash } from "@/src/util/format";
 import { relativeAge } from "@/src/util/relativeAge";
 import { useMinHold } from "@/components/useMinHold";
 import { useNowTick } from "@/components/useNowTick";
@@ -335,14 +335,14 @@ export default function MetaSnapPane({
                   like `stateProof` does: descriptor first, polled buffer behind it. The em-dash
                   survives for the one case that is genuinely unknown — a snapshot stepped to
                   after it aged out of the retained buffer — where stating the gap is the point. */}
-              <FootRow label="Hash" value={shortHash(hash)} title={hash} copy={hash || undefined} />
+              <FootRow label="Hash" value={midHash(hash, 34)} title={hash} copy={hash || undefined} />
               {polled?.parent && (
-                <FootRow label="Parent hash" value={shortHash(polled.parent)} title={polled.parent} copy={polled.parent} />
+                <FootRow label="Parent hash" value={midHash(polled.parent, 27)} title={polled.parent} copy={polled.parent} />
               )}
               {stateProof && (
                 // "State HASH" (user, 2026-08-14 — "state proof" collided with the signers tab's
                 // "snapshot proof", a signature set; this is a DIGEST, kin to Hash/Parent above).
-                <FootRow label="State hash" value={shortHash(stateProof)} title={"The hash of the application state this snapshot results in, covered by the snapshot's own L0 seal — the state's provability. Distinct from the SIGNERS tab's 'snapshot proof', which is the L0 signature set; this is a digest, and the signatures sign over it." + stateProof} copy={stateProof} />
+                <FootRow label="State hash" value={midHash(stateProof, 29)} title={"The hash of the application state this snapshot results in, covered by the snapshot's own L0 seal — the state's provability. Distinct from the SIGNERS tab's 'snapshot proof', which is the L0 signature set; this is a digest, and the signatures sign over it." + stateProof} copy={stateProof} />
               )}
             </Foot>
           </div>
