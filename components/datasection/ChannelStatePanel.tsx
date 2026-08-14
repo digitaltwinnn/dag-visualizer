@@ -493,6 +493,16 @@ export function ChannelStatePanel() {
             <span className="text-right tabular-nums text-foreground-dim">{deep.blocks.toLocaleString()}</span>
           </div>
 
+          {/* THE IDLE LINE, the card's own remark in the same lead position (user, 2026-08-14):
+              the read landed and neither payload lane exists — the bytes are the envelope and
+              the proofs the SIGNERS tab below lists. Verified, never guessed: the pane always
+              decompresses on arrival, so this renders only over a real read. */}
+          {lanes.length > 0 && !lanes.some((l) => l.id === "state" || l.id === "data") && (
+            <p className="flex-none text-label text-muted-foreground">
+              An idle snapshot: it anchored only its envelope and proofs.
+            </p>
+          )}
+
           {active == null ? (
             // Facts but no payload, stated rather than left as an empty frame (rule 10).
             <p className="flex-none text-label text-muted-foreground">
