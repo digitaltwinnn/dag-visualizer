@@ -168,7 +168,10 @@ export function FootRow({
 }) {
   return (
     <div className="group/copy flex items-baseline justify-between gap-2.5" title={title}>
-      <span className="text-micro tracking-caps uppercase text-muted-foreground">{label}</span>
+      {/* shrink-0: the label column is exactly its words (user, 2026-08-14 — "State proof"
+          wrapped to two rows once the values took the pane's width); the VALUE is the column
+          that truncates. */}
+      <span className="shrink-0 whitespace-nowrap text-micro tracking-caps uppercase text-muted-foreground">{label}</span>
       {/* The value takes the parent's full width (user, 2026-08-14 — the always-reserved copy
           slot left every row ~22px short of the right edge): the button OVERLAYS the row's end
           on hover instead of reserving a column, on the foot's own plate colour so a long value

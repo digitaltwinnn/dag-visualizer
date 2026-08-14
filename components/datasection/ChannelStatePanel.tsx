@@ -57,11 +57,13 @@ import { metaSnapDeepKey } from "@/src/data/types";
 import type { NodeRow } from "@/src/data/types";
 import { getNetwork, metagraphById, resolveSigner, shortHash, SIGNER_GROUPS, SIGNER_UNKNOWN } from "@/src/data/network";
 import { snapsAtTick } from "@/src/data/anchorLog";
+import { UNLISTED_HUE } from "@/src/data/unlisted";
 import { PAYLOAD_LANES, parsePayload, payloadKinds, stateSchema, unifyFieldKinds } from "@/src/data/payloadKinds";
 import { identityHudHex } from "@/src/palette/identity";
 import { CopyButton, FootRow, IdentityDot, RoleChips } from "@/components/inspector/parts";
 import { fmtDag, fmtKB } from "@/src/util/format";
 import JsonTree from "@/components/datasection/JsonTree";
+import TablePager from "@/components/datasection/TablePager";
 import { cn } from "@/lib/utils";
 
 /** Whether a decoded payload carries anything at all — `{}`, `[]` and `""` do NOT open a lane. */
@@ -122,98 +124,104 @@ function LaneTable({
   );
 }
 
-/** The data lane's SCHEMA read (user, 2026-08-13 — the joined "attribute · attribute · …" kind
- *  string read as one unparseable token): each record kind renders its field names as discrete
- *  squared chips that wrap, the count on the head line — a schema as tokens, not prose. A kind
- *  that is already one word (a wrapper name, a JSON type) renders as a single chip. Mechanical
- *  like its source (payloadKinds): the chips are the record's own keys, never an inferred schema. */
-function SchemaKinds({ kinds }: { kinds: { kind: string; fields: string[] | null; count: number }[] }) {
+/** ONE SCHEMA GRAMMAR, BOTH LANES (user, 2026-08-14 — third pass): a schema row is a
+ *  DISCLOSURE — the row carries the name and the record count, and opening it reveals the
+ *  record's field chips in their own section, wrapping freely (the collapsed row shows no
+ *  chips at all, so the old cap/'… +N' machinery retired with the clutter it managed). The
+ *  data lane's row is named `records` (the card's own word — its union kind string is not a
+ *  name); a wrapper kind keeps its wrapper name; a state key keeps its key. Rows with nothing
+ *  under them (a scalar state key) render plain, chevron-less — affordance follows the data.
+ *  NESTING stays ignored by construction (kindOf reads top-level keys) — the code well below
+ *  is the authority on depth. */
+function SchemaRows({
+  header,
+  rows,
+}: {
+  header: string;
+  rows: { label: string; mono?: boolean; count: number; kinds: { kind: string; fields: string[] | null; count: number }[] }[];
+}) {
   return (
-    <div className="flex flex-col gap-2">
+    <div className="flex flex-col gap-1">
       <div className="flex items-baseline justify-between gap-2.5">
-        <span className={LANE_HEAD}>Schema</span>
+        <span className={LANE_HEAD}>{header}</span>
         <span className={LANE_HEAD}>Records</span>
       </div>
-      {kinds.map((k) => (
-        <div key={k.kind} className="flex items-start justify-between gap-3" title={k.kind}>
-          <FieldChips fields={k.fields ?? [k.kind]} />
-          <span className="flex-none text-right tabular-nums text-label">{k.count.toLocaleString()}</span>
-        </div>
+      {rows.map((r) => (
+        <SchemaRow key={r.label} {...r} />
       ))}
     </div>
   );
 }
 
-/** One record schema as wrapping squared mono chips — the shared token rendering, CAPPED
- *  (user, 2026-08-14 — "some schemas can have many attributes… just show a few and use a …"):
- *  a wide record shows its first few fields and a `… +N` chip that expands to the full set;
- *  NESTING is deliberately ignored everywhere (kindOf reads top-level keys only) — the code
- *  well below carries the real structure, the chips only say what a record is made of. */
-const FIELD_CHIP_CAP = 5; // user, 2026-08-14 — unlisted channels carry LARGE schemas
-const FIELD_CHIP_BUDGET = 44; // ≈ one line of chips in the pane, so long names cut early too
+function SchemaRow({
+  label,
+  mono = true,
+  count,
+  kinds,
+}: {
+  label: string;
+  mono?: boolean;
+  count: number;
+  kinds: { kind: string; fields: string[] | null; count: number }[];
+}) {
+  const [open, setOpen] = useState(false);
+  // Only a row with fields BEHIND it discloses — a chevron onto nothing is a lie about the data.
+  const openable = kinds.some((k) => k.fields != null || k.kind !== label);
+  const row = (
+    <>
+      <span className={cn("min-w-0 truncate text-label", mono && "font-mono")} title={label}>
+        {label}
+      </span>
+      <span className="flex-1" />
+      <span className="flex-none text-right tabular-nums text-label">{count.toLocaleString()}</span>
+    </>
+  );
+  if (!openable) return <div className="flex items-center gap-1.5 py-0.5 pl-[18px]">{row}</div>;
+  return (
+    <div className="flex flex-col gap-1">
+      <button
+        type="button"
+        aria-expanded={open}
+        onClick={() => setOpen((o) => !o)}
+        className={cn(
+          "flex items-center gap-1.5 w-full py-0.5 rounded-xs cursor-pointer text-left",
+          "hover:bg-wash-faint focus-visible:outline focus-visible:outline-1 focus-visible:outline-[var(--primary)]",
+        )}
+      >
+        <ChevronRight
+          aria-hidden
+          className={cn(
+            "size-3 flex-none text-muted-foreground transition-transform duration-150 motion-reduce:transition-none",
+            open && "rotate-90",
+          )}
+        />
+        {row}
+      </button>
+      {open && (
+        <div className="flex flex-col gap-1 pl-[18px]">
+          {kinds.map((k) => (
+            <FieldChips key={k.kind} fields={k.fields ?? [k.kind]} />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** One record schema as wrapping squared mono chips — the shared token rendering. Uncapped:
+ *  chips only ever render inside a row the user opened, so vertical room is granted by the
+ *  gesture itself. */
 function FieldChips({ fields }: { fields: string[] }) {
-  const [all, setAll] = useState(false);
-  // Two cuts, whichever comes first (both user-called): at most five chips, and at most one
-  // LINE's worth of characters — a count cap alone lets five long unlisted field names wrap.
-  let used = 0;
-  let fit = 0;
-  for (const f of fields) {
-    if (fit >= FIELD_CHIP_CAP || (fit > 0 && used + f.length + 3 > FIELD_CHIP_BUDGET)) break;
-    used += f.length + 3;
-    fit++;
-  }
-  const shown = all ? fields : fields.slice(0, fit);
-  const hidden = fields.length - shown.length;
-  const chip = "inline-flex items-center rounded-xs border border-border bg-wash-faint px-[5px] py-[2px] font-mono text-micro leading-none text-muted-foreground";
+  const chip =
+    "inline-flex items-center rounded-xs border border-border bg-wash-faint px-[5px] py-[2px] font-mono text-micro leading-none text-muted-foreground";
   return (
     <span className="min-w-0 flex flex-wrap gap-1">
-      {shown.map((f) => (
+      {fields.map((f) => (
         <span key={f} className={chip}>
           {f}
         </span>
       ))}
-      {hidden > 0 && (
-        <button
-          type="button"
-          className={cn(chip, "cursor-pointer hover:text-foreground hover:bg-wash-soft focus-visible:outline focus-visible:outline-1 focus-visible:outline-[var(--primary)]")}
-          title={fields.join(" · ")}
-          aria-label={`Show all ${fields.length} fields`}
-          onClick={() => setAll(true)}
-        >
-          … +{hidden}
-        </button>
-      )}
     </span>
-  );
-}
-
-/** The STATE lane's schema (user, 2026-08-14 — "can the data approach apply to state? DOR's
- *  `updates` key is only the parent of an underlying schema"): each top-level state key keeps
- *  its row — the container is the state's real structure — and the records UNDER it render
- *  their field chips beneath, the same mechanical read the data lane gets from payloadKinds
- *  (stateSchema reads an array's items or a keyed map's values; a scalar has no records and
- *  shows none). One schema language across both payload lanes, whatever shape a metagraph is. */
-function StateSchema({ rows }: { rows: { key: string; count: number; kinds: { kind: string; fields: string[] | null; count: number }[] }[] }) {
-  return (
-    <div className="flex flex-col gap-2">
-      <div className="flex items-baseline justify-between gap-2.5">
-        <span className={LANE_HEAD}>State key · schema</span>
-        <span className={LANE_HEAD}>Records</span>
-      </div>
-      {rows.map((r) => (
-        <div key={r.key} className="flex flex-col gap-1">
-          <div className="flex items-baseline justify-between gap-3">
-            <span className="min-w-0 truncate font-mono text-label" title={r.key}>{r.key}</span>
-            <span className="flex-none text-right tabular-nums text-label">{r.count.toLocaleString()}</span>
-          </div>
-          {r.kinds.map((k) => (
-            <div key={k.kind} className="pl-2" title={k.kind}>
-              <FieldChips fields={k.fields ?? [k.kind]} />
-            </div>
-          ))}
-        </div>
-      ))}
-    </div>
   );
 }
 
@@ -284,6 +292,7 @@ function RawSection({
  *  layer says exactly what the metagraph-snapshot card and the ledger explorer say about the same
  *  id. No click affordance: an unknown machine has no card to open, and the raw layer's signer list
  *  is a reading surface, not a browse target. */
+const SIGNER_PAGE = 3; // rows per page — the consensus MINIMUM, so one page is one quorum (user)
 function SignerGroup({
   group,
   ids,
@@ -296,6 +305,10 @@ function SignerGroup({
   selNodes: NodeRow[];
 }) {
   const g = SIGNER_GROUPS[group];
+  const [page, setPage] = useState(1);
+  const pages = Math.max(1, Math.ceil(ids.length / SIGNER_PAGE));
+  const p = Math.min(page, pages);
+  const slice = ids.slice((p - 1) * SIGNER_PAGE, p * SIGNER_PAGE);
   return (
     <div className="flex flex-col gap-2">
       {/* Label left, the producing LAYER as its squared chip right (user, 2026-08-14 — the
@@ -313,7 +326,7 @@ function SignerGroup({
       </div>
       <LaneTable
         head={["Node", "Signer id"]}
-        rows={ids.map((id) => {
+        rows={slice.map((id) => {
           const r = resolveSigner(selNodes, metaId, id);
           const w = r.known ? null : SIGNER_UNKNOWN[r.reason];
           return {
@@ -341,6 +354,14 @@ function SignerGroup({
             b: <span className="font-mono text-label text-muted-foreground">{id}</span>,
           };
         })}
+      />
+      <TablePager
+        page={p}
+        pages={pages}
+        from={(p - 1) * SIGNER_PAGE + 1}
+        to={Math.min(p * SIGNER_PAGE, ids.length)}
+        total={ids.length}
+        onPage={setPage}
       />
     </div>
   );
@@ -413,7 +434,10 @@ export function ChannelStatePanel() {
   }
   const cfg = metagraphById(sel.metaId);
   const ticker = cfg?.ticker || cfg?.name || shortHash(sel.metaId);
-  const hue = identityHudHex(sel.metaId);
+  // An UNLISTED channel takes the set's neutral gray (user, 2026-08-14 — the head's dot minted
+  // a random hue; the same rule the snapshot card fixed on 2026-08-08: no single identity can
+  // speak for the mixed set, so none does).
+  const hue = cfg ? identityHudHex(sel.metaId) : UNLISTED_HUE;
   // The snapshot's OWN hash, tiered like the card's foot: descriptor first, polled record behind
   // it (a pager-stepped or exact-read-built selection carries hash "").
   const net = getNetwork();
@@ -523,7 +547,12 @@ export function ChannelStatePanel() {
               <div className="min-h-0 flex-1 overflow-auto slim-scroll">
                 {active === "state" && (
                   <div className="flex flex-col gap-2">
-                    {stateRows.length > 0 && <StateSchema rows={stateRows} />}
+                    {stateRows.length > 0 && (
+                      <SchemaRows
+                        header="Schema"
+                        rows={stateRows.map((r) => ({ label: r.key, count: r.count, kinds: r.kinds }))}
+                      />
+                    )}
                     {state != null && <RawSection open={raw} onToggle={() => setRaw((o) => !o)} data={state} />}
                   </div>
                 )}
@@ -533,7 +562,19 @@ export function ChannelStatePanel() {
                         lane leads with (the tab's count is the record COUNT, a different number).
                         Without it this lane opened on a bare table header while its two siblings
                         opened on a note — the uniform body's first part, missing. */}
-                    {kinds.length > 0 && <SchemaKinds kinds={kinds} />}
+                    {kinds.length > 0 && (
+                      <SchemaRows
+                        header="Schema"
+                        rows={kinds.map((k) => ({
+                          // The union field-kind row is named `records` (the card's word); a
+                          // wrapper kind is its own name and carries no chips to open.
+                          label: k.fields ? "records" : k.kind,
+                          mono: !k.fields,
+                          count: k.count,
+                          kinds: [k],
+                        }))}
+                      />
+                    )}
                     {dataTx != null && <RawSection open={raw} onToggle={() => setRaw((o) => !o)} data={dataTx} />}
                   </div>
                 )}

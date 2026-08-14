@@ -18,6 +18,7 @@ import { SelectedRowMark, selectionHue } from "@/components/selection";
 import { cn } from "@/lib/utils";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import TablePager from "@/components/datasection/TablePager";
 import { POLL } from "@/src/engine/config";
 
 // The retained global window the log joins against — the same buffer the strip's bars plot,
@@ -63,12 +64,20 @@ export default function AnchorLogTable() {
       ? unlistedLog(net.globalSnapshots, snapshotExact)
       : [];
   const [sort, setSort] = useState<{ key: AnchorLogSortKey; dir: 1 | -1 }>({ key: "age", dir: 1 });
-  const rows = sortAnchorLog(
+  const allRows = sortAnchorLog(
     [...listedRows, ...unlistedRows],
     sort.key,
     sort.dir,
     (metaId) => displayNetwork(metaId)?.name ?? metaId,
   );
+  // PAGINATED (user, 2026-08-14): a bottom pager strip rather than one long scroll. The page is
+  // CLAMPED, never reset — the live window advances every few seconds, so page 1 churns at the
+  // heartbeat's own pace and deeper pages shift only as rows age out of the window.
+  const PAGE = 25;
+  const [pageState, setPage] = useState(1);
+  const pages = Math.max(1, Math.ceil(allRows.length / PAGE));
+  const page = Math.min(pageState, pages);
+  const rows = allRows.slice((page - 1) * PAGE, page * PAGE);
 
   // THE LAYER OPENS ON A SUBJECT: with nothing selected, the log commits its own first row on
   // arrival, so the pane opens populated instead of on an empty state the user has to dismiss by
@@ -82,7 +91,7 @@ export default function AnchorLogTable() {
   useEffect(() => {
     armed.current = section === "data";
   }, [section]);
-  const first = rows[0] ?? null;
+  const first = allRows[0] ?? null;
   useEffect(() => {
     if (section !== "data" || !armed.current || metaSnap || !first) return;
     armed.current = false;
@@ -96,7 +105,7 @@ export default function AnchorLogTable() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [section, metaSnap, first?.metaId, first?.ordinal]);
 
-  if (rows.length === 0)
+  if (allRows.length === 0)
     return (
       <p className="m-auto text-label text-muted-foreground">
         {!live ? "NO SIGNAL" : "Waiting for anchored metagraph snapshots…"}
@@ -106,6 +115,7 @@ export default function AnchorLogTable() {
   const now = Date.now();
 
   return (
+    <>
     <ScrollArea className="flex-1 min-h-0">
       <Table>
         <TableHeader className="sticky top-0 z-10 bg-[var(--panel-solid)] backdrop-blur-md">
@@ -216,5 +226,14 @@ export default function AnchorLogTable() {
         </TableBody>
       </Table>
     </ScrollArea>
+    <TablePager
+      page={page}
+      pages={pages}
+      from={(page - 1) * PAGE + 1}
+      to={Math.min(page * PAGE, allRows.length)}
+      total={allRows.length}
+      onPage={setPage}
+    />
+    </>
   );
 }
