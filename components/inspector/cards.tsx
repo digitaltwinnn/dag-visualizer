@@ -15,9 +15,9 @@ import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Separator } from "@/components/ui/separator";
 import { SonarRing, NodeStars, NoSignalDot } from "@/components/state/StateAtoms";
 import { VIEW_ICONS, SNAPSHOT_ICON, COUNTRY_ICON, PROVIDER_ICON, COMPOSITION_ICON, KIND_MARK_CLASS } from "@/components/icons";
-import { ExternalLink } from "lucide-react";
+import { Check, ExternalLink } from "lucide-react";
 import { useMinHold } from "@/components/useMinHold";
-import { useArchive, archiveDisplay, archiveSummary } from "@/components/useArchive";
+import { useArchive, archiveDisplay, archiveSummary, fmtSnapCount } from "@/components/useArchive";
 import { useNowTick } from "@/components/useNowTick";
 import { POLL } from "@/src/engine/config";
 import { Desc, StatusMark, CompositionRows, StatusBreakdown, RoleChips, IdentityDot, networkKind, Fact, FactGroup, Foot, FootRow } from "./parts";
@@ -364,21 +364,30 @@ export function MetaCard({ cfg }: { cfg: MetaCfg }) {
         </>
       )}
       {/* Fleet-level archive summary, in the same summary block as Online nodes; the DAG
-          dossier carries no composition block, so it brings its own separator. */}
+          dossier carries no composition block, so it brings its own separator. ONE fact in
+          the Fees-paid stacked grammar (user, 2026-08-14, settled over several passes —
+          "from genesis as a separate fact, like a checkmark", then "the ~15 months as an
+          underline like fees paid"): the main line counts the machines keeping the whole
+          chain — ratio bold under the Online nodes total it counts against, checked in the
+          success hue when any exist — and the muted underline carries the fleet's deepest
+          surviving reach in the time register. */}
       {archSum && (
         <>
           {nodes.length === 0 && <Separator className="my-2" />}
-          {/* The dossier's summary grammar (user, 2026-08-14, settled): the RATIO bold at the
-              right edge — it counts NODES, so it aligns directly under the Online nodes total —
-              and the muted qualifier in front says what the ratio is of ("from genesis") plus,
-              for a fleet with no genesis keeper, the deepest surviving reach ("~15 months"),
-              which must never drop out of the value. The label names WHO keeps it: "Node
-              archives" — "Snapshot history" could live anywhere, and the point is that it
-              lives (or doesn't) on the network's own machines. */}
-          <Fact label="Node archives">
-            <span title={archSum.title}>
-              <span className="text-label text-muted-foreground">{archSum.qualifier} · </span>
-              <b className="font-bold">{archSum.ratio}</b>
+          <Fact label="From genesis">
+            <span className="flex flex-col items-end" title={`${archSum.genesisTitle} ${archSum.reachTitle}`}>
+              <span className="inline-flex items-center gap-1.5">
+                {archSum.genesisAny && <Check aria-hidden className="size-3 text-[var(--success)]" />}
+                <b className="font-bold">{archSum.genesisRatio}</b>
+              </span>
+              <span className="text-label text-muted-foreground">
+                {archSum.genesisAny ? `whole chain · ${archSum.reach}` : `deepest ${archSum.reach}`}
+              </span>
+              {/* Second underline: what that reach holds in snapshots — absent for the holed
+                  global deep archives, where any count would overclaim. */}
+              {archSum.kept != null && (
+                <span className="text-label text-muted-foreground">{fmtSnapCount(archSum.kept)} snapshots</span>
+              )}
             </span>
           </Fact>
         </>

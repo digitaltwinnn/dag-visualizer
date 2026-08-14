@@ -58,21 +58,23 @@ describe("archive summary", () => {
   const e = (ip: string, chain: string, kind: ArchiveEntry["kind"], floor: number, latest: number, floorTs: string | null = null): ArchiveEntry =>
     ({ ip, chain, kind, floor, latest, floorTs });
 
-  it("genesis keepers: bold ratio right, from-genesis qualifier in front", () => {
-    const c = census([e("a", "m1", "genesis", 1, 100), e("b", "m1", "window", 50, 100), e("c", "m1", "window", 60, 100)]);
-    expect(archiveSummary(c, "m1")).toMatchObject({ ratio: "1 / 3", qualifier: "from genesis" });
+  it("a genesis keeper checks the From genesis fact and sets reach to the chain's age", () => {
+    const now = Date.now();
+    const birth = new Date(now - 450 * 86_400_000).toISOString();
+    const c = census([e("a", "m1", "genesis", 1, 100, birth), e("b", "m1", "window", 50, 100), e("c", "m1", "window", 60, 100)]);
+    expect(archiveSummary(c, "m1")).toMatchObject({ reach: "~15 months", genesisRatio: "1 / 3", genesisAny: true });
   });
 
-  it("global falls to the deep-era qualifier when nobody has genesis", () => {
+  it("global reads the deep-era reach; From genesis stays unchecked at 0", () => {
     const c = census([e("a", "global", "deep", 766_780, 6_700_000), e("b", "global", "window", 6_500_000, 6_700_000)]);
-    expect(archiveSummary(c, "global")).toMatchObject({ ratio: "1 / 2", qualifier: "back to Nov 2023" });
+    expect(archiveSummary(c, "global")).toMatchObject({ reach: "back to Nov 2023", genesisRatio: "0 / 2", genesisAny: false });
   });
 
-  it("a window-only fleet: zero ratio bold, the deepest reach leads the qualifier", () => {
+  it("a window-only fleet: reach is the deepest window, From genesis 0 / N unchecked", () => {
     const now = Date.now();
     const ts = new Date(now - 450 * 86_400_000).toISOString();
     const c = census([e("a", "dor", "window", 14_650_870, 27_227_757, ts), e("b", "dor", "window", 15_000_000, 27_227_757, ts)]);
-    expect(archiveSummary(c, "dor")).toMatchObject({ ratio: "0 / 2", qualifier: "~15 months" });
+    expect(archiveSummary(c, "dor")).toMatchObject({ reach: "~15 months", genesisRatio: "0 / 2", genesisAny: false });
   });
 
   it("answers null for a chain with no probed machines", () => {
