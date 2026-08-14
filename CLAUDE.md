@@ -1512,12 +1512,13 @@ them — but the Next Node server can.
   like a success** — throwing it made every repeat of the same bad `(ordinal, address)` re-download
   the whole global, an anonymous amplification loop; only transient failures throw and retry.
 
-⚠️ **Both snapshot routes are bounded by `app/api/snapshot/ordinalWindow.ts`.** The L0 LB serves the
-**entire ordinal history** (verified 2026-08-13 — the old "prunes after ~30 min" belief is false), so
-without a bound the ~6.7M-ordinal space is an anonymous walk of cold ~2.5 MB pulls, decodes and
-day-long data-cache writes, with no rate limiting on Hobby. The window is deliberately ~100× the
-client's deepest legitimate ask and **fails open** when its tiny latest-ordinal reference read fails —
-the route's own upstream fetch is about to fail honestly on the same host anyway.
+⚠️ **The snapshot routes' PAST bound is DROPPED** (user, 2026-08-14 — the anchor log pages a
+network's whole history and the payload follows the rows; "if abused I'll switch to Pro for DDoS
+protection"). `app/api/snapshot/ordinalWindow.ts` remains the one home and still bounds the FUTURE
+(+5, nonsense is not history) and **fails open** when its reference read fails. The accepted cost is
+the one the old ~5000-tick window guarded against: any historical ordinal is a valid anonymous
+~2.5 MB pull + decode + day-long cache write — once per ordinal ever, since they're immutable.
+Re-tighten here when the plan changes.
 - The client fetches `/api/metagraphs` on mount **and re-pulls every 10 min** — Vercel never restarts
   and ISR only freshens the *server* cache, so an idle tab must re-pull. Snapshot and cluster feeds are
   live client polling.

@@ -11,10 +11,13 @@ import { unstable_cache } from "next/cache";
 // ever asks about the retained client window (POLL.maxSnapshots = 52 ticks ≈ 25 min, plus the
 // 8-tick backfill and pager steps inside that buffer), so a generous bound breaks nothing real.
 //
-// PAST_WINDOW is deliberately ~100× the client's deepest legitimate ask (~1.6 days of ticks at
-// the measured ~28 s cadence) — the point is to be much smaller than 6.7M, not tight. The small
-// FUTURE allowance covers clock/ordering skew between the explorer feed and the LB.
-export const PAST_WINDOW = 5000;
+// ⚠️ THE PAST BOUND IS DROPPED (user decision, 2026-08-14): the anchor log now pages a
+// network's ENTIRE snapshot history, and the payload should follow the rows — "I'm ok to drop
+// it; if site visits increase and/or it's abused I'll switch to Pro to get DDoS protection."
+// The accepted cost is the one this window was built against: any historical ordinal is again
+// a valid anonymous request (~2.5 MB upstream pull + decode + day-long cache write, immutable
+// so each ordinal costs at most once). The FUTURE bound stays — it rejects nonsense, not
+// history — and the module remains the one place to re-tighten when the plan changes.
 export const FUTURE_WINDOW = 5;
 
 /** The pure bound — exported for the colocated test. `latest == null` means the reference read
@@ -23,7 +26,7 @@ export const FUTURE_WINDOW = 5;
  *  second failure mode in front of a working one. */
 export function inServedWindow(ordinal: number, latest: number | null): boolean {
   if (latest == null) return true;
-  return ordinal >= latest - PAST_WINDOW && ordinal <= latest + FUTURE_WINDOW;
+  return ordinal >= 1 && ordinal <= latest + FUTURE_WINDOW;
 }
 
 const L0 = "https://l0-lb-mainnet.constellationnetwork.io";
