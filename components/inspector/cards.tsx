@@ -17,7 +17,7 @@ import { SonarRing, NodeStars, NoSignalDot } from "@/components/state/StateAtoms
 import { VIEW_ICONS, SNAPSHOT_ICON, COUNTRY_ICON, PROVIDER_ICON, COMPOSITION_ICON, KIND_MARK_CLASS } from "@/components/icons";
 import { ExternalLink } from "lucide-react";
 import { useMinHold } from "@/components/useMinHold";
-import { useArchive } from "@/components/useArchive";
+import { useArchive, archiveValue } from "@/components/useArchive";
 import { useNowTick } from "@/components/useNowTick";
 import { POLL } from "@/src/engine/config";
 import { Desc, StatusMark, CompositionRows, StatusBreakdown, RoleChips, IdentityDot, networkKind, Fact, FactGroup, Foot, FootRow } from "./parts";
@@ -489,13 +489,15 @@ function GeoLiveNode({ p }: { p: PickOf<"l0" | "l1" | "metanode"> }) {
   const compWord = p.node ? nodeCompositionLabel(p.node) : null;
   const comp = compWord ? compWord.charAt(0).toUpperCase() + compWord.slice(1) : null;
   const codes = p.node ? compositionRows([p.node])[0]?.codes : undefined;
-  // ARCHIVE — whether this machine keeps the chain's history (user, 2026-08-14: "I find this
-  // info very interesting"). Only DAG L0 validators are in the census, so metagraph machines
-  // simply don't grow the row; a node the probe couldn't reach doesn't either (absent data
-  // stays absent, never "unknown" filler). Not part of the pile dedup: no ancestor card states
-  // it. The title carries the census context the one-line value can't.
+  // ARCHIVE — what depth of ITS OWN chain this machine serves (user, 2026-08-14: "I find this
+  // info very interesting", then "mention time and/or snapshots... metagraph nodes as well").
+  // The census probes the global L0 cluster and every catalog metagraph's L0 cluster, so a DAG
+  // validator answers for the global chain and a metagraph machine for its currency chain; a
+  // node the probe couldn't reach grows no row (absent data stays absent, never "unknown"
+  // filler). Not part of the pile dedup: no ancestor card states it. The title carries the
+  // census context the one-line value can't.
   const archive = useArchive();
-  const archStatus = p.node?.ip ? archive?.status.get(p.node.ip) : undefined;
+  const archEntry = p.node?.ip ? archive?.entries.get(p.node.ip) : undefined;
   // The host's ASN answers to the provider rung exactly as the Hosting line above it does — one
   // condition, so the two can't disagree about who owns the host.
   const asn = cohort == null ? geo?.asn : null;
@@ -528,16 +530,18 @@ function GeoLiveNode({ p }: { p: PickOf<"l0" | "l1" | "metanode"> }) {
         {asn && <Fact label="ASN"><span className="font-mono">{asn}</span></Fact>}
         {/* Reading order: place → role → host → SERVICE — what this machine serves sits with
             the host block, above the reference foot. */}
-        {archStatus && archive && (
+        {archEntry && archive && (
           <Fact label="Archive">
             <span
               title={
-                archStatus === "archival"
-                  ? `Keeps global snapshots back to the metagraph era (${archive.since}), with some gaps — one of ${archive.archivalCount} archival validators of ${archive.total} probed`
-                  : `Keeps a rolling recent window of global snapshots; deeper history is served by ${archive.archivalCount} archival validators of ${archive.total} probed`
+                archEntry.kind === "genesis"
+                  ? `Serves its chain's every snapshot, back to ordinal 1`
+                  : archEntry.kind === "deep"
+                    ? `Serves global snapshots back to the metagraph era (${archive.since}), with some gaps — one of ${archive.archivalCount} archival validators of ${archive.total} probed`
+                    : `Serves ~${(archEntry.latest - archEntry.floor).toLocaleString()} recent snapshots of its own chain, back to ordinal ${archEntry.floor.toLocaleString()}; older history is discarded`
               }
             >
-              {archStatus === "archival" ? `Back to ${archive.since}` : "Recent window"}
+              {archiveValue(archEntry, archive.since)}
             </span>
           </Fact>
         )}
