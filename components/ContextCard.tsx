@@ -77,13 +77,17 @@ export default function ContextCard({
         />
         {!collapsed && (
           <>
-            {/* The blurb tracks what the card now shows (user, 2026-08-14 — the old "mixed set"
-                sentence predated the per-address blocks): with members observed it introduces
-                them; with none it says so, window-scoped and honest. */}
+            {/* The blurb tracks what the card shows and COUNTS it (user, 2026-08-14 — "each
+                network id below" misread when one is listed, and the word is METAGRAPHS,
+                the app's one vocabulary, not "state channels"). Window-scoped and honest in
+                all three counts. */}
             <p className="m-0 text-body text-muted-foreground">
-              {unlistedIds.length > 0
-                ? "State channels anchoring into Global L0 without an entry in the public catalog. Each network id below is one distinct metagraph; its chain and owner address are public, its operator and machines are not."
-                : "State channels anchoring into Global L0 without an entry in the public catalog. None was seen anchoring in the measured window."}
+              {"Metagraphs anchoring into Global L0 without an entry in the public catalog. " +
+                (unlistedIds.length === 0
+                  ? "None was seen anchoring in the measured window."
+                  : unlistedIds.length === 1
+                    ? "One anchored in the measured window; its chain and owner address are public, its operator and machines are not."
+                    : `${unlistedIds.length} anchored in the measured window; their chains and owner addresses are public, their operators and machines are not.`)}
             </p>
             {/* (The set-level "Machines · not knowable" row is gone — user, 2026-08-14: the
                 per-address blocks below carry each network's own node facts, so a set-level
