@@ -509,11 +509,14 @@ export function MetaCard({ cfg }: { cfg: MetaCfg }) {
           grows none. */}
       {footId && (
         <Foot>
-          <FootRow label="Network id" value={shortHash(footId)} title={footId} copy={footId} />
+          {/* The snapshot cards' fill rule (user, 2026-08-14 — "the value takes up most of the
+              space and sits against the label"): midHash at per-label budgets, so each address
+              fills its own row toward its label. */}
+          <FootRow label="Network id" value={midHash(footId, 28)} title={footId} copy={footId} />
           {chainSpan?.owner && (
             <FootRow
               label="Owner address"
-              value={shortHash(chainSpan.owner)}
+              value={midHash(chainSpan.owner, 24)}
               title={`The address that registered and controls this metagraph. ${chainSpan.owner}`}
               copy={chainSpan.owner}
             />
@@ -521,7 +524,7 @@ export function MetaCard({ cfg }: { cfg: MetaCfg }) {
           {chainSpan?.staking && (
             <FootRow
               label="Staking address"
-              value={shortHash(chainSpan.staking)}
+              value={midHash(chainSpan.staking, 23)}
               title={`The address holding this metagraph's staked collateral. ${chainSpan.staking}`}
               copy={chainSpan.staking}
             />
@@ -754,7 +757,7 @@ function GeoLiveNode({ p }: { p: PickOf<"l0" | "l1" | "metanode"> }) {
           its own. Truncated display, full hash on hover. */}
       {p.node?.id && (
         <Foot>
-          <FootRow label="Node id" value={shortHash(p.node.id)} title={p.node.id} copy={p.node.id} />
+          <FootRow label="Node id" value={midHash(p.node.id, 30)} title={p.node.id} copy={p.node.id} />
         </Foot>
       )}
     </>
