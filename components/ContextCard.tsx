@@ -96,8 +96,8 @@ export default function ContextCard({
                 network id means different metagraph"): one block per uncataloged address seen
                 anchoring in the measured window. Machines stay unknowable; the chain's own
                 span is real (the explorer indexes every anchoring chain). */}
-            {unlistedIds.map((id) => (
-              <UnlistedNetBlock key={id} id={id} />
+            {unlistedIds.map((id, i) => (
+              <UnlistedNetBlock key={id} id={id} last={i === unlistedIds.length - 1} />
             ))}
           </>
         )}

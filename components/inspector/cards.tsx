@@ -310,20 +310,25 @@ export function SnapshotCard({ data: d }: { data: GlobalSnapshot }) {
 // MACHINES are honestly unknowable (no published cluster), but the CHAIN is not — the
 // explorer indexes every anchoring chain's records, so the block states its real span. Its
 // own component because the span hook is per address.
-export function UnlistedNetBlock({ id }: { id: string }) {
+export function UnlistedNetBlock({ id, last }: { id: string; last: boolean }) {
   const span = useChainSpan(id);
   const age = span?.genesisTs ? fmtReach(span.genesisTs) : null;
   return (
     <>
       <Separator className="my-2" />
-      {/* The identity line a catalog card carries in its head: here the address IS the name. */}
-      <div className="flex items-center justify-between gap-2">
-        <span className="text-micro tracking-caps uppercase text-muted-foreground">Network id</span>
-        <span className="font-mono text-label" title={id}>
-          {shortHash(id)}
-        </span>
-      </div>
-      <div className="mt-1.5">
+      {/* With SEVERAL members the block needs its own identity line for association; the LAST
+          block's references live in the card's standard Foot instead — so the common
+          one-member card reads exactly like a regular dossier (user, 2026-08-14: "it should
+          use the same card as any other metagraph"). */}
+      {!last && (
+        <div className="flex items-center justify-between gap-2">
+          <span className="text-micro tracking-caps uppercase text-muted-foreground">Network id</span>
+          <span className="font-mono text-label" title={id}>
+            {shortHash(id)}
+          </span>
+        </div>
+      )}
+      <div className={last ? undefined : "mt-1.5"}>
         <Fact label="Online nodes">
           <span className="text-muted-foreground italic" title="This network publishes no node cluster, so its machines are unknowable.">
             unknown
@@ -349,16 +354,31 @@ export function UnlistedNetBlock({ id }: { id: string }) {
             )}
           </span>
         </Fact>
-        {/* The closest thing to an operator identity an uncataloged chain publishes: the
-            address that owns the channel, straight off its newest record. */}
-        {span?.owner && (
-          <Fact label="Owner">
-            <span className="font-mono" title={span.owner}>
-              {shortHash(span.owner)}
-            </span>
-          </Fact>
-        )}
       </div>
+      {/* The references sit where references sit — the foot, exactly as on a catalog dossier. */}
+      {last && (
+        <Foot>
+          <FootRow label="Network id" value={shortHash(id)} title={id} copy={id} />
+          {span?.owner && (
+            <FootRow
+              label="Owner wallet"
+              value={shortHash(span.owner)}
+              title={`The wallet that registered and controls this metagraph (its records' ownerAddress) — distinct from its staking address, which holds staked collateral. ${span.owner}`}
+              copy={span.owner}
+            />
+          )}
+        </Foot>
+      )}
+      {!last && span?.owner && (
+        <Fact label="Owner wallet">
+          <span
+            className="font-mono"
+            title={`The wallet that registered and controls this metagraph (its records' ownerAddress) — distinct from its staking address, which holds staked collateral. ${span.owner}`}
+          >
+            {shortHash(span.owner)}
+          </span>
+        </Fact>
+      )}
     </>
   );
 }
@@ -369,6 +389,10 @@ export function UnlistedNetBlock({ id }: { id: string }) {
 export function MetaCard({ cfg }: { cfg: MetaCfg }) {
   const metaList = useStore((s) => s.metaList);
   const mg = metaList.find((x) => x.id === cfg.id) || null;
+  // The Owner wallet, off the chain's newest record (user, 2026-08-14 — the unlisted card
+  // grew it first; the regular card carries the same fact). The DAG core has no currency
+  // chain, so its lookup idles and no row grows.
+  const chainSpan = useChainSpan(cfg.id !== "dag" && metagraphById(cfg.id) ? cfg.id : null);
   // The network's ARCHIVE reading (user, 2026-08-14 — "how many have genesis? that's useful
   // information to know about a network"): genesis survival counted across the fleet, or the
   // deepest reach any of its own machines still serves. The DAG core's chain is "global" in
@@ -474,6 +498,14 @@ export function MetaCard({ cfg }: { cfg: MetaCfg }) {
       {cfg.id !== "dag" && metagraphById(cfg.id) && (
         <Foot>
           <FootRow label="Network id" value={shortHash(cfg.id)} title={cfg.id} copy={cfg.id} />
+          {chainSpan?.owner && (
+            <FootRow
+              label="Owner wallet"
+              value={shortHash(chainSpan.owner)}
+              title={`The wallet that registered and controls this metagraph (its records' ownerAddress) — distinct from its staking address, which holds staked collateral. ${chainSpan.owner}`}
+              copy={chainSpan.owner}
+            />
+          )}
         </Foot>
       )}
     </>
