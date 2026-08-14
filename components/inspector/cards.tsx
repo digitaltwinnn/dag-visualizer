@@ -560,8 +560,16 @@ function GeoLiveNode({ p }: { p: PickOf<"l0" | "l1" | "metanode"> }) {
         )}
         {archNone && (
           <Fact label="Archive">
-            <span title="A chain's snapshots are served by its L0 layer; this machine runs no L0 process, so it keeps no snapshot archive.">
-              None<span className="text-label text-muted-foreground"> · no L0 layer</span>
+            {/* The layer wears its chip, the same token the Composition line uses — one layer
+                vocabulary everywhere (user, 2026-08-14: "not an L0 validator, use the L0 chip"). */}
+            <span
+              className="inline-flex items-center gap-1"
+              title="A chain's snapshots are served by its L0 validators; this machine runs no L0 process, so it keeps no snapshot archive."
+            >
+              <span>None</span>
+              <span className="text-label text-muted-foreground">· not an</span>
+              <RoleChips codes={["L0"]} />
+              <span className="text-label text-muted-foreground">validator</span>
             </span>
           </Fact>
         )}
