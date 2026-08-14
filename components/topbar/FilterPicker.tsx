@@ -51,7 +51,10 @@ export default function FilterPicker({ onPicked }: { onPicked?: () => void }) {
 
   const chipClass = (active: boolean, off: boolean) =>
     cn(
-      "flex items-center gap-[7px] py-1.5 px-2.5 rounded-btn border-0 bg-transparent cursor-pointer",
+      // Tightened one step each (user, 2026-08-14 — "a little too much margin/spacing
+      // around each element"): py-1.5→1, px-2.5→2, internal gap 7→6. Desktop only in
+      // effect: the <1100px arm keeps its 44px tap minimum below.
+      "flex items-center gap-1.5 py-1 px-2 rounded-btn border-0 bg-transparent cursor-pointer",
       "text-left whitespace-nowrap transition-[background] duration-150",
       "hover:bg-wash-hover",
       "focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--primary)] focus-visible:outline-offset-[-2px]",
@@ -63,7 +66,7 @@ export default function FilterPicker({ onPicked }: { onPicked?: () => void }) {
   return (
     <div
       className={cn(
-        "flex flex-wrap items-center gap-1 mx-2 px-1.5 pb-2 pt-1.5 border-t border-border/60",
+        "flex flex-wrap items-center gap-1 mx-2 px-1.5 pb-1.5 pt-1 border-t border-border/60",
         // PHONE: the wrapped chips would otherwise fill ~a third of the screen (12 chips at
         // ≥44px tap height wrap to ~7 rows). Cap to ~4 rows and scroll the rest (user,
         // 2026-07-12) — the strip stays a bar expansion, not a takeover. `.slim-scroll` =
