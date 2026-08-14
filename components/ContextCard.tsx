@@ -3,15 +3,15 @@
 import { CircleHelp } from "lucide-react";
 import { useStore } from "@/src/store/store";
 import { applyClickActions } from "@/src/store/applyClickActions";
+import { UNLISTED_ID, UNLISTED_CFG, displayNetwork } from "@/src/data/unlisted";
 import { metagraphById } from "@/src/data/network";
-import { UNLISTED_ID, displayNetwork } from "@/src/data/unlisted";
 import { hex } from "@/src/util/format";
 import { subjectPairing } from "@/components/useSubjectPairing";
 import CardHead, { RailPane } from "@/components/CardHead";
 import InspectorCard from "@/components/InspectorCard";
+import { MetaCard } from "@/components/inspector/cards";
 import { PulseEdge, useEdgePulse } from "@/components/EdgePulse";
 import { KIND_MARK_CLASS } from "@/components/icons";
-import { Fact } from "@/components/inspector/parts";
 import type { PickDescriptor } from "@/src/data/types";
 
 // The Context (parent) card at the top of the right-rail subject stack. It mirrors the
@@ -71,19 +71,12 @@ export default function ContextCard({
           collapsed={collapsed}
           onToggle={onToggle}
         />
-        {!collapsed && (
-          <>
-            <p className="m-0 text-body text-muted-foreground">
-              State channels anchoring into Global L0 without an entry in the public catalog — a
-              mixed set with no single operator or token.
-            </p>
-            {/* Absent data is an INSTRUMENT STATE, never a fabricated number: the operators'
-                machines are outside every feed this app reads. */}
-            <Fact className="mt-2" label="Machines">
-              <span className="text-muted-foreground italic">not knowable</span>
-            </Fact>
-          </>
-        )}
+        {/* The BODY is the one dossier component (user, 2026-08-14 — "I'd rather not just
+            share grammar but prefer sharing components"): MetaCard renders the unlisted set
+            through the same code path as every catalog metagraph — counted blurb, member
+            facts, and the shared Foot. Only the HEAD stays bespoke (the "?" mark, italic
+            name): a mixed set has no logo, brand hue or site. */}
+        {!collapsed && <MetaCard cfg={UNLISTED_CFG} />}
         <PulseEdge pulseKey={pulseKey} rail="right" />
       </RailPane>
     );

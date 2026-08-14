@@ -195,8 +195,11 @@ export const SIGNER_UNKNOWN: Record<"network" | "node", { label: string; title: 
  *  into a structural one. */
 export const SIGNER_GROUPS = {
   proof: {
-    /** The group's noun (the raw lane's note). */
-    label: "snapshot proof",
+    /** The group's noun (the raw lane's group header) — the THING signed, always singular, and
+        it references the pane's own TABS (user, 2026-08-14, twice: the header names what got
+        signed, the chip says who; and the groups should speak the tab names — the seal covers
+        both payload tabs, which the parenthetical states). */
+    label: "snapshot (state & data)",
     /** The producing cluster, terse enough for an instrument note. */
     layer: "L0 cluster",
     /** What the counted things ARE, read after a number ("3 L0 validators"). */
@@ -205,11 +208,13 @@ export const SIGNER_GROUPS = {
       "A metagraph seals every snapshot with its own L0 cluster, so this list IS that cluster — a 3-node L0 signs all three, every time.",
   },
   dataBlocks: {
-    label: "data blocks",
+    /** Matches the DATA tab's name 1:1 (user, 2026-08-14 — consistency in the tabs' direction);
+        the BLOCKS nuance lives in the title, where the union across them is already explained. */
+    label: "data",
     layer: "dL1, rotating",
     who: "dL1 validators",
     title:
-      "Data blocks are produced by the metagraph's dL1 cluster, each block by a rotating subset of that fleet — so this count varies per snapshot, and a hybrid node signs here under its dL1 id rather than its L0 one.",
+      "Data blocks are produced by the metagraph's dL1 cluster, EACH BLOCK by a rotating subset of that fleet — this list is the union: every validator that signed at least one of this snapshot's blocks (the per-block split lives on chain, not here). A hybrid node signs under its dL1 id rather than its L0 one.",
   },
   /** The GLOBAL snapshot's own seal. The DAG is a metagraph-shaped core under the unified node model,
    *  so its proof group is the same shape as a metagraph's — its own L0 cluster — and reads with the

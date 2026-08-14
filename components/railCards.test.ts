@@ -239,6 +239,18 @@ describe("focusSlotId — the focus rung both rails read", () => {
     // …and with no recency data, the finest present slot wins (the old rule).
     expect(focusSlotId(details({ mode: "ledger", filter: "dag", snap: snapPick, inspect: nodePick }))).toBe("node");
   });
+  it("a filter commit focuses the CONTEXT dossier over a follow-pinned snapshot (2026-08-14)", () => {
+    // The user's gesture was the network; the snap/metaSnap pins arrived from the live follow
+    // (advance*, non-bumping) — so "network" leads the stack and the dossier is the box.
+    expect(
+      focusSlotId({ ...details({ mode: "ledger", filter: "dor", snap: snapPick }), selStack: ["network", "snap"] }),
+    ).toBe("context");
+    // A later explicit snapshot click still wins — recency is the rule, filter is just IN it now.
+    expect(
+      focusSlotId({ ...details({ mode: "ledger", filter: "dor", snap: snapPick }), selStack: ["snap", "network"] }),
+    ).toBe("snap");
+  });
+
   it("flat views have no focus rung", () => {
     expect(focusSlotId(details({ mode: "status", filter: "dag", inspect: nodePick }))).toBeNull();
   });

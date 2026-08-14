@@ -107,9 +107,15 @@ HMR — not just geometry built in constructors. The engine is one long-lived im
 behind a dynamic import, so a swapped module leaves the running instance on its old methods and you
 verify the previous build believing it's the new one. Reload after every engine edit.
 
+⚠️ **Turbopack's persistent cache can serve a STALE `globals.css` compile, and it survives a plain
+restart** — the chunk keeps one filename, so an old body ships under the same URL (found 2026-08-13:
+the phone flight-dim rules were in the source for a day while the served chunk predated them, and
+the "bug" was chased in the state machine first). When a rule is missing from the browser's CSSOM,
+don't debug the cascade: kill the server, `rm -rf .next/dev`, restart.
+
 `next build` and `next dev` don't conflict (dev outputs to `.next/dev`), so the production check can
 run alongside the dev server. Do it at phase boundaries: the build should be clean and
-`/api/metagraphs` should stay `○` (Static) with `10m` revalidate.
+`/api/metagraphs` should stay `○` (Static) with `5m` revalidate.
 
 ### Verifying changes
 
@@ -886,7 +892,9 @@ its own strip height so a paged box's plank rides ON the plate — one number, t
 
 On the two snapshot cards the foot has one shape: **the artifact's chain identity — what it is, what it
 links to, what it proves.** They are the same `Signed[]` artifact, so they carry the same set, and the
-metagraph card's `State proof` is the one addition, because only a metagraph snapshot proves an
+metagraph card's `State hash` is the one addition (renamed from `State proof` 2026-08-14 — it collided
+with the signers' `snapshot proof`, a SIGNATURE set, while this is a digest, kin to Hash/Parent),
+because only a metagraph snapshot proves an
 application state. **Counters are not chain identity**: `Height`, `Blocks` and `epochProgress` are all
 carried by the types and none of them appear.
 
@@ -1010,10 +1018,25 @@ in a held slot reflows the row when the number replaces it.
 `reading…` forever, which rule 10 counts as a fabricated state exactly
 like a fabricated number. The exact read's signal is `store.exactMiss` (recorded by
 `RawSnapshotBridge`, cleared when the read lands); the deep read's is the 12s `decodeGaveUp` timer.
-⚠️ **The failure is a blip, not pruning.** The L0 LB serves the ENTIRE ordinal history (verified
-2026-08-13: ordinal 1,000,000 answers 200 — the old "prunes after ~30 min" premise is false), so a
-give-up copy must never name pruning as the cause; the bound on what the routes serve is the app's
-own `ordinalWindow.ts`, sized so no legitimate client ask ever hits it.
+⚠️ **The payload host's depth is a PER-REQUEST LOTTERY — the LB fronts pruned and archival
+nodes.** Probed node-by-node 2026-08-14: of 152 Ready L0 validators, **143 serve only a rolling
+~78-day window and 9 serve deep history**, so a deep read through the LB succeeds on roughly a
+1-in-17 draw — which is how the same probe measured "entire history" one day, a hard ~78-day band
+the next, and genesis again the day after. All three were real. Deep history itself starts at
+**ordinal 766,718 (2023-11-13 11:44 UTC** — right after a 27-minute cadence gap, the
+metagraph-era upgrade restart); nothing behind the LB serves anything older, and nothing needs
+to: every metagraph snapshot ever anchored postdates it (DOR's genesis anchored 43 minutes
+after). **Reach is not completeness**: the deep archives share holes (~2.4–2.8M missing on all
+nine, ~3.5M on eight — common holes mean a shared sync source), so "archival" means "serves deep
+history", never "serves every ordinal". `app/api/archive/probe.ts` is the census's one home
+(cached 6h; feeds the node card's Archive fact via `/api/archive` and `useArchive`), and
+`app/api/snapshot/fetchGlobal.ts` is the one global-snapshot pull — LB first, then every
+archival node in random order on a 404. So **no failed old read is provably permanent** and no
+serving horizon may be stated in copy — the give-up copy invites a retry, and the channel
+route's upstream-404-throws-as-transient choice is what makes each retry a fresh draw. The
+explorer separately serves tiny full-history RECORDS at any depth (its own indexer storage, not
+the validators), which is what the anchor log's history paging and the timestamp→ordinal
+resolver ride.
 
 **A value slot states a READING; an invitation is a CONTROL** (user, 2026-08-10 — "I don't like the
 word 'pin', it's not very clear to me"). The metagraph snapshot card's Data slot said `pin to read`:
@@ -1029,7 +1052,7 @@ cost is the ~2.5 MB fetch).
 
 **One control position, two tiers**, because there are two costs and the card charges the second only
 once the first is paid: `Read this snapshot` runs the deep read and states the SHAPE in place;
-`Show the application state` opens the raw layer for the payload. Tier 1 is the card's ONLY route to
+`Show the raw data` opens the raw layer for the payload (named for the MODE, 2026-08-13 — the pane shows state, data and signers, so naming one lane undersold it). Tier 1 is the card's ONLY route to
 the read — the card never fetches on its own, because being pinned is not the same as asking (the
 surface gate, under *The Snapshots view*); the button writes `deepWanted` and that is the whole
 request. Tier 2 gates on the deep read having
@@ -1374,7 +1397,7 @@ head (above), so its body opens straight on the payload. So the metagraph card's
 gone: a list whose first column was a CITY
 said cities sign, it sat at equal weight below the facts with nothing dividing it, and it put the
 secondary fact first. The good version already lives one tier down in the raw layer's SIGNERS lane, which
-is what the card's "Show the application state" link opens — the card states the SHAPE, the pane renders
+is what the card's "Show the raw data" link opens — the card states the SHAPE, the pane renders
 the payload. The named cost is the card's signer↔tray hover pairing; the Engine's signer glow on
 selection is separate and unaffected. The card gains `Blocks by N dL1 validators` beside
 `Signed by N L0 validators`, because the user's question — "general signing is L0 validator, and data
@@ -1482,7 +1505,7 @@ them — but the Next Node server can.
   computes identity hues, and returns `{ metagraphs, geo }`. **On failure it answers an honest 503** —
   no pre-baked fallback; the client keeps its last good data and re-pulls next cycle. The inner fetches
   are `no-store`, which alone would make the route dynamic, so the live fetch is wrapped in
-  `unstable_cache` at a 10-minute revalidate (throwing on an empty result keeps a blip from being
+  `unstable_cache` at a 5-minute revalidate (was 10 — halved 2026-08-14: a node-set restart read as "unknown node" for most of a cycle) (throwing on an empty result keeps a blip from being
   cached). A `maxDuration` and a per-fetch timeout keep a slow cluster LB from blowing the function
   budget.
 - **`/api/geo`** serves the validator IP→geo map live (cached 1h, 503 on failure) so the globe plots
@@ -1504,13 +1527,14 @@ them — but the Next Node server can.
   like a success** — throwing it made every repeat of the same bad `(ordinal, address)` re-download
   the whole global, an anonymous amplification loop; only transient failures throw and retry.
 
-⚠️ **Both snapshot routes are bounded by `app/api/snapshot/ordinalWindow.ts`.** The L0 LB serves the
-**entire ordinal history** (verified 2026-08-13 — the old "prunes after ~30 min" belief is false), so
-without a bound the ~6.7M-ordinal space is an anonymous walk of cold ~2.5 MB pulls, decodes and
-day-long data-cache writes, with no rate limiting on Hobby. The window is deliberately ~100× the
-client's deepest legitimate ask and **fails open** when its tiny latest-ordinal reference read fails —
-the route's own upstream fetch is about to fail honestly on the same host anyway.
-- The client fetches `/api/metagraphs` on mount **and re-pulls every 10 min** — Vercel never restarts
+⚠️ **The snapshot routes' PAST bound is DROPPED** (user, 2026-08-14 — the anchor log pages a
+network's whole history and the payload follows the rows; "if abused I'll switch to Pro for DDoS
+protection"). `app/api/snapshot/ordinalWindow.ts` remains the one home and still bounds the FUTURE
+(+5, nonsense is not history) and **fails open** when its reference read fails. The accepted cost:
+any historical ordinal is a valid anonymous ~2.5 MB pull + decode + cache write — once per ordinal
+ever, since they're immutable. (The LB's serving depth varies per request — see the payload-depth
+note above — so the band is no cost bound.) Re-tighten here when the plan changes.
+- The client fetches `/api/metagraphs` on mount **and re-pulls every 5 min** — Vercel never restarts
   and ISR only freshens the *server* cache, so an idle tab must re-pull. Snapshot and cluster feeds are
   live client polling.
 
@@ -1518,7 +1542,7 @@ the route's own upstream fetch is about to fail honestly on the same host anyway
 the field set changes.
 
 ⚠️ **`ip-api.com` is free-tier: HTTP-only, rate-limited per source IP, non-commercial use only.** Fine
-at one batched call per 10-minute regeneration; **for a commercial product switch to a licensed HTTPS
+at one batched call per 5-minute regeneration; **for a commercial product switch to a licensed HTTPS
 provider.**
 
 **There is intentionally no `$DAG` price networking** — don't add a market-data fetch unless something

@@ -6,7 +6,7 @@
 // so the two explorers can't drift on row styling.
 import { ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { SELECTED_ROW, SelectedRowMark, selectedRow } from "@/components/selection";
+import { SELECTED_ROW, SelectedRowMark, selectedRow, selectionHue } from "@/components/selection";
 import { subjectPairing } from "@/components/useSubjectPairing";
 import { hoverKeyOf } from "@/src/data/hoverSubject";
 import { shortHash, CORE_HEX } from "@/src/data/network";
@@ -132,7 +132,10 @@ export function DisclosureRow({
         on && selectedRow(focused ?? true),
         pair.paired && pair.className,
       )}
-      style={pair.style}
+      // The selection follows the subject's identity (selection.tsx · selectionHue): the same
+      // hue the pairing already carries re-hues the committed wash/ring; rows without one (a
+      // cohort, a country) fall through to the structural cyan tokens.
+      style={{ ...((on || holdsSel) ? selectionHue(hue) : undefined), ...pair.style }}
       aria-expanded={previewOnly ? undefined : open}
       aria-disabled={previewOnly || undefined}
       title={title}
@@ -163,7 +166,7 @@ export function DisclosureRow({
         // would shift their count column against each other.
         <span aria-hidden className="size-3.5 flex-none" />
       ) : on || (holdsSel && !open) ? (
-        <SelectedRowMark className="flex-none" muted={on && focused === false} />
+        <SelectedRowMark className="flex-none" muted={on && focused === false} hue={hue} />
       ) : (
         <DisclosureChevron open={open} />
       )}
@@ -202,7 +205,7 @@ export function NodePickerRow({
         selected && SELECTED_ROW,
         pair.paired && pair.className,
       )}
-      style={pair.style}
+      style={{ ...(selected ? selectionHue(hue) : undefined), ...pair.style }}
       title={`${row.label} · ${row.state ?? "—"}`}
       onClick={onSelect}
       onMouseEnter={pair.onMouseEnter}
@@ -216,7 +219,7 @@ export function NodePickerRow({
           {row.id ? shortHash(row.id) : row.label}
         </span>
       </span>
-      {selected && <SelectedRowMark className="absolute right-2" />}
+      {selected && <SelectedRowMark className="absolute right-2" hue={hue} />}
     </button>
   );
 }

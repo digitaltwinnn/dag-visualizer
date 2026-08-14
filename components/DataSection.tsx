@@ -11,20 +11,31 @@ import NodeRosterTable from "@/components/datasection/NodeRosterTable";
 export default function DataSection() {
   const mode = useStore((s) => s.mode);
   return (
-    // The right pad is wider than the left ON PURPOSE: it reserves the corner the layer's own ×
-    // occupies (SectionShell). Below 1100px the tables outgrow the panel and scroll sideways, so
-    // without the gutter the sticky header slid under the close mark (2026-08-02).
-    <div className="h-full flex flex-col pl-6 pr-10 py-3">
+    // The ×-gutter is now NARROW-ONLY (user, 2026-08-14 — the pane left a dead strip on the
+    // right): its recorded reason is the <1100px sideways scroll, where the sticky header slid
+    // under the close mark (2026-08-02) — at desktop the tables fit and nothing runs beneath
+    // the ×, so both pads match and the pane takes the width.
+    <div className="h-full flex flex-col pl-6 pr-6 max-[1099px]:pr-10 py-3">
       {mode === "ledger" ? (
         // MASTER–DETAIL (item 9, 2026-08-06): the anchor log is the index on the left; the right
         // pane renders the SELECTED metagraph snapshot's contents (the deep read + the JSON tree),
         // or its own quiet hint while nothing is selected. The pane is always present so the log
         // never reflows on selection.
-        <div className="h-full flex gap-5 min-h-0">
-          <div className="flex-1 min-w-0 flex flex-col">
+        // PHONE (<700px, the shell's own tier): the split STACKS (user report 2026-08-13 — the
+        // desktop shape gave the log ~1.5 columns and the pane ~170px, wrapping every fact row).
+        // Log above, pane below at a fixed share with its own scroll; the divider rotates with
+        // the axis (border-l → border-t).
+        <div className="h-full flex gap-5 min-h-0 max-[699px]:flex-col max-[699px]:gap-3">
+          <div className="flex-1 min-w-0 min-h-0 flex flex-col">
             <AnchorLogTable />
           </div>
-          <div className="w-[36%] max-w-[520px] flex-none min-w-0 flex flex-col border-l border-border/50 pl-5">
+          <div
+            className={
+              "w-[36%] max-w-[520px] flex-none min-w-0 flex flex-col border-l border-border/50 pl-5 " +
+              "max-[699px]:w-auto max-[699px]:max-w-none max-[699px]:h-[44%] max-[699px]:border-l-0 " +
+              "max-[699px]:border-t max-[699px]:pl-0 max-[699px]:pt-3 max-[699px]:overflow-y-auto slim-scroll"
+            }
+          >
             <ChannelStatePanel />
           </div>
         </div>

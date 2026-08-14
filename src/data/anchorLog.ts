@@ -1,5 +1,6 @@
 import type { MetaSnapRecord } from "@/src/data/api";
 import type { GlobalSnapshot } from "@/src/data/types";
+import { ledgerLens } from "@/src/data/ledgerStory";
 
 /** The metagraph snapshots one metagraph anchored into ONE global tick, oldest first.
  *  This is what makes a ledger tile identifiable without a fetch (spec §6.1): the 4s poll already
@@ -34,12 +35,14 @@ export interface AnchorLogRow {
 export function buildAnchorLog(
   metaSnaps: ReadonlyMap<string, MetaSnapRecord[]>,
   globalSnapshots: readonly GlobalSnapshot[],
-  filter: string, // "all" | "dag" | metagraph id — dag has no metagraph snapshots → empty
+  filter: string, // "all" | "dag" | metagraph id — dag reads as all (ledgerLens: every global
+  // tick IS a DAG snapshot, so the base ledger's log is the whole log; user, 2026-08-13)
 ): AnchorLogRow[] {
+  const f = ledgerLens(filter);
   const byTs = new Map(globalSnapshots.map((g) => [g.timestamp, g]));
   const rows: AnchorLogRow[] = [];
   for (const [metaId, recs] of metaSnaps) {
-    if (filter !== "all" && filter !== metaId) continue;
+    if (f !== "all" && f !== metaId) continue;
     for (const rec of recs) {
       const global = byTs.get(rec.ts);
       if (!global) continue;
@@ -49,6 +52,36 @@ export function buildAnchorLog(
   // ISO-8601 timestamps sort lexicographically; newest tick first, then ordinal desc within it.
   rows.sort((a, b) => (a.ts === b.ts ? b.ordinal - a.ordinal : a.ts < b.ts ? 1 : -1));
   return rows;
+}
+
+/** The anchor log's sortable axes (user, 2026-08-13 — the roster sorts, the log didn't).
+ *  `net` compares the DISPLAYED name via the caller's resolver — the roster's own lesson
+ *  (2026-08-13): sorting the metaId orders hidden hex. Numbers compare numerically; the
+ *  default order stays the log's chronological construction (ts desc, ordinal desc within),
+ *  which is `age` ascending. */
+export type AnchorLogSortKey = "net" | "ordinal" | "fee" | "size" | "tick" | "age";
+
+export function sortAnchorLog(
+  rows: readonly AnchorLogRow[],
+  key: AnchorLogSortKey,
+  dir: 1 | -1,
+  nameOf: (metaId: string) => string,
+): AnchorLogRow[] {
+  const num = (f: (r: AnchorLogRow) => number) => (a: AnchorLogRow, b: AnchorLogRow) => (f(a) - f(b)) * dir;
+  const cmp =
+    key === "net"
+      ? (a: AnchorLogRow, b: AnchorLogRow) => nameOf(a.metaId).localeCompare(nameOf(b.metaId)) * dir
+      : key === "ordinal"
+        ? num((r) => r.ordinal)
+        : key === "fee"
+          ? num((r) => r.fee)
+          : key === "size"
+            ? num((r) => r.sizeInKB)
+            : key === "tick"
+              ? num((r) => r.global.ordinal)
+              : // age ascending = newest first, the log's resting order
+                (a: AnchorLogRow, b: AnchorLogRow) => (a.ts === b.ts ? b.ordinal - a.ordinal : a.ts < b.ts ? 1 : -1) * dir;
+  return [...rows].sort(cmp);
 }
 
 /** The UNLISTED channels' log rows (2026-08-07): the polled buffers only track the public

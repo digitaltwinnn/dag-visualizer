@@ -13,6 +13,9 @@ import {
   MapPin,
   Server,
   Component,
+  Database,
+  Blocks,
+  Signature,
   type LucideIcon,
 } from "lucide-react";
 import type { Mode } from "@/src/store/store";
@@ -86,6 +89,18 @@ export const COMPOSITION_ICON: LucideIcon = Component;
 // text-title headline (user follow-up on Task 23). Single-sourced here so the heads can't drift;
 // the dock TRAYS and the top-bar view switch deliberately keep their own sizes (this constant is
 // only the head/title mark).
+/** The raw pane's LANE icons (user, 2026-08-14): the payload tabs and the signers tab each get
+ *  a mark — the accumulated STORE, the carried records, the signatures. Monochrome via
+ *  currentColor like every glyph, so the tab's own on/off colour carries them. */
+export const LANE_ICONS: Record<"state" | "data" | "signers", LucideIcon> = {
+  state: Database,
+  // Blocks, not a file (user, 2026-08-14): the lane's records ride in DATA BLOCKS — the mark
+  // says what the chain actually carries. Distinct from Box (the global snapshot) and Boxes
+  // (the metagraph snapshot tile).
+  data: Blocks,
+  signers: Signature,
+};
+
 export const KIND_MARK_CLASS = "flex-none size-4";
 
 // The inspector card KINDS map onto one glyph set shared with the dock icon trays: the metagraph

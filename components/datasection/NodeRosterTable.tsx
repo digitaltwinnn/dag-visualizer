@@ -10,7 +10,7 @@ import { hoverKeyOf } from "@/src/data/hoverSubject";
 import { nodeSelectActions } from "@/src/engine/domain/pickActions";
 import { applyClickActions } from "@/src/store/applyClickActions";
 import { IdentityDot, RoleChips } from "@/components/inspector/parts";
-import { SelectedRowMark } from "@/components/selection";
+import { SelectedRowMark, selectionHue } from "@/components/selection";
 import { cn } from "@/lib/utils";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -104,7 +104,7 @@ export default function NodeRosterTable({ mode }: { mode: "hyper" | "geo" }) {
   return (
     <ScrollArea className="flex-1 min-h-0">
       <Table>
-        <TableHeader className="sticky top-0 z-10 bg-background">
+        <TableHeader className="sticky top-0 z-10 bg-[var(--panel-solid)] backdrop-blur-md">
           <TableRow className="border-border">
             {COLS[mode].map((c) => (
               <TableHead
@@ -146,6 +146,8 @@ export default function NodeRosterTable({ mode }: { mode: "hyper" | "geo" }) {
                 // A <tr> is not natively focusable — tabIndex + Enter/Space give the keyboard the
                 // same commit the click makes, and focus previews what hover previews.
                 tabIndex={0}
+                // The selection follows the subject's identity (selection.tsx · selectionHue).
+                style={selected && r.netId ? selectionHue(filterAccent(r.netId)) : undefined}
                 onMouseEnter={() => r.node.id && setHoverNodeId(r.node.id)}
                 onMouseLeave={() => setHoverNodeId(null)}
                 onFocus={() => r.node.id && setHoverNodeId(r.node.id)}
@@ -161,7 +163,7 @@ export default function NodeRosterTable({ mode }: { mode: "hyper" | "geo" }) {
                 {COLS[mode].map((c) => (
                   <TableCell key={c.key}>{cell(r, c.key)}</TableCell>
                 ))}
-                <TableCell className="w-7">{selected && <SelectedRowMark />}</TableCell>
+                <TableCell className="w-7">{selected && <SelectedRowMark hue={r.netId ? filterAccent(r.netId) : undefined} />}</TableCell>
               </TableRow>
             );
           })}

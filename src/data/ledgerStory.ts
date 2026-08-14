@@ -30,6 +30,18 @@ export function storyCount(
   return null;
 }
 
+/** THE LEDGER'S OWN READING OF THE FILTER (user, 2026-08-13): committed DAG reads as the WHOLE
+ *  chamber. Every global tick IS a DAG snapshot — the global floor is DAG's lane and it contains
+ *  everything — so "DAG" in the *when* view means the base ledger itself, not a lane to isolate.
+ *  Before this, DAG dimmed every band (nothing is keyed "dag"), blanked the strip and turned
+ *  every explorer group preview-only: the view read as broken exactly where the filter meant the
+ *  most. Every ledger surface passes its committed filter through here — the scene's emphasis,
+ *  the strip's scale, the explorer's lens, the anchor log — so the mapping cannot drift. The
+ *  functions above already agree by construction ("dag" has no per-network story, so the release
+ *  rule never fires on it), and what the commit still means is carried elsewhere: the DAG
+ *  dossier card, and the global-floor tray nodes staying on-filter (the node model's own answer). */
+export const ledgerLens = (filter: string): string => (filter === "dag" ? "all" : filter);
+
 /** The polled anchor index needs a settling window after a fresh tick (see CLAUDE.md, the tick
  *  lifecycle) — a zero read inside it may just be lag, and the release rule must never fire on
  *  a lagging count. */

@@ -39,6 +39,10 @@ export interface DecodedChannel {
    *  decoded values as JSON text for the raw layer's tree. */
   dataTxCount: number;
   dataTx: string;
+  /** The data blocks' measured serialized size — Σ of the app blocks' byte lengths, the same
+   *  bytes-as-carried reading `stateBytes` gives the state (2026-08-13: the card's two payload
+   *  sections headline in one unit). A block that can't be decoded still carried its bytes. */
+  dataBytes: number;
 }
 
 const asBytes = (v: unknown): Buffer | null =>
@@ -80,9 +84,11 @@ export async function decodeChannelContent(content: unknown): Promise<DecodedCha
   const appBlocks = app && Array.isArray(app.blocks) ? (app.blocks as unknown[]) : [];
   const dataBlockSigners: string[] = [];
   const dataTxValues: unknown[] = [];
+  let dataBytes = 0;
   for (const b of appBlocks) {
     const buf = asBytes(b);
     if (!buf) continue;
+    dataBytes += buf.length;
     try {
       const blk = JSON.parse(buf.toString("utf8")) as {
         proofs?: { id?: string }[];
@@ -116,5 +122,6 @@ export async function decodeChannelContent(content: unknown): Promise<DecodedCha
     dataBlockSigners: [...new Set(dataBlockSigners)],
     dataTxCount: dataTxValues.length,
     dataTx: dataTxValues.length ? JSON.stringify(dataTxValues) : "",
+    dataBytes,
   };
 }
