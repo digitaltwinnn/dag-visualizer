@@ -622,7 +622,11 @@ export function ChannelStatePanel() {
                 <FootRow label="Parent" value={paneHash(deep.lastSnapshotHash)} title={deep.lastSnapshotHash} copy={deep.lastSnapshotHash} />
               )}
               {deep.stateProof && (
-                <FootRow label="State proof" value={paneHash(deep.stateProof)} title={deep.stateProof} copy={deep.stateProof} />
+                // The title answers what this row IS (user, 2026-08-14 — "is it related to the
+                // state tab? do we have different proofs for state vs data?"): a COMMITMENT, not
+                // a signer set — the third kind of proof on one snapshot, beside the L0 seal
+                // (whole artifact) and the dL1 block signatures (inside DATA).
+                <FootRow label="State proof" value={paneHash(deep.stateProof)} title={"A digest of the application state this snapshot results in, covered by the snapshot's own L0 seal — the state's provability. Not a signature set: data blocks carry their own dL1 signatures, the state carries this commitment instead.\n\n" + deep.stateProof} copy={deep.stateProof} />
               )}
             </div>
           )}

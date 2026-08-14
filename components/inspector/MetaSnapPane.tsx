@@ -337,7 +337,10 @@ export default function MetaSnapPane({
                 <FootRow label="Parent" value={shortHash(polled.parent)} title={polled.parent} copy={polled.parent} />
               )}
               {stateProof && (
-                <FootRow label="State proof" value={shortHash(stateProof)} title={stateProof} copy={stateProof} />
+                // A COMMITMENT, not a signer set (user, 2026-08-14): the digest of the resulting
+                // application state, covered by the snapshot's own L0 seal — see the raw pane's
+                // twin row for the fuller note.
+                <FootRow label="State proof" value={shortHash(stateProof)} title={"A digest of the application state this snapshot results in, covered by the snapshot's own L0 seal — the state's provability. Not a signature set: data blocks carry their own dL1 signatures, the state carries this commitment instead.\n\n" + stateProof} copy={stateProof} />
               )}
             </Foot>
           </div>
