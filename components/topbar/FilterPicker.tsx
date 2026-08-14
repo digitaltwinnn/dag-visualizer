@@ -33,7 +33,6 @@ export default function FilterPicker({ onPicked }: { onPicked?: () => void }) {
     [metaList],
   );
   const totalNodes = useMemo(() => rows.reduce((s, m) => s + (m.located ?? 0), 0), [rows]);
-  const mappedCount = useMemo(() => rows.filter((m) => (m.located ?? 0) > 0).length, [rows]);
   // The strip's three KINDS of chip get a divider between them (user, 2026-08-13): networks with
   // plottable nodes, then the catalog's 0-located ones, then unlisted — which is NOT a fourth
   // zero: its machines are unknowable rather than absent, which is why its chip says "—" below
@@ -58,7 +57,10 @@ export default function FilterPicker({ onPicked }: { onPicked?: () => void }) {
       "text-left whitespace-nowrap transition-[background] duration-150",
       "hover:bg-wash-hover",
       "focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--primary)] focus-visible:outline-offset-[-2px]",
-      "max-[1099px]:min-h-11",
+      // The 44px tap minimum keys on the POINTER, not the width (user, 2026-08-14 —
+      // resizing a desktop window smaller made the bar GROW): a coarse pointer is a
+      // touch device wherever the window edge sits; a fine pointer never needs it.
+      "pointer-coarse:min-h-11",
       active && SELECTED_ROW,
       off && "opacity-45",
     );
@@ -84,9 +86,9 @@ export default function FilterPicker({ onPicked }: { onPicked?: () => void }) {
       >
         <IdentityDot hue="var(--primary)" />
         <span className="text-body text-foreground">All</span>
-        <span className="text-label text-muted-foreground tabular-nums">
-          {mappedCount} metagraphs · {totalNodes}
-        </span>
+        {/* ONE count like every other chip (user, 2026-08-14): the node total. The metagraph
+            count is the strip itself — its chips are countable right there. */}
+        <span className="text-label text-muted-foreground tabular-nums">{totalNodes}</span>
       </button>
       <span className="w-px self-stretch bg-foreground/25 my-1.5 mx-1" aria-hidden />
       {rows.map((m, i) => {
