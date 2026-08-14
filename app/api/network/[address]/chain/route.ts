@@ -16,7 +16,6 @@ interface BeSnap {
   ordinal?: number;
   timestamp?: string;
   ownerAddress?: string;
-  stakingAddress?: string;
 }
 
 async function readSnap(url: string): Promise<BeSnap | null> {
@@ -45,11 +44,10 @@ async function fetchSpan(address: string) {
     genesisTs: genesis?.timestamp ?? null,
     latestOrdinal: latest.ordinal ?? 0,
     latestTs: latest.timestamp ?? null,
-    // The two addresses a chain publishes about itself, straight off the newest record
-    // (user, 2026-08-14): the owner (registered and controls the metagraph) and the staking
-    // address (holds its staked collateral).
+    // The owner address, straight off the newest record (user, 2026-08-14): the address that
+    // registered and controls the metagraph. (The staking address stays OFF this response —
+    // it is fee-model collateral, homed in the future Staking view.)
     owner: latest.ownerAddress ?? null,
-    staking: latest.stakingAddress ?? null,
   };
 }
 

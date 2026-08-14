@@ -521,14 +521,9 @@ export function MetaCard({ cfg }: { cfg: MetaCfg }) {
               copy={chainSpan.owner}
             />
           )}
-          {chainSpan?.staking && (
-            <FootRow
-              label="Staking address"
-              value={midHash(chainSpan.staking, 23)}
-              title={`The address holding this metagraph's staked collateral. ${chainSpan.staking}`}
-              copy={chainSpan.staking}
-            />
-          )}
+          {/* The staking address deliberately does NOT ride this foot (user, 2026-08-14):
+              it is the fee-model's collateral pointer, and its home is the future Staking
+              view — the dossier keeps the two identity references. */}
         </Foot>
       )}
     </>

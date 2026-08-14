@@ -167,8 +167,6 @@ export interface ChainSpan {
   /** The channel's owner address off its newest record — the closest thing to an operator
    *  identity an uncataloged chain publishes. */
   owner: string | null;
-  /** The address holding the metagraph's staked collateral. */
-  staking: string | null;
 }
 const spans = new Map<string, ChainSpan | null>();
 const spanInflight = new Map<string, Promise<ChainSpan | null>>();
@@ -177,8 +175,8 @@ async function loadSpan(address: string): Promise<ChainSpan | null> {
     // ?v busts any browser-cached previous response shape (the route is public, max-age 5m).
     const r = await fetch(`/api/network/${address}/chain?v=3`);
     if (!r.ok) return null;
-    const j = (await r.json()) as { genesisTs: string | null; latestOrdinal: number; owner: string | null; staking: string | null };
-    return { genesisTs: j.genesisTs, latestOrdinal: j.latestOrdinal, owner: j.owner ?? null, staking: j.staking ?? null };
+    const j = (await r.json()) as { genesisTs: string | null; latestOrdinal: number; owner: string | null };
+    return { genesisTs: j.genesisTs, latestOrdinal: j.latestOrdinal, owner: j.owner ?? null };
   } catch {
     return null;
   }
