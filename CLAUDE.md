@@ -892,7 +892,9 @@ its own strip height so a paged box's plank rides ON the plate — one number, t
 
 On the two snapshot cards the foot has one shape: **the artifact's chain identity — what it is, what it
 links to, what it proves.** They are the same `Signed[]` artifact, so they carry the same set, and the
-metagraph card's `State proof` is the one addition, because only a metagraph snapshot proves an
+metagraph card's `State hash` is the one addition (renamed from `State proof` 2026-08-14 — it collided
+with the signers' `snapshot proof`, a SIGNATURE set, while this is a digest, kin to Hash/Parent),
+because only a metagraph snapshot proves an
 application state. **Counters are not chain identity**: `Height`, `Blocks` and `epochProgress` are all
 carried by the types and none of them appear.
 

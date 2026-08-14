@@ -622,11 +622,12 @@ export function ChannelStatePanel() {
                 <FootRow label="Parent" value={paneHash(deep.lastSnapshotHash)} title={deep.lastSnapshotHash} copy={deep.lastSnapshotHash} />
               )}
               {deep.stateProof && (
-                // The title answers what this row IS (user, 2026-08-14 — "is it related to the
-                // state tab? do we have different proofs for state vs data?"): a COMMITMENT, not
-                // a signer set — the third kind of proof on one snapshot, beside the L0 seal
-                // (whole artifact) and the dL1 block signatures (inside DATA).
-                <FootRow label="State proof" value={paneHash(deep.stateProof)} title={"A digest of the application state this snapshot results in, covered by the snapshot's own L0 seal — the state's provability. Not a signature set: data blocks carry their own dL1 signatures, the state carries this commitment instead.\n\n" + deep.stateProof} copy={deep.stateProof} />
+                // "State HASH", not "state proof" (user, 2026-08-14 — the SIGNERS tab says
+                // "snapshot proof" for the L0 SIGNATURE SET, so two unrelated species shared the
+                // word one screen apart and read as kin). It is a digest, the same species as
+                // its Hash/Parent siblings; the chain field stays calculatedStateProof (internal
+                // identifiers keep their names). The title carries the distinction.
+                <FootRow label="State hash" value={paneHash(deep.stateProof)} title={"The hash of the application state this snapshot results in, covered by the snapshot's own L0 seal — the state's provability. Distinct from the SIGNERS tab's 'snapshot proof', which is the L0 signature set; this is a digest, and the signatures sign over it." + deep.stateProof} copy={deep.stateProof} />
               )}
             </div>
           )}
