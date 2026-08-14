@@ -39,9 +39,11 @@ const PAGE = 25;
 //     merged cross-network history feed exists to page — and its pager says so ("in window")
 //     with the route further back named in words: pick a network.
 //   · Under a committed CATALOG network the log pages that network's ENTIRE chain through
-//     /api/network/[address]/snapshots (the explorer's cursor pages, walked prev/next and
-//     memoized per page). Ordinals are sequential and gapless, so the network's newest ordinal
-//     IS its lifetime total and every pager number derives from the rows' own ordinals.
+//     /api/network/[address]/snapshots. Ordinals are sequential and gapless, so the newest
+//     ordinal IS the lifetime total and EVERY page is pure arithmetic — page N asks for
+//     ?before=latest−(N−1)·25, which is what makes the pager's «/» jumps (genesis included)
+//     one request deep. `latest` FREEZES per walk (refreshed while on page 1) so deep pages
+//     don't shift under the reader as new anchors land.
 //
 // A history row's ANCHORED INTO is resolved exactly — the buffer's own tick first, then
 // /api/global/at (the timestamp→ordinal binary search; the join is timestamp EQUALITY, the
@@ -69,10 +71,10 @@ export default function AnchorLogTable() {
 
   // ── History state (refs so fetches don't churn the effect graph; `version` re-renders) ──────
   type HistRow = { ordinal: number; hash: string; parent: string; ts: string; fee: number; sizeInKB: number };
-  const hist = useRef<{ net: string; pages: Map<number, HistRow[]>; cursors: Map<number, string | null> }>({
+  const hist = useRef<{ net: string; pages: Map<number, HistRow[]>; latest: number }>({
     net: "",
     pages: new Map(),
-    cursors: new Map(),
+    latest: 0,
   });
   const resolved = useRef(new Map<string, { ordinal: number; hash: string }>()); // ts → global
   const inFlight = useRef(new Set<string>());
@@ -89,14 +91,19 @@ export default function AnchorLogTable() {
     return max;
   })();
   const histFirst = hist.current.net === lens ? (hist.current.pages.get(1)?.[0]?.ordinal ?? 0) : 0;
-  const latest = Math.max(bufferedNewest, histFirst);
+  // The FROZEN latest — page arithmetic must not shift under the reader mid-walk, so it only
+  // advances while the reader is ON the live page (or when the walk resets).
+  if (hist.current.net === lens && (page === 1 || hist.current.latest === 0)) {
+    hist.current.latest = Math.max(hist.current.latest, bufferedNewest, histFirst);
+  }
+  const latest = hist.current.latest || Math.max(bufferedNewest, histFirst);
 
   // Reset the walk when the network changes; refresh page 1 when a new anchor lands (the live
-  // tip is the only mutable page — cursored pages are immutable).
+  // tip is the only mutable page — ordinal-addressed pages are immutable).
   useEffect(() => {
     if (!histNet) return;
     if (hist.current.net !== histNet) {
-      hist.current = { net: histNet, pages: new Map(), cursors: new Map() };
+      hist.current = { net: histNet, pages: new Map(), latest: 0 };
       setPageState(1);
       setVersion((v) => v + 1);
     }
@@ -109,18 +116,21 @@ export default function AnchorLogTable() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [bufferedNewest, histNet]);
 
-  // Fetch the current history page if missing (prev/next walking guarantees the cursor chain).
+  // Fetch the current page if missing. Page 1 is the live tip; every deeper page is the
+  // ordinal-addressed immutable read, so ANY page — a « jump to genesis included — is one
+  // request, no cursor chain.
   useEffect(() => {
     if (!histNet || hist.current.net !== histNet || hist.current.pages.has(page)) return;
-    const cursor = page === 1 ? null : (hist.current.cursors.get(page - 1) ?? null);
-    if (page !== 1 && cursor == null) return;
+    const frozen = hist.current.latest;
+    if (page !== 1 && frozen === 0) return; // no arithmetic base yet — page 1 seeds it
+    const before = frozen - (page - 1) * PAGE;
+    if (page !== 1 && before < 1) return;
     let dead = false;
-    fetch(`/api/network/${histNet}/snapshots${cursor ? `?cursor=${encodeURIComponent(cursor)}` : ""}`)
-      .then((r) => (r.ok ? (r.json() as Promise<{ rows: HistRow[]; next: string | null }>) : Promise.reject()))
+    fetch(`/api/network/${histNet}/snapshots${page === 1 ? "" : `?before=${before}`}`)
+      .then((r) => (r.ok ? (r.json() as Promise<{ rows: HistRow[] }>) : Promise.reject()))
       .then((d) => {
         if (dead) return;
         hist.current.pages.set(page, d.rows);
-        hist.current.cursors.set(page, d.next);
         setHistErr(false);
         setVersion((v) => v + 1);
       })
@@ -203,8 +213,11 @@ export default function AnchorLogTable() {
     total = latest;
     pages = Math.max(1, Math.ceil(Math.max(total, 1) / PAGE));
     const ords = raw.map((r) => r.ordinal);
-    from = ords.length && latest ? latest - Math.max(...ords) + 1 : 0;
-    to = ords.length && latest ? latest - Math.min(...ords) + 1 : 0;
+    // Page 1 IS positions 1..N by definition — deriving them by subtraction mixes two sources
+    // (the buffer's `latest` can lead the explorer's live page by a tick, which read "13–37").
+    // Deeper pages subtract against the SAME frozen latest their ?before was computed from.
+    from = !ords.length ? 0 : page === 1 ? 1 : latest - Math.max(...ords) + 1;
+    to = !ords.length ? 0 : page === 1 ? ords.length : latest - Math.min(...ords) + 1;
   }
 
   // THE LAYER OPENS ON A SUBJECT (2026-08-13): with nothing selected, the log commits its own

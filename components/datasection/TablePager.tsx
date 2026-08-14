@@ -1,6 +1,6 @@
 "use client";
 
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 // The raw layer's ONE table pager (user, 2026-08-14 — "add a bottom row with pagination", the
@@ -42,14 +42,23 @@ export default function TablePager({
         {note ? <span className="normal-case tracking-normal"> — {note}</span> : null}
       </span>
       <span className="inline-flex items-center gap-1">
+        {/* First/last jumps (user, 2026-08-14 — "I want to see the genesis block; now I have to
+            go page by page"): the standard « ‹ › » cluster. The last page IS genesis in the
+            history mode, one jump deep now that pages are ordinal-addressed. */}
+        <button type="button" className={btn} aria-label="First page" disabled={page <= 1} onClick={() => onPage(1)}>
+          <ChevronsLeft aria-hidden className="size-3.5" />
+        </button>
         <button type="button" className={btn} aria-label="Previous page" disabled={page <= 1} onClick={() => onPage(page - 1)}>
           <ChevronLeft aria-hidden className="size-3.5" />
         </button>
         <span className={cn("text-micro tabular-nums text-muted-foreground")}>
-          {page} / {pages}
+          {page} / {pages.toLocaleString()}
         </span>
         <button type="button" className={btn} aria-label="Next page" disabled={page >= pages} onClick={() => onPage(page + 1)}>
           <ChevronRight aria-hidden className="size-3.5" />
+        </button>
+        <button type="button" className={btn} aria-label="Last page" disabled={page >= pages} onClick={() => onPage(pages)}>
+          <ChevronsRight aria-hidden className="size-3.5" />
         </button>
       </span>
     </div>
