@@ -502,9 +502,14 @@ function GeoLiveNode({ p }: { p: PickOf<"l0" | "l1" | "metanode"> }) {
   // A machine that runs NO L0 layer serves no snapshot chain — that is a KNOWN fact, not
   // missing data, so it gets an honest "None" rather than silent absence (user, 2026-08-14:
   // DOR's 17 dedicated dL1 machines showed nothing and read as an inconsistency). A machine
-  // WITH an L0 layer but no census entry stays absent — there the truth really is unknown
-  // (unreachable at probe time).
-  const archNone = !archEntry && archive != null && (p.node?.roles?.length ?? 0) > 0 && !p.node!.roles!.includes("l0");
+  // WITH an L0 layer but no census entry says "Unmeasured" (user, same day — the truth there
+  // is that the census has no reading, and next to siblings with values silence reads as a
+  // defect): unreachable at probe time, not Ready then, or joined since — the title names the
+  // possibilities, the value only claims the absence of a reading. Roles unknown → no row at
+  // all, since even "None" would be a guess.
+  const archRoles = p.node?.roles ?? [];
+  const archNone = !archEntry && archive != null && archRoles.length > 0 && !archRoles.includes("l0");
+  const archUnmeasured = !archEntry && archive != null && archRoles.includes("l0");
   // The host's ASN answers to the provider rung exactly as the Hosting line above it does — one
   // condition, so the two can't disagree about who owns the host.
   const asn = cohort == null ? geo?.asn : null;
@@ -557,6 +562,16 @@ function GeoLiveNode({ p }: { p: PickOf<"l0" | "l1" | "metanode"> }) {
           <Fact label="Archive">
             <span title="A chain's snapshots are served by its L0 layer; this machine runs no L0 process, so it keeps no snapshot archive.">
               None<span className="text-label text-muted-foreground"> · no L0 layer</span>
+            </span>
+          </Fact>
+        )}
+        {archUnmeasured && (
+          <Fact label="Archive">
+            <span
+              className="text-muted-foreground"
+              title="The archive census (refreshed every few hours) has no reading for this machine — it was unreachable at probe time, not Ready then, or joined the cluster since."
+            >
+              Unmeasured
             </span>
           </Fact>
         )}
