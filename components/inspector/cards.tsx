@@ -292,7 +292,7 @@ export function SnapshotCard({ data: d }: { data: GlobalSnapshot }) {
       <Foot>
         <FootRow label="Hash" value={shortHash(d.hash)} title={d.hash} copy={d.hash} />
         {d.lastSnapshotHash && (
-          <FootRow label="Parent" value={shortHash(d.lastSnapshotHash)} title={d.lastSnapshotHash} copy={d.lastSnapshotHash} />
+          <FootRow label="Parent hash" value={shortHash(d.lastSnapshotHash)} title={d.lastSnapshotHash} copy={d.lastSnapshotHash} />
         )}
       </Foot>
     </div>

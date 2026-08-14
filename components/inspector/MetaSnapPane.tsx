@@ -334,7 +334,7 @@ export default function MetaSnapPane({
                   after it aged out of the retained buffer — where stating the gap is the point. */}
               <FootRow label="Hash" value={shortHash(hash)} title={hash} copy={hash || undefined} />
               {polled?.parent && (
-                <FootRow label="Parent" value={shortHash(polled.parent)} title={polled.parent} copy={polled.parent} />
+                <FootRow label="Parent hash" value={shortHash(polled.parent)} title={polled.parent} copy={polled.parent} />
               )}
               {stateProof && (
                 // "State HASH" (user, 2026-08-14 — "state proof" collided with the signers tab's

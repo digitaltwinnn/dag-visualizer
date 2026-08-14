@@ -590,11 +590,15 @@ export function ChannelStatePanel() {
                 )}
                 {active === "signers" && (
                   <div className="flex flex-col gap-3">
-                    {deep.signers.length > 0 && (
-                      <SignerGroup group="proof" ids={deep.signers} metaId={deep.metaId} selNodes={selNodes} />
-                    )}
+                    {/* dL1 FIRST, L0 AFTER (user, 2026-08-14): the production order — the data
+                        blocks are signed by their dL1 producers before the L0 cluster seals the
+                        snapshot around them, so the lane reads in the order the signatures were
+                        actually made. */}
                     {deep.dataBlockSigners.length > 0 && (
                       <SignerGroup group="dataBlocks" ids={deep.dataBlockSigners} metaId={deep.metaId} selNodes={selNodes} />
+                    )}
+                    {deep.signers.length > 0 && (
+                      <SignerGroup group="proof" ids={deep.signers} metaId={deep.metaId} selNodes={selNodes} />
                     )}
                   </div>
                 )}
@@ -619,7 +623,7 @@ export function ChannelStatePanel() {
             <div className="flex-none flex flex-col gap-1 rounded-md bg-[var(--panel-plate)] px-2.5 py-2">
               {hash && <FootRow label="Hash" value={paneHash(hash)} title={hash} copy={hash} />}
               {deep.lastSnapshotHash && (
-                <FootRow label="Parent" value={paneHash(deep.lastSnapshotHash)} title={deep.lastSnapshotHash} copy={deep.lastSnapshotHash} />
+                <FootRow label="Parent hash" value={paneHash(deep.lastSnapshotHash)} title={deep.lastSnapshotHash} copy={deep.lastSnapshotHash} />
               )}
               {deep.stateProof && (
                 // "State HASH", not "state proof" (user, 2026-08-14 — the SIGNERS tab says
