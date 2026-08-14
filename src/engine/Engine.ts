@@ -622,7 +622,7 @@ export class Engine {
     // client-side (NetworkData), but the metagraph SET is fetched once — so re-pull
     // it on an interval too (Vercel never restarts; ISR only freshens the server
     // cache, not an idle client). Matches the route's revalidate window.
-    this.metaTimer = setInterval(() => this.refreshMeta(false), 10 * 60 * 1000);
+    this.metaTimer = setInterval(() => this.refreshMeta(false), 5 * 60 * 1000); // matches the route's 5m revalidate
   }
 
   // Fetch the (server-cached, live) metagraph set + node geo. On the initial load we

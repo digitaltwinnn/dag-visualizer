@@ -436,7 +436,7 @@ function PayloadBlock({
     // standard, 2026-08-07); an asked read shows its own state in the same slot.
     return (
       <div className="mt-1.5 text-body text-muted-foreground italic">
-        {!asked ? "undecodable payload" : decodeGaveUp ? "decompression unavailable — the read failed" : "decompressing…"}
+        {!asked ? "undecodable payload" : decodeGaveUp ? "decompression unavailable — the read failed, or the payload is beyond the chain\u2019s serving horizon" : "decompressing…"}
       </div>
     );
   }
@@ -444,7 +444,7 @@ function PayloadBlock({
   // The in-flight word renders PER SECTION (user, 2026-08-13 — a single line under both read as
   // DATA's alone while STATE sat bare): both sections are being decompressed by the one read, so
   // both say so, exactly as each states its own verified `none` after it.
-  const pending = asked && !deep ? (decodeGaveUp ? "decompression unavailable — the read failed" : "decompressing…") : null;
+  const pending = asked && !deep ? (decodeGaveUp ? "decompression unavailable — the read failed, or the payload is beyond the chain\u2019s serving horizon" : "decompressing…") : null;
 
   return (
     <div className="mt-1.5">

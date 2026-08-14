@@ -14,6 +14,8 @@ export default function TablePager({
   from,
   to,
   total,
+  suffix,
+  note,
   onPage,
 }: {
   page: number; // 1-based
@@ -21,17 +23,23 @@ export default function TablePager({
   from: number; // 1-based row range of the current slice
   to: number;
   total: number;
+  /** Qualifies the total ("in window") — the honest scope of a windowed count. */
+  suffix?: string;
+  /** One muted sentence after the range (the "pick a network to page all time" hint). */
+  note?: string;
   onPage: (p: number) => void;
 }) {
-  if (pages <= 1) return null;
+  if (pages <= 1 && !note) return null;
   const btn =
     "inline-flex items-center justify-center size-5 rounded-xs cursor-pointer text-muted-foreground " +
     "hover:text-foreground hover:bg-wash-faint disabled:opacity-30 disabled:cursor-default disabled:hover:bg-transparent " +
     "focus-visible:outline focus-visible:outline-1 focus-visible:outline-[var(--primary)]";
   return (
     <div className="flex-none flex items-center justify-between gap-2 pt-1.5">
-      <span className="text-micro tracking-caps uppercase tabular-nums text-muted-foreground">
-        {from}–{to} of {total}
+      <span className="min-w-0 truncate text-micro tracking-caps uppercase tabular-nums text-muted-foreground">
+        {from}–{to} of {total.toLocaleString()}
+        {suffix ? ` ${suffix}` : ""}
+        {note ? <span className="normal-case tracking-normal"> — {note}</span> : null}
       </span>
       <span className="inline-flex items-center gap-1">
         <button type="button" className={btn} aria-label="Previous page" disabled={page <= 1} onClick={() => onPage(page - 1)}>

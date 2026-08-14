@@ -3,13 +3,11 @@ import { unstable_cache } from "next/cache";
 // The SERVED ORDINAL WINDOW — the bound that turns the snapshot routes from a walkable surface
 // into an instrument.
 //
-// The premise these routes were built on ("the L0 node prunes after ~30 min, so only recent
-// ticks resolve") is FALSE against the live LB: it serves the entire ordinal history (verified
-// 2026-08-13 — ordinal 1,000,000, years old, answers 200). Without a bound, every one of the
-// ~6.7M ordinals is a valid anonymous request: a cold ~2.5 MB upstream pull, a full decode and a
-// day-long data-cache write each, with no rate limiting on the Hobby plan. The app itself only
-// ever asks about the retained client window (POLL.maxSnapshots = 52 ticks ≈ 25 min, plus the
-// 8-tick backfill and pager steps inside that buffer), so a generous bound breaks nothing real.
+// THE LB'S OWN SERVING BAND (measured 2026-08-14): the payload host serves roughly the last
+// ~240k ordinals (~78 days) and 404s older ones — NOT "~30 min" (the original premise) and NOT
+// "the entire history" (2026-08-13's probe does not reproduce). So deep history 404s upstream
+// on its own; this module's remaining job is the FUTURE bound and being the one place a past
+// bound returns if the plan's protections change.
 //
 // ⚠️ THE PAST BOUND IS DROPPED (user decision, 2026-08-14): the anchor log now pages a
 // network's ENTIRE snapshot history, and the payload should follow the rows — "I'm ok to drop

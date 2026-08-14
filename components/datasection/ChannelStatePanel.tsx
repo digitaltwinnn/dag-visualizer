@@ -374,8 +374,8 @@ export function ChannelStatePanel() {
   const following = useStore((s) => s.following);
   const selNodes = useStore((s) => s.selNodes);
   // The pinned decode's give-up timer (2026-08-08): "reading…" must terminate honestly when
-  // the deep read fails (upstream blip / timeout — not pruning: the LB serves the whole
-  // ordinal history, verified 2026-08-13).
+  // the deep read fails (an upstream blip, or a snapshot older than the chain's ~78-day
+  // payload band, measured 2026-08-14).
   const [gaveUp, setGaveUp] = useState(false);
   useEffect(() => {
     setGaveUp(false);
@@ -471,7 +471,7 @@ export function ChannelStatePanel() {
           {following
             ? "Click this snapshot's row in the anchor log to decompress its payload. It is a ~2.5 MB fetch, so it runs only when you ask."
             : gaveUp
-              ? "decompression failed or timed out — selecting the row again retries"
+              ? "decompression failed — a blip retries on reselect; snapshots older than the chain\u2019s ~78-day serving horizon have no payload to read"
               : "decompressing…"}
         </p>
       ) : (

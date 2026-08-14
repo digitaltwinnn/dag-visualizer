@@ -115,7 +115,7 @@ don't debug the cascade: kill the server, `rm -rf .next/dev`, restart.
 
 `next build` and `next dev` don't conflict (dev outputs to `.next/dev`), so the production check can
 run alongside the dev server. Do it at phase boundaries: the build should be clean and
-`/api/metagraphs` should stay `○` (Static) with `10m` revalidate.
+`/api/metagraphs` should stay `○` (Static) with `5m` revalidate.
 
 ### Verifying changes
 
@@ -1018,10 +1018,11 @@ in a held slot reflows the row when the number replaces it.
 `reading…` forever, which rule 10 counts as a fabricated state exactly
 like a fabricated number. The exact read's signal is `store.exactMiss` (recorded by
 `RawSnapshotBridge`, cleared when the read lands); the deep read's is the 12s `decodeGaveUp` timer.
-⚠️ **The failure is a blip, not pruning.** The L0 LB serves the ENTIRE ordinal history (verified
-2026-08-13: ordinal 1,000,000 answers 200 — the old "prunes after ~30 min" premise is false), so a
-give-up copy must never name pruning as the cause; the bound on what the routes serve is the app's
-own `ordinalWindow.ts`, sized so no legitimate client ask ever hits it.
+⚠️ **The payload host serves a BAND, not the whole history** (measured 2026-08-14: roughly the
+last ~240k ordinals ≈ 78 days; 2026-08-13's "entire history" probe does not reproduce, and the
+original "~30 min" premise was also false). So a failed old read may be PERMANENT — the give-up
+copy names the horizon — while the explorer serves tiny full-history RECORDS at any depth, which
+is what the anchor log's history paging and the timestamp→ordinal resolver ride.
 
 **A value slot states a READING; an invitation is a CONTROL** (user, 2026-08-10 — "I don't like the
 word 'pin', it's not very clear to me"). The metagraph snapshot card's Data slot said `pin to read`:
@@ -1490,7 +1491,7 @@ them — but the Next Node server can.
   computes identity hues, and returns `{ metagraphs, geo }`. **On failure it answers an honest 503** —
   no pre-baked fallback; the client keeps its last good data and re-pulls next cycle. The inner fetches
   are `no-store`, which alone would make the route dynamic, so the live fetch is wrapped in
-  `unstable_cache` at a 10-minute revalidate (throwing on an empty result keeps a blip from being
+  `unstable_cache` at a 5-minute revalidate (was 10 — halved 2026-08-14: a node-set restart read as "unknown node" for most of a cycle) (throwing on an empty result keeps a blip from being
   cached). A `maxDuration` and a per-fetch timeout keep a slow cluster LB from blowing the function
   budget.
 - **`/api/geo`** serves the validator IP→geo map live (cached 1h, 503 on failure) so the globe plots
@@ -1516,10 +1517,10 @@ them — but the Next Node server can.
 network's whole history and the payload follows the rows; "if abused I'll switch to Pro for DDoS
 protection"). `app/api/snapshot/ordinalWindow.ts` remains the one home and still bounds the FUTURE
 (+5, nonsense is not history) and **fails open** when its reference read fails. The accepted cost is
-the one the old ~5000-tick window guarded against: any historical ordinal is a valid anonymous
-~2.5 MB pull + decode + day-long cache write — once per ordinal ever, since they're immutable.
-Re-tighten here when the plan changes.
-- The client fetches `/api/metagraphs` on mount **and re-pulls every 10 min** — Vercel never restarts
+bounded by the LB's own ~78-day serving band (older ordinals 404 upstream in ~0.6s with no
+payload); within it, any ordinal is a valid anonymous ~2.5 MB pull + decode + cache write — once
+per ordinal ever, since they're immutable. Re-tighten here when the plan changes.
+- The client fetches `/api/metagraphs` on mount **and re-pulls every 5 min** — Vercel never restarts
   and ISR only freshens the *server* cache, so an idle tab must re-pull. Snapshot and cluster feeds are
   live client polling.
 
@@ -1527,7 +1528,7 @@ Re-tighten here when the plan changes.
 the field set changes.
 
 ⚠️ **`ip-api.com` is free-tier: HTTP-only, rate-limited per source IP, non-commercial use only.** Fine
-at one batched call per 10-minute regeneration; **for a commercial product switch to a licensed HTTPS
+at one batched call per 5-minute regeneration; **for a commercial product switch to a licensed HTTPS
 provider.**
 
 **There is intentionally no `$DAG` price networking** — don't add a market-data fetch unless something
