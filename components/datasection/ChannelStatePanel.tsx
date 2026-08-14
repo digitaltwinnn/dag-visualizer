@@ -59,7 +59,7 @@ import { getNetwork, metagraphById, resolveSigner, shortHash, SIGNER_GROUPS, SIG
 import { snapsAtTick } from "@/src/data/anchorLog";
 import { PAYLOAD_LANES, parsePayload, payloadKinds, stateSchema, unifyFieldKinds } from "@/src/data/payloadKinds";
 import { identityHudHex } from "@/src/palette/identity";
-import { CopyButton, FootRow, IdentityDot } from "@/components/inspector/parts";
+import { CopyButton, FootRow, IdentityDot, RoleChips } from "@/components/inspector/parts";
 import { fmtDag, fmtKB } from "@/src/util/format";
 import JsonTree from "@/components/datasection/JsonTree";
 import { cn } from "@/lib/utils";
@@ -73,21 +73,14 @@ function nonEmpty(v: unknown): boolean {
   return true;
 }
 
+/** The pane's own hash display: the card's shortHash (8…6) sized for a ~200px rail column,
+ *  while this pane runs ~3× that — the labels need no more than their words, so the value
+ *  takes the room (user, 2026-08-14). Head AND tail kept, like shortHash: a chain hash's tail
+ *  is what gets compared. */
+const paneHash = (v: string): string => (v.length <= 46 ? v : `${v.slice(0, 26)}…${v.slice(-18)}`);
+
 type LaneId = "state" | "data" | "signers";
 type Lane = { id: LaneId; name: string; title: string };
-
-/** A lane's NOTE — its own facts, in the one position every lane puts them. Uppercase micro like a
- *  card's eyebrow; a caller wraps anything case-sensitive (a hash) in `normal-case`. */
-function LaneNote({ children, title }: { children: ReactNode; title?: string }) {
-  return (
-    <p
-      className="flex-none text-micro tracking-caps uppercase text-muted-foreground"
-      title={title}
-    >
-      {children}
-    </p>
-  );
-}
 
 const LANE_HEAD = "text-micro uppercase tracking-caps text-muted-foreground font-normal";
 
@@ -237,27 +230,34 @@ function RawSection({
   data: unknown;
 }) {
   return (
-    <div className="flex flex-col gap-1">
-      <button
-        type="button"
-        onClick={onToggle}
-        aria-expanded={open}
-        className={cn(
-          "flex w-fit items-center gap-1 py-0.5 pr-1.5 cursor-pointer rounded-xs",
-          "text-micro tracking-caps uppercase text-muted-foreground",
-          "hover:text-foreground hover:bg-wash-faint",
-          "focus-visible:outline focus-visible:outline-1 focus-visible:outline-[var(--primary)]",
-        )}
-      >
-        <ChevronRight
-          aria-hidden
+    // mt-1.5 on top of the lane's gap-2 (user, 2026-08-14 — the disclosure hugged the shape
+    // table): the raw tier sits visibly below the shape it expands on. The header row carries
+    // the shared copy control at its right end — the WHOLE payload as pretty-printed JSON, the
+    // same text the well renders (group/copy, so it reveals with the row like every other).
+    <div className="group/copy flex flex-col gap-1 mt-1.5">
+      <div className="flex items-center justify-between gap-2">
+        <button
+          type="button"
+          onClick={onToggle}
+          aria-expanded={open}
           className={cn(
-            "size-3 flex-none transition-transform duration-150 motion-reduce:transition-none",
-            open && "rotate-90",
+            "flex w-fit items-center gap-1 py-0.5 pr-1.5 cursor-pointer rounded-xs",
+            "text-micro tracking-caps uppercase text-muted-foreground",
+            "hover:text-foreground hover:bg-wash-faint",
+            "focus-visible:outline focus-visible:outline-1 focus-visible:outline-[var(--primary)]",
           )}
-        />
-        raw JSON
-      </button>
+        >
+          <ChevronRight
+            aria-hidden
+            className={cn(
+              "size-3 flex-none transition-transform duration-150 motion-reduce:transition-none",
+              open && "rotate-90",
+            )}
+          />
+          raw JSON
+        </button>
+        <CopyButton value={JSON.stringify(data, null, 2)} subject="raw JSON" />
+      </div>
       {open && (
         // THE CODE WELL (user, 2026-08-14 — "put the raw JSON in some sort of code box, like
         // Discord"): the tree sits on the page's own ground inside a bordered rounded well, so
@@ -298,10 +298,19 @@ function SignerGroup({
   const g = SIGNER_GROUPS[group];
   return (
     <div className="flex flex-col gap-2">
-      <LaneNote title={g.title}>
-        {g.label} · <span className="tabular-nums">{ids.length}</span> ·{" "}
-        <span className="text-foreground-dim">{g.layer}</span>
-      </LaneNote>
+      {/* Label left, the producing LAYER as its squared chip right (user, 2026-08-14 — the
+          "snapshot proof · 3 · L0 cluster" run-on cleaned up): the count is gone because it
+          counted SIGNERS, not proofs — the rows below ARE that count — and "rotating" is the
+          title's nuance, not a header's. The chip code derives from SIGNER_GROUPS' own words
+          (the one home), so the two can't drift. */}
+      <div className="flex items-center justify-between gap-2.5" title={g.title}>
+        <span className={LANE_HEAD}>{g.label}</span>
+        {/* "signed by [L0]" (user, 2026-08-14) — the chip alone floated context-free. */}
+        <span className="inline-flex items-center gap-1.5">
+          <span className="text-micro text-muted-foreground">signed by</span>
+          <RoleChips codes={[g.who.split(" ")[0]]} />
+        </span>
+      </div>
       <LaneTable
         head={["Node", "Signer id"]}
         rows={ids.map((id) => {
@@ -557,12 +566,12 @@ export function ChannelStatePanel() {
             // chain identity in the card's own order and tiering — the descriptor's hash first,
             // the polled record behind it (the pager-sibling lesson from the card's foot).
             <div className="flex-none flex flex-col gap-1 rounded-md bg-[var(--panel-plate)] px-2.5 py-2">
-              {hash && <FootRow label="Hash" value={shortHash(hash)} title={hash} copy={hash} />}
+              {hash && <FootRow label="Hash" value={paneHash(hash)} title={hash} copy={hash} />}
               {deep.lastSnapshotHash && (
-                <FootRow label="Parent" value={shortHash(deep.lastSnapshotHash)} title={deep.lastSnapshotHash} copy={deep.lastSnapshotHash} />
+                <FootRow label="Parent" value={paneHash(deep.lastSnapshotHash)} title={deep.lastSnapshotHash} copy={deep.lastSnapshotHash} />
               )}
               {deep.stateProof && (
-                <FootRow label="State proof" value={shortHash(deep.stateProof)} title={deep.stateProof} copy={deep.stateProof} />
+                <FootRow label="State proof" value={paneHash(deep.stateProof)} title={deep.stateProof} copy={deep.stateProof} />
               )}
             </div>
           )}
