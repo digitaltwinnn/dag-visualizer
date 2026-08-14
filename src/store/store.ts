@@ -12,7 +12,7 @@ import type { CohortSel, CompositionSel, FocusLevel } from "@/src/engine/domain/
 export type Mode = "hyper" | "geo" | "ledger" | "status" | "transactions" | "staking";
 
 // One slot in the right-rail card stack (extend with future card types — e.g. "tx").
-export type SelSlot = "node" | "snap" | "metaSnap" | "country" | "cohort" | "composition";
+export type SelSlot = "network" | "node" | "snap" | "metaSnap" | "country" | "cohort" | "composition";
 
 // Move `slot` to the FRONT of the recency stack when it becomes active, or drop it when cleared.
 function bumpStack(stack: SelSlot[], slot: SelSlot, active: boolean): SelSlot[] {
@@ -318,7 +318,10 @@ export const useStore = create<AppState>((set) => ({
   setLatestSnapshot: (latestSnapshot) => set({ latestSnapshot }),
   setActivity: (activity) => set({ activity }),
   setMode: (mode) => set({ mode }),
-  setFilter: (filter) => set({ filter }),
+  // Committing a network IS a user gesture (user, 2026-08-14 — changing the filter or paging
+  // the dossier left the snapshot card as the box): it bumps the recency stack like every
+  // other selection, so the facts rail focuses the metagraph card. "all" clears the entry.
+  setFilter: (filter) => set((s) => ({ filter, selStack: bumpStack(s.selStack, "network", filter !== "all") })),
   setMetaList: (metaList) => set({ metaList }),
   setInspect: (inspect) => set((s) => ({ inspect, selStack: bumpStack(s.selStack, "node", !!inspect) })),
   setSnap: (snap) => set((s) => ({ snap, selStack: bumpStack(s.selStack, "snap", !!snap) })),
