@@ -368,14 +368,16 @@ export function MetaCard({ cfg }: { cfg: MetaCfg }) {
       {archSum && (
         <>
           {nodes.length === 0 && <Separator className="my-2" />}
-          {/* The dossier's summary grammar (user, 2026-08-14): a bold RATIO at the right
-              edge, column-aligned with the Online nodes total above it, a short muted
-              qualifier leading in — the numeric register these rows speak. The node card
-              keeps its wordier claim-first value: there the reach IS the value. */}
-          <Fact label="Archive">
+          {/* The dossier's summary grammar (user, 2026-08-14, third pass): the CLAIM bold at
+              the right edge — From genesis / Back to Nov 2023 / the deepest surviving reach,
+              which must never drop out of the value — with the RATIO riding the muted
+              qualifier in front, so the row stays number-bearing without going full-prose.
+              The label names the subject ("Archive" alone didn't say what it was OF, on a
+              card about a whole network). */}
+          <Fact label="Snapshot history">
             <span title={archSum.title}>
               <span className="text-label text-muted-foreground">{archSum.qualifier} · </span>
-              <b className="font-bold">{archSum.ratio}</b>
+              <b className="font-bold">{archSum.claim}</b>
             </span>
           </Fact>
         </>
