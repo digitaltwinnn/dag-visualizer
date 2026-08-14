@@ -21,7 +21,7 @@ describe("archive value", () => {
     expect(fmtReach("not a date", now)).toBeNull();
   });
 
-  it("time leads a window; the count is the muted detail", () => {
+  it("a window node: No, with its own reach and count as underlines", () => {
     const now = Date.now();
     const win: ArchiveEntry = {
       ...base,
@@ -29,20 +29,23 @@ describe("archive value", () => {
       latest: 6_768_000,
       floorTs: new Date(now - 78 * 86_400_000).toISOString(),
     };
-    expect(archiveDisplay(win, "Nov 2023")).toEqual({ primary: "~3 months", detail: "241k snapshots" });
+    expect(archiveDisplay(win, "Nov 2023")).toEqual({ genesis: false, reach: "~3 months", count: "241k snapshots" });
   });
 
-  it("genesis claims the chain and carries its size; deep claims only its era, no count", () => {
-    expect(archiveDisplay({ ...base, kind: "genesis", floor: 1, latest: 1_213_930 }, "Nov 2023")).toEqual({
-      primary: "From genesis",
-      detail: "1.2M snapshots",
+  it("a genesis node: Yes, the whole chain with its age and size; deep: No, era only", () => {
+    const now = Date.now();
+    const birth = new Date(now - 450 * 86_400_000).toISOString();
+    expect(archiveDisplay({ ...base, kind: "genesis", floor: 1, latest: 1_213_930, floorTs: birth }, "Nov 2023")).toEqual({
+      genesis: true,
+      reach: "~15 months",
+      count: "1.2M snapshots",
     });
-    expect(archiveDisplay({ ...base, kind: "deep" }, "Nov 2023")).toEqual({ primary: "Back to Nov 2023" });
+    expect(archiveDisplay({ ...base, kind: "deep" }, "Nov 2023")).toEqual({ genesis: false, reach: "back to Nov 2023" });
   });
 
-  it("falls back to count alone when the floor date is unknown", () => {
+  it("keeps the count when the floor date is unknown", () => {
     const win: ArchiveEntry = { ...base, floor: 100, latest: 5_100, floorTs: null };
-    expect(archiveDisplay(win, "Nov 2023")).toEqual({ primary: "~5k snapshots" });
+    expect(archiveDisplay(win, "Nov 2023")).toEqual({ genesis: false, reach: undefined, count: "5k snapshots" });
   });
 });
 

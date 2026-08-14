@@ -375,14 +375,11 @@ export function MetaCard({ cfg }: { cfg: MetaCfg }) {
         <>
           {nodes.length === 0 && <Separator className="my-2" />}
           <Fact label="From genesis">
+            {/* No checkmark here (user, 2026-08-14 — "it just clutters the view"): the ratio
+                already answers, and the node card's Yes keeps the check where it is the value. */}
             <span className="flex flex-col items-end" title={`${archSum.genesisTitle} ${archSum.reachTitle}`}>
-              <span className="inline-flex items-center gap-1.5">
-                {archSum.genesisAny && <Check aria-hidden className="size-3 text-[var(--success)]" />}
-                <b className="font-bold">{archSum.genesisRatio}</b>
-              </span>
-              <span className="text-label text-muted-foreground">
-                {archSum.genesisAny ? `whole chain · ${archSum.reach}` : `deepest ${archSum.reach}`}
-              </span>
+              <b className="font-bold">{archSum.genesisRatio}</b>
+              <span className="text-label text-muted-foreground">{archSum.reach}</span>
               {/* Second underline: what that reach holds in snapshots — absent for the holed
                   global deep archives, where any count would overclaim. */}
               {archSum.kept != null && (
@@ -578,9 +575,14 @@ function GeoLiveNode({ p }: { p: PickOf<"l0" | "l1" | "metanode"> }) {
         {asn && <Fact label="ASN"><span className="font-mono">{asn}</span></Fact>}
         {/* Reading order: place → role → host → SERVICE — what this machine serves sits with
             the host block, above the reference foot. */}
-        {archEntry && archive && (
-          <Fact label="Archive">
+        {arch && archEntry && archive && (
+          /* The dossier's settled stacked grammar, machine-scoped (user, 2026-08-14 — "in the
+             node card follow the same thinking; still says 'archive'"): Yes/No against the
+             From genesis label (check in the success hue on Yes), the machine's own reach as
+             the first underline, its kept count as the second. */
+          <Fact label="From genesis">
             <span
+              className="flex flex-col items-end"
               title={
                 archEntry.kind === "genesis"
                   ? `Serves its chain's every snapshot, back to ordinal 1`
@@ -589,28 +591,32 @@ function GeoLiveNode({ p }: { p: PickOf<"l0" | "l1" | "metanode"> }) {
                     : `Serves ~${(archEntry.latest - archEntry.floor).toLocaleString()} recent snapshots of its own chain, back to ordinal ${archEntry.floor.toLocaleString()}; older history is discarded`
               }
             >
-              {arch!.primary}
-              {arch!.detail && <span className="text-label text-muted-foreground"> · {arch!.detail}</span>}
+              <span className="inline-flex items-center gap-1.5">
+                {arch.genesis && <Check aria-hidden className="size-3 text-[var(--success)]" />}
+                <b className="font-bold">{arch.genesis ? "Yes" : "No"}</b>
+              </span>
+              {arch.reach && <span className="text-label text-muted-foreground">{arch.reach}</span>}
+              {arch.count && <span className="text-label text-muted-foreground">{arch.count}</span>}
             </span>
           </Fact>
         )}
         {archNone && (
-          <Fact label="Archive">
+          <Fact label="From genesis">
             {/* The layer wears its chip, the same token the Composition line uses — one layer
                 vocabulary everywhere (user, 2026-08-14: "not an L0 validator, use the L0 chip"). */}
             <span
-              className="inline-flex items-center gap-1"
+              className="flex flex-col items-end"
               title="A chain's snapshots are served by its L0 validators; this machine runs no L0 process, so it keeps no snapshot archive."
             >
-              <span>None</span>
-              <span className="text-label text-muted-foreground">· not an</span>
-              <RoleChips codes={["L0"]} />
-              <span className="text-label text-muted-foreground">validator</span>
+              <b className="font-bold">None</b>
+              <span className="inline-flex items-center gap-1 text-label text-muted-foreground">
+                not an <RoleChips codes={["L0"]} /> validator
+              </span>
             </span>
           </Fact>
         )}
         {archUnmeasured && (
-          <Fact label="Archive">
+          <Fact label="From genesis">
             <span
               className="text-muted-foreground"
               title="The archive census (refreshed every few hours) has no reading for this machine — it was unreachable at probe time, not Ready then, or joined the cluster since."

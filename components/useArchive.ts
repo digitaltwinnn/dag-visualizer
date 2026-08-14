@@ -45,21 +45,33 @@ export function fmtReach(floorTs: string, now = Date.now()): string | null {
   return `${Math.round(days / 365.25)} years`;
 }
 
-// The Archive fact's value, structured so the card can weight it: TIME is the register that
-// matters, so it is the primary; the kept-snapshot count rides as a muted detail beside it
-// (user, 2026-08-14 — "drop 'Last'... say ~15 months and say 893k snapshots more subtle").
-// "From genesis" claims the whole chain, so its detail is the chain's own size; the global
-// deep archives claim only their floor era — they have holes, so never a count.
-export interface ArchiveDisplay {
-  primary: string;
-  detail?: string;
+// The NODE card's Archive value, in the same stacked grammar the dossier settled on (user,
+// 2026-08-14 — "in the node card follow the same thinking"): a Yes/No main line against the
+// "From genesis" label, the machine's own reach as the first underline, its kept-snapshot
+// count as the second. The holed global deep archives still carry no count.
+export interface ArchiveNodeDisplay {
+  genesis: boolean;
+  reach?: string;
+  count?: string;
 }
-export function archiveDisplay(e: ArchiveEntry, since: string): ArchiveDisplay {
-  if (e.kind === "genesis") return { primary: "From genesis", detail: `${fmtSnapCount(e.latest)} snapshots` };
-  if (e.kind === "deep") return { primary: `Back to ${since}` };
-  const count = `${fmtSnapCount(e.latest - e.floor)} snapshots`;
+export function archiveDisplay(e: ArchiveEntry, since: string): ArchiveNodeDisplay {
+  if (e.kind === "genesis") {
+    // No "whole chain" prefix (user, 2026-08-14 — "let the number speak"): Yes already says
+    // completeness, so the underline is just the chain's age.
+    const age = e.floorTs ? fmtReach(e.floorTs) : null;
+    return {
+      genesis: true,
+      reach: age ? `~${age}` : undefined,
+      count: `${fmtSnapCount(e.latest)} snapshots`,
+    };
+  }
+  if (e.kind === "deep") return { genesis: false, reach: `back to ${since}` };
   const reach = e.floorTs ? fmtReach(e.floorTs) : null;
-  return reach ? { primary: `~${reach}`, detail: count } : { primary: `~${count}` };
+  return {
+    genesis: false,
+    reach: reach ? `~${reach}` : undefined,
+    count: `${fmtSnapCount(e.latest - e.floor)} snapshots`,
+  };
 }
 
 // The NETWORK-level reading for the dossier (user, 2026-08-14, settled over several passes):
