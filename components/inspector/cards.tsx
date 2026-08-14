@@ -17,7 +17,7 @@ import { SonarRing, NodeStars, NoSignalDot } from "@/components/state/StateAtoms
 import { VIEW_ICONS, SNAPSHOT_ICON, COUNTRY_ICON, PROVIDER_ICON, COMPOSITION_ICON, KIND_MARK_CLASS } from "@/components/icons";
 import { ExternalLink } from "lucide-react";
 import { useMinHold } from "@/components/useMinHold";
-import { useArchive, archiveDisplay } from "@/components/useArchive";
+import { useArchive, archiveDisplay, archiveSummary } from "@/components/useArchive";
 import { useNowTick } from "@/components/useNowTick";
 import { POLL } from "@/src/engine/config";
 import { Desc, StatusMark, CompositionRows, StatusBreakdown, RoleChips, IdentityDot, networkKind, Fact, FactGroup, Foot, FootRow } from "./parts";
@@ -306,6 +306,13 @@ export function SnapshotCard({ data: d }: { data: GlobalSnapshot }) {
 export function MetaCard({ cfg }: { cfg: MetaCfg }) {
   const metaList = useStore((s) => s.metaList);
   const mg = metaList.find((x) => x.id === cfg.id) || null;
+  // The network's ARCHIVE reading (user, 2026-08-14 — "how many have genesis? that's useful
+  // information to know about a network"): genesis survival counted across the fleet, or the
+  // deepest reach any of its own machines still serves. The DAG core's chain is "global" in
+  // the census; a chain with no probed machines (unlisted, zero-node) answers null and grows
+  // no row.
+  const archive = useArchive();
+  const archSum = archive ? archiveSummary(archive, cfg.id === "dag" ? "global" : cfg.id) : null;
   const nodes = mg?.nodes || [];
   const blurb = mg?.description || cfg.blurb;
   // The site link rides the BODY now (MetaSiteRow — the aside slot carries the ticker). Falls
@@ -354,6 +361,19 @@ export function MetaCard({ cfg }: { cfg: MetaCfg }) {
               <StatusBreakdown states={states} />
             </div>
           )}
+        </>
+      )}
+      {/* Fleet-level archive summary, in the same summary block as Online nodes; the DAG
+          dossier carries no composition block, so it brings its own separator. */}
+      {archSum && (
+        <>
+          {nodes.length === 0 && <Separator className="my-2" />}
+          <Fact label="Archive">
+            <span title={archSum.title}>
+              {archSum.primary}
+              {archSum.detail && <span className="text-label text-muted-foreground"> · {archSum.detail}</span>}
+            </span>
+          </Fact>
         </>
       )}
       {/* The site reference LAST, where references sit (the node card's reading order). */}

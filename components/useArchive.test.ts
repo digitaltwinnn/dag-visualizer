@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { archiveDisplay, fmtReach, fmtSnapCount, type ArchiveEntry } from "./useArchive";
+import { archiveDisplay, archiveSummary, fmtReach, fmtSnapCount, type ArchiveEntry, type ArchiveCensus } from "./useArchive";
 
 // The Archive fact's value grammar: time AND kept-count for a window, "From genesis" for the
 // whole chain, floor-era-only for the holed global deep archives (never a count — they have
@@ -43,5 +43,39 @@ describe("archive value", () => {
   it("falls back to count alone when the floor date is unknown", () => {
     const win: ArchiveEntry = { ...base, floor: 100, latest: 5_100, floorTs: null };
     expect(archiveDisplay(win, "Nov 2023")).toEqual({ primary: "~5k snapshots" });
+  });
+});
+
+// The dossier's network-level reading: genesis survival counted across the fleet; a
+// window-only fleet leads with its deepest reach and states the converse plainly.
+describe("archive summary", () => {
+  const census = (entries: ArchiveEntry[]): ArchiveCensus => ({
+    entries: new Map(entries.map((e) => [e.ip, e])),
+    since: "Nov 2023",
+    archivalCount: 0,
+    total: entries.length,
+  });
+  const e = (ip: string, chain: string, kind: ArchiveEntry["kind"], floor: number, latest: number, floorTs: string | null = null): ArchiveEntry =>
+    ({ ip, chain, kind, floor, latest, floorTs });
+
+  it("counts genesis keepers when any exist", () => {
+    const c = census([e("a", "m1", "genesis", 1, 100), e("b", "m1", "window", 50, 100), e("c", "m1", "window", 60, 100)]);
+    expect(archiveSummary(c, "m1")).toMatchObject({ primary: "From genesis", detail: "1 of 3 nodes" });
+  });
+
+  it("global falls to the deep-era claim when nobody has genesis", () => {
+    const c = census([e("a", "global", "deep", 766_780, 6_700_000), e("b", "global", "window", 6_500_000, 6_700_000)]);
+    expect(archiveSummary(c, "global")).toMatchObject({ primary: "Back to Nov 2023", detail: "1 of 2 nodes" });
+  });
+
+  it("a window-only fleet leads with its deepest reach and says no node has genesis", () => {
+    const now = Date.now();
+    const ts = new Date(now - 450 * 86_400_000).toISOString();
+    const c = census([e("a", "dor", "window", 14_650_870, 27_227_757, ts), e("b", "dor", "window", 15_000_000, 27_227_757, ts)]);
+    expect(archiveSummary(c, "dor")).toMatchObject({ primary: "~15 months", detail: "no node from genesis" });
+  });
+
+  it("answers null for a chain with no probed machines", () => {
+    expect(archiveSummary(census([]), "m9")).toBeNull();
   });
 });

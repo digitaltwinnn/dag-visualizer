@@ -62,6 +62,40 @@ export function archiveDisplay(e: ArchiveEntry, since: string): ArchiveDisplay {
   return reach ? { primary: `~${reach}`, detail: count } : { primary: `~${count}` };
 }
 
+// The NETWORK-level reading for the dossier (user, 2026-08-14 — "how many have genesis?
+// if not, that's useful information to know about a network"): does this chain's history
+// survive on its own machines, and on how many of them?
+export function archiveSummary(c: ArchiveCensus, chain: string): { primary: string; detail?: string; title: string } | null {
+  const entries = [...c.entries.values()].filter((e) => e.chain === chain);
+  if (!entries.length) return null;
+  const total = entries.length;
+  const genesis = entries.filter((e) => e.kind === "genesis").length;
+  if (genesis > 0) {
+    return {
+      primary: "From genesis",
+      detail: `${genesis} of ${total} nodes`,
+      title: `${genesis} of the ${total} probed machines serve the chain's every snapshot, back to ordinal 1.`,
+    };
+  }
+  const deep = entries.filter((e) => e.kind === "deep").length;
+  if (deep > 0) {
+    return {
+      primary: `Back to ${c.since}`,
+      detail: `${deep} of ${total} nodes`,
+      title: `No machine serves the chain back to genesis; ${deep} of ${total} keep deep history to the metagraph era (${c.since}), with some gaps.`,
+    };
+  }
+  // A window-only fleet: the deepest reach any of its own machines still serves — and the
+  // honest converse, which is the interesting fact: everything older lives nowhere on them.
+  const best = entries.reduce((a, b) => (b.floor < a.floor ? b : a));
+  const reach = best.floorTs ? fmtReach(best.floorTs) : null;
+  return {
+    primary: reach ? `~${reach}` : `~${fmtSnapCount(best.latest - best.floor)} snapshots`,
+    detail: "no node from genesis",
+    title: `The deepest archive among this network's own machines reaches back to ordinal ${best.floor.toLocaleString()}; the chain's first ${fmtSnapCount(best.floor)} snapshots are not served by any of them (the explorer's index still lists their records).`,
+  };
+}
+
 let cached: ArchiveCensus | null = null;
 let inflight: Promise<ArchiveCensus | null> | null = null;
 
