@@ -3,7 +3,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { cn } from "@/lib/utils";
 import { useStore } from "@/src/store/store";
-import { shortHash, CORE_HEX, metagraphById, SIGNER_GROUPS } from "@/src/data/network";
+import { shortHash, CORE_HEX, metagraphById, getNetwork, SIGNER_GROUPS } from "@/src/data/network";
+import { UNLISTED_ID, observedUnlistedIds } from "@/src/data/unlisted";
 import { identityHudHex } from "@/src/palette/identity";
 import { hex, fmtDag, fmtKB, midHash } from "@/src/util/format";
 import { relativeAge } from "@/src/util/relativeAge";
@@ -305,12 +306,14 @@ export function SnapshotCard({ data: d }: { data: GlobalSnapshot }) {
 }
 
 // ONE observed unlisted metagraph (user, 2026-08-14 — "different network id means different
-// metagraph; determine cards for the currently unlisted ones"): a block inside the unlisted
-// dossier, per distinct uncataloged address seen anchoring in the measured window. The
-// MACHINES are honestly unknowable (no published cluster), but the CHAIN is not — the
-// explorer indexes every anchoring chain's records, so the block states its real span. Its
-// own component because the span hook is per address.
-export function UnlistedNetBlock({ id, last }: { id: string; last: boolean }) {
+// metagraph; determine cards for the currently unlisted ones"): the FACTS for one distinct
+// uncataloged address seen anchoring in the measured window, rendered INSIDE MetaCard — the
+// unlisted dossier is the same component as every other dossier (user, same day: "I'd rather
+// not just share grammar but prefer sharing components"), so this block carries no foot; the
+// card's one shared Foot states the last member's references. The MACHINES are honestly
+// unknowable (no published cluster), but the CHAIN is not — the explorer indexes every
+// anchoring chain's records. Its own component because the span hook is per address.
+function UnlistedMemberFacts({ id, last }: { id: string; last: boolean }) {
   const span = useChainSpan(id);
   const age = span?.genesisTs ? fmtReach(span.genesisTs) : null;
   return (
@@ -355,28 +358,6 @@ export function UnlistedNetBlock({ id, last }: { id: string; last: boolean }) {
           </span>
         </Fact>
       </div>
-      {/* The references sit where references sit — the foot, exactly as on a catalog dossier. */}
-      {last && (
-        <Foot>
-          <FootRow label="Network id" value={shortHash(id)} title={id} copy={id} />
-          {span?.owner && (
-            <FootRow
-              label="Owner address"
-              value={shortHash(span.owner)}
-              title={`The address that registered and controls this metagraph. ${span.owner}`}
-              copy={span.owner}
-            />
-          )}
-          {span?.staking && (
-            <FootRow
-              label="Staking address"
-              value={shortHash(span.staking)}
-              title={`The address holding this metagraph's staked collateral. ${span.staking}`}
-              copy={span.staking}
-            />
-          )}
-        </Foot>
-      )}
       {!last && span?.owner && (
         <Fact label="Owner address">
           <span className="font-mono" title={`The address that registered and controls this metagraph. ${span.owner}`}>
@@ -394,10 +375,22 @@ export function UnlistedNetBlock({ id, last }: { id: string; last: boolean }) {
 export function MetaCard({ cfg }: { cfg: MetaCfg }) {
   const metaList = useStore((s) => s.metaList);
   const mg = metaList.find((x) => x.id === cfg.id) || null;
-  // The owner and staking addresses, off the chain's newest record (user, 2026-08-14 — the unlisted card
-  // grew it first; the regular card carries the same fact). The DAG core has no currency
-  // chain, so its lookup idles and no row grows.
-  const chainSpan = useChainSpan(cfg.id !== "dag" && metagraphById(cfg.id) ? cfg.id : null);
+  // The UNLISTED dossier is THIS component (user, 2026-08-14 — shared components, not shared
+  // grammar): its members are the distinct uncataloged addresses observed in the window's
+  // exact reads, subscribed only while unlisted IS the subject so every other dossier pays
+  // nothing.
+  const snapshotExact = useStore((s) => (cfg.id === UNLISTED_ID ? s.snapshotExact : null));
+  const unlistedMembers =
+    cfg.id === UNLISTED_ID && snapshotExact
+      ? observedUnlistedIds(getNetwork()?.globalSnapshots ?? [], snapshotExact).slice(0, 6)
+      : [];
+  // The card's ONE foot subject: the catalog address, or the last observed unlisted member.
+  const footId =
+    cfg.id !== "dag" && metagraphById(cfg.id) ? cfg.id : (unlistedMembers[unlistedMembers.length - 1] ?? null);
+  // The owner and staking addresses, off the chain's newest record (user, 2026-08-14 — the
+  // unlisted card grew them first; every dossier carries the same facts). The DAG core has no
+  // currency chain, so its lookup idles and no rows grow.
+  const chainSpan = useChainSpan(footId);
   // The network's ARCHIVE reading (user, 2026-08-14 — "how many have genesis? that's useful
   // information to know about a network"): genesis survival counted across the fleet, or the
   // deepest reach any of its own machines still serves. The DAG core's chain is "global" in
@@ -406,7 +399,17 @@ export function MetaCard({ cfg }: { cfg: MetaCfg }) {
   const archive = useArchive();
   const archSum = archive ? archiveSummary(archive, cfg.id === "dag" ? "global" : cfg.id) : null;
   const nodes = mg?.nodes || [];
-  const blurb = mg?.description || cfg.blurb;
+  // The unlisted blurb COUNTS its members (user, 2026-08-14) — built here, beside the member
+  // list it describes, so the two can't drift.
+  const blurb =
+    cfg.id === UNLISTED_ID
+      ? "Metagraphs anchoring into Global L0 without an entry in the public catalog. " +
+        (unlistedMembers.length === 0
+          ? "None was seen anchoring in the measured window."
+          : unlistedMembers.length === 1
+            ? "One anchored in the measured window; its chain and owner address are public, its operator and machines are not."
+            : `${unlistedMembers.length} anchored in the measured window; their chains and owner addresses are public, their operators and machines are not.`)
+      : mg?.description || cfg.blurb;
   // The site link rides the BODY now (MetaSiteRow — the aside slot carries the ticker). Falls
   // back to the config-level url for cores the live metaList doesn't carry a site for (the DAG).
   const site = mg?.siteUrl ?? cfg.siteUrl;
@@ -489,6 +492,9 @@ export function MetaCard({ cfg }: { cfg: MetaCfg }) {
           </Fact>
         </>
       )}
+      {unlistedMembers.map((id, i) => (
+        <UnlistedMemberFacts key={id} id={id} last={i === unlistedMembers.length - 1} />
+      ))}
       {/* The site reference LAST, where references sit (the node card's reading order). */}
       {site && (
         <>
@@ -496,13 +502,14 @@ export function MetaCard({ cfg }: { cfg: MetaCfg }) {
           <MetaSiteRow site={site} />
         </>
       )}
-      {/* FOOT — the network's own chain reference (user, 2026-08-13): a metagraph's id IS its
-          state-channel address, the value every anchor row and exact read keys on, so the
-          dossier states it where references sit. Only for a real catalog metagraph: the DAG
-          core's internal key ("dag") is not an address, and the unlisted set has no single id. */}
-      {cfg.id !== "dag" && metagraphById(cfg.id) && (
+      {/* FOOT — the network's own chain references (user, 2026-08-13/14): a metagraph's id IS
+          its state-channel address, plus the owner and staking addresses its records publish.
+          ONE foot for every dossier — a catalog metagraph's own address, or the last observed
+          unlisted member's. The DAG core's internal key ("dag") is not an address, so it
+          grows none. */}
+      {footId && (
         <Foot>
-          <FootRow label="Network id" value={shortHash(cfg.id)} title={cfg.id} copy={cfg.id} />
+          <FootRow label="Network id" value={shortHash(footId)} title={footId} copy={footId} />
           {chainSpan?.owner && (
             <FootRow
               label="Owner address"

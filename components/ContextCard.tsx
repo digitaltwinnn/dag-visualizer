@@ -3,15 +3,15 @@
 import { CircleHelp } from "lucide-react";
 import { useStore } from "@/src/store/store";
 import { applyClickActions } from "@/src/store/applyClickActions";
-import { UNLISTED_ID, displayNetwork, observedUnlistedIds } from "@/src/data/unlisted";
-import { getNetwork, metagraphById } from "@/src/data/network";
+import { UNLISTED_ID, UNLISTED_CFG, displayNetwork } from "@/src/data/unlisted";
+import { metagraphById } from "@/src/data/network";
 import { hex } from "@/src/util/format";
 import { subjectPairing } from "@/components/useSubjectPairing";
 import CardHead, { RailPane } from "@/components/CardHead";
 import InspectorCard from "@/components/InspectorCard";
+import { MetaCard } from "@/components/inspector/cards";
 import { PulseEdge, useEdgePulse } from "@/components/EdgePulse";
 import { KIND_MARK_CLASS } from "@/components/icons";
-import { UnlistedNetBlock } from "@/components/inspector/cards";
 import type { PickDescriptor } from "@/src/data/types";
 
 // The Context (parent) card at the top of the right-rail subject stack. It mirrors the
@@ -30,9 +30,6 @@ export default function ContextCard({
   onToggle?: () => void;
 } = {}) {
   const filter = useStore((s) => s.filter);
-  // The exact reads are the unlisted card's only honest source for who is inside the mixed
-  // set — subscribed only while unlisted IS the filter, so other filters pay nothing.
-  const snapshotExact = useStore((s) => (s.filter === UNLISTED_ID ? s.snapshotExact : null));
   const hoverFilter = useStore((s) => s.hoverFilter);
   const setHoverFilter = useStore((s) => s.setHoverFilter);
   const mgCfg = metagraphById(filter);
@@ -49,7 +46,6 @@ export default function ContextCard({
   // noun stays Metagraph like every dossier, the "?" says which kind this one is.
   if (filter === UNLISTED_ID) {
     const dn = displayNetwork(UNLISTED_ID)!;
-    const unlistedIds = observedUnlistedIds(getNetwork()?.globalSnapshots ?? [], snapshotExact ?? {}).slice(0, 6);
     const pair = subjectPairing<string>(hoverFilter, dn.id, setHoverFilter, dn.hue);
     return (
       <RailPane
@@ -75,32 +71,12 @@ export default function ContextCard({
           collapsed={collapsed}
           onToggle={onToggle}
         />
-        {!collapsed && (
-          <>
-            {/* The blurb tracks what the card shows and COUNTS it (user, 2026-08-14 — "each
-                network id below" misread when one is listed, and the word is METAGRAPHS,
-                the app's one vocabulary, not "state channels"). Window-scoped and honest in
-                all three counts. */}
-            <p className="m-0 text-body text-muted-foreground">
-              {"Metagraphs anchoring into Global L0 without an entry in the public catalog. " +
-                (unlistedIds.length === 0
-                  ? "None was seen anchoring in the measured window."
-                  : unlistedIds.length === 1
-                    ? "One anchored in the measured window; its chain and owner address are public, its operator and machines are not."
-                    : `${unlistedIds.length} anchored in the measured window; their chains and owner addresses are public, their operators and machines are not.`)}
-            </p>
-            {/* (The set-level "Machines · not knowable" row is gone — user, 2026-08-14: the
-                per-address blocks below carry each network's own node facts, so a set-level
-                repeat above them was noise.) */}
-            {/* The DISTINCT metagraphs inside the mixed set (user, 2026-08-14 — "different
-                network id means different metagraph"): one block per uncataloged address seen
-                anchoring in the measured window. Machines stay unknowable; the chain's own
-                span is real (the explorer indexes every anchoring chain). */}
-            {unlistedIds.map((id, i) => (
-              <UnlistedNetBlock key={id} id={id} last={i === unlistedIds.length - 1} />
-            ))}
-          </>
-        )}
+        {/* The BODY is the one dossier component (user, 2026-08-14 — "I'd rather not just
+            share grammar but prefer sharing components"): MetaCard renders the unlisted set
+            through the same code path as every catalog metagraph — counted blurb, member
+            facts, and the shared Foot. Only the HEAD stays bespoke (the "?" mark, italic
+            name): a mixed set has no logo, brand hue or site. */}
+        {!collapsed && <MetaCard cfg={UNLISTED_CFG} />}
         <PulseEdge pulseKey={pulseKey} rail="right" />
       </RailPane>
     );
