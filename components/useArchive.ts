@@ -64,37 +64,38 @@ export function archiveDisplay(e: ArchiveEntry, since: string): ArchiveDisplay {
 
 // The NETWORK-level reading for the dossier (user, 2026-08-14 — "how many have genesis?
 // if not, that's useful information to know about a network"): does this chain's history
-// survive on its own machines, and on how many of them? The CLAIM is bold at the right —
-// "From genesis", "Back to Nov 2023", or the deepest surviving reach ("~15 months", which
-// must never drop out of the value: user, same day) — and the RATIO rides the muted
-// qualifier in front, so the row stays number-bearing without going full-prose.
-export function archiveSummary(c: ArchiveCensus, chain: string): { claim: string; qualifier: string; title: string } | null {
+// survive on its own machines, and on how many of them? The RATIO is bold at the right —
+// it counts nodes, so it aligns under the Online nodes total (user, same day) — and the
+// muted qualifier in front says what the ratio is OF ("from genesis") plus, for a fleet
+// with no genesis keeper, the deepest reach that survives ("~15 months"), which must never
+// drop out of the value.
+export function archiveSummary(c: ArchiveCensus, chain: string): { ratio: string; qualifier: string; title: string } | null {
   const entries = [...c.entries.values()].filter((e) => e.chain === chain);
   if (!entries.length) return null;
   const total = entries.length;
   const genesis = entries.filter((e) => e.kind === "genesis").length;
   if (genesis > 0) {
     return {
-      claim: "From genesis",
-      qualifier: `${genesis} / ${total} nodes`,
+      ratio: `${genesis} / ${total}`,
+      qualifier: "from genesis",
       title: `${genesis} of the ${total} probed machines serve the chain's every snapshot, back to ordinal 1.`,
     };
   }
   const deep = entries.filter((e) => e.kind === "deep").length;
   if (deep > 0) {
     return {
-      claim: `Back to ${c.since}`,
-      qualifier: `${deep} / ${total} nodes`,
+      ratio: `${deep} / ${total}`,
+      qualifier: `back to ${c.since}`,
       title: `No machine serves the chain back to genesis; ${deep} of ${total} keep deep history to the metagraph era (${c.since}), with some gaps.`,
     };
   }
-  // A window-only fleet: the deepest reach any machine still serves IS the claim, and the
-  // zero ratio says the converse — everything older lives nowhere on the network's machines.
+  // A window-only fleet: the zero ratio still counts genesis keepers, and the deepest reach
+  // any machine serves leads the qualifier — everything older lives nowhere on these machines.
   const best = entries.reduce((a, b) => (b.floor < a.floor ? b : a));
   const reach = best.floorTs ? fmtReach(best.floorTs) : null;
   return {
-    claim: reach ? `~${reach}` : `~${fmtSnapCount(best.latest - best.floor)} snapshots`,
-    qualifier: `0 / ${total} from genesis`,
+    ratio: `0 / ${total}`,
+    qualifier: `${reach ? `~${reach}` : `~${fmtSnapCount(best.latest - best.floor)} snapshots`} · from genesis`,
     title: `No machine serves the chain back to genesis — the deepest archive reaches back to ordinal ${best.floor.toLocaleString()}; the chain's first ${fmtSnapCount(best.floor)} snapshots are not served by any of them (the explorer's index still lists their records).`,
   };
 }

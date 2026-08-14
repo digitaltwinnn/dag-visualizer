@@ -368,17 +368,17 @@ export function MetaCard({ cfg }: { cfg: MetaCfg }) {
       {archSum && (
         <>
           {nodes.length === 0 && <Separator className="my-2" />}
-          {/* The dossier's summary grammar (user, 2026-08-14, third pass): the CLAIM bold at
-              the right edge — From genesis / Back to Nov 2023 / the deepest surviving reach,
-              which must never drop out of the value — with the RATIO riding the muted
-              qualifier in front, so the row stays number-bearing without going full-prose.
-              The label names WHO keeps it: "Node archives" — "Snapshot history" could live
-              anywhere, and the point is that it lives (or doesn't) on the network's own
-              machines (user, 2026-08-14). */}
+          {/* The dossier's summary grammar (user, 2026-08-14, settled): the RATIO bold at the
+              right edge — it counts NODES, so it aligns directly under the Online nodes total —
+              and the muted qualifier in front says what the ratio is of ("from genesis") plus,
+              for a fleet with no genesis keeper, the deepest surviving reach ("~15 months"),
+              which must never drop out of the value. The label names WHO keeps it: "Node
+              archives" — "Snapshot history" could live anywhere, and the point is that it
+              lives (or doesn't) on the network's own machines. */}
           <Fact label="Node archives">
             <span title={archSum.title}>
               <span className="text-label text-muted-foreground">{archSum.qualifier} · </span>
-              <b className="font-bold">{archSum.claim}</b>
+              <b className="font-bold">{archSum.ratio}</b>
             </span>
           </Fact>
         </>
