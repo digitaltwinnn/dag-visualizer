@@ -195,10 +195,11 @@ export const SIGNER_UNKNOWN: Record<"network" | "node", { label: string; title: 
  *  into a structural one. */
 export const SIGNER_GROUPS = {
   proof: {
-    /** The group's noun (the raw lane's group header) — the THING signed, always singular
-        (user, 2026-08-14: "snapshot proof · signed by L0" said proof twice over; the header
-        names what got signed, the chip says who signed it). */
-    label: "snapshot",
+    /** The group's noun (the raw lane's group header) — the THING signed, always singular, and
+        it references the pane's own TABS (user, 2026-08-14, twice: the header names what got
+        signed, the chip says who; and the groups should speak the tab names — the seal covers
+        both payload tabs, which the parenthetical states). */
+    label: "snapshot (state & data)",
     /** The producing cluster, terse enough for an instrument note. */
     layer: "L0 cluster",
     /** What the counted things ARE, read after a number ("3 L0 validators"). */
@@ -207,7 +208,9 @@ export const SIGNER_GROUPS = {
       "A metagraph seals every snapshot with its own L0 cluster, so this list IS that cluster — a 3-node L0 signs all three, every time.",
   },
   dataBlocks: {
-    label: "data blocks",
+    /** Matches the DATA tab's name 1:1 (user, 2026-08-14 — consistency in the tabs' direction);
+        the BLOCKS nuance lives in the title, where the union across them is already explained. */
+    label: "data",
     layer: "dL1, rotating",
     who: "dL1 validators",
     title:
