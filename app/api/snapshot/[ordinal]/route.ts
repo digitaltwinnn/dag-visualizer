@@ -3,6 +3,7 @@ import { unstable_cache } from "next/cache";
 import { METAGRAPHS } from "@/src/engine/config";
 import type { SnapshotExact, ChannelSnapRow } from "@/src/data/types";
 import { decodeChannelContent } from "../decodeChannel";
+import { fetchGlobalJson } from "../fetchGlobal";
 import { withinServedWindow } from "../ordinalWindow";
 
 // EXACT per-tick anchor totals, read straight from the raw L0 global snapshot. The block explorer
@@ -11,14 +12,12 @@ import { withinServedWindow } from "../ordinalWindow";
 // precise per-metagraph breakdown — INCLUDING unlisted metagraphs (no directory needed). The raw
 // payload is heavy (~2.5 MB on a big tick), so this runs server-side and returns a tiny JSON,
 // cached per ordinal (ordinals are immutable) — one fetch is shared across every client/render.
-// ⚠️ The LB serves the ENTIRE ordinal history (verified 2026-08-13 — the old "prunes after
-// ~30 min" premise is false), so ordinalWindow.ts bounds what this route will ask it for; a 404
-// here means transiently unavailable or outside that served window, and the client falls back to
-// the polled floor either way.
+// ⚠️ The LB's serving depth is a per-request lottery (see CLAUDE.md's payload-depth note), so
+// the pull goes through fetchGlobal.ts, which falls back to known-archival nodes on a 404;
+// ordinalWindow.ts still bounds the future, and a failure here leaves the client on the polled
+// floor either way.
 
-export const maxDuration = 30;
-
-const L0 = "https://l0-lb-mainnet.constellationnetwork.io";
+export const maxDuration = 60;
 
 // Addresses we track (the public catalog, config.METAGRAPHS — the canonical list the
 // Hypergraph hubs are built from) — used to split listed vs unlisted.
@@ -27,15 +26,9 @@ const LISTED = new Set(METAGRAPHS.map((m) => m.id));
 type StateChannelSnap = { value?: { fee?: number; content?: unknown[] } };
 
 async function fetchExact(ordinal: number): Promise<SnapshotExact> {
-  const r = await fetch(`${L0}/global-snapshots/${ordinal}`, {
-    headers: { Accept: "application/json" },
-    cache: "no-store",
-    signal: AbortSignal.timeout(8000),
-  });
-  // Throw (don't return a sentinel) so unstable_cache never caches a miss — a momentarily
-  // unavailable recent tick is retried on the next request.
-  if (!r.ok) throw new Error(`l0 ${r.status}`);
-  const j = (await r.json()) as { value?: Record<string, unknown>; proofs?: unknown } & Record<string, unknown>;
+  // fetchGlobalJson throws on failure (LB and archival fallback both) so unstable_cache never
+  // caches a miss — a momentarily unavailable tick is retried on the next request.
+  const j = (await fetchGlobalJson(ordinal)) as { value?: Record<string, unknown>; proofs?: unknown } & Record<string, unknown>;
   const v = (j.value ?? j) as {
     stateChannelSnapshots?: Record<string, StateChannelSnap[]>;
     rewards?: unknown;

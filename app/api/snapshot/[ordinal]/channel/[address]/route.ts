@@ -7,12 +7,11 @@
 import { unstable_cache } from "next/cache";
 import { NextResponse } from "next/server";
 import { decodeChannelContent } from "../../../decodeChannel";
+import { fetchGlobalJson } from "../../../fetchGlobal";
 import { withinServedWindow } from "../../../ordinalWindow";
 import type { ChannelSnapDeep } from "@/src/data/types";
 
-export const maxDuration = 30;
-
-const L0 = "https://l0-lb-mainnet.constellationnetwork.io";
+export const maxDuration = 60;
 
 // A DETERMINISTIC miss — the global was fetched fine and this channel/snapshot provably isn't in
 // it. Ordinals are immutable, so this answer never changes and MUST be cached like a success:
@@ -24,12 +23,9 @@ const L0 = "https://l0-lb-mainnet.constellationnetwork.io";
 type DeepMiss = { available: false };
 
 async function fetchDeep(ordinal: number, address: string, snapOrdinal: number): Promise<ChannelSnapDeep | DeepMiss> {
-  const r = await fetch(`${L0}/global-snapshots/${ordinal}`, {
-    cache: "no-store",
-    signal: AbortSignal.timeout(8000),
-  });
-  if (!r.ok) throw new Error(`l0 ${r.status}`);
-  const j = (await r.json()) as { value?: { stateChannelSnapshots?: Record<string, { value?: { fee?: number; content?: unknown[] } }[]> } };
+  // The pull rides fetchGlobal.ts: LB first, known-archival nodes on a 404 — a deep ordinal is
+  // otherwise a ~1-in-17 LB draw, and this route is exactly the one the history pages lean on.
+  const j = (await fetchGlobalJson(ordinal)) as { value?: { stateChannelSnapshots?: Record<string, { value?: { fee?: number; content?: unknown[] } }[]> } };
   const sc = j?.value?.stateChannelSnapshots;
   if (!sc) return { available: false }; // decoded fine, no channel map — immutable fact
   const entries = sc[address];

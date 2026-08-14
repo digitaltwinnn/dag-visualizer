@@ -1026,11 +1026,17 @@ the next, and genesis again the day after. All three were real. Deep history its
 **ordinal 766,718 (2023-11-13 11:44 UTC** — right after a 27-minute cadence gap, the
 metagraph-era upgrade restart); nothing behind the LB serves anything older, and nothing needs
 to: every metagraph snapshot ever anchored postdates it (DOR's genesis anchored 43 minutes
-after). So **no failed old read is provably permanent** and no serving horizon may be stated in
-copy — the give-up copy invites a retry, and the channel route's upstream-404-throws-as-transient
-choice is what makes each retry a fresh draw. The explorer separately serves tiny full-history
-RECORDS at any depth (its own indexer storage, not the validators), which is what the anchor
-log's history paging and the timestamp→ordinal resolver ride.
+after). **Reach is not completeness**: the deep archives share holes (~2.4–2.8M missing on all
+nine, ~3.5M on eight — common holes mean a shared sync source), so "archival" means "serves deep
+history", never "serves every ordinal". `app/api/archive/probe.ts` is the census's one home
+(cached 6h; feeds the node card's Archive fact via `/api/archive` and `useArchive`), and
+`app/api/snapshot/fetchGlobal.ts` is the one global-snapshot pull — LB first, then every
+archival node in random order on a 404. So **no failed old read is provably permanent** and no
+serving horizon may be stated in copy — the give-up copy invites a retry, and the channel
+route's upstream-404-throws-as-transient choice is what makes each retry a fresh draw. The
+explorer separately serves tiny full-history RECORDS at any depth (its own indexer storage, not
+the validators), which is what the anchor log's history paging and the timestamp→ordinal
+resolver ride.
 
 **A value slot states a READING; an invitation is a CONTROL** (user, 2026-08-10 — "I don't like the
 word 'pin', it's not very clear to me"). The metagraph snapshot card's Data slot said `pin to read`:
