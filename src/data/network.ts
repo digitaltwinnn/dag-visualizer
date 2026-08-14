@@ -211,7 +211,7 @@ export const SIGNER_GROUPS = {
     layer: "dL1, rotating",
     who: "dL1 validators",
     title:
-      "Data blocks are produced by the metagraph's dL1 cluster, each block by a rotating subset of that fleet — so this count varies per snapshot, and a hybrid node signs here under its dL1 id rather than its L0 one.",
+      "Data blocks are produced by the metagraph's dL1 cluster, EACH BLOCK by a rotating subset of that fleet — this list is the union: every validator that signed at least one of this snapshot's blocks (the per-block split lives on chain, not here). A hybrid node signs under its dL1 id rather than its L0 one.",
   },
   /** The GLOBAL snapshot's own seal. The DAG is a metagraph-shaped core under the unified node model,
    *  so its proof group is the same shape as a metagraph's — its own L0 cluster — and reads with the
