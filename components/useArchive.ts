@@ -45,15 +45,21 @@ export function fmtReach(floorTs: string, now = Date.now()): string | null {
   return `${Math.round(days / 365.25)} years`;
 }
 
-// The Archive fact's one-line value. Reach states time AND kept-snapshot count for a window
-// ("Last ~3 months · 241k snapshots"); "From genesis" claims the whole chain; the global deep
-// archives claim only their floor era ("Back to Nov 2023") — they have holes, so no count.
-export function archiveValue(e: ArchiveEntry, since: string): string {
-  if (e.kind === "genesis") return "From genesis";
-  if (e.kind === "deep") return `Back to ${since}`;
-  const count = fmtSnapCount(e.latest - e.floor);
+// The Archive fact's value, structured so the card can weight it: TIME is the register that
+// matters, so it is the primary; the kept-snapshot count rides as a muted detail beside it
+// (user, 2026-08-14 — "drop 'Last'... say ~15 months and say 893k snapshots more subtle").
+// "From genesis" claims the whole chain, so its detail is the chain's own size; the global
+// deep archives claim only their floor era — they have holes, so never a count.
+export interface ArchiveDisplay {
+  primary: string;
+  detail?: string;
+}
+export function archiveDisplay(e: ArchiveEntry, since: string): ArchiveDisplay {
+  if (e.kind === "genesis") return { primary: "From genesis", detail: `${fmtSnapCount(e.latest)} snapshots` };
+  if (e.kind === "deep") return { primary: `Back to ${since}` };
+  const count = `${fmtSnapCount(e.latest - e.floor)} snapshots`;
   const reach = e.floorTs ? fmtReach(e.floorTs) : null;
-  return reach ? `Last ~${reach} · ${count} snapshots` : `Last ~${count} snapshots`;
+  return reach ? { primary: `~${reach}`, detail: count } : { primary: `~${count}` };
 }
 
 let cached: ArchiveCensus | null = null;

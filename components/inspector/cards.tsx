@@ -17,7 +17,7 @@ import { SonarRing, NodeStars, NoSignalDot } from "@/components/state/StateAtoms
 import { VIEW_ICONS, SNAPSHOT_ICON, COUNTRY_ICON, PROVIDER_ICON, COMPOSITION_ICON, KIND_MARK_CLASS } from "@/components/icons";
 import { ExternalLink } from "lucide-react";
 import { useMinHold } from "@/components/useMinHold";
-import { useArchive, archiveValue } from "@/components/useArchive";
+import { useArchive, archiveDisplay } from "@/components/useArchive";
 import { useNowTick } from "@/components/useNowTick";
 import { POLL } from "@/src/engine/config";
 import { Desc, StatusMark, CompositionRows, StatusBreakdown, RoleChips, IdentityDot, networkKind, Fact, FactGroup, Foot, FootRow } from "./parts";
@@ -498,6 +498,7 @@ function GeoLiveNode({ p }: { p: PickOf<"l0" | "l1" | "metanode"> }) {
   // census context the one-line value can't.
   const archive = useArchive();
   const archEntry = p.node?.ip ? archive?.entries.get(p.node.ip) : undefined;
+  const arch = archEntry && archive ? archiveDisplay(archEntry, archive.since) : null;
   // The host's ASN answers to the provider rung exactly as the Hosting line above it does — one
   // condition, so the two can't disagree about who owns the host.
   const asn = cohort == null ? geo?.asn : null;
@@ -541,7 +542,8 @@ function GeoLiveNode({ p }: { p: PickOf<"l0" | "l1" | "metanode"> }) {
                     : `Serves ~${(archEntry.latest - archEntry.floor).toLocaleString()} recent snapshots of its own chain, back to ordinal ${archEntry.floor.toLocaleString()}; older history is discarded`
               }
             >
-              {archiveValue(archEntry, archive.since)}
+              {arch!.primary}
+              {arch!.detail && <span className="text-label text-muted-foreground"> · {arch!.detail}</span>}
             </span>
           </Fact>
         )}
