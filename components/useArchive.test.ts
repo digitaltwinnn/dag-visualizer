@@ -58,21 +58,23 @@ describe("archive summary", () => {
   const e = (ip: string, chain: string, kind: ArchiveEntry["kind"], floor: number, latest: number, floorTs: string | null = null): ArchiveEntry =>
     ({ ip, chain, kind, floor, latest, floorTs });
 
-  it("counts genesis keepers when any exist", () => {
+  it("counts genesis keepers as a bold ratio", () => {
     const c = census([e("a", "m1", "genesis", 1, 100), e("b", "m1", "window", 50, 100), e("c", "m1", "window", 60, 100)]);
-    expect(archiveSummary(c, "m1")).toMatchObject({ primary: "From genesis", detail: "1 of 3 nodes" });
+    expect(archiveSummary(c, "m1")).toMatchObject({ ratio: "1 / 3", qualifier: "from genesis" });
   });
 
-  it("global falls to the deep-era claim when nobody has genesis", () => {
+  it("global falls to the deep-era ratio when nobody has genesis", () => {
     const c = census([e("a", "global", "deep", 766_780, 6_700_000), e("b", "global", "window", 6_500_000, 6_700_000)]);
-    expect(archiveSummary(c, "global")).toMatchObject({ primary: "Back to Nov 2023", detail: "1 of 2 nodes" });
+    expect(archiveSummary(c, "global")).toMatchObject({ ratio: "1 / 2", qualifier: "back to Nov 2023" });
   });
 
-  it("a window-only fleet leads with its deepest reach and says no node has genesis", () => {
+  it("a window-only fleet reads 0 / N; the deepest reach moves to the title", () => {
     const now = Date.now();
     const ts = new Date(now - 450 * 86_400_000).toISOString();
     const c = census([e("a", "dor", "window", 14_650_870, 27_227_757, ts), e("b", "dor", "window", 15_000_000, 27_227_757, ts)]);
-    expect(archiveSummary(c, "dor")).toMatchObject({ primary: "~15 months", detail: "no node from genesis" });
+    const s = archiveSummary(c, "dor");
+    expect(s).toMatchObject({ ratio: "0 / 2", qualifier: "from genesis" });
+    expect(s!.title).toContain("~15 months");
   });
 
   it("answers null for a chain with no probed machines", () => {

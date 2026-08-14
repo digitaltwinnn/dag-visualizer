@@ -368,14 +368,14 @@ export function MetaCard({ cfg }: { cfg: MetaCfg }) {
       {archSum && (
         <>
           {nodes.length === 0 && <Separator className="my-2" />}
-          {/* The dossier's summary grammar (user, 2026-08-14): the qualifier leads MUTED and
-              the claim sits BOLD at the right edge, column-aligned with the Online nodes
-              total above it — the node card keeps claim-first, since there the reach IS the
-              value and nothing above it sets a bold column. */}
+          {/* The dossier's summary grammar (user, 2026-08-14): a bold RATIO at the right
+              edge, column-aligned with the Online nodes total above it, a short muted
+              qualifier leading in — the numeric register these rows speak. The node card
+              keeps its wordier claim-first value: there the reach IS the value. */}
           <Fact label="Archive">
             <span title={archSum.title}>
-              {archSum.detail && <span className="text-label text-muted-foreground">{archSum.detail} · </span>}
-              <b className="font-bold">{archSum.primary}</b>
+              <span className="text-label text-muted-foreground">{archSum.qualifier} · </span>
+              <b className="font-bold">{archSum.ratio}</b>
             </span>
           </Fact>
         </>
