@@ -372,9 +372,10 @@ export function MetaCard({ cfg }: { cfg: MetaCfg }) {
               the right edge — From genesis / Back to Nov 2023 / the deepest surviving reach,
               which must never drop out of the value — with the RATIO riding the muted
               qualifier in front, so the row stays number-bearing without going full-prose.
-              The label names the subject ("Archive" alone didn't say what it was OF, on a
-              card about a whole network). */}
-          <Fact label="Snapshot history">
+              The label names WHO keeps it: "Node archives" — "Snapshot history" could live
+              anywhere, and the point is that it lives (or doesn't) on the network's own
+              machines (user, 2026-08-14). */}
+          <Fact label="Node archives">
             <span title={archSum.title}>
               <span className="text-label text-muted-foreground">{archSum.qualifier} · </span>
               <b className="font-bold">{archSum.claim}</b>
