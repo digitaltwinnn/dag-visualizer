@@ -4,8 +4,9 @@
 // the 3D view itself: an Instrument-Glass mini-panel tied to the subject's rendered position by a
 // dashed leader ending in a small identity-hued ring, the same leader language as the ledger's
 // ordinal labels. It is a LABEL, not a control (`pointer-events-none` — the subject's controls are
-// the rail cards), and it carries the CardHead register at tooltip scale: eyebrow slot noun,
-// identity dot + name, ticker aside, one muted lead line.
+// the rail cards; no ×, by decision: dismissal is the selection's own), and it carries the
+// CardHead register at tooltip scale: eyebrow slot noun, title, hued aside, the head hairline,
+// one muted lead line with the cards' own RoleChips.
 //
 // SPLIT OF LABOUR (the spike's conclusion, and the user's own instinct — "furniture can be regular
 // threejs object text, subjects more 2d/3d html type of content"): FURNITURE labels are in-scene
@@ -23,15 +24,19 @@
 // 0-size ANCHOR at the projected point, and everything inside is laid out relative to it, so the
 // engine writes exactly one transform and one flag.
 //
-// V1 SCOPE (hyper, first consumer — `viewPolicy.callout`): the anchor is NETWORK-level — the
-// committed metagraph's hub, or the DAG core. A committed NODE keeps the network callout: hyper's
-// own camera answers a node commit with its network's framing (a node is one bead on a shell), so
-// the callout matches what the view frames; per-node anchors arrive with the geo rollout, where a
-// chip has a positional identity of its own. `unlisted` has no anchor — honest absence, no callout.
+// PER-VIEW SUBJECTS (`viewPolicy.callout` gates; the Engine's anchor resolvers mirror this table):
+// - hyper: NETWORK-level — the committed metagraph's hub or the DAG core. A committed node keeps
+//   its network's callout, matching hyper's own camera answer to a node (one bead on a shell).
+//   `unlisted` has no anchor — honest absence, no callout.
+// - geo: the finest committed rung with a POINT to point at — node > provider cohort > country.
+//   The network rung deliberately shows nothing: a filtered fleet is spread across the globe, and
+//   a single anchor would lie about where it is.
 import { useStore } from "@/src/store/store";
 import { VIEW_POLICIES } from "@/src/engine/domain/viewPolicy";
 import { displayNetwork } from "@/src/data/unlisted";
+import { filterAccent } from "@/src/data/network";
 import { RoleChips } from "@/components/inspector/parts";
+import type { GeoInfo } from "@/src/data/types";
 
 // Panel offset from the anchor, up and to the right. The leader spans exactly this diagonal, so
 // the three pieces (ring, line, panel corner) stay attached by construction.
@@ -56,20 +61,98 @@ function layerCodes(nodes: { roles?: string[] }[]): string[] {
     .map((k) => (k === "l0" ? "L0" : k === "cl1" ? "cL1" : "dL1"));
 }
 
+// What the panel says — one model, filled per view/rung so the JSX below stays single-sourced.
+// `aside.hue` absent = muted (the country card's ISO-code rule: a place carries no identity).
+interface Model {
+  key: string;
+  eyebrow: string;
+  title: string;
+  aside?: { text: string; hue?: string };
+  ring: string;
+  lead?: { text?: string; codes?: string[] };
+}
+
+const geoOf = (p: { kind: string }): GeoInfo | undefined =>
+  "geo" in p ? (p as { geo?: GeoInfo }).geo : undefined;
+
 export default function SceneCallout() {
   const mode = useStore((s) => s.mode);
   const filter = useStore((s) => s.filter);
   const section = useStore((s) => s.section);
   const metaList = useStore((s) => s.metaList);
+  const inspect = useStore((s) => s.inspect);
+  const cohort = useStore((s) => s.cohort);
+  const country = useStore((s) => s.country);
+  const selNodes = useStore((s) => s.selNodes);
   if (!VIEW_POLICIES[mode].callout || section !== "scene") return null;
-  const net = displayNetwork(filter);
-  // "all" has no subject; the unlisted set has no 3D anchor (no machines are knowable).
-  if (!net || net.virtual) return null;
-  const mg = metaList.find((m) => m.id === filter) ?? null;
-  const codes = mg ? layerCodes(mg.nodes) : [];
-  // The ticker aside suppresses itself when it only restates the name (the DAG core's ticker IS
-  // its name) — a head must not say the same thing twice (the CardHead aside rule).
-  const aside = net.ticker !== net.name ? net.ticker : null;
+
+  let m: Model | null = null;
+  if (mode === "hyper") {
+    const net = displayNetwork(filter);
+    // "all" has no subject; the unlisted set has no 3D anchor (no machines are knowable).
+    if (!net || net.virtual) return null;
+    const mg = metaList.find((x) => x.id === filter) ?? null;
+    const codes = mg ? layerCodes(mg.nodes) : [];
+    m = {
+      key: `net|${filter}`,
+      eyebrow: filter === "dag" ? "Network" : "Metagraph",
+      title: net.name,
+      // The aside suppresses itself when it only restates the name (the DAG core's ticker IS
+      // its name) — a head must not say the same thing twice (the CardHead aside rule).
+      aside: net.ticker !== net.name ? { text: net.ticker, hue: net.hue } : undefined,
+      ring: net.hue,
+      lead: mg ? { text: `${mg.nodes.length} nodes`, codes } : undefined,
+    };
+  } else if (mode === "geo") {
+    const nodePick =
+      inspect && (inspect.kind === "l0" || inspect.kind === "l1" || inspect.kind === "metanode") ? inspect : null;
+    const g = nodePick ? geoOf(nodePick) : undefined;
+    if (nodePick && g?.lat != null && g.lon != null) {
+      // NODE — city-first like the node card; the network ticker is the hued identity aside
+      // (node marks carry their node's own network hue), composition as the cards' pills.
+      const netId = nodePick.kind === "metanode" ? ((nodePick as { meta?: { id?: string } }).meta?.id ?? null) : "dag";
+      const nnet = displayNetwork(netId);
+      const codes = layerCodes([{ roles: nodePick.roles }]);
+      m = {
+        key: `node|${g.lat},${g.lon}`,
+        eyebrow: "Node",
+        title: g.city ?? g.country ?? "Node",
+        aside: nnet ? { text: nnet.ticker, hue: nnet.hue } : undefined,
+        ring: nnet?.hue ?? "var(--primary)",
+        lead: codes.length ? { codes } : undefined,
+      };
+    } else if (cohort) {
+      // PROVIDER — the provider card's title IS the isp; the city rides muted (a place carries
+      // no identity). The ring takes the active filter's accent, like every card-head mark.
+      const n = selNodes.filter((r) => {
+        const rg = geoOf(r.pick);
+        return !!rg && rg.cc === cohort.cc && (rg.city || null) === cohort.city && (rg.isp || null) === cohort.isp;
+      }).length;
+      m = {
+        key: `cohort|${cohort.cc}|${cohort.city}|${cohort.isp}`,
+        eyebrow: "Provider",
+        title: cohort.isp ?? "Unknown provider",
+        aside: cohort.city ? { text: cohort.city } : undefined,
+        ring: filterAccent(filter),
+        lead: n > 0 ? { text: `${n} nodes` } : undefined,
+      };
+    } else if (country) {
+      // COUNTRY — display name with the ISO code as the muted aside, suppressed when the name
+      // is unknown and the title already fell back to the code (the country card's own rule).
+      const members = selNodes.filter((r) => geoOf(r.pick)?.cc === country);
+      const name = members.map((r) => geoOf(r.pick)?.country).find(Boolean) ?? null;
+      m = {
+        key: `cc|${country}`,
+        eyebrow: "Country",
+        title: name ?? country,
+        aside: name ? { text: country } : undefined,
+        ring: filterAccent(filter),
+        lead: members.length > 0 ? { text: `${members.length} nodes` } : undefined,
+      };
+    }
+  }
+  if (!m) return null;
+
   return (
     <div
       id="callout"
@@ -77,10 +160,11 @@ export default function SceneCallout() {
       aria-hidden
       className="fixed left-0 top-0 z-30 pointer-events-none opacity-0 data-[on=1]:opacity-100 transition-opacity duration-200 motion-reduce:transition-none"
     >
-      {/* Anchor ring at the projected point (the wrapper's origin). */}
+      {/* Anchor ring at the projected point (the wrapper's origin) — the subject mark at the
+          scene end of the tie. */}
       <span
         className="absolute -translate-x-1/2 -translate-y-1/2 w-[9px] h-[9px] rounded-full border-[1.5px]"
-        style={{ borderColor: net.hue }}
+        style={{ borderColor: m.ring }}
       />
       {/* Dashed leader from the anchor to the panel's near corner — the ordinal-label language,
           in the SAME ink: the chamber's in-scene anchor lines are structural cyan, and cyan is
@@ -100,24 +184,20 @@ export default function SceneCallout() {
         />
       </svg>
       {/* The panel — keyed by subject so the roll-in replays on a change, like a card title. */}
-      <div
-        key={filter}
-        className={`roll-in absolute whitespace-nowrap ${SCENE_GLASS}`}
-        style={{ left: OFF_X, bottom: OFF_Y }}
-      >
+      <div key={m.key} className={`roll-in absolute whitespace-nowrap ${SCENE_GLASS}`} style={{ left: OFF_X, bottom: OFF_Y }}>
         {/* The card eyebrow's own ink (CardHead: EYEBROW + text-accent), not a muted caption —
             this is the same slot noun the rail card wears (user, 2026-08-15). */}
-        <div className="text-micro font-bold tracking-[0.1em] uppercase leading-none text-accent mb-1.5">
-          {filter === "dag" ? "Network" : "Metagraph"}
-        </div>
-        {/* No identity dot here (user, 2026-08-15): the hued TICKER aside already carries the
-            identity on this row — a dot beside it would say the same thing twice — and the
-            anchor ring below is the subject mark at the scene end of the tie. */}
+        <div className="text-micro font-bold tracking-[0.1em] uppercase leading-none text-accent mb-1.5">{m.eyebrow}</div>
+        {/* No identity dot here (user, 2026-08-15): the hued aside already carries the identity
+            on this row, and the anchor ring is the subject mark at the scene end of the tie. */}
         <div className="flex items-center gap-[7px]">
-          <span className="text-body font-semibold text-foreground">{net.name}</span>
-          {aside && (
-            <span className="text-label font-bold ml-1" style={{ color: net.hue }}>
-              {aside}
+          <span className="text-body font-semibold text-foreground">{m.title}</span>
+          {m.aside && (
+            <span
+              className={m.aside.hue ? "text-label font-bold ml-1" : "text-label text-muted-foreground ml-1"}
+              style={m.aside.hue ? { color: m.aside.hue } : undefined}
+            >
+              {m.aside.text}
             </span>
           )}
         </div>
@@ -127,10 +207,10 @@ export default function SceneCallout() {
             where there IS a body to divide — a lead-less callout stays ruleless, the same gate
             CardHead applies when collapsed. Inside the padded box, so it shares the content
             edge like every resting division. */}
-        {mg && (
+        {m.lead && (
           <div className="mt-1.5 pt-1.5 border-t border-border flex items-center gap-1.5 text-label text-muted-foreground">
-            <span>{mg.nodes.length} nodes</span>
-            {codes.length > 0 && <RoleChips codes={codes} />}
+            {m.lead.text && <span>{m.lead.text}</span>}
+            {m.lead.codes && m.lead.codes.length > 0 && <RoleChips codes={m.lead.codes} />}
           </div>
         )}
       </div>

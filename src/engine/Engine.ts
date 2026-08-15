@@ -23,7 +23,7 @@ import { readSceneColors } from "./sceneColors";
 import { VIEW_POLICIES, type ViewPolicy } from "./domain/viewPolicy";
 import { FOCI, hubFraming, geoFraming, nodeFraming, cohortFraming, ledgerCommitTilt, dollyBack, railsLean, restOrbit, easeInOutQuad, isSamePose, nudgeMix, NUDGE_DUR, type CameraFraming, type FocusName } from "./domain/cameraRig";
 import { countryFraming } from "./domain/countryShape";
-import { R as GEO_R, LAND_H } from "./domain/geoLayout";
+import { R as GEO_R, LAND_H, latLonToVec3 } from "./domain/geoLayout";
 import { clickActions, pickActive, pickNetId, viewEntryActions, metaSnapSelectActions, bandSelectActions } from "./domain/pickActions";
 import { ViewTransition, is3D } from "./domain/viewTransition";
 import { gatherBand, type GatherBand } from "./domain/gatherLayout";
@@ -85,6 +85,15 @@ export class Engine {
   private disposed = false;
   private _dofTmp = new THREE.Vector3();
   private _calloutV = new THREE.Vector3(); // scratch: the subject callout's anchor, world → NDC
+  // Geo callout anchors, cached EVENT-TIME (latLonToVec3 allocates and ring extraction is
+  // heavy — neither may run per frame): the node anchor recomputes when the pick REFERENCE
+  // changes, the country centroid when the cc string does; the cohort dir is already
+  // event-time in Globe and read through its getter.
+  private _geoNodePick: unknown = null;
+  private _geoNodeLocal = new THREE.Vector3();
+  private _geoCcKey: string | null = null;
+  private _geoCcDir = new THREE.Vector3();
+  private _geoCcOk = false;
 
   private mode: Mode = "hyper";
   // This frame's view-policy row (domain/viewPolicy.ts), resolved once in _integrateInputs and
@@ -1713,15 +1722,10 @@ export class Engine {
   private _syncCallout(): void {
     const el = document.getElementById("callout");
     if (!el) return;
-    let on = this._policy.callout && !this.transition.active() && this.filter !== "all";
+    let on = this._policy.callout && !this.transition.active();
     if (on) {
       const v = this._calloutV;
-      // v1 anchors are NETWORK-level (the hub / the core) — a node commit keeps its network's
-      // callout, matching hyper's own camera answer to a node (per-node anchors arrive with geo).
-      // The label needs the RENDERED position, not a layout anchor — this is not framing math.
-      if (this.filter === "dag") this.layers.coreGroup.getWorldPosition(v); // render-state OK
-      else if (this._dofMeta) this._dofMeta.group.getWorldPosition(v); // render-state OK
-      else on = false; // unlisted / unknown: no 3D anchor — honest absence
+      on = this.mode === "geo" ? this._geoCalloutAnchor(v) : this._hyperCalloutAnchor(v);
       if (on) {
         v.applyMatrix4(this.ctx.camera.matrixWorldInverse); // world → view (camera looks −z)
         if (v.z > -0.1) on = false; // behind (or grazing) the camera plane
@@ -1738,6 +1742,52 @@ export class Engine {
     // subject change (fresh data-on="0"), so a field would go stale exactly then.
     const flag = on ? "1" : "0";
     if (el.dataset.on !== flag) el.dataset.on = flag;
+  }
+
+  // HYPER anchors are NETWORK-level (the hub / the core) — a node commit keeps its network's
+  // callout, matching hyper's own camera answer to a node. The label needs the RENDERED
+  // position, not a layout anchor — this is not framing math.
+  private _hyperCalloutAnchor(v: THREE.Vector3): boolean {
+    if (this.filter === "all") return false;
+    if (this.filter === "dag") {
+      this.layers.coreGroup.getWorldPosition(v); // render-state OK
+      return true;
+    }
+    if (!this._dofMeta) return false; // unlisted / unknown: no 3D anchor — honest absence
+    this._dofMeta.group.getWorldPosition(v); // render-state OK
+    return true;
+  }
+
+  // GEO anchors the finest committed rung with a POINT to point at — node > cohort > country.
+  // The network rung deliberately has none: a filtered fleet is spread across the globe, and a
+  // single anchor would lie about where it is (the component agrees and renders nothing).
+  // Anchors are globe-LOCAL surface points lifted just above the land, carried into world
+  // space through the rotating globe group each frame — a render-path label read, the same
+  // justification as the hyper anchors above.
+  private _geoCalloutAnchor(v: THREE.Vector3): boolean {
+    const st = useStore.getState();
+    const lift = GEO_R + LAND_H + 0.5;
+    const p = st.inspect;
+    if (p && (p.kind === "l0" || p.kind === "l1" || p.kind === "metanode") && p.geo?.lat != null && p.geo.lon != null) {
+      if (this._geoNodePick !== p) {
+        this._geoNodePick = p;
+        this._geoNodeLocal.copy(latLonToVec3(p.geo.lat, p.geo.lon, lift)); // event-time
+      }
+      v.copy(this._geoNodeLocal);
+    } else if (st.cohort) {
+      const d = this.globe.cohortAnchorDir;
+      if (!d) return false;
+      v.copy(d).multiplyScalar(lift);
+    } else if (st.country) {
+      if (this._geoCcKey !== st.country) {
+        this._geoCcKey = st.country;
+        this._geoCcOk = this.globe.countryAnchorDir(st.country, this._geoCcDir); // event-time
+      }
+      if (!this._geoCcOk) return false;
+      v.copy(this._geoCcDir).multiplyScalar(lift);
+    } else return false;
+    this.globe.group.localToWorld(v); // the rendered globe rotation — a label read. render-state OK
+    return true;
   }
 
   /**

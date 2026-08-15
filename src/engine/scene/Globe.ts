@@ -721,6 +721,27 @@ export class Globe implements GeoViewHost {
     return geom ? geometryRings(geom) : null;
   }
 
+  /** The committed provider cohort's anchor: the members' centroid as a unit, globe-LOCAL
+   *  direction — event-time resolved by setSelectedCohort, so this is a cheap read. Null while
+   *  no cohort is resolvable. Read by the Engine's subject callout, which lifts it to the
+   *  surface and into world space through the rotating group. */
+  get cohortAnchorDir(): THREE.Vector3 | null {
+    return this._selCohortOk ? this._selCohortDir : null;
+  }
+
+  /** The drilled country's main-landmass centroid as a unit, globe-LOCAL direction, written
+   *  into `out`. Ring extraction is event-frequency work — callers cache per cc (the Engine's
+   *  callout does). False when the shape is unknown (unknown cc / topology still loading). */
+  countryAnchorDir(cc: string, out: THREE.Vector3): boolean {
+    const ccn = ccToNumeric(cc);
+    const geom = ccn ? this.countryGeoms?.get(ccn) : null;
+    const rings = geom ? mainPolygonRings(geom) : null;
+    const centroid = rings?.length ? ringsCentroid(rings) : null;
+    if (!centroid) return false;
+    out.copy(centroid);
+    return true;
+  }
+
   // Aim the globe so the country's shape centroid faces the camera (same gentle lean cap as
   // focusDensest — the constant viewing angle comes from countryFraming's camera construction,
   // not the lean). Returns the centroid's elevation angle + the country's angular radius, or
