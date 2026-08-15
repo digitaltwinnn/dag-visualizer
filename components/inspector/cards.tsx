@@ -18,7 +18,7 @@ import { SonarRing, NodeStars, NoSignalDot } from "@/components/state/StateAtoms
 import { VIEW_ICONS, SNAPSHOT_ICON, COUNTRY_ICON, PROVIDER_ICON, COMPOSITION_ICON, KIND_MARK_CLASS } from "@/components/icons";
 import { Check, ExternalLink } from "lucide-react";
 import { useMinHold } from "@/components/useMinHold";
-import { useArchive, archiveDisplay, archiveSummary, fmtSnapCount, fmtReach, useChainSpan } from "@/components/useArchive";
+import { useArchive, archiveFactState, archiveSummary, fmtSnapCount, fmtReach, useChainSpan } from "@/components/useArchive";
 import { useNowTick } from "@/components/useNowTick";
 import { POLL } from "@/src/engine/config";
 import { Desc, StatusMark, CompositionRows, StatusBreakdown, RoleChips, IdentityDot, networkKind, Fact, FactGroup, Foot, FootRow } from "./parts";
@@ -395,9 +395,12 @@ export function MetaCard({ cfg }: { cfg: MetaCfg }) {
   // information to know about a network"): genesis survival counted across the fleet, or the
   // deepest reach any of its own machines still serves. The DAG core's chain is "global" in
   // the census; a chain with no probed machines (unlisted, zero-node) answers null and grows
-  // no row.
-  const archive = useArchive();
-  const archSum = archive ? archiveSummary(archive, cfg.id === "dag" ? "global" : cfg.id) : null;
+  // no row. While the census is in flight the row holds its place with stars (user,
+  // 2026-08-15 — a separately-loaded fact never pops in), gated to networks the census
+  // actually probes (the DAG + the catalog) so stars only ever promise data that is coming.
+  const { census: archCensus, settled: archSettled } = useArchive();
+  const archSum = archCensus ? archiveSummary(archCensus, cfg.id === "dag" ? "global" : cfg.id) : null;
+  const archAcquiring = archSum == null && !archSettled && (cfg.id === "dag" || metagraphById(cfg.id) != null);
   const nodes = mg?.nodes || [];
   // The unlisted blurb COUNTS its members (user, 2026-08-14) — built here, beside the member
   // list it describes, so the two can't drift.
@@ -466,7 +469,7 @@ export function MetaCard({ cfg }: { cfg: MetaCfg }) {
           chain — ratio bold under the Online nodes total it counts against, checked in the
           success hue when any exist — and the muted underline carries the fleet's deepest
           surviving reach in the time register. */}
-      {archSum && (
+      {(archSum || archAcquiring) && (
         <>
           {nodes.length === 0 && <Separator className="my-2" />}
           {/* "Full archive nodes", not "genesis nodes" (user, 2026-08-14): the latter reads as
@@ -478,17 +481,21 @@ export function MetaCard({ cfg }: { cfg: MetaCfg }) {
               </span>
             }
           >
-            {/* No checkmark here (user, 2026-08-14 — "it just clutters the view"): the ratio
-                already answers, and the node card's Yes keeps the check where it is the value. */}
-            <span className="flex flex-col items-end" title={`${archSum.genesisTitle} ${archSum.reachTitle}`}>
-              <b className="font-bold">{archSum.genesisRatio}</b>
-              <span className="text-label text-muted-foreground">{archSum.reach}</span>
-              {/* Second underline: what that reach holds in snapshots — absent for the holed
-                  global deep archives, where any count would overclaim. */}
-              {archSum.kept != null && (
-                <span className="text-label text-muted-foreground">{fmtSnapCount(archSum.kept)} snapshots</span>
-              )}
-            </span>
+            {archSum ? (
+              /* No checkmark here (user, 2026-08-14 — "it just clutters the view"): the ratio
+                 already answers, and the node card's Yes keeps the check where it is the value. */
+              <span className="flex flex-col items-end" title={`${archSum.genesisTitle} ${archSum.reachTitle}`}>
+                <b className="font-bold">{archSum.genesisRatio}</b>
+                <span className="text-label text-muted-foreground">{archSum.reach}</span>
+                {/* Second underline: what that reach holds in snapshots — absent for the holed
+                    global deep archives, where any count would overclaim. */}
+                {archSum.kept != null && (
+                  <span className="text-label text-muted-foreground">{fmtSnapCount(archSum.kept)} snapshots</span>
+                )}
+              </span>
+            ) : (
+              <NodeStars count={4} />
+            )}
           </Fact>
         </>
       )}
@@ -646,24 +653,17 @@ function GeoLiveNode({ p }: { p: PickOf<"l0" | "l1" | "metanode"> }) {
   // ARCHIVE — what depth of ITS OWN chain this machine serves (user, 2026-08-14: "I find this
   // info very interesting", then "mention time and/or snapshots... metagraph nodes as well").
   // The census probes the global L0 cluster and every catalog metagraph's L0 cluster, so a DAG
-  // validator answers for the global chain and a metagraph machine for its currency chain; a
-  // node the probe couldn't reach grows no row (absent data stays absent, never "unknown"
-  // filler). Not part of the pile dedup: no ancestor card states it. The title carries the
-  // census context the one-line value can't.
-  const archive = useArchive();
+  // validator answers for the global chain and a metagraph machine for its currency chain. Not
+  // part of the pile dedup: no ancestor card states it. The title carries the census context the
+  // one-line value can't. The ROW is always decided, never absent-then-popping (user,
+  // 2026-08-15): archiveFactState is the one home for that decision — stars while the census is
+  // genuinely in flight, "n/a" immediately for a machine with no L0 process (roles are local
+  // knowledge; the chip underline says why), "Unmeasured" once settled with no reading, which
+  // covers a failed fetch too, so the stars can never hang. Roles unknown → no row at all,
+  // since even "n/a" would be a guess.
+  const { census: archive, settled: archSettled } = useArchive();
   const archEntry = p.node?.ip ? archive?.entries.get(p.node.ip) : undefined;
-  const arch = archEntry && archive ? archiveDisplay(archEntry, archive.since) : null;
-  // A machine that runs NO L0 layer serves no snapshot chain — that is a KNOWN fact, not
-  // missing data, so it gets an honest "None" rather than silent absence (user, 2026-08-14:
-  // DOR's 17 dedicated dL1 machines showed nothing and read as an inconsistency). A machine
-  // WITH an L0 layer but no census entry says "Unmeasured" (user, same day — the truth there
-  // is that the census has no reading, and next to siblings with values silence reads as a
-  // defect): unreachable at probe time, not Ready then, or joined since — the title names the
-  // possibilities, the value only claims the absence of a reading. Roles unknown → no row at
-  // all, since even "None" would be a guess.
-  const archRoles = p.node?.roles ?? [];
-  const archNone = !archEntry && archive != null && archRoles.length > 0 && !archRoles.includes("l0");
-  const archUnmeasured = !archEntry && archive != null && archRoles.includes("l0");
+  const archState = archiveFactState(archEntry, archive?.since, archSettled, p.node?.roles ?? []);
   // The host's ASN answers to the provider rung exactly as the Hosting line above it does — one
   // condition, so the two can't disagree about who owns the host.
   const asn = cohort == null ? geo?.asn : null;
@@ -696,7 +696,7 @@ function GeoLiveNode({ p }: { p: PickOf<"l0" | "l1" | "metanode"> }) {
         {asn && <Fact label="ASN"><span className="font-mono">{asn}</span></Fact>}
         {/* Reading order: place → role → host → SERVICE — what this machine serves sits with
             the host block, above the reference foot. */}
-        {arch && archEntry && archive && (
+        {archState.kind === "value" && archEntry && archive && (
           /* The dossier's settled stacked grammar, machine-scoped (user, 2026-08-14 — "in the
              node card follow the same thinking; still says 'archive'"): Yes/No against the
              From genesis label (check in the success hue on Yes), the machine's own reach as
@@ -713,30 +713,40 @@ function GeoLiveNode({ p }: { p: PickOf<"l0" | "l1" | "metanode"> }) {
               }
             >
               <span className="inline-flex items-center gap-1.5">
-                {arch.genesis && <Check aria-hidden className="size-3 text-[var(--success)]" />}
-                <b className="font-bold">{arch.genesis ? "Yes" : "No"}</b>
+                {archState.display.genesis && <Check aria-hidden className="size-3 text-[var(--success)]" />}
+                <b className="font-bold">{archState.display.genesis ? "Yes" : "No"}</b>
               </span>
-              {arch.reach && <span className="text-label text-muted-foreground">{arch.reach}</span>}
-              {arch.count && <span className="text-label text-muted-foreground">{arch.count}</span>}
+              {archState.display.reach && <span className="text-label text-muted-foreground">{archState.display.reach}</span>}
+              {archState.display.count && <span className="text-label text-muted-foreground">{archState.display.count}</span>}
             </span>
           </Fact>
         )}
-        {archNone && (
+        {archState.kind === "acquiring" && (
+          /* The held-slot acquiring form: a reading for this machine is genuinely arriving
+             (the census fetch is in flight), so the row holds its place with the stars rather
+             than popping in when the value lands. */
+          <Fact label="Full archive">
+            <NodeStars count={4} />
+          </Fact>
+        )}
+        {archState.kind === "na" && (
           <Fact label="Full archive">
             {/* The layer wears its chip, the same token the Composition line uses — one layer
-                vocabulary everywhere (user, 2026-08-14: "not an L0 validator, use the L0 chip"). */}
+                vocabulary everywhere (user, 2026-08-14: "not an L0 validator, use the L0 chip").
+                "n/a", not "None" (user, 2026-08-15): the machine runs no L0 process, so the
+                question doesn't apply — "None" would claim it could have kept one and didn't. */}
             <span
               className="flex flex-col items-end"
               title="A chain's snapshots are served by its L0 validators; this machine runs no L0 process, so it keeps no snapshot archive."
             >
-              <b className="font-bold">None</b>
+              <b className="font-bold">n/a</b>
               <span className="inline-flex items-center gap-1 text-label text-muted-foreground">
                 not an <RoleChips codes={["L0"]} /> validator
               </span>
             </span>
           </Fact>
         )}
-        {archUnmeasured && (
+        {archState.kind === "unmeasured" && (
           <Fact label="Full archive">
             <span
               className="text-muted-foreground"

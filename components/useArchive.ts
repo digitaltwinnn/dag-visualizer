@@ -4,8 +4,10 @@ import { useEffect, useState } from "react";
 
 // The archive census, client side (user, 2026-08-14 — the node card's Archive fact). One fetch
 // per page load shared by every card via a module-level cache: archival membership changes on
-// operator timescales, and the route itself is cached for an hour. A failed fetch leaves the
-// map absent and the card row simply doesn't render — absent data stays absent.
+// operator timescales, and the route itself is cached for an hour. The hook reports whether the
+// fetch has SETTLED, so a card can hold the row with an acquiring state instead of popping it
+// in (user, 2026-08-15); a failed fetch settles with no census and the node card states
+// "Unmeasured" — never a hang, and the next mount asks again.
 
 export interface ArchiveEntry {
   ip: string;
@@ -72,6 +74,30 @@ export function archiveDisplay(e: ArchiveEntry, since: string): ArchiveNodeDispl
     reach: reach ? `~${reach}` : undefined,
     count: `${fmtSnapCount(e.latest - e.floor)} snapshots`,
   };
+}
+
+// The node card's Full archive ROW, decided as pure data (user, 2026-08-15 — a separately-loaded
+// fact holds its row rather than popping in once loaded). "na" is immediate — roles are local
+// knowledge, and a machine with no L0 process serves no chain whatever the census says about
+// others; "acquiring" only ever shows while the census is genuinely in flight, because "settled"
+// covers failure too, so the give-up path is the same "unmeasured" a probe gap gets. A census
+// entry wins over roles: the reading is the data, roles only predict it.
+export type ArchiveFactState =
+  | { kind: "value"; display: ArchiveNodeDisplay }
+  | { kind: "na" }
+  | { kind: "acquiring" }
+  | { kind: "unmeasured" }
+  | { kind: "none" };
+export function archiveFactState(
+  entry: ArchiveEntry | undefined,
+  since: string | undefined,
+  settled: boolean,
+  roles: string[],
+): ArchiveFactState {
+  if (entry && since != null) return { kind: "value", display: archiveDisplay(entry, since) };
+  if (roles.length === 0) return { kind: "none" };
+  if (!roles.includes("l0")) return { kind: "na" };
+  return settled ? { kind: "unmeasured" } : { kind: "acquiring" };
 }
 
 // The NETWORK-level reading for the dossier (user, 2026-08-14, settled over several passes):
@@ -247,17 +273,23 @@ export function useSnapRecord(metaId: string | null, ordinal: number, skip: bool
   return key && !skip ? rec : null;
 }
 
-export function useArchive(): ArchiveCensus | null {
-  const [census, setCensus] = useState(cached);
+// The census plus whether its one fetch has resolved — success OR failure — so a consumer can
+// distinguish "a reading is coming" from "no reading came".
+export interface ArchiveState {
+  census: ArchiveCensus | null;
+  settled: boolean;
+}
+export function useArchive(): ArchiveState {
+  const [state, setState] = useState<ArchiveState>(() => ({ census: cached, settled: cached != null }));
   useEffect(() => {
     if (cached) return;
     let dead = false;
     (inflight ??= load()).then((v) => {
-      if (!dead && v) setCensus(v);
+      if (!dead) setState({ census: v, settled: true });
     });
     return () => {
       dead = true;
     };
   }, []);
-  return census;
+  return state;
 }
