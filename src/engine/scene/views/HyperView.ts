@@ -17,6 +17,7 @@ import { ORB_FRESNEL_GLSL, ORB_FRESNEL_MIX } from "../objects/NodeFabric";
 import { offNetMul } from "../../domain/dimModel";
 import { makeRadialGradientTexture } from "../objects/gradientTexture";
 import type { SceneColors } from "../../sceneColors";
+import { makeTextLabel } from "../objects/TextLabel";
 import type { TuneSchema } from "../../tune";
 import type { SceneView } from "./SceneView";
 
@@ -125,6 +126,20 @@ function applyOrbFresnel(mat: THREE.MeshStandardMaterial): void {
 // builds — scene/Globe.ts (via `layers.metas.find`, keying off `.cfg.id`/`.group`) and
 // Engine.ts (`.cfg.id` lookups for DoF/filter) read these fields off the instances handed
 // to them, so this type must track _buildMetagraphs verbatim).
+// FURNITURE LABELS (user, 2026-08-15 — the callout spike's other half): each hub wears its
+// ticker as flat in-scene text under it, and the core wears "Global L0" — the same words the
+// hover tooltip uses. In-scene on purpose (makeTextLabel): they bloom on the scene lane, ride
+// the structure's tilt/spin/morph, and dim as FURNITURE — each hub's label on the same fdim as
+// its tether and hoops, the core's on coreOffMul — so a label can never outshine the thing it
+// names. The hub label hangs BELOW the hub, clear of its own ring atom (radial placement would
+// sit inside the 5.4-radius cL1 ring); the core label counter-rotates against the shared spin
+// so it always reads upright.
+const HUB_LABEL_H = 2.7;
+const HUB_LABEL_DROP = 6.8; // below the hub centre, clear of the 5.4-radius cL1 ring
+const HUB_LABEL_OP = 0.95;
+const CORE_LABEL_H = 2.4;
+const CORE_LABEL_OP = 0.6;
+
 export interface MetaHubRec {
   group: THREE.Group;
   hub: THREE.Mesh;
@@ -146,6 +161,7 @@ export interface MetaHubRec {
   active: boolean;
   hoops: THREE.LineLoop[]; // the cyan layer rings (structural) drawn around this hub
   fills: THREE.Mesh[]; // soft radial fill disks under each ring (rim-weighted, fade to transparent)
+  label: THREE.Mesh; // the hub's flat ticker label (furniture — dims on fdim with the tether)
 }
 
 export class HyperView implements SceneView {
@@ -164,6 +180,8 @@ export class HyperView implements SceneView {
   core!: THREE.Mesh;
   coreFlash?: number;
   private _coreRings: THREE.LineLoop[] = []; // the DAG core's cyan "sun" hoops (rebuilt on node load)
+  private _coreLabel: THREE.Mesh | null = null; // "Global L0" furniture label (built with the shells)
+  private _coreLabelR = 8; // just outside the outermost shell — set by buildCoreRings
   private _coreFills: THREE.Mesh[] = []; // the DAG core's shell rim-fill disks (same as a metagraph's)
   private _fillTex?: THREE.Texture; // shared rim-weighted radial gradient for the ring fill disks
   // The focus spotlight (see SPOT_* above) + per-frame scratch. The light itself is shared and
@@ -385,7 +403,19 @@ export class HyperView implements SceneView {
       }
 
       this.root.add(group);
-      this.metas.push({ group, hub, cfg, state: null, tether, packets: [], pool, pending: 0, lastLaunch: 0, glow: 0, anchor: pos.clone(), orbit: an.a, radius: an.radius, incl: an.incl, spin: 0.3 + Math.random() * 0.5, active: true, hoops, fills });
+      // The hub's ticker as flat scene text, tinted with its identity scene colour (see the
+      // furniture-label note above MetaHubRec). Positioned/oriented per frame in the hub loop.
+      const lc = new THREE.Color(col);
+      const label = makeTextLabel(
+        `rgba(${Math.round(lc.r * 255)},${Math.round(lc.g * 255)},${Math.round(lc.b * 255)},0.92)`,
+        cfg.ticker || cfg.name,
+        HUB_LABEL_H,
+        500,
+      );
+      label.rotation.order = "YXZ";
+      this.root.add(label);
+
+      this.metas.push({ group, hub, cfg, state: null, tether, packets: [], pool, pending: 0, lastLaunch: 0, glow: 0, anchor: pos.clone(), orbit: an.a, radius: an.radius, incl: an.incl, spin: 0.3 + Math.random() * 0.5, active: true, hoops, fills, label });
     });
   }
 
@@ -535,6 +565,21 @@ export class HyperView implements SceneView {
         this._coreFills.push(fill);
       }
     }
+    // The core's own furniture label — "Global L0", the tooltip's words — built here because
+    // the shells' radii are only known now; it sits just outside the outermost shell and is
+    // positioned per frame (counter-rotated against the shared spin, so it reads upright).
+    this._coreLabelR = Math.max(...shells.map((x) => x.radius), 5) + 3.2;
+    if (!this._coreLabel) {
+      const cc = new THREE.Color(this._core);
+      this._coreLabel = makeTextLabel(
+        `rgba(${Math.round(cc.r * 255)},${Math.round(cc.g * 255)},${Math.round(cc.b * 255)},0.85)`,
+        "Global L0",
+        CORE_LABEL_H,
+        500,
+      );
+      this._coreLabel.rotation.order = "YXZ";
+      this.coreGroup.add(this._coreLabel);
+    }
   }
 
   // ---------------------------------------------------------------- Update loop
@@ -607,6 +652,16 @@ export class HyperView implements SceneView {
     // The core shells' rim-fill disks fade the same way (same treatment as a metagraph's fills).
     const coreFillOp = FILL_OP * coreReveal * coreOffMul;
     for (const f of this._coreFills) (f.material as THREE.MeshBasicMaterial).opacity = coreFillOp * this._fades.alpha;
+    // The "Global L0" label counter-rotates against the shared spin (coreGroup carries the same
+    // angle as root) so it always reads upright, sitting just outside the outermost shell on
+    // the camera side. Furniture: the core's own coreOffMul, like the hoops and fills.
+    if (this._coreLabel) {
+      const cry = this.coreGroup.rotation.y;
+      this._coreLabel.position.set(-Math.sin(cry) * this._coreLabelR, 0.3, Math.cos(cry) * this._coreLabelR);
+      this._coreLabel.rotation.set(-Math.PI / 2, -cry, 0);
+      (this._coreLabel.material as THREE.MeshBasicMaterial).opacity =
+        CORE_LABEL_OP * coreReveal * coreOffMul * this._fades.alpha;
+    }
     if (this.coreFlash) this.coreFlash = Math.max(0, this.coreFlash - dt * 1.6);
 
     // Metagraphs — orbit, spin, tether pulses. While ANY metagraph is selected (focusId), the
@@ -664,6 +719,16 @@ export class HyperView implements SceneView {
       // The rim-fill disks fade with the hoops (populated rings only — empty ones were hidden).
       const fillOp = FILL_OP * metaF * (m.active ? 1 : 0.7) * fdim;
       for (const f of m.fills) (f.material as THREE.MeshBasicMaterial).opacity = fillOp * this._fades.alpha;
+
+      // The ticker label hangs below the hub, flat in the structure plane, counter-rotated
+      // against the shared spin exactly like the core label — every label reads upright and
+      // uniformly at the resting pose (a tangent orientation left side hubs edge-on).
+      // Furniture: same fdim as the tether/hoops, same fades.
+      m.label.position.set(_pos.x, _pos.y - HUB_LABEL_DROP, _pos.z);
+      m.label.rotation.set(-Math.PI / 2, -this.root.rotation.y, 0);
+      (m.label.material as THREE.MeshBasicMaterial).opacity =
+        HUB_LABEL_OP * metaF * (m.active ? 1 : 0.6) * fdim * this._fades.alpha;
+      m.label.visible = hubFade > 0.001;
 
 
       // Anchor packets: launch one per pending snapshot (staggered), advance the in-flight ones

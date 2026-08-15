@@ -32,6 +32,7 @@ import { buildGeoView, setCountryBorder, setCountryFillMask, HOVER_MASK_BOOST, t
 import type { StageLight } from "./objects/StageLight";
 import { STAGE_LIGHTS } from "../domain/stageLight";
 import { ccToNumeric, countryCcAt, countryLean, geometryRings, mainPolygonRings, ringsAngularRadius, ringsCentroid, type Ring } from "../domain/countryShape";
+import { makeTextLabel, disposeTextLabel } from "./objects/TextLabel";
 import { closeness, NODE_RAISE } from "../domain/cameraRig";
 import type { CohortSel } from "../domain/focusLadder";
 import { ancestryGlow } from "../domain/dimModel";
@@ -174,6 +175,12 @@ export class Globe implements GeoViewHost {
   // existing group-tier channel at the end of the precedence chain.
   private _signerIds: Set<string> | null = null;
   private _selCohortDir = new THREE.Vector3(); // resolved centroid unit dir (scratch)
+  // FURNITURE country-name labels (user, 2026-08-15): flat, whisper-muted names on the land, for
+  // HOSTING countries only — the label set states a network fact (where the network runs), not an
+  // atlas; empty countries staying nameless is itself information, the same honesty as the
+  // strip's empty ticks. Event-time rebuilt on node data + topology arrival; they ride geoFades,
+  // so the existing surface fade covers them with zero new per-frame code.
+  private _countryLabels: THREE.Mesh[] = [];
   private _selCohortOk = false;
   private _hoverCountryCc: string | null = null; // explorer row hover — border preview only
   // The geo focus SPOTLIGHT (scene/objects/StageLight): the SHARED light, claimed per frame and
@@ -250,7 +257,10 @@ export class Globe implements GeoViewHost {
     // The geo globe surface (body, graticule, atmosphere, continents) — it sets the surface handles
     // back on `this` for the morph/fade loop and pushes its fade materials into this.geoFades.
     // The countries topology arrives async: re-assert any drill/hover border made before then.
-    this.onCountriesReady = () => this._updateCountryBorder();
+    this.onCountriesReady = () => {
+      this._updateCountryBorder();
+      this._rebuildCountryLabels(); // topology may land after the first node build
+    };
     buildGeoView(this);
     // The arcs share the surface's camera-FACING + closeness uniforms (created by buildGeoView,
     // hence after it): the hologram has no opaque body sphere, so nothing depth-occludes a comet
@@ -407,6 +417,7 @@ export class Globe implements GeoViewHost {
     this._relayoutGeo();
     this._buildDensityGlow(); // light pools follow the validator sites too
     this._assignGatherSlots(); // a validator-only rebuild must not leave stale ranks either
+    this._rebuildCountryLabels();
     this.setMorph(this.morph); // place at current morph
   }
 
@@ -605,6 +616,7 @@ export class Globe implements GeoViewHost {
     // was just reset (to `recs`, or to `[]` above if `!recs.length`), so the "dag" group's slots need
     // recomputing here too (the packed row shifts when a metagraph appears/vanishes).
     this._assignGatherSlots();
+    this._rebuildCountryLabels();
   }
 
   // A soft additive "light pool" under each dense node cluster on the globe — LIGHTING driven by the
@@ -727,6 +739,52 @@ export class Globe implements GeoViewHost {
    *  surface and into world space through the rotating group. */
   get cohortAnchorDir(): THREE.Vector3 | null {
     return this._selCohortOk ? this._selCohortDir : null;
+  }
+
+  /** Rebuild the hosting-country name labels (see the field note): one flat, whisper-muted
+   *  name at each hosting country's main-landmass centroid, tangent to the surface, north-up.
+   *  Event-time (node data + topology arrival). Labels join `geoFades`, so the surface fade
+   *  drives their opacity with no per-frame code of their own. */
+  private _rebuildCountryLabels(): void {
+    for (const m of this._countryLabels) {
+      this.surface.remove(m);
+      const mat = m.material as THREE.MeshBasicMaterial;
+      const fi = this.geoFades.findIndex((f) => f.mat === mat);
+      if (fi >= 0) this.geoFades.splice(fi, 1);
+      disposeTextLabel(m);
+    }
+    this._countryLabels = [];
+    if (!this.countryGeoms) return; // topology not loaded yet — onCountriesReady re-runs this
+    const names = new Map<string, string>();
+    const addFrom = (pick: PickDescriptor) => {
+      const g = geoOf(pick);
+      if (g?.cc && g.country && !names.has(g.cc)) names.set(g.cc, g.country);
+    };
+    for (const u of this.nodes) if (!u.noGeo) addFrom(u.pick);
+    for (const r of this.metaNodes) addFrom(r.pick);
+    const cc = new THREE.Color(this.geoColor);
+    const tone = `rgba(${Math.round(cc.r * 255)},${Math.round(cc.g * 255)},${Math.round(cc.b * 255)},0.62)`;
+    const up = new THREE.Vector3(0, 1, 0);
+    for (const [code, name] of names) {
+      const ccn = ccToNumeric(code);
+      const geom = ccn ? this.countryGeoms.get(ccn) : null;
+      const rings = geom ? mainPolygonRings(geom) : null;
+      const centroid = rings?.length ? ringsCentroid(rings) : null;
+      if (!centroid) continue;
+      const normal = centroid.clone().normalize();
+      const east = new THREE.Vector3().crossVectors(up, normal);
+      if (east.lengthSq() < 1e-6) continue; // polar degenerate — no hosting country lives there
+      east.normalize();
+      const north = new THREE.Vector3().crossVectors(normal, east);
+      const mesh = makeTextLabel(tone, name, 0.7);
+      mesh.quaternion.setFromRotationMatrix(new THREE.Matrix4().makeBasis(east, north, normal));
+      mesh.position.copy(normal).multiplyScalar(R + LAND_H + 0.12);
+      this.surface.add(mesh);
+      const mat = mesh.material as THREE.MeshBasicMaterial;
+      mat.opacity = 0; // geoFades drives it from the next frame
+      this.geoFades.push({ mat, base: 0.5 });
+      this._countryLabels.push(mesh);
+    }
   }
 
   /** The drilled country's main-landmass centroid as a unit, globe-LOCAL direction, written
