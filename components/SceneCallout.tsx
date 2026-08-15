@@ -38,6 +38,13 @@ import { RoleChips } from "@/components/inspector/parts";
 const OFF_X = 62;
 const OFF_Y = 92;
 
+// The ONE glass container for scene-anchored labels (user, 2026-08-15 — "align the hover and the
+// click card"): the hover Tooltip and this callout are the same species — HUD glass tied to a
+// scene subject — so they share one surface recipe. Identity never tints the frame; it lives on
+// the content (the hued ticker) and the anchor ring, like every card.
+export const SCENE_GLASS =
+  "rounded-[10px] border border-border px-3 py-2 backdrop-blur-[8px] bg-[var(--panel-solid)]";
+
 // The composition lead line's layer codes — the one layer vocabulary in its fixed order,
 // rendered by the cards' own `RoleChips` (user, 2026-08-15: "look at my cards — square pills";
 // the pills are THE one rendering for layer codes wherever they appear, this surface included).
@@ -95,7 +102,7 @@ export default function SceneCallout() {
       {/* The panel — keyed by subject so the roll-in replays on a change, like a card title. */}
       <div
         key={filter}
-        className="roll-in absolute whitespace-nowrap rounded-[10px] border border-border px-3 py-2 backdrop-blur-[8px] bg-[var(--panel-solid)]"
+        className={`roll-in absolute whitespace-nowrap ${SCENE_GLASS}`}
         style={{ left: OFF_X, bottom: OFF_Y }}
       >
         {/* The card eyebrow's own ink (CardHead: EYEBROW + text-accent), not a muted caption —
