@@ -181,11 +181,6 @@ interface AppState {
   // choreography is its own 3.9s answer to the user's gesture, so a 1.4s dim inside it would read
   // as a blink.
   cameraFlying: boolean;
-  // PHONE ONLY: whether the top bar's vitals row is expanded (the bar grows downward by one
-  // full-width row showing the active view's vitals). A USER CHOICE that persists across view
-  // switches (the row's CONTENT swaps per view; only the user's toggle opens/closes it) —
-  // session-only, like `phoneDock` (no localStorage). Unused on tablet/desktop (vitals inline).
-  phoneVitals: boolean;
   // PHONE ONLY: the bottom sheet's drag-chosen height override in px (null = the default 60vh).
   // Shared by BOTH dock sheets so switching halves keeps the chosen height; reset to null the
   // moment the dock fully closes (`setPhoneDock(null)`) so reopening starts at the default.
@@ -251,7 +246,6 @@ interface AppState {
   setRailsHidden: (hidden: boolean) => void;
   setSceneDragging: (dragging: boolean) => void;
   setCameraFlying: (flying: boolean) => void;
-  setPhoneVitals: (open: boolean) => void;
   setPhoneSheetPx: (px: number | null) => void;
   setRailCollapse: (id: string, collapsed: boolean | null) => void;
   setRailCollapseMany: (entries: Record<string, boolean | null>) => void;
@@ -304,7 +298,6 @@ export const useStore = create<AppState>((set) => ({
   railsHidden: false,
   sceneDragging: false,
   cameraFlying: false,
-  phoneVitals: false,
   railCollapse: {},
   focusRung: null,
   phoneSheetPx: null,
@@ -414,7 +407,6 @@ export const useStore = create<AppState>((set) => ({
   setRailsHidden: (railsHidden) => set({ railsHidden }),
   setSceneDragging: (sceneDragging) => set({ sceneDragging }),
   setCameraFlying: (cameraFlying) => set({ cameraFlying }),
-  setPhoneVitals: (phoneVitals) => set({ phoneVitals }),
   setRailCollapse: (id, collapsed) =>
     set((s) => {
       const railCollapse = { ...s.railCollapse };
