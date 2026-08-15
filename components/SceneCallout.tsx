@@ -121,8 +121,14 @@ export default function SceneCallout() {
             </span>
           )}
         </div>
+        {/* The card grammar's HEAD HAIRLINE at callout scale (user, 2026-08-15 — "cards have an
+            underline between header and the rest"): it divides the HEAD (eyebrow + title, whose
+            own separation stays colour-only, as in the cards) from the body, and it only exists
+            where there IS a body to divide — a lead-less callout stays ruleless, the same gate
+            CardHead applies when collapsed. Inside the padded box, so it shares the content
+            edge like every resting division. */}
         {mg && (
-          <div className="flex items-center gap-1.5 text-label text-muted-foreground mt-1">
+          <div className="mt-1.5 pt-1.5 border-t border-border flex items-center gap-1.5 text-label text-muted-foreground">
             <span>{mg.nodes.length} nodes</span>
             {codes.length > 0 && <RoleChips codes={codes} />}
           </div>
