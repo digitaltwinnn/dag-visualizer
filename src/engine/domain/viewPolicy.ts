@@ -169,7 +169,7 @@ export const VIEW_POLICIES: Record<Mode, ViewPolicy> = {
     // The Snapshots node browser (LedgerPanel's floor disclosures) reads store.selNodes.
     nodeList: true,
     timeLane: true, // the ONLY view with a time axis — the tick bar-chart is this view's instrument
-    callout: false, // not yet — see hyper's row
+    callout: true, // the pinned snapshot — the lane lead tile, or the global tick's bar
     bloom: BLOOM_CALM, // the reference look the design likes — unchanged
   },
   status: FLAT,

@@ -1725,7 +1725,12 @@ export class Engine {
     let on = this._policy.callout && !this.transition.active();
     if (on) {
       const v = this._calloutV;
-      on = this.mode === "geo" ? this._geoCalloutAnchor(v) : this._hyperCalloutAnchor(v);
+      on =
+        this.mode === "geo"
+          ? this._geoCalloutAnchor(v)
+          : this.mode === "ledger"
+            ? this._ledgerCalloutAnchor(v)
+            : this._hyperCalloutAnchor(v);
       if (on) {
         v.applyMatrix4(this.ctx.camera.matrixWorldInverse); // world → view (camera looks −z)
         if (v.z > -0.1) on = false; // behind (or grazing) the camera plane
@@ -1787,6 +1792,21 @@ export class Engine {
       v.copy(this._geoCcDir).multiplyScalar(lift);
     } else return false;
     this.globe.group.localToWorld(v); // the rendered globe rotation — a label read. render-state OK
+    return true;
+  }
+
+  // LEDGER anchors the pinned SNAPSHOT — the metagraph snapshot's lane lead, or the committed
+  // global tick's byte-bar lead one storey down. The rewind brings a committed row to the lead
+  // position, so the lead slot IS where the subject settles (LedgerView.calloutAnchor is pure
+  // layout data). An uncataloged channel's rows live on the unlisted lane.
+  private _ledgerCalloutAnchor(v: THREE.Vector3): boolean {
+    const st = useStore.getState();
+    if (st.metaSnap) {
+      if (!this.ledger.calloutAnchor(st.metaSnap.metaId, v) && !this.ledger.calloutAnchor(UNLISTED_ID, v)) return false;
+    } else if (st.snap) {
+      this.ledger.calloutAnchor(null, v);
+    } else return false;
+    this.ledger.group.localToWorld(v); // the rendered chamber transform — a label read. render-state OK
     return true;
   }
 

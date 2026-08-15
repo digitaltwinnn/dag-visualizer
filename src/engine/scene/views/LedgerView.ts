@@ -376,6 +376,21 @@ export class LedgerView implements SceneView {
     this._ribbons.setSceneColors(map);
   }
 
+  /** The SUBJECT CALLOUT's anchor in chamber-LOCAL coordinates: the LEAD slot of the named
+   *  lane's plane, or the global floor's lead bar (`laneId: null`). The rewind brings a
+   *  committed row to the lead position, so the lead IS where the pinned subject settles —
+   *  pure layout data, no per-row tracking. False when the lane isn't in the field. */
+  calloutAnchor(laneId: string | null, out: THREE.Vector3): boolean {
+    if (laneId === null) {
+      out.set(LEAD_X, FLOOR_Y.gl0 + 0.3, 0);
+      return true;
+    }
+    const z = this._laneZOf(laneId);
+    if (z == null) return false;
+    out.set(LEAD_X, FLOOR_Y.msnap + 0.3, z);
+    return true;
+  }
+
   // ── the lane field ───────────────────────────────────────────────────────
 
   /** Construction-time only — the lane field is FIXED (user reversal 2026-08-07): a committed

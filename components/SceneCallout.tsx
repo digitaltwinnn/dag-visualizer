@@ -84,6 +84,8 @@ export default function SceneCallout() {
   const cohort = useStore((s) => s.cohort);
   const country = useStore((s) => s.country);
   const selNodes = useStore((s) => s.selNodes);
+  const metaSnap = useStore((s) => s.metaSnap);
+  const snap = useStore((s) => s.snap);
   if (!VIEW_POLICIES[mode].callout || section !== "scene") return null;
 
   let m: Model | null = null;
@@ -148,6 +150,31 @@ export default function SceneCallout() {
         aside: name ? { text: country } : undefined,
         ring: filterAccent(filter),
         lead: members.length > 0 ? { text: `${members.length} nodes` } : undefined,
+      };
+    }
+  } else if (mode === "ledger") {
+    // The pinned SNAPSHOT — metagraph snapshot over the global tick (the finer subject wins,
+    // like the rail's slot order). Titles are bare ordinals (no `#`, the ordinal rule); the
+    // unlisted lane keeps its deliberate neutral gray — identity is not a state.
+    if (metaSnap) {
+      const nnet = displayNetwork(metaSnap.metaId);
+      m = {
+        key: `ms|${metaSnap.metaId}|${metaSnap.ordinal}`,
+        eyebrow: "Metagraph snapshot",
+        title: metaSnap.ordinal.toLocaleString(),
+        aside: nnet ? { text: nnet.ticker, hue: nnet.hue } : undefined,
+        ring: nnet?.hue ?? "var(--primary)",
+      };
+    } else if (snap) {
+      m = {
+        key: `gs|${snap.data.ordinal}`,
+        eyebrow: "Global snapshot",
+        title: snap.data.ordinal.toLocaleString(),
+        ring: "var(--core)",
+        lead:
+          typeof snap.data.metagraphSnapshotCount === "number"
+            ? { text: `${snap.data.metagraphSnapshotCount} anchors` }
+            : undefined,
       };
     }
   }
