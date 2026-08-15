@@ -84,6 +84,7 @@ export class Engine {
   private raf = 0;
   private disposed = false;
   private _dofTmp = new THREE.Vector3();
+  private _calloutV = new THREE.Vector3(); // scratch: the subject callout's anchor, world → NDC
 
   private mode: Mode = "hyper";
   // This frame's view-policy row (domain/viewPolicy.ts), resolved once in _integrateInputs and
@@ -1694,6 +1695,49 @@ export class Engine {
       // more background separation while focused).
       this.ctx.dof.uniforms["maxblur"].value = 0.16 * dofMix;
     }
+
+    this._syncCallout();
+  }
+
+  // ---- the subject callout (policy.callout) --------------------------------------------------
+  // components/SceneCallout.tsx renders the label; `#callout` is the marker contract, and the
+  // Engine owns only its per-frame PLACEMENT: the committed subject's rendered anchor projected
+  // to screen, written straight to the DOM — the Tooltip discipline, so following the subject
+  // never triggers a React render (getElementById survives the component's own remounts). The
+  // anchor reads the RENDERED world transform on purpose: a label must track where the object is
+  // THIS frame — orbit spin, structure tilt and morph included — this is not framing math.
+  // render-state OK. Hidden during the view transition (mid-flight positions mislead, same reason
+  // picking is suppressed), behind the camera, and wherever the policy or subject says no; the
+  // component independently declines to render the same cases from store state, so `data-on` is
+  // belt on top of braces, never the only gate.
+  private _syncCallout(): void {
+    const el = document.getElementById("callout");
+    if (!el) return;
+    let on = this._policy.callout && !this.transition.active() && this.filter !== "all";
+    if (on) {
+      const v = this._calloutV;
+      // v1 anchors are NETWORK-level (the hub / the core) — a node commit keeps its network's
+      // callout, matching hyper's own camera answer to a node (per-node anchors arrive with geo).
+      // The label needs the RENDERED position, not a layout anchor — this is not framing math.
+      if (this.filter === "dag") this.layers.coreGroup.getWorldPosition(v); // render-state OK
+      else if (this._dofMeta) this._dofMeta.group.getWorldPosition(v); // render-state OK
+      else on = false; // unlisted / unknown: no 3D anchor — honest absence
+      if (on) {
+        v.applyMatrix4(this.ctx.camera.matrixWorldInverse); // world → view (camera looks −z)
+        if (v.z > -0.1) on = false; // behind (or grazing) the camera plane
+        else {
+          v.applyMatrix4(this.ctx.camera.projectionMatrix); // view → NDC (w-divide included)
+          const r = this.ctx.renderer.domElement.getBoundingClientRect();
+          const x = r.left + (v.x * 0.5 + 0.5) * r.width;
+          const y = r.top + (-v.y * 0.5 + 0.5) * r.height;
+          el.style.transform = `translate3d(${x.toFixed(1)}px, ${y.toFixed(1)}px, 0)`;
+        }
+      }
+    }
+    // Guard on the ELEMENT's own attribute, not a cached flag: React remounts the wrapper on a
+    // subject change (fresh data-on="0"), so a field would go stale exactly then.
+    const flag = on ? "1" : "0";
+    if (el.dataset.on !== flag) el.dataset.on = flag;
   }
 
   /**

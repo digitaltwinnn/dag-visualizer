@@ -11,6 +11,7 @@ import RailScroll from "@/components/RailScroll";
 import FollowController from "@/components/FollowController";
 import RawSnapshotBridge from "@/components/RawSnapshotBridge";
 import Tooltip from "@/components/Tooltip";
+import SceneCallout from "@/components/SceneCallout";
 import SectionShell from "@/components/SectionShell";
 import DataSection from "@/components/DataSection";
 
@@ -42,6 +43,10 @@ export default function Home() {
       <FollowController />
       <RawSnapshotBridge />
       <Tooltip />
+      {/* The subject callout — like Tooltip, OUTSIDE the shell: the Engine writes its screen
+          position in canvas-rect coordinates, and a transformed ancestor would re-anchor its
+          fixed box (CSS trap 2). It hides itself outside the scene pose. */}
+      <SceneCallout />
     </main>
   );
 }
