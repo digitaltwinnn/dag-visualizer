@@ -407,6 +407,12 @@
      rest vs signal contrast is consistent everywhere. Brightness belongs to the signals (pulses)
      and the node dots, which stay outside the dim. */
   --rail-rest-dim: 0.6;
+  /* The ONE spring easing for gesture settles (user, 2026-08-15 — the native "final touches"):
+     a damped spring encoded as CSS linear(), ~5% overshoot then settle. Consumed by the sibling
+     pager's snap/step motion and the phone sheet's detent snap, so every gesture in the app
+     lands with the same physics. Pair with ~0.35-0.45s durations — the curve does most of its
+     travel in the first third, so it reads quick with a soft landing, not slow. */
+  --ease-spring: linear(0, 0.056, 0.204, 0.404, 0.6, 0.766 25%, 0.937 32.5%, 1.022 40%, 1.056 47.5%, 1.055 55%, 1.035 65%, 1.012 77.5%, 1.001 90%, 1);
 
   --background: oklch(0.09 0.02 265);        /* #05060e app bg */
   --foreground: oklch(0.94 0.02 255);        /* #e8eefc text */

@@ -17,9 +17,16 @@
 // is honest about the edge); a completed drag swallows the trailing click so the card underneath
 // never mis-fires. It commits on RELEASE TRAVEL or on a FLICK — a fast short throw is the dominant
 // phone paging gesture, and without a velocity rule it read as "the swipe didn't work" (the card
-// sprang back and nothing happened). Keyboard: ←/→ while focus is inside the card. The step itself
-// swaps the subject in place — the card's own title roll-in + edge pulse are the arrival signal, so
-// the wrapper only snaps its transform back.
+// sprang back and nothing happened). Keyboard: ←/→ while focus is inside the card. A committed
+// step FOLLOWS THROUGH (user, 2026-08-15 — the native "final touches"): the card slides a short
+// way out in the throw direction while fading, the subject swaps while it is blank, and it slides
+// back in from the opposite edge on the shared `--ease-spring` — presentation-only motion on the
+// ONE card, so the "no rendered neighbours" architecture below stands. The plank's chevrons and
+// the arrow keys ride the same path, so every step speaks one directional language. A cancelled
+// drag snaps back on the same spring. Deferring the store commit into the blank moment is also
+// the measured fix for the release stall (233ms of subject-swap work — store write, engine
+// focus/camera, Inspector re-render — used to land synchronously in pointerup, exactly when the
+// snap-back animation was supposed to play).
 //
 // The drag transform is written STRAIGHT TO THE NODE, not through React state (2026-08-13): a
 // `setDx` per pointermove re-rendered this wrapper 60-120×/s mid-drag, and it subscribes to a
@@ -46,6 +53,7 @@
 //     with the title roll-in and edge pulse that already answer the step.
 // The actionable half of the challenge was the FEEL, which is the flick and the render fix above.
 import {
+  useEffect,
   useMemo,
   useRef,
   type KeyboardEvent,
@@ -67,12 +75,19 @@ import type { RailCardKind } from "@/components/railCards";
 
 const ENGAGE_PX = 14; // horizontal travel before the drag claims the pointer
 const STEP_PX = 48; // release travel that commits a step
-const DRAG_LIMIT = 84; // damped travel cap mid-set
-const END_LIMIT = 26; // hard-stop cap past either end (the no-wrap resistance)
+const DRAG_LIMIT = 84; // rubber-band asymptote mid-set
+const END_LIMIT = 26; // rubber-band asymptote past either end (the no-wrap resistance)
 // The travel damping (0.55) is DELIBERATE and stays: there is no neighbour rendered behind the
 // card, so a 1:1 follow would promise a reveal that isn't there. The drag is an affordance saying
 // "you are pulling something that will change", not a spatial transition.
 const DAMP = 0.55;
+// Progressive resistance toward an asymptote `d` (the iOS rubber-band curve) — identity-sloped at
+// 0 so the drag starts 1:1 with the damped travel, never reaching `d` so there is no hard stop.
+const rubber = (x: number, d: number) => Math.sign(x) * d * (1 - 1 / (Math.abs(x) / d + 1));
+// Follow-through timing: a short throw-direction exit, the swap while blank, a spring return.
+const OUT_PX = 34;
+const OUT_MS = 110;
+const IN_MS = 280;
 const FLICK_V = 0.35; // px/ms at release — a throw this fast commits regardless of travel. Measured
 // live rather than guessed: a deliberate slow pull the user means to cancel runs ~0.11 px/ms, and a
 // quick 30px throw ~0.42-0.6, so the gate sits between them (Hammer's own swipe default is 0.3).
@@ -155,10 +170,63 @@ export default function RailPager({ slot, children }: { slot: RailCardKind; chil
     if (it) applyClickActions(it.actions);
   };
 
+  // FOLLOW-THROUGH (user, 2026-08-15): out in the throw direction, swap while blank, spring back
+  // in from the opposite edge. Inline transitions on purpose — the class's resting transition is
+  // the cancel snap-back, and these two phases each need their own curve. The store commit runs
+  // inside the blank moment, which is ALSO the perf fix: the subject-swap work (store + engine +
+  // Inspector re-render, measured 233ms) lands while nothing is animating, instead of on top of
+  // the settle. `pending` lets a new pointerdown interrupt cleanly: the committed step is not
+  // lost — it has already run by then unless the timer is still waiting, in which case it runs
+  // immediately (a swipe must never silently not-commit).
+  const pending = useRef<{ t: ReturnType<typeof setTimeout>; dir: -1 | 1 } | null>(null);
+  useEffect(() => () => { if (pending.current) clearTimeout(pending.current.t); }, []);
+  const settlePending = () => {
+    const p = pending.current;
+    if (!p) return;
+    pending.current = null;
+    clearTimeout(p.t);
+    step(p.dir);
+    const el = wrap.current;
+    if (el) {
+      el.style.transition = "none";
+      el.style.transform = "";
+      el.style.opacity = "";
+    }
+  };
+  const commitStep = (dir: -1 | 1) => {
+    if (!set?.items[set.index + dir]) return;
+    const el = wrap.current;
+    const reduced = typeof matchMedia === "function" && matchMedia("(prefers-reduced-motion: reduce)").matches;
+    if (!el || reduced) {
+      // Reduced motion: the swap is instant — the title roll-in's own guard handles the rest.
+      step(dir);
+      setTx(0, false);
+      return;
+    }
+    settlePending();
+    el.style.transition = `transform ${OUT_MS}ms ease-in, opacity ${OUT_MS}ms ease-in`;
+    el.style.transform = `translateX(${-dir * OUT_PX}px)`;
+    el.style.opacity = "0";
+    pending.current = {
+      dir,
+      t: setTimeout(() => {
+        pending.current = null;
+        step(dir);
+        el.style.transition = "none";
+        el.style.transform = `translateX(${dir * OUT_PX}px)`;
+        void el.offsetWidth; // flush, so the spring animates from the entry side
+        el.style.transition = `transform ${IN_MS}ms var(--ease-spring), opacity ${Math.round(IN_MS * 0.6)}ms ease-out`;
+        el.style.transform = "";
+        el.style.opacity = "";
+      }, OUT_MS),
+    };
+  };
+
   if (!set) return <>{children}</>;
 
   const onPointerDown = (e: PointerEvent<HTMLDivElement>) => {
     if (e.pointerType === "mouse" && e.button !== 0) return;
+    settlePending();
     start.current = { x: e.clientX, y: e.clientY, id: e.pointerId };
     engaged.current = false;
     trail.current = [{ x: e.clientX, t: e.timeStamp }];
@@ -178,8 +246,10 @@ export default function RailPager({ slot, children }: { slot: RailCardKind; chil
     trail.current.push({ x: e.clientX, t });
     while (trail.current.length > 1 && t - trail.current[0].t > FLICK_MS) trail.current.shift();
     const atEnd = (ddx < 0 && set.index >= set.items.length - 1) || (ddx > 0 && set.index <= 0);
-    const lim = atEnd ? END_LIMIT : DRAG_LIMIT;
-    setTx(Math.max(-lim, Math.min(lim, ddx * DAMP)), false);
+    // Progressive rubber-band toward the limit (was a hard clamp): resistance grows with travel
+    // and the limit is an asymptote, so the pull never hits a wall — the END limit is short and
+    // firm (the no-wrap answer), the mid-set one longer and softer.
+    setTx(rubber(ddx * DAMP, atEnd ? END_LIMIT : DRAG_LIMIT), false);
   };
   const endDrag = (e: PointerEvent<HTMLDivElement>) => {
     const st = start.current;
@@ -195,7 +265,11 @@ export default function RailPager({ slot, children }: { slot: RailCardKind; chil
       // and the travel rule below still answers it.
       const flick =
         Math.abs(v) >= FLICK_V && Math.abs(ddx) >= ENGAGE_PX && Math.sign(v) === Math.sign(ddx);
-      if (Math.abs(ddx) >= STEP_PX || flick) step(ddx < 0 ? 1 : -1);
+      if (Math.abs(ddx) >= STEP_PX || flick) {
+        commitStep(ddx < 0 ? 1 : -1);
+        trail.current.length = 0;
+        return; // commitStep owns the motion from here — no snap-back on top of the follow-through
+      }
     }
     trail.current.length = 0;
     setTx(0, true);
@@ -212,7 +286,7 @@ export default function RailPager({ slot, children }: { slot: RailCardKind; chil
     const t = e.target as HTMLElement;
     if (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.isContentEditable) return;
     e.preventDefault();
-    step(e.key === "ArrowLeft" ? -1 : 1);
+    commitStep(e.key === "ArrowLeft" ? -1 : 1);
   };
 
   const prev = set.items[set.index - 1];
@@ -235,7 +309,7 @@ export default function RailPager({ slot, children }: { slot: RailCardKind; chil
         // full-bleeds to the panel's bottom edge. Without it the plate would stop at the default
         // 18 and leave the plank floating on bare glass below its own ground; with it the plank
         // and its hairline (siblings of the panel, so painted after it) ride ON the plate.
-        className="relative touch-pan-y select-none transition-transform duration-200 ease-out motion-reduce:transition-none [--pager-strip:36px] [--foot-bleed:var(--pager-strip)] [&>.ig-panel]:pb-[var(--pager-strip)]"
+        className="relative touch-pan-y select-none transition-transform duration-[380ms] ease-[var(--ease-spring)] motion-reduce:transition-none [--pager-strip:36px] [--foot-bleed:var(--pager-strip)] [&>.ig-panel]:pb-[var(--pager-strip)]"
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
         onPointerUp={endDrag}
@@ -274,7 +348,7 @@ export default function RailPager({ slot, children }: { slot: RailCardKind; chil
             size="icon-xs"
             className="size-5"
             disabled={!prev}
-            onClick={() => step(-1)}
+            onClick={() => commitStep(-1)}
             aria-label={prev ? `Previous: ${prev.label}` : "Previous"}
             title={prev?.label}
           >
@@ -291,7 +365,7 @@ export default function RailPager({ slot, children }: { slot: RailCardKind; chil
             size="icon-xs"
             className="size-5"
             disabled={!next}
-            onClick={() => step(1)}
+            onClick={() => commitStep(1)}
             aria-label={next ? `Next: ${next.label}` : "Next"}
             title={next?.label}
           >
