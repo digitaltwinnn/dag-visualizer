@@ -75,18 +75,19 @@ export default function SceneCallout() {
         className="absolute -translate-x-1/2 -translate-y-1/2 w-[9px] h-[9px] rounded-full border-[1.5px]"
         style={{ borderColor: net.hue }}
       />
-      {/* Dashed leader from the anchor to the panel's near corner — the ordinal-label language.
-          NEUTRAL RULER TONE, not the identity hue and not the resting border (user, 2026-08-15 —
-          the border token was near-invisible): the anchor sits in the subject's own glow, so a
-          hue-tinted line would vanish into a same-hue hub, and the leader is instrument chrome —
-          the thread's neutral-ruler half — while the RING above carries the identity. */}
+      {/* Dashed leader from the anchor to the panel's near corner — the ordinal-label language,
+          in the SAME ink: the chamber's in-scene anchor lines are structural cyan, and cyan is
+          the design's one accent/affordance signal (user, 2026-08-15 — round 2; the neutral grey
+          read as chrome, the border token before it was too weak). Moderate opacity, not full —
+          it is a tie, not a signal. Identity stays on the anchor RING. */}
       <svg className="absolute left-0 top-0 overflow-visible" width="1" height="1" aria-hidden>
         <line
           x1={6}
           y1={-6}
           x2={OFF_X}
           y2={-OFF_Y + 8}
-          stroke="var(--muted-foreground)"
+          stroke="var(--primary)"
+          strokeOpacity="0.55"
           strokeWidth="1.5"
           strokeDasharray="4 4"
         />
@@ -97,11 +98,15 @@ export default function SceneCallout() {
         className="roll-in absolute whitespace-nowrap rounded-[10px] border border-border px-3 py-2 backdrop-blur-[8px] bg-[var(--panel-solid)]"
         style={{ left: OFF_X, bottom: OFF_Y }}
       >
-        <div className="text-micro tracking-caps uppercase text-muted-foreground mb-0.5">
+        {/* The card eyebrow's own ink (CardHead: EYEBROW + text-accent), not a muted caption —
+            this is the same slot noun the rail card wears (user, 2026-08-15). */}
+        <div className="text-micro font-bold tracking-[0.1em] uppercase leading-none text-accent mb-1.5">
           {filter === "dag" ? "Network" : "Metagraph"}
         </div>
+        {/* No identity dot here (user, 2026-08-15): the hued TICKER aside already carries the
+            identity on this row — a dot beside it would say the same thing twice — and the
+            anchor ring below is the subject mark at the scene end of the tie. */}
         <div className="flex items-center gap-[7px]">
-          <span className="w-[9px] h-[9px] rounded-full flex-none" style={{ background: net.hue }} />
           <span className="text-body font-semibold text-foreground">{net.name}</span>
           {aside && (
             <span className="text-label font-bold ml-1" style={{ color: net.hue }}>
