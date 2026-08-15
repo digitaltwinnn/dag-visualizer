@@ -915,6 +915,24 @@ export class Globe implements GeoViewHost {
         null;
   }
 
+  /** The SELECTED node's own chip position in globe-LOCAL coordinates — the same resolution
+   *  the node-pick spotlight aims at (the fanned stack position for a metagraph node, the
+   *  stacked radius for a validator), so the subject callout points at THE chip rather than
+   *  the stack's base (user, 2026-08-15). False when nothing is selected or the record has no
+   *  place on the globe. */
+  selectedNodeAnchor(out: THREE.Vector3): boolean {
+    const rec = this._selNodeRec;
+    if (!rec) return false;
+    if ("geoPos" in rec) {
+      if (rec.geoPos.lengthSq() < 1) return false; // unplaced — never anchor at the globe centre
+      out.copy(rec.geoPos);
+      return true;
+    }
+    if (rec.noGeo || !rec.geoDir) return false;
+    out.copy(rec.geoDir).multiplyScalar(rec.geoRadius);
+    return true;
+  }
+
   // Commit/clear the cohort selection: resolve member ids + the representative direction from
   // the CURRENT node records by cc+city+isp match (event-time — re-run by the data-rebuild
   // sites exactly like setSelectedNode's re-resolve). Membership matching mirrors

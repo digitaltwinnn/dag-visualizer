@@ -376,6 +376,41 @@ export class LedgerView implements SceneView {
     this._ribbons.setSceneColors(map);
   }
 
+  // The committed metagraph snapshot's TILE — resolved to an instance index event-time (every
+  // new tick shifts the instance order, so _rebuildTilePicks re-resolves), its live position
+  // recorded as the trail draws (rewind and trail offsets included).
+  private _selTile: { metaId: string; ordinal: number } | null = null;
+  private _selTileIndex = -1;
+  private _selTilePos = new THREE.Vector3();
+  private _selTilePosOk = false;
+
+  /** Tell the chamber which metagraph snapshot is committed, so the callout can anchor ITS
+   *  tile rather than the lane lead (user, 2026-08-15). */
+  setSelectedTile(sel: { metaId: string; ordinal: number } | null): void {
+    this._selTile = sel;
+    this._resolveSelTile();
+  }
+
+  private _resolveSelTile(): void {
+    this._selTileIndex = -1;
+    const sel = this._selTile;
+    if (!sel) return;
+    for (let i = 0; i < META_TRAIL_MAX; i++) {
+      const p = this._tilePicks[i];
+      if (p?.kind === "metaSnap" && p.sel.metaId === sel.metaId && p.sel.ordinal === sel.ordinal) {
+        this._selTileIndex = i;
+        return;
+      }
+    }
+  }
+
+  /** The committed snapshot's own tile position (chamber-local), when it drew this frame. */
+  selectedTileAnchor(out: THREE.Vector3): boolean {
+    if (!this._selTilePosOk) return false;
+    out.copy(this._selTilePos);
+    return true;
+  }
+
   /** The SUBJECT CALLOUT's anchor in chamber-LOCAL coordinates: the LEAD slot of the named
    *  lane's plane, or the global floor's lead bar (`laneId: null`). The rewind brings a
    *  committed row to the lead position, so the lead IS where the pinned subject settles —
@@ -698,8 +733,10 @@ export class LedgerView implements SceneView {
       }
     }
     for (let j = mi; j < META_TRAIL_MAX; j++) this._tilePicks[j] = null;
-    // A held hover's tile index is only valid against THIS table.
+    // A held hover's tile index is only valid against THIS table — and so is the selected
+    // tile's (the callout anchor).
     this._syncHoverTile();
+    this._resolveSelTile();
   }
 
   private _syncPickables(): void {
@@ -756,6 +793,7 @@ export class LedgerView implements SceneView {
     // chamber is simply running, and stepping the whole trail back against a row it advanced onto
     // by itself would make `back` a second `rest`.
     const anyFocus = this._hoverSlot >= 0 || this._hoverTile >= 0 || pinSlot >= 0;
+    this._selTilePosOk = false; // re-recorded below when the selected tile draws this frame
     for (const lane of this.model.lanes.values()) {
       const laneColor = this._laneColor(lane.id);
       const cz = this._laneZ.get(lane.id) ?? lane.z;
@@ -790,6 +828,12 @@ export class LedgerView implements SceneView {
         // world height (geometry depth 0.35 × scale.z becomes the height under the -90° X spin).
         const tileH = 0.35 * b.size;
         _dummy.position.set(wx + b.ox, FLOOR_Y.msnap + TILE_LIFT + tileH / 2, cz + b.oz);
+        // The subject callout anchors THE committed snapshot's tile, not the lane lead (user,
+        // 2026-08-15) — record its live position (rewind/trail offsets included) as it draws.
+        if (mi === this._selTileIndex) {
+          this._selTilePos.set(wx + b.ox, FLOOR_Y.msnap + TILE_LIFT + tileH, cz + b.oz);
+          this._selTilePosOk = edge > 0;
+        }
         _dummy.rotation.set(-Math.PI / 2, 0, 0);
         _dummy.scale.set(b.size, b.size, b.size);
         _dummy.updateMatrix();

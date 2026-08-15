@@ -555,6 +555,8 @@ export class Engine {
         // prefixes are resolved against the live metaList before reaching the glow set.
         if (st.metaSnap !== prev.metaSnap || st.metaSnapDeep !== prev.metaSnapDeep || st.metaList !== prev.metaList) {
           const sel = st.metaSnap;
+          // The callout's tile anchor rides the same commit (see LedgerView.setSelectedTile).
+          this.ledger.setSelectedTile(sel ? { metaId: sel.metaId, ordinal: sel.ordinal } : null);
           if (!sel) this.globe.setSignerIds(null);
           else {
             const deep = st.metaSnapDeep[metaSnapDeepKey(sel.globalOrdinal, sel.metaId, sel.ordinal)];
@@ -1774,11 +1776,16 @@ export class Engine {
     const lift = GEO_R + LAND_H + 0.5;
     const p = st.inspect;
     if (p && (p.kind === "l0" || p.kind === "l1" || p.kind === "metanode") && p.geo?.lat != null && p.geo.lon != null) {
-      if (this._geoNodePick !== p) {
-        this._geoNodePick = p;
-        this._geoNodeLocal.copy(latLonToVec3(p.geo.lat, p.geo.lon, lift)); // event-time
+      // THE chip, not the stack's base (user, 2026-08-15): the spotlight's own per-record
+      // resolution, exposed by Globe. The lat/lon surface point stays as the fallback for the
+      // brief window before the selection record resolves on fresh data.
+      if (!this.globe.selectedNodeAnchor(v)) {
+        if (this._geoNodePick !== p) {
+          this._geoNodePick = p;
+          this._geoNodeLocal.copy(latLonToVec3(p.geo.lat, p.geo.lon, lift)); // event-time
+        }
+        v.copy(this._geoNodeLocal);
       }
-      v.copy(this._geoNodeLocal);
     } else if (st.cohort) {
       const d = this.globe.cohortAnchorDir;
       if (!d) return false;
@@ -1802,7 +1809,12 @@ export class Engine {
   private _ledgerCalloutAnchor(v: THREE.Vector3): boolean {
     const st = useStore.getState();
     if (st.metaSnap) {
-      if (!this.ledger.calloutAnchor(st.metaSnap.metaId, v) && !this.ledger.calloutAnchor(UNLISTED_ID, v)) return false;
+      // THE committed snapshot's tile (user, 2026-08-15), rewind offsets included; the lane
+      // lead stays as the fallback while the tile is off-trail (aged out of the window or not
+      // drawn this frame).
+      if (!this.ledger.selectedTileAnchor(v)) {
+        if (!this.ledger.calloutAnchor(st.metaSnap.metaId, v) && !this.ledger.calloutAnchor(UNLISTED_ID, v)) return false;
+      }
     } else if (st.snap) {
       this.ledger.calloutAnchor(null, v);
     } else return false;

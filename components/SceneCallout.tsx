@@ -222,6 +222,17 @@ export default function SceneCallout() {
       </svg>
       {/* The panel — keyed by subject so the roll-in replays on a change, like a card title. */}
       <div key={m.key} className={`roll-in absolute whitespace-nowrap ${SCENE_GLASS}`} style={{ left: OFF_X, bottom: OFF_Y }}>
+        {/* The identity EDGE SPINE (user, 2026-08-15 — "the rails/hairline effect on the left
+            side, attached"): the sheets' single-identity-cue language at callout scale — a
+            soft-tipped vertical hairline in the subject's hue on the SCENE-FACING edge (the
+            side every card edge signal uses), with the leader flowing into its lower tip.
+            Static and subtle: a resting identity cue, not a signal — the shared soft-tipped
+            recipe, full hue across the middle, easing out in the last ~18% each end. */}
+        <span
+          aria-hidden
+          className="absolute -left-px inset-y-1.5 w-[2px] rounded-full opacity-70"
+          style={{ background: `linear-gradient(180deg, transparent, ${m.ring} 18%, ${m.ring} 82%, transparent)` }}
+        />
         {/* The card eyebrow's own ink (CardHead: EYEBROW + text-accent), not a muted caption —
             this is the same slot noun the rail card wears (user, 2026-08-15). */}
         <div className="text-micro font-bold tracking-[0.1em] uppercase leading-none text-accent mb-1.5">{m.eyebrow}</div>
