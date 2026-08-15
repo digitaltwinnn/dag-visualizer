@@ -159,6 +159,64 @@ export default function RailDock({
     setOpen(next);
     onOpenChange?.(next);
   };
+  const handleOpenChangeRef = useRef(handleOpenChange);
+  handleOpenChangeRef.current = handleOpenChange;
+
+  // ── Tap-outside dismiss (phone bar-half only, user 2026-08-15) ─────────────────────────────
+  // A TAP on the scene collapses the open bottom sheet, the same dismissal the bar-half toggle
+  // performs (selection untouched — dismissing only collapses). Phone only: on tablet both edge
+  // docks can be open over an interactive scene and a pick UPDATES Details, so outside-tap
+  // dismissal would fight that (the `onInteractOutside` preventDefault below keeps standing for
+  // both tiers — radix knows no tap-from-drag). Three decisions carry this:
+  // - Tap ≠ drag. Orbiting behind the open sheet is a supported phone flow (the sheet dims via
+  //   `useSceneYield` exactly for it), so only a stationary down→up pair dismisses — same
+  //   discipline as the Engine's own drag suppression and `tapZoom`.
+  // - The tap is CONSUMED: it closes the sheet and does nothing else. The Engine picks on
+  //   `click` (canvas listener), so eating the click at window capture phase stops a tap on a
+  //   hub/tile from toggling selection while the sheet closes — one gesture, one answer.
+  //   OrbitControls rides pointer events, which pass through untouched, so no stuck drag state.
+  // - Only CANVAS taps qualify. The top bar, the dock bar and the sheet itself keep their own
+  //   behaviour — the user said "on the scene", and eating chrome taps would break navigation.
+  useEffect(() => {
+    if (!isBarHalf || !open || !shellVisible) return;
+    let down: { x: number; y: number; t: number; id: number } | null = null;
+    let eat = 0;
+    const onDown = (e: PointerEvent) => {
+      if (down) {
+        // A second pointer is a pinch, not a tap — the pair is invalidated.
+        down = null;
+        return;
+      }
+      down = e.target instanceof HTMLCanvasElement ? { x: e.clientX, y: e.clientY, t: performance.now(), id: e.pointerId } : null;
+    };
+    const onUp = (e: PointerEvent) => {
+      if (!down || e.pointerId !== down.id) {
+        down = null;
+        return;
+      }
+      const tap = Math.hypot(e.clientX - down.x, e.clientY - down.y) < 10 && performance.now() - down.t < 500;
+      down = null;
+      if (!tap) return;
+      // Windowed, not a bare flag: if the browser never delivers the click, a stale eat must
+      // not swallow the NEXT real one (the Engine's own eat-flag learned the same lesson).
+      eat = performance.now() + 400;
+      handleOpenChangeRef.current(false);
+    };
+    const onClick = (e: MouseEvent) => {
+      if (performance.now() > eat) return;
+      eat = 0;
+      e.preventDefault();
+      e.stopPropagation();
+    };
+    window.addEventListener("pointerdown", onDown, true);
+    window.addEventListener("pointerup", onUp, true);
+    window.addEventListener("click", onClick, true);
+    return () => {
+      window.removeEventListener("pointerdown", onDown, true);
+      window.removeEventListener("pointerup", onUp, true);
+      window.removeEventListener("click", onClick, true);
+    };
+  }, [isBarHalf, open, shellVisible]);
 
   // ── Bottom-sheet drag (phone, grabber-initiated) ────────────────────────────────────────────
   // Standard mobile sheet gesture, v1 GRABBER-ONLY by design: the sheet body owns touch scroll,
@@ -442,10 +500,11 @@ export default function RailDock({
               : undefined
           }
           // Don't let a pointer-down/interaction OUTSIDE the sheet (e.g. on the scene, or on the
-          // OTHER open dock) dismiss it — the user closes each dock explicitly via its own ✕ /
-          // Escape / bar-half toggle. Without this, radix's DismissableLayer auto-closes a
-          // non-modal dialog on any outside pointer-down, which would make the two docks fight +
-          // close on every scene pick.
+          // OTHER open dock) dismiss it — radix's DismissableLayer would auto-close a non-modal
+          // dialog on any outside pointer-down, drag included, which would make the tablet docks
+          // fight + close on every scene pick and orbit start. Dismissal is explicit (✕ / Escape
+          // / bar-half toggle) — plus, on phone only, the tap-outside recognizer above, which
+          // knows a tap from a drag where radix doesn't.
           onInteractOutside={(e) => e.preventDefault()}
           aria-describedby={undefined}
         >
