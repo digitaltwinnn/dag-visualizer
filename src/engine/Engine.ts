@@ -1756,8 +1756,13 @@ export class Engine {
   // network's framing, but the label points at the thing itself), else the network's hub or
   // the core. The label needs the RENDERED position, not a layout anchor — not framing math.
   private _hyperCalloutAnchor(v: THREE.Vector3): boolean {
-    const p = useStore.getState().inspect;
+    const st = useStore.getState();
+    const p = st.inspect;
+    // THE BOX LEADS (user, 2026-08-15): re-boxing an ancestor card (clicking a committed
+    // node's hub) steps the callout up to the network — the box is the subject, exactly as
+    // the camera answers it. SceneCallout mirrors this preference for the content.
     if (
+      st.boxedCard !== "context" &&
       p && (p.kind === "l0" || p.kind === "l1" || p.kind === "metanode") &&
       this.globe.selectedNodeHyperAnchor(v)
     ) {
@@ -1783,31 +1788,53 @@ export class Engine {
   private _geoCalloutAnchor(v: THREE.Vector3): boolean {
     const st = useStore.getState();
     const lift = GEO_R + LAND_H + 0.5;
-    const p = st.inspect;
-    if (p && (p.kind === "l0" || p.kind === "l1" || p.kind === "metanode") && p.geo?.lat != null && p.geo.lon != null) {
-      // THE chip, not the stack's base (user, 2026-08-15): the spotlight's own per-record
-      // resolution, exposed by Globe. The lat/lon surface point stays as the fallback for the
-      // brief window before the selection record resolves on fresh data.
-      if (!this.globe.selectedNodeAnchor(v)) {
-        if (this._geoNodePick !== p) {
-          this._geoNodePick = p;
-          this._geoNodeLocal.copy(latLonToVec3(p.geo.lat, p.geo.lon, lift)); // event-time
-        }
-        v.copy(this._geoNodeLocal);
-      }
-    } else if (st.cohort) {
-      const d = this.globe.cohortAnchorDir;
-      if (!d) return false;
-      v.copy(d).multiplyScalar(lift);
-    } else if (st.country) {
-      if (this._geoCcKey !== st.country) {
-        this._geoCcKey = st.country;
-        this._geoCcOk = this.globe.countryAnchorDir(st.country, this._geoCcDir); // event-time
-      }
-      if (!this._geoCcOk) return false;
-      v.copy(this._geoCcDir).multiplyScalar(lift);
-    } else return false;
+    // THE BOX LEADS (user, 2026-08-15), then the default finest-first order — a boxed rung
+    // whose anchor can't resolve falls through rather than blanking the callout.
+    const boxed = st.boxedCard;
+    const ok =
+      (boxed === "cohort" && this._geoAnchorCohort(st, v, lift)) ||
+      (boxed === "country" && this._geoAnchorCountry(st, v, lift)) ||
+      this._geoAnchorNode(st, v, lift) ||
+      this._geoAnchorCohort(st, v, lift) ||
+      this._geoAnchorCountry(st, v, lift);
+    if (!ok) return false;
     this.globe.group.localToWorld(v); // the rendered globe rotation — a label read. render-state OK
+    return true;
+  }
+
+  private _geoAnchorNode(st: ReturnType<typeof useStore.getState>, v: THREE.Vector3, lift: number): boolean {
+    const p = st.inspect;
+    if (!p || (p.kind !== "l0" && p.kind !== "l1" && p.kind !== "metanode") || p.geo?.lat == null || p.geo.lon == null)
+      return false;
+    // THE chip, not the stack's base (user, 2026-08-15): the spotlight's own per-record
+    // resolution, exposed by Globe. The lat/lon surface point stays as the fallback for the
+    // brief window before the selection record resolves on fresh data.
+    if (!this.globe.selectedNodeAnchor(v)) {
+      if (this._geoNodePick !== p) {
+        this._geoNodePick = p;
+        this._geoNodeLocal.copy(latLonToVec3(p.geo.lat, p.geo.lon, lift)); // event-time
+      }
+      v.copy(this._geoNodeLocal);
+    }
+    return true;
+  }
+
+  private _geoAnchorCohort(st: ReturnType<typeof useStore.getState>, v: THREE.Vector3, lift: number): boolean {
+    if (!st.cohort) return false;
+    const d = this.globe.cohortAnchorDir;
+    if (!d) return false;
+    v.copy(d).multiplyScalar(lift);
+    return true;
+  }
+
+  private _geoAnchorCountry(st: ReturnType<typeof useStore.getState>, v: THREE.Vector3, lift: number): boolean {
+    if (!st.country) return false;
+    if (this._geoCcKey !== st.country) {
+      this._geoCcKey = st.country;
+      this._geoCcOk = this.globe.countryAnchorDir(st.country, this._geoCcDir); // event-time
+    }
+    if (!this._geoCcOk) return false;
+    v.copy(this._geoCcDir).multiplyScalar(lift);
     return true;
   }
 
@@ -1817,6 +1844,13 @@ export class Engine {
   // layout data). An uncataloged channel's rows live on the unlisted lane.
   private _ledgerCalloutAnchor(v: THREE.Vector3): boolean {
     const st = useStore.getState();
+    // THE BOX LEADS (user, 2026-08-15): with the global snapshot card boxed, the callout
+    // steps up to the tick's byte bar even while a metagraph snapshot stays committed.
+    if (st.boxedCard === "snap" && st.snap) {
+      this.ledger.calloutAnchor(null, v);
+      this.ledger.group.localToWorld(v); // render-state OK
+      return true;
+    }
     if (st.metaSnap) {
       // THE committed snapshot's tile (user, 2026-08-15), rewind offsets included; the lane
       // lead stays as the fallback while the tile is off-trail (aged out of the window or not

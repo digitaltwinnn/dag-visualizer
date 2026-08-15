@@ -90,6 +90,11 @@ export default function SceneCallout() {
   const metaSnap = useStore((s) => s.metaSnap);
   const snap = useStore((s) => s.snap);
   const following = useStore((s) => s.following);
+  // THE BOX LEADS (user, 2026-08-15 — clicking a committed node's hub re-boxes the metagraph
+  // card and "nothing happens in the scene"): the box is the subject (it gets the camera), so
+  // the callout mirrors it. Inspector publishes the boxed slot; the Engine's anchor resolvers
+  // apply the SAME preference, so label and anchor step up and down together.
+  const boxedCard = useStore((s) => s.boxedCard);
   // The global tick's aside is its AGE, ticking (user, 2026-08-15 — "same as card"):
   // SnapshotAside's two states mirrored as a label — `live · Xs` with the beating dot while
   // following, `◷ Xs` on a pin. The card keeps the BUTTON (follow toggle); this is read-only.
@@ -120,18 +125,13 @@ export default function SceneCallout() {
     };
   };
 
-  let m: Model | null = null;
-  if (mode === "hyper") {
-    m = nodeModel();
-    if (m) {
-      // fall through to render — the node leads over its network
-    } else {
+  const netModel = (): Model | null => {
     const net = displayNetwork(filter);
     // "all" has no subject; the unlisted set has no 3D anchor (no machines are knowable).
     if (!net || net.virtual) return null;
     const mg = metaList.find((x) => x.id === filter) ?? null;
     const codes = mg ? layerCodes(mg.nodes) : [];
-    m = {
+    return {
       key: `net|${filter}`,
       eyebrow: filter === "dag" ? "Network" : "Metagraph",
       title: net.name,
@@ -141,20 +141,26 @@ export default function SceneCallout() {
       ring: net.hue,
       lead: mg ? { text: `${mg.nodes.length} nodes`, codes } : undefined,
     };
-    }
+  };
+
+  let m: Model | null = null;
+  if (mode === "hyper") {
+    m = boxedCard === "context" ? (netModel() ?? nodeModel()) : (nodeModel() ?? netModel());
+    if (!m) return null;
   } else if (mode === "geo") {
     const g = nodePick ? geoOf(nodePick) : undefined;
-    if (nodePick && g?.lat != null && g.lon != null) {
-      // NODE — the shared model above (the ANCHOR needs a geo place here, hence the gate).
-      m = nodeModel();
-    } else if (cohort) {
+    // The builders, ordered by the BOX first (the Engine's anchor resolvers mirror this), then
+    // the default finest-first ladder.
+    const geoNodeModel = (): Model | null => (nodePick && g?.lat != null && g?.lon != null ? nodeModel() : null);
+    const cohortModel = (): Model | null => {
+      if (!cohort) return null;
       // PROVIDER — the provider card's title IS the isp; the city rides muted (a place carries
       // no identity). The ring takes the active filter's accent, like every card-head mark.
       const n = selNodes.filter((r) => {
         const rg = geoOf(r.pick);
         return !!rg && rg.cc === cohort.cc && (rg.city || null) === cohort.city && (rg.isp || null) === cohort.isp;
       }).length;
-      m = {
+      return {
         key: `cohort|${cohort.cc}|${cohort.city}|${cohort.isp}`,
         eyebrow: "Provider",
         title: cohort.isp ?? "Unknown provider",
@@ -162,12 +168,14 @@ export default function SceneCallout() {
         ring: filterAccent(filter),
         lead: n > 0 ? { text: `${n} nodes` } : undefined,
       };
-    } else if (country) {
+    };
+    const countryModel = (): Model | null => {
+      if (!country) return null;
       // COUNTRY — display name with the ISO code as the muted aside, suppressed when the name
       // is unknown and the title already fell back to the code (the country card's own rule).
       const members = selNodes.filter((r) => geoOf(r.pick)?.cc === country);
       const name = members.map((r) => geoOf(r.pick)?.country).find(Boolean) ?? null;
-      m = {
+      return {
         key: `cc|${country}`,
         eyebrow: "Country",
         title: name ?? country,
@@ -175,23 +183,33 @@ export default function SceneCallout() {
         ring: filterAccent(filter),
         lead: members.length > 0 ? { text: `${members.length} nodes` } : undefined,
       };
-    }
+    };
+    m =
+      (boxedCard === "cohort" ? cohortModel() : null) ??
+      (boxedCard === "country" ? countryModel() : null) ??
+      geoNodeModel() ??
+      cohortModel() ??
+      countryModel();
   } else if (mode === "ledger") {
     // The pinned SNAPSHOT — metagraph snapshot over the global tick (the finer subject wins,
-    // like the rail's slot order). Titles are bare ordinals (no `#`, the ordinal rule); the
-    // unlisted lane keeps its deliberate neutral gray — identity is not a state.
-    if (metaSnap) {
+    // like the rail's slot order) — unless the GLOBAL card is the box. Titles are bare
+    // ordinals (no `#`, the ordinal rule); the unlisted lane keeps its deliberate neutral
+    // gray — identity is not a state.
+    const msModel = (): Model | null => {
+      if (!metaSnap) return null;
       const nnet = displayNetwork(metaSnap.metaId);
-      m = {
+      return {
         key: `ms|${metaSnap.metaId}|${metaSnap.ordinal}`,
         eyebrow: "Metagraph snapshot",
         title: metaSnap.ordinal.toLocaleString(),
         aside: nnet ? { text: nnet.ticker, hue: nnet.hue } : undefined,
         ring: nnet?.hue ?? "var(--primary)",
       };
-    } else if (snap) {
+    };
+    const gsModel = (): Model | null => {
+      if (!snap) return null;
       const rel = relativeAge(now - Date.parse(snap.data.timestamp));
-      m = {
+      return {
         key: `gs|${snap.data.ordinal}`,
         eyebrow: "Global snapshot",
         title: snap.data.ordinal.toLocaleString(),
@@ -202,7 +220,8 @@ export default function SceneCallout() {
             ? { text: `${snap.data.metagraphSnapshotCount} anchors` }
             : undefined,
       };
-    }
+    };
+    m = (boxedCard === "snap" ? gsModel() : null) ?? msModel() ?? gsModel();
   }
   if (!m) return null;
 

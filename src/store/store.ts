@@ -181,6 +181,13 @@ interface AppState {
   // choreography is its own 3.9s answer to the user's gesture, so a 1.4s dim inside it would read
   // as a blink.
   cameraFlying: boolean;
+  // Which rail slot is the materialized BOX right now (the expanded card — "context", "node",
+  // "snap", …), or null when nothing is boxed. A PRESENTATION channel, written by Inspector
+  // from the same state that renders the box, read by the subject callout so the scene label
+  // mirrors the box exactly as the camera does (user, 2026-08-15: clicking a committed node's
+  // hub re-boxes the metagraph card — the callout must step up with it). Never a selection
+  // channel: committing/deselecting stays with the ladder.
+  boxedCard: string | null;
   // PHONE ONLY: the bottom sheet's drag-chosen height override in px (null = the default 60vh).
   // Shared by BOTH dock sheets so switching halves keeps the chosen height; reset to null the
   // moment the dock fully closes (`setPhoneDock(null)`) so reopening starts at the default.
@@ -247,6 +254,7 @@ interface AppState {
   setSceneDragging: (dragging: boolean) => void;
   setCameraFlying: (flying: boolean) => void;
   setPhoneSheetPx: (px: number | null) => void;
+  setBoxedCard: (id: string | null) => void;
   setRailCollapse: (id: string, collapsed: boolean | null) => void;
   setRailCollapseMany: (entries: Record<string, boolean | null>) => void;
   /** Ask the Engine to frame this ladder rung (see `focusRung`). One-shot; the Engine reads it
@@ -301,6 +309,7 @@ export const useStore = create<AppState>((set) => ({
   railCollapse: {},
   focusRung: null,
   phoneSheetPx: null,
+  boxedCard: null,
 
   setLive: (live, lastGoodAt) => set((s) => ({ live, lastGoodAt: lastGoodAt ?? s.lastGoodAt })),
   setEngineReady: (engineReady) => set({ engineReady }),
@@ -426,6 +435,7 @@ export const useStore = create<AppState>((set) => ({
       return { railCollapse };
     }),
   setPhoneSheetPx: (phoneSheetPx) => set({ phoneSheetPx }),
+  setBoxedCard: (boxedCard) => set({ boxedCard }),
   // A fresh object every call — the request is the EVENT, so re-opening the same rung must reach
   // the Engine's reference-compare bridge again.
   requestFocusRung: (level) => set({ focusRung: { level } }),
