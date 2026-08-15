@@ -209,6 +209,7 @@ export function NodePickerRow({
       title={`${row.label} · ${row.state ?? "—"}`}
       onClick={onSelect}
       onMouseEnter={pair.onMouseEnter}
+      onMouseMove={pair.onMouseMove}
       onFocus={pair.onFocus}
     >
       {/* Just "Node" + the mono id — the row is a pure picker; the parent row carries the

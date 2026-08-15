@@ -153,16 +153,18 @@ function inspectedNode(inspect: ReturnType<typeof useStore.getState>["inspect"])
 // so this reads as the Snapshots view's variant with no view check anywhere. Signers come from
 // the same two sources the Engine's tray glow reads — the deep read when it has landed, else
 // the exact read's shallow row.
-function useSignedSelected(node: { id?: string | null; ids?: string[] } | undefined | null): boolean {
+function useSignedSelected(node: { id?: string | null; ids?: string[] } | undefined | null): number | null {
   const metaSnap = useStore((s) => s.metaSnap);
   const deepMap = useStore((s) => s.metaSnapDeep);
   const exact = useStore((s) => s.snapshotExact);
-  if (!node || !metaSnap) return false;
+  if (!node || !metaSnap) return null;
   const deep = deepMap[metaSnapDeepKey(metaSnap.globalOrdinal, metaSnap.metaId, metaSnap.ordinal)];
   const row = exact[metaSnap.globalOrdinal]?.rows?.find(
     (r) => r.metaId === metaSnap.metaId && r.ordinal === metaSnap.ordinal,
   );
-  return nodeSigned(node, deep?.signers ?? row?.signers ?? null);
+  // Returns the SIGNED snapshot's ordinal (not a bare boolean): the relation names its object
+  // (user, 2026-08-15 — "say what it signed, like 'anchored to'").
+  return nodeSigned(node, deep?.signers ?? row?.signers ?? null) ? metaSnap.ordinal : null;
 }
 
 function nodeCity(node: NonNullable<ReturnType<typeof inspectedNode>>): string {
@@ -202,13 +204,16 @@ export function GeoLiveAside() {
   const node = inspectedNode(inspect);
   const signed = useSignedSelected(node?.node);
   if (!node) return null;
-  if (signed)
+  if (signed != null)
     return (
+      // The relation NAMES ITS OBJECT (user, 2026-08-15 — like the snapshot card's "anchored
+      // to N"): the signed metagraph snapshot's own ordinal, bare per the ordinal rule. The
+      // layer detail (the L0 seal) rides the title — the aside states the relation.
       <span
-        className="inline-flex items-center gap-1 text-label text-muted-foreground whitespace-nowrap"
+        className="text-label text-muted-foreground whitespace-nowrap"
         title="This machine is among the committed metagraph snapshot's proof signers — a snapshot is sealed by the metagraph's own L0 cluster."
       >
-        signed <RoleChips codes={["L0"]} />
+        signed {signed.toLocaleString()}
       </span>
     );
   return <StatusMark state={node.node?.state} />;
@@ -671,7 +676,7 @@ function GeoLiveNode({ p }: { p: PickOf<"l0" | "l1" | "metanode"> }) {
   // The SIGNED relation owns the head aside while it exists (GeoLiveAside) — the status the
   // head normally carries moves down here as the first body row, so no fact is lost, only
   // redistributed (the pile rule's redistribution idea, applied within one card).
-  const signedSel = useSignedSelected(p.node);
+  const signedSel = useSignedSelected(p.node) != null;
   // The three ancestor rungs that can own one of this card's facts.
   const country = useStore((s) => s.country);
   const cohort = useStore((s) => s.cohort);

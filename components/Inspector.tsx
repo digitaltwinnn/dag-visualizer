@@ -97,6 +97,7 @@ function CardPane({
       className={pair.className}
       style={pair.style}
       onMouseEnter={pair.onMouseEnter}
+      onMouseMove={pair.onMouseMove}
       onMouseLeave={pair.onMouseLeave}
       onFocus={pair.onFocus}
       onBlur={pair.onBlur}
@@ -127,7 +128,7 @@ function CountryPane({ cc, onClose, collapsed, onToggle }: { cc: string; onClose
   const pair = subjectPairing<string>(hoverCountry, cc, setHoverCountry, filterAccent(filter));
   const pulseKey = useEdgePulse(cc);
   return (
-    <RailPane entry={collapsed} className={pair.className} style={pair.style} onMouseEnter={pair.onMouseEnter} onMouseLeave={pair.onMouseLeave} onFocus={pair.onFocus} onBlur={pair.onBlur}>
+    <RailPane entry={collapsed} className={pair.className} style={pair.style} onMouseEnter={pair.onMouseEnter} onMouseMove={pair.onMouseMove} onMouseLeave={pair.onMouseLeave} onFocus={pair.onFocus} onBlur={pair.onBlur}>
       <CardHead
         eyebrow="Country"
         title={<CountryTitle cc={cc} />}

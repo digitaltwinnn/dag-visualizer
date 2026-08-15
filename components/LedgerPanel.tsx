@@ -139,6 +139,7 @@ function SnapRow<K extends string | number>({
       onClick={onClick}
       aria-expanded={disclose ? disclose.open : undefined}
       onMouseEnter={pair.onMouseEnter}
+      onMouseMove={pair.onMouseMove}
       onMouseLeave={pair.onMouseLeave}
       onFocus={pair.onFocus}
       onBlur={pair.onBlur}

@@ -100,6 +100,7 @@ export function RailPane({
   className,
   style,
   onMouseEnter,
+  onMouseMove,
   onMouseLeave,
   onFocus,
   onBlur,
@@ -110,6 +111,9 @@ export function RailPane({
   className?: string;
   style?: CSSProperties;
   onMouseEnter?: () => void;
+  // The pairing's swap-under-pointer healer (useSubjectPairing.onMouseMove) — a pager step or
+  // live advance replaces the keyed card under a stationary cursor and mouseenter never fires.
+  onMouseMove?: () => void;
   onMouseLeave?: () => void;
   onFocus?: () => void;
   onBlur?: () => void;
@@ -117,14 +121,14 @@ export function RailPane({
 }) {
   if (entry) {
     return (
-      <aside id={id} className={cn(RAIL_ENTRY, "sig-left", className)} style={style} onMouseEnter={onMouseEnter} onMouseLeave={onMouseLeave} onFocus={onFocus} onBlur={onBlur}>
+      <aside id={id} className={cn(RAIL_ENTRY, "sig-left", className)} style={style} onMouseEnter={onMouseEnter} onMouseMove={onMouseMove} onMouseLeave={onMouseLeave} onFocus={onFocus} onBlur={onBlur}>
         {children}
       </aside>
     );
   }
   return (
     <Card asChild className={cn(RIGHT_CARD, "sig-left", "animate-card-in motion-reduce:animate-none", className)}>
-      <aside id={id} style={style} onMouseEnter={onMouseEnter} onMouseLeave={onMouseLeave} onFocus={onFocus} onBlur={onBlur}>
+      <aside id={id} style={style} onMouseEnter={onMouseEnter} onMouseMove={onMouseMove} onMouseLeave={onMouseLeave} onFocus={onFocus} onBlur={onBlur}>
         {children}
       </aside>
     </Card>

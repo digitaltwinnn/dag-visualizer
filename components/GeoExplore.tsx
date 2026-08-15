@@ -221,6 +221,7 @@ export default function GeoExplore() {
                   aria-expanded={open}
                   onClick={() => drill(c.cc)}
                   onMouseEnter={pair.onMouseEnter}
+      onMouseMove={pair.onMouseMove}
                   onMouseLeave={pair.onMouseLeave}
                   onFocus={pair.onFocus}
                   onBlur={pair.onBlur}

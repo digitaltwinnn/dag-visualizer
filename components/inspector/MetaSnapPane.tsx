@@ -8,11 +8,12 @@
 import { useEffect, useMemo, useState, type CSSProperties } from "react";
 import { Button } from "@/components/ui/button";
 import CardHead, { RailPane } from "@/components/CardHead";
+import { subjectPairing } from "@/components/useSubjectPairing";
 import { Fact, FactGroup, Foot, FootRow } from "@/components/inspector/parts";
 import { useSnapRecord } from "@/components/useArchive";
 import { Separator } from "@/components/ui/separator";
 import { useStore } from "@/src/store/store";
-import { metaSnapDeepKey } from "@/src/data/types";
+import { metaSnapDeepKey, metaSnapHoverKey } from "@/src/data/types";
 import type { ChannelSnapDeep, ChannelSnapRow } from "@/src/data/types";
 import { getNetwork, SIGNER_GROUPS, metagraphById } from "@/src/data/network";
 import { UNLISTED_HUE } from "@/src/data/unlisted";
@@ -55,6 +56,14 @@ export default function MetaSnapPane({
   const deep = useStore((s) => (deepKey ? s.metaSnapDeep[deepKey] : undefined));
   const following = useStore((s) => s.following);
   const filter = useStore((s) => s.filter);
+  // Rule 9's missing consumer (user, 2026-08-15 — "a gray edge effect even though it's filtered
+  // on DOR; happens when I swipe"): this card never paired, so its edge could only ever show
+  // the grey whisper — hovering now rides `hoverMetaSnap`, the SAME channel the anchor-log row,
+  // the explorer leaf and the scene's tile use (a row is a snapshot, not its tick), which
+  // supplies `.subject-paired` + the hued `--row-hue` the edge recipes read, and glows the tile
+  // bidirectionally. The pairing's onMouseMove healer covers the swipe's swap-under-pointer.
+  const hoverMetaSnap = useStore((s) => s.hoverMetaSnap);
+  const setHoverMetaSnap = useStore((s) => s.setHoverMetaSnap);
   const snap = useStore((s) => s.snap);
   const setSection = useStore((s) => s.setSection);
   const setDeepWanted = useStore((s) => s.setDeepWanted);
@@ -123,6 +132,7 @@ export default function MetaSnapPane({
   // (2026-08-08: hashing the address through the identity palette minted a random hue per channel —
   // pink icons for a set that deliberately has no identity of its own).
   const hue = cfg ? identityHudHex(sel.metaId) : UNLISTED_HUE;
+  const pair = subjectPairing<string>(hoverMetaSnap, metaSnapHoverKey(sel.metaId, sel.ordinal), setHoverMetaSnap, hue);
   // Hoisted out of the state tier so the FOOT can reach it — it is a hash, and hashes are looked
   // up, not read. The deep read wins where it exists; the exact row carries it otherwise.
   const stateProof = deep?.stateProof ?? row?.stateProof;
@@ -166,7 +176,16 @@ export default function MetaSnapPane({
   );
 
   return (
-    <RailPane entry={collapsed}>
+    <RailPane
+      entry={collapsed}
+      className={pair.className}
+      style={pair.style}
+      onMouseEnter={pair.onMouseEnter}
+      onMouseMove={pair.onMouseMove}
+      onMouseLeave={pair.onMouseLeave}
+      onFocus={pair.onFocus}
+      onBlur={pair.onBlur}
+    >
       <CardHead
           eyebrow="Metagraph snapshot"
           title={

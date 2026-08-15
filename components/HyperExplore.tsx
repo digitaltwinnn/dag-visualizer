@@ -127,6 +127,7 @@ export default function HyperExplore() {
                     title={`${name} · ${m.nodes.length} node${m.nodes.length === 1 ? "" : "s"}`}
                     onClick={() => toggleNetwork(m.id)}
                     onMouseEnter={pair.onMouseEnter}
+      onMouseMove={pair.onMouseMove}
                     onMouseLeave={pair.onMouseLeave}
                     onFocus={pair.onFocus}
                     onBlur={pair.onBlur}

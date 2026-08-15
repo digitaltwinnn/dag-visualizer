@@ -911,6 +911,24 @@ set is identical in every view — only its distribution across planks moves. Wh
 one fixed reading order, **place → role → host → reference**, so the card always reads the same way; it
 just has fewer lines.
 
+**CARDS TELL THE STORY, NOT A STATIC RECORD** (user, 2026-08-15 — the named principle behind the pile
+rule and its kin). A card is its subject *as seen from the current scene*: the same facts, redistributed
+to lead with what the present context makes relevant. Three forms, one principle:
+
+- **Across cards** — the pile dedup above: a fact moves to whichever plank states it best, never
+  duplicated at equal weight.
+- **Within a card** — the node card's SIGNED relation: with a metagraph snapshot committed and the node
+  among its proof signers, the head aside states the relation (`signed` + the L0 chip — the one fact
+  tying the node to the chamber's subject) and the status moves down to the first body row. Nothing
+  lost, redistributed.
+- **Across surfaces** — the subject callout mirrors the BOX (`store.boxedCard`, published by Inspector
+  from the same state that renders it): the box is the subject — it already gets the camera — so
+  re-boxing an ancestor card steps the scene label up with it.
+
+The gate is always **presence** (a committed rung, a live relation, the box), never `mode` — `metaSnap`
+being ledger-scoped is what scopes the signed relation to the chamber, with no view check anywhere. A
+new per-context variation must name the story state it answers to, not the view it appears in.
+
 **Density came from culling, not from tightening.** `Data blocks`, `Height` and `Blocks` (metagraph
 snapshot) and `Epoch` (global snapshot) were removed outright — a fact nobody reads costs more than the
 pixels it takes.
