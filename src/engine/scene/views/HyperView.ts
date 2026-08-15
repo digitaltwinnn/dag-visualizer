@@ -126,17 +126,14 @@ function applyOrbFresnel(mat: THREE.MeshStandardMaterial): void {
 // builds — scene/Globe.ts (via `layers.metas.find`, keying off `.cfg.id`/`.group`) and
 // Engine.ts (`.cfg.id` lookups for DoF/filter) read these fields off the instances handed
 // to them, so this type must track _buildMetagraphs verbatim).
-// FURNITURE LABELS (user, 2026-08-15 — the callout spike's other half): each hub wears its
-// ticker as flat in-scene text under it, and the core wears "Global L0" — the same words the
-// hover tooltip uses. In-scene on purpose (makeTextLabel): they bloom on the scene lane, ride
-// the structure's tilt/spin/morph, and dim as FURNITURE — each hub's label on the same fdim as
-// its tether and hoops, the core's on coreOffMul — so a label can never outshine the thing it
-// names. The hub label hangs BELOW the hub, clear of its own ring atom (radial placement would
-// sit inside the 5.4-radius cL1 ring); the core label counter-rotates against the shared spin
-// so it always reads upright.
-const HUB_LABEL_H = 2.7;
-const HUB_LABEL_DROP = 6.8; // below the hub centre, clear of the 5.4-radius cL1 ring
-const HUB_LABEL_OP = 0.95;
+// FURNITURE LABEL (user, 2026-08-15 — the callout spike's other half): the core wears
+// "Global L0" — the same words the hover tooltip uses — as flat in-scene text just outside its
+// outermost shell, counter-rotated against the shared spin so it always reads upright, dimming
+// as core furniture on coreOffMul. In-scene on purpose (makeTextLabel): it blooms on the scene
+// lane and rides the structure's tilt/spin/morph. PER-HUB ticker labels were built and REMOVED
+// the same day (user: "remove it") — ten tickers under ten orbiting hubs read as clutter the
+// identity hues + the hover tooltip + the callout already answer; the core is the one piece of
+// furniture whose name isn't carried anywhere else at rest.
 const CORE_LABEL_H = 2.4;
 const CORE_LABEL_OP = 0.6;
 
@@ -161,7 +158,6 @@ export interface MetaHubRec {
   active: boolean;
   hoops: THREE.LineLoop[]; // the cyan layer rings (structural) drawn around this hub
   fills: THREE.Mesh[]; // soft radial fill disks under each ring (rim-weighted, fade to transparent)
-  label: THREE.Mesh; // the hub's flat ticker label (furniture — dims on fdim with the tether)
 }
 
 export class HyperView implements SceneView {
@@ -403,19 +399,7 @@ export class HyperView implements SceneView {
       }
 
       this.root.add(group);
-      // The hub's ticker as flat scene text, tinted with its identity scene colour (see the
-      // furniture-label note above MetaHubRec). Positioned/oriented per frame in the hub loop.
-      const lc = new THREE.Color(col);
-      const label = makeTextLabel(
-        `rgba(${Math.round(lc.r * 255)},${Math.round(lc.g * 255)},${Math.round(lc.b * 255)},0.92)`,
-        cfg.ticker || cfg.name,
-        HUB_LABEL_H,
-        500,
-      );
-      label.rotation.order = "YXZ";
-      this.root.add(label);
-
-      this.metas.push({ group, hub, cfg, state: null, tether, packets: [], pool, pending: 0, lastLaunch: 0, glow: 0, anchor: pos.clone(), orbit: an.a, radius: an.radius, incl: an.incl, spin: 0.3 + Math.random() * 0.5, active: true, hoops, fills, label });
+      this.metas.push({ group, hub, cfg, state: null, tether, packets: [], pool, pending: 0, lastLaunch: 0, glow: 0, anchor: pos.clone(), orbit: an.a, radius: an.radius, incl: an.incl, spin: 0.3 + Math.random() * 0.5, active: true, hoops, fills });
     });
   }
 
@@ -720,15 +704,6 @@ export class HyperView implements SceneView {
       const fillOp = FILL_OP * metaF * (m.active ? 1 : 0.7) * fdim;
       for (const f of m.fills) (f.material as THREE.MeshBasicMaterial).opacity = fillOp * this._fades.alpha;
 
-      // The ticker label hangs below the hub, flat in the structure plane, counter-rotated
-      // against the shared spin exactly like the core label — every label reads upright and
-      // uniformly at the resting pose (a tangent orientation left side hubs edge-on).
-      // Furniture: same fdim as the tether/hoops, same fades.
-      m.label.position.set(_pos.x, _pos.y - HUB_LABEL_DROP, _pos.z);
-      m.label.rotation.set(-Math.PI / 2, -this.root.rotation.y, 0);
-      (m.label.material as THREE.MeshBasicMaterial).opacity =
-        HUB_LABEL_OP * metaF * (m.active ? 1 : 0.6) * fdim * this._fades.alpha;
-      m.label.visible = hubFade > 0.001;
 
 
       // Anchor packets: launch one per pending snapshot (staggered), advance the in-flight ones
