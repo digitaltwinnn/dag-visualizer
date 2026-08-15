@@ -112,8 +112,18 @@ export function resolveSignerIps(
   return ips.length ? ips : null;
 }
 
-// The card-side twin of resolveSignerIps: given ONE signer's truncated id, find the matching
-// live NODE ROW (the same rows the ledger explorer/roster browse — `store.selNodes`) so the
+/** Whether ONE node is among a snapshot proof's signers, given the proof's truncated signer
+ *  ids — the membership read behind the node card's "signed" relation (user, 2026-08-15).
+ *  Matches across every LAYER id (`ids`), per the ⚠️ above — a proof is sealed by the L0
+ *  layer, whose id differs from a hybrid's other layers. */
+export function nodeSigned(
+  node: { id?: string | null; ids?: string[] },
+  signers: readonly string[] | null | undefined,
+): boolean {
+  return !!signers?.some((p) => !!p && carriesSigner(node, p));
+}
+
+// The card-side twin of resolveSignerIps: given ONE signer's truncated id, find the matching// live NODE ROW (the same rows the ledger explorer/roster browse — `store.selNodes`) so the
 // metagraph-snapshot card can render a clickable/hoverable row per signer instead of a bare
 // hash. Scoped to the snapshot's own network first (a truncated prefix could theoretically
 // collide across metagraphs; pickNetId keeps the match honest), then prefix-matched like

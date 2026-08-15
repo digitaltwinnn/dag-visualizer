@@ -222,6 +222,26 @@
   box-shadow: 0 0 10px 0 var(--row-hue, var(--spine, var(--primary)));
 }
 
+/* The identity EDGE SPINE with corner run-off (user, 2026-08-15 — "the fade drops too quickly
+   on short cards; let it fade a bit into the corners"). Mechanism: a transparent border whose
+   LEFT side alone carries the hue — a border follows the box's rounded corners, so the ink
+   bends into the top/bottom arcs — masked by a FIXED-LENGTH vertical fade, so the tips spend
+   themselves IN the corner curves instead of stopping short of them. Fixed 22px (not a
+   percentage): a short callout fades across most of its edge, a tall card confines the fade to
+   its corners — one recipe, every size. Hue rides `--spine` (the identity-var convention);
+   opacity belongs to the consumer. First consumer: the subject callout (SceneCallout); the
+   sheets' `.ig-sheet-edge` can adopt the same device if their straight tips ever read abrupt. */
+.edge-spine {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  border: 1.5px solid transparent;
+  border-left-color: var(--spine, var(--primary));
+  pointer-events: none;
+  -webkit-mask: linear-gradient(180deg, transparent, #000 22px, #000 calc(100% - 22px), transparent);
+  mask: linear-gradient(180deg, transparent, #000 22px, #000 calc(100% - 22px), transparent);
+}
+
 /* Sheets (tablet/phone RailDock): the sheet's own `.ig-sheet-edge` spine is the single identity
    cue, so even the transient hover-pairing edge is suppressed on hosted cards to keep the sheet
    calm (resting spines are already 0 everywhere — design-concern #5 is resolved by construction).

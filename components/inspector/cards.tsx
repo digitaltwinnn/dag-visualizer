@@ -3,13 +3,14 @@
 import { useEffect, useMemo, useState } from "react";
 import { cn } from "@/lib/utils";
 import { useStore } from "@/src/store/store";
-import { shortHash, CORE_HEX, metagraphById, getNetwork, SIGNER_GROUPS } from "@/src/data/network";
+import { shortHash, CORE_HEX, metagraphById, getNetwork, SIGNER_GROUPS, nodeSigned } from "@/src/data/network";
 import { UNLISTED_ID, observedUnlistedIds } from "@/src/data/unlisted";
 import { identityHudHex } from "@/src/palette/identity";
 import { hex, fmtDag, fmtKB, midHash } from "@/src/util/format";
 import { relativeAge } from "@/src/util/relativeAge";
 import { statusBreakdown } from "@/src/data/nodeStatus";
 import type { GlobalSnapshot, MetaCfg, PickDescriptor } from "@/src/data/types";
+import { metaSnapDeepKey } from "@/src/data/types";
 import AnchoredTags from "./AnchoredTags";
 import Odometer from "@/components/Odometer";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
@@ -146,6 +147,24 @@ function inspectedNode(inspect: ReturnType<typeof useStore.getState>["inspect"])
 // The node's resolved CITY — the title's place word ("" when geolocation hasn't resolved). The
 // COUNTRY left the title (user, 2026-08-02): it is a labelled fact like hosting and the node id,
 // so it reads in the body with the rest rather than doubling the headline.
+// Whether the inspected node is among the COMMITTED metagraph snapshot's proof signers — the
+// node card's "signed" relation (user, 2026-08-15). PRESENCE-gated, never mode-gated
+// (convention 7's honest form): `metaSnap` is ledger-scoped and cleared on leaving the view,
+// so this reads as the Snapshots view's variant with no view check anywhere. Signers come from
+// the same two sources the Engine's tray glow reads — the deep read when it has landed, else
+// the exact read's shallow row.
+function useSignedSelected(node: { id?: string | null; ids?: string[] } | undefined | null): boolean {
+  const metaSnap = useStore((s) => s.metaSnap);
+  const deepMap = useStore((s) => s.metaSnapDeep);
+  const exact = useStore((s) => s.snapshotExact);
+  if (!node || !metaSnap) return false;
+  const deep = deepMap[metaSnapDeepKey(metaSnap.globalOrdinal, metaSnap.metaId, metaSnap.ordinal)];
+  const row = exact[metaSnap.globalOrdinal]?.rows?.find(
+    (r) => r.metaId === metaSnap.metaId && r.ordinal === metaSnap.ordinal,
+  );
+  return nodeSigned(node, deep?.signers ?? row?.signers ?? null);
+}
+
 function nodeCity(node: NonNullable<ReturnType<typeof inspectedNode>>): string {
   return node.geo?.city ?? "";
 }
@@ -173,11 +192,25 @@ export function GeoLiveTitle() {
   );
 }
 
-// Node title-row aside: the status pill.
+// Node title-row aside: the status pill — unless the SIGNED relation exists (user, 2026-08-15:
+// "the header not to show the status, move that to a row, and instead show the relation"):
+// with a metagraph snapshot committed and this node among its proof signers, the head states
+// the relation — the one fact tying the node to the chamber's subject — and the status moves
+// into the body (GeoLiveNode's Status row, gated on the same hook).
 export function GeoLiveAside() {
   const inspect = useStore((s) => s.inspect);
   const node = inspectedNode(inspect);
+  const signed = useSignedSelected(node?.node);
   if (!node) return null;
+  if (signed)
+    return (
+      <span
+        className="inline-flex items-center gap-1 text-label text-muted-foreground whitespace-nowrap"
+        title="This machine is among the committed metagraph snapshot's proof signers — a snapshot is sealed by the metagraph's own L0 cluster."
+      >
+        signed <RoleChips codes={["L0"]} />
+      </span>
+    );
   return <StatusMark state={node.node?.state} />;
 }
 
@@ -635,6 +668,10 @@ export function GeoLiveCard() {
 // above it uses, so the two can't disagree about who owns the host, and it keeps the mono face
 // the provider card's own ASN row carries.
 function GeoLiveNode({ p }: { p: PickOf<"l0" | "l1" | "metanode"> }) {
+  // The SIGNED relation owns the head aside while it exists (GeoLiveAside) — the status the
+  // head normally carries moves down here as the first body row, so no fact is lost, only
+  // redistributed (the pile rule's redistribution idea, applied within one card).
+  const signedSel = useSignedSelected(p.node);
   // The three ancestor rungs that can own one of this card's facts.
   const country = useStore((s) => s.country);
   const cohort = useStore((s) => s.cohort);
@@ -672,6 +709,12 @@ function GeoLiveNode({ p }: { p: PickOf<"l0" | "l1" | "metanode"> }) {
   return (
     <>
       <FactGroup>
+        {/* STATUS — only while the SIGNED relation holds the head aside (its usual home). */}
+        {signedSel && (
+          <Fact label="Status">
+            <StatusMark state={p.node?.state} />
+          </Fact>
+        )}
         {/* COUNTRY — the half of the place the head no longer carries (user, 2026-08-02). The
             country CODE suffix is gone (2026-08-10): it restated the name it sat beside.
             Yields to the country card's own title once that rung is drilled. */}

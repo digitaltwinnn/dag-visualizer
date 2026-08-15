@@ -1751,10 +1751,19 @@ export class Engine {
     if (el.dataset.on !== flag) el.dataset.on = flag;
   }
 
-  // HYPER anchors are NETWORK-level (the hub / the core) — a node commit keeps its network's
-  // callout, matching hyper's own camera answer to a node. The label needs the RENDERED
-  // position, not a layout anchor — this is not framing math.
+  // HYPER anchors the committed NODE's own bead when one is committed (user, 2026-08-15 —
+  // clickable, has a card, so it gets its callout; the CAMERA still answers a node with its
+  // network's framing, but the label points at the thing itself), else the network's hub or
+  // the core. The label needs the RENDERED position, not a layout anchor — not framing math.
   private _hyperCalloutAnchor(v: THREE.Vector3): boolean {
+    const p = useStore.getState().inspect;
+    if (
+      p && (p.kind === "l0" || p.kind === "l1" || p.kind === "metanode") &&
+      this.globe.selectedNodeHyperAnchor(v)
+    ) {
+      this.globe.group.localToWorld(v); // the rendered structure transform — a label read. render-state OK
+      return true;
+    }
     if (this.filter === "all") return false;
     if (this.filter === "dag") {
       this.layers.coreGroup.getWorldPosition(v); // render-state OK

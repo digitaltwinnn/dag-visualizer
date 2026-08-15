@@ -34,7 +34,7 @@
 import { useStore } from "@/src/store/store";
 import { VIEW_POLICIES } from "@/src/engine/domain/viewPolicy";
 import { displayNetwork } from "@/src/data/unlisted";
-import { filterAccent } from "@/src/data/network";
+import { filterAccent, shortHash } from "@/src/data/network";
 import { RoleChips } from "@/components/inspector/parts";
 import { useNowTick } from "@/components/useNowTick";
 import { relativeAge } from "@/src/util/relativeAge";
@@ -96,8 +96,36 @@ export default function SceneCallout() {
   const now = useNowTick(1000);
   if (!VIEW_POLICIES[mode].callout || section !== "scene") return null;
 
+  // The committed NODE's model — shared by hyper and geo (user, 2026-08-15: in hyper too, "the
+  // node does not have its callout — clickable, has a card"). City-first like the node card,
+  // the network ticker as the hued identity aside, composition as the cards' pills; a node
+  // with no place falls back to its short id (mono subjects keep their register elsewhere —
+  // here the name is simply the best handle the node offers).
+  const nodePick =
+    inspect && (inspect.kind === "l0" || inspect.kind === "l1" || inspect.kind === "metanode") ? inspect : null;
+  const nodeModel = (): Model | null => {
+    if (!nodePick) return null;
+    const g = geoOf(nodePick);
+    const netId = nodePick.kind === "metanode" ? ((nodePick as { meta?: { id?: string } }).meta?.id ?? null) : "dag";
+    const nnet = displayNetwork(netId);
+    const codes = layerCodes([{ roles: nodePick.roles }]);
+    const id = (nodePick as { node?: { id?: string } }).node?.id;
+    return {
+      key: `node|${id ?? `${g?.lat},${g?.lon}`}`,
+      eyebrow: "Node",
+      title: g?.city ?? g?.country ?? (id ? shortHash(id) : "Node"),
+      aside: nnet ? { text: nnet.ticker, hue: nnet.hue } : undefined,
+      ring: nnet?.hue ?? "var(--primary)",
+      lead: codes.length ? { codes } : undefined,
+    };
+  };
+
   let m: Model | null = null;
   if (mode === "hyper") {
+    m = nodeModel();
+    if (m) {
+      // fall through to render — the node leads over its network
+    } else {
     const net = displayNetwork(filter);
     // "all" has no subject; the unlisted set has no 3D anchor (no machines are knowable).
     if (!net || net.virtual) return null;
@@ -113,24 +141,12 @@ export default function SceneCallout() {
       ring: net.hue,
       lead: mg ? { text: `${mg.nodes.length} nodes`, codes } : undefined,
     };
+    }
   } else if (mode === "geo") {
-    const nodePick =
-      inspect && (inspect.kind === "l0" || inspect.kind === "l1" || inspect.kind === "metanode") ? inspect : null;
     const g = nodePick ? geoOf(nodePick) : undefined;
     if (nodePick && g?.lat != null && g.lon != null) {
-      // NODE — city-first like the node card; the network ticker is the hued identity aside
-      // (node marks carry their node's own network hue), composition as the cards' pills.
-      const netId = nodePick.kind === "metanode" ? ((nodePick as { meta?: { id?: string } }).meta?.id ?? null) : "dag";
-      const nnet = displayNetwork(netId);
-      const codes = layerCodes([{ roles: nodePick.roles }]);
-      m = {
-        key: `node|${g.lat},${g.lon}`,
-        eyebrow: "Node",
-        title: g.city ?? g.country ?? "Node",
-        aside: nnet ? { text: nnet.ticker, hue: nnet.hue } : undefined,
-        ring: nnet?.hue ?? "var(--primary)",
-        lead: codes.length ? { codes } : undefined,
-      };
+      // NODE — the shared model above (the ANCHOR needs a geo place here, hence the gate).
+      m = nodeModel();
     } else if (cohort) {
       // PROVIDER — the provider card's title IS the isp; the city rides muted (a place carries
       // no identity). The ring takes the active filter's accent, like every card-head mark.
@@ -223,16 +239,12 @@ export default function SceneCallout() {
       {/* The panel — keyed by subject so the roll-in replays on a change, like a card title. */}
       <div key={m.key} className={`roll-in absolute whitespace-nowrap ${SCENE_GLASS}`} style={{ left: OFF_X, bottom: OFF_Y }}>
         {/* The identity EDGE SPINE (user, 2026-08-15 — "the rails/hairline effect on the left
-            side, attached"): the sheets' single-identity-cue language at callout scale — a
-            soft-tipped vertical hairline in the subject's hue on the SCENE-FACING edge (the
-            side every card edge signal uses), with the leader flowing into its lower tip.
-            Static and subtle: a resting identity cue, not a signal — the shared soft-tipped
-            recipe, full hue across the middle, easing out in the last ~18% each end. */}
-        <span
-          aria-hidden
-          className="absolute -left-px inset-y-1.5 w-[2px] rounded-full opacity-70"
-          style={{ background: `linear-gradient(180deg, transparent, ${m.ring} 18%, ${m.ring} 82%, transparent)` }}
-        />
+            side, attached", then "let it fade into the corners"): the sheets' single-identity-
+            cue language at callout scale, as the shared `.edge-spine` recipe (globals.css) — a
+            corner-wrapping hue border under a fixed-length fade, so on a panel this short the
+            tips spend themselves in the corner curves rather than stopping abruptly. The
+            leader flows into its lower run-off. Static and subtle: a resting identity cue. */}
+        <span aria-hidden className="edge-spine opacity-70" style={{ ["--spine" as string]: m.ring }} />
         {/* The card eyebrow's own ink (CardHead: EYEBROW + text-accent), not a muted caption —
             this is the same slot noun the rail card wears (user, 2026-08-15). */}
         <div className="text-micro font-bold tracking-[0.1em] uppercase leading-none text-accent mb-1.5">{m.eyebrow}</div>

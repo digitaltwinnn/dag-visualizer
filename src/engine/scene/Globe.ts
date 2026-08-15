@@ -933,6 +933,22 @@ export class Globe implements GeoViewHost {
     return true;
   }
 
+  /** The SELECTED node's HYPER position in globe-LOCAL coordinates — the same anchor the
+   *  instance write uses (hub-glued world→local + offset for a metagraph node, the spun shell
+   *  position for a validator), so the hyper callout can point at the committed node's own
+   *  bead (user, 2026-08-15: "the node does not have its callout"). */
+  selectedNodeHyperAnchor(out: THREE.Vector3): boolean {
+    const rec = this._selNodeRec;
+    if (!rec) return false;
+    if ("hubGroup" in rec && rec.hubGroup) {
+      rec.hubGroup.getWorldPosition(out);
+      this.group.worldToLocal(out).add(rec.offset);
+      return true;
+    }
+    out.copy(rec.hyperPos);
+    return true;
+  }
+
   // Commit/clear the cohort selection: resolve member ids + the representative direction from
   // the CURRENT node records by cc+city+isp match (event-time — re-run by the data-rebuild
   // sites exactly like setSelectedNode's re-resolve). Membership matching mirrors

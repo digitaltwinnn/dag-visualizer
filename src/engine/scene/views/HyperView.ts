@@ -17,7 +17,6 @@ import { ORB_FRESNEL_GLSL, ORB_FRESNEL_MIX } from "../objects/NodeFabric";
 import { offNetMul } from "../../domain/dimModel";
 import { makeRadialGradientTexture } from "../objects/gradientTexture";
 import type { SceneColors } from "../../sceneColors";
-import { makeTextLabel } from "../objects/TextLabel";
 import type { TuneSchema } from "../../tune";
 import type { SceneView } from "./SceneView";
 
@@ -126,16 +125,12 @@ function applyOrbFresnel(mat: THREE.MeshStandardMaterial): void {
 // builds — scene/Globe.ts (via `layers.metas.find`, keying off `.cfg.id`/`.group`) and
 // Engine.ts (`.cfg.id` lookups for DoF/filter) read these fields off the instances handed
 // to them, so this type must track _buildMetagraphs verbatim).
-// FURNITURE LABEL (user, 2026-08-15 — the callout spike's other half): the core wears
-// "Global L0" — the same words the hover tooltip uses — as flat in-scene text just outside its
-// outermost shell, counter-rotated against the shared spin so it always reads upright, dimming
-// as core furniture on coreOffMul. In-scene on purpose (makeTextLabel): it blooms on the scene
-// lane and rides the structure's tilt/spin/morph. PER-HUB ticker labels were built and REMOVED
-// the same day (user: "remove it") — ten tickers under ten orbiting hubs read as clutter the
-// identity hues + the hover tooltip + the callout already answer; the core is the one piece of
-// furniture whose name isn't carried anywhere else at rest.
-const CORE_LABEL_H = 2.4;
-const CORE_LABEL_OP = 0.6;
+// NO FURNITURE LABELS IN HYPER (user, 2026-08-15, two reversals the same day): per-hub ticker
+// labels AND the core's "Global L0" were both built and removed after live review — text under
+// the orbiting structure read as clutter that the identity hues, the hover tooltip and the
+// subject callout already answer, and the About card carries the architecture story. The
+// in-scene text mechanism (objects/TextLabel.ts) lives on in geo's hosting-country names;
+// don't re-grow hyper labels without a live look first.
 
 export interface MetaHubRec {
   group: THREE.Group;
@@ -176,8 +171,6 @@ export class HyperView implements SceneView {
   core!: THREE.Mesh;
   coreFlash?: number;
   private _coreRings: THREE.LineLoop[] = []; // the DAG core's cyan "sun" hoops (rebuilt on node load)
-  private _coreLabel: THREE.Mesh | null = null; // "Global L0" furniture label (built with the shells)
-  private _coreLabelR = 8; // just outside the outermost shell — set by buildCoreRings
   private _coreFills: THREE.Mesh[] = []; // the DAG core's shell rim-fill disks (same as a metagraph's)
   private _fillTex?: THREE.Texture; // shared rim-weighted radial gradient for the ring fill disks
   // The focus spotlight (see SPOT_* above) + per-frame scratch. The light itself is shared and
@@ -549,21 +542,6 @@ export class HyperView implements SceneView {
         this._coreFills.push(fill);
       }
     }
-    // The core's own furniture label — "Global L0", the tooltip's words — built here because
-    // the shells' radii are only known now; it sits just outside the outermost shell and is
-    // positioned per frame (counter-rotated against the shared spin, so it reads upright).
-    this._coreLabelR = Math.max(...shells.map((x) => x.radius), 5) + 3.2;
-    if (!this._coreLabel) {
-      const cc = new THREE.Color(this._core);
-      this._coreLabel = makeTextLabel(
-        `rgba(${Math.round(cc.r * 255)},${Math.round(cc.g * 255)},${Math.round(cc.b * 255)},0.85)`,
-        "Global L0",
-        CORE_LABEL_H,
-        500,
-      );
-      this._coreLabel.rotation.order = "YXZ";
-      this.coreGroup.add(this._coreLabel);
-    }
   }
 
   // ---------------------------------------------------------------- Update loop
@@ -636,16 +614,6 @@ export class HyperView implements SceneView {
     // The core shells' rim-fill disks fade the same way (same treatment as a metagraph's fills).
     const coreFillOp = FILL_OP * coreReveal * coreOffMul;
     for (const f of this._coreFills) (f.material as THREE.MeshBasicMaterial).opacity = coreFillOp * this._fades.alpha;
-    // The "Global L0" label counter-rotates against the shared spin (coreGroup carries the same
-    // angle as root) so it always reads upright, sitting just outside the outermost shell on
-    // the camera side. Furniture: the core's own coreOffMul, like the hoops and fills.
-    if (this._coreLabel) {
-      const cry = this.coreGroup.rotation.y;
-      this._coreLabel.position.set(-Math.sin(cry) * this._coreLabelR, 0.3, Math.cos(cry) * this._coreLabelR);
-      this._coreLabel.rotation.set(-Math.PI / 2, -cry, 0);
-      (this._coreLabel.material as THREE.MeshBasicMaterial).opacity =
-        CORE_LABEL_OP * coreReveal * coreOffMul * this._fades.alpha;
-    }
     if (this.coreFlash) this.coreFlash = Math.max(0, this.coreFlash - dt * 1.6);
 
     // Metagraphs — orbit, spin, tether pulses. While ANY metagraph is selected (focusId), the

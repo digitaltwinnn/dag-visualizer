@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { matchSignerRow, resolveSigner, resolveSignerIps, SIGNER_GROUPS, SIGNER_UNKNOWN } from "@/src/data/network";
+import { matchSignerRow, nodeSigned, resolveSigner, resolveSignerIps, SIGNER_GROUPS, SIGNER_UNKNOWN } from "@/src/data/network";
 import type { MetaInfo, NodeRow } from "@/src/data/types";
 
 const meta = (id: string, nodes: { ip?: string; id?: string; ids?: string[] }[]): MetaInfo => ({
@@ -113,6 +113,16 @@ describe("matchSignerRow", () => {
 // The words for WHICH CLUSTER signed — one home, because the confusion the constant answers (DOR's
 // "signed by" is always 3 of its 20 machines) only clears if all three signer surfaces name the same
 // layer the same way.
+describe("nodeSigned", () => {
+  it("matches across every LAYER id, not the primary alone (a hybrid's L0 id differs)", () => {
+    const hybrid = { id: "dl1aaaa", ids: ["dl1aaaa", "l0bbbb"] };
+    expect(nodeSigned(hybrid, ["l0bb"])).toBe(true); // the L0 layer signed the proof
+    expect(nodeSigned(hybrid, ["zzzz"])).toBe(false);
+    expect(nodeSigned(hybrid, null)).toBe(false);
+    expect(nodeSigned(hybrid, [])).toBe(false);
+  });
+});
+
 describe("SIGNER_GROUPS", () => {
   it("names a distinct producing layer for each group, in every register a site needs", () => {
     expect(SIGNER_GROUPS.proof.layer).not.toBe(SIGNER_GROUPS.dataBlocks.layer);
