@@ -744,10 +744,12 @@ node tally is structure and structure is already the subject of the view above i
 simply absent there and the space comes back to the rails and the raw layer.
 
 `BottomStream` is the **one publisher**: it both mounts the strip and writes `--bottom-reserve`, from the
-one policy flag `VIEW_POLICIES[mode].timeLane`, so presence and reserved space can't drift (the previous
-arrangement published the reserve per view while the strip mounted unconditionally — two values for one
-token). The token's static default in `globals.css` is therefore **`0px`**, matching the boot view. The
-lane belongs to neither layer, so where it mounts it stays interactive in both poses.
+one policy flag `VIEW_POLICIES[mode].timeLane` **AND the scene pose**, so presence and reserved space
+can't drift (the previous arrangement published the reserve per view while the strip mounted
+unconditionally — two values for one token). The token's static default in `globals.css` is therefore
+**`0px`**, matching the boot view. The lane is **scene-pose only** (user, 2026-08-15): the raw anchor log
+pages arbitrarily deep into history, so the strip's retained window is no longer 1-1 with the table it
+would float over, and its reserve goes back to the raw layer — which the phone pane needs.
 
 ### Responsive shell
 
