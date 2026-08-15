@@ -31,21 +31,22 @@
 import { useStore } from "@/src/store/store";
 import { VIEW_POLICIES } from "@/src/engine/domain/viewPolicy";
 import { displayNetwork } from "@/src/data/unlisted";
+import { RoleChips } from "@/components/inspector/parts";
 
 // Panel offset from the anchor, up and to the right. The leader spans exactly this diagonal, so
 // the three pieces (ring, line, panel corner) stay attached by construction.
 const OFF_X = 62;
 const OFF_Y = 92;
 
-// The composition lead line: the layer codes present across the network's machines, in the one
-// layer vocabulary and its fixed order (L0 · cL1 · dL1).
-function layerCodes(nodes: { roles?: string[] }[]): string {
+// The composition lead line's layer codes — the one layer vocabulary in its fixed order,
+// rendered by the cards' own `RoleChips` (user, 2026-08-15: "look at my cards — square pills";
+// the pills are THE one rendering for layer codes wherever they appear, this surface included).
+function layerCodes(nodes: { roles?: string[] }[]): string[] {
   const has = { l0: false, cl1: false, dl1: false };
   for (const n of nodes) for (const r of n.roles ?? []) if (r in has) has[r as keyof typeof has] = true;
   return (["l0", "cl1", "dl1"] as const)
     .filter((k) => has[k])
-    .map((k) => (k === "l0" ? "L0" : k === "cl1" ? "cL1" : "dL1"))
-    .join(" · ");
+    .map((k) => (k === "l0" ? "L0" : k === "cl1" ? "cL1" : "dL1"));
 }
 
 export default function SceneCallout() {
@@ -58,8 +59,7 @@ export default function SceneCallout() {
   // "all" has no subject; the unlisted set has no 3D anchor (no machines are knowable).
   if (!net || net.virtual) return null;
   const mg = metaList.find((m) => m.id === filter) ?? null;
-  const codes = mg ? layerCodes(mg.nodes) : "";
-  const lead = mg ? `${mg.nodes.length} nodes${codes ? ` · ${codes}` : ""}` : null;
+  const codes = mg ? layerCodes(mg.nodes) : [];
   // The ticker aside suppresses itself when it only restates the name (the DAG core's ticker IS
   // its name) — a head must not say the same thing twice (the CardHead aside rule).
   const aside = net.ticker !== net.name ? net.ticker : null;
@@ -72,12 +72,24 @@ export default function SceneCallout() {
     >
       {/* Anchor ring at the projected point (the wrapper's origin). */}
       <span
-        className="absolute -translate-x-1/2 -translate-y-1/2 w-[7px] h-[7px] rounded-full border"
+        className="absolute -translate-x-1/2 -translate-y-1/2 w-[9px] h-[9px] rounded-full border-[1.5px]"
         style={{ borderColor: net.hue }}
       />
-      {/* Dashed leader from the anchor to the panel's near corner — the ordinal-label language. */}
+      {/* Dashed leader from the anchor to the panel's near corner — the ordinal-label language.
+          NEUTRAL RULER TONE, not the identity hue and not the resting border (user, 2026-08-15 —
+          the border token was near-invisible): the anchor sits in the subject's own glow, so a
+          hue-tinted line would vanish into a same-hue hub, and the leader is instrument chrome —
+          the thread's neutral-ruler half — while the RING above carries the identity. */}
       <svg className="absolute left-0 top-0 overflow-visible" width="1" height="1" aria-hidden>
-        <line x1={5} y1={-5} x2={OFF_X} y2={-OFF_Y + 8} stroke="var(--border)" strokeWidth="1" strokeDasharray="3 4" />
+        <line
+          x1={6}
+          y1={-6}
+          x2={OFF_X}
+          y2={-OFF_Y + 8}
+          stroke="var(--muted-foreground)"
+          strokeWidth="1.5"
+          strokeDasharray="4 4"
+        />
       </svg>
       {/* The panel — keyed by subject so the roll-in replays on a change, like a card title. */}
       <div
@@ -97,7 +109,12 @@ export default function SceneCallout() {
             </span>
           )}
         </div>
-        {lead && <div className="text-label text-muted-foreground mt-0.5">{lead}</div>}
+        {mg && (
+          <div className="flex items-center gap-1.5 text-label text-muted-foreground mt-1">
+            <span>{mg.nodes.length} nodes</span>
+            {codes.length > 0 && <RoleChips codes={codes} />}
+          </div>
+        )}
       </div>
     </div>
   );
