@@ -36,6 +36,8 @@ import { VIEW_POLICIES } from "@/src/engine/domain/viewPolicy";
 import { displayNetwork } from "@/src/data/unlisted";
 import { filterAccent } from "@/src/data/network";
 import { RoleChips } from "@/components/inspector/parts";
+import { useNowTick } from "@/components/useNowTick";
+import { relativeAge } from "@/src/util/relativeAge";
 import type { GeoInfo } from "@/src/data/types";
 
 // Panel offset from the anchor, up and to the right. The leader spans exactly this diagonal, so
@@ -62,12 +64,13 @@ function layerCodes(nodes: { roles?: string[] }[]): string[] {
 }
 
 // What the panel says — one model, filled per view/rung so the JSX below stays single-sourced.
-// `aside.hue` absent = muted (the country card's ISO-code rule: a place carries no identity).
+// `aside.hue` absent = muted (the country card's ISO-code rule: a place carries no identity);
+// `aside.live` prepends the beating live dot (the global card's aside state, mirrored).
 interface Model {
   key: string;
   eyebrow: string;
   title: string;
-  aside?: { text: string; hue?: string };
+  aside?: { text: string; hue?: string; live?: boolean };
   ring: string;
   lead?: { text?: string; codes?: string[] };
 }
@@ -86,6 +89,11 @@ export default function SceneCallout() {
   const selNodes = useStore((s) => s.selNodes);
   const metaSnap = useStore((s) => s.metaSnap);
   const snap = useStore((s) => s.snap);
+  const following = useStore((s) => s.following);
+  // The global tick's aside is its AGE, ticking (user, 2026-08-15 — "same as card"):
+  // SnapshotAside's two states mirrored as a label — `live · Xs` with the beating dot while
+  // following, `◷ Xs` on a pin. The card keeps the BUTTON (follow toggle); this is read-only.
+  const now = useNowTick(1000);
   if (!VIEW_POLICIES[mode].callout || section !== "scene") return null;
 
   let m: Model | null = null;
@@ -166,10 +174,12 @@ export default function SceneCallout() {
         ring: nnet?.hue ?? "var(--primary)",
       };
     } else if (snap) {
+      const rel = relativeAge(now - Date.parse(snap.data.timestamp));
       m = {
         key: `gs|${snap.data.ordinal}`,
         eyebrow: "Global snapshot",
         title: snap.data.ordinal.toLocaleString(),
+        aside: following ? { text: rel ? `live · ${rel}` : "live", live: true } : rel ? { text: `◷ ${rel}` } : undefined,
         ring: "var(--core)",
         lead:
           typeof snap.data.metagraphSnapshotCount === "number"
@@ -221,9 +231,16 @@ export default function SceneCallout() {
           <span className="text-body font-semibold text-foreground">{m.title}</span>
           {m.aside && (
             <span
-              className={m.aside.hue ? "text-label font-bold ml-1" : "text-label text-muted-foreground ml-1"}
+              className={
+                m.aside.hue
+                  ? "text-label font-bold ml-1"
+                  : "inline-flex items-center gap-1.5 text-label text-muted-foreground ml-1"
+              }
               style={m.aside.hue ? { color: m.aside.hue } : undefined}
             >
+              {m.aside.live && (
+                <span className="w-2 h-2 rounded-full bg-primary shadow-[0_0_0_3px_color-mix(in_oklch,var(--primary)_30%,transparent)] animate-dot-beat motion-reduce:animate-none" />
+              )}
               {m.aside.text}
             </span>
           )}
