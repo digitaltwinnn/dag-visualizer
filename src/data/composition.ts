@@ -27,6 +27,26 @@ export function layerCodesOf(nodes: ReadonlyArray<{ roles?: string[] }>): string
   return ROLE_ORDER.filter((r) => all.has(r)).map((r) => ROLE_SHORT[r]);
 }
 
+/** What a layer DOES — one functional clause per code, in the app's own established language
+ *  (L0 seals snapshots per SIGNER_GROUPS; cL1 carries the currency; dL1 produces the data
+ *  blocks). The hyper explorer's leaf caption composes these into "Nodes that …" (user,
+ *  2026-08-16: the caption should say what the group does — repeating the parent row's codes
+ *  was duplication). One home beside the code vocabulary, so a new layer adds its clause here. */
+const LAYER_CLAUSE: Record<string, string> = {
+  L0: "seal the network's snapshots",
+  cL1: "validate currency transactions",
+  dL1: "validate data updates",
+};
+
+/** The composition's functional sentence fragment ("seal the network's snapshots and validate
+ *  currency transactions"), in the fixed code order; null when no code has a clause. */
+export function compositionClause(codes: readonly string[]): string | null {
+  const parts = codes.map((c) => LAYER_CLAUSE[c]).filter((c): c is string => !!c);
+  if (!parts.length) return null;
+  if (parts.length === 1) return parts[0];
+  return `${parts.slice(0, -1).join(", ")} and ${parts[parts.length - 1]}`;
+}
+
 export function compositionRows(nodes: NodeInfo[]): CompRow[] {
   const hybridByKey = new Map<string, CompRow>();
   const dedByRole: Record<string, number> = {};

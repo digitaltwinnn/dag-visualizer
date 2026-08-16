@@ -4,7 +4,7 @@ import { cn } from "@/lib/utils";
 import { useStore } from "@/src/store/store";
 import ExplorerShell from "@/components/ExplorerShell";
 import { metagraphById } from "@/src/data/network";
-import { compositionGroups } from "@/src/data/composition";
+import { compositionGroups, compositionClause } from "@/src/data/composition";
 import { identityHudHex } from "@/src/palette/identity";
 import { IdentityDot, RoleChips } from "@/components/inspector/parts";
 import { SelectedRowMark, selectedRow, selectionHue } from "@/components/selection";
@@ -211,18 +211,23 @@ export default function HyperExplore() {
 
                               {isOpen && (
                                 <div className="mb-1 ml-[7px] pl-2 border-l border-border">
-                                  {/* Depth caption (user, 2026-08-16, refined same day — "make it
-                                      specific to the composition, use the wording that is
-                                      consistent across the app"): the ONE validator vocabulary is
-                                      layer-qualified (a validator is a LAYER acting), so the
-                                      caption states this group's own codes as the chips + the
-                                      word — "L0 · cL1 validators", exactly the SIGNER_GROUPS
-                                      register. */}
+                                  {/* Depth caption (user, 2026-08-16, twice refined — first to the
+                                      group's codes, then past them: "rather than repeating its
+                                      parent, say what it DOES"): the parent row already names the
+                                      label and the chips, so the caption states the FUNCTION —
+                                      "Nodes that seal the network's snapshots" — composed per code
+                                      from compositionClause (one home, src/data/composition.ts).
+                                      A composition with no known clause falls back to the codes'
+                                      "…validators" form rather than saying nothing wrong. */}
                                   <DepthCaption>
-                                    <span className="inline-flex items-center gap-1">
-                                      <RoleChips codes={g.codes} />
-                                      <span>validators</span>
-                                    </span>
+                                    {compositionClause(g.codes) ? (
+                                      <span>Nodes that {compositionClause(g.codes)}</span>
+                                    ) : (
+                                      <span className="inline-flex items-center gap-1">
+                                        <RoleChips codes={g.codes} />
+                                        <span>validators</span>
+                                      </span>
+                                    )}
                                   </DepthCaption>
                                   {g.rows.map((r, i) => {
                                     const on =

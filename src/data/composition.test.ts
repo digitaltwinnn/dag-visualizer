@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { compositionRows, nodeCompositionLabel, compositionKey, parseCompositionKey } from "./composition";
+import { compositionRows, nodeCompositionLabel, compositionKey, parseCompositionKey, compositionClause } from "./composition";
 import type { NodeInfo } from "@/src/data/types";
 
 const n = (roles: string[]): NodeInfo => ({ ip: "x", state: "Ready", layer: roles[0], roles }) as NodeInfo;
@@ -49,5 +49,23 @@ describe("compositionKey / parseCompositionKey", () => {
   });
   it("round-trips a group with no codes", () => {
     expect(parseCompositionKey(compositionKey("Node", []))).toEqual({ label: "Node", codes: [] });
+  });
+});
+
+// The caption's functional clauses (user, 2026-08-16): the leaf caption says what a group DOES.
+describe("compositionClause", () => {
+  it("names one layer's function alone", () => {
+    expect(compositionClause(["L0"])).toBe("seal the network's snapshots");
+    expect(compositionClause(["dL1"])).toBe("validate data updates");
+  });
+  it("joins a hybrid's clauses in code order with a final 'and'", () => {
+    expect(compositionClause(["L0", "cL1"])).toBe("seal the network's snapshots and validate currency transactions");
+    expect(compositionClause(["L0", "cL1", "dL1"])).toBe(
+      "seal the network's snapshots, validate currency transactions and validate data updates",
+    );
+  });
+  it("answers null for codes it has no clause for — the caller falls back", () => {
+    expect(compositionClause([])).toBeNull();
+    expect(compositionClause(["??"])).toBeNull();
   });
 });
