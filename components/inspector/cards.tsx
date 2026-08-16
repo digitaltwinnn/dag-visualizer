@@ -802,9 +802,10 @@ function GeoLiveNode({ p }: { p: PickOf<"l0" | "l1" | "metanode"> }) {
               ))}
             </span>
           ) : (
-            <span className="text-muted-foreground" title="No other network has a node at this IP.">
-              none
-            </span>
+            // "none" is a MEASURED reading (both cluster sides are live and no co-tenant
+            // exists), so it takes the value register like any other fact — muting it made a
+            // fact read as an instrument state (user, 2026-08-16).
+            <span title="No other network has a node at this IP.">none</span>
           )}
         </Fact>
         {/* Reading order: place → role → host → SERVICE — what this machine serves sits with

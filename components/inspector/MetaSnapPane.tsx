@@ -545,7 +545,10 @@ function PayloadSection({
       </div>
       {pending && <p className="pl-2 text-label text-muted-foreground italic">{pending}</p>}
       {read && rows.length === 0 && !signers && (
-        <p className="pl-2 text-label text-muted-foreground italic">none</p>
+        // MEASURED empty — the deep read landed and this section carries nothing. A reading,
+        // not a state, so it takes the section rows' own register; the italic-muted treatment
+        // is `pending`'s (unread / reading…), and "unread and none are different facts".
+        <p className="pl-2 text-label text-foreground-dim">none</p>
       )}
       {rows.map((r) => (
         <div key={r.name} className="flex items-start justify-between gap-2.5 pl-2" title={r.name}>
