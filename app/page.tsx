@@ -11,6 +11,7 @@ import RailScroll from "@/components/RailScroll";
 import FollowController from "@/components/FollowController";
 import RawSnapshotBridge from "@/components/RawSnapshotBridge";
 import Tooltip from "@/components/Tooltip";
+import HintTips from "@/components/HintTips";
 import SceneCallout from "@/components/SceneCallout";
 import DevCssCanary from "@/components/DevCssCanary";
 import SectionShell from "@/components/SectionShell";
@@ -52,6 +53,9 @@ export default function Home() {
       <FollowController />
       <RawSnapshotBridge />
       <Tooltip />
+      {/* Styled replacement for the native `title` bubble — delegated, so every title= in the
+          app inherits the design (user, 2026-08-16). */}
+      <HintTips />
       <DevCssCanary />
     </main>
   );

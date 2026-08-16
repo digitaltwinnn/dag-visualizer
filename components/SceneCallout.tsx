@@ -36,6 +36,7 @@
 //   anchor would lie about where it is.
 // - ledger: the pinned metagraph snapshot's own tile (rewind included), else the committed
 //   global tick's byte-bar lead.
+import { cn } from "@/lib/utils";
 import { useStore } from "@/src/store/store";
 import { VIEW_POLICIES } from "@/src/engine/domain/viewPolicy";
 import { displayNetwork } from "@/src/data/unlisted";
@@ -58,17 +59,77 @@ const OFF_Y = 92;
 // What the panel says — one model, filled per view/rung so the JSX below stays single-sourced.
 // `aside.hue` absent = muted (the country card's ISO-code rule: a place carries no identity);
 // `aside.live` prepends the beating live dot (the global card's aside state, mirrored).
-interface Model {
+export interface CalloutModel {
   key: string;
   eyebrow: string;
   title: string;
   aside?: { text: string; hue?: string; live?: boolean };
   ring: string;
-  lead?: { text?: string; codes?: string[] };
+  /** `ident` leads the row in its identity hue (the aside's hued-ticker idiom, one register). */
+  lead?: { ident?: { text: string; hue: string }; text?: string; codes?: string[] };
 }
+type Model = CalloutModel;
 
 const geoOf = (p: { kind: string }): GeoInfo | undefined =>
   "geo" in p ? (p as { geo?: GeoInfo }).geo : undefined;
+
+
+/** The callout PANEL alone — the eyebrow / title+aside / lead grammar on SCENE_GLASS — shared
+ *  with the LiveStrip's bar hover (user, 2026-08-16: "fully re-use the one from the scene"),
+ *  which wraps it in its own cursor-follow box instead of the Engine-anchored `.co-panel`. */
+export function CalloutPanel({ m, className }: { m: CalloutModel; className?: string }) {
+  return (
+    <div key={m.key} className={cn("roll-in whitespace-nowrap", SCENE_GLASS, className)}>
+      {/* The identity EDGE SPINE (user, 2026-08-15 — "the rails/hairline effect on the left
+          side, attached", then "let it fade into the corners"): the sheets' single-identity-
+          cue language at callout scale, as the shared `.edge-spine` recipe (globals.css) — a
+          corner-wrapping hue border under a fixed-length fade, so on a panel this short the
+          tips spend themselves in the corner curves rather than stopping abruptly. The
+          leader flows into its lower run-off. Static and subtle: a resting identity cue. */}
+      <span aria-hidden className="edge-spine opacity-70" style={{ ["--spine" as string]: m.ring }} />
+      {/* The card eyebrow's own ink (CardHead: EYEBROW + text-accent), not a muted caption —
+          this is the same slot noun the rail card wears (user, 2026-08-15). */}
+      <div className="text-micro font-bold tracking-[0.1em] uppercase leading-none text-accent mb-1.5">{m.eyebrow}</div>
+      {/* No identity dot here (user, 2026-08-15): the hued aside already carries the identity
+          on this row, and the anchor ring is the subject mark at the scene end of the tie. */}
+      <div className="flex items-center gap-[7px]">
+        <span className="text-body font-semibold text-foreground">{m.title}</span>
+        {m.aside && (
+          <span
+            className={
+              m.aside.hue
+                ? "text-label font-bold ml-1"
+                : "inline-flex items-center gap-1.5 text-label text-muted-foreground ml-1"
+            }
+            style={m.aside.hue ? { color: m.aside.hue } : undefined}
+          >
+            {m.aside.live && (
+              <span className="w-2 h-2 rounded-full bg-primary shadow-[0_0_0_3px_color-mix(in_oklch,var(--primary)_30%,transparent)] animate-dot-beat motion-reduce:animate-none" />
+            )}
+            {m.aside.text}
+          </span>
+        )}
+      </div>
+      {/* The card grammar's HEAD HAIRLINE at callout scale (user, 2026-08-15 — "cards have an
+          underline between header and the rest"): it divides the HEAD (eyebrow + title, whose
+          own separation stays colour-only, as in the cards) from the body, and it only exists
+          where there IS a body to divide — a lead-less callout stays ruleless, the same gate
+          CardHead applies when collapsed. Inside the padded box, so it shares the content
+          edge like every resting division. */}
+      {m.lead && (
+        <div className="mt-1.5 pt-1.5 border-t border-border flex items-center gap-1.5 text-label text-muted-foreground">
+          {m.lead.ident && (
+            <span className="font-bold" style={{ color: m.lead.ident.hue }}>
+              {m.lead.ident.text}
+            </span>
+          )}
+          {m.lead.text && <span>{m.lead.text}</span>}
+          {m.lead.codes && m.lead.codes.length > 0 && <RoleChips codes={m.lead.codes} />}
+        </div>
+      )}
+    </div>
+  );
+}
 
 export default function SceneCallout() {
   const mode = useStore((s) => s.mode);
@@ -265,50 +326,7 @@ export default function SceneCallout() {
       {/* The panel — keyed by subject so the roll-in replays on a change, like a card title. */}
       {/* Position lives in globals.css (`.co-panel` + the data-flip/data-drop mirrors the
           Engine toggles near viewport edges) — inline left/bottom would beat the flip rules. */}
-      <div key={m.key} className={`co-panel roll-in absolute whitespace-nowrap ${SCENE_GLASS}`}>
-        {/* The identity EDGE SPINE (user, 2026-08-15 — "the rails/hairline effect on the left
-            side, attached", then "let it fade into the corners"): the sheets' single-identity-
-            cue language at callout scale, as the shared `.edge-spine` recipe (globals.css) — a
-            corner-wrapping hue border under a fixed-length fade, so on a panel this short the
-            tips spend themselves in the corner curves rather than stopping abruptly. The
-            leader flows into its lower run-off. Static and subtle: a resting identity cue. */}
-        <span aria-hidden className="edge-spine opacity-70" style={{ ["--spine" as string]: m.ring }} />
-        {/* The card eyebrow's own ink (CardHead: EYEBROW + text-accent), not a muted caption —
-            this is the same slot noun the rail card wears (user, 2026-08-15). */}
-        <div className="text-micro font-bold tracking-[0.1em] uppercase leading-none text-accent mb-1.5">{m.eyebrow}</div>
-        {/* No identity dot here (user, 2026-08-15): the hued aside already carries the identity
-            on this row, and the anchor ring is the subject mark at the scene end of the tie. */}
-        <div className="flex items-center gap-[7px]">
-          <span className="text-body font-semibold text-foreground">{m.title}</span>
-          {m.aside && (
-            <span
-              className={
-                m.aside.hue
-                  ? "text-label font-bold ml-1"
-                  : "inline-flex items-center gap-1.5 text-label text-muted-foreground ml-1"
-              }
-              style={m.aside.hue ? { color: m.aside.hue } : undefined}
-            >
-              {m.aside.live && (
-                <span className="w-2 h-2 rounded-full bg-primary shadow-[0_0_0_3px_color-mix(in_oklch,var(--primary)_30%,transparent)] animate-dot-beat motion-reduce:animate-none" />
-              )}
-              {m.aside.text}
-            </span>
-          )}
-        </div>
-        {/* The card grammar's HEAD HAIRLINE at callout scale (user, 2026-08-15 — "cards have an
-            underline between header and the rest"): it divides the HEAD (eyebrow + title, whose
-            own separation stays colour-only, as in the cards) from the body, and it only exists
-            where there IS a body to divide — a lead-less callout stays ruleless, the same gate
-            CardHead applies when collapsed. Inside the padded box, so it shares the content
-            edge like every resting division. */}
-        {m.lead && (
-          <div className="mt-1.5 pt-1.5 border-t border-border flex items-center gap-1.5 text-label text-muted-foreground">
-            {m.lead.text && <span>{m.lead.text}</span>}
-            {m.lead.codes && m.lead.codes.length > 0 && <RoleChips codes={m.lead.codes} />}
-          </div>
-        )}
-      </div>
+      <CalloutPanel m={m} className="co-panel absolute" />
     </div>
   );
 }
