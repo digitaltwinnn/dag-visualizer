@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState, type CSSProperties } from "react";
 import { createPortal } from "react-dom";
 import { cn } from "@/lib/utils";
+import { SCENE_GLASS } from "@/components/selection";
 import { latestRelevant } from "@/src/data/follow";
 import { useStore } from "@/src/store/store";
 import { useSnapshotFeed } from "@/components/useSnapshotFeed";
@@ -172,12 +173,20 @@ export default function LiveStrip() {
       </div>
 
       {tip && createPortal(
+        // One subject, one look (user, 2026-08-16 — "they represent the same thing"): a strip bar
+        // IS a global tick, so its hover wears the scene callout's own grammar — SCENE_GLASS, the
+        // eyebrow, the bare mono ordinal — instead of a bespoke panel. The body rows below stay
+        // the strip's own (the filter-aware anchors line is what this instrument adds).
         <div
           id="ls-tip"
           ref={tipRef}
-          className="fixed z-30 pointer-events-none py-2 px-[11px] bg-[var(--panel-solid)] border border-border rounded-btn text-body whitespace-nowrap -translate-x-1/2 -translate-y-[130%] flex flex-col gap-1"
+          className={cn(
+            "fixed z-30 pointer-events-none whitespace-nowrap -translate-x-1/2 -translate-y-[130%] flex flex-col gap-1",
+            SCENE_GLASS,
+          )}
           style={{ left: tip.x, top: tip.y }}
         >
+          <div className="text-micro font-bold tracking-[0.1em] uppercase leading-none text-accent">Global snapshot</div>
           {/* Bare ordinal head — no '#'; a big mono number in a snapshot tooltip is obviously the ordinal. */}
           <div className="text-foreground font-mono font-bold tabular-nums">{tip.ordinal.toLocaleString()}</div>
           <div className="flex items-center justify-between gap-[18px]">
