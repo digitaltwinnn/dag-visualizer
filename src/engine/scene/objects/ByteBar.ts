@@ -269,9 +269,9 @@ export class ByteBar {
       }
       // GROW-IN: ease a just-measured bar from the forming footprint to its stored targets.
       if (s.grow < 1) {
-        // ~0.8s to full (user, 2026-08-16 — "grows a bit too quick"): the ease keeps the
-        // arrival soft, the small linear term guarantees it lands.
-        s.grow = Math.min(1, s.grow + (1 - s.grow) * Math.min(1, dt * 2.2) + dt * 0.1);
+        // ~0.4s to full (user, 2026-08-16, round 2 — the bar was TRAILING its own ribbons,
+        // which ease in over 0.65s: the bar now lands first, the sheets bloom onto it).
+        s.grow = Math.min(1, s.grow + (1 - s.grow) * Math.min(1, dt * 4.5) + dt * 0.25);
         for (let i = 0; i < s.used; i++) {
           s.bands[i].scale.z = s.tw[i] * s.grow;
           s.bands[i].position.z = s.tz[i] * s.grow;
