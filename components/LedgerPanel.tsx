@@ -148,7 +148,11 @@ function SnapRow<K extends string | number>({
         outset ? ROW_OUTSET : "w-full pl-2 pr-2",
         "hover:bg-wash-hover",
         "focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--primary)] focus-visible:outline-offset-[-2px]",
-        selected && selectedRow(true),
+        // A row that HOLDS the selection (a group header over the selected snapshot) wears the
+        // wash at ANCESTOR strength — the finest rung is the child below it (user, 2026-08-16:
+        // the header set the hue vars but no wash class, so it stayed uncolored). Its own
+        // selection keeps the full mark.
+        (selected || disclose?.holdsSel) && selectedRow(!!selected),
         pair.paired && pair.className,
       )}
       // The selection follows the subject's identity (selection.tsx · selectionHue): `accent` is

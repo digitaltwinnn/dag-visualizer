@@ -9,7 +9,7 @@ import { cn } from "@/lib/utils";
 import { SELECTED_ROW, SelectedRowMark, selectedRow, selectionHue } from "@/components/selection";
 import { subjectPairing } from "@/components/useSubjectPairing";
 import { hoverKeyOf } from "@/src/data/hoverSubject";
-import { shortHash, CORE_HEX } from "@/src/data/network";
+import { shortHash } from "@/src/data/network";
 import { identityHudHex } from "@/src/palette/identity";
 import type { NodeRow } from "@/src/data/types";
 
@@ -129,7 +129,11 @@ export function DisclosureRow({
         "hover:bg-wash-hover",
         previewOnly ? "cursor-default text-muted-foreground" : "cursor-pointer hover:text-foreground",
         "focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--primary)] focus-visible:outline-offset-[-2px]",
-        on && selectedRow(focused ?? true),
+        // A row that merely HOLDS the selection (ledger's network group header over the pinned
+        // snapshot; a collapsed group with the selected node) wears the wash at ANCESTOR
+        // strength — it set the hue vars but no wash class, so it stayed uncolored (user,
+        // 2026-08-16). Its OWN commit keeps the focused/ancestor split it always had.
+        (on || holdsSel) && selectedRow(on ? (focused ?? true) : false),
         pair.paired && pair.className,
       )}
       // The selection follows the subject's identity (selection.tsx · selectionHue): the same
@@ -192,7 +196,7 @@ export function NodePickerRow({
   onSelect: () => void;
 }) {
   const hoverKey = hoverKeyOf(row.pick);
-  const hue = row.pick.kind === "metanode" && row.pick.meta ? identityHudHex(row.pick.meta.id) : CORE_HEX;
+  const hue = identityHudHex(row.pick.kind === "metanode" && row.pick.meta ? row.pick.meta.id : "dag");
   const pair = subjectPairing(hoverNodeId, hoverKey, setHoverNodeId, hue);
   return (
     <button

@@ -3,7 +3,7 @@
 import { cn } from "@/lib/utils";
 import { useStore } from "@/src/store/store";
 import ExplorerShell from "@/components/ExplorerShell";
-import { CORE_HEX, metagraphById } from "@/src/data/network";
+import { metagraphById } from "@/src/data/network";
 import { compositionGroups } from "@/src/data/composition";
 import { identityHudHex } from "@/src/palette/identity";
 import { IdentityDot, RoleChips } from "@/components/inspector/parts";
@@ -96,7 +96,7 @@ export default function HyperExplore() {
       {[...metaList].sort((a, b) => b.nodes.length - a.nodes.length).map((m) => {
               const cfg = metagraphById(m.id);
               const name = cfg?.name ?? m.id;
-              const hue = m.id === "dag" ? CORE_HEX : identityHudHex(m.id);
+              const hue = identityHudHex(m.id);
               const open = m.id === filter;
               // Bidirectional pairing on the SAME channel the 3D hubs and the dossier use:
               // hovering the row previews the selection dim in the scene, hovering the hub

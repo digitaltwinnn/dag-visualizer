@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, type CSSProperties, type ReactNode } from "
 import { useStore } from "@/src/store/store";
 import { displayNetwork } from "@/src/data/unlisted";
 import { applyClickActions } from "@/src/store/applyClickActions";
-import { filterAccent, CORE_HEX } from "@/src/data/network";
+import { filterAccent } from "@/src/data/network";
 import { identityHudHex } from "@/src/palette/identity";
 import { hoverKeyOf } from "@/src/data/hoverSubject";
 import { compositionGroups } from "@/src/data/composition";
@@ -81,7 +81,7 @@ function CardPane({
       inspect && (inspect.kind === "l0" || inspect.kind === "l1" || inspect.kind === "metanode")
         ? inspect
         : null;
-    const nodeHue = node?.kind === "metanode" && node.meta ? identityHudHex(node.meta.id) : CORE_HEX;
+    const nodeHue = identityHudHex(node?.kind === "metanode" && node.meta ? node.meta.id : "dag");
     subjectKey = hoverKeyOf(node);
     pair = subjectPairing<string>(hoverNodeId, subjectKey as string | null, setHoverNodeId, nodeHue);
   }
@@ -224,7 +224,7 @@ function CompositionPane({ sel, onClose, collapsed, onToggle }: { sel: Compositi
     hoverGroup,
     subjectKey,
     setHoverGroup,
-    sel.netId === "dag" ? CORE_HEX : identityHudHex(sel.netId),
+    identityHudHex(sel.netId),
   );
   // The SAME grouping the explorer rows and the Engine's glow resolution use — one helper, so
   // the card, the row and the 3D highlight always speak about the same machines.
@@ -606,7 +606,7 @@ export default function Inspector() {
   // Icon per hosted card comes from the manifest; hue is the tray's own presentation: the node's
   // metagraph hue (or core cyan), everything else the filter accent.
   const nodeHue =
-    inspect?.kind === "metanode" ? (inspect.meta ? identityHudHex(inspect.meta.id) : undefined) : CORE_HEX;
+    inspect?.kind === "metanode" ? (inspect.meta ? identityHudHex(inspect.meta.id) : undefined) : identityHudHex("dag");
   const tray: TabSignal[] = manifest
     .filter((c) => c.present)
     .map((c) => ({

@@ -1,10 +1,12 @@
 import { NextResponse } from "next/server";
 import { unstable_cache } from "next/cache";
 
-// VALIDATOR NAMES from the Global L0's delegated-staking registry (`/node-params` — probed
-// 2026-08-14: ~181 entries of peerId + nodeMetadataParameters.name, operators name their own
-// machines: "DOR - Node 1", "CEO Ben Jorgensen"…). Served as a flat { peerId: name } map for
-// the node card's Name row and the callout title (user, 2026-08-16 — identity enrichment).
+// VALIDATOR NAMES + DELEGATED-STAKING OPT-IN from the Global L0's delegated-staking registry
+// (`/node-params` — probed 2026-08-14: ~181 entries of peerId + nodeMetadataParameters.name,
+// operators name their own machines: "DOR - Node 1", "CEO Ben Jorgensen"…). An ENTRY means the
+// operator registered as a delegated-staking candidate (user, 2026-08-16), so the map keeps
+// every registered peerId — name or not ("" when unnamed) — and the client reads presence for
+// the opt-in and the non-empty name for the Nickname. Served as a flat { peerId: name } map.
 // Cached 1h (operator metadata moves on operator timescales); 503 on failure — the client
 // keeps quiet and retries next mount (the /api/geo pattern; absent data stays absent).
 export const runtime = "nodejs";
@@ -25,13 +27,12 @@ const getNames = unstable_cache(
     const arr = (await r.json()) as RegistryEntry[];
     const map: Record<string, string> = {};
     for (const e of arr) {
-      const name = e.nodeMetadataParameters?.name?.trim();
-      if (e.peerId && name) map[e.peerId] = name;
+      if (e.peerId) map[e.peerId] = e.nodeMetadataParameters?.name?.trim() ?? "";
     }
     if (!Object.keys(map).length) throw new Error("registry empty");
     return map;
   },
-  ["node-names-v1"],
+  ["node-names-v2"],
   { revalidate },
 );
 

@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { cn } from "@/lib/utils";
 import { useStore } from "@/src/store/store";
-import { shortHash, CORE_HEX, metagraphById, getNetwork, SIGNER_GROUPS, nodeSigned, coLocatedNetworks, filterAccent } from "@/src/data/network";
+import { shortHash, metagraphById, getNetwork, SIGNER_GROUPS, nodeSigned, coLocatedNetworks, filterAccent } from "@/src/data/network";
 import { UNLISTED_ID, observedUnlistedIds } from "@/src/data/unlisted";
 import { identityHudHex } from "@/src/palette/identity";
 import { hex, fmtDag, fmtKB, midHash } from "@/src/util/format";
@@ -20,7 +20,7 @@ import { VIEW_ICONS, SNAPSHOT_ICON, COUNTRY_ICON, PROVIDER_ICON, COMPOSITION_ICO
 import { Check, ExternalLink } from "lucide-react";
 import { useMinHold } from "@/components/useMinHold";
 import { useArchive, archiveFactState, archiveSummary, fmtSnapCount, fmtReach, useChainSpan } from "@/components/useArchive";
-import { useNodeNames, nodeName } from "@/components/useNodeNames";
+import { useNodeNames, nodeName, nodeRegistered } from "@/components/useNodeNames";
 import { useNowTick } from "@/components/useNowTick";
 import { POLL } from "@/src/engine/config";
 import { Desc, StatusMark, CompositionRows, StatusBreakdown, RoleChips, IdentityDot, networkKind, Fact, FactGroup, Foot, FootRow } from "./parts";
@@ -185,7 +185,7 @@ export function GeoLiveTitle() {
   const id = node.node?.id;
   const city = nodeCity(node);
   const title = city || (id ? shortHash(id) : node.node?.ip || "Node");
-  const color = node.kind === "metanode" ? (node.meta ? identityHudHex(node.meta.id) : undefined) : CORE_HEX;
+  const color = node.kind === "metanode" ? (node.meta ? identityHudHex(node.meta.id) : undefined) : identityHudHex("dag");
   const Mark = VIEW_ICONS.geo;
   return (
     <span className="inline-flex items-center gap-2 min-w-0">
@@ -683,14 +683,16 @@ function GeoLiveNode({ p }: { p: PickOf<"l0" | "l1" | "metanode"> }) {
   // The registry keys on a PEER ID, so the name names a keypair — and a machine that reuses
   // one keypair across networks (the Upsider pattern) carries it on its metagraph record too,
   // which is why the match runs for every node kind (user, 2026-08-16: "keep it actual").
-  // What stays validator-only is the ABSENCE states: only a Global L0 validator can register
-  // (measured 2026-08-16: 31 of 147 live validators haven't — a real fact worth a row), so a
-  // metagraph node shows the row only when a name actually resolves. The row HOLDS while the
-  // registry loads (the separate-load rule) and gives up honestly: "not registered" when the
-  // loaded registry has no entry, "not available" when the registry itself couldn't be read.
+  // The row is PURELY the name now — presence-gated like Hosting/Country, appearing when a
+  // name resolves. The registry's other reading, the delegated-staking OPT-IN, is its own row
+  // (user, 2026-08-16: "would that be a separate attribute?") in the service block below:
+  // Yes/No for DAG validators only — only a Global L0 validator can register (measured: 31 of
+  // 147 live validators haven't), so a metagraph machine gets no row; the absence states
+  // ("not available" when the registry couldn't be read, stars while it loads) live there too.
   const isDagValidator = p.kind === "l0" || p.kind === "l1";
   const nickState = useNodeNames();
   const nickname = nodeName(nickState.names, p.node);
+  const registered = nodeRegistered(nickState.names, p.node);
   // The three ancestor rungs that can own one of this card's facts.
   const country = useStore((s) => s.country);
   const cohort = useStore((s) => s.cohort);
@@ -737,22 +739,9 @@ function GeoLiveNode({ p }: { p: PickOf<"l0" | "l1" | "metanode"> }) {
   return (
     <>
       <FactGroup>
-        {/* NICKNAME — the operator's informal self-registered handle (see the note above). */}
-        {(isDagValidator || nickname) && (
-          <Fact label="Nickname">
-            {nickname ?? (!nickState.settled ? (
-              <NodeStars count={4} />
-            ) : nickState.names ? (
-              <span className="text-muted-foreground italic" title="This validator has no entry in the Global L0's delegated-staking registry, where operators offering delegated staking publish a display name — separate from validator approval, which is why a live validator can lack one.">
-                not registered
-              </span>
-            ) : (
-              <span className="text-muted-foreground italic" title="The delegated-staking registry could not be read — retried on the next visit.">
-                not available
-              </span>
-            ))}
-          </Fact>
-        )}
+        {/* NICKNAME — the operator's informal self-registered handle (see the note above);
+            purely the name, shown wherever one resolves. */}
+        {nickname && <Fact label="Nickname">{nickname}</Fact>}
         {/* STATUS — only while the SIGNED relation holds the head aside (its usual home). */}
         {signedSel && (
           <Fact label="Status">
@@ -806,6 +795,34 @@ function GeoLiveNode({ p }: { p: PickOf<"l0" | "l1" | "metanode"> }) {
         </Fact>
         {/* Reading order: place → role → host → SERVICE — what this machine serves sits with
             the host block, above the reference foot. */}
+        {/* DELEGATED STAKING — the registry's opt-in reading (see the Nickname note): whether
+            this validator registered as a candidate DAG holders can delegate to. A service the
+            machine offers, so it sits with the host block like Full archive, and it shares that
+            row's Yes/No grammar. Validators only — the question doesn't apply to a metagraph
+            machine (the archive row's n/a lesson, taken one further: no row at all). */}
+        {isDagValidator && (
+          <Fact label="Delegated staking">
+            {!nickState.settled ? (
+              <NodeStars count={3} />
+            ) : nickState.names ? (
+              <span
+                className="inline-flex items-center gap-1.5"
+                title={
+                  registered
+                    ? "Registered as a delegated-staking candidate in the Global L0 registry — DAG holders can delegate stake to this validator."
+                    : "In the validator whitelist but not registered as a delegated-staking candidate — separate, independent gates, which is why a live validator can lack an entry."
+                }
+              >
+                {registered && <Check aria-hidden className="size-3 text-[var(--success)]" />}
+                <b className="font-bold">{registered ? "Yes" : "No"}</b>
+              </span>
+            ) : (
+              <span className="text-muted-foreground italic" title="The delegated-staking registry could not be read — retried on the next visit.">
+                not available
+              </span>
+            )}
+          </Fact>
+        )}
         {archState.kind === "value" && archEntry && archive && (
           /* The dossier's settled stacked grammar, machine-scoped (user, 2026-08-14 — "in the
              node card follow the same thinking; still says 'archive'"): Yes/No against the
@@ -998,7 +1015,7 @@ export function CompositionCard({ sel }: { sel: CompositionSel }) {
       <Fact label="Share of network">{share}%</Fact>
       <Fact label="Network">
         <span className="inline-flex items-center gap-1.5 min-w-0">
-          <IdentityDot hue={sel.netId === "dag" ? CORE_HEX : identityHudHex(sel.netId)} />
+          <IdentityDot hue={identityHudHex(sel.netId)} />
           <span className="truncate">{cfg?.name || sel.netId}</span>
         </span>
       </Fact>

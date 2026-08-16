@@ -5,7 +5,6 @@ import { cn } from "@/lib/utils";
 import { useStore } from "@/src/store/store";
 import ExplorerShell from "@/components/ExplorerShell";
 import { filterAccent, metagraphById } from "@/src/data/network";
-import { identityHudHex } from "@/src/palette/identity";
 import { SelectedRowMark, selectedRow, selectionHue } from "@/components/selection";
 import { ccMark } from "@/src/util/format";
 import { hoverKeyOf } from "@/src/data/hoverSubject";
@@ -64,7 +63,7 @@ export default function GeoExplore() {
   // The magnitude bar is a distribution leaderboard cue: structural cyan for the whole network /
   // DAG, but when a single metagraph is filtered the list is ITS nodes, so the bar tints to that
   // metagraph's identity hue (HUD lane).
-  const barHue = isMetaFilter ? identityHudHex(filter) : undefined;
+  const barHue = filter !== "all" ? filterAccent(filter) : undefined;
   const activeCfg = metagraphById(filter);
   const tickerOrName = activeCfg ? activeCfg.ticker || activeCfg.name : "This metagraph";
   // Click a country: drill the globe into it (store.country) — the drill state doubles as the

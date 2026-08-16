@@ -46,7 +46,9 @@ export function useNodeNames(): NodeNamesState {
   return state;
 }
 
-/** The registered operator name for a node, matched across every LAYER id it carries. */
+/** The registered operator name for a node, matched across every LAYER id it carries.
+ *  Empty-string entries (registered but unnamed) yield null — the name and the opt-in are
+ *  separate facts, and this answers only the name. */
 export function nodeName(
   names: Record<string, string> | null,
   node: { id?: string | null; ids?: string[] } | null | undefined,
@@ -57,4 +59,19 @@ export function nodeName(
     if (n) return n;
   }
   return null;
+}
+
+/** Whether any of the node's layer ids has a registry ENTRY — the delegated-staking opt-in
+ *  (user, 2026-08-16: an entry means the operator registered as a candidate; the whitelist
+ *  that admits a validator to the cluster is a separate, independent gate). Presence-keyed,
+ *  not name-keyed, so a nameless registration still answers Yes. */
+export function nodeRegistered(
+  names: Record<string, string> | null,
+  node: { id?: string | null; ids?: string[] } | null | undefined,
+): boolean {
+  if (!names || !node) return false;
+  for (const id of node.ids?.length ? node.ids : node.id ? [node.id] : []) {
+    if (id in names) return true;
+  }
+  return false;
 }
