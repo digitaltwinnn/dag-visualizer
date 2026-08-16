@@ -34,15 +34,16 @@ export function layerCodesOf(nodes: ReadonlyArray<{ roles?: string[] }>): string
  *  was duplication). One home beside the code vocabulary, so a new layer adds its clause here. */
 const LAYER_CLAUSE: Record<string, string> = {
   L0: "seal snapshots",
-  cL1: "validate currency",
-  dL1: "validate data",
+  cL1: "validate transactions", // the TRANSACTIONS are validated, never "the currency" (user, 2026-08-16)
+  dL1: "validate data updates", // the card's own object ("Data updates: N")
 };
 
-/** The composition's functional fragment ("seal snapshots, validate currency and data"), in
+/** The composition's functional fragment ("seal snapshots, validate transactions and data
+ *  updates"), in
  *  the fixed code order; null when no code has a clause. Clauses are LABEL-length — the caption
  *  wears the caps-micro section register (user, 2026-08-16: the prose form blended into the
  *  rows), where a full sentence wrapped four lines. A repeated leading verb is elided from the
- *  latter clause ("validate currency and data", not "…and validate data"). */
+ *  latter clause ("validate transactions and data updates", not "…and validate data updates"). */
 export function compositionClause(codes: readonly string[]): string | null {
   const parts = codes.map((c) => LAYER_CLAUSE[c]).filter((c): c is string => !!c);
   if (!parts.length) return null;

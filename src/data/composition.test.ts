@@ -56,12 +56,12 @@ describe("compositionKey / parseCompositionKey", () => {
 describe("compositionClause", () => {
   it("names one layer's function alone", () => {
     expect(compositionClause(["L0"])).toBe("seal snapshots");
-    expect(compositionClause(["dL1"])).toBe("validate data");
+    expect(compositionClause(["dL1"])).toBe("validate data updates");
   });
   it("joins a hybrid's clauses in code order with a final 'and', eliding a repeated verb", () => {
-    expect(compositionClause(["L0", "cL1"])).toBe("seal snapshots and validate currency");
-    expect(compositionClause(["L0", "cL1", "dL1"])).toBe("seal snapshots, validate currency and data");
-    expect(compositionClause(["cL1", "dL1"])).toBe("validate currency and data");
+    expect(compositionClause(["L0", "cL1"])).toBe("seal snapshots and validate transactions");
+    expect(compositionClause(["L0", "cL1", "dL1"])).toBe("seal snapshots, validate transactions and data updates");
+    expect(compositionClause(["cL1", "dL1"])).toBe("validate transactions and data updates");
   });
   it("answers null for codes it has no clause for — the caller falls back", () => {
     expect(compositionClause([])).toBeNull();
