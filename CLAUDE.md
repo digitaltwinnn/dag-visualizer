@@ -515,6 +515,40 @@ The design rules behind the table, which the tests pin but don't explain:
   inline. `components/selectionBoundary.test.ts` enforces this — and note the rule is **write**-based,
   so read-only facts cards cost nothing and every future explorer card inherits the table.
 
+## The subject callout & furniture labels
+
+**One split, decided in a spike (2026-08-15) and matching the user's own instinct: FURNITURE text is
+in-scene (`scene/objects/TextLabel.ts` canvas-texture meshes — blooms on the scene lane, rides group
+transforms and shader fades); the SUBJECT callout is real HUD DOM** (`components/SceneCallout.tsx`),
+composited crisp over the bloom pass so it reuses the HUD's tokens and grammar directly.
+CSS2DRenderer was evaluated and declined — the node chips are InstancedMesh instances, so per-frame
+anchor resolution must live in the Engine either way; the renderer would only replace the final
+projection while adding its container, render pass and a React-portal handshake. Contained swap if
+callouts ever multiply.
+
+**`components/calloutBoundary.test.ts` pins the contracts**: `#callout` has exactly two homes (React
+renders + owns content, `Engine._syncCallout` writes transform + `data-on` per frame — the Tooltip
+discipline); BOTH owners consult `store.boxedCard`; and `SCENE_GLASS` is the one container the hover
+Tooltip shares (hover and commit are one species — identity never tints the frame; it lives on the
+hued ticker, the anchor ring and the `.edge-spine`). The design rules the test can't carry:
+
+- **The box leads.** The callout mirrors the expanded card (`boxedCard`, published by Inspector from
+  the same state that renders the box), exactly as the camera answers it; the component picks the
+  MODEL and the Engine the ANCHOR from one mirrored preference, falling through to the finest
+  committed rung.
+- **Anchors are object-level**: a geo node's own chip (the spotlight's per-record resolution), the
+  pinned snapshot's own tile (live position recorded as the trail draws, rewind included). Group
+  anchors are fallbacks only. A distributed subject (a filtered fleet in geo, unlisted anywhere)
+  gets NO callout — a single anchor would lie about where it is.
+- **It is a label, not a control**: `pointer-events-none`, no ×, dismissal is the selection's own.
+  Content mirrors the cards' grammar rung for rung (eyebrow ink, bare ordinals, aside rules,
+  RoleChips, the ticking age on the global tick).
+- **Furniture labels are sparse by review**: geo's hosting-country names (the set states where the
+  network runs — empty countries staying nameless is information) are the only ones standing. Hyper's
+  hub tickers AND its "Global L0" were built and removed the same day (clutter over what hues,
+  tooltip and callout already answer) — HyperView's header records it; don't re-grow without a live
+  look.
+
 ## Layout — the four-zone HUD over a raw data layer
 
 The page is one fixed shell in **two layers at different depths** (`SectionShell` + `store.section`).

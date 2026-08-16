@@ -24,18 +24,27 @@
 // 0-size ANCHOR at the projected point, and everything inside is laid out relative to it, so the
 // engine writes exactly one transform and one flag.
 //
-// PER-VIEW SUBJECTS (`viewPolicy.callout` gates; the Engine's anchor resolvers mirror this table):
-// - hyper: NETWORK-level — the committed metagraph's hub or the DAG core. A committed node keeps
-//   its network's callout, matching hyper's own camera answer to a node (one bead on a shell).
-//   `unlisted` has no anchor — honest absence, no callout.
-// - geo: the finest committed rung with a POINT to point at — node > provider cohort > country.
-//   The network rung deliberately shows nothing: a filtered fleet is spread across the globe, and
-//   a single anchor would lie about where it is.
+// PER-VIEW SUBJECTS (`viewPolicy.callout` gates; the Engine's anchor resolvers mirror this
+// table, and `components/calloutBoundary.test.ts` pins the mirroring contracts):
+// - THE BOX LEADS everywhere (user, 2026-08-15): the boxed card's rung is preferred when its
+//   model and anchor resolve, falling through to the view's default order below — the box is
+//   the subject, exactly as the camera answers it (`store.boxedCard`, published by Inspector).
+// - hyper: the committed NODE's own bead, else the network's hub or the DAG core. `unlisted`
+//   has no anchor — honest absence, no callout.
+// - geo: node (its own chip in the stack) > provider cohort > country. The network rung
+//   deliberately shows nothing: a filtered fleet is spread across the globe, and a single
+//   anchor would lie about where it is.
+// - ledger: the pinned metagraph snapshot's own tile (rewind included), else the committed
+//   global tick's byte-bar lead.
 import { useStore } from "@/src/store/store";
 import { VIEW_POLICIES } from "@/src/engine/domain/viewPolicy";
 import { displayNetwork } from "@/src/data/unlisted";
 import { filterAccent, shortHash } from "@/src/data/network";
+import { SCENE_GLASS } from "@/components/selection";
 import { RoleChips } from "@/components/inspector/parts";
+// The lead line's codes come from the composition vocabulary's ONE home, rendered by the cards'
+// own RoleChips (user, 2026-08-15: "look at my cards — square pills").
+import { layerCodesOf } from "@/src/data/composition";
 import { useNowTick } from "@/components/useNowTick";
 import { relativeAge } from "@/src/util/relativeAge";
 import type { GeoInfo } from "@/src/data/types";
@@ -45,23 +54,6 @@ import type { GeoInfo } from "@/src/data/types";
 const OFF_X = 62;
 const OFF_Y = 92;
 
-// The ONE glass container for scene-anchored labels (user, 2026-08-15 — "align the hover and the
-// click card"): the hover Tooltip and this callout are the same species — HUD glass tied to a
-// scene subject — so they share one surface recipe. Identity never tints the frame; it lives on
-// the content (the hued ticker) and the anchor ring, like every card.
-export const SCENE_GLASS =
-  "rounded-[10px] border border-border px-3 py-2 backdrop-blur-[8px] bg-[var(--panel-solid)]";
-
-// The composition lead line's layer codes — the one layer vocabulary in its fixed order,
-// rendered by the cards' own `RoleChips` (user, 2026-08-15: "look at my cards — square pills";
-// the pills are THE one rendering for layer codes wherever they appear, this surface included).
-function layerCodes(nodes: { roles?: string[] }[]): string[] {
-  const has = { l0: false, cl1: false, dl1: false };
-  for (const n of nodes) for (const r of n.roles ?? []) if (r in has) has[r as keyof typeof has] = true;
-  return (["l0", "cl1", "dl1"] as const)
-    .filter((k) => has[k])
-    .map((k) => (k === "l0" ? "L0" : k === "cl1" ? "cL1" : "dL1"));
-}
 
 // What the panel says — one model, filled per view/rung so the JSX below stays single-sourced.
 // `aside.hue` absent = muted (the country card's ISO-code rule: a place carries no identity);
@@ -113,7 +105,7 @@ export default function SceneCallout() {
     const g = geoOf(nodePick);
     const netId = nodePick.kind === "metanode" ? ((nodePick as { meta?: { id?: string } }).meta?.id ?? null) : "dag";
     const nnet = displayNetwork(netId);
-    const codes = layerCodes([{ roles: nodePick.roles }]);
+    const codes = layerCodesOf([{ roles: nodePick.roles }]);
     const id = (nodePick as { node?: { id?: string } }).node?.id;
     return {
       key: `node|${id ?? `${g?.lat},${g?.lon}`}`,
@@ -130,7 +122,7 @@ export default function SceneCallout() {
     // "all" has no subject; the unlisted set has no 3D anchor (no machines are knowable).
     if (!net || net.virtual) return null;
     const mg = metaList.find((x) => x.id === filter) ?? null;
-    const codes = mg ? layerCodes(mg.nodes) : [];
+    const codes = mg ? layerCodesOf(mg.nodes) : [];
     return {
       key: `net|${filter}`,
       eyebrow: filter === "dag" ? "Network" : "Metagraph",

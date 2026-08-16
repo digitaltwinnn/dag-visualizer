@@ -13,6 +13,15 @@ import { cn } from "@/lib/utils";
 // pairing), and box-shadow is an independent property — cursor/pairing tint under the mark, and
 // the selection returns untouched when they leave. A `background` recipe would either vanish
 // under them (specificity) or fight them (one property).
+// The ONE glass container for scene-anchored labels (user, 2026-08-15 — "align the hover and
+// the click card"): the hover Tooltip and the subject callout are the same species — HUD glass
+// tied to a scene subject — so they share one surface recipe. Identity never tints the frame; it
+// lives on the content (the hued ticker), the anchor ring and the `.edge-spine`. Lives HERE
+// (beside SELECTED_ROW, the shared-recipe home) rather than in SceneCallout so the server-side
+// /design page can render the specimen — a string export cannot cross a "use client" boundary.
+export const SCENE_GLASS =
+  "rounded-[10px] border border-border px-3 py-2 backdrop-blur-[8px] bg-[var(--panel-solid)]";
+
 export const SELECTED_ROW =
   "text-foreground shadow-[inset_0_0_0_1px_var(--sel-border),inset_0_0_0_9999px_var(--sel-bg)]";
 

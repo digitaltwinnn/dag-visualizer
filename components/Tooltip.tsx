@@ -4,7 +4,7 @@ import { useEffect, useRef } from "react";
 import { cn } from "@/lib/utils";
 import { useStore } from "@/src/store/store";
 import { shortHash } from "@/src/data/network";
-import { SCENE_GLASS } from "@/components/SceneCallout";
+import { SCENE_GLASS } from "@/components/selection";
 
 // Lean hover tooltip — a LABEL, not a mini-card: `‹name› ‹ticker›` + "click to inspect". Facts
 // live in the card that opens on click. Content comes from the store (engine raycast, set only

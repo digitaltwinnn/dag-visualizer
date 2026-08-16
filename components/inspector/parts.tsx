@@ -22,7 +22,8 @@ import { compositionRows } from "@/src/data/composition";
 // lives with SIGNER_GROUPS in src/data/network.ts). A second long-form map ("currency-L1",
 // "data-L1") used to sit here and fed the composition `parts` strings, so the same layer could
 // read two ways within one card — the chips beside them have always used these codes.
-export const ROLE_SHORT: Record<string, string> = { l0: "L0", cl1: "cL1", dl1: "dL1" };
+import { ROLE_SHORT } from "@/src/data/composition";
+export { ROLE_SHORT }; // ONE home for the layer-code map (2026-08-16) — this is a re-export
 export const ROLE_ORDER = ["l0", "cl1", "dl1"];
 
 // ── The card body's ONE row grammar, in three weights (user, 2026-08-10) ────────────────────
