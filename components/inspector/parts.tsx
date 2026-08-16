@@ -1,7 +1,7 @@
 "use client";
 
 import { Fragment, useRef, useState, type ReactNode } from "react";
-import { Check, Copy } from "lucide-react";
+import { Check, Copy, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -200,6 +200,18 @@ export const rolesOf = (n: NodeInfo) => (n.roles && n.roles.length ? n.roles : [
 // user-unified to the picker's exact treatment).
 export function IdentityDot({ hue }: { hue: string }) {
   return <span className="w-2 h-2 rounded-full flex-none" style={{ background: hue }} aria-hidden />;
+}
+
+/** The Yes/No FACT mark (user, 2026-08-16 — "yes has a checkmark, so for no add a x"): Yes
+ *  takes the check, No an ✕, BOTH at soft tints — the status pill's own discipline ("even the
+ *  green stays un-dominant"); a raw `--success` glyph read stronger than anything else on the
+ *  card. One component so the two Yes/No rows (Full archive, Delegated staking) can't drift. */
+export function BoolMark({ on }: { on: boolean }) {
+  return on ? (
+    <Check aria-hidden className="size-3" style={{ color: "color-mix(in oklch, var(--success) 72%, transparent)" }} />
+  ) : (
+    <X aria-hidden className="size-3 text-muted-foreground/70" />
+  );
 }
 
 // The ONE status pill chrome (user, 2026-07-12 — unified: ready used to render as plain bold

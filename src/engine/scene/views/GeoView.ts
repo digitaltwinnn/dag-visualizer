@@ -59,6 +59,9 @@ export interface GeoViewHost {
   countryGeoms?: Map<string, { type: string; coordinates: unknown }>;
   countryBorder?: { mesh: THREE.LineSegments; fade: GeoFadeEntry };      // the committed drill
   hoverCountryBorder?: { mesh: THREE.LineSegments; fade: GeoFadeEntry }; // the hover preview (may coexist)
+  // PERSISTENT hosting outlines (user, 2026-08-16): every country with a filter-active node keeps
+  // its outline at a resting whisper — presence reads at a glance; hover still adds the fill.
+  hostCountryBorder?: { mesh: THREE.LineSegments; fade: GeoFadeEntry };
   // The drilled country's FILL boost: a low-res equirect mask texture sampled by the land-fill
   // shader — inside the mask the additive land glass brightens (see setCountryFillMask).
   countryMaskUniforms?: { uCountryMask: { value: THREE.Texture }; uMaskBoost: { value: number } };
@@ -521,6 +524,7 @@ async function buildLand(globe: GeoViewHost) {
     };
     globe.countryBorder = makeBorder();
     globe.hoverCountryBorder = makeBorder();
+    globe.hostCountryBorder = makeBorder();
 
     // Per-country geometry index for the border + framing (world-atlas numeric id → geometry).
     const countries = feature(topo, topo.objects.countries) as unknown as {
@@ -611,11 +615,12 @@ export function setCountryFillMask(globe: GeoViewHost, rings: Ring[] | null, boo
 // hover/drill change, never per frame.
 export function setCountryBorder(
   globe: GeoViewHost,
-  which: "drill" | "hover",
+  which: "drill" | "hover" | "host",
   rings: Ring[] | null,
   level: number,
 ): void {
-  const b = which === "drill" ? globe.countryBorder : globe.hoverCountryBorder;
+  const b =
+    which === "drill" ? globe.countryBorder : which === "hover" ? globe.hoverCountryBorder : globe.hostCountryBorder;
   if (!b) return; // topology not loaded yet — onCountriesReady re-asserts
   if (!rings?.length || level <= 0) {
     b.fade.base = 0;

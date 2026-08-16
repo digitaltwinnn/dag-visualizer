@@ -17,13 +17,13 @@ import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Separator } from "@/components/ui/separator";
 import { SonarRing, NodeStars, NoSignalDot } from "@/components/state/StateAtoms";
 import { VIEW_ICONS, SNAPSHOT_ICON, COUNTRY_ICON, PROVIDER_ICON, COMPOSITION_ICON, KIND_MARK_CLASS } from "@/components/icons";
-import { Check, ExternalLink } from "lucide-react";
+import { ExternalLink } from "lucide-react";
 import { useMinHold } from "@/components/useMinHold";
 import { useArchive, archiveFactState, archiveSummary, fmtSnapCount, fmtReach, useChainSpan } from "@/components/useArchive";
 import { useNodeNames, nodeName, nodeRegistered } from "@/components/useNodeNames";
 import { useNowTick } from "@/components/useNowTick";
 import { POLL } from "@/src/engine/config";
-import { Desc, StatusMark, CompositionRows, StatusBreakdown, RoleChips, IdentityDot, networkKind, Fact, FactGroup, Foot, FootRow, LayerWho } from "./parts";
+import { Desc, StatusMark, CompositionRows, StatusBreakdown, RoleChips, IdentityDot, networkKind, Fact, FactGroup, Foot, FootRow, LayerWho, BoolMark } from "./parts";
 import { compositionGroups, compositionRows, nodeCompositionLabel, parseCompositionKey } from "@/src/data/composition";
 import { pickNetId, followToggleActions } from "@/src/engine/domain/pickActions";
 import { applyClickActions } from "@/src/store/applyClickActions";
@@ -212,7 +212,7 @@ export function GeoLiveAside() {
       // layer detail (the L0 seal) rides the title — the aside states the relation.
       <span
         className="text-label text-muted-foreground whitespace-nowrap"
-        title="This machine is among the committed metagraph snapshot's proof signers — a snapshot is sealed by the metagraph's own L0 cluster."
+        title="This node is among the committed metagraph snapshot's proof signers — a snapshot is sealed by the metagraph's own L0 cluster."
       >
         signed {signed.toLocaleString()}
       </span>
@@ -372,7 +372,7 @@ function UnlistedMemberFacts({ id, last }: { id: string; last: boolean }) {
       )}
       <div className={last ? undefined : "mt-1.5"}>
         <Fact label="Online nodes">
-          <span className="text-muted-foreground italic" title="This network publishes no node cluster, so its machines are unknowable.">
+          <span className="text-muted-foreground italic" title="This network publishes no node cluster, so its nodes are unknowable.">
             unknown
           </span>
         </Fact>
@@ -385,7 +385,7 @@ function UnlistedMemberFacts({ id, last }: { id: string; last: boolean }) {
         >
           <span
             className="flex flex-col items-end"
-            title={`Whether any machine keeps this chain in full is unknowable — no cluster is published. The chain itself is real: ${
+            title={`Whether any node keeps this chain in full is unknowable — no cluster is published. The chain itself is real: ${
               span ? `${span.latestOrdinal.toLocaleString()} snapshots${age ? ` since ~${age.replace("~", "")} ago` : ""}.` : "reading its span…"
             }`}
           >
@@ -449,7 +449,7 @@ export function MetaCard({ cfg }: { cfg: MetaCfg }) {
         (unlistedMembers.length === 0
           ? "None was seen anchoring in the measured window."
           : unlistedMembers.length === 1
-            ? "One anchored in the measured window; its chain and owner address are public, its operator and machines are not."
+            ? "One anchored in the measured window; its chain and owner address are public, its operator and nodes are not."
             : `${unlistedMembers.length} anchored in the measured window; their chains and owner addresses are public, their operators and machines are not.`)
       : mg?.description || cfg.blurb;
   // The site link rides the BODY now (MetaSiteRow — the aside slot carries the ticker). Falls
@@ -678,17 +678,16 @@ function GeoLiveNode({ p }: { p: PickOf<"l0" | "l1" | "metanode"> }) {
   // head normally carries moves down here as the first body row, so no fact is lost, only
   // redistributed (the pile rule's redistribution idea, applied within one card).
   const signedSel = useSignedSelected(p.node) != null;
-  // The operator's self-registered NICKNAME from the delegated-staking registry (user,
-  // 2026-08-16 — "those names look informal often": a content attribute, never the title).
-  // The registry keys on a PEER ID, so the name names a keypair — and a machine that reuses
-  // one keypair across networks (the Upsider pattern) carries it on its metagraph record too,
-  // which is why the match runs for every node kind (user, 2026-08-16: "keep it actual").
-  // The row is PURELY the name now — presence-gated like Hosting/Country, appearing when a
-  // name resolves. The registry's other reading, the delegated-staking OPT-IN, is its own row
-  // (user, 2026-08-16: "would that be a separate attribute?") in the service block below:
-  // Yes/No for DAG validators only — only a Global L0 validator can register (measured: 31 of
-  // 147 live validators haven't), so a metagraph machine gets no row; the absence states
-  // ("not available" when the registry couldn't be read, stars while it loads) live there too.
+  // The operator's self-registered ALIAS from the delegated-staking registry (user,
+  // 2026-08-16 — "those names look informal often": a content attribute, never the title; and
+  // "alias" is the user-facing word, "nickname" stays the internal register). The registry
+  // keys on a PEER ID, so the name names a keypair — and a host that reuses one keypair
+  // across networks (the Upsider pattern) carries it on its metagraph record too, which is
+  // why the match runs for every node kind (user, 2026-08-16: "keep it actual"). The row is
+  // ALWAYS stated, "not known" when nothing resolves. The registry's other reading, the
+  // delegated-staking OPT-IN, is its own row (user, 2026-08-16: "would that be a separate
+  // attribute?") in the service block below: Yes/No for DAG validators only — only a Global
+  // L0 validator can register (measured: 31 of 147 live validators haven't).
   const isDagValidator = p.kind === "l0" || p.kind === "l1";
   const nickState = useNodeNames();
   const nickname = nodeName(nickState.names, p.node);
@@ -739,9 +738,24 @@ function GeoLiveNode({ p }: { p: PickOf<"l0" | "l1" | "metanode"> }) {
   return (
     <>
       <FactGroup>
-        {/* NICKNAME — the operator's informal self-registered handle (see the note above);
-            purely the name, shown wherever one resolves. */}
-        {nickname && <Fact label="Nickname">{nickname}</Fact>}
+        {/* ALIAS — the operator's informal self-registered handle (see the note above). The row
+            is ALWAYS stated (user, 2026-08-16: "if it's missing just say so, don't hide the
+            attribute" — and "alias" over "nickname"): a name, stars while the registry loads,
+            "not known" when the loaded registry has none for this node's keys, "not available"
+            when the registry itself couldn't be read. */}
+        <Fact label="Alias">
+          {nickname ?? (!nickState.settled ? (
+            <NodeStars count={4} />
+          ) : nickState.names ? (
+            <span className="text-muted-foreground italic" title="No display name is registered for this node's keys in the Global L0's delegated-staking registry.">
+              not known
+            </span>
+          ) : (
+            <span className="text-muted-foreground italic" title="The delegated-staking registry could not be read — retried on the next visit.">
+              not available
+            </span>
+          ))}
+        </Fact>
         {/* STATUS — only while the SIGNED relation holds the head aside (its usual home). */}
         {signedSel && (
           <Fact label="Status">
@@ -778,7 +792,7 @@ function GeoLiveNode({ p }: { p: PickOf<"l0" | "l1" | "metanode"> }) {
           ) : colo.length ? (
             <span
               className="inline-flex items-center gap-1.5"
-              title="This machine also runs another network's layers — the same IP answers in both clusters."
+              title="Another network runs its layers at this node's IP — the same host answers in both clusters."
             >
               {colo.map((c) => (
                 <span key={c.id} className="inline-flex items-center gap-1.5">
@@ -788,7 +802,7 @@ function GeoLiveNode({ p }: { p: PickOf<"l0" | "l1" | "metanode"> }) {
               ))}
             </span>
           ) : (
-            <span className="text-muted-foreground" title="No other network has a node at this machine's IP.">
+            <span className="text-muted-foreground" title="No other network has a node at this IP.">
               none
             </span>
           )}
@@ -813,7 +827,7 @@ function GeoLiveNode({ p }: { p: PickOf<"l0" | "l1" | "metanode"> }) {
                     : "In the validator whitelist but not registered as a delegated-staking candidate — separate, independent gates, which is why a live validator can lack an entry."
                 }
               >
-                {registered && <Check aria-hidden className="size-3 text-[var(--success)]" />}
+                <BoolMark on={registered} />
                 <b className="font-bold">{registered ? "Yes" : "No"}</b>
               </span>
             ) : (
@@ -840,7 +854,7 @@ function GeoLiveNode({ p }: { p: PickOf<"l0" | "l1" | "metanode"> }) {
               }
             >
               <span className="inline-flex items-center gap-1.5">
-                {archState.display.genesis && <Check aria-hidden className="size-3 text-[var(--success)]" />}
+                <BoolMark on={archState.display.genesis} />
                 <b className="font-bold">{archState.display.genesis ? "Yes" : "No"}</b>
               </span>
               {archState.display.reach && <span className="text-label text-muted-foreground">{archState.display.reach}</span>}
@@ -864,7 +878,7 @@ function GeoLiveNode({ p }: { p: PickOf<"l0" | "l1" | "metanode"> }) {
                 question doesn't apply — "None" would claim it could have kept one and didn't. */}
             <span
               className="flex flex-col items-end"
-              title="A chain's snapshots are served by its L0 validators; this machine runs no L0 process, so it keeps no snapshot archive."
+              title="A chain's snapshots are served by its L0 validators; this node runs no L0 process, so it keeps no snapshot archive."
             >
               <b className="font-bold">n/a</b>
               <span className="inline-flex items-center gap-1 text-label text-muted-foreground">
@@ -877,7 +891,7 @@ function GeoLiveNode({ p }: { p: PickOf<"l0" | "l1" | "metanode"> }) {
           <Fact label="Full archive">
             <span
               className="text-muted-foreground"
-              title="The archive census (refreshed every few hours) has no reading for this machine — it was unreachable at probe time, not Ready then, or joined the cluster since."
+              title="The archive census (refreshed every few hours) has no reading for this node — it was unreachable at probe time, not Ready then, or joined the cluster since."
             >
               Unmeasured
             </span>
@@ -988,7 +1002,10 @@ export function CompositionTitle({ sel }: { sel: CompositionSel }) {
   return (
     <span className="flex items-center gap-2 min-w-0 max-w-full">
       <Mark aria-hidden className={cn(KIND_MARK_CLASS, "text-[var(--filter-accent,var(--primary))]")} />
-      <span className="truncate min-w-0">{label}</span>
+      {/* "<Label> validators", not the bare word (user, 2026-08-16 — aligning with the explorer
+          depth caption's "…validators" register): the bare "Hybrid"/"Consensus" read as a
+          category, not as the machines it names; the aside's layer chips still carry the codes. */}
+      <span className="truncate min-w-0">{label} validators</span>
     </span>
   );
 }
@@ -1011,7 +1028,7 @@ export function CompositionCard({ sel }: { sel: CompositionSel }) {
   const cfg = metagraphById(sel.netId);
   return (
     <FactGroup>
-      <Fact label="Machines">{members.length}</Fact>
+      <Fact label="Nodes">{members.length}</Fact>
       <Fact label="Share of network">{share}%</Fact>
       <Fact label="Network">
         <span className="inline-flex items-center gap-1.5 min-w-0">

@@ -187,6 +187,7 @@ export class Globe implements GeoViewHost {
   private _countryLabels: THREE.Mesh[] = [];
   private _selCohortOk = false;
   private _hoverCountryCc: string | null = null; // explorer row hover — border preview only
+  private _hostBorderKey: string | null = null; // hosting-outline rebuild key (active set + drill)
   // The geo focus SPOTLIGHT (scene/objects/StageLight): the SHARED light, claimed per frame and
   // staged above the SELECTED node's chip stack so the zoomed-in node pick catches a light wash
   // (user). `_selNodeRec` caches the selected node's geoPrimary record — re-resolved by
@@ -211,6 +212,7 @@ export class Globe implements GeoViewHost {
   countryGeoms?: GeoViewHost["countryGeoms"];   // per-country geometries (drill border + framing)
   countryBorder?: GeoViewHost["countryBorder"];           // the committed drill's border
   hoverCountryBorder?: GeoViewHost["hoverCountryBorder"]; // the hover preview's border
+  hostCountryBorder?: GeoViewHost["hostCountryBorder"];   // the persistent hosting outlines
   onCountriesReady?: GeoViewHost["onCountriesReady"];
 
   private fabric: NodeFabric;
@@ -422,6 +424,7 @@ export class Globe implements GeoViewHost {
     this._buildDensityGlow(); // light pools follow the validator sites too
     this._assignGatherSlots(); // a validator-only rebuild must not leave stale ranks either
     this._rebuildCountryLabels();
+    this._updateCountryBorder(); // the hosting outlines follow the fresh active set
     this.setMorph(this.morph); // place at current morph
   }
 
@@ -854,6 +857,24 @@ export class Globe implements GeoViewHost {
     // so the drill wins when both are present.
     if (drillRings) setCountryFillMask(this, drillRings);
     else setCountryFillMask(this, hoverRings, HOVER_MASK_BOOST);
+    // PERSISTENT HOSTING OUTLINES (user, 2026-08-16 — "always have the country outline for
+    // those that have any nodes; hover adds the fill"): every country with a filter-active
+    // node keeps its outline at a resting whisper, ONE LineSegments concatenating all their
+    // rings. Rebuilt only when the hosting set or the drill changes — this method also runs on
+    // every hover move, and re-concatenating ~30 countries' rings there would be waste. The
+    // drilled country is excluded (its own border draws at full strength above); a hovered one
+    // keeps its host line — the 0.3 preview draws over it additively, which only firms it.
+    const hostKey = [...this._activeCcs()].sort().join(",") + "|" + (drillCc ?? "");
+    if (hostKey !== this._hostBorderKey) {
+      this._hostBorderKey = hostKey;
+      const hostRings: Ring[] = [];
+      for (const cc of this._activeCcs()) {
+        if (cc === drillCc) continue;
+        const r = this.countryRings(cc);
+        if (r) hostRings.push(...r);
+      }
+      setCountryBorder(this, "host", hostRings.length ? hostRings : null, 0.15);
+    }
   }
 
   // Resolve a globe-surface WORLD point to the country under it — only countries that

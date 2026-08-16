@@ -179,7 +179,7 @@ export function lanePlaneHalf(n: number): number {
  *  runs low: live ticks of 80–90 KB were observed within minutes of baking, i.e. the reference is
  *  exceeded more often than "p99" suggests. That is handled honestly (clip + overflow multiplier),
  *  not hidden. A future re-bake should calibrate against exact-read totals instead. */
-export const BYTE_SCALE_KB = 589; // rebaked 2026-08-16 (traffic ~6.6× the 08-07 bake; the median tick had reached the old reference, so half of all bars clipped)
+export const BYTE_SCALE_KB = 150; // rebaked 2026-08-16 at ~p70 of anchored KB/tick (median fills ~57%, ~30% of ticks clip with the honest ×N label) — the p99 bake made the median bar a sliver, and the user prefers 'more often too filled than too small'
 
 // ── Node trays (redesign 2026-08-07 — ONE tray per snapshot plane, no role split): glass trays
 // hanging under the FRONT (+X, camera-side) edge of the plane their machines serve, facing the

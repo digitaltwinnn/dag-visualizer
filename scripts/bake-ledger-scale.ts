@@ -64,10 +64,14 @@ async function main() {
   // The listed directory is not the whole story: a few anchors come from metagraphs that aren't
   // publicly listed, so the measured p99 is inflated by their observed byte share.
   const UNLISTED_SHARE = 1.08;
-  const p99 = at(0.99) * UNLISTED_SHARE;
+  // THE REFERENCE QUANTILE IS ~p70, NOT p99 (user, 2026-08-16 — "more often too filled than too
+  // small"): a p99 bake made the median bar a sliver of tiny unreadable segments, while a full
+  // bar clips HONESTLY (the ×N overflow label states by how much). ~p70 puts the median around
+  // half width and lets roughly a third of ticks clip.
+  const ref = at(0.7) * UNLISTED_SHARE;
   console.log(`complete window from ${windowStart.slice(0, 16)} — ticks=${ticks.length}`);
-  console.log(`p50=${at(0.5).toFixed(1)} p95=${at(0.95).toFixed(1)} p99=${at(0.99).toFixed(1)} max=${ticks[ticks.length - 1].toFixed(1)}`);
-  console.log(`\nBYTE_SCALE_KB = ${Math.round(p99)}   // p99 of anchored KB/tick, +unlisted share`);
+  console.log(`p50=${at(0.5).toFixed(1)} p70=${at(0.7).toFixed(1)} p95=${at(0.95).toFixed(1)} p99=${at(0.99).toFixed(1)} max=${ticks[ticks.length - 1].toFixed(1)}`);
+  console.log(`\nBYTE_SCALE_KB = ${Math.round(ref)}   // ~p70 of anchored KB/tick, +unlisted share`);
 }
 
 main();

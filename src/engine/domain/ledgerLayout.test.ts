@@ -120,8 +120,8 @@ describe("two-floor chamber (redesign 2026-08-04)", () => {
     expect(BAR_D).toBeLessThan(3.6);
   });
 
-  it("carries the baked p99 scale reference in KB", () => {
-    expect(BYTE_SCALE_KB).toBe(589);
+  it("carries the baked scale reference in KB (~p70 — the user prefers full-and-clipping over sliver bars)", () => {
+    expect(BYTE_SCALE_KB).toBe(150);
   });
 
   it("hangs the node trays under their plane's front edge, facing the camera", () => {

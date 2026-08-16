@@ -280,7 +280,7 @@ export default function GeoExplore() {
                       <>
                       {/* Depth caption (user, 2026-08-16): this depth's one new concept — the
                           country's machines grouped into provider COHORTS. */}
-                      <DepthCaption>Machines by city · provider</DepthCaption>
+                      <DepthCaption>Nodes by city · provider</DepthCaption>
                       {cohortsOf(nodes).map((ch) => {
                         const holdsSel =
                           selIp != null &&

@@ -1276,9 +1276,11 @@ included), gapped, each with a small ticker label, machines hanging in one tray 
 The storey heights give the ribbons a deliberate long run.
 
 **The byte bar IS the global snapshot.** One bar per tick on the global floor, fixed height and depth,
-**its width alone encoding the bytes that tick carried** against a FIXED baked reference — the p99 of
-anchored KB/tick, so the rare monster clips at the floor edge with an honest `×N` overflow label
-instead of rescaling the whole past. The bar is centered on the lane field and split into bands, one
+**its width alone encoding the bytes that tick carried** against a FIXED baked reference — **~p70 of
+anchored KB/tick** (user, 2026-08-16: "more often too filled than too small" — the earlier p99 bake
+made the median bar a sliver of unreadable segments), so a heavy tick clips at the floor edge with an
+honest `×N` overflow label instead of rescaling the whole past. `scripts/bake-ledger-scale.ts`
+re-measures it; its header carries the complete-window sampling trap. The bar is centered on the lane field and split into bands, one
 per contributing metagraph plus unlisted, each its own pickable mesh from a pool allocated once.
 **Bands follow lane order, so band order and lane order agree and the ribbons never cross.**
 

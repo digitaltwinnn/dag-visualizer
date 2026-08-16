@@ -237,7 +237,7 @@ export default function SceneCallout() {
       id="callout"
       data-on="0"
       aria-hidden
-      className="fixed left-0 top-0 z-30 pointer-events-none opacity-0 data-[on=1]:opacity-100 transition-opacity duration-200 motion-reduce:transition-none"
+      className="fixed left-0 top-0 z-[5] pointer-events-none opacity-0 data-[on=1]:opacity-100 transition-opacity duration-200 motion-reduce:transition-none"
     >
       {/* Anchor ring at the projected point (the wrapper's origin) — the subject mark at the
           scene end of the tie. */}

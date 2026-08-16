@@ -168,7 +168,7 @@ export default function HyperExplore() {
                           const groups = compositionGroups(selNodes);
                           // Depth caption (user, 2026-08-16): this depth's one new concept — the
                           // network's machines grouped by role make-up.
-                          const caption = <DepthCaption key="caption">Machines by composition</DepthCaption>;
+                          const caption = <DepthCaption key="caption">Nodes by composition</DepthCaption>;
                           // The label column sizes to the LONGEST label PRESENT (user — a fixed
                           // width left dead air when only short words showed): every label span
                           // stacks an invisible copy of the longest word behind its own text
@@ -211,6 +211,19 @@ export default function HyperExplore() {
 
                               {isOpen && (
                                 <div className="mb-1 ml-[7px] pl-2 border-l border-border">
+                                  {/* Depth caption (user, 2026-08-16, refined same day — "make it
+                                      specific to the composition, use the wording that is
+                                      consistent across the app"): the ONE validator vocabulary is
+                                      layer-qualified (a validator is a LAYER acting), so the
+                                      caption states this group's own codes as the chips + the
+                                      word — "L0 · cL1 validators", exactly the SIGNER_GROUPS
+                                      register. */}
+                                  <DepthCaption>
+                                    <span className="inline-flex items-center gap-1">
+                                      <RoleChips codes={g.codes} />
+                                      <span>validators</span>
+                                    </span>
+                                  </DepthCaption>
                                   {g.rows.map((r, i) => {
                                     const on =
                                       selIp != null &&
