@@ -55,14 +55,13 @@ describe("compositionKey / parseCompositionKey", () => {
 // The caption's functional clauses (user, 2026-08-16): the leaf caption says what a group DOES.
 describe("compositionClause", () => {
   it("names one layer's function alone", () => {
-    expect(compositionClause(["L0"])).toBe("seal the network's snapshots");
-    expect(compositionClause(["dL1"])).toBe("validate data updates");
+    expect(compositionClause(["L0"])).toBe("seal snapshots");
+    expect(compositionClause(["dL1"])).toBe("validate data");
   });
-  it("joins a hybrid's clauses in code order with a final 'and'", () => {
-    expect(compositionClause(["L0", "cL1"])).toBe("seal the network's snapshots and validate currency transactions");
-    expect(compositionClause(["L0", "cL1", "dL1"])).toBe(
-      "seal the network's snapshots, validate currency transactions and validate data updates",
-    );
+  it("joins a hybrid's clauses in code order with a final 'and', eliding a repeated verb", () => {
+    expect(compositionClause(["L0", "cL1"])).toBe("seal snapshots and validate currency");
+    expect(compositionClause(["L0", "cL1", "dL1"])).toBe("seal snapshots, validate currency and data");
+    expect(compositionClause(["cL1", "dL1"])).toBe("validate currency and data");
   });
   it("answers null for codes it has no clause for — the caller falls back", () => {
     expect(compositionClause([])).toBeNull();

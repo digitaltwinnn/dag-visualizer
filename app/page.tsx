@@ -35,6 +35,14 @@ export default function Home() {
       <SectionShell scene={<SceneCanvas />} raw={<DataSection />} strip={<BottomStream />}>
         <Blueprint />
         <BootOverlay />
+        {/* The subject callout lives INSIDE the shell (user, 2026-08-16 — it painted over the
+            rail cards): its z-[5] must compete in the SAME stacking context as the rails' z-10,
+            and outside the shell it compared against the whole shell at z-auto instead. The
+            shell's transform is IDENTITY at rest (CSS trap 2's load-bearing arrangement), so the
+            Engine's canvas-rect coordinates resolve the same fixed box the rails use; during the
+            depth transition the shell scales, but the callout has already hidden itself (it only
+            renders in the scene pose). */}
+        <SceneCallout />
         <ExploreRail />
         <Inspector />
         <PhoneDockSweep />
@@ -44,10 +52,6 @@ export default function Home() {
       <FollowController />
       <RawSnapshotBridge />
       <Tooltip />
-      {/* The subject callout — like Tooltip, OUTSIDE the shell: the Engine writes its screen
-          position in canvas-rect coordinates, and a transformed ancestor would re-anchor its
-          fixed box (CSS trap 2). It hides itself outside the scene pose. */}
-      <SceneCallout />
       <DevCssCanary />
     </main>
   );

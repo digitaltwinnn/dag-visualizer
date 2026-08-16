@@ -53,13 +53,16 @@ const NO_PAIR = () => {};
 // signer explainer). It exists only where the child grouping introduces a NEW concept the
 // parent row doesn't state (signed-by, city · provider, composition, by-network); a depth
 // whose rows self-describe gets none — a caption there would be noise, not orientation.
-// Prose register (text-label muted), never the uppercase LABEL register: it is a phrase you
-// read, not a column head — and it shares the cards' vocabulary ("Signed by N L0 validators")
-// so the explorer and the facts rail speak one language. Not a control: plain <p>, no hover
-// wash, the `title` carries the long explanation.
+// The CAPS-MICRO section register — what every "this names a section" line in the app wears
+// (the raw pane's lane tabs, the shape table's heads). It started in the prose register and
+// blended straight into the rows (user, 2026-08-16 — the signer list's grey mono ids sat in
+// the same hue and weight); uppercase at micro is the one register no data row uses, so the
+// caption reads as structure at a glance. Content is written in sentence case and LABEL
+// length (see compositionClause) — CSS does the shouting, so `title`/copy stay readable.
+// Not a control: plain <p>, no hover wash, the `title` carries the long explanation.
 export function DepthCaption({ title, children }: { title?: string; children: React.ReactNode }) {
   return (
-    <p className="flex items-baseline gap-1 w-full py-1 pl-2 pr-7 text-label text-muted-foreground" title={title}>
+    <p className="flex items-baseline gap-1 w-full py-1 pl-2 pr-7 text-micro uppercase tracking-caps text-muted-foreground" title={title}>
       {children}
     </p>
   );

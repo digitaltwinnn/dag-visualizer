@@ -873,7 +873,7 @@ export class Globe implements GeoViewHost {
         const r = this.countryRings(cc);
         if (r) hostRings.push(...r);
       }
-      setCountryBorder(this, "host", hostRings.length ? hostRings : null, 0.15);
+      setCountryBorder(this, "host", hostRings.length ? hostRings : null, 0.08); // a true whisper (user, 2026-08-16: 0.15 read too present at rest)
     }
   }
 

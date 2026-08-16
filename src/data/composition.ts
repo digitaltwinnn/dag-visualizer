@@ -33,18 +33,27 @@ export function layerCodesOf(nodes: ReadonlyArray<{ roles?: string[] }>): string
  *  2026-08-16: the caption should say what the group does — repeating the parent row's codes
  *  was duplication). One home beside the code vocabulary, so a new layer adds its clause here. */
 const LAYER_CLAUSE: Record<string, string> = {
-  L0: "seal the network's snapshots",
-  cL1: "validate currency transactions",
-  dL1: "validate data updates",
+  L0: "seal snapshots",
+  cL1: "validate currency",
+  dL1: "validate data",
 };
 
-/** The composition's functional sentence fragment ("seal the network's snapshots and validate
- *  currency transactions"), in the fixed code order; null when no code has a clause. */
+/** The composition's functional fragment ("seal snapshots, validate currency and data"), in
+ *  the fixed code order; null when no code has a clause. Clauses are LABEL-length — the caption
+ *  wears the caps-micro section register (user, 2026-08-16: the prose form blended into the
+ *  rows), where a full sentence wrapped four lines. A repeated leading verb is elided from the
+ *  latter clause ("validate currency and data", not "…and validate data"). */
 export function compositionClause(codes: readonly string[]): string | null {
   const parts = codes.map((c) => LAYER_CLAUSE[c]).filter((c): c is string => !!c);
   if (!parts.length) return null;
-  if (parts.length === 1) return parts[0];
-  return `${parts.slice(0, -1).join(", ")} and ${parts[parts.length - 1]}`;
+  const out: string[] = [parts[0]];
+  for (let i = 1; i < parts.length; i++) {
+    const prevVerb = parts[i - 1].split(" ")[0];
+    const [verb, ...rest] = parts[i].split(" ");
+    out.push(verb === prevVerb ? rest.join(" ") : parts[i]);
+  }
+  if (out.length === 1) return out[0];
+  return `${out.slice(0, -1).join(", ")} and ${out[out.length - 1]}`;
 }
 
 export function compositionRows(nodes: NodeInfo[]): CompRow[] {
