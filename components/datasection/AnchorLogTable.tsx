@@ -185,7 +185,7 @@ export default function AnchorLogTable() {
   if (!histNet) {
     const listedRows = net ? buildAnchorLog(net.metaSnaps, net.globalSnapshots, filter) : [];
     const unlistedRows = net && (lens === "all" || lens === UNLISTED_ID) ? unlistedLog(net.globalSnapshots, snapshotExact) : [];
-    allRows = sortAnchorLog([...listedRows, ...unlistedRows], sort.key, sort.dir, (metaId) => displayNetwork(metaId)?.name ?? metaId);
+    allRows = sortAnchorLog([...listedRows, ...unlistedRows], sort.key, sort.dir, (metaId) => displayNetwork(metaId)?.ticker ?? metaId);
     total = allRows.length;
     pages = Math.max(1, Math.ceil(total / PAGE));
     const p = Math.min(page, pages);
@@ -208,7 +208,7 @@ export default function AnchorLogTable() {
       };
     });
     // Sorting scopes to the page in history mode — the full set is the chain itself.
-    rows = sortAnchorLog(mapped, sort.key, sort.dir, () => displayNetwork(histNet)?.name ?? histNet) as ViewRow[];
+    rows = sortAnchorLog(mapped, sort.key, sort.dir, () => displayNetwork(histNet)?.ticker ?? histNet) as ViewRow[];
     allRows = rows;
     total = latest;
     pages = Math.max(1, Math.ceil(Math.max(total, 1) / PAGE));
@@ -344,7 +344,13 @@ export default function AnchorLogTable() {
                     <span className="flex items-center gap-2">
                       <IdentityDot hue={cfg?.hue ?? "var(--core)"} />
                       {cfg && !cfg.virtual ? (
-                        cfg.name
+                        // The TICKER, not the full name (user, 2026-08-15): at tablet widths the
+                        // name column alone pushed the log into horizontal scroll, and dot +
+                        // ticker is the established compact identity — the pane head one column
+                        // over says `DED 1,978,733` in exactly this register, so the log and the
+                        // pane now name a row the same way. The full name remains one click away
+                        // (the pane head's own subject line + the rail card).
+                        <span title={cfg.name}>{cfg.ticker}</span>
                       ) : (
                         // An uncataloged channel: the core tone + its address, honestly unnamed.
                         <span className="italic text-muted-foreground">unlisted · {r.metaId.slice(0, 10)}…</span>

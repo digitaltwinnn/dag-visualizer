@@ -120,6 +120,13 @@ export const TILE_TUNE_SCHEMA: TuneSchema<TileTune> = {
   rest: { min: 0, max: 2, step: 0.05 },
 };
 
+// The view-entry drop's shape (see the VIEW-ENTRY DROP note in the class): fall height and
+// per-slot timing. The TOTAL is derived so _entryT in [0,1] maps onto real seconds.
+const ENTRY_H = 6.5;
+const ENTRY_FALL = 0.45;
+const ENTRY_STAG = 0.04;
+const ENTRY_TOTAL = ENTRY_FALL + ENTRY_STAG * (SLOT_N - 1);
+
 export class LedgerView implements SceneView {
   group: THREE.Group;
   pickables: THREE.Object3D[];
@@ -361,8 +368,10 @@ export class LedgerView implements SceneView {
     for (const o of this._ordLabels.values()) {
       const ox = LEAD_X - o.slot * SLOT_SP + this._trailOff;
       // Both boundaries at once: the rewind's front dissolve and the horizon's — no instrument
-      // may float on glass that has already faded out (user, 2026-08-09).
-      const front = this._rewind.fadeAtX(ox) * horizonAt(ox);
+      // may float on glass that has already faded out (user, 2026-08-09) — and the ENTRY fade:
+      // a label must not name a row whose bar hasn't dropped in yet.
+      const entryF = this._entryT < 1 && o.slot >= 0 && o.slot < SLOT_N ? this._entryFade[o.slot] : 1;
+      const front = this._rewind.fadeAtX(ox) * horizonAt(ox) * entryF;
       (o.mesh.material as THREE.MeshBasicMaterial).opacity = ORD_OP * front * a;
       // The anchor line whispers under its label (user, 2026-08-07 — "a bit more subtle").
       (o.line.material as THREE.LineDashedMaterial).opacity = ORD_OP * 0.45 * front * a;
@@ -374,6 +383,104 @@ export class LedgerView implements SceneView {
     this._laneColors.clear();
     this._bar.setSceneColors(map);
     this._ribbons.setSceneColors(map);
+  }
+
+  // ── VIEW-ENTRY DROP (user, 2026-08-16, retimed same day — "should occur as the last effect
+  // on the scene to signal we're done"): snapshots are SUBJECTS, so they arrive like ones —
+  // but AFTER the choreography settles, not inside it (the first cut ran during the IN build,
+  // where the camera is mid-flight and the chamber still translucent, and read as nothing).
+  // The subjects HOLD elevated and dark through the transition; on release they drop ~2.6
+  // units onto their planes over ~1.05s, slot-staggered front-to-back, brightness riding the
+  // same ease, ribbons on the tail — the chamber's closing beat. `_entryT` parks at 1 and the
+  // per-frame work is skipped entirely once settled.
+  private _entryT = 1;
+  private _entryHold = false;
+  private readonly _entryDrop = new Float32Array(SLOT_N);
+  private readonly _entryFade = new Float32Array(SLOT_N);
+  // ── THE TICK HANDOFF's GRACE SHEET (user, 2026-08-16 — "the ribbon and snapshot selection
+  // effect disappear immediate ... give a nice fade to the getting-old snapshot and a smooth
+  // pivot to the new one"). On a new tick the outgoing lead's ribbon FOLLOWS its row back one
+  // slot and fades (~0.8s); the moment the new lead's sheet is drawable (its exact read landed
+  // — "no exact read → no bands"), the fade accelerates into a crossfade (~0.35s). Ribbons row
+  // 3 is the carrier; the ordinal (not the slot) is tracked so further ticks keep the sheet on
+  // its own row as everything shifts.
+  private _graceOrd: number | null = null;
+  private _graceT = 0;
+  private _graceSlot = -1; // the grace row's live slot — hue continuity for tiles + bar
+  // The NEW lead's ribbon fades IN over ~0.9s (user, 2026-08-16 — it popped to full the frame
+  // it became drawable; only the OLD sheet was crossfading). Keyed by ordinal, smoothstepped.
+  private _leadRibOrd: number | null = null;
+  private _leadRibT = 1;
+
+  /** Arm the drop (subjects held high and dark) — called on every arrival in this view. */
+  beginEntry(): void {
+    this._entryT = 0;
+    this._entryHold = true;
+    this._entryDrop.fill(2.6);
+    this._entryFade.fill(0);
+  }
+
+  /** Release it — the transition settled (or there was none); the drop is the closing beat. */
+  releaseEntry(): void {
+    this._entryHold = false;
+  }
+
+  // The committed metagraph snapshot's TILE — resolved to an instance index event-time (every
+  // new tick shifts the instance order, so _rebuildTilePicks re-resolves), its live position
+  // recorded as the trail draws (rewind and trail offsets included).
+  private _selTile: { metaId: string; ordinal: number } | null = null;
+  private _selTileIndex = -1;
+  private _selTilePos = new THREE.Vector3();
+  private _selTilePosOk = false;
+
+  /** Tell the chamber which metagraph snapshot is committed, so the callout can anchor ITS
+   *  tile rather than the lane lead (user, 2026-08-15). */
+  setSelectedTile(sel: { metaId: string; ordinal: number } | null): void {
+    this._selTile = sel;
+    this._resolveSelTile();
+  }
+
+  private _resolveSelTile(): void {
+    this._selTileIndex = -1;
+    const sel = this._selTile;
+    if (!sel) return;
+    for (let i = 0; i < META_TRAIL_MAX; i++) {
+      const p = this._tilePicks[i];
+      if (p?.kind === "metaSnap" && p.sel.metaId === sel.metaId && p.sel.ordinal === sel.ordinal) {
+        this._selTileIndex = i;
+        return;
+      }
+    }
+  }
+
+  /** The committed FILTER's band on the shown global row (the selected row owns the front, so
+   *  this is the lead-or-pinned slot) — the byte bar's own segment for the network, so the
+   *  global callout can point at it under a filter (user, 2026-08-16). Chamber-local. */
+  bandAnchor(key: string, out: THREE.Vector3): boolean {
+    const slot = this.model.selectedSlot >= 0 ? this.model.selectedSlot : 0;
+    return this._bar.bandAnchor(slot, key, out);
+  }
+
+  /** The committed snapshot's own tile position (chamber-local), when it drew this frame. */
+  selectedTileAnchor(out: THREE.Vector3): boolean {
+    if (!this._selTilePosOk) return false;
+    out.copy(this._selTilePos);
+    return true;
+  }
+
+  /** The SUBJECT CALLOUT's anchor in chamber-LOCAL coordinates: the LEAD slot of the named
+   *  lane's plane, or the global floor's lead bar (`laneId: null`). The rewind brings a
+   *  committed row to the lead position, so the lead IS where the pinned subject settles —
+   *  pure layout data, no per-row tracking. False when the lane isn't in the field. */
+  calloutAnchor(laneId: string | null, out: THREE.Vector3): boolean {
+    if (laneId === null) {
+      out.set(LEAD_X, FLOOR_Y.gl0 + 0.3, 0);
+      return true;
+    }
+    const z = this._laneZOf(laneId);
+    if (z == null) return false;
+    out.set(LEAD_X, FLOOR_Y.msnap + 0.3, z);
+    return true;
   }
 
   // ── the lane field ───────────────────────────────────────────────────────
@@ -424,7 +531,16 @@ export class LedgerView implements SceneView {
         : { fee: 0, count: u, metaIds: new Set([UNLISTED_KEY]), metaCounts, touched: 0 };
     };
 
+    // Capture the outgoing lead BEFORE the model shifts: if it had a drawable sheet, the
+    // grace row inherits it (see the field note above).
+    const prevLead = this.model.tickOrdinal;
+    const hadSheet = !!(this._slotSnap[0] && this._specs[0]?.measured && this._specs[0].bandCount > 0);
     this.model.setData(snaps, wrapped);
+    if (prevLead != null && this.model.tickOrdinal !== prevLead && hadSheet) {
+      this._graceOrd = prevLead;
+      this._graceT = 1;
+    }
+
     for (let s = 0; s < SLOT_N; s++) this._slotSnap[s] = null;
     if (this.model.tickOrdinal != null)
       this._slotSnap[0] = this._byOrd.get(this.model.tickOrdinal) ?? null;
@@ -433,6 +549,16 @@ export class LedgerView implements SceneView {
         this._slotSnap[tr.slot] = this._byOrd.get(tr.ordinal) ?? null;
 
     this._recomputeHoverSlot();
+    this._rebuildAllSlots();
+  }
+
+  // Ordinals whose exact read FAILED (store.exactMiss, bridged by the Engine): the forming
+  // block's give-up signal — a missed lead stops pulsing and draws nothing, the same honest
+  // absence a historical unmeasured row shows (the acquiring give-up rule; a retry that later
+  // lands clears the miss and the read arrives through setExact as usual).
+  private _missOrds: ReadonlySet<number> = new Set();
+  setExactMisses(byOrdinal: Record<number, unknown>): void {
+    this._missOrds = new Set(Object.keys(byOrdinal).map(Number)); // event-time
     this._rebuildAllSlots();
   }
 
@@ -574,7 +700,7 @@ export class LedgerView implements SceneView {
         ex?.anchored ??
         (typeof snap.metagraphSnapshotCount === "number" ? snap.metagraphSnapshotCount : 0);
       fillBarSpec(this._specs[s], ex ? this._bytesByKey(ex) : null, this._laneOrder, anchored);
-      this._bar.setBar(s, snap.ordinal, this._specs[s], this._pickFor(snap));
+      this._bar.setBar(s, snap.ordinal, this._specs[s], this._pickFor(snap), !this._missOrds.has(snap.ordinal));
     }
     this._syncRibbonRows();
     this._syncOrdLabels();
@@ -657,6 +783,20 @@ export class LedgerView implements SceneView {
       // so it rides the same shared focus ranking every node loop uses.
       this._ribbons.setRowFade(2, focusWeightOf(false, true));
     } else this._ribbons.clearRow(2);
+    // Row 3 = the GRACE sheet (see the field note): the outgoing lead's ribbon at its CURRENT
+    // slot, fading per frame below. Keyed by ordinal so further ticks keep it on its own row.
+    let g = -1;
+    if (this._graceOrd != null && this._graceT > 0) {
+      for (const tr of this.model.trail) if (tr.ordinal === this._graceOrd) { g = tr.slot; break; }
+    }
+    if (g > 0 && g < SLOT_N && g !== hot && this._slotSnap[g] && this._specs[g].measured) {
+      this._ribbons.setRow(3, g, this._specs[g], this._laneZOf);
+    } else {
+      // Clear the SHEET but never the grace itself here: on the very first sync after a tick
+      // the trail may not carry the outgoing lead yet, and killing the grace at arm time was
+      // one of the ways the handoff silently died. Only the per-frame decay ends it.
+      this._ribbons.clearRow(3);
+    }
   }
 
   /** Walks the lane tiles in the SAME order update() draws them, so instance id === pick index. */
@@ -683,8 +823,10 @@ export class LedgerView implements SceneView {
       }
     }
     for (let j = mi; j < META_TRAIL_MAX; j++) this._tilePicks[j] = null;
-    // A held hover's tile index is only valid against THIS table.
+    // A held hover's tile index is only valid against THIS table — and so is the selected
+    // tile's (the callout anchor).
     this._syncHoverTile();
+    this._resolveSelTile();
   }
 
   private _syncPickables(): void {
@@ -701,6 +843,26 @@ export class LedgerView implements SceneView {
 
   update(dt: number) {
     this.t += dt;
+
+    // The entry ramp (see beginEntry): held at full lift while the transition runs, then the
+    // DROP once released — retuned 2026-08-16 after the first cut read as a mere fade: the
+    // fall is HIGH (6.5 units — clearly airborne above the planes at the chamber's low camera
+    // angle), gravity-eased (p², accelerating — a drop, not a float), and the stagger is
+    // REVERSED: the far history lands first and the bright LEAD row last, at the front, so the
+    // finale punctuates exactly where the eye rests. ~1.3s in total.
+    if (this._entryT < 1) {
+      if (!this._entryHold) this._entryT = Math.min(1, this._entryT + dt / ENTRY_TOTAL);
+      const tSec = this._entryT * ENTRY_TOTAL;
+      for (let si = 0; si < SLOT_N; si++) {
+        const start = (SLOT_N - 1 - si) * ENTRY_STAG; // reversed: the lead (slot 0) falls last
+        const p = Math.min(1, Math.max(0, (tSec - start) / ENTRY_FALL));
+        const e = p * p; // gravity: accelerate into the plane
+        this._entryDrop[si] = ENTRY_H * (1 - e);
+        this._entryFade[si] = Math.min(1, p * 1.6); // visible early in its own fall
+      }
+      this._bar.setEntryDrop(this._entryDrop, this._entryFade);
+      if (this._entryT >= 1) this._bar.setEntryDrop(null, null); // park — steady frames write nothing
+    }
 
     // ── the TRAIL REWIND (objects/TrailRewind.ts): the shown snapshot owns the front; rows
     // newer than it slide past the edge and dissolve. All scalar logic lives in the adapter.
@@ -719,7 +881,43 @@ export class LedgerView implements SceneView {
     this._ordGroup.position.x = this._trailOff;
     // The live lead's ribbon sheet fades out as it crosses the front (row 1 — the selected
     // row's sheet — lands exactly AT the front, so it never fades).
-    this._ribbons.setRowFade(0, this._rewind.fadeAtX(LEAD_X + this._trailOff));
+    // Entry ramp tail: ribbons arrive after the tiles have mostly landed (squared ease), so a
+    // sheet never hangs from a tile still in the air.
+    const entryRib = this._entryT >= 1 ? 1 : Math.max(0, this._entryT * 1.6 - 0.6) ** 2;
+    // The incoming lead sheet's own ease-in (see the field note) — armed the frame its spec
+    // first becomes drawable, so the crossfade has two soft sides.
+    const lead0 = this._slotSnap[0];
+    const leadDrawn = !!(lead0 && this._specs[0].measured && this._specs[0].bandCount > 0);
+    if (leadDrawn && this._leadRibOrd !== lead0.ordinal) {
+      this._leadRibOrd = lead0.ordinal;
+      this._leadRibT = 0;
+    }
+    if (this._leadRibT < 1) this._leadRibT = Math.min(1, this._leadRibT + dt / 0.65);
+    const leadIn = this._leadRibT * this._leadRibT * (3 - 2 * this._leadRibT);
+    this._ribbons.setRowFade(0, this._rewind.fadeAtX(LEAD_X + this._trailOff) * entryRib * leadIn);
+    // The grace sheet's fade (see the field note). The unmeasured decay is sized to the gap it
+    // exists to bridge — the new lead's EXACT-READ latency (~1.5-2s; the first cut's 0.8s died
+    // before the new sheet could draw, which was the user's original glitch wearing a new
+    // face) — then a quick crossfade once the new sheet is drawable. The grace row also keeps
+    // its IDENTITY HUE while it lives (_graceSlot, read by the tile loop and the bar): the
+    // colour snapped to neutral the frame the row stopped leading, which was the other half of
+    // "the selection effect disappears immediately".
+    this._graceSlot = -1;
+    if (this._graceOrd != null && this._graceT > 0) {
+      const newDrawn = !!(this._slotSnap[0] && this._specs[0].measured && this._specs[0].bandCount > 0);
+      this._graceT = Math.max(0, this._graceT - dt / (newDrawn ? 0.35 : 2.5));
+      let g = -1;
+      for (const tr of this.model.trail) if (tr.ordinal === this._graceOrd) { g = tr.slot; break; }
+      this._graceSlot = g;
+      const gx = LEAD_X - g * SLOT_SP + this._trailOff;
+      this._ribbons.setRowFade(3, this._graceT * this._rewind.fadeAtX(gx) * entryRib);
+      if (this._graceT <= 0) {
+        this._ribbons.clearRow(3);
+        this._graceOrd = null;
+        this._graceSlot = -1;
+      }
+    }
+    this._bar.setGraceSlot(this._graceSlot);
 
     this._applyFloorAlpha();
 
@@ -741,6 +939,7 @@ export class LedgerView implements SceneView {
     // chamber is simply running, and stepping the whole trail back against a row it advanced onto
     // by itself would make `back` a second `rest`.
     const anyFocus = this._hoverSlot >= 0 || this._hoverTile >= 0 || pinSlot >= 0;
+    this._selTilePosOk = false; // re-recorded below when the selected tile draws this frame
     for (const lane of this.model.lanes.values()) {
       const laneColor = this._laneColor(lane.id);
       const cz = this._laneZ.get(lane.id) ?? lane.z;
@@ -774,7 +973,15 @@ export class LedgerView implements SceneView {
         // Bottom just above the plane (user, 2026-08-07): the box is centred, so lift by half its
         // world height (geometry depth 0.35 × scale.z becomes the height under the -90° X spin).
         const tileH = 0.35 * b.size;
-        _dummy.position.set(wx + b.ox, FLOOR_Y.msnap + TILE_LIFT + tileH / 2, cz + b.oz);
+        // The entry drop rides the slot (0 while settled — the array only holds values mid-ramp).
+        const dropY = this._entryT < 1 && b.slot >= 0 && b.slot < SLOT_N ? this._entryDrop[b.slot] : 0;
+        _dummy.position.set(wx + b.ox, FLOOR_Y.msnap + TILE_LIFT + tileH / 2 + dropY, cz + b.oz);
+        // The subject callout anchors THE committed snapshot's tile, not the lane lead (user,
+        // 2026-08-15) — record its live position (rewind/trail offsets included) as it draws.
+        if (mi === this._selTileIndex) {
+          this._selTilePos.set(wx + b.ox, FLOOR_Y.msnap + TILE_LIFT + tileH + dropY, cz + b.oz);
+          this._selTilePosOk = edge > 0;
+        }
         _dummy.rotation.set(-Math.PI / 2, 0, 0);
         _dummy.scale.set(b.size, b.size, b.size);
         _dummy.updateMatrix();
@@ -794,7 +1001,7 @@ export class LedgerView implements SceneView {
         // (user, 2026-08-09), every other snapshot the neutral trail. BRIGHTNESS is the shared node
         // vocabulary — a snapshot is data, so it dims, boosts and steps back on exactly the knobs
         // the chips in the trays answer to.
-        const ident = hot || hov || hovTile || onNet || b.slot <= 0;
+        const ident = hot || hov || hovTile || onNet || b.slot <= 0 || b.slot === this._graceSlot;
         // The BOOST answers a deliberate focus only (user, 2026-08-11) — a hover, or an explicit
         // pin; the live lead is simply the shown row, which its front position and identity hue
         // already say. A hovered TILE is the subject itself, so it takes the primary weight
@@ -806,9 +1013,10 @@ export class LedgerView implements SceneView {
         // the RIBBON leaving this tile takes, so a ribbon and the two ends it connects now read at
         // one level; compounding dim × back left the endpoints near-black under their own ribbon.
         const rowFocus = pinned || hov;
+        const entryF = this._entryT < 1 && b.slot >= 0 && b.slot < SLOT_N ? this._entryFade[b.slot] : 1;
         const brightT =
           snapBright(tileRest * b.fade, offNet, focus, anyFocus && !rowFocus)
-          * edge * this._fades.alpha;
+          * edge * this._fades.alpha * entryF;
         // Emphasis EASES rather than snapping (dimModel.emphasisK). The state rides the BLOCK, next
         // to its two other eased fields — an instance-index buffer would hand a block's brightness
         // to its neighbour every tick, since a new tick shifts every block one slot along.

@@ -9,7 +9,8 @@ import StatusDemo from "./StatusDemo";
 import OdometerDemo from "./OdometerDemo";
 import EcgDemo from "./EcgDemo";
 import { NodeStars, NoSignalDot, SonarRing, StandbyHalo } from "@/components/state/StateAtoms";
-import { SELECTED_ROW, SelectedRowMark } from "@/components/selection";
+import { SELECTED_ROW, SelectedRowMark, SCENE_GLASS } from "@/components/selection";
+import { RoleChips } from "@/components/inspector/parts";
 
 // Internal styleguide: robots-disallowed; carries its OWN title and no canonical (it would
 // point at the marketing root otherwise).
@@ -284,6 +285,48 @@ export default function DesignPage() {
             <span className="w-2 h-2 rounded-full flex-none" style={{ background: "var(--primary)" }} />
             Selected row
             <SelectedRowMark className="absolute right-2" />
+          </div>
+        </div>
+      </section>
+
+      <section className="mb-10">
+        <h2 className="text-sm uppercase tracking-widest text-muted-foreground mb-3">
+          Scene-anchored labels — <code className="font-mono">SCENE_GLASS</code> + the subject callout
+        </h2>
+        <p className="text-sm text-muted-foreground mb-3 max-w-2xl">
+          The hover tooltip and the subject callout are ONE species — HUD glass tied to a scene
+          subject — sharing the <code className="font-mono">SCENE_GLASS</code> container. The callout
+          carries the CardHead register at tooltip scale: eyebrow ink, title + hued ticker aside, the
+          head hairline, <code className="font-mono">RoleChips</code>, and the{" "}
+          <code className="font-mono">.edge-spine</code> — a corner-wrapping identity hairline under a
+          fixed-length fade, so short panels spend their fade in the corner curves. The cyan dashed
+          leader ties it to the anchor ring; identity never tints the frame.
+        </p>
+        <div className="relative h-[190px]">
+          {/* Static specimen at the anchor-wrapper geometry the live callout uses. */}
+          {/* GENERIC content on purpose (user, 2026-08-16): no real network names, tickers or
+              locations in specimens — this page teaches the grammar, not today's data. The hue
+              is a made-up identity, not a brand's. */}
+          <div className="absolute left-[60px] top-[160px]">
+            <span
+              className="absolute -translate-x-1/2 -translate-y-1/2 w-[9px] h-[9px] rounded-full border-[1.5px]"
+              style={{ borderColor: "#c9824f" }}
+            />
+            <svg className="absolute left-0 top-0 overflow-visible" width="1" height="1" aria-hidden>
+              <line x1={6} y1={-6} x2={62} y2={-84} stroke="var(--primary)" strokeOpacity="0.55" strokeWidth="1.5" strokeDasharray="4 4" />
+            </svg>
+            <div className={cn("absolute whitespace-nowrap", SCENE_GLASS)} style={{ left: 62, bottom: 92 }}>
+              <span aria-hidden className="edge-spine opacity-70" style={{ ["--spine" as string]: "#c9824f" }} />
+              <div className="text-micro font-bold tracking-[0.1em] uppercase leading-none text-accent mb-1.5">Metagraph</div>
+              <div className="flex items-center gap-[7px]">
+                <span className="text-body font-semibold text-foreground">Metagraph name</span>
+                <span className="text-label font-bold ml-1" style={{ color: "#c9824f" }}>TICKER</span>
+              </div>
+              <div className="mt-1.5 pt-1.5 border-t border-border flex items-center gap-1.5 text-label text-muted-foreground">
+                <span>12 nodes</span>
+                <RoleChips codes={["L0", "cL1", "dL1"]} />
+              </div>
+            </div>
           </div>
         </div>
       </section>

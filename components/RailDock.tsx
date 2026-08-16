@@ -159,6 +159,84 @@ export default function RailDock({
     setOpen(next);
     onOpenChange?.(next);
   };
+  // OPEN-TIME FIT (user, 2026-08-16, from the collapse discussion): a phone sheet that opens
+  // onto short content (two collapsed ghosts) sizes to the content instead of 60vh of empty
+  // glass — measured ONCE at open, then held for that open's whole session (never resizing
+  // while up: no motion the user didn't ask for; a drag or the store's default still wins).
+  // `phoneSheetPx` resets on full close, so every open re-fits.
+  const fitRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!isBarHalf || !open || sheetPx != null) return;
+    const raf = requestAnimationFrame(() => {
+      const content = fitRef.current;
+      if (!content) return;
+      const CHROME = 96; // sheet head + grabber + paddings
+      const fit = content.offsetHeight + CHROME;
+      const def = Math.round(window.innerHeight * 0.6);
+      if (fit < def - 12) onSheetPx?.(Math.max(170, fit));
+    });
+    return () => cancelAnimationFrame(raf);
+    // Open-edge only — content growing later must not resize the sheet mid-session.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, isBarHalf]);
+  const handleOpenChangeRef = useRef(handleOpenChange);
+  handleOpenChangeRef.current = handleOpenChange;
+
+  // ── Tap-outside dismiss (phone bar-half only, user 2026-08-15) ─────────────────────────────
+  // A TAP on the scene collapses the open bottom sheet, the same dismissal the bar-half toggle
+  // performs (selection untouched — dismissing only collapses). Phone only: on tablet both edge
+  // docks can be open over an interactive scene and a pick UPDATES Details, so outside-tap
+  // dismissal would fight that (the `onInteractOutside` preventDefault below keeps standing for
+  // both tiers — radix knows no tap-from-drag). Three decisions carry this:
+  // - Tap ≠ drag. Orbiting behind the open sheet is a supported phone flow (the sheet dims via
+  //   `useSceneYield` exactly for it), so only a stationary down→up pair dismisses — same
+  //   discipline as the Engine's own drag suppression and `tapZoom`.
+  // - The tap is CONSUMED: it closes the sheet and does nothing else. The Engine picks on
+  //   `click` (canvas listener), so eating the click at window capture phase stops a tap on a
+  //   hub/tile from toggling selection while the sheet closes — one gesture, one answer.
+  //   OrbitControls rides pointer events, which pass through untouched, so no stuck drag state.
+  // - Only CANVAS taps qualify. The top bar, the dock bar and the sheet itself keep their own
+  //   behaviour — the user said "on the scene", and eating chrome taps would break navigation.
+  useEffect(() => {
+    if (!isBarHalf || !open || !shellVisible) return;
+    let down: { x: number; y: number; t: number; id: number } | null = null;
+    let eat = 0;
+    const onDown = (e: PointerEvent) => {
+      if (down) {
+        // A second pointer is a pinch, not a tap — the pair is invalidated.
+        down = null;
+        return;
+      }
+      down = e.target instanceof HTMLCanvasElement ? { x: e.clientX, y: e.clientY, t: performance.now(), id: e.pointerId } : null;
+    };
+    const onUp = (e: PointerEvent) => {
+      if (!down || e.pointerId !== down.id) {
+        down = null;
+        return;
+      }
+      const tap = Math.hypot(e.clientX - down.x, e.clientY - down.y) < 10 && performance.now() - down.t < 500;
+      down = null;
+      if (!tap) return;
+      // Windowed, not a bare flag: if the browser never delivers the click, a stale eat must
+      // not swallow the NEXT real one (the Engine's own eat-flag learned the same lesson).
+      eat = performance.now() + 400;
+      handleOpenChangeRef.current(false);
+    };
+    const onClick = (e: MouseEvent) => {
+      if (performance.now() > eat) return;
+      eat = 0;
+      e.preventDefault();
+      e.stopPropagation();
+    };
+    window.addEventListener("pointerdown", onDown, true);
+    window.addEventListener("pointerup", onUp, true);
+    window.addEventListener("click", onClick, true);
+    return () => {
+      window.removeEventListener("pointerdown", onDown, true);
+      window.removeEventListener("pointerup", onUp, true);
+      window.removeEventListener("click", onClick, true);
+    };
+  }, [isBarHalf, open, shellVisible]);
 
   // ── Bottom-sheet drag (phone, grabber-initiated) ────────────────────────────────────────────
   // Standard mobile sheet gesture, v1 GRABBER-ONLY by design: the sheet body owns touch scroll,
@@ -174,6 +252,13 @@ export default function RailDock({
   const drag = useRef<{ startY: number; startH: number; moved: boolean; samples: { t: number; y: number }[]; el: HTMLElement } | null>(null);
   const expandedPx = () => Math.min(Math.round(window.innerHeight * 0.8), window.innerHeight - 140);
   const defaultPx = () => Math.round(window.innerHeight * 0.6); // = the CSS h-[60vh]
+  const MIN_PX = 90;
+  // Rubber-band past the detent range (user, 2026-08-15 — the native "final touches"): beyond
+  // [MIN_PX, expanded] the height keeps following with progressive resistance toward a short
+  // asymptote instead of hard-clamping, and the release snap pulls it back on the spring. Same
+  // curve as RailPager's — identity-sloped at 0, never reaching the asymptote.
+  const RUBBER_PX = 36;
+  const rubber = (over: number, d: number) => d * (1 - 1 / (over / d + 1));
   const grabDown = (e: React.PointerEvent<HTMLButtonElement>) => {
     const el = e.currentTarget.closest<HTMLElement>('[data-slot="sheet-content"]');
     if (!el) return;
@@ -197,7 +282,10 @@ export default function RailDock({
     const dy = d.startY - e.clientY; // up = grow
     if (Math.abs(dy) > 6) d.moved = true;
     if (!d.moved) return;
-    onSheetPx?.(Math.max(90, Math.min(expandedPx(), Math.round(d.startH + dy))));
+    const raw = d.startH + dy;
+    const max = expandedPx();
+    const h = raw > max ? max + rubber(raw - max, RUBBER_PX) : raw < MIN_PX ? MIN_PX - rubber(MIN_PX - raw, RUBBER_PX) : raw;
+    onSheetPx?.(Math.round(h));
     d.samples.push({ t: performance.now(), y: e.clientY });
     if (d.samples.length > 10) d.samples.shift();
   };
@@ -218,14 +306,19 @@ export default function RailDock({
     const now = performance.now();
     const past = d.samples.find((s) => now - s.t <= 120) ?? d.samples[0]!;
     const vy = (e.clientY - past.y) / Math.max(1, now - past.t);
-    if (vy > 0.5 || h < def * 0.55) {
-      // Fast flick down, or released well below the default → dismiss (same as retap).
+    // MOMENTUM-PROJECTED settle (user, 2026-08-15): the detent choice reads where the throw
+    // would land (~160ms of release velocity carried forward), not where the finger stopped —
+    // a medium downward toss from expanded now reaches default instead of springing back up.
+    // The hard flick-dismiss rule stays on top: a genuine throw down closes from anywhere.
+    const hp = h - vy * 160;
+    if (vy > 0.5 || hp < def * 0.55) {
+      // Fast flick down, or projected to land well below the default → dismiss (same as retap).
       onSheetPx?.(null);
       handleOpenChange(false);
       return;
     }
     const exp = expandedPx();
-    onSheetPx?.(Math.abs(h - def) <= Math.abs(h - exp) ? def : exp);
+    onSheetPx?.(Math.abs(hp - def) <= Math.abs(hp - exp) ? def : exp);
   };
   // A completed drag also fires a click on the grabber — swallow it so it doesn't re-collapse.
   const grabClick = (e: React.MouseEvent) => {
@@ -426,10 +519,11 @@ export default function RailDock({
           // Phone bar-half variant: the sheet sits DIRECTLY ABOVE the persistent dock bar (never
           // covers it — the bar is its visible header/handle), so offset it up by the bar height.
           // `!` beats the base `bottom-0` from the bottom-side placement in sheet.tsx. Snapping
-          // animates the height (calm 0.2s; suspended while the finger drags, instant under
-          // reduced motion).
-          // reduced motion). `opacity` rides the same list so the scene-yield dim isn't stranded
-          // by this element-level `transition-property` — it takes the sheet's own 0.2s tempo
+          // animates the height on the shared `--ease-spring` (user, 2026-08-15 — the detent
+          // lands with the same physics as the pager; suspended while the finger drags, instant
+          // under reduced motion).
+          // `opacity` rides the same list so the scene-yield dim isn't stranded
+          // by this element-level `transition-property` — it takes the sheet's own tempo
           // rather than the rails' 0.3s, which is the honest trade for not fighting the cascade.
           className={
             isBarHalf
@@ -437,15 +531,16 @@ export default function RailDock({
                   "!bottom-[var(--phone-dock-h)]",
                   dragging
                     ? "!transition-none"
-                    : "transition-[height,opacity] duration-200 ease-out motion-reduce:!transition-none",
+                    : "transition-[height,opacity] duration-[380ms] ease-[var(--ease-spring)] motion-reduce:!transition-none",
                 )
               : undefined
           }
           // Don't let a pointer-down/interaction OUTSIDE the sheet (e.g. on the scene, or on the
-          // OTHER open dock) dismiss it — the user closes each dock explicitly via its own ✕ /
-          // Escape / bar-half toggle. Without this, radix's DismissableLayer auto-closes a
-          // non-modal dialog on any outside pointer-down, which would make the two docks fight +
-          // close on every scene pick.
+          // OTHER open dock) dismiss it — radix's DismissableLayer would auto-close a non-modal
+          // dialog on any outside pointer-down, drag included, which would make the tablet docks
+          // fight + close on every scene pick and orbit start. Dismissal is explicit (✕ / Escape
+          // / bar-half toggle) — plus, on phone only, the tap-outside recognizer above, which
+          // knows a tap from a drag where radix doesn't.
           onInteractOutside={(e) => e.preventDefault()}
           aria-describedby={undefined}
         >
@@ -508,7 +603,7 @@ export default function RailDock({
               `.ig-sheet-edge` spine is the single identity cue (no double spine); the transient
               edge PULSE still plays on each card's own edge. */}
           <div className="sheet-cards flex-1 min-h-0 flex flex-col gap-[var(--rail-gap)] overflow-y-auto overscroll-contain [scrollbar-width:none] [-webkit-overflow-scrolling:touch] [&::-webkit-scrollbar]:hidden">
-            {children}
+            <div ref={fitRef}>{children}</div>
           </div>
         </SheetContent>
       </Sheet>

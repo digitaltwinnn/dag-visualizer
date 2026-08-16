@@ -29,7 +29,11 @@ import { snapBright } from "../../domain/dimModel";
 // THREE rows since 2026-08-07 (was 2): the LEAD row, the COMMITTED/hot row, and the HOVER
 // preview row — with a snapshot pinned, a hover needs its own sheet or the preview ribbon
 // simply never appears (the pinned row owns row 1).
-export const RIBBON_ROWS = 3;
+// FOUR rows since 2026-08-16 (was 3): row 3 is the GRACE sheet — on a new tick the outgoing
+// lead's ribbon follows its row back one slot and fades, instead of vanishing the frame the
+// row stops being the lead (user: "the ribbon and snapshot selection effect disappear
+// immediate"). LedgerView owns the handoff timing; this row is just one more sheet.
+export const RIBBON_ROWS = 4;
 /** Vertical subdivisions per ribbon — enough for the eased sweep to read as a curve. */
 export const RIBBON_SEG = 16;
 const PER_ROW = METAGRAPHS.length + 1;
@@ -125,7 +129,7 @@ export class Ribbons {
    *  network committed): a hidden lane laid no tiles, so it gets no ribbon either. The unlisted
    *  channels have a real lane of their own now (the "unknown" lane at the screen-left end,
    *  2026-08-07), so every band resolves the same way — the old mid-air start is retired. */
-  setRow(row: 0 | 1 | 2, slot: number, spec: BarSpec | null, laneZ: (key: string) => number | null): void {
+  setRow(row: 0 | 1 | 2 | 3, slot: number, spec: BarSpec | null, laneZ: (key: string) => number | null): void {
     const st = this._rows[row];
     st.slot = slot;
     st.keys.length = 0;
@@ -144,7 +148,7 @@ export class Ribbons {
     this._writeGeometry();
   }
 
-  clearRow(row: 0 | 1 | 2): void {
+  clearRow(row: 0 | 1 | 2 | 3): void {
     this._rows[row].count = 0;
     this._rows[row].keys.length = 0;
     this._writeGeometry();
@@ -152,7 +156,7 @@ export class Ribbons {
 
   /** Set a row's brightness scale (0..1). Rewrites the sheet only on real change — called per
    *  frame during the trail-rewind ease, but the rewrite fires ~a handful of times per ease. */
-  setRowFade(row: 0 | 1 | 2, f: number): void {
+  setRowFade(row: 0 | 1 | 2 | 3, f: number): void {
     if (Math.abs(this._rowFade[row] - f) < 0.012) return;
     this._rowFade[row] = f;
     this._writeGeometry();

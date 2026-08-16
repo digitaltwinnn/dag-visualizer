@@ -12,6 +12,13 @@ import type { CSSProperties } from "react";
 // event props, so focus and hover can never preview differently. (React's onFocus/onBlur bubble
 // like focusin/focusout; on a wrapper whose children swap focus the channel is re-set to the same
 // key, which the store dedupes.)
+//
+// `onMouseMove` is the SWAP-UNDER-POINTER healer (user, 2026-08-15 — "when a card is swiped, it
+// loses the hover effect"): a pager step or a live follow advance replaces the KEYED element
+// under a stationary cursor, and mouseenter only fires on boundary CROSSINGS — the new element
+// never hears one, so the pairing stays dead until the pointer leaves and returns. The first
+// pointer move over the element re-arms it; guarded on `active !== key`, so it writes once and
+// every later move over an already-paired subject is a no-op, not a store write per pixel.
 export function subjectPairing<T extends string | number>(
   active: T | null,
   key: T | null,
@@ -22,6 +29,7 @@ export function subjectPairing<T extends string | number>(
   className: string;
   style: CSSProperties | undefined;
   onMouseEnter: () => void;
+  onMouseMove: () => void;
   onMouseLeave: () => void;
   onFocus: () => void;
   onBlur: () => void;
@@ -34,6 +42,9 @@ export function subjectPairing<T extends string | number>(
     className: paired ? "subject-paired" : "",
     style: paired ? ({ ["--row-hue"]: hue } as CSSProperties) : undefined,
     onMouseEnter: enter,
+    onMouseMove: () => {
+      if (active !== key) enter();
+    },
     onMouseLeave: leave,
     onFocus: enter,
     onBlur: leave,

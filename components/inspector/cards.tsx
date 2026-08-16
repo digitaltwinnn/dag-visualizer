@@ -3,25 +3,27 @@
 import { useEffect, useMemo, useState } from "react";
 import { cn } from "@/lib/utils";
 import { useStore } from "@/src/store/store";
-import { shortHash, CORE_HEX, metagraphById, getNetwork, SIGNER_GROUPS } from "@/src/data/network";
+import { shortHash, metagraphById, getNetwork, SIGNER_GROUPS, nodeSigned, coLocatedNetworks, filterAccent } from "@/src/data/network";
 import { UNLISTED_ID, observedUnlistedIds } from "@/src/data/unlisted";
 import { identityHudHex } from "@/src/palette/identity";
 import { hex, fmtDag, fmtKB, midHash } from "@/src/util/format";
 import { relativeAge } from "@/src/util/relativeAge";
 import { statusBreakdown } from "@/src/data/nodeStatus";
 import type { GlobalSnapshot, MetaCfg, PickDescriptor } from "@/src/data/types";
+import { metaSnapDeepKey } from "@/src/data/types";
 import AnchoredTags from "./AnchoredTags";
 import Odometer from "@/components/Odometer";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Separator } from "@/components/ui/separator";
 import { SonarRing, NodeStars, NoSignalDot } from "@/components/state/StateAtoms";
 import { VIEW_ICONS, SNAPSHOT_ICON, COUNTRY_ICON, PROVIDER_ICON, COMPOSITION_ICON, KIND_MARK_CLASS } from "@/components/icons";
-import { Check, ExternalLink } from "lucide-react";
+import { ExternalLink } from "lucide-react";
 import { useMinHold } from "@/components/useMinHold";
-import { useArchive, archiveDisplay, archiveSummary, fmtSnapCount, fmtReach, useChainSpan } from "@/components/useArchive";
+import { useArchive, archiveFactState, archiveSummary, fmtSnapCount, fmtReach, useChainSpan } from "@/components/useArchive";
+import { useNodeNames, nodeName, nodeRegistered } from "@/components/useNodeNames";
 import { useNowTick } from "@/components/useNowTick";
 import { POLL } from "@/src/engine/config";
-import { Desc, StatusMark, CompositionRows, StatusBreakdown, RoleChips, IdentityDot, networkKind, Fact, FactGroup, Foot, FootRow } from "./parts";
+import { Desc, StatusMark, CompositionRows, StatusBreakdown, RoleChips, IdentityDot, networkKind, Fact, FactGroup, Foot, FootRow, LayerWho, BoolMark } from "./parts";
 import { compositionGroups, compositionRows, nodeCompositionLabel, parseCompositionKey } from "@/src/data/composition";
 import { pickNetId, followToggleActions } from "@/src/engine/domain/pickActions";
 import { applyClickActions } from "@/src/store/applyClickActions";
@@ -146,6 +148,26 @@ function inspectedNode(inspect: ReturnType<typeof useStore.getState>["inspect"])
 // The node's resolved CITY — the title's place word ("" when geolocation hasn't resolved). The
 // COUNTRY left the title (user, 2026-08-02): it is a labelled fact like hosting and the node id,
 // so it reads in the body with the rest rather than doubling the headline.
+// Whether the inspected node is among the COMMITTED metagraph snapshot's proof signers — the
+// node card's "signed" relation (user, 2026-08-15). PRESENCE-gated, never mode-gated
+// (convention 7's honest form): `metaSnap` is ledger-scoped and cleared on leaving the view,
+// so this reads as the Snapshots view's variant with no view check anywhere. Signers come from
+// the same two sources the Engine's tray glow reads — the deep read when it has landed, else
+// the exact read's shallow row.
+function useSignedSelected(node: { id?: string | null; ids?: string[] } | undefined | null): number | null {
+  const metaSnap = useStore((s) => s.metaSnap);
+  const deepMap = useStore((s) => s.metaSnapDeep);
+  const exact = useStore((s) => s.snapshotExact);
+  if (!node || !metaSnap) return null;
+  const deep = deepMap[metaSnapDeepKey(metaSnap.globalOrdinal, metaSnap.metaId, metaSnap.ordinal)];
+  const row = exact[metaSnap.globalOrdinal]?.rows?.find(
+    (r) => r.metaId === metaSnap.metaId && r.ordinal === metaSnap.ordinal,
+  );
+  // Returns the SIGNED snapshot's ordinal (not a bare boolean): the relation names its object
+  // (user, 2026-08-15 — "say what it signed, like 'anchored to'").
+  return nodeSigned(node, deep?.signers ?? row?.signers ?? null) ? metaSnap.ordinal : null;
+}
+
 function nodeCity(node: NonNullable<ReturnType<typeof inspectedNode>>): string {
   return node.geo?.city ?? "";
 }
@@ -163,7 +185,7 @@ export function GeoLiveTitle() {
   const id = node.node?.id;
   const city = nodeCity(node);
   const title = city || (id ? shortHash(id) : node.node?.ip || "Node");
-  const color = node.kind === "metanode" ? (node.meta ? identityHudHex(node.meta.id) : undefined) : CORE_HEX;
+  const color = node.kind === "metanode" ? (node.meta ? identityHudHex(node.meta.id) : undefined) : identityHudHex("dag");
   const Mark = VIEW_ICONS.geo;
   return (
     <span className="inline-flex items-center gap-2 min-w-0">
@@ -173,11 +195,28 @@ export function GeoLiveTitle() {
   );
 }
 
-// Node title-row aside: the status pill.
+// Node title-row aside: the status pill — unless the SIGNED relation exists (user, 2026-08-15:
+// "the header not to show the status, move that to a row, and instead show the relation"):
+// with a metagraph snapshot committed and this node among its proof signers, the head states
+// the relation — the one fact tying the node to the chamber's subject — and the status moves
+// into the body (GeoLiveNode's Status row, gated on the same hook).
 export function GeoLiveAside() {
   const inspect = useStore((s) => s.inspect);
   const node = inspectedNode(inspect);
+  const signed = useSignedSelected(node?.node);
   if (!node) return null;
+  if (signed != null)
+    return (
+      // The relation NAMES ITS OBJECT (user, 2026-08-15 — like the snapshot card's "anchored
+      // to N"): the signed metagraph snapshot's own ordinal, bare per the ordinal rule. The
+      // layer detail (the L0 seal) rides the title — the aside states the relation.
+      <span
+        className="text-label text-muted-foreground whitespace-nowrap"
+        title="This node is among the committed metagraph snapshot's proof signers — a snapshot is sealed by the metagraph's own L0 cluster."
+      >
+        signed {signed.toLocaleString()}
+      </span>
+    );
   return <StatusMark state={node.node?.state} />;
 }
 
@@ -275,8 +314,8 @@ export function SnapshotCard({ data: d }: { data: GlobalSnapshot }) {
               so it is the same kind of fact and takes the same words. One home: SIGNER_GROUPS. */}
           {exact != null && (exact.signerCount ?? 0) > 0 && (
             <Fact label="Signed by" title={SIGNER_GROUPS.globalProof.title}>
-              <span className="animate-resolve-in motion-reduce:animate-none">
-                {exact.signerCount} {SIGNER_GROUPS.globalProof.who}
+              <span className="animate-resolve-in motion-reduce:animate-none inline-flex items-center gap-1">
+                {exact.signerCount} <LayerWho who={SIGNER_GROUPS.globalProof.who} />
               </span>
             </Fact>
           )}
@@ -333,7 +372,7 @@ function UnlistedMemberFacts({ id, last }: { id: string; last: boolean }) {
       )}
       <div className={last ? undefined : "mt-1.5"}>
         <Fact label="Online nodes">
-          <span className="text-muted-foreground italic" title="This network publishes no node cluster, so its machines are unknowable.">
+          <span className="text-muted-foreground italic" title="This network publishes no node cluster, so its nodes are unknowable.">
             unknown
           </span>
         </Fact>
@@ -346,7 +385,7 @@ function UnlistedMemberFacts({ id, last }: { id: string; last: boolean }) {
         >
           <span
             className="flex flex-col items-end"
-            title={`Whether any machine keeps this chain in full is unknowable — no cluster is published. The chain itself is real: ${
+            title={`Whether any node keeps this chain in full is unknowable — no cluster is published. The chain itself is real: ${
               span ? `${span.latestOrdinal.toLocaleString()} snapshots${age ? ` since ~${age.replace("~", "")} ago` : ""}.` : "reading its span…"
             }`}
           >
@@ -395,9 +434,12 @@ export function MetaCard({ cfg }: { cfg: MetaCfg }) {
   // information to know about a network"): genesis survival counted across the fleet, or the
   // deepest reach any of its own machines still serves. The DAG core's chain is "global" in
   // the census; a chain with no probed machines (unlisted, zero-node) answers null and grows
-  // no row.
-  const archive = useArchive();
-  const archSum = archive ? archiveSummary(archive, cfg.id === "dag" ? "global" : cfg.id) : null;
+  // no row. While the census is in flight the row holds its place with stars (user,
+  // 2026-08-15 — a separately-loaded fact never pops in), gated to networks the census
+  // actually probes (the DAG + the catalog) so stars only ever promise data that is coming.
+  const { census: archCensus, settled: archSettled } = useArchive();
+  const archSum = archCensus ? archiveSummary(archCensus, cfg.id === "dag" ? "global" : cfg.id) : null;
+  const archAcquiring = archSum == null && !archSettled && (cfg.id === "dag" || metagraphById(cfg.id) != null);
   const nodes = mg?.nodes || [];
   // The unlisted blurb COUNTS its members (user, 2026-08-14) — built here, beside the member
   // list it describes, so the two can't drift.
@@ -407,7 +449,7 @@ export function MetaCard({ cfg }: { cfg: MetaCfg }) {
         (unlistedMembers.length === 0
           ? "None was seen anchoring in the measured window."
           : unlistedMembers.length === 1
-            ? "One anchored in the measured window; its chain and owner address are public, its operator and machines are not."
+            ? "One anchored in the measured window; its chain and owner address are public, its operator and nodes are not."
             : `${unlistedMembers.length} anchored in the measured window; their chains and owner addresses are public, their operators and machines are not.`)
       : mg?.description || cfg.blurb;
   // The site link rides the BODY now (MetaSiteRow — the aside slot carries the ticker). Falls
@@ -466,7 +508,7 @@ export function MetaCard({ cfg }: { cfg: MetaCfg }) {
           chain — ratio bold under the Online nodes total it counts against, checked in the
           success hue when any exist — and the muted underline carries the fleet's deepest
           surviving reach in the time register. */}
-      {archSum && (
+      {(archSum || archAcquiring) && (
         <>
           {nodes.length === 0 && <Separator className="my-2" />}
           {/* "Full archive nodes", not "genesis nodes" (user, 2026-08-14): the latter reads as
@@ -478,17 +520,21 @@ export function MetaCard({ cfg }: { cfg: MetaCfg }) {
               </span>
             }
           >
-            {/* No checkmark here (user, 2026-08-14 — "it just clutters the view"): the ratio
-                already answers, and the node card's Yes keeps the check where it is the value. */}
-            <span className="flex flex-col items-end" title={`${archSum.genesisTitle} ${archSum.reachTitle}`}>
-              <b className="font-bold">{archSum.genesisRatio}</b>
-              <span className="text-label text-muted-foreground">{archSum.reach}</span>
-              {/* Second underline: what that reach holds in snapshots — absent for the holed
-                  global deep archives, where any count would overclaim. */}
-              {archSum.kept != null && (
-                <span className="text-label text-muted-foreground">{fmtSnapCount(archSum.kept)} snapshots</span>
-              )}
-            </span>
+            {archSum ? (
+              /* No checkmark here (user, 2026-08-14 — "it just clutters the view"): the ratio
+                 already answers, and the node card's Yes keeps the check where it is the value. */
+              <span className="flex flex-col items-end" title={`${archSum.genesisTitle} ${archSum.reachTitle}`}>
+                <b className="font-bold">{archSum.genesisRatio}</b>
+                <span className="text-label text-muted-foreground">{archSum.reach}</span>
+                {/* Second underline: what that reach holds in snapshots — absent for the holed
+                    global deep archives, where any count would overclaim. */}
+                {archSum.kept != null && (
+                  <span className="text-label text-muted-foreground">{fmtSnapCount(archSum.kept)} snapshots</span>
+                )}
+              </span>
+            ) : (
+              <NodeStars count={4} />
+            )}
           </Fact>
         </>
       )}
@@ -628,6 +674,24 @@ export function GeoLiveCard() {
 // above it uses, so the two can't disagree about who owns the host, and it keeps the mono face
 // the provider card's own ASN row carries.
 function GeoLiveNode({ p }: { p: PickOf<"l0" | "l1" | "metanode"> }) {
+  // The SIGNED relation owns the head aside while it exists (GeoLiveAside) — the status the
+  // head normally carries moves down here as the first body row, so no fact is lost, only
+  // redistributed (the pile rule's redistribution idea, applied within one card).
+  const signedSel = useSignedSelected(p.node) != null;
+  // The operator's self-registered ALIAS from the delegated-staking registry (user,
+  // 2026-08-16 — "those names look informal often": a content attribute, never the title; and
+  // "alias" is the user-facing word, "nickname" stays the internal register). The registry
+  // keys on a PEER ID, so the name names a keypair — and a host that reuses one keypair
+  // across networks (the Upsider pattern) carries it on its metagraph record too, which is
+  // why the match runs for every node kind (user, 2026-08-16: "keep it actual"). The row is
+  // ALWAYS stated, "not known" when nothing resolves. The registry's other reading, the
+  // delegated-staking OPT-IN, is its own row (user, 2026-08-16: "would that be a separate
+  // attribute?") in the service block below: Yes/No for DAG validators only — only a Global
+  // L0 validator can register (measured: 31 of 147 live validators haven't).
+  const isDagValidator = p.kind === "l0" || p.kind === "l1";
+  const nickState = useNodeNames();
+  const nickname = nodeName(nickState.names, p.node);
+  const registered = nodeRegistered(nickState.names, p.node);
   // The three ancestor rungs that can own one of this card's facts.
   const country = useStore((s) => s.country);
   const cohort = useStore((s) => s.cohort);
@@ -646,32 +710,58 @@ function GeoLiveNode({ p }: { p: PickOf<"l0" | "l1" | "metanode"> }) {
   // ARCHIVE — what depth of ITS OWN chain this machine serves (user, 2026-08-14: "I find this
   // info very interesting", then "mention time and/or snapshots... metagraph nodes as well").
   // The census probes the global L0 cluster and every catalog metagraph's L0 cluster, so a DAG
-  // validator answers for the global chain and a metagraph machine for its currency chain; a
-  // node the probe couldn't reach grows no row (absent data stays absent, never "unknown"
-  // filler). Not part of the pile dedup: no ancestor card states it. The title carries the
-  // census context the one-line value can't.
-  const archive = useArchive();
+  // validator answers for the global chain and a metagraph machine for its currency chain. Not
+  // part of the pile dedup: no ancestor card states it. The title carries the census context the
+  // one-line value can't. The ROW is always decided, never absent-then-popping (user,
+  // 2026-08-15): archiveFactState is the one home for that decision — stars while the census is
+  // genuinely in flight, "n/a" immediately for a machine with no L0 process (roles are local
+  // knowledge; the chip underline says why), "Unmeasured" once settled with no reading, which
+  // covers a failed fetch too, so the stars can never hang. Roles unknown → no row at all,
+  // since even "n/a" would be a guess.
+  const { census: archive, settled: archSettled } = useArchive();
   const archEntry = p.node?.ip ? archive?.entries.get(p.node.ip) : undefined;
-  const arch = archEntry && archive ? archiveDisplay(archEntry, archive.since) : null;
-  // A machine that runs NO L0 layer serves no snapshot chain — that is a KNOWN fact, not
-  // missing data, so it gets an honest "None" rather than silent absence (user, 2026-08-14:
-  // DOR's 17 dedicated dL1 machines showed nothing and read as an inconsistency). A machine
-  // WITH an L0 layer but no census entry says "Unmeasured" (user, same day — the truth there
-  // is that the census has no reading, and next to siblings with values silence reads as a
-  // defect): unreachable at probe time, not Ready then, or joined since — the title names the
-  // possibilities, the value only claims the absence of a reading. Roles unknown → no row at
-  // all, since even "None" would be a guess.
-  const archRoles = p.node?.roles ?? [];
-  const archNone = !archEntry && archive != null && archRoles.length > 0 && !archRoles.includes("l0");
-  const archUnmeasured = !archEntry && archive != null && archRoles.includes("l0");
+  const archState = archiveFactState(archEntry, archive?.since, archSettled, p.node?.roles ?? []);
   // The host's ASN answers to the provider rung exactly as the Hosting line above it does — one
   // condition, so the two can't disagree about who owns the host.
   const asn = cohort == null ? geo?.asn : null;
+  // CO-LOCATION (user, 2026-08-16 — "can we show this in the node card?"): what ELSE this
+  // machine runs, from the one home in network.ts (the roster's Co-located column reads the
+  // same call). A host fact, so it sits with the host block. Usually "none" — stated, per the
+  // user's spec, so the rare tenancy reads against a known resting value — but only once BOTH
+  // sides of the read are live (the DAG core and at least one metagraph in the metaList);
+  // before that a bare "none" would be a guess, so the slot holds (the archive row's lesson).
+  const metaList = useStore((s) => s.metaList);
+  const coloReady = metaList.some((m) => m.isRoot) && metaList.some((m) => !m.isRoot);
+  const colo = coloReady ? coLocatedNetworks(p.node?.ip, pickNetId(p), metaList) : null;
   // NB: the hover pairing (synced 3D glow) lives on the OUTER pane (Inspector.CardPane), not here,
   // so the glow lights the card's rounded edge.
   return (
     <>
       <FactGroup>
+        {/* ALIAS — the operator's informal self-registered handle (see the note above). The row
+            is ALWAYS stated (user, 2026-08-16: "if it's missing just say so, don't hide the
+            attribute" — and "alias" over "nickname"): a name, stars while the registry loads,
+            "not known" when the loaded registry has none for this node's keys, "not available"
+            when the registry itself couldn't be read. */}
+        <Fact label="Alias">
+          {nickname ?? (!nickState.settled ? (
+            <NodeStars count={4} />
+          ) : nickState.names ? (
+            <span className="text-muted-foreground italic" title="No display name is registered for this node's keys in the Global L0's delegated-staking registry.">
+              not known
+            </span>
+          ) : (
+            <span className="text-muted-foreground italic" title="The delegated-staking registry could not be read — retried on the next visit.">
+              not available
+            </span>
+          ))}
+        </Fact>
+        {/* STATUS — only while the SIGNED relation holds the head aside (its usual home). */}
+        {signedSel && (
+          <Fact label="Status">
+            <StatusMark state={p.node?.state} />
+          </Fact>
+        )}
         {/* COUNTRY — the half of the place the head no longer carries (user, 2026-08-02). The
             country CODE suffix is gone (2026-08-10): it restated the name it sat beside.
             Yields to the country card's own title once that rung is drilled. */}
@@ -694,9 +784,61 @@ function GeoLiveNode({ p }: { p: PickOf<"l0" | "l1" | "metanode"> }) {
             provider card, whose title IS the isp and whose body carries the same reference. */}
         {cohort == null && geo?.isp && <Fact label="Hosting">{geo.isp}</Fact>}
         {asn && <Fact label="ASN"><span className="font-mono">{asn}</span></Fact>}
+        {/* CO-LOCATED — the machine's other tenant networks (see the note above). Each name
+            keeps its identity dot: a metagraph's hue is the same everywhere it appears. */}
+        <Fact label="Co-located">
+          {colo == null ? (
+            <NodeStars count={3} />
+          ) : colo.length ? (
+            <span
+              className="inline-flex items-center gap-1.5"
+              title="Another network runs its layers at this node's IP — one host answering in more than one cluster."
+            >
+              {colo.map((c) => (
+                <span key={c.id} className="inline-flex items-center gap-1.5">
+                  <IdentityDot hue={filterAccent(c.id)} />
+                  {c.name}
+                </span>
+              ))}
+            </span>
+          ) : (
+            // "none" is a MEASURED reading (both cluster sides are live and no co-tenant
+            // exists), so it takes the value register like any other fact — muting it made a
+            // fact read as an instrument state (user, 2026-08-16).
+            <span title="No other network has a node at this IP.">none</span>
+          )}
+        </Fact>
         {/* Reading order: place → role → host → SERVICE — what this machine serves sits with
             the host block, above the reference foot. */}
-        {arch && archEntry && archive && (
+        {/* DELEGATED STAKING — the registry's opt-in reading (see the Nickname note): whether
+            this validator registered as a candidate DAG holders can delegate to. A service the
+            machine offers, so it sits with the host block like Full archive, and it shares that
+            row's Yes/No grammar. Validators only — the question doesn't apply to a metagraph
+            machine (the archive row's n/a lesson, taken one further: no row at all). */}
+        {isDagValidator && (
+          <Fact label="Delegated staking">
+            {!nickState.settled ? (
+              <NodeStars count={3} />
+            ) : nickState.names ? (
+              <span
+                className="inline-flex items-center gap-1.5"
+                title={
+                  registered
+                    ? "Registered as a delegated-staking candidate in the Global L0 registry — DAG holders can delegate stake to this L0 validator."
+                    : "Whitelisted to validate but not registered as a delegated-staking candidate — separate, independent gates, which is why a live L0 validator can lack an entry."
+                }
+              >
+                <BoolMark on={registered} />
+                <b className="font-bold">{registered ? "Yes" : "No"}</b>
+              </span>
+            ) : (
+              <span className="text-muted-foreground italic" title="The delegated-staking registry could not be read — retried on the next visit.">
+                not available
+              </span>
+            )}
+          </Fact>
+        )}
+        {archState.kind === "value" && archEntry && archive && (
           /* The dossier's settled stacked grammar, machine-scoped (user, 2026-08-14 — "in the
              node card follow the same thinking; still says 'archive'"): Yes/No against the
              From genesis label (check in the success hue on Yes), the machine's own reach as
@@ -708,39 +850,49 @@ function GeoLiveNode({ p }: { p: PickOf<"l0" | "l1" | "metanode"> }) {
                 archEntry.kind === "genesis"
                   ? `Serves its chain's every snapshot, back to ordinal 1`
                   : archEntry.kind === "deep"
-                    ? `Serves global snapshots back to the metagraph era (${archive.since}), with some gaps — one of ${archive.archivalCount} archival validators of ${archive.total} probed`
+                    ? `Serves global snapshots back to the metagraph era (${archive.since}), with some gaps — one of ${archive.archivalCount} archival L0 validators of ${archive.total} probed`
                     : `Serves ~${(archEntry.latest - archEntry.floor).toLocaleString()} recent snapshots of its own chain, back to ordinal ${archEntry.floor.toLocaleString()}; older history is discarded`
               }
             >
               <span className="inline-flex items-center gap-1.5">
-                {arch.genesis && <Check aria-hidden className="size-3 text-[var(--success)]" />}
-                <b className="font-bold">{arch.genesis ? "Yes" : "No"}</b>
+                <BoolMark on={archState.display.genesis} />
+                <b className="font-bold">{archState.display.genesis ? "Yes" : "No"}</b>
               </span>
-              {arch.reach && <span className="text-label text-muted-foreground">{arch.reach}</span>}
-              {arch.count && <span className="text-label text-muted-foreground">{arch.count}</span>}
+              {archState.display.reach && <span className="text-label text-muted-foreground">{archState.display.reach}</span>}
+              {archState.display.count && <span className="text-label text-muted-foreground">{archState.display.count}</span>}
             </span>
           </Fact>
         )}
-        {archNone && (
+        {archState.kind === "acquiring" && (
+          /* The held-slot acquiring form: a reading for this machine is genuinely arriving
+             (the census fetch is in flight), so the row holds its place with the stars rather
+             than popping in when the value lands. */
+          <Fact label="Full archive">
+            <NodeStars count={4} />
+          </Fact>
+        )}
+        {archState.kind === "na" && (
           <Fact label="Full archive">
             {/* The layer wears its chip, the same token the Composition line uses — one layer
-                vocabulary everywhere (user, 2026-08-14: "not an L0 validator, use the L0 chip"). */}
+                vocabulary everywhere (user, 2026-08-14: "not an L0 validator, use the L0 chip").
+                "n/a", not "None" (user, 2026-08-15): the machine runs no L0 process, so the
+                question doesn't apply — "None" would claim it could have kept one and didn't. */}
             <span
               className="flex flex-col items-end"
-              title="A chain's snapshots are served by its L0 validators; this machine runs no L0 process, so it keeps no snapshot archive."
+              title="A chain's snapshots are served by its L0 validators; this node runs no L0 process, so it keeps no snapshot archive."
             >
-              <b className="font-bold">None</b>
+              <b className="font-bold">n/a</b>
               <span className="inline-flex items-center gap-1 text-label text-muted-foreground">
                 not an <RoleChips codes={["L0"]} /> validator
               </span>
             </span>
           </Fact>
         )}
-        {archUnmeasured && (
+        {archState.kind === "unmeasured" && (
           <Fact label="Full archive">
             <span
               className="text-muted-foreground"
-              title="The archive census (refreshed every few hours) has no reading for this machine — it was unreachable at probe time, not Ready then, or joined the cluster since."
+              title="The archive census (refreshed every few hours) has no reading for this node — it was unreachable at probe time, not Ready then, or joined the cluster since."
             >
               Unmeasured
             </span>
@@ -851,7 +1003,10 @@ export function CompositionTitle({ sel }: { sel: CompositionSel }) {
   return (
     <span className="flex items-center gap-2 min-w-0 max-w-full">
       <Mark aria-hidden className={cn(KIND_MARK_CLASS, "text-[var(--filter-accent,var(--primary))]")} />
-      <span className="truncate min-w-0">{label}</span>
+      {/* "<Label> validators", not the bare word (user, 2026-08-16 — aligning with the explorer
+          depth caption's "…validators" register): the bare "Hybrid"/"Consensus" read as a
+          category, not as the machines it names; the aside's layer chips still carry the codes. */}
+      <span className="truncate min-w-0">{label} validators</span>
     </span>
   );
 }
@@ -874,11 +1029,11 @@ export function CompositionCard({ sel }: { sel: CompositionSel }) {
   const cfg = metagraphById(sel.netId);
   return (
     <FactGroup>
-      <Fact label="Machines">{members.length}</Fact>
+      <Fact label="Nodes">{members.length}</Fact>
       <Fact label="Share of network">{share}%</Fact>
       <Fact label="Network">
         <span className="inline-flex items-center gap-1.5 min-w-0">
-          <IdentityDot hue={sel.netId === "dag" ? CORE_HEX : identityHudHex(sel.netId)} />
+          <IdentityDot hue={identityHudHex(sel.netId)} />
           <span className="truncate">{cfg?.name || sel.netId}</span>
         </span>
       </Fact>

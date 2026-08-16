@@ -9,12 +9,53 @@ import type { NodeInfo, NodeRow } from "@/src/data/types";
 export interface CompRow { label: string; codes: string[]; count: number; }
 
 const ROLE_ORDER = ["l0", "cl1", "dl1"];
-const ROLE_SHORT: Record<string, string> = { l0: "L0", cl1: "cL1", dl1: "dL1" };
+// EXPORTED as the vocabulary's ONE home (2026-08-16): parts.tsx re-exports it for the chips and
+// SceneCallout's lead line reads layerCodesOf below — three private copies of this map existed
+// before the consolidation, which is exactly how a fourth dialect starts.
+export const ROLE_SHORT: Record<string, string> = { l0: "L0", cl1: "cL1", dl1: "dL1" };
 // A node's roles, falling back to its single primary layer when the role list is absent.
 const rolesOf = (n: NodeInfo): string[] => (n.roles && n.roles.length ? n.roles : [n.layer!]);
 const DEDICATED_LABEL: Record<string, string> = { l0: "Consensus", cl1: "Currency", dl1: "Data" };
 const codesFor = (roles: string[]) =>
   ROLE_ORDER.filter((r) => roles.includes(r)).map((r) => ROLE_SHORT[r]);
+
+/** The layer codes present across a set of role lists, in the fixed vocabulary order — the
+ *  subject callout's lead-line read, and the one aggregate over ROLE_SHORT. */
+export function layerCodesOf(nodes: ReadonlyArray<{ roles?: string[] }>): string[] {
+  const all = new Set<string>();
+  for (const n of nodes) for (const r of n.roles ?? []) all.add(r);
+  return ROLE_ORDER.filter((r) => all.has(r)).map((r) => ROLE_SHORT[r]);
+}
+
+/** What a layer DOES — one functional clause per code, in the app's own established language
+ *  (L0 seals snapshots per SIGNER_GROUPS; cL1 carries the currency; dL1 produces the data
+ *  blocks). The hyper explorer's leaf caption composes these into "Nodes that …" (user,
+ *  2026-08-16: the caption should say what the group does — repeating the parent row's codes
+ *  was duplication). One home beside the code vocabulary, so a new layer adds its clause here. */
+const LAYER_CLAUSE: Record<string, string> = {
+  L0: "seal snapshots",
+  cL1: "validate transactions", // the TRANSACTIONS are validated, never "the currency" (user, 2026-08-16)
+  dL1: "validate data updates", // the card's own object ("Data updates: N")
+};
+
+/** The composition's functional fragment ("seal snapshots, validate transactions and data
+ *  updates"), in
+ *  the fixed code order; null when no code has a clause. Clauses are LABEL-length — the caption
+ *  wears the caps-micro section register (user, 2026-08-16: the prose form blended into the
+ *  rows), where a full sentence wrapped four lines. A repeated leading verb is elided from the
+ *  latter clause ("validate transactions and data updates", not "…and validate data updates"). */
+export function compositionClause(codes: readonly string[]): string | null {
+  const parts = codes.map((c) => LAYER_CLAUSE[c]).filter((c): c is string => !!c);
+  if (!parts.length) return null;
+  const out: string[] = [parts[0]];
+  for (let i = 1; i < parts.length; i++) {
+    const prevVerb = parts[i - 1].split(" ")[0];
+    const [verb, ...rest] = parts[i].split(" ");
+    out.push(verb === prevVerb ? rest.join(" ") : parts[i]);
+  }
+  if (out.length === 1) return out[0];
+  return `${out.slice(0, -1).join(", ")} and ${out[out.length - 1]}`;
+}
 
 export function compositionRows(nodes: NodeInfo[]): CompRow[] {
   const hybridByKey = new Map<string, CompRow>();

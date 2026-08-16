@@ -68,6 +68,11 @@ export interface ViewPolicy {
   // strip and publishes `--bottom-reserve` from this flag, so the lane's presence and the space it
   // reserves can never disagree.
   timeLane: boolean;
+  // Does this view anchor the SUBJECT CALLOUT (user, 2026-08-15) — the HUD-layer label the Engine
+  // positions over the committed subject's projected anchor each frame? Two readers: SceneCallout
+  // mounts on it, the Engine's per-frame sync gates on it — one flag, so the label and its
+  // positioning can't disagree. All three 3D views carry it; the flat placeholders stay false.
+  callout: boolean;
   // Per-view bloom (UnrealBloomPass strength/radius/threshold), applied by the Engine each frame.
   // Hyper/geo run CALMER than ledger on purpose: their dense, bright emitters (the core, hundreds
   // of nodes, the additive coastal walls) piled up an additive veil + a strength-driven "black
@@ -98,6 +103,7 @@ const FLAT: ViewPolicy = {
   minPolarAngle: 0.25,
   nodeList: false,
   timeLane: false,
+  callout: false,
   bloom: BLOOM_CALM,
 };
 
@@ -123,6 +129,7 @@ export const VIEW_POLICIES: Record<Mode, ViewPolicy> = {
     // so hyper shares the overview pose with the other views and never needs the pole-crossing relax
     nodeList: true,
     timeLane: false,
+    callout: true, // first consumer of the subject callout (rolling out view by view)
     // Calmer than ledger: the core + dense node field piled up an additive bleed on OLED/HDR.
     bloom: { strength: 0.27, radius: 0.32, threshold: 0.14 },
     },
@@ -140,6 +147,7 @@ export const VIEW_POLICIES: Record<Mode, ViewPolicy> = {
     minPolarAngle: 0.25,
     nodeList: true,
     timeLane: false,
+    callout: true, // node > cohort > country anchors; the distributed network rung has none
     // The lowest bloom of the three views: strength drives the "black halo" ring the saturated
     // node/wall hues cast on the globe, and the additive coastal walls read fuzzy under bloom.
     bloom: { strength: 0.20, radius: 0.30, threshold: 0.16 },
@@ -161,6 +169,7 @@ export const VIEW_POLICIES: Record<Mode, ViewPolicy> = {
     // The Snapshots node browser (LedgerPanel's floor disclosures) reads store.selNodes.
     nodeList: true,
     timeLane: true, // the ONLY view with a time axis — the tick bar-chart is this view's instrument
+    callout: true, // the pinned snapshot — the lane lead tile, or the global tick's bar
     bloom: BLOOM_CALM, // the reference look the design likes — unchanged
   },
   status: FLAT,

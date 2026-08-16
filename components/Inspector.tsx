@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, type CSSProperties, type ReactNode } from "
 import { useStore } from "@/src/store/store";
 import { displayNetwork } from "@/src/data/unlisted";
 import { applyClickActions } from "@/src/store/applyClickActions";
-import { filterAccent, CORE_HEX } from "@/src/data/network";
+import { filterAccent } from "@/src/data/network";
 import { identityHudHex } from "@/src/palette/identity";
 import { hoverKeyOf } from "@/src/data/hoverSubject";
 import { compositionGroups } from "@/src/data/composition";
@@ -81,7 +81,7 @@ function CardPane({
       inspect && (inspect.kind === "l0" || inspect.kind === "l1" || inspect.kind === "metanode")
         ? inspect
         : null;
-    const nodeHue = node?.kind === "metanode" && node.meta ? identityHudHex(node.meta.id) : CORE_HEX;
+    const nodeHue = identityHudHex(node?.kind === "metanode" && node.meta ? node.meta.id : "dag");
     subjectKey = hoverKeyOf(node);
     pair = subjectPairing<string>(hoverNodeId, subjectKey as string | null, setHoverNodeId, nodeHue);
   }
@@ -97,6 +97,7 @@ function CardPane({
       className={pair.className}
       style={pair.style}
       onMouseEnter={pair.onMouseEnter}
+      onMouseMove={pair.onMouseMove}
       onMouseLeave={pair.onMouseLeave}
       onFocus={pair.onFocus}
       onBlur={pair.onBlur}
@@ -127,7 +128,7 @@ function CountryPane({ cc, onClose, collapsed, onToggle }: { cc: string; onClose
   const pair = subjectPairing<string>(hoverCountry, cc, setHoverCountry, filterAccent(filter));
   const pulseKey = useEdgePulse(cc);
   return (
-    <RailPane entry={collapsed} className={pair.className} style={pair.style} onMouseEnter={pair.onMouseEnter} onMouseLeave={pair.onMouseLeave} onFocus={pair.onFocus} onBlur={pair.onBlur}>
+    <RailPane entry={collapsed} className={pair.className} style={pair.style} onMouseEnter={pair.onMouseEnter} onMouseMove={pair.onMouseMove} onMouseLeave={pair.onMouseLeave} onFocus={pair.onFocus} onBlur={pair.onBlur}>
       <CardHead
         eyebrow="Country"
         title={<CountryTitle cc={cc} />}
@@ -223,7 +224,7 @@ function CompositionPane({ sel, onClose, collapsed, onToggle }: { sel: Compositi
     hoverGroup,
     subjectKey,
     setHoverGroup,
-    sel.netId === "dag" ? CORE_HEX : identityHudHex(sel.netId),
+    identityHudHex(sel.netId),
   );
   // The SAME grouping the explorer rows and the Engine's glow resolution use — one helper, so
   // the card, the row and the 3D highlight always speak about the same machines.
@@ -373,6 +374,16 @@ export default function Inspector() {
   const focusId = useLadderFocus();
   const autoCollapsed = (id: string) => ladderIds.includes(id) && presentOf(id) && id !== focusId;
   const effCollapsed = (id: string) => railCollapse[id] ?? autoCollapsed(id);
+  // Publish which slot is the BOX (store.boxedCard) — the same `present && !effCollapsed` that
+  // renders it, so channel and render can't disagree (the data-tier lesson). The subject
+  // callout reads it to mirror the box exactly as the camera does: re-boxing an ancestor card
+  // (clicking a committed node's hub) steps the scene label up with it (user, 2026-08-15).
+  const boxedId = ladderIds.find((id) => presentOf(id) && !effCollapsed(id)) ?? null;
+  const setBoxedCard = useStore((s) => s.setBoxedCard);
+  useEffect(() => {
+    setBoxedCard(boxedId);
+    return () => setBoxedCard(null);
+  }, [boxedId, setBoxedCard]);
   // ONE BOX AT A TIME (card-redesign 2026-08-08): the rail's grammar is "the box = you are here",
   // so manually expanding an entry re-materializes IT as the box and dissolves whichever box was
   // open — single-open accordion semantics across the present ladder rungs, written as overrides
@@ -595,7 +606,7 @@ export default function Inspector() {
   // Icon per hosted card comes from the manifest; hue is the tray's own presentation: the node's
   // metagraph hue (or core cyan), everything else the filter accent.
   const nodeHue =
-    inspect?.kind === "metanode" ? (inspect.meta ? identityHudHex(inspect.meta.id) : undefined) : CORE_HEX;
+    inspect?.kind === "metanode" ? (inspect.meta ? identityHudHex(inspect.meta.id) : undefined) : identityHudHex("dag");
   const tray: TabSignal[] = manifest
     .filter((c) => c.present)
     .map((c) => ({

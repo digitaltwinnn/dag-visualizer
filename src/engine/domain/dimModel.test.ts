@@ -395,6 +395,14 @@ describe("hubMatchBoost (the committed metagraph's hub-level bloom)", () => {
     expect(hubMatchBoost(ctx({ morph: 0 }), 0.33, false)).toBe(0);
   });
 
+  it("is zero in the chamber, whose frozen morph would otherwise leave it on (2026-08-16)", () => {
+    // The ledger freezes morph at the source view's value — entering from hyper (morph 0) left
+    // this hub-furniture boost fully on in the trays, and the committed network's whole fleet
+    // glowed at hub level, drowning the selected machine's own focus emphasis (user: "all nodes
+    // get a highlight except the selected node"). There is no hub to match in the chamber.
+    expect(hubMatchBoost(ctx({ morph: 0, ledger: true }), 0.33, true)).toBe(0);
+  });
+
   it("fades out with the hubs by morph 0.3 — there's no hub on the globe", () => {
     expect(hubMatchBoost(ctx({ morph: 0.15 }), 0.33, true)).toBeCloseTo((0.72 - 0.33) * 0.5, 10);
     expect(hubMatchBoost(ctx({ morph: 0.3 }), 0.33, true)).toBe(0);

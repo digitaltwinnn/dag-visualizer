@@ -515,6 +515,40 @@ The design rules behind the table, which the tests pin but don't explain:
   inline. `components/selectionBoundary.test.ts` enforces this — and note the rule is **write**-based,
   so read-only facts cards cost nothing and every future explorer card inherits the table.
 
+## The subject callout & furniture labels
+
+**One split, decided in a spike (2026-08-15) and matching the user's own instinct: FURNITURE text is
+in-scene (`scene/objects/TextLabel.ts` canvas-texture meshes — blooms on the scene lane, rides group
+transforms and shader fades); the SUBJECT callout is real HUD DOM** (`components/SceneCallout.tsx`),
+composited crisp over the bloom pass so it reuses the HUD's tokens and grammar directly.
+CSS2DRenderer was evaluated and declined — the node chips are InstancedMesh instances, so per-frame
+anchor resolution must live in the Engine either way; the renderer would only replace the final
+projection while adding its container, render pass and a React-portal handshake. Contained swap if
+callouts ever multiply.
+
+**`components/calloutBoundary.test.ts` pins the contracts**: `#callout` has exactly two homes (React
+renders + owns content, `Engine._syncCallout` writes transform + `data-on` per frame — the Tooltip
+discipline); BOTH owners consult `store.boxedCard`; and `SCENE_GLASS` is the one container the hover
+Tooltip shares (hover and commit are one species — identity never tints the frame; it lives on the
+hued ticker, the anchor ring and the `.edge-spine`). The design rules the test can't carry:
+
+- **The box leads.** The callout mirrors the expanded card (`boxedCard`, published by Inspector from
+  the same state that renders the box), exactly as the camera answers it; the component picks the
+  MODEL and the Engine the ANCHOR from one mirrored preference, falling through to the finest
+  committed rung.
+- **Anchors are object-level**: a geo node's own chip (the spotlight's per-record resolution), the
+  pinned snapshot's own tile (live position recorded as the trail draws, rewind included). Group
+  anchors are fallbacks only. A distributed subject (a filtered fleet in geo, unlisted anywhere)
+  gets NO callout — a single anchor would lie about where it is.
+- **It is a label, not a control**: `pointer-events-none`, no ×, dismissal is the selection's own.
+  Content mirrors the cards' grammar rung for rung (eyebrow ink, bare ordinals, aside rules,
+  RoleChips, the ticking age on the global tick).
+- **Furniture labels are sparse by review**: geo's hosting-country names (the set states where the
+  network runs — empty countries staying nameless is information) are the only ones standing. Hyper's
+  hub tickers AND its "Global L0" were built and removed the same day (clutter over what hues,
+  tooltip and callout already answer) — HyperView's header records it; don't re-grow without a live
+  look.
+
 ## Layout — the four-zone HUD over a raw data layer
 
 The page is one fixed shell in **two layers at different depths** (`SectionShell` + `store.section`).
@@ -744,10 +778,12 @@ node tally is structure and structure is already the subject of the view above i
 simply absent there and the space comes back to the rails and the raw layer.
 
 `BottomStream` is the **one publisher**: it both mounts the strip and writes `--bottom-reserve`, from the
-one policy flag `VIEW_POLICIES[mode].timeLane`, so presence and reserved space can't drift (the previous
-arrangement published the reserve per view while the strip mounted unconditionally — two values for one
-token). The token's static default in `globals.css` is therefore **`0px`**, matching the boot view. The
-lane belongs to neither layer, so where it mounts it stays interactive in both poses.
+one policy flag `VIEW_POLICIES[mode].timeLane` **AND the scene pose**, so presence and reserved space
+can't drift (the previous arrangement published the reserve per view while the strip mounted
+unconditionally — two values for one token). The token's static default in `globals.css` is therefore
+**`0px`**, matching the boot view. The lane is **scene-pose only** (user, 2026-08-15): the raw anchor log
+pages arbitrarily deep into history, so the strip's retained window is no longer 1-1 with the table it
+would float over, and its reserve goes back to the raw layer — which the phone pane needs.
 
 ### Responsive shell
 
@@ -908,6 +944,24 @@ ladders change and the fact grows back wherever nothing above it says it. Read d
 set is identical in every view — only its distribution across planks moves. Whichever facts survive keep
 one fixed reading order, **place → role → host → reference**, so the card always reads the same way; it
 just has fewer lines.
+
+**CARDS TELL THE STORY, NOT A STATIC RECORD** (user, 2026-08-15 — the named principle behind the pile
+rule and its kin). A card is its subject *as seen from the current scene*: the same facts, redistributed
+to lead with what the present context makes relevant. Three forms, one principle:
+
+- **Across cards** — the pile dedup above: a fact moves to whichever plank states it best, never
+  duplicated at equal weight.
+- **Within a card** — the node card's SIGNED relation: with a metagraph snapshot committed and the node
+  among its proof signers, the head aside states the relation (`signed` + the L0 chip — the one fact
+  tying the node to the chamber's subject) and the status moves down to the first body row. Nothing
+  lost, redistributed.
+- **Across surfaces** — the subject callout mirrors the BOX (`store.boxedCard`, published by Inspector
+  from the same state that renders it): the box is the subject — it already gets the camera — so
+  re-boxing an ancestor card steps the scene label up with it.
+
+The gate is always **presence** (a committed rung, a live relation, the box), never `mode` — `metaSnap`
+being ledger-scoped is what scopes the signed relation to the chamber, with no view check anywhere. A
+new per-context variation must name the story state it answers to, not the view it appears in.
 
 **Density came from culling, not from tightening.** `Data blocks`, `Height` and `Blocks` (metagraph
 snapshot) and `Epoch` (global snapshot) were removed outright — a fact nobody reads costs more than the
@@ -1138,6 +1192,7 @@ seam and corner rules select on the same markers the thread measures:
 | `data-depth` / `data-focus` / `data-ghost` | The thread's read — depth dimming and dot state |
 | `.nb-row` | The pairing row-wash selector |
 | `#topbar`, `#metapane`, `#tooltip` | Layout and positioning |
+| `#callout` (+ `data-on`) | The subject callout's 0-size anchor wrapper — `SceneCallout` renders it, `Engine._syncCallout` writes its transform + `data-on` per frame (the Tooltip discipline: position never renders React) |
 
 ⚠️ The card query is deliberately **depth-agnostic** (filtered to outermost panels): a `:scope >
 .ig-panel` form silently matches nothing once the ladder lane nests the cards.
@@ -1221,9 +1276,11 @@ included), gapped, each with a small ticker label, machines hanging in one tray 
 The storey heights give the ribbons a deliberate long run.
 
 **The byte bar IS the global snapshot.** One bar per tick on the global floor, fixed height and depth,
-**its width alone encoding the bytes that tick carried** against a FIXED baked reference — the p99 of
-anchored KB/tick, so the rare monster clips at the floor edge with an honest `×N` overflow label
-instead of rescaling the whole past. The bar is centered on the lane field and split into bands, one
+**its width alone encoding the bytes that tick carried** against a FIXED baked reference — **~p70 of
+anchored KB/tick** (user, 2026-08-16: "more often too filled than too small" — the earlier p99 bake
+made the median bar a sliver of unreadable segments), so a heavy tick clips at the floor edge with an
+honest `×N` overflow label instead of rescaling the whole past. `scripts/bake-ledger-scale.ts`
+re-measures it; its header carries the complete-window sampling trap. The bar is centered on the lane field and split into bands, one
 per contributing metagraph plus unlisted, each its own pickable mesh from a pool allocated once.
 **Bands follow lane order, so band order and lane order agree and the ribbons never cross.**
 
@@ -1449,6 +1506,13 @@ Verified live against mainnet:
   batch dozens into a single tick** (verified: DOR 83 in one, DED 41 — both listed). The ground truth
   for *who* anchored is the raw L0 snapshot's `stateChannelSnapshots`, not the explorer, which only
   gives the count.
+
+**An animation bridging an async gap is sized by the MEASURED latency, never a pleasing
+constant** (2026-08-16). The tick-handoff grace was first given a 0.8s fade — shorter than the
+~1.5-2s exact-read gap it exists to bridge — so it died into the same dead air it was built to
+cover; the user's original glitch, wearing a new face. The grace now decays over 2.5s (≈ the
+latency) and crossfades on arrival; the forming byte-bar block covers the same window from the
+other side. When a beat covers a wait, measure the wait first.
 
 ### The tick lifecycle — why a breakdown *settles*
 

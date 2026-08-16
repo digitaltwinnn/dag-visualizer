@@ -27,6 +27,14 @@ view, so switching views never relearns the screen:
 - **Right rail** — facts on demand: a stack of selected-subject cards.
 - **Bottom** — the **live/time lane**: the snapshot barchart
 
+**Cards tell the story, not a static record.** A card is its subject *as seen from the current
+scene*: the same facts, redistributed to lead with what the context makes relevant. Select a node
+in the Snapshots view and its card head states the relation to the pinned snapshot ("signed", with
+the layer chip) while the status steps down to a body row; committed ancestor cards absorb the
+facts they state better (a node under a committed country drops its Country line — the country card's
+title says it); and the in-scene callout label follows whichever card you expand, exactly as the
+camera does. Nothing is duplicated, nothing is lost — the presentation follows the story's state.
+
 The three live views are **complementary projections of the same network** — each answers an
 orthogonal question and owns one "signature" detail card, so the views never overlap:
 

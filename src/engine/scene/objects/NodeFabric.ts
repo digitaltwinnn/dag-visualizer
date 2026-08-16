@@ -537,7 +537,11 @@ export class NodeFabric {
       // dimModel.nodeEmissive: composes glow + arc flash + hubBoost inside its floor, then the
       // hover/selection focus boost/dim-back — one function, both loops. The write EASES toward it
       // (dimModel.emphasisK), with metaEmi itself as the state — same as the validator loop.
-      const emiT = nodeEmissive(c, dEff, flRaw, fw, !!focusId, hubBoost);
+      // ⚠️ A FOCUSED node takes its boost INSTEAD of the hub-match, never stacked (user,
+      // 2026-08-16): the sum left the palette's hue-keeping range and the subject blew out to a
+      // pale point — the "inverse" read. One emphasis at a time: the hub-match is the committed
+      // network's RESTING lift; the subject has its own.
+      const emiT = nodeEmissive(c, dEff, flRaw, fw, !!focusId, fw > 0 ? 0 : hubBoost);
       emi[r.index] += (emiT - emi[r.index]) * ek;
       if (flRaw) r._flash = flRaw * flashDecay;
 

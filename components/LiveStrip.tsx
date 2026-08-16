@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState, type CSSProperties } from "react";
 import { createPortal } from "react-dom";
 import { cn } from "@/lib/utils";
+import { CalloutPanel } from "@/components/SceneCallout";
 import { latestRelevant } from "@/src/data/follow";
 import { useStore } from "@/src/store/store";
 import { useSnapshotFeed } from "@/components/useSnapshotFeed";
@@ -172,49 +173,32 @@ export default function LiveStrip() {
       </div>
 
       {tip && createPortal(
+        // FULL callout reuse (user, 2026-08-16 — "fully re-use the one from the scene"): a strip
+        // bar IS a global tick, so its hover renders the scene callout's own PANEL (CalloutPanel,
+        // one home in SceneCallout) inside this cursor-follow box. The model mirrors gsModel —
+        // eyebrow, bare ordinal, live/age aside — and the lead is the strip's own reading:
+        // "N anchors", or under a filter the hued ticker + "x of y anchors" (the callout
+        // grammar's identity carrier answering "whose x?").
         <div
           id="ls-tip"
           ref={tipRef}
-          className="fixed z-30 pointer-events-none py-2 px-[11px] bg-[var(--panel-solid)] border border-border rounded-btn text-body whitespace-nowrap -translate-x-1/2 -translate-y-[130%] flex flex-col gap-1"
+          className="fixed z-30 pointer-events-none -translate-x-1/2 -translate-y-[130%]"
           style={{ left: tip.x, top: tip.y }}
         >
-          {/* Bare ordinal head — no '#'; a big mono number in a snapshot tooltip is obviously the ordinal. */}
-          <div className="text-foreground font-mono font-bold tabular-nums">{tip.ordinal.toLocaleString()}</div>
-          <div className="flex items-center justify-between gap-[18px]">
-            {isMeta ? (
-              tip.mine > 0 ? (
-                <>
-                  <span className="flex items-center gap-1.5 text-muted-foreground text-label">
-                    <span className="flex-none w-2 h-2 rounded-full" style={{ background: accent }} />
-                    {cfg!.ticker || cfg!.name}
-                  </span>
-                  <span className="text-foreground-dim text-label tabular-nums">{tip.mine} of {tip.total} total</span>
-                </>
-              ) : (
-                <>
-                  <span className="flex items-center gap-1.5 text-muted-foreground text-label">
-                    <span className="flex-none w-2 h-2 rounded-full" style={{ background: accent }} />
-                    {cfg!.ticker || cfg!.name}
-                  </span>
-                  <span className="text-muted-foreground text-label tabular-nums">0 · none this tick ({tip.total} total)</span>
-                </>
-              )
-            ) : (
-              <>
-                <span className="text-muted-foreground text-label">anchored</span>
-                <span className="text-foreground-dim text-label tabular-nums">{tip.total} metagraph snapshot{tip.total === 1 ? "" : "s"}</span>
-              </>
-            )}
-          </div>
-          {/* Recency — relative + coarse; the live bar reads 'live now'. */}
-          <div className="flex items-center gap-1.5 text-label text-muted-foreground mt-1">
-            {tip.live ? (
-              <><span className="w-[7px] h-[7px] rounded-full bg-primary shadow-[0_0_0_3px_color-mix(in_oklch,var(--primary)_30%,transparent)]" /> live now</>
-            ) : (
-              <>◷ {relativeAge(Date.now() - Date.parse(tip.ts))}</>
-            )}
-          </div>
-          <div className="text-label text-muted-foreground opacity-70 mt-1">click to open snapshot</div>
+          <CalloutPanel
+            m={{
+              key: `lst|${tip.ordinal}`,
+              eyebrow: "Global snapshot",
+              title: tip.ordinal.toLocaleString(),
+              aside: tip.live
+                ? { text: "live", live: true }
+                : { text: `◷ ${relativeAge(Date.now() - Date.parse(tip.ts))}` },
+              ring: isMeta ? accent : "var(--core)",
+              lead: isMeta
+                ? { ident: { text: cfg!.ticker || cfg!.name, hue: accent }, text: `${tip.mine} of ${tip.total} anchors` }
+                : { text: `${tip.total} anchor${tip.total === 1 ? "" : "s"}` },
+            }}
+          />
         </div>,
         document.body,
       )}

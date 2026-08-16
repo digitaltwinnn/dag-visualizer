@@ -1,5 +1,13 @@
 import { describe, it, expect } from "vitest";
-import { archiveDisplay, archiveSummary, fmtReach, fmtSnapCount, type ArchiveEntry, type ArchiveCensus } from "./useArchive";
+import {
+  archiveDisplay,
+  archiveFactState,
+  archiveSummary,
+  fmtReach,
+  fmtSnapCount,
+  type ArchiveEntry,
+  type ArchiveCensus,
+} from "./useArchive";
 
 // The Archive fact's value grammar: time AND kept-count for a window, "From genesis" for the
 // whole chain, floor-era-only for the holed global deep archives (never a count — they have
@@ -82,5 +90,34 @@ describe("archive summary", () => {
 
   it("answers null for a chain with no probed machines", () => {
     expect(archiveSummary(census([]), "m9")).toBeNull();
+  });
+});
+
+// The node card's Full archive row is ALWAYS decided, never absent-then-popping (user,
+// 2026-08-15): a separately-loaded fact holds its row with an acquiring state instead of
+// appearing once loaded. The give-up is wired — a settled census with no reading is
+// "unmeasured", never stars forever — and "n/a" needs no census at all: roles are local
+// knowledge, so a machine with no L0 process answers immediately.
+describe("archive fact state", () => {
+  const entry: ArchiveEntry = { ip: "1.2.3.4", chain: "global", kind: "deep", floor: 766_780, latest: 6_700_000, floorTs: null };
+
+  it("a census entry wins whatever the roles say", () => {
+    const s = archiveFactState(entry, "Nov 2023", true, ["l0", "dl1"]);
+    expect(s.kind).toBe("value");
+    if (s.kind === "value") expect(s.display).toEqual({ genesis: false, reach: "back to Nov 2023" });
+  });
+
+  it("no L0 process answers n/a immediately, census still in flight", () => {
+    expect(archiveFactState(undefined, undefined, false, ["dl1"]).kind).toBe("na");
+  });
+
+  it("an L0 machine acquires while the census is in flight, and gives up to unmeasured once settled", () => {
+    expect(archiveFactState(undefined, undefined, false, ["l0"]).kind).toBe("acquiring");
+    expect(archiveFactState(undefined, undefined, true, ["l0"]).kind).toBe("unmeasured");
+  });
+
+  it("unknown roles grow no row — even n/a would be a guess", () => {
+    expect(archiveFactState(undefined, undefined, false, []).kind).toBe("none");
+    expect(archiveFactState(undefined, undefined, true, []).kind).toBe("none");
   });
 });

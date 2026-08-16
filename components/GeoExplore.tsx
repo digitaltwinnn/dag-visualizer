@@ -5,15 +5,14 @@ import { cn } from "@/lib/utils";
 import { useStore } from "@/src/store/store";
 import ExplorerShell from "@/components/ExplorerShell";
 import { filterAccent, metagraphById } from "@/src/data/network";
-import { identityHudHex } from "@/src/palette/identity";
-import { SelectedRowMark, selectedRow } from "@/components/selection";
+import { SelectedRowMark, selectedRow, selectionHue } from "@/components/selection";
 import { ccMark } from "@/src/util/format";
 import { hoverKeyOf } from "@/src/data/hoverSubject";
 import { countryToggleActions, nodeSelectActions, cohortToggleActions, sameCohort } from "@/src/engine/domain/pickActions";
 import { applyClickActions } from "@/src/store/applyClickActions";
 import { subjectPairing } from "@/components/useSubjectPairing";
 import { useLadderFocus } from "@/components/useLadderFocus";
-import { DisclosureChevron, DisclosureRow, NodePickerRow, ROW_NEST, ROW_OUTSET } from "@/components/ExploreRows";
+import { DepthCaption, DisclosureChevron, DisclosureRow, NodePickerRow, ROW_NEST, ROW_OUTSET } from "@/components/ExploreRows";
 import type { NodeRow } from "@/src/data/types";
 import type { CohortSel } from "@/src/engine/domain/focusLadder";
 
@@ -64,7 +63,7 @@ export default function GeoExplore() {
   // The magnitude bar is a distribution leaderboard cue: structural cyan for the whole network /
   // DAG, but when a single metagraph is filtered the list is ITS nodes, so the bar tints to that
   // metagraph's identity hue (HUD lane).
-  const barHue = isMetaFilter ? identityHudHex(filter) : undefined;
+  const barHue = filter !== "all" ? filterAccent(filter) : undefined;
   const activeCfg = metagraphById(filter);
   const tickerOrName = activeCfg ? activeCfg.ticker || activeCfg.name : "This metagraph";
   // Click a country: drill the globe into it (store.country) — the drill state doubles as the
@@ -217,10 +216,16 @@ export default function GeoExplore() {
                     open && selectedRow(focus === "country"),
                     pair.paired && pair.className,
                   )}
-                  style={pair.style}
+                  // The selection follows the subject's identity (selection.tsx · selectionHue):
+                  // a country has none of its own, so this is the committed FILTER's hue — under
+                  // a metagraph filter the row's numbers are that network's, exactly like the
+                  // count bar (barHue) beside it; on "all" barHue is undefined and both the wash
+                  // and the ✓ fall through to structural cyan (identity never gets invented).
+                  style={{ ...(open ? selectionHue(barHue) : undefined), ...pair.style }}
                   aria-expanded={open}
                   onClick={() => drill(c.cc)}
                   onMouseEnter={pair.onMouseEnter}
+      onMouseMove={pair.onMouseMove}
                   onMouseLeave={pair.onMouseLeave}
                   onFocus={pair.onFocus}
                   onBlur={pair.onBlur}
@@ -247,7 +252,7 @@ export default function GeoExplore() {
                     where there's no hover. Both occupy the same flex-none slot, so the count
                     column never shifts. */}
                 {open ? (
-                  <SelectedRowMark className="flex-none" muted={focus !== "country"} />
+                  <SelectedRowMark className="flex-none" muted={focus !== "country"} hue={barHue} />
                 ) : (
                   <DisclosureChevron open={open} />
                 )}
@@ -272,7 +277,11 @@ export default function GeoExplore() {
                     {nodes.length === 0 ? (
                       <p className="mt-1 mx-1 mb-1.5 text-label text-muted-foreground">No locatable nodes here yet.</p>
                     ) : (
-                      cohortsOf(nodes).map((ch) => {
+                      <>
+                      {/* Depth caption (user, 2026-08-16): this depth's one new concept — the
+                          country's machines grouped into provider COHORTS. */}
+                      <DepthCaption>Nodes by city · provider</DepthCaption>
+                      {cohortsOf(nodes).map((ch) => {
                         const holdsSel =
                           selIp != null &&
                           ch.rows.some(
@@ -364,7 +373,8 @@ export default function GeoExplore() {
                             )}
                           </div>
                         );
-                      })
+                      })}
+                      </>
                     )}
                   </div>
                 )}

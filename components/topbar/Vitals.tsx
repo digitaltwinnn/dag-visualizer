@@ -1,6 +1,5 @@
 "use client";
 
-import { Gauge } from "lucide-react";
 import { useStore } from "@/src/store/store";
 import { metagraphById, filterAccent } from "@/src/data/network";
 import { displayNetwork } from "@/src/data/unlisted";
@@ -249,32 +248,15 @@ function VitalsCluster({ align = "end" }: { align?: "end" | "center" } = {}) {
   );
 }
 
-// Phone's compact ≥44px toggle button — expands/collapses the bar's own vitals ROW (TopBar);
-// no more floating popover, so no measuring ref.
-export function VitalsToggle({ open, onClick }: { open: boolean; onClick: () => void }) {
-  return (
-    <button
-      type="button"
-      className={cn(
-        "flex items-center justify-center min-w-11 min-h-11 px-2.5 rounded-btn",
-        "bg-transparent border-0 text-muted-foreground cursor-pointer flex-none",
-        "hover:text-foreground hover:bg-wash-soft",
-        open && "text-foreground bg-wash-soft",
-      )}
-      aria-expanded={open}
-      aria-label="Toggle vitals"
-      onClick={onClick}
-    >
-      <Gauge size={14} />
-    </button>
-  );
-}
+// Phone's compact toggle button is GONE (user, 2026-08-15): the vitals now ride the filter
+// strip as a second row, so the bar row carries no vitals control at all on phone — the
+// separate 44px toggle was starving the row the filter button lives in.
 
 export { VitalsCluster };
 
 // Tablet/desktop: vitals render inline, unchanged. On phone this renders nothing — TopBar owns
-// the phone treatment: a toggle button that grows the command bar downward by one full-width
-// vitals ROW on the bar's own surface (the old floating popover was removed).
+// the phone treatment: the vitals ride the filter strip as a second row (the toggle button and
+// the floating popover before it are both gone).
 export default function Vitals() {
   const bp = useBreakpoint();
   if (bp === "phone") return null;

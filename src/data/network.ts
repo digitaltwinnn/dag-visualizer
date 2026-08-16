@@ -112,8 +112,18 @@ export function resolveSignerIps(
   return ips.length ? ips : null;
 }
 
-// The card-side twin of resolveSignerIps: given ONE signer's truncated id, find the matching
-// live NODE ROW (the same rows the ledger explorer/roster browse — `store.selNodes`) so the
+/** Whether ONE node is among a snapshot proof's signers, given the proof's truncated signer
+ *  ids — the membership read behind the node card's "signed" relation (user, 2026-08-15).
+ *  Matches across every LAYER id (`ids`), per the ⚠️ above — a proof is sealed by the L0
+ *  layer, whose id differs from a hybrid's other layers. */
+export function nodeSigned(
+  node: { id?: string | null; ids?: string[] },
+  signers: readonly string[] | null | undefined,
+): boolean {
+  return !!signers?.some((p) => !!p && carriesSigner(node, p));
+}
+
+// The card-side twin of resolveSignerIps: given ONE signer's truncated id, find the matching// live NODE ROW (the same rows the ledger explorer/roster browse — `store.selNodes`) so the
 // metagraph-snapshot card can render a clickable/hoverable row per signer instead of a bare
 // hash. Scoped to the snapshot's own network first (a truncated prefix could theoretically
 // collide across metagraphs; pickNetId keeps the match honest), then prefix-matched like
@@ -126,6 +136,28 @@ export function matchSignerRow(selNodes: NodeRow[], metaId: string, signerPrefix
     if (carriesSigner(r, signerPrefix)) return r;
   }
   return null;
+}
+
+/** CO-LOCATION — every OTHER network with a node at this machine's IP (user, 2026-08-16:
+ *  the Upsider pair runs a Global L0 validator AND their metagraph's l0+cl1 on one machine,
+ *  reusing one keypair across both L0 processes — 2 such machines fleet-wide today, could
+ *  grow). ONE home for the read, consumed by the node card's Co-located row and the roster's
+ *  Co-located column so the two can't disagree. It reads the FULL `metaList` — the DAG core
+ *  is prepended there, so one scan covers validator↔metagraph tenancy both ways — and never
+ *  `selNodes`, because a committed filter must not hide a co-tenant. Excludes the node's OWN
+ *  network: the row states what ELSE the machine runs. */
+export function coLocatedNetworks(
+  ip: string | null | undefined,
+  ownNetId: string | null,
+  metaList: readonly MetaInfo[],
+): { id: string; name: string }[] {
+  if (!ip) return [];
+  const out: { id: string; name: string }[] = [];
+  for (const m of metaList) {
+    if (m.id === ownNetId) continue;
+    if (m.nodes.some((n) => n.ip === ip)) out.push({ id: m.id, name: m.name });
+  }
+  return out;
 }
 
 /** Whether a snapshot's signer names a machine this app can show — and if not, WHY.
@@ -205,7 +237,7 @@ export const SIGNER_GROUPS = {
     /** What the counted things ARE, read after a number ("3 L0 validators"). */
     who: "L0 validators",
     title:
-      "A metagraph seals every snapshot with its own L0 cluster, so this list IS that cluster — a 3-node L0 signs all three, every time.",
+      "A metagraph seals every snapshot with its own L0 cluster, so this list IS that cluster — the whole cluster, not a rotating subset.",
   },
   dataBlocks: {
     /** Matches the DATA tab's name 1:1 (user, 2026-08-14 — consistency in the tabs' direction);
@@ -214,7 +246,7 @@ export const SIGNER_GROUPS = {
     layer: "dL1, rotating",
     who: "dL1 validators",
     title:
-      "Data blocks are produced by the metagraph's dL1 cluster, EACH BLOCK by a rotating subset of that fleet — this list is the union: every validator that signed at least one of this snapshot's blocks (the per-block split lives on chain, not here). A hybrid node signs under its dL1 id rather than its L0 one.",
+      "Data blocks are produced by the metagraph's dL1 cluster, EACH BLOCK by a rotating subset of that fleet — this list is the union: every dL1 validator that signed at least one of this snapshot's blocks (the per-block split lives on chain, not here). A hybrid node signs under its dL1 id rather than its L0 one.",
   },
   /** The GLOBAL snapshot's own seal. The DAG is a metagraph-shaped core under the unified node model,
    *  so its proof group is the same shape as a metagraph's — its own L0 cluster — and reads with the
@@ -225,7 +257,7 @@ export const SIGNER_GROUPS = {
     layer: "L0 cluster",
     who: "L0 validators",
     title:
-      "The global snapshot is sealed by the DAG's own L0 cluster — one validator per participating node, so this is how much of the network signed this tick.",
+      "The global snapshot is sealed by the DAG's own L0 cluster — one L0 validator per participating node, so this is how much of the network signed this tick.",
   },
 } as const;
 

@@ -7,7 +7,7 @@ import { useStore } from "@/src/store/store";
 import { displayNetwork } from "@/src/data/unlisted";
 import { cn } from "@/lib/utils";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
-import Vitals, { VitalsCluster, VitalsToggle } from "@/components/topbar/Vitals";
+import Vitals, { VitalsCluster } from "@/components/topbar/Vitals";
 import FilterPicker from "@/components/topbar/FilterPicker";
 import EcgMark from "@/components/topbar/EcgMark";
 import PresentationToggle from "@/components/topbar/PresentationToggle";
@@ -50,10 +50,6 @@ export default function TopBar() {
   useEffect(() => {
     if (bp === "phone") setOpen(false);
   }, [bp]);
-  // PHONE: whether the bar's vitals ROW is expanded (the bar grows downward — see below).
-  // Store-held (session) because it's a user choice that persists across view switches.
-  const phoneVitals = useStore((s) => s.phoneVitals);
-  const setPhoneVitals = useStore((s) => s.setPhoneVitals);
 
   const face = filterFace(filter);
 
@@ -138,7 +134,7 @@ export default function TopBar() {
       >
         {/* LEFT zone (phone grid): brand + filter. `contents` above 700px = invisible to the
             flex row, so tablet/desktop layout is byte-identical. */}
-        <div className="contents max-[699px]:flex max-[699px]:items-center max-[699px]:gap-1.5 max-[699px]:min-w-0">
+        <div className="contents max-[699px]:flex max-[699px]:items-center max-[699px]:gap-1 max-[699px]:min-w-0">
         {/* Brand — AND the one route to /about (user, 2026-08-09, replacing the always-on
             experimental banner). The identity mark is the honest affordance for "what is this
             thing?": clicking the app's own name to read what it is, who made it and that it's
@@ -190,7 +186,11 @@ export default function TopBar() {
       // resizing a desktop window smaller made the bar GROW): a coarse pointer is a
       // touch device wherever the window edge sits; a fine pointer never needs it.
       "pointer-coarse:min-h-11",
-            "max-[699px]:p-1.5 max-[699px]:gap-[5px]",
+            // PHONE: the face must fit its grid column beside the fixed 3×44px switch (user,
+            // 2026-08-15 — the button used to run UNDER the switch and read as unclickable):
+            // trimmed paddings/gaps, and `min-w-0` + the label's truncate below so a long
+            // ticker ellipsizes inside its own column instead of overlapping the neighbour.
+            "min-w-0 max-[699px]:px-1 max-[699px]:py-1.5 max-[699px]:gap-[4px]",
           )}
         >
           {/* The "FILTER" text label on wide bars; on the condensed breakpoints (≤940px) it
@@ -212,11 +212,17 @@ export default function TopBar() {
             className="w-[9px] h-[9px] rounded-full flex-none animate-dot-beat motion-reduce:animate-none"
             style={{ background: face.dot }}
           />
-          <span className="text-body text-foreground">{face.label}</span>
+          <span className="text-body text-foreground truncate">{face.label}</span>
+          {/* No chevron on phone (user, 2026-08-15 — the face must fit a 99px grid column
+              beside the fixed 3×44 switch, and the ticker is the part that must survive):
+              the open state still reads from the face's wash + the strip itself, and
+              `aria-expanded` carries it for AT. The truncate above stays as the safety for
+              a ticker longer than the column. */}
           <ChevronDown
             aria-hidden
             className={cn(
-              "size-3.5 text-muted-foreground transition-transform motion-reduce:transition-none",
+              "size-3.5 flex-none text-muted-foreground transition-transform motion-reduce:transition-none",
+              "max-[699px]:hidden",
               open && "rotate-180",
             )}
           />
@@ -283,12 +289,11 @@ export default function TopBar() {
         <div className="contents max-[699px]:flex max-[699px]:items-center max-[699px]:gap-1.5 max-[699px]:justify-self-end">
         <span className="w-px self-stretch bg-border my-1 max-[820px]:hidden" />
 
-        {/* Vitals — inline on tablet/desktop; a toggle button on phone that expands the bar's
-            own vitals ROW below (the old floating popover read as an afterthought). */}
+        {/* Vitals — inline on tablet/desktop. On phone they render nothing here: the vitals
+            ride the filter strip below as a second row (user, 2026-08-15 — the separate 44px
+            vitals toggle starved the bar, and the strip is already the bar's one "grow
+            downward" mechanism), so the right zone is the presentation toggle alone. */}
         <Vitals />
-        {bp === "phone" && (
-          <VitalsToggle open={phoneVitals} onClick={() => setPhoneVitals(!phoneVitals)} />
-        )}
 
         {/* PRESENTATION — the bar's trailing control: ONE axis for how the view's information
             is presented (SCENE / CARDS / RAW — replacing the separate Focus icon + RAW switch,
@@ -321,32 +326,19 @@ export default function TopBar() {
         <div className={cn("overflow-hidden min-h-0", !open && "invisible")}>
           <div ref={stripInner}>
             <FilterPicker onPicked={() => setOpen(false)} />
+            {/* PHONE: the vitals ride the SAME strip as a second row (user, 2026-08-15) — one
+                dropdown control on the filter face instead of a separate 44px toggle starving
+                the bar row. Inside `stripInner`, so the published `--topbar-extra` height and
+                the rails' slide-down already account for it. Same key/value language as the
+                desktop cluster; the hairline is the phone vitals row's own border-t device. */}
+            {bp === "phone" && (
+              <div className="flex items-center justify-center gap-2 mx-2 px-2 pb-2 pt-1.5 border-t border-border/60">
+                <VitalsCluster align="center" />
+              </div>
+            )}
           </div>
         </div>
       </div>
-
-      {/* PHONE vitals row — the bar GROWS DOWNWARD by one full-width row on its own surface,
-          showing the active view's vitals horizontally in the same key/value language as
-          desktop (`VitalsCluster`, whose content swaps per view). Open/closed is a USER CHOICE
-          persisted in the store (`phoneVitals`) — it survives view switches until explicitly
-          collapsed for scene space. Calm grid-rows height transition (~0.25s; reduced motion →
-          instant). The below-bar view caption is a flow sibling of the bar, so it rides down
-          with the expansion automatically. */}
-      {bp === "phone" && (
-        <div
-          className={cn(
-            "grid transition-[grid-template-rows] duration-250 ease-out motion-reduce:transition-none",
-            phoneVitals ? "grid-rows-[1fr]" : "grid-rows-[0fr]",
-          )}
-          aria-hidden={!phoneVitals}
-        >
-          <div className="overflow-hidden min-h-0">
-            <div className="flex items-center justify-center gap-2 mx-2 px-2 pb-2 pt-1.5 border-t border-border/60">
-              <VitalsCluster align="center" />
-            </div>
-          </div>
-        </div>
-      )}
       </div>
 
       {/* Selected-view label — only on the icon-only breakpoints (<1300, where the switch drops

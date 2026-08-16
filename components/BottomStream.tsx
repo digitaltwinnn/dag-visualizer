@@ -23,7 +23,14 @@ const RESERVE = 130; // 16px bottom inset + the strip's 98px height + 16px clear
 
 export default function BottomStream() {
   const mode = useStore((s) => s.mode);
-  const lane = VIEW_POLICIES[mode].timeLane;
+  const section = useStore((s) => s.section);
+  // SCENE-POSE ONLY (user, 2026-08-15). The strip is part of the scene's HUD, not the raw
+  // layer: the raw anchor log pages arbitrarily deep into history, so the strip's retained
+  // window is no longer 1-1 with what the table shows — a time instrument that doesn't describe
+  // the surface it floats over. Removing it in the raw pose also returns its reserve to the
+  // table, which the phone pane needs. Same ONE-PUBLISHER discipline: presence and reserve
+  // flip together, so the raw layer reclaims the space in the same breath.
+  const lane = VIEW_POLICIES[mode].timeLane && section === "scene";
   useEffect(() => {
     document.documentElement.style.setProperty("--bottom-reserve", lane ? `${RESERVE}px` : "0px");
     return () => document.documentElement.style.setProperty("--bottom-reserve", "0px");

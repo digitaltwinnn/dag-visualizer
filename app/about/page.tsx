@@ -228,6 +228,16 @@ export default function AboutPage() {
               <ViewCard icon={Globe} name="Geography" about={ABOUT.geo} />
               <ViewCard icon={Layers} name="Snapshots" about={ABOUT.ledger} />
             </div>
+            {/* The card-adaptation principle, stated for the reader (user, 2026-08-15) — the same
+                text CLAUDE.md and the README carry in their own registers. */}
+            <p>
+              Everything you select gets a card, and the cards <strong>tell the story rather than
+              recite a record</strong>: the same subject is presented as the current scene sees it.
+              Select a node while a snapshot is pinned and its card leads with the relation —
+              signed, and by which layer — while routine facts step back; facts an ancestor card
+              already states aren&apos;t repeated below it; and the label floating in the scene
+              follows whichever card you expand, exactly as the camera does.
+            </p>
           </Section>
 
           <Section id="constellation" title="What is the Constellation Network?">
