@@ -48,6 +48,23 @@ const NO_PAIR = () => {};
 // (unscoped) `group` class itself — `group-hover`/`group-focus-visible` below target it — and
 // reserve this component's `flex-none` slot in its trailing column (e.g. next to a count) so the
 // row's layout doesn't shift when the chevron is invisible.
+// A DEPTH CAPTION — one quiet line leading a disclosure's child list, naming what the rows
+// below REPRESENT (user, 2026-08-16: "explain what it represents", generalizing the ledger's
+// signer explainer). It exists only where the child grouping introduces a NEW concept the
+// parent row doesn't state (signed-by, city · provider, composition, by-network); a depth
+// whose rows self-describe gets none — a caption there would be noise, not orientation.
+// Prose register (text-label muted), never the uppercase LABEL register: it is a phrase you
+// read, not a column head — and it shares the cards' vocabulary ("Signed by N L0 validators")
+// so the explorer and the facts rail speak one language. Not a control: plain <p>, no hover
+// wash, the `title` carries the long explanation.
+export function DepthCaption({ title, children }: { title?: string; children: React.ReactNode }) {
+  return (
+    <p className="flex items-baseline gap-1 w-full py-1 pl-2 pr-7 text-label text-muted-foreground" title={title}>
+      {children}
+    </p>
+  );
+}
+
 export function DisclosureChevron({ open }: { open: boolean }) {
   return (
     <ChevronRight

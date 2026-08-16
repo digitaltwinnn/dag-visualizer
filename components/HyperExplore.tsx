@@ -13,7 +13,7 @@ import { compositionToggleActions, filterToggleActions, nodeSelectActions } from
 import { applyClickActions } from "@/src/store/applyClickActions";
 import { subjectPairing } from "@/components/useSubjectPairing";
 import { useLadderFocus } from "@/components/useLadderFocus";
-import { DisclosureChevron, DisclosureRow, NodePickerRow, ROW_NEST, ROW_OUTSET } from "@/components/ExploreRows";
+import { DepthCaption, DisclosureChevron, DisclosureRow, NodePickerRow, ROW_NEST, ROW_OUTSET } from "@/components/ExploreRows";
 import type { NodeRow } from "@/src/data/types";
 
 // Hypergraph's single **explore** card — the architectural sibling of GeoExplore: each view's
@@ -166,12 +166,15 @@ export default function HyperExplore() {
                       ) : (
                         (() => {
                           const groups = compositionGroups(selNodes);
+                          // Depth caption (user, 2026-08-16): this depth's one new concept — the
+                          // network's machines grouped by role make-up.
+                          const caption = <DepthCaption key="caption">Machines by composition</DepthCaption>;
                           // The label column sizes to the LONGEST label PRESENT (user — a fixed
                           // width left dead air when only short words showed): every label span
                           // stacks an invisible copy of the longest word behind its own text
                           // (the inline-grid overlap sizer), so the pill column aligns AND hugs.
                           const longest = groups.reduce((a, g) => (g.label.length > a.length ? g.label : a), "");
-                          return groups.map((g) => {
+                          return [caption, ...groups.map((g) => {
                           const key = `${m.id}|${g.key}`;
                           const isOpen = openCompKey === g.key;
                           const holdsSel =
@@ -227,7 +230,7 @@ export default function HyperExplore() {
                               )}
                             </div>
                           );
-                          });
+                          })];
                         })()
                       )}
                     </div>

@@ -12,7 +12,7 @@ import { countryToggleActions, nodeSelectActions, cohortToggleActions, sameCohor
 import { applyClickActions } from "@/src/store/applyClickActions";
 import { subjectPairing } from "@/components/useSubjectPairing";
 import { useLadderFocus } from "@/components/useLadderFocus";
-import { DisclosureChevron, DisclosureRow, NodePickerRow, ROW_NEST, ROW_OUTSET } from "@/components/ExploreRows";
+import { DepthCaption, DisclosureChevron, DisclosureRow, NodePickerRow, ROW_NEST, ROW_OUTSET } from "@/components/ExploreRows";
 import type { NodeRow } from "@/src/data/types";
 import type { CohortSel } from "@/src/engine/domain/focusLadder";
 
@@ -277,7 +277,11 @@ export default function GeoExplore() {
                     {nodes.length === 0 ? (
                       <p className="mt-1 mx-1 mb-1.5 text-label text-muted-foreground">No locatable nodes here yet.</p>
                     ) : (
-                      cohortsOf(nodes).map((ch) => {
+                      <>
+                      {/* Depth caption (user, 2026-08-16): this depth's one new concept — the
+                          country's machines grouped into provider COHORTS. */}
+                      <DepthCaption>Machines by city · provider</DepthCaption>
+                      {cohortsOf(nodes).map((ch) => {
                         const holdsSel =
                           selIp != null &&
                           ch.rows.some(
@@ -369,7 +373,8 @@ export default function GeoExplore() {
                             )}
                           </div>
                         );
-                      })
+                      })}
+                      </>
                     )}
                   </div>
                 )}
