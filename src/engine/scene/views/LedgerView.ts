@@ -120,6 +120,13 @@ export const TILE_TUNE_SCHEMA: TuneSchema<TileTune> = {
   rest: { min: 0, max: 2, step: 0.05 },
 };
 
+// The view-entry drop's shape (see the VIEW-ENTRY DROP note in the class): fall height and
+// per-slot timing. The TOTAL is derived so _entryT in [0,1] maps onto real seconds.
+const ENTRY_H = 6.5;
+const ENTRY_FALL = 0.55;
+const ENTRY_STAG = 0.055;
+const ENTRY_TOTAL = ENTRY_FALL + ENTRY_STAG * (SLOT_N - 1);
+
 export class LedgerView implements SceneView {
   group: THREE.Group;
   pickables: THREE.Object3D[];
@@ -819,15 +826,21 @@ export class LedgerView implements SceneView {
   update(dt: number) {
     this.t += dt;
 
-    // The entry ramp (see beginEntry): held at full lift while the transition runs, then eased
-    // per-slot drop + fade once released. DROP 2.6 units, ~1.05s, 33ms stagger, cubic ease-out.
+    // The entry ramp (see beginEntry): held at full lift while the transition runs, then the
+    // DROP once released — retuned 2026-08-16 after the first cut read as a mere fade: the
+    // fall is HIGH (6.5 units — clearly airborne above the planes at the chamber's low camera
+    // angle), gravity-eased (p², accelerating — a drop, not a float), and the stagger is
+    // REVERSED: the far history lands first and the bright LEAD row last, at the front, so the
+    // finale punctuates exactly where the eye rests. ~1.3s in total.
     if (this._entryT < 1) {
-      if (!this._entryHold) this._entryT = Math.min(1, this._entryT + dt / 1.05);
+      if (!this._entryHold) this._entryT = Math.min(1, this._entryT + dt / ENTRY_TOTAL);
+      const tSec = this._entryT * ENTRY_TOTAL;
       for (let si = 0; si < SLOT_N; si++) {
-        const p = Math.min(1, Math.max(0, this._entryT * 1.45 - si * 0.033));
-        const e = 1 - (1 - p) ** 3;
-        this._entryDrop[si] = 2.6 * (1 - e);
-        this._entryFade[si] = e;
+        const start = (SLOT_N - 1 - si) * ENTRY_STAG; // reversed: the lead (slot 0) falls last
+        const p = Math.min(1, Math.max(0, (tSec - start) / ENTRY_FALL));
+        const e = p * p; // gravity: accelerate into the plane
+        this._entryDrop[si] = ENTRY_H * (1 - e);
+        this._entryFade[si] = Math.min(1, p * 1.6); // visible early in its own fall
       }
       this._bar.setEntryDrop(this._entryDrop, this._entryFade);
       if (this._entryT >= 1) this._bar.setEntryDrop(null, null); // park — steady frames write nothing
