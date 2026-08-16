@@ -138,7 +138,7 @@ export default function HyperExplore() {
                     </span>
                     <span className="flex-none text-right text-body tabular-nums font-semibold">{m.nodes.length}</span>
                     {open ? (
-                      <SelectedRowMark className="flex-none" muted={focus !== "context"} />
+                      <SelectedRowMark className="flex-none" muted={focus !== "context"} hue={hue} />
                     ) : (
                       <DisclosureChevron open={open} />
                     )}

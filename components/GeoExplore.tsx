@@ -6,7 +6,7 @@ import { useStore } from "@/src/store/store";
 import ExplorerShell from "@/components/ExplorerShell";
 import { filterAccent, metagraphById } from "@/src/data/network";
 import { identityHudHex } from "@/src/palette/identity";
-import { SelectedRowMark, selectedRow } from "@/components/selection";
+import { SelectedRowMark, selectedRow, selectionHue } from "@/components/selection";
 import { ccMark } from "@/src/util/format";
 import { hoverKeyOf } from "@/src/data/hoverSubject";
 import { countryToggleActions, nodeSelectActions, cohortToggleActions, sameCohort } from "@/src/engine/domain/pickActions";
@@ -217,7 +217,12 @@ export default function GeoExplore() {
                     open && selectedRow(focus === "country"),
                     pair.paired && pair.className,
                   )}
-                  style={pair.style}
+                  // The selection follows the subject's identity (selection.tsx · selectionHue):
+                  // a country has none of its own, so this is the committed FILTER's hue — under
+                  // a metagraph filter the row's numbers are that network's, exactly like the
+                  // count bar (barHue) beside it; on "all" barHue is undefined and both the wash
+                  // and the ✓ fall through to structural cyan (identity never gets invented).
+                  style={{ ...(open ? selectionHue(barHue) : undefined), ...pair.style }}
                   aria-expanded={open}
                   onClick={() => drill(c.cc)}
                   onMouseEnter={pair.onMouseEnter}
@@ -248,7 +253,7 @@ export default function GeoExplore() {
                     where there's no hover. Both occupy the same flex-none slot, so the count
                     column never shifts. */}
                 {open ? (
-                  <SelectedRowMark className="flex-none" muted={focus !== "country"} />
+                  <SelectedRowMark className="flex-none" muted={focus !== "country"} hue={barHue} />
                 ) : (
                   <DisclosureChevron open={open} />
                 )}
