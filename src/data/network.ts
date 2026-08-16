@@ -237,7 +237,7 @@ export const SIGNER_GROUPS = {
     /** What the counted things ARE, read after a number ("3 L0 validators"). */
     who: "L0 validators",
     title:
-      "A metagraph seals every snapshot with its own L0 cluster, so this list IS that cluster — a 3-node L0 cluster shows the same 3 signers on every snapshot.",
+      "A metagraph seals every snapshot with its own L0 cluster, so this list IS that cluster — the whole cluster, not a rotating subset.",
   },
   dataBlocks: {
     /** Matches the DATA tab's name 1:1 (user, 2026-08-14 — consistency in the tabs' direction);

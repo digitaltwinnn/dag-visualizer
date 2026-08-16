@@ -792,7 +792,7 @@ function GeoLiveNode({ p }: { p: PickOf<"l0" | "l1" | "metanode"> }) {
           ) : colo.length ? (
             <span
               className="inline-flex items-center gap-1.5"
-              title="Another network runs its layers at this node's IP — the same host answers in both clusters."
+              title="Another network runs its layers at this node's IP — one host answering in more than one cluster."
             >
               {colo.map((c) => (
                 <span key={c.id} className="inline-flex items-center gap-1.5">
