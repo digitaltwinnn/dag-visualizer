@@ -778,8 +778,10 @@ export class LedgerView implements SceneView {
     if (g > 0 && g < SLOT_N && g !== hot && this._slotSnap[g] && this._specs[g].measured) {
       this._ribbons.setRow(3, g, this._specs[g], this._laneZOf);
     } else {
+      // Clear the SHEET but never the grace itself here: on the very first sync after a tick
+      // the trail may not carry the outgoing lead yet, and killing the grace at arm time was
+      // one of the ways the handoff silently died. Only the per-frame decay ends it.
       this._ribbons.clearRow(3);
-      if (g <= 0) this._graceOrd = null;
     }
   }
 
