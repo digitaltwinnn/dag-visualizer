@@ -177,7 +177,13 @@ export const FOCUS_TUNE_DEFAULTS: Readonly<Record<View3D, Readonly<FocusRow>>> =
   // hyper's `back`/`boost` re-tuned live (user, 2026-08-12): the shells are dense and evenly
   // lit, so a focused node needed both a louder boost and a deeper step-back from its
   // neighbours before it read as the subject rather than as one bright node among many.
-  hyper: { dim: 0.32, hide: 0, elem: 0.38, back: 0.41, boost: 1.85 },
+  // boost 1.85 → 1.1 (user, 2026-08-16 — "all except the selected node get highlighted"): with
+  // the network committed the boost STACKED on hubMatchBoost to ~2.57 emissive, past the scene
+  // palette's hue-keeping range — the subject blew out to a small white point while its backed
+  // siblings kept fat saturated bodies, so the emphasis read INVERTED. The stack is gone too
+  // (NodeFabric: a focused node's boost replaces the hub-match, one emphasis at a time), and 1.1
+  // lands the subject ~1.4, above the hub level and inside the hue range.
+  hyper: { dim: 0.32, hide: 0, elem: 0.38, back: 0.41, boost: 1.1 },
   geo: { dim: 1.0, hide: 1, elem: 0, back: 0.65, boost: 0.7 },
   ledger: { dim: 0.5, hide: 0, elem: 0, back: 0.55, boost: 0.7 },
 };

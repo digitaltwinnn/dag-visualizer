@@ -264,6 +264,12 @@ export class Globe implements GeoViewHost {
     // back on `this` for the morph/fade loop and pushes its fade materials into this.geoFades.
     // The countries topology arrives async: re-assert any drill/hover border made before then.
     this.onCountriesReady = () => {
+      // The host-outline key must not survive the topology's arrival (review find, 2026-08-16):
+      // a node build BEFORE the topojson sets the key while every countryRings() answers null,
+      // and an unchanged key would skip the re-assert below — no outlines until the next
+      // filter/data change. The race runs the other way on most loads, which is why it passed
+      // live checks.
+      this._hostBorderKey = null;
       this._updateCountryBorder();
       this._rebuildCountryLabels(); // topology may land after the first node build
     };
