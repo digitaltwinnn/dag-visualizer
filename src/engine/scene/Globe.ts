@@ -175,6 +175,10 @@ export class Globe implements GeoViewHost {
   // existing group-tier channel at the end of the precedence chain.
   private _signerIds: Set<string> | null = null;
   private _selCohortDir = new THREE.Vector3(); // resolved centroid unit dir (scratch)
+  // Geo's SUBJECT-ARRIVAL beat (the Engine's begin/release contract): the density glow holds
+  // dark through the view choreography and breathes in (~0.7s) once it settles.
+  private _glowEntryT = 1;
+  private _glowEntryHold = false;
   // FURNITURE country-name labels (user, 2026-08-15): flat, whisper-muted names on the land, for
   // HOSTING countries only — the label set states a network fact (where the network runs), not an
   // atlas; empty countries staying nameless is itself information, the same honesty as the
@@ -731,6 +735,17 @@ export class Globe implements GeoViewHost {
     const ccn = ccToNumeric(cc);
     const geom = ccn ? this.countryGeoms?.get(ccn) : null;
     return geom ? geometryRings(geom) : null;
+  }
+
+  /** Arm geo's subject-arrival beat — the glow holds dark until releaseEntry. */
+  beginEntry(): void {
+    this._glowEntryT = 0;
+    this._glowEntryHold = true;
+  }
+
+  /** The choreography settled — the glow breathes in as the closing beat. */
+  releaseEntry(): void {
+    this._glowEntryHold = false;
   }
 
   /** The committed provider cohort's anchor: the members' centroid as a unit, globe-LOCAL
@@ -1297,15 +1312,15 @@ export class Globe implements GeoViewHost {
     for (const f of this.geoFades) f.mat.opacity = f.base * surf;
     // Density light pools: morph fade × the country-drill recede (so a drilled country's own
     // highlight isn't washed out by the pools).
-    // The pools belong to the SUBJECTS, not the furniture (user, 2026-08-16): they light where
-    // the stacks stand, so they breathe in as the nodes SETTLE (the IN phase's disperse ramp,
-    // smoothstepped) rather than arriving with the glass — and stay untouched outside
-    // transitions (settleAlpha is 1 at idle, so data rebuilds don't blink them).
-    const settle = this.transition ? this.transition.settleAlpha("geo") : 1;
-    const glowSettle = settle * settle * (3 - 2 * settle);
+    // The pools belong to the SUBJECTS, not the furniture (user, 2026-08-16): they are geo's
+    // SUBJECT-ARRIVAL beat — held dark through the choreography and breathing in under the
+    // settled stacks on release (the Engine's begin/release contract, shared with the ledger's
+    // drop and hyper's tether sweep). Data rebuilds outside transitions don't blink them
+    // (_glowEntryT parks at 1).
+    const ge = this._glowEntryT * this._glowEntryT * (3 - 2 * this._glowEntryT);
     for (const g of this._densityGlow) {
       (g.material as THREE.MeshBasicMaterial).opacity =
-        (g.userData.glowBase as number) * surf * glowSettle * this._glowDim * this._glowAllDim;
+        (g.userData.glowBase as number) * surf * ge * this._glowDim * this._glowAllDim;
     }
     // Depth cueing for the see-through hologram: the graticule + coastal walls dim their far
     // hemisphere through the shared facing uniform (camera dir in this group's local frame),
@@ -1358,6 +1373,8 @@ export class Globe implements GeoViewHost {
   }
 
   update(dt: number): void {
+    // Advance the arrival beat (see beginEntry) — parked at 1 in steady state.
+    if (!this._glowEntryHold && this._glowEntryT < 1) this._glowEntryT = Math.min(1, this._glowEntryT + dt / 0.7);
     this.clock += dt;
     // Node-pick SPOTLIGHT (geo only): claim the shared stage light above the selected node's chip
     // stack so the zoomed-in pick catches a light wash (user). The record's geo position is

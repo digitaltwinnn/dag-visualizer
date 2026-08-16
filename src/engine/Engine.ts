@@ -896,16 +896,27 @@ export class Engine {
   // Reached ONLY via _applyBoundary, whose `dest` is always a 3D view (hyper/geo/ledger) —
   // flat/"soon" views never route here (they PARK the fleet and never apply a destination
   // layout, see setMode's !is3D branch). So there is no flat-view reset case below.
+  // The per-view owner of the subject-arrival beat (see _applyDestLayout's note).
+  private _entryViewFor(mode: Mode): { beginEntry(): void; releaseEntry(): void } | null {
+    if (mode === "ledger") return this.ledger;
+    if (mode === "geo") return this.globe;
+    if (mode === "hyper") return this.layers;
+    return null;
+  }
+
   private _applyDestLayout(mode: Mode) {
-    // The chamber's subjects DROP IN as the view arrives — held elevated through the
-    // choreography and RELEASED at the transition's completion edge (user, 2026-08-16: "the
-    // last effect on the scene, to signal we're done"). A direct arrival with no transition
-    // releases immediately. (⚠️ 2026-08-16: this call was silently LOST once by an edit that
-    // anchored on a wrong parameter name — the effect ran nowhere while every test passed;
-    // hence the boundary test below.)
-    if (mode === "ledger") {
-      this.ledger.beginEntry();
-      if (!this.transition.active()) this.ledger.releaseEntry();
+    // THE SUBJECT-ARRIVAL BEAT (user, 2026-08-16 — "give each view a place to animate their
+    // view-specific subjects as the final view construction part"): every 3D view owns a
+    // begin/release pair — armed here as the destination layout lands, held through the
+    // choreography, RELEASED at the transition's completion edge as the scene's closing beat
+    // (ledger: the snapshot drop; geo: the density glow breathing in under the stacks; hyper:
+    // the tethers sweeping out from the core). A direct arrival with no transition releases
+    // immediately. (⚠️ 2026-08-16: the ledger call was silently LOST once by an edit anchored
+    // on a wrong parameter name — the effect ran nowhere while every test passed.)
+    const entryView = this._entryViewFor(mode);
+    if (entryView) {
+      entryView.beginEntry();
+      if (!this.transition.active()) entryView.releaseEntry();
     }
     // Snapshots view reuses the SAME hub/node meshes, laid into planar rows / lanes. These are the
     // boundary-only layout snaps (invisible: the nodes are gathered): the hyper furniture hard
@@ -1552,10 +1563,10 @@ export class Engine {
       this._resettleFocus = false;
       this._resolveFocus(); // a mid-OUT commit's framing was held — re-derive from committed state
     }
-    // The transition's completion edge also releases the chamber's held entry drop — the
-    // choreography is over, the closing beat may play (see _applyDestLayout).
-    if (this._wasTransitionActive && !this.transition.active() && this.mode === "ledger") {
-      this.ledger.releaseEntry();
+    // The transition's completion edge releases the destination view's held subject-arrival
+    // beat — the choreography is over, the closing beat may play (see _applyDestLayout).
+    if (this._wasTransitionActive && !this.transition.active()) {
+      this._entryViewFor(this.mode)?.releaseEntry();
     }
     this._wasTransitionActive = this.transition.active();
   }

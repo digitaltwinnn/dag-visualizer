@@ -123,8 +123,8 @@ export const TILE_TUNE_SCHEMA: TuneSchema<TileTune> = {
 // The view-entry drop's shape (see the VIEW-ENTRY DROP note in the class): fall height and
 // per-slot timing. The TOTAL is derived so _entryT in [0,1] maps onto real seconds.
 const ENTRY_H = 6.5;
-const ENTRY_FALL = 0.55;
-const ENTRY_STAG = 0.055;
+const ENTRY_FALL = 0.45;
+const ENTRY_STAG = 0.04;
 const ENTRY_TOTAL = ENTRY_FALL + ENTRY_STAG * (SLOT_N - 1);
 
 export class LedgerView implements SceneView {
@@ -882,7 +882,7 @@ export class LedgerView implements SceneView {
       this._leadRibOrd = lead0.ordinal;
       this._leadRibT = 0;
     }
-    if (this._leadRibT < 1) this._leadRibT = Math.min(1, this._leadRibT + dt / 0.9);
+    if (this._leadRibT < 1) this._leadRibT = Math.min(1, this._leadRibT + dt / 0.65);
     const leadIn = this._leadRibT * this._leadRibT * (3 - 2 * this._leadRibT);
     this._ribbons.setRowFade(0, this._rewind.fadeAtX(LEAD_X + this._trailOff) * entryRib * leadIn);
     // The grace sheet's fade (see the field note). The unmeasured decay is sized to the gap it
