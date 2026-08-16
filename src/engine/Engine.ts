@@ -537,6 +537,10 @@ export class Engine {
         // A landing EXACT read is what turns a tick from an unmeasured seam into a measured byte
         // bar (spec §6.3), so re-hand the map the moment it changes. Ledger-only: nothing else
         // reads it from the scene, and the view re-reads it on entry via _refreshLedger.
+        // The forming block's GIVE-UP path (user, 2026-08-16 — every acquiring state needs
+        // one): a FAILED exact read must stop the pulse, or it promises an arrival that isn't
+        // coming (bounded by the next tick, but the card rules call that a hang).
+        if (st.exactMiss !== prev.exactMiss) this.ledger.setExactMisses(st.exactMiss);
         if (st.snapshotExact !== prev.snapshotExact) {
           if (this.mode === "ledger") this.ledger.setExact(st.snapshotExact);
           // event-time: one pass per landing exact read, over a ~30-entry record. Gated on the
@@ -1782,6 +1786,19 @@ export class Engine {
           const x = r.left + (v.x * 0.5 + 0.5) * r.width;
           const y = r.top + (-v.y * 0.5 + 0.5) * r.height;
           el.style.transform = `translate3d(${x.toFixed(1)}px, ${y.toFixed(1)}px, 0)`;
+          // Viewport flips (user, 2026-08-16): near the right edge the panel goes up-LEFT,
+          // near the top it drops BELOW the anchor — globals.css mirrors the geometry off
+          // these attributes (guarded writes, like data-on).
+          const flip = x > r.right - 320;
+          const drop = y < r.top + 170;
+          if ((el.dataset.flip != null) !== flip) {
+            if (flip) el.dataset.flip = "";
+            else delete el.dataset.flip;
+          }
+          if ((el.dataset.drop != null) !== drop) {
+            if (drop) el.dataset.drop = "";
+            else delete el.dataset.drop;
+          }
         }
       }
     }

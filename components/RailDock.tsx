@@ -159,6 +159,26 @@ export default function RailDock({
     setOpen(next);
     onOpenChange?.(next);
   };
+  // OPEN-TIME FIT (user, 2026-08-16, from the collapse discussion): a phone sheet that opens
+  // onto short content (two collapsed ghosts) sizes to the content instead of 60vh of empty
+  // glass — measured ONCE at open, then held for that open's whole session (never resizing
+  // while up: no motion the user didn't ask for; a drag or the store's default still wins).
+  // `phoneSheetPx` resets on full close, so every open re-fits.
+  const fitRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!isBarHalf || !open || sheetPx != null) return;
+    const raf = requestAnimationFrame(() => {
+      const content = fitRef.current;
+      if (!content) return;
+      const CHROME = 96; // sheet head + grabber + paddings
+      const fit = content.offsetHeight + CHROME;
+      const def = Math.round(window.innerHeight * 0.6);
+      if (fit < def - 12) onSheetPx?.(Math.max(170, fit));
+    });
+    return () => cancelAnimationFrame(raf);
+    // Open-edge only — content growing later must not resize the sheet mid-session.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, isBarHalf]);
   const handleOpenChangeRef = useRef(handleOpenChange);
   handleOpenChangeRef.current = handleOpenChange;
 
@@ -583,7 +603,7 @@ export default function RailDock({
               `.ig-sheet-edge` spine is the single identity cue (no double spine); the transient
               edge PULSE still plays on each card's own edge. */}
           <div className="sheet-cards flex-1 min-h-0 flex flex-col gap-[var(--rail-gap)] overflow-y-auto overscroll-contain [scrollbar-width:none] [-webkit-overflow-scrolling:touch] [&::-webkit-scrollbar]:hidden">
-            {children}
+            <div ref={fitRef}>{children}</div>
           </div>
         </SheetContent>
       </Sheet>

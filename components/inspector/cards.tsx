@@ -20,6 +20,7 @@ import { VIEW_ICONS, SNAPSHOT_ICON, COUNTRY_ICON, PROVIDER_ICON, COMPOSITION_ICO
 import { Check, ExternalLink } from "lucide-react";
 import { useMinHold } from "@/components/useMinHold";
 import { useArchive, archiveFactState, archiveSummary, fmtSnapCount, fmtReach, useChainSpan } from "@/components/useArchive";
+import { useNodeNames, nodeName } from "@/components/useNodeNames";
 import { useNowTick } from "@/components/useNowTick";
 import { POLL } from "@/src/engine/config";
 import { Desc, StatusMark, CompositionRows, StatusBreakdown, RoleChips, IdentityDot, networkKind, Fact, FactGroup, Foot, FootRow } from "./parts";
@@ -677,6 +678,16 @@ function GeoLiveNode({ p }: { p: PickOf<"l0" | "l1" | "metanode"> }) {
   // head normally carries moves down here as the first body row, so no fact is lost, only
   // redistributed (the pile rule's redistribution idea, applied within one card).
   const signedSel = useSignedSelected(p.node) != null;
+  // The operator's self-registered NICKNAME from the delegated-staking registry (user,
+  // 2026-08-16 — "those names look informal often": a content attribute, never the title).
+  // DAG validators only — the registry keys on global-L0 peer ids, so a metagraph machine can
+  // never carry one and gets NO row (the archive card's n/a lesson: the question doesn't
+  // apply). The row HOLDS while the registry loads (the separate-load rule) and gives up
+  // honestly: "not registered" when the loaded registry has no entry, "not available" when
+  // the registry itself couldn't be read.
+  const isDagValidator = p.kind === "l0" || p.kind === "l1";
+  const nickState = useNodeNames();
+  const nickname = isDagValidator ? nodeName(nickState.names, p.node) : null;
   // The three ancestor rungs that can own one of this card's facts.
   const country = useStore((s) => s.country);
   const cohort = useStore((s) => s.cohort);
@@ -714,6 +725,22 @@ function GeoLiveNode({ p }: { p: PickOf<"l0" | "l1" | "metanode"> }) {
   return (
     <>
       <FactGroup>
+        {/* NICKNAME — the operator's informal self-registered handle (see the note above). */}
+        {isDagValidator && (
+          <Fact label="Nickname">
+            {nickname ?? (!nickState.settled ? (
+              <NodeStars count={4} />
+            ) : nickState.names ? (
+              <span className="text-muted-foreground italic" title="This validator has no entry in the Global L0's delegated-staking registry, where operators register a display name.">
+                not registered
+              </span>
+            ) : (
+              <span className="text-muted-foreground italic" title="The delegated-staking registry could not be read — retried on the next visit.">
+                not available
+              </span>
+            ))}
+          </Fact>
+        )}
         {/* STATUS — only while the SIGNED relation holds the head aside (its usual home). */}
         {signedSel && (
           <Fact label="Status">

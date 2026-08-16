@@ -104,8 +104,10 @@ export class ByteBar {
     this._sceneColors = map;
   }
 
-  /** Lay out one tick's bar. Event-time only. */
-  setBar(slot: number, ordinal: number, spec: BarSpec | null, pick: PickDescriptor): void {
+  /** Lay out one tick's bar. Event-time only. `formingAllowed` is the give-up gate: a lead
+   *  whose exact read FAILED stops pulsing (honest absence) instead of promising an arrival
+   *  that isn't coming. */
+  setBar(slot: number, ordinal: number, spec: BarSpec | null, pick: PickDescriptor, formingAllowed = true): void {
     const s = this._slots[slot];
     if (!s) return;
     s.ordinal = ordinal;
@@ -121,7 +123,7 @@ export class ByteBar {
       // never inferred from anchor count or fee). The LEAD row alone gets the FORMING block
       // (user, 2026-08-16 — see the Slot note): the read is genuinely in flight there, so the
       // held-slot acquiring form applies, exactly as the cards' NodeStars.
-      const forming = slot === 0 && !!spec && !spec.measured;
+      const forming = slot === 0 && !!spec && !spec.measured && formingAllowed;
       for (let i = forming ? 1 : 0; i < s.used; i++) { s.bands[i].visible = false; s.bands[i].scale.set(0, 0, 0); }
       s.measured = !!spec && spec.measured;
       s.forming = forming;

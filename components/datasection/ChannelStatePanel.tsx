@@ -560,7 +560,12 @@ export function ChannelStatePanel() {
                   Every lane below is note → table → raw disclosure, in that order. `.slim-scroll`
                   is the app's one scrollbar recipe: an opened JSON tree genuinely scrolls both
                   ways, and the platform default read as a browser part laid over the glass. */}
-              <div className="min-h-0 flex-1 overflow-auto slim-scroll">
+              {/* The tab row's baseline hairline is this box's TOP edge — the content wears the
+                  matching side/bottom hairlines (user, 2026-08-16: "the tabs look disconnected
+                  from the content"), so the active tab visibly opens INTO the bounded panel
+                  (its panel-solid fill already bridges the baseline). Same border weight as the
+                  tabs' own (border/50); bottom corners pick up the pane radius. */}
+              <div className="min-h-0 flex-1 overflow-auto slim-scroll border border-t-0 border-border/50 rounded-b-md px-2.5 pt-2 pb-2">
                 {active === "state" && (
                   <div className="flex flex-col gap-2">
                     {stateRows.length > 0 && (

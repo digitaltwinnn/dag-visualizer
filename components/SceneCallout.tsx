@@ -110,6 +110,8 @@ export default function SceneCallout() {
     return {
       key: `node|${id ?? `${g?.lat},${g?.lon}`}`,
       eyebrow: "Node",
+      // City-first like the node card (nickname stays a CARD attribute — user, 2026-08-16:
+      // the registry handles are informal, a content fact rather than the subject's name).
       title: g?.city ?? g?.country ?? (id ? shortHash(id) : "Node"),
       aside: nnet ? { text: nnet.ticker, hue: nnet.hue } : undefined,
       ring: nnet?.hue ?? "var(--primary)",
@@ -248,7 +250,7 @@ export default function SceneCallout() {
           the design's one accent/affordance signal (user, 2026-08-15 — round 2; the neutral grey
           read as chrome, the border token before it was too weak). Moderate opacity, not full —
           it is a tie, not a signal. Identity stays on the anchor RING. */}
-      <svg className="absolute left-0 top-0 overflow-visible" width="1" height="1" aria-hidden>
+      <svg className="co-leader absolute left-0 top-0 overflow-visible" width="1" height="1" aria-hidden>
         <line
           x1={6}
           y1={-6}
@@ -261,7 +263,9 @@ export default function SceneCallout() {
         />
       </svg>
       {/* The panel — keyed by subject so the roll-in replays on a change, like a card title. */}
-      <div key={m.key} className={`roll-in absolute whitespace-nowrap ${SCENE_GLASS}`} style={{ left: OFF_X, bottom: OFF_Y }}>
+      {/* Position lives in globals.css (`.co-panel` + the data-flip/data-drop mirrors the
+          Engine toggles near viewport edges) — inline left/bottom would beat the flip rules. */}
+      <div key={m.key} className={`co-panel roll-in absolute whitespace-nowrap ${SCENE_GLASS}`}>
         {/* The identity EDGE SPINE (user, 2026-08-15 — "the rails/hairline effect on the left
             side, attached", then "let it fade into the corners"): the sheets' single-identity-
             cue language at callout scale, as the shared `.edge-spine` recipe (globals.css) — a

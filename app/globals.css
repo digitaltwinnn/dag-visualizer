@@ -231,6 +231,25 @@
    its corners — one recipe, every size. Hue rides `--spine` (the identity-var convention);
    opacity belongs to the consumer. First consumer: the subject callout (SceneCallout); the
    sheets' `.ig-sheet-edge` can adopt the same device if their straight tips ever read abrupt. */
+/* The subject callout's panel geometry + VIEWPORT FLIPS (user, 2026-08-16 — the fixed
+   up-right offset clipped at screen edges): the Engine flips the panel to the anchor's other
+   side via `data-flip` (horizontal) / `data-drop` (vertical), the leader mirrors with it, and
+   the identity spine stays on the SCENE-FACING edge. The 62/92 offsets are mirrored by the
+   leader-line endpoints in SceneCallout.tsx — change them together. */
+#callout .co-panel { left: 62px; bottom: 92px; }
+#callout[data-flip] .co-panel { left: auto; right: 62px; }
+#callout[data-drop] .co-panel { bottom: auto; top: 92px; }
+#callout .co-leader { transform: none; }
+#callout[data-flip] .co-leader { transform: scaleX(-1); }
+#callout[data-drop] .co-leader { transform: scaleY(-1); }
+#callout[data-flip][data-drop] .co-leader { transform: scale(-1, -1); }
+#callout[data-flip] .edge-spine {
+  border-left-color: transparent;
+  border-right-color: var(--spine, var(--primary));
+  -webkit-mask: linear-gradient(180deg, transparent, #000 22px, #000 calc(100% - 22px), transparent);
+  mask: linear-gradient(180deg, transparent, #000 22px, #000 calc(100% - 22px), transparent);
+}
+
 .edge-spine {
   position: absolute;
   inset: 0;

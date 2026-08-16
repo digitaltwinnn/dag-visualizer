@@ -552,6 +552,16 @@ export class LedgerView implements SceneView {
     this._rebuildAllSlots();
   }
 
+  // Ordinals whose exact read FAILED (store.exactMiss, bridged by the Engine): the forming
+  // block's give-up signal — a missed lead stops pulsing and draws nothing, the same honest
+  // absence a historical unmeasured row shows (the acquiring give-up rule; a retry that later
+  // lands clears the miss and the read arrives through setExact as usual).
+  private _missOrds: ReadonlySet<number> = new Set();
+  setExactMisses(byOrdinal: Record<number, unknown>): void {
+    this._missOrds = new Set(Object.keys(byOrdinal).map(Number)); // event-time
+    this._rebuildAllSlots();
+  }
+
   /** The exact per-ordinal byte reads — the ONLY source a bar's width may come from (spec §6.2),
    *  and since 2026-08-07 the only source of the unknown lane's tile counts too. */
   setExact(byOrdinal: Record<number, SnapshotExact>): void {
@@ -690,7 +700,7 @@ export class LedgerView implements SceneView {
         ex?.anchored ??
         (typeof snap.metagraphSnapshotCount === "number" ? snap.metagraphSnapshotCount : 0);
       fillBarSpec(this._specs[s], ex ? this._bytesByKey(ex) : null, this._laneOrder, anchored);
-      this._bar.setBar(s, snap.ordinal, this._specs[s], this._pickFor(snap));
+      this._bar.setBar(s, snap.ordinal, this._specs[s], this._pickFor(snap), !this._missOrds.has(snap.ordinal));
     }
     this._syncRibbonRows();
     this._syncOrdLabels();
