@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { cn } from "@/lib/utils";
 import { useStore } from "@/src/store/store";
-import { shortHash, CORE_HEX, metagraphById, getNetwork, SIGNER_GROUPS, nodeSigned } from "@/src/data/network";
+import { shortHash, CORE_HEX, metagraphById, getNetwork, SIGNER_GROUPS, nodeSigned, coLocatedNetworks, filterAccent } from "@/src/data/network";
 import { UNLISTED_ID, observedUnlistedIds } from "@/src/data/unlisted";
 import { identityHudHex } from "@/src/palette/identity";
 import { hex, fmtDag, fmtKB, midHash } from "@/src/util/format";
@@ -680,14 +680,17 @@ function GeoLiveNode({ p }: { p: PickOf<"l0" | "l1" | "metanode"> }) {
   const signedSel = useSignedSelected(p.node) != null;
   // The operator's self-registered NICKNAME from the delegated-staking registry (user,
   // 2026-08-16 — "those names look informal often": a content attribute, never the title).
-  // DAG validators only — the registry keys on global-L0 peer ids, so a metagraph machine can
-  // never carry one and gets NO row (the archive card's n/a lesson: the question doesn't
-  // apply). The row HOLDS while the registry loads (the separate-load rule) and gives up
-  // honestly: "not registered" when the loaded registry has no entry, "not available" when
-  // the registry itself couldn't be read.
+  // The registry keys on a PEER ID, so the name names a keypair — and a machine that reuses
+  // one keypair across networks (the Upsider pattern) carries it on its metagraph record too,
+  // which is why the match runs for every node kind (user, 2026-08-16: "keep it actual").
+  // What stays validator-only is the ABSENCE states: only a Global L0 validator can register
+  // (measured 2026-08-16: 31 of 147 live validators haven't — a real fact worth a row), so a
+  // metagraph node shows the row only when a name actually resolves. The row HOLDS while the
+  // registry loads (the separate-load rule) and gives up honestly: "not registered" when the
+  // loaded registry has no entry, "not available" when the registry itself couldn't be read.
   const isDagValidator = p.kind === "l0" || p.kind === "l1";
   const nickState = useNodeNames();
-  const nickname = isDagValidator ? nodeName(nickState.names, p.node) : null;
+  const nickname = nodeName(nickState.names, p.node);
   // The three ancestor rungs that can own one of this card's facts.
   const country = useStore((s) => s.country);
   const cohort = useStore((s) => s.cohort);
@@ -720,18 +723,27 @@ function GeoLiveNode({ p }: { p: PickOf<"l0" | "l1" | "metanode"> }) {
   // The host's ASN answers to the provider rung exactly as the Hosting line above it does — one
   // condition, so the two can't disagree about who owns the host.
   const asn = cohort == null ? geo?.asn : null;
+  // CO-LOCATION (user, 2026-08-16 — "can we show this in the node card?"): what ELSE this
+  // machine runs, from the one home in network.ts (the roster's Co-located column reads the
+  // same call). A host fact, so it sits with the host block. Usually "none" — stated, per the
+  // user's spec, so the rare tenancy reads against a known resting value — but only once BOTH
+  // sides of the read are live (the DAG core and at least one metagraph in the metaList);
+  // before that a bare "none" would be a guess, so the slot holds (the archive row's lesson).
+  const metaList = useStore((s) => s.metaList);
+  const coloReady = metaList.some((m) => m.isRoot) && metaList.some((m) => !m.isRoot);
+  const colo = coloReady ? coLocatedNetworks(p.node?.ip, pickNetId(p), metaList) : null;
   // NB: the hover pairing (synced 3D glow) lives on the OUTER pane (Inspector.CardPane), not here,
   // so the glow lights the card's rounded edge.
   return (
     <>
       <FactGroup>
         {/* NICKNAME — the operator's informal self-registered handle (see the note above). */}
-        {isDagValidator && (
+        {(isDagValidator || nickname) && (
           <Fact label="Nickname">
             {nickname ?? (!nickState.settled ? (
               <NodeStars count={4} />
             ) : nickState.names ? (
-              <span className="text-muted-foreground italic" title="This validator has no entry in the Global L0's delegated-staking registry, where operators register a display name.">
+              <span className="text-muted-foreground italic" title="This validator has no entry in the Global L0's delegated-staking registry, where operators offering delegated staking publish a display name — separate from validator approval, which is why a live validator can lack one.">
                 not registered
               </span>
             ) : (
@@ -769,6 +781,29 @@ function GeoLiveNode({ p }: { p: PickOf<"l0" | "l1" | "metanode"> }) {
             provider card, whose title IS the isp and whose body carries the same reference. */}
         {cohort == null && geo?.isp && <Fact label="Hosting">{geo.isp}</Fact>}
         {asn && <Fact label="ASN"><span className="font-mono">{asn}</span></Fact>}
+        {/* CO-LOCATED — the machine's other tenant networks (see the note above). Each name
+            keeps its identity dot: a metagraph's hue is the same everywhere it appears. */}
+        <Fact label="Co-located">
+          {colo == null ? (
+            <NodeStars count={3} />
+          ) : colo.length ? (
+            <span
+              className="inline-flex items-center gap-1.5"
+              title="This machine also runs another network's layers — the same IP answers in both clusters."
+            >
+              {colo.map((c) => (
+                <span key={c.id} className="inline-flex items-center gap-1.5">
+                  <IdentityDot hue={filterAccent(c.id)} />
+                  {c.name}
+                </span>
+              ))}
+            </span>
+          ) : (
+            <span className="text-muted-foreground" title="No other network has a node at this machine's IP.">
+              none
+            </span>
+          )}
+        </Fact>
         {/* Reading order: place → role → host → SERVICE — what this machine serves sits with
             the host block, above the reference foot. */}
         {archState.kind === "value" && archEntry && archive && (

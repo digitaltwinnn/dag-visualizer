@@ -29,6 +29,7 @@ const COLS: Record<"hyper" | "geo", { key: RosterSortKey; label: string }[]> = {
     { key: "net", label: "Network" },
     { key: "id", label: "Node" },
     { key: "layer", label: "Layer" },
+    { key: "colo", label: "Co-located" },
   ],
   hyper: [
     { key: "net", label: "Network" },
@@ -37,17 +38,19 @@ const COLS: Record<"hyper" | "geo", { key: RosterSortKey; label: string }[]> = {
     { key: "isp", label: "Provider" },
     { key: "country", label: "Country" },
     { key: "city", label: "City" },
+    { key: "colo", label: "Co-located" },
   ],
 };
 
 export default function NodeRosterTable({ mode }: { mode: "hyper" | "geo" }) {
   const selNodes = useStore((s) => s.selNodes);
+  const metaList = useStore((s) => s.metaList);
   const filter = useStore((s) => s.filter);
   const live = useStore((s) => s.live);
   const inspect = useStore((s) => s.inspect);
   const setHoverNodeId = useStore((s) => s.setHoverNodeId);
   const [sort, setSort] = useState<{ key: RosterSortKey; dir: 1 | -1 }>({ key: COLS[mode][0].key, dir: 1 });
-  const rows = sortRoster(buildRoster(selNodes), sort.key, sort.dir);
+  const rows = sortRoster(buildRoster(selNodes, metaList), sort.key, sort.dir);
 
   if (rows.length === 0) {
     const cfg = metagraphById(filter);
@@ -98,6 +101,11 @@ export default function NodeRosterTable({ mode }: { mode: "hyper" | "geo" }) {
         return r.node.city ?? "—";
       case "isp":
         return r.isp ? `${r.isp}${r.asn ? ` · ${r.asn}` : ""}` : "—";
+      case "colo":
+        // CO-LOCATION (user, 2026-08-16): the machine's other tenant networks — rare (2
+        // machines today), so the column reads as dashes with the exceptions standing out;
+        // sorting it ascending gathers them at the top (nulls sort last).
+        return r.colo ?? "—";
     }
   };
 

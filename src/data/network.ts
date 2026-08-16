@@ -138,6 +138,28 @@ export function matchSignerRow(selNodes: NodeRow[], metaId: string, signerPrefix
   return null;
 }
 
+/** CO-LOCATION — every OTHER network with a node at this machine's IP (user, 2026-08-16:
+ *  the Upsider pair runs a Global L0 validator AND their metagraph's l0+cl1 on one machine,
+ *  reusing one keypair across both L0 processes — 2 such machines fleet-wide today, could
+ *  grow). ONE home for the read, consumed by the node card's Co-located row and the roster's
+ *  Co-located column so the two can't disagree. It reads the FULL `metaList` — the DAG core
+ *  is prepended there, so one scan covers validator↔metagraph tenancy both ways — and never
+ *  `selNodes`, because a committed filter must not hide a co-tenant. Excludes the node's OWN
+ *  network: the row states what ELSE the machine runs. */
+export function coLocatedNetworks(
+  ip: string | null | undefined,
+  ownNetId: string | null,
+  metaList: readonly MetaInfo[],
+): { id: string; name: string }[] {
+  if (!ip) return [];
+  const out: { id: string; name: string }[] = [];
+  for (const m of metaList) {
+    if (m.id === ownNetId) continue;
+    if (m.nodes.some((n) => n.ip === ip)) out.push({ id: m.id, name: m.name });
+  }
+  return out;
+}
+
 /** Whether a snapshot's signer names a machine this app can show — and if not, WHY.
  *
  *  Every proof id names a real machine: a metagraph seals its snapshots with its own L0 cluster.

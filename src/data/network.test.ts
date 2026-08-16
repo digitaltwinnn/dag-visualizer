@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { matchSignerRow, nodeSigned, resolveSigner, resolveSignerIps, SIGNER_GROUPS, SIGNER_UNKNOWN } from "@/src/data/network";
+import { coLocatedNetworks, matchSignerRow, nodeSigned, resolveSigner, resolveSignerIps, SIGNER_GROUPS, SIGNER_UNKNOWN } from "@/src/data/network";
 import type { MetaInfo, NodeRow } from "@/src/data/types";
 
 const meta = (id: string, nodes: { ip?: string; id?: string; ids?: string[] }[]): MetaInfo => ({
@@ -198,5 +198,27 @@ describe("resolveSigner", () => {
       expect(w.label.length).toBeGreaterThan(0);
       expect(w.title.length).toBeGreaterThan(0);
     }
+  });
+});
+
+// The co-location read (the Upsider pattern: one machine, a Global L0 validator plus its own
+// metagraph's layers). One home — the card row and the roster column must agree.
+describe("coLocatedNetworks", () => {
+  const list = [
+    meta("dag", [{ ip: "9.9.9.9" }, { ip: "1.1.1.1" }]),
+    meta("up", [{ ip: "9.9.9.9" }, { ip: "2.2.2.2" }]),
+    meta("dor", [{ ip: "3.3.3.3" }]),
+  ];
+  it("names every OTHER network sharing the machine's IP", () => {
+    expect(coLocatedNetworks("9.9.9.9", "dag", list)).toEqual([{ id: "up", name: "up" }]);
+    expect(coLocatedNetworks("9.9.9.9", "up", list)).toEqual([{ id: "dag", name: "dag" }]);
+  });
+  it("answers empty for a single-tenant machine and excludes the node's own network", () => {
+    expect(coLocatedNetworks("1.1.1.1", "dag", list)).toEqual([]);
+    expect(coLocatedNetworks("3.3.3.3", "dor", list)).toEqual([]);
+  });
+  it("answers empty with no IP — an unlocated machine claims no tenancy", () => {
+    expect(coLocatedNetworks(undefined, "dag", list)).toEqual([]);
+    expect(coLocatedNetworks(null, "up", list)).toEqual([]);
   });
 });

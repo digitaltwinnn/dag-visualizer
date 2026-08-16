@@ -1,6 +1,6 @@
-import type { GeoInfo, NodeRow } from "@/src/data/types";
+import type { GeoInfo, MetaInfo, NodeRow } from "@/src/data/types";
 import { pickNetId } from "@/src/engine/domain/pickActions";
-import { metagraphById } from "@/src/data/network";
+import { coLocatedNetworks, metagraphById } from "@/src/data/network";
 
 // The raw layer's node-roster rows (spec 2026-08-01): a flat, sortable projection of
 // `store.selNodes` — the same records the explorers browse, denser. Pure so the sorting/
@@ -12,11 +12,12 @@ export interface RosterRow {
   netName: string | null; // the DISPLAYED network name — what the Network column sorts on
   isp: string | null;
   asn: string | null;
+  colo: string | null; // co-located networks' names, joined — null for a single-tenant machine (sorts last)
 }
 
-export type RosterSortKey = "net" | "id" | "layer" | "country" | "city" | "isp";
+export type RosterSortKey = "net" | "id" | "layer" | "country" | "city" | "isp" | "colo";
 
-export function buildRoster(selNodes: readonly NodeRow[]): RosterRow[] {
+export function buildRoster(selNodes: readonly NodeRow[], metaList: readonly MetaInfo[] = []): RosterRow[] {
   // The key is the row's own IDENTITY, not its position: under the "all" filter the same machine
   // appears once per network it serves and both rows report the same node id, so the network and
   // layer join it. A bare index suffix would have done the same job, but it re-keys every row
@@ -39,6 +40,13 @@ export function buildRoster(selNodes: readonly NodeRow[]): RosterRow[] {
       netName: netId ? (metagraphById(netId)?.name ?? netId) : null,
       isp: geo?.isp ?? null,
       asn: geo?.asn ?? null,
+      // CO-LOCATION (user, 2026-08-16 — "easily spot those two"): the machine's other tenant
+      // networks, from the one home in network.ts. Null (not "none") when single-tenant so the
+      // column sorts its rare positives together and the table shows a quiet dash.
+      colo:
+        coLocatedNetworks("node" in node.pick ? node.pick.node?.ip : undefined, netId, metaList)
+          .map((c) => c.name)
+          .join(", ") || null,
     };
   });
 }
@@ -50,6 +58,7 @@ const FIELD: Record<RosterSortKey, (r: RosterRow) => string | null> = {
   country: (r) => r.node.country,
   city: (r) => r.node.city,
   isp: (r) => r.isp,
+  colo: (r) => r.colo,
 };
 
 // Stable copy-sort; null/empty values sort LAST regardless of direction (an unknown city is
