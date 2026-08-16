@@ -12,6 +12,7 @@ import FollowController from "@/components/FollowController";
 import RawSnapshotBridge from "@/components/RawSnapshotBridge";
 import Tooltip from "@/components/Tooltip";
 import SceneCallout from "@/components/SceneCallout";
+import DevCssCanary from "@/components/DevCssCanary";
 import SectionShell from "@/components/SectionShell";
 import DataSection from "@/components/DataSection";
 
@@ -47,6 +48,7 @@ export default function Home() {
           position in canvas-rect coordinates, and a transformed ancestor would re-anchor its
           fixed box (CSS trap 2). It hides itself outside the scene pose. */}
       <SceneCallout />
+      <DevCssCanary />
     </main>
   );
 }

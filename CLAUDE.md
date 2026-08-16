@@ -1505,6 +1505,13 @@ Verified live against mainnet:
   for *who* anchored is the raw L0 snapshot's `stateChannelSnapshots`, not the explorer, which only
   gives the count.
 
+**An animation bridging an async gap is sized by the MEASURED latency, never a pleasing
+constant** (2026-08-16). The tick-handoff grace was first given a 0.8s fade — shorter than the
+~1.5-2s exact-read gap it exists to bridge — so it died into the same dead air it was built to
+cover; the user's original glitch, wearing a new face. The grace now decays over 2.5s (≈ the
+latency) and crossfades on arrival; the forming byte-bar block covers the same window from the
+other side. When a beat covers a wait, measure the wait first.
+
 ### The tick lifecycle — why a breakdown *settles*
 
 Read this before touching the ledger view. A metagraph snapshot is stamped with its anchoring global
