@@ -84,7 +84,9 @@ const DAMP = 0.55;
 // 0 so the drag starts 1:1 with the damped travel, never reaching `d` so there is no hard stop.
 const rubber = (x: number, d: number) => Math.sign(x) * d * (1 - 1 / (Math.abs(x) / d + 1));
 // The accordion slide's tempo — one spring for both cards (the shared gesture physics).
-const SLIDE_MS = 380;
+// 380 → 560 (user, 2026-08-16: "a bit smoother, it feels too rushed") — the spring curve does
+// most of its travel early, so the longer clock reads as calm follow-through, not slowness.
+const SLIDE_MS = 560;
 const FLICK_V = 0.35; // px/ms at release — a throw this fast commits regardless of travel. Measured
 // live rather than guessed: a deliberate slow pull the user means to cancel runs ~0.11 px/ms, and a
 // quick 30px throw ~0.42-0.6, so the gate sits between them (Hammer's own swipe default is 0.3).

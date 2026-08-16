@@ -318,6 +318,12 @@ export function snapBright(
 // node model — the one asymmetry left, and it is about what a node orbits, not about what it is.
 export function hubMatchBoost(c: DimContext, glow: number, committed: boolean): number {
   if (!committed) return 0;
+  // NOT in the chamber (user bug, 2026-08-16 — "all nodes get a highlight except the selected"):
+  // the ledger FREEZES morph at the source view's value, so arriving from hyper (morph 0) left
+  // this hub-furniture boost fully on in the trays — the committed network's whole fleet glowed
+  // at hub level, drowning the selected machine's own focus emphasis. There is no hub to match
+  // in the chamber; its emphasis is snapBright's own tiers.
+  if (c.ledger) return 0;
   const hubFade = Math.min(1, Math.max(0, 1 - c.morph / 0.3));
   return Math.max(0, 0.72 - glow) * hubFade;
 }

@@ -361,8 +361,10 @@ export class LedgerView implements SceneView {
     for (const o of this._ordLabels.values()) {
       const ox = LEAD_X - o.slot * SLOT_SP + this._trailOff;
       // Both boundaries at once: the rewind's front dissolve and the horizon's — no instrument
-      // may float on glass that has already faded out (user, 2026-08-09).
-      const front = this._rewind.fadeAtX(ox) * horizonAt(ox);
+      // may float on glass that has already faded out (user, 2026-08-09) — and the ENTRY fade:
+      // a label must not name a row whose bar hasn't dropped in yet.
+      const entryF = this._entryT < 1 && o.slot >= 0 && o.slot < SLOT_N ? this._entryFade[o.slot] : 1;
+      const front = this._rewind.fadeAtX(ox) * horizonAt(ox) * entryF;
       (o.mesh.material as THREE.MeshBasicMaterial).opacity = ORD_OP * front * a;
       // The anchor line whispers under its label (user, 2026-08-07 — "a bit more subtle").
       (o.line.material as THREE.LineDashedMaterial).opacity = ORD_OP * 0.45 * front * a;
@@ -376,13 +378,18 @@ export class LedgerView implements SceneView {
     this._ribbons.setSceneColors(map);
   }
 
-  // ── VIEW-ENTRY DROP (user, 2026-08-16): snapshots are SUBJECTS, so they arrive like ones —
-  // tiles and byte bars start elevated and settle onto the furniture over ~1s, slot-staggered
-  // so the trail lands front-to-back, with the ribbons fading in on the ramp's tail. Furniture
-  // keeps its own build (the fades); this ramp touches only the subjects. `_entryT` parks at 1,
-  // and the per-frame work below is skipped entirely once settled.
+  // ── VIEW-ENTRY DROP (user, 2026-08-16, retimed same day — "should occur as the last effect
+  // on the scene to signal we're done"): snapshots are SUBJECTS, so they arrive like ones —
+  // but AFTER the choreography settles, not inside it (the first cut ran during the IN build,
+  // where the camera is mid-flight and the chamber still translucent, and read as nothing).
+  // The subjects HOLD elevated and dark through the transition; on release they drop ~2.6
+  // units onto their planes over ~1.05s, slot-staggered front-to-back, brightness riding the
+  // same ease, ribbons on the tail — the chamber's closing beat. `_entryT` parks at 1 and the
+  // per-frame work is skipped entirely once settled.
   private _entryT = 1;
+  private _entryHold = false;
   private readonly _entryDrop = new Float32Array(SLOT_N);
+  private readonly _entryFade = new Float32Array(SLOT_N);
   // ── THE TICK HANDOFF's GRACE SHEET (user, 2026-08-16 — "the ribbon and snapshot selection
   // effect disappear immediate ... give a nice fade to the getting-old snapshot and a smooth
   // pivot to the new one"). On a new tick the outgoing lead's ribbon FOLLOWS its row back one
@@ -393,10 +400,17 @@ export class LedgerView implements SceneView {
   private _graceOrd: number | null = null;
   private _graceT = 0;
 
-  /** Start the drop — called by the Engine at the transition boundary into this view (and on a
-   *  direct entry from a flat view, where no choreography runs). */
+  /** Arm the drop (subjects held high and dark) — called on every arrival in this view. */
   beginEntry(): void {
     this._entryT = 0;
+    this._entryHold = true;
+    this._entryDrop.fill(2.6);
+    this._entryFade.fill(0);
+  }
+
+  /** Release it — the transition settled (or there was none); the drop is the closing beat. */
+  releaseEntry(): void {
+    this._entryHold = false;
   }
 
   // The committed metagraph snapshot's TILE — resolved to an instance index event-time (every
@@ -805,17 +819,18 @@ export class LedgerView implements SceneView {
   update(dt: number) {
     this.t += dt;
 
-    // The entry ramp (see beginEntry): eased per-slot drop offsets, recomputed only while the
-    // ramp runs. DROP 2.6 world units, ~1.05s total, 35ms stagger per slot, cubic ease-out.
+    // The entry ramp (see beginEntry): held at full lift while the transition runs, then eased
+    // per-slot drop + fade once released. DROP 2.6 units, ~1.05s, 33ms stagger, cubic ease-out.
     if (this._entryT < 1) {
-      this._entryT = Math.min(1, this._entryT + dt / 1.05);
+      if (!this._entryHold) this._entryT = Math.min(1, this._entryT + dt / 1.05);
       for (let si = 0; si < SLOT_N; si++) {
         const p = Math.min(1, Math.max(0, this._entryT * 1.45 - si * 0.033));
         const e = 1 - (1 - p) ** 3;
         this._entryDrop[si] = 2.6 * (1 - e);
+        this._entryFade[si] = e;
       }
-      this._bar.setEntryDrop(this._entryDrop);
-      if (this._entryT >= 1) this._bar.setEntryDrop(null); // park at rest — steady frames write nothing
+      this._bar.setEntryDrop(this._entryDrop, this._entryFade);
+      if (this._entryT >= 1) this._bar.setEntryDrop(null, null); // park — steady frames write nothing
     }
 
     // ── the TRAIL REWIND (objects/TrailRewind.ts): the shown snapshot owns the front; rows
@@ -948,9 +963,10 @@ export class LedgerView implements SceneView {
         // the RIBBON leaving this tile takes, so a ribbon and the two ends it connects now read at
         // one level; compounding dim × back left the endpoints near-black under their own ribbon.
         const rowFocus = pinned || hov;
+        const entryF = this._entryT < 1 && b.slot >= 0 && b.slot < SLOT_N ? this._entryFade[b.slot] : 1;
         const brightT =
           snapBright(tileRest * b.fade, offNet, focus, anyFocus && !rowFocus)
-          * edge * this._fades.alpha;
+          * edge * this._fades.alpha * entryF;
         // Emphasis EASES rather than snapping (dimModel.emphasisK). The state rides the BLOCK, next
         // to its two other eased fields — an instance-index buffer would hand a block's brightness
         // to its neighbour every tick, since a new tick shifts every block one slot along.

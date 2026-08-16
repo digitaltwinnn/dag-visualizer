@@ -155,12 +155,15 @@ export class ByteBar {
     this.group.position.x = off;
   }
 
+  private _entryFade: Float32Array | null = null;
+
   /** VIEW-ENTRY DROP (user, 2026-08-16 — snapshots are subjects and "drop from an elevated
-   *  starting position" as the view arrives): a per-slot Y lift added onto every band mesh.
+   *  starting position", as the scene's CLOSING beat after the transition settles): a per-slot
+   *  Y lift on every band mesh plus a per-slot brightness fade the opacity loop multiplies in.
    *  Event-frequency in practice — LedgerView drives it only while its entry ramp runs and
-   *  parks it at null when settled, so the steady-state frame writes nothing. The bands were
-   *  positioned event-time at setBar; this shifts them off/back to that resting y. */
-  setEntryDrop(yBySlot: Float32Array | null): void {
+   *  parks both at null when settled, so the steady-state frame writes nothing. */
+  setEntryDrop(yBySlot: Float32Array | null, fadeBySlot: Float32Array | null): void {
+    this._entryFade = fadeBySlot;
     const restY = FLOOR_Y.gl0 + BAR_LIFT + BAR_H / 2;
     for (let si = 0; si < this._slots.length; si++) {
       const lift = yBySlot ? yBySlot[si] : 0;
@@ -238,7 +241,7 @@ export class ByteBar {
         // dim × back left a band near-black under a ribbon that was only gently dimmed.
         const rowFocus = pinned || hov;
         const t = snapBright(rest, offNet, focus, anyFocus && !rowFocus)
-          * fade * front * this._alpha;
+          * fade * front * this._alpha * (this._entryFade ? this._entryFade[si] : 1);
         s.mats[i].opacity += (t - s.mats[i].opacity) * k;
         s.mats[i].color.setHex(hot || hov || onNet ? s.colors[i] : this._neutral);
       }

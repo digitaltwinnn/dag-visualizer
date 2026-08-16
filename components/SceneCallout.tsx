@@ -218,6 +218,9 @@ export default function SceneCallout() {
     };
     // The boxed NODE card leads (user, 2026-08-16 — a tray machine selected via the card
     // stack shows ITS callout); then the boxed global card; then the default finest-first.
+    // The boxed METAGRAPH card shows NOTHING (user, 2026-08-16 — like geo's network rung: a
+    // network in the chamber is a whole lane, and a single anchor would lie about it).
+    if (boxedCard === "context") return null;
     m =
       (boxedCard === "node" ? nodeModel() : null) ??
       (boxedCard === "snap" ? gsModel() : null) ??

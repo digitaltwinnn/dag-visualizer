@@ -1231,11 +1231,25 @@ export class Engine {
 
   // Hover tooltip: only writes the store when the hovered target changes (not per
   // pixel); the Tooltip component positions itself from the pointer.
+
+  // Picking stays suppressed while the transition MISLEADS — but not a moment longer (user,
+  // 2026-08-16: "when I arrive in hyper I can't click a node ... at some moment it starts to
+  // work"). The full choreography runs ~3.9s while the destination READS ready after ~1.9s
+  // (furniture built, most nodes landed): the OUT phase and early IN stay suppressed (nodes
+  // bunched at the staging grid — a ray there hits the wrong machine), but once the disperse
+  // ramp passes 0.6 the fleet is in its ease-out tail, converging on real positions, and a
+  // click means what it looks like. `settleAlpha` is the same ramp the geo glow rides.
+  private _pickSuppressed(): boolean {
+    if (!this.transition.active()) return false;
+    if (this.transition.phase !== "in") return true;
+    return !is3D(this.mode) || this.transition.settleAlpha(this.mode) < 0.6;
+  }
+
   private _handleMove(e: MouseEvent) {
     // Mid-drag (orbiting): no hover picking — raycasting the planes every move would flicker the
     // layer highlight across the stack while the user is just navigating.
     if (e.buttons !== 0) return;
-    if (this.transition.active()) return; // nodes are mid-flight; raycasting moving targets misleads (spec)
+    if (this._pickSuppressed()) return; // early flight only — see the note on _pickSuppressed
     const p = this._pickAt(e);
     this.canvas.style.cursor = p ? "pointer" : "grab";
     const st = useStore.getState();
@@ -1289,7 +1303,7 @@ export class Engine {
     }
     // A click that ends a drag (orbit/pan) is navigation, not selection — see onDown.
     if (Math.hypot(e.clientX - this._downX, e.clientY - this._downY) > 5) return;
-    if (this.transition.active()) return; // nodes are mid-flight; raycasting moving targets misleads (spec)
+    if (this._pickSuppressed()) return; // early flight only — see the note on _pickSuppressed
     const p = this._pickAt(e);
     // With nothing picked, resolve the drillable country under the cursor (geo only — the
     // land-sphere hit is analytic; the Globe resolves WHICH country in its rotated frame).
@@ -1527,6 +1541,11 @@ export class Engine {
     if (this._wasTransitionActive && !this.transition.active() && this._resettleFocus) {
       this._resettleFocus = false;
       this._resolveFocus(); // a mid-OUT commit's framing was held — re-derive from committed state
+    }
+    // The transition's completion edge also releases the chamber's held entry drop — the
+    // choreography is over, the closing beat may play (see _applyDestLayout).
+    if (this._wasTransitionActive && !this.transition.active() && this.mode === "ledger") {
+      this.ledger.releaseEntry();
     }
     this._wasTransitionActive = this.transition.active();
   }
@@ -1846,7 +1865,10 @@ export class Engine {
     const st = useStore.getState();
     // THE BOX LEADS (user, 2026-08-15/16): the boxed NODE card anchors the machine's own tray
     // chip; the boxed GLOBAL card anchors the tick's bar — even while a finer subject stays
-    // committed. Then the default order: metagraph tile > global bar > tray node.
+    // committed. The boxed METAGRAPH card shows NOTHING (user, 2026-08-16 — like geo's network
+    // rung: a network in the chamber is a whole LANE, and a single anchor would lie about it).
+    // Then the default order: metagraph tile > global bar > tray node.
+    if (st.boxedCard === "context") return false;
     if (st.boxedCard === "node" && this._ledgerNodeAnchor(st, v)) return true;
     if (st.boxedCard === "snap" && st.snap) {
       this._ledgerBarAnchor(v);
