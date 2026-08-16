@@ -155,6 +155,39 @@ export class ByteBar {
     this.group.position.x = off;
   }
 
+  /** VIEW-ENTRY DROP (user, 2026-08-16 — snapshots are subjects and "drop from an elevated
+   *  starting position" as the view arrives): a per-slot Y lift added onto every band mesh.
+   *  Event-frequency in practice — LedgerView drives it only while its entry ramp runs and
+   *  parks it at null when settled, so the steady-state frame writes nothing. The bands were
+   *  positioned event-time at setBar; this shifts them off/back to that resting y. */
+  setEntryDrop(yBySlot: Float32Array | null): void {
+    const restY = FLOOR_Y.gl0 + BAR_LIFT + BAR_H / 2;
+    for (let si = 0; si < this._slots.length; si++) {
+      const lift = yBySlot ? yBySlot[si] : 0;
+      const bands = this._slots[si].bands;
+      for (const m of bands) m.position.y = restY + lift;
+    }
+  }
+
+  /** The lead-row BAND anchor for one lane key (user, 2026-08-16 — under a filter the global
+   *  callout points at the committed network's own segment of the byte bar, not the bar's
+   *  centre). Chamber-local (the group's trail offset folded in); false when the slot carries
+   *  no measured band for the key. */
+  bandAnchor(slot: number, key: string, out: THREE.Vector3): boolean {
+    const s = this._slots[slot];
+    if (!s) return false;
+    for (let i = 0; i < s.used; i++) {
+      if (s.keys[i] !== key) continue;
+      const m = s.bands[i];
+      if (!m.visible) return false;
+      out.copy(m.position);
+      out.x += this._off;
+      out.y += BAR_H / 2;
+      return true;
+    }
+    return false;
+  }
+
   update(dt: number): void {
     // dimModel.emphasisK: the ONE emphasis-easing rate, shared with the node fabric and the lane
     // tiles. It replaces the local rate this bar used to ease its opacity at (slightly faster now);

@@ -206,14 +206,24 @@ export default function SceneCallout() {
         eyebrow: "Global snapshot",
         title: snap.data.ordinal.toLocaleString(),
         aside: following ? { text: rel ? `live · ${rel}` : "live", live: true } : rel ? { text: `◷ ${rel}` } : undefined,
-        ring: "var(--core)",
+        // Unfiltered the ring marks the whole bar (core cyan); under a filter the anchor
+        // points at the committed network's own SEGMENT, so the ring takes its accent
+        // (user, 2026-08-16 — "if filter, select the correct segment of the byte bar").
+        ring: filter !== "all" ? filterAccent(filter) : "var(--core)",
         lead:
           typeof snap.data.metagraphSnapshotCount === "number"
             ? { text: `${snap.data.metagraphSnapshotCount} anchors` }
             : undefined,
       };
     };
-    m = (boxedCard === "snap" ? gsModel() : null) ?? msModel() ?? gsModel();
+    // The boxed NODE card leads (user, 2026-08-16 — a tray machine selected via the card
+    // stack shows ITS callout); then the boxed global card; then the default finest-first.
+    m =
+      (boxedCard === "node" ? nodeModel() : null) ??
+      (boxedCard === "snap" ? gsModel() : null) ??
+      msModel() ??
+      gsModel() ??
+      nodeModel();
   }
   if (!m) return null;
 

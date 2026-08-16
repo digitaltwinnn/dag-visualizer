@@ -417,15 +417,16 @@ export default function LedgerPanel() {
           const pinned = !following && snap != null;
           const beating = following && previewOrd == null;
           const label = previewOrd != null ? "Pinned" : following ? "Live" : pinned ? "Pinned" : "Live";
-          // Filtered live mode follows the NETWORK's anchors, not every global tick (the trail
-          // holds its newest anchored row at the front) — say so (user, 2026-08-07).
+          // Filtered live mode follows the NETWORK's newest anchored row — the ticker alone
+          // says it (user, 2026-08-16: "just say 'following DOR'" — the word "anchors" restated
+          // what the whole view is about).
           const liveTicker = displayNetwork(filter)?.ticker ?? null;
           const sub =
             previewOrd != null
               ? previewOrd.toLocaleString()
               : following
                 ? liveTicker
-                  ? `following ${liveTicker} anchors`
+                  ? `following ${liveTicker}`
                   : "following new snapshots"
                 : pinned
                   ? `${snap!.data.ordinal.toLocaleString()} · click for live`

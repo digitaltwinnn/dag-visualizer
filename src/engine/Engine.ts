@@ -1844,10 +1844,12 @@ export class Engine {
   // layout data). An uncataloged channel's rows live on the unlisted lane.
   private _ledgerCalloutAnchor(v: THREE.Vector3): boolean {
     const st = useStore.getState();
-    // THE BOX LEADS (user, 2026-08-15): with the global snapshot card boxed, the callout
-    // steps up to the tick's byte bar even while a metagraph snapshot stays committed.
+    // THE BOX LEADS (user, 2026-08-15/16): the boxed NODE card anchors the machine's own tray
+    // chip; the boxed GLOBAL card anchors the tick's bar — even while a finer subject stays
+    // committed. Then the default order: metagraph tile > global bar > tray node.
+    if (st.boxedCard === "node" && this._ledgerNodeAnchor(st, v)) return true;
     if (st.boxedCard === "snap" && st.snap) {
-      this.ledger.calloutAnchor(null, v);
+      this._ledgerBarAnchor(v);
       this.ledger.group.localToWorld(v); // render-state OK
       return true;
     }
@@ -1859,9 +1861,29 @@ export class Engine {
         if (!this.ledger.calloutAnchor(st.metaSnap.metaId, v) && !this.ledger.calloutAnchor(UNLISTED_ID, v)) return false;
       }
     } else if (st.snap) {
-      this.ledger.calloutAnchor(null, v);
-    } else return false;
+      this._ledgerBarAnchor(v);
+    } else if (this._ledgerNodeAnchor(st, v)) return true;
+    else return false;
     this.ledger.group.localToWorld(v); // the rendered chamber transform — a label read. render-state OK
+    return true;
+  }
+
+  // The tick's byte-bar anchor: under a committed filter, the network's OWN band on the shown
+  // row (user, 2026-08-16 — "the correct segment of the byte bar"); unfiltered, or when the
+  // band isn't drawn (unmeasured tick), the bar's lead centre. Chamber-local (caller lifts).
+  private _ledgerBarAnchor(v: THREE.Vector3): void {
+    const lens = ledgerLens(this.filter);
+    if (lens !== "all" && this.ledger.bandAnchor(lens, v)) return;
+    this.ledger.calloutAnchor(null, v);
+  }
+
+  // The committed node's tray chip — the same `ledgerPos` its instance lerps to. The chips
+  // live in the GLOBE group's space (the fabric is shared), so the lift goes through it.
+  private _ledgerNodeAnchor(st: ReturnType<typeof useStore.getState>, v: THREE.Vector3): boolean {
+    const p = st.inspect;
+    if (!p || (p.kind !== "l0" && p.kind !== "l1" && p.kind !== "metanode")) return false;
+    if (!this.globe.selectedNodeLedgerAnchor(v)) return false;
+    this.globe.group.localToWorld(v); // render-state OK
     return true;
   }
 

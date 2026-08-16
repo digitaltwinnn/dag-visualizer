@@ -304,23 +304,26 @@ export default function DesignPage() {
         </p>
         <div className="relative h-[190px]">
           {/* Static specimen at the anchor-wrapper geometry the live callout uses. */}
+          {/* GENERIC content on purpose (user, 2026-08-16): no real network names, tickers or
+              locations in specimens — this page teaches the grammar, not today's data. The hue
+              is a made-up identity, not a brand's. */}
           <div className="absolute left-[60px] top-[160px]">
             <span
               className="absolute -translate-x-1/2 -translate-y-1/2 w-[9px] h-[9px] rounded-full border-[1.5px]"
-              style={{ borderColor: "#ff7a45" }}
+              style={{ borderColor: "#c9824f" }}
             />
             <svg className="absolute left-0 top-0 overflow-visible" width="1" height="1" aria-hidden>
               <line x1={6} y1={-6} x2={62} y2={-84} stroke="var(--primary)" strokeOpacity="0.55" strokeWidth="1.5" strokeDasharray="4 4" />
             </svg>
             <div className={cn("absolute whitespace-nowrap", SCENE_GLASS)} style={{ left: 62, bottom: 92 }}>
-              <span aria-hidden className="edge-spine opacity-70" style={{ ["--spine" as string]: "#ff7a45" }} />
+              <span aria-hidden className="edge-spine opacity-70" style={{ ["--spine" as string]: "#c9824f" }} />
               <div className="text-micro font-bold tracking-[0.1em] uppercase leading-none text-accent mb-1.5">Metagraph</div>
               <div className="flex items-center gap-[7px]">
-                <span className="text-body font-semibold text-foreground">Dor Technologies</span>
-                <span className="text-label font-bold ml-1" style={{ color: "#ff7a45" }}>DOR</span>
+                <span className="text-body font-semibold text-foreground">Metagraph name</span>
+                <span className="text-label font-bold ml-1" style={{ color: "#c9824f" }}>TICKER</span>
               </div>
               <div className="mt-1.5 pt-1.5 border-t border-border flex items-center gap-1.5 text-label text-muted-foreground">
-                <span>19 nodes</span>
+                <span>12 nodes</span>
                 <RoleChips codes={["L0", "cL1", "dL1"]} />
               </div>
             </div>

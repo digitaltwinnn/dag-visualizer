@@ -18,15 +18,14 @@
 // never mis-fires. It commits on RELEASE TRAVEL or on a FLICK — a fast short throw is the dominant
 // phone paging gesture, and without a velocity rule it read as "the swipe didn't work" (the card
 // sprang back and nothing happened). Keyboard: ←/→ while focus is inside the card. A committed
-// step FOLLOWS THROUGH (user, 2026-08-15 — the native "final touches"): the card slides a short
-// way out in the throw direction while fading, the subject swaps while it is blank, and it slides
-// back in from the opposite edge on the shared `--ease-spring` — presentation-only motion on the
-// ONE card, so the "no rendered neighbours" architecture below stands. The plank's chevrons and
-// the arrow keys ride the same path, so every step speaks one directional language. A cancelled
-// drag snaps back on the same spring. Deferring the store commit into the blank moment is also
-// the measured fix for the release stall (233ms of subject-swap work — store write, engine
-// focus/camera, Inspector re-render — used to land synchronously in pointerup, exactly when the
-// snap-back animation was supposed to play).
+// step plays the ACCORDION (user, 2026-08-16, superseding the 2026-08-15 out/blank/in
+// follow-through): the outgoing card is snapshotted as a sanitized static clone and the two
+// slide together on the shared `--ease-spring` — old out the throw side, new in from the other —
+// so the step reads as adjacent cards moving while the lane still holds exactly ONE live card.
+// The plank's chevrons and the arrow keys ride the same path, so every step speaks one
+// directional language. A cancelled drag snaps back on the same spring. The store commit runs
+// before the slide starts, with both cards at rest — the measured 233ms subject-swap stall
+// (store write, engine focus/camera, Inspector re-render) lands where nothing is animating.
 //
 // The drag transform is written STRAIGHT TO THE NODE, not through React state (2026-08-13): a
 // `setDx` per pointermove re-rendered this wrapper 60-120×/s mid-drag, and it subscribes to a
@@ -84,10 +83,8 @@ const DAMP = 0.55;
 // Progressive resistance toward an asymptote `d` (the iOS rubber-band curve) — identity-sloped at
 // 0 so the drag starts 1:1 with the damped travel, never reaching `d` so there is no hard stop.
 const rubber = (x: number, d: number) => Math.sign(x) * d * (1 - 1 / (Math.abs(x) / d + 1));
-// Follow-through timing: a short throw-direction exit, the swap while blank, a spring return.
-const OUT_PX = 34;
-const OUT_MS = 110;
-const IN_MS = 280;
+// The accordion slide's tempo — one spring for both cards (the shared gesture physics).
+const SLIDE_MS = 380;
 const FLICK_V = 0.35; // px/ms at release — a throw this fast commits regardless of travel. Measured
 // live rather than guessed: a deliberate slow pull the user means to cancel runs ~0.11 px/ms, and a
 // quick 30px throw ~0.42-0.6, so the gate sits between them (Hammer's own swipe default is 0.3).
@@ -170,56 +167,67 @@ export default function RailPager({ slot, children }: { slot: RailCardKind; chil
     if (it) applyClickActions(it.actions);
   };
 
-  // FOLLOW-THROUGH (user, 2026-08-15): out in the throw direction, swap while blank, spring back
-  // in from the opposite edge. Inline transitions on purpose — the class's resting transition is
-  // the cancel snap-back, and these two phases each need their own curve. The store commit runs
-  // inside the blank moment, which is ALSO the perf fix: the subject-swap work (store + engine +
-  // Inspector re-render, measured 233ms) lands while nothing is animating, instead of on top of
-  // the settle. `pending` lets a new pointerdown interrupt cleanly: the committed step is not
-  // lost — it has already run by then unless the timer is still waiting, in which case it runs
-  // immediately (a swipe must never silently not-commit).
-  const pending = useRef<{ t: ReturnType<typeof setTimeout>; dir: -1 | 1 } | null>(null);
-  useEffect(() => () => { if (pending.current) clearTimeout(pending.current.t); }, []);
+  // THE ACCORDION (user, 2026-08-16 — "draw the new card already next to the old and move it";
+  // supersedes the out/blank/in follow-through of 2026-08-15). The lane still holds exactly ONE
+  // live card (the Embla decline stands): the outgoing card is snapshotted as a STATIC DOM
+  // clone — sanitized of `.ig-panel`/`.rail-entry`/ids so the RailThread's measurement and the
+  // slab's `:has()` selectors can't see it — the store commits immediately (the subject-swap
+  // work lands while both cards are still at rest), and then clone and real card slide together
+  // on the shared spring: old out the throw side, new in from the other. `pending` holds the
+  // visual cleanup; a new pointerdown finishes it instantly (the commit has already run, so a
+  // swipe can never silently not-commit).
+  const pending = useRef<{ t: ReturnType<typeof setTimeout>; fin: () => void } | null>(null);
+  useEffect(() => () => { if (pending.current) { clearTimeout(pending.current.t); pending.current.fin(); } }, []);
   const settlePending = () => {
     const p = pending.current;
     if (!p) return;
     pending.current = null;
     clearTimeout(p.t);
-    step(p.dir);
-    const el = wrap.current;
-    if (el) {
-      el.style.transition = "none";
-      el.style.transform = "";
-      el.style.opacity = "";
-    }
+    p.fin();
   };
   const commitStep = (dir: -1 | 1) => {
     if (!set?.items[set.index + dir]) return;
     const el = wrap.current;
+    const parent = el?.parentElement;
     const reduced = typeof matchMedia === "function" && matchMedia("(prefers-reduced-motion: reduce)").matches;
-    if (!el || reduced) {
+    if (!el || !parent || reduced) {
       // Reduced motion: the swap is instant — the title roll-in's own guard handles the rest.
       step(dir);
       setTx(0, false);
       return;
     }
     settlePending();
-    el.style.transition = `transform ${OUT_MS}ms ease-in, opacity ${OUT_MS}ms ease-in`;
-    el.style.transform = `translateX(${-dir * OUT_PX}px)`;
-    el.style.opacity = "0";
-    pending.current = {
-      dir,
-      t: setTimeout(() => {
-        pending.current = null;
-        step(dir);
-        el.style.transition = "none";
-        el.style.transform = `translateX(${dir * OUT_PX}px)`;
-        void el.offsetWidth; // flush, so the spring animates from the entry side
-        el.style.transition = `transform ${IN_MS}ms var(--ease-spring), opacity ${Math.round(IN_MS * 0.6)}ms ease-out`;
-        el.style.transform = "";
-        el.style.opacity = "";
-      }, OUT_MS),
+    const w = el.offsetWidth;
+    const dragged = el.style.transform; // carry the finger's displacement into the slide
+    const clone = el.cloneNode(true) as HTMLElement;
+    for (const n of clone.querySelectorAll("[id]")) n.removeAttribute("id");
+    for (const n of clone.querySelectorAll(".ig-panel, .rail-entry")) n.classList.remove("ig-panel", "rail-entry");
+    clone.classList.remove("ig-panel", "rail-entry");
+    clone.setAttribute("aria-hidden", "true");
+    clone.style.cssText = `position:absolute;left:0;top:0;width:${w}px;margin:0;pointer-events:none;transition:none;`;
+    clone.style.transform = dragged;
+    const prevPos = parent.style.position;
+    const prevOverflow = parent.style.overflow;
+    parent.style.position = "relative";
+    parent.style.overflow = "hidden"; // clip the adjacent slide to the lane
+    parent.appendChild(clone);
+    step(dir); // the heavy subject swap runs NOW, with both cards visible and at rest
+    el.style.transition = "none";
+    el.style.transform = `translateX(${dir * w}px)`; // the new card waits just offstage
+    void el.offsetWidth; // flush, so both start their slide together
+    el.style.transition = `transform ${SLIDE_MS}ms var(--ease-spring)`;
+    el.style.transform = "";
+    clone.style.transition = `transform ${SLIDE_MS}ms var(--ease-spring), opacity ${SLIDE_MS}ms ease-out`;
+    clone.style.transform = `translateX(${-dir * w}px)`;
+    clone.style.opacity = "0.5"; // a light fade as it leaves — motion carries the story
+    const fin = () => {
+      clone.remove();
+      parent.style.position = prevPos;
+      parent.style.overflow = prevOverflow;
+      el.style.transition = "none";
+      el.style.transform = "";
     };
+    pending.current = { fin, t: setTimeout(() => { pending.current = null; fin(); }, SLIDE_MS + 40) };
   };
 
   if (!set) return <>{children}</>;

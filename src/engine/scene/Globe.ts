@@ -949,6 +949,17 @@ export class Globe implements GeoViewHost {
     return true;
   }
 
+  /** The SELECTED node's LEDGER tray-chip position in globe-LOCAL coordinates — the same
+   *  `ledgerPos` the instance write lerps to, so the chamber callout can point at the machine's
+   *  own chip in its tray (user, 2026-08-16). False when nothing is selected or the chip is
+   *  hidden with its lane. */
+  selectedNodeLedgerAnchor(out: THREE.Vector3): boolean {
+    const rec = this._selNodeRec;
+    if (!rec || rec.ledgerHide) return false;
+    out.copy(rec.ledgerPos);
+    return true;
+  }
+
   // Commit/clear the cohort selection: resolve member ids + the representative direction from
   // the CURRENT node records by cc+city+isp match (event-time — re-run by the data-rebuild
   // sites exactly like setSelectedNode's re-resolve). Membership matching mirrors
@@ -1286,8 +1297,15 @@ export class Globe implements GeoViewHost {
     for (const f of this.geoFades) f.mat.opacity = f.base * surf;
     // Density light pools: morph fade × the country-drill recede (so a drilled country's own
     // highlight isn't washed out by the pools).
+    // The pools belong to the SUBJECTS, not the furniture (user, 2026-08-16): they light where
+    // the stacks stand, so they breathe in as the nodes SETTLE (the IN phase's disperse ramp,
+    // smoothstepped) rather than arriving with the glass — and stay untouched outside
+    // transitions (settleAlpha is 1 at idle, so data rebuilds don't blink them).
+    const settle = this.transition ? this.transition.settleAlpha("geo") : 1;
+    const glowSettle = settle * settle * (3 - 2 * settle);
     for (const g of this._densityGlow) {
-      (g.material as THREE.MeshBasicMaterial).opacity = (g.userData.glowBase as number) * surf * this._glowDim * this._glowAllDim;
+      (g.material as THREE.MeshBasicMaterial).opacity =
+        (g.userData.glowBase as number) * surf * glowSettle * this._glowDim * this._glowAllDim;
     }
     // Depth cueing for the see-through hologram: the graticule + coastal walls dim their far
     // hemisphere through the shared facing uniform (camera dir in this group's local frame),

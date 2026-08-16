@@ -260,3 +260,23 @@ describe("is3D", () => {
     expect(["status", "transactions", "staking"].some(is3D)).toBe(false);
   });
 });
+
+describe("settleAlpha (the nodes' own arrival ramp)", () => {
+  it("is 1 at idle, 0 while gathered toward, and ramps across the IN phase", () => {
+    const tr = new ViewTransition();
+    expect(tr.settleAlpha("geo")).toBe(1); // idle: data rebuilds outside transitions unaffected
+    tr.start("hyper", "geo");
+    expect(tr.settleAlpha("geo")).toBe(0); // OUT: the destination's nodes are being gathered
+    expect(tr.settleAlpha("hyper")).toBe(1); // the from-view keeps its settle (its own fades rule)
+    while (!tr.tick(0.1)) { /* run to the boundary */ }
+    // The boundary tick carries its leftover dt into IN (the clock is continuous), so the
+    // ramp has just barely begun rather than sitting at exactly 0.
+    expect(tr.settleAlpha("geo")).toBeLessThan(0.1);
+    tr.tick(1.5);
+    const mid = tr.settleAlpha("geo");
+    expect(mid).toBeGreaterThan(0.3);
+    expect(mid).toBeLessThan(0.8);
+    tr.tick(10); // run the IN phase out
+    expect(tr.settleAlpha("geo")).toBe(1);
+  });
+});
