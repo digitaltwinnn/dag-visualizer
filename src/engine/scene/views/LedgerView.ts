@@ -407,6 +407,10 @@ export class LedgerView implements SceneView {
   private _graceOrd: number | null = null;
   private _graceT = 0;
   private _graceSlot = -1; // the grace row's live slot — hue continuity for tiles + bar
+  // The NEW lead's ribbon fades IN over ~0.9s (user, 2026-08-16 — it popped to full the frame
+  // it became drawable; only the OLD sheet was crossfading). Keyed by ordinal, smoothstepped.
+  private _leadRibOrd: number | null = null;
+  private _leadRibT = 1;
 
   /** Arm the drop (subjects held high and dark) — called on every arrival in this view. */
   beginEntry(): void {
@@ -870,7 +874,17 @@ export class LedgerView implements SceneView {
     // Entry ramp tail: ribbons arrive after the tiles have mostly landed (squared ease), so a
     // sheet never hangs from a tile still in the air.
     const entryRib = this._entryT >= 1 ? 1 : Math.max(0, this._entryT * 1.6 - 0.6) ** 2;
-    this._ribbons.setRowFade(0, this._rewind.fadeAtX(LEAD_X + this._trailOff) * entryRib);
+    // The incoming lead sheet's own ease-in (see the field note) — armed the frame its spec
+    // first becomes drawable, so the crossfade has two soft sides.
+    const lead0 = this._slotSnap[0];
+    const leadDrawn = !!(lead0 && this._specs[0].measured && this._specs[0].bandCount > 0);
+    if (leadDrawn && this._leadRibOrd !== lead0.ordinal) {
+      this._leadRibOrd = lead0.ordinal;
+      this._leadRibT = 0;
+    }
+    if (this._leadRibT < 1) this._leadRibT = Math.min(1, this._leadRibT + dt / 0.9);
+    const leadIn = this._leadRibT * this._leadRibT * (3 - 2 * this._leadRibT);
+    this._ribbons.setRowFade(0, this._rewind.fadeAtX(LEAD_X + this._trailOff) * entryRib * leadIn);
     // The grace sheet's fade (see the field note). The unmeasured decay is sized to the gap it
     // exists to bridge — the new lead's EXACT-READ latency (~1.5-2s; the first cut's 0.8s died
     // before the new sheet could draw, which was the user's original glitch wearing a new
