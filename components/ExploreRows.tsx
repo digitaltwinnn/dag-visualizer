@@ -60,9 +60,17 @@ const NO_PAIR = () => {};
 // "should these be normal text instead of the square all-caps?" — so the distinguishers are
 // now SIZE (micro, below every row) and VOICE (italic, which no data row uses), not case.
 // Not a control: plain <p>, no hover wash, the `title` carries the long explanation.
+// The GROUND seals it (user, 2026-08-16 — "do something with the backgrounds"): a faint
+// neutral plate behind the caption, the foot's own white-LIFT mechanism (additive, so it
+// reads the same over any backdrop — a dark scrim dies on the rail's near-black). Rows then
+// sit ground-less as content under an annotated strip; the plate never touches the rows
+// themselves, whose backgrounds are the wash language (hover/selection) and must stay free.
 export function DepthCaption({ title, children }: { title?: string; children: React.ReactNode }) {
   return (
-    <p className="flex flex-wrap items-baseline gap-x-1 w-full py-1 pl-2 pr-7 text-micro italic leading-4 text-muted-foreground" title={title}>
+    <p
+      className="flex flex-wrap items-baseline gap-x-1 w-full py-1 pl-2 pr-2 my-px rounded-sm bg-white/[0.03] text-micro italic leading-4 text-muted-foreground"
+      title={title}
+    >
       {children}
     </p>
   );
