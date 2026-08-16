@@ -406,6 +406,7 @@ export class LedgerView implements SceneView {
   // its own row as everything shifts.
   private _graceOrd: number | null = null;
   private _graceT = 0;
+  private _graceSlot = -1; // the grace row's live slot — hue continuity for tiles + bar
 
   /** Arm the drop (subjects held high and dark) — called on every arrival in this view. */
   beginEntry(): void {
@@ -535,6 +536,7 @@ export class LedgerView implements SceneView {
       this._graceOrd = prevLead;
       this._graceT = 1;
     }
+
     for (let s = 0; s < SLOT_N; s++) this._slotSnap[s] = null;
     if (this.model.tickOrdinal != null)
       this._slotSnap[0] = this._byOrd.get(this.model.tickOrdinal) ?? null;
@@ -867,20 +869,29 @@ export class LedgerView implements SceneView {
     // sheet never hangs from a tile still in the air.
     const entryRib = this._entryT >= 1 ? 1 : Math.max(0, this._entryT * 1.6 - 0.6) ** 2;
     this._ribbons.setRowFade(0, this._rewind.fadeAtX(LEAD_X + this._trailOff) * entryRib);
-    // The grace sheet's fade (see the field note): slow while the new lead is still unmeasured,
-    // a quick crossfade once its sheet is drawable.
+    // The grace sheet's fade (see the field note). The unmeasured decay is sized to the gap it
+    // exists to bridge — the new lead's EXACT-READ latency (~1.5-2s; the first cut's 0.8s died
+    // before the new sheet could draw, which was the user's original glitch wearing a new
+    // face) — then a quick crossfade once the new sheet is drawable. The grace row also keeps
+    // its IDENTITY HUE while it lives (_graceSlot, read by the tile loop and the bar): the
+    // colour snapped to neutral the frame the row stopped leading, which was the other half of
+    // "the selection effect disappears immediately".
+    this._graceSlot = -1;
     if (this._graceOrd != null && this._graceT > 0) {
       const newDrawn = !!(this._slotSnap[0] && this._specs[0].measured && this._specs[0].bandCount > 0);
-      this._graceT = Math.max(0, this._graceT - dt / (newDrawn ? 0.35 : 0.8));
+      this._graceT = Math.max(0, this._graceT - dt / (newDrawn ? 0.35 : 2.5));
       let g = -1;
       for (const tr of this.model.trail) if (tr.ordinal === this._graceOrd) { g = tr.slot; break; }
+      this._graceSlot = g;
       const gx = LEAD_X - g * SLOT_SP + this._trailOff;
       this._ribbons.setRowFade(3, this._graceT * this._rewind.fadeAtX(gx) * entryRib);
       if (this._graceT <= 0) {
         this._ribbons.clearRow(3);
         this._graceOrd = null;
+        this._graceSlot = -1;
       }
     }
+    this._bar.setGraceSlot(this._graceSlot);
 
     this._applyFloorAlpha();
 
@@ -964,7 +975,7 @@ export class LedgerView implements SceneView {
         // (user, 2026-08-09), every other snapshot the neutral trail. BRIGHTNESS is the shared node
         // vocabulary — a snapshot is data, so it dims, boosts and steps back on exactly the knobs
         // the chips in the trays answer to.
-        const ident = hot || hov || hovTile || onNet || b.slot <= 0;
+        const ident = hot || hov || hovTile || onNet || b.slot <= 0 || b.slot === this._graceSlot;
         // The BOOST answers a deliberate focus only (user, 2026-08-11) — a hover, or an explicit
         // pin; the live lead is simply the shown row, which its front position and identity hue
         // already say. A hovered TILE is the subject itself, so it takes the primary weight

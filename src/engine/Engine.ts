@@ -897,6 +897,16 @@ export class Engine {
   // flat/"soon" views never route here (they PARK the fleet and never apply a destination
   // layout, see setMode's !is3D branch). So there is no flat-view reset case below.
   private _applyDestLayout(mode: Mode) {
+    // The chamber's subjects DROP IN as the view arrives — held elevated through the
+    // choreography and RELEASED at the transition's completion edge (user, 2026-08-16: "the
+    // last effect on the scene, to signal we're done"). A direct arrival with no transition
+    // releases immediately. (⚠️ 2026-08-16: this call was silently LOST once by an edit that
+    // anchored on a wrong parameter name — the effect ran nowhere while every test passed;
+    // hence the boundary test below.)
+    if (mode === "ledger") {
+      this.ledger.beginEntry();
+      if (!this.transition.active()) this.ledger.releaseEntry();
+    }
     // Snapshots view reuses the SAME hub/node meshes, laid into planar rows / lanes. These are the
     // boundary-only layout snaps (invisible: the nodes are gathered): the hyper furniture hard
     // hide/show and the node lane placement.

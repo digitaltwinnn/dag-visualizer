@@ -156,6 +156,14 @@ export class ByteBar {
   }
 
   private _entryFade: Float32Array | null = null;
+  private _graceSlot = -1;
+
+  /** The tick-handoff grace row (LedgerView drives): its bands keep IDENTITY hue while the
+   *  grace lives, so the outgoing lead's colour fades with its ribbon instead of snapping to
+   *  the neutral trail the frame it stops leading (user, 2026-08-16). */
+  setGraceSlot(si: number): void {
+    this._graceSlot = si;
+  }
 
   /** VIEW-ENTRY DROP (user, 2026-08-16 — snapshots are subjects and "drop from an elevated
    *  starting position", as the scene's CLOSING beat after the transition settles): a per-slot
@@ -211,7 +219,7 @@ export class ByteBar {
       // the HORIZON (user, 2026-08-09): a terminal dissolve at the far boundary, the mirror of
       // the front one below, so no bar floats on glass that has already faded out.
       const fade = horizonAt(x);
-      const hot = si === this._selected || si === 0;
+      const hot = si === this._selected || si === 0 || si === this._graceSlot;
       const hov = si === this._hovered;
       // The one row that owns the focus (see `anyFocus`) — `_selected` is -1 when none does. Note
       // this is NOT `hot`, which also colours the bare lead: the lead keeps identity hue whether or
