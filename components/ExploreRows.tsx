@@ -53,18 +53,16 @@ const NO_PAIR = () => {};
 // signer explainer). It exists only where the child grouping introduces a NEW concept the
 // parent row doesn't state (signed-by, city · provider, composition, by-network); a depth
 // whose rows self-describe gets none — a caption there would be noise, not orientation.
-// The CAPS-MICRO section register — what every "this names a section" line in the app wears
-// (the raw pane's lane tabs, the shape table's heads). It started in the prose register and
-// blended straight into the rows (user, 2026-08-16 — the signer list's grey mono ids sat in
-// the same hue and weight); uppercase at micro is the one register no data row uses, so the
-// caption reads as structure at a glance — at 70% alpha and tight leading (user, 2026-08-16:
-// full-strength caps read LOUD, especially wrapped), quieter than any row while still apart
-// from them. Content is written in sentence case and LABEL
-// length (see compositionClause) — CSS does the shouting, so `title`/copy stay readable.
+// The GHOST-HINT voice: sentence-case ITALIC prose at micro — the register the rail's ghost
+// hints already speak in, which is exactly what a caption is (an explanatory aside, not data).
+// The register took three passes to land (user, 2026-08-16): plain prose at text-label blended
+// into the rows (the signer ids sit in the same grey), caps-micro read as structure but LOUD —
+// "should these be normal text instead of the square all-caps?" — so the distinguishers are
+// now SIZE (micro, below every row) and VOICE (italic, which no data row uses), not case.
 // Not a control: plain <p>, no hover wash, the `title` carries the long explanation.
 export function DepthCaption({ title, children }: { title?: string; children: React.ReactNode }) {
   return (
-    <p className="flex flex-wrap items-baseline gap-x-1 w-full py-1 pl-2 pr-7 text-micro uppercase tracking-caps leading-4 text-muted-foreground/70" title={title}>
+    <p className="flex flex-wrap items-baseline gap-x-1 w-full py-1 pl-2 pr-7 text-micro italic leading-4 text-muted-foreground" title={title}>
       {children}
     </p>
   );
