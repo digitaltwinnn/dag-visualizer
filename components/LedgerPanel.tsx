@@ -267,8 +267,10 @@ function SignerList({
           is reachable here: `signersOf` reads the tick's exact read, and the data-block signers
           exist only in the ~2.5 MB deep read, which browsing must never trigger. */}
       <DepthCaption title={SIGNER_GROUPS.proof.title}>
+        {/* The count inherits the caption's own quiet voice — a bold foreground number made the
+            caption louder than the rows it introduces (user, 2026-08-16). */}
         <span>Signed by</span>
-        <span className="tabular-nums font-semibold text-foreground-dim">{ids.length}</span>
+        <span className="tabular-nums">{ids.length}</span>
         <LayerWho who={SIGNER_GROUPS.proof.who} />
       </DepthCaption>
       {ids.map((sid) => {

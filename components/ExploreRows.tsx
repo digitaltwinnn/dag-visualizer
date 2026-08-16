@@ -57,12 +57,14 @@ const NO_PAIR = () => {};
 // (the raw pane's lane tabs, the shape table's heads). It started in the prose register and
 // blended straight into the rows (user, 2026-08-16 — the signer list's grey mono ids sat in
 // the same hue and weight); uppercase at micro is the one register no data row uses, so the
-// caption reads as structure at a glance. Content is written in sentence case and LABEL
+// caption reads as structure at a glance — at 70% alpha and tight leading (user, 2026-08-16:
+// full-strength caps read LOUD, especially wrapped), quieter than any row while still apart
+// from them. Content is written in sentence case and LABEL
 // length (see compositionClause) — CSS does the shouting, so `title`/copy stay readable.
 // Not a control: plain <p>, no hover wash, the `title` carries the long explanation.
 export function DepthCaption({ title, children }: { title?: string; children: React.ReactNode }) {
   return (
-    <p className="flex items-baseline gap-1 w-full py-1 pl-2 pr-7 text-micro uppercase tracking-caps text-muted-foreground" title={title}>
+    <p className="flex flex-wrap items-baseline gap-x-1 w-full py-1 pl-2 pr-7 text-micro uppercase tracking-caps leading-4 text-muted-foreground/70" title={title}>
       {children}
     </p>
   );
