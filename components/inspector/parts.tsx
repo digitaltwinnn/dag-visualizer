@@ -1,7 +1,7 @@
 "use client";
 
 import { Fragment, useRef, useState, type ReactNode } from "react";
-import { Check, Copy } from "lucide-react";
+import { Check, Copy, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -22,7 +22,8 @@ import { compositionRows } from "@/src/data/composition";
 // lives with SIGNER_GROUPS in src/data/network.ts). A second long-form map ("currency-L1",
 // "data-L1") used to sit here and fed the composition `parts` strings, so the same layer could
 // read two ways within one card — the chips beside them have always used these codes.
-export const ROLE_SHORT: Record<string, string> = { l0: "L0", cl1: "cL1", dl1: "dL1" };
+import { ROLE_SHORT } from "@/src/data/composition";
+export { ROLE_SHORT }; // ONE home for the layer-code map (2026-08-16) — this is a re-export
 export const ROLE_ORDER = ["l0", "cl1", "dl1"];
 
 // ── The card body's ONE row grammar, in three weights (user, 2026-08-10) ────────────────────
@@ -201,6 +202,18 @@ export function IdentityDot({ hue }: { hue: string }) {
   return <span className="w-2 h-2 rounded-full flex-none" style={{ background: hue }} aria-hidden />;
 }
 
+/** The Yes/No FACT mark (user, 2026-08-16 — "yes has a checkmark, so for no add a x"): Yes
+ *  takes the check, No an ✕, BOTH at soft tints — the status pill's own discipline ("even the
+ *  green stays un-dominant"); a raw `--success` glyph read stronger than anything else on the
+ *  card. One component so the two Yes/No rows (Full archive, Delegated staking) can't drift. */
+export function BoolMark({ on }: { on: boolean }) {
+  return on ? (
+    <Check aria-hidden className="size-3" style={{ color: "color-mix(in oklch, var(--success) 72%, transparent)" }} />
+  ) : (
+    <X aria-hidden className="size-3 text-muted-foreground/70" />
+  );
+}
+
 // The ONE status pill chrome (user, 2026-07-12 — unified: ready used to render as plain bold
 // green text while every other state got a pill, which read as an inconsistency next to the
 // dossier's breakdown). Quiet by construction: the state's bucket colour at soft tint alphas
@@ -268,6 +281,21 @@ export function StatusBreakdown({ states }: { states: (string | null | undefined
 // node card's subtitle, the dossier's composition rows). User, 2026-07-12: the joined
 // "L0·cL1" text read as one mushy token; separate squared pills scan as discrete units.
 // Taxonomy chrome, not identity — muted text on the faint wash, never hued.
+/** A signer group's `who` phrase ("L0 validators") with the layer code as the square pill —
+ *  the composition chips' own vocabulary (user, 2026-08-16). ONE renderer so every surface
+ *  showing the phrase (the explorer's depth caption, the snapshot cards' Signed-by rows) draws
+ *  it the same way; `title=` strings keep the plain one-home text, since a tooltip can't hold a
+ *  chip. Parses the code out of SIGNER_GROUPS' string rather than hardcoding a second copy. */
+export function LayerWho({ who }: { who: string }) {
+  const [code, ...rest] = who.split(" ");
+  return (
+    <span className="inline-flex items-center gap-1">
+      <RoleChips codes={[code]} />
+      <span>{rest.join(" ")}</span>
+    </span>
+  );
+}
+
 export function RoleChips({ codes }: { codes: string[] }) {
   return (
     <span className="inline-flex items-center gap-1">

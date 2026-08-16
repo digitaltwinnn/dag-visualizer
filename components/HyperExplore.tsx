@@ -3,8 +3,8 @@
 import { cn } from "@/lib/utils";
 import { useStore } from "@/src/store/store";
 import ExplorerShell from "@/components/ExplorerShell";
-import { CORE_HEX, metagraphById } from "@/src/data/network";
-import { compositionGroups } from "@/src/data/composition";
+import { metagraphById } from "@/src/data/network";
+import { compositionGroups, compositionClause } from "@/src/data/composition";
 import { identityHudHex } from "@/src/palette/identity";
 import { IdentityDot, RoleChips } from "@/components/inspector/parts";
 import { SelectedRowMark, selectedRow, selectionHue } from "@/components/selection";
@@ -13,7 +13,7 @@ import { compositionToggleActions, filterToggleActions, nodeSelectActions } from
 import { applyClickActions } from "@/src/store/applyClickActions";
 import { subjectPairing } from "@/components/useSubjectPairing";
 import { useLadderFocus } from "@/components/useLadderFocus";
-import { DisclosureChevron, DisclosureRow, NodePickerRow, ROW_NEST, ROW_OUTSET } from "@/components/ExploreRows";
+import { DepthCaption, DisclosureChevron, DisclosureRow, NodePickerRow, ROW_NEST, ROW_OUTSET } from "@/components/ExploreRows";
 import type { NodeRow } from "@/src/data/types";
 
 // Hypergraph's single **explore** card — the architectural sibling of GeoExplore: each view's
@@ -96,7 +96,7 @@ export default function HyperExplore() {
       {[...metaList].sort((a, b) => b.nodes.length - a.nodes.length).map((m) => {
               const cfg = metagraphById(m.id);
               const name = cfg?.name ?? m.id;
-              const hue = m.id === "dag" ? CORE_HEX : identityHudHex(m.id);
+              const hue = identityHudHex(m.id);
               const open = m.id === filter;
               // Bidirectional pairing on the SAME channel the 3D hubs and the dossier use:
               // hovering the row previews the selection dim in the scene, hovering the hub
@@ -127,6 +127,7 @@ export default function HyperExplore() {
                     title={`${name} · ${m.nodes.length} node${m.nodes.length === 1 ? "" : "s"}`}
                     onClick={() => toggleNetwork(m.id)}
                     onMouseEnter={pair.onMouseEnter}
+      onMouseMove={pair.onMouseMove}
                     onMouseLeave={pair.onMouseLeave}
                     onFocus={pair.onFocus}
                     onBlur={pair.onBlur}
@@ -137,7 +138,7 @@ export default function HyperExplore() {
                     </span>
                     <span className="flex-none text-right text-body tabular-nums font-semibold">{m.nodes.length}</span>
                     {open ? (
-                      <SelectedRowMark className="flex-none" muted={focus !== "context"} />
+                      <SelectedRowMark className="flex-none" muted={focus !== "context"} hue={hue} />
                     ) : (
                       <DisclosureChevron open={open} />
                     )}
@@ -165,12 +166,15 @@ export default function HyperExplore() {
                       ) : (
                         (() => {
                           const groups = compositionGroups(selNodes);
+                          // Depth caption (user, 2026-08-16): this depth's one new concept — the
+                          // network's machines grouped by role make-up.
+                          const caption = <DepthCaption key="caption">Nodes by composition</DepthCaption>;
                           // The label column sizes to the LONGEST label PRESENT (user — a fixed
                           // width left dead air when only short words showed): every label span
                           // stacks an invisible copy of the longest word behind its own text
                           // (the inline-grid overlap sizer), so the pill column aligns AND hugs.
                           const longest = groups.reduce((a, g) => (g.label.length > a.length ? g.label : a), "");
-                          return groups.map((g) => {
+                          return [caption, ...groups.map((g) => {
                           const key = `${m.id}|${g.key}`;
                           const isOpen = openCompKey === g.key;
                           const holdsSel =
@@ -207,6 +211,24 @@ export default function HyperExplore() {
 
                               {isOpen && (
                                 <div className="mb-1 ml-[7px] pl-2 border-l border-border">
+                                  {/* Depth caption (user, 2026-08-16, twice refined — first to the
+                                      group's codes, then past them: "rather than repeating its
+                                      parent, say what it DOES"): the parent row already names the
+                                      label and the chips, so the caption states the FUNCTION —
+                                      "Nodes that seal the network's snapshots" — composed per code
+                                      from compositionClause (one home, src/data/composition.ts).
+                                      A composition with no known clause falls back to the codes'
+                                      "…validators" form rather than saying nothing wrong. */}
+                                  <DepthCaption>
+                                    {compositionClause(g.codes) ? (
+                                      <span>Nodes that {compositionClause(g.codes)}</span>
+                                    ) : (
+                                      <span className="inline-flex items-center gap-1">
+                                        <RoleChips codes={g.codes} />
+                                        <span>validators</span>
+                                      </span>
+                                    )}
+                                  </DepthCaption>
                                   {g.rows.map((r, i) => {
                                     const on =
                                       selIp != null &&
@@ -226,7 +248,7 @@ export default function HyperExplore() {
                               )}
                             </div>
                           );
-                          });
+                          })];
                         })()
                       )}
                     </div>

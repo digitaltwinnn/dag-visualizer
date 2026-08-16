@@ -125,6 +125,20 @@ function applyOrbFresnel(mat: THREE.MeshStandardMaterial): void {
 // builds — scene/Globe.ts (via `layers.metas.find`, keying off `.cfg.id`/`.group`) and
 // Engine.ts (`.cfg.id` lookups for DoF/filter) read these fields off the instances handed
 // to them, so this type must track _buildMetagraphs verbatim).
+// HYPER's SUBJECT-ARRIVAL beat (the Engine's begin/release contract, user 2026-08-16 — every
+// view animates its view-specific subjects as the final construction part): the TETHERS — the
+// anchoring relationships, hyper's analogue of the chamber's ribbons — sweep OUT from the core
+// to each hub (~0.7s, staggered per hub) once the choreography settles. Implemented in the
+// existing per-frame tether write: each vertex's fraction is scaled by the eased entry, so the
+// line literally grows core→hub with its baked colour profile riding along.
+
+// NO FURNITURE LABELS IN HYPER (user, 2026-08-15, two reversals the same day): per-hub ticker
+// labels AND the core's "Global L0" were both built and removed after live review — text under
+// the orbiting structure read as clutter that the identity hues, the hover tooltip and the
+// subject callout already answer, and the About card carries the architecture story. The
+// in-scene text mechanism (objects/TextLabel.ts) lives on in geo's hosting-country names;
+// don't re-grow hyper labels without a live look first.
+
 export interface MetaHubRec {
   group: THREE.Group;
   hub: THREE.Mesh;
@@ -154,6 +168,8 @@ export class HyperView implements SceneView {
   pickables: THREE.Object3D[];
   metas: MetaHubRec[];
   sceneColors: Record<string, number> | null;
+  private _tetherEntryT = 1;
+  private _tetherEntryHold = false;
   clock: number;
   focusId: string | null;
   ledger: boolean;
@@ -507,6 +523,17 @@ export class HyperView implements SceneView {
   // (Re)build the DAG core's tilted cyan hoops — one per ring of each armillary shell (L0 ball +
   // the separated $DAG L1 outer shell) — matching the node rings Globe placed. Called from
   // Globe.setNodes whenever the validator set changes.
+  /** Arm hyper's subject-arrival beat — tethers held at the core until releaseEntry. */
+  beginEntry(): void {
+    this._tetherEntryT = 0;
+    this._tetherEntryHold = true;
+  }
+
+  /** The choreography settled — the tethers sweep out to their hubs. */
+  releaseEntry(): void {
+    this._tetherEntryHold = false;
+  }
+
   buildCoreRings(shells: { radius: number; numRings: number; tilt: number; code: string }[]) {
     for (const h of this._coreRings) {
       this.coreGroup.remove(h);
@@ -617,7 +644,15 @@ export class HyperView implements SceneView {
     // orbits off (hubOrbits) — the two freezes are independent but drive the same hold.
     const frozen = this.focusId != null || !this.hubOrbits;
     const tetherOp = this.tetherTune.restOp; // hoisted: one property load per frame, not per hub
+    // The arrival beat's clock (see beginEntry) — parked at 1 in steady state.
+    if (!this._tetherEntryHold && this._tetherEntryT < 1)
+      this._tetherEntryT = Math.min(1, this._tetherEntryT + dt / 0.7);
+    let hubIdx = -1;
     for (const m of this.metas) {
+      hubIdx++;
+      // Per-hub eased sweep, staggered so the tethers reach their hubs one after another.
+      const tp = Math.min(1, Math.max(0, this._tetherEntryT * 1.35 - hubIdx * 0.045));
+      const tSweep = tp * tp * (3 - 2 * tp);
       if (!frozen) m.orbit += dt * 0.03;
       const a = m.orbit;
       // Scratch vector reused every frame — this runs for all 10 hubs at 60fps, so a fresh
@@ -653,7 +688,7 @@ export class HyperView implements SceneView {
       // attribute (_bakeTethers); this only moves the line.
       const tetherPos = m.tether.geometry.attributes.position;
       for (let j = 1; j <= TETHER_SEG; j++) {
-        const f = TETHER_F[j];
+        const f = TETHER_F[j] * tSweep; // the arrival sweep: the line grows core→hub
         tetherPos.setXYZ(j, _pos.x * f, _pos.y * f, _pos.z * f);
       }
       tetherPos.needsUpdate = true;
@@ -664,6 +699,7 @@ export class HyperView implements SceneView {
       // The rim-fill disks fade with the hoops (populated rings only — empty ones were hidden).
       const fillOp = FILL_OP * metaF * (m.active ? 1 : 0.7) * fdim;
       for (const f of m.fills) (f.material as THREE.MeshBasicMaterial).opacity = fillOp * this._fades.alpha;
+
 
 
       // Anchor packets: launch one per pending snapshot (staggered), advance the in-flight ones

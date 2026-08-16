@@ -11,6 +11,9 @@ import RailScroll from "@/components/RailScroll";
 import FollowController from "@/components/FollowController";
 import RawSnapshotBridge from "@/components/RawSnapshotBridge";
 import Tooltip from "@/components/Tooltip";
+import HintTips from "@/components/HintTips";
+import SceneCallout from "@/components/SceneCallout";
+import DevCssCanary from "@/components/DevCssCanary";
 import SectionShell from "@/components/SectionShell";
 import DataSection from "@/components/DataSection";
 
@@ -33,6 +36,14 @@ export default function Home() {
       <SectionShell scene={<SceneCanvas />} raw={<DataSection />} strip={<BottomStream />}>
         <Blueprint />
         <BootOverlay />
+        {/* The subject callout lives INSIDE the shell (user, 2026-08-16 — it painted over the
+            rail cards): its z-[5] must compete in the SAME stacking context as the rails' z-10,
+            and outside the shell it compared against the whole shell at z-auto instead. The
+            shell's transform is IDENTITY at rest (CSS trap 2's load-bearing arrangement), so the
+            Engine's canvas-rect coordinates resolve the same fixed box the rails use; during the
+            depth transition the shell scales, but the callout has already hidden itself (it only
+            renders in the scene pose). */}
+        <SceneCallout />
         <ExploreRail />
         <Inspector />
         <PhoneDockSweep />
@@ -42,6 +53,10 @@ export default function Home() {
       <FollowController />
       <RawSnapshotBridge />
       <Tooltip />
+      {/* Styled replacement for the native `title` bubble — delegated, so every title= in the
+          app inherits the design (user, 2026-08-16). */}
+      <HintTips />
+      <DevCssCanary />
     </main>
   );
 }

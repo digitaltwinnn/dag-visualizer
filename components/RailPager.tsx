@@ -17,9 +17,15 @@
 // is honest about the edge); a completed drag swallows the trailing click so the card underneath
 // never mis-fires. It commits on RELEASE TRAVEL or on a FLICK — a fast short throw is the dominant
 // phone paging gesture, and without a velocity rule it read as "the swipe didn't work" (the card
-// sprang back and nothing happened). Keyboard: ←/→ while focus is inside the card. The step itself
-// swaps the subject in place — the card's own title roll-in + edge pulse are the arrival signal, so
-// the wrapper only snaps its transform back.
+// sprang back and nothing happened). Keyboard: ←/→ while focus is inside the card. A committed
+// step plays the ACCORDION (user, 2026-08-16, superseding the 2026-08-15 out/blank/in
+// follow-through): the outgoing card is snapshotted as a sanitized static clone and the two
+// slide together on the shared `--ease-spring` — old out the throw side, new in from the other —
+// so the step reads as adjacent cards moving while the lane still holds exactly ONE live card.
+// The plank's chevrons and the arrow keys ride the same path, so every step speaks one
+// directional language. A cancelled drag snaps back on the same spring. The store commit runs
+// before the slide starts, with both cards at rest — the measured 233ms subject-swap stall
+// (store write, engine focus/camera, Inspector re-render) lands where nothing is animating.
 //
 // The drag transform is written STRAIGHT TO THE NODE, not through React state (2026-08-13): a
 // `setDx` per pointermove re-rendered this wrapper 60-120×/s mid-drag, and it subscribes to a
@@ -46,6 +52,7 @@
 //     with the title roll-in and edge pulse that already answer the step.
 // The actionable half of the challenge was the FEEL, which is the flick and the render fix above.
 import {
+  useEffect,
   useMemo,
   useRef,
   type KeyboardEvent,
@@ -67,12 +74,19 @@ import type { RailCardKind } from "@/components/railCards";
 
 const ENGAGE_PX = 14; // horizontal travel before the drag claims the pointer
 const STEP_PX = 48; // release travel that commits a step
-const DRAG_LIMIT = 84; // damped travel cap mid-set
-const END_LIMIT = 26; // hard-stop cap past either end (the no-wrap resistance)
+const DRAG_LIMIT = 84; // rubber-band asymptote mid-set
+const END_LIMIT = 26; // rubber-band asymptote past either end (the no-wrap resistance)
 // The travel damping (0.55) is DELIBERATE and stays: there is no neighbour rendered behind the
 // card, so a 1:1 follow would promise a reveal that isn't there. The drag is an affordance saying
 // "you are pulling something that will change", not a spatial transition.
 const DAMP = 0.55;
+// Progressive resistance toward an asymptote `d` (the iOS rubber-band curve) — identity-sloped at
+// 0 so the drag starts 1:1 with the damped travel, never reaching `d` so there is no hard stop.
+const rubber = (x: number, d: number) => Math.sign(x) * d * (1 - 1 / (Math.abs(x) / d + 1));
+// The accordion slide's tempo — one spring for both cards (the shared gesture physics).
+// 380 → 560 (user, 2026-08-16: "a bit smoother, it feels too rushed") — the spring curve does
+// most of its travel early, so the longer clock reads as calm follow-through, not slowness.
+const SLIDE_MS = 560;
 const FLICK_V = 0.35; // px/ms at release — a throw this fast commits regardless of travel. Measured
 // live rather than guessed: a deliberate slow pull the user means to cancel runs ~0.11 px/ms, and a
 // quick 30px throw ~0.42-0.6, so the gate sits between them (Hammer's own swipe default is 0.3).
@@ -155,10 +169,74 @@ export default function RailPager({ slot, children }: { slot: RailCardKind; chil
     if (it) applyClickActions(it.actions);
   };
 
+  // THE ACCORDION (user, 2026-08-16 — "draw the new card already next to the old and move it";
+  // supersedes the out/blank/in follow-through of 2026-08-15). The lane still holds exactly ONE
+  // live card (the Embla decline stands): the outgoing card is snapshotted as a STATIC DOM
+  // clone — sanitized of `.ig-panel`/`.rail-entry`/ids so the RailThread's measurement and the
+  // slab's `:has()` selectors can't see it — the store commits immediately (the subject-swap
+  // work lands while both cards are still at rest), and then clone and real card slide together
+  // on the shared spring: old out the throw side, new in from the other. `pending` holds the
+  // visual cleanup; a new pointerdown finishes it instantly (the commit has already run, so a
+  // swipe can never silently not-commit).
+  const pending = useRef<{ t: ReturnType<typeof setTimeout>; fin: () => void } | null>(null);
+  useEffect(() => () => { if (pending.current) { clearTimeout(pending.current.t); pending.current.fin(); } }, []);
+  const settlePending = () => {
+    const p = pending.current;
+    if (!p) return;
+    pending.current = null;
+    clearTimeout(p.t);
+    p.fin();
+  };
+  const commitStep = (dir: -1 | 1) => {
+    if (!set?.items[set.index + dir]) return;
+    const el = wrap.current;
+    const parent = el?.parentElement;
+    const reduced = typeof matchMedia === "function" && matchMedia("(prefers-reduced-motion: reduce)").matches;
+    if (!el || !parent || reduced) {
+      // Reduced motion: the swap is instant — the title roll-in's own guard handles the rest.
+      step(dir);
+      setTx(0, false);
+      return;
+    }
+    settlePending();
+    const w = el.offsetWidth;
+    const dragged = el.style.transform; // carry the finger's displacement into the slide
+    const clone = el.cloneNode(true) as HTMLElement;
+    for (const n of clone.querySelectorAll("[id]")) n.removeAttribute("id");
+    for (const n of clone.querySelectorAll(".ig-panel, .rail-entry")) n.classList.remove("ig-panel", "rail-entry");
+    clone.classList.remove("ig-panel", "rail-entry");
+    clone.setAttribute("aria-hidden", "true");
+    clone.style.cssText = `position:absolute;left:0;top:0;width:${w}px;margin:0;pointer-events:none;transition:none;`;
+    clone.style.transform = dragged;
+    const prevPos = parent.style.position;
+    const prevOverflow = parent.style.overflow;
+    parent.style.position = "relative";
+    parent.style.overflow = "hidden"; // clip the adjacent slide to the lane
+    parent.appendChild(clone);
+    step(dir); // the heavy subject swap runs NOW, with both cards visible and at rest
+    el.style.transition = "none";
+    el.style.transform = `translateX(${dir * w}px)`; // the new card waits just offstage
+    void el.offsetWidth; // flush, so both start their slide together
+    el.style.transition = `transform ${SLIDE_MS}ms var(--ease-spring)`;
+    el.style.transform = "";
+    clone.style.transition = `transform ${SLIDE_MS}ms var(--ease-spring), opacity ${SLIDE_MS}ms ease-out`;
+    clone.style.transform = `translateX(${-dir * w}px)`;
+    clone.style.opacity = "0.5"; // a light fade as it leaves — motion carries the story
+    const fin = () => {
+      clone.remove();
+      parent.style.position = prevPos;
+      parent.style.overflow = prevOverflow;
+      el.style.transition = "none";
+      el.style.transform = "";
+    };
+    pending.current = { fin, t: setTimeout(() => { pending.current = null; fin(); }, SLIDE_MS + 40) };
+  };
+
   if (!set) return <>{children}</>;
 
   const onPointerDown = (e: PointerEvent<HTMLDivElement>) => {
     if (e.pointerType === "mouse" && e.button !== 0) return;
+    settlePending();
     start.current = { x: e.clientX, y: e.clientY, id: e.pointerId };
     engaged.current = false;
     trail.current = [{ x: e.clientX, t: e.timeStamp }];
@@ -178,8 +256,10 @@ export default function RailPager({ slot, children }: { slot: RailCardKind; chil
     trail.current.push({ x: e.clientX, t });
     while (trail.current.length > 1 && t - trail.current[0].t > FLICK_MS) trail.current.shift();
     const atEnd = (ddx < 0 && set.index >= set.items.length - 1) || (ddx > 0 && set.index <= 0);
-    const lim = atEnd ? END_LIMIT : DRAG_LIMIT;
-    setTx(Math.max(-lim, Math.min(lim, ddx * DAMP)), false);
+    // Progressive rubber-band toward the limit (was a hard clamp): resistance grows with travel
+    // and the limit is an asymptote, so the pull never hits a wall — the END limit is short and
+    // firm (the no-wrap answer), the mid-set one longer and softer.
+    setTx(rubber(ddx * DAMP, atEnd ? END_LIMIT : DRAG_LIMIT), false);
   };
   const endDrag = (e: PointerEvent<HTMLDivElement>) => {
     const st = start.current;
@@ -195,7 +275,11 @@ export default function RailPager({ slot, children }: { slot: RailCardKind; chil
       // and the travel rule below still answers it.
       const flick =
         Math.abs(v) >= FLICK_V && Math.abs(ddx) >= ENGAGE_PX && Math.sign(v) === Math.sign(ddx);
-      if (Math.abs(ddx) >= STEP_PX || flick) step(ddx < 0 ? 1 : -1);
+      if (Math.abs(ddx) >= STEP_PX || flick) {
+        commitStep(ddx < 0 ? 1 : -1);
+        trail.current.length = 0;
+        return; // commitStep owns the motion from here — no snap-back on top of the follow-through
+      }
     }
     trail.current.length = 0;
     setTx(0, true);
@@ -212,7 +296,7 @@ export default function RailPager({ slot, children }: { slot: RailCardKind; chil
     const t = e.target as HTMLElement;
     if (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.isContentEditable) return;
     e.preventDefault();
-    step(e.key === "ArrowLeft" ? -1 : 1);
+    commitStep(e.key === "ArrowLeft" ? -1 : 1);
   };
 
   const prev = set.items[set.index - 1];
@@ -235,7 +319,7 @@ export default function RailPager({ slot, children }: { slot: RailCardKind; chil
         // full-bleeds to the panel's bottom edge. Without it the plate would stop at the default
         // 18 and leave the plank floating on bare glass below its own ground; with it the plank
         // and its hairline (siblings of the panel, so painted after it) ride ON the plate.
-        className="relative touch-pan-y select-none transition-transform duration-200 ease-out motion-reduce:transition-none [--pager-strip:36px] [--foot-bleed:var(--pager-strip)] [&>.ig-panel]:pb-[var(--pager-strip)]"
+        className="relative touch-pan-y select-none transition-transform duration-[380ms] ease-[var(--ease-spring)] motion-reduce:transition-none [--pager-strip:36px] [--foot-bleed:var(--pager-strip)] [&>.ig-panel]:pb-[var(--pager-strip)]"
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
         onPointerUp={endDrag}
@@ -274,7 +358,7 @@ export default function RailPager({ slot, children }: { slot: RailCardKind; chil
             size="icon-xs"
             className="size-5"
             disabled={!prev}
-            onClick={() => step(-1)}
+            onClick={() => commitStep(-1)}
             aria-label={prev ? `Previous: ${prev.label}` : "Previous"}
             title={prev?.label}
           >
@@ -291,7 +375,7 @@ export default function RailPager({ slot, children }: { slot: RailCardKind; chil
             size="icon-xs"
             className="size-5"
             disabled={!next}
-            onClick={() => step(1)}
+            onClick={() => commitStep(1)}
             aria-label={next ? `Next: ${next.label}` : "Next"}
             title={next?.label}
           >

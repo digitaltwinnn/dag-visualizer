@@ -23,7 +23,7 @@ import { readSceneColors } from "./sceneColors";
 import { VIEW_POLICIES, type ViewPolicy } from "./domain/viewPolicy";
 import { FOCI, hubFraming, geoFraming, nodeFraming, cohortFraming, ledgerCommitTilt, dollyBack, railsLean, restOrbit, easeInOutQuad, isSamePose, nudgeMix, NUDGE_DUR, type CameraFraming, type FocusName } from "./domain/cameraRig";
 import { countryFraming } from "./domain/countryShape";
-import { R as GEO_R, LAND_H } from "./domain/geoLayout";
+import { R as GEO_R, LAND_H, latLonToVec3 } from "./domain/geoLayout";
 import { clickActions, pickActive, pickNetId, viewEntryActions, metaSnapSelectActions, bandSelectActions } from "./domain/pickActions";
 import { ViewTransition, is3D } from "./domain/viewTransition";
 import { gatherBand, type GatherBand } from "./domain/gatherLayout";
@@ -84,6 +84,16 @@ export class Engine {
   private raf = 0;
   private disposed = false;
   private _dofTmp = new THREE.Vector3();
+  private _calloutV = new THREE.Vector3(); // scratch: the subject callout's anchor, world → NDC
+  // Geo callout anchors, cached EVENT-TIME (latLonToVec3 allocates and ring extraction is
+  // heavy — neither may run per frame): the node anchor recomputes when the pick REFERENCE
+  // changes, the country centroid when the cc string does; the cohort dir is already
+  // event-time in Globe and read through its getter.
+  private _geoNodePick: unknown = null;
+  private _geoNodeLocal = new THREE.Vector3();
+  private _geoCcKey: string | null = null;
+  private _geoCcDir = new THREE.Vector3();
+  private _geoCcOk = false;
 
   private mode: Mode = "hyper";
   // This frame's view-policy row (domain/viewPolicy.ts), resolved once in _integrateInputs and
@@ -527,6 +537,10 @@ export class Engine {
         // A landing EXACT read is what turns a tick from an unmeasured seam into a measured byte
         // bar (spec §6.3), so re-hand the map the moment it changes. Ledger-only: nothing else
         // reads it from the scene, and the view re-reads it on entry via _refreshLedger.
+        // The forming block's GIVE-UP path (user, 2026-08-16 — every acquiring state needs
+        // one): a FAILED exact read must stop the pulse, or it promises an arrival that isn't
+        // coming (bounded by the next tick, but the card rules call that a hang).
+        if (st.exactMiss !== prev.exactMiss) this.ledger.setExactMisses(st.exactMiss);
         if (st.snapshotExact !== prev.snapshotExact) {
           if (this.mode === "ledger") this.ledger.setExact(st.snapshotExact);
           // event-time: one pass per landing exact read, over a ~30-entry record. Gated on the
@@ -545,6 +559,8 @@ export class Engine {
         // prefixes are resolved against the live metaList before reaching the glow set.
         if (st.metaSnap !== prev.metaSnap || st.metaSnapDeep !== prev.metaSnapDeep || st.metaList !== prev.metaList) {
           const sel = st.metaSnap;
+          // The callout's tile anchor rides the same commit (see LedgerView.setSelectedTile).
+          this.ledger.setSelectedTile(sel ? { metaId: sel.metaId, ordinal: sel.ordinal } : null);
           if (!sel) this.globe.setSignerIds(null);
           else {
             const deep = st.metaSnapDeep[metaSnapDeepKey(sel.globalOrdinal, sel.metaId, sel.ordinal)];
@@ -884,7 +900,28 @@ export class Engine {
   // Reached ONLY via _applyBoundary, whose `dest` is always a 3D view (hyper/geo/ledger) —
   // flat/"soon" views never route here (they PARK the fleet and never apply a destination
   // layout, see setMode's !is3D branch). So there is no flat-view reset case below.
+  // The per-view owner of the subject-arrival beat (see _applyDestLayout's note).
+  private _entryViewFor(mode: Mode): { beginEntry(): void; releaseEntry(): void } | null {
+    if (mode === "ledger") return this.ledger;
+    if (mode === "geo") return this.globe;
+    if (mode === "hyper") return this.layers;
+    return null;
+  }
+
   private _applyDestLayout(mode: Mode) {
+    // THE SUBJECT-ARRIVAL BEAT (user, 2026-08-16 — "give each view a place to animate their
+    // view-specific subjects as the final view construction part"): every 3D view owns a
+    // begin/release pair — armed here as the destination layout lands, held through the
+    // choreography, RELEASED at the transition's completion edge as the scene's closing beat
+    // (ledger: the snapshot drop; geo: the density glow breathing in under the stacks; hyper:
+    // the tethers sweeping out from the core). A direct arrival with no transition releases
+    // immediately. (⚠️ 2026-08-16: the ledger call was silently LOST once by an edit anchored
+    // on a wrong parameter name — the effect ran nowhere while every test passed.)
+    const entryView = this._entryViewFor(mode);
+    if (entryView) {
+      entryView.beginEntry();
+      if (!this.transition.active()) entryView.releaseEntry();
+    }
     // Snapshots view reuses the SAME hub/node meshes, laid into planar rows / lanes. These are the
     // boundary-only layout snaps (invisible: the nodes are gathered): the hyper furniture hard
     // hide/show and the node lane placement.
@@ -1219,11 +1256,25 @@ export class Engine {
 
   // Hover tooltip: only writes the store when the hovered target changes (not per
   // pixel); the Tooltip component positions itself from the pointer.
+
+  // Picking stays suppressed while the transition MISLEADS — but not a moment longer (user,
+  // 2026-08-16: "when I arrive in hyper I can't click a node ... at some moment it starts to
+  // work"). The full choreography runs ~3.9s while the destination READS ready after ~1.9s
+  // (furniture built, most nodes landed): the OUT phase and early IN stay suppressed (nodes
+  // bunched at the staging grid — a ray there hits the wrong machine), but once the disperse
+  // ramp passes 0.6 the fleet is in its ease-out tail, converging on real positions, and a
+  // click means what it looks like. `settleAlpha` is the same ramp the geo glow rides.
+  private _pickSuppressed(): boolean {
+    if (!this.transition.active()) return false;
+    if (this.transition.phase !== "in") return true;
+    return !is3D(this.mode) || this.transition.settleAlpha(this.mode) < 0.6;
+  }
+
   private _handleMove(e: MouseEvent) {
     // Mid-drag (orbiting): no hover picking — raycasting the planes every move would flicker the
     // layer highlight across the stack while the user is just navigating.
     if (e.buttons !== 0) return;
-    if (this.transition.active()) return; // nodes are mid-flight; raycasting moving targets misleads (spec)
+    if (this._pickSuppressed()) return; // early flight only — see the note on _pickSuppressed
     const p = this._pickAt(e);
     this.canvas.style.cursor = p ? "pointer" : "grab";
     const st = useStore.getState();
@@ -1277,7 +1328,7 @@ export class Engine {
     }
     // A click that ends a drag (orbit/pan) is navigation, not selection — see onDown.
     if (Math.hypot(e.clientX - this._downX, e.clientY - this._downY) > 5) return;
-    if (this.transition.active()) return; // nodes are mid-flight; raycasting moving targets misleads (spec)
+    if (this._pickSuppressed()) return; // early flight only — see the note on _pickSuppressed
     const p = this._pickAt(e);
     // With nothing picked, resolve the drillable country under the cursor (geo only — the
     // land-sphere hit is analytic; the Globe resolves WHICH country in its rotated frame).
@@ -1516,6 +1567,11 @@ export class Engine {
       this._resettleFocus = false;
       this._resolveFocus(); // a mid-OUT commit's framing was held — re-derive from committed state
     }
+    // The transition's completion edge releases the destination view's held subject-arrival
+    // beat — the choreography is over, the closing beat may play (see _applyDestLayout).
+    if (this._wasTransitionActive && !this.transition.active()) {
+      this._entryViewFor(this.mode)?.releaseEntry();
+    }
     this._wasTransitionActive = this.transition.active();
   }
 
@@ -1694,6 +1750,201 @@ export class Engine {
       // more background separation while focused).
       this.ctx.dof.uniforms["maxblur"].value = 0.16 * dofMix;
     }
+
+    this._syncCallout();
+  }
+
+  // ---- the subject callout (policy.callout) --------------------------------------------------
+  // components/SceneCallout.tsx renders the label; `#callout` is the marker contract, and the
+  // Engine owns only its per-frame PLACEMENT: the committed subject's rendered anchor projected
+  // to screen, written straight to the DOM — the Tooltip discipline, so following the subject
+  // never triggers a React render (getElementById survives the component's own remounts). The
+  // anchor reads the RENDERED world transform on purpose: a label must track where the object is
+  // THIS frame — orbit spin, structure tilt and morph included — this is not framing math.
+  // render-state OK. Hidden during the view transition (mid-flight positions mislead, same reason
+  // picking is suppressed), behind the camera, and wherever the policy or subject says no; the
+  // component independently declines to render the same cases from store state, so `data-on` is
+  // belt on top of braces, never the only gate.
+  private _syncCallout(): void {
+    const el = document.getElementById("callout");
+    if (!el) return;
+    let on = this._policy.callout && !this.transition.active();
+    if (on) {
+      const v = this._calloutV;
+      on =
+        this.mode === "geo"
+          ? this._geoCalloutAnchor(v)
+          : this.mode === "ledger"
+            ? this._ledgerCalloutAnchor(v)
+            : this._hyperCalloutAnchor(v);
+      if (on) {
+        v.applyMatrix4(this.ctx.camera.matrixWorldInverse); // world → view (camera looks −z)
+        if (v.z > -0.1) on = false; // behind (or grazing) the camera plane
+        else {
+          v.applyMatrix4(this.ctx.camera.projectionMatrix); // view → NDC (w-divide included)
+          const r = this.ctx.renderer.domElement.getBoundingClientRect();
+          const x = r.left + (v.x * 0.5 + 0.5) * r.width;
+          const y = r.top + (-v.y * 0.5 + 0.5) * r.height;
+          el.style.transform = `translate3d(${x.toFixed(1)}px, ${y.toFixed(1)}px, 0)`;
+          // Viewport flips (user, 2026-08-16): near the right edge the panel goes up-LEFT,
+          // near the top it drops BELOW the anchor — globals.css mirrors the geometry off
+          // these attributes (guarded writes, like data-on).
+          const flip = x > r.right - 320;
+          const drop = y < r.top + 170;
+          if ((el.dataset.flip != null) !== flip) {
+            if (flip) el.dataset.flip = "";
+            else delete el.dataset.flip;
+          }
+          if ((el.dataset.drop != null) !== drop) {
+            if (drop) el.dataset.drop = "";
+            else delete el.dataset.drop;
+          }
+        }
+      }
+    }
+    // Guard on the ELEMENT's own attribute, not a cached flag: React remounts the wrapper on a
+    // subject change (fresh data-on="0"), so a field would go stale exactly then.
+    const flag = on ? "1" : "0";
+    if (el.dataset.on !== flag) el.dataset.on = flag;
+  }
+
+  // HYPER anchors the committed NODE's own bead when one is committed (user, 2026-08-15 —
+  // clickable, has a card, so it gets its callout; the CAMERA still answers a node with its
+  // network's framing, but the label points at the thing itself), else the network's hub or
+  // the core. The label needs the RENDERED position, not a layout anchor — not framing math.
+  private _hyperCalloutAnchor(v: THREE.Vector3): boolean {
+    const st = useStore.getState();
+    const p = st.inspect;
+    // THE BOX LEADS (user, 2026-08-15): re-boxing an ancestor card (clicking a committed
+    // node's hub) steps the callout up to the network — the box is the subject, exactly as
+    // the camera answers it. SceneCallout mirrors this preference for the content.
+    if (
+      st.boxedCard !== "context" &&
+      p && (p.kind === "l0" || p.kind === "l1" || p.kind === "metanode") &&
+      this.globe.selectedNodeHyperAnchor(v)
+    ) {
+      this.globe.group.localToWorld(v); // the rendered structure transform — a label read. render-state OK
+      return true;
+    }
+    if (this.filter === "all") return false;
+    if (this.filter === "dag") {
+      this.layers.coreGroup.getWorldPosition(v); // render-state OK
+      return true;
+    }
+    if (!this._dofMeta) return false; // unlisted / unknown: no 3D anchor — honest absence
+    this._dofMeta.group.getWorldPosition(v); // render-state OK
+    return true;
+  }
+
+  // GEO anchors the finest committed rung with a POINT to point at — node > cohort > country.
+  // The network rung deliberately has none: a filtered fleet is spread across the globe, and a
+  // single anchor would lie about where it is (the component agrees and renders nothing).
+  // Anchors are globe-LOCAL surface points lifted just above the land, carried into world
+  // space through the rotating globe group each frame — a render-path label read, the same
+  // justification as the hyper anchors above.
+  private _geoCalloutAnchor(v: THREE.Vector3): boolean {
+    const st = useStore.getState();
+    const lift = GEO_R + LAND_H + 0.5;
+    // THE BOX LEADS (user, 2026-08-15), then the default finest-first order — a boxed rung
+    // whose anchor can't resolve falls through rather than blanking the callout.
+    const boxed = st.boxedCard;
+    const ok =
+      (boxed === "cohort" && this._geoAnchorCohort(st, v, lift)) ||
+      (boxed === "country" && this._geoAnchorCountry(st, v, lift)) ||
+      this._geoAnchorNode(st, v, lift) ||
+      this._geoAnchorCohort(st, v, lift) ||
+      this._geoAnchorCountry(st, v, lift);
+    if (!ok) return false;
+    this.globe.group.localToWorld(v); // the rendered globe rotation — a label read. render-state OK
+    return true;
+  }
+
+  private _geoAnchorNode(st: ReturnType<typeof useStore.getState>, v: THREE.Vector3, lift: number): boolean {
+    const p = st.inspect;
+    if (!p || (p.kind !== "l0" && p.kind !== "l1" && p.kind !== "metanode") || p.geo?.lat == null || p.geo.lon == null)
+      return false;
+    // THE chip, not the stack's base (user, 2026-08-15): the spotlight's own per-record
+    // resolution, exposed by Globe. The lat/lon surface point stays as the fallback for the
+    // brief window before the selection record resolves on fresh data.
+    if (!this.globe.selectedNodeAnchor(v)) {
+      if (this._geoNodePick !== p) {
+        this._geoNodePick = p;
+        this._geoNodeLocal.copy(latLonToVec3(p.geo.lat, p.geo.lon, lift)); // event-time
+      }
+      v.copy(this._geoNodeLocal);
+    }
+    return true;
+  }
+
+  private _geoAnchorCohort(st: ReturnType<typeof useStore.getState>, v: THREE.Vector3, lift: number): boolean {
+    if (!st.cohort) return false;
+    const d = this.globe.cohortAnchorDir;
+    if (!d) return false;
+    v.copy(d).multiplyScalar(lift);
+    return true;
+  }
+
+  private _geoAnchorCountry(st: ReturnType<typeof useStore.getState>, v: THREE.Vector3, lift: number): boolean {
+    if (!st.country) return false;
+    if (this._geoCcKey !== st.country) {
+      this._geoCcKey = st.country;
+      this._geoCcOk = this.globe.countryAnchorDir(st.country, this._geoCcDir); // event-time
+    }
+    if (!this._geoCcOk) return false;
+    v.copy(this._geoCcDir).multiplyScalar(lift);
+    return true;
+  }
+
+  // LEDGER anchors the pinned SNAPSHOT — the metagraph snapshot's lane lead, or the committed
+  // global tick's byte-bar lead one storey down. The rewind brings a committed row to the lead
+  // position, so the lead slot IS where the subject settles (LedgerView.calloutAnchor is pure
+  // layout data). An uncataloged channel's rows live on the unlisted lane.
+  private _ledgerCalloutAnchor(v: THREE.Vector3): boolean {
+    const st = useStore.getState();
+    // THE BOX LEADS (user, 2026-08-15/16): the boxed NODE card anchors the machine's own tray
+    // chip; the boxed GLOBAL card anchors the tick's bar — even while a finer subject stays
+    // committed. The boxed METAGRAPH card shows NOTHING (user, 2026-08-16 — like geo's network
+    // rung: a network in the chamber is a whole LANE, and a single anchor would lie about it).
+    // Then the default order: metagraph tile > global bar > tray node.
+    if (st.boxedCard === "context") return false;
+    if (st.boxedCard === "node" && this._ledgerNodeAnchor(st, v)) return true;
+    if (st.boxedCard === "snap" && st.snap) {
+      this._ledgerBarAnchor(v);
+      this.ledger.group.localToWorld(v); // render-state OK
+      return true;
+    }
+    if (st.metaSnap) {
+      // THE committed snapshot's tile (user, 2026-08-15), rewind offsets included; the lane
+      // lead stays as the fallback while the tile is off-trail (aged out of the window or not
+      // drawn this frame).
+      if (!this.ledger.selectedTileAnchor(v)) {
+        if (!this.ledger.calloutAnchor(st.metaSnap.metaId, v) && !this.ledger.calloutAnchor(UNLISTED_ID, v)) return false;
+      }
+    } else if (st.snap) {
+      this._ledgerBarAnchor(v);
+    } else if (this._ledgerNodeAnchor(st, v)) return true;
+    else return false;
+    this.ledger.group.localToWorld(v); // the rendered chamber transform — a label read. render-state OK
+    return true;
+  }
+
+  // The tick's byte-bar anchor: under a committed filter, the network's OWN band on the shown
+  // row (user, 2026-08-16 — "the correct segment of the byte bar"); unfiltered, or when the
+  // band isn't drawn (unmeasured tick), the bar's lead centre. Chamber-local (caller lifts).
+  private _ledgerBarAnchor(v: THREE.Vector3): void {
+    const lens = ledgerLens(this.filter);
+    if (lens !== "all" && this.ledger.bandAnchor(lens, v)) return;
+    this.ledger.calloutAnchor(null, v);
+  }
+
+  // The committed node's tray chip — the same `ledgerPos` its instance lerps to. The chips
+  // live in the GLOBE group's space (the fabric is shared), so the lift goes through it.
+  private _ledgerNodeAnchor(st: ReturnType<typeof useStore.getState>, v: THREE.Vector3): boolean {
+    const p = st.inspect;
+    if (!p || (p.kind !== "l0" && p.kind !== "l1" && p.kind !== "metanode")) return false;
+    if (!this.globe.selectedNodeLedgerAnchor(v)) return false;
+    this.globe.group.localToWorld(v); // render-state OK
+    return true;
   }
 
   /**

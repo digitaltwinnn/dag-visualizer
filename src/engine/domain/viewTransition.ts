@@ -111,6 +111,20 @@ export class ViewTransition {
     return this.phase === "out";
   }
 
+  /** How SETTLED the destination view's NODES are, 0..1 — the disperse ramp of the IN phase
+   *  (furnitureAlpha is the furniture's own faster build; this tracks the subjects). For
+   *  presentation that belongs to the nodes rather than the furniture — the geo density light
+   *  pools breathe in as the stacks land (user, 2026-08-16) — 1 when idle (data rebuilds
+   *  outside transitions are unaffected), 0 while the view is still being gathered toward. */
+  settleAlpha(view: View3D): number {
+    if (this.phase === "idle") return 1;
+    if (this.phase === "staged") return 0;
+    if (this.phase === "out") return view === this.from ? 1 : 0;
+    // phase === "in": nodes disperse toward `to` across the whole IN window.
+    if (view !== this.to) return 0;
+    return Math.min(1, Math.max(0, this.t / DUR_IN));
+  }
+
   // Begin or RETARGET a transition (spec: no teleports — weights stay continuous).
   start(from: View3D, to: View3D): void {
     if (this.phase === "idle") {

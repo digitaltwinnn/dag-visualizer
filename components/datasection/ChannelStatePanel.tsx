@@ -560,7 +560,12 @@ export function ChannelStatePanel() {
                   Every lane below is note → table → raw disclosure, in that order. `.slim-scroll`
                   is the app's one scrollbar recipe: an opened JSON tree genuinely scrolls both
                   ways, and the platform default read as a browser part laid over the glass. */}
-              <div className="min-h-0 flex-1 overflow-auto slim-scroll">
+              {/* The tab row's baseline hairline is this box's TOP edge — the content wears the
+                  matching side/bottom hairlines (user, 2026-08-16: "the tabs look disconnected
+                  from the content"), so the active tab visibly opens INTO the bounded panel
+                  (its panel-solid fill already bridges the baseline). Same border weight as the
+                  tabs' own (border/50); bottom corners pick up the pane radius. */}
+              <div className="min-h-0 flex-1 overflow-auto slim-scroll border border-t-0 border-border/50 rounded-b-md px-2.5 pt-2 pb-2">
                 {active === "state" && (
                   <div className="flex flex-col gap-2">
                     {stateRows.length > 0 && (
@@ -626,7 +631,12 @@ export function ChannelStatePanel() {
             // ensure they are the same attributes"): Hash · Parent · State proof, the artifact's
             // chain identity in the card's own order and tiering — the descriptor's hash first,
             // the polled record behind it (the pager-sibling lesson from the card's foot).
-            <div className="flex-none flex flex-col gap-1 rounded-md bg-[var(--panel-plate)] px-2.5 py-2">
+            // ⚠️ The plate's own padding BLEEDS (-mx), so the rows keep the pane's shared value
+            // edge (user, 2026-08-15 — "the right alignment looks wrong": every value column in
+            // the pane ends on one right edge, and the hash values sat 10px short of it because
+            // the padding was carried INSIDE the content box; same arithmetic as the rail Foot's
+            // full-bleed, at the pane's scale).
+            <div className="flex-none flex flex-col gap-1 rounded-md bg-[var(--panel-plate)] px-2.5 -mx-2.5 py-2">
               {hash && <FootRow label="Hash" value={paneHash(hash)} title={hash} copy={hash} />}
               {deep.lastSnapshotHash && (
                 <FootRow label="Parent hash" value={paneHash(deep.lastSnapshotHash)} title={deep.lastSnapshotHash} copy={deep.lastSnapshotHash} />

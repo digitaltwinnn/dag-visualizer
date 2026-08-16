@@ -32,6 +32,7 @@ import { buildGeoView, setCountryBorder, setCountryFillMask, HOVER_MASK_BOOST, t
 import type { StageLight } from "./objects/StageLight";
 import { STAGE_LIGHTS } from "../domain/stageLight";
 import { ccToNumeric, countryCcAt, countryLean, geometryRings, mainPolygonRings, ringsAngularRadius, ringsCentroid, type Ring } from "../domain/countryShape";
+import { makeTextLabel, disposeTextLabel } from "./objects/TextLabel";
 import { closeness, NODE_RAISE } from "../domain/cameraRig";
 import type { CohortSel } from "../domain/focusLadder";
 import { ancestryGlow } from "../domain/dimModel";
@@ -174,8 +175,19 @@ export class Globe implements GeoViewHost {
   // existing group-tier channel at the end of the precedence chain.
   private _signerIds: Set<string> | null = null;
   private _selCohortDir = new THREE.Vector3(); // resolved centroid unit dir (scratch)
+  // Geo's SUBJECT-ARRIVAL beat (the Engine's begin/release contract): the density glow holds
+  // dark through the view choreography and breathes in (~0.7s) once it settles.
+  private _glowEntryT = 1;
+  private _glowEntryHold = false;
+  // FURNITURE country-name labels (user, 2026-08-15): flat, whisper-muted names on the land, for
+  // HOSTING countries only — the label set states a network fact (where the network runs), not an
+  // atlas; empty countries staying nameless is itself information, the same honesty as the
+  // strip's empty ticks. Event-time rebuilt on node data + topology arrival; they ride geoFades,
+  // so the existing surface fade covers them with zero new per-frame code.
+  private _countryLabels: THREE.Mesh[] = [];
   private _selCohortOk = false;
   private _hoverCountryCc: string | null = null; // explorer row hover — border preview only
+  private _hostBorderKey: string | null = null; // hosting-outline rebuild key (active set + drill)
   // The geo focus SPOTLIGHT (scene/objects/StageLight): the SHARED light, claimed per frame and
   // staged above the SELECTED node's chip stack so the zoomed-in node pick catches a light wash
   // (user). `_selNodeRec` caches the selected node's geoPrimary record — re-resolved by
@@ -200,6 +212,7 @@ export class Globe implements GeoViewHost {
   countryGeoms?: GeoViewHost["countryGeoms"];   // per-country geometries (drill border + framing)
   countryBorder?: GeoViewHost["countryBorder"];           // the committed drill's border
   hoverCountryBorder?: GeoViewHost["hoverCountryBorder"]; // the hover preview's border
+  hostCountryBorder?: GeoViewHost["hostCountryBorder"];   // the persistent hosting outlines
   onCountriesReady?: GeoViewHost["onCountriesReady"];
 
   private fabric: NodeFabric;
@@ -250,7 +263,16 @@ export class Globe implements GeoViewHost {
     // The geo globe surface (body, graticule, atmosphere, continents) — it sets the surface handles
     // back on `this` for the morph/fade loop and pushes its fade materials into this.geoFades.
     // The countries topology arrives async: re-assert any drill/hover border made before then.
-    this.onCountriesReady = () => this._updateCountryBorder();
+    this.onCountriesReady = () => {
+      // The host-outline key must not survive the topology's arrival (review find, 2026-08-16):
+      // a node build BEFORE the topojson sets the key while every countryRings() answers null,
+      // and an unchanged key would skip the re-assert below — no outlines until the next
+      // filter/data change. The race runs the other way on most loads, which is why it passed
+      // live checks.
+      this._hostBorderKey = null;
+      this._updateCountryBorder();
+      this._rebuildCountryLabels(); // topology may land after the first node build
+    };
     buildGeoView(this);
     // The arcs share the surface's camera-FACING + closeness uniforms (created by buildGeoView,
     // hence after it): the hologram has no opaque body sphere, so nothing depth-occludes a comet
@@ -407,6 +429,8 @@ export class Globe implements GeoViewHost {
     this._relayoutGeo();
     this._buildDensityGlow(); // light pools follow the validator sites too
     this._assignGatherSlots(); // a validator-only rebuild must not leave stale ranks either
+    this._rebuildCountryLabels();
+    this._updateCountryBorder(); // the hosting outlines follow the fresh active set
     this.setMorph(this.morph); // place at current morph
   }
 
@@ -605,6 +629,7 @@ export class Globe implements GeoViewHost {
     // was just reset (to `recs`, or to `[]` above if `!recs.length`), so the "dag" group's slots need
     // recomputing here too (the packed row shifts when a metagraph appears/vanishes).
     this._assignGatherSlots();
+    this._rebuildCountryLabels();
   }
 
   // A soft additive "light pool" under each dense node cluster on the globe — LIGHTING driven by the
@@ -721,6 +746,84 @@ export class Globe implements GeoViewHost {
     return geom ? geometryRings(geom) : null;
   }
 
+  /** Arm geo's subject-arrival beat — the glow holds dark until releaseEntry. */
+  beginEntry(): void {
+    this._glowEntryT = 0;
+    this._glowEntryHold = true;
+  }
+
+  /** The choreography settled — the glow breathes in as the closing beat. */
+  releaseEntry(): void {
+    this._glowEntryHold = false;
+  }
+
+  /** The committed provider cohort's anchor: the members' centroid as a unit, globe-LOCAL
+   *  direction — event-time resolved by setSelectedCohort, so this is a cheap read. Null while
+   *  no cohort is resolvable. Read by the Engine's subject callout, which lifts it to the
+   *  surface and into world space through the rotating group. */
+  get cohortAnchorDir(): THREE.Vector3 | null {
+    return this._selCohortOk ? this._selCohortDir : null;
+  }
+
+  /** Rebuild the hosting-country name labels (see the field note): one flat, whisper-muted
+   *  name at each hosting country's main-landmass centroid, tangent to the surface, north-up.
+   *  Event-time (node data + topology arrival). Labels join `geoFades`, so the surface fade
+   *  drives their opacity with no per-frame code of their own. */
+  private _rebuildCountryLabels(): void {
+    for (const m of this._countryLabels) {
+      this.surface.remove(m);
+      const mat = m.material as THREE.MeshBasicMaterial;
+      const fi = this.geoFades.findIndex((f) => f.mat === mat);
+      if (fi >= 0) this.geoFades.splice(fi, 1);
+      disposeTextLabel(m);
+    }
+    this._countryLabels = [];
+    if (!this.countryGeoms) return; // topology not loaded yet — onCountriesReady re-runs this
+    const names = new Map<string, string>();
+    const addFrom = (pick: PickDescriptor) => {
+      const g = geoOf(pick);
+      if (g?.cc && g.country && !names.has(g.cc)) names.set(g.cc, g.country);
+    };
+    for (const u of this.nodes) if (!u.noGeo) addFrom(u.pick);
+    for (const r of this.metaNodes) addFrom(r.pick);
+    const cc = new THREE.Color(this.geoColor);
+    const tone = `rgba(${Math.round(cc.r * 255)},${Math.round(cc.g * 255)},${Math.round(cc.b * 255)},0.62)`;
+    const up = new THREE.Vector3(0, 1, 0);
+    for (const [code, name] of names) {
+      const ccn = ccToNumeric(code);
+      const geom = ccn ? this.countryGeoms.get(ccn) : null;
+      const rings = geom ? mainPolygonRings(geom) : null;
+      const centroid = rings?.length ? ringsCentroid(rings) : null;
+      if (!centroid) continue;
+      const normal = centroid.clone().normalize();
+      const east = new THREE.Vector3().crossVectors(up, normal);
+      if (east.lengthSq() < 1e-6) continue; // polar degenerate — no hosting country lives there
+      east.normalize();
+      const north = new THREE.Vector3().crossVectors(normal, east);
+      const mesh = makeTextLabel(tone, name, 0.7);
+      mesh.quaternion.setFromRotationMatrix(new THREE.Matrix4().makeBasis(east, north, normal));
+      mesh.position.copy(normal).multiplyScalar(R + LAND_H + 0.12);
+      this.surface.add(mesh);
+      const mat = mesh.material as THREE.MeshBasicMaterial;
+      mat.opacity = 0; // geoFades drives it from the next frame
+      this.geoFades.push({ mat, base: 0.5 });
+      this._countryLabels.push(mesh);
+    }
+  }
+
+  /** The drilled country's main-landmass centroid as a unit, globe-LOCAL direction, written
+   *  into `out`. Ring extraction is event-frequency work — callers cache per cc (the Engine's
+   *  callout does). False when the shape is unknown (unknown cc / topology still loading). */
+  countryAnchorDir(cc: string, out: THREE.Vector3): boolean {
+    const ccn = ccToNumeric(cc);
+    const geom = ccn ? this.countryGeoms?.get(ccn) : null;
+    const rings = geom ? mainPolygonRings(geom) : null;
+    const centroid = rings?.length ? ringsCentroid(rings) : null;
+    if (!centroid) return false;
+    out.copy(centroid);
+    return true;
+  }
+
   // Aim the globe so the country's shape centroid faces the camera (same gentle lean cap as
   // focusDensest — the constant viewing angle comes from countryFraming's camera construction,
   // not the lean). Returns the centroid's elevation angle + the country's angular radius, or
@@ -760,6 +863,24 @@ export class Globe implements GeoViewHost {
     // so the drill wins when both are present.
     if (drillRings) setCountryFillMask(this, drillRings);
     else setCountryFillMask(this, hoverRings, HOVER_MASK_BOOST);
+    // PERSISTENT HOSTING OUTLINES (user, 2026-08-16 — "always have the country outline for
+    // those that have any nodes; hover adds the fill"): every country with a filter-active
+    // node keeps its outline at a resting whisper, ONE LineSegments concatenating all their
+    // rings. Rebuilt only when the hosting set or the drill changes — this method also runs on
+    // every hover move, and re-concatenating ~30 countries' rings there would be waste. The
+    // drilled country is excluded (its own border draws at full strength above); a hovered one
+    // keeps its host line — the 0.3 preview draws over it additively, which only firms it.
+    const hostKey = [...this._activeCcs()].sort().join(",") + "|" + (drillCc ?? "");
+    if (hostKey !== this._hostBorderKey) {
+      this._hostBorderKey = hostKey;
+      const hostRings: Ring[] = [];
+      for (const cc of this._activeCcs()) {
+        if (cc === drillCc) continue;
+        const r = this.countryRings(cc);
+        if (r) hostRings.push(...r);
+      }
+      setCountryBorder(this, "host", hostRings.length ? hostRings : null, 0.08); // a true whisper (user, 2026-08-16: 0.15 read too present at rest)
+    }
   }
 
   // Resolve a globe-surface WORLD point to the country under it — only countries that
@@ -834,6 +955,51 @@ export class Globe implements GeoViewHost {
       : this.nodes.find((n) => n.nodeId === id && n.geoPrimary) ??
         this.metaNodes.find((n) => n.nodeId === id && n.geoPrimary) ??
         null;
+  }
+
+  /** The SELECTED node's own chip position in globe-LOCAL coordinates — the same resolution
+   *  the node-pick spotlight aims at (the fanned stack position for a metagraph node, the
+   *  stacked radius for a validator), so the subject callout points at THE chip rather than
+   *  the stack's base (user, 2026-08-15). False when nothing is selected or the record has no
+   *  place on the globe. */
+  selectedNodeAnchor(out: THREE.Vector3): boolean {
+    const rec = this._selNodeRec;
+    if (!rec) return false;
+    if ("geoPos" in rec) {
+      if (rec.geoPos.lengthSq() < 1) return false; // unplaced — never anchor at the globe centre
+      out.copy(rec.geoPos);
+      return true;
+    }
+    if (rec.noGeo || !rec.geoDir) return false;
+    out.copy(rec.geoDir).multiplyScalar(rec.geoRadius);
+    return true;
+  }
+
+  /** The SELECTED node's HYPER position in globe-LOCAL coordinates — the same anchor the
+   *  instance write uses (hub-glued world→local + offset for a metagraph node, the spun shell
+   *  position for a validator), so the hyper callout can point at the committed node's own
+   *  bead (user, 2026-08-15: "the node does not have its callout"). */
+  selectedNodeHyperAnchor(out: THREE.Vector3): boolean {
+    const rec = this._selNodeRec;
+    if (!rec) return false;
+    if ("hubGroup" in rec && rec.hubGroup) {
+      rec.hubGroup.getWorldPosition(out);
+      this.group.worldToLocal(out).add(rec.offset);
+      return true;
+    }
+    out.copy(rec.hyperPos);
+    return true;
+  }
+
+  /** The SELECTED node's LEDGER tray-chip position in globe-LOCAL coordinates — the same
+   *  `ledgerPos` the instance write lerps to, so the chamber callout can point at the machine's
+   *  own chip in its tray (user, 2026-08-16). False when nothing is selected or the chip is
+   *  hidden with its lane. */
+  selectedNodeLedgerAnchor(out: THREE.Vector3): boolean {
+    const rec = this._selNodeRec;
+    if (!rec || rec.ledgerHide) return false;
+    out.copy(rec.ledgerPos);
+    return true;
   }
 
   // Commit/clear the cohort selection: resolve member ids + the representative direction from
@@ -1173,8 +1339,15 @@ export class Globe implements GeoViewHost {
     for (const f of this.geoFades) f.mat.opacity = f.base * surf;
     // Density light pools: morph fade × the country-drill recede (so a drilled country's own
     // highlight isn't washed out by the pools).
+    // The pools belong to the SUBJECTS, not the furniture (user, 2026-08-16): they are geo's
+    // SUBJECT-ARRIVAL beat — held dark through the choreography and breathing in under the
+    // settled stacks on release (the Engine's begin/release contract, shared with the ledger's
+    // drop and hyper's tether sweep). Data rebuilds outside transitions don't blink them
+    // (_glowEntryT parks at 1).
+    const ge = this._glowEntryT * this._glowEntryT * (3 - 2 * this._glowEntryT);
     for (const g of this._densityGlow) {
-      (g.material as THREE.MeshBasicMaterial).opacity = (g.userData.glowBase as number) * surf * this._glowDim * this._glowAllDim;
+      (g.material as THREE.MeshBasicMaterial).opacity =
+        (g.userData.glowBase as number) * surf * ge * this._glowDim * this._glowAllDim;
     }
     // Depth cueing for the see-through hologram: the graticule + coastal walls dim their far
     // hemisphere through the shared facing uniform (camera dir in this group's local frame),
@@ -1227,6 +1400,8 @@ export class Globe implements GeoViewHost {
   }
 
   update(dt: number): void {
+    // Advance the arrival beat (see beginEntry) — parked at 1 in steady state.
+    if (!this._glowEntryHold && this._glowEntryT < 1) this._glowEntryT = Math.min(1, this._glowEntryT + dt / 0.7);
     this.clock += dt;
     // Node-pick SPOTLIGHT (geo only): claim the shared stage light above the selected node's chip
     // stack so the zoomed-in pick catches a light wash (user). The record's geo position is

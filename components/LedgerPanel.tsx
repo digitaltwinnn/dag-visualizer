@@ -13,11 +13,11 @@ import type { GlobalSnapshot, NodeRow, SnapshotExact } from "@/src/data/types";
 import { metaSnapHoverKey } from "@/src/data/types";
 import { latestRelevant } from "@/src/data/follow";
 import { identityHudHex } from "@/src/palette/identity";
-import { IdentityDot } from "@/components/inspector/parts";
+import { IdentityDot, LayerWho } from "@/components/inspector/parts";
 import { useStore } from "@/src/store/store";
 import { metaSnapSelectActions, snapshotSelectActions, sameMetaSnap, followToggleActions, nodeSelectActions } from "@/src/engine/domain/pickActions";
 import { applyClickActions } from "@/src/store/applyClickActions";
-import { DisclosureChevron, DisclosureRow, NodePickerRow, ROW_NEST, ROW_OUTSET } from "@/components/ExploreRows";
+import { DepthCaption, DisclosureChevron, DisclosureRow, NodePickerRow, ROW_NEST, ROW_OUTSET } from "@/components/ExploreRows";
 import { NoSignalDot } from "@/components/state/StateAtoms";
 import { buildAnchorLog, type AnchorLogRow } from "@/src/data/anchorLog";
 import { SLOT_N } from "@/src/engine/domain/ledgerModel";
@@ -139,6 +139,7 @@ function SnapRow<K extends string | number>({
       onClick={onClick}
       aria-expanded={disclose ? disclose.open : undefined}
       onMouseEnter={pair.onMouseEnter}
+      onMouseMove={pair.onMouseMove}
       onMouseLeave={pair.onMouseLeave}
       onFocus={pair.onFocus}
       onBlur={pair.onBlur}
@@ -147,7 +148,11 @@ function SnapRow<K extends string | number>({
         outset ? ROW_OUTSET : "w-full pl-2 pr-2",
         "hover:bg-wash-hover",
         "focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--primary)] focus-visible:outline-offset-[-2px]",
-        selected && selectedRow(true),
+        // A row that HOLDS the selection (a group header over the selected snapshot) wears the
+        // wash at ANCESTOR strength — the finest rung is the child below it (user, 2026-08-16:
+        // the header set the hue vars but no wash class, so it stayed uncolored). Its own
+        // selection keeps the full mark.
+        (selected || disclose?.holdsSel) && selectedRow(!!selected),
         pair.paired && pair.className,
       )}
       // The selection follows the subject's identity (selection.tsx · selectionHue): `accent` is
@@ -254,18 +259,20 @@ function SignerList({
 }) {
   return (
     <div className="mb-1 ml-[7px] pl-2 border-l border-border">
-      {/* WHICH cluster this list is — the same words the card and the raw lane use. The explorer is
+      {/* WHICH cluster this list is — the cards' own phrase ("Signed by N L0 validators"), whose
+          words come from the one home SIGNER_GROUPS (user, 2026-08-16 — redesigned from the
+          `label · count · layer` interpunct line into the DepthCaption register). The explorer is
           where the constant count is most puzzling (DOR discloses 3 rows under a 20-machine
           network), so the depth names the producing layer before the rows. Only the snapshot PROOF
           is reachable here: `signersOf` reads the tick's exact read, and the data-block signers
           exist only in the ~2.5 MB deep read, which browsing must never trigger. */}
-      <p
-        className="py-1 pl-2 text-micro tracking-caps uppercase text-muted-foreground"
-        title={SIGNER_GROUPS.proof.title}
-      >
-        {SIGNER_GROUPS.proof.label} · <span className="tabular-nums">{ids.length}</span> ·{" "}
-        <span className="text-foreground-dim">{SIGNER_GROUPS.proof.layer}</span>
-      </p>
+      <DepthCaption title={SIGNER_GROUPS.proof.title}>
+        {/* The count inherits the caption's own quiet voice — a bold foreground number made the
+            caption louder than the rows it introduces (user, 2026-08-16). */}
+        <span>Signed by</span>
+        <span className="tabular-nums">{ids.length}</span>
+        <LayerWho who={SIGNER_GROUPS.proof.who} />
+      </DepthCaption>
       {ids.map((sid) => {
         const r = resolveSigner(selNodes, metaId, sid);
         if (!r.known) {
@@ -416,15 +423,16 @@ export default function LedgerPanel() {
           const pinned = !following && snap != null;
           const beating = following && previewOrd == null;
           const label = previewOrd != null ? "Pinned" : following ? "Live" : pinned ? "Pinned" : "Live";
-          // Filtered live mode follows the NETWORK's anchors, not every global tick (the trail
-          // holds its newest anchored row at the front) — say so (user, 2026-08-07).
+          // Filtered live mode follows the NETWORK's newest anchored row — the ticker alone
+          // says it (user, 2026-08-16: "just say 'following DOR'" — the word "anchors" restated
+          // what the whole view is about).
           const liveTicker = displayNetwork(filter)?.ticker ?? null;
           const sub =
             previewOrd != null
               ? previewOrd.toLocaleString()
               : following
                 ? liveTicker
-                  ? `following ${liveTicker} anchors`
+                  ? `following ${liveTicker}`
                   : "following new snapshots"
                 : pinned
                   ? `${snap!.data.ordinal.toLocaleString()} · click for live`
@@ -546,7 +554,7 @@ export default function LedgerPanel() {
                       pairOrd={d.ordinal}
                       setHoverOrd={setHoverSnapOrd}
                       accent={accent}
-                      title={`Global snapshot ${d.ordinal.toLocaleString()} · ${d.metagraphSnapshotCount ?? 0} anchored`}
+                      title={`Global snapshot ${d.ordinal.toLocaleString()} · ${d.metagraphSnapshotCount ?? 0} anchors`}
                       onClick={() => {
                         applyClickActions(
                           snapshotSelectActions(globalPick, latestRelevant("all")?.ordinal === d.ordinal, {
@@ -561,6 +569,11 @@ export default function LedgerPanel() {
                     />
                     {isOpen && (
                       <div className={cn("mb-1.5 ml-[9px] py-0.5 pl-3", ROW_NEST)}>
+                        {/* Depth caption (user, 2026-08-16): the child grouping's one new concept —
+                            these rows are the tick's anchors split BY NETWORK. */}
+                        {(tickGroups.length > 0 || tickUnlisted > 0) && (
+                          <DepthCaption>Snapshots by network</DepthCaption>
+                        )}
                         {tickGroups.length === 0 && tickUnlisted === 0 ? (
                           // The polled buffer identified none of this tick's anchors (yet), and
                           // the exact read counted no uncataloged ones — say so, never fabricate.

@@ -54,6 +54,7 @@ export default function ContextCard({
         className={pair.className}
         style={pair.style}
         onMouseEnter={pair.onMouseEnter}
+      onMouseMove={pair.onMouseMove}
         onMouseLeave={pair.onMouseLeave}
         onFocus={pair.onFocus}
         onBlur={pair.onBlur}
@@ -95,6 +96,7 @@ export default function ContextCard({
       className={pair.className}
       style={pair.style}
       onMouseEnter={pair.onMouseEnter}
+      onMouseMove={pair.onMouseMove}
       onMouseLeave={pair.onMouseLeave}
       onFocus={pair.onFocus}
       onBlur={pair.onBlur}

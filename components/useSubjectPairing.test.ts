@@ -20,4 +20,18 @@ describe("subjectPairing", () => {
     p.onMouseEnter(); expect(set).toHaveBeenCalledWith(42);
     p.onMouseLeave(); expect(set).toHaveBeenCalledWith(null);
   });
+
+  it("onMouseMove re-arms a swapped-in element under a stationary pointer, once", () => {
+    // Not yet paired (active !== key): the first move writes the key — the swap-under-pointer
+    // healer (a pager step replaces the keyed card; mouseenter never fires on the new element).
+    const set = vi.fn();
+    const unpaired = subjectPairing<number>(null, 42, set, "#fff");
+    unpaired.onMouseMove();
+    expect(set).toHaveBeenCalledWith(42);
+    // Already paired (active === key): moves are no-ops, not a store write per pixel.
+    const paired = subjectPairing<number>(42, 42, set, "#fff");
+    set.mockClear();
+    paired.onMouseMove();
+    expect(set).not.toHaveBeenCalled();
+  });
 });
