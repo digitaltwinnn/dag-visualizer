@@ -28,9 +28,13 @@ export interface BarTune {
   rest: number; // a resting band's opacity
 }
 
-// rest user-tuned via ?tune, 2026-08-07. (`hot` retired 2026-08-11 — it was exactly the ledger
+// rest user-tuned via ?tune, 2026-08-07; raised 0.05 → 0.12 (user, 2026-08-16): under a committed
+// filter an off-filter band answered `rest × (1 − dim)` = 0.025 opacity — invisible beside the
+// ribbon LANDING on it (0.85 × 0.5 additive), a 30× gap to the boosted band in the same bar. The
+// base was below the range any multiplicative dim can survive; the dim knob itself is untouched.
+// (`hot` retired 2026-08-11 — it was exactly the ledger
 // row's `boost`, and a snapshot is data, so it takes the node's focus knob instead.)
-export const BAR_TUNE_DEFAULTS: BarTune = { rest: 0.05 };
+export const BAR_TUNE_DEFAULTS: BarTune = { rest: 0.12 };
 
 /** The `?tune` knob ranges (contract: src/engine/tune.ts), colocated with the numbers they bound. */
 export const BAR_TUNE_SCHEMA: TuneSchema<BarTune> = {
