@@ -23,7 +23,7 @@ import { useArchive, archiveFactState, archiveSummary, fmtSnapCount, fmtReach, u
 import { useNodeNames, nodeName, nodeRegistered } from "@/components/useNodeNames";
 import { useNowTick } from "@/components/useNowTick";
 import { POLL } from "@/src/engine/config";
-import { Desc, StatusMark, CompositionRows, StatusBreakdown, RoleChips, IdentityDot, networkKind, Fact, FactGroup, Foot, FootRow } from "./parts";
+import { Desc, StatusMark, CompositionRows, StatusBreakdown, RoleChips, IdentityDot, networkKind, Fact, FactGroup, Foot, FootRow, LayerWho } from "./parts";
 import { compositionGroups, compositionRows, nodeCompositionLabel, parseCompositionKey } from "@/src/data/composition";
 import { pickNetId, followToggleActions } from "@/src/engine/domain/pickActions";
 import { applyClickActions } from "@/src/store/applyClickActions";
@@ -314,8 +314,8 @@ export function SnapshotCard({ data: d }: { data: GlobalSnapshot }) {
               so it is the same kind of fact and takes the same words. One home: SIGNER_GROUPS. */}
           {exact != null && (exact.signerCount ?? 0) > 0 && (
             <Fact label="Signed by" title={SIGNER_GROUPS.globalProof.title}>
-              <span className="animate-resolve-in motion-reduce:animate-none">
-                {exact.signerCount} {SIGNER_GROUPS.globalProof.who}
+              <span className="animate-resolve-in motion-reduce:animate-none inline-flex items-center gap-1">
+                {exact.signerCount} <LayerWho who={SIGNER_GROUPS.globalProof.who} />
               </span>
             </Fact>
           )}

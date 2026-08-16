@@ -9,7 +9,7 @@ import { useEffect, useMemo, useState, type CSSProperties } from "react";
 import { Button } from "@/components/ui/button";
 import CardHead, { RailPane } from "@/components/CardHead";
 import { subjectPairing } from "@/components/useSubjectPairing";
-import { Fact, FactGroup, Foot, FootRow } from "@/components/inspector/parts";
+import { Fact, FactGroup, Foot, FootRow, LayerWho } from "@/components/inspector/parts";
 import { useSnapRecord } from "@/components/useArchive";
 import { Separator } from "@/components/ui/separator";
 import { useStore } from "@/src/store/store";
@@ -239,7 +239,9 @@ export default function MetaSnapPane({
                       Free tier (the exact row carries the proofs), so it never waits on the
                       deep read; the dL1 signers stay inside the Data section they produce. */}
                   <Fact label="Signed by" title={SIGNER_GROUPS.proof.title}>
-                    {(deep?.signers ?? row.signers)?.length ?? 0} {SIGNER_GROUPS.proof.who}
+                    <span className="inline-flex items-center gap-1">
+                      {(deep?.signers ?? row.signers)?.length ?? 0} <LayerWho who={SIGNER_GROUPS.proof.who} />
+                    </span>
                   </Fact>
                 </>
               ) : !row && exact ? (
@@ -555,7 +557,7 @@ function PayloadSection({
         <div className="flex items-start justify-between gap-2.5 pl-2" title={signers.title}>
           <span className="min-w-0 truncate text-label text-muted-foreground">{signers.label}</span>
           <span className="shrink-0 text-label text-foreground-dim tabular-nums">
-            {signers.count} {signers.who}
+            <span className="inline-flex items-center gap-1">{signers.count} <LayerWho who={signers.who} /></span>
           </span>
         </div>
       )}

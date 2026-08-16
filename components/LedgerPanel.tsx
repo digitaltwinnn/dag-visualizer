@@ -13,7 +13,7 @@ import type { GlobalSnapshot, NodeRow, SnapshotExact } from "@/src/data/types";
 import { metaSnapHoverKey } from "@/src/data/types";
 import { latestRelevant } from "@/src/data/follow";
 import { identityHudHex } from "@/src/palette/identity";
-import { IdentityDot } from "@/components/inspector/parts";
+import { IdentityDot, LayerWho } from "@/components/inspector/parts";
 import { useStore } from "@/src/store/store";
 import { metaSnapSelectActions, snapshotSelectActions, sameMetaSnap, followToggleActions, nodeSelectActions } from "@/src/engine/domain/pickActions";
 import { applyClickActions } from "@/src/store/applyClickActions";
@@ -269,7 +269,7 @@ function SignerList({
       <DepthCaption title={SIGNER_GROUPS.proof.title}>
         <span>Signed by</span>
         <span className="tabular-nums font-semibold text-foreground-dim">{ids.length}</span>
-        <span>{SIGNER_GROUPS.proof.who}</span>
+        <LayerWho who={SIGNER_GROUPS.proof.who} />
       </DepthCaption>
       {ids.map((sid) => {
         const r = resolveSigner(selNodes, metaId, sid);

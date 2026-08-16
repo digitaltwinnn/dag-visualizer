@@ -269,6 +269,21 @@ export function StatusBreakdown({ states }: { states: (string | null | undefined
 // node card's subtitle, the dossier's composition rows). User, 2026-07-12: the joined
 // "L0·cL1" text read as one mushy token; separate squared pills scan as discrete units.
 // Taxonomy chrome, not identity — muted text on the faint wash, never hued.
+/** A signer group's `who` phrase ("L0 validators") with the layer code as the square pill —
+ *  the composition chips' own vocabulary (user, 2026-08-16). ONE renderer so every surface
+ *  showing the phrase (the explorer's depth caption, the snapshot cards' Signed-by rows) draws
+ *  it the same way; `title=` strings keep the plain one-home text, since a tooltip can't hold a
+ *  chip. Parses the code out of SIGNER_GROUPS' string rather than hardcoding a second copy. */
+export function LayerWho({ who }: { who: string }) {
+  const [code, ...rest] = who.split(" ");
+  return (
+    <span className="inline-flex items-center gap-1">
+      <RoleChips codes={[code]} />
+      <span>{rest.join(" ")}</span>
+    </span>
+  );
+}
+
 export function RoleChips({ codes }: { codes: string[] }) {
   return (
     <span className="inline-flex items-center gap-1">
