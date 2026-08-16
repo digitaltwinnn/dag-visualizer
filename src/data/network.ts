@@ -237,7 +237,7 @@ export const SIGNER_GROUPS = {
     /** What the counted things ARE, read after a number ("3 L0 validators"). */
     who: "L0 validators",
     title:
-      "A metagraph seals every snapshot with its own L0 cluster, so this list IS that cluster — a 3-node L0 signs all three, every time.",
+      "A metagraph seals every snapshot with its own L0 cluster, so this list IS that cluster — a 3-node L0 cluster shows the same 3 signers on every snapshot.",
   },
   dataBlocks: {
     /** Matches the DATA tab's name 1:1 (user, 2026-08-14 — consistency in the tabs' direction);
@@ -246,7 +246,7 @@ export const SIGNER_GROUPS = {
     layer: "dL1, rotating",
     who: "dL1 validators",
     title:
-      "Data blocks are produced by the metagraph's dL1 cluster, EACH BLOCK by a rotating subset of that fleet — this list is the union: every validator that signed at least one of this snapshot's blocks (the per-block split lives on chain, not here). A hybrid node signs under its dL1 id rather than its L0 one.",
+      "Data blocks are produced by the metagraph's dL1 cluster, EACH BLOCK by a rotating subset of that fleet — this list is the union: every dL1 validator that signed at least one of this snapshot's blocks (the per-block split lives on chain, not here). A hybrid node signs under its dL1 id rather than its L0 one.",
   },
   /** The GLOBAL snapshot's own seal. The DAG is a metagraph-shaped core under the unified node model,
    *  so its proof group is the same shape as a metagraph's — its own L0 cluster — and reads with the
@@ -257,7 +257,7 @@ export const SIGNER_GROUPS = {
     layer: "L0 cluster",
     who: "L0 validators",
     title:
-      "The global snapshot is sealed by the DAG's own L0 cluster — one validator per participating node, so this is how much of the network signed this tick.",
+      "The global snapshot is sealed by the DAG's own L0 cluster — one L0 validator per participating node, so this is how much of the network signed this tick.",
   },
 } as const;
 

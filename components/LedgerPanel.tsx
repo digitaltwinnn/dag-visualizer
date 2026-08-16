@@ -554,7 +554,7 @@ export default function LedgerPanel() {
                       pairOrd={d.ordinal}
                       setHoverOrd={setHoverSnapOrd}
                       accent={accent}
-                      title={`Global snapshot ${d.ordinal.toLocaleString()} · ${d.metagraphSnapshotCount ?? 0} anchored`}
+                      title={`Global snapshot ${d.ordinal.toLocaleString()} · ${d.metagraphSnapshotCount ?? 0} anchors`}
                       onClick={() => {
                         applyClickActions(
                           snapshotSelectActions(globalPick, latestRelevant("all")?.ordinal === d.ordinal, {

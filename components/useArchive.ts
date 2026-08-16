@@ -125,8 +125,8 @@ export function archiveSummary(c: ArchiveCensus, chain: string): ArchiveNetSumma
   const genesisRatio = `${genesis.length} / ${total}`;
   const genesisAny = genesis.length > 0;
   const genesisTitle = genesisAny
-    ? `${genesis.length} of the ${total} probed machines serve the chain's every snapshot, back to ordinal 1.`
-    : `No probed machine serves the chain back to ordinal 1.`;
+    ? `${genesis.length} of the ${total} probed nodes serve the chain's every snapshot, back to ordinal 1.`
+    : `No probed node serves the chain back to ordinal 1.`;
   if (genesisAny) {
     // The fleet's deepest reach IS the chain's whole age — the genesis floor's own date.
     const ts = genesis.find((e) => e.floorTs)?.floorTs;
@@ -144,7 +144,7 @@ export function archiveSummary(c: ArchiveCensus, chain: string): ArchiveNetSumma
   if (deep > 0) {
     return {
       reach: `back to ${c.since}`,
-      reachTitle: `${deep} of ${total} machines keep deep history to the metagraph era (${c.since}), with some gaps.`,
+      reachTitle: `${deep} of ${total} nodes keep deep history to the metagraph era (${c.since}), with some gaps.`,
       genesisRatio,
       genesisAny,
       genesisTitle,
@@ -154,7 +154,7 @@ export function archiveSummary(c: ArchiveCensus, chain: string): ArchiveNetSumma
   const reach = best.floorTs ? fmtReach(best.floorTs) : null;
   return {
     reach: reach ? `~${reach}` : `~${fmtSnapCount(best.latest - best.floor)} snapshots`,
-    reachTitle: `The deepest archive reaches back to ordinal ${best.floor.toLocaleString()}; the chain's first ${fmtSnapCount(best.floor)} snapshots are not served by any of the network's own machines (the explorer's index still lists their records).`,
+    reachTitle: `The deepest archive reaches back to ordinal ${best.floor.toLocaleString()}; the chain's first ${fmtSnapCount(best.floor)} snapshots are not served by any of the network's own nodes (the explorer's index still lists their records).`,
     genesisRatio,
     genesisAny,
     genesisTitle,

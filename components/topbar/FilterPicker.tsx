@@ -129,7 +129,7 @@ export default function FilterPicker({ onPicked }: { onPicked?: () => void }) {
       <button
         type="button"
         aria-pressed={filter === UNLISTED_ID}
-        title="Anchoring state channels not in the public catalog — their machines are not knowable here"
+        title="Anchoring state channels not in the public catalog — their nodes are not knowable here"
         className={chipClass(filter === UNLISTED_ID, true)}
         onClick={() => pick(UNLISTED_ID)}
         onMouseEnter={() => setHoverFilter(UNLISTED_ID)}

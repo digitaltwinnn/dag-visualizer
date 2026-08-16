@@ -824,8 +824,8 @@ function GeoLiveNode({ p }: { p: PickOf<"l0" | "l1" | "metanode"> }) {
                 className="inline-flex items-center gap-1.5"
                 title={
                   registered
-                    ? "Registered as a delegated-staking candidate in the Global L0 registry — DAG holders can delegate stake to this validator."
-                    : "In the validator whitelist but not registered as a delegated-staking candidate — separate, independent gates, which is why a live validator can lack an entry."
+                    ? "Registered as a delegated-staking candidate in the Global L0 registry — DAG holders can delegate stake to this L0 validator."
+                    : "Whitelisted to validate but not registered as a delegated-staking candidate — separate, independent gates, which is why a live L0 validator can lack an entry."
                 }
               >
                 <BoolMark on={registered} />
@@ -850,7 +850,7 @@ function GeoLiveNode({ p }: { p: PickOf<"l0" | "l1" | "metanode"> }) {
                 archEntry.kind === "genesis"
                   ? `Serves its chain's every snapshot, back to ordinal 1`
                   : archEntry.kind === "deep"
-                    ? `Serves global snapshots back to the metagraph era (${archive.since}), with some gaps — one of ${archive.archivalCount} archival validators of ${archive.total} probed`
+                    ? `Serves global snapshots back to the metagraph era (${archive.since}), with some gaps — one of ${archive.archivalCount} archival L0 validators of ${archive.total} probed`
                     : `Serves ~${(archEntry.latest - archEntry.floor).toLocaleString()} recent snapshots of its own chain, back to ordinal ${archEntry.floor.toLocaleString()}; older history is discarded`
               }
             >
