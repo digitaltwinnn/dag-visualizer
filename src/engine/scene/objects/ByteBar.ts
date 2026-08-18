@@ -13,7 +13,7 @@ import type { PickDescriptor } from "@/src/data/types";
 import { METAGRAPHS } from "../../config";
 import { BAR_H, BAR_D, BAR_LIFT, FLOOR_Y, LEAD_X } from "../../domain/ledgerLayout";
 import { type Band, type BarSpec } from "../../domain/ledgerBands";
-import { SLOT_SP, SLOT_N, horizonAt } from "../../domain/ledgerModel";
+import { SLOT_SP, SLOT_N, horizonAt, frontAt } from "../../domain/ledgerModel";
 import { snapBright, snapFocusOf, emphasisK } from "../../domain/dimModel";
 import type { TuneSchema } from "../../tune";
 
@@ -336,9 +336,11 @@ export class ByteBar {
       // SEED: no measurement here, so nothing in the normal band loop applies. The lead's read is
       // in flight, so it BREATHES on the calm beat (the held-slot acquiring form, as the cards'
       // NodeStars); every other seed sits STILL and dimmer, because nothing is arriving and a
-      // pulse would say otherwise.
+      // pulse would say otherwise. It takes BOTH trail boundaries like any other row — a seed is a
+      // row too, and skipping the front dissolve is what left forming blocks hanging off the glass
+      // under a filtered follow (see `frontAt`).
       if (s.forming) {
-        const fade0 = horizonAt(x) * (this._entryFade ? this._entryFade[si] : 1);
+        const fade0 = horizonAt(x) * frontAt(x) * (this._entryFade ? this._entryFade[si] : 1);
         const e = s.pulse ? 0.3 + 0.12 * Math.sin(this._t * 2.4) : SEED_STILL_OP;
         s.mats[0].opacity = e * fade0 * this._alpha;
         s.mats[0].color.setHex(this._neutral);
@@ -374,8 +376,7 @@ export class ByteBar {
       // not it is selected, but hue is the chamber's own reading and never lifts brightness.
       const pinned = si === this._selected;
       // Rows the rewind pushed past the front edge dissolve within one slot of travel.
-      const over = (x - LEAD_X) / (SLOT_SP * 0.9);
-      const front = over <= 0 ? 1 : Math.max(0, 1 - over);
+      const front = frontAt(x);
       for (let i = 0; i < s.used; i++) {
         // Brightness is the node vocabulary (snapBright); COLOUR is the chamber's own independent
         // reading — the shown row, a hover preview and the committed network's own bands carry

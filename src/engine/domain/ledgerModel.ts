@@ -64,7 +64,7 @@ export const slotFade = (slot: number): number => Math.min(1, Math.max(0, 1 - (s
 //
 // This is NOT the recency fade `slotFade` describes and the trail deliberately does not use (see
 // LedgerView's "No depth fade" note): it is a TERMINAL DISSOLVE at the trail's far boundary — the
-// exact mirror of `TrailRewind.fadeAtX`, which already dissolves rows sliding off the FRONT edge.
+// exact mirror of `frontAt` below, which dissolves rows sliding off the FRONT edge.
 // Recency is still position plus the ordinal labels: `HORIZON_X` is placed beyond the last visible
 // slot, so 8 of the 9 rows stay at full brightness and only the oldest has begun to go.
 //
@@ -78,6 +78,25 @@ export const HORIZON_SPAN = 2.2 * SLOT_SP;
  *  world while the trail slides through it. */
 export const horizonAt = (x: number): number =>
   Math.min(1, Math.max(0, (x - HORIZON_X) / HORIZON_SPAN));
+
+/** The trail's OTHER boundary, and it lives here beside the horizon for the same reason that one
+ *  does: every instrument riding the trail has to agree about where the chamber ends, or one of
+ *  them floats past the edge on its own. 1 at or behind the lead position, dissolving within one
+ *  slot of travel once the rewind has pushed the row past the front edge.
+ *
+ *  ⚠️ SEEDS ARE ROWS TOO (user, 2026-08-18 — filter on a metagraph and let it follow: "these
+ *  forming blocks are drawn in front, outside of the panel"). Under a filtered follow the rewind
+ *  holds the network's own newest anchored tick at the lead, so every global tick that anchored
+ *  nothing of that network sits AHEAD of the front edge — measured ones dissolved there, but the
+ *  byte bar's unmeasured SEED branch multiplied only the horizon and hung in the air off the glass.
+ *  The rows are not dropped and must not be: when the network anchors again the offset eases back
+ *  and they slide onto the panel, in their own place in time. POSITION IS TIME, so a row is shown
+ *  where its tick belongs and dissolves when that is off the chamber — never pinned to the glass to
+ *  keep it visible. */
+export const frontAt = (x: number): number => {
+  const over = (x - LEAD_X) / (SLOT_SP * 0.9);
+  return over <= 0 ? 1 : Math.max(0, 1 - over);
+};
 
 // A tick keeps collecting metagraph snapshots for seconds after it appears (the anchor index's
 // `touched` grows). The lead row says so rather than pretending it is final — the same ~7s window

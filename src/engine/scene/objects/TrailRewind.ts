@@ -12,8 +12,7 @@
 //
 // The owner (LedgerView) applies `offset` to its groups/instances and multiplies brightnesses
 // by `fadeAtX`; this class owns only the scalar state. Allocation-free per frame.
-import { LEAD_X } from "../../domain/ledgerLayout";
-import { SLOT_SP } from "../../domain/ledgerModel";
+import { SLOT_SP, frontAt } from "../../domain/ledgerModel";
 
 export class TrailRewind {
   private _off = 0;
@@ -51,9 +50,10 @@ export class TrailRewind {
     if (Math.abs(target - this._off) < 0.002) this._off = target;
   }
 
-  /** 1 at/behind the lead position, dissolving within one slot of travel past the front edge. */
+  /** 1 at/behind the lead position, dissolving within one slot of travel past the front edge.
+   *  The math is `frontAt` in domain/ledgerModel — the byte bar reads it too, and the two must
+   *  agree about where the chamber's front edge is. */
   fadeAtX(x: number): number {
-    const over = (x - LEAD_X) / (SLOT_SP * 0.9);
-    return over <= 0 ? 1 : Math.max(0, 1 - over);
+    return frontAt(x);
   }
 }

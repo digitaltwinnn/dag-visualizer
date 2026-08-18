@@ -8,6 +8,7 @@ import {
   HORIZON_X,
   HORIZON_SPAN,
   horizonAt,
+  frontAt,
   anchorTiles,
   LedgerModel,
   LEAD_SETTLE_MS, LANE_IDS } from "./ledgerModel";
@@ -116,6 +117,28 @@ describe("the horizon (user, 2026-08-09: the chamber must read as continuing int
   it("sits beyond the last slot but in FRONT of the floor's own back edge, so the glass ends first", () => {
     expect(HORIZON_X).toBeLessThan(LEAD_X - (SLOT_N - 1) * SLOT_SP);
     expect(HORIZON_X).toBeGreaterThan(-33); // LedgerView's FLOOR_CX - FLOOR_W / 2
+  });
+});
+
+describe("the front edge (the horizon's mirror — where the rewind pushes rows off the chamber)", () => {
+  it("leaves the whole trail alone: full at the lead and everywhere behind it", () => {
+    expect(frontAt(LEAD_X)).toBe(1);
+    for (let s = 1; s < SLOT_N; s++) expect(frontAt(LEAD_X - s * SLOT_SP)).toBe(1);
+  });
+
+  it("dissolves within one slot of travel past the lead, and clamps beyond it", () => {
+    const half = frontAt(LEAD_X + SLOT_SP * 0.45);
+    expect(half).toBeGreaterThan(0);
+    expect(half).toBeLessThan(1);
+    expect(frontAt(LEAD_X + SLOT_SP)).toBe(0);
+    expect(frontAt(LEAD_X + SLOT_SP * 5)).toBe(0);
+  });
+
+  // The filtered-follow case (user, 2026-08-18): the rewind holds the network's own newest
+  // anchored tick at the lead, so every global tick since sits a whole slot or more in front —
+  // gone, whatever kind of row it is. The byte bar's SEED branch used to skip this call.
+  it("is fully gone for every tick newer than a held row, so nothing hangs off the glass", () => {
+    for (let newer = 1; newer <= 6; newer++) expect(frontAt(LEAD_X + newer * SLOT_SP)).toBe(0);
   });
 });
 
