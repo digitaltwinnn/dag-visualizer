@@ -87,6 +87,14 @@ type Lane = { id: LaneId; name: string; title: string };
 
 const LANE_HEAD = "text-micro uppercase tracking-caps text-muted-foreground font-normal";
 
+/** Which part of a payload lane owns the scroll (2026-08-18). Exactly one of the lane's two parts
+ *  may be a scroller, or the box shows two bars for one overflow. With the tree OPEN the well is
+ *  it and the schema keeps its natural height — capped at a share of the box so a wide-open schema
+ *  can never squeeze the well away; with the tree folded there is no well, so the schema takes the
+ *  scroll itself. */
+const schemaBox = (rawOpen: boolean): string =>
+  rawOpen ? "flex-none max-h-[45%] overflow-auto slim-scroll" : "min-h-0 flex-1 overflow-auto slim-scroll";
+
 /** A lane's TABLE — two columns, identical markup in every lane, so the three lanes read as three
  *  views of one pane rather than three designs.
  *
@@ -243,7 +251,11 @@ function RawSection({
     // table): the raw tier sits visibly below the shape it expands on. The header row carries
     // the shared copy control at its right end — the WHOLE payload as pretty-printed JSON, the
     // same text the well renders (group/copy, so it reveals with the row like every other).
-    <div className="group/copy flex flex-col gap-1 mt-1.5">
+    //
+    // OPEN, the section CLAIMS the lane's remaining height (min-h-0 flex-1) so the well below can
+    // be the box's one scroller; folded it takes its own row back, or the chevron would float on
+    // top of an empty column.
+    <div className={cn("group/copy flex flex-col gap-1 mt-1.5", open && "min-h-0 flex-1")}>
       <div className="flex items-center justify-between gap-2">
         <button
           type="button"
@@ -275,15 +287,16 @@ function RawSection({
         // fence is a window down, not a tier up. Long JSON scrolls INSIDE the well (.slim-scroll,
         // the one scrollbar recipe), never stretching the pane.
         //
-        // The well is CAPPED (user, 2026-08-18 — "raw JSON needs a scrollbar when we expand
-        // elements and it becomes too large"). Uncapped it grew to whatever the opened tree
-        // needed and handed the scrolling to the pane's own region, which scrolled the note and
-        // the schema table off the top — the tree pushed its siblings out of view, which is the
-        // one thing the lane's single scroll region exists to prevent. Both axes are stated
-        // explicitly: `overflow-x-auto` alone already forces the used value of `overflow-y` to
-        // `auto`, so the vertical scroll was live but unbounded, and reading the class list gave
-        // no hint of it.
-        <div className="max-h-[46vh] overflow-auto slim-scroll rounded-md border border-border/50 bg-[var(--background)] px-2.5 py-2">
+        // ⚠️ THE WELL IS THE LANE'S ONE SCROLLER — it FILLS the remaining height, it is not
+        // capped (user, 2026-08-18, second pass: "it now creates a double scrollbar instead of
+        // 1"). Uncapped it grew to whatever the opened tree needed and handed the scrolling to
+        // the lane box, which scrolled the schema table off the top; capped at a viewport
+        // fraction it scrolled internally AND left the box overflowing, so BOTH bars showed at
+        // once. A share of the viewport can't answer this, because what the well may occupy is
+        // whatever its siblings above it don't. So the chain is measured instead: the box no
+        // longer scrolls (overflow-hidden, a flex column), the schema block keeps its natural
+        // height, and the well takes the rest — one bar, and it belongs to the tree.
+        <div className="min-h-[7rem] flex-1 overflow-auto slim-scroll rounded-md border border-border/50 bg-[var(--background)] px-2.5 py-2">
           <JsonTree data={data} />
         </div>
       )}
@@ -568,48 +581,56 @@ export function ChannelStatePanel() {
                   an opened tree grows INSIDE this box instead of pushing its sibling out of view.
                   Every lane below is note → table → raw disclosure, in that order. `.slim-scroll`
                   is the app's one scrollbar recipe: an opened JSON tree genuinely scrolls both
-                  ways, and the platform default read as a browser part laid over the glass. */}
+                  ways, and the platform default read as a browser part laid over the glass.
+                  ⚠️ The box itself does NOT scroll — it is the flex COLUMN the one scroller sizes
+                  against, and each lane names which of its parts that scroller is (the payload
+                  lanes hand it to the open tree, the signer lane keeps it). Two nested `auto`
+                  regions is the double scrollbar this replaced. */}
               {/* The tab row's baseline hairline is this box's TOP edge — the content wears the
                   matching side/bottom hairlines (user, 2026-08-16: "the tabs look disconnected
                   from the content"), so the active tab visibly opens INTO the bounded panel
                   (its panel-solid fill already bridges the baseline). Same border weight as the
                   tabs' own (border/50); bottom corners pick up the pane radius. */}
-              <div className="min-h-0 flex-1 overflow-auto slim-scroll border border-t-0 border-border/50 rounded-b-md px-2.5 pt-2 pb-2">
+              <div className="min-h-0 flex-1 flex flex-col overflow-hidden border border-t-0 border-border/50 rounded-b-md px-2.5 pt-2 pb-2">
                 {active === "state" && (
-                  <div className="flex flex-col gap-2">
+                  <div className="flex flex-col gap-2 min-h-0 flex-1">
                     {stateRows.length > 0 && (
-                      <SchemaRows
-                        header="Schema"
-                        rows={stateRows.map((r) => ({ label: r.key, count: r.count, kinds: r.kinds }))}
-                      />
+                      <div className={schemaBox(state != null && raw)}>
+                        <SchemaRows
+                          header="Schema"
+                          rows={stateRows.map((r) => ({ label: r.key, count: r.count, kinds: r.kinds }))}
+                        />
+                      </div>
                     )}
                     {state != null && <RawSection open={raw} onToggle={() => setRaw((o) => !o)} data={state} />}
                   </div>
                 )}
                 {active === "data" && (
-                  <div className="flex flex-col gap-2">
+                  <div className="flex flex-col gap-2 min-h-0 flex-1">
                     {/* The data lane's NOTE: the payload's own weight, the same fact the state
                         lane leads with (the tab's count is the record COUNT, a different number).
                         Without it this lane opened on a bare table header while its two siblings
                         opened on a note — the uniform body's first part, missing. */}
                     {kinds.length > 0 && (
-                      <SchemaRows
-                        header="Schema"
-                        rows={kinds.map((k) => ({
-                          // The union field-kind row is named `records` (the card's word); a
-                          // wrapper kind is its own name and carries no chips to open.
-                          label: k.fields ? "records" : k.kind,
-                          mono: !k.fields,
-                          count: k.count,
-                          kinds: [k],
-                        }))}
-                      />
+                      <div className={schemaBox(dataTx != null && raw)}>
+                        <SchemaRows
+                          header="Schema"
+                          rows={kinds.map((k) => ({
+                            // The union field-kind row is named `records` (the card's word); a
+                            // wrapper kind is its own name and carries no chips to open.
+                            label: k.fields ? "records" : k.kind,
+                            mono: !k.fields,
+                            count: k.count,
+                            kinds: [k],
+                          }))}
+                        />
+                      </div>
                     )}
                     {dataTx != null && <RawSection open={raw} onToggle={() => setRaw((o) => !o)} data={dataTx} />}
                   </div>
                 )}
                 {active === "signers" && (
-                  <div className="flex flex-col gap-3">
+                  <div className="flex flex-col gap-3 min-h-0 flex-1 overflow-auto slim-scroll">
                     {/* dL1 FIRST, L0 AFTER (user, 2026-08-14): the production order — the data
                         blocks are signed by their dL1 producers before the L0 cluster seals the
                         snapshot around them, so the lane reads in the order the signatures were
