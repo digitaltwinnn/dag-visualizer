@@ -621,6 +621,18 @@ export class Globe implements GeoViewHost {
       const drill = this.countryFilter;
       this.setFilter(this.filter);
       if (drill) this.setCountry(drill);
+      // ⚠️ …and the dim must be SNAPPED, not eased (user, 2026-08-18: "objects very briefly appear
+      // and hide again" after a long session). Every record above is brand new and born at `dim: 0`
+      // — lit — while `_applyDim` writes only the TARGET, so the per-frame ease (dt*4, ~1s) played
+      // an off-filter node's whole mute from scratch on every 5-minute re-pull. In geo that ease is
+      // also its SIZE (hide reads the same raw ramp), so the muted fleet POPPED IN at full size and
+      // full brightness before shrinking away again. Same argument as the drill restore above: a
+      // rebuild has no prior state to ease FROM, so there is nothing to animate. Snapping every
+      // record is safe precisely because none of them existed a moment ago — a genuine filter
+      // switch still eases, since it runs against records that do. Measured with a temporary probe
+      // 150ms after each rebuild, DOR committed: 43 off-filter records at dim 0.20–0.36 (so 64–80%
+      // of full size and brightness, on screen) without this line, 1.000 with it.
+      for (const r of recs) r.dim = r.dimTarget;
       this.setSelectedNode(this._selectedNodeId); // re-resolve the spotlight's record on fresh data
       this.setSelectedCohort(this._selCohort); // re-resolve the cohort membership/centroid too
       this._buildDensityGlow();
