@@ -903,6 +903,18 @@
   --animate-boot-ping: st-sonar 1.6s ease-out infinite;
   --animate-st-standby-node: st-standby-node 1.5s ease-in-out infinite;
   --animate-st-standby-halo: st-standby-halo 1.6s ease-out infinite;
+  /* The boot core's armillary shells — the hoops the hypergraph's Global L0 core actually wears,
+     prefigured while the feed is still connecting, so the overlay reads as the thing it becomes
+     rather than as a glow. Screen-space spin only: each hoop's TILT is a static transform at the
+     call site (a flattened ellipse), and this turns that ellipse's major axis, which is what makes
+     a pair of them read as an armillary rather than as two rings. Same keyframe, two cadences and
+     opposite directions — the `st-sonar` idiom right above. */
+  --animate-boot-shell: boot-shell 15s linear infinite;
+  --animate-boot-shell-alt: boot-shell 23s linear infinite reverse;
+}
+@keyframes boot-shell {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
 }
 
 /* The LiveStrip bar-chart's entry animation (components/LiveStrip.tsx) — a new bar streams in
