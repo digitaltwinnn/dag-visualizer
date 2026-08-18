@@ -256,7 +256,16 @@ const BUCKET_WORD: Record<StatusBucket, string> = {
   down: "down",
   unknown: "unknown",
 };
-export function StatusBreakdown({ states }: { states: (string | null | undefined)[] }) {
+export function StatusBreakdown({
+  states,
+  form = "pills",
+}: {
+  states: (string | null | undefined)[];
+  /** `pills` is the standalone roll-up; `counts` is the dossier's STACKED underline under the
+   *  Online-nodes total (user, 2026-08-18) — same vocabulary and same bucket colours, without
+   *  the pill's wash and border, which is what let a mixed fleet wrap onto a second line. */
+  form?: "pills" | "counts";
+}) {
   const b = statusBreakdown(states);
   const order: StatusBucket[] = ["ready", "progress", "down", "unknown"];
   const items = order
@@ -265,6 +274,17 @@ export function StatusBreakdown({ states }: { states: (string | null | undefined
       k === "progress" || k === "down"
         ? labelBreakdown(states, k).map((it) => ({ ...it, color: BUCKET_COLOR[k] }))
         : [{ label: BUCKET_WORD[k], count: b[k], color: BUCKET_COLOR[k] }],
+    );
+  if (form === "counts")
+    return (
+      <span className="text-label inline-flex items-center flex-wrap justify-end gap-x-1.5">
+        {items.map((it, i) => (
+          <span key={it.label} style={{ color: it.color }}>
+            {i > 0 && <span className="text-muted-foreground mr-1.5">·</span>}
+            {it.count} {it.label}
+          </span>
+        ))}
+      </span>
     );
   return (
     <span className="inline-flex items-center flex-wrap justify-end gap-1">

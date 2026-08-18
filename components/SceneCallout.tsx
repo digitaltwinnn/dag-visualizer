@@ -40,7 +40,7 @@ import { cn } from "@/lib/utils";
 import { useStore } from "@/src/store/store";
 import { VIEW_POLICIES } from "@/src/engine/domain/viewPolicy";
 import { displayNetwork } from "@/src/data/unlisted";
-import { filterAccent, shortHash } from "@/src/data/network";
+import { coLocatedNetworks, filterAccent, getAnchor, metagraphById, shortHash } from "@/src/data/network";
 import { SCENE_GLASS } from "@/components/selection";
 import { RoleChips } from "@/components/inspector/parts";
 // The lead line's codes come from the composition vocabulary's ONE home, rendered by the cards'
@@ -65,8 +65,15 @@ export interface CalloutModel {
   title: string;
   aside?: { text: string; hue?: string; live?: boolean };
   ring: string;
-  /** `ident` leads the row in its identity hue (the aside's hued-ticker idiom, one register). */
-  lead?: { ident?: { text: string; hue: string }; text?: string; codes?: string[] };
+  /** `ident` leads the row in its identity hue (the aside's hued-ticker idiom, one register).
+   *  `also` closes it with the OTHER networks sharing this subject's machine — same idiom,
+   *  one hued ticker each (user, 2026-08-18). */
+  lead?: {
+    ident?: { text: string; hue: string };
+    text?: string;
+    codes?: string[];
+    also?: { text: string; hue: string }[];
+  };
 }
 type Model = CalloutModel;
 
@@ -125,6 +132,22 @@ export function CalloutPanel({ m, className }: { m: CalloutModel; className?: st
           )}
           {m.lead.text && <span>{m.lead.text}</span>}
           {m.lead.codes && m.lead.codes.length > 0 && <RoleChips codes={m.lead.codes} />}
+          {/* CO-TENANTS — the other networks running on this same machine, each as its own
+              hued ticker (user, 2026-08-18). It closes the lead because the node card reads
+              place → role → host → co-located, and the chips to its left are this node's own
+              composition: the `+` says these are additional networks, not more of its layers.
+              Rendered only when the fact is MEASURED — the builder passes nothing while both
+              cluster sides aren't live, so the callout never guesses a co-tenancy. */}
+          {m.lead.also && m.lead.also.length > 0 && (
+            <span className="inline-flex items-center gap-1.5">
+              <span className="opacity-60">+</span>
+              {m.lead.also.map((t) => (
+                <span key={t.text} className="font-bold" style={{ color: t.hue }}>
+                  {t.text}
+                </span>
+              ))}
+            </span>
+          )}
         </div>
       )}
     </div>
@@ -168,6 +191,15 @@ export default function SceneCallout() {
     const nnet = displayNetwork(netId);
     const codes = layerCodesOf([{ roles: nodePick.roles }]);
     const id = (nodePick as { node?: { id?: string } }).node?.id;
+    // CO-LOCATION — the same reading the node card's own Co-located fact takes, from the one
+    // home (`coLocatedNetworks`) and behind the same `coloReady` gate: both cluster sides must
+    // be live, or a machine that simply hasn't been polled yet would read as single-tenant.
+    // Unmeasured means NO line, not a "none" — the callout is a label, and rule 10's absent-
+    // data instrument states belong to the card that has room to state them.
+    const ip = (nodePick as { node?: { ip?: string } }).node?.ip;
+    const coloReady = metaList.some((x) => x.isRoot) && metaList.some((x) => !x.isRoot);
+    const colo = coloReady ? coLocatedNetworks(ip, netId, metaList) : [];
+    const also = colo.map((c) => ({ text: displayNetwork(c.id)?.ticker ?? c.name, hue: filterAccent(c.id) }));
     return {
       key: `node|${id ?? `${g?.lat},${g?.lon}`}`,
       eyebrow: "Node",
@@ -176,7 +208,7 @@ export default function SceneCallout() {
       title: g?.city ?? g?.country ?? (id ? shortHash(id) : "Node"),
       aside: nnet ? { text: nnet.ticker, hue: nnet.hue } : undefined,
       ring: nnet?.hue ?? "var(--primary)",
-      lead: codes.length ? { codes } : undefined,
+      lead: codes.length || also.length ? { codes, also } : undefined,
     };
   };
 
@@ -264,6 +296,17 @@ export default function SceneCallout() {
     const gsModel = (): Model | null => {
       if (!snap) return null;
       const rel = relativeAge(now - Date.parse(snap.data.timestamp));
+      // A COMMITTED METAGRAPH RE-READS THE LEAD (user, 2026-08-18 — the filter reached the
+      // strip's bars but not the same card in the scene). The ring already points at that
+      // network's own segment of the byte bar, so the count under it must be that segment's
+      // too: the hued ticker answering "whose x?", then `x of y anchors` — the strip's tooltip
+      // form verbatim, since a strip bar and this callout are the same subject read twice.
+      // Gate and source are the strip's own (`metagraphById`, the anchor index's per-id
+      // counts), so a lane the catalog can't name — "all", the DAG itself, unlisted — keeps
+      // the tick-wide total rather than guessing a share of it.
+      const cfg = metagraphById(filter);
+      const mine = cfg && filter !== "all" && filter !== "dag" ? cfg : null;
+      const total = snap.data.metagraphSnapshotCount;
       return {
         key: `gs|${snap.data.ordinal}`,
         eyebrow: "Global snapshot",
@@ -274,9 +317,14 @@ export default function SceneCallout() {
         // (user, 2026-08-16 — "if filter, select the correct segment of the byte bar").
         ring: filter !== "all" ? filterAccent(filter) : "var(--core)",
         lead:
-          typeof snap.data.metagraphSnapshotCount === "number"
-            ? { text: `${snap.data.metagraphSnapshotCount} anchors` }
-            : undefined,
+          typeof total !== "number"
+            ? undefined
+            : mine
+              ? {
+                  ident: { text: mine.ticker || mine.name, hue: filterAccent(filter) },
+                  text: `${getAnchor(snap.data.timestamp)?.metaCounts?.get(filter) ?? 0} of ${total} anchors`,
+                }
+              : { text: `${total} anchors` },
       };
     };
     // The boxed NODE card leads (user, 2026-08-16 — a tray machine selected via the card
