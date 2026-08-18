@@ -201,11 +201,19 @@
    and goes with the hover; the 0.16s transition on the base elements eases it in/out).
    RIGHT-rail cards (`.sig-left`) light the ig-panel ::before on their LEFT (scene-facing) edge —
    RIGHT_CARD suppresses `--spine`, so colour comes from the subject's `--row-hue` (falling back
-   to the rail's `--filter-accent`). Same soft-tipped line via `--edge-hue`; only the glow is new. */
+   to the rail's `--filter-accent`). Same soft-tipped line via `--edge-hue`; only the glow is new.
+
+   ⚠ The glow is OFFSET OUTWARD, not centred (user, 2026-08-18 — "the cards when collapsed now have
+   a glow based on metagraph color […] should still be only mostly on that left edge"). A centred
+   `0 0 10px` blur spends half its reach INSIDE the card, which is proportionally invisible on a
+   440px box and covers a 67px collapsed entry corner to corner — measured, ~19px of hue across the
+   face plus both left arcs. Pushing the blur 2px onto the scene-facing side and trimming it to 7px
+   leaves 5px inward and 9px outward: the same signal on a tall card, an EDGE rather than a tint on
+   a short one. The sign is per rail — it always spills away from the card, toward the scene. */
 .sig-left.subject-paired::before {
   opacity: 1;
   --edge-hue: var(--row-hue, var(--filter-accent, var(--primary)));
-  box-shadow: 0 0 10px 0 var(--row-hue, var(--filter-accent, var(--primary)));
+  box-shadow: -2px 0 7px 0 var(--row-hue, var(--filter-accent, var(--primary)));
 }
 
 /* LEFT-rail cards (`.sig-right`) — the mirror: pairing lights an ::after on the card's RIGHT
@@ -219,7 +227,7 @@
 .sig-right.subject-paired::after {
   opacity: 1;
   --edge-hue: var(--row-hue, var(--spine, var(--primary)));
-  box-shadow: 0 0 10px 0 var(--row-hue, var(--spine, var(--primary)));
+  box-shadow: 2px 0 7px 0 var(--row-hue, var(--spine, var(--primary)));
 }
 
 /* The identity EDGE SPINE with corner run-off (user, 2026-08-15 — "the fade drops too quickly
