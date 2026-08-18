@@ -467,11 +467,16 @@ export class NodeFabric {
       // model — the DAG core's nodes are metagraph nodes that orbit the origin). The base's
       // hyper→globe endpoints live in the domain, so the two call sites cannot pass different
       // ones. Steady; the old twinkle shimmer was removed. Also composes the hover/selection
-      // focus boost/dim-back inside. No hubBoost: the core has no orbiting hub to match.
+      // focus boost/dim-back inside.
+      // dimModel.hubMatchBoost, same call as the metagraph loop (user, 2026-08-18): the core IS a
+      // hub under ONE NODE MODEL, so committing the DAG lifts its validators to hub level exactly
+      // as committing a metagraph lifts that network's nodes. Same replace-not-stack rule — a
+      // FOCUSED node takes its own boost instead, never both.
+      const hubBoost = hubMatchBoost(c, nodeGlow(c, d), c.filter === "dag");
       const flRaw = u._flash || 0; // brief flash when an arc pulse reaches this node
       // The buffer IS the easing state — emiArr persists across frames and a node keeps its slot,
       // so approaching the target in place costs one array read and allocates nothing.
-      const emiT = nodeEmissive(c, d, flRaw, fw, !!focusId);
+      const emiT = nodeEmissive(c, d, flRaw, fw, !!focusId, fw > 0 ? 0 : hubBoost);
       emi[u.index] += (emiT - emi[u.index]) * ek;
       if (flRaw) u._flash = flRaw * flashDecay;
 

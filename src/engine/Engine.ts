@@ -1788,9 +1788,11 @@ export class Engine {
           el.style.transform = `translate3d(${x.toFixed(1)}px, ${y.toFixed(1)}px, 0)`;
           // Viewport flips (user, 2026-08-16): near the right edge the panel goes up-LEFT,
           // near the top it drops BELOW the anchor — globals.css mirrors the geometry off
-          // these attributes (guarded writes, like data-on).
-          const flip = x > r.right - 320;
-          const drop = y < r.top + 170;
+          // these attributes (guarded writes, like data-on). Both thresholds are the panel's
+          // own reach on that axis — SceneCallout's OFF_X/OFF_Y standoff plus the widest/
+          // tallest panel — so they move with those offsets, never on their own.
+          const flip = x > r.right - 360;
+          const drop = y < r.top + 220;
           if ((el.dataset.flip != null) !== flip) {
             if (flip) el.dataset.flip = "";
             else delete el.dataset.flip;

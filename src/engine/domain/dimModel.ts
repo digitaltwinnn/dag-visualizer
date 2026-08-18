@@ -319,9 +319,13 @@ export function snapBright(
 // bloom like their hub (user). Derived from the node's own pre-floor `glow` (the boost is the
 // GAP up to 0.72, never negative) and fading out with the hubs by morph 0.3 — there's no hub on
 // the globe. `committed` = this node's metagraph IS the committed filter.
-// The DAG core deliberately does NOT take this: it has no orbiting hub to match, it IS the core
-// sphere at the centre, which carries its own reveal/dim in HyperView. That is furniture, not the
-// node model — the one asymmetry left, and it is about what a node orbits, not about what it is.
+//
+// ONE NODE MODEL: the DAG core takes it too (user, 2026-08-18 — "the DAG focus/dim effect on the
+// node subjects is not clear enough, should be the same as for metagraphs"). It had been exempt on
+// the reasoning that the core has no orbiting hub to match, but since 2026-08-11 the core IS a hub:
+// the same HUB_ORB geometry at hub size, sitting at the origin. Committing the DAG therefore left
+// its validators at their bare base 0.47 against the others' dimmed 0.33 — a 1.4x separation, where
+// a committed metagraph's own nodes lift to 0.72 against that same 0.33 and read at a glance.
 export function hubMatchBoost(c: DimContext, glow: number, committed: boolean): number {
   if (!committed) return 0;
   // NOT in the chamber (user bug, 2026-08-16 — "all nodes get a highlight except the selected"):

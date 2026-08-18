@@ -52,8 +52,15 @@ import type { GeoInfo } from "@/src/data/types";
 
 // Panel offset from the anchor, up and to the right. The leader spans exactly this diagonal, so
 // the three pieces (ring, line, panel corner) stay attached by construction.
-const OFF_X = 62;
-const OFF_Y = 92;
+//
+// The standoff is longer than the panel is TALL (user, 2026-08-18 — "the call-out card sits on the
+// actual selection instead of at the end of the connecting line"). At the original 62/92 the tie was
+// ~111px against an ~82px panel, so the card landed inside its own subject's neighbourhood — in
+// hyper, squarely on the validator shells the selected bead sits on — and the leader read as a stub
+// under it rather than as the thing the card hangs from. The mirrored viewport thresholds in
+// `Engine._syncCallout` are derived from these two numbers; change all four together.
+const OFF_X = 100;
+const OFF_Y = 140;
 
 
 // What the panel says — one model, filled per view/rung so the JSX below stays single-sourced.
