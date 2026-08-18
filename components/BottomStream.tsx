@@ -19,7 +19,10 @@ import { VIEW_POLICIES } from "@/src/engine/domain/viewPolicy";
 // presence and the space reserved for it cannot drift. That is what the previous arrangement got
 // wrong in the other direction: the reserve was published per view from here while the strip was
 // always mounted, which left two values for one token.
-const RESERVE = 130; // 16px bottom inset + the strip's 98px height + 16px clearance above it
+// The reserve is measured from the TOP OF THE FOOTER, not from the viewport bottom (2026-08-18):
+// the strip now sits 8px above the site footer, and every consumer of this token subtracts
+// `--footer-h` separately, so folding the footer in here would count it twice.
+const RESERVE = 122; // 8px gap above the footer + the strip's 98px height + 16px clearance above it
 
 export default function BottomStream() {
   const mode = useStore((s) => s.mode);

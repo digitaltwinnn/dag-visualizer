@@ -564,6 +564,13 @@
                               (it publishes the real height from the same policy flag that decides
                               whether the strip mounts at all), so this value is only ever what the
                               stylesheet answers before that effect runs. */
+  --footer-h: 26px;        /* the site footer's band along the very bottom edge (SiteFooter.tsx,
+                              2026-08-18) — site chrome, not view chrome, so it is a STATIC token
+                              rather than a published one. Everything above it ADDS this to its own
+                              bottom inset, exactly as the rails add --topbar-extra at the top, and
+                              --bottom-reserve keeps its meaning: the lane's own band ABOVE the
+                              footer. Zeroed on the phone, where the 56px dock owns the bottom edge
+                              and the footer hides — one token, so every consumer follows. */
   --rail-fade: 28px;       /* height of a clipped rail's bottom fade — AND its scroll runway
                               (globals `.rail-clip` + RailScroll's measure read this one token) */
 
@@ -638,8 +645,12 @@
        underneath (bug, 2026-07-18: a 5-card #rightcol stack's trailing card × silently clicked
        a LiveStrip bar it was invisibly sitting on top of). Subtracting --bottom-reserve here
        keeps the box entirely above the strip; the rail-clip mask/runway then fades/scrolls
-       purely WITHIN that bound, never over live chrome. */
-    max-height: calc(100vh - var(--rail-top) - var(--topbar-extra, 0px) - var(--bottom-reserve, 0px) - 14px);
+       purely WITHIN that bound, never over live chrome.
+       The trailing `max(14px, --footer-h)` is the rail's bottom breather AND the site footer's
+       band in one term (2026-08-18): the footer is the taller of the two on the desktop, and on
+       the phone the token zeroes and the original 14px breather is what remains — one expression,
+       so a rail can never sit on the footer and never loses its breather when there is none. */
+    max-height: calc(100vh - var(--rail-top) - var(--topbar-extra, 0px) - var(--bottom-reserve, 0px) - max(14px, var(--footer-h, 0px)));
     overflow-y: auto;
   }
   /* Rail cards are flex-none SO THE RAIL SCROLLS — an expanded card (the country accordion)
@@ -694,7 +705,7 @@
     /* Must never enter the LiveStrip's reserved band — see the matching #leftcol comment above
        (same bug: a masked-invisible trailing card was still fully clickable, and #livestrip's
        later DOM position won the hit-test at equal z-index). */
-    max-height: calc(100vh - var(--rail-top) - var(--topbar-extra, 0px) - var(--bottom-reserve, 0px) - 14px);
+    max-height: calc(100vh - var(--rail-top) - var(--topbar-extra, 0px) - var(--bottom-reserve, 0px) - max(14px, var(--footer-h, 0px)));
     overflow-y: auto;
     pointer-events: none;
   }
@@ -799,6 +810,15 @@
   --tracking-caps: 0.13em;
 
   --animate-breathe: breathe 1.5s ease-in-out infinite;
+}
+
+/* The footer hides on the phone (the 56px dock owns that edge), so its band must go to 0 in the
+   same breath or every consumer would keep reserving space for a strip that isn't drawn. Written
+   as `not (min-width: …)` rather than `max-width` to match the SAME boundary Tailwind's
+   `max-[699px]:hidden` compiles to on the component itself — CSS trap 8, where the two forms
+   disagree by exactly one pixel. */
+@media not (min-width: 699px) {
+  :root { --footer-h: 0px; }
 }
 
 @keyframes breathe {

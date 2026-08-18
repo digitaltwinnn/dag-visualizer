@@ -16,6 +16,7 @@ import SceneCallout from "@/components/SceneCallout";
 import DevCssCanary from "@/components/DevCssCanary";
 import SectionShell from "@/components/SectionShell";
 import DataSection from "@/components/DataSection";
+import SiteFooter from "@/components/SiteFooter";
 
 // Single-page shell in TWO LAYERS (spec 2026-08-01): SectionShell carries the fixed scene shell
 // (the canvas in its own `scene` slot, since it recedes rather than hides, + the HUD as children)
@@ -33,6 +34,9 @@ export default function Home() {
   return (
     <main>
       <TopBar />
+      {/* Site chrome, pinned to the real viewport like the bar — the second route to /about and
+          the home of the project's own links (user, 2026-08-18). */}
+      <SiteFooter />
       <SectionShell scene={<SceneCanvas />} raw={<DataSection />} strip={<BottomStream />}>
         <Blueprint />
         <BootOverlay />

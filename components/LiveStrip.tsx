@@ -108,7 +108,7 @@ export default function LiveStrip() {
     <section
       id="livestrip"
       className={cn(
-        "fixed z-10 left-4 right-4 bottom-4 h-[98px] px-[14px] flex items-center bg-transparent border-none",
+        "fixed z-10 left-4 right-4 bottom-[calc(var(--footer-h,0px)+8px)] h-[98px] px-[14px] flex items-center bg-transparent border-none",
         "max-[699px]:bottom-[calc(var(--phone-dock-h,56px)+8px)]",
         !live && "saturate-[.45]",
       )}

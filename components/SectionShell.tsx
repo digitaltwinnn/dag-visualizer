@@ -149,9 +149,10 @@ export default function SectionShell({
       </div>
 
       {/* The raw layer: fixed into exactly the band the rails occupy (the same `--rail-top` /
-          `--topbar-extra` / `--bottom-reserve` tokens), edge-aligned with the command bar, wearing
-          the app's own glass (`.ig-panel`). z-9 puts it over the receded scene and under the strip
-          (z-10, where the strip mounts) and the command bar (z-40). It starts `visibility:hidden` so
+          `--topbar-extra` / `--bottom-reserve` / `--footer-h` tokens), edge-aligned with the command
+          bar, wearing the app's own glass (`.ig-panel`). z-9 puts it over the receded scene and under
+          the strip (z-10, where the strip mounts) and the command bar (z-40). It starts
+          `visibility:hidden` so
           it is out of the paint and hit-test path entirely until it surfaces. The reserve FALLBACKS
           are 0, matching the token's own static default — the lane is Snapshots-only, so "no
           `--bottom-reserve` yet" means no lane, not the ledger's band. */}
@@ -162,7 +163,7 @@ export default function SectionShell({
         inert={section !== "data"}
         className={
           "ig-panel fixed z-9 overflow-hidden left-4 right-4 min-[1100px]:left-[26px] min-[1100px]:right-[26px] " +
-          "top-[calc(var(--rail-top)+var(--topbar-extra,0px))] bottom-[var(--bottom-reserve,0px)] " +
+          "top-[calc(var(--rail-top)+var(--topbar-extra,0px))] bottom-[calc(var(--bottom-reserve,0px)+var(--footer-h,0px))] " +
           "max-[699px]:bottom-[calc(var(--phone-dock-h,56px)+var(--bottom-reserve,0px))]"
         }
         style={{ visibility: "hidden", willChange: "transform, opacity" }}
