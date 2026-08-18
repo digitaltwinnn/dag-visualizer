@@ -280,8 +280,16 @@ export class Engine {
   // No param → stays 1 → the whole mechanism is a no-op, so the parse itself is the dev/prod gate
   // (unlike `stats`, which toggles a visible DOM panel and so needs an explicit environment check).
   private _slowmo = 1;
-  // The ?tune live-tuning panel's handle (devTune.ts) — dev tooling, disposed with the engine.
+  // The live-tuning panel's handle (devTune.ts) — dev tooling, disposed with the engine.
   private _devTune?: { dispose(): void };
+  // Its dev-only DOM switch (user, 2026-08-18 — "can't we just add a switch and show it only for
+  // dev?"). `?tune` still opens the panel anywhere, which is what makes it usable against a
+  // DEPLOYED build; the switch is the everyday route and exists in `next dev` alone, so nothing
+  // here reaches a real user. It sits beside the stats panel bottom-left, outside the four HUD
+  // zones — dev chrome is not view chrome, and the same reasoning that keeps Stats out of React
+  // keeps this out of it. Grayscale only, per the colour rule: dev tooling states nothing about
+  // the palette.
+  private _tuneBtn?: HTMLButtonElement;
   // Fired once, after the first frame actually renders (see start()'s loop) — lets callers
   // (SceneCanvas → store.engineReady) know the scene has painted, not just constructed.
   private _onReady?: () => void;
@@ -412,18 +420,9 @@ export class Engine {
 
     // Live tuning panel — `?tune` (the ?stats idiom): tweakpane is dynamically imported so it
     // never enters the normal bundle; the panel binds the scene's *TUNE_DEFAULTS-backed objects.
-    if (/[?#&]tune/.test(window.location.search + window.location.hash)) {
-      import("./devTune").then(async (m) => {
-        if (this.disposed) return;
-        this._devTune = await m.mountDevTune({
-          ledger: this.ledger,
-          hyper: this.layers,
-          camera: this.ctx.camera,
-          controls: this.ctx.controls,
-        });
-        if (this.disposed) this._devTune.dispose();
-      });
-    }
+    // In `next dev` a switch offers the same thing without a reload (see _tuneBtn).
+    if (/[?#&]tune/.test(window.location.search + window.location.hash)) this._openDevTune();
+    if (process.env.NODE_ENV === "development") this._mountTuneSwitch();
 
     // Apply current store state, then react to changes (Lane B command bridge).
     const s = useStore.getState();
@@ -2023,6 +2022,74 @@ export class Engine {
     }
   }
 
+  // ── The dev tuning panel: one open path, whether the URL flag or the switch asked ──────────
+  // `_tuneOpening` is the re-entrancy guard: the import is async, so without it a second click
+  // during the load mounts a second panel bound to the same objects.
+  private _tuneOpening = false;
+  private async _openDevTune(): Promise<void> {
+    if (this._devTune || this._tuneOpening) return;
+    this._tuneOpening = true;
+    try {
+      const m = await import("./devTune");
+      if (this.disposed) return;
+      this._devTune = await m.mountDevTune({
+        ledger: this.ledger,
+        hyper: this.layers,
+        camera: this.ctx.camera,
+        controls: this.ctx.controls,
+      });
+      if (this.disposed) this._devTune.dispose();
+    } finally {
+      this._tuneOpening = false;
+      this._syncTuneSwitch();
+    }
+  }
+
+  private _closeDevTune(): void {
+    this._devTune?.dispose();
+    this._devTune = undefined;
+    this._syncTuneSwitch();
+  }
+
+  private _syncTuneSwitch(): void {
+    const b = this._tuneBtn;
+    if (!b) return;
+    const on = !!this._devTune;
+    b.setAttribute("aria-pressed", String(on));
+    b.style.opacity = on ? "1" : "0.55";
+  }
+
+  // The switch itself. Plain DOM beside Stats, built here rather than in devTune.ts because it has
+  // to exist BEFORE the panel module loads — it is what asks for the load.
+  private _mountTuneSwitch(): void {
+    const b = document.createElement("button");
+    b.type = "button";
+    b.textContent = "tune";
+    b.title = "Live-tune the scene look (dev only). Same panel as ?tune.";
+    b.setAttribute("aria-pressed", "false");
+    Object.assign(b.style, {
+      position: "fixed",
+      left: "8px",
+      bottom: "8px",
+      zIndex: "10000",
+      padding: "3px 8px",
+      font: "11px/1.4 ui-monospace, monospace",
+      letterSpacing: "0.06em",
+      color: "#fff",
+      background: "rgba(0,0,0,0.72)",
+      border: "1px solid rgba(255,255,255,0.22)",
+      borderRadius: "4px",
+      cursor: "pointer",
+      opacity: "0.55",
+    } satisfies Partial<CSSStyleDeclaration>);
+    b.addEventListener("click", () => {
+      if (this._devTune) this._closeDevTune();
+      else void this._openDevTune();
+    });
+    document.body.appendChild(b);
+    this._tuneBtn = b;
+  }
+
   dispose() {
     this.disposed = true;
     if (this.metaTimer) clearInterval(this.metaTimer);
@@ -2043,6 +2110,7 @@ export class Engine {
     if (useStore.getState().sceneDragging) useStore.getState().setSceneDragging(false);
     if (useStore.getState().cameraFlying) useStore.getState().setCameraFlying(false);
     this.stats?.dom.remove();
+    this._tuneBtn?.remove();
     this._devTune?.dispose();
     this.unsub.forEach((u) => u());
     cancelAnimationFrame(this.raf);
