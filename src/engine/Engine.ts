@@ -1790,7 +1790,13 @@ export class Engine {
           // these attributes (guarded writes, like data-on). Both thresholds are the panel's
           // own reach on that axis — SceneCallout's OFF_X/OFF_Y standoff plus the widest/
           // tallest panel — so they move with those offsets, never on their own.
-          const flip = x > r.right - 360;
+          // ⚠️ A flip must never push the panel into the CLOSER edge. The reach test alone
+          // assumes a viewport wider than twice that reach; on a phone `r.right - 360` sits
+          // ~40px in, so all but the leftmost anchors flipped and overflowed left by more
+          // than they would have overflowed right. Flipping only toward the roomier side
+          // makes the choice honest at every width and is provably a no-op on desktop —
+          // there, an anchor past the reach threshold always has the room behind it.
+          const flip = x > r.right - 360 && x - r.left > r.right - x;
           const drop = y < r.top + 220;
           if ((el.dataset.flip != null) !== flip) {
             if (flip) el.dataset.flip = "";
