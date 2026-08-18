@@ -47,6 +47,7 @@ import { RoleChips } from "@/components/inspector/parts";
 // own RoleChips (user, 2026-08-15: "look at my cards — square pills").
 import { layerCodesOf } from "@/src/data/composition";
 import { useNowTick } from "@/components/useNowTick";
+import { useBreakpoint } from "@/components/useBreakpoint";
 import { relativeAge } from "@/src/util/relativeAge";
 import type { GeoInfo } from "@/src/data/types";
 
@@ -182,7 +183,11 @@ export default function SceneCallout() {
   // SnapshotAside's two states mirrored as a label — `live · Xs` with the beating dot while
   // following, `◷ Xs` on a pin. The card keeps the BUTTON (follow toggle); this is read-only.
   const now = useNowTick(1000);
-  if (!VIEW_POLICIES[mode].callout || section !== "scene") return null;
+  // NOT ON A PHONE (user, 2026-08-18) — the reasoning lives with the Engine's mirrored gate in
+  // `_syncCallout`: the label's value is co-location, and under 700px the panel's reach can't
+  // deliver it. `breakpointOf` is the one home for the tier, so both owners answer the same call.
+  const bp = useBreakpoint();
+  if (!VIEW_POLICIES[mode].callout || section !== "scene" || bp === "phone") return null;
 
   // The committed NODE's model — shared by hyper and geo (user, 2026-08-15: in hyper too, "the
   // node does not have its callout — clickable, has a card"). City-first like the node card,

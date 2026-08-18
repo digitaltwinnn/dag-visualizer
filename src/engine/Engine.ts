@@ -32,6 +32,7 @@ import { LADDERS, LEVEL_CARRY, hasLevel, type CohortSel, type CompositionSel, ty
 import { compositionGroups, compositionKey, compositionRows } from "@/src/data/composition";
 import { metaSnapDeepKey, metaSnapHoverKey } from "@/src/data/types";
 import { snapsAtTick } from "@/src/data/anchorLog";
+import { breakpointOf } from "@/src/data/breakpoint";
 import type { GlobalSnapshot, NodeRow, PickDescriptor } from "@/src/data/types";
 import type { ClusterNode, DagCore, GeoMap, RouteMetagraph } from "@/src/data/types";
 
@@ -1764,10 +1765,22 @@ export class Engine {
   // picking is suppressed), behind the camera, and wherever the policy or subject says no; the
   // component independently declines to render the same cases from store state, so `data-on` is
   // belt on top of braces, never the only gate.
+  //
+  // NOT ON A PHONE (user, 2026-08-18 — "drop the callout when in mobile mode"). The label's whole
+  // value is CO-LOCATION with its subject, and under 700px the ~298px reach can't deliver it:
+  // shortening the leader parks the panel ON the thing it points at, clamping points it sideways
+  // at nothing — both keep the pixels and throw the meaning away. It is the same judgement the
+  // view already makes for a distributed subject (a filtered fleet gets no callout, because "a
+  // single anchor would lie about where it is"); a callout that cannot say WHERE is not a smaller
+  // callout, it is a wrong one. Nothing is lost that isn't one tap away — the phone's Details
+  // sheet carries the box and the dock's icon tray announces when it updates. `breakpointOf` is
+  // the ONE home for the tier (the component gates on the same call through `useBreakpoint`), so
+  // the two owners cannot drift apart at the boundary.
   private _syncCallout(): void {
     const el = document.getElementById("callout");
     if (!el) return;
-    let on = this._policy.callout && !this.transition.active();
+    let on =
+      this._policy.callout && !this.transition.active() && breakpointOf(window.innerWidth) !== "phone";
     if (on) {
       const v = this._calloutV;
       on =
