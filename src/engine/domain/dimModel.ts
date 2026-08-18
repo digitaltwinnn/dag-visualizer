@@ -70,8 +70,25 @@ export const nodeDimScale = (c: DimContext): number => viewMix(c, "dim");
 //
 // Reading the RAW ramp is also what keeps the country drill a LENS: `nodeDim`'s countryMix raise is
 // a mute, and must never shrink the nodes it looks past.
-// Callers compose the gather escape hatch (parked squares show the whole fleet) on top.
+// The gather escape hatch is `gatherRaw` below, applied to the ramp BEFORE this reads it.
 export const hideFrac = (c: DimContext, raw: number): number => raw * viewMix(c, "hide");
+
+// The view-transition's staging block shows the WHOLE fleet, so the gather releases a node from the
+// filter as it flies: the ramp itself relaxes to 0 at the parked position, and BOTH readings follow
+// it — the chip comes back to full size AND to full brightness together.
+//
+// ⚠️ It lifts the RAMP, not one reading of it (user, 2026-08-18 — "node inverse focus geo→snapshot,
+// happens on geo outgoing animation"). The hatch used to live in the callers, composed onto `hide`
+// alone: `show += (1 - show) * gw`. So leaving geo under a filter restored an off-filter chip's SIZE
+// while its dim stayed at 1.0 — glow 0.03, a black chip at full size for the whole out phase — and
+// then the invisible mid-transition boundary swapped geo's row for the ledger's (dim 1.0 → 0.5) and
+// 161 chips lit at once. That boundary is invisible for a LAYOUT change, which is all it was ever
+// asked to hide; a change in what is VISIBLE reads as a pop wherever the nodes are standing.
+// Driving the ramp to 0 is what makes the two rows agree there, so the fade is continuous across it.
+//
+// Linear in `raw`, so it reproduces the old size behaviour EXACTLY: `1 - hideFrac(c, raw*(1-gw))`
+// is `1 - hideFrac(c, raw)*(1-gw)`, which is the composed form term for term.
+export const gatherRaw = (raw: number, gatherW: number): number => raw * (1 - gatherW);
 
 // Set the dim TARGETS for a selection (the dim itself eases each frame; the per-view STRENGTH is
 // applied in the node loops). The validators ARE the DAG core → lit under "all"/"dag", dimmed only

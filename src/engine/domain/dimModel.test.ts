@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import {
   nodeDimScale,
   hideFrac,
+  gatherRaw,
   offNetMul,
   EMPHASIS_EASE,
   emphasisK,
@@ -114,6 +115,63 @@ describe("hideFrac (the shrink, an independent reading of the same ramp as the d
     const drilled = ctx({ morph: 1, countryFilter: "DE", countryMix: 0.8 });
     expect(nodeDim(drilled, 0, "US")).toBeCloseTo(0.8, 10); // the mute lands…
     expect(hideFrac(drilled, 0)).toBeCloseTo(0, 10); // …the shrink does not
+  });
+});
+
+describe("gatherRaw (the view-transition's escape hatch — it lifts the RAMP, not one reading)", () => {
+  it("releases the ramp completely at the parked position, and is inert with no transition", () => {
+    expect(gatherRaw(1, 0)).toBeCloseTo(1, 10);
+    expect(gatherRaw(1, 1)).toBeCloseTo(0, 10);
+    expect(gatherRaw(0.4, 0)).toBeCloseTo(0.4, 10);
+    expect(gatherRaw(0.4, 1)).toBeCloseTo(0, 10);
+  });
+
+  it("is monotone in flight — a chip only ever comes further back as it parks", () => {
+    let prev = gatherRaw(1, 0);
+    for (let gw = 0.1; gw <= 1.0001; gw += 0.1) {
+      const now = gatherRaw(1, gw);
+      expect(now).toBeLessThan(prev);
+      prev = now;
+    }
+  });
+
+  // The whole point of moving the hatch onto the ramp: the DIM follows the size back up, so an
+  // off-filter chip is never restored to full size while still resolving to a black glow.
+  it("brings the dim up with the size — the two readings can no longer disagree", () => {
+    const geo = ctx({ morph: 1 }); // dim 1.0, hide 1 — the isolate
+    // At rest an off-filter chip is gone AND black; parked it is present AND lit, together.
+    expect(hideFrac(geo, gatherRaw(1, 0))).toBeCloseTo(1, 10);
+    expect(nodeDim(geo, gatherRaw(1, 0), null)).toBeCloseTo(1, 10);
+    expect(hideFrac(geo, gatherRaw(1, 1))).toBeCloseTo(0, 10);
+    expect(nodeDim(geo, gatherRaw(1, 1), null)).toBeCloseTo(0, 10);
+  });
+
+  // What makes the invisible mid-transition boundary actually invisible for BRIGHTNESS as well as
+  // layout: at the parked position the ramp is 0, so every view's row resolves the same dim and the
+  // geo→ledger row swap (dim 1.0 → 0.5) can't step the fleet's glow.
+  it("makes every view's row agree at the boundary — no pop when the layout snaps", () => {
+    const parked = gatherRaw(1, 1);
+    for (const c of [ctx({ morph: 1 }), ctx({ morph: 0 }), ctx({ morph: 1, ledger: true })]) {
+      expect(nodeDim(c, parked, null)).toBeCloseTo(0, 10);
+      expect(hideFrac(c, parked)).toBeCloseTo(0, 10);
+    }
+  });
+
+  // The callers used to compose the hatch onto `hide` as `show += (1 - show) * gw`. Both forms are
+  // linear in the ramp, so routing it through gatherRaw is a pure generalization — the size
+  // behaviour is bit-identical and only the dim is new.
+  it("reproduces the composed size behaviour term for term", () => {
+    for (const c of [ctx({ morph: 1 }), ctx({ morph: 0.5 }), ctx({ morph: 0 })]) {
+      for (const raw of [0, 0.3, 0.5, 1]) {
+        for (const gw of [0, 0.25, 0.5, 0.75, 1]) {
+          const composed = (() => {
+            const show = 1 - hideFrac(c, raw);
+            return show + (1 - show) * gw;
+          })();
+          expect(1 - hideFrac(c, gatherRaw(raw, gw))).toBeCloseTo(composed, 10);
+        }
+      }
+    }
   });
 });
 

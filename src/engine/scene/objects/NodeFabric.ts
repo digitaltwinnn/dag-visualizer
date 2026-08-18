@@ -16,7 +16,7 @@ import * as THREE from "three";
 import { LEDGER } from "../../domain/ledgerLayout";
 import { HEX_H } from "../../domain/geoLayout";
 import { discFall, lerp, smooth } from "../../domain/nodeLayout";
-import { nodeDim, nodeEmissive, nodeGlow, hubMatchBoost, focusWeightOf, hideFrac, emphasisK } from "../../domain/dimModel";
+import { nodeDim, nodeEmissive, nodeGlow, hubMatchBoost, focusWeightOf, hideFrac, gatherRaw, emphasisK } from "../../domain/dimModel";
 import type { DimContext } from "../../domain/dimModel";
 import type { MetaNodeRecord, ValidatorRecord } from "../../domain/records";
 import type { ViewTransition } from "../../domain/viewTransition";
@@ -391,8 +391,9 @@ export class NodeFabric {
       // Off-filter nodes SHRINK AWAY on the globe and merely mute in hyper — dimModel.hideFrac
       // owns that split. It reads the RAW ramp, not the resolved dim, so the two knobs are
       // independent (and the country drill's mute can never shrink a node — lens, not filter).
-      let show = 1 - hideFrac(c, dim);
-      show += (1 - show) * gw; // parked squares show the whole fleet (dim re-applies on landing)
+      // dimModel.gatherRaw releases that ramp along the gather flight, so the parked squares show
+      // the whole fleet at full size AND full brightness — the glow loop reads the same hatch.
+      const show = 1 - hideFrac(c, gatherRaw(dim, gw));
 
       // Sphere: tumbling on its own axis, cross-fading into the chip ALONG the gather flight
       // (wEff; noGeo nodes keep the plain morph squash — they have no geo chip to become).
@@ -435,8 +436,14 @@ export class NodeFabric {
     // read as a local in the loop — the tune hoist rule.
     const ek = emphasisK(dt);
     // While a country drill-down is active, per-node dim varies, so recolour every frame; otherwise
-    // only during a layer-dim transition.
+    // only during a layer-dim transition. A view transition also varies it per node (each node's
+    // gather weight releases its own ramp — dimModel.gatherRaw), and it does so WITHOUT moving the
+    // shared `dim`, so the flight must be its own trigger or the base colour stays dimmed under a
+    // brightening emissive. No falling-edge touch-up is needed: viewTransition's stagger spread
+    // exactly fills its phase (FLIGHT_IN + STAGGER_SPREAD === DUR_IN), so every node's weight has
+    // reached 0 — to ~1e-6, smootherstep being flat at 1 — by the frame the phase goes idle.
     const recolour = cf != null || cmix > 0.001 ||
+      !!(ctx.transition && ctx.transition.active()) ||
       Math.abs(dim - this._appliedDim) > 0.001;
     const base = this.baseArr;
     const emi = this.emiArr;
@@ -449,10 +456,15 @@ export class NodeFabric {
     const focusId = c.hoverNodeId || c.selectedNodeId || c.hoverCohort;
     for (const u of records) {
       const geoCc = geoCcOf(u.pick);
+      // dimModel.gatherRaw: the same escape hatch placeValidators applies to the SIZE, read here so
+      // the two can't disagree — a chip restored to full size mid-gather is restored to full glow
+      // with it, and the ramp reaching 0 at the parked position is what keeps the mid-transition
+      // boundary's row swap invisible for brightness as well as layout.
+      const rawEff = gatherRaw(dim, this._gatherW(ctx, u.gRank, u.gCount));
       // dimModel.nodeDim: dim * nodeDimScale(c) (the morph-ramped strength), raised by the
       // country dim outside the drilled-into country (geo only) — CALLS the domain function
       // directly now (no inline mirror).
-      const d = nodeDim(c, dim, geoCc);
+      const d = nodeDim(c, rawEff, geoCc);
       // dimModel.focusWeightOf: the hovered/selected node itself takes the FULL boost, a mere
       // member of a focused group (a hovered/committed provider cohort) only a share — so
       // picking one node inside a lit cohort still reads (user, 2026-08-01). Since 2026-08-11 a
@@ -516,16 +528,18 @@ export class NodeFabric {
       const prim = r.geoPrimary !== false;
       const wEff = w + (1 - w) * gw; // staging shape = the chip (see the validator loop)
       const geoCc = geoCcOf(r.pick);
-      // dimModel.nodeDim: r.dim × the morph-ramped strength — the SAME call the validator loop
+      // dimModel.gatherRaw: the view transition's staging block shows the whole fleet, so the
+      // gather releases this node from the filter as it flies — and it releases the RAMP, so the
+      // chip comes back to full size AND full brightness together. Both readings below take it.
+      const rawEff = gatherRaw(r.dim, gw);
+      // dimModel.nodeDim: the ramp × the morph-ramped strength — the SAME call the validator loop
       // makes (user, 2026-08-11: one node model), raised by the country dim when outside the
       // drilled-into country (geo only); LEDGER forces its flat row value (morph frozen).
-      const dEff = nodeDim(c, r.dim, geoCc);
+      const dEff = nodeDim(c, rawEff, geoCc);
       // dimModel.hideFrac: how far an off-filter node SHRINKS AWAY — 1 on the globe (the isolate),
       // 0 in hyper, where a turned-up dim mutes in place at full size. It reads the RAW ramp, not
-      // dEff, so `dim` and `hide` move one effect each. The gather escape hatch lifts it back:
-      // parked squares show the whole fleet.
-      const hid = hideFrac(c, r.dim);
-      const vis = (1 - hid) + hid * gw;
+      // dEff, so `dim` and `hide` move one effect each.
+      const vis = 1 - hideFrac(c, rawEff);
       // dimModel.hubMatchBoost: the COMMITTED metagraph's own nodes glow at the hub's resting
       // level (HyperView hub base 0.72) in the Hypergraph, so the picked network's nodes bloom
       // like its hub instead of sitting at the dimmer node base (user). Fades out with the hubs
