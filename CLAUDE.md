@@ -1289,9 +1289,26 @@ per contributing metagraph plus unlisted, each its own pickable mesh from a pool
 **Bands follow lane order, so band order and lane order agree and the ribbons never cross.**
 
 **The honesty is in the domain, not the adapter** (`ledgerBands.ts`): **no exact read → no bands.** A
-composition is never inferred from the anchor count and never from the fee, and an unmeasured or empty
-tick **draws no bar at all**, because the per-row ordinal label already marks that the tick happened —
-so nothing is drawn that could read as a small bar.
+composition is never inferred from the anchor count and never from the fee.
+
+**HEIGHT says whether a measurement exists; WIDTH says how big it is** (user, 2026-08-18 — *"it shows a
+snapshot in that view which can't be drawn … now it's just empty"*). An unmeasured row used to draw
+nothing at all, so a tick whose exact read failed was blank floor with a dotted anchor line pointing at
+it — the HUD said `EXACT READ FAILED` while the scene said nothing had happened. A row with no
+measurement now draws the **SEED**: the same flush block a forming lead lies in, `SEED_W × SEED_H`.
+Lying in the glass it is not a bar, so it makes **no width claim** — which is exactly what lets its
+footprint be nominal under `ledgerBands.ts`'s ban on inferring a width from anchor count or fee — and
+when a read lands the row RISES into its bands through the machinery that already existed. The
+**energy** says which absence: the lead's read is genuinely in flight, so it breathes on the calm beat
+(the held-slot acquiring form, as the cards' `NodeStars`); a read that failed or was never taken sits
+**still and dimmer**, because nothing is arriving. A seed stays **pickable** — selecting an unread tick
+is what asks for its read. ⚠️ `s.forming` stays true for a still seed: it is what short-circuits the
+grow loop, which would otherwise ease the mark into a full-height bar.
+
+And the **SEAM** — a measured tick that anchored nothing — is a MEASUREMENT, so it draws at full
+height: `ledgerBands.ts` has specified a minimum-width bar for it since the redesign, but the adapter's
+one `!measured || bandCount === 0` branch lumped it in with the unmeasured case and never drew it. It
+now rides the real write path through one synthetic neutral band.
 
 **Ribbons carry the anchor.** One tapering sheet per anchoring lane, from that metagraph's lane tiles
 down to **its own band** — the literal statement of which bytes came from where. Both edges are eased

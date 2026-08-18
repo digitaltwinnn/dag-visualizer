@@ -62,7 +62,7 @@ import type {
 } from "@/src/data/types";
 import { metaSnapHoverKey } from "@/src/data/types";
 import { LEDGER_LAYERS } from "@/src/data/ledgerLayers"; // shared display copy — floor labels = panel rows
-import { ByteBar } from "../objects/ByteBar";
+import { ByteBar, SEED_W } from "../objects/ByteBar";
 import { snapBright, snapFocusOf, focusWeightOf, emphasisK } from "../../domain/dimModel";
 import { Ribbons } from "../objects/Ribbons";
 import { SnapshotPlane, makeEdgeLabel, GLOBAL_PLANE_TUNE_DEFAULTS, META_PLANE_TUNE_DEFAULTS, type PlaneTune } from "../objects/SnapshotPlane";
@@ -744,9 +744,10 @@ export class LedgerView implements SceneView {
       const x = LEAD_X - s * SLOT_SP;
       o.mesh.position.x = x;
       // The dotted anchor runs from the text's end to the row's bar edge (its live width/2 —
-      // grows when the exact read lands); with no bar drawn it points at the row's centreline.
+      // grows when the exact read lands). Every row now draws SOMETHING (a measured bar, a
+      // measured-empty seam, or the flush seed), so the line always has a real edge to reach.
       const spec = this._specs[s];
-      const barEdge = spec.measured && spec.bandCount > 0 ? spec.width / 2 + 0.18 : 0.3;
+      const barEdge = (spec.measured ? spec.width / 2 : SEED_W / 2) + 0.18;
       const pos = o.line.geometry.attributes.position as THREE.BufferAttribute;
       pos.setXYZ(0, x, y, ORD_LINE_Z0);
       pos.setXYZ(1, x, y, Math.min(barEdge, ORD_LINE_Z0 - 0.2));
