@@ -57,13 +57,27 @@ interface Slot {
    *  when the read lands (`grow` eases 0→1 over the stored per-band targets). */
   forming: boolean;
   grow: number;
+  /** Companion to `grow` for the seed's HEIGHT, eased 0→1 on its own so it needs no record of
+   *  where `grow` started. 1 for a bar that was never a seed. */
+  rise: number;
   tz: number[]; // per-band target z-centre (measured layout)
   tw: number[]; // per-band target width
 }
 
-// The FORMING block's fixed footprint — nominal, deliberately unrelated to any byte count (the
+// The FORMING seed's fixed footprint — nominal, deliberately unrelated to any byte count (the
 // pulse and neutral tone say "acquiring"; the width says nothing until the read lands).
 const FORM_W = 1.3;
+// …and its height, as a fraction of the bar's (user, 2026-08-18: the seed "sits in front of the
+// plane rather than within"). At full BAR_H the seed was a near-cube — 1.6 deep, 0.9 tall, 1.3
+// wide — standing proud of the floor beside a trail of long flat bars, so it read as an object
+// placed in front of the plane rather than as the row that is coming. Flush in the glass it reads
+// as the row's own footprint, and the read landing then RISES it into the bar: the transform is
+// the arrival, which is the whole point of having a seed instead of an empty slot.
+const FORM_H = 0.14;
+/** The seed→bar height ramp, shared by the event-time write and the per-frame ease. */
+const riseScaleY = (rise: number): number => FORM_H + (1 - FORM_H) * rise;
+/** Box geometry is centred, so a bar of height `BAR_H * sy` sits on the floor at half that up. */
+const riseY = (sy: number): number => FLOOR_Y.gl0 + BAR_LIFT + (BAR_H * sy) / 2;
 
 export class ByteBar {
   group = new THREE.Group();
@@ -99,7 +113,7 @@ export class ByteBar {
       this._slots.push({
         ordinal: -1, bands, mats,
         measured: false, keys: [], colors: [], used: 0,
-        forming: false, grow: 1, tz: [], tw: [],
+        forming: false, grow: 1, rise: 1, tz: [], tw: [],
       });
     }
   }
@@ -114,12 +128,14 @@ export class ByteBar {
   setBar(slot: number, ordinal: number, spec: BarSpec | null, pick: PickDescriptor, formingAllowed = true): void {
     const s = this._slots[slot];
     if (!s) return;
+    // Captured BEFORE the write, so the measured branch below can tell a first measurement from a
+    // rebuild of a row it is already animating.
+    const prevOrd = s.ordinal;
+    const wasMeasured = s.measured;
     s.ordinal = ordinal;
     s.keys.length = 0;
     s.colors.length = 0;
     const x = LEAD_X - slot * SLOT_SP;
-    // Bottom just above the plane (user, 2026-08-07) — the box is centred, so lift by half height.
-    const y = FLOOR_Y.gl0 + BAR_LIFT + BAR_H / 2;
 
     if (!spec || !spec.measured || spec.bandCount === 0) {
       // No exact read yet, or a measured tick that anchored nothing: historical rows draw
@@ -132,11 +148,13 @@ export class ByteBar {
       s.measured = !!spec && spec.measured;
       s.forming = forming;
       s.grow = 1;
+      s.rise = forming ? 0 : 1;
       if (forming) {
         const mesh = s.bands[0];
+        const sy = riseScaleY(0);
         mesh.visible = true;
-        mesh.scale.set(BAR_D, 1, FORM_W);
-        mesh.position.set(x, y, 0);
+        mesh.scale.set(BAR_D, sy, FORM_W);
+        mesh.position.set(x, riseY(sy), 0);
         s.mats[0].color.setHex(this._neutral);
         mesh.userData.pick = pick;
         mesh.userData.bandKey = "";
@@ -156,8 +174,24 @@ export class ByteBar {
     const n = spec.bandCount;
     // GROW-IN (user, 2026-08-16): a bar that was forming animates from the forming footprint
     // into its measured width — the resize IS the "now it's a fact" signal. update() eases
-    // `grow` to 1 and re-derives each band from the targets stored here.
-    s.grow = wasForming ? Math.min(1, Math.max(0.08, FORM_W / Math.max(0.001, spec.width))) : 1;
+    // `grow`/`rise` to 1 and re-derives each band from the targets stored here.
+    //
+    // A rebuild of a row that is ALREADY animating must not restart or truncate it (user,
+    // 2026-08-18 — "it should be used to transform into the real snapshot"). `_rebuildAllSlots`
+    // re-runs on every poll and exact-read arrival, so the measured write landed 2-4 more times
+    // within the ~0.4s ramp, and each re-entry took the `: 1` arm and snapped the bar to full
+    // width. The morph was built, fired correctly, and then was never seen. Same ordinal, still
+    // mid-ramp ⇒ carry the running values through instead of re-deriving them.
+    const continuing = !wasForming && wasMeasured && prevOrd === ordinal && (s.grow < 1 || s.rise < 1);
+    if (wasForming) {
+      s.grow = Math.min(1, Math.max(0.08, FORM_W / Math.max(0.001, spec.width)));
+      s.rise = 0;
+    } else if (!continuing) {
+      s.grow = 1;
+      s.rise = 1;
+    }
+    const sy = riseScaleY(s.rise);
+    const y = riseY(sy);
     s.tz.length = 0;
     s.tw.length = 0;
     for (let i = 0; i < BANDS_PER_SLOT; i++) {
@@ -170,7 +204,7 @@ export class ByteBar {
       s.tw.push(w);
       mesh.visible = true;
       // The bar runs along Z (the lane/width field); X is time, so the box's own X is its depth.
-      mesh.scale.set(BAR_D, 1, w * s.grow);
+      mesh.scale.set(BAR_D, sy, w * s.grow);
       mesh.position.set(x, y, cz * s.grow);
       const identityHex =
         // The scene-color map carries EVERY drawable id incl. the unlisted gray (Engine's
@@ -273,13 +307,21 @@ export class ByteBar {
         s.mats[0].color.setHex(this._neutral);
         continue;
       }
-      // GROW-IN: ease a just-measured bar from the forming footprint to its stored targets.
-      if (s.grow < 1) {
+      // GROW-IN: ease a just-measured bar from the forming seed to its stored targets — outward
+      // in Z (the width becoming a fact) and upward in Y (the seed rising out of the glass it lay
+      // flush in). Both run on the same ~0.4s ramp so the bar arrives as one movement.
+      if (s.grow < 1 || s.rise < 1) {
         // ~0.4s to full (user, 2026-08-16, round 2 — the bar was TRAILING its own ribbons,
         // which ease in over 0.65s: the bar now lands first, the sheets bloom onto it).
-        s.grow = Math.min(1, s.grow + (1 - s.grow) * Math.min(1, dt * 4.5) + dt * 0.25);
+        const step = Math.min(1, dt * 4.5);
+        s.grow = Math.min(1, s.grow + (1 - s.grow) * step + dt * 0.25);
+        s.rise = Math.min(1, s.rise + (1 - s.rise) * step + dt * 0.25);
+        const sy = riseScaleY(s.rise);
+        const y = riseY(sy);
         for (let i = 0; i < s.used; i++) {
+          s.bands[i].scale.y = sy;
           s.bands[i].scale.z = s.tw[i] * s.grow;
+          s.bands[i].position.y = y;
           s.bands[i].position.z = s.tz[i] * s.grow;
         }
       }
