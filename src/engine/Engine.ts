@@ -2067,9 +2067,11 @@ export class Engine {
     b.textContent = "tune";
     b.title = "Live-tune the scene look (dev only). Same panel as ?tune.";
     b.setAttribute("aria-pressed", "false");
+    // Offset right of Next's own dev-tools badge, which claims the bottom-left corner in `next dev`
+    // and was covering half this pill — including its hit area.
     Object.assign(b.style, {
       position: "fixed",
-      left: "8px",
+      left: "66px",
       bottom: "8px",
       zIndex: "10000",
       padding: "3px 8px",
