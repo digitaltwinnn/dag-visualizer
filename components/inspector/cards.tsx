@@ -486,24 +486,26 @@ export function MetaCard({ cfg }: { cfg: MetaCfg }) {
           <div className="mt-3">
             <CompositionRows nodes={nodes} />
           </div>
+          {/* The SECOND partition of the same fleet — by state, in the same row grammar (user,
+              2026-08-18). It appears only when something is NOT ready (all-ready is the silent
+              default), and then it shows the FULL breakdown including the ready count, so a mixed
+              fleet reads as one complete picture. Its Separator is not decoration: column-aligned
+              and undivided, the two tables would read as ONE whose four partitions sum to twice
+              the fleet. */}
+          {nonReady && (
+            <>
+              <Separator className="my-2" />
+              <StatusBreakdown states={states} />
+            </>
+          )}
           <Separator className="my-2" />
-          {/* Summary in the shared Fact grammar — muted label left, the bold TOTAL right
-              (column-aligned with the composition counts it summarizes), and the per-state
-              breakdown STACKED under it in the Full-archive row's own grammar (user,
-              2026-08-18). It was a pill row on its own flex line below the Fact, which broke
-              the summary into two lines the moment a fleet was mixed; as a stacked underline
-              the two rows of this block now read as one shape — a total, then the two
-              breakdowns of it (by state here, by archive depth below). The bucket COLOURS
-              survive the loss of the pill chrome: amber and red are the signal, the wash and
-              border were only its box. */}
+          {/* Summary in the shared Fact grammar — muted label left, the bold TOTAL right,
+              column-aligned with the counts of both tables it summarizes. Totals sit BELOW their
+              parts, which is why the state table sits above this row rather than hanging under it
+              as its underline: below, it would wedge between this Fact and the archive Fact, and
+              those two read as one summary block. */}
           <Fact label="Online nodes">
-            <span className="flex flex-col items-end">
-              <b className="font-bold">{nodes.length}</b>
-              {/* Shown only when something is NOT ready — and then it shows the FULL
-                  breakdown including the ready count (user, 2026-07-12: all-ready is the
-                  silent default; a mixed fleet reads as one complete picture). */}
-              {nonReady && <StatusBreakdown states={states} form="counts" />}
-            </span>
+            <b className="font-bold">{nodes.length}</b>
           </Fact>
         </>
       )}

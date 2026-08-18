@@ -243,29 +243,25 @@ export function StatusMark({ state }: { state?: string | null }) {
   return <StatusPill color={s.color}>{s.label}</StatusPill>;
 }
 
-// Rolled-up status for a node group (dossier): the non-zero buckets as count PILLS in the
-// node card's exact StatusPill chrome (`21 ready` / `2 syncing` — user, 2026-07-12: pills
-// read cleaner than the old bullet+text items and align the two cards' status language).
-// The amber "progress" AND red "down" buckets are spelled out by their exact lifecycle
-// state(s) — the same wording the single node's own card shows (`StatusMark`; the dossier
-// said "down" while the node card said "leaving", user 2026-07-12) — instead of collapsing
-// to the bucket word; colour still comes from the bucket (BUCKET_COLOR).
+// Rolled-up status for a node group (dossier): the non-zero buckets as one small TABLE, the
+// composition table's own row grammar (see the placement note inside). The amber "progress" AND
+// red "down" buckets are spelled out by their exact lifecycle state(s) — the same wording the
+// single node's own card shows (`StatusMark`; the dossier said "down" while the node card said
+// "leaving", user 2026-07-12) — instead of collapsing to the bucket word; the bucket colour
+// (BUCKET_COLOR) rides the CHIPS only, never the word or the count. It went pills → stacked inline
+// counts → rows over three passes; the pill form has no consumer left, so it is gone rather than
+// kept as a dead branch.
 const BUCKET_WORD: Record<StatusBucket, string> = {
   ready: "ready",
   progress: "in progress",
   down: "down",
   unknown: "unknown",
 };
-export function StatusBreakdown({
-  states,
-  form = "pills",
-}: {
-  states: (string | null | undefined)[];
-  /** `pills` is the standalone roll-up; `counts` is the dossier's STACKED underline under the
-   *  Online-nodes total (user, 2026-08-18) — same vocabulary and same bucket colours, without
-   *  the pill's wash and border, which is what let a mixed fleet wrap onto a second line. */
-  form?: "pills" | "counts";
-}) {
+/** Row-leading capital for a lifecycle word — the labels beside it in the make-up table are
+ *  proper nouns of a sort ("Hybrid", "Data"), so a bare lowercase state broke the column. */
+const cap = (w: string): string => w.charAt(0).toUpperCase() + w.slice(1);
+
+export function StatusBreakdown({ states }: { states: (string | null | undefined)[] }) {
   const b = statusBreakdown(states);
   const order: StatusBucket[] = ["ready", "progress", "down", "unknown"];
   const items = order
@@ -275,23 +271,54 @@ export function StatusBreakdown({
         ? labelBreakdown(states, k).map((it) => ({ ...it, color: BUCKET_COLOR[k] }))
         : [{ label: BUCKET_WORD[k], count: b[k], color: BUCKET_COLOR[k] }],
     );
-  if (form === "counts")
-    return (
-      <span className="text-label inline-flex items-center flex-wrap justify-end gap-x-1.5">
-        {items.map((it, i) => (
-          <span key={it.label} style={{ color: it.color }}>
-            {i > 0 && <span className="text-muted-foreground mr-1.5">·</span>}
-            {it.count} {it.label}
-          </span>
-        ))}
-      </span>
-    );
+  // The COMPOSITION table's grammar, applied to the second partition (user, 2026-08-18). It was
+  // an inline run of coloured counts hanging under the Online-nodes total, which wrapped the
+  // moment a fleet was mixed — exactly when it has something to say. The card already asks this
+  // shape of question twice (of N nodes, how many are X): make-up above, state here, both summing
+  // to the same total, so they share one row grammar and their count columns line up. No code
+  // column — a state has no layer — so the grid is three columns to the composition's four; the
+  // count column is right-aligned in both, which is what makes them agree.
+  //   ⚠️ Its placement is load-bearing: it sits ABOVE the Online-nodes total with a Separator
+  // between the two tables. Column-aligned and undivided, the two grids read as ONE table whose
+  // four partitions appear to sum to twice the fleet.
   return (
-    <span className="inline-flex items-center flex-wrap justify-end gap-1">
+    <div className="grid grid-cols-[auto_1fr_auto] items-center gap-x-2 gap-y-[7px]">
       {items.map((it) => (
-        <StatusPill key={it.label} color={it.color}>
-          {it.count} {it.label}
-        </StatusPill>
+        <Fragment key={it.label}>
+          {/* The bucket colour rides the CHIPS alone (user, 2026-08-18) — the word takes the
+              default ink, like the composition labels above it, and the count column stays
+              neutral in both tables. One colour per row, on the one element that is nothing but
+              colour; a hued label as well made the state table read as an alert list beside its
+              plain twin. Capitalized to match those labels, since a bucket word opens a row. */}
+          <span className="text-body text-foreground">{cap(it.label)}</span>
+          <ChipStack count={it.count} color={it.color} />
+          <span className="text-body text-foreground tabular-nums min-w-[1.5em] text-right">{it.count}</span>
+        </Fragment>
+      ))}
+    </div>
+  );
+}
+
+// The miniature node cloud — ONE renderer for both partition tables (extracted 2026-08-18 when
+// the status breakdown became rows). Identity-hued discs that OVERLAP like stacked avatars, each
+// ringed in the panel colour so the overlap reads. Visual scale only, capped ≤10 with no +N — the
+// authoritative number is the count column beside it. Plain overlapping dots (no image/fallback
+// content), so a bare utility span reproduces the look more directly than fighting Avatar's
+// chrome. `color` is the ONLY difference between the two tables: the filter's identity hue for a
+// make-up row, the status bucket's for a state row.
+export function ChipStack({ count, color }: { count: number; color?: string }) {
+  const hue = color ?? "var(--filter-accent, var(--foreground-dim))";
+  return (
+    <span className="inline-flex justify-end items-center pl-1" aria-hidden>
+      {Array.from({ length: Math.min(count, 10) }).map((_, j) => (
+        <span
+          key={j}
+          className="w-[9px] h-[9px] rounded-full -ml-1"
+          style={{
+            background: `color-mix(in oklch, ${hue} 60%, transparent)`,
+            boxShadow: "0 0 0 1.5px var(--panel)",
+          }}
+        />
       ))}
     </span>
   );
@@ -346,22 +373,7 @@ export function CompositionRows({ nodes }: { nodes: NodeInfo[] }) {
         <Fragment key={i}>
           <span className="text-body text-foreground">{r.label}</span>
           <RoleChips codes={r.codes} />
-          {/* Chip stack = a miniature of the 3D node cloud: identity-hued discs that OVERLAP (like
-              stacked avatars), each ringed in the panel colour so the overlap reads. Visual scale
-              only (capped ≤10). Plain overlapping dots (no image/fallback content), so a bare
-              utility span reproduces the look more directly than fighting Avatar's chrome. */}
-          <span className="inline-flex justify-end items-center pl-1" aria-hidden>
-            {Array.from({ length: Math.min(r.count, 10) }).map((_, j) => (
-              <span
-                key={j}
-                className="w-[9px] h-[9px] rounded-full -ml-1"
-                style={{
-                  background: "color-mix(in oklch, var(--filter-accent, var(--foreground-dim)) 60%, transparent)",
-                  boxShadow: "0 0 0 1.5px var(--panel)",
-                }}
-              />
-            ))}
-          </span>
+          <ChipStack count={r.count} />
           <span className="text-body text-foreground tabular-nums min-w-[1.5em] text-right">{r.count}</span>
         </Fragment>
       ))}
