@@ -70,6 +70,7 @@ import type {
   SnapshotExact,
 } from "@/src/data/types";
 import { metaSnapHoverKey } from "@/src/data/types";
+import { fmtKB } from "@/src/util/format"; // the HUD's own size vocabulary — one formatter, so scene and cards can't disagree
 import { LEDGER_LAYERS } from "@/src/data/ledgerLayers"; // shared display copy — floor labels = panel rows
 import { ByteBar, SEED_W } from "../objects/ByteBar";
 import { LiveEdge } from "../objects/LiveEdge";
@@ -102,6 +103,21 @@ const ORD_H = 0.78;
 const ORD_Z = LANE_HALF_Z + 0.35;
 /** Where the text visually ends (≈ the digits' extent) — the dotted anchor line starts here. */
 const ORD_LINE_Z0 = ORD_Z - 2.1;
+/** The SIZE column at the bars' other end (user, 2026-08-18: "the other visualization of a row
+ *  represents size: can we use dotted lines on the right side of the plane to show the size in
+ *  kB?"). It is the exact reading of what WIDTH encodes, exactly as the ordinal column is the
+ *  exact reading of what POSITION encodes, so the row is legible from both ends.
+ *
+ *  It mirrors the left column's geometry but reads OUTWARD: the ink is pinned at the inner
+ *  boundary and grows away from the chamber, because a bar clipped at the floor edge already
+ *  reaches ±(LANE_HALF_Z − BAR_EDGE_MARGIN) and a value growing inward would land on top of it.
+ *  Outward there is no bound, so a 1.2 MB tick states its size as calmly as a 4 KB one.
+ *
+ *  Only a MEASURED row gets a number (rule 10): reading down the column a GAP means "not read",
+ *  never zero. A measured-empty seam honestly reads its own tiny size, because that is a real
+ *  measurement. This is also the honest answer the clipped bar never had — a bar at the floor
+ *  edge states its true size in words instead of a multiplier. */
+const KB_Z0 = -ORD_LINE_Z0;
 
 const _dummy = new THREE.Object3D();
 const _ordSeen = new Set<number>(); // scratch for _syncOrdLabels (event-time)
@@ -209,7 +225,10 @@ export class LedgerView implements SceneView {
   // ── the lead row's honesty label: the newest tick's anchor count is still growing
   /** ordinal → its row label + the dotted anchor line tying it to the row's actual bar
    *  (recycled by ordinal as slots shift; `slot` feeds the rewind's front fade). */
-  private _ordLabels = new Map<number, { mesh: THREE.Mesh; line: THREE.Line; slot: number }>();
+  private _ordLabels = new Map<
+    number,
+    { mesh: THREE.Mesh; line: THREE.Line; slot: number; kb: THREE.Mesh | null; kbLine: THREE.Line; kbText: string }
+  >();
   /** The labels+lines ride the trail rewind as one group. */
   private _ordGroup = new THREE.Group();
   /** The TRAIL REWIND (objects/TrailRewind.ts — the shown snapshot owns the front). Keyed to
@@ -392,6 +411,10 @@ export class LedgerView implements SceneView {
       (o.mesh.material as THREE.MeshBasicMaterial).opacity = ORD_OP * front * a;
       // The anchor line whispers under its label (user, 2026-08-07 — "a bit more subtle").
       (o.line.material as THREE.LineDashedMaterial).opacity = ORD_OP * 0.45 * front * a;
+      // The size column rides the same two boundaries. Its line goes with its number: with no
+      // measurement to state there is nothing for the line to tie to.
+      if (o.kb) (o.kb.material as THREE.MeshBasicMaterial).opacity = ORD_OP * front * a;
+      (o.kbLine.material as THREE.LineDashedMaterial).opacity = o.kb ? ORD_OP * 0.45 * front * a : 0;
     }
   }
 
@@ -740,6 +763,48 @@ export class LedgerView implements SceneView {
   }
 
 
+  /** Release one row's whole label set — both columns' text and both anchor lines. */
+  private _disposeOrd(o: { mesh: THREE.Mesh; line: THREE.Line; kb: THREE.Mesh | null; kbLine: THREE.Line }): void {
+    this._ordGroup.remove(o.mesh, o.line, o.kbLine);
+    for (const m of [o.mesh, o.kb]) {
+      if (!m) continue;
+      this._ordGroup.remove(m);
+      m.geometry.dispose();
+      const mat = m.material as THREE.MeshBasicMaterial;
+      mat.map?.dispose();
+      mat.dispose();
+    }
+    for (const l of [o.line, o.kbLine]) {
+      l.geometry.dispose();
+      (l.material as THREE.Material).dispose();
+    }
+  }
+
+  /** One dotted anchor line — the shared recipe both label columns tie their rows with. */
+  private _makeDashLine(y: number, z0: number): THREE.Line {
+    const lg = new THREE.BufferGeometry().setFromPoints([
+      new THREE.Vector3(0, y, z0),
+      new THREE.Vector3(0, y, 0),
+    ]);
+    const lm = new THREE.LineDashedMaterial({
+      color: this._core, transparent: true, opacity: 0,
+      depthWrite: false, dashSize: 0.14, gapSize: 0.18,
+    });
+    const line = new THREE.Line(lg, lm);
+    line.renderOrder = 2;
+    return line;
+  }
+
+  /** Point an existing anchor line at its row's bar edge. Event-time (a slot move or a read
+   *  landing): a dashed line needs its distances recomputed after every move. */
+  private _aimDash(line: THREE.Line, x: number, y: number, z0: number, z1: number): void {
+    const pos = line.geometry.attributes.position as THREE.BufferAttribute;
+    pos.setXYZ(0, x, y, z0);
+    pos.setXYZ(1, x, y, z1);
+    pos.needsUpdate = true;
+    line.computeLineDistances();
+  }
+
   /** One GLOBAL SNAPSHOT ID label per visible tick row, screen-left of the bars, each tied to
    *  its row's actual bar by a DOTTED anchor line (user, 2026-08-07). Keyed by ordinal so a
    *  label rides its row down the trail; one new canvas per tick (event-time — recycled labels
@@ -760,22 +825,14 @@ export class LedgerView implements SceneView {
       let o = this._ordLabels.get(snap.ordinal);
       if (o) o.slot = s;
       if (!o) {
-        // event-time: one canvas + one 2-point dashed line per new tick
+        // event-time: one canvas + two 2-point dashed lines per new tick
         const mesh = makeEdgeLabel(this._colors, snap.ordinal.toLocaleString(), 0, FLOOR_Y.gl0, ORD_Z, ORD_H);
         (mesh.material as THREE.MeshBasicMaterial).opacity = 0;
-        const lg = new THREE.BufferGeometry().setFromPoints([
-          new THREE.Vector3(0, y, ORD_LINE_Z0),
-          new THREE.Vector3(0, y, 0),
-        ]);
-        const lm = new THREE.LineDashedMaterial({
-          color: this._core, transparent: true, opacity: 0,
-          depthWrite: false, dashSize: 0.14, gapSize: 0.18,
-        });
-        const line = new THREE.Line(lg, lm);
-        line.renderOrder = 2;
-        o = { mesh, line, slot: s };
+        const line = this._makeDashLine(y, ORD_LINE_Z0);
+        const kbLine = this._makeDashLine(y, KB_Z0);
+        o = { mesh, line, slot: s, kb: null, kbLine, kbText: "" };
         this._ordLabels.set(snap.ordinal, o);
-        this._ordGroup.add(mesh, line);
+        this._ordGroup.add(mesh, line, kbLine);
       }
       const x = LEAD_X - s * SLOT_SP;
       o.mesh.position.x = x;
@@ -784,21 +841,33 @@ export class LedgerView implements SceneView {
       // measured-empty seam, or the flush seed), so the line always has a real edge to reach.
       const spec = this._specs[s];
       const barEdge = (spec.measured ? spec.width / 2 : SEED_W / 2) + 0.18;
-      const pos = o.line.geometry.attributes.position as THREE.BufferAttribute;
-      pos.setXYZ(0, x, y, ORD_LINE_Z0);
-      pos.setXYZ(1, x, y, Math.min(barEdge, ORD_LINE_Z0 - 0.2));
-      pos.needsUpdate = true;
-      o.line.computeLineDistances(); // event-time: dashed lines need distances after a move
+      this._aimDash(o.line, x, y, ORD_LINE_Z0, Math.min(barEdge, ORD_LINE_Z0 - 0.2));
+      // The SIZE column, mirrored: a number only once the row has a measurement to state, and its
+      // text is rebuilt when the exact read lands (unmeasured → a real size).
+      const kbText = spec.measured ? fmtKB(spec.kb) : "";
+      if (kbText !== o.kbText) {
+        o.kbText = kbText;
+        if (o.kb) {
+          this._ordGroup.remove(o.kb);
+          o.kb.geometry.dispose();
+          const km = o.kb.material as THREE.MeshBasicMaterial;
+          km.map?.dispose();
+          km.dispose();
+          o.kb = null;
+        }
+        if (kbText) {
+          // event-time: one canvas when a row's measurement arrives or changes
+          o.kb = makeEdgeLabel(this._colors, kbText, 0, FLOOR_Y.gl0, KB_Z0, ORD_H);
+          (o.kb.material as THREE.MeshBasicMaterial).opacity = 0;
+          this._ordGroup.add(o.kb);
+        }
+      }
+      if (o.kb) o.kb.position.x = x;
+      this._aimDash(o.kbLine, x, y, KB_Z0, Math.max(-barEdge, KB_Z0 + 0.2));
     }
     for (const [ord, o] of this._ordLabels) {
       if (seen.has(ord)) continue;
-      this._ordGroup.remove(o.mesh, o.line);
-      o.mesh.geometry.dispose();
-      const mat = o.mesh.material as THREE.MeshBasicMaterial;
-      mat.map?.dispose();
-      mat.dispose();
-      o.line.geometry.dispose();
-      (o.line.material as THREE.Material).dispose();
+      this._disposeOrd(o);
       this._ordLabels.delete(ord);
     }
   }
@@ -1082,15 +1151,7 @@ export class LedgerView implements SceneView {
   }
 
   dispose() {
-    for (const o of this._ordLabels.values()) {
-      this._ordGroup.remove(o.mesh, o.line);
-      o.mesh.geometry.dispose();
-      const mat = o.mesh.material as THREE.MeshBasicMaterial;
-      mat.map?.dispose();
-      mat.dispose();
-      o.line.geometry.dispose();
-      (o.line.material as THREE.Material).dispose();
-    }
+    for (const o of this._ordLabels.values()) this._disposeOrd(o);
     this._ordLabels.clear();
     for (const p of [...this._globalPlanes, ...this._metaPlanes.values()]) p.dispose();
     this._globalPlanes.length = 0;
