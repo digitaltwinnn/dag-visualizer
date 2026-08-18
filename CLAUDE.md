@@ -560,6 +560,12 @@ hued ticker, the anchor ring and the `.edge-spine`). The design rules the test c
 - **It is a label, not a control**: `pointer-events-none`, no ×, dismissal is the selection's own.
   Content mirrors the cards' grammar rung for rung (eyebrow ink, bare ordinals, aside rules,
   RoleChips, the ticking age on the global tick).
+- **The phone declines it** (user, 2026-08-18). Co-location is the whole promise — the panel stands
+  beside its subject and points at it — and a phone has no width to stand beside anything: the panel
+  is a third of the viewport, so it lands ON the subject or over the dock, and the flip rule has no
+  roomier side to flip to. **Both owners decline, through the same `breakpointOf` home** the rails
+  restructure on, so presence and anchor can't disagree; `components/calloutBoundary.test.ts` pins
+  that neither grows a threshold of its own. Tablet keeps it — there the flip has somewhere to go.
 - **Furniture labels are sparse by review**: geo's hosting-country names (the set states where the
   network runs — empty countries staying nameless is information) are the only ones standing. Hyper's
   hub tickers AND its "Global L0" were built and removed the same day (clutter over what hues,
@@ -1466,6 +1472,18 @@ tiles and the byte bars all multiply their own brightness by `horizonAt`, becaus
 dissolved floor is worse than a hard edge. The **node trays are deliberately exempt** — they sit at the
 front of the chamber, where an end is simply the truth. Deliberately **not** a `?tune` knob: it is the
 frame's own shape, not a look.
+
+**The trail has TWO boundaries, one home each, and every row-riding instrument reads both** —
+`horizonAt` above and `frontAt` beside it, where the rewind pushes rows off the front. ⚠️ The front
+one is what a filtered follow leans on hardest (user, 2026-08-18): the rewind holds the *network's*
+own newest anchored tick at the lead, so every global tick that anchored nothing of it sits ahead of
+the front edge, and a forming row is exactly the kind that piles up there. The byte bar's SEED branch
+skipped the call and left those blocks hanging in the air off the glass — **a seed is a row too.**
+They are not dropped and must not be: **POSITION IS TIME**, so a row is drawn where its tick belongs
+and dissolves when that is off the chamber, never pinned to the glass to keep it visible; when the
+network anchors again the offset eases back and they slide onto the panel in their own place. The
+front formula had two homes when this happened (`TrailRewind.fadeAtX` plus an inline copy in the
+bar), which is how one write path came to miss it at all.
 
 **Signer glow.** When the selected metagraph snapshot changes, the Engine resolves its signers to IPs
 and lights those machines in the trays — the scene keys metagraph nodes by IP, not id, so the machines
