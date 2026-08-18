@@ -1301,8 +1301,11 @@ The storey heights give the ribbons a deliberate long run.
 **The byte bar IS the global snapshot.** One bar per tick on the global floor, fixed height and depth,
 **its width alone encoding the bytes that tick carried** against a FIXED baked reference — **~p70 of
 anchored KB/tick** (user, 2026-08-16: "more often too filled than too small" — the earlier p99 bake
-made the median bar a sliver of unreadable segments), so a heavy tick clips at the floor edge with an
-honest `×N` overflow label instead of rescaling the whole past. `scripts/bake-ledger-scale.ts`
+made the median bar a sliver of unreadable segments), so a heavy tick clips at the floor edge instead
+of rescaling the whole past — and states its true size in words in the SIZE column below, which is the
+honest answer the clip never had. (`spec.clipped` / `spec.overflow` in `ledgerBands.ts` are computed
+for an `×N` overflow label that was never built; the size column supersedes it.)
+`scripts/bake-ledger-scale.ts`
 re-measures it; its header carries the complete-window sampling trap. The bar is centered on the lane field and split into bands, one
 per contributing metagraph plus unlisted, each its own pickable mesh from a pool allocated once.
 **Bands follow lane order, so band order and lane order agree and the ribbons never cross.**
@@ -1314,15 +1317,35 @@ composition is never inferred from the anchor count and never from the fee.
 snapshot in that view which can't be drawn … now it's just empty"*). An unmeasured row used to draw
 nothing at all, so a tick whose exact read failed was blank floor with a dotted anchor line pointing at
 it — the HUD said `EXACT READ FAILED` while the scene said nothing had happened. A row with no
-measurement now draws the **SEED**: the same flush block a forming lead lies in, `SEED_W × SEED_H`.
+measurement now draws the **SEED**: a flush block lying in the glass, `SEED_W × SEED_H`.
 Lying in the glass it is not a bar, so it makes **no width claim** — which is exactly what lets its
 footprint be nominal under `ledgerBands.ts`'s ban on inferring a width from anchor count or fee — and
-when a read lands the row RISES into its bands through the machinery that already existed. The
-**energy** says which absence: the lead's read is genuinely in flight, so it breathes on the calm beat
-(the held-slot acquiring form, as the cards' `NodeStars`); a read that failed or was never taken sits
-**still and dimmer**, because nothing is arriving. A seed stays **pickable** — selecting an unread tick
+when a read lands the row RISES into its bands through the machinery that already existed. It sits
+**still and dim**, because nothing is arriving: a read that failed or was never taken is not in
+flight. A seed stays **pickable** — selecting an unread tick
 is what asks for its read. ⚠️ `s.forming` stays true for a still seed: it is what short-circuits the
 grow loop, which would otherwise ease the mark into a full-height bar.
+
+**The tick still FORMING is not a row at all — it is the LIVE EDGE** (user, 2026-08-18: *"what if we
+don't show an actual snapshot for [forming], but instead a dim line in front of the snapshots with
+some relevant info about what's happening, to indicate it's forming, live, filtered"*). A tick arrives
+and its exact read is in flight for ~1.8–2.5s; drawn as a seed in the lead slot that window had no
+honest place to stand, because under filter + follow the rewind holds the NETWORK's own newest
+anchored tick at the lead, so the forming tick sat ahead of the front edge and dissolved. **A row that
+cannot be placed is not a row.** `scene/objects/LiveEdge.ts` is the boundary with NOW instead: a thin
+line lying flush in the glass at `LIVE_X`, mounted straight into the view root — **never into a group
+the rewind offsets**, because now does not slide with the trail — running WIDER than `BAR_MAX_W` so it
+can never be misread as a bar, and not pickable, because there is no snapshot there to select. It
+**breathes** on the calm beat while a read is in flight and **rests still** in standby, and it takes
+the committed network's identity hue, which is how it says *filtered* without a word. `liveEdgePhase`
+(`domain/ledgerModel.ts`) is the resolver and **`LedgerView._liveOrd()` the one predicate** all three
+consumers ask — the slot's mute, the ordinal column's suppression and the edge's own phase — so the
+line and the row can never both claim the tick, and the column can never name it twice.
+⚠️ It carries **no label**, measured rather than omitted: the strip it would occupy is ~10px at the
+resting pose and already holds the floor's front rim, the floor's own `GLOBAL SNAPSHOTS` name and the
+lead bar's bloom, so the words washed out. Hyper's hub tickers are the precedent — furniture labels are
+sparse by review, the line's own behaviour says all three states, and words about the live tick belong
+to the HUD, where the global snapshot card already ticks its age. Don't re-grow it without a live look.
 
 And the **SEAM** — a measured tick that anchored nothing — is a MEASUREMENT, so it draws at full
 height: `ledgerBands.ts` has specified a minimum-width bar for it since the redesign, but the adapter's
@@ -1385,9 +1408,19 @@ MULTIPLIES: tick 6,741,486 anchored **20 DOR snapshots**, so one swipe through t
 publishes personal records, which is why the payload is two deliberate gestures deep at all.
 
 **Labels.** The global floor is named by subtle flat edge-aligned text rather than billboards, and each
-metagraph plane carries a smaller ticker label the same way. Every visible tick row is named by a
-global ordinal label screen-left of the bars, tied to its row's bar by a dotted anchor line whose end
-tracks the bar's live width, keyed by ordinal so label and line ride their row down the trail.
+metagraph plane carries a smaller ticker label the same way. Every visible tick row is named at BOTH
+ends, by two mirrored dotted columns: a global ordinal screen-left — the exact reading of what POSITION
+encodes — and its SIZE in kB screen-right, the exact reading of what WIDTH encodes, through the HUD's
+own `fmtKB` so scene and cards can't disagree about a size. Each is tied to its row's bar by a dotted
+anchor line whose end tracks the bar's live width, keyed by ordinal so labels and lines ride their row
+down the trail. The two columns share one line recipe, one aim and one dispose, so they can't drift.
+⚠️ The size column reads **outward** — ink pinned at the inner boundary, growing away from the chamber
+— because a bar already reaches ±(`LANE_HALF_Z` − `BAR_EDGE_MARGIN`) and a value growing inward would
+land on top of it; outward there is no bound, so a 1.2 MB tick states its size as calmly as a 4 KB one.
+Only a MEASURED row gets a number (rule 10): reading down the column a GAP means *not read*, never
+zero, and a measured-empty seam honestly reads its own tiny size. The forming tick is named by neither
+column — the live edge stands for it, and a label there would run its anchor line out to a bar that
+doesn't exist.
 
 **Glass, emphasis and the rewind.** The glass fill shader is shared but the looks are split: the PLANES
 are square with a soft-rim drop-off, the node TRAYS are flat rounded-corner panels. Rounded corners are
