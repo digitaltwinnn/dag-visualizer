@@ -272,9 +272,18 @@ function RawSection({
         // Discord"): the tree sits on the page's own ground inside a bordered rounded well, so
         // it reads as a different MATERIAL — raw code recessed into the glass — rather than more
         // prose. Deliberately `--background` (the raw ground itself), not a plate lift: a code
-        // fence is a window down, not a tier up. Long JSON scrolls sideways INSIDE the well
-        // (.slim-scroll, the one scrollbar recipe), never stretching the pane.
-        <div className="rounded-md border border-border/50 bg-[var(--background)] px-2.5 py-2 overflow-x-auto slim-scroll">
+        // fence is a window down, not a tier up. Long JSON scrolls INSIDE the well (.slim-scroll,
+        // the one scrollbar recipe), never stretching the pane.
+        //
+        // The well is CAPPED (user, 2026-08-18 — "raw JSON needs a scrollbar when we expand
+        // elements and it becomes too large"). Uncapped it grew to whatever the opened tree
+        // needed and handed the scrolling to the pane's own region, which scrolled the note and
+        // the schema table off the top — the tree pushed its siblings out of view, which is the
+        // one thing the lane's single scroll region exists to prevent. Both axes are stated
+        // explicitly: `overflow-x-auto` alone already forces the used value of `overflow-y` to
+        // `auto`, so the vertical scroll was live but unbounded, and reading the class list gave
+        // no hint of it.
+        <div className="max-h-[46vh] overflow-auto slim-scroll rounded-md border border-border/50 bg-[var(--background)] px-2.5 py-2">
           <JsonTree data={data} />
         </div>
       )}
