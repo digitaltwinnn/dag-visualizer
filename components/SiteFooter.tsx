@@ -30,7 +30,14 @@ export default function SiteFooter() {
       id="sitefoot"
       className="fixed inset-x-0 bottom-0 z-10 h-[var(--footer-h)] flex items-center justify-center pointer-events-none max-[699px]:hidden"
     >
-      <nav className="flex items-center gap-2 text-micro text-muted-foreground/70 [&_a]:pointer-events-auto">
+      {/* ⚠️ The band is TRANSPARENT over a live scene, so its ground is whatever orbits past — in
+          hyper a metagraph hub sweeps the bottom edge and its bloom washed "Design" out entirely
+          (measured at 1600×950 and again at 900×900). The answer is a shadow, not a plate: a plate
+          would be the surface the brief ruled out, and it would sit there at full weight over the
+          black the footer rests on 95% of the time. A shadow costs nothing over black and only
+          appears where something bright is behind it. Grayscale by rule — a tinted halo would read
+          as an accent. */}
+      <nav className="flex items-center gap-2 text-micro text-muted-foreground/70 [text-shadow:0_0_3px_rgb(0_0_0/0.9),0_0_10px_rgb(0_0_0/0.95)] [&_a]:pointer-events-auto">
         <a href={GITHUB} target="_blank" rel="noopener noreferrer" className="hover:text-foreground transition-colors">
           GitHub
         </a>
