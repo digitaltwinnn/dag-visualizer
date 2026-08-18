@@ -13,7 +13,7 @@ import type { PickDescriptor } from "@/src/data/types";
 import { METAGRAPHS } from "../../config";
 import { BAR_H, BAR_D, BAR_LIFT, FLOOR_Y, LEAD_X } from "../../domain/ledgerLayout";
 import { type Band, type BarSpec } from "../../domain/ledgerBands";
-import { SLOT_SP, SLOT_N, horizonAt, frontAt } from "../../domain/ledgerModel";
+import { SLOT_SP, SLOT_N, horizonAt, frontAt, rowOnChamber } from "../../domain/ledgerModel";
 import { snapBright, snapFocusOf, emphasisK } from "../../domain/dimModel";
 import type { TuneSchema } from "../../tune";
 
@@ -269,6 +269,31 @@ export class ByteBar {
   setOffset(off: number): void {
     this._off = off;
     this.group.position.x = off;
+    // The offset is what carries a row over a boundary, so it is also what can change the PICK set
+    // (`rowOnChamber`). Nine predicate calls per frame, and the list is only rebuilt when the span
+    // actually moves — a rebuild every frame would be a per-frame allocation for a set that changes
+    // once a tick.
+    if (this._refreshOnSpan()) this._syncPickables();
+  }
+
+  private _onFirst = 0;
+  private _onLast = SLOT_N - 1;
+
+  /** Re-derive the span of slots still on the chamber; true when it moved. Contiguous by
+   *  construction — x falls monotonically with the slot index and each boundary is one-sided — so a
+   *  first/last pair describes it exactly. −1/−1 means nothing is on (the pick set empties). */
+  private _refreshOnSpan(): boolean {
+    let first = -1;
+    let last = -1;
+    for (let si = 0; si < this._slots.length; si++) {
+      if (!rowOnChamber(LEAD_X - si * SLOT_SP + this._off)) continue;
+      if (first < 0) first = si;
+      last = si;
+    }
+    if (first === this._onFirst && last === this._onLast) return false;
+    this._onFirst = first;
+    this._onLast = last;
+    return true;
   }
 
   private _entryFade: Float32Array | null = null;
@@ -407,7 +432,10 @@ export class ByteBar {
 
   private _syncPickables(): void {
     this.pickables.length = 0;
-    for (const s of this._slots) {
+    if (this._onFirst < 0) return; // the whole trail is off the chamber
+    for (let si = this._onFirst; si <= this._onLast; si++) {
+      const s = this._slots[si];
+      if (!s) continue;
       for (let i = 0; i < s.used; i++) this.pickables.push(s.bands[i]);
     }
   }

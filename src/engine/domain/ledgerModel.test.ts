@@ -9,6 +9,7 @@ import {
   HORIZON_SPAN,
   horizonAt,
   frontAt,
+  rowOnChamber,
   anchorTiles,
   LedgerModel,
   LEAD_SETTLE_MS, LANE_IDS } from "./ledgerModel";
@@ -139,6 +140,29 @@ describe("the front edge (the horizon's mirror — where the rewind pushes rows 
   // gone, whatever kind of row it is. The byte bar's SEED branch used to skip this call.
   it("is fully gone for every tick newer than a held row, so nothing hangs off the glass", () => {
     for (let newer = 1; newer <= 6; newer++) expect(frontAt(LEAD_X + newer * SLOT_SP)).toBe(0);
+  });
+});
+
+describe("rowOnChamber — the one question a PICK can ask (the ramps are analogue, a pick is binary)", () => {
+  it("is true across the lit trail, from the lead back to the last slot", () => {
+    for (let s = 0; s < SLOT_N; s++) expect(rowOnChamber(LEAD_X - s * SLOT_SP)).toBe(true);
+  });
+
+  it("is false past the front edge — the exact rows a filtered follow pushes off", () => {
+    for (let newer = 1; newer <= 6; newer++) expect(rowOnChamber(LEAD_X + newer * SLOT_SP)).toBe(false);
+  });
+
+  it("is false at and beyond the horizon", () => {
+    expect(rowOnChamber(HORIZON_X)).toBe(false);
+    expect(rowOnChamber(HORIZON_X - SLOT_SP)).toBe(false);
+  });
+
+  // Both boundaries, one predicate: a row is pickable only while some of it is actually drawn, so
+  // the answer must agree with the two ramps rather than being tuned beside them.
+  it("agrees with the ramps it is made of, everywhere", () => {
+    for (let x = HORIZON_X - SLOT_SP; x <= LEAD_X + 3 * SLOT_SP; x += SLOT_SP / 7) {
+      expect(rowOnChamber(x)).toBe(horizonAt(x) * frontAt(x) > 0);
+    }
   });
 });
 

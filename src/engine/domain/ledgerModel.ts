@@ -98,6 +98,17 @@ export const frontAt = (x: number): number => {
   return over <= 0 ? 1 : Math.max(0, 1 - over);
 };
 
+/** Is a row at group-X `x` still ON the chamber — inside BOTH boundaries, so any of it is drawn?
+ *
+ *  ⚠️ Three's raycaster ignores every visual state a mesh carries (measured 2026-08-18: with an
+ *  older tick pinned, the tick one slot NEWER than it — `frontAt` 0, nothing on screen — answered
+ *  22 of 47 hover samples over the empty air in front of the lead, and a click there would have
+ *  committed it). Opacity is not the only thing a boundary has to reach: a row the eye has been
+ *  told is gone must leave the pick set with it, or the chamber's front edge is honest in one
+ *  channel and lying in the other. The trail's instruments fade on the ramps; a PICK is binary, so
+ *  it asks the one question the ramps can't answer between them. */
+export const rowOnChamber = (x: number): boolean => horizonAt(x) > 0 && frontAt(x) > 0;
+
 // A tick keeps collecting metagraph snapshots for seconds after it appears (the anchor index's
 // `touched` grows). The lead row says so rather than pretending it is final — the same ~7s window
 // AnchoredTags uses for its FLOOR/COMPLETE gate. The BAR below does not settle: once the exact
