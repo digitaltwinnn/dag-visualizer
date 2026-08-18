@@ -1220,19 +1220,27 @@ export class Globe implements GeoViewHost {
     // Group-tier glow, one channel, four sources in precedence order: a LIVE hover wins (a group
     // row previews exactly what clicking it would commit), then geo's committed cohort, then
     // hyper's committed composition group, then ledger's signer set (spec §5.3) — the three
-    // committed kinds are each view/subject-scoped, so at most one is ever set. The two committed
-    // ANCESTRY kinds are the ones gated by dimModel.ancestryGlow (that function is the rule); the
-    // signer set sits OUTSIDE the gate because it is not ancestry — it is a relation from a
-    // different subject, the selected metagraph snapshot — so it never yields to a node.
+    // committed kinds are each view/subject-scoped, so at most one is ever set.
     // The gate's node subject is the committed node OR the hovered one: a hover previews the
     // commit, and committing a node collapses the borrowed glow (user, 2026-08-12).
+    //
+    // ⚠️ THE SIGNER SET YIELDS TO A NODE TOO (user, 2026-08-18: "filter on UP in hyper, pick a
+    // node, go to snapshot and you will see the other two nodes become too bright in addition to
+    // the actually selected node"). It used to sit OUTSIDE the gate, on the argument that it is
+    // not ancestry but a relation from a different subject — true, and beside the point: The
+    // Upsider AI seals every snapshot with all three of its machines, so committing one of them
+    // left the other two at the group tier (resting + 0.45 × boost ≈ 0.79 against the subject's
+    // 1.17, while the rest of the fleet sat at 0.14) and the selection was unreadable. The
+    // ancestry rule's own reasoning covers it: a borrowed glow is honest while the group IS the
+    // subject and a lie once the click lands on a node. Nothing true is lost — the snapshot's own
+    // lane tile still carries the relation in the scene, the node card still states `signed`, and
+    // each deselect visibly widens the lit set again.
     c.hoverCohort =
       this._hoverCohort ??
       ancestryGlow(
-        this._selCohortIds ?? this._selGroupIds,
+        this._selCohortIds ?? this._selGroupIds ?? this._signerIds,
         this._selectedNodeId ?? this._hoverNodeId,
-      ) ??
-      this._signerIds;
+      );
     c.selectedNodeId = this._selectedNodeId;
     c.filter = this.filter;
     ctx.dim = this.dim;

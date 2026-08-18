@@ -502,8 +502,12 @@ The design rules behind the table, which the tests pin but don't explain:
   border, the chip; the **group** rungs (geo's provider cohort, hyper's composition group) have none,
   so lighting their members is the only way they appear in the scene at all. Honest while the group IS
   the subject, a lie once the click lands on a node. `dimModel.ancestryGlow` is the rule and its test
-  the spec; the ledger's signer set stays outside it (not ancestry — a relation from a different
-  subject), and hover is untouched. One call site: `Globe._frameCtx`'s glow channel.
+  the spec; hover is untouched. One call site: `Globe._frameCtx`'s glow channel. **The ledger's
+  SIGNER set reads the same gate** (user, 2026-08-18): it was exempt on the argument that it is not
+  ancestry but a relation from a different subject — true, and beside the point, because a metagraph
+  that seals with its whole 3-machine cluster left a committed node reading as one bright chip among
+  three. The rule's own reasoning governs it, and nothing true is lost: the snapshot's lane tile still
+  carries the relation and the node card still states `signed`.
 - **A tick drops the metagraph snapshot it can't contain** (user, 2026-08-10). Stronger than the story
   rule one rung up: that one is about set membership, this is a one-to-one join
   (`metagraph.timestamp === global.timestamp`), so committing a DIFFERENT tick provably means the held

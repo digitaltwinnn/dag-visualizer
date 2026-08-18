@@ -153,6 +153,12 @@ export const focusWeightOf = (primary: boolean, group: boolean): number =>
 // commit (rule 9), and clicking that node collapses the borrowed glow, so the hover must show that
 // collapse: group back to resting, the node alone. Both group rungs read this one function, so geo
 // and hyper cannot answer the gesture differently.
+// The ledger's SIGNER set reads the same gate (user, 2026-08-18). It is not ancestry — it is a
+// relation from a different subject, the selected metagraph snapshot — and it was exempt on that
+// argument until a 3-machine metagraph that seals with all three left a committed node reading as
+// one bright chip among three. The reasoning above is what actually governs: a borrowed glow is
+// honest while the group IS the subject, a lie once the click lands on a node. Hence the parameter
+// names say `ancestry`/`nodeSubject` but the rule is "a borrowed group glow yields to a node".
 export const ancestryGlow = (
   ancestry: ReadonlySet<string> | null,
   nodeSubject: string | null,
