@@ -8,6 +8,7 @@ import {
   emphasisK,
   focusDim,
   focusBoost,
+  focusGrow,
   focusWeightOf,
   ancestryGlow,
   GROUP_FOCUS,
@@ -292,6 +293,24 @@ describe("focusDim / focusBoost (per-view hover/selection strength)", () => {
     expect(focusBoost(ctx({ morph: 0 }))).toBeCloseTo(FOCUS_TUNE_DEFAULTS.hyper.boost, 10);
     expect(focusBoost(ctx({ morph: 1 }))).toBeCloseTo(FOCUS_TUNE_DEFAULTS.geo.boost, 10);
     expect(focusBoost(ctx({ morph: 0, ledger: true }))).toBeCloseTo(FOCUS_TUNE_DEFAULTS.ledger.boost, 10);
+  });
+
+  it("focusGrow reads each view's own `grow`", () => {
+    expect(focusGrow(ctx({ morph: 0 }))).toBeCloseTo(FOCUS_TUNE_DEFAULTS.hyper.grow, 10);
+    expect(focusGrow(ctx({ morph: 1 }))).toBeCloseTo(FOCUS_TUNE_DEFAULTS.geo.grow, 10);
+    expect(focusGrow(ctx({ morph: 0, ledger: true }))).toBeCloseTo(FOCUS_TUNE_DEFAULTS.ledger.grow, 10);
+  });
+
+  // The second emphasis channel is HYPER'S ALONE, and the two views that answer 0 do so for
+  // reasons that are design, not tuning: a geo chip's size is data (the honeycomb sums to the
+  // true node count) and the ledger's trays are deliberately uniform — a grow there IS the
+  // retired dim-shrink coming back. So this is a hard 0, not a small number.
+  it("keeps the grow channel out of geo and the ledger entirely", () => {
+    expect(FOCUS_TUNE_DEFAULTS.geo.grow).toBe(0);
+    expect(FOCUS_TUNE_DEFAULTS.ledger.grow).toBe(0);
+    expect(FOCUS_TUNE_DEFAULTS.hyper.grow).toBeGreaterThan(0);
+    // and it fades out with the morph, so the globe never inherits it mid-transition
+    expect(focusGrow(ctx({ morph: 0.5 }))).toBeCloseTo(FOCUS_TUNE_DEFAULTS.hyper.grow / 2, 10);
   });
 
   // The design relations the numbers must keep, whatever a ?tune session moves them to: the

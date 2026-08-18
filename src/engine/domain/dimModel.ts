@@ -126,6 +126,13 @@ export const focusDim = (c: DimContext): number => viewMix(c, "back");
 // 2026-07-17: the chips' base glow is brighter there and the flat 1.4 blew out).
 export const focusBoost = (c: DimContext): number => viewMix(c, "boost");
 
+// Per-view focus GROW: how far the focused node swells, as a fraction of its own size. The
+// SECOND emphasis channel, and the one that survives a crowd — where the shells are dense enough
+// that neighbouring bloom halos merge, a brighter node is filled in from both sides while a
+// bigger one still owns its own silhouette. Read by BOTH node loops (ONE NODE MODEL), scaled by
+// the same `focusWeightOf` tier the boost uses, so a group member swells by its share.
+export const focusGrow = (c: DimContext): number => viewMix(c, "grow");
+
 // Focus is TIERED, not a flag (user, 2026-08-01: "selecting a provider highlights its nodes,
 // but selecting a node afterwards has no visual effect" — the node was already lit at exactly
 // the group's strength, so the finer selection said nothing, while the same click over a
@@ -188,6 +195,8 @@ export interface FocusRow {
   back: number;
   /** Emissive added to the focused node — `focusBoost`. */
   boost: number;
+  /** How far the focused node GROWS, as a fraction of its own size — `focusGrow`. */
+  grow: number;
 }
 
 /** Genuinely cross-view: it ranks focus TIERS, which every view shares. */
@@ -206,9 +215,18 @@ export const FOCUS_TUNE_DEFAULTS: Readonly<Record<View3D, Readonly<FocusRow>>> =
   // siblings kept fat saturated bodies, so the emphasis read INVERTED. The stack is gone too
   // (NodeFabric: a focused node's boost replaces the hub-match, one emphasis at a time), and 1.1
   // lands the subject ~1.4, above the hub level and inside the hue range.
-  hyper: { dim: 0.32, hide: 0, elem: 0.38, back: 0.41, boost: 1.1 },
-  geo: { dim: 1.0, hide: 1, elem: 0, back: 0.65, boost: 0.7 },
-  ledger: { dim: 0.5, hide: 0, elem: 0, back: 0.55, boost: 0.7 },
+  // grow: hyper ALONE (user, 2026-08-18). Measured on the running app: the DAG's 160 validators
+  // sit closer together than the bloom radius, so their halos merge into ONE continuous glow
+  // ribbon and every node core already clips white — an emissive-only emphasis has no channel
+  // left there, and `boost` cannot be raised because it was pulled 1.85 → 1.1 for the opposite
+  // bug two days earlier. A SIZE lift breaks the ribbon's silhouette, which brightness cannot.
+  // geo answers 0: `hide` already isolates the fleet, and a globe chip's size is DATA (the
+  // honeycomb's hexes sum to the true node count), so growing one would state a count that
+  // isn't there. The ledger answers 0 because its trays are deliberately uniform (user,
+  // 2026-08-07) — that is the retired dim-shrink, and this must not re-open it.
+  hyper: { dim: 0.32, hide: 0, elem: 0.38, back: 0.41, boost: 1.1, grow: 0.45 },
+  geo: { dim: 1.0, hide: 1, elem: 0, back: 0.65, boost: 0.7, grow: 0 },
+  ledger: { dim: 0.5, hide: 0, elem: 0, back: 0.55, boost: 0.7, grow: 0 },
 };
 
 export const FOCUS_SHARED_DEFAULTS: Readonly<FocusShared> = { groupShare: GROUP_FOCUS };
@@ -233,6 +251,7 @@ export const FOCUS_ROW_SCHEMA: TuneSchema<FocusRow> = {
   elem: { min: 0, max: 1, label: "dim · elements" },
   back: { min: 0, max: 1, label: "dim-back on focus" },
   boost: { min: 0, max: 3, step: 0.05, label: "focus boost" },
+  grow: { min: 0, max: 1.5, step: 0.05, label: "focus grow" },
 };
 
 export const FOCUS_SHARED_SCHEMA: TuneSchema<FocusShared> = {

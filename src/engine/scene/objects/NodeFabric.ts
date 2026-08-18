@@ -16,7 +16,7 @@ import * as THREE from "three";
 import { LEDGER } from "../../domain/ledgerLayout";
 import { HEX_H } from "../../domain/geoLayout";
 import { discFall, lerp, smooth } from "../../domain/nodeLayout";
-import { nodeDim, nodeEmissive, nodeGlow, hubMatchBoost, focusWeightOf, hideFrac, gatherRaw, emphasisK } from "../../domain/dimModel";
+import { nodeDim, nodeEmissive, nodeGlow, hubMatchBoost, focusWeightOf, focusGrow, hideFrac, gatherRaw, emphasisK } from "../../domain/dimModel";
 import type { DimContext } from "../../domain/dimModel";
 import type { MetaNodeRecord, ValidatorRecord } from "../../domain/records";
 import type { ViewTransition } from "../../domain/viewTransition";
@@ -345,6 +345,12 @@ export class NodeFabric {
     // cross-fade them into the circles only at the last moment, once the nodes have essentially
     // arrived at the globe surface.
     const w = smooth(THREE.MathUtils.clamp((m - 0.82) / 0.16, 0, 1)); // sphere → chip squash phase
+    // dimModel.focusGrow: the SECOND emphasis channel, and the one that survives a crowd —
+    // hyper's shells pack the nodes closer than the bloom radius, so a focused node's halo merges
+    // with its neighbours' and brightness alone can no longer say which one is the subject (a
+    // measured finding, 2026-08-18). Size still owns its own silhouette. Hoisted here and read as
+    // a local in the loop — the tune hoist rule.
+    const grow = focusGrow(c);
     for (const u of records) {
       // Snapshots (ledger) view: hard-place as standing CHIPS on the floor planes (the same
       // cylinder geometry as geo, HEX_H tall — user 2026-07-12: the old squashed-sphere COIN
@@ -399,7 +405,7 @@ export class NodeFabric {
       // (wEff; noGeo nodes keep the plain morph squash — they have no geo chip to become).
       _qSpin.setFromAxisAngle(u.spinAxis, u.spinPhase + t * u.spinSpeed);
       _dummy.quaternion.copy(_qSpin);
-      _dummy.scale.setScalar(u.hyperSize * (1 - (u.noGeo ? w : wEff)) * (u.noGeo ? 1 - e : 1) * show);
+      _dummy.scale.setScalar(u.hyperSize * (1 + grow * u.fw) * (1 - (u.noGeo ? w : wEff)) * (u.noGeo ? 1 - e : 1) * show);
       this._applyGather(ctx, u, gw, prim);
       _dummy.updateMatrix();
       this.instSphere.setMatrixAt(u.index, _dummy.matrix);
@@ -475,6 +481,11 @@ export class NodeFabric {
         u.nodeId === c.hoverNodeId || u.nodeId === c.selectedNodeId,
         !!u.nodeId && !!c.hoverCohort?.has(u.nodeId),
       );
+      // The SIZE channel's state (dimModel.focusGrow), eased on the record so the swell and the
+      // glow move as one. placeValidators runs earlier in the frame and so reads this a frame
+      // behind — one frame at the easing rate is not a visible lag, and keeping the tier ranked
+      // in ONE place beats re-deriving focusId in the geometry pass.
+      u.fw += (fw - u.fw) * ek;
       // dimModel.nodeEmissive: the SAME glow model the metagraph loop below calls (user: one node
       // model — the DAG core's nodes are metagraph nodes that orbit the origin). The base's
       // hyper→globe endpoints live in the domain, so the two call sites cannot pass different
@@ -519,6 +530,7 @@ export class NodeFabric {
     const w = smooth(THREE.MathUtils.clamp((m - 0.82) / 0.16, 0, 1)); // sphere → chip squash phase
     const kk = Math.min(1, dt * 4);
     const ek = emphasisK(dt); // emphasis easing — hoisted once per frame (the tune hoist rule)
+    const grow = focusGrow(c); // the size channel — see placeValidators (one node model)
     const emi = this.metaEmi;
     const base = this.metaBaseArr;
     const focusId = c.hoverNodeId || c.selectedNodeId || c.hoverCohort; // see the validator loop
@@ -552,6 +564,7 @@ export class NodeFabric {
         r.nodeId === c.hoverNodeId || r.nodeId === c.selectedNodeId,
         !!c.hoverCohort?.has(r.nodeId),
       );
+      r.fw += (fw - r.fw) * ek; // the size channel's eased state — see the validator loop
       const flRaw = r._flash || 0; // brief flash when an arc pulse reaches this node
       // dimModel.nodeEmissive: composes glow + arc flash + hubBoost inside its floor, then the
       // hover/selection focus boost/dim-back — one function, both loops. The write EASES toward it
@@ -613,7 +626,7 @@ export class NodeFabric {
       // shrink fully out on the globe and stay full-size (just muted) in hyper — `vis`, above.
       _qSpin.setFromAxisAngle(r.spinAxis, r.spinPhase + clock * r.spinSpeed);
       _dummy.quaternion.copy(_qSpin);
-      _dummy.scale.setScalar(r.hyperSize * (1 - wEff) * vis);
+      _dummy.scale.setScalar(r.hyperSize * (1 + grow * r.fw) * (1 - wEff) * vis);
       this._applyGather(ctx, r, gw, prim);
       _dummy.updateMatrix();
       this.metaSphere.setMatrixAt(r.index, _dummy.matrix);

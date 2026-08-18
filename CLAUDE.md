@@ -193,6 +193,19 @@ so turning it down shrank nodes less as well as muting them less. It now reads t
 knob moves exactly one effect. A corollary that matters: the country drill's `countryMix` raise is a
 MUTE, and reading the raw ramp is what guarantees a lens can never shrink what it looks past.
 
+⚠️ **BRIGHTNESS IS THE EMPHASIS CHANNEL IN A SPARSE FIELD; SIZE IS THE ONE IN A CROWDED ONE** (user,
+2026-08-18 — *"I can't really see the difference on what node is selected"* about the DAG's own
+validators). Measured: the DAG's 160 validators sit closer together than the bloom radius, so their
+halos merge into ONE continuous ~54,000px ribbon (a metagraph's 19 stay discrete, largest blob
+~12,000), and every node core already clips white — so a focus expressed only as emissive has no
+channel left to spend. `boost` can't answer it either; it was pulled 1.85 → 1.1 on 2026-08-16 for the
+opposite bug. **`grow` is the second channel**: `focusGrow()` reads the row's own field and the node
+loops scale by `1 + grow × fw`, where `fw` is the eased focus weight carried ON THE RECORD (the scale
+and the glow are written by different passes and must swell together). It is **hyper's alone** — geo's
+chip size is DATA (the honeycomb's hexes sum to the true node count) and the ledger's trays are
+uniform by design, so both answer a hard `0`, pinned by test. It is the same question `hide` had to
+ask: a new effect gets its own field rather than riding a dim number.
+
 **A view's own FURNITURE dims on its own field, `elem`** (user, 2026-08-11). `dim` mutes off-filter
 NODES; the per-network furniture a view draws around them — hyper's hubs, tethers and hoops — used to
 fade by two unrelated magic numbers (`HyperView`'s local `fdim = 0.62`, `Ribbons`' exported
