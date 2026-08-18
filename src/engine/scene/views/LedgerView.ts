@@ -51,7 +51,16 @@ import {
   type RailGroup,
 } from "../../domain/ledgerLayout";
 import type { SceneColors } from "../../sceneColors";
-import { LedgerModel, LANE_IDS, SLOT_SP, SLOT_N, HORIZON_X, HORIZON_SPAN, horizonAt } from "../../domain/ledgerModel";
+import {
+  LedgerModel,
+  LANE_IDS,
+  SLOT_SP,
+  SLOT_N,
+  HORIZON_X,
+  HORIZON_SPAN,
+  horizonAt,
+  liveEdgePhase,
+} from "../../domain/ledgerModel";
 import { makeBarSpec, fillBarSpec, UNLISTED_KEY, type BarSpec } from "../../domain/ledgerBands";
 import type { ContainerSpec } from "../../domain/ledgerRails";
 import type {
@@ -63,6 +72,7 @@ import type {
 import { metaSnapHoverKey } from "@/src/data/types";
 import { LEDGER_LAYERS } from "@/src/data/ledgerLayers"; // shared display copy — floor labels = panel rows
 import { ByteBar, SEED_W } from "../objects/ByteBar";
+import { LiveEdge } from "../objects/LiveEdge";
 import { snapBright, snapFocusOf, focusWeightOf, emphasisK } from "../../domain/dimModel";
 import { Ribbons } from "../objects/Ribbons";
 import { SnapshotPlane, makeEdgeLabel, GLOBAL_PLANE_TUNE_DEFAULTS, META_PLANE_TUNE_DEFAULTS, type PlaneTune } from "../objects/SnapshotPlane";
@@ -155,6 +165,7 @@ export class LedgerView implements SceneView {
 
   // ── the adapters (spec §4.2–§4.4)
   private _bar: ByteBar;
+  private _live: LiveEdge;
   private _ribbons: Ribbons;
   /** Dev-only access for the ?tune panel (Engine.mountDevTune) — not part of the frame path. */
   get ribbons(): Ribbons { return this._ribbons; }
@@ -262,6 +273,11 @@ export class LedgerView implements SceneView {
     this._bar = new ByteBar(colors, sceneColors);
     this._ribbons = new Ribbons(colors, sceneColors);
     this.group.add(this._bar.group, this._ribbons.group, this._ordGroup);
+    // The live edge mounts SEPARATELY and straight into the root: the three groups above all take
+    // `position.x = this._trailOff` from the rewind, and the edge marks NOW — which does not slide
+    // with the trail.
+    this._live = new LiveEdge();
+    this.group.add(this._live.group);
 
     this._buildMetaTrail();
     this._syncPickables();
@@ -351,6 +367,7 @@ export class LedgerView implements SceneView {
     this._fades.apply(a);
     this._bar.setAlpha(a);
     this._ribbons.setAlpha(a);
+    this._live.setAlpha(a);
     // group.visible is owned SOLELY by the Engine — a view fades, it never hides itself.
   }
 
@@ -552,10 +569,11 @@ export class LedgerView implements SceneView {
     this._rebuildAllSlots();
   }
 
-  // Ordinals whose exact read FAILED (store.exactMiss, bridged by the Engine): the forming
-  // block's give-up signal — a missed lead stops pulsing and draws nothing, the same honest
-  // absence a historical unmeasured row shows (the acquiring give-up rule; a retry that later
-  // lands clears the miss and the read arrives through setExact as usual).
+  // Ordinals whose exact read FAILED (store.exactMiss, bridged by the Engine): the give-up
+  // signal. A missed tick is no longer IN FLIGHT, so the live edge lets go of it and falls to
+  // standby, and the tick becomes an ordinary unmeasured ROW — a still, dim seed in its own
+  // place in time, the same honest absence a historical unread row shows (the acquiring give-up
+  // rule; a retry that later lands clears the miss and the read arrives through setExact).
   private _missOrds: ReadonlySet<number> = new Set();
   setExactMisses(byOrdinal: Record<number, unknown>): void {
     this._missOrds = new Set(Object.keys(byOrdinal).map(Number)); // event-time
@@ -689,7 +707,20 @@ export class LedgerView implements SceneView {
     } satisfies PickDescriptor;
   }
 
+  /** The tick the LIVE EDGE is naming: the newest one, while its exact read is genuinely in
+   *  flight. ONE predicate with one home — it decides the slot's mute, the ordinal column's
+   *  slot-0 suppression and the edge's own phase, so the line and the row can never both claim
+   *  the tick, and the column can never name it twice. A read that FAILED is not in flight, so
+   *  that tick falls back to being an ordinary unmeasured ROW and states its absence as a still
+   *  seed in its own place in time. */
+  private _liveOrd(): number | null {
+    const snap = this._slotSnap[0];
+    if (!snap || this._exact[snap.ordinal] || this._missOrds.has(snap.ordinal)) return null;
+    return snap.ordinal;
+  }
+
   private _rebuildAllSlots(): void {
+    const liveOrd = this._liveOrd();
     for (let s = 0; s < SLOT_N; s++) {
       const snap = this._slotSnap[s];
       // A slot with no tick at all renders NOTHING — the seam is reserved for a tick that HAPPENED
@@ -700,7 +731,7 @@ export class LedgerView implements SceneView {
         ex?.anchored ??
         (typeof snap.metagraphSnapshotCount === "number" ? snap.metagraphSnapshotCount : 0);
       fillBarSpec(this._specs[s], ex ? this._bytesByKey(ex) : null, this._laneOrder, anchored);
-      this._bar.setBar(s, snap.ordinal, this._specs[s], this._pickFor(snap), !this._missOrds.has(snap.ordinal));
+      this._bar.setBar(s, snap.ordinal, this._specs[s], this._pickFor(snap), snap.ordinal === liveOrd);
     }
     this._syncRibbonRows();
     this._syncOrdLabels();
@@ -717,9 +748,14 @@ export class LedgerView implements SceneView {
     const seen = _ordSeen;
     seen.clear();
     const y = FLOOR_Y.gl0 + 0.06;
+    // The forming tick's own row draws nothing — the live edge stands for it — so it gets no name
+    // here either. A label needs its dotted anchor line, and that line would run out to a bar that
+    // does not exist: exactly the dangling-line defect the SEED was drawn to answer. It is named
+    // the moment its read lands and it becomes an ordinary measured row.
+    const liveOrd = this._liveOrd();
     for (let s = 0; s < SLOT_N; s++) {
       const snap = this._slotSnap[s];
-      if (!snap) continue;
+      if (!snap || snap.ordinal === liveOrd) continue;
       seen.add(snap.ordinal);
       let o = this._ordLabels.get(snap.ordinal);
       if (o) o.slot = s;
@@ -923,6 +959,13 @@ export class LedgerView implements SceneView {
     this._applyFloorAlpha();
 
     this._bar.update(dt);
+    // The chamber's boundary with NOW. Hue says "filtered" without a word — the committed
+    // network's identity, the neutral core when the filter is "all".
+    const liveOrd = this._liveOrd();
+    this._live.setState(liveEdgePhase(this.model.tickOrdinal != null, liveOrd));
+    const lk = this._netDimKey();
+    this._live.setHue(lk === "all" ? this._core : this._laneColor(lk).getHex());
+    this._live.update(dt);
     // (no _ribbons.update: the sheet's only per-frame value is its opacity, and setViewAlpha —
     // called every frame — writes that directly now.)
 
@@ -1053,6 +1096,7 @@ export class LedgerView implements SceneView {
     this._globalPlanes.length = 0;
     this._metaPlanes.clear();
     this._bar.dispose();
+    this._live.dispose();
     this._ribbons.dispose();
     for (const o of this.group.children.slice()) {
       this.group.remove(o);

@@ -56,11 +56,13 @@ interface Slot {
    *  be nominal (ledgerBands.ts forbids inferring a width from anchor count or fee). It GROWS
    *  into the measured bands when a read lands (`grow`/`rise` ease 0→1 over the stored targets). */
   forming: boolean;
-  /** Which absence the seed is stating. The LEAD's read is genuinely in flight (~1.5-2s: the
-   *  server pulls the whole ~2.5MB raw global), so it BREATHES on the calm beat — the acquiring
-   *  form, exactly as the cards' NodeStars. Every other seed sits STILL and dimmer: a read that
-   *  failed or was never taken is standby, and a pulse there would promise an arrival. */
-  pulse: boolean;
+  /** MUTED (user, 2026-08-18): the LIVE EDGE is naming this tick, so the slot draws nothing at
+   *  all. A tick whose read is in flight is not a row yet — it has no measurement and, under a
+   *  filtered follow, no honest place in the trail either, since the rewind holds the network's
+   *  own newest anchored tick at the lead. It is stated once, as the chamber's boundary with now
+   *  (scene/objects/LiveEdge.ts). `forming` stays TRUE underneath, so when the read lands the row
+   *  still RISES into its bands: the arrival beat is what the seed was for, and it survives. */
+  mute: boolean;
   grow: number;
   /** Companion to `grow` for the seed's HEIGHT, eased 0→1 on its own so it needs no record of
    *  where `grow` started. 1 for a bar that was never a seed. */
@@ -79,8 +81,9 @@ export const SEED_W = 1.3;
 // as the row's own footprint, and the read landing then RISES it into the bar: the transform is
 // the arrival, which is the whole point of having a seed instead of an empty slot.
 const SEED_H = 0.14;
-/** A still seed's opacity — below the in-flight pulse's trough, above a resting band's `rest`:
- *  quieter than something arriving, present enough to read as a row that exists. */
+/** A seed's opacity — every DRAWN seed is a standby one now (a read genuinely in flight is stated
+ *  by the live edge instead), so there is one level: above a resting band's `rest`, quiet enough
+ *  to read as a row whose measurement is missing rather than as one that has it. */
 const SEED_STILL_OP = 0.22;
 /** The seed→bar height ramp, shared by the event-time write and the per-frame ease. */
 const riseScaleY = (rise: number): number => SEED_H + (1 - SEED_H) * rise;
@@ -104,7 +107,6 @@ export class ByteBar {
   private _hovered = -1;
   private _off = 0;
   private _filter = "all";
-  private _t = 0; // forming-pulse clock
 
   constructor(colors: SceneColors, sceneColors: Record<string, number>) {
     this._sceneColors = sceneColors;
@@ -125,7 +127,7 @@ export class ByteBar {
       this._slots.push({
         ordinal: -1, bands, mats,
         measured: false, keys: [], colors: [], used: 0,
-        forming: false, pulse: false, grow: 1, rise: 1, tz: [], tw: [],
+        forming: false, mute: false, grow: 1, rise: 1, tz: [], tw: [],
       });
     }
   }
@@ -134,10 +136,10 @@ export class ByteBar {
     this._sceneColors = map;
   }
 
-  /** Lay out one tick's bar. Event-time only. `formingAllowed` is the give-up gate: a lead whose
-   *  exact read FAILED still states its absence with the seed, but STOPS PULSING — a breath there
-   *  would promise an arrival that isn't coming. */
-  setBar(slot: number, ordinal: number, spec: BarSpec | null, pick: PickDescriptor, formingAllowed = true): void {
+  /** Lay out one tick's bar. Event-time only. `live` says the LIVE EDGE is naming this tick, so
+   *  the slot draws nothing and offers nothing to pick — the chamber states an in-flight read once,
+   *  at its boundary with now, not twice. */
+  setBar(slot: number, ordinal: number, spec: BarSpec | null, pick: PickDescriptor, live = false): void {
     const s = this._slots[slot];
     if (!s) return;
     // Captured BEFORE the write, so the measured branch below can tell a first measurement from a
@@ -152,7 +154,7 @@ export class ByteBar {
     if (!spec) {
       // A slot the trail has never populated — nothing happened here, so nothing is drawn.
       for (let i = 0; i < s.used; i++) { s.bands[i].visible = false; s.bands[i].scale.set(0, 0, 0); }
-      s.measured = false; s.forming = false; s.pulse = false;
+      s.measured = false; s.forming = false; s.mute = false;
       s.grow = 1; s.rise = 1; s.used = 0;
       this._syncPickables();
       return;
@@ -167,19 +169,21 @@ export class ByteBar {
       // lets its footprint be nominal (ledgerBands.ts forbids inferring a width from anchor
       // count or fee). When the read lands, the row RISES into its bands.
       //
-      // The ENERGY says WHICH absence: only the lead's read is genuinely in flight, so only it
-      // breathes; a read that failed or was never taken sits still and dimmer (standby — a
-      // pulse there would promise an arrival that isn't coming). The row stays PICKABLE either
-      // way, because selecting an unread tick is what asks for its read.
+      // Every seed DRAWN here is a standby one: a read that failed or was never taken, sitting
+      // still, because nothing is arriving. The row stays PICKABLE, since selecting an unread tick
+      // is what asks for its read. A read genuinely IN FLIGHT is `live` — the live edge is already
+      // naming that tick at the chamber's boundary with now, so the slot stays MUTE rather than
+      // claiming a second place for it. `forming` stays true underneath either way, so the read
+      // landing still RISES the row into its bands.
       for (let i = 1; i < s.used; i++) { s.bands[i].visible = false; s.bands[i].scale.set(0, 0, 0); }
       s.measured = false;
       s.forming = true;
-      s.pulse = slot === 0 && formingAllowed;
+      s.mute = live;
       s.grow = 1;
       s.rise = 0;
       const mesh = s.bands[0];
       const sy = riseScaleY(0);
-      mesh.visible = true;
+      mesh.visible = !live;
       mesh.scale.set(BAR_D, sy, SEED_W);
       mesh.position.set(x, riseY(sy), 0);
       s.mats[0].color.setHex(this._neutral);
@@ -192,7 +196,7 @@ export class ByteBar {
 
     const wasForming = s.forming;
     s.forming = false;
-    s.pulse = false;
+    s.mute = false;
     s.measured = true;
     // THE SEAM: a measured tick that anchored NOTHING. ledgerBands.ts specifies a minimum-width
     // bar for it — the tick provably happened and provably carried nothing, which is a fact, not
@@ -343,7 +347,6 @@ export class ByteBar {
   }
 
   update(dt: number): void {
-    this._t += dt;
     // dimModel.emphasisK: the ONE emphasis-easing rate, shared with the node fabric and the lane
     // tiles. It replaces the local rate this bar used to ease its opacity at (slightly faster now);
     // `k` drives nothing geometric here, only `s.mats[i].opacity`.
@@ -358,16 +361,14 @@ export class ByteBar {
     for (let si = 0; si < this._slots.length; si++) {
       const s = this._slots[si];
       const x = LEAD_X - si * SLOT_SP + this._off;
-      // SEED: no measurement here, so nothing in the normal band loop applies. The lead's read is
-      // in flight, so it BREATHES on the calm beat (the held-slot acquiring form, as the cards'
-      // NodeStars); every other seed sits STILL and dimmer, because nothing is arriving and a
-      // pulse would say otherwise. It takes BOTH trail boundaries like any other row — a seed is a
-      // row too, and skipping the front dissolve is what left forming blocks hanging off the glass
-      // under a filtered follow (see `frontAt`).
+      // SEED: no measurement here, so nothing in the normal band loop applies. It sits STILL,
+      // because nothing is arriving — a read genuinely in flight is `mute` here and stated by the
+      // live edge instead. It takes BOTH trail boundaries like any other row: a seed is a row too,
+      // and skipping the front dissolve is what left forming blocks hanging off the glass under a
+      // filtered follow (see `frontAt`).
       if (s.forming) {
         const fade0 = horizonAt(x) * frontAt(x) * (this._entryFade ? this._entryFade[si] : 1);
-        const e = s.pulse ? 0.3 + 0.12 * Math.sin(this._t * 2.4) : SEED_STILL_OP;
-        s.mats[0].opacity = e * fade0 * this._alpha;
+        s.mats[0].opacity = (s.mute ? 0 : SEED_STILL_OP) * fade0 * this._alpha;
         s.mats[0].color.setHex(this._neutral);
         continue;
       }
@@ -435,7 +436,7 @@ export class ByteBar {
     if (this._onFirst < 0) return; // the whole trail is off the chamber
     for (let si = this._onFirst; si <= this._onLast; si++) {
       const s = this._slots[si];
-      if (!s) continue;
+      if (!s || s.mute) continue; // invisible must mean unpickable — the raycaster ignores `visible`
       for (let i = 0; i < s.used; i++) this.pickables.push(s.bands[i]);
     }
   }

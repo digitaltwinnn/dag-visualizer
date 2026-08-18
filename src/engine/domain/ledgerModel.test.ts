@@ -10,6 +10,8 @@ import {
   horizonAt,
   frontAt,
   rowOnChamber,
+  LIVE_X,
+  liveEdgePhase,
   anchorTiles,
   LedgerModel,
   LEAD_SETTLE_MS, LANE_IDS } from "./ledgerModel";
@@ -163,6 +165,33 @@ describe("rowOnChamber — the one question a PICK can ask (the ramps are analog
     for (let x = HORIZON_X - SLOT_SP; x <= LEAD_X + 3 * SLOT_SP; x += SLOT_SP / 7) {
       expect(rowOnChamber(x)).toBe(horizonAt(x) * frontAt(x) > 0);
     }
+  });
+});
+
+describe("the LIVE EDGE — the boundary that is NOT a dissolve", () => {
+  // It marks NOW, so it stands ahead of every row the trail holds — and within one slot pitch of
+  // the lead, or the gap it leaves would read as an empty slot of its own rather than as the edge
+  // of the chamber.
+  it("stands ahead of the lead, closer than one slot", () => {
+    expect(LIVE_X).toBeGreaterThan(LEAD_X);
+    expect(LIVE_X - LEAD_X).toBeLessThan(SLOT_SP);
+    for (let s = 0; s < SLOT_N; s++) expect(LIVE_X).toBeGreaterThan(LEAD_X - s * SLOT_SP);
+  });
+
+  it("says nothing at all without a feed", () => {
+    expect(liveEdgePhase(false, null)).toBe("off");
+    expect(liveEdgePhase(false, 42)).toBe("off");
+  });
+
+  it("breathes and names the tick whose read is in flight", () => {
+    expect(liveEdgePhase(true, 6778644)).toBe("forming");
+  });
+
+  // A read that failed or was never taken is standby, not forming: that tick states its own
+  // absence as a still row at the lead, and a breath here would promise an arrival that isn't
+  // coming — the same rule the seed's own energy follows.
+  it("rests, unlabelled, when nothing is in flight", () => {
+    expect(liveEdgePhase(true, null)).toBe("standby");
   });
 });
 

@@ -109,6 +109,43 @@ export const frontAt = (x: number): number => {
  *  it asks the one question the ramps can't answer between them. */
 export const rowOnChamber = (x: number): boolean => horizonAt(x) > 0 && frontAt(x) > 0;
 
+// ── the LIVE EDGE (user, 2026-08-18: "what if we don't show an actual snapshot for [forming], but
+// instead a dim line in front of the snapshots with some relevant info about what's happening, to
+// indicate it's forming, live, filtered"). The third boundary, and the only one that is not a
+// dissolve — it is where the chamber meets NOW.
+//
+// The forming tick used to be drawn as the lead ROW: a seed lying in slot 0. That put a thing with
+// no measurement into the place the slot model reserves for a tick's real position in time, and
+// under a filtered follow the two claims collided — the rewind holds the network's own newest
+// anchored tick at the lead, so a global tick that anchored nothing of it belongs AHEAD of the
+// front edge and dissolved there, taking the one mark that said a read was in flight with it.
+//
+// A tick whose read has not landed is not a row yet, so it is stated as an INSTRUMENT STATE
+// instead: one dim line fixed in the chamber frame, ahead of the lead, spanning the whole lane
+// field. Lying flush and spanning everything it makes no width claim (ledgerBands.ts forbids
+// inferring a width from anchor count or fee) and it is not pickable — there is no snapshot there
+// to select. When the read lands the row RISES into its bands at the lead exactly as before, so
+// the arrival beat is untouched; and when the followed network anchors again, the rewind eases the
+// intervening ticks onto the panel on their own.
+//
+// FIXED IN THE FRAME, so it must not be parented to anything the rewind offsets — it marks now,
+// and now does not slide with the trail.
+export const LIVE_X = LEAD_X + 1.2;
+
+/** What the live edge is saying — carried by the line's own behaviour, since it wears no label
+ *  (the rationale for that is in `scene/objects/LiveEdge.ts`). `forming` — a tick has arrived and
+ *  its exact read is in flight, so the line BREATHES on the calm beat. `standby` — nothing is in
+ *  flight (the newest tick is measured, or its read gave up and states that as its own still row),
+ *  so the line RESTS: quiet standby, never a promise of an arrival that isn't coming. `off` — no
+ *  feed at all, so the edge itself is a claim the chamber can't make. */
+export type LiveEdgePhase = "off" | "forming" | "standby";
+
+/** The one resolver. `formingOrd` is the newest tick's ordinal while its read is genuinely in
+ *  flight, null otherwise — the same predicate that mutes the lead row's seed, so the line and the
+ *  slot can never both claim the tick. */
+export const liveEdgePhase = (running: boolean, formingOrd: number | null): LiveEdgePhase =>
+  !running ? "off" : formingOrd == null ? "standby" : "forming";
+
 // A tick keeps collecting metagraph snapshots for seconds after it appears (the anchor index's
 // `touched` grows). The lead row says so rather than pretending it is final — the same ~7s window
 // AnchoredTags uses for its FLOOR/COMPLETE gate. The BAR below does not settle: once the exact
