@@ -6,7 +6,9 @@
 //   • no exact read yet          → `measured: false`, minimum width, NO bands (never inferred
 //                                  from anchor count and never from the fee)
 //   • measured, anchored nothing → a minimum-width SEAM (the tick still happened)
-//   • over the fixed reference   → clipped at the floor edge, `overflow` states by how much
+//   • over the fixed reference   → the WIDTH clips at the floor edge rather than rescaling the
+//                                  whole past; the scene's SIZE column states the true size in
+//                                  words, which is the honest answer the clip itself can't give
 //
 // Allocation-free after construction: `makeBarSpec()` preallocates one band record per listed
 // metagraph plus the unlisted aggregate, and `fillBarSpec()` only writes into them.
@@ -29,8 +31,6 @@ export interface BarSpec {
   kb: number;
   z0: number;
   width: number;
-  clipped: boolean;
-  overflow: number;   // ×N past the reference; 1 when the bar fits
   bands: Band[];      // PREALLOCATED; only the first `bandCount` are live
   bandCount: number;
 }
@@ -41,7 +41,7 @@ const BYTES_FULL = BYTE_SCALE_KB * 1024;
 export function makeBarSpec(): BarSpec {
   const bands: Band[] = [];
   for (let i = 0; i < MAX_BANDS; i++) bands.push({ key: "", z0: 0, z1: 0, bytes: 0 });
-  return { measured: false, anchored: 0, kb: 0, z0: -BAR_MIN_W / 2, width: BAR_MIN_W, clipped: false, overflow: 1, bands, bandCount: 0 };
+  return { measured: false, anchored: 0, kb: 0, z0: -BAR_MIN_W / 2, width: BAR_MIN_W, bands, bandCount: 0 };
 }
 
 /**
@@ -57,8 +57,6 @@ export function fillBarSpec(
 ): BarSpec {
   out.anchored = anchored;
   out.bandCount = 0;
-  out.clipped = false;
-  out.overflow = 1;
 
   if (!bytesByKey) {
     out.measured = false;
@@ -74,9 +72,7 @@ export function fillBarSpec(
   out.kb = total / 1024;
 
   if (total >= BYTES_FULL) {
-    out.width = BAR_MAX_W;
-    out.clipped = true;
-    out.overflow = total / BYTES_FULL;
+    out.width = BAR_MAX_W; // clipped: the SIZE column carries the true size (header)
   } else {
     out.width = Math.max(BAR_MIN_W, (total / BYTES_FULL) * BAR_MAX_W);
   }
