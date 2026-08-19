@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { compositionRows, nodeCompositionLabel, compositionKey, parseCompositionKey, compositionClause } from "./composition";
-import type { NodeInfo } from "@/src/data/types";
+import { compositionRows, nodeCompositionLabel, compositionKey, parseCompositionKey, compositionClause, ROLE_SHORT, layerCodesOf, compositionGroups } from "./composition";
+import type { NodeInfo, NodeRow } from "@/src/data/types";
 
 const n = (roles: string[]): NodeInfo => ({ ip: "x", state: "Ready", layer: roles[0], roles }) as NodeInfo;
 
@@ -66,5 +66,59 @@ describe("compositionClause", () => {
   it("answers null for codes it has no clause for — the caller falls back", () => {
     expect(compositionClause([])).toBeNull();
     expect(compositionClause(["??"])).toBeNull();
+  });
+});
+
+// ONE layer vocabulary app-wide (CLAUDE.md, "Nodes, layers & the filter"): the codes the
+// composition chips use are the codes every surface uses. Three private copies of this map
+// existed before the 2026-08-16 consolidation, so the exported map is the thing under test.
+describe("ROLE_SHORT", () => {
+  it("is the whole layer vocabulary and nothing else", () => {
+    expect(ROLE_SHORT).toEqual({ l0: "L0", cl1: "cL1", dl1: "dL1" });
+  });
+});
+
+describe("layerCodesOf", () => {
+  it("aggregates the layers present, in the fixed vocabulary order", () => {
+    expect(layerCodesOf([{ roles: ["dl1"] }, { roles: ["l0"] }])).toEqual(["L0", "dL1"]);
+  });
+  it("reports each layer ONCE however many machines run it", () => {
+    expect(layerCodesOf([{ roles: ["l0", "dl1"] }, { roles: ["l0", "dl1"] }])).toEqual(["L0", "dL1"]);
+  });
+  it("is empty for nodes carrying no role list", () => {
+    expect(layerCodesOf([{}, { roles: [] }])).toEqual([]);
+  });
+});
+
+const nrow = (ip: string, roles: string[], id: string | null = ip): NodeRow =>
+  ({ pick: { kind: "l0", node: { ip, roles } as never }, label: ip, id, cc: null, country: null, city: null, layer: roles[0], roles }) as NodeRow;
+
+describe("compositionGroups", () => {
+  // ⚠️ A machine appears ONCE per cluster it runs, so the group counts match the dossier's
+  // table — this is the "a count can't drift" guarantee CLAUDE.md names for the shared math.
+  it("dedups a machine reported by several clusters", () => {
+    const groups = compositionGroups([nrow("1.1.1.1", ["l0", "dl1"]), nrow("1.1.1.1", ["l0", "dl1"])]);
+    expect(groups).toHaveLength(1);
+    expect(groups[0].rows).toHaveLength(1);
+  });
+
+  it("splits by composition and orders the biggest group first", () => {
+    const groups = compositionGroups([
+      nrow("1.1.1.1", ["dl1"]), nrow("2.2.2.2", ["dl1"]), nrow("3.3.3.3", ["l0", "dl1"]),
+    ]);
+    expect(groups.map((g) => [g.label, g.rows.length])).toEqual([["Data", 2], ["Hybrid", 1]]);
+  });
+
+  // The key is the group's stable identity — the same string the store's CompositionSel carries,
+  // which is why the builder and the parser live in one module.
+  it("keys each group with the round-trippable label + codes", () => {
+    const [g] = compositionGroups([nrow("1.1.1.1", ["l0", "dl1"])]);
+    expect(g.key).toBe(compositionKey("Hybrid", ["L0", "dL1"]));
+    expect(parseCompositionKey(g.key)).toEqual({ label: "Hybrid", codes: ["L0", "dL1"] });
+  });
+
+  it("orders rows within a group deterministically", () => {
+    const groups = compositionGroups([nrow("9.9.9.9", ["dl1"]), nrow("1.1.1.1", ["dl1"])]);
+    expect(groups[0].rows.map((r) => r.id)).toEqual(["1.1.1.1", "9.9.9.9"]);
   });
 });
