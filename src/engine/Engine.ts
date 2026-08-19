@@ -33,6 +33,7 @@ import { compositionGroups, compositionKey, compositionRows } from "@/src/data/c
 import { metaSnapDeepKey, metaSnapHoverKey } from "@/src/data/types";
 import { snapsAtTick } from "@/src/data/anchorLog";
 import { breakpointOf } from "@/src/data/breakpoint";
+import { calloutPlacement } from "./domain/calloutPlacement";
 import type { GlobalSnapshot, NodeRow, PickDescriptor } from "@/src/data/types";
 import type { ClusterNode, DagCore, GeoMap, RouteMetagraph } from "@/src/data/types";
 
@@ -1797,27 +1798,27 @@ export class Engine {
           const r = this.ctx.renderer.domElement.getBoundingClientRect();
           const x = r.left + (v.x * 0.5 + 0.5) * r.width;
           const y = r.top + (-v.y * 0.5 + 0.5) * r.height;
-          el.style.transform = `translate3d(${x.toFixed(1)}px, ${y.toFixed(1)}px, 0)`;
-          // Viewport flips (user, 2026-08-16): near the right edge the panel goes up-LEFT,
-          // near the top it drops BELOW the anchor — globals.css mirrors the geometry off
-          // these attributes (guarded writes, like data-on). Both thresholds are the panel's
-          // own reach on that axis — SceneCallout's OFF_X/OFF_Y standoff plus the widest/
-          // tallest panel — so they move with those offsets, never on their own.
-          // ⚠️ A flip must never push the panel into the CLOSER edge. The reach test alone
-          // assumes a viewport wider than twice that reach; on a phone `r.right - 360` sits
-          // ~40px in, so all but the leftmost anchors flipped and overflowed left by more
-          // than they would have overflowed right. Flipping only toward the roomier side
-          // makes the choice honest at every width and is provably a no-op on desktop —
-          // there, an anchor past the reach threshold always has the room behind it.
-          const flip = x > r.right - 360 && x - r.left > r.right - x;
-          const drop = y < r.top + 220;
-          if ((el.dataset.flip != null) !== flip) {
-            if (flip) el.dataset.flip = "";
-            else delete el.dataset.flip;
-          }
-          if ((el.dataset.drop != null) !== drop) {
-            if (drop) el.dataset.drop = "";
-            else delete el.dataset.drop;
+          // Placement is `domain/calloutPlacement.ts` — the flip/drop rules and the panel's reach
+          // live there with their test, and globals.css mirrors the geometry off the attributes
+          // written below (guarded writes, like data-on).
+          // ⚠️ MEASURE THE FREE CANVAS BAND, NOT THE CANVAS. Below 1100px the rails are
+          // sheets that OVERLAY a still-viewport-sized canvas, so `r.left`/`r.right` describe room
+          // the callout does not have: at 900px with both sheets open a geo node's panel rendered
+          // as a ~25px fragment in the strip between them. `sceneCoverL`/`sceneCoverR` are what the
+          // open sheets measured off themselves (0 on desktop and phone, so this is a no-op there).
+          const st = useStore.getState();
+          const p = calloutPlacement(x, y, r.left + st.sceneCoverL, r.right - st.sceneCoverR, r.top);
+          if (!p.show) on = false;
+          else {
+            el.style.transform = `translate3d(${x.toFixed(1)}px, ${y.toFixed(1)}px, 0)`;
+            if ((el.dataset.flip != null) !== p.flip) {
+              if (p.flip) el.dataset.flip = "";
+              else delete el.dataset.flip;
+            }
+            if ((el.dataset.drop != null) !== p.drop) {
+              if (p.drop) el.dataset.drop = "";
+              else delete el.dataset.drop;
+            }
           }
         }
       }

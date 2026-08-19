@@ -49,19 +49,21 @@ import { layerCodesOf } from "@/src/data/composition";
 import { useNowTick } from "@/components/useNowTick";
 import { useBreakpoint } from "@/components/useBreakpoint";
 import { relativeAge } from "@/src/util/relativeAge";
+import { CALLOUT_OFF_X, CALLOUT_OFF_Y } from "@/src/engine/domain/calloutPlacement";
 import type { GeoInfo } from "@/src/data/types";
 
-// Panel offset from the anchor, up and to the right. The leader spans exactly this diagonal, so
-// the three pieces (ring, line, panel corner) stay attached by construction.
+// The panel's standoff from the anchor lives in `src/engine/domain/calloutPlacement.ts`, with the
+// reach thresholds derived from it and the placement rules that read them. It used to be a local
+// pair here plus two derived constants in `Engine._syncCallout`, under a comment asking the next
+// reader to "change all four together" — one concern, so now one home. The leader below spans
+// exactly this diagonal, so the three pieces (ring, line, panel corner) stay attached by
+// construction.
 //
 // The standoff is longer than the panel is TALL (user, 2026-08-18 — "the call-out card sits on the
 // actual selection instead of at the end of the connecting line"). At the original 62/92 the tie was
 // ~111px against an ~82px panel, so the card landed inside its own subject's neighbourhood — in
 // hyper, squarely on the validator shells the selected bead sits on — and the leader read as a stub
-// under it rather than as the thing the card hangs from. The mirrored viewport thresholds in
-// `Engine._syncCallout` are derived from these two numbers; change all four together.
-const OFF_X = 100;
-const OFF_Y = 140;
+// under it rather than as the thing the card hangs from.
 
 
 // What the panel says — one model, filled per view/rung so the JSX below stays single-sourced.
@@ -375,8 +377,8 @@ export default function SceneCallout() {
         <line
           x1={6}
           y1={-6}
-          x2={OFF_X}
-          y2={-OFF_Y + 8}
+          x2={CALLOUT_OFF_X}
+          y2={-CALLOUT_OFF_Y + 8}
           stroke="var(--primary)"
           strokeOpacity="0.55"
           strokeWidth="1.5"

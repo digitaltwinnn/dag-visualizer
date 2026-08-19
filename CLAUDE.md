@@ -577,6 +577,19 @@ hued ticker, the anchor ring and the `.edge-spine`). The design rules the test c
   roomier side to flip to. **Both owners decline, through the same `breakpointOf` home** the rails
   restructure on, so presence and anchor can't disagree; `components/calloutBoundary.test.ts` pins
   that neither grows a threshold of its own. Tablet keeps it — there the flip has somewhere to go.
+- **Placement measures the FREE CANVAS BAND, not the canvas** (`domain/calloutPlacement.ts`, its
+  test the spec). Below 1100px the rails are sheets that OVERLAY a viewport-sized canvas, so a
+  placement measured against the canvas rect puts the panel under one: at 900px with both sheets
+  open a geo node's callout rendered as a ~25px fragment in the strip between them, while the
+  Details sheet behind it showed the whole node card anyway. The band is the canvas pulled in by
+  `store.sceneCover{L,R}` — the px each open side sheet covers, MEASURED by `RailDock` and reported
+  through an `onCoverPx` prop so the dock stays store-free. An anchor outside the band, or a panel
+  that fits on neither side, gets no callout: this is the phone rule's own reasoning reaching the
+  width the SHEETS create rather than only the width the device does. It is a no-op on desktop and
+  phone, where the cover is 0. ⚠️ The sheet mounts a commit LATER than the one that opens it (radix
+  portals its content), so the cover is published off a callback REF, not an effect keyed on `open`
+  — keyed on `open` it measures a null node and publishes 0 forever, which passes tsc and vitest
+  and fails only in the browser.
 - **Furniture labels are sparse by review**: geo's hosting-country names (the set states where the
   network runs — empty countries staying nameless is information) are the only ones standing. Hyper's
   hub tickers AND its "Global L0" were built and removed the same day (clutter over what hues,

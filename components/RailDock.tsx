@@ -110,6 +110,7 @@ export default function RailDock({
   sheetPx,
   onSheetPx,
   signalKey,
+  onCoverPx,
 }: {
   side: "left" | "right";
   label: string;
@@ -140,6 +141,13 @@ export default function RailDock({
   // continuous left-edge→right-edge sweep. `updateKey`'s per-half carrier (below) is unaffected —
   // a card update is genuinely local to its own half.
   signalKey?: unknown;
+  // How many px of the CANVAS this dock's sheet covers while open — 0 when closed, and 0 for a
+  // BOTTOM sheet, which takes height rather than width. Below 1100px the sheet OVERLAYS the
+  // full-viewport canvas instead of sitting beside it, so anything the Engine places against the
+  // canvas rect needs to know what it can't actually see (`store.sceneCover*`, consumed today by
+  // the subject callout). Reported through a prop for the same reason `sheetPx` is: RailDock stays
+  // store-free, and the CALLER decides which side of the store this lands on.
+  onCoverPx?: (px: number) => void;
 }) {
   const [openState, setOpen] = useState(false);
   const open = openProp ?? openState;
@@ -181,6 +189,39 @@ export default function RailDock({
   }, [open, isBarHalf]);
   const handleOpenChangeRef = useRef(handleOpenChange);
   handleOpenChangeRef.current = handleOpenChange;
+
+  // ── Canvas cover (tablet) ──────────────────────────────────────────────────────────────────
+  // Publish the WIDTH this sheet takes off the canvas while it's up. Measured rather than assumed:
+  // the sheet's width is a CSS decision (`SHEET_SIDE` + the caller's `style`), so reading it back
+  // keeps this from becoming a second home for that number. Only the width is needed, so the
+  // slide-in transform is irrelevant — a translateX doesn't change `offsetWidth`, and there's no
+  // wait-for-the-animation timing to get wrong. A bottom sheet reports 0: it takes height, and the
+  // callout declines on phone outright anyway.
+  // ⚠️ The sheet mounts in a LATER commit than the one that opens it — radix portals its
+  // content and `Presence` gates it on its own state, so an effect keyed on `open` alone runs
+  // with a null ref and publishes 0 forever (measured: both sheets up, `offsetWidth` 300/320,
+  // store still 0). The node therefore arrives through a callback ref as STATE, which re-runs
+  // this effect when it lands, and a ResizeObserver carries every later width change — including
+  // a tier switch, which a window-resize listener would also have caught, and a token change,
+  // which it would not.
+  const [sheetEl, setSheetEl] = useState<HTMLDivElement | null>(null);
+  const onCoverRef = useRef(onCoverPx);
+  onCoverRef.current = onCoverPx;
+  const covering = open && shellVisible && (sheetSide ?? side) !== "bottom";
+  useEffect(() => {
+    if (!covering || !sheetEl) {
+      onCoverRef.current?.(0);
+      return;
+    }
+    const publish = () => onCoverRef.current?.(Math.round(sheetEl.offsetWidth));
+    publish();
+    const ro = new ResizeObserver(publish);
+    ro.observe(sheetEl);
+    return () => {
+      ro.disconnect();
+      onCoverRef.current?.(0);
+    };
+  }, [covering, sheetEl]);
 
   // ── Tap-outside dismiss (phone bar-half only, user 2026-08-15) ─────────────────────────────
   // A TAP on the scene collapses the open bottom sheet, the same dismissal the bar-half toggle
@@ -505,6 +546,7 @@ export default function RailDock({
           renders whatever `open` it's given. */}
       <Sheet open={open && shellVisible} onOpenChange={handleOpenChange} modal={false}>
         <SheetContent
+          ref={setSheetEl}
           side={sheetSide ?? side}
           // Drag-chosen height override (phone bottom sheet): inline height + unlocked max-height
           // (the CSS caps at 72vh, below the expanded snap). Cleared back to the 60vh default when

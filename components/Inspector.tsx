@@ -339,6 +339,7 @@ export default function Inspector() {
   const phoneDock = useStore((s) => s.phoneDock);
   const setPhoneDock = useStore((s) => s.setPhoneDock);
   const phoneSheetPx = useStore((s) => s.phoneSheetPx);
+  const setSceneCover = useStore((s) => s.setSceneCover);
   const setPhoneSheetPx = useStore((s) => s.setPhoneSheetPx);
 
   const accent = { ["--filter-accent"]: filterAccent(filter) } as CSSProperties;
@@ -668,7 +669,18 @@ export default function Inspector() {
     // Tablet: unchanged — the right edge tab opening a right-side Sheet, independent of the
     // left "Explore" dock (both can be open at once).
     return (
-      <RailDock side="right" label="Details" style={accent} signals={tray} updateKey={updateKey} signalKey={`${mode}|${filter}`} onOpenChange={onTrayOpenChange}>
+      <RailDock
+        side="right"
+        label="Details"
+        style={accent}
+        signals={tray}
+        updateKey={updateKey}
+        signalKey={`${mode}|${filter}`}
+        onOpenChange={onTrayOpenChange}
+        // See `store.sceneCoverR` — this sheet takes width off the canvas the Engine places
+        // the subject callout against.
+        onCoverPx={(px) => setSceneCover("right", px)}
+      >
         {content}
       </RailDock>
     );
