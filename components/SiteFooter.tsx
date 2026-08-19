@@ -28,7 +28,7 @@ export default function SiteFooter() {
     // canvas, and an orbit drag started along the bottom edge must still reach the scene.
     <footer
       id="sitefoot"
-      className="fixed inset-x-0 bottom-0 z-10 h-[var(--footer-h)] flex items-center justify-center pointer-events-none max-[699px]:hidden"
+      className="fixed inset-x-0 bottom-0 z-10 h-[var(--footer-h)] flex items-center justify-center pointer-events-none max-[700px]:hidden"
     >
       {/* ⚠️ The band is TRANSPARENT over a live scene, so its ground is whatever orbits past — in
           hyper a metagraph hub sweeps the bottom edge and its bloom washed "Design" out entirely

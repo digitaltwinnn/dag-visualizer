@@ -73,7 +73,7 @@ export default function FilterPicker({ onPicked }: { onPicked?: () => void }) {
         // ≥44px tap height wrap to ~7 rows). Cap to ~4 rows and scroll the rest (user,
         // 2026-07-12) — the strip stays a bar expansion, not a takeover. `.slim-scroll` =
         // the shared slim scrollbar; overscroll-contain keeps the flick off the page.
-        "max-[699px]:max-h-[192px] max-[699px]:overflow-y-auto max-[699px]:overscroll-contain slim-scroll",
+        "max-[700px]:max-h-[192px] max-[700px]:overflow-y-auto max-[700px]:overscroll-contain slim-scroll",
       )}
       onMouseLeave={() => setHoverFilter(null)}
     >

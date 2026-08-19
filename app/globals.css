@@ -814,10 +814,11 @@
 
 /* The footer hides on the phone (the 56px dock owns that edge), so its band must go to 0 in the
    same breath or every consumer would keep reserving space for a strip that isn't drawn. Written
-   as `not (min-width: …)` rather than `max-width` to match the SAME boundary Tailwind's
-   `max-[699px]:hidden` compiles to on the component itself — CSS trap 8, where the two forms
-   disagree by exactly one pixel. */
-@media not (min-width: 699px) {
+   as `not (min-width: …)` rather than `max-width` because that is what Tailwind's
+   `max-[700px]:hidden` compiles to on the component itself — CSS trap 8, where the two forms
+   disagree by exactly one pixel. 700 is `breakpointOf`'s own phone boundary, and every arm of it
+   names that same number. */
+@media not (min-width: 700px) {
   :root { --footer-h: 0px; }
 }
 

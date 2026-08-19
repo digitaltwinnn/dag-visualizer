@@ -7,8 +7,11 @@ export function useBreakpoint(): Breakpoint {
   useEffect(() => {
     const compute = () => setBp(breakpointOf(window.innerWidth));
     compute();
-    const mqTablet = window.matchMedia("(max-width: 1099px)");
-    const mqPhone = window.matchMedia("(max-width: 699px)");
+    // `not all and (min-width: N)` rather than `max-width: N-1` so the listeners flip on exactly
+    // the boundaries `breakpointOf` reads — a `max-width` arm one pixel down misses a fractional
+    // width that has already crossed it (CSS trap 8).
+    const mqTablet = window.matchMedia("not all and (min-width: 1100px)");
+    const mqPhone = window.matchMedia("not all and (min-width: 700px)");
     mqTablet.addEventListener("change", compute);
     mqPhone.addEventListener("change", compute);
     return () => { mqTablet.removeEventListener("change", compute); mqPhone.removeEventListener("change", compute); };

@@ -164,7 +164,7 @@ export default function SectionShell({
         className={
           "ig-panel fixed z-9 overflow-hidden left-4 right-4 min-[1100px]:left-[26px] min-[1100px]:right-[26px] " +
           "top-[calc(var(--rail-top)+var(--topbar-extra,0px))] bottom-[calc(var(--bottom-reserve,0px)+var(--footer-h,0px))] " +
-          "max-[699px]:bottom-[calc(var(--phone-dock-h,56px)+var(--bottom-reserve,0px))]"
+          "max-[700px]:bottom-[calc(var(--phone-dock-h,56px)+var(--bottom-reserve,0px))]"
         }
         style={{ visibility: "hidden", willChange: "transform, opacity" }}
       >
