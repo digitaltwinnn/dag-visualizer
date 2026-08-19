@@ -41,6 +41,8 @@ import * as THREE from "three";
 import { METAGRAPHS } from "../../config";
 import {
   LEDGER,
+  FLOOR_CX,
+  FLOOR_W,
   FLOOR_Y,
   PLANE_FIELD_HALF,
   LANE_HALF_Z,
@@ -84,12 +86,12 @@ import type { TuneSchema } from "../../tune";
 
 const META_TRAIL_MAX = 1500;
 
-/** The glass floors' footprint, and the X the edge-aligned labels read from. Module scope because
- *  the gutter label has to land on the SAME edge as the floor labels (it used to be derived from
- *  LEDGER.depth and floated ~9 units in front of the chamber). */
-const FLOOR_W = 39.5;
+/** The floors' X footprint lives in `domain/ledgerLayout` (the trail's front boundary is derived
+ *  from that rim, so the domain has to own it). What stays here is the label X — the gutter label
+ *  has to land on the SAME edge as the floor labels (it used to be derived from LEDGER.depth and
+ *  floated ~9 units in front of the chamber) — and the glass shader's drop-off reference, which is
+ *  a look, not an extent. */
 const FLOOR_D = 44;
-const FLOOR_CX = -13.25;
 const FLOOR_LABEL_X = FLOOR_CX + FLOOR_W / 2 - 0.4;
 
 /** The per-row GLOBAL SNAPSHOT ID labels at the global plane's screen-left edge (user,

@@ -54,11 +54,13 @@ Eleven invariants. Six are executable — `npm test` fails when they break.
 | 5 | **Zero-allocation render loop.** No `new THREE.*`/`.clone()` in per-frame bodies unless marked `event-time`. | `src/engine/noFrameAllocations.test.ts` |
 | 6 | **Scene-view contract.** Bespoke views implement `SceneView`; scene modules never compare `Mode` strings; framing math reads layout data, not rendered transforms; views never write their root `visible`. | `src/engine/scene/views/sceneView.test.ts`, `src/engine/sceneViewContract.test.ts` |
 
-Four narrower boundary tests work the same way: `components/unlistedBoundary.test.ts` (the `"unlisted"`
+Five narrower boundary tests work the same way: `components/unlistedBoundary.test.ts` (the `"unlisted"`
 id literal has exactly two homes), `components/railLadderBoundary.test.ts` (every committable focus
 rung maps to a hinted rail card slot), `components/railTierBoundary.test.ts` (`data-focus` has two
-homes and the slab's geometry — the pager included — keys on `data-tier`) and
-`src/data/signerMatchBoundary.test.ts` (a peer-id prefix comparison lives only in `src/data/network.ts`).
+homes and the slab's geometry — the pager included — keys on `data-tier`),
+`src/data/signerMatchBoundary.test.ts` (a peer-id prefix comparison lives only in `src/data/network.ts`)
+and `src/engine/scene/rowBoundary.test.ts` (a scene module that places a ledger row consults the
+trail's boundaries).
 
 Each of these files opens with a header comment giving the rationale, the scope and every exemption
 with its reason. **That header is the rule's authoritative statement** — read it rather than inferring
@@ -1539,6 +1541,25 @@ and dissolves when that is off the chamber, never pinned to the glass to keep it
 network anchors again the offset eases back and they slide onto the panel in their own place. The
 front formula had two homes when this happened (`TrailRewind.fadeAtX` plus an inline copy in the
 bar), which is how one write path came to miss it at all.
+
+⚠️ **A BOUNDARY MUST FINISH INSIDE THE GLASS, AND THE RAMP IS DERIVED FROM THE RIM** (user,
+2026-08-19 — *"nothing is ever drawn in front of the plane; I still see sometimes something
+drawn/flash in front"*). Every row-riding write path already multiplied by `frontAt`, so the hunt
+for a missing call found nothing: the defect was one level up. `frontAt` dissolved over
+`SLOT_SP * 0.9`, a length picked for how the fade LOOKED, which put its zero at x 7.14 while the
+glass stops at 6.5 — and a byte bar reaches `BAR_D / 2` ahead of its own centre, so the last ink of
+a fading row sat at 7.94, nearly a slot and a half out in mid-air. Visible only while the rewind
+pushes rows forward (a pin, a filtered follow), which is exactly why it read as an intermittent
+flash. The chamber's footprint is now `FLOOR_W` / `FLOOR_CX` in `domain/ledgerLayout.ts` with
+`FLOOR_FRONT_X` / `FLOOR_BACK_X` beside them (promoted out of `LedgerView`, which keeps only the
+label X and the glass shader's drop-off reference), and the ramp ends at `FRONT_INK_X =
+FLOOR_FRONT_X − ROW_HALF_D` — so at `frontAt = 0` the row's leading face lands ON the rim. Retune
+the rim, the slot spacing or the bar's depth and the ramp follows; there is no second number to
+keep in step. **Two tests, because the rule has two halves that fail independently**: the sweep in
+`domain/ledgerModel.test.ts` proves the ramps are short enough (both ends, pick set included), and
+`scene/rowBoundary.test.ts` proves they are asked — any non-test `scene/` module referencing
+`SLOT_SP` must reference a boundary, with `setRowFade` the one stated exemption for `Ribbons`,
+whose vertex colours are baked at event time so the view pushes its fade in.
 
 **Signer glow.** When the selected metagraph snapshot changes, the Engine resolves its signers to IPs
 and lights those machines in the trays — the scene keys metagraph nodes by IP, not id, so the machines

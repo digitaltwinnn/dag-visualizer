@@ -6,6 +6,7 @@ import {
   BAR_MAX_W, BAR_MIN_W, BAR_H, BAR_D, BYTE_SCALE_KB, BAR_EDGE_MARGIN,
   CONT_X, CONT_TOP_GAP, CONT_CHIP_Z, CONT_ROW_Y, CONT_PAD, CONT_Z0, CONT_Z1,
   LEAD_X, TILE_LIFT, BAR_LIFT,
+  FLOOR_W, FLOOR_CX, FLOOR_FRONT_X, FLOOR_BACK_X,
   LANE_PLANE_GAP, lanePlaneHalf, laneSpan,
 } from "./ledgerLayout";
 
@@ -166,5 +167,20 @@ describe("two-floor chamber (redesign 2026-08-04)", () => {
       // Each lane owns one slice of the field, so n lanes tile it without overlapping.
       expect(s.hz).toBeCloseTo(LANE_HALF_Z / n, 6);
     }
+  });
+});
+
+describe("the glass footprint (promoted out of LedgerView 2026-08-19)", () => {
+  it("gives the chamber ONE front rim and one back rim, centred on FLOOR_CX", () => {
+    expect(FLOOR_FRONT_X).toBe(FLOOR_CX + FLOOR_W / 2);
+    expect(FLOOR_BACK_X).toBe(FLOOR_CX - FLOOR_W / 2);
+    expect(FLOOR_FRONT_X - FLOOR_BACK_X).toBe(FLOOR_W);
+  });
+
+  it("leaves the lead slot standing on glass, well inside the front rim", () => {
+    // The trail's front boundary is derived from this rim (ledgerModel's FRONT_INK_X), so a rim
+    // that fell behind the lead would dissolve the live row on arrival.
+    expect(LEAD_X).toBeLessThan(FLOOR_FRONT_X);
+    expect(FLOOR_FRONT_X - LEAD_X).toBeGreaterThan(BAR_D / 2);
   });
 });

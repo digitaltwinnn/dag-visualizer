@@ -65,9 +65,9 @@ export class TrailRewind {
     if (Math.abs(target - this._off) < 0.002) this._off = target;
   }
 
-  /** 1 at/behind the lead position, dissolving within one slot of travel past the front edge.
-   *  The math is `frontAt` in domain/ledgerModel — the byte bar reads it too, and the two must
-   *  agree about where the chamber's front edge is. */
+  /** 1 at/behind the lead position, fully dissolved by the chamber's front rim. The math is
+   *  `frontAt` in domain/ledgerModel — the byte bar reads it too, and the two must agree about
+   *  where the chamber's front edge is. */
   fadeAtX(x: number): number {
     return frontAt(x);
   }

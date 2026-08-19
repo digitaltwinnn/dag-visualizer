@@ -10,6 +10,9 @@ import {
   horizonAt,
   frontAt,
   rowOnChamber,
+  ROW_HALF_D,
+  FRONT_INK_X,
+  BACK_INK_X,
   LIVE_X,
   liveEdgePhase,
   anchorTiles,
@@ -18,7 +21,7 @@ import {
 import { METAGRAPHS } from "../config";
 import { lanePlaneHalf } from "./ledgerLayout";
 import { UNLISTED_KEY } from "./ledgerBands";
-import { ledgerSite, LEAD_X } from "./ledgerLayout";
+import { ledgerSite, LEAD_X, FLOOR_BACK_X, FLOOR_FRONT_X } from "./ledgerLayout";
 import type { GlobalSnapshot, Anchor } from "@/src/data/types";
 
 function snap(ordinal: number, ts: string, count = 0): GlobalSnapshot {
@@ -425,5 +428,72 @@ describe("LANE_IDS (the unknown lane, 2026-08-07)", () => {
     const lane = model.lanes.get(UNLISTED_KEY)!;
     expect(lane).toBeTruthy();
     expect(lane.blocks.filter((b) => b.filled).length).toBeGreaterThan(0);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────────────────────
+// NOTHING IS EVER DRAWN OFF THE GLASS (user, 2026-08-19: "I still see sometimes something
+// drawn/flash in front of the plane (so perhaps its not drawing but some flash occurs)").
+//
+// It was drawing. Every row-riding instrument already multiplied by `frontAt`, so the recurring
+// hunt for a missing multiply found nothing — the defect was one level up: the dissolve RAMP was
+// longer than the glass. `frontAt` faded over `SLOT_SP * 0.9`, reaching 0 at x 7.14, and a byte
+// bar reaches BAR_D/2 = 0.8 ahead of its own centre, so the last ink of a fading row sat at 7.94
+// against a front rim of 6.5. Nearly a slot and a half of visible row hanging in mid-air, seen
+// only while the rewind pushes rows forward (a pin, or a filtered follow), which is exactly why
+// it read as an intermittent flash rather than as something always wrong.
+//
+// So this is a GEOMETRIC rule, not a code-shape one, and it is stated as a sweep: wherever a
+// boundary still says "draw", the row's ink must be inside the rim it belongs to. Both ends are
+// swept, because the back rim is the same claim mirrored and it is only safe today by accident of
+// tuning. Retune the rim, the slot spacing or the bar's depth and this test is what notices.
+// ─────────────────────────────────────────────────────────────────────────────────────────────
+describe("the trail's boundaries finish inside the glass", () => {
+  /** Every X a row can occupy, live offset included, at a resolution well under the ink radius. */
+  const sweep = (fn: (x: number) => void) => {
+    for (let x = FLOOR_BACK_X - 4 * SLOT_SP; x <= FLOOR_FRONT_X + 4 * SLOT_SP; x += 0.02) fn(x);
+  };
+
+  it("puts no ink past the FRONT rim — the reported flash", () => {
+    sweep((x) => {
+      if (frontAt(x) > 0) expect(x + ROW_HALF_D).toBeLessThanOrEqual(FLOOR_FRONT_X + 1e-9);
+    });
+  });
+
+  it("puts no ink past the BACK rim either", () => {
+    sweep((x) => {
+      if (horizonAt(x) > 0) expect(x - ROW_HALF_D).toBeGreaterThanOrEqual(FLOOR_BACK_X - 1e-9);
+    });
+  });
+
+  it("takes the PICK set with it at both ends, so nothing invisible stays clickable", () => {
+    sweep((x) => {
+      if (!rowOnChamber(x)) return;
+      expect(x + ROW_HALF_D).toBeLessThanOrEqual(FLOOR_FRONT_X + 1e-9);
+      expect(x - ROW_HALF_D).toBeGreaterThanOrEqual(FLOOR_BACK_X - 1e-9);
+    });
+  });
+
+  it("still draws the whole resting trail at full strength — the ramp tightened, it did not eat rows", () => {
+    // At rest the offset is 0, so the newest row sits AT the lead and nothing is ever ahead of it.
+    expect(frontAt(LEAD_X)).toBe(1);
+    for (let slot = 0; slot < SLOT_N; slot++) {
+      const x = LEAD_X - slot * SLOT_SP;
+      expect(frontAt(x)).toBe(1);
+      expect(rowOnChamber(x)).toBe(true);
+    }
+  });
+
+  it("keeps the LIVE EDGE inside the rim — it is the one thing drawn ahead of the lead", () => {
+    // The edge is not a row and takes no boundary (it marks NOW, which does not slide with the
+    // trail), so its clearance is asserted here rather than left to the sweep above.
+    expect(LIVE_X).toBeGreaterThan(LEAD_X);
+    expect(LIVE_X + ROW_HALF_D).toBeLessThanOrEqual(FLOOR_FRONT_X);
+  });
+
+  it("derives both ink bounds from the rims rather than restating them", () => {
+    expect(FRONT_INK_X).toBe(FLOOR_FRONT_X - ROW_HALF_D);
+    expect(BACK_INK_X).toBe(FLOOR_BACK_X + ROW_HALF_D);
+    expect(frontAt(FRONT_INK_X)).toBeCloseTo(0, 10);
   });
 });

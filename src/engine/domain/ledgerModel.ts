@@ -26,7 +26,7 @@
 // behaviour must match js/ledger.js exactly since Task 13 will diff against it).
 
 import { METAGRAPHS } from "../config";
-import { ledgerSite, lanePlaneHalf, LEAD_X } from "./ledgerLayout";
+import { ledgerSite, lanePlaneHalf, BAR_D, FLOOR_BACK_X, FLOOR_FRONT_X, LEAD_X } from "./ledgerLayout";
 import { UNLISTED_KEY } from "./ledgerBands";
 import type { GlobalSnapshot, Anchor } from "@/src/data/types";
 
@@ -79,10 +79,29 @@ export const HORIZON_SPAN = 2.2 * SLOT_SP;
 export const horizonAt = (x: number): number =>
   Math.min(1, Math.max(0, (x - HORIZON_X) / HORIZON_SPAN));
 
+/** How far ahead of its own centre a row reaches: the byte bar is the deepest thing a row draws
+ *  in X, so half its depth is the row's ink radius. The lane tiles (BLOCK_SIZE) and the label
+ *  columns are shallower and ride inside it. */
+export const ROW_HALF_D = BAR_D / 2;
+
+/** THE RAMP IS DERIVED FROM THE RIM, NOT FROM A FRACTION OF A SLOT (2026-08-19). `frontAt` used
+ *  to dissolve over `SLOT_SP * 0.9`, a length chosen for how the fade LOOKED — which put its zero
+ *  at x 7.14 and the last ink of a fading row at 7.94, while the glass stops at 6.5. So a row
+ *  pushed forward by the rewind spent the tail of its dissolve hanging in mid-air past the front
+ *  rim, which is what the user saw as "something drawn/flash in front of the plane". The span is
+ *  now whatever reaches the rim exactly: FRONT_INK_X is the last X a row may put ink, so at
+ *  frontAt = 0 the row's leading face lands ON FLOOR_FRONT_X and never past it. Retune the rim or
+ *  the bar depth and the ramp follows; there is no second number to keep in step. */
+export const FRONT_INK_X = FLOOR_FRONT_X - ROW_HALF_D;
+
+/** The mirror at the far rim — what the horizon has to clear for the same reason. Derived, not
+ *  asserted: `ledgerModel.test.ts` sweeps both boundaries against these. */
+export const BACK_INK_X = FLOOR_BACK_X + ROW_HALF_D;
+
 /** The trail's OTHER boundary, and it lives here beside the horizon for the same reason that one
  *  does: every instrument riding the trail has to agree about where the chamber ends, or one of
- *  them floats past the edge on its own. 1 at or behind the lead position, dissolving within one
- *  slot of travel once the rewind has pushed the row past the front edge.
+ *  them floats past the edge on its own. 1 at or behind the lead position, fully dissolved by
+ *  the time the rewind has pushed the row's leading face to the glass's own front rim.
  *
  *  ⚠️ SEEDS ARE ROWS TOO (user, 2026-08-18 — filter on a metagraph and let it follow: "these
  *  forming blocks are drawn in front, outside of the panel"). Under a filtered follow the rewind
@@ -94,7 +113,7 @@ export const horizonAt = (x: number): number =>
  *  where its tick belongs and dissolves when that is off the chamber — never pinned to the glass to
  *  keep it visible. */
 export const frontAt = (x: number): number => {
-  const over = (x - LEAD_X) / (SLOT_SP * 0.9);
+  const over = (x - LEAD_X) / (FRONT_INK_X - LEAD_X);
   return over <= 0 ? 1 : Math.max(0, 1 - over);
 };
 
