@@ -50,14 +50,26 @@ Eleven invariants. Six are executable — `npm test` fails when they break.
 | 1 | **Engine layering.** `domain/` = pure logic, `scene/` = Three adapters, `Engine.ts` = the only store bridge. | `src/engine/layerBoundaries.test.ts` |
 | 2 | **One selection write path.** Every interactive surface expresses intent through the decision table and applies it through the one executor. | `components/selectionBoundary.test.ts` |
 | 3 | **One colour source.** CSS tokens are canonical; no raw hex in `scene/` or `components/` outside the allowlist. | `src/engine/noHardcodedColors.test.ts` |
-| 4 | **Domain-export coverage.** Every value export of a `domain/` module is referenced by its sibling test. | `src/engine/domainExportCoverage.test.ts` |
+| 4 | **Pure-module export coverage.** Every value export of a `domain/` or `src/data/` module is referenced by its sibling test. | `src/engine/domainExportCoverage.test.ts`, `src/data/dataExportCoverage.test.ts` |
 | 5 | **Zero-allocation render loop.** No `new THREE.*`/`.clone()` in per-frame bodies unless marked `event-time`. | `src/engine/noFrameAllocations.test.ts` |
 | 6 | **Scene-view contract.** Bespoke views implement `SceneView`; scene modules never compare `Mode` strings; framing math reads layout data, not rendered transforms; views never write their root `visible`. | `src/engine/scene/views/sceneView.test.ts`, `src/engine/sceneViewContract.test.ts` |
 
-Five narrower boundary tests work the same way: `components/unlistedBoundary.test.ts` (the `"unlisted"`
+⚠️ Rule 4 reaches TWO directories and is not the same rule in both. `domain/` is pure by
+construction — rule 1 denies it react, the store and the addons — so its coverage needs no
+exemptions. `src/data/` holds the live singleton and the geo cache alongside the row builders, so
+`dataExportCoverage.test.ts` carries an explicit exemption list plus guards that keep it from
+growing: a mechanical purity classifier was tried and rejected (its regex matched the words
+"window" and "fetch" inside this repo's own comments), and the header records why.
+
+Seven narrower boundary tests work the same way: `components/unlistedBoundary.test.ts` (the `"unlisted"`
 id literal has exactly two homes), `components/railLadderBoundary.test.ts` (every committable focus
 rung maps to a hinted rail card slot), `components/railTierBoundary.test.ts` (`data-focus` has two
 homes and the slab's geometry — the pager included — keys on `data-tier`),
+`components/cssTrapBoundary.test.ts` (CSS traps 3 and 6 — a `bg-[var()]` never points at a gradient
+token, and every custom `text-*`/`tracking-*`/`rounded-*` token is registered with twMerge),
+`components/publishChannelBoundary.test.ts` (the React→Engine publish channels are one-way and
+single-publisher: `focusRung` is a fresh object bridged by reference, `sceneCover` is measured by
+`RailDock` off an element ref and sided by the two rails, `boxedCard` is Inspector's alone),
 `src/data/signerMatchBoundary.test.ts` (a peer-id prefix comparison lives only in `src/data/network.ts`)
 and `src/engine/scene/rowBoundary.test.ts` (a scene module that places a ledger row consults the
 trail's boundaries).
@@ -1177,8 +1189,8 @@ under it. The engine-anchored `Tooltip` stays custom, because a Radix tooltip ca
 
 ### CSS traps
 
-Each has cost real debugging time. Only trap 8 is executable —
-`components/breakpointArmBoundary.test.ts`; the rest are yours to remember.
+Each has cost real debugging time. Traps 3, 6 and 8 are executable — `components/cssTrapBoundary.test.ts`
+for the first two, `components/breakpointArmBoundary.test.ts` for the last; the rest are yours to remember.
 
 1. **Recipes that must beat element utilities stay UNLAYERED.** Tailwind v4 orders `theme, base,
    components, utilities`, so a rule in `@layer components` loses to a utility **at ANY specificity** —
@@ -1333,8 +1345,9 @@ The storey heights give the ribbons a deliberate long run.
 anchored KB/tick** (user, 2026-08-16: "more often too filled than too small" — the earlier p99 bake
 made the median bar a sliver of unreadable segments), so a heavy tick clips at the floor edge instead
 of rescaling the whole past — and states its true size in words in the SIZE column below, which is the
-honest answer the clip never had. (`spec.clipped` / `spec.overflow` in `ledgerBands.ts` are computed
-for an `×N` overflow label that was never built; the size column supersedes it.)
+honest answer the clip never had. (`spec.clipped` / `spec.overflow` were computed in `ledgerBands.ts`
+for an `×N` overflow label that was never built, and were removed 2026-08-19 — the size column
+supersedes them, so a clipped bar states its size in words rather than in a multiplier.)
 `scripts/bake-ledger-scale.ts`
 re-measures it; its header carries the complete-window sampling trap. The bar is centered on the lane field and split into bands, one
 per contributing metagraph plus unlisted, each its own pickable mesh from a pool allocated once.
