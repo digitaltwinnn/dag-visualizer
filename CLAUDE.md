@@ -1164,7 +1164,8 @@ under it. The engine-anchored `Tooltip` stays custom, because a Radix tooltip ca
 
 ### CSS traps
 
-Nothing tests these. Each has cost real debugging time.
+Each has cost real debugging time. Only trap 8 is executable —
+`components/breakpointArmBoundary.test.ts`; the rest are yours to remember.
 
 1. **Recipes that must beat element utilities stay UNLAYERED.** Tailwind v4 orders `theme, base,
    components, utilities`, so a rule in `@layer components` loses to a utility **at ANY specificity** —
@@ -1198,10 +1199,15 @@ Nothing tests these. Each has cost real debugging time.
    a second one. `:is()` inside `:has()` is fine.
 8. **`max-[N]` is EXCLUSIVE** — Tailwind v4 compiles it to `@media not (min-width: N)`, so it stops
    applying **at** N, not after it. A tier boundary is therefore written with the SAME number on both
-   arms (`max-[1100px]` / `min-[1100px]`), which is how the rail widths pair. The `max-[1099px]:!hidden`
-   safety nets are the older form and leave exactly 1099px on the desktop arm — harmless (nothing
-   double-renders, the desktop rails simply arrive one pixel early), but don't copy the pattern into a
-   new boundary, and never pair `max-[N]` with `min-[N+1]` thinking it closes the gap: it opens one.
+   arms (`max-[1100px]` / `min-[1100px]`), which is how the rail widths pair. Never pair `max-[N]` with
+   `min-[N+1]` thinking it closes the gap: it opens one, and the hole is invisible to every other gate
+   here because both arms are individually well-formed. **The phone tier had one** (fixed 2026-08-19):
+   `max-[699px]` against `min-[700px]` left exactly 699px with the dock CSS-hidden and the tablet tabs
+   not yet matching — no rail control at all, neither rail openable. Every arm names 700 now, which is
+   `breakpointOf`'s own boundary, and `components/breakpointArmBoundary.test.ts` is the rule; its header
+   carries the ONE exemption, the `max-[1099px]:!hidden` safety nets, where the desktop rails fill in at
+   the same width the tabs vanish so nothing goes missing. Don't copy that older form into a new
+   boundary.
 9. **One slim scrollbar recipe, `.slim-scroll`.** Any scroll region **on glass** wears it — the platform
    default paints a chunky bright bar that reads as a browser part laid over the panel. It's a class
    rather than a token because its consumers are reusable primitives (the filter strip's phone overflow,
