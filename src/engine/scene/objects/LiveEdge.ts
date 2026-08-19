@@ -31,12 +31,21 @@ const EDGE_D = 0.13;
  *  with no measurement yet. `SEED_H` is a fraction of BAR_H in ByteBar; this is that product. */
 const EDGE_H = 0.14 * BAR_H;
 
-/** Resting opacity while a read is in flight — the calm beat, as the cards' acquiring stars. */
-const BREATHE_BASE = 0.3;
-const BREATHE_AMP = 0.12;
+/** Resting opacity while a read is in flight — the calm beat, as the cards' acquiring stars.
+ *  Raised 0.30/0.12 -> 0.62/0.26 (user, 2026-08-18: "can you make the pulse more visible/bright?").
+ *  The line lies flush in a lit glass floor a few pixels tall at the resting pose, so the earlier
+ *  swing of 0.18-0.42 read as a shade of the rim rather than as something breathing. The RATE is
+ *  untouched: the tempo is the calm beat this shares with the heartbeat family, and the ask was
+ *  for a brighter breath, not a faster one. The swing is now 0.36-0.88, so the trough still
+ *  clearly darkens rather than the whole line pinning bright. */
+const BREATHE_BASE = 0.62;
+const BREATHE_AMP = 0.26;
 const BREATHE_RATE = 2.4;
-/** Standby: still and dimmer than the seed's own 0.22, because this line's area is far larger. */
-const STILL_OP = 0.14;
+/** Standby: still, and now well under the breath's own trough (user, 2026-08-18: "dim the front
+ *  line that 'settles' a bit more while it is at rest"). Raising the breath raised the contrast the
+ *  resting state has to clear — at 0.2 the still line read as a quiet moment of the same signal
+ *  rather than as a different state, which is the one thing this line has to say without words. */
+const STILL_OP = 0.11;
 
 export class LiveEdge {
   /** Mounted straight into the view root, NEVER into a group the rewind offsets: the edge marks

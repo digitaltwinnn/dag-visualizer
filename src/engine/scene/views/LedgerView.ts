@@ -96,6 +96,13 @@ const FLOOR_LABEL_X = FLOOR_CX + FLOOR_W / 2 - 0.4;
  *  2026-08-07 — replaced the lead row's `forming…` note): every visible tick row is named by
  *  the ordinal it anchors, quieter than the plane label. */
 const ORD_OP = 0.55;
+/** The dotted anchor line's share of its label's opacity. It is a TIE, not a reading — the number
+ *  at one end and the bar at the other are the two things being read, and the line only has to say
+ *  which belongs to which. Dropped 0.45 -> 0.26 (user, 2026-08-18: "dim also the dotted lines
+ *  attached to snapshot id/size"): at the resting pose eight rows of dashes ran the full width of
+ *  the chamber on both sides, which is a lot of ink for a joining mark. ONE constant, because both
+ *  columns tie their rows with the same recipe and must not drift. */
+const ORD_LINE_MUL = 0.26;
 /** The committed lane's plane edge-fill multiplier (its plane leads with its snapshots). */
 const LANE_FILL_BOOST = 3;
 const ORD_H = 0.78;
@@ -410,11 +417,11 @@ export class LedgerView implements SceneView {
       const front = this._rewind.fadeAtX(ox) * horizonAt(ox) * entryF;
       (o.mesh.material as THREE.MeshBasicMaterial).opacity = ORD_OP * front * a;
       // The anchor line whispers under its label (user, 2026-08-07 — "a bit more subtle").
-      (o.line.material as THREE.LineDashedMaterial).opacity = ORD_OP * 0.45 * front * a;
+      (o.line.material as THREE.LineDashedMaterial).opacity = ORD_OP * ORD_LINE_MUL * front * a;
       // The size column rides the same two boundaries. Its line goes with its number: with no
       // measurement to state there is nothing for the line to tie to.
       if (o.kb) (o.kb.material as THREE.MeshBasicMaterial).opacity = ORD_OP * front * a;
-      (o.kbLine.material as THREE.LineDashedMaterial).opacity = o.kb ? ORD_OP * 0.45 * front * a : 0;
+      (o.kbLine.material as THREE.LineDashedMaterial).opacity = o.kb ? ORD_OP * ORD_LINE_MUL * front * a : 0;
     }
   }
 
