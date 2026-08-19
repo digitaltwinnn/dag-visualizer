@@ -12,6 +12,16 @@
 //
 // The owner (LedgerView) applies `offset` to its groups/instances and multiplies brightnesses
 // by `fadeAtX`; this class owns only the scalar state. Allocation-free per frame.
+//
+// This offset is the trail's ONE source of motion. It used to have a rival: a `holding` flag told
+// the lane tiles to snap to their slot while a pin held the front and to ease their own stored x
+// otherwise — but every other row-riding instrument (the byte bar, the ribbons, both label
+// columns) reads `LEAD_X - slot * SLOT_SP` directly, so the ease was one instrument drifting off
+// its own row rather than a motion the chamber had. It showed worst exactly where the flag
+// dropped: a filtered follow's fresh anchor moves the held ordinal to slot 0, so `holding` went
+// false in the same event that shifted every slot, and the tiles glided in a full slot late while
+// their bars were already correct. Retired 2026-08-18 — tile x is derived, and the trail moves
+// here or not at all.
 import { SLOT_SP, frontAt } from "../../domain/ledgerModel";
 
 export class TrailRewind {
@@ -23,12 +33,6 @@ export class TrailRewind {
   /** The current +X offset the whole trail wears. */
   get offset(): number {
     return this._off;
-  }
-
-  /** True while a rewind target holds the front — tile x must snap to its slot exactly (the
-   *  generic per-tick ease would fight the jumped offset; the trail must read FROZEN). */
-  get holding(): boolean {
-    return this._pinnedOrd != null && this._slotPrev > 0;
   }
 
   /** The COMMITTED (clicked) or FOLLOWED snapshot — the only thing the rewind tracks. */

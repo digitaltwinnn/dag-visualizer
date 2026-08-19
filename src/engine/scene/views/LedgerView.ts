@@ -974,7 +974,6 @@ export class LedgerView implements SceneView {
     // newer than it slide past the edge and dissolve. All scalar logic lives in the adapter.
     this._rewind.update(dt, this._slotOfOrd);
     this._trailOff = this._rewind.offset;
-    const pinnedHold = this._rewind.holding;
     // Hoisted per frame (the tune hoist rule): the SELECTED row — the one that owns the focus — or -1.
     const pinSlot = this.model.selectedSlot;
     this._bar.setOffset(this._trailOff);
@@ -1058,8 +1057,14 @@ export class LedgerView implements SceneView {
       const cz = this._laneZ.get(lane.id) ?? lane.z;
       for (const b of lane.blocks) {
         if (mi >= META_TRAIL_MAX) break;
-        if (pinnedHold) b.x = LEAD_X - b.slot * SLOT_SP;
-        else b.x += (LEAD_X - b.slot * SLOT_SP - b.x) * k;
+        // A row is ONE object, so its tiles sit at EXACTLY the x its bar, ribbon and labels
+        // sit at — every one of those reads the slot directly, and the tile was the only
+        // instrument easing an x of its own (user, 2026-08-18: "it does not jump to the exact
+        // row location and then corrects itself directly after"). Under a filtered follow the
+        // tear was a full SLOT_SP: the fresh anchor shifts every slot in one event, so the tile
+        // began the frame a whole slot behind the bar it hangs under and glided in late. All
+        // trail motion is the ONE rewind offset; a slot is a place in time and time cuts.
+        const bx = LEAD_X - b.slot * SLOT_SP;
         // No depth fade (user, 2026-08-07): every trail row eases to FULL brightness — recency
         // reads from position + the ordinal labels, not a gradient into the dark.
         b.fade += (1 - b.fade) * k;
@@ -1069,7 +1074,7 @@ export class LedgerView implements SceneView {
         // so a zero-brightness one is a BLACK BLOCK sitting in front of the active row, occluding
         // the ribbons and glass behind it — and the raycaster ignores `visible`, so it would still
         // eat a click. Zero-scaling is the same answer an unfilled tick already gets.
-        const wx = b.x + this._trailOff;
+        const wx = bx + this._trailOff;
         const edge = this._rewind.fadeAtX(wx) * horizonAt(wx);
         // A tick this lane anchored NOTHING into draws NOTHING (user, 2026-08-07 — the small
         // dimmed placeholder block is gone; the model keeps the slot, the mesh zero-scales).

@@ -5,7 +5,7 @@
 //
 // js/ledger.js entangles STATE (which slot a block sits in, its fade/size/position) with MESHES
 // (the block IS a THREE.Mesh; the trail entry holds `{ mesh, slot, ordinal }`). This module keeps
-// only the state fields a mesh would otherwise carry — `x`/`fade`/`size`/`filled`/`ox`/`oz`/`link`
+// only the state fields a mesh would otherwise carry — `fade`/`size`/`filled`/`ox`/`oz`/`link`
 // — and drops the mesh reference entirely; Task 13 pairs model rows to meshes by array index
 // (lane.blocks[i] <-> instance i) / by ordinal (trail entries <-> trail meshes), the same way the
 // scene layer already pairs LedgerModel-shaped data to InstancedMesh slots elsewhere in this
@@ -182,13 +182,19 @@ export function anchorTiles(count: number): TileSpec[] {
 
 // js/ledger.js:127 (`_metaLanes` block shape, minus the mesh) — one lane block's state.
 export interface LaneBlock {
-  x: number;
+  /** The block's place in TIME, and the ONLY thing its x is ever derived from. There is no stored
+   *  `x` beside it (dropped 2026-08-18): every other row-riding instrument — the byte bar, the
+   *  ribbons, the ordinal and size labels — reads `LEAD_X - slot * SLOT_SP` directly, so a second
+   *  home for the same fact could only ever be a way for one instrument to fall behind its own
+   *  row. It did: the tiles eased their stored x while the bar snapped, so a tick advance tore
+   *  each row apart by a full slot for a third of a second. All trail motion is the ONE rewind
+   *  offset. */
   slot: number;
   fade: number;
   /** Eased emphasis BRIGHTNESS — see LedgerView's tile loop. Per-block, not per instance index:
    *  a tick pushes a block and drops the oldest, so an index-keyed buffer hands one block's eased
-   *  state to its neighbour every tick. Lives here beside `x` and `fade`, the block's other two
-   *  eased fields, and is preserved across a slot-0 rebuild for the same reason they are. */
+   *  state to its neighbour every tick. Lives here beside `fade`, the block's other eased field,
+   *  and is preserved across a slot-0 rebuild for the same reason it is. */
   bright: number;
   size: number;
   filled: boolean;
@@ -243,24 +249,23 @@ export class LedgerModel {
 
   // js/ledger.js:235-249 (`_anchorMetaBlock`) verbatim, minus the mesh/link-draw side effects.
   // A metagraph anchored into the LIVE tick -> (re)build its slot-0 cluster: one tile per anchored
-  // snapshot, preserving the current slot-0 x/fade (so the caller's easing continues smoothly).
+  // snapshot, preserving the current slot-0 fade/brightness (so the caller's easing continues).
   // `ts` is the live tick's timestamp (the caller's `this.tickTs`), threaded onto every tile so a
   // slot-0 block can name the snapshot it belongs to without a lookup.
   private anchorMetaBlock(id: string, count: number, ts: string): void {
     const i = LANE_IDS.indexOf(id);
     if (i < 0) return; // not a lane (an unlisted ADDRESS — those aggregate into the unknown lane)
     const lane = this.lane(id, i);
-    let bx = 0, bfade = 0, bbright = 0;
+    let bfade = 0, bbright = 0;
     for (let j = lane.blocks.length - 1; j >= 0; j--) {
       if (lane.blocks[j].slot === 0) {
-        bx = lane.blocks[j].x;
         bfade = lane.blocks[j].fade;
         bbright = lane.blocks[j].bright;
         lane.blocks.splice(j, 1);
       }
     }
     for (const tl of anchorTiles(count)) {
-      lane.blocks.unshift({ x: bx, slot: 0, fade: bfade, bright: bbright, ox: tl.ox, oz: tl.oz, size: tl.size, filled: true, link: tl.link, ts, count });
+      lane.blocks.unshift({ slot: 0, fade: bfade, bright: bbright, ox: tl.ox, oz: tl.oz, size: tl.size, filled: true, link: tl.link, ts, count });
     }
   }
 
@@ -281,10 +286,10 @@ export class LedgerModel {
         const lane = this.lane(id, i);
         if (nc > 0) {
           for (const tl of anchorTiles(nc)) {
-            lane.blocks.push({ x: LEAD_X - s * SLOT_SP, slot: s, fade: slotFade(s), bright: 0, ox: tl.ox, oz: tl.oz, size: tl.size, filled: true, link: tl.link, ts: snap.timestamp, count: nc });
+            lane.blocks.push({ slot: s, fade: slotFade(s), bright: 0, ox: tl.ox, oz: tl.oz, size: tl.size, filled: true, link: tl.link, ts: snap.timestamp, count: nc });
           }
         } else {
-          lane.blocks.push({ x: LEAD_X - s * SLOT_SP, slot: s, fade: slotFade(s), bright: 0, ox: 0, oz: 0, size: 0.24, filled: false, link: false, ts: snap.timestamp, count: 0 });
+          lane.blocks.push({ slot: s, fade: slotFade(s), bright: 0, ox: 0, oz: 0, size: 0.24, filled: false, link: false, ts: snap.timestamp, count: 0 });
         }
       }
     }
@@ -334,7 +339,7 @@ export class LedgerModel {
       // The new LIVE tick starts with an empty placeholder at slot 0 for EVERY metagraph (shown on
       // the latest too); anchorMetaBlock upgrades it to a real, sized block if the metagraph anchors.
       for (let i = 0; i < LANE_IDS.length; i++) {
-        this.lane(LANE_IDS[i], i).blocks.unshift({ x: 0, slot: 0, fade: 0, bright: 0, ox: 0, oz: 0, size: 0.24, filled: false, link: false, ts: this.tickTs, count: 0 });
+        this.lane(LANE_IDS[i], i).blocks.unshift({ slot: 0, fade: 0, bright: 0, ox: 0, oz: 0, size: 0.24, filled: false, link: false, ts: this.tickTs, count: 0 });
       }
     }
 
