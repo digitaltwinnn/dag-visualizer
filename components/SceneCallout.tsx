@@ -40,7 +40,7 @@ import { cn } from "@/lib/utils";
 import { useStore } from "@/src/store/store";
 import { VIEW_POLICIES } from "@/src/engine/domain/viewPolicy";
 import { displayNetwork } from "@/src/data/unlisted";
-import { coLocatedNetworks, filterAccent, getAnchor, metagraphById, shortHash } from "@/src/data/network";
+import { coLocatedNetworks, filterAccent, getAnchor, isAnchorSettling, metagraphById, shortHash } from "@/src/data/network";
 import { SCENE_GLASS } from "@/components/selection";
 import { RoleChips } from "@/components/inspector/parts";
 // The lead line's codes come from the composition vocabulary's ONE home, rendered by the cards'
@@ -321,6 +321,17 @@ export default function SceneCallout() {
       const cfg = metagraphById(filter);
       const mine = cfg && filter !== "all" && filter !== "dag" ? cfg : null;
       const total = snap.data.metagraphSnapshotCount;
+      // ⚠ A SHARE THAT HASN'T FOLDED IN YET IS NOT A ZERO (rule 10). A tick's `total` is final
+      // the instant it arrives, but the per-metagraph stamps land over the next seconds and the
+      // poll needs a cycle to fold them in — so a bare `?? 0` states a hard `0 of N` for a network
+      // that DID anchor here, and then silently corrects itself. `isAnchorSettling` is that
+      // lifecycle's one home (src/data/network.ts, CLAUDE.md → "The tick lifecycle"); while it
+      // holds, this falls back to the tick-wide form — the SAME answer the comment above already
+      // gives a lane the catalog can't name. The ring keeps the filter's hue, so the identity is
+      // not lost, and the share appears the moment it is real. (The strip's own `?? 0` one surface
+      // over drives a BAR HEIGHT, where an absent count is an honest gap, not a stated numeral.)
+      const share = mine ? getAnchor(snap.data.timestamp)?.metaCounts?.get(filter) : undefined;
+      const settling = mine != null && share == null && isAnchorSettling(snap.data.timestamp, typeof total === "number" ? total : null);
       return {
         key: `gs|${snap.data.ordinal}`,
         eyebrow: "Global snapshot",
@@ -333,10 +344,10 @@ export default function SceneCallout() {
         lead:
           typeof total !== "number"
             ? undefined
-            : mine
+            : mine && !settling
               ? {
                   ident: { text: mine.ticker || mine.name, hue: filterAccent(filter) },
-                  text: `${getAnchor(snap.data.timestamp)?.metaCounts?.get(filter) ?? 0} of ${total} anchors`,
+                  text: `${share ?? 0} of ${total} anchors`,
                 }
               : { text: `${total} anchors` },
       };
