@@ -148,6 +148,15 @@ Gotchas worth knowing before you burn time on them:
 - **`--virtual-time-budget` runs very few frames**, so a fresh boot gets caught mid-intro. Use
   **`?slowmo=N`** (a dev flag like `?stats`, clamped to `[0.1, 20]`, values <1 speeding things UP) to
   inspect mid-flight states.
+- ⚠️ **Every scene clock is FRAME-driven off a `dt` clamped to 0.05s, so a slow renderer stretches it
+  in WALL-CLOCK time** — and the HUD, being React, does not ride that clock. Below 20 FPS the clamp
+  bites and the ~3.9s view choreography takes `3.9 / 0.05 / fps` seconds: at SwiftShader's 2–6 FPS,
+  13–40s. So a headless screenshot taken 15s after a view switch catches the transition still
+  running, and the panels beside it are already populated — **a bare ledger floor next to an explorer
+  full of measured ticks is the renderer, not the feed** (chased as a data bug for most of a session,
+  2026-08-19; `?slowmo=0.25` ran the same entry out in a quarter the time, which is what settled it).
+  Wait ~30s after a headless view switch, or drive it with `?slowmo`. The clamp itself is right — it
+  is the standard guard against a post-stall jump — and at real frame rates it never engages.
 - Benign console noise: `mojo ... rejected`, `PHONE_REGISTRATION_ERROR`, `BackForwardCache`.
 
 ### Tuning the look live
