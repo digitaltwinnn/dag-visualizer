@@ -1486,6 +1486,18 @@ rewind follows only the committed pin — a hover previews the hot row in place.
 no depth fade on the trail: every row keeps one brightness, and recency reads from position plus the
 ordinal labels.
 
+⚠️ **A ROW IS ONE OBJECT — every instrument that rides a row derives its x from the SLOT, and the
+rewind offset is the trail's one source of motion** (user, 2026-08-18 — *"it does not jump to the exact
+row location and then corrects itself directly after"*). The bars, the ribbons and both label columns
+all read `LEAD_X - slot * SLOT_SP` in the frame that draws them; the lane tiles alone used to keep a
+stored `x` on the block and ease it toward that same expression, snapping only while a `holding` flag
+said a pin held the front. So a tile chased its row rather than riding it. It tore worst exactly where
+the flag dropped: under a filtered follow a fresh anchor moves the held ordinal to slot 0, so `holding`
+went false in the same event that incremented every slot, and the tiles started a full `SLOT_SP` behind
+their own bars. `LaneBlock.x` and `TrailRewind.holding` are both gone — **a second home for row
+position is a tear waiting for the frame that separates them**, and easing one instrument toward a
+number every other instrument already has is not motion the chamber has.
+
 ⚠️ **A DISSOLVED ROW MUST ZERO-SCALE, NOT JUST GO DARK** (user, 2026-08-11). The lane tiles are one
 instanced mesh on an **opaque, depth-writing** material whose brightness rides the instance COLOUR, so a
 row multiplied to brightness 0 is a BLACK BLOCK — it occluded the ribbons and glass behind it in front
