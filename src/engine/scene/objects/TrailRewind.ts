@@ -10,6 +10,11 @@
 //   · rows newer than the held row slide past the front edge and dissolve (`fadeAtX`, one slot
 //     of travel).
 //
+// The two compose, and that is the whole of a filtered follow's tick handoff: the advance fires
+// the JUMP (same ordinal, one slot back, so the held row does not move), and the store's follow
+// then names the fresh ordinal at slot 0, so the target drops to 0 and the trail EASES back one
+// slot in a single direction. A row arrives in ONE movement or the offset is fighting itself.
+//
 // The owner (LedgerView) applies `offset` to its groups/instances and multiplies brightnesses
 // by `fadeAtX`; this class owns only the scalar state. Allocation-free per frame.
 //
@@ -45,7 +50,13 @@ export class TrailRewind {
   update(dt: number, slotOf: (ordinal: number) => number): void {
     const slot = this._pinnedOrd != null ? slotOf(this._pinnedOrd) : -1;
     const target = slot > 0 ? slot * SLOT_SP : 0;
-    if (slot > 0 && this._slotPrev > 0 && slot !== this._slotPrev && this._pinnedOrd === this._ordPrev) {
+    // `>= 0` is "was the held row VISIBLE", and slot 0 — the LEAD — is visible. Written `> 0` it
+    // excluded the one state a live follow actually sits in, which is what made the followed row
+    // arrive in three movements instead of one (user, 2026-08-18: "active snapshot moves to the
+    // back, then a bit to the front now and then arrives at its trail row"): the tick advance drew
+    // it a full slot back, the missing jump let the offset ease up after it, and the store's follow
+    // then landed on the new ordinal and unwound that ease. Only −1 (not visible) may skip the jump.
+    if (slot > 0 && this._slotPrev >= 0 && slot !== this._slotPrev && this._pinnedOrd === this._ordPrev) {
       this._off += (slot - this._slotPrev) * SLOT_SP; // the calm jump — same ordinal, shifted slot
     }
     this._slotPrev = slot;

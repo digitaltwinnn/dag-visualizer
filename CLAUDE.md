@@ -1498,6 +1498,16 @@ their own bars. `LaneBlock.x` and `TrailRewind.holding` are both gone — **a se
 position is a tear waiting for the frame that separates them**, and easing one instrument toward a
 number every other instrument already has is not motion the chamber has.
 
+**A held row arrives in ONE movement, and `scene/objects/TrailRewind.test.ts` is that contract** —
+the offset's jump-vs-ease rules as pure scalars, asserting direction and standing still rather than
+the easing rate. The same bug class recurred the next day (user, 2026-08-18 — *"active snapshot moves
+to the back, then a bit to the front now and then arrives at its trail row … only appears when
+current and new is both active?"*): the calm jump's guard read `_slotPrev > 0` where it meant *was the
+held row VISIBLE*, and slot **0 is the lead** — the one state a filtered live follow sits in. So the
+advance drew the row a slot back, the missing jump let the offset ease up after it, and the store's
+follow then named the fresh ordinal and unwound that ease. Three movements from one tick. Only `−1`
+may skip the jump.
+
 ⚠️ **A DISSOLVED ROW MUST ZERO-SCALE, NOT JUST GO DARK** (user, 2026-08-11). The lane tiles are one
 instanced mesh on an **opaque, depth-writing** material whose brightness rides the instance COLOUR, so a
 row multiplied to brightness 0 is a BLACK BLOCK — it occluded the ribbons and glass behind it in front
