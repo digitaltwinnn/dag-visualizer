@@ -70,8 +70,25 @@ export const nodeDimScale = (c: DimContext): number => viewMix(c, "dim");
 //
 // Reading the RAW ramp is also what keeps the country drill a LENS: `nodeDim`'s countryMix raise is
 // a mute, and must never shrink the nodes it looks past.
-// Callers compose the gather escape hatch (parked squares show the whole fleet) on top.
+// The gather escape hatch is `gatherRaw` below, applied to the ramp BEFORE this reads it.
 export const hideFrac = (c: DimContext, raw: number): number => raw * viewMix(c, "hide");
+
+// The view-transition's staging block shows the WHOLE fleet, so the gather releases a node from the
+// filter as it flies: the ramp itself relaxes to 0 at the parked position, and BOTH readings follow
+// it — the chip comes back to full size AND to full brightness together.
+//
+// ⚠️ It lifts the RAMP, not one reading of it (user, 2026-08-18 — "node inverse focus geo→snapshot,
+// happens on geo outgoing animation"). The hatch used to live in the callers, composed onto `hide`
+// alone: `show += (1 - show) * gw`. So leaving geo under a filter restored an off-filter chip's SIZE
+// while its dim stayed at 1.0 — glow 0.03, a black chip at full size for the whole out phase — and
+// then the invisible mid-transition boundary swapped geo's row for the ledger's (dim 1.0 → 0.5) and
+// 161 chips lit at once. That boundary is invisible for a LAYOUT change, which is all it was ever
+// asked to hide; a change in what is VISIBLE reads as a pop wherever the nodes are standing.
+// Driving the ramp to 0 is what makes the two rows agree there, so the fade is continuous across it.
+//
+// Linear in `raw`, so it reproduces the old size behaviour EXACTLY: `1 - hideFrac(c, raw*(1-gw))`
+// is `1 - hideFrac(c, raw)*(1-gw)`, which is the composed form term for term.
+export const gatherRaw = (raw: number, gatherW: number): number => raw * (1 - gatherW);
 
 // Set the dim TARGETS for a selection (the dim itself eases each frame; the per-view STRENGTH is
 // applied in the node loops). The validators ARE the DAG core → lit under "all"/"dag", dimmed only
@@ -109,6 +126,13 @@ export const focusDim = (c: DimContext): number => viewMix(c, "back");
 // 2026-07-17: the chips' base glow is brighter there and the flat 1.4 blew out).
 export const focusBoost = (c: DimContext): number => viewMix(c, "boost");
 
+// Per-view focus GROW: how far the focused node swells, as a fraction of its own size. The
+// SECOND emphasis channel, and the one that survives a crowd — where the shells are dense enough
+// that neighbouring bloom halos merge, a brighter node is filled in from both sides while a
+// bigger one still owns its own silhouette. Read by BOTH node loops (ONE NODE MODEL), scaled by
+// the same `focusWeightOf` tier the boost uses, so a group member swells by its share.
+export const focusGrow = (c: DimContext): number => viewMix(c, "grow");
+
 // Focus is TIERED, not a flag (user, 2026-08-01: "selecting a provider highlights its nodes,
 // but selecting a node afterwards has no visual effect" — the node was already lit at exactly
 // the group's strength, so the finer selection said nothing, while the same click over a
@@ -136,6 +160,12 @@ export const focusWeightOf = (primary: boolean, group: boolean): number =>
 // commit (rule 9), and clicking that node collapses the borrowed glow, so the hover must show that
 // collapse: group back to resting, the node alone. Both group rungs read this one function, so geo
 // and hyper cannot answer the gesture differently.
+// The ledger's SIGNER set reads the same gate (user, 2026-08-18). It is not ancestry — it is a
+// relation from a different subject, the selected metagraph snapshot — and it was exempt on that
+// argument until a 3-machine metagraph that seals with all three left a committed node reading as
+// one bright chip among three. The reasoning above is what actually governs: a borrowed glow is
+// honest while the group IS the subject, a lie once the click lands on a node. Hence the parameter
+// names say `ancestry`/`nodeSubject` but the rule is "a borrowed group glow yields to a node".
 export const ancestryGlow = (
   ancestry: ReadonlySet<string> | null,
   nodeSubject: string | null,
@@ -165,6 +195,8 @@ export interface FocusRow {
   back: number;
   /** Emissive added to the focused node — `focusBoost`. */
   boost: number;
+  /** How far the focused node GROWS, as a fraction of its own size — `focusGrow`. */
+  grow: number;
 }
 
 /** Genuinely cross-view: it ranks focus TIERS, which every view shares. */
@@ -183,9 +215,18 @@ export const FOCUS_TUNE_DEFAULTS: Readonly<Record<View3D, Readonly<FocusRow>>> =
   // siblings kept fat saturated bodies, so the emphasis read INVERTED. The stack is gone too
   // (NodeFabric: a focused node's boost replaces the hub-match, one emphasis at a time), and 1.1
   // lands the subject ~1.4, above the hub level and inside the hue range.
-  hyper: { dim: 0.32, hide: 0, elem: 0.38, back: 0.41, boost: 1.1 },
-  geo: { dim: 1.0, hide: 1, elem: 0, back: 0.65, boost: 0.7 },
-  ledger: { dim: 0.5, hide: 0, elem: 0, back: 0.55, boost: 0.7 },
+  // grow: hyper ALONE (user, 2026-08-18). Measured on the running app: the DAG's 160 validators
+  // sit closer together than the bloom radius, so their halos merge into ONE continuous glow
+  // ribbon and every node core already clips white — an emissive-only emphasis has no channel
+  // left there, and `boost` cannot be raised because it was pulled 1.85 → 1.1 for the opposite
+  // bug two days earlier. A SIZE lift breaks the ribbon's silhouette, which brightness cannot.
+  // geo answers 0: `hide` already isolates the fleet, and a globe chip's size is DATA (the
+  // honeycomb's hexes sum to the true node count), so growing one would state a count that
+  // isn't there. The ledger answers 0 because its trays are deliberately uniform (user,
+  // 2026-08-07) — that is the retired dim-shrink, and this must not re-open it.
+  hyper: { dim: 0.32, hide: 0, elem: 0.38, back: 0.41, boost: 1.1, grow: 0.45 },
+  geo: { dim: 1.0, hide: 1, elem: 0, back: 0.65, boost: 0.7, grow: 0 },
+  ledger: { dim: 0.5, hide: 0, elem: 0, back: 0.55, boost: 0.7, grow: 0 },
 };
 
 export const FOCUS_SHARED_DEFAULTS: Readonly<FocusShared> = { groupShare: GROUP_FOCUS };
@@ -210,6 +251,7 @@ export const FOCUS_ROW_SCHEMA: TuneSchema<FocusRow> = {
   elem: { min: 0, max: 1, label: "dim · elements" },
   back: { min: 0, max: 1, label: "dim-back on focus" },
   boost: { min: 0, max: 3, step: 0.05, label: "focus boost" },
+  grow: { min: 0, max: 1.5, step: 0.05, label: "focus grow" },
 };
 
 export const FOCUS_SHARED_SCHEMA: TuneSchema<FocusShared> = {
@@ -319,9 +361,13 @@ export function snapBright(
 // bloom like their hub (user). Derived from the node's own pre-floor `glow` (the boost is the
 // GAP up to 0.72, never negative) and fading out with the hubs by morph 0.3 — there's no hub on
 // the globe. `committed` = this node's metagraph IS the committed filter.
-// The DAG core deliberately does NOT take this: it has no orbiting hub to match, it IS the core
-// sphere at the centre, which carries its own reveal/dim in HyperView. That is furniture, not the
-// node model — the one asymmetry left, and it is about what a node orbits, not about what it is.
+//
+// ONE NODE MODEL: the DAG core takes it too (user, 2026-08-18 — "the DAG focus/dim effect on the
+// node subjects is not clear enough, should be the same as for metagraphs"). It had been exempt on
+// the reasoning that the core has no orbiting hub to match, but since 2026-08-11 the core IS a hub:
+// the same HUB_ORB geometry at hub size, sitting at the origin. Committing the DAG therefore left
+// its validators at their bare base 0.47 against the others' dimmed 0.33 — a 1.4x separation, where
+// a committed metagraph's own nodes lift to 0.72 against that same 0.33 and read at a glance.
 export function hubMatchBoost(c: DimContext, glow: number, committed: boolean): number {
   if (!committed) return 0;
   // NOT in the chamber (user bug, 2026-08-16 — "all nodes get a highlight except the selected"):

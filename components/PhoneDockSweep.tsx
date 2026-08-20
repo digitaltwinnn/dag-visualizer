@@ -37,7 +37,7 @@ export default function PhoneDockSweep() {
   if (!switchP.live) return null;
   return (
     <span
-      className="hidden max-[699px]:block fixed z-[43] bottom-0 left-0 w-full h-[var(--phone-dock-h)] pointer-events-none"
+      className="hidden max-[700px]:block fixed z-[43] bottom-0 left-0 w-full h-[var(--phone-dock-h)] pointer-events-none"
       style={{ ["--spine" as string]: accent } as CSSProperties}
       aria-hidden
     >

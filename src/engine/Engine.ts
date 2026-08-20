@@ -32,6 +32,8 @@ import { LADDERS, LEVEL_CARRY, hasLevel, type CohortSel, type CompositionSel, ty
 import { compositionGroups, compositionKey, compositionRows } from "@/src/data/composition";
 import { metaSnapDeepKey, metaSnapHoverKey } from "@/src/data/types";
 import { snapsAtTick } from "@/src/data/anchorLog";
+import { breakpointOf } from "@/src/data/breakpoint";
+import { calloutPlacement } from "./domain/calloutPlacement";
 import type { GlobalSnapshot, NodeRow, PickDescriptor } from "@/src/data/types";
 import type { ClusterNode, DagCore, GeoMap, RouteMetagraph } from "@/src/data/types";
 
@@ -280,8 +282,16 @@ export class Engine {
   // No param → stays 1 → the whole mechanism is a no-op, so the parse itself is the dev/prod gate
   // (unlike `stats`, which toggles a visible DOM panel and so needs an explicit environment check).
   private _slowmo = 1;
-  // The ?tune live-tuning panel's handle (devTune.ts) — dev tooling, disposed with the engine.
+  // The live-tuning panel's handle (devTune.ts) — dev tooling, disposed with the engine.
   private _devTune?: { dispose(): void };
+  // Its dev-only DOM switch (user, 2026-08-18 — "can't we just add a switch and show it only for
+  // dev?"). `?tune` still opens the panel anywhere, which is what makes it usable against a
+  // DEPLOYED build; the switch is the everyday route and exists in `next dev` alone, so nothing
+  // here reaches a real user. It sits beside the stats panel bottom-left, outside the four HUD
+  // zones — dev chrome is not view chrome, and the same reasoning that keeps Stats out of React
+  // keeps this out of it. Grayscale only, per the colour rule: dev tooling states nothing about
+  // the palette.
+  private _tuneBtn?: HTMLButtonElement;
   // Fired once, after the first frame actually renders (see start()'s loop) — lets callers
   // (SceneCanvas → store.engineReady) know the scene has painted, not just constructed.
   private _onReady?: () => void;
@@ -412,18 +422,9 @@ export class Engine {
 
     // Live tuning panel — `?tune` (the ?stats idiom): tweakpane is dynamically imported so it
     // never enters the normal bundle; the panel binds the scene's *TUNE_DEFAULTS-backed objects.
-    if (/[?#&]tune/.test(window.location.search + window.location.hash)) {
-      import("./devTune").then(async (m) => {
-        if (this.disposed) return;
-        this._devTune = await m.mountDevTune({
-          ledger: this.ledger,
-          hyper: this.layers,
-          camera: this.ctx.camera,
-          controls: this.ctx.controls,
-        });
-        if (this.disposed) this._devTune.dispose();
-      });
-    }
+    // In `next dev` a switch offers the same thing without a reload (see _tuneBtn).
+    if (/[?#&]tune/.test(window.location.search + window.location.hash)) this._openDevTune();
+    if (process.env.NODE_ENV === "development") this._mountTuneSwitch();
 
     // Apply current store state, then react to changes (Lane B command bridge).
     const s = useStore.getState();
@@ -1765,10 +1766,22 @@ export class Engine {
   // picking is suppressed), behind the camera, and wherever the policy or subject says no; the
   // component independently declines to render the same cases from store state, so `data-on` is
   // belt on top of braces, never the only gate.
+  //
+  // NOT ON A PHONE (user, 2026-08-18 — "drop the callout when in mobile mode"). The label's whole
+  // value is CO-LOCATION with its subject, and under 700px the ~298px reach can't deliver it:
+  // shortening the leader parks the panel ON the thing it points at, clamping points it sideways
+  // at nothing — both keep the pixels and throw the meaning away. It is the same judgement the
+  // view already makes for a distributed subject (a filtered fleet gets no callout, because "a
+  // single anchor would lie about where it is"); a callout that cannot say WHERE is not a smaller
+  // callout, it is a wrong one. Nothing is lost that isn't one tap away — the phone's Details
+  // sheet carries the box and the dock's icon tray announces when it updates. `breakpointOf` is
+  // the ONE home for the tier (the component gates on the same call through `useBreakpoint`), so
+  // the two owners cannot drift apart at the boundary.
   private _syncCallout(): void {
     const el = document.getElementById("callout");
     if (!el) return;
-    let on = this._policy.callout && !this.transition.active();
+    let on =
+      this._policy.callout && !this.transition.active() && breakpointOf(window.innerWidth) !== "phone";
     if (on) {
       const v = this._calloutV;
       on =
@@ -1785,19 +1798,27 @@ export class Engine {
           const r = this.ctx.renderer.domElement.getBoundingClientRect();
           const x = r.left + (v.x * 0.5 + 0.5) * r.width;
           const y = r.top + (-v.y * 0.5 + 0.5) * r.height;
-          el.style.transform = `translate3d(${x.toFixed(1)}px, ${y.toFixed(1)}px, 0)`;
-          // Viewport flips (user, 2026-08-16): near the right edge the panel goes up-LEFT,
-          // near the top it drops BELOW the anchor — globals.css mirrors the geometry off
-          // these attributes (guarded writes, like data-on).
-          const flip = x > r.right - 320;
-          const drop = y < r.top + 170;
-          if ((el.dataset.flip != null) !== flip) {
-            if (flip) el.dataset.flip = "";
-            else delete el.dataset.flip;
-          }
-          if ((el.dataset.drop != null) !== drop) {
-            if (drop) el.dataset.drop = "";
-            else delete el.dataset.drop;
+          // Placement is `domain/calloutPlacement.ts` — the flip/drop rules and the panel's reach
+          // live there with their test, and globals.css mirrors the geometry off the attributes
+          // written below (guarded writes, like data-on).
+          // ⚠️ MEASURE THE FREE CANVAS BAND, NOT THE CANVAS. Below 1100px the rails are
+          // sheets that OVERLAY a still-viewport-sized canvas, so `r.left`/`r.right` describe room
+          // the callout does not have: at 900px with both sheets open a geo node's panel rendered
+          // as a ~25px fragment in the strip between them. `sceneCoverL`/`sceneCoverR` are what the
+          // open sheets measured off themselves (0 on desktop and phone, so this is a no-op there).
+          const st = useStore.getState();
+          const p = calloutPlacement(x, y, r.left + st.sceneCoverL, r.right - st.sceneCoverR, r.top);
+          if (!p.show) on = false;
+          else {
+            el.style.transform = `translate3d(${x.toFixed(1)}px, ${y.toFixed(1)}px, 0)`;
+            if ((el.dataset.flip != null) !== p.flip) {
+              if (p.flip) el.dataset.flip = "";
+              else delete el.dataset.flip;
+            }
+            if ((el.dataset.drop != null) !== p.drop) {
+              if (p.drop) el.dataset.drop = "";
+              else delete el.dataset.drop;
+            }
           }
         }
       }
@@ -2021,6 +2042,76 @@ export class Engine {
     }
   }
 
+  // ── The dev tuning panel: one open path, whether the URL flag or the switch asked ──────────
+  // `_tuneOpening` is the re-entrancy guard: the import is async, so without it a second click
+  // during the load mounts a second panel bound to the same objects.
+  private _tuneOpening = false;
+  private async _openDevTune(): Promise<void> {
+    if (this._devTune || this._tuneOpening) return;
+    this._tuneOpening = true;
+    try {
+      const m = await import("./devTune");
+      if (this.disposed) return;
+      this._devTune = await m.mountDevTune({
+        ledger: this.ledger,
+        hyper: this.layers,
+        camera: this.ctx.camera,
+        controls: this.ctx.controls,
+      });
+      if (this.disposed) this._devTune.dispose();
+    } finally {
+      this._tuneOpening = false;
+      this._syncTuneSwitch();
+    }
+  }
+
+  private _closeDevTune(): void {
+    this._devTune?.dispose();
+    this._devTune = undefined;
+    this._syncTuneSwitch();
+  }
+
+  private _syncTuneSwitch(): void {
+    const b = this._tuneBtn;
+    if (!b) return;
+    const on = !!this._devTune;
+    b.setAttribute("aria-pressed", String(on));
+    b.style.opacity = on ? "1" : "0.55";
+  }
+
+  // The switch itself. Plain DOM beside Stats, built here rather than in devTune.ts because it has
+  // to exist BEFORE the panel module loads — it is what asks for the load.
+  private _mountTuneSwitch(): void {
+    const b = document.createElement("button");
+    b.type = "button";
+    b.textContent = "tune";
+    b.title = "Live-tune the scene look (dev only). Same panel as ?tune.";
+    b.setAttribute("aria-pressed", "false");
+    // Offset right of Next's own dev-tools badge, which claims the bottom-left corner in `next dev`
+    // and was covering half this pill — including its hit area.
+    Object.assign(b.style, {
+      position: "fixed",
+      left: "66px",
+      bottom: "8px",
+      zIndex: "10000",
+      padding: "3px 8px",
+      font: "11px/1.4 ui-monospace, monospace",
+      letterSpacing: "0.06em",
+      color: "#fff",
+      background: "rgba(0,0,0,0.72)",
+      border: "1px solid rgba(255,255,255,0.22)",
+      borderRadius: "4px",
+      cursor: "pointer",
+      opacity: "0.55",
+    } satisfies Partial<CSSStyleDeclaration>);
+    b.addEventListener("click", () => {
+      if (this._devTune) this._closeDevTune();
+      else void this._openDevTune();
+    });
+    document.body.appendChild(b);
+    this._tuneBtn = b;
+  }
+
   dispose() {
     this.disposed = true;
     if (this.metaTimer) clearInterval(this.metaTimer);
@@ -2041,6 +2132,7 @@ export class Engine {
     if (useStore.getState().sceneDragging) useStore.getState().setSceneDragging(false);
     if (useStore.getState().cameraFlying) useStore.getState().setCameraFlying(false);
     this.stats?.dom.remove();
+    this._tuneBtn?.remove();
     this._devTune?.dispose();
     this.unsub.forEach((u) => u());
     cancelAnimationFrame(this.raf);

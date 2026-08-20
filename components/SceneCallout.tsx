@@ -40,20 +40,30 @@ import { cn } from "@/lib/utils";
 import { useStore } from "@/src/store/store";
 import { VIEW_POLICIES } from "@/src/engine/domain/viewPolicy";
 import { displayNetwork } from "@/src/data/unlisted";
-import { filterAccent, shortHash } from "@/src/data/network";
+import { coLocatedNetworks, filterAccent, getAnchor, isAnchorSettling, metagraphById, shortHash } from "@/src/data/network";
 import { SCENE_GLASS } from "@/components/selection";
 import { RoleChips } from "@/components/inspector/parts";
 // The lead line's codes come from the composition vocabulary's ONE home, rendered by the cards'
 // own RoleChips (user, 2026-08-15: "look at my cards — square pills").
 import { layerCodesOf } from "@/src/data/composition";
 import { useNowTick } from "@/components/useNowTick";
+import { useBreakpoint } from "@/components/useBreakpoint";
 import { relativeAge } from "@/src/util/relativeAge";
+import { CALLOUT_OFF_X, CALLOUT_OFF_Y } from "@/src/engine/domain/calloutPlacement";
 import type { GeoInfo } from "@/src/data/types";
 
-// Panel offset from the anchor, up and to the right. The leader spans exactly this diagonal, so
-// the three pieces (ring, line, panel corner) stay attached by construction.
-const OFF_X = 62;
-const OFF_Y = 92;
+// The panel's standoff from the anchor lives in `src/engine/domain/calloutPlacement.ts`, with the
+// reach thresholds derived from it and the placement rules that read them. It used to be a local
+// pair here plus two derived constants in `Engine._syncCallout`, under a comment asking the next
+// reader to "change all four together" — one concern, so now one home. The leader below spans
+// exactly this diagonal, so the three pieces (ring, line, panel corner) stay attached by
+// construction.
+//
+// The standoff is longer than the panel is TALL (user, 2026-08-18 — "the call-out card sits on the
+// actual selection instead of at the end of the connecting line"). At the original 62/92 the tie was
+// ~111px against an ~82px panel, so the card landed inside its own subject's neighbourhood — in
+// hyper, squarely on the validator shells the selected bead sits on — and the leader read as a stub
+// under it rather than as the thing the card hangs from.
 
 
 // What the panel says — one model, filled per view/rung so the JSX below stays single-sourced.
@@ -65,8 +75,15 @@ export interface CalloutModel {
   title: string;
   aside?: { text: string; hue?: string; live?: boolean };
   ring: string;
-  /** `ident` leads the row in its identity hue (the aside's hued-ticker idiom, one register). */
-  lead?: { ident?: { text: string; hue: string }; text?: string; codes?: string[] };
+  /** `ident` leads the row in its identity hue (the aside's hued-ticker idiom, one register).
+   *  `also` closes it with the OTHER networks sharing this subject's machine — same idiom,
+   *  one hued ticker each (user, 2026-08-18). */
+  lead?: {
+    ident?: { text: string; hue: string };
+    text?: string;
+    codes?: string[];
+    also?: { text: string; hue: string }[];
+  };
 }
 type Model = CalloutModel;
 
@@ -125,6 +142,22 @@ export function CalloutPanel({ m, className }: { m: CalloutModel; className?: st
           )}
           {m.lead.text && <span>{m.lead.text}</span>}
           {m.lead.codes && m.lead.codes.length > 0 && <RoleChips codes={m.lead.codes} />}
+          {/* CO-TENANTS — the other networks running on this same machine, each as its own
+              hued ticker (user, 2026-08-18). It closes the lead because the node card reads
+              place → role → host → co-located, and the chips to its left are this node's own
+              composition: the `+` says these are additional networks, not more of its layers.
+              Rendered only when the fact is MEASURED — the builder passes nothing while both
+              cluster sides aren't live, so the callout never guesses a co-tenancy. */}
+          {m.lead.also && m.lead.also.length > 0 && (
+            <span className="inline-flex items-center gap-1.5">
+              <span className="opacity-60">+</span>
+              {m.lead.also.map((t) => (
+                <span key={t.text} className="font-bold" style={{ color: t.hue }}>
+                  {t.text}
+                </span>
+              ))}
+            </span>
+          )}
         </div>
       )}
     </div>
@@ -152,7 +185,11 @@ export default function SceneCallout() {
   // SnapshotAside's two states mirrored as a label — `live · Xs` with the beating dot while
   // following, `◷ Xs` on a pin. The card keeps the BUTTON (follow toggle); this is read-only.
   const now = useNowTick(1000);
-  if (!VIEW_POLICIES[mode].callout || section !== "scene") return null;
+  // NOT ON A PHONE (user, 2026-08-18) — the reasoning lives with the Engine's mirrored gate in
+  // `_syncCallout`: the label's value is co-location, and under 700px the panel's reach can't
+  // deliver it. `breakpointOf` is the one home for the tier, so both owners answer the same call.
+  const bp = useBreakpoint();
+  if (!VIEW_POLICIES[mode].callout || section !== "scene" || bp === "phone") return null;
 
   // The committed NODE's model — shared by hyper and geo (user, 2026-08-15: in hyper too, "the
   // node does not have its callout — clickable, has a card"). City-first like the node card,
@@ -168,6 +205,15 @@ export default function SceneCallout() {
     const nnet = displayNetwork(netId);
     const codes = layerCodesOf([{ roles: nodePick.roles }]);
     const id = (nodePick as { node?: { id?: string } }).node?.id;
+    // CO-LOCATION — the same reading the node card's own Co-located fact takes, from the one
+    // home (`coLocatedNetworks`) and behind the same `coloReady` gate: both cluster sides must
+    // be live, or a machine that simply hasn't been polled yet would read as single-tenant.
+    // Unmeasured means NO line, not a "none" — the callout is a label, and rule 10's absent-
+    // data instrument states belong to the card that has room to state them.
+    const ip = (nodePick as { node?: { ip?: string } }).node?.ip;
+    const coloReady = metaList.some((x) => x.isRoot) && metaList.some((x) => !x.isRoot);
+    const colo = coloReady ? coLocatedNetworks(ip, netId, metaList) : [];
+    const also = colo.map((c) => ({ text: displayNetwork(c.id)?.ticker ?? c.name, hue: filterAccent(c.id) }));
     return {
       key: `node|${id ?? `${g?.lat},${g?.lon}`}`,
       eyebrow: "Node",
@@ -176,7 +222,7 @@ export default function SceneCallout() {
       title: g?.city ?? g?.country ?? (id ? shortHash(id) : "Node"),
       aside: nnet ? { text: nnet.ticker, hue: nnet.hue } : undefined,
       ring: nnet?.hue ?? "var(--primary)",
-      lead: codes.length ? { codes } : undefined,
+      lead: codes.length || also.length ? { codes, also } : undefined,
     };
   };
 
@@ -264,6 +310,28 @@ export default function SceneCallout() {
     const gsModel = (): Model | null => {
       if (!snap) return null;
       const rel = relativeAge(now - Date.parse(snap.data.timestamp));
+      // A COMMITTED METAGRAPH RE-READS THE LEAD (user, 2026-08-18 — the filter reached the
+      // strip's bars but not the same card in the scene). The ring already points at that
+      // network's own segment of the byte bar, so the count under it must be that segment's
+      // too: the hued ticker answering "whose x?", then `x of y anchors` — the strip's tooltip
+      // form verbatim, since a strip bar and this callout are the same subject read twice.
+      // Gate and source are the strip's own (`metagraphById`, the anchor index's per-id
+      // counts), so a lane the catalog can't name — "all", the DAG itself, unlisted — keeps
+      // the tick-wide total rather than guessing a share of it.
+      const cfg = metagraphById(filter);
+      const mine = cfg && filter !== "all" && filter !== "dag" ? cfg : null;
+      const total = snap.data.metagraphSnapshotCount;
+      // ⚠ A SHARE THAT HASN'T FOLDED IN YET IS NOT A ZERO (rule 10). A tick's `total` is final
+      // the instant it arrives, but the per-metagraph stamps land over the next seconds and the
+      // poll needs a cycle to fold them in — so a bare `?? 0` states a hard `0 of N` for a network
+      // that DID anchor here, and then silently corrects itself. `isAnchorSettling` is that
+      // lifecycle's one home (src/data/network.ts, CLAUDE.md → "The tick lifecycle"); while it
+      // holds, this falls back to the tick-wide form — the SAME answer the comment above already
+      // gives a lane the catalog can't name. The ring keeps the filter's hue, so the identity is
+      // not lost, and the share appears the moment it is real. (The strip's own `?? 0` one surface
+      // over drives a BAR HEIGHT, where an absent count is an honest gap, not a stated numeral.)
+      const share = mine ? getAnchor(snap.data.timestamp)?.metaCounts?.get(filter) : undefined;
+      const settling = mine != null && share == null && isAnchorSettling(snap.data.timestamp, typeof total === "number" ? total : null);
       return {
         key: `gs|${snap.data.ordinal}`,
         eyebrow: "Global snapshot",
@@ -274,9 +342,14 @@ export default function SceneCallout() {
         // (user, 2026-08-16 — "if filter, select the correct segment of the byte bar").
         ring: filter !== "all" ? filterAccent(filter) : "var(--core)",
         lead:
-          typeof snap.data.metagraphSnapshotCount === "number"
-            ? { text: `${snap.data.metagraphSnapshotCount} anchors` }
-            : undefined,
+          typeof total !== "number"
+            ? undefined
+            : mine && !settling
+              ? {
+                  ident: { text: mine.ticker || mine.name, hue: filterAccent(filter) },
+                  text: `${share ?? 0} of ${total} anchors`,
+                }
+              : { text: `${total} anchors` },
       };
     };
     // The boxed NODE card leads (user, 2026-08-16 — a tray machine selected via the card
@@ -315,8 +388,8 @@ export default function SceneCallout() {
         <line
           x1={6}
           y1={-6}
-          x2={OFF_X}
-          y2={-OFF_Y + 8}
+          x2={CALLOUT_OFF_X}
+          y2={-CALLOUT_OFF_Y + 8}
           stroke="var(--primary)"
           strokeOpacity="0.55"
           strokeWidth="1.5"

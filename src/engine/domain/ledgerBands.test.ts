@@ -30,17 +30,16 @@ describe("fillBarSpec", () => {
   it("scales width against the fixed reference and never below the seam", () => {
     const half = fillBarSpec(makeBarSpec(), new Map([[A, (BYTE_SCALE_KB / 2) * KB]]), ORDER, 1);
     expect(half.width).toBeCloseTo(BAR_MAX_W / 2, 4);
-    expect(half.clipped).toBe(false);
-    expect(half.overflow).toBe(1);
     const tiny = fillBarSpec(makeBarSpec(), new Map([[A, 1]]), ORDER, 1);
     expect(tiny.width).toBeCloseTo(BAR_MIN_W, 6);
   });
 
-  it("clips an over-reference tick and states the overflow multiplier", () => {
+  // The WIDTH clips at the floor edge rather than rescaling the whole past — but `kb` keeps the
+  // true size, because that is what the scene's SIZE column reads: the clip is a bound on the
+  // drawing, never on the measurement.
+  it("clips an over-reference tick at the floor edge, keeping the true size", () => {
     const s = fillBarSpec(makeBarSpec(), new Map([[A, BYTE_SCALE_KB * 12 * KB]]), ORDER, 40);
     expect(s.width).toBeCloseTo(BAR_MAX_W, 6);
-    expect(s.clipped).toBe(true);
-    expect(s.overflow).toBeCloseTo(12, 3);
     expect(s.kb).toBeCloseTo(BYTE_SCALE_KB * 12, 3);
   });
 

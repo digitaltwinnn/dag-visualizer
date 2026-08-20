@@ -486,18 +486,27 @@ export function MetaCard({ cfg }: { cfg: MetaCfg }) {
           <div className="mt-3">
             <CompositionRows nodes={nodes} />
           </div>
-          <Separator className="my-2" />
-          {/* Summary in the shared Fact grammar — muted label left, the bold TOTAL right
-              (column-aligned with the composition counts it summarizes). */}
-          <Fact label="Online nodes"><b className="font-bold">{nodes.length}</b></Fact>
-          {/* The pill row appears only when something is NOT ready — and then it shows the
-              FULL breakdown including the ready pill (user, 2026-07-12: all-ready is the
-              silent default; a mixed fleet reads as one complete picture). */}
+          {/* The SECOND partition of the same fleet — by state, in the same row grammar (user,
+              2026-08-18). It appears only when something is NOT ready (all-ready is the silent
+              default), and then it shows the FULL breakdown including the ready count, so a mixed
+              fleet reads as one complete picture. Its Separator is not decoration: column-aligned
+              and undivided, the two tables would read as ONE whose four partitions sum to twice
+              the fleet. */}
           {nonReady && (
-            <div className="mt-1.5 flex justify-end">
+            <>
+              <Separator className="my-2" />
               <StatusBreakdown states={states} />
-            </div>
+            </>
           )}
+          <Separator className="my-2" />
+          {/* Summary in the shared Fact grammar — muted label left, the bold TOTAL right,
+              column-aligned with the counts of both tables it summarizes. Totals sit BELOW their
+              parts, which is why the state table sits above this row rather than hanging under it
+              as its underline: below, it would wedge between this Fact and the archive Fact, and
+              those two read as one summary block. */}
+          <Fact label="Online nodes">
+            <b className="font-bold">{nodes.length}</b>
+          </Fact>
         </>
       )}
       {/* Fleet-level archive summary, in the same summary block as Online nodes; the DAG
@@ -524,7 +533,7 @@ export function MetaCard({ cfg }: { cfg: MetaCfg }) {
               /* No checkmark here (user, 2026-08-14 — "it just clutters the view"): the ratio
                  already answers, and the node card's Yes keeps the check where it is the value. */
               <span className="flex flex-col items-end" title={`${archSum.genesisTitle} ${archSum.reachTitle}`}>
-                <b className="font-bold">{archSum.genesisRatio}</b>
+                <b className="font-bold">{archSum.genesisCount}</b>
                 <span className="text-label text-muted-foreground">{archSum.reach}</span>
                 {/* Second underline: what that reach holds in snapshots — absent for the holed
                     global deep archives, where any count would overclaim. */}

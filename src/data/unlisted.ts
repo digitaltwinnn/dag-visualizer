@@ -7,7 +7,9 @@
 //   · IDENTITY — `displayNetwork(id)`: the one lookup UI surfaces use where a catalog metagraph
 //     OR the unlisted set may appear. Returns the catalog record shaped for display, or the
 //     UNLISTED pseudo-record (neutral gray, both lanes — no single identity hue can speak for a
-//     mixed set, so none does; 2026-08-08 — italic by convention), or null for "all"/"dag"/unknown.
+//     mixed set, so none does; 2026-08-08 — italic by convention), or null for "all"/unknown.
+//     Note "dag" is NOT null: under the unified node model the core is a catalog metagraph, so it
+//     presents as an ordinary network here.
 //   · DATA — the polled buffers only track the public catalog, so the EXACT reads
 //     (store.snapshotExact) are the only honest source for unlisted snapshots.
 //     `unlistedLog` re-exports the pure builder; `latestUnlistedTick` answers the follow

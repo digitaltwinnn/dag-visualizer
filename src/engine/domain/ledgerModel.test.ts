@@ -8,13 +8,20 @@ import {
   HORIZON_X,
   HORIZON_SPAN,
   horizonAt,
+  frontAt,
+  rowOnChamber,
+  ROW_HALF_D,
+  FRONT_INK_X,
+  BACK_INK_X,
+  LIVE_X,
+  liveEdgePhase,
   anchorTiles,
   LedgerModel,
   LEAD_SETTLE_MS, LANE_IDS } from "./ledgerModel";
 import { METAGRAPHS } from "../config";
 import { lanePlaneHalf } from "./ledgerLayout";
 import { UNLISTED_KEY } from "./ledgerBands";
-import { ledgerSite, LEAD_X } from "./ledgerLayout";
+import { ledgerSite, LEAD_X, FLOOR_BACK_X, FLOOR_FRONT_X } from "./ledgerLayout";
 import type { GlobalSnapshot, Anchor } from "@/src/data/types";
 
 function snap(ordinal: number, ts: string, count = 0): GlobalSnapshot {
@@ -116,6 +123,78 @@ describe("the horizon (user, 2026-08-09: the chamber must read as continuing int
   it("sits beyond the last slot but in FRONT of the floor's own back edge, so the glass ends first", () => {
     expect(HORIZON_X).toBeLessThan(LEAD_X - (SLOT_N - 1) * SLOT_SP);
     expect(HORIZON_X).toBeGreaterThan(-33); // LedgerView's FLOOR_CX - FLOOR_W / 2
+  });
+});
+
+describe("the front edge (the horizon's mirror — where the rewind pushes rows off the chamber)", () => {
+  it("leaves the whole trail alone: full at the lead and everywhere behind it", () => {
+    expect(frontAt(LEAD_X)).toBe(1);
+    for (let s = 1; s < SLOT_N; s++) expect(frontAt(LEAD_X - s * SLOT_SP)).toBe(1);
+  });
+
+  it("dissolves within one slot of travel past the lead, and clamps beyond it", () => {
+    const half = frontAt(LEAD_X + SLOT_SP * 0.45);
+    expect(half).toBeGreaterThan(0);
+    expect(half).toBeLessThan(1);
+    expect(frontAt(LEAD_X + SLOT_SP)).toBe(0);
+    expect(frontAt(LEAD_X + SLOT_SP * 5)).toBe(0);
+  });
+
+  // The filtered-follow case (user, 2026-08-18): the rewind holds the network's own newest
+  // anchored tick at the lead, so every global tick since sits a whole slot or more in front —
+  // gone, whatever kind of row it is. The byte bar's SEED branch used to skip this call.
+  it("is fully gone for every tick newer than a held row, so nothing hangs off the glass", () => {
+    for (let newer = 1; newer <= 6; newer++) expect(frontAt(LEAD_X + newer * SLOT_SP)).toBe(0);
+  });
+});
+
+describe("rowOnChamber — the one question a PICK can ask (the ramps are analogue, a pick is binary)", () => {
+  it("is true across the lit trail, from the lead back to the last slot", () => {
+    for (let s = 0; s < SLOT_N; s++) expect(rowOnChamber(LEAD_X - s * SLOT_SP)).toBe(true);
+  });
+
+  it("is false past the front edge — the exact rows a filtered follow pushes off", () => {
+    for (let newer = 1; newer <= 6; newer++) expect(rowOnChamber(LEAD_X + newer * SLOT_SP)).toBe(false);
+  });
+
+  it("is false at and beyond the horizon", () => {
+    expect(rowOnChamber(HORIZON_X)).toBe(false);
+    expect(rowOnChamber(HORIZON_X - SLOT_SP)).toBe(false);
+  });
+
+  // Both boundaries, one predicate: a row is pickable only while some of it is actually drawn, so
+  // the answer must agree with the two ramps rather than being tuned beside them.
+  it("agrees with the ramps it is made of, everywhere", () => {
+    for (let x = HORIZON_X - SLOT_SP; x <= LEAD_X + 3 * SLOT_SP; x += SLOT_SP / 7) {
+      expect(rowOnChamber(x)).toBe(horizonAt(x) * frontAt(x) > 0);
+    }
+  });
+});
+
+describe("the LIVE EDGE — the boundary that is NOT a dissolve", () => {
+  // It marks NOW, so it stands ahead of every row the trail holds — and within one slot pitch of
+  // the lead, or the gap it leaves would read as an empty slot of its own rather than as the edge
+  // of the chamber.
+  it("stands ahead of the lead, closer than one slot", () => {
+    expect(LIVE_X).toBeGreaterThan(LEAD_X);
+    expect(LIVE_X - LEAD_X).toBeLessThan(SLOT_SP);
+    for (let s = 0; s < SLOT_N; s++) expect(LIVE_X).toBeGreaterThan(LEAD_X - s * SLOT_SP);
+  });
+
+  it("says nothing at all without a feed", () => {
+    expect(liveEdgePhase(false, null)).toBe("off");
+    expect(liveEdgePhase(false, 42)).toBe("off");
+  });
+
+  it("breathes and names the tick whose read is in flight", () => {
+    expect(liveEdgePhase(true, 6778644)).toBe("forming");
+  });
+
+  // A read that failed or was never taken is standby, not forming: that tick states its own
+  // absence as a still row at the lead, and a breath here would promise an arrival that isn't
+  // coming — the same rule the seed's own energy follows.
+  it("rests, unlabelled, when nothing is in flight", () => {
+    expect(liveEdgePhase(true, null)).toBe("standby");
   });
 });
 
@@ -349,5 +428,72 @@ describe("LANE_IDS (the unknown lane, 2026-08-07)", () => {
     const lane = model.lanes.get(UNLISTED_KEY)!;
     expect(lane).toBeTruthy();
     expect(lane.blocks.filter((b) => b.filled).length).toBeGreaterThan(0);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────────────────────
+// NOTHING IS EVER DRAWN OFF THE GLASS (user, 2026-08-19: "I still see sometimes something
+// drawn/flash in front of the plane (so perhaps its not drawing but some flash occurs)").
+//
+// It was drawing. Every row-riding instrument already multiplied by `frontAt`, so the recurring
+// hunt for a missing multiply found nothing — the defect was one level up: the dissolve RAMP was
+// longer than the glass. `frontAt` faded over `SLOT_SP * 0.9`, reaching 0 at x 7.14, and a byte
+// bar reaches BAR_D/2 = 0.8 ahead of its own centre, so the last ink of a fading row sat at 7.94
+// against a front rim of 6.5. Nearly a slot and a half of visible row hanging in mid-air, seen
+// only while the rewind pushes rows forward (a pin, or a filtered follow), which is exactly why
+// it read as an intermittent flash rather than as something always wrong.
+//
+// So this is a GEOMETRIC rule, not a code-shape one, and it is stated as a sweep: wherever a
+// boundary still says "draw", the row's ink must be inside the rim it belongs to. Both ends are
+// swept, because the back rim is the same claim mirrored and it is only safe today by accident of
+// tuning. Retune the rim, the slot spacing or the bar's depth and this test is what notices.
+// ─────────────────────────────────────────────────────────────────────────────────────────────
+describe("the trail's boundaries finish inside the glass", () => {
+  /** Every X a row can occupy, live offset included, at a resolution well under the ink radius. */
+  const sweep = (fn: (x: number) => void) => {
+    for (let x = FLOOR_BACK_X - 4 * SLOT_SP; x <= FLOOR_FRONT_X + 4 * SLOT_SP; x += 0.02) fn(x);
+  };
+
+  it("puts no ink past the FRONT rim — the reported flash", () => {
+    sweep((x) => {
+      if (frontAt(x) > 0) expect(x + ROW_HALF_D).toBeLessThanOrEqual(FLOOR_FRONT_X + 1e-9);
+    });
+  });
+
+  it("puts no ink past the BACK rim either", () => {
+    sweep((x) => {
+      if (horizonAt(x) > 0) expect(x - ROW_HALF_D).toBeGreaterThanOrEqual(FLOOR_BACK_X - 1e-9);
+    });
+  });
+
+  it("takes the PICK set with it at both ends, so nothing invisible stays clickable", () => {
+    sweep((x) => {
+      if (!rowOnChamber(x)) return;
+      expect(x + ROW_HALF_D).toBeLessThanOrEqual(FLOOR_FRONT_X + 1e-9);
+      expect(x - ROW_HALF_D).toBeGreaterThanOrEqual(FLOOR_BACK_X - 1e-9);
+    });
+  });
+
+  it("still draws the whole resting trail at full strength — the ramp tightened, it did not eat rows", () => {
+    // At rest the offset is 0, so the newest row sits AT the lead and nothing is ever ahead of it.
+    expect(frontAt(LEAD_X)).toBe(1);
+    for (let slot = 0; slot < SLOT_N; slot++) {
+      const x = LEAD_X - slot * SLOT_SP;
+      expect(frontAt(x)).toBe(1);
+      expect(rowOnChamber(x)).toBe(true);
+    }
+  });
+
+  it("keeps the LIVE EDGE inside the rim — it is the one thing drawn ahead of the lead", () => {
+    // The edge is not a row and takes no boundary (it marks NOW, which does not slide with the
+    // trail), so its clearance is asserted here rather than left to the sweep above.
+    expect(LIVE_X).toBeGreaterThan(LEAD_X);
+    expect(LIVE_X + ROW_HALF_D).toBeLessThanOrEqual(FLOOR_FRONT_X);
+  });
+
+  it("derives both ink bounds from the rims rather than restating them", () => {
+    expect(FRONT_INK_X).toBe(FLOOR_FRONT_X - ROW_HALF_D);
+    expect(BACK_INK_X).toBe(FLOOR_BACK_X + ROW_HALF_D);
+    expect(frontAt(FRONT_INK_X)).toBeCloseTo(0, 10);
   });
 });

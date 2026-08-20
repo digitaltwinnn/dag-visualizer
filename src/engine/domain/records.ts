@@ -36,6 +36,10 @@ export interface ValidatorRecord {
   spinSpeed: number;
   spinPhase: number;
   pick: PickDescriptor;
+  /** Eased focus weight (dimModel.focusWeightOf, approached at emphasisK) — the SIZE channel's
+   *  state, the way the emissive buffer is the glow channel's. Lives on the record because the
+   *  scale and the glow are written by different passes and must swell together. */
+  fw: number;
   /** Brief flash when an arc pulse reaches this node — set dynamically (js/globe.js:996), absent until then. */
   _flash?: number;
   // Staging-grid slot for the view-transition choreography (domain/gatherLayout, assigned
@@ -87,6 +91,10 @@ export interface MetaNodeRecord {
   dim: number;
   dimTarget: number;
   pick: PickDescriptor;
+  /** Eased focus weight (dimModel.focusWeightOf, approached at emphasisK) — the SIZE channel's
+   *  state, the way the emissive buffer is the glow channel's. Lives on the record because the
+   *  scale and the glow are written by different passes and must swell together. */
+  fw: number;
   /** Brief flash when an arc pulse reaches this node — set dynamically (js/globe.js:1109), absent until then. */
   _flash?: number;
   // Staging-grid slot for the view-transition choreography (domain/gatherLayout, assigned

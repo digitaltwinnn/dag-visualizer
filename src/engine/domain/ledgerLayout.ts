@@ -129,13 +129,22 @@ export const FLOOR_Y: Record<LedgerFloorId, number> = {
 /** Half the Z extent the metagraph lanes spread over (ledgerSite's outermost |z|). */
 export const LANE_HALF_Z = (LEDGER.depth * LANE_SPREAD) / 2;
 
-/** The floor planes' +Z (screen-left) edge — LedgerView's FLOOR_D/2, promoted here so the
- *  containers can span the plane's full front width. */
-/** The seam between the main plane and the gutter plane. */
+/** THE GLASS FOOTPRINT IN X — every storey shares it, so the chamber has ONE front rim and one
+ *  back rim. Promoted out of LedgerView (2026-08-19) because the trail's boundaries are derived
+ *  from the rim: a dissolve ramp that outlives the glass leaves a row hanging in mid-air, and a
+ *  rim that lives only in the adapter is a number the domain has to guess at. LedgerView's
+ *  `FLOOR_D` stays where it is — that one is a drop-off reference for the glass shader, not an
+ *  extent (the planes' real Z extent is 2·PLANE_FIELD_HALF). */
+export const FLOOR_W = 39.5;
+export const FLOOR_CX = -13.25;
+/** The camera-side rim: the chamber's physical front edge, past which there is no glass. */
+export const FLOOR_FRONT_X = FLOOR_CX + FLOOR_W / 2;
+/** The far rim, behind the horizon. */
+export const FLOOR_BACK_X = FLOOR_CX - FLOOR_W / 2;
 
 /** The LEAD slot's X — the whole time trail (lane tiles, byte bars, ribbons) leads well toward
  *  the camera-side floor edge and trails to −X from here (user, 2026-08-07: the snapshots sat
- *  too deep in the plane). The floors' front edge is at ~6.5 local. */
+ *  too deep in the plane). */
 export const LEAD_X = 3.9;
 
 // ── The byte bar (spec §4.2) — fixed height and depth; WIDTH (the Z extent) alone encodes the

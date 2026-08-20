@@ -103,14 +103,18 @@ export function archiveFactState(
 // The NETWORK-level reading for the dossier (user, 2026-08-14, settled over several passes):
 // TWO facts, one claim each. "Node archives" states the deepest reach any of the network's
 // own machines still serves, in the time register; "From genesis" is its own fact (user —
-// "perhaps just a separate fact, like a checkmark"): a counted ratio, checked when at least
+// "perhaps just a separate fact, like a checkmark"): a bare count, checked when at least
 // one machine keeps the whole chain.
+// The count is BARE — `1`, not `1 / 12` (user, 2026-08-18). It is one of two breakdowns of the
+// same total, and Online nodes states that total two rows up in the same block, so the
+// denominator restated it. Which total it counts against still lives in `genesisTitle`.
 export interface ArchiveNetSummary {
   /** The deepest reach any machine serves — "~15 months", "back to Nov 2023", "~2.8 years". */
   reach: string;
   reachTitle: string;
-  /** How many machines keep the chain back to ordinal 1. */
-  genesisRatio: string;
+  /** How many machines keep the chain back to ordinal 1 — a bare count against the total
+   *  Online nodes states (see above). */
+  genesisCount: string;
   /** True when any machine keeps the whole chain — the row's checkmark. */
   genesisAny: boolean;
   genesisTitle: string;
@@ -122,7 +126,7 @@ export function archiveSummary(c: ArchiveCensus, chain: string): ArchiveNetSumma
   if (!entries.length) return null;
   const total = entries.length;
   const genesis = entries.filter((e) => e.kind === "genesis");
-  const genesisRatio = `${genesis.length} / ${total}`;
+  const genesisCount = `${genesis.length}`;
   const genesisAny = genesis.length > 0;
   const genesisTitle = genesisAny
     ? `${genesis.length} of the ${total} probed nodes serve the chain's every snapshot, back to ordinal 1.`
@@ -134,7 +138,7 @@ export function archiveSummary(c: ArchiveCensus, chain: string): ArchiveNetSumma
     return {
       reach: reach ? `~${reach}` : "full chain",
       reachTitle: `The deepest archive holds the whole chain, back to ordinal 1.`,
-      genesisRatio,
+      genesisCount,
       genesisAny,
       genesisTitle,
       kept: genesis[0].latest,
@@ -145,7 +149,7 @@ export function archiveSummary(c: ArchiveCensus, chain: string): ArchiveNetSumma
     return {
       reach: `back to ${c.since}`,
       reachTitle: `${deep} of ${total} nodes keep deep history to the metagraph era (${c.since}), with some gaps.`,
-      genesisRatio,
+      genesisCount,
       genesisAny,
       genesisTitle,
     };
@@ -155,7 +159,7 @@ export function archiveSummary(c: ArchiveCensus, chain: string): ArchiveNetSumma
   return {
     reach: reach ? `~${reach}` : `~${fmtSnapCount(best.latest - best.floor)} snapshots`,
     reachTitle: `The deepest archive reaches back to ordinal ${best.floor.toLocaleString()}; the chain's first ${fmtSnapCount(best.floor)} snapshots are not served by any of the network's own nodes (the explorer's index still lists their records).`,
-    genesisRatio,
+    genesisCount,
     genesisAny,
     genesisTitle,
     kept: best.latest - best.floor,

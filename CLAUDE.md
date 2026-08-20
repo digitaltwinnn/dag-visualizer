@@ -50,15 +50,29 @@ Eleven invariants. Six are executable — `npm test` fails when they break.
 | 1 | **Engine layering.** `domain/` = pure logic, `scene/` = Three adapters, `Engine.ts` = the only store bridge. | `src/engine/layerBoundaries.test.ts` |
 | 2 | **One selection write path.** Every interactive surface expresses intent through the decision table and applies it through the one executor. | `components/selectionBoundary.test.ts` |
 | 3 | **One colour source.** CSS tokens are canonical; no raw hex in `scene/` or `components/` outside the allowlist. | `src/engine/noHardcodedColors.test.ts` |
-| 4 | **Domain-export coverage.** Every value export of a `domain/` module is referenced by its sibling test. | `src/engine/domainExportCoverage.test.ts` |
+| 4 | **Pure-module export coverage.** Every value export of a `domain/` or `src/data/` module is referenced by its sibling test. | `src/engine/domainExportCoverage.test.ts`, `src/data/dataExportCoverage.test.ts` |
 | 5 | **Zero-allocation render loop.** No `new THREE.*`/`.clone()` in per-frame bodies unless marked `event-time`. | `src/engine/noFrameAllocations.test.ts` |
 | 6 | **Scene-view contract.** Bespoke views implement `SceneView`; scene modules never compare `Mode` strings; framing math reads layout data, not rendered transforms; views never write their root `visible`. | `src/engine/scene/views/sceneView.test.ts`, `src/engine/sceneViewContract.test.ts` |
 
-Four narrower boundary tests work the same way: `components/unlistedBoundary.test.ts` (the `"unlisted"`
+⚠️ Rule 4 reaches TWO directories and is not the same rule in both. `domain/` is pure by
+construction — rule 1 denies it react, the store and the addons — so its coverage needs no
+exemptions. `src/data/` holds the live singleton and the geo cache alongside the row builders, so
+`dataExportCoverage.test.ts` carries an explicit exemption list plus guards that keep it from
+growing: a mechanical purity classifier was tried and rejected (its regex matched the words
+"window" and "fetch" inside this repo's own comments), and the header records why.
+
+Seven narrower boundary tests work the same way: `components/unlistedBoundary.test.ts` (the `"unlisted"`
 id literal has exactly two homes), `components/railLadderBoundary.test.ts` (every committable focus
 rung maps to a hinted rail card slot), `components/railTierBoundary.test.ts` (`data-focus` has two
-homes and the slab's geometry — the pager included — keys on `data-tier`) and
-`src/data/signerMatchBoundary.test.ts` (a peer-id prefix comparison lives only in `src/data/network.ts`).
+homes and the slab's geometry — the pager included — keys on `data-tier`),
+`components/cssTrapBoundary.test.ts` (CSS traps 3 and 6 — a `bg-[var()]` never points at a gradient
+token, and every custom `text-*`/`tracking-*`/`rounded-*` token is registered with twMerge),
+`components/publishChannelBoundary.test.ts` (the React→Engine publish channels are one-way and
+single-publisher: `focusRung` is a fresh object bridged by reference, `sceneCover` is measured by
+`RailDock` off an element ref and sided by the two rails, `boxedCard` is Inspector's alone),
+`src/data/signerMatchBoundary.test.ts` (a peer-id prefix comparison lives only in `src/data/network.ts`)
+and `src/engine/scene/rowBoundary.test.ts` (a scene module that places a ledger row consults the
+trail's boundaries).
 
 Each of these files opens with a header comment giving the rationale, the scope and every exemption
 with its reason. **That header is the rule's authoritative statement** — read it rather than inferring
@@ -146,6 +160,15 @@ Gotchas worth knowing before you burn time on them:
 - **`--virtual-time-budget` runs very few frames**, so a fresh boot gets caught mid-intro. Use
   **`?slowmo=N`** (a dev flag like `?stats`, clamped to `[0.1, 20]`, values <1 speeding things UP) to
   inspect mid-flight states.
+- ⚠️ **Every scene clock is FRAME-driven off a `dt` clamped to 0.05s, so a slow renderer stretches it
+  in WALL-CLOCK time** — and the HUD, being React, does not ride that clock. Below 20 FPS the clamp
+  bites and the ~3.9s view choreography takes `3.9 / 0.05 / fps` seconds: at SwiftShader's 2–6 FPS,
+  13–40s. So a headless screenshot taken 15s after a view switch catches the transition still
+  running, and the panels beside it are already populated — **a bare ledger floor next to an explorer
+  full of measured ticks is the renderer, not the feed** (chased as a data bug for most of a session,
+  2026-08-19; `?slowmo=0.25` ran the same entry out in a quarter the time, which is what settled it).
+  Wait ~30s after a headless view switch, or drive it with `?slowmo`. The clamp itself is right — it
+  is the standard guard against a post-stall jump — and at real frame rates it never engages.
 - Benign console noise: `mojo ... rejected`, `PHONE_REGISTRATION_ERROR`, `BackForwardCache`.
 
 ### Tuning the look live
@@ -192,6 +215,19 @@ made shrink `raw × dim × hide` against mute's `raw × dim`: `dim` was a master
 so turning it down shrank nodes less as well as muting them less. It now reads the raw ramp, so each
 knob moves exactly one effect. A corollary that matters: the country drill's `countryMix` raise is a
 MUTE, and reading the raw ramp is what guarantees a lens can never shrink what it looks past.
+
+⚠️ **BRIGHTNESS IS THE EMPHASIS CHANNEL IN A SPARSE FIELD; SIZE IS THE ONE IN A CROWDED ONE** (user,
+2026-08-18 — *"I can't really see the difference on what node is selected"* about the DAG's own
+validators). Measured: the DAG's 160 validators sit closer together than the bloom radius, so their
+halos merge into ONE continuous ~54,000px ribbon (a metagraph's 19 stay discrete, largest blob
+~12,000), and every node core already clips white — so a focus expressed only as emissive has no
+channel left to spend. `boost` can't answer it either; it was pulled 1.85 → 1.1 on 2026-08-16 for the
+opposite bug. **`grow` is the second channel**: `focusGrow()` reads the row's own field and the node
+loops scale by `1 + grow × fw`, where `fw` is the eased focus weight carried ON THE RECORD (the scale
+and the glow are written by different passes and must swell together). It is **hyper's alone** — geo's
+chip size is DATA (the honeycomb's hexes sum to the true node count) and the ledger's trays are
+uniform by design, so both answer a hard `0`, pinned by test. It is the same question `hide` had to
+ask: a new effect gets its own field rather than riding a dim number.
 
 **A view's own FURNITURE dims on its own field, `elem`** (user, 2026-08-11). `dim` mutes off-filter
 NODES; the per-network furniture a view draws around them — hyper's hubs, tethers and hoops — used to
@@ -502,8 +538,12 @@ The design rules behind the table, which the tests pin but don't explain:
   border, the chip; the **group** rungs (geo's provider cohort, hyper's composition group) have none,
   so lighting their members is the only way they appear in the scene at all. Honest while the group IS
   the subject, a lie once the click lands on a node. `dimModel.ancestryGlow` is the rule and its test
-  the spec; the ledger's signer set stays outside it (not ancestry — a relation from a different
-  subject), and hover is untouched. One call site: `Globe._frameCtx`'s glow channel.
+  the spec; hover is untouched. One call site: `Globe._frameCtx`'s glow channel. **The ledger's
+  SIGNER set reads the same gate** (user, 2026-08-18): it was exempt on the argument that it is not
+  ancestry but a relation from a different subject — true, and beside the point, because a metagraph
+  that seals with its whole 3-machine cluster left a committed node reading as one bright chip among
+  three. The rule's own reasoning governs it, and nothing true is lost: the snapshot's lane tile still
+  carries the relation and the node card still states `signed`.
 - **A tick drops the metagraph snapshot it can't contain** (user, 2026-08-10). Stronger than the story
   rule one rung up: that one is about set membership, this is a one-to-one join
   (`metagraph.timestamp === global.timestamp`), so committing a DIFFERENT tick provably means the held
@@ -543,6 +583,25 @@ hued ticker, the anchor ring and the `.edge-spine`). The design rules the test c
 - **It is a label, not a control**: `pointer-events-none`, no ×, dismissal is the selection's own.
   Content mirrors the cards' grammar rung for rung (eyebrow ink, bare ordinals, aside rules,
   RoleChips, the ticking age on the global tick).
+- **The phone declines it** (user, 2026-08-18). Co-location is the whole promise — the panel stands
+  beside its subject and points at it — and a phone has no width to stand beside anything: the panel
+  is a third of the viewport, so it lands ON the subject or over the dock, and the flip rule has no
+  roomier side to flip to. **Both owners decline, through the same `breakpointOf` home** the rails
+  restructure on, so presence and anchor can't disagree; `components/calloutBoundary.test.ts` pins
+  that neither grows a threshold of its own. Tablet keeps it — there the flip has somewhere to go.
+- **Placement measures the FREE CANVAS BAND, not the canvas** (`domain/calloutPlacement.ts`, its
+  test the spec). Below 1100px the rails are sheets that OVERLAY a viewport-sized canvas, so a
+  placement measured against the canvas rect puts the panel under one: at 900px with both sheets
+  open a geo node's callout rendered as a ~25px fragment in the strip between them, while the
+  Details sheet behind it showed the whole node card anyway. The band is the canvas pulled in by
+  `store.sceneCover{L,R}` — the px each open side sheet covers, MEASURED by `RailDock` and reported
+  through an `onCoverPx` prop so the dock stays store-free. An anchor outside the band, or a panel
+  that fits on neither side, gets no callout: this is the phone rule's own reasoning reaching the
+  width the SHEETS create rather than only the width the device does. It is a no-op on desktop and
+  phone, where the cover is 0. ⚠️ The sheet mounts a commit LATER than the one that opens it (radix
+  portals its content), so the cover is published off a callback REF, not an effect keyed on `open`
+  — keyed on `open` it measures a null node and publishes 0 forever, which passes tsc and vitest
+  and fails only in the browser.
 - **Furniture labels are sparse by review**: geo's hosting-country names (the set states where the
   network runs — empty countries staying nameless is information) are the only ones standing. Hyper's
   hub tickers AND its "Global L0" were built and removed the same day (clutter over what hues,
@@ -1130,7 +1189,8 @@ under it. The engine-anchored `Tooltip` stays custom, because a Radix tooltip ca
 
 ### CSS traps
 
-Nothing tests these. Each has cost real debugging time.
+Each has cost real debugging time. Traps 3, 6 and 8 are executable — `components/cssTrapBoundary.test.ts`
+for the first two, `components/breakpointArmBoundary.test.ts` for the last; the rest are yours to remember.
 
 1. **Recipes that must beat element utilities stay UNLAYERED.** Tailwind v4 orders `theme, base,
    components, utilities`, so a rule in `@layer components` loses to a utility **at ANY specificity** —
@@ -1164,10 +1224,15 @@ Nothing tests these. Each has cost real debugging time.
    a second one. `:is()` inside `:has()` is fine.
 8. **`max-[N]` is EXCLUSIVE** — Tailwind v4 compiles it to `@media not (min-width: N)`, so it stops
    applying **at** N, not after it. A tier boundary is therefore written with the SAME number on both
-   arms (`max-[1100px]` / `min-[1100px]`), which is how the rail widths pair. The `max-[1099px]:!hidden`
-   safety nets are the older form and leave exactly 1099px on the desktop arm — harmless (nothing
-   double-renders, the desktop rails simply arrive one pixel early), but don't copy the pattern into a
-   new boundary, and never pair `max-[N]` with `min-[N+1]` thinking it closes the gap: it opens one.
+   arms (`max-[1100px]` / `min-[1100px]`), which is how the rail widths pair. Never pair `max-[N]` with
+   `min-[N+1]` thinking it closes the gap: it opens one, and the hole is invisible to every other gate
+   here because both arms are individually well-formed. **The phone tier had one** (fixed 2026-08-19):
+   `max-[699px]` against `min-[700px]` left exactly 699px with the dock CSS-hidden and the tablet tabs
+   not yet matching — no rail control at all, neither rail openable. Every arm names 700 now, which is
+   `breakpointOf`'s own boundary, and `components/breakpointArmBoundary.test.ts` is the rule; its header
+   carries the ONE exemption, the `max-[1099px]:!hidden` safety nets, where the desktop rails fill in at
+   the same width the tabs vanish so nothing goes missing. Don't copy that older form into a new
+   boundary.
 9. **One slim scrollbar recipe, `.slim-scroll`.** Any scroll region **on glass** wears it — the platform
    default paints a chunky bright bar that reads as a browser part laid over the panel. It's a class
    rather than a token because its consumers are reusable primitives (the filter strip's phone overflow,
@@ -1278,16 +1343,57 @@ The storey heights give the ribbons a deliberate long run.
 **The byte bar IS the global snapshot.** One bar per tick on the global floor, fixed height and depth,
 **its width alone encoding the bytes that tick carried** against a FIXED baked reference — **~p70 of
 anchored KB/tick** (user, 2026-08-16: "more often too filled than too small" — the earlier p99 bake
-made the median bar a sliver of unreadable segments), so a heavy tick clips at the floor edge with an
-honest `×N` overflow label instead of rescaling the whole past. `scripts/bake-ledger-scale.ts`
+made the median bar a sliver of unreadable segments), so a heavy tick clips at the floor edge instead
+of rescaling the whole past — and states its true size in words in the SIZE column below, which is the
+honest answer the clip never had. (`spec.clipped` / `spec.overflow` were computed in `ledgerBands.ts`
+for an `×N` overflow label that was never built, and were removed 2026-08-19 — the size column
+supersedes them, so a clipped bar states its size in words rather than in a multiplier.)
+`scripts/bake-ledger-scale.ts`
 re-measures it; its header carries the complete-window sampling trap. The bar is centered on the lane field and split into bands, one
 per contributing metagraph plus unlisted, each its own pickable mesh from a pool allocated once.
 **Bands follow lane order, so band order and lane order agree and the ribbons never cross.**
 
 **The honesty is in the domain, not the adapter** (`ledgerBands.ts`): **no exact read → no bands.** A
-composition is never inferred from the anchor count and never from the fee, and an unmeasured or empty
-tick **draws no bar at all**, because the per-row ordinal label already marks that the tick happened —
-so nothing is drawn that could read as a small bar.
+composition is never inferred from the anchor count and never from the fee.
+
+**HEIGHT says whether a measurement exists; WIDTH says how big it is** (user, 2026-08-18 — *"it shows a
+snapshot in that view which can't be drawn … now it's just empty"*). An unmeasured row used to draw
+nothing at all, so a tick whose exact read failed was blank floor with a dotted anchor line pointing at
+it — the HUD said `EXACT READ FAILED` while the scene said nothing had happened. A row with no
+measurement now draws the **SEED**: a flush block lying in the glass, `SEED_W × SEED_H`.
+Lying in the glass it is not a bar, so it makes **no width claim** — which is exactly what lets its
+footprint be nominal under `ledgerBands.ts`'s ban on inferring a width from anchor count or fee — and
+when a read lands the row RISES into its bands through the machinery that already existed. It sits
+**still and dim**, because nothing is arriving: a read that failed or was never taken is not in
+flight. A seed stays **pickable** — selecting an unread tick
+is what asks for its read. ⚠️ `s.forming` stays true for a still seed: it is what short-circuits the
+grow loop, which would otherwise ease the mark into a full-height bar.
+
+**The tick still FORMING is not a row at all — it is the LIVE EDGE** (user, 2026-08-18: *"what if we
+don't show an actual snapshot for [forming], but instead a dim line in front of the snapshots with
+some relevant info about what's happening, to indicate it's forming, live, filtered"*). A tick arrives
+and its exact read is in flight for ~1.8–2.5s; drawn as a seed in the lead slot that window had no
+honest place to stand, because under filter + follow the rewind holds the NETWORK's own newest
+anchored tick at the lead, so the forming tick sat ahead of the front edge and dissolved. **A row that
+cannot be placed is not a row.** `scene/objects/LiveEdge.ts` is the boundary with NOW instead: a thin
+line lying flush in the glass at `LIVE_X`, mounted straight into the view root — **never into a group
+the rewind offsets**, because now does not slide with the trail — running WIDER than `BAR_MAX_W` so it
+can never be misread as a bar, and not pickable, because there is no snapshot there to select. It
+**breathes** on the calm beat while a read is in flight and **rests still** in standby, and it takes
+the committed network's identity hue, which is how it says *filtered* without a word. `liveEdgePhase`
+(`domain/ledgerModel.ts`) is the resolver and **`LedgerView._liveOrd()` the one predicate** all three
+consumers ask — the slot's mute, the ordinal column's suppression and the edge's own phase — so the
+line and the row can never both claim the tick, and the column can never name it twice.
+⚠️ It carries **no label**, measured rather than omitted: the strip it would occupy is ~10px at the
+resting pose and already holds the floor's front rim, the floor's own `GLOBAL SNAPSHOTS` name and the
+lead bar's bloom, so the words washed out. Hyper's hub tickers are the precedent — furniture labels are
+sparse by review, the line's own behaviour says all three states, and words about the live tick belong
+to the HUD, where the global snapshot card already ticks its age. Don't re-grow it without a live look.
+
+And the **SEAM** — a measured tick that anchored nothing — is a MEASUREMENT, so it draws at full
+height: `ledgerBands.ts` has specified a minimum-width bar for it since the redesign, but the adapter's
+one `!measured || bandCount === 0` branch lumped it in with the unmeasured case and never drew it. It
+now rides the real write path through one synthetic neutral band.
 
 **Ribbons carry the anchor.** One tapering sheet per anchoring lane, from that metagraph's lane tiles
 down to **its own band** — the literal statement of which bytes came from where. Both edges are eased
@@ -1345,9 +1451,19 @@ MULTIPLIES: tick 6,741,486 anchored **20 DOR snapshots**, so one swipe through t
 publishes personal records, which is why the payload is two deliberate gestures deep at all.
 
 **Labels.** The global floor is named by subtle flat edge-aligned text rather than billboards, and each
-metagraph plane carries a smaller ticker label the same way. Every visible tick row is named by a
-global ordinal label screen-left of the bars, tied to its row's bar by a dotted anchor line whose end
-tracks the bar's live width, keyed by ordinal so label and line ride their row down the trail.
+metagraph plane carries a smaller ticker label the same way. Every visible tick row is named at BOTH
+ends, by two mirrored dotted columns: a global ordinal screen-left — the exact reading of what POSITION
+encodes — and its SIZE in kB screen-right, the exact reading of what WIDTH encodes, through the HUD's
+own `fmtKB` so scene and cards can't disagree about a size. Each is tied to its row's bar by a dotted
+anchor line whose end tracks the bar's live width, keyed by ordinal so labels and lines ride their row
+down the trail. The two columns share one line recipe, one aim and one dispose, so they can't drift.
+⚠️ The size column reads **outward** — ink pinned at the inner boundary, growing away from the chamber
+— because a bar already reaches ±(`LANE_HALF_Z` − `BAR_EDGE_MARGIN`) and a value growing inward would
+land on top of it; outward there is no bound, so a 1.2 MB tick states its size as calmly as a 4 KB one.
+Only a MEASURED row gets a number (rule 10): reading down the column a GAP means *not read*, never
+zero, and a measured-empty seam honestly reads its own tiny size. The forming tick is named by neither
+column — the live edge stands for it, and a label there would run its anchor line out to a bar that
+doesn't exist.
 
 **Glass, emphasis and the rewind.** The glass fill shader is shared but the looks are split: the PLANES
 are square with a soft-rim drop-off, the node TRAYS are flat rounded-corner panels. Rounded corners are
@@ -1413,6 +1529,28 @@ rewind follows only the committed pin — a hover previews the hot row in place.
 no depth fade on the trail: every row keeps one brightness, and recency reads from position plus the
 ordinal labels.
 
+⚠️ **A ROW IS ONE OBJECT — every instrument that rides a row derives its x from the SLOT, and the
+rewind offset is the trail's one source of motion** (user, 2026-08-18 — *"it does not jump to the exact
+row location and then corrects itself directly after"*). The bars, the ribbons and both label columns
+all read `LEAD_X - slot * SLOT_SP` in the frame that draws them; the lane tiles alone used to keep a
+stored `x` on the block and ease it toward that same expression, snapping only while a `holding` flag
+said a pin held the front. So a tile chased its row rather than riding it. It tore worst exactly where
+the flag dropped: under a filtered follow a fresh anchor moves the held ordinal to slot 0, so `holding`
+went false in the same event that incremented every slot, and the tiles started a full `SLOT_SP` behind
+their own bars. `LaneBlock.x` and `TrailRewind.holding` are both gone — **a second home for row
+position is a tear waiting for the frame that separates them**, and easing one instrument toward a
+number every other instrument already has is not motion the chamber has.
+
+**A held row arrives in ONE movement, and `scene/objects/TrailRewind.test.ts` is that contract** —
+the offset's jump-vs-ease rules as pure scalars, asserting direction and standing still rather than
+the easing rate. The same bug class recurred the next day (user, 2026-08-18 — *"active snapshot moves
+to the back, then a bit to the front now and then arrives at its trail row … only appears when
+current and new is both active?"*): the calm jump's guard read `_slotPrev > 0` where it meant *was the
+held row VISIBLE*, and slot **0 is the lead** — the one state a filtered live follow sits in. So the
+advance drew the row a slot back, the missing jump let the offset ease up after it, and the store's
+follow then named the fresh ordinal and unwound that ease. Three movements from one tick. Only `−1`
+may skip the jump.
+
 ⚠️ **A DISSOLVED ROW MUST ZERO-SCALE, NOT JUST GO DARK** (user, 2026-08-11). The lane tiles are one
 instanced mesh on an **opaque, depth-writing** material whose brightness rides the instance COLOUR, so a
 row multiplied to brightness 0 is a BLACK BLOCK — it occluded the ribbons and glass behind it in front
@@ -1432,6 +1570,37 @@ tiles and the byte bars all multiply their own brightness by `horizonAt`, becaus
 dissolved floor is worse than a hard edge. The **node trays are deliberately exempt** — they sit at the
 front of the chamber, where an end is simply the truth. Deliberately **not** a `?tune` knob: it is the
 frame's own shape, not a look.
+
+**The trail has TWO boundaries, one home each, and every row-riding instrument reads both** —
+`horizonAt` above and `frontAt` beside it, where the rewind pushes rows off the front. ⚠️ The front
+one is what a filtered follow leans on hardest (user, 2026-08-18): the rewind holds the *network's*
+own newest anchored tick at the lead, so every global tick that anchored nothing of it sits ahead of
+the front edge, and a forming row is exactly the kind that piles up there. The byte bar's SEED branch
+skipped the call and left those blocks hanging in the air off the glass — **a seed is a row too.**
+They are not dropped and must not be: **POSITION IS TIME**, so a row is drawn where its tick belongs
+and dissolves when that is off the chamber, never pinned to the glass to keep it visible; when the
+network anchors again the offset eases back and they slide onto the panel in their own place. The
+front formula had two homes when this happened (`TrailRewind.fadeAtX` plus an inline copy in the
+bar), which is how one write path came to miss it at all.
+
+⚠️ **A BOUNDARY MUST FINISH INSIDE THE GLASS, AND THE RAMP IS DERIVED FROM THE RIM** (user,
+2026-08-19 — *"nothing is ever drawn in front of the plane; I still see sometimes something
+drawn/flash in front"*). Every row-riding write path already multiplied by `frontAt`, so the hunt
+for a missing call found nothing: the defect was one level up. `frontAt` dissolved over
+`SLOT_SP * 0.9`, a length picked for how the fade LOOKED, which put its zero at x 7.14 while the
+glass stops at 6.5 — and a byte bar reaches `BAR_D / 2` ahead of its own centre, so the last ink of
+a fading row sat at 7.94, nearly a slot and a half out in mid-air. Visible only while the rewind
+pushes rows forward (a pin, a filtered follow), which is exactly why it read as an intermittent
+flash. The chamber's footprint is now `FLOOR_W` / `FLOOR_CX` in `domain/ledgerLayout.ts` with
+`FLOOR_FRONT_X` / `FLOOR_BACK_X` beside them (promoted out of `LedgerView`, which keeps only the
+label X and the glass shader's drop-off reference), and the ramp ends at `FRONT_INK_X =
+FLOOR_FRONT_X − ROW_HALF_D` — so at `frontAt = 0` the row's leading face lands ON the rim. Retune
+the rim, the slot spacing or the bar's depth and the ramp follows; there is no second number to
+keep in step. **Two tests, because the rule has two halves that fail independently**: the sweep in
+`domain/ledgerModel.test.ts` proves the ramps are short enough (both ends, pick set included), and
+`scene/rowBoundary.test.ts` proves they are asked — any non-test `scene/` module referencing
+`SLOT_SP` must reference a boundary, with `setRowFade` the one stated exemption for `Ribbons`,
+whose vertex colours are baked at event time so the view pushes its fade in.
 
 **Signer glow.** When the selected metagraph snapshot changes, the Engine resolves its signers to IPs
 and lights those machines in the trays — the scene keys metagraph nodes by IP, not id, so the machines

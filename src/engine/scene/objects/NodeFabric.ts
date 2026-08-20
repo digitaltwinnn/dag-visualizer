@@ -16,7 +16,7 @@ import * as THREE from "three";
 import { LEDGER } from "../../domain/ledgerLayout";
 import { HEX_H } from "../../domain/geoLayout";
 import { discFall, lerp, smooth } from "../../domain/nodeLayout";
-import { nodeDim, nodeEmissive, nodeGlow, hubMatchBoost, focusWeightOf, hideFrac, emphasisK } from "../../domain/dimModel";
+import { nodeDim, nodeEmissive, nodeGlow, hubMatchBoost, focusWeightOf, focusGrow, hideFrac, gatherRaw, emphasisK } from "../../domain/dimModel";
 import type { DimContext } from "../../domain/dimModel";
 import type { MetaNodeRecord, ValidatorRecord } from "../../domain/records";
 import type { ViewTransition } from "../../domain/viewTransition";
@@ -345,6 +345,12 @@ export class NodeFabric {
     // cross-fade them into the circles only at the last moment, once the nodes have essentially
     // arrived at the globe surface.
     const w = smooth(THREE.MathUtils.clamp((m - 0.82) / 0.16, 0, 1)); // sphere → chip squash phase
+    // dimModel.focusGrow: the SECOND emphasis channel, and the one that survives a crowd —
+    // hyper's shells pack the nodes closer than the bloom radius, so a focused node's halo merges
+    // with its neighbours' and brightness alone can no longer say which one is the subject (a
+    // measured finding, 2026-08-18). Size still owns its own silhouette. Hoisted here and read as
+    // a local in the loop — the tune hoist rule.
+    const grow = focusGrow(c);
     for (const u of records) {
       // Snapshots (ledger) view: hard-place as standing CHIPS on the floor planes (the same
       // cylinder geometry as geo, HEX_H tall — user 2026-07-12: the old squashed-sphere COIN
@@ -391,14 +397,15 @@ export class NodeFabric {
       // Off-filter nodes SHRINK AWAY on the globe and merely mute in hyper — dimModel.hideFrac
       // owns that split. It reads the RAW ramp, not the resolved dim, so the two knobs are
       // independent (and the country drill's mute can never shrink a node — lens, not filter).
-      let show = 1 - hideFrac(c, dim);
-      show += (1 - show) * gw; // parked squares show the whole fleet (dim re-applies on landing)
+      // dimModel.gatherRaw releases that ramp along the gather flight, so the parked squares show
+      // the whole fleet at full size AND full brightness — the glow loop reads the same hatch.
+      const show = 1 - hideFrac(c, gatherRaw(dim, gw));
 
       // Sphere: tumbling on its own axis, cross-fading into the chip ALONG the gather flight
       // (wEff; noGeo nodes keep the plain morph squash — they have no geo chip to become).
       _qSpin.setFromAxisAngle(u.spinAxis, u.spinPhase + t * u.spinSpeed);
       _dummy.quaternion.copy(_qSpin);
-      _dummy.scale.setScalar(u.hyperSize * (1 - (u.noGeo ? w : wEff)) * (u.noGeo ? 1 - e : 1) * show);
+      _dummy.scale.setScalar(u.hyperSize * (1 + grow * u.fw) * (1 - (u.noGeo ? w : wEff)) * (u.noGeo ? 1 - e : 1) * show);
       this._applyGather(ctx, u, gw, prim);
       _dummy.updateMatrix();
       this.instSphere.setMatrixAt(u.index, _dummy.matrix);
@@ -435,8 +442,14 @@ export class NodeFabric {
     // read as a local in the loop — the tune hoist rule.
     const ek = emphasisK(dt);
     // While a country drill-down is active, per-node dim varies, so recolour every frame; otherwise
-    // only during a layer-dim transition.
+    // only during a layer-dim transition. A view transition also varies it per node (each node's
+    // gather weight releases its own ramp — dimModel.gatherRaw), and it does so WITHOUT moving the
+    // shared `dim`, so the flight must be its own trigger or the base colour stays dimmed under a
+    // brightening emissive. No falling-edge touch-up is needed: viewTransition's stagger spread
+    // exactly fills its phase (FLIGHT_IN + STAGGER_SPREAD === DUR_IN), so every node's weight has
+    // reached 0 — to ~1e-6, smootherstep being flat at 1 — by the frame the phase goes idle.
     const recolour = cf != null || cmix > 0.001 ||
+      !!(ctx.transition && ctx.transition.active()) ||
       Math.abs(dim - this._appliedDim) > 0.001;
     const base = this.baseArr;
     const emi = this.emiArr;
@@ -449,10 +462,15 @@ export class NodeFabric {
     const focusId = c.hoverNodeId || c.selectedNodeId || c.hoverCohort;
     for (const u of records) {
       const geoCc = geoCcOf(u.pick);
+      // dimModel.gatherRaw: the same escape hatch placeValidators applies to the SIZE, read here so
+      // the two can't disagree — a chip restored to full size mid-gather is restored to full glow
+      // with it, and the ramp reaching 0 at the parked position is what keeps the mid-transition
+      // boundary's row swap invisible for brightness as well as layout.
+      const rawEff = gatherRaw(dim, this._gatherW(ctx, u.gRank, u.gCount));
       // dimModel.nodeDim: dim * nodeDimScale(c) (the morph-ramped strength), raised by the
       // country dim outside the drilled-into country (geo only) — CALLS the domain function
       // directly now (no inline mirror).
-      const d = nodeDim(c, dim, geoCc);
+      const d = nodeDim(c, rawEff, geoCc);
       // dimModel.focusWeightOf: the hovered/selected node itself takes the FULL boost, a mere
       // member of a focused group (a hovered/committed provider cohort) only a share — so
       // picking one node inside a lit cohort still reads (user, 2026-08-01). Since 2026-08-11 a
@@ -463,15 +481,25 @@ export class NodeFabric {
         u.nodeId === c.hoverNodeId || u.nodeId === c.selectedNodeId,
         !!u.nodeId && !!c.hoverCohort?.has(u.nodeId),
       );
+      // The SIZE channel's state (dimModel.focusGrow), eased on the record so the swell and the
+      // glow move as one. placeValidators runs earlier in the frame and so reads this a frame
+      // behind — one frame at the easing rate is not a visible lag, and keeping the tier ranked
+      // in ONE place beats re-deriving focusId in the geometry pass.
+      u.fw += (fw - u.fw) * ek;
       // dimModel.nodeEmissive: the SAME glow model the metagraph loop below calls (user: one node
       // model — the DAG core's nodes are metagraph nodes that orbit the origin). The base's
       // hyper→globe endpoints live in the domain, so the two call sites cannot pass different
       // ones. Steady; the old twinkle shimmer was removed. Also composes the hover/selection
-      // focus boost/dim-back inside. No hubBoost: the core has no orbiting hub to match.
+      // focus boost/dim-back inside.
+      // dimModel.hubMatchBoost, same call as the metagraph loop (user, 2026-08-18): the core IS a
+      // hub under ONE NODE MODEL, so committing the DAG lifts its validators to hub level exactly
+      // as committing a metagraph lifts that network's nodes. Same replace-not-stack rule — a
+      // FOCUSED node takes its own boost instead, never both.
+      const hubBoost = hubMatchBoost(c, nodeGlow(c, d), c.filter === "dag");
       const flRaw = u._flash || 0; // brief flash when an arc pulse reaches this node
       // The buffer IS the easing state — emiArr persists across frames and a node keeps its slot,
       // so approaching the target in place costs one array read and allocates nothing.
-      const emiT = nodeEmissive(c, d, flRaw, fw, !!focusId);
+      const emiT = nodeEmissive(c, d, flRaw, fw, !!focusId, fw > 0 ? 0 : hubBoost);
       emi[u.index] += (emiT - emi[u.index]) * ek;
       if (flRaw) u._flash = flRaw * flashDecay;
 
@@ -502,6 +530,7 @@ export class NodeFabric {
     const w = smooth(THREE.MathUtils.clamp((m - 0.82) / 0.16, 0, 1)); // sphere → chip squash phase
     const kk = Math.min(1, dt * 4);
     const ek = emphasisK(dt); // emphasis easing — hoisted once per frame (the tune hoist rule)
+    const grow = focusGrow(c); // the size channel — see placeValidators (one node model)
     const emi = this.metaEmi;
     const base = this.metaBaseArr;
     const focusId = c.hoverNodeId || c.selectedNodeId || c.hoverCohort; // see the validator loop
@@ -511,16 +540,18 @@ export class NodeFabric {
       const prim = r.geoPrimary !== false;
       const wEff = w + (1 - w) * gw; // staging shape = the chip (see the validator loop)
       const geoCc = geoCcOf(r.pick);
-      // dimModel.nodeDim: r.dim × the morph-ramped strength — the SAME call the validator loop
+      // dimModel.gatherRaw: the view transition's staging block shows the whole fleet, so the
+      // gather releases this node from the filter as it flies — and it releases the RAMP, so the
+      // chip comes back to full size AND full brightness together. Both readings below take it.
+      const rawEff = gatherRaw(r.dim, gw);
+      // dimModel.nodeDim: the ramp × the morph-ramped strength — the SAME call the validator loop
       // makes (user, 2026-08-11: one node model), raised by the country dim when outside the
       // drilled-into country (geo only); LEDGER forces its flat row value (morph frozen).
-      const dEff = nodeDim(c, r.dim, geoCc);
+      const dEff = nodeDim(c, rawEff, geoCc);
       // dimModel.hideFrac: how far an off-filter node SHRINKS AWAY — 1 on the globe (the isolate),
       // 0 in hyper, where a turned-up dim mutes in place at full size. It reads the RAW ramp, not
-      // dEff, so `dim` and `hide` move one effect each. The gather escape hatch lifts it back:
-      // parked squares show the whole fleet.
-      const hid = hideFrac(c, r.dim);
-      const vis = (1 - hid) + hid * gw;
+      // dEff, so `dim` and `hide` move one effect each.
+      const vis = 1 - hideFrac(c, rawEff);
       // dimModel.hubMatchBoost: the COMMITTED metagraph's own nodes glow at the hub's resting
       // level (HyperView hub base 0.72) in the Hypergraph, so the picked network's nodes bloom
       // like its hub instead of sitting at the dimmer node base (user). Fades out with the hubs
@@ -533,6 +564,7 @@ export class NodeFabric {
         r.nodeId === c.hoverNodeId || r.nodeId === c.selectedNodeId,
         !!c.hoverCohort?.has(r.nodeId),
       );
+      r.fw += (fw - r.fw) * ek; // the size channel's eased state — see the validator loop
       const flRaw = r._flash || 0; // brief flash when an arc pulse reaches this node
       // dimModel.nodeEmissive: composes glow + arc flash + hubBoost inside its floor, then the
       // hover/selection focus boost/dim-back — one function, both loops. The write EASES toward it
@@ -594,7 +626,7 @@ export class NodeFabric {
       // shrink fully out on the globe and stay full-size (just muted) in hyper — `vis`, above.
       _qSpin.setFromAxisAngle(r.spinAxis, r.spinPhase + clock * r.spinSpeed);
       _dummy.quaternion.copy(_qSpin);
-      _dummy.scale.setScalar(r.hyperSize * (1 - wEff) * vis);
+      _dummy.scale.setScalar(r.hyperSize * (1 + grow * r.fw) * (1 - wEff) * vis);
       this._applyGather(ctx, r, gw, prim);
       _dummy.updateMatrix();
       this.metaSphere.setMatrixAt(r.index, _dummy.matrix);

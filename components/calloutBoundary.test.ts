@@ -15,6 +15,11 @@ import { join } from "node:path";
 //  3. `SCENE_GLASS` (components/selection.tsx, the shared-recipe home) is the ONE container
 //     for scene-anchored labels: SceneCallout and Tooltip both wear it (user, 2026-08-15 —
 //     "align the hover and the click card"). Neither may re-grow its own glass recipe.
+//  4. BOTH owners decline on a PHONE, through `breakpointOf`'s one home (the component via
+//     `useBreakpoint`, the Engine directly). The callout's value is co-location with its
+//     subject and its ~298px reach cannot deliver that under 700px; a hard-coded width in
+//     either owner would let the DOM and the placement disagree about where the tier ends.
+
 const ROOTS = ["components", "src", "app"];
 const CALLOUT_HOMES = new Set(["components/SceneCallout.tsx", "src/engine/Engine.ts"]);
 
@@ -59,6 +64,17 @@ describe("subject-callout boundary", () => {
       const code = stripComments(read(f));
       expect(code.includes("SCENE_GLASS"), `${f} must wear the shared scene-label container`).toBe(true);
       expect(/backdrop-blur|panel-solid/.test(code), `${f} re-grows its own glass — the container belongs to SCENE_GLASS (components/selection.tsx)`).toBe(false);
+    }
+  });
+
+  it("both callout owners decline on a phone through the shared breakpoint home", () => {
+    for (const home of CALLOUT_HOMES) {
+      const code = stripComments(read(home));
+      expect(
+        /breakpointOf|useBreakpoint/.test(code),
+        `${home} must read the tier from src/data/breakpoint (directly or via useBreakpoint) — a hard-coded width lets the two owners disagree about where the phone tier ends`,
+      ).toBe(true);
+      expect(code.includes('"phone"'), `${home} no longer declines the callout on the phone tier`).toBe(true);
     }
   });
 });

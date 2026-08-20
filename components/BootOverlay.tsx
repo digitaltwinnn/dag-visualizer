@@ -4,7 +4,10 @@ import { useMinHold } from "@/components/useMinHold";
 import { cn } from "@/lib/utils";
 
 // Cold-start overlay, painted by React independent of the Three scene: a centred forming Global L0
-// core (soft radial glow + an expanding ping) + a "Connecting…" label, in neutral cyan.
+// core — a small crisp disc with a tight glow, the two armillary shells it wears in the hypergraph
+// turning slowly around it, and the expanding sonar ping — plus a "Connecting…" label, in neutral
+// cyan. The mark PREFIGURES its own destination: this overlay hands off to the hypergraph's core,
+// so it draws that core forming rather than a generic glow.
 // On LIVE it cross-fades out as the real 3D core fades in; on timeout it switches to the grey NO
 // SIGNAL treatment. Removed from the DOM once fully faded (LIVE) so it never intercepts anything.
 export default function BootOverlay() {
@@ -41,16 +44,35 @@ export default function BootOverlay() {
         {!noEngine && (
           <span
             className={cn(
-              "absolute inset-[34px] rounded-full border border-[color-mix(in_oklch,var(--primary)_55%,transparent)]",
+              "absolute inset-[45px] rounded-full border border-[color-mix(in_oklch,var(--primary)_55%,transparent)]",
               "animate-boot-ping motion-reduce:animate-none motion-reduce:opacity-0", // reuse the sonar expand (peak ≤ 0.6)
               dead && "grayscale",
             )}
           />
         )}
+        {/* The two armillary shells. Each wrapper spins in SCREEN space (`boot-shell`) and its
+            child carries the static tilt — a rotateX with no perspective, so it resolves to a
+            flattened circle. Turning that ellipse's major axis is what reads as a hoop in orbit;
+            two of them, at different flattenings and opposite cadences, read as the shells the
+            hypergraph core wears. Reduced motion leaves them parked at their tilt, which still
+            says "core with shells". */}
+        {!noEngine && (
+          <>
+            <span className={cn("absolute inset-0 animate-boot-shell motion-reduce:animate-none", dead && "grayscale")}>
+              <span className="absolute inset-[16px] rounded-full border border-[color-mix(in_oklch,var(--primary)_38%,transparent)] [transform:rotateX(66deg)]" />
+            </span>
+            <span className={cn("absolute inset-0 animate-boot-shell-alt motion-reduce:animate-none", dead && "grayscale")}>
+              <span className="absolute inset-[31px] rounded-full border border-[color-mix(in_oklch,var(--primary)_52%,transparent)] [transform:rotateX(44deg)]" />
+            </span>
+          </>
+        )}
+        {/* The core itself: a small CRISP disc with a tight glow, not a soft field. It used to be a
+            120px radial gradient breathing its opacity, which at that size is a large solid centre
+            with a long smear — a blob, where every other mark in the app is an instrument. */}
         <span
           className={cn(
-            "absolute inset-0 rounded-full",
-            "bg-[radial-gradient(circle,color-mix(in_oklch,var(--primary)_85%,transparent)_0%,transparent_62%)]",
+            "absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[13px] h-[13px] rounded-full",
+            "bg-[var(--primary)] shadow-[0_0_14px_3px_color-mix(in_oklch,var(--primary)_45%,transparent)]",
             "animate-breathe motion-reduce:animate-none motion-reduce:opacity-90",
             dead && "grayscale",
           )}

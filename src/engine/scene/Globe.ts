@@ -395,7 +395,7 @@ export class Globe implements GeoViewHost {
           azimuth: Math.atan2(hyperPos.z, hyperPos.x),
           spinAxis: new THREE.Vector3(Math.random() * 2 - 1, Math.random() * 2 - 1, Math.random() * 2 - 1).normalize(),
           spinSpeed: 0.3 + Math.random() * 0.5, spinPhase: Math.random() * 6.2831,
-          pick,
+          pick, fw: 0,
           gU: 0, gV: 0, gRank: 0, gCount: 0, gS: 0,
         };
         this.nodes.push(u);
@@ -604,7 +604,7 @@ export class Globe implements GeoViewHost {
             spinAxis: new THREE.Vector3(Math.random() * 2 - 1, Math.random() * 2 - 1, Math.random() * 2 - 1).normalize(),
             spinSpeed: 0.3 + Math.random() * 0.5, spinPhase: Math.random() * 6.2831,
             dim: 0, dimTarget: 0,
-            pick,
+            pick, fw: 0,
             gU: 0, gV: 0, gRank: 0, gCount: 0, gS: 0,
           });
         });
@@ -621,6 +621,18 @@ export class Globe implements GeoViewHost {
       const drill = this.countryFilter;
       this.setFilter(this.filter);
       if (drill) this.setCountry(drill);
+      // ⚠️ …and the dim must be SNAPPED, not eased (user, 2026-08-18: "objects very briefly appear
+      // and hide again" after a long session). Every record above is brand new and born at `dim: 0`
+      // — lit — while `_applyDim` writes only the TARGET, so the per-frame ease (dt*4, ~1s) played
+      // an off-filter node's whole mute from scratch on every 5-minute re-pull. In geo that ease is
+      // also its SIZE (hide reads the same raw ramp), so the muted fleet POPPED IN at full size and
+      // full brightness before shrinking away again. Same argument as the drill restore above: a
+      // rebuild has no prior state to ease FROM, so there is nothing to animate. Snapping every
+      // record is safe precisely because none of them existed a moment ago — a genuine filter
+      // switch still eases, since it runs against records that do. Measured with a temporary probe
+      // 150ms after each rebuild, DOR committed: 43 off-filter records at dim 0.20–0.36 (so 64–80%
+      // of full size and brightness, on screen) without this line, 1.000 with it.
+      for (const r of recs) r.dim = r.dimTarget;
       this.setSelectedNode(this._selectedNodeId); // re-resolve the spotlight's record on fresh data
       this.setSelectedCohort(this._selCohort); // re-resolve the cohort membership/centroid too
       this._buildDensityGlow();
@@ -1208,19 +1220,27 @@ export class Globe implements GeoViewHost {
     // Group-tier glow, one channel, four sources in precedence order: a LIVE hover wins (a group
     // row previews exactly what clicking it would commit), then geo's committed cohort, then
     // hyper's committed composition group, then ledger's signer set (spec §5.3) — the three
-    // committed kinds are each view/subject-scoped, so at most one is ever set. The two committed
-    // ANCESTRY kinds are the ones gated by dimModel.ancestryGlow (that function is the rule); the
-    // signer set sits OUTSIDE the gate because it is not ancestry — it is a relation from a
-    // different subject, the selected metagraph snapshot — so it never yields to a node.
+    // committed kinds are each view/subject-scoped, so at most one is ever set.
     // The gate's node subject is the committed node OR the hovered one: a hover previews the
     // commit, and committing a node collapses the borrowed glow (user, 2026-08-12).
+    //
+    // ⚠️ THE SIGNER SET YIELDS TO A NODE TOO (user, 2026-08-18: "filter on UP in hyper, pick a
+    // node, go to snapshot and you will see the other two nodes become too bright in addition to
+    // the actually selected node"). It used to sit OUTSIDE the gate, on the argument that it is
+    // not ancestry but a relation from a different subject — true, and beside the point: The
+    // Upsider AI seals every snapshot with all three of its machines, so committing one of them
+    // left the other two at the group tier (resting + 0.45 × boost ≈ 0.79 against the subject's
+    // 1.17, while the rest of the fleet sat at 0.14) and the selection was unreadable. The
+    // ancestry rule's own reasoning covers it: a borrowed glow is honest while the group IS the
+    // subject and a lie once the click lands on a node. Nothing true is lost — the snapshot's own
+    // lane tile still carries the relation in the scene, the node card still states `signed`, and
+    // each deselect visibly widens the lit set again.
     c.hoverCohort =
       this._hoverCohort ??
       ancestryGlow(
-        this._selCohortIds ?? this._selGroupIds,
+        this._selCohortIds ?? this._selGroupIds ?? this._signerIds,
         this._selectedNodeId ?? this._hoverNodeId,
-      ) ??
-      this._signerIds;
+      );
     c.selectedNodeId = this._selectedNodeId;
     c.filter = this.filter;
     ctx.dim = this.dim;
