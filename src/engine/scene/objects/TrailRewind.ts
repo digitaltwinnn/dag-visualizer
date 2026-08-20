@@ -10,10 +10,24 @@
 //   · rows newer than the held row slide past the front edge and dissolve (`fadeAtX`, one slot
 //     of travel).
 //
+// The two compose, and that is the whole of a filtered follow's tick handoff: the advance fires
+// the JUMP (same ordinal, one slot back, so the held row does not move), and the store's follow
+// then names the fresh ordinal at slot 0, so the target drops to 0 and the trail EASES back one
+// slot in a single direction. A row arrives in ONE movement or the offset is fighting itself.
+//
 // The owner (LedgerView) applies `offset` to its groups/instances and multiplies brightnesses
 // by `fadeAtX`; this class owns only the scalar state. Allocation-free per frame.
-import { LEAD_X } from "../../domain/ledgerLayout";
-import { SLOT_SP } from "../../domain/ledgerModel";
+//
+// This offset is the trail's ONE source of motion. It used to have a rival: a `holding` flag told
+// the lane tiles to snap to their slot while a pin held the front and to ease their own stored x
+// otherwise — but every other row-riding instrument (the byte bar, the ribbons, both label
+// columns) reads `LEAD_X - slot * SLOT_SP` directly, so the ease was one instrument drifting off
+// its own row rather than a motion the chamber had. It showed worst exactly where the flag
+// dropped: a filtered follow's fresh anchor moves the held ordinal to slot 0, so `holding` went
+// false in the same event that shifted every slot, and the tiles glided in a full slot late while
+// their bars were already correct. Retired 2026-08-18 — tile x is derived, and the trail moves
+// here or not at all.
+import { SLOT_SP, frontAt } from "../../domain/ledgerModel";
 
 export class TrailRewind {
   private _off = 0;
@@ -26,12 +40,6 @@ export class TrailRewind {
     return this._off;
   }
 
-  /** True while a rewind target holds the front — tile x must snap to its slot exactly (the
-   *  generic per-tick ease would fight the jumped offset; the trail must read FROZEN). */
-  get holding(): boolean {
-    return this._pinnedOrd != null && this._slotPrev > 0;
-  }
-
   /** The COMMITTED (clicked) or FOLLOWED snapshot — the only thing the rewind tracks. */
   setPinned(ordinal: number | null): void {
     this._pinnedOrd = ordinal;
@@ -42,7 +50,13 @@ export class TrailRewind {
   update(dt: number, slotOf: (ordinal: number) => number): void {
     const slot = this._pinnedOrd != null ? slotOf(this._pinnedOrd) : -1;
     const target = slot > 0 ? slot * SLOT_SP : 0;
-    if (slot > 0 && this._slotPrev > 0 && slot !== this._slotPrev && this._pinnedOrd === this._ordPrev) {
+    // `>= 0` is "was the held row VISIBLE", and slot 0 — the LEAD — is visible. Written `> 0` it
+    // excluded the one state a live follow actually sits in, which is what made the followed row
+    // arrive in three movements instead of one (user, 2026-08-18: "active snapshot moves to the
+    // back, then a bit to the front now and then arrives at its trail row"): the tick advance drew
+    // it a full slot back, the missing jump let the offset ease up after it, and the store's follow
+    // then landed on the new ordinal and unwound that ease. Only −1 (not visible) may skip the jump.
+    if (slot > 0 && this._slotPrev >= 0 && slot !== this._slotPrev && this._pinnedOrd === this._ordPrev) {
       this._off += (slot - this._slotPrev) * SLOT_SP; // the calm jump — same ordinal, shifted slot
     }
     this._slotPrev = slot;
@@ -51,9 +65,10 @@ export class TrailRewind {
     if (Math.abs(target - this._off) < 0.002) this._off = target;
   }
 
-  /** 1 at/behind the lead position, dissolving within one slot of travel past the front edge. */
+  /** 1 at/behind the lead position, fully dissolved by the chamber's front rim. The math is
+   *  `frontAt` in domain/ledgerModel — the byte bar reads it too, and the two must agree about
+   *  where the chamber's front edge is. */
   fadeAtX(x: number): number {
-    const over = (x - LEAD_X) / (SLOT_SP * 0.9);
-    return over <= 0 ? 1 : Math.max(0, 1 - over);
+    return frontAt(x);
   }
 }

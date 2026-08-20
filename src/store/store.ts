@@ -192,6 +192,20 @@ interface AppState {
   // Shared by BOTH dock sheets so switching halves keeps the chosen height; reset to null the
   // moment the dock fully closes (`setPhoneDock(null)`) so reopening starts at the default.
   phoneSheetPx: number | null;
+  // How many px of the CANVAS each side is covered by an open rail sheet, left and right (0 =
+  // nothing covering that side). Below 1100px the rails stop sitting BESIDE the canvas and become
+  // sheets that OVERLAY it, while the canvas itself stays viewport-sized underneath — so anything
+  // the Engine places against the canvas rect is placing against a box the user can't fully see.
+  // The subject callout is the one consumer today: it measures its panel against the free band
+  // `[left + sceneCoverL, right - sceneCoverR]` and declines rather than render a fragment in a
+  // gap too narrow to hold it (`domain/calloutPlacement.ts`). Published by whoever OWNS the dock —
+  // RailDock stays store-free and reports its measured width through an `onCoverPx` prop, so this
+  // is written by ExploreRail and Inspector. TWO SCALARS ON PURPOSE, never one object: they are
+  // written independently and read per frame, so a shared object would churn its reference every
+  // time either side moved. Always 0 on desktop (rails are inline) and on phone (bottom sheets
+  // take height, not width — and the callout declines there outright anyway).
+  sceneCoverL: number;
+  sceneCoverR: number;
   // Per-slot rail-card collapse OVERRIDES (slot id → collapsed), written by a user's +/− toggle
   // or the rail-top minimize/expand-all controls. A slot with NO entry falls back to the rail's
   // AUTO default (Inspector: ladder ancestors of the focused rung rest collapsed) — so `null`
@@ -254,6 +268,8 @@ interface AppState {
   setSceneDragging: (dragging: boolean) => void;
   setCameraFlying: (flying: boolean) => void;
   setPhoneSheetPx: (px: number | null) => void;
+  /** Publish how many px of the canvas an open rail sheet covers on one side (0 when closed). */
+  setSceneCover: (side: "left" | "right", px: number) => void;
   setBoxedCard: (id: string | null) => void;
   setRailCollapse: (id: string, collapsed: boolean | null) => void;
   setRailCollapseMany: (entries: Record<string, boolean | null>) => void;
@@ -309,6 +325,8 @@ export const useStore = create<AppState>((set) => ({
   railCollapse: {},
   focusRung: null,
   phoneSheetPx: null,
+  sceneCoverL: 0,
+  sceneCoverR: 0,
   boxedCard: null,
 
   setLive: (live, lastGoodAt) => set((s) => ({ live, lastGoodAt: lastGoodAt ?? s.lastGoodAt })),
@@ -435,6 +453,18 @@ export const useStore = create<AppState>((set) => ({
       return { railCollapse };
     }),
   setPhoneSheetPx: (phoneSheetPx) => set({ phoneSheetPx }),
+  // Guarded so a re-measure reporting the same width is a no-op — this fires on every sheet
+  // open/close and the Engine reads it per frame.
+  setSceneCover: (side, px) =>
+    set((s) =>
+      side === "left"
+        ? s.sceneCoverL === px
+          ? s
+          : { sceneCoverL: px }
+        : s.sceneCoverR === px
+          ? s
+          : { sceneCoverR: px },
+    ),
   setBoxedCard: (boxedCard) => set({ boxedCard }),
   // A fresh object every call — the request is the EVENT, so re-opening the same rung must reach
   // the Engine's reference-compare bridge again.

@@ -45,8 +45,11 @@ export default function RailScroll() {
         // slack let the rail overlap the chart unfaded — user bug; the content-height measure
         // is DOM-change-driven, so borderline flicker isn't a concern the way it was for the
         // old rect-based measure). The shell no longer translates (the raw data layer surfaces
-        // in place — SectionShell), so the measured rect IS the viewport position.
-        const avail = window.innerHeight - reserve - r.top;
+        // in place — SectionShell), so the measured rect IS the viewport position. The
+        // `max(14, --footer-h)` term MIRRORS the rails' own max-height in globals.css — the two
+        // must describe the same bottom bound or the fade would toggle at a different line than
+        // the one the box actually stops at.
+        const avail = window.innerHeight - reserve - Math.max(14, px("--footer-h")) - r.top;
         el.classList.toggle("rail-clip", reserve > 0 && contentH > avail);
       };
       const scheduleClip = () => { if (!raf) raf = requestAnimationFrame(syncClip); };

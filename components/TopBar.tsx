@@ -129,12 +129,12 @@ export default function TopBar() {
           // `1fr auto 1fr` keeps the sides equal (centring the middle) and degrades gracefully:
           // a long ticker just shifts the switch instead of overlapping it. Tablet/desktop keep
           // the flex row unchanged (the zone wrappers are `display: contents` there).
-          "max-[699px]:gap-1.5 max-[699px]:p-2 max-[699px]:grid max-[699px]:grid-cols-[1fr_auto_1fr]",
+          "max-[700px]:gap-1.5 max-[700px]:p-2 max-[700px]:grid max-[700px]:grid-cols-[1fr_auto_1fr]",
         )}
       >
         {/* LEFT zone (phone grid): brand + filter. `contents` above 700px = invisible to the
             flex row, so tablet/desktop layout is byte-identical. */}
-        <div className="contents max-[699px]:flex max-[699px]:items-center max-[699px]:gap-1 max-[699px]:min-w-0">
+        <div className="contents max-[700px]:flex max-[700px]:items-center max-[700px]:gap-1 max-[700px]:min-w-0">
         {/* Brand — AND the one route to /about (user, 2026-08-09, replacing the always-on
             experimental banner). The identity mark is the honest affordance for "what is this
             thing?": clicking the app's own name to read what it is, who made it and that it's
@@ -190,7 +190,7 @@ export default function TopBar() {
             // 2026-08-15 — the button used to run UNDER the switch and read as unclickable):
             // trimmed paddings/gaps, and `min-w-0` + the label's truncate below so a long
             // ticker ellipsizes inside its own column instead of overlapping the neighbour.
-            "min-w-0 max-[699px]:px-1 max-[699px]:py-1.5 max-[699px]:gap-[4px]",
+            "min-w-0 max-[700px]:px-1 max-[700px]:py-1.5 max-[700px]:gap-[4px]",
           )}
         >
           {/* The "FILTER" text label on wide bars; on the condensed breakpoints (≤940px) it
@@ -222,7 +222,7 @@ export default function TopBar() {
             aria-hidden
             className={cn(
               "size-3.5 flex-none text-muted-foreground transition-transform motion-reduce:transition-none",
-              "max-[699px]:hidden",
+              "max-[700px]:hidden",
               open && "rotate-180",
             )}
           />
@@ -230,7 +230,7 @@ export default function TopBar() {
         </div>
 
         {/* Flex spacers (tablet/desktop only) — the phone grid's 1fr columns own the spacing. */}
-        <div className="flex-1 max-[699px]:hidden" />
+        <div className="flex-1 max-[700px]:hidden" />
 
         {/* View switch — structural. On phone there's no room for the three non-functional
             "soon" placeholders (Network/Transactions/Staking) — they're dimmed dead weight
@@ -240,7 +240,7 @@ export default function TopBar() {
           type="single"
           value={mode}
           onValueChange={(v) => { if (v) setMode(v as Mode); }}
-          className="flex gap-0.5 max-[699px]:gap-0"
+          className="flex gap-0.5 max-[700px]:gap-0"
         >
           {(bp === "phone" ? VIEWS.filter((v) => !("soon" in v && v.soon)) : VIEWS).map((v) => {
             const Icon = VIEW_ICONS[v.id as Mode];
@@ -264,9 +264,9 @@ export default function TopBar() {
                 "pointer-coarse:min-h-11 pointer-coarse:min-w-11 max-[1299px]:justify-center",
                 "max-[1120px]:px-2 max-[1120px]:py-1.5 max-[1120px]:text-label",
                 // Phone keeps the ≥44px touch WIDTH (the min-w-11 above still applies — the old
-                // `max-[699px]:min-w-0` override made the icon-only radios too narrow to press);
+                // `max-[700px]:min-w-0` override made the icon-only radios too narrow to press);
                 // only the padding condenses. Room is fine: phone shows just the 3 working views.
-                "max-[699px]:p-1.5",
+                "max-[700px]:p-1.5",
                 // The three "soon" placeholders also stand down on a NARROW TABLET (700–819px):
                 // measured, the six-icon switch needs 771px and the bar is clipped below that, so
                 // the first thing sacrificed is the dead weight — same argument the phone makes,
@@ -282,11 +282,11 @@ export default function TopBar() {
           })}
         </ToggleGroup>
 
-        <div className="flex-1 max-[699px]:hidden" />
+        <div className="flex-1 max-[700px]:hidden" />
 
         {/* RIGHT zone (phone grid): vitals. Mirrors the left zone (`contents` above 700px);
             `justify-self-end` pins it to the bar's right edge in the grid. */}
-        <div className="contents max-[699px]:flex max-[699px]:items-center max-[699px]:gap-1.5 max-[699px]:justify-self-end">
+        <div className="contents max-[700px]:flex max-[700px]:items-center max-[700px]:gap-1.5 max-[700px]:justify-self-end">
         <span className="w-px self-stretch bg-border my-1 max-[820px]:hidden" />
 
         {/* Vitals — inline on tablet/desktop. On phone they render nothing here: the vitals

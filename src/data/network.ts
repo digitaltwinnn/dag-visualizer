@@ -64,9 +64,11 @@ export function getAnchor(ts: string): Anchor | null {
 }
 
 // How long after a tick's identified count last grew we treat it as "settled". Until then its
-// breakdown is still filling in (metagraphs anchor over a few seconds + our poll catches up), so
-// the UI says "still gathering" rather than committing to a floor/unlisted number. Shared by the
-// snapshot card's anchor pills and its fee note so they agree. See CLAUDE.md → "The tick lifecycle".
+// breakdown is still filling in (metagraphs anchor over a few seconds + our poll catches up), so a
+// surface reading the POLLED per-id counts must not commit to a number yet. The snapshot card
+// sidesteps this entirely — it reads the exact snapshot and has no polled fallback — so the one
+// consumer is the subject callout's global lead, which reads the polled counts on purpose (to
+// agree with the LiveStrip). See CLAUDE.md → "The tick lifecycle".
 export const ANCHOR_SETTLE_MS = 7000;
 
 // True while the tick `ts` is still gathering anchors (count below the authoritative total AND it

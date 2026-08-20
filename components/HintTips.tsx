@@ -32,16 +32,19 @@ export default function HintTips() {
   const [hint, setHint] = useState<Hint | null>(null);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const anchor = useRef<Element | null>(null);
+  const viaPointer = useRef(false);
+  const pointer = useRef({ x: -1, y: -1 });
 
   useEffect(() => {
     const cancel = () => {
       if (timer.current) clearTimeout(timer.current);
       timer.current = null;
       anchor.current = null;
+      viaPointer.current = false;
       setHint(null);
     };
 
-    const arm = (el: Element) => {
+    const arm = (el: Element, pointerDriven: boolean) => {
       // One-way move: title → data-hint (kills the native bubble forever on this element).
       const t = el.getAttribute("title");
       if (t) {
@@ -54,6 +57,7 @@ export default function HintTips() {
       if (!text) return;
       if (timer.current) clearTimeout(timer.current);
       anchor.current = el;
+      viaPointer.current = pointerDriven;
       timer.current = setTimeout(() => {
         if (anchor.current !== el || !el.isConnected) return;
         const r = el.getBoundingClientRect();
@@ -69,7 +73,7 @@ export default function HintTips() {
       const el = (e.target as Element | null)?.closest?.("[title], [data-hint]");
       if (!el) return;
       if (anchor.current === el) return;
-      arm(el);
+      arm(el, e.type === "mouseover");
     };
     const out = (e: MouseEvent) => {
       const el = anchor.current;
@@ -80,17 +84,42 @@ export default function HintTips() {
     };
     const focusin = (e: Event) => over(e);
     const focusout = () => cancel();
+    const track = (e: PointerEvent) => {
+      pointer.current.x = e.clientX;
+      pointer.current.y = e.clientY;
+    };
+
+    // A hover can stop WITHOUT a `mouseout` (user, 2026-08-18 — "does not close automatically in
+    // edge cases when hover stops"). Two real ones here: the anchor UNMOUNTS under the cursor on a
+    // live re-render (an explorer row the poll replaced, a card the ladder collapsed), and the
+    // layout MOVES it out from under a STATIONARY cursor (the LiveStrip's bars shift on every
+    // tick — the same no-mouseleave trap its own hover clearing exists for). Neither one emits an
+    // event, so there is nothing to listen to; the armed anchor is re-verified on a slow beat
+    // instead. Pointer-armed hints only — a keyboard-focus hint is governed by `focusout`, and the
+    // pointer may legitimately be resting anywhere else while it shows.
+    const verify = setInterval(() => {
+      const el = anchor.current;
+      if (!el || !viaPointer.current) return;
+      if (!el.isConnected) return cancel();
+      const { x, y } = pointer.current;
+      if (x < 0) return;
+      const hit = document.elementFromPoint(x, y);
+      if (!hit || (hit !== el && !el.contains(hit))) cancel();
+    }, 250);
 
     document.addEventListener("mouseover", over, true);
     document.addEventListener("mouseout", out, true);
+    document.addEventListener("pointermove", track, true);
     document.addEventListener("focusin", focusin, true);
     document.addEventListener("focusout", focusout, true);
     document.addEventListener("pointerdown", cancel, true);
     document.addEventListener("scroll", cancel, true);
     window.addEventListener("blur", cancel);
     return () => {
+      clearInterval(verify);
       document.removeEventListener("mouseover", over, true);
       document.removeEventListener("mouseout", out, true);
+      document.removeEventListener("pointermove", track, true);
       document.removeEventListener("focusin", focusin, true);
       document.removeEventListener("focusout", focusout, true);
       document.removeEventListener("pointerdown", cancel, true);

@@ -46,11 +46,19 @@ export default function AnchoredTags({
       return n;
     });
 
-  const total = anchored ?? exact?.anchored ?? 0;
+  // Rule 10: an ABSENT count is not zero. `anchored` is null whenever the polled feed carries no
+  // `metagraphSnapshotCount` for this tick, and the exact read may not have landed yet — so the
+  // count is a HELD SLOT (stars, reserving its width so the sentence doesn't reflow when the
+  // number lands) and states nothing at all once the read has provably failed. A bold
+  // "0 snapshots anchored" sitting above a block that was still resolving was exactly the
+  // fabricated number the rule exists to prevent.
+  const total = anchored ?? exact?.anchored ?? null;
   const channels = exact?.channels ?? null;
   // A FAILED exact read (RawSnapshotBridge records it) is this block's give-up signal: the
   // twinkling stars promise a breakdown that is no longer coming, so they terminate on an honest
-  // word. The header's total stays — it is the polled count, a different (and still live) source.
+  // word. The header's total stays WHEN THE POLLED FEED CARRIES ONE — that is a different (and
+  // still live) source. With no polled count either, the sentence has no subject and the failure
+  // word stands alone; stars there would promise an arrival that already gave up.
   const missed = useStore((s) => s.exactMiss[ordinal] != null) && !exact;
 
   // Hold the ACQUIRING "resolving" row for one calm cycle even if the exact read lands sooner,
@@ -60,10 +68,17 @@ export default function AnchoredTags({
   const resolveHold = useMinHold(!exact && !missed);
   const acquiring = !exact || resolveHold.show;
 
-  // Header (always, even while acquiring): "N snapshots anchored from M metagraphs".
-  const header = (
+  // Header (whenever a count exists or is coming): "N snapshots anchored from M metagraphs".
+  const countLost = total == null && missed && !resolveHold.show;
+  const header = countLost ? null : (
     <div className="flex items-baseline gap-2 flex-wrap mb-1.5">
-      <span className="text-body text-foreground"><b className="font-bold">{total}</b> snapshot{total === 1 ? "" : "s"} anchored</span>
+      <span className="text-body text-foreground">
+        {total != null ? (
+          <><b className="font-bold">{total}</b> snapshot{total === 1 ? "" : "s"} anchored</>
+        ) : (
+          <><NodeStars count={3} /> snapshots anchored</>
+        )}
+      </span>
       {channels != null && !acquiring && <span className="text-label text-muted-foreground">from {channels} metagraph{channels === 1 ? "" : "s"}</span>}
     </div>
   );
@@ -108,7 +123,8 @@ export default function AnchoredTags({
     rows.push({ id: UNLISTED_ID, label: UNLISTED_ID, hue: null, n: exact.unlistedCount, fee: exact.unlistedFee, bytes: unlistedBytes });
   }
 
-  const pct = (n: number) => (total > 0 ? (n / total) * 100 : 0);
+  const denom = total ?? exact.anchored;
+  const pct = (n: number) => (denom > 0 ? (n / denom) * 100 : 0);
   const pctStr = (n: number) => `${pct(n).toFixed(pct(n) < 10 ? 1 : 0)}%`;
   const bar = (n: number, hue: string | null) => (
     <span className="block flex-1 h-1.5 rounded-xs bg-white/[0.06] overflow-hidden">

@@ -104,6 +104,7 @@ function SnapRow<K extends string | number>({
   sub,
   mark,
   outset,
+  nested,
   disclose,
 }: {
   label: string;
@@ -127,6 +128,17 @@ function SnapRow<K extends string | number>({
    *  takes the right-edge contract's outset instead of a plain `w-full` — ExploreRows' ROW_OUTSET
    *  and ROW_NEST are the only two places allowed to own it. */
   outset?: boolean;
+  /** A row BELOW the top level (a metagraph snapshot under its network under its tick): takes the
+   *  quieter leaf register `NodePickerRow` already wears at the bottom of both explorers — one step
+   *  down the type scale, dimmed rather than full foreground. Depth used to read as INDENT ALONE
+   *  (user, 2026-08-18: "three hierarchical rows with ticks and selection looks a bit messy"),
+   *  because both depths are this one component: a leaf's ordinal rendered at exactly the tick's
+   *  size, weight and colour, and metagraph ordinals are the LONGER numbers (27,338,081 against
+   *  6,777,339), so a leaf read louder than the row containing it.
+   *  Deliberately NOT folded into `outset`, which today is its exact complement: that flag owns the
+   *  right-edge contract (a layout invariant), this one owns the typographic register — two
+   *  questions that only happen to have the same answer at the two depths this tree has today. */
+  nested?: boolean;
   /** Disclosure affordance: this row also opens a child list, so it ends with the chevron (or the
    *  ✓ when it holds a selection while closed) instead of a bare reserved slot. */
   disclose?: { open: boolean; holdsSel?: boolean };
@@ -136,6 +148,12 @@ function SnapRow<K extends string | number>({
     <button
       type="button"
       title={title}
+      // The row's own text is a bare ordinal beside a bare figure, so the DEFAULT accessible name
+      // concatenates them into "6,777,33985 KB" — two numbers fused into a third that means
+      // nothing. The `title` is already the readable sentence; the metric joins it because it is
+      // real per-row information the sentence doesn't carry (and "—" is the honest no-exact-read
+      // dash, which reads as nothing at all out loud).
+      aria-label={metric === "—" ? title : `${title} · ${metric}`}
       onClick={onClick}
       aria-expanded={disclose ? disclose.open : undefined}
       onMouseEnter={pair.onMouseEnter}
@@ -165,7 +183,8 @@ function SnapRow<K extends string | number>({
           reads as one). Without a sub the label takes the flex, as every other row does. */}
       <span
         className={cn(
-          "text-body tabular-nums text-foreground whitespace-nowrap overflow-hidden text-ellipsis",
+          "tabular-nums whitespace-nowrap overflow-hidden text-ellipsis",
+          nested ? "text-label text-foreground-dim" : "text-body text-foreground",
           sub ? "flex-none" : "flex-1 min-w-0",
         )}
       >
@@ -181,7 +200,11 @@ function SnapRow<K extends string | number>({
           {mark.count}
         </span>
       )}
-      <span className="flex-none tabular-nums text-label font-semibold text-muted-foreground">{metric}</span>
+      {/* The metric drops its bold weight on a nested row: with the label one step smaller, a
+          semibold figure beside it would make the BYTES the loudest thing on a leaf. */}
+      <span className={cn("flex-none tabular-nums text-label text-muted-foreground", !nested && "font-semibold")}>
+        {metric}
+      </span>
       {/* The trailing slot is ALWAYS reserved (the GeoExplore idiom) so the metric column never
           shifts when a row gains the selection mark (user, 2026-08-07). A disclosing row spends
           that same slot on its chevron — one column, one width, every depth. */}
@@ -567,8 +590,13 @@ export default function LedgerPanel() {
                         setOpenTick(isOpen ? null : d.ordinal);
                       }}
                     />
+                    {/* ONE RUNG WIDTH for the whole tree: 15px of indent per level, the same
+                        `ml-[7px] pl-2` the level-2+ container below uses. This one used to be
+                        `ml-[9px] pl-3` (21px), so the two steps measured 28px then 16px and the
+                        depths read as unrelated insets rather than one ladder. Only the LEFT
+                        indent changes — ROW_NEST's `-mr-1.5` is the right-edge contract. */}
                     {isOpen && (
-                      <div className={cn("mb-1.5 ml-[9px] py-0.5 pl-3", ROW_NEST)}>
+                      <div className={cn("mb-1.5 ml-[7px] py-0.5 pl-2", ROW_NEST)}>
                         {/* Depth caption (user, 2026-08-16): the child grouping's one new concept —
                             these rows are the tick's anchors split BY NETWORK. */}
                         {(tickGroups.length > 0 || tickUnlisted > 0) && (
@@ -642,7 +670,12 @@ export default function LedgerPanel() {
                                   <span className="flex-1 min-w-0 text-body whitespace-nowrap overflow-hidden text-ellipsis">
                                     {g.name}
                                   </span>
-                                  <span className="flex-none tabular-nums text-label font-semibold text-muted-foreground">
+                                  {/* Labelled, or the row's accessible name fuses the network into
+                                      its count — "Dor Technologies17". */}
+                                  <span
+                                    className="flex-none tabular-nums text-label font-semibold text-muted-foreground"
+                                    aria-label={`${g.rows.length} snapshot${g.rows.length === 1 ? "" : "s"}`}
+                                  >
                                     {g.rows.length}
                                   </span>
                                 </DisclosureRow>
@@ -664,6 +697,7 @@ export default function LedgerPanel() {
                                       return (
                                         <div key={r.ordinal}>
                                           <SnapRow
+                                            nested
                                             label={r.ordinal.toLocaleString()}
                                             metric={fmtKB(r.sizeInKB)}
                                             selected={sameMetaSnap(metaSnap, sel)}
@@ -736,7 +770,10 @@ export default function LedgerPanel() {
                               <span className="flex-1 min-w-0 text-body italic whitespace-nowrap overflow-hidden text-ellipsis">
                                 unlisted
                               </span>
-                              <span className="flex-none tabular-nums text-label font-semibold text-muted-foreground">
+                              <span
+                                className="flex-none tabular-nums text-label font-semibold text-muted-foreground"
+                                aria-label={`${tickUnlisted} snapshot${tickUnlisted === 1 ? "" : "s"}`}
+                              >
                                 {tickUnlisted}
                               </span>
                             </DisclosureRow>
@@ -756,6 +793,7 @@ export default function LedgerPanel() {
                                   return (
                                     <div key={`${r.metaId}:${i}`}>
                                       <SnapRow
+                                        nested
                                         label={r.ordinal > 0 ? r.ordinal.toLocaleString() : `${r.metaId.slice(0, 10)}…`}
                                         // Each unlisted row's ordinal belongs to ITS OWN channel's
                                         // sequence — one tick can carry several chains, so the short

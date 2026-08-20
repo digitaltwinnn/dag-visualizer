@@ -5,7 +5,7 @@
 //
 // js/ledger.js entangles STATE (which slot a block sits in, its fade/size/position) with MESHES
 // (the block IS a THREE.Mesh; the trail entry holds `{ mesh, slot, ordinal }`). This module keeps
-// only the state fields a mesh would otherwise carry — `x`/`fade`/`size`/`filled`/`ox`/`oz`/`link`
+// only the state fields a mesh would otherwise carry — `fade`/`size`/`filled`/`ox`/`oz`/`link`
 // — and drops the mesh reference entirely; Task 13 pairs model rows to meshes by array index
 // (lane.blocks[i] <-> instance i) / by ordinal (trail entries <-> trail meshes), the same way the
 // scene layer already pairs LedgerModel-shaped data to InstancedMesh slots elsewhere in this
@@ -26,7 +26,7 @@
 // behaviour must match js/ledger.js exactly since Task 13 will diff against it).
 
 import { METAGRAPHS } from "../config";
-import { ledgerSite, lanePlaneHalf, LEAD_X } from "./ledgerLayout";
+import { ledgerSite, lanePlaneHalf, BAR_D, FLOOR_BACK_X, FLOOR_FRONT_X, LEAD_X } from "./ledgerLayout";
 import { UNLISTED_KEY } from "./ledgerBands";
 import type { GlobalSnapshot, Anchor } from "@/src/data/types";
 
@@ -64,7 +64,7 @@ export const slotFade = (slot: number): number => Math.min(1, Math.max(0, 1 - (s
 //
 // This is NOT the recency fade `slotFade` describes and the trail deliberately does not use (see
 // LedgerView's "No depth fade" note): it is a TERMINAL DISSOLVE at the trail's far boundary — the
-// exact mirror of `TrailRewind.fadeAtX`, which already dissolves rows sliding off the FRONT edge.
+// exact mirror of `frontAt` below, which dissolves rows sliding off the FRONT edge.
 // Recency is still position plus the ordinal labels: `HORIZON_X` is placed beyond the last visible
 // slot, so 8 of the 9 rows stay at full brightness and only the oldest has begun to go.
 //
@@ -78,6 +78,92 @@ export const HORIZON_SPAN = 2.2 * SLOT_SP;
  *  world while the trail slides through it. */
 export const horizonAt = (x: number): number =>
   Math.min(1, Math.max(0, (x - HORIZON_X) / HORIZON_SPAN));
+
+/** How far ahead of its own centre a row reaches: the byte bar is the deepest thing a row draws
+ *  in X, so half its depth is the row's ink radius. The lane tiles (BLOCK_SIZE) and the label
+ *  columns are shallower and ride inside it. */
+export const ROW_HALF_D = BAR_D / 2;
+
+/** THE RAMP IS DERIVED FROM THE RIM, NOT FROM A FRACTION OF A SLOT (2026-08-19). `frontAt` used
+ *  to dissolve over `SLOT_SP * 0.9`, a length chosen for how the fade LOOKED — which put its zero
+ *  at x 7.14 and the last ink of a fading row at 7.94, while the glass stops at 6.5. So a row
+ *  pushed forward by the rewind spent the tail of its dissolve hanging in mid-air past the front
+ *  rim, which is what the user saw as "something drawn/flash in front of the plane". The span is
+ *  now whatever reaches the rim exactly: FRONT_INK_X is the last X a row may put ink, so at
+ *  frontAt = 0 the row's leading face lands ON FLOOR_FRONT_X and never past it. Retune the rim or
+ *  the bar depth and the ramp follows; there is no second number to keep in step. */
+export const FRONT_INK_X = FLOOR_FRONT_X - ROW_HALF_D;
+
+/** The mirror at the far rim — what the horizon has to clear for the same reason. Derived, not
+ *  asserted: `ledgerModel.test.ts` sweeps both boundaries against these. */
+export const BACK_INK_X = FLOOR_BACK_X + ROW_HALF_D;
+
+/** The trail's OTHER boundary, and it lives here beside the horizon for the same reason that one
+ *  does: every instrument riding the trail has to agree about where the chamber ends, or one of
+ *  them floats past the edge on its own. 1 at or behind the lead position, fully dissolved by
+ *  the time the rewind has pushed the row's leading face to the glass's own front rim.
+ *
+ *  ⚠️ SEEDS ARE ROWS TOO (user, 2026-08-18 — filter on a metagraph and let it follow: "these
+ *  forming blocks are drawn in front, outside of the panel"). Under a filtered follow the rewind
+ *  holds the network's own newest anchored tick at the lead, so every global tick that anchored
+ *  nothing of that network sits AHEAD of the front edge — measured ones dissolved there, but the
+ *  byte bar's unmeasured SEED branch multiplied only the horizon and hung in the air off the glass.
+ *  The rows are not dropped and must not be: when the network anchors again the offset eases back
+ *  and they slide onto the panel, in their own place in time. POSITION IS TIME, so a row is shown
+ *  where its tick belongs and dissolves when that is off the chamber — never pinned to the glass to
+ *  keep it visible. */
+export const frontAt = (x: number): number => {
+  const over = (x - LEAD_X) / (FRONT_INK_X - LEAD_X);
+  return over <= 0 ? 1 : Math.max(0, 1 - over);
+};
+
+/** Is a row at group-X `x` still ON the chamber — inside BOTH boundaries, so any of it is drawn?
+ *
+ *  ⚠️ Three's raycaster ignores every visual state a mesh carries (measured 2026-08-18: with an
+ *  older tick pinned, the tick one slot NEWER than it — `frontAt` 0, nothing on screen — answered
+ *  22 of 47 hover samples over the empty air in front of the lead, and a click there would have
+ *  committed it). Opacity is not the only thing a boundary has to reach: a row the eye has been
+ *  told is gone must leave the pick set with it, or the chamber's front edge is honest in one
+ *  channel and lying in the other. The trail's instruments fade on the ramps; a PICK is binary, so
+ *  it asks the one question the ramps can't answer between them. */
+export const rowOnChamber = (x: number): boolean => horizonAt(x) > 0 && frontAt(x) > 0;
+
+// ── the LIVE EDGE (user, 2026-08-18: "what if we don't show an actual snapshot for [forming], but
+// instead a dim line in front of the snapshots with some relevant info about what's happening, to
+// indicate it's forming, live, filtered"). The third boundary, and the only one that is not a
+// dissolve — it is where the chamber meets NOW.
+//
+// The forming tick used to be drawn as the lead ROW: a seed lying in slot 0. That put a thing with
+// no measurement into the place the slot model reserves for a tick's real position in time, and
+// under a filtered follow the two claims collided — the rewind holds the network's own newest
+// anchored tick at the lead, so a global tick that anchored nothing of it belongs AHEAD of the
+// front edge and dissolved there, taking the one mark that said a read was in flight with it.
+//
+// A tick whose read has not landed is not a row yet, so it is stated as an INSTRUMENT STATE
+// instead: one dim line fixed in the chamber frame, ahead of the lead, spanning the whole lane
+// field. Lying flush and spanning everything it makes no width claim (ledgerBands.ts forbids
+// inferring a width from anchor count or fee) and it is not pickable — there is no snapshot there
+// to select. When the read lands the row RISES into its bands at the lead exactly as before, so
+// the arrival beat is untouched; and when the followed network anchors again, the rewind eases the
+// intervening ticks onto the panel on their own.
+//
+// FIXED IN THE FRAME, so it must not be parented to anything the rewind offsets — it marks now,
+// and now does not slide with the trail.
+export const LIVE_X = LEAD_X + 1.2;
+
+/** What the live edge is saying — carried by the line's own behaviour, since it wears no label
+ *  (the rationale for that is in `scene/objects/LiveEdge.ts`). `forming` — a tick has arrived and
+ *  its exact read is in flight, so the line BREATHES on the calm beat. `standby` — nothing is in
+ *  flight (the newest tick is measured, or its read gave up and states that as its own still row),
+ *  so the line RESTS: quiet standby, never a promise of an arrival that isn't coming. `off` — no
+ *  feed at all, so the edge itself is a claim the chamber can't make. */
+export type LiveEdgePhase = "off" | "forming" | "standby";
+
+/** The one resolver. `formingOrd` is the newest tick's ordinal while its read is genuinely in
+ *  flight, null otherwise — the same predicate that mutes the lead row's seed, so the line and the
+ *  slot can never both claim the tick. */
+export const liveEdgePhase = (running: boolean, formingOrd: number | null): LiveEdgePhase =>
+  !running ? "off" : formingOrd == null ? "standby" : "forming";
 
 // A tick keeps collecting metagraph snapshots for seconds after it appears (the anchor index's
 // `touched` grows). The lead row says so rather than pretending it is final — the same ~7s window
@@ -115,13 +201,19 @@ export function anchorTiles(count: number): TileSpec[] {
 
 // js/ledger.js:127 (`_metaLanes` block shape, minus the mesh) — one lane block's state.
 export interface LaneBlock {
-  x: number;
+  /** The block's place in TIME, and the ONLY thing its x is ever derived from. There is no stored
+   *  `x` beside it (dropped 2026-08-18): every other row-riding instrument — the byte bar, the
+   *  ribbons, the ordinal and size labels — reads `LEAD_X - slot * SLOT_SP` directly, so a second
+   *  home for the same fact could only ever be a way for one instrument to fall behind its own
+   *  row. It did: the tiles eased their stored x while the bar snapped, so a tick advance tore
+   *  each row apart by a full slot for a third of a second. All trail motion is the ONE rewind
+   *  offset. */
   slot: number;
   fade: number;
   /** Eased emphasis BRIGHTNESS — see LedgerView's tile loop. Per-block, not per instance index:
    *  a tick pushes a block and drops the oldest, so an index-keyed buffer hands one block's eased
-   *  state to its neighbour every tick. Lives here beside `x` and `fade`, the block's other two
-   *  eased fields, and is preserved across a slot-0 rebuild for the same reason they are. */
+   *  state to its neighbour every tick. Lives here beside `fade`, the block's other eased field,
+   *  and is preserved across a slot-0 rebuild for the same reason it is. */
   bright: number;
   size: number;
   filled: boolean;
@@ -176,24 +268,23 @@ export class LedgerModel {
 
   // js/ledger.js:235-249 (`_anchorMetaBlock`) verbatim, minus the mesh/link-draw side effects.
   // A metagraph anchored into the LIVE tick -> (re)build its slot-0 cluster: one tile per anchored
-  // snapshot, preserving the current slot-0 x/fade (so the caller's easing continues smoothly).
+  // snapshot, preserving the current slot-0 fade/brightness (so the caller's easing continues).
   // `ts` is the live tick's timestamp (the caller's `this.tickTs`), threaded onto every tile so a
   // slot-0 block can name the snapshot it belongs to without a lookup.
   private anchorMetaBlock(id: string, count: number, ts: string): void {
     const i = LANE_IDS.indexOf(id);
     if (i < 0) return; // not a lane (an unlisted ADDRESS — those aggregate into the unknown lane)
     const lane = this.lane(id, i);
-    let bx = 0, bfade = 0, bbright = 0;
+    let bfade = 0, bbright = 0;
     for (let j = lane.blocks.length - 1; j >= 0; j--) {
       if (lane.blocks[j].slot === 0) {
-        bx = lane.blocks[j].x;
         bfade = lane.blocks[j].fade;
         bbright = lane.blocks[j].bright;
         lane.blocks.splice(j, 1);
       }
     }
     for (const tl of anchorTiles(count)) {
-      lane.blocks.unshift({ x: bx, slot: 0, fade: bfade, bright: bbright, ox: tl.ox, oz: tl.oz, size: tl.size, filled: true, link: tl.link, ts, count });
+      lane.blocks.unshift({ slot: 0, fade: bfade, bright: bbright, ox: tl.ox, oz: tl.oz, size: tl.size, filled: true, link: tl.link, ts, count });
     }
   }
 
@@ -214,10 +305,10 @@ export class LedgerModel {
         const lane = this.lane(id, i);
         if (nc > 0) {
           for (const tl of anchorTiles(nc)) {
-            lane.blocks.push({ x: LEAD_X - s * SLOT_SP, slot: s, fade: slotFade(s), bright: 0, ox: tl.ox, oz: tl.oz, size: tl.size, filled: true, link: tl.link, ts: snap.timestamp, count: nc });
+            lane.blocks.push({ slot: s, fade: slotFade(s), bright: 0, ox: tl.ox, oz: tl.oz, size: tl.size, filled: true, link: tl.link, ts: snap.timestamp, count: nc });
           }
         } else {
-          lane.blocks.push({ x: LEAD_X - s * SLOT_SP, slot: s, fade: slotFade(s), bright: 0, ox: 0, oz: 0, size: 0.24, filled: false, link: false, ts: snap.timestamp, count: 0 });
+          lane.blocks.push({ slot: s, fade: slotFade(s), bright: 0, ox: 0, oz: 0, size: 0.24, filled: false, link: false, ts: snap.timestamp, count: 0 });
         }
       }
     }
@@ -267,7 +358,7 @@ export class LedgerModel {
       // The new LIVE tick starts with an empty placeholder at slot 0 for EVERY metagraph (shown on
       // the latest too); anchorMetaBlock upgrades it to a real, sized block if the metagraph anchors.
       for (let i = 0; i < LANE_IDS.length; i++) {
-        this.lane(LANE_IDS[i], i).blocks.unshift({ x: 0, slot: 0, fade: 0, bright: 0, ox: 0, oz: 0, size: 0.24, filled: false, link: false, ts: this.tickTs, count: 0 });
+        this.lane(LANE_IDS[i], i).blocks.unshift({ slot: 0, fade: 0, bright: 0, ox: 0, oz: 0, size: 0.24, filled: false, link: false, ts: this.tickTs, count: 0 });
       }
     }
 

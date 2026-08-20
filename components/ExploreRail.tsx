@@ -29,6 +29,7 @@ export default function ExploreRail() {
   const setPhoneDock = useStore((s) => s.setPhoneDock);
   const phoneSheetPx = useStore((s) => s.phoneSheetPx);
   const setPhoneSheetPx = useStore((s) => s.setPhoneSheetPx);
+  const setSceneCover = useStore((s) => s.setSceneCover);
   // Theme every card's bullet to the current selection (the explore card is always
   // specific to the active filter).
   const accent = { ["--filter-accent"]: filterAccent(filter) } as CSSProperties;
@@ -83,7 +84,16 @@ export default function ExploreRail() {
     return (
       // `signalKey` = the same subject RailThread pulses on (desktop-only) — RailDock replays the
       // view/filter-switch pulse on the sheet edge / tab edge so tablet keeps the signal.
-      <RailDock side="left" label="Explore" style={accent} signals={tray} signalKey={`${mode}|${filter}`}>
+      <RailDock
+        side="left"
+        label="Explore"
+        style={accent}
+        signals={tray}
+        signalKey={`${mode}|${filter}`}
+        // This sheet OVERLAYS the canvas rather than sitting beside it, so the Engine has to
+        // know what it can't see — see `store.sceneCoverL`.
+        onCoverPx={(px) => setSceneCover("left", px)}
+      >
         {content}
       </RailDock>
     );
