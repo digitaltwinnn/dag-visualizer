@@ -331,9 +331,16 @@ export class Engine {
     setColors(c: SceneColors): void;
     setSceneColors(m: Record<string, number>): void;
   }[] = [];
-  // Per-view bloom strength multiplier (spec §5): the day look runs bloom near-off, because on
-  // paper an additive halo is haze rather than light. STRENGTH only — radius and threshold are
-  // the pass's shape, not its level, and themeing them would change what blooms, not how much.
+  // Per-view bloom level, themed (spec §5). ON PAPER THE PASS IS OFF, and the reason is the
+  // HIGHPASS: bloom keeps what is brighter than `threshold` (0.13, low so every identity hue
+  // clears it), blurs it and adds it back. A ~0.94-L page clears that by itself, so on light the
+  // pass returns a blurred copy of the PAGE and adds it over everything — equal RGB everywhere,
+  // which lifts every dark mark toward white and crushes its saturation. That veil, not any
+  // material value, is what made the day look read as washed-out pastel (measured 2026-08-21:
+  // turning it off dropped the scene's dark marks from 140 to 65 luminance and multiplied its
+  // strongly-coloured pixels 17×). Raising the threshold is not the alternative: nothing on
+  // paper is brighter than the page, so a page-clearing threshold means nothing blooms anyway.
+  // Ink does not glow — the day look wants the pass skipped, not quiet.
   private _bloomMul = 1;
 
   constructor(canvas: HTMLCanvasElement, onReady?: () => void, onSceneReady?: () => void) {
@@ -353,7 +360,7 @@ export class Engine {
       parseThemePref(safeRead(THEME_KEY)),
       typeof window !== "undefined" && window.matchMedia("(prefers-color-scheme: dark)").matches,
     );
-    this._bloomMul = this._theme === "light" ? 0.15 : 1;
+    this._bloomMul = this._theme === "light" ? 0 : 1; // paper: no pass (see the field)
     if (process.env.NODE_ENV === "development" && this._theme === "dark") {
       // Tolerant compare (±2 per channel): oklch→sRGB resolution rounds, so only a genuine token
       // change (a different colour) should warn — not a 1-bit rounding wobble.
@@ -738,7 +745,7 @@ export class Engine {
     setNodeDimTarget(this._colors);
     this._pushSceneColors();
     for (const m of this._colorConsumers) m.setColors(this._colors);
-    this._bloomMul = theme === "light" ? 0.15 : 1;
+    this._bloomMul = theme === "light" ? 0 : 1;
   }
 
   private async refreshMeta(initial: boolean) {
@@ -1655,6 +1662,10 @@ export class Engine {
     this.ctx.bloom.strength = pb.strength * this._bloomMul;
     this.ctx.bloom.radius = pb.radius;
     this.ctx.bloom.threshold = pb.threshold;
+    // Paper skips the pass outright rather than running it at zero strength — the composer's own
+    // `enabled` flag, the same lever the DoF pass sits behind (SceneContext). A plain boolean
+    // write, so the frame body still allocates nothing.
+    this.ctx.bloom.enabled = this._bloomMul > 0;
 
     // ---- view-transition choreography ------------------------------------------------------
     // Advance the machine; tick() returns TRUE exactly once, at the OUT→IN boundary. The nodes
