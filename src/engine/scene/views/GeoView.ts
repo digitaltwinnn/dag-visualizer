@@ -15,6 +15,10 @@ import { ringsToSegments, type Ring } from "../../domain/countryShape";
 interface GeoFadeEntry {
   mat: THREE.Material & { opacity: number };
   base: number;
+  /** Resting presence on PAPER, for the one piece whose presence MODEL differs by ground rather
+   *  than only in strength: the land fill, whose map is a luminance encoding to add on dark and an
+   *  ALPHA MASK on paper (see buildLand). Everything else translates by `inkPresence`. */
+  paperBase?: number;
 }
 
 // The exact handles buildGeoView reads and writes on the host (the Globe instance,
@@ -58,6 +62,10 @@ export interface GeoViewHost {
     uOpacity: { value: number };
   };
   landFillMat?: THREE.MeshBasicMaterial;
+  /** GROUND for the land-fill shader (1 = paper). The land map means two different things on the
+   *  two grounds — light to add, or a mask to cut alpha with — so the branch is a uniform, flipped
+   *  by `retintGeoView` like every other theme capture. */
+  landPaperUniform?: { value: number };
   landFillMesh?: THREE.Mesh;
   // Shared FACING uniform (camera direction in the globe's local frame — Globe copies _camN in
   // each frame): the graticule + coastal walls dim their far-hemisphere fragments through it,
@@ -120,6 +128,7 @@ export function retintGeoView(globe: GeoViewHost): void {
   for (const c of globe.geoTints) c.setHex(globe.geoColor);
   // The blend mode themes too (GeoViewHost.geoPaper): additive ink is invisible on paper.
   const bl = geoBlend(globe);
+  if (globe.landPaperUniform) globe.landPaperUniform.value = globe.geoPaper ? 1 : 0;
   for (const m of globe.geoBlends) {
     m.blending = bl;
     m.needsUpdate = true;
@@ -447,6 +456,9 @@ async function buildLand(globe: GeoViewHost) {
     // opaque sphere depth-occludes the far-side walls (depthWrite stays off here).
     const wallGeo = new THREE.BufferGeometry();
     wallGeo.setAttribute("position", new THREE.Float32BufferAttribute(wallPos, 3));
+    // GROUND, created here rather than at the fill below because BOTH shaders need it and the wall
+    // is built first — one object, captured by both, flipped by `retintGeoView`.
+    globe.landPaperUniform = { value: globe.geoPaper ? 1 : 0 };
     globe.landWallUniforms = {
       uColor: { value: globe._edgeColor.clone() },
       uBase: { value: wallBase },
@@ -459,6 +471,7 @@ async function buildLand(globe: GeoViewHost) {
       ...globe.landWallUniforms,
       uCamN: globe.facingUniform ?? { value: new THREE.Vector3(0, 0, 1) },
       uClose: globe.closeUniform ?? { value: 0 },
+      uPaper: globe.landPaperUniform,
     };
     const wallMat = new THREE.ShaderMaterial({
       uniforms: wallUniforms,
@@ -471,7 +484,7 @@ async function buildLand(globe: GeoViewHost) {
         }`,
       fragmentShader: `
         uniform vec3 uColor; uniform float uBase; uniform float uTop; uniform float uOpacity;
-        uniform vec3 uCamN; uniform float uClose;
+        uniform vec3 uCamN; uniform float uClose; uniform float uPaper;
         varying float vH; varying vec3 vDir;
         void main() {
           float t = clamp((vH - uBase) / (uTop - uBase), 0.0, 1.0);
@@ -489,7 +502,17 @@ async function buildLand(globe: GeoViewHost) {
           // presence) but clearly BEHIND — and near-invisible at close range (uClose), where
           // seeing through the globe distracted (user). See GeoViewHost.facingUniform/closeUniform.
           float facing = mix(mix(0.35, 0.04, uClose), 1.0, smoothstep(-0.35, 0.15, dot(vDir, uCamN)));
-          gl_FragColor = vec4(uColor * (body + edge), min(1.0, e * mix(0.72, 0.6, uClose)) * uOpacity * facing);
+          vec3 rgb = uColor * (body + edge);
+          float a = min(1.0, e * mix(0.72, 0.6, uClose)) * uOpacity * facing;
+          // ON PAPER THE RIDGE RAMP IS PRESENCE, SO IT RIDES ALPHA, NOT THE COLOUR. body + edge
+          // is how much light this fragment ADDS on black — scaling the tint by it is the additive
+          // idiom. Normal-blended on a page the same product paints a DARKENED teal, so the dimmest
+          // part of every cliff is the blackest ink on the globe, and where the sphere turns away
+          // dozens of walls stack per pixel into the ragged black comb the limb showed. The tint
+          // therefore stays the full ink colour and the ramp moves to alpha, ×2 because an alpha of
+          // 0.02 is nothing at all: the top rim resolves as a crisp coastline and the body fades to
+          // near-nothing, which is what the ridge was always saying — said the other way round.
+          gl_FragColor = vec4(mix(rgb, uColor, uPaper), mix(a, min(1.0, a * (body + edge) * 2.0), uPaper));
         }`,
       // Single-sided so only cliffs whose face points toward the camera draw: a
       // continent's near + side edges show, its far edge (behind the filled plateau)
@@ -531,22 +554,59 @@ async function buildLand(globe: GeoViewHost) {
     landMat.onBeforeCompile = (sh) => {
       sh.uniforms.uCountryMask = globe.countryMaskUniforms!.uCountryMask;
       sh.uniforms.uMaskBoost = globe.countryMaskUniforms!.uMaskBoost;
+      sh.uniforms.uPaper = globe.landPaperUniform!;
       sh.fragmentShader = sh.fragmentShader
-        .replace("#include <common>", "#include <common>\nuniform sampler2D uCountryMask;\nuniform float uMaskBoost;")
+        .replace(
+          "#include <common>",
+          "#include <common>\nuniform sampler2D uCountryMask;\nuniform float uMaskBoost;\nuniform float uPaper;",
+        )
         .replace(
           "#include <map_fragment>",
           // THRESHOLDED sample: linear filtering smears the rasterized mask across many
           // screen pixels at node-level zoom (the fill faded toward the border, user
           // 2026-07-12) — the tight smoothstep snaps the boost to a crisp in/out boundary
           // with sub-texel antialiasing, so the fill reads as a proper fill to the edge.
-          "#include <map_fragment>\n\tdiffuseColor.rgb *= mix(1.0, uMaskBoost, smoothstep(0.4, 0.6, texture2D(uCountryMask, vMapUv).r));",
+          "#include <map_fragment>\n" +
+            "\tfloat mgBoost = mix(1.0, uMaskBoost, smoothstep(0.4, 0.6, texture2D(uCountryMask, vMapUv).r));\n" +
+            "\tdiffuseColor.rgb *= mgBoost;\n" +
+            // ON PAPER THE MAP IS A MASK, NOT A LUMINANCE. The land texture is flattened onto an
+            // OPAQUE BLACK canvas (makeLandTexture), so the ocean is RGB 0 — which adds nothing on
+            // a dark ground and therefore simply is not there. Normal-blended on paper that same
+            // black is INK, and the material paints the whole ocean hemisphere: measured, a 0.38
+            // fill over a 240-luminance page lands at 149, exactly the pale grey ball the day globe
+            // read as. So paper reads the map's luminance as PRESENCE — it cuts alpha to the land's
+            // own shape — and takes the tint from the material's own `diffuse` at full strength
+            // rather than through a 0.055 texel.
+            // THE WINDOW SITS JUST ABOVE ZERO, and that is the whole rule: the map is BINARY —
+            // ocean 0, land one flat level — so the mask asks "is this texel non-zero", never
+            // "how bright is it". Worth stating because the level that ARRIVES is not the level
+            // that was baked: makeLandTexture writes 14/255 = 0.055 and flags the texture
+            // NoColorSpace, but the sampler hands the shader 0.0043 — an sRGB decode of that
+            // same byte (measured 2026-08-21 by two shader probes: a step ladder at 0.005 stayed
+            // dark, a x200 ramp saturated, bracketing the sample to [0.0043, 0.005)). A window
+            // keyed to the BAKED level therefore returns 0 everywhere and the land paints
+            // nothing, which is exactly what it did. Placed low it is correct under either
+            // reading, so it cannot break again if a three release changes where the decode
+            // happens; it spans the lower half of the arriving level so linear filtering still
+            // gives the coastline sub-texel antialiasing.
+            "\tfloat mgLand = smoothstep(0.0008, 0.0034, texture2D(map, vMapUv).g);\n" +
+            "\tdiffuseColor.rgb = mix(diffuseColor.rgb, diffuse, uPaper);\n" +
+            // The drill boost firms the plate by raising PRESENCE here, and takes a root on the way:
+            // uMaskBoost's readable range starts ~×6 because it multiplies a tiny additive
+            // contribution, whereas an alpha already near half saturates instantly — the root keeps
+            // the hover preview (3.4 → ×1.7) honestly under the drill (5.9 → ×2.2).
+            "\tdiffuseColor.a = mix(diffuseColor.a, min(1.0, diffuseColor.a * mgLand * pow(mgBoost, 0.45)), uPaper);",
         );
     };
     globe.landFillMat = landMat;
     globe.geoTints.push(landMat.color);
     // base = the resting ADDITIVE strength of the land surface (0..1) — lower = more transparent.
     // Kept well below 1 so the globe reads as a faint calm hologram, the coastal walls the accent.
-    globe.geoFades.push({ mat: globe.landFillMat, base: 0.38 });
+    // `paperBase` is the same surface as INK: with the map now cutting alpha to the land's shape
+    // (above), the fill is a flat wash over the continents, and it is deliberately LIGHTER than
+    // `inkPresence(0.38)` would make it — the resting land is a ground for the chips and the
+    // coastal walls, and the drill needs headroom above it to firm into.
+    globe.geoFades.push({ mat: globe.landFillMat, base: 0.38, paperBase: 0.68 });
     globe.landFillMesh = new THREE.Mesh(new THREE.SphereGeometry(top, 96, 64), globe.landFillMat);
     globe.landFillMesh.renderOrder = -1; // before the rim/nodes
     // Visible from birth — its OPACITY starts 0 and rides geoFades (base × surf), and the Engine

@@ -22,7 +22,7 @@ import { metaTrayLayout, dagTrayLayout, containerChipPos, type ContainerSpec } f
 import { LANE_IDS } from "../domain/ledgerModel";
 import { gatherSlots, gatherExtent, gatherSpread, gatherRows, type GatherExtent, type GatherSlot } from "../domain/gatherLayout";
 import type { ViewTransition } from "../domain/viewTransition";
-import { glowBlend, isLightGround, type SceneColors } from "../sceneColors";
+import { glowBlend, inkPresence, isLightGround, type SceneColors } from "../sceneColors";
 import * as geoStats from "../domain/geoStats";
 import { R, LAND_H, CHIP_PITCH, HEX_H, VALIDATOR_HEX_R, META_HEX_R, latLonToVec3, vec3ToLatLon } from "../domain/geoLayout";
 import { armillaryFrame, ringFramePos, ringNormal, armillaryRings, armillaryPos, nodeRoles, spreadCoLocated } from "../domain/nodeLayout";
@@ -1426,7 +1426,19 @@ export class Globe implements GeoViewHost {
     const surf = this.ledger ? 0 : surfFade(m) * vAlpha;
     const extras = this.ledger ? 0 : extrasFade(m) * vAlpha;
     this.surfaceAlpha = Math.max(surf, extras);
-    for (const f of this.geoFades) f.mat.opacity = f.base * surf;
+    // Every piece of geo furniture — the sea graticule, the land glass, the country borders and
+    // their names — carries its resting presence in `base`, and those numbers are the DARK look:
+    // additive light on black, which the bloom lifts clear. Painted as normal-blended ink on paper
+    // (glowBlend) the same numbers are a ghost — a 0.045 graticule is invisible and a 0.38 land
+    // fill barely separates from the ocean, which is what left the day globe reading as one pale
+    // sphere. So the PRESENCE asks the ground and the morph fade, which is geometry rather than
+    // weight, multiplies in afterwards untouched (inkPresence's own rule).
+    // `paperBase`, where a piece states one, is the exception the translation cannot cover: its
+    // presence MODEL differs by ground rather than only in strength (the land fill's map is light to
+    // ADD on black and an alpha MASK on paper — see buildLand), so it names its own paper level.
+    const paper = this.geoPaper; // hoisted: one field load per frame, not per material
+    for (const f of this.geoFades)
+      f.mat.opacity = (paper && f.paperBase !== undefined ? f.paperBase : inkPresence(f.base, paper)) * surf;
     // Density light pools: morph fade × the country-drill recede (so a drilled country's own
     // highlight isn't washed out by the pools).
     // The pools belong to the SUBJECTS, not the furniture (user, 2026-08-16): they are geo's
