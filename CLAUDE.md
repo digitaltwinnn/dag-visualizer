@@ -128,8 +128,9 @@ the "bug" was chased in the state machine first). When a rule is missing from th
 don't debug the cascade: kill the server, `rm -rf .next/dev`, restart.
 
 `next build` and `next dev` don't conflict (dev outputs to `.next/dev`), so the production check can
-run alongside the dev server. Do it at phase boundaries: the build should be clean and
-`/api/metagraphs` should stay `○` (Static) with `5m` revalidate.
+run alongside the dev server. Do it at phase boundaries: the build should be clean;
+`/api/metagraphs` is `ƒ` (Dynamic — it reads `?net=`) and must answer with
+`Cache-Control: public, s-maxage=300` so the CDN still caches it per URL.
 
 ### Verifying changes
 

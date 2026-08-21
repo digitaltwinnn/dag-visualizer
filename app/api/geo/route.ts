@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { unstable_cache } from "next/cache";
-import { NETWORKS } from "@/src/engine/config";
+import { NETWORKS, type NetworkId } from "@/src/engine/config";
+import { netOf } from "@/src/net/request";
 import { geolocate } from "@/src/server/ipGeolocate";
 import type { GeoMap } from "@/src/data/types";
 
@@ -27,22 +28,32 @@ async function clusterIps(url: string): Promise<string[]> {
   }
 }
 
-const getLiveGeo = unstable_cache(
-  async (): Promise<GeoMap> => {
-    const [l0, l1] = await Promise.all([clusterIps(NETWORKS.mainnet.l0 + "/cluster/info"), clusterIps(NETWORKS.mainnet.l1 + "/cluster/info")]);
-    const ips = [...new Set([...l0, ...l1])];
-    if (!ips.length) throw new Error("no validator ips");
-    const map = await geolocate(ips);
-    if (!Object.keys(map).length) throw new Error("geolocation empty");
-    return map;
-  },
-  ["validator-geo-live-v2"], // v2: +isp/asn fields (a key bump busts the pre-provider cache)
-  { revalidate },
-);
+// Per-network cached fetch (the repo's inline unstable_cache factory idiom — global/at):
+// the key carries `net`, so each network warms its own entry.
+const getLiveGeo = (net: NetworkId) =>
+  unstable_cache(
+    async (): Promise<GeoMap> => {
+      const [l0, l1] = await Promise.all([
+        clusterIps(NETWORKS[net].l0 + "/cluster/info"),
+        clusterIps(NETWORKS[net].l1 + "/cluster/info"),
+      ]);
+      const ips = [...new Set([...l0, ...l1])];
+      if (!ips.length) throw new Error("no validator ips");
+      const map = await geolocate(ips);
+      if (!Object.keys(map).length) throw new Error("geolocation empty");
+      return map;
+    },
+    ["validator-geo-live-v2", net], // v2: +isp/asn fields (a key bump busts the pre-provider cache)
+    { revalidate },
+  )();
 
-export async function GET() {
+export async function GET(req: Request) {
+  // Reading ?net= makes the route dynamic (ƒ) — the CDN caches it per URL via s-maxage
+  // instead, so mainnet's hit behaviour is preserved (multi-network design §3).
   try {
-    return NextResponse.json(await getLiveGeo());
+    return NextResponse.json(await getLiveGeo(netOf(req)), {
+      headers: { "Cache-Control": "public, s-maxage=3600, stale-while-revalidate=7200" },
+    });
   } catch {
     return NextResponse.json({ error: "live validator geolocation failed" }, { status: 503 });
   }

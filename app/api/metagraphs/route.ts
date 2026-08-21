@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { unstable_cache } from "next/cache";
-import { assignPalette } from "@/src/palette/palette";
+import { assignPalette, allowedFor } from "@/src/palette/palette";
+import { NETWORKS, type NetworkId } from "@/src/engine/config";
+import { netOf } from "@/src/net/request";
 import { identityPins } from "@/src/palette/identity";
 import { geolocate } from "@/src/server/ipGeolocate";
 import type { GeoMap } from "@/src/data/types";
@@ -20,7 +22,6 @@ export const revalidate = 300; // re-fetch at most every 5 minutes (was 10 — u
 // Hobby 10s default (the per-fetch timeout below keeps the realistic case well under).
 export const maxDuration = 60;
 
-const API = "https://production.dagexplorer-api.constellationnetwork.net/mainnet";
 // l0 (consensus/inner) > dl1 > cl1 (outer, usually empty) — primary layer priority.
 const LAYERS: Array<[string, string]> = [
   ["l0", "l0"],
@@ -68,7 +69,8 @@ async function clusterNodes(base: string): Promise<Array<{ ip: string; state: st
   }
 }
 
-async function fetchLive(): Promise<{ metagraphs: Metagraph[]; geo: GeoMap }> {
+async function fetchLive(net: NetworkId): Promise<{ metagraphs: Metagraph[]; geo: GeoMap }> {
+  const API = NETWORKS[net].directory;
   const list = ((await getJson(`${API}/metagraphs?limit=100`)) as { data?: unknown[] }).data ?? [];
   const ips = new Set<string>();
 
@@ -139,28 +141,37 @@ async function fetchLive(): Promise<{ metagraphs: Metagraph[]; geo: GeoMap }> {
 // every visitor's mount (inner fetches use `no-store`, which otherwise makes the route
 // dynamic and re-runs the whole fan-out per request). Throwing on empty keeps a network
 // blip from being cached: GET answers 503 and the next request retries.
-const getLive = unstable_cache(
+const getLive = (net: NetworkId) =>
+  unstable_cache(
   async () => {
-    const live = await fetchLive();
+    const live = await fetchLive(net);
     if (!live.metagraphs.length) throw new Error("empty live result");
     return live;
   },
-  ["metagraphs-live-v3"], // v3: +per-layer node `ids` (v2 was +isp/asn geo fields)
+  ["metagraphs-live-v3", net], // v3: +per-layer node `ids` (v2 was +isp/asn geo fields)
   { revalidate },
-);
+  )();
 
-function withHues(list: Metagraph[]): Metagraph[] {
-  const palette = assignPalette(list.map((m) => m.id), identityPins());
+function withHues(list: Metagraph[], net: NetworkId): Metagraph[] {
+  // The REQUEST's allowed ranges, not the module default: this runs on the server, where the
+  // frozen client resolver always answers mainnet — passing them keeps server-assigned hues
+  // identical to what the client's own palette would assign for this network.
+  const palette = assignPalette(list.map((m) => m.id), identityPins(), allowedFor(net));
   return list.map((m) => {
     const e = palette.get(m.id);
     return e ? { ...m, hue: { deg: e.hueDeg, oklch: e.oklch, hex: e.hex } } : m;
   });
 }
 
-export async function GET() {
+export async function GET(req: Request) {
+  const net = netOf(req);
   try {
-    const live = await getLive();
-    return NextResponse.json({ ...live, metagraphs: withHues(live.metagraphs) });
+    const live = await getLive(net);
+    // Dynamic since ?net= — the CDN caches per URL via s-maxage (multi-network design §3).
+    return NextResponse.json(
+      { ...live, metagraphs: withHues(live.metagraphs, net) },
+      { headers: { "Cache-Control": "public, s-maxage=300, stale-while-revalidate=600" } },
+    );
   } catch {
     // No baked fallback (user decision): an honest 503 — the client keeps its last good
     // pull (Engine.refreshMeta only rebuilds on a changed OK response) and retries later.

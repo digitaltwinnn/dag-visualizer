@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
 import { unstable_cache } from "next/cache";
+import { NETWORKS, type NetworkId } from "@/src/engine/config";
+import { netOf } from "@/src/net/request";
 
 // ONE snapshot record of ANY currency chain — catalog or uncataloged alike (user, 2026-08-14:
 // an unlisted metagraph snapshot's card had no hash to show, because a hash is not a field of
@@ -10,7 +12,6 @@ import { unstable_cache } from "next/cache";
 
 export const maxDuration = 15;
 
-const BE = "https://be-mainnet.constellationnetwork.io";
 const ADDRESS = /^DAG[A-Za-z0-9]{30,45}$/;
 
 interface BeSnap {
@@ -24,8 +25,8 @@ interface BeSnap {
   stakingAddress?: string;
 }
 
-async function fetchRecord(address: string, ordinal: number) {
-  const r = await fetch(`${BE}/currency/${address}/snapshots/${ordinal}`, {
+async function fetchRecord(net: NetworkId, address: string, ordinal: number) {
+  const r = await fetch(`${NETWORKS[net].be}/currency/${address}/snapshots/${ordinal}`, {
     headers: { Accept: "application/json" },
     cache: "no-store",
     signal: AbortSignal.timeout(6000),
@@ -47,19 +48,19 @@ async function fetchRecord(address: string, ordinal: number) {
   };
 }
 
-const cachedRecord = (address: string, ordinal: number) =>
-  unstable_cache(() => fetchRecord(address, ordinal), ["network-snap-record-v1", address, String(ordinal)], {
+const cachedRecord = (net: NetworkId, address: string, ordinal: number) =>
+  unstable_cache(() => fetchRecord(net, address, ordinal), ["network-snap-record-v1", net, address, String(ordinal)], {
     revalidate: 86400,
   })();
 
-export async function GET(_req: Request, ctx: { params: Promise<{ address: string; ordinal: string }> }) {
+export async function GET(req: Request, ctx: { params: Promise<{ address: string; ordinal: string }> }) {
   const { address, ordinal: ordStr } = await ctx.params;
   const ordinal = Number(ordStr);
   if (!ADDRESS.test(address) || !Number.isInteger(ordinal) || ordinal < 1) {
     return NextResponse.json({ error: "bad request" }, { status: 400 });
   }
   try {
-    const rec = await cachedRecord(address, ordinal);
+    const rec = await cachedRecord(netOf(req), address, ordinal);
     if (!rec.available) return NextResponse.json({ available: false }, { status: 404 });
     return NextResponse.json(rec, { headers: { "Cache-Control": "public, max-age=86400, immutable" } });
   } catch {

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { unstable_cache } from "next/cache";
-import { METAGRAPHS } from "@/src/net/current";
+import { CATALOG, type NetworkId } from "@/src/engine/config";
+import { netOf } from "@/src/net/request";
 import type { SnapshotExact, ChannelSnapRow } from "@/src/data/types";
 import { decodeChannelContent } from "../decodeChannel";
 import { fetchGlobalJson } from "../fetchGlobal";
@@ -21,14 +22,14 @@ export const maxDuration = 60;
 
 // Addresses we track (the public catalog, config.METAGRAPHS — the canonical list the
 // Hypergraph hubs are built from) — used to split listed vs unlisted.
-const LISTED = new Set(METAGRAPHS.map((m) => m.id));
 
 type StateChannelSnap = { value?: { fee?: number; content?: unknown[] } };
 
-async function fetchExact(ordinal: number): Promise<SnapshotExact> {
+async function fetchExact(net: NetworkId, ordinal: number): Promise<SnapshotExact> {
+  const LISTED = new Set(CATALOG[net].map((m) => m.id));
   // fetchGlobalJson throws on failure (LB and archival fallback both) so unstable_cache never
   // caches a miss — a momentarily unavailable tick is retried on the next request.
-  const j = (await fetchGlobalJson(ordinal)) as { value?: Record<string, unknown>; proofs?: unknown } & Record<string, unknown>;
+  const j = (await fetchGlobalJson(net, ordinal)) as { value?: Record<string, unknown>; proofs?: unknown } & Record<string, unknown>;
   const v = (j.value ?? j) as {
     stateChannelSnapshots?: Record<string, StateChannelSnap[]>;
     rewards?: unknown;
@@ -119,26 +120,27 @@ async function fetchExact(ordinal: number): Promise<SnapshotExact> {
   };
 }
 
-const cachedExact = (ordinal: number) =>
+const cachedExact = (net: NetworkId, ordinal: number) =>
   // The cache key is versioned WITH the payload shape (v3: rows carry dataBytes, 2026-08-13;
   // v2: signerCount) — entries cached under an old key would otherwise miss fields for a day.
-  unstable_cache(() => fetchExact(ordinal), ["snapshot-exact-v3", String(ordinal)], {
+  unstable_cache(() => fetchExact(net, ordinal), ["snapshot-exact-v3", net, String(ordinal)], {
     revalidate: 86400, // ordinals are immutable; a day is plenty (success is cached, misses throw)
   })();
 
-export async function GET(_req: Request, ctx: { params: Promise<{ ordinal: string }> }) {
+export async function GET(req: Request, ctx: { params: Promise<{ ordinal: string }> }) {
   const { ordinal } = await ctx.params;
+  const net = netOf(req);
   const n = Number(ordinal);
   if (!Number.isFinite(n) || n < 0) {
     return NextResponse.json({ error: "bad ordinal" }, { status: 400 });
   }
-  if (!(await withinServedWindow(n))) {
+  if (!(await withinServedWindow(net, n))) {
     // Outside the window this app can ever ask about (ordinalWindow.ts) — refuse without
     // touching the upstream, so the route isn't an anonymous walk over ~6.7M ordinals.
     return NextResponse.json({ available: false, ordinal: n }, { status: 404 });
   }
   try {
-    const data = await cachedExact(n);
+    const data = await cachedExact(net, n);
     return NextResponse.json(data, {
       headers: { "Cache-Control": "public, max-age=86400, immutable" },
     });

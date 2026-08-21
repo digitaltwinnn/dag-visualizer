@@ -1,5 +1,5 @@
 import { unstable_cache } from "next/cache";
-import { METAGRAPHS } from "@/src/net/current";
+import { CATALOG, NETWORKS, type NetworkId } from "@/src/engine/config";
 
 // WHO KEEPS THE CHAIN'S HISTORY — the one home for the archive census (user, 2026-08-14: "can
 // we know how many nodes have the full history?", then "mention time and/or snapshots, and
@@ -20,10 +20,6 @@ import { METAGRAPHS } from "@/src/net/current";
 // Measured 2026-08-14: 9 deep of 152 global Ready. A node that can't be reached lands in NO
 // list — absent data stays absent, so the card shows nothing rather than a guess.
 
-const L0 = "https://l0-lb-mainnet.constellationnetwork.io";
-const BE = "https://be-mainnet.constellationnetwork.io";
-const DIRECTORY = "https://production.dagexplorer-api.constellationnetwork.net/mainnet/metagraphs?limit=100";
-const LISTED = new Set(METAGRAPHS.map((m) => m.id));
 
 // DOR's genesis anchor — 62 ordinals above the global archive floor, ~24 KB. Served by every
 // node that keeps deep history, 404 on every pruned one, and immutable so it never goes stale.
@@ -109,9 +105,9 @@ async function floorSearch(base: string, lo: number, hi: number): Promise<number
   return hi;
 }
 
-async function explorerTs(path: string): Promise<string | undefined> {
+async function explorerTs(be: string, path: string): Promise<string | undefined> {
   try {
-    const r = await fetch(`${BE}${path}`, {
+    const r = await fetch(`${be}${path}`, {
       headers: { Accept: "application/json" },
       cache: "no-store",
       signal: AbortSignal.timeout(5000),
@@ -166,8 +162,8 @@ async function probeCurrencyNode(t: ArchiveTarget, metaId: string, latest: numbe
   return { ip: t.ip, chain: metaId, kind: "window", floor, latest };
 }
 
-async function latestGlobal(): Promise<number> {
-  const r = await fetch(`${BE}/global-snapshots/latest`, {
+async function latestGlobal(be: string): Promise<number> {
+  const r = await fetch(`${be}/global-snapshots/latest`, {
     headers: { Accept: "application/json" },
     cache: "no-store",
     signal: AbortSignal.timeout(6000),
@@ -178,9 +174,9 @@ async function latestGlobal(): Promise<number> {
   return j.data.ordinal;
 }
 
-async function latestCurrency(metaId: string): Promise<number | null> {
+async function latestCurrency(be: string, metaId: string): Promise<number | null> {
   try {
-    const r = await fetch(`${BE}/currency/${metaId}/snapshots?limit=1`, {
+    const r = await fetch(`${be}/currency/${metaId}/snapshots?limit=1`, {
       headers: { Accept: "application/json" },
       cache: "no-store",
       signal: AbortSignal.timeout(6000),
@@ -194,9 +190,12 @@ async function latestCurrency(metaId: string): Promise<number | null> {
   }
 }
 
-async function probeArchive(): Promise<ArchiveInfo> {
-  const gLatest = await latestGlobal();
-  const globalNodes = await readyNodes(`${L0}/cluster/info`);
+async function probeArchive(net: NetworkId): Promise<ArchiveInfo> {
+  const BE = NETWORKS[net].be;
+  const DIRECTORY = `${NETWORKS[net].directory}/metagraphs?limit=100`;
+  const LISTED = new Set(CATALOG[net].map((m) => m.id));
+  const gLatest = await latestGlobal(BE);
+  const globalNodes = await readyNodes(`${NETWORKS[net].l0}/cluster/info`);
 
   // Each catalog metagraph's own l0 cluster, from the same directory /api/metagraphs reads.
   const dirMetas: { id: string; l0: string }[] = [];
@@ -222,7 +221,7 @@ async function probeArchive(): Promise<ArchiveInfo> {
     if (e) entries.push(e);
   });
   const metaRuns = dirMetas.map(async (m) => {
-    const latest = await latestCurrency(m.id);
+    const latest = await latestCurrency(BE, m.id);
     if (latest == null) return;
     let nodes: ArchiveTarget[] = [];
     try {
@@ -250,6 +249,7 @@ async function probeArchive(): Promise<ArchiveInfo> {
     entries.map(async (e) => {
       if (e.kind === "deep") return;
       e.floorTs = await explorerTs(
+        BE,
         e.chain === "global" ? `/global-snapshots/${e.floor}` : `/currency/${e.chain}/snapshots/${e.floor}`,
       );
     }),
@@ -262,5 +262,5 @@ async function probeArchive(): Promise<ArchiveInfo> {
 }
 
 // Archival membership changes on operator timescales, not tick timescales — 6h is generous.
-export const getArchiveInfo = (): Promise<ArchiveInfo> =>
-  unstable_cache(probeArchive, ["archive-probe-v2"], { revalidate: 21600 })();
+export const getArchiveInfo = (net: NetworkId): Promise<ArchiveInfo> =>
+  unstable_cache(() => probeArchive(net), ["archive-probe-v2", net], { revalidate: 21600 })();
