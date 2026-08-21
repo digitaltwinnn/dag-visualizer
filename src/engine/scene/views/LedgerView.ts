@@ -78,7 +78,7 @@ import { ByteBar, SEED_W } from "../objects/ByteBar";
 import { LiveEdge } from "../objects/LiveEdge";
 import { snapBright, snapFocusOf, focusWeightOf, emphasisK } from "../../domain/dimModel";
 import { Ribbons } from "../objects/Ribbons";
-import { SnapshotPlane, makeEdgeLabel, GLOBAL_PLANE_TUNE_DEFAULTS, META_PLANE_TUNE_DEFAULTS, type PlaneTune } from "../objects/SnapshotPlane";
+import { SnapshotPlane, makeEdgeLabel, retintEdgeLabel, GLOBAL_PLANE_TUNE_DEFAULTS, META_PLANE_TUNE_DEFAULTS, type PlaneTune } from "../objects/SnapshotPlane";
 import { TrailRewind } from "../objects/TrailRewind";
 import { FadeSet } from "../objects/FadeSet";
 import type { SceneView } from "./SceneView";
@@ -432,6 +432,29 @@ export class LedgerView implements SceneView {
     this._laneColors.clear();
     this._bar.setSceneColors(map);
     this._ribbons.setSceneColors(map);
+  }
+
+  /** THEME FLIP — the chamber's construction-time captures of the STRUCTURAL palette. `_colors` is
+   *  the Engine's own object and already reads new, so this re-applies what was copied out of it:
+   *  the neutral-trail scalar the per-frame writers compare against, every storey's glass + edge
+   *  label (whose blend mode themes — see applyGlassTheme), the two pooled label columns and their
+   *  dotted anchor lines, and the two instruments that BAKE (the bar's neutral, the ribbons' vertex
+   *  colours). Identity hue is the other channel and arrives separately via setSceneColors.
+   *  Event-time — one flip, not a frame. */
+  setColors(c: SceneColors): void {
+    this._colors = c;
+    this._core = c.core;
+    this._coreCol.setHex(c.core);
+    for (const p of [...this._globalPlanes, ...this._metaPlanes.values()]) p.setColors(c);
+    this._bar.setColors(c);
+    this._ribbons.setColors(c);
+    // The ordinal + kB columns are POOLED per visible row (recycled by ordinal), so the live set
+    // is retinted in place; rows built after the flip read the new `_colors`/`_core` above.
+    for (const o of this._ordLabels.values()) {
+      retintEdgeLabel(o.mesh, c);
+      if (o.kb) retintEdgeLabel(o.kb, c);
+      for (const l of [o.line, o.kbLine]) (l.material as THREE.LineDashedMaterial).color.setHex(c.core);
+    }
   }
 
   // ── VIEW-ENTRY DROP (user, 2026-08-16, retimed same day — "should occur as the last effect

@@ -136,6 +136,13 @@ export class ByteBar {
     this._sceneColors = map;
   }
 
+  /** THEME FLIP — `_neutral` is the one threaded colour this module captures at construction. It is
+   *  consumed per FRAME (the trail's neutral bands, the seam's synthetic band), so re-pointing the
+   *  field is the whole retint; nothing here is baked. */
+  setColors(c: SceneColors): void {
+    this._neutral = c.core;
+  }
+
   /** Lay out one tick's bar. Event-time only. `live` says the LIVE EDGE is naming this tick, so
    *  the slot draws nothing and offers nothing to pick — the chamber states an in-flight read once,
    *  at its boundary with now, not twice. */

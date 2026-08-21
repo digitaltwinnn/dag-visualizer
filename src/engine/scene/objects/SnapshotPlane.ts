@@ -16,7 +16,7 @@ import * as THREE from "three";
 import type { SceneColors } from "../../sceneColors";
 import { CONT_X } from "../../domain/ledgerLayout";
 import type { ContainerSpec } from "../../domain/ledgerRails";
-import { makeGlassFill, type GlassFillUniforms } from "./glassFill";
+import { applyGlassTheme, makeGlassFill, type GlassFillUniforms } from "./glassFill";
 import type { TuneSchema } from "../../tune";
 
 /** One plane's live-tunable look (dev `?tune` panel binds it; the values are the shipped look). */
@@ -48,9 +48,6 @@ const PLANE_CORNER_R = 0;
 /** The trays' corner radius — the smooth-corner clip of the shared glass fill. */
 const TRAY_CORNER_R = 0.3;
 
-const rgbTriplet = (c: THREE.Color): string =>
-  `${Math.round(c.r * 255)},${Math.round(c.g * 255)},${Math.round(c.b * 255)}`;
-
 /** A flat, edge-aligned label plane — the chamber's only text (moved out of LedgerView with the
  *  blueprint; the stack-level digit box went with the explorer's badges, user 2026-08-07).
  *  `align` reads `z` as the text's LEFT edge ("left", the floor-label idiom) or its CENTRE
@@ -69,8 +66,11 @@ export function makeEdgeLabel(
   c.width = 512 * SS;
   c.height = 64 * SS;
   const ctx = c.getContext("2d")!;
-  const cc = new THREE.Color(colors.core);
-  const tone = `rgba(${rgbTriplet(cc)},0.85)`;
+  // THEME — the ink is drawn WHITE and tinted by the material's own `color` (map RGB × color, so
+  // this is pixel-identical to baking the tone into the canvas). That is the whole reason: a flip
+  // is then one `setHex` on a material instead of a canvas redraw + texture re-upload per label,
+  // and the chamber names every visible row at both ends. Grayscale is rule-3 exempt.
+  const tone = "rgba(255,255,255,0.85)";
   const textX = 6 * SS;
   ctx.font = `400 ${26 * SS}px system-ui, -apple-system, sans-serif`;
   ctx.textAlign = align;
@@ -86,6 +86,7 @@ export function makeEdgeLabel(
     new THREE.PlaneGeometry(w, h),
     new THREE.MeshBasicMaterial({
       map: tex,
+      color: new THREE.Color(colors.core), // the label's tone — see `tone` above; retintEdgeLabel re-points it
       transparent: true,
       depthWrite: false,
       depthTest: false,
@@ -102,6 +103,12 @@ export function makeEdgeLabel(
   mesh.position.set(frontX - h / 2, y + 0.06, align === "center" ? z : z - w / 2);
   mesh.renderOrder = 2;
   return mesh;
+}
+
+/** THEME FLIP for an edge label built by `makeEdgeLabel` — the tone lives on the material, so this
+ *  is the whole retint (no canvas, no texture upload). Event-time; the caller owns the meshes. */
+export function retintEdgeLabel(mesh: THREE.Mesh, colors: SceneColors): void {
+  (mesh.material as THREE.MeshBasicMaterial).color.setHex(colors.core);
 }
 
 export interface SnapshotPlaneOpts {
@@ -131,7 +138,7 @@ export class SnapshotPlane {
   constructor(parent: THREE.Group, colors: SceneColors, o: SnapshotPlaneOpts) {
     this._parent = parent;
     this._colors = colors;
-    const fm = makeGlassFill(colors.core, o.w / 2, o.d / 2, PLANE_CORNER_R);
+    const fm = makeGlassFill(colors, o.w / 2, o.d / 2, PLANE_CORNER_R);
     this.fill = new THREE.Mesh(new THREE.PlaneGeometry(o.w, o.d), fm);
     this.fill.rotation.x = -Math.PI / 2;
     this.fill.position.set(o.cx, o.y, o.cz);
@@ -155,7 +162,7 @@ export class SnapshotPlane {
       return;
     }
     if (!this._tray) {
-      const tm = makeGlassFill(this._colors.core, 1, 1, TRAY_CORNER_R);
+      const tm = makeGlassFill(this._colors, 1, 1, TRAY_CORNER_R);
       this._tray = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), tm);
       this._trayU = tm.uniforms as unknown as GlassFillUniforms;
       this._parent.add(this._tray);
@@ -167,6 +174,16 @@ export class SnapshotPlane {
     this._tray.rotation.set(0, Math.PI / 2, 0);
     this._tray.position.set(CONT_X - 0.05, spec.cy, spec.cz);
     this._trayU!.uHalf.value.set(spec.hz, spec.hy);
+  }
+
+  /** THEME FLIP — the plane's three construction-time captures: the fill's shader uniform (whose
+   *  BLEND MODE themes too — see applyGlassTheme), the lazily-built tray's, and the edge label's
+   *  material tint. `_colors` is the Engine's own mutated object, so it already reads new; this
+   *  re-applies the values that were copied OUT of it. Event-time. */
+  setColors(c: SceneColors): void {
+    applyGlassTheme(this.fill.material as THREE.ShaderMaterial, c);
+    if (this._tray) applyGlassTheme(this._tray.material as THREE.ShaderMaterial, c);
+    if (this.label) retintEdgeLabel(this.label, c);
   }
 
   /** The HORIZON — dissolve the glass out before its own far edge, so the surface the time trail

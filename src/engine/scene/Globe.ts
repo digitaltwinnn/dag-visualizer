@@ -22,14 +22,14 @@ import { metaTrayLayout, dagTrayLayout, containerChipPos, type ContainerSpec } f
 import { LANE_IDS } from "../domain/ledgerModel";
 import { gatherSlots, gatherExtent, gatherSpread, gatherRows, type GatherExtent, type GatherSlot } from "../domain/gatherLayout";
 import type { ViewTransition } from "../domain/viewTransition";
-import type { SceneColors } from "../sceneColors";
+import { glowBlend, isLightGround, type SceneColors } from "../sceneColors";
 import * as geoStats from "../domain/geoStats";
 import { R, LAND_H, CHIP_PITCH, HEX_H, VALIDATOR_HEX_R, META_HEX_R, latLonToVec3, vec3ToLatLon } from "../domain/geoLayout";
 import { armillaryFrame, ringFramePos, ringNormal, armillaryRings, armillaryPos, nodeRoles, spreadCoLocated } from "../domain/nodeLayout";
 import { surfFade, extrasFade } from "../domain/morph";
 import { ArcSim, type ArcEndpoint } from "../domain/arcSim";
 import type { MetaNodeRecord, ValidatorRecord } from "../domain/records";
-import { buildGeoView, setCountryBorder, setCountryFillMask, HOVER_MASK_BOOST, type GeoViewHost } from "./views/GeoView";
+import { buildGeoView, retintGeoView, setCountryBorder, setCountryFillMask, HOVER_MASK_BOOST, type GeoViewHost } from "./views/GeoView";
 import type { StageLight } from "./objects/StageLight";
 import { STAGE_LIGHTS } from "../domain/stageLight";
 import { ccToNumeric, countryCcAt, countryLean, geometryRings, mainPolygonRings, ringsAngularRadius, ringsCentroid, type Ring } from "../domain/countryShape";
@@ -115,7 +115,14 @@ export class Globe implements GeoViewHost {
   pickables: THREE.Object3D[] = [];
   nodes: ValidatorRecord[] = [];
   geoFades: GeoViewHost["geoFades"] = []; // { mat, base } surface materials faded by morph
+  geoTints: GeoViewHost["geoTints"] = []; // every construction-time capture of geoColor (theme flip)
+  geoPaper: GeoViewHost["geoPaper"] = false;   // ground is light — the furniture's blend mode follows it
+  geoBlends: GeoViewHost["geoBlends"] = [];    // every material whose blending themes (see GeoViewHost)
   private _densityGlow: THREE.Mesh[] = []; // additive light pools under dense node clusters (geo)
+  // The palette, held so a REBUILD of the density pools (which happens on every data refresh, long
+  // after construction) can ask glowBlend the ground question again. Swapped in place by the Engine,
+  // so it is always current.
+  private _colorsRef!: SceneColors;
   private _glowTex?: THREE.Texture; // shared radial-gradient sprite for the light pools
   private _glowDim = 1; // eased 1→~0.2 while a country is drilled, so its highlight isn't overruled
   private _glowAllDim = 1; // eased ~0.62 in "all" (overlapping per-network planes stack additively)
@@ -236,6 +243,10 @@ export class Globe implements GeoViewHost {
     this.layers = layers; // for gluing metagraph nodes to their orbiting hubs
     this.camera = camera; // for the view-dependent disc falloff at the limb
     this.geoColor = colors.core;   // the geo hologram = the accent (calm via opacity); wall + grid + graticule
+    // Set BEFORE buildGeoView: each furniture material picks its blend mode at creation, so booting
+    // straight into light needs no second pass (and the async land build inherits it for free).
+    this._colorsRef = colors;
+    this.geoPaper = isLightGround(colors);
     this._dagCore = colors.dagCore;  // DAG validator-node fallback hue
     this._edgeColor.setHex(colors.core);
     this._edgeTarget.setHex(colors.core);
@@ -280,6 +291,7 @@ export class Globe implements GeoViewHost {
     // flying over the far hemisphere — it has to fade itself, exactly like the walls and the
     // graticule do (user, 2026-08-01: "arcs are visible through the globe").
     this.arcs.setFacing(this.facingUniform, this.closeUniform);
+    this.arcs.setColors(this._colorsRef);
   }
 
   // View-derived sim gates from VIEW_POLICIES (the Engine calls this on every mode change). Only the
@@ -509,6 +521,63 @@ export class Globe implements GeoViewHost {
   }
 
   // -------------------------------------------------- metagraph nodes
+  /**
+   * THEME FLIP — re-point every colour this adapter captured at construction (rule 1: plain data
+   * in). The per-frame writers already read the Engine's swapped `colors` object, so what is left
+   * here is exactly the born-once set: the surface furniture registry, the node records' own
+   * `THREE.Color`s (written into instance colours each frame FROM the record), the density pools
+   * and the baked country-name labels.
+   *
+   * The Engine assigns `sceneColors` before calling this, so the identity retint rides along.
+   */
+  setColors(c: SceneColors): void {
+    this._colorsRef = c;
+    this.geoColor = c.core;
+    this._dagCore = c.dagCore;
+    // BOTH ends of the eased coastal-wall colour: the flip is an instant snap (spec §3), and
+    // easing only the target would leave the walls crawling toward the new accent for a second.
+    this._edgeColor.setHex(c.core);
+    this._edgeTarget.setHex(c.core);
+    this.geoPaper = isLightGround(c);
+    retintGeoView(this);
+    this._retintNetworks();
+    // Canvas-texture ink cannot be re-pointed, so the labels redraw. The method is self-cleaning
+    // (it splices its own geoFades entries and disposes the old meshes), so this is safe to repeat.
+    this._rebuildCountryLabels();
+    // The travelling packets own their own material (rebuilt per filter change), so the ground
+    // question reaches them through their adapter rather than through _retintNetworks.
+    this.arcs.setColors(c);
+  }
+
+  /** Identity SCENE hues changed (theme flip, or a fresh assignment) — re-tint everything keyed by
+   *  network. Same expressions the builders use, so a pool and its chips can never disagree. */
+  setSceneColors(map: Record<string, number>): void {
+    this.sceneColors = map;
+    this._retintNetworks();
+  }
+
+  private _retintNetworks(): void {
+    const dagHex = this.sceneColors?.dag ?? this._dagCore;
+    // A validator's own tint is `base` (the name the fabric's `aBase` attribute takes it from);
+    // the fabric caches that buffer, so re-pointing the records is only half the write.
+    for (const u of this.nodes) u.base.setHex(dagHex);
+    this.fabric.invalidateBases();
+    const metaHex = (id: string) => this.sceneColors?.[id] ?? this.geoColor;
+    for (const m of this.metaList) m.color = metaHex(m.id);
+    // The metagraph loop re-bakes its own buffer from `r.color` every frame — no invalidation.
+    for (const r of this.metaNodes) r.color.setHex(metaHex(r.metaId));
+    // The density pools are tagged with their network at build time (userData.net), so they retint
+    // without re-clustering — the clustering is geometry, and geometry does not theme.
+    for (const mesh of this._densityGlow) {
+      const net = mesh.userData.net as string;
+      const mat = mesh.material as THREE.MeshBasicMaterial;
+      mat.color.setHex(net === "dag" ? dagHex : metaHex(net));
+      // A pool is GLOW: additive on the dark ground, normal-blended ink on paper (see glowBlend).
+      const bl = glowBlend(this._colorsRef);
+      if (mat.blending !== bl) { mat.blending = bl; mat.needsUpdate = true; }
+    }
+  }
+
   // `list` is /api/metagraphs; geoMap supplies each node's location. Only metagraphs with at least
   // one locatable node are kept.
   setMetagraphs(list: RouteMetagraph[], geoMap: GeoMap): void {
@@ -687,7 +756,7 @@ export class Globe implements GeoViewHost {
       const size = Math.min(9, 2.2 + Math.sqrt(c.n) * 0.9); // pool grows with node count, capped
       const mat = new THREE.MeshBasicMaterial({
         map: this._glowTex, color: new THREE.Color(c.color),
-        transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, opacity: 0,
+        transparent: true, blending: glowBlend(this._colorsRef), depthWrite: false, opacity: 0,
       });
       const mesh = new THREE.Mesh(new THREE.PlaneGeometry(size, size), mat);
       mesh.position.copy(dir).multiplyScalar(R + LAND_H + 0.06); // just above the plateau

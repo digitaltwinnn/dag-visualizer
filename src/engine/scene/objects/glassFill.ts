@@ -5,6 +5,7 @@
 // units, and `uInner` is the flat centre whisper. The look is driven per frame from the owner's
 // PlaneTune channel (SnapshotPlane.applyAlpha) — this module owns only the shader.
 import * as THREE from "three";
+import { isLightGround, type SceneColors } from "../../sceneColors";
 
 export interface GlassFillUniforms {
   uColor: { value: THREE.Color };
@@ -24,16 +25,34 @@ export interface GlassFillUniforms {
   uFadeSpan: { value: number };        // ramp length; 0 disables the whole ramp
 }
 
+/**
+ * THEME — the glass is the one piece of chamber furniture whose BLEND MODE themes, not just its
+ * colour. On the dark ground it GLOWS: additive cyan at a whisper alpha, which is why "calm comes
+ * from opacity" works there. On paper additive is invisible — adding light to near-white is a no-op
+ * — so the same whisper has to SHADE instead: normal blending with the muted ink tone. Same
+ * uniforms, same tune knobs, opposite direction of travel, and no new colour literal either way
+ * (spec §5: "glass planes shade DARK at low alpha instead of glowing").
+ *
+ * Keyed on the GROUND, not on a theme name — `scene/` never learns the word (see isLightGround).
+ */
+export function applyGlassTheme(mat: THREE.ShaderMaterial, c: SceneColors): void {
+  const paper = isLightGround(c);
+  mat.blending = paper ? THREE.NormalBlending : THREE.AdditiveBlending;
+  (mat.uniforms.uColor.value as THREE.Color).setHex(paper ? c.muted : c.core);
+  mat.needsUpdate = true; // blending is a program/state flag, not a uniform
+}
+
 /** One glass-fill material for a plane of `halfW × halfH` half extents. The caller owns the
- *  uniforms (typed via `.uniforms as unknown as GlassFillUniforms`) and drives the opacities. */
-export function makeGlassFill(colorHex: number, halfW: number, halfH: number, radius: number): THREE.ShaderMaterial {
-  return new THREE.ShaderMaterial({
+ *  uniforms (typed via `.uniforms as unknown as GlassFillUniforms`) and drives the opacities.
+ *  The theme half of the look is `applyGlassTheme`, called here and again on every flip. */
+export function makeGlassFill(c: SceneColors, halfW: number, halfH: number, radius: number): THREE.ShaderMaterial {
+  const mat = new THREE.ShaderMaterial({
     transparent: true,
     depthWrite: false,
     side: THREE.DoubleSide,
     blending: THREE.AdditiveBlending,
     uniforms: {
-      uColor: { value: new THREE.Color(colorHex) },
+      uColor: { value: new THREE.Color(c.core) },
       uOpacity: { value: 0 },
       uInner: { value: 0 },
       uEdgeW: { value: 1 },
@@ -63,4 +82,6 @@ export function makeGlassFill(colorHex: number, halfW: number, halfH: number, ra
         gl_FragColor = vec4(uColor, a);
       }`,
   });
+  applyGlassTheme(mat, c);
+  return mat;
 }

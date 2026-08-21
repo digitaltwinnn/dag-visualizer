@@ -17,7 +17,7 @@ import { FadeSet } from "../objects/FadeSet";
 import { ORB_FRESNEL_GLSL, ORB_FRESNEL_MIX } from "../objects/NodeFabric";
 import { offNetMul } from "../../domain/dimModel";
 import { makeRadialGradientTexture } from "../objects/gradientTexture";
-import type { SceneColors } from "../../sceneColors";
+import { glowBlend, inkMix, type SceneColors } from "../../sceneColors";
 import type { TuneSchema } from "../../tune";
 import type { SceneView } from "./SceneView";
 
@@ -190,6 +190,9 @@ export class HyperView implements SceneView {
   private _spotN = new THREE.Vector3();
   private _coreDim = 0; // eased 0→1: the DAG core fades back when a specific metagraph is the subject
   private _core: number; // the structural accent (colors.core) — the core sphere hue
+  /** The live palette. The furniture here is additive GLOW on the dark ground and normal-blended
+   *  INK on paper, and the tether bakes its tip-fade as presence — both need the ground. */
+  private _colors: SceneColors;
   // furnitureAlpha("hyper") — the view-transition build/teardown fade. FadeSet is the single owner
   // of the alpha; every site here is a DYNAMIC per-frame expression (verified — zero static
   // registrations in this view today), so they all just read `_fades.alpha`.
@@ -206,6 +209,7 @@ export class HyperView implements SceneView {
   constructor(scene: THREE.Scene, colors: SceneColors, stage: StageLight, sceneColors?: Record<string, number>) {
     this.scene = scene;
     this._core = colors.core;
+    this._colors = colors;
     this.stage = stage;
     this.root = new THREE.Group();
     // Tilt the hub/tether/hoop structure to read top-down from the shared overview camera (Globe
@@ -378,7 +382,7 @@ export class HyperView implements SceneView {
         tGeo,
         new THREE.LineBasicMaterial({
           vertexColors: true, transparent: true, opacity: 0, depthWrite: false,
-          blending: THREE.AdditiveBlending,
+          blending: glowBlend(this._colors),
         }),
       );
       // The positions are rewritten per frame without recomputing bounds, so the bounding sphere
@@ -393,7 +397,7 @@ export class HyperView implements SceneView {
           new THREE.SphereGeometry(0.28, 12, 12),
           // Additive (only ever BRIGHTENS — normal blending darkened the bloomed tether/core as a
           // packet passed over, the "black objects"); depthTest off so it never occludes the line.
-          new THREE.MeshBasicMaterial({ color: col, transparent: true, opacity: 0, depthWrite: false, depthTest: false, blending: THREE.AdditiveBlending }),
+          new THREE.MeshBasicMaterial({ color: col, transparent: true, opacity: 0, depthWrite: false, depthTest: false, blending: glowBlend(this._colors) }),
         );
         pk.renderOrder = 4;
         pk.visible = false;
@@ -404,6 +408,54 @@ export class HyperView implements SceneView {
       this.root.add(group);
       this.metas.push({ group, hub, cfg, state: null, tether, packets: [], pool, pending: 0, lastLaunch: 0, glow: 0, anchor: pos.clone(), orbit: an.a, radius: an.radius, incl: an.incl, spin: 0.3 + Math.random() * 0.5, active: true, hoops, fills });
     });
+  }
+
+  /**
+   * Re-apply the STRUCTURAL palette after a theme flip. Every site here is a construction-time
+   * capture of `colors.core` — the per-frame passes below write only opacities/intensities, so
+   * they follow the new hue for free once these materials hold it. Plain data in (rule 1).
+   */
+  setColors(c: SceneColors) {
+    this._core = c.core;
+    this._colors = c;
+    // The GROUND changed, so hyper's furniture switches between additive glow and normal-blended
+    // ink (see glowBlend) — additive on paper draws nothing. Every material that carries a fade in
+    // its own `opacity` needs only this; the tether, whose fade is baked into vertex COLOUR, is
+    // re-baked below through inkMix.
+    const bl = glowBlend(c);
+    const reblend = (m: THREE.Material) => { m.blending = bl; m.needsUpdate = true; };
+    for (const f of this._coreFills) reblend(f.material as THREE.Material);
+    for (const m of this.metas) {
+      reblend(m.tether.material as THREE.Material);
+      for (const pk of m.pool) reblend(pk.material as THREE.Material);
+      for (const f of m.fills) reblend(f.material as THREE.Material);
+    }
+    const coreMat = this.core.material as THREE.MeshStandardMaterial;
+    coreMat.color.setHex(this._core);
+    coreMat.emissive.setHex(this._core);
+    for (const h of this._coreRings) (h.material as THREE.LineDashedMaterial).color.setHex(this._core);
+    for (const f of this._coreFills) (f.material as THREE.MeshBasicMaterial).color.setHex(this._core);
+    for (const m of this.metas) {
+      for (const h of m.hoops) (h.material as THREE.LineDashedMaterial).color.setHex(this._core);
+      for (const f of m.fills) (f.material as THREE.MeshBasicMaterial).color.setHex(this._core);
+    }
+    this._bakeTethers(); // the tether profile is baked from _core into vertex colours
+  }
+
+  /**
+   * Re-apply the IDENTITY scene lane after a theme flip (the lane's L/C themes; the hue never
+   * does). The ctor comment above says this map never needs updating — true for DATA (the hub set
+   * is config.METAGRAPHS, fixed), false for THEME, which is the one thing that re-tints it.
+   */
+  setSceneColors(map: Record<string, number>) {
+    this.sceneColors = map;
+    for (const m of this.metas) {
+      const col = map[m.cfg.id] ?? m.cfg.color;
+      const hubMat = m.hub.material as THREE.MeshStandardMaterial;
+      hubMat.color.setHex(col);
+      hubMat.emissive.setHex(col);
+      for (const pk of m.pool) (pk.material as THREE.MeshBasicMaterial).color.setHex(col);
+    }
   }
 
   /** Apply the tune knobs (see TETHER_TUNE_DEFAULTS) to the tether's baked look.
@@ -428,7 +480,12 @@ export class HyperView implements SceneView {
       // Fade UP out of the core (dissolves the knot where ten tethers meet), fade DOWN
       // into the hub (the line lands in the orb instead of stabbing it).
       const a = smoothstep(0, coreFade, t) * smoothstep(0, hubFade, 1 - t) * brightness;
-      col.setXYZ(j, _tcol.r * a, _tcol.g * a, _tcol.b * a);
+      // The profile is PRESENCE, so it resolves toward the ground: black under additive (where
+      // black is absent), the paper colour under normal blending (where black is the loudest ink
+      // there is, and the tips would land as two dark blobs). See inkMix.
+      _tcol.setHex(this._core);
+      inkMix(_tcol, a, this._colors);
+      col.setXYZ(j, _tcol.r, _tcol.g, _tcol.b);
     }
     col.needsUpdate = true;
   }
@@ -501,7 +558,7 @@ export class HyperView implements SceneView {
     const geo = new THREE.CircleGeometry(radius, 96);
     const mat = new THREE.MeshBasicMaterial({
       map: this._fillTex, color: new THREE.Color(this._core), transparent: true,
-      blending: THREE.AdditiveBlending, depthWrite: false, opacity: FILL_OP, side: THREE.DoubleSide,
+      blending: glowBlend(this._colors), depthWrite: false, opacity: FILL_OP, side: THREE.DoubleSide,
     });
     const mesh = new THREE.Mesh(geo, mat);
     // Orient the disk into the ring's tilted plane: CircleGeometry lies in XY (+Z normal) → map its

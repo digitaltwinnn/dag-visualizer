@@ -15,6 +15,7 @@
 
 import * as THREE from "three";
 import { ARC_TAIL, ARC_TAIL_FRAC, type ArcAgent, type ArcSim } from "../../domain/arcSim";
+import { glowBlend, type SceneColors } from "../../sceneColors";
 
 // A node record the flash is applied back onto (validator or metagraph node).
 interface FlashRec {
@@ -37,9 +38,21 @@ export class Arcs {
   private _camN: { value: THREE.Vector3 } = { value: new THREE.Vector3(0, 0, 1) };
   private _close: { value: number } = { value: 0 };
   hasArcs = false;
+  // The travelling packets are additive GLOW on the dark ground and normal-blended INK on paper —
+  // additive over a 0.965-L background saturates to white and draws nothing. Held as a field
+  // because the material is rebuilt on every filter change (see rebuildFrom), so the blend mode has
+  // to outlive it. See glowBlend.
+  private _blend: THREE.Blending = THREE.AdditiveBlending;
 
   constructor(parent: THREE.Group) {
     this.parent = parent;
+  }
+
+  /** Theme flip: plain data in — rule 1 untouched. Re-points the blend mode of the live material
+   *  and of every one the next rebuild makes. */
+  setColors(c: SceneColors): void {
+    this._blend = glowBlend(c);
+    if (this.mat) { this.mat.blending = this._blend; this.mat.needsUpdate = true; }
   }
 
   // Adopt the surface's facing/closeness uniforms so a comet over the FAR hemisphere fades the
@@ -99,7 +112,7 @@ export class Arcs {
     this.arcColAttr = colAttr;
 
     this.mat = new THREE.ShaderMaterial({
-      transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
+      transparent: true, depthWrite: false, blending: this._blend,
       uniforms: {
         uM: { value: 0 }, // morph fade-in (geography view)
         uCamN: this._camN, // shared with the graticule/walls — see setFacing

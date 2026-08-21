@@ -26,6 +26,12 @@ export interface SceneCtx {
   dof: DofPass;
   bloom: UnrealBloomPass; // per-view strength/radius/threshold, driven by the Engine from ViewPolicy
   resize(): void;
+  /**
+   * Re-point the scene's clear colour at a new `--background` (theme flip). The scene has no fog
+   * (see createScene), so the background IS the whole backdrop and this one write is the entire
+   * ground change. Plain data in — rule 1 untouched.
+   */
+  setClearColor(bg: number): void;
 }
 
 // Scene LIGHTING is a rendering technicality, NOT a palette concern: a light shades the (mostly
@@ -155,5 +161,11 @@ export function createScene(canvas: HTMLCanvasElement, colors: SceneColors): Sce
     composer.setSize(window.innerWidth, window.innerHeight);
   }
 
-  return { scene, camera, renderer, controls, composer, dof, bloom, resize };
+  // The clear colour is the one construction-time capture of a threaded token in this module
+  // (`scene.background`), so it is the one thing a theme flip has to re-apply here.
+  function setClearColor(bg: number) {
+    (scene.background as THREE.Color).setHex(bg);
+  }
+
+  return { scene, camera, renderer, controls, composer, dof, bloom, resize, setClearColor };
 }

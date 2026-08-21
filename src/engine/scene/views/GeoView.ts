@@ -32,6 +32,24 @@ export interface GeoViewHost {
   surface: THREE.Group;
   geoFades: GeoFadeEntry[];
   geoColor: number; // the structural accent (--primary), fed from the Engine — grid + graticule hue
+  /** Every THREE.Color that was BORN holding `geoColor` at construction time. The surface is built
+   *  once and never rebuilt, so on a theme flip each of those materials would keep the colour it was
+   *  born with — `retintGeoView` re-points them all in one loop. Colours a per-frame path already
+   *  drives (the coastal wall's `uColor`, copied from `_edgeColor` every frame) are deliberately NOT
+   *  registered: they follow their own source. */
+  geoTints: THREE.Color[];
+  /** True when the scene's ground is PAPER (light theme). The globe's furniture is drawn with
+   *  ADDITIVE blending, which is a mathematical no-op on a near-white ground — `dst + src`
+   *  saturates to white, so a correctly-retinted hologram renders invisible. Every material whose
+   *  blend mode therefore has to follow the ground is registered in `geoBlends`; this flag is what
+   *  it follows. Same mechanism (and same reason) as `applyGlassTheme` in glassFill.ts — the
+   *  BLEND MODE themes, not only the colour. Set by Globe before the build and on every flip.
+   *  Resting OPACITIES are deliberately NOT touched here: making the day look actually read is
+   *  sub-project 2's live design pass, this only keeps it from being blank. */
+  geoPaper: boolean;
+  /** Every material whose blending follows `geoPaper` (see above). Registered at creation, which
+   *  is what makes the async land build pick the right mode without a second hook. */
+  geoBlends: THREE.Material[];
   _edgeColor: THREE.Color;
   landWallUniforms?: {
     uColor: { value: THREE.Color };
@@ -80,6 +98,34 @@ export function buildGeoView(globe: GeoViewHost): void {
   buildLand(globe);
 }
 
+/** The blend mode the globe's furniture draws with on the current ground — see GeoViewHost.geoPaper.
+ *  Additive light on paper is invisible, so on a light ground the same ink draws NORMALLY. */
+function geoBlend(globe: GeoViewHost): THREE.Blending {
+  return globe.geoPaper ? THREE.NormalBlending : THREE.AdditiveBlending;
+}
+
+/** Register a material whose blend mode themes, and set it for the ground in force right now. */
+function blendReg(globe: GeoViewHost, mat: THREE.Material): void {
+  globe.geoBlends.push(mat);
+  mat.blending = geoBlend(globe);
+}
+
+/**
+ * THEME FLIP — re-point every construction-time capture of `geoColor` at its new value. The caller
+ * (Globe.setColors) writes `geoColor` first; this walks the registry every builder above pushes
+ * into. One loop, no rebuild: the geometry, the canvases and the fade bookkeeping are all
+ * colour-independent, so the surface never has to be torn down for a retint.
+ */
+export function retintGeoView(globe: GeoViewHost): void {
+  for (const c of globe.geoTints) c.setHex(globe.geoColor);
+  // The blend mode themes too (GeoViewHost.geoPaper): additive ink is invisible on paper.
+  const bl = geoBlend(globe);
+  for (const m of globe.geoBlends) {
+    m.blending = bl;
+    m.needsUpdate = true;
+  }
+}
+
 function buildGraticule(globe: GeoViewHost) {
   const pts: THREE.Vector3[] = [];
   const step = 15;
@@ -98,6 +144,7 @@ function buildGraticule(globe: GeoViewHost) {
   // visible there, it hosts the chips), z-rejecting the additive chamber behind it into a BLACK
   // lined globe silhouette (user, 2026-08-07).
   const mat = new THREE.LineBasicMaterial({ color: globe.geoColor, transparent: true, opacity: 0, depthWrite: false });
+  globe.geoTints.push(mat.color);
   // FACING dim: far-hemisphere fragments fade to ~30% so the backside reads as behind the globe
   // instead of blending with the front (the hologram keeps its see-through presence, quieter).
   // The floor drops to near-zero as the camera closes in (uClose) — at country/node range the
@@ -154,16 +201,21 @@ function buildCompassRose(globe: GeoViewHost) {
     const cv = document.createElement("canvas");
     cv.width = cv.height = 128;
     const g = cv.getContext("2d")!;
-    g.fillStyle = new THREE.Color(globe.geoColor).getStyle();
+    // The glyph is drawn WHITE and TINTED by the material colour, not baked in the canvas: a
+    // canvas texture cannot be re-pointed at a new accent without a redraw, and additive white ×
+    // colour is the identical pixel. So a theme flip is one setHex like every other mark here.
+    g.fillStyle = "#ffffff";
     g.font = "600 84px ui-monospace, monospace"; // no webfont is loaded — name the real stack
     g.textAlign = "center"; g.textBaseline = "middle";
     g.fillText(text, 64, 68);
     const tex = new THREE.CanvasTexture(cv);
     tex.anisotropy = 4;
     const mat = new THREE.MeshBasicMaterial({
-      map: tex, transparent: true, opacity: 0,
-      blending: THREE.AdditiveBlending, depthWrite: false,
+      map: tex, color: new THREE.Color(globe.geoColor), transparent: true, opacity: 0,
+      depthWrite: false,
     });
+    globe.geoTints.push(mat.color);
+    blendReg(globe, mat);
     return new THREE.Mesh(new THREE.PlaneGeometry(0.95, 0.95), mat);
   };
 
@@ -178,8 +230,10 @@ function buildCompassRose(globe: GeoViewHost) {
   for (const pole of poles) {
     const mat = new THREE.LineBasicMaterial({
       color: globe.geoColor, transparent: true, opacity: 0,
-      blending: THREE.AdditiveBlending, depthWrite: false,
+      depthWrite: false,
     });
+    globe.geoTints.push(mat.color);
+    blendReg(globe, mat);
     const dial = new THREE.LineSegments(dialGeo, mat);
     dial.position.y = pole.y;
     globe.surface.add(dial);
@@ -442,8 +496,8 @@ async function buildLand(globe: GeoViewHost) {
       // is culled instead of glowing through the translucent fill. BackSide because the
       // topojson ring winding puts the outward cliff face on the geometry's back side.
       transparent: true, depthWrite: false, side: THREE.BackSide,
-      blending: THREE.AdditiveBlending,
     });
+    blendReg(globe, wallMat);
     globe.surface.add(new THREE.Mesh(wallGeo, wallMat));
 
     // HOLOGRAPHIC LAND. The surface is the geo view's "ledger pane": a faint, CALM structural skin
@@ -460,9 +514,10 @@ async function buildLand(globe: GeoViewHost) {
     const landMat = new THREE.MeshBasicMaterial({
       map: landTex,
       color: new THREE.Color(globe.geoColor),
-      blending: THREE.AdditiveBlending, depthWrite: false,
+      depthWrite: false,
       transparent: true, opacity: 0, side: THREE.FrontSide,
     });
+    blendReg(globe, landMat);
     // SELECTED-COUNTRY FILL BOOST (user, 2026-07-11): the drilled country's interior firms up
     // while the rest of the world keeps the calm resting glass. A second equirect MASK texture
     // (rasterized per drill — setCountryFillMask) rides the same UVs as the land map; inside
@@ -488,6 +543,7 @@ async function buildLand(globe: GeoViewHost) {
         );
     };
     globe.landFillMat = landMat;
+    globe.geoTints.push(landMat.color);
     // base = the resting ADDITIVE strength of the land surface (0..1) — lower = more transparent.
     // Kept well below 1 so the globe reads as a faint calm hologram, the coastal walls the accent.
     globe.geoFades.push({ mat: globe.landFillMat, base: 0.38 });
@@ -512,9 +568,10 @@ async function buildLand(globe: GeoViewHost) {
         color: globe.geoColor,
         transparent: true,
         opacity: 0,
-        blending: THREE.AdditiveBlending,
         depthWrite: false,
       });
+      globe.geoTints.push(mat.color);
+      blendReg(globe, mat);
       const mesh = new THREE.LineSegments(new THREE.BufferGeometry(), mat);
       mesh.visible = false;
       const fade = { mat, base: 0 };

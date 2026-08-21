@@ -17,7 +17,7 @@
 // Drawn on the LEAD row and the HOT row only, so the trail stays calm; older ticks keep a hairline
 // strut drawn by the view. One Mesh, one preallocated geometry, rewritten event-time.
 import * as THREE from "three";
-import type { SceneColors } from "../../sceneColors";
+import { glowBlend, inkMix, type SceneColors } from "../../sceneColors";
 import type { TuneSchema } from "../../tune";
 import { METAGRAPHS } from "@/src/net/current";
 import { BAR_H, BAR_LIFT, FLOOR_Y, LEAD_X, TILE_LIFT } from "../../domain/ledgerLayout";
@@ -90,8 +90,12 @@ export class Ribbons {
   private _rowFade = [1, 1, 1];
   private _filter = "all";
   private _c = new THREE.Color();
+  /** The live palette — the sheet is normal-blended INK on paper, additive GLOW on the dark
+   *  ground, and its per-row brightness has to be expressed for whichever one it lands on. */
+  private _colors: SceneColors;
 
   constructor(colors: SceneColors, sceneColors: Record<string, number>) {
+    this._colors = colors;
     this._sceneColors = sceneColors;
     this._neutral = colors.core;
     const verts = RIBBON_ROWS * PER_ROW * VERTS_PER_RIBBON;
@@ -104,7 +108,7 @@ export class Ribbons {
     this._geo.setDrawRange(0, 0);
     this._mat = new THREE.MeshBasicMaterial({
       vertexColors: true, transparent: true, opacity: 0,
-      side: THREE.DoubleSide, depthWrite: false, blending: THREE.AdditiveBlending,
+      side: THREE.DoubleSide, depthWrite: false, blending: glowBlend(colors),
     });
     this._mesh = new THREE.Mesh(this._geo, this._mat);
     this._mesh.frustumCulled = false;
@@ -117,7 +121,22 @@ export class Ribbons {
     }
   }
 
-  setSceneColors(map: Record<string, number>): void { this._sceneColors = map; }
+  setSceneColors(map: Record<string, number>): void {
+    this._sceneColors = map;
+    this._writeGeometry(); // event-time: the sheet's colours are BAKED into vertex colours
+  }
+
+  /** THEME FLIP — the neutral trail colour is baked into the vertex colours alongside the identity
+   *  hues, so a retint is the same rewrite a filter commit runs. Event-time, like `setFilter`. */
+  setColors(c: SceneColors): void {
+    this._colors = c;
+    this._neutral = c.core;
+    // The GROUND changed, so the sheet's blend mode changes with it (see glowBlend): additive glow
+    // on the dark ground is a no-op on paper — the ribbons vanished outright before this line.
+    this._mat.blending = glowBlend(c);
+    this._mat.needsUpdate = true; // three caches the program per blending mode
+    this._writeGeometry(); // event-time: a theme flip, not a frame
+  }
 
   /** Live-tune the look (dev panel). Event-time: rewrites the sheet. */
   setTune(t: Partial<RibbonTune>): void {
@@ -209,7 +228,10 @@ export class Ribbons {
         this._c.setHex(hex);
         const off = this._filter !== "all" && key !== this._filter;
         const sc = snapBright(brightness * rowFade, off);
-        const cr = this._c.r * sc, cg = this._c.g * sc, cb = this._c.b * sc;
+        // Presence toward the GROUND, not toward black — on paper a multiply would make the
+        // dimmest sheet the darkest mark in the chamber and invert the dim tiers (see inkMix).
+        inkMix(this._c, sc, this._colors);
+        const cr = this._c.r, cg = this._c.g, cb = this._c.b;
         for (let j = 0; j < RIBBON_SEG; j++) {
           const t0 = j / RIBBON_SEG, t1 = (j + 1) / RIBBON_SEG;
           const s0 = sweep(t0, curve), s1 = sweep(t1, curve);

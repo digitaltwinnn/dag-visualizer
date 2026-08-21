@@ -15,6 +15,8 @@
 // makes cross-view consistency automatic (e.g. the geo hologram and the ledger tiles are both
 // `--primary`, so they match by construction).
 
+import * as THREE from "three";
+
 export interface SceneColors {
   core: number; //    --primary   (accent cyan — the DAG spine, live/selected signals, the geo
   //                               hologram + ledger tiles rendered dim, key light)
@@ -67,6 +69,69 @@ export function readColorToken(name: SceneColorVar): number {
   const v = resolveCssColor(`var(${name})`);
   if (v == null) throw new Error(`sceneColors: CSS token ${name} did not resolve (is globals.css applied?)`);
   return v;
+}
+
+/**
+ * Is the scene's GROUND paper rather than ink? Asked by the few scene modules whose BLEND MODE — not
+ * their colour — has to change with the theme: the glass fill glows (additive) on a dark ground and
+ * shades (normal blend, dark ink) on a light one. That is a fact about the BACKGROUND, not about a
+ * theme name, so the scene asks the colours it was handed and never learns the word "light" (rule 1
+ * keeps `scene/` free of store values; this keeps it free of the theme vocabulary too). ONE home for
+ * the question, so two adapters can't disagree about which ground they are on.
+ *
+ * Rec. 709 relative luminance over the packed sRGB bytes, thresholded at the midpoint — the two
+ * grounds this app ships sit at ~0.03 and ~0.95, so nothing rides on the exact cut.
+ */
+export function isLightGround(c: SceneColors): boolean {
+  const r = (c.bg >> 16) & 0xff, g = (c.bg >> 8) & 0xff, b = c.bg & 0xff;
+  return (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255 > 0.5;
+}
+
+/**
+ * THE SCENE'S GLOW IDIOM IS ADDITIVE, AND ADDITIVE IS A NO-OP ON PAPER. Every piece of emissive
+ * furniture in this app — the ribbons, the arcs, the hyper tethers and ring fills, the geo globe's
+ * graticule/borders/coastal wall, the density glow — adds light to a black ground. Add that same
+ * light to a 0.965-L ground and it saturates to white: the element is drawn, its tint is correct,
+ * and it is invisible. So the blend mode THEMES alongside the colour, and on a light ground the
+ * furniture paints its tint as INK (normal blend) instead of adding it as glow.
+ *
+ * One home, asked by every additive site (convention 8), because the failure is silent: a material
+ * that forgets to ask still renders, still retints, and still cannot be seen. Found live on the geo
+ * globe and again on the ledger's ribbons, which vanished entirely on paper.
+ *
+ * A material whose blend mode can change after construction must set `needsUpdate` when it does —
+ * three caches the program per blending mode.
+ */
+export function glowBlend(c: SceneColors): THREE.Blending {
+  return isLightGround(c) ? THREE.NormalBlending : THREE.AdditiveBlending;
+}
+
+const _ground = new THREE.Color();
+
+/**
+ * Scale a mark's PRESENCE for whichever ground it is painted on, in place (`out` arrives holding
+ * the mark's own hue). Companion to `glowBlend`: the sites that bake presence into a VERTEX colour
+ * rather than into a material `opacity` — the ledger's ribbons, hyper's tethers — need the same
+ * ground question answered a second way.
+ *
+ * On the dark ground the mark is additive glow, so less presence is a straight multiply toward
+ * black, which IS the ground. On paper the mark is normal-blended ink, and a multiply there drives
+ * it toward BLACK instead — making the dimmest thing the most prominent thing on the page and
+ * inverting every emphasis hierarchy in the app (dimTiers' order is the design). Presence on paper
+ * is therefore a lerp toward the PAPER: same meaning, expressed for the ground it lands on.
+ *
+ * Dark keeps the pure multiply rather than lerping from `--background` too: the dark look is
+ * byte-pinned, and a non-black ground would add a few percent of grey to every dimmed mark.
+ *
+ * Event-time only (colour bakes), so the module scratch never runs in a frame body.
+ */
+export function inkMix(out: THREE.Color, s: number, c: SceneColors): THREE.Color {
+  if (!isLightGround(c)) return out.multiplyScalar(s);
+  _ground.setHex(c.bg);
+  out.r = _ground.r + (out.r - _ground.r) * s;
+  out.g = _ground.g + (out.g - _ground.g) * s;
+  out.b = _ground.b + (out.b - _ground.b) * s;
+  return out;
 }
 
 // Read the four structural tokens from globals.css. Called once by the Engine at construction.
