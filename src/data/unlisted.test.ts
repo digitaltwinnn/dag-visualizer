@@ -1,9 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { METAGRAPHS } from "@/src/engine/config";
+import { METAGRAPHS } from "@/src/net/current";
 import {
   LISTED_IDS,
   UNLISTED_CFG,
-  UNLISTED_HUD_HEX,
   UNLISTED_HUE,
   UNLISTED_ID,
   UNLISTED_SCENE_HEX,
@@ -33,12 +32,10 @@ const LISTED = METAGRAPHS[0].id;
 
 describe("the unlisted identity", () => {
   // ⚠️ The module's own comment is the rule: the HUD lane resolves a CSS var and the two
-  // surfaces that CAN'T resolve one (SVG attributes, the scene) carry "the same tone as a baked
-  // number". Two literals written by hand, so nothing but this stops them drifting apart — and
-  // a drift repaints the rail thread in exactly the colour this neutral identity retired.
-  it("states one tone across all three lanes", () => {
-    expect(UNLISTED_HUD_HEX).toMatch(/^#[0-9a-f]{6}$/);
-    expect(UNLISTED_SCENE_HEX).toBe(parseInt(UNLISTED_HUD_HEX.slice(1), 16));
+  // the one surface that CAN'T resolve one (the scene) carries "the same tone as a baked
+  // number" (the HUD's last resolved-hex consumer, RailThread, now rides currentColor).
+  it("states one tone across both lanes", () => {
+    expect(UNLISTED_SCENE_HEX.toString(16).padStart(6, "0")).toMatch(/^[0-9a-f]{6}$/);
     expect(UNLISTED_HUE).toBe("var(--muted-foreground)");
   });
 

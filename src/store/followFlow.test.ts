@@ -6,7 +6,7 @@ import {
   followToggleActions,
   metaSnapSelectActions,
 } from "@/src/engine/domain/pickActions";
-import { METAGRAPHS } from "@/src/engine/config";
+import { METAGRAPHS } from "@/src/net/current";
 import type { GlobalSnapshot, MetaSnapSel, PickDescriptor } from "@/src/data/types";
 
 // The FOLLOW FLOW as a tested decision table (2026-08-08 — the retrospective's ask: the

@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
 import { unstable_cache } from "next/cache";
+import { NETWORKS, type NetworkId } from "@/src/engine/config";
+import { netOf } from "@/src/net/request";
 
 // TIMESTAMP → GLOBAL ORDINAL, exactly (user, 2026-08-14 — the history rows' ANCHORED INTO
 // join). The explorer stamps every metagraph snapshot with its anchoring global's OWN timestamp
@@ -13,16 +15,14 @@ import { unstable_cache } from "next/cache";
 
 export const maxDuration = 20;
 
-const BE = "https://be-mainnet.constellationnetwork.io";
-
 interface GlobalRec {
   ordinal: number;
   timestamp: string;
   hash: string;
 }
 
-async function fetchGlobal(ordinal: number): Promise<GlobalRec> {
-  const r = await fetch(`${BE}/global-snapshots/${ordinal}`, {
+async function fetchGlobal(net: NetworkId, ordinal: number): Promise<GlobalRec> {
+  const r = await fetch(`${NETWORKS[net].be}/global-snapshots/${ordinal}`, {
     headers: { Accept: "application/json" },
     cache: "no-store",
     signal: AbortSignal.timeout(6000),
@@ -35,11 +35,11 @@ async function fetchGlobal(ordinal: number): Promise<GlobalRec> {
 }
 
 // Ordinals are immutable — each probe caches for a day, shared across searches.
-const cachedGlobal = (ordinal: number) =>
-  unstable_cache(() => fetchGlobal(ordinal), ["be-global-v1", String(ordinal)], { revalidate: 86400 })();
+const cachedGlobal = (net: NetworkId, ordinal: number) =>
+  unstable_cache(() => fetchGlobal(net, ordinal), ["be-global-v1", net, String(ordinal)], { revalidate: 86400 })();
 
-async function latestOrdinal(): Promise<number> {
-  const r = await fetch(`${BE}/global-snapshots/latest`, {
+async function latestOrdinal(net: NetworkId): Promise<number> {
+  const r = await fetch(`${NETWORKS[net].be}/global-snapshots/latest`, {
     headers: { Accept: "application/json" },
     cache: "no-store",
     signal: AbortSignal.timeout(6000),
@@ -50,13 +50,13 @@ async function latestOrdinal(): Promise<number> {
   return j.data.ordinal;
 }
 
-async function resolve(ts: string): Promise<GlobalRec | null> {
+async function resolve(net: NetworkId, ts: string): Promise<GlobalRec | null> {
   let lo = 1;
-  let hi = await latestOrdinal();
+  let hi = await latestOrdinal(net);
   // ISO-8601 Zulu strings compare lexicographically; both sides come from the same indexer.
   while (lo <= hi) {
     const mid = Math.floor((lo + hi) / 2);
-    const g = await cachedGlobal(mid);
+    const g = await cachedGlobal(net, mid);
     if (g.timestamp === ts) return g;
     if (g.timestamp < ts) lo = mid + 1;
     else hi = mid - 1;
@@ -65,8 +65,8 @@ async function resolve(ts: string): Promise<GlobalRec | null> {
 }
 
 // The RESULT is immutable too (a timestamp's global never changes) — cache the whole search.
-const cachedResolve = (ts: string) =>
-  unstable_cache(() => resolve(ts), ["global-at-v1", ts], { revalidate: 86400 })();
+const cachedResolve = (net: NetworkId, ts: string) =>
+  unstable_cache(() => resolve(net, ts), ["global-at-v1", net, ts], { revalidate: 86400 })();
 
 export async function GET(req: Request) {
   const ts = new URL(req.url).searchParams.get("ts");
@@ -75,7 +75,7 @@ export async function GET(req: Request) {
     return NextResponse.json({ error: "bad ts" }, { status: 400 });
   }
   try {
-    const g = await cachedResolve(ts);
+    const g = await cachedResolve(netOf(req), ts);
     if (!g) return NextResponse.json({ available: false, ts }, { status: 404 });
     return NextResponse.json(g, { headers: { "Cache-Control": "public, max-age=86400, immutable" } });
   } catch {

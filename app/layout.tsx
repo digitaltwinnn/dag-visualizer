@@ -55,8 +55,20 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
       <body>
+        {/* Stamp the network on <html> BEFORE anything paints, so the [data-net] accent
+            override applies from the first frame. Inline because a layout cannot read
+            searchParams and middleware would make every page dynamic; the regex mirrors
+            src/net/parse.ts's validator (an inline script cannot import). CSP already
+            allows 'unsafe-inline' (next.config.mjs). suppressHydrationWarning on <html>
+            covers the pre-hydration dataset write. */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html:
+              '(function(){var m=/[?&]net=(integrationnet|testnet)(?:&|$)/.exec(location.search);if(m)document.documentElement.dataset.net=m[1];})();',
+          }}
+        />
         {children}
         <script
           type="application/ld+json"

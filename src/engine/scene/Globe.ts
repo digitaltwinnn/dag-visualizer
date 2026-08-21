@@ -14,7 +14,8 @@
 // boundary/cast layer needed.
 
 import * as THREE from "three";
-import { METAGRAPHS, DEFAULT_META_COLOR } from "../config";
+import { METAGRAPHS } from "@/src/net/current";
+import { DEFAULT_META_COLOR } from "../config";
 import { metaAnchor, META_LAYERS, META_RING, DAG_L0, DAG_L1, HYPER_TILT, applyHyperRig } from "../domain/hyperLayout";
 import { LEDGER, type RailGroup } from "../domain/ledgerLayout";
 import { metaTrayLayout, dagTrayLayout, containerChipPos, type ContainerSpec } from "../domain/ledgerRails";

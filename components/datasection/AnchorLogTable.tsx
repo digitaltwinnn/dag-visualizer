@@ -1,5 +1,6 @@
 "use client";
 
+import { netUrl } from "@/src/net/current";
 import { useEffect, useRef, useState } from "react";
 import { ArrowDown, ArrowUp } from "lucide-react";
 import { useStore } from "@/src/store/store";
@@ -126,7 +127,7 @@ export default function AnchorLogTable() {
     const before = frozen - (page - 1) * PAGE;
     if (page !== 1 && before < 1) return;
     let dead = false;
-    fetch(`/api/network/${histNet}/snapshots${page === 1 ? "" : `?before=${before}`}`)
+    fetch(netUrl(`/api/network/${histNet}/snapshots${page === 1 ? "" : `?before=${before}`}`))
       .then((r) => (r.ok ? (r.json() as Promise<{ rows: HistRow[] }>) : Promise.reject()))
       .then((d) => {
         if (dead) return;
@@ -156,7 +157,7 @@ export default function AnchorLogTable() {
         continue;
       }
       inFlight.current.add(r.ts);
-      fetch(`/api/global/at?ts=${encodeURIComponent(r.ts)}`)
+      fetch(netUrl(`/api/global/at?ts=${encodeURIComponent(r.ts)}`))
         .then((res) => (res.ok ? (res.json() as Promise<{ ordinal: number; hash: string }>) : Promise.reject()))
         .then((g2) => {
           resolved.current.set(r.ts, { ordinal: g2.ordinal, hash: g2.hash });

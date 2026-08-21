@@ -11,6 +11,8 @@ import Vitals, { VitalsCluster } from "@/components/topbar/Vitals";
 import FilterPicker from "@/components/topbar/FilterPicker";
 import EcgMark from "@/components/topbar/EcgMark";
 import PresentationToggle from "@/components/topbar/PresentationToggle";
+import NetworkSwitch, { NET_SWITCH_VIEW } from "@/components/topbar/NetworkSwitch";
+import NetLink from "@/components/NetLink";
 import { useBreakpoint } from "@/components/useBreakpoint";
 import type { Mode } from "@/src/store/store";
 
@@ -51,6 +53,23 @@ export default function TopBar() {
     if (bp === "phone") setOpen(false);
   }, [bp]);
 
+  // Consume the NetworkSwitch's one-shot view handoff (see its header): a network switch is a
+  // hard reload, and the view you were on survives it. Runs once on mount, BEFORE the engine's
+  // dynamic import resolves, so the scene boots straight into the carried view rather than
+  // transitioning to it. An effect, not a store initial value — SSR renders the default view,
+  // and a differing first client render is a hydration mismatch, which React 19 answers by
+  // regenerating the tree (the data-net trap, CLAUDE.md "The three networks").
+  useEffect(() => {
+    let saved: string | null = null;
+    try {
+      saved = sessionStorage.getItem(NET_SWITCH_VIEW);
+      if (saved != null) sessionStorage.removeItem(NET_SWITCH_VIEW);
+    } catch {
+      return; /* storage unavailable — nothing carried */
+    }
+    if (saved != null && VIEWS.some((v) => v.id === saved)) setMode(saved as Mode);
+  }, [setMode]);
+
   const face = filterFace(filter);
 
   // Publish the strip's rendered height as `--topbar-extra` (globals.css) so the RAILS slide
@@ -81,11 +100,17 @@ export default function TopBar() {
     const el = barRow.current;
     if (!el) return;
     const check = () => {
-      const over = el.scrollWidth - el.clientWidth;
+      // Two failure shapes since the grid promotion: the ROW overflowing its box, and a ZONE
+      // being crushed below its content (the left zone's min-w-0 lets the grid shrink it, so
+      // the row's own scrollWidth stays clean while the brand/filter get clipped inside it).
+      let over = el.scrollWidth - el.clientWidth;
+      for (const zone of el.children) {
+        if (zone instanceof HTMLElement) over = Math.max(over, zone.scrollWidth - zone.clientWidth);
+      }
       if (over > 0)
         console.warn(
           `[TopBar] the command bar overflows by ${over}px at ${window.innerWidth}px — ` +
-            "the trailing control is being clipped. Raise a breakpoint in components/TopBar.tsx.",
+            "a control is being clipped. Raise a breakpoint in components/TopBar.tsx.",
         );
     };
     check();
@@ -119,22 +144,24 @@ export default function TopBar() {
       <div
         ref={barRow}
         className={cn(
-          "flex items-center gap-3 py-2 px-3.5",
+          // A 3-zone grid at EVERY width (left cluster | view switch | right cluster) so the
+          // switch is TRULY centred in the bar. Flex spacers only centre it when the side
+          // clusters are equal-width — they never are (the phone measured the symptom first:
+          // ECG + filter ≈ 100px vs a 44px toggle pushed the switch ~28px right of centre) —
+          // and the NetworkSwitch made the right zone heavier still. `1fr auto 1fr`
+          // (minmax(auto,1fr)) keeps the sides equal while both fit and degrades as flex did
+          // past that: a long ticker shifts the switch instead of overlapping it; the dev
+          // overflow alarm below arbitrates. Promoted from the phone tier 2026-08-21 — the
+          // zone wrappers were already in the DOM as `display: contents` above 700px.
+          "grid grid-cols-[1fr_auto_1fr] items-center gap-3 py-2 px-3.5",
           "max-[1260px]:gap-2.5",
           "max-[940px]:gap-2 max-[940px]:px-2.5 max-[940px]:py-2",
-          // PHONE: a 3-zone grid (left cluster | view switch | right cluster) so the switch is
-          // TRULY centred in the bar. The flex layout centres it between the side clusters, and
-          // those are unequal (ECG + filter ≈ 100px vs the 44px vitals toggle), which pushed the
-          // switch ~28px right of centre — pre-existing, worsened by the removed funnel icon.
-          // `1fr auto 1fr` keeps the sides equal (centring the middle) and degrades gracefully:
-          // a long ticker just shifts the switch instead of overlapping it. Tablet/desktop keep
-          // the flex row unchanged (the zone wrappers are `display: contents` there).
-          "max-[700px]:gap-1.5 max-[700px]:p-2 max-[700px]:grid max-[700px]:grid-cols-[1fr_auto_1fr]",
+          "max-[700px]:gap-1.5 max-[700px]:p-2",
         )}
       >
-        {/* LEFT zone (phone grid): brand + filter. `contents` above 700px = invisible to the
-            flex row, so tablet/desktop layout is byte-identical. */}
-        <div className="contents max-[700px]:flex max-[700px]:items-center max-[700px]:gap-1 max-[700px]:min-w-0">
+        {/* LEFT zone: brand + filter. A real flex container at every width now that the grid
+            is the base layout — the in-zone gaps mirror the row's own gap steps. */}
+        <div className="flex items-center gap-3 max-[1260px]:gap-2.5 max-[940px]:gap-2 max-[700px]:gap-1 min-w-0">
         {/* Brand — AND the one route to /about (user, 2026-08-09, replacing the always-on
             experimental banner). The identity mark is the honest affordance for "what is this
             thing?": clicking the app's own name to read what it is, who made it and that it's
@@ -143,7 +170,7 @@ export default function TopBar() {
             Link: /about is a separate document with its own scroll, and the app is a long-lived
             WebGL tab — a client-side route change would tear the engine down and rebuild it on
             return, so the full navigation is the cheaper one. */}
-        <a
+        <NetLink
           href="/about"
           title="About DAG Visualizer, an unofficial community project"
           className={cn(
@@ -166,7 +193,7 @@ export default function TopBar() {
             <span className={live ? "text-foreground" : "text-muted-foreground opacity-70"}>DAG</span>{" "}
             <span className={cn("text-muted-foreground", !live && "opacity-70")}>Visualizer</span>
           </span>
-        </a>
+        </NetLink>
         <span className="w-px self-stretch bg-border my-1 max-[820px]:hidden" />
 
         {/* Filter (toned, de-nested) — toggles the ATTACHED filter strip below (user,
@@ -229,9 +256,6 @@ export default function TopBar() {
         </button>
         </div>
 
-        {/* Flex spacers (tablet/desktop only) — the phone grid's 1fr columns own the spacing. */}
-        <div className="flex-1 max-[700px]:hidden" />
-
         {/* View switch — structural. On phone there's no room for the three non-functional
             "soon" placeholders (Network/Transactions/Staking) — they're dimmed dead weight
             that helped overflow the bar, so phone shows only the 3 working views. Tablet +
@@ -282,11 +306,9 @@ export default function TopBar() {
           })}
         </ToggleGroup>
 
-        <div className="flex-1 max-[700px]:hidden" />
-
-        {/* RIGHT zone (phone grid): vitals. Mirrors the left zone (`contents` above 700px);
-            `justify-self-end` pins it to the bar's right edge in the grid. */}
-        <div className="contents max-[700px]:flex max-[700px]:items-center max-[700px]:gap-1.5 max-[700px]:justify-self-end">
+        {/* RIGHT zone: vitals + presentation. Mirrors the left zone; `justify-self-end` pins
+            it to the bar's right edge in the grid. */}
+        <div className="flex items-center gap-3 max-[1260px]:gap-2.5 max-[940px]:gap-2 max-[700px]:gap-1.5 justify-self-end">
         <span className="w-px self-stretch bg-border my-1 max-[820px]:hidden" />
 
         {/* Vitals — inline on tablet/desktop. On phone they render nothing here: the vitals
@@ -298,10 +320,20 @@ export default function TopBar() {
         {/* PRESENTATION — the bar's trailing control: ONE axis for how the view's information
             is presented (SCENE / CARDS / RAW — replacing the separate Focus icon + RAW switch,
             user 2026-08-08). It sits in the COMMAND bar (this zone's scope is the whole
-            instrument) rather than the live lane, and LAST because it acts on everything to
-            its left. */}
+            instrument) rather than the live lane. */}
         <span className="w-px self-stretch bg-border my-1 max-[820px]:hidden" />
         <PresentationToggle />
+
+        {/* Network switch — the RIGHT edge of the bar, one past the presentation toggle: the
+            network acts on everything INCLUDING presentation, so the edge escalates in scope
+            and the bar reads as a valley — brand (what this app is) and network (which chain)
+            at the outer edges, the most specific controls in the middle. On PHONE it rides
+            the filter strip's second row instead (see the strip below) — in this zone it
+            starved the filter face's word out of the bar (measured at 360-390, 2026-08-21). */}
+        <span className="w-px self-stretch bg-border my-1 max-[820px]:hidden" />
+        <div className="contents max-[700px]:hidden">
+          <NetworkSwitch />
+        </div>
         </div>
       </div>
 
@@ -334,6 +366,11 @@ export default function TopBar() {
             {bp === "phone" && (
               <div className="flex items-center justify-center gap-2 mx-2 px-2 pb-2 pt-1.5 border-t border-border/60">
                 <VitalsCluster align="center" />
+                {/* The phone home of the network switch (its bar slot is desktop/tablet-only):
+                    the strip row is the one place the bar grows, and it has the width the
+                    right zone doesn't. */}
+                <span className="w-px self-stretch bg-border my-1" />
+                <NetworkSwitch />
               </div>
             )}
           </div>

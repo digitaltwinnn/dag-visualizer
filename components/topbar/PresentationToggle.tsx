@@ -13,8 +13,10 @@ import { useStore } from "@/src/store/store";
 //     remain as the minimized possibility map) and the camera leans in (cameraRig.railsLean);
 //   · HUD   — the default four-zone overlay: the info cards over the scene;
 //   · RAW   — the data behind the view (SectionShell's depth choreography).
-// One segmented control (the view-switch ToggleGroup idiom, same sizing/on-state), sitting LAST
-// in the bar because it acts on everything to its left. The state derives from the two store
+// One segmented control (the view-switch ToggleGroup idiom, same sizing/on-state), sitting
+// last-but-one in the bar: it acts on everything to its left, and the NetworkSwitch to its
+// right acts on everything INCLUDING this toggle — the right edge escalates in scope (see
+// the multi-network design §5). The state derives from the two store
 // fields (`section`, `railsHidden`) and each pick writes both deterministically — Escape / the
 // raw layer's × still land on whichever scene presentation was active before. The SCENE segment
 // is desktop-only (below 1100px the rails are dock sheets); labels condense below 1560px,

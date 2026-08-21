@@ -16,7 +16,7 @@
 import type { Mode } from "@/src/store/store";
 import type { PickDescriptor, MetaSnapSel } from "@/src/data/types";
 import type { CohortSel, CompositionSel } from "./focusLadder";
-import { METAGRAPHS } from "../config";
+import { METAGRAPHS } from "@/src/net/current";
 import { UNLISTED_KEY } from "./ledgerBands";
 
 export type ClickAction =

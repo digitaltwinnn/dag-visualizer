@@ -19,7 +19,7 @@
 import * as THREE from "three";
 import type { SceneColors } from "../../sceneColors";
 import type { TuneSchema } from "../../tune";
-import { METAGRAPHS } from "../../config";
+import { METAGRAPHS } from "@/src/net/current";
 import { BAR_H, BAR_LIFT, FLOOR_Y, LEAD_X, TILE_LIFT } from "../../domain/ledgerLayout";
 import { SLOT_SP } from "../../domain/ledgerModel";
 import { ribbonQuad, RIBBON_LANE_HALF, type BarSpec, type RibbonQuad } from "../../domain/ledgerBands";

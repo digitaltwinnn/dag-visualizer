@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
 import { unstable_cache } from "next/cache";
+import { NETWORKS, type NetworkId } from "@/src/engine/config";
+import { netOf } from "@/src/net/request";
 
 // A CHAIN'S SPAN — genesis date and newest ordinal — for ANY currency address, the catalog and
 // the uncataloged alike (user, 2026-08-14: the unlisted card states real chain facts about a
@@ -9,7 +11,6 @@ import { unstable_cache } from "next/cache";
 
 export const maxDuration = 15;
 
-const BE = "https://be-mainnet.constellationnetwork.io";
 const ADDRESS = /^DAG[A-Za-z0-9]{30,45}$/;
 
 interface BeSnap {
@@ -31,7 +32,8 @@ async function readSnap(url: string): Promise<BeSnap | null> {
   return d ?? null;
 }
 
-async function fetchSpan(address: string) {
+async function fetchSpan(net: NetworkId, address: string) {
+  const BE = NETWORKS[net].be;
   const [genesis, latest] = await Promise.all([
     readSnap(`${BE}/currency/${address}/snapshots/1`),
     readSnap(`${BE}/currency/${address}/snapshots?limit=1`),
@@ -51,16 +53,16 @@ async function fetchSpan(address: string) {
   };
 }
 
-const cachedSpan = (address: string) =>
-  unstable_cache(() => fetchSpan(address), ["network-chain-span-v3", address], { revalidate: 300 })();
+const cachedSpan = (net: NetworkId, address: string) =>
+  unstable_cache(() => fetchSpan(net, address), ["network-chain-span-v3", net, address], { revalidate: 300 })();
 
-export async function GET(_req: Request, ctx: { params: Promise<{ address: string }> }) {
+export async function GET(req: Request, ctx: { params: Promise<{ address: string }> }) {
   const { address } = await ctx.params;
   if (!ADDRESS.test(address)) {
     return NextResponse.json({ error: "bad address" }, { status: 400 });
   }
   try {
-    const span = await cachedSpan(address);
+    const span = await cachedSpan(netOf(req), address);
     if (!span.available) return NextResponse.json({ available: false }, { status: 404 });
     return NextResponse.json(span, { headers: { "Cache-Control": "public, max-age=300" } });
   } catch {
