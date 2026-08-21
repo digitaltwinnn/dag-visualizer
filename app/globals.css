@@ -1,6 +1,19 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 
+/* Tailwind v4's automatic source detection scans PROSE too, and a class-shaped token in
+   documentation becomes a real utility: CLAUDE.md's own mention of the trap-3 form generated
+   `.bg-\[var\(\)\] { background-color: var(); }` — invalid CSS that fails the whole
+   stylesheet compile (found 2026-08-21 on a cold cache; the Turbopack persistent cache had
+   masked it). Docs are not markup: exclude them from candidate extraction. */
+@source not "../docs";
+@source not "../CLAUDE.md";
+@source not "../README.md";
+/* Tests never render markup, and the boundary tests NAME utility forms in their prose —
+   cssTrapBoundary's own `bg-[var()]` example was the second copy of the same failure. */
+@source not "../**/*.test.ts";
+@source not "../**/*.test.tsx";
+
 /* ── Shared subject-pairing highlight (useSubjectPairing.ts) ───────────────────
    A subject hovered in the 3D scene (or in chrome) lights its paired card/row in ITS identity hue
    (`--row-hue`, set inline only while paired) — the same hue the 3D object glows, so the two read
