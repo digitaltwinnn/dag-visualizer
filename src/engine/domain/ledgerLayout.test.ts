@@ -3,7 +3,7 @@ import { METAGRAPHS } from "@/src/net/current";
 import {
   LEDGER, LAYER_GEOM, ledgerSite, clusterRadius, ledgerSpread,
   FLOOR_IDS, FLOOR_Y, LANE_HALF_Z, PLANE_FIELD_HALF,
-  BAR_MAX_W, BAR_MIN_W, BAR_H, BAR_D, BYTE_SCALE_KB, BAR_EDGE_MARGIN,
+  BAR_MAX_W, BAR_MIN_W, BAR_H, BAR_D, BYTE_SCALE_KB, BYTE_SCALE_KB_BY_NET, BAR_EDGE_MARGIN,
   CONT_X, CONT_TOP_GAP, CONT_CHIP_Z, CONT_ROW_Y, CONT_PAD, CONT_Z0, CONT_Z1,
   LEAD_X, TILE_LIFT, BAR_LIFT,
   FLOOR_W, FLOOR_CX, FLOOR_FRONT_X, FLOOR_BACK_X,
@@ -123,6 +123,10 @@ describe("two-floor chamber (redesign 2026-08-04)", () => {
 
   it("carries the baked scale reference in KB (~p70 — the user prefers full-and-clipping over sliver bars)", () => {
     expect(BYTE_SCALE_KB).toBe(150);
+    // Under Node the resolver answers mainnet, so the live constant IS the mainnet row; the
+    // dev rows keep the mainnet reference until a bake finds honest traffic (see the source).
+    expect(BYTE_SCALE_KB).toBe(BYTE_SCALE_KB_BY_NET.mainnet);
+    for (const v of Object.values(BYTE_SCALE_KB_BY_NET)) expect(v).toBeGreaterThan(0);
   });
 
   it("hangs the node trays under their plane's front edge, facing the camera", () => {

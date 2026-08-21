@@ -23,7 +23,8 @@
 // cut — left the geometry with Task 16; their row constants are gone too, so the only heights
 // declared below are the two floors FLOOR_Y actually reads.)
 
-import { METAGRAPHS } from "@/src/net/current";
+import { METAGRAPHS, NET } from "@/src/net/current";
+import type { NetworkId } from "../config";
 import { hexCell } from "./nodeLayout";
 
 export const LEDGER = {
@@ -188,7 +189,19 @@ export function lanePlaneHalf(n: number): number {
  *  runs low: live ticks of 80–90 KB were observed within minutes of baking, i.e. the reference is
  *  exceeded more often than "p99" suggests. That is handled honestly (clip + overflow multiplier),
  *  not hidden. A future re-bake should calibrate against exact-read totals instead. */
-export const BYTE_SCALE_KB = 150; // rebaked 2026-08-16 at ~p70 of anchored KB/tick (median fills ~57%, ~30% of ticks clip with the honest ×N label) — the p99 bake made the median bar a sliver, and the user prefers 'more often too filled than too small'
+// One baked reference per network — scripts/bake-ledger-scale.ts <net>. Mainnet rebaked
+// 2026-08-16 at ~p70 of anchored KB/tick (median fills ~57%, ~30% of ticks clip) — the p99
+// bake made the median bar a sliver, and the user prefers 'more often too filled than too
+// small'. The dev networks were bake-probed 2026-08-21 and answered ZERO complete ticks in
+// the window (their chains anchor rarely for days at a stretch), so no honest per-network
+// quantile exists — both keep the mainnet reference rather than a number measured over
+// nothing; re-run the bake if dev traffic ever picks up.
+export const BYTE_SCALE_KB_BY_NET: Record<NetworkId, number> = {
+  mainnet: 150,
+  integrationnet: 150,
+  testnet: 150,
+};
+export const BYTE_SCALE_KB = BYTE_SCALE_KB_BY_NET[NET];
 
 // ── Node trays (redesign 2026-08-07 — ONE tray per snapshot plane, no role split): glass trays
 // hanging under the FRONT (+X, camera-side) edge of the plane their machines serve, facing the

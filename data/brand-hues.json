@@ -58,5 +58,105 @@
     "hueDeg": 248.99900000000002,
     "srcHex": "#1050e0",
     "source": "raster"
+  },
+  "DAG0chGHJTDN17VdgedukaZCxAPXwospruMoPL1E": {
+    "hueDeg": 240.99900000000002,
+    "srcHex": "#3e4fea",
+    "source": "svg"
+  },
+  "DAG2uPStsfJvszi559PFgY8VoJM2pKmvBC2u93Z4": {
+    "hueDeg": 324.24138620950623,
+    "srcHex": "#e030f0",
+    "source": "raster"
+  },
+  "DAG1JkGeewaTBHMLwk6aehofLbjoSxZ8DKo1yvA4": {
+    "hueDeg": 140.34509816880768,
+    "srcHex": "#11be08",
+    "source": "svg"
+  },
+  "DAG5bjTe13TY8GB6AN9HXiTCPXHJhdK5AFEMZfvx": {
+    "hueDeg": 345.2139949577628,
+    "srcHex": "#fb3cbb",
+    "source": "svg"
+  },
+  "DAG1jF8FDHEC8VhZwpVyyc6zDy8XE7JRAAAypmhr": {
+    "hueDeg": 41,
+    "srcHex": "#d02d2d",
+    "source": "svg"
+  },
+  "DAG0svaNZVPenLPujZ3hgHcYK2MmZJVyF4QjkaTk": {
+    "hueDeg": 106,
+    "srcHex": "#c0b070",
+    "source": "raster"
+  },
+  "DAG3GzFbfN6m5uEQpS6PwYHmTUZ373d5VWPA4uUi": {
+    "hueDeg": 54,
+    "srcHex": "",
+    "source": "override"
+  },
+  "DAG06mK9MUCiUchQnEwgqvSAcNmwKowgudWWf3ga": {
+    "hueDeg": 148.43941967131332,
+    "srcHex": "#00c050",
+    "source": "raster"
+  },
+  "DAG3qrtBnL8Zc9QjTPX9YW9v79eJdFNeS6YnLWjK": {
+    "hueDeg": 232.99900000000002,
+    "srcHex": "#102040",
+    "source": "raster"
+  },
+  "DAG7VNFvsf65gvVCYPkxVZYd2xYAsq4KFBYr8gKn": {
+    "hueDeg": 215.64929851249167,
+    "srcHex": "#206070",
+    "source": "raster"
+  },
+  "DAG1GH7r7RX1Ca7MbuvqUPT37FAtTfGM1WYQ4otZ": {
+    "hueDeg": 114,
+    "srcHex": "#f0d050",
+    "source": "raster"
+  },
+  "DAG8CHWAjGJP7JfHnHJ8BZ53AA4kq8xhniZZJRVY": {
+    "hueDeg": 130.4953388878099,
+    "srcHex": "#00f000",
+    "source": "raster"
+  },
+  "DAG387n6WmUQXfE6zyAd6R5EiYhmgQjWxt2e8NKP": {
+    "hueDeg": 73.99900000000002,
+    "srcHex": "#d0a030",
+    "source": "raster"
+  },
+  "DAG4dWrdALPQmvF5UBpuXrqdkMHea1H5f7rjb4qY": {
+    "hueDeg": 224.99900000000002,
+    "srcHex": "#7080f0",
+    "source": "raster"
+  },
+  "DAG5kfY9GoHF1CYaY8tuRJxmB3JSzAEARJEAkA2C": {
+    "hueDeg": 63,
+    "srcHex": "#df1e25",
+    "source": "svg"
+  },
+  "DAG1VF44t1ZaxK9gknpEYRysm3MBm7rsxhaARUGb": {
+    "hueDeg": 345.2139949577628,
+    "srcHex": "#fb3cbb",
+    "source": "svg"
+  },
+  "DAG6kKgcDKGWiT6paYfaqTAXxFZUaJWjbp9wjtyk": {
+    "hueDeg": 41,
+    "srcHex": "#d02d2d",
+    "source": "svg"
+  },
+  "DAG6tBEdBr1KsBByorcag2e2rAmhnL1hPV9fnfVD": {
+    "hueDeg": 142.34509816880768,
+    "srcHex": "#11be08",
+    "source": "svg"
+  },
+  "DAG8gMagrwoJ4nAMjbGx17WB5D6nqBEPZYChc3zH": {
+    "hueDeg": 49,
+    "srcHex": "#df1e25",
+    "source": "svg"
+  },
+  "DAG5j83gnnxMX1S5ZAZAszU9CRxsqJLxtRmyFPj6": {
+    "hueDeg": 316,
+    "srcHex": "#402070",
+    "source": "raster"
   }
 }
