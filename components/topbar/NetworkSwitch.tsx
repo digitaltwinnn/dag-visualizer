@@ -6,7 +6,17 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { SELECTED_ROW } from "@/components/selection";
 import { cn } from "@/lib/utils";
 import { NET } from "@/src/net/current";
+import { useStore } from "@/src/store/store";
 import type { NetworkId } from "@/src/engine/config";
+
+// A network switch is a hard reload (the network is a page parameter), but the VIEW you were
+// on survives it (user, 2026-08-21): each row writes a ONE-SHOT per-tab handoff as the
+// navigation starts, and TopBar consumes it on the next boot through the ordinary setMode
+// path — the same click a user would make, so the engine simply boots into that view.
+// Deliberately NOT a URL param: this repo has no URL deep links into views, and a copied
+// /?net= link stays clean; a new tab (middle-click) is a fresh entry and starts at the
+// default view, which is exactly what a fresh entry is.
+export const NET_SWITCH_VIEW = "dagviz:net-switch-view";
 
 // The network switch — RIGHTMOST in the command bar (multi-network design §5): the right edge
 // escalates in scope (…vitals → presentation → network), so the bar reads as a valley with the
@@ -66,6 +76,13 @@ export default function NetworkSwitch() {
             key={r.id}
             href={r.href}
             aria-current={r.id === net ? "page" : undefined}
+            onClick={() => {
+              try {
+                sessionStorage.setItem(NET_SWITCH_VIEW, useStore.getState().mode);
+              } catch {
+                /* storage unavailable (private mode) — the switch still works, view resets */
+              }
+            }}
             className={cn(
               "flex items-center gap-2.5 rounded-md px-2.5 py-2 text-label",
               "text-muted-foreground hover:text-foreground hover:bg-wash-soft",

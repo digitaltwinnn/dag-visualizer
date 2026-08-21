@@ -11,7 +11,7 @@ import Vitals, { VitalsCluster } from "@/components/topbar/Vitals";
 import FilterPicker from "@/components/topbar/FilterPicker";
 import EcgMark from "@/components/topbar/EcgMark";
 import PresentationToggle from "@/components/topbar/PresentationToggle";
-import NetworkSwitch from "@/components/topbar/NetworkSwitch";
+import NetworkSwitch, { NET_SWITCH_VIEW } from "@/components/topbar/NetworkSwitch";
 import NetLink from "@/components/NetLink";
 import { useBreakpoint } from "@/components/useBreakpoint";
 import type { Mode } from "@/src/store/store";
@@ -52,6 +52,23 @@ export default function TopBar() {
   useEffect(() => {
     if (bp === "phone") setOpen(false);
   }, [bp]);
+
+  // Consume the NetworkSwitch's one-shot view handoff (see its header): a network switch is a
+  // hard reload, and the view you were on survives it. Runs once on mount, BEFORE the engine's
+  // dynamic import resolves, so the scene boots straight into the carried view rather than
+  // transitioning to it. An effect, not a store initial value — SSR renders the default view,
+  // and a differing first client render is a hydration mismatch, which React 19 answers by
+  // regenerating the tree (the data-net trap, CLAUDE.md "The three networks").
+  useEffect(() => {
+    let saved: string | null = null;
+    try {
+      saved = sessionStorage.getItem(NET_SWITCH_VIEW);
+      if (saved != null) sessionStorage.removeItem(NET_SWITCH_VIEW);
+    } catch {
+      return; /* storage unavailable — nothing carried */
+    }
+    if (saved != null && VIEWS.some((v) => v.id === saved)) setMode(saved as Mode);
+  }, [setMode]);
 
   const face = filterFace(filter);
 
