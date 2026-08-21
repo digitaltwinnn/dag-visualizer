@@ -1749,6 +1749,50 @@ in a mount effect (NetLink, NetworkSwitch): a hydration mismatch makes React 19 
 tree, which strips the `data-net` stamp — and `suppressHydrationWarning` is not the tool, it
 KEEPS the server value.
 
+## Light/dark
+
+**Theme is a two-way pref (`system` / `light` / `dark`), not a boolean** — `src/theme/resolve.ts`
+is the one resolver (`ThemePref`, `Theme`, `THEME_KEY`, `parseThemePref`, `resolveTheme`), the
+`src/net/parse.ts` pattern mirrored for theme. Almost every token is a single `light-dark(dark,
+light)` call at its ONE definition site in `:root` — no second `[data-theme]` override block the
+way the network accent needs, because CSS itself carries both values. `color-scheme: light dark`
+on `:root` is what makes `light-dark()` resolve at all; an explicit choice stamps
+`[data-theme="light"|"dark"]` on `<html>`, narrowing `color-scheme` to just that value, and
+`System` removes the attribute so the browser's own `prefers-color-scheme` decides — confirmed
+live: flipping the OS scheme with no reload repaints every token with zero JS, because nothing
+but CSS is involved while `data-theme` is absent. layout.tsx's inline pre-paint script (the same
+device the network accent uses) reads `localStorage['dagviz:theme']` and stamps `data-theme`
+synchronously before first paint, so a stored explicit choice never flashes the wrong scheme.
+**The one number exception**: `--ident-l`/`--ident-c` are numbers, and `light-dark()` is
+`<color>`-only, so they use the guarded override pair instead (`:root` bakes the dark value,
+`:root:not([data-theme="light"])` and `:root[data-theme="light"]` both restate it) — the CSS
+comment above them states it as the one exception.
+
+**`components/ThemeController.tsx` is THE one owner of theme state.** It reads the stored pref on
+mount, adopts what the pre-paint script already stamped, and is the app's only
+`matchMedia("(prefers-color-scheme: dark)")` listener — it resolves against the CURRENT pref on
+every OS change, so a flip is a no-op unless the pref is `system`. `applyThemePref()` is the one
+write path (stamps or removes `data-theme`, persists or clears `localStorage`, writes the store's
+`theme`/`themePref` pair); `ThemeToggle` calls it and renders nothing of its own — same
+React-19 mount-state rule "The three networks" states for `NetLink`/`NetworkSwitch`: it boots
+`system` on server AND first client render, so hydration sees no mismatch and the icon corrects
+itself once `ThemeController`'s effect adopts the stored choice.
+
+**The Engine swaps colours in place, never rebuilds.** `_colors` (the structural `SceneColors`)
+and `_sceneColorMap` (the identity hex map) are both mutated by `_refreshTheme()`, so every
+per-frame reader that captured a reference at construction sees the new values with no code
+change; `_colorConsumers` is the fan-out array (`HyperView`, `Globe`, `LedgerView`) populated
+once in construction order, each exposing `setColors`/`setSceneColors`. `_bloomMul` (dark `1`,
+light `0.15`) is the same swap-in-place contract applied to a non-colour constant — decided once
+at construction and rewritten by the same `_refreshTheme()` call. The Engine never listens to
+`matchMedia` or the DOM itself; it detects a flip purely by diffing the store's `theme` field
+once per frame against the previous read.
+
+**Sub-project 2 (per-view day-look refinement) is open.** Byte-identity against master is pinned
+for dark; light is correct at the token and page level but each 3D view's own look under light
+(bloom, glass, ribbon contrast) has not had its own tuning pass — the ledger chamber in
+particular reads washed out under light today.
+
 ## Data — server-side routes
 
 Metagraph cluster endpoints are plain HTTP on custom ports with **no CORS**, so the browser can't fetch
