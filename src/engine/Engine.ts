@@ -16,7 +16,7 @@ import { UNLISTED_KEY } from "./domain/ledgerBands";
 // The public catalog's ids — the unknown-lane tile resolver splits listed from unlisted rows.
 import { StageLight } from "./scene/objects/StageLight";
 import { loadGeoCache, resolveMissing } from "@/src/data/geoResolve";
-import { METAGRAPHS, netUrl } from "@/src/net/current";
+import { METAGRAPHS, NET, netUrl } from "@/src/net/current";
 import { COLORS } from "@/src/engine/config";
 import { BYTE_SCALE_KB, type RailGroup } from "./domain/ledgerLayout";
 import { HYPER_TILT, HYPER_TILT_FOCUS } from "./domain/hyperLayout";
@@ -319,8 +319,11 @@ export class Engine {
         Math.abs(((a >> 16) & 255) - ((b >> 16) & 255)) <= 2 &&
         Math.abs(((a >> 8) & 255) - ((b >> 8) & 255)) <= 2 &&
         Math.abs((a & 255) - (b & 255)) <= 2;
-      const drift = ([["core", COLORS.core, colors.core], ["dagCore", COLORS.dagCore, colors.dagCore],
-        ["bg", COLORS.bg, colors.bg]] as const)
+      // The mirror mirrors :root — under a dev network the [data-net] override re-points
+      // --primary ON PURPOSE, so only mainnet checks core. dagCore/bg are never overridden.
+      const drift = ([...(NET === "mainnet" ? [["core", COLORS.core, colors.core] as const] : []),
+        ["dagCore", COLORS.dagCore, colors.dagCore] as const,
+        ["bg", COLORS.bg, colors.bg] as const])
         .filter(([, a, b]) => !near(a, b)).map(([k]) => k);
       if (drift.length) console.warn(
         `[sceneColors] config.COLORS drifts from globals.css tokens: ${drift.join(", ")} — update config.ts to match.`,

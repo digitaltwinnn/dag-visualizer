@@ -1,14 +1,13 @@
 import type { PickDescriptor } from "./types";
-import { hex } from "@/src/util/format";
 import { METAGRAPHS } from "@/src/net/current";
-import { COLORS } from "@/src/engine/config";
 import { identityHudHex } from "@/src/palette/identity";
 
-// Core cyan (the DAG spine) — the identity hue for every NON-metagraph subject (a DAG-core
-// validator, the L0 core, a global snapshot). From the plain-constant config (and the
-// Node-safe src/net/current for the catalog), NOT network.ts (browser-only), so this module
-// stays Node-test-safe.
-const CORE = hex((COLORS as { core: number }).core);
+// The identity colour for every NON-metagraph subject (a DAG-core validator, the L0 core, a
+// global snapshot) is the structural accent token itself, `var(--primary)` — resolved by CSS
+// at render time (Tooltip renders it as a `color` style property), never by JS, so it tracks
+// the network's [data-net] accent override with nothing to keep in sync, and this module
+// stays Node-test-safe (no DOM read).
+const CORE = "var(--primary)";
 
 // The stable hover-pairing KEY for a NODE pick: a validator by its MACHINE id (so a hybrid's
 // several layer-shells read as one machine), a metagraph node by its IP. Anything else → null.

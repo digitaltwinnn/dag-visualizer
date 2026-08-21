@@ -1,10 +1,10 @@
 import { describe, it, expect } from "vitest";
 import { hoverKeyOf, tooltipSubject } from "./hoverSubject";
-import { COLORS } from "@/src/engine/config";
 
-// The core accent hex, derived from the SAME source tooltipSubject uses (config.COLORS.core, the
-// mirror of --primary) — not a hardcoded literal, so a token change can't silently break this.
-const CORE = "#" + COLORS.core.toString(16).padStart(6, "0");
+// The identity colour for every NON-metagraph subject is the token itself, `var(--primary)` —
+// resolved by CSS at render time (Tooltip renders it as a `color` style property), never by
+// JS, so there is nothing to keep in sync with the network's accent override.
+const CORE = "var(--primary)";
 
 describe("hoverKeyOf", () => {
   it("keys a metagraph node by ip", () => {
