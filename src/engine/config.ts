@@ -85,9 +85,10 @@ export interface MetaConfig {
 // that same live directory, so re-running it is the other half of adding a row here.
 // One catalog per network. Ids are globally unique across networks (verified 2026-08-20:
 // PacaSwap's mainnet and testnet ids differ), so data/brand-hues.json stays one flat id-keyed
-// file. Dev-network rows carry DEFAULT_META_COLOR as their seed — the SENTINEL for "no seed":
-// configPins() skips it (src/palette/identity.ts), so a dev metagraph's hue comes from its
-// baked brand pin or the hash fallback, never from 18 rows sharing one green.
+// file. Dev-network rows carry color: 0 — the SENTINEL for "no seed": configPins() skips it
+// (src/palette/identity.ts), so a dev metagraph's hue comes from its baked brand pin or the
+// hash fallback, never from 18 rows sharing one seed. (DEFAULT_META_COLOR is NOT the sentinel
+// on purpose — mainnet's Common Crawl row genuinely seeds that value.)
 export const CATALOG: Record<NetworkId, MetaConfig[]> = {
   mainnet: [
     // ⚠️ BioFi was MISSING here while the live route listed it (found 2026-08-12), and the symptom
@@ -122,53 +123,53 @@ export const CATALOG: Record<NetworkId, MetaConfig[]> = {
       blurb: "Foot-traffic & commerce data from the Dor Traffic Miner, validated on its own metagraph." },
   ],
   integrationnet: [
-    { name: "ChainStats", ticker: "STATS", color: DEFAULT_META_COLOR, id: "DAG6BDkunF5NcyneYvgaEZTZiyF18QUdr7XuC3oY",
+    { name: "ChainStats", ticker: "STATS", color: 0, id: "DAG6BDkunF5NcyneYvgaEZTZiyF18QUdr7XuC3oY",
       blurb: "Decentralized nodes aggregating and validating on-chain data to democratize access to blockchain information." },
-    { name: "Digital Evidence", ticker: "DED", color: DEFAULT_META_COLOR, id: "DAG0chGHJTDN17VdgedukaZCxAPXwospruMoPL1E",
+    { name: "Digital Evidence", ticker: "DED", color: 0, id: "DAG0chGHJTDN17VdgedukaZCxAPXwospruMoPL1E",
       blurb: "DoD-vetted data-fingerprinting as a service — immutable proof of data authenticity via a simple API." },
-    { name: "BLDR", ticker: "BLDR", color: DEFAULT_META_COLOR, id: "DAG2uPStsfJvszi559PFgY8VoJM2pKmvBC2u93Z4",
+    { name: "BLDR", ticker: "BLDR", color: 0, id: "DAG2uPStsfJvszi559PFgY8VoJM2pKmvBC2u93Z4",
       blurb: "Decentralized validation and incentivization of social data and community interactions." },
-    { name: "ACY", ticker: "ACY", color: DEFAULT_META_COLOR, id: "DAG1JkGeewaTBHMLwk6aehofLbjoSxZ8DKo1yvA4",
+    { name: "ACY", ticker: "ACY", color: 0, id: "DAG1JkGeewaTBHMLwk6aehofLbjoSxZ8DKo1yvA4",
       blurb: "ACY." },
-    { name: "PacaSwap", ticker: "SWAP", color: DEFAULT_META_COLOR, id: "DAG5bjTe13TY8GB6AN9HXiTCPXHJhdK5AFEMZfvx",
+    { name: "PacaSwap", ticker: "SWAP", color: 0, id: "DAG5bjTe13TY8GB6AN9HXiTCPXHJhdK5AFEMZfvx",
       blurb: "A scalable, secure trading environment for swapping L0 tokens, earning rewards and governance." },
-    { name: "ACX", ticker: "ACX", color: DEFAULT_META_COLOR, id: "DAG1jF8FDHEC8VhZwpVyyc6zDy8XE7JRAAAypmhr",
+    { name: "ACX", ticker: "ACX", color: 0, id: "DAG1jF8FDHEC8VhZwpVyyc6zDy8XE7JRAAAypmhr",
       blurb: "ACX." },
-    { name: "The Void", ticker: "HALO", color: DEFAULT_META_COLOR, id: "DAG4iv2b5XE9WNc7fLeyvF2bFkHkmCqhXZMrQH6N",
+    { name: "The Void", ticker: "HALO", color: 0, id: "DAG4iv2b5XE9WNc7fLeyvF2bFkHkmCqhXZMrQH6N",
       blurb: "A decentralized platform for builders and organizations to tokenize applications, services and data." },
-    { name: "Hypermatrix", ticker: "HPMX", color: DEFAULT_META_COLOR, id: "DAG0svaNZVPenLPujZ3hgHcYK2MmZJVyF4QjkaTk",
+    { name: "Hypermatrix", ticker: "HPMX", color: 0, id: "DAG0svaNZVPenLPujZ3hgHcYK2MmZJVyF4QjkaTk",
       blurb: "A streamlined, easy-to-integrate Web3 solution for game developers." },
-    { name: "The Upsider AI", ticker: "UP", color: DEFAULT_META_COLOR, id: "DAG3GzFbfN6m5uEQpS6PwYHmTUZ373d5VWPA4uUi",
+    { name: "The Upsider AI", ticker: "UP", color: 0, id: "DAG3GzFbfN6m5uEQpS6PwYHmTUZ373d5VWPA4uUi",
       blurb: "An AI-agent metagraph introducing new users to Constellation with challenges rewarded in $DAG." },
-    { name: "BioFi", ticker: "BIOFI", color: DEFAULT_META_COLOR, id: "DAG06mK9MUCiUchQnEwgqvSAcNmwKowgudWWf3ga",
+    { name: "BioFi", ticker: "BIOFI", color: 0, id: "DAG06mK9MUCiUchQnEwgqvSAcNmwKowgudWWf3ga",
       blurb: "A utility token uniting an ecosystem focused on safeguarding personal data and protecting users from fraud." },
-    { name: "Common Crawl", ticker: "CMC", color: DEFAULT_META_COLOR, id: "DAG3qrtBnL8Zc9QjTPX9YW9v79eJdFNeS6YnLWjK",
+    { name: "Common Crawl", ticker: "CMC", color: 0, id: "DAG3qrtBnL8Zc9QjTPX9YW9v79eJdFNeS6YnLWjK",
       blurb: "Open web-crawl data, validated and anchored to the Hypergraph for provenance." },
-    { name: "AutoSight", ticker: "AUTO", color: DEFAULT_META_COLOR, id: "DAG7VNFvsf65gvVCYPkxVZYd2xYAsq4KFBYr8gKn",
+    { name: "AutoSight", ticker: "AUTO", color: 0, id: "DAG7VNFvsf65gvVCYPkxVZYd2xYAsq4KFBYr8gKn",
       blurb: "Reward token minted to users for contributing image data to the AutoSight metagraph." },
-    { name: "El Paca", ticker: "PACA", color: DEFAULT_META_COLOR, id: "DAG1GH7r7RX1Ca7MbuvqUPT37FAtTfGM1WYQ4otZ",
+    { name: "El Paca", ticker: "PACA", color: 0, id: "DAG1GH7r7RX1Ca7MbuvqUPT37FAtTfGM1WYQ4otZ",
       blurb: "A meme-utility token rewarding community members for engaging in network activities." },
-    { name: "Cyberlete", ticker: "LEET", color: DEFAULT_META_COLOR, id: "DAG8CHWAjGJP7JfHnHJ8BZ53AA4kq8xhniZZJRVY",
+    { name: "Cyberlete", ticker: "LEET", color: 0, id: "DAG8CHWAjGJP7JfHnHJ8BZ53AA4kq8xhniZZJRVY",
       blurb: "Tournament and engagement data processed through consensus validation on a metagraph." },
-    { name: "Intrana", ticker: "INT", color: DEFAULT_META_COLOR, id: "DAG3spUrLbFXgxhhapFRjLj72P7WV2f4h9f98dXV",
+    { name: "Intrana", ticker: "INT", color: 0, id: "DAG3spUrLbFXgxhhapFRjLj72P7WV2f4h9f98dXV",
       blurb: "Intrana utility token." },
-    { name: "National Digifoundry", ticker: "NDT", color: DEFAULT_META_COLOR, id: "DAG387n6WmUQXfE6zyAd6R5EiYhmgQjWxt2e8NKP",
+    { name: "National Digifoundry", ticker: "NDT", color: 0, id: "DAG387n6WmUQXfE6zyAd6R5EiYhmgQjWxt2e8NKP",
       blurb: "A national collaboration fostering continuous innovation in the digital asset ecosystem." },
-    { name: "Metagraph Token", ticker: "MGT", color: DEFAULT_META_COLOR, id: "DAG4dWrdALPQmvF5UBpuXrqdkMHea1H5f7rjb4qY",
+    { name: "Metagraph Token", ticker: "MGT", color: 0, id: "DAG4dWrdALPQmvF5UBpuXrqdkMHea1H5f7rjb4qY",
       blurb: "Metagraph used for testing purposes." },
-    { name: "Dor Technologies", ticker: "DOR", color: DEFAULT_META_COLOR, id: "DAG5kfY9GoHF1CYaY8tuRJxmB3JSzAEARJEAkA2C",
+    { name: "Dor Technologies", ticker: "DOR", color: 0, id: "DAG5kfY9GoHF1CYaY8tuRJxmB3JSzAEARJEAkA2C",
       blurb: "Foot-traffic & commerce data from the Dor Traffic Miner, validated on its own metagraph." },
   ],
   testnet: [
-    { name: "PacaSwap", ticker: "SWAP", color: DEFAULT_META_COLOR, id: "DAG1VF44t1ZaxK9gknpEYRysm3MBm7rsxhaARUGb",
+    { name: "PacaSwap", ticker: "SWAP", color: 0, id: "DAG1VF44t1ZaxK9gknpEYRysm3MBm7rsxhaARUGb",
       blurb: "A scalable, secure trading environment for swapping L0 tokens, earning rewards and governance." },
-    { name: "ACX", ticker: "ACX", color: DEFAULT_META_COLOR, id: "DAG6kKgcDKGWiT6paYfaqTAXxFZUaJWjbp9wjtyk",
+    { name: "ACX", ticker: "ACX", color: 0, id: "DAG6kKgcDKGWiT6paYfaqTAXxFZUaJWjbp9wjtyk",
       blurb: "ACX." },
-    { name: "ACY", ticker: "ACY", color: DEFAULT_META_COLOR, id: "DAG6tBEdBr1KsBByorcag2e2rAmhnL1hPV9fnfVD",
+    { name: "ACY", ticker: "ACY", color: 0, id: "DAG6tBEdBr1KsBByorcag2e2rAmhnL1hPV9fnfVD",
       blurb: "ACY." },
-    { name: "Dor Technologies", ticker: "DOR", color: DEFAULT_META_COLOR, id: "DAG8gMagrwoJ4nAMjbGx17WB5D6nqBEPZYChc3zH",
+    { name: "Dor Technologies", ticker: "DOR", color: 0, id: "DAG8gMagrwoJ4nAMjbGx17WB5D6nqBEPZYChc3zH",
       blurb: "Foot-traffic & commerce data from the Dor Traffic Miner, validated on its own metagraph." },
-    { name: "Constellation Test Token", ticker: "CTT", color: DEFAULT_META_COLOR, id: "DAG5j83gnnxMX1S5ZAZAszU9CRxsqJLxtRmyFPj6",
+    { name: "Constellation Test Token", ticker: "CTT", color: 0, id: "DAG5j83gnnxMX1S5ZAZAszU9CRxsqJLxtRmyFPj6",
       blurb: "Metagraph used for testing purposes." },
   ],
 };

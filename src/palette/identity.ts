@@ -40,7 +40,11 @@ let _pins: Record<string, number> | null = null;
 export function configPins(): Record<string, number> {
   if (_pins) return _pins;
   const pins: Record<string, number> = {};
-  for (const m of CONFIG) pins[m.id] = hexToHueDeg(m.color);
+  // color: 0 is the "no seed" sentinel (dev-network catalog rows all carry it): skip, so
+  // those metagraphs resolve through their baked brand pin or the hash fallback — 23 rows
+  // sharing one seed would otherwise pin two whole networks to one hue. No mainnet row
+  // carries 0 (DEFAULT_META_COLOR would NOT work as the sentinel — Common Crawl seeds it).
+  for (const m of CONFIG) if (m.color !== 0) pins[m.id] = hexToHueDeg(m.color);
   _pins = Object.freeze(pins);
   return _pins;
 }
