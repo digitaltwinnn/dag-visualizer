@@ -620,7 +620,7 @@ export default function RailDock({
             // Sheet's own chrome (label + close), ABOVE the hosted content so the ✕ never overlaps a
             // hosted card's top-right control. The close is ≥44px.
             <div className="flex items-center justify-between gap-2">
-              <SheetTitle className="m-0 text-body font-semibold tracking-[0.02em] uppercase text-foreground opacity-90 [text-shadow:0_1px_2px_rgba(3,5,12,0.7)]">
+              <SheetTitle className="m-0 text-body font-semibold tracking-[0.02em] uppercase text-foreground opacity-90 [text-shadow:0_1px_2px_var(--scrim-shadow)]">
                 {label}
               </SheetTitle>
               {/* The sheet's × on the same ghost-Button baseline as CardHead's card close (muted,

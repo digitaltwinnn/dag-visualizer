@@ -20,12 +20,11 @@ import { SHELL_ID } from "@/components/SectionShell";
 // exact x-mirror of the right one (x' = W − x), ticks pointing outward toward the screen edge.
 //
 // Ruler-hairline spec — mirrors the CSS `--thread-*` tokens (globals.css) so the SVG threads and the
-// bar-chart axis read identically. Kept as literals because an SVG stroke ATTRIBUTE can't resolve a
-// CSS var(); keep the two in sync.
+// bar-chart axis read identically. The lines below consume them via the `.thread-rule`/`.thread-tick`/
+// `.thread-tick-major` classes (globals.css, unlayered) — a CSS PROPERTY on SVG resolves var() even
+// though a presentation ATTRIBUTE (`stroke="…"`) doesn't, which is why this used to mirror the tokens
+// as literal consts (retired 2026-08-21).
 const TICK_PITCH = 13; // px between hairlines
-const TICK_LINE = "rgba(178,193,223,0.40)"; // neutral base line (CSS --thread-line)
-const TICK_MINOR = "rgba(178,193,223,0.3)"; // short hairline
-const TICK_MAJOR = "rgba(178,193,223,0.42)"; // every 4th — longer + brighter
 
 type Side = "left" | "right";
 
@@ -52,10 +51,6 @@ const GEOM: Record<Side, {
 // contrast is consistent across breakpoints. 0.6 here is the SVG-attribute fallback (SVG `opacity`
 // attributes don't resolve CSS vars; the group uses a style prop instead — see below).
 const REST_DIM = "var(--rail-rest-dim, 0.6)";
-
-// The dark punch behind a node-dot, separating it from the identity spine it sits on. NB a real
-// hex, not var(--panel): an SVG `fill`/`stroke` ATTRIBUTE doesn't resolve CSS custom properties.
-const PUNCH = "#0c1020";
 
 // The thread's soft top/bottom entry, in PIXELS — see the render note where it is applied for why
 // a percentage was the wrong unit here. The top ramp is short enough to clear the first card's
@@ -258,11 +253,11 @@ export default function RailThread({ side = "right" }: { side?: Side }) {
            spine takes the full resting dim, keeping brightness for the signals + node dots. */}
         <g style={{ opacity: 0.9 }}>
           {/* neutral base line — SOFT/muted; carries the ruler ticks. */}
-          <line x1={gm.neut} y1={0} x2={gm.neut} y2={H} stroke={TICK_LINE} strokeWidth={1} />
+          <line x1={gm.neut} y1={0} x2={gm.neut} y2={H} className="thread-rule" strokeWidth={1} />
           {/* ruler ticker hatches — short marks stepping OUTWARD from the neutral line toward the screen
              edge; muted, every 4th a touch longer/brighter (an instrument scale). */}
           {ticks.map((y, i) => (
-            <line key={i} x1={gm.neut} y1={y} x2={i % 4 === 0 ? gm.tickMaj : gm.tickMin} y2={y} stroke={i % 4 === 0 ? TICK_MAJOR : TICK_MINOR} strokeWidth={1} />
+            <line key={i} x1={gm.neut} y1={y} x2={i % 4 === 0 ? gm.tickMaj : gm.tickMin} y2={y} className={i % 4 === 0 ? "thread-tick-major" : "thread-tick"} strokeWidth={1} />
           ))}
         </g>
         <g style={{ opacity: REST_DIM }}>
@@ -288,14 +283,16 @@ export default function RailThread({ side = "right" }: { side?: Side }) {
               <line x1={x1} y1={m.y} x2={gm.dot} y2={m.y} stroke="currentColor" strokeWidth={1.25} opacity={m.focus ? 0.9 : m.entry ? 0.55 : 0.7} />
               {m.ghost ? (
                 <>
-                  {/* punch first, then the ring — a hollow dot still has to sit ON the spine */}
-                  <circle cx={gm.dot} cy={m.y} r={4.2} fill={PUNCH} />
+                  {/* punch first, then the ring — a hollow dot still has to sit ON the spine. A CSS
+                     PROPERTY (style), not the `fill` attribute, so var() resolves; `.thread-punch`
+                     is stroke-only (its other consumer below keeps its own currentColor fill). */}
+                  <circle cx={gm.dot} cy={m.y} r={4.2} style={{ fill: "var(--thread-punch)" }} />
                   <circle cx={gm.dot} cy={m.y} r={3.2} fill="none" stroke="currentColor" strokeWidth={1.3} />
                 </>
               ) : (
                 <>
                   <circle cx={gm.dot} cy={m.y} r={m.focus ? 7 : 5} fill="currentColor" opacity={m.focus ? 0.26 : 0.16} />
-                  <circle cx={gm.dot} cy={m.y} r={3.4} fill="currentColor" stroke={PUNCH} strokeWidth={1.5} />
+                  <circle cx={gm.dot} cy={m.y} r={3.4} fill="currentColor" className="thread-punch" strokeWidth={1.5} />
                 </>
               )}
             </g>

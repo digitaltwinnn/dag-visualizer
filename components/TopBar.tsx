@@ -138,7 +138,7 @@ export default function TopBar() {
           // cue is the ECG mark, so the old left-edge cyan→blue gradient pseudo is gone.
           "relative flex flex-col overflow-hidden pointer-events-auto",
           "border border-border rounded-lg backdrop-blur-md",
-          "bg-[linear-gradient(180deg,rgba(20,26,46,0.82),rgba(10,14,28,0.76))]",
+          "[background:var(--topbar-glass)]",
           "shadow-[inset_0_1px_0_rgba(255,255,255,0.05),0_8px_30px_rgba(0,0,0,0.35)]",
         )}
       >

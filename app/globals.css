@@ -590,6 +590,19 @@
      selected, which for look-up data is backwards. */
   --panel-plate: light-dark(rgba(10, 20, 60, 0.05), rgba(255, 255, 255, 0.045));
 
+  /* Chrome surfaces that were raw literals in JSX (the old rule-3 allowlist): themed here so the
+     theme reaches them; trap 3 — the gradient token is consumed as [background:var()], never
+     bg-[var()]. --scrim mirrors the sheet overlay's own literal alpha (0.16, sheet.tsx's
+     "Deliberately faint scrim"); --scrim-shadow shares its base ink but keeps RailDock's sheet
+     title text-shadow at its OWN alpha (0.7) — same near-black tint, two different call-site
+     strengths, so one token can't serve both without shifting one of the looks. */
+  --topbar-glass: linear-gradient(180deg,
+    light-dark(rgba(250, 252, 255, 0.86), rgba(20, 26, 46, 0.82)),
+    light-dark(rgba(240, 244, 252, 0.80), rgba(10, 14, 28, 0.76)));
+  --scrim: light-dark(rgba(235, 240, 250, 0.16), rgba(3, 5, 12, 0.16));
+  --scrim-shadow: light-dark(rgba(235, 240, 250, 0.7), rgba(3, 5, 12, 0.7));
+  --thread-punch: light-dark(oklch(0.965 0.008 265), #0c1020);
+
   /* Dot-size scale (documented, not tokenised — the w-/h- micro-dots read cleaner as literals at
      the call site than as size utilities): 3px xs · 5px sm · 7px md · 9px lg (odd, +2px steps) —
      node/status/beat dots across StateAtoms, inspector/parts, CardHead, LiveStrip. Keep to it. */
@@ -634,8 +647,10 @@
   /* ── Instrument-thread ruler spec (the ONE shared source) ─────────────────────
      Both rails' SVG threads (RailThread.tsx) and the bar-chart axis read identically:
      a neutral base line with ruler hairlines — short marks, every 4th longer + brighter.
-     The SVG threads can't consume these (an SVG stroke attribute doesn't resolve var()),
-     so they mirror the SAME literals in code — keep in sync (see RailThread `TICK_*`).
+     RailThread consumes these directly via the `.thread-rule`/`.thread-tick`/`.thread-tick-major`/
+     `.thread-punch` classes defined just below the `:root` block — CSS PROPERTIES on SVG resolve
+     var() even though a presentation ATTRIBUTE (`stroke="…"`) doesn't, which is why the ruler
+     mirrored these as literal consts until 2026-08-21.
      `--axis-hairlines` is the reusable recipe for a horizontal axis (the bar chart). */
   --thread-line: light-dark(rgba(40, 55, 95, 0.40), rgba(178, 193, 223, 0.40));        /* the neutral base line the ticks hang off */
   --thread-tick: light-dark(rgba(40, 55, 95, 0.30), rgba(178, 193, 223, 0.30));        /* minor hairline */
@@ -653,6 +668,16 @@
       var(--thread-tick) 0, var(--thread-tick) 1px,
       transparent 1px, transparent var(--thread-tick-pitch)) left top / 100% 5px no-repeat;
 }
+
+/* RailThread's ruler ink — CSS properties, not SVG attributes, so the tokens resolve and the
+   theme reaches the thread (rule-3's old allowlisted literals, retired 2026-08-21). Unlayered
+   (same layer-trap as .subject-paired above) so these apply reliably regardless of load order;
+   they carry no competing utility anyway, but the whole card-signal block above them is unlayered
+   on the same principle, so this stays consistent with it. */
+.thread-rule { stroke: var(--thread-line); }
+.thread-tick { stroke: var(--thread-tick); }
+.thread-tick-major { stroke: var(--thread-tick-major); }
+.thread-punch { stroke: var(--thread-punch); }
 
 /* ── Base resets (was app/styles/00-base.css) ── */
 @layer base {
