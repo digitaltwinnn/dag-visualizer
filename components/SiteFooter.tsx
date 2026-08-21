@@ -20,6 +20,8 @@
 // ⚠️ NO DONATE LINK. The user asked for one and the project carries no donation destination — an
 // invented address is a fabricated fact of the worst kind (rule 10). Add the entry here the moment
 // a real one exists.
+import NetLink from "@/components/NetLink";
+
 const GITHUB = "https://github.com/digitaltwinnn/dag-visualizer";
 
 export default function SiteFooter() {
@@ -42,19 +44,19 @@ export default function SiteFooter() {
           GitHub
         </a>
         <span aria-hidden className="opacity-40">·</span>
-        <a href="/about" className="hover:text-foreground transition-colors">
+        <NetLink href="/about" className="hover:text-foreground transition-colors">
           About
-        </a>
+        </NetLink>
         <span aria-hidden className="opacity-40">·</span>
-        <a href="/design" className="hover:text-foreground transition-colors">
+        <NetLink href="/design" className="hover:text-foreground transition-colors">
           Design
-        </a>
+        </NetLink>
         <span aria-hidden className="opacity-40">·</span>
         {/* The disclaimer is a STATEMENT, not navigation — it reads at rest and links to the
             section that states it in full. Same words as /about#unofficial leads with. */}
-        <a href="/about#unofficial" className="hover:text-foreground transition-colors">
+        <NetLink href="/about#unofficial" className="hover:text-foreground transition-colors">
           Unofficial community project
-        </a>
+        </NetLink>
       </nav>
     </footer>
   );

@@ -1,14 +1,22 @@
 import { describe, it, expect } from "vitest";
-import { assignPalette, oklchToHex, IDENTITY_L, IDENTITY_C } from "./palette";
+import { assignPalette, oklchToHex, IDENTITY_L, IDENTITY_C, allowedFor, guardsFor, ALLOWED, SLOT_STEP } from "./palette";
+import { CATALOG } from "@/src/engine/config";
 
-// The reserved structural hue centres and the ±16° guard band (spec).
-const RESERVED = [25, 90, 165, 195, 265, 300];
+// The guard bands are PER NETWORK (multi-network design §2): five centres are guarded
+// everywhere, the sixth is the network's own accent. ±16° around each.
+const NETS = ["mainnet", "integrationnet", "testnet"] as const;
 const GUARD = 16;
-function inGuardBand(h: number): boolean {
-  return RESERVED.some((r) => {
+function inGuardBand(h: number, guards: number[]): boolean {
+  return guards.some((r) => {
     const d = Math.abs(((h - r + 180 + 360) % 360) - 180);
     return d < GUARD;
   });
+}
+// Slot enumeration mirrors the module's own rule: lo…hi EXCLUSIVE, stepped by SLOT_STEP.
+function slotsOf(ranges: [number, number][]): number[] {
+  const out: number[] = [];
+  for (const [lo, hi] of ranges) for (let h = lo; h < hi; h += SLOT_STEP) out.push(((h % 360) + 360) % 360);
+  return out;
 }
 
 const IDS = [
@@ -22,7 +30,31 @@ const IDS = [
 describe("assignPalette", () => {
   it("keeps every hue out of the reserved guard bands", () => {
     for (const e of assignPalette(IDS).values()) {
-      expect(inGuardBand(e.hueDeg), `hue ${e.hueDeg} for ${e.id}`).toBe(false);
+      expect(inGuardBand(e.hueDeg, guardsFor("mainnet")), `hue ${e.hueDeg} for ${e.id}`).toBe(false);
+    }
+  });
+
+  it("mainnet's derived ranges equal the historical literal — mainnet hues are byte-identical", () => {
+    expect(allowedFor("mainnet")).toEqual([[41, 74], [106, 149], [211, 249], [316, 369]]);
+    expect(ALLOWED).toEqual(allowedFor("mainnet")); // Node resolves mainnet
+  });
+
+  it("keeps every slot out of that network's OWN guard bands", () => {
+    for (const net of NETS)
+      for (const h of slotsOf(allowedFor(net)))
+        expect(inGuardBand(h, guardsFor(net)), `${net}: slot ${h}`).toBe(false);
+  });
+
+  it("slot capacity covers every network's catalog plus the DAG core", () => {
+    expect(slotsOf(allowedFor("mainnet")).length).toBe(23); // unchanged
+    expect(slotsOf(allowedFor("integrationnet")).length).toBe(27); // violet band pre-existed: freeing cyan is a pure +4
+    expect(slotsOf(allowedFor("testnet")).length).toBe(24); // +9 freeing cyan, −4 to the 327 guard… net +1
+    for (const net of NETS) expect(slotsOf(allowedFor(net)).length).toBeGreaterThanOrEqual(CATALOG[net].length + 1);
+  });
+
+  it("assigns per-network ranges when passed explicitly (the server route's path)", () => {
+    for (const e of assignPalette(IDS, {}, allowedFor("testnet")).values()) {
+      expect(inGuardBand(e.hueDeg, guardsFor("testnet")), `testnet hue ${e.hueDeg} for ${e.id}`).toBe(false);
     }
   });
 

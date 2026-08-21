@@ -1,7 +1,8 @@
 import { useStore } from "@/src/store/store";
 import type { Anchor, GlobalSnapshot, MetaInfo, NodeRow } from "@/src/data/types";
 import { NetworkData, shortHash } from "@/src/data/api";
-import { METAGRAPHS, COLORS as RAW_COLORS, DEFAULT_META_COLOR as RAW_DEFAULT_META } from "@/src/engine/config";
+import { METAGRAPHS } from "@/src/net/current";
+import { COLORS as RAW_COLORS, DEFAULT_META_COLOR as RAW_DEFAULT_META } from "@/src/engine/config";
 import { hex } from "@/src/util/format";
 import { identityHudNumber } from "@/src/palette/identity";
 import { UNLISTED_ID, UNLISTED_HUE } from "@/src/data/unlisted";
@@ -10,9 +11,7 @@ import { pickNetId } from "@/src/engine/domain/pickActions";
 export { shortHash };
 export const COLORS = RAW_COLORS;
 
-// The neutral accent as a CSS string (for libraries like Recharts that need a literal),
-// and the fallback hub colour for a metagraph the config doesn't know yet.
-export const CORE_HEX = hex(COLORS.core);
+// The fallback hub colour for a metagraph the config doesn't know yet.
 export const DEFAULT_META_COLOR = RAW_DEFAULT_META as number;
 
 let net: NetworkData | null = null;

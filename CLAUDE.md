@@ -128,8 +128,9 @@ the "bug" was chased in the state machine first). When a rule is missing from th
 don't debug the cascade: kill the server, `rm -rf .next/dev`, restart.
 
 `next build` and `next dev` don't conflict (dev outputs to `.next/dev`), so the production check can
-run alongside the dev server. Do it at phase boundaries: the build should be clean and
-`/api/metagraphs` should stay `○` (Static) with `5m` revalidate.
+run alongside the dev server. Do it at phase boundaries: the build should be clean;
+`/api/metagraphs` is `ƒ` (Dynamic — it reads `?net=`) and must answer with
+`Cache-Control: public, s-maxage=300` so the CDN still caches it per URL.
 
 ### Verifying changes
 
@@ -1728,6 +1729,25 @@ backend and the chain holds the tamper-proof roots. So the decoder surfaces deco
 and the card shows "Data updates: N". This is structural, not per-network: probed across all anchoring
 channels over 12 live ticks, zero undecodable entries and three distinct payload shapes all rendering
 honestly through the same generic extraction.
+
+## The three networks
+
+**The Constellation network is a PAGE PARAMETER, not state** — `?net=integrationnet` /
+`?net=testnet` select a dev network; the bare URL is mainnet, byte-identical in CSS, `/api/*`
+URLs and palette to the single-network app. `src/net/` is the one resolver home: `parse.ts` the
+validator (query string ONLY, never the hash), `current.ts` the client side (frozen at first
+import; Node/vitest/SSR always resolve mainnet, which is what keeps the suite green),
+`request.ts` the per-request server side. `config.ts` carries `NETWORKS` (hosts) and `CATALOG`
+(one metagraph list per network); `METAGRAPHS` is imported from `src/net/current`, never config.
+Every client `/api/` fetch rides `netUrl()` — `src/net/netUrlBoundary.test.ts` is the fence —
+and every server route resolves `netOf(req)` and keys its `unstable_cache` entries with the net.
+The accent is CSS alone: `--net-*` tokens in `:root`, two `[data-net]` overrides re-pointing
+`--primary`/`--ring`, stamped on `<html>` before first paint by layout.tsx's inline script
+(mainnet gets no rule). The NetworkSwitch is the bar's rightmost control (the strip's second
+row on phone). ⚠️ Anything network-dependent that SSR renders must start as mainnet and swap
+in a mount effect (NetLink, NetworkSwitch): a hydration mismatch makes React 19 regenerate the
+tree, which strips the `data-net` stamp — and `suppressHydrationWarning` is not the tool, it
+KEEPS the server value.
 
 ## Data — server-side routes
 

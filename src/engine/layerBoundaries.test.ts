@@ -5,7 +5,9 @@ import { join } from "node:path";
 // Enforces the layering carved out by the Engine refactor:
 //   domain/  = pure logic + data. THREE's math classes (Vector3, Color, …) are fine — the boundary
 //              forbids scene/, three/addons, react, and store VALUE imports (the `Mode` string-union
-//              TYPE is allowed via `import type`).
+//              TYPE is allowed via `import type`). src/net/current is allowed outright: the frozen
+//              page-level network resolver is still pure data — the same standing config has
+//              (evaluated once, no store, no react, no scene).
 //   scene/   = imperative THREE view code. Must not reach into the store or react (the Engine is
 //              the only bridge to Lane B; the scene is driven by plain data).
 // Reading the files with fs keeps this a cheap grep over real import lines — no bundler needed.

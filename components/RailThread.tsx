@@ -2,8 +2,7 @@
 
 import { useEffect, useState, type CSSProperties } from "react";
 import { useStore } from "@/src/store/store";
-import { filterAccent, CORE_HEX } from "@/src/data/network";
-import { UNLISTED_ID, UNLISTED_HUD_HEX } from "@/src/data/unlisted";
+import { filterAccent } from "@/src/data/network";
 import { PulseEdge, useEdgePulse } from "@/components/EdgePulse";
 import { SHELL_ID } from "@/components/SectionShell";
 
@@ -86,13 +85,13 @@ type Mark = { y: number; inset: number; focus: boolean; ghost: boolean; entry: b
 export default function RailThread({ side = "right" }: { side?: Side }) {
   const filter = useStore((s) => s.filter);
   const mode = useStore((s) => s.mode);
-  // Resolve to a real colour: an SVG `stroke` ATTRIBUTE doesn't resolve CSS custom properties,
-  // and filterAccent returns var() for "all" (structural cyan) AND "unlisted" (the neutral
-  // gray) — each var() case falls back to ITS OWN resolved hex (review fix 2026-08-08: the
-  // one-size core-hex fallback repainted the unlisted thread in the core blue the gray retired).
-  const rawAccent = filterAccent(filter);
-  const accent =
-    filter === UNLISTED_ID ? UNLISTED_HUD_HEX : rawAccent.startsWith("var(") ? CORE_HEX : rawAccent;
+  // The accent may be a hex (a committed metagraph) OR a var() (all → --primary, unlisted →
+  // --muted-foreground). Either way it is set ONCE as the SVG's `color` style property and
+  // every accent stroke/fill below rides `currentColor` — a native SVG keyword, so the var()
+  // cases resolve through CSS instead of needing a resolved-hex mirror in JS. That retires the
+  // whole 2026-08-08 bug class (the one-size core-hex fallback repainting the unlisted thread),
+  // and it is what lets the accent track the per-network [data-net] --primary override.
+  const accent = filterAccent(filter);
   const [g, setG] = useState<{ top: number; left: number; height: number; marks: Mark[] } | null>(null);
 
   // View-switch AND filter-change signal: either plays the SAME travelling-light language as the
@@ -231,6 +230,9 @@ export default function RailThread({ side = "right" }: { side?: Side }) {
         style={{
           top: g.top,
           left: g.left,
+          // The one place the accent is stated — every accent stroke/fill in this SVG is
+          // `currentColor`, so a var() accent resolves in CSS, never in JS.
+          color: accent,
           // Fades the thread top/bottom so it reads as an instrument rail, not a hard bar
           // (was `.rail-thread`, 13-right-column.css). Kept as inline style, not a Tailwind
           // arbitrary property, since the vendor-prefixed property name doesn't round-trip
@@ -266,7 +268,7 @@ export default function RailThread({ side = "right" }: { side?: Side }) {
         <g style={{ opacity: REST_DIM }}>
           {/* identity line — BOTH rails, mirrored (the HUD's resting identity cue; cards are
              spineless at rest). The line is the selection's hue. */}
-          <line x1={gm.identity} y1={0} x2={gm.identity} y2={H} stroke={accent} strokeWidth={2} />
+          <line x1={gm.identity} y1={0} x2={gm.identity} y2={H} stroke="currentColor" strokeWidth={2} />
         </g>
         {/* node-dots — OUTSIDE the dim group at original full brightness (user adjustment): one per
            card at its middle, tethered to the card edge by the connector. The thread is the rail's
@@ -283,17 +285,17 @@ export default function RailThread({ side = "right" }: { side?: Side }) {
             <g key={i} opacity={m.ghost ? 0.5 : 1}>
               {/* An unboxed ancestor's tie rests dimmer than a box's — a STATE tier (materialized
                  vs shed its glass), matching the entries' own distance dim, not a depth encoding. */}
-              <line x1={x1} y1={m.y} x2={gm.dot} y2={m.y} stroke={accent} strokeWidth={1.25} opacity={m.focus ? 0.9 : m.entry ? 0.55 : 0.7} />
+              <line x1={x1} y1={m.y} x2={gm.dot} y2={m.y} stroke="currentColor" strokeWidth={1.25} opacity={m.focus ? 0.9 : m.entry ? 0.55 : 0.7} />
               {m.ghost ? (
                 <>
                   {/* punch first, then the ring — a hollow dot still has to sit ON the spine */}
                   <circle cx={gm.dot} cy={m.y} r={4.2} fill={PUNCH} />
-                  <circle cx={gm.dot} cy={m.y} r={3.2} fill="none" stroke={accent} strokeWidth={1.3} />
+                  <circle cx={gm.dot} cy={m.y} r={3.2} fill="none" stroke="currentColor" strokeWidth={1.3} />
                 </>
               ) : (
                 <>
-                  <circle cx={gm.dot} cy={m.y} r={m.focus ? 7 : 5} fill={accent} opacity={m.focus ? 0.26 : 0.16} />
-                  <circle cx={gm.dot} cy={m.y} r={3.4} fill={accent} stroke={PUNCH} strokeWidth={1.5} />
+                  <circle cx={gm.dot} cy={m.y} r={m.focus ? 7 : 5} fill="currentColor" opacity={m.focus ? 0.26 : 0.16} />
+                  <circle cx={gm.dot} cy={m.y} r={3.4} fill="currentColor" stroke={PUNCH} strokeWidth={1.5} />
                 </>
               )}
             </g>

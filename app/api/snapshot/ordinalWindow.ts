@@ -1,4 +1,5 @@
 import { unstable_cache } from "next/cache";
+import { NETWORKS, type NetworkId } from "@/src/engine/config";
 
 // The SERVED ORDINAL WINDOW — the bound that turns the snapshot routes from a walkable surface
 // into an instrument.
@@ -27,14 +28,13 @@ export function inServedWindow(ordinal: number, latest: number | null): boolean 
   return ordinal >= 1 && ordinal <= latest + FUTURE_WINDOW;
 }
 
-const L0 = "https://l0-lb-mainnet.constellationnetwork.io";
-
 // The reference point: the LB's own latest ordinal — a tiny (~20 B) read, cached across
 // requests/instances for a minute so the bound costs ~one upstream call per minute, not one per
 // request. Throwing on a bad shape keeps a blip from being cached (the caller fails open).
-const cachedLatest = unstable_cache(
+const cachedLatest = (net: NetworkId) =>
+  unstable_cache(
   async (): Promise<number> => {
-    const r = await fetch(`${L0}/global-snapshots/latest/ordinal`, {
+    const r = await fetch(`${NETWORKS[net].l0}/global-snapshots/latest/ordinal`, {
       headers: { Accept: "application/json" },
       cache: "no-store",
       signal: AbortSignal.timeout(4000),
@@ -44,15 +44,15 @@ const cachedLatest = unstable_cache(
     if (typeof j?.value !== "number") throw new Error("no ordinal");
     return j.value;
   },
-  ["l0-latest-ordinal-v1"],
+  ["l0-latest-ordinal-v1", net],
   { revalidate: 60 },
-);
+  )();
 
 /** Is this ordinal one the app could legitimately be asking about? */
-export async function withinServedWindow(ordinal: number): Promise<boolean> {
+export async function withinServedWindow(net: NetworkId, ordinal: number): Promise<boolean> {
   let latest: number | null = null;
   try {
-    latest = await cachedLatest();
+    latest = await cachedLatest(net);
   } catch {
     /* reference unavailable — fail open (see inServedWindow) */
   }

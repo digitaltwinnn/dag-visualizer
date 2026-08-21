@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { ledgerLens, storyCount, tickInStory, STORY_SETTLE_MS } from "./ledgerStory";
-import { METAGRAPHS } from "@/src/engine/config";
+import { METAGRAPHS } from "@/src/net/current";
 import type { Anchor, SnapshotExact } from "@/src/data/types";
 
 const LISTED = METAGRAPHS[0].id;

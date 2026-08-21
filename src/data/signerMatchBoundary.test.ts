@@ -19,11 +19,7 @@ import { join } from "node:path";
 // So: a prefix comparison lives in the home, or it is EXEMPT here with a reason.
 const ROOTS = ["components", "src", "app"];
 const HOME = "src/data/network.ts";
-const EXEMPT: Record<string, string> = {
-  // A CSS value sniff, not an identifier: does the resolved accent read `var(...)` (unresolvable
-  // in an SVG stroke attribute) rather than a hex? Nothing to do with peer ids.
-  "components/RailThread.tsx": "CSS value sniff (`var(` prefix), not an id comparison",
-};
+const EXEMPT: Record<string, string> = {};
 
 const walk = (dir: string): string[] =>
   readdirSync(dir).flatMap((name) => {

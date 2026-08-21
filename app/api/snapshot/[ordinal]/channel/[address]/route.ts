@@ -5,6 +5,8 @@
 // deliberately: the read is cached immutably per (ordinal, address) pair and only ever runs on an
 // explicit gesture on one card, never on a poll and never across the chain.
 import { unstable_cache } from "next/cache";
+import { type NetworkId } from "@/src/engine/config";
+import { netOf } from "@/src/net/request";
 import { NextResponse } from "next/server";
 import { decodeChannelContent } from "../../../decodeChannel";
 import { fetchGlobalJson } from "../../../fetchGlobal";
@@ -22,10 +24,10 @@ export const maxDuration = 60;
 // timeout) still throw, so a blip is never cached and retries on the next request.
 type DeepMiss = { available: false };
 
-async function fetchDeep(ordinal: number, address: string, snapOrdinal: number): Promise<ChannelSnapDeep | DeepMiss> {
+async function fetchDeep(net: NetworkId, ordinal: number, address: string, snapOrdinal: number): Promise<ChannelSnapDeep | DeepMiss> {
   // The pull rides fetchGlobal.ts: LB first, known-archival nodes on a 404 — a deep ordinal is
   // otherwise a ~1-in-17 LB draw, and this route is exactly the one the history pages lean on.
-  const j = (await fetchGlobalJson(ordinal)) as { value?: { stateChannelSnapshots?: Record<string, { value?: { fee?: number; content?: unknown[] } }[]> } };
+  const j = (await fetchGlobalJson(net, ordinal)) as { value?: { stateChannelSnapshots?: Record<string, { value?: { fee?: number; content?: unknown[] } }[]> } };
   const sc = j?.value?.stateChannelSnapshots;
   if (!sc) return { available: false }; // decoded fine, no channel map — immutable fact
   const entries = sc[address];
@@ -67,12 +69,12 @@ async function fetchDeep(ordinal: number, address: string, snapOrdinal: number):
   return best;
 }
 
-const cachedDeep = (ordinal: number, address: string, snapOrdinal: number) =>
+const cachedDeep = (net: NetworkId, ordinal: number, address: string, snapOrdinal: number) =>
   unstable_cache(
-    () => fetchDeep(ordinal, address, snapOrdinal),
+    () => fetchDeep(net, ordinal, address, snapOrdinal),
     // v5: rows carry dataBytes (2026-08-13). v4: deterministic misses cached as
     // {available:false}. The shape rides the key, as ever.
-    ["snapshot-channel-v5", String(ordinal), address, String(snapOrdinal)],
+    ["snapshot-channel-v5", net, String(ordinal), address, String(snapOrdinal)],
     { revalidate: 86400 },
   )();
 
@@ -83,13 +85,14 @@ export async function GET(req: Request, ctx: { params: Promise<{ ordinal: string
   if (!Number.isFinite(ordinal) || ordinal <= 0 || !address) {
     return NextResponse.json({ error: "bad request" }, { status: 400 });
   }
-  if (!(await withinServedWindow(ordinal))) {
+  const net = netOf(req);
+  if (!(await withinServedWindow(net, ordinal))) {
     // Outside the window this app can ever ask about (ordinalWindow.ts) — refuse without
     // touching the upstream, so the deep chain isn't an anonymous walk over all of history.
     return NextResponse.json({ available: false, ordinal, address }, { status: 404 });
   }
   try {
-    const data = await cachedDeep(ordinal, address, snapOrdinal);
+    const data = await cachedDeep(net, ordinal, address, snapOrdinal);
     if ("available" in data && data.available === false) {
       // The cached deterministic miss — same honest 404, now without the ~2.5 MB re-pull.
       return NextResponse.json({ available: false, ordinal, address }, { status: 404 });

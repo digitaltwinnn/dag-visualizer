@@ -1,5 +1,6 @@
 "use client";
 
+import { netUrl } from "@/src/net/current";
 import { useEffect, useRef } from "react";
 import { useStore } from "@/src/store/store";
 import type { SnapshotExact, ChannelSnapDeep } from "@/src/data/types";
@@ -44,7 +45,7 @@ function ensure(ordinal: number | null | undefined) {
   const st = useStore.getState();
   if (st.snapshotExact[ordinal] || inflight.has(ordinal)) return; // already have it / fetching
   inflight.add(ordinal);
-  fetch(`/api/snapshot/${ordinal}`)
+  fetch(netUrl(`/api/snapshot/${ordinal}`))
     .then((r) => (r.ok ? (r.json() as Promise<SnapshotExact>) : null))
     .then((data) => {
       if (data && typeof data.totalFee === "number") st.setSnapshotExact(data);
@@ -123,7 +124,7 @@ export default function RawSnapshotBridge() {
     if (st.metaSnapDeep[key] || deepInflight.has(key)) return;
 
     deepInflight.add(key);
-    fetch(`/api/snapshot/${deepSel.globalOrdinal}/channel/${deepSel.metaId}?snap=${deepSel.ordinal}`)
+    fetch(netUrl(`/api/snapshot/${deepSel.globalOrdinal}/channel/${deepSel.metaId}?snap=${deepSel.ordinal}`))
       .then((r) => (r.ok ? (r.json() as Promise<ChannelSnapDeep>) : null))
       .then((d) => {
         // Store under the REQUESTED key: when the route fell back (an undecodable row asks

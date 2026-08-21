@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { viewEntryActions, clickActions, cohortToggleActions, compositionToggleActions, countryToggleActions, filterToggleActions, followToggleActions, nodeSelectActions, sameCohort, sameComposition, snapshotSelectActions, pickActive, pickNetId, metaSnapSelectActions, metaSnapArrivalActions, bandSelectActions, sameMetaSnap, type ClickAction } from "./pickActions";
 import { finerLevels } from "./focusLadder";
-import { METAGRAPHS } from "../config";
+import { METAGRAPHS } from "@/src/net/current";
 import type { PickDescriptor, MetaSnapSel } from "@/src/data/types";
 
 // Minimal pick fixtures — only the fields the table reads.

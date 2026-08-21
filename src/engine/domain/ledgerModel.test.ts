@@ -18,7 +18,7 @@ import {
   anchorTiles,
   LedgerModel,
   LEAD_SETTLE_MS, LANE_IDS } from "./ledgerModel";
-import { METAGRAPHS } from "../config";
+import { METAGRAPHS } from "@/src/net/current";
 import { lanePlaneHalf } from "./ledgerLayout";
 import { UNLISTED_KEY } from "./ledgerBands";
 import { ledgerSite, LEAD_X, FLOOR_BACK_X, FLOOR_FRONT_X } from "./ledgerLayout";

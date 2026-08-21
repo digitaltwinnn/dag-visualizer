@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { cn } from "@/lib/utils";
-import { METAGRAPHS } from "@/src/engine/config";
+import { METAGRAPHS } from "@/src/net/current";
 import { identityMap } from "@/src/palette/identity";
 import CardHeadDemo from "./CardHeadDemo";
 import CardSignalsDemo from "./CardSignalsDemo";

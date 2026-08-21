@@ -25,7 +25,7 @@
 // next call that does carry anchor data. Kept verbatim below rather than "fixed" (the observable
 // behaviour must match js/ledger.js exactly since Task 13 will diff against it).
 
-import { METAGRAPHS } from "../config";
+import { METAGRAPHS } from "@/src/net/current";
 import { ledgerSite, lanePlaneHalf, BAR_D, FLOOR_BACK_X, FLOOR_FRONT_X, LEAD_X } from "./ledgerLayout";
 import { UNLISTED_KEY } from "./ledgerBands";
 import type { GlobalSnapshot, Anchor } from "@/src/data/types";
