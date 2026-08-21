@@ -69,6 +69,15 @@ export default function RootLayout({
               '(function(){var m=/[?&]net=(integrationnet|testnet)(?:&|$)/.exec(location.search);if(m)document.documentElement.dataset.net=m[1];})();',
           }}
         />
+        {/* Theme stamp — the data-net script's twin: pin data-theme BEFORE first paint iff an
+            explicit choice is stored. Absence = System = no attribute (color-scheme: light dark
+            lets the browser resolve). Mirrors src/theme/resolve.ts's two-value check. */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html:
+              '(function(){try{var t=localStorage.getItem("dagviz:theme");if(t==="light"||t==="dark")document.documentElement.dataset.theme=t;}catch(e){}})();',
+          }}
+        />
         {children}
         <script
           type="application/ld+json"
