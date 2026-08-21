@@ -1040,11 +1040,23 @@
        detail): alphas raised 0.78/0.72 → 0.88/0.82 + blur restored to 14px (the pre-migration
        value) so `text-muted-foreground` body text stays comfortably readable over the bright
        hypergraph core, while the gradient + blur keep the scene glowing through at the card
-       edges — good glass, not a solid slab. */
-    background: linear-gradient(180deg, rgba(20, 26, 46, 0.88), rgba(10, 14, 28, 0.82));
+       edges — good glass, not a solid slab. Light side (theme fix round, 2026-08-21): missed in
+       the original light/dark conversion — every sibling glass token (`--panel`, `--topbar-glass`)
+       already paired a white stop with the dark one, this recipe never got one. Follows the same
+       family: `--panel`'s white glass ink (252, 253, 255) at THIS recipe's own raised alphas
+       (0.88/0.82), not `--panel`'s own (lower) alphas — the raise here was for legibility over a
+       busy scene and applies to both grounds equally. */
+    background: linear-gradient(180deg,
+      light-dark(rgba(252, 253, 255, 0.88), rgba(20, 26, 46, 0.88)),
+      light-dark(rgba(252, 253, 255, 0.82), rgba(10, 14, 28, 0.82)));
     border: 1px solid var(--border);
     border-radius: var(--radius);
     backdrop-filter: blur(14px);
+    /* Ambient shadow stays theme-neutral on purpose: the inset line is a top-edge glass highlight
+       (harmless at 0.05 white on either ground) and the drop is elevation, which both grounds
+       read as a dark cast shadow — the same pair `.subject-paired` (line ~42) and the boxed rail
+       ladder rung (line ~411) extend, so the three recipes must keep matching, not each pick a
+       theme-aware value alone. */
     box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05), 0 8px 30px rgba(0, 0, 0, 0.35);
   }
   .ig-panel::before {
