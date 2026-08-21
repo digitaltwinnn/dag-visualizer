@@ -2,6 +2,7 @@
 // resolves any validators not in the cache at runtime. Results are remembered
 // in localStorage so the globe fills in over time.
 
+import { netUrl } from "@/src/net/current";
 import type { GeoMap } from "@/src/data/types";
 
 const LS_KEY = "dag-geo-cache-v2"; // v2: +isp/asn (old entries lack the provider fields)
@@ -10,7 +11,7 @@ export async function loadGeoCache(): Promise<GeoMap> {
   const map: GeoMap = {};
   // baked validator geo seed, served on-disk by the Next /api/geo route
   try {
-    const res = await fetch("/api/geo");
+    const res = await fetch(netUrl("/api/geo"));
     if (res.ok) Object.assign(map, await res.json());
   } catch (e) { /* ignore */ }
   // anything resolved on previous visits

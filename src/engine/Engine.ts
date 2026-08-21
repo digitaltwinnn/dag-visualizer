@@ -16,7 +16,7 @@ import { UNLISTED_KEY } from "./domain/ledgerBands";
 // The public catalog's ids — the unknown-lane tile resolver splits listed from unlisted rows.
 import { StageLight } from "./scene/objects/StageLight";
 import { loadGeoCache, resolveMissing } from "@/src/data/geoResolve";
-import { METAGRAPHS } from "@/src/net/current";
+import { METAGRAPHS, netUrl } from "@/src/net/current";
 import { COLORS } from "@/src/engine/config";
 import { BYTE_SCALE_KB, type RailGroup } from "./domain/ledgerLayout";
 import { HYPER_TILT, HYPER_TILT_FOCUS } from "./domain/hyperLayout";
@@ -648,7 +648,7 @@ export class Engine {
   // set actually changed, and WITHOUT moving the camera (don't yank the user's view).
   private async refreshMeta(initial: boolean) {
     try {
-      const r = await fetch("/api/metagraphs");
+      const r = await fetch(netUrl("/api/metagraphs"));
       if (!r.ok) return;
       const { metagraphs, geo } = await r.json();
       if (geo) this.geoMap = { ...this.geoMap, ...geo };
