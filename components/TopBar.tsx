@@ -328,8 +328,12 @@ export default function TopBar() {
         <PresentationToggle />
 
         {/* Theme — the "how it looks" control, riding beside presentation with no divider of
-            its own (it reads as part of that group, not a fourth zone). */}
-        <ThemeToggle />
+            its own (it reads as part of that group, not a fourth zone). On PHONE it rides the
+            filter strip's second row instead, same as NetworkSwitch below — otherwise it would
+            render twice (bar + open strip) at once. */}
+        <div className="contents max-[700px]:hidden">
+          <ThemeToggle />
+        </div>
 
         {/* Network switch — the RIGHT edge of the bar, one past the presentation toggle: the
             network acts on everything INCLUDING presentation, so the edge escalates in scope
