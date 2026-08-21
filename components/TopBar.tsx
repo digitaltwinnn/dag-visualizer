@@ -119,22 +119,24 @@ export default function TopBar() {
       <div
         ref={barRow}
         className={cn(
-          "flex items-center gap-3 py-2 px-3.5",
+          // A 3-zone grid at EVERY width (left cluster | view switch | right cluster) so the
+          // switch is TRULY centred in the bar. Flex spacers only centre it when the side
+          // clusters are equal-width — they never are (the phone measured the symptom first:
+          // ECG + filter ≈ 100px vs a 44px toggle pushed the switch ~28px right of centre) —
+          // and the NetworkSwitch made the right zone heavier still. `1fr auto 1fr`
+          // (minmax(auto,1fr)) keeps the sides equal while both fit and degrades as flex did
+          // past that: a long ticker shifts the switch instead of overlapping it; the dev
+          // overflow alarm below arbitrates. Promoted from the phone tier 2026-08-21 — the
+          // zone wrappers were already in the DOM as `display: contents` above 700px.
+          "grid grid-cols-[1fr_auto_1fr] items-center gap-3 py-2 px-3.5",
           "max-[1260px]:gap-2.5",
           "max-[940px]:gap-2 max-[940px]:px-2.5 max-[940px]:py-2",
-          // PHONE: a 3-zone grid (left cluster | view switch | right cluster) so the switch is
-          // TRULY centred in the bar. The flex layout centres it between the side clusters, and
-          // those are unequal (ECG + filter ≈ 100px vs the 44px vitals toggle), which pushed the
-          // switch ~28px right of centre — pre-existing, worsened by the removed funnel icon.
-          // `1fr auto 1fr` keeps the sides equal (centring the middle) and degrades gracefully:
-          // a long ticker just shifts the switch instead of overlapping it. Tablet/desktop keep
-          // the flex row unchanged (the zone wrappers are `display: contents` there).
-          "max-[700px]:gap-1.5 max-[700px]:p-2 max-[700px]:grid max-[700px]:grid-cols-[1fr_auto_1fr]",
+          "max-[700px]:gap-1.5 max-[700px]:p-2",
         )}
       >
-        {/* LEFT zone (phone grid): brand + filter. `contents` above 700px = invisible to the
-            flex row, so tablet/desktop layout is byte-identical. */}
-        <div className="contents max-[700px]:flex max-[700px]:items-center max-[700px]:gap-1 max-[700px]:min-w-0">
+        {/* LEFT zone: brand + filter. A real flex container at every width now that the grid
+            is the base layout — the in-zone gaps mirror the row's own gap steps. */}
+        <div className="flex items-center gap-3 max-[1260px]:gap-2.5 max-[940px]:gap-2 max-[700px]:gap-1 min-w-0">
         {/* Brand — AND the one route to /about (user, 2026-08-09, replacing the always-on
             experimental banner). The identity mark is the honest affordance for "what is this
             thing?": clicking the app's own name to read what it is, who made it and that it's
@@ -229,9 +231,6 @@ export default function TopBar() {
         </button>
         </div>
 
-        {/* Flex spacers (tablet/desktop only) — the phone grid's 1fr columns own the spacing. */}
-        <div className="flex-1 max-[700px]:hidden" />
-
         {/* View switch — structural. On phone there's no room for the three non-functional
             "soon" placeholders (Network/Transactions/Staking) — they're dimmed dead weight
             that helped overflow the bar, so phone shows only the 3 working views. Tablet +
@@ -282,11 +281,9 @@ export default function TopBar() {
           })}
         </ToggleGroup>
 
-        <div className="flex-1 max-[700px]:hidden" />
-
-        {/* RIGHT zone (phone grid): vitals. Mirrors the left zone (`contents` above 700px);
-            `justify-self-end` pins it to the bar's right edge in the grid. */}
-        <div className="contents max-[700px]:flex max-[700px]:items-center max-[700px]:gap-1.5 max-[700px]:justify-self-end">
+        {/* RIGHT zone: vitals + presentation. Mirrors the left zone; `justify-self-end` pins
+            it to the bar's right edge in the grid. */}
+        <div className="flex items-center gap-3 max-[1260px]:gap-2.5 max-[940px]:gap-2 max-[700px]:gap-1.5 justify-self-end">
         <span className="w-px self-stretch bg-border my-1 max-[820px]:hidden" />
 
         {/* Vitals — inline on tablet/desktop. On phone they render nothing here: the vitals
