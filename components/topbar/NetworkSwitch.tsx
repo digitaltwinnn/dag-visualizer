@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { ChevronDown } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { SELECTED_ROW } from "@/components/selection";
@@ -31,7 +32,15 @@ const ROWS: { id: NetworkId; code: string; name: string; href: string }[] = [
 ];
 
 export default function NetworkSwitch() {
-  const cur = ROWS.find((r) => r.id === NET)!;
+  // Render mainnet until mounted, then swap to the page's real network as a normal update.
+  // The server cannot know the network, and hydrating different text/attributes makes React
+  // 19 regenerate the tree — which strips the pre-paint data-net stamp off <html> and snaps
+  // the accent back to cyan (seen live 2026-08-21). suppressHydrationWarning is not the tool:
+  // it KEEPS the server value instead of patching. The one-frame MAIN face on a dev network
+  // hides under the boot overlay.
+  const [net, setNet] = useState<NetworkId>("mainnet");
+  useEffect(() => setNet(NET), []);
+  const cur = ROWS.find((r) => r.id === net)!;
   return (
     <Popover>
       <PopoverTrigger asChild>
@@ -43,7 +52,7 @@ export default function NetworkSwitch() {
             // grid's right zone can never squeeze the one control that names the chain.
             "group flex flex-none items-center gap-1.5 h-9 py-1.5 px-2.5 rounded-btn! pointer-coarse:min-h-11",
             "bg-transparent border-0 hover:bg-wash-soft",
-            NET === "mainnet" ? "text-muted-foreground hover:text-foreground" : "text-[var(--primary)]",
+            net === "mainnet" ? "text-muted-foreground hover:text-foreground" : "text-[var(--primary)]",
           )}
         >
           <span className="text-micro tracking-caps uppercase">{cur.code}</span>
@@ -56,11 +65,11 @@ export default function NetworkSwitch() {
           <a
             key={r.id}
             href={r.href}
-            aria-current={r.id === NET ? "page" : undefined}
+            aria-current={r.id === net ? "page" : undefined}
             className={cn(
               "flex items-center gap-2.5 rounded-md px-2.5 py-2 text-label",
               "text-muted-foreground hover:text-foreground hover:bg-wash-soft",
-              r.id === NET && SELECTED_ROW,
+              r.id === net && SELECTED_ROW,
             )}
           >
             {/* Each network's own accent token — defined in :root ALWAYS (globals.css), exactly

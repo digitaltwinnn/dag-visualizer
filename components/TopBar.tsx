@@ -12,7 +12,7 @@ import FilterPicker from "@/components/topbar/FilterPicker";
 import EcgMark from "@/components/topbar/EcgMark";
 import PresentationToggle from "@/components/topbar/PresentationToggle";
 import NetworkSwitch from "@/components/topbar/NetworkSwitch";
-import { netUrl } from "@/src/net/current";
+import NetLink from "@/components/NetLink";
 import { useBreakpoint } from "@/components/useBreakpoint";
 import type { Mode } from "@/src/store/store";
 
@@ -153,8 +153,8 @@ export default function TopBar() {
             Link: /about is a separate document with its own scroll, and the app is a long-lived
             WebGL tab — a client-side route change would tear the engine down and rebuild it on
             return, so the full navigation is the cheaper one. */}
-        <a
-          href={netUrl("/about")}
+        <NetLink
+          href="/about"
           title="About DAG Visualizer, an unofficial community project"
           className={cn(
             "flex items-center gap-2 rounded-btn -mx-1 px-1 py-0.5 no-underline",
@@ -176,7 +176,7 @@ export default function TopBar() {
             <span className={live ? "text-foreground" : "text-muted-foreground opacity-70"}>DAG</span>{" "}
             <span className={cn("text-muted-foreground", !live && "opacity-70")}>Visualizer</span>
           </span>
-        </a>
+        </NetLink>
         <span className="w-px self-stretch bg-border my-1 max-[820px]:hidden" />
 
         {/* Filter (toned, de-nested) — toggles the ATTACHED filter strip below (user,
