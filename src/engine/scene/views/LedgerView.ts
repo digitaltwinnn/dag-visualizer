@@ -52,7 +52,7 @@ import {
   laneSpan,
   type RailGroup,
 } from "../../domain/ledgerLayout";
-import type { SceneColors } from "../../sceneColors";
+import { isLightGround, inkMix, inkPresence, type SceneColors } from "../../sceneColors";
 import {
   LedgerModel,
   LANE_IDS,
@@ -175,6 +175,8 @@ export class LedgerView implements SceneView {
   /** The HOVERED network, a pure preview that overrides the committed one for DIMMING only. */
 
   private _colors: SceneColors;
+  /** GROUND, hoisted at event time — the tile loop and the label pass read a boolean. */
+  private _paper: boolean;
   private _core: number;
   private readonly _coreCol = new THREE.Color();
 
@@ -270,6 +272,7 @@ export class LedgerView implements SceneView {
     sceneColors: Record<string, number>,
   ) {
     this._colors = colors;
+    this._paper = isLightGround(colors);
     this._core = colors.core;
     this._coreCol.setHex(colors.core);
     this.sceneColors = sceneColors;
@@ -417,13 +420,17 @@ export class LedgerView implements SceneView {
       // a label must not name a row whose bar hasn't dropped in yet.
       const entryF = this._entryT < 1 && o.slot >= 0 && o.slot < SLOT_N ? this._entryFade[o.slot] : 1;
       const front = this._rewind.fadeAtX(ox) * horizonAt(ox) * entryF;
-      (o.mesh.material as THREE.MeshBasicMaterial).opacity = ORD_OP * front * a;
+      // Both columns' resting level is a dark-ground opacity; on paper it is ink over the page, so
+      // it asks the ground once here. The dotted line keeps its RATIO to the text (ORD_LINE_MUL) —
+      // it is a tie to its row, and a tie that outweighs the number it carries reads as the subject.
+      const ordOp = inkPresence(ORD_OP, this._paper);
+      (o.mesh.material as THREE.MeshBasicMaterial).opacity = ordOp * front * a;
       // The anchor line whispers under its label (user, 2026-08-07 — "a bit more subtle").
-      (o.line.material as THREE.LineDashedMaterial).opacity = ORD_OP * ORD_LINE_MUL * front * a;
+      (o.line.material as THREE.LineDashedMaterial).opacity = ordOp * ORD_LINE_MUL * front * a;
       // The size column rides the same two boundaries. Its line goes with its number: with no
       // measurement to state there is nothing for the line to tie to.
-      if (o.kb) (o.kb.material as THREE.MeshBasicMaterial).opacity = ORD_OP * front * a;
-      (o.kbLine.material as THREE.LineDashedMaterial).opacity = o.kb ? ORD_OP * ORD_LINE_MUL * front * a : 0;
+      if (o.kb) (o.kb.material as THREE.MeshBasicMaterial).opacity = ordOp * front * a;
+      (o.kbLine.material as THREE.LineDashedMaterial).opacity = o.kb ? ordOp * ORD_LINE_MUL * front * a : 0;
     }
   }
 
@@ -443,6 +450,7 @@ export class LedgerView implements SceneView {
    *  Event-time — one flip, not a frame. */
   setColors(c: SceneColors): void {
     this._colors = c;
+    this._paper = isLightGround(c);
     this._core = c.core;
     this._coreCol.setHex(c.core);
     for (const p of [...this._globalPlanes, ...this._metaPlanes.values()]) p.setColors(c);
@@ -1165,13 +1173,17 @@ export class LedgerView implements SceneView {
         const rowFocus = pinned || hov;
         const entryF = this._entryT < 1 && b.slot >= 0 && b.slot < SLOT_N ? this._entryFade[b.slot] : 1;
         const brightT =
-          snapBright(tileRest * b.fade, offNet, focus, anyFocus && !rowFocus)
+          inkPresence(snapBright(tileRest * b.fade, offNet, focus, anyFocus && !rowFocus), this._paper)
           * edge * this._fades.alpha * entryF;
         // Emphasis EASES rather than snapping (dimModel.emphasisK). The state rides the BLOCK, next
         // to its two other eased fields — an instance-index buffer would hand a block's brightness
         // to its neighbour every tick, since a new tick shifts every block one slot along.
         const bright = (b.bright += (brightT - b.bright) * ek);
-        this._metaTrailMesh.setColorAt(mi, _col.copy(ident ? laneColor : this._coreCol).multiplyScalar(bright));
+        // GROUND (inkMix): brightness on black is a multiply toward the ground, but these tiles are
+        // OPAQUE and normal-blended, so on paper the same multiply drives them toward BLACK — the
+        // dimmest tile would be the heaviest mark on the page. Presence there is a lerp toward the
+        // paper instead. The `edge <= 0` zero-scale above still owns a fully dissolved row.
+        this._metaTrailMesh.setColorAt(mi, inkMix(_col.copy(ident ? laneColor : this._coreCol), bright, this._colors));
         mi++;
       }
     }

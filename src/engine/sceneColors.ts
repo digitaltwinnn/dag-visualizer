@@ -123,7 +123,10 @@ const _ground = new THREE.Color();
  * Dark keeps the pure multiply rather than lerping from `--background` too: the dark look is
  * byte-pinned, and a non-black ground would add a few percent of grey to every dimmed mark.
  *
- * Event-time only (colour bakes), so the module scratch never runs in a frame body.
+ * The scratch is module-SCOPE, so this allocates nothing and is safe inside a frame body (rule 5,
+ * noFrameAllocations): the ledger's lane tiles lerp per frame, while the ribbons and hyper's
+ * tethers bake with it at event time. Presence carried by an OPACITY rather than a colour asks
+ * the same question through `inkPresence` below.
  */
 export function inkMix(out: THREE.Color, s: number, c: SceneColors): THREE.Color {
   if (!isLightGround(c)) return out.multiplyScalar(s);
@@ -132,6 +135,43 @@ export function inkMix(out: THREE.Color, s: number, c: SceneColors): THREE.Color
   out.g = _ground.g + (out.g - _ground.g) * s;
   out.b = _ground.b + (out.b - _ground.b) * s;
   return out;
+}
+
+/**
+ * The ink-presence gamma. One number, tuned by looking at the chamber on paper (2026-08-21): low
+ * enough to lift a resting band clear of the page, high enough that the focus boost still has
+ * somewhere to go. See `inkPresence`.
+ */
+const INK_GAMMA = 0.42;
+
+/**
+ * A mark's PRESENCE, translated for the ground it is painted on — the sibling of `inkMix` for the
+ * sites where presence rides an OPACITY (the byte bar's bands, the glass planes' fill levels)
+ * rather than a vertex colour.
+ *
+ * On the dark ground the resting levels ARE the look: a band at 0.12 opacity is a faint glow against
+ * black and the bloom pass lifts the focused ones clear of it, so the whole emphasis span (roughly
+ * 0.05 → 0.82) reads because the eye is measuring light added to nothing. Paint that same span as INK
+ * on a 0.94-L page and the resting mark is 12% of a hue over white — a pastel, which is exactly the
+ * wash this pass was opened to fix. ON PAPER, REST IS INK AND EMPHASIS IS WEIGHT.
+ *
+ * The translation is one order-preserving gamma: `s ** g` with g < 1 is strictly increasing and fixes
+ * both 0 and 1, so it lifts the bunched-up bottom of the span into the page's usable ink range while
+ * leaving the top where it is. dimTiers' pinned ORDER therefore survives untouched (the order is the
+ * design, the numbers may move) and nothing that was invisible becomes visible. Dark returns `s`
+ * unchanged — the dark look is byte-pinned.
+ *
+ * Apply it to the EMPHASIS term alone, never to the whole product. The factors a mark multiplies
+ * afterwards — the horizon and front ramps, the furniture fade, the entry stagger — are geometry,
+ * not weight, and gamma-stretching a ramp moves where a row appears to leave the chamber.
+ *
+ * Takes the ground as a BOOLEAN rather than the colours, so the per-frame call is plain arithmetic:
+ * hoist `isLightGround(c)` into a field at event time (setColors), the same hoist rule the `?tune`
+ * contract states for per-node loops.
+ */
+export function inkPresence(s: number, paper: boolean): number {
+  if (!paper || s <= 0 || s >= 1) return s;
+  return Math.pow(s, INK_GAMMA);
 }
 
 // Read the four structural tokens from globals.css. Called once by the Engine at construction.

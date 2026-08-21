@@ -13,7 +13,7 @@
 // Two tune channels (user, 2026-08-07): the GLOBAL plane and the METAGRAPH planes are tuned
 // separately (`?tune` folders) — same blueprint, each caller passes its own PlaneTune.
 import * as THREE from "three";
-import type { SceneColors } from "../../sceneColors";
+import { isLightGround, inkPresence, type SceneColors } from "../../sceneColors";
 import { CONT_X } from "../../domain/ledgerLayout";
 import type { ContainerSpec } from "../../domain/ledgerRails";
 import { applyGlassTheme, makeGlassFill, type GlassFillUniforms } from "./glassFill";
@@ -132,12 +132,15 @@ export class SnapshotPlane {
   private readonly _cx: number;
   private readonly _parent: THREE.Group;
   private readonly _colors: SceneColors;
+  /** GROUND, hoisted at event time — applyAlpha runs per frame and reads a boolean. */
+  private _paper: boolean;
   private _tray: THREE.Mesh | null = null;
   private _trayU: GlassFillUniforms | null = null;
 
   constructor(parent: THREE.Group, colors: SceneColors, o: SnapshotPlaneOpts) {
     this._parent = parent;
     this._colors = colors;
+    this._paper = isLightGround(colors);
     const fm = makeGlassFill(colors, o.w / 2, o.d / 2, PLANE_CORNER_R);
     this.fill = new THREE.Mesh(new THREE.PlaneGeometry(o.w, o.d), fm);
     this.fill.rotation.x = -Math.PI / 2;
@@ -181,6 +184,7 @@ export class SnapshotPlane {
    *  material tint. `_colors` is the Engine's own mutated object, so it already reads new; this
    *  re-applies the values that were copied OUT of it. Event-time. */
   setColors(c: SceneColors): void {
+    this._paper = isLightGround(c);
     applyGlassTheme(this.fill.material as THREE.ShaderMaterial, c);
     if (this._tray) applyGlassTheme(this._tray.material as THREE.ShaderMaterial, c);
     if (this.label) retintEdgeLabel(this.label, c);
@@ -203,13 +207,17 @@ export class SnapshotPlane {
    *  width across planes; narrow pieces clamp it to stay a rim. `fillBoost` lifts the edge
    *  fill alone — the committed lane's plane glows a step brighter (user, 2026-08-07). */
   applyAlpha(tune: PlaneTune, alpha: number, rimRef: number, fillBoost = 1): void {
-    this._fillU.uOpacity.value = tune.fillOp * fillBoost * alpha;
-    this._fillU.uInner.value = tune.innerOp * alpha;
+    // The tune levels are the DARK look, where the glass ADDS its light to black; on paper the same
+    // plane shades the page as ink and those levels are invisible, so the two fill channels ask the
+    // ground (inkPresence) before the furniture fade multiplies them. That is what gives the chamber
+    // a frame on paper: a shaded surface with an ink rim, rather than white on white.
+    this._fillU.uOpacity.value = inkPresence(tune.fillOp * fillBoost, this._paper) * alpha;
+    this._fillU.uInner.value = inkPresence(tune.innerOp, this._paper) * alpha;
     this._fillU.uEdgeW.value = Math.min((1 - tune.edge) * rimRef, 0.8 * this._minHalf);
     if (this._trayU && this._tray?.visible) {
       // FLAT tray fill: the rim channel stays off, the centre level carries the whole panel.
       this._trayU.uOpacity.value = 0;
-      this._trayU.uInner.value = tune.trayOp * alpha;
+      this._trayU.uInner.value = inkPresence(tune.trayOp, this._paper) * alpha;
     }
   }
 
