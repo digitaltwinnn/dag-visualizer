@@ -2,7 +2,8 @@
 // No simulation — if the API is unreachable the app shows a "no data" state and
 // keeps polling, recovering on its own once it responds again (`live` reflects this).
 
-import { API_BASE, COLORS, L0_CLUSTER, L1_CLUSTER, METAGRAPHS, POLL, type MetaConfig } from "@/src/engine/config";
+import { METAGRAPHS, NET_DEF } from "@/src/net/current";
+import { COLORS, POLL, type MetaConfig } from "@/src/engine/config";
 import type { Anchor, ClusterNode, DagCore, GlobalSnapshot } from "@/src/data/types";
 
 export interface NetworkEvents {
@@ -141,7 +142,7 @@ export class NetworkData {
     }
   }
   private _get(path: string): Promise<any> {
-    return this._fetchJson(API_BASE + path);
+    return this._fetchJson(NET_DEF.be + path);
   }
 
   // ---- bootstrap: seed the spine with recent history ----
@@ -168,8 +169,8 @@ export class NetworkData {
   async _fetchClusters(): Promise<void> {
     try {
       const [l0, l1] = await Promise.all([
-        this._fetchJson(L0_CLUSTER),
-        this._fetchJson(L1_CLUSTER),
+        this._fetchJson(NET_DEF.l0 + "/cluster/info"),
+        this._fetchJson(NET_DEF.l1 + "/cluster/info"),
       ]);
       if (Array.isArray(l0) && Array.isArray(l1) && l0.length && l1.length) {
         this.clusters = { l0, l1 };

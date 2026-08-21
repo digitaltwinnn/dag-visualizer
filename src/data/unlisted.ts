@@ -17,7 +17,7 @@
 //
 // The ledger scene needs no import: `ledgerBands.UNLISTED_KEY` carries the same id string, so
 // the lane, band and dim machinery match by construction.
-import { METAGRAPHS } from "@/src/engine/config";
+import { METAGRAPHS } from "@/src/net/current";
 import { metagraphById } from "@/src/data/network";
 import { hex } from "@/src/util/format";
 import { buildUnlistedLog } from "@/src/data/anchorLog";

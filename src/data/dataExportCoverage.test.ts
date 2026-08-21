@@ -49,7 +49,7 @@ const EXEMPT_EXPORTS: Record<string, string[]> = {
     "initNetwork", "getNetwork", "getAnchor", "isAnchorSettling",
     // config mirrors (config.ts is pure static data; these re-expose it to the HUD)
     "COLORS", "CORE_HEX", "DEFAULT_META_COLOR", "ANCHOR_SETTLE_MS",
-    // catalog lookups over config.METAGRAPHS
+    // catalog lookups over the CATALOG (via src/net/current)
     "metagraphById", "filterAccent", "allMetagraphs",
     // re-export of api.ts's own helper, covered where it is defined
     "shortHash",

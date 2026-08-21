@@ -1,7 +1,8 @@
 import { useStore } from "@/src/store/store";
 import type { Anchor, GlobalSnapshot, MetaInfo, NodeRow } from "@/src/data/types";
 import { NetworkData, shortHash } from "@/src/data/api";
-import { METAGRAPHS, COLORS as RAW_COLORS, DEFAULT_META_COLOR as RAW_DEFAULT_META } from "@/src/engine/config";
+import { METAGRAPHS } from "@/src/net/current";
+import { COLORS as RAW_COLORS, DEFAULT_META_COLOR as RAW_DEFAULT_META } from "@/src/engine/config";
 import { hex } from "@/src/util/format";
 import { identityHudNumber } from "@/src/palette/identity";
 import { UNLISTED_ID, UNLISTED_HUE } from "@/src/data/unlisted";

@@ -13,7 +13,7 @@
 // Allocation-free after construction: `makeBarSpec()` preallocates one band record per listed
 // metagraph plus the unlisted aggregate, and `fillBarSpec()` only writes into them.
 import { BAR_MAX_W, BAR_MIN_W, BYTE_SCALE_KB, lanePlaneHalf } from "./ledgerLayout";
-import { METAGRAPHS } from "../config";
+import { METAGRAPHS } from "@/src/net/current";
 
 /** The band key for every anchor from a metagraph that isn't publicly listed. */
 export const UNLISTED_KEY = "unlisted";

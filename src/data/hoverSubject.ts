@@ -1,11 +1,13 @@
 import type { PickDescriptor } from "./types";
 import { hex } from "@/src/util/format";
-import { COLORS, METAGRAPHS } from "@/src/engine/config";
+import { METAGRAPHS } from "@/src/net/current";
+import { COLORS } from "@/src/engine/config";
 import { identityHudHex } from "@/src/palette/identity";
 
 // Core cyan (the DAG spine) — the identity hue for every NON-metagraph subject (a DAG-core
-// validator, the L0 core, a global snapshot). From the plain-constant config, NOT network.ts
-// (browser-only), so this module stays Node-test-safe.
+// validator, the L0 core, a global snapshot). From the plain-constant config (and the
+// Node-safe src/net/current for the catalog), NOT network.ts (browser-only), so this module
+// stays Node-test-safe.
 const CORE = hex((COLORS as { core: number }).core);
 
 // The stable hover-pairing KEY for a NODE pick: a validator by its MACHINE id (so a hybrid's

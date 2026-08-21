@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { METAGRAPHS } from "@/src/engine/config";
+import { METAGRAPHS } from "@/src/net/current";
 import {
   LISTED_IDS,
   UNLISTED_CFG,

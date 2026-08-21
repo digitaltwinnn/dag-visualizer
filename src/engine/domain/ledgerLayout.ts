@@ -23,7 +23,7 @@
 // cut — left the geometry with Task 16; their row constants are gone too, so the only heights
 // declared below are the two floors FLOOR_Y actually reads.)
 
-import { METAGRAPHS } from "../config";
+import { METAGRAPHS } from "@/src/net/current";
 import { hexCell } from "./nodeLayout";
 
 export const LEDGER = {

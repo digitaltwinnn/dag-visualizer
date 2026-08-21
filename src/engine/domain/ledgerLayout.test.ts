@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { METAGRAPHS } from "../config";
+import { METAGRAPHS } from "@/src/net/current";
 import {
   LEDGER, LAYER_GEOM, ledgerSite, clusterRadius, ledgerSpread,
   FLOOR_IDS, FLOOR_Y, LANE_HALF_Z, PLANE_FIELD_HALF,

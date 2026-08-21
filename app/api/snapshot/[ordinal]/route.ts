@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { unstable_cache } from "next/cache";
-import { METAGRAPHS } from "@/src/engine/config";
+import { METAGRAPHS } from "@/src/net/current";
 import type { SnapshotExact, ChannelSnapRow } from "@/src/data/types";
 import { decodeChannelContent } from "../decodeChannel";
 import { fetchGlobalJson } from "../fetchGlobal";

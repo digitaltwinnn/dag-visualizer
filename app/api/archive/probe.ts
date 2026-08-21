@@ -1,5 +1,5 @@
 import { unstable_cache } from "next/cache";
-import { METAGRAPHS } from "@/src/engine/config";
+import { METAGRAPHS } from "@/src/net/current";
 
 // WHO KEEPS THE CHAIN'S HISTORY — the one home for the archive census (user, 2026-08-14: "can
 // we know how many nodes have the full history?", then "mention time and/or snapshots, and

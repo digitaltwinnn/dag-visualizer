@@ -173,12 +173,6 @@ export const CATALOG: Record<NetworkId, MetaConfig[]> = {
   ],
 };
 
-// TRANSITIONAL — removed in the import-move task: the single-network exports, pointed at
-// mainnet so the tree compiles while consumers migrate to src/net/current.
-export const METAGRAPHS: MetaConfig[] = CATALOG.mainnet;
-export const API_BASE = NETWORKS.mainnet.be;
-export const L0_CLUSTER = NETWORKS.mainnet.l0 + "/cluster/info";
-export const L1_CLUSTER = NETWORKS.mainnet.l1 + "/cluster/info";
 
 // Data polling cadence + retention (was `VIS`, renamed: this group is DATA tuning, not visuals).
 export const POLL = {

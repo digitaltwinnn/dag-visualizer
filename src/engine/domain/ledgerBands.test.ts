@@ -4,7 +4,7 @@ import {
   type RibbonQuad,
 } from "./ledgerBands";
 import { BAR_MAX_W, BAR_MIN_W, BYTE_SCALE_KB, LANE_HALF_Z } from "./ledgerLayout";
-import { METAGRAPHS } from "../config";
+import { METAGRAPHS } from "@/src/net/current";
 
 const KB = 1024;
 const ORDER = METAGRAPHS.map((m) => m.id);

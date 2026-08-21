@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { unstable_cache } from "next/cache";
-import { METAGRAPHS } from "@/src/engine/config";
+import { METAGRAPHS } from "@/src/net/current";
 
 // A NETWORK'S SNAPSHOT HISTORY, ordinal-addressed (user, 2026-08-14 — "the pagination should be
 // based on the total number of snapshots", then "jump to first and latest"): ordinals are

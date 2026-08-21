@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { unstable_cache } from "next/cache";
-import { L0_CLUSTER, L1_CLUSTER } from "@/src/engine/config";
+import { NETWORKS } from "@/src/engine/config";
 import { geolocate } from "@/src/server/ipGeolocate";
 import type { GeoMap } from "@/src/data/types";
 
@@ -29,7 +29,7 @@ async function clusterIps(url: string): Promise<string[]> {
 
 const getLiveGeo = unstable_cache(
   async (): Promise<GeoMap> => {
-    const [l0, l1] = await Promise.all([clusterIps(L0_CLUSTER), clusterIps(L1_CLUSTER)]);
+    const [l0, l1] = await Promise.all([clusterIps(NETWORKS.mainnet.l0 + "/cluster/info"), clusterIps(NETWORKS.mainnet.l1 + "/cluster/info")]);
     const ips = [...new Set([...l0, ...l1])];
     if (!ips.length) throw new Error("no validator ips");
     const map = await geolocate(ips);

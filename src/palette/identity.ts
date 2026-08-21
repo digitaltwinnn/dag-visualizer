@@ -1,7 +1,8 @@
 // Identity-lane colour map: ONE deterministic source of a metagraph's identity hue, resolved for
 // each medium (HUD flat-on-glass vs the 3D scene under emissive+bloom). Built on the palette
 // generator; precedence = brand hue > config colour > hash fallback (CLAUDE.md "Two colour lanes").
-import { METAGRAPHS, COLORS } from "@/src/engine/config";
+import { METAGRAPHS } from "@/src/net/current";
+import { COLORS } from "@/src/engine/config";
 import { assignPalette, oklchToHex } from "./palette";
 import { hexToOklch } from "./brand";
 import brandHues from "@/data/brand-hues.json";
