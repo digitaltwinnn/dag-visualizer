@@ -487,6 +487,16 @@
   --primary: oklch(0.88 0.13 195);           /* accent cyan #2af5ff — the sole live/accent signal */
   --primary-foreground: oklch(0.14 0.02 265);
   --ring: oklch(0.88 0.13 195);
+  /* The three network accents — ONE home (multi-network design §2). All three are always
+     defined so the NetworkSwitch popover can render every network's dot on any network; the
+     [data-net] rules after this block only re-point --primary/--ring. Mainnet gets NO
+     [data-net] rule, so the bare URL's rendered CSS stays byte-identical. Chroma 0.13 on all
+     three (matching --primary, deliberately below cyan's 0.150 gamut ceiling); lightness
+     differs per hue because each hue's in-gamut chroma peaks at a different brightness.
+     Guard-band kin: ACCENT_HUE in src/palette/palette.ts mirrors these hues — keep in sync. */
+  --net-mainnet: oklch(0.88 0.13 195);
+  --net-integrationnet: oklch(0.78 0.13 300);
+  --net-testnet: oklch(0.84 0.13 327);
   /* The sole --accent definition (the legacy literal in app/styles/00-base.css was dropped
      when that file was retired in Task 10) — points at --primary so it stays the single
      source of truth. Consumed by CardHead's `var(--filter-accent, var(--accent))` bullet. */
@@ -520,6 +530,18 @@
   --wash-faint: rgba(90, 140, 255, 0.05);
   --wash-soft:  rgba(90, 140, 255, 0.10);
   --wash-hover: rgba(90, 140, 255, 0.12);
+}
+
+/* Network accent override — stamped on <html> before first paint by the inline script in
+   app/layout.tsx. Mainnet has no rule on purpose (byte-identical CSS). --primary-foreground
+   is unchanged for all three (contrast verified in the design). */
+:root[data-net="integrationnet"] {
+  --primary: var(--net-integrationnet);
+  --ring: var(--net-integrationnet);
+}
+:root[data-net="testnet"] {
+  --primary: var(--net-testnet);
+  --ring: var(--net-testnet);
 }
 
 /* ── Structural / layout lane (was app/styles/00-base.css, retired in Task 10) ──
