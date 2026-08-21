@@ -484,11 +484,18 @@
      travel in the first third, so it reads quick with a soft landing, not slow. */
   --ease-spring: linear(0, 0.056, 0.204, 0.404, 0.6, 0.766 25%, 0.937 32.5%, 1.022 40%, 1.056 47.5%, 1.055 55%, 1.035 65%, 1.012 77.5%, 1.001 90%, 1);
 
-  --background: light-dark(oklch(0.965 0.008 265), oklch(0.09 0.02 265));        /* #05060e app bg (dark) */
-  --foreground: light-dark(oklch(0.24 0.03 265), oklch(0.94 0.02 255));        /* #e8eefc text (dark) */
-  --muted-foreground: light-dark(oklch(0.48 0.03 265), oklch(0.66 0.04 265));  /* #8a96b8 muted (dark) */
+  --background: light-dark(oklch(0.94 0.012 265), oklch(0.09 0.02 265));         /* #05060e app bg (dark) */
+  --foreground: light-dark(oklch(0.21 0.035 265), oklch(0.94 0.02 255));       /* #e8eefc text (dark) */
+  --muted-foreground: light-dark(oklch(0.44 0.035 265), oklch(0.66 0.04 265)); /* #8a96b8 muted (dark) */
 
-  --card: light-dark(oklch(0.94 0.01 265), oklch(0.15 0.03 265));
+  /* LIGHT IS A LAYERED GROUND, and the order is the point (user, 2026-08-21: "white cards,
+     white background white furniture; we're missing proper contrast"). On dark the page is the
+     floor and every surface rises OUT of it, so --card sits lighter than --background. Paper
+     inverts the reading, not the relation: the page steps DOWN to 0.94 and the card back UP to
+     0.985, so a panel is still the raised thing — but the two now differ by a readable step
+     instead of both being near-white. Keep any new surface on the same side of the page it is
+     on in dark; what changes across themes is the ground, never which surface is on top. */
+  --card: light-dark(oklch(0.985 0.004 265), oklch(0.15 0.03 265));
   --card-foreground: var(--foreground);
   --popover: var(--card);
   --popover-foreground: var(--foreground);
@@ -503,11 +510,15 @@
      three (matching --primary, deliberately below cyan's 0.150 gamut ceiling); lightness
      differs per hue because each hue's in-gamut chroma peaks at a different brightness.
      Guard-band kin: ACCENT_HUE in src/palette/palette.ts mirrors these hues — keep in sync.
-     Light sides share L 0.50 / C 0.085 because CYAN's ink-lightness ceiling binds all three
-     (spec's measured table — on dark ground the inversion is the other way). */
+     The light sides share L 0.50 and NOTHING ELSE (user, 2026-08-21: "the colors can still pop").
+     They were briefly pinned to cyan's chroma as well, on the reasoning that cyan's ink-lightness
+     ceiling binds all three — but a ceiling is not a style: at L 0.50 cyan 195 tops out at C 0.085
+     while violet 300 reaches 0.266 and magenta 327 reaches 0.231 (measured), so matching them to
+     the tightest hue spent two-thirds of their gamut buying a uniformity nobody sees. Each takes
+     what its own hue affords; cyan alone is at its ceiling and must not be raised. */
   --net-mainnet: light-dark(oklch(0.50 0.085 195), oklch(0.88 0.13 195));
-  --net-integrationnet: light-dark(oklch(0.50 0.085 300), oklch(0.78 0.13 300));
-  --net-testnet: light-dark(oklch(0.50 0.085 327), oklch(0.84 0.13 327));
+  --net-integrationnet: light-dark(oklch(0.50 0.19 300), oklch(0.78 0.13 300));
+  --net-testnet: light-dark(oklch(0.50 0.18 327), oklch(0.84 0.13 327));
   /* The sole --accent definition (the legacy literal in app/styles/00-base.css was dropped
      when that file was retired in Task 10) — points at --primary so it stays the single
      source of truth. Consumed by CardHead's `var(--filter-accent, var(--accent))` bullet. */
@@ -530,7 +541,7 @@
      is still a real one, distinct from an error). */
   --warn-soft: light-dark(#8a6a00, #ffd166);
 
-  --border: light-dark(rgba(30, 60, 140, 0.28), rgba(90, 140, 255, 0.22));        /* panel/hairline border (was the --panel-border alias) */
+  --border: light-dark(rgba(30, 60, 140, 0.38), rgba(90, 140, 255, 0.22));        /* panel/hairline border (was the --panel-border alias) */
   --input: var(--border);
   --surface-muted: light-dark(oklch(0.92 0.01 265), oklch(0.18 0.03 265));
   --secondary: var(--surface-muted);
@@ -550,9 +561,9 @@
    are today's HUD lane verbatim (identity.ts pins them); light is the measured ink lane. */
 :root { --ident-l: 0.74; --ident-c: 0.19; }
 @media (prefers-color-scheme: light) {
-  :root:not([data-theme="dark"]) { --ident-l: 0.50; --ident-c: 0.14; }
+  :root:not([data-theme="dark"]) { --ident-l: 0.48; --ident-c: 0.16; }
 }
-:root[data-theme="light"] { --ident-l: 0.50; --ident-c: 0.14; }
+:root[data-theme="light"] { --ident-l: 0.48; --ident-c: 0.16; }
 
 /* Network accent override — stamped on <html> before first paint by the inline script in
    app/layout.tsx. Mainnet has no rule on purpose (byte-identical CSS). --primary-foreground
@@ -576,7 +587,7 @@
   /* --panel is the translucent glass panel fill; it has no shadcn equivalent, so it stays a
      structural literal (NOT an alias). --panel-light is its lighter sibling (same RGB, lower
      alpha) for the tablet/phone dock glass; --panel-solid is the near-opaque tooltip/tip glass. */
-  --panel: light-dark(rgba(252, 253, 255, 0.78), rgba(12, 16, 32, 0.72));
+  --panel: light-dark(rgba(252, 253, 255, 0.85), rgba(12, 16, 32, 0.72));
   --panel-light: light-dark(rgba(252, 253, 255, 0.40), rgba(12, 16, 32, 0.35));
   --panel-solid: light-dark(rgba(248, 250, 255, 0.94), rgba(8, 12, 26, 0.92));
   /* --panel-plate is the BASE PLATE a card's FOOT sits on (user, 2026-08-10: the foot's tier
@@ -601,7 +612,10 @@
     light-dark(rgba(240, 244, 252, 0.80), rgba(10, 14, 28, 0.76)));
   --scrim: light-dark(rgba(235, 240, 250, 0.16), rgba(3, 5, 12, 0.16));
   --scrim-shadow: light-dark(rgba(235, 240, 250, 0.7), rgba(3, 5, 12, 0.7));
-  --thread-punch: light-dark(oklch(0.965 0.008 265), #0c1020);
+  /* The thread's punch-through tone — the PAGE, so the ruler reads as cut out of the ground
+     rather than drawn on it. It duplicates --background's light value on purpose (a var() here
+     would resolve against the wrong element in the SVG); the two move together. */
+  --thread-punch: light-dark(oklch(0.94 0.012 265), #0c1020);
 
   /* Dot-size scale (documented, not tokenised — the w-/h- micro-dots read cleaner as literals at
      the call site than as size utilities): 3px xs · 5px sm · 7px md · 9px lg (odd, +2px steps) —

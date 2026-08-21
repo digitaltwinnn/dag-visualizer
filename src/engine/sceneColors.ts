@@ -142,7 +142,7 @@ export function inkMix(out: THREE.Color, s: number, c: SceneColors): THREE.Color
  * enough to lift a resting band clear of the page, high enough that the focus boost still has
  * somewhere to go. See `inkPresence`.
  */
-const INK_GAMMA = 0.42;
+const INK_GAMMA = 0.28;
 
 /**
  * A mark's PRESENCE, translated for the ground it is painted on — the sibling of `inkMix` for the

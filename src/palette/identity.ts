@@ -19,12 +19,17 @@ export const SCENE_C = 0.20;
 // dot/chip on the panel surface. Tuned visually. DARK-theme values.
 export const HUD_L = 0.74;
 export const HUD_C = 0.19;
-// Scene lane L/C for the LIGHT theme (Task 6, spec §5) — lower L / lower C than dark so a bloomed
-// node stays legible against a light background instead of blowing out. The HUD lane needs no light
-// pair: identityHudCss() defers L/C to the CSS tokens (--ident-l/--ident-c), which already carry
-// both themes' values, so the HUD retints for free with zero re-renders.
-export const SCENE_L_LIGHT = 0.45;
-export const SCENE_C_LIGHT = 0.17;
+// Scene lane L/C for the LIGHT theme (Task 6, spec §5) — lower L than dark so an identity mark
+// reads as INK on the page instead of blowing out. The chroma goes the OTHER way (2026-08-21,
+// user: "the colors can still pop"): on black a hue is light ADDED, and the bloom does half the
+// saturating for it; on paper the same hue is pigment laid on a bright ground, where the eye
+// reads far less of it, so the light lane needs MORE chroma than dark to carry the same identity.
+// Not every hue can pay for it — a request past its own gamut is chroma-reduced per hue, which is
+// exactly the behaviour that lets one pair serve all of them. The HUD lane needs no light pair:
+// identityHudCss() defers L/C to the CSS tokens (--ident-l/--ident-c), which already carry both
+// themes' values, so the HUD retints for free with zero re-renders.
+export const SCENE_L_LIGHT = 0.42;
+export const SCENE_C_LIGHT = 0.19;
 
 export interface IdentityHue {
   id: string;

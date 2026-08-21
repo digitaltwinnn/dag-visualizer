@@ -17,7 +17,7 @@
 // Drawn on the LEAD row and the HOT row only, so the trail stays calm; older ticks keep a hairline
 // strut drawn by the view. One Mesh, one preallocated geometry, rewritten event-time.
 import * as THREE from "three";
-import { glowBlend, inkMix, type SceneColors } from "../../sceneColors";
+import { glowBlend, inkMix, inkPresence, isLightGround, type SceneColors } from "../../sceneColors";
 import type { TuneSchema } from "../../tune";
 import { METAGRAPHS } from "@/src/net/current";
 import { BAR_H, BAR_LIFT, FLOOR_Y, LEAD_X, TILE_LIFT } from "../../domain/ledgerLayout";
@@ -93,9 +93,12 @@ export class Ribbons {
   /** The live palette — the sheet is normal-blended INK on paper, additive GLOW on the dark
    *  ground, and its per-row brightness has to be expressed for whichever one it lands on. */
   private _colors: SceneColors;
+  /** GROUND, hoisted at event time — setAlpha runs per frame and reads a boolean. */
+  private _paper: boolean;
 
   constructor(colors: SceneColors, sceneColors: Record<string, number>) {
     this._colors = colors;
+    this._paper = isLightGround(colors);
     this._sceneColors = sceneColors;
     this._neutral = colors.core;
     const verts = RIBBON_ROWS * PER_ROW * VERTS_PER_RIBBON;
@@ -130,6 +133,7 @@ export class Ribbons {
    *  hues, so a retint is the same rewrite a filter commit runs. Event-time, like `setFilter`. */
   setColors(c: SceneColors): void {
     this._colors = c;
+    this._paper = isLightGround(c);
     this._neutral = c.core;
     // The GROUND changed, so the sheet's blend mode changes with it (see glowBlend): additive glow
     // on the dark ground is a no-op on paper — the ribbons vanished outright before this line.
@@ -188,7 +192,11 @@ export class Ribbons {
    *  visibly trailing them out of the view by ~half a second. `restOp` is read per frame here like
    *  every other tune row, so the knob still lives without an onChange. */
   setAlpha(a: number): void {
-    this._mat.opacity = this.tune.restOp * a;
+    // `restOp` is the level of an ADDITIVE sheet over black, where the bloom lifts it clear; the same
+    // number as normal-blended ink on paper composites the (already ink-mixed) vertex colour at a
+    // quarter strength, which is precisely how the ribbons read as white ghosts on the light ground.
+    // Presence, so it asks the ground — see inkPresence.
+    this._mat.opacity = inkPresence(this.tune.restOp, this._paper) * a;
   }
 
   /** COMMITTED filter → the other metagraphs' sheets take the COLORED dim (identity hue at the
@@ -227,7 +235,11 @@ export class Ribbons {
         const hex = this._sceneColors[key] ?? this._neutral;
         this._c.setHex(hex);
         const off = this._filter !== "all" && key !== this._filter;
-        const sc = snapBright(brightness * rowFade, off);
+        // The EMPHASIS term alone asks the ground; `rowFade` is the trail's front/horizon boundary
+        // ramp — geometry, not weight — so it multiplies in afterwards ungamma'd (inkPresence's own
+        // rule). Factoring it out of `snapBright` is exact: with no focus the resolver is purely
+        // multiplicative in `base`, so dark is byte-identical.
+        const sc = inkPresence(snapBright(brightness, off), this._paper) * rowFade;
         // Presence toward the GROUND, not toward black — on paper a multiply would make the
         // dimmest sheet the darkest mark in the chamber and invert the dim tiers (see inkMix).
         inkMix(this._c, sc, this._colors);
