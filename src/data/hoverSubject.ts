@@ -1,6 +1,6 @@
 import type { PickDescriptor } from "./types";
 import { METAGRAPHS } from "@/src/net/current";
-import { identityHudCss, identityHudHex } from "@/src/palette/identity";
+import { identityHudCss } from "@/src/palette/identity";
 
 // The identity colour for every NON-metagraph subject (a DAG-core validator, the L0 core, a
 // global snapshot) is the structural accent token itself, `var(--primary)` — resolved by CSS
@@ -36,7 +36,7 @@ export function tooltipSubject(p: PickDescriptor | null | undefined): HoverSubje
       return {
         ident: p.meta?.symbol || p.meta?.name || "metagraph",
         name: p.node?.id || p.node?.ip || "node",
-        color: p.meta ? identityHudHex(p.meta.id) : CORE,
+        color: p.meta ? identityHudCss(p.meta.id) : CORE,
         mono: !!p.node?.id,
       };
     case "l0":

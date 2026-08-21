@@ -26,7 +26,7 @@ describe("tooltipSubject", () => {
     expect(s?.ident).toBe("DED");
     expect(s?.name).toBe("9c2f");
     expect(s?.mono).toBe(true);
-    expect(s?.color).toMatch(/^#[0-9a-f]{6}$/);
+    expect(s?.color).toMatch(/^oklch\(var\(--ident-l\)/);
     expect(s?.color).not.toBe(CORE);
   });
   it("labels a DAG validator as DAG in core cyan, name mono", () => {
