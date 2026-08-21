@@ -1764,9 +1764,11 @@ but CSS is involved while `data-theme` is absent. layout.tsx's inline pre-paint 
 device the network accent uses) reads `localStorage['dagviz:theme']` and stamps `data-theme`
 synchronously before first paint, so a stored explicit choice never flashes the wrong scheme.
 **The one number exception**: `--ident-l`/`--ident-c` are numbers, and `light-dark()` is
-`<color>`-only, so they use the guarded override pair instead (`:root` bakes the dark value,
-`:root:not([data-theme="light"])` and `:root[data-theme="light"]` both restate it) — the CSS
-comment above them states it as the one exception.
+`<color>`-only, so they use the guarded override pair instead — `:root` bakes the dark value,
+`@media (prefers-color-scheme: light) { :root:not([data-theme="dark"]) { … } }` swaps in the
+light value under OS-light (`:not([data-theme="dark"])` guards an explicit dark pin from being
+overridden by the media query), and `:root[data-theme="light"]` restates that same light value
+for an explicit light pin — the CSS comment above them states it as the one exception.
 
 **`components/ThemeController.tsx` is THE one owner of theme state.** It reads the stored pref on
 mount, adopts what the pre-paint script already stamped, and is the app's only
@@ -1787,6 +1789,20 @@ light `0.15`) is the same swap-in-place contract applied to a non-colour constan
 at construction and rewritten by the same `_refreshTheme()` call. The Engine never listens to
 `matchMedia` or the DOM itself; it detects a flip purely by diffing the store's `theme` field
 once per frame against the previous read.
+
+**Any new glow/emissive material must ask the ground question.** The scene's glow idiom is
+additive — ribbons, arcs, hyper's tethers and ring fills, the globe's graticule/borders/coastal
+wall — which adds light to a black ground but saturates a light one straight to invisible white,
+so blend mode is decided per theme by `glowBlend()` (`src/engine/sceneColors.ts`), called both at
+construction and again at `_refreshTheme()`'s rebuild (a material whose blending changes after
+construction needs `needsUpdate`, since three.js caches the program per blend mode). Where a site
+bakes presence into a VERTEX colour instead of a material opacity — the ledger's ribbons, hyper's
+tethers — the same ground question rides `inkMix()`: dark stays a straight multiply toward black,
+light lerps toward `--background` instead, so a dimmed mark still reads as *less present* rather
+than inverting the dim-tier hierarchy. One home for both, asked at every additive site, because
+the failure is silent — a material that forgets to ask still renders, still retints, and simply
+cannot be seen. Found live on the geo globe and the ledger's ribbons, which vanished entirely
+under light.
 
 **Sub-project 2 (per-view day-look refinement) is open.** Byte-identity against master is pinned
 for dark; light is correct at the token and page level but each 3D view's own look under light
