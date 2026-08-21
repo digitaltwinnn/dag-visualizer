@@ -2,6 +2,7 @@ import SceneCanvas from "@/components/SceneCanvas";
 import Blueprint from "@/components/Blueprint";
 import BootOverlay from "@/components/BootOverlay";
 import DataBridge from "@/components/DataBridge";
+import ThemeController from "@/components/ThemeController";
 import TopBar from "@/components/TopBar";
 import BottomStream from "@/components/BottomStream";
 import ExploreRail from "@/components/ExploreRail";
@@ -56,6 +57,7 @@ export default function Home() {
       <DataBridge />
       <FollowController />
       <RawSnapshotBridge />
+      <ThemeController />
       <Tooltip />
       {/* Styled replacement for the native `title` bubble — delegated, so every title= in the
           app inherits the design (user, 2026-08-16). */}
