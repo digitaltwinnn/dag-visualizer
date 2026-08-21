@@ -22,6 +22,7 @@ import { metagraphById } from "@/src/data/network";
 import { hex } from "@/src/util/format";
 import { buildUnlistedLog } from "@/src/data/anchorLog";
 import type { GlobalSnapshot, MetaCfg, SnapshotExact } from "@/src/data/types";
+import type { Theme } from "@/src/theme/resolve";
 
 export const UNLISTED_ID = "unlisted";
 
@@ -35,7 +36,12 @@ export const UNLISTED_ID = "unlisted";
 export const UNLISTED_HUE = "var(--muted-foreground)";
 // The same tone as a RESOLVED hex, for the one surface that can't resolve a CSS var: the
 // scene (the HUD's last resolved-hex consumer, RailThread, now rides currentColor).
-export const UNLISTED_SCENE_HEX = 0x8a96b8;
+// One neutral pair per theme — dark keeps the original tone, light is the darker read that
+// stays visible on a light glass surface. `UNLISTED_SCENE_HEX` is the dark value, kept for
+// every existing (theme-unaware) caller; Task 7 threads `UNLISTED_SCENE_HEX_BY_THEME[theme]`
+// through the scene lane once it knows which theme it's drawing.
+export const UNLISTED_SCENE_HEX_BY_THEME: Record<Theme, number> = { dark: 0x8a96b8, light: 0x5a6478 };
+export const UNLISTED_SCENE_HEX = UNLISTED_SCENE_HEX_BY_THEME.dark;
 
 export const LISTED_IDS: ReadonlySet<string> = new Set(METAGRAPHS.map((m) => m.id));
 

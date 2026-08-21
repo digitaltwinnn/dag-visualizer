@@ -1,6 +1,6 @@
 import type { PickDescriptor } from "./types";
 import { METAGRAPHS } from "@/src/net/current";
-import { identityHudHex } from "@/src/palette/identity";
+import { identityHudCss, identityHudHex } from "@/src/palette/identity";
 
 // The identity colour for every NON-metagraph subject (a DAG-core validator, the L0 core, a
 // global snapshot) is the structural accent token itself, `var(--primary)` — resolved by CSS
@@ -45,7 +45,7 @@ export function tooltipSubject(p: PickDescriptor | null | undefined): HoverSubje
     case "core":
       return { ident: "DAG", name: "Global L0", color: CORE, mono: false };
     case "meta":
-      return { ident: p.cfg.ticker || p.cfg.name, name: p.cfg.name, color: identityHudHex(p.cfg.id), mono: false };
+      return { ident: p.cfg.ticker || p.cfg.name, name: p.cfg.name, color: identityHudCss(p.cfg.id), mono: false };
     case "snapshot":
       return { ident: "L0", name: p.data.ordinal.toLocaleString(), color: CORE, mono: false };
     case "metaSnap": {
@@ -54,7 +54,7 @@ export function tooltipSubject(p: PickDescriptor | null | undefined): HoverSubje
       // row, so its address is the only name it has (the card's fallback, shortened here).
       const cfg = METAGRAPHS.find((m) => m.id === p.sel.metaId);
       const ident = cfg?.ticker || cfg?.name || p.sel.metaId.slice(0, 6) + "…";
-      return { ident, name: p.sel.ordinal.toLocaleString(), color: identityHudHex(p.sel.metaId), mono: false };
+      return { ident, name: p.sel.ordinal.toLocaleString(), color: identityHudCss(p.sel.metaId), mono: false };
     }
     default:
       return null; // geoLive is a rail-only proxy, never a 3D-hover subject

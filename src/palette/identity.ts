@@ -6,16 +6,25 @@ import { COLORS } from "@/src/engine/config";
 import { assignPalette, oklchToHex } from "./palette";
 import { hexToOklch } from "./brand";
 import brandHues from "@/data/brand-hues.json";
+import type { Theme } from "@/src/theme/resolve";
 
 // Bloom-tuned L/C for the 3D lane — higher chroma / lower L than the HUD so an emissive+bloomed
-// node keeps a distinct hue instead of blowing out to white. Visually tuned in Task 3.
+// node keeps a distinct hue instead of blowing out to white. Visually tuned in Task 3. DARK-theme
+// values — byte-identical, pinned by identity.test.ts's "theme-lane constants" — every existing
+// caller (identityHudHex, identitySceneHex's default) depends on these never moving.
 export const SCENE_L = 0.68;
 export const SCENE_C = 0.20;
 // HUD lane L/C. Lower L + higher C than the original 0.80/0.15 (which read washed-out / pale on the
 // dark glass) — closer to the scene's vividness while staying light enough to be legible as a small
-// dot/chip on the panel surface. Tuned visually.
+// dot/chip on the panel surface. Tuned visually. DARK-theme values.
 export const HUD_L = 0.74;
 export const HUD_C = 0.19;
+// Scene lane L/C for the LIGHT theme (Task 6, spec §5) — lower L / lower C than dark so a bloomed
+// node stays legible against a light background instead of blowing out. The HUD lane needs no light
+// pair: identityHudCss() defers L/C to the CSS tokens (--ident-l/--ident-c), which already carry
+// both themes' values, so the HUD retints for free with zero re-renders.
+export const SCENE_L_LIGHT = 0.45;
+export const SCENE_C_LIGHT = 0.17;
 
 export interface IdentityHue {
   id: string;
@@ -118,6 +127,33 @@ function resolve(id: string): IdentityHue | null {
 }
 
 export function identityHudHex(id: string): string { return resolve(id)?.hudHex ?? CORE_HEX; }
-export function identitySceneHex(id: string): string { return resolve(id)?.sceneHex ?? CORE_HEX; }
+
+// CSS-deferred HUD colour: the value never encodes L/C at all, so a theme switch retints every
+// consumer for free (a CSS var write, zero React re-renders) instead of the resolve()-baked hex
+// identityHudHex() returns. Every HUD caller that feeds a `style`/CSS custom property should use
+// this over identityHudHex — see the identityHudHex holdout-grep migration in Task 6's report.
+// Falsy id (resolve() returns null) falls back to the structural accent, not a baked hex, because
+// there is no hue degree to defer at all.
+export function identityHudCss(id: string): string {
+  const r = resolve(id);
+  if (!r) return "var(--primary)";
+  return `oklch(var(--ident-l) var(--ident-c) ${r.hueDeg}deg)`;
+}
+
+// Cache for the LIGHT-theme scene hex, keyed by id, beside the existing dark-lane memo (known()'s
+// entries + _unknown already carry the dark sceneHex baked in toEntry()). Kept separate rather than
+// widening IdentityHue with a second sceneHex field, so the dark path stays byte-identical to what
+// toEntry() has always produced.
+const _sceneLight = new Map<string, string>();
+export function identitySceneHex(id: string, theme: Theme = "dark"): string {
+  const r = resolve(id);
+  if (theme === "dark") return r?.sceneHex ?? CORE_HEX;
+  if (!r) return CORE_HEX;
+  const cached = _sceneLight.get(id);
+  if (cached) return cached;
+  const hex = oklchToHex(SCENE_L_LIGHT, SCENE_C_LIGHT, r.hueDeg);
+  _sceneLight.set(id, hex);
+  return hex;
+}
 export function identityHudNumber(id: string): number { return parseInt(identityHudHex(id).slice(1), 16); }
 export function identitySceneNumber(id: string): number { return parseInt(identitySceneHex(id).slice(1), 16); }

@@ -6,6 +6,7 @@ import {
   UNLISTED_HUE,
   UNLISTED_ID,
   UNLISTED_SCENE_HEX,
+  UNLISTED_SCENE_HEX_BY_THEME,
   displayNetwork,
   latestUnlistedTick,
   observedUnlistedIds,
@@ -49,6 +50,15 @@ describe("the unlisted identity", () => {
   it("is never itself listed", () => {
     expect(LISTED_IDS.has(UNLISTED_ID)).toBe(false);
     expect(LISTED_IDS.size).toBe(METAGRAPHS.length);
+  });
+
+  // The neutral scene tone is a pair, one per theme — `UNLISTED_SCENE_HEX` is the dark value
+  // kept for every existing (theme-unaware) caller, and light is a genuinely distinct, darker
+  // tone (a light-lane wash needs a darker neutral to stay visible on light glass).
+  it("carries a dark/light pair, with the bare export equal to the dark value", () => {
+    expect(UNLISTED_SCENE_HEX_BY_THEME.dark).toBe(UNLISTED_SCENE_HEX);
+    expect(UNLISTED_SCENE_HEX_BY_THEME.light).not.toBe(UNLISTED_SCENE_HEX_BY_THEME.dark);
+    expect(UNLISTED_SCENE_HEX_BY_THEME.light.toString(16).padStart(6, "0")).toMatch(/^[0-9a-f]{6}$/);
   });
 });
 

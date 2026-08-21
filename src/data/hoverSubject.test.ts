@@ -40,7 +40,7 @@ describe("tooltipSubject", () => {
     expect(s?.ident).toBe("DOR");
     expect(s?.name).toBe("Dor Technologies");
     expect(s?.mono).toBe(false);
-    expect(s?.color).toMatch(/^#[0-9a-f]{6}$/);
+    expect(s?.color).toMatch(/^oklch\(var\(--ident-l\)/);
     expect(s?.color).not.toBe(CORE);
   });
   it("labels a snapshot by ordinal in core cyan", () => {
