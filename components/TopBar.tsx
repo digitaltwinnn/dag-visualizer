@@ -11,6 +11,8 @@ import Vitals, { VitalsCluster } from "@/components/topbar/Vitals";
 import FilterPicker from "@/components/topbar/FilterPicker";
 import EcgMark from "@/components/topbar/EcgMark";
 import PresentationToggle from "@/components/topbar/PresentationToggle";
+import NetworkSwitch from "@/components/topbar/NetworkSwitch";
+import { netUrl } from "@/src/net/current";
 import { useBreakpoint } from "@/components/useBreakpoint";
 import type { Mode } from "@/src/store/store";
 
@@ -81,11 +83,17 @@ export default function TopBar() {
     const el = barRow.current;
     if (!el) return;
     const check = () => {
-      const over = el.scrollWidth - el.clientWidth;
+      // Two failure shapes since the grid promotion: the ROW overflowing its box, and a ZONE
+      // being crushed below its content (the left zone's min-w-0 lets the grid shrink it, so
+      // the row's own scrollWidth stays clean while the brand/filter get clipped inside it).
+      let over = el.scrollWidth - el.clientWidth;
+      for (const zone of el.children) {
+        if (zone instanceof HTMLElement) over = Math.max(over, zone.scrollWidth - zone.clientWidth);
+      }
       if (over > 0)
         console.warn(
           `[TopBar] the command bar overflows by ${over}px at ${window.innerWidth}px — ` +
-            "the trailing control is being clipped. Raise a breakpoint in components/TopBar.tsx.",
+            "a control is being clipped. Raise a breakpoint in components/TopBar.tsx.",
         );
     };
     check();
@@ -146,7 +154,7 @@ export default function TopBar() {
             WebGL tab — a client-side route change would tear the engine down and rebuild it on
             return, so the full navigation is the cheaper one. */}
         <a
-          href="/about"
+          href={netUrl("/about")}
           title="About DAG Visualizer, an unofficial community project"
           className={cn(
             "flex items-center gap-2 rounded-btn -mx-1 px-1 py-0.5 no-underline",
@@ -295,10 +303,20 @@ export default function TopBar() {
         {/* PRESENTATION — the bar's trailing control: ONE axis for how the view's information
             is presented (SCENE / CARDS / RAW — replacing the separate Focus icon + RAW switch,
             user 2026-08-08). It sits in the COMMAND bar (this zone's scope is the whole
-            instrument) rather than the live lane, and LAST because it acts on everything to
-            its left. */}
+            instrument) rather than the live lane. */}
         <span className="w-px self-stretch bg-border my-1 max-[820px]:hidden" />
         <PresentationToggle />
+
+        {/* Network switch — the RIGHT edge of the bar, one past the presentation toggle: the
+            network acts on everything INCLUDING presentation, so the edge escalates in scope
+            and the bar reads as a valley — brand (what this app is) and network (which chain)
+            at the outer edges, the most specific controls in the middle. On PHONE it rides
+            the filter strip's second row instead (see the strip below) — in this zone it
+            starved the filter face's word out of the bar (measured at 360-390, 2026-08-21). */}
+        <span className="w-px self-stretch bg-border my-1 max-[820px]:hidden" />
+        <div className="contents max-[700px]:hidden">
+          <NetworkSwitch />
+        </div>
         </div>
       </div>
 
@@ -331,6 +349,11 @@ export default function TopBar() {
             {bp === "phone" && (
               <div className="flex items-center justify-center gap-2 mx-2 px-2 pb-2 pt-1.5 border-t border-border/60">
                 <VitalsCluster align="center" />
+                {/* The phone home of the network switch (its bar slot is desktop/tablet-only):
+                    the strip row is the one place the bar grows, and it has the width the
+                    right zone doesn't. */}
+                <span className="w-px self-stretch bg-border my-1" />
+                <NetworkSwitch />
               </div>
             )}
           </div>

@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Globe, Layers, Orbit, TriangleAlert, type LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
+import NetLink from "@/components/NetLink";
 import { ABOUT } from "@/components/aboutCopy";
 
 // A plain-HTML, crawlable ABOUT page — deliberately GENERIC and non-technical (user, 2026-07-10):
@@ -156,7 +157,7 @@ export default function AboutPage() {
             <span className="flex-1" />
             {/* A plain <a>: the visualizer boots a WebGL engine on a fresh document, and there is
                 no client router on this page to preserve. */}
-            <a
+            <NetLink
               href="/"
               className={cn(
                 "text-label text-primary no-underline rounded-btn py-1.5 px-2.5 whitespace-nowrap",
@@ -165,7 +166,7 @@ export default function AboutPage() {
               )}
             >
               Open the visualizer →
-            </a>
+            </NetLink>
           </Panel>
         </header>
 
@@ -319,9 +320,9 @@ export default function AboutPage() {
           </section>
 
           <footer className="mt-14 pt-6 border-t border-border flex flex-wrap items-center gap-x-5 gap-y-2">
-            <a href="/" className="text-primary no-underline hover:underline underline-offset-2">
+            <NetLink href="/" className="text-primary no-underline hover:underline underline-offset-2">
               Open the visualizer →
-            </a>
+            </NetLink>
             <span className="text-label text-muted-foreground">
               Built entirely from Constellation&apos;s public data. No account, nothing to sign up for.
             </span>
