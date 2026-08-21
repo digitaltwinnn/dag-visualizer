@@ -1753,8 +1753,8 @@ KEEPS the server value.
 
 **Theme is a two-way pref (`system` / `light` / `dark`), not a boolean** — `src/theme/resolve.ts`
 is the one resolver (`ThemePref`, `Theme`, `THEME_KEY`, `parseThemePref`, `resolveTheme`), the
-`src/net/parse.ts` pattern mirrored for theme. Almost every token is a single `light-dark(dark,
-light)` call at its ONE definition site in `:root` — no second `[data-theme]` override block the
+`src/net/parse.ts` pattern mirrored for theme. Almost every token is a single `light-dark(light,
+dark)` call at its ONE definition site in `:root` — no second `[data-theme]` override block the
 way the network accent needs, because CSS itself carries both values. `color-scheme: light dark`
 on `:root` is what makes `light-dark()` resolve at all; an explicit choice stamps
 `[data-theme="light"|"dark"]` on `<html>`, narrowing `color-scheme` to just that value, and
@@ -1787,8 +1787,8 @@ change; `_colorConsumers` is the fan-out array (`HyperView`, `Globe`, `LedgerVie
 once in construction order, each exposing `setColors`/`setSceneColors`. `_bloomMul` (dark `1`,
 light `0.15`) is the same swap-in-place contract applied to a non-colour constant — decided once
 at construction and rewritten by the same `_refreshTheme()` call. The Engine never listens to
-`matchMedia` or the DOM itself; it detects a flip purely by diffing the store's `theme` field
-once per frame against the previous read.
+`matchMedia` or the DOM itself; it detects a flip through a zustand store subscription registered
+in the constructor, event-driven when `theme` changes.
 
 **Any new glow/emissive material must ask the ground question.** The scene's glow idiom is
 additive — ribbons, arcs, hyper's tethers and ring fills, the globe's graticule/borders/coastal
