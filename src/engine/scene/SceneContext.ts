@@ -46,7 +46,8 @@ const LIGHT_RIM = 0x5a6f9c;     // muted cool rim light (back — edge separatio
 
 export function createScene(canvas: HTMLCanvasElement, colors: SceneColors): SceneCtx {
   const scene = new THREE.Scene();
-  scene.background = new THREE.Color(colors.bg);
+  const bgColor = new THREE.Color(colors.bg);
+  scene.background = bgColor;
   // Deliberately NO scene fog (removed 2026-07-11, user): the FogExp2 depth cue darkened the
   // whole scene as the camera pulled back — the scene must stay clear and coloured at every
   // zoom. Depth reads through DoF (hyper focus), the facing dims, and the closeness uniform;
@@ -171,13 +172,55 @@ export function createScene(canvas: HTMLCanvasElement, colors: SceneColors): Sce
   // (`scene.background`), so it is the one thing a theme flip has to re-apply here — plus the
   // tone-mapping pair above, which keys on the same ground question (the OutputPass reads
   // renderer.toneMapping per render, so no material invalidation is needed).
+  //
+  // On PAPER the ground is a VIGNETTE, not a flat fill (user, 2026-08-25: "this dull white
+  // background") — the paper darkens ~5% toward the frame's edges, as if lit where the
+  // instrument sits. A CanvasTexture as scene.background renders screen-stretched, which is
+  // exactly a vignette. Built at event time only (theme flip / token re-read); the dark ground
+  // stays the flat Color it always was — byte-identical.
+  let vignette: THREE.CanvasTexture | null = null;
+  let isPaper = isLightGround(colors);
+  function paperVignette(bg: number): THREE.CanvasTexture {
+    const cv = document.createElement("canvas");
+    cv.width = cv.height = 512;
+    const g = cv.getContext("2d")!;
+    // Scale the sRGB BYTES, not THREE.Color channels — those are linear, and a linear value
+    // drawn into a 2D canvas as if it were sRGB shifts the paper's near-neutral hue visibly
+    // (first cut of this read lavender).
+    const hex = (m: number) =>
+      "#" + [(bg >> 16) & 255, (bg >> 8) & 255, bg & 255]
+        .map((u) => Math.round(Math.min(255, u * m)).toString(16).padStart(2, "0")).join("");
+    const grad = g.createRadialGradient(256, 236, 60, 256, 256, 400);
+    grad.addColorStop(0, hex(1.015));
+    grad.addColorStop(0.62, hex(1));
+    grad.addColorStop(1, hex(0.94));
+    g.fillStyle = grad;
+    g.fillRect(0, 0, 512, 512);
+    const tex = new THREE.CanvasTexture(cv);
+    tex.colorSpace = THREE.SRGBColorSpace;
+    return tex;
+  }
+  function applyBackground() {
+    if (isPaper) {
+      vignette?.dispose();
+      vignette = paperVignette(bgColor.getHex());
+      scene.background = vignette;
+    } else {
+      scene.background = bgColor;
+    }
+  }
   function setClearColor(bg: number) {
-    (scene.background as THREE.Color).setHex(bg);
+    bgColor.setHex(bg);
+    applyBackground();
   }
   function setGround(light: boolean) {
     renderer.toneMapping = light ? THREE.NoToneMapping : THREE.ACESFilmicToneMapping;
     renderer.toneMappingExposure = light ? 1 : 0.82;
+    isPaper = light;
+    applyBackground();
   }
+
+  applyBackground(); // construction honours the current ground (a light boot starts on the vignette)
 
   return { scene, camera, renderer, controls, composer, dof, bloom, resize, setClearColor, setGround };
 }
