@@ -21,7 +21,7 @@ import type { DimContext } from "../../domain/dimModel";
 import type { MetaNodeRecord, ValidatorRecord } from "../../domain/records";
 import type { ViewTransition } from "../../domain/viewTransition";
 import type { PickDescriptor } from "@/src/data/types";
-import { isLightGround, type SceneColors } from "../../sceneColors";
+import { inkPresence, isLightGround, type SceneColors } from "../../sceneColors";
 
 const Y_AXIS = new THREE.Vector3(0, 1, 0); // hex-prism axis (radial after _qRadial)
 // The ONE orb fresnel-rim shader tail (view-dependent rim so emissive spheres read as lit 3D
@@ -52,7 +52,11 @@ const DIM = new THREE.Color(DIM_DARK);
  *  Engine's `_refreshTheme` (event-time), beside the clear colour. */
 export function setNodeDimTarget(colors: SceneColors): void {
   DIM.setHex(isLightGround(colors) ? colors.bg : DIM_DARK);
+  _paper = isLightGround(colors);
 }
+// The ground flag for the per-frame emissive mapping below — module-level for the same reason
+// as DIM (one shared value, per-frame readers hold no copy).
+let _paper = false;
 const _dummy = new THREE.Object3D(); // reused to compose per-instance matrices
 const _vec = new THREE.Vector3();
 const _geoVec = new THREE.Vector3(); // scratch for the morph-fly interpolation
@@ -526,7 +530,10 @@ export class NodeFabric {
       const flRaw = u._flash || 0; // brief flash when an arc pulse reaches this node
       // The buffer IS the easing state — emiArr persists across frames and a node keeps its slot,
       // so approaching the target in place costs one array read and allocates nothing.
-      const emiT = nodeEmissive(c, d, flRaw, fw, !!focusId, fw > 0 ? 0 : hubBoost);
+      // On paper the emissive term multiplies INK, not glow — map it through the one
+      // presence curve so resting nodes read as full ink (measured 2026-08-25: nodes sat at
+      // ~0.78x of the hub's lit face before this asked the ground question).
+      const emiT = inkPresence(nodeEmissive(c, d, flRaw, fw, !!focusId, fw > 0 ? 0 : hubBoost), _paper);
       emi[u.index] += (emiT - emi[u.index]) * ek;
       if (flRaw) u._flash = flRaw * flashDecay;
 
@@ -600,7 +607,7 @@ export class NodeFabric {
       // 2026-08-16): the sum left the palette's hue-keeping range and the subject blew out to a
       // pale point — the "inverse" read. One emphasis at a time: the hub-match is the committed
       // network's RESTING lift; the subject has its own.
-      const emiT = nodeEmissive(c, dEff, flRaw, fw, !!focusId, fw > 0 ? 0 : hubBoost);
+      const emiT = inkPresence(nodeEmissive(c, dEff, flRaw, fw, !!focusId, fw > 0 ? 0 : hubBoost), _paper);
       emi[r.index] += (emiT - emi[r.index]) * ek;
       if (flRaw) r._flash = flRaw * flashDecay;
 
