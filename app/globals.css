@@ -500,9 +500,9 @@
   --popover: var(--card);
   --popover-foreground: var(--foreground);
 
-  --primary: light-dark(oklch(0.50 0.085 195), oklch(0.88 0.13 195));           /* accent cyan #2af5ff — the sole live/accent signal (dark) */
+  --primary: light-dark(oklch(0.56 0.094 195), oklch(0.88 0.13 195));           /* accent cyan #2af5ff — the sole live/accent signal (dark) */
   --primary-foreground: light-dark(oklch(0.98 0.005 265), oklch(0.14 0.02 265));
-  --ring: light-dark(oklch(0.50 0.085 195), oklch(0.88 0.13 195));
+  --ring: light-dark(oklch(0.56 0.094 195), oklch(0.88 0.13 195));
   /* The three network accents — ONE home (multi-network design §2). All three are always
      defined so the NetworkSwitch popover can render every network's dot on any network; the
      [data-net] rules after this block only re-point --primary/--ring. Mainnet gets NO
@@ -516,7 +516,7 @@
      while violet 300 reaches 0.266 and magenta 327 reaches 0.231 (measured), so matching them to
      the tightest hue spent two-thirds of their gamut buying a uniformity nobody sees. Each takes
      what its own hue affords; cyan alone is at its ceiling and must not be raised. */
-  --net-mainnet: light-dark(oklch(0.50 0.085 195), oklch(0.88 0.13 195));
+  --net-mainnet: light-dark(oklch(0.56 0.094 195), oklch(0.88 0.13 195));
   --net-integrationnet: light-dark(oklch(0.50 0.19 300), oklch(0.78 0.13 300));
   --net-testnet: light-dark(oklch(0.50 0.18 327), oklch(0.84 0.13 327));
   /* The sole --accent definition (the legacy literal in app/styles/00-base.css was dropped
@@ -635,13 +635,13 @@
                               2026-07-05; moved up 25px with the retired banner, 2026-08-09) */
   --rail-w: 264px;         /* left control rail width */
   --detail-w: 320px;       /* right details rail width */
-  --sel-bg: light-dark(rgba(1, 114, 114, 0.10), rgba(42, 245, 255, 0.12));   /* selected/active fill, reused everywhere */
-  --sel-border: light-dark(rgba(1, 114, 114, 0.45), rgba(42, 245, 255, 0.5));
-  --sel-bg-dim: light-dark(rgba(1, 114, 114, 0.05), rgba(42, 245, 255, 0.05));  /* the same mark at ANCESTOR strength: an explorer row
+  --sel-bg: light-dark(rgba(9, 133, 133, 0.12), rgba(42, 245, 255, 0.12));   /* selected/active fill, reused everywhere */
+  --sel-border: light-dark(rgba(9, 133, 133, 0.55), rgba(42, 245, 255, 0.5));
+  --sel-bg-dim: light-dark(rgba(9, 133, 133, 0.06), rgba(42, 245, 255, 0.05));  /* the same mark at ANCESTOR strength: an explorer row
                                               whose rung is committed but no longer the focus (a
                                               finer rung is) — same language, half a voice, so one
                                               list can't show three equally loud selections */
-  --sel-border-dim: light-dark(rgba(1, 114, 114, 0.20), rgba(42, 245, 255, 0.22));
+  --sel-border-dim: light-dark(rgba(9, 133, 133, 0.25), rgba(42, 245, 255, 0.22));
   --bottom-reserve: 0px;   /* vertical space the bottom LiveStrip lane reserves. The lane is
                               SNAPSHOTS-ONLY, so 0 is the correct static default — the store boots
                               in `hyper`, which mounts no strip. `BottomStream` is the one writer
