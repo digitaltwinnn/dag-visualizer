@@ -8,7 +8,7 @@ import { RenderPass } from "three/addons/postprocessing/RenderPass.js";
 import { UnrealBloomPass } from "three/addons/postprocessing/UnrealBloomPass.js";
 import { BokehPass, type BokehPassParameters } from "three/addons/postprocessing/BokehPass.js";
 import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
-import type { SceneColors } from "../sceneColors";
+import { isLightGround, type SceneColors } from "../sceneColors";
 
 // @types/three types BokehPass.uniforms as a bare `object`; the engine reads
 // uniforms.focus/maxblur .value, so refine just those.
@@ -32,6 +32,7 @@ export interface SceneCtx {
    * ground change. Plain data in — rule 1 untouched.
    */
   setClearColor(bg: number): void;
+  setGround(light: boolean): void;
 }
 
 // Scene LIGHTING is a rendering technicality, NOT a palette concern: a light shades the (mostly
@@ -75,13 +76,18 @@ export function createScene(canvas: HTMLCanvasElement, colors: SceneColors): Sce
   // ring is gone. The earlier A/B that preferred Neutral was run on the OLD hot bloom (strength
   // 0.9) where ACES hazed blown cores; with the now-calm per-view bloom that haze is a non-issue.
   // Trade accepted (user): ACES desaturates very bright hub/core CENTRES slightly toward white.
-  renderer.toneMapping = THREE.ACESFilmicToneMapping;
+  // ⚠️ ACES is a GLOW-look device, and the day look declines it exactly as it declines bloom
+  // (user, 2026-08-25: filmic mapping turned mid-lightness identity ink muddy — DOR's orange
+  // chips read BROWN next to the HUD's chip at the same oklch). Ink wants colorimetric
+  // fidelity: on paper the scene runs NoToneMapping at exposure 1, so a node's rendered sRGB
+  // tracks the CSS token lane. Both pairs re-apply on a theme flip via setGround below.
+  renderer.toneMapping = isLightGround(colors) ? THREE.NoToneMapping : THREE.ACESFilmicToneMapping;
   // Exposure is the master brightness dial (a single multiplier applied to the whole frame at
   // the OutputPass). Kept below 1 on purpose: the scene otherwise read too hot overall — most
   // visible in hyper/geo, where many emissive nodes each contribute a bit of ADDITIVE bloom that
   // accumulates into a general glow. Nudged 0.7 → 0.82 (user) after the large bright objects were
   // downsized and ACES gave more highlight headroom — the scene has room to sit a touch brighter.
-  renderer.toneMappingExposure = 0.82;
+  renderer.toneMappingExposure = isLightGround(colors) ? 1 : 0.82;
 
   const controls = new OrbitControls(camera, renderer.domElement);
   controls.enableDamping = true;
@@ -162,10 +168,16 @@ export function createScene(canvas: HTMLCanvasElement, colors: SceneColors): Sce
   }
 
   // The clear colour is the one construction-time capture of a threaded token in this module
-  // (`scene.background`), so it is the one thing a theme flip has to re-apply here.
+  // (`scene.background`), so it is the one thing a theme flip has to re-apply here — plus the
+  // tone-mapping pair above, which keys on the same ground question (the OutputPass reads
+  // renderer.toneMapping per render, so no material invalidation is needed).
   function setClearColor(bg: number) {
     (scene.background as THREE.Color).setHex(bg);
   }
+  function setGround(light: boolean) {
+    renderer.toneMapping = light ? THREE.NoToneMapping : THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = light ? 1 : 0.82;
+  }
 
-  return { scene, camera, renderer, controls, composer, dof, bloom, resize, setClearColor };
+  return { scene, camera, renderer, controls, composer, dof, bloom, resize, setClearColor, setGround };
 }

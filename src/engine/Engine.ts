@@ -742,6 +742,7 @@ export class Engine {
     // Hue never themes (spec §4), so identityMap is NOT re-run here: the assignment is unchanged
     // and only each hue's L/C moved. refreshMeta stays the one place ids are assigned.
     this.ctx.setClearColor(this._colors.bg);
+    this.ctx.setGround(theme === "light");
     setNodeDimTarget(this._colors);
     this._pushSceneColors();
     for (const m of this._colorConsumers) m.setColors(this._colors);
