@@ -561,9 +561,9 @@
    are today's HUD lane verbatim (identity.ts pins them); light is the measured ink lane. */
 :root { --ident-l: 0.74; --ident-c: 0.19; }
 @media (prefers-color-scheme: light) {
-  :root:not([data-theme="dark"]) { --ident-l: 0.48; --ident-c: 0.16; }
+  :root:not([data-theme="dark"]) { --ident-l: 0.58; --ident-c: 0.19; }
 }
-:root[data-theme="light"] { --ident-l: 0.48; --ident-c: 0.16; }
+:root[data-theme="light"] { --ident-l: 0.58; --ident-c: 0.19; }
 
 /* Network accent override — stamped on <html> before first paint by the inline script in
    app/layout.tsx. Mainnet has no rule on purpose (byte-identical CSS). --primary-foreground
