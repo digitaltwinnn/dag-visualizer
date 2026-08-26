@@ -19,6 +19,8 @@ import { GLOBAL_PLANE_TUNE_DEFAULTS, META_PLANE_TUNE_DEFAULTS, PLANE_TUNE_SCHEMA
 import { TILE_TUNE_DEFAULTS, TILE_TUNE_SCHEMA } from "./scene/views/LedgerView";
 import { FOCUS_TUNE, FOCUS_TUNE_DEFAULTS, FOCUS_ROW_SCHEMA, FOCUS_SHARED, FOCUS_SHARED_DEFAULTS, FOCUS_SHARED_SCHEMA } from "./domain/dimModel";
 import { STAGE_LIGHTS, STAGE_LIGHT_DEFAULTS, STAGE_LIGHT_SCHEMA, type StagedView } from "./domain/stageLight";
+import { LIGHT_TUNE, LIGHT_TUNE_DEFAULTS, LIGHT_TUNE_SCHEMA } from "./sceneColors";
+import { setSceneLaneLight } from "../palette/identity";
 import type { View3D } from "./domain/viewTransition";
 import { CAM_ZOOM, RAILS_HIDDEN_DOLLY } from "./domain/cameraRig";
 import {
@@ -31,6 +33,8 @@ export interface DevTuneTargets {
   hyper: HyperView;
   camera: THREE.PerspectiveCamera;
   controls: { target: THREE.Vector3 };
+  /** Re-runs the Engine's whole theme thread — the light-look group lands its dials through it. */
+  refreshTheme: () => void;
 }
 
 export interface DevTuneHandle {
@@ -39,7 +43,7 @@ export interface DevTuneHandle {
 
 export async function mountDevTune(targets: DevTuneTargets): Promise<DevTuneHandle> {
   const { Pane } = await import("tweakpane");
-  const { ledger, hyper, camera, controls } = targets;
+  const { ledger, hyper, camera, controls, refreshTheme } = targets;
 
   // ---- the manifest ---------------------------------------------------------------------------
   // Shared groups: these shape EVERY view, so they sit above the per-view folders. Emphasis is
@@ -53,6 +57,26 @@ export async function mountDevTune(targets: DevTuneTargets): Promise<DevTuneHand
       defaults: FOCUS_SHARED_DEFAULTS,
       schema: FOCUS_SHARED_SCHEMA,
       home: "domain/dimModel.ts · FOCUS_SHARED_DEFAULTS",
+    },
+    {
+      // Every dial reaches the LIGHT ground only (sceneColors.ts, the LightTune doc): in dark
+      // the lane setter rewrites an unused memo, the ground override keeps its dark face, and
+      // the Engine ignores bloomMul/bloomFloor while _bloomMul is 1.
+      title: "light look",
+      values: LIGHT_TUNE,
+      defaults: LIGHT_TUNE_DEFAULTS,
+      schema: LIGHT_TUNE_SCHEMA,
+      home: "engine/sceneColors.ts · LIGHT_TUNE_DEFAULTS",
+      onChange: () => {
+        // The ground is a CSS token: override it INLINE as a light-dark() pair so the dark
+        // face survives the override verbatim (a flat value would repaint dark too).
+        document.documentElement.style.setProperty(
+          "--scene-ground",
+          `light-dark(oklch(${LIGHT_TUNE.groundL} 0.016 265), oklch(0.09 0.02 265))`,
+        );
+        setSceneLaneLight(LIGHT_TUNE.laneL, LIGHT_TUNE.laneC);
+        refreshTheme();
+      },
     },
   ];
 

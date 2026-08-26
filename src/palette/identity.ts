@@ -150,13 +150,23 @@ export function identityHudCss(id: string): string {
 // widening IdentityHue with a second sceneHex field, so the dark path stays byte-identical to what
 // toEntry() has always produced.
 const _sceneLight = new Map<string, string>();
+// The LIVE light-lane L/C — the exported consts are the shipped defaults (what tests read); the
+// `?tune` panel drives these through setSceneLaneLight so a dial edit rebuilds the light memo
+// without touching the dark path.
+let _laneL = SCENE_L_LIGHT;
+let _laneC = SCENE_C_LIGHT;
+export function setSceneLaneLight(l: number, c: number): void {
+  _laneL = l;
+  _laneC = c;
+  _sceneLight.clear();
+}
 export function identitySceneHex(id: string, theme: Theme = "dark"): string {
   const r = resolve(id);
   if (theme === "dark") return r?.sceneHex ?? CORE_HEX;
   if (!r) return CORE_HEX;
   const cached = _sceneLight.get(id);
   if (cached) return cached;
-  const hex = oklchToHex(SCENE_L_LIGHT, SCENE_C_LIGHT, r.hueDeg);
+  const hex = oklchToHex(_laneL, _laneC, r.hueDeg);
   _sceneLight.set(id, hex);
   return hex;
 }

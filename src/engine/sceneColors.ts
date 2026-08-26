@@ -142,7 +142,31 @@ export function inkMix(out: THREE.Color, s: number, c: SceneColors): THREE.Color
  * enough to lift a resting band clear of the page, high enough that the focus boost still has
  * somewhere to go. See `inkPresence`.
  */
-const INK_GAMMA = 0.15;
+/** THE LIGHT-LOOK DIALS (the `?tune` "light look" group — tune.ts contract). Every field only
+ *  reaches the LIGHT ground: the lane setter rewrites the light memo alone, the ground override
+ *  keeps its dark face verbatim, and the Engine applies bloomMul/bloomFloor only while the theme
+ *  is light. Defaults are the shipped look (2026-08-25's "extreme checkpoint", to be dialled in
+ *  live); no test pins these — the dark look's pins live elsewhere and stay untouched. */
+export interface LightTune {
+  laneL: number; //   scene identity lane lightness (identity.ts consumes via setSceneLaneLight)
+  laneC: number; //   scene identity lane chroma (chroma-reduction still caps per hue)
+  groundL: number; // --scene-ground's light lightness (devTune writes the token override)
+  inkGamma: number; // rest-presence curve: s^gamma — lower = rest closer to full ink
+  bloomMul: number; // light bloom strength as a fraction of the view policy's
+  bloomFloor: number; // minimum bloom threshold on light, so the ground never halos
+}
+export const LIGHT_TUNE_DEFAULTS: Readonly<LightTune> = Object.freeze({
+  laneL: 0.70, laneC: 0.25, groundL: 0.68, inkGamma: 0.15, bloomMul: 0.75, bloomFloor: 0.62,
+});
+export const LIGHT_TUNE: LightTune = { ...LIGHT_TUNE_DEFAULTS };
+export const LIGHT_TUNE_SCHEMA: import("./tune").TuneSchema<LightTune> = {
+  laneL: { min: 0.4, max: 0.85, step: 0.01, label: "lane L" },
+  laneC: { min: 0.05, max: 0.3, step: 0.005, label: "lane C" },
+  groundL: { min: 0.5, max: 0.95, step: 0.005, label: "ground L" },
+  inkGamma: { min: 0.05, max: 1, step: 0.01, label: "ink gamma" },
+  bloomMul: { min: 0, max: 1.5, step: 0.05, label: "bloom ×" },
+  bloomFloor: { min: 0.3, max: 1, step: 0.01, label: "bloom floor" },
+};
 
 /**
  * A mark's PRESENCE, translated for the ground it is painted on — the sibling of `inkMix` for the
@@ -171,7 +195,7 @@ const INK_GAMMA = 0.15;
  */
 export function inkPresence(s: number, paper: boolean): number {
   if (!paper || s <= 0 || s >= 1) return s;
-  return Math.pow(s, INK_GAMMA);
+  return Math.pow(s, LIGHT_TUNE.inkGamma);
 }
 
 // Read the four structural tokens from globals.css. Called once by the Engine at construction.

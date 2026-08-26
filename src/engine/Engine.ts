@@ -20,7 +20,7 @@ import { METAGRAPHS, NET, netUrl } from "@/src/net/current";
 import { COLORS } from "@/src/engine/config";
 import { BYTE_SCALE_KB, type RailGroup } from "./domain/ledgerLayout";
 import { HYPER_TILT, HYPER_TILT_FOCUS } from "./domain/hyperLayout";
-import { readSceneColors, type SceneColors } from "./sceneColors";
+import { readSceneColors, type SceneColors , LIGHT_TUNE } from "./sceneColors";
 import { setNodeDimTarget } from "./scene/objects/NodeFabric";
 import { THEME_KEY, parseThemePref, resolveTheme, type Theme } from "@/src/theme/resolve";
 import { VIEW_POLICIES, type ViewPolicy } from "./domain/viewPolicy";
@@ -361,7 +361,7 @@ export class Engine {
       parseThemePref(safeRead(THEME_KEY)),
       typeof window !== "undefined" && window.matchMedia("(prefers-color-scheme: dark)").matches,
     );
-    this._bloomMul = this._theme === "light" ? 0.75 : 1; // silver: calm pass (see the field)
+    this._bloomMul = this._theme === "light" ? LIGHT_TUNE.bloomMul : 1; // silver: calm pass (see the field)
     if (process.env.NODE_ENV === "development" && this._theme === "dark") {
       // Tolerant compare (±2 per channel): oklch→sRGB resolution rounds, so only a genuine token
       // change (a different colour) should warn — not a 1-bit rounding wobble.
@@ -747,7 +747,7 @@ export class Engine {
     setNodeDimTarget(this._colors);
     this._pushSceneColors();
     for (const m of this._colorConsumers) m.setColors(this._colors);
-    this._bloomMul = theme === "light" ? 0.75 : 1;
+    this._bloomMul = theme === "light" ? LIGHT_TUNE.bloomMul : 1;
   }
 
   private async refreshMeta(initial: boolean) {
@@ -1664,7 +1664,7 @@ export class Engine {
     this.ctx.bloom.strength = pb.strength * this._bloomMul;
     this.ctx.bloom.radius = pb.radius;
     // On silver the threshold floors high: only marks brighter than the ground may halo.
-    this.ctx.bloom.threshold = this._bloomMul < 1 ? Math.max(pb.threshold, 0.62) : pb.threshold;
+    this.ctx.bloom.threshold = this._bloomMul < 1 ? Math.max(pb.threshold, LIGHT_TUNE.bloomFloor) : pb.threshold;
     // Paper skips the pass outright rather than running it at zero strength — the composer's own
     // `enabled` flag, the same lever the DoF pass sits behind (SceneContext). A plain boolean
     // write, so the frame body still allocates nothing.
@@ -2176,6 +2176,9 @@ export class Engine {
         hyper: this.layers,
         camera: this.ctx.camera,
         controls: this.ctx.controls,
+        // The light-look group's onChange re-runs the whole theme thread (token re-read, scene
+        // map rebuild, bloom re-apply) so every dial lands the same way a real flip does.
+        refreshTheme: () => this._refreshTheme(this._theme),
       });
       if (this.disposed) this._devTune.dispose();
     } finally {
