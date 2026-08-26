@@ -361,7 +361,7 @@ export class Engine {
       parseThemePref(safeRead(THEME_KEY)),
       typeof window !== "undefined" && window.matchMedia("(prefers-color-scheme: dark)").matches,
     );
-    this._bloomMul = this._theme === "light" ? 0.35 : 1; // silver: calm pass (see the field)
+    this._bloomMul = this._theme === "light" ? 0.75 : 1; // silver: calm pass (see the field)
     if (process.env.NODE_ENV === "development" && this._theme === "dark") {
       // Tolerant compare (±2 per channel): oklch→sRGB resolution rounds, so only a genuine token
       // change (a different colour) should warn — not a 1-bit rounding wobble.
@@ -747,7 +747,7 @@ export class Engine {
     setNodeDimTarget(this._colors);
     this._pushSceneColors();
     for (const m of this._colorConsumers) m.setColors(this._colors);
-    this._bloomMul = theme === "light" ? 0.35 : 1;
+    this._bloomMul = theme === "light" ? 0.75 : 1;
   }
 
   private async refreshMeta(initial: boolean) {
@@ -1664,7 +1664,7 @@ export class Engine {
     this.ctx.bloom.strength = pb.strength * this._bloomMul;
     this.ctx.bloom.radius = pb.radius;
     // On silver the threshold floors high: only marks brighter than the ground may halo.
-    this.ctx.bloom.threshold = this._bloomMul < 1 ? Math.max(pb.threshold, 0.72) : pb.threshold;
+    this.ctx.bloom.threshold = this._bloomMul < 1 ? Math.max(pb.threshold, 0.62) : pb.threshold;
     // Paper skips the pass outright rather than running it at zero strength — the composer's own
     // `enabled` flag, the same lever the DoF pass sits behind (SceneContext). A plain boolean
     // write, so the frame body still allocates nothing.
