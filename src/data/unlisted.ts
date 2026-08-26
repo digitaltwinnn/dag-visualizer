@@ -19,7 +19,7 @@
 // the lane, band and dim machinery match by construction.
 import { METAGRAPHS } from "@/src/net/current";
 import { metagraphById } from "@/src/data/network";
-import { hex } from "@/src/util/format";
+import { identityHudCss } from "@/src/palette/identity";
 import { buildUnlistedLog } from "@/src/data/anchorLog";
 import type { GlobalSnapshot, MetaCfg, SnapshotExact } from "@/src/data/types";
 import type { Theme } from "@/src/theme/resolve";
@@ -81,7 +81,7 @@ export function displayNetwork(id: string | null | undefined): DisplayNetwork | 
   if (id === UNLISTED_ID) return UNLISTED_DISPLAY;
   const cfg = metagraphById(id);
   if (!cfg) return null;
-  return { id: cfg.id, name: cfg.name, ticker: cfg.ticker || cfg.name, hue: hex(cfg.color), virtual: false };
+  return { id: cfg.id, name: cfg.name, ticker: cfg.ticker || cfg.name, hue: identityHudCss(cfg.id), virtual: false };
 }
 
 /** The unlisted snapshots in the measured window, newest first — the ONE row source (the

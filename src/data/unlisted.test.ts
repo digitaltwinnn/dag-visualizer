@@ -72,7 +72,10 @@ describe("displayNetwork", () => {
     const d = displayNetwork(LISTED);
     expect(d?.id).toBe(LISTED);
     expect(d?.virtual).toBe(false);
-    expect(d?.hue).toMatch(/^#/);
+    // Theme-aware HUD dialect (identityHudCss): a live oklch() expression over the CSS
+    // --ident-l/--ident-c tokens, not a baked hex — that's the dark-lane-only dialect this
+    // surface must never use (see CLAUDE.md "Light/dark").
+    expect(d?.hue).toMatch(/^oklch\(var\(--ident-l\) var\(--ident-c\) [\d.]+deg\)$/);
     expect(d?.ticker).toBeTruthy();
   });
 

@@ -6,7 +6,7 @@ import { useStore } from "@/src/store/store";
 import { shortHash, metagraphById, getNetwork, SIGNER_GROUPS, nodeSigned, coLocatedNetworks, filterAccent } from "@/src/data/network";
 import { UNLISTED_ID, observedUnlistedIds } from "@/src/data/unlisted";
 import { identityHudCss } from "@/src/palette/identity";
-import { hex, fmtDag, fmtKB, midHash } from "@/src/util/format";
+import { fmtDag, fmtKB, midHash } from "@/src/util/format";
 import { relativeAge } from "@/src/util/relativeAge";
 import { statusBreakdown } from "@/src/data/nodeStatus";
 import type { GlobalSnapshot, MetaCfg, PickDescriptor } from "@/src/data/types";
@@ -110,7 +110,7 @@ export function SnapshotAside({ data: d }: { data: GlobalSnapshot }) {
 export function MetaTitle({ cfg }: { cfg: MetaCfg }) {
   const metaList = useStore((s) => s.metaList);
   const mg = metaList.find((x) => x.id === cfg.id) || null;
-  const hue = hex(cfg.color);
+  const hue = identityHudCss(cfg.id);
   const iconUrl = mg?.iconUrl || cfg.iconUrl; // live metagraph icon, or the core's bundled logo
   const monogram = (cfg.ticker || cfg.name).slice(0, 3).toUpperCase();
   const kind = networkKind(cfg.id, mg?.nodes || []);
@@ -591,7 +591,7 @@ export function MetaCard({ cfg }: { cfg: MetaCfg }) {
 export function MetaTickerAside({ cfg }: { cfg: MetaCfg }) {
   if (!cfg.ticker) return null;
   return (
-    <span className="text-label font-semibold tracking-[0.02em]" style={{ color: hex(cfg.color) }}>
+    <span className="text-label font-semibold tracking-[0.02em]" style={{ color: identityHudCss(cfg.id) }}>
       {cfg.ticker}
     </span>
   );
