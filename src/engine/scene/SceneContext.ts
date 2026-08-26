@@ -190,10 +190,12 @@ export function createScene(canvas: HTMLCanvasElement, colors: SceneColors): Sce
     const hex = (m: number) =>
       "#" + [(bg >> 16) & 255, (bg >> 8) & 255, bg & 255]
         .map((u) => Math.round(Math.min(255, u * m)).toString(16).padStart(2, "0")).join("");
-    const grad = g.createRadialGradient(256, 236, 60, 256, 256, 400);
-    grad.addColorStop(0, hex(1.015));
-    grad.addColorStop(0.62, hex(1));
-    grad.addColorStop(1, hex(0.94));
+    // Measured on the first cut (user: "I don't see it"): 1.5%/−6% over a screen-stretched
+    // 512px canvas lands under JPEG noise. The working range is ~+2.5% centre / −14% corners.
+    const grad = g.createRadialGradient(256, 240, 70, 256, 250, 470);
+    grad.addColorStop(0, hex(1.025));
+    grad.addColorStop(0.55, hex(1));
+    grad.addColorStop(1, hex(0.86));
     g.fillStyle = grad;
     g.fillRect(0, 0, 512, 512);
     const tex = new THREE.CanvasTexture(cv);

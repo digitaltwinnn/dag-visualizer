@@ -338,9 +338,10 @@ export class Engine {
   // which lifts every dark mark toward white and crushes its saturation. That veil, not any
   // material value, is what made the day look read as washed-out pastel (measured 2026-08-21:
   // turning it off dropped the scene's dark marks from 140 to 65 luminance and multiplied its
-  // strongly-coloured pixels 17×). Raising the threshold is not the alternative: nothing on
-  // paper is brighter than the page, so a page-clearing threshold means nothing blooms anyway.
-  // Ink does not glow — the day look wants the pass skipped, not quiet.
+  // strongly-coloured pixels 17×). With the SILVER scene ground (fork C, 2026-08-25) the pass
+  // returns in light at a calm level: marks CAN exceed a 0.78-L ground, so a whisper of glow is
+  // physically meaningful again — strength scaled well down, threshold floored high so only the
+  // genuinely bright marks halo, never the ground.
   private _bloomMul = 1;
 
   constructor(canvas: HTMLCanvasElement, onReady?: () => void, onSceneReady?: () => void) {
@@ -360,7 +361,7 @@ export class Engine {
       parseThemePref(safeRead(THEME_KEY)),
       typeof window !== "undefined" && window.matchMedia("(prefers-color-scheme: dark)").matches,
     );
-    this._bloomMul = this._theme === "light" ? 0 : 1; // paper: no pass (see the field)
+    this._bloomMul = this._theme === "light" ? 0.35 : 1; // silver: calm pass (see the field)
     if (process.env.NODE_ENV === "development" && this._theme === "dark") {
       // Tolerant compare (±2 per channel): oklch→sRGB resolution rounds, so only a genuine token
       // change (a different colour) should warn — not a 1-bit rounding wobble.
@@ -746,7 +747,7 @@ export class Engine {
     setNodeDimTarget(this._colors);
     this._pushSceneColors();
     for (const m of this._colorConsumers) m.setColors(this._colors);
-    this._bloomMul = theme === "light" ? 0 : 1;
+    this._bloomMul = theme === "light" ? 0.35 : 1;
   }
 
   private async refreshMeta(initial: boolean) {
@@ -1662,7 +1663,8 @@ export class Engine {
     // one thing a paper ground wants near-zero.
     this.ctx.bloom.strength = pb.strength * this._bloomMul;
     this.ctx.bloom.radius = pb.radius;
-    this.ctx.bloom.threshold = pb.threshold;
+    // On silver the threshold floors high: only marks brighter than the ground may halo.
+    this.ctx.bloom.threshold = this._bloomMul < 1 ? Math.max(pb.threshold, 0.72) : pb.threshold;
     // Paper skips the pass outright rather than running it at zero strength — the composer's own
     // `enabled` flag, the same lever the DoF pass sits behind (SceneContext). A plain boolean
     // write, so the frame body still allocates nothing.

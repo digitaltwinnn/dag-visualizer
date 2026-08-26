@@ -485,6 +485,12 @@
   --ease-spring: linear(0, 0.056, 0.204, 0.404, 0.6, 0.766 25%, 0.937 32.5%, 1.022 40%, 1.056 47.5%, 1.055 55%, 1.035 65%, 1.012 77.5%, 1.001 90%, 1);
 
   --background: light-dark(oklch(0.94 0.012 265), oklch(0.09 0.02 265));         /* #05060e app bg (dark) */
+  /* The SCENE's own light ground (design fork C, user 2026-08-25): the canvas is the
+     instrument's SCREEN, and light mode lightens it from black to SILVER, not to paper — a
+     deeper grey than the page so ink pops, marks can exceed the ground, and a calm bloom is
+     physically possible again. The HUD page keeps --background's paper; dark side is
+     --background's dark verbatim, so the dark scene is byte-identical. */
+  --scene-ground: light-dark(oklch(0.78 0.012 265), oklch(0.09 0.02 265));
   --foreground: light-dark(oklch(0.21 0.035 265), oklch(0.94 0.02 255));       /* #e8eefc text (dark) */
   --muted-foreground: light-dark(oklch(0.44 0.035 265), oklch(0.66 0.04 265)); /* #8a96b8 muted (dark) */
 

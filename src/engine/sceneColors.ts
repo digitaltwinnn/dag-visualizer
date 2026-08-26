@@ -31,7 +31,7 @@ export interface SceneColors {
   //                               the React .role-chip pill's text-muted-foreground)
 }
 
-export type SceneColorVar = "--primary" | "--core" | "--background" | "--border" | "--panel" | "--muted-foreground";
+export type SceneColorVar = "--primary" | "--core" | "--background" | "--scene-ground" | "--border" | "--panel" | "--muted-foreground";
 
 // Resolve one CSS colour expression (e.g. "var(--primary)") to a packed 0xRRGGBB. Two steps, because
 // the computed-colour STRING format varies by browser (a token authored in oklch resolves to
@@ -179,7 +179,7 @@ export function readSceneColors(): SceneColors {
   return {
     core: readColorToken("--primary"),
     dagCore: readColorToken("--core"),
-    bg: readColorToken("--background"),
+    bg: readColorToken("--scene-ground"), // the scene's OWN ground — silver in light, --background's dark verbatim in dark
     border: readColorToken("--border"),
     panel: readColorToken("--panel"),
     muted: readColorToken("--muted-foreground"),
