@@ -173,40 +173,90 @@ export function createScene(canvas: HTMLCanvasElement, colors: SceneColors): Sce
   // tone-mapping pair above, which keys on the same ground question (the OutputPass reads
   // renderer.toneMapping per render, so no material invalidation is needed).
   //
-  // On PAPER the ground is a VIGNETTE, not a flat fill (user, 2026-08-25: "this dull white
-  // background") — the paper darkens ~5% toward the frame's edges, as if lit where the
-  // instrument sits. A CanvasTexture as scene.background renders screen-stretched, which is
-  // exactly a vignette. Built at event time only (theme flip / token re-read); the dark ground
-  // stays the flat Color it always was — byte-identical.
-  let vignette: THREE.CanvasTexture | null = null;
+  // On PAPER the ground is a STUDIO BACKDROP, not a flat fill (user, 2026-08-25: "this dull
+  // white background"; 2026-08-26: "gray background looks ugly/boring too"). A flat wall plus a
+  // symmetric vignette is a photograph of nothing; a cyclorama is lit from ABOVE and sweeps
+  // into depth below, which is what makes a product sit ON something instead of floating in
+  // grey. So two composed passes, in this order:
+  //
+  //   1. a VERTICAL sweep — near-white high, settling through the lower third where the
+  //      instruments stand, and gaining CHROMA as it settles;
+  //   2. a radial fall-off MULTIPLIED over it, its hot spot high rather than centred, so the
+  //      key light and the vignette agree about where the light comes from.
+  //
+  // The depth colour is not a new hue: `--background` is already oklch(… 265), the same
+  // blue-grey family the HUD's own depth tokens live in, so the sweep just stops washing it
+  // out. Probed at fixed L, chroma 0.012 → 0.030 moves the sRGB bytes R ×0.974, G ×1.0,
+  // B ×1.049 — that vector IS `coolDrift`, which is why the drift is a per-channel bias here
+  // rather than an oklch round-trip.
+  //
+  // A CanvasTexture as scene.background renders screen-stretched (flipY puts the canvas's
+  // bottom row at the screen's bottom, so the canvas is in screen orientation). Built at event
+  // time only (theme flip / token re-read); the dark ground stays the flat Color it always
+  // was — byte-identical.
+  let backdrop: THREE.CanvasTexture | null = null;
   let isPaper = isLightGround(colors);
-  function paperVignette(bg: number): THREE.CanvasTexture {
+  // The drift vector above, applied per channel at strength k.
+  const coolDrift = [1 - 0.026, 1, 1 + 0.049];
+  function paperBackdrop(bg: number): THREE.CanvasTexture {
     const cv = document.createElement("canvas");
     cv.width = cv.height = 512;
     const g = cv.getContext("2d")!;
     // Scale the sRGB BYTES, not THREE.Color channels — those are linear, and a linear value
     // drawn into a 2D canvas as if it were sRGB shifts the paper's near-neutral hue visibly
     // (first cut of this read lavender).
-    const hex = (m: number) =>
+    // `m` is the level on the paper, `k` how far the stop has settled into its own hue.
+    const hex = (m: number, k = 0) =>
       "#" + [(bg >> 16) & 255, (bg >> 8) & 255, bg & 255]
-        .map((u) => Math.round(Math.min(255, u * m)).toString(16).padStart(2, "0")).join("");
-    // Measured on the first cut (user: "I don't see it"): 1.5%/−6% over a screen-stretched
-    // 512px canvas lands under JPEG noise. The working range is ~+2.5% centre / −14% corners.
-    const grad = g.createRadialGradient(256, 240, 70, 256, 250, 470);
-    grad.addColorStop(0, hex(1.025));
-    grad.addColorStop(0.55, hex(1));
-    grad.addColorStop(1, hex(0.86));
-    g.fillStyle = grad;
+        .map((u, i) => Math.round(Math.min(255, u * m * (1 + (coolDrift[i] - 1) * k)))
+          .toString(16).padStart(2, "0")).join("");
+
+    // ⚠️ THE RANGE IS SPENT DOWNWARD, BECAUSE PAPER HAS ALMOST NO HEADROOM ABOVE IT. The paper
+    // token's blue is already 243/255, so ANY composite over ~1.049 clips that channel alone and
+    // swings the top of the frame off-hue — a ceiling the levels below are solved against, never
+    // an aesthetic choice. (The same shape as this wave's ink curve: on paper, emphasis is
+    // separation you take AWAY, not light you add.)
+    //
+    // The level is therefore anchored at MID-FRAME, not at the area mean: a cyclorama is lit for
+    // the subject, and the instruments stand in the middle band. Composite there is 0.976 — the
+    // ground level the user tuned, held to within 2.4% — while the frame falls to 0.79 at the
+    // bottom corners, a 1.32× top-to-corner range.
+    //
+    // 1. The sweep. Measured on the flat-vignette cut (user: "I don't see it"): 1.5%/−6% over a
+    // screen-stretched 512px canvas lands under JPEG noise, so the range has to be this wide to
+    // read at all. Top is a touch above the paper — the lit edge of the cyc — and the knee sits
+    // at 0.72 because the instruments' own footprint starts around there.
+    const sweep = g.createLinearGradient(0, 0, 0, 512);
+    sweep.addColorStop(0, hex(1.045));
+    sweep.addColorStop(0.40, hex(1, 0.2));
+    sweep.addColorStop(0.72, hex(0.93, 0.65));
+    sweep.addColorStop(1, hex(0.86, 1));
+    g.fillStyle = sweep;
     g.fillRect(0, 0, 512, 512);
+
+    // 2. The fall-off, multiplied so it only ever takes light away — the sweep alone owns the
+    // levels, and a second additive pass would fight it for the top end. Centred high (y 170)
+    // so the brightest point of the wall is where the key light lands, not the middle of the
+    // frame. Greys are neutral on purpose: the hue is the sweep's business. The outer stop is
+    // what makes the pass earn its place: at #ebebeb the corners sat 2 levels under mid-frame,
+    // measured — a fall-off nobody could see is just a slower fill.
+    const fall = g.createRadialGradient(256, 170, 60, 256, 170, 500);
+    fall.addColorStop(0, "#ffffff");
+    fall.addColorStop(0.5, "#fbfbfb");
+    fall.addColorStop(1, "#e0e0e0");
+    g.globalCompositeOperation = "multiply";
+    g.fillStyle = fall;
+    g.fillRect(0, 0, 512, 512);
+
     const tex = new THREE.CanvasTexture(cv);
     tex.colorSpace = THREE.SRGBColorSpace;
     return tex;
   }
   function applyBackground() {
     if (isPaper) {
-      vignette?.dispose();
-      vignette = paperVignette(bgColor.getHex());
-      scene.background = vignette;
+      backdrop?.dispose();
+      backdrop = paperBackdrop(bgColor.getHex());
+      scene.background = backdrop;
     } else {
       scene.background = bgColor;
     }
@@ -222,7 +272,7 @@ export function createScene(canvas: HTMLCanvasElement, colors: SceneColors): Sce
     applyBackground();
   }
 
-  applyBackground(); // construction honours the current ground (a light boot starts on the vignette)
+  applyBackground(); // construction honours the current ground (a light boot starts on the backdrop)
 
   return { scene, camera, renderer, controls, composer, dof, bloom, resize, setClearColor, setGround };
 }
