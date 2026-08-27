@@ -156,7 +156,7 @@ export interface LightTune {
   bloomFloor: number; // minimum bloom threshold on light, so the ground never halos
 }
 export const LIGHT_TUNE_DEFAULTS: Readonly<LightTune> = Object.freeze({
-  laneL: 0.57, laneC: 0.28, groundL: 0.66, inkGamma: 0.15, bloomMul: 0.4, bloomFloor: 0.5,
+  laneL: 0.51, laneC: 0.28, groundL: 0.66, inkGamma: 0.15, bloomMul: 0.4, bloomFloor: 0.5,
 });
 export const LIGHT_TUNE: LightTune = { ...LIGHT_TUNE_DEFAULTS };
 export const LIGHT_TUNE_SCHEMA: import("./tune").TuneSchema<LightTune> = {
