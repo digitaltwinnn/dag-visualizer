@@ -13,7 +13,7 @@
 // Two tune channels (user, 2026-08-07): the GLOBAL plane and the METAGRAPH planes are tuned
 // separately (`?tune` folders) — same blueprint, each caller passes its own PlaneTune.
 import * as THREE from "three";
-import { isLightGround, inkPresence, type SceneColors } from "../../sceneColors";
+import { isLightGround, type SceneColors } from "../../sceneColors";
 import { CONT_X } from "../../domain/ledgerLayout";
 import type { ContainerSpec } from "../../domain/ledgerRails";
 import { applyGlassTheme, makeGlassFill, type GlassFillUniforms } from "./glassFill";
@@ -41,6 +41,40 @@ export const PLANE_TUNE_SCHEMA: TuneSchema<PlaneTune> = {
   innerOp: { min: 0, max: 0.1, step: 0.002, label: "centre fill" },
   edge: { min: 0, max: 0.99, label: "drop-off" },
   trayOp: { min: 0, max: 0.3, step: 0.005, label: "tray fill" },
+};
+
+/** THE DAY GLASS — the LIGHT ground's own pane look (user, 2026-08-26: "the snapshot page panels
+ *  look really ugly in light mode (ok in dark mode) […] can you make it a nice glass panel?").
+ *
+ *  It is ONE set for the whole chamber, not a per-channel one like PlaneTune above: PlaneTune tunes
+ *  how much PRESENCE a storey has, and the two storeys legitimately differ; this tunes what GLASS
+ *  IS, and a floor made of different glass from the lane above it is two materials, not one
+ *  chamber. The channels still separate — every term below is multiplied by the caller's own
+ *  furniture alpha and fill boost — so the committed lane still leads. */
+export interface GlassTune {
+  body: number;     // the pane's own tint: what the glass costs the ground beneath it
+  sky: number;      // the reflected room's gradient — bright above the horizon, lit silver below
+  rim: number;      // the Fresnel grazing sheen, CAPPED: a full mirror would hide the trail
+  spec: number;     // the reflected window
+  specPow: number;  // its tightness
+  edge: number;     // the polished edge the SDF band already measures
+  trayBody: number; // the trays face the camera head-on: no sky, little Fresnel, so more body
+}
+
+export const GLASS_TUNE_DEFAULTS: Readonly<GlassTune> = Object.freeze({
+  body: 0.095, sky: 0.45, rim: 0.38, spec: 0.5, specPow: 24, edge: 0.32, trayBody: 0.12,
+});
+/** The live struct the `?tune` panel binds; DEFAULTS above is the shipped look and what tests pin. */
+export const GLASS_TUNE: GlassTune = { ...GLASS_TUNE_DEFAULTS };
+
+export const GLASS_TUNE_SCHEMA: TuneSchema<GlassTune> = {
+  body: { min: 0, max: 0.4, step: 0.005, label: "body tint" },
+  sky: { min: 0, max: 1, step: 0.02, label: "room colour" },
+  rim: { min: 0, max: 1.5, step: 0.02, label: "reflectance" },
+  spec: { min: 0, max: 1.5, step: 0.02, label: "window" },
+  specPow: { min: 1, max: 64, step: 1, label: "window tightness" },
+  edge: { min: 0, max: 1.5, step: 0.02, label: "polished edge" },
+  trayBody: { min: 0, max: 0.5, step: 0.005, label: "tray body" },
 };
 
 /** The planes' corner radius — SQUARE (rounded corners belong to the trays). */
@@ -207,17 +241,43 @@ export class SnapshotPlane {
    *  width across planes; narrow pieces clamp it to stay a rim. `fillBoost` lifts the edge
    *  fill alone — the committed lane's plane glows a step brighter (user, 2026-08-07). */
   applyAlpha(tune: PlaneTune, alpha: number, rimRef: number, fillBoost = 1): void {
-    // The tune levels are the DARK look, where the glass ADDS its light to black; on paper the same
-    // plane shades the page as ink and those levels are invisible, so the two fill channels ask the
-    // ground (inkPresence) before the furniture fade multiplies them. That is what gives the chamber
-    // a frame on paper: a shaded surface with an ink rim, rather than white on white.
-    this._fillU.uOpacity.value = inkPresence(tune.fillOp * fillBoost, this._paper) * alpha;
-    this._fillU.uInner.value = inkPresence(tune.innerOp, this._paper) * alpha;
     this._fillU.uEdgeW.value = Math.min((1 - tune.edge) * rimRef, 0.8 * this._minHalf);
+    if (this._paper) {
+      // THE DAY GLASS. The dark look's two flat fills are not dimmed here, they are REPLACED: an
+      // additive whisper over black is a glow, and the same whisper shaded onto paper through
+      // inkPresence's gamma is a sheet of grey card at ~0.6 alpha — which is exactly what the user
+      // saw. So the light branch drives the view-dependent terms instead and the flat channels stay
+      // off. `alpha` is the furniture fade (geometry, not emphasis) so it multiplies every term
+      // straight, and the caller's fillBoost lifts the committed lane's pane as one piece of glass
+      // rather than only its rim.
+      const g = GLASS_TUNE;
+      const k = alpha * Math.min(fillBoost, 2); // 3× a whisper is a whisper; 3× glass is a mirror
+      this._fillU.uOpacity.value = 0;
+      this._fillU.uInner.value = 0;
+      this._fillU.uBody.value = g.body * k;
+      this._fillU.uSky.value = g.sky * k;
+      this._fillU.uRim.value = g.rim * k;
+      this._fillU.uSpec.value = g.spec * k;
+      this._fillU.uSpecPow.value = g.specPow;
+      this._fillU.uEdgeA.value = g.edge * k;
+      if (this._trayU && this._tray?.visible) {
+        this._trayU.uOpacity.value = 0;
+        this._trayU.uInner.value = 0;
+        this._trayU.uBody.value = g.trayBody * alpha;
+        this._trayU.uSky.value = g.sky * alpha;
+        this._trayU.uRim.value = g.rim * alpha;
+        this._trayU.uSpec.value = g.spec * alpha;
+        this._trayU.uSpecPow.value = g.specPow;
+        this._trayU.uEdgeA.value = g.edge * alpha;
+      }
+      return;
+    }
+    this._fillU.uOpacity.value = tune.fillOp * fillBoost * alpha;
+    this._fillU.uInner.value = tune.innerOp * alpha;
     if (this._trayU && this._tray?.visible) {
       // FLAT tray fill: the rim channel stays off, the centre level carries the whole panel.
       this._trayU.uOpacity.value = 0;
-      this._trayU.uInner.value = inkPresence(tune.trayOp, this._paper) * alpha;
+      this._trayU.uInner.value = tune.trayOp * alpha;
     }
   }
 

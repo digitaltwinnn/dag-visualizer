@@ -15,7 +15,7 @@ import type { HyperView } from "./scene/views/HyperView";
 import { TETHER_TUNE_DEFAULTS, TETHER_TUNE_SCHEMA } from "./scene/views/HyperView";
 import { RIBBON_TUNE_DEFAULTS, RIBBON_TUNE_SCHEMA } from "./scene/objects/Ribbons";
 import { BAR_TUNE_DEFAULTS, BAR_TUNE_SCHEMA } from "./scene/objects/ByteBar";
-import { GLOBAL_PLANE_TUNE_DEFAULTS, META_PLANE_TUNE_DEFAULTS, PLANE_TUNE_SCHEMA } from "./scene/objects/SnapshotPlane";
+import { GLOBAL_PLANE_TUNE_DEFAULTS, META_PLANE_TUNE_DEFAULTS, PLANE_TUNE_SCHEMA, GLASS_TUNE, GLASS_TUNE_DEFAULTS, GLASS_TUNE_SCHEMA } from "./scene/objects/SnapshotPlane";
 import { TILE_TUNE_DEFAULTS, TILE_TUNE_SCHEMA } from "./scene/views/LedgerView";
 import { FOCUS_TUNE, FOCUS_TUNE_DEFAULTS, FOCUS_ROW_SCHEMA, FOCUS_SHARED, FOCUS_SHARED_DEFAULTS, FOCUS_SHARED_SCHEMA } from "./domain/dimModel";
 import { STAGE_LIGHTS, STAGE_LIGHT_DEFAULTS, STAGE_LIGHT_SCHEMA, type StagedView } from "./domain/stageLight";
@@ -159,6 +159,16 @@ export async function mountDevTune(targets: DevTuneTargets): Promise<DevTuneHand
         defaults: META_PLANE_TUNE_DEFAULTS,
         schema: PLANE_TUNE_SCHEMA,
         home: "scene/objects/SnapshotPlane.ts · META_PLANE_TUNE_DEFAULTS",
+      },
+      // ONE set for the whole chamber, unlike the two channels above: this tunes what GLASS IS, not
+      // how much presence a storey has. Read per frame, so no onChange. Inert under the dark ground,
+      // where the panes take the flat additive whisper instead.
+      {
+        title: "day glass (light mode)",
+        values: GLASS_TUNE,
+        defaults: GLASS_TUNE_DEFAULTS,
+        schema: GLASS_TUNE_SCHEMA,
+        home: "scene/objects/SnapshotPlane.ts · GLASS_TUNE_DEFAULTS",
       },
     ],
   };
