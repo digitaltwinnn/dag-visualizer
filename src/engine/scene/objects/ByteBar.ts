@@ -436,7 +436,9 @@ export class ByteBar {
         const rowFocus = pinned || hov;
         // On paper the resting opacities ARE the wash, so the EMPHASIS term is translated for the
         // ground before the dissolves multiply it (inkPresence — order-preserving, dark unchanged).
-        const t = inkPresence(snapBright(rest, offNet, focus, anyFocus && !rowFocus), this._paper)
+        // `rest` rides along as the curve's REFERENCE: the translation is a ratio around this
+        // instrument's own resting weight, or the tiers land within a few percent of each other.
+        const t = inkPresence(snapBright(rest, offNet, focus, anyFocus && !rowFocus), this._paper, rest)
           * fade * front * this._alpha * (this._entryFade ? this._entryFade[si] : 1);
         s.mats[i].opacity += (t - s.mats[i].opacity) * k;
         s.mats[i].color.setHex(hot || hov || onNet ? s.colors[i] : this._neutral);

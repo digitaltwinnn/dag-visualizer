@@ -1173,7 +1173,9 @@ export class LedgerView implements SceneView {
         const rowFocus = pinned || hov;
         const entryF = this._entryT < 1 && b.slot >= 0 && b.slot < SLOT_N ? this._entryFade[b.slot] : 1;
         const brightT =
-          inkPresence(snapBright(tileRest * b.fade, offNet, focus, anyFocus && !rowFocus), this._paper)
+          // `tileRest` is the curve's REFERENCE on paper — the tiles' own resting weight, taken
+          // UNFADED so `b.fade` reads as the ratio it is rather than moving the reference itself.
+          inkPresence(snapBright(tileRest * b.fade, offNet, focus, anyFocus && !rowFocus), this._paper, tileRest)
           * edge * this._fades.alpha * entryF;
         // Emphasis EASES rather than snapping (dimModel.emphasisK). The state rides the BLOCK, next
         // to its two other eased fields — an instance-index buffer would hand a block's brightness

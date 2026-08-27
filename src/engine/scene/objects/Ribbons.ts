@@ -238,8 +238,10 @@ export class Ribbons {
         // The EMPHASIS term alone asks the ground; `rowFade` is the trail's front/horizon boundary
         // ramp — geometry, not weight — so it multiplies in afterwards ungamma'd (inkPresence's own
         // rule). Factoring it out of `snapBright` is exact: with no focus the resolver is purely
-        // multiplicative in `base`, so dark is byte-identical.
-        const sc = inkPresence(snapBright(brightness, off), this._paper) * rowFade;
+        // multiplicative in `base`, so dark is byte-identical. `brightness` is also the curve's
+        // REFERENCE — a ribbon rests at 0.85, so without it the paper gamma read an off-filter
+        // sheet at 95% of a resting one and the filter's whole answer vanished.
+        const sc = inkPresence(snapBright(brightness, off), this._paper, brightness) * rowFade;
         // Presence toward the GROUND, not toward black — on paper a multiply would make the
         // dimmest sheet the darkest mark in the chamber and invert the dim tiers (see inkMix).
         inkMix(this._c, sc, this._colors);

@@ -151,12 +151,16 @@ export interface LightTune {
   laneL: number; //   scene identity lane lightness (identity.ts consumes via setSceneLaneLight)
   laneC: number; //   scene identity lane chroma (chroma-reduction still caps per hue)
   groundL: number; // --scene-ground's light lightness (devTune writes the token override)
-  inkGamma: number; // rest-presence curve: s^gamma — lower = rest closer to full ink
+  inkGamma: number; // rest-presence curve: rest^gamma — lower = rest closer to full ink
+  inkDimG: number; //  how hard a mark BELOW its resting weight drops (1 = proportional)
+  inkLift: number; //  how much of the headroom above rest a focus claims
   bloomMul: number; // light bloom strength as a fraction of the view policy's
   bloomFloor: number; // minimum bloom threshold on light, so the ground never halos
 }
 export const LIGHT_TUNE_DEFAULTS: Readonly<LightTune> = Object.freeze({
-  laneL: 0.51, laneC: 0.28, groundL: 0.66, inkGamma: 0.15, bloomMul: 0.4, bloomFloor: 0.5,
+  laneL: 0.51, laneC: 0.28, groundL: 0.66,
+  inkGamma: 0.15, inkDimG: 0.8, inkLift: 0.6,
+  bloomMul: 0.4, bloomFloor: 0.5,
 });
 export const LIGHT_TUNE: LightTune = { ...LIGHT_TUNE_DEFAULTS };
 export const LIGHT_TUNE_SCHEMA: import("./tune").TuneSchema<LightTune> = {
@@ -164,6 +168,8 @@ export const LIGHT_TUNE_SCHEMA: import("./tune").TuneSchema<LightTune> = {
   laneC: { min: 0.05, max: 0.3, step: 0.005, label: "lane C" },
   groundL: { min: 0.5, max: 0.95, step: 0.005, label: "ground L" },
   inkGamma: { min: 0.05, max: 1, step: 0.01, label: "ink gamma" },
+  inkDimG: { min: 0.2, max: 2, step: 0.05, label: "ink dim curve" },
+  inkLift: { min: 0.1, max: 4, step: 0.05, label: "ink focus lift" },
   bloomMul: { min: 0, max: 1.5, step: 0.05, label: "bloom ×" },
   bloomFloor: { min: 0.3, max: 1, step: 0.01, label: "bloom floor" },
 };
@@ -189,13 +195,41 @@ export const LIGHT_TUNE_SCHEMA: import("./tune").TuneSchema<LightTune> = {
  * afterwards — the horizon and front ramps, the furniture fade, the entry stagger — are geometry,
  * not weight, and gamma-stretching a ramp moves where a row appears to leave the chamber.
  *
+ * ⚠️ THE CURVE IS RELATIVE TO THE MARK'S OWN RESTING WEIGHT, and that is what makes emphasis
+ * survive it (user, 2026-08-26: *"the snapshot view has lost its focus color effect on the ribbons?
+ * I hardly don't see any difference when filtering a metagraph"*). A bare `s ** 0.15` maps the
+ * chamber's whole emphasis span onto 0.66 → 0.97 alpha — a 13.7× span compressed to 1.5×, measured
+ * at ΔL* 5.3 on paper against 36.3 on dark — so the tiers were still ORDERED and no longer legible.
+ * The gamma is not the mistake: it is the only reason a resting mark reads as ink at all, and the
+ * vivid rest is the look. What was missing is that the gamma answers an ABSOLUTE opacity while
+ * emphasis is a RATIO — and each instrument rests somewhere else (the bar's bands at 0.12, the
+ * ribbons at 0.85), so no single absolute knee could serve them both. Pass `ref` — the resting base
+ * `snapBright` was handed — and the curve pins that rest at exactly `ref ** gamma` (byte-identical
+ * to before) and spends the rest of the range around it:
+ *
+ *   - BELOW rest the fall is proportional in the ratio (`inkDimG`), so an off-filter ribbon lands
+ *     near half the resting ink instead of 95% of it. This is where the range lives on paper:
+ *     **emphasis on a page is spent DOWNWARD.** Ink can only go to full ink, while the dark ground
+ *     has emissive headroom plus a bloom pass above its resting glow. Focus here is expressed by
+ *     what steps BACK, which is also why the boost side needs so little.
+ *   - ABOVE rest the lift saturates into whatever headroom is left (`inkLift`), so a boost still
+ *     reads without the top two tiers collapsing onto full ink.
+ *
+ * Omitting `ref` defaults it to `s`, which is exactly the old `s ** gamma` — so every site whose
+ * argument is a plain resting level (the seed, the ordinal labels, hyper's furniture) is unchanged
+ * by construction, and only the three sites carrying a `snapBright` product pass one.
+ *
  * Takes the ground as a BOOLEAN rather than the colours, so the per-frame call is plain arithmetic:
  * hoist `isLightGround(c)` into a field at event time (setColors), the same hoist rule the `?tune`
  * contract states for per-node loops.
  */
-export function inkPresence(s: number, paper: boolean): number {
+export function inkPresence(s: number, paper: boolean, ref = s): number {
   if (!paper || s <= 0 || s >= 1) return s;
-  return Math.pow(s, LIGHT_TUNE.inkGamma);
+  const restA = Math.pow(Math.min(ref, 1), LIGHT_TUNE.inkGamma);
+  const r = ref > 0 ? s / ref : 1;
+  if (r < 1) return restA * Math.pow(r, LIGHT_TUNE.inkDimG);
+  // Saturating: contributes exactly 0 at r = 1, so the resting look is untouched by this branch.
+  return restA + (1 - restA) * (1 - 1 / (1 + (r - 1) * LIGHT_TUNE.inkLift));
 }
 
 // Read the four structural tokens from globals.css. Called once by the Engine at construction.
