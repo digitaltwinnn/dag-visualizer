@@ -190,10 +190,32 @@ export function makeGlassFill(c: SceneColors, halfW: number, halfH: number, radi
         // ground, which the room term already answers. The ramp is soft and starts below zero because
         // floor's own reflection only clears the horizon by ~0.15 rad at the back of the trail.
         float sky = smoothstep(-0.30, 0.10, R.y);
-        float rig = uEnv * sky * (
-              softbox(az, -1.30, 0.034) * 0.85
-            + softbox(az, -1.53, 0.042) * 0.8
-            + softbox(az, -1.79, 0.055) * 0.9);
+        // THE LOW WINDOW (user, 2026-08-28: the bottom pane shows the lamp's pool while the top
+        // planes "show the light differently"). The storeys do not disagree about WHERE the room is
+        // — the same probe run over the lane planes reads the SAME azimuth band, -1.93 (screen left)
+        // to -1.17 (screen right). They disagree about which HALF of it they see: the lane planes
+        // stand at y +2.5 and the resting camera at y -1, so they are read from BELOW and their
+        // reflection points DOWN — measured R.y -0.15..0.00 against the floor's +0.11..+0.30. So
+        // every upward-facing term the floor lives on is dead up there by construction: sky halves
+        // the rig, the window direction reflects off-camera, and the lamp's half-vector lobe is on
+        // the wrong side of the pane entirely. What survived was the narrow middle softbox clipping
+        // the storey as a hard streak — light, but not the same room's light.
+        //
+        // ⚠️ THE GATE IS THE MEASURED GAP, NOT A FEELING. The two storeys' R.y bands do not overlap,
+        // and that is the only thing separating them: aim a lobe by DIRECTION alone and a pow-19
+        // window centred on the lane band still lands ~0.48 on the floor, re-lighting the pool the
+        // user tuned. "under" ramps out at +0.12, above the lane storey's whole range and below the
+        // floor's 1st percentile (0.114), so the floor cannot see this term at all.
+        //
+        // It rides uEnv with the boxes above rather than taking a knob of its own: the storeys are
+        // one lit room, so there is one lamp, and the low window is deliberately the gentler half.
+        float under = smoothstep(0.12, 0.0, R.y);
+        float rig = uEnv * (
+              sky * (
+                  softbox(az, -1.30, 0.034) * 0.85
+                + softbox(az, -1.53, 0.042) * 0.8
+                + softbox(az, -1.79, 0.055) * 0.9)
+            + under * softbox(az, -1.55, 0.22) * 0.55);
         // THE MOVABLE HALF. A ShaderMaterial is unlit, but a light is only a POSITION and this one is
         // handed in as exactly that (LedgerView.setSpot, from the app's one StageLight), so a real
         // Blinn-Phong lobe is available here. uSpotI carries the light's own eased weight, so the
