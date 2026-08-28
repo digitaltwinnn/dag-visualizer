@@ -170,6 +170,11 @@ export interface LightTune {
   inkLift: number; //  how much of the headroom above rest a focus claims
   bloomMul: number; // light bloom strength as a fraction of the view policy's
   bloomFloor: number; // minimum bloom threshold on light, so the ground never halos
+  // The SELECTIVE bloom (scene/SceneContext.ts · BLOOM_LAYER). The whole-frame pass above cannot
+  // select ink darker than its ground; these drive the layer that can. Read per frame, no callback.
+  selBleed: number;  // how far the halo multiplies the ground toward the mark's own hue
+  selGlow: number;   // the additive term beside it — light added at the mark's own core
+  selRadius: number; // the halo's spread
   // The studio backdrop (scene/SceneContext.ts · paperBackdrop). Both are BAKED into a canvas at
   // event time, not read per frame — the "light look" group's onChange already ends in
   // refreshTheme(), which re-applies the background, so an edit rebuilds the texture for free.
@@ -182,7 +187,14 @@ export const LIGHT_TUNE_DEFAULTS: Readonly<LightTune> = Object.freeze({
   // brighter ink reads right once the de-emphasized field around it is genuinely thin.
   laneL: 0.61, laneC: 0.28, groundL: 0.72, // groundL back up (user, 2026-08-28: 0.66 read too dark)
   inkGamma: 0.15, inkDimG: 1.35, inkLift: 0.6,
-  bloomMul: 0.4, bloomFloor: 0.5,
+  // THE WHOLE-FRAME PASS IS OFF ON PAPER. It is a luminance highpass over the finished frame, and
+  // on paper the marks are INK — darker than the ground they lie on — so no threshold selects them;
+  // all it ever did was blow the one place light DID clear it (the lead bar, the ribbon foot) to
+  // white. Engine's `bloom.enabled = _bloomMul > 0` skips the pass outright, so this is a look fix
+  // and a full-res pass off the light path both. `bloomFloor` is inert while this is 0 — it shapes
+  // that pass's threshold alone — and stays as the lever if the whole-frame look is ever wanted back.
+  bloomMul: 0, bloomFloor: 0.5,
+  selBleed: 0.85, selGlow: 0.06, selRadius: 0.6,
   bgTint: 1, bgGrid: 0.07,
 });
 export const LIGHT_TUNE: LightTune = { ...LIGHT_TUNE_DEFAULTS };
@@ -195,6 +207,9 @@ export const LIGHT_TUNE_SCHEMA: import("./tune").TuneSchema<LightTune> = {
   inkLift: { min: 0.1, max: 4, step: 0.05, label: "ink focus lift" },
   bloomMul: { min: 0, max: 1.5, step: 0.05, label: "bloom ×" },
   bloomFloor: { min: 0.3, max: 1, step: 0.01, label: "bloom floor" },
+  selBleed: { min: 0, max: 4, step: 0.05, label: "halo bleed" },
+  selGlow: { min: 0, max: 2, step: 0.05, label: "halo glow" },
+  selRadius: { min: 0.1, max: 1.5, step: 0.05, label: "halo spread" },
   bgTint: { min: 0, max: 2.5, step: 0.05, label: "backdrop tint" },
   bgGrid: { min: 0, max: 0.25, step: 0.005, label: "backdrop grid" },
 };

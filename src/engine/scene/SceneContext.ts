@@ -8,7 +8,115 @@ import { RenderPass } from "three/addons/postprocessing/RenderPass.js";
 import { UnrealBloomPass } from "three/addons/postprocessing/UnrealBloomPass.js";
 import { BokehPass, type BokehPassParameters } from "three/addons/postprocessing/BokehPass.js";
 import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
+import { ShaderPass } from "three/addons/postprocessing/ShaderPass.js";
 import { isLightGround, LIGHT_TUNE, type SceneColors } from "../sceneColors";
+
+/**
+ * THE SELECTIVE-BLOOM LAYER — the day look's answer to a glow pass that cannot select ink.
+ *
+ * UnrealBloomPass is a LUMINANCE HIGHPASS over the finished frame: it keeps what is brighter than
+ * `threshold`, blurs it, adds it back. That works on the dark ground, where every mark is emissive
+ * light against black. On paper the identity marks are INK — measured, the scene ground sits at
+ * L 0.72 while a DOR band at the identity lane's own `laneL` (0.61) lands near 0.42 relative
+ * luminance — so the marks are DARKER THAN WHAT THEY LIE ON and no threshold can pick them out.
+ * Floor it low and the whole page halos (the wave that read "soft/washed"); floor it high and
+ * nothing does at all (user, 2026-08-28: "bloom does not appear to work"). Both failures are the
+ * same fact: a highpass cannot select the darker half of a frame.
+ *
+ * So the marks are selected by MEMBERSHIP instead of by brightness. Objects that join this layer
+ * render a second time into a target that is black except for them; that target is blurred and
+ * composited ADDITIVELY under the OutputPass. The bloom pass then thresholds against BLACK, where
+ * ink is the bright thing — the highpass works again because the ground it measures against is one
+ * we chose rather than one we inherited.
+ *
+ * Additive glow over paper is intrinsically faint, and that is accepted rather than worked around
+ * (user, 2026-08-28: "most of the bloomed objects sit on a surface … so I'm ok if bloom is not very
+ * present when its directly on the light background"). Over the chamber's own glass and around
+ * saturated ink it reads as a warm halo bleeding outward; over the raw backdrop it reads as almost
+ * nothing, which is the honest answer for light added to a near-white page.
+ *
+ * ⚠️ MEMBERSHIP IS PER-MESH, WHICH IS WHY THE BRIGHTNESS STILL DOES THE EMPHASIS. Almost every mark
+ * here is an InstancedMesh (the lane tiles, the node chips), so a layer cannot name one tile — and
+ * it does not have to: a member renders with its OWN per-instance colour and alpha, so what it
+ * contributes to the bloom target is exactly its own presence. The committed band leads its
+ * off-filter neighbours in the halo by the same ratio `inkPresence` already gave it on the page.
+ * The emphasis system is untouched; this pass only gives it a second channel to spend.
+ */
+export const BLOOM_LAYER = 1;
+
+/**
+ * Put one mark in the selective-bloom set (convention 8: one home for the question). Called at
+ * construction by the adapters that own a glowing mark — the byte bar's bands, the ledger's lane
+ * tiles, the live edge, the node chips, hyper's core and hub orbs. Deliberately NOT the glass, the
+ * trays, the backdrop, the labels or the ribbons: a ribbon is a wide soft sheet that would dominate
+ * the target and blur into a smear, and its ENDS are already lit by the band and the tile it runs
+ * between — which is the halo the eye actually reads along it.
+ *
+ * Unconditional, not light-gated: `layers.enable` only ADDS a layer, so a member still matches the
+ * default camera mask and the dark ground renders byte-identically. The gate is the pass, not the
+ * membership.
+ */
+export function joinBloom(o: THREE.Object3D): void {
+  o.layers.enable(BLOOM_LAYER);
+}
+
+// The bloom target runs at half resolution. Standard for a blur pyramid (the pass mips down from
+// here anyway) and it is what keeps the second scene render off the frame budget.
+const SEL_SCALE = 0.5;
+
+/**
+ * The composite — TWO terms, because a halo on paper cannot be made of light alone.
+ *
+ * ⚠️ ADDITIVE GLOW IS INVISIBLE ON THIS GROUND, AND THE MEASUREMENT SAYS SO. The paper sits at
+ * L 0.72 and the chamber's own glass lands within ~12/255 of it (measured in wave 5, which is why
+ * `inkMix` points every site at `c.bg`) — so the surfaces the user expects the halo to read over
+ * are as bright as the page. Light added there clips to white: the "glow" is a bleach, which is
+ * precisely the blowout the day look already had. The backdrop's own header states the rule this
+ * wave keeps running into — on paper, emphasis is separation you take AWAY, not light you add.
+ *
+ * So the primary term is a BLEED: the ground multiplied toward the mark's own hue, weighted by the
+ * blur's magnitude. `base * mix(vec3(1), ink, a)` is a pure multiply, so it can only ever darken
+ * and tint — it cannot blow out, it keeps the ground's own level and vignette underneath, and it
+ * reads as the mark's ink spreading into the paper around it. That is what a saturated mark does
+ * on a real page, and it is visible over the glass, over the backdrop and over another mark alike.
+ *
+ * The `glow` term is the ordinary additive composite kept alongside it at a low weight: right at
+ * the mark's core, where the bleed has nothing left to darken, a little added light is what keeps
+ * a bright mark from reading as a smudge. Two weights rather than one because they act in opposite
+ * directions and the balance between them is exactly what there was to tune.
+ *
+ * `ink` normalises the blurred colour to its own hue, so the tail carries full saturation at tiny
+ * coverage instead of desaturating toward grey as it fades — the same reason wave 5's tiles needed
+ * a hue floor. The magnitude does the falling off; the hue does not.
+ */
+const SEL_MIX_SHADER = {
+  uniforms: {
+    tDiffuse: { value: null as THREE.Texture | null },
+    bloomTexture: { value: null as THREE.Texture | null },
+    bleed: { value: 1 },
+    glow: { value: 0.25 },
+  },
+  vertexShader: /* glsl */ `
+    varying vec2 vUv;
+    void main() { vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }
+  `,
+  fragmentShader: /* glsl */ `
+    uniform sampler2D tDiffuse;
+    uniform sampler2D bloomTexture;
+    uniform float bleed;
+    uniform float glow;
+    varying vec2 vUv;
+    void main() {
+      vec4 base = texture2D(tDiffuse, vUv);
+      vec3 b = texture2D(bloomTexture, vUv).rgb;
+      float m = max(b.r, max(b.g, b.b));
+      vec3 ink = b / max(m, 1e-4);
+      float a = clamp(bleed * m, 0.0, 1.0);
+      vec3 rgb = base.rgb * mix(vec3(1.0), ink, a) + glow * b;
+      gl_FragColor = vec4(rgb, base.a);
+    }
+  `,
+};
 
 // @types/three types BokehPass.uniforms as a bare `object`; the engine reads
 // uniforms.focus/maxblur .value, so refine just those.
@@ -25,6 +133,12 @@ export interface SceneCtx {
   composer: EffectComposer;
   dof: DofPass;
   bloom: UnrealBloomPass; // per-view strength/radius/threshold, driven by the Engine from ViewPolicy
+  /**
+   * Draw one frame. The ONE home for the ground question in the render chain: dark runs the
+   * original composer alone, paper runs the selective-bloom sub-pipeline first (see BLOOM_LAYER).
+   * The Engine calls this instead of `composer.render()` so it never has to know which.
+   */
+  renderFrame(): void;
   resize(): void;
   /**
    * Re-point the scene's clear colour at a new `--background` (theme flip). The scene has no fog
@@ -33,6 +147,8 @@ export interface SceneCtx {
    */
   setClearColor(bg: number): void;
   setGround(light: boolean): void;
+  /** Tear down both composers and every render target either of them allocated. */
+  dispose(): void;
 }
 
 // Scene LIGHTING is a rendering technicality, NOT a palette concern: a light shades the (mostly
@@ -158,7 +274,84 @@ export function createScene(canvas: HTMLCanvasElement, colors: SceneColors): Sce
   // conversion to the composited result. Without it an EffectComposer bypasses the renderer's
   // output step, so `toneMapping` above was effectively a no-op (three r150+ standardised on
   // OutputPass as the correct chain end).
-  composer.addPass(new OutputPass());
+  const outputPass = new OutputPass();
+  composer.addPass(outputPass);
+
+  // ── The selective-bloom sub-pipeline (see BLOOM_LAYER above) ────────────────────────────────
+  //
+  // Built LAZILY on the first paper frame, so the dark ground allocates no second composer and no
+  // extra render targets — it pays literally nothing for a feature it does not use. The mix pass
+  // sits BEFORE the OutputPass so the composite happens in linear space, on the same numbers the
+  // tone map and the sRGB encode are about to read.
+  let sel: {
+    composer: EffectComposer;
+    render: RenderPass;
+    bloom: UnrealBloomPass;
+    mix: ShaderPass;
+  } | null = null;
+
+  function ensureSel() {
+    if (sel) return;
+    const w = Math.max(1, Math.round(window.innerWidth * SEL_SCALE));
+    const h = Math.max(1, Math.round(window.innerHeight * SEL_SCALE));
+    const c = new EffectComposer(renderer);
+    c.renderToScreen = false;
+    const rp = new RenderPass(scene, camera);
+    rp.clearColor = new THREE.Color(0x000000);
+    rp.clearAlpha = 1;
+    c.addPass(rp);
+    // threshold 0: the target is BLACK except the members, so there is nothing to reject — every
+    // mark is above the floor by construction. This is the whole point of the layer (see above).
+    const bp = new UnrealBloomPass(new THREE.Vector2(w, h), 1, LIGHT_TUNE.selRadius, 0);
+    c.addPass(bp);
+    c.setSize(w, h);
+    const mx = new ShaderPass(SEL_MIX_SHADER);
+    mx.uniforms.bloomTexture.value = c.renderTarget2.texture;
+    composer.insertPass(mx, composer.passes.indexOf(outputPass));
+    sel = { composer: c, render: rp, bloom: bp, mix: mx };
+  }
+
+  /**
+   * ONE render call for the frame, so the ground question is asked in exactly one place.
+   *
+   * On dark this is `composer.render()` and nothing else — the mix pass does not exist, so the
+   * chain is the same four passes it has always been and the output is byte-identical.
+   *
+   * On paper the members are rendered first into their own black target. Three saves make that
+   * safe, and each is load-bearing: the BACKGROUND is nulled (the studio backdrop would otherwise
+   * fill the target and every pixel would clear the threshold — the layer would select nothing);
+   * the camera LAYER MASK is narrowed to the bloom layer alone (`layers.set`, not `enable`, so
+   * layer 0 is excluded and the target holds the marks and only the marks); and the AUTOCLEAR is
+   * left to the RenderPass's own black clear. All three are restored before the main chain runs,
+   * so the visible frame is drawn from exactly the state the rest of the engine set up.
+   */
+  function renderFrame() {
+    // Both knobs at zero IS off, and off must cost nothing — the mark pass is a whole extra scene
+    // render plus a blur, so disabling only the mix pass would leave the expensive half running to
+    // feed a texture nobody samples. Same shape as the dark path below: skip, don't neutralise.
+    const on = isPaper && (LIGHT_TUNE.selBleed > 0 || LIGHT_TUNE.selGlow > 0);
+    if (!on) {
+      if (sel) sel.mix.enabled = false;
+      composer.render();
+      return;
+    }
+    ensureSel();
+    const s = sel!;
+    s.bloom.radius = LIGHT_TUNE.selRadius;
+    s.mix.uniforms.bleed.value = LIGHT_TUNE.selBleed;
+    s.mix.uniforms.glow.value = LIGHT_TUNE.selGlow;
+    s.mix.enabled = true;
+
+    const bg = scene.background;
+    const mask = camera.layers.mask;
+    scene.background = null;
+    camera.layers.set(BLOOM_LAYER);
+    s.composer.render();
+    camera.layers.mask = mask;
+    scene.background = bg;
+
+    composer.render();
+  }
 
   // The caller (engine) owns the resize listener so it can be removed on dispose.
   function resize() {
@@ -166,6 +359,20 @@ export function createScene(canvas: HTMLCanvasElement, colors: SceneColors): Sce
     camera.updateProjectionMatrix();
     renderer.setSize(window.innerWidth, window.innerHeight);
     composer.setSize(window.innerWidth, window.innerHeight);
+    if (sel) {
+      sel.composer.setSize(
+        Math.max(1, Math.round(window.innerWidth * SEL_SCALE)),
+        Math.max(1, Math.round(window.innerHeight * SEL_SCALE)),
+      );
+      // setSize rebuilds the composer's targets, so the mix pass's captured texture is stale.
+      sel.mix.uniforms.bloomTexture.value = sel.composer.renderTarget2.texture;
+    }
+  }
+
+  function dispose() {
+    sel?.composer.dispose();
+    sel?.bloom.dispose();
+    composer.dispose();
   }
 
   // The clear colour is the one construction-time capture of a threaded token in this module
@@ -327,5 +534,8 @@ export function createScene(canvas: HTMLCanvasElement, colors: SceneColors): Sce
 
   applyBackground(); // construction honours the current ground (a light boot starts on the backdrop)
 
-  return { scene, camera, renderer, controls, composer, dof, bloom, resize, setClearColor, setGround };
+  return {
+    scene, camera, renderer, controls, composer, dof, bloom,
+    renderFrame, resize, setClearColor, setGround, dispose,
+  };
 }

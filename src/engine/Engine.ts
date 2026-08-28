@@ -1637,7 +1637,7 @@ export class Engine {
       const zoomedIn = this._integrateMotion(dt); // hyper spin/tilt ease + globe rotation (poses final after this)
       this._deriveFrames();        // staging plane from the SETTLED camera + rotation
       this._writeScene(dt, zoomedIn); // morph/alphas/visibility/view updates/DoF — reads only settled state
-      this.ctx.composer.render();
+      this.ctx.renderFrame();
       if (this._onReady) {
         const cb = this._onReady;
         this._onReady = undefined;
@@ -2260,6 +2260,6 @@ export class Engine {
     cancelAnimationFrame(this.raf);
     this.ctx.controls.dispose?.();
     this.ctx.renderer.dispose?.();
-    this.ctx.composer.dispose?.();
+    this.ctx.dispose();
   }
 }
