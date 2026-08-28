@@ -13,7 +13,7 @@
 // Two tune channels (user, 2026-08-07): the GLOBAL plane and the METAGRAPH planes are tuned
 // separately (`?tune` folders) — same blueprint, each caller passes its own PlaneTune.
 import * as THREE from "three";
-import { isLightGround, type SceneColors } from "../../sceneColors";
+import { isLightGround, labelInk, type SceneColors } from "../../sceneColors";
 import { CONT_X } from "../../domain/ledgerLayout";
 import type { ContainerSpec } from "../../domain/ledgerRails";
 import { applyGlassTheme, makeGlassFill, type GlassFillUniforms } from "./glassFill";
@@ -112,6 +112,7 @@ export function makeEdgeLabel(
   z: number,
   height = 1.05,
   align: "left" | "center" = "left",
+  weight: "name" | "readout" = "name",
 ): THREE.Mesh {
   const c = document.createElement("canvas");
   const SS = 2;
@@ -138,7 +139,7 @@ export function makeEdgeLabel(
     new THREE.PlaneGeometry(w, h),
     new THREE.MeshBasicMaterial({
       map: tex,
-      color: new THREE.Color(colors.core), // the label's tone — see `tone` above; retintEdgeLabel re-points it
+      color: new THREE.Color(labelInk(colors, weight)), // the label's tone — see `tone` above; retintEdgeLabel re-points it
       transparent: true,
       depthWrite: false,
       depthTest: false,
@@ -158,9 +159,10 @@ export function makeEdgeLabel(
 }
 
 /** THEME FLIP for an edge label built by `makeEdgeLabel` — the tone lives on the material, so this
- *  is the whole retint (no canvas, no texture upload). Event-time; the caller owns the meshes. */
-export function retintEdgeLabel(mesh: THREE.Mesh, colors: SceneColors): void {
-  (mesh.material as THREE.MeshBasicMaterial).color.setHex(colors.core);
+ *  is the whole retint (no canvas, no texture upload). Event-time; the caller owns the meshes.
+ *  `weight` must match what the label was BUILT with, or a flip silently re-weights it. */
+export function retintEdgeLabel(mesh: THREE.Mesh, colors: SceneColors, weight: "name" | "readout" = "name"): void {
+  (mesh.material as THREE.MeshBasicMaterial).color.setHex(labelInk(colors, weight));
 }
 
 export interface SnapshotPlaneOpts {

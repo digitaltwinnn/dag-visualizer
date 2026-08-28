@@ -22,7 +22,7 @@ import { metaTrayLayout, dagTrayLayout, containerChipPos, type ContainerSpec } f
 import { LANE_IDS } from "../domain/ledgerModel";
 import { gatherSlots, gatherExtent, gatherSpread, gatherRows, type GatherExtent, type GatherSlot } from "../domain/gatherLayout";
 import type { ViewTransition } from "../domain/viewTransition";
-import { glowBlend, inkPresence, isLightGround, type SceneColors } from "../sceneColors";
+import { glowBlend, inkPresence, isLightGround, labelInk, type SceneColors } from "../sceneColors";
 import * as geoStats from "../domain/geoStats";
 import { R, LAND_H, CHIP_PITCH, HEX_H, VALIDATOR_HEX_R, META_HEX_R, latLonToVec3, vec3ToLatLon } from "../domain/geoLayout";
 import { armillaryFrame, ringFramePos, ringNormal, armillaryRings, armillaryPos, nodeRoles, spreadCoLocated } from "../domain/nodeLayout";
@@ -868,7 +868,11 @@ export class Globe implements GeoViewHost {
     };
     for (const u of this.nodes) if (!u.noGeo) addFrom(u.pick);
     for (const r of this.metaNodes) addFrom(r.pick);
-    const cc = new THREE.Color(this.geoColor);
+    // The furniture INK, not the accent: on paper a country name tinted with the hologram's own
+    // cyan is pale teal on a near-white globe. `labelInk` is the one home for that question, shared
+    // with the chamber's edge labels — which ask it through a material colour, while these bake the
+    // tone into the canvas, so the two mechanisms must not each grow an opinion.
+    const cc = new THREE.Color(labelInk(this._colorsRef));
     const tone = `rgba(${Math.round(cc.r * 255)},${Math.round(cc.g * 255)},${Math.round(cc.b * 255)},0.62)`;
     const up = new THREE.Vector3(0, 1, 0);
     for (const [code, name] of names) {

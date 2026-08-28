@@ -29,9 +29,11 @@ export interface SceneColors {
   //                               with it so the badge reads as glass, not the disc behind it)
   muted: number; //   --muted-foreground (the muted text tone — the label-chip CODE text, matching
   //                               the React .role-chip pill's text-muted-foreground)
+  fg: number; //      --foreground (full body ink — reached ONLY by `labelInk`'s "readout" weight,
+  //                               for in-scene text that states a reading rather than a name)
 }
 
-export type SceneColorVar = "--primary" | "--core" | "--background" | "--scene-ground" | "--border" | "--panel" | "--muted-foreground";
+export type SceneColorVar = "--primary" | "--core" | "--background" | "--scene-ground" | "--border" | "--panel" | "--muted-foreground" | "--foreground";
 
 // Resolve one CSS colour expression (e.g. "var(--primary)") to a packed 0xRRGGBB. Two steps, because
 // the computed-colour STRING format varies by browser (a token authored in oklch resolves to
@@ -104,6 +106,47 @@ export function isLightGround(c: SceneColors): boolean {
  */
 export function glowBlend(c: SceneColors): THREE.Blending {
   return isLightGround(c) ? THREE.NormalBlending : THREE.AdditiveBlending;
+}
+
+/**
+ * THE FURNITURE INK — the tone for in-scene TEXT (2026-08-28). Third member of the ground-question
+ * family, and the one that is about the mark's HUE rather than its blend mode or its presence.
+ *
+ * Text is the one thing in the scene that is READ rather than looked at, so it answers the ground
+ * differently from every glowing mark beside it. On the dark ground the accent IS the ink: a cyan
+ * label is light added to black and reads at a glance. Point that same accent at a 0.93-L page and
+ * it is pale teal on white — measured at the resting pose, the chamber's floor name ran 1.27:1 and
+ * its ordinal column 1.33:1 against their own ground, which is not a quiet label, it is an absent
+ * one. On paper the ink must be INK, so it takes `--muted-foreground`: the HUD's own tone for its
+ * quietest words, which is exactly the register furniture text wants — legible at a glance, never
+ * competing with the data.
+ *
+ * ONE home, because the callers are two families that would otherwise drift: the chamber's edge
+ * labels tint a white canvas through a material `color` (a flip is one setHex), while geo's country
+ * names bake their tone INTO the canvas (a flip is a redraw). Same question, same answer, two
+ * mechanisms — which is precisely the shape that grows a second opinion if each site asks alone.
+ *
+ * TWO WEIGHTS, BECAUSE IN-SCENE TEXT IS TWO THINGS AND ONLY PAPER CAN TELL THEM APART. A `name`
+ * is FURNITURE — the floor's "GLOBAL SNAPSHOTS", a lane's ticker, a hosting country — sparse by
+ * review and never the subject; it takes `--muted-foreground`, the HUD's own tone for its quietest
+ * words. A `readout` is the chamber's exact reading of what its geometry encodes — the ordinal
+ * column for POSITION, the size column for WIDTH — and a readout you cannot read is not quiet, it
+ * is missing; it takes `--foreground`.
+ *
+ * Measured rather than felt, at the resting pose against each mark's own ground: dark runs the
+ * floor name at 4.64:1 and the ordinal column at 2.84:1, so dark already spends more on the
+ * readout than its size suggests. On paper the accent gave 1.94:1 and 1.35:1; one muted ink lifted
+ * them to 2.93:1 and 1.51:1 — the name arriving, the column still half of what dark gives it,
+ * because a 5px glyph antialiases to about half coverage and no hue survives that at L* 34.8.
+ * `--foreground` is what buys the column back, and pointing the NAME there too would take it past
+ * dark's own 4.64:1 and make it compete with the snapshots lying on it. Same question, one home,
+ * two answers — which is the shape that keeps a call site from inventing a third.
+ *
+ * Dark answers `c.core` to both, so it is byte-identical by construction whatever a caller asks.
+ */
+export function labelInk(c: SceneColors, weight: "name" | "readout" = "name"): number {
+  if (!isLightGround(c)) return c.core;
+  return weight === "readout" ? c.fg : c.muted;
 }
 
 const _ground = new THREE.Color();
@@ -287,5 +330,6 @@ export function readSceneColors(): SceneColors {
     border: readColorToken("--border"),
     panel: readColorToken("--panel"),
     muted: readColorToken("--muted-foreground"),
+    fg: readColorToken("--foreground"),
   };
 }

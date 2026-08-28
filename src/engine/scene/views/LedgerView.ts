@@ -52,7 +52,7 @@ import {
   laneSpan,
   type RailGroup,
 } from "../../domain/ledgerLayout";
-import { isLightGround, inkMix, inkPresence, type SceneColors } from "../../sceneColors";
+import { isLightGround, inkMix, inkPresence, labelInk, type SceneColors } from "../../sceneColors";
 import {
   LedgerModel,
   LANE_IDS,
@@ -511,9 +511,9 @@ export class LedgerView implements SceneView {
     // The ordinal + kB columns are POOLED per visible row (recycled by ordinal), so the live set
     // is retinted in place; rows built after the flip read the new `_colors`/`_core` above.
     for (const o of this._ordLabels.values()) {
-      retintEdgeLabel(o.mesh, c);
-      if (o.kb) retintEdgeLabel(o.kb, c);
-      for (const l of [o.line, o.kbLine]) (l.material as THREE.LineDashedMaterial).color.setHex(c.core);
+      retintEdgeLabel(o.mesh, c, "readout");
+      if (o.kb) retintEdgeLabel(o.kb, c, "readout");
+      for (const l of [o.line, o.kbLine]) (l.material as THREE.LineDashedMaterial).color.setHex(labelInk(c, "readout"));
     }
   }
 
@@ -879,7 +879,7 @@ export class LedgerView implements SceneView {
       new THREE.Vector3(0, y, 0),
     ]);
     const lm = new THREE.LineDashedMaterial({
-      color: this._core, transparent: true, opacity: 0,
+      color: labelInk(this._colors, "readout"), transparent: true, opacity: 0,
       depthWrite: false, dashSize: 0.14, gapSize: 0.18,
     });
     const line = new THREE.Line(lg, lm);
@@ -918,7 +918,7 @@ export class LedgerView implements SceneView {
       if (o) o.slot = s;
       if (!o) {
         // event-time: one canvas + two 2-point dashed lines per new tick
-        const mesh = makeEdgeLabel(this._colors, snap.ordinal.toLocaleString(), 0, FLOOR_Y.gl0, ORD_Z, ORD_H);
+        const mesh = makeEdgeLabel(this._colors, snap.ordinal.toLocaleString(), 0, FLOOR_Y.gl0, ORD_Z, ORD_H, "left", "readout");
         (mesh.material as THREE.MeshBasicMaterial).opacity = 0;
         const line = this._makeDashLine(y, ORD_LINE_Z0);
         const kbLine = this._makeDashLine(y, KB_Z0);
@@ -949,7 +949,7 @@ export class LedgerView implements SceneView {
         }
         if (kbText) {
           // event-time: one canvas when a row's measurement arrives or changes
-          o.kb = makeEdgeLabel(this._colors, kbText, 0, FLOOR_Y.gl0, KB_Z0, ORD_H);
+          o.kb = makeEdgeLabel(this._colors, kbText, 0, FLOOR_Y.gl0, KB_Z0, ORD_H, "left", "readout");
           (o.kb.material as THREE.MeshBasicMaterial).opacity = 0;
           this._ordGroup.add(o.kb);
         }
