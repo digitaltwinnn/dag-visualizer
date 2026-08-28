@@ -449,8 +449,10 @@ export class LedgerView implements SceneView {
     // The committed (or hover-previewed) network's OWN plane glows a step brighter — the
     // plane-level twin of the colored dim (user, 2026-08-07).
     const netKey = this._netDimKey();
-    for (const [key, p] of this._metaPlanes)
-      p.applyAlpha(this.metaTune, a, FLOOR_D / 2, key === netKey ? LANE_FILL_BOOST : 1);
+    for (const [key, p] of this._metaPlanes) {
+      const lane = key === netKey;
+      p.applyAlpha(this.metaTune, a, FLOOR_D / 2, lane ? LANE_FILL_BOOST : 1, lane ? this._laneColor(key).getHex() : null);
+    }
     for (const o of this._ordLabels.values()) {
       const ox = LEAD_X - o.slot * SLOT_SP + this._trailOff;
       // Both boundaries at once: the rewind's front dissolve and the horizon's — no instrument

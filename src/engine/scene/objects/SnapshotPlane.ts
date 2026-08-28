@@ -60,6 +60,13 @@ export interface GlassTune {
   edge: number;     // the polished edge the SDF band already measures
   env: number;      // the studio SOFTBOXES in the reflected room — what makes orbiting sweep it
   trayBody: number; // the trays face the camera head-on: no sky, little Fresnel, so more body
+  // ── THE COMMITTED LANE, on paper. Dark answers a commit by lifting the edge fill; the day glass
+  // has no such term, and multiplying the REFLECTION terms instead is what blew the committed
+  // plane to white (user, 2026-08-28: "the active metagraph plane is white") — the shader mixes
+  // uColor toward white by those very terms, so twice the reflection IS white. Emphasis on paper
+  // therefore rides the two channels that CAN'T bleach: the body tint's alpha, and hue.
+  laneBody: number; // how much more of its own tint the committed lane's pane holds
+  laneTint: number; // how far that tint moves from the neutral pane toward the lane's identity
 }
 
 export const GLASS_TUNE_DEFAULTS: Readonly<GlassTune> = Object.freeze({
@@ -68,6 +75,7 @@ export const GLASS_TUNE_DEFAULTS: Readonly<GlassTune> = Object.freeze({
   // reflection lobes came down a step — and the TRAYS came UP (0.12 → 0.42): with the planes
   // calmed, the trays finally earn real presence.
   body: 0.095, sky: 0.43, rim: 0.3, spec: 0.5, specPow: 19, edge: 0.08, env: 0.4, trayBody: 0.42,
+  laneBody: 2.2, laneTint: 0.42,
 });
 /** The live struct the `?tune` panel binds; DEFAULTS above is the shipped look and what tests pin. */
 export const GLASS_TUNE: GlassTune = { ...GLASS_TUNE_DEFAULTS };
@@ -81,12 +89,16 @@ export const GLASS_TUNE_SCHEMA: TuneSchema<GlassTune> = {
   edge: { min: 0, max: 1.5, step: 0.02, label: "polished edge" },
   env: { min: 0, max: 1.5, step: 0.02, label: "softboxes" },
   trayBody: { min: 0, max: 0.5, step: 0.005, label: "tray body" },
+  laneBody: { min: 1, max: 4, step: 0.05, label: "lane body ×" },
+  laneTint: { min: 0, max: 1, step: 0.02, label: "lane tint" },
 };
 
 /** The planes' corner radius — SQUARE (rounded corners belong to the trays). */
-const PLANE_CORNER_R = 0;
-/** The trays' corner radius — the smooth-corner clip of the shared glass fill. */
+const PLANE_CORNER_R = 0;/** The trays' corner radius — the smooth-corner clip of the shared glass fill. */
 const TRAY_CORNER_R = 0.3;
+
+/** Scratch for the committed lane's tint (rule 5: applyAlpha runs per frame and allocates nothing). */
+const _hue = new THREE.Color();
 
 /** A flat, edge-aligned label plane — the chamber's only text (moved out of LedgerView with the
  *  blueprint; the stack-level digit box went with the explorer's badges, user 2026-08-07).
@@ -179,6 +191,9 @@ export class SnapshotPlane {
   /** The staged light's own eased intensity, pushed by setSpot and spent by applyAlpha (which owns
    *  the alpha scaling every other glass term goes through). 0 whenever nothing is staged. */
   private _spotI = 0;
+  /** The pane's own neutral tone, captured from the theme — what a lane tint lerps AWAY from, and
+   *  what it must return to the moment the commit is released. */
+  private _base = 0;
 
   constructor(parent: THREE.Group, colors: SceneColors, o: SnapshotPlaneOpts) {
     this._parent = parent;
@@ -191,6 +206,7 @@ export class SnapshotPlane {
     this.fill.renderOrder = -2;
     this.fill.userData.blocker = true; // a normal surface: rays stop here (no pick, no pass-through)
     this._fillU = fm.uniforms as unknown as GlassFillUniforms;
+    this._base = this._fillU.uColor.value.getHex();
     this._minHalf = Math.min(o.w, o.d) / 2;
     this._cx = o.cx;
     parent.add(this.fill);
@@ -229,6 +245,7 @@ export class SnapshotPlane {
   setColors(c: SceneColors): void {
     this._paper = isLightGround(c);
     applyGlassTheme(this.fill.material as THREE.ShaderMaterial, c);
+    this._base = this._fillU.uColor.value.getHex();
     if (this._tray) applyGlassTheme(this._tray.material as THREE.ShaderMaterial, c);
     if (this.label) retintEdgeLabel(this.label, c);
   }
@@ -259,29 +276,39 @@ export class SnapshotPlane {
   /** Per-frame look: the caller passes ITS tune channel (global vs metagraph planes) and the
    *  furniture alpha. `rimRef` is the shared drop-off reference depth so the rim reads as one
    *  width across planes; narrow pieces clamp it to stay a rim. `fillBoost` lifts the edge
-   *  fill alone — the committed lane's plane glows a step brighter (user, 2026-08-07). */
-  applyAlpha(tune: PlaneTune, alpha: number, rimRef: number, fillBoost = 1): void {
+   *  fill alone — the committed lane's plane glows a step brighter (user, 2026-08-07). `hue` is
+   *  the committed lane's identity, which only the day glass spends (see GlassTune.laneTint). */
+  applyAlpha(tune: PlaneTune, alpha: number, rimRef: number, fillBoost = 1, hue: number | null = null): void {
     this._fillU.uEdgeW.value = Math.min((1 - tune.edge) * rimRef, 0.8 * this._minHalf);
     if (this._paper) {
       // THE DAY GLASS. The dark look's two flat fills are not dimmed here, they are REPLACED: an
       // additive whisper over black is a glow, and the same whisper shaded onto paper through
       // inkPresence's gamma is a sheet of grey card at ~0.6 alpha — which is exactly what the user
       // saw. So the light branch drives the view-dependent terms instead and the flat channels stay
-      // off. `alpha` is the furniture fade (geometry, not emphasis) so it multiplies every term
-      // straight, and the caller's fillBoost lifts the committed lane's pane as one piece of glass
-      // rather than only its rim.
+      // off. `alpha` is the furniture fade (geometry, not emphasis) so it multiplies every term.
+      //
+      // THE COMMITTED LANE IS THE SAME GLASS AS EVERY OTHER LANE (user, 2026-08-28: "the active
+      // metagraph plane is white"). fillBoost used to scale every term here; the shader mixes the
+      // pane's colour toward WHITE by its reflection terms, so boosting them does not emphasise a
+      // pane, it bleaches one. Glass is glass — the commit is spent on the two channels that carry
+      // it without bleaching: `uBody`, which appears in the ALPHA term alone, so more of it is more
+      // pane and no more light; and the pane's own tint, lerped toward the lane's identity so the
+      // committed plane reads as ITS lane rather than as heat.
       const g = GLASS_TUNE;
-      const k = alpha * Math.min(fillBoost, 2); // 3× a whisper is a whisper; 3× glass is a mirror
+      const lane = fillBoost > 1;
       this._fillU.uOpacity.value = 0;
       this._fillU.uInner.value = 0;
-      this._fillU.uBody.value = g.body * k;
-      this._fillU.uSky.value = g.sky * k;
-      this._fillU.uRim.value = g.rim * k;
-      this._fillU.uSpec.value = g.spec * k;
+      this._fillU.uBody.value = g.body * alpha * (lane ? g.laneBody : 1);
+      this._fillU.uSky.value = g.sky * alpha;
+      this._fillU.uRim.value = g.rim * alpha;
+      this._fillU.uSpec.value = g.spec * alpha;
       this._fillU.uSpecPow.value = g.specPow;
-      this._fillU.uEdgeA.value = g.edge * k;
-      this._fillU.uEnv.value = g.env * k;
-      this._fillU.uSpotI.value = this._spotI * k;
+      this._fillU.uEdgeA.value = g.edge * alpha;
+      this._fillU.uEnv.value = g.env * alpha;
+      this._fillU.uSpotI.value = this._spotI * alpha;
+      // Written every frame, both ways: a released commit must return the pane to neutral.
+      const uc = this._fillU.uColor.value.setHex(this._base);
+      if (lane && hue != null) uc.lerp(_hue.setHex(hue), g.laneTint);
       if (this._trayU && this._tray?.visible) {
         this._trayU.uOpacity.value = 0;
         this._trayU.uInner.value = 0;
