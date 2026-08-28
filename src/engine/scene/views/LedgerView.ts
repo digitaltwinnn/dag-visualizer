@@ -80,6 +80,8 @@ import { snapBright, snapFocusOf, focusWeightOf, emphasisK } from "../../domain/
 import { Ribbons } from "../objects/Ribbons";
 import { SnapshotPlane, makeEdgeLabel, retintEdgeLabel, GLOBAL_PLANE_TUNE_DEFAULTS, META_PLANE_TUNE_DEFAULTS, type PlaneTune } from "../objects/SnapshotPlane";
 import { TrailRewind } from "../objects/TrailRewind";
+import type { StageLight } from "../objects/StageLight";
+import { STAGE_LIGHTS } from "../../domain/stageLight";
 import { FadeSet } from "../objects/FadeSet";
 import type { SceneView } from "./SceneView";
 import type { TuneSchema } from "../../tune";
@@ -262,15 +264,24 @@ export class LedgerView implements SceneView {
   /** Filter-chip / metagraph-row HOVER — previews the colored network dim at commit strength. */
   private _hoverNet: string | null = null;
 
-  // ── fades (the ledger's stage light went with the layer navigation, 2026-08-06 — nothing
-  // committable is left for a spot to dramatise)
+  // ── fades
   private _fades = new FadeSet();
+
+  // ── THE DAY GLASS'S LAMP. The chamber stages a light on a LIGHT ground only (see the claim in
+  // update()). Both vectors are WORLD space and the group's transform is fixed at construction —
+  // quaternion and scale are set once and never written again — so they are resolved once here
+  // rather than per frame, and no render state is read.
+  private readonly _stageSubject = new THREE.Vector3();
+  private readonly _stageNormal = new THREE.Vector3();
+  private readonly _spot: StageLight;
 
   constructor(
     scene: THREE.Scene,
     colors: SceneColors,
     sceneColors: Record<string, number>,
+    spot: StageLight,
   ) {
+    this._spot = spot;
     this._colors = colors;
     this._paper = isLightGround(colors);
     this._core = colors.core;
@@ -285,6 +296,15 @@ export class LedgerView implements SceneView {
     );
     this.group.scale.setScalar(LEDGER.viewScale);
     scene.add(this.group);
+    // The chamber's own centre ON THE GLOBAL FLOOR, and the group's up, taken into world through
+    // that fixed transform. The floor is the subject because the floor is the pane the highlight has
+    // to land on: a lamp staged over the chamber's mid-height would put its mirror image past the
+    // front rim from the resting pose, and there is no floor out there to catch it.
+    this._stageSubject
+      .set(FLOOR_CX, LEDGER.rowGL0, 0)
+      .multiplyScalar(LEDGER.viewScale)
+      .applyQuaternion(this.group.quaternion);
+    this._stageNormal.set(0, 1, 0).applyQuaternion(this.group.quaternion);
 
     this.pickables = [];
     this._floorBlockers.length = 0;
@@ -407,6 +427,24 @@ export class LedgerView implements SceneView {
     // blueprint, two knobs; user 2026-08-07). FLOOR_D/2 is the shared drop-off reference so the
     // rim reads as one width everywhere; narrow pieces clamp it inside SnapshotPlane.
     const a = this._fades.alpha;
+    // ── THE STAGE LIGHT, CLAIMED ON PAPER ONLY (user, 2026-08-26: "I would expect the glass to show
+    // some light reflection?"). The dark chamber stages NOTHING and always has: an additive whisper
+    // over black is already a glow, so a lamp there would be a second light source with nothing to
+    // do. The day glass is the opposite — a reflective pane needs something to reflect, and a rig
+    // baked into the shader can only be aimed by editing the shader. So the ledger claims the app's
+    // one light here, gated on the ground, and the existing `?tune` spotlight knobs become the aim.
+    // Not claiming IS off, so on dark this branch simply never runs and nothing else changes.
+    //
+    // The uniform push reads the light's PREVIOUS frame (StageLight.update resolves claims after
+    // every view has had its turn). That is deliberate: re-deriving `subject + normal × height` here
+    // would put the staging formula in two homes, and one frame of lag on a lamp that eases at
+    // ~3/sec over a chamber whose subject never moves is not observable.
+    if (this._paper) {
+      this._spot.claim("ledger", this._stageSubject, this._stageNormal, STAGE_LIGHTS.ledger.height, a);
+    }
+    const spotI = this._paper ? this._spot.light.intensity : 0;
+    for (const p of this._globalPlanes) p.setSpot(this._spot.light.position, spotI);
+    for (const p of this._metaPlanes.values()) p.setSpot(this._spot.light.position, spotI);
     for (const p of this._globalPlanes) p.applyAlpha(this.globalTune, a, FLOOR_D / 2);
     // The committed (or hover-previewed) network's OWN plane glows a step brighter — the
     // plane-level twin of the colored dim (user, 2026-08-07).

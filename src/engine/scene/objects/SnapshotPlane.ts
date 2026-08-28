@@ -58,11 +58,12 @@ export interface GlassTune {
   spec: number;     // the reflected window
   specPow: number;  // its tightness
   edge: number;     // the polished edge the SDF band already measures
+  env: number;      // the studio SOFTBOXES in the reflected room — what makes orbiting sweep it
   trayBody: number; // the trays face the camera head-on: no sky, little Fresnel, so more body
 }
 
 export const GLASS_TUNE_DEFAULTS: Readonly<GlassTune> = Object.freeze({
-  body: 0.095, sky: 0.45, rim: 0.38, spec: 0.5, specPow: 24, edge: 0.32, trayBody: 0.12,
+  body: 0.095, sky: 0.45, rim: 0.38, spec: 0.5, specPow: 24, edge: 0.32, env: 0.42, trayBody: 0.12,
 });
 /** The live struct the `?tune` panel binds; DEFAULTS above is the shipped look and what tests pin. */
 export const GLASS_TUNE: GlassTune = { ...GLASS_TUNE_DEFAULTS };
@@ -74,6 +75,7 @@ export const GLASS_TUNE_SCHEMA: TuneSchema<GlassTune> = {
   spec: { min: 0, max: 1.5, step: 0.02, label: "window" },
   specPow: { min: 1, max: 64, step: 1, label: "window tightness" },
   edge: { min: 0, max: 1.5, step: 0.02, label: "polished edge" },
+  env: { min: 0, max: 1.5, step: 0.02, label: "softboxes" },
   trayBody: { min: 0, max: 0.5, step: 0.005, label: "tray body" },
 };
 
@@ -170,6 +172,9 @@ export class SnapshotPlane {
   private _paper: boolean;
   private _tray: THREE.Mesh | null = null;
   private _trayU: GlassFillUniforms | null = null;
+  /** The staged light's own eased intensity, pushed by setSpot and spent by applyAlpha (which owns
+   *  the alpha scaling every other glass term goes through). 0 whenever nothing is staged. */
+  private _spotI = 0;
 
   constructor(parent: THREE.Group, colors: SceneColors, o: SnapshotPlaneOpts) {
     this._parent = parent;
@@ -236,6 +241,17 @@ export class SnapshotPlane {
     this._fillU.uFadeSpan.value = span;
   }
 
+  /** THE MOVABLE HIGHLIGHT — the app's one StageLight, handed to the glass as a WORLD POSITION so
+   *  an unlit ShaderMaterial can still compute a Blinn-Phong lobe from it (glassFill's `uSpot*`).
+   *  Per frame, uniform writes only, no allocation. `i` is the light's own eased intensity, so the
+   *  lobe fades in and out with the lamp and is exactly 0 whenever the ledger has not claimed it —
+   *  which on the dark ground is always. */
+  setSpot(pos: THREE.Vector3, i: number): void {
+    this._spotI = i;
+    this._fillU.uSpotPos.value.copy(pos);
+    if (this._trayU) this._trayU.uSpotPos.value.copy(pos);
+  }
+
   /** Per-frame look: the caller passes ITS tune channel (global vs metagraph planes) and the
    *  furniture alpha. `rimRef` is the shared drop-off reference depth so the rim reads as one
    *  width across planes; narrow pieces clamp it to stay a rim. `fillBoost` lifts the edge
@@ -260,6 +276,8 @@ export class SnapshotPlane {
       this._fillU.uSpec.value = g.spec * k;
       this._fillU.uSpecPow.value = g.specPow;
       this._fillU.uEdgeA.value = g.edge * k;
+      this._fillU.uEnv.value = g.env * k;
+      this._fillU.uSpotI.value = this._spotI * k;
       if (this._trayU && this._tray?.visible) {
         this._trayU.uOpacity.value = 0;
         this._trayU.uInner.value = 0;
@@ -269,6 +287,8 @@ export class SnapshotPlane {
         this._trayU.uSpec.value = g.spec * alpha;
         this._trayU.uSpecPow.value = g.specPow;
         this._trayU.uEdgeA.value = g.edge * alpha;
+        this._trayU.uEnv.value = g.env * alpha;
+        this._trayU.uSpotI.value = this._spotI * alpha;
       }
       return;
     }

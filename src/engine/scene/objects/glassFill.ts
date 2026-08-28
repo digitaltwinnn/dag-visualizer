@@ -27,6 +27,17 @@ export interface GlassFillUniforms {
   uSpecPow: { value: number };  // its tightness
   uEdgeA: { value: number };    // the polished edge
   uLightDir: { value: THREE.Vector3 }; // the virtual window's WORLD direction (see makeGlassFill)
+  // THE ROOM HAS FEATURES (user, 2026-08-26: "I would expect the glass to show some light
+  // reflection? It just looks gray transparent with a bright(?) white edge"). A room term that is a
+  // single smoothstep on the reflection's elevation is FLAT in azimuth, so orbiting the chamber
+  // changes nothing and the pane reads as tinted air with a lit rim. `uEnv` is the strength of three
+  // analytic studio SOFTBOXES the reflection vector actually sweeps across (see the fragment
+  // shader), and `uSpot*` is the movable half — the app's one StageLight, handed in as a WORLD
+  // POSITION so an unlit ShaderMaterial can still compute a real Blinn-Phong lobe from it. Both are
+  // ZERO on the dark ground by construction: the dark branch returns before either is read.
+  uEnv: { value: number };             // softbox streak strength (0 = the old flat room)
+  uSpotPos: { value: THREE.Vector3 };  // the staged light's WORLD position
+  uSpotI: { value: number };           // its weight — 0 whenever nothing is staged
   // The HORIZON ramp (user, 2026-08-09: "the snapshot lanes logically go all the way to the back
   // since there will be many historic snapshots […] currently there is a hard edge"). The rim band
   // rises toward EVERY edge equally, so the edge the trail runs away into terminated in a bright
@@ -87,6 +98,9 @@ export function makeGlassFill(c: SceneColors, halfW: number, halfH: number, radi
       uSpecPow: { value: 12 },
       uEdgeA: { value: 0 },
       uLightDir: { value: WINDOW_DIR },
+      uEnv: { value: 0 },
+      uSpotPos: { value: new THREE.Vector3() },
+      uSpotI: { value: 0 },
       uFadeDir: { value: new THREE.Vector2(1, 0) },
       uFadeAt: { value: 0 },
       uFadeSpan: { value: 0 },
@@ -109,7 +123,16 @@ export function makeGlassFill(c: SceneColors, halfW: number, halfH: number, radi
       uniform vec2 uFadeDir; uniform float uFadeAt; uniform float uFadeSpan;
       uniform float uPaper; uniform float uBody; uniform float uSky; uniform float uRim;
       uniform float uSpec; uniform float uSpecPow; uniform float uEdgeA; uniform vec3 uLightDir;
+      uniform float uEnv; uniform vec3 uSpotPos; uniform float uSpotI;
       varying vec3 vWorld; varying vec3 vNormal;
+      // One studio softbox: a soft band centred on azimuth \`c\`, \`s\` wide. The angular distance is
+      // taken through atan(sin,cos) so it is WRAP-SAFE — a raw (az - c) tears at ±pi, and a box
+      // placed anywhere near there would split into two half-streaks as you orbit past it.
+      float softbox(float az, float c, float s) {
+        float d = az - c;
+        d = atan(sin(d), cos(d));
+        return exp(-(d * d) / (2.0 * s * s));
+      }
       void main() {
         vec2 p = vP * uHalf;
         vec2 q = abs(p) - (uHalf - vec2(uRadius));
@@ -146,17 +169,52 @@ export function makeGlassFill(c: SceneColors, halfW: number, halfH: number, radi
         // below it, never zero. Bottoming it out is what made the lane planes read from underneath
         // as an opaque dark wedge — physically a mirror, but a mirror of nothing.
         float room = mix(0.34, 1.0, smoothstep(-0.9, 0.85, R.y));
+        // THE RIG. The room above is smooth in azimuth, so it is the same reflection from every
+        // angle — which is exactly why the pane read as "gray transparent with a bright white edge".
+        // Three soft vertical boxes give the reflection FEATURES: on a floor a vertical softbox
+        // reflects as a streak fanning away from the eye, so orbiting sweeps them across the panes
+        // and the glass finally reads as a surface.
+        //
+        // ⚠️ THE CENTRES ARE NOT FREE — a floor reflects a NARROW azimuth band and a box outside it
+        // is invisible ink. On a level pane R.xz = -V.xz, so the band the floor actually samples is
+        // the camera→point direction reversed. MEASURED at the resting pose by writing the azimuth out as a
+        // colour and reading the pixels back: the global floor spans -1.90 (screen left) to -1.05
+        // (screen right), R.y 0.19-0.43. The first version of this rig placed boxes at
+        // 0.55 / 2.35 / -1.80 and only the last one clipped the edge of that — the term was live,
+        // correct, tuned, and contributed ~0.1 at its peak. Re-aim before re-weighting: measure the
+        // band, then put the boxes IN it. And measure the LEVEL the same way — a flat rig at 0.5
+        // saturates the pane to white, so the streaks live an order of magnitude below the knob's
+        // top and uEnv is a fine adjustment, not a fader.
+        float az = atan(R.z, R.x);
+        // Above the horizon is the rig; below it the ray is looking at the chamber's own paper
+        // ground, which the room term already answers. The ramp is soft and starts below zero because
+        // floor's own reflection only clears the horizon by ~0.15 rad at the back of the trail.
+        float sky = smoothstep(-0.30, 0.10, R.y);
+        float rig = uEnv * sky * (
+              softbox(az, -1.30, 0.034) * 0.85
+            + softbox(az, -1.53, 0.042) * 0.8
+            + softbox(az, -1.79, 0.055) * 0.9);
+        // THE MOVABLE HALF. A ShaderMaterial is unlit, but a light is only a POSITION and this one is
+        // handed in as exactly that (LedgerView.setSpot, from the app's one StageLight), so a real
+        // Blinn-Phong lobe is available here. uSpotI carries the light's own eased weight, so the
+        // whole term is 0 whenever nothing is staged — and it is never staged on the dark ground.
+        // The exponent is deliberately BROADER than the window's (a half-vector lobe needs ~4x an
+        // exponent for the same width, and this one wants to read as a pool of light on the floor
+        // rather than a pinpoint), so it lands near 1.5x and the pool spans a few slots.
+        vec3 L = normalize(uSpotPos - vWorld);
+        vec3 Hv = normalize(L + V);
+        float lobe = uSpotI * pow(max(dot(N, Hv), 0.0), uSpecPow * 1.5);
         float win = pow(max(dot(R, uLightDir), 0.0), uSpecPow);  // its window
         float pol = uEdgeA * band * band;                        // the polished rim
 
         // Reflectance is CAPPED below 1: real glass at grazing is a full mirror, and a full mirror
         // in the lane storey hides the tiles and ribbons the chamber exists to show. uRim is that
         // cap — the pane stays a pane you read the trail through.
-        float a = clamp(uBody + uRim * fres + uSpec * win + pol, 0.0, 1.0) * fade;
+        float a = clamp(uBody + uRim * fres + uSpec * win + lobe + rig * 0.5 + pol, 0.0, 1.0) * fade;
         if (a <= 0.002) discard;
         // uColor is the muted ink: a ray that reflects nothing above the horizon costs the ground a
-        // little, which is the transmission tint. Sky, window and rim lift it toward the room.
-        vec3 col = mix(uColor, vec3(1.0), clamp(uSky * room + uSpec * win + pol, 0.0, 1.0));
+        // little, which is the transmission tint. Sky, rig, window, lamp and rim lift it toward the room.
+        vec3 col = mix(uColor, vec3(1.0), clamp(uSky * room + rig + uSpec * win + lobe + pol, 0.0, 1.0));
         gl_FragColor = vec4(col, a);
       }`,
   });

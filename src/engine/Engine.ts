@@ -401,7 +401,7 @@ export class Engine {
     // SCENE map the hubs were born with, at construction, so nothing anywhere is built from a raw
     // config colour ("dag" included — its own brand hue, distinct from structural cyan; see
     // palette/identity.ts). refreshMeta below refreshes/extends both once the live set is known.
-    this.ledger = new LedgerView(this.ctx.scene, colors, this._sceneColorMap);
+    this.ledger = new LedgerView(this.ctx.scene, colors, this._sceneColorMap, this._stageLight);
     // The theme fan-out, in construction order. Each holds construction-time captures of one or
     // both palettes (materials, shader uniforms, baked vertex colours, canvas-texture labels);
     // everything else in the scene reads the mutated objects per frame and needs no call.
@@ -1804,7 +1804,7 @@ export class Engine {
     // The stage light's per-view PRESENCE, published BEFORE the view updates that claim it: a claim
     // is scaled by its view's furniture alpha, so a fading view's light fades with its furniture and
     // a dark view's claim is worth nothing. That is the whole off-switch — not claiming IS off.
-    this._stageLight.setPresence(hyperAlpha, this.transition.furnitureAlpha("geo"));
+    this._stageLight.setPresence(hyperAlpha, this.transition.furnitureAlpha("geo"), ledgerAlpha);
 
     this.globe.setMorph(this.morph);
     // Core-dim target: the DAG core fades back when a specific metagraph is the effective subject

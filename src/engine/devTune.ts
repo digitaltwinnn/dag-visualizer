@@ -170,6 +170,10 @@ export async function mountDevTune(targets: DevTuneTargets): Promise<DevTuneHand
         schema: GLASS_TUNE_SCHEMA,
         home: "scene/objects/SnapshotPlane.ts · GLASS_TUNE_DEFAULTS",
       },
+      // The day glass's MOVABLE highlight. The chamber claims the light on a light ground only, so
+      // this folder is inert under dark exactly as the one above it — it aims a reflection, not a
+      // beam (nothing in the chamber is lit by three.js).
+      spotGroup("ledger"),
     ],
   };
 

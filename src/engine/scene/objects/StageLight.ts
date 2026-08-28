@@ -22,7 +22,7 @@ export class StageLight {
   private _i = 0; // eased intensity
 
   // The frame's presence per view (furniture alpha) and its winning claim. Both allocated once.
-  private presence: Record<StagedView, number> = { hyper: 0, geo: 0 };
+  private presence: Record<StagedView, number> = { hyper: 0, geo: 0, ledger: 0 };
   private claimed: StagedView | null = null;
   private weight = 0;
   private readonly pos = new THREE.Vector3();
@@ -40,9 +40,10 @@ export class StageLight {
 
   /** The Engine calls this ONCE PER FRAME, BEFORE the view updates that claim — a claim scales by
    *  its view's presence, so a stale value would light a view that is fading out. */
-  setPresence(hyper: number, geo: number): void {
+  setPresence(hyper: number, geo: number, ledger: number): void {
     this.presence.hyper = hyper;
     this.presence.geo = geo;
+    this.presence.ledger = ledger;
   }
 
   /** Claim the light for this view's subject (both vectors WORLD space): lit `height` above it
