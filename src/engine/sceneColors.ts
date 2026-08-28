@@ -123,14 +123,25 @@ const _ground = new THREE.Color();
  * Dark keeps the pure multiply rather than lerping from `--background` too: the dark look is
  * byte-pinned, and a non-black ground would add a few percent of grey to every dimmed mark.
  *
+ * A LERP IS AN ALPHA COMPOSITE, SO IT MUST NAME WHAT THE MARK ACTUALLY LIES ON (2026-08-28).
+ * `lerp(ground, ink, s)` is exactly what compositing the ink at alpha `s` would paint — which is
+ * why this is the honest stand-in for transparency at a site that cannot BE transparent. But it
+ * only reads as thinning if the target is the mark's real backdrop. The ledger's lane tiles lie on
+ * a near-white glass PLANE while `c.bg` is the chamber's mid-silver ground, so fading them toward
+ * `c.bg` walked them toward a tone darker than their own surroundings: a dim tile turned into a
+ * grey smudge that lost its hue on the way, the exact "washed out" the user named. `onto` lets a
+ * caller name its own backdrop; it defaults to `c.bg` for the marks that really do hang over the
+ * chamber's ground (hyper's tethers). Dark ignores it — there the backdrop IS black, which is what
+ * the multiply already lerps toward.
+ *
  * The scratch is module-SCOPE, so this allocates nothing and is safe inside a frame body (rule 5,
  * noFrameAllocations): the ledger's lane tiles lerp per frame, while the ribbons and hyper's
  * tethers bake with it at event time. Presence carried by an OPACITY rather than a colour asks
  * the same question through `inkPresence` below.
  */
-export function inkMix(out: THREE.Color, s: number, c: SceneColors): THREE.Color {
+export function inkMix(out: THREE.Color, s: number, c: SceneColors, onto?: number): THREE.Color {
   if (!isLightGround(c)) return out.multiplyScalar(s);
-  _ground.setHex(c.bg);
+  _ground.setHex(onto ?? c.bg);
   out.r = _ground.r + (out.r - _ground.r) * s;
   out.g = _ground.g + (out.g - _ground.g) * s;
   out.b = _ground.b + (out.b - _ground.b) * s;

@@ -1223,7 +1223,18 @@ export class LedgerView implements SceneView {
         // OPAQUE and normal-blended, so on paper the same multiply drives them toward BLACK — the
         // dimmest tile would be the heaviest mark on the page. Presence there is a lerp toward the
         // paper instead. The `edge <= 0` zero-scale above still owns a fully dissolved row.
-        this._metaTrailMesh.setColorAt(mi, inkMix(_col.copy(ident ? laneColor : this._coreCol), bright, this._colors));
+        // ON PAPER THE PAPER IS THE PLANE, NOT THE CHAMBER'S GROUND (user, 2026-08-28: de-emphasis
+        // should read as transparency, "as opposed to making the colors look washed out"). A tile
+        // lies ON its metagraph's glass plane, so `c.panel` is what an alpha composite here would
+        // fall back to; `c.bg` is the mid-silver ground BELOW the chamber, darker than the plane, so
+        // fading toward it made a dim tile a grey smudge instead of a thin one. This is the tiles'
+        // whole answer to the transparency question: opaque + depthWrite is load-bearing here (pick
+        // blocking, occlusion), so they cannot go translucent — but a lerp toward the real backdrop
+        // paints exactly what translucency would, and keeps the tile's own hue the whole way down.
+        this._metaTrailMesh.setColorAt(
+          mi,
+          inkMix(_col.copy(ident ? laneColor : this._coreCol), bright, this._colors, this._colors.panel),
+        );
         mi++;
       }
     }
