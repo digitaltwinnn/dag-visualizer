@@ -22,6 +22,7 @@ import type { MetaNodeRecord, ValidatorRecord } from "../../domain/records";
 import type { ViewTransition } from "../../domain/viewTransition";
 import type { PickDescriptor } from "@/src/data/types";
 import { inkPresence, isLightGround, type SceneColors } from "../../sceneColors";
+import { joinBloom } from "../SceneContext";
 
 const Y_AXIS = new THREE.Vector3(0, 1, 0); // hex-prism axis (radial after _qRadial)
 // The ONE orb fresnel-rim shader tail (view-dependent rim so emissive spheres read as lit 3D
@@ -222,6 +223,7 @@ export class NodeFabric {
       mesh.frustumCulled = false; // instances span the whole scene; base bounds would mis-cull
       mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
       mesh.userData.picks = picks;
+      joinBloom(mesh); // the chips are identity marks — see BLOOM_LAYER
       this.nodeGroup.add(mesh);
       return mesh;
     };
@@ -283,6 +285,7 @@ export class NodeFabric {
       mesh.frustumCulled = false;
       mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
       mesh.userData.picks = picks;
+      joinBloom(mesh); // the chips are identity marks — see BLOOM_LAYER
       this.nodeGroup.add(mesh);
       return mesh;
     };

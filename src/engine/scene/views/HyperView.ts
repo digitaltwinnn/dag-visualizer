@@ -20,6 +20,7 @@ import { makeRadialGradientTexture } from "../objects/gradientTexture";
 import { glowBlend, inkMix, inkPresence, isLightGround, type SceneColors } from "../../sceneColors";
 import type { TuneSchema } from "../../tune";
 import type { SceneView } from "./SceneView";
+import { joinBloom } from "../SceneContext";
 
 const _pos = new THREE.Vector3(); // scratch for hub orbit positions (reused each frame)
 const _tcol = new THREE.Color(); // scratch for the tether colour bake (event-time, reused)
@@ -297,6 +298,7 @@ export class HyperView implements SceneView {
     });
     applyOrbFresnel(mat);
     this.core = new THREE.Mesh(HUB_ORB, mat);
+    joinBloom(this.core); // one node model: the core glows like any hub — see BLOOM_LAYER
     this.core.userData.pick = {
       kind: "core",
       title: "Global L0 — the Hypergraph core",
@@ -351,6 +353,7 @@ export class HyperView implements SceneView {
       });
       applyOrbFresnel(hubMat);
       const hub = new THREE.Mesh(HUB_ORB, hubMat);
+      joinBloom(hub);
       hub.userData.pick = { kind: "meta", cfg, title: cfg.name, sub: `Metagraph · ${cfg.ticker}` };
       group.add(hub);
       this.pickables.push(hub);

@@ -16,6 +16,7 @@ import { type Band, type BarSpec } from "../../domain/ledgerBands";
 import { SLOT_SP, SLOT_N, horizonAt, frontAt, rowOnChamber } from "../../domain/ledgerModel";
 import { snapBright, snapFocusOf, emphasisK } from "../../domain/dimModel";
 import type { TuneSchema } from "../../tune";
+import { joinBloom } from "../SceneContext";
 
 const BANDS_PER_SLOT = METAGRAPHS.length + 1;
 
@@ -123,6 +124,7 @@ export class ByteBar {
         const mesh = new THREE.Mesh(this._geo, mat);
         mesh.scale.set(0, 0, 0);
         mesh.visible = false;
+        joinBloom(mesh); // a band is the tick's own ink — see BLOOM_LAYER
         this.group.add(mesh);
         bands.push(mesh);
         mats.push(mat);

@@ -84,6 +84,7 @@ import type { StageLight } from "../objects/StageLight";
 import { STAGE_LIGHTS } from "../../domain/stageLight";
 import { FadeSet } from "../objects/FadeSet";
 import type { SceneView } from "./SceneView";
+import { joinBloom } from "../SceneContext";
 import type { TuneSchema } from "../../tune";
 
 const META_TRAIL_MAX = 1500;
@@ -356,6 +357,7 @@ export class LedgerView implements SceneView {
       new THREE.MeshBasicMaterial({}),
       META_TRAIL_MAX,
     );
+    joinBloom(this._metaTrailMesh); // the lane tiles are the trail's identity marks — see BLOOM_LAYER
     this._metaTrailMesh.frustumCulled = false;
     this._metaTrailMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
     for (let i = 0; i < META_TRAIL_MAX; i++) this._metaTrailMesh.setColorAt(i, _col.set(0xffffff));
