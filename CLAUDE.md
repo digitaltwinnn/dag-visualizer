@@ -1804,10 +1804,38 @@ the failure is silent — a material that forgets to ask still renders, still re
 cannot be seen. Found live on the geo globe and the ledger's ribbons, which vanished entirely
 under light.
 
+⚠️ **BLOOM IS THE SAME QUESTION, AND ON PAPER THE ANSWER IS A SECOND LAYER.**
+`UnrealBloomPass` is a luminance highpass over the FINISHED frame, so it can only ever select
+what is BRIGHTER than its surroundings — and on paper an identity mark is INK (a DOR band sits
+at ~0.42 relative luminance against the 0.72-L ground). No threshold reaches it, which is why
+`LIGHT_TUNE.bloomMul` is **0**: the whole-frame pass is skipped outright on light (Engine's
+`bloom.enabled = _bloomMul > 0`), and all it did there was blow the one place light DID clear it
+— the lead bar, the ribbon foot — to white. `bloomFloor` is inert while that is 0. The marks get
+their own layer instead (`BLOOM_LAYER` + `joinBloom()`, `scene/SceneContext.ts`): on a paper frame
+the camera is narrowed to that layer alone, the background nulled, and the members rendered into a
+half-res target with its own black clear, blurred, and mixed in before `OutputPass`. **Membership
+is the emissive identity MARKS and nothing else** — byte-bar bands, lane tiles, the LiveEdge, node
+chips, hub orbs (the core included, one node model); never the glass, the backdrop or the labels,
+which are the ground the halo is measured against. Three things are load-bearing and each fails
+silently: `layers` is **per-object, not inherited** (tag the mesh, never its group), `joinBloom`
+only ENABLES layer 1 so a member still renders on layer 0 exactly as before, and the sub-pass must
+**null `scene.background`** or the backdrop fills the target and every pixel clears the threshold.
+The **camera layer-mask** variant is chosen over the official darken-non-bloom-materials recipe
+because it is the only one that works with `InstancedMesh` — each instance contributes in
+proportion to its own instance colour, so the emphasis system does the selection WITHIN a member
+mesh — at the cost of occlusion (a mark behind glass still halos), accepted because the planes are
+translucent and the paper halo is faint.
+⚠️ **And the composite's primary term is a MULTIPLY, not an add** — the ground question one level
+up. Paper is L 0.72 and the chamber glass sits within ~12/255 of it, so light added there clips to
+white; `bleed` multiplies the ground toward the mark's own hue, which can only darken and tint,
+keeps the ground's level and vignette underneath, and cannot blow out. `glow` is a whisper beside
+it (0.06). Extends the backdrop rule: **on paper, emphasis is separation you take AWAY, not light
+you add.** Dark is untouched by construction — the sub-composer is built lazily on the first paper
+frame, and both knobs at zero skip the sub-pipeline rather than neutralising it.
+
 **Sub-project 2 (per-view day-look refinement) is open.** Byte-identity against master is pinned
-for dark; light is correct at the token and page level but each 3D view's own look under light
-(bloom, glass, ribbon contrast) has not had its own tuning pass — the ledger chamber in
-particular reads washed out under light today.
+for dark. Light now has its own bloom (above), backdrop, glass and ink-emphasis passes; what is
+still untuned is geo under light — the globe's own day look has had no pass of its own.
 
 ## Data — server-side routes
 
