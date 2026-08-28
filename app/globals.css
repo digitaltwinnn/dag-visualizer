@@ -490,7 +490,7 @@
      deeper grey than the page so ink pops, marks can exceed the ground, and a calm bloom is
      physically possible again. The HUD page keeps --background's paper; dark side is
      --background's dark verbatim, so the dark scene is byte-identical. */
-  --scene-ground: light-dark(oklch(0.68 0.016 265), oklch(0.09 0.02 265));
+  --scene-ground: light-dark(oklch(0.72 0.014 265), oklch(0.09 0.02 265)); /* lightened 0.68 → 0.72 (user, 2026-08-28); keep LIGHT_TUNE.groundL in sync */
   --foreground: light-dark(oklch(0.21 0.035 265), oklch(0.94 0.02 255));       /* #e8eefc text (dark) */
   --muted-foreground: light-dark(oklch(0.44 0.035 265), oklch(0.66 0.04 265)); /* #8a96b8 muted (dark) */
 
