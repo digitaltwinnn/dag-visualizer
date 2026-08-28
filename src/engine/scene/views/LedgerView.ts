@@ -146,15 +146,25 @@ export type TilePickResolver = (metaId: string, tickTs: string, k: number) => Pi
  *  chips in the trays answer to. */
 export interface TileTune {
   rest: number; // a resting filled tile
+  // ── THE HUE FLOOR, on paper only. A tile cannot be transparent (opaque + depthWrite is what makes
+  // it a pick blocker), so its presence is a lerp toward the glass it lies on — and a lerp that runs
+  // all the way to the backdrop arrives with no hue left. That is the neutral trail reading as blank
+  // lozenges (user, 2026-08-28: "the snapshots in the trail are white"). The floor is how far a
+  // de-emphasized tile is allowed to thin before it stops being a MARK: the emphasis term is mapped
+  // into [ink, 1], so a resting tile still states its tint on the glass while the span above it keeps
+  // its order. Applied to the EMPHASIS alone — the horizon, front and entry ramps are geometry and a
+  // fully dissolved row still zero-scales.
+  ink: number;
 }
 
 // rest user-tuned via ?tune, 2026-08-07. (`hot` retired 2026-08-11 — it was exactly the ledger
 // row's `boost`, and a snapshot is data, so it takes the node's focus knob instead.)
-export const TILE_TUNE_DEFAULTS: TileTune = { rest: 0.1 };
+export const TILE_TUNE_DEFAULTS: TileTune = { rest: 0.1, ink: 0.3 };
 
 /** The `?tune` knob ranges (contract: src/engine/tune.ts), colocated with the numbers they bound. */
 export const TILE_TUNE_SCHEMA: TuneSchema<TileTune> = {
   rest: { min: 0, max: 2, step: 0.05 },
+  ink: { min: 0, max: 0.8, step: 0.02, label: "hue floor (light)" },
 };
 
 // The view-entry drop's shape (see the VIEW-ENTRY DROP note in the class): fall height and
@@ -1126,6 +1136,7 @@ export class LedgerView implements SceneView {
     // Hoisted per frame (the tune hoist rule): one read for every lane's every tile.
     const dimNet = this._netDimKey();
     const tileRest = this.tiles.rest;
+    const tileInk = this.tiles.ink;
     // A focus is a SELECTED row (pinned or live-followed — how it was reached is not what it is),
     // a hovered row or a hovered tile. The bare lead is none of them: with nothing selected the
     // chamber is simply running, and stepping the whole trail back against a row it advanced onto
@@ -1212,11 +1223,12 @@ export class LedgerView implements SceneView {
         // one level; compounding dim × back left the endpoints near-black under their own ribbon.
         const rowFocus = pinned || hov;
         const entryF = this._entryT < 1 && b.slot >= 0 && b.slot < SLOT_N ? this._entryFade[b.slot] : 1;
-        const brightT =
-          // `tileRest` is the curve's REFERENCE on paper — the tiles' own resting weight, taken
-          // UNFADED so `b.fade` reads as the ratio it is rather than moving the reference itself.
-          inkPresence(snapBright(tileRest * b.fade, offNet, focus, anyFocus && !rowFocus), this._paper, tileRest)
-          * edge * this._fades.alpha * entryF;
+        // `tileRest` is the curve's REFERENCE on paper — the tiles' own resting weight, taken
+        // UNFADED so `b.fade` reads as the ratio it is rather than moving the reference itself.
+        const emph = inkPresence(snapBright(tileRest * b.fade, offNet, focus, anyFocus && !rowFocus), this._paper, tileRest);
+        // The hue floor (TileTune.ink) maps the emphasis into [ink, 1] on paper — affine, so the
+        // tier ORDER above it is untouched and only the bottom of the span is lifted off the glass.
+        const brightT = (this._paper ? tileInk + (1 - tileInk) * emph : emph) * edge * this._fades.alpha * entryF;
         // Emphasis EASES rather than snapping (dimModel.emphasisK). The state rides the BLOCK, next
         // to its two other eased fields — an instance-index buffer would hand a block's brightness
         // to its neighbour every tick, since a new tick shifts every block one slot along.
@@ -1225,18 +1237,15 @@ export class LedgerView implements SceneView {
         // OPAQUE and normal-blended, so on paper the same multiply drives them toward BLACK — the
         // dimmest tile would be the heaviest mark on the page. Presence there is a lerp toward the
         // paper instead. The `edge <= 0` zero-scale above still owns a fully dissolved row.
-        // ON PAPER THE PAPER IS THE PLANE, NOT THE CHAMBER'S GROUND (user, 2026-08-28: de-emphasis
-        // should read as transparency, "as opposed to making the colors look washed out"). A tile
-        // lies ON its metagraph's glass plane, so `c.panel` is what an alpha composite here would
-        // fall back to; `c.bg` is the mid-silver ground BELOW the chamber, darker than the plane, so
-        // fading toward it made a dim tile a grey smudge instead of a thin one. This is the tiles'
-        // whole answer to the transparency question: opaque + depthWrite is load-bearing here (pick
-        // blocking, occlusion), so they cannot go translucent — but a lerp toward the real backdrop
-        // paints exactly what translucency would, and keeps the tile's own hue the whole way down.
-        this._metaTrailMesh.setColorAt(
-          mi,
-          inkMix(_col.copy(ident ? laneColor : this._coreCol), bright, this._colors, this._colors.panel),
-        );
+        // THE BACKDROP IS MEASURED, NOT NAMED (2026-08-28). A pass at this pointed the lerp at
+        // `c.panel` on the reasoning that a tile lies on a "near-white glass PLANE" — sampled live,
+        // the plane's channels sample in the high 170s to low 190s while `c.panel` is 251, so the target
+        // overshot the real backdrop by ~70/255 and every de-emphasized tile arrived BRIGHTER than the glass it
+        // was supposed to sink into (user: "the snapshots in the trail are white"). The plane sits
+        // within ~12/255 of `c.bg`, so the scene's own ground is the honest backdrop to measuring
+        // accuracy; what was actually missing is hue at the bottom of the span, which is TileTune.ink
+        // above. Thin toward the ground, floor the tint — the two answer different halves.
+        this._metaTrailMesh.setColorAt(mi, inkMix(_col.copy(ident ? laneColor : this._coreCol), bright, this._colors));
         mi++;
       }
     }

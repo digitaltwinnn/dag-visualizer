@@ -125,23 +125,26 @@ const _ground = new THREE.Color();
  *
  * A LERP IS AN ALPHA COMPOSITE, SO IT MUST NAME WHAT THE MARK ACTUALLY LIES ON (2026-08-28).
  * `lerp(ground, ink, s)` is exactly what compositing the ink at alpha `s` would paint — which is
- * why this is the honest stand-in for transparency at a site that cannot BE transparent. But it
- * only reads as thinning if the target is the mark's real backdrop. The ledger's lane tiles lie on
- * a near-white glass PLANE while `c.bg` is the chamber's mid-silver ground, so fading them toward
- * `c.bg` walked them toward a tone darker than their own surroundings: a dim tile turned into a
- * grey smudge that lost its hue on the way, the exact "washed out" the user named. `onto` lets a
- * caller name its own backdrop; it defaults to `c.bg` for the marks that really do hang over the
- * chamber's ground (hyper's tethers). Dark ignores it — there the backdrop IS black, which is what
- * the multiply already lerps toward.
+ * why this is the honest stand-in for transparency at a site that cannot BE transparent. The
+ * chamber's ground is what every one of these marks lies on, INCLUDING the ledger's lane tiles: a
+ * pass that pointed those at `c.panel` instead, reasoning that a tile lies on a "near-white glass
+ * PLANE", was measured wrong — sampled live the plane's channels land in the high 170s to low 190s
+ * against `c.panel`'s 251, so a thinning tile arrived brighter than its own backdrop and read as a white
+ * lozenge. The plane sits within ~12/255 of `c.bg`, so one target serves every site and there is no
+ * per-caller backdrop to keep in step. Dark ignores the question — there the backdrop IS black,
+ * which is what the multiply already lerps toward.
+ *
+ * A mark that loses its HUE on the way down is a different defect and takes a different fix: floor
+ * the caller's own emphasis term (the tiles' `TileTune.ink`), never the target.
  *
  * The scratch is module-SCOPE, so this allocates nothing and is safe inside a frame body (rule 5,
  * noFrameAllocations): the ledger's lane tiles lerp per frame, while the ribbons and hyper's
  * tethers bake with it at event time. Presence carried by an OPACITY rather than a colour asks
  * the same question through `inkPresence` below.
  */
-export function inkMix(out: THREE.Color, s: number, c: SceneColors, onto?: number): THREE.Color {
+export function inkMix(out: THREE.Color, s: number, c: SceneColors): THREE.Color {
   if (!isLightGround(c)) return out.multiplyScalar(s);
-  _ground.setHex(onto ?? c.bg);
+  _ground.setHex(c.bg);
   out.r = _ground.r + (out.r - _ground.r) * s;
   out.g = _ground.g + (out.g - _ground.g) * s;
   out.b = _ground.b + (out.b - _ground.b) * s;
