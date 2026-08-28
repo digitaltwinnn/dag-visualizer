@@ -74,8 +74,8 @@ export const GLASS_TUNE_DEFAULTS: Readonly<GlassTune> = Object.freeze({
   // under a committed filter: the polished edge was the hot term (0.32 → 0.08), rim and the
   // reflection lobes came down a step — and the TRAYS came UP (0.12 → 0.42): with the planes
   // calmed, the trays finally earn real presence.
-  body: 0.095, sky: 0.43, rim: 0.3, spec: 0.5, specPow: 19, edge: 0.08, env: 0.4, trayBody: 0.42,
-  laneBody: 2.2, laneTint: 0.42,
+  body: 0.11, sky: 0.43, rim: 0.3, spec: 0.5, specPow: 19, edge: 0.08, env: 0.38, trayBody: 0.42,
+  laneBody: 1.75, laneTint: 0.8,
 });
 /** The live struct the `?tune` panel binds; DEFAULTS above is the shipped look and what tests pin. */
 export const GLASS_TUNE: GlassTune = { ...GLASS_TUNE_DEFAULTS };
