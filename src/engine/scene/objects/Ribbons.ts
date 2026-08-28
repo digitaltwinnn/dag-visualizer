@@ -103,7 +103,13 @@ export class Ribbons {
     this._neutral = colors.core;
     const verts = RIBBON_ROWS * PER_ROW * VERTS_PER_RIBBON;
     this._pos = new THREE.Float32BufferAttribute(new Float32Array(verts * 3), 3);
-    this._col = new THREE.Float32BufferAttribute(new Float32Array(verts * 3), 3);
+    // itemSize 4: the 4th component is PER-VERTEX ALPHA (three's USE_COLOR_ALPHA path). It
+    // exists for the paper ground alone — the trail's front/horizon fade must ride ALPHA there,
+    // because a colour faded toward the paper at full material opacity is still a milky sheet
+    // hanging over the chamber (user, 2026-08-28: "a transparent ribbon sitting in front of my
+    // snapshot panels"). On dark it stays 1 everywhere and the colour multiply does the fading,
+    // exactly as before — byte-identical.
+    this._col = new THREE.Float32BufferAttribute(new Float32Array(verts * 4), 4);
     this._pos.setUsage(THREE.DynamicDrawUsage);
     this._col.setUsage(THREE.DynamicDrawUsage);
     this._geo.setAttribute("position", this._pos);
@@ -216,9 +222,9 @@ export class Ribbons {
     const c = this._col.array as Float32Array;
     const { curve, brightness } = this.tune;
     let v = 0;
-    const push = (x: number, z: number, y: number, r: number, g: number, b: number) => {
+    const push = (x: number, z: number, y: number, r: number, g: number, b: number, a: number) => {
       p[v * 3] = x; p[v * 3 + 1] = y; p[v * 3 + 2] = z;
-      c[v * 3] = r; c[v * 3 + 1] = g; c[v * 3 + 2] = b;
+      c[v * 4] = r; c[v * 4 + 1] = g; c[v * 4 + 2] = b; c[v * 4 + 3] = a;
       v++;
     };
     for (let r = 0; r < RIBBON_ROWS; r++) {
@@ -241,19 +247,24 @@ export class Ribbons {
         // multiplicative in `base`, so dark is byte-identical. `brightness` is also the curve's
         // REFERENCE — a ribbon rests at 0.85, so without it the paper gamma read an off-filter
         // sheet at 95% of a resting one and the filter's whole answer vanished.
-        const sc = inkPresence(snapBright(brightness, off), this._paper, brightness) * rowFade;
-        // Presence toward the GROUND, not toward black — on paper a multiply would make the
-        // dimmest sheet the darkest mark in the chamber and invert the dim tiers (see inkMix).
+        const emph = inkPresence(snapBright(brightness, off), this._paper, brightness);
+        // The GEOMETRIC fade (front/horizon boundary) splits by ground: on dark it multiplies the
+        // colour exactly as it always did (toward black = invisible under additive — byte-identical);
+        // on paper a colour fade lands on the PAPER tone at full opacity — a milky ghost sheet over
+        // the chamber — so there the fade rides the vertex ALPHA and the colour keeps only the
+        // EMPHASIS term (inkMix keeps the dim tiers reading toward the ground, not toward black).
+        const sc = this._paper ? emph : emph * rowFade;
         inkMix(this._c, sc, this._colors);
         const cr = this._c.r, cg = this._c.g, cb = this._c.b;
+        const ca = this._paper ? rowFade : 1;
         for (let j = 0; j < RIBBON_SEG; j++) {
           const t0 = j / RIBBON_SEG, t1 = (j + 1) / RIBBON_SEG;
           const s0 = sweep(t0, curve), s1 = sweep(t1, curve);
           const y0 = yTop + (yBot - yTop) * t0, y1 = yTop + (yBot - yTop) * t1;
           const l0 = q.topZ0 + (q.botZ0 - q.topZ0) * s0, r0 = q.topZ1 + (q.botZ1 - q.topZ1) * s0;
           const l1 = q.topZ0 + (q.botZ0 - q.topZ0) * s1, r1 = q.topZ1 + (q.botZ1 - q.topZ1) * s1;
-          push(x, l0, y0, cr, cg, cb); push(x, r0, y0, cr, cg, cb); push(x, r1, y1, cr, cg, cb);
-          push(x, l0, y0, cr, cg, cb); push(x, r1, y1, cr, cg, cb); push(x, l1, y1, cr, cg, cb);
+          push(x, l0, y0, cr, cg, cb, ca); push(x, r0, y0, cr, cg, cb, ca); push(x, r1, y1, cr, cg, cb, ca);
+          push(x, l0, y0, cr, cg, cb, ca); push(x, r1, y1, cr, cg, cb, ca); push(x, l1, y1, cr, cg, cb, ca);
         }
       }
     }
