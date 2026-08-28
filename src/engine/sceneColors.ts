@@ -194,7 +194,7 @@ export const LIGHT_TUNE_DEFAULTS: Readonly<LightTune> = Object.freeze({
   // and a full-res pass off the light path both. `bloomFloor` is inert while this is 0 — it shapes
   // that pass's threshold alone — and stays as the lever if the whole-frame look is ever wanted back.
   bloomMul: 0, bloomFloor: 0.5,
-  selBleed: 0.85, selGlow: 0.06, selRadius: 0.6,
+  selBleed: 0.45, selGlow: 0.04, selRadius: 0.55, // pulled 0.85/0.06/0.6 (user, 2026-08-28: 'blooms too much, more subtle')
   bgTint: 1, bgGrid: 0.07,
 });
 export const LIGHT_TUNE: LightTune = { ...LIGHT_TUNE_DEFAULTS };
