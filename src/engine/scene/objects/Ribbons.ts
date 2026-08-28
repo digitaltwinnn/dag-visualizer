@@ -104,11 +104,12 @@ export class Ribbons {
     const verts = RIBBON_ROWS * PER_ROW * VERTS_PER_RIBBON;
     this._pos = new THREE.Float32BufferAttribute(new Float32Array(verts * 3), 3);
     // itemSize 4: the 4th component is PER-VERTEX ALPHA (three's USE_COLOR_ALPHA path). It
-    // exists for the paper ground alone — the trail's front/horizon fade must ride ALPHA there,
-    // because a colour faded toward the paper at full material opacity is still a milky sheet
-    // hanging over the chamber (user, 2026-08-28: "a transparent ribbon sitting in front of my
-    // snapshot panels"). On dark it stays 1 everywhere and the colour multiply does the fading,
-    // exactly as before — byte-identical.
+    // exists for the paper ground alone — on paper BOTH the trail's front/horizon fade and the
+    // emphasis dim ride ALPHA there, because a colour faded toward the paper at full material
+    // opacity is still a milky sheet hanging over the chamber (user, 2026-08-28: "a transparent
+    // ribbon sitting in front of my snapshot panels", then "should we focus more on transparency
+    // as opposed to making the colors look washed out"). On dark it stays 1 everywhere and the
+    // colour multiply does the fading, exactly as before — byte-identical.
     this._col = new THREE.Float32BufferAttribute(new Float32Array(verts * 4), 4);
     this._pos.setUsage(THREE.DynamicDrawUsage);
     this._col.setUsage(THREE.DynamicDrawUsage);
@@ -248,15 +249,17 @@ export class Ribbons {
         // REFERENCE — a ribbon rests at 0.85, so without it the paper gamma read an off-filter
         // sheet at 95% of a resting one and the filter's whole answer vanished.
         const emph = inkPresence(snapBright(brightness, off), this._paper, brightness);
-        // The GEOMETRIC fade (front/horizon boundary) splits by ground: on dark it multiplies the
-        // colour exactly as it always did (toward black = invisible under additive — byte-identical);
-        // on paper a colour fade lands on the PAPER tone at full opacity — a milky ghost sheet over
-        // the chamber — so there the fade rides the vertex ALPHA and the colour keeps only the
-        // EMPHASIS term (inkMix keeps the dim tiers reading toward the ground, not toward black).
-        const sc = this._paper ? emph : emph * rowFade;
-        inkMix(this._c, sc, this._colors);
+        // ON PAPER, DE-EMPHASIS RIDES OPACITY (user, 2026-08-28: "should we focus more on
+        // transparency as opposed to making the colors look washed out"). c9b3ffc moved the
+        // GEOMETRIC fade onto alpha for exactly this reason; the EMPHASIS term now follows it.
+        // A colour lerped toward the paper still paints an OPAQUE milky sheet — over the glass
+        // planes and over everything behind them — so an off-filter ribbon read as bleached
+        // rather than as itself, fainter. Ink keeps its full hue and saturation; presence and
+        // the boundary ramp both ride the vertex ALPHA. On dark both stay in the colour multiply
+        // (toward black = invisible under additive), byte-identical.
+        if (!this._paper) inkMix(this._c, emph * rowFade, this._colors);
         const cr = this._c.r, cg = this._c.g, cb = this._c.b;
-        const ca = this._paper ? rowFade : 1;
+        const ca = this._paper ? emph * rowFade : 1;
         for (let j = 0; j < RIBBON_SEG; j++) {
           const t0 = j / RIBBON_SEG, t1 = (j + 1) / RIBBON_SEG;
           const s0 = sweep(t0, curve), s1 = sweep(t1, curve);
