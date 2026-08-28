@@ -8,7 +8,7 @@ import { RenderPass } from "three/addons/postprocessing/RenderPass.js";
 import { UnrealBloomPass } from "three/addons/postprocessing/UnrealBloomPass.js";
 import { BokehPass, type BokehPassParameters } from "three/addons/postprocessing/BokehPass.js";
 import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
-import { isLightGround, type SceneColors } from "../sceneColors";
+import { isLightGround, LIGHT_TUNE, type SceneColors } from "../sceneColors";
 
 // @types/three types BokehPass.uniforms as a bare `object`; the engine reads
 // uniforms.focus/maxblur .value, so refine just those.
@@ -199,8 +199,12 @@ export function createScene(canvas: HTMLCanvasElement, colors: SceneColors): Sce
   // The drift vector above, applied per channel at strength k.
   const coolDrift = [1 - 0.026, 1, 1 + 0.049];
   function paperBackdrop(bg: number): THREE.CanvasTexture {
+    // 1024, not the 512 this started at: the GRID below is a ONE-TEXEL line and the backdrop
+    // renders screen-stretched, so the texel size IS the line weight. At 512 a hairline arrives
+    // ~6px wide on a 1600px frame, which is a drawn rule rather than paper.
+    const S = 1024;
     const cv = document.createElement("canvas");
-    cv.width = cv.height = 512;
+    cv.width = cv.height = S;
     const g = cv.getContext("2d")!;
     // Scale the sRGB BYTES, not THREE.Color channels — those are linear, and a linear value
     // drawn into a 2D canvas as if it were sRGB shifts the paper's near-neutral hue visibly
@@ -208,7 +212,7 @@ export function createScene(canvas: HTMLCanvasElement, colors: SceneColors): Sce
     // `m` is the level on the paper, `k` how far the stop has settled into its own hue.
     const hex = (m: number, k = 0) =>
       "#" + [(bg >> 16) & 255, (bg >> 8) & 255, bg & 255]
-        .map((u, i) => Math.round(Math.min(255, u * m * (1 + (coolDrift[i] - 1) * k)))
+        .map((u, i) => Math.round(Math.min(255, u * m * (1 + (coolDrift[i] - 1) * k * LIGHT_TUNE.bgTint)))
           .toString(16).padStart(2, "0")).join("");
 
     // ⚠️ THE RANGE IS SPENT DOWNWARD, BECAUSE PAPER HAS ALMOST NO HEADROOM ABOVE IT. The paper
@@ -219,34 +223,83 @@ export function createScene(canvas: HTMLCanvasElement, colors: SceneColors): Sce
     //
     // The level is therefore anchored at MID-FRAME, not at the area mean: a cyclorama is lit for
     // the subject, and the instruments stand in the middle band. Composite there is 0.976 — the
-    // ground level the user tuned, held to within 2.4% — while the frame falls to 0.79 at the
-    // bottom corners, a 1.32× top-to-corner range.
+    // ground level the user tuned — while the frame falls away below and to the corners.
     //
     // 1. The sweep. Measured on the flat-vignette cut (user: "I don't see it"): 1.5%/−6% over a
-    // screen-stretched 512px canvas lands under JPEG noise, so the range has to be this wide to
-    // read at all. Top is a touch above the paper — the lit edge of the cyc — and the knee sits
-    // at 0.72 because the instruments' own footprint starts around there.
-    const sweep = g.createLinearGradient(0, 0, 0, 512);
-    sweep.addColorStop(0, hex(1.045));
-    sweep.addColorStop(0.40, hex(1, 0.2));
-    sweep.addColorStop(0.72, hex(0.93, 0.65));
-    sweep.addColorStop(1, hex(0.86, 1));
+    // screen-stretched canvas lands under JPEG noise, so the range has to be this wide to read at
+    // all. The knee sits at 0.72 because the instruments' own footprint starts around there.
+    //
+    // ⚠️ THE TOP STOP BUYS HUE WITH LEVEL, BECAUSE THE CEILING ALLOWS NOTHING ELSE (user,
+    // 2026-08-26: "the gray looks boring"). The cool drift RAISES blue, so at the old 1.045 any
+    // drift at all clipped — which is exactly why the brightest, largest part of the frame was
+    // the one part with no hue in it, and why the whole thing read grey. Dropping the top to 1.02
+    // opens room for k = 0.4 there; the eye reads the tint, not the 2% of level it cost. The two
+    // MIDDLE stops keep their levels untouched — the mid-frame anchor above is measured through
+    // them — and only their k rises, so the frame gains colour without moving the ground the user
+    // tuned. The bottom is where the range is genuinely spent: deeper (0.82) and fully drifted, so
+    // the lower third settles into depth instead of into grey.
+    const sweep = g.createLinearGradient(0, 0, 0, S);
+    sweep.addColorStop(0, hex(1.02, 0.4));
+    sweep.addColorStop(0.40, hex(1, 0.55));
+    sweep.addColorStop(0.72, hex(0.93, 0.9));
+    sweep.addColorStop(1, hex(0.82, 1.35));
     g.fillStyle = sweep;
-    g.fillRect(0, 0, 512, 512);
+    g.fillRect(0, 0, S, S);
 
     // 2. The fall-off, multiplied so it only ever takes light away — the sweep alone owns the
-    // levels, and a second additive pass would fight it for the top end. Centred high (y 170)
+    // levels, and a second additive pass would fight it for the top end. Centred high (y 0.332)
     // so the brightest point of the wall is where the key light lands, not the middle of the
     // frame. Greys are neutral on purpose: the hue is the sweep's business. The outer stop is
     // what makes the pass earn its place: at #ebebeb the corners sat 2 levels under mid-frame,
     // measured — a fall-off nobody could see is just a slower fill.
-    const fall = g.createRadialGradient(256, 170, 60, 256, 170, 500);
+    const fall = g.createRadialGradient(S / 2, S * 0.332, S * 0.117, S / 2, S * 0.332, S * 0.977);
     fall.addColorStop(0, "#ffffff");
     fall.addColorStop(0.5, "#fbfbfb");
     fall.addColorStop(1, "#e0e0e0");
     g.globalCompositeOperation = "multiply";
     g.fillStyle = fall;
-    g.fillRect(0, 0, 512, 512);
+    g.fillRect(0, 0, S, S);
+
+    // 3. THE ENGINEERING-PAPER GRID — the app's own blueprint idiom (components/Blueprint.tsx)
+    // brought to the backdrop, because a lit wall with no structure in it is still a wall you
+    // look THROUGH rather than a surface the instruments stand on. Three rules keep it from
+    // becoming a pattern you look AT:
+    //   - it is a MULTIPLY at a few percent, so it can only ever take light away and the sweep
+    //     keeps owning the levels;
+    //   - it is masked to an ANNULUS around the subject: transparent under the middle, where the
+    //     instruments stand and where it must never fight the trail's own dotted label columns,
+    //     and gone again before the corners, where the fall-off has already taken the ground —
+    //     so the grid is only ever visible on the empty wall between the two;
+    //   - the cell is square ON SCREEN, not on the canvas. The backdrop stretches to fill, so a
+    //     square canvas cell arrives as a widescreen one; the horizontal pitch carries the live
+    //     aspect to cancel that. (It is baked, so a later window resize skews the cells until the
+    //     next theme flip — the same approximation the vignette's own circle already makes.)
+    if (LIGHT_TUNE.bgGrid > 0) {
+      const grid = document.createElement("canvas");
+      grid.width = grid.height = S;
+      const gg = grid.getContext("2d")!;
+      const aspect = Math.min(3, Math.max(0.5, window.innerWidth / Math.max(1, window.innerHeight)));
+      const pitchY = S / 9;
+      const pitchX = pitchY / aspect;
+      gg.strokeStyle = "#000";
+      gg.lineWidth = 1;
+      gg.beginPath();
+      // The half-texel offset is what keeps a 1px stroke ON one texel instead of split across two.
+      for (let x = pitchX; x < S; x += pitchX) { gg.moveTo(Math.round(x) + 0.5, 0); gg.lineTo(Math.round(x) + 0.5, S); }
+      for (let y = pitchY; y < S; y += pitchY) { gg.moveTo(0, Math.round(y) + 0.5); gg.lineTo(S, Math.round(y) + 0.5); }
+      gg.stroke();
+      const a = LIGHT_TUNE.bgGrid;
+      const ring = gg.createRadialGradient(S / 2, S * 0.52, 0, S / 2, S * 0.52, S * 0.62);
+      ring.addColorStop(0, "rgba(0,0,0,0)");
+      ring.addColorStop(0.42, `rgba(0,0,0,${a})`);
+      ring.addColorStop(0.74, `rgba(0,0,0,${a})`);
+      ring.addColorStop(1, "rgba(0,0,0,0)");
+      gg.globalCompositeOperation = "destination-in"; // dest alpha *= source alpha — the mask
+      gg.fillStyle = ring;
+      gg.fillRect(0, 0, S, S);
+      g.globalCompositeOperation = "multiply";
+      g.drawImage(grid, 0, 0);
+    }
 
     const tex = new THREE.CanvasTexture(cv);
     tex.colorSpace = THREE.SRGBColorSpace;

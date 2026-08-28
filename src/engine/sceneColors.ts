@@ -156,11 +156,17 @@ export interface LightTune {
   inkLift: number; //  how much of the headroom above rest a focus claims
   bloomMul: number; // light bloom strength as a fraction of the view policy's
   bloomFloor: number; // minimum bloom threshold on light, so the ground never halos
+  // The studio backdrop (scene/SceneContext.ts · paperBackdrop). Both are BAKED into a canvas at
+  // event time, not read per frame — the "light look" group's onChange already ends in
+  // refreshTheme(), which re-applies the background, so an edit rebuilds the texture for free.
+  bgTint: number;  // how far the sweep settles into its cool hue — 1 is the shipped ramp, 0 grey
+  bgGrid: number;  // the backdrop grid's peak ink — 0 is a plain lit wall, no grid drawn
 }
 export const LIGHT_TUNE_DEFAULTS: Readonly<LightTune> = Object.freeze({
   laneL: 0.51, laneC: 0.28, groundL: 0.66,
   inkGamma: 0.15, inkDimG: 0.8, inkLift: 0.6,
   bloomMul: 0.4, bloomFloor: 0.5,
+  bgTint: 1, bgGrid: 0.07,
 });
 export const LIGHT_TUNE: LightTune = { ...LIGHT_TUNE_DEFAULTS };
 export const LIGHT_TUNE_SCHEMA: import("./tune").TuneSchema<LightTune> = {
@@ -172,6 +178,8 @@ export const LIGHT_TUNE_SCHEMA: import("./tune").TuneSchema<LightTune> = {
   inkLift: { min: 0.1, max: 4, step: 0.05, label: "ink focus lift" },
   bloomMul: { min: 0, max: 1.5, step: 0.05, label: "bloom ×" },
   bloomFloor: { min: 0.3, max: 1, step: 0.01, label: "bloom floor" },
+  bgTint: { min: 0, max: 2.5, step: 0.05, label: "backdrop tint" },
+  bgGrid: { min: 0, max: 0.25, step: 0.005, label: "backdrop grid" },
 };
 
 /**
