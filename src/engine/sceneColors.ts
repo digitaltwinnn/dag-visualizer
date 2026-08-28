@@ -178,7 +178,7 @@ export interface LightTune {
 }
 export const LIGHT_TUNE_DEFAULTS: Readonly<LightTune> = Object.freeze({
   laneL: 0.51, laneC: 0.28, groundL: 0.66,
-  inkGamma: 0.15, inkDimG: 0.8, inkLift: 0.6,
+  inkGamma: 0.15, inkDimG: 1.1, inkLift: 0.6,
   bloomMul: 0.4, bloomFloor: 0.5,
   bgTint: 1, bgGrid: 0.07,
 });
@@ -233,7 +233,13 @@ export const LIGHT_TUNE_SCHEMA: import("./tune").TuneSchema<LightTune> = {
  *     near half the resting ink instead of 95% of it. This is where the range lives on paper:
  *     **emphasis on a page is spent DOWNWARD.** Ink can only go to full ink, while the dark ground
  *     has emissive headroom plus a bloom pass above its resting glow. Focus here is expressed by
- *     what steps BACK, which is also why the boost side needs so little.
+ *     what steps BACK, which is also why the boost side needs so little. It runs SUPER-proportional
+ *     (> 1) for that reason (user, 2026-08-28: *"can you make the inactive ribbon and snapshots a
+ *     bit more transparent"*): at 0.8 an inactive mark was held ABOVE its own ratio — a ribbon at
+ *     half weight painted 57% of the resting ink — so the page's most crowded marks were the ones
+ *     the filter had already answered. This branch is the ONE home for that, because `ref` is only
+ *     ever passed by the three sites carrying a `snapBright` product (the ribbons, the byte bar's
+ *     bands, the lane tiles) — exactly the marks a filter or a focus steps back, and nothing else.
  *   - ABOVE rest the lift saturates into whatever headroom is left (`inkLift`), so a boost still
  *     reads without the top two tiers collapsing onto full ink.
  *
