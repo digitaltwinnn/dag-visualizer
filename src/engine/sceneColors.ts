@@ -177,8 +177,11 @@ export interface LightTune {
   bgGrid: number;  // the backdrop grid's peak ink — 0 is a plain lit wall, no grid drawn
 }
 export const LIGHT_TUNE_DEFAULTS: Readonly<LightTune> = Object.freeze({
-  laneL: 0.51, laneC: 0.28, groundL: 0.66,
-  inkGamma: 0.15, inkDimG: 1.1, inkLift: 0.6,
+  // Settled from the user's own EXPORT (2026-08-28, second round): with the inactive marks
+  // thinned (inkDimG 1.1 → 1.35) the identity lane could come UP (laneL 0.51 → 0.61) —
+  // brighter ink reads right once the de-emphasized field around it is genuinely thin.
+  laneL: 0.61, laneC: 0.28, groundL: 0.66,
+  inkGamma: 0.15, inkDimG: 1.35, inkLift: 0.6,
   bloomMul: 0.4, bloomFloor: 0.5,
   bgTint: 1, bgGrid: 0.07,
 });
