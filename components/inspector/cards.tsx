@@ -4,9 +4,9 @@ import { useEffect, useMemo, useState } from "react";
 import { cn } from "@/lib/utils";
 import { useStore } from "@/src/store/store";
 import { shortHash, metagraphById, getNetwork, SIGNER_GROUPS, nodeSigned, coLocatedNetworks, filterAccent } from "@/src/data/network";
-import { UNLISTED_ID, observedUnlistedIds } from "@/src/data/unlisted";
-import { identityHudHex } from "@/src/palette/identity";
-import { hex, fmtDag, fmtKB, midHash } from "@/src/util/format";
+import { UNLISTED_ID, UNLISTED_HUE, observedUnlistedIds } from "@/src/data/unlisted";
+import { identityHudCss } from "@/src/palette/identity";
+import { fmtDag, fmtKB, midHash } from "@/src/util/format";
 import { relativeAge } from "@/src/util/relativeAge";
 import { statusBreakdown } from "@/src/data/nodeStatus";
 import type { GlobalSnapshot, MetaCfg, PickDescriptor } from "@/src/data/types";
@@ -110,7 +110,10 @@ export function SnapshotAside({ data: d }: { data: GlobalSnapshot }) {
 export function MetaTitle({ cfg }: { cfg: MetaCfg }) {
   const metaList = useStore((s) => s.metaList);
   const mg = metaList.find((x) => x.id === cfg.id) || null;
-  const hue = hex(cfg.color);
+  // The unlisted pseudo-network keeps its mandated neutral — identityHudCss would hash-assign a
+  // saturated hue to the "unlisted" id, and no single identity can speak for a mixed set. Same
+  // guard LedgerPanel applies (UNLISTED_HUE is the one home, src/data/unlisted.ts).
+  const hue = cfg.id === UNLISTED_ID ? UNLISTED_HUE : identityHudCss(cfg.id);
   const iconUrl = mg?.iconUrl || cfg.iconUrl; // live metagraph icon, or the core's bundled logo
   const monogram = (cfg.ticker || cfg.name).slice(0, 3).toUpperCase();
   const kind = networkKind(cfg.id, mg?.nodes || []);
@@ -185,7 +188,7 @@ export function GeoLiveTitle() {
   const id = node.node?.id;
   const city = nodeCity(node);
   const title = city || (id ? shortHash(id) : node.node?.ip || "Node");
-  const color = node.kind === "metanode" ? (node.meta ? identityHudHex(node.meta.id) : undefined) : identityHudHex("dag");
+  const color = node.kind === "metanode" ? (node.meta ? identityHudCss(node.meta.id) : undefined) : identityHudCss("dag");
   const Mark = VIEW_ICONS.geo;
   return (
     <span className="inline-flex items-center gap-2 min-w-0">
@@ -591,7 +594,11 @@ export function MetaCard({ cfg }: { cfg: MetaCfg }) {
 export function MetaTickerAside({ cfg }: { cfg: MetaCfg }) {
   if (!cfg.ticker) return null;
   return (
-    <span className="text-label font-semibold tracking-[0.02em]" style={{ color: hex(cfg.color) }}>
+    <span
+      className="text-label font-semibold tracking-[0.02em]"
+      // Unlisted stays neutral — same guard as MetaTitle above.
+      style={{ color: cfg.id === UNLISTED_ID ? UNLISTED_HUE : identityHudCss(cfg.id) }}
+    >
       {cfg.ticker}
     </span>
   );
@@ -1042,7 +1049,7 @@ export function CompositionCard({ sel }: { sel: CompositionSel }) {
       <Fact label="Share of network">{share}%</Fact>
       <Fact label="Network">
         <span className="inline-flex items-center gap-1.5 min-w-0">
-          <IdentityDot hue={identityHudHex(sel.netId)} />
+          <IdentityDot hue={identityHudCss(sel.netId)} />
           <span className="truncate">{cfg?.name || sel.netId}</span>
         </span>
       </Fact>
@@ -1128,7 +1135,7 @@ export function ProviderCard({ sel }: { sel: CohortSel }) {
               const cfg = metagraphById(id);
               return (
                 <span key={id} className="inline-flex items-center gap-1.5">
-                  <IdentityDot hue={identityHudHex(id)} />
+                  <IdentityDot hue={identityHudCss(id)} />
                   {cfg?.ticker || cfg?.name || id}
                 </span>
               );

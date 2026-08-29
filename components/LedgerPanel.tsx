@@ -12,7 +12,7 @@ import { displayNetwork, unlistedLog, UNLISTED_ID, UNLISTED_HUE, LISTED_IDS } fr
 import type { GlobalSnapshot, NodeRow, SnapshotExact } from "@/src/data/types";
 import { metaSnapHoverKey } from "@/src/data/types";
 import { latestRelevant } from "@/src/data/follow";
-import { identityHudHex } from "@/src/palette/identity";
+import { identityHudCss } from "@/src/palette/identity";
 import { IdentityDot, LayerWho } from "@/components/inspector/parts";
 import { useStore } from "@/src/store/store";
 import { metaSnapSelectActions, snapshotSelectActions, sameMetaSnap, followToggleActions, nodeSelectActions } from "@/src/engine/domain/pickActions";
@@ -77,7 +77,7 @@ function groupByMeta(rows: AnchorLogRow[]): MetaGroup[] {
     let g = by.get(r.metaId);
     if (!g) {
       const cfg = metagraphById(r.metaId);
-      g = { id: r.metaId, name: cfg?.name ?? r.metaId, hue: identityHudHex(r.metaId), rows: [] };
+      g = { id: r.metaId, name: cfg?.name ?? r.metaId, hue: identityHudCss(r.metaId), rows: [] };
       by.set(r.metaId, g);
     }
     g.rows.push(r);

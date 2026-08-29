@@ -39,7 +39,7 @@
      resettled midway. Row wash below is unchanged. */
   box-shadow: inset 0 0 0 1px color-mix(in oklch, var(--row-hue, var(--primary)) 46%, transparent),
               inset 0 0 18px -5px color-mix(in oklch, var(--row-hue, var(--primary)) 44%, transparent),
-              inset 0 1px 0 rgba(255, 255, 255, 0.05), 0 8px 30px rgba(0, 0, 0, 0.35);
+              var(--card-ambient);
   transition: box-shadow 0.16s ease;
 }
 /* Explorer rows are dense list items → a wash + border reads better there than an inset glow. */
@@ -408,8 +408,7 @@
   z-index: 2;
 }
 .rail-ladder > [data-tier="box"] .ig-panel:not(.subject-paired) {
-  box-shadow: 0 10px 26px -12px rgba(0, 0, 0, 0.85), 0 -8px 22px -14px rgba(0, 0, 0, 0.8),
-    0 8px 30px rgba(0, 0, 0, 0.35);
+  box-shadow: var(--box-lift), var(--card-ambient);
 }
 
 /* CORNER PATCHES — the plane continues UNDER the box's rounded corners (user, 2026-08-09: "where the
@@ -458,6 +457,15 @@
 
 /* ── Structural lane (chrome + status) — shadcn CSS variables in oklch ── */
 :root {
+  /* THE theme switch (multi-network design's light/dark spec §1): `light dark` IS the System
+     state — the browser resolves every light-dark() against the OS preference and OS flips
+     propagate live. An explicit choice pins it via data-theme (stamped pre-paint by the
+     inline script in app/layout.tsx; owned at runtime by ThemeController). There are NO
+     duplicated [data-theme] token blocks anywhere — each token defines both faces at its one
+     site. The ONE exception: --ident-l/--ident-c below are NUMBERS, and light-dark() is
+     <color>-only, so they use the guarded override pair instead. */
+  color-scheme: light dark;
+
   --radius: 14px;
   /* Height of the phone persistent bottom dock bar — the single source of truth referenced by
      the phone bar-half sheet offset (RailDock) AND the LiveStrip's phone bottom offset. (Was
@@ -475,62 +483,101 @@
      travel in the first third, so it reads quick with a soft landing, not slow. */
   --ease-spring: linear(0, 0.056, 0.204, 0.404, 0.6, 0.766 25%, 0.937 32.5%, 1.022 40%, 1.056 47.5%, 1.055 55%, 1.035 65%, 1.012 77.5%, 1.001 90%, 1);
 
-  --background: oklch(0.09 0.02 265);        /* #05060e app bg */
-  --foreground: oklch(0.94 0.02 255);        /* #e8eefc text */
-  --muted-foreground: oklch(0.66 0.04 265);  /* #8a96b8 muted */
+  --background: light-dark(oklch(0.94 0.012 265), oklch(0.09 0.02 265));         /* #05060e app bg (dark) */
+  /* The SCENE's own light ground (design fork C, user 2026-08-25): the canvas is the
+     instrument's SCREEN, and light mode lightens it from black to SILVER, not to paper — a
+     deeper grey than the page so ink pops, marks can exceed the ground, and a calm bloom is
+     physically possible again. The HUD page keeps --background's paper; dark side is
+     --background's dark verbatim, so the dark scene is byte-identical. */
+  --scene-ground: light-dark(oklch(0.81 0.005 85), oklch(0.09 0.02 265)); /* near-neutral, faint warm bias oklch(0.81 0.005 85) — blue read cold, full greige read dirty (user, 2026-08-29); keep LIGHT_TUNE.groundL AND devTune's ground override in sync */
+  /* The card elevation pair, ONE home for three recipes (`.ig-panel`, `.subject-paired`, the boxed
+     rail rung) — they must keep matching, and a token matches by construction where the previous
+     "restate the literal" arrangement matched by discipline. Theme-aware since 2026-08-29: pure
+     black at dark-ground alphas read as smudges at the slab's corner joints on the light panel
+     (user), so light casts a soft ink-navy at a third the weight; dark keeps the original bytes. */
+  --card-ambient: inset 0 1px 0 rgba(255, 255, 255, 0.05),
+    0 8px 30px light-dark(rgba(15, 23, 42, 0.14), rgba(0, 0, 0, 0.35));
+  --box-lift: 0 10px 26px -12px light-dark(rgba(15, 23, 42, 0.32), rgba(0, 0, 0, 0.85)),
+    0 -8px 22px -14px light-dark(rgba(15, 23, 42, 0.28), rgba(0, 0, 0, 0.8));
+  --foreground: light-dark(oklch(0.21 0.035 265), oklch(0.94 0.02 255));       /* #e8eefc text (dark) */
+  --muted-foreground: light-dark(oklch(0.44 0.035 265), oklch(0.66 0.04 265)); /* #8a96b8 muted (dark) */
 
-  --card: oklch(0.15 0.03 265);
+  /* LIGHT IS A LAYERED GROUND, and the order is the point (user, 2026-08-21: "white cards,
+     white background white furniture; we're missing proper contrast"). On dark the page is the
+     floor and every surface rises OUT of it, so --card sits lighter than --background. Paper
+     inverts the reading, not the relation: the page steps DOWN to 0.94 and the card back UP to
+     0.985, so a panel is still the raised thing — but the two now differ by a readable step
+     instead of both being near-white. Keep any new surface on the same side of the page it is
+     on in dark; what changes across themes is the ground, never which surface is on top. */
+  --card: light-dark(oklch(0.985 0.004 265), oklch(0.15 0.03 265));
   --card-foreground: var(--foreground);
   --popover: var(--card);
   --popover-foreground: var(--foreground);
 
-  --primary: oklch(0.88 0.13 195);           /* accent cyan #2af5ff — the sole live/accent signal */
-  --primary-foreground: oklch(0.14 0.02 265);
-  --ring: oklch(0.88 0.13 195);
+  --primary: light-dark(oklch(0.56 0.094 195), oklch(0.88 0.13 195));           /* accent cyan #2af5ff — the sole live/accent signal (dark) */
+  --primary-foreground: light-dark(oklch(0.98 0.005 265), oklch(0.14 0.02 265));
+  --ring: light-dark(oklch(0.56 0.094 195), oklch(0.88 0.13 195));
   /* The three network accents — ONE home (multi-network design §2). All three are always
      defined so the NetworkSwitch popover can render every network's dot on any network; the
      [data-net] rules after this block only re-point --primary/--ring. Mainnet gets NO
      [data-net] rule, so the bare URL's rendered CSS stays byte-identical. Chroma 0.13 on all
      three (matching --primary, deliberately below cyan's 0.150 gamut ceiling); lightness
      differs per hue because each hue's in-gamut chroma peaks at a different brightness.
-     Guard-band kin: ACCENT_HUE in src/palette/palette.ts mirrors these hues — keep in sync. */
-  --net-mainnet: oklch(0.88 0.13 195);
-  --net-integrationnet: oklch(0.78 0.13 300);
-  --net-testnet: oklch(0.84 0.13 327);
+     Guard-band kin: ACCENT_HUE in src/palette/palette.ts mirrors these hues — keep in sync.
+     The light sides share L 0.50 and NOTHING ELSE (user, 2026-08-21: "the colors can still pop").
+     They were briefly pinned to cyan's chroma as well, on the reasoning that cyan's ink-lightness
+     ceiling binds all three — but a ceiling is not a style: at L 0.50 cyan 195 tops out at C 0.085
+     while violet 300 reaches 0.266 and magenta 327 reaches 0.231 (measured), so matching them to
+     the tightest hue spent two-thirds of their gamut buying a uniformity nobody sees. Each takes
+     what its own hue affords; cyan alone is at its ceiling and must not be raised. */
+  --net-mainnet: light-dark(oklch(0.56 0.094 195), oklch(0.88 0.13 195));
+  --net-integrationnet: light-dark(oklch(0.50 0.19 300), oklch(0.78 0.13 300));
+  --net-testnet: light-dark(oklch(0.50 0.18 327), oklch(0.84 0.13 327));
   /* The sole --accent definition (the legacy literal in app/styles/00-base.css was dropped
      when that file was retired in Task 10) — points at --primary so it stays the single
      source of truth. Consumed by CardHead's `var(--filter-accent, var(--accent))` bullet. */
   --accent: var(--primary);
   --accent-foreground: var(--primary-foreground);
 
-  --destructive: oklch(0.63 0.20 25);        /* warn red — also the NO-SIGNAL dot (StateAtoms) */
+  --destructive: light-dark(oklch(0.50 0.18 25), oklch(0.63 0.20 25));        /* warn red — also the NO-SIGNAL dot (StateAtoms) */
   --destructive-foreground: var(--foreground);
 
   /* Added beyond shadcn defaults (structural, still not identity) */
-  --success: oklch(0.80 0.15 165);           /* ready / green */
-  --core: oklch(0.66 0.16 265);              /* DAG hypergraph-core blue #5b8cff — ONE hue for the
+  --success: light-dark(oklch(0.45 0.10 165), oklch(0.80 0.15 165));           /* ready / green */
+  --core: light-dark(oklch(0.45 0.16 265), oklch(0.66 0.16 265));              /* DAG hypergraph-core blue #5b8cff — ONE hue for the
                                                 core; L0/L1 are NOT colour-distinguished anywhere */
   /* A second muted text tone — brighter than --muted-foreground, dimmer than --foreground.
      The repeated "muted blue-grey" copy tone (dossier description, geo rows, tooltip figures). */
-  --foreground-dim: #c7d0ea;
+  --foreground-dim: light-dark(#3a4460, #c7d0ea);
   /* The advisory amber — NOT --destructive (amber ≠ red): a distinct "work-in-progress /
      advisory" accent. Its home is /about's unofficial-project notice (the always-on experimental
      banner it was made for was retired 2026-08-09; the token stays because the advisory REGISTER
      is still a real one, distinct from an error). */
-  --warn-soft: #ffd166;
+  --warn-soft: light-dark(#8a6a00, #ffd166);
 
-  --border: rgba(90, 140, 255, 0.22);        /* panel/hairline border (was the --panel-border alias) */
+  --border: light-dark(rgba(30, 60, 140, 0.38), rgba(90, 140, 255, 0.22));        /* panel/hairline border (was the --panel-border alias) */
   --input: var(--border);
-  --surface-muted: oklch(0.18 0.03 265);
+  --surface-muted: light-dark(oklch(0.92 0.01 265), oklch(0.18 0.03 265));
   --secondary: var(--surface-muted);
   --secondary-foreground: var(--foreground);
 
   /* Accent glass-wash family — the --border RGB (90,140,255) at fill alphas BELOW its .22
      hairline. One mechanism for every faint accent fill (topbar/vitals/geo hover + open washes). */
-  --wash-faint: rgba(90, 140, 255, 0.05);
-  --wash-soft:  rgba(90, 140, 255, 0.10);
-  --wash-hover: rgba(90, 140, 255, 0.12);
+  --wash-faint: light-dark(rgba(30, 60, 140, 0.05), rgba(90, 140, 255, 0.05));
+  --wash-soft:  light-dark(rgba(30, 60, 140, 0.10), rgba(90, 140, 255, 0.10));
+  --wash-hover: light-dark(rgba(30, 60, 140, 0.12), rgba(90, 140, 255, 0.12));
 }
+
+:root[data-theme="light"] { color-scheme: light; }
+:root[data-theme="dark"] { color-scheme: dark; }
+
+/* The identity lanes' L/C (spec §4) — the light-dark() exception: number tokens. Dark values
+   are today's HUD lane verbatim (identity.ts pins them); light is the measured ink lane. */
+:root { --ident-l: 0.74; --ident-c: 0.19; }
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme="dark"]) { --ident-l: 0.58; --ident-c: 0.19; }
+}
+:root[data-theme="light"] { --ident-l: 0.58; --ident-c: 0.19; }
 
 /* Network accent override — stamped on <html> before first paint by the inline script in
    app/layout.tsx. Mainnet has no rule on purpose (byte-identical CSS). --primary-foreground
@@ -554,9 +601,9 @@
   /* --panel is the translucent glass panel fill; it has no shadcn equivalent, so it stays a
      structural literal (NOT an alias). --panel-light is its lighter sibling (same RGB, lower
      alpha) for the tablet/phone dock glass; --panel-solid is the near-opaque tooltip/tip glass. */
-  --panel: rgba(12, 16, 32, 0.72);
-  --panel-light: rgba(12, 16, 32, 0.35);
-  --panel-solid: rgba(8, 12, 26, 0.92);
+  --panel: light-dark(rgba(252, 253, 255, 0.85), rgba(12, 16, 32, 0.72));
+  --panel-light: light-dark(rgba(252, 253, 255, 0.40), rgba(12, 16, 32, 0.35));
+  --panel-solid: light-dark(rgba(248, 250, 255, 0.94), rgba(8, 12, 26, 0.92));
   /* --panel-plate is the BASE PLATE a card's FOOT sits on (user, 2026-08-10: the foot's tier
      change "is only the font", asked for more). A NEUTRAL WHITE lift, and the mechanism is the
      whole point — measured live against both grounds: a dark scrim (tried first, at black 40%)
@@ -566,7 +613,28 @@
      on any ground — so the foot reads as its own tier everywhere. Keep it NEUTRAL: the --wash-*
      family is accent-hued and IS the selection language, so a blue-tinted lift here would read as
      selected, which for look-up data is backwards. */
-  --panel-plate: rgba(255, 255, 255, 0.045);
+  --panel-plate: light-dark(rgba(10, 20, 60, 0.05), rgba(255, 255, 255, 0.045));
+
+  /* Chrome surfaces that were raw literals in JSX (the old rule-3 allowlist): themed here so the
+     theme reaches them; trap 3 — the gradient token is consumed as [background:var()], never
+     bg-[var()]. --scrim mirrors the sheet overlay's own literal alpha (0.16, sheet.tsx's
+     "Deliberately faint scrim"); --scrim-shadow shares its base ink but keeps RailDock's sheet
+     title text-shadow at its OWN alpha (0.7) — same near-black tint, two different call-site
+     strengths, so one token can't serve both without shifting one of the looks. */
+  --topbar-glass: linear-gradient(180deg,
+    light-dark(rgba(250, 252, 255, 0.86), rgba(20, 26, 46, 0.82)),
+    light-dark(rgba(240, 244, 252, 0.80), rgba(10, 14, 28, 0.76)));
+  --scrim: light-dark(rgba(235, 240, 250, 0.16), rgba(3, 5, 12, 0.16));
+  --scrim-shadow: light-dark(rgba(235, 240, 250, 0.7), rgba(3, 5, 12, 0.7));
+  /* The footer's legibility halo over the scene — dark glow on the dark scene, a paper glow on
+     the light wall (the hardcoded black pair read as a dirty smudge there — user, 2026-08-29).
+     light-dark() per colour stop, since it is <color>-only. */
+  --footer-halo: 0 0 3px light-dark(rgba(248, 250, 255, 0.9), rgba(0, 0, 0, 0.9)),
+    0 0 10px light-dark(rgba(248, 250, 255, 0.95), rgba(0, 0, 0, 0.95));
+  /* The thread's punch-through tone — the PAGE, so the ruler reads as cut out of the ground
+     rather than drawn on it. It duplicates --background's light value on purpose (a var() here
+     would resolve against the wrong element in the SVG); the two move together. */
+  --thread-punch: light-dark(oklch(0.94 0.012 265), #0c1020);
 
   /* Dot-size scale (documented, not tokenised — the w-/h- micro-dots read cleaner as literals at
      the call site than as size utilities): 3px xs · 5px sm · 7px md · 9px lg (odd, +2px steps) —
@@ -586,13 +654,13 @@
                               2026-07-05; moved up 25px with the retired banner, 2026-08-09) */
   --rail-w: 264px;         /* left control rail width */
   --detail-w: 320px;       /* right details rail width */
-  --sel-bg: rgba(42, 245, 255, 0.12);   /* selected/active fill, reused everywhere */
-  --sel-border: rgba(42, 245, 255, 0.5);
-  --sel-bg-dim: rgba(42, 245, 255, 0.05);  /* the same mark at ANCESTOR strength: an explorer row
+  --sel-bg: light-dark(rgba(9, 133, 133, 0.12), rgba(42, 245, 255, 0.12));   /* selected/active fill, reused everywhere */
+  --sel-border: light-dark(rgba(9, 133, 133, 0.55), rgba(42, 245, 255, 0.5));
+  --sel-bg-dim: light-dark(rgba(9, 133, 133, 0.06), rgba(42, 245, 255, 0.05));  /* the same mark at ANCESTOR strength: an explorer row
                                               whose rung is committed but no longer the focus (a
                                               finer rung is) — same language, half a voice, so one
                                               list can't show three equally loud selections */
-  --sel-border-dim: rgba(42, 245, 255, 0.22);
+  --sel-border-dim: light-dark(rgba(9, 133, 133, 0.25), rgba(42, 245, 255, 0.22));
   --bottom-reserve: 0px;   /* vertical space the bottom LiveStrip lane reserves. The lane is
                               SNAPSHOTS-ONLY, so 0 is the correct static default — the store boots
                               in `hyper`, which mounts no strip. `BottomStream` is the one writer
@@ -612,13 +680,15 @@
   /* ── Instrument-thread ruler spec (the ONE shared source) ─────────────────────
      Both rails' SVG threads (RailThread.tsx) and the bar-chart axis read identically:
      a neutral base line with ruler hairlines — short marks, every 4th longer + brighter.
-     The SVG threads can't consume these (an SVG stroke attribute doesn't resolve var()),
-     so they mirror the SAME literals in code — keep in sync (see RailThread `TICK_*`).
+     RailThread consumes these directly via the `.thread-rule`/`.thread-tick`/`.thread-tick-major`/
+     `.thread-punch` classes defined just below the `:root` block — CSS PROPERTIES on SVG resolve
+     var() even though a presentation ATTRIBUTE (`stroke="…"`) doesn't, which is why the ruler
+     mirrored these as literal consts until 2026-08-21.
      `--axis-hairlines` is the reusable recipe for a horizontal axis (the bar chart). */
-  --thread-line: rgba(178, 193, 223, 0.40);        /* the neutral base line the ticks hang off */
-  --thread-tick: rgba(178, 193, 223, 0.30);        /* minor hairline */
-  --thread-tick-major: rgba(178, 193, 223, 0.42);  /* every 4th — longer + brighter */
-  --thread-faint: rgba(178, 193, 223, 0.10);       /* faintest thread-family hairline (dock borders) */
+  --thread-line: light-dark(rgba(40, 55, 95, 0.40), rgba(178, 193, 223, 0.40));        /* the neutral base line the ticks hang off */
+  --thread-tick: light-dark(rgba(40, 55, 95, 0.30), rgba(178, 193, 223, 0.30));        /* minor hairline */
+  --thread-tick-major: light-dark(rgba(40, 55, 95, 0.42), rgba(178, 193, 223, 0.42));  /* every 4th — longer + brighter */
+  --thread-faint: light-dark(rgba(40, 55, 95, 0.10), rgba(178, 193, 223, 0.10));       /* faintest thread-family hairline (dock borders) */
   --thread-tick-pitch: 13px;                        /* spacing between hairlines */
   /* Horizontal baseline → vertical ticks HANGING DOWN from it (the bar-chart axis, so the ruler
      sits under the bars, not through them). Anchored to the TOP so ticks grow downward; major
@@ -631,6 +701,16 @@
       var(--thread-tick) 0, var(--thread-tick) 1px,
       transparent 1px, transparent var(--thread-tick-pitch)) left top / 100% 5px no-repeat;
 }
+
+/* RailThread's ruler ink — CSS properties, not SVG attributes, so the tokens resolve and the
+   theme reaches the thread (rule-3's old allowlisted literals, retired 2026-08-21). Unlayered
+   (same layer-trap as .subject-paired above) so these apply reliably regardless of load order;
+   they carry no competing utility anyway, but the whole card-signal block above them is unlayered
+   on the same principle, so this stays consistent with it. */
+.thread-rule { stroke: var(--thread-line); }
+.thread-tick { stroke: var(--thread-tick); }
+.thread-tick-major { stroke: var(--thread-tick-major); }
+.thread-punch { stroke: var(--thread-punch); }
 
 /* ── Base resets (was app/styles/00-base.css) ── */
 @layer base {
@@ -993,12 +1073,23 @@
        detail): alphas raised 0.78/0.72 → 0.88/0.82 + blur restored to 14px (the pre-migration
        value) so `text-muted-foreground` body text stays comfortably readable over the bright
        hypergraph core, while the gradient + blur keep the scene glowing through at the card
-       edges — good glass, not a solid slab. */
-    background: linear-gradient(180deg, rgba(20, 26, 46, 0.88), rgba(10, 14, 28, 0.82));
+       edges — good glass, not a solid slab. Light side (theme fix round, 2026-08-21): missed in
+       the original light/dark conversion — every sibling glass token (`--panel`, `--topbar-glass`)
+       already paired a white stop with the dark one, this recipe never got one. Follows the same
+       family: `--panel`'s white glass ink (252, 253, 255) at THIS recipe's own raised alphas
+       (0.88/0.82), not `--panel`'s own (lower) alphas — the raise here was for legibility over a
+       busy scene and applies to both grounds equally. */
+    background: linear-gradient(180deg,
+      light-dark(rgba(252, 253, 255, 0.88), rgba(20, 26, 46, 0.88)),
+      light-dark(rgba(252, 253, 255, 0.82), rgba(10, 14, 28, 0.82)));
     border: 1px solid var(--border);
     border-radius: var(--radius);
     backdrop-filter: blur(14px);
-    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05), 0 8px 30px rgba(0, 0, 0, 0.35);
+    /* The elevation pair lives in `--card-ambient` (`:root`) — ONE home shared with
+       `.subject-paired` and the boxed rail rung, theme-aware there since 2026-08-29 (the
+       dark-ground black smudged the light slab's corner joints). The inset line is a top-edge
+       glass highlight, harmless at 0.05 white on either ground. */
+    box-shadow: var(--card-ambient);
   }
   .ig-panel::before {
     content: "";

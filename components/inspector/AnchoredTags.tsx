@@ -6,7 +6,8 @@ import { cn } from "@/lib/utils";
 import { useStore } from "@/src/store/store";
 import { UNLISTED_ID } from "@/src/data/unlisted";
 import { metagraphById } from "@/src/data/network";
-import { hex, fmtDag, fmtKB } from "@/src/util/format";
+import { identityHudCss } from "@/src/palette/identity";
+import { fmtDag, fmtKB } from "@/src/util/format";
 import { NodeStars } from "@/components/state/StateAtoms";
 import { useMinHold } from "@/components/useMinHold";
 
@@ -108,7 +109,7 @@ export default function AnchoredTags({
   const listed: Row[] = [];
   for (const [addr, { count, fee, bytes }] of Object.entries(exact.perMeta)) {
     const c = metagraphById(addr);
-    if (c) listed.push({ id: addr, label: c.ticker || c.name, hue: hex(c.color), n: count, fee, bytes });
+    if (c) listed.push({ id: addr, label: c.ticker || c.name, hue: identityHudCss(c.id), n: count, fee, bytes });
   }
   listed.sort((a, b) => b.n - a.n);
 

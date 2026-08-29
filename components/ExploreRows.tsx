@@ -10,7 +10,7 @@ import { SELECTED_ROW, SelectedRowMark, selectedRow, selectionHue } from "@/comp
 import { subjectPairing } from "@/components/useSubjectPairing";
 import { hoverKeyOf } from "@/src/data/hoverSubject";
 import { shortHash } from "@/src/data/network";
-import { identityHudHex } from "@/src/palette/identity";
+import { identityHudCss } from "@/src/palette/identity";
 import type { NodeRow } from "@/src/data/types";
 
 // The ONE explorer-row RIGHT-EDGE contract (2026-08-01, user: "explorer dropdown rows
@@ -224,7 +224,7 @@ export function NodePickerRow({
   onSelect: () => void;
 }) {
   const hoverKey = hoverKeyOf(row.pick);
-  const hue = identityHudHex(row.pick.kind === "metanode" && row.pick.meta ? row.pick.meta.id : "dag");
+  const hue = identityHudCss(row.pick.kind === "metanode" && row.pick.meta ? row.pick.meta.id : "dag");
   const pair = subjectPairing(hoverNodeId, hoverKey, setHoverNodeId, hue);
   return (
     <button

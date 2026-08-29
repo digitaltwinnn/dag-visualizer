@@ -15,10 +15,17 @@ import type { HyperView } from "./scene/views/HyperView";
 import { TETHER_TUNE_DEFAULTS, TETHER_TUNE_SCHEMA } from "./scene/views/HyperView";
 import { RIBBON_TUNE_DEFAULTS, RIBBON_TUNE_SCHEMA } from "./scene/objects/Ribbons";
 import { BAR_TUNE_DEFAULTS, BAR_TUNE_SCHEMA } from "./scene/objects/ByteBar";
-import { GLOBAL_PLANE_TUNE_DEFAULTS, META_PLANE_TUNE_DEFAULTS, PLANE_TUNE_SCHEMA } from "./scene/objects/SnapshotPlane";
+import { GLOBAL_PLANE_TUNE_DEFAULTS, META_PLANE_TUNE_DEFAULTS, PLANE_TUNE_SCHEMA, GLASS_TUNE, GLASS_TUNE_DEFAULTS, GLASS_TUNE_SCHEMA } from "./scene/objects/SnapshotPlane";
 import { TILE_TUNE_DEFAULTS, TILE_TUNE_SCHEMA } from "./scene/views/LedgerView";
+import { SUN_TUNE, SUN_TUNE_DEFAULTS, SUN_TUNE_SCHEMA } from "./scene/views/GeoView";
 import { FOCUS_TUNE, FOCUS_TUNE_DEFAULTS, FOCUS_ROW_SCHEMA, FOCUS_SHARED, FOCUS_SHARED_DEFAULTS, FOCUS_SHARED_SCHEMA } from "./domain/dimModel";
 import { STAGE_LIGHTS, STAGE_LIGHT_DEFAULTS, STAGE_LIGHT_SCHEMA, type StagedView } from "./domain/stageLight";
+import {
+  SCENE_RIG, SCENE_RIG_DEFAULTS, RIG_ROW_SCHEMA,
+  RIG_PAPER, RIG_PAPER_DEFAULTS, RIG_PAPER_SCHEMA,
+} from "./domain/sceneRig";
+import { LIGHT_TUNE, LIGHT_TUNE_DEFAULTS, LIGHT_TUNE_SCHEMA } from "./sceneColors";
+import { setSceneLaneLight } from "../palette/identity";
 import type { View3D } from "./domain/viewTransition";
 import { CAM_ZOOM, RAILS_HIDDEN_DOLLY } from "./domain/cameraRig";
 import {
@@ -31,6 +38,8 @@ export interface DevTuneTargets {
   hyper: HyperView;
   camera: THREE.PerspectiveCamera;
   controls: { target: THREE.Vector3 };
+  /** Re-runs the Engine's whole theme thread — the light-look group lands its dials through it. */
+  refreshTheme: () => void;
 }
 
 export interface DevTuneHandle {
@@ -39,7 +48,7 @@ export interface DevTuneHandle {
 
 export async function mountDevTune(targets: DevTuneTargets): Promise<DevTuneHandle> {
   const { Pane } = await import("tweakpane");
-  const { ledger, hyper, camera, controls } = targets;
+  const { ledger, hyper, camera, controls, refreshTheme } = targets;
 
   // ---- the manifest ---------------------------------------------------------------------------
   // Shared groups: these shape EVERY view, so they sit above the per-view folders. Emphasis is
@@ -53,6 +62,40 @@ export async function mountDevTune(targets: DevTuneTargets): Promise<DevTuneHand
       defaults: FOCUS_SHARED_DEFAULTS,
       schema: FOCUS_SHARED_SCHEMA,
       home: "domain/dimModel.ts · FOCUS_SHARED_DEFAULTS",
+    },
+    {
+      // Every dial reaches the LIGHT ground only (sceneColors.ts, the LightTune doc): in dark
+      // the lane setter rewrites an unused memo, the ground override keeps its dark face, and
+      // the Engine ignores bloomMul/bloomFloor while _bloomMul is 1.
+      title: "light look",
+      values: LIGHT_TUNE,
+      defaults: LIGHT_TUNE_DEFAULTS,
+      schema: LIGHT_TUNE_SCHEMA,
+      home: "engine/sceneColors.ts · LIGHT_TUNE_DEFAULTS",
+      onChange: () => {
+        // The ground is a CSS token: override it INLINE as a light-dark() pair so the dark
+        // face survives the override verbatim (a flat value would repaint dark too).
+        // ⚠️ The CHROMA here is the token's own (globals.css `--scene-ground`) and must be kept
+        // in step with it — it drifted to 0.016 against the token's 0.014 once, which made the
+        // ground knob quietly RETINT the scene as well as relight it.
+        document.documentElement.style.setProperty(
+          "--scene-ground",
+          `light-dark(oklch(${LIGHT_TUNE.groundL} 0.005 85), oklch(0.09 0.02 265))` // greige — keep chroma+hue in sync with the token AND sceneColors,
+        );
+        setSceneLaneLight(LIGHT_TUNE.laneL, LIGHT_TUNE.laneC);
+        refreshTheme();
+      },
+    },
+    {
+      // The rig's PAPER answer — four multipliers over whichever view's row won the frame. Shared
+      // rather than per-view because it is a statement about the GROUND, not about a view: the page
+      // is its own bounce card everywhere. Inert under dark, where every multiplier is 1 by
+      // definition (the rows themselves are the dark look).
+      title: "rig · paper",
+      values: RIG_PAPER,
+      defaults: RIG_PAPER_DEFAULTS,
+      schema: RIG_PAPER_SCHEMA,
+      home: "domain/sceneRig.ts · RIG_PAPER_DEFAULTS",
     },
   ];
 
@@ -77,9 +120,21 @@ export async function mountDevTune(targets: DevTuneTargets): Promise<DevTuneHand
     home: `domain/dimModel.ts · FOCUS_TUNE_DEFAULTS.${view}`,
   });
 
+  // The view's KEY/FILL/RIM. Every 3D view has one — unlike the spotlight, which only the views
+  // that stage a claim get: a view is always lit, it just may not be spotlit. No onChange (SceneRig
+  // re-blends the rows every frame).
+  const rigGroup = (view: View3D): TuneGroup => ({
+    title: `${view} · rig`,
+    values: SCENE_RIG[view],
+    defaults: SCENE_RIG_DEFAULTS[view],
+    schema: RIG_ROW_SCHEMA,
+    home: `domain/sceneRig.ts · SCENE_RIG_DEFAULTS.${view}`,
+  });
+
   const perView: Record<string, TuneGroup[]> = {
     hyper: [
       focusGroup("hyper"),
+      rigGroup("hyper"),
       spotGroup("hyper"),
       {
         title: "tethers",
@@ -92,11 +147,26 @@ export async function mountDevTune(targets: DevTuneTargets): Promise<DevTuneHand
         home: "scene/views/HyperView.ts · TETHER_TUNE_DEFAULTS",
       },
     ],
-    geo: [focusGroup("geo"), spotGroup("geo")],
+    geo: [
+      focusGroup("geo"),
+      rigGroup("geo"),
+      spotGroup("geo"),
+      {
+        // The globe's day side. Read per frame by Globe (which picks the ground's own pair out of
+        // it), so no onChange — and it sits in the GEO folder because it is geo's look, even though
+        // the DIRECTION it shades along belongs to the shared rig one folder up.
+        title: "sun (terminator)",
+        values: SUN_TUNE,
+        defaults: SUN_TUNE_DEFAULTS,
+        schema: SUN_TUNE_SCHEMA,
+        home: "scene/views/GeoView.ts · SUN_TUNE_DEFAULTS",
+      },
+    ],
     // Almost every dim number is read per frame, so the group needs no onChange — EXCEPT the
     // ledger's `dim`, which the ribbons bake into their vertex colours. Re-push the sheet there.
     ledger: [
       { ...focusGroup("ledger"), onChange: () => ledger.ribbons.setTune({}) },
+      rigGroup("ledger"),
       {
         title: "ribbons",
         values: ledger.ribbons.tune,
@@ -136,6 +206,20 @@ export async function mountDevTune(targets: DevTuneTargets): Promise<DevTuneHand
         schema: PLANE_TUNE_SCHEMA,
         home: "scene/objects/SnapshotPlane.ts · META_PLANE_TUNE_DEFAULTS",
       },
+      // ONE set for the whole chamber, unlike the two channels above: this tunes what GLASS IS, not
+      // how much presence a storey has. Read per frame, so no onChange. Inert under the dark ground,
+      // where the panes take the flat additive whisper instead.
+      {
+        title: "day glass (light mode)",
+        values: GLASS_TUNE,
+        defaults: GLASS_TUNE_DEFAULTS,
+        schema: GLASS_TUNE_SCHEMA,
+        home: "scene/objects/SnapshotPlane.ts · GLASS_TUNE_DEFAULTS",
+      },
+      // The day glass's MOVABLE highlight. The chamber claims the light on a light ground only, so
+      // this folder is inert under dark exactly as the one above it — it aims a reflection, not a
+      // beam (nothing in the chamber is lit by three.js).
+      spotGroup("ledger"),
     ],
   };
 

@@ -65,9 +65,11 @@ export default function PresentationToggle() {
             )}
           >
             <Icon aria-hidden className="size-4 group-data-[state=on]:text-primary" />
-            {/* Three labelled segments are wide — labels condense away below 1560px (measured:
-                they pushed the bar past the viewport at 1500), leaving icons + titles. */}
-            <span className="text-micro tracking-caps uppercase max-[1559px]:hidden">{it.name}</span>
+            {/* Three labelled segments are wide — labels condense away below 1650px (measured:
+                they pushed the bar past the viewport at 1500; raised from 1559 on 2026-08-21
+                when the ThemeToggle landed in the right zone and reproduced a 35px overflow
+                at 1600px), leaving icons + titles. */}
+            <span className="text-micro tracking-caps uppercase max-[1649px]:hidden">{it.name}</span>
           </ToggleGroupItem>
         );
       })}

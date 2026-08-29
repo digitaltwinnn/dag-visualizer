@@ -52,7 +52,7 @@ import {
   laneSpan,
   type RailGroup,
 } from "../../domain/ledgerLayout";
-import type { SceneColors } from "../../sceneColors";
+import { isLightGround, inkMix, inkPresence, labelInk, type SceneColors } from "../../sceneColors";
 import {
   LedgerModel,
   LANE_IDS,
@@ -78,10 +78,13 @@ import { ByteBar, SEED_W } from "../objects/ByteBar";
 import { LiveEdge } from "../objects/LiveEdge";
 import { snapBright, snapFocusOf, focusWeightOf, emphasisK } from "../../domain/dimModel";
 import { Ribbons } from "../objects/Ribbons";
-import { SnapshotPlane, makeEdgeLabel, GLOBAL_PLANE_TUNE_DEFAULTS, META_PLANE_TUNE_DEFAULTS, type PlaneTune } from "../objects/SnapshotPlane";
+import { SnapshotPlane, makeEdgeLabel, retintEdgeLabel, GLOBAL_PLANE_TUNE_DEFAULTS, META_PLANE_TUNE_DEFAULTS, type PlaneTune } from "../objects/SnapshotPlane";
 import { TrailRewind } from "../objects/TrailRewind";
+import type { StageLight } from "../objects/StageLight";
+import { STAGE_LIGHTS } from "../../domain/stageLight";
 import { FadeSet } from "../objects/FadeSet";
 import type { SceneView } from "./SceneView";
+import { joinBloom } from "../SceneContext";
 import type { TuneSchema } from "../../tune";
 
 const META_TRAIL_MAX = 1500;
@@ -144,15 +147,25 @@ export type TilePickResolver = (metaId: string, tickTs: string, k: number) => Pi
  *  chips in the trays answer to. */
 export interface TileTune {
   rest: number; // a resting filled tile
+  // ── THE HUE FLOOR, on paper only. A tile cannot be transparent (opaque + depthWrite is what makes
+  // it a pick blocker), so its presence is a lerp toward the glass it lies on — and a lerp that runs
+  // all the way to the backdrop arrives with no hue left. That is the neutral trail reading as blank
+  // lozenges (user, 2026-08-28: "the snapshots in the trail are white"). The floor is how far a
+  // de-emphasized tile is allowed to thin before it stops being a MARK: the emphasis term is mapped
+  // into [ink, 1], so a resting tile still states its tint on the glass while the span above it keeps
+  // its order. Applied to the EMPHASIS alone — the horizon, front and entry ramps are geometry and a
+  // fully dissolved row still zero-scales.
+  ink: number;
 }
 
 // rest user-tuned via ?tune, 2026-08-07. (`hot` retired 2026-08-11 — it was exactly the ledger
 // row's `boost`, and a snapshot is data, so it takes the node's focus knob instead.)
-export const TILE_TUNE_DEFAULTS: TileTune = { rest: 0.1 };
+export const TILE_TUNE_DEFAULTS: TileTune = { rest: 0.1, ink: 0.3 };
 
 /** The `?tune` knob ranges (contract: src/engine/tune.ts), colocated with the numbers they bound. */
 export const TILE_TUNE_SCHEMA: TuneSchema<TileTune> = {
   rest: { min: 0, max: 2, step: 0.05 },
+  ink: { min: 0, max: 0.8, step: 0.02, label: "hue floor (light)" },
 };
 
 // The view-entry drop's shape (see the VIEW-ENTRY DROP note in the class): fall height and
@@ -175,6 +188,8 @@ export class LedgerView implements SceneView {
   /** The HOVERED network, a pure preview that overrides the committed one for DIMMING only. */
 
   private _colors: SceneColors;
+  /** GROUND, hoisted at event time — the tile loop and the label pass read a boolean. */
+  private _paper: boolean;
   private _core: number;
   private readonly _coreCol = new THREE.Color();
 
@@ -260,16 +275,26 @@ export class LedgerView implements SceneView {
   /** Filter-chip / metagraph-row HOVER — previews the colored network dim at commit strength. */
   private _hoverNet: string | null = null;
 
-  // ── fades (the ledger's stage light went with the layer navigation, 2026-08-06 — nothing
-  // committable is left for a spot to dramatise)
+  // ── fades
   private _fades = new FadeSet();
+
+  // ── THE DAY GLASS'S LAMP. The chamber stages a light on a LIGHT ground only (see the claim in
+  // update()). Both vectors are WORLD space and the group's transform is fixed at construction —
+  // quaternion and scale are set once and never written again — so they are resolved once here
+  // rather than per frame, and no render state is read.
+  private readonly _stageSubject = new THREE.Vector3();
+  private readonly _stageNormal = new THREE.Vector3();
+  private readonly _spot: StageLight;
 
   constructor(
     scene: THREE.Scene,
     colors: SceneColors,
     sceneColors: Record<string, number>,
+    spot: StageLight,
   ) {
+    this._spot = spot;
     this._colors = colors;
+    this._paper = isLightGround(colors);
     this._core = colors.core;
     this._coreCol.setHex(colors.core);
     this.sceneColors = sceneColors;
@@ -282,6 +307,15 @@ export class LedgerView implements SceneView {
     );
     this.group.scale.setScalar(LEDGER.viewScale);
     scene.add(this.group);
+    // The chamber's own centre ON THE GLOBAL FLOOR, and the group's up, taken into world through
+    // that fixed transform. The floor is the subject because the floor is the pane the highlight has
+    // to land on: a lamp staged over the chamber's mid-height would put its mirror image past the
+    // front rim from the resting pose, and there is no floor out there to catch it.
+    this._stageSubject
+      .set(FLOOR_CX, LEDGER.rowGL0, 0)
+      .multiplyScalar(LEDGER.viewScale)
+      .applyQuaternion(this.group.quaternion);
+    this._stageNormal.set(0, 1, 0).applyQuaternion(this.group.quaternion);
 
     this.pickables = [];
     this._floorBlockers.length = 0;
@@ -323,6 +357,7 @@ export class LedgerView implements SceneView {
       new THREE.MeshBasicMaterial({}),
       META_TRAIL_MAX,
     );
+    joinBloom(this._metaTrailMesh); // the lane tiles are the trail's identity marks — see BLOOM_LAYER
     this._metaTrailMesh.frustumCulled = false;
     this._metaTrailMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
     for (let i = 0; i < META_TRAIL_MAX; i++) this._metaTrailMesh.setColorAt(i, _col.set(0xffffff));
@@ -404,12 +439,35 @@ export class LedgerView implements SceneView {
     // blueprint, two knobs; user 2026-08-07). FLOOR_D/2 is the shared drop-off reference so the
     // rim reads as one width everywhere; narrow pieces clamp it inside SnapshotPlane.
     const a = this._fades.alpha;
+    // ── THE STAGE LIGHT, CLAIMED ON PAPER ONLY (user, 2026-08-26: "I would expect the glass to show
+    // some light reflection?"). The dark chamber stages NOTHING and always has: an additive whisper
+    // over black is already a glow, so a lamp there would be a second light source with nothing to
+    // do. The day glass is the opposite — a reflective pane needs something to reflect, and a rig
+    // baked into the shader can only be aimed by editing the shader. So the ledger claims the app's
+    // one light here, gated on the ground, and the existing `?tune` spotlight knobs become the aim.
+    // Not claiming IS off, so on dark this branch simply never runs and nothing else changes.
+    //
+    // The uniform push reads the light's PREVIOUS frame (StageLight.update resolves claims after
+    // every view has had its turn). That is deliberate: re-deriving `subject + normal × height` here
+    // would put the staging formula in two homes, and one frame of lag on a lamp that eases at
+    // ~3/sec over a chamber whose subject never moves is not observable.
+    if (this._paper) {
+      this._spot.claim("ledger", this._stageSubject, this._stageNormal, STAGE_LIGHTS.ledger.height, a);
+    }
+    const spotI = this._paper ? this._spot.light.intensity : 0;
+    for (const p of this._globalPlanes) p.setSpot(this._spot.light.position, spotI);
+    for (const p of this._metaPlanes.values()) p.setSpot(this._spot.light.position, spotI);
     for (const p of this._globalPlanes) p.applyAlpha(this.globalTune, a, FLOOR_D / 2);
     // The committed (or hover-previewed) network's OWN plane glows a step brighter — the
     // plane-level twin of the colored dim (user, 2026-08-07).
     const netKey = this._netDimKey();
-    for (const [key, p] of this._metaPlanes)
-      p.applyAlpha(this.metaTune, a, FLOOR_D / 2, key === netKey ? LANE_FILL_BOOST : 1);
+    for (const [key, p] of this._metaPlanes) {
+      const lane = key === netKey;
+      p.applyAlpha(this.metaTune, a, FLOOR_D / 2, lane ? LANE_FILL_BOOST : 1, lane ? this._laneColor(key).getHex() : null);
+    }
+    // Both columns' resting level is a dark-ground opacity; on paper it is ink over the page, so
+    // it asks the ground once, hoisted here — loop-invariant (the hoist rule).
+    const ordOp = inkPresence(ORD_OP, this._paper);
     for (const o of this._ordLabels.values()) {
       const ox = LEAD_X - o.slot * SLOT_SP + this._trailOff;
       // Both boundaries at once: the rewind's front dissolve and the horizon's — no instrument
@@ -417,13 +475,15 @@ export class LedgerView implements SceneView {
       // a label must not name a row whose bar hasn't dropped in yet.
       const entryF = this._entryT < 1 && o.slot >= 0 && o.slot < SLOT_N ? this._entryFade[o.slot] : 1;
       const front = this._rewind.fadeAtX(ox) * horizonAt(ox) * entryF;
-      (o.mesh.material as THREE.MeshBasicMaterial).opacity = ORD_OP * front * a;
+      // The dotted line keeps its RATIO to the text (ORD_LINE_MUL) —
+      // it is a tie to its row, and a tie that outweighs the number it carries reads as the subject.
+      (o.mesh.material as THREE.MeshBasicMaterial).opacity = ordOp * front * a;
       // The anchor line whispers under its label (user, 2026-08-07 — "a bit more subtle").
-      (o.line.material as THREE.LineDashedMaterial).opacity = ORD_OP * ORD_LINE_MUL * front * a;
+      (o.line.material as THREE.LineDashedMaterial).opacity = ordOp * ORD_LINE_MUL * front * a;
       // The size column rides the same two boundaries. Its line goes with its number: with no
       // measurement to state there is nothing for the line to tie to.
-      if (o.kb) (o.kb.material as THREE.MeshBasicMaterial).opacity = ORD_OP * front * a;
-      (o.kbLine.material as THREE.LineDashedMaterial).opacity = o.kb ? ORD_OP * ORD_LINE_MUL * front * a : 0;
+      if (o.kb) (o.kb.material as THREE.MeshBasicMaterial).opacity = ordOp * front * a;
+      (o.kbLine.material as THREE.LineDashedMaterial).opacity = o.kb ? ordOp * ORD_LINE_MUL * front * a : 0;
     }
   }
 
@@ -432,6 +492,30 @@ export class LedgerView implements SceneView {
     this._laneColors.clear();
     this._bar.setSceneColors(map);
     this._ribbons.setSceneColors(map);
+  }
+
+  /** THEME FLIP — the chamber's construction-time captures of the STRUCTURAL palette. `_colors` is
+   *  the Engine's own object and already reads new, so this re-applies what was copied out of it:
+   *  the neutral-trail scalar the per-frame writers compare against, every storey's glass + edge
+   *  label (whose blend mode themes — see applyGlassTheme), the two pooled label columns and their
+   *  dotted anchor lines, and the two instruments that BAKE (the bar's neutral, the ribbons' vertex
+   *  colours). Identity hue is the other channel and arrives separately via setSceneColors.
+   *  Event-time — one flip, not a frame. */
+  setColors(c: SceneColors): void {
+    this._colors = c;
+    this._paper = isLightGround(c);
+    this._core = c.core;
+    this._coreCol.setHex(c.core);
+    for (const p of [...this._globalPlanes, ...this._metaPlanes.values()]) p.setColors(c);
+    this._bar.setColors(c);
+    this._ribbons.setColors(c);
+    // The ordinal + kB columns are POOLED per visible row (recycled by ordinal), so the live set
+    // is retinted in place; rows built after the flip read the new `_colors`/`_core` above.
+    for (const o of this._ordLabels.values()) {
+      retintEdgeLabel(o.mesh, c, "readout");
+      if (o.kb) retintEdgeLabel(o.kb, c, "readout");
+      for (const l of [o.line, o.kbLine]) (l.material as THREE.LineDashedMaterial).color.setHex(labelInk(c, "readout"));
+    }
   }
 
   // ── VIEW-ENTRY DROP (user, 2026-08-16, retimed same day — "should occur as the last effect
@@ -796,7 +880,7 @@ export class LedgerView implements SceneView {
       new THREE.Vector3(0, y, 0),
     ]);
     const lm = new THREE.LineDashedMaterial({
-      color: this._core, transparent: true, opacity: 0,
+      color: labelInk(this._colors, "readout"), transparent: true, opacity: 0,
       depthWrite: false, dashSize: 0.14, gapSize: 0.18,
     });
     const line = new THREE.Line(lg, lm);
@@ -835,7 +919,7 @@ export class LedgerView implements SceneView {
       if (o) o.slot = s;
       if (!o) {
         // event-time: one canvas + two 2-point dashed lines per new tick
-        const mesh = makeEdgeLabel(this._colors, snap.ordinal.toLocaleString(), 0, FLOOR_Y.gl0, ORD_Z, ORD_H);
+        const mesh = makeEdgeLabel(this._colors, snap.ordinal.toLocaleString(), 0, FLOOR_Y.gl0, ORD_Z, ORD_H, "left", "readout");
         (mesh.material as THREE.MeshBasicMaterial).opacity = 0;
         const line = this._makeDashLine(y, ORD_LINE_Z0);
         const kbLine = this._makeDashLine(y, KB_Z0);
@@ -866,7 +950,7 @@ export class LedgerView implements SceneView {
         }
         if (kbText) {
           // event-time: one canvas when a row's measurement arrives or changes
-          o.kb = makeEdgeLabel(this._colors, kbText, 0, FLOOR_Y.gl0, KB_Z0, ORD_H);
+          o.kb = makeEdgeLabel(this._colors, kbText, 0, FLOOR_Y.gl0, KB_Z0, ORD_H, "left", "readout");
           (o.kb.material as THREE.MeshBasicMaterial).opacity = 0;
           this._ordGroup.add(o.kb);
         }
@@ -1055,6 +1139,7 @@ export class LedgerView implements SceneView {
     // Hoisted per frame (the tune hoist rule): one read for every lane's every tile.
     const dimNet = this._netDimKey();
     const tileRest = this.tiles.rest;
+    const tileInk = this.tiles.ink;
     // A focus is a SELECTED row (pinned or live-followed — how it was reached is not what it is),
     // a hovered row or a hovered tile. The bare lead is none of them: with nothing selected the
     // chamber is simply running, and stepping the whole trail back against a row it advanced onto
@@ -1141,14 +1226,29 @@ export class LedgerView implements SceneView {
         // one level; compounding dim × back left the endpoints near-black under their own ribbon.
         const rowFocus = pinned || hov;
         const entryF = this._entryT < 1 && b.slot >= 0 && b.slot < SLOT_N ? this._entryFade[b.slot] : 1;
-        const brightT =
-          snapBright(tileRest * b.fade, offNet, focus, anyFocus && !rowFocus)
-          * edge * this._fades.alpha * entryF;
+        // `tileRest` is the curve's REFERENCE on paper — the tiles' own resting weight, taken
+        // UNFADED so `b.fade` reads as the ratio it is rather than moving the reference itself.
+        const emph = inkPresence(snapBright(tileRest * b.fade, offNet, focus, anyFocus && !rowFocus), this._paper, tileRest);
+        // The hue floor (TileTune.ink) maps the emphasis into [ink, 1] on paper — affine, so the
+        // tier ORDER above it is untouched and only the bottom of the span is lifted off the glass.
+        const brightT = (this._paper ? tileInk + (1 - tileInk) * emph : emph) * edge * this._fades.alpha * entryF;
         // Emphasis EASES rather than snapping (dimModel.emphasisK). The state rides the BLOCK, next
         // to its two other eased fields — an instance-index buffer would hand a block's brightness
         // to its neighbour every tick, since a new tick shifts every block one slot along.
         const bright = (b.bright += (brightT - b.bright) * ek);
-        this._metaTrailMesh.setColorAt(mi, _col.copy(ident ? laneColor : this._coreCol).multiplyScalar(bright));
+        // GROUND (inkMix): brightness on black is a multiply toward the ground, but these tiles are
+        // OPAQUE and normal-blended, so on paper the same multiply drives them toward BLACK — the
+        // dimmest tile would be the heaviest mark on the page. Presence there is a lerp toward the
+        // paper instead. The `edge <= 0` zero-scale above still owns a fully dissolved row.
+        // THE BACKDROP IS MEASURED, NOT NAMED (2026-08-28). A pass at this pointed the lerp at
+        // `c.panel` on the reasoning that a tile lies on a "near-white glass PLANE" — sampled live,
+        // the plane's channels sample in the high 170s to low 190s while `c.panel` is 251, so the target
+        // overshot the real backdrop by ~70/255 and every de-emphasized tile arrived BRIGHTER than the glass it
+        // was supposed to sink into (user: "the snapshots in the trail are white"). The plane sits
+        // within ~12/255 of `c.bg`, so the scene's own ground is the honest backdrop to measuring
+        // accuracy; what was actually missing is hue at the bottom of the span, which is TileTune.ink
+        // above. Thin toward the ground, floor the tint — the two answer different halves.
+        this._metaTrailMesh.setColorAt(mi, inkMix(_col.copy(ident ? laneColor : this._coreCol), bright, this._colors));
         mi++;
       }
     }

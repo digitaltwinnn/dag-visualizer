@@ -3,8 +3,7 @@ import type { Anchor, GlobalSnapshot, MetaInfo, NodeRow } from "@/src/data/types
 import { NetworkData, shortHash } from "@/src/data/api";
 import { METAGRAPHS } from "@/src/net/current";
 import { COLORS as RAW_COLORS, DEFAULT_META_COLOR as RAW_DEFAULT_META } from "@/src/engine/config";
-import { hex } from "@/src/util/format";
-import { identityHudNumber } from "@/src/palette/identity";
+import { identityHudCss, identityHudNumber } from "@/src/palette/identity";
 import { UNLISTED_ID, UNLISTED_HUE } from "@/src/data/unlisted";
 import { pickNetId } from "@/src/engine/domain/pickActions";
 
@@ -279,10 +278,11 @@ const DAG_CFG: MetagraphConfig = {
 
 // Config core (id → {color, ticker, name, …}) — a metagraph or the DAG; null for "all".
 // The color field is resolved through the identity HUD map so every downstream HUD read
-// (filterAccent, the Engine-built metaList[].color, and any hex(cfg.color) sourced from this
-// accessor) gets the identity hue at once — the DAG flips through the same lane as any other
-// metagraph now (see palette/identity.ts's resolve()); "All" stays structural cyan via
-// filterAccent's own fallback below, and the central core sphere reads COLORS.core directly.
+// (the Engine-built metaList[].color, and anything sourced from this accessor) gets the
+// identity hue at once — the DAG flips through the same lane as any other metagraph now (see
+// palette/identity.ts's resolve()); "All" stays structural cyan via filterAccent's own fallback
+// below, and the central core sphere reads COLORS.core directly. filterAccent itself no longer
+// reads this field — it rides the CSS-token lane directly via identityHudCss (Task 6).
 export function metagraphById(id: string): MetagraphConfig | null {
   if (id === "dag") return { ...DAG_CFG, color: identityHudNumber(id) };
   const cfg = (METAGRAPHS as MetagraphConfig[]).find((m) => m.id === id);
@@ -297,7 +297,7 @@ export function metagraphById(id: string): MetagraphConfig | null {
 export function filterAccent(filter: string): string {
   if (filter === UNLISTED_ID) return UNLISTED_HUE;
   const cfg = metagraphById(filter);
-  if (cfg) return hex(cfg.color);
+  if (cfg) return identityHudCss(cfg.id);
   return "var(--primary)";
 }
 

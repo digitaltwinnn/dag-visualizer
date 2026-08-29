@@ -5,6 +5,7 @@ import type { HoverSubject } from "@/src/data/hoverSubject";
 // Type-only — the store may not import domain VALUES (layerBoundaries rule), but a type-only
 // import of a domain type is legal and keeps CohortSel defined in exactly one place.
 import type { CohortSel, CompositionSel, FocusLevel } from "@/src/engine/domain/focusLadder";
+import type { ThemePref, Theme } from "@/src/theme/resolve";
 
 // The active view. `hyper`/`geo`/`ledger` all drive the 3D scene (every switch among them runs
 // the gather choreography); `status`/`transactions`/`staking` are flat scaffolded placeholders
@@ -276,6 +277,13 @@ interface AppState {
   /** Ask the Engine to frame this ladder rung (see `focusRung`). One-shot; the Engine reads it
    *  on change and never clears it — the value IS the last request, not a pending queue. */
   requestFocusRung: (level: FocusLevel) => void;
+  // THEME (light/dark spec §2). Unlike the network (a frozen page parameter), theme is genuine
+  // runtime state: the resolved value drives the Engine's colour re-thread and any component
+  // that renders theme-conditionally. ONE writer: ThemeController. `theme` boots "dark" (the
+  // SSR-safe default); the controller corrects it on mount before the engine constructs.
+  themePref: ThemePref;
+  theme: Theme;
+  setTheme: (pref: ThemePref, resolved: Theme) => void;
 }
 
 // Keep the exact-snapshot cache bounded (one small object per ordinal); drop the oldest.
@@ -328,6 +336,8 @@ export const useStore = create<AppState>((set) => ({
   sceneCoverL: 0,
   sceneCoverR: 0,
   boxedCard: null,
+  themePref: "system" as ThemePref,
+  theme: "dark" as Theme,
 
   setLive: (live, lastGoodAt) => set((s) => ({ live, lastGoodAt: lastGoodAt ?? s.lastGoodAt })),
   setEngineReady: (engineReady) => set({ engineReady }),
@@ -469,4 +479,5 @@ export const useStore = create<AppState>((set) => ({
   // A fresh object every call — the request is the EVENT, so re-opening the same rung must reach
   // the Engine's reference-compare bridge again.
   requestFocusRung: (level) => set({ focusRung: { level } }),
+  setTheme: (pref, resolved) => set({ themePref: pref, theme: resolved }),
 }));

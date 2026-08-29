@@ -26,37 +26,15 @@ const COMPONENTS_DIR = join(import.meta.dirname, "..", "..", "components");
 
 // Engine / scene-layer allowlist:
 const ENGINE_ALLOWED = new Set<number>([
-  // Scene LIGHTING literals — lighting is a rendering technicality (it shades emissive materials),
-  // deliberately decoupled from the palette; a light is not a surface/identity hue (see SceneContext).
-  0x4a5a8c, // ambient FILL light (cool grey)
-  0xccd6e6, // key light (neutral cool-white)
-  0x5a6f9c, // rim light (muted cool)
+  // Scene LIGHTING used to hold three entries here (ambient / key / rim). The rig replaced them with
+  // a TEMPERATURE axis (domain/sceneRig.ts · tempTint), so lighting is still decoupled from the
+  // palette — it just no longer needs a colour literal to say so, and this list shrank by three.
   0x223046, // dimmed-node tone (Globe + NodeFabric) — TODO: derive from a token
 ]);
 
 // Components-layer allowlist:
 const COMPONENTS_ALLOWED = new Set<number>([
-  // components/RailThread.tsx — the SVG thread ruler + node-dot ring. Kept as literal strings on
-  // purpose: these are native SVG presentation ATTRIBUTES (`stroke="…"`, not a `style` prop), and
-  // this codebase's own tested finding is that a `var(--…)` there doesn't reliably resolve the same
-  // way the equivalent CSS-property use does elsewhere (see the file's inline comments at the
-  // TICK_LINE/TICK_MINOR/TICK_MAJOR consts and the `#0c1020` node-dot ring) — so the values are
-  // hand-mirrored from the tokens instead and must be kept in sync manually.
-  0xb2c1df, // rgba(178,193,223,·) — mirrors --thread-line / --thread-tick / --thread-tick-major
-  0x0c1020, // #0c1020 — mirrors --panel's base RGB (the node-dot's punch-out ring)
-
-  // components/TopBar.tsx — the command bar's own glass gradient. Same base recipe as `.ig-panel`
-  // (globals.css) but tuned to a slightly more transparent alpha for the spineless bar (no resting
-  // edge/spine of its own); `.ig-panel`'s matching gradient stops are themselves an unlayered CSS
-  // literal, not exposed as a `--…` var, so there's no token to point at without changing the alpha
-  // (and therefore the rendered colour).
-  0x141a2e, // rgba(20,26,46,·) — gradient top stop, mirrors .ig-panel's
-  0x0a0e1c, // rgba(10,14,28,·) — gradient bottom stop, mirrors .ig-panel's
-
-  // components/ui/sheet.tsx (overlay scrim) + components/RailDock.tsx (sheet title text-shadow) —
-  // a near-black tint close to but not exactly --background's resolved sRGB (0x010207); no existing
-  // token matches it exactly, and substituting one would shift the (very subtle, low-alpha) colour.
-  0x03050c, // rgba(3,5,12,·)
+  // RailThread/TopBar/scrim literals became themed tokens — light/dark spec §1.
 ]);
 
 // Parse any colour-literal token to {r,g,b}, or null if it isn't one.

@@ -138,8 +138,12 @@ export default function SectionShell({
     <>
       {/* The inline identity transform is REQUIRED from first paint: it flips the fixed children's
           containing block to this wrapper before anything renders, so geometry never jumps when
-          GSAP later writes the same property. */}
-      <div ref={shellRef} id={SHELL_ID} className="fixed inset-0 will-change-transform" style={{ transform: "translateY(0px)" }}>
+          GSAP later writes the same property. The background is the SCENE's own ground token, not
+          the page's paper: during boot the canvas sits at opacity 0, so this is the colour the
+          loading screen stands on — body's `--background` there made boot open on the HUD's paper
+          and then jump to the scene ground as the canvas faded in (user, 2026-08-29). Painted here
+          rather than on `body` so /about and /design keep the paper. */}
+      <div ref={shellRef} id={SHELL_ID} className="fixed inset-0 will-change-transform bg-[var(--scene-ground)]" style={{ transform: "translateY(0px)" }}>
         {scene}
         {/* A plain div — no transform/filter/will-change, and OPACITY ONLY from the timeline — so
             it does NOT become a containing block for the fixed rails inside it. */}

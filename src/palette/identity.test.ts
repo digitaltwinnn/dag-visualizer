@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { hexToHueDeg, configPins, identityPins, identityMap, identityHudHex, identitySceneHex, SCENE_L, SCENE_C, HUD_L, HUD_C } from "./identity";
+import { hexToHueDeg, configPins, identityPins, identityMap, identityHudHex, identityHudCss, identitySceneHex, SCENE_L, SCENE_C, HUD_L, HUD_C } from "./identity";
 import { METAGRAPHS } from "@/src/net/current";
 import { COLORS } from "@/src/engine/config";
 import { oklchToHex } from "./palette";
@@ -71,5 +71,32 @@ describe("lane accessors", () => {
   it("hud and scene share the hue for a known metagraph", () => {
     const m0 = (METAGRAPHS as { id: string }[])[0];
     expect(Math.abs(hexToHueDeg(parseInt(identityHudHex(m0.id).slice(1),16)) - hexToHueDeg(parseInt(identitySceneHex(m0.id).slice(1),16)))).toBeLessThan(2);
+  });
+});
+
+describe("theme-lane constants", () => {
+  // The dark pairs are the byte-identity pin (CLAUDE.md's TDD rule): turning a theme knob
+  // must never move these two numbers, since every existing dark-lane caller (identityHudHex,
+  // identitySceneHex's default) depends on them staying exactly what they've always been.
+  it("HUD_L/HUD_C/SCENE_L/SCENE_C stay the pinned dark values", () => {
+    expect(HUD_L).toBe(0.74);
+    expect(HUD_C).toBe(0.19);
+    expect(SCENE_L).toBe(0.68);
+    expect(SCENE_C).toBe(0.20);
+  });
+});
+
+describe("identityHudCss", () => {
+  it("defers L/C to the CSS tokens so the HUD retints with zero re-renders", () => {
+    const m0 = (METAGRAPHS as { id: string }[])[0];
+    expect(identityHudCss(m0.id)).toMatch(/^oklch\(var\(--ident-l\) var\(--ident-c\) [\d.]+deg\)$/);
+  });
+});
+
+describe("identitySceneHex theming", () => {
+  it("the scene lane themes explicitly, defaulting dark", () => {
+    const m0 = (METAGRAPHS as { id: string }[])[0];
+    expect(identitySceneHex(m0.id)).toBe(identitySceneHex(m0.id, "dark"));
+    expect(identitySceneHex(m0.id, "light")).not.toBe(identitySceneHex(m0.id, "dark"));
   });
 });

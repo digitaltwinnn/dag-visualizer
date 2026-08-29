@@ -15,11 +15,54 @@
 
 import * as THREE from "three";
 import { ARC_TAIL, ARC_TAIL_FRAC, type ArcAgent, type ArcSim } from "../../domain/arcSim";
+import { glowBlend, isLightGround, type SceneColors } from "../../sceneColors";
+import { joinBloom } from "../SceneContext";
 
 // A node record the flash is applied back onto (validator or metagraph node).
 interface FlashRec {
   _flash?: number;
 }
+
+/**
+ * THE HEAD IS A LIGHT; THE TRAIL IS ITS PATH. One packet, two marks, and on paper they answer the
+ * ground question with OPPOSITE answers — which is why the head is a mesh of its own rather than
+ * the bright end of the trail's vertex ramp.
+ *
+ * The trail is where the packet HAS BEEN: a path drawn on the wall, so it takes `glowBlend`'s ink
+ * on paper like every other piece of furniture, and wave 8 judged it right ("fine ink trails"). The
+ * head is the packet ITSELF — a travelling light — and a light that fades into the wall the moment
+ * the ground turns pale is not a light. So it stays ADDITIVE on both grounds, deliberately NOT
+ * asking `glowBlend`.
+ *
+ * ⚠️ That is not the additive-is-a-no-op trap, because the scene's light ground is SILVER, not the
+ * HUD's paper. `--scene-ground`'s own token comment states the reason it exists: "a deeper grey
+ * than the page so ink pops, MARKS CAN EXCEED THE GROUND, and a calm bloom is physically possible
+ * again" (design fork C). Measured, the silver sits ~184/255 against the page's ~240 — some 70
+ * bytes of headroom that a mark lying on `--background` genuinely does not have. The head spends
+ * exactly that headroom, and nothing else in the scene competes for it.
+ *
+ * The ground still decides the head's WEIGHT, because a spark needs different things on each. On
+ * black the hue IS the light and a small hot dot reads immediately. On silver the same dot reads as
+ * a pale smudge — the eye has no dark surround to measure it against — so paper takes a bigger
+ * point, a whiter core and a saturated coloured skirt around it: the hue is what separates a spark
+ * from a specular highlight on a grey wall.
+ *
+ * And the head — the head ALONE — joins BLOOM_LAYER. That is the second half of reading as a spark
+ * on silver: the selective pass bleeds the ground toward the head's own hue and adds a whisper of
+ * light at its core, which is a halo the additive dot cannot draw for itself. The TRAIL must stay
+ * out of the layer: it is a wide soft sheet of near-identical ink, and blurred it would smear the
+ * whole swarm into one coloured fog — the same reason the ledger's ribbons are excluded.
+ */
+const HEAD_TUNE_DEFAULTS = Object.freeze({
+  size: 5.5,     //  point diameter in CSS px at the resting geo distance
+  sizeMin: 3,    //  px floor — a spark zoomed out must still be a spark, not a speck
+  sizeMax: 26,   //  px ceiling — and zoomed in it must not become a blob
+  paperMul: 2,   //  how much bigger the head runs on silver (see the header)
+  core: 0.85,    //  weight of the tight hot centre over the coloured skirt
+  white: 0.45,   //  how far that centre pushes toward white on the dark ground
+  whitePaper: 0.6, // …and on silver, where a hotter core is what says "light, not ink"
+  alpha: 1,      //  overall additive weight
+});
 
 export class Arcs {
   private parent: THREE.Group;
@@ -37,9 +80,41 @@ export class Arcs {
   private _camN: { value: THREE.Vector3 } = { value: new THREE.Vector3(0, 0, 1) };
   private _close: { value: number } = { value: 0 };
   hasArcs = false;
+  // The travelling packets are additive GLOW on the dark ground and normal-blended INK on paper —
+  // additive over a 0.965-L background saturates to white and draws nothing. Held as a field
+  // because the material is rebuilt on every filter change (see rebuildFrom), so the blend mode has
+  // to outlive it. See glowBlend.
+  private _blend: THREE.Blending = THREE.AdditiveBlending;
+  // The comet HEADS — their own Points mesh, and the only member of BLOOM_LAYER here. See the
+  // HEAD_TUNE_DEFAULTS header for why the head is a separate mark from the trail it leads.
+  private headMat: THREE.ShaderMaterial | null = null;
+  private headPos: Float32Array = new Float32Array(0);
+  private headCol: Float32Array = new Float32Array(0);
+  private headPosAttr: THREE.BufferAttribute | null = null;
+  private headColAttr: THREE.BufferAttribute | null = null;
+  // The ground question, hoisted at event time (setColors) so the per-frame path is plain writes.
+  private _paper = false;
 
   constructor(parent: THREE.Group) {
     this.parent = parent;
+  }
+
+  /** Theme flip: plain data in — rule 1 untouched. Re-points the blend mode of the live material
+   *  and of every one the next rebuild makes. The HEAD keeps its additive blend on both grounds
+   *  (see HEAD_TUNE_DEFAULTS) — only its weight themes, through the uniforms below. */
+  setColors(c: SceneColors): void {
+    this._blend = glowBlend(c);
+    if (this.mat) { this.mat.blending = this._blend; this.mat.needsUpdate = true; }
+    this._paper = isLightGround(c);
+    if (this.headMat) this._stageHead(this.headMat);
+  }
+
+  // The head's ground-dependent uniforms, in one place so construction and a live theme flip can
+  // never disagree about what a spark weighs on this ground.
+  private _stageHead(m: THREE.ShaderMaterial): void {
+    const t = HEAD_TUNE_DEFAULTS;
+    m.uniforms.uSize.value = t.size * (this._paper ? t.paperMul : 1);
+    m.uniforms.uWhite.value = this._paper ? t.whitePaper : t.white;
   }
 
   // Adopt the surface's facing/closeness uniforms so a comet over the FAR hemisphere fades the
@@ -64,6 +139,9 @@ export class Arcs {
     this.arcGroup = new THREE.Group();
     this.parent.add(this.arcGroup);
     this.mat = null;
+    this.headMat = null;
+    this.headPosAttr = null;
+    this.headColAttr = null;
     this.hasArcs = false;
     this._sim = sim;
     this._poolRecs = poolRecs;
@@ -78,6 +156,10 @@ export class Arcs {
     this._cometPts = this._cometPts || Array.from({ length: ARC_TAIL }, () => new THREE.Vector3());
     this.arcPos = positions;
     this.arcCol = colors;
+    // One head per agent. `vstart` is `agentIndex * vertsPer` (arcSim), so the head index is
+    // derivable from the agent alone and no parallel bookkeeping is needed.
+    this.headPos = new Float32Array(agents.length * 3);
+    this.headCol = new Float32Array(agents.length * 3);
 
     for (const ag of agents) {
       // static comet falloff: aTail 0 at the head -> 1 at the tail tip
@@ -99,7 +181,7 @@ export class Arcs {
     this.arcColAttr = colAttr;
 
     this.mat = new THREE.ShaderMaterial({
-      transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
+      transparent: true, depthWrite: false, blending: this._blend,
       uniforms: {
         uM: { value: 0 }, // morph fade-in (geography view)
         uCamN: this._camN, // shared with the graticule/walls — see setFacing
@@ -130,12 +212,77 @@ export class Arcs {
         }`,
     });
     this.arcGroup.add(new THREE.LineSegments(geo, this.mat));
+
+    // ── The heads ───────────────────────────────────────────────────────────────────────────────
+    const hGeo = new THREE.BufferGeometry();
+    const hPosAttr = new THREE.BufferAttribute(this.headPos, 3); hPosAttr.setUsage(THREE.DynamicDrawUsage);
+    const hColAttr = new THREE.BufferAttribute(this.headCol, 3); hColAttr.setUsage(THREE.DynamicDrawUsage);
+    hGeo.setAttribute("position", hPosAttr);
+    hGeo.setAttribute("aColor", hColAttr);
+    // A Points cloud has no bounding sphere until one is computed, and the head positions start at
+    // the origin, so let three skip the frustum test rather than cull the whole swarm on frame 1.
+    hGeo.boundingSphere = new THREE.Sphere(new THREE.Vector3(), 1e4);
+    this.headPosAttr = hPosAttr;
+    this.headColAttr = hColAttr;
+
+    const t = HEAD_TUNE_DEFAULTS;
+    // gl_PointSize is in PHYSICAL pixels while the tune is authored in CSS px, so the size carries
+    // the renderer's own pixel-ratio clamp (SceneContext: min(devicePixelRatio, 2)).
+    const px = Math.min(typeof window === "undefined" ? 1 : window.devicePixelRatio, 2);
+    this.headMat = new THREE.ShaderMaterial({
+      transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
+      uniforms: {
+        uM: { value: 0 },
+        uCamN: this._camN,
+        uClose: this._close,
+        uSize: { value: t.size },
+        uWhite: { value: t.white },
+        uPx: { value: px },
+      },
+      vertexShader: `
+        attribute vec3 aColor;
+        uniform float uSize; uniform float uPx;
+        varying vec3 vColor; varying vec3 vDir;
+        void main() {
+          vColor = aColor;
+          vDir = normalize(position);
+          vec4 mv = modelViewMatrix * vec4(position, 1.0);
+          // Attenuated, then CLAMPED at both ends: a spark that shrinks to a speck when the globe
+          // is framed whole has stopped being an accent, and one that swells to a blob up close has
+          // stopped being a packet. The clamp is what keeps it reading at every orbit distance.
+          gl_PointSize = clamp(uSize * uPx * (55.0 / max(-mv.z, 1.0)), ${t.sizeMin.toFixed(1)} * uPx, ${t.sizeMax.toFixed(1)} * uPx);
+          gl_Position = projectionMatrix * mv;
+        }`,
+      fragmentShader: `
+        uniform float uM; uniform vec3 uCamN; uniform float uClose; uniform float uWhite;
+        varying vec3 vColor; varying vec3 vDir;
+        void main() {
+          // The same FACING dim the trail and the globe surface run, so a head crossing the limb
+          // goes behind the hologram with its own tail rather than popping off it.
+          float facing = mix(mix(0.22, 0.03, uClose), 1.0, smoothstep(-0.25, 0.12, dot(vDir, uCamN)));
+          float d = length(gl_PointCoord - vec2(0.5)) * 2.0;
+          if (d >= 1.0) discard;
+          float f = 1.0 - d;
+          float skirt = f * f;            // the coloured falloff — this is what carries the hue
+          float core = pow(f, 7.0);       // the tight centre — this is what reads as hot
+          vec3 rgb = vColor * skirt + mix(vColor, vec3(1.0), uWhite) * core * ${t.core.toFixed(2)};
+          float a = (skirt * 0.75 + core) * ${t.alpha.toFixed(2)} * uM * facing;
+          if (a < 0.004) discard;
+          gl_FragColor = vec4(rgb, a);
+        }`,
+    });
+    this._stageHead(this.headMat);
+    const headPoints = new THREE.Points(hGeo, this.headMat);
+    joinBloom(headPoints); // the head is the spark — see HEAD_TUNE_DEFAULTS. The trail stays out.
+    this.arcGroup.add(headPoints);
+
     this.hasArcs = true;
   }
 
   // js/globe.js:944 — morph fade-in of the whole swarm (set from setMorph's `extras`, not per hop).
   setUM(v: number): void {
     if (this.mat) this.mat.uniforms.uM.value = v;
+    if (this.headMat) this.headMat.uniforms.uM.value = v;
   }
 
   // js/globe.js:990-1015's buffer writes: apply this step's arrival flashes to the node records,
@@ -148,9 +295,11 @@ export class Arcs {
     }
     for (const ag of sim.agents) this._writeAgent(ag);
     if (this.arcPosAttr) this.arcPosAttr.needsUpdate = true;
+    if (this.headPosAttr) this.headPosAttr.needsUpdate = true;
     if (retargeted) {
       for (const ag of sim.agents) this._colorAgent(ag); // take on the new destination's colour
       if (this.arcColAttr) this.arcColAttr.needsUpdate = true;
+      if (this.headColAttr) this.headColAttr.needsUpdate = true;
     }
   }
 
@@ -159,10 +308,13 @@ export class Arcs {
     const c = ag.to.node.color || ag.to.node.base; // metanode .color / validator .base
     if (!c) return;
     const col = this.arcCol;
-    for (let v = 0, n = (ARC_TAIL - 1) * 2; v < n; v++) {
+    const vertsPer = (ARC_TAIL - 1) * 2;
+    for (let v = 0; v < vertsPer; v++) {
       const ci = (ag.vstart + v) * 3;
       col[ci] = c.r; col[ci + 1] = c.g; col[ci + 2] = c.b;
     }
+    const hi = (ag.vstart / vertsPer) * 3;
+    this.headCol[hi] = c.r; this.headCol[hi + 1] = c.g; this.headCol[hi + 2] = c.b;
   }
 
   // Write a packet's comet into the shared position buffer: ARC_TAIL points trailing the head
@@ -180,5 +332,9 @@ export class Arcs {
       pos[vi] = A.x; pos[vi + 1] = A.y; pos[vi + 2] = A.z;
       pos[vi + 3] = B.x; pos[vi + 4] = B.y; pos[vi + 5] = B.z;
     }
+    // The head rides p[0] — the same sample the trail's bright end already uses, so the spark can
+    // never drift off the comet it leads.
+    const hi = (ag.vstart / ((ARC_TAIL - 1) * 2)) * 3, H = p[0];
+    this.headPos[hi] = H.x; this.headPos[hi + 1] = H.y; this.headPos[hi + 2] = H.z;
   }
 }

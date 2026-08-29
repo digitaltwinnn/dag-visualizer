@@ -4,7 +4,7 @@ import { useStore, type Mode } from "@/src/store/store";
 import { applyClickActions } from "@/src/store/applyClickActions";
 import { metagraphById, initNetwork, getNetwork, getAnchor, DEFAULT_META_COLOR, resolveSignerIps } from "@/src/data/network";
 import { ledgerLens, tickInStory } from "@/src/data/ledgerStory";
-import { LISTED_IDS, UNLISTED_ID, UNLISTED_SCENE_HEX } from "@/src/data/unlisted";
+import { LISTED_IDS, UNLISTED_ID, UNLISTED_SCENE_HEX_BY_THEME } from "@/src/data/unlisted";
 import { hoverKeyOf, tooltipSubject } from "@/src/data/hoverSubject";
 import { identityMap, identitySceneHex } from "@/src/palette/identity";
 import { createScene, type SceneCtx } from "./scene/SceneContext";
@@ -15,12 +15,15 @@ import { UNLISTED_KEY } from "./domain/ledgerBands";
 
 // The public catalog's ids — the unknown-lane tile resolver splits listed from unlisted rows.
 import { StageLight } from "./scene/objects/StageLight";
+import { SceneRig } from "./scene/objects/SceneRig";
 import { loadGeoCache, resolveMissing } from "@/src/data/geoResolve";
 import { METAGRAPHS, NET, netUrl } from "@/src/net/current";
 import { COLORS } from "@/src/engine/config";
 import { BYTE_SCALE_KB, type RailGroup } from "./domain/ledgerLayout";
 import { HYPER_TILT, HYPER_TILT_FOCUS } from "./domain/hyperLayout";
-import { readSceneColors } from "./sceneColors";
+import { readSceneColors, type SceneColors, LIGHT_TUNE } from "./sceneColors";
+import { setNodeDimTarget } from "./scene/objects/NodeFabric";
+import { THEME_KEY, parseThemePref, resolveTheme, type Theme } from "@/src/theme/resolve";
 import { VIEW_POLICIES, type ViewPolicy } from "./domain/viewPolicy";
 import { FOCI, hubFraming, geoFraming, nodeFraming, cohortFraming, ledgerCommitTilt, dollyBack, railsLean, restOrbit, easeInOutQuad, isSamePose, nudgeMix, NUDGE_DUR, type CameraFraming, type FocusName } from "./domain/cameraRig";
 import { countryFraming } from "./domain/countryShape";
@@ -50,14 +53,22 @@ const GATHER_DIST = 34;
 // id[] -> { id: sceneColorNumber }, resolved through the identity map (Task 1). The scene
 // layer never imports the TS generator — the Engine owns the map and hands scene colors
 // over as plain data.
-const sceneColorsFor = (ids: string[]): Record<string, number> => {
+// localStorage throws in a hardened/private context; a missing pref is the System state, which is
+// exactly what parseThemePref answers for null — so a failed read degrades to System, not to a crash.
+const safeRead = (key: string): string | null => {
+  try { return window.localStorage.getItem(key); } catch { return null; }
+};
+
+const sceneColorsFor = (ids: string[], theme: Theme): Record<string, number> => {
   const out: Record<string, number> = {};
-  for (const [id, e] of identityMap(ids)) out[id] = parseInt(e.sceneHex.slice(1), 16);
+  // identityMap ASSIGNS the hues (the guard-band walk over the whole id set), so it still runs;
+  // only each hue's L/C themes, which is what identitySceneHex(id, theme) resolves.
+  for (const [id] of identityMap(ids)) out[id] = parseInt(identitySceneHex(id, theme).slice(1), 16);
   // The unlisted pseudo-network rides every map with its NEUTRAL gray (one home: unlisted.ts,
   // 2026-08-08) — so the lane/band/ribbon/tile machinery colors it like any catalog id and the
   // scene needs no special case (ByteBar/Ribbons' UNLISTED_KEY→neutral branch was retired with
   // this). Harmless in maps whose consumer never draws it (HyperView's hub map).
-  out[UNLISTED_ID] = UNLISTED_SCENE_HEX;
+  out[UNLISTED_ID] = UNLISTED_SCENE_HEX_BY_THEME[theme];
   return out;
 };
 
@@ -80,6 +91,10 @@ export class Engine {
   // THE stage light — one shared SpotLight the focused view CLAIMS per frame (scene/objects/
   // StageLight). Constructed after the scene exists, so it is assigned in the constructor.
   private _stageLight!: StageLight;
+  // THE LIGHTING RIG — the app's one ambient + three-point directional set (scene/objects/SceneRig).
+  // Sibling of the StageLight: that one is a CLAIM (one subject, strongest wins), this one a BLEND
+  // (every view lights the scene, weighted by the same per-view presences).
+  private _rig!: SceneRig;
   private _ledgerDirty = false; // rebuild the ledger geometry next frame (set on data events)
   // The frame timer — THREE.Timer (THREE.Clock was deprecated in r180). Unlike Clock it must be
   // updated once per frame before reading the delta; the render loop does that.
@@ -87,6 +102,8 @@ export class Engine {
   private raf = 0;
   private disposed = false;
   private _dofTmp = new THREE.Vector3();
+  /** Scratch for the follow-spot's per-frame anchor hand-off (Globe records → HyperView's claim). */
+  private _stageNodeTmp = new THREE.Vector3();
   private _calloutV = new THREE.Vector3(); // scratch: the subject callout's anchor, world → NDC
   // Geo callout anchors, cached EVENT-TIME (latLonToVec3 allocates and ring extraction is
   // heavy — neither may run per frame): the node anchor recomputes when the pick REFERENCE
@@ -303,6 +320,38 @@ export class Engine {
   private _metaNodesPlaced = false;
   private _coreNodesPlaced = false;
 
+  // ---- theme -------------------------------------------------------------------------------
+  // The resolved theme the SCENE currently wears. Resolved at construction from the same two
+  // inputs ThemeController reads (stored pref + the media query), because the store's own `theme`
+  // may not have been corrected yet when the engine is built; kept current by _refreshTheme.
+  private _theme: Theme = "dark";
+  // The ONE structural palette object every scene module was threaded at construction. A theme
+  // flip mutates it IN PLACE (Object.assign), so every per-frame reader repaints next frame with
+  // no call at all — only the construction-time captures need the _colorConsumers fan-out.
+  private _colors!: SceneColors;
+  // The ONE identity scene map, likewise threaded once and mutated in place. Holds every config
+  // metagraph, every live one, "dag" and "unlisted".
+  private _sceneColorMap!: Record<string, number>;
+  // Adapters holding construction-time captures of either palette. Registered once, in
+  // construction order; a flip calls both setters on each.
+  private _colorConsumers: {
+    setColors(c: SceneColors): void;
+    setSceneColors(m: Record<string, number>): void;
+  }[] = [];
+  // Per-view bloom level, themed (spec §5). ON PAPER THE PASS IS OFF, and the reason is the
+  // HIGHPASS: bloom keeps what is brighter than `threshold` (0.13, low so every identity hue
+  // clears it), blurs it and adds it back. A ~0.94-L page clears that by itself, so on light the
+  // pass returns a blurred copy of the PAGE and adds it over everything — equal RGB everywhere,
+  // which lifts every dark mark toward white and crushes its saturation. That veil, not any
+  // material value, is what made the day look read as washed-out pastel (measured 2026-08-21:
+  // turning it off dropped the scene's dark marks from 140 to 65 luminance and multiplied its
+  // strongly-coloured pixels 17×). The shipped `LIGHT_TUNE.bloomMul` is 0, so on paper the
+  // whole-frame pass is SKIPPED outright (`bloom.enabled = _bloomMul > 0`; `bloomFloor` is inert
+  // while it is 0) and the identity marks halo through their own selective layer instead
+  // (SceneContext's BLOOM_LAYER sub-pipeline). The knob stays: any value > 0 re-enables the
+  // whole-frame pass at that calm level with the threshold floored high.
+  private _bloomMul = 1;
+
   constructor(canvas: HTMLCanvasElement, onReady?: () => void, onSceneReady?: () => void) {
     this.canvas = canvas;
     this._onReady = onReady;
@@ -312,7 +361,16 @@ export class Engine {
     // warn if config.COLORS (the static mirror the non-DOM data/palette layer needs) drifts from the
     // live tokens, so the two can't silently diverge.
     const colors = readSceneColors();
-    if (process.env.NODE_ENV === "development") {
+    this._colors = colors;
+    // Resolve the theme the way ThemeController does. The pre-paint stamp has already run, so the
+    // tokens read above are ALREADY the right theme's — this only tells us WHICH one they are, for
+    // the identity lane (which resolves in JS, not CSS) and the drift gate below.
+    this._theme = resolveTheme(
+      parseThemePref(safeRead(THEME_KEY)),
+      typeof window !== "undefined" && window.matchMedia("(prefers-color-scheme: dark)").matches,
+    );
+    this._bloomMul = this._theme === "light" ? LIGHT_TUNE.bloomMul : 1; // silver: calm pass (see the field)
+    if (process.env.NODE_ENV === "development" && this._theme === "dark") {
       // Tolerant compare (±2 per channel): oklch→sRGB resolution rounds, so only a genuine token
       // change (a different colour) should warn — not a 1-bit rounding wobble.
       const near = (a: number, b: number) =>
@@ -321,6 +379,9 @@ export class Engine {
         Math.abs((a & 255) - (b & 255)) <= 2;
       // The mirror mirrors :root — under a dev network the [data-net] override re-points
       // --primary ON PURPOSE, so only mainnet checks core. dagCore/bg are never overridden.
+      // And config.COLORS stays the DARK mirror (spec §4) — its consumers (SSR, the bake scripts)
+      // have no DOM and no theme — so the whole comparison is gated on dark above: mainnet-dark is
+      // the one state `:root` fully describes, and on paper every row would "drift" by design.
       const drift = ([...(NET === "mainnet" ? [["core", COLORS.core, colors.core] as const] : []),
         ["dagCore", COLORS.dagCore, colors.dagCore] as const,
         ["bg", COLORS.bg, colors.bg] as const])
@@ -329,14 +390,25 @@ export class Engine {
         `[sceneColors] config.COLORS drifts from globals.css tokens: ${drift.join(", ")} — update config.ts to match.`,
       );
     }
+    setNodeDimTarget(colors); // the fabrics' shared mute target follows the ground (see NodeFabric)
     this.ctx = createScene(canvas, colors);
     // HyperView builds all its hubs synchronously from config.METAGRAPHS inside its
     // constructor (before any API data exists), so the identity scene-color map has to be
     // handed in at construction — passing it as a 2nd ctor arg (read by _buildMetagraphs) means
     // the hubs are born in the identity color with no recolor pass and no first-paint flash.
-    // HyperView only ever has these 10 config hubs, so this map never needs updating.
+    // HyperView only ever has these 10 config hubs, so this map never GAINS keys — but its VALUES
+    // theme (each hue's L/C is per-theme, spec §4), so it is the same mutated-in-place object the
+    // globe and the ledger hold rather than a private build of its own.
+    this._sceneColorMap = sceneColorsFor([...METAGRAPHS.map((m) => m.id), "dag"], this._theme);
     this._stageLight = new StageLight(this.ctx.scene);
-    this.layers = new HyperView(this.ctx.scene, colors, this._stageLight, sceneColorsFor(METAGRAPHS.map((m) => m.id)));
+    // The scene's own key/fill/rim. Constructed here beside the StageLight and for the same reason:
+    // both are LIGHTS staged per frame from per-view domain rows, and SceneContext is the render
+    // pipeline's home, not the lighting's. The rig is set to the boot ground immediately so the
+    // first frame is lit for the theme the pre-paint stamp already chose.
+    this._rig = new SceneRig(this.ctx.scene);
+    this._rig.setGround(this._theme === "light");
+    this._stageLight.setGround(this._theme === "light");
+    this.layers = new HyperView(this.ctx.scene, colors, this._stageLight, this._sceneColorMap);
     this.globe = new Globe(this.ctx.scene, this.layers, this.ctx.camera, colors, this._stageLight);
     // The Globe reads the transition machine each frame (geo furniture alpha + the node gather).
     this.globe.transition = this.transition;
@@ -344,8 +416,11 @@ export class Engine {
     // SCENE map the hubs were born with, at construction, so nothing anywhere is built from a raw
     // config colour ("dag" included — its own brand hue, distinct from structural cyan; see
     // palette/identity.ts). refreshMeta below refreshes/extends both once the live set is known.
-    const initialSceneColors = sceneColorsFor([...METAGRAPHS.map((m) => m.id), "dag"]);
-    this.ledger = new LedgerView(this.ctx.scene, colors, initialSceneColors);
+    this.ledger = new LedgerView(this.ctx.scene, colors, this._sceneColorMap, this._stageLight);
+    // The theme fan-out, in construction order. Each holds construction-time captures of one or
+    // both palettes (materials, shader uniforms, baked vertex colours, canvas-texture labels);
+    // everything else in the scene reads the mutated objects per frame and needs no call.
+    this._colorConsumers = [this.layers, this.globe, this.ledger];
     // A tile's identity comes from the POLLED feed (spec §6.1) — the Engine is the store/data
     // bridge, so the lookup lives here and the model stays pure. A tile the buffer can't name is
     // anonymous: drawn, but not pickable. `k` is the tile's index within ITS TICK.
@@ -385,7 +460,7 @@ export class Engine {
     // (see globe.js setNodes) — seed it here, synchronously, so it's populated before the first
     // setNodes call (which can fire from the "cluster" event before refreshMeta's API round-trip
     // resolves).
-    this.globe.sceneColors = initialSceneColors;
+    this.globe.setSceneColors(this._sceneColorMap);
     canvas.addEventListener("click", this.onClick);
     canvas.addEventListener("pointermove", this.onMove);
     canvas.addEventListener("pointerdown", this.onDown);
@@ -451,6 +526,11 @@ export class Engine {
     this.unsub.push(
       useStore.subscribe((st, prev) => {
         if (st.mode !== prev.mode) this.setMode(st.mode);
+        // The engine learns of a theme flip the one allowed way (spec §3). The CSS has already
+        // flipped on this same click — `data-theme` / `color-scheme` are stamped by
+        // ThemeController before it writes the store — so the tokens re-read below resolve to the
+        // new theme with no ordering handshake.
+        if (st.theme !== prev.theme) this._refreshTheme(st.theme);
         // The rails-hidden camera LEAN (2026-08-08, review-hardened): the lean is composed into
         // EVERY tween destination by _tweenTo while the flag holds, so the toggle just mirrors
         // the flag and RE-RESOLVES the canonical pose — focus flights, transition landings and
@@ -649,6 +729,44 @@ export class Engine {
   // Fetch the (server-cached, live) metagraph set + node geo. On the initial load we
   // build + frame as usual; on a periodic refresh we rebuild the nodes ONLY if the
   // set actually changed, and WITHOUT moving the camera (don't yank the user's view).
+  /** Push the identity scene map at every holder. One home for the fan-out — refreshMeta (new
+   *  metagraphs) and _refreshTheme (new L/C for the same hues) both go through it. */
+  private _pushSceneColors(): void {
+    for (const m of this._colorConsumers) m.setSceneColors(this._sceneColorMap);
+  }
+
+  /**
+   * A theme flip, applied in one frame (spec §3). The CSS has already flipped, so the two palette
+   * objects are swapped IN PLACE and every per-frame writer — the dimModel resolvers, the
+   * instanced colour passes, the tile brightness — repaints next frame with no call at all. Only
+   * the construction-time captures need the fan-out below.
+   *
+   * Deliberately an instant snap: a scene cross-fade synchronised against an atomic CSS repaint is
+   * complexity with no payoff, and reduced motion is therefore a no-op by construction.
+   */
+  private _refreshTheme(theme: Theme): void {
+    this._theme = theme;
+    Object.assign(this._colors, readSceneColors()); // CSS already flipped — the tokens resolve new
+    for (const id of Object.keys(this._sceneColorMap)) {
+      this._sceneColorMap[id] =
+        id === UNLISTED_ID
+          // The unlisted network is neutral gray in both lanes and generates no hue, so it is not
+          // in identityMap's domain — it carries its own per-theme pair (src/data/unlisted.ts).
+          ? UNLISTED_SCENE_HEX_BY_THEME[theme]
+          : parseInt(identitySceneHex(id, theme).slice(1), 16);
+    }
+    // Hue never themes (spec §4), so identityMap is NOT re-run here: the assignment is unchanged
+    // and only each hue's L/C moved. refreshMeta stays the one place ids are assigned.
+    this.ctx.setClearColor(this._colors.bg);
+    this.ctx.setGround(theme === "light");
+    this._rig.setGround(theme === "light"); // swap-in-place: the next frame multiplies by the other set
+    this._stageLight.setGround(theme === "light"); // a lamp is a different instrument on paper
+    setNodeDimTarget(this._colors);
+    this._pushSceneColors();
+    for (const m of this._colorConsumers) m.setColors(this._colors);
+    this._bloomMul = theme === "light" ? LIGHT_TUNE.bloomMul : 1;
+  }
+
   private async refreshMeta(initial: boolean) {
     try {
       const r = await fetch(netUrl("/api/metagraphs"));
@@ -661,9 +779,15 @@ export class Engine {
       // Globe colors nodes for ALL current metagraphs (incl. new ones the API adds later) AND the
       // DAG's own validator nodes, so rebuild the scene-color map over the live id set + "dag" on
       // every refresh, right before either path below calls setMetagraphs.
-      const liveSceneColors = sceneColorsFor([...(this.metaData || []).map((m) => m.id), "dag"]);
-      this.globe.sceneColors = liveSceneColors;
-      this.ledger.setSceneColors(liveSceneColors); // re-tints the dials/pulses too (incl. new metagraphs)
+      // Mutated IN PLACE, never rebuilt: the same object was threaded into all three views at
+      // construction and a theme flip mutates that same object, so a fresh one here would silently
+      // strand whichever holder kept the old reference. The live set only ever ADDS ids to the
+      // config set, so stale keys are impossible to reach and harmless to keep.
+      Object.assign(
+        this._sceneColorMap,
+        sceneColorsFor([...(this.metaData || []).map((m) => m.id), "dag"], this._theme),
+      );
+      this._pushSceneColors(); // re-tints the dials/pulses too (incl. new metagraphs)
       if (initial) {
         this._applyMetagraphs();
       } else if (this.metaData && changed && Object.keys(this.geoMap).length) {
@@ -1016,7 +1140,7 @@ export class Engine {
     // any other id, not structural cyan.
     const accent =
       this.filter && this.filter !== "all"
-        ? new THREE.Color(identitySceneHex(this.filter)).getHex()
+        ? new THREE.Color(identitySceneHex(this.filter, this._theme)).getHex()
         : null;
     this.globe.setEdgeColor(accent);
   }
@@ -1530,7 +1654,7 @@ export class Engine {
       const zoomedIn = this._integrateMotion(dt); // hyper spin/tilt ease + globe rotation (poses final after this)
       this._deriveFrames();        // staging plane from the SETTLED camera + rotation
       this._writeScene(dt, zoomedIn); // morph/alphas/visibility/view updates/DoF — reads only settled state
-      this.ctx.composer.render();
+      this.ctx.renderFrame();
       if (this._onReady) {
         const cb = this._onReady;
         this._onReady = undefined;
@@ -1551,9 +1675,17 @@ export class Engine {
     // strength/radius/threshold live each render, so a per-frame set is enough (and it tracks a
     // mode switch immediately).
     const pb = policy.bloom;
-    this.ctx.bloom.strength = pb.strength;
+    // × the theme's level (spec §5). Strength alone: radius and threshold say WHAT blooms and how
+    // wide the halo is — the pass's shape — while strength is how much of it lands, which is the
+    // one thing a paper ground wants near-zero.
+    this.ctx.bloom.strength = pb.strength * this._bloomMul;
     this.ctx.bloom.radius = pb.radius;
-    this.ctx.bloom.threshold = pb.threshold;
+    // On silver the threshold floors high: only marks brighter than the ground may halo.
+    this.ctx.bloom.threshold = this._bloomMul < 1 ? Math.max(pb.threshold, LIGHT_TUNE.bloomFloor) : pb.threshold;
+    // Paper skips the pass outright rather than running it at zero strength — the composer's own
+    // `enabled` flag, the same lever the DoF pass sits behind (SceneContext). A plain boolean
+    // write, so the frame body still allocates nothing.
+    this.ctx.bloom.enabled = this._bloomMul > 0;
 
     // ---- view-transition choreography ------------------------------------------------------
     // Advance the machine; tick() returns TRUE exactly once, at the OUT→IN boundary. The nodes
@@ -1689,9 +1821,26 @@ export class Engine {
     // The stage light's per-view PRESENCE, published BEFORE the view updates that claim it: a claim
     // is scaled by its view's furniture alpha, so a fading view's light fades with its furniture and
     // a dark view's claim is worth nothing. That is the whole off-switch — not claiming IS off.
-    this._stageLight.setPresence(hyperAlpha, this.transition.furnitureAlpha("geo"));
+    this._stageLight.setPresence(hyperAlpha, this.transition.furnitureAlpha("geo"), ledgerAlpha);
+    // The RIG rides the same three presences — one room's lighting cross-fading into the next,
+    // rather than a cut at the transition boundary. Aimed from the camera (see domain/sceneRig),
+    // so it is staged here, after the camera phase and before the views write their materials.
+    this._rig.update(
+      this.ctx.camera, this.ctx.controls.target,
+      hyperAlpha, this.transition.furnitureAlpha("geo"), ledgerAlpha,
+    );
 
+    // ONE LIGHT, TWO CONSUMERS: the rig's key IS geo's sun (see GeoViewHost.sunUniform). Pushed
+    // after the rig has been staged for this frame, so the globe's day side and the chips standing
+    // on it can never disagree about where the light comes from.
+    this.globe.setSun(this._rig.keyDir);
     this.globe.setMorph(this.morph);
+    // THE FOLLOW-SPOT's subject, resolved from the node RECORDS and handed to the view that stages
+    // hyper's light. The records are the Globe's and the claim is HyperView's, so the Engine — the
+    // one bridge between adapters — carries it across, before `layers.update` makes the claim.
+    this.layers.setStageNode(
+      this.globe.stageNodeHyperAnchor(this._stageNodeTmp) ? this._stageNodeTmp : null,
+    );
     // Core-dim target: the DAG core fades back when a specific metagraph is the effective subject
     // (hover-preview wins over the committed filter), and stays lit for "all"/"dag".
     const coreSubj = this._hoverFilter ?? this.filter;
@@ -2061,6 +2210,9 @@ export class Engine {
         hyper: this.layers,
         camera: this.ctx.camera,
         controls: this.ctx.controls,
+        // The light-look group's onChange re-runs the whole theme thread (token re-read, scene
+        // map rebuild, bloom re-apply) so every dial lands the same way a real flip does.
+        refreshTheme: () => this._refreshTheme(this._theme),
       });
       if (this.disposed) this._devTune.dispose();
     } finally {
@@ -2142,6 +2294,6 @@ export class Engine {
     cancelAnimationFrame(this.raf);
     this.ctx.controls.dispose?.();
     this.ctx.renderer.dispose?.();
-    this.ctx.composer.dispose?.();
+    this.ctx.dispose();
   }
 }

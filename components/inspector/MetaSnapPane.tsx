@@ -23,7 +23,7 @@ import { fmtDag, fmtKB, midHash } from "@/src/util/format";
 import { relativeAge } from "@/src/util/relativeAge";
 import { useMinHold } from "@/components/useMinHold";
 import { useNowTick } from "@/components/useNowTick";
-import { identityHudHex } from "@/src/palette/identity";
+import { identityHudCss } from "@/src/palette/identity";
 import { PulseEdge, useEdgePulse } from "@/components/EdgePulse";
 import { METASNAP_ICON, KIND_MARK_CLASS } from "@/components/icons";
 import { followToggleActions, metaSnapSelectActions } from "@/src/engine/domain/pickActions";
@@ -131,7 +131,7 @@ export default function MetaSnapPane({
   // An UNLISTED metagraph has no config row, so its hue is the unlisted set's NEUTRAL gray
   // (2026-08-08: hashing the address through the identity palette minted a random hue per channel —
   // pink icons for a set that deliberately has no identity of its own).
-  const hue = cfg ? identityHudHex(sel.metaId) : UNLISTED_HUE;
+  const hue = cfg ? identityHudCss(sel.metaId) : UNLISTED_HUE;
   const pair = subjectPairing<string>(hoverMetaSnap, metaSnapHoverKey(sel.metaId, sel.ordinal), setHoverMetaSnap, hue);
   // Hoisted out of the state tier so the FOOT can reach it — it is a hash, and hashes are looked
   // up, not read. The deep read wins where it exists; the exact row carries it otherwise.
