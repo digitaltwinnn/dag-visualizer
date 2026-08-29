@@ -395,8 +395,20 @@ export function createScene(canvas: HTMLCanvasElement, colors: SceneColors): Sce
   // was — byte-identical.
   let backdrop: THREE.CanvasTexture | null = null;
   let isPaper = isLightGround(colors);
-  // The drift vector above, applied per channel at strength k.
-  const coolDrift = [1 - 0.026, 1, 1 + 0.049];
+  /**
+   * The tint axis, and it is SIGNED: +k drifts the stop toward the blue depth, −k back the other
+   * way into a warm cream. One vector, two directions, because a cyclorama's whole colour story is
+   * a single warm/cool axis — the sky end and the lit end are not two unrelated hues, they are the
+   * two ends of where the light came from.
+   *
+   * Widened from the ±(2.6%, 0, 4.9%) this started at (user, 2026-08-29: the ground "is a dull gray
+   * currently … make it lighter or more colourful"). At the old width the whole frame sat inside one
+   * grey-blue, which is exactly the complaint: a drift you have to be told about is not colour.
+   */
+  const coolDrift = [1 - 0.058, 1 - 0.008, 1 + 0.088];
+  // The multiply pass's base — white is a multiply's identity, so its stops read as fractions of
+  // whatever the sweep already laid down. Grayscale, so rule 3 has nothing to say about it.
+  const WHITE_BYTES = [255, 255, 255];
   function paperBackdrop(bg: number): THREE.CanvasTexture {
     // 1024, not the 512 this started at: the GRID below is a ONE-TEXEL line and the backdrop
     // renders screen-stretched, so the texel size IS the line weight. At 512 a hairline arrives
@@ -408,53 +420,74 @@ export function createScene(canvas: HTMLCanvasElement, colors: SceneColors): Sce
     // Scale the sRGB BYTES, not THREE.Color channels — those are linear, and a linear value
     // drawn into a 2D canvas as if it were sRGB shifts the paper's near-neutral hue visibly
     // (first cut of this read lavender).
-    // `m` is the level on the paper, `k` how far the stop has settled into its own hue.
-    const hex = (m: number, k = 0) =>
-      "#" + [(bg >> 16) & 255, (bg >> 8) & 255, bg & 255]
+    // `m` is the level on the stop's base, `k` how far it has drifted along the warm/cool axis
+    // (see coolDrift: +k cool, −k warm).
+    const tint = (base: readonly number[], m: number, k: number) =>
+      "#" + base
         .map((u, i) => Math.round(Math.min(255, u * m * (1 + (coolDrift[i] - 1) * k * LIGHT_TUNE.bgTint)))
           .toString(16).padStart(2, "0")).join("");
+    // The two passes' bases: the sweep paints the GROUND itself, the fall-off MULTIPLIES over it,
+    // so its base is white (a multiply's identity) and its levels read as fractions of what the
+    // sweep already laid down. Sharing `tint` is what keeps both passes on the ONE warm/cool axis
+    // — and it is why the vignette needs no colour literal of its own (rule 3: the hue comes from
+    // the token, the drift from the one vector, and `bgTint` 0 still returns the whole frame to
+    // neutral grey in BOTH passes).
+    const bgBytes = [(bg >> 16) & 255, (bg >> 8) & 255, bg & 255];
+    const hex = (m: number, k = 0) => tint(bgBytes, m, k);
+    const grey = (m: number, k = 0) => tint(WHITE_BYTES, m, k);
 
-    // ⚠️ THE RANGE IS SPENT DOWNWARD, BECAUSE PAPER HAS ALMOST NO HEADROOM ABOVE IT. The paper
-    // token's blue is already 243/255, so ANY composite over ~1.049 clips that channel alone and
-    // swings the top of the frame off-hue — a ceiling the levels below are solved against, never
-    // an aesthetic choice. (The same shape as this wave's ink curve: on paper, emphasis is
-    // separation you take AWAY, not light you add.)
+    // ⚠️ THE CEILING THAT SHAPED THIS SWEEP WAS THE PAGE'S, NOT THIS GROUND'S (measured
+    // 2026-08-29). The rule here used to read "the paper token's blue is already 243/255, so ANY
+    // composite over ~1.049 clips" — and every level below was solved downward against it. That
+    // 243 is `--background`, the HUD's paper. This backdrop is built from `--scene-ground`, which
+    // design fork C turned to SILVER: probed live it is [176,184,198], so the blue has ~57 bytes
+    // of headroom and the sweep can spend range UPWARD as well as down. The old ceiling was real
+    // when it was written and simply stopped being about this texture; it is why the wall kept
+    // being asked to buy hue with level, and why it kept coming back grey.
     //
-    // The level is therefore anchored at MID-FRAME, not at the area mean: a cyclorama is lit for
-    // the subject, and the instruments stand in the middle band. Composite there is 0.976 — the
-    // ground level the user tuned — while the frame falls away below and to the corners.
+    // The level is still anchored where the INSTRUMENTS stand — a cyclorama is lit for the
+    // subject, and they occupy the middle band — but the anchor itself moved up with the token
+    // (user, 2026-08-29: "make the background of the scene lighter"). Both halves of "lighter"
+    // are spent: the token carries the ground, this carries the light on it.
     //
-    // 1. The sweep. Measured on the flat-vignette cut (user: "I don't see it"): 1.5%/−6% over a
-    // screen-stretched canvas lands under JPEG noise, so the range has to be this wide to read at
-    // all. The knee sits at 0.72 because the instruments' own footprint starts around there.
-    //
-    // ⚠️ THE TOP STOP BUYS HUE WITH LEVEL, BECAUSE THE CEILING ALLOWS NOTHING ELSE (user,
-    // 2026-08-26: "the gray looks boring"). The cool drift RAISES blue, so at the old 1.045 any
-    // drift at all clipped — which is exactly why the brightest, largest part of the frame was
-    // the one part with no hue in it, and why the whole thing read grey. Dropping the top to 1.02
-    // opens room for k = 0.4 there; the eye reads the tint, not the 2% of level it cost. The two
-    // MIDDLE stops keep their levels untouched — the mid-frame anchor above is measured through
-    // them — and only their k rises, so the frame gains colour without moving the ground the user
-    // tuned. The bottom is where the range is genuinely spent: deeper (0.82) and fully drifted, so
-    // the lower third settles into depth instead of into grey.
+    // 1. The sweep — a SKY-TO-STAGE ramp, not a grey fade. Bright and cool at the top where a
+    // studio wall catches the most light, easing through the lit band, then falling into a deep
+    // saturated blue at the bottom: the floor of the cyclorama, where the light has run out and
+    // the hue is all that is left. The k column is what makes it a colour ramp rather than a
+    // brightness ramp — it climbs the whole way down, so the frame gets BLUER as it gets darker,
+    // which is what depth actually looks like and what a uniform grey-blue never says.
+    // ⚠️ DEPTH IS BOUGHT WITH CHROMA HERE, NOT WITH LEVEL — the ask was "lighter" and a cyclorama's
+    // floor is the one part that naturally wants to go dark, so the two pull against each other.
+    // Measured at the first cut (m 0.9 / 0.76 down the bottom): the corners composited to
+    // [105,121,155], DARKER than the flat ground this replaced — the frame read lighter overall and
+    // still had a heavy floor. The levels below are lifted and the k column left climbing, so the
+    // bottom settles by getting BLUER rather than by getting dimmer.
     const sweep = g.createLinearGradient(0, 0, 0, S);
-    sweep.addColorStop(0, hex(1.02, 0.4));
-    sweep.addColorStop(0.40, hex(1, 0.55));
-    sweep.addColorStop(0.72, hex(0.93, 0.9));
-    sweep.addColorStop(1, hex(0.82, 1.35));
+    sweep.addColorStop(0, hex(1.13, 0.5));
+    sweep.addColorStop(0.28, hex(1.09, 0.35));
+    sweep.addColorStop(0.55, hex(1.02, 0.6));
+    sweep.addColorStop(0.78, hex(0.96, 1.05));
+    sweep.addColorStop(1, hex(0.87, 1.6));
     g.fillStyle = sweep;
     g.fillRect(0, 0, S, S);
 
     // 2. The fall-off, multiplied so it only ever takes light away — the sweep alone owns the
     // levels, and a second additive pass would fight it for the top end. Centred high (y 0.332)
     // so the brightest point of the wall is where the key light lands, not the middle of the
-    // frame. Greys are neutral on purpose: the hue is the sweep's business. The outer stop is
-    // what makes the pass earn its place: at #ebebeb the corners sat 2 levels under mid-frame,
-    // measured — a fall-off nobody could see is just a slower fill.
+    // frame.
+    //
+    // ⚠️ THIS PASS IS NOW THE WARM POOL, AND THAT IS THE OTHER HALF OF THE COLOUR (2026-08-29).
+    // Its stops used to be neutral greys, on the rule that "the hue is the sweep's business" —
+    // which left one axis doing all the work and the result reading as one tinted grey. A key
+    // light is WARM and it lands in a SPOT, so the warmth belongs to the radial pass, not to a
+    // horizontal band of the vertical one. Multiply can only darken, so warm is expressed by
+    // taking blue away at the centre and taking red away at the rim: the pool goes cream, the
+    // corners go cool and deep, and the two passes now cross rather than stack. That crossing is
+    // what makes it read as a lit room instead of a gradient.
     const fall = g.createRadialGradient(S / 2, S * 0.332, S * 0.117, S / 2, S * 0.332, S * 0.977);
-    fall.addColorStop(0, "#ffffff");
-    fall.addColorStop(0.5, "#fbfbfb");
-    fall.addColorStop(1, "#e0e0e0");
+    fall.addColorStop(0, grey(1, -0.55));
+    fall.addColorStop(0.5, grey(0.98, -0.2));
+    fall.addColorStop(1, grey(0.89, 0.7));
     g.globalCompositeOperation = "multiply";
     g.fillStyle = fall;
     g.fillRect(0, 0, S, S);

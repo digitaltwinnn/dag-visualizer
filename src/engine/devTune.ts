@@ -75,9 +75,12 @@ export async function mountDevTune(targets: DevTuneTargets): Promise<DevTuneHand
       onChange: () => {
         // The ground is a CSS token: override it INLINE as a light-dark() pair so the dark
         // face survives the override verbatim (a flat value would repaint dark too).
+        // ⚠️ The CHROMA here is the token's own (globals.css `--scene-ground`) and must be kept
+        // in step with it — it drifted to 0.016 against the token's 0.014 once, which made the
+        // ground knob quietly RETINT the scene as well as relight it.
         document.documentElement.style.setProperty(
           "--scene-ground",
-          `light-dark(oklch(${LIGHT_TUNE.groundL} 0.016 265), oklch(0.09 0.02 265))`,
+          `light-dark(oklch(${LIGHT_TUNE.groundL} 0.022 265), oklch(0.09 0.02 265))`,
         );
         setSceneLaneLight(LIGHT_TUNE.laneL, LIGHT_TUNE.laneC);
         refreshTheme();
