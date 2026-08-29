@@ -24,8 +24,9 @@ export interface StageLightRow {
   distance: number;  // light range — size past the farthest lit point (decay 0)
   intensity: number; // full-on target the light eases toward (the DARK ground's level)
   /** THE SAME LAMP NEEDS A DIFFERENT LEVEL ON A GROUND IT CANNOT BLOOM INTO. In dark the spot's
-   *  wash lands on an emissive node and the bloom pass then amplifies it; on paper the pass runs at
-   *  `LIGHT_TUNE.bloomMul` (0.15) and the silver ground competes, so the identical claim reads as
+   *  wash lands on an emissive node and the bloom pass then amplifies it; on paper the whole-frame
+   *  pass is skipped (`LIGHT_TUNE.bloomMul` 0) and the light ground competes, so the identical
+   *  claim reads as
    *  nothing. Measured on paper (2026-08-29, DOR's hybrid shell): at 2.4 the lit node was
    *  indistinguishable from its neighbours; at 12 it was unmistakable but visibly desaturating
    *  toward white — which is the ink lane failing, not emphasis. The paper level is picked between

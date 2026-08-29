@@ -21,7 +21,7 @@ import { METAGRAPHS, NET, netUrl } from "@/src/net/current";
 import { COLORS } from "@/src/engine/config";
 import { BYTE_SCALE_KB, type RailGroup } from "./domain/ledgerLayout";
 import { HYPER_TILT, HYPER_TILT_FOCUS } from "./domain/hyperLayout";
-import { readSceneColors, type SceneColors , LIGHT_TUNE } from "./sceneColors";
+import { readSceneColors, type SceneColors, LIGHT_TUNE } from "./sceneColors";
 import { setNodeDimTarget } from "./scene/objects/NodeFabric";
 import { THEME_KEY, parseThemePref, resolveTheme, type Theme } from "@/src/theme/resolve";
 import { VIEW_POLICIES, type ViewPolicy } from "./domain/viewPolicy";
@@ -345,10 +345,11 @@ export class Engine {
   // which lifts every dark mark toward white and crushes its saturation. That veil, not any
   // material value, is what made the day look read as washed-out pastel (measured 2026-08-21:
   // turning it off dropped the scene's dark marks from 140 to 65 luminance and multiplied its
-  // strongly-coloured pixels 17×). With the SILVER scene ground (fork C, 2026-08-25) the pass
-  // returns in light at a calm level: marks CAN exceed a 0.78-L ground, so a whisper of glow is
-  // physically meaningful again — strength scaled well down, threshold floored high so only the
-  // genuinely bright marks halo, never the ground.
+  // strongly-coloured pixels 17×). The shipped `LIGHT_TUNE.bloomMul` is 0, so on paper the
+  // whole-frame pass is SKIPPED outright (`bloom.enabled = _bloomMul > 0`; `bloomFloor` is inert
+  // while it is 0) and the identity marks halo through their own selective layer instead
+  // (SceneContext's BLOOM_LAYER sub-pipeline). The knob stays: any value > 0 re-enables the
+  // whole-frame pass at that calm level with the threshold floored high.
   private _bloomMul = 1;
 
   constructor(canvas: HTMLCanvasElement, onReady?: () => void, onSceneReady?: () => void) {

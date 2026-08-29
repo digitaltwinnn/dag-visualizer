@@ -465,6 +465,9 @@ export class LedgerView implements SceneView {
       const lane = key === netKey;
       p.applyAlpha(this.metaTune, a, FLOOR_D / 2, lane ? LANE_FILL_BOOST : 1, lane ? this._laneColor(key).getHex() : null);
     }
+    // Both columns' resting level is a dark-ground opacity; on paper it is ink over the page, so
+    // it asks the ground once, hoisted here — loop-invariant (the hoist rule).
+    const ordOp = inkPresence(ORD_OP, this._paper);
     for (const o of this._ordLabels.values()) {
       const ox = LEAD_X - o.slot * SLOT_SP + this._trailOff;
       // Both boundaries at once: the rewind's front dissolve and the horizon's — no instrument
@@ -472,10 +475,8 @@ export class LedgerView implements SceneView {
       // a label must not name a row whose bar hasn't dropped in yet.
       const entryF = this._entryT < 1 && o.slot >= 0 && o.slot < SLOT_N ? this._entryFade[o.slot] : 1;
       const front = this._rewind.fadeAtX(ox) * horizonAt(ox) * entryF;
-      // Both columns' resting level is a dark-ground opacity; on paper it is ink over the page, so
-      // it asks the ground once here. The dotted line keeps its RATIO to the text (ORD_LINE_MUL) —
+      // The dotted line keeps its RATIO to the text (ORD_LINE_MUL) —
       // it is a tie to its row, and a tie that outweighs the number it carries reads as the subject.
-      const ordOp = inkPresence(ORD_OP, this._paper);
       (o.mesh.material as THREE.MeshBasicMaterial).opacity = ordOp * front * a;
       // The anchor line whispers under its label (user, 2026-08-07 — "a bit more subtle").
       (o.line.material as THREE.LineDashedMaterial).opacity = ordOp * ORD_LINE_MUL * front * a;

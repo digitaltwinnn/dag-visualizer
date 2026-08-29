@@ -365,6 +365,7 @@ export function createScene(canvas: HTMLCanvasElement, colors: SceneColors): Sce
     sel?.composer.dispose();
     sel?.bloom.dispose();
     composer.dispose();
+    backdrop?.dispose(); // the paper cyclorama's CanvasTexture (null on a dark-only session)
   }
 
   // The clear colour is the one construction-time capture of a threaded token in this module

@@ -94,7 +94,8 @@ export const GLASS_TUNE_SCHEMA: TuneSchema<GlassTune> = {
 };
 
 /** The planes' corner radius — SQUARE (rounded corners belong to the trays). */
-const PLANE_CORNER_R = 0;/** The trays' corner radius — the smooth-corner clip of the shared glass fill. */
+const PLANE_CORNER_R = 0;
+/** The trays' corner radius — the smooth-corner clip of the shared glass fill. */
 const TRAY_CORNER_R = 0.3;
 
 /** Scratch for the committed lane's tint (rule 5: applyAlpha runs per frame and allocates nothing). */

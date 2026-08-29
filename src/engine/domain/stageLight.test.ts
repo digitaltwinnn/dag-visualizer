@@ -34,7 +34,8 @@ describe("STAGE_LIGHTS", () => {
   });
 
   // A lamp is not the same instrument on both grounds: dark blooms the wash it lays on an emissive
-  // node, paper (bloomMul 0.15) barely does, so the identical claim reads as nothing there. Every
+  // node, paper does not (the whole-frame pass is skipped there), so the identical claim reads as
+  // nothing there. Every
   // row that states a paper level must state a HIGHER one — the direction is the design, the
   // numbers are tuning. The ledger is exempt by construction: its claim is paper-only, so its one
   // `intensity` already is its paper number.

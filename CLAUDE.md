@@ -225,9 +225,13 @@ halos merge into ONE continuous ~54,000px ribbon (a metagraph's 19 stay discrete
 channel left to spend. `boost` can't answer it either; it was pulled 1.85 → 1.1 on 2026-08-16 for the
 opposite bug. **`grow` is the second channel**: `focusGrow()` reads the row's own field and the node
 loops scale by `1 + grow × fw`, where `fw` is the eased focus weight carried ON THE RECORD (the scale
-and the glow are written by different passes and must swell together). It is **hyper's alone** — geo's
-chip size is DATA (the honeycomb's hexes sum to the true node count) and the ledger's trays are
-uniform by design, so both answer a hard `0`, pinned by test. It is the same question `hide` had to
+and the glow are written by different passes and must swell together). It began as **hyper's alone**
+on the argument that geo's chip size is DATA (the honeycomb's hexes sum to the true node count) and
+the ledger's trays are uniform by design — but the user reversed that (2026-08-28): the swell is a
+TRANSIENT emphasis riding the eased focus weight, not a resting size claim, so it lies about no
+count. **Every view now grows, hyper loudest** (its field is the crowded one), and the test pins the
+RELATIONS — every view above 0, hyper the largest, all modest — never the numbers. It is the same
+question `hide` had to
 ask: a new effect gets its own field rather than riding a dim number.
 
 **A view's own FURNITURE dims on its own field, `elem`** (user, 2026-08-11). `dim` mutes off-filter
@@ -348,7 +352,7 @@ equally, which is the flatness the rig exists to undo. **Aimed from the CAMERA**
 convention: the rig follows the actor), so orbiting can never swing the lit side out of view;
 elevation is world-absolute. **A light is a TEMPERATURE, not a palette hue** — rows carry a −1…+1
 axis resolved by `tempTint`, which is why lighting owns no colour literal and no allowlist entry.
-`RIG_PAPER` takes every channel down on the light ground (ambient hardest, key least): a 0.72-L page
+`RIG_PAPER` takes every channel down on the light ground (ambient hardest, key least): a ~0.8-L page
 is its own bounce card, so on paper the rig narrows to FORM and presence keeps riding the ink system.
 ⚠️ When every view's weight is ~0 the blend HOLDS the last frame — normalising a zero would black the
 scene out at the gather boundary.
@@ -371,8 +375,10 @@ bug class the previous per-view-light + registry arrangement kept guarding again
 is already applied centrally, so a claim must not multiply by its own fade again.
 
 `StagedView` (`domain/stageLight.ts`) is the type that says which views stage a light, and the `?tune`
-panel builds a spotlight folder only for those — the ledger deliberately stages none (its chamber is
-lit by its own glass and emissive snapshots; emphasis there is the four colour dim tiers). Claiming
+panel builds a spotlight folder only for those — since the day-look work all three 3D views stage one;
+the ledger's claim is **paper-only** (its dark chamber stays lit by its own glass and emissive
+snapshots, and emphasis there is the four colour dim tiers — on paper those need the lobe's help, see
+the lamp rule below). Claiming
 for an unstaged view is a compile error, not a silent no-op.
 
 **The claim follows the LADDER, and there is ONE claim per view.** Hyper's subject is the staged
@@ -386,7 +392,8 @@ subjects at three scales from one row, so a node carries its own `heightNode`/`a
 the subject, the lower and tighter its stage.
 
 ⚠️ **A LAMP IS NOT THE SAME INSTRUMENT ON BOTH GROUNDS.** Dark blooms the wash a claim lays on an
-emissive node; paper (`bloomMul` 0.15) barely does, so the identical claim reads as nothing there —
+emissive node; paper does not bloom it at all (the whole-frame pass is skipped there — see *Light/dark*),
+so the identical claim reads as nothing there —
 and pushed far enough it desaturates the ink toward white, which is the ink lane failing rather than
 emphasis working. Rows state `intensityPaper` between those two measured ends, and the test pins the
 DIRECTION (a paper level is always higher), never the numbers. The ledger is exempt by construction:
@@ -1826,7 +1833,8 @@ and `_sceneColorMap` (the identity hex map) are both mutated by `_refreshTheme()
 per-frame reader that captured a reference at construction sees the new values with no code
 change; `_colorConsumers` is the fan-out array (`HyperView`, `Globe`, `LedgerView`) populated
 once in construction order, each exposing `setColors`/`setSceneColors`. `_bloomMul` (dark `1`,
-light `0.15`) is the same swap-in-place contract applied to a non-colour constant — decided once
+light `LIGHT_TUNE.bloomMul` — shipped `0`, which skips the whole-frame pass outright) is the same
+swap-in-place contract applied to a non-colour constant — decided once
 at construction and rewritten by the same `_refreshTheme()` call. The Engine never listens to
 `matchMedia` or the DOM itself; it detects a flip through a zustand store subscription registered
 in the constructor, event-driven when `theme` changes.
@@ -1848,7 +1856,7 @@ under light.
 ⚠️ **BLOOM IS THE SAME QUESTION, AND ON PAPER THE ANSWER IS A SECOND LAYER.**
 `UnrealBloomPass` is a luminance highpass over the FINISHED frame, so it can only ever select
 what is BRIGHTER than its surroundings — and on paper an identity mark is INK (a DOR band sits
-at ~0.42 relative luminance against the 0.72-L ground). No threshold reaches it, which is why
+at ~0.42 relative luminance against the ~0.8-L ground). No threshold reaches it, which is why
 `LIGHT_TUNE.bloomMul` is **0**: the whole-frame pass is skipped outright on light (Engine's
 `bloom.enabled = _bloomMul > 0`), and all it did there was blow the one place light DID clear it
 — the lead bar, the ribbon foot — to white. `bloomFloor` is inert while that is 0. The marks get
@@ -1867,7 +1875,7 @@ proportion to its own instance colour, so the emphasis system does the selection
 mesh — at the cost of occlusion (a mark behind glass still halos), accepted because the planes are
 translucent and the paper halo is faint.
 ⚠️ **And the composite's primary term is a MULTIPLY, not an add** — the ground question one level
-up. Paper is L 0.72 and the chamber glass sits within ~12/255 of it, so light added there clips to
+up. Paper is L ~0.8 and the chamber glass sits within ~12/255 of it, so light added there clips to
 white; `bleed` multiplies the ground toward the mark's own hue, which can only darken and tint,
 keeps the ground's level and vignette underneath, and cannot blow out. `glow` is a whisper beside
 it (0.06). Extends the backdrop rule: **on paper, emphasis is separation you take AWAY, not light
