@@ -19,6 +19,10 @@ import { GLOBAL_PLANE_TUNE_DEFAULTS, META_PLANE_TUNE_DEFAULTS, PLANE_TUNE_SCHEMA
 import { TILE_TUNE_DEFAULTS, TILE_TUNE_SCHEMA } from "./scene/views/LedgerView";
 import { FOCUS_TUNE, FOCUS_TUNE_DEFAULTS, FOCUS_ROW_SCHEMA, FOCUS_SHARED, FOCUS_SHARED_DEFAULTS, FOCUS_SHARED_SCHEMA } from "./domain/dimModel";
 import { STAGE_LIGHTS, STAGE_LIGHT_DEFAULTS, STAGE_LIGHT_SCHEMA, type StagedView } from "./domain/stageLight";
+import {
+  SCENE_RIG, SCENE_RIG_DEFAULTS, RIG_ROW_SCHEMA,
+  RIG_PAPER, RIG_PAPER_DEFAULTS, RIG_PAPER_SCHEMA,
+} from "./domain/sceneRig";
 import { LIGHT_TUNE, LIGHT_TUNE_DEFAULTS, LIGHT_TUNE_SCHEMA } from "./sceneColors";
 import { setSceneLaneLight } from "../palette/identity";
 import type { View3D } from "./domain/viewTransition";
@@ -78,6 +82,17 @@ export async function mountDevTune(targets: DevTuneTargets): Promise<DevTuneHand
         refreshTheme();
       },
     },
+    {
+      // The rig's PAPER answer — four multipliers over whichever view's row won the frame. Shared
+      // rather than per-view because it is a statement about the GROUND, not about a view: the page
+      // is its own bounce card everywhere. Inert under dark, where every multiplier is 1 by
+      // definition (the rows themselves are the dark look).
+      title: "rig · paper",
+      values: RIG_PAPER,
+      defaults: RIG_PAPER_DEFAULTS,
+      schema: RIG_PAPER_SCHEMA,
+      home: "domain/sceneRig.ts · RIG_PAPER_DEFAULTS",
+    },
   ];
 
   // Per-view groups. Only the views that STAGE a light get a spotlight folder — `StagedView` is
@@ -101,9 +116,21 @@ export async function mountDevTune(targets: DevTuneTargets): Promise<DevTuneHand
     home: `domain/dimModel.ts · FOCUS_TUNE_DEFAULTS.${view}`,
   });
 
+  // The view's KEY/FILL/RIM. Every 3D view has one — unlike the spotlight, which only the views
+  // that stage a claim get: a view is always lit, it just may not be spotlit. No onChange (SceneRig
+  // re-blends the rows every frame).
+  const rigGroup = (view: View3D): TuneGroup => ({
+    title: `${view} · rig`,
+    values: SCENE_RIG[view],
+    defaults: SCENE_RIG_DEFAULTS[view],
+    schema: RIG_ROW_SCHEMA,
+    home: `domain/sceneRig.ts · SCENE_RIG_DEFAULTS.${view}`,
+  });
+
   const perView: Record<string, TuneGroup[]> = {
     hyper: [
       focusGroup("hyper"),
+      rigGroup("hyper"),
       spotGroup("hyper"),
       {
         title: "tethers",
@@ -116,11 +143,12 @@ export async function mountDevTune(targets: DevTuneTargets): Promise<DevTuneHand
         home: "scene/views/HyperView.ts · TETHER_TUNE_DEFAULTS",
       },
     ],
-    geo: [focusGroup("geo"), spotGroup("geo")],
+    geo: [focusGroup("geo"), rigGroup("geo"), spotGroup("geo")],
     // Almost every dim number is read per frame, so the group needs no onChange — EXCEPT the
     // ledger's `dim`, which the ribbons bake into their vertex colours. Re-push the sheet there.
     ledger: [
       { ...focusGroup("ledger"), onChange: () => ledger.ribbons.setTune({}) },
+      rigGroup("ledger"),
       {
         title: "ribbons",
         values: ledger.ribbons.tune,

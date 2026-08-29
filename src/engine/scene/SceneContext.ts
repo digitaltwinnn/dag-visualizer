@@ -151,14 +151,14 @@ export interface SceneCtx {
   dispose(): void;
 }
 
-// Scene LIGHTING is a rendering technicality, NOT a palette concern: a light shades the (mostly
-// emissive) materials for subtle dimensional form — it is not a surface, accent or identity hue, so
-// it is deliberately NOT sourced from the CSS design tokens. These are dedicated, self-contained cool
-// lighting literals (all allowlisted in noHardcodedColors.test.ts). Changing the palette must not
-// change the lighting, and vice-versa.
-const LIGHT_AMBIENT = 0x4a5a8c; // cool-grey fill (mostly carries the scene, materials being emissive)
-const LIGHT_KEY = 0xccd6e6;     // neutral cool-white key light (top)
-const LIGHT_RIM = 0x5a6f9c;     // muted cool rim light (back — edge separation)
+// Scene LIGHTING lives in the RIG (domain/sceneRig.ts + scene/objects/SceneRig.ts), not here. It
+// used to be three fixed literals constructed at this point — an ambient plus two point lights —
+// and the move is not a relocation: a point light inside the field gave every node its own lighting
+// direction, so the population never resolved into one lit scene. The rig is directional, per-view
+// and camera-relative, and it carries its colours as TEMPERATURES rather than hexes, which is why
+// this file no longer holds a single lighting literal (nor an allowlist entry for one). Lighting is
+// still a rendering technicality, deliberately decoupled from the palette both ways — that rule did
+// not change, only where it is stated.
 
 export function createScene(canvas: HTMLCanvasElement, colors: SceneColors): SceneCtx {
   const scene = new THREE.Scene();
@@ -220,16 +220,8 @@ export function createScene(canvas: HTMLCanvasElement, colors: SceneColors): Sce
   controls.autoRotate = true;
   controls.autoRotateSpeed = 0.35;
 
-  // Lighting — mostly ambient since materials are emissive; a couple of points add subtle
-  // dimensional shading. All three are dedicated lighting literals (see LIGHT_* above), decoupled
-  // from the palette — a light is a rendering technicality, not an accent/identity hue.
-  scene.add(new THREE.AmbientLight(LIGHT_AMBIENT, 1.1));
-  const key = new THREE.PointLight(LIGHT_KEY, 2.2, 220);
-  key.position.set(0, 8, 0);
-  scene.add(key);
-  const rim = new THREE.PointLight(LIGHT_RIM, 1.4, 260);
-  rim.position.set(40, -20, -30);
-  scene.add(rim);
+  // Lighting is the SceneRig's (constructed by the Engine alongside the StageLight, so this file
+  // stays the render pipeline's home and nothing else) — see the note above the imports.
 
   // Postprocessing — depth of field then bloom.
   const composer = new EffectComposer(renderer);

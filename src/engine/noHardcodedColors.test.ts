@@ -26,11 +26,9 @@ const COMPONENTS_DIR = join(import.meta.dirname, "..", "..", "components");
 
 // Engine / scene-layer allowlist:
 const ENGINE_ALLOWED = new Set<number>([
-  // Scene LIGHTING literals — lighting is a rendering technicality (it shades emissive materials),
-  // deliberately decoupled from the palette; a light is not a surface/identity hue (see SceneContext).
-  0x4a5a8c, // ambient FILL light (cool grey)
-  0xccd6e6, // key light (neutral cool-white)
-  0x5a6f9c, // rim light (muted cool)
+  // Scene LIGHTING used to hold three entries here (ambient / key / rim). The rig replaced them with
+  // a TEMPERATURE axis (domain/sceneRig.ts · tempTint), so lighting is still decoupled from the
+  // palette — it just no longer needs a colour literal to say so, and this list shrank by three.
   0x223046, // dimmed-node tone (Globe + NodeFabric) — TODO: derive from a token
 ]);
 

@@ -15,6 +15,7 @@ import { UNLISTED_KEY } from "./domain/ledgerBands";
 
 // The public catalog's ids — the unknown-lane tile resolver splits listed from unlisted rows.
 import { StageLight } from "./scene/objects/StageLight";
+import { SceneRig } from "./scene/objects/SceneRig";
 import { loadGeoCache, resolveMissing } from "@/src/data/geoResolve";
 import { METAGRAPHS, NET, netUrl } from "@/src/net/current";
 import { COLORS } from "@/src/engine/config";
@@ -90,6 +91,10 @@ export class Engine {
   // THE stage light — one shared SpotLight the focused view CLAIMS per frame (scene/objects/
   // StageLight). Constructed after the scene exists, so it is assigned in the constructor.
   private _stageLight!: StageLight;
+  // THE LIGHTING RIG — the app's one ambient + three-point directional set (scene/objects/SceneRig).
+  // Sibling of the StageLight: that one is a CLAIM (one subject, strongest wins), this one a BLEND
+  // (every view lights the scene, weighted by the same per-view presences).
+  private _rig!: SceneRig;
   private _ledgerDirty = false; // rebuild the ledger geometry next frame (set on data events)
   // The frame timer — THREE.Timer (THREE.Clock was deprecated in r180). Unlike Clock it must be
   // updated once per frame before reading the delta; the render loop does that.
@@ -393,6 +398,12 @@ export class Engine {
     // globe and the ledger hold rather than a private build of its own.
     this._sceneColorMap = sceneColorsFor([...METAGRAPHS.map((m) => m.id), "dag"], this._theme);
     this._stageLight = new StageLight(this.ctx.scene);
+    // The scene's own key/fill/rim. Constructed here beside the StageLight and for the same reason:
+    // both are LIGHTS staged per frame from per-view domain rows, and SceneContext is the render
+    // pipeline's home, not the lighting's. The rig is set to the boot ground immediately so the
+    // first frame is lit for the theme the pre-paint stamp already chose.
+    this._rig = new SceneRig(this.ctx.scene);
+    this._rig.setGround(this._theme === "light");
     this.layers = new HyperView(this.ctx.scene, colors, this._stageLight, this._sceneColorMap);
     this.globe = new Globe(this.ctx.scene, this.layers, this.ctx.camera, colors, this._stageLight);
     // The Globe reads the transition machine each frame (geo furniture alpha + the node gather).
@@ -744,6 +755,7 @@ export class Engine {
     // and only each hue's L/C moved. refreshMeta stays the one place ids are assigned.
     this.ctx.setClearColor(this._colors.bg);
     this.ctx.setGround(theme === "light");
+    this._rig.setGround(theme === "light"); // swap-in-place: the next frame multiplies by the other set
     setNodeDimTarget(this._colors);
     this._pushSceneColors();
     for (const m of this._colorConsumers) m.setColors(this._colors);
@@ -1805,6 +1817,13 @@ export class Engine {
     // is scaled by its view's furniture alpha, so a fading view's light fades with its furniture and
     // a dark view's claim is worth nothing. That is the whole off-switch — not claiming IS off.
     this._stageLight.setPresence(hyperAlpha, this.transition.furnitureAlpha("geo"), ledgerAlpha);
+    // The RIG rides the same three presences — one room's lighting cross-fading into the next,
+    // rather than a cut at the transition boundary. Aimed from the camera (see domain/sceneRig),
+    // so it is staged here, after the camera phase and before the views write their materials.
+    this._rig.update(
+      this.ctx.camera, this.ctx.controls.target,
+      hyperAlpha, this.transition.furnitureAlpha("geo"), ledgerAlpha,
+    );
 
     this.globe.setMorph(this.morph);
     // Core-dim target: the DAG core fades back when a specific metagraph is the effective subject
