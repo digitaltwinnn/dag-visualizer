@@ -466,8 +466,11 @@ export function createScene(canvas: HTMLCanvasElement, colors: SceneColors): Sce
     // still had a heavy floor. The levels below are lifted and the k column left climbing, so the
     // bottom settles by getting BLUER rather than by getting dimmer.
     const sweep = g.createLinearGradient(0, 0, 0, S);
-    sweep.addColorStop(0, hex(1.13, 0.5));
-    sweep.addColorStop(0.28, hex(1.09, 0.35));
+    // Top pair lifted 1.13/1.09 -> 1.20/1.14 (user, 2026-08-29: "a bit lighter at the top") —
+    // still inside the byte headroom the ceiling note above measured; the stage band down is
+    // untouched, so the instruments' anchor holds and only the sky end brightens.
+    sweep.addColorStop(0, hex(1.2, 0.5));
+    sweep.addColorStop(0.28, hex(1.14, 0.35));
     sweep.addColorStop(0.55, hex(1.02, 0.6));
     sweep.addColorStop(0.78, hex(0.96, 1.05));
     sweep.addColorStop(1, hex(0.87, 1.6));
