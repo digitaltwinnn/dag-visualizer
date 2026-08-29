@@ -29,7 +29,7 @@ import { armillaryFrame, ringFramePos, ringNormal, armillaryRings, armillaryPos,
 import { surfFade, extrasFade } from "../domain/morph";
 import { ArcSim, type ArcEndpoint } from "../domain/arcSim";
 import type { MetaNodeRecord, ValidatorRecord } from "../domain/records";
-import { buildGeoView, retintGeoView, setCountryBorder, setCountryFillMask, HOVER_MASK_BOOST, type GeoViewHost } from "./views/GeoView";
+import { buildGeoView, retintGeoView, setCountryBorder, setCountryFillMask, HOVER_MASK_BOOST, SUN_TUNE, BORDER_LEVELS, BORDER_LEVELS_PAPER, type GeoViewHost } from "./views/GeoView";
 import type { StageLight } from "./objects/StageLight";
 import { STAGE_LIGHTS } from "../domain/stageLight";
 import { ccToNumeric, countryCcAt, countryLean, geometryRings, mainPolygonRings, ringsAngularRadius, ringsCentroid, type Ring } from "../domain/countryShape";
@@ -77,8 +77,17 @@ const hexPitchDeg = (r: number) => ((2 * r * 1.04) / (R + LAND_H)) * (180 / Math
 // Two numbers because a shade and a glow do not carry at the same strength: `POOL_SHADE` is how far
 // down the hue goes (the pool's own darkness), `POOL_SHADE_OP` how much of the dark look's resting
 // weight it keeps (a near-ground glow may sit at 0.28 unnoticed; ink at 0.28 is a blot).
+//
+// ⚠️ THE WEIGHT WAS LEFT AT 0 AND IS NOW A REAL NUMBER (2026-08-29). The mechanism above shipped
+// with `POOL_SHADE_OP = 0`, which is a mechanism carrying a dead knob: the pools simply did not
+// draw on paper, and the file said "shade" while the render said "nothing". The wave-7 brief did
+// allow "or nothing" as an answer, but a dead constant is not that answer — it is the question left
+// open in code. Judged live at 0.55 with Germany drilled: the shade reads as a CONTACT SHADOW, the
+// thing that makes a stack of chips sit ON the globe rather than float over it, and with the sun's
+// terminator now shading the sphere underneath it the two agree instead of competing. So it stays,
+// with a weight; if it ever has to go, delete the mechanism rather than zero it again.
 const POOL_SHADE = 0.34;
-const POOL_SHADE_OP = 0.0;
+const POOL_SHADE_OP = 0.55;
 
 // View-transition staging grid: THE cell pitch (world units). setGatherFit may only shrink it
 // (with the chip size, by one factor) to make the packed row of per-network squares
@@ -238,6 +247,8 @@ export class Globe implements GeoViewHost {
   landFillMat?: THREE.MeshBasicMaterial;
   landFillMesh?: THREE.Mesh;
   facingUniform?: GeoViewHost["facingUniform"]; // shared camera-facing uniform (graticule + walls)
+  sunUniform?: GeoViewHost["sunUniform"];       // the rig's key direction, world space (see GeoView)
+  sunMixUniform?: GeoViewHost["sunMixUniform"];
   closeUniform?: GeoViewHost["closeUniform"];   // shared closeness uniform (wall sharpening + far-side damp)
   poleRoses?: GeoViewHost["poleRoses"];         // the polar compass roses (faded per frame here)
   countryGeoms?: GeoViewHost["countryGeoms"];   // per-country geometries (drill border + framing)
@@ -972,10 +983,10 @@ export class Globe implements GeoViewHost {
   private _updateCountryBorder(): void {
     const drillCc = this.countryFilter;
     const drillRings = drillCc ? this.countryRings(drillCc) : null;
-    setCountryBorder(this, "drill", drillRings, drillCc ? 1.0 : 0);
+    setCountryBorder(this, "drill", drillRings, drillCc ? BORDER_LEVELS.drill : 0, BORDER_LEVELS_PAPER.drill);
     const hoverCc = this._hoverCountryCc && this._hoverCountryCc !== drillCc ? this._hoverCountryCc : null;
     const hoverRings = hoverCc ? this.countryRings(hoverCc) : null;
-    setCountryBorder(this, "hover", hoverRings, hoverCc ? 0.3 : 0);
+    setCountryBorder(this, "hover", hoverRings, hoverCc ? BORDER_LEVELS.hover : 0, BORDER_LEVELS_PAPER.hover);
     // The country's INTERIOR firms up via the fill-mask shader (scoped — the old whole-globe base
     // bump is gone). The committed drill fills at full strength; a HOVER preview fills at a lower
     // boost so it reads as a preview and selecting still firms it further (user). One mask uniform,
@@ -998,7 +1009,7 @@ export class Globe implements GeoViewHost {
         const r = this.countryRings(cc);
         if (r) hostRings.push(...r);
       }
-      setCountryBorder(this, "host", hostRings.length ? hostRings : null, 0.08); // a true whisper (user, 2026-08-16: 0.15 read too present at rest)
+      setCountryBorder(this, "host", hostRings.length ? hostRings : null, BORDER_LEVELS.host, BORDER_LEVELS_PAPER.host); // a true whisper (user, 2026-08-16: 0.15 read too present at rest)
     }
   }
 
@@ -1035,6 +1046,13 @@ export class Globe implements GeoViewHost {
 
   // Hover-pairing: pass the hovered node's id; the per-frame glow loops brighten every instance
   // that shares it. null clears the highlight.
+  /** THE SUN (world space) — the Engine hands down the rig's own KEY direction each frame, so the
+   *  globe's day side and the chips' lit side are one light. A plain copy: the vector is the rig's
+   *  and this view only reads it. */
+  setSun(dir: THREE.Vector3): void {
+    if (this.sunUniform) this.sunUniform.value.copy(dir);
+  }
+
   setHoverNode(id: string | null): void {
     this._hoverNodeId = id || null;
     // Resolve the record once per hover change (never per frame) — the same event-time cache
@@ -1538,6 +1556,17 @@ export class Globe implements GeoViewHost {
     // and each polar compass rose fades by its own pole's facing on top of the morph fade —
     // a far-side rose dims hard, so front vs back reads instantly (user).
     if (this.facingUniform && this._hasCam) this.facingUniform.value.copy(this._camN);
+    // THE SUN's look, pushed from its tune row every frame (the hoist rule: one read per frame, and
+    // the shader needs no recompile for a knob). `x` is the terminator's half-width; `yz` is the
+    // (night, day) pair FOR THE GROUND IN FORCE — the polarity inversion between glow and ink is
+    // decided here, so the shader carries one expression and no branch.
+    if (this.sunMixUniform) {
+      this.sunMixUniform.value.set(
+        SUN_TUNE.term,
+        paper ? SUN_TUNE.nightInk : SUN_TUNE.nightGlow,
+        paper ? SUN_TUNE.dayInk : SUN_TUNE.dayGlow,
+      );
+    }
     // Closeness (0 = overview, 1 = country/node zoom) from the camera altitude: the walls
     // tighten to a crisp rim and the far-side see-through damps out as the camera closes in.
     if (this.closeUniform && this.camera) {

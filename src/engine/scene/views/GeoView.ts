@@ -2,6 +2,7 @@ import * as THREE from "three";
 import { feature } from "topojson-client";
 import { R, LAND_H, latLonToVec3 } from "../../domain/geoLayout";
 import { ringsToSegments, type Ring } from "../../domain/countryShape";
+import type { TuneSchema } from "../../tune";
 
 // Builds the geo globe SURFACE — the body sphere, graticule, atmosphere rim, and the raised
 // continents (+ glowing coastal cliffs) — into `globe.group`, and sets the handles the morph/fade
@@ -66,6 +67,16 @@ export interface GeoViewHost {
    *  two grounds — light to add, or a mask to cut alpha with — so the branch is a uniform, flipped
    *  by `retintGeoView` like every other theme capture. */
   landPaperUniform?: { value: number };
+  /** THE SUN — the rig's own KEY direction (world space), handed down by the Engine each frame.
+   *  ONE LIGHT, TWO CONSUMERS: the same vector that gives the chips standing on the globe their lit
+   *  side shades the globe under them, so a chip's highlight and the surface's day side can never
+   *  disagree. Camera-relative by construction (domain/sceneRig aims every azimuth off the camera's
+   *  bearing), which is the whole reason a geographically-honest sun was NOT built: the globe spins
+   *  to face a selection, and a sun that left the viewed hemisphere dark would be the wrong kind of
+   *  honest. `uSunMix` carries the tunables (terminator softness, then the ink/glow pair for the
+   *  ground in force) so the look is live-tunable without a shader recompile. */
+  sunUniform?: { value: THREE.Vector3 };
+  sunMixUniform?: { value: THREE.Vector3 };
   landFillMesh?: THREE.Mesh;
   // Shared FACING uniform (camera direction in the globe's local frame — Globe copies _camN in
   // each frame): the graticule + coastal walls dim their far-hemisphere fragments through it,
@@ -93,6 +104,30 @@ export interface GeoViewHost {
   countryMaskUniforms?: { uCountryMask: { value: THREE.Texture }; uMaskBoost: { value: number } };
   onCountriesReady?: () => void;
 }
+
+/** THE SUN's look (contract: src/engine/tune.ts). Read per frame by Globe and pushed into
+ *  `sunMixUniform`, so every knob is live with no recompile and no onChange.
+ *
+ *  `term` is the terminator's half-width in COSINE space, deliberately generous: at a hard edge the
+ *  surface reads as a painted texture, and only a transition wide enough to cover most of the
+ *  visible disc reads as a shaded sphere. The two pairs are (night, day) MULTIPLIERS for their
+ *  ground — dark's spread around 1 is small because the hologram's own glow is the subject and a
+ *  strong terminator would read as a second light source; paper's is wider because ink is what the
+ *  day look has to shade with, and the sphere has to come from somewhere. */
+export const SUN_TUNE = {
+  term: 0.75,
+  nightGlow: 0.72, dayGlow: 1.22,
+  nightInk: 1.34, dayInk: 0.9,
+};
+export type SunTune = typeof SUN_TUNE;
+export const SUN_TUNE_DEFAULTS: Readonly<SunTune> = { ...SUN_TUNE };
+export const SUN_TUNE_SCHEMA: TuneSchema<SunTune> = {
+  term: { min: 0.05, max: 2, step: 0.01, label: "terminator" },
+  nightGlow: { min: 0, max: 2, step: 0.01, label: "dark · night" },
+  dayGlow: { min: 0, max: 3, step: 0.01, label: "dark · day" },
+  nightInk: { min: 0, max: 3, step: 0.01, label: "paper · night" },
+  dayInk: { min: 0, max: 2, step: 0.01, label: "paper · day" },
+};
 
 // HOLOGRAPHIC GLOBE: there is deliberately NO opaque body sphere and NO atmosphere halo.
 // The coastal wall rim is the defining stroke, the land glass + micro-grid carry the surface,
@@ -459,6 +494,10 @@ async function buildLand(globe: GeoViewHost) {
     // GROUND, created here rather than at the fill below because BOTH shaders need it and the wall
     // is built first — one object, captured by both, flipped by `retintGeoView`.
     globe.landPaperUniform = { value: globe.geoPaper ? 1 : 0 };
+    // The sun starts straight up: a real direction arrives on the first frame Globe.setSun runs,
+    // and "overhead" is the one default that can never look like a bug in the meantime.
+    globe.sunUniform = { value: new THREE.Vector3(0, 1, 0) };
+    globe.sunMixUniform = { value: new THREE.Vector3(SUN_TUNE.term, 1, 1) };
     globe.landWallUniforms = {
       uColor: { value: globe._edgeColor.clone() },
       uBase: { value: wallBase },
@@ -564,6 +603,8 @@ async function buildLand(globe: GeoViewHost) {
       sh.uniforms.uCountryMask = globe.countryMaskUniforms!.uCountryMask;
       sh.uniforms.uMaskBoost = globe.countryMaskUniforms!.uMaskBoost;
       sh.uniforms.uPaper = globe.landPaperUniform!;
+      sh.uniforms.uSun = globe.sunUniform!;
+      sh.uniforms.uSunMix = globe.sunMixUniform!;
       // DAY GLASS needs a view angle, and MeshBasicMaterial computes none — so the two vectors
       // are carried by hand. The mesh is a SPHERE about the group's origin, so its object-space
       // normal IS `normalize(position)`; `modelMatrix` then takes both into world space, which is
@@ -582,7 +623,7 @@ async function buildLand(globe: GeoViewHost) {
       sh.fragmentShader = sh.fragmentShader
         .replace(
           "#include <common>",
-          "#include <common>\nuniform sampler2D uCountryMask;\nuniform float uMaskBoost;\nuniform float uPaper;\nvarying vec3 vGN;\nvarying vec3 vGV;",
+          "#include <common>\nuniform sampler2D uCountryMask;\nuniform float uMaskBoost;\nuniform float uPaper;\nuniform vec3 uSun;\nuniform vec3 uSunMix;\nvarying vec3 vGN;\nvarying vec3 vGV;",
         )
         .replace(
           "#include <map_fragment>",
@@ -615,6 +656,27 @@ async function buildLand(globe: GeoViewHost) {
             // gives the coastline sub-texel antialiasing.
             "\tfloat mgLand = smoothstep(0.0008, 0.0034, texture2D(map, vMapUv).g);\n" +
             "\tdiffuseColor.rgb = mix(diffuseColor.rgb, diffuse, uPaper);\n" +
+            // ── THE SUN ──────────────────────────────────────────────────────────────────────
+            // The globe reads flat because nothing on it ever varied with a direction: the fill is
+            // a MeshBasicMaterial (deliberately — the hologram must read on both hemispheres) and
+            // the Fresnel above is radially symmetric, so it says "ball" only at the limb and says
+            // nothing at all about which way is up. One dot product against the rig's key fixes
+            // that, and it is the SAME key the chips standing on this surface are lit by.
+            //
+            // The terminator is a smoothstep, not a step: a hard day/night line reads as a painted
+            // texture, a soft one as a shaded sphere. `uSunMix.x` is its half-width in cosine
+            // space, which is why it is generous — most of the visible disc should be inside the
+            // transition, so the surface carries a GRADIENT rather than two flat regions.
+            "\tfloat mgDay = smoothstep(-uSunMix.x, uSunMix.x, dot(normalize(vGN), uSun));\n" +
+            // Both grounds shade, through the same expression and OPPOSITE numbers, because they
+            // are made of opposite substances. `uSunMix.yz` is the (night, day) pair for the ground
+            // in force — Globe picks it, so the shader has no branch. Dark is emitted light: the
+            // day side glows MORE and the night side falls back, and the hologram keeps its
+            // character. Paper is INK: a lit face reflects more and therefore carries LESS ink, a
+            // shadowed face more, so the pair inverts and the night limb is where the ink piles up.
+            // The channel differs with the substance too — dark shades COLOUR (an additive glow has
+            // no other channel), paper shades PRESENCE, which is the day look's whole vocabulary.
+            "\tdiffuseColor.rgb *= mix(mix(uSunMix.y, uSunMix.z, mgDay), 1.0, uPaper);\n" +
             // ⚠️ ON PAPER THE FILL IS GLASS, NOT PAINT (user, 2026-08-26 — "in dark mode the geo
             // globe has an almost transparent fill and nice lit edge effect; in white it just
             // looks like a burning colored surface"). The alpha mask above fixed the SHAPE and
@@ -640,7 +702,8 @@ async function buildLand(globe: GeoViewHost) {
             // uMaskBoost's readable range starts ~×6 because it multiplies a tiny additive
             // contribution, whereas an alpha already near half saturates instantly — the root keeps
             // the hover preview (3.4 → ×1.7) honestly under the drill (5.9 → ×2.2).
-            "\tdiffuseColor.a = mix(diffuseColor.a, min(1.0, diffuseColor.a * mgLand * mgGlass * pow(mgBoost, 0.45)), uPaper);",
+            "\tfloat mgInk = mix(uSunMix.y, uSunMix.z, mgDay);\n" +
+            "\tdiffuseColor.a = mix(diffuseColor.a, min(1.0, diffuseColor.a * mgLand * mgGlass * mgInk * pow(mgBoost, 0.45)), uPaper);",
         );
     };
     globe.landFillMat = landMat;
@@ -781,20 +844,38 @@ export function setCountryFillMask(globe: GeoViewHost, rings: Ring[] | null, boo
   old.dispose(); // event-driven swap — never per frame
 }
 
+/** THE BORDER LADDER — the drilled country, the hover preview, and the resting hosting whisper —
+ *  stated once, per ground, because ON PAPER THE THREE COLLAPSE INTO ONE.
+ *
+ *  Measured 2026-08-29: the dark levels (1 / 0.3 / 0.08) run through `inkPresence`, whose resting
+ *  curve is `rest^0.15` — deliberately aggressive, so a faint mark still reads as ink on a 0.72-L
+ *  page. Applied to a LADDER that curve is fatal: it maps the three to 1 / 0.835 / 0.685, turning a
+ *  12-fold spread into a 1.5-fold one, and every hosting country's outline reads as strongly as the
+ *  one you actually drilled into. The paper ladder is therefore stated OUTRIGHT rather than derived,
+ *  and rides `paperBase` so `inkPresence` never re-compresses it — the same escape the land fill
+ *  already uses, and for the same reason: a presence MODEL that differs by ground, not a strength.
+ *
+ *  The order is the design; the numbers are tuning. */
+export const BORDER_LEVELS = { drill: 1, hover: 0.3, host: 0.08 };
+export const BORDER_LEVELS_PAPER = { drill: 1, hover: 0.45, host: 0.16 };
+
 // Show a country border (`which`: the committed drill or the hover preview) for `rings` at
-// `level` opacity (0 hides it). The geometry rebuild is event-driven — once per country
-// hover/drill change, never per frame.
+// `level` opacity (0 hides it) — `paperLevel` is the same mark's level on the light ground (see
+// BORDER_LEVELS). The geometry rebuild is event-driven — once per country hover/drill change,
+// never per frame.
 export function setCountryBorder(
   globe: GeoViewHost,
   which: "drill" | "hover" | "host",
   rings: Ring[] | null,
   level: number,
+  paperLevel: number,
 ): void {
   const b =
     which === "drill" ? globe.countryBorder : which === "hover" ? globe.hoverCountryBorder : globe.hostCountryBorder;
   if (!b) return; // topology not loaded yet — onCountriesReady re-asserts
   if (!rings?.length || level <= 0) {
     b.fade.base = 0;
+    b.fade.paperBase = 0;
     b.mesh.visible = false;
     return;
   }
@@ -804,4 +885,5 @@ export function setCountryBorder(
   b.mesh.geometry = geo;
   b.mesh.visible = true;
   b.fade.base = level;
+  b.fade.paperBase = paperLevel;
 }

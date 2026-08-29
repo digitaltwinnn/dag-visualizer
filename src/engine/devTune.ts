@@ -17,6 +17,7 @@ import { RIBBON_TUNE_DEFAULTS, RIBBON_TUNE_SCHEMA } from "./scene/objects/Ribbon
 import { BAR_TUNE_DEFAULTS, BAR_TUNE_SCHEMA } from "./scene/objects/ByteBar";
 import { GLOBAL_PLANE_TUNE_DEFAULTS, META_PLANE_TUNE_DEFAULTS, PLANE_TUNE_SCHEMA, GLASS_TUNE, GLASS_TUNE_DEFAULTS, GLASS_TUNE_SCHEMA } from "./scene/objects/SnapshotPlane";
 import { TILE_TUNE_DEFAULTS, TILE_TUNE_SCHEMA } from "./scene/views/LedgerView";
+import { SUN_TUNE, SUN_TUNE_DEFAULTS, SUN_TUNE_SCHEMA } from "./scene/views/GeoView";
 import { FOCUS_TUNE, FOCUS_TUNE_DEFAULTS, FOCUS_ROW_SCHEMA, FOCUS_SHARED, FOCUS_SHARED_DEFAULTS, FOCUS_SHARED_SCHEMA } from "./domain/dimModel";
 import { STAGE_LIGHTS, STAGE_LIGHT_DEFAULTS, STAGE_LIGHT_SCHEMA, type StagedView } from "./domain/stageLight";
 import {
@@ -143,7 +144,21 @@ export async function mountDevTune(targets: DevTuneTargets): Promise<DevTuneHand
         home: "scene/views/HyperView.ts · TETHER_TUNE_DEFAULTS",
       },
     ],
-    geo: [focusGroup("geo"), rigGroup("geo"), spotGroup("geo")],
+    geo: [
+      focusGroup("geo"),
+      rigGroup("geo"),
+      spotGroup("geo"),
+      {
+        // The globe's day side. Read per frame by Globe (which picks the ground's own pair out of
+        // it), so no onChange — and it sits in the GEO folder because it is geo's look, even though
+        // the DIRECTION it shades along belongs to the shared rig one folder up.
+        title: "sun (terminator)",
+        values: SUN_TUNE,
+        defaults: SUN_TUNE_DEFAULTS,
+        schema: SUN_TUNE_SCHEMA,
+        home: "scene/views/GeoView.ts · SUN_TUNE_DEFAULTS",
+      },
+    ],
     // Almost every dim number is read per frame, so the group needs no onChange — EXCEPT the
     // ledger's `dim`, which the ribbons bake into their vertex colours. Re-push the sheet there.
     ledger: [

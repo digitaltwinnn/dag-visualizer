@@ -1829,6 +1829,10 @@ export class Engine {
       hyperAlpha, this.transition.furnitureAlpha("geo"), ledgerAlpha,
     );
 
+    // ONE LIGHT, TWO CONSUMERS: the rig's key IS geo's sun (see GeoViewHost.sunUniform). Pushed
+    // after the rig has been staged for this frame, so the globe's day side and the chips standing
+    // on it can never disagree about where the light comes from.
+    this.globe.setSun(this._rig.keyDir);
     this.globe.setMorph(this.morph);
     // THE FOLLOW-SPOT's subject, resolved from the node RECORDS and handed to the view that stages
     // hyper's light. The records are the Globe's and the claim is HyperView's, so the Engine — the
