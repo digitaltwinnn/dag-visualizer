@@ -39,7 +39,9 @@ const HEX_ALPHA = 0.92;
 // the REFERENCE, not the live value: the chip scale and the cell pitch must move TOGETHER (a
 // bigger cell with the same chip is a sparse scatter, not a square — the nodes ARE the pixels),
 // so Globe.setGatherFit writes both onto ctx.gather by the same factor.
-export const GATHER_SCALE = 0.22;
+// Halved from 0.22 (user, 2026-08-29): the staged chips read too heavy parked at the top of the
+// screen — the pitch is untouched, so the blocks keep their footprint and the air doubles.
+export const GATHER_SCALE = 0.11;
 // The DIM TARGET — what an off-filter node's colour is lerped TOWARD. On the dark ground it is a
 // LIFTED navy (not the background itself): a mute has to stay a mark, so it sits just above the
 // ground rather than dissolving into it. Themed by the same reasoning read on paper — there the
