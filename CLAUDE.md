@@ -337,6 +337,30 @@ Five named phases in a fixed order: inputs → camera → motion → derived fra
 contract is that nothing may mutate a pose after the phase that derives from it.** New per-frame work
 goes in the phase whose inputs it needs, never earlier.
 
+### Two lighting systems: the RIG blends, the STAGE LIGHT claims
+
+**The rig is the scene's own key/fill/rim** (`domain/sceneRig.ts` + `scene/objects/SceneRig.ts`) —
+an ambient plus three DIRECTIONALS, per-view rows blended by the same presences the stage light's
+claims are scaled by. Directional is the design, not a detail: a point light inside the field lights
+every node from a different direction, so the population never resolves into one lit scene and every
+sphere reads as a flat disc. The fill is directional for the same reason — ambient lifts every face
+equally, which is the flatness the rig exists to undo. **Aimed from the CAMERA** (the studio
+convention: the rig follows the actor), so orbiting can never swing the lit side out of view;
+elevation is world-absolute. **A light is a TEMPERATURE, not a palette hue** — rows carry a −1…+1
+axis resolved by `tempTint`, which is why lighting owns no colour literal and no allowlist entry.
+`RIG_PAPER` takes every channel down on the light ground (ambient hardest, key least): a 0.72-L page
+is its own bounce card, so on paper the rig narrows to FORM and presence keeps riding the ink system.
+⚠️ When every view's weight is ~0 the blend HOLDS the last frame — normalising a zero would black the
+scene out at the gather boundary.
+
+**The geo row's key IS the globe's SUN** — one vector, two consumers (`GeoViewHost.sunUniform`), so a
+chip's lit side and the surface's day side can never disagree. Camera-relative by construction, which
+is deliberate: the globe spins to face a selection, and a geographically-honest sun that left the
+viewed hemisphere dark would be the wrong kind of honest. Both grounds shade through one expression
+with opposite numbers, because they are opposite substances — dark is emitted light (the day side
+glows more), paper is ink (a lit face carries LESS of it) — and the channel follows the substance:
+dark shades colour, paper shades presence.
+
 ### The stage light claims, it is never switched off
 
 There is ONE `THREE.SpotLight` for the whole app (`scene/objects/StageLight.ts`). The Engine sets its
@@ -350,6 +374,23 @@ is already applied centrally, so a claim must not multiply by its own fade again
 panel builds a spotlight folder only for those — the ledger deliberately stages none (its chamber is
 lit by its own glass and emissive snapshots; emphasis there is the four colour dim tiers). Claiming
 for an unstaged view is a compile error, not a silent no-op.
+
+**The claim follows the LADDER, and there is ONE claim per view.** Hyper's subject is the staged
+NODE, else its hub, else the DAG core — the same coarse→fine order every other emphasis follows; the
+node branch is an *else-of*, not a second claimer, because a node select commits its network too and
+two claims would decide the light by call order instead of by the ladder. The subject is the HOVERED
+node when there is one, else the committed one (hover previews at emphasis strength, like the dim and
+the glow) — deliberately NOT the callout's rule, which mirrors the box and so only moves on a commit.
+The anchor is layout data: `Globe`'s one `_hyperAnchorOf`, shared with the callout. Hyper stages three
+subjects at three scales from one row, so a node carries its own `heightNode`/`angleNode` — the finer
+the subject, the lower and tighter its stage.
+
+⚠️ **A LAMP IS NOT THE SAME INSTRUMENT ON BOTH GROUNDS.** Dark blooms the wash a claim lays on an
+emissive node; paper (`bloomMul` 0.15) barely does, so the identical claim reads as nothing there —
+and pushed far enough it desaturates the ink toward white, which is the ink lane failing rather than
+emphasis working. Rows state `intensityPaper` between those two measured ends, and the test pins the
+DIRECTION (a paper level is always higher), never the numbers. The ledger is exempt by construction:
+its claim is paper-only, so its one `intensity` already is its paper number.
 
 ### Three camera principles
 
@@ -1833,9 +1874,12 @@ it (0.06). Extends the backdrop rule: **on paper, emphasis is separation you tak
 you add.** Dark is untouched by construction — the sub-composer is built lazily on the first paper
 frame, and both knobs at zero skip the sub-pipeline rather than neutralising it.
 
-**Sub-project 2 (per-view day-look refinement) is open.** Byte-identity against master is pinned
-for dark. Light now has its own bloom (above), backdrop, glass and ink-emphasis passes; what is
-still untuned is geo under light — the globe's own day look has had no pass of its own.
+**Sub-project 2 (per-view day-look refinement) is open.** ⚠️ **Dark's byte-identity guardrail is
+RETIRED for LIGHTING** (user, 2026-08-29): the rig, the follow-spot and geo's sun evolve BOTH themes,
+deliberately and documented, judged as design rather than diff-matched. Everything outside lighting
+keeps the discipline. Geo's day pass is closed (sun + terminator, the paper border ladder, the
+density pools' contact shade, chips reading as objects on silver); wave 8's record, including the
+remaining look-debt, is `.superpowers/light-wave8-report.md`.
 
 ## Data — server-side routes
 
