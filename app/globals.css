@@ -39,7 +39,7 @@
      resettled midway. Row wash below is unchanged. */
   box-shadow: inset 0 0 0 1px color-mix(in oklch, var(--row-hue, var(--primary)) 46%, transparent),
               inset 0 0 18px -5px color-mix(in oklch, var(--row-hue, var(--primary)) 44%, transparent),
-              inset 0 1px 0 rgba(255, 255, 255, 0.05), 0 8px 30px rgba(0, 0, 0, 0.35);
+              var(--card-ambient);
   transition: box-shadow 0.16s ease;
 }
 /* Explorer rows are dense list items → a wash + border reads better there than an inset glow. */
@@ -408,8 +408,7 @@
   z-index: 2;
 }
 .rail-ladder > [data-tier="box"] .ig-panel:not(.subject-paired) {
-  box-shadow: 0 10px 26px -12px rgba(0, 0, 0, 0.85), 0 -8px 22px -14px rgba(0, 0, 0, 0.8),
-    0 8px 30px rgba(0, 0, 0, 0.35);
+  box-shadow: var(--box-lift), var(--card-ambient);
 }
 
 /* CORNER PATCHES — the plane continues UNDER the box's rounded corners (user, 2026-08-09: "where the
@@ -491,6 +490,15 @@
      physically possible again. The HUD page keeps --background's paper; dark side is
      --background's dark verbatim, so the dark scene is byte-identical. */
   --scene-ground: light-dark(oklch(0.81 0.005 85), oklch(0.09 0.02 265)); /* near-neutral, faint warm bias oklch(0.81 0.005 85) — blue read cold, full greige read dirty (user, 2026-08-29); keep LIGHT_TUNE.groundL AND devTune's ground override in sync */
+  /* The card elevation pair, ONE home for three recipes (`.ig-panel`, `.subject-paired`, the boxed
+     rail rung) — they must keep matching, and a token matches by construction where the previous
+     "restate the literal" arrangement matched by discipline. Theme-aware since 2026-08-29: pure
+     black at dark-ground alphas read as smudges at the slab's corner joints on the light panel
+     (user), so light casts a soft ink-navy at a third the weight; dark keeps the original bytes. */
+  --card-ambient: inset 0 1px 0 rgba(255, 255, 255, 0.05),
+    0 8px 30px light-dark(rgba(15, 23, 42, 0.14), rgba(0, 0, 0, 0.35));
+  --box-lift: 0 10px 26px -12px light-dark(rgba(15, 23, 42, 0.32), rgba(0, 0, 0, 0.85)),
+    0 -8px 22px -14px light-dark(rgba(15, 23, 42, 0.28), rgba(0, 0, 0, 0.8));
   --foreground: light-dark(oklch(0.21 0.035 265), oklch(0.94 0.02 255));       /* #e8eefc text (dark) */
   --muted-foreground: light-dark(oklch(0.44 0.035 265), oklch(0.66 0.04 265)); /* #8a96b8 muted (dark) */
 
@@ -1077,12 +1085,11 @@
     border: 1px solid var(--border);
     border-radius: var(--radius);
     backdrop-filter: blur(14px);
-    /* Ambient shadow stays theme-neutral on purpose: the inset line is a top-edge glass highlight
-       (harmless at 0.05 white on either ground) and the drop is elevation, which both grounds
-       read as a dark cast shadow — the same pair `.subject-paired` (line ~42) and the boxed rail
-       ladder rung (line ~411) extend, so the three recipes must keep matching, not each pick a
-       theme-aware value alone. */
-    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05), 0 8px 30px rgba(0, 0, 0, 0.35);
+    /* The elevation pair lives in `--card-ambient` (`:root`) — ONE home shared with
+       `.subject-paired` and the boxed rail rung, theme-aware there since 2026-08-29 (the
+       dark-ground black smudged the light slab's corner joints). The inset line is a top-edge
+       glass highlight, harmless at 0.05 white on either ground. */
+    box-shadow: var(--card-ambient);
   }
   .ig-panel::before {
     content: "";
