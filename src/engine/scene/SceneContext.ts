@@ -405,7 +405,10 @@ export function createScene(canvas: HTMLCanvasElement, colors: SceneColors): Sce
    * currently … make it lighter or more colourful"). At the old width the whole frame sat inside one
    * grey-blue, which is exactly the complaint: a drift you have to be told about is not colour.
    */
-  const coolDrift = [1 - 0.058, 1 - 0.008, 1 + 0.088];
+  // WARM GREIGE, not blue (user, 2026-08-29: "blue... is a bit of a cold color"): the drift
+  // axis now runs toward ivory (+R, −B) high on the wall — the gallery-wall answer, and the
+  // cool instruments pop by complement. Signed use unchanged (+k warm, −k cool at the stage).
+  const coolDrift = [1 + 0.062, 1 + 0.014, 1 - 0.066];
   // The multiply pass's base — white is a multiply's identity, so its stops read as fractions of
   // whatever the sweep already laid down. Grayscale, so rule 3 has nothing to say about it.
   const WHITE_BYTES = [255, 255, 255];

@@ -490,7 +490,7 @@
      deeper grey than the page so ink pops, marks can exceed the ground, and a calm bloom is
      physically possible again. The HUD page keeps --background's paper; dark side is
      --background's dark verbatim, so the dark scene is byte-identical. */
-  --scene-ground: light-dark(oklch(0.78 0.022 265), oklch(0.09 0.02 265)); /* lightened 0.68 → 0.72 → 0.78 and chroma 0.014 → 0.022 (user, 2026-08-29: "a dull gray"); keep LIGHT_TUNE.groundL AND devTune's ground override in sync */
+  --scene-ground: light-dark(oklch(0.80 0.014 85), oklch(0.09 0.02 265)); /* warm greige oklch(0.80 0.014 85) — the blue family read cold (user, 2026-08-29); keep LIGHT_TUNE.groundL AND devTune's ground override in sync */
   --foreground: light-dark(oklch(0.21 0.035 265), oklch(0.94 0.02 255));       /* #e8eefc text (dark) */
   --muted-foreground: light-dark(oklch(0.44 0.035 265), oklch(0.66 0.04 265)); /* #8a96b8 muted (dark) */
 
@@ -618,6 +618,11 @@
     light-dark(rgba(240, 244, 252, 0.80), rgba(10, 14, 28, 0.76)));
   --scrim: light-dark(rgba(235, 240, 250, 0.16), rgba(3, 5, 12, 0.16));
   --scrim-shadow: light-dark(rgba(235, 240, 250, 0.7), rgba(3, 5, 12, 0.7));
+  /* The footer's legibility halo over the scene — dark glow on the dark scene, a paper glow on
+     the light wall (the hardcoded black pair read as a dirty smudge there — user, 2026-08-29).
+     light-dark() per colour stop, since it is <color>-only. */
+  --footer-halo: 0 0 3px light-dark(rgba(248, 250, 255, 0.9), rgba(0, 0, 0, 0.9)),
+    0 0 10px light-dark(rgba(248, 250, 255, 0.95), rgba(0, 0, 0, 0.95));
   /* The thread's punch-through tone — the PAGE, so the ruler reads as cut out of the ground
      rather than drawn on it. It duplicates --background's light value on purpose (a var() here
      would resolve against the wrong element in the SVG); the two move together. */
