@@ -102,6 +102,8 @@ export class Engine {
   private raf = 0;
   private disposed = false;
   private _dofTmp = new THREE.Vector3();
+  /** Scratch for the follow-spot's per-frame anchor hand-off (Globe records → HyperView's claim). */
+  private _stageNodeTmp = new THREE.Vector3();
   private _calloutV = new THREE.Vector3(); // scratch: the subject callout's anchor, world → NDC
   // Geo callout anchors, cached EVENT-TIME (latLonToVec3 allocates and ring extraction is
   // heavy — neither may run per frame): the node anchor recomputes when the pick REFERENCE
@@ -404,6 +406,7 @@ export class Engine {
     // first frame is lit for the theme the pre-paint stamp already chose.
     this._rig = new SceneRig(this.ctx.scene);
     this._rig.setGround(this._theme === "light");
+    this._stageLight.setGround(this._theme === "light");
     this.layers = new HyperView(this.ctx.scene, colors, this._stageLight, this._sceneColorMap);
     this.globe = new Globe(this.ctx.scene, this.layers, this.ctx.camera, colors, this._stageLight);
     // The Globe reads the transition machine each frame (geo furniture alpha + the node gather).
@@ -756,6 +759,7 @@ export class Engine {
     this.ctx.setClearColor(this._colors.bg);
     this.ctx.setGround(theme === "light");
     this._rig.setGround(theme === "light"); // swap-in-place: the next frame multiplies by the other set
+    this._stageLight.setGround(theme === "light"); // a lamp is a different instrument on paper
     setNodeDimTarget(this._colors);
     this._pushSceneColors();
     for (const m of this._colorConsumers) m.setColors(this._colors);
@@ -1826,6 +1830,12 @@ export class Engine {
     );
 
     this.globe.setMorph(this.morph);
+    // THE FOLLOW-SPOT's subject, resolved from the node RECORDS and handed to the view that stages
+    // hyper's light. The records are the Globe's and the claim is HyperView's, so the Engine — the
+    // one bridge between adapters — carries it across, before `layers.update` makes the claim.
+    this.layers.setStageNode(
+      this.globe.stageNodeHyperAnchor(this._stageNodeTmp) ? this._stageNodeTmp : null,
+    );
     // Core-dim target: the DAG core fades back when a specific metagraph is the effective subject
     // (hover-preview wins over the committed filter), and stays lit for "all"/"dag".
     const coreSubj = this._hoverFilter ?? this.filter;

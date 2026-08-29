@@ -189,6 +189,11 @@ export class HyperView implements SceneView {
   private readonly stage: StageLight;
   private _spotPos = new THREE.Vector3();
   private _spotN = new THREE.Vector3();
+  // THE FOLLOW-SPOT's subject — the focused node's own bead, in WORLD space. Pushed in per frame by
+  // the Engine (the node records are the Globe's, and the Engine is the one bridge between the two
+  // adapters); copied rather than referenced so this view owns no foreign vector.
+  private _stageNodePos = new THREE.Vector3();
+  private _stageNodeOn = false;
   private _coreDim = 0; // eased 0→1: the DAG core fades back when a specific metagraph is the subject
   private _core: number; // the structural accent (colors.core) — the core sphere hue
   /** The live palette. The furniture here is additive GLOW on the dark ground and normal-blended
@@ -260,6 +265,14 @@ export class HyperView implements SceneView {
   // The view-transition furniture multiplier (Engine, per frame). The spotlight needs no gate of
   // its own: the Engine hands the same alpha to StageLight as this view's presence, so a claim
   // made while the view fades out is scaled to nothing.
+  /** THE FOLLOW-SPOT's subject for this frame, or null to fall back down the ladder (hub, core).
+   *  World space. Called every frame by the Engine, which resolves it from the node RECORDS via the
+   *  Globe — layout data, never a rendered transform of this view's own. */
+  setStageNode(pos: THREE.Vector3 | null): void {
+    this._stageNodeOn = pos != null;
+    if (pos) this._stageNodePos.copy(pos);
+  }
+
   setViewAlpha(a: number): void {
     this._fades.apply(a);
   }
@@ -805,12 +818,26 @@ export class HyperView implements SceneView {
       if (m.cfg.id === this.focusId) this._spotPos.copy(m.group.position);
     }
 
-    // Focus SPOTLIGHT: stage a white key above the focused subject's ring plane — a metagraph atom's
-    // hub, or the DAG CORE itself (same subject at a bigger scale; higher stage, same cone) — so the
-    // selection catches a real light wash on top of the DoF/dim emphasis (user). Rests dark
-    // otherwise: not claiming IS off, so there is no spot to switch back off here.
+    // Focus SPOTLIGHT: stage a white key above the focused subject — and the subject is THE FINEST
+    // RUNG THE SCENE CAN POINT AT, the same coarse→fine ladder every other emphasis in the app
+    // follows. A staged NODE wins (its own bead on its shell, pushed in from the records by the
+    // Engine — `setStageNode`); else a metagraph atom's hub; else the DAG CORE itself (the same
+    // subject at a bigger scale: higher stage, same cone). So the selection catches a real light
+    // wash on top of the DoF/dim emphasis (user). Rests dark otherwise: not claiming IS off, so
+    // there is no spot to switch back off here.
+    //
+    // ⚠️ ONE CLAIM PER VIEW. The node branch is an else-of, not a second claimer racing the hub's:
+    // a node select commits its network too (full ancestry), so both subjects are live at once and
+    // two claims would decide hyper's light by call order and claim weight instead of by the
+    // ladder. The view that stages the light picks the subject.
+    const row = STAGE_LIGHTS.hyper;
     const spotMeta = this.focusId != null && this.metas.some((m) => m.cfg.id === this.focusId);
-    if (spotMeta || dagFocused) {
+    if (this._stageNodeOn) {
+      this._spotN.set(0, 1, 0).applyEuler(this.root.rotation); // the ring-plane normal (world)
+      // No fade of its own: a hovered or committed node is fully present the moment it exists, and
+      // StageLight applies this view's presence itself.
+      this.stage.claim("hyper", this._stageNodePos, this._spotN, row.heightNode!, 1, row.angleNode);
+    } else if (spotMeta || dagFocused) {
       // Only while focused: resolve the subject to world once per frame (root tilt+spin+scale) —
       // the metagraph loop stashed its hub's ROOT-LOCAL position; the DAG core sits at the origin.
       this._spotN.set(0, 1, 0).applyEuler(this.root.rotation); // the ring-plane normal (world)
@@ -822,7 +849,7 @@ export class HyperView implements SceneView {
         "hyper",
         this._spotPos,
         this._spotN,
-        spotMeta ? STAGE_LIGHTS.hyper.height : STAGE_LIGHTS.hyper.heightDag!,
+        spotMeta ? row.height : row.heightDag!,
         spotMeta ? hubFade : coreReveal,
       );
     }

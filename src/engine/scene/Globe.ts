@@ -60,6 +60,26 @@ import type {
 const HEX_BASE_R = R + LAND_H + 0.02 + HEX_H / 2;
 const hexPitchDeg = (r: number) => ((2 * r * 1.04) / (R + LAND_H)) * (180 / Math.PI);
 
+// THE DENSITY POOL'S DAY FORM IS A SHADE (2026-08-28). Every other additive mark in this app
+// answers the ground with `glowBlend`'s blend swap alone — its tint is the thing, and normal-blending
+// that tint on paper paints it as ink. A LIGHT POOL IS THE ONE MARK WHOSE TINT IS NOT THE THING:
+// what it states is "there is more light here because there are more nodes here", and light added
+// to a 0.63-L page is not a statement at all. Measured at the resting pose before this: a transect
+// across the densest cluster read the ground at a uniform (145,152,167) either side, with two
+// samples 2% bluer beside the stacks — the pools were drawn, correctly tinted, and invisible.
+//
+// So on paper the pool inverts: a dense site sits in its own soft SHADE instead of its own pool of
+// light, which is what a lit stage does with a crowd of objects anyway. Same data, same falloff,
+// same sprite, same seating job — expressed for a ground that can only be darkened. The tint stays
+// the network's identity hue so the pool still says WHOSE nodes these are; it is only taken well
+// below the ground's own lightness so it reads as shadow rather than as a pastel disc.
+//
+// Two numbers because a shade and a glow do not carry at the same strength: `POOL_SHADE` is how far
+// down the hue goes (the pool's own darkness), `POOL_SHADE_OP` how much of the dark look's resting
+// weight it keeps (a near-ground glow may sit at 0.28 unnoticed; ink at 0.28 is a blot).
+const POOL_SHADE = 0.34;
+const POOL_SHADE_OP = 0.0;
+
 // View-transition staging grid: THE cell pitch (world units). setGatherFit may only shrink it
 // (with the chip size, by one factor) to make the packed row of per-network squares
 // (domain/gatherLayout) fit the band the Engine measured against the HUD — a phone-portrait
@@ -170,6 +190,9 @@ export class Globe implements GeoViewHost {
   metaList: MetaLayout[] = [];
   filter = "all";
   private _hoverNodeId: string | null = null;
+  // The hovered node's own record, resolved at hover time (see setHoverNode) — the stage light's
+  // preview subject.
+  private _hoverNodeRec: ValidatorRecord | MetaNodeRecord | null = null;
   private _hoverCohort: Set<string> | null = null; // cohort-row hover — the whole stack glows
   private _selectedNodeId: string | null = null;
   private _selCohort: CohortSel | null = null;
@@ -571,8 +594,9 @@ export class Globe implements GeoViewHost {
     for (const mesh of this._densityGlow) {
       const net = mesh.userData.net as string;
       const mat = mesh.material as THREE.MeshBasicMaterial;
-      mat.color.setHex(net === "dag" ? dagHex : metaHex(net));
-      // A pool is GLOW: additive on the dark ground, normal-blended ink on paper (see glowBlend).
+      this._poolTint(mat.color, net === "dag" ? dagHex : metaHex(net));
+      // A pool is GLOW: additive on the dark ground, normal-blended INK on paper (see glowBlend) —
+      // and on paper its ink is the shade `_poolTint` just resolved, not the hue itself.
       const bl = glowBlend(this._colorsRef);
       if (mat.blending !== bl) { mat.blending = bl; mat.needsUpdate = true; }
     }
@@ -717,6 +741,15 @@ export class Globe implements GeoViewHost {
   // A soft additive "light pool" under each dense node cluster on the globe — LIGHTING driven by the
   // real data (more nodes at a site → a bigger, brighter pool), so Germany / the US / Finland glow.
   // Fades with the morph (geoFades) so it's a geo-only effect. Rebuilt whenever node data changes.
+  //
+  // ON PAPER IT IS A SHADE, NOT A POOL — see POOL_SHADE above. This is the one home for that
+  // question: both the builder and the theme-flip retint go through `_poolTint`, so the two
+  // mechanisms (a fresh material vs a live `setHex`) cannot grow separate opinions about it.
+  private _poolTint(out: THREE.Color, hex: number): THREE.Color {
+    out.setHex(hex);
+    return this.geoPaper ? out.multiplyScalar(POOL_SHADE) : out;
+  }
+
   private _buildDensityGlow(): void {
     for (const m of this._densityGlow) {
       this.surface.remove(m);
@@ -755,7 +788,7 @@ export class Globe implements GeoViewHost {
       const dir = c.dir.normalize();
       const size = Math.min(9, 2.2 + Math.sqrt(c.n) * 0.9); // pool grows with node count, capped
       const mat = new THREE.MeshBasicMaterial({
-        map: this._glowTex, color: new THREE.Color(c.color),
+        map: this._glowTex, color: this._poolTint(new THREE.Color(), c.color),
         transparent: true, blending: glowBlend(this._colorsRef), depthWrite: false, opacity: 0,
       });
       const mesh = new THREE.Mesh(new THREE.PlaneGeometry(size, size), mat);
@@ -1004,6 +1037,27 @@ export class Globe implements GeoViewHost {
   // that shares it. null clears the highlight.
   setHoverNode(id: string | null): void {
     this._hoverNodeId = id || null;
+    // Resolve the record once per hover change (never per frame) — the same event-time cache
+    // `setSelectedNode` keeps, for the same consumer: the stage light follows the HOVERED node
+    // when there is one (see `_stageRec`).
+    this._hoverNodeRec = this._recOf(this._hoverNodeId);
+  }
+
+  /** The geoPrimary record for a node id, or null. One home for the lookup both hover and
+   *  selection do — event-time only, never per frame. */
+  private _recOf(id: string | null): ValidatorRecord | MetaNodeRecord | null {
+    if (!id) return null;
+    return this.nodes.find((n) => n.nodeId === id && n.geoPrimary) ??
+      this.metaNodes.find((n) => n.nodeId === id && n.geoPrimary) ??
+      null;
+  }
+
+  /** THE SUBJECT THE STAGE LIGHT FOLLOWS: the hovered node if there is one, else the committed
+   *  one. A hover previews what a click would commit (rule 9), and the light is emphasis — so it
+   *  previews at the same strength, exactly as the dim and the glow do. It is deliberately NOT the
+   *  callout's rule: the callout mirrors the BOX, which only a commit moves. */
+  private _stageRec(): ValidatorRecord | MetaNodeRecord | null {
+    return this._hoverNodeRec ?? this._selNodeRec;
   }
 
   // Cohort-row hover (explorer): glow EVERY member of the cohort's 3D stack together.
@@ -1061,13 +1115,36 @@ export class Globe implements GeoViewHost {
     return true;
   }
 
+  /** THE HYPER FOLLOW-SPOT's subject, in WORLD space — the stage node's own bead on its shell.
+   *
+   *  Hyper's light used to stop at the hub: a committed node was the finest rung on the ladder and
+   *  the brightest thing in the rail, and the scene answered it by lighting the whole metagraph.
+   *  This is the same anchor `selectedNodeHyperAnchor` resolves for the callout (layout data — the
+   *  hub-glued world→local + offset, or the spun shell position), taken all the way to world here
+   *  because a claim is world-space, and taken from `_stageRec` so a hover previews it.
+   *
+   *  False past the morph midpoint: a hyper anchor means nothing once the layout is the globe's,
+   *  and the ledger rewrites these same chips into its trays. */
+  stageNodeHyperAnchor(out: THREE.Vector3): boolean {
+    if (this.ledger || this.morph > 0.5) return false;
+    const rec = this._stageRec();
+    if (!rec || !this._hyperAnchorOf(rec, out)) return false;
+    this.group.localToWorld(out);
+    return true;
+  }
+
   /** The SELECTED node's HYPER position in globe-LOCAL coordinates — the same anchor the
    *  instance write uses (hub-glued world→local + offset for a metagraph node, the spun shell
    *  position for a validator), so the hyper callout can point at the committed node's own
    *  bead (user, 2026-08-15: "the node does not have its callout"). */
   selectedNodeHyperAnchor(out: THREE.Vector3): boolean {
     const rec = this._selNodeRec;
-    if (!rec) return false;
+    return rec ? this._hyperAnchorOf(rec, out) : false;
+  }
+
+  /** One home for "where is this node in hyper" (globe-LOCAL), shared by the callout's committed
+   *  read above and the follow-spot's hover-preferring one. */
+  private _hyperAnchorOf(rec: ValidatorRecord | MetaNodeRecord, out: THREE.Vector3): boolean {
     if ("hubGroup" in rec && rec.hubGroup) {
       rec.hubGroup.getWorldPosition(out);
       this.group.worldToLocal(out).add(rec.offset);
@@ -1451,9 +1528,10 @@ export class Globe implements GeoViewHost {
     // drop and hyper's tether sweep). Data rebuilds outside transitions don't blink them
     // (_glowEntryT parks at 1).
     const ge = this._glowEntryT * this._glowEntryT * (3 - 2 * this._glowEntryT);
+    const poolW = paper ? POOL_SHADE_OP : 1; // hoisted: ink and glow do not rest at one weight
     for (const g of this._densityGlow) {
       (g.material as THREE.MeshBasicMaterial).opacity =
-        (g.userData.glowBase as number) * surf * ge * this._glowDim * this._glowAllDim;
+        (g.userData.glowBase as number) * poolW * surf * ge * this._glowDim * this._glowAllDim;
     }
     // Depth cueing for the see-through hologram: the graticule + coastal walls dim their far
     // hemisphere through the shared facing uniform (camera dir in this group's local frame),
@@ -1509,10 +1587,12 @@ export class Globe implements GeoViewHost {
     // Advance the arrival beat (see beginEntry) — parked at 1 in steady state.
     if (!this._glowEntryHold && this._glowEntryT < 1) this._glowEntryT = Math.min(1, this._glowEntryT + dt / 0.7);
     this.clock += dt;
-    // Node-pick SPOTLIGHT (geo only): claim the shared stage light above the selected node's chip
-    // stack so the zoomed-in pick catches a light wash (user). The record's geo position is
-    // group-LOCAL — resolve through the globe's spin/lean each frame.
-    const selRec = this._selNodeRec;
+    // Node-pick SPOTLIGHT (geo only): claim the shared stage light above the node's chip stack so
+    // the zoomed-in pick catches a light wash (user). The subject is `_stageRec` — the hovered node
+    // if there is one, else the committed one — so the light previews a hover exactly as the dim
+    // does. The record's geo position is group-LOCAL; resolve through the globe's spin/lean each
+    // frame.
+    const selRec = this._stageRec();
     if (selRec != null && !this.ledger && this.morph > 0.85 && ("geoPos" in selRec || !selRec.noGeo)) {
       const rec = selRec;
       if ("geoPos" in rec) this._spotPos.copy(rec.geoPos); // metagraph node (fanned stack position)

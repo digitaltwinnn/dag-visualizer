@@ -13,14 +13,37 @@ describe("STAGE_LIGHTS", () => {
     expect(Object.keys(STAGE_LIGHTS).sort()).toEqual(["geo", "hyper", "ledger"]);
   });
 
-  it("pins hyper's row (moved verbatim from HyperView.ts's SPOT_* consts)", () => {
+  // Hyper stages THREE subjects at three scales out of one row — the DAG core, a metagraph hub and
+  // a single node (the follow-spot). The node's own height AND cone are what make the pool read as
+  // emphasis on one bead rather than as a wash over its whole shell, so both are pinned.
+  it("pins hyper's row, including its per-subject stages (core, hub, node)", () => {
     expect(STAGE_LIGHT_DEFAULTS.hyper).toEqual({
-      angle: 0.9, distance: 40, intensity: 2.4, penumbra: 0.25, height: 9, heightDag: 17,
+      angle: 0.9, distance: 40, intensity: 2.4, intensityPaper: 5.5, penumbra: 0.25,
+      height: 9, heightDag: 17, heightNode: 3.2, angleNode: 0.5,
     });
+    // The ladder in numbers: the finer the subject, the lower and tighter its stage.
+    expect(STAGE_LIGHT_DEFAULTS.hyper.heightNode!).toBeLessThan(STAGE_LIGHT_DEFAULTS.hyper.height);
+    expect(STAGE_LIGHT_DEFAULTS.hyper.height).toBeLessThan(STAGE_LIGHT_DEFAULTS.hyper.heightDag!);
+    expect(STAGE_LIGHT_DEFAULTS.hyper.angleNode!).toBeLessThan(STAGE_LIGHT_DEFAULTS.hyper.angle);
   });
 
   it("pins geo's row (moved verbatim from Globe.ts)", () => {
-    expect(STAGE_LIGHT_DEFAULTS.geo).toEqual({ angle: 0.36, distance: 22, intensity: 1.5, height: 6 });
+    expect(STAGE_LIGHT_DEFAULTS.geo).toEqual({
+      angle: 0.36, distance: 22, intensity: 1.5, intensityPaper: 3.4, height: 6,
+    });
+  });
+
+  // A lamp is not the same instrument on both grounds: dark blooms the wash it lays on an emissive
+  // node, paper (bloomMul 0.15) barely does, so the identical claim reads as nothing there. Every
+  // row that states a paper level must state a HIGHER one — the direction is the design, the
+  // numbers are tuning. The ledger is exempt by construction: its claim is paper-only, so its one
+  // `intensity` already is its paper number.
+  it("asks MORE of a claim on paper, wherever a row states a paper level", () => {
+    for (const [view, row] of Object.entries(STAGE_LIGHT_DEFAULTS)) {
+      if (row.intensityPaper == null) continue;
+      expect(row.intensityPaper, `${view} paper level`).toBeGreaterThan(row.intensity);
+    }
+    expect(STAGE_LIGHT_DEFAULTS.ledger.intensityPaper).toBeUndefined();
   });
 
   it("pins the ledger's row (the day glass's movable highlight)", () => {
