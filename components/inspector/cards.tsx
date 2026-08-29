@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { cn } from "@/lib/utils";
 import { useStore } from "@/src/store/store";
 import { shortHash, metagraphById, getNetwork, SIGNER_GROUPS, nodeSigned, coLocatedNetworks, filterAccent } from "@/src/data/network";
-import { UNLISTED_ID, observedUnlistedIds } from "@/src/data/unlisted";
+import { UNLISTED_ID, UNLISTED_HUE, observedUnlistedIds } from "@/src/data/unlisted";
 import { identityHudCss } from "@/src/palette/identity";
 import { fmtDag, fmtKB, midHash } from "@/src/util/format";
 import { relativeAge } from "@/src/util/relativeAge";
@@ -110,7 +110,10 @@ export function SnapshotAside({ data: d }: { data: GlobalSnapshot }) {
 export function MetaTitle({ cfg }: { cfg: MetaCfg }) {
   const metaList = useStore((s) => s.metaList);
   const mg = metaList.find((x) => x.id === cfg.id) || null;
-  const hue = identityHudCss(cfg.id);
+  // The unlisted pseudo-network keeps its mandated neutral — identityHudCss would hash-assign a
+  // saturated hue to the "unlisted" id, and no single identity can speak for a mixed set. Same
+  // guard LedgerPanel applies (UNLISTED_HUE is the one home, src/data/unlisted.ts).
+  const hue = cfg.id === UNLISTED_ID ? UNLISTED_HUE : identityHudCss(cfg.id);
   const iconUrl = mg?.iconUrl || cfg.iconUrl; // live metagraph icon, or the core's bundled logo
   const monogram = (cfg.ticker || cfg.name).slice(0, 3).toUpperCase();
   const kind = networkKind(cfg.id, mg?.nodes || []);
@@ -591,7 +594,11 @@ export function MetaCard({ cfg }: { cfg: MetaCfg }) {
 export function MetaTickerAside({ cfg }: { cfg: MetaCfg }) {
   if (!cfg.ticker) return null;
   return (
-    <span className="text-label font-semibold tracking-[0.02em]" style={{ color: identityHudCss(cfg.id) }}>
+    <span
+      className="text-label font-semibold tracking-[0.02em]"
+      // Unlisted stays neutral — same guard as MetaTitle above.
+      style={{ color: cfg.id === UNLISTED_ID ? UNLISTED_HUE : identityHudCss(cfg.id) }}
+    >
       {cfg.ticker}
     </span>
   );
