@@ -228,7 +228,7 @@ export const LIGHT_TUNE_DEFAULTS: Readonly<LightTune> = Object.freeze({
   // Settled from the user's own EXPORT (2026-08-28, second round): with the inactive marks
   // thinned (inkDimG 1.1 → 1.35) the identity lane could come UP (laneL 0.51 → 0.61) —
   // brighter ink reads right once the de-emphasized field around it is genuinely thin.
-  laneL: 0.61, laneC: 0.28, groundL: 0.80, // groundL 0.72 → 0.78 (user, 2026-08-29: "a dull gray"); keep globals.css --scene-ground AND devTune's override in sync
+  laneL: 0.61, laneC: 0.28, groundL: 0.81, // groundL 0.72 → 0.78 (user, 2026-08-29: "a dull gray"); keep globals.css --scene-ground AND devTune's override in sync
   inkGamma: 0.15, inkDimG: 1.35, inkLift: 0.6,
   // THE WHOLE-FRAME PASS IS OFF ON PAPER. It is a luminance highpass over the finished frame, and
   // on paper the marks are INK — darker than the ground they lie on — so no threshold selects them;

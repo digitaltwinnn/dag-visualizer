@@ -80,7 +80,7 @@ export async function mountDevTune(targets: DevTuneTargets): Promise<DevTuneHand
         // ground knob quietly RETINT the scene as well as relight it.
         document.documentElement.style.setProperty(
           "--scene-ground",
-          `light-dark(oklch(${LIGHT_TUNE.groundL} 0.014 85), oklch(0.09 0.02 265))` // greige — keep chroma+hue in sync with the token AND sceneColors,
+          `light-dark(oklch(${LIGHT_TUNE.groundL} 0.005 85), oklch(0.09 0.02 265))` // greige — keep chroma+hue in sync with the token AND sceneColors,
         );
         setSceneLaneLight(LIGHT_TUNE.laneL, LIGHT_TUNE.laneC);
         refreshTheme();
