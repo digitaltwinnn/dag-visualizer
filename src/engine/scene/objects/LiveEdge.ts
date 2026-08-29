@@ -24,6 +24,7 @@
 import * as THREE from "three";
 import { BAR_H, BAR_LIFT, FLOOR_Y, PLANE_FIELD_HALF } from "../../domain/ledgerLayout";
 import { LIVE_X, type LiveEdgePhase } from "../../domain/ledgerModel";
+import { joinBloom } from "../SceneContext";
 
 /** The line's own thickness in X (depth). Thin enough to read as a rule rather than a slab. */
 const EDGE_D = 0.13;
@@ -65,6 +66,7 @@ export class LiveEdge {
     const mesh = new THREE.Mesh(this._geo, this._mat);
     mesh.position.set(LIVE_X, FLOOR_Y.gl0 + BAR_LIFT + EDGE_H / 2, 0);
     mesh.renderOrder = 1;
+    joinBloom(mesh); // the boundary with NOW carries the committed hue — see BLOOM_LAYER
     this.group.add(mesh);
   }
 

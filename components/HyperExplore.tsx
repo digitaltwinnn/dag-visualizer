@@ -5,7 +5,7 @@ import { useStore } from "@/src/store/store";
 import ExplorerShell from "@/components/ExplorerShell";
 import { metagraphById } from "@/src/data/network";
 import { compositionGroups, compositionClause } from "@/src/data/composition";
-import { identityHudHex } from "@/src/palette/identity";
+import { identityHudCss } from "@/src/palette/identity";
 import { IdentityDot, RoleChips } from "@/components/inspector/parts";
 import { SelectedRowMark, selectedRow, selectionHue } from "@/components/selection";
 import { hoverKeyOf } from "@/src/data/hoverSubject";
@@ -96,7 +96,7 @@ export default function HyperExplore() {
       {[...metaList].sort((a, b) => b.nodes.length - a.nodes.length).map((m) => {
               const cfg = metagraphById(m.id);
               const name = cfg?.name ?? m.id;
-              const hue = identityHudHex(m.id);
+              const hue = identityHudCss(m.id);
               const open = m.id === filter;
               // Bidirectional pairing on the SAME channel the 3D hubs and the dossier use:
               // hovering the row previews the selection dim in the scene, hovering the hub

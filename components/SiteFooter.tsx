@@ -36,10 +36,10 @@ export default function SiteFooter() {
           hyper a metagraph hub sweeps the bottom edge and its bloom washed "Design" out entirely
           (measured at 1600×950 and again at 900×900). The answer is a shadow, not a plate: a plate
           would be the surface the brief ruled out, and it would sit there at full weight over the
-          black the footer rests on 95% of the time. A shadow costs nothing over black and only
+          black the footer rests on 95% of the time (in dark). A halo costs nothing over black and only
           appears where something bright is behind it. Grayscale by rule — a tinted halo would read
           as an accent. */}
-      <nav className="flex items-center gap-2 text-micro text-muted-foreground/70 [text-shadow:0_0_3px_rgb(0_0_0/0.9),0_0_10px_rgb(0_0_0/0.95)] [&_a]:pointer-events-auto">
+      <nav className="flex items-center gap-2 text-micro text-muted-foreground/70 [text-shadow:var(--footer-halo)] [&_a]:pointer-events-auto">
         <a href={GITHUB} target="_blank" rel="noopener noreferrer" className="hover:text-foreground transition-colors">
           GitHub
         </a>

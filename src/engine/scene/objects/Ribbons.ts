@@ -17,7 +17,7 @@
 // Drawn on the LEAD row and the HOT row only, so the trail stays calm; older ticks keep a hairline
 // strut drawn by the view. One Mesh, one preallocated geometry, rewritten event-time.
 import * as THREE from "three";
-import type { SceneColors } from "../../sceneColors";
+import { glowBlend, inkMix, inkPresence, isLightGround, type SceneColors } from "../../sceneColors";
 import type { TuneSchema } from "../../tune";
 import { METAGRAPHS } from "@/src/net/current";
 import { BAR_H, BAR_LIFT, FLOOR_Y, LEAD_X, TILE_LIFT } from "../../domain/ledgerLayout";
@@ -90,13 +90,27 @@ export class Ribbons {
   private _rowFade = [1, 1, 1];
   private _filter = "all";
   private _c = new THREE.Color();
+  /** The live palette — the sheet is normal-blended INK on paper, additive GLOW on the dark
+   *  ground, and its per-row brightness has to be expressed for whichever one it lands on. */
+  private _colors: SceneColors;
+  /** GROUND, hoisted at event time — setAlpha runs per frame and reads a boolean. */
+  private _paper: boolean;
 
   constructor(colors: SceneColors, sceneColors: Record<string, number>) {
+    this._colors = colors;
+    this._paper = isLightGround(colors);
     this._sceneColors = sceneColors;
     this._neutral = colors.core;
     const verts = RIBBON_ROWS * PER_ROW * VERTS_PER_RIBBON;
     this._pos = new THREE.Float32BufferAttribute(new Float32Array(verts * 3), 3);
-    this._col = new THREE.Float32BufferAttribute(new Float32Array(verts * 3), 3);
+    // itemSize 4: the 4th component is PER-VERTEX ALPHA (three's USE_COLOR_ALPHA path). It
+    // exists for the paper ground alone — on paper BOTH the trail's front/horizon fade and the
+    // emphasis dim ride ALPHA there, because a colour faded toward the paper at full material
+    // opacity is still a milky sheet hanging over the chamber (user, 2026-08-28: "a transparent
+    // ribbon sitting in front of my snapshot panels", then "should we focus more on transparency
+    // as opposed to making the colors look washed out"). On dark it stays 1 everywhere and the
+    // colour multiply does the fading, exactly as before — byte-identical.
+    this._col = new THREE.Float32BufferAttribute(new Float32Array(verts * 4), 4);
     this._pos.setUsage(THREE.DynamicDrawUsage);
     this._col.setUsage(THREE.DynamicDrawUsage);
     this._geo.setAttribute("position", this._pos);
@@ -104,7 +118,7 @@ export class Ribbons {
     this._geo.setDrawRange(0, 0);
     this._mat = new THREE.MeshBasicMaterial({
       vertexColors: true, transparent: true, opacity: 0,
-      side: THREE.DoubleSide, depthWrite: false, blending: THREE.AdditiveBlending,
+      side: THREE.DoubleSide, depthWrite: false, blending: glowBlend(colors),
     });
     this._mesh = new THREE.Mesh(this._geo, this._mat);
     this._mesh.frustumCulled = false;
@@ -117,7 +131,23 @@ export class Ribbons {
     }
   }
 
-  setSceneColors(map: Record<string, number>): void { this._sceneColors = map; }
+  setSceneColors(map: Record<string, number>): void {
+    this._sceneColors = map;
+    this._writeGeometry(); // event-time: the sheet's colours are BAKED into vertex colours
+  }
+
+  /** THEME FLIP — the neutral trail colour is baked into the vertex colours alongside the identity
+   *  hues, so a retint is the same rewrite a filter commit runs. Event-time, like `setFilter`. */
+  setColors(c: SceneColors): void {
+    this._colors = c;
+    this._paper = isLightGround(c);
+    this._neutral = c.core;
+    // The GROUND changed, so the sheet's blend mode changes with it (see glowBlend): additive glow
+    // on the dark ground is a no-op on paper — the ribbons vanished outright before this line.
+    this._mat.blending = glowBlend(c);
+    this._mat.needsUpdate = true; // three caches the program per blending mode
+    this._writeGeometry(); // event-time: a theme flip, not a frame
+  }
 
   /** Live-tune the look (dev panel). Event-time: rewrites the sheet. */
   setTune(t: Partial<RibbonTune>): void {
@@ -169,7 +199,11 @@ export class Ribbons {
    *  visibly trailing them out of the view by ~half a second. `restOp` is read per frame here like
    *  every other tune row, so the knob still lives without an onChange. */
   setAlpha(a: number): void {
-    this._mat.opacity = this.tune.restOp * a;
+    // `restOp` is the level of an ADDITIVE sheet over black, where the bloom lifts it clear; the same
+    // number as normal-blended ink on paper composites the (already ink-mixed) vertex colour at a
+    // quarter strength, which is precisely how the ribbons read as white ghosts on the light ground.
+    // Presence, so it asks the ground — see inkPresence.
+    this._mat.opacity = inkPresence(this.tune.restOp, this._paper) * a;
   }
 
   /** COMMITTED filter → the other metagraphs' sheets take the COLORED dim (identity hue at the
@@ -189,9 +223,9 @@ export class Ribbons {
     const c = this._col.array as Float32Array;
     const { curve, brightness } = this.tune;
     let v = 0;
-    const push = (x: number, z: number, y: number, r: number, g: number, b: number) => {
+    const push = (x: number, z: number, y: number, r: number, g: number, b: number, a: number) => {
       p[v * 3] = x; p[v * 3 + 1] = y; p[v * 3 + 2] = z;
-      c[v * 3] = r; c[v * 3 + 1] = g; c[v * 3 + 2] = b;
+      c[v * 4] = r; c[v * 4 + 1] = g; c[v * 4 + 2] = b; c[v * 4 + 3] = a;
       v++;
     };
     for (let r = 0; r < RIBBON_ROWS; r++) {
@@ -208,16 +242,32 @@ export class Ribbons {
         const hex = this._sceneColors[key] ?? this._neutral;
         this._c.setHex(hex);
         const off = this._filter !== "all" && key !== this._filter;
-        const sc = snapBright(brightness * rowFade, off);
-        const cr = this._c.r * sc, cg = this._c.g * sc, cb = this._c.b * sc;
+        // The EMPHASIS term alone asks the ground; `rowFade` is the trail's front/horizon boundary
+        // ramp — geometry, not weight — so it multiplies in afterwards ungamma'd (inkPresence's own
+        // rule). Factoring it out of `snapBright` is exact: with no focus the resolver is purely
+        // multiplicative in `base`, so dark is byte-identical. `brightness` is also the curve's
+        // REFERENCE — a ribbon rests at 0.85, so without it the paper gamma read an off-filter
+        // sheet at 95% of a resting one and the filter's whole answer vanished.
+        const emph = inkPresence(snapBright(brightness, off), this._paper, brightness);
+        // ON PAPER, DE-EMPHASIS RIDES OPACITY (user, 2026-08-28: "should we focus more on
+        // transparency as opposed to making the colors look washed out"). c9b3ffc moved the
+        // GEOMETRIC fade onto alpha for exactly this reason; the EMPHASIS term now follows it.
+        // A colour lerped toward the paper still paints an OPAQUE milky sheet — over the glass
+        // planes and over everything behind them — so an off-filter ribbon read as bleached
+        // rather than as itself, fainter. Ink keeps its full hue and saturation; presence and
+        // the boundary ramp both ride the vertex ALPHA. On dark both stay in the colour multiply
+        // (toward black = invisible under additive), byte-identical.
+        if (!this._paper) inkMix(this._c, emph * rowFade, this._colors);
+        const cr = this._c.r, cg = this._c.g, cb = this._c.b;
+        const ca = this._paper ? emph * rowFade : 1;
         for (let j = 0; j < RIBBON_SEG; j++) {
           const t0 = j / RIBBON_SEG, t1 = (j + 1) / RIBBON_SEG;
           const s0 = sweep(t0, curve), s1 = sweep(t1, curve);
           const y0 = yTop + (yBot - yTop) * t0, y1 = yTop + (yBot - yTop) * t1;
           const l0 = q.topZ0 + (q.botZ0 - q.topZ0) * s0, r0 = q.topZ1 + (q.botZ1 - q.topZ1) * s0;
           const l1 = q.topZ0 + (q.botZ0 - q.topZ0) * s1, r1 = q.topZ1 + (q.botZ1 - q.topZ1) * s1;
-          push(x, l0, y0, cr, cg, cb); push(x, r0, y0, cr, cg, cb); push(x, r1, y1, cr, cg, cb);
-          push(x, l0, y0, cr, cg, cb); push(x, r1, y1, cr, cg, cb); push(x, l1, y1, cr, cg, cb);
+          push(x, l0, y0, cr, cg, cb, ca); push(x, r0, y0, cr, cg, cb, ca); push(x, r1, y1, cr, cg, cb, ca);
+          push(x, l0, y0, cr, cg, cb, ca); push(x, r1, y1, cr, cg, cb, ca); push(x, l1, y1, cr, cg, cb, ca);
         }
       }
     }

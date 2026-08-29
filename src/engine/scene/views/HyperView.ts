@@ -17,9 +17,10 @@ import { FadeSet } from "../objects/FadeSet";
 import { ORB_FRESNEL_GLSL, ORB_FRESNEL_MIX } from "../objects/NodeFabric";
 import { offNetMul } from "../../domain/dimModel";
 import { makeRadialGradientTexture } from "../objects/gradientTexture";
-import type { SceneColors } from "../../sceneColors";
+import { glowBlend, inkMix, inkPresence, isLightGround, type SceneColors } from "../../sceneColors";
 import type { TuneSchema } from "../../tune";
 import type { SceneView } from "./SceneView";
+import { joinBloom } from "../SceneContext";
 
 const _pos = new THREE.Vector3(); // scratch for hub orbit positions (reused each frame)
 const _tcol = new THREE.Color(); // scratch for the tether colour bake (event-time, reused)
@@ -188,8 +189,18 @@ export class HyperView implements SceneView {
   private readonly stage: StageLight;
   private _spotPos = new THREE.Vector3();
   private _spotN = new THREE.Vector3();
+  // THE FOLLOW-SPOT's subject — the focused node's own bead, in WORLD space. Pushed in per frame by
+  // the Engine (the node records are the Globe's, and the Engine is the one bridge between the two
+  // adapters); copied rather than referenced so this view owns no foreign vector.
+  private _stageNodePos = new THREE.Vector3();
+  private _stageNodeOn = false;
   private _coreDim = 0; // eased 0→1: the DAG core fades back when a specific metagraph is the subject
   private _core: number; // the structural accent (colors.core) — the core sphere hue
+  /** The live palette. The furniture here is additive GLOW on the dark ground and normal-blended
+   *  INK on paper, and the tether bakes its tip-fade as presence — both need the ground. */
+  private _colors: SceneColors;
+  /** GROUND, hoisted at event time — the per-hub loop reads a boolean, never re-derives luminance. */
+  private _paper: boolean;
   // furnitureAlpha("hyper") — the view-transition build/teardown fade. FadeSet is the single owner
   // of the alpha; every site here is a DYNAMIC per-frame expression (verified — zero static
   // registrations in this view today), so they all just read `_fades.alpha`.
@@ -206,6 +217,8 @@ export class HyperView implements SceneView {
   constructor(scene: THREE.Scene, colors: SceneColors, stage: StageLight, sceneColors?: Record<string, number>) {
     this.scene = scene;
     this._core = colors.core;
+    this._colors = colors;
+    this._paper = isLightGround(colors);
     this.stage = stage;
     this.root = new THREE.Group();
     // Tilt the hub/tether/hoop structure to read top-down from the shared overview camera (Globe
@@ -252,6 +265,14 @@ export class HyperView implements SceneView {
   // The view-transition furniture multiplier (Engine, per frame). The spotlight needs no gate of
   // its own: the Engine hands the same alpha to StageLight as this view's presence, so a claim
   // made while the view fades out is scaled to nothing.
+  /** THE FOLLOW-SPOT's subject for this frame, or null to fall back down the ladder (hub, core).
+   *  World space. Called every frame by the Engine, which resolves it from the node RECORDS via the
+   *  Globe — layout data, never a rendered transform of this view's own. */
+  setStageNode(pos: THREE.Vector3 | null): void {
+    this._stageNodeOn = pos != null;
+    if (pos) this._stageNodePos.copy(pos);
+  }
+
   setViewAlpha(a: number): void {
     this._fades.apply(a);
   }
@@ -290,6 +311,7 @@ export class HyperView implements SceneView {
     });
     applyOrbFresnel(mat);
     this.core = new THREE.Mesh(HUB_ORB, mat);
+    joinBloom(this.core); // one node model: the core glows like any hub — see BLOOM_LAYER
     this.core.userData.pick = {
       kind: "core",
       title: "Global L0 — the Hypergraph core",
@@ -344,6 +366,7 @@ export class HyperView implements SceneView {
       });
       applyOrbFresnel(hubMat);
       const hub = new THREE.Mesh(HUB_ORB, hubMat);
+      joinBloom(hub);
       hub.userData.pick = { kind: "meta", cfg, title: cfg.name, sub: `Metagraph · ${cfg.ticker}` };
       group.add(hub);
       this.pickables.push(hub);
@@ -378,7 +401,7 @@ export class HyperView implements SceneView {
         tGeo,
         new THREE.LineBasicMaterial({
           vertexColors: true, transparent: true, opacity: 0, depthWrite: false,
-          blending: THREE.AdditiveBlending,
+          blending: glowBlend(this._colors),
         }),
       );
       // The positions are rewritten per frame without recomputing bounds, so the bounding sphere
@@ -393,7 +416,7 @@ export class HyperView implements SceneView {
           new THREE.SphereGeometry(0.28, 12, 12),
           // Additive (only ever BRIGHTENS — normal blending darkened the bloomed tether/core as a
           // packet passed over, the "black objects"); depthTest off so it never occludes the line.
-          new THREE.MeshBasicMaterial({ color: col, transparent: true, opacity: 0, depthWrite: false, depthTest: false, blending: THREE.AdditiveBlending }),
+          new THREE.MeshBasicMaterial({ color: col, transparent: true, opacity: 0, depthWrite: false, depthTest: false, blending: glowBlend(this._colors) }),
         );
         pk.renderOrder = 4;
         pk.visible = false;
@@ -404,6 +427,55 @@ export class HyperView implements SceneView {
       this.root.add(group);
       this.metas.push({ group, hub, cfg, state: null, tether, packets: [], pool, pending: 0, lastLaunch: 0, glow: 0, anchor: pos.clone(), orbit: an.a, radius: an.radius, incl: an.incl, spin: 0.3 + Math.random() * 0.5, active: true, hoops, fills });
     });
+  }
+
+  /**
+   * Re-apply the STRUCTURAL palette after a theme flip. Every site here is a construction-time
+   * capture of `colors.core` — the per-frame passes below write only opacities/intensities, so
+   * they follow the new hue for free once these materials hold it. Plain data in (rule 1).
+   */
+  setColors(c: SceneColors) {
+    this._core = c.core;
+    this._colors = c;
+    this._paper = isLightGround(c);
+    // The GROUND changed, so hyper's furniture switches between additive glow and normal-blended
+    // ink (see glowBlend) — additive on paper draws nothing. Every material that carries a fade in
+    // its own `opacity` needs only this; the tether, whose fade is baked into vertex COLOUR, is
+    // re-baked below through inkMix.
+    const bl = glowBlend(c);
+    const reblend = (m: THREE.Material) => { m.blending = bl; m.needsUpdate = true; };
+    for (const f of this._coreFills) reblend(f.material as THREE.Material);
+    for (const m of this.metas) {
+      reblend(m.tether.material as THREE.Material);
+      for (const pk of m.pool) reblend(pk.material as THREE.Material);
+      for (const f of m.fills) reblend(f.material as THREE.Material);
+    }
+    const coreMat = this.core.material as THREE.MeshStandardMaterial;
+    coreMat.color.setHex(this._core);
+    coreMat.emissive.setHex(this._core);
+    for (const h of this._coreRings) (h.material as THREE.LineDashedMaterial).color.setHex(this._core);
+    for (const f of this._coreFills) (f.material as THREE.MeshBasicMaterial).color.setHex(this._core);
+    for (const m of this.metas) {
+      for (const h of m.hoops) (h.material as THREE.LineDashedMaterial).color.setHex(this._core);
+      for (const f of m.fills) (f.material as THREE.MeshBasicMaterial).color.setHex(this._core);
+    }
+    this._bakeTethers(); // the tether profile is baked from _core into vertex colours
+  }
+
+  /**
+   * Re-apply the IDENTITY scene lane after a theme flip (the lane's L/C themes; the hue never
+   * does). The ctor comment above says this map never needs updating — true for DATA (the hub set
+   * is config.METAGRAPHS, fixed), false for THEME, which is the one thing that re-tints it.
+   */
+  setSceneColors(map: Record<string, number>) {
+    this.sceneColors = map;
+    for (const m of this.metas) {
+      const col = map[m.cfg.id] ?? m.cfg.color;
+      const hubMat = m.hub.material as THREE.MeshStandardMaterial;
+      hubMat.color.setHex(col);
+      hubMat.emissive.setHex(col);
+      for (const pk of m.pool) (pk.material as THREE.MeshBasicMaterial).color.setHex(col);
+    }
   }
 
   /** Apply the tune knobs (see TETHER_TUNE_DEFAULTS) to the tether's baked look.
@@ -428,7 +500,12 @@ export class HyperView implements SceneView {
       // Fade UP out of the core (dissolves the knot where ten tethers meet), fade DOWN
       // into the hub (the line lands in the orb instead of stabbing it).
       const a = smoothstep(0, coreFade, t) * smoothstep(0, hubFade, 1 - t) * brightness;
-      col.setXYZ(j, _tcol.r * a, _tcol.g * a, _tcol.b * a);
+      // The profile is PRESENCE, so it resolves toward the ground: black under additive (where
+      // black is absent), the paper colour under normal blending (where black is the loudest ink
+      // there is, and the tips would land as two dark blobs). See inkMix.
+      _tcol.setHex(this._core);
+      inkMix(_tcol, a, this._colors);
+      col.setXYZ(j, _tcol.r, _tcol.g, _tcol.b);
     }
     col.needsUpdate = true;
   }
@@ -501,7 +578,7 @@ export class HyperView implements SceneView {
     const geo = new THREE.CircleGeometry(radius, 96);
     const mat = new THREE.MeshBasicMaterial({
       map: this._fillTex, color: new THREE.Color(this._core), transparent: true,
-      blending: THREE.AdditiveBlending, depthWrite: false, opacity: FILL_OP, side: THREE.DoubleSide,
+      blending: glowBlend(this._colors), depthWrite: false, opacity: FILL_OP, side: THREE.DoubleSide,
     });
     const mesh = new THREE.Mesh(geo, mat);
     // Orient the disk into the ring's tilted plane: CircleGeometry lies in XY (+Z normal) → map its
@@ -593,6 +670,7 @@ export class HyperView implements SceneView {
     // furniture's off-focus dim is hyper's `elem` knob — the same "the view's own ELEMENTS drop when
     // off-subject" number the ledger spends on its bands, tiles and ribbons.
     const hubOffMul = offNetMul("hyper");
+    const paper = this._paper; // hoisted: one field load per frame, not per hub (the `?tune` hoist rule)
     // The hub BODY is the softer of the knob's two channels: glow/tether/hoops/fills take the
     // full drop, the solid body only HUB_BODY_SOFT of it, so an out-of-focus hub stays clearly
     // present while its light recedes. Derived, not a second magic number — at the shipped
@@ -623,17 +701,22 @@ export class HyperView implements SceneView {
     // stand-in for a hub's binary `focusOther`, so the knob is lerped by it rather than switched.
     const coreOffMul = 1 - this._coreDim * (1 - hubOffMul);
     const coreMat = this.core.material as THREE.MeshStandardMaterial;
-    coreMat.emissiveIntensity = (0.6 + flash * 0.9) * coreF * coreReveal * (1 - 0.5 * (1 - coreReveal)) * coreOffMul * this._fades.alpha;
+    coreMat.emissiveIntensity =
+      (0.6 + flash * 0.9) * coreF * coreReveal * (1 - 0.5 * (1 - coreReveal)) * coreOffMul * this._fades.alpha;
     // The core BODY keeps full opacity — a hub's soft channel (hubBodyMul) taken to its limit,
     // because the one sphere at the origin is the structure's centre and always reads as a position.
     coreMat.opacity = coreOpacity * coreReveal * this._fades.alpha;
     this.coreGroup.visible = coreReveal > 0.001;
     // The DAG core's cyan "sun" hoops fade with the core on the morph, and take the full `elem` drop
     // when a specific metagraph is the subject — exactly what a metagraph's own layer hoops take.
-    const coreHoopOp = HOOP_OP * coreReveal * coreOffMul;
+    // The resting levels below are the DARK look — additive light on black, which the bloom lifts
+    // clear. Painted as normal-blended ink on paper the same numbers are a ghost, so the EMPHASIS
+    // term asks the ground (inkPresence) while the reveal/fade ramps, which are geometry rather
+    // than weight, multiply in afterwards untouched.
+    const coreHoopOp = inkPresence(HOOP_OP * coreOffMul, paper) * coreReveal;
     for (const h of this._coreRings) (h.material as THREE.LineBasicMaterial).opacity = coreHoopOp * this._fades.alpha;
     // The core shells' rim-fill disks fade the same way (same treatment as a metagraph's fills).
-    const coreFillOp = FILL_OP * coreReveal * coreOffMul;
+    const coreFillOp = inkPresence(FILL_OP * coreOffMul, paper) * coreReveal;
     for (const f of this._coreFills) (f.material as THREE.MeshBasicMaterial).opacity = coreFillOp * this._fades.alpha;
     if (this.coreFlash) this.coreFlash = Math.max(0, this.coreFlash - dt * 1.6);
 
@@ -693,12 +776,13 @@ export class HyperView implements SceneView {
         tetherPos.setXYZ(j, _pos.x * f, _pos.y * f, _pos.z * f);
       }
       tetherPos.needsUpdate = true;
-      (m.tether.material as THREE.LineBasicMaterial).opacity = tetherOp * metaF * (m.active ? 1 : 0.6) * fdim * this._fades.alpha;
+      (m.tether.material as THREE.LineBasicMaterial).opacity =
+        inkPresence(tetherOp * (m.active ? 1 : 0.6) * fdim, paper) * metaF * this._fades.alpha;
       // The cyan layer hoops fade with the hubs on the morph, dim on inactive / out-of-focus hubs.
-      const hoopOp = HOOP_OP * metaF * (m.active ? 1 : 0.7) * fdim;
+      const hoopOp = inkPresence(HOOP_OP * (m.active ? 1 : 0.7) * fdim, paper) * metaF;
       for (const h of m.hoops) (h.material as THREE.LineBasicMaterial).opacity = hoopOp * this._fades.alpha;
       // The rim-fill disks fade with the hoops (populated rings only — empty ones were hidden).
-      const fillOp = FILL_OP * metaF * (m.active ? 1 : 0.7) * fdim;
+      const fillOp = inkPresence(FILL_OP * (m.active ? 1 : 0.7) * fdim, paper) * metaF;
       for (const f of m.fills) (f.material as THREE.MeshBasicMaterial).opacity = fillOp * this._fades.alpha;
 
 
@@ -734,12 +818,26 @@ export class HyperView implements SceneView {
       if (m.cfg.id === this.focusId) this._spotPos.copy(m.group.position);
     }
 
-    // Focus SPOTLIGHT: stage a white key above the focused subject's ring plane — a metagraph atom's
-    // hub, or the DAG CORE itself (same subject at a bigger scale; higher stage, same cone) — so the
-    // selection catches a real light wash on top of the DoF/dim emphasis (user). Rests dark
-    // otherwise: not claiming IS off, so there is no spot to switch back off here.
+    // Focus SPOTLIGHT: stage a white key above the focused subject — and the subject is THE FINEST
+    // RUNG THE SCENE CAN POINT AT, the same coarse→fine ladder every other emphasis in the app
+    // follows. A staged NODE wins (its own bead on its shell, pushed in from the records by the
+    // Engine — `setStageNode`); else a metagraph atom's hub; else the DAG CORE itself (the same
+    // subject at a bigger scale: higher stage, same cone). So the selection catches a real light
+    // wash on top of the DoF/dim emphasis (user). Rests dark otherwise: not claiming IS off, so
+    // there is no spot to switch back off here.
+    //
+    // ⚠️ ONE CLAIM PER VIEW. The node branch is an else-of, not a second claimer racing the hub's:
+    // a node select commits its network too (full ancestry), so both subjects are live at once and
+    // two claims would decide hyper's light by call order and claim weight instead of by the
+    // ladder. The view that stages the light picks the subject.
+    const row = STAGE_LIGHTS.hyper;
     const spotMeta = this.focusId != null && this.metas.some((m) => m.cfg.id === this.focusId);
-    if (spotMeta || dagFocused) {
+    if (this._stageNodeOn) {
+      this._spotN.set(0, 1, 0).applyEuler(this.root.rotation); // the ring-plane normal (world)
+      // No fade of its own: a hovered or committed node is fully present the moment it exists, and
+      // StageLight applies this view's presence itself.
+      this.stage.claim("hyper", this._stageNodePos, this._spotN, row.heightNode!, 1, row.angleNode);
+    } else if (spotMeta || dagFocused) {
       // Only while focused: resolve the subject to world once per frame (root tilt+spin+scale) —
       // the metagraph loop stashed its hub's ROOT-LOCAL position; the DAG core sits at the origin.
       this._spotN.set(0, 1, 0).applyEuler(this.root.rotation); // the ring-plane normal (world)
@@ -751,7 +849,7 @@ export class HyperView implements SceneView {
         "hyper",
         this._spotPos,
         this._spotN,
-        spotMeta ? STAGE_LIGHTS.hyper.height : STAGE_LIGHTS.hyper.heightDag!,
+        spotMeta ? row.height : row.heightDag!,
         spotMeta ? hubFade : coreReveal,
       );
     }

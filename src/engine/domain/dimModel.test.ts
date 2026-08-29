@@ -301,16 +301,24 @@ describe("focusDim / focusBoost (per-view hover/selection strength)", () => {
     expect(focusGrow(ctx({ morph: 0, ledger: true }))).toBeCloseTo(FOCUS_TUNE_DEFAULTS.ledger.grow, 10);
   });
 
-  // The second emphasis channel is HYPER'S ALONE, and the two views that answer 0 do so for
-  // reasons that are design, not tuning: a geo chip's size is data (the honeycomb sums to the
-  // true node count) and the ledger's trays are deliberately uniform — a grow there IS the
-  // retired dim-shrink coming back. So this is a hard 0, not a small number.
-  it("keeps the grow channel out of geo and the ledger entirely", () => {
-    expect(FOCUS_TUNE_DEFAULTS.geo.grow).toBe(0);
-    expect(FOCUS_TUNE_DEFAULTS.ledger.grow).toBe(0);
-    expect(FOCUS_TUNE_DEFAULTS.hyper.grow).toBeGreaterThan(0);
-    // and it fades out with the morph, so the globe never inherits it mid-transition
-    expect(focusGrow(ctx({ morph: 0.5 }))).toBeCloseTo(FOCUS_TUNE_DEFAULTS.hyper.grow / 2, 10);
+  // The second emphasis channel reaches EVERY view since 2026-08-28 (the user reversed their
+  // own 2026-08-18 hyper-alone ruling: a hover swell is focus language, wanted app-wide). The
+  // relations that survive the reversal ARE the design: grow only reaches a node through its
+  // transient focus weight (rest sizes stay honest — geo's honeycomb still sums to the true
+  // count at rest, the ledger's trays stay uniform at rest), hyper's swell stays the loudest
+  // (its nodes sit alone on shells; geo/ledger chips sit in dense stacks where a large swell
+  // collides with neighbours), and every view's is SUBTLE (the user pulled hyper's own back
+  // from 0.45: "keep it subtle but visible").
+  it("gives every view a subtle grow, hyper loudest", () => {
+    expect(FOCUS_TUNE_DEFAULTS.geo.grow).toBeGreaterThan(0);
+    expect(FOCUS_TUNE_DEFAULTS.ledger.grow).toBeGreaterThan(0);
+    expect(FOCUS_TUNE_DEFAULTS.hyper.grow).toBeGreaterThan(FOCUS_TUNE_DEFAULTS.geo.grow);
+    expect(FOCUS_TUNE_DEFAULTS.hyper.grow).toBeGreaterThan(FOCUS_TUNE_DEFAULTS.ledger.grow);
+    for (const v of ["hyper", "geo", "ledger"] as const)
+      expect(FOCUS_TUNE_DEFAULTS[v].grow).toBeLessThanOrEqual(0.45); // subtle: below the pre-reversal hyper value
+    // the morph blend still mixes the two endpoint rows, so a transition inherits neither alone
+    expect(focusGrow(ctx({ morph: 0.5 }))).toBeCloseTo(
+      (FOCUS_TUNE_DEFAULTS.hyper.grow + FOCUS_TUNE_DEFAULTS.geo.grow) / 2, 10);
   });
 
   // The design relations the numbers must keep, whatever a ?tune session moves them to: the

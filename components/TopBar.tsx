@@ -11,6 +11,7 @@ import Vitals, { VitalsCluster } from "@/components/topbar/Vitals";
 import FilterPicker from "@/components/topbar/FilterPicker";
 import EcgMark from "@/components/topbar/EcgMark";
 import PresentationToggle from "@/components/topbar/PresentationToggle";
+import ThemeToggle from "@/components/topbar/ThemeToggle";
 import NetworkSwitch, { NET_SWITCH_VIEW } from "@/components/topbar/NetworkSwitch";
 import NetLink from "@/components/NetLink";
 import { useBreakpoint } from "@/components/useBreakpoint";
@@ -137,7 +138,7 @@ export default function TopBar() {
           // cue is the ECG mark, so the old left-edge cyan→blue gradient pseudo is gone.
           "relative flex flex-col overflow-hidden pointer-events-auto",
           "border border-border rounded-lg backdrop-blur-md",
-          "bg-[linear-gradient(180deg,rgba(20,26,46,0.82),rgba(10,14,28,0.76))]",
+          "[background:var(--topbar-glass)]",
           "shadow-[inset_0_1px_0_rgba(255,255,255,0.05),0_8px_30px_rgba(0,0,0,0.35)]",
         )}
       >
@@ -194,7 +195,7 @@ export default function TopBar() {
             <span className={cn("text-muted-foreground", !live && "opacity-70")}>Visualizer</span>
           </span>
         </NetLink>
-        <span className="w-px self-stretch bg-border my-1 max-[820px]:hidden" />
+        <span className="w-px self-stretch bg-border my-1 max-[860px]:hidden" />
 
         {/* Filter (toned, de-nested) — toggles the ATTACHED filter strip below (user,
             2026-07-12: reversed the 2026-07-04 detached-popover decision; the strip lives on
@@ -291,12 +292,14 @@ export default function TopBar() {
                 // `max-[700px]:min-w-0` override made the icon-only radios too narrow to press);
                 // only the padding condenses. Room is fine: phone shows just the 3 working views.
                 "max-[700px]:p-1.5",
-                // The three "soon" placeholders also stand down on a NARROW TABLET (700–819px):
+                // The three "soon" placeholders also stand down on a NARROW TABLET (700–859px):
                 // measured, the six-icon switch needs 771px and the bar is clipped below that, so
                 // the first thing sacrificed is the dead weight — same argument the phone makes,
-                // one breakpoint up. The threshold is the DIVIDERS' own `max-[820px]` so the
-                // condensed and the full face change on one line. Tablet ≥820 and desktop keep six.
-                "soon" in v && v.soon && "opacity-45 max-[820px]:hidden",
+                // one breakpoint up. The threshold is the DIVIDERS' own `max-[860px]` so the
+                // condensed and the full face change on one line. Tablet ≥860 and desktop keep six.
+                // (Raised from 820 on 2026-08-21 when ThemeToggle landed beside PresentationToggle:
+                // measured 32px overflow at 820px; 860px is clean with slack, breakeven ~853px.)
+                "soon" in v && v.soon && "opacity-45 max-[860px]:hidden",
               )}
             >
               <Icon aria-hidden className="size-4 group-data-[state=on]:text-primary" />
@@ -309,7 +312,7 @@ export default function TopBar() {
         {/* RIGHT zone: vitals + presentation. Mirrors the left zone; `justify-self-end` pins
             it to the bar's right edge in the grid. */}
         <div className="flex items-center gap-3 max-[1260px]:gap-2.5 max-[940px]:gap-2 max-[700px]:gap-1.5 justify-self-end">
-        <span className="w-px self-stretch bg-border my-1 max-[820px]:hidden" />
+        <span className="w-px self-stretch bg-border my-1 max-[860px]:hidden" />
 
         {/* Vitals — inline on tablet/desktop. On phone they render nothing here: the vitals
             ride the filter strip below as a second row (user, 2026-08-15 — the separate 44px
@@ -321,8 +324,16 @@ export default function TopBar() {
             is presented (SCENE / CARDS / RAW — replacing the separate Focus icon + RAW switch,
             user 2026-08-08). It sits in the COMMAND bar (this zone's scope is the whole
             instrument) rather than the live lane. */}
-        <span className="w-px self-stretch bg-border my-1 max-[820px]:hidden" />
+        <span className="w-px self-stretch bg-border my-1 max-[860px]:hidden" />
         <PresentationToggle />
+
+        {/* Theme — the "how it looks" control, riding beside presentation with no divider of
+            its own (it reads as part of that group, not a fourth zone). On PHONE it rides the
+            filter strip's second row instead, same as NetworkSwitch below — otherwise it would
+            render twice (bar + open strip) at once. */}
+        <div className="contents max-[700px]:hidden">
+          <ThemeToggle />
+        </div>
 
         {/* Network switch — the RIGHT edge of the bar, one past the presentation toggle: the
             network acts on everything INCLUDING presentation, so the edge escalates in scope
@@ -330,7 +341,7 @@ export default function TopBar() {
             at the outer edges, the most specific controls in the middle. On PHONE it rides
             the filter strip's second row instead (see the strip below) — in this zone it
             starved the filter face's word out of the bar (measured at 360-390, 2026-08-21). */}
-        <span className="w-px self-stretch bg-border my-1 max-[820px]:hidden" />
+        <span className="w-px self-stretch bg-border my-1 max-[860px]:hidden" />
         <div className="contents max-[700px]:hidden">
           <NetworkSwitch />
         </div>
@@ -371,6 +382,7 @@ export default function TopBar() {
                     right zone doesn't. */}
                 <span className="w-px self-stretch bg-border my-1" />
                 <NetworkSwitch />
+                <ThemeToggle />
               </div>
             )}
           </div>

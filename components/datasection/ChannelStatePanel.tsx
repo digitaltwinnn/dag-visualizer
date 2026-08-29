@@ -59,7 +59,7 @@ import { getNetwork, metagraphById, resolveSigner, shortHash, SIGNER_GROUPS, SIG
 import { snapsAtTick } from "@/src/data/anchorLog";
 import { UNLISTED_HUE } from "@/src/data/unlisted";
 import { PAYLOAD_LANES, parsePayload, payloadKinds, stateSchema, unifyFieldKinds } from "@/src/data/payloadKinds";
-import { identityHudHex } from "@/src/palette/identity";
+import { identityHudCss } from "@/src/palette/identity";
 import { CopyButton, FootRow, IdentityDot, RoleChips } from "@/components/inspector/parts";
 import { fmtDag, fmtKB, midHash } from "@/src/util/format";
 import JsonTree from "@/components/datasection/JsonTree";
@@ -461,7 +461,7 @@ export function ChannelStatePanel() {
   // An UNLISTED channel takes the set's neutral gray (user, 2026-08-14 — the head's dot minted
   // a random hue; the same rule the snapshot card fixed on 2026-08-08: no single identity can
   // speak for the mixed set, so none does).
-  const hue = cfg ? identityHudHex(sel.metaId) : UNLISTED_HUE;
+  const hue = cfg ? identityHudCss(sel.metaId) : UNLISTED_HUE;
   // The snapshot's OWN hash, tiered like the card's foot: descriptor first, polled record behind
   // it (a pager-stepped or exact-read-built selection carries hash "").
   const net = getNetwork();

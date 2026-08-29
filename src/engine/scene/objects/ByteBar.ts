@@ -8,7 +8,7 @@
 // unit box geometry — and each slot's meshes are positioned/scaled or zero-scaled on a tick, never
 // per frame.
 import * as THREE from "three";
-import type { SceneColors } from "../../sceneColors";
+import { isLightGround, inkPresence, type SceneColors } from "../../sceneColors";
 import type { PickDescriptor } from "@/src/data/types";
 import { METAGRAPHS } from "@/src/net/current";
 import { BAR_H, BAR_D, BAR_LIFT, FLOOR_Y, LEAD_X } from "../../domain/ledgerLayout";
@@ -16,6 +16,7 @@ import { type Band, type BarSpec } from "../../domain/ledgerBands";
 import { SLOT_SP, SLOT_N, horizonAt, frontAt, rowOnChamber } from "../../domain/ledgerModel";
 import { snapBright, snapFocusOf, emphasisK } from "../../domain/dimModel";
 import type { TuneSchema } from "../../tune";
+import { joinBloom } from "../SceneContext";
 
 const BANDS_PER_SLOT = METAGRAPHS.length + 1;
 
@@ -102,6 +103,8 @@ export class ByteBar {
   private _geo = new THREE.BoxGeometry(1, BAR_H, 1);
   private _sceneColors: Record<string, number>;
   private _neutral: number;
+  /** GROUND, hoisted at event time — the band loop reads a boolean, never re-derives luminance. */
+  private _paper: boolean;
   private _alpha = 0;
   private _selected = -1;
   private _hovered = -1;
@@ -111,6 +114,7 @@ export class ByteBar {
   constructor(colors: SceneColors, sceneColors: Record<string, number>) {
     this._sceneColors = sceneColors;
     this._neutral = colors.core;
+    this._paper = isLightGround(colors);
 
     for (let s = 0; s < SLOT_N; s++) {
       const bands: THREE.Mesh[] = [];
@@ -120,6 +124,7 @@ export class ByteBar {
         const mesh = new THREE.Mesh(this._geo, mat);
         mesh.scale.set(0, 0, 0);
         mesh.visible = false;
+        joinBloom(mesh); // a band is the tick's own ink — see BLOOM_LAYER
         this.group.add(mesh);
         bands.push(mesh);
         mats.push(mat);
@@ -134,6 +139,14 @@ export class ByteBar {
 
   setSceneColors(map: Record<string, number>): void {
     this._sceneColors = map;
+  }
+
+  /** THEME FLIP — `_neutral` is the one threaded colour this module captures at construction. It is
+   *  consumed per FRAME (the trail's neutral bands, the seam's synthetic band), so re-pointing the
+   *  field is the whole retint; nothing here is baked. */
+  setColors(c: SceneColors): void {
+    this._neutral = c.core;
+    this._paper = isLightGround(c);
   }
 
   /** Lay out one tick's bar. Event-time only. `live` says the LIVE EDGE is naming this tick, so
@@ -368,7 +381,7 @@ export class ByteBar {
       // filtered follow (see `frontAt`).
       if (s.forming) {
         const fade0 = horizonAt(x) * frontAt(x) * (this._entryFade ? this._entryFade[si] : 1);
-        s.mats[0].opacity = (s.mute ? 0 : SEED_STILL_OP) * fade0 * this._alpha;
+        s.mats[0].opacity = inkPresence(s.mute ? 0 : SEED_STILL_OP, this._paper) * fade0 * this._alpha;
         s.mats[0].color.setHex(this._neutral);
         continue;
       }
@@ -423,7 +436,11 @@ export class ByteBar {
         // this band takes, so a ribbon and its two endpoints read at one level. Compounding
         // dim × back left a band near-black under a ribbon that was only gently dimmed.
         const rowFocus = pinned || hov;
-        const t = snapBright(rest, offNet, focus, anyFocus && !rowFocus)
+        // On paper the resting opacities ARE the wash, so the EMPHASIS term is translated for the
+        // ground before the dissolves multiply it (inkPresence — order-preserving, dark unchanged).
+        // `rest` rides along as the curve's REFERENCE: the translation is a ratio around this
+        // instrument's own resting weight, or the tiers land within a few percent of each other.
+        const t = inkPresence(snapBright(rest, offNet, focus, anyFocus && !rowFocus), this._paper, rest)
           * fade * front * this._alpha * (this._entryFade ? this._entryFade[si] : 1);
         s.mats[i].opacity += (t - s.mats[i].opacity) * k;
         s.mats[i].color.setHex(hot || hov || onNet ? s.colors[i] : this._neutral);

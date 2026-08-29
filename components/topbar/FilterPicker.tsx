@@ -4,7 +4,7 @@ import { useStore } from "@/src/store/store";
 import { UNLISTED_ID } from "@/src/data/unlisted";
 import { filterToggleActions } from "@/src/engine/domain/pickActions";
 import { applyClickActions } from "@/src/store/applyClickActions";
-import { hex } from "@/src/util/format";
+import { identityHudCss } from "@/src/palette/identity";
 import { cn } from "@/lib/utils";
 import { SELECTED_ROW, selectionHue } from "@/components/selection";
 import { IdentityDot } from "@/components/inspector/parts";
@@ -105,11 +105,11 @@ export default function FilterPicker({ onPicked }: { onPicked?: () => void }) {
               className={chipClass(filter === m.id, off)}
               // The committed chip's wash/ring speak the metagraph's own hue (selection.tsx ·
               // selectionHue); "All" and unlisted keep the structural cyan — no single identity.
-              style={filter === m.id ? selectionHue(hex(m.color)) : undefined}
+              style={filter === m.id ? selectionHue(identityHudCss(m.id)) : undefined}
               onClick={() => pick(m.id)}
               onMouseEnter={() => setHoverFilter(m.id)}
             >
-              <IdentityDot hue={hex(m.color)} />
+              <IdentityDot hue={identityHudCss(m.id)} />
               <span className="text-body text-foreground">{m.name}</span>
               {/* The count column belongs to the WITH-NODES group alone (user, 2026-08-13): past
                   the divider every count is 0 by construction, so the divider carries that fact

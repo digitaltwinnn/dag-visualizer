@@ -40,7 +40,7 @@ function SheetOverlay({
     <SheetPrimitive.Overlay
       data-slot="sheet-overlay"
       className={cn(
-        "fixed inset-0 z-40 bg-[rgba(3,5,12,0.16)] backdrop-blur-[1px]",
+        "fixed inset-0 z-40 bg-[var(--scrim)] backdrop-blur-[1px]",
         className,
       )}
       {...props}

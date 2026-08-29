@@ -5,7 +5,7 @@ import { useStore } from "@/src/store/store";
 import { applyClickActions } from "@/src/store/applyClickActions";
 import { UNLISTED_ID, UNLISTED_CFG, displayNetwork } from "@/src/data/unlisted";
 import { metagraphById } from "@/src/data/network";
-import { hex } from "@/src/util/format";
+import { identityHudCss } from "@/src/palette/identity";
 import { subjectPairing } from "@/components/useSubjectPairing";
 import CardHead, { RailPane } from "@/components/CardHead";
 import InspectorCard from "@/components/InspectorCard";
@@ -88,7 +88,7 @@ export default function ContextCard({
   const context: PickDescriptor = { kind: "meta", title: mgCfg.name, cfg: mgCfg };
   // Pair the dossier (the outer rounded pane) with its 3D hub: hovering either glows both in the
   // metagraph's hue, via the shared hoverFilter channel.
-  const pair = subjectPairing<string>(hoverFilter, mgCfg.id, setHoverFilter, hex(mgCfg.color));
+  const pair = subjectPairing<string>(hoverFilter, mgCfg.id, setHoverFilter, identityHudCss(mgCfg.id));
   return (
     <RailPane
       entry={collapsed}

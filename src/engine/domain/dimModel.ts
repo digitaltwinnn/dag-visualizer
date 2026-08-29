@@ -215,18 +215,20 @@ export const FOCUS_TUNE_DEFAULTS: Readonly<Record<View3D, Readonly<FocusRow>>> =
   // siblings kept fat saturated bodies, so the emphasis read INVERTED. The stack is gone too
   // (NodeFabric: a focused node's boost replaces the hub-match, one emphasis at a time), and 1.1
   // lands the subject ~1.4, above the hub level and inside the hue range.
-  // grow: hyper ALONE (user, 2026-08-18). Measured on the running app: the DAG's 160 validators
-  // sit closer together than the bloom radius, so their halos merge into ONE continuous glow
-  // ribbon and every node core already clips white — an emissive-only emphasis has no channel
-  // left there, and `boost` cannot be raised because it was pulled 1.85 → 1.1 for the opposite
-  // bug two days earlier. A SIZE lift breaks the ribbon's silhouette, which brightness cannot.
-  // geo answers 0: `hide` already isolates the fleet, and a globe chip's size is DATA (the
-  // honeycomb's hexes sum to the true node count), so growing one would state a count that
-  // isn't there. The ledger answers 0 because its trays are deliberately uniform (user,
-  // 2026-08-07) — that is the retired dim-shrink, and this must not re-open it.
-  hyper: { dim: 0.32, hide: 0, elem: 0.38, back: 0.41, boost: 1.1, grow: 0.45 },
-  geo: { dim: 1.0, hide: 1, elem: 0, back: 0.65, boost: 0.7, grow: 0 },
-  ledger: { dim: 0.5, hide: 0, elem: 0, back: 0.55, boost: 0.7, grow: 0 },
+  // grow: EVERY view, subtly (user, 2026-08-28: "like in hyper view... can we do the same all
+  // views? It increases a bit too much now in hyper, keep it subtle but visible"). This
+  // REVERSES the 2026-08-18 hyper-alone ruling by the same authority that made it. What
+  // stands from the old reasoning: a hovered/committed node's grow is a TRANSIENT focus
+  // signal, not a resting size — geo's honeycomb still sums to the true node count at rest
+  // and the ledger's trays are still uniform at rest, because `grow` only reaches a node
+  // through its eased focus weight. What changed: the earlier reading treated ANY grow in
+  // geo/ledger as a data lie; the user judges a transient hover swell as focus language,
+  // wanted app-wide. Values: hyper pulled 0.45 → 0.28 (was "a bit too much"); geo/ledger
+  // smaller still — their chips sit in dense stacks/trays where a large swell collides
+  // with neighbours.
+  hyper: { dim: 0.32, hide: 0, elem: 0.38, back: 0.41, boost: 1.1, grow: 0.28 },
+  geo: { dim: 1.0, hide: 1, elem: 0, back: 0.65, boost: 0.7, grow: 0.16 },
+  ledger: { dim: 0.5, hide: 0, elem: 0, back: 0.55, boost: 0.7, grow: 0.16 },
 };
 
 export const FOCUS_SHARED_DEFAULTS: Readonly<FocusShared> = { groupShare: GROUP_FOCUS };

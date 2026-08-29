@@ -21,6 +21,8 @@ import type { DimContext } from "../../domain/dimModel";
 import type { MetaNodeRecord, ValidatorRecord } from "../../domain/records";
 import type { ViewTransition } from "../../domain/viewTransition";
 import type { PickDescriptor } from "@/src/data/types";
+import { inkPresence, isLightGround, type SceneColors } from "../../sceneColors";
+import { joinBloom } from "../SceneContext";
 
 const Y_AXIS = new THREE.Vector3(0, 1, 0); // hex-prism axis (radial after _qRadial)
 // The ONE orb fresnel-rim shader tail (view-dependent rim so emissive spheres read as lit 3D
@@ -37,8 +39,27 @@ const HEX_ALPHA = 0.92;
 // the REFERENCE, not the live value: the chip scale and the cell pitch must move TOGETHER (a
 // bigger cell with the same chip is a sparse scatter, not a square — the nodes ARE the pixels),
 // so Globe.setGatherFit writes both onto ctx.gather by the same factor.
-export const GATHER_SCALE = 0.22;
-const DIM = new THREE.Color(0x223046);
+// Halved from 0.22 (user, 2026-08-29): the staged chips read too heavy parked at the top of the
+// screen — the pitch is untouched, so the blocks keep their footprint and the air doubles.
+export const GATHER_SCALE = 0.11;
+// The DIM TARGET — what an off-filter node's colour is lerped TOWARD. On the dark ground it is a
+// LIFTED navy (not the background itself): a mute has to stay a mark, so it sits just above the
+// ground rather than dissolving into it. Themed by the same reasoning read on paper — there the
+// direction reverses, because a navy mark on white is EMPHASIS, not a mute, so the target becomes
+// the paper itself and dimming is receding into the ground. (Dark keeps 0x223046 verbatim, so the
+// shipped look is byte-identical; the light analogue is a first-pass value — sub-project 2.)
+const DIM_DARK = 0x223046;
+const DIM = new THREE.Color(DIM_DARK);
+/** THEME FLIP — module-level because the target is one shared value for every fabric, and the
+ *  per-instance consumers below lerp toward it each frame with no copy of their own. Called by the
+ *  Engine's `_refreshTheme` (event-time), beside the clear colour. */
+export function setNodeDimTarget(colors: SceneColors): void {
+  DIM.setHex(isLightGround(colors) ? colors.bg : DIM_DARK);
+  _paper = isLightGround(colors);
+}
+// The ground flag for the per-frame emissive mapping below — module-level for the same reason
+// as DIM (one shared value, per-frame readers hold no copy).
+let _paper = false;
 const _dummy = new THREE.Object3D(); // reused to compose per-instance matrices
 const _vec = new THREE.Vector3();
 const _geoVec = new THREE.Vector3(); // scratch for the morph-fly interpolation
@@ -163,6 +184,19 @@ export class NodeFabric {
   // -------------------------------------------------- build the shared validator meshes
   // js/globe.js:178-208 — the two InstancedMeshes + shared aBase/aEmissive buffers, sized to the
   // records Globe has already built. Fills aBase/picks from the records; caches the base geometries.
+  /**
+   * THEME FLIP — drop the VALIDATOR colour cache so the next frame re-bakes `aBase` from the
+   * records. The metagraph loop rewrites its buffer from `r.color` every frame, so those chips
+   * retint the moment their record is re-pointed; the validator loop is gated by `recolour` (a
+   * cache keyed on the dim, the country mix and the transition), so re-pointing `u.base` alone
+   * would leave the old theme's ink in the buffer until something unrelated invalidated it. This
+   * is the same invalidation `buildValidators` uses, and `dim` is in [0,1], so the next frame
+   * always misses the cache.
+   */
+  invalidateBases(): void {
+    this._appliedDim = -1;
+  }
+
   buildValidators(records: ValidatorRecord[]): void {
     const total = records.length;
     const baseArr = new Float32Array(total * 3);
@@ -191,6 +225,7 @@ export class NodeFabric {
       mesh.frustumCulled = false; // instances span the whole scene; base bounds would mis-cull
       mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
       mesh.userData.picks = picks;
+      joinBloom(mesh); // the chips are identity marks — see BLOOM_LAYER
       this.nodeGroup.add(mesh);
       return mesh;
     };
@@ -252,6 +287,7 @@ export class NodeFabric {
       mesh.frustumCulled = false;
       mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
       mesh.userData.picks = picks;
+      joinBloom(mesh); // the chips are identity marks — see BLOOM_LAYER
       this.nodeGroup.add(mesh);
       return mesh;
     };
@@ -499,7 +535,10 @@ export class NodeFabric {
       const flRaw = u._flash || 0; // brief flash when an arc pulse reaches this node
       // The buffer IS the easing state — emiArr persists across frames and a node keeps its slot,
       // so approaching the target in place costs one array read and allocates nothing.
-      const emiT = nodeEmissive(c, d, flRaw, fw, !!focusId, fw > 0 ? 0 : hubBoost);
+      // On paper the emissive term multiplies INK, not glow — map it through the one
+      // presence curve so resting nodes read as full ink (measured 2026-08-25: nodes sat at
+      // ~0.78x of the hub's lit face before this asked the ground question).
+      const emiT = inkPresence(nodeEmissive(c, d, flRaw, fw, !!focusId, fw > 0 ? 0 : hubBoost), _paper);
       emi[u.index] += (emiT - emi[u.index]) * ek;
       if (flRaw) u._flash = flRaw * flashDecay;
 
@@ -573,7 +612,7 @@ export class NodeFabric {
       // 2026-08-16): the sum left the palette's hue-keeping range and the subject blew out to a
       // pale point — the "inverse" read. One emphasis at a time: the hub-match is the committed
       // network's RESTING lift; the subject has its own.
-      const emiT = nodeEmissive(c, dEff, flRaw, fw, !!focusId, fw > 0 ? 0 : hubBoost);
+      const emiT = inkPresence(nodeEmissive(c, dEff, flRaw, fw, !!focusId, fw > 0 ? 0 : hubBoost), _paper);
       emi[r.index] += (emiT - emi[r.index]) * ek;
       if (flRaw) r._flash = flRaw * flashDecay;
 
