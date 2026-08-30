@@ -65,13 +65,15 @@ describe("VIEW_POLICIES", () => {
   });
 
   // The chip env sheen is per-view, and the RELATION is the design (the numbers may move):
-  // the ledger zeroes it — its trays hold coplanar flat chips, so at the resting pose every
-  // chip mirrors the env's bright region at once and the whole tray washes toward white
-  // (user, 2026-08-30) — while every other view keeps the sheen on.
-  it("zeroes the chip env sheen ONLY in ledger", () => {
+  // the ledger runs LOWER than every other view — its trays hold coplanar flat chips, so at the
+  // resting pose full sheen mirrors on every chip at once and washes the tray toward white — but
+  // NOT zero: zero went bland and dropped the parked grids' bloom in one visible step at the
+  // transition boundary (user, 2026-08-30, both directions the same day).
+  it("keeps the ledger's chip env sheen lowest but above zero", () => {
+    const ledger = VIEW_POLICIES.ledger.chipEnv;
+    expect(ledger).toBeGreaterThan(0);
     for (const m of MODES) {
-      if (m === "ledger") expect(VIEW_POLICIES[m].chipEnv).toBe(0);
-      else expect(VIEW_POLICIES[m].chipEnv).toBeGreaterThan(0);
+      if (m !== "ledger") expect(VIEW_POLICIES[m].chipEnv).toBeGreaterThan(ledger);
     }
   });
 });

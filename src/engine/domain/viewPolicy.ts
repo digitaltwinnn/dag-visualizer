@@ -81,11 +81,15 @@ export interface ViewPolicy {
   // strength"). All three are read live by UnrealBloomPass.render, so a per-frame set is enough.
   bloom: { strength: number; radius: number; threshold: number };
   // Multiplier on the chip materials' env-sheen intensity (NodeFabric's ENV_INT × this), applied
-  // by the Engine on a view change. The ledger answers 0: its trays hold COPLANAR flat chips, so
-  // at the chamber's resting pose every chip mirrors the env's bright region at once and the whole
-  // tray washes toward white (user, 2026-08-30: "the nodes are much lighter than in the other
-  // views") — geo's chips sit on a curved globe at varied normals, so the same intensity reads as
-  // a sweeping sheen there, not a wash. The staged gather grids ride the non-ledger value.
+  // by the Engine on a view change. The ledger runs LOW: its trays hold COPLANAR flat chips, so at
+  // the chamber's resting pose every chip mirrors the env's bright region at once and full sheen
+  // washes the whole tray toward white (user, 2026-08-30: "the nodes are much lighter than in the
+  // other views") — geo's chips sit on a curved globe at varied normals, so the same intensity
+  // reads as a sweeping sheen there, not a wash. But ZERO overshot (user, same day: colors "very
+  // bland", and the parked grids "completely loose their bloom" at the boundary — on paper the env
+  // reflection also feeds the selective bloom layer): the ledger keeps HALF, enough liveliness to
+  // match the other views without the wash, and the boundary flip becomes a half-step instead of a
+  // cliff on chips that are in plain view at the staging grids.
   chipEnv: number;
 }
 
@@ -181,7 +185,7 @@ export const VIEW_POLICIES: Record<Mode, ViewPolicy> = {
     timeLane: true, // the ONLY view with a time axis — the tick bar-chart is this view's instrument
     callout: true, // the pinned snapshot — the lane lead tile, or the global tick's bar
     bloom: BLOOM_CALM, // the reference look the design likes — unchanged
-    chipEnv: 0, // coplanar trays mirror the env in unison and wash out — see the field's note
+    chipEnv: 0.5, // low, not zero — coplanar trays wash at full sheen, go bland at none (field note)
   },
   status: FLAT,
   transactions: FLAT,
