@@ -164,7 +164,7 @@ export interface TileTune {
 
 // rest user-tuned via ?tune, 2026-08-07. (`hot` retired 2026-08-11 — it was exactly the ledger
 // row's `boost`, and a snapshot is data, so it takes the node's focus knob instead.)
-export const TILE_TUNE_DEFAULTS: TileTune = { rest: 0.1, ink: 0.3, halo: 1.3 };
+export const TILE_TUNE_DEFAULTS: TileTune = { rest: 0.1, ink: 0.3, halo: 2.5 };
 
 /** The `?tune` knob ranges (contract: src/engine/tune.ts), colocated with the numbers they bound. */
 export const TILE_TUNE_SCHEMA: TuneSchema<TileTune> = {

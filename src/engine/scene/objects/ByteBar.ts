@@ -40,7 +40,7 @@ export interface BarTune {
 // base was below the range any multiplicative dim can survive; the dim knob itself is untouched.
 // (`hot` retired 2026-08-11 — it was exactly the ledger
 // row's `boost`, and a snapshot is data, so it takes the node's focus knob instead.)
-export const BAR_TUNE_DEFAULTS: BarTune = { rest: 0.12, halo: 1.3 };
+export const BAR_TUNE_DEFAULTS: BarTune = { rest: 0.12, halo: 2.4 };
 
 /** The `?tune` knob ranges (contract: src/engine/tune.ts), colocated with the numbers they bound. */
 export const BAR_TUNE_SCHEMA: TuneSchema<BarTune> = {

@@ -48,8 +48,8 @@ export interface RibbonTune {
 
 // User-tuned via ?tune, 2026-08-07.
 export const RIBBON_TUNE_DEFAULTS: RibbonTune = {
-  restOp: 0.25,
-  brightness: 0.85,
+  restOp: 0.21, // 0.25 → 0.21 with brightness 0.85 → 1.1 (user export, 2026-08-30): a touch less film, more vivid colour — beside the snapshots' new halo lift
+  brightness: 1.1,
   curve: 1,
 };
 

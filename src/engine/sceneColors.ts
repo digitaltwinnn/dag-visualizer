@@ -254,7 +254,9 @@ export const LIGHT_TUNE_DEFAULTS: Readonly<LightTune> = Object.freeze({
   // glow UP (0.12 → 0.27) and spread further out (1 → 1.35) — with the trays' milky plates gone
   // the halo is the marks' main paper presence again, and it can afford more light. Fourth export
   // eased both a step back (bleed 0.3 → 0.2, glow 0.27 → 0.22) against the lighter 0.88 wall.
-  selBleed: 0.2, selGlow: 0.22, selRadius: 1.35,
+  // Fifth (same day, with the chamber's halo input lift landed): bleed back UP 0.2 → 0.35 — the
+  // lift feeds the tint term real input from the snapshots, so the bleed now has ink to spend.
+  selBleed: 0.35, selGlow: 0.22, selRadius: 1.35,
   // bgTint returned (0 → 0.5 → 1 across the user's exports, 2026-08-30): the ivory drift read
   // BROWN at the first shipped chroma and was zeroed the same day — re-picked at half and then
   // full strength as the quiet-tray glass, the brighter halo and the lighter wall (groundL 0.88)
