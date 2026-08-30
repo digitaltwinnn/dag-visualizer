@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { Check, ChevronDown, Monitor, Moon, Sun } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { SELECTED_ROW } from "@/components/selection";
@@ -28,6 +29,10 @@ const ROWS: { id: ThemePref; name: string }[] = [
 
 export default function ThemeToggle() {
   const pref = useStore((s) => s.themePref);
+  // Controlled open so picking a row CLOSES the menu (user, 2026-08-30): unlike the network
+  // menu's rows — navigations, where the reload dismisses everything — a theme pick applies in
+  // place, and a menu that lingers after a set-and-forget choice reads as unfinished.
+  const [open, setOpen] = useState(false);
   const Icon = FACE[pref];
   // What System currently resolves to — read once per render, never subscribed: the popover
   // only renders on the client (content mounts on open), and ThemeController stays the app's
@@ -35,7 +40,7 @@ export default function ThemeToggle() {
   const sysTheme =
     typeof window !== "undefined" && window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
   return (
-    <Popover>
+    <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
         <button
           type="button"
@@ -58,7 +63,7 @@ export default function ThemeToggle() {
               key={r.id}
               type="button"
               aria-current={r.id === pref ? "true" : undefined}
-              onClick={() => applyThemePref(r.id)}
+              onClick={() => { applyThemePref(r.id); setOpen(false); }}
               className={cn(
                 "flex w-full items-center gap-2.5 rounded-md px-2.5 py-2 text-label",
                 "bg-transparent border-0 text-muted-foreground hover:text-foreground hover:bg-wash-soft",
