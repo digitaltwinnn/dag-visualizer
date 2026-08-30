@@ -63,7 +63,7 @@ import {
   horizonAt,
   liveEdgePhase,
 } from "../../domain/ledgerModel";
-import { makeBarSpec, fillBarSpec, UNLISTED_KEY, type BarSpec } from "../../domain/ledgerBands";
+import { makeBarSpec, fillBarSpec, UNLISTED_KEY, RIBBON_LANE_HALF, type BarSpec } from "../../domain/ledgerBands";
 import type { ContainerSpec } from "../../domain/ledgerRails";
 import type {
   GlobalSnapshot,
@@ -229,6 +229,23 @@ export class LedgerView implements SceneView {
   /** Ribbons' lane resolver. The lane field is FIXED now (user reversal 2026-08-07 — a filter
    *  dims, it never hides/moves lanes), so every roster key resolves. */
   private readonly _laneZOf = (key: string): number | null => this._laneZ.get(key) ?? null;
+  /** Ribbons' TOP-EDGE half-width resolver, the `_laneZOf` pattern (a stable arrow + a slot field
+   *  written before each setRow, so the event-time sync allocates no closures). The sheet's top
+   *  leaves the TILES, not the plane (user, 2026-08-30: full lane width "while the metagraph
+   *  snapshots are smaller") — the tile grid's own measured z-extent from the model's blocks,
+   *  layout data exactly as the bottom edge reads the band's z0/z1. A lane whose tiles aren't
+   *  knowable for the slot (no exact read yet) answers the lane-cell fallback, the old look. */
+  private _ribbonTopSlot = 0;
+  private readonly _topHalfOf = (key: string): number => {
+    const lane = this.model.lanes.get(key);
+    let h = 0;
+    if (lane) {
+      for (const b of lane.blocks) {
+        if (b.slot === this._ribbonTopSlot && b.filled) h = Math.max(h, Math.abs(b.oz) + b.size / 2);
+      }
+    }
+    return h > 0 ? h : RIBBON_LANE_HALF;
+  };
 
   // ── per-slot bar specs + the snapshot each slot stands for
   private readonly _specs: BarSpec[] = [];
@@ -977,18 +994,21 @@ export class LedgerView implements SceneView {
   }
 
   private _syncRibbonRows(): void {
-    this._ribbons.setRow(0, 0, this._slotSnap[0] ? this._specs[0] : null, this._laneZOf);
+    this._ribbonTopSlot = 0;
+    this._ribbons.setRow(0, 0, this._slotSnap[0] ? this._specs[0] : null, this._laneZOf, this._topHalfOf);
     // Row 1 = the COMMITTED row (full strength); row 2 = the HOVER preview (colored dim).
     // Separate rows (2026-08-07): with a snapshot pinned, a hover needs its own sheet — the
     // active row keeps its ribbons regardless of hover, and the preview never goes missing.
     const hot = this.model.selectedSlot;
     if (hot > 0 && hot < SLOT_N && this._slotSnap[hot]) {
-      this._ribbons.setRow(1, hot, this._specs[hot], this._laneZOf);
+      this._ribbonTopSlot = hot;
+      this._ribbons.setRow(1, hot, this._specs[hot], this._laneZOf, this._topHalfOf);
       this._ribbons.setRowFade(1, 1);
     } else this._ribbons.clearRow(1);
     const hov = this._hoverSlot;
     if (hov > 0 && hov < SLOT_N && hov !== hot && this._slotSnap[hov]) {
-      this._ribbons.setRow(2, hov, this._specs[hov], this._laneZOf);
+      this._ribbonTopSlot = hov;
+      this._ribbons.setRow(2, hov, this._specs[hov], this._laneZOf, this._topHalfOf);
       // The hover ribbon IS the group tier — a hovered row is a preview of what a click would pin,
       // so it rides the same shared focus ranking every node loop uses.
       this._ribbons.setRowFade(2, focusWeightOf(false, true));
@@ -1000,7 +1020,8 @@ export class LedgerView implements SceneView {
       for (const tr of this.model.trail) if (tr.ordinal === this._graceOrd) { g = tr.slot; break; }
     }
     if (g > 0 && g < SLOT_N && g !== hot && this._slotSnap[g] && this._specs[g].measured) {
-      this._ribbons.setRow(3, g, this._specs[g], this._laneZOf);
+      this._ribbonTopSlot = g;
+      this._ribbons.setRow(3, g, this._specs[g], this._laneZOf, this._topHalfOf);
     } else {
       // Clear the SHEET but never the grace itself here: on the very first sync after a tick
       // the trail may not carry the outgoing lead yet, and killing the grace at arm time was

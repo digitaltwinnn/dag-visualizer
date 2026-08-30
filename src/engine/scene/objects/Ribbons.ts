@@ -22,7 +22,7 @@ import type { TuneSchema } from "../../tune";
 import { METAGRAPHS } from "@/src/net/current";
 import { BAR_H, BAR_LIFT, FLOOR_Y, LEAD_X, TILE_LIFT } from "../../domain/ledgerLayout";
 import { SLOT_SP } from "../../domain/ledgerModel";
-import { ribbonQuad, RIBBON_LANE_HALF, type BarSpec, type RibbonQuad } from "../../domain/ledgerBands";
+import { ribbonQuad, type BarSpec, type RibbonQuad } from "../../domain/ledgerBands";
 import { snapBright } from "../../domain/dimModel";
 
 
@@ -159,7 +159,11 @@ export class Ribbons {
    *  network committed): a hidden lane laid no tiles, so it gets no ribbon either. The unlisted
    *  channels have a real lane of their own now (the "unknown" lane at the screen-left end,
    *  2026-08-07), so every band resolves the same way — the old mid-air start is retired. */
-  setRow(row: 0 | 1 | 2 | 3, slot: number, spec: BarSpec | null, laneZ: (key: string) => number | null): void {
+  /** `topHalf` resolves a lane's top-edge HALF-WIDTH for this row — the tile grid's own measured
+   *  z-extent (user, 2026-08-30: the sheet used to span the whole plane while "the metagraph
+   *  snapshots are smaller"), the same honesty the bottom edge always had from the band's z0/z1.
+   *  The caller answers RIBBON_LANE_HALF where no tiles are knowable, which is the old look. */
+  setRow(row: 0 | 1 | 2 | 3, slot: number, spec: BarSpec | null, laneZ: (key: string) => number | null, topHalf: (key: string) => number): void {
     const st = this._rows[row];
     st.slot = slot;
     st.keys.length = 0;
@@ -171,7 +175,7 @@ export class Ribbons {
       if (band.bytes <= 0) continue;
       const z = laneZ(band.key);
       if (z == null) continue; // hidden lane → no sheet
-      ribbonQuad(z, RIBBON_LANE_HALF, band, st.quads[st.count]);
+      ribbonQuad(z, topHalf(band.key), band, st.quads[st.count]);
       st.keys.push(band.key);
       st.count++;
     }
