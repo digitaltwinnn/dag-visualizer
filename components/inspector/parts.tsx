@@ -186,8 +186,8 @@ export function FootRow({
         <span
           className={cn(
             "text-label text-foreground-dim tabular-nums truncate",
-            copy && "group-hover/copy:[mask-image:linear-gradient(to_right,#000_calc(100%-26px),transparent_calc(100%-4px))]",
-            copy && "group-focus-within/copy:[mask-image:linear-gradient(to_right,#000_calc(100%-26px),transparent_calc(100%-4px))]",
+            copy && "group-hover/copy:[mask-image:linear-gradient(to_right,#000_calc(100%-46px),transparent_calc(100%-14px))]",
+            copy && "group-focus-within/copy:[mask-image:linear-gradient(to_right,#000_calc(100%-46px),transparent_calc(100%-14px))]",
           )}
         >{value}</span>
         {copy && (
