@@ -86,13 +86,15 @@ const rubber = (x: number, d: number) => Math.sign(x) * d * (1 - 1 / (Math.abs(x
 // The accordion slide's tempo — one spring for both cards (the shared gesture physics).
 // 380 → 560 (user, 2026-08-16: "a bit smoother, it feels too rushed") — the spring curve does
 // most of its travel early, so the longer clock reads as calm follow-through, not slowness.
-// 560 → 680, and the COMMITTED slide trades the spring for a calm ease-out (user, 2026-08-30:
-// "the card swipe animates too quickly") — the spring curve covers ~77% of the travel in its
-// first quarter, so at 560ms the visible motion was a ~140ms snap with a long invisible settle.
-// The ease-out spreads the motion across the whole window with a soft landing and no overshoot;
-// the CANCEL snap-back keeps the spring — a rubber band springing home is exactly that gesture.
-const SLIDE_MS = 680;
-const SLIDE_EASE = "cubic-bezier(0.22, 0.8, 0.3, 1)";
+// THE COMMITTED SLIDE'S CLOCK (user, 2026-08-30, two rounds: "animates too quickly", then
+// "still as quick"). The culprit was never the duration but the curve's HEAD: the spring covered
+// ~77% of its travel in the first quarter, and the first replacement ease-out still measured 55%
+// by 200ms — a fast start reads as a snap whatever follows it. An S-CURVE is what actually slows
+// the eye: slow in, cross mid-window, slow out (~15% covered at quarter time, measured), over a
+// slightly longer window. The CANCEL snap-back keeps the spring — a rubber band springing home
+// is exactly that gesture, and its different feel is what says "didn't commit".
+const SLIDE_MS = 820;
+const SLIDE_EASE = "cubic-bezier(0.45, 0.05, 0.25, 1)";
 const FLICK_V = 0.35; // px/ms at release — a throw this fast commits regardless of travel. Measured
 // live rather than guessed: a deliberate slow pull the user means to cancel runs ~0.11 px/ms, and a
 // quick 30px throw ~0.42-0.6, so the gate sits between them (Hammer's own swipe default is 0.3).
