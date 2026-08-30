@@ -5,74 +5,64 @@ import { cn } from "@/lib/utils";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { useStore } from "@/src/store/store";
 
-// The command bar's trailing PRESENTATION control (user, 2026-08-08 — evolving the separate
-// Focus icon + RAW switch into ONE axis): how the view's information is presented, three states
-// named for WHICH LAYER OF THE INSTRUMENT LEADS (the house registers — user rejected "cards":
-// it named the furniture, not the state; HUD is the project's own word for the info overlay) —
-//   · SCENE — just the 3D, browsed freely; both card rails collapse to their threads (the dots
-//     remain as the minimized possibility map) and the camera leans in (cameraRig.railsLean);
-//   · HUD   — the default four-zone overlay: the info cards over the scene;
-//   · RAW   — the data behind the view (SectionShell's depth choreography).
-// One segmented control (the view-switch ToggleGroup idiom, same sizing/on-state), sitting
-// last-but-one in the bar: it acts on everything to its left, and the NetworkSwitch to its
-// right acts on everything INCLUDING this toggle — the right edge escalates in scope (see
-// the multi-network design §5). The state derives from the two store
-// fields (`section`, `railsHidden`) and each pick writes both deterministically — Escape / the
-// raw layer's × still land on whichever scene presentation was active before. The SCENE segment
-// is desktop-only (below 1100px the rails are dock sheets); labels condense below 1560px,
-// icons + titles carry the names there.
-type PresentMode = "scene" | "cards" | "raw";
-
-const ITEMS: { id: PresentMode; name: string; title: string; icon: typeof Focus; desktopOnly?: boolean }[] = [
-  { id: "scene", name: "Scene", title: "Scene: just the 3D, rails collapse to their threads", icon: Focus, desktopOnly: true },
-  { id: "cards", name: "HUD", title: "HUD: the info cards over the scene", icon: LayoutPanelLeft },
-  { id: "raw", name: "Raw", title: "Raw: the data behind the view", icon: Table2 },
-];
+// The command bar's trailing PRESENTATION group — TWO controls since 2026-08-30 (user: "scene
+// vs hud [is] a toggle; raw is still separate because that's unrelated"), splitting the one
+// 3-state axis of 2026-08-08 back along the store's own seams:
+//   · SCENE ⇄ HUD — one two-state toggle over `railsHidden`: the same scene, chrome off/on.
+//     Desktop-only as a PAIR (below 1100px the rails are dock sheets and SCENE has no meaning).
+//   · RAW — its own pressed toggle over `section`: not a third dressing but a different LAYER
+//     (SectionShell's depth choreography, with its own Escape/× exits). Because the two axes are
+//     now independent controls, popping out of RAW RESTORES whichever presentation you had —
+//     rails hidden or not — instead of flattening onto one.
+// The two sit adjacent with no divider, so they still read as one presentation group (the
+// 2026-08-08 unification's real complaint was two controls reading unrelated — adjacency keeps
+// the pairing, the split keeps the axes honest). Same sizing/on-state recipe as the view switch;
+// labels condense below 1650px (measured, see the span note).
+const SEG = cn(
+  "group flex items-center gap-1.5 h-9 py-1.5 px-2.5 rounded-btn!",
+  "text-muted-foreground bg-transparent border-0",
+  "hover:text-foreground hover:bg-wash-soft",
+  "data-[state=on]:text-foreground data-[state=on]:bg-[var(--sel-bg)]",
+  "data-[state=on]:shadow-[inset_0_0_0_1px_var(--sel-border)]",
+);
 
 export default function PresentationToggle() {
   const section = useStore((s) => s.section);
   const railsHidden = useStore((s) => s.railsHidden);
   const setSection = useStore((s) => s.setSection);
   const setRailsHidden = useStore((s) => s.setRailsHidden);
-  const mode: PresentMode = section === "data" ? "raw" : railsHidden ? "scene" : "cards";
-  const apply = (v: PresentMode) => {
-    setSection(v === "raw" ? "data" : "scene");
-    if (v !== "raw") setRailsHidden(v === "scene");
-  };
   return (
-    <ToggleGroup
-      type="single"
-      value={mode}
-      onValueChange={(v) => { if (v) apply(v as PresentMode); }}
-      className="flex gap-0.5"
-      aria-label="How the information is presented"
-    >
-      {ITEMS.map((it) => {
-        const Icon = it.icon;
-        return (
-          <ToggleGroupItem
-            key={it.id}
-            value={it.id}
-            title={it.title}
-            className={cn(
-              // The view switch's exact sizing/on-state recipe (see TopBar's note on rounded-btn!).
-              "group flex items-center gap-1.5 h-9 py-1.5 px-2.5 rounded-btn!",
-              "text-muted-foreground bg-transparent border-0",
-              "hover:text-foreground hover:bg-wash-soft",
-              "data-[state=on]:text-foreground data-[state=on]:bg-[var(--sel-bg)]",
-              "data-[state=on]:shadow-[inset_0_0_0_1px_var(--sel-border)]",
-              it.desktopOnly && "max-[1099px]:hidden",
-            )}
-          >
-            <Icon aria-hidden className="size-4 group-data-[state=on]:text-primary" />
-            {/* Three labelled segments are wide — labels condense away below 1650px (measured:
-                they pushed the bar past the viewport at 1500; raised from 1559 on 2026-08-21
-                when the ThemeToggle landed in the right zone and reproduced a 35px overflow
-                at 1600px), leaving icons + titles. */}
-            <span className="text-micro tracking-caps uppercase max-[1649px]:hidden">{it.name}</span>
-          </ToggleGroupItem>
-        );
-      })}
-    </ToggleGroup>
+    <div className="flex items-center gap-0.5" role="group" aria-label="How the information is presented">
+      {/* SCENE ⇄ HUD — the chrome toggle. Stays live while RAW is open: it then states (and
+          edits) what the raw layer will return to. */}
+      <ToggleGroup
+        type="single"
+        value={railsHidden ? "scene" : "cards"}
+        onValueChange={(v) => { if (v) setRailsHidden(v === "scene"); }}
+        className="flex gap-0.5 max-[1099px]:hidden"
+        aria-label="Scene chrome"
+      >
+        <ToggleGroupItem value="scene" title="Scene: just the 3D, rails collapse to their threads" className={SEG}>
+          <Focus aria-hidden className="size-4 group-data-[state=on]:text-primary" />
+          <span className="text-micro tracking-caps uppercase max-[1649px]:hidden">Scene</span>
+        </ToggleGroupItem>
+        <ToggleGroupItem value="cards" title="HUD: the info cards over the scene" className={SEG}>
+          <LayoutPanelLeft aria-hidden className="size-4 group-data-[state=on]:text-primary" />
+          <span className="text-micro tracking-caps uppercase max-[1649px]:hidden">HUD</span>
+        </ToggleGroupItem>
+      </ToggleGroup>
+      {/* RAW — the layer toggle. aria-pressed, not a radio segment: it pushes a different
+          surface in and pops it out, and the pair to its left survives the round trip. */}
+      <button
+        type="button"
+        aria-pressed={section === "data"}
+        title="Raw: the data behind the view"
+        onClick={() => setSection(section === "data" ? "scene" : "data")}
+        className={cn(SEG, section === "data" && "text-foreground bg-[var(--sel-bg)] shadow-[inset_0_0_0_1px_var(--sel-border)] [&>svg]:text-primary")}
+      >
+        <Table2 aria-hidden className="size-4" />
+        <span className="text-micro tracking-caps uppercase max-[1649px]:hidden">Raw</span>
+      </button>
+    </div>
   );
 }

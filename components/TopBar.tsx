@@ -316,10 +316,11 @@ export default function TopBar() {
             the vitals still ride the filter strip below as a second row, unchanged. */}
         <div className="flex items-center gap-3 max-[1260px]:gap-2.5 max-[940px]:gap-2 max-[700px]:gap-1.5 justify-self-end">
 
-        {/* PRESENTATION — the bar's trailing control: ONE axis for how the view's information
-            is presented (SCENE / CARDS / RAW — replacing the separate Focus icon + RAW switch,
-            user 2026-08-08). It sits in the COMMAND bar (this zone's scope is the whole
-            instrument) rather than the live lane. */}
+        {/* PRESENTATION — the bar's trailing group: the SCENE⇄HUD chrome toggle + the RAW
+            layer toggle, adjacent as one pair (user, 2026-08-30 — re-split along the store's
+            own axes; the 2026-08-08 one-axis control flattened two independent axes into three
+            states). It sits in the COMMAND bar (this zone's scope is the whole instrument)
+            rather than the live lane. */}
         <span className="w-px self-stretch bg-border my-1 max-[860px]:hidden" />
         <PresentationToggle />
 
