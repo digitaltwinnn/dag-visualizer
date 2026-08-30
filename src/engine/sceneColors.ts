@@ -242,7 +242,10 @@ export const LIGHT_TUNE_DEFAULTS: Readonly<LightTune> = Object.freeze({
   // resting halo starved — "we've lost the bloom effect, I'd still like a subtle bloom also in
   // light mode" (user, same day). The lift restores a resting glow WITHOUT the old fat tips:
   // the calm evened out the cap hotspots that used to concentrate the halo.
-  selBleed: 0.55, selGlow: 0.12, selRadius: 0.55,
+  // Re-balanced by the user live (2026-08-30, after the chip env landed): the bleed comes DOWN
+  // (0.55 → 0.3) and the spread OUT to the schema's full reach (0.55 → 1) — a wider, gentler
+  // halo now that the env sheen carries part of the marks' presence on paper.
+  selBleed: 0.3, selGlow: 0.12, selRadius: 1,
   // bgTint 0: the ivory drift read BROWN at the shipped chroma (user, 2026-08-30, picked from a
   // measured warm↔cool bracket) — the cool-silver token now carries the wall's colour alone, the
   // sweep/fall-off shape it in pure level, and the knob stays as the lever if a drift comes back.
