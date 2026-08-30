@@ -74,7 +74,11 @@ export const GLASS_TUNE_DEFAULTS: Readonly<GlassTune> = Object.freeze({
   // under a committed filter: the polished edge was the hot term (0.32 → 0.08), rim and the
   // reflection lobes came down a step — and the TRAYS came UP (0.12 → 0.42): with the planes
   // calmed, the trays finally earn real presence.
-  body: 0.185, sky: 0.33, rim: 0.3, spec: 0.5, specPow: 19, edge: 0.16, env: 0.48, trayBody: 0.42, // user export 2026-08-29: more body/edge/env, less sky — glass presence up on the lighter wall
+  // 2026-08-30 first pass at "too glossy, want shiny but not too much" (user): the DIFFUSE film
+  // steps down (sky 0.33 → 0.26, env 0.48 → 0.40 — the milky all-over gloss) and the CRISP terms
+  // step up and tighten (spec 0.5 → 0.62, specPow 19 → 30, edge 0.16 → 0.22, rim 0.3 → 0.34) —
+  // sheen concentrated into highlights instead of spread as film.
+  body: 0.185, sky: 0.26, rim: 0.34, spec: 0.62, specPow: 30, edge: 0.22, env: 0.4, trayBody: 0.42,
   laneBody: 1.75, laneTint: 0.8,
 });
 /** The live struct the `?tune` panel binds; DEFAULTS above is the shipped look and what tests pin. */
