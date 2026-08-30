@@ -298,7 +298,6 @@ function GeoCells({ accent }: { accent: string }) {
     <>
       <BandCard label="Nodes"><span className="font-mono font-bold text-foreground tabular-nums"><Odometer int value={total || null} /></span></BandCard>
       <BandCard label="Countries"><span className="font-mono font-bold text-foreground tabular-nums"><Odometer int value={countries.length || null} /></span></BandCard>
-      <BandCard label="Providers"><span className="font-mono font-bold text-foreground tabular-nums"><Odometer int value={ispCounts.size || null} /></span></BandCard>
       {topCountries.length > 0 && (
         <BandCard label="Nodes by country" className="flex-[1.4]">
           <div className="flex w-full items-center gap-2">
@@ -307,6 +306,7 @@ function GeoCells({ accent }: { accent: string }) {
           </div>
         </BandCard>
       )}
+      <BandCard label="Providers"><span className="font-mono font-bold text-foreground tabular-nums"><Odometer int value={ispCounts.size || null} /></span></BandCard>
       {topIsps.length > 0 && (
         <BandCard label="Top providers" className="flex-[1.6]">
           {/* labelW 92 → 150 (user, 2026-08-30): the card had spare width while "Hetzner
