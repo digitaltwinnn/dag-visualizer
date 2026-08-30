@@ -6,6 +6,7 @@ import { displayNetwork } from "@/src/data/unlisted";
 import { compositionCounts } from "@/components/topbar/Vitals";
 import { networkKind, rolesOf, IdentityDot } from "@/components/inspector/parts";
 import { identityHudCss } from "@/src/palette/identity";
+import { METATYPE_ICONS, VIEW_ICONS } from "@/components/icons";
 import Sparkline from "@/components/Sparkline";
 import Odometer from "@/components/Odometer";
 import { NoSignalDot } from "@/components/state/StateAtoms";
@@ -128,6 +129,26 @@ function Donut({ counts, accent }: { counts: Record<string, number>; accent: str
 // how many L0 / cL1 / dL1 processes run in the selection), and the fleet NODES total.
 const TYPE_ORDER = ["data", "currency", "data + currency", "unknown"] as const;
 
+/** One type's glyph — "data + currency" is deliberately the data+currency PAIR (no third
+ *  metaphor; see METATYPE_ICONS), "hypergraph" the hyper view's own Orbit. */
+function TypeGlyph({ t, className }: { t: string; className?: string }) {
+  if (t === "data + currency") {
+    return (
+      <span aria-hidden className="flex items-center gap-0.5 flex-none">
+        <METATYPE_ICONS.data className={className} />
+        <METATYPE_ICONS.currency className={className} />
+      </span>
+    );
+  }
+  const Icon =
+    t === "hypergraph" ? VIEW_ICONS.hyper
+    : t === "mixed set" ? METATYPE_ICONS.mixed
+    : t === "currency" ? METATYPE_ICONS.currency
+    : t === "data" ? METATYPE_ICONS.data
+    : METATYPE_ICONS.unknown;
+  return <Icon aria-hidden className={cn("flex-none", className)} />;
+}
+
 function HyperCells({ accent }: { accent: string }) {
   const filter = useStore((s) => s.filter);
   const metaList = useStore((s) => s.metaList);
@@ -163,32 +184,42 @@ function HyperCells({ accent }: { accent: string }) {
     }
   }
 
+  // A COMMITTED SCOPE flips the card from a DISTRIBUTION to a CHARACTERISTIC (user, 2026-08-30:
+  // "'currency 1' and a bar ... is more a single characteristic than a count"): one network has a
+  // type, not a type breakdown, so the eyebrow goes singular and the value is the type — icon +
+  // word. The DAG answers networkKind's own "hypergraph" (the hyper view's Orbit), the unlisted
+  // set the honest "mixed set". "all" keeps the count with one icon+count entry per type — icons
+  // over bars (user, same day): a type is a KIND, not a magnitude, so a glyph says it better
+  // than a share bar, and the same glyphs then serve the filtered card unchanged.
+  const singleWord =
+    filter === "dag" ? "hypergraph"
+    : displayNetwork(filter)?.virtual === true ? "mixed set"
+    : cfg ? (TYPE_ORDER.find((t) => types[t]! > 0) ?? "unknown")
+    : null;
+
   return (
     <>
+      {singleWord != null ? (
+        <BandCard label={cfg ? "Metagraph type" : "Network type"}>
+          <TypeGlyph t={singleWord} className="size-4 text-muted-foreground" />
+          <span className="font-mono font-bold text-foreground whitespace-nowrap">{singleWord}</span>
+        </BandCard>
+      ) : (
       <BandCard label="Metagraphs" className="flex-[1.3]">
         <span className="font-mono font-bold text-foreground tabular-nums"><Odometer int value={typeTotal || null} /></span>
-        <div className="flex flex-col gap-1 min-w-0 flex-1 self-center">
-          {/* the by-type stacked bar — shares of the listed set, 2px surface gaps */}
-          <div aria-hidden className="flex h-[6px] w-full gap-[2px]">
-            {TYPE_ORDER.map((t, i) =>
-              types[t]! > 0 ? (
-                <span key={t} className="rounded-full" style={{ background: accent, opacity: DONUT_STEPS[i] ?? 0.2, flexGrow: types[t]!, flexBasis: 0 }} />
-              ) : null,
-            )}
-          </div>
-          <div className="flex flex-wrap gap-x-3 gap-y-0.5">
-            {TYPE_ORDER.map((t, i) =>
-              types[t]! > 0 ? (
-                <span key={t} className="flex items-center gap-1 whitespace-nowrap">
-                  <span aria-hidden className="size-1.5 rounded-full flex-none" style={{ background: accent, opacity: DONUT_STEPS[i] ?? 0.2 }} />
-                  <span className="text-micro uppercase text-muted-foreground">{t}</span>
-                  <span className="font-mono text-micro tabular-nums text-foreground">{types[t]}</span>
-                </span>
-              ) : null,
-            )}
-          </div>
+        <div className="grid grid-cols-2 gap-x-4 gap-y-1 min-w-0 flex-1 self-center">
+          {TYPE_ORDER.map((t) =>
+            types[t]! > 0 ? (
+              <span key={t} className="flex items-center gap-1.5 whitespace-nowrap">
+                <TypeGlyph t={t} className="size-3.5 text-muted-foreground" />
+                <span className="text-micro uppercase text-muted-foreground">{t}</span>
+                <span className="font-mono font-bold text-caption tabular-nums text-foreground">{types[t]}</span>
+              </span>
+            ) : null,
+          )}
         </div>
       </BandCard>
+      )}
       <BandCard label="Composition" className="flex-[1.5]">
         <Donut counts={counts} accent={accent} />
         <div className="grid grid-cols-2 gap-x-4 gap-y-0.5">

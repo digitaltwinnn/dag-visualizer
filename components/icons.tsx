@@ -16,6 +16,9 @@ import {
   Database,
   Blocks,
   Signature,
+  Coins,
+  CircleHelp,
+  Shapes,
   type LucideIcon,
 } from "lucide-react";
 import type { Mode } from "@/src/store/store";
@@ -102,6 +105,19 @@ export const LANE_ICONS: Record<"state" | "data" | "signers", LucideIcon> = {
 };
 
 export const KIND_MARK_CLASS = "flex-none size-4";
+
+/** A METAGRAPH TYPE's mark (the vitals band's metagraphs card, 2026-08-30): what the network
+ *  anchors — data rides in DATA BLOCKS (the same Blocks the raw pane's data lane wears — one
+ *  vocabulary for one concept), currency is the coin (Coins, distinct from the staking view's
+ *  HandCoins), an UNKNOWN type (a 0-node network whose roles can't be read) the circled ?, and
+ *  the unlisted MIXED SET the mixed shapes. A "data + currency" network deliberately has NO
+ *  third metaphor — it wears the data+currency PAIR side by side, which is what it is. */
+export const METATYPE_ICONS: Record<"data" | "currency" | "unknown" | "mixed", LucideIcon> = {
+  data: Blocks,
+  currency: Coins,
+  unknown: CircleHelp,
+  mixed: Shapes,
+};
 
 // The inspector card KINDS map onto one glyph set shared with the dock icon trays: the metagraph
 // dossier is the Hypergraph subject (Orbit), a node is the Geography subject (Globe), a snapshot
