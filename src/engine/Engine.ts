@@ -104,7 +104,12 @@ export class Engine {
   private _dofTmp = new THREE.Vector3();
   /** Scratch for the follow-spot's per-frame anchor hand-off (Globe records → HyperView's claim). */
   private _stageNodeTmp = new THREE.Vector3();
-  private _calloutV = new THREE.Vector3(); // scratch: the subject callout's anchor, world → NDC
+  private _calloutV = new THREE.Vector3();
+  // The multi-leader's scratch + state (rule 5: allocated once). `_calloutNodeAnchor` is set by
+  // _hyperCalloutAnchor: only the NODE branch anchors a machine, and only a machine has sibling
+  // layer beads to point at.
+  private _calloutSibs = [new THREE.Vector3(), new THREE.Vector3()];
+  private _calloutNodeAnchor = false; // scratch: the subject callout's anchor, world → NDC
   // Geo callout anchors, cached EVENT-TIME (latLonToVec3 allocates and ring extraction is
   // heavy — neither may run per frame): the node anchor recomputes when the pick REFERENCE
   // changes, the country centroid when the cc string does; the cohort dir is already
@@ -1983,14 +1988,57 @@ export class Engine {
               if (p.drop) el.dataset.drop = "";
               else delete el.dataset.drop;
             }
+            this._syncCalloutMulti(el, x, y, r);
           }
         }
       }
     }
+    if (!on) this._syncCalloutMulti(el, 0, 0, null);
     // Guard on the ELEMENT's own attribute, not a cached flag: React remounts the wrapper on a
     // subject change (fresh data-on="0"), so a field would go stale exactly then.
     const flag = on ? "1" : "0";
     if (el.dataset.on !== flag) el.dataset.on = flag;
+  }
+
+  // THE MULTI-LEADER (user, 2026-08-30): a machine is SEVERAL beads in hyper — one per layer it
+  // runs — and its callout points at each of them, not just the primary. Projects the sibling
+  // beads (Globe.selectedNodeHyperAnchors) and writes the extra dashed legs' endpoints in
+  // PANEL-LOCAL pixels (the wrapper's origin IS the primary anchor). DOM writes only — position
+  // never renders React (the Tooltip discipline). `anchor == null` (or a non-node anchor, or any
+  // other view) hides every leg.
+  private _syncCalloutMulti(el: HTMLElement, ax: number, ay: number, r: DOMRect | null): void {
+    const legs = el.querySelectorAll<SVGGElement>(".co-mleg");
+    if (legs.length === 0) return;
+    let n = 0;
+    if (r && this.mode === "hyper" && this._calloutNodeAnchor) {
+      const count = this.globe.selectedNodeHyperAnchors(this._calloutSibs);
+      for (let i = 0; i < count && n < legs.length; i++) {
+        const v = this._calloutSibs[i]!;
+        this.globe.group.localToWorld(v); // the rendered structure transform — a label read. render-state OK
+        v.applyMatrix4(this.ctx.camera.matrixWorldInverse);
+        if (v.z > -0.1) continue; // behind the camera plane — this bead gets no leg this frame
+        v.applyMatrix4(this.ctx.camera.projectionMatrix);
+        const sx = r.left + (v.x * 0.5 + 0.5) * r.width - ax;
+        const sy = r.top + (-v.y * 0.5 + 0.5) * r.height - ay;
+        const leg = legs[n]!;
+        const line = leg.querySelector("line")!;
+        const ring = leg.querySelector("circle")!;
+        // Start the leg just off the primary ring, along its own direction (the primary leader's
+        // 6px inset, aimed instead of fixed).
+        const len = Math.hypot(sx, sy) || 1;
+        line.setAttribute("x1", ((sx / len) * 8).toFixed(1));
+        line.setAttribute("y1", ((sy / len) * 8).toFixed(1));
+        line.setAttribute("x2", sx.toFixed(1));
+        line.setAttribute("y2", sy.toFixed(1));
+        ring.setAttribute("cx", sx.toFixed(1));
+        ring.setAttribute("cy", sy.toFixed(1));
+        if (leg.getAttribute("visibility") !== "visible") leg.setAttribute("visibility", "visible");
+        n++;
+      }
+    }
+    for (let i = n; i < legs.length; i++) {
+      if (legs[i]!.getAttribute("visibility") !== "hidden") legs[i]!.setAttribute("visibility", "hidden");
+    }
   }
 
   // HYPER anchors the committed NODE's own bead when one is committed (user, 2026-08-15 —
@@ -2000,6 +2048,7 @@ export class Engine {
   private _hyperCalloutAnchor(v: THREE.Vector3): boolean {
     const st = useStore.getState();
     const p = st.inspect;
+    this._calloutNodeAnchor = false;
     // THE BOX LEADS (user, 2026-08-15): re-boxing an ancestor card (clicking a committed
     // node's hub) steps the callout up to the network — the box is the subject, exactly as
     // the camera answers it. SceneCallout mirrors this preference for the content.
@@ -2009,6 +2058,7 @@ export class Engine {
       this.globe.selectedNodeHyperAnchor(v)
     ) {
       this.globe.group.localToWorld(v); // the rendered structure transform — a label read. render-state OK
+      this._calloutNodeAnchor = true;
       return true;
     }
     if (this.filter === "all") return false;

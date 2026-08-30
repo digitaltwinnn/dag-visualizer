@@ -1173,6 +1173,27 @@ export class Globe implements GeoViewHost {
     return rec ? this._hyperAnchorOf(rec, out) : false;
   }
 
+  /** The selected MACHINE's other layer beads (globe-LOCAL) — every non-primary record sharing
+   *  its nodeId (a hybrid runs one record per layer, so one machine is several beads on several
+   *  shells). The callout's MULTI-LEADER (user, 2026-08-30: "the node's callout shows multiple
+   *  layers — draw the dotted connecting line to each of the active elements"); the geoPrimary
+   *  record is skipped because the primary anchor already points at it. Fills `out` up to its
+   *  length (the caller owns the scratch — rule 5), returns the count. */
+  selectedNodeHyperAnchors(out: THREE.Vector3[]): number {
+    const id = this._selectedNodeId;
+    if (!id) return 0;
+    let n = 0;
+    for (const r of this.nodes) {
+      if (n >= out.length) return n;
+      if (r.nodeId === id && !r.geoPrimary && this._hyperAnchorOf(r, out[n]!)) n++;
+    }
+    for (const r of this.metaNodes) {
+      if (n >= out.length) return n;
+      if (r.nodeId === id && !r.geoPrimary && this._hyperAnchorOf(r, out[n]!)) n++;
+    }
+    return n;
+  }
+
   /** One home for "where is this node in hyper" (globe-LOCAL), shared by the callout's committed
    *  read above and the follow-spot's hover-preferring one. */
   private _hyperAnchorOf(rec: ValidatorRecord | MetaNodeRecord, out: THREE.Vector3): boolean {

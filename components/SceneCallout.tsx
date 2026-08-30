@@ -396,6 +396,19 @@ export default function SceneCallout() {
           strokeDasharray="4 4"
         />
       </svg>
+      {/* MULTI-LEADER (user, 2026-08-30): a machine's callout points at EACH of its layer beads
+          — up to two extra dashed legs from the anchor to the non-primary shells, written per
+          frame by Engine._syncCalloutMulti (the Tooltip discipline: position never renders
+          React). Same leader ink; each leg ends in a smaller identity ring. Hidden until the
+          Engine reveals a leg, and only the hyper node anchor ever does. */}
+      <svg className="co-multi absolute left-0 top-0 overflow-visible" width="1" height="1" aria-hidden>
+        {[0, 1].map((i) => (
+          <g key={i} className="co-mleg" visibility="hidden">
+            <line x1={0} y1={0} x2={0} y2={0} stroke="var(--primary)" strokeOpacity="0.55" strokeWidth="1.5" strokeDasharray="4 4" />
+            <circle cx={0} cy={0} r={3.5} fill="none" strokeWidth={1.5} stroke={m.ring} />
+          </g>
+        ))}
+      </svg>
       {/* The panel — keyed by subject so the roll-in replays on a change, like a card title. */}
       {/* Position lives in globals.css (`.co-panel` + the data-flip/data-drop mirrors the
           Engine toggles near viewport edges) — inline left/bottom would beat the flip rules. */}
