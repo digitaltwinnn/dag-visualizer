@@ -82,7 +82,12 @@ export const GLASS_TUNE_DEFAULTS: Readonly<GlassTune> = Object.freeze({
   // env 0.40 → 0.28, rim 0.34 → 0.26) and GLASSNESS is bought with clarity instead — body tint
   // thinner (0.185 → 0.155, you see more THROUGH the pane) and the polished edge up
   // (0.22 → 0.28, the one term that says "cut glass" without filming the face).
-  body: 0.155, sky: 0.17, rim: 0.26, spec: 0.62, specPow: 30, edge: 0.28, env: 0.28, trayBody: 0.42,
+  // 2026-08-30 third pass — "I want them more shiny glass" (user), after the chip-env wash was
+  // fixed (viewPolicy.chipEnv): while every tray chip washed white, the glass terms were visually
+  // swamped and the knobs read as dead; with the chips back to ink the same terms show again, and
+  // shine comes UP across the board — bought with the crisp terms (edge, window, softboxes) plus a
+  // step of rim/sky, while body stays at the second pass's clarity so the trail stays readable.
+  body: 0.155, sky: 0.3, rim: 0.4, spec: 0.85, specPow: 18, edge: 0.45, env: 0.5, trayBody: 0.42,
   laneBody: 1.75, laneTint: 0.8,
 });
 /** The live struct the `?tune` panel binds; DEFAULTS above is the shipped look and what tests pin. */
