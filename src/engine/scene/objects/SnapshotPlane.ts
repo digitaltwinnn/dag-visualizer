@@ -90,8 +90,10 @@ export const GLASS_TUNE_DEFAULTS: Readonly<GlassTune> = Object.freeze({
   // Settled from the user's own EXPORT (same day): edge 0.45 → 0.25 (the white border calmed),
   // trayBody 0.42 → 0.075 (the milky plates behind the chips were half of what read as washed
   // nodes — quiet trays let the chips carry their own colour), laneTint 0.8 → 1 (the committed
-  // pane goes fully to its lane's identity).
-  body: 0.155, sky: 0.3, rim: 0.4, spec: 0.85, specPow: 18, edge: 0.25, env: 0.5, trayBody: 0.075,
+  // pane goes fully to its lane's identity). Next export the same day trades edge for body —
+  // 0.25 → 0.15 and body 0.155 → 0.26: the pane's presence moves from the cut border into the
+  // tint itself, more pane and less outline over the lighter 0.88 wall.
+  body: 0.26, sky: 0.3, rim: 0.4, spec: 0.85, specPow: 18, edge: 0.15, env: 0.5, trayBody: 0.075,
   laneBody: 1.75, laneTint: 1,
 });
 /** The live struct the `?tune` panel binds; DEFAULTS above is the shipped look and what tests pin. */
