@@ -79,7 +79,14 @@ const chipPaperCalm = (chipShare: number, fw: number): number =>
 // dark emissive look keeps it subtle) and is re-applied through the theme fan-out
 // (Globe.setColors → setEnvIntensity below).
 let _env: THREE.Texture | null = null;
-export const ENV_INT = { dark: 0.45, paper: 0.85 } as const;
+export const ENV_INT = { dark: 0.3, paper: 0.65 } as const;
+// The room's bright region sits at its zenith, which only a straight-down camera mirrors off a
+// flat cap — the STANDARD poses (elevated front orbit) reflected the dim walls instead, while a
+// bottom-front dive caught the lamps at grazing angle and bloomed (user, 2026-08-30: "move that
+// light [to] the standard view pose, and probably can be tuned down"). This stock
+// `material.envMapRotation` tilts the env so the lit ceiling mirrors into a ~40° camera; the
+// intensities above are tuned DOWN to match, since the sheen now lands where it is actually seen.
+export const ENV_ROT = new THREE.Euler(0.9, 0, 0);
 export function setNodeEnv(tex: THREE.Texture): void {
   _env = tex;
 }
@@ -181,6 +188,7 @@ export class NodeFabric {
       // facet-definition trick); the edge-lit cap/fresnel treatment is shading-independent.
       transparent: alpha < 1, opacity: alpha,
     });
+    if (flat && _env) mat.envMapRotation.copy(ENV_ROT); // aim the lit ceiling at the resting pose
     mat.onBeforeCompile = (shader) => {
       shader.vertexShader = shader.vertexShader
         .replace("#include <common>", "#include <common>\nattribute vec3 aBase;\nattribute float aEmissive;\nvarying vec3 vBase;\nvarying float vEmi;\nvarying float vCap;")

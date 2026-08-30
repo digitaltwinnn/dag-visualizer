@@ -591,7 +591,12 @@ export function createScene(canvas: HTMLCanvasElement, colors: SceneColors): Sce
     if (nodeEnvTex) return nodeEnvTex;
     const pmrem = new THREE.PMREMGenerator(renderer);
     const room = new RoomEnvironment();
-    nodeEnvTex = pmrem.fromScene(room, 0.04).texture;
+    // Sigma SMEARS the room's discrete lamps into a soft top-lit gradient. At the stock 0.04 the
+    // lamps survive as near-mirror hot spots, and a grazing view (the ledger seen from
+    // bottom-front, the parked grid's top rows) catches one and BLOOMS it — a brightness spike at
+    // poses users never take, proven by zeroing the env (2026-08-30). The sweep survives the blur;
+    // the spikes don't.
+    nodeEnvTex = pmrem.fromScene(room, 0.35).texture;
     pmrem.dispose();
     return nodeEnvTex;
   }
