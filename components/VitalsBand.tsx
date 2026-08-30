@@ -95,7 +95,7 @@ function BandCard({ label, children, className }: { label: string; children: Rea
 
 /** A row of labelled micro horizontal bars (the geo country / provider / layer read) — one
  *  measure, one hue, widths on the row max, every bar named (identity never colour-alone). */
-function MicroBars({ rows, accent, labelW = 26 }: { rows: { key: string; label: React.ReactNode; count: number }[]; accent: string; labelW?: number }) {
+export function MicroBars({ rows, accent, labelW = 26 }: { rows: { key: string; label: React.ReactNode; count: number }[]; accent: string; labelW?: number }) {
   const max = Math.max(1, ...rows.map((r) => r.count));
   return (
     <div className="flex flex-col gap-[3px] w-full self-center min-w-0">
@@ -115,7 +115,7 @@ function MicroBars({ rows, accent, labelW = 26 }: { rows: { key: string; label: 
 /** The composition donut — four shares of one fleet as stroke arcs on a single accent hue at
  *  stepped opacities, the total in the hole. Pure SVG, no interaction; 2px surface gaps between
  *  segments (the dataviz spacer rule) via a gap subtracted from each arc. */
-function Donut({ counts, accent }: { counts: Record<string, number>; accent: string }) {
+export function Donut({ counts, accent }: { counts: Record<string, number>; accent: string }) {
   const entries = Object.entries(counts);
   const total = entries.reduce((s, [, n]) => s + n, 0);
   const R = 15.5, C = 2 * Math.PI * R, GAP = 2;
