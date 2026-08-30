@@ -14,7 +14,6 @@ import EcgMark from "@/components/topbar/EcgMark";
 import PresentationToggle from "@/components/topbar/PresentationToggle";
 import ThemeToggle from "@/components/topbar/ThemeToggle";
 import NetworkSwitch, { NET_SWITCH_VIEW } from "@/components/topbar/NetworkSwitch";
-import NetLink from "@/components/NetLink";
 import { useBreakpoint } from "@/components/useBreakpoint";
 import { VIEW_POLICIES } from "@/src/engine/domain/viewPolicy";
 import type { Mode } from "@/src/store/store";
@@ -188,35 +187,16 @@ export default function TopBar() {
         >
           <EcgMark />
         </button>
-        {/* The wordmark keeps the /about route (a plain <a>, not a Link: the app is a
-            long-lived WebGL tab — a client-side route change would tear the engine down). */}
-        <NetLink
-          href="/about"
-          title="About DAG Visualizer, an unofficial community project"
-          className={cn(
-            "flex items-center gap-2 rounded-btn -mx-1 px-1 py-0.5 no-underline",
-            "hover:bg-wash-soft transition-colors duration-150 motion-reduce:transition-none",
-            "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--primary)]",
-          )}
-        >
-          {/* Wordmark hides below 1439. The thresholds in this bar are MEASURED, not guessed —
-              the bar is `overflow-hidden`, so anything that doesn't fit is silently clipped off
-              the right edge, and the first thing to go is the presentation toggle (user bug,
-              2026-08-09: "the right view type buttons go out of view"). Measured needs, at the
-              vitals cluster's present 250px: labels + wordmark → 1392px; labels alone → 1257px.
-              So the wordmark waits for 1439 and the labels for 1299, each with real slack. (`max-[N]`
-              compiles to `not (min-width: N)` — EXCLUSIVE, so N itself is already the wide face.)
-              Raise them together with any part that grows; the dev overflow warning in the effect
-              above shouts if they drift again. */}
-              {/* Hidden in the 700-1439 crunch band ONLY (2026-08-30): the PHONE gets the
-                  wordmark back — with the ECG now opening the pulse strip, this link is the
-                  phone's one route to /about (footer hidden there). Both arms name real
-                  boundaries: 700 is breakpointOf's own, 1439 the measured desktop crunch. */}
-              <span className="font-semibold tracking-[-0.01em] text-title whitespace-nowrap min-[700px]:max-[1439px]:hidden">
-            <span className={live ? "text-foreground" : "text-muted-foreground opacity-70"}>DAG</span>{" "}
-            <span className={cn("text-muted-foreground", !live && "opacity-70")}>Visualizer</span>
-          </span>
-        </NetLink>
+        {/* The WORDMARK — plain identity text since 2026-08-30 (user: the footer owns /about
+            now, "don't link it here"; the ECG beside it owns the pulse strip). Shown at every
+            width: the old 1439 hide was measured WITH the vitals cluster in the bar, and the
+            vitals left for the bottom band — re-measured after, the full wordmark fits down to
+            phone with zero zone overflow (the dev overflow alarm above still shouts if content
+            grows and this drifts again). */}
+        <span className="flex items-center gap-2 font-semibold tracking-[-0.01em] text-title whitespace-nowrap">
+          <span className={live ? "text-foreground" : "text-muted-foreground opacity-70"}>DAG</span>{" "}
+          <span className={cn("text-muted-foreground", !live && "opacity-70")}>Visualizer</span>
+        </span>
         <span className="w-px self-stretch bg-border my-1 max-[860px]:hidden" />
 
         {/* Filter (toned, de-nested) — toggles the ATTACHED filter strip below (user,
