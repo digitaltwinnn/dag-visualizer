@@ -80,6 +80,13 @@ export interface ViewPolicy {
   // fuller bloom the design wants. strength is the dominant lever (the halo "vanishes with
   // strength"). All three are read live by UnrealBloomPass.render, so a per-frame set is enough.
   bloom: { strength: number; radius: number; threshold: number };
+  // Multiplier on the chip materials' env-sheen intensity (NodeFabric's ENV_INT × this), applied
+  // by the Engine on a view change. The ledger answers 0: its trays hold COPLANAR flat chips, so
+  // at the chamber's resting pose every chip mirrors the env's bright region at once and the whole
+  // tray washes toward white (user, 2026-08-30: "the nodes are much lighter than in the other
+  // views") — geo's chips sit on a curved globe at varied normals, so the same intensity reads as
+  // a sweeping sheen there, not a wash. The staged gather grids ride the non-ledger value.
+  chipEnv: number;
 }
 
 // The calm bloom the ledger view uses — the reference the design likes (thin lines, sparse
@@ -105,6 +112,7 @@ const FLAT: ViewPolicy = {
   timeLane: false,
   callout: false,
   bloom: BLOOM_CALM,
+  chipEnv: 1,
 };
 
 export const VIEW_POLICIES: Record<Mode, ViewPolicy> = {
@@ -132,6 +140,7 @@ export const VIEW_POLICIES: Record<Mode, ViewPolicy> = {
     callout: true, // first consumer of the subject callout (rolling out view by view)
     // Calmer than ledger: the core + dense node field piled up an additive bleed on OLED/HDR.
     bloom: { strength: 0.27, radius: 0.32, threshold: 0.14 },
+    chipEnv: 1,
     },
   // Footprint: the holographic globe + travelling packets; picks the globe nodes only.
   geo: {
@@ -151,6 +160,7 @@ export const VIEW_POLICIES: Record<Mode, ViewPolicy> = {
     // The lowest bloom of the three views: strength drives the "black halo" ring the saturated
     // node/wall hues cast on the globe, and the additive coastal walls read fuzzy under bloom.
     bloom: { strength: 0.20, radius: 0.30, threshold: 0.16 },
+    chipEnv: 1,
     },
   // Snapshots: the settlement chamber. Morph frozen (nodes fly into lanes); picks the centred
   // snapshot + the reused producer dots. (The ledger-specific depth-fog recency treatment was
@@ -171,6 +181,7 @@ export const VIEW_POLICIES: Record<Mode, ViewPolicy> = {
     timeLane: true, // the ONLY view with a time axis — the tick bar-chart is this view's instrument
     callout: true, // the pinned snapshot — the lane lead tile, or the global tick's bar
     bloom: BLOOM_CALM, // the reference look the design likes — unchanged
+    chipEnv: 0, // coplanar trays mirror the env in unison and wash out — see the field's note
   },
   status: FLAT,
   transactions: FLAT,

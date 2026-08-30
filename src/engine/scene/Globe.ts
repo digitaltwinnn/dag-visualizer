@@ -332,8 +332,7 @@ export class Globe implements GeoViewHost {
   // arcs + globeSpin flags concern the Globe; the rest of the sims object is ignored here.
   setSimFlags(sims: { arcs: boolean; globeSpin: boolean }): void {
     this.simArcs = sims.arcs;
-    this.simSpin = sims.globeSpin;
-    // ⚠️ THE GATES FLIP HERE, THE ORIENTATION DOES NOT (user, 2026-08-12 — "when we switch from geo
+    this.simSpin = sims.globeSpin;    // ⚠️ THE GATES FLIP HERE, THE ORIENTATION DOES NOT (user, 2026-08-12 — "when we switch from geo
     // to another view, the globe rotation changes before it fades"). This used to hard-write hyper's
     // Euler rig the moment `globeSpin` dropped, and the Engine calls it at switch time, one phase
     // BEFORE the choreography's boundary — so leaving geo for ANY view (hyper, ledger, or a flat
@@ -344,6 +343,13 @@ export class Globe implements GeoViewHost {
     // Engine then re-asserts every hyper frame. Ledger zeroes its own rotation in updateRotation,
     // and a flat view draws nothing to orient. Same rule as the camera hold (viewTransition
     // .holdCamera) and the _integrateMotion guard that fixed this bug's sibling half.
+  }
+
+  /** View fan-out (Engine, viewPolicy.chipEnv → the fabric's per-view env-sheen gain). Applied at
+   *  the transition BOUNDARY for 3D↔3D switches — the setSimFlags rule above: the from-view's
+   *  still-visible chips must not change at switch time. */
+  setChipEnv(mul: number): void {
+    this.fabric.setEnvView(mul);
   }
 
   // Set the hyper-structure spin: the node group is tilted by HYPER_TILT and spun about its own

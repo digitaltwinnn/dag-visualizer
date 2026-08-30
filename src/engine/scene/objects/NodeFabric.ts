@@ -87,6 +87,11 @@ export const ENV_INT = { dark: 0.3, paper: 0.65 } as const;
 // `material.envMapRotation` tilts the env so the lit ceiling mirrors into a ~40° camera; the
 // intensities above are tuned DOWN to match, since the sheen now lands where it is actually seen.
 export const ENV_ROT = new THREE.Euler(0.9, 0, 0);
+// Per-VIEW gain on the sheen (viewPolicy.chipEnv, set by the Engine on a view change) — module
+// level like _paper: one value, both write paths below read it, so a material built later and a
+// re-apply cannot disagree. The applied intensity is always ENV_INT[ground] × this.
+let _envMul = 1;
+const envIntensity = (): number => (_paper ? ENV_INT.paper : ENV_INT.dark) * _envMul;
 export function setNodeEnv(tex: THREE.Texture): void {
   _env = tex;
 }
@@ -183,7 +188,7 @@ export class NodeFabric {
       // The chip mirrors the stock studio env (SceneContext.nodeEnv — plain built-in
       // envMap/envMapIntensity, no shader work): a flat cap's one normal mirrors the key away
       // from a top-down camera, so the reflection is the only channel that answers from above.
-      ...(flat && _env ? { envMap: _env, envMapIntensity: _paper ? ENV_INT.paper : ENV_INT.dark } : {}),
+      ...(flat && _env ? { envMap: _env, envMapIntensity: envIntensity() } : {}),
       // smooth-shaded everywhere: the chips are ROUND now (flat shading was the hex prisms'
       // facet-definition trick); the edge-lit cap/fresnel treatment is shading-independent.
       transparent: alpha < 1, opacity: alpha,
@@ -241,9 +246,22 @@ export class NodeFabric {
    *  dark keeps it subtle under the emissive look. A material built later reads the same pair
    *  through `_paper` at creation, so the two paths cannot disagree. */
   applyGroundEnv(paper: boolean): void {
+    void paper; // _paper (set by setNodeDimTarget before this runs) is the one ground flag
+    this._applyEnv();
+  }
+
+  /** View fan-out (Engine, from viewPolicy.chipEnv on a view change): the ledger zeroes the
+   *  sheen — its coplanar trays mirror the env in unison and wash out (the policy field's note). */
+  setEnvView(mul: number): void {
+    if (mul === _envMul) return;
+    _envMul = mul;
+    this._applyEnv();
+  }
+
+  private _applyEnv(): void {
     for (const mesh of [this.instHex, this.metaHex]) {
       const m = mesh?.material as THREE.MeshStandardMaterial | undefined;
-      if (m?.envMap) m.envMapIntensity = paper ? ENV_INT.paper : ENV_INT.dark;
+      if (m?.envMap) m.envMapIntensity = envIntensity();
     }
   }
 

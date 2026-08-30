@@ -63,4 +63,15 @@ describe("VIEW_POLICIES", () => {
   it("freezes hub orbits everywhere except hyper", () => {
     for (const m of MODES) expect(VIEW_POLICIES[m].sims.hubOrbits).toBe(m === "hyper");
   });
+
+  // The chip env sheen is per-view, and the RELATION is the design (the numbers may move):
+  // the ledger zeroes it — its trays hold coplanar flat chips, so at the resting pose every
+  // chip mirrors the env's bright region at once and the whole tray washes toward white
+  // (user, 2026-08-30) — while every other view keeps the sheen on.
+  it("zeroes the chip env sheen ONLY in ledger", () => {
+    for (const m of MODES) {
+      if (m === "ledger") expect(VIEW_POLICIES[m].chipEnv).toBe(0);
+      else expect(VIEW_POLICIES[m].chipEnv).toBeGreaterThan(0);
+    }
+  });
 });

@@ -988,6 +988,10 @@ export class Engine {
       // flat/boot origin there is nothing to gather — the machine parks instantly.
       this._pendingBoundary = null;
       this._resettleFocus = false; // any pending reversal re-resolve is moot — this path resolves/parks on its own
+      // The parked grids ride the flat rows' chipEnv (1): applied at switch time here — a flat
+      // view has no boundary, and coming from the ledger the chips are already mid-gather, so
+      // the scalar change rides the flight rather than popping a resting view.
+      this.globe.setChipEnv(policy.chipEnv);
       if (is3D(prevMode)) this.transition.stage(prevMode);
       else this.transition.stageInstant();
     } else {
@@ -1011,6 +1015,10 @@ export class Engine {
   private _applyBoundary(dest: Mode): void {
     if (dest === "geo") this.morph = 1;
     if (dest === "hyper") this.morph = 0;
+    // The chip env sheen is per-view (viewPolicy.chipEnv — the ledger's coplanar trays zero it)
+    // and flips HERE, not at switch time, so the from-view's chips hold their look through the
+    // visible OUT phase (the setSimFlags orientation rule).
+    this.globe.setChipEnv(VIEW_POLICIES[dest].chipEnv);
     // ledger snaps nothing — it freezes morph at the source view's value.
     // Bring the DESTINATION's frame state up BEFORE any framing math reads it: the hyper
     // root's scale is still collapsed from geo's morph 1 at this instant (a hub
