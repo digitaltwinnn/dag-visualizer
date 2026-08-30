@@ -261,7 +261,7 @@ export const LIGHT_TUNE_DEFAULTS: Readonly<LightTune> = Object.freeze({
   // BROWN at the first shipped chroma and was zeroed the same day — re-picked at half and then
   // full strength as the quiet-tray glass, the brighter halo and the lighter wall (groundL 0.88)
   // changed what the tint sits over.
-  bgTint: 1, bgGrid: 0.07,
+  bgTint: 1, bgGrid: 0.05, // grid eased 0.07 → 0.05 (user export, 2026-08-30 — a touch quieter under the full ivory)
 });
 export const LIGHT_TUNE: LightTune = { ...LIGHT_TUNE_DEFAULTS };
 export const LIGHT_TUNE_SCHEMA: import("./tune").TuneSchema<LightTune> = {
