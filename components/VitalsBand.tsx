@@ -51,7 +51,14 @@ function windowNote(a: Activity | null | undefined, unit: string): string | unde
  *  own flex via className. */
 function BandCard({ label, children, className }: { label: string; children: React.ReactNode; className?: string }) {
   return (
-    <div className={cn("flex flex-col gap-1 rounded-lg border border-border/50 bg-card/40 backdrop-blur-sm px-3 py-1.5 min-w-0 flex-1 basis-0", className)}>
+    <div className={cn(
+      // The plate is the COMMAND BAR's own glass (`--topbar-glass` — a gradient token, so the
+      // arbitrary-property form per CSS trap 3): the band is that bar's sibling instrument, and
+      // the earlier `bg-card/40` was tuned under light and sat near-invisible over the dark
+      // scene's glow (user, 2026-08-30: "in dark the card needs a bit more contrast").
+      "flex flex-col gap-1 rounded-lg border border-border/60 [background:var(--topbar-glass)] backdrop-blur-sm px-3 py-1.5 min-w-0 flex-1 basis-0",
+      className,
+    )}>
       <span className="text-micro tracking-[0.1em] uppercase text-muted-foreground whitespace-nowrap leading-none">{label}</span>
       <div className="flex items-center gap-2 min-h-0 flex-1">{children}</div>
     </div>
