@@ -243,13 +243,15 @@ export const LIGHT_TUNE_DEFAULTS: Readonly<LightTune> = Object.freeze({
   // light mode" (user, same day). The lift restores a resting glow WITHOUT the old fat tips:
   // the calm evened out the cap hotspots that used to concentrate the halo.
   // Re-balanced by the user live (2026-08-30, after the chip env landed): the bleed comes DOWN
-  // (0.55 → 0.3) and the spread OUT to the schema's full reach (0.55 → 1) — a wider, gentler
-  // halo now that the env sheen carries part of the marks' presence on paper.
-  selBleed: 0.3, selGlow: 0.12, selRadius: 1,
-  // bgTint 0: the ivory drift read BROWN at the shipped chroma (user, 2026-08-30, picked from a
-  // measured warm↔cool bracket) — the cool-silver token now carries the wall's colour alone, the
-  // sweep/fall-off shape it in pure level, and the knob stays as the lever if a drift comes back.
-  bgTint: 0, bgGrid: 0.07,
+  // (0.55 → 0.3) and the spread OUT — a wider, gentler halo now that the env sheen carries part
+  // of the marks' presence on paper. Second export same day, alongside the quiet-tray glass:
+  // glow UP (0.12 → 0.27) and spread further out (1 → 1.35) — with the trays' milky plates gone
+  // the halo is the marks' main paper presence again, and it can afford more light.
+  selBleed: 0.3, selGlow: 0.27, selRadius: 1.35,
+  // bgTint returned (0 → 0.5, user's export 2026-08-30): the ivory drift read BROWN at the first
+  // shipped chroma and was zeroed the same day — re-picked at half strength once the quiet-tray
+  // glass and the brighter halo changed what the wall sits behind.
+  bgTint: 0.5, bgGrid: 0.07,
 });
 export const LIGHT_TUNE: LightTune = { ...LIGHT_TUNE_DEFAULTS };
 export const LIGHT_TUNE_SCHEMA: import("./tune").TuneSchema<LightTune> = {
