@@ -850,8 +850,14 @@ export class Globe implements GeoViewHost {
   }
 
   // Set the dim TARGETS for a selection (the dim itself eases each frame).
+  // ⚠️ In the LEDGER the DAG core is ALWAYS lit (user, 2026-08-30: "the DAG nodes should never be
+  // dimmed since in this view the global snapshot is part of our active/selected scope"): every
+  // metagraph anchors INTO the global, so the global layer — floor, fleet tray — is inside every
+  // committed story, and the L0 validators under it show at rest whatever the filter says. This is
+  // a WHO-is-in-scope statement, so it lives here at the TARGET (the view rows keep saying how
+  // MUCH); applyLedgerLayout re-derives it when the flag flips, and the ease carries the change.
   private _applyDim(sel: string): void {
-    const dagLit = sel === "all" || sel === "dag";
+    const dagLit = sel === "all" || sel === "dag" || this.ledger;
     this.dimTarget = dagLit ? 0 : 1;
     for (const r of this.metaNodes) r.dimTarget = (sel === "all" || sel === r.metaId) ? 0 : 1;
   }
@@ -1510,6 +1516,9 @@ export class Globe implements GeoViewHost {
   // gather dissolve).
   applyLedgerLayout(on: boolean): void {
     this.ledger = on;
+    // The core's dim target keys on this flag (the ledger always lights the DAG — see _applyDim),
+    // so a flip re-derives it under the current filter; the per-frame ease makes the change soft.
+    this._applyDim(this.filter);
     if (on) {
       this.group.rotation.set(0, 0, 0);
       this.ledgerT = 1;

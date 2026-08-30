@@ -64,9 +64,9 @@ describe("nodeDimScale", () => {
   });
 
   // Morph is frozen in the ledger, so the ramp can't apply — the row's own flat value does.
-  it("is the ledger row's flat 0.5 in the Snapshots view, whatever the morph", () => {
-    expect(nodeDimScale(ctx({ morph: 0, ledger: true }))).toBeCloseTo(0.5, 10);
-    expect(nodeDimScale(ctx({ morph: 1, ledger: true }))).toBeCloseTo(0.5, 10);
+  it("is the ledger row's flat 0.67 in the Snapshots view, whatever the morph", () => {
+    expect(nodeDimScale(ctx({ morph: 0, ledger: true }))).toBeCloseTo(0.67, 10);
+    expect(nodeDimScale(ctx({ morph: 1, ledger: true }))).toBeCloseTo(0.67, 10);
   });
 });
 
@@ -462,7 +462,7 @@ describe("nodeDim", () => {
 
   it("takes the ledger row's flat multiplier, ignoring the morph", () => {
     const c = ctx({ morph: 0, ledger: true });
-    expect(nodeDim(c, 0.5, null)).toBeCloseTo(0.5 * 0.5, 10);
+    expect(nodeDim(c, 0.5, null)).toBeCloseTo(0.67 * 0.5, 10);
   });
 });
 
@@ -613,10 +613,10 @@ describe("FOCUS_TUNE", () => {
 
   it("reproduces the pre-refactor ledger overrides", () => {
     const c = ctx({ ledger: true, morph: 0.5 });
-    expect(nodeDimScale(c)).toBeCloseTo(0.5, 10);
+    expect(nodeDimScale(c)).toBeCloseTo(0.67, 10); // 0.5 → 0.67, user export 2026-08-30
     expect(focusDim(c)).toBeCloseTo(0.55, 10);
     expect(focusBoost(c)).toBeCloseTo(0.7, 10);
-    expect(nodeDim(c, 1, null)).toBeCloseTo(0.5, 10);
+    expect(nodeDim(c, 1, null)).toBeCloseTo(0.67, 10);
   });
 });
 
