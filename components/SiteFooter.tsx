@@ -32,14 +32,12 @@ export default function SiteFooter() {
       id="sitefoot"
       className="fixed inset-x-0 bottom-0 z-10 h-[var(--footer-h)] flex items-center justify-center pointer-events-none max-[700px]:hidden"
     >
-      {/* ⚠️ The band is TRANSPARENT over a live scene, so its ground is whatever orbits past — in
-          hyper a metagraph hub sweeps the bottom edge and its bloom washed "Design" out entirely
-          (measured at 1600×950 and again at 900×900). The answer is a shadow, not a plate: a plate
-          would be the surface the brief ruled out, and it would sit there at full weight over the
-          black the footer rests on 95% of the time (in dark). A halo costs nothing over black and only
-          appears where something bright is behind it. Grayscale by rule — a tinted halo would read
-          as an accent. */}
-      <nav className="flex items-center gap-2 text-micro text-muted-foreground/70 [text-shadow:var(--footer-halo)] [&_a]:pointer-events-auto">
+      {/* The halo text-shadow is GONE (user, 2026-08-30: "it has some shadow which for text is
+          not great") — it existed for bloom sweeping the bottom edge, but the vitals band now
+          stands between the scene and this line in every 3D view, so the wash-out it answered
+          no longer reaches here. Readability comes from real ink instead: full muted-foreground,
+          up from the /70 tint. */}
+      <nav className="flex items-center gap-2 text-micro text-muted-foreground [&_a]:pointer-events-auto">
         <a href={GITHUB} target="_blank" rel="noopener noreferrer" className="hover:text-foreground transition-colors">
           GitHub
         </a>

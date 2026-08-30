@@ -4,7 +4,7 @@ import { useStore } from "@/src/store/store";
 import { metagraphById, filterAccent, getAnchor } from "@/src/data/network";
 import { displayNetwork } from "@/src/data/unlisted";
 import { compositionCounts } from "@/components/topbar/Vitals";
-import { networkKind, rolesOf, IdentityDot } from "@/components/inspector/parts";
+import { networkKind, rolesOf, IdentityDot, RoleChips } from "@/components/inspector/parts";
 import { identityHudCss } from "@/src/palette/identity";
 import { METATYPE_ICONS, VIEW_ICONS } from "@/components/icons";
 import Sparkline from "@/components/Sparkline";
@@ -13,6 +13,7 @@ import { NoSignalDot } from "@/components/state/StateAtoms";
 import { isGlobalActivityScope, type Activity } from "@/src/data/api";
 import { POLL } from "@/src/engine/config";
 import { useSnapshotFeed } from "@/components/useSnapshotFeed";
+import { useSceneYield } from "@/components/RailShade";
 import { cn } from "@/lib/utils";
 import type { CSSProperties } from "react";
 
@@ -68,7 +69,7 @@ function BandCard({ label, children, className }: { label: string; children: Rea
 
 /** A row of labelled micro horizontal bars (the geo country / provider / layer read) — one
  *  measure, one hue, widths on the row max, every bar named (identity never colour-alone). */
-function MicroBars({ rows, accent, labelW = 26 }: { rows: { key: string; label: string; count: number }[]; accent: string; labelW?: number }) {
+function MicroBars({ rows, accent, labelW = 26 }: { rows: { key: string; label: React.ReactNode; count: number }[]; accent: string; labelW?: number }) {
   const max = Math.max(1, ...rows.map((r) => r.count));
   return (
     <div className="flex flex-col gap-[3px] w-full self-center min-w-0">
@@ -76,7 +77,7 @@ function MicroBars({ rows, accent, labelW = 26 }: { rows: { key: string; label: 
         <span key={r.key} className="flex items-center gap-1.5 min-w-0">
           {/* NO uppercase transform: the layer codes are ONE vocabulary (L0/cL1/dL1 — case is
               part of the code) and provider names are names; country codes arrive uppercase. */}
-          <span className="text-micro text-muted-foreground flex-none truncate" style={{ width: labelW }}>{r.label}</span>
+          <span className="text-micro text-muted-foreground flex-none truncate leading-none" style={{ width: labelW }}>{r.label}</span>
           <span aria-hidden className="h-[5px] rounded-full flex-none" style={{ background: accent, opacity: 0.75, width: `${Math.max(4, (r.count / max) * 72)}px` }} />
           <span className="font-mono text-micro tabular-nums text-foreground">{r.count}</span>
         </span>
@@ -131,10 +132,10 @@ const TYPE_ORDER = ["data", "currency", "data + currency", "unknown"] as const;
 
 /** One type's glyph — "data + currency" is deliberately the data+currency PAIR (no third
  *  metaphor; see METATYPE_ICONS), "hypergraph" the hyper view's own Orbit. */
-function TypeGlyph({ t, className }: { t: string; className?: string }) {
+function TypeGlyph({ t, className, color }: { t: string; className?: string; color?: string }) {
   if (t === "data + currency") {
     return (
-      <span aria-hidden className="flex items-center gap-0.5 flex-none">
+      <span aria-hidden className="flex items-center gap-0.5 flex-none" style={color ? { color } : undefined}>
         <METATYPE_ICONS.data className={className} />
         <METATYPE_ICONS.currency className={className} />
       </span>
@@ -146,7 +147,7 @@ function TypeGlyph({ t, className }: { t: string; className?: string }) {
     : t === "currency" ? METATYPE_ICONS.currency
     : t === "data" ? METATYPE_ICONS.data
     : METATYPE_ICONS.unknown;
-  return <Icon aria-hidden className={cn("flex-none", className)} />;
+  return <Icon aria-hidden className={cn("flex-none", className)} style={color ? { color } : undefined} />;
 }
 
 function HyperCells({ accent }: { accent: string }) {
@@ -201,26 +202,30 @@ function HyperCells({ accent }: { accent: string }) {
     <>
       {singleWord != null ? (
         <BandCard label={cfg ? "Metagraph type" : "Network type"}>
-          <TypeGlyph t={singleWord} className="size-4 text-muted-foreground" />
-          <span className="font-mono font-bold text-foreground whitespace-nowrap">{singleWord}</span>
+          {/* SUBTLE on purpose (user): a characteristic is a quiet reading, not a headline —
+              the number cards keep the bold mono, a word does not. */}
+          <TypeGlyph t={singleWord} className="size-3.5" color={accent} />
+          <span className="font-mono text-caption text-foreground whitespace-nowrap">{singleWord}</span>
         </BandCard>
       ) : (
       <BandCard label="Metagraphs" className="flex-[1.3]">
         <span className="font-mono font-bold text-foreground tabular-nums"><Odometer int value={typeTotal || null} /></span>
-        <div className="grid grid-cols-2 gap-x-4 gap-y-1 min-w-0 flex-1 self-center">
+        <div className="grid grid-cols-2 gap-x-3 gap-y-1 min-w-0 flex-1 self-center">
+          {/* the pair's legend word is the user's own "both" — the full "data + currency" kept
+              overflowing the cell; the filtered face still states it in full. */}
           {TYPE_ORDER.map((t) =>
             types[t]! > 0 ? (
               <span key={t} className="flex items-center gap-1.5 whitespace-nowrap">
-                <TypeGlyph t={t} className="size-3.5 text-muted-foreground" />
-                <span className="text-micro uppercase text-muted-foreground">{t}</span>
-                <span className="font-mono font-bold text-caption tabular-nums text-foreground">{types[t]}</span>
+                <TypeGlyph t={t} className="size-3" color={accent} />
+                <span className="text-micro uppercase text-muted-foreground">{t === "data + currency" ? "both" : t}</span>
+                <span className="font-mono text-micro tabular-nums text-foreground">{types[t]}</span>
               </span>
             ) : null,
           )}
         </div>
       </BandCard>
       )}
-      <BandCard label="Composition" className="flex-[1.5]">
+      <BandCard label="Node composition" className="flex-[1.5]">
         <Donut counts={counts} accent={accent} />
         <div className="grid grid-cols-2 gap-x-4 gap-y-0.5">
           {Object.entries(counts).map(([label, n], i) => (
@@ -234,11 +239,11 @@ function HyperCells({ accent }: { accent: string }) {
           ))}
         </div>
       </BandCard>
-      <BandCard label="Layers">
-        <MicroBars accent={accent} rows={[
-          { key: "l0", label: "L0", count: layers.l0! },
-          { key: "cl1", label: "cL1", count: layers.cl1! },
-          { key: "dl1", label: "dL1", count: layers.dl1! },
+      <BandCard label="Network layers">
+        <MicroBars accent={accent} labelW={34} rows={[
+          { key: "l0", label: <RoleChips codes={["L0"]} />, count: layers.l0! },
+          { key: "cl1", label: <RoleChips codes={["cL1"]} />, count: layers.cl1! },
+          { key: "dl1", label: <RoleChips codes={["dL1"]} />, count: layers.dl1! },
         ]} />
       </BandCard>
       <BandCard label="Nodes">
@@ -290,26 +295,25 @@ function GeoCells({ accent }: { accent: string }) {
 // interaction: unfiltered each bar is the tick's TOTAL anchors in cyan on the window max;
 // filtered it is THAT network's own anchors on its OWN scale in its identity hue, empty ticks
 // as honest gaps. Only the newest bar glows. A regular bar chart, nothing more.
-const TICK_BARS = 32;
-
 function TickBars({ accent, isMeta, filter }: { accent: string; isMeta: boolean; filter: string }) {
+  // The FULL retained window (the old strip's own choice): a fixed slice left the wide card's
+  // right side empty (user, 2026-08-30 — "a lot of room available to the right").
   const { snaps } = useSnapshotFeed(POLL.maxSnapshots);
-  const recent = snaps.slice(-TICK_BARS);
-  const bars = recent.map((d) => {
+  const bars = snaps.map((d) => {
     const total = typeof d.metagraphSnapshotCount === "number" ? d.metagraphSnapshotCount : 0;
     const mine = isMeta ? getAnchor(d.timestamp)?.metaCounts?.get(filter) ?? 0 : total;
     return { v: isMeta ? mine : total, ord: d.ordinal };
   });
   const max = Math.max(1, ...bars.map((b) => b.v));
   return (
-    <div className="flex items-end gap-[2px] h-[34px] w-full self-end pb-0.5" aria-hidden>
+    <div className="flex items-end justify-end gap-[2px] h-[34px] w-full self-end pb-0.5" aria-hidden>
       {bars.length === 0 && <span className="text-micro text-muted-foreground self-center">acquiring…</span>}
       {bars.map((b, i) => {
         const latest = i === bars.length - 1;
         return (
           <span
             key={b.ord}
-            className="flex-1 max-w-[7px] rounded-t-[2px]"
+            className="flex-1 max-w-[9px] rounded-t-[2px]"
             style={{
               height: b.v > 0 ? `${Math.max(8, (b.v / max) * 100)}%` : "2px",
               background: accent,
@@ -335,7 +339,8 @@ function LedgerCells({ accent, filter }: { accent: string; filter: string }) {
   const rate = (label: string, value: number | undefined, spark: number[] | undefined, note?: string) => (
     <BandCard label={label}>
       <span className="font-mono font-bold text-foreground tabular-nums whitespace-nowrap"><Odometer value={value} /></span>
-      <Sparkline data={spark} color="var(--primary)" width={64} height={26} />
+      {/* stretch: the fixed 64px chart left the card's right half empty (user, 2026-08-30) */}
+      <span className="flex-1 min-w-0 self-center"><Sparkline data={spark} color="var(--primary)" height={26} stretch /></span>
       {note && <span className="sr-only">{note}</span>}
     </BandCard>
   );
@@ -346,7 +351,7 @@ function LedgerCells({ accent, filter }: { accent: string; filter: string }) {
         ? rate("DAG fees/hr", activity?.feesPerHour, activity?.feesSeries, basis && `$DAG this network pays to anchor. ${basis}`)
         : rate("Anchors/hr", activity?.anchorsPerHour, activity?.anchoredSeries, basis && `Metagraph snapshots anchored into the global chain. ${basis}`)}
       <AnchoringNetworks />
-      <BandCard label={isMeta ? "Anchors per tick" : "Anchors per global tick"} className="flex-[2] min-w-[220px]">
+      <BandCard label="Anchors per global snapshot" className="flex-[2] min-w-[220px]">
         <TickBars accent={accent} isMeta={isMeta} filter={filter} />
       </BandCard>
     </>
@@ -382,6 +387,10 @@ export default function VitalsBand() {
   const mode = useStore((s) => s.mode);
   const live = useStore((s) => s.live);
   const filter = useStore((s) => s.filter);
+  // The band steps back with the rails while the user's hand is on the camera (user, 2026-08-30)
+  // — the same one read the RailShade dims on, at the recipe's own tempos (away 0.3s, the return
+  // faster: it answers a gesture already finished).
+  const yielding = useSceneYield();
   const scopeHue = filter !== "all" ? filterAccent(filter) : null;
   // Rule 3: structural cyan is the charts' resting hue; a committed filter re-points the one
   // accent var at the identity hue (the strip's old rule, kept).
@@ -394,6 +403,8 @@ export default function VitalsBand() {
         // pointer-events-none: the band is a read-only instrument — orbit drags pass through it.
         "fixed z-10 left-4 right-4 bottom-[calc(var(--footer-h,0px)+10px)] pointer-events-none",
         "flex items-stretch gap-2",
+        "transition-opacity duration-[180ms] ease-out motion-reduce:transition-none",
+        yielding && "opacity-40 duration-300",
         !live && "saturate-[.45]",
       )}
       style={{ ["--vb-accent"]: accent } as CSSProperties}
