@@ -7,7 +7,7 @@ import { useStore } from "@/src/store/store";
 import { displayNetwork } from "@/src/data/unlisted";
 import { cn } from "@/lib/utils";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
-import { VitalsCluster } from "@/components/topbar/Vitals";
+import { VitalsStripRow } from "@/components/VitalsBand";
 import FilterPicker from "@/components/topbar/FilterPicker";
 import EcgMark from "@/components/topbar/EcgMark";
 import PresentationToggle from "@/components/topbar/PresentationToggle";
@@ -15,6 +15,7 @@ import ThemeToggle from "@/components/topbar/ThemeToggle";
 import NetworkSwitch, { NET_SWITCH_VIEW } from "@/components/topbar/NetworkSwitch";
 import NetLink from "@/components/NetLink";
 import { useBreakpoint } from "@/components/useBreakpoint";
+import { VIEW_POLICIES } from "@/src/engine/domain/viewPolicy";
 import type { Mode } from "@/src/store/store";
 
 const VIEWS = [
@@ -371,7 +372,10 @@ export default function TopBar() {
                 desktop cluster; the hairline is the phone vitals row's own border-t device. */}
             {bp === "phone" && (
               <div className="flex items-center justify-center gap-2 mx-2 px-2 pb-2 pt-1.5 border-t border-border/60">
-                <VitalsCluster align="center" />
+                {/* The band's own cards, horizontally scrollable (user pick, 2026-08-30 — one
+                    vitals design on every tier; the bare-number cluster is retired). Gated on
+                    the band's own policy flag so a flat view's row carries controls alone. */}
+                {VIEW_POLICIES[mode].vitalsLane && <VitalsStripRow />}
                 {/* The phone home of the network switch (its bar slot is desktop/tablet-only):
                     the strip row is the one place the bar grows, and it has the width the
                     right zone doesn't. */}

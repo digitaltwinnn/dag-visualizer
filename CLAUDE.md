@@ -906,8 +906,9 @@ rate is named by its own label.
 the one policy flag `VIEW_POLICIES[mode].vitalsLane` **AND three deliberate gates** — the scene pose
 (user, 2026-08-15: the raw layer pages history the lane wouldn't describe, and needs the space), the
 rails (user, 2026-08-30: presentation mode shows just the 3D, so rails-hidden hides the band too), and
-the phone (the dock + sheet own that edge; phone vitals stay in the filter strip's second row,
-`VitalsCluster`). Presence and reserved space can't drift. The token's static default in `globals.css`
+the phone (the dock + sheet own that edge; the filter strip's second row renders the SAME cards
+as a horizontal scroll instead — `VitalsStripRow`, one vitals design on every tier). Presence and
+reserved space can't drift. The token's static default in `globals.css`
 stays **`0px`**.
 
 ### Responsive shell

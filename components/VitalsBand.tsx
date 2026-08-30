@@ -3,8 +3,9 @@
 import { useStore } from "@/src/store/store";
 import { metagraphById, filterAccent, getAnchor } from "@/src/data/network";
 import { displayNetwork } from "@/src/data/unlisted";
-import { compositionCounts } from "@/components/topbar/Vitals";
 import { networkKind, rolesOf, IdentityDot, RoleChips } from "@/components/inspector/parts";
+import { compositionRows } from "@/src/data/composition";
+import type { NodeInfo } from "@/src/data/types";
 import { identityHudCss } from "@/src/palette/identity";
 import { METATYPE_ICONS, VIEW_ICONS } from "@/components/icons";
 import Sparkline from "@/components/Sparkline";
@@ -38,6 +39,31 @@ import type { CSSProperties } from "react";
 // and dim variants are the same token at low opacity, never a bespoke tone). Fixed order, fixed
 // step per label — a filter that empties a segment must not repaint the survivors.
 const DONUT_STEPS = [1, 0.66, 0.42, 0.24] as const;
+
+// The composition counting (moved home from the retired topbar/Vitals cluster, 2026-08-30 —
+// this module is its one consumer now that the phone strip renders the band's own cards).
+// Cluster entries are deduped to machines first (a hybrid appears once per cluster it runs),
+// then counted by their composition label; the keys are EVERY label the vocabulary can produce,
+// so they SUM to the selection.
+export function compositionCounts(
+  metaList: { id: string; nodes: NodeInfo[] }[],
+  filter: string,
+): Record<string, number> {
+  const cfg = metagraphById(filter);
+  const counts: Record<string, number> = { Hybrid: 0, Consensus: 0, Currency: 0, Data: 0 };
+  const isUnlisted = displayNetwork(filter)?.virtual === true;
+  const cores = cfg ? metaList.filter((m) => m.id === cfg.id) : isUnlisted ? [] : metaList;
+  for (const mg of cores) {
+    const machines = new Map<string, NodeInfo>();
+    for (const n of mg.nodes) {
+      const k = n.ip || JSON.stringify(n);
+      if (!machines.has(k)) machines.set(k, n);
+    }
+    for (const row of compositionRows([...machines.values()]))
+      if (row.label in counts) counts[row.label]! += row.count;
+  }
+  return counts;
+}
 
 function windowNote(a: Activity | null | undefined, unit: string): string | undefined {
   if (!a) return undefined;
@@ -421,5 +447,34 @@ export default function VitalsBand() {
           bare numbers, the band's own charts already wear the identity accent under a filter,
           so the scope is stated by the vitals themselves. */}
     </section>
+  );
+}
+
+/** The PHONE home of the vitals (user pick, 2026-08-30 — option 1): the SAME cards, riding the
+ *  filter strip's second row as a horizontal scroll instead of a fixed band — the strip is
+ *  already where phone vitals live and growing downward is its one mechanism, so no new surface
+ *  or vertical space is claimed. Cards go content-sized (`flex-none basis-auto` overrides the
+ *  band's even distribution at higher specificity) with a floor so the stretch sparklines have
+ *  real width to measure. TopBar gates the row on `vitalsLane`, the band's own policy flag. */
+export function VitalsStripRow() {
+  const mode = useStore((s) => s.mode);
+  const live = useStore((s) => s.live);
+  const filter = useStore((s) => s.filter);
+  const scopeHue = filter !== "all" ? filterAccent(filter) : null;
+  const accent = scopeHue ?? "var(--primary)";
+  return (
+    <div
+      className={cn(
+        "flex items-stretch gap-2 overflow-x-auto slim-scroll pb-1 min-w-0 flex-1",
+        "[&>*]:flex-none [&>*]:basis-auto [&>*]:min-w-[150px]",
+        !live && "saturate-[.45]",
+      )}
+      style={{ ["--vb-accent"]: accent } as CSSProperties}
+    >
+      {!live && <span className="self-center flex-none min-w-0!"><NoSignalDot /></span>}
+      {mode === "hyper" && <HyperCells accent={accent} />}
+      {mode === "geo" && <GeoCells accent={accent} />}
+      {mode === "ledger" && <LedgerCells accent={accent} filter={filter} />}
+    </div>
   );
 }

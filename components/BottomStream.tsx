@@ -23,8 +23,8 @@ import { VIEW_POLICIES } from "@/src/engine/domain/viewPolicy";
 //    arbitrarily deep, so a live instrument doesn't describe the surface it would float over —
 //    and the raw layer (the phone pane especially) needs the space back.
 //  - RAILS HIDDEN hides the band too (user, 2026-08-30): presentation mode shows just the 3D.
-//  - PHONE never mounts it (the dock + sheet own that edge; the vitals stay in the filter
-//    strip's second row, unchanged).
+//  - PHONE never mounts it (the dock + sheet own that edge; the filter strip's second row
+//    renders the same cards as a horizontal scroll instead — VitalsStripRow).
 const RESERVE = 92; // 10px gap above the footer + the band's ~66px height + 16px clearance above it
 
 export default function BottomStream() {
