@@ -350,7 +350,10 @@ every node from a different direction, so the population never resolves into one
 sphere reads as a flat disc. The fill is directional for the same reason — ambient lifts every face
 equally, which is the flatness the rig exists to undo. **Aimed from the CAMERA** (the studio
 convention: the rig follows the actor), so orbiting can never swing the lit side out of view;
-elevation is world-absolute. **A light is a TEMPERATURE, not a palette hue** — rows carry a −1…+1
+elevation follows the camera's PITCH as a delta from the view's resting pitch
+(`domain/cameraRig.restPitch`) — byte-identical at the resting poses the rows were tuned on, and a
+dive or vertical orbit carries the whole rig, the geo sun included (was world-absolute, which died
+at any pose off the resting pitch — user, 2026-08-30). **A light is a TEMPERATURE, not a palette hue** — rows carry a −1…+1
 axis resolved by `tempTint`, which is why lighting owns no colour literal and no allowlist entry.
 `RIG_PAPER` takes every channel down on the light ground (ambient hardest, key least): a ~0.8-L page
 is its own bounce card, so on paper the rig narrows to FORM and presence keeps riding the ink system.
@@ -2011,3 +2014,13 @@ KV/Postgres/Blob (no persistence), Edge Config / env vars (no secrets).
 - **Commit trailer**: end commit messages with `Co-Authored-By: Claude <noreply@anthropic.com>` — no
   model name, so the line can't go stale (PR bodies: `🤖 Generated with
   [Claude Code](https://claude.com/claude-code)`).
+
+<!-- BEGIN:nextjs-agent-rules -->
+
+# This is NOT the Next.js you know
+
+This version has breaking changes — APIs, conventions, and file structure may all differ from your training data. Read the relevant guide in `node_modules/next/dist/docs/` (resolved from this file's directory; in monorepos the `next` package may not be visible from the repo root) before writing any code. Heed deprecation notices.
+
+This block is written and re-added by `next dev` — verify at `node_modules/next/dist/server/lib/generate-agent-files.js`. Removing it from a diff only re-creates the uncommitted change; committing it with your work keeps the tree clean.
+
+<!-- END:nextjs-agent-rules -->

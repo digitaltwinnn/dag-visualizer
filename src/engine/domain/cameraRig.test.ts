@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import * as THREE from "three";
-import { FOCI, hubFraming, geoFraming, ledgerCommitTilt, LEDGER_TILT_YAW, LEDGER_TILT_PITCH, LEDGER_TILT_DOLLY, easeInOutQuad, CAM_ZOOM, dollyBack, RAILS_HIDDEN_DOLLY, railsLean, restOrbit, nodeFraming, cohortFraming, isSamePose, nudgeMix, NUDGE_AMP, NUDGE_DUR, NUDGE_SAME, closeness, CLOSE_FAR_ALT, CLOSE_NEAR_ALT, NODE_RAISE } from "./cameraRig";
+import { FOCI, hubFraming, geoFraming, ledgerCommitTilt, LEDGER_TILT_YAW, LEDGER_TILT_PITCH, LEDGER_TILT_DOLLY, easeInOutQuad, CAM_ZOOM, dollyBack, RAILS_HIDDEN_DOLLY, railsLean, restOrbit, restPitch, nodeFraming, cohortFraming, isSamePose, nudgeMix, NUDGE_AMP, NUDGE_DUR, NUDGE_SAME, closeness, CLOSE_FAR_ALT, CLOSE_NEAR_ALT, NODE_RAISE } from "./cameraRig";
 
 // NO Snapshots framing is pinned here, because the view HAS none: it owns one pose, `FOCI.ledger`,
 // with one state-keyed variation — `ledgerCommitTilt`, the commit ORBIT, pinned below. Five framings
@@ -193,6 +193,21 @@ describe("restOrbit (what the lean's ramp measures against)", () => {
       const f = FOCI[key];
       expect(restOrbit(view)).toBeCloseTo(f.pos.distanceTo(f.target), 9);
       expect(restOrbit(view)).toBeGreaterThan(0);
+    }
+  });
+});
+
+describe("restPitch (what the rig's pitch-follow measures against)", () => {
+  it("reads each 3D view's resting pitch out of FOCI — above the target, below the zenith", () => {
+    for (const [view, key] of [["hyper", "overview"], ["geo", "geo"], ["ledger", "ledger"]] as const) {
+      const f = FOCI[key];
+      const dy = f.pos.y - f.target.y;
+      const expected = Math.atan2(dy, Math.hypot(f.pos.x - f.target.x, f.pos.z - f.target.z));
+      expect(restPitch(view)).toBeCloseTo(expected, 9);
+      // every resting pose looks DOWN at its subject from above, and none from straight overhead —
+      // the delta-follow assumes a finite reference on both sides
+      expect(restPitch(view)).toBeGreaterThan(0);
+      expect(restPitch(view)).toBeLessThan(Math.PI / 2);
     }
   });
 });
