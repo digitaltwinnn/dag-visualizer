@@ -169,7 +169,6 @@ function HyperCells({ accent }: { accent: string }) {
     else if (kind === "data metagraph") types.data!++;
     else types.unknown!++; // bare "metagraph": zero locatable nodes, roles unknowable
   }
-  const typeTotal = metas.length;
 
   // The layers' populations: one count per PROCESS layer across the selection's machines —
   // rolesOf is the one fallback home (a role list, else the single primary layer).
@@ -208,20 +207,20 @@ function HyperCells({ accent }: { accent: string }) {
           <span className="font-mono text-caption text-foreground whitespace-nowrap">{singleWord}</span>
         </BandCard>
       ) : (
-      <BandCard label="Metagraphs" className="flex-[1.3]">
-        <span className="font-mono font-bold text-foreground tabular-nums"><Odometer int value={typeTotal || null} /></span>
-        <div className="grid grid-cols-2 gap-x-3 gap-y-1 min-w-0 flex-1 self-center">
-          {/* the pair's legend word is the user's own "both" — the full "data + currency" kept
-              overflowing the cell; the filtered face still states it in full. */}
-          {TYPE_ORDER.map((t) =>
-            types[t]! > 0 ? (
-              <span key={t} className="flex items-center gap-1.5 whitespace-nowrap">
-                <TypeGlyph t={t} className="size-3" color={accent} />
-                <span className="text-micro uppercase text-muted-foreground">{t === "data + currency" ? "both" : t}</span>
-                <span className="font-mono text-micro tabular-nums text-foreground">{types[t]}</span>
-              </span>
-            ) : null,
-          )}
+      <BandCard label="Metagraphs" className="flex-[1.4]">
+        {/* THE COMPOSITION CARD'S OWN SHAPE (user, 2026-08-30: "the same design (1 total value +
+            4 subsets) — the one used for node composition looks best"): the two cards are sibling
+            share-of-whole readings, so they wear one donut + dot-legend design. The type GLYPHS
+            keep their home on the filtered face, where the card states a single characteristic. */}
+        <Donut counts={types} accent={accent} />
+        <div className="grid grid-cols-2 gap-x-4 gap-y-0.5">
+          {TYPE_ORDER.map((t, i) => (
+            <span key={t} className="flex items-center gap-1.5 whitespace-nowrap">
+              <span aria-hidden className="size-1.5 rounded-full flex-none" style={{ background: accent, opacity: DONUT_STEPS[i] ?? 0.2 }} />
+              <span className="text-micro tracking-[0.08em] uppercase text-muted-foreground">{t === "data + currency" ? "both" : t}</span>
+              <span className="font-mono font-bold text-caption tabular-nums text-foreground"><Odometer int value={types[t]!} /></span>
+            </span>
+          ))}
         </div>
       </BandCard>
       )}
@@ -284,7 +283,9 @@ function GeoCells({ accent }: { accent: string }) {
       )}
       {topIsps.length > 0 && (
         <BandCard label="Top providers" className="flex-[1.6]">
-          <MicroBars accent={accent} labelW={92} rows={topIsps.map(([isp, n]) => ({ key: isp, label: isp, count: n }))} />
+          {/* labelW 92 → 150 (user, 2026-08-30): the card had spare width while "Hetzner
+              Online GmbH" truncated — the name is the row's identity, so it gets the room. */}
+          <MicroBars accent={accent} labelW={150} rows={topIsps.map(([isp, n]) => ({ key: isp, label: isp, count: n }))} />
         </BandCard>
       )}
     </>
