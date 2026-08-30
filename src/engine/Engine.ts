@@ -4,6 +4,7 @@ import { useStore, type Mode } from "@/src/store/store";
 import { applyClickActions } from "@/src/store/applyClickActions";
 import { metagraphById, initNetwork, getNetwork, getAnchor, DEFAULT_META_COLOR, resolveSignerIps } from "@/src/data/network";
 import { ledgerLens, tickInStory } from "@/src/data/ledgerStory";
+import { reportPoll } from "@/src/data/api";
 import { LISTED_IDS, UNLISTED_ID, UNLISTED_SCENE_HEX_BY_THEME } from "@/src/data/unlisted";
 import { hoverKeyOf, tooltipSubject } from "@/src/data/hoverSubject";
 import { identityMap, identitySceneHex } from "@/src/palette/identity";
@@ -778,6 +779,7 @@ export class Engine {
   private async refreshMeta(initial: boolean) {
     try {
       const r = await fetch(netUrl("/api/metagraphs"));
+      reportPoll("api-metagraphs", "Metagraph directory", "app API", 5 * 60_000, r.ok);
       if (!r.ok) return;
       const { metagraphs, geo } = await r.json();
       if (geo) this.geoMap = { ...this.geoMap, ...geo };
@@ -804,6 +806,7 @@ export class Engine {
         this._publishLeaderboard();
       }
     } catch {
+      reportPoll("api-metagraphs", "Metagraph directory", "app API", 5 * 60_000, false);
       /* keep showing the last good data */
     }
   }

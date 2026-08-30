@@ -9,6 +9,7 @@ import { cn } from "@/lib/utils";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { VitalsStripRow } from "@/components/VitalsBand";
 import FilterPicker from "@/components/topbar/FilterPicker";
+import PulseStrip from "@/components/topbar/PulseStrip";
 import EcgMark from "@/components/topbar/EcgMark";
 import PresentationToggle from "@/components/topbar/PresentationToggle";
 import ThemeToggle from "@/components/topbar/ThemeToggle";
@@ -43,16 +44,17 @@ export default function TopBar() {
   const mode = useStore((s) => s.mode);
   const setMode = useStore((s) => s.setMode);
 
-  // The filter strip's open state — COLLAPSED BY DEFAULT (user): it's a persistent part of the
-  // bar, not a popup, but starts closed on every load/view. The FILTER button toggles it, Escape
-  // closes it, and picking a chip closes it too (user, 2026-08-02 — see the strip note below).
-  // The phone effect below still force-closes it if the viewport becomes phone-width after a
-  // manual open.
-  const [open, setOpen] = useState(false);
+  // The bar's ONE grow-downward slot, two tenants (2026-08-30 — the PULSE strip joined the
+  // filter strip): `strip` names which row is open, null = closed. One slot makes them mutually
+  // exclusive by construction — the ECG toggles "pulse", the FILTER button "filter", Escape and
+  // a picked chip close whichever is open. The phone effect below still force-closes on a
+  // viewport change to phone-width.
+  const [strip, setStrip] = useState<null | "filter" | "pulse">(null);
+  const open = strip != null;
 
   const bp = useBreakpoint();
   useEffect(() => {
-    if (bp === "phone") setOpen(false);
+    if (bp === "phone") setStrip(null);
   }, [bp]);
 
   // Consume the NetworkSwitch's one-shot view handoff (see its header): a network switch is a
@@ -164,14 +166,30 @@ export default function TopBar() {
         {/* LEFT zone: brand + filter. A real flex container at every width now that the grid
             is the base layout — the in-zone gaps mirror the row's own gap steps. */}
         <div className="flex items-center gap-3 max-[1260px]:gap-2.5 max-[940px]:gap-2 max-[700px]:gap-1 min-w-0">
-        {/* Brand — AND the one route to /about (user, 2026-08-09, replacing the always-on
-            experimental banner). The identity mark is the honest affordance for "what is this
-            thing?": clicking the app's own name to read what it is, who made it and that it's
-            unofficial needs no new chrome in a bar that has none to spare, and it works at every
-            breakpoint because the ECG mark survives when the wordmark hides. A plain <a>, not a
-            Link: /about is a separate document with its own scroll, and the app is a long-lived
-            WebGL tab — a client-side route change would tear the engine down and rebuild it on
-            return, so the full navigation is the cheaper one. */}
+        {/* The HEARTBEAT — the PULSE STRIP's toggle (user, 2026-08-30: "when I click the top
+            bar heartbeat it should show a bottom section with relevant information about the
+            liveliness of the app", superseding the 2026-08-09 /about route — the mark IS the
+            liveliness cue, so it opens the liveliness instrument; /about moves to the wordmark
+            and rides the pulse strip's own trailing link, which is what keeps the route at
+            every width including phone). */}
+        <button
+          type="button"
+          aria-expanded={strip === "pulse"}
+          aria-controls="filter-strip"
+          title="App liveliness — the polls behind the numbers"
+          onClick={() => setStrip((cur) => (cur === "pulse" ? null : "pulse"))}
+          onKeyDown={(e) => { if (e.key === "Escape") setStrip(null); }}
+          className={cn(
+            "flex items-center rounded-btn -mx-1 px-1 py-0.5 bg-transparent border-0 cursor-pointer",
+            "hover:bg-wash-soft transition-colors duration-150 motion-reduce:transition-none",
+            strip === "pulse" && "bg-wash-soft",
+            "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--primary)]",
+          )}
+        >
+          <EcgMark />
+        </button>
+        {/* The wordmark keeps the /about route (a plain <a>, not a Link: the app is a
+            long-lived WebGL tab — a client-side route change would tear the engine down). */}
         <NetLink
           href="/about"
           title="About DAG Visualizer, an unofficial community project"
@@ -181,7 +199,6 @@ export default function TopBar() {
             "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--primary)]",
           )}
         >
-          <EcgMark />
           {/* Wordmark hides below 1439. The thresholds in this bar are MEASURED, not guessed —
               the bar is `overflow-hidden`, so anything that doesn't fit is silently clipped off
               the right edge, and the first thing to go is the presentation toggle (user bug,
@@ -203,14 +220,14 @@ export default function TopBar() {
             the bar's own surface so the scene reacts in the open while you hover networks). */}
         <button
           type="button"
-          aria-expanded={open}
+          aria-expanded={strip === "filter"}
           aria-controls="filter-strip"
-          onClick={() => setOpen((o) => !o)}
-          onKeyDown={(e) => { if (e.key === "Escape") setOpen(false); }}
+          onClick={() => setStrip((cur) => (cur === "filter" ? null : "filter"))}
+          onKeyDown={(e) => { if (e.key === "Escape") setStrip(null); }}
           className={cn(
             "flex items-center gap-[7px] bg-transparent border-0 cursor-pointer py-1.5 px-2 rounded-btn",
             "hover:bg-wash-soft",
-            open && "bg-wash-soft",
+            strip === "filter" && "bg-wash-soft",
             // The 44px tap minimum keys on the POINTER, not the width (user, 2026-08-14 —
       // resizing a desktop window smaller made the bar GROW): a coarse pointer is a
       // touch device wherever the window edge sits; a fine pointer never needs it.
@@ -232,7 +249,7 @@ export default function TopBar() {
             className={cn(
               "text-micro tracking-caps uppercase max-[940px]:hidden",
               "transition-colors duration-150 motion-reduce:transition-none",
-              open ? "text-primary" : "text-muted-foreground",
+              strip === "filter" ? "text-primary" : "text-muted-foreground",
             )}
           >
             Filter
@@ -252,7 +269,7 @@ export default function TopBar() {
             className={cn(
               "size-3.5 flex-none text-muted-foreground transition-transform motion-reduce:transition-none",
               "max-[700px]:hidden",
-              open && "rotate-180",
+              strip === "filter" && "rotate-180",
             )}
           />
         </button>
@@ -361,11 +378,11 @@ export default function TopBar() {
           open ? "grid-rows-[1fr]" : "grid-rows-[0fr]",
         )}
         aria-hidden={!open}
-        onKeyDown={(e) => { if (e.key === "Escape") setOpen(false); }}
+        onKeyDown={(e) => { if (e.key === "Escape") setStrip(null); }}
       >
         <div className={cn("overflow-hidden min-h-0", !open && "invisible")}>
           <div ref={stripInner}>
-            <FilterPicker onPicked={() => setOpen(false)} />
+            {strip === "pulse" ? <PulseStrip /> : <FilterPicker onPicked={() => setStrip(null)} />}
             {/* PHONE: the vitals ride the SAME strip as a second row (user, 2026-08-15) — one
                 dropdown control on the filter face instead of a separate 44px toggle starving
                 the bar row. Inside `stripInner`, so the published `--topbar-extra` height and

@@ -2,6 +2,7 @@
 // resolves any validators not in the cache at runtime. Results are remembered
 // in localStorage so the globe fills in over time.
 
+import { reportPoll } from "./api";
 import { netUrl } from "@/src/net/current";
 import type { GeoMap } from "@/src/data/types";
 
@@ -12,8 +13,12 @@ export async function loadGeoCache(): Promise<GeoMap> {
   // baked validator geo seed, served on-disk by the Next /api/geo route
   try {
     const res = await fetch(netUrl("/api/geo"));
+    reportPoll("api-geo", "Validator geo map", "app API", null, res.ok);
     if (res.ok) Object.assign(map, await res.json());
-  } catch (e) { /* ignore */ }
+  } catch (e) {
+    reportPoll("api-geo", "Validator geo map", "app API", null, false);
+    /* ignore */
+  }
   // anything resolved on previous visits
   try {
     const saved = JSON.parse(localStorage.getItem(LS_KEY) || "{}");
