@@ -644,7 +644,7 @@
      spacing scale, one "selected" treatment; component utilities reference these. */
   --panel-pad-x: 16px;     /* horizontal padding inside a panel header/section */
   --panel-pad-y: 12px;     /* vertical   padding inside a panel header/section */
-  --rail-gap: 12px;        /* gap between stacked panels in a column */
+  --rail-gap: 16px;        /* gap between stacked panels in a column — 12 → 16 (user, 2026-08-30: the explore rail's cards sat too close, felt on paper where both are bright glass) */
   --topbar-extra: 0px;     /* how far the command bar has GROWN downward (the attached filter
                               strip, 2026-07-12) — published live by TopBar via ResizeObserver;
                               the rails add it to their top so the strip PUSHES the layout
