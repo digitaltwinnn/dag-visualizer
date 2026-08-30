@@ -371,13 +371,15 @@ function LedgerCells({ accent, filter }: { accent: string; filter: string }) {
       {note && <span className="sr-only">{note}</span>}
     </BandCard>
   );
+  // WHO anchors, HOW MUCH, HOW OFTEN, then the per-tick picture (user ordering, 2026-08-30):
+  // the roster leads, the anchor rate beside it, the cadence, and the chart closes the row.
   return (
     <>
-      {rate("Snaps/hour", activity?.snapsPerHour, activity?.cadenceSeries, basis)}
+      <AnchoringNetworks />
       {scoped
         ? rate("DAG fees/hour", activity?.feesPerHour, activity?.feesSeries, basis && `$DAG this network pays to anchor. ${basis}`)
         : rate("Anchors/hour", activity?.anchorsPerHour, activity?.anchoredSeries, basis && `Metagraph snapshots anchored into the global chain. ${basis}`)}
-      <AnchoringNetworks />
+      {rate("Snaps/hour", activity?.snapsPerHour, activity?.cadenceSeries, basis)}
       <BandCard label="Anchors per global snapshot" className="flex-[2] min-w-[220px]">
         <TickBars accent={accent} isMeta={isMeta} filter={filter} />
       </BandCard>
