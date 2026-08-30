@@ -78,7 +78,11 @@ export const GLASS_TUNE_DEFAULTS: Readonly<GlassTune> = Object.freeze({
   // steps down (sky 0.33 → 0.26, env 0.48 → 0.40 — the milky all-over gloss) and the CRISP terms
   // step up and tighten (spec 0.5 → 0.62, specPow 19 → 30, edge 0.16 → 0.22, rim 0.3 → 0.34) —
   // sheen concentrated into highlights instead of spread as film.
-  body: 0.185, sky: 0.26, rim: 0.34, spec: 0.62, specPow: 30, edge: 0.22, env: 0.4, trayBody: 0.42,
+  // Second pass same day ("more glass, less gloss"): the film comes down again (sky 0.26 → 0.17,
+  // env 0.40 → 0.28, rim 0.34 → 0.26) and GLASSNESS is bought with clarity instead — body tint
+  // thinner (0.185 → 0.155, you see more THROUGH the pane) and the polished edge up
+  // (0.22 → 0.28, the one term that says "cut glass" without filming the face).
+  body: 0.155, sky: 0.17, rim: 0.26, spec: 0.62, specPow: 30, edge: 0.28, env: 0.28, trayBody: 0.42,
   laneBody: 1.75, laneTint: 0.8,
 });
 /** The live struct the `?tune` panel binds; DEFAULTS above is the shipped look and what tests pin. */
