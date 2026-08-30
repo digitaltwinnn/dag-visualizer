@@ -66,14 +66,16 @@ export const SCENE_RIG: Record<View3D, RigRow> = {
     ambInt: 0.3, ambTemp: -1,
   },
   // geo — the chips on the globe. Its key is ALSO THE SUN (see Globe's terminator): the one lit
-  // direction shades the sphere and the chips standing on it, which is why this row's key is the
-  // warmest of the three and its fill the coolest — daylight warm, sky-shadow cool, the oldest
-  // trick there is for making a sphere read as a sphere.
+  // direction shades the sphere and the chips standing on it. The DAYLIGHT statement is retired
+  // (user, 2026-08-30 — "I don't think the extra 'sun' adds any value"; it also read as
+  // too-bright chips on dark): key pulled 2.0 → 1.5 and its warmth 0.16 → −0.15, rim eased,
+  // ambient up a step so chips keep form without the hot side. The sun VECTOR stays — one
+  // direction still shades sphere and chips together — it just stopped being a warm noon.
   geo: {
-    keyAz: 0.62, keyEl: 0.4, keyInt: 2.0, keyTemp: 0.16,
+    keyAz: 0.62, keyEl: 0.4, keyInt: 1.5, keyTemp: -0.15,
     fillAz: 0.2, fillEl: 0.12, fillInt: 0.55, fillTemp: -1,
-    rimAz: 2.95, rimEl: 0.3, rimInt: 1.15, rimTemp: -0.9,
-    ambInt: 0.32, ambTemp: -1,
+    rimAz: 2.95, rimEl: 0.3, rimInt: 0.9, rimTemp: -0.9,
+    ambInt: 0.36, ambTemp: -1,
   },
   // ledger — the chamber is lit by its own glass and emissive snapshots, and its focus lamp is the
   // StageLight's own claim, so the rig here only has to keep the TRAY CHIPS from going flat. Softer
