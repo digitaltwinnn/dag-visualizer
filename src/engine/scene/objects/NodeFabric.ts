@@ -56,10 +56,20 @@ const DIM = new THREE.Color(DIM_DARK);
 export function setNodeDimTarget(colors: SceneColors): void {
   DIM.setHex(isLightGround(colors) ? colors.bg : DIM_DARK);
   _paper = isLightGround(colors);
+  U_PAPER.value = _paper ? 1 : 0;
 }
 // The ground flag for the per-frame emissive mapping below — module-level for the same reason
 // as DIM (one shared value, per-frame readers hold no copy).
 let _paper = false;
+// The same flag as a GPU uniform, shared by reference across every fabric material (onBeforeCompile
+// aliases it), so the theme flip above is one write and no material is ever missed. It drives the
+// edge-lit chip's CAP/FRESNEL redistribution: those coefficients are a dark-ground idiom (backlit
+// acrylic — light ADDED at the cap), and on paper the same numbers blow the stack tips toward
+// white, which the selective bloom then halos into fat glowing tips (user, 2026-08-30: "too bright
+// and a bit too large"). The ground question (glowBlend/inkMix's kin) answered at this emissive
+// site: on paper the redistribution flattens toward the body's own ink. Dark keeps 0.95/1.1
+// verbatim — the mix() returns them exactly at uPaper 0.
+const U_PAPER = { value: 0 };
 const _dummy = new THREE.Object3D(); // reused to compose per-instance matrices
 const _vec = new THREE.Vector3();
 const _geoVec = new THREE.Vector3(); // scratch for the morph-fly interpolation
@@ -155,20 +165,26 @@ export class NodeFabric {
       transparent: alpha < 1, opacity: alpha,
     });
     mat.onBeforeCompile = (shader) => {
+      shader.uniforms.uPaper = U_PAPER; // shared by reference — setNodeDimTarget's one write reaches every program
       shader.vertexShader = shader.vertexShader
         .replace("#include <common>", "#include <common>\nattribute vec3 aBase;\nattribute float aEmissive;\nvarying vec3 vBase;\nvarying float vEmi;\nvarying float vCap;")
         .replace("#include <begin_vertex>", "#include <begin_vertex>\nvBase = aBase;\nvEmi = aEmissive;\nvCap = max(0.0, objectNormal.y);");
       shader.fragmentShader = shader.fragmentShader
-        .replace("#include <common>", "#include <common>\nvarying vec3 vBase;\nvarying float vEmi;\nvarying float vCap;")
+        .replace("#include <common>", "#include <common>\nuniform float uPaper;\nvarying vec3 vBase;\nvarying float vEmi;\nvarying float vCap;")
         .replace("#include <color_fragment>", "#include <color_fragment>\ndiffuseColor.rgb *= vBase;")
         .replace(
           "#include <emissivemap_fragment>",
           flat
             ? // edge-lit chip: dim sides + bright cap + fresnel rim (`normal` is the flat-shaded
               // view-space normal here; vViewPosition normalized points fragment→camera).
+              // Cap/fresnel are paper-mixed toward flat (see U_PAPER above): on ink the
+              // redistribution stays; on paper it eases off so a stack's tip reads as the same
+              // ink as its body instead of a bloomed white cap. Dark is byte-identical (uPaper 0).
               "#include <emissivemap_fragment>\n" +
               "float fres = pow(1.0 - clamp(dot(normalize(vViewPosition), normal), 0.0, 1.0), 3.0);\n" +
-              "totalEmissiveRadiance = vBase * vEmi * (0.5 + 0.95 * vCap + 1.1 * fres);"
+              "float capK = mix(0.95, 0.30, uPaper);\n" +
+              "float fresK = mix(1.1, 0.45, uPaper);\n" +
+              "totalEmissiveRadiance = vBase * vEmi * (0.5 + capK * vCap + fresK * fres);"
             : // spheres (hyper nodes): a view-dependent FRESNEL rim so they read as glowing 3D orbs
               // instead of flat blobs (user). Coeffs keep the average near the old flat vEmi so the
               // dim/hover and bloom-threshold behaviour is unchanged. The rim is the shared
