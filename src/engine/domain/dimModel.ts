@@ -227,8 +227,8 @@ export const FOCUS_TUNE_DEFAULTS: Readonly<Record<View3D, Readonly<FocusRow>>> =
   // smaller still — their chips sit in dense stacks/trays where a large swell collides
   // with neighbours.
   hyper: { dim: 0.32, hide: 0, elem: 0.38, back: 0.41, boost: 1.1, grow: 0.28 },
-  geo: { dim: 1.0, hide: 1, elem: 0, back: 0.65, boost: 0.7, grow: 0.16 },
-  ledger: { dim: 0.5, hide: 0, elem: 0, back: 0.55, boost: 0.7, grow: 0.16 },
+  geo: { dim: 1.0, hide: 1, elem: 0, back: 0.65, boost: 0.7, grow: 0.24 }, // 0.16 → 0.24 (user, 2026-08-30: "same as hyper" — the old value was below noticing in a stack); hyper stays loudest
+  ledger: { dim: 0.5, hide: 0, elem: 0, back: 0.55, boost: 0.7, grow: 0.24 },
 };
 
 export const FOCUS_SHARED_DEFAULTS: Readonly<FocusShared> = { groupShare: GROUP_FOCUS };
