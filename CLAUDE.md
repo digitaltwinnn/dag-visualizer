@@ -275,8 +275,13 @@ identical bodies, twin emissive resolvers differing by a sub-1% coefficient, and
 ≈ 0.33` glow). With the dim pre-applied as the resting look, the live dim *had* to be zeroed or it would
 apply twice; that zero is the whole origin of the split, never a design decision. `domain/dimModel.ts`
 now exposes ONE `dim` row field and one `nodeDim`/`nodeGlow`/`nodeEmissive` triple that both pools call.
-The one surviving asymmetry is deliberate: `hubMatchBoost` targets the metagraph **hub's** resting glow,
-which is view furniture — about what a node orbits, not what a node is. The core's own SPHERE follows
+That asymmetry's last survivor, `hubMatchBoost`, is RETIRED (user, 2026-08-30, structural): **a
+committed filter adds NO light to member nodes, in any view.** The commit is answered by each
+view's own channel — hyper by the HUB and the others' `elem`/`dim` drops, geo by the isolate
+(`hide`; no per-network furniture exists there), the ledger by the coloured dim — and light added
+to a node is reserved for the FOCUS vocabulary (the hovered/committed node, a group while it is
+the finest rung). Member nodes keep their at-rest colour under a filter everywhere; the rule's
+executable pin is in `dimModel.test.ts`. The core's own SPHERE follows
 the same rule and is now the shared `HUB_ORB` geometry at hub size (was r 1.5 vs the hubs' 0.9): *"its
 central position already tells it's a bit different from the others, not size"* (user, 2026-08-11).
 

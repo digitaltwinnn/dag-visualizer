@@ -1,6 +1,6 @@
 // Reference + regression spec for the per-frame node dim/emissive resolution — and the SINGLE
 // SOURCE for that math. The render path CALLS these functions directly: NodeFabric's two node
-// loops (scene/objects/NodeFabric.ts) call nodeDim + nodeEmissive + hideFrac + hubMatchBoost per
+// loops (scene/objects/NodeFabric.ts) call nodeDim + nodeEmissive + hideFrac per
 // record. There is no separate inline copy left to drift — the tests colocated with this file are
 // the executable spec, and changing a formula here changes the render immediately.
 //
@@ -280,8 +280,7 @@ const BASE_HYPER = 0.47;
 const BASE_GLOBE = 0.37;
 
 // A node's glow before the floor and the focus terms — the dim's own suppression of the base.
-// Exported because the render path needs it to measure hubMatchBoost's gap up to the hub level,
-// and re-deriving it at the call site would be exactly the inline mirror this file exists to stop.
+// Exported for its own spec (the resting base both pools share); nodeEmissive composes on it.
 export const nodeGlow = (c: DimContext, d: number): number =>
   lerp(BASE_HYPER, BASE_GLOBE, c.morph) * (1 - d * 0.92);
 
@@ -292,8 +291,7 @@ export const nodeGlow = (c: DimContext, d: number): number =>
 // dim-back branch may fire, and a pure function has no side channel to detect that, so the caller
 // must fold it in. It is named for the PRECONDITION rather than the effect because each call site
 // derives it from its own state (a node id, a hovered/selected row, a hovered tile) and every bug
-// this parameter has had was a call site answering "is anything focused?" wrongly. `hubBoost`
-// is hubMatchBoost(...) below — added INSIDE the floor, exactly as the render path composes it.
+// this parameter has had was a call site answering "is anything focused?" wrongly.
 // STEADY: the old decorative twinkle shimmer was removed (user) — only data-driven pulses animate.
 export function nodeEmissive(
   c: DimContext,
@@ -301,10 +299,9 @@ export function nodeEmissive(
   flash: number,
   focus: number,
   anyFocus: boolean,
-  hubBoost = 0,
 ): number {
   const fl = flash * c.morph; // arcs are a geo-only visual — their flash must not bleed into hyper
-  let v = Math.max(0.02, nodeGlow(c, d) + fl + hubBoost);
+  let v = Math.max(0.02, nodeGlow(c, d) + fl);
   // Hover/selection pairing: the focused machine's every layer-shell glows together,
   // and the rest dim back so it stands out (only when not already isolating a metagraph).
   if (focus > 0) v += focusBoost(c) * focus;
@@ -358,29 +355,16 @@ export function snapBright(
   return v;
 }
 
-// The COMMITTED metagraph's hub-match boost: in the Hypergraph, the picked network's nodes rise
-// to the hub's resting glow level (0.72) instead of sitting at the dimmer node base, so they
-// bloom like their hub (user). Derived from the node's own pre-floor `glow` (the boost is the
-// GAP up to 0.72, never negative) and fading out with the hubs by morph 0.3 — there's no hub on
-// the globe. `committed` = this node's metagraph IS the committed filter.
-//
-// ONE NODE MODEL: the DAG core takes it too (user, 2026-08-18 — "the DAG focus/dim effect on the
-// node subjects is not clear enough, should be the same as for metagraphs"). It had been exempt on
-// the reasoning that the core has no orbiting hub to match, but since 2026-08-11 the core IS a hub:
-// the same HUB_ORB geometry at hub size, sitting at the origin. Committing the DAG therefore left
-// its validators at their bare base 0.47 against the others' dimmed 0.33 — a 1.4x separation, where
-// a committed metagraph's own nodes lift to 0.72 against that same 0.33 and read at a glance.
-export function hubMatchBoost(c: DimContext, glow: number, committed: boolean): number {
-  if (!committed) return 0;
-  // NOT in the chamber (user bug, 2026-08-16 — "all nodes get a highlight except the selected"):
-  // the ledger FREEZES morph at the source view's value, so arriving from hyper (morph 0) left
-  // this hub-furniture boost fully on in the trays — the committed network's whole fleet glowed
-  // at hub level, drowning the selected machine's own focus emphasis. There is no hub to match
-  // in the chamber; its emphasis is snapBright's own tiers.
-  if (c.ledger) return 0;
-  const hubFade = Math.min(1, Math.max(0, 1 - c.morph / 0.3));
-  return Math.max(0, 0.72 - glow) * hubFade;
-}
+// A COMMITTED FILTER ADDS NO LIGHT TO MEMBER NODES (user, 2026-08-30 — structural, all views).
+// `hubMatchBoost` lived here until then: in hyper it lifted the committed network's nodes to the
+// hub's resting glow (0.72), which made "select a metagraph" read as "highlight all its nodes".
+// The user's structural correction: the commit is answered by each view's OWN channel — hyper by
+// the hub (furniture: the flight, the paused orbit, every other network's `elem` drop and `dim`),
+// geo by the isolate (`hide` — there is no per-network furniture to answer with), the ledger by
+// the coloured dim. Member nodes keep their at-rest colour everywhere; light added to a node is
+// reserved for the FOCUS vocabulary (a hovered/committed node, a group while it is the finest
+// rung). The DAG had been pulled INTO the lift on one-node-model grounds (2026-08-18); the model
+// survives the retirement the other way round — no pool takes it.
 
 // EMPHASIS EASES, IT DOES NOT SNAP (user, 2026-08-11: "a subtle transition ... to make it less
 // jumpy ... as default as possible in every view, so not a spot solution"). A hover is a PREVIEW,

@@ -16,7 +16,7 @@ import * as THREE from "three";
 import { LEDGER } from "../../domain/ledgerLayout";
 import { HEX_H } from "../../domain/geoLayout";
 import { discFall, lerp, smooth } from "../../domain/nodeLayout";
-import { nodeDim, nodeEmissive, nodeGlow, hubMatchBoost, focusWeightOf, focusGrow, hideFrac, gatherRaw, emphasisK } from "../../domain/dimModel";
+import { nodeDim, nodeEmissive, focusWeightOf, focusGrow, hideFrac, gatherRaw, emphasisK } from "../../domain/dimModel";
 import type { DimContext } from "../../domain/dimModel";
 import type { MetaNodeRecord, ValidatorRecord } from "../../domain/records";
 import type { ViewTransition } from "../../domain/viewTransition";
@@ -553,11 +553,10 @@ export class NodeFabric {
       // hyper→globe endpoints live in the domain, so the two call sites cannot pass different
       // ones. Steady; the old twinkle shimmer was removed. Also composes the hover/selection
       // focus boost/dim-back inside.
-      // dimModel.hubMatchBoost, same call as the metagraph loop (user, 2026-08-18): the core IS a
-      // hub under ONE NODE MODEL, so committing the DAG lifts its validators to hub level exactly
-      // as committing a metagraph lifts that network's nodes. Same replace-not-stack rule — a
-      // FOCUSED node takes its own boost instead, never both.
-      const hubBoost = hubMatchBoost(c, nodeGlow(c, d), c.filter === "dag");
+      // NO FILTER LIFT (hubMatchBoost retired 2026-08-30 — see dimModel's note): a committed
+      // network's nodes keep their at-rest glow; the commit is answered by the view's own
+      // channel (hyper's hub + elem/dim, geo's hide, the ledger's coloured dim), never by
+      // adding light to the members.
       const flRaw = u._flash || 0; // brief flash when an arc pulse reaches this node
       // The buffer IS the easing state — emiArr persists across frames and a node keeps its slot,
       // so approaching the target in place costs one array read and allocates nothing.
@@ -569,8 +568,8 @@ export class NodeFabric {
       // hover/selection read as nothing in the DAG's crowded shells (user: "shows all nodes in
       // that cohort, not just that node"). With the ratio branch engaged, `back` and `boost`
       // separate on paper exactly as they do on dark. Dark is untouched (inkPresence returns s).
-      const restRef = nodeEmissive(c, d, flRaw, 0, false, hubBoost);
-      const emiT = inkPresence(nodeEmissive(c, d, flRaw, fw, !!focusId, fw > 0 ? 0 : hubBoost), _paper, restRef)
+      const restRef = nodeEmissive(c, d, flRaw, 0, false);
+      const emiT = inkPresence(nodeEmissive(c, d, flRaw, fw, !!focusId), _paper, restRef)
         * chipPaperCalm(wChip, u.fw); // rest-only tip calm, chip share only (hyper spheres exempt)
       emi[u.index] += (emiT - emi[u.index]) * ek;
       if (flRaw) u._flash = flRaw * flashDecay;
@@ -624,13 +623,7 @@ export class NodeFabric {
       // 0 in hyper, where a turned-up dim mutes in place at full size. It reads the RAW ramp, not
       // dEff, so `dim` and `hide` move one effect each.
       const vis = 1 - hideFrac(c, rawEff);
-      // dimModel.hubMatchBoost: the COMMITTED metagraph's own nodes glow at the hub's resting
-      // level (HyperView hub base 0.72) in the Hypergraph, so the picked network's nodes bloom
-      // like its hub instead of sitting at the dimmer node base (user). Fades out with the hubs
-      // by morph 0.3 — there's no hub on the globe. It measures the GAP up from this node's own
-      // pre-floor glow, which is why the domain exports nodeGlow rather than leaving the call
-      // site to re-derive it.
-      const hubBoost = hubMatchBoost(c, nodeGlow(c, dEff), c.filter === r.metaId);
+      // NO FILTER LIFT (hubMatchBoost retired 2026-08-30 — see the validator loop and dimModel).
       // Tiered focus, same ranking as the validator loop (dimModel.focusWeightOf).
       const fw = focusWeightOf(
         r.nodeId === c.hoverNodeId || r.nodeId === c.selectedNodeId,
@@ -638,16 +631,12 @@ export class NodeFabric {
       );
       r.fw += (fw - r.fw) * ek; // the size channel's eased state — see the validator loop
       const flRaw = r._flash || 0; // brief flash when an arc pulse reaches this node
-      // dimModel.nodeEmissive: composes glow + arc flash + hubBoost inside its floor, then the
-      // hover/selection focus boost/dim-back — one function, both loops. The write EASES toward it
+      // dimModel.nodeEmissive: composes glow + arc flash, then the hover/selection focus
+      // boost/dim-back — one function, both loops. The write EASES toward it
       // (dimModel.emphasisK), with metaEmi itself as the state — same as the validator loop.
-      // ⚠️ A FOCUSED node takes its boost INSTEAD of the hub-match, never stacked (user,
-      // 2026-08-16): the sum left the palette's hue-keeping range and the subject blew out to a
-      // pale point — the "inverse" read. One emphasis at a time: the hub-match is the committed
-      // network's RESTING lift; the subject has its own.
       // REF engages the ratio branch for the focus vocabulary on paper — see the validator loop.
-      const restRefM = nodeEmissive(c, dEff, flRaw, 0, false, hubBoost);
-      const emiT = inkPresence(nodeEmissive(c, dEff, flRaw, fw, !!focusId, fw > 0 ? 0 : hubBoost), _paper, restRefM)
+      const restRefM = nodeEmissive(c, dEff, flRaw, 0, false);
+      const emiT = inkPresence(nodeEmissive(c, dEff, flRaw, fw, !!focusId), _paper, restRefM)
         * chipPaperCalm(c.ledger ? 1 : wEff, r.fw); // rest-only tip calm — see the validator loop
       emi[r.index] += (emiT - emi[r.index]) * ek;
       if (flRaw) r._flash = flRaw * flashDecay;

@@ -18,7 +18,6 @@ import {
   FOCUS_SHARED,
   FOCUS_SHARED_DEFAULTS,
   FOCUS_SHARED_SCHEMA,
-  hubMatchBoost,
   dimTargetsFor,
   nodeDim,
   nodeGlow,
@@ -467,40 +466,15 @@ describe("nodeDim", () => {
   });
 });
 
-describe("hubMatchBoost (the committed metagraph's hub-level bloom)", () => {
-  it("lifts the committed network's node up to the hub level 0.72 in hyper", () => {
-    expect(hubMatchBoost(ctx({ morph: 0 }), 0.33, true)).toBeCloseTo(0.72 - 0.33, 10);
-  });
-
-  it("is never negative (a node already above 0.72 keeps its own glow)", () => {
-    expect(hubMatchBoost(ctx({ morph: 0 }), 0.9, true)).toBe(0);
-  });
-
-  it("is zero for non-committed networks", () => {
-    expect(hubMatchBoost(ctx({ morph: 0 }), 0.33, false)).toBe(0);
-  });
-
-  it("is zero in the chamber, whose frozen morph would otherwise leave it on (2026-08-16)", () => {
-    // The ledger freezes morph at the source view's value — entering from hyper (morph 0) left
-    // this hub-furniture boost fully on in the trays, and the committed network's whole fleet
-    // glowed at hub level, drowning the selected machine's own focus emphasis (user: "all nodes
-    // get a highlight except the selected node"). There is no hub to match in the chamber.
-    expect(hubMatchBoost(ctx({ morph: 0, ledger: true }), 0.33, true)).toBe(0);
-  });
-
-  it("fades out with the hubs by morph 0.3 — there's no hub on the globe", () => {
-    expect(hubMatchBoost(ctx({ morph: 0.15 }), 0.33, true)).toBeCloseTo((0.72 - 0.33) * 0.5, 10);
-    expect(hubMatchBoost(ctx({ morph: 0.3 }), 0.33, true)).toBe(0);
-    expect(hubMatchBoost(ctx({ morph: 1 }), 0.33, true)).toBe(0);
-  });
-
-  it("composes INSIDE nodeEmissive's floor, exactly as the render path does", () => {
-    // The boost is measured from the node's OWN resting glow, which is why nodeGlow is exported:
-    // the render path must not mirror the base formula inline to compute the gap.
-    const c = ctx({ morph: 0 });
-    const boost = hubMatchBoost(c, nodeGlow(c, 0), true);
-    expect(nodeEmissive(c, 0, 0, 0, false, boost)).toBeCloseTo(0.72, 10);
-  });
+// A COMMITTED FILTER ADDS NO LIGHT TO MEMBER NODES (user, 2026-08-30 — structural, every view):
+// hubMatchBoost, which lifted the committed network's nodes to hub level 0.72 in hyper, is
+// retired. The commit is answered by each view's own channel — hyper's hub + elem/dim, geo's
+// hide, the ledger's coloured dim — and light added to a node is reserved for the FOCUS
+// vocabulary. The rule's full statement lives beside nodeEmissive in dimModel.ts.
+it("a committed filter adds no light to member nodes — nodeEmissive has no filter term", () => {
+  // Same context, same dim, no focus: the emissive is the resting glow whatever the filter says.
+  const c = ctx({ morph: 0 });
+  expect(nodeEmissive(c, 0, 0, 0, false)).toBeCloseTo(Math.max(0.02, nodeGlow(c, 0)), 10);
 });
 
 describe("nodeGlow (the resting base both pools share)", () => {
@@ -557,12 +531,6 @@ describe("nodeEmissive", () => {
 
   it("does nothing extra when there's no focus target at all (isFocus and anyFocus both false)", () => {
     expect(nodeEmissive(ctx({ morph: 0 }), 0, 0, 0, false)).toBeCloseTo(0.47, 10);
-  });
-
-  it("adds the hub boost inside the floor, defaulting to none", () => {
-    const c = ctx({ morph: 0 });
-    expect(nodeEmissive(c, 0, 0, 0, false, 0.1)).toBeCloseTo(0.57, 10);
-    expect(nodeEmissive(c, 0, 0, 0, false)).toBeCloseTo(nodeEmissive(c, 0, 0, 0, false, 0), 10);
   });
 });
 
