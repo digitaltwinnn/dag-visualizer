@@ -56,20 +56,22 @@ const DIM = new THREE.Color(DIM_DARK);
 export function setNodeDimTarget(colors: SceneColors): void {
   DIM.setHex(isLightGround(colors) ? colors.bg : DIM_DARK);
   _paper = isLightGround(colors);
-  U_PAPER.value = _paper ? 1 : 0;
 }
 // The ground flag for the per-frame emissive mapping below — module-level for the same reason
 // as DIM (one shared value, per-frame readers hold no copy).
 let _paper = false;
-// The same flag as a GPU uniform, shared by reference across every fabric material (onBeforeCompile
-// aliases it), so the theme flip above is one write and no material is ever missed. It drives the
-// edge-lit chip's CAP/FRESNEL redistribution: those coefficients are a dark-ground idiom (backlit
-// acrylic — light ADDED at the cap), and on paper the same numbers blow the stack tips toward
-// white, which the selective bloom then halos into fat glowing tips (user, 2026-08-30: "too bright
-// and a bit too large"). The ground question (glowBlend/inkMix's kin) answered at this emissive
-// site: on paper the redistribution flattens toward the body's own ink. Dark keeps 0.95/1.1
-// verbatim — the mix() returns them exactly at uPaper 0.
-const U_PAPER = { value: 0 };
+// THE TIP-CALM, second cut (2026-08-30). The chips' edge-lit cap redistribution is a dark-ground
+// idiom; on paper the same numbers blew RESTING stack tips toward white and the selective bloom
+// haloed them fat (user: "too bright and a bit too large"). The first cut reduced the shader's
+// cap/fresnel coefficients under a paper uniform — which scaled the FOCUSED chip and its halo
+// down too, and geo's hover/selection highlight vanished (user, same day). The calm is rest-only
+// now: applied to the emissive input on the CPU, where the focus weight is known — a resting chip
+// on paper drops to CHIP_PAPER_CALM of its emissive, a focused one keeps full ink and full halo.
+// Scoped to the CHIP presentation (the globe's wEff crossfade / the ledger's trays): hyper's
+// sphere day look was tuned separately and must not ride along. Dark never reads it (_paper).
+const CHIP_PAPER_CALM = 0.55;
+const chipPaperCalm = (chipShare: number, fw: number): number =>
+  _paper ? 1 - (1 - CHIP_PAPER_CALM) * chipShare * (1 - Math.min(1, fw * 2)) : 1;
 const _dummy = new THREE.Object3D(); // reused to compose per-instance matrices
 const _vec = new THREE.Vector3();
 const _geoVec = new THREE.Vector3(); // scratch for the morph-fly interpolation
@@ -165,26 +167,25 @@ export class NodeFabric {
       transparent: alpha < 1, opacity: alpha,
     });
     mat.onBeforeCompile = (shader) => {
-      shader.uniforms.uPaper = U_PAPER; // shared by reference — setNodeDimTarget's one write reaches every program
       shader.vertexShader = shader.vertexShader
         .replace("#include <common>", "#include <common>\nattribute vec3 aBase;\nattribute float aEmissive;\nvarying vec3 vBase;\nvarying float vEmi;\nvarying float vCap;")
         .replace("#include <begin_vertex>", "#include <begin_vertex>\nvBase = aBase;\nvEmi = aEmissive;\nvCap = max(0.0, objectNormal.y);");
       shader.fragmentShader = shader.fragmentShader
-        .replace("#include <common>", "#include <common>\nuniform float uPaper;\nvarying vec3 vBase;\nvarying float vEmi;\nvarying float vCap;")
+        .replace("#include <common>", "#include <common>\nvarying vec3 vBase;\nvarying float vEmi;\nvarying float vCap;")
         .replace("#include <color_fragment>", "#include <color_fragment>\ndiffuseColor.rgb *= vBase;")
         .replace(
           "#include <emissivemap_fragment>",
           flat
             ? // edge-lit chip: dim sides + bright cap + fresnel rim (`normal` is the flat-shaded
               // view-space normal here; vViewPosition normalized points fragment→camera).
-              // Cap/fresnel are paper-mixed toward flat (see U_PAPER above): on ink the
-              // redistribution stays; on paper it eases off so a stack's tip reads as the same
-              // ink as its body instead of a bloomed white cap. Dark is byte-identical (uPaper 0).
+              // ⚠️ The coefficients are CONSTANT again (2026-08-30, round 2): a paper-side
+              // uniform reduction here scaled the WHOLE emissive channel — the focused chip and
+              // its bloom halo dimmed with the resting tips, and geo's hover/selection highlight
+              // vanished on light (user). The tip-calming is rest-only now, on the CPU where fw
+              // is known (see CHIP_PAPER_CALM below).
               "#include <emissivemap_fragment>\n" +
               "float fres = pow(1.0 - clamp(dot(normalize(vViewPosition), normal), 0.0, 1.0), 3.0);\n" +
-              "float capK = mix(0.95, 0.30, uPaper);\n" +
-              "float fresK = mix(1.1, 0.45, uPaper);\n" +
-              "totalEmissiveRadiance = vBase * vEmi * (0.5 + capK * vCap + fresK * fres);"
+              "totalEmissiveRadiance = vBase * vEmi * (0.5 + 0.95 * vCap + 1.1 * fres);"
             : // spheres (hyper nodes): a view-dependent FRESNEL rim so they read as glowing 3D orbs
               // instead of flat blobs (user). Coeffs keep the average near the old flat vEmi so the
               // dim/hover and bloom-threshold behaviour is unchanged. The rim is the shared
@@ -470,7 +471,11 @@ export class NodeFabric {
       _dummy.quaternion.copy(_qRadial);
       // fall lifts with gw: a far-side chip must still fill its staging pixel mid-flight.
       const gV = u.noGeo ? 0 : wEff * (fall + (1 - fall) * gw) * show;
-      _dummy.scale.set(u.geoSize * gV, HEX_H * gV, u.geoSize * gV);
+      // dimModel.focusGrow reaches the CHIP too (user, 2026-08-30 — the 2026-08-28 "every view
+      // grows" was wired on the sphere matrices alone, so geo never actually swelled). DIAMETER
+      // only: a stacked chip that grew in height would push into the chip above it.
+      const gN = 1 + grow * u.fw;
+      _dummy.scale.set(u.geoSize * gV * gN, HEX_H * gV, u.geoSize * gV * gN);
       this._applyGather(ctx, u, gw, prim);
       _dummy.updateMatrix();
       this.instHex.setMatrixAt(u.index, _dummy.matrix);
@@ -512,6 +517,11 @@ export class NodeFabric {
     // snapshots did — nodes and snapshots are two subjects sharing one emphasis vocabulary, and
     // within each the dim-back must fire exactly when that subject's focus takes its boost.
     const focusId = c.hoverNodeId || c.selectedNodeId || c.hoverCohort;
+    // The CHIP presentation share for the rest-only tip calm below — the same sphere→chip
+    // crossfade window placeValidators uses (per-pass, not per-record: the calm may lag the
+    // per-record gather crossfade by the flight window, which the transition's full-brightness
+    // staging already owns). Ledger trays are chips outright.
+    const wChip = c.ledger ? 1 : smooth(THREE.MathUtils.clamp((c.morph - 0.82) / 0.16, 0, 1));
     for (const u of records) {
       const geoCc = geoCcOf(u.pick);
       // dimModel.gatherRaw: the same escape hatch placeValidators applies to the SIZE, read here so
@@ -554,7 +564,14 @@ export class NodeFabric {
       // On paper the emissive term multiplies INK, not glow — map it through the one
       // presence curve so resting nodes read as full ink (measured 2026-08-25: nodes sat at
       // ~0.78x of the hub's lit face before this asked the ground question).
-      const emiT = inkPresence(nodeEmissive(c, d, flRaw, fw, !!focusId, fw > 0 ? 0 : hubBoost), _paper);
+      // ⚠️ REF is the node's own RESTING emissive (2026-08-30): without it the curve's gamma
+      // (0.15) flattened the focus vocabulary — a back-stepped node kept ~87% of its ink and a
+      // hover/selection read as nothing in the DAG's crowded shells (user: "shows all nodes in
+      // that cohort, not just that node"). With the ratio branch engaged, `back` and `boost`
+      // separate on paper exactly as they do on dark. Dark is untouched (inkPresence returns s).
+      const restRef = nodeEmissive(c, d, flRaw, 0, false, hubBoost);
+      const emiT = inkPresence(nodeEmissive(c, d, flRaw, fw, !!focusId, fw > 0 ? 0 : hubBoost), _paper, restRef)
+        * chipPaperCalm(wChip, u.fw); // rest-only tip calm, chip share only (hyper spheres exempt)
       emi[u.index] += (emiT - emi[u.index]) * ek;
       if (flRaw) u._flash = flRaw * flashDecay;
 
@@ -628,7 +645,10 @@ export class NodeFabric {
       // 2026-08-16): the sum left the palette's hue-keeping range and the subject blew out to a
       // pale point — the "inverse" read. One emphasis at a time: the hub-match is the committed
       // network's RESTING lift; the subject has its own.
-      const emiT = inkPresence(nodeEmissive(c, dEff, flRaw, fw, !!focusId, fw > 0 ? 0 : hubBoost), _paper);
+      // REF engages the ratio branch for the focus vocabulary on paper — see the validator loop.
+      const restRefM = nodeEmissive(c, dEff, flRaw, 0, false, hubBoost);
+      const emiT = inkPresence(nodeEmissive(c, dEff, flRaw, fw, !!focusId, fw > 0 ? 0 : hubBoost), _paper, restRefM)
+        * chipPaperCalm(c.ledger ? 1 : wEff, r.fw); // rest-only tip calm — see the validator loop
       emi[r.index] += (emiT - emi[r.index]) * ek;
       if (flRaw) r._flash = flRaw * flashDecay;
 
@@ -691,7 +711,8 @@ export class NodeFabric {
       _qRadial.setFromUnitVectors(Y_AXIS, r.geoDir);
       _dummy.quaternion.copy(_qRadial);
       const gM = wEff * (fall + (1 - fall) * gw) * vis; // fall lifts with gw (see validators)
-      _dummy.scale.set(r.geoSize * gM, HEX_H * gM, r.geoSize * gM);
+      const gN2 = 1 + grow * r.fw; // the chip's grow — diameter only, see the validator loop
+      _dummy.scale.set(r.geoSize * gM * gN2, HEX_H * gM, r.geoSize * gM * gN2);
       this._applyGather(ctx, r, gw, prim);
       _dummy.updateMatrix();
       this.metaHex.setMatrixAt(r.index, _dummy.matrix);
