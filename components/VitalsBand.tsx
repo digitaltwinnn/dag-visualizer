@@ -379,7 +379,7 @@ function LedgerCells({ accent, filter }: { accent: string; filter: string }) {
       {scoped
         ? rate("DAG fees/hour", activity?.feesPerHour, activity?.feesSeries, basis && `$DAG this network pays to anchor. ${basis}`)
         : rate("Anchors/hour", activity?.anchorsPerHour, activity?.anchoredSeries, basis && `Metagraph snapshots anchored into the global chain. ${basis}`)}
-      {rate("Snaps/hour", activity?.snapsPerHour, activity?.cadenceSeries, basis)}
+      {rate("Snapshots/hour", activity?.snapsPerHour, activity?.cadenceSeries, basis)}
       <BandCard label="Anchors per global snapshot" className="flex-[2] min-w-[220px]">
         <TickBars accent={accent} isMeta={isMeta} filter={filter} />
       </BandCard>
