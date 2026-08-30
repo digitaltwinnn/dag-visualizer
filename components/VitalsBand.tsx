@@ -402,7 +402,10 @@ export default function VitalsBand() {
       aria-label="View vitals"
       className={cn(
         // pointer-events-none: the band is a read-only instrument — orbit drags pass through it.
-        "fixed z-10 left-4 right-4 bottom-[calc(var(--footer-h,0px)+10px)] pointer-events-none",
+        // 26px each side — the RAILS' own outer margin (#leftcol/#rightcol, globals.css), so the
+        // band's edges align with the rail cards and never cover the RailThread rulers that live
+        // in that margin (user, 2026-08-30: the band "sits on top of the rail of the side panels").
+        "fixed z-10 left-[26px] right-[26px] bottom-[calc(var(--footer-h,0px)+10px)] pointer-events-none",
         "flex items-stretch gap-2",
         "transition-opacity duration-[180ms] ease-out motion-reduce:transition-none",
         yielding && "opacity-40 duration-300",
