@@ -86,7 +86,13 @@ const rubber = (x: number, d: number) => Math.sign(x) * d * (1 - 1 / (Math.abs(x
 // The accordion slide's tempo — one spring for both cards (the shared gesture physics).
 // 380 → 560 (user, 2026-08-16: "a bit smoother, it feels too rushed") — the spring curve does
 // most of its travel early, so the longer clock reads as calm follow-through, not slowness.
-const SLIDE_MS = 560;
+// 560 → 680, and the COMMITTED slide trades the spring for a calm ease-out (user, 2026-08-30:
+// "the card swipe animates too quickly") — the spring curve covers ~77% of the travel in its
+// first quarter, so at 560ms the visible motion was a ~140ms snap with a long invisible settle.
+// The ease-out spreads the motion across the whole window with a soft landing and no overshoot;
+// the CANCEL snap-back keeps the spring — a rubber band springing home is exactly that gesture.
+const SLIDE_MS = 680;
+const SLIDE_EASE = "cubic-bezier(0.22, 0.8, 0.3, 1)";
 const FLICK_V = 0.35; // px/ms at release — a throw this fast commits regardless of travel. Measured
 // live rather than guessed: a deliberate slow pull the user means to cancel runs ~0.11 px/ms, and a
 // quick 30px throw ~0.42-0.6, so the gate sits between them (Hammer's own swipe default is 0.3).
@@ -217,9 +223,9 @@ export default function RailPager({ slot, children }: { slot: RailCardKind; chil
     el.style.transition = "none";
     el.style.transform = `translateX(${dir * w}px)`; // the new card waits just offstage
     void el.offsetWidth; // flush, so both start their slide together
-    el.style.transition = `transform ${SLIDE_MS}ms var(--ease-spring)`;
+    el.style.transition = `transform ${SLIDE_MS}ms ${SLIDE_EASE}`;
     el.style.transform = "";
-    clone.style.transition = `transform ${SLIDE_MS}ms var(--ease-spring), opacity ${SLIDE_MS}ms ease-out`;
+    clone.style.transition = `transform ${SLIDE_MS}ms ${SLIDE_EASE}, opacity ${SLIDE_MS}ms ease-out`;
     clone.style.transform = `translateX(${-dir * w}px)`;
     clone.style.opacity = "0.5"; // a light fade as it leaves — motion carries the story
     const fin = () => {
