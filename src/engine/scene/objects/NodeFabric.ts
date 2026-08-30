@@ -72,6 +72,17 @@ let _paper = false;
 const CHIP_PAPER_CALM = 0.55;
 const chipPaperCalm = (chipShare: number, fw: number): number =>
   _paper ? 1 - (1 - CHIP_PAPER_CALM) * chipShare * (1 - Math.min(1, fw * 2)) : 1;
+// THE CHIP ENVIRONMENT (SceneContext.nodeEnv — see its note for the physics): shared by every
+// CHIP material so a flat cap answers a top-down view with a reflection sweep; the spheres skip
+// it (hyper's orb look is fresnel-carried and tuned). Module-level like DIM: one value, set once
+// by the Engine before the first build; intensity is the GROUND's (paper welcomes the sheen, the
+// dark emissive look keeps it subtle) and is re-applied through the theme fan-out
+// (Globe.setColors → setEnvIntensity below).
+let _env: THREE.Texture | null = null;
+export const ENV_INT = { dark: 0.45, paper: 0.85 } as const;
+export function setNodeEnv(tex: THREE.Texture): void {
+  _env = tex;
+}
 const _dummy = new THREE.Object3D(); // reused to compose per-instance matrices
 const _vec = new THREE.Vector3();
 const _geoVec = new THREE.Vector3(); // scratch for the morph-fly interpolation
@@ -162,6 +173,10 @@ export class NodeFabric {
     const mat = new THREE.MeshStandardMaterial({
       color: 0xffffff,
       roughness: flat ? 0.3 : 0.5, metalness: flat ? 0.35 : 0.2,
+      // The chip mirrors the stock studio env (SceneContext.nodeEnv — plain built-in
+      // envMap/envMapIntensity, no shader work): a flat cap's one normal mirrors the key away
+      // from a top-down camera, so the reflection is the only channel that answers from above.
+      ...(flat && _env ? { envMap: _env, envMapIntensity: _paper ? ENV_INT.paper : ENV_INT.dark } : {}),
       // smooth-shaded everywhere: the chips are ROUND now (flat shading was the hex prisms'
       // facet-definition trick); the edge-lit cap/fresnel treatment is shading-independent.
       transparent: alpha < 1, opacity: alpha,
@@ -212,6 +227,16 @@ export class NodeFabric {
    */
   invalidateBases(): void {
     this._appliedDim = -1;
+  }
+
+  /** Theme fan-out (Globe.setColors): the chip env sheen is the GROUND's — paper welcomes it,
+   *  dark keeps it subtle under the emissive look. A material built later reads the same pair
+   *  through `_paper` at creation, so the two paths cannot disagree. */
+  applyGroundEnv(paper: boolean): void {
+    for (const mesh of [this.instHex, this.metaHex]) {
+      const m = mesh?.material as THREE.MeshStandardMaterial | undefined;
+      if (m?.envMap) m.envMapIntensity = paper ? ENV_INT.paper : ENV_INT.dark;
+    }
   }
 
   buildValidators(records: ValidatorRecord[]): void {

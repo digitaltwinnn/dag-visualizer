@@ -573,6 +573,7 @@ export class Globe implements GeoViewHost {
     this._edgeColor.setHex(c.core);
     this._edgeTarget.setHex(c.core);
     this.geoPaper = isLightGround(c);
+    this.fabric.applyGroundEnv(this.geoPaper); // the chip env sheen is the GROUND's — see NodeFabric
     retintGeoView(this);
     this._retintNetworks();
     // Canvas-texture ink cannot be re-pointed, so the labels redraw. The method is self-cleaning

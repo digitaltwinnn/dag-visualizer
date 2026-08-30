@@ -22,7 +22,7 @@ import { COLORS } from "@/src/engine/config";
 import { BYTE_SCALE_KB, type RailGroup } from "./domain/ledgerLayout";
 import { HYPER_TILT, HYPER_TILT_FOCUS } from "./domain/hyperLayout";
 import { readSceneColors, type SceneColors, LIGHT_TUNE } from "./sceneColors";
-import { setNodeDimTarget } from "./scene/objects/NodeFabric";
+import { setNodeDimTarget, setNodeEnv } from "./scene/objects/NodeFabric";
 import { THEME_KEY, parseThemePref, resolveTheme, type Theme } from "@/src/theme/resolve";
 import { VIEW_POLICIES, type ViewPolicy } from "./domain/viewPolicy";
 import { FOCI, hubFraming, geoFraming, nodeFraming, cohortFraming, ledgerCommitTilt, dollyBack, railsLean, restOrbit, easeInOutQuad, isSamePose, nudgeMix, NUDGE_DUR, type CameraFraming, type FocusName } from "./domain/cameraRig";
@@ -392,6 +392,9 @@ export class Engine {
     }
     setNodeDimTarget(colors); // the fabrics' shared mute target follows the ground (see NodeFabric)
     this.ctx = createScene(canvas, colors);
+    // The shared chip studio env, handed over before any fabric builds a material — every chip
+    // material born after this carries it (see NodeFabric's note for the physics).
+    setNodeEnv(this.ctx.nodeEnv());
     // HyperView builds all its hubs synchronously from config.METAGRAPHS inside its
     // constructor (before any API data exists), so the identity scene-color map has to be
     // handed in at construction — passing it as a 2nd ctor arg (read by _buildMetagraphs) means
