@@ -373,10 +373,10 @@ function LedgerCells({ accent, filter }: { accent: string; filter: string }) {
   );
   return (
     <>
-      {rate("Snaps/hr", activity?.snapsPerHour, activity?.cadenceSeries, basis)}
+      {rate("Snaps/hour", activity?.snapsPerHour, activity?.cadenceSeries, basis)}
       {scoped
-        ? rate("DAG fees/hr", activity?.feesPerHour, activity?.feesSeries, basis && `$DAG this network pays to anchor. ${basis}`)
-        : rate("Anchors/hr", activity?.anchorsPerHour, activity?.anchoredSeries, basis && `Metagraph snapshots anchored into the global chain. ${basis}`)}
+        ? rate("DAG fees/hour", activity?.feesPerHour, activity?.feesSeries, basis && `$DAG this network pays to anchor. ${basis}`)
+        : rate("Anchors/hour", activity?.anchorsPerHour, activity?.anchoredSeries, basis && `Metagraph snapshots anchored into the global chain. ${basis}`)}
       <AnchoringNetworks />
       <BandCard label="Anchors per global snapshot" className="flex-[2] min-w-[220px]">
         <TickBars accent={accent} isMeta={isMeta} filter={filter} />
@@ -398,7 +398,7 @@ function AnchoringNetworks() {
   }
   const list = [...ids];
   return (
-    <BandCard label="Networks anchoring">
+    <BandCard label="Metagraphs anchoring">
       <span className="font-mono font-bold text-foreground tabular-nums"><Odometer int value={list.length || null} /></span>
       <span className="flex flex-wrap items-center gap-1 max-w-[120px]">
         {list.slice(0, 12).map((id) => <IdentityDot key={id} hue={identityHudCss(id)} />)}
