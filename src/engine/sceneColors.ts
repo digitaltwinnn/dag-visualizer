@@ -238,7 +238,10 @@ export const LIGHT_TUNE_DEFAULTS: Readonly<LightTune> = Object.freeze({
   // that pass's threshold alone — and stays as the lever if the whole-frame look is ever wanted back.
   bloomMul: 0, bloomFloor: 0.5,
   selBleed: 0.35, selGlow: 0.05, selRadius: 0.45, // the user's settled halo (2026-08-28)
-  bgTint: 1, bgGrid: 0.07,
+  // bgTint 0: the ivory drift read BROWN at the shipped chroma (user, 2026-08-30, picked from a
+  // measured warm↔cool bracket) — the cool-silver token now carries the wall's colour alone, the
+  // sweep/fall-off shape it in pure level, and the knob stays as the lever if a drift comes back.
+  bgTint: 0, bgGrid: 0.07,
 });
 export const LIGHT_TUNE: LightTune = { ...LIGHT_TUNE_DEFAULTS };
 export const LIGHT_TUNE_SCHEMA: import("./tune").TuneSchema<LightTune> = {

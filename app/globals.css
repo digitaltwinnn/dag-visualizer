@@ -489,7 +489,7 @@
      deeper grey than the page so ink pops, marks can exceed the ground, and a calm bloom is
      physically possible again. The HUD page keeps --background's paper; dark side is
      --background's dark verbatim, so the dark scene is byte-identical. */
-  --scene-ground: light-dark(oklch(0.81 0.005 85), oklch(0.09 0.02 265)); /* near-neutral, faint warm bias oklch(0.81 0.005 85) — blue read cold, full greige read dirty (user, 2026-08-29); keep LIGHT_TUNE.groundL AND devTune's ground override in sync */
+  --scene-ground: light-dark(oklch(0.81 0.01 250), oklch(0.09 0.02 265)); /* cool silver oklch(0.81 0.01 250) — the warm greige read brown; picked from a measured warm↔cool bracket (user, 2026-08-30), pairs with bgTint 0; keep LIGHT_TUNE.groundL AND devTune's ground override in sync */
   /* The card elevation pair, ONE home for three recipes (`.ig-panel`, `.subject-paired`, the boxed
      rail rung) — they must keep matching, and a token matches by construction where the previous
      "restate the literal" arrangement matched by discipline. Theme-aware since 2026-08-29: pure

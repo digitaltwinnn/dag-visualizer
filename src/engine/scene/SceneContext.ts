@@ -409,6 +409,9 @@ export function createScene(canvas: HTMLCanvasElement, colors: SceneColors): Sce
   // WARM GREIGE, not blue (user, 2026-08-29: "blue... is a bit of a cold color"): the drift
   // axis now runs toward ivory (+R, −B) high on the wall — the gallery-wall answer, and the
   // cool instruments pop by complement. Signed use unchanged (+k warm, −k cool at the stage).
+  // ⚠️ SHIPPED INERT since 2026-08-30: even halved, the ivory read BROWN across the lower wall
+  // (measured R−B +18 at the floor) — `bgTint` now defaults 0 and the cool-silver token carries
+  // the wall's colour alone. The vector stays as the knob's axis, not the shipped look.
   const coolDrift = [1 + 0.028, 1 + 0.006, 1 - 0.030]; // halved: full ivory read DIRTY at wall lightness — a whisper of warmth is the ceiling (user, 2026-08-29)
   // The multiply pass's base — white is a multiply's identity, so its stops read as fractions of
   // whatever the sweep already laid down. Grayscale, so rule 3 has nothing to say about it.
