@@ -87,8 +87,12 @@ export const GLASS_TUNE_DEFAULTS: Readonly<GlassTune> = Object.freeze({
   // swamped and the knobs read as dead; with the chips back to ink the same terms show again, and
   // shine comes UP across the board — bought with the crisp terms (edge, window, softboxes) plus a
   // step of rim/sky, while body stays at the second pass's clarity so the trail stays readable.
-  body: 0.155, sky: 0.3, rim: 0.4, spec: 0.85, specPow: 18, edge: 0.45, env: 0.5, trayBody: 0.42,
-  laneBody: 1.75, laneTint: 0.8,
+  // Settled from the user's own EXPORT (same day): edge 0.45 → 0.25 (the white border calmed),
+  // trayBody 0.42 → 0.075 (the milky plates behind the chips were half of what read as washed
+  // nodes — quiet trays let the chips carry their own colour), laneTint 0.8 → 1 (the committed
+  // pane goes fully to its lane's identity).
+  body: 0.155, sky: 0.3, rim: 0.4, spec: 0.85, specPow: 18, edge: 0.25, env: 0.5, trayBody: 0.075,
+  laneBody: 1.75, laneTint: 1,
 });
 /** The live struct the `?tune` panel binds; DEFAULTS above is the shipped look and what tests pin. */
 export const GLASS_TUNE: GlassTune = { ...GLASS_TUNE_DEFAULTS };
