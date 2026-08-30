@@ -1170,9 +1170,15 @@ export class LedgerView implements SceneView {
         // eat a click. Zero-scaling is the same answer an unfilled tick already gets.
         const wx = bx + this._trailOff;
         const edge = this._rewind.fadeAtX(wx) * horizonAt(wx);
+        // The entry drop's per-slot fade, hoisted above the branch: a HELD subject (entryF 0,
+        // parked 2.6 units up through the transition) must zero-scale like a dissolved row —
+        // brightness 0 is invisible on the dark ground but on paper it is GROUND-COLOURED INK,
+        // and an opaque ground-tinted slab hanging over the planes read as a transparent ghost
+        // (user, 2026-08-30 — the bands never showed this: their entry fade rides OPACITY).
+        const entryF = this._entryT < 1 && b.slot >= 0 && b.slot < SLOT_N ? this._entryFade[b.slot] : 1;
         // A tick this lane anchored NOTHING into draws NOTHING (user, 2026-08-07 — the small
         // dimmed placeholder block is gone; the model keeps the slot, the mesh zero-scales).
-        if (!b.filled || edge <= 0) {
+        if (!b.filled || edge <= 0 || entryF <= 0) {
           _dummy.position.set(0, 0, 0);
           _dummy.rotation.set(0, 0, 0);
           _dummy.scale.setScalar(0);
@@ -1225,7 +1231,7 @@ export class LedgerView implements SceneView {
         // the RIBBON leaving this tile takes, so a ribbon and the two ends it connects now read at
         // one level; compounding dim × back left the endpoints near-black under their own ribbon.
         const rowFocus = pinned || hov;
-        const entryF = this._entryT < 1 && b.slot >= 0 && b.slot < SLOT_N ? this._entryFade[b.slot] : 1;
+        // (entry fade hoisted above the zero-scale branch — a held subject is not drawn at all)
         // `tileRest` is the curve's REFERENCE on paper — the tiles' own resting weight, taken
         // UNFADED so `b.fade` reads as the ratio it is rather than moving the reference itself.
         const emph = inkPresence(snapBright(tileRest * b.fade, offNet, focus, anyFocus && !rowFocus), this._paper, tileRest);
