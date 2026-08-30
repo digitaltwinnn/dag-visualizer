@@ -417,15 +417,9 @@ export default function VitalsBand() {
       {mode === "hyper" && <HyperCells accent={accent} />}
       {mode === "geo" && <GeoCells accent={accent} />}
       {mode === "ledger" && <LedgerCells accent={accent} filter={filter} />}
-      {/* FILTER-SCOPE hairline (the bar's device, kept): with a network committed the numbers are
-          silently filtered — the band wears the identity hairline along its bottom edge. */}
-      {scopeHue && (
-        <span
-          aria-hidden
-          className="absolute -bottom-[6px] left-[10%] right-[10%] h-px opacity-60"
-          style={{ background: `linear-gradient(90deg, transparent, ${scopeHue} 15%, ${scopeHue} 85%, transparent)` }}
-        />
-      )}
+      {/* NO filter-scope hairline (user, 2026-08-30 — removed): unlike the old bar cluster's
+          bare numbers, the band's own charts already wear the identity accent under a filter,
+          so the scope is stated by the vitals themselves. */}
     </section>
   );
 }

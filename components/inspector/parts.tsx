@@ -178,12 +178,23 @@ export function FootRow({
           on hover instead of reserving a column, on the foot's own plate colour so a long value
           is covered, never shifted — the no-shift rule kept by other means. */}
       <span className={cn("relative inline-flex items-center min-w-0", mono && "font-mono")}>
-        <span className="text-label text-foreground-dim tabular-nums truncate">{value}</span>
+        {/* ⚠️ The button's old `bg-[var(--panel-plate)]` cover was a TRANSLUCENT lift (the foot
+            plate is additive by design), so the value's tail showed straight through it — the
+            button read as sitting ON the text (user, 2026-08-30). Nothing can opaquely match a
+            glass ground, so the text FADES OUT beneath the button instead: a mask on the value
+            while the row reveals the control. No layout shift, honest on every ground. */}
+        <span
+          className={cn(
+            "text-label text-foreground-dim tabular-nums truncate",
+            copy && "group-hover/copy:[mask-image:linear-gradient(to_right,#000_calc(100%-26px),transparent_calc(100%-4px))]",
+            copy && "group-focus-within/copy:[mask-image:linear-gradient(to_right,#000_calc(100%-26px),transparent_calc(100%-4px))]",
+          )}
+        >{value}</span>
         {copy && (
           <CopyButton
             value={copy}
             subject={label.toLowerCase()}
-            className="absolute right-0 top-1/2 -translate-y-1/2 my-0 bg-[var(--panel-plate)]"
+            className="absolute right-0 top-1/2 -translate-y-1/2 my-0"
           />
         )}
       </span>
