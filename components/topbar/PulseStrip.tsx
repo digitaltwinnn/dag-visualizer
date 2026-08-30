@@ -38,7 +38,7 @@ export default function PulseStrip() {
         const stale = !errLast && r.everyMs != null && okAge != null && okAge > r.everyMs * 2.5;
         const dot = errLast ? "var(--destructive)" : stale ? "var(--warn-soft)" : okAge != null ? "var(--success)" : "var(--muted-foreground)";
         return (
-          <div key={r.id} className="flex flex-col gap-0.5 rounded-lg border border-border/50 bg-card/40 px-3 py-1.5 flex-none min-w-[150px]">
+          <div key={r.id} className="flex flex-col gap-0.5 rounded-lg border border-border/50 bg-card/40 px-3 py-1.5 flex-1 basis-0 min-w-[150px]">
             <span className="flex items-center gap-1.5">
               <span aria-hidden className="size-1.5 rounded-full flex-none" style={{ background: dot }} />
               <span className="text-micro tracking-[0.1em] uppercase text-muted-foreground whitespace-nowrap">{r.label}</span>
