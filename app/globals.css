@@ -685,10 +685,10 @@
      var() even though a presentation ATTRIBUTE (`stroke="…"`) doesn't, which is why the ruler
      mirrored these as literal consts until 2026-08-21.
      `--axis-hairlines` is the reusable recipe for a horizontal axis (the bar chart). */
-  --thread-line: light-dark(rgba(40, 55, 95, 0.40), rgba(178, 193, 223, 0.40));        /* the neutral base line the ticks hang off */
-  --thread-tick: light-dark(rgba(40, 55, 95, 0.30), rgba(178, 193, 223, 0.30));        /* minor hairline */
-  --thread-tick-major: light-dark(rgba(40, 55, 95, 0.42), rgba(178, 193, 223, 0.42));  /* every 4th — longer + brighter */
-  --thread-faint: light-dark(rgba(40, 55, 95, 0.10), rgba(178, 193, 223, 0.10));       /* faintest thread-family hairline (dock borders) */
+  --thread-line: light-dark(rgba(40, 55, 95, 0.55), rgba(178, 193, 223, 0.40));        /* the neutral base line the ticks hang off — light face raised .40 → .55 (user, 2026-08-30: the rules read too soft on paper; the same alpha carries less on a bright ground) */
+  --thread-tick: light-dark(rgba(40, 55, 95, 0.42), rgba(178, 193, 223, 0.30));        /* minor hairline (light .30 → .42) */
+  --thread-tick-major: light-dark(rgba(40, 55, 95, 0.58), rgba(178, 193, 223, 0.42));  /* every 4th — longer + brighter (light .42 → .58) */
+  --thread-faint: light-dark(rgba(40, 55, 95, 0.14), rgba(178, 193, 223, 0.10));       /* faintest thread-family hairline (dock borders; light .10 → .14) */
   --thread-tick-pitch: 13px;                        /* spacing between hairlines */
   /* Horizontal baseline → vertical ticks HANGING DOWN from it (the bar-chart axis, so the ruler
      sits under the bars, not through them). Anchored to the TOP so ticks grow downward; major
