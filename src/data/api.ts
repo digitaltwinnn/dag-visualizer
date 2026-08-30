@@ -210,12 +210,12 @@ export class NetworkData {
         this.clusters = { l0, l1 };
         this.dagCore = this._buildDagCore(l0, l1);
         this._emit("cluster", { l0, l1, dag: this.dagCore });
-        reportPoll("clusters", "Validator clusters", "L0 + L1 load balancers", POLL.clusterMs, true);
+        reportPoll("clusters", "DAG nodes", "L0 + L1 load balancers", POLL.clusterMs, true);
         return;
       }
-      reportPoll("clusters", "Validator clusters", "L0 + L1 load balancers", POLL.clusterMs, false);
+      reportPoll("clusters", "DAG nodes", "L0 + L1 load balancers", POLL.clusterMs, false);
     } catch (e) {
-      reportPoll("clusters", "Validator clusters", "L0 + L1 load balancers", POLL.clusterMs, false);
+      reportPoll("clusters", "DAG nodes", "L0 + L1 load balancers", POLL.clusterMs, false);
       /* keep whatever real membership we already have (maybe none) */
     }
   }

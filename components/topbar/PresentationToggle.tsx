@@ -2,7 +2,6 @@
 
 import { Focus, LayoutPanelLeft, Table2 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { useStore } from "@/src/store/store";
 
 // The command bar's trailing PRESENTATION group — TWO controls since 2026-08-30 (user: "scene
@@ -33,24 +32,25 @@ export default function PresentationToggle() {
   const setRailsHidden = useStore((s) => s.setRailsHidden);
   return (
     <div className="flex items-center gap-0.5" role="group" aria-label="How the information is presented">
-      {/* SCENE ⇄ HUD — the chrome toggle. Stays live while RAW is open: it then states (and
-          edits) what the raw layer will return to. */}
-      <ToggleGroup
-        type="single"
-        value={railsHidden ? "scene" : "cards"}
-        onValueChange={(v) => { if (v) setRailsHidden(v === "scene"); }}
-        className="flex gap-0.5 max-[1099px]:hidden"
-        aria-label="Scene chrome"
+      {/* SCENE ⇄ HUD — ONE toggle button (user, 2026-08-30, round 2: the two-segment group
+          looked identical to the old radio at icon-only widths — "a toggle" means one button
+          that flips). It shows the CURRENT presentation and presses on Scene (the non-default,
+          chrome-hidden state); the title names what a click does. Stays live while RAW is open:
+          it then states (and edits) what the raw layer will return to. */}
+      <button
+        type="button"
+        aria-pressed={railsHidden}
+        title={railsHidden ? "Scene: just the 3D — click for the HUD cards" : "HUD: the info cards — click for just the 3D"}
+        onClick={() => setRailsHidden(!railsHidden)}
+        className={cn(
+          SEG,
+          "max-[1099px]:hidden",
+          railsHidden && "text-foreground bg-[var(--sel-bg)] shadow-[inset_0_0_0_1px_var(--sel-border)] [&>svg]:text-primary",
+        )}
       >
-        <ToggleGroupItem value="scene" title="Scene: just the 3D, rails collapse to their threads" className={SEG}>
-          <Focus aria-hidden className="size-4 group-data-[state=on]:text-primary" />
-          <span className="text-micro tracking-caps uppercase max-[1649px]:hidden">Scene</span>
-        </ToggleGroupItem>
-        <ToggleGroupItem value="cards" title="HUD: the info cards over the scene" className={SEG}>
-          <LayoutPanelLeft aria-hidden className="size-4 group-data-[state=on]:text-primary" />
-          <span className="text-micro tracking-caps uppercase max-[1649px]:hidden">HUD</span>
-        </ToggleGroupItem>
-      </ToggleGroup>
+        {railsHidden ? <Focus aria-hidden className="size-4" /> : <LayoutPanelLeft aria-hidden className="size-4" />}
+        <span className="text-micro tracking-caps uppercase max-[1649px]:hidden">{railsHidden ? "Scene" : "HUD"}</span>
+      </button>
       {/* RAW — the layer toggle. aria-pressed, not a radio segment: it pushes a different
           surface in and pops it out, and the pair to its left survives the round trip. */}
       <button

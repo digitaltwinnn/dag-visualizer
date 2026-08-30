@@ -2,8 +2,6 @@
 
 import { pollHealthRows } from "@/src/data/api";
 import { useNowTick } from "@/components/useNowTick";
-import NetLink from "@/components/NetLink";
-import { cn } from "@/lib/utils";
 
 // THE PULSE STRIP — the heartbeat's own row (user, 2026-08-30: clicking the ECG "should show a
 // bottom section (like the filter) with relevant information about the liveliness of the app —
@@ -13,9 +11,6 @@ import { cn } from "@/lib/utils";
 // the dot derives from the stamps (ok / STALE past ~2.5× its own cadence / error when the last
 // outcome failed), never a fabricated status (rule 10).
 //
-// It also carries the /about link at its end: the ECG used to BE the about route, and the phone
-// (footer hidden, wordmark hidden) would otherwise lose the page entirely — liveliness and
-// provenance share the heartbeat's row.
 
 function ageWord(ms: number): string {
   const s = Math.round(ms / 1000);
@@ -60,16 +55,6 @@ export default function PulseStrip() {
           </div>
         );
       })}
-      {/* Provenance rides the heartbeat's row — the route the ECG click used to be. */}
-      <NetLink
-        href="/about"
-        className={cn(
-          "self-center flex-none ml-auto px-2 py-1 rounded-btn text-label text-muted-foreground",
-          "hover:text-foreground hover:bg-wash-soft no-underline whitespace-nowrap",
-        )}
-      >
-        about this project →
-      </NetLink>
     </div>
   );
 }

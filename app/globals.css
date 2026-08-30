@@ -717,6 +717,12 @@
   * { box-sizing: border-box; }
   html, body { margin: 0; height: 100%; background: var(--background); overflow: hidden; }
   body { font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; color: var(--foreground); }
+  /* Interactive things get the hand (user, 2026-08-30: "quite a lot of elements don't have the
+     fingerpointer while interactive") — Tailwind v4's preflight follows the spec and leaves
+     buttons at `cursor: default`, so every custom button here silently lost the hand unless it
+     carried cursor-pointer itself. One base rule instead of chasing call sites; a rare utility
+     (e.g. the pager wrapper's grab cursor) still wins from the utilities layer. */
+  button:not(:disabled), [role="button"]:not([aria-disabled="true"]), [role="radio"]:not([aria-disabled="true"]), [role="option"], [cmdk-item], a[href], summary { cursor: pointer; }
 }
 
 /* ── Scene canvas + rail containers (was app/styles/00-base.css) ──────────────────
