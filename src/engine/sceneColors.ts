@@ -237,7 +237,12 @@ export const LIGHT_TUNE_DEFAULTS: Readonly<LightTune> = Object.freeze({
   // and a full-res pass off the light path both. `bloomFloor` is inert while this is 0 — it shapes
   // that pass's threshold alone — and stays as the lever if the whole-frame look is ever wanted back.
   bloomMul: 0, bloomFloor: 0.5,
-  selBleed: 0.35, selGlow: 0.05, selRadius: 0.45, // the user's settled halo (2026-08-28)
+  // Raised from the 2026-08-28 settled 0.35/0.05/0.45: the rest-only chip calm and the
+  // hubMatchBoost retirement (both 2026-08-30) fed this layer visibly less input, and the
+  // resting halo starved — "we've lost the bloom effect, I'd still like a subtle bloom also in
+  // light mode" (user, same day). The lift restores a resting glow WITHOUT the old fat tips:
+  // the calm evened out the cap hotspots that used to concentrate the halo.
+  selBleed: 0.55, selGlow: 0.12, selRadius: 0.55,
   // bgTint 0: the ivory drift read BROWN at the shipped chroma (user, 2026-08-30, picked from a
   // measured warm↔cool bracket) — the cool-silver token now carries the wall's colour alone, the
   // sweep/fall-off shape it in pure level, and the knob stays as the lever if a drift comes back.
