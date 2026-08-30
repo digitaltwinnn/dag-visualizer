@@ -8,7 +8,6 @@ import Odometer from "@/components/Odometer";
 import { NoSignalDot } from "@/components/state/StateAtoms";
 import { compositionRows } from "@/src/data/composition";
 import { isGlobalActivityScope, type Activity } from "@/src/data/api";
-import { useBreakpoint } from "@/components/useBreakpoint";
 import { cn } from "@/lib/utils";
 import type { NodeInfo } from "@/src/data/types";
 
@@ -59,22 +58,16 @@ function Vital({ label, value, spark, title }: { label: string; value: React.Rea
   );
 }
 
-// Hypergraph vitals — the network's **structure** (who/what), filter-aware: how many MACHINES
-// of each composition make up the current selection (user, 2026-07-12 — replaced the per-layer
-// L0/cL1/dL1 role counts: the composition vocabulary is what the hyper explorer + the dossier
-// table speak, so the vitals now agree with them). Cluster entries are deduped to machines
-// first (a hybrid appears once per cluster it runs), then counted by their composition label
-// (src/data/composition). The columns are EVERY label that vocabulary can produce, so they SUM
-// to the selection (2026-08-02: "Consensus" — dedicated-L0, 16 of them on the DAG core — had no
-// column, so hyper read 146 machines where geo read 162 nodes for the same selection; user).
-// Filtered: an em-dash for a composition the selection doesn't have (stable columns, no reflow).
-function HyperVitals() {
-  const filter = useStore((s) => s.filter);
-  const metaList = useStore((s) => s.metaList);
+// The composition counting, shared with the bottom VitalsBand (2026-08-30) so the phone strip's
+// cluster and the band's donut can never disagree about the same four numbers. Cluster entries
+// are deduped to machines first (a hybrid appears once per cluster it runs), then counted by
+// their composition label (src/data/composition). The keys are EVERY label that vocabulary can
+// produce, so they SUM to the selection.
+export function compositionCounts(
+  metaList: { id: string; nodes: NodeInfo[] }[],
+  filter: string,
+): Record<string, number> {
   const cfg = metagraphById(filter);
-
-  // Order: the make-up that dominates every real network first, then the dedicated roles in
-  // layer order (L0 → cL1 → dL1) — the same order `compositionRows` emits them in.
   const counts: Record<string, number> = { Hybrid: 0, Consensus: 0, Currency: 0, Data: 0 };
   // A VIRTUAL network (the unlisted set) is committed-but-machineless BY NATURE (2026-08-07,
   // one-home design): an empty selection with em-dashes, never the whole network's numbers.
@@ -89,6 +82,21 @@ function HyperVitals() {
     for (const row of compositionRows([...machines.values()]))
       if (row.label in counts) counts[row.label]! += row.count;
   }
+  return counts;
+}
+
+// Hypergraph vitals — the network's **structure** (who/what), filter-aware: how many MACHINES
+// of each composition make up the current selection (user, 2026-07-12 — replaced the per-layer
+// L0/cL1/dL1 role counts: the composition vocabulary is what the hyper explorer + the dossier
+// table speak, so the vitals now agree with them). The counting lives in `compositionCounts`
+// above (one home, shared with the VitalsBand).
+// Filtered: an em-dash for a composition the selection doesn't have (stable columns, no reflow).
+function HyperVitals() {
+  const filter = useStore((s) => s.filter);
+  const metaList = useStore((s) => s.metaList);
+  const cfg = metagraphById(filter);
+  const isUnlisted = displayNetwork(filter)?.virtual === true;
+  const counts = compositionCounts(metaList, filter);
 
   const cell = (n: number) =>
     (cfg || isUnlisted) && n === 0 ? <span className="text-muted-foreground italic opacity-60">—</span> : <Odometer int value={n} />;
@@ -254,11 +262,6 @@ function VitalsCluster({ align = "end" }: { align?: "end" | "center" } = {}) {
 
 export { VitalsCluster };
 
-// Tablet/desktop: vitals render inline, unchanged. On phone this renders nothing — TopBar owns
-// the phone treatment: the vitals ride the filter strip as a second row (the toggle button and
-// the floating popover before it are both gone).
-export default function Vitals() {
-  const bp = useBreakpoint();
-  if (bp === "phone") return null;
-  return <VitalsCluster />;
-}
+// The desktop-inline wrapper is GONE (2026-08-30): the vitals left the bar for the bottom
+// VitalsBand. This module stays as the PHONE cluster (the filter strip's second row, unchanged)
+// and the one home of `compositionCounts`, which the band's donut shares.

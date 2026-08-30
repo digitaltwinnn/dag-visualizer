@@ -606,7 +606,7 @@ The design rules behind the table, which the tests pin but don't explain:
   (`metagraph.timestamp === global.timestamp`), so committing a DIFFERENT tick provably means the held
   snapshot didn't anchor here. Left in place it sat directly under the global card in the pile — where
   ADJACENCY IS CONTAINMENT — stating that tick B contains a snapshot that landed in tick A. It lives in
-  `snapshotSelectActions`, so all four consumers (explorer row, LiveStrip bar, the global card's pager,
+  `snapshotSelectActions`, so all remaining consumers (explorer row, the global card's pager,
   the 3D band click) inherit it.
 - **New click/select semantics go in the table with a test**, their effects in the executor, never
   inline. `components/selectionBoundary.test.ts` enforces this — and note the rule is **write**-based,
@@ -678,7 +678,7 @@ mirror, with three ways to ask for it — the switch, Escape, the layer's own ×
 
 **The page never scrolls.** The scene wrapper is `position:fixed; inset:0` with an identity transform
 from first paint, which makes it the containing block for every fixed descendant — see CSS trap 2,
-where both halves of that arrangement are load-bearing. The raw layer and the `LiveStrip` are siblings
+where both halves of that arrangement are load-bearing. The raw layer and the vitals band are siblings
 of that wrapper, not children. Whichever layer is away carries `inert`.
 
 The HUD is **four fixed zones, one scope each, stable across views. Gate new chrome by which
@@ -686,7 +686,8 @@ zone/scope it belongs to, not by what a particular view puts there** — a card 
 and its contents are view-specific examples that keep changing.
 
 **Top — the command bar.** One full-width glass bar, edges aligned with the rail columns: status +
-filter on the left, the view switch centered, view vitals and the RAW switch on the right (RAW last,
+filter on the left, the view switch centered, presentation/theme/network on the right (the vitals
+left the bar for the bottom band, 2026-08-30; RAW last,
 because it acts on everything to its left). The filter button toggles an **attached filter strip** that
 grows the bar downward by a row of network chips; hovering previews the dim, picking closes it. The
 strip is a **layout participant, not a popup** — TopBar publishes its height and both the rails and the
@@ -825,11 +826,12 @@ into one tick (DOR routinely 9-plus), so a tick-wide `N` would contradict the br
 
 **The global snapshot's set is OPEN** (user, 2026-08-09): time is ongoing, so the same plank steps one
 tick at a time but shows **no `n / N`** — a window into an unbounded chain has no total to state, and
-`SiblingSet.open` is what says so. That is also what keeps it from rivalling the `LiveStrip`: **the strip
-is the time INSTRUMENT** (scale, window, cadence), the plank is a nudge to the adjacent tick. It steps the
-strip's own buffer in the strip's own order (oldest→newest) through the same descriptor a bar click
-builds, so stepping back from the front pins and stepping onto the live tip resumes following; a pin aged
-out of the retained window gets no pager rather than a guessed neighbour.
+`SiblingSet.open` is what says so. The plank is a nudge to the adjacent tick: it steps the retained
+global window (the same buffer the vitals band's tick chart plots) oldest→newest through the same
+descriptor the old strip's bar click built (the chart is non-interactive now, 2026-08-30 — the plank
+and the explorer rows ARE the tick-stepping routes), so stepping back from the front pins and stepping
+onto the live tip resumes following; a pin aged out of the retained window gets no pager rather than a
+guessed neighbour.
 
 **Expanding a rung's card FLIES THE CAMERA to it** (user, 2026-08-09 — "we do the same when we click a
 row in the explorer"): the box is the subject, so it gets the subject's pose. `ladderLevelOfSlot()` in
@@ -856,7 +858,7 @@ already names — and the metagraph TICKER that shared that row went with it und
 the METAGRAPH card sits directly above and this card's own mark already carries the hue.
 
 **An ordinal is written BARE — no `#`** (user, 2026-08-10). Every surface that renders one as a value
-already did (the snapshot card titles, the explorer rows, the anchor-log cells, the LiveStrip's tooltip
+already did (the snapshot card titles, the explorer rows, the anchor-log cells, the old strip's tooltip
 head); the sigil only survived where a number got glued into a sentence — this aside, the raw layer's
 channel pane head, the pager's step labels, the ledger explorer's tooltips and the scene tooltip. It is
 noise in all of them: the label beside it already says what the number is. Internal `PickDescriptor.title`
@@ -886,20 +888,27 @@ re-grew Country and Hosting, since the pile-dedup rule found no ancestors. It is
 selection change: the store is untouched, so returning to a 3D view restores the whole pile. This
 matches the left rail, which shows About and no tool card there.
 
-**Bottom — the live/time lane, and it is SNAPSHOTS-ONLY** (user, 2026-08-12). The lane holds one
-instrument, the `LiveStrip`'s tick bar-chart, and a bar-chart over ticks is a TIME instrument — so it
-belongs to the *when* view and nothing else. hyper and geo carried a node-count readout in the same
-footprint to keep the lane from reading as blank; that answered the wrong question, since a per-network
-node tally is structure and structure is already the subject of the view above it. The lane is now
-simply absent there and the space comes back to the rails and the raw layer.
+**Bottom — the VITALS BAND** (`components/VitalsBand.tsx`, 2026-08-30 — the vitals left the crowded
+command bar; docs/superpowers/plans/2026-08-30-vitals-bottom-band.md is the plan). A slim full-width
+row of **read-only info cards**, one set per 3D view: hyper leads with a composition DONUT (the four
+counts are shares of one fleet — the one honest home for a donut) plus its legend; geo shows its
+footprint numbers plus a nodes-by-country micro-bar row; the ledger shows its two rate cards (number +
+sparkline off the live buffers) beside the declicked tick bar-chart. This deliberately widens the old
+snapshots-only rule (2026-08-12): each band is the view's OWN vitals — the numbers the bar's vitals
+region used to show — so nothing generic returned. **The band takes no pointer events at all**
+(`pointer-events-none` — user: "no clicking etc required"): every route the old strip's clicks served
+survives in the explorer rows and the global card's pager. Colour is rule 3's: structural cyan, the
+identity hue only under a committed filter (one inline `--vb-accent`), with the filter-scope hairline
+along the band's bottom edge. Identity is never colour-alone — every donut segment, country bar and
+rate is named by its own label.
 
-`BottomStream` is the **one publisher**: it both mounts the strip and writes `--bottom-reserve`, from the
-one policy flag `VIEW_POLICIES[mode].timeLane` **AND the scene pose**, so presence and reserved space
-can't drift (the previous arrangement published the reserve per view while the strip mounted
-unconditionally — two values for one token). The token's static default in `globals.css` is therefore
-**`0px`**, matching the boot view. The lane is **scene-pose only** (user, 2026-08-15): the raw anchor log
-pages arbitrarily deep into history, so the strip's retained window is no longer 1-1 with the table it
-would float over, and its reserve goes back to the raw layer — which the phone pane needs.
+`BottomStream` is the **one publisher**: it both mounts the band and writes `--bottom-reserve`, from
+the one policy flag `VIEW_POLICIES[mode].vitalsLane` **AND three deliberate gates** — the scene pose
+(user, 2026-08-15: the raw layer pages history the lane wouldn't describe, and needs the space), the
+rails (user, 2026-08-30: presentation mode shows just the 3D, so rails-hidden hides the band too), and
+the phone (the dock + sheet own that edge; phone vitals stay in the filter strip's second row,
+`VitalsCluster`). Presence and reserved space can't drift. The token's static default in `globals.css`
+stays **`0px`**.
 
 ### Responsive shell
 
@@ -1237,7 +1246,7 @@ were reading. Same builder as the anchor-log row, so a read and the equivalent r
 ### shadcn primitives
 
 `components/ui/` holds the adopted primitives; compose classes with `cn()`. **`Button` is adopted only
-for small text/icon controls that map cleanly onto a variant** — the LiveStrip bars, accordion rows,
+for small text/icon controls that map cleanly onto a variant** — accordion rows,
 rail edge-tabs, phone-dock halves, the view switch and the filter button are deliberately NOT Buttons,
 and that boundary is the convention. `Command` backs the filter picker (its cursor wash is overridden
 to a faint neutral — the bright accent fill washed text out). `Table` + `ScrollArea` are the raw layer
@@ -1323,7 +1332,7 @@ seam and corner rules select on the same markers the thread measures:
 
 Global L0 produces a snapshot roughly every **28 seconds** — measured live, mean 28.1s over a full
 window, range 4.6–114.8, so the cadence is irregular and a "few seconds" intuition will mislead any
-timing you build on it (the LiveStrip's window, a hold, a settle gate). Three counters, which the UI
+timing you build on it (the tick chart's window, a hold, a settle gate). Three counters, which the UI
 keeps separate on purpose:
 
 - **`ordinal`** — sequence number, +1 every snapshot even when empty.
@@ -1339,13 +1348,13 @@ scale by anchors, and the snapshot card leads with the anchors, breaks them down
 states the derived fee and the bytes anchored. **The card carries no height, sub-height or block
 count at all** — a counter that answers no question the card raises, culled 2026-08-10 with the rest.
 
-**`LiveStrip`** is the bottom lane's one instrument and mounts in **Snapshots alone** (above). One bar per
-tick, height = anchors. Unfiltered, bars plot each tick's total in cyan. **Filtered, each bar plots
-that metagraph's own anchors on its OWN scale in its identity hue** — its own cadence, with empty ticks
-as honest gaps. A ~1-anchor-per-tick metagraph reads sparse and 0-in-window reads blank; that honesty
-is the design. Clicking a bar selects that snapshot in place, through the same table and executor as
-the 3D tile. Hovering cross-highlights the matching ledger block, and the hover is cleared on each new
-tick, because bars shift under a stationary cursor that never fires mouseleave.
+**The tick bar-chart** is the vitals band's ledger cell (`VitalsBand`'s `TickBars` — the LiveStrip's
+successor, 2026-08-30, declicked per the plan). One bar per tick, height = anchors, last ~32 ticks.
+Unfiltered, bars plot each tick's total in cyan. **Filtered, each bar plots that metagraph's own
+anchors on its OWN scale in its identity hue** — its own cadence, with empty ticks as honest gaps. A
+~1-anchor-per-tick metagraph reads sparse and 0-in-window reads blank; that honesty is the design.
+**No interaction at all** — the strip's bar-click (pin) and hover cross-highlight died with the band's
+`pointer-events-none`; the pin routes live on in the explorer rows and the global card's pager.
 
 **The raw data layer's table** is the same per-view projection in table form, dispatching on `mode`.
 The ledger one is a master–detail split: the anchor log on the left, the channel-state panel as the

@@ -1,6 +1,6 @@
 # Plan — the vitals leave the bar: a bottom instrument band
 
-**Date** 2026-08-30 · **Status** awaiting user sign-off · **Branch** `bugfix/wip` (or a fresh feature branch)
+**Date** 2026-08-30 · **Status** IMPLEMENTED (2026-08-30, signed off with visual upgrades: donut + micro-bars + info cards; see progress.md) · **Branch** `bugfix/wip` (or a fresh feature branch)
 
 ## What the user asked for (their words, condensed)
 

@@ -7,7 +7,7 @@ import { useStore } from "@/src/store/store";
 import { displayNetwork } from "@/src/data/unlisted";
 import { cn } from "@/lib/utils";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
-import Vitals, { VitalsCluster } from "@/components/topbar/Vitals";
+import { VitalsCluster } from "@/components/topbar/Vitals";
 import FilterPicker from "@/components/topbar/FilterPicker";
 import EcgMark from "@/components/topbar/EcgMark";
 import PresentationToggle from "@/components/topbar/PresentationToggle";
@@ -309,16 +309,11 @@ export default function TopBar() {
           })}
         </ToggleGroup>
 
-        {/* RIGHT zone: vitals + presentation. Mirrors the left zone; `justify-self-end` pins
-            it to the bar's right edge in the grid. */}
+        {/* RIGHT zone: presentation + theme + network. The vitals LEFT the bar (2026-08-30 —
+            the bottom VitalsBand is their home now; docs/superpowers/plans/
+            2026-08-30-vitals-bottom-band.md), so the zone is the control group alone. On phone
+            the vitals still ride the filter strip below as a second row, unchanged. */}
         <div className="flex items-center gap-3 max-[1260px]:gap-2.5 max-[940px]:gap-2 max-[700px]:gap-1.5 justify-self-end">
-        <span className="w-px self-stretch bg-border my-1 max-[860px]:hidden" />
-
-        {/* Vitals — inline on tablet/desktop. On phone they render nothing here: the vitals
-            ride the filter strip below as a second row (user, 2026-08-15 — the separate 44px
-            vitals toggle starved the bar, and the strip is already the bar's one "grow
-            downward" mechanism), so the right zone is the presentation toggle alone. */}
-        <Vitals />
 
         {/* PRESENTATION — the bar's trailing control: ONE axis for how the view's information
             is presented (SCENE / CARDS / RAW — replacing the separate Focus icon + RAW switch,
