@@ -197,7 +197,7 @@ export default function TopBar() {
             is data-dependent, a committed network's name widens the filter face past what the
             390px sweep measured). 700 is breakpointOf's own boundary, same arm every phone gate
             names (CSS trap 8: max-[700px] stops applying AT 700, the wide face). */}
-        <span className="flex items-center gap-2 font-semibold tracking-[-0.01em] text-title whitespace-nowrap max-[700px]:hidden">
+        <span className="flex items-center gap-2 font-semibold tracking-[-0.01em] text-title whitespace-nowrap select-none cursor-default max-[700px]:hidden">
           <span className={live ? "text-foreground" : "text-muted-foreground opacity-70"}>DAG</span>{" "}
           <span className={cn("text-muted-foreground", !live && "opacity-70")}>Visualizer</span>
         </span>
