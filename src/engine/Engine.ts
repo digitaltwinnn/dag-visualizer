@@ -779,7 +779,7 @@ export class Engine {
   private async refreshMeta(initial: boolean) {
     try {
       const r = await fetch(netUrl("/api/metagraphs"));
-      reportPoll("api-metagraphs", "Metagraph directory", "app API", 5 * 60_000, r.ok);
+      reportPoll("api-metagraphs", r.ok);
       if (!r.ok) return;
       const { metagraphs, geo } = await r.json();
       if (geo) this.geoMap = { ...this.geoMap, ...geo };
@@ -806,7 +806,7 @@ export class Engine {
         this._publishLeaderboard();
       }
     } catch {
-      reportPoll("api-metagraphs", "Metagraph directory", "app API", 5 * 60_000, false);
+      reportPoll("api-metagraphs", false);
       /* keep showing the last good data */
     }
   }

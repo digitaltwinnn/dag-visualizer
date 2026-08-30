@@ -13,10 +13,10 @@ export async function loadGeoCache(): Promise<GeoMap> {
   // baked validator geo seed, served on-disk by the Next /api/geo route
   try {
     const res = await fetch(netUrl("/api/geo"));
-    reportPoll("api-geo", "Validator geo map", "app API", null, res.ok);
+    reportPoll("api-geo", res.ok);
     if (res.ok) Object.assign(map, await res.json());
   } catch (e) {
-    reportPoll("api-geo", "Validator geo map", "app API", null, false);
+    reportPoll("api-geo", false);
     /* ignore */
   }
   // anything resolved on previous visits

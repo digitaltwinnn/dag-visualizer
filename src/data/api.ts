@@ -23,16 +23,25 @@ export interface PollHealth {
   ok: number;
   err: number;
 }
+// THE FEEDS TABLE — the one home for each feed's descriptor (2026-08-30, same-day structural
+// fix): the first cut passed (label, target, interval) at every reportPoll call site, which is
+// the two-homes drift class this repo keeps re-catching — change a label at the success site
+// and not its error twin and the registry silently grows two rows. Call sites pass the ID alone.
+const FEEDS = {
+  global: { label: "Global snapshots", target: "block explorer", everyMs: POLL.pollMs },
+  metasnaps: { label: "Metagraph snapshots", target: "block explorer", everyMs: POLL.pollMs },
+  clusters: { label: "DAG nodes", target: "L0 + L1 load balancers", everyMs: POLL.clusterMs },
+  "api-metagraphs": { label: "Metagraph directory", target: "app API", everyMs: 5 * 60_000 },
+  "api-geo": { label: "Validator geo map", target: "app API", everyMs: null },
+} as const;
+export type FeedId = keyof typeof FEEDS;
 const POLL_HEALTH = new Map<string, PollHealth>();
-function healthRow(id: string, label: string, target: string, everyMs: number | null): PollHealth {
-  let r = POLL_HEALTH.get(id);
-  if (!r) { r = { id, label, target, everyMs, lastOkAt: null, lastErrAt: null, ok: 0, err: 0 }; POLL_HEALTH.set(id, r); }
-  return r;
-}
 /** Report one fetch outcome into the registry — exported for the two fetch sites outside this
  *  module (/api/metagraphs in Engine.refreshMeta, /api/geo in geoResolve). */
-export function reportPoll(id: string, label: string, target: string, everyMs: number | null, ok: boolean): void {
-  const r = healthRow(id, label, target, everyMs);
+export function reportPoll(id: FeedId, ok: boolean): void {
+  const d = FEEDS[id];
+  let r = POLL_HEALTH.get(id);
+  if (!r) { r = { id, label: d.label, target: d.target, everyMs: d.everyMs, lastOkAt: null, lastErrAt: null, ok: 0, err: 0 }; POLL_HEALTH.set(id, r); }
   if (ok) { r.lastOkAt = Date.now(); r.ok++; } else { r.lastErrAt = Date.now(); r.err++; }
 }
 /** The registry, in stable insertion order — the pulse strip's one read. */
@@ -210,12 +219,12 @@ export class NetworkData {
         this.clusters = { l0, l1 };
         this.dagCore = this._buildDagCore(l0, l1);
         this._emit("cluster", { l0, l1, dag: this.dagCore });
-        reportPoll("clusters", "DAG nodes", "L0 + L1 load balancers", POLL.clusterMs, true);
+        reportPoll("clusters", true);
         return;
       }
-      reportPoll("clusters", "DAG nodes", "L0 + L1 load balancers", POLL.clusterMs, false);
+      reportPoll("clusters", false);
     } catch (e) {
-      reportPoll("clusters", "DAG nodes", "L0 + L1 load balancers", POLL.clusterMs, false);
+      reportPoll("clusters", false);
       /* keep whatever real membership we already have (maybe none) */
     }
   }
@@ -288,14 +297,14 @@ export class NetworkData {
         this._pushGlobal(snap);
       }
       this._setLive(true, Date.now());
-      reportPoll("global", "Global snapshots", "block explorer", POLL.pollMs, true);
+      reportPoll("global", true);
       // Pull each metagraph's newest snapshots EVERY tick (was every other tick) — together with
       // the deeper tail, this keeps up with high-throughput metagraphs (Dor) so their snapshots
       // are all attributed correctly instead of leaking into the "unlisted" count.
       this._refreshMeta(POLL.metaSnapTail);
     } catch (e) {
       this._setLive(false);
-      reportPoll("global", "Global snapshots", "block explorer", POLL.pollMs, false);
+      reportPoll("global", false);
     }
   }
 
@@ -333,9 +342,9 @@ export class NetworkData {
       let json;
       try {
         json = await this._get(`/currency/${m.id}/snapshots?limit=${lim}`);
-        reportPoll("metasnaps", "Metagraph snapshots", "block explorer", POLL.pollMs, true);
+        reportPoll("metasnaps", true);
       } catch {
-        reportPoll("metasnaps", "Metagraph snapshots", "block explorer", POLL.pollMs, false);
+        reportPoll("metasnaps", false);
         return; // no data this tick — stay factual, try again next poll
       }
       list = json.data || [];
