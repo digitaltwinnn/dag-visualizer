@@ -250,6 +250,9 @@ function HyperCells({ accent }: { accent: string }) {
         </div>
       </BandCard>
       )}
+      <BandCard label="Nodes">
+        <span className="font-mono font-bold text-foreground tabular-nums"><Odometer int value={selNodes.length || null} /></span>
+      </BandCard>
       <BandCard label="Node composition" className="flex-[1.5]">
         <Donut counts={counts} accent={accent} />
         <div className="grid grid-cols-2 gap-x-4 gap-y-0.5">
@@ -270,9 +273,6 @@ function HyperCells({ accent }: { accent: string }) {
           { key: "cl1", label: <RoleChips codes={["cL1"]} />, count: layers.cl1! },
           { key: "dl1", label: <RoleChips codes={["dL1"]} />, count: layers.dl1! },
         ]} />
-      </BandCard>
-      <BandCard label="Nodes">
-        <span className="font-mono font-bold text-foreground tabular-nums"><Odometer int value={selNodes.length || null} /></span>
       </BandCard>
     </>
   );
