@@ -37,7 +37,7 @@ import { compositionGroups, compositionKey, compositionRows } from "@/src/data/c
 import { metaSnapDeepKey, metaSnapHoverKey } from "@/src/data/types";
 import { snapsAtTick } from "@/src/data/anchorLog";
 import { breakpointOf } from "@/src/data/breakpoint";
-import { calloutPlacement } from "./domain/calloutPlacement";
+import { calloutPlacement, CALLOUT_OFF_X, CALLOUT_OFF_Y } from "./domain/calloutPlacement";
 import type { GlobalSnapshot, NodeRow, PickDescriptor } from "@/src/data/types";
 import type { ClusterNode, DagCore, GeoMap, RouteMetagraph } from "@/src/data/types";
 
@@ -1988,12 +1988,12 @@ export class Engine {
               if (p.drop) el.dataset.drop = "";
               else delete el.dataset.drop;
             }
-            this._syncCalloutMulti(el, x, y, r);
+            this._syncCalloutMulti(el, x, y, r, p.flip, p.drop);
           }
         }
       }
     }
-    if (!on) this._syncCalloutMulti(el, 0, 0, null);
+    if (!on) this._syncCalloutMulti(el, 0, 0, null, false, false);
     // Guard on the ELEMENT's own attribute, not a cached flag: React remounts the wrapper on a
     // subject change (fresh data-on="0"), so a field would go stale exactly then.
     const flag = on ? "1" : "0";
@@ -2002,13 +2002,22 @@ export class Engine {
 
   // THE MULTI-LEADER (user, 2026-08-30): a machine is SEVERAL beads in hyper — one per layer it
   // runs — and its callout points at each of them, not just the primary. Projects the sibling
-  // beads (Globe.selectedNodeHyperAnchors) and writes the extra dashed legs' endpoints in
-  // PANEL-LOCAL pixels (the wrapper's origin IS the primary anchor). DOM writes only — position
-  // never renders React (the Tooltip discipline). `anchor == null` (or a non-node anchor, or any
-  // other view) hides every leg.
-  private _syncCalloutMulti(el: HTMLElement, ax: number, ay: number, r: DOMRect | null): void {
+  // beads (Globe.selectedNodeHyperAnchors) and writes the extra dashed legs in PANEL-LOCAL
+  // pixels (the wrapper's origin IS the primary anchor). DOM writes only — position never
+  // renders React (the Tooltip discipline). `r == null` (or a non-node anchor, or any other
+  // view) hides every leg.
+  //
+  // EVERY LEG FANS FROM THE PANEL'S OWN CORNER (user, same day, second round: "connect the
+  // anchor itself to all spheres — they are considered equal"): the first cut ran the extra
+  // legs bead-to-bead from the primary, which read as one privileged sphere chained to the
+  // others. The corner is the .co-leader's own panel end (CALLOUT_OFF_X/Y, mirrored by the
+  // flip/drop the placement just decided), so the primary's leader and the sibling legs all
+  // meet at one point and the beads read as peers.
+  private _syncCalloutMulti(el: HTMLElement, ax: number, ay: number, r: DOMRect | null, flip: boolean, drop: boolean): void {
     const legs = el.querySelectorAll<SVGGElement>(".co-mleg");
     if (legs.length === 0) return;
+    const cx = flip ? -CALLOUT_OFF_X : CALLOUT_OFF_X;
+    const cy = drop ? CALLOUT_OFF_Y - 2 : -(CALLOUT_OFF_Y - 2);
     let n = 0;
     if (r && this.mode === "hyper" && this._calloutNodeAnchor) {
       const count = this.globe.selectedNodeHyperAnchors(this._calloutSibs);
@@ -2023,11 +2032,8 @@ export class Engine {
         const leg = legs[n]!;
         const line = leg.querySelector("line")!;
         const ring = leg.querySelector("circle")!;
-        // Start the leg just off the primary ring, along its own direction (the primary leader's
-        // 6px inset, aimed instead of fixed).
-        const len = Math.hypot(sx, sy) || 1;
-        line.setAttribute("x1", ((sx / len) * 8).toFixed(1));
-        line.setAttribute("y1", ((sy / len) * 8).toFixed(1));
+        line.setAttribute("x1", cx.toFixed(1));
+        line.setAttribute("y1", cy.toFixed(1));
         line.setAttribute("x2", sx.toFixed(1));
         line.setAttribute("y2", sy.toFixed(1));
         ring.setAttribute("cx", sx.toFixed(1));
