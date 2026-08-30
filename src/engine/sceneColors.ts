@@ -228,7 +228,7 @@ export const LIGHT_TUNE_DEFAULTS: Readonly<LightTune> = Object.freeze({
   // Settled from the user's own EXPORT (2026-08-28, second round): with the inactive marks
   // thinned (inkDimG 1.1 → 1.35) the identity lane could come UP (laneL 0.51 → 0.61) —
   // brighter ink reads right once the de-emphasized field around it is genuinely thin.
-  laneL: 0.61, laneC: 0.28, groundL: 0.81, // groundL settled 0.72 → 0.78 → 0.80 → 0.81 across the wall iterations (user, 2026-08-29); keep globals.css --scene-ground AND devTune's override in sync
+  laneL: 0.57, laneC: 0.28, groundL: 0.88, // laneL eased back 0.61 → 0.57 with the brighter wall; groundL settled 0.72 → 0.78 → 0.80 → 0.81 → 0.88 across the wall iterations (user, 2026-08-29/30); keep globals.css --scene-ground AND devTune's override in sync
   inkGamma: 0.15, inkDimG: 1.35, inkLift: 0.6,
   // THE WHOLE-FRAME PASS IS OFF ON PAPER. It is a luminance highpass over the finished frame, and
   // on paper the marks are INK — darker than the ground they lie on — so no threshold selects them;
@@ -248,10 +248,11 @@ export const LIGHT_TUNE_DEFAULTS: Readonly<LightTune> = Object.freeze({
   // glow UP (0.12 → 0.27) and spread further out (1 → 1.35) — with the trays' milky plates gone
   // the halo is the marks' main paper presence again, and it can afford more light.
   selBleed: 0.3, selGlow: 0.27, selRadius: 1.35,
-  // bgTint returned (0 → 0.5, user's export 2026-08-30): the ivory drift read BROWN at the first
-  // shipped chroma and was zeroed the same day — re-picked at half strength once the quiet-tray
-  // glass and the brighter halo changed what the wall sits behind.
-  bgTint: 0.5, bgGrid: 0.07,
+  // bgTint returned (0 → 0.5 → 1 across the user's exports, 2026-08-30): the ivory drift read
+  // BROWN at the first shipped chroma and was zeroed the same day — re-picked at half and then
+  // full strength as the quiet-tray glass, the brighter halo and the lighter wall (groundL 0.88)
+  // changed what the tint sits over.
+  bgTint: 1, bgGrid: 0.07,
 });
 export const LIGHT_TUNE: LightTune = { ...LIGHT_TUNE_DEFAULTS };
 export const LIGHT_TUNE_SCHEMA: import("./tune").TuneSchema<LightTune> = {
