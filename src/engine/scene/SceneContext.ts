@@ -61,6 +61,14 @@ export function joinBloom(o: THREE.Object3D): void {
   o.layers.enable(BLOOM_LAYER);
 }
 
+// True only while the selective MARK pass is rendering (paper frames; see renderFrame). A member
+// whose main-pass ink is too dark to halo — the chamber's bands and tiles are ink on paper, where
+// geo's chips get free sub-pass brightness from their env sheen — checks this in onBeforeRender
+// and raises its own contribution for that render alone (restored in onAfterRender), so the
+// visible frame never changes. One flag, owned here beside the pass that defines it.
+let markPass = false;
+export const inMarkPass = (): boolean => markPass;
+
 // The bloom target runs at half resolution. Standard for a blur pyramid (the pass mips down from
 // here anyway) and it is what keeps the second scene render off the frame budget.
 const SEL_SCALE = 0.5;
@@ -113,7 +121,10 @@ const SEL_MIX_SHADER = {
       float m = max(b.r, max(b.g, b.b));
       vec3 ink = b / max(m, 1e-4);
       float a = clamp(bleed * m, 0.0, 1.0);
-      vec3 rgb = base.rgb * mix(vec3(1.0), ink, a) + glow * b;
+      // The glow input is CAPPED like the bleed's: the mark-pass input lifts (BarTune/TileTune
+      // .halo) push b past 1 at a boosted lead, and an uncapped add there climbs to white — the
+      // one thing paper emphasis must never do. Below 1 the term is byte-identical to before.
+      vec3 rgb = base.rgb * mix(vec3(1.0), ink, a) + glow * min(b, vec3(1.0));
       gl_FragColor = vec4(rgb, base.a);
     }
   `,
@@ -345,7 +356,9 @@ export function createScene(canvas: HTMLCanvasElement, colors: SceneColors): Sce
     const mask = camera.layers.mask;
     scene.background = null;
     camera.layers.set(BLOOM_LAYER);
+    markPass = true;
     s.composer.render();
+    markPass = false;
     camera.layers.mask = mask;
     scene.background = bg;
 

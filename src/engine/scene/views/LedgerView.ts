@@ -84,7 +84,7 @@ import type { StageLight } from "../objects/StageLight";
 import { STAGE_LIGHTS } from "../../domain/stageLight";
 import { FadeSet } from "../objects/FadeSet";
 import type { SceneView } from "./SceneView";
-import { joinBloom } from "../SceneContext";
+import { joinBloom, inMarkPass } from "../SceneContext";
 import type { TuneSchema } from "../../tune";
 
 const META_TRAIL_MAX = 1500;
@@ -156,16 +156,21 @@ export interface TileTune {
   // its order. Applied to the EMPHASIS alone — the horizon, front and entry ramps are geometry and a
   // fully dissolved row still zero-scales.
   ink: number;
+  // Sub-pass input × for the selective paper halo (SceneContext.inMarkPass) — the bar's twin
+  // (ByteBar's BarTune.halo carries the same note): raised only while the mark pass renders, so
+  // the visible tile never changes.
+  halo: number;
 }
 
 // rest user-tuned via ?tune, 2026-08-07. (`hot` retired 2026-08-11 — it was exactly the ledger
 // row's `boost`, and a snapshot is data, so it takes the node's focus knob instead.)
-export const TILE_TUNE_DEFAULTS: TileTune = { rest: 0.1, ink: 0.3 };
+export const TILE_TUNE_DEFAULTS: TileTune = { rest: 0.1, ink: 0.3, halo: 1.3 };
 
 /** The `?tune` knob ranges (contract: src/engine/tune.ts), colocated with the numbers they bound. */
 export const TILE_TUNE_SCHEMA: TuneSchema<TileTune> = {
   rest: { min: 0, max: 2, step: 0.05 },
   ink: { min: 0, max: 0.8, step: 0.02, label: "hue floor (light)" },
+  halo: { min: 1, max: 6, step: 0.1, label: "halo input × (light)" },
 };
 
 // The view-entry drop's shape (see the VIEW-ENTRY DROP note in the class): fall height and
@@ -358,6 +363,12 @@ export class LedgerView implements SceneView {
       META_TRAIL_MAX,
     );
     joinBloom(this._metaTrailMesh); // the lane tiles are the trail's identity marks — see BLOOM_LAYER
+    // The paper halo's input lift (TileTune.halo, the bar's twin): multiplied up only while the
+    // selective mark pass renders, un-multiplied inside the same pass — the main frame always
+    // draws the tiles at their true colour (multiply, never set — the bar's rule).
+    const tileMat = this._metaTrailMesh.material as THREE.MeshBasicMaterial;
+    this._metaTrailMesh.onBeforeRender = () => { if (inMarkPass()) tileMat.color.multiplyScalar(this.tiles.halo); };
+    this._metaTrailMesh.onAfterRender = () => { if (inMarkPass()) tileMat.color.multiplyScalar(1 / this.tiles.halo); };
     this._metaTrailMesh.frustumCulled = false;
     this._metaTrailMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
     for (let i = 0; i < META_TRAIL_MAX; i++) this._metaTrailMesh.setColorAt(i, _col.set(0xffffff));
