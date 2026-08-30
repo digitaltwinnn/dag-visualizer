@@ -11,7 +11,7 @@ import * as THREE from "three";
 import { isLightGround, inkPresence, type SceneColors } from "../../sceneColors";
 import type { PickDescriptor } from "@/src/data/types";
 import { METAGRAPHS } from "@/src/net/current";
-import { BAR_H, BAR_D, BAR_LIFT, FLOOR_Y, LEAD_X } from "../../domain/ledgerLayout";
+import { BAR_H, BAR_D, BAR_LIFT, FLOOR_Y, LEAD_X, SEED_W } from "../../domain/ledgerLayout";
 import { type Band, type BarSpec } from "../../domain/ledgerBands";
 import { SLOT_SP, SLOT_N, horizonAt, frontAt, rowOnChamber } from "../../domain/ledgerModel";
 import { snapBright, snapFocusOf, emphasisK } from "../../domain/dimModel";
@@ -78,9 +78,10 @@ interface Slot {
   tw: number[]; // per-band target width
 }
 
-// The SEED's fixed footprint — nominal, deliberately unrelated to any byte count (it lies flush,
-// so it isn't a bar and claims no width; the tone and the beat say which absence it is).
-export const SEED_W = 1.3;
+// The SEED's footprint now lives in domain/ledgerLayout (SEED_W — shared with the SEAM, which
+// wears the same square so height alone separates the two special rows); re-exported for
+// LedgerView's callout-edge math.
+export { SEED_W };
 // …and its height, as a fraction of the bar's (user, 2026-08-18: the seed "sits in front of the
 // plane rather than within"). At full BAR_H the seed was a near-cube — 1.6 deep, 0.9 tall, 1.3
 // wide — standing proud of the floor beside a trail of long flat bars, so it read as an object
