@@ -389,7 +389,7 @@ export default function SceneCallout() {
           x1={6}
           y1={-6}
           x2={CALLOUT_OFF_X}
-          y2={-CALLOUT_OFF_Y + 8}
+          y2={-CALLOUT_OFF_Y + 2}
           stroke="var(--primary)"
           strokeOpacity="0.55"
           strokeWidth="1.5"
