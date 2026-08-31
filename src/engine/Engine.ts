@@ -517,7 +517,17 @@ export class Engine {
       const d = this.stats.dom;
       d.style.left = "8px";
       d.style.top = "auto";
-      d.style.bottom = "56px"; // clear the bottom-left logo + the ribbon
+      // RIDE THE BAND'S OWN RESERVE. A flat 56px predates the vitals band (2026-08-30) and put
+      // this panel squarely ON its first card — which is how a card's donut total came to look
+      // missing in dev when it was simply covered (user, 2026-08-31). `--bottom-reserve` is
+      // BottomStream's one publish, so the meter now sits above the band when there is one and
+      // drops back down when there isn't (rails hidden, the raw layer, phone).
+      // +24, not +8: measured 2026-08-31 the band's cards render a little TALLER than the
+      // reserve they publish (label baseline ~844 against the 858 a 92px reserve implies), so a
+      // hairline clearance still clipped the first card's eyebrow. The overflow itself is worth a
+      // look — BottomStream is meant to be the one publisher of both — but a dev meter should not
+      // be what depends on that being exact.
+      d.style.bottom = "calc(var(--bottom-reserve, 92px) + 24px)";
       document.body.appendChild(d);
     }
 

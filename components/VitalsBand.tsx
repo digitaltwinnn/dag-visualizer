@@ -121,7 +121,12 @@ export function MicroBars({ rows, accent, labelW = 26 }: { rows: { key: string; 
 /** The composition donut — four shares of one fleet as stroke arcs on a single accent hue at
  *  stepped opacities, the total in the hole. Pure SVG, no interaction; 2px surface gaps between
  *  segments (the dataviz spacer rule) via a gap subtracted from each arc. */
-export function Donut({ counts, accent }: { counts: Record<string, number>; accent: string }) {
+/** `centre` overrides the number in the hole. It DEFAULTS to the segment sum, which is the right
+ *  reading when the ring partitions a population (node composition: four shares of one fleet).
+ *  A merged total card passes its own instead — "how many COUNTRIES" over a ring of nodes-by-
+ *  country — because there the hole answers a different question from the ring: how many
+ *  categories there are, versus how the population spreads across them. */
+export function Donut({ counts, accent, centre }: { counts: Record<string, number>; accent: string; centre?: number | null }) {
   const entries = Object.entries(counts);
   const total = entries.reduce((s, [, n]) => s + n, 0);
   const R = 15.5, C = 2 * Math.PI * R, GAP = 2;
@@ -150,16 +155,17 @@ export function Donut({ counts, accent }: { counts: Record<string, number>; acce
         })}
       {total === 0 && <circle cx="22" cy="22" r={R} fill="none" stroke="var(--border)" strokeWidth="6" />}
       <text x="22" y="22" transform="rotate(90 22 22)" textAnchor="middle" dominantBaseline="central" className="font-mono font-bold fill-[var(--foreground)]" fontSize="11">
-        {total || "—"}
+        {(centre === undefined ? total : centre) || "—"}
       </text>
     </svg>
   );
 }
 
-// hyper — the structure cells (4): METAGRAPHS with a by-type stacked bar (networkKind is the
+// hyper — the structure cells (3): METAGRAPHS with a by-type stacked bar (networkKind is the
 // one home for the type read — "unknown" is the honest word for a 0-node network whose roles
-// can't be known), the COMPOSITION donut, the LAYERS' own populations (the shells' vocabulary:
-// how many L0 / cL1 / dL1 processes run in the selection), and the fleet NODES total.
+// can't be known), the COMPOSITION donut (whose hole IS the fleet total, so no separate NODES
+// card), and the LAYERS' own populations (the shells' vocabulary: how many L0 / cL1 / dL1
+// processes run in the selection).
 const TYPE_ORDER = ["data", "currency", "data + currency", "unknown"] as const;
 
 /** One type's glyph — "data + currency" is deliberately the data+currency PAIR (no third
@@ -185,7 +191,8 @@ function TypeGlyph({ t, className, color }: { t: string; className?: string; col
 function HyperCells({ accent }: { accent: string }) {
   const filter = useStore((s) => s.filter);
   const metaList = useStore((s) => s.metaList);
-  const selNodes = useStore((s) => s.selNodes);
+  // No `selNodes` subscription any more: the NODES card was its only reader, and dropping it also
+  // drops a per-publish re-render of this whole cell from the band.
   const cfg = metagraphById(filter);
   const scoped = !!cfg || displayNetwork(filter)?.virtual === true;
   // Memoized on the DATA inputs: the band re-renders on every scene-yield flip and feed
@@ -260,9 +267,10 @@ function HyperCells({ accent }: { accent: string }) {
         </div>
       </BandCard>
       )}
-      <BandCard label="Nodes">
-        <span className="font-mono font-bold text-foreground tabular-nums"><Odometer int value={selNodes.length || null} /></span>
-      </BandCard>
+      {/* NO SEPARATE "NODES" CARD (user, 2026-08-31). The composition counts PARTITION the fleet,
+          so their sum is the fleet size — the donut's hole was already printing the very number
+          the neighbouring card printed, twice on one row. The card that keeps it is the one that
+          also says how it splits. */}
       <BandCard label="Node composition" className="flex-[1.5]">
         <Donut counts={counts} accent={accent} />
         <div className="grid grid-cols-2 gap-x-4 gap-y-0.5">
@@ -288,9 +296,9 @@ function HyperCells({ accent }: { accent: string }) {
   );
 }
 
-// geo — the footprint cells (5): three numbers, nodes-by-country micro-bars (the view's own
-// axis) and TOP PROVIDERS (the hosting-concentration read — the same facts the cohort explorer
-// speaks). Single hue — one measure per chart, magnitude only.
+// geo — the footprint cells (3): the fleet total, then two MERGED readings that each carry their
+// own total in a donut hole — countries over nodes-by-country, providers over top-providers.
+// Single hue — one measure per chart, magnitude only.
 function GeoCells({ accent }: { accent: string }) {
   const lb = useStore((s) => s.leaderboard);
   const selNodes = useStore((s) => s.selNodes);
@@ -306,21 +314,40 @@ function GeoCells({ accent }: { accent: string }) {
   }, [selNodes]);
   const topCountries = countries.slice(0, 3);
   const restC = countries.slice(3).reduce((s, c) => s + c.count, 0);
+  const restI = total - topIsps.reduce((s, [, n]) => s + n, 0);
+
+  // THE TOTAL MOVES INTO ITS OWN BREAKDOWN (user, 2026-08-31): "countries" and "providers" were
+  // bare number cards sitting next to the very lists that break those numbers down, so the row
+  // said each thing twice. Merged, each card is one reading — how MANY, and how they SPREAD —
+  // wearing the composition card's own donut + rows design, which is already this band's shape
+  // for a share-of-whole (user, 2026-08-30: "the one used for node composition looks best").
+  //
+  // ⚠️ THE RING MUST PARTITION THE FLEET, so the remainder is a SEGMENT, not a footnote. Ringing
+  // only the top three would draw them as the whole population — three slices summing to 100%
+  // while a third of the nodes sit outside the chart. `other` carries them at the faintest step,
+  // and its presence is what makes the visible slices' proportions true.
+  const countryRing: Record<string, number> = Object.fromEntries(topCountries.map((c) => [c.cc, c.count]));
+  if (restC > 0) countryRing.other = restC;
+  const ispRing: Record<string, number> = Object.fromEntries(topIsps);
+  if (restI > 0) ispRing.other = restI;
+
   return (
     <>
       <BandCard label="Nodes"><span className="font-mono font-bold text-foreground tabular-nums"><Odometer int value={total || null} /></span></BandCard>
-      <BandCard label="Countries"><span className="font-mono font-bold text-foreground tabular-nums"><Odometer int value={countries.length || null} /></span></BandCard>
       {topCountries.length > 0 && (
-        <BandCard label="Nodes by country" className="flex-[1.4]">
+        <BandCard label="Nodes by country" className="flex-[1.6]">
+          {/* The hole counts COUNTRIES, the ring spreads NODES across them — two different
+              questions, which is why the centre is passed rather than left as the sum. */}
+          <Donut counts={countryRing} accent={accent} centre={countries.length} />
           <div className="flex w-full items-center gap-2">
             <MicroBars accent={accent} labelW={18} rows={topCountries.map((c) => ({ key: c.cc, label: c.cc, count: c.count }))} />
             {restC > 0 && <span className="text-micro text-muted-foreground whitespace-nowrap self-end pb-0.5">+{countries.length - topCountries.length} more · {restC}</span>}
           </div>
         </BandCard>
       )}
-      <BandCard label="Providers"><span className="font-mono font-bold text-foreground tabular-nums"><Odometer int value={ispCounts.size || null} /></span></BandCard>
       {topIsps.length > 0 && (
-        <BandCard label="Top providers" className="flex-[1.6]">
+        <BandCard label="Top providers" className="flex-[1.8]">
+          <Donut counts={ispRing} accent={accent} centre={ispCounts.size} />
           {/* labelW 92 → 150 (user, 2026-08-30): the card had spare width while "Hetzner
               Online GmbH" truncated — the name is the row's identity, so it gets the room. */}
           <MicroBars accent={accent} labelW={150} rows={topIsps.map(([isp, n]) => ({ key: isp, label: isp, count: n }))} />
